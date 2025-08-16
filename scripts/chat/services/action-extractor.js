@@ -9,14 +9,12 @@ export async function extractActionData(message) {
   const context = message.flags?.pf2e?.context;
   const origin = message.flags?.pf2e?.origin;
 
-  const isPointOutAction =
-    origin?.rollOptions?.includes("origin:item:point-out") ||
-    origin?.rollOptions?.includes("origin:item:slug:point-out") ||
-    message.content?.includes("Point Out") ||
-    message.flavor?.toLowerCase?.().includes?.("point out");
-
+  const isPointOutAction =   
+      message.flavor?.toLowerCase?.().includes?.("point out") ||
+      message.flavor?.toLowerCase?.().includes?.("указать"); // temporary fix for russian language
+ 
   const isSeekAction =
-    (context?.type === "skill-check" &&
+    (context?.type === "perception-check" &&
       (context.options?.includes("action:seek") || context.slug === "seek")) ||
     message.flavor?.toLowerCase?.().includes?.("seek");
 
