@@ -8,6 +8,7 @@
 @import url('shared-ui-components.css');
 
 .pf2e-visioner {
+
   /* Responsive Window Sizing */
   .token-visibility-manager {
     width: auto;
@@ -64,13 +65,16 @@
     background: var(--color-bg-alt, rgba(0, 0, 0, 0.05));
     border: 1px solid var(--color-border-light-tertiary, rgba(0, 0, 0, 0.1));
     border-radius: var(--radius-lg);
-    padding: 6px 6px 8px 6px; /* extra top/side padding prevents button glow clipping */
+    padding: 6px 6px 8px 6px;
+    /* extra top/side padding prevents button glow clipping */
     margin-bottom: -24px;
     display: flex;
     align-items: flex-start;
     gap: 4px;
-    justify-content: space-between; /* space for tools on the right */
-    overflow: visible; /* allow glow and borders to render */
+    justify-content: space-between;
+    /* space for tools on the right */
+    overflow: visible;
+    /* allow glow and borders to render */
   }
 
   .observer-image {
@@ -105,15 +109,18 @@
   .observer-tools {
     display: flex;
     flex-direction: column;
-    align-items: flex-end; /* position tools at top-right */
+    align-items: flex-end;
+    /* position tools at top-right */
     gap: 4px;
   }
 
   .icon-tab-navigation {
     display: flex;
     gap: 4px;
-    margin-bottom: 20px; /* push legend below the toggle to avoid overlap */
-    overflow: visible; /* allow glow to render */
+    margin-bottom: 20px;
+    /* push legend below the toggle to avoid overlap */
+    overflow: visible;
+    /* allow glow to render */
   }
 
   /* Color the tab buttons: eye = green, shield = blue */
@@ -128,10 +135,12 @@
       background 0.2s ease,
       border-color 0.2s ease;
   }
+
   .icon-tab-navigation .icon-tab-button:hover {
     transform: translateY(-1px);
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
   }
+
   .icon-tab-navigation .icon-tab-button:active {
     transform: scale(0.98);
   }
@@ -141,17 +150,21 @@
     border-color: var(--visibility-observed);
     color: var(--color-text-light-primary);
   }
+
   .icon-tab-navigation .icon-tab-button[data-tab='cover'].active {
     background: linear-gradient(135deg, var(--cover-standard), var(--cover-standard));
     border-color: var(--cover-standard);
     color: var(--color-text-light-primary);
   }
+
   .icon-tab-navigation .icon-tab-button[data-tab='visibility'] i {
     color: var(--visibility-observed);
   }
+
   .icon-tab-navigation .icon-tab-button[data-tab='cover'] i {
     color: var(--cover-standard);
   }
+
   .icon-tab-navigation .icon-tab-button.active i {
     color: var(--color-text-light-primary);
   }
@@ -166,7 +179,8 @@
     background: var(--color-bg-secondary, rgba(0, 0, 0, 0.08));
     border: 1px solid var(--color-border-light-tertiary);
     border-radius: var(--radius-md);
-    margin-top: 6px; /* ensure it renders beneath the tab toggle */
+    margin-top: 6px;
+    /* ensure it renders beneath the tab toggle */
   }
 
   /* Ensure the legend container itself takes normal flow beneath the toggle */
@@ -225,7 +239,8 @@
     flex: 1;
     display: flex;
     flex-direction: column;
-    min-height: 0; /* allow inner scroll containers to size */
+    min-height: 0;
+    /* allow inner scroll containers to size */
     overflow: hidden;
   }
 
@@ -246,6 +261,7 @@
       opacity: 0;
       transform: translateY(6px);
     }
+
     to {
       opacity: 1;
       transform: translateY(0);
@@ -264,7 +280,8 @@
     flex-wrap: wrap;
     gap: 8px;
     align-items: center;
-    justify-content: flex-end; /* Move to the right like visibility legend */
+    justify-content: flex-end;
+    /* Move to the right like visibility legend */
   }
 
   .cover-legend .legend-title {
@@ -279,7 +296,7 @@
     align-items: center;
     gap: 4px;
     font-size: 11px;
-    color: var(--color-text-dark-secondary);
+    color: var(--pf2e-visioner-gray);
   }
 
   .cover-legend .legend-item i {
@@ -323,7 +340,8 @@
     position: sticky;
     top: 0;
     z-index: 10;
-    font-size: inherit; /* match visibility header size */
+    font-size: inherit;
+    /* match visibility header size */
   }
 
   /* Normalize table typography and alignment across both tabs */
@@ -331,16 +349,19 @@
   .cover-table {
     font-size: 11px;
   }
+
   .visibility-table th,
   .cover-table th {
     font-size: 13px;
     text-align: center;
     vertical-align: middle;
   }
+
   .visibility-table td,
   .cover-table td {
     text-align: center;
   }
+
   .visibility-table .token-name,
   .cover-table .token-name {
     text-align: center;
@@ -351,10 +372,12 @@
     width: 28%;
     min-width: 130px;
   }
+
   .cover-table .current-state {
     width: 26%;
     min-width: 100px;
   }
+
   .cover-table .mechanical-effects {
     width: 28%;
     min-width: 140px;
@@ -370,7 +393,7 @@
     align-items: center;
     gap: 4px;
     font-size: 10px;
-    color: var(--color-text-dark-secondary);
+    color: var(--pf2e-visioner-gray);
     border: 1px solid currentColor;
     border-radius: 4px;
     padding: 1px 4px;
@@ -378,19 +401,23 @@
   }
 
   .cover-effect i {
-    color: inherit; /* inherit traffic-light color from parent */
+    color: inherit;
+    /* inherit traffic-light color from parent */
   }
 
   /* Colored cover effect badges matching traffic-light scheme */
   .cover-none {
     color: var(--cover-none) !important;
   }
+
   .cover-lesser {
     color: var(--cover-lesser) !important;
   }
+
   .cover-standard {
     color: var(--cover-standard) !important;
   }
+
   .cover-greater {
     color: var(--cover-greater) !important;
   }
@@ -399,12 +426,15 @@
   .cover-none i {
     color: var(--cover-none) !important;
   }
+
   .cover-lesser i {
     color: var(--cover-lesser) !important;
   }
+
   .cover-standard i {
     color: var(--cover-standard) !important;
   }
+
   .cover-greater i {
     color: var(--cover-greater) !important;
   }
@@ -559,21 +589,17 @@
 
   /* Active State Colors */
   .mode-toggle.observer-active .toggle-option:first-child {
-    background: linear-gradient(
-      135deg,
-      var(--pf2e-visioner-info),
-      var(--pf2e-visioner-info)
-    ) !important;
+    background: linear-gradient(135deg,
+        var(--pf2e-visioner-info),
+        var(--pf2e-visioner-info)) !important;
     color: white !important;
     box-shadow: var(--shadow-sm);
   }
 
   .mode-toggle.target-active .toggle-option:last-child {
-    background: linear-gradient(
-      135deg,
-      var(--pf2e-visioner-danger),
-      var(--pf2e-visioner-danger)
-    ) !important;
+    background: linear-gradient(135deg,
+        var(--pf2e-visioner-danger),
+        var(--pf2e-visioner-danger)) !important;
     color: white !important;
     box-shadow: var(--shadow-sm);
   }
@@ -727,7 +753,8 @@
     align-items: center;
     justify-content: space-between;
     margin: 0 0 3px 0;
-    padding: 5px 8px 4px 8px; /* extra top padding so button borders aren't clipped */
+    padding: 5px 8px 4px 8px;
+    /* extra top padding so button borders aren't clipped */
     background: var(--color-bg-option);
     border: 1px solid var(--color-border-light-primary);
     border-radius: var(--radius-lg) var(--radius-lg) 0 0;
@@ -746,7 +773,8 @@
     display: flex;
     gap: 4px;
     align-items: center;
-    padding-top: 1px; /* breathing room for top border glow */
+    padding-top: 1px;
+    /* breathing room for top border glow */
   }
 
   .bulk-state-header {
@@ -768,7 +796,8 @@
     background: var(--color-bg-btn);
     border-color: var(--color-border-highlight);
     transform: translateY(-1px);
-    box-shadow: 0 0 0 2px rgba(255, 125, 0, 0.2); /* ensure glow not clipped visually */
+    box-shadow: 0 0 0 2px rgba(255, 125, 0, 0.2);
+    /* ensure glow not clipped visually */
   }
 
   /* Specific bulk state header button styling - using CSS custom properties */
@@ -839,6 +868,7 @@
     from {
       transform: rotate(0deg);
     }
+
     to {
       transform: rotate(360deg);
     }
@@ -941,6 +971,7 @@
     width: 12%;
     min-width: 90px;
   }
+
   .visibility-table .outcome-column {
     width: 19%;
     min-width: 140px;
@@ -1137,28 +1168,32 @@
   /* Effects column colors - subtle professional styling */
   .pf2e-visioner .cover-none,
   .pf2e-visioner .no-effect.cover-none {
-    background: var(--cover-none-bg-strong) !important; /* Subtle green */
+    background: var(--cover-none-bg-strong) !important;
+    /* Subtle green */
     color: var(--cover-none) !important;
     border: 1px solid var(--cover-none) !important;
   }
 
   .pf2e-visioner .cover-lesser,
   .pf2e-visioner .cover-effect.cover-lesser {
-    background: var(--cover-lesser-bg-strong) !important; /* Subtle yellow */
+    background: var(--cover-lesser-bg-strong) !important;
+    /* Subtle yellow */
     color: var(--cover-lesser) !important;
     border: 1px solid var(--cover-lesser) !important;
   }
 
   .pf2e-visioner .cover-standard,
   .pf2e-visioner .cover-effect.cover-standard {
-    background: var(--cover-standard-bg-strong) !important; /* Subtle orange */
+    background: var(--cover-standard-bg-strong) !important;
+    /* Subtle orange */
     color: var(--cover-standard) !important;
     border: 1px solid var(--cover-standard) !important;
   }
 
   .pf2e-visioner .cover-greater,
   .pf2e-visioner .cover-effect.cover-greater {
-    background: var(--cover-greater-bg-strong) !important; /* Subtle red */
+    background: var(--cover-greater-bg-strong) !important;
+    /* Subtle red */
     color: var(--cover-greater) !important;
     border: 1px solid var(--cover-greater) !important;
   }
@@ -1170,95 +1205,134 @@
   .pf2e-visioner .state-indicator.cover-none,
   .pf2e-visioner .state-indicator.cover-none,
   .pf2e-visioner span.state-indicator.cover-none {
-    background: var(--cover-none-bg-strong) !important; /* Green for No Cover */
-    color: var(--cover-none) !important; /* Green text */
-    border-color: var(--cover-none) !important; /* Green border */
+    background: var(--cover-none-bg-strong) !important;
+    /* Green for No Cover */
+    color: var(--cover-none) !important;
+    /* Green text */
+    border-color: var(--cover-none) !important;
+    /* Green border */
   }
 
   .pf2e-visioner .state-indicator.cover-lesser,
   .pf2e-visioner .state-indicator.cover-lesser,
   .pf2e-visioner span.state-indicator.cover-lesser {
-    background: var(--cover-lesser-bg-strong) !important; /* Yellow for Lesser Cover */
-    color: var(--cover-lesser) !important; /* Yellow text */
-    border-color: var(--cover-lesser) !important; /* Yellow border */
+    background: var(--cover-lesser-bg-strong) !important;
+    /* Yellow for Lesser Cover */
+    color: var(--cover-lesser) !important;
+    /* Yellow text */
+    border-color: var(--cover-lesser) !important;
+    /* Yellow border */
   }
 
   .pf2e-visioner .state-indicator.cover-standard,
   .pf2e-visioner .state-indicator.cover-standard,
   .pf2e-visioner span.state-indicator.cover-standard {
-    background: var(--cover-standard-bg-strong) !important; /* Orange for Standard Cover */
-    color: var(--cover-standard) !important; /* Orange text */
-    border-color: var(--cover-standard) !important; /* Orange border */
+    background: var(--cover-standard-bg-strong) !important;
+    /* Orange for Standard Cover */
+    color: var(--cover-standard) !important;
+    /* Orange text */
+    border-color: var(--cover-standard) !important;
+    /* Orange border */
   }
 
   .pf2e-visioner .state-indicator.cover-greater,
   .pf2e-visioner .state-indicator.cover-greater,
   .pf2e-visioner span.state-indicator.cover-greater {
-    background: var(--cover-greater-bg-strong) !important; /* Red for Greater Cover */
-    color: var(--cover-greater) !important; /* Red text */
-    border-color: var(--cover-greater) !important; /* Red border */
+    background: var(--cover-greater-bg-strong) !important;
+    /* Red for Greater Cover */
+    color: var(--cover-greater) !important;
+    /* Red text */
+    border-color: var(--cover-greater) !important;
+    /* Red border */
   }
 
   /* JavaScript will ensure CSS classes are applied - use simple class selectors */
   .pf2e-visioner .state-indicator.cover-none {
-    background: var(--cover-none-bg-strong) !important; /* Green for No Cover */
-    color: var(--cover-none) !important; /* Green text */
-    border-color: var(--cover-none) !important; /* Green border */
+    background: var(--cover-none-bg-strong) !important;
+    /* Green for No Cover */
+    color: var(--cover-none) !important;
+    /* Green text */
+    border-color: var(--cover-none) !important;
+    /* Green border */
   }
 
   .pf2e-visioner .state-indicator.cover-lesser {
-    background: var(--cover-lesser-bg-strong) !important; /* Yellow for Lesser Cover */
-    color: var(--cover-lesser) !important; /* Yellow text */
-    border-color: var(--cover-lesser) !important; /* Yellow border */
+    background: var(--cover-lesser-bg-strong) !important;
+    /* Yellow for Lesser Cover */
+    color: var(--cover-lesser) !important;
+    /* Yellow text */
+    border-color: var(--cover-lesser) !important;
+    /* Yellow border */
   }
 
   .pf2e-visioner .state-indicator.cover-standard {
-    background: var(--cover-standard-bg-strong) !important; /* Orange for Standard Cover */
-    color: var(--cover-standard) !important; /* Orange text */
-    border-color: var(--cover-standard) !important; /* Orange border */
+    background: var(--cover-standard-bg-strong) !important;
+    /* Orange for Standard Cover */
+    color: var(--cover-standard) !important;
+    /* Orange text */
+    border-color: var(--cover-standard) !important;
+    /* Orange border */
   }
 
   .pf2e-visioner .state-indicator.cover-greater {
-    background: var(--cover-greater-bg-strong) !important; /* Red for Greater Cover */
-    color: var(--cover-greater) !important; /* Red text */
-    border-color: var(--cover-greater) !important; /* Red border */
+    background: var(--cover-greater-bg-strong) !important;
+    /* Red for Greater Cover */
+    color: var(--cover-greater) !important;
+    /* Red text */
+    border-color: var(--cover-greater) !important;
+    /* Red border */
   }
 
   /* Duplicate rules removed - using higher specificity rules above */
 
   /* Visibility state indicators with subtle colors */
   .pf2e-visioner .state-indicator.visibility-observed {
-    background: var(--visibility-observed-bg-strong) !important; /* Subtle green background */
-    color: var(--visibility-observed) !important; /* Green text */
-    border-color: var(--visibility-observed) !important; /* Green border */
+    background: var(--visibility-observed-bg-strong) !important;
+    /* Subtle green background */
+    color: var(--visibility-observed) !important;
+    /* Green text */
+    border-color: var(--visibility-observed) !important;
+    /* Green border */
   }
 
   .pf2e-visioner .state-indicator.visibility-concealed {
-    background: var(--visibility-concealed-bg-strong) !important; /* Subtle orange background */
-    color: var(--visibility-concealed) !important; /* Orange text */
-    border-color: var(--visibility-concealed) !important; /* Orange border */
+    background: var(--visibility-concealed-bg-strong) !important;
+    /* Subtle orange background */
+    color: var(--visibility-concealed) !important;
+    /* Orange text */
+    border-color: var(--visibility-concealed) !important;
+    /* Orange border */
   }
 
   .pf2e-visioner .state-indicator.visibility-hidden {
-    background: var(--visibility-hidden-bg-strong) !important; /* Subtle orange background */
-    color: var(--visibility-hidden) !important; /* Orange text */
-    border-color: var(--visibility-hidden) !important; /* Orange border */
+    background: var(--visibility-hidden-bg-strong) !important;
+    /* Subtle orange background */
+    color: var(--visibility-hidden) !important;
+    /* Orange text */
+    border-color: var(--visibility-hidden) !important;
+    /* Orange border */
   }
 
   .pf2e-visioner .state-indicator.visibility-undetected {
-    background: var(--visibility-undetected-bg-strong) !important; /* Subtle red background */
-    color: var(--visibility-undetected) !important; /* Red text */
-    border-color: var(--visibility-undetected) !important; /* Red border */
+    background: var(--visibility-undetected-bg-strong) !important;
+    /* Subtle red background */
+    color: var(--visibility-undetected) !important;
+    /* Red text */
+    border-color: var(--visibility-undetected) !important;
+    /* Red border */
   }
 
   /* Cover state indicator colors - WORKING SOLUTION FOR BOTH MODES */
   span.state-indicator.cover-none,
   .pf2e-visioner .state-indicator.cover-none,
-  .mode-toggle.observer-active ~ * .state-indicator.cover-none,
-  .mode-toggle.target-active ~ * .state-indicator.cover-none {
-    background: var(--cover-none-bg-strong) !important; /* Subtle green background */
-    color: var(--cover-none) !important; /* Green text */
-    border: 1px solid var(--cover-none) !important; /* Green border */
+  .mode-toggle.observer-active~* .state-indicator.cover-none,
+  .mode-toggle.target-active~* .state-indicator.cover-none {
+    background: var(--cover-none-bg-strong) !important;
+    /* Subtle green background */
+    color: var(--cover-none) !important;
+    /* Green text */
+    border: 1px solid var(--cover-none) !important;
+    /* Green border */
   }
 
   /* Removed redundant class-based selectors - using content-based selectors above */
@@ -1320,7 +1394,7 @@
   .no-targets {
     text-align: center;
     padding: 40px 20px;
-    color: var(--color-text-dark-secondary);
+    color: var(--pf2e-visioner-gray);
     font-style: italic;
   }
 
@@ -1557,4 +1631,6 @@
     border-left: 3px solid var(--visibility-concealed);
     cursor: pointer;
   }
-} /* End .pf2e-visioner scope */
+}
+
+/* End .pf2e-visioner scope */

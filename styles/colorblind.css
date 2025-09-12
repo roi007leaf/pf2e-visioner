@@ -10,10 +10,14 @@
 /* PROTANOPIA (Red-blind) - Use blues, yellows, and purples instead of red/green */
 body.pf2e-visioner-colorblind-protanopia {
   /* Visibility state colors - avoid red and green */
-  --visibility-observed-color: #0072b2; /* Blue instead of green */
-  --visibility-concealed-color: #f0e442; /* Yellow */
-  --visibility-hidden-color: #cc79a7; /* Pink instead of orange */
-  --visibility-undetected-color: #9467bd; /* Purple instead of red */
+  --visibility-observed-color: #0072b2;
+  /* Blue instead of green */
+  --visibility-concealed-color: #f0e442;
+  /* Yellow */
+  --visibility-hidden-color: #cc79a7;
+  /* Pink instead of orange */
+  --visibility-undetected-color: #9467bd;
+  /* Purple instead of red */
 
   /* Visibility state background colors */
   --visibility-observed-bg-light-color: rgba(0, 114, 178, 0.05);
@@ -41,10 +45,14 @@ body.pf2e-visioner-colorblind-protanopia {
   --visibility-undetected-bg-solid-color: rgba(148, 103, 189, 0.9);
 
   /* Cover state colors */
-  --cover-none-color: #0072b2; /* Blue instead of green */
-  --cover-lesser-color: #f0e442; /* Yellow */
-  --cover-standard-color: #cc79a7; /* Pink */
-  --cover-greater-color: #9467bd; /* Purple instead of red */
+  --cover-none-color: #0072b2;
+  /* Blue instead of green */
+  --cover-lesser-color: #f0e442;
+  /* Yellow */
+  --cover-standard-color: #cc79a7;
+  /* Pink */
+  --cover-greater-color: #9467bd;
+  /* Purple instead of red */
 
   /* Cover state background colors */
   --cover-none-bg-strong-color: rgba(0, 114, 178, 0.3);
@@ -77,10 +85,7 @@ body.pf2e-visioner-colorblind-protanopia .pf2e-visioner .state-indicator.visibil
 
 body.pf2e-visioner-colorblind-protanopia .pf2e-visioner .state-icon[data-state='concealed'],
 body.pf2e-visioner-colorblind-protanopia .pf2e-visioner .bulk-state-header[data-state='concealed'],
-body.pf2e-visioner-colorblind-protanopia
-  .pf2e-visioner
-  .bulk-state-header[data-state='concealed']
-  i,
+body.pf2e-visioner-colorblind-protanopia .pf2e-visioner .bulk-state-header[data-state='concealed'] i,
 body.pf2e-visioner-colorblind-protanopia .pf2e-visioner .state-indicator.visibility-concealed {
   color: #f0e442 !important;
   border-color: #f0e442 !important;
@@ -96,10 +101,7 @@ body.pf2e-visioner-colorblind-protanopia .pf2e-visioner .state-indicator.visibil
 
 body.pf2e-visioner-colorblind-protanopia .pf2e-visioner .state-icon[data-state='undetected'],
 body.pf2e-visioner-colorblind-protanopia .pf2e-visioner .bulk-state-header[data-state='undetected'],
-body.pf2e-visioner-colorblind-protanopia
-  .pf2e-visioner
-  .bulk-state-header[data-state='undetected']
-  i,
+body.pf2e-visioner-colorblind-protanopia .pf2e-visioner .bulk-state-header[data-state='undetected'] i,
 body.pf2e-visioner-colorblind-protanopia .pf2e-visioner .state-indicator.visibility-undetected {
   color: #9467bd !important;
   border-color: #9467bd !important;
@@ -108,10 +110,14 @@ body.pf2e-visioner-colorblind-protanopia .pf2e-visioner .state-indicator.visibil
 /* DEUTERANOPIA (Green-blind) - Use blues, yellows, and magentas instead of green/red */
 body.pf2e-visioner-colorblind-deuteranopia {
   /* Visibility state colors - avoid green and red */
-  --visibility-observed-color: #0072b2; /* Blue instead of green */
-  --visibility-concealed-color: #f0e442; /* Yellow */
-  --visibility-hidden-color: #ff8c00; /* Orange (safe for green-blind) */
-  --visibility-undetected-color: #d946ef; /* Magenta instead of red */
+  --visibility-observed-color: #0072b2;
+  /* Blue instead of green */
+  --visibility-concealed-color: #f0e442;
+  /* Yellow */
+  --visibility-hidden-color: #ff8c00;
+  /* Orange (safe for green-blind) */
+  --visibility-undetected-color: #d946ef;
+  /* Magenta instead of red */
 
   /* Visibility state background colors */
   --visibility-observed-bg-light-color: rgba(0, 114, 178, 0.05);
@@ -139,10 +145,14 @@ body.pf2e-visioner-colorblind-deuteranopia {
   --visibility-undetected-bg-solid-color: rgba(217, 70, 239, 0.9);
 
   /* Cover state colors */
-  --cover-none-color: #0072b2; /* Blue instead of green */
-  --cover-lesser-color: #f0e442; /* Yellow */
-  --cover-standard-color: #ff8c00; /* Orange */
-  --cover-greater-color: #d946ef; /* Magenta instead of red */
+  --cover-none-color: #0072b2;
+  /* Blue instead of green */
+  --cover-lesser-color: #f0e442;
+  /* Yellow */
+  --cover-standard-color: #ff8c00;
+  /* Orange */
+  --cover-greater-color: #d946ef;
+  /* Magenta instead of red */
 
   /* Cover state background colors */
   --cover-none-bg-strong-color: rgba(0, 114, 178, 0.3);
@@ -173,9 +183,7 @@ body.pf2e-visioner-colorblind-deuteranopia .pf2e-visioner .state-indicator.visib
 }
 
 body.pf2e-visioner-colorblind-deuteranopia .pf2e-visioner .state-icon[data-state='concealed'],
-body.pf2e-visioner-colorblind-deuteranopia
-  .pf2e-visioner
-  .bulk-state-header[data-state='concealed'],
+body.pf2e-visioner-colorblind-deuteranopia .pf2e-visioner .bulk-state-header[data-state='concealed'],
 body.pf2e-visioner-colorblind-deuteranopia .pf2e-visioner .state-indicator.visibility-concealed {
   color: #f0e442 !important;
   border-color: #f0e442 !important;
@@ -189,9 +197,7 @@ body.pf2e-visioner-colorblind-deuteranopia .pf2e-visioner .state-indicator.visib
 }
 
 body.pf2e-visioner-colorblind-deuteranopia .pf2e-visioner .state-icon[data-state='undetected'],
-body.pf2e-visioner-colorblind-deuteranopia
-  .pf2e-visioner
-  .bulk-state-header[data-state='undetected'],
+body.pf2e-visioner-colorblind-deuteranopia .pf2e-visioner .bulk-state-header[data-state='undetected'],
 body.pf2e-visioner-colorblind-deuteranopia .pf2e-visioner .state-indicator.visibility-undetected {
   color: #d946ef !important;
   border-color: #d946ef !important;
@@ -200,10 +206,14 @@ body.pf2e-visioner-colorblind-deuteranopia .pf2e-visioner .state-indicator.visib
 /* TRITANOPIA (Blue-blind) - Use greens, yellows, and oranges instead of blue/purple */
 body.pf2e-visioner-colorblind-tritanopia {
   /* Visibility state colors - avoid blue and purple */
-  --visibility-observed-color: #00b050; /* Green (safe for blue-blind) */
-  --visibility-concealed-color: #ffd700; /* Gold/Yellow */
-  --visibility-hidden-color: #ff6600; /* Orange */
-  --visibility-undetected-color: #dc143c; /* Crimson/Red */
+  --visibility-observed-color: #00b050;
+  /* Green (safe for blue-blind) */
+  --visibility-concealed-color: #ffd700;
+  /* Gold/Yellow */
+  --visibility-hidden-color: #ff6600;
+  /* Orange */
+  --visibility-undetected-color: #dc143c;
+  /* Crimson/Red */
 
   /* Visibility state background colors */
   --visibility-observed-bg-light-color: rgba(0, 176, 80, 0.05);
@@ -231,10 +241,14 @@ body.pf2e-visioner-colorblind-tritanopia {
   --visibility-undetected-bg-solid-color: rgba(220, 20, 60, 0.9);
 
   /* Cover state colors */
-  --cover-none-color: #00b050; /* Green */
-  --cover-lesser-color: #ffd700; /* Gold */
-  --cover-standard-color: #ff6600; /* Orange */
-  --cover-greater-color: #dc143c; /* Crimson */
+  --cover-none-color: #00b050;
+  /* Green */
+  --cover-lesser-color: #ffd700;
+  /* Gold */
+  --cover-standard-color: #ff6600;
+  /* Orange */
+  --cover-greater-color: #dc143c;
+  /* Crimson */
 
   /* Cover state background colors */
   --cover-none-bg-strong-color: rgba(0, 176, 80, 0.3);
@@ -288,10 +302,14 @@ body.pf2e-visioner-colorblind-tritanopia .pf2e-visioner .state-indicator.visibil
 /* ACHROMATOPSIA (Complete colorblind) - Use only grayscale with different brightness levels */
 body.pf2e-visioner-colorblind-achromatopsia {
   /* Visibility state colors - grayscale with distinct brightness */
-  --visibility-observed-color: #ffffff; /* White - highest contrast */
-  --visibility-concealed-color: #cccccc; /* Light gray */
-  --visibility-hidden-color: #888888; /* Medium gray */
-  --visibility-undetected-color: #333333; /* Dark gray */
+  --visibility-observed-color: #ffffff;
+  /* White - highest contrast */
+  --visibility-concealed-color: #cccccc;
+  /* Light gray */
+  --visibility-hidden-color: #888888;
+  /* Medium gray */
+  --visibility-undetected-color: #333333;
+  /* Dark gray */
 
   /* Visibility state background colors */
   --visibility-observed-bg-light-color: rgba(255, 255, 255, 0.05);
@@ -319,10 +337,14 @@ body.pf2e-visioner-colorblind-achromatopsia {
   --visibility-undetected-bg-solid-color: rgba(51, 51, 51, 0.9);
 
   /* Cover state colors */
-  --cover-none-color: #ffffff; /* White */
-  --cover-lesser-color: #cccccc; /* Light gray */
-  --cover-standard-color: #888888; /* Medium gray */
-  --cover-greater-color: #333333; /* Dark gray */
+  --cover-none-color: #ffffff;
+  /* White */
+  --cover-lesser-color: #cccccc;
+  /* Light gray */
+  --cover-standard-color: #888888;
+  /* Medium gray */
+  --cover-greater-color: #333333;
+  /* Dark gray */
 
   /* Cover state background colors */
   --cover-none-bg-strong-color: rgba(255, 255, 255, 0.3);
@@ -346,18 +368,14 @@ body.pf2e-visioner-colorblind-achromatopsia {
 
 /* Achromatopsia Token Manager specific overrides */
 body.pf2e-visioner-colorblind-achromatopsia .pf2e-visioner .state-icon[data-state='observed'],
-body.pf2e-visioner-colorblind-achromatopsia
-  .pf2e-visioner
-  .bulk-state-header[data-state='observed'],
+body.pf2e-visioner-colorblind-achromatopsia .pf2e-visioner .bulk-state-header[data-state='observed'],
 body.pf2e-visioner-colorblind-achromatopsia .pf2e-visioner .state-indicator.visibility-observed {
   color: #ffffff !important;
   border-color: #ffffff !important;
 }
 
 body.pf2e-visioner-colorblind-achromatopsia .pf2e-visioner .state-icon[data-state='concealed'],
-body.pf2e-visioner-colorblind-achromatopsia
-  .pf2e-visioner
-  .bulk-state-header[data-state='concealed'],
+body.pf2e-visioner-colorblind-achromatopsia .pf2e-visioner .bulk-state-header[data-state='concealed'],
 body.pf2e-visioner-colorblind-achromatopsia .pf2e-visioner .state-indicator.visibility-concealed {
   color: #cccccc !important;
   border-color: #cccccc !important;
@@ -371,9 +389,7 @@ body.pf2e-visioner-colorblind-achromatopsia .pf2e-visioner .state-indicator.visi
 }
 
 body.pf2e-visioner-colorblind-achromatopsia .pf2e-visioner .state-icon[data-state='undetected'],
-body.pf2e-visioner-colorblind-achromatopsia
-  .pf2e-visioner
-  .bulk-state-header[data-state='undetected'],
+body.pf2e-visioner-colorblind-achromatopsia .pf2e-visioner .bulk-state-header[data-state='undetected'],
 body.pf2e-visioner-colorblind-achromatopsia .pf2e-visioner .state-indicator.visibility-undetected {
   color: #333333 !important;
   border-color: #333333 !important;
@@ -492,24 +508,17 @@ body.pf2e-visioner-colorblind-protanopia .pf2e-visioner .help-text.error {
 }
 
 /* Tab navigation buttons for Protanopia */
-body.pf2e-visioner-colorblind-protanopia
-  .icon-tab-navigation
-  .icon-tab-button[data-tab='visibility'].active {
+body.pf2e-visioner-colorblind-protanopia .icon-tab-navigation .icon-tab-button[data-tab='visibility'].active {
   background: linear-gradient(135deg, #0072b2, #0072b2) !important;
   border-color: #0072b2 !important;
 }
 
-body.pf2e-visioner-colorblind-protanopia
-  .icon-tab-navigation
-  .icon-tab-button[data-tab='cover'].active {
+body.pf2e-visioner-colorblind-protanopia .icon-tab-navigation .icon-tab-button[data-tab='cover'].active {
   background: linear-gradient(135deg, #cc79a7, #cc79a7) !important;
   border-color: #cc79a7 !important;
 }
 
-body.pf2e-visioner-colorblind-protanopia
-  .icon-tab-navigation
-  .icon-tab-button[data-tab='visibility']
-  i {
+body.pf2e-visioner-colorblind-protanopia .icon-tab-navigation .icon-tab-button[data-tab='visibility'] i {
   color: #0072b2 !important;
 }
 
@@ -518,18 +527,14 @@ body.pf2e-visioner-colorblind-protanopia .icon-tab-navigation .icon-tab-button[d
 }
 
 /* Ensure icons remain visible when tab is active - use contrasting colors */
-body.pf2e-visioner-colorblind-protanopia
-  .icon-tab-navigation
-  .icon-tab-button[data-tab='visibility'].active
-  i {
-  color: #ffffff !important; /* White text on blue background */
+body.pf2e-visioner-colorblind-protanopia .icon-tab-navigation .icon-tab-button[data-tab='visibility'].active i {
+  color: #ffffff !important;
+  /* White text on blue background */
 }
 
-body.pf2e-visioner-colorblind-protanopia
-  .icon-tab-navigation
-  .icon-tab-button[data-tab='cover'].active
-  i {
-  color: #ffffff !important; /* White text on pink background */
+body.pf2e-visioner-colorblind-protanopia .icon-tab-navigation .icon-tab-button[data-tab='cover'].active i {
+  color: #ffffff !important;
+  /* White text on pink background */
 }
 
 /* Legend icon colors for Protanopia */
@@ -563,10 +568,7 @@ body.pf2e-visioner-colorblind-protanopia .pf2e-visioner .bulk-state-header[data-
 }
 
 body.pf2e-visioner-colorblind-protanopia .pf2e-visioner .bulk-state-header[data-state='standard'],
-body.pf2e-visioner-colorblind-protanopia
-  .pf2e-visioner
-  .bulk-state-header[data-state='standard']
-  i {
+body.pf2e-visioner-colorblind-protanopia .pf2e-visioner .bulk-state-header[data-state='standard'] i {
   color: #cc79a7 !important;
   border-color: #cc79a7 !important;
 }
@@ -716,47 +718,33 @@ body.pf2e-visioner-colorblind-deuteranopia .pf2e-visioner .help-text.error {
 }
 
 /* Tab navigation buttons for Deuteranopia */
-body.pf2e-visioner-colorblind-deuteranopia
-  .icon-tab-navigation
-  .icon-tab-button[data-tab='visibility'].active {
+body.pf2e-visioner-colorblind-deuteranopia .icon-tab-navigation .icon-tab-button[data-tab='visibility'].active {
   background: linear-gradient(135deg, #0072b2, #0072b2) !important;
   border-color: #0072b2 !important;
 }
 
-body.pf2e-visioner-colorblind-deuteranopia
-  .icon-tab-navigation
-  .icon-tab-button[data-tab='cover'].active {
+body.pf2e-visioner-colorblind-deuteranopia .icon-tab-navigation .icon-tab-button[data-tab='cover'].active {
   background: linear-gradient(135deg, #ff8c00, #ff8c00) !important;
   border-color: #ff8c00 !important;
 }
 
-body.pf2e-visioner-colorblind-deuteranopia
-  .icon-tab-navigation
-  .icon-tab-button[data-tab='visibility']
-  i {
+body.pf2e-visioner-colorblind-deuteranopia .icon-tab-navigation .icon-tab-button[data-tab='visibility'] i {
   color: #0072b2 !important;
 }
 
-body.pf2e-visioner-colorblind-deuteranopia
-  .icon-tab-navigation
-  .icon-tab-button[data-tab='cover']
-  i {
+body.pf2e-visioner-colorblind-deuteranopia .icon-tab-navigation .icon-tab-button[data-tab='cover'] i {
   color: #ff8c00 !important;
 }
 
 /* Ensure icons remain visible when tab is active - use contrasting colors */
-body.pf2e-visioner-colorblind-deuteranopia
-  .icon-tab-navigation
-  .icon-tab-button[data-tab='visibility'].active
-  i {
-  color: #ffffff !important; /* White text on blue background */
+body.pf2e-visioner-colorblind-deuteranopia .icon-tab-navigation .icon-tab-button[data-tab='visibility'].active i {
+  color: #ffffff !important;
+  /* White text on blue background */
 }
 
-body.pf2e-visioner-colorblind-deuteranopia
-  .icon-tab-navigation
-  .icon-tab-button[data-tab='cover'].active
-  i {
-  color: #ffffff !important; /* White text on orange background */
+body.pf2e-visioner-colorblind-deuteranopia .icon-tab-navigation .icon-tab-button[data-tab='cover'].active i {
+  color: #ffffff !important;
+  /* White text on orange background */
 }
 
 /* Legend icon colors for Deuteranopia */
@@ -787,9 +775,7 @@ body.pf2e-visioner-colorblind-deuteranopia .pf2e-visioner .bulk-state-header[dat
   border-color: #f0e442 !important;
 }
 
-body.pf2e-visioner-colorblind-deuteranopia
-  .pf2e-visioner
-  .bulk-state-header[data-state='standard'] {
+body.pf2e-visioner-colorblind-deuteranopia .pf2e-visioner .bulk-state-header[data-state='standard'] {
   color: #ff8c00 !important;
   border-color: #ff8c00 !important;
 }
@@ -938,24 +924,17 @@ body.pf2e-visioner-colorblind-tritanopia .pf2e-visioner .help-text.error {
 }
 
 /* Tab navigation buttons for Tritanopia */
-body.pf2e-visioner-colorblind-tritanopia
-  .icon-tab-navigation
-  .icon-tab-button[data-tab='visibility'].active {
+body.pf2e-visioner-colorblind-tritanopia .icon-tab-navigation .icon-tab-button[data-tab='visibility'].active {
   background: linear-gradient(135deg, #00b050, #00b050) !important;
   border-color: #00b050 !important;
 }
 
-body.pf2e-visioner-colorblind-tritanopia
-  .icon-tab-navigation
-  .icon-tab-button[data-tab='cover'].active {
+body.pf2e-visioner-colorblind-tritanopia .icon-tab-navigation .icon-tab-button[data-tab='cover'].active {
   background: linear-gradient(135deg, #ff6600, #ff6600) !important;
   border-color: #ff6600 !important;
 }
 
-body.pf2e-visioner-colorblind-tritanopia
-  .icon-tab-navigation
-  .icon-tab-button[data-tab='visibility']
-  i {
+body.pf2e-visioner-colorblind-tritanopia .icon-tab-navigation .icon-tab-button[data-tab='visibility'] i {
   color: #00b050 !important;
 }
 
@@ -964,18 +943,14 @@ body.pf2e-visioner-colorblind-tritanopia .icon-tab-navigation .icon-tab-button[d
 }
 
 /* Ensure icons remain visible when tab is active - use contrasting colors */
-body.pf2e-visioner-colorblind-tritanopia
-  .icon-tab-navigation
-  .icon-tab-button[data-tab='visibility'].active
-  i {
-  color: #ffffff !important; /* White text on green background */
+body.pf2e-visioner-colorblind-tritanopia .icon-tab-navigation .icon-tab-button[data-tab='visibility'].active i {
+  color: #ffffff !important;
+  /* White text on green background */
 }
 
-body.pf2e-visioner-colorblind-tritanopia
-  .icon-tab-navigation
-  .icon-tab-button[data-tab='cover'].active
-  i {
-  color: #ffffff !important; /* White text on orange background */
+body.pf2e-visioner-colorblind-tritanopia .icon-tab-navigation .icon-tab-button[data-tab='cover'].active i {
+  color: #ffffff !important;
+  /* White text on orange background */
 }
 
 /* Legend icon colors for Tritanopia */
@@ -1136,9 +1111,7 @@ body.pf2e-visioner-colorblind-achromatopsia .mode-toggle.target-active .toggle-o
   color: white !important;
 }
 
-body.pf2e-visioner-colorblind-achromatopsia
-  .mode-toggle.observer-active
-  .toggle-option:first-child {
+body.pf2e-visioner-colorblind-achromatopsia .mode-toggle.observer-active .toggle-option:first-child {
   background: linear-gradient(135deg, #aaaaaa, #aaaaaa) !important;
   color: white !important;
 }
@@ -1157,47 +1130,33 @@ body.pf2e-visioner-colorblind-achromatopsia .pf2e-visioner .help-text.error {
 }
 
 /* Tab navigation buttons for Achromatopsia */
-body.pf2e-visioner-colorblind-achromatopsia
-  .icon-tab-navigation
-  .icon-tab-button[data-tab='visibility'].active {
+body.pf2e-visioner-colorblind-achromatopsia .icon-tab-navigation .icon-tab-button[data-tab='visibility'].active {
   background: linear-gradient(135deg, #ffffff, #ffffff) !important;
   border-color: #ffffff !important;
 }
 
-body.pf2e-visioner-colorblind-achromatopsia
-  .icon-tab-navigation
-  .icon-tab-button[data-tab='cover'].active {
+body.pf2e-visioner-colorblind-achromatopsia .icon-tab-navigation .icon-tab-button[data-tab='cover'].active {
   background: linear-gradient(135deg, #888888, #888888) !important;
   border-color: #888888 !important;
 }
 
-body.pf2e-visioner-colorblind-achromatopsia
-  .icon-tab-navigation
-  .icon-tab-button[data-tab='visibility']
-  i {
+body.pf2e-visioner-colorblind-achromatopsia .icon-tab-navigation .icon-tab-button[data-tab='visibility'] i {
   color: #ffffff !important;
 }
 
-body.pf2e-visioner-colorblind-achromatopsia
-  .icon-tab-navigation
-  .icon-tab-button[data-tab='cover']
-  i {
+body.pf2e-visioner-colorblind-achromatopsia .icon-tab-navigation .icon-tab-button[data-tab='cover'] i {
   color: #888888 !important;
 }
 
 /* Ensure icons remain visible when tab is active - use contrasting colors */
-body.pf2e-visioner-colorblind-achromatopsia
-  .icon-tab-navigation
-  .icon-tab-button[data-tab='visibility'].active
-  i {
-  color: #000000 !important; /* Black text on white background */
+body.pf2e-visioner-colorblind-achromatopsia .icon-tab-navigation .icon-tab-button[data-tab='visibility'].active i {
+  color: #000000 !important;
+  /* Black text on white background */
 }
 
-body.pf2e-visioner-colorblind-achromatopsia
-  .icon-tab-navigation
-  .icon-tab-button[data-tab='cover'].active
-  i {
-  color: #ffffff !important; /* White text on gray background */
+body.pf2e-visioner-colorblind-achromatopsia .icon-tab-navigation .icon-tab-button[data-tab='cover'].active i {
+  color: #ffffff !important;
+  /* White text on gray background */
 }
 
 /* Legend icon colors for Achromatopsia */
@@ -1228,16 +1187,12 @@ body.pf2e-visioner-colorblind-achromatopsia .pf2e-visioner .bulk-state-header[da
   border-color: #cccccc !important;
 }
 
-body.pf2e-visioner-colorblind-achromatopsia
-  .pf2e-visioner
-  .bulk-state-header[data-state='standard'] {
+body.pf2e-visioner-colorblind-achromatopsia .pf2e-visioner .bulk-state-header[data-state='standard'] {
   color: #888888 !important;
   border-color: #888888 !important;
 }
 
-body.pf2e-visioner-colorblind-achromatopsia
-  .pf2e-visioner
-  .bulk-state-header[data-state='greater'] {
+body.pf2e-visioner-colorblind-achromatopsia .pf2e-visioner .bulk-state-header[data-state='greater'] {
   color: #333333 !important;
   border-color: #333333 !important;
 }
@@ -1274,591 +1229,287 @@ body.pf2e-visioner-colorblind-achromatopsia .state-icon.calculated-outcome {
 
 /* CRITICAL FIX: Bulk state header icons for ALL colorblind modes */
 /* Protanopia - icons inside bulk buttons */
-body.pf2e-visioner-colorblind-protanopia
-  .bulk-actions-header
-  .bulk-state-header[data-state='observed']
-  i,
-body.pf2e-visioner-colorblind-protanopia
-  .bulk-actions-header
-  .bulk-state-header[data-state='observed']:hover
-  i {
+body.pf2e-visioner-colorblind-protanopia .bulk-actions-header .bulk-state-header[data-state='observed'] i,
+body.pf2e-visioner-colorblind-protanopia .bulk-actions-header .bulk-state-header[data-state='observed']:hover i {
   color: #0072b2 !important;
 }
 
-body.pf2e-visioner-colorblind-protanopia
-  .bulk-actions-header
-  .bulk-state-header[data-state='concealed']
-  i,
-body.pf2e-visioner-colorblind-protanopia
-  .bulk-actions-header
-  .bulk-state-header[data-state='concealed']:hover
-  i {
+body.pf2e-visioner-colorblind-protanopia .bulk-actions-header .bulk-state-header[data-state='concealed'] i,
+body.pf2e-visioner-colorblind-protanopia .bulk-actions-header .bulk-state-header[data-state='concealed']:hover i {
   color: #f0e442 !important;
 }
 
-body.pf2e-visioner-colorblind-protanopia
-  .bulk-actions-header
-  .bulk-state-header[data-state='hidden']
-  i,
-body.pf2e-visioner-colorblind-protanopia
-  .bulk-actions-header
-  .bulk-state-header[data-state='hidden']:hover
-  i {
+body.pf2e-visioner-colorblind-protanopia .bulk-actions-header .bulk-state-header[data-state='hidden'] i,
+body.pf2e-visioner-colorblind-protanopia .bulk-actions-header .bulk-state-header[data-state='hidden']:hover i {
   color: #cc79a7 !important;
 }
 
-body.pf2e-visioner-colorblind-protanopia
-  .bulk-actions-header
-  .bulk-state-header[data-state='undetected']
-  i,
-body.pf2e-visioner-colorblind-protanopia
-  .bulk-actions-header
-  .bulk-state-header[data-state='undetected']:hover
-  i {
+body.pf2e-visioner-colorblind-protanopia .bulk-actions-header .bulk-state-header[data-state='undetected'] i,
+body.pf2e-visioner-colorblind-protanopia .bulk-actions-header .bulk-state-header[data-state='undetected']:hover i {
   color: #9467bd !important;
 }
 
 /* Deuteranopia - icons inside bulk buttons */
-body.pf2e-visioner-colorblind-deuteranopia
-  .bulk-actions-header
-  .bulk-state-header[data-state='observed']
-  i,
-body.pf2e-visioner-colorblind-deuteranopia
-  .bulk-actions-header
-  .bulk-state-header[data-state='observed']:hover
-  i {
+body.pf2e-visioner-colorblind-deuteranopia .bulk-actions-header .bulk-state-header[data-state='observed'] i,
+body.pf2e-visioner-colorblind-deuteranopia .bulk-actions-header .bulk-state-header[data-state='observed']:hover i {
   color: #0072b2 !important;
 }
 
-body.pf2e-visioner-colorblind-deuteranopia
-  .bulk-actions-header
-  .bulk-state-header[data-state='concealed']
-  i,
-body.pf2e-visioner-colorblind-deuteranopia
-  .bulk-actions-header
-  .bulk-state-header[data-state='concealed']:hover
-  i {
+body.pf2e-visioner-colorblind-deuteranopia .bulk-actions-header .bulk-state-header[data-state='concealed'] i,
+body.pf2e-visioner-colorblind-deuteranopia .bulk-actions-header .bulk-state-header[data-state='concealed']:hover i {
   color: #f0e442 !important;
 }
 
-body.pf2e-visioner-colorblind-deuteranopia
-  .bulk-actions-header
-  .bulk-state-header[data-state='hidden']
-  i,
-body.pf2e-visioner-colorblind-deuteranopia
-  .bulk-actions-header
-  .bulk-state-header[data-state='hidden']:hover
-  i {
+body.pf2e-visioner-colorblind-deuteranopia .bulk-actions-header .bulk-state-header[data-state='hidden'] i,
+body.pf2e-visioner-colorblind-deuteranopia .bulk-actions-header .bulk-state-header[data-state='hidden']:hover i {
   color: #ff8c00 !important;
 }
 
-body.pf2e-visioner-colorblind-deuteranopia
-  .bulk-actions-header
-  .bulk-state-header[data-state='undetected']
-  i,
-body.pf2e-visioner-colorblind-deuteranopia
-  .bulk-actions-header
-  .bulk-state-header[data-state='undetected']:hover
-  i {
+body.pf2e-visioner-colorblind-deuteranopia .bulk-actions-header .bulk-state-header[data-state='undetected'] i,
+body.pf2e-visioner-colorblind-deuteranopia .bulk-actions-header .bulk-state-header[data-state='undetected']:hover i {
   color: #d946ef !important;
 }
 
 /* Tritanopia - icons inside bulk buttons */
-body.pf2e-visioner-colorblind-tritanopia
-  .bulk-actions-header
-  .bulk-state-header[data-state='observed']
-  i,
-body.pf2e-visioner-colorblind-tritanopia
-  .bulk-actions-header
-  .bulk-state-header[data-state='observed']:hover
-  i {
+body.pf2e-visioner-colorblind-tritanopia .bulk-actions-header .bulk-state-header[data-state='observed'] i,
+body.pf2e-visioner-colorblind-tritanopia .bulk-actions-header .bulk-state-header[data-state='observed']:hover i {
   color: #00b050 !important;
 }
 
-body.pf2e-visioner-colorblind-tritanopia
-  .bulk-actions-header
-  .bulk-state-header[data-state='concealed']
-  i,
-body.pf2e-visioner-colorblind-tritanopia
-  .bulk-actions-header
-  .bulk-state-header[data-state='concealed']:hover
-  i {
+body.pf2e-visioner-colorblind-tritanopia .bulk-actions-header .bulk-state-header[data-state='concealed'] i,
+body.pf2e-visioner-colorblind-tritanopia .bulk-actions-header .bulk-state-header[data-state='concealed']:hover i {
   color: #ffd700 !important;
 }
 
-body.pf2e-visioner-colorblind-tritanopia
-  .bulk-actions-header
-  .bulk-state-header[data-state='hidden']
-  i,
-body.pf2e-visioner-colorblind-tritanopia
-  .bulk-actions-header
-  .bulk-state-header[data-state='hidden']:hover
-  i {
+body.pf2e-visioner-colorblind-tritanopia .bulk-actions-header .bulk-state-header[data-state='hidden'] i,
+body.pf2e-visioner-colorblind-tritanopia .bulk-actions-header .bulk-state-header[data-state='hidden']:hover i {
   color: #ff6600 !important;
 }
 
-body.pf2e-visioner-colorblind-tritanopia
-  .bulk-actions-header
-  .bulk-state-header[data-state='undetected']
-  i,
-body.pf2e-visioner-colorblind-tritanopia
-  .bulk-actions-header
-  .bulk-state-header[data-state='undetected']:hover
-  i {
+body.pf2e-visioner-colorblind-tritanopia .bulk-actions-header .bulk-state-header[data-state='undetected'] i,
+body.pf2e-visioner-colorblind-tritanopia .bulk-actions-header .bulk-state-header[data-state='undetected']:hover i {
   color: #dc143c !important;
 }
 
 /* Achromatopsia - icons inside bulk buttons */
-body.pf2e-visioner-colorblind-achromatopsia
-  .bulk-actions-header
-  .bulk-state-header[data-state='observed']
-  i,
-body.pf2e-visioner-colorblind-achromatopsia
-  .bulk-actions-header
-  .bulk-state-header[data-state='observed']:hover
-  i {
+body.pf2e-visioner-colorblind-achromatopsia .bulk-actions-header .bulk-state-header[data-state='observed'] i,
+body.pf2e-visioner-colorblind-achromatopsia .bulk-actions-header .bulk-state-header[data-state='observed']:hover i {
   color: #ffffff !important;
 }
 
-body.pf2e-visioner-colorblind-achromatopsia
-  .bulk-actions-header
-  .bulk-state-header[data-state='concealed']
-  i,
-body.pf2e-visioner-colorblind-achromatopsia
-  .bulk-actions-header
-  .bulk-state-header[data-state='concealed']:hover
-  i {
+body.pf2e-visioner-colorblind-achromatopsia .bulk-actions-header .bulk-state-header[data-state='concealed'] i,
+body.pf2e-visioner-colorblind-achromatopsia .bulk-actions-header .bulk-state-header[data-state='concealed']:hover i {
   color: #cccccc !important;
 }
 
-body.pf2e-visioner-colorblind-achromatopsia
-  .bulk-actions-header
-  .bulk-state-header[data-state='hidden']
-  i,
-body.pf2e-visioner-colorblind-achromatopsia
-  .bulk-actions-header
-  .bulk-state-header[data-state='hidden']:hover
-  i {
+body.pf2e-visioner-colorblind-achromatopsia .bulk-actions-header .bulk-state-header[data-state='hidden'] i,
+body.pf2e-visioner-colorblind-achromatopsia .bulk-actions-header .bulk-state-header[data-state='hidden']:hover i {
   color: #888888 !important;
 }
 
-body.pf2e-visioner-colorblind-achromatopsia
-  .bulk-actions-header
-  .bulk-state-header[data-state='undetected']
-  i,
-body.pf2e-visioner-colorblind-achromatopsia
-  .bulk-actions-header
-  .bulk-state-header[data-state='undetected']:hover
-  i {
+body.pf2e-visioner-colorblind-achromatopsia .bulk-actions-header .bulk-state-header[data-state='undetected'] i,
+body.pf2e-visioner-colorblind-achromatopsia .bulk-actions-header .bulk-state-header[data-state='undetected']:hover i {
   color: #333333 !important;
 }
 
 /* COVER STATE BULK BUTTON ICONS - ALL COLORBLIND MODES */
 /* Protanopia - cover state icons inside bulk buttons */
-body.pf2e-visioner-colorblind-protanopia
-  .bulk-actions-header
-  .bulk-state-header[data-state='none']
-  i,
-body.pf2e-visioner-colorblind-protanopia
-  .bulk-actions-header
-  .bulk-state-header[data-state='none']:hover
-  i {
+body.pf2e-visioner-colorblind-protanopia .bulk-actions-header .bulk-state-header[data-state='none'] i,
+body.pf2e-visioner-colorblind-protanopia .bulk-actions-header .bulk-state-header[data-state='none']:hover i {
   color: #0072b2 !important;
 }
 
-body.pf2e-visioner-colorblind-protanopia
-  .bulk-actions-header
-  .bulk-state-header[data-state='lesser']
-  i,
-body.pf2e-visioner-colorblind-protanopia
-  .bulk-actions-header
-  .bulk-state-header[data-state='lesser']:hover
-  i {
+body.pf2e-visioner-colorblind-protanopia .bulk-actions-header .bulk-state-header[data-state='lesser'] i,
+body.pf2e-visioner-colorblind-protanopia .bulk-actions-header .bulk-state-header[data-state='lesser']:hover i {
   color: #f0e442 !important;
 }
 
-body.pf2e-visioner-colorblind-protanopia
-  .bulk-actions-header
-  .bulk-state-header[data-state='standard']
-  i,
-body.pf2e-visioner-colorblind-protanopia
-  .bulk-actions-header
-  .bulk-state-header[data-state='standard']:hover
-  i {
+body.pf2e-visioner-colorblind-protanopia .bulk-actions-header .bulk-state-header[data-state='standard'] i,
+body.pf2e-visioner-colorblind-protanopia .bulk-actions-header .bulk-state-header[data-state='standard']:hover i {
   color: #cc79a7 !important;
 }
 
-body.pf2e-visioner-colorblind-protanopia
-  .bulk-actions-header
-  .bulk-state-header[data-state='greater']
-  i,
-body.pf2e-visioner-colorblind-protanopia
-  .bulk-actions-header
-  .bulk-state-header[data-state='greater']:hover
-  i {
+body.pf2e-visioner-colorblind-protanopia .bulk-actions-header .bulk-state-header[data-state='greater'] i,
+body.pf2e-visioner-colorblind-protanopia .bulk-actions-header .bulk-state-header[data-state='greater']:hover i {
   color: #9467bd !important;
 }
 
 /* Deuteranopia - cover state icons inside bulk buttons */
-body.pf2e-visioner-colorblind-deuteranopia
-  .bulk-actions-header
-  .bulk-state-header[data-state='none']
-  i,
-body.pf2e-visioner-colorblind-deuteranopia
-  .bulk-actions-header
-  .bulk-state-header[data-state='none']:hover
-  i {
+body.pf2e-visioner-colorblind-deuteranopia .bulk-actions-header .bulk-state-header[data-state='none'] i,
+body.pf2e-visioner-colorblind-deuteranopia .bulk-actions-header .bulk-state-header[data-state='none']:hover i {
   color: #0072b2 !important;
 }
 
-body.pf2e-visioner-colorblind-deuteranopia
-  .bulk-actions-header
-  .bulk-state-header[data-state='lesser']
-  i,
-body.pf2e-visioner-colorblind-deuteranopia
-  .bulk-actions-header
-  .bulk-state-header[data-state='lesser']:hover
-  i {
+body.pf2e-visioner-colorblind-deuteranopia .bulk-actions-header .bulk-state-header[data-state='lesser'] i,
+body.pf2e-visioner-colorblind-deuteranopia .bulk-actions-header .bulk-state-header[data-state='lesser']:hover i {
   color: #f0e442 !important;
 }
 
-body.pf2e-visioner-colorblind-deuteranopia
-  .bulk-actions-header
-  .bulk-state-header[data-state='standard']
-  i,
-body.pf2e-visioner-colorblind-deuteranopia
-  .bulk-actions-header
-  .bulk-state-header[data-state='standard']:hover
-  i {
+body.pf2e-visioner-colorblind-deuteranopia .bulk-actions-header .bulk-state-header[data-state='standard'] i,
+body.pf2e-visioner-colorblind-deuteranopia .bulk-actions-header .bulk-state-header[data-state='standard']:hover i {
   color: #ff8c00 !important;
 }
 
-body.pf2e-visioner-colorblind-deuteranopia
-  .bulk-actions-header
-  .bulk-state-header[data-state='greater']
-  i,
-body.pf2e-visioner-colorblind-deuteranopia
-  .bulk-actions-header
-  .bulk-state-header[data-state='greater']:hover
-  i {
+body.pf2e-visioner-colorblind-deuteranopia .bulk-actions-header .bulk-state-header[data-state='greater'] i,
+body.pf2e-visioner-colorblind-deuteranopia .bulk-actions-header .bulk-state-header[data-state='greater']:hover i {
   color: #d946ef !important;
 }
 
 /* Tritanopia - cover state icons inside bulk buttons */
-body.pf2e-visioner-colorblind-tritanopia
-  .bulk-actions-header
-  .bulk-state-header[data-state='none']
-  i,
-body.pf2e-visioner-colorblind-tritanopia
-  .bulk-actions-header
-  .bulk-state-header[data-state='none']:hover
-  i {
+body.pf2e-visioner-colorblind-tritanopia .bulk-actions-header .bulk-state-header[data-state='none'] i,
+body.pf2e-visioner-colorblind-tritanopia .bulk-actions-header .bulk-state-header[data-state='none']:hover i {
   color: #00b050 !important;
 }
 
-body.pf2e-visioner-colorblind-tritanopia
-  .bulk-actions-header
-  .bulk-state-header[data-state='lesser']
-  i,
-body.pf2e-visioner-colorblind-tritanopia
-  .bulk-actions-header
-  .bulk-state-header[data-state='lesser']:hover
-  i {
+body.pf2e-visioner-colorblind-tritanopia .bulk-actions-header .bulk-state-header[data-state='lesser'] i,
+body.pf2e-visioner-colorblind-tritanopia .bulk-actions-header .bulk-state-header[data-state='lesser']:hover i {
   color: #ffd700 !important;
 }
 
-body.pf2e-visioner-colorblind-tritanopia
-  .bulk-actions-header
-  .bulk-state-header[data-state='standard']
-  i,
-body.pf2e-visioner-colorblind-tritanopia
-  .bulk-actions-header
-  .bulk-state-header[data-state='standard']:hover
-  i {
+body.pf2e-visioner-colorblind-tritanopia .bulk-actions-header .bulk-state-header[data-state='standard'] i,
+body.pf2e-visioner-colorblind-tritanopia .bulk-actions-header .bulk-state-header[data-state='standard']:hover i {
   color: #ff6600 !important;
 }
 
-body.pf2e-visioner-colorblind-tritanopia
-  .bulk-actions-header
-  .bulk-state-header[data-state='greater']
-  i,
-body.pf2e-visioner-colorblind-tritanopia
-  .bulk-actions-header
-  .bulk-state-header[data-state='greater']:hover
-  i {
+body.pf2e-visioner-colorblind-tritanopia .bulk-actions-header .bulk-state-header[data-state='greater'] i,
+body.pf2e-visioner-colorblind-tritanopia .bulk-actions-header .bulk-state-header[data-state='greater']:hover i {
   color: #dc143c !important;
 }
 
 /* Achromatopsia - cover state icons inside bulk buttons */
-body.pf2e-visioner-colorblind-achromatopsia
-  .bulk-actions-header
-  .bulk-state-header[data-state='none']
-  i,
-body.pf2e-visioner-colorblind-achromatopsia
-  .bulk-actions-header
-  .bulk-state-header[data-state='none']:hover
-  i {
+body.pf2e-visioner-colorblind-achromatopsia .bulk-actions-header .bulk-state-header[data-state='none'] i,
+body.pf2e-visioner-colorblind-achromatopsia .bulk-actions-header .bulk-state-header[data-state='none']:hover i {
   color: #ffffff !important;
 }
 
-body.pf2e-visioner-colorblind-achromatopsia
-  .bulk-actions-header
-  .bulk-state-header[data-state='lesser']
-  i,
-body.pf2e-visioner-colorblind-achromatopsia
-  .bulk-actions-header
-  .bulk-state-header[data-state='lesser']:hover
-  i {
+body.pf2e-visioner-colorblind-achromatopsia .bulk-actions-header .bulk-state-header[data-state='lesser'] i,
+body.pf2e-visioner-colorblind-achromatopsia .bulk-actions-header .bulk-state-header[data-state='lesser']:hover i {
   color: #cccccc !important;
 }
 
-body.pf2e-visioner-colorblind-achromatopsia
-  .bulk-actions-header
-  .bulk-state-header[data-state='standard']
-  i,
-body.pf2e-visioner-colorblind-achromatopsia
-  .bulk-actions-header
-  .bulk-state-header[data-state='standard']:hover
-  i {
+body.pf2e-visioner-colorblind-achromatopsia .bulk-actions-header .bulk-state-header[data-state='standard'] i,
+body.pf2e-visioner-colorblind-achromatopsia .bulk-actions-header .bulk-state-header[data-state='standard']:hover i {
   color: #888888 !important;
 }
 
-body.pf2e-visioner-colorblind-achromatopsia
-  .bulk-actions-header
-  .bulk-state-header[data-state='greater']
-  i,
-body.pf2e-visioner-colorblind-achromatopsia
-  .bulk-actions-header
-  .bulk-state-header[data-state='greater']:hover
-  i {
+body.pf2e-visioner-colorblind-achromatopsia .bulk-actions-header .bulk-state-header[data-state='greater'] i,
+body.pf2e-visioner-colorblind-achromatopsia .bulk-actions-header .bulk-state-header[data-state='greater']:hover i {
   color: #333333 !important;
 }
 
 /* COVER SECTION ELEMENTS - ALL COLORBLIND MODES */
 /* Protanopia - cover section elements */
 body.pf2e-visioner-colorblind-protanopia .cover-section .state-icon[data-state='none'],
-body.pf2e-visioner-colorblind-protanopia
-  .cover-section
-  .bulk-actions-header
-  .bulk-state-header[data-state='none'],
-body.pf2e-visioner-colorblind-protanopia
-  .cover-section
-  .bulk-actions-header
-  .bulk-state-header[data-state='none']
-  i {
+body.pf2e-visioner-colorblind-protanopia .cover-section .bulk-actions-header .bulk-state-header[data-state='none'],
+body.pf2e-visioner-colorblind-protanopia .cover-section .bulk-actions-header .bulk-state-header[data-state='none'] i {
   color: #0072b2 !important;
   border-color: #0072b2 !important;
 }
 
 body.pf2e-visioner-colorblind-protanopia .cover-section .state-icon[data-state='lesser'],
-body.pf2e-visioner-colorblind-protanopia
-  .cover-section
-  .bulk-actions-header
-  .bulk-state-header[data-state='lesser'],
-body.pf2e-visioner-colorblind-protanopia
-  .cover-section
-  .bulk-actions-header
-  .bulk-state-header[data-state='lesser']
-  i {
+body.pf2e-visioner-colorblind-protanopia .cover-section .bulk-actions-header .bulk-state-header[data-state='lesser'],
+body.pf2e-visioner-colorblind-protanopia .cover-section .bulk-actions-header .bulk-state-header[data-state='lesser'] i {
   color: #f0e442 !important;
   border-color: #f0e442 !important;
 }
 
 body.pf2e-visioner-colorblind-protanopia .cover-section .state-icon[data-state='standard'],
-body.pf2e-visioner-colorblind-protanopia
-  .cover-section
-  .bulk-actions-header
-  .bulk-state-header[data-state='standard'],
-body.pf2e-visioner-colorblind-protanopia
-  .cover-section
-  .bulk-actions-header
-  .bulk-state-header[data-state='standard']
-  i {
+body.pf2e-visioner-colorblind-protanopia .cover-section .bulk-actions-header .bulk-state-header[data-state='standard'],
+body.pf2e-visioner-colorblind-protanopia .cover-section .bulk-actions-header .bulk-state-header[data-state='standard'] i {
   color: #cc79a7 !important;
   border-color: #cc79a7 !important;
 }
 
 body.pf2e-visioner-colorblind-protanopia .cover-section .state-icon[data-state='greater'],
-body.pf2e-visioner-colorblind-protanopia
-  .cover-section
-  .bulk-actions-header
-  .bulk-state-header[data-state='greater'],
-body.pf2e-visioner-colorblind-protanopia
-  .cover-section
-  .bulk-actions-header
-  .bulk-state-header[data-state='greater']
-  i {
+body.pf2e-visioner-colorblind-protanopia .cover-section .bulk-actions-header .bulk-state-header[data-state='greater'],
+body.pf2e-visioner-colorblind-protanopia .cover-section .bulk-actions-header .bulk-state-header[data-state='greater'] i {
   color: #9467bd !important;
   border-color: #9467bd !important;
 }
 
 /* Deuteranopia - cover section elements */
 body.pf2e-visioner-colorblind-deuteranopia .cover-section .state-icon[data-state='none'],
-body.pf2e-visioner-colorblind-deuteranopia
-  .cover-section
-  .bulk-actions-header
-  .bulk-state-header[data-state='none'],
-body.pf2e-visioner-colorblind-deuteranopia
-  .cover-section
-  .bulk-actions-header
-  .bulk-state-header[data-state='none']
-  i {
+body.pf2e-visioner-colorblind-deuteranopia .cover-section .bulk-actions-header .bulk-state-header[data-state='none'],
+body.pf2e-visioner-colorblind-deuteranopia .cover-section .bulk-actions-header .bulk-state-header[data-state='none'] i {
   color: #0072b2 !important;
   border-color: #0072b2 !important;
 }
 
 body.pf2e-visioner-colorblind-deuteranopia .cover-section .state-icon[data-state='lesser'],
-body.pf2e-visioner-colorblind-deuteranopia
-  .cover-section
-  .bulk-actions-header
-  .bulk-state-header[data-state='lesser'],
-body.pf2e-visioner-colorblind-deuteranopia
-  .cover-section
-  .bulk-actions-header
-  .bulk-state-header[data-state='lesser']
-  i {
+body.pf2e-visioner-colorblind-deuteranopia .cover-section .bulk-actions-header .bulk-state-header[data-state='lesser'],
+body.pf2e-visioner-colorblind-deuteranopia .cover-section .bulk-actions-header .bulk-state-header[data-state='lesser'] i {
   color: #f0e442 !important;
   border-color: #f0e442 !important;
 }
 
 body.pf2e-visioner-colorblind-deuteranopia .cover-section .state-icon[data-state='standard'],
-body.pf2e-visioner-colorblind-deuteranopia
-  .cover-section
-  .bulk-actions-header
-  .bulk-state-header[data-state='standard'],
-body.pf2e-visioner-colorblind-deuteranopia
-  .cover-section
-  .bulk-actions-header
-  .bulk-state-header[data-state='standard']
-  i {
+body.pf2e-visioner-colorblind-deuteranopia .cover-section .bulk-actions-header .bulk-state-header[data-state='standard'],
+body.pf2e-visioner-colorblind-deuteranopia .cover-section .bulk-actions-header .bulk-state-header[data-state='standard'] i {
   color: #ff8c00 !important;
   border-color: #ff8c00 !important;
 }
 
 body.pf2e-visioner-colorblind-deuteranopia .cover-section .state-icon[data-state='greater'],
-body.pf2e-visioner-colorblind-deuteranopia
-  .cover-section
-  .bulk-actions-header
-  .bulk-state-header[data-state='greater'],
-body.pf2e-visioner-colorblind-deuteranopia
-  .cover-section
-  .bulk-actions-header
-  .bulk-state-header[data-state='greater']
-  i {
+body.pf2e-visioner-colorblind-deuteranopia .cover-section .bulk-actions-header .bulk-state-header[data-state='greater'],
+body.pf2e-visioner-colorblind-deuteranopia .cover-section .bulk-actions-header .bulk-state-header[data-state='greater'] i {
   color: #d946ef !important;
   border-color: #d946ef !important;
 }
 
 /* Tritanopia - cover section elements */
 body.pf2e-visioner-colorblind-tritanopia .cover-section .state-icon[data-state='none'],
-body.pf2e-visioner-colorblind-tritanopia
-  .cover-section
-  .bulk-actions-header
-  .bulk-state-header[data-state='none'],
-body.pf2e-visioner-colorblind-tritanopia
-  .cover-section
-  .bulk-actions-header
-  .bulk-state-header[data-state='none']
-  i {
+body.pf2e-visioner-colorblind-tritanopia .cover-section .bulk-actions-header .bulk-state-header[data-state='none'],
+body.pf2e-visioner-colorblind-tritanopia .cover-section .bulk-actions-header .bulk-state-header[data-state='none'] i {
   color: #00b050 !important;
   border-color: #00b050 !important;
 }
 
 body.pf2e-visioner-colorblind-tritanopia .cover-section .state-icon[data-state='lesser'],
-body.pf2e-visioner-colorblind-tritanopia
-  .cover-section
-  .bulk-actions-header
-  .bulk-state-header[data-state='lesser'],
-body.pf2e-visioner-colorblind-tritanopia
-  .cover-section
-  .bulk-actions-header
-  .bulk-state-header[data-state='lesser']
-  i {
+body.pf2e-visioner-colorblind-tritanopia .cover-section .bulk-actions-header .bulk-state-header[data-state='lesser'],
+body.pf2e-visioner-colorblind-tritanopia .cover-section .bulk-actions-header .bulk-state-header[data-state='lesser'] i {
   color: #ffd700 !important;
   border-color: #ffd700 !important;
 }
 
 body.pf2e-visioner-colorblind-tritanopia .cover-section .state-icon[data-state='standard'],
-body.pf2e-visioner-colorblind-tritanopia
-  .cover-section
-  .bulk-actions-header
-  .bulk-state-header[data-state='standard'],
-body.pf2e-visioner-colorblind-tritanopia
-  .cover-section
-  .bulk-actions-header
-  .bulk-state-header[data-state='standard']
-  i {
+body.pf2e-visioner-colorblind-tritanopia .cover-section .bulk-actions-header .bulk-state-header[data-state='standard'],
+body.pf2e-visioner-colorblind-tritanopia .cover-section .bulk-actions-header .bulk-state-header[data-state='standard'] i {
   color: #ff6600 !important;
   border-color: #ff6600 !important;
 }
 
 body.pf2e-visioner-colorblind-tritanopia .cover-section .state-icon[data-state='greater'],
-body.pf2e-visioner-colorblind-tritanopia
-  .cover-section
-  .bulk-actions-header
-  .bulk-state-header[data-state='greater'],
-body.pf2e-visioner-colorblind-tritanopia
-  .cover-section
-  .bulk-actions-header
-  .bulk-state-header[data-state='greater']
-  i {
+body.pf2e-visioner-colorblind-tritanopia .cover-section .bulk-actions-header .bulk-state-header[data-state='greater'],
+body.pf2e-visioner-colorblind-tritanopia .cover-section .bulk-actions-header .bulk-state-header[data-state='greater'] i {
   color: #dc143c !important;
   border-color: #dc143c !important;
 }
 
 /* Achromatopsia - cover section elements */
 body.pf2e-visioner-colorblind-achromatopsia .cover-section .state-icon[data-state='none'],
-body.pf2e-visioner-colorblind-achromatopsia
-  .cover-section
-  .bulk-actions-header
-  .bulk-state-header[data-state='none'],
-body.pf2e-visioner-colorblind-achromatopsia
-  .cover-section
-  .bulk-actions-header
-  .bulk-state-header[data-state='none']
-  i {
+body.pf2e-visioner-colorblind-achromatopsia .cover-section .bulk-actions-header .bulk-state-header[data-state='none'],
+body.pf2e-visioner-colorblind-achromatopsia .cover-section .bulk-actions-header .bulk-state-header[data-state='none'] i {
   color: #ffffff !important;
   border-color: #ffffff !important;
 }
 
 body.pf2e-visioner-colorblind-achromatopsia .cover-section .state-icon[data-state='lesser'],
-body.pf2e-visioner-colorblind-achromatopsia
-  .cover-section
-  .bulk-actions-header
-  .bulk-state-header[data-state='lesser'],
-body.pf2e-visioner-colorblind-achromatopsia
-  .cover-section
-  .bulk-actions-header
-  .bulk-state-header[data-state='lesser']
-  i {
+body.pf2e-visioner-colorblind-achromatopsia .cover-section .bulk-actions-header .bulk-state-header[data-state='lesser'],
+body.pf2e-visioner-colorblind-achromatopsia .cover-section .bulk-actions-header .bulk-state-header[data-state='lesser'] i {
   color: #cccccc !important;
   border-color: #cccccc !important;
 }
 
 body.pf2e-visioner-colorblind-achromatopsia .cover-section .state-icon[data-state='standard'],
-body.pf2e-visioner-colorblind-achromatopsia
-  .cover-section
-  .bulk-actions-header
-  .bulk-state-header[data-state='standard'],
-body.pf2e-visioner-colorblind-achromatopsia
-  .cover-section
-  .bulk-actions-header
-  .bulk-state-header[data-state='standard']
-  i {
+body.pf2e-visioner-colorblind-achromatopsia .cover-section .bulk-actions-header .bulk-state-header[data-state='standard'],
+body.pf2e-visioner-colorblind-achromatopsia .cover-section .bulk-actions-header .bulk-state-header[data-state='standard'] i {
   color: #888888 !important;
   border-color: #888888 !important;
 }
 
 body.pf2e-visioner-colorblind-achromatopsia .cover-section .state-icon[data-state='greater'],
-body.pf2e-visioner-colorblind-achromatopsia
-  .cover-section
-  .bulk-actions-header
-  .bulk-state-header[data-state='greater'],
-body.pf2e-visioner-colorblind-achromatopsia
-  .cover-section
-  .bulk-actions-header
-  .bulk-state-header[data-state='greater']
-  i {
+body.pf2e-visioner-colorblind-achromatopsia .cover-section .bulk-actions-header .bulk-state-header[data-state='greater'],
+body.pf2e-visioner-colorblind-achromatopsia .cover-section .bulk-actions-header .bulk-state-header[data-state='greater'] i {
   color: #333333 !important;
   border-color: #333333 !important;
 }
@@ -2009,25 +1660,29 @@ body.pf2e-visioner-colorblind-protanopia .cover-greater i {
 
 /* Protanopia - state indicators (Current State column) */
 body.pf2e-visioner-colorblind-protanopia .state-indicator {
-  background: rgba(0, 114, 178, 0.25) !important; /* Blue for No Cover */
+  background: rgba(0, 114, 178, 0.25) !important;
+  /* Blue for No Cover */
   color: #0072b2 !important;
   border-color: #0072b2 !important;
 }
 
 body.pf2e-visioner-colorblind-protanopia .state-indicator:contains('Lesser Cover') {
-  background: rgba(240, 228, 66, 0.25) !important; /* Yellow */
+  background: rgba(240, 228, 66, 0.25) !important;
+  /* Yellow */
   color: #f0e442 !important;
   border-color: #f0e442 !important;
 }
 
 body.pf2e-visioner-colorblind-protanopia .state-indicator:contains('Standard Cover') {
-  background: rgba(204, 121, 167, 0.25) !important; /* Pink */
+  background: rgba(204, 121, 167, 0.25) !important;
+  /* Pink */
   color: #cc79a7 !important;
   border-color: #cc79a7 !important;
 }
 
 body.pf2e-visioner-colorblind-protanopia .state-indicator:contains('Greater Cover') {
-  background: rgba(148, 103, 189, 0.25) !important; /* Purple */
+  background: rgba(148, 103, 189, 0.25) !important;
+  /* Purple */
   color: #9467bd !important;
   border-color: #9467bd !important;
 }
@@ -2051,25 +1706,29 @@ body.pf2e-visioner-colorblind-deuteranopia .cover-greater i {
 
 /* Deuteranopia - state indicators (Current State column) */
 body.pf2e-visioner-colorblind-deuteranopia .state-indicator {
-  background: rgba(0, 114, 178, 0.25) !important; /* Blue for No Cover */
+  background: rgba(0, 114, 178, 0.25) !important;
+  /* Blue for No Cover */
   color: #0072b2 !important;
   border-color: #0072b2 !important;
 }
 
 body.pf2e-visioner-colorblind-deuteranopia .state-indicator:contains('Lesser Cover') {
-  background: rgba(240, 228, 66, 0.25) !important; /* Yellow */
+  background: rgba(240, 228, 66, 0.25) !important;
+  /* Yellow */
   color: #f0e442 !important;
   border-color: #f0e442 !important;
 }
 
 body.pf2e-visioner-colorblind-deuteranopia .state-indicator:contains('Standard Cover') {
-  background: rgba(255, 140, 0, 0.25) !important; /* Orange */
+  background: rgba(255, 140, 0, 0.25) !important;
+  /* Orange */
   color: #ff8c00 !important;
   border-color: #ff8c00 !important;
 }
 
 body.pf2e-visioner-colorblind-deuteranopia .state-indicator:contains('Greater Cover') {
-  background: rgba(217, 70, 239, 0.25) !important; /* Magenta */
+  background: rgba(217, 70, 239, 0.25) !important;
+  /* Magenta */
   color: #d946ef !important;
   border-color: #d946ef !important;
 }
@@ -2093,25 +1752,29 @@ body.pf2e-visioner-colorblind-tritanopia .cover-greater i {
 
 /* Tritanopia - state indicators (Current State column) */
 body.pf2e-visioner-colorblind-tritanopia .state-indicator {
-  background: rgba(0, 176, 80, 0.25) !important; /* Green for No Cover */
+  background: rgba(0, 176, 80, 0.25) !important;
+  /* Green for No Cover */
   color: #00b050 !important;
   border-color: #00b050 !important;
 }
 
 body.pf2e-visioner-colorblind-tritanopia .state-indicator:contains('Lesser Cover') {
-  background: rgba(255, 215, 0, 0.25) !important; /* Gold */
+  background: rgba(255, 215, 0, 0.25) !important;
+  /* Gold */
   color: #ffd700 !important;
   border-color: #ffd700 !important;
 }
 
 body.pf2e-visioner-colorblind-tritanopia .state-indicator:contains('Standard Cover') {
-  background: rgba(255, 102, 0, 0.25) !important; /* Orange */
+  background: rgba(255, 102, 0, 0.25) !important;
+  /* Orange */
   color: #ff6600 !important;
   border-color: #ff6600 !important;
 }
 
 body.pf2e-visioner-colorblind-tritanopia .state-indicator:contains('Greater Cover') {
-  background: rgba(220, 20, 60, 0.25) !important; /* Crimson */
+  background: rgba(220, 20, 60, 0.25) !important;
+  /* Crimson */
   color: #dc143c !important;
   border-color: #dc143c !important;
 }
@@ -2135,25 +1798,29 @@ body.pf2e-visioner-colorblind-achromatopsia .cover-greater i {
 
 /* Achromatopsia - state indicators (Current State column) */
 body.pf2e-visioner-colorblind-achromatopsia .state-indicator {
-  background: rgba(255, 255, 255, 0.25) !important; /* White for No Cover */
+  background: rgba(255, 255, 255, 0.25) !important;
+  /* White for No Cover */
   color: #ffffff !important;
   border-color: #ffffff !important;
 }
 
 body.pf2e-visioner-colorblind-achromatopsia .state-indicator:contains('Lesser Cover') {
-  background: rgba(204, 204, 204, 0.25) !important; /* Light gray */
+  background: rgba(204, 204, 204, 0.25) !important;
+  /* Light gray */
   color: #cccccc !important;
   border-color: #cccccc !important;
 }
 
 body.pf2e-visioner-colorblind-achromatopsia .state-indicator:contains('Standard Cover') {
-  background: rgba(136, 136, 136, 0.25) !important; /* Medium gray */
+  background: rgba(136, 136, 136, 0.25) !important;
+  /* Medium gray */
   color: #888888 !important;
   border-color: #888888 !important;
 }
 
 body.pf2e-visioner-colorblind-achromatopsia .state-indicator:contains('Greater Cover') {
-  background: rgba(51, 51, 51, 0.25) !important; /* Dark gray */
+  background: rgba(51, 51, 51, 0.25) !important;
+  /* Dark gray */
   color: #333333 !important;
   border-color: #333333 !important;
 }
@@ -2164,10 +1831,14 @@ body.pf2e-visioner-colorblind-achromatopsia .state-indicator:contains('Greater C
 .pf2e-visioner.pf2e-visioner-colorblind-tritanopia,
 .pf2e-visioner.pf2e-visioner-colorblind-achromatopsia {
   /* Override all visibility state colors */
-  --visibility-observed-color: #0072b2; /* Blue instead of green */
-  --visibility-concealed-color: #f0e442; /* Yellow */
-  --visibility-hidden-color: #cc79a7; /* Pink instead of orange */
-  --visibility-undetected-color: #9467bd; /* Purple instead of red */
+  --visibility-observed-color: #0072b2;
+  /* Blue instead of green */
+  --visibility-concealed-color: #f0e442;
+  /* Yellow */
+  --visibility-hidden-color: #cc79a7;
+  /* Pink instead of orange */
+  --visibility-undetected-color: #9467bd;
+  /* Purple instead of red */
 
   /* Override all visibility state background colors */
   --visibility-observed-bg-light-color: rgba(0, 114, 178, 0.05);
@@ -2195,16 +1866,24 @@ body.pf2e-visioner-colorblind-achromatopsia .state-indicator:contains('Greater C
   --visibility-undetected-bg-solid-color: rgba(148, 103, 189, 0.9);
 
   /* Override all cover state colors */
-  --cover-none-color: #009e73; /* Green */
-  --cover-lesser-color: #e69f00; /* Orange */
-  --cover-standard-color: #d55e00; /* Dark orange */
-  --cover-greater-color: #cc79a7; /* Pink instead of red */
+  --cover-none-color: #009e73;
+  /* Green */
+  --cover-lesser-color: #e69f00;
+  /* Orange */
+  --cover-standard-color: #d55e00;
+  /* Dark orange */
+  --cover-greater-color: #cc79a7;
+  /* Pink instead of red */
 
   /* Override all module colors */
-  --pf2e-visioner-success-color: #0072b2; /* Blue instead of green */
-  --pf2e-visioner-warning-color: #f0e442; /* Yellow */
-  --pf2e-visioner-danger-color: #9467bd; /* Purple instead of red */
-  --pf2e-visioner-info-color: #56b4e9; /* Light blue */
+  --pf2e-visioner-success-color: #0072b2;
+  /* Blue instead of green */
+  --pf2e-visioner-warning-color: #f0e442;
+  /* Yellow */
+  --pf2e-visioner-danger-color: #9467bd;
+  /* Purple instead of red */
+  --pf2e-visioner-info-color: #56b4e9;
+  /* Light blue */
 
   /* Override chat automation panel colors */
   --pf2e-visioner-info-light-color: #e3f2fd;
@@ -2230,7 +1909,7 @@ body.pf2e-visioner-colorblind-achromatopsia .state-indicator:contains('Greater C
   --pf2e-visioner-primary-hover-color: #005b8e;
   --pf2e-visioner-danger-hover-color: #7b1fa2;
   --color-text-dark-primary-color: #333;
-  --color-text-dark-secondary-color: #666;
+  /* Removed --color-text-dark-secondary-color override to avoid conflicts with other modules */
   --color-text-light-primary-color: #ffffff;
   --color-bg-btn-primary-color: #0072b2;
   --color-bg-btn-primary-active-color: #005b8e;
@@ -2247,53 +1926,73 @@ body.pf2e-visioner-colorblind-achromatopsia .state-indicator:contains('Greater C
 /* Protanopia (Red-blind) - Use blues, yellows, and purples */
 .pf2e-visioner.pf2e-visioner-colorblind-protanopia {
   /* Override any remaining blue/red/green with distinct colors */
-  --pf2e-visioner-primary: #0072b2; /* Blue instead of orange */
+  --pf2e-visioner-primary: #0072b2;
+  /* Blue instead of orange */
   --pf2e-visioner-primary-hover: #005b8e;
-  --color-border-highlight: #0072b2; /* Blue instead of orange */
+  --color-border-highlight: #0072b2;
+  /* Blue instead of orange */
   --color-border-highlight-alt: #0072b2;
-  --color-shadow-highlight: rgba(0, 114, 178, 0.3); /* Blue shadow */
+  --color-shadow-highlight: rgba(0, 114, 178, 0.3);
+  /* Blue shadow */
 }
 
 /* Deuteranopia (Green-blind) - Use blues, yellows, and magentas */
 .pf2e-visioner.pf2e-visioner-colorblind-deuteranopia {
   /* Override any remaining blue/red/green with distinct colors */
-  --pf2e-visioner-primary: #0072b2; /* Blue instead of orange */
+  --pf2e-visioner-primary: #0072b2;
+  /* Blue instead of orange */
   --pf2e-visioner-primary-hover: #005b8e;
-  --color-border-highlight: #0072b2; /* Blue instead of orange */
+  --color-border-highlight: #0072b2;
+  /* Blue instead of orange */
   --color-border-highlight-alt: #0072b2;
-  --color-shadow-highlight: rgba(0, 114, 178, 0.3); /* Blue shadow */
+  --color-shadow-highlight: rgba(0, 114, 178, 0.3);
+  /* Blue shadow */
 }
 
 /* Tritanopia (Blue-blind) - Use reds, greens, and yellows */
 .pf2e-visioner.pf2e-visioner-colorblind-tritanopia {
   /* Override any remaining blue with distinct colors */
-  --pf2e-visioner-primary: #d55e00; /* Dark orange instead of blue */
+  --pf2e-visioner-primary: #d55e00;
+  /* Dark orange instead of blue */
   --pf2e-visioner-primary-hover: #b84a00;
-  --color-border-highlight: #d55e00; /* Dark orange instead of blue */
+  --color-border-highlight: #d55e00;
+  /* Dark orange instead of blue */
   --color-border-highlight-alt: #d55e00;
-  --color-shadow-highlight: rgba(213, 94, 0, 0.3); /* Dark orange shadow */
+  --color-shadow-highlight: rgba(213, 94, 0, 0.3);
+  /* Dark orange shadow */
 }
 
 /* Achromatopsia (Complete color blindness) - Use high-contrast grayscale */
 .pf2e-visioner.pf2e-visioner-colorblind-achromatopsia {
   /* Override all colors with high-contrast grayscale */
-  --pf2e-visioner-primary: #000000; /* Black */
+  --pf2e-visioner-primary: #000000;
+  /* Black */
   --pf2e-visioner-primary-hover: #333333;
-  --color-border-highlight: #000000; /* Black */
+  --color-border-highlight: #000000;
+  /* Black */
   --color-border-highlight-alt: #000000;
-  --color-shadow-highlight: rgba(0, 0, 0, 0.5); /* Black shadow */
+  --color-shadow-highlight: rgba(0, 0, 0, 0.5);
+  /* Black shadow */
 
   /* High contrast visibility states */
-  --visibility-observed-color: #000000; /* Black */
-  --visibility-concealed-color: #333333; /* Dark gray */
-  --visibility-hidden-color: #666666; /* Medium gray */
-  --visibility-undetected-color: #999999; /* Light gray */
+  --visibility-observed-color: #000000;
+  /* Black */
+  --visibility-concealed-color: #333333;
+  /* Dark gray */
+  --visibility-hidden-color: #666666;
+  /* Medium gray */
+  --visibility-undetected-color: #999999;
+  /* Light gray */
 
   /* High contrast cover states */
-  --cover-none-color: #000000; /* Black */
-  --cover-lesser-color: #333333; /* Dark gray */
-  --cover-standard-color: #666666; /* Medium gray */
-  --cover-greater-color: #999999; /* Light gray */
+  --cover-none-color: #000000;
+  /* Black */
+  --cover-lesser-color: #333333;
+  /* Dark gray */
+  --cover-standard-color: #666666;
+  /* Medium gray */
+  --cover-greater-color: #999999;
+  /* Light gray */
 }
 
 /* Enhanced visual indicators for colorblind modes */
@@ -2370,10 +2069,14 @@ body.pf2e-visioner-colorblind-achromatopsia .state-indicator:contains('Greater C
 /* Protanopia (Red-blind) - Chat automation panels and visibility states */
 .pf2e-visioner.pf2e-visioner-colorblind-protanopia {
   /* Protanopia-specific visibility colors - avoid red/green confusion */
-  --visibility-observed-color: #0072b2; /* Blue - safe */
-  --visibility-concealed-color: #f0e442; /* Yellow - caution */
-  --visibility-hidden-color: #cc79a7; /* Pink - warning */
-  --visibility-undetected-color: #9467bd; /* Purple - danger */
+  --visibility-observed-color: #0072b2;
+  /* Blue - safe */
+  --visibility-concealed-color: #f0e442;
+  /* Yellow - caution */
+  --visibility-hidden-color: #cc79a7;
+  /* Pink - warning */
+  --visibility-undetected-color: #9467bd;
+  /* Purple - danger */
 
   /* Protanopia-specific background colors */
   --visibility-observed-bg-light-color: rgba(0, 114, 178, 0.05);
@@ -2400,25 +2103,32 @@ body.pf2e-visioner-colorblind-achromatopsia .state-indicator:contains('Greater C
   --visibility-undetected-bg-strong-color: rgba(148, 103, 189, 0.2);
   --visibility-undetected-bg-solid-color: rgba(148, 103, 189, 0.9);
 
-  --pf2e-visioner-info: #0072b2; /* Blue */
+  --pf2e-visioner-info: #0072b2;
+  /* Blue */
   --pf2e-visioner-info-light: #e3f2fd;
   --pf2e-visioner-info-lighter: #bbdefb;
-  --pf2e-visioner-warning: #cc79a7; /* Pink instead of orange */
+  --pf2e-visioner-warning: #cc79a7;
+  /* Pink instead of orange */
   --pf2e-visioner-warning-light: #fce4ec;
   --pf2e-visioner-warning-lighter: #f8bbd9;
-  --pf2e-visioner-purple: #9467bd; /* Purple */
+  --pf2e-visioner-purple: #9467bd;
+  /* Purple */
   --pf2e-visioner-purple-light: #f3e5f5;
   --pf2e-visioner-purple-lighter: #e1bee7;
-  --pf2e-visioner-gray: #9e9e9e; /* Gray */
+  --pf2e-visioner-gray: #9e9e9e;
+  /* Gray */
   --pf2e-visioner-gray-light: #f8f9fa;
   --pf2e-visioner-gray-lighter: #e9ecef;
-  --pf2e-visioner-teal: #0072b2; /* Blue instead of teal */
+  --pf2e-visioner-teal: #0072b2;
+  /* Blue instead of teal */
   --pf2e-visioner-teal-light: #e3f2fd;
   --pf2e-visioner-teal-lighter: #bbdefb;
-  --pf2e-visioner-danger: #9467bd; /* Purple instead of red */
+  --pf2e-visioner-danger: #9467bd;
+  /* Purple instead of red */
   --pf2e-visioner-danger-light: #f3e5f5;
   --pf2e-visioner-danger-lighter: #e1bee7;
-  --pf2e-visioner-brown: #8b6d27; /* Brown */
+  --pf2e-visioner-brown: #8b6d27;
+  /* Brown */
   --pf2e-visioner-brown-light: #efebe9;
   --pf2e-visioner-brown-lighter: #d7ccc8;
 }
@@ -2426,10 +2136,14 @@ body.pf2e-visioner-colorblind-achromatopsia .state-indicator:contains('Greater C
 /* Deuteranopia (Green-blind) - Chat automation panels and visibility states */
 .pf2e-visioner.pf2e-visioner-colorblind-deuteranopia {
   /* Deuteranopia-specific visibility colors - avoid red/green confusion */
-  --visibility-observed-color: #0072b2; /* Blue - safe */
-  --visibility-concealed-color: #f0e442; /* Yellow - caution */
-  --visibility-hidden-color: #cc79a7; /* Magenta - warning */
-  --visibility-undetected-color: #9467bd; /* Purple - danger */
+  --visibility-observed-color: #0072b2;
+  /* Blue - safe */
+  --visibility-concealed-color: #f0e442;
+  /* Yellow - caution */
+  --visibility-hidden-color: #cc79a7;
+  /* Magenta - warning */
+  --visibility-undetected-color: #9467bd;
+  /* Purple - danger */
 
   /* Deuteranopia-specific background colors */
   --visibility-observed-bg-light-color: rgba(0, 114, 178, 0.05);
@@ -2456,25 +2170,32 @@ body.pf2e-visioner-colorblind-achromatopsia .state-indicator:contains('Greater C
   --visibility-undetected-bg-strong-color: rgba(148, 103, 189, 0.2);
   --visibility-undetected-bg-solid-color: rgba(148, 103, 189, 0.9);
 
-  --pf2e-visioner-info: #0072b2; /* Blue */
+  --pf2e-visioner-info: #0072b2;
+  /* Blue */
   --pf2e-visioner-info-light: #e3f2fd;
   --pf2e-visioner-info-lighter: #bbdefb;
-  --pf2e-visioner-warning: #f0e442; /* Yellow instead of orange */
+  --pf2e-visioner-warning: #f0e442;
+  /* Yellow instead of orange */
   --pf2e-visioner-warning-light: #fffde7;
   --pf2e-visioner-warning-lighter: #fff9c4;
-  --pf2e-visioner-purple: #9467bd; /* Purple */
+  --pf2e-visioner-purple: #9467bd;
+  /* Purple */
   --pf2e-visioner-purple-light: #f3e5f5;
   --pf2e-visioner-purple-lighter: #e1bee7;
-  --pf2e-visioner-gray: #9e9e9e; /* Gray */
+  --pf2e-visioner-gray: #9e9e9e;
+  /* Gray */
   --pf2e-visioner-gray-light: #f8f9fa;
   --pf2e-visioner-gray-lighter: #e9ecef;
-  --pf2e-visioner-teal: #0072b2; /* Blue instead of teal */
+  --pf2e-visioner-teal: #0072b2;
+  /* Blue instead of teal */
   --pf2e-visioner-teal-light: #e3f2fd;
   --pf2e-visioner-teal-lighter: #bbdefb;
-  --pf2e-visioner-danger: #cc79a7; /* Magenta instead of red */
+  --pf2e-visioner-danger: #cc79a7;
+  /* Magenta instead of red */
   --pf2e-visioner-danger-light: #f3e5f5;
   --pf2e-visioner-danger-lighter: #e1bee7;
-  --pf2e-visioner-brown: #8b6d27; /* Brown */
+  --pf2e-visioner-brown: #8b6d27;
+  /* Brown */
   --pf2e-visioner-brown-light: #efebe9;
   --pf2e-visioner-brown-lighter: #d7ccc8;
 }
@@ -2482,10 +2203,14 @@ body.pf2e-visioner-colorblind-achromatopsia .state-indicator:contains('Greater C
 /* Tritanopia (Blue-blind) - Chat automation panels and visibility states */
 .pf2e-visioner.pf2e-visioner-colorblind-tritanopia {
   /* Tritanopia-specific visibility colors - avoid blue/yellow confusion */
-  --visibility-observed-color: #009e73; /* Green - safe */
-  --visibility-concealed-color: #cc79a7; /* Magenta - caution */
-  --visibility-hidden-color: #e69f00; /* Orange - warning */
-  --visibility-undetected-color: #d55e00; /* Dark orange - danger */
+  --visibility-observed-color: #009e73;
+  /* Green - safe */
+  --visibility-concealed-color: #cc79a7;
+  /* Magenta - caution */
+  --visibility-hidden-color: #e69f00;
+  /* Orange - warning */
+  --visibility-undetected-color: #d55e00;
+  /* Dark orange - danger */
 
   /* Tritanopia-specific background colors */
   --visibility-observed-bg-light-color: rgba(0, 158, 115, 0.05);
@@ -2512,25 +2237,32 @@ body.pf2e-visioner-colorblind-achromatopsia .state-indicator:contains('Greater C
   --visibility-undetected-bg-strong-color: rgba(213, 94, 0, 0.2);
   --visibility-undetected-bg-solid-color: rgba(213, 94, 0, 0.9);
 
-  --pf2e-visioner-info: #e69f00; /* Orange instead of blue */
+  --pf2e-visioner-info: #e69f00;
+  /* Orange instead of blue */
   --pf2e-visioner-info-light: #fff3e0;
   --pf2e-visioner-info-lighter: #ffe0b2;
-  --pf2e-visioner-warning: #f0e442; /* Yellow */
+  --pf2e-visioner-warning: #f0e442;
+  /* Yellow */
   --pf2e-visioner-warning-light: #fffde7;
   --pf2e-visioner-warning-lighter: #fff9c4;
-  --pf2e-visioner-purple: #9467bd; /* Purple */
+  --pf2e-visioner-purple: #9467bd;
+  /* Purple */
   --pf2e-visioner-purple-light: #f3e5f5;
   --pf2e-visioner-purple-lighter: #e1bee7;
-  --pf2e-visioner-gray: #9e9e9e; /* Gray */
+  --pf2e-visioner-gray: #9e9e9e;
+  /* Gray */
   --pf2e-visioner-gray-light: #f8f9fa;
   --pf2e-visioner-gray-lighter: #e9ecef;
-  --pf2e-visioner-teal: #009e73; /* Green instead of teal */
+  --pf2e-visioner-teal: #009e73;
+  /* Green instead of teal */
   --pf2e-visioner-teal-light: #e8f5e8;
   --pf2e-visioner-teal-lighter: #c8e6c9;
-  --pf2e-visioner-danger: #d55e00; /* Orange-red instead of red */
+  --pf2e-visioner-danger: #d55e00;
+  /* Orange-red instead of red */
   --pf2e-visioner-danger-light: #ffebee;
   --pf2e-visioner-danger-lighter: #ffcdd2;
-  --pf2e-visioner-brown: #8b6d27; /* Brown */
+  --pf2e-visioner-brown: #8b6d27;
+  /* Brown */
   --pf2e-visioner-brown-light: #efebe9;
   --pf2e-visioner-brown-lighter: #d7ccc8;
 }
@@ -2538,10 +2270,14 @@ body.pf2e-visioner-colorblind-achromatopsia .state-indicator:contains('Greater C
 /* Achromatopsia (Complete color blindness) - Chat automation panels and visibility states */
 .pf2e-visioner.pf2e-visioner-colorblind-achromatopsia {
   /* Achromatopsia-specific visibility colors - grayscale only with distinct brightness levels */
-  --visibility-observed-color: #333333; /* Dark gray - safe */
-  --visibility-concealed-color: #666666; /* Medium gray - caution */
-  --visibility-hidden-color: #999999; /* Light gray - warning */
-  --visibility-undetected-color: #000000; /* Black - danger */
+  --visibility-observed-color: #333333;
+  /* Dark gray - safe */
+  --visibility-concealed-color: #666666;
+  /* Medium gray - caution */
+  --visibility-hidden-color: #999999;
+  /* Light gray - warning */
+  --visibility-undetected-color: #000000;
+  /* Black - danger */
 
   /* Achromatopsia-specific background colors */
   --visibility-observed-bg-light-color: rgba(51, 51, 51, 0.05);
@@ -2568,25 +2304,32 @@ body.pf2e-visioner-colorblind-achromatopsia .state-indicator:contains('Greater C
   --visibility-undetected-bg-strong-color: rgba(0, 0, 0, 0.2);
   --visibility-undetected-bg-solid-color: rgba(0, 0, 0, 0.9);
 
-  --pf2e-visioner-info: #bbbbbb; /* Medium-light gray */
+  --pf2e-visioner-info: #bbbbbb;
+  /* Medium-light gray */
   --pf2e-visioner-info-light: #f8f9fa;
   --pf2e-visioner-info-lighter: #e9ecef;
-  --pf2e-visioner-warning: #cccccc; /* Light gray */
+  --pf2e-visioner-warning: #cccccc;
+  /* Light gray */
   --pf2e-visioner-warning-light: #f8f9fa;
   --pf2e-visioner-warning-lighter: #e9ecef;
-  --pf2e-visioner-purple: #888888; /* Medium gray */
+  --pf2e-visioner-purple: #888888;
+  /* Medium gray */
   --pf2e-visioner-purple-light: #f8f9fa;
   --pf2e-visioner-purple-lighter: #e9ecef;
-  --pf2e-visioner-gray: #9e9e9e; /* Gray */
+  --pf2e-visioner-gray: #9e9e9e;
+  /* Gray */
   --pf2e-visioner-gray-light: #f8f9fa;
   --pf2e-visioner-gray-lighter: #e9ecef;
-  --pf2e-visioner-teal: #666666; /* Darker gray */
+  --pf2e-visioner-teal: #666666;
+  /* Darker gray */
   --pf2e-visioner-teal-light: #f8f9fa;
   --pf2e-visioner-teal-lighter: #e9ecef;
-  --pf2e-visioner-danger: #444444; /* Dark gray */
+  --pf2e-visioner-danger: #444444;
+  /* Dark gray */
   --pf2e-visioner-danger-light: #f8f9fa;
   --pf2e-visioner-danger-lighter: #e9ecef;
-  --pf2e-visioner-brown: #555555; /* Medium-dark gray */
+  --pf2e-visioner-brown: #555555;
+  /* Medium-dark gray */
   --pf2e-visioner-brown-light: #f8f9fa;
   --pf2e-visioner-brown-lighter: #e9ecef;
 }

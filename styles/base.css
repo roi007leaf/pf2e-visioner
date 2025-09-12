@@ -14,44 +14,34 @@
   --pf2e-visioner-info: var(--pf2e-visioner-info-color, #2196f3);
 
   /* Visibility state colors */
-  --visibility-observed: var(--visibility-observed-color, #4caf50); /* Green - safe/visible */
-  --visibility-concealed: var(--visibility-concealed-color, #ffc107); /* Yellow - caution */
-  --visibility-hidden: var(--visibility-hidden-color, #ff6600); /* Bright orange - warning */
-  --visibility-undetected: var(--visibility-undetected-color, #f44336); /* Red - danger */
+  --visibility-observed: var(--visibility-observed-color, #4caf50);
+  /* Green - safe/visible */
+  --visibility-concealed: var(--visibility-concealed-color, #ffc107);
+  /* Yellow - caution */
+  --visibility-hidden: var(--visibility-hidden-color, #ff6600);
+  /* Bright orange - warning */
+  --visibility-undetected: var(--visibility-undetected-color, #f44336);
+  /* Red - danger */
 
   /* Visibility state background colors (with alpha) */
-  --visibility-observed-bg-light: var(
-    --visibility-observed-bg-light-color,
-    rgba(76, 175, 80, 0.05)
-  );
+  --visibility-observed-bg-light: var(--visibility-observed-bg-light-color,
+      rgba(76, 175, 80, 0.05));
   --visibility-observed-bg: var(--visibility-observed-bg-color, rgba(76, 175, 80, 0.1));
-  --visibility-observed-bg-medium: var(
-    --visibility-observed-bg-medium-color,
-    rgba(76, 175, 80, 0.15)
-  );
-  --visibility-observed-bg-strong: var(
-    --visibility-observed-bg-strong-color,
-    rgba(76, 175, 80, 0.2)
-  );
+  --visibility-observed-bg-medium: var(--visibility-observed-bg-medium-color,
+      rgba(76, 175, 80, 0.15));
+  --visibility-observed-bg-strong: var(--visibility-observed-bg-strong-color,
+      rgba(76, 175, 80, 0.2));
   --visibility-observed-bg-solid: var(--visibility-observed-bg-solid-color, rgba(76, 175, 80, 0.9));
 
-  --visibility-concealed-bg-light: var(
-    --visibility-concealed-bg-light-color,
-    rgba(255, 235, 59, 0.05)
-  );
+  --visibility-concealed-bg-light: var(--visibility-concealed-bg-light-color,
+      rgba(255, 235, 59, 0.05));
   --visibility-concealed-bg: var(--visibility-concealed-bg-color, rgba(255, 235, 59, 0.1));
-  --visibility-concealed-bg-medium: var(
-    --visibility-concealed-bg-medium-color,
-    rgba(255, 235, 59, 0.15)
-  );
-  --visibility-concealed-bg-strong: var(
-    --visibility-concealed-bg-strong-color,
-    rgba(255, 235, 59, 0.2)
-  );
-  --visibility-concealed-bg-solid: var(
-    --visibility-concealed-bg-solid-color,
-    rgba(255, 235, 59, 0.9)
-  );
+  --visibility-concealed-bg-medium: var(--visibility-concealed-bg-medium-color,
+      rgba(255, 235, 59, 0.15));
+  --visibility-concealed-bg-strong: var(--visibility-concealed-bg-strong-color,
+      rgba(255, 235, 59, 0.2));
+  --visibility-concealed-bg-solid: var(--visibility-concealed-bg-solid-color,
+      rgba(255, 235, 59, 0.9));
 
   --visibility-hidden-bg-light: var(--visibility-hidden-bg-light-color, rgba(255, 152, 0, 0.05));
   --visibility-hidden-bg: var(--visibility-hidden-bg-color, rgba(255, 152, 0, 0.1));
@@ -59,29 +49,25 @@
   --visibility-hidden-bg-strong: var(--visibility-hidden-bg-strong-color, rgba(255, 152, 0, 0.2));
   --visibility-hidden-bg-solid: var(--visibility-hidden-bg-solid-color, rgba(255, 152, 0, 0.9));
 
-  --visibility-undetected-bg-light: var(
-    --visibility-undetected-bg-light-color,
-    rgba(244, 67, 54, 0.05)
-  );
+  --visibility-undetected-bg-light: var(--visibility-undetected-bg-light-color,
+      rgba(244, 67, 54, 0.05));
   --visibility-undetected-bg: var(--visibility-undetected-bg-color, rgba(244, 67, 54, 0.1));
-  --visibility-undetected-bg-medium: var(
-    --visibility-undetected-bg-medium-color,
-    rgba(244, 67, 54, 0.15)
-  );
-  --visibility-undetected-bg-strong: var(
-    --visibility-undetected-bg-strong-color,
-    rgba(244, 67, 54, 0.2)
-  );
-  --visibility-undetected-bg-solid: var(
-    --visibility-undetected-bg-solid-color,
-    rgba(244, 67, 54, 0.9)
-  );
+  --visibility-undetected-bg-medium: var(--visibility-undetected-bg-medium-color,
+      rgba(244, 67, 54, 0.15));
+  --visibility-undetected-bg-strong: var(--visibility-undetected-bg-strong-color,
+      rgba(244, 67, 54, 0.2));
+  --visibility-undetected-bg-solid: var(--visibility-undetected-bg-solid-color,
+      rgba(244, 67, 54, 0.9));
 
   /* Cover state colors */
-  --cover-none: var(--cover-none-color, #4caf50); /* Green - no cover */
-  --cover-lesser: var(--cover-lesser-color, #ffc107); /* Yellow - minor cover */
-  --cover-standard: var(--cover-standard-color, #ff6600); /* Orange - significant cover */
-  --cover-greater: var(--cover-greater-color, #f44336); /* Red - major cover */
+  --cover-none: var(--cover-none-color, #4caf50);
+  /* Green - no cover */
+  --cover-lesser: var(--cover-lesser-color, #ffc107);
+  /* Yellow - minor cover */
+  --cover-standard: var(--cover-standard-color, #ff6600);
+  /* Orange - significant cover */
+  --cover-greater: var(--cover-greater-color, #f44336);
+  /* Red - major cover */
 
   /* Cover state background colors with transparency */
   --cover-none-bg-strong: var(--cover-none-bg-strong-color, rgba(76, 175, 80, 0.3));
@@ -151,7 +137,7 @@
 
   /* Additional Foundry variables used in original CSS */
   --color-shadow-highlight: rgba(255, 100, 0, 0.3);
-  --color-text-dark-secondary: var(--color-text-dark-secondary-color, #999);
+  /* Removed --color-text-dark-secondary override to avoid conflicts with other modules like dorako-ui */
   --color-bg-header: var(--color-bg-option);
   --color-text-header: var(--color-text-primary);
   --color-border-dark: var(--color-border-light-primary);
@@ -196,7 +182,7 @@
   --pf2e-visioner-primary-hover-color: #e55a00;
   --pf2e-visioner-danger-hover-color: #d32f2f;
   --color-text-dark-primary-color: #333;
-  --color-text-dark-secondary-color: #999;
+  /* Removed --color-text-dark-secondary-color definition to use system/theme defaults */
   --color-text-light-primary-color: #ffffff;
   --color-bg-btn-primary-color: #28a745;
   --color-bg-btn-primary-active-color: #218838;
@@ -211,6 +197,7 @@
 }
 
 .pf2e-visioner {
+
   /* Common utility classes */
   .pf2e-visioner-flex {
     display: flex;
@@ -394,7 +381,7 @@
   }
 
   .reset-mode i {
-    color: var(--color-text-dark-secondary);
+    color: var(--pf2e-visioner-gray);
   }
 
   .auto-cover-icon {
@@ -618,6 +605,7 @@
       opacity: 0;
       transform: translateY(-10px);
     }
+
     to {
       opacity: 1;
       transform: translateY(0);
@@ -657,18 +645,23 @@
   .pf2e-visioner-m-0 {
     margin: 0;
   }
+
   .pf2e-visioner-p-0 {
     padding: 0;
   }
+
   .pf2e-visioner-mt-sm {
     margin-top: var(--spacing-sm);
   }
+
   .pf2e-visioner-mb-sm {
     margin-bottom: var(--spacing-sm);
   }
+
   .pf2e-visioner-pt-sm {
     padding-top: var(--spacing-sm);
   }
+
   .pf2e-visioner-pb-sm {
     padding-bottom: var(--spacing-sm);
   }
@@ -677,9 +670,12 @@
     border: 2px solid var(--color-border-highlight);
     padding: 4px;
     border-radius: 4px;
-    background: rgba(255, 215, 0, 0.05); /* subtle gold tint */
+    background: rgba(255, 215, 0, 0.05);
+    /* subtle gold tint */
   }
-} /* End .pf2e-visioner scope */
+}
+
+/* End .pf2e-visioner scope */
 
 /* Tooltip badges are appended to <body>, so provide global styles */
 .pf2e-visioner-tooltip-badge {
@@ -691,7 +687,8 @@
   border-radius: var(--pf2e-visioner-tooltip-badge-radius, 8px);
   width: var(--pf2e-visioner-tooltip-badge-width, 24px);
   height: var(--pf2e-visioner-tooltip-badge-height, 20px);
-  color: var(--visibility-observed); /* default fallback */
+  color: var(--visibility-observed);
+  /* default fallback */
 }
 
 .pf2e-visioner-tooltip-badge i {
@@ -703,12 +700,15 @@
 .pf2e-visioner-tooltip-badge.visibility-observed {
   color: var(--visibility-observed);
 }
+
 .pf2e-visioner-tooltip-badge.visibility-concealed {
   color: var(--visibility-concealed);
 }
+
 .pf2e-visioner-tooltip-badge.visibility-hidden {
   color: var(--visibility-hidden);
 }
+
 .pf2e-visioner-tooltip-badge.visibility-undetected {
   color: var(--visibility-undetected);
 }
@@ -717,12 +717,15 @@
 .pf2e-visioner-tooltip-badge.cover-none {
   color: var(--cover-none);
 }
+
 .pf2e-visioner-tooltip-badge.cover-lesser {
   color: var(--cover-lesser);
 }
+
 .pf2e-visioner-tooltip-badge.cover-standard {
   color: var(--cover-standard);
 }
+
 .pf2e-visioner-tooltip-badge.cover-greater {
   color: var(--cover-greater);
 }

@@ -7,6 +7,7 @@
 @import url('shared-ui-components.css');
 
 .pf2e-visioner {
+
   /* Force dialog to have a fixed height */
   .point-out-preview-dialog,
   .seek-preview-dialog,
@@ -110,8 +111,10 @@
   .observer-name {
     white-space: normal;
     word-wrap: break-word;
-    word-break: normal; /* Changed from break-word to normal */
-    hyphens: auto; /* Allows hyphenation for very long words */
+    word-break: normal;
+    /* Changed from break-word to normal */
+    hyphens: auto;
+    /* Allows hyphenation for very long words */
   }
 
   .results-table-container td.token-name {
@@ -119,7 +122,8 @@
     word-wrap: break-word;
     overflow-wrap: break-word;
     word-break: normal;
-    max-width: 150px; /* Forces wrapping when needed */
+    max-width: 150px;
+    /* Forces wrapping when needed */
   }
 
   /* Token image clickable styling */
@@ -274,29 +278,14 @@
 
   /* Override any CSS variable backgrounds that might be interfering */
   .point-out-preview-dialog .results-table-container tbody tr[style*='--color-bg-primary'],
-  .point-out-preview-dialog
-    .results-table-container
-    tbody
-    tr[style*='background: var(--color-bg-primary'],
-  .point-out-preview-dialog
-    .results-table-container
-    tbody
-    tr[style*='background-color: var(--color-bg-primary'] {
+  .point-out-preview-dialog .results-table-container tbody tr[style*='background: var(--color-bg-primary'],
+  .point-out-preview-dialog .results-table-container tbody tr[style*='background-color: var(--color-bg-primary'] {
     background: transparent !important;
   }
 
-  .point-out-preview-dialog
-    .results-table-container
-    tbody
-    tr[style*='--color-bg-primary']:nth-child(even),
-  .point-out-preview-dialog
-    .results-table-container
-    tbody
-    tr[style*='background: var(--color-bg-primary']:nth-child(even),
-  .point-out-preview-dialog
-    .results-table-container
-    tbody
-    tr[style*='background-color: var(--color-bg-primary']:nth-child(even) {
+  .point-out-preview-dialog .results-table-container tbody tr[style*='--color-bg-primary']:nth-child(even),
+  .point-out-preview-dialog .results-table-container tbody tr[style*='background: var(--color-bg-primary']:nth-child(even),
+  .point-out-preview-dialog .results-table-container tbody tr[style*='background-color: var(--color-bg-primary']:nth-child(even) {
     background-color: rgba(0, 0, 0, 0.1) !important;
   }
 
@@ -358,12 +347,15 @@
   .take-cover-preview-dialog .results-table-container {
     scrollbar-color: rgba(121, 85, 72, 0.6) transparent;
   }
+
   .take-cover-preview-dialog .results-table-container::-webkit-scrollbar-thumb {
     background: rgba(121, 85, 72, 0.6);
   }
+
   .take-cover-preview-dialog .results-table-container::-webkit-scrollbar-thumb:hover {
     background: rgba(121, 85, 72, 0.8);
   }
+
   .take-cover-preview-dialog .results-table-container thead th {
     background-color: var(--pf2e-visioner-brown);
     color: var(--color-text-light-primary);
@@ -388,7 +380,7 @@
   }
 
   .consequences-preview-dialog .visibility-arrow {
-    color: var(--color-text-dark-secondary);
+    color: var(--pf2e-visioner-gray);
     font-size: 14px;
     margin: 0 4px;
   }
@@ -427,11 +419,13 @@
       border-color: var(--visibility-observed);
       transform: scale(1.05);
     }
+
     50% {
       box-shadow: 0 0 20px var(--visibility-observed);
       border-color: var(--cover-none);
       transform: scale(1.1);
     }
+
     100% {
       box-shadow: 0 0 8px var(--visibility-observed);
       border-color: var(--visibility-observed);
@@ -511,9 +505,7 @@
     border: 1px solid var(--color-text-light-primary);
   }
 
-  .consequences-preview-dialog
-    .override-icons
-    .state-icon[data-state='undetected'].selected::after {
+  .consequences-preview-dialog .override-icons .state-icon[data-state='undetected'].selected::after {
     content: '';
     position: absolute;
     bottom: -2px;
@@ -648,7 +640,7 @@
       flex-shrink: 0;
     }
 
-    .search-filter-container > div {
+    .search-filter-container>div {
       display: flex;
       align-items: center;
       gap: 4px;
@@ -1002,7 +994,7 @@
         align-items: stretch;
       }
 
-      .search-filter-container > div {
+      .search-filter-container>div {
         justify-content: space-between;
       }
 
@@ -1012,4 +1004,6 @@
       }
     }
   }
-} /* End .pf2e-visioner scope */
+}
+
+/* End .pf2e-visioner scope */
