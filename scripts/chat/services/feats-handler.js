@@ -114,11 +114,7 @@ const SEEK_FEAT_ADJUSTERS = {
   'keen-eyes': () => 0, // handled in visibility post-processing
 };
 
-const DIVERSION_FEAT_ADJUSTERS = {
-  'cunning-distraction': () => +1,
-  'distracting-shadows': (ctx) => (ctx.inDimOrDarker ? +1 : 0),
-  'shadow-self': (ctx) => (ctx.inDimOrDarker ? +1 : 0),
-};
+const DIVERSION_FEAT_ADJUSTERS = {};
 
 function normalizeSlug(nameOrSlug = '') {
   try {
@@ -295,12 +291,6 @@ export class FeatsHandler {
       if (inNatural && (context?.outcome === 'success' || context?.outcome === 'critical-success')) {
         newVisibility = step(newVisibility, towardsConcealment, +1);
       }
-      return newVisibility;
-    }
-
-    // Diversion: Distracting Shadows could make observers more distracted in dim light
-    if (action === 'create-a-diversion' && feats.has('distracting-shadows') && context?.inDimOrDarker) {
-      newVisibility = step(newVisibility, towardsObserved, +1);
       return newVisibility;
     }
 

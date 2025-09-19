@@ -45,8 +45,8 @@ export class DiversionActionHandler extends ActionHandlerBase {
     const dc = extractPerceptionDC(subject);
     const total = Number(actionData?.roll?.total ?? 0);
     const die = Number(
-      actionData?.roll?.dice?.[0]?.results?.[0]?.result ?? 
-      actionData?.roll?.dice?.[0]?.total ?? 
+      actionData?.roll?.dice?.[0]?.results?.[0]?.result ??
+      actionData?.roll?.dice?.[0]?.total ??
       actionData?.roll?.terms?.[0]?.total ?? 0,
     );
     const margin = total - dc;
@@ -59,10 +59,9 @@ export class DiversionActionHandler extends ActionHandlerBase {
     try {
       const { FeatsHandler } = await import('../feats-handler.js');
       newVisibility = FeatsHandler.adjustVisibility('create-a-diversion', actionData.actor, current, newVisibility, {
-        inDimOrDarker: false,
         outcome,
       });
-    } catch {}
+    } catch { }
 
     return {
       observer: subject,

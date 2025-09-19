@@ -583,19 +583,9 @@ export class SneakActionHandler extends ActionHandlerBase {
     try {
       const { FeatsHandler } = await import('../feats-handler.js');
       // Basic context: lighting at the sneaking token's position
-      let inDimOrDarker = false;
-      try {
-        const { LightingCalculator } = await import('../../../visibility/auto-visibility/LightingCalculator.js');
-        const lightingCalculator = LightingCalculator.getInstance();
-        const targetPosition = actionData.actor?.center || actionData.actor?.document?.center || actionData.actor?.object?.center || actionData.actor?.token?.object?.center || null;
-        targetPosition.elevation = actionData.actor?.document?.elevation || actionData.actor?.elevation || actionData.actor?.token?.object?.document?.elevation || 0;
-        if (targetPosition && lightingCalculator) {
-          const lightInfo = lightingCalculator.getLightLevelAt(targetPosition);
-          inDimOrDarker = ['dim', 'darkness'].includes(lightInfo?.level);
-        }
-      } catch { }
 
-      const { shift, notes } = FeatsHandler.getOutcomeAdjustment(actionData.actor, 'sneak', { inDimOrDarker });
+
+      const { shift, notes } = FeatsHandler.getOutcomeAdjustment(actionData.actor, 'sneak');
       if (shift) {
         adjustedOutcome = FeatsHandler.applyOutcomeShift(outcome, shift);
         featNotes = notes;
