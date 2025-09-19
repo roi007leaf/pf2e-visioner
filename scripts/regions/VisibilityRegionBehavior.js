@@ -5,19 +5,20 @@
  * entering and exiting regions.
  */
 
+import AvsOverrideManager from '../chat/services/infra/avs-override-manager.js';
 import { VISIBILITY_STATES } from '../constants.js';
 import { segmentsIntersect } from '../helpers/geometry-utils.js';
 import { getVisibility, setVisibilityBetween } from '../stores/visibility-map.js';
-import AvsOverrideManager from '../chat/services/infra/avs-override-manager.js';
 import { isValidToken } from '../utils.js';
+import RegionHelper from '../utils/region.js';
 
 const RegionBehaviorBase =
   typeof foundry !== 'undefined' &&
-  foundry.data &&
-  foundry.data.regionBehaviors &&
-  foundry.data.regionBehaviors.RegionBehaviorType
+    foundry.data &&
+    foundry.data.regionBehaviors &&
+    foundry.data.regionBehaviors.RegionBehaviorType
     ? foundry.data.regionBehaviors.RegionBehaviorType
-    : class {};
+    : class { };
 
 const DEFAULT_DEBOUNCE_MS = 50;
 
@@ -104,7 +105,7 @@ export class VisibilityRegionBehavior extends RegionBehaviorBase {
           const parts = event.tokenUuid.split('.');
           const last = parts[parts.length - 1];
           if (last) token = canvas.tokens.get(last);
-        } catch (_) {}
+        } catch { }
       }
     } catch (err) {
       console.error('PF2e Visioner | Error resolving token from event:', err, event);
@@ -203,7 +204,7 @@ export class VisibilityRegionBehavior extends RegionBehaviorBase {
     const getTokenActorType = (t) => {
       try {
         return t?.actor?.type ?? t?.document?.actor?.type ?? null;
-      } catch (_) {
+      } catch {
         return null;
       }
     };
@@ -214,7 +215,7 @@ export class VisibilityRegionBehavior extends RegionBehaviorBase {
     try {
       const thisType = getTokenActorType(token);
       if (thisType && ignoredActorTypes.has(thisType)) return [];
-    } catch (_) {}
+    } catch { }
 
     const visibilityState = this.visibilityState;
     const applyToInsideTokens = this.applyToInsideTokens;
@@ -275,7 +276,7 @@ export class VisibilityRegionBehavior extends RegionBehaviorBase {
               skipResetDueToCombat = true;
           }
         }
-      } catch (_) {}
+      } catch { }
 
       if (!skipResetDueToCombat) {
         const tokensToReset = [
@@ -347,11 +348,11 @@ export class VisibilityRegionBehavior extends RegionBehaviorBase {
                 continue;
               if (segmentsIntersect(p1, p2, { x: w.wx1, y: w.wy1 }, { x: w.wx2, y: w.wy2 }))
                 return false;
-            } catch (_) {
+            } catch {
               continue;
             }
           }
-        } catch (_) {
+        } catch {
           /* ignore */
         }
         return true;
@@ -374,7 +375,7 @@ export class VisibilityRegionBehavior extends RegionBehaviorBase {
           const p2 = getCenter(u.target);
           if (!p1 || !p2) continue;
           if (isLineOfSightClear(p1, p2)) filtered.push(u);
-        } catch (err) {
+        } catch {
           filtered.push(u);
         }
       }
@@ -392,48 +393,16 @@ export class VisibilityRegionBehavior extends RegionBehaviorBase {
     if (!region) return [];
 
     const pointInRegion = (x, y) => {
-      try {
-        if (typeof region.testPoint === 'function') return region.testPoint(x, y);
-        if (typeof region.containsPoint === 'function') {
-          try {
-            if (region.containsPoint({ x, y })) return true;
-          } catch (__) {}
-          try {
-            if (region.containsPoint(x, y)) return true;
-          } catch (__) {}
-        }
-        if (region.shape && typeof region.shape.containsPoint === 'function') {
-          try {
-            if (region.shape.containsPoint(new PIXI.Point(x, y))) return true;
-          } catch (__) {}
-        }
-
-        const pts = region.points ?? region.geometry?.points ?? region.boundary ?? null;
-        if (Array.isArray(pts) && pts.length) {
-          const poly = pts.map((p) => (Array.isArray(p) ? p : [p.x ?? p[0], p.y ?? p[1]]));
-          let inside = false;
-          for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
-            const xi = poly[i][0],
-              yi = poly[i][1];
-            const xj = poly[j][0],
-              yj = poly[j][1];
-            const intersect = yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi;
-            if (intersect) inside = !inside;
-          }
-          return inside;
-        }
-      } catch (err) {
-        console.warn('PF2e Visioner | pointInRegion fallback error:', err);
-      }
-      return false;
+      try { return RegionHelper.isPointInside(region, { x, y }); } catch { return false; }
     };
 
     // Compute a bounding box for the region (if available) to prefilter tokens
     let regionBBox = null;
     try {
-      if (region.bounds) regionBBox = region.bounds;
-      else if (region._bounds) regionBBox = region._bounds;
-      else if (Array.isArray(region.points) && region.points.length) {
+      const b = RegionHelper.getBounds(region);
+      if (b) {
+        regionBBox = { left: b.x, right: b.x + b.width, top: b.y, bottom: b.y + b.height };
+      } else if (Array.isArray(region.points) && region.points.length) {
         const xs = region.points.map((p) => (Array.isArray(p) ? p[0] : (p.x ?? p[0])));
         const ys = region.points.map((p) => (Array.isArray(p) ? p[1] : (p.y ?? p[1])));
         regionBBox = {
@@ -443,7 +412,7 @@ export class VisibilityRegionBehavior extends RegionBehaviorBase {
           bottom: Math.max(...ys),
         };
       }
-    } catch (_) {
+    } catch {
       regionBBox = null;
     }
 
@@ -492,7 +461,7 @@ export class VisibilityRegionBehavior extends RegionBehaviorBase {
                 // already in desired state
                 continue;
               }
-            } catch (_) {}
+            } catch { }
 
             resolved += 1;
             promises.push((async () => {
@@ -508,7 +477,7 @@ export class VisibilityRegionBehavior extends RegionBehaviorBase {
                   });
                 } else if (state === 'observed') {
                   // Clearing: remove any prior override for this direction to restore AVS control
-                  try { await AvsOverrideManager.removeOverride(sourceToken.document.id, targetToken.document.id); } catch (__) {}
+                  try { await AvsOverrideManager.removeOverride(sourceToken.document.id, targetToken.document.id); } catch { }
                 }
               } catch (overrideErr) {
                 console.warn('PF2E Visioner | Region override operation failed:', overrideErr);

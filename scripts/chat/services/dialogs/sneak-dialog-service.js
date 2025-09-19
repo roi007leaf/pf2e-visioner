@@ -64,18 +64,18 @@ export class SneakDialogService {
         const actor = token?.actor;
         if (actor) {
           const waiting = actor.itemTypes?.effect?.find?.(e => e?.system?.slug === 'waiting-for-sneak-start');
-            if (waiting) {
-              try { await actor.deleteEmbeddedDocuments('Item', [waiting.id]); } catch (e) {
-                console.warn('PF2E Visioner | Failed to remove waiting-for-sneak-start effect:', e);
-              }
+          if (waiting) {
+            try { await actor.deleteEmbeddedDocuments('Item', [waiting.id]); } catch (e) {
+              console.warn('PF2E Visioner | Failed to remove waiting-for-sneak-start effect:', e);
             }
+          }
         }
         try {
           const tokenObj = canvas.tokens.get(token.id);
           if (tokenObj) tokenObj.locked = false;
-        } catch {}
+        } catch { }
         // Clear waiting flag so movement is allowed
-        try { await token.document.unsetFlag('pf2e-visioner', 'waitingSneak'); } catch {}
+        try { await token.document.unsetFlag('pf2e-visioner', 'waitingSneak'); } catch { }
       } catch (cleanupErr) {
         console.warn('PF2E Visioner | Cleanup waiting effect failed:', cleanupErr);
       }
@@ -147,13 +147,35 @@ export class SneakDialogService {
         await message.setFlag('pf2e-visioner', 'sneakStartStates', startStates);
       }
 
+      // NEW: Capture and store the sneaking token's starting position when Start Sneak is pressed
+      try {
+        if (message && token) {
+          const cx = token?.center?.x;
+          const cy = token?.center?.y;
+          const pos = {
+            x: typeof token.x === 'number' ? token.x : token?.document?.x,
+            y: typeof token.y === 'number' ? token.y : token?.document?.y,
+            center: (typeof cx === 'number' && typeof cy === 'number') ? { x: cx, y: cy } : undefined,
+            elevation: token?.document?.elevation || 0,
+            tokenId: token?.id,
+            tokenName: token?.name,
+            timestamp: Date.now(),
+          };
+          await message.setFlag('pf2e-visioner', 'sneakStartPosition', pos);
+          // Mirror into actionData for immediate consumers
+          actionData.storedStartPosition = pos;
+        }
+      } catch (posErr) {
+        console.warn('PF2E Visioner | Failed to store sneak start position:', posErr);
+      }
+
       // Set sneak flag on the token to indicate it's currently sneaking
       await token.document.setFlag('pf2e-visioner', SNEAK_FLAGS.SNEAK_ACTIVE, true);
 
       // Apply speed halving while sneaking
       try {
         const { SneakSpeedService } = await import('../sneak-speed-service.js');
-        await SneakSpeedService.applySneakWalkSpeed(token);
+        await SneakSpeedService.applySneakStartEffect(token);
       } catch (speedErr) {
         console.warn('PF2E Visioner | Failed to apply sneak walk speed:', speedErr);
       }

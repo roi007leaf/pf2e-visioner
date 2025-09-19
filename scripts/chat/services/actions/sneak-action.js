@@ -110,7 +110,7 @@ export class SneakActionHandler extends ActionHandlerBase {
       // Apply walk speed halving while sneaking
       try {
         const { SneakSpeedService } = await import('../sneak-speed-service.js');
-        await SneakSpeedService.applySneakWalkSpeed(sneakingToken);
+        await SneakSpeedService.applySneakStartEffect(sneakingToken);
       } catch (speedErr) {
         console.warn('PF2E Visioner | Failed to apply sneak walk speed:', speedErr);
       }
@@ -237,6 +237,24 @@ export class SneakActionHandler extends ActionHandlerBase {
         } else if (message?.flags?.['pf2e-visioner']?.rollTimePosition) {
           actionData.storedStartPosition = message.flags['pf2e-visioner'].rollTimePosition;
         }
+
+        // Fallback: if still not set, capture current token center NOW (prerequisites time)
+        if (!actionData.storedStartPosition) {
+          const token = this._getSneakingToken(actionData);
+          const cx = token?.center?.x;
+          const cy = token?.center?.y;
+          if (typeof cx === 'number' && typeof cy === 'number') {
+            actionData.storedStartPosition = {
+              x: typeof token.x === 'number' ? token.x : undefined,
+              y: typeof token.y === 'number' ? token.y : undefined,
+              center: { x: cx, y: cy },
+              elevation: token?.document?.elevation || 0,
+              tokenId: token?.id,
+              tokenName: token?.name,
+              timestamp: Date.now(),
+            };
+          }
+        }
       }
 
     } catch (error) {
@@ -360,6 +378,49 @@ export class SneakActionHandler extends ActionHandlerBase {
       current = getVisibilityBetween(subject, actionData.actor);
     }
 
+    // Terrain Stalker free Sneak: if criteria met, skip Stealth check and keep visibility
+    try {
+      const free = await this._checkTerrainStalkerFreeSneak(actionData, subject, current);
+      if (free?.applies) {
+        return {
+          token: subject,
+          dc: extractPerceptionDC(subject),
+          originalDC: extractPerceptionDC(subject),
+          rollTotal: Number(actionData?.roll?.total ?? 0),
+          dieResult: Number(actionData?.roll?.dice?.[0]?.results?.[0]?.result ?? 0),
+          margin: 0,
+          adjustedMargin: 0,
+          originalMargin: 0,
+          baseMargin: 0,
+          outcome: 'success',
+          originalOutcome: 'success',
+          originalOutcomeLabel: 'Success',
+          originalNewVisibility: current,
+          shouldShowOverride: false,
+          currentVisibility: current,
+          oldVisibility: current,
+          oldVisibilityLabel: current,
+          newVisibility: current,
+          changed: false,
+          autoCover: null,
+          originalRollTotal: Number(actionData?.roll?.total ?? 0),
+          baseRollTotal: Number(actionData?.roll?.total ?? 0),
+          positionTransition: free.positionTransition || null,
+          startPosition: free.positionTransition?.startPosition || null,
+          endPosition: free.positionTransition?.endPosition || null,
+          // Force qualifications for preview/UI when TS free-sneak applies
+          positionQualifies: { startQualifies: true, endQualifies: true, bothQualify: true, reason: 'Terrain Stalker: free Sneak' },
+          _featPositionOverride: { startQualifies: true, endQualifies: true, bothQualify: true, reason: 'Terrain Stalker: free Sneak' },
+          dcAdjustment: 0,
+          outcomeChanged: false,
+          enhancedAnalysis: { hasPositionData: !!free.positionTransition },
+          enhancedOutcomeData: { explanation: 'Terrain Stalker: move <= 5 ft, stay 10 ft from enemies, undetected by all' },
+          featNotes: ['Terrain Stalker: no Stealth check required'],
+          _tsFreeSneak: true,
+        };
+      }
+    } catch { /* ignore and continue normal flow */ }
+
     // Calculate roll information (stealth vs observer's perception DC)
     let adjustedDC = extractPerceptionDC(subject);
 
@@ -452,6 +513,13 @@ export class SneakActionHandler extends ActionHandlerBase {
 
       // Create autoCover object if we have a cover state OR if there's an override
       if (coverState || isOverride) {
+        // Feat: Ceaseless Shadows upgrades cover from a creature's perspective
+        try {
+          const { FeatsHandler } = await import('../feats-handler.js');
+          const upgraded = FeatsHandler.upgradeCoverForCreature(actionData.actor, coverState);
+          coverState = upgraded.state;
+          var _csCanTakeCover = upgraded.canTakeCover;
+        } catch { }
         const coverConfig = COVER_STATES[coverState || 'none'];
         const actualStealthBonus = coverConfig?.bonusStealth || 0;
         result.autoCover = {
@@ -461,6 +529,8 @@ export class SneakActionHandler extends ActionHandlerBase {
           color: coverConfig?.color || '#999',
           cssClass: coverConfig?.cssClass || '',
           bonus: actualStealthBonus,
+          // Ceaseless Shadows: gaining Standard or better allows Take Cover
+          canTakeCover: _csCanTakeCover || ((coverState === 'standard' || coverState === 'greater') ? true : undefined),
           isOverride: isOverride && originalDetectedState !== coverState,
           source: coverSource,
           // Add override details for template display (only if actually overridden)
@@ -575,18 +645,23 @@ export class SneakActionHandler extends ActionHandlerBase {
           positionTransition
         });
         newVisibility = enhancedOutcome.newVisibility;
-        // Enforce end-position prerequisite as a safety net: end must have Standard/Greater cover or be Concealed
+        // Enforce end-position prerequisite unless a feat removes it
         try {
-          const endCover = positionTransition?.endPosition?.coverState;
-          const endVis = positionTransition?.endPosition?.avsVisibility;
-          const endQualifies = (endCover === 'standard' || endCover === 'greater') || endVis === 'concealed';
-          if (!endQualifies) newVisibility = 'observed';
+          const { FeatsHandler } = await import('../feats-handler.js');
+          const skip = FeatsHandler.shouldSkipEndCoverRequirement(actionData.actor, 'sneak');
+          if (!skip) {
+            const endCover = positionTransition?.endPosition?.coverState;
+            const endVis = positionTransition?.endPosition?.avsVisibility;
+            const endQualifies = (endCover === 'standard' || endCover === 'greater') || endVis === 'concealed';
+            if (!endQualifies) newVisibility = 'observed';
+          }
         } catch { }
         // Feat-based post visibility adjustments (e.g., Vanish into the Land)
         try {
           const { FeatsHandler } = await import('../feats-handler.js');
+          const inNatural = (() => { try { return FeatsHandler.isEnvironmentActive(actionData.actor, 'natural'); } catch { return false; } })();
           newVisibility = FeatsHandler.adjustVisibility('sneak', actionData.actor, current, newVisibility, {
-            inNaturalTerrain: positionTransition?.endPosition?.terrainTag === 'natural',
+            inNaturalTerrain: inNatural,
             outcome: adjustedOutcome,
           });
         } catch { }
@@ -597,8 +672,9 @@ export class SneakActionHandler extends ActionHandlerBase {
         // Feat-based post visibility adjustments
         try {
           const { FeatsHandler } = await import('../feats-handler.js');
+          const inNatural = (() => { try { return FeatsHandler.isEnvironmentActive(actionData.actor, 'natural'); } catch { return false; } })();
           newVisibility = FeatsHandler.adjustVisibility('sneak', actionData.actor, current, newVisibility, {
-            inNaturalTerrain: positionTransition?.endPosition?.terrainTag === 'natural',
+            inNaturalTerrain: inNatural,
             outcome: adjustedOutcome,
           });
         } catch { }
@@ -611,8 +687,9 @@ export class SneakActionHandler extends ActionHandlerBase {
       // Feat-based post visibility adjustments
       try {
         const { FeatsHandler } = await import('../feats-handler.js');
+        const inNatural = (() => { try { return FeatsHandler.isEnvironmentActive(actionData.actor, 'natural'); } catch { return false; } })();
         newVisibility = FeatsHandler.adjustVisibility('sneak', actionData.actor, current, newVisibility, {
-          inNaturalTerrain: positionTransition?.endPosition?.terrainTag === 'natural',
+          inNaturalTerrain: inNatural,
           outcome: adjustedOutcome,
         });
       } catch { }
@@ -744,6 +821,25 @@ export class SneakActionHandler extends ActionHandlerBase {
       // Feats adjustment notes
       featNotes,
     };
+  }
+
+  /**
+   * Terrain Stalker free Sneak check
+   * Criteria: actor has TS selected terrain active, is Undetected by all non-allies,
+   * movement <= 5 ft, and path stays >= 10 ft from enemies.
+   */
+  async _checkTerrainStalkerFreeSneak(actionData, subject) {
+    try {
+      const { TerrainStalkerService } = await import('../feats/terrain-stalker.js');
+      return await TerrainStalkerService.checkFreeSneak(actionData, subject, {
+        discoverSubjects: (ad) => this.discoverSubjects(ad),
+        sneakCore: this.sneakCore,
+        sessionId: this._currentSessionId,
+        getSneakingToken: (ad) => this._getSneakingToken(ad),
+      });
+    } catch (e) {
+      return { applies: false, reason: `Error during free-sneak check: ${e?.message || 'unknown'}` };
+    }
   }
   outcomeToChange(actionData, outcome) {
     const observer = outcome.token || outcome.target;
@@ -940,12 +1036,12 @@ export class SneakActionHandler extends ActionHandlerBase {
     try {
       const { FeatsHandler } = await import('../feats-handler.js');
       const acting = this._getSneakingToken?.(actionData) || actionData?.actor || null;
+      const inNatural = (() => { try { return FeatsHandler.isEnvironmentActive(acting, 'natural'); } catch { return false; } })();
       result = FeatsHandler.overridePrerequisites(acting, result, {
         startVisibility: startPos.avsVisibility,
         endVisibility: endPos.avsVisibility,
         endCoverState: endPos.coverState,
-        startTerrainTag: startPos.terrainTag,
-        endTerrainTag: endPos.terrainTag,
+        inNaturalTerrain: inNatural,
       });
     } catch {
       // ignore

@@ -874,8 +874,8 @@ export class EventDrivenVisibilitySystem {
         const actor = token.actor;
         if (actor) {
           // HP based check (covers 0 or negative)
-            const hpValue = actor.hitPoints?.value ?? actor.system?.attributes?.hp?.value;
-            if (typeof hpValue === 'number' && hpValue <= 0) return true;
+          const hpValue = actor.hitPoints?.value ?? actor.system?.attributes?.hp?.value;
+          if (typeof hpValue === 'number' && hpValue <= 0) return true;
 
           // Condition-based check (PF2e conditions use itemTypes.condition or conditions array)
           const conditionSlugs = new Set();
@@ -1045,6 +1045,42 @@ export class EventDrivenVisibilitySystem {
       // Best effort only
     }
     return await optimizedVisibilityCalculator.calculateVisibility(observer, target);
+  }
+
+  /**
+   * Calculate effective visibility including manual overrides and the persisted visibility map.
+   * Precedence:
+   * 1) Active override flag on target (avs-override-from-<observerId>)
+   * 2) Current visibility map entry (observer -> target)
+   * 3) Fresh AVS calculation (no overrides)
+   * @param {Token} observer
+   * @param {Token} target
+   * @returns {Promise<string>} Visibility state
+   */
+  async calculateVisibilityWithOverrides(observer, target) {
+    try {
+      if (!observer?.document?.id || !target?.document?.id) return 'observed';
+
+      // 1) Check for active override (persisted flag)
+      try {
+        const overrideFlagKey = `avs-override-from-${observer.document.id}`;
+        const overrideData = target.document.getFlag('pf2e-visioner', overrideFlagKey);
+        if (overrideData && overrideData.state) {
+          return overrideData.state;
+        }
+      } catch { /* ignore */ }
+
+      // 2) Check current visibility map (observer -> target)
+      try {
+        const current = getVisibilityMap(observer)?.[target.document.id];
+        if (current) return current;
+      } catch { /* ignore */ }
+
+      // 3) Fallback to regular AVS calculation (no overrides)
+      return await this.calculateVisibility(observer, target);
+    } catch {
+      return 'observed';
+    }
   }
 
   /**

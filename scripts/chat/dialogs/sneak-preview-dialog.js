@@ -220,7 +220,10 @@ export class SneakPreviewDialog extends BaseActionDialog {
         );
         outcome.liveEndVisibility = liveEndVis;
       } catch { }
-      if (positionTransition) {
+      if (outcome._tsFreeSneak) {
+        // For Terrain Stalker free-sneak, force qualifications to pass for UI and keep newVisibility
+        outcome._featPositionOverride = { startQualifies: true, endQualifies: true, bothQualify: true, reason: 'Terrain Stalker: free Sneak' };
+      } else if (positionTransition) {
         // Calculate raw qualifications
         const rawStart = this._startPositionQualifiesForSneak(outcome.token, outcome);
         const rawEnd = this._endPositionQualifiesForSneak(outcome.token, outcome);
@@ -230,13 +233,14 @@ export class SneakPreviewDialog extends BaseActionDialog {
         try {
           const sp = positionTransition.startPosition || {};
           const ep = positionTransition.endPosition || {};
+          const inNatural = (() => {
+            try { return FeatsHandler.isEnvironmentActive(this.sneakingToken, 'natural'); } catch { return false; }
+          })();
           effective = FeatsHandler.overridePrerequisites(this.sneakingToken, effective, {
             startVisibility: sp.avsVisibility,
             endVisibility: ep.avsVisibility,
             endCoverState: ep.coverState,
-            startTerrainTag: sp.terrainTag,
-            endTerrainTag: ep.terrainTag,
-            inNaturalTerrain: ep.terrainTag === 'natural',
+            inNaturalTerrain: inNatural,
             impreciseOnly: outcome?.impreciseOnly || false,
           });
         } catch { }
@@ -483,7 +487,10 @@ export class SneakPreviewDialog extends BaseActionDialog {
     for (const outcome of filteredOutcomes) {
       // Check if we have position data and if positions don't qualify
       const positionTransition = outcome.positionTransition || this._getPositionTransitionForToken(outcome.token);
-      if (positionTransition) {
+      if (outcome._tsFreeSneak) {
+        outcome._featPositionOverride = { startQualifies: true, endQualifies: true, bothQualify: true, reason: 'Terrain Stalker: free Sneak' };
+        // Keep existing newVisibility; do not force observed
+      } else if (positionTransition) {
         // Calculate raw qualifications
         const startQualifies = this._startPositionQualifiesForSneak(outcome.token, outcome);
         const endQualifies = this._endPositionQualifiesForSneak(outcome.token, outcome);
@@ -493,13 +500,14 @@ export class SneakPreviewDialog extends BaseActionDialog {
         try {
           const sp = positionTransition.startPosition || {};
           const ep = positionTransition.endPosition || {};
+          const inNatural = (() => {
+            try { return FeatsHandler.isEnvironmentActive(this.sneakingToken, 'natural'); } catch { return false; }
+          })();
           effective = FeatsHandler.overridePrerequisites(this.sneakingToken, effective, {
             startVisibility: sp.avsVisibility,
             endVisibility: ep.avsVisibility,
             endCoverState: ep.coverState,
-            startTerrainTag: sp.terrainTag,
-            endTerrainTag: ep.terrainTag,
-            inNaturalTerrain: ep.terrainTag === 'natural',
+            inNaturalTerrain: inNatural,
             impreciseOnly: outcome?.impreciseOnly || false,
           });
         } catch { }

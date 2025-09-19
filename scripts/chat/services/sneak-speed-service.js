@@ -31,13 +31,39 @@ export class SneakSpeedService {
   }
 
   /**
+   * Back-compat shim: legacy API expected to halve speed unless a feat grants full speed.
+   * New behavior: we don't change base speed; we apply a label-only effect to indicate Sneaking.
+   * If multiplier resolves to 1.0, we skip any effect/flags entirely (as tests expect).
+   * @param {Token|Actor} tokenOrActor
+   */
+  static async applySneakWalkSpeed(tokenOrActor) {
+    try {
+      const actor = SneakSpeedService.resolveActor(tokenOrActor);
+      if (!actor) return;
+      let multiplier = 0.5;
+      try {
+        const { FeatsHandler } = await import('./feats-handler.js');
+        multiplier = FeatsHandler.getSneakSpeedMultiplier(actor) ?? 0.5;
+      } catch { /* default multiplier */ }
+
+      // If full-speed Sneak, do nothing (skip effect/flags)
+      if (multiplier >= 0.999) return;
+
+      // Otherwise, apply a label-only effect to indicate Sneaking
+      await SneakSpeedService.applySneakStartEffect(actor);
+    } catch (e) {
+      console.debug('PF2E Visioner | applySneakWalkSpeed noop failed (continuing):', e);
+    }
+  }
+
+  /**
    * Halve walking speed for the provided token/actor.
    * Prefers adding a PF2e effect (ActiveEffectLike multiply 0.5) so the sheet/UI updates properly.
    * Falls back to directly updating system.attributes.speed.value when effects aren't available.
    * Safe to call multiple times; will not stack.
    * @param {Token|Actor} tokenOrActor
    */
-  static async applySneakWalkSpeed(tokenOrActor) {
+  static async applySneakStartEffect(tokenOrActor) {
     try {
       const actor = SneakSpeedService.resolveActor(tokenOrActor);
       if (!actor) return;
@@ -135,7 +161,7 @@ export class SneakSpeedService {
       const { FeatsHandler } = await import('./feats-handler.js');
       multiplier = FeatsHandler.getSneakSpeedMultiplier(actor) ?? 0.5;
       bonusFeet = FeatsHandler.getSneakDistanceBonusFeet(actor) ?? 0;
-    } catch {}
+    } catch { }
 
     const raw = Math.floor(baseSpeed * multiplier) + bonusFeet;
     // Cannot exceed base Speed as per Very Sneaky text

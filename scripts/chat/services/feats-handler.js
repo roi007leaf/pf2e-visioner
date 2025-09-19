@@ -28,6 +28,29 @@ class FeatsHandlerInternal {
     if (tokenOrActor.system?.attributes) return tokenOrActor;
     return null;
   }
+
+  /**
+   * Resolve a Token object from various shapes.
+   * @param {Token|Actor} tokenOrActor
+   * @returns {Token|null}
+   */
+  static resolveToken(tokenOrActor) {
+    try {
+      if (!tokenOrActor) return null;
+      // If passed a token-like object
+      if (tokenOrActor?.isToken || tokenOrActor?.center) return tokenOrActor;
+      if (tokenOrActor?.object?.isToken || tokenOrActor?.object?.center) return tokenOrActor.object;
+      if (tokenOrActor?.document?.object?.isToken) return tokenOrActor.document.object;
+
+      // If passed an actor, prefer active token on canvas
+      const actor = this.resolveActor(tokenOrActor);
+      if (actor?.getActiveTokens) {
+        const tokens = actor.getActiveTokens(true);
+        if (tokens?.length) return tokens[0];
+      }
+    } catch { }
+    return null;
+  }
 }
 
 /**
@@ -69,8 +92,9 @@ const SNEAK_FEAT_ADJUSTERS = {
   'distracting-shadows': (ctx) => (ctx.inDimOrDarker ? +1 : 0),
   'ceaseless-shadows': (ctx) => (ctx.inShadowyMovement ? +1 : 0),
   'shadow-self': (ctx) => (ctx.inDimOrDarker ? +1 : 0),
-  'forest-stealth': (ctx) => (ctx.terrainTag === 'forest' ? +1 : 0),
-  'swamp-stealth': (ctx) => (ctx.terrainTag === 'swamp' ? +1 : 0),
+  // Back-compat: accept either explicit flags (inForest/inSwamp) or legacy context.terrainTag
+  'forest-stealth': (ctx) => (ctx.inForest || ctx.terrainTag === 'forest' ? +1 : 0),
+  'swamp-stealth': (ctx) => (ctx.inSwamp || ctx.terrainTag === 'swamp' ? +1 : 0),
 };
 
 const HIDE_FEAT_ADJUSTERS = {
@@ -79,8 +103,9 @@ const HIDE_FEAT_ADJUSTERS = {
   'very-very-sneaky': () => +1,
   'vanish-into-the-land': (ctx) => (ctx.inNaturalTerrain ? +1 : 0),
   'legendary-sneak': () => +1,
-  'forest-stealth': (ctx) => (ctx.terrainTag === 'forest' ? +1 : 0),
-  'swamp-stealth': (ctx) => (ctx.terrainTag === 'swamp' ? +1 : 0),
+  // Back-compat: accept either explicit flags (inForest/inSwamp) or legacy context.terrainTag
+  'forest-stealth': (ctx) => (ctx.inForest || ctx.terrainTag === 'forest' ? +1 : 0),
+  'swamp-stealth': (ctx) => (ctx.inSwamp || ctx.terrainTag === 'swamp' ? +1 : 0),
 };
 
 const SEEK_FEAT_ADJUSTERS = {
@@ -132,6 +157,8 @@ function getAdjusterMapForAction(action) {
  * @param {object} context - environment context (lighting, terrain, observer senses)
  * @returns {{ shift: number, notes: string[] }} - Net shift and contributing notes
  */
+import EnvironmentHelper from '../../utils/environment.js';
+
 export class FeatsHandler {
   /**
    * Compute the total outcome adjustment for the given action.
@@ -194,6 +221,39 @@ export class FeatsHandler {
   }
 
   /**
+   * Stealth helpers: centralize repeated checks
+   */
+  static hasCeaselessShadows(tokenOrActor) {
+    return FeatsHandler.hasFeat(tokenOrActor, 'ceaseless-shadows');
+  }
+
+  /**
+   * Given a cover state detected from a creature, upgrade it per Ceaseless Shadows.
+   * Returns { state, canTakeCover }.
+   */
+  static upgradeCoverForCreature(tokenOrActor, coverState) {
+    let state = coverState;
+    try {
+      if (FeatsHandler.hasCeaselessShadows(tokenOrActor)) {
+        if (state === 'lesser') state = 'standard';
+        else if (state === 'standard') state = 'greater';
+      }
+    } catch { /* best-effort */ }
+    const canTakeCover = state === 'standard' || state === 'greater';
+    return { state, canTakeCover };
+  }
+
+  /**
+   * Whether to skip enforcing end cover/concealment requirement in Sneak/Hide (Ceaseless Shadows removes it).
+   */
+  static shouldSkipEndCoverRequirement(tokenOrActor, action) {
+    try {
+      if ((action === 'sneak' || action === 'hide') && FeatsHandler.hasCeaselessShadows(tokenOrActor)) return true;
+    } catch { }
+    return false;
+  }
+
+  /**
    * Post-process visibility result for feat effects that target visibility directly.
    * Returns possibly adjusted visibility string.
    */
@@ -228,7 +288,11 @@ export class FeatsHandler {
 
     // Hide/Sneak: Vanish into the Land improves concealment on success in natural terrain
     if ((action === 'hide' || action === 'sneak') && feats.has('vanish-into-the-land')) {
-      if (context?.inNaturalTerrain && (context?.outcome === 'success' || context?.outcome === 'critical-success')) {
+      let inNatural = !!context?.inNaturalTerrain;
+      if (!inNatural) {
+        try { inNatural = EnvironmentHelper.isEnvironmentActive(tokenOrActor, 'natural'); } catch { }
+      }
+      if (inNatural && (context?.outcome === 'success' || context?.outcome === 'critical-success')) {
         newVisibility = step(newVisibility, towardsConcealment, +1);
       }
       return newVisibility;
@@ -291,6 +355,13 @@ export class FeatsHandler {
     let { startQualifies, endQualifies } = base;
     let reason = base.reason || '';
 
+    // Ceaseless Shadows: You no longer need cover or concealment to Hide or Sneak
+    if (feats.has('ceaseless-shadows')) {
+      startQualifies = true;
+      endQualifies = true;
+      reason = reason || 'Ceaseless Shadows removes cover/concealment requirement';
+    }
+
     // Legendary Sneak: You can Sneak even without cover/concealment at the start,
     // as long as you end in cover or concealment (we still require endQualifies).
     if (!startQualifies && endQualifies && feats.has('legendary-sneak')) {
@@ -310,20 +381,38 @@ export class FeatsHandler {
       if (!reason) reason = 'Very, Very Sneaky removes end cover/concealment requirement';
     }
 
-    // Vanish into the Land: Hide or Sneak without cover or concealment in natural terrain
-    if (!startQualifies && feats.has('vanish-into-the-land')) {
-      const natural = extra?.startTerrainTag === 'natural' || extra?.endTerrainTag === 'natural' || extra?.inNaturalTerrain;
-      if (natural) {
-        startQualifies = true;
-        if (!reason) reason = 'Vanish into the Land (natural terrain)';
-      }
+    // Vanish into the Land:
+    // When in the difficult terrain you've selected for the Terrain Stalker feat,
+    // you can Hide and Sneak even without cover or being Concealed.
+    if (feats.has('vanish-into-the-land')) {
+      try {
+        const selection = FeatsHandler._getTerrainStalkerSelection(actor);
+        if (selection) {
+          const regions = EnvironmentHelper.getMatchingEnvironmentRegions(tokenOrActor, selection) || [];
+          if (regions.length > 0) {
+            // In matching difficult terrain for TS selection: relax both start and end requirements
+            if (!startQualifies) startQualifies = true;
+            if (!endQualifies) endQualifies = true;
+            if (!reason) reason = `Vanish into the Land (${selection} difficult terrain)`;
+          }
+        }
+      } catch { /* best-effort only */ }
     }
 
     // Terrain Stalker: Can Hide or Sneak while observed in chosen terrain
     if (!startQualifies && feats.has('terrain-stalker')) {
-      if (extra?.startTerrainTag || extra?.endTerrainTag) {
-        startQualifies = true;
-        if (!reason) reason = 'Terrain Stalker (chosen terrain)';
+      try {
+        const selection = FeatsHandler._getTerrainStalkerSelection(actor);
+        if (selection && EnvironmentHelper.isEnvironmentActive(tokenOrActor, selection)) {
+          startQualifies = true;
+          if (!reason) reason = `Terrain Stalker (${selection})`;
+        }
+      } catch {
+        // Fall back to legacy tag hints if any provided
+        if (extra?.startTerrainTag || extra?.endTerrainTag) {
+          startQualifies = true;
+          if (!reason) reason = 'Terrain Stalker (chosen terrain)';
+        }
       }
     }
 
@@ -336,6 +425,53 @@ export class FeatsHandler {
 
     const bothQualify = !!(startQualifies && endQualifies);
     return { ...base, startQualifies, endQualifies, bothQualify, reason };
+  }
+
+  /**
+   * Public helper: is the given environment currently active for this token/actor?
+   * @param {Token|Actor} tokenOrActor
+   * @param {string} environmentKey
+   * @returns {boolean}
+   */
+  static isEnvironmentActive(tokenOrActor, environmentKey) {
+    return EnvironmentHelper.isEnvironmentActive(tokenOrActor, environmentKey);
+  }
+
+  /**
+   * Public helper: get the selected Terrain Stalker environment, if any.
+   * @param {Token|Actor} tokenOrActor
+   * @returns {string|null}
+   */
+  static getTerrainStalkerSelection(tokenOrActor) {
+    const actor = FeatsHandlerInternal.resolveActor(tokenOrActor);
+    return FeatsHandler._getTerrainStalkerSelection(actor);
+  }
+
+  /**
+   * Read the selected environment from the actor's Terrain Stalker feat rules.
+   * Tries to find an item with slug 'terrain-stalker' and a rule with a 'selection' field.
+   * @param {Actor} actor
+   * @returns {string|null}
+   * @private
+   */
+  static _getTerrainStalkerSelection(actor) {
+    try {
+      const items = actor?.items ?? [];
+      const ts = items.find((it) => it?.type === 'feat' && normalizeSlug(it.system?.slug ?? it.slug ?? it.name) === 'terrain-stalker');
+      if (!ts) return null;
+      const rules = Array.isArray(ts.system?.rules) ? ts.system.rules : [];
+      // Prefer an explicit selection property on any rule
+      for (const r of rules) {
+        const sel = r?.selection ?? r?.value?.selection ?? null;
+        if (typeof sel === 'string' && sel) return normalizeSlug(sel);
+      }
+      // Fallback: some rule elements nest selection differently
+      const first = rules[0];
+      const fallback = first?.selection ?? first?.value?.selection ?? null;
+      return typeof fallback === 'string' && fallback ? normalizeSlug(fallback) : null;
+    } catch {
+      return null;
+    }
   }
 }
 

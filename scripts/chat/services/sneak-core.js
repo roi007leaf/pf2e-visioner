@@ -74,6 +74,26 @@ export class SneakCore {
       !shouldFilterAlly(observer, sneakingToken)
     );
 
+    // If no explicit stored start position was provided, populate a default using the token's current center
+    try {
+      if (!actionData.storedStartPosition && sneakingToken) {
+        const cx = sneakingToken?.center?.x;
+        const cy = sneakingToken?.center?.y;
+        const ex = sneakingToken?.document?.elevation || 0;
+        if (typeof cx === 'number' && typeof cy === 'number') {
+          actionData.storedStartPosition = {
+            x: typeof sneakingToken.x === 'number' ? sneakingToken.x : undefined,
+            y: typeof sneakingToken.y === 'number' ? sneakingToken.y : undefined,
+            center: { x: cx, y: cy },
+            elevation: ex,
+            tokenId: sneakingToken.id,
+            tokenName: sneakingToken.name,
+            timestamp
+          };
+        }
+      }
+    } catch { }
+
     // Capture start positions
     const startPositions = await this._capturePositions(sneakingToken, filteredObservers, {
       timestamp,

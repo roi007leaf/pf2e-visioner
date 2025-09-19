@@ -5,6 +5,7 @@
  */
 
 import { MODULE_ID } from '../../constants.js';
+import RegionHelper from '../../utils/region.js';
 
 export class LightingCalculator {
   /** @type {LightingCalculator} */
@@ -61,15 +62,15 @@ export class LightingCalculator {
     const DIM = 1;
     const BRIGHT = 2;
     const FOUNDRY_DARK = 0.25;
-    
+
     // Check for region-specific darkness level
     const regionDarkness = this.#getRegionDarknessAt(position);
     const effectiveDarkness = regionDarkness !== null ? regionDarkness : sceneDarkness;
-    
+
     const baseIllumination = hasGlobalIllumination ? 1.0 - effectiveDarkness : 0.0;
 
-    function makeIlluminationResult(illumination) { 
-      const LIGHT_LEVELS = ['darkness','dim','bright' ];
+    function makeIlluminationResult(illumination) {
+      const LIGHT_LEVELS = ['darkness', 'dim', 'bright'];
       const LIGHT_THRESHOLDS = [0.0, 0.5, 1.0];
       return {
         level: LIGHT_LEVELS[illumination],
@@ -107,7 +108,7 @@ export class LightingCalculator {
 
       // Check if position is inside the light polygon first
       const isInPolygon = this.#isPositionInLightPolygon(position, light);
-      
+
       // If polygon check is available and position is outside, skip this light
       if (isInPolygon === false) {
         continue;
@@ -125,8 +126,8 @@ export class LightingCalculator {
       // Only do distance calculation if polygon check is not available or position is inside polygon
       if (isInPolygon === null) {
         // Calculated distances are in squared pixel units
-        const distanceSquared = 
-          Math.pow(position.x - lightX, 2) + Math.pow(position.y - lightY, 2) ;
+        const distanceSquared =
+          Math.pow(position.x - lightX, 2) + Math.pow(position.y - lightY, 2);
         const brightRadiusSquared = Math.pow(brightRadius * pixelsPerUnit, 2);
         const dimRadiusSquared = Math.pow(dimRadius * pixelsPerUnit, 2);
 
@@ -148,10 +149,10 @@ export class LightingCalculator {
       } else {
         // Position is inside the light polygon, determine if it's bright or dim
         // This requires checking if it's within the bright radius or just the dim radius
-        const distanceSquared = 
-          Math.pow(position.x - lightX, 2) + Math.pow(position.y - lightY, 2) ;
+        const distanceSquared =
+          Math.pow(position.x - lightX, 2) + Math.pow(position.y - lightY, 2);
         const brightRadiusSquared = Math.pow(brightRadius * pixelsPerUnit, 2);
-        
+
         if (isDarknessSource) {
           return makeIlluminationResult(DARK);
         } else {
@@ -167,15 +168,15 @@ export class LightingCalculator {
 
     // If we were in a darkness source then we've already returned DARK
     // If we find ourselves in BRIGHT illumination we can return immediately
-    if (illumination === BRIGHT) 
+    if (illumination === BRIGHT)
       return makeIlluminationResult(BRIGHT);
 
     // Check light-emitting tokens using cached results
     const lightEmittingTokens = this.#getLightEmittingTokens();
     for (const tokenInfo of lightEmittingTokens) {
-      
-      const distanceSquared = 
-        Math.pow(position.x - tokenInfo.x, 2) + Math.pow(position.y - tokenInfo.y, 2) ;
+
+      const distanceSquared =
+        Math.pow(position.x - tokenInfo.x, 2) + Math.pow(position.y - tokenInfo.y, 2);
 
       const brightRadiusSquared = Math.pow(tokenInfo.brightRadius * pixelsPerUnit, 2);
       const dimRadiusSquared = Math.pow(tokenInfo.dimRadius * pixelsPerUnit, 2);
@@ -247,21 +248,7 @@ export class LightingCalculator {
    */
   #isPositionInRegion(position, region) {
     try {
-      // Use Foundry's built-in method if available
-      if (region.testPoint) {
-        return region.testPoint(position);
-      }
-
-      // Fallback: check against region bounds
-      const bounds = region.bounds || region.document.bounds;
-      if (bounds) {
-        return position.x >= bounds.x && 
-               position.x <= bounds.x + bounds.width &&
-               position.y >= bounds.y && 
-               position.y <= bounds.y + bounds.height;
-      }
-
-      return false;
+      return RegionHelper.isPointInside(region, position);
     } catch (error) {
       console.warn(`${MODULE_ID} | Error checking region bounds:`, error);
       return false;
@@ -287,7 +274,7 @@ export class LightingCalculator {
         // Manual ray-cast on point array (x0,y0,x1,y1,...)
         if (Array.isArray(poly.points) && poly.points.length >= 6) {
           const pts = poly.points;
-            const b = poly.bounds || poly.boundingBox;
+          const b = poly.bounds || poly.boundingBox;
           if (b) {
             if (position.x < b.x || position.x > b.x + b.width || position.y < b.y || position.y > b.y + b.height) {
               return false; // outside bounds
@@ -333,7 +320,7 @@ export class LightingCalculator {
    * Refresh the cache of light-emitting tokens
    */
   #refreshLightEmittingTokensCache() {
-  // const debugMode = game.settings.get(MODULE_ID, 'autoVisibilityDebugMode'); // currently unused
+    // const debugMode = game.settings.get(MODULE_ID, 'autoVisibilityDebugMode'); // currently unused
     const tokens = canvas.tokens?.placeables || [];
 
     this.#lightEmittingTokensCache = tokens

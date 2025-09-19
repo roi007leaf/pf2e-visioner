@@ -147,6 +147,13 @@ export class HideActionHandler extends ActionHandlerBase {
 
       // Create autoCover object if we have a cover state OR if there's an override
       if (coverState || isOverride) {
+        // Feat: Ceaseless Shadows upgrades cover from a creature's perspective
+        try {
+          const { FeatsHandler } = await import('../feats-handler.js');
+          const upgraded = FeatsHandler.upgradeCoverForCreature(actionData.actor, coverState);
+          coverState = upgraded.state;
+          var _csCanTakeCover = upgraded.canTakeCover;
+        } catch { }
         const coverConfig = COVER_STATES[coverState || 'none'];
         const actualStealthBonus = coverConfig?.bonusStealth || 0;
         result.autoCover = {
@@ -156,6 +163,8 @@ export class HideActionHandler extends ActionHandlerBase {
           color: coverConfig?.color || '#999',
           cssClass: coverConfig?.cssClass || '',
           bonus: actualStealthBonus,
+          // Ceaseless Shadows: gaining Standard or better allows Take Cover
+          canTakeCover: _csCanTakeCover || ((coverState === 'standard' || coverState === 'greater') ? true : undefined),
           isOverride: isOverride && originalDetectedState !== coverState,
           source: coverSource,
           // Add override details for template display (only if actually overridden)
@@ -253,8 +262,9 @@ export class HideActionHandler extends ActionHandlerBase {
     // Feat-based post visibility adjustments
     try {
       const { FeatsHandler } = await import('../feats-handler.js');
+      const inNatural = (() => { try { return FeatsHandler.isEnvironmentActive(actionData.actor, 'natural'); } catch { return false; } })();
       newVisibility = FeatsHandler.adjustVisibility('hide', actionData.actor, current, newVisibility, {
-        inNaturalTerrain: false,
+        inNaturalTerrain: inNatural,
         outcome: adjustedOutcome,
       });
     } catch { }
@@ -278,7 +288,8 @@ export class HideActionHandler extends ActionHandlerBase {
       let qualification = { startQualifies, endQualifies, bothQualify: startQualifies && endQualifies, reason: 'Hide prerequisites evaluated' };
       try {
         const { FeatsHandler } = await import('../feats-handler.js');
-        qualification = FeatsHandler.overridePrerequisites(actionData.actor, qualification, { startVisibility, endVisibility, endCoverState });
+        const inNatural = (() => { try { return FeatsHandler.isEnvironmentActive(actionData.actor, 'natural'); } catch { return false; } })();
+        qualification = FeatsHandler.overridePrerequisites(actionData.actor, qualification, { startVisibility, endVisibility, endCoverState, inNaturalTerrain: inNatural });
       } catch { }
       positionQualification = qualification;
       if (!qualification.endQualifies) newVisibility = 'observed';
@@ -291,8 +302,9 @@ export class HideActionHandler extends ActionHandlerBase {
     if (originalTotal) {
       try {
         const { FeatsHandler } = await import('../feats-handler.js');
+        const inNatural = (() => { try { return FeatsHandler.isEnvironmentActive(actionData.actor, 'natural'); } catch { return false; } })();
         originalNewVisibility = FeatsHandler.adjustVisibility('hide', actionData.actor, current, originalNewVisibility, {
-          inNaturalTerrain: false,
+          inNaturalTerrain: inNatural,
           outcome: originalOutcome,
         });
       } catch { }
