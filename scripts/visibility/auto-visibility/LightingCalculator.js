@@ -6,7 +6,6 @@
 
 import { MODULE_ID } from '../../constants.js';
 import { getLogger } from '../../utils/logger.js';
-import RegionHelper from '../../utils/region.js';
 const log = getLogger('LightingCalculator');
 
 export class LightingCalculator {
@@ -92,7 +91,9 @@ export class LightingCalculator {
         light.document?.config?.negative ||
         light.document?.config?.darkness?.negative ||
         light.document?.negative ||
-        light.config?.negative
+        light.config?.negative ||
+        // PF2E Visioner custom flag: mark this light as a magical darkness source
+        light.document?.getFlag?.(MODULE_ID, 'magicalDarkness')
       );
 
       // Skip if the light is hidden. For non-darkness lights also skip if they do not emit light.

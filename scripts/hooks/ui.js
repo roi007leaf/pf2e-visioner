@@ -9,6 +9,9 @@ export function registerUIHooks() {
   Hooks.on('renderTokenHUD', onRenderTokenHUD);
   Hooks.on('getTokenDirectoryEntryContext', onGetTokenDirectoryEntryContext);
   Hooks.on('renderWallConfig', onRenderWallConfig);
+  // Light config injection: add Magical Darkness checkbox
+  Hooks.on('renderLightConfig', onRenderLightConfig);
+  Hooks.on('renderAmbientLightConfig', onRenderLightConfig);
   // We no longer create a separate Visioner tool; tools are injected into Tokens/Walls below
   // Helper utilities to support both array- and object-shaped tool containers
   const getNamedTool = (toolsContainer, name) => {
@@ -746,6 +749,59 @@ export function registerUIHooks() {
         );
       }
 
+      // === LIGHTING TOOL ADDITIONS ===
+      const lighting = groups.find((c) => c?.name === 'lighting' || c?.name === 'lights');
+      if (lighting) {
+        // Toggle Magical Darkness on selected lights
+        const selectedLights = canvas?.lighting?.controlled ?? [];
+        const allAreMagDark = selectedLights.length > 0 && selectedLights.every((l) => !!l?.document?.getFlag?.(MODULE_ID, 'magicalDarkness'));
+        addTool(lighting.tools, {
+          name: 'pf2e-visioner-toggle-magical-darkness',
+          title: 'Toggle Magical Darkness (Selected Lights)',
+          icon: allAreMagDark ? 'fa-solid fa-moon' : 'fa-regular fa-moon',
+          toggle: true,
+          active: allAreMagDark,
+          onChange: async (_event, toggled) => {
+            try {
+              const selected = canvas?.lighting?.controlled ?? [];
+              if (!selected.length) return;
+              if (toggled) {
+                // Enable our flag and ensure the light is a darkness source in Foundry
+                await Promise.all(selected.map(async (l) => {
+                  try { await l?.document?.setFlag?.(MODULE_ID, 'magicalDarkness', true); } catch { }
+                  // If not already marked as a darkness source, set the negative flag(s)
+                  const isAlreadyDark = !!(
+                    l?.isDarknessSource ||
+                    l?.document?.config?.negative ||
+                    l?.document?.config?.darkness?.negative ||
+                    l?.document?.negative ||
+                    l?.config?.negative
+                  );
+                  if (!isAlreadyDark) {
+                    try {
+                      await l?.document?.update?.({ 'config.negative': true, 'config.darkness.negative': true });
+                    } catch { /* ignore if schema differs; our LightingCalculator still detects via our flag */ }
+                  }
+                }));
+              } else {
+                for (const l of selected) {
+                  try { await l?.document?.unsetFlag?.(MODULE_ID, 'magicalDarkness'); } catch { await l?.document?.setFlag?.(MODULE_ID, 'magicalDarkness', false); }
+                }
+              }
+              // Invalidate lighting cache and refresh perception so visibility updates immediately
+              try {
+                const { LightingCalculator } = await import('../visibility/auto-visibility/LightingCalculator.js');
+                LightingCalculator.getInstance().invalidateLightCache();
+              } catch { }
+              canvas.perception.update({ refreshVision: true, initializeVision: true, refreshLighting: true });
+              ui.controls.render(true);
+            } catch (e) {
+              console.error('[pf2e-visioner] Toggle Magical Darkness failed', e);
+            }
+          },
+        });
+      }
+
       // When selecting walls, show wall identifier if present on the control icon tooltip
       const showWallIdentifierTooltip = async () => {
         try {
@@ -990,6 +1046,68 @@ function onRenderWallConfig(app, html) {
       }
 
 
+    } catch { }
+  } catch { }
+}
+
+function onRenderLightConfig(app, html) {
+  try {
+    const root = html?.jquery ? html[0] : html;
+    if (!root) return;
+    const form = root.querySelector('form') || root;
+    if (!form || form.querySelector('.pf2e-visioner-light-settings')) return;
+
+    const fs = document.createElement('fieldset');
+    fs.className = 'pf2e-visioner-light-settings';
+    const lightDoc = app?.document || app?.object || null;
+    const checked = !!lightDoc?.getFlag?.(MODULE_ID, 'magicalDarkness');
+    fs.innerHTML = `
+        <legend>PF2E Visioner</legend>
+        <div class="form-group">
+          <label class="checkbox">
+            <input type="checkbox" name="flags.${MODULE_ID}.magicalDarkness" ${checked ? 'checked' : ''}>
+            Magical darkness (pierced only by Greater Darkvision)
+          </label>
+          <p class="notes">Marks this light as a darkness source that turns its bright/dim areas into magical darkness.</p>
+        </div>
+    `;
+    // Prefer the Advanced Options tab: insert at the top, before "Light Placement" if found
+    let inserted = false;
+    const advTab = form.querySelector('div.tab[data-tab="advanced"], section.tab[data-tab="advanced"], [data-tab="advanced"]');
+    if (advTab) {
+      try {
+        const headings = Array.from(advTab.querySelectorAll('legend,h2,h3,header,label'));
+        const lightPlacementHeader = headings.find((h) => /light\s*placement/i.test(h.textContent || ''));
+        if (lightPlacementHeader && lightPlacementHeader.parentElement) {
+          lightPlacementHeader.parentElement.insertAdjacentElement('beforebegin', fs);
+          inserted = true;
+        }
+      } catch { /* ignore */ }
+      if (!inserted) {
+        try {
+          advTab.insertBefore(fs, advTab.firstChild);
+          inserted = true;
+        } catch { /* ignore */ }
+      }
+    }
+    if (!inserted) form.appendChild(fs);
+
+    // Sync native darkness checkbox when enabling magical darkness in the form
+    try {
+      const magCb = form.querySelector(`input[name="flags.${MODULE_ID}.magicalDarkness"]`);
+      const nativeNeg = () => form.querySelector(
+        'input[name="config.negative"], input[name$=".negative"], input[name*="darkness"][name*="negative"]'
+      );
+      if (magCb) {
+        magCb.addEventListener('change', () => {
+          if (magCb.checked) {
+            const neg = nativeNeg();
+            if (neg && !neg.checked) {
+              try { neg.checked = true; neg.dispatchEvent(new Event('change', { bubbles: true })); } catch { }
+            }
+          }
+        });
+      }
     } catch { }
   } catch { }
 }
