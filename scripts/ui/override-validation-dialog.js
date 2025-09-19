@@ -55,7 +55,7 @@ export class OverrideValidationDialog extends foundry.applications.api.Handlebar
 
       if (/sneak/i.test(src)) {
         badgeLabel = 'Sneak Override';
-        badgeIcon = 'fa-running';
+        badgeIcon = 'fa-ninja';
         badgeClass = 'badge-sneak';
       } else if (/seek/i.test(src)) {
         badgeLabel = 'Seek action';
@@ -69,10 +69,6 @@ export class OverrideValidationDialog extends foundry.applications.api.Handlebar
         badgeLabel = 'Diversion';
         badgeIcon = 'fa-theater-masks';
         badgeClass = 'badge-diversion';
-      } else if (/take[_-]?cover/i.test(src)) {
-        badgeLabel = 'Take Cover';
-        badgeIcon = 'fa-shield-alt';
-        badgeClass = 'badge-takecover';
       } else if (/hide/i.test(src)) {
         badgeLabel = 'Hide Override';
         badgeIcon = 'fa-user-secret';

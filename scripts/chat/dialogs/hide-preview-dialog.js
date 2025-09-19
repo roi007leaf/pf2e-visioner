@@ -220,7 +220,7 @@ export class HidePreviewDialog extends BaseActionDialog {
     // Process outcomes to add additional properties needed by template
     let processedOutcomes = filteredOutcomes.map((outcome) => {
       const availableStates = this.getAvailableStatesForOutcome(outcome);
-      const effectiveNewState = outcome.overrideState || outcome.newVisibility;
+      const effectiveNewState = outcome.overrideState ?? outcome.newVisibility;
       const baseOldState = outcome.oldVisibility || outcome.currentVisibility;
       const hasActionableChange =
         baseOldState != null && effectiveNewState != null && effectiveNewState !== baseOldState;
@@ -230,7 +230,7 @@ export class HidePreviewDialog extends BaseActionDialog {
         positionDisplay: outcome.positionDisplay,
         hasPositionData: !!outcome.hasPositionData,
         availableStates,
-        overrideState: effectiveNewState,
+        // Do not clobber overrideState here; preserve only user-intended overrides
         hasActionableChange,
         calculatedOutcome: outcome.newVisibility,
         tokenImage: this.resolveTokenImage(outcome.target),
