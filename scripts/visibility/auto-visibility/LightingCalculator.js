@@ -41,36 +41,25 @@ export class LightingCalculator {
 
   /**
    * Get the light level at a specific position
-   * @param {Object} position - {x, y} coordinates
+   * @param {Object} position - {x, y, elevation} coordinates
    * @returns {Object} Light level information
    */
   getLightLevelAt(position) {
     if (log.enabled()) log.debug(() => ({ step: 'start-getLightLevelAt', position }));
 
-    const sceneDarkness = canvas.scene?.environment?.darknessLevel ?? canvas.scene?.darkness ?? 0;
+    const scene = canvas.scene;
+    const sceneDarkness = (scene.environment.globalLight.enabled)
+      ? canvas.effects.getDarknessLevel(position)
+      : 0.0;
 
-    // Determine if the scene actually has global illumination enabled.
-    // If not, there should be no base illumination and only light sources contribute.
-    // v13+: Use environment.globalLight.enabled; fall back to hasGlobalIllumination for older scenes
-    const hasGlobalIllumination =
-      canvas.scene?.environment?.globalLight?.enabled ??
-      canvas.scene?.hasGlobalIllumination ??
-      false;
-
-    // Start with base illumination only when global illumination is active
     // Foundry determines dark to be 75% or higher darkness
-    // Addition of global dim lighting requires addtion of a scene-wide setting.
-    // This also doesn't take darkness regions into consideration.
     const DARK = 0;
     const DIM = 1;
     const BRIGHT = 2;
-    const FOUNDRY_DARK = 0.25;
+    const FOUNDRY_DARK = 0.75;
 
-    // Check for region-specific darkness level
-    const regionDarkness = this.#getRegionDarknessAt(position);
-    const effectiveDarkness = regionDarkness !== null ? regionDarkness : sceneDarkness;
-
-    const baseIllumination = hasGlobalIllumination ? 1.0 - effectiveDarkness : 0.0;
+    const baseIllumination = 1.0 - sceneDarkness;
+    let illumination = sceneDarkness < FOUNDRY_DARK ? BRIGHT : DARK;
 
     function makeIlluminationResult(illumination, extras = {}) {
       const LIGHT_LEVELS = ['darkness', 'dim', 'bright'];
@@ -86,7 +75,6 @@ export class LightingCalculator {
       if (log.enabled()) log.debug(() => ({ step: 'illumination-result', res }));
       return res;
     }
-    let illumination = baseIllumination > FOUNDRY_DARK ? BRIGHT : DARK;
 
     // Check if position is illuminated by any light sources OR light-emitting tokens
     const lightSources = canvas.lighting?.placeables || [];
@@ -258,69 +246,6 @@ export class LightingCalculator {
 
     // After considering all light sources and token lights, return the final illumination result
     return makeIlluminationResult(illumination);
-  }
-
-  /**
-   * Get darkness level from scene regions at a specific position
-   * @param {Object} position - {x, y} coordinates
-   * @returns {number|null} Region darkness level or null if no region affects this position
-   */
-  #getRegionDarknessAt(position) {
-    // Check if scene regions exist (v12+)
-    if (!canvas.scene?.regions || !canvas.regions?.placeables) {
-      return null;
-    }
-
-    // Check each region to see if the position is within it
-    for (const region of canvas.regions.placeables) {
-      if (!region.document || region.document.hidden) {
-        continue;
-      }
-
-      // Check if position is within this region's bounds
-      if (this.#isPositionInRegion(position, region)) {
-        // Look for darkness behaviors (support legacy 'environment' and new 'adjustDarknessLevel')
-        const behaviors = region.document.behaviors || [];
-        for (const behavior of behaviors) {
-          if (behavior?.type === 'adjustDarknessLevel') {
-            const mode = behavior.system?.mode; // 0=set, 1=add, 2=mult (assumed semantics)
-            const modifier = Number(behavior.system?.modifier ?? 0);
-            const base = canvas.scene?.environment?.darknessLevel ?? canvas.scene?.darkness ?? 0;
-            let value = base;
-            switch (mode) {
-              case 0: // set
-                value = modifier; break;
-              case 1: // add
-                value = base + modifier; break;
-              case 2: // multiply
-                value = base * modifier; break;
-              default:
-                value = base + modifier; // fallback treat as additive
-            }
-            // Clamp between 0 and 1
-            value = Math.min(1, Math.max(0, value));
-            return value;
-          }
-        }
-      }
-    }
-
-    return null;
-  }
-
-  /**
-   * Check if a position is within a region
-   * @param {Object} position - {x, y} coordinates
-   * @param {Object} region - The region object
-   * @returns {boolean} True if position is within the region
-   */
-  #isPositionInRegion(position, region) {
-    try {
-      return RegionHelper.isPointInside(region, position);
-    } catch (error) {
-      console.warn(`${MODULE_ID} | Error checking region bounds:`, error);
-      return false;
-    }
   }
 
   /**
