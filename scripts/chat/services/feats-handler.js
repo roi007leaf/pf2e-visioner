@@ -373,12 +373,12 @@ export class FeatsHandler {
       reason = reason || 'Ceaseless Shadows removes cover/concealment requirement';
     }
 
-    // Legendary Sneak: You can Sneak even without cover/concealment at the start,
-    // as long as you end in cover or concealment (we still require endQualifies).
-    if (!startQualifies && endQualifies && feats.has('legendary-sneak')) {
+    // Legendary Sneak: You can Hide and Sneak even without cover or being concealed.
+    // RAW: bypass both start and end prerequisites entirely.
+    if (feats.has('legendary-sneak')) {
       startQualifies = true;
       endQualifies = true;
-      reason = 'Legendary Sneak removes cover/concealment requirement';
+      if (!reason) reason = 'Legendary Sneak removes cover/concealment requirement';
     }
 
     // Very, Very Sneaky: End position does not require cover or concealment either
