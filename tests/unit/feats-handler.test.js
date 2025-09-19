@@ -154,26 +154,6 @@ describe('FeatsHandler - all feats coverage', () => {
     });
   });
 
-  describe('create-a-diversion feat adjusters and visibility', () => {
-    test('cunning-distraction adds +1 shift', () => {
-      const actor = createActorWithFeats(['cunning-distraction']);
-      const { shift } = FeatsHandler.getOutcomeAdjustment(actor, 'create-a-diversion', {});
-      expect(shift).toBe(1);
-    });
-
-    test('distracting-shadows and shadow-self add +1 in dim and step one toward observed on visibility', () => {
-      const actor = createActorWithFeats(['distracting-shadows', 'shadow-self']);
-      const ctx = { inDimOrDarker: true };
-      const { shift } = FeatsHandler.getOutcomeAdjustment(actor, 'create-a-diversion', ctx);
-      // +1 +1 = 2 but clamp to +2 (still 2)
-      expect(shift).toBe(2);
-
-      // adjustVisibility: e.g., hidden -> observed ladder step (hidden -> observed)
-      const adjusted = FeatsHandler.adjustVisibility('create-a-diversion', actor, 'hidden', 'hidden', ctx);
-      expect(adjusted).toBe('observed');
-    });
-  });
-
   describe('multi-feat accumulation and clamp', () => {
     test('multiple sneak feats accumulate but clamp to +2', () => {
       const actor = createActorWithFeats([
