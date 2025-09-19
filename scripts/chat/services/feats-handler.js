@@ -84,7 +84,6 @@ function getActorFeatSlugs(actor) {
 const SNEAK_FEAT_ADJUSTERS = {
   // Examples: These are conservative interpretations meant to be refined.
   'terrain-stalker': (ctx) => (ctx.terrainMatches ? +1 : 0),
-  'foil-senses': () => +1,
   'vanish-into-the-land': (ctx) => (ctx.inNaturalTerrain ? +1 : 0),
   'legendary-sneak': () => +1,
   'very-sneaky': () => +1,
@@ -92,20 +91,13 @@ const SNEAK_FEAT_ADJUSTERS = {
   'distracting-shadows': (ctx) => (ctx.inDimOrDarker ? +1 : 0),
   'ceaseless-shadows': (ctx) => (ctx.inShadowyMovement ? +1 : 0),
   'shadow-self': (ctx) => (ctx.inDimOrDarker ? +1 : 0),
-  // Back-compat: accept either explicit flags (inForest/inSwamp) or legacy context.terrainTag
-  'forest-stealth': (ctx) => (ctx.inForest || ctx.terrainTag === 'forest' ? +1 : 0),
-  'swamp-stealth': (ctx) => (ctx.inSwamp || ctx.terrainTag === 'swamp' ? +1 : 0),
 };
 
 const HIDE_FEAT_ADJUSTERS = {
   'terrain-stalker': (ctx) => (ctx.terrainMatches ? +1 : 0),
-  'foil-senses': () => +1,
   'very-very-sneaky': () => +1,
   'vanish-into-the-land': (ctx) => (ctx.inNaturalTerrain ? +1 : 0),
   'legendary-sneak': () => +1,
-  // Back-compat: accept either explicit flags (inForest/inSwamp) or legacy context.terrainTag
-  'forest-stealth': (ctx) => (ctx.inForest || ctx.terrainTag === 'forest' ? +1 : 0),
-  'swamp-stealth': (ctx) => (ctx.inSwamp || ctx.terrainTag === 'swamp' ? +1 : 0),
 };
 
 const SEEK_FEAT_ADJUSTERS = {

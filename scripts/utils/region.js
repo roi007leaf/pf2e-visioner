@@ -36,11 +36,6 @@ export default class RegionHelper {
                 const elev = (p) => ({ x: p.x, y: p.y, z: p.z ?? p.elevation ?? 0 });
                 try { if (region.document.testPoint(elev(point))) return true; } catch { }
             }
-            // Back-compat: some regions expose testPoint directly on the region object
-            if (typeof region?.testPoint === 'function') {
-                try { if (region.testPoint(point)) return true; } catch { }
-                try { if (region.testPoint(point.x, point.y)) return true; } catch { }
-            }
             // Some regions expose containsPoint in different signatures
             if (typeof region?.containsPoint === 'function') {
                 try { if (region.containsPoint(point)) return true; } catch { }
