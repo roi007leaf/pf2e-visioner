@@ -5,7 +5,9 @@
  */
 
 import { MODULE_ID } from '../../constants.js';
+import { getLogger } from '../../utils/logger.js';
 import RegionHelper from '../../utils/region.js';
+const log = getLogger('LightingCalculator');
 
 export class LightingCalculator {
   /** @type {LightingCalculator} */
@@ -43,6 +45,7 @@ export class LightingCalculator {
    * @returns {Object} Light level information
    */
   getLightLevelAt(position) {
+    if (log.enabled()) log.debug(() => ({ step: 'start-getLightLevelAt', position }));
 
     const sceneDarkness = canvas.scene?.environment?.darknessLevel ?? canvas.scene?.darkness ?? 0;
 
@@ -69,16 +72,19 @@ export class LightingCalculator {
 
     const baseIllumination = hasGlobalIllumination ? 1.0 - effectiveDarkness : 0.0;
 
-    function makeIlluminationResult(illumination) {
+    function makeIlluminationResult(illumination, extras = {}) {
       const LIGHT_LEVELS = ['darkness', 'dim', 'bright'];
       const LIGHT_THRESHOLDS = [0.0, 0.5, 1.0];
-      return {
+      const res = {
         level: LIGHT_LEVELS[illumination],
         illumination,
         sceneDarkness,
         baseIllumination,
         lightIllumination: LIGHT_THRESHOLDS[illumination],
+        ...extras,
       };
+      if (log.enabled()) log.debug(() => ({ step: 'illumination-result', res }));
+      return res;
     }
     let illumination = baseIllumination > FOUNDRY_DARK ? BRIGHT : DARK;
 
@@ -135,7 +141,7 @@ export class LightingCalculator {
         // For darkness sources, both bright and dim areas provide full darkness
         if (isDarknessSource) {
           if (distanceSquared <= brightRadiusSquared || distanceSquared <= dimRadiusSquared) {
-            return makeIlluminationResult(DARK);
+            return makeIlluminationResult(DARK, { isDarknessSource: true });
           }
         } else {
           // Handle normal light sources (they increase illumination) - use pixel-converted radii
@@ -147,17 +153,19 @@ export class LightingCalculator {
           }
         }
       } else {
-        // Position is inside the light polygon, determine if it's bright or dim
-        // This requires checking if it's within the bright radius or just the dim radius
+        // Position is inside the light polygon: compute distance and compare against both radii
         const distanceSquared =
           Math.pow(position.x - lightX, 2) + Math.pow(position.y - lightY, 2);
         const brightRadiusSquared = Math.pow(brightRadius * pixelsPerUnit, 2);
+        const dimRadiusSquared = Math.pow(dimRadius * pixelsPerUnit, 2);
 
         if (isDarknessSource) {
-          return makeIlluminationResult(DARK);
+          return makeIlluminationResult(DARK, { isDarknessSource: true });
         } else {
-          // Within polygon - check if it's bright or dim illumination
-          if (distanceSquared <= brightRadiusSquared) {
+          // If beyond the configured dim radius, this light does not contribute
+          if (dimRadius > 0 && distanceSquared > dimRadiusSquared) {
+            // no contribution from this light
+          } else if (distanceSquared <= brightRadiusSquared) {
             illumination = BRIGHT;
           } else {
             illumination = Math.max(illumination, DIM);
@@ -173,22 +181,82 @@ export class LightingCalculator {
 
     // Check light-emitting tokens using cached results
     const lightEmittingTokens = this.#getLightEmittingTokens();
+    if (log.enabled()) log.debug(() => ({ step: 'token-lights-count', count: lightEmittingTokens.length }));
     for (const tokenInfo of lightEmittingTokens) {
+      // Optional: lightweight debug for token light entries
+      if (log.enabled()) log.debug(() => ({ step: 'token-light-entry', name: tokenInfo.name }));
+      // Prefer checking against the token's light polygon if available, which already
+      // accounts for wall clipping. Fall back to radial distance + wall occlusion checks.
+      let usedPolygon = false;
+      try {
+        const tok = canvas.tokens?.get?.(tokenInfo.id);
+        if (tok) {
+          const inPoly = this.#isPositionInTokenLightPolygon(position, tok);
+          if (log.enabled()) log.debug(() => ({ step: 'token-light-polygon-check', token: tok.name, inPoly }));
+          if (inPoly === false) {
+            usedPolygon = true;
+            continue;
+          } else if (inPoly === true) {
+            usedPolygon = true;
+            const distanceSquared = Math.pow(position.x - tokenInfo.x, 2) + Math.pow(position.y - tokenInfo.y, 2);
+            const brightRadiusSquared = Math.pow(tokenInfo.brightRadius * pixelsPerUnit, 2);
+            const dimRadiusSquared = Math.pow(tokenInfo.dimRadius * pixelsPerUnit, 2);
 
-      const distanceSquared =
-        Math.pow(position.x - tokenInfo.x, 2) + Math.pow(position.y - tokenInfo.y, 2);
+            // Even if the polygon includes the point, verify a wall does not occlude the token light.
+            const { occluded: isOccludedByWall, details: occlusionDetails } = this.#isPathOccludedByWalls(
+              { x: tokenInfo.x, y: tokenInfo.y },
+              { x: position.x, y: position.y },
+            );
+            if (log.enabled()) log.debug(() => ({ step: 'token-light-polygon-occlusion-ray', token: tok.name ?? tokenInfo.name, isOccludedByWall, samples: occlusionDetails?.samples?.length ?? 0 }));
 
-      const brightRadiusSquared = Math.pow(tokenInfo.brightRadius * pixelsPerUnit, 2);
-      const dimRadiusSquared = Math.pow(tokenInfo.dimRadius * pixelsPerUnit, 2);
+            if (isOccludedByWall) {
+              // Occluded: this token light does not contribute illumination at this position.
+              continue;
+            }
 
-      if (distanceSquared <= brightRadiusSquared) {
-        return makeIlluminationResult(BRIGHT);
-      } else if (distanceSquared <= dimRadiusSquared) {
-        // no need for max here since BRIGHT case already returned
-        illumination = DIM;
+            // If beyond the configured dim radius, this token light does not contribute
+            if (tokenInfo.dimRadius > 0 && distanceSquared > dimRadiusSquared) {
+              continue;
+            } else if (distanceSquared <= brightRadiusSquared) {
+              return makeIlluminationResult(BRIGHT);
+            } else {
+              illumination = Math.max(illumination, DIM);
+              // Continue evaluating other sources only if not bright.
+              continue;
+            }
+          }
+        }
+      } catch (err) {
+        if (log.enabled()) log.warn(() => ({ step: 'token-light-polygon-error', token: tokenInfo.name, error: err }));
+        /* noop, will fallback below */
       }
+
+      // Fallback path: radial distance with explicit wall occlusion checks
+      if (!usedPolygon) {
+        const distanceSquared = Math.pow(position.x - tokenInfo.x, 2) + Math.pow(position.y - tokenInfo.y, 2);
+        const brightRadiusSquared = Math.pow(tokenInfo.brightRadius * pixelsPerUnit, 2);
+        const dimRadiusSquared = Math.pow(tokenInfo.dimRadius * pixelsPerUnit, 2);
+
+        const { occluded: isOccludedByWall, details: occlusionDetails } = this.#isPathOccludedByWalls(
+          { x: tokenInfo.x, y: tokenInfo.y },
+          { x: position.x, y: position.y },
+        );
+        if (log.enabled()) log.debug(() => ({ step: 'token-light-occlusion-ray', token: tokenInfo.name, isOccludedByWall, samples: occlusionDetails?.samples?.length ?? 0 }));
+
+        if (!isOccludedByWall) {
+          if (distanceSquared <= brightRadiusSquared) {
+            if (log.enabled()) log.debug(() => ({ step: 'token-light-fallback-bright', token: tokenInfo.name }));
+            return makeIlluminationResult(BRIGHT);
+          } else if (distanceSquared <= dimRadiusSquared) {
+            if (log.enabled()) log.debug(() => ({ step: 'token-light-fallback-dim', token: tokenInfo.name }));
+            illumination = DIM;
+          }
+        }
+      }
+
     }
 
+    // After considering all light sources and token lights, return the final illumination result
     return makeIlluminationResult(illumination);
   }
 
@@ -264,6 +332,10 @@ export class LightingCalculator {
   #isPositionInLightPolygon(position, light) {
     try {
       const shape = light.shape || light.lightSource?.shape || light.source?.shape || null;
+      if (log.enabled()) {
+        const srcName = light?.constructor?.name;
+        log.debug(() => ({ step: 'polygon-shape-detect', src: srcName, hasShape: !!shape }));
+      }
 
       const testPoly = (poly) => {
         if (!poly) return null;
@@ -305,15 +377,136 @@ export class LightingCalculator {
   }
 
   /**
+   * Robust wall-occlusion test between two points using multi-ray sampling.
+   * Returns { occluded: boolean, details: object }
+   */
+  #isPathOccludedByWalls(A, B) {
+    const details = { samples: [], used: 'checkCollision', epsilon: 0 };
+    try {
+      const RayClass = foundry?.canvas?.geometry?.Ray || foundry?.utils?.Ray;
+      const dx = B.x - A.x;
+      const dy = B.y - A.y;
+      const len = Math.hypot(dx, dy) || 1;
+      // Perpendicular unit vector
+      const px = -dy / len;
+      const py = dx / len;
+      const grid = canvas.grid?.size || 100;
+      const eps = Math.max(1, Math.round(grid * 0.02)); // ~2% grid size, at least 1px
+      details.epsilon = eps;
+
+      const offsets = [0, +eps, -eps];
+      let centralBlocked = false;
+      let blockedCount = 0;
+      for (const off of offsets) {
+        const Ao = { x: A.x + px * off, y: A.y + py * off };
+        const Bo = { x: B.x + px * off, y: B.y + py * off };
+        let blockedLight = false, blockedSight = false, blockedFallback = false;
+        try {
+          if (RayClass) {
+            const ray = new RayClass(Ao, Bo);
+            blockedLight = !!(canvas.walls?.checkCollision?.(ray, { type: 'light', mode: 'any' }) ?? false);
+            blockedSight = !!(canvas.walls?.checkCollision?.(ray, { type: 'sight', mode: 'any' }) ?? false);
+            blockedFallback = !!(canvas.walls?.checkCollision?.(ray) ?? false);
+          } else if (canvas.walls?.checkCollision) {
+            const seg = { A: Ao, B: Bo };
+            blockedLight = !!canvas.walls.checkCollision(seg, { type: 'light', mode: 'any' });
+            blockedSight = !!canvas.walls.checkCollision(seg, { type: 'sight', mode: 'any' });
+            blockedFallback = !!canvas.walls.checkCollision(seg);
+          } else if (canvas.walls?.raycast) {
+            details.used = 'raycast';
+            blockedFallback = !!canvas.walls.raycast(Ao, Bo);
+          }
+        } catch { /* ignore */ }
+
+        const blocked = !!(blockedLight || blockedSight || blockedFallback);
+        if (off === 0) centralBlocked = blocked;
+        if (blocked) blockedCount++;
+        details.samples.push({ off, Ao, Bo, blockedLight, blockedSight, blockedFallback, blocked });
+      }
+
+      // Conservative rule: if the central ray is blocked OR at least two samples are blocked, treat as occluded
+      const occluded = centralBlocked || blockedCount >= 2;
+      details.centralBlocked = centralBlocked;
+      details.blockedCount = blockedCount;
+      return { occluded, details };
+    } catch (error) {
+      return { occluded: false, details: { error } };
+    }
+  }
+
+  /**
+   * Check if a position lies within a token's emitted light polygon, if available.
+   * Returns:
+   * - true if inside
+   * - false if outside
+   * - null if no polygon is available (callers should fallback to distance checks)
+   */
+  #isPositionInTokenLightPolygon(position, token) {
+    try {
+      // Try multiple paths to find a LightSource-like object with a shape
+      // Foundry versions may expose token light via different properties
+      const source = this.#getTokenLightSource(token);
+      if (!source) return null;
+      // Reuse existing polygon tester by passing the source, which has a .shape
+      return this.#isPositionInLightPolygon(position, source);
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Attempt to retrieve a token's LightSource-like object across Foundry versions.
+   * Returns undefined/null if not found.
+   */
+  #getTokenLightSource(token) {
+    try {
+      // Common paths across v10-v13
+      return (
+        token?.light?.source ||
+        token?.lightSource ||
+        token?.source ||
+        // Some builds expose the shape directly on token.light
+        (token?.light?.shape ? { shape: token.light.shape } : null) ||
+        null
+      );
+    } catch {
+      return null;
+    }
+  }
+
+  /**
    * Get cached light-emitting tokens or refresh cache if expired
    * @returns {Array} Array of light-emitting token information
    */
   #getLightEmittingTokens() {
     const now = Date.now();
     if (this.#lightEmittingTokensCache && (now - this.#lightCacheTimestamp) < this.#lightCacheTimeout) {
-      return this.#lightEmittingTokensCache;
+      try {
+        // Verify freshness: if any token center or radii changed since cache, refresh now
+        const placeables = canvas.tokens?.placeables || [];
+        let stale = false;
+        if (placeables.length !== this.#lightEmittingTokensCache.length) {
+          stale = true;
+        } else {
+          const byId = new Map(this.#lightEmittingTokensCache.map(t => [t.id, t]));
+          for (const tok of placeables) {
+            const c = byId.get(tok.id);
+            if (!c) { stale = true; break; }
+            const cx = tok.center?.x ?? tok.x;
+            const cy = tok.center?.y ?? tok.y;
+            const br = tok.document.light?.bright || tok.light?.bright || tok.document.config?.light?.bright || tok.document.data?.light?.bright || tok.data?.light?.bright || 0;
+            const dr = tok.document.light?.dim || tok.light?.dim || tok.document.config?.light?.dim || tok.document.data?.light?.dim || tok.data?.light?.dim || 0;
+            if (c.x !== cx || c.y !== cy || c.brightRadius !== br || c.dimRadius !== dr) { stale = true; break; }
+          }
+        }
+        if (!stale) {
+          if (log.enabled()) log.debug(() => ({ step: 'token-cache-hit', count: this.#lightEmittingTokensCache?.length || 0 }));
+          return this.#lightEmittingTokensCache;
+        }
+      } catch { /* if any error, refresh below */ }
     }
     this.#refreshLightEmittingTokensCache();
+    if (log.enabled()) log.debug(() => ({ step: 'token-cache-refreshed', count: this.#lightEmittingTokensCache?.length || 0 }));
     return this.#lightEmittingTokensCache || [];
   }
   /**
@@ -351,6 +544,7 @@ export class LightingCalculator {
         return hasLight;
       })
       .map((token) => ({
+        id: token.id,
         name: token.name,
         x: token.center.x,
         y: token.center.y,
@@ -379,6 +573,7 @@ export class LightingCalculator {
   invalidateLightCache() {
     this.#lightEmittingTokensCache = null;
     this.#lightCacheTimestamp = 0;
+    if (log.enabled()) log.debug(() => ({ step: 'invalidateLightCache' }));
   }
 
   /**

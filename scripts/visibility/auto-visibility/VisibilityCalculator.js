@@ -3,7 +3,8 @@
  * Bypasses all throttling and circuit breaking for immediate processing
  */
 
-import { MODULE_ID } from '../../constants.js';
+import { getLogger } from '../../utils/logger.js';
+const log = getLogger('VisibilityCalculator');
 
 
 export class VisibilityCalculator {
@@ -90,7 +91,7 @@ export class VisibilityCalculator {
         target.document.flags['pf2e-visioner'][observerFlagKey] = removedOverride;
       }
     }
-    
+
     return result;
   }
 
@@ -118,12 +119,14 @@ export class VisibilityCalculator {
 
       // Step 1: Check if observer is blinded (cannot see anything)
       const isBlinded = this.#conditionManager.isBlinded(observer);
+      if (log.enabled()) log.debug(() => ({ step: 'blinded-check', observer: observer.name, result: isBlinded }));
       if (isBlinded) {
         return 'hidden';
       }
 
       // Step 2: Check if target is completely invisible to observer
       const isInvisible = this.#conditionManager.isInvisibleTo(observer, target);
+      if (log.enabled()) log.debug(() => ({ step: 'invisible-check', observer: observer.name, target: target.name, result: isInvisible }));
       if (isInvisible) {
         // In PF2e, invisible targets are undetected to all observers unless they have special abilities
         return 'undetected';
@@ -131,14 +134,20 @@ export class VisibilityCalculator {
 
       // Step 3: Check if observer is dazzled (everything appears concealed)
       const isDazzled = this.#conditionManager.isDazzled(observer);
+      if (log.enabled()) log.debug(() => ({ step: 'dazzled-check', observer: observer.name, result: isDazzled }));
       if (isDazzled) {
         // In PF2e, dazzled creatures see everything as concealed unless they have special abilities
         return 'concealed';
       }
 
-      // Step 4: Check line of sight (informational only). No-LoS should not grant 'hidden' by itself.
-      // When called from calculateVisibilityWithoutOverrides, overrides are cleared but
-      // Foundry detection wrappers can still bias LoS. Use raw=true for direct LoS.
+      // Step 4: Check line of sight directly against walls. If LoS is blocked, treat as hidden.
+      try {
+        const losClear = !!this.#visionAnalyzer.hasLineOfSight(observer, target, true);
+        if (log.enabled()) log.debug(() => ({ step: 'los-raw', observer: observer.name, target: target.name, losClear }));
+        if (!losClear) {
+          return 'hidden';
+        }
+      } catch { /* best effort: continue */ }
 
       // Step 5: Check lighting conditions at target's position
       // Use position override if provided, otherwise calculate from document
@@ -149,17 +158,19 @@ export class VisibilityCalculator {
       };
       const lightLevel = this.#lightingCalculator.getLightLevelAt(targetPosition);
       const observerVision = this.#visionAnalyzer.getVisionCapabilities(observer);
+      if (log.enabled()) log.debug(() => ({ step: 'lighting', target: target.name, pos: targetPosition, lightLevel }));
+      if (log.enabled()) log.debug(() => ({ step: 'vision-capabilities', observer: observer.name, observerVision }));
 
       // Step 6: Determine visibility based on light level and observer's vision
       const result = this.#visionAnalyzer.determineVisibilityFromLighting(
         lightLevel,
         observerVision,
-        target, // Pass the target token for sneaking checks
       );
+      if (log.enabled()) log.info(() => ({ step: 'result', observer: observer.name, target: target.name, result }));
 
       return result;
     } catch (error) {
-      try { console.warn('PF2E Visioner | calcVis: error, default observed', error); } catch {}
+      try { console.warn('PF2E Visioner | calcVis: error, default observed', error); } catch { }
       return 'observed'; // Default fallback
     }
   }

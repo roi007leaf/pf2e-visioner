@@ -5,6 +5,8 @@
  */
 
 import { MODULE_ID } from '../../constants.js';
+import { getLogger } from '../../utils/logger.js';
+const log = getLogger('VisionAnalyzer');
 
 export class VisionAnalyzer {
   /** @type {VisionAnalyzer} */
@@ -43,7 +45,7 @@ export class VisionAnalyzer {
    */
   getVisionCapabilities(token) {
     if (!token?.actor) {
-      return { hasVision: false, hasDarkvision: false, hasLowLightVision: false };
+      return { hasVision: false, hasDarkvision: false, hasLowLightVision: false, hasGreaterDarkvision: false };
     }
 
     const tokenId = token.document.id;
@@ -75,12 +77,13 @@ export class VisionAnalyzer {
   #calculateVisionCapabilities(token) {
     const actor = token.actor;
     if (!actor) {
-      return { hasVision: false, hasDarkvision: false, hasLowLightVision: false };
+      return { hasVision: false, hasDarkvision: false, hasLowLightVision: false, hasGreaterDarkvision: false };
     }
 
     let hasVision = true;
     let hasDarkvision = false;
     let hasLowLightVision = false;
+    let hasGreaterDarkvision = false;
     let darkvisionRange = 0;
     let lowLightRange = 0;
     let isBlinded = false;
@@ -116,7 +119,11 @@ export class VisionAnalyzer {
         if (Array.isArray(senses)) {
           // NPC format: array of sense objects
           for (const sense of senses) {
-            if (sense.type === 'darkvision') {
+            if (sense.type === 'greater-darkvision' || sense.type === 'greaterDarkvision') {
+              hasDarkvision = true;
+              hasGreaterDarkvision = true;
+              darkvisionRange = sense.range || Infinity;
+            } else if (sense.type === 'darkvision') {
               hasDarkvision = true;
               darkvisionRange = sense.range || Infinity;
             } else if (sense.type === 'low-light-vision') {
@@ -126,6 +133,11 @@ export class VisionAnalyzer {
           }
         } else {
           // PC format: object with sense properties
+          if (senses['greater-darkvision'] || senses.greaterDarkvision) {
+            hasDarkvision = true;
+            hasGreaterDarkvision = true;
+            darkvisionRange = (senses['greater-darkvision']?.range || senses.greaterDarkvision?.range || Infinity);
+          }
           if (senses.darkvision) {
             hasDarkvision = true;
             darkvisionRange = senses.darkvision.range || Infinity;
@@ -143,6 +155,13 @@ export class VisionAnalyzer {
         darkvisionRange = actor.darkvision || actor.system?.darkvision || Infinity;
       }
 
+      // Greater darkvision via flags or custom fields
+      if (!hasGreaterDarkvision && (actor['greater-darkvision'] || actor.system?.['greater-darkvision'])) {
+        hasDarkvision = true;
+        hasGreaterDarkvision = true;
+        darkvisionRange = actor['greater-darkvision'] || actor.system?.['greater-darkvision'] || darkvisionRange || Infinity;
+      }
+
       if (!hasLowLightVision && (actor['low-light-vision'] || actor.system?.['low-light-vision'])) {
         hasLowLightVision = true;
         lowLightRange = actor['low-light-vision'] || actor.system?.['low-light-vision'] || Infinity;
@@ -154,11 +173,16 @@ export class VisionAnalyzer {
         hasDarkvision = true;
         darkvisionRange = flags.darkvision.range || Infinity;
       }
+      if (!hasGreaterDarkvision && (flags['greater-darkvision'] || flags.greaterDarkvision)) {
+        hasDarkvision = true;
+        hasGreaterDarkvision = true;
+        darkvisionRange = (flags['greater-darkvision']?.range || flags.greaterDarkvision?.range || darkvisionRange || Infinity);
+      }
       if (!hasLowLightVision && flags['low-light-vision']) {
         hasLowLightVision = true;
         lowLightRange = flags['low-light-vision'].range || Infinity;
       }
-  } catch {
+    } catch {
     }
 
     const result = {
@@ -169,6 +193,7 @@ export class VisionAnalyzer {
       lowLightRange,
       isBlinded,
       isDazzled,
+      hasGreaterDarkvision,
     };
 
     return result;
@@ -186,25 +211,26 @@ export class VisionAnalyzer {
     try {
       if (raw) {
         const res = this.#hasDirectLineOfSight(observer, target);
-
+        if (log.enabled()) log.debug(() => ({ step: 'los-raw', observer: observer?.name, target: target?.name, res }));
         return res;
       }
       // Special handling for sneaking tokens - bypass Foundry's detection system
       // to avoid interference from detection wrapper
       const isTargetSneaking = target.document.getFlag('pf2e-visioner', 'sneak-active');
       const isObserverSneaking = observer.document.getFlag('pf2e-visioner', 'sneak-active');
-      
+
       if (isTargetSneaking || isObserverSneaking) {
         // For sneaking tokens, use direct ray casting instead of Foundry's testVisibility
         // This bypasses the detection wrapper and gives us true line-of-sight
         return this.#hasDirectLineOfSight(observer, target);
       }
-      
+
       // For normal tokens, use FoundryVTT's built-in visibility testing
       const result = canvas.visibility.testVisibility(target.center, {
         tolerance: 0,
         object: target,
       });
+      if (log.enabled()) log.debug(() => ({ step: 'los-foundry', observer: observer?.name, target: target?.name, result }));
 
       return result;
     } catch (error) {
@@ -224,10 +250,12 @@ export class VisionAnalyzer {
     try {
       // Use Foundry's walls collision test for sight. This checks only topology (walls),
       // bypassing detection modes/wrappers that affect canvas.visibility.testVisibility.
-  const RayClass = foundry?.canvas?.geometry?.Ray || foundry?.utils?.Ray;
+      const RayClass = foundry?.canvas?.geometry?.Ray || foundry?.utils?.Ray;
       const ray = new RayClass(observer.center, target.center);
       const blocked = canvas.walls?.checkCollision?.(ray, { type: 'sight' }) ?? false;
-      return !blocked;
+      const res = !blocked;
+      if (log.enabled()) log.debug(() => ({ step: 'raycast-sight', observer: observer?.name, target: target?.name, blocked, res }));
+      return res;
     } catch (error) {
       console.warn(`${MODULE_ID} | Error in direct line of sight check:`, error);
       // Fallback to Foundry's method if direct check fails
@@ -267,8 +295,8 @@ export class VisionAnalyzer {
    * @param {Token} target - The target token (for sneaking checks)
    * @returns {string} Visibility state
    */
-  determineVisibilityFromLighting(lightLevel, observerVision, target = null) {
-
+  determineVisibilityFromLighting(lightLevel, observerVision) {
+    if (log.enabled()) log.debug(() => ({ step: 'determineVisibility', lightLevel: lightLevel?.level, observerVision }));
     // Blinded: Can't see anything (handled by hasVision = false)
     if (!observerVision.hasVision) {
       return 'hidden';
@@ -284,6 +312,7 @@ export class VisionAnalyzer {
     }
 
     let result;
+    const isMagicalDarkness = !!lightLevel?.isDarknessSource; // tagged by LightingCalculator
     switch (lightLevel.level) {
       case 'bright':
         result = 'observed';
@@ -298,7 +327,11 @@ export class VisionAnalyzer {
         break;
 
       case 'darkness':
-        if (observerVision.hasDarkvision) {
+        if (isMagicalDarkness) {
+          // Only greater darkvision pierces magical/negative darkness
+          if (observerVision.hasGreaterDarkvision) result = 'observed';
+          else result = 'hidden';
+        } else if (observerVision.hasDarkvision) {
           result = 'observed';
         } else {
           result = 'hidden';

@@ -4,12 +4,7 @@
  * Relies purely on event batching and requestAnimationFrame for performance
  */
 
-import AvsOverrideManager from '../../chat/services/infra/avs-override-manager.js';
 import { MODULE_ID } from '../../constants.js';
-import { refreshEveryonesPerceptionOptimized } from '../../services/optimized-socket.js';
-import { getVisibilityMap, setVisibilityBetween } from '../../stores/visibility-map.js';
-import { optimizedPerceptionManager } from './PerceptionManager.js';
-import { optimizedVisibilityCalculator } from './VisibilityCalculator.js';
 
 // Exported helper for unit tests and potential external reuse
 export function isDefeatedOrUnconscious(token) {
@@ -60,6 +55,24 @@ export class EventDrivenVisibilitySystem {
   /** @type {boolean} - Flag to prevent reacting to our own effect changes */
   #isUpdatingEffects = false;
 
+  /** @type {import('./LightingCalculator.js').LightingCalculator} */
+  #lightingCalculator = null;
+
+  /** @type {any} - Lazily loaded AVS Override Manager */
+  #avsOverrideManager = null;
+
+  /** @type {any} - Optimized visibility calculator facade */
+  #optimizedVisibilityCalculator = null;
+
+  /** @type {(observer: Token, target: Token) => any} */
+  #getVisibilityMap = null;
+
+  /** @type {(observer: Token, target: Token, state: string, options?: any) => void} */
+  #setVisibilityBetween = null;
+
+  /** @type {() => void} */
+  #refreshPerception = null;
+
   // AVS Override Management
   /** @type {Map<string, Object>} - Active overrides by "observerId-targetId" key */
   #activeOverrides = new Map();
@@ -95,17 +108,22 @@ export class EventDrivenVisibilitySystem {
     const { LightingCalculator } = await import('./LightingCalculator.js');
     const { VisionAnalyzer } = await import('./VisionAnalyzer.js');
     const { ConditionManager } = await import('./ConditionManager.js');
+    const { optimizedVisibilityCalculator } = await import('./VisibilityCalculator.js');
+    const { refreshEveryonesPerceptionOptimized } = await import('../../services/optimized-socket.js');
+    const { getVisibilityMap, setVisibilityBetween } = await import('../../stores/visibility-map.js');
 
     const lightingCalculator = LightingCalculator.getInstance();
+    this.#lightingCalculator = lightingCalculator;
     const visionAnalyzer = VisionAnalyzer.getInstance();
     const invisibilityManager = ConditionManager.getInstance();
 
     // Initialize the optimized visibility calculator with the core components
-    optimizedVisibilityCalculator.initialize(
-      lightingCalculator,
-      visionAnalyzer,
-      invisibilityManager,
-    );
+    optimizedVisibilityCalculator.initialize(lightingCalculator, visionAnalyzer, invisibilityManager);
+    // Store facades/utilities for later method use
+    this.#optimizedVisibilityCalculator = optimizedVisibilityCalculator;
+    this.#refreshPerception = refreshEveryonesPerceptionOptimized;
+    this.#getVisibilityMap = getVisibilityMap;
+    this.#setVisibilityBetween = setVisibilityBetween;
 
     this.#enabled = game.settings.get(MODULE_ID, 'autoVisibilityEnabled');
 
@@ -126,7 +144,15 @@ export class EventDrivenVisibilitySystem {
     Hooks.on('deleteToken', this.#onTokenDelete.bind(this));
 
     // AVS Override Management Hook is centralized in AvsOverrideManager
-    try { AvsOverrideManager.registerHooks(); } catch { }
+    // Use promise-based dynamic import here because `await` is not allowed in this non-async method.
+    import('../../chat/services/infra/avs-override-manager.js')
+      .then(({ default: AvsOverrideManager }) => {
+        try {
+          AvsOverrideManager.registerHooks?.();
+          this.#avsOverrideManager = AvsOverrideManager;
+        } catch { /* best-effort */ }
+      })
+      .catch(() => { /* ignore if module can't be loaded */ });
 
     // Lighting events
     Hooks.on('updateAmbientLight', this.#onLightUpdate.bind(this));
@@ -214,27 +240,18 @@ export class EventDrivenVisibilitySystem {
       changes.actorData?.effects !== undefined || changes.actorData !== undefined;
 
 
-    let shouldUpdate = false;
+    // Removed threshold-gated batching; we process immediately for all relevant changes
 
-    if (positionChanged) {
-      const distance = this.#getMovementDistance(tokenDoc, changes);
-      const threshold = (canvas.grid?.size || 100) * 0.5;
-      if (distance >= threshold) shouldUpdate = true;
-    }
+    // Invalidate lighting cache immediately when position or light changed (even for tiny moves)
+    try {
+      if (this.#lightingCalculator && (positionChanged || lightChanged)) {
+        this.#lightingCalculator.invalidateLightCache();
+      }
+    } catch { /* best-effort only */ }
 
-    if ((lightChanged || visionChanged)) {
-      shouldUpdate = true;
-      // Removed debug log
-    }
-
-    if (effectsChanged) {
-      shouldUpdate = true;
-      // Removed debug log
-    }
-
-    if (shouldUpdate) {
+    // For any relevant change, store updated coordinates and trigger immediate processing
+    if (positionChanged || lightChanged || visionChanged || effectsChanged) {
       // Store the updated document for position calculations
-      // Use the NEW coordinates from changes, fallback to current if not changed
       this.#updatedTokenDocs.set(tokenDoc.id, {
         id: tokenDoc.id,
         x: changes.x !== undefined ? changes.x : tokenDoc.x,
@@ -596,6 +613,14 @@ export class EventDrivenVisibilitySystem {
         await new Promise(resolve => setTimeout(resolve, 25)); // Reduced delay, only when needed
       }
 
+      // Ensure canvas perception and token geometry are up-to-date before we sample LoS/lighting.
+      // This avoids the "one extra step" lag at borders when Foundry hasn't fully settled yet.
+      try {
+        this.#refreshPerception?.();
+      } catch { /* best-effort */ }
+      // Wait two RAFs to allow rendering and perception to settle
+      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+
       // Removed debug log
       // const debugMode = game.settings.get(MODULE_ID, 'autoVisibilityDebugMode');
       // const startTime = performance.now();
@@ -603,6 +628,8 @@ export class EventDrivenVisibilitySystem {
       // Only include tokens that are not excluded per policy
       const allTokens = canvas.tokens?.placeables?.filter((t) => t.actor && !this.#isExcludedToken(t)) || [];
       const updates = [];
+
+      // Debug logging removed
 
       // For each changed token, recalculate visibility with all other tokens
       for (const changedTokenId of this.#changedTokens) {
@@ -664,19 +691,21 @@ export class EventDrivenVisibilitySystem {
 
           // Read current map values early for potential suppression logic later
           const currentVisibility1 =
-            getVisibilityMap(changedToken)[otherToken.document.id] || 'observed';
+            this.#getVisibilityMap?.(changedToken)?.[otherToken.document.id] || 'observed';
           const currentVisibility2 =
-            getVisibilityMap(otherToken)[changedToken.document.id] || 'observed';
+            this.#getVisibilityMap?.(otherToken)?.[changedToken.document.id] || 'observed';
 
           // Only calculate visibility if we don't have overrides
           if (!hasOverride1 || !hasOverride2) {
             const changedTokenPosition = this.#getTokenPosition(changedToken);
             const otherTokenPosition = this.#getTokenPosition(otherToken);
 
+            // Debug logging removed
+
             // Calculate visibility in both directions using optimized calculator
             // Pass position overrides to ensure we use the latest coordinates
             if (!hasOverride1) {
-              const visibility1 = await optimizedVisibilityCalculator.calculateVisibilityWithPosition(
+              const visibility1 = await this.#optimizedVisibilityCalculator.calculateVisibilityWithPosition(
                 changedToken,
                 otherToken,
                 changedTokenPosition,
@@ -686,7 +715,7 @@ export class EventDrivenVisibilitySystem {
             }
 
             if (!hasOverride2) {
-              const visibility2 = await optimizedVisibilityCalculator.calculateVisibilityWithPosition(
+              const visibility2 = await this.#optimizedVisibilityCalculator.calculateVisibilityWithPosition(
                 otherToken,
                 changedToken,
                 otherTokenPosition,
@@ -694,38 +723,13 @@ export class EventDrivenVisibilitySystem {
               );
               effectiveVisibility2 = visibility2;
             }
+
+            // Debug logging removed
           }
 
 
-          // Suppress wall-only driven "hidden/undetected" changes: walls should grant cover, not change vision states
-          // If calculator suggests hidden/undetected solely due to an obstacle (e.g., wall), keep previous state
-          // We use CoverDetector and only suppress when target has greater cover (typical for solid walls)
-          if (!hasOverride1 && (effectiveVisibility1 === 'hidden' || effectiveVisibility1 === 'undetected')) {
-            try {
-              const { CoverDetector } = await import('../../cover/auto-cover/CoverDetector.js');
-              const coverDetector = new CoverDetector();
-              const coverResult = coverDetector.detectBetweenTokens(changedToken, otherToken);
-              if (coverResult === 'greater') {
-                // Keep existing state; do not downgrade to hidden/undetected because of walls
-                effectiveVisibility1 = currentVisibility1;
-              }
-            } catch {
-              // Best effort only; if cover calc fails, proceed without suppression
-            }
-          }
-
-          if (!hasOverride2 && (effectiveVisibility2 === 'hidden' || effectiveVisibility2 === 'undetected')) {
-            try {
-              const { CoverDetector } = await import('../../cover/auto-cover/CoverDetector.js');
-              const coverDetector = new CoverDetector();
-              const coverResult = coverDetector.detectBetweenTokens(otherToken, changedToken);
-              if (coverResult === 'greater') {
-                effectiveVisibility2 = currentVisibility2;
-              }
-            } catch {
-              // Best effort only
-            }
-          }
+          // Note: Suppression of downgrades (e.g., keeping 'concealed' when new calc says 'hidden')
+          // has been removed to avoid border-step lag and ensure immediate state transitions.
 
 
           // Only update if visibility changed
@@ -757,7 +761,7 @@ export class EventDrivenVisibilitySystem {
       // Apply all updates immediately
       if (updates.length > 0) {
         for (const update of updates) {
-          setVisibilityBetween(update.observer, update.target, update.visibility, {
+          this.#setVisibilityBetween?.(update.observer, update.target, update.visibility, {
             isAutomatic: true,
           });
 
@@ -769,8 +773,13 @@ export class EventDrivenVisibilitySystem {
           );
         }
 
+        // Allow the visibility-map writes and hooks to settle visually before global refresh
+        try {
+          await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+        } catch { /* noop */ }
+
         // Refresh perception once for all updates - IMMEDIATELY
-        refreshEveryonesPerceptionOptimized();
+        this.#refreshPerception?.();
 
         this.#updateCount += updates.length;
       }
@@ -785,17 +794,7 @@ export class EventDrivenVisibilitySystem {
     }
   }
 
-  /**
-   * Calculate movement distance for threshold checking
-   */
-  #getMovementDistance(tokenDoc, changes) {
-    const currentX = tokenDoc.x || 0;
-    const currentY = tokenDoc.y || 0;
-    const newX = changes.x !== undefined ? changes.x : currentX;
-    const newY = changes.y !== undefined ? changes.y : currentY;
-
-    return Math.sqrt(Math.pow(newX - currentX, 2) + Math.pow(newY - currentY, 2));
-  }
+  // Removed unused #getMovementDistance
 
   /**
    * Get the actual position for a token, using live canvas coordinates first
@@ -836,39 +835,19 @@ export class EventDrivenVisibilitySystem {
     return position;
   }
 
-  /**
-   * Check Foundry's visibility for a token's center point.
-   * Returns false if the token fails Foundry visibility checks (treated like Foundry-hidden for AVS purposes).
-   */
-  #passesFoundryVisibility(token) {
-    try {
-      const point = token?.center || null;
-      if (!point) return true; // default to include if we can't get center
-      if (canvas?.visibility?.testVisibility) {
-        return !!canvas.visibility.testVisibility(point, { object: token, tolerance: 0 });
-      }
-      // Fallback for older APIs
-      if (canvas?.sight?.testVisibility) {
-        return !!canvas.sight.testVisibility(point, { tolerance: 0 });
-      }
-    } catch {
-      // Best effort only
-    }
-    return true;
-  }
+  // Removed unused #passesFoundryVisibility
 
   /**
    * Central predicate: tokens excluded from AVS calculations
+   * Keep exclusion minimal to avoid delaying state updates at visibility borders.
    * - Foundry hidden
-   * - Sneak-active flag set
-   * - Do not pass Foundry's testVisibility
+   * - Defeated/unconscious/dead (cannot observe others)
    */
   #isExcludedToken(token) {
     try {
       if (!token?.document) return true;
       if (token.document.hidden) return true;
-      if (token.document.getFlag(MODULE_ID, 'sneak-active')) return true;
-      if (!this.#passesFoundryVisibility(token)) return true;
+      // Do not exclude based on sneak-active or viewport visibility; AVS must still process them
       // Skip defeated / unconscious / dead tokens: they can't currently observe others
       try {
         const actor = token.actor;
@@ -1030,11 +1009,11 @@ export class EventDrivenVisibilitySystem {
     try {
       // Short-circuit: AVS does not calculate for excluded participants (hidden, fails testVisibility, sneak-active)
       if (observer && this.#isExcludedToken(observer)) {
-        const map = getVisibilityMap(observer || {});
+        const map = this.#getVisibilityMap?.(observer || {});
         return map?.[target?.document?.id] || 'observed';
       }
       if (target && this.#isExcludedToken(target)) {
-        const map = getVisibilityMap(observer || {});
+        const map = this.#getVisibilityMap?.(observer || {});
         return map?.[target?.document?.id] || 'observed';
       }
       // Ensure we don't use stale cached vision capabilities when movement just happened
@@ -1044,7 +1023,7 @@ export class EventDrivenVisibilitySystem {
     } catch {
       // Best effort only
     }
-    return await optimizedVisibilityCalculator.calculateVisibility(observer, target);
+    return await this.#optimizedVisibilityCalculator.calculateVisibility(observer, target);
   }
 
   /**
@@ -1072,7 +1051,7 @@ export class EventDrivenVisibilitySystem {
 
       // 2) Check current visibility map (observer -> target)
       try {
-        const current = getVisibilityMap(observer)?.[target.document.id];
+        const current = this.#getVisibilityMap?.(observer)?.[target.document.id];
         if (current) return current;
       } catch { /* ignore */ }
 
@@ -1166,7 +1145,7 @@ export class EventDrivenVisibilitySystem {
     // Delegate to AvsOverrideManager; keep memory map cleanup for legacy if desired
     const overrideKey = `${observerId}-${targetId}`;
     this.#activeOverrides.delete(overrideKey);
-    return AvsOverrideManager.removeOverride(observerId, targetId);
+    return this.#avsOverrideManager?.removeOverride?.(observerId, targetId);
   }
 
   /**
@@ -1175,7 +1154,7 @@ export class EventDrivenVisibilitySystem {
   async clearAllOverrides() {
     // Clear memory and delegate persistent flags cleanup to manager
     this.#activeOverrides.clear();
-    await AvsOverrideManager.clearAllOverrides();
+    await this.#avsOverrideManager?.clearAllOverrides?.();
   }
 
   // ==========================================
@@ -1280,7 +1259,7 @@ export class EventDrivenVisibilitySystem {
 
     // Ensure perception/vision are up-to-date before running validations
     try {
-      optimizedPerceptionManager.forceRefreshPerception();
+      this.#refreshPerception?.();
       // Wait for rendering/perception to settle (2 RAFs)
       await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
     } catch (e) {
