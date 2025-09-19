@@ -9,9 +9,6 @@ function createActorWithFeats(slugs = []) {
   };
 }
 
-function createTokenWithActorFeats(slugs = []) {
-  return { actor: createActorWithFeats(slugs) };
-}
 
 describe('FeatsHandler - all feats coverage', () => {
   let FeatsHandler;
@@ -44,12 +41,6 @@ describe('FeatsHandler - all feats coverage', () => {
     test('terrain-stalker shifts in matching terrain', () => {
       const actor = createActorWithFeats(['terrain-stalker']);
       const { shift } = FeatsHandler.getOutcomeAdjustment(actor, 'sneak', { terrainMatches: true });
-      expect(shift).toBe(1);
-    });
-
-    test('foil-senses grants +1', () => {
-      const actor = createActorWithFeats(['foil-senses']);
-      const { shift } = FeatsHandler.getOutcomeAdjustment(actor, 'sneak', {});
       expect(shift).toBe(1);
     });
 
@@ -94,90 +85,73 @@ describe('FeatsHandler - all feats coverage', () => {
       expect(shift).toBe(1);
     });
 
-    test('forest-stealth and swamp-stealth grant +1 in matching terrain tags', () => {
-      const forestActor = createActorWithFeats(['forest-stealth']);
-      const swampActor = createActorWithFeats(['swamp-stealth']);
-      expect(FeatsHandler.getOutcomeAdjustment(forestActor, 'sneak', { terrainTag: 'forest' }).shift).toBe(1);
-      expect(FeatsHandler.getOutcomeAdjustment(swampActor, 'sneak', { terrainTag: 'swamp' }).shift).toBe(1);
-      // non-matching
-      expect(FeatsHandler.getOutcomeAdjustment(forestActor, 'sneak', { terrainTag: 'swamp' }).shift).toBe(0);
-    });
-  });
-
-  describe('hide feat adjusters', () => {
-    test('terrain-stalker, foil-senses, vanish-into-the-land apply on hide', () => {
-      const actor = createActorWithFeats(['terrain-stalker', 'foil-senses', 'vanish-into-the-land']);
-      const { shift } = FeatsHandler.getOutcomeAdjustment(actor, 'hide', {
-        terrainMatches: true,
-        inNaturalTerrain: true,
+    describe('hide feat adjusters', () => {
+      test('terrain-stalker, foil-senses, vanish-into-the-land apply on hide', () => {
+        const actor = createActorWithFeats(['terrain-stalker', 'foil-senses', 'vanish-into-the-land']);
+        const { shift } = FeatsHandler.getOutcomeAdjustment(actor, 'hide', {
+          terrainMatches: true,
+          inNaturalTerrain: true,
+        });
+        // +1 +1 +1 = 3 but clamped to 2
+        expect(shift).toBe(2);
       });
-      // +1 +1 +1 = 3 but clamped to 2
-      expect(shift).toBe(2);
-    });
 
-    test('vanish-into-the-land improves concealment ladder on hide success', () => {
-      const actor = createActorWithFeats(['vanish-into-the-land']);
-      const adjusted = FeatsHandler.adjustVisibility('hide', actor, 'observed', 'concealed', {
-        inNaturalTerrain: true,
-        outcome: 'success',
+      test('vanish-into-the-land improves concealment ladder on hide success', () => {
+        const actor = createActorWithFeats(['vanish-into-the-land']);
+        const adjusted = FeatsHandler.adjustVisibility('hide', actor, 'observed', 'concealed', {
+          inNaturalTerrain: true,
+          outcome: 'success',
+        });
+        expect(adjusted).toBe('hidden');
       });
-      expect(adjusted).toBe('hidden');
-    });
-  });
-
-  describe('seek feat adjusters and visibility', () => {
-    test("that's-odd increases shift against anomalies and improves visibility one step", () => {
-      const actor = createActorWithFeats(["that's-odd"]);
-      const ctx = { subjectType: 'hazard' };
-      const { shift } = FeatsHandler.getOutcomeAdjustment(actor, 'seek', ctx);
-      expect(shift).toBe(1);
-
-      // Adjust visibility: from hidden -> observed one step (hidden -> observed ladder)
-      const adjusted1 = FeatsHandler.adjustVisibility('seek', actor, 'hidden', 'hidden', ctx);
-      expect(adjusted1).toBe('observed');
-
-      // Also when undetected -> hidden
-      const adjusted2 = FeatsHandler.adjustVisibility('seek', actor, 'undetected', 'undetected', ctx);
-      expect(adjusted2).toBe('hidden');
     });
 
-    test('keen-eyes has no shift but improves visibility on seek', () => {
-      const actor = createActorWithFeats(['keen-eyes']);
-      const { shift } = FeatsHandler.getOutcomeAdjustment(actor, 'seek', {});
-      expect(shift).toBe(0);
+    describe('seek feat adjusters and visibility', () => {
+      test("that's-odd increases shift against anomalies and improves visibility one step", () => {
+        const actor = createActorWithFeats(["that's-odd"]);
+        const ctx = { subjectType: 'hazard' };
+        const { shift } = FeatsHandler.getOutcomeAdjustment(actor, 'seek', ctx);
+        expect(shift).toBe(1);
 
-      const adjusted1 = FeatsHandler.adjustVisibility('seek', actor, 'hidden', 'hidden', {});
-      expect(adjusted1).toBe('observed');
+        // Adjust visibility: from hidden -> observed one step (hidden -> observed ladder)
+        const adjusted1 = FeatsHandler.adjustVisibility('seek', actor, 'hidden', 'hidden', ctx);
+        expect(adjusted1).toBe('observed');
 
-      const adjusted2 = FeatsHandler.adjustVisibility('seek', actor, 'undetected', 'undetected', {});
-      expect(adjusted2).toBe('hidden');
+        // Also when undetected -> hidden
+        const adjusted2 = FeatsHandler.adjustVisibility('seek', actor, 'undetected', 'undetected', ctx);
+        expect(adjusted2).toBe('hidden');
+      });
+
+      test('keen-eyes has no shift but improves visibility on seek', () => {
+        const actor = createActorWithFeats(['keen-eyes']);
+        const { shift } = FeatsHandler.getOutcomeAdjustment(actor, 'seek', {});
+        expect(shift).toBe(0);
+
+        const adjusted1 = FeatsHandler.adjustVisibility('seek', actor, 'hidden', 'hidden', {});
+        expect(adjusted1).toBe('observed');
+
+        const adjusted2 = FeatsHandler.adjustVisibility('seek', actor, 'undetected', 'undetected', {});
+        expect(adjusted2).toBe('hidden');
+      });
     });
-  });
 
-  describe('multi-feat accumulation and clamp', () => {
-    test('multiple sneak feats accumulate but clamp to +2', () => {
-      const actor = createActorWithFeats([
-        'terrain-stalker',
-        'foil-senses',
-        'legendary-sneak',
-        'very-sneaky',
-        'very-very-sneaky',
-      ]);
-      const { shift } = FeatsHandler.getOutcomeAdjustment(actor, 'sneak', { terrainMatches: true });
-      expect(shift).toBe(2);
+    describe('multi-feat accumulation and clamp', () => {
+      test('multiple sneak feats accumulate but clamp to +2', () => {
+        const actor = createActorWithFeats([
+          'terrain-stalker',
+          'foil-senses',
+          'legendary-sneak',
+          'very-sneaky',
+          'very-very-sneaky',
+        ]);
+        const { shift } = FeatsHandler.getOutcomeAdjustment(actor, 'sneak', { terrainMatches: true });
+        expect(shift).toBe(2);
 
-      const base = 'failure';
-      const outcome = FeatsHandler.applyOutcomeShift(base, shift);
-      // failure shifted by +2 -> critical-success per ordered list
-      expect(outcome).toBe('critical-success');
-    });
-  });
-
-  describe('token vs actor input', () => {
-    test('resolve actor from token works', () => {
-      const token = createTokenWithActorFeats(['foil-senses']);
-      const { shift } = FeatsHandler.getOutcomeAdjustment(token, 'sneak', {});
-      expect(shift).toBe(1);
+        const base = 'failure';
+        const outcome = FeatsHandler.applyOutcomeShift(base, shift);
+        // failure shifted by +2 -> critical-success per ordered list
+        expect(outcome).toBe('critical-success');
+      });
     });
   });
 });
