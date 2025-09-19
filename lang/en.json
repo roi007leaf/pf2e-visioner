@@ -1,8 +1,9 @@
 {
   "PF2E_VISIONER": {
+    "ENVIRONMENT": {},
     "MODULE_TITLE": "PF2E Visioner",
     "TOKEN_MANAGER": {
-      "TITLE": "Visioner Token Manager",
+      "TITLE": "Visioner Manager",
       "OBSERVER": "Observer Token",
       "TARGET": "Target Token",
       "VISIBILITY_STATE": "Visibility State",
@@ -93,7 +94,9 @@
       "RANGE_LIMIT_ACTIVE": "Range limit active: Only showing targets within 30 feet",
       "RANGE_LIMIT_ACTIVE_CUSTOM": "Range limit active: Only showing targets within {distance} feet",
       "NO_TARGETS_IN_RANGE": "No valid targets within 30 feet range",
-      "NO_TARGETS_IN_RANGE_CUSTOM": "No valid targets within {distance} feet range"
+      "NO_TARGETS_IN_RANGE_CUSTOM": "No valid targets within {distance} feet range",
+      "ECHOLOCATION_LABEL": "Echolocation",
+      "ECHOLOCATION_TOOLTIP": "Precise hearing active until the start of your next turn"
     },
     "HIDE_AUTOMATION": {
       "BUTTON_APPLY": "Apply Hide Results",
@@ -114,7 +117,21 @@
       "OPEN_RESULTS_TOOLTIP": "Open the Hide results dialog to apply individual or bulk visibility changes",
       "ENCOUNTER_ONLY": "Show only encounter tokens",
       "SETTING_NAME": "Enable Hide Automation",
-      "SETTING_HINT": "Automatically add buttons to Hide chat messages for applying visibility changes"
+      "SETTING_HINT": "Automatically add buttons to Hide chat messages for applying visibility changes",
+      "BADGES": {
+        "TERRAIN_STALKER_LABEL": "Terrain Stalker",
+        "TERRAIN_STALKER_TOOLTIP": "Chosen terrain active: {{selection}}",
+        "VANISH_INTO_THE_LAND_LABEL": "Vanish into the Land",
+        "VANISH_INTO_THE_LAND_TOOLTIP": "You can Hide and Sneak even without cover or concealment in your chosen difficult terrain",
+        "VERY_VERY_SNEAKY_LABEL": "Very, Very Sneaky",
+        "VERY_VERY_SNEAKY_TOOLTIP": "End position cover/concealment requirement is bypassed",
+        "LEGENDARY_SNEAK_LABEL": "Legendary Sneak",
+        "LEGENDARY_SNEAK_TOOLTIP": "Start position cover/concealment requirement is bypassed",
+        "CEASELESS_SHADOWS_LABEL": "Ceaseless Shadows",
+        "CEASELESS_SHADOWS_TOOLTIP": "Cover/concealment prerequisites are removed",
+        "DISTRACTING_SHADOWS_LABEL": "Distracting Shadows",
+        "DISTRACTING_SHADOWS_TOOLTIP": "You may use larger creatures as cover for Hide/Sneak prerequisites"
+      }
     },
     "SNEAK_AUTOMATION": {
       "BUTTON_APPLY": "Apply Sneak Results",
@@ -134,7 +151,21 @@
       "OPEN_RESULTS_TOOLTIP": "Open the Sneak results dialog to apply individual or bulk visibility changes",
       "ENCOUNTER_ONLY": "Show only encounter tokens",
       "SETTING_NAME": "Enable Sneak Automation",
-      "SETTING_HINT": "Automatically add buttons to Sneak chat messages for applying visibility changes"
+      "SETTING_HINT": "Automatically add buttons to Sneak chat messages for applying visibility changes",
+      "BADGES": {
+        "TERRAIN_STALKER_LABEL": "Terrain Stalker",
+        "TERRAIN_STALKER_TOOLTIP": "Chosen terrain active: {{selection}}",
+        "VANISH_INTO_THE_LAND_LABEL": "Vanish into the Land",
+        "VANISH_INTO_THE_LAND_TOOLTIP": "You can Sneak even without cover or concealment in your chosen difficult terrain",
+        "VERY_VERY_SNEAKY_LABEL": "Very, Very Sneaky",
+        "VERY_VERY_SNEAKY_TOOLTIP": "End position cover/concealment requirement is relaxed",
+        "LEGENDARY_SNEAK_LABEL": "Legendary Sneak",
+        "LEGENDARY_SNEAK_TOOLTIP": "Start position cover/concealment requirement is relaxed",
+        "CEASELESS_SHADOWS_LABEL": "Ceaseless Shadows",
+        "CEASELESS_SHADOWS_TOOLTIP": "Cover/concealment prerequisites are removed",
+        "DISTRACTING_SHADOWS_LABEL": "Distracting Shadows",
+        "DISTRACTING_SHADOWS_TOOLTIP": "You may use larger creatures as cover for Hide/Sneak prerequisites"
+      }
     },
     "CREATE_A_DIVERSION_AUTOMATION": {
       "BUTTON_APPLY": "Apply Diversion Results",
@@ -204,6 +235,18 @@
       "ENABLE_ALL_TOKENS_VISION": {
         "name": "Vision for NPCs",
         "hint": "Enables token vision for all NPC tokens to more easily see point of view"
+      },
+      "GDV_VISUAL_OVERRIDE_ENABLED": {
+        "name": "Greater Darkvision Visual Override",
+        "hint": "Client-only: When your selected token has Greater Darkvision, lighten darkness areas so visuals match Visioner rules."
+      },
+      "GDV_OVERLAY_ALPHA": {
+        "name": "GDV Overlay Intensity",
+        "hint": "Client-only: How strongly to counteract darkness tint for Greater Darkvision (0–1)."
+      },
+      "GDV_TOKEN_GRAYSCALE": {
+        "name": "GDV: Black & White Tokens",
+        "hint": "Client-only: When seeing via (greater) darkvision, render tokens in grayscale to match rules text (black and white vision)."
       },
       "DEFAULT_ENCOUNTER_FILTER": {
         "name": "Set Default \"Encounter Only\" State",
@@ -385,7 +428,7 @@
     },
     "KEYBINDINGS": {
       "OPEN_TOKEN_MANAGER": {
-        "name": "Open Visioner Token Manager",
+        "name": "Open Visioner Manager",
         "hint": "Open the token manager for selected tokens"
       },
       "OPEN_VISIBILITY_MANAGER": {

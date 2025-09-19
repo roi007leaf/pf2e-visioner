@@ -398,6 +398,90 @@ export class SneakPreviewDialog extends BaseActionDialog {
       };
     } catch { }
 
+    // Compute feat prerequisite-relaxation badges (Terrain Stalker, Vanish into the Land, Very Very Sneaky, Legendary Sneak, Ceaseless Shadows, Distracting Shadows)
+    try {
+      const badges = [];
+      const actorOrToken = this.sneakingToken;
+      const has = (slug) => {
+        try { return FeatsHandler.hasFeat(actorOrToken, slug); } catch { return false; }
+      };
+      // Ceaseless Shadows: removes cover/concealment requirement entirely
+      if (has('ceaseless-shadows')) {
+        badges.push({
+          key: 'ceaseless-shadows',
+          icon: 'fas fa-infinity',
+          label: game.i18n.localize('PF2E_VISIONER.SNEAK_AUTOMATION.BADGES.CEASELESS_SHADOWS_LABEL'),
+          tooltip: game.i18n.localize('PF2E_VISIONER.SNEAK_AUTOMATION.BADGES.CEASELESS_SHADOWS_TOOLTIP'),
+        });
+      }
+      // Legendary Sneak: relaxes start prerequisite
+      if (has('legendary-sneak')) {
+        badges.push({
+          key: 'legendary-sneak',
+          icon: 'fas fa-shoe-prints',
+          label: game.i18n.localize('PF2E_VISIONER.SNEAK_AUTOMATION.BADGES.LEGENDARY_SNEAK_LABEL'),
+          tooltip: game.i18n.localize('PF2E_VISIONER.SNEAK_AUTOMATION.BADGES.LEGENDARY_SNEAK_TOOLTIP'),
+        });
+      }
+      // Very, Very Sneaky: relaxes end prerequisite
+      if (has('very-very-sneaky')) {
+        badges.push({
+          key: 'very-very-sneaky',
+          icon: 'fas fa-user-ninja',
+          label: game.i18n.localize('PF2E_VISIONER.SNEAK_AUTOMATION.BADGES.VERY_VERY_SNEAKY_LABEL'),
+          tooltip: game.i18n.localize('PF2E_VISIONER.SNEAK_AUTOMATION.BADGES.VERY_VERY_SNEAKY_TOOLTIP'),
+        });
+      }
+      // Terrain Stalker: active in chosen environment
+      try {
+        if (has('terrain-stalker')) {
+          const selection = FeatsHandler.getTerrainStalkerSelection(actorOrToken);
+          if (selection && FeatsHandler.isEnvironmentActive(actorOrToken, selection)) {
+            badges.push({
+              key: 'terrain-stalker',
+              icon: 'fas fa-tree',
+              label: game.i18n.localize('PF2E_VISIONER.SNEAK_AUTOMATION.BADGES.TERRAIN_STALKER_LABEL'),
+              tooltip: game.i18n.format('PF2E_VISIONER.SNEAK_AUTOMATION.BADGES.TERRAIN_STALKER_TOOLTIP', { selection }),
+            });
+          }
+        }
+      } catch { }
+      // Vanish into the Land: active in selected difficult terrain for Terrain Stalker
+      try {
+        if (has('vanish-into-the-land')) {
+          const selection = FeatsHandler.getTerrainStalkerSelection(actorOrToken);
+          if (selection) {
+            // Use EnvironmentHelper via FeatsHandler helper
+            let active = false;
+            try {
+              // Prefer precise difficult terrain check
+              const env = (await import('../../utils/environment.js')).default;
+              const matches = env.getMatchingEnvironmentRegions(actorOrToken, selection) || [];
+              active = matches.length > 0;
+            } catch { active = FeatsHandler.isEnvironmentActive(actorOrToken, selection); }
+            if (active) {
+              badges.push({
+                key: 'vanish-into-the-land',
+                icon: 'fas fa-leaf',
+                label: game.i18n.localize('PF2E_VISIONER.SNEAK_AUTOMATION.BADGES.VANISH_INTO_THE_LAND_LABEL'),
+                tooltip: game.i18n.localize('PF2E_VISIONER.SNEAK_AUTOMATION.BADGES.VANISH_INTO_THE_LAND_TOOLTIP'),
+              });
+            }
+          }
+        }
+      } catch { }
+      // Distracting Shadows: show informational badge when feat present (contextual per observer)
+      if (has('distracting-shadows')) {
+        badges.push({
+          key: 'distracting-shadows',
+          icon: 'fas fa-users',
+          label: game.i18n.localize('PF2E_VISIONER.SNEAK_AUTOMATION.BADGES.DISTRACTING_SHADOWS_LABEL'),
+          tooltip: game.i18n.localize('PF2E_VISIONER.SNEAK_AUTOMATION.BADGES.DISTRACTING_SHADOWS_TOOLTIP'),
+        });
+      }
+      context.prereqBadges = badges;
+    } catch { }
+
     Object.assign(context, this.buildCommonContext(processedOutcomes));
 
     return context;

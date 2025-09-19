@@ -278,7 +278,17 @@ export class HideActionHandler extends ActionHandlerBase {
       try {
         const { FeatsHandler } = await import('../feats-handler.js');
         const inNatural = (() => { try { return FeatsHandler.isEnvironmentActive(actionData.actor, 'natural'); } catch { return false; } })();
-        qualification = FeatsHandler.overridePrerequisites(actionData.actor, qualification, { startVisibility, endVisibility, endCoverState, inNaturalTerrain: inNatural });
+        qualification = FeatsHandler.overridePrerequisites(actionData.actor, qualification, {
+          action: 'hide',
+          observer: subject,
+          startVisibility,
+          endVisibility,
+          endCoverState,
+          inNaturalTerrain: inNatural,
+          // Position hints for Distracting Shadows
+          startCenter: actionData?.storedStartPosition?.center || undefined,
+          endCenter: endSnapshot?.endPositionCenter || undefined,
+        });
       } catch { }
       positionQualification = qualification;
       if (!qualification.endQualifies) newVisibility = 'observed';

@@ -108,6 +108,7 @@ export default class RegionHelper {
     static extractEnvironmentTypes(region) {
         const set = new Set();
         try {
+            // 1) Core behaviors-provided environment types
             const behaviors = this.getBehaviors(region);
             for (const b of behaviors) {
                 const viaValue = b?.value?.system?.environmentTypes;
@@ -126,6 +127,20 @@ export default class RegionHelper {
                 };
                 push(viaValue ?? viaSystem);
             }
+
+            // 2) Also respect explicit flags on the Region document: flags.pf2e.environmentTypes
+            try {
+                const flagEnv = region?.document?.flags?.pf2e?.environmentTypes;
+                if (flagEnv) {
+                    if (Array.isArray(flagEnv)) {
+                        for (const v of flagEnv) if (v) set.add(normalizeSlug(String(v)));
+                    } else if (typeof flagEnv === 'object') {
+                        for (const [k, v] of Object.entries(flagEnv)) if (v) set.add(normalizeSlug(String(k)));
+                    } else if (typeof flagEnv === 'string') {
+                        set.add(normalizeSlug(flagEnv));
+                    }
+                }
+            } catch { /* ignore */ }
         } catch { }
         return set;
     }

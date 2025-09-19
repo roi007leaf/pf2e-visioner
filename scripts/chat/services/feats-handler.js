@@ -153,6 +153,8 @@ function getAdjusterMapForAction(action) {
  * @param {object} context - environment context (lighting, terrain, observer senses)
  * @returns {{ shift: number, notes: string[] }} - Net shift and contributing notes
  */
+import { segmentRectIntersectionLength } from '../../helpers/line-intersection.js';
+import { getSizeRank, getTokenRect } from '../../helpers/size-elevation-utils.js';
 import EnvironmentHelper from '../../utils/environment.js';
 
 export class FeatsHandler {
@@ -270,6 +272,7 @@ export class FeatsHandler {
 
     // Seek-specific post adjustments
     if (action === 'seek') {
+      // Echolocation: now handled by PF2e effect item 'effect-echolocation'. No flag setting here.
       // Keen Eyes: treat Undetected as Hidden; Hidden as Observed on Seek
       if (feats.has('keen-eyes')) {
         newVisibility = step(newVisibility, towardsObserved, +1);
@@ -295,6 +298,24 @@ export class FeatsHandler {
     }
 
     return newVisibility;
+  }
+
+  /**
+   * Determine if the given token/actor represents a player character (PC).
+   * Accepts either a Token or Actor; resolves to Actor and checks common PF2e indicators.
+   * Criteria: actor.type === 'character' OR actor.hasPlayerOwner === true
+   */
+  static isPC(tokenOrActor) {
+    try {
+      const actor = FeatsHandlerInternal.resolveActor(tokenOrActor);
+      if (!actor) return false;
+      const type = actor.type ?? actor.system?.details?.type?.value;
+      if (String(type).toLowerCase() === 'character') return true;
+      if (actor.hasPlayerOwner === true) return true;
+      return false;
+    } catch {
+      return false;
+    }
   }
 
   /**
@@ -356,17 +377,13 @@ export class FeatsHandler {
     // as long as you end in cover or concealment (we still require endQualifies).
     if (!startQualifies && endQualifies && feats.has('legendary-sneak')) {
       startQualifies = true;
-      reason = 'Legendary Sneak allows starting without cover or concealment';
-    }
-
-    // Very, Very Sneaky: Can Hide or Sneak without cover or concealment
-    if (!startQualifies && feats.has('very-very-sneaky')) {
-      startQualifies = true;
-      if (!reason) reason = 'Very, Very Sneaky removes start cover/concealment requirement';
+      endQualifies = true;
+      reason = 'Legendary Sneak removes cover/concealment requirement';
     }
 
     // Very, Very Sneaky: End position does not require cover or concealment either
     if (!endQualifies && feats.has('very-very-sneaky')) {
+      startQualifies = true;
       endQualifies = true;
       if (!reason) reason = 'Very, Very Sneaky removes end cover/concealment requirement';
     }
@@ -411,6 +428,91 @@ export class FeatsHandler {
     if (!startQualifies && feats.has('foil-senses') && extra?.impreciseOnly) {
       startQualifies = true;
       if (!reason) reason = 'Foil Senses vs. imprecise senses';
+    }
+
+    // Distracting Shadows: You can use creatures that are at least one size larger than you
+    // as cover for the Hide and Sneak actions (but not for other uses).
+    // Scope: only applies to Hide/Sneak prerequisite checks; does not modify actual cover state,
+    // bonuses, or Take Cover eligibility.
+    if (feats.has('distracting-shadows') && (extra?.action === 'hide' || extra?.action === 'sneak')) {
+      try {
+        const observer = extra?.observer || null;
+        const actorToken = FeatsHandlerInternal.resolveToken(tokenOrActor) || tokenOrActor;
+
+        const computeHasLargeCreatureCover = (pointHint = null) => {
+          try {
+            if (!observer || !actorToken) return false;
+
+            // Determine ray endpoints
+            const p1 = observer?.center || observer?.getCenter?.();
+            let p2 = null;
+            if (pointHint && typeof pointHint.x === 'number' && typeof pointHint.y === 'number') {
+              p2 = { x: pointHint.x, y: pointHint.y };
+            } else {
+              p2 = actorToken?.center || actorToken?.getCenter?.();
+            }
+            if (!p1 || !p2) return false;
+
+            // Actor size rank for comparison
+            const actorRank = getSizeRank(actorToken);
+
+            // Iterate potential blockers
+            const tokens = canvas?.tokens?.placeables || [];
+            for (const blocker of tokens) {
+              if (!blocker?.actor) continue;
+              // Skip self/observer
+              if (blocker.id === actorToken.id || blocker.id === observer.id) continue;
+              if (blocker.document?.hidden) continue; // ignore Foundry-hidden
+              const type = blocker.actor?.type;
+              if (type === 'loot' || type === 'hazard') continue;
+
+              // Require at least one size larger than the actor
+              let blockerRank = 0;
+              try { blockerRank = getSizeRank(blocker); } catch { blockerRank = 0; }
+              if (!(blockerRank >= actorRank + 1)) continue;
+
+              const rect = getTokenRect(blocker);
+              const len = segmentRectIntersectionLength(p1, p2, rect);
+              if (len > 0) {
+                return true; // Found a qualifying larger creature along the path
+              }
+            }
+            return false;
+          } catch (e) {
+            console.warn('PF2E Visioner | Distracting Shadows cover check failed:', e);
+            return false;
+          }
+        };
+
+        // Compute start/end large-creature cover signals
+        const startHint = extra?.startPoint || extra?.startCenter || extra?.storedStartPosition?.center || null;
+        const endHint = extra?.endPoint || extra?.endCenter || null;
+
+        const startHasLargeCover = typeof extra?.startHasLargeCreatureCover === 'boolean'
+          ? extra.startHasLargeCreatureCover
+          : computeHasLargeCreatureCover(startHint);
+
+        // For end: prefer explicit boolean, else compute using endHint if provided.
+        // If no hint is available (e.g., end position is virtual during preview), allow a conservative
+        // fallback: if system detected only 'lesser' cover at end, consider it sufficient for prerequisites.
+        let endHasLargeCover = typeof extra?.endHasLargeCreatureCover === 'boolean'
+          ? extra.endHasLargeCreatureCover
+          : (endHint ? computeHasLargeCreatureCover(endHint) : false);
+        if (!endHasLargeCover && extra?.endCoverState === 'lesser') {
+          endHasLargeCover = true; // Treat creature-provided lesser cover as sufficient for DS prerequisites
+        }
+
+        if (!startQualifies && startHasLargeCover) {
+          startQualifies = true;
+          if (!reason) reason = 'Distracting Shadows: using larger creature as cover (start)';
+        }
+        if (!endQualifies && endHasLargeCover) {
+          endQualifies = true;
+          if (!reason) reason = 'Distracting Shadows: using larger creature as cover (end)';
+        }
+      } catch (e) {
+        console.warn('PF2E Visioner | Distracting Shadows prerequisite override failed:', e);
+      }
     }
 
     const bothQualify = !!(startQualifies && endQualifies);

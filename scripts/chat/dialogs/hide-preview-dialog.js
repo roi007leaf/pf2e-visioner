@@ -258,6 +258,52 @@ export class HidePreviewDialog extends BaseActionDialog {
       }
     } catch { }
 
+    // Compute feat prerequisite-relaxation badges for Hide action
+    try {
+      const { FeatsHandler } = await import('../services/feats-handler.js');
+      const has = (slug) => {
+        try { return FeatsHandler.hasFeat(this.actorToken, slug); } catch { return false; }
+      };
+      const badges = [];
+      if (has('ceaseless-shadows')) {
+        badges.push({ key: 'ceaseless-shadows', icon: 'fas fa-infinity', label: game.i18n.localize('PF2E_VISIONER.HIDE_AUTOMATION.BADGES.CEASELESS_SHADOWS_LABEL'), tooltip: game.i18n.localize('PF2E_VISIONER.HIDE_AUTOMATION.BADGES.CEASELESS_SHADOWS_TOOLTIP') });
+      }
+      if (has('legendary-sneak')) {
+        badges.push({ key: 'legendary-sneak', icon: 'fas fa-shoe-prints', label: game.i18n.localize('PF2E_VISIONER.HIDE_AUTOMATION.BADGES.LEGENDARY_SNEAK_LABEL'), tooltip: game.i18n.localize('PF2E_VISIONER.HIDE_AUTOMATION.BADGES.LEGENDARY_SNEAK_TOOLTIP') });
+      }
+      if (has('very-very-sneaky')) {
+        badges.push({ key: 'very-very-sneaky', icon: 'fas fa-user-ninja', label: game.i18n.localize('PF2E_VISIONER.HIDE_AUTOMATION.BADGES.VERY_VERY_SNEAKY_LABEL'), tooltip: game.i18n.localize('PF2E_VISIONER.HIDE_AUTOMATION.BADGES.VERY_VERY_SNEAKY_TOOLTIP') });
+      }
+      try {
+        if (has('terrain-stalker')) {
+          const selection = FeatsHandler.getTerrainStalkerSelection(this.actorToken);
+          if (selection && FeatsHandler.isEnvironmentActive(this.actorToken, selection)) {
+            badges.push({ key: 'terrain-stalker', icon: 'fas fa-tree', label: game.i18n.localize('PF2E_VISIONER.HIDE_AUTOMATION.BADGES.TERRAIN_STALKER_LABEL'), tooltip: game.i18n.format('PF2E_VISIONER.HIDE_AUTOMATION.BADGES.TERRAIN_STALKER_TOOLTIP', { selection }) });
+          }
+        }
+      } catch { }
+      try {
+        if (has('vanish-into-the-land')) {
+          const selection = FeatsHandler.getTerrainStalkerSelection(this.actorToken);
+          if (selection) {
+            let active = false;
+            try {
+              const env = (await import('../../utils/environment.js')).default;
+              const matches = env.getMatchingEnvironmentRegions(this.actorToken, selection) || [];
+              active = matches.length > 0;
+            } catch { active = FeatsHandler.isEnvironmentActive(this.actorToken, selection); }
+            if (active) {
+              badges.push({ key: 'vanish-into-the-land', icon: 'fas fa-leaf', label: game.i18n.localize('PF2E_VISIONER.HIDE_AUTOMATION.BADGES.VANISH_INTO_THE_LAND_LABEL'), tooltip: game.i18n.localize('PF2E_VISIONER.HIDE_AUTOMATION.BADGES.VANISH_INTO_THE_LAND_TOOLTIP') });
+            }
+          }
+        }
+      } catch { }
+      if (has('distracting-shadows')) {
+        badges.push({ key: 'distracting-shadows', icon: 'fas fa-users', label: game.i18n.localize('PF2E_VISIONER.HIDE_AUTOMATION.BADGES.DISTRACTING_SHADOWS_LABEL'), tooltip: game.i18n.localize('PF2E_VISIONER.HIDE_AUTOMATION.BADGES.DISTRACTING_SHADOWS_TOOLTIP') });
+      }
+      context.prereqBadges = badges;
+    } catch { }
+
     // Keep the immutable original list in _originalOutcomes for live re-filtering,
     // but set the current outcomes to the processed list so UI buttons use up-to-date flags
     this.outcomes = processedOutcomes;

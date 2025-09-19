@@ -10,7 +10,7 @@ import { DEFAULT_SETTINGS, KEYBINDINGS, MODULE_ID } from './constants.js';
 // Outside-of-dialog groups (Target Hover Tooltips, Debug Mode etc.) remain native.
 const SETTINGS_GROUPS = {
   General: [
-    { title: 'General UI', keys: ['useHudButton', 'hideVisionerSceneTools', 'hideQuickEditTool'] },
+    { title: 'General UI', keys: ['useHudButton', 'showVisionerSceneTools', 'showQuickEditTool'] },
     {
       title: 'Visioner Manager Settings',
       keys: ['integrateRollOutcome', 'defaultEncounterFilter', 'ignoreAllies', 'hideFoundryHiddenTokens'],
@@ -484,7 +484,7 @@ export function registerSettings() {
               initializeHoverTooltips();
           } catch (_) { }
         };
-      } else if (key === 'hideVisionerSceneTools') {
+      } else if (key === 'showVisionerSceneTools') {
         // Rebuild scene controls to add/remove Visioner tools immediately
         settingConfig.onChange = () => {
           try {

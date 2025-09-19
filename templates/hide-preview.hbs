@@ -12,6 +12,16 @@
     <div class="hider-details">
       <h3 class="hider-name">{{actorToken.name}}</h3>
       <p class="hint">Attempting to hide from observers</p>
+      {{#if prereqBadges}}
+        <div class="action-context-badges">
+          {{#each prereqBadges as |b|}}
+            <span class="badge badge-feat" data-tooltip="{{b.tooltip}}">
+              <i class="{{b.icon}}"></i>
+              <span class="badge-label">{{b.label}}</span>
+            </span>
+          {{/each}}
+        </div>
+      {{/if}}
     </div>
   </div>
 

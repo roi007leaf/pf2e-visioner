@@ -183,7 +183,6 @@ export const DEFAULT_SETTINGS = {
     type: Boolean,
     default: false,
   },
-  
 
   colorblindMode: {
     name: 'PF2E_VISIONER.SETTINGS.COLORBLIND_MODE.name',
@@ -339,15 +338,15 @@ export const DEFAULT_SETTINGS = {
     default: true,
   },
 
-  // Hide Visioner tools in Tokens and Walls scene controls
-  hideVisionerSceneTools: {
+  // Show Visioner tools in Tokens and Walls scene controls
+  showVisionerSceneTools: {
     name: 'PF2E_VISIONER.SETTINGS.VISIONER_SCENE_CONTROLS.name',
     hint: 'PF2E_VISIONER.SETTINGS.VISIONER_SCENE_CONTROLS.hint',
     scope: 'world',
     config: true,
     restricted: true,
     type: Boolean,
-    default: false,
+    default: true,
   },
 
   // Token Manager
@@ -491,15 +490,15 @@ export const DEFAULT_SETTINGS = {
     type: Boolean,
     default: false,
   },
-  // Hide Quick Edit tool in token controls
-  hideQuickEditTool: {
+  // Show Quick Edit tool in token controls
+  showQuickEditTool: {
     name: 'PF2E_VISIONER.SETTINGS.VISIONER_QUICK_EDIT_TOOL.name',
     hint: 'PF2E_VISIONER.SETTINGS.VISIONER_QUICK_EDIT_TOOL.hint',
     scope: 'world',
     config: true,
     restricted: true,
     type: Boolean,
-    default: false,
+    default: true,
   },
 };
 

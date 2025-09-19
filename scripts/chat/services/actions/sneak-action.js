@@ -740,7 +740,7 @@ export class SneakActionHandler extends ActionHandlerBase {
     const finalMargin = margin;
 
     // Simple position qualification check
-    const positionQualifies = this._checkPositionQualification(positionTransition, actionData);
+    const positionQualifies = await this._checkPositionQualification(positionTransition, actionData, subject);
 
     return {
       token: subject,
@@ -995,7 +995,7 @@ export class SneakActionHandler extends ActionHandlerBase {
    * @returns {Object} Position qualification data
    * @private
    */
-  async _checkPositionQualification(positionTransition, actionData) {
+  async _checkPositionQualification(positionTransition, actionData, observerToken = null) {
     if (!positionTransition) {
       return {
         startQualifies: false,
@@ -1022,16 +1022,23 @@ export class SneakActionHandler extends ActionHandlerBase {
       reason: bothQualify ? 'Both positions qualify for sneak' : 'Position does not qualify for sneak'
     };
 
-    // Allow feats to override prerequisites (e.g., Legendary Sneak)
+    // Allow feats to override prerequisites (e.g., Legendary Sneak, Distracting Shadows)
     try {
       const { FeatsHandler } = await import('../feats-handler.js');
       const acting = this._getSneakingToken?.(actionData) || actionData?.actor || null;
       const inNatural = (() => { try { return FeatsHandler.isEnvironmentActive(acting, 'natural'); } catch { return false; } })();
+      // Position hints for Distracting Shadows
+      const startCenter = actionData?.storedStartPosition?.center || null;
+      const endCenter = (this._getSneakingToken?.(actionData) || actionData?.actor)?.center || null;
       result = FeatsHandler.overridePrerequisites(acting, result, {
+        action: 'sneak',
+        observer: observerToken,
         startVisibility: startPos.avsVisibility,
         endVisibility: endPos.avsVisibility,
         endCoverState: endPos.coverState,
         inNaturalTerrain: inNatural,
+        startCenter,
+        endCenter,
       });
     } catch {
       // ignore

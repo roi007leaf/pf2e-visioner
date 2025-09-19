@@ -1,5 +1,6 @@
 {
   "PF2E_VISIONER": {
+    "ENVIRONMENT": {},
     "MODULE_TITLE": "PF2E Visioner",
     "TOKEN_MANAGER": {
       "TITLE": "Menedżer widoczności tokenów",
@@ -99,7 +100,9 @@
       "RANGE_LIMIT_ACTIVE": "Aktywne ograniczenie zasięgu: Wyświetlane są tylko cele znajdujące się w odległości do 30 stóp.",
       "RANGE_LIMIT_ACTIVE_CUSTOM": "Aktywne ograniczenie zasięgu: Wyświetlane są tylko cele znajdujące się w odległości {distance} stóp.",
       "NO_TARGETS_IN_RANGE": "Brak ważnych celów w zasięgu 30 stóp.",
-      "NO_TARGETS_IN_RANGE_CUSTOM": "Brak ważnych celów w zasięgu {distance} stóp."
+      "NO_TARGETS_IN_RANGE_CUSTOM": "Brak ważnych celów w zasięgu {distance} stóp.",
+      "ECHOLOCATION_LABEL": "Echolokacja",
+      "ECHOLOCATION_TOOLTIP": "Dokładny słuch aktywny do początku twojej następnej tury"
     },
     "HIDE_AUTOMATION": {
       "BUTTON_APPLY": "Zastosuj wyniki Ukrywania",

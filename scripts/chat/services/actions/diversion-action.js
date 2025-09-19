@@ -55,7 +55,6 @@ export class DiversionActionHandler extends ActionHandlerBase {
     // Default new state via centralized mapping
     const { getDefaultNewStateFor } = await import('../data/action-state-config.js');
     let newVisibility = getDefaultNewStateFor('create-a-diversion', current, outcome) || current;
-    // Feat-based post visibility adjustments (e.g., Distracting Shadows)
     try {
       const { FeatsHandler } = await import('../feats-handler.js');
       newVisibility = FeatsHandler.adjustVisibility('create-a-diversion', actionData.actor, current, newVisibility, {

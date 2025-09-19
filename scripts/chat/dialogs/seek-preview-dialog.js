@@ -275,12 +275,34 @@ export class SeekPreviewDialog extends BaseActionDialog {
     });
 
     // Set actor context for seeker
+    // Echolocation flag on seeker (precise hearing until next turn)
+    let echolocationActive = false;
+    let echolocationRange = 0;
+    try {
+      // Prefer PF2e effect item slug
+      const effects = this.actorToken?.actor?.itemTypes?.effect ?? [];
+      const hasEchoEffect = !!effects?.some?.((e) => (e?.slug || e?.system?.slug || e?.name)?.toLowerCase?.() === 'effect-echolocation');
+      if (hasEchoEffect) {
+        echolocationActive = true;
+        echolocationRange = 40;
+      } else {
+        const flag = this.actorToken?.actor?.getFlag?.('pf2e-visioner', 'echolocation');
+        if (flag?.active) {
+          echolocationActive = true;
+          echolocationRange = Number(flag.range) || 40;
+        }
+      }
+    } catch { }
+
     context.seeker = {
       name: this.actorToken?.name || 'Unknown Actor',
       image: this.resolveTokenImage(this.actorToken),
       actionType: 'seek',
       actionLabel: 'Seek action results analysis',
     };
+    context.echolocationActive = echolocationActive;
+    context.echolocationRange = echolocationRange;
+    // No noisy environment indicator (feature removed)
     context.outcomes = processedOutcomes;
     context.ignoreWalls = !!this.ignoreWalls;
     context.ignoreAllies = !!this.ignoreAllies;

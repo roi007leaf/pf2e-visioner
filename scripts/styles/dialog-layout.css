@@ -257,6 +257,33 @@
     color: white;
   }
 
+    /* Echolocation badge */
+    .seek-preview-dialog .seek-context-badges {
+      display: flex;
+      gap: 6px;
+      margin-top: 4px;
+      align-items: center;
+    }
+    .seek-preview-dialog .badge.badge-echolocation {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      line-height: 1;
+      padding: 4px 6px;
+      border-radius: 6px;
+      color: #0d47a1;
+      background: rgba(33, 150, 243, 0.15);
+      border: 1px solid rgba(33, 150, 243, 0.35);
+    }
+    .seek-preview-dialog .badge.badge-echolocation i {
+      color: #2196f3;
+    }
+    .seek-preview-dialog .badge.badge-echolocation .badge-range {
+      opacity: 0.85;
+    }
+    /* Noisy badge removed */
+
   /* Point Out - Orange */
   .point-out-preview-dialog .results-table-container {
     scrollbar-color: var(--visibility-hidden) transparent;
@@ -319,6 +346,40 @@
   .sneak-preview-dialog .results-table-container thead th {
     background-color: var(--pf2e-visioner-gray);
     color: white;
+  }
+
+  /* Generic action context badges (used by Sneak/Hide feat prerequisite indicators) */
+  .action-context-badges {
+    display: flex;
+    gap: 6px;
+    margin-top: 4px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .badge.badge-feat {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    line-height: 1;
+    padding: 4px 6px;
+    border-radius: 6px;
+    color: #2d2d2d;
+    background: rgba(108, 117, 125, 0.15);
+    border: 1px solid rgba(108, 117, 125, 0.35);
+  }
+  .hide-preview-dialog .badge.badge-feat {
+    color: #3a2357;
+    background: rgba(142, 36, 170, 0.12);
+    border-color: rgba(142, 36, 170, 0.35);
+  }
+  .sneak-preview-dialog .badge.badge-feat {
+    color: #343a40;
+    background: rgba(108, 117, 125, 0.12);
+    border-color: rgba(108, 117, 125, 0.35);
+  }
+  .badge.badge-feat i {
+    color: inherit;
   }
 
   /* Create a Diversion - Teal */

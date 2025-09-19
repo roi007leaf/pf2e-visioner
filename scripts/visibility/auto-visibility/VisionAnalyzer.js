@@ -70,6 +70,150 @@ export class VisionAnalyzer {
   }
 
   /**
+   * Parse an actor's senses into a normalized summary.
+   * Supports both array (NPC) and object (PC) formats and values under value.*
+   * Returns { precise: [{type, range}], imprecise: [{type, range}], hearing: { acuity, range }|null, echolocationActive, echolocationRange }
+   * Note: This does not include normal visual sight; see getVisionCapabilities for that.
+   */
+  getSensingSummary(token) {
+    const actor = token?.actor;
+    const summary = {
+      precise: [],
+      imprecise: [],
+      hearing: null,
+      echolocationActive: false,
+      echolocationRange: 0,
+    };
+    if (!actor) return summary;
+
+    // Echolocation detection: prefer PF2e effect item (effect-echolocation) over our module flag
+    try {
+      const effects = actor.itemTypes?.effect ?? actor.items?.filter?.((i) => i?.type === 'effect') ?? [];
+      const hasEchoEffect = !!effects?.some?.((e) => (e?.slug || e?.system?.slug || e?.name)?.toLowerCase?.() === 'effect-echolocation');
+      if (hasEchoEffect) {
+        summary.echolocationActive = true;
+        summary.echolocationRange = 40; // RAW default; effect does not typically encode range separately
+      } else {
+        // Back-compat: support temporary module flag if present
+        const echo = actor.getFlag?.('pf2e-visioner', 'echolocation') || null;
+        if (echo?.active) {
+          summary.echolocationActive = true;
+          summary.echolocationRange = Number(echo.range) || 40;
+        }
+      }
+    } catch { /* ignore */ }
+
+    let senses = null;
+    try {
+      senses = actor.system?.perception?.senses ?? actor.perception?.senses ?? null;
+    } catch { /* ignore */ }
+    if (!senses) return summary;
+
+    const pushSense = (type, acuity, range) => {
+      const r = Number(range);
+      const entry = { type: String(type || '').toLowerCase(), range: Number.isFinite(r) ? r : Infinity };
+      const a = String(acuity || '').toLowerCase();
+      if (entry.type === 'hearing') {
+        summary.hearing = { acuity: a || 'imprecise', range: entry.range };
+      }
+      if (a === 'precise') summary.precise.push(entry);
+      else if (a === 'imprecise' || a === 'vague' || !a) summary.imprecise.push(entry);
+      else summary.imprecise.push(entry);
+    };
+
+    try {
+      if (Array.isArray(senses)) {
+        for (const s of senses) {
+          const type = s?.type ?? s?.slug ?? s?.name ?? s?.label;
+          const val = s?.value ?? s;
+          const acuity = val?.acuity ?? s?.acuity ?? val?.value;
+          const range = val?.range ?? s?.range;
+          pushSense(type, acuity, range);
+        }
+      } else if (typeof senses === 'object') {
+        for (const [type, obj] of Object.entries(senses)) {
+          const val = obj?.value ?? obj;
+          const acuity = val?.acuity ?? obj?.acuity ?? val?.value;
+          const range = val?.range ?? obj?.range;
+          pushSense(type, acuity, range);
+        }
+      }
+    } catch { /* ignore */ }
+
+    // Upgrade hearing to precise within echolocation range when active
+    try {
+      if (summary.hearing && summary.echolocationActive) {
+        const r = summary.echolocationRange || summary.hearing.range || 40;
+        // Represent precise-hearing as a precise sense with capped range
+        summary.precise.push({ type: 'hearing', range: r });
+      }
+    } catch { /* ignore */ }
+
+    return summary;
+  }
+
+  /**
+   * Return whether any imprecise sense can reach the target.
+   */
+  canSenseImprecisely(observer, target) {
+    try {
+      const s = this.getSensingSummary(observer);
+      if (!s.imprecise.length && !s.hearing) return false;
+      const dist = this.#distanceFeet(observer, target);
+      for (const ent of s.imprecise) {
+        if (!ent || typeof ent.range !== 'number') continue;
+        if (ent.range === Infinity || ent.range >= dist) return true;
+      }
+      if (s.hearing) {
+        const hr = Number(s.hearing.range);
+        if (!Number.isFinite(hr) || hr >= dist) return true;
+      }
+    } catch { }
+    return false;
+  }
+
+  /**
+   * Whether any precise non-visual sense can reach the target (includes echolocation precise-hearing when active)
+   */
+  hasPreciseNonVisualInRange(observer, target) {
+    try {
+      const s = this.getSensingSummary(observer);
+      if (!s.precise.length) return false;
+      const dist = this.#distanceFeet(observer, target);
+      for (const ent of s.precise) {
+        if (!ent || typeof ent.range !== 'number') continue;
+        if (ent.type === 'vision' || ent.type === 'sight') continue;
+        if (ent.range === Infinity || ent.range >= dist) return true;
+      }
+    } catch { }
+    return false;
+  }
+
+  /**
+   * Check if environment distorts hearing for this observer (e.g., noisy room)
+   */
+  isHearingDistorted(observer) {
+    // Noisy environment feature removed; hearing is not distorted by environment.
+    void observer; // satisfy linter
+    return false;
+  }
+
+  /**
+   * Distance between tokens in feet (center-to-center)
+   * @private
+   */
+  #distanceFeet(a, b) {
+    try {
+      const dx = a.center.x - b.center.x;
+      const dy = a.center.y - b.center.y;
+      const px = Math.hypot(dx, dy);
+      const gridSize = canvas?.grid?.size || 100;
+      const unitDist = canvas?.scene?.grid?.distance || 5;
+      return (px / gridSize) * unitDist;
+    } catch { return Infinity; }
+  }
+
+  /**
    * Calculate vision capabilities for a token
    * @param {Token} token
    * @returns {Object} Vision capabilities

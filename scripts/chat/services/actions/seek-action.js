@@ -96,7 +96,7 @@ export class SeekActionHandler extends ActionHandlerBase {
           });
         }
       }
-  } catch { }
+    } catch { }
 
     // Do not pre-filter by encounter; the dialog applies encounter filter as needed
     return potential;
@@ -109,8 +109,8 @@ export class SeekActionHandler extends ActionHandlerBase {
       '../infra/shared-utils.js'
     );
 
-  let current = 'hidden';
-  let dc = 0;
+    let current = 'hidden';
+    let dc = 0;
 
     // Determine anomaly and That's Odd feat early
     let thatsOddAuto = false;
@@ -120,12 +120,12 @@ export class SeekActionHandler extends ActionHandlerBase {
       if (isAnomaly && FeatsHandler.hasFeat(actionData.actor, ["thats-odd", "that's-odd"])) {
         thatsOddAuto = true;
       }
-    } catch {}
+    } catch { }
 
     if (subject && subject._isWall) {
       // Walls: use provided dc and evaluate new state vs current observer wall state
       dc = Number(subject.dc) || 15;
-  // visibility state applies to wall map per observer; reuse actor for presentation
+      // visibility state applies to wall map per observer; reuse actor for presentation
       try {
         const map = actionData.actor?.document?.getFlag?.(MODULE_ID, 'walls') || {};
         current = map?.[subject.wall?.id] || 'hidden';
@@ -166,7 +166,7 @@ export class SeekActionHandler extends ActionHandlerBase {
             }
           }
         }
-  } catch { }
+      } catch { }
 
       // For loot actors, use the custom Stealth DC flag configured on the token; otherwise use Perception DC
       dc = extractStealthDC(subject);
@@ -177,7 +177,7 @@ export class SeekActionHandler extends ActionHandlerBase {
       actionData?.roll?.dice?.[0]?.total ??
       actionData?.roll?.terms?.[0]?.total ?? 0,
     );
-  const outcome = determineOutcome(total, die, dc);
+    const outcome = determineOutcome(total, die, dc);
     // Simple mapping: success → observed; failure → concealed/hidden depending on target state; crit-failure → undetected
     const { getDefaultNewStateFor } = await import('../data/action-state-config.js');
     let newVisibility = getDefaultNewStateFor('seek', current, outcome) || current;
@@ -189,7 +189,25 @@ export class SeekActionHandler extends ActionHandlerBase {
         isHiddenWall: !!subject?._isWall,
         outcome,
       });
-    } catch {}
+    } catch { }
+
+    // PF2e RAW correction: You CAN Seek with imprecise senses,
+    // but the best you can do is make the target Hidden (never Observed).
+    // Echolocation (precise hearing within 40 ft) and other precise senses can allow Observed.
+    try {
+      if (!subject?._isWall && newVisibility === 'observed') {
+        const { VisionAnalyzer } = await import(
+          '../../../visibility/auto-visibility/VisionAnalyzer.js'
+        );
+        const va = VisionAnalyzer.getInstance();
+        const visCaps = va.getVisionCapabilities(actionData.actor);
+        const hasVisualPrecise = !!(visCaps?.hasVision && !visCaps?.isBlinded);
+        const hasNonVisualPrecise = va.hasPreciseNonVisualInRange(actionData.actor, subject);
+        if (!hasVisualPrecise && !hasNonVisualPrecise) {
+          newVisibility = 'hidden';
+        }
+      }
+    } catch { }
 
     // Build display metadata for walls
     let wallMeta = {};
@@ -209,7 +227,7 @@ export class SeekActionHandler extends ActionHandlerBase {
           wallIdentifier: name,
           wallImg: img,
         };
-  } catch { }
+      } catch { }
     }
 
     const base = {
@@ -278,7 +296,7 @@ export class SeekActionHandler extends ActionHandlerBase {
 
         if (!inside) return { ...base, changed: false };
       }
-  } catch { }
+    } catch { }
 
     return base;
   }
@@ -320,7 +338,7 @@ export class SeekActionHandler extends ActionHandlerBase {
           oldVisibility: outcome?.oldVisibility || outcome?.currentVisibility || null,
         };
       }
-  } catch { }
+    } catch { }
     return super.outcomeToChange(actionData, outcome);
   }
 
@@ -342,7 +360,7 @@ export class SeekActionHandler extends ActionHandlerBase {
         }
       }
       return base;
-  } catch {
+    } catch {
       return outcomes;
     }
   }
@@ -404,7 +422,7 @@ export class SeekActionHandler extends ActionHandlerBase {
           }
         }
       }
-  } catch {
+    } catch {
       // Fallback to base implementation if something goes wrong
       return super.applyChangesInternal(changes);
     }
@@ -441,7 +459,7 @@ export class SeekActionHandler extends ActionHandlerBase {
             return id ? tokenMap.has(id) : false;
           });
         }
-  } catch { }
+      } catch { }
 
       if (filtered.length === 0) {
         (await import('../infra/notifications.js')).notify.info('No changes to apply');

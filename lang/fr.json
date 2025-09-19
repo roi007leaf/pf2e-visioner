@@ -1,5 +1,17 @@
 {
   "PF2E_VISIONER": {
+    "ENVIRONMENT": {
+      "SCENE_NOISY_LABEL": "",
+      "SCENE_NOISY_HINT": "",
+      "TOGGLE_SCENE_NOISY_ON": "",
+      "TOGGLE_SCENE_NOISY_OFF": "",
+      "TOGGLE_REGION_NOISY_SELECT": "",
+      "TOGGLE_REGION_NOISY_ON": "",
+      "TOGGLE_REGION_NOISY_OFF": "",
+      "NOISY_ENABLED_SCENE": "",
+      "NOISY_DISABLED_SCENE": "",
+      "NOISY_TOGGLED_REGIONS": ""
+    },
     "MODULE_TITLE": "PF2E Visioner",
     "TOKEN_MANAGER": {
       "TITLE": "Gestionnaire de visibilité de jeton",
@@ -94,7 +106,11 @@
       "RANGE_LIMIT_ACTIVE": "La limite de portée est active : Montre seulement les cibles dans un rayon de 9 mètres",
       "RANGE_LIMIT_ACTIVE_CUSTOM": "Limite de portée active : Montre seumement les cibles dans les {distance} pieds ",
       "NO_TARGETS_IN_RANGE": "PAs de cibles valides dans la portée de 9 mètres",
-      "NO_TARGETS_IN_RANGE_CUSTOM": "Pas de cibles valides dans la portée de {distance} pieds"
+      "NO_TARGETS_IN_RANGE_CUSTOM": "Pas de cibles valides dans la portée de {distance} pieds",
+      "ECHOLOCATION_LABEL": "Écholocalisation",
+      "ECHOLOCATION_TOOLTIP": "Ouïe précise active jusqu'au début de votre prochain tour",
+      "NOISY_LABEL": "",
+      "NOISY_TOOLTIP": ""
     },
     "HIDE_AUTOMATION": {
       "BUTTON_APPLY": "Applique les résultats de Se cacher",

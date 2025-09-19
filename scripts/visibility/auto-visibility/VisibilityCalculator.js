@@ -121,6 +121,12 @@ export class VisibilityCalculator {
       const isBlinded = this.#conditionManager.isBlinded(observer);
       if (log.enabled()) log.debug(() => ({ step: 'blinded-check', observer: observer.name, result: isBlinded }));
       if (isBlinded) {
+        // If blinded, but has precise non-visual sense in range, can still observe
+        try {
+          if (this.#visionAnalyzer.hasPreciseNonVisualInRange(observer, target)) return 'observed';
+          // If any imprecise sense can detect, target is at least hidden rather than undetected
+          if (this.#visionAnalyzer.canSenseImprecisely(observer, target)) return 'hidden';
+        } catch { }
         return 'hidden';
       }
 
@@ -128,7 +134,13 @@ export class VisibilityCalculator {
       const isInvisible = this.#conditionManager.isInvisibleTo(observer, target);
       if (log.enabled()) log.debug(() => ({ step: 'invisible-check', observer: observer.name, target: target.name, result: isInvisible }));
       if (isInvisible) {
-        // In PF2e, invisible targets are undetected to all observers unless they have special abilities
+        // If observer has precise non-visual sense (e.g., tremorsense, echolocation) in range → observed
+        try {
+          if (this.#visionAnalyzer.hasPreciseNonVisualInRange(observer, target)) return 'observed';
+          // If any imprecise sense can detect (e.g., hearing), invisible is at least hidden
+          if (this.#visionAnalyzer.canSenseImprecisely(observer, target)) return 'hidden';
+        } catch { }
+        // Otherwise invisible = undetected
         return 'undetected';
       }
 
@@ -136,7 +148,11 @@ export class VisibilityCalculator {
       const isDazzled = this.#conditionManager.isDazzled(observer);
       if (log.enabled()) log.debug(() => ({ step: 'dazzled-check', observer: observer.name, result: isDazzled }));
       if (isDazzled) {
-        // In PF2e, dazzled creatures see everything as concealed unless they have special abilities
+        // If you have a precise non-visual sense in range, dazzled doesn't matter for that target
+        try {
+          if (this.#visionAnalyzer.hasPreciseNonVisualInRange(observer, target)) return 'observed';
+        } catch { }
+        // Otherwise, everything is concealed
         return 'concealed';
       }
 
@@ -145,7 +161,13 @@ export class VisibilityCalculator {
         const losClear = !!this.#visionAnalyzer.hasLineOfSight(observer, target, true);
         if (log.enabled()) log.debug(() => ({ step: 'los-raw', observer: observer.name, target: target.name, losClear }));
         if (!losClear) {
-          return 'hidden';
+          // If LoS blocked, but a precise non-visual sense is in range → observed
+          try {
+            if (this.#visionAnalyzer.hasPreciseNonVisualInRange(observer, target)) return 'observed';
+            // If only imprecise sense can detect → hidden; if none → undetected
+            if (this.#visionAnalyzer.canSenseImprecisely(observer, target)) return 'hidden';
+            return 'undetected';
+          } catch { return 'hidden'; }
         }
       } catch { /* best effort: continue */ }
 
@@ -162,10 +184,33 @@ export class VisibilityCalculator {
       if (log.enabled()) log.debug(() => ({ step: 'vision-capabilities', observer: observer.name, observerVision }));
 
       // Step 6: Determine visibility based on light level and observer's vision
-      const result = this.#visionAnalyzer.determineVisibilityFromLighting(
+      let result = this.#visionAnalyzer.determineVisibilityFromLighting(
         lightLevel,
         observerVision,
       );
+
+      // Clamp per imprecise-only rule: if observer has no precise senses on target (including vision), but can sense imprecisely, treat as hidden
+      try {
+        const preciseNonVisual = this.#visionAnalyzer.hasPreciseNonVisualInRange(observer, target);
+        const canImprecise = this.#visionAnalyzer.canSenseImprecisely(observer, target);
+        const hasSight = observerVision?.hasVision !== false; // visual path already considered in determineVisibilityFromLighting
+        if (!preciseNonVisual && canImprecise) {
+          // If lighting result says observed but only imprecise senses apply (e.g., darkness without darkvision), degrade to hidden
+          if (result === 'observed') {
+            // If lighting made it observed due to visual capabilities, keep observed; otherwise, convert to hidden
+            // When in darkness without darkvision, determineVisibilityFromLighting returns hidden/concealed; so only degrade in bright/dim cases where vision fails for other reasons
+            result = 'hidden';
+          }
+          if (result === 'concealed') result = 'hidden';
+          if (result === 'hidden' || result === 'undetected') {
+            // Ensure not worse than hidden if we can sense imprecisely
+            result = 'hidden';
+          }
+        } else if (!hasSight && !preciseNonVisual && !canImprecise) {
+          // No senses can detect → undetected
+          result = 'undetected';
+        }
+      } catch { }
       if (log.enabled()) log.info(() => ({ step: 'result', observer: observer.name, target: target.name, result }));
 
       return result;

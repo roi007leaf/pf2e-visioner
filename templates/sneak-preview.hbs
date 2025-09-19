@@ -12,6 +12,16 @@
     <div class="sneaker-details">
       <h3 class="sneaker-name">{{sneaker.name}}</h3>
       <p class="hint">{{sneaker.actionLabel}}</p>
+      {{#if prereqBadges}}
+        <div class="action-context-badges">
+          {{#each prereqBadges as |b|}}
+            <span class="badge badge-feat" data-tooltip="{{b.tooltip}}">
+              <i class="{{b.icon}}"></i>
+              <span class="badge-label">{{b.label}}</span>
+            </span>
+          {{/each}}
+        </div>
+      {{/if}}
       {{#if sneakDistance}}
         <div class="sneak-distance-indicator">
           <span class="distance-chip" data-tooltip="{{sneakDistance.tooltip}}">

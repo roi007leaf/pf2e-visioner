@@ -12,6 +12,17 @@
     <div class="seeker-details">
       <h3 class="seeker-name">{{seeker.name}}</h3>
       <p class="hint">{{seeker.actionLabel}}</p>
+      {{#if echolocationActive}}
+        <div class="seek-context-badges">
+          {{#if echolocationActive}}
+            <span class="badge badge-echolocation" data-tooltip="{{localize 'PF2E_VISIONER.SEEK_AUTOMATION.ECHOLOCATION_TOOLTIP'}}">
+              <i class="fas fa-volume-high"></i>
+              <span class="badge-label">{{localize 'PF2E_VISIONER.SEEK_AUTOMATION.ECHOLOCATION_LABEL'}}</span>
+              <span class="badge-range">{{echolocationRange}} ft</span>
+            </span>
+          {{/if}}
+        </div>
+      {{/if}}
     </div>
   </div>
 
