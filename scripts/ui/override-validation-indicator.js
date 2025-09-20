@@ -309,13 +309,13 @@ class OverrideValidationIndicator {
       const cfg = VISIBILITY_STATES?.[key] || { icon: 'fas fa-eye', label: 'Observed', cssClass: 'visibility-observed' };
       const label = game?.i18n?.localize?.(cfg.label) || cfg.label || '';
       const cls = cfg.cssClass || `visibility-${key}`;
-      return `<i class="${cfg.icon} state-indicator ${cls}" data-kind="visibility" data-state="${key}" title="${label}"></i>`;
+      return `<i class="${cfg.icon} state-indicator ${cls}" data-kind="visibility" data-state="${key}" data-tooltip="${label}"></i>`;
     };
     const mkCover = (key) => {
       const cfg = COVER_STATES?.[key] || { icon: 'fas fa-shield', label: 'Cover', cssClass: 'cover-none' };
       const label = game?.i18n?.localize?.(cfg.label) || cfg.label || '';
       const cls = cfg.cssClass || `cover-${key}`;
-      return `<i class="${cfg.icon} state-indicator ${cls}" data-kind="cover" data-state="${key}" title="${label}"></i>`;
+      return `<i class="${cfg.icon} state-indicator ${cls}" data-kind="cover" data-state="${key}" data-tooltip="${label}"></i>`;
     };
 
     const buildRow = (o) => {
@@ -323,7 +323,7 @@ class OverrideValidationIndicator {
       const prevCover = (o.expectedCover ?? (o.hasCover ? 'standard' : 'none'));
       const curVis = o.currentVisibility || 'observed';
       const curCover = o.currentCover || 'none';
-      const reasons = (o.reasonIcons || []).map((r) => `<i class="${r.icon}" title="${r.text}"></i>`).join('');
+      const reasons = (o.reasonIcons || []).map((r) => `<i class="${r.icon}" data-tooltip="${r.text}"></i>`).join('');
       return `
         <div class="tip-row">
           <div class="who">${o.observerName} <i class="fas fa-arrow-right"></i> ${o.targetName}</div>

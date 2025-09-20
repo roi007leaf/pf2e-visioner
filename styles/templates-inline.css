@@ -186,3 +186,28 @@
 /* Floating action button hover/focus states (optional future) */
 .pv-fab-save:hover { filter:brightness(1.05); }
 .pv-fab-save:focus { outline:2px solid var(--color-border-highlight); }
+
+/* --- Light Config: Heightened Darkness (appealing card) --- */
+.pf2e-visioner-light-settings { margin-top:6px; border-radius:8px; }
+.pf2e-visioner-light-settings legend { font-weight:700; letter-spacing:.2px; padding:0 4px; }
+.pf2e-visioner-light-settings .pvv-card {
+  margin-top:4px;
+  padding:8px 10px;
+  border:1px solid var(--color-border-light-primary, rgba(255,255,255,0.12));
+  border-radius:8px;
+  background: var(--color-bg-primary, rgba(0,0,0,0.15));
+}
+.pf2e-visioner-light-settings .pvv-title-row {
+  display:flex; align-items:flex-start; gap:8px; margin:0; cursor:default;
+}
+.pf2e-visioner-light-settings .pvv-title-copy { display:flex; flex-direction:column; gap:2px; }
+.pf2e-visioner-light-settings .pvv-title { font-weight:600; }
+.pf2e-visioner-light-settings .pvv-subtle { opacity:0.85; font-size: var(--font-size-12, 12px); }
+.pf2e-visioner-light-settings .pvv-chip-row { margin:6px 0 0 1.6rem; }
+.pf2e-visioner-light-settings .pvv-chip {
+  display:inline-flex; align-items:center; gap:6px; padding:2px 8px;
+  border-radius:12px; background:rgba(255,255,255,0.08);
+  border:1px solid rgba(255,255,255,0.12); font-size: var(--font-size-12, 12px);
+}
+.pf2e-visioner-light-settings .pvv-chip i { opacity:0.9; }
+.pf2e-visioner-light-settings .pvv-help { margin:6px 0 0 1.6rem; line-height:1.2; opacity:.85; font-size: var(--font-size-12, 12px); }

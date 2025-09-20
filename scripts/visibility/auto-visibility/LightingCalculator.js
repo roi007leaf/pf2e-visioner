@@ -95,9 +95,9 @@ export class LightingCalculator {
       );
       // Read heightened darkness rank from our module flag if present
       const darknessRank = Number(light.document?.getFlag?.(MODULE_ID, 'darknessRank') || 0) || 0;
-      // PF2E Visioner: "magical darkness" behavior only applies when explicitly flagged OR rank >= 4
-      const magicalFlag = !!light.document?.getFlag?.(MODULE_ID, 'magicalDarkness');
-      const isMagicalDarkness = !!(magicalFlag || darknessRank >= 4);
+      // PF2E Visioner: backward-compatible flags
+      const heightenedFlag = !!light.document?.getFlag?.(MODULE_ID, 'heightenedDarkness');
+      const isMagicalDarkness = !!(heightenedFlag || darknessRank >= 4);
 
       // Skip if the light is hidden. For non-darkness lights also skip if they do not emit light.
       // Darkness sources often report emitsLight=false, but we still need to process them so they can impose darkness.

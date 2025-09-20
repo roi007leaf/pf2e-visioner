@@ -1323,7 +1323,7 @@ export class EventDrivenVisibilitySystem {
         x: template.x,
         y: template.y,
         hidden: false,
-        flags: { [MODULE_ID]: { magicalDarkness: darknessRank >= 4, linkedTemplateId: template.id, source: 'pf2e-darkness', darknessRank } },
+        flags: { [MODULE_ID]: { heightenedDarkness: darknessRank >= 4, linkedTemplateId: template.id, source: 'pf2e-darkness', darknessRank } },
         config: { bright: dist, dim: dist, negative: true },
         rotation: 0,
         walls: true,
@@ -1374,9 +1374,10 @@ export class EventDrivenVisibilitySystem {
         hidden: false,
         ...(darknessRank ? { [`flags.${MODULE_ID}.darknessRank`]: darknessRank } : {}),
       };
-      // Only mark magicalDarkness when heightened to rank >= 4
+      // Only mark heightenedDarkness when heightened to rank >= 4
       if (typeof darknessRank === 'number') {
-        update[`flags.${MODULE_ID}.magicalDarkness`] = darknessRank >= 4;
+        const on = darknessRank >= 4;
+        update[`flags.${MODULE_ID}.heightenedDarkness`] = on;
       }
       await canvas.scene?.updateEmbeddedDocuments?.('AmbientLight', [update]);
     } catch (e) {

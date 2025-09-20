@@ -42,7 +42,7 @@ function makeToken(actor, id = 'tok') {
 }
 
 function setupSceneWithDarkness({ rank = 0, magical = false } = {}) {
-    const flags = { 'pf2e-visioner': { darknessRank: rank, magicalDarkness: magical } };
+    const flags = { 'pf2e-visioner': { darknessRank: rank, heightenedDarkness: magical } };
     const origCanvas = global.canvas;
     global.canvas = {
         scene: {

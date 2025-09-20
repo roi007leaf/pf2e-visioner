@@ -9,7 +9,7 @@ export function registerUIHooks() {
   Hooks.on('renderTokenHUD', onRenderTokenHUD);
   Hooks.on('getTokenDirectoryEntryContext', onGetTokenDirectoryEntryContext);
   Hooks.on('renderWallConfig', onRenderWallConfig);
-  // Light config injection: add Magical Darkness checkbox
+  // Light config injection: add Heightened Darkness (rank 4+) checkbox
   Hooks.on('renderLightConfig', onRenderLightConfig);
   Hooks.on('renderAmbientLightConfig', onRenderLightConfig);
   // We no longer create a separate Visioner tool; tools are injected into Tokens/Walls below
@@ -436,27 +436,27 @@ export function registerUIHooks() {
       const selected = canvas?.lighting?.controlled ?? [];
       if (!selected.length) {
         tool.icon = 'fa-regular fa-moon';
-        tool.title = 'Toggle Magical Darkness (Selected Lights)';
+        tool.title = 'Toggle Heightened Darkness (Rank 4+)';
         tool.active = false;
         ui.controls.render();
         return;
       }
 
-      const statuses = selected.map((l) => !!l?.document?.getFlag?.(MODULE_ID, 'magicalDarkness'));
+      const statuses = selected.map((l) => !!(l?.document?.getFlag?.(MODULE_ID, 'heightenedDarkness')));
       const all = statuses.every(Boolean);
       const none = statuses.every((s) => !s);
 
       if (all) {
         tool.icon = 'fa-solid fa-moon';
-        tool.title = 'Disable Magical Darkness (Selected Lights)';
+        tool.title = 'Disable Heightened Darkness (Rank 4+)';
         tool.active = true;
       } else if (none) {
         tool.icon = 'fa-regular fa-moon';
-        tool.title = 'Enable Magical Darkness (Selected Lights)';
+        tool.title = 'Enable Heightened Darkness (Rank 4+)';
         tool.active = false;
       } else {
         tool.icon = 'fa-solid fa-circle-half-stroke';
-        tool.title = 'Mixed: Toggle Magical Darkness (Selected Lights)';
+        tool.title = 'Mixed: Toggle Heightened Darkness (Rank 4+)';
         tool.active = false;
       }
 
@@ -796,17 +796,17 @@ export function registerUIHooks() {
       if (lighting) {
         // Toggle Magical Darkness on selected lights
         const selectedLights = canvas?.lighting?.controlled ?? [];
-        const statuses = selectedLights.map((l) => !!l?.document?.getFlag?.(MODULE_ID, 'magicalDarkness'));
+        const statuses = selectedLights.map((l) => !!(l?.document?.getFlag?.(MODULE_ID, 'heightenedDarkness')));
         const allAreMagDark = selectedLights.length > 0 && statuses.every(Boolean);
         const noneAreMagDark = selectedLights.length > 0 && statuses.every((s) => !s);
         const mixedMagDark = selectedLights.length > 0 && !allAreMagDark && !noneAreMagDark;
         addTool(lighting.tools, {
           name: 'pf2e-visioner-toggle-magical-darkness',
           title: mixedMagDark
-            ? 'Mixed: Toggle Magical Darkness (Selected Lights)'
+            ? 'Mixed: Toggle Heightened Darkness (Rank 4+)'
             : allAreMagDark
-              ? 'Disable Magical Darkness (Selected Lights)'
-              : 'Enable Magical Darkness (Selected Lights)',
+              ? 'Disable Heightened Darkness (Rank 4+)'
+              : 'Enable Heightened Darkness (Rank 4+)',
           icon: mixedMagDark
             ? 'fa-solid fa-circle-half-stroke'
             : allAreMagDark
@@ -821,7 +821,7 @@ export function registerUIHooks() {
               if (toggled) {
                 // Enable our flag and ensure the light is a darkness source in Foundry
                 await Promise.all(selected.map(async (l) => {
-                  try { await l?.document?.setFlag?.(MODULE_ID, 'magicalDarkness', true); } catch { }
+                  try { await l?.document?.setFlag?.(MODULE_ID, 'heightenedDarkness', true); } catch { }
                   // If not already marked as a darkness source, set the negative flag(s)
                   const isAlreadyDark = !!(
                     l?.isDarknessSource ||
@@ -838,7 +838,7 @@ export function registerUIHooks() {
                 }));
               } else {
                 for (const l of selected) {
-                  try { await l?.document?.unsetFlag?.(MODULE_ID, 'magicalDarkness'); } catch { await l?.document?.setFlag?.(MODULE_ID, 'magicalDarkness', false); }
+                  try { await l?.document?.unsetFlag?.(MODULE_ID, 'heightenedDarkness'); } catch { await l?.document?.setFlag?.(MODULE_ID, 'heightenedDarkness', false); }
                 }
               }
               // Invalidate lighting cache and refresh perception so visibility updates immediately
@@ -1113,19 +1113,24 @@ function onRenderLightConfig(app, html) {
     const fs = document.createElement('fieldset');
     fs.className = 'pf2e-visioner-light-settings';
     const lightDoc = app?.document || app?.object || null;
-    const checked = !!lightDoc?.getFlag?.(MODULE_ID, 'magicalDarkness');
+    const checked = !!(lightDoc?.getFlag?.(MODULE_ID, 'heightenedDarkness'));
+    const derivedRank = Number(lightDoc?.getFlag?.(MODULE_ID, 'darknessRank') ?? 0) || 0;
+    const linkedTemplateId = lightDoc?.getFlag?.(MODULE_ID, 'linkedTemplateId') || '';
     fs.innerHTML = `
         <legend>PF2E Visioner</legend>
-        <div class="form-group slim" style="margin:4px 0;">
-          <label class="checkbox" style="display:flex; align-items:center; gap:8px; margin:0;">
-            <input type="checkbox" name="flags.${MODULE_ID}.magicalDarkness" ${checked ? 'checked' : ''}>
-            <span>Magical darkness</span>
-            <span style="opacity:.8; font-size: var(--font-size-12, 12px);">(pierced only by Greater Darkvision)</span>
+        <div class="pvv-card">
+          <label class="checkbox pvv-title-row">
+            <input type="checkbox" name="flags.${MODULE_ID}.heightenedDarkness" ${checked ? 'checked' : ''}>
+            <div class="pvv-title-copy">
+              <span class="pvv-title">Treat as Heightened Darkness <em class="pvv-subtle">(rank 4+)</em></span>
+              <span class="pvv-subtle">In this area: darkvision sees Concealed; greater darkvision sees normally.</span>
+            </div>
           </label>
+          ${linkedTemplateId ? `<div class="pvv-chip-row"><span class="pvv-chip" data-tooltip="From linked Darkness template"><i class="fas fa-moon"></i> Derived rank: <strong>${derivedRank || '—'}</strong></span></div>` : ''}
+          <div class="pvv-help">Applies the rank 4 Darkness visibility rule.</div>
         </div>
-        <small class="notes" style="display:block; margin:2px 0 0 1.6rem; line-height:1.2; opacity:.85;">Turns this light's bright/dim areas into magical darkness.</small>
     `;
-    try { fs.style.padding = '8px 10px'; fs.style.marginTop = '6px'; fs.style.marginBottom = '6px'; } catch { }
+    // light padding/margins are handled by CSS classes
     // Prefer inserting directly under the native "Is Darkness Source" control
     let inserted = false;
     let negCheckbox = null;
@@ -1186,7 +1191,7 @@ function onRenderLightConfig(app, html) {
 
     // Sync native darkness checkbox when enabling magical darkness in the form
     try {
-      const magCb = form.querySelector(`input[name="flags.${MODULE_ID}.magicalDarkness"]`);
+      const magCb = form.querySelector(`input[name="flags.${MODULE_ID}.heightenedDarkness"]`);
       const nativeNeg = () =>
         form.querySelector(
           'input[name="config.negative"], input[name$=".negative"], input[name*="darkness"][name*="negative"]'
