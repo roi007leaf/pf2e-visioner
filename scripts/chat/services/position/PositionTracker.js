@@ -205,7 +205,7 @@ export class PositionTracker {
       }
 
       try {
-        lightingConditions = this._getLightingConditions(sneakingToken, observerToken);
+        lightingConditions = this._getLightingConditions(observerToken);
       } catch (error) {
         console.warn('PF2E Visioner | Lighting calculation failed:', error);
       }
@@ -369,13 +369,20 @@ export class PositionTracker {
    * @returns {string} Lighting condition description
    * @private
    */
-  _getLightingConditions(token1, token2) {
+  _getLightingConditions(token2) {
     try {
       // Use the LightingCalculator singleton directly for accurate lighting analysis
       const lightingCalculator = LightingCalculator.getInstance();
 
       // Use target token directly for lighting calculation
-      const lightLevelInfo = lightingCalculator.getLightLevelAt(token2);
+
+      const targetPosition = {
+        x: token2.center.x,
+        y: token2.center.y,
+        elevation: token2.document.elevation || 0,
+      };
+
+      const lightLevelInfo = lightingCalculator.getLightLevelAt(targetPosition, token2);
 
       // Return the light level directly from the calculator
       return lightLevelInfo.level; // Returns 'bright', 'dim', or 'darkness'

@@ -4,7 +4,12 @@ import { jest } from '@jest/globals';
 function actorWithSpeedAndFeats(speed, slugs = []) {
   const items = slugs.map((slug) => ({ type: 'feat', system: { slug } }));
   return {
-    system: { attributes: { speed: { value: speed } } },
+    system: {
+      // New movement path used by the system under test
+      movement: { speeds: { land: { value: speed } } },
+      // Keep legacy attributes.speed for backward compatibility with other code
+      attributes: { speed: { value: speed } },
+    },
     items,
     getFlag: () => undefined,
     setFlag: () => Promise.resolve(),

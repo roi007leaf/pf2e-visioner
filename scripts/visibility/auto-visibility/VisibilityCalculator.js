@@ -179,7 +179,7 @@ export class VisibilityCalculator {
         elevation: target.document.elevation || 0,
       };
       // New API prefers passing a token; supports position objects for overrides
-      const lightLevel = this.#lightingCalculator.getLightLevelAt(target);
+      const lightLevel = this.#lightingCalculator.getLightLevelAt(targetPosition, target);
       const observerVision = this.#visionAnalyzer.getVisionCapabilities(observer);
       if (log.enabled()) log.debug(() => ({ step: 'lighting', target: target.name, pos: targetPosition, lightLevel }));
       if (log.enabled()) log.debug(() => ({ step: 'vision-capabilities', observer: observer.name, observerVision }));

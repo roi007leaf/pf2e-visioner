@@ -4,17 +4,17 @@ function buildSneakDistanceChipHTML(tokenOrActor) {
   try {
     const actor = tokenOrActor?.actor || tokenOrActor?.document?.actor || tokenOrActor;
     const baseFromFlag = actor?.getFlag?.('pf2e-visioner', 'sneak-original-walk-speed');
-    const baseSpeed = Number(baseFromFlag ?? actor?.system?.attributes?.speed?.value ?? 0) || 0;
+    const baseSpeed = Number(baseFromFlag ?? actor?.system?.movement?.speeds?.land?.value ?? 0) || 0;
     if (!actor || baseSpeed <= 0) return '';
 
     const multiplier = Number(FeatsHandler.getSneakSpeedMultiplier(actor) ?? 0.5);
     const bonusFeet = Number(FeatsHandler.getSneakDistanceBonusFeet(actor) ?? 0);
 
-  const raw = Math.floor(baseSpeed * multiplier) + bonusFeet;
-  const capped = Math.min(baseSpeed, raw);
-  const maxFeet = Math.floor(capped / 5) * 5;
+    const raw = Math.floor(baseSpeed * multiplier) + bonusFeet;
+    const capped = Math.min(baseSpeed, raw);
+    const maxFeet = Math.floor(capped / 5) * 5;
 
-  // Collect feat names for tooltip clarity
+    // Collect feat names for tooltip clarity
     const hasSwiftSneak = FeatsHandler.hasFeat(actor, 'swift-sneak');
     const hasLegendarySneak = FeatsHandler.hasFeat(actor, 'legendary-sneak');
     const hasVeryVerySneaky = FeatsHandler.hasFeat(actor, 'very-very-sneaky');
@@ -74,7 +74,7 @@ export function buildSneakPanel(actionData = {}, message = null) {
       const icon = 'fas fa-user-ninja';
       const actionName = 'open-sneak-results';
       const buttonClass = 'visioner-btn-sneak';
-      
+
       actionButtonsHtml = `
         <button type="button" 
                 class="visioner-btn ${buttonClass}" 
@@ -92,7 +92,7 @@ export function buildSneakPanel(actionData = {}, message = null) {
       // Show "Start Sneak" if sneak hasn't been started yet
       const buttonClass = 'visioner-btn-sneak';
       const distanceChip = buildSneakDistanceChipHTML(actionData?.actor);
-      
+
       actionButtonsHtml = `
         <div class="visioner-row-with-chip" style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
           <button type="button" 

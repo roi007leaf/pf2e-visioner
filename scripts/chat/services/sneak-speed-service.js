@@ -71,7 +71,7 @@ export class SneakSpeedService {
       const existingEffectId = actor.getFlag?.(MODULE_ID, EFFECT_ID_FLAG);
       if (existingEffectId) return;
 
-      const current = Number(actor.system?.attributes?.speed?.value ?? 0);
+      const current = Number(actor.system?.movement?.speeds?.land?.value ?? 0);
       if (!Number.isFinite(current) || current <= 0) return;
 
       // Try to use a PF2e effect with ActiveEffectLike to multiply base speed by the calculated multiplier
@@ -152,7 +152,7 @@ export class SneakSpeedService {
     if (!actor) return 0;
     // Prefer original speed flag if present (so we don't double-apply the effect when Sneak is active)
     const original = actor.getFlag?.(MODULE_ID, ORIGINAL_SPEED_FLAG);
-    const baseSpeed = Number(original ?? actor.system?.attributes?.speed?.value ?? 0) || 0;
+    const baseSpeed = Number(original ?? actor.system?.movement?.speeds?.land?.value ?? 0) || 0;
     if (baseSpeed <= 0) return 0;
 
     let multiplier = 0.5;

@@ -361,7 +361,7 @@ export class SneakPreviewDialog extends BaseActionDialog {
     try {
       const { SneakSpeedService } = await import('../services/sneak-speed-service.js');
       const actor = this.sneakingToken?.actor || this.sneakingToken;
-      const baseSpeed = Number(actor?.system?.attributes?.speed?.value ?? 0) || 0;
+      const baseSpeed = Number(actor?.system?.movement?.speeds?.land?.value ?? 0) || 0;
       // Prefer original speed flag if present (effect applied), otherwise current value
       let originalSpeed = baseSpeed;
       try {

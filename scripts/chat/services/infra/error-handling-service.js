@@ -100,7 +100,7 @@ export class ErrorHandlingService {
    * @returns {Object} Fallback visibility data
    */
   async handleAVSSystemFailure(context) {
-    const { observer, target } = context;
+    const { observer, target, options = {} } = context;
 
     log.warn('AVS system unavailable, applying graceful degradation');
 
@@ -145,9 +145,15 @@ export class ErrorHandlingService {
           );
           const lightingCalculator = LightingCalculator.getInstance();
 
-          const lightLevelInfo = lightingCalculator.getLightLevelAt(target);
+          const targetPosition = {
+            x: target.center.x,
+            y: target.center.y,
+            elevation: target.document.elevation || 0,
+          };
+
+          const lightLevelInfo = lightingCalculator.getLightLevelAt(targetPosition, target);
           fallbackVisibility = lightLevelInfo.level === 'darkness' ? 'concealed' : 'observed';
-        } catch {
+        } catch (importError) {
           // Use conservative fallback if LightingCalculator is not available
           fallbackVisibility = 'observed';
         }
@@ -191,7 +197,7 @@ export class ErrorHandlingService {
    * @returns {Object} Fallback cover data
    */
   async handleAutoCoverSystemFailure(context) {
-    const { observer, target } = context;
+    const { observer, target, options = {} } = context;
 
     log.warn('Auto-Cover system unavailable, applying fallback processing');
 
@@ -425,8 +431,6 @@ export class ErrorHandlingService {
    * @private
    */
   _determineSeverity(systemType, error, context) {
-    // touch unused param for linter
-    void context;
     // Critical errors that break core functionality
     if (systemType === SYSTEM_TYPES.SNEAK_ACTION && error.message.includes('core')) {
       return ERROR_SEVERITY.CRITICAL;
@@ -621,7 +625,6 @@ export class ErrorHandlingService {
    * @private
    */
   async _recoverAVSSystem(context) {
-    void context;
     try {
       // Check if AVS is enabled in settings
       const avsEnabled = game.settings.get(MODULE_ID, 'autoVisibilityEnabled');
@@ -651,7 +654,6 @@ export class ErrorHandlingService {
    * @private
    */
   async _recoverAutoCoverSystem(context) {
-    void context;
     try {
       // Check if Auto-Cover is enabled in settings
       const autoCoverEnabled = game.settings.get(MODULE_ID, 'autoCover');
@@ -683,7 +685,6 @@ export class ErrorHandlingService {
    * @private
    */
   async _recoverPositionTracker(context) {
-    void context;
     try {
       // Try to re-initialize position tracker
       const positionTrackerModule = await import('../position/PositionTracker.js');
@@ -709,7 +710,6 @@ export class ErrorHandlingService {
    * @private
    */
   async _recoverSneakAction(context) {
-    void context;
     try {
       // Basic recovery - check if core sneak functionality is available
       return typeof canvas !== 'undefined' && canvas.tokens?.placeables?.length > 0;
@@ -726,7 +726,6 @@ export class ErrorHandlingService {
    * @private
    */
   async _recoverDialog(context) {
-    void context;
     try {
       // Basic recovery - check if dialog system is available
       return typeof Dialog !== 'undefined' && typeof ui !== 'undefined';
@@ -747,7 +746,7 @@ export class ErrorHandlingService {
     try {
       const { getCoverBetween } = await import('../../../utils.js');
       return getCoverBetween(observer, target) || 'none';
-    } catch {
+    } catch (error) {
       return 'none';
     }
   }
