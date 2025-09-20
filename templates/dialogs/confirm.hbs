@@ -1,0 +1,12 @@
+<div class="visioner-confirm pvv-confirm-dialog {{#if isDanger}}pvv-confirm-danger{{/if}} {{#if isWarning}}pvv-confirm-warning{{/if}} {{#if isInfo}}pvv-confirm-info{{/if}}" tabindex="0">
+  <div class="pvv-confirm-hero">
+    <div class="pvv-confirm-hero-icon"><i class="{{icon}}"></i></div>
+    <div class="pvv-confirm-hero-copy">
+      {{{content}}}
+    </div>
+  </div>
+  <footer class="pvv-confirm-footer">
+    <button type="button" class="pvv-btn pvv-btn-secondary" data-action="no"><i class="fas fa-times"></i> {{no}}</button>
+    <button type="button" class="pvv-btn pvv-btn-primary" data-action="yes" autofocus><i class="fas fa-check"></i> {{yes}}</button>
+  </footer>
+</div>

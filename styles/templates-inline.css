@@ -211,3 +211,60 @@
 }
 .pf2e-visioner-light-settings .pvv-chip i { opacity:0.9; }
 .pf2e-visioner-light-settings .pvv-help { margin:6px 0 0 1.6rem; line-height:1.2; opacity:.85; font-size: var(--font-size-12, 12px); }
+
+/* --- Dialog: Darkness Mode chooser --- */
+.pvv-darkness-dialog .pvv-darkness-chooser { display:flex; flex-direction:column; gap:8px; }
+.pvv-darkness-dialog { max-width: 640px; }
+.pvv-darkness-dialog .window-content { max-width: 640px; }
+.pvv-darkness-dialog .pvv-darkness-chooser .notes { margin:0 0 4px 0; }
+.pvv-darkness-dialog .pvv-options { display:flex; gap:10px; flex-wrap:wrap; }
+.pvv-darkness-dialog .pvv-option {
+  flex:1 1 260px; min-width:230px; max-width: 100%; display:flex; align-items:flex-start; gap:10px;
+  border:1px solid var(--color-border-light-primary);
+  border-radius:10px; padding:10px 12px; cursor:pointer; transition:background .15s ease, border-color .15s ease, box-shadow .15s ease, transform .03s ease;
+}
+.pvv-darkness-dialog .pvv-option:focus { outline:2px solid var(--color-border-highlight, #88c0ff); outline-offset:2px; }
+.pvv-darkness-dialog .pvv-option:hover { box-shadow:0 1px 0 rgba(255,255,255,0.08) inset; transform:translateY(-1px); }
+.pvv-darkness-dialog .pvv-option .pvv-option-icon { width:28px; height:28px; display:flex; align-items:center; justify-content:center; border-radius:6px; }
+.pvv-darkness-dialog .pvv-option .pvv-option-title { font-weight:700; }
+.pvv-darkness-dialog .pvv-option .pvv-option-sub { opacity:.8; font-size: var(--font-size-12, 12px); }
+
+/* Variants */
+.pvv-darkness-dialog .pvv-variant-plain { background: linear-gradient(180deg, rgba(60,60,70,0.35), rgba(40,40,50,0.25)); }
+.pvv-darkness-dialog .pvv-variant-plain .pvv-option-icon { background: rgba(120,130,255,0.14); color:#c9d4ff; }
+.pvv-darkness-dialog .pvv-variant-plain:hover { border-color: rgba(130,140,255,0.5); }
+
+.pvv-darkness-dialog .pvv-variant-heightened { background: linear-gradient(180deg, rgba(100,55,120,0.35), rgba(80,45,100,0.25)); }
+.pvv-darkness-dialog .pvv-variant-heightened .pvv-option-icon { background: rgba(200,100,255,0.16); color:#efc8ff; }
+.pvv-darkness-dialog .pvv-variant-heightened:hover { border-color: rgba(200,100,255,0.5); }
+
+.pvv-darkness-dialog .pvv-help-inline { margin-top:4px; font-size: var(--font-size-12, 12px); }
+.pvv-darkness-dialog .pvv-footer { display:flex; gap:8px; justify-content:flex-end; margin-top:8px; }
+.pvv-darkness-dialog .pvv-btn-clear { background: rgba(255,170,70,0.14); border:1px solid rgba(255,170,70,0.4); }
+.pvv-darkness-dialog .pvv-btn-clear:hover { filter:brightness(1.05); }
+.pvv-darkness-dialog .pvv-btn-cancel { background: rgba(180,180,180,0.12); border:1px solid rgba(180,180,180,0.35); }
+.pvv-darkness-dialog .pvv-btn-cancel:hover { filter:brightness(1.05); }
+
+/* --- Dialog: Confirm (Purge/Warning) --- */
+.visioner-confirm.pvv-confirm-dialog { display:flex; flex-direction:column; gap:10px; }
+.pvv-confirm-hero { display:flex; gap:10px; align-items:flex-start; padding:8px 10px; border:1px solid var(--color-border-light-primary); border-radius:10px; }
+.pvv-confirm-hero-icon { width:32px; height:32px; display:flex; align-items:center; justify-content:center; border-radius:8px; flex-shrink:0; }
+.pvv-confirm-hero-copy { flex:1; line-height:1.3; }
+.pvv-confirm-footer { display:flex; gap:8px; justify-content:flex-end; }
+.pvv-btn { padding:6px 10px; border-radius:8px; border:1px solid var(--color-border-light-primary); background: rgba(180,180,180,0.12); cursor:pointer; }
+.pvv-btn:hover { filter:brightness(1.05); }
+.pvv-btn-primary { background: rgba(255,255,255,0.12); border-color: rgba(255,255,255,0.35); }
+.pvv-btn-secondary { background: rgba(180,180,180,0.12); border-color: rgba(180,180,180,0.35); }
+
+/* Variants */
+.pvv-confirm-danger .pvv-confirm-hero { background: linear-gradient(180deg, rgba(120,40,40,0.25), rgba(80,25,25,0.25)); border-color: rgba(255,90,90,0.45); }
+.pvv-confirm-danger .pvv-confirm-hero-icon { background: rgba(255,100,100,0.16); color:#ffd0d0; }
+.pvv-confirm-danger .pvv-btn-primary { background: rgba(255,100,100,0.16); border-color: rgba(255,100,100,0.5); }
+
+.pvv-confirm-warning .pvv-confirm-hero { background: linear-gradient(180deg, rgba(120,90,40,0.25), rgba(90,70,30,0.25)); border-color: rgba(255,200,120,0.45); }
+.pvv-confirm-warning .pvv-confirm-hero-icon { background: rgba(255,200,120,0.16); color:#ffe6bf; }
+.pvv-confirm-warning .pvv-btn-primary { background: rgba(255,200,120,0.16); border-color: rgba(255,200,120,0.5); }
+
+.pvv-confirm-info .pvv-confirm-hero { background: linear-gradient(180deg, rgba(70,90,120,0.25), rgba(40,55,80,0.25)); border-color: rgba(140,180,255,0.45); }
+.pvv-confirm-info .pvv-confirm-hero-icon { background: rgba(140,180,255,0.16); color:#d6e4ff; }
+.pvv-confirm-info .pvv-btn-primary { background: rgba(140,180,255,0.16); border-color: rgba(140,180,255,0.5); }

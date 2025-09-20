@@ -42,14 +42,17 @@ export function registerUIHooks() {
       if (!tool) return;
 
       const selectedLights = canvas?.lighting?.controlled ?? [];
-      const isDarkness = (l) => !!(
-        l?.isDarknessSource ||
-        l?.document?.config?.negative ||
-        l?.document?.config?.darkness?.negative ||
-        l?.document?.negative ||
-        l?.config?.negative
-      );
-      const isHeightened = (l) => !!(l?.document?.getFlag?.(MODULE_ID, 'heightenedDarkness'));
+      const isDarkness = (l) => {
+        const cfg = l?.document?.config ?? l?.config;
+        return !!(cfg?.negative || cfg?.darkness?.negative);
+      };
+      const isHeightened = (l) => {
+        const flags = l?.document?.flags?.[MODULE_ID] || {};
+        const h = !!flags.heightenedDarkness;
+        const legacy = !!flags.magicalDarkness;
+        const rank = Number(flags.darknessRank || 0);
+        return h || legacy || rank >= 4;
+      };
 
       let iconClass = 'fa-regular fa-circle';
       let titleText = 'Set Darkness Mode (Selected Lights)';
@@ -63,24 +66,33 @@ export function registerUIHooks() {
 
         if (allDark && allHeight) {
           iconClass = 'fa-solid fa-moon';
-          titleText = 'All: Heightened Darkness (Rank 4+)';
+          titleText = 'Heightened Darkness (Rank 4+)';
         } else if (allDark && !anyHeight) {
           iconClass = 'fa-regular fa-moon';
-          titleText = 'All: Darkness Source (non-heightened)';
+          titleText = 'Darkness Source (non-heightened)';
         } else if (noneDark) {
-          iconClass = 'fa-regular fa-circle';
-          titleText = 'None: Not Darkness Source';
+          iconClass = 'fa-regular fa-lightbulb';
+          titleText = 'Not a Darkness Source';
         } else {
           iconClass = 'fa-solid fa-circle-half-stroke';
           titleText = 'Mixed Darkness Modes';
         }
       }
 
+      const changed = tool.icon !== iconClass || tool.title !== titleText;
       tool.icon = iconClass;
       tool.title = titleText;
-      ui.controls.render();
+      if (changed) ui.controls.render();
     } catch { }
   };
+  // Update tool icon on light selection and CRUD changes
+  // Update on light selection changes (AmbientLight/Light placeables)
+  Hooks.on('controlAmbientLight', refreshDarknessTool);
+  Hooks.on('controlLight', refreshDarknessTool);
+  Hooks.on('createAmbientLight', refreshDarknessTool);
+  Hooks.on('updateAmbientLight', refreshDarknessTool);
+  Hooks.on('deleteAmbientLight', refreshDarknessTool);
+  // Avoid calling refresh from renderSceneControls/canvasReady to prevent re-render loops
   // Keep toolbar toggle states in sync with current selection (Token tool)
   const refreshTokenTool = () => {
     try {
@@ -801,12 +813,12 @@ export function registerUIHooks() {
               if (selectedTokens.length > 0) {
                 // Tokens selected - offer to clear all selected tokens' data
                 const tokenNames = selectedTokens.map((t) => t.name).join(', ');
-                const confirmed = await Dialog.confirm({
+                const { VisionerConfirmDialog } = await import('../ui/dialogs/confirm-dialog.js');
+                const confirmed = await VisionerConfirmDialog.confirm({
                   title: 'PF2E Visioner',
                   content: `<p>Clear all PF2E Visioner data for <strong>${selectedTokens.length === 1 ? tokenNames : `${selectedTokens.length} selected tokens`}</strong>? This will reset all visibility and cover relationships for ${selectedTokens.length === 1 ? 'this token' : 'all selected tokens'}.</p>`,
-                  yes: () => true,
-                  no: () => false,
-                  defaultYes: false,
+                  yes: 'Clear',
+                  no: 'Cancel',
                 });
                 if (!confirmed) return;
                 const { api } = await import('../api.js');
@@ -815,12 +827,12 @@ export function registerUIHooks() {
                 await api.clearAllDataForSelectedTokens(selectedTokens);
               } else {
                 // No tokens or multiple tokens selected - offer to clear entire scene
-                const confirmed = await Dialog.confirm({
+                const { VisionerConfirmDialog } = await import('../ui/dialogs/confirm-dialog.js');
+                const confirmed = await VisionerConfirmDialog.confirm({
                   title: 'PF2E Visioner',
                   content: `<p>Clear all PF2E Visioner data for this scene? This cannot be undone.</p>`,
-                  yes: () => true,
-                  no: () => false,
-                  defaultYes: false,
+                  yes: 'Clear Scene',
+                  no: 'Cancel',
                 });
                 if (!confirmed) return;
                 const { api } = await import('../api.js');
@@ -843,14 +855,17 @@ export function registerUIHooks() {
       if (lighting) {
         // Darkness Mode tool (dialog-based): Plain Darkness vs Heightened Darkness
         const selectedLights = canvas?.lighting?.controlled ?? [];
-        const isDarkness = (l) => !!(
-          l?.isDarknessSource ||
-          l?.document?.config?.negative ||
-          l?.document?.config?.darkness?.negative ||
-          l?.document?.negative ||
-          l?.config?.negative
-        );
-        const isHeightened = (l) => !!(l?.document?.getFlag?.(MODULE_ID, 'heightenedDarkness'));
+        const isDarkness = (l) => {
+          const cfg = l?.document?.config ?? l?.config;
+          return !!(cfg?.negative || cfg?.darkness?.negative);
+        };
+        const isHeightened = (l) => {
+          const flags = l?.document?.flags?.[MODULE_ID] || {};
+          const h = !!flags.heightenedDarkness;
+          const legacy = !!flags.magicalDarkness;
+          const rank = Number(flags.darknessRank || 0);
+          return h || legacy || rank >= 4;
+        };
 
         let iconClass = 'fa-regular fa-circle';
         let titleText = 'Set Darkness Mode (Selected Lights)';
@@ -887,29 +902,6 @@ export function registerUIHooks() {
             try {
               const selected = canvas?.lighting?.controlled ?? [];
               if (!selected.length) return;
-
-              const applyPlainDarkness = async () => {
-                await Promise.all(selected.map(async (l) => {
-                  try { await l?.document?.update?.({ 'config.negative': true, 'config.darkness.negative': true }); } catch { }
-                  try { await l?.document?.unsetFlag?.(MODULE_ID, 'heightenedDarkness'); } catch { await l?.document?.setFlag?.(MODULE_ID, 'heightenedDarkness', false); }
-                }));
-              };
-
-              const applyHeightened = async () => {
-                await Promise.all(selected.map(async (l) => {
-                  // Ensure it is a darkness source
-                  try { await l?.document?.update?.({ 'config.negative': true, 'config.darkness.negative': true }); } catch { }
-                  try { await l?.document?.setFlag?.(MODULE_ID, 'heightenedDarkness', true); } catch { }
-                }));
-              };
-
-              const clearDarkness = async () => {
-                await Promise.all(selected.map(async (l) => {
-                  try { await l?.document?.update?.({ 'config.negative': false, 'config.darkness.negative': false }); } catch { }
-                  try { await l?.document?.unsetFlag?.(MODULE_ID, 'heightenedDarkness'); } catch { await l?.document?.setFlag?.(MODULE_ID, 'heightenedDarkness', false); }
-                }));
-              };
-
               const refreshAfterChange = async () => {
                 try {
                   const { LightingCalculator } = await import('../visibility/auto-visibility/LightingCalculator.js');
@@ -920,45 +912,33 @@ export function registerUIHooks() {
                 refreshDarknessTool();
                 ui.controls.render(true);
               };
+              const { DarknessModeDialog } = await import('../ui/dialogs/darkness-mode-dialog.js');
+              const choice = await DarknessModeDialog.choose();
+              if (!choice) return;
 
-              const dialog = new Dialog({
-                title: 'PF2E Visioner: Set Darkness Mode',
-                content: `
-                  <div class="pf2e-visioner pvv-darkness-dialog" style="display:flex; flex-direction:column; gap:8px;">
-                    <p class="notes" style="margin:0 0 4px 0;">Choose how the selected light(s) should behave.</p>
-                    <div style="display:flex; gap:8px; flex-wrap:wrap;">
-                      <div class="pvv-option-btn" data-action="plain" style="flex:1; min-width:180px; display:flex; align-items:center; gap:6px; padding:6px 8px; border:1px solid var(--color-border-light-primary); border-radius:6px; cursor:pointer;">
-                        <i class="fa-regular fa-moon"></i> <span>Darkness Source (non-heightened)</span>
-                      </div>
-                      <div class="pvv-option-btn" data-action="heightened" style="flex:1; min-width:180px; display:flex; align-items:center; gap:6px; padding:6px 8px; border:1px solid var(--color-border-light-primary); border-radius:6px; cursor:pointer;">
-                        <i class="fa-solid fa-moon"></i> <span>Heightened Darkness (rank 4+)</span>
-                      </div>
-                    </div>
-                    <div class="pv-text-subtle" style="margin-top:4px; font-size: var(--font-size-12, 12px);">Heightened restricts darkvision to Concealed while preserving greater darkvision.</div>
-                  </div>
-                `,
-                buttons: {
-                  cancel: { icon: '<i class="fas fa-times"></i>', label: 'Cancel' },
-                  clear: { icon: '<i class="fas fa-eraser"></i>', label: 'Clear Darkness', callback: async () => { await clearDarkness(); await refreshAfterChange(); } },
-                },
-                render: (html) => {
-                  try {
-                    const root = html?.[0] || html;
-                    const bind = (sel, fn) => {
-                      const el = root?.querySelector(sel);
-                      if (!el) return;
-                      const handler = async (ev) => { try { ev?.preventDefault?.(); ev?.stopPropagation?.(); await fn(); await refreshAfterChange(); dialog.close(); } catch { } };
-                      el.addEventListener('click', handler);
-                      el.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') handler(e); });
-                      try { el.setAttribute('tabindex', '0'); el.setAttribute('role', 'button'); } catch { }
-                    };
-                    bind('[data-action="plain"]', applyPlainDarkness);
-                    bind('[data-action="heightened"]', applyHeightened);
-                  } catch { }
-                },
-                default: 'cancel'
-              });
-              dialog.render(true);
+              const applyPlainDarkness = async () => {
+                await Promise.all(selected.map(async (l) => {
+                  try { await l?.document?.update?.({ 'config.negative': true, 'config.darkness.negative': true }); } catch { }
+                  try { await l?.document?.unsetFlag?.(MODULE_ID, 'heightenedDarkness'); } catch { await l?.document?.setFlag?.(MODULE_ID, 'heightenedDarkness', false); }
+                }));
+              };
+              const applyHeightened = async () => {
+                await Promise.all(selected.map(async (l) => {
+                  try { await l?.document?.update?.({ 'config.negative': true, 'config.darkness.negative': true }); } catch { }
+                  try { await l?.document?.setFlag?.(MODULE_ID, 'heightenedDarkness', true); } catch { }
+                }));
+              };
+              const clearDarkness = async () => {
+                await Promise.all(selected.map(async (l) => {
+                  try { await l?.document?.update?.({ 'config.negative': false, 'config.darkness.negative': false }); } catch { }
+                  try { await l?.document?.unsetFlag?.(MODULE_ID, 'heightenedDarkness'); } catch { await l?.document?.setFlag?.(MODULE_ID, 'heightenedDarkness', false); }
+                }));
+              };
+
+              if (choice === 'plain') await applyPlainDarkness();
+              else if (choice === 'heightened') await applyHeightened();
+              else if (choice === 'clear') await clearDarkness();
+              await refreshAfterChange();
             } catch (e) {
               console.error('[pf2e-visioner] Darkness Mode dialog failed', e);
             }
