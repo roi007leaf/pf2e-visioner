@@ -1260,8 +1260,29 @@ export class EventDrivenVisibilitySystem {
       if (slug === 'darkness') return true;
       const name = (origin.name || item.name || '').toString().toLowerCase();
       if (name.includes('darkness')) return true;
-      const traits = new Set([...(origin.traits || []), ...(item.traits || []), ...(origin.rollOptions || []), ...(item.rollOptions || [])].map((t) => normalize(t)));
-      if (traits.has('darkness') || traits.has('origin:item:darkness')) return true;
+      const rawList = [
+        ...(origin.traits || []),
+        ...(item.traits || []),
+        ...(origin.rollOptions || []),
+        ...(item.rollOptions || []),
+      ].map((t) => String(t).toLowerCase());
+      const rawSet = new Set(rawList);
+      if (
+        rawSet.has('darkness') ||
+        rawSet.has('origin:item:darkness') ||
+        rawSet.has('origin:item:slug:darkness') ||
+        rawList.some((t) => t.includes('darkness'))
+      ) {
+        return true;
+      }
+      const normSet = new Set(rawList.map((t) => normalize(t)));
+      if (
+        normSet.has('darkness') ||
+        normSet.has('origin-item-darkness') ||
+        normSet.has('origin-item-slug-darkness')
+      ) {
+        return true;
+      }
       return false;
     } catch {
       return false;
@@ -1282,11 +1303,27 @@ export class EventDrivenVisibilitySystem {
       }
 
       const dist = Number(template.distance) || 20;
+      // Determine cast rank from PF2e flags (origin preferred)
+      let darknessRank = 0;
+      try {
+        const pf2e = template.flags?.pf2e || {};
+        const origin = pf2e.origin || {};
+        const item = pf2e.item || {};
+        darknessRank = Number(origin.castRank || item.castRank || 0) || 0;
+        if (!darknessRank) {
+          const rolls = [...(origin.rollOptions || []), ...(item.rollOptions || [])];
+          const rankOpt = rolls.find((r) => /(^|:)rank:(\d+)/i.test(String(r)));
+          if (rankOpt) {
+            const m = String(rankOpt).match(/(^|:)rank:(\d+)/i);
+            if (m) darknessRank = Number(m[2]) || 0;
+          }
+        }
+      } catch { /* ignore */ }
       const data = {
         x: template.x,
         y: template.y,
         hidden: false,
-        flags: { [MODULE_ID]: { magicalDarkness: true, linkedTemplateId: template.id, source: 'pf2e-darkness' } },
+        flags: { [MODULE_ID]: { magicalDarkness: darknessRank >= 4, linkedTemplateId: template.id, source: 'pf2e-darkness', darknessRank } },
         config: { bright: dist, dim: dist, negative: true },
         rotation: 0,
         walls: true,
@@ -1311,7 +1348,23 @@ export class EventDrivenVisibilitySystem {
       const lightId = template.getFlag?.(MODULE_ID, 'darknessLightId');
       if (!lightId) return;
       const dist = Number(template.distance) || 20;
-      await canvas.scene?.updateEmbeddedDocuments?.('AmbientLight', [{
+      // Try to update the darkness rank flag as well
+      let darknessRank = null;
+      try {
+        const pf2e = template.flags?.pf2e || {};
+        const origin = pf2e.origin || {};
+        const item = pf2e.item || {};
+        darknessRank = Number(origin.castRank || item.castRank || 0) || null;
+        if (!darknessRank) {
+          const rolls = [...(origin.rollOptions || []), ...(item.rollOptions || [])];
+          const rankOpt = rolls.find((r) => /(^|:)rank:(\d+)/i.test(String(r)));
+          if (rankOpt) {
+            const m = String(rankOpt).match(/(^|:)rank:(\d+)/i);
+            if (m) darknessRank = Number(m[2]) || null;
+          }
+        }
+      } catch { /* ignore */ }
+      const update = {
         _id: lightId,
         x: template.x,
         y: template.y,
@@ -1319,7 +1372,13 @@ export class EventDrivenVisibilitySystem {
         'config.dim': dist,
         'config.negative': true,
         hidden: false,
-      }]);
+        ...(darknessRank ? { [`flags.${MODULE_ID}.darknessRank`]: darknessRank } : {}),
+      };
+      // Only mark magicalDarkness when heightened to rank >= 4
+      if (typeof darknessRank === 'number') {
+        update[`flags.${MODULE_ID}.magicalDarkness`] = darknessRank >= 4;
+      }
+      await canvas.scene?.updateEmbeddedDocuments?.('AmbientLight', [update]);
     } catch (e) {
       console.warn('PF2E Visioner | Failed to sync Darkness light for template:', e);
     }

@@ -2,7 +2,7 @@ import { MODULE_ID } from '../constants.js';
 import { showNotification } from '../utils.js';
 
 // Avoid name collision with Foundry/socket.io global `socket`
-let visionerSocket = null;
+// No module-scoped socket reference required; use the service wrapper
 
 class SocketService {
   constructor() {
@@ -42,7 +42,7 @@ const SEEK_TEMPLATE_CHANNEL = 'SeekTemplate';
 const POINTOUT_REQUEST_CHANNEL = 'PointOutRequest';
 
 export function registerSocket() {
-  visionerSocket = _socketService.register();
+  _socketService.register();
 }
 
 /*
@@ -60,7 +60,7 @@ export function refreshLocalPerception() {
       const { updateWallVisuals } = await import('./visual-effects.js');
       await updateWallVisuals();
     })();
-  } catch (_) {}
+  } catch { }
 }
 
 /*
@@ -85,7 +85,7 @@ export function refreshEveryonesPerception() {
         const { updateWallVisuals } = await import('./visual-effects.js');
         await updateWallVisuals(observerId);
       })();
-    } catch (_) {}
+    } catch { }
 
     _perceptionRefreshTimeout = null;
   }, 100); // 100ms debounce to prevent spam
@@ -101,7 +101,7 @@ export function requestGMHandlePointOut(...args) {
 /*
  * Runs on GM machine with data sent from client
  */
-function pointOutHandler(...args) {
+function pointOutHandler() {
   //do what you want to do
 }
 
@@ -201,7 +201,7 @@ async function pointOutRequestHandler({ pointerTokenId, targetTokenId, messageId
       });
       try {
         await msg.render(true);
-      } catch (_) {}
+      } catch { }
     }
 
     // Update GM panel actions if already rendered
@@ -230,7 +230,7 @@ async function pointOutRequestHandler({ pointerTokenId, targetTokenId, messageId
           } else {
             try {
               panel.remove();
-            } catch (_) {
+            } catch {
               actions.innerHTML = '';
             }
           }
@@ -348,11 +348,11 @@ async function seekTemplateHandler({
         if (playerUser && _socketService.socket?.executeForUser) {
           _socketService.socket.executeForUser(userId, REFRESH_CHANNEL);
         }
-      } catch (_) {}
+      } catch { }
       // Re-render the chat message so the injected panel can be updated/removed appropriately
       try {
         await msg.render(true);
-      } catch (_) {}
+      } catch { }
     }
 
     // If the automation panel is already injected for this message on the GM, swap its action to "Open Seek Results"
@@ -380,7 +380,7 @@ async function seekTemplateHandler({
             // No targets: remove the entire panel to avoid showing Setup Seek Template
             try {
               panel.remove();
-            } catch (_) {
+            } catch {
               actions.innerHTML = '';
             }
           }

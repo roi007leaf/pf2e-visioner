@@ -86,19 +86,22 @@ export class LightingCalculator {
     // Check dedicated light sources first (including darkness sources)
     for (const light of lightSources) {
       // Determine if this light is a "darkness" (negative) source. Support multiple possible paths for robustness across Foundry versions.
-      const isDarknessSource = !!(
+      const isNegative = !!(
         light.isDarknessSource ||
         light.document?.config?.negative ||
         light.document?.config?.darkness?.negative ||
         light.document?.negative ||
-        light.config?.negative ||
-        // PF2E Visioner custom flag: mark this light as a magical darkness source
-        light.document?.getFlag?.(MODULE_ID, 'magicalDarkness')
+        light.config?.negative
       );
+      // Read heightened darkness rank from our module flag if present
+      const darknessRank = Number(light.document?.getFlag?.(MODULE_ID, 'darknessRank') || 0) || 0;
+      // PF2E Visioner: "magical darkness" behavior only applies when explicitly flagged OR rank >= 4
+      const magicalFlag = !!light.document?.getFlag?.(MODULE_ID, 'magicalDarkness');
+      const isMagicalDarkness = !!(magicalFlag || darknessRank >= 4);
 
       // Skip if the light is hidden. For non-darkness lights also skip if they do not emit light.
       // Darkness sources often report emitsLight=false, but we still need to process them so they can impose darkness.
-      if (light.document.hidden || (!isDarknessSource && !light.emitsLight))
+      if (light.document.hidden || (!isNegative && !light.emitsLight))
         continue;
 
       // Check if position is inside the light polygon first
@@ -128,9 +131,9 @@ export class LightingCalculator {
 
         // Handle darkness sources (they eliminate illumination)
         // For darkness sources, both bright and dim areas provide full darkness
-        if (isDarknessSource) {
+        if (isNegative) {
           if (distanceSquared <= brightRadiusSquared || distanceSquared <= dimRadiusSquared) {
-            return makeIlluminationResult(DARK, { isDarknessSource: true });
+            return makeIlluminationResult(DARK, { isDarknessSource: true, isMagicalDarkness, darknessRank });
           }
         } else {
           // Handle normal light sources (they increase illumination) - use pixel-converted radii
@@ -148,8 +151,8 @@ export class LightingCalculator {
         const brightRadiusSquared = Math.pow(brightRadius * pixelsPerUnit, 2);
         const dimRadiusSquared = Math.pow(dimRadius * pixelsPerUnit, 2);
 
-        if (isDarknessSource) {
-          return makeIlluminationResult(DARK, { isDarknessSource: true });
+        if (isNegative) {
+          return makeIlluminationResult(DARK, { isDarknessSource: true, isMagicalDarkness, darknessRank });
         } else {
           // If beyond the configured dim radius, this light does not contribute
           if (dimRadius > 0 && distanceSquared > dimRadiusSquared) {
