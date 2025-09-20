@@ -1168,14 +1168,16 @@ export class EventDrivenVisibilitySystem {
     if (!this.#enabled || !game.user.isGM) return;
 
     // Check if this template might affect visibility (light spells, darkness, etc.)
-    const templateName = template.flags?.pf2e?.item?.name?.toLowerCase() || '';
-    const isLightTemplate =
-      templateName.includes('light') ||
-      templateName.includes('darkness') ||
-      templateName.includes('shadow');
+    const { looksLikeLight } = this.#getTemplateNameAndLightHint(template);
 
-    if (isLightTemplate) {
-      // Removed debug log
+    // Special handling: Darkness spell -> create a magical darkness light source matching the template radius
+    try {
+      if (this.#isDarknessTemplate(template)) {
+        this.#ensureDarknessLightForTemplate(template);
+      }
+    } catch { /* best-effort */ }
+
+    if (looksLikeLight) {
       this.#markAllTokensChangedImmediate();
     }
   }
@@ -1194,14 +1196,16 @@ export class EventDrivenVisibilitySystem {
       changes.hidden !== undefined;
 
     if (significantChange) {
-      const templateName = template.flags?.pf2e?.item?.name?.toLowerCase() || '';
-      const isLightTemplate =
-        templateName.includes('light') ||
-        templateName.includes('darkness') ||
-        templateName.includes('shadow');
+      const { looksLikeLight } = this.#getTemplateNameAndLightHint(template);
 
-      if (isLightTemplate) {
-        // Removed debug log
+      // Keep linked Darkness light in sync
+      try {
+        if (this.#isDarknessTemplate(template)) {
+          this.#syncDarknessLightForTemplate(template);
+        }
+      } catch { /* best-effort */ }
+
+      if (looksLikeLight) {
         this.#markAllTokensChangedImmediate();
       }
     }
@@ -1213,15 +1217,125 @@ export class EventDrivenVisibilitySystem {
   #onTemplateDelete(template) {
     if (!this.#enabled || !game.user.isGM) return;
 
-    const templateName = template.flags?.pf2e?.item?.name?.toLowerCase() || '';
-    const isLightTemplate =
-      templateName.includes('light') ||
-      templateName.includes('darkness') ||
-      templateName.includes('shadow');
+    const { looksLikeLight } = this.#getTemplateNameAndLightHint(template);
 
-    if (isLightTemplate) {
-      // Removed debug log
+    // Cleanup linked Darkness light source if present
+    try {
+      if (this.#isDarknessTemplate(template)) {
+        this.#removeDarknessLightForTemplate(template);
+      }
+    } catch { /* best-effort */ }
+
+    if (looksLikeLight) {
       this.#markAllTokensChangedImmediate();
+    }
+  }
+
+  /**
+   * Heuristics to extract name and identify light-like templates from PF2e flags.
+   */
+  #getTemplateNameAndLightHint(template) {
+    try {
+      const item = template.flags?.pf2e?.item || {};
+      const origin = template.flags?.pf2e?.origin || {};
+      const name = (item.name || origin.name || '').toString();
+      const nameLower = name.toLowerCase();
+      const looksLikeLight = nameLower.includes('light') || nameLower.includes('darkness') || nameLower.includes('shadow');
+      return { nameLower, looksLikeLight };
+    } catch {
+      return { nameLower: '', looksLikeLight: false };
+    }
+  }
+
+  /**
+   * Robust check if a measured template represents the Darkness spell
+   */
+  #isDarknessTemplate(template) {
+    try {
+      const normalize = (v = '') => String(v).toLowerCase().replace(/\u2019/g, "'").replace(/'+/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+      const pf2e = template.flags?.pf2e || {};
+      const item = pf2e.item || {};
+      const origin = pf2e.origin || {};
+      const slug = normalize(origin.slug || item.slug || origin.name || item.name || '');
+      if (slug === 'darkness') return true;
+      const name = (origin.name || item.name || '').toString().toLowerCase();
+      if (name.includes('darkness')) return true;
+      const traits = new Set([...(origin.traits || []), ...(item.traits || []), ...(origin.rollOptions || []), ...(item.rollOptions || [])].map((t) => normalize(t)));
+      if (traits.has('darkness') || traits.has('origin:item:darkness')) return true;
+      return false;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Ensure a magical darkness light exists for a Darkness template and link it via flags.
+   * Creates the light if missing.
+   */
+  async #ensureDarknessLightForTemplate(template) {
+    try {
+      const existingId = template.getFlag?.(MODULE_ID, 'darknessLightId');
+      if (existingId && canvas.scene?.lights?.get?.(existingId)) {
+        // Already linked; sync to ensure correct radius/position
+        await this.#syncDarknessLightForTemplate(template);
+        return;
+      }
+
+      const dist = Number(template.distance) || 20;
+      const data = {
+        x: template.x,
+        y: template.y,
+        hidden: false,
+        flags: { [MODULE_ID]: { magicalDarkness: true, linkedTemplateId: template.id, source: 'pf2e-darkness' } },
+        config: { bright: dist, dim: dist, negative: true },
+        rotation: 0,
+        walls: true,
+        vision: true,
+      };
+      const created = await canvas.scene?.createEmbeddedDocuments?.('AmbientLight', [data]);
+      const createdDoc = Array.isArray(created) ? created[0] : null;
+      const lightId = createdDoc?.id || createdDoc?._id || null;
+      if (lightId) {
+        try { await template.setFlag?.(MODULE_ID, 'darknessLightId', lightId); } catch { /* ignore */ }
+      }
+    } catch (e) {
+      console.warn('PF2E Visioner | Failed to create Darkness light for template:', e);
+    }
+  }
+
+  /**
+   * Sync the linked Darkness light to the template's position and radius.
+   */
+  async #syncDarknessLightForTemplate(template) {
+    try {
+      const lightId = template.getFlag?.(MODULE_ID, 'darknessLightId');
+      if (!lightId) return;
+      const dist = Number(template.distance) || 20;
+      await canvas.scene?.updateEmbeddedDocuments?.('AmbientLight', [{
+        _id: lightId,
+        x: template.x,
+        y: template.y,
+        'config.bright': dist,
+        'config.dim': dist,
+        'config.negative': true,
+        hidden: false,
+      }]);
+    } catch (e) {
+      console.warn('PF2E Visioner | Failed to sync Darkness light for template:', e);
+    }
+  }
+
+  /**
+   * Remove the linked Darkness light when the template is deleted or effect ends.
+   */
+  async #removeDarknessLightForTemplate(template) {
+    try {
+      const lightId = template.getFlag?.(MODULE_ID, 'darknessLightId');
+      if (!lightId) return;
+      try { await canvas.scene?.deleteEmbeddedDocuments?.('AmbientLight', [lightId]); } catch { /* ignore delete errors */ }
+      try { await template.unsetFlag?.(MODULE_ID, 'darknessLightId'); } catch { /* ignore flag errors */ }
+    } catch (e) {
+      console.warn('PF2E Visioner | Failed to remove Darkness light for template:', e);
     }
   }
 

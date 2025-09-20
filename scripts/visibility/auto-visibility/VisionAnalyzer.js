@@ -234,6 +234,16 @@ export class VisionAnalyzer {
     let isDazzled = false;
 
     try {
+      // Local helper to normalize slugs/names for robust matching
+      const normalizeSlug = (value = '') => {
+        try {
+          const lower = String(value).toLowerCase();
+          const noApos = lower.replace(/\u2019/g, "'").replace(/'+/g, '');
+          return noApos.replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+        } catch {
+          return value;
+        }
+      };
       // Check for blinded and dazzled conditions first (these override other vision capabilities)
       isBlinded = this.#hasCondition(actor, 'blinded');
       isDazzled = this.#hasCondition(actor, 'dazzled');
@@ -325,6 +335,20 @@ export class VisionAnalyzer {
       if (!hasLowLightVision && flags['low-light-vision']) {
         hasLowLightVision = true;
         lowLightRange = flags['low-light-vision'].range || Infinity;
+      }
+
+      // New: support PF2e ancestry feat "Greater Darkvision" for PCs that don't list a separate sense
+      if (!hasGreaterDarkvision) {
+        try {
+          const feats = actor.itemTypes?.feat
+            ?? (actor.items?.filter?.((i) => i?.type === 'feat') || []);
+          const hasFeat = !!feats?.some?.((it) => normalizeSlug(it?.system?.slug ?? it?.slug ?? it?.name) === 'greater-darkvision');
+          if (hasFeat) {
+            hasGreaterDarkvision = true;
+            hasDarkvision = true;
+            if (!darkvisionRange) darkvisionRange = Infinity;
+          }
+        } catch { /* ignore feat read errors */ }
       }
     } catch {
     }
