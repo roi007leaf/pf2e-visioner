@@ -97,7 +97,7 @@ class VisionerSettingsForm extends foundry.applications.api.ApplicationV2 {
     // Default to the first defined group
     try {
       if (!this.activeGroupKey) this.activeGroupKey = Object.keys(SETTINGS_GROUPS)[0];
-    } catch (_) {
+    } catch {
       this.activeGroupKey = 'General';
     }
   }
@@ -183,7 +183,7 @@ class VisionerSettingsForm extends foundry.applications.api.ApplicationV2 {
               label,
               selected: String(current) === String(val),
             }));
-          } catch (_) {
+          } catch {
             choicesList = null;
           }
         } else if (cfg.type === Boolean) inputType = 'checkbox';
@@ -213,7 +213,7 @@ class VisionerSettingsForm extends foundry.applications.api.ApplicationV2 {
           key,
           name: game.i18n?.localize?.(cfg.name) ?? cfg.name,
           hint: game.i18n?.localize?.(cfg.hint) ?? (cfg.hint || ''),
-            value: current,
+          value: current,
           inputType,
           choices: choicesList,
           min: cfg.min ?? null,
@@ -228,6 +228,7 @@ class VisionerSettingsForm extends foundry.applications.api.ApplicationV2 {
   }
 
   async _renderHTML(context, _options) {
+    _options; // mark as used to satisfy linter
     return await foundry.applications.handlebars.renderTemplate(
       'modules/pf2e-visioner/templates/settings-menu.hbs',
       context,
@@ -235,6 +236,7 @@ class VisionerSettingsForm extends foundry.applications.api.ApplicationV2 {
   }
 
   _replaceHTML(result, content, _options) {
+    result; _options; // mark as used to satisfy linter
     content.innerHTML = result;
     try {
       // Wire tabs for categories
@@ -243,7 +245,7 @@ class VisionerSettingsForm extends foundry.applications.api.ApplicationV2 {
         btn.addEventListener('click', () => {
           try {
             VisionerSettingsForm._onSwitchGroup(null, btn);
-          } catch (_) { }
+          } catch { }
         });
       });
 
@@ -260,7 +262,7 @@ class VisionerSettingsForm extends foundry.applications.api.ApplicationV2 {
             group.dataset.pvDisplay = group.style.display || computed || '';
           }
           group.style.display = visible ? group.dataset.pvDisplay : 'none';
-        } catch (_) { }
+        } catch { }
       };
 
       // Generic dependency system per redesign
@@ -292,15 +294,15 @@ class VisionerSettingsForm extends foundry.applications.api.ApplicationV2 {
         // First apply parent->child visibility
         for (const [parent, children] of Object.entries(dependencyMap)) {
           const parentEl = content.querySelector(`[name="settings.${parent}"]`);
-            const active = !!parentEl?.checked;
-            for (const child of children) {
-              // Seek template special handling below
-              if (parent.startsWith('limitSeekRange') && seekTemplateToggle?.checked) {
-                toggleSettingVisibility(child, false);
-              } else {
-                toggleSettingVisibility(child, active);
-              }
+          const active = !!parentEl?.checked;
+          for (const child of children) {
+            // Seek template special handling below
+            if (parent.startsWith('limitSeekRange') && seekTemplateToggle?.checked) {
+              toggleSettingVisibility(child, false);
+            } else {
+              toggleSettingVisibility(child, active);
             }
+          }
         }
         // Seek template case: hide limit toggles and distance inputs when template used
         const templateOn = !!seekTemplateToggle?.checked;
@@ -327,11 +329,12 @@ class VisionerSettingsForm extends foundry.applications.api.ApplicationV2 {
 
       // Hide deprecated auto-cover coverage settings entirely
       ['autoCoverCoverageStandardPct', 'autoCoverCoverageGreaterPct', 'autoCoverRespectIgnoreFlag'].forEach((k) => toggleSettingVisibility(k, false));
-    } catch (_) { }
+    } catch { }
     return content;
   }
 
   static async _onSubmit(event, _button) {
+    event; _button; // mark as used to satisfy linter
     const app = currentVisionerSettingsApp || this;
     try {
       const formEl = app.element.querySelector('form.pf2e-visioner-settings');
@@ -339,7 +342,7 @@ class VisionerSettingsForm extends foundry.applications.api.ApplicationV2 {
       // Capture any unsaved edits from the currently visible group before reading form data
       try {
         app._capturePendingChanges();
-      } catch (_) { }
+      } catch { }
       const fd = new FormData(formEl);
       const rawMap = Object.fromEntries(fd.entries());
       // Merge previously edited values from other tabs
@@ -348,7 +351,7 @@ class VisionerSettingsForm extends foundry.applications.api.ApplicationV2 {
           if (!(name in rawMap)) rawMap[name] = value;
         }
       }
-  const allKeys = allGroupedKeys();
+      const allKeys = allGroupedKeys();
       for (const key of allKeys) {
         const cfg = DEFAULT_SETTINGS[key];
         if (!cfg) continue;
@@ -366,14 +369,14 @@ class VisionerSettingsForm extends foundry.applications.api.ApplicationV2 {
       // Reset pending after successful save
       try {
         app._pendingChanges = {};
-      } catch (_) { }
+      } catch { }
       try {
         await app.close();
-      } catch (_) { }
+      } catch { }
     } catch (e) {
-      /* noop */ try {
+      e; /* noop */ try {
         await app.close();
-      } catch (_) { }
+      } catch { }
     }
   }
 
@@ -386,10 +389,10 @@ class VisionerSettingsForm extends foundry.applications.api.ApplicationV2 {
       // Preserve edits from the current group before switching
       try {
         app._capturePendingChanges();
-      } catch (_) { }
+      } catch { }
       app.activeGroupKey = key;
       app.render({ force: true });
-    } catch (_) { }
+    } catch { }
   }
 }
 
@@ -405,7 +408,7 @@ VisionerSettingsForm.prototype._capturePendingChanges = function _capturePending
       if (el.type === 'checkbox') this._pendingChanges[name] = !!el.checked;
       else this._pendingChanges[name] = el.value;
     });
-  } catch (_) { }
+  } catch { }
 };
 
 /**
@@ -430,7 +433,7 @@ export function registerSettings() {
             );
             if (value) initializeHoverTooltips();
             else cleanupHoverTooltips();
-          } catch (_) { }
+          } catch { }
         };
       } else if (key === 'allowPlayerTooltips') {
         settingConfig.onChange = () => { };
@@ -482,7 +485,7 @@ export function registerSettings() {
               game.settings.get(MODULE_ID, 'allowPlayerTooltips')
             )
               initializeHoverTooltips();
-          } catch (_) { }
+          } catch { }
         };
       } else if (key === 'showVisionerSceneTools') {
         // Rebuild scene controls to add/remove Visioner tools immediately
@@ -492,7 +495,7 @@ export function registerSettings() {
             SettingsConfig.reloadConfirm({
               world: true,
             });
-          } catch (_) { }
+          } catch { }
         };
       } else if (key === 'hiddenWallsEnabled') {
         // Refresh wall visuals when toggled
@@ -500,7 +503,7 @@ export function registerSettings() {
           try {
             const { updateWallVisuals } = await import('./services/visual-effects.js');
             await updateWallVisuals();
-          } catch (_) { }
+          } catch { }
         };
       } else if (key === 'tooltipFontSize') {
         settingConfig.onChange = (value) => {
@@ -576,6 +579,14 @@ export function registerSettings() {
             }
           }, 10);
         };
+      } else if (key === 'overrideIndicatorSize') {
+        // Live-apply by refreshing indicator styles
+        settingConfig.onChange = async () => {
+          try {
+            const { default: indicator } = await import('./ui/override-validation-indicator.js');
+            indicator.refreshStyles?.();
+          } catch { /* noop */ }
+        };
       } else if (key === 'keybindingOpensTMInTargetMode') {
         // No reload needed: swap mode is read at runtime
         settingConfig.onChange = () => { };
@@ -612,7 +623,7 @@ export function registerSettings() {
         type: VisionerSettingsForm,
         restricted: true,
       });
-    } catch (_) { }
+    } catch { }
   } catch (error) {
     throw error;
   }
@@ -648,7 +659,7 @@ export function registerKeybindings() {
             if (existing) {
               try {
                 await existing.close();
-              } catch (_) { }
+              } catch { }
               return;
             }
 
@@ -662,14 +673,14 @@ export function registerKeybindings() {
               qp.render(true);
               try {
                 qp._removeFloatingButton();
-              } catch (_) { }
+              } catch { }
               return;
             }
 
             // Otherwise open a new one
             const qp = new VisionerQuickPanel();
             qp.render(true);
-          } catch (_) { }
+          } catch { }
         };
         break;
       case 'openVisibilityManager':
@@ -700,13 +711,13 @@ export function registerKeybindings() {
             // Render fresh auto-cover computation overlay (cover-only)
             hideAutoCoverComputedOverlay();
             showAutoCoverComputedOverlay(token);
-          } catch (_) { }
+          } catch { }
         };
         keybindingConfig.onUp = async () => {
           try {
             const { hideAutoCoverComputedOverlay } = await import('./services/hover-tooltips.js');
             hideAutoCoverComputedOverlay();
-          } catch (_) { }
+          } catch { }
         };
         break;
       case 'openWallManager':

@@ -176,6 +176,16 @@
         "name": "(PL) Kontrolki sceny Visioner",
         "hint": "(PL) Pokaż przyciski Visioner na paskach narzędzi"
       },
+      "OVERRIDE_INDICATOR_SIZE": {
+        "name": "(PL) Rozmiar wskaźnika nadpisań",
+        "hint": "(PL) Kontroluje rozmiar pływającego przycisku wskaźnika nadpisań i jego podpowiedzi.",
+        "CHOICES": {
+          "small": "(PL) Mały",
+          "medium": "(PL) Średni",
+          "large": "(PL) Duży",
+          "xlarge": "(PL) Bardzo duży"
+        }
+      },
       "REMOVE_PLAYER_TARGET_TOOLTIPS": {
         "name": "(PL) Usuń podpowiedzi celu dla graczy",
         "hint": "(PL) Gracze nie widzą podpowiedzi celu"

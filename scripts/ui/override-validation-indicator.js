@@ -83,6 +83,15 @@ class OverrideValidationIndicator {
     this._lastCount = 0;
   }
 
+  // Public: re-apply computed styles (e.g., after settings change)
+  refreshStyles() {
+    try {
+      this.#ensureStyles();
+      // Recompute tooltip contents/colors if visible
+      if (this._tooltipEl?.isConnected) this.#renderTooltipContents();
+    } catch { /* noop */ }
+  }
+
   update(overrideData, tokenName) {
     // Ensure latest styles are applied (hot-reload safe)
     this.#ensureStyles();
@@ -493,76 +502,89 @@ class OverrideValidationIndicator {
 
   #ensureStyles() {
     const existing = document.getElementById('pf2e-visioner-override-indicator-styles');
+    // Read size preference (client setting); default medium
+    let size = 'medium';
+    try {
+      size = game.settings.get('pf2e-visioner', 'overrideIndicatorSize') || 'medium';
+    } catch { /* setting might not exist yet during early loads */ }
+
+    const presets = {
+      small: { box: 34, radius: 8, font: 15, badgeFont: 10, badgePadX: 5, badgePadY: 2, pulseInset: -5, pulseRadius: 10, border: 2, tipFont: 11 },
+      medium: { box: 42, radius: 9, font: 18, badgeFont: 11, badgePadX: 6, badgePadY: 2, pulseInset: -6, pulseRadius: 12, border: 2, tipFont: 12 },
+      large: { box: 52, radius: 10, font: 22, badgeFont: 12, badgePadX: 7, badgePadY: 3, pulseInset: -7, pulseRadius: 14, border: 2, tipFont: 13 },
+      xlarge: { box: 64, radius: 12, font: 26, badgeFont: 13, badgePadX: 8, badgePadY: 4, pulseInset: -8, pulseRadius: 16, border: 3, tipFont: 14 },
+    };
+    const p = presets[size] || presets.medium;
+
     const css = `
       .pf2e-visioner-override-indicator {
-        position: fixed; top: 60%; left: 10px; width: 42px; height: 42px; background: var(--color-bg-option, rgba(0,0,0,0.85)); border: 2px solid var(--pf2e-visioner-warning); border-radius: 9px; color: var(--color-text-light-primary, #fff); display: none; align-items: center; justify-content: center; cursor: move; z-index: 1001; font-size: 18px; box-shadow: 0 2px 8px rgba(0,0,0,0.35); transition: transform .15s ease, box-shadow .15s ease; user-select: none; overflow: visible;
+        position: fixed; top: 60%; left: 10px; width: ${p.box}px; height: ${p.box}px; background: var(--color-bg-option, rgba(0,0,0,0.85)); border: ${p.border}px solid var(--pf2e-visioner-warning); border-radius: ${p.radius}px; color: var(--color-text-light-primary, #fff); display: none; align-items: center; justify-content: center; cursor: move; z-index: 1001; font-size: ${p.font}px; box-shadow: 0 2px 8px rgba(0,0,0,0.35); transition: transform .15s ease, box-shadow .15s ease; user-select: none; overflow: visible;
       }
       .pf2e-visioner-override-indicator--visible { display: flex; }
       .pf2e-visioner-override-indicator.dragging { cursor: grabbing; transform: scale(1.06); box-shadow: 0 4px 18px rgba(0,0,0,0.5); }
-    .pf2e-visioner-override-indicator .indicator-icon { pointer-events: none; }
-  .pf2e-visioner-override-indicator .indicator-badge { position: absolute; top: -6px; right: -6px; background: var(--pf2e-visioner-danger); color: var(--color-text-light-primary, #fff); border-radius: 10px; padding: 2px 6px; font-size: 11px; border: 1px solid rgba(0,0,0,0.2); }
-  /* Transform-based pulse ring for broad compatibility (no color-mix needed) */
-  .pf2e-visioner-override-indicator.pulse::after {
-    content: '';
-    position: absolute;
-    inset: -6px;
-    border-radius: 12px;
-    border: 2px solid var(--pf2e-visioner-warning);
-    opacity: 0;
-    transform: scale(1);
-    pointer-events: none;
-    animation: pv-pulse-ring 1.2s ease-out infinite;
-  }
-  @keyframes pv-pulse-ring {
-    0% { opacity: 0.6; transform: scale(0.9); }
-    70% { opacity: 0; transform: scale(1.35); }
-    100% { opacity: 0; transform: scale(1.35); }
-  }
+      .pf2e-visioner-override-indicator .indicator-icon { pointer-events: none; }
+      .pf2e-visioner-override-indicator .indicator-badge { position: absolute; top: -6px; right: -6px; background: var(--pf2e-visioner-danger); color: var(--color-text-light-primary, #fff); border-radius: 10px; padding: ${p.badgePadY}px ${p.badgePadX}px; font-size: ${p.badgeFont}px; border: 1px solid rgba(0,0,0,0.2); }
+      /* Transform-based pulse ring for broad compatibility (no color-mix needed) */
+      .pf2e-visioner-override-indicator.pulse::after {
+        content: '';
+        position: absolute;
+        inset: ${p.pulseInset}px;
+        border-radius: ${p.pulseRadius}px;
+        border: 2px solid var(--pf2e-visioner-warning);
+        opacity: 0;
+        transform: scale(1);
+        pointer-events: none;
+        animation: pv-pulse-ring 1.2s ease-out infinite;
+      }
+      @keyframes pv-pulse-ring {
+        0% { opacity: 0.6; transform: scale(0.9); }
+        70% { opacity: 0; transform: scale(1.35); }
+        100% { opacity: 0; transform: scale(1.35); }
+      }
 
-      .pf2e-visioner-override-tooltip { position: fixed; min-width: 280px; max-width: 400px; background: rgba(30,30,30,0.98); color: var(--color-text-light-primary, #fff); border: 1px solid var(--color-border-light-primary, #555); border-radius: 8px; padding: 6px; z-index: 1002; font-size: 12px; box-shadow: 0 2px 16px rgba(0,0,0,0.45); backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
-    /* State indicator colors: rely on global variable mappings so colorblind overrides propagate */
-  /* Force per-state colors inside tooltip (override any external .state-indicator !important rules) */
-  .pf2e-visioner-override-tooltip .state-indicator.visibility-observed { color: var(--visibility-observed, var(--visibility-observed-color, #4caf50)) !important; }
-  .pf2e-visioner-override-tooltip .state-indicator.visibility-concealed { color: var(--visibility-concealed, var(--visibility-concealed-color, #ffc107)) !important; }
-  .pf2e-visioner-override-tooltip .state-indicator.visibility-hidden { color: var(--visibility-hidden, var(--visibility-hidden-color, #ff9800)) !important; }
-  .pf2e-visioner-override-tooltip .state-indicator.visibility-undetected { color: var(--visibility-undetected, var(--visibility-undetected-color, #f44336)) !important; }
-  .pf2e-visioner-override-tooltip .state-indicator.cover-none { color: var(--cover-none, var(--cover-none-color, #4caf50)) !important; }
-  .pf2e-visioner-override-tooltip .state-indicator.cover-lesser { color: var(--cover-lesser, var(--cover-lesser-color, #ffc107)) !important; }
-  .pf2e-visioner-override-tooltip .state-indicator.cover-standard { color: var(--cover-standard, var(--cover-standard-color, #ff6600)) !important; }
-  .pf2e-visioner-override-tooltip .state-indicator.cover-greater { color: var(--cover-greater, var(--cover-greater-color, #f44336)) !important; }
-    /* Normalize cover icon visual size vs visibility */
-    .pf2e-visioner-override-tooltip .state-indicator[class*='cover-'] { font-size: 1.08em; }
-    .pf2e-visioner-override-tooltip .tip-header { font-weight: 600; margin-bottom: 6px; color: var(--pf2e-visioner-warning); }
-    .pf2e-visioner-override-tooltip .tip-group { margin-top: 4px; }
-    .pf2e-visioner-override-tooltip .tip-group-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-top: 4px; }
-    .pf2e-visioner-override-tooltip .tip-subheader { font-weight: 600; color: var(--color-text-dark-secondary, #bbb); }
-    .pf2e-visioner-override-tooltip .tip-group-body { margin-top: 2px; }
-    .pf2e-visioner-override-tooltip .tip-row { display: grid; grid-template-columns: 1fr auto auto auto; column-gap: 8px; row-gap: 4px; align-items: center; padding: 6px 0; border-top: 1px solid rgba(255,255,255,0.06); }
-    .pf2e-visioner-override-tooltip .tip-row:first-of-type { border-top: none; }
-    .pf2e-visioner-override-tooltip .who { color: #ddd; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .pf2e-visioner-override-tooltip .state-pair { display: inline-flex; align-items: center; gap: 4px; color: #aaa; }
-  /* Add separation between the visibility and cover state groups */
-  .pf2e-visioner-override-tooltip .state-pair + .state-pair { margin-left: 10px; }
-    .pf2e-visioner-override-tooltip .state-pair i.fas.fa-arrow-right { color: #999; }
-    .pf2e-visioner-override-tooltip .state-pair i.state-indicator { margin: 0; }
-    /* Tooltip-specific reset: ensure icons remain simple (no background boxes) regardless of global .state-indicator styling */
-    .pf2e-visioner-override-tooltip .state-indicator {
-      background: transparent !important;
-      border: none !important;
-      padding: 0 !important;
-      box-shadow: none !important;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: auto;
-      height: auto;
-    }
-    .pf2e-visioner-override-tooltip .reasons { display: inline-flex; align-items: center; gap: 4px; color: var(--pf2e-visioner-info, #90caf9); }
-    .pf2e-visioner-override-tooltip .reasons i { font-size: 11px; }
-    .pf2e-visioner-override-tooltip .tip-footer { display: flex; flex-direction: row; align-items: flex-end; justify-content: space-between; margin-top: 6px; color: #bbb; gap: 12px; }
-    .pf2e-visioner-override-tooltip .tip-footer .footer-right { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
-    .pf2e-visioner-override-tooltip .tip-footer .footer-bottom { white-space: nowrap; }
-    .pf2e-visioner-override-tooltip .tip-empty { color: var(--color-text-dark-secondary, #bbb); padding: 8px 0; }
+  .pf2e-visioner-override-tooltip { position: fixed; min-width: 260px; max-width: 420px; background: rgba(30,30,30,0.98); color: var(--color-text-light-primary, #fff); border: 1px solid var(--color-border-light-primary, #555); border-radius: 8px; padding: 6px; z-index: 1002; font-size: ${p.tipFont}px; box-shadow: 0 2px 16px rgba(0,0,0,0.45); backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
+      /* Force per-state colors inside tooltip (override any external .state-indicator !important rules) */
+      .pf2e-visioner-override-tooltip .state-indicator.visibility-observed { color: var(--visibility-observed, var(--visibility-observed-color, #4caf50)) !important; }
+      .pf2e-visioner-override-tooltip .state-indicator.visibility-concealed { color: var(--visibility-concealed, var(--visibility-concealed-color, #ffc107)) !important; }
+      .pf2e-visioner-override-tooltip .state-indicator.visibility-hidden { color: var(--visibility-hidden, var(--visibility-hidden-color, #ff9800)) !important; }
+      .pf2e-visioner-override-tooltip .state-indicator.visibility-undetected { color: var(--visibility-undetected, var(--visibility-undetected-color, #f44336)) !important; }
+      .pf2e-visioner-override-tooltip .state-indicator.cover-none { color: var(--cover-none, var(--cover-none-color, #4caf50)) !important; }
+      .pf2e-visioner-override-tooltip .state-indicator.cover-lesser { color: var(--cover-lesser, var(--cover-lesser-color, #ffc107)) !important; }
+      .pf2e-visioner-override-tooltip .state-indicator.cover-standard { color: var(--cover-standard, var(--cover-standard-color, #ff6600)) !important; }
+      .pf2e-visioner-override-tooltip .state-indicator.cover-greater { color: var(--cover-greater, var(--cover-greater-color, #f44336)) !important; }
+      /* Normalize cover icon visual size vs visibility */
+      .pf2e-visioner-override-tooltip .state-indicator[class*='cover-'] { font-size: 1.08em; }
+      .pf2e-visioner-override-tooltip .tip-header { font-weight: 600; margin-bottom: 6px; color: var(--pf2e-visioner-warning); }
+      .pf2e-visioner-override-tooltip .tip-group { margin-top: 4px; }
+      .pf2e-visioner-override-tooltip .tip-group-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-top: 4px; }
+      .pf2e-visioner-override-tooltip .tip-subheader { font-weight: 600; color: var(--color-text-dark-secondary, #bbb); }
+      .pf2e-visioner-override-tooltip .tip-group-body { margin-top: 2px; }
+      .pf2e-visioner-override-tooltip .tip-row { display: grid; grid-template-columns: 1fr auto auto auto; column-gap: 8px; row-gap: 4px; align-items: center; padding: 6px 0; border-top: 1px solid rgba(255,255,255,0.06); }
+      .pf2e-visioner-override-tooltip .tip-row:first-of-type { border-top: none; }
+      .pf2e-visioner-override-tooltip .who { color: #ddd; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .pf2e-visioner-override-tooltip .state-pair { display: inline-flex; align-items: center; gap: 4px; color: #aaa; }
+      /* Add separation between the visibility and cover state groups */
+      .pf2e-visioner-override-tooltip .state-pair + .state-pair { margin-left: 10px; }
+      .pf2e-visioner-override-tooltip .state-pair i.fas.fa-arrow-right { color: #999; }
+      .pf2e-visioner-override-tooltip .state-pair i.state-indicator { margin: 0; }
+      /* Tooltip-specific reset: ensure icons remain simple (no background boxes) regardless of global .state-indicator styling */
+      .pf2e-visioner-override-tooltip .state-indicator {
+        background: transparent !important;
+        border: none !important;
+        padding: 0 !important;
+        box-shadow: none !important;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: auto;
+        height: auto;
+      }
+      .pf2e-visioner-override-tooltip .reasons { display: inline-flex; align-items: center; gap: 4px; color: var(--pf2e-visioner-info, #90caf9); }
+      .pf2e-visioner-override-tooltip .reasons i { font-size: 11px; }
+      .pf2e-visioner-override-tooltip .tip-footer { display: flex; flex-direction: row; align-items: flex-end; justify-content: space-between; margin-top: 6px; color: #bbb; gap: 12px; }
+      .pf2e-visioner-override-tooltip .tip-footer .footer-right { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+      .pf2e-visioner-override-tooltip .tip-footer .footer-bottom { white-space: nowrap; }
+      .pf2e-visioner-override-tooltip .tip-empty { color: var(--color-text-dark-secondary, #bbb); padding: 8px 0; }
     `;
     if (existing) {
       existing.textContent = css;

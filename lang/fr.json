@@ -184,6 +184,16 @@
         "name": "(FR) Contrôles de scène Visioner",
         "hint": "(FR) Affiche les boutons Visioner dans les barres d'outils Scènes"
       },
+      "OVERRIDE_INDICATOR_SIZE": {
+        "name": "(FR) Taille de l'indicateur de dérogation",
+        "hint": "(FR) Contrôle la taille du bouton flottant de l'indicateur de dérogation et de son info-bulle.",
+        "CHOICES": {
+          "small": "(FR) Petit",
+          "medium": "(FR) Moyen",
+          "large": "(FR) Grand",
+          "xlarge": "(FR) Très grand"
+        }
+      },
       "REMOVE_PLAYER_TARGET_TOOLTIPS": {
         "name": "(FR) Retirer les infobulles de cible des joueurs",
         "hint": "(FR) Empêche les joueurs de voir les infobulles de cible"

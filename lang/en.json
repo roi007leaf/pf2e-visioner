@@ -368,6 +368,16 @@
         "name": "Visioner Scene Controls",
         "hint": "Adds specific Visioner features as buttons to Token Controls and Wall Controls on the left sidebar. If disabled, features can still be accessed via individual token/wall settings or keybinds"
       },
+      "OVERRIDE_INDICATOR_SIZE": {
+        "name": "Override Indicator Size",
+        "hint": "Controls the size of the floating override indicator button and its tooltip.",
+        "CHOICES": {
+          "small": "Small",
+          "medium": "Medium",
+          "large": "Large",
+          "xlarge": "Extra Large"
+        }
+      },
       "MANAGER_ROLL_COMPARISON": {
         "name": "Visioner Manager Roll Comparison",
         "hint": "Adds a roll comparison column to the Visioner Manager comparing the last relevant roll vs relevant DC"
