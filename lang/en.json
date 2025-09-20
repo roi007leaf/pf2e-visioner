@@ -2,6 +2,22 @@
   "PF2E_VISIONER": {
     "ENVIRONMENT": {},
     "MODULE_TITLE": "PF2E Visioner",
+    "MECHANICAL_EFFECTS": {
+      "HIDDEN_FLAT_CHECK": "DC 11 flat check required for targeting",
+      "CONCEALED_FLAT_CHECK": "DC 5 flat check required for targeting",
+      "UNDETECTED_CONDITION": "Undetected condition applied with full mechanical effects",
+      "VISIBLE_NO_EFFECTS": "No penalties when targeting; no additional effects",
+      "HIDDEN_TOOLTIP": "Hidden: You are off-guard to the target and must succeed at a DC 11 flat check when targeting with an attack, spell, or other effect",
+      "CONCEALED_TOOLTIP": "Concealed: You must succeed at a DC 5 flat check when targeting with an attack, spell, or other effect",
+      "UNDETECTED_TOOLTIP": "Undetected: You don't know the target's location. You are off-guard to the target and you can't easily target it. Using the Seek action can help find an undetected creature",
+      "VISIBLE_TOOLTIP": "Visible: No penalties or effects",
+      "BLINDED_OVERRIDE": "All creatures appear Hidden due to Blinded condition",
+      "DAZZLED_OVERRIDE": "All creatures appear Concealed due to Dazzled condition",
+      "NO_COVER_TOOLTIP": "No Cover: No bonuses or penalties",
+      "LESSER_COVER_TOOLTIP": "Lesser Cover: +1 circumstance bonus to AC",
+      "STANDARD_COVER_TOOLTIP": "Standard Cover: +2 circumstance bonus to AC, Reflex saves, and Stealth checks. Can Hide behind this cover.",
+      "GREATER_COVER_TOOLTIP": "Greater Cover: +4 circumstance bonus to AC, Reflex saves, and Stealth checks. Can Hide behind this cover."
+    },
     "TOKEN_MANAGER": {
       "TITLE": "Visioner Manager",
       "OBSERVER": "Observer Token",
