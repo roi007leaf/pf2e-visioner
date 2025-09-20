@@ -425,6 +425,48 @@ export function registerUIHooks() {
   Hooks.on('deleteWall', refreshWallTool);
   Hooks.on('createWall', refreshWallTool);
   Hooks.on('updateWall', refreshWallTool);
+  // Lighting tool state refresh (selected lights)
+  const refreshLightingTool = () => {
+    try {
+      const controls = ui.controls?.controls || {};
+      const lightingTools = controls.lighting?.tools || controls.lights?.tools;
+      const tool = getNamedTool(lightingTools, 'pf2e-visioner-toggle-magical-darkness');
+      if (!tool) return;
+
+      const selected = canvas?.lighting?.controlled ?? [];
+      if (!selected.length) {
+        tool.icon = 'fa-regular fa-moon';
+        tool.title = 'Toggle Magical Darkness (Selected Lights)';
+        tool.active = false;
+        ui.controls.render();
+        return;
+      }
+
+      const statuses = selected.map((l) => !!l?.document?.getFlag?.(MODULE_ID, 'magicalDarkness'));
+      const all = statuses.every(Boolean);
+      const none = statuses.every((s) => !s);
+
+      if (all) {
+        tool.icon = 'fa-solid fa-moon';
+        tool.title = 'Disable Magical Darkness (Selected Lights)';
+        tool.active = true;
+      } else if (none) {
+        tool.icon = 'fa-regular fa-moon';
+        tool.title = 'Enable Magical Darkness (Selected Lights)';
+        tool.active = false;
+      } else {
+        tool.icon = 'fa-solid fa-circle-half-stroke';
+        tool.title = 'Mixed: Toggle Magical Darkness (Selected Lights)';
+        tool.active = false;
+      }
+
+      ui.controls.render();
+    } catch { }
+  };
+  Hooks.on('controlAmbientLight', refreshLightingTool);
+  Hooks.on('deleteAmbientLight', refreshLightingTool);
+  Hooks.on('createAmbientLight', refreshLightingTool);
+  Hooks.on('updateAmbientLight', refreshLightingTool);
 
   // Refresh wall labels when camera zoom changes
   Hooks.on('canvasPan', () => {
@@ -754,11 +796,22 @@ export function registerUIHooks() {
       if (lighting) {
         // Toggle Magical Darkness on selected lights
         const selectedLights = canvas?.lighting?.controlled ?? [];
-        const allAreMagDark = selectedLights.length > 0 && selectedLights.every((l) => !!l?.document?.getFlag?.(MODULE_ID, 'magicalDarkness'));
+        const statuses = selectedLights.map((l) => !!l?.document?.getFlag?.(MODULE_ID, 'magicalDarkness'));
+        const allAreMagDark = selectedLights.length > 0 && statuses.every(Boolean);
+        const noneAreMagDark = selectedLights.length > 0 && statuses.every((s) => !s);
+        const mixedMagDark = selectedLights.length > 0 && !allAreMagDark && !noneAreMagDark;
         addTool(lighting.tools, {
           name: 'pf2e-visioner-toggle-magical-darkness',
-          title: 'Toggle Magical Darkness (Selected Lights)',
-          icon: allAreMagDark ? 'fa-solid fa-moon' : 'fa-regular fa-moon',
+          title: mixedMagDark
+            ? 'Mixed: Toggle Magical Darkness (Selected Lights)'
+            : allAreMagDark
+              ? 'Disable Magical Darkness (Selected Lights)'
+              : 'Enable Magical Darkness (Selected Lights)',
+          icon: mixedMagDark
+            ? 'fa-solid fa-circle-half-stroke'
+            : allAreMagDark
+              ? 'fa-solid fa-moon'
+              : 'fa-regular fa-moon',
           toggle: true,
           active: allAreMagDark,
           onChange: async (_event, toggled) => {
@@ -1063,31 +1116,70 @@ function onRenderLightConfig(app, html) {
     const checked = !!lightDoc?.getFlag?.(MODULE_ID, 'magicalDarkness');
     fs.innerHTML = `
         <legend>PF2E Visioner</legend>
-        <div class="form-group">
-          <label class="checkbox">
+        <div class="form-group slim" style="margin:4px 0;">
+          <label class="checkbox" style="display:flex; align-items:center; gap:8px; margin:0;">
             <input type="checkbox" name="flags.${MODULE_ID}.magicalDarkness" ${checked ? 'checked' : ''}>
-            Magical darkness (pierced only by Greater Darkvision)
+            <span>Magical darkness</span>
+            <span style="opacity:.8; font-size: var(--font-size-12, 12px);">(pierced only by Greater Darkvision)</span>
           </label>
-          <p class="notes">Marks this light as a darkness source that turns its bright/dim areas into magical darkness.</p>
         </div>
+        <small class="notes" style="display:block; margin:2px 0 0 1.6rem; line-height:1.2; opacity:.85;">Turns this light's bright/dim areas into magical darkness.</small>
     `;
-    // Prefer the Advanced Options tab: insert at the top, before "Light Placement" if found
+    try { fs.style.padding = '8px 10px'; fs.style.marginTop = '6px'; fs.style.marginBottom = '6px'; } catch { }
+    // Prefer inserting directly under the native "Is Darkness Source" control
     let inserted = false;
-    const advTab = form.querySelector('div.tab[data-tab="advanced"], section.tab[data-tab="advanced"], [data-tab="advanced"]');
-    if (advTab) {
+    let negCheckbox = null;
+    try {
+      // Locate the native darkness checkbox and its form-group container
+      negCheckbox = form.querySelector(
+        'input[name="config.negative"], input[name$=".negative"], input[name*="darkness"][name*="negative"]'
+      );
+      const negGroup = negCheckbox?.closest?.('.form-group');
+      if (negGroup && negGroup.parentElement) {
+        negGroup.insertAdjacentElement('afterend', fs);
+        inserted = true;
+      }
+    } catch { /* fall through to other placements */ }
+
+    // Fallbacks: first (leftmost) tab, then common tab names, then Advanced, then end of form
+    if (!inserted) {
       try {
-        const headings = Array.from(advTab.querySelectorAll('legend,h2,h3,header,label'));
-        const lightPlacementHeader = headings.find((h) => /light\s*placement/i.test(h.textContent || ''));
-        if (lightPlacementHeader && lightPlacementHeader.parentElement) {
-          lightPlacementHeader.parentElement.insertAdjacentElement('beforebegin', fs);
-          inserted = true;
+        const nav = form.querySelector('nav.tabs, nav[data-group], .tabs');
+        const firstBtn = nav?.querySelector?.('[data-tab]');
+        const firstTabName = firstBtn?.getAttribute?.('data-tab');
+        if (firstTabName) {
+          const firstTabPanel = form.querySelector(
+            `div.tab[data-tab="${firstTabName}"], section.tab[data-tab="${firstTabName}"], [data-tab="${firstTabName}"]`
+          );
+          if (firstTabPanel) {
+            firstTabPanel.insertBefore(fs, firstTabPanel.firstChild);
+            inserted = true;
+          }
         }
-      } catch { /* ignore */ }
-      if (!inserted) {
+      } catch { /* ignore and fallback */ }
+    }
+    if (!inserted) {
+      const basicTab = form.querySelector(
+        'div.tab[data-tab="basic"], div.tab[data-tab="basics"], div.tab[data-tab="configuration"], section.tab[data-tab="basic"], section.tab[data-tab="basics"], section.tab[data-tab="configuration"]'
+      );
+      if (basicTab) {
+        try { basicTab.insertBefore(fs, basicTab.firstChild); inserted = true; } catch { }
+      }
+    }
+    if (!inserted) {
+      const advTab = form.querySelector('div.tab[data-tab="advanced"], section.tab[data-tab="advanced"], [data-tab="advanced"]');
+      if (advTab) {
         try {
-          advTab.insertBefore(fs, advTab.firstChild);
-          inserted = true;
+          const headings = Array.from(advTab.querySelectorAll('legend,h2,h3,header,label'));
+          const lightPlacementHeader = headings.find((h) => /light\s*placement/i.test(h.textContent || ''));
+          if (lightPlacementHeader && lightPlacementHeader.parentElement) {
+            lightPlacementHeader.parentElement.insertAdjacentElement('beforebegin', fs);
+            inserted = true;
+          }
         } catch { /* ignore */ }
+        if (!inserted) {
+          try { advTab.insertBefore(fs, advTab.firstChild); inserted = true; } catch { }
+        }
       }
     }
     if (!inserted) form.appendChild(fs);
@@ -1095,9 +1187,10 @@ function onRenderLightConfig(app, html) {
     // Sync native darkness checkbox when enabling magical darkness in the form
     try {
       const magCb = form.querySelector(`input[name="flags.${MODULE_ID}.magicalDarkness"]`);
-      const nativeNeg = () => form.querySelector(
-        'input[name="config.negative"], input[name$=".negative"], input[name*="darkness"][name*="negative"]'
-      );
+      const nativeNeg = () =>
+        form.querySelector(
+          'input[name="config.negative"], input[name$=".negative"], input[name*="darkness"][name*="negative"]'
+        );
       if (magCb) {
         magCb.addEventListener('change', () => {
           if (magCb.checked) {
@@ -1108,6 +1201,13 @@ function onRenderLightConfig(app, html) {
           }
         });
       }
+      // Hide our fieldset unless the native darkness checkbox is checked
+      const neg = negCheckbox || nativeNeg();
+      const syncVisibility = () => {
+        try { fs.style.display = neg?.checked ? '' : 'none'; } catch { }
+      };
+      syncVisibility();
+      if (neg) neg.addEventListener('change', syncVisibility);
     } catch { }
   } catch { }
 }
