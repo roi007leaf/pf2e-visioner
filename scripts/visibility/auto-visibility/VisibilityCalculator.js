@@ -178,7 +178,8 @@ export class VisibilityCalculator {
         y: target.document.y + (target.document.height * canvas.grid.size) / 2,
         elevation: target.document.elevation || 0,
       };
-      const lightLevel = this.#lightingCalculator.getLightLevelAt(targetPosition);
+      // New API prefers passing a token; supports position objects for overrides
+      const lightLevel = this.#lightingCalculator.getLightLevelAt(target);
       const observerVision = this.#visionAnalyzer.getVisionCapabilities(observer);
       if (log.enabled()) log.debug(() => ({ step: 'lighting', target: target.name, pos: targetPosition, lightLevel }));
       if (log.enabled()) log.debug(() => ({ step: 'vision-capabilities', observer: observer.name, observerVision }));

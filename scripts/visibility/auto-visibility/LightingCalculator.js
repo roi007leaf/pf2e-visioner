@@ -39,12 +39,36 @@ export class LightingCalculator {
   }
 
   /**
-   * Get the light level at a specific position
-   * @param {Object} position - {x, y, elevation} coordinates
+   * Get the light level at a specific location.
+   * Accepts either a Token (preferred) or a raw position object.
+   * @param {Token|Object} tokenOrPosition - Token instance or {x, y, elevation}
    * @returns {Object} Light level information
    */
-  getLightLevelAt(position) {
-    if (log.enabled()) log.debug(() => ({ step: 'start-getLightLevelAt', position }));
+  getLightLevelAt(tokenOrPosition) {
+    // Normalize input to a position object
+    let position;
+    try {
+      // If a Token-like object is provided
+      if (tokenOrPosition?.document && (tokenOrPosition?.center || (typeof tokenOrPosition?.document?.x === 'number' && typeof tokenOrPosition?.document?.y === 'number'))) {
+        const doc = tokenOrPosition.document;
+        const gridSize = canvas.grid?.size || 100;
+        const cx = tokenOrPosition.center?.x ?? (doc.x + (doc.width * gridSize) / 2);
+        const cy = tokenOrPosition.center?.y ?? (doc.y + (doc.height * gridSize) / 2);
+        position = { x: cx, y: cy, elevation: doc.elevation || 0 };
+      }
+      // If a raw position object is provided
+      else if (typeof tokenOrPosition?.x === 'number' && typeof tokenOrPosition?.y === 'number') {
+        const elev = typeof tokenOrPosition.elevation === 'number' ? tokenOrPosition.elevation : 0;
+        position = { x: tokenOrPosition.x, y: tokenOrPosition.y, elevation: elev };
+      }
+    } catch { /* ignore and fallback below */ }
+
+    // Fallback if input was invalid
+    if (!position) {
+      position = { x: 0, y: 0, elevation: 0 };
+    }
+
+    if (log.enabled()) log.debug(() => ({ step: 'start-getLightLevelAt', inputType: tokenOrPosition?.document ? 'token' : 'position', position }));
 
     const scene = canvas.scene;
     const sceneDarkness = (scene.environment.globalLight.enabled)

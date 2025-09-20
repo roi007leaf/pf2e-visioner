@@ -4,7 +4,7 @@
  * unified position state information for enhanced sneak mechanics.
  */
 
-import { getVisibilityBetween } from '../../../utils.js';
+// import { getVisibilityBetween } from '../../../utils.js';
 import { LightingCalculator } from '../../../visibility/auto-visibility/LightingCalculator.js';
 import { visibilityCalculator } from '../../../visibility/auto-visibility/VisibilityCalculator.js';
 import errorHandlingService, { SYSTEM_TYPES } from '../infra/error-handling-service.js';
@@ -114,14 +114,14 @@ export class PositionTracker {
 
       try {
         // Pass stored position data for historical distance calculation
-        const captureOptions = storedStartPosition 
+        const captureOptions = storedStartPosition
           ? { storedSneakingPosition: storedStartPosition }
           : {};
-        
+
         const positionState = await this._capturePositionState(
-          sneakingToken, 
-          target, 
-          timestamp, 
+          sneakingToken,
+          target,
+          timestamp,
           captureOptions
         );
         positionStates.set(target.document.id, positionState);
@@ -155,7 +155,7 @@ export class PositionTracker {
    */
   async _capturePositionState(sneakingToken, observerToken, timestamp, options = {}) {
     await this._initialize();
-    
+
     try {
       // Check cache first unless forced fresh
       if (!options.forceFresh) {
@@ -171,7 +171,7 @@ export class PositionTracker {
         ...options,
         storedSneakingPosition: options.storedSneakingPosition,
       };
-      
+
       const combinedState = await dualSystemIntegration.getCombinedSystemState(
         observerToken,
         sneakingToken,
@@ -188,7 +188,7 @@ export class PositionTracker {
         // Use stored coordinates if provided (for historical position calculations)
         if (options.storedSneakingPosition) {
           distance = this._calculateDistanceWithStoredPosition(
-            options.storedSneakingPosition, 
+            options.storedSneakingPosition,
             observerToken
           );
         } else {
@@ -230,10 +230,10 @@ export class PositionTracker {
         hasLineOfSight,
         lightingConditions,
         timestamp,
-        
+
         // Position calculation metadata
         usedStoredPosition: !!options.storedSneakingPosition,
-        positionNote: options.storedSneakingPosition ? 
+        positionNote: options.storedSneakingPosition ?
           'Distance calculated from stored coordinates; visibility/cover from current position' :
           'All calculations from current position',
 
@@ -282,7 +282,7 @@ export class PositionTracker {
         const dy = token1.center.y - token2.center.y;
         return Math.sqrt(dx * dx + dy * dy);
       }
-    } catch (error) {
+    } catch {
       // Fallback to simple Euclidean distance
       const dx = token1.center.x - token2.center.x;
       const dy = token1.center.y - token2.center.y;
@@ -302,7 +302,7 @@ export class PositionTracker {
   _calculateDistanceWithStoredPosition(storedPosition, observerToken) {
     try {
       const storedCenter = { x: storedPosition.x, y: storedPosition.y };
-      
+
       // Use the updated v13+ API for distance calculation
       if (canvas.grid.measurePath) {
         const path = canvas.grid.measurePath([storedCenter, observerToken.center]);
@@ -316,7 +316,7 @@ export class PositionTracker {
         const dy = storedCenter.y - observerToken.center.y;
         return Math.sqrt(dx * dx + dy * dy);
       }
-    } catch (error) {
+    } catch {
       // Fallback to simple Euclidean distance
       const dx = storedPosition.x - observerToken.center.x;
       const dy = storedPosition.y - observerToken.center.y;
@@ -374,14 +374,8 @@ export class PositionTracker {
       // Use the LightingCalculator singleton directly for accurate lighting analysis
       const lightingCalculator = LightingCalculator.getInstance();
 
-      // Use target token position for lighting calculation (where the sneaking token is)
-      const targetPosition = {
-        x: token2.center.x,
-        y: token2.center.y,
-        elevation: token2.document.elevation || 0,
-      };
-
-      const lightLevelInfo = lightingCalculator.getLightLevelAt(targetPosition);
+      // Use target token directly for lighting calculation
+      const lightLevelInfo = lightingCalculator.getLightLevelAt(token2);
 
       // Return the light level directly from the calculator
       return lightLevelInfo.level; // Returns 'bright', 'dim', or 'darkness'

@@ -509,10 +509,10 @@ class OverrideValidationIndicator {
     } catch { /* setting might not exist yet during early loads */ }
 
     const presets = {
-      small: { box: 34, radius: 8, font: 15, badgeFont: 10, badgePadX: 5, badgePadY: 2, pulseInset: -5, pulseRadius: 10, border: 2, tipFont: 11 },
-      medium: { box: 42, radius: 9, font: 18, badgeFont: 11, badgePadX: 6, badgePadY: 2, pulseInset: -6, pulseRadius: 12, border: 2, tipFont: 12 },
-      large: { box: 52, radius: 10, font: 22, badgeFont: 12, badgePadX: 7, badgePadY: 3, pulseInset: -7, pulseRadius: 14, border: 2, tipFont: 13 },
-      xlarge: { box: 64, radius: 12, font: 26, badgeFont: 13, badgePadX: 8, badgePadY: 4, pulseInset: -8, pulseRadius: 16, border: 3, tipFont: 14 },
+      small: { box: 34, radius: 8, font: 15, badgeFont: 10, badgePadX: 5, badgePadY: 2, badgeOffset: 5, pulseInset: -5, pulseRadius: 10, pulseBorder: 2, border: 2, tipFont: 11, tipPad: 6 },
+      medium: { box: 42, radius: 9, font: 18, badgeFont: 11, badgePadX: 6, badgePadY: 2, badgeOffset: 6, pulseInset: -6, pulseRadius: 12, pulseBorder: 2, border: 2, tipFont: 12, tipPad: 6 },
+      large: { box: 52, radius: 10, font: 22, badgeFont: 12, badgePadX: 7, badgePadY: 3, badgeOffset: 7, pulseInset: -7, pulseRadius: 14, pulseBorder: 3, border: 2, tipFont: 13, tipPad: 7 },
+      xlarge: { box: 64, radius: 12, font: 26, badgeFont: 13, badgePadX: 8, badgePadY: 4, badgeOffset: 8, pulseInset: -8, pulseRadius: 16, pulseBorder: 3, border: 3, tipFont: 14, tipPad: 8 },
     };
     const p = presets[size] || presets.medium;
 
@@ -523,14 +523,14 @@ class OverrideValidationIndicator {
       .pf2e-visioner-override-indicator--visible { display: flex; }
       .pf2e-visioner-override-indicator.dragging { cursor: grabbing; transform: scale(1.06); box-shadow: 0 4px 18px rgba(0,0,0,0.5); }
       .pf2e-visioner-override-indicator .indicator-icon { pointer-events: none; }
-      .pf2e-visioner-override-indicator .indicator-badge { position: absolute; top: -6px; right: -6px; background: var(--pf2e-visioner-danger); color: var(--color-text-light-primary, #fff); border-radius: 10px; padding: ${p.badgePadY}px ${p.badgePadX}px; font-size: ${p.badgeFont}px; border: 1px solid rgba(0,0,0,0.2); }
+  .pf2e-visioner-override-indicator .indicator-badge { position: absolute; top: -${p.badgeOffset}px; right: -${p.badgeOffset}px; background: var(--pf2e-visioner-danger); color: var(--color-text-light-primary, #fff); border-radius: 10px; padding: ${p.badgePadY}px ${p.badgePadX}px; font-size: ${p.badgeFont}px; border: 1px solid rgba(0,0,0,0.2); }
       /* Transform-based pulse ring for broad compatibility (no color-mix needed) */
       .pf2e-visioner-override-indicator.pulse::after {
         content: '';
         position: absolute;
         inset: ${p.pulseInset}px;
         border-radius: ${p.pulseRadius}px;
-        border: 2px solid var(--pf2e-visioner-warning);
+  border: ${p.pulseBorder}px solid var(--pf2e-visioner-warning);
         opacity: 0;
         transform: scale(1);
         pointer-events: none;
@@ -542,7 +542,7 @@ class OverrideValidationIndicator {
         100% { opacity: 0; transform: scale(1.35); }
       }
 
-  .pf2e-visioner-override-tooltip { position: fixed; min-width: 260px; max-width: 420px; background: rgba(30,30,30,0.98); color: var(--color-text-light-primary, #fff); border: 1px solid var(--color-border-light-primary, #555); border-radius: 8px; padding: 6px; z-index: 1002; font-size: ${p.tipFont}px; box-shadow: 0 2px 16px rgba(0,0,0,0.45); backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
+  .pf2e-visioner-override-tooltip { position: fixed; min-width: 260px; max-width: 420px; background: rgba(30,30,30,0.98); color: var(--color-text-light-primary, #fff); border: 1px solid var(--color-border-light-primary, #555); border-radius: 8px; padding: ${p.tipPad}px; z-index: 1002; font-size: ${p.tipFont}px; box-shadow: 0 2px 16px rgba(0,0,0,0.45); backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
       /* Force per-state colors inside tooltip (override any external .state-indicator !important rules) */
       .pf2e-visioner-override-tooltip .state-indicator.visibility-observed { color: var(--visibility-observed, var(--visibility-observed-color, #4caf50)) !important; }
       .pf2e-visioner-override-tooltip .state-indicator.visibility-concealed { color: var(--visibility-concealed, var(--visibility-concealed-color, #ffc107)) !important; }
@@ -580,7 +580,7 @@ class OverrideValidationIndicator {
         height: auto;
       }
       .pf2e-visioner-override-tooltip .reasons { display: inline-flex; align-items: center; gap: 4px; color: var(--pf2e-visioner-info, #90caf9); }
-      .pf2e-visioner-override-tooltip .reasons i { font-size: 11px; }
+  .pf2e-visioner-override-tooltip .reasons i { font-size: ${Math.max(10, p.tipFont - 1)}px; }
       .pf2e-visioner-override-tooltip .tip-footer { display: flex; flex-direction: row; align-items: flex-end; justify-content: space-between; margin-top: 6px; color: #bbb; gap: 12px; }
       .pf2e-visioner-override-tooltip .tip-footer .footer-right { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
       .pf2e-visioner-override-tooltip .tip-footer .footer-bottom { white-space: nowrap; }
