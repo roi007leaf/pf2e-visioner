@@ -34,6 +34,53 @@ export function registerUIHooks() {
       else if (typeof toolsContainer === 'object') toolsContainer[tool.name] = tool;
     } catch { }
   };
+  // Keep Darkness tool icon/title in sync with current selection (Lighting tool)
+  const refreshDarknessTool = () => {
+    try {
+      const lightingTools = ui.controls.controls?.lighting?.tools || ui.controls.controls?.lights?.tools;
+      const tool = getNamedTool(lightingTools, 'pf2e-visioner-darkness-mode');
+      if (!tool) return;
+
+      const selectedLights = canvas?.lighting?.controlled ?? [];
+      const isDarkness = (l) => !!(
+        l?.isDarknessSource ||
+        l?.document?.config?.negative ||
+        l?.document?.config?.darkness?.negative ||
+        l?.document?.negative ||
+        l?.config?.negative
+      );
+      const isHeightened = (l) => !!(l?.document?.getFlag?.(MODULE_ID, 'heightenedDarkness'));
+
+      let iconClass = 'fa-regular fa-circle';
+      let titleText = 'Set Darkness Mode (Selected Lights)';
+      if (selectedLights.length > 0) {
+        const darkStatuses = selectedLights.map(isDarkness);
+        const heightenedStatuses = selectedLights.map(isHeightened);
+        const allDark = darkStatuses.every(Boolean);
+        const noneDark = darkStatuses.every((s) => !s);
+        const allHeight = heightenedStatuses.every(Boolean);
+        const anyHeight = heightenedStatuses.some(Boolean);
+
+        if (allDark && allHeight) {
+          iconClass = 'fa-solid fa-moon';
+          titleText = 'All: Heightened Darkness (Rank 4+)';
+        } else if (allDark && !anyHeight) {
+          iconClass = 'fa-regular fa-moon';
+          titleText = 'All: Darkness Source (non-heightened)';
+        } else if (noneDark) {
+          iconClass = 'fa-regular fa-circle';
+          titleText = 'None: Not Darkness Source';
+        } else {
+          iconClass = 'fa-solid fa-circle-half-stroke';
+          titleText = 'Mixed Darkness Modes';
+        }
+      }
+
+      tool.icon = iconClass;
+      tool.title = titleText;
+      ui.controls.render();
+    } catch { }
+  };
   // Keep toolbar toggle states in sync with current selection (Token tool)
   const refreshTokenTool = () => {
     try {
@@ -794,62 +841,126 @@ export function registerUIHooks() {
       // === LIGHTING TOOL ADDITIONS ===
       const lighting = groups.find((c) => c?.name === 'lighting' || c?.name === 'lights');
       if (lighting) {
-        // Toggle Magical Darkness on selected lights
+        // Darkness Mode tool (dialog-based): Plain Darkness vs Heightened Darkness
         const selectedLights = canvas?.lighting?.controlled ?? [];
-        const statuses = selectedLights.map((l) => !!(l?.document?.getFlag?.(MODULE_ID, 'heightenedDarkness')));
-        const allAreMagDark = selectedLights.length > 0 && statuses.every(Boolean);
-        const noneAreMagDark = selectedLights.length > 0 && statuses.every((s) => !s);
-        const mixedMagDark = selectedLights.length > 0 && !allAreMagDark && !noneAreMagDark;
+        const isDarkness = (l) => !!(
+          l?.isDarknessSource ||
+          l?.document?.config?.negative ||
+          l?.document?.config?.darkness?.negative ||
+          l?.document?.negative ||
+          l?.config?.negative
+        );
+        const isHeightened = (l) => !!(l?.document?.getFlag?.(MODULE_ID, 'heightenedDarkness'));
+
+        let iconClass = 'fa-regular fa-circle';
+        let titleText = 'Set Darkness Mode (Selected Lights)';
+        if (selectedLights.length > 0) {
+          const darkStatuses = selectedLights.map(isDarkness);
+          const heightenedStatuses = selectedLights.map(isHeightened);
+          const allDark = darkStatuses.every(Boolean);
+          const noneDark = darkStatuses.every((s) => !s);
+          const allHeight = heightenedStatuses.every(Boolean);
+          const anyHeight = heightenedStatuses.some(Boolean);
+
+          if (allDark && allHeight) {
+            iconClass = 'fa-solid fa-moon';
+            titleText = 'All: Heightened Darkness (Rank 4+)';
+          } else if (allDark && !anyHeight) {
+            iconClass = 'fa-regular fa-moon';
+            titleText = 'All: Darkness Source (non-heightened)';
+          } else if (noneDark) {
+            iconClass = 'fa-regular fa-circle';
+            titleText = 'None: Not Darkness Source';
+          } else {
+            iconClass = 'fa-solid fa-circle-half-stroke';
+            titleText = 'Mixed Darkness Modes';
+          }
+        }
+
         addTool(lighting.tools, {
-          name: 'pf2e-visioner-toggle-magical-darkness',
-          title: mixedMagDark
-            ? 'Mixed: Toggle Heightened Darkness (Rank 4+)'
-            : allAreMagDark
-              ? 'Disable Heightened Darkness (Rank 4+)'
-              : 'Enable Heightened Darkness (Rank 4+)',
-          icon: mixedMagDark
-            ? 'fa-solid fa-circle-half-stroke'
-            : allAreMagDark
-              ? 'fa-solid fa-moon'
-              : 'fa-regular fa-moon',
-          toggle: true,
-          active: allAreMagDark,
-          onChange: async (_event, toggled) => {
+          name: 'pf2e-visioner-darkness-mode',
+          title: titleText,
+          icon: iconClass,
+          toggle: false,
+          button: true,
+          onChange: async () => {
             try {
               const selected = canvas?.lighting?.controlled ?? [];
               if (!selected.length) return;
-              if (toggled) {
-                // Enable our flag and ensure the light is a darkness source in Foundry
+
+              const applyPlainDarkness = async () => {
                 await Promise.all(selected.map(async (l) => {
-                  try { await l?.document?.setFlag?.(MODULE_ID, 'heightenedDarkness', true); } catch { }
-                  // If not already marked as a darkness source, set the negative flag(s)
-                  const isAlreadyDark = !!(
-                    l?.isDarknessSource ||
-                    l?.document?.config?.negative ||
-                    l?.document?.config?.darkness?.negative ||
-                    l?.document?.negative ||
-                    l?.config?.negative
-                  );
-                  if (!isAlreadyDark) {
-                    try {
-                      await l?.document?.update?.({ 'config.negative': true, 'config.darkness.negative': true });
-                    } catch { /* ignore if schema differs; our LightingCalculator still detects via our flag */ }
-                  }
-                }));
-              } else {
-                for (const l of selected) {
+                  try { await l?.document?.update?.({ 'config.negative': true, 'config.darkness.negative': true }); } catch { }
                   try { await l?.document?.unsetFlag?.(MODULE_ID, 'heightenedDarkness'); } catch { await l?.document?.setFlag?.(MODULE_ID, 'heightenedDarkness', false); }
-                }
-              }
-              // Invalidate lighting cache and refresh perception so visibility updates immediately
-              try {
-                const { LightingCalculator } = await import('../visibility/auto-visibility/LightingCalculator.js');
-                LightingCalculator.getInstance().invalidateLightCache();
-              } catch { }
-              canvas.perception.update({ refreshVision: true, initializeVision: true, refreshLighting: true });
-              ui.controls.render(true);
+                }));
+              };
+
+              const applyHeightened = async () => {
+                await Promise.all(selected.map(async (l) => {
+                  // Ensure it is a darkness source
+                  try { await l?.document?.update?.({ 'config.negative': true, 'config.darkness.negative': true }); } catch { }
+                  try { await l?.document?.setFlag?.(MODULE_ID, 'heightenedDarkness', true); } catch { }
+                }));
+              };
+
+              const clearDarkness = async () => {
+                await Promise.all(selected.map(async (l) => {
+                  try { await l?.document?.update?.({ 'config.negative': false, 'config.darkness.negative': false }); } catch { }
+                  try { await l?.document?.unsetFlag?.(MODULE_ID, 'heightenedDarkness'); } catch { await l?.document?.setFlag?.(MODULE_ID, 'heightenedDarkness', false); }
+                }));
+              };
+
+              const refreshAfterChange = async () => {
+                try {
+                  const { LightingCalculator } = await import('../visibility/auto-visibility/LightingCalculator.js');
+                  LightingCalculator.getInstance().invalidateLightCache();
+                } catch { }
+                canvas.perception.update({ refreshVision: true, initializeVision: true, refreshLighting: true });
+                // Update tool icon/title immediately
+                refreshDarknessTool();
+                ui.controls.render(true);
+              };
+
+              const dialog = new Dialog({
+                title: 'PF2E Visioner: Set Darkness Mode',
+                content: `
+                  <div class="pf2e-visioner pvv-darkness-dialog" style="display:flex; flex-direction:column; gap:8px;">
+                    <p class="notes" style="margin:0 0 4px 0;">Choose how the selected light(s) should behave.</p>
+                    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                      <div class="pvv-option-btn" data-action="plain" style="flex:1; min-width:180px; display:flex; align-items:center; gap:6px; padding:6px 8px; border:1px solid var(--color-border-light-primary); border-radius:6px; cursor:pointer;">
+                        <i class="fa-regular fa-moon"></i> <span>Darkness Source (non-heightened)</span>
+                      </div>
+                      <div class="pvv-option-btn" data-action="heightened" style="flex:1; min-width:180px; display:flex; align-items:center; gap:6px; padding:6px 8px; border:1px solid var(--color-border-light-primary); border-radius:6px; cursor:pointer;">
+                        <i class="fa-solid fa-moon"></i> <span>Heightened Darkness (rank 4+)</span>
+                      </div>
+                    </div>
+                    <div class="pv-text-subtle" style="margin-top:4px; font-size: var(--font-size-12, 12px);">Heightened restricts darkvision to Concealed while preserving greater darkvision.</div>
+                  </div>
+                `,
+                buttons: {
+                  cancel: { icon: '<i class="fas fa-times"></i>', label: 'Cancel' },
+                  clear: { icon: '<i class="fas fa-eraser"></i>', label: 'Clear Darkness', callback: async () => { await clearDarkness(); await refreshAfterChange(); } },
+                },
+                render: (html) => {
+                  try {
+                    const root = html?.[0] || html;
+                    const bind = (sel, fn) => {
+                      const el = root?.querySelector(sel);
+                      if (!el) return;
+                      const handler = async (ev) => { try { ev?.preventDefault?.(); ev?.stopPropagation?.(); await fn(); await refreshAfterChange(); dialog.close(); } catch { } };
+                      el.addEventListener('click', handler);
+                      el.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') handler(e); });
+                      try { el.setAttribute('tabindex', '0'); el.setAttribute('role', 'button'); } catch { }
+                    };
+                    bind('[data-action="plain"]', applyPlainDarkness);
+                    bind('[data-action="heightened"]', applyHeightened);
+                  } catch { }
+                },
+                default: 'cancel'
+              });
+              dialog.render(true);
             } catch (e) {
-              console.error('[pf2e-visioner] Toggle Magical Darkness failed', e);
+              console.error('[pf2e-visioner] Darkness Mode dialog failed', e);
             }
           },
         });
