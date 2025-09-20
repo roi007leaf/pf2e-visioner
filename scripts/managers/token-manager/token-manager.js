@@ -321,7 +321,7 @@ export class VisionerTokenManager extends foundry.applications.api.ApplicationV2
       const showOutcome = game.settings.get(MODULE_ID, 'integrateRollOutcome');
       if (showOutcome) {
         // Ensure sufficient width to display Outcome column fully
-        const minWidth = 705;
+        const minWidth = 750;
         const current = this.position?.width ?? 0;
         if (!current || current < minWidth) {
           this.setPosition({ width: minWidth });
