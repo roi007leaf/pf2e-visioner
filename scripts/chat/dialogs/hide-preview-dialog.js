@@ -904,14 +904,14 @@ export class HidePreviewDialog extends BaseActionDialog {
   }
 
   // Bulk override action handlers
-  // eslint-disable-next-line no-unused-vars
+   
   static _onBulkOverrideSet(event, target) {
     const app = currentHideDialog;
     if (!app) return;
     app._onBulkOverrideSet(event);
   }
 
-  // eslint-disable-next-line no-unused-vars
+   
   static _onBulkOverrideClear(event, target) {
     const app = currentHideDialog;
     if (!app) return;
