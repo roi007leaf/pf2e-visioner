@@ -481,7 +481,6 @@ export class VisionAnalyzer {
 
     let result;
     const isMagicalDarkness = !!lightLevel?.isMagicalDarkness; // tagged by LightingCalculator when magical darkness
-    const darknessRank = Number(lightLevel?.darknessRank || 0) || 0;
     switch (lightLevel.level) {
       case 'bright':
         result = 'observed';
@@ -497,9 +496,9 @@ export class VisionAnalyzer {
 
       case 'darkness':
         if (isMagicalDarkness) {
-          // Heightened darkness (rank >= 4): darkvision becomes concealed; greater darkvision still observed
+          // Magical darkness behavior: darkvision becomes concealed; greater darkvision still observed
           if (observerVision.hasGreaterDarkvision) result = 'observed';
-          else if (darknessRank >= 4 && observerVision.hasDarkvision) result = 'concealed';
+          else if (observerVision.hasDarkvision) result = 'concealed';
           else result = 'hidden';
         } else if (observerVision.hasDarkvision) {
           result = 'observed';
