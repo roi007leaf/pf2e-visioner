@@ -21,7 +21,6 @@ class CoverModifierService {
     /** @type {number|null} Cleanup interval timer */
     this._cleanupTimer = null;
 
-    this._startCleanupTimer();
   }
 
   /**
@@ -168,23 +167,6 @@ class CoverModifierService {
    */
   _isExpired(modifier, now = Date.now()) {
     return modifier.timestamp && now - modifier.timestamp > this._maxAge;
-  }
-
-  /**
-   * Start the periodic cleanup timer
-   * @private
-   */
-  _startCleanupTimer() {
-    // Run cleanup every 2 minutes
-    this._cleanupTimer = setInterval(
-      () => {
-        const cleaned = this.cleanupExpiredModifiers();
-        if (cleaned > 0) {
-          console.log(`PF2E Visioner | Cleaned up ${cleaned} expired cover modifiers`);
-        }
-      },
-      2 * 60 * 1000,
-    );
   }
 }
 

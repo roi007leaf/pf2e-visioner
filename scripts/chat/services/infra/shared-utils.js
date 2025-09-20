@@ -9,6 +9,20 @@ import { refreshEveryonesPerception } from '../../../services/socket.js';
 import { updateTokenVisuals } from '../../../services/visual-effects.js';
 import { setVisibilityBetween } from '../../../utils.js';
 import { notify } from './notifications.js';
+import AvsOverrideManager from './avs-override-manager.js';
+
+/**
+ * Set AVS pair overrides to prevent automatic recalculation of manually set visibility states
+ * This is crucial for actions like sneak where we don't want AVS to override our manual changes
+ * @param {Token} observer - The observing token
+ * @param {Map} changesByTarget - Map of target changes
+ * @param {Object} options - Application options
+ */
+// setAVSPairOverrides has moved to AvsOverrideManager. Keep a thin delegate for backward compatibility.
+export async function setAVSPairOverrides(observer, changesByTarget, options = {}) {
+  return AvsOverrideManager.setPairOverrides(observer, changesByTarget, options);
+}
+
 /**
  * Validate if a token is a valid Seek target
  * @param {Token} token - Potential target token
@@ -133,8 +147,13 @@ export function isTokenInEncounter(token) {
     const isFamiliar = actor?.type === 'familiar';
     const isEidolon = actor?.type === 'eidolon' || actor?.isOfType?.('eidolon');
 
-    // Always include familiars regardless of encounter filter
-    if (isFamiliar) return true;
+    // Check if familiar's master is in the encounter
+    if (isFamiliar) {
+      const masterId = actor?.system?.master?.id;
+      if (masterId && game.combat.combatants.some((c) => c.actorId === masterId)) {
+        return true;
+      }
+    }
 
     // Try PF2e master linkage on eidolon
     const master = isEidolon ? actor?.system?.eidolon?.master : null;
@@ -185,6 +204,7 @@ export function determineOutcome(total, die, dc) {
   const ladder = ['critical-failure', 'failure', 'success', 'critical-success'];
   const idx = ladder.indexOf(outcome);
   const natural = Number(die);
+  
   if (natural === 20) {
     // Promote by one step unless already crit success
     return ladder[Math.min(idx + 1, ladder.length - 1)];
@@ -193,6 +213,7 @@ export function determineOutcome(total, die, dc) {
     // Demote by one step unless already crit failure
     return ladder[Math.max(idx - 1, 0)];
   }
+  
   return outcome;
 }
 
@@ -239,6 +260,21 @@ export async function applyVisibilityChanges(observer, changes, options = {}) {
           target: targetToken,
           state: effectiveNewState,
         });
+      }
+    }
+
+    // Set AVS pair overrides to prevent automatic recalculation of these visibility states
+    // This is crucial for sneak actions - we don't want AVS to override our manual visibility changes
+    if (options.setAVSOverrides !== false) { // Default to true unless explicitly disabled
+      
+      if (changesByTarget.size === 0) {
+        console.warn('PF2E Visioner | No changes found - cannot set AVS overrides');
+      } else {
+        try {
+          await AvsOverrideManager.setPairOverrides(observer, changesByTarget, options);
+        } catch (avsError) {
+          console.warn('PF2E Visioner | Failed to set AVS pair overrides:', avsError);
+        }
       }
     }
 
@@ -639,9 +675,20 @@ export function calculateStealthRollTotals(
   // Fallback: try roll modifiers if still no original bonus found
   if (originalCoverBonus === 0) {
     const rollModifiers = actionData?.roll?.options?.modifiers || [];
+    
     const coverModifier = rollModifiers.find(
-      (mod) =>
-        mod.label?.toLowerCase().includes('cover') || mod.slug?.toLowerCase().includes('cover'),
+      (mod) => {
+        const label = mod.label?.toLowerCase() || '';
+        const slug = mod.slug?.toLowerCase() || '';
+        // Only match modifiers that are specifically cover-related, not just containing "cover"
+        return (
+          slug === 'pf2e-visioner-cover' || // Our own cover modifier
+          label.includes('cover bonus') ||
+          label.includes('cover stealth') ||
+          (label.includes('cover') && label.includes('stealth')) ||
+          slug.includes('cover-stealth')
+        );
+      }
     );
     if (coverModifier) {
       originalCoverBonus = Number(coverModifier.modifier || 0);
@@ -674,12 +721,28 @@ export function calculateStealthRollTotals(
     // Brackets: Show what this specific observer DETECTED (before override)
     originalTotal = baseTotal - originalCoverBonus + originalStateBonus;
   } else {
-    // NORMAL CASE: Show detected cover result, no override involved
-    total = baseTotal - originalCoverBonus + currentCoverBonus;
-
-    // Only show brackets if cover bonus is different from original
-    if (currentCoverBonus !== originalCoverBonus) {
-      originalTotal = baseTotal;
+    // NORMAL CASE: No override, use the roll as it was made
+    // The baseTotal already includes the original cover bonus that was applied when the roll was made
+    // We should only adjust if there's actually a detected difference between what was applied and current cover
+    
+    // If we have current cover detected and it matches what was originally applied, no adjustment needed
+    if (originalCoverBonus === currentCoverBonus) {
+      total = baseTotal;
+    } else {
+      // Safety check: if current cover is 'none' and we detect a large original bonus,
+      // it might be a detection error. Cap the adjustment to prevent unreasonable results.
+      if (currentCoverState === 'none' && originalCoverBonus > 4) {
+        console.warn('PF2E Visioner | Large cover bonus detected for no-cover situation. Limiting adjustment.');
+        total = baseTotal;
+      } else {
+        // There's a mismatch - the roll was made with different cover than what we detect now
+        // This can happen if the player moved between rolling and dialog opening
+        // Show the adjusted total based on current cover detection
+        total = baseTotal - originalCoverBonus + currentCoverBonus;
+        
+        // Show the original roll in brackets if there's a difference
+        originalTotal = baseTotal;
+      }
     }
   }
 

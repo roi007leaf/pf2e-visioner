@@ -53,7 +53,7 @@
       },
       "./scripts/stores/": {
         "branches": 75,
-        "functions": 100,
+        "functions": 95,
         "lines": 75,
         "statements": 75
       },

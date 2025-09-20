@@ -29,7 +29,6 @@ export class SeekActionHandler extends ActionHandlerBase {
     const { shouldFilterAlly, hasActiveEncounter, calculateTokenDistance } = await import(
       '../infra/shared-utils.js'
     );
-    const { getVisibilityBetween } = await import('../../../utils.js');
     const { MODULE_ID } = await import('../../../constants.js');
 
     const allTokens = canvas?.tokens?.placeables || [];
@@ -78,43 +77,6 @@ export class SeekActionHandler extends ActionHandlerBase {
       console.error('Error processing walls in discoverSubjects:', error);
     }
 
-    // Apply RAW enforcement if enabled
-    const enforceRAW = game.settings.get(MODULE_ID, 'enforceRawRequirements');
-    if (enforceRAW) {
-      // Filter to only include targets that are Undetected or Hidden from the seeker
-      potential = potential.filter((subject) => {
-        try {
-          if (subject._isWall) {
-            // Hidden walls are always valid seek targets (they're hidden by definition)
-            return true;
-          }
-
-          if (subject?.actor?.type === 'hazard' || subject?.actor?.type === 'loot') {
-            // Hazards and loot are always valid seek targets
-            return true;
-          }
-
-          // For regular tokens, check visibility state
-          const visibility = getVisibilityBetween(actionData.actor, subject);
-          const isValidTarget = visibility === 'undetected' || visibility === 'hidden';
-
-          return isValidTarget;
-        } catch (error) {
-          console.warn('Error checking visibility for RAW enforcement:', error);
-          // If we can't determine visibility, exclude the target to be safe
-          return false;
-        }
-      });
-
-      // If no valid targets found after RAW filtering, notify the user
-      if (potential.length === 0) {
-        const { notify } = await import('../infra/notifications.js');
-        notify.warn(
-          'No valid Seek targets found. According to RAW, you can only Seek targets that are Undetected or Hidden from you.',
-        );
-      }
-    }
-
     // Optional distance limitation based on settings (combat vs out-of-combat)
     try {
       const inCombat = hasActiveEncounter();
@@ -134,39 +96,48 @@ export class SeekActionHandler extends ActionHandlerBase {
           });
         }
       }
-    } catch (_) {}
+    } catch { }
 
     // Do not pre-filter by encounter; the dialog applies encounter filter as needed
     return potential;
   }
 
   async analyzeOutcome(actionData, subject) {
-    const { getVisibilityBetween } = await import('../../../utils.js');
     const { MODULE_ID } = await import('../../../constants.js');
-    const { extractStealthDC, hasConcealedCondition, determineOutcome } = await import(
+    const { getVisibilityBetween } = await import('../../../utils.js');
+    const { extractStealthDC, determineOutcome } = await import(
       '../infra/shared-utils.js'
     );
 
     let current = 'hidden';
     let dc = 0;
-    let targetToken = subject;
+
+    // Determine anomaly and That's Odd feat early
+    let thatsOddAuto = false;
+    try {
+      const { FeatsHandler } = await import('../feats-handler.js');
+      const isAnomaly = !!(subject?._isWall || subject?.actor?.type === 'hazard' || subject?.actor?.type === 'loot');
+      if (isAnomaly && FeatsHandler.hasFeat(actionData.actor, ["thats-odd", "that's-odd"])) {
+        thatsOddAuto = true;
+      }
+    } catch { }
 
     if (subject && subject._isWall) {
       // Walls: use provided dc and evaluate new state vs current observer wall state
       dc = Number(subject.dc) || 15;
-      targetToken = actionData.actor; // visibility state applies to wall map per observer; reuse actor for presentation
+      // visibility state applies to wall map per observer; reuse actor for presentation
       try {
         const map = actionData.actor?.document?.getFlag?.(MODULE_ID, 'walls') || {};
         current = map?.[subject.wall?.id] || 'hidden';
-      } catch (_) {
+      } catch {
         current = 'hidden';
       }
     } else {
       current = getVisibilityBetween(actionData.actor, subject);
 
-      // Proficiency gating for hazards/loot
+      // Proficiency gating for hazards/loot (skip if That's Odd guarantees detection)
       try {
-        if (subject?.actor && (subject.actor.type === 'hazard' || subject.actor.type === 'loot')) {
+        if (!thatsOddAuto && subject?.actor && (subject.actor.type === 'hazard' || subject.actor.type === 'loot')) {
           const minRank = Number(subject.document?.getFlag?.(MODULE_ID, 'minPerceptionRank') ?? 0);
           if (Number.isFinite(minRank) && minRank > 0) {
             const stat = actionData.actor?.actor?.getStatistic?.('perception');
@@ -195,19 +166,48 @@ export class SeekActionHandler extends ActionHandlerBase {
             }
           }
         }
-      } catch (_) {}
+      } catch { }
 
       // For loot actors, use the custom Stealth DC flag configured on the token; otherwise use Perception DC
       dc = extractStealthDC(subject);
     }
     const total = Number(actionData?.roll?.total ?? 0);
     const die = Number(
-      actionData?.roll?.dice?.[0]?.total ?? actionData?.roll?.terms?.[0]?.total ?? 0,
+      actionData?.roll?.dice?.[0]?.results?.[0]?.result ??
+      actionData?.roll?.dice?.[0]?.total ??
+      actionData?.roll?.terms?.[0]?.total ?? 0,
     );
     const outcome = determineOutcome(total, die, dc);
     // Simple mapping: success → observed; failure → concealed/hidden depending on target state; crit-failure → undetected
     const { getDefaultNewStateFor } = await import('../data/action-state-config.js');
     let newVisibility = getDefaultNewStateFor('seek', current, outcome) || current;
+    // Feat-based post visibility adjustments (Keen Eyes, That's Odd)
+    try {
+      const { FeatsHandler } = await import('../feats-handler.js');
+      newVisibility = FeatsHandler.adjustVisibility('seek', actionData.actor, current, newVisibility, {
+        subjectType: subject?._isWall ? 'wall' : subject?.actor?.type,
+        isHiddenWall: !!subject?._isWall,
+        outcome,
+      });
+    } catch { }
+
+    // PF2e RAW correction: You CAN Seek with imprecise senses,
+    // but the best you can do is make the target Hidden (never Observed).
+    // Echolocation (precise hearing within 40 ft) and other precise senses can allow Observed.
+    try {
+      if (!subject?._isWall && newVisibility === 'observed') {
+        const { VisionAnalyzer } = await import(
+          '../../../visibility/auto-visibility/VisionAnalyzer.js'
+        );
+        const va = VisionAnalyzer.getInstance();
+        const visCaps = va.getVisionCapabilities(actionData.actor);
+        const hasVisualPrecise = !!(visCaps?.hasVision && !visCaps?.isBlinded);
+        const hasNonVisualPrecise = va.hasPreciseNonVisualInRange(actionData.actor, subject);
+        if (!hasVisualPrecise && !hasNonVisualPrecise) {
+          newVisibility = 'hidden';
+        }
+      }
+    } catch { }
 
     // Build display metadata for walls
     let wallMeta = {};
@@ -227,7 +227,7 @@ export class SeekActionHandler extends ActionHandlerBase {
           wallIdentifier: name,
           wallImg: img,
         };
-      } catch (_) {}
+      } catch { }
     }
 
     const base = {
@@ -248,6 +248,21 @@ export class SeekActionHandler extends ActionHandlerBase {
       ...wallMeta,
     };
 
+    // That's Odd: guarantee anomaly detection -> force observed, regardless of roll/DC
+    if (thatsOddAuto) {
+      const forced = {
+        ...base,
+        outcome: 'success',
+        newVisibility: 'observed',
+        changed: current !== 'observed',
+        autoDetected: true,
+        autoReason: "that's-odd",
+      };
+      // For walls, also set explicit override state in case UI wishes to preserve it
+      if (subject?._isWall) forced.overrideState = 'observed';
+      return forced;
+    }
+
     // If a seek template was provided, ensure the target is within it; otherwise mark as unchanged to be filtered out later
     try {
       if (actionData.seekTemplateCenter && actionData.seekTemplateRadiusFeet) {
@@ -261,12 +276,12 @@ export class SeekActionHandler extends ActionHandlerBase {
             if (wallCenter) {
               const distance = Math.sqrt(
                 Math.pow(wallCenter.x - actionData.seekTemplateCenter.x, 2) +
-                  Math.pow(wallCenter.y - actionData.seekTemplateCenter.y, 2),
+                Math.pow(wallCenter.y - actionData.seekTemplateCenter.y, 2),
               );
               const radiusPixels = (actionData.seekTemplateRadiusFeet * canvas.scene.grid.size) / 5;
               inside = distance <= radiusPixels;
             }
-          } catch (_) {
+          } catch {
             // If wall center calculation fails, assume it's not in template
             inside = false;
           }
@@ -281,7 +296,7 @@ export class SeekActionHandler extends ActionHandlerBase {
 
         if (!inside) return { ...base, changed: false };
       }
-    } catch (_) {}
+    } catch { }
 
     return base;
   }
@@ -323,7 +338,7 @@ export class SeekActionHandler extends ActionHandlerBase {
           oldVisibility: outcome?.oldVisibility || outcome?.currentVisibility || null,
         };
       }
-    } catch (_) {}
+    } catch { }
     return super.outcomeToChange(actionData, outcome);
   }
 
@@ -345,7 +360,7 @@ export class SeekActionHandler extends ActionHandlerBase {
         }
       }
       return base;
-    } catch (_) {
+    } catch {
       return outcomes;
     }
   }
@@ -375,7 +390,7 @@ export class SeekActionHandler extends ActionHandlerBase {
           await applyVisibilityChanges(
             group.observer,
             group.items.map((i) => ({ target: i.target, newVisibility: i.newVisibility })),
-            { direction: this.getApplyDirection() },
+            { direction: this.getApplyDirection(), source: 'seek_action' },
           );
         }
       }
@@ -401,13 +416,13 @@ export class SeekActionHandler extends ActionHandlerBase {
             try {
               const { updateWallVisuals } = await import('../../../services/visual-effects.js');
               await updateWallVisuals(observer.id);
-            } catch (_) {}
-          } catch (e) {
+            } catch { }
+          } catch {
             /* ignore per-observer wall errors */
           }
         }
       }
-    } catch (e) {
+    } catch {
       // Fallback to base implementation if something goes wrong
       return super.applyChangesInternal(changes);
     }
@@ -444,7 +459,7 @@ export class SeekActionHandler extends ActionHandlerBase {
             return id ? tokenMap.has(id) : false;
           });
         }
-      } catch (_) {}
+      } catch { }
 
       if (filtered.length === 0) {
         (await import('../infra/notifications.js')).notify.info('No changes to apply');

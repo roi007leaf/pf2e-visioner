@@ -2,7 +2,7 @@ export function buildHidePanel() {
   const label = 'Open Hide Results';
   const tooltip = 'Preview and apply Hide visibility changes';
   const title = 'Hide Results';
-  const icon = 'fas fa-eye-slash';
+  const icon = 'fas fa-mask';
   const actionName = 'open-hide-results';
   const buttonClass = 'visioner-btn-hide';
   const panelClass = 'hide-panel';

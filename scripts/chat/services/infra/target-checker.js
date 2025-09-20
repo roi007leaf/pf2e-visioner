@@ -1,6 +1,5 @@
 import { MODULE_ID } from '../../../constants.js';
-import autoCoverSystem from '../../../cover/auto-cover/AutoCoverSystem.js';
-import { getCoverBetween, getVisibilityBetween } from '../../../utils.js';
+import { getVisibilityBetween } from '../../../utils.js';
 // Debug logger removed
 import { shouldFilterAlly } from './shared-utils.js';
 
@@ -43,11 +42,10 @@ export function checkForValidTargets(actionData) {
 }
 
 function checkConsequencesTargets(actionData, potentialTargets) {
-  const enforceRAW = game.settings.get(MODULE_ID, 'enforceRawRequirements');
 
   for (const target of potentialTargets) {
     if (
-      enforceRAW &&
+
       shouldFilterAlly(actionData.actor, target, 'enemies', actionData?.ignoreAllies)
     ) {
       continue;
@@ -115,7 +113,7 @@ function checkSeekTargets(actionData, potentialTargets) {
         }
       }
     }
-  } catch (_) {}
+  } catch (_) { }
 
   for (const target of potentialTargets) {
     // Check if target is a hazard/loot with a minimum perception rank
@@ -157,7 +155,7 @@ function checkSeekTargets(actionData, potentialTargets) {
           return true;
         }
       }
-    } catch (_) {}
+    } catch (_) { }
 
     const visibility = getVisibilityBetween(actionData.actor, target);
     if (['concealed', 'hidden', 'undetected'].includes(visibility)) return true;
@@ -199,58 +197,12 @@ function checkPointOutTargets(actionData, potentialTargets) {
 }
 
 function checkHideTargets(actionData, potentialTargets) {
-  const enforceRAW = game.settings.get(MODULE_ID, 'enforceRawRequirements');
-  const autoCover = game.settings.get(MODULE_ID, 'autoCover');
-  if (!enforceRAW) return potentialTargets.length > 0;
+  return potentialTargets.length > 0;
 
-  // RAW prerequisite: at least one observed creature must either see the actor as concealed
-  // OR the actor must have Standard or Greater Cover from at least one observed creature
-  try {
-    for (const observer of potentialTargets) {
-      const vis = getVisibilityBetween(observer, actionData.actor);
-      if (vis === 'concealed') {
-        return true;
-      }
-      // Prefer fresh auto-cover detection; fallback to stored map if needed
-      let cover = 'none';
-      if (autoCover) {
-        try {
-          cover =
-            autoCoverSystem.detectCoverBetweenTokens(observer, actionData.actor, {
-              rawPrereq: true,
-            }) || 'none';
-        } catch (_) {}
-      }
-      if (cover === 'none') {
-        try {
-          cover = getCoverBetween(observer, actionData.actor);
-        } catch (_) {
-          cover = 'none';
-        }
-      }
-      if (cover === 'standard' || cover === 'greater') {
-        return true;
-      }
-    }
-  } catch (_) {}
-  return false;
 }
 
 function checkSneakTargets(actionData, potentialTargets) {
-  const enforceRAW = game.settings.get(MODULE_ID, 'enforceRawRequirements');
-  if (!enforceRAW) return potentialTargets.length > 0;
-  // RAW: You can attempt Sneak only against creatures you were Hidden or Undetected from at the start.
-  try {
-    const observers = potentialTargets.filter(
-      (o) => !shouldFilterAlly(actionData.actor, o, 'enemies', actionData?.ignoreAllies),
-    );
-    return observers.some((o) => {
-      const vis = getVisibilityBetween(o, actionData.actor);
-      return vis === 'hidden' || vis === 'undetected';
-    });
-  } catch (_) {
-    return false;
-  }
+  return potentialTargets.length > 0;
 }
 
 function checkDiversionTargets(actionData, potentialTargets) {
@@ -260,7 +212,7 @@ function checkDiversionTargets(actionData, potentialTargets) {
       const observers = discoverDiversionObservers(actionData.actor);
       return observers.length > 0;
     }
-  } catch (_) {}
+  } catch (_) { }
   // Fallback to simple heuristic if dynamic import not cached
   return potentialTargets.length > 0;
 }

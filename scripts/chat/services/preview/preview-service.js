@@ -20,6 +20,26 @@ export async function previewActionResults(actionData) {
         isProcessingSeek = true;
 
         try {
+          // Helper to robustly resolve a Token from various actor/token shapes
+          const resolveToken = (tokenOrActor) => {
+            try {
+              if (!tokenOrActor) return null;
+              if (tokenOrActor.isToken || tokenOrActor.center) return tokenOrActor;
+              if (tokenOrActor.object?.isToken || tokenOrActor.object?.center)
+                return tokenOrActor.object;
+              if (tokenOrActor.document?.object?.isToken) return tokenOrActor.document.object;
+              const actor = tokenOrActor.actor || tokenOrActor.document?.actor || tokenOrActor;
+              if (actor?.getActiveTokens) {
+                const tokens = actor.getActiveTokens(true);
+                if (tokens?.length) return tokens[0];
+              }
+            } catch { }
+            return null;
+          };
+          const seekerToken = resolveToken(actionData?.actor);
+
+          // No gating by precise sense: PF2e allows Seek with imprecise senses; outcomes are capped elsewhere
+
           // Prevent duplicate seek dialogs by closing any existing one first
           try {
             const { SeekPreviewDialog } = await import('../../dialogs/seek-preview-dialog.js');
@@ -30,7 +50,7 @@ export async function previewActionResults(actionData) {
               await new Promise((resolve) => setTimeout(resolve, 100));
             } else {
             }
-          } catch (_) {
+          } catch {
             // Ignore errors when closing existing dialog
           }
 
@@ -43,14 +63,14 @@ export async function previewActionResults(actionData) {
           try {
             const { checkForValidTargets } = await import('../infra/target-checker.js');
             const canSeek = checkForValidTargets({ ...actionData, actionType: 'seek' });
-            if (!canSeek && game.settings.get(MODULE_ID, 'enforceRawRequirements')) {
+            if (!canSeek) {
               const { notify } = await import('../infra/notifications.js');
               notify.warn(
                 'No valid Seek targets found. According to RAW, you can only Seek targets that are Undetected or Hidden from you.',
               );
               return;
             }
-          } catch (_) {}
+          } catch { }
 
           // Do NOT pre-filter allies at discovery time; let the dialog control it live
           const subjects = await handler.discoverSubjects({ ...actionData, ignoreAllies: false });
@@ -67,7 +87,7 @@ export async function previewActionResults(actionData) {
           }
 
           // Pass the current desired per-dialog ignoreAllies default
-          new SeekPreviewDialog(actionData.actor, outcomes, changes, {
+          new SeekPreviewDialog(seekerToken || actionData.actor, outcomes, changes, {
             ...actionData,
             ignoreAllies: actionData?.ignoreAllies ?? game.settings.get(MODULE_ID, 'ignoreAllies'),
           }).render(true);
@@ -100,29 +120,17 @@ export async function previewActionResults(actionData) {
         const { HidePreviewDialog } = await import('../../dialogs/hide-preview-dialog.js');
         const handler = new HideActionHandler();
         await handler.ensurePrerequisites(actionData);
-        // // If a Check Modifiers dialog is open, copy its rollId into actionData.context for override consumption
-        // try {
-        //   const stealthDialog = Object.values(ui.windows).find(
-        //     (w) => w?.constructor?.name === 'CheckModifiersDialog',
-        //   );
-        //   const rollId = stealthDialog?._pvRollId || stealthDialog?.context?._visionerRollId;
-        //   if (rollId) {
-        //     actionData.context = actionData.context || {};
-        //     actionData.context._visionerRollId = rollId;
-        //   }
-        // } catch (_) {}
-        // RAW enforcement gate: do not open dialog if prerequisites fail
         try {
           const { checkForValidTargets } = await import('../infra/target-checker.js');
           const canHide = checkForValidTargets({ ...actionData, actionType: 'hide' });
-          if (!canHide && game.settings.get(MODULE_ID, 'enforceRawRequirements')) {
+          if (!canHide) {
             const { notify } = await import('../infra/notifications.js');
             notify.warn(
               'The creature hiding should be Concealed from, or have Standard or Greater Cover from, at least one observed.',
             );
             return;
           }
-        } catch (_) {}
+        } catch { }
         // Do NOT pre-filter allies; let dialog control it
         const subjects = await handler.discoverSubjects({ ...actionData, ignoreAllies: false });
         const outcomes = await Promise.all(
@@ -151,26 +159,52 @@ export async function previewActionResults(actionData) {
             actionData.context = actionData.context || {};
             actionData.context._visionerRollId = rollId;
           }
-        } catch (_) {}
+        } catch { }
         // RAW enforcement gate: do not open dialog if prerequisites fail
         try {
           const { checkForValidTargets } = await import('../infra/target-checker.js');
           const canSneak = checkForValidTargets({ ...actionData, actionType: 'sneak' });
-          if (!canSneak && game.settings.get(MODULE_ID, 'enforceRawRequirements')) {
+          if (!canSneak) {
             const { notify } = await import('../infra/notifications.js');
             notify.warn(
               'You can attempt Sneak only against creatures you were Hidden or Undetected from at the start.',
             );
             return;
           }
-        } catch (_) {}
+        } catch { }
         // Do NOT pre-filter allies; let dialog control it
         const subjects = await handler.discoverSubjects({ ...actionData, ignoreAllies: false });
         const outcomes = await Promise.all(
           subjects.map((s) => handler.analyzeOutcome(actionData, s)),
         );
         const changes = outcomes.filter((o) => o && o.changed);
-        new SneakPreviewDialog(actionData.actor, outcomes, changes, actionData).render(true);
+        // Get the token from the actor
+        const token = actionData.actor?.token || actionData.actor;
+        if (!token) {
+          console.error('PF2E Visioner | No token found for sneak action');
+          return;
+        }
+
+        // Try to retrieve start states for sneak action
+        let startStates = {};
+        try {
+          // Check message flags for start states
+          if (actionData.message?.flags?.['pf2e-visioner']?.startStates) {
+            startStates = actionData.message.flags['pf2e-visioner'].startStates;
+          }
+          // Check token flags as backup
+          else if (token?.document?.flags?.['pf2e-visioner']?.startStates) {
+            startStates = token.document.flags['pf2e-visioner'].startStates;
+          }
+        } catch (error) {
+          console.error('PF2E Visioner | Could not retrieve start states in preview service:', error);
+        }
+
+        // Create dialog with start states included
+        new SneakPreviewDialog(token, outcomes, changes, {
+          ...actionData,
+          startStates
+        }).render(true);
         return;
       }
       case 'create-a-diversion': {
@@ -217,14 +251,14 @@ export async function previewActionResults(actionData) {
             ...actionData,
             actionType: 'consequences',
           });
-          if (!canShowConsequences && game.settings.get(MODULE_ID, 'enforceRawRequirements')) {
+          if (!canShowConsequences) {
             const { notify } = await import('../infra/notifications.js');
             notify.warn(
-              'No valid targets found for Attack Consequences. According to RAW, you can only see consequences from targets that you are Hidden or Undetected from.',
+              'No valid targets found for Attack Consequences. you can only see consequences if you are Hidden or Undetected from at least one observer.',
             );
             return;
           }
-        } catch (_) {}
+        } catch { }
 
         const subjects = await handler.discoverSubjects({ ...actionData, ignoreAllies: false });
         const outcomes = await Promise.all(

@@ -20,5 +20,6 @@ export * from './actions/diversion-action.js';
 export * from './actions/hide-action.js';
 export * from './actions/point-out-action.js';
 export * from './actions/seek-action.js';
-export * from './actions/sneak-action.js';
+// Temporarily disabled old sneak system to use new state-based approach
+// export * from './actions/sneak-action.js';
 export * from './actions/take-cover-action.js';

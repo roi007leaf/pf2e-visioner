@@ -87,15 +87,15 @@ describe('Hooks Integration Tests', () => {
     test('chat message hooks are registered', () => {
       // Mock chat hook registration
       const registerChatHooks = () => {
-        global.Hooks.on('chatMessage', (message, html, data) => {
+  global.Hooks.on('chatMessage', (message) => {
           console.log('Chat message received:', message.id);
         });
 
-        global.Hooks.on('preCreateChatMessage', (message, data, options, userId) => {
+  global.Hooks.on('preCreateChatMessage', (message) => {
           console.log('Chat message being created:', message.id);
         });
 
-        global.Hooks.on('createChatMessage', (message, options, userId) => {
+  global.Hooks.on('createChatMessage', (message) => {
           console.log('Chat message created:', message.id);
         });
       };
@@ -132,19 +132,19 @@ describe('Hooks Integration Tests', () => {
     test('combat hooks are registered', () => {
       // Mock combat hook registration
       const registerCombatHooks = () => {
-        global.Hooks.on('combatStart', (combat, options) => {
+  global.Hooks.on('combatStart', (combat) => {
           console.log('Combat started:', combat.id);
         });
 
-        global.Hooks.on('combatRound', (combat, round, options) => {
+  global.Hooks.on('combatRound', (combat, round) => {
           console.log('Combat round:', round);
         });
 
-        global.Hooks.on('combatTurn', (combat, turn, options) => {
+  global.Hooks.on('combatTurn', (combat, turn) => {
           console.log('Combat turn:', turn);
         });
 
-        global.Hooks.on('combatEnd', (combat, options) => {
+  global.Hooks.on('combatEnd', (combat) => {
           console.log('Combat ended:', combat.id);
         });
       };
@@ -189,15 +189,15 @@ describe('Hooks Integration Tests', () => {
     test('token creation hooks are registered', () => {
       // Mock token creation hook registration
       const registerTokenHooks = () => {
-        global.Hooks.on('preCreateToken', (token, data, options, userId) => {
+  global.Hooks.on('preCreateToken', (token) => {
           console.log('Token being created:', token.id);
         });
 
-        global.Hooks.on('createToken', (token, options, userId) => {
+  global.Hooks.on('createToken', (token) => {
           console.log('Token created:', token.id);
         });
 
-        global.Hooks.on('preUpdateToken', (token, changes, data, options, userId) => {
+  global.Hooks.on('preUpdateToken', (token) => {
           console.log('Token being updated:', token.id);
         });
 
@@ -245,6 +245,37 @@ describe('Hooks Integration Tests', () => {
       const noMovementResult = handleTokenMovement({ id: 'token1' }, oldPos, oldPos);
       expect(noMovementResult.visibilityUpdate).toBe(false);
       expect(noMovementResult.reason).toBe('no_movement');
+    });
+
+    test('hidden state toggle triggers global recalculation', () => {
+      // Simulate minimal subset of EventDrivenVisibilitySystem logic we rely on
+      const recalculationCalls = [];
+      const system = {
+        markAll: () => recalculationCalls.push('markAll'),
+        handleUpdate: (oldHidden, changes) => {
+          const hiddenChanged = Object.prototype.hasOwnProperty.call(changes, 'hidden');
+            if (hiddenChanged) {
+              const wasHidden = !!oldHidden;
+              const isNowHidden = !!changes.hidden;
+              if (wasHidden !== isNowHidden) {
+                system.markAll();
+              }
+            }
+            // If now hidden we stop further per-token processing
+            if ((hiddenChanged ? changes.hidden : oldHidden) === true) return 'excluded';
+            return 'processed';
+        }
+      };
+
+      // Case 1: becomes hidden
+      const resultHidden = system.handleUpdate(false, { hidden: true });
+      expect(resultHidden).toBe('excluded');
+      expect(recalculationCalls).toContain('markAll');
+
+      // Case 2: becomes visible again
+      const resultVisible = system.handleUpdate(true, { hidden: false });
+      expect(resultVisible).toBe('processed');
+      expect(recalculationCalls.length).toBe(2);
     });
   });
 

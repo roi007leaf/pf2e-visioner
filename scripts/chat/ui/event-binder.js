@@ -47,6 +47,15 @@ export function bindAutomationEvents(panel, message, actionData) {
         'apply-now-diversion': applyNowDiversion,
         'apply-now-consequences': applyNowConsequences,
         'apply-now-take-cover': applyNowTakeCover,
+        'start-sneak': async (actionData, buttonEl) => {
+          const { SneakDialogService } = await import('../services/dialogs/sneak-dialog-service.js');
+          const service = new SneakDialogService();
+          return service.startSneak(actionData, buttonEl);
+        },
+        'open-sneak-results': async (actionData) => {
+          const { SneakDialogService } = await import('../services/dialogs/sneak-dialog-service.js');
+          return SneakDialogService.openSneakResults(actionData);
+        },
       };
       const revertHandlers = {
         'revert-now-seek': revertNowSeek,
@@ -79,7 +88,7 @@ export function bindAutomationEvents(panel, message, actionData) {
               updateSeekTemplateButton(actionData, false);
             }
           }
-        } catch (_) {}
+  } catch {}
       } else if (action === 'open-seek-results' && actionData.actionType === 'seek') {
         let msg = game.messages.get(actionData.messageId);
         let pending = msg?.flags?.['pf2e-visioner']?.seekTemplate;
@@ -106,7 +115,7 @@ export function bindAutomationEvents(panel, message, actionData) {
                   t?.user?.id === msg.author.id
                 );
               }) || null;
-          } catch (_) {}
+          } catch {}
         }
         if ((pending || fallbackTemplate) && game.user.isGM) {
           const center =
@@ -142,7 +151,7 @@ export function bindAutomationEvents(panel, message, actionData) {
                   hasTargets: true,
                 },
               });
-            } catch (_) {}
+            } catch {}
           }
         } else if (game.user.isGM && game.settings.get('pf2e-visioner', 'seekUseTemplate')) {
           // Still no template data: avoid opening unfiltered results
@@ -166,7 +175,7 @@ export function bindAutomationEvents(panel, message, actionData) {
           ...actionData,
           ignoreAllies: game.settings.get('pf2e-visioner', 'ignoreAllies'),
         });
-      } else if (applyHandlers[action]) {
+  } else if (applyHandlers[action]) {
         // For Point Out, ping the pointed target when applying from the chat panel
         try {
           if (action === 'apply-now-point-out' && game.user.isGM) {
@@ -178,7 +187,7 @@ export function bindAutomationEvents(panel, message, actionData) {
               );
               const first = dialog?.outcomes?.[0]?.targetToken;
               if (first) token = first;
-            } catch (_) {}
+            } catch {}
             if (!token) {
               const msg = game.messages.get(actionData?.messageId);
               const pointOutFlags = msg?.flags?.['pf2e-visioner']?.pointOut;
@@ -192,10 +201,10 @@ export function bindAutomationEvents(panel, message, actionData) {
               const { pingTokenCenter } = await import('../services/gm-ping.js');
               try {
                 pingTokenCenter(token, 'Point Out Target');
-              } catch (_) {}
+              } catch {}
             }
           }
-        } catch (_) {}
+  } catch {}
 
         // For Hide: if there are no actionable changes (respecting default encounter filter),
         // show a no-changes notification and skip applying
@@ -215,14 +224,14 @@ export function bindAutomationEvents(panel, message, actionData) {
             if (changed.length === 0) {
               try {
                 notify.info('No changes to apply');
-              } catch (_) {
+              } catch {
                 try {
                   notify.info('No changes to apply');
-                } catch (_) {}
+                } catch {}
               }
               return;
             }
-          } catch (_) {}
+          } catch {}
         }
         // For Seek: respect distance and template limits when applying directly from panel
         if (action === 'apply-now-seek') {
@@ -268,7 +277,7 @@ export function bindAutomationEvents(panel, message, actionData) {
                   tplCenter = { x: t.x, y: t.y };
                   tplRadius = Number(t.distance) || 0;
                 }
-              } catch (_) {}
+              } catch {}
             }
             if (tplCenter && tplRadius) {
               actionable = filterOutcomesByTemplate(actionable, tplCenter, tplRadius, 'target');
@@ -277,8 +286,11 @@ export function bindAutomationEvents(panel, message, actionData) {
               notify.info('No changes to apply');
               return;
             }
-          } catch (_) {}
+          } catch {}
         }
+        await applyHandlers[action](actionData, button);
+      } else if (action === 'start-sneak') {
+        // Special case: ensure we pass the actual button element so the service can refresh the UI
         await applyHandlers[action](actionData, button);
       } else if (revertHandlers[action]) {
         await revertHandlers[action](actionData, button);

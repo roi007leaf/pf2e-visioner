@@ -30,6 +30,12 @@ export class ConsequencesPreviewDialog extends BaseActionDialog {
     this.encounterOnly = game.settings.get(MODULE_ID, 'defaultEncounterFilter');
     // Per-dialog ignore-allies (defaults to global setting, can be toggled in-dialog)
     this.ignoreAllies = options?.ignoreAllies ?? game.settings.get(MODULE_ID, 'ignoreAllies');
+    // Visual filter default from per-user setting
+    try {
+      this.hideFoundryHidden = game.settings.get(MODULE_ID, 'hideFoundryHiddenTokens');
+    } catch {
+      this.hideFoundryHidden = true;
+    }
     this.bulkActionState = 'initial'; // 'initial', 'applied', 'reverted'
 
     // Set global reference
@@ -60,6 +66,7 @@ export class ConsequencesPreviewDialog extends BaseActionDialog {
       revertAll: ConsequencesPreviewDialog._onRevertAll,
       toggleEncounterFilter: ConsequencesPreviewDialog._onToggleEncounterFilter,
       overrideState: ConsequencesPreviewDialog._onOverrideState,
+      removeOverrides: ConsequencesPreviewDialog._onRemoveOverrides,
     },
   };
 
@@ -68,6 +75,57 @@ export class ConsequencesPreviewDialog extends BaseActionDialog {
       template: 'modules/pf2e-visioner/templates/consequences-preview.hbs',
     },
   };
+
+  static async _onRemoveOverrides() {
+    const app = currentConsequencesDialog;
+    if (!app) {
+      console.error('Consequences Dialog not found');
+      return;
+    }
+
+  // Filter outcomes based on encounter filter
+  let filteredOutcomes = filterOutcomesByEncounter(app.outcomes, app.encounterOnly, 'target');
+
+    // Apply ally filtering if ignore allies is enabled
+    try {
+      const { filterOutcomesByAllies } = await import('../services/infra/shared-utils.js');
+      filteredOutcomes = filterOutcomesByAllies(
+        filteredOutcomes,
+        app.attackingToken,
+        app.ignoreAllies,
+        'target',
+      );
+    } catch { }
+
+    // Respect Hide Foundry-hidden toggle for Apply All
+    try {
+      if (app.hideFoundryHidden) {
+        filteredOutcomes = filteredOutcomes.filter((o) => o?.target?.document?.hidden !== true);
+      }
+    } catch { }
+
+    // Get all observer tokens
+    const observers = filteredOutcomes.map((o) => o?.target).filter(Boolean);
+    if (observers.length === 0) {
+      notify.warn(`${MODULE_TITLE}: No observers found to remove overrides.`);
+      return;
+    }
+
+    // Import AVS override manager and clear overrides between attacker and observers
+    try {
+      const { AvsOverrideManager } = await import('../services/infra/avs-override-manager.js');
+      await AvsOverrideManager.clearForConsequences(app.attackingToken, observers, { refresh: true });
+      notify.info(`${MODULE_TITLE}: Removed overrides between ${app.attackingToken.name} and ${observers.length} observer(s).`);
+      // Reset dialog bulk state and re-render to update counts/UI (data changed)
+      try {
+        app.bulkActionState = 'initial';
+        await app.render({ force: true });
+      } catch { }
+    } catch (err) {
+      console.error('Error clearing overrides:', err);
+      notify.error(`${MODULE_TITLE}: Failed to remove overrides.`);
+    }
+  }
 
   async _prepareContext(options) {
     const context = await super._prepareContext(options);
@@ -88,7 +146,7 @@ export class ConsequencesPreviewDialog extends BaseActionDialog {
         this.ignoreAllies,
         'target',
       );
-    } catch (_) {}
+    } catch { }
 
     // Prepare outcomes with additional UI data (and normalize shape)
     processedOutcomes = processedOutcomes.map((outcome) => {
@@ -121,6 +179,13 @@ export class ConsequencesPreviewDialog extends BaseActionDialog {
       };
     });
 
+    // Visual filtering: hide Foundry-hidden tokens from display if enabled
+    try {
+      if (this.hideFoundryHidden) {
+        processedOutcomes = processedOutcomes.filter((o) => o?.target?.document?.hidden !== true);
+      }
+    } catch { }
+
     // Prepare attacking token with proper image path
     context.attackingToken = {
       ...this.attackingToken,
@@ -128,6 +193,7 @@ export class ConsequencesPreviewDialog extends BaseActionDialog {
     };
     context.outcomes = processedOutcomes;
     context.ignoreAllies = !!this.ignoreAllies;
+    context.hideFoundryHidden = !!this.hideFoundryHidden; // Added context for hideFoundryHidden
 
     // Keep internal outcomes annotated where relevant (e.g., hasActionableChange)
     try {
@@ -143,7 +209,7 @@ export class ConsequencesPreviewDialog extends BaseActionDialog {
           o.newVisibility = po.newVisibility;
         }
       }
-    } catch (_) {}
+    } catch { }
 
     // Log the number of changes for debugging
     Object.assign(context, this.buildCommonContext(processedOutcomes));
@@ -154,7 +220,7 @@ export class ConsequencesPreviewDialog extends BaseActionDialog {
   /**
    * Render the HTML for the application
    */
-  async _renderHTML(context, options) {
+  async _renderHTML(context) {
     const html = await foundry.applications.handlebars.renderTemplate(
       this.constructor.PARTS.content.template,
       context,
@@ -165,7 +231,7 @@ export class ConsequencesPreviewDialog extends BaseActionDialog {
   /**
    * Replace the HTML content of the application
    */
-  _replaceHTML(result, content, options) {
+  _replaceHTML(result, content) {
     content.innerHTML = result;
     return content;
   }
@@ -214,7 +280,19 @@ export class ConsequencesPreviewDialog extends BaseActionDialog {
           this.render({ force: true });
         });
       }
-    } catch (_) {}
+    } catch { }
+    // Wire Hide Foundry-hidden visual filter toggle
+    try {
+      const cbh = this.element.querySelector('input[data-action="toggleHideFoundryHidden"]');
+      if (cbh) {
+        cbh.onchange = null;
+        cbh.addEventListener('change', async () => {
+          this.hideFoundryHidden = !!cbh.checked;
+          try { await game.settings.set(MODULE_ID, 'hideFoundryHiddenTokens', this.hideFoundryHidden); } catch { }
+          this.render({ force: true });
+        });
+      }
+    } catch { }
   }
 
   /**
@@ -247,9 +325,9 @@ export class ConsequencesPreviewDialog extends BaseActionDialog {
           ignoreAllies: app.ignoreAllies,
           encounterOnly: app.encounterOnly,
         },
-        { html: () => {}, attr: () => {} },
+        { html: () => { }, attr: () => { } },
       );
-    } catch (_) {}
+    } catch { }
 
     // Update button states
     app.updateRowButtonsToApplied([{ target: { id: tokenId }, hasActionableChange: true }]);
@@ -270,8 +348,8 @@ export class ConsequencesPreviewDialog extends BaseActionDialog {
       const { revertNowConsequences } = await import('../services/index.js');
       // Pass the specific tokenId for per-row revert
       const actionDataWithTarget = { ...app.actionData, targetTokenId: tokenId };
-      await revertNowConsequences(actionDataWithTarget, { html: () => {}, attr: () => {} });
-    } catch (_) {}
+      await revertNowConsequences(actionDataWithTarget, { html: () => { }, attr: () => { } });
+    } catch { }
 
     // Update button states
     app.updateRowButtonsToReverted([{ target: { id: tokenId }, hasActionableChange: true }]);
@@ -281,7 +359,7 @@ export class ConsequencesPreviewDialog extends BaseActionDialog {
   /**
    * Handle apply all changes
    */
-  static async _onApplyAll(event, target) {
+  static async _onApplyAll() {
     // Get the dialog instance
     const app = currentConsequencesDialog;
     if (!app) {
@@ -308,7 +386,14 @@ export class ConsequencesPreviewDialog extends BaseActionDialog {
         app.ignoreAllies,
         'target',
       );
-    } catch (_) {}
+    } catch { }
+
+    // Respect Hide Foundry-hidden toggle for Revert All
+    try {
+      if (app.hideFoundryHidden) {
+        filteredOutcomes = filteredOutcomes.filter((o) => o?.target?.document?.hidden !== true);
+      }
+    } catch { }
 
     // Only apply changes to filtered outcomes that have actionable changes
     const changedOutcomes = filteredOutcomes.filter((outcome) => {
@@ -334,7 +419,7 @@ export class ConsequencesPreviewDialog extends BaseActionDialog {
         ignoreAllies: app.ignoreAllies,
         encounterOnly: app.encounterOnly,
       },
-      { html: () => {}, attr: () => {} },
+      { html: () => { }, attr: () => { } },
     );
 
     // Update UI for each row
@@ -356,7 +441,7 @@ export class ConsequencesPreviewDialog extends BaseActionDialog {
   /**
    * Handle revert all changes
    */
-  static async _onRevertAll(event, target) {
+  static async _onRevertAll() {
     // Get the dialog instance
     const app = currentConsequencesDialog;
     if (!app) {
@@ -383,7 +468,14 @@ export class ConsequencesPreviewDialog extends BaseActionDialog {
         app.ignoreAllies,
         'target',
       );
-    } catch (_) {}
+    } catch { }
+
+    // Respect Hide Foundry-hidden toggle for Revert All (UI only)
+    try {
+      if (app.hideFoundryHidden) {
+        filteredOutcomes = filteredOutcomes.filter((o) => o?.target?.document?.hidden !== true);
+      }
+    } catch { }
 
     // Only revert changes to filtered outcomes that have actionable changes
     const changedOutcomes = filteredOutcomes.filter((outcome) => {
@@ -396,7 +488,7 @@ export class ConsequencesPreviewDialog extends BaseActionDialog {
     }
 
     const { revertNowConsequences } = await import('../services/index.js');
-    await revertNowConsequences(app.actionData, { html: () => {}, attr: () => {} });
+    await revertNowConsequences(app.actionData, { html: () => { }, attr: () => { } });
     for (const outcome of changedOutcomes) {
       app.updateRowButtonsToReverted([
         { target: { id: outcome.target.id }, hasActionableChange: true },
@@ -423,7 +515,7 @@ export class ConsequencesPreviewDialog extends BaseActionDialog {
   /**
    * Handle visibility state override - not used directly, handled by icon click handlers
    */
-  static async _onOverrideState(event, target) {
+  static async _onOverrideState() {
     // This is a placeholder for compatibility with the action system
     // The actual implementation is in the icon click handlers
   }
@@ -471,7 +563,7 @@ export class ConsequencesPreviewDialog extends BaseActionDialog {
   }
 
   // Use base implementations for selection, bulk button state, and icon handlers
-  async applyVisibilityChange(_targetToken, _newVisibility) {}
+  async applyVisibilityChange() { }
 
   updateActionButtonsForToken(tokenId, hasActionableChange) {
     // Delegate to base which renders Apply/Revert or "No Change"

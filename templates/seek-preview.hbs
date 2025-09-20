@@ -7,33 +7,55 @@
   {{!-- Seeker Information Panel --}}
   <div class="seeker-info">
     <div class="seeker-image">
-      <img src="{{seeker.image}}" />
+      <img src="{{seeker.image}}" data-tooltip="{{seeker.name}}" />
     </div>
     <div class="seeker-details">
       <h3 class="seeker-name">{{seeker.name}}</h3>
       <p class="hint">{{seeker.actionLabel}}</p>
+      {{#if echolocationActive}}
+        <div class="seek-context-badges">
+          {{#if echolocationActive}}
+            <span class="badge badge-echolocation" data-tooltip="{{localize 'PF2E_VISIONER.SEEK_AUTOMATION.ECHOLOCATION_TOOLTIP'}}">
+              <i class="fas fa-volume-high"></i>
+              <span class="badge-label">{{localize 'PF2E_VISIONER.SEEK_AUTOMATION.ECHOLOCATION_LABEL'}}</span>
+              <span class="badge-range">{{echolocationRange}} ft</span>
+            </span>
+          {{/if}}
+        </div>
+      {{/if}}
     </div>
   </div>
 
   {{!-- Encounter Filter + Ignore Allies (Encounter-only shown when relevant; Ignore allies always shown) --}}
-  <div class="encounter-filter-section" style="display:flex; gap:16px; align-items:center;">
+  <div class="encounter-filter-section">
     {{#if showEncounterFilter}}
-    <label class="encounter-filter-checkbox" style="display:flex; align-items:center; gap:8px;">
+  <label class="encounter-filter-checkbox">
       <input type="checkbox" {{#if encounterOnly}}checked{{/if}} data-action="toggleEncounterFilter" data-tooltip="Only show tokens in the current encounter" />
       <span class="encounter-filter-label">{{localize "PF2E_VISIONER.UI.ENCOUNTER_FILTER_TEXT"}}</span>
     </label>
     {{/if}}
-    <label class="ignore-allies-filter-checkbox" style="display:flex; align-items:center; gap:8px;">
+  <label class="ignore-allies-filter-checkbox">
       <input type="checkbox" {{#if ignoreAllies}}checked{{/if}} data-action="toggleIgnoreAllies" data-tooltip="Hide allies from the results list" />
       <span class="encounter-filter-label">Ignore allies</span>
     </label>
-    <label class="ignore-walls-filter-checkbox" style="display:flex; align-items:center; gap:8px;">
+  <label class="hide-foundry-hidden-filter-checkbox">
+      <input type="checkbox" {{#if hideFoundryHidden}}checked{{/if}} data-action="toggleHideFoundryHidden" data-tooltip="Visually hide tokens that are Foundry-hidden (document.hidden)" />
+      <span class="encounter-filter-label">Hide Foundry-hidden tokens</span>
+    </label>
+  <label class="show-only-changes-filter-checkbox">
+      <input type="checkbox" {{#if showOnlyChanges}}checked{{/if}} data-action="toggleShowOnlyChanges" data-tooltip="Show only rows with visibility changes" />
+      <span class="encounter-filter-label">Show only changes</span>
+    </label>
+  <label class="ignore-walls-filter-checkbox">
       <input type="checkbox" {{#if ignoreWalls}}checked{{/if}} data-action="toggleIgnoreWalls" data-tooltip="Hide walls from the results list" />
       <span class="encounter-filter-label">Ignore walls</span>
     </label>
   </div>
 
   {{!-- Results Table --}}
+  {{#if bulkOverrideStates}}
+    {{> "pf2e-visioner.bulk-override"}}
+  {{/if}}
   <div class="results-table-container">
     <table class="visibility-table seek-results-table">
       <thead>
@@ -51,16 +73,21 @@
           <tr class="token-row" {{#unless outcome._isWall}}data-token-id="{{outcome.target.id}}"{{/unless}} {{#if outcome._isWall}}data-wall-id="{{outcome.wallId}}"{{/if}}>
             <td class="token-image">
               {{#if outcome._isWall}}
-                <img src="{{outcome.wallImg}}" width="28" height="28" />
+                <img src="{{outcome.wallImg}}" data-tooltip="{{outcome.wallIdentifier}}" width="28" height="28" />
               {{else}}
-                <img src="{{outcome.tokenImage}}" width="28" height="28" />
+                <span class="token-img-wrapper">
+                  <img src="{{outcome.tokenImage}}" data-tooltip="{{outcome.target.name}}" width="28" height="28" />
+                  {{#if outcome.target.document.hidden}}
+                    <span class="foundry-hidden-indicator" data-tooltip="Foundry Hidden"><i class="fas fa-eye-slash"></i></span>
+                  {{/if}}
+                </span>
               {{/if}}
             </td>
             <td class="token-name">
               {{#if outcome._isWall}}
-                <strong>{{outcome.wallIdentifier}}</strong>
+                <strong data-tooltip="{{outcome.wallIdentifier}}">{{outcome.wallIdentifier}}</strong>
               {{else}}
-                <strong>{{outcome.target.name}}</strong>
+                <strong data-tooltip="{{outcome.target.name}}">{{outcome.target.name}}</strong>
               {{/if}}
             </td>
             <td class="roll-result">
@@ -82,11 +109,9 @@
               {{outcome.outcomeLabel}}
             </td>
             <td class="visibility-change">
-              <div class="visibility-change-inline">
-                <span class="state-icon" data-state="{{outcome.oldVisibility}}" data-tooltip="{{outcome.oldVisibilityLabel}}">
-                  {{{visibilityIcon outcome.oldVisibility}}}
-                </span>
-                <i class="fas fa-arrow-right visibility-arrow"></i>
+              <div class="visibility-change-with-override">
+                {{{visibilityIcon outcome.oldVisibility}}}
+                <i class="fas fa-arrow-right position-arrow" aria-hidden="true"></i>
                 <div class="override-icons" data-target="{{#unless outcome._isWall}}{{outcome.target.id}}{{/unless}}" data-wall-id="{{#if outcome._isWall}}{{outcome.wallId}}{{/if}}">
                   {{#each outcome.availableStates as |state|}}
                     <button type="button" class="state-icon {{#if state.selected}}selected{{/if}} {{#if state.calculatedOutcome}}calculated-outcome{{/if}} {{state.cssClass}}" 

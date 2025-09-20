@@ -1,3 +1,4 @@
+import AvsOverrideManager from '../chat/services/infra/avs-override-manager.js';
 import { COVER_STATES, VISIBILITY_STATES } from '../constants.js';
 import { setCoverBetween, setVisibilityBetween } from '../utils.js';
 
@@ -8,7 +9,7 @@ export class VisionerQuickPanel extends foundry.applications.api.ApplicationV2 {
     tag: 'div',
     window: {
       title: 'Visioner Quick Edit',
-      icon: 'fas fa-eye',
+      icon: 'fas fa-bolt',
       resizable: true,
     },
     position: { width: 'auto', height: 'auto' },
@@ -33,7 +34,7 @@ export class VisionerQuickPanel extends foundry.applications.api.ApplicationV2 {
     this._floatingPos = null;
     try {
       VisionerQuickPanel.current = this;
-    } catch (_) {}
+    } catch (_) { }
   }
 
   get selectedTokens() {
@@ -95,7 +96,7 @@ export class VisionerQuickPanel extends foundry.applications.api.ApplicationV2 {
   _replaceHTML(result, content, _options) {
     try {
       content.innerHTML = result;
-    } catch (_) {}
+    } catch (_) { }
     return content;
   }
 
@@ -104,7 +105,7 @@ export class VisionerQuickPanel extends foundry.applications.api.ApplicationV2 {
     this._injectHeaderMinimizeButton();
     try {
       VisionerQuickPanel.current = this;
-    } catch (_) {}
+    } catch (_) { }
     this._bindAutoRefresh();
 
     // Fire custom hook for colorblind mode application
@@ -118,22 +119,22 @@ export class VisionerQuickPanel extends foundry.applications.api.ApplicationV2 {
   static _onClose(_event, _button) {
     try {
       this.close();
-    } catch (_) {}
+    } catch (_) { }
   }
 
   async close(options) {
     try {
       this._unbindAutoRefresh?.();
-    } catch (_) {}
+    } catch (_) { }
     try {
       await super.close(options);
     } finally {
       try {
         this._unbindAutoRefresh = null;
-      } catch (_) {}
+      } catch (_) { }
       try {
         VisionerQuickPanel.current = null;
-      } catch (_) {}
+      } catch (_) { }
     }
   }
 
@@ -162,10 +163,10 @@ export class VisionerQuickPanel extends foundry.applications.api.ApplicationV2 {
           left = rect.left;
           top = rect.top;
         }
-      } catch (_) {}
+      } catch (_) { }
       this._showFloatingButton({ left, top });
       await this.close();
-    } catch (_) {}
+    } catch (_) { }
   }
 
   static async _onSetVisibility(event, button) {
@@ -188,6 +189,16 @@ export class VisionerQuickPanel extends foundry.applications.api.ApplicationV2 {
     }
     try {
       for (const [obs, tgt] of pairs) {
+        // First, set AVS overrides so auto-visibility won't fight manual edits
+        try {
+          await AvsOverrideManager.applyOverrides(obs, { target: tgt, state }, {
+            source: 'manual_action',
+          });
+        } catch (e) {
+          console.warn('[pf2e-visioner] quick panel: failed to set AVS overrides', e);
+        }
+
+        // Then, apply the immediate visibility change for responsiveness
         await setVisibilityBetween(obs, tgt, state);
       }
       ui.notifications?.info?.(`Applied ${state} to ${pairs.length} pair(s).`);
@@ -389,9 +400,9 @@ export class VisionerQuickPanel extends foundry.applications.api.ApplicationV2 {
           this._autoRefreshTimer = setTimeout(() => {
             try {
               this.render({ force: true });
-            } catch (_) {}
+            } catch (_) { }
           }, 50);
-        } catch (_) {}
+        } catch (_) { }
       };
       const onControlToken = () => rerender();
       const onTargetToken = () => rerender();
@@ -401,28 +412,28 @@ export class VisionerQuickPanel extends foundry.applications.api.ApplicationV2 {
       this._unbindAutoRefresh = () => {
         try {
           Hooks.off('controlToken', onControlToken);
-        } catch (_) {}
+        } catch (_) { }
         try {
           Hooks.off('releaseToken', onControlToken);
-        } catch (_) {}
+        } catch (_) { }
         try {
           Hooks.off('targetToken', onTargetToken);
-        } catch (_) {}
+        } catch (_) { }
         try {
           if (this._autoRefreshTimer) {
             clearTimeout(this._autoRefreshTimer);
             this._autoRefreshTimer = null;
           }
-        } catch (_) {}
+        } catch (_) { }
         this._unbindAutoRefresh = null;
       };
       // Clean up on close
       this.once?.('close', () => {
         try {
           this._unbindAutoRefresh?.();
-        } catch (_) {}
+        } catch (_) { }
       });
-    } catch (_) {}
+    } catch (_) { }
   }
   _injectHeaderMinimizeButton() {
     try {
@@ -460,11 +471,11 @@ export class VisionerQuickPanel extends foundry.applications.api.ApplicationV2 {
           const pos = rect ? { left: rect.left, top: rect.top } : null;
           this._showFloatingButton(pos || undefined);
           this.close();
-        } catch (_) {}
+        } catch (_) { }
       });
       if (closeBtn && closeBtn.parentElement) closeBtn.parentElement.insertBefore(btn, closeBtn);
       else header.appendChild(btn);
-    } catch (_) {}
+    } catch (_) { }
   }
 
   _showFloatingButton(pos) {
@@ -496,14 +507,14 @@ export class VisionerQuickPanel extends foundry.applications.api.ApplicationV2 {
       try {
         const saved = localStorage.getItem('pf2e-visioner.qp.float.pos');
         if (saved) this._floatingPos = JSON.parse(saved);
-      } catch (_) {}
+      } catch (_) { }
       const basePos = pos || this._floatingPos || this.position || { left: 120, top: 120 };
       const left = Math.max(0, Math.round(basePos.left ?? 120));
       const top = Math.max(0, Math.round(basePos.top ?? 120));
       btn.style.left = `${Math.max(0, left)}px`;
       btn.style.top = `${Math.max(0, top)}px`;
 
-      btn.innerHTML = '<i class="fas fa-face-hand-peeking"></i>';
+      btn.innerHTML = '<i class="fas fa-bolt"></i>';
 
       // Click to reopen
       btn.addEventListener('click', (ev) => {
@@ -515,7 +526,7 @@ export class VisionerQuickPanel extends foundry.applications.api.ApplicationV2 {
           this.position = { ...(this.position || {}), left: leftNow, top: topNow };
           this.render({ force: true });
           this._removeFloatingButton();
-        } catch (_) {}
+        } catch (_) { }
       });
 
       // Drag logic
@@ -546,7 +557,7 @@ export class VisionerQuickPanel extends foundry.applications.api.ApplicationV2 {
               top: parseInt(btn.style.top || '0', 10),
             };
             localStorage.setItem('pf2e-visioner.qp.float.pos', JSON.stringify(this._floatingPos));
-          } catch (_) {}
+          } catch (_) { }
           setTimeout(() => {
             btn._dragging = false;
           }, 0);
@@ -567,7 +578,7 @@ export class VisionerQuickPanel extends foundry.applications.api.ApplicationV2 {
       if (this._floatingBtnEl && this._floatingBtnEl.parentElement)
         this._floatingBtnEl.parentElement.removeChild(this._floatingBtnEl);
       this._floatingBtnEl = null;
-    } catch (_) {}
+    } catch (_) { }
   }
 
   // Helper methods to get party and enemy tokens

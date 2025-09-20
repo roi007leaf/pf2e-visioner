@@ -58,6 +58,7 @@ scripts/
 │   └── cover-map.js           # Cover state persistence
 ├── services/                  # Cross-cutting operations
 │   ├── api-internal.js        # Internal API helpers
+│   ├── auto-visibility-system.js # Automatic visibility detection system
 │   ├── scene-cleanup.js       # Token deletion cleanup
 │   ├── party-token-state.js   # Party token state preservation
 │   ├── socket.js              # Cross-client communication
@@ -168,7 +169,20 @@ scripts/
 - **Localized**: Supports multiple languages with proper i18n formatting
 - **Non-intrusive**: Appears as a subtle warning-colored bar in chat messages
 
-### 6. Party Token Integration ✅ **VALIDATED IN PRODUCTION**
+### 6. Auto-Visibility System ✅ **NEW FEATURE**
+
+- **Automatic visibility detection**: Analyzes lighting conditions, creature senses, and environmental factors to automatically set appropriate visibility flags
+- **Lighting-based calculations**: Considers bright light, dim light, and darkness levels at token positions
+- **Creature senses integration**: Supports darkvision, low-light vision, tremorsense, echolocation, see-invisibility, and other PF2E senses
+- **Real-time updates**: Automatically recalculates visibility when tokens move, lighting changes, or walls are modified
+- **Scene Config Intelligence**: Detects when Scene Configuration dialog is open and defers updates until user saves changes
+- **Performance optimized**: Uses singleton pattern with efficient batching and prevents duplicate processing
+- **Comprehensive API**: Provides methods for manual calculation, debugging, and system control
+- **GM-only operation**: Only runs for GM users to prevent conflicts and ensure consistent state
+- **Configurable settings**: Enable/disable system, control update triggers, and debug mode
+- **Error handling**: Graceful fallbacks and comprehensive error logging for troubleshooting
+
+### 7. Party Token Integration ✅ **VALIDATED IN PRODUCTION**
 
 - **State preservation**: Saves visibility/cover when tokens consolidated into party
 - **Automatic restoration**: Restores state when tokens brought back from party
@@ -281,6 +295,7 @@ scripts/
 ### World Settings (GM-only)
 
 - **Auto-Cover**: Master toggle and behavior configuration
+- **Auto-Visibility**: Enable automatic visibility detection, update triggers, debug mode
 - **Action Automation**: Template usage, range limits, raw enforcement
 - **UI Behavior**: Default filters, HUD buttons, tooltip permissions
 - **Performance**: Debug mode, ally filtering, encounter filtering
@@ -296,6 +311,7 @@ scripts/
 - **Token flags**: `ignoreAutoCover`, `hiddenWall`, `stealthDC`
 - **Wall flags**: `provideCover`, `hiddenWall`
 - **Scene flags**: `partyTokenStateCache` for party token preservation
+- **Auto-Visibility flags**: System automatically manages visibility flags based on calculations
 
 ## 🧪 Testing Strategy
 
@@ -403,7 +419,9 @@ npm run test:ci       # CI mode with strict requirements
 - **Scene corruption**: Use `api.clearAllSceneData()` to reset
 - **Party token issues**: Use `manuallyRestoreAllPartyTokens()` ✅ **TESTED & WORKING**
 - **Effect cleanup**: Use `cleanupAllCoverEffects()` for orphaned effects
+- **Auto-visibility issues**: Use `api.autoVisibility.recalculateAll()` to recalculate all visibility
 - **Party cache inspection**: Check scene flags `pf2e-visioner.partyTokenStateCache` for debugging
+- **Auto-visibility debugging**: Enable debug mode in settings or use `api.autoVisibility.getDebugInfo(observer, target)`
 
 ### Performance Issues
 
@@ -412,6 +430,53 @@ npm run test:ci       # CI mode with strict requirements
 - **Canvas performance**: Optimize drawing operations, reduce redraws
 
 ## 🐛 Recent Bug Fixes (Latest)
+
+### 🚨 CRITICAL: Infinite lightingRefresh Loop Fix (2025-01-20)
+
+**EMERGENCY BUG FIX COMPLETED**: Fixed infinite loop causing continuous `lightingRefresh` hooks that led to:
+- Constant token jittering and visual effects
+- Darkness slider resetting continuously  
+- Memory leaks from excessive recalculations
+- Performance degradation with hundreds of calculations per second
+
+**Root Cause**: Infinite feedback loop in perception refresh system:
+1. `lightingRefresh` hook fires → `AutoVisibilitySystem.#onLightingRefresh()`
+2. Calls `recalculateAllVisibility()` → updates visibility states
+3. Calls `refreshEveryonesPerception()` → `refreshLocalPerception()`
+4. Calls `canvas.perception.update({ refreshLighting: true })` → triggers another `lightingRefresh` hook
+5. Loop back to step 1 infinitely
+
+**Fix Implemented**:
+- **Removed `refreshLighting: true`** from `scripts/services/socket.js` `refreshLocalPerception()`
+- **Removed `refreshLighting: true`** from `scripts/services/visual-effects.js` perception updates
+- **Kept vision and occlusion refresh** which are actually needed for visibility updates
+- **Added circuit breaker system** as emergency fallback to prevent future runaway calculations
+
+**Files Modified**:
+- `scripts/services/socket.js` - Removed `refreshLighting: true` from perception updates
+- `scripts/services/visual-effects.js` - Removed `refreshLighting: true` from sight changes
+- `scripts/visibility/auto-visibility/AutoVisibilitySystem.js` - Added circuit breaker system
+- `scripts/api.js` - Added `testDarknessSources()` and `resetCircuitBreaker()` debug methods
+
+**Impact**: ✅ FIXED - System now operates normally without continuous loops:
+- Token jittering eliminated
+- Darkness slider works correctly
+- Memory usage stable
+- Performance restored to normal levels
+- Auto-visibility system functions properly without spam
+
+**FOLLOW-UP FIX**: Fixed the actual root cause of excessive recalculations:
+- **Problem**: Auto-visibility system was reacting to its own effect changes, creating another feedback loop
+- **Chain**: Visibility update → creates "Hidden" effects → `updateItem` hook → `#onItemChange` → triggers another recalculation
+- **Solution**: Added `#isUpdatingEffects` flag to ignore item changes when the system is updating effects
+- **Files**: `scripts/stores/visibility-map.js`, `scripts/visibility/auto-visibility/AutoVisibilitySystem.js`
+- **Result**: No more excessive recalculations, circuit breaker messages only in debug mode
+
+**Technical Details**:
+- **Circuit breaker**: Limits recalculations to max 3 per 10-second window
+- **Emergency reset**: `game.modules.get('pf2e-visioner').api.resetCircuitBreaker()` available
+- **Debug methods**: `testDarknessSources()` to verify darkness light source detection
+- **Proper separation**: Lighting refresh only when actually needed, not during visibility updates
 
 ### ✅ Pre-release Foundry Publishing Prevention (2025-01-20)
 

@@ -5,7 +5,15 @@
  * - Safe hook attachment/cleanup
  */
 
-export class BasePreviewDialog extends foundry.applications.api.ApplicationV2 {
+import {
+  addTokenImageClickHandlers,
+  panToAndSelectToken,
+  panToWall,
+} from '../../ui/shared-ui-utils.js';
+
+export class BasePreviewDialog extends foundry.applications.api.HandlebarsApplicationMixin(
+  foundry.applications.api.ApplicationV2
+) {
   constructor(options = {}) {
     super(options);
     this._selectionHookId = null;
@@ -16,11 +24,15 @@ export class BasePreviewDialog extends foundry.applications.api.ApplicationV2 {
     super._onFirstRender?.(context, options);
     this._attachSelectionHandlers();
     this._applySelectionHighlight();
+    // Ensure action preview dialogs have a fixed height and inner scroll area
+    try { this._ensureActionDialogScrollLayout(); } catch { }
   }
 
   _onRender(context, options) {
     super._onRender?.(context, options);
     this._applySelectionHighlight();
+    // Re-apply layout enforcement on rerenders
+    try { this._ensureActionDialogScrollLayout(); } catch { }
     // Live re-filtering for per-dialog Ignore Allies checkbox
     try {
       const cb = this.element.querySelector('input[data-action="toggleIgnoreAllies"]');
@@ -30,12 +42,12 @@ export class BasePreviewDialog extends foundry.applications.api.ApplicationV2 {
           this.render({ force: true });
         });
       }
-    } catch (_) {}
+    } catch { }
 
     // Add token image click handlers for panning and selection
     try {
-      this.addTokenImageClickHandlers?.();
-    } catch (_) {}
+      addTokenImageClickHandlers(this.element, this);
+    } catch { }
   }
 
   async close(options) {
@@ -54,10 +66,10 @@ export class BasePreviewDialog extends foundry.applications.api.ApplicationV2 {
   _detachSelectionHandlers() {
     try {
       if (this._selectionHookId) Hooks.off('controlToken', this._selectionHookId);
-    } catch (_) {}
+    } catch { }
     try {
       if (this._targetHookId) Hooks.off('targetToken', this._targetHookId);
-    } catch (_) {}
+    } catch { }
     this._selectionHookId = null;
     this._targetHookId = null;
   }
@@ -87,6 +99,78 @@ export class BasePreviewDialog extends foundry.applications.api.ApplicationV2 {
       if (firstRow && typeof firstRow.scrollIntoView === 'function') {
         firstRow.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
       }
-    } catch (_) {}
+    } catch { }
+  }
+
+  // Token image click handlers
+  panToAndSelectToken(token) {
+    return panToAndSelectToken(token);
+  }
+
+  panToWall(wall) {
+    return panToWall(wall);
+  }
+
+  /**
+   * Enforce a consistent scrollable layout for action preview dialogs.
+   * Ensures the dialog has a bounded height and the results container scrolls vertically.
+   */
+  _ensureActionDialogScrollLayout() {
+    const root = this.element;
+    if (!root) return;
+
+    // Only apply to Visioner action dialogs (seek/hide/sneak/etc.) that contain tables
+    const isActionDialog = root.classList.contains('pf2e-visioner') &&
+      (
+        root.classList.contains('seek-preview-dialog') ||
+        root.classList.contains('hide-preview-dialog') ||
+        root.classList.contains('sneak-preview-dialog') ||
+        root.classList.contains('point-out-preview-dialog') ||
+        root.classList.contains('create-a-diversion-preview-dialog') ||
+        root.classList.contains('consequences-preview-dialog') ||
+        root.classList.contains('take-cover-preview-dialog')
+      );
+    if (!isActionDialog) return;
+
+    // Fix overall height if not constrained (avoid expanding to content and losing inner scrollbars)
+    try {
+      const currentH = root.style.height?.trim();
+      if (!currentH || currentH === 'auto') {
+        root.style.height = '600px';
+        root.style.maxHeight = '85vh';
+      }
+    } catch { }
+
+    // Window content should not scroll; inner container will handle scrolling
+    const wc = root.querySelector('.window-content');
+    if (wc) {
+      wc.style.height = '100%';
+      wc.style.minHeight = '0';
+      wc.style.overflow = 'hidden';
+      // Prefer a little padding for aesthetics if not already set inline
+      if (!wc.style.padding) wc.style.padding = '10px';
+    }
+
+    // Content wrapper must be a flex column that fills available height
+    const contentWrapper = root.querySelector(
+      '.seek-preview-content, .hide-preview-content, .sneak-preview-content, .point-out-preview-content, .create-a-diversion-preview-content, .consequences-preview-content, .take-cover-preview-content'
+    );
+    if (contentWrapper) {
+      contentWrapper.style.display = 'flex';
+      contentWrapper.style.flexDirection = 'column';
+      contentWrapper.style.height = '100%';
+      contentWrapper.style.minHeight = '0';
+      contentWrapper.style.overflow = 'hidden';
+    }
+
+    // Results container should scroll vertically inside the flex column
+    const containers = root.querySelectorAll('.results-table-container');
+    containers.forEach((el) => {
+      el.style.flex = '1 1 auto';
+      el.style.minHeight = '0';
+      el.style.maxHeight = '100%';
+      el.style.overflowY = 'auto';
+      // Do not force overflowX here; allow CSS (e.g., enhanced-position-tracking) to control horizontal scroll
+    });
   }
 }

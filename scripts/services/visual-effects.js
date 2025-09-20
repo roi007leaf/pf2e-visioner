@@ -229,12 +229,20 @@ export async function cleanupDeletedWallVisuals(wallDocument) {
  * Hides walls for this client if the active observer has them set as hidden
  */
 // Wall visuals and tooltips temporarily disabled
+let lastObserverId = null;
 export async function updateWallVisuals(observerId = null) {
   try {
     // Respect setting toggle
     if (!game.settings?.get?.(MODULE_ID, 'hiddenWallsEnabled')) {
       return;
     }
+
+    // Quick exit if observer hasn't changed (prevents unnecessary work)
+    if (observerId === lastObserverId) {
+      return;
+    }
+    lastObserverId = observerId;
+
     const walls = canvas?.walls?.placeables || [];
     if (!walls.length) return;
 
@@ -637,7 +645,6 @@ export async function updateWallVisuals(observerId = null) {
           });
         // After sight changes, refresh perception
         canvas.perception.update({
-          refreshLighting: true,
           refreshVision: true,
           refreshOcclusion: true,
         });

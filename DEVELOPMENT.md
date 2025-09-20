@@ -259,6 +259,40 @@ await game.modules
 await game.modules.get('pf2e-visioner')?.api?.updateTokenVisuals();
 ```
 
+## Bulk Visibility Override Bar (Added 2025-09)
+
+All action preview dialogs (Seek, Hide, Sneak, Create a Diversion, Consequences, Point Out, Take Cover) now expose a unified bulk visibility override control.
+
+Key Elements:
+
+- Template partial: `templates/partials/bulk-override.hbs`
+- Injected context: `bulkOverrideStates` (array of { value, icon, label, cssClass })
+- Handlers: `_onBulkOverrideSet` / `_onBulkOverrideClear` in `scripts/chat/dialogs/base-action-dialog.js`
+- Styling: `.bulk-override-bar` block in `styles/dialog-layout.css`
+
+Behavior:
+
+- Clicking a state button sets `overrideState` for every outcome row and recomputes `hasActionableChange`.
+- Clear button removes all overrides, restoring each row's calculated visibility change.
+- Changes remain ephemeral until Apply / Apply All is triggered (which still creates AVS overrides as before).
+
+Adding to New Dialogs:
+Insert the partial just above the results table:
+
+```
+{{> "pf2e-visioner.bulk-override"}}
+```
+
+If context is missing it simply renders nothing (safe no-op).
+
+Testing:
+
+- See `tests/unit/bulk-override.test.js` for coverage of set & clear mechanics.
+
+Accessibility:
+
+- Buttons inherit existing tooltip infrastructure; future enhancement could add ARIA live region updates when bulk operations fire.
+
 ## Contributing
 
 ### Code Style

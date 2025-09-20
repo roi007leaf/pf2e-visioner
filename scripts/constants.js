@@ -94,6 +94,14 @@ export const COVER_STATES = {
 };
 
 /**
+ * Sneak action flags
+ */
+export const SNEAK_FLAGS = {
+  SNEAK_ACTIVE: 'sneak-active', // Flag indicating token is currently sneaking
+};
+
+
+/**
  * Default module settings
  */
 export const DEFAULT_SETTINGS = {
@@ -111,7 +119,7 @@ export const DEFAULT_SETTINGS = {
   enableHoverTooltips: {
     name: 'PF2E_VISIONER.SETTINGS.ENABLE_HOVER_TOOLTIPS.name',
     hint: 'PF2E_VISIONER.SETTINGS.ENABLE_HOVER_TOOLTIPS.hint',
-    scope: 'world',
+    scope: 'client',
     config: true,
     restricted: true,
     type: Boolean,
@@ -121,7 +129,7 @@ export const DEFAULT_SETTINGS = {
   allowPlayerTooltips: {
     name: 'PF2E_VISIONER.SETTINGS.ALLOW_PLAYER_TOOLTIPS.name',
     hint: 'PF2E_VISIONER.SETTINGS.ALLOW_PLAYER_TOOLTIPS.hint',
-    scope: 'world',
+    scope: 'client',
     config: true,
     restricted: true,
     type: Boolean,
@@ -143,6 +151,54 @@ export const DEFAULT_SETTINGS = {
       xlarge: 'PF2E_VISIONER.SETTINGS.TOOLTIP_FONT_SIZE.CHOICES.xlarge',
     },
     default: 'medium',
+  },
+
+  // AVS changes indicator floating button size
+  avsChangesIndicatorSize: {
+    name: 'PF2E_VISIONER.SETTINGS.AVS_CHANGES_INDICATOR_SIZE.name',
+    hint: 'PF2E_VISIONER.SETTINGS.AVS_CHANGES_INDICATOR_SIZE.hint',
+    scope: 'client',
+    config: true,
+    restricted: false, // players can choose their preferred size
+    type: String,
+    choices: {
+      small: 'PF2E_VISIONER.SETTINGS.AVS_CHANGES_INDICATOR_SIZE.CHOICES.small',
+      medium: 'PF2E_VISIONER.SETTINGS.AVS_CHANGES_INDICATOR_SIZE.CHOICES.medium',
+      large: 'PF2E_VISIONER.SETTINGS.AVS_CHANGES_INDICATOR_SIZE.CHOICES.large',
+      xlarge: 'PF2E_VISIONER.SETTINGS.AVS_CHANGES_INDICATOR_SIZE.CHOICES.xlarge',
+    },
+    default: 'medium',
+  },
+
+  blockPlayerTargetTooltips: {
+    name: 'PF2E_VISIONER.SETTINGS.REMOVE_PLAYER_TARGET_TOOLTIPS.name',
+    hint: 'PF2E_VISIONER.SETTINGS.REMOVE_PLAYER_TARGET_TOOLTIPS.hint',
+    scope: 'world',
+    config: true,
+    restricted: true,
+    type: Boolean,
+    default: false,
+  },
+
+  // Auto-Visibility System
+  autoVisibilityEnabled: {
+    name: 'PF2E_VISIONER.SETTINGS.AUTO_VISIBILITY_ENABLED.name',
+    hint: 'PF2E_VISIONER.SETTINGS.AUTO_VISIBILITY_ENABLED.hint',
+    scope: 'world',
+    config: true,
+    restricted: true,
+    type: Boolean,
+    default: false,
+  },
+
+  autoVisibilityDebugMode: {
+    name: 'PF2E_VISIONER.SETTINGS.AUTO_VISIBILITY_DEBUG_MODE.name',
+    hint: 'PF2E_VISIONER.SETTINGS.AUTO_VISIBILITY_DEBUG_MODE.hint',
+    scope: 'world',
+    config: true,
+    restricted: true,
+    type: Boolean,
+    default: false,
   },
 
   colorblindMode: {
@@ -172,6 +228,16 @@ export const DEFAULT_SETTINGS = {
     type: Boolean,
     default: true,
   },
+  // Visual filter: hide Foundry-hidden tokens in UIs
+  hideFoundryHiddenTokens: {
+    name: 'PF2E_VISIONER.SETTINGS.HIDE_FOUNDRY_HIDDEN_TOKENS.name',
+    hint: 'PF2E_VISIONER.SETTINGS.HIDE_FOUNDRY_HIDDEN_TOKENS.hint',
+    scope: 'client',
+    config: true,
+    restricted: true,
+    type: Boolean,
+    default: true,
+  },
   // Token Filtering
   enableAllTokensVision: {
     name: 'PF2E_VISIONER.SETTINGS.ENABLE_ALL_TOKENS_VISION.name',
@@ -181,16 +247,6 @@ export const DEFAULT_SETTINGS = {
     restricted: true,
     type: Boolean,
     default: true,
-  },
-
-  sneakRawEnforcement: {
-    name: 'PF2E_VISIONER.SETTINGS.SNEAK_RAW_ENFORCEMENT.name',
-    hint: 'PF2E_VISIONER.SETTINGS.SNEAK_RAW_ENFORCEMENT.hint',
-    scope: 'world',
-    config: true,
-    restricted: true,
-    type: Boolean,
-    default: false,
   },
 
   // Loot DCs
@@ -290,8 +346,8 @@ export const DEFAULT_SETTINGS = {
 
   // Interface Settings
   useHudButton: {
-    name: 'PF2E_VISIONER.SETTINGS.USE_HUD_BUTTON.name',
-    hint: 'PF2E_VISIONER.SETTINGS.USE_HUD_BUTTON.hint',
+    name: 'PF2E_VISIONER.SETTINGS.TOKEN_HUD_BUTTON.name',
+    hint: 'PF2E_VISIONER.SETTINGS.TOKEN_HUD_BUTTON.hint',
     scope: 'world',
     config: true,
     restricted: true,
@@ -299,42 +355,21 @@ export const DEFAULT_SETTINGS = {
     default: true,
   },
 
-  // Hide Visioner tools in Tokens and Walls scene controls
-  hideVisionerSceneTools: {
-    name: 'Hide Visioner Tools in Scene Controls',
-    hint: 'If enabled, Visioner buttons/toggles on the Tokens and Walls toolbars are hidden. You can still access features via menus and keybinds.',
+  // Show Visioner tools in Tokens and Walls scene controls
+  showVisionerSceneTools: {
+    name: 'PF2E_VISIONER.SETTINGS.VISIONER_SCENE_CONTROLS.name',
+    hint: 'PF2E_VISIONER.SETTINGS.VISIONER_SCENE_CONTROLS.hint',
     scope: 'world',
     config: true,
     restricted: true,
     type: Boolean,
-    default: false,
-  },
-
-  blockPlayerTargetTooltips: {
-    name: 'PF2E_VISIONER.SETTINGS.BLOCK_PLAYER_TARGET_TOOLTIPS.name',
-    hint: 'PF2E_VISIONER.SETTINGS.BLOCK_PLAYER_TARGET_TOOLTIPS.hint',
-    scope: 'world',
-    config: true,
-    restricted: true,
-    type: Boolean,
-    default: false,
-  },
-
-  // RAW enforcement toggle
-  enforceRawRequirements: {
-    name: 'PF2E_VISIONER.SETTINGS.ENFORCE_RAW.name',
-    hint: 'PF2E_VISIONER.SETTINGS.ENFORCE_RAW.hint',
-    scope: 'world',
-    config: true,
-    restricted: true,
-    type: Boolean,
-    default: false,
+    default: true,
   },
 
   // Token Manager
   integrateRollOutcome: {
-    name: 'PF2E_VISIONER.SETTINGS.INTEGRATE_ROLL_OUTCOME.name',
-    hint: 'PF2E_VISIONER.SETTINGS.INTEGRATE_ROLL_OUTCOME.hint',
+    name: 'PF2E_VISIONER.SETTINGS.MANAGER_ROLL_COMPARISON.name',
+    hint: 'PF2E_VISIONER.SETTINGS.MANAGER_ROLL_COMPARISON.hint',
     scope: 'world',
     config: true,
     restricted: true,
@@ -354,23 +389,23 @@ export const DEFAULT_SETTINGS = {
 
   // Auto-Cover behavior tuning
   autoCoverTokenIntersectionMode: {
-    name: 'Auto-Cover: Token Intersection Mode',
-    hint: "Choose how token blockers are evaluated: 'Any' (size rule: any entry → Lesser; Standard if blocker is ≥2 sizes larger than both attacker and target), '10%' (ray inside ≥10% of blocker side), 'Coverage' (side coverage with fixed thresholds: Standard at 50%, Greater at 70%), or 'Tactical' (corner-to-corner line calculations for precise cover determination).",
+    name: 'PF2E_VISIONER.SETTINGS.TOKEN_INTERSECTION_MODE.name',
+    hint: 'PF2E_VISIONER.SETTINGS.TOKEN_INTERSECTION_MODE.hint',
     scope: 'world',
     config: true,
     restricted: true,
     type: String,
     choices: {
-      any: 'Any (ray entering blocker)',
-      length10: '10% (ray inside ≥10% of blocker side)',
-      coverage: 'Side Coverage (fixed 50%(Standard)/70%(Greater))',
-      tactical: 'Tactical (corner-to-corner calculations)',
+      any: 'PF2E_VISIONER.SETTINGS.TOKEN_INTERSECTION_MODE.CHOICES.any',
+      length10: 'PF2E_VISIONER.SETTINGS.TOKEN_INTERSECTION_MODE.CHOICES.length10',
+      coverage: 'PF2E_VISIONER.SETTINGS.TOKEN_INTERSECTION_MODE.CHOICES.coverage',
+      tactical: 'PF2E_VISIONER.SETTINGS.TOKEN_INTERSECTION_MODE.CHOICES.tactical',
     },
     default: 'length10',
   },
   autoCoverIgnoreUndetected: {
-    name: 'Auto-Cover: Ignore Undetected Tokens',
-    hint: "If enabled, tokens that are undetected to the attacker (per Visioner visibility map) won't count for auto-cover.",
+    name: 'PF2E_VISIONER.SETTINGS.AUTO_COVER_IGNORE_UNDETECTED.name',
+    hint: 'PF2E_VISIONER.SETTINGS.AUTO_COVER_IGNORE_UNDETECTED.hint',
     scope: 'world',
     config: true,
     restricted: true,
@@ -379,8 +414,8 @@ export const DEFAULT_SETTINGS = {
   },
 
   autoCoverVisualizationOnlyInEncounter: {
-    name: 'Auto-Cover: Visualization Only in Encounter',
-    hint: 'If enabled, cover visualization will only work during active encounters. If disabled, cover visualization works everywhere.',
+    name: 'PF2E_VISIONER.SETTINGS.AUTO_COVER_VISUALIZATION_COMBAT_ONLY.name',
+    hint: 'PF2E_VISIONER.SETTINGS.AUTO_COVER_VISUALIZATION_COMBAT_ONLY.hint',
     scope: 'world',
     config: true,
     restricted: true,
@@ -388,8 +423,8 @@ export const DEFAULT_SETTINGS = {
     default: true,
   },
   autoCoverVisualizationRespectFogForGM: {
-    name: 'Auto-Cover: GM Respects Line of Sight',
-    hint: 'If enabled, GMs will see the cover heatmap limited to explored areas (same as players). If disabled, GMs see the full scene.',
+    name: 'PF2E_VISIONER.SETTINGS.AUTO_COVER_GM_RESPECT_FOG.name',
+    hint: 'PF2E_VISIONER.SETTINGS.AUTO_COVER_GM_RESPECT_FOG.hint',
     scope: 'world',
     config: true,
     restricted: true,
@@ -397,8 +432,8 @@ export const DEFAULT_SETTINGS = {
     default: false,
   },
   autoCoverIgnoreDead: {
-    name: 'Auto-Cover: Ignore Dead Tokens',
-    hint: "If enabled, tokens with 0 HP won't count for auto-cover.",
+    name: 'PF2E_VISIONER.SETTINGS.AUTO_COVER_IGNORE_DEAD.name',
+    hint: 'PF2E_VISIONER.SETTINGS.AUTO_COVER_IGNORE_DEAD.hint',
     scope: 'world',
     config: true,
     restricted: true,
@@ -406,8 +441,8 @@ export const DEFAULT_SETTINGS = {
     default: true,
   },
   autoCoverIgnoreAllies: {
-    name: 'Auto-Cover: Ignore Allies',
-    hint: "If enabled, allied tokens won't count for auto-cover.",
+    name: 'PF2E_VISIONER.SETTINGS.AUTO_COVER_IGNORE_ALLIES.name',
+    hint: 'PF2E_VISIONER.SETTINGS.AUTO_COVER_IGNORE_ALLIES.hint',
     scope: 'world',
     config: true,
     restricted: true,
@@ -417,8 +452,8 @@ export const DEFAULT_SETTINGS = {
 
   // Wall cover thresholds (percentage of the target token blocked by walls)
   wallCoverStandardThreshold: {
-    name: 'Wall Cover: Standard Threshold (%)',
-    hint: 'Percent of the target token that must be blocked by walls to grant Standard cover.',
+    name: 'PF2E_VISIONER.SETTINGS.WALL_STANDARD_THRESHOLD.name',
+    hint: 'PF2E_VISIONER.SETTINGS.WALL_STANDARD_THRESHOLD.hint',
     scope: 'world',
     config: true,
     restricted: true,
@@ -426,8 +461,8 @@ export const DEFAULT_SETTINGS = {
     default: 50,
   },
   wallCoverGreaterThreshold: {
-    name: 'Wall Cover: Greater Threshold (%)',
-    hint: 'Percent of the target token that must be blocked by walls to grant Greater cover.',
+    name: 'PF2E_VISIONER.SETTINGS.WALL_GREATER_THRESHOLD.name',
+    hint: 'PF2E_VISIONER.SETTINGS.WALL_GREATER_THRESHOLD.hint',
     scope: 'world',
     config: true,
     restricted: true,
@@ -435,8 +470,8 @@ export const DEFAULT_SETTINGS = {
     default: 70,
   },
   wallCoverAllowGreater: {
-    name: 'Wall Cover: Allow Greater',
-    hint: 'If disabled, walls will never grant Greater cover; coverage above the greater threshold is treated as Standard cover.',
+    name: 'PF2E_VISIONER.SETTINGS.WALLS_ALLOW_GREATER.name',
+    hint: 'PF2E_VISIONER.SETTINGS.WALLS_ALLOW_GREATER.hint',
     scope: 'world',
     config: true,
     restricted: true,
@@ -444,8 +479,8 @@ export const DEFAULT_SETTINGS = {
     default: true,
   },
   autoCoverAllowProneBlockers: {
-    name: 'Auto-Cover: Prone Tokens Can Block',
-    hint: 'If enabled, prone tokens can grant cover. If disabled, prone tokens are ignored as blockers.',
+    name: 'PF2E_VISIONER.SETTINGS.IGNORE_PRONE_TOKENS.name',
+    hint: 'PF2E_VISIONER.SETTINGS.IGNORE_PRONE_TOKENS.hint',
     scope: 'world',
     config: true,
     restricted: true,
@@ -453,33 +488,34 @@ export const DEFAULT_SETTINGS = {
     default: true,
   },
   keybindingOpensTMInTargetMode: {
-    name: 'Keybinding Opens Token Manager in Target Mode',
-    hint: 'If enabled, the keybinding to open Token Manager in Target mode rather than Observer mode.',
+    name: 'PF2E_VISIONER.SETTINGS.KEYBIND_OPEN_MANAGER_TARGET_MODE.name',
+    hint: 'PF2E_VISIONER.SETTINGS.KEYBIND_OPEN_MANAGER_TARGET_MODE.hint',
     scope: 'world',
-    config: true,
+    // Deprecated per redesign mockup (removed from UI). Keep for backward compatibility.
+    config: false,
     restricted: false,
     type: Boolean,
     default: false,
   },
 
   debug: {
-    name: 'Debug Mode',
-    hint: 'Enable detailed console logging for troubleshooting',
+    name: 'PF2E_VISIONER.SETTINGS.DEBUG.name',
+    hint: 'PF2E_VISIONER.SETTINGS.DEBUG.hint',
     scope: 'world',
     config: true,
     restricted: true,
     type: Boolean,
     default: false,
   },
-  // Hide Quick Edit tool in token controls
-  hideQuickEditTool: {
-    name: 'Hide Quick Edit Tool',
-    hint: 'If enabled, the Quick Edit tool will be hidden from the token controls toolbar.',
+  // Show Quick Edit tool in token controls
+  showQuickEditTool: {
+    name: 'PF2E_VISIONER.SETTINGS.VISIONER_QUICK_EDIT_TOOL.name',
+    hint: 'PF2E_VISIONER.SETTINGS.VISIONER_QUICK_EDIT_TOOL.hint',
     scope: 'world',
     config: true,
     restricted: true,
     type: Boolean,
-    default: false,
+    default: true,
   },
 };
 
@@ -501,8 +537,8 @@ export const KEYBINDINGS = {
     restricted: true,
   },
   openQuickPanel: {
-    name: 'Open Visioner Quick Panel',
-    hint: 'Open the compact Visioner Quick Edit panel.',
+    name: 'PF2E_VISIONER.KEYBINDINGS.OPEN_QUICK_PANEL.name',
+    hint: 'PF2E_VISIONER.KEYBINDINGS.OPEN_QUICK_PANEL.hint',
     editable: [],
     restricted: true,
   },
@@ -520,20 +556,20 @@ export const KEYBINDINGS = {
     restricted: false,
   },
   showAutoCoverOverlay: {
-    name: 'Show Auto‑Cover Overlay',
-    hint: 'Press to show auto‑cover badges for the hovered token (or controlled token if none).',
+    name: 'PF2E_VISIONER.KEYBINDINGS.SHOW_AUTO_COVER_OVERLAY.name',
+    hint: 'PF2E_VISIONER.KEYBINDINGS.SHOW_AUTO_COVER_OVERLAY.hint',
     editable: [{ key: 'KeyG', modifiers: [] }],
     restricted: false,
   },
   holdCoverVisualization: {
-    name: 'Hold for Cover Visualization',
-    hint: 'Hold this key while hovering over tokens to visualize cover fields. Shows optimal positioning for attacks.',
+    name: 'PF2E_VISIONER.KEYBINDINGS.HOLD_COVER_VISUALIZATION.name',
+    hint: 'PF2E_VISIONER.KEYBINDINGS.HOLD_COVER_VISUALIZATION.hint',
     editable: [{ key: 'KeyY', modifiers: [] }],
     restricted: false,
   },
   openWallManager: {
-    name: 'Open Wall Manager',
-    hint: 'Open the Visioner Wall Manager dialog to bulk edit wall settings.',
+    name: 'PF2E_VISIONER.KEYBINDINGS.OPEN_WALL_MANAGER.name',
+    hint: 'PF2E_VISIONER.KEYBINDINGS.OPEN_WALL_MANAGER.hint',
     editable: [],
     restricted: true,
   },

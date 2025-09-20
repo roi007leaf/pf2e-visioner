@@ -9,7 +9,7 @@
       "flags": {}
     }
   ],
-  "version": "3.1.5",
+  "version": "4.0.0-alpha.1",
   "compatibility": {
     "minimum": "13.341",
     "verified": "13.348"
@@ -42,6 +42,12 @@
     },
     {
       "src": "styles/token-manager-ui.css"
+    },
+    {
+      "src": "styles/enhanced-position-tracking.css"
+    },
+    {
+      "src": "styles/templates-inline.css"
     }
   ],
   "languages": [

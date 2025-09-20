@@ -13,7 +13,6 @@ describe('Take Cover Action Comprehensive Tests', () => {
     // Store original settings
     originalSettings = {
       ignoreAllies: game.settings.get('pf2e-visioner', 'ignoreAllies'),
-      enforceRawRequirements: game.settings.get('pf2e-visioner', 'enforceRawRequirements'),
     };
   });
 
@@ -205,45 +204,10 @@ describe('Take Cover Action Comprehensive Tests', () => {
     });
   });
 
-  describe('RAW Enforcement Integration Tests', () => {
-    test('chat apply-changes respects RAW enforcement', () => {
-      game.settings.set('pf2e-visioner', 'enforceRawRequirements', true);
 
-      const mockOutcomes = [
-        { token: { id: 'valid1' }, hasActionableChange: true, newCover: 'standard' },
-        { token: { id: 'invalid1' }, hasActionableChange: false, newCover: 'standard' },
-      ];
-
-      // When RAW enforcement is on, only actionable changes should be applied
-      const validOutcomes = mockOutcomes.filter((o) => o.hasActionableChange);
-
-      expect(validOutcomes).toHaveLength(1);
-      expect(validOutcomes[0].token.id).toBe('valid1');
-    });
-
-    test('dialog apply-all respects RAW enforcement', () => {
-      game.settings.set('pf2e-visioner', 'enforceRawRequirements', true);
-
-      const mockDialog = {
-        outcomes: [
-          { token: { id: 'valid1' }, hasActionableChange: true, newCover: 'standard' },
-          { token: { id: 'invalid1' }, hasActionableChange: false, newCover: 'standard' },
-        ],
-      };
-
-      const validOutcomes = mockDialog.outcomes.filter((o) => o.hasActionableChange);
-
-      expect(validOutcomes).toHaveLength(1);
-      expect(validOutcomes[0].token.id).toBe('valid1');
-    });
-  });
 
   describe('hasActionableChange Calculation Tests', () => {
     describe('Without RAW Enforcement', () => {
-      beforeEach(() => {
-        game.settings.set('pf2e-visioner', 'enforceRawRequirements', false);
-      });
-
       test('take-cover action concept validation', () => {
         // Take Cover is primarily about cover mechanics, not visibility states
         // The hasActionableChange logic would apply to cover changes, not visibility
@@ -281,30 +245,7 @@ describe('Take Cover Action Comprehensive Tests', () => {
       });
     });
 
-    describe('With General RAW Enforcement', () => {
-      beforeEach(() => {
-        game.settings.set('pf2e-visioner', 'enforceRawRequirements', true);
-      });
 
-      test('take-cover with RAW enforcement still produces normal outcomes', () => {
-        // General RAW enforcement doesn't change cover mechanics
-        // It may affect target eligibility, but not the cover change logic
-        const oldCover = 'none';
-        const newCover = 'standard';
-        const hasActionableChange = newCover !== oldCover;
-
-        expect(hasActionableChange).toBe(true);
-        expect(newCover).toBe('standard');
-      });
-
-      test('take-cover RAW enforcement concept validation', () => {
-        // RAW enforcement for take-cover would likely involve:
-        // - Checking if the target can actually take cover
-        // - Validating cover sources exist
-        // - Ensuring the action is mechanically possible
-        expect(true).toBe(true); // Concept validated
-      });
-    });
 
     test('hasActionableChange correctly identifies cover transitions', () => {
       const testCases = [

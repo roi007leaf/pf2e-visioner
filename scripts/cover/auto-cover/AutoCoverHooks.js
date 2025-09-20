@@ -83,14 +83,7 @@ export class AutoCoverHooks {
       // Core message hooks
       Hooks.on('preCreateChatMessage', instance.onPreCreateChatMessage.bind(instance));
 
-      // Test multiple hooks to see which ones fire for attack rolls
-      Hooks.on('renderChatMessage', (message, html) => {
-        const ctx = message?.flags?.pf2e?.context || {};
-        if (ctx.type === 'attack-roll') {
-          return instance.onRenderChatMessage.bind(instance)(message, html);
-        }
-      });
-
+      // Use v13+ hook for chat message rendering
       Hooks.on('renderChatMessageHTML', (message, html) => {
         return instance.onRenderChatMessage.bind(instance)(message, html);
       });
@@ -400,6 +393,8 @@ export class AutoCoverHooks {
       return null;
     }
 
+    const options = Array.from(ctx.options || []);
+
     // Check for attack context
     if (this._isAttackContext(ctx)) {
       return this.attackRollUseCase;
@@ -410,11 +405,12 @@ export class AutoCoverHooks {
       return this.savingThrowUseCase;
     }
 
-    // Check for stealth context
+    // Check for stealth context (exclude sneak checks)
     if (
       ctx.type === 'skill-check' &&
       Array.isArray(ctx.domains) &&
-      ctx.domains.includes('stealth')
+      ctx.domains.includes('stealth') &&
+      !options?.includes("action:sneak")
     ) {
       return this.stealthCheckUseCase;
     }
