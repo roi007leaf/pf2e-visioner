@@ -176,9 +176,9 @@
         "name": "(PL) Kontrolki sceny Visioner",
         "hint": "(PL) Pokaż przyciski Visioner na paskach narzędzi"
       },
-      "OVERRIDE_INDICATOR_SIZE": {
-        "name": "(PL) Rozmiar wskaźnika nadpisań",
-        "hint": "(PL) Kontroluje rozmiar pływającego przycisku wskaźnika nadpisań i jego podpowiedzi.",
+      "AVS_CHANGES_INDICATOR_SIZE": {
+        "name": "(PL) Rozmiar wskaźnika zmian AVS",
+        "hint": "(PL) Kontroluje rozmiar pływającego przycisku wskaźnika zmian AVS i jego podpowiedzi.",
         "CHOICES": {
           "small": "(PL) Mały",
           "medium": "(PL) Średni",

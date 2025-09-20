@@ -153,19 +153,19 @@ export const DEFAULT_SETTINGS = {
     default: 'medium',
   },
 
-  // Override indicator floating button size
-  overrideIndicatorSize: {
-    name: 'PF2E_VISIONER.SETTINGS.OVERRIDE_INDICATOR_SIZE.name',
-    hint: 'PF2E_VISIONER.SETTINGS.OVERRIDE_INDICATOR_SIZE.hint',
+  // AVS changes indicator floating button size
+  avsChangesIndicatorSize: {
+    name: 'PF2E_VISIONER.SETTINGS.AVS_CHANGES_INDICATOR_SIZE.name',
+    hint: 'PF2E_VISIONER.SETTINGS.AVS_CHANGES_INDICATOR_SIZE.hint',
     scope: 'client',
     config: true,
     restricted: false, // players can choose their preferred size
     type: String,
     choices: {
-      small: 'PF2E_VISIONER.SETTINGS.OVERRIDE_INDICATOR_SIZE.CHOICES.small',
-      medium: 'PF2E_VISIONER.SETTINGS.OVERRIDE_INDICATOR_SIZE.CHOICES.medium',
-      large: 'PF2E_VISIONER.SETTINGS.OVERRIDE_INDICATOR_SIZE.CHOICES.large',
-      xlarge: 'PF2E_VISIONER.SETTINGS.OVERRIDE_INDICATOR_SIZE.CHOICES.xlarge',
+      small: 'PF2E_VISIONER.SETTINGS.AVS_CHANGES_INDICATOR_SIZE.CHOICES.small',
+      medium: 'PF2E_VISIONER.SETTINGS.AVS_CHANGES_INDICATOR_SIZE.CHOICES.medium',
+      large: 'PF2E_VISIONER.SETTINGS.AVS_CHANGES_INDICATOR_SIZE.CHOICES.large',
+      xlarge: 'PF2E_VISIONER.SETTINGS.AVS_CHANGES_INDICATOR_SIZE.CHOICES.xlarge',
     },
     default: 'medium',
   },

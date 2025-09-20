@@ -184,9 +184,9 @@
         "name": "(FR) Contrôles de scène Visioner",
         "hint": "(FR) Affiche les boutons Visioner dans les barres d'outils Scènes"
       },
-      "OVERRIDE_INDICATOR_SIZE": {
-        "name": "(FR) Taille de l'indicateur de dérogation",
-        "hint": "(FR) Contrôle la taille du bouton flottant de l'indicateur de dérogation et de son info-bulle.",
+      "AVS_CHANGES_INDICATOR_SIZE": {
+        "name": "(FR) Taille de l'indicateur de changements AVS",
+        "hint": "(FR) Contrôle la taille du bouton flottant de l'indicateur de changements AVS et de son info-bulle.",
         "CHOICES": {
           "small": "(FR) Petit",
           "medium": "(FR) Moyen",
