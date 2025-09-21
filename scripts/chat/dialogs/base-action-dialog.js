@@ -79,12 +79,12 @@ export class BaseActionDialog extends BasePreviewDialog {
           this.render({ force: true });
         });
       }
-    } catch {}
+    } catch { }
 
     // Ensure bulk override buttons get listeners
     try {
       this._attachBulkOverrideHandlers();
-    } catch {}
+    } catch { }
 
     // Wire up Show Only Changes checkbox
     try {
@@ -98,7 +98,7 @@ export class BaseActionDialog extends BasePreviewDialog {
           this.render({ force: true });
         });
       }
-    } catch {}
+    } catch { }
   }
 
   buildCommonContext(outcomes) {
@@ -162,7 +162,7 @@ export class BaseActionDialog extends BasePreviewDialog {
       });
       const clearBtn = root.querySelector('button[data-action="bulkOverrideClear"]');
       if (clearBtn) clearBtn.addEventListener('click', (ev) => this._onBulkOverrideClear(ev));
-    } catch {}
+    } catch { }
   }
 
   _onBulkOverrideSet(event) {
@@ -177,7 +177,9 @@ export class BaseActionDialog extends BasePreviewDialog {
         o.hasActionableChange = oldState != null && state !== null && state !== oldState;
         if (o.hasActionableChange) o.hasRevertableChange = true;
       }
+      // Update UI to reflect new actionable states
       this.markInitialSelections();
+      this.refreshRowActionButtons();
       this.updateChangesCount();
       this.updateBulkActionButtons();
       // If filtering to show only changes, re-render so rows reflect new effective states
@@ -197,7 +199,9 @@ export class BaseActionDialog extends BasePreviewDialog {
         o.hasActionableChange = oldState != null && effective != null && effective !== oldState;
         if (!o.hasActionableChange) o.hasRevertableChange = false;
       }
+      // Update UI to reflect recalculated actionable states
       this.markInitialSelections();
+      this.refreshRowActionButtons();
       this.updateChangesCount();
       this.updateBulkActionButtons();
       // If filtering to show only changes, re-render so rows reflect recalculated actionability
@@ -215,7 +219,7 @@ export class BaseActionDialog extends BasePreviewDialog {
       const message = emptyNotice || 'No encounter tokens found, showing all';
       try {
         notify.info(`${MODULE_TITLE}: ${message}`);
-      } catch {}
+      } catch { }
     }
     return filtered;
   }
@@ -235,7 +239,7 @@ export class BaseActionDialog extends BasePreviewDialog {
     import('../services/ui/dialog-utils.js').then(({ updateRowButtonsToApplied }) => {
       try {
         updateRowButtonsToApplied(this.element, normalized);
-      } catch {}
+      } catch { }
     });
   }
 
@@ -247,7 +251,7 @@ export class BaseActionDialog extends BasePreviewDialog {
     import('../services/ui/dialog-utils.js').then(({ updateRowButtonsToReverted }) => {
       try {
         updateRowButtonsToReverted(this.element, normalized);
-      } catch {}
+      } catch { }
       try {
         // After reverting, reset each row's selection to its initial calculated outcome
         if (!Array.isArray(outcomes)) return;
@@ -279,9 +283,9 @@ export class BaseActionDialog extends BasePreviewDialog {
               (x) => String(this.getOutcomeTokenId(x)) === String(tokenId),
             );
             if (outcome) outcome.overrideState = null;
-          } catch {}
+          } catch { }
         }
-      } catch {}
+      } catch { }
     });
   }
 
@@ -289,7 +293,7 @@ export class BaseActionDialog extends BasePreviewDialog {
     import('../services/ui/dialog-utils.js').then(({ updateBulkActionButtons }) => {
       try {
         updateBulkActionButtons(this.element, this.bulkActionState);
-      } catch {}
+      } catch { }
     });
   }
 
@@ -297,7 +301,7 @@ export class BaseActionDialog extends BasePreviewDialog {
     import('../services/ui/dialog-utils.js').then(({ updateChangesCount }) => {
       try {
         updateChangesCount(this.element, this.getChangesCounterClass());
-      } catch {}
+      } catch { }
     });
   }
 
@@ -322,7 +326,7 @@ export class BaseActionDialog extends BasePreviewDialog {
         const icon = container.querySelector(`.state-icon[data-state="${desiredState}"]`);
         if (icon) icon.classList.add('selected');
       }
-    } catch {}
+    } catch { }
   }
 
   // Outcome display helpers (string-based). Subclasses can override if needed
@@ -391,7 +395,7 @@ export class BaseActionDialog extends BasePreviewDialog {
       } else {
         container.innerHTML = '<span class="no-action">No Change</span>';
       }
-    } catch {}
+    } catch { }
   }
 
   addIconClickHandlers() {
@@ -435,7 +439,7 @@ export class BaseActionDialog extends BasePreviewDialog {
               wallId,
               row: event.currentTarget.closest('tr'),
             });
-          } catch {}
+          } catch { }
           // Direct DOM fallback to ensure row shows buttons immediately
           try {
             const rowEl = event.currentTarget.closest('tr');
@@ -461,25 +465,46 @@ export class BaseActionDialog extends BasePreviewDialog {
                 }
               }
             }
-          } catch {}
+          } catch { }
           try {
             // Maintain a lightweight list of changed outcomes for convenience
             this.changes = Array.isArray(this.outcomes)
               ? this.outcomes.filter((o) => {
-                  const baseOld = o.oldVisibility ?? o.currentVisibility ?? null;
-                  const baseNew = o.overrideState ?? o.newVisibility ?? null;
-                  return baseOld != null && baseNew != null && baseOld !== baseNew;
-                })
+                const baseOld = o.oldVisibility ?? o.currentVisibility ?? null;
+                const baseNew = o.overrideState ?? o.newVisibility ?? null;
+                return baseOld != null && baseNew != null && baseOld !== baseNew;
+              })
               : [];
-          } catch {}
+          } catch { }
         }
         this.updateChangesCount();
         // If "Show only changes" is active, re-render so filtering reflects override adjustments
         try {
           if (this.showOnlyChanges) this.render({ force: true });
-        } catch {}
+        } catch { }
       });
     });
+  }
+
+  // Refresh per-row Actions column to show Apply/Revert buttons only when the state changes from old
+  refreshRowActionButtons() {
+    try {
+      if (!Array.isArray(this.outcomes)) return;
+      for (const o of this.outcomes) {
+        const tokenId = this.getOutcomeTokenId(o);
+        const wallId = o?._isWall ? o.wallId : null;
+        // Only attempt to update rows that exist in the current DOM
+        const rowSelector = wallId
+          ? `tr[data-wall-id="${String(wallId)}"]`
+          : tokenId
+            ? `tr[data-token-id="${String(tokenId)}"]`
+            : null;
+        if (!rowSelector) continue;
+        const row = this.element?.querySelector?.(rowSelector);
+        if (!row) continue;
+        this.updateActionButtonsForToken(tokenId || null, !!o.hasActionableChange, { wallId, row });
+      }
+    } catch { }
   }
 
   /**

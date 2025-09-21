@@ -129,7 +129,18 @@
               {{#if outcome._isWall}}
                 <strong data-tooltip="{{outcome.wallIdentifier}}">{{outcome.wallIdentifier}}</strong>
               {{else}}
-                <strong data-tooltip="{{outcome.target.name}}">{{outcome.target.name}}</strong>
+                <div class="token-name-and-tags">
+                  <strong data-tooltip="{{outcome.target.name}}">{{outcome.target.name}}</strong>
+                  {{#if outcome.usedImprecise}}
+                    <span class="badge badge-imprecise" data-tooltip="Imprecise sense used: {{outcome.usedImpreciseSenseType}}">
+                      <i class="fas fa-wave-square"></i>
+                      <span class="badge-label">Imprecise ({{outcome.usedImpreciseSenseType}})</span>
+                      {{#if outcome.usedImpreciseSenseRange}}
+                        <span class="badge-range">{{outcome.usedImpreciseSenseRange}} ft</span>
+                      {{/if}}
+                    </span>
+                  {{/if}}
+                </div>
               {{/if}}
             </td>
             <td class="roll-result">

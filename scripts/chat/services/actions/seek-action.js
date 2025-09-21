@@ -96,7 +96,7 @@ export class SeekActionHandler extends ActionHandlerBase {
           });
         }
       }
-    } catch {}
+    } catch { }
 
     // Do not pre-filter by encounter; the dialog applies encounter filter as needed
     return potential;
@@ -122,7 +122,7 @@ export class SeekActionHandler extends ActionHandlerBase {
       if (isAnomaly && FeatsHandler.hasFeat(actionData.actor, ['thats-odd', "that's-odd"])) {
         thatsOddAuto = true;
       }
-    } catch {}
+    } catch { }
 
     if (subject && subject._isWall) {
       // Walls: use provided dc and evaluate new state vs current observer wall state
@@ -175,7 +175,7 @@ export class SeekActionHandler extends ActionHandlerBase {
             }
           }
         }
-      } catch {}
+      } catch { }
 
       // For loot actors, use the custom Stealth DC flag configured on the token; otherwise use Perception DC
       dc = extractStealthDC(subject);
@@ -183,9 +183,9 @@ export class SeekActionHandler extends ActionHandlerBase {
     const total = Number(actionData?.roll?.total ?? 0);
     const die = Number(
       actionData?.roll?.dice?.[0]?.results?.[0]?.result ??
-        actionData?.roll?.dice?.[0]?.total ??
-        actionData?.roll?.terms?.[0]?.total ??
-        0,
+      actionData?.roll?.dice?.[0]?.total ??
+      actionData?.roll?.terms?.[0]?.total ??
+      0,
     );
     const outcome = determineOutcome(total, die, dc);
     // Simple mapping: success → observed; failure → concealed/hidden depending on target state; crit-failure → undetected
@@ -205,9 +205,16 @@ export class SeekActionHandler extends ActionHandlerBase {
           outcome,
         },
       );
-    } catch {}
+    } catch { }
 
-    // Check special sense range limitations first
+    // Check special sense limitations only if NO precise sense is available to the seeker,
+    // or if the seeker is blinded we also consider imprecise fallback senses (hearing, lifesense, etc.).
+    // We only block if neither a precise sense nor any imprecise sense can detect the target.
+    // Track if we actually rely on imprecise sensing for this specific subject/outcome
+    let usedImprecise = false;
+    let usedImpreciseSenseType = null;
+    let usedImpreciseSenseRange = null;
+
     try {
       if (!subject?._isWall) {
         const { VisionAnalyzer } = await import(
@@ -215,51 +222,85 @@ export class SeekActionHandler extends ActionHandlerBase {
         );
         const { SPECIAL_SENSES } = await import('../../../constants.js');
         const va = VisionAnalyzer.getInstance();
-        const sensingSummary = va.getSensingSummary(actionData.actor);
 
-        // Check all ranged special senses
-        for (const [senseType, senseConfig] of Object.entries(SPECIAL_SENSES)) {
-          if (!senseConfig.hasRangeLimit) continue;
+        // Determine if the seeker has any precise sense to use (visual or non-visual)
+        // Resolve the observer token for accurate LoS and range tests
+        const observerToken = actionData.actorToken || actionData.actor?.token?.object || actionData.actor;
+        const visCaps = va.getVisionCapabilities(observerToken);
+        const hasLoS = va.hasLineOfSight?.(observerToken, subject) ?? true;
+        const hasVisualPrecise = !!(
+          visCaps?.hasVision && !visCaps?.isBlinded && hasLoS
+        );
+        const hasNonVisualPrecise = va.hasPreciseNonVisualInRange(actionData.actor, subject);
+        const hasAnyPrecise = hasVisualPrecise || hasNonVisualPrecise;
 
-          const senseData = sensingSummary[senseType];
-          if (!senseData) continue;
-
-          // Check if target can be detected by this sense
-          const canDetectType = await va.canDetectWithSpecialSense(subject, senseType);
-          if (!canDetectType) {
-            // Target is undetectable by this sense regardless of roll outcome
-            // Generate explanation for why this sense can't detect the target
-            const unmetCondition = this.#getUnmetConditionExplanation(
-              subject,
-              senseType,
-              senseConfig,
-            );
-
-            return {
-              target: subject,
-              dc,
-              roll: total,
-              die,
-              rollTotal: total,
-              dieResult: die,
-              margin: total - dc,
-              outcome: 'unmet-conditions',
-              currentVisibility: current,
-              oldVisibility: current,
-              newVisibility: current, // No visibility change
-              changed: false,
-              unmetConditions: true,
-              senseType,
-              senseRange: senseData.range,
-              unmetCondition,
-            };
-          }
-
-          // Check range limitation
+        // Evaluate imprecise senses if we lack any precise sense, OR we are blinded AND do not have a non-visual precise sense
+        const shouldEvaluateImprecise = !hasAnyPrecise || (visCaps?.isBlinded && !hasNonVisualPrecise);
+        if (shouldEvaluateImprecise) {
+          const sensingSummary = va.getSensingSummary(actionData.actor);
           const dist = this.#calculateDistance(actionData.actor, subject);
 
-          if (senseData.range !== Infinity && dist > senseData.range) {
-            // Target is out of range for this sense regardless of roll outcome
+          let anyImprecisePresent = false;
+          let anyImpreciseViable = false;
+          let lastBlock = null; // { type, senseType, senseRange, unmetCondition }
+
+          // Consider generic hearing (imprecise)
+          try {
+            const h = sensingSummary?.hearing;
+            if (h) {
+              anyImprecisePresent = true;
+              let hr = Number(h.range);
+              if (!Number.isFinite(hr)) hr = 0;
+              if (hr >= dist) {
+                anyImpreciseViable = true;
+                usedImprecise = true;
+                usedImpreciseSenseType = 'hearing';
+                usedImpreciseSenseRange = hr;
+              } else {
+                lastBlock = { type: 'out-of-range', senseType: 'hearing', senseRange: hr };
+              }
+            }
+          } catch { }
+
+          // Consider imprecise special senses and other imprecise entries (e.g., lifesense)
+          try {
+            for (const ent of sensingSummary?.imprecise || []) {
+              if (!ent) continue;
+              anyImprecisePresent = true;
+              const senseType = String(ent.type || '').toLowerCase();
+              // Normalize range: prefer entry range, fall back to summary[senseType].range; if unknown, treat as 0 (not infinite)
+              let r = Number(ent.range);
+              if (!Number.isFinite(r)) {
+                const sr = sensingSummary?.[senseType]?.range;
+                r = Number(sr);
+              }
+              if (!Number.isFinite(r)) r = 0;
+              const cfg = SPECIAL_SENSES[senseType];
+
+              if (cfg) {
+                const canDetectType = await va.canDetectWithSpecialSense(subject, senseType);
+                if (!canDetectType) {
+                  const unmetCondition = this.#getUnmetConditionExplanation(subject, senseType, cfg);
+                  lastBlock = { type: 'unmet-conditions', senseType, senseRange: r, unmetCondition };
+                  continue;
+                }
+              }
+
+              if (r >= dist) {
+                anyImpreciseViable = true;
+                usedImprecise = true;
+                usedImpreciseSenseType = senseType;
+                usedImpreciseSenseRange = r;
+                break;
+              } else {
+                lastBlock = { type: 'out-of-range', senseType, senseRange: r };
+              }
+            }
+          } catch { }
+
+          // If there is no precise sense available and no imprecise can detect, block
+          if (!hasAnyPrecise && (!anyImprecisePresent || !anyImpreciseViable)) {
+            const reason = lastBlock?.type || 'out-of-range';
             return {
               target: subject,
               dc,
@@ -268,19 +309,22 @@ export class SeekActionHandler extends ActionHandlerBase {
               rollTotal: total,
               dieResult: die,
               margin: total - dc,
-              outcome: 'out-of-range',
+              outcome: reason,
               currentVisibility: current,
               oldVisibility: current,
-              newVisibility: current, // No visibility change
+              newVisibility: current,
               changed: false,
-              outOfRange: true,
-              senseType,
-              senseRange: senseData.range,
+              unmetConditions: reason === 'unmet-conditions',
+              outOfRange: reason === 'out-of-range',
+              senseType: lastBlock?.senseType,
+              senseRange: lastBlock?.senseRange,
+              unmetCondition: lastBlock?.unmetCondition,
             };
           }
+          // If a precise sense exists, we don't block even if imprecise can't detect; proceed normally
         }
       }
-    } catch {}
+    } catch { }
 
     // PF2e RAW correction: You CAN Seek with imprecise senses,
     // but the best you can do is make the target Hidden (never Observed).
@@ -291,14 +335,20 @@ export class SeekActionHandler extends ActionHandlerBase {
           '../../../visibility/auto-visibility/VisionAnalyzer.js'
         );
         const va = VisionAnalyzer.getInstance();
-        const visCaps = va.getVisionCapabilities(actionData.actor);
-        const hasVisualPrecise = !!(visCaps?.hasVision && !visCaps?.isBlinded);
-        const hasNonVisualPrecise = va.hasPreciseNonVisualInRange(actionData.actor, subject);
+        const observerToken = actionData.actorToken || actionData.actor?.token?.object || actionData.actor;
+        const visCaps = va.getVisionCapabilities(observerToken);
+        // Visual precise is only considered available if the observer both has vision and has LoS,
+        // and current visibility (pre-seek) is at least precise quality (observed or concealed)
+        const hasLoS = va.hasLineOfSight?.(observerToken, subject) ?? true;
+        const hasVisualPrecise = !!(
+          visCaps?.hasVision && !visCaps?.isBlinded && hasLoS
+        );
+        const hasNonVisualPrecise = va.hasPreciseNonVisualInRange(observerToken, subject);
         if (!hasVisualPrecise && !hasNonVisualPrecise) {
           newVisibility = 'hidden';
         }
       }
-    } catch {}
+    } catch { }
 
     // Sneaky feat check: Prevents becoming observed if the target has Sneaky feat effect active against this observer
     let sneakyFeatApplied = false;
@@ -337,7 +387,7 @@ export class SeekActionHandler extends ActionHandlerBase {
           wallIdentifier: name,
           wallImg: img,
         };
-      } catch {}
+      } catch { }
     }
 
     const base = {
@@ -356,6 +406,9 @@ export class SeekActionHandler extends ActionHandlerBase {
       newVisibility,
       changed: newVisibility !== current,
       sneakyFeatApplied,
+      usedImprecise: !!usedImprecise,
+      usedImpreciseSenseType: usedImpreciseSenseType || null,
+      usedImpreciseSenseRange: usedImpreciseSenseRange ?? null,
       ...wallMeta,
     };
 
@@ -387,7 +440,7 @@ export class SeekActionHandler extends ActionHandlerBase {
             if (wallCenter) {
               const distance = Math.sqrt(
                 Math.pow(wallCenter.x - actionData.seekTemplateCenter.x, 2) +
-                  Math.pow(wallCenter.y - actionData.seekTemplateCenter.y, 2),
+                Math.pow(wallCenter.y - actionData.seekTemplateCenter.y, 2),
               );
               const radiusPixels = (actionData.seekTemplateRadiusFeet * canvas.scene.grid.size) / 5;
               inside = distance <= radiusPixels;
@@ -407,7 +460,7 @@ export class SeekActionHandler extends ActionHandlerBase {
 
         if (!inside) return { ...base, changed: false };
       }
-    } catch {}
+    } catch { }
 
     return base;
   }
@@ -449,7 +502,7 @@ export class SeekActionHandler extends ActionHandlerBase {
           oldVisibility: outcome?.oldVisibility || outcome?.currentVisibility || null,
         };
       }
-    } catch {}
+    } catch { }
     return super.outcomeToChange(actionData, outcome);
   }
 
@@ -527,7 +580,7 @@ export class SeekActionHandler extends ActionHandlerBase {
             try {
               const { updateWallVisuals } = await import('../../../services/visual-effects.js');
               await updateWallVisuals(observer.id);
-            } catch {}
+            } catch { }
           } catch {
             /* ignore per-observer wall errors */
           }
@@ -570,7 +623,7 @@ export class SeekActionHandler extends ActionHandlerBase {
             return id ? tokenMap.has(id) : false;
           });
         }
-      } catch {}
+      } catch { }
 
       if (filtered.length === 0) {
         (await import('../infra/notifications.js')).notify.info('No changes to apply');

@@ -391,7 +391,7 @@ export class VisionAnalyzer {
         const hr = Number(s.hearing.range);
         if (!Number.isFinite(hr) || hr >= dist) return true;
       }
-    } catch {}
+    } catch { }
     return false;
   }
 
@@ -405,10 +405,23 @@ export class VisionAnalyzer {
       const dist = this.#distanceFeet(observer, target);
       for (const ent of s.precise) {
         if (!ent || typeof ent.range !== 'number') continue;
-        if (ent.type === 'vision' || ent.type === 'sight') continue;
+        // Exclude all visual senses: plain vision/sight, darkvision, greater-darkvision, low-light-vision, truesight, infrared vision, etc.
+        const t = String(ent.type || '').toLowerCase();
+        const isVisual =
+          t === 'vision' ||
+          t === 'sight' ||
+          t === 'darkvision' ||
+          t === 'greater-darkvision' ||
+          t === 'greaterdarkvision' ||
+          t === 'low-light-vision' ||
+          t === 'lowlightvision' ||
+          t === 'truesight' ||
+          t.includes('vision') ||
+          t.includes('sight');
+        if (isVisual) continue;
         if (ent.range === Infinity || ent.range >= dist) return true;
       }
-    } catch {}
+    } catch { }
     return false;
   }
 
@@ -597,7 +610,7 @@ export class VisionAnalyzer {
           /* ignore feat read errors */
         }
       }
-    } catch {}
+    } catch { }
 
     const result = {
       hasVision,

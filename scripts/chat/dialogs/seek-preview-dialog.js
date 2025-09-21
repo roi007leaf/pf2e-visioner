@@ -120,7 +120,7 @@ export class SeekPreviewDialog extends BaseActionDialog {
           'target',
         );
       }
-    } catch {}
+    } catch { }
     // Optional walls exclusion for UI convenience
     if (this.ignoreWalls === true) {
       filteredOutcomes = Array.isArray(filteredOutcomes)
@@ -153,7 +153,7 @@ export class SeekPreviewDialog extends BaseActionDialog {
         const overrideState = existing?.overrideState ?? o?.overrideState ?? null;
         return { ...o, overrideState };
       });
-    } catch {}
+    } catch { }
 
     // Prepare outcomes for template
     let processedOutcomes = await Promise.all(
@@ -194,7 +194,7 @@ export class SeekPreviewDialog extends BaseActionDialog {
                       await setVisibilityBetween(pcToken, outcome.target, inferred, {
                         direction: 'observer_to_target',
                       });
-                    } catch {}
+                    } catch { }
                   }
                 }
 
@@ -203,7 +203,7 @@ export class SeekPreviewDialog extends BaseActionDialog {
                   await setVisibilityBetween(this.actorToken, outcome.target, inferred, {
                     direction: 'observer_to_target',
                   });
-                } catch {}
+                } catch { }
 
                 // Remove PF2e system condition to avoid double-state after Visioner owns it
                 try {
@@ -214,14 +214,14 @@ export class SeekPreviewDialog extends BaseActionDialog {
                   else if (actor?.toggleCondition)
                     await actor.toggleCondition(slug, { active: false });
                   else if (actor?.decreaseCondition) await actor.decreaseCondition(slug);
-                } catch {}
+                } catch { }
                 currentVisibility = inferred;
                 // Ensure in-memory outcomes reflect the actual new mapping right away
                 outcome.oldVisibility = currentVisibility;
                 outcome.newVisibility = currentVisibility;
               }
             }
-          } catch {}
+          } catch { }
         }
 
         // Prepare available states for override using per-action config
@@ -266,14 +266,14 @@ export class SeekPreviewDialog extends BaseActionDialog {
           }
         });
       }
-    } catch {}
+    } catch { }
 
     // Show-only-changes visual filter
     try {
       if (this.showOnlyChanges) {
         processedOutcomes = processedOutcomes.filter((o) => !!o.hasActionableChange);
       }
-    } catch {}
+    } catch { }
 
     // Update original outcomes with hasActionableChange for Apply All button logic
     processedOutcomes.forEach((processedOutcome, index) => {
@@ -283,7 +283,7 @@ export class SeekPreviewDialog extends BaseActionDialog {
     });
 
     // Set actor context for seeker
-    // Detect all special senses on seeker
+    // Detect all special senses on seeker (capabilities)
     let activeSenses = [];
     try {
       const { VisionAnalyzer } = await import('../../visibility/auto-visibility/VisionAnalyzer.js');
@@ -329,7 +329,23 @@ export class SeekPreviewDialog extends BaseActionDialog {
           });
         }
       }
-    } catch {}
+    } catch { }
+
+    // Only show imprecise sense badges if they were ACTUALLY used by at least one outcome
+    try {
+      const usedTypes = new Set(
+        (processedOutcomes || [])
+          .filter((o) => o?.usedImprecise && typeof o?.usedImpreciseSenseType === 'string')
+          .map((o) => o.usedImpreciseSenseType),
+      );
+      if (usedTypes.size > 0) {
+        // Filter to only the imprecise senses that were used in any row
+        activeSenses = activeSenses.filter((s) => usedTypes.has(s.type));
+      } else {
+        // If no imprecise sense was used, hide the badges entirely to avoid confusion
+        activeSenses = null;
+      }
+    } catch { }
 
     context.seeker = {
       name: this.actorToken?.name || 'Unknown Actor',
@@ -340,8 +356,8 @@ export class SeekPreviewDialog extends BaseActionDialog {
     context.activeSenses = activeSenses;
 
     // Legacy support for existing template logic
-    const echolocationSense = activeSenses.find((s) => s.type === 'echolocation');
-    const lifesenseSense = activeSenses.find((s) => s.type === 'lifesense');
+    const echolocationSense = activeSenses?.find?.((s) => s.type === 'echolocation');
+    const lifesenseSense = activeSenses?.find?.((s) => s.type === 'lifesense');
     context.echolocationActive = !!echolocationSense;
     context.echolocationRange = echolocationSense?.range || 0;
     context.lifesenseActive = !!lifesenseSense;
@@ -400,7 +416,7 @@ export class SeekPreviewDialog extends BaseActionDialog {
             .catch(() => this.render({ force: true }));
         });
       }
-    } catch {}
+    } catch { }
     // Hook up per-dialog Ignore Walls toggle
     try {
       const cbw = content.querySelector('input[data-action="toggleIgnoreWalls"]');
@@ -417,7 +433,7 @@ export class SeekPreviewDialog extends BaseActionDialog {
             .catch(() => this.render({ force: true }));
         });
       }
-    } catch {}
+    } catch { }
     // Hook up Hide Foundry-hidden visual filter
     try {
       const cbh = content.querySelector('input[data-action="toggleHideFoundryHidden"]');
@@ -426,11 +442,11 @@ export class SeekPreviewDialog extends BaseActionDialog {
           this.hideFoundryHidden = !!cbh.checked;
           try {
             await game.settings.set(MODULE_ID, 'hideFoundryHiddenTokens', this.hideFoundryHidden);
-          } catch {}
+          } catch { }
           this.render({ force: true });
         });
       }
-    } catch {}
+    } catch { }
 
     // Hook up reactions system
     try {
@@ -450,7 +466,7 @@ export class SeekPreviewDialog extends BaseActionDialog {
           await this.applyReaction(reactionKey);
         });
       });
-    } catch {}
+    } catch { }
 
     // Hook up Sense the Unseen button (deprecated - for backward compatibility)
     try {
@@ -460,7 +476,7 @@ export class SeekPreviewDialog extends BaseActionDialog {
           await this.applySenseUnseen();
         });
       }
-    } catch {}
+    } catch { }
     return content;
   }
 
@@ -485,7 +501,7 @@ export class SeekPreviewDialog extends BaseActionDialog {
           const { filterOutcomesByAllies } = await import('../services/infra/shared-utils.js');
           filtered = filterOutcomesByAllies(filtered, this.actorToken, this.ignoreAllies, 'target');
         }
-      } catch {}
+      } catch { }
 
       // Optional walls exclusion for UI convenience
       if (this.ignoreWalls === true) {
@@ -504,7 +520,7 @@ export class SeekPreviewDialog extends BaseActionDialog {
             this.actionData.seekTemplateRadiusFeet,
             'target',
           );
-        } catch {}
+        } catch { }
       }
 
       // Seek distance limits
@@ -515,7 +531,7 @@ export class SeekPreviewDialog extends BaseActionDialog {
           );
           filtered = filterOutcomesBySeekDistance(filtered, this.actorToken, 'target');
         }
-      } catch {}
+      } catch { }
       // Compute actionability and carry over any existing overrides from the currently displayed outcomes
       if (!Array.isArray(filtered)) return [];
       const processed = filtered.map((o) => {
@@ -537,7 +553,7 @@ export class SeekPreviewDialog extends BaseActionDialog {
                 currentVisibility =
                   getVisibilityBetween(this.actorToken, o.target) || currentVisibility;
               }
-            } catch {}
+            } catch { }
           }
           const effectiveNewState = overrideState || o.newVisibility || currentVisibility;
           const baseOldState = o.oldVisibility || currentVisibility;
@@ -560,13 +576,13 @@ export class SeekPreviewDialog extends BaseActionDialog {
             }
           });
         }
-      } catch {}
+      } catch { }
       // Apply show-only-changes filter for both UI and Apply All
       try {
         if (this.showOnlyChanges) {
           visual = visual.filter((o) => !!o.hasActionableChange);
         }
-      } catch {}
+      } catch { }
       return visual;
     } catch {
       return Array.isArray(this.outcomes) ? this.outcomes : [];
@@ -639,7 +655,7 @@ export class SeekPreviewDialog extends BaseActionDialog {
         payload.overrides = overrides;
       }
       // Pass current live ignoreAllies so discovery in apply respects checkbox state
-      const appliedCount = await applyNowSeek(payload, { html: () => {}, attr: () => {} });
+      const appliedCount = await applyNowSeek(payload, { html: () => { }, attr: () => { } });
       notify.info(
         `${MODULE_TITLE}: Applied ${appliedCount ?? actionableOutcomes.length} visibility changes. Dialog remains open for additional actions.`,
       );
@@ -676,7 +692,7 @@ export class SeekPreviewDialog extends BaseActionDialog {
       const { revertNowSeek } = await import('../services/index.js');
       await revertNowSeek(
         { ...app.actionData, ignoreAllies: app.ignoreAllies },
-        { html: () => {}, attr: () => {} },
+        { html: () => { }, attr: () => { } },
       );
 
       app.updateRowButtonsToReverted(changedOutcomes);
@@ -723,12 +739,12 @@ export class SeekPreviewDialog extends BaseActionDialog {
         const overrides = {
           __wall__: { [outcome.wallId]: outcome.overrideState || outcome.newVisibility },
         };
-        await applyNowSeek({ ...actionData, overrides }, { html: () => {}, attr: () => {} });
+        await applyNowSeek({ ...actionData, overrides }, { html: () => { }, attr: () => { } });
         // Disable the row's Apply button for this wall
         app.updateRowButtonsToApplied([{ wallId: outcome.wallId }]);
       } else {
         const overrides = { [outcome.target.id]: outcome.overrideState || outcome.newVisibility };
-        await applyNowSeek({ ...actionData, overrides }, { html: () => {}, attr: () => {} });
+        await applyNowSeek({ ...actionData, overrides }, { html: () => { }, attr: () => { } });
         // Disable the row's Apply button for this token
         app.updateRowButtonsToApplied([{ target: { id: outcome.target.id } }]);
       }
@@ -832,7 +848,7 @@ export class SeekPreviewDialog extends BaseActionDialog {
     if (this._selectionHookId) {
       try {
         Hooks.off('controlToken', this._selectionHookId);
-      } catch {}
+      } catch { }
       this._selectionHookId = null;
     }
     _currentSeekDialogInstance = null;
