@@ -5,20 +5,18 @@
   {{#if showOutcomeColumn}}
   <colgroup>
   <col class="col-w-6" />  {{!-- Token --}}
-  <col class="col-w-14" /> {{!-- Name --}}
-  <col class="col-w-24" /> {{!-- Visibility selection --}}
-  <col class="col-w-8" />  {{!-- Override (trash) --}}
-  <col class="col-w-17" /> {{!-- Current State --}}
-  <col class="col-w-11" /> {{!-- DC --}}
+  <col class="col-w-16" /> {{!-- Name --}}
+  <col class="col-w-34" /> {{!-- Visibility selection (now includes trash when present) --}}
+  <col class="col-w-16" /> {{!-- Current State --}}
+  <col class="col-w-8" />  {{!-- DC --}}
   <col class="col-w-20" /> {{!-- Outcome --}}
   </colgroup>
   {{else}}
   <colgroup>
   <col class="col-w-6" />  {{!-- Token --}}
-  <col class="col-w-17" /> {{!-- Name --}}
-  <col class="col-w-30" /> {{!-- Visibility selection --}}
-  <col class="col-w-8" />  {{!-- Override (trash) --}}
-  <col class="col-w-19" /> {{!-- Current State --}}
+  <col class="col-w-20" /> {{!-- Name --}}
+  <col class="col-w-38" /> {{!-- Visibility selection (now includes trash when present) --}}
+  <col class="col-w-16" /> {{!-- Current State --}}
   <col class="col-w-20" /> {{!-- DC --}}
   </colgroup>
   {{/if}}
@@ -27,7 +25,6 @@
       <th class="token-image">Token</th>
       <th class="token-name">Name</th>
       <th class="visibility-state">{{localize "PF2E_VISIONER.TOKEN_MANAGER.VISIBILITY_STATE"}}</th>
-      <th class="override-column" data-tooltip="AVS Override">AVS Override</th>
       <th class="current-state">Current State</th>
       <th class="dc-column">{{#if isTargetMode}}Perception DC{{else}}Stealth DC{{/if}}</th>
       {{#if showOutcomeColumn}}
@@ -60,15 +57,13 @@
                 <i class="{{state.icon}}"></i>
               </button>
             {{/each}}
+            {{#if target.hasAvsOverride}}
+              <button type="button" class="state-icon remove-override" data-action="removeAvsOverride" data-token-id="{{target.id}}" data-tooltip="Remove AVS Override">
+                <i class="fas fa-trash"></i>
+              </button>
+            {{/if}}
             <input type="hidden" name="visibility.{{target.id}}" value="{{target.currentVisibilityState}}" />
           </div>
-        </td>
-        <td class="override-column">
-          {{#if target.hasAvsOverride}}
-            <button type="button" class="remove-override" data-action="removeAvsOverride" data-token-id="{{target.id}}" data-tooltip="Remove AVS Override">
-              <i class="fas fa-trash"></i>
-            </button>
-          {{/if}}
         </td>
         <td class="current-state">
           {{#each target.visibilityStates as |state|}}

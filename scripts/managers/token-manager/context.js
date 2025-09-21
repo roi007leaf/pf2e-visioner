@@ -146,14 +146,14 @@ export async function buildContext(app, options) {
         cssClass: VISIBILITY_STATES[key].cssClass,
       }));
 
-        // Determine if an AVS override exists for this pair (observer -> target) in observer mode
-        let hasAvsOverride = false;
-        try {
-          hasAvsOverride = !!token.document.getFlag(
-            MODULE_ID,
-            `avs-override-from-${app.observer.document.id}`,
-          );
-        } catch { /* ignore */ }
+      // Determine if an AVS override exists for this pair (observer -> target) in observer mode
+      let hasAvsOverride = false;
+      try {
+        hasAvsOverride = !!token.document.getFlag(
+          MODULE_ID,
+          `avs-override-from-${app.observer.document.id}`,
+        );
+      } catch { /* ignore */ }
 
       return {
         id: token.document.id,
@@ -309,8 +309,20 @@ export async function buildContext(app, options) {
     return a.name.localeCompare(b.name);
   };
 
-  context.pcTargets = allTargets.filter((t) => t.isPC && !t.isLoot).sort(sortByStatusAndName);
-  context.npcTargets = allTargets.filter((t) => !t.isPC && !t.isLoot).sort(sortByStatusAndName);
+  // Overrides-first sorting: prioritize rows that have an AVS override, then apply status/name sort
+  const sortWithOverridesFirst = (a, b) => {
+    const aHas = !!a.hasAvsOverride;
+    const bHas = !!b.hasAvsOverride;
+    if (aHas !== bHas) return aHas ? -1 : 1; // true first
+    return sortByStatusAndName(a, b);
+  };
+
+  context.pcTargets = allTargets
+    .filter((t) => t.isPC && !t.isLoot)
+    .sort(sortWithOverridesFirst);
+  context.npcTargets = allTargets
+    .filter((t) => !t.isPC && !t.isLoot)
+    .sort(sortWithOverridesFirst);
   context.lootTargets =
     app.mode === 'observer' ? allTargets.filter((t) => t.isLoot).sort(sortByStatusAndName) : [];
   context.targets = allTargets;
