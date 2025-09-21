@@ -201,6 +201,12 @@
               <div class="final-result-display">
                 <div class="outcome-primary sneak-result-{{outcome.outcome}}">
                   <span class="outcome-text">{{outcome.outcomeLabel}}</span>
+                  {{#if outcome.sneakAdeptApplied}}
+                    <span class="sneak-adept-indicator" data-tooltip="{{localize 'PF2E_VISIONER.SNEAK_ADEPT_FEAT.TOOLTIP'}}">
+                      <i class="fas fa-arrow-up"></i>
+                      {{localize "PF2E_VISIONER.SNEAK_ADEPT_FEAT.OUTCOME_UPGRADED"}}
+                    </span>
+                  {{/if}}
                 </div>
               </div>
             </td>

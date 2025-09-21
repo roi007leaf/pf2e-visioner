@@ -530,6 +530,14 @@
       },
       "VISIBILITY_UPDATED": "Region visibility updated for {count} token relationships",
       "UPDATE_ERROR": "Failed to update region visibility relationships"
+    },
+    "SNEAKY_FEAT": {
+      "VISIBILITY_CAPPED": "Sneaky Feat",
+      "TOOLTIP": "Visibility capped at Hidden due to Sneaky feat effect. This creature successfully sneaked against you."
+    },
+    "SNEAK_ADEPT_FEAT": {
+      "OUTCOME_UPGRADED": "Sneak Adept",
+      "TOOLTIP": "Failure upgraded to Success due to Sneak Adept feat. It's almost impossible to spot this creature."
     }
   }
 }

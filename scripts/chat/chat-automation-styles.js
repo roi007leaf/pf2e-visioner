@@ -891,6 +891,62 @@ function getChatAutomationCSS() {
             color: #ff8c00; /* Orange */
             font-style: italic;
         }
+
+        /* Sneaky Feat Indicator */
+        .sneaky-feat-indicator {
+            display: block !important;
+            margin-top: 4px !important;
+            padding: 2px 6px !important;
+            background: rgba(138, 43, 226, 0.2) !important; /* Purple background */
+            border: 1px solid rgba(138, 43, 226, 0.5) !important;
+            border-radius: 3px !important;
+            font-size: 10px !important;
+            font-weight: 600 !important;
+            color: #dda0dd !important; /* Light purple text */
+            text-transform: uppercase !important;
+            letter-spacing: 0.5px !important;
+            cursor: help !important;
+        }
+
+        .sneaky-feat-indicator i {
+            margin-right: 3px !important;
+            font-size: 9px !important;
+        }
+
+        /* Colorblind support for Sneaky feat indicator */
+        .colorblind .sneaky-feat-indicator {
+            background: rgba(255, 165, 0, 0.2) !important; /* Orange background for colorblind */
+            border-color: rgba(255, 165, 0, 0.5) !important;
+            color: #ffb347 !important; /* Light orange text */
+        }
+
+        /* Sneak Adept Feat Indicator */
+        .sneak-adept-indicator {
+            display: block !important;
+            margin-top: 4px !important;
+            padding: 2px 6px !important;
+            background: rgba(34, 197, 94, 0.2) !important; /* Green background */
+            border: 1px solid rgba(34, 197, 94, 0.5) !important;
+            border-radius: 3px !important;
+            font-size: 10px !important;
+            font-weight: 600 !important;
+            color: #86efac !important; /* Light green text */
+            text-transform: uppercase !important;
+            letter-spacing: 0.5px !important;
+            cursor: help !important;
+        }
+
+        .sneak-adept-indicator i {
+            margin-right: 3px !important;
+            font-size: 9px !important;
+        }
+
+        /* Colorblind support for Sneak Adept indicator */
+        .colorblind .sneak-adept-indicator {
+            background: rgba(59, 130, 246, 0.2) !important; /* Blue background for colorblind */
+            border-color: rgba(59, 130, 246, 0.5) !important;
+            color: #93c5fd !important; /* Light blue text */
+        }
         
         /* Bulk Action Buttons */
         .seek-preview-dialog-bulk-action-btn {

@@ -4,9 +4,9 @@
  * This is the main integration point for applying visibility and cover changes
  */
 
-import * as SharedUtils from './infra/shared-utils.js';
-import AvsOverrideManager from './infra/avs-override-manager.js';
 import autoCoverSystem from '../../cover/auto-cover/AutoCoverSystem.js';
+import AvsOverrideManager from './infra/avs-override-manager.js';
+import * as SharedUtils from './infra/shared-utils.js';
 
 class DualSystemResultApplication {
   constructor() {
@@ -78,10 +78,10 @@ class DualSystemResultApplication {
 
       // Apply changes using our enhanced applyVisibilityChanges with AVS overrides
       let totalChangesApplied = 0;
-      
+      let allAppliedChanges = []; // Track all changes for Sneaky feat processing
+
       for (const [observerId, data] of changesByObserver) {
         try {
-
           // Ensure AVS pair override flags are set BEFORE we apply visibility changes.
           // This prevents the Auto-Visibility System from recalculating and clobbering
           // our manual visibility updates while they are being applied.
@@ -96,25 +96,34 @@ class DualSystemResultApplication {
               // If the sneak result carried explicit autoCover info, prefer its originalState as expectedCover
               let expectedCover = undefined;
               try {
-                detectedCover = autoCoverSystem.detectCoverBetweenTokens(data.observer, targetToken) || 'none';
+                detectedCover =
+                  autoCoverSystem.detectCoverBetweenTokens(data.observer, targetToken) || 'none';
               } catch {}
               // Pull expected/original cover from attached autoCover details on the matching sneak result, if any
               try {
-                const matching = (sneakResults || []).find(r => r.token?.document?.id === data.observer?.document?.id && (r.actor?.document?.id || r.actor?.id) === targetToken?.document?.id);
+                const matching = (sneakResults || []).find(
+                  (r) =>
+                    r.token?.document?.id === data.observer?.document?.id &&
+                    (r.actor?.document?.id || r.actor?.id) === targetToken?.document?.id,
+                );
                 const overrideDetails = matching?.autoCover?.overrideDetails;
                 if (overrideDetails && overrideDetails.originalState) {
                   expectedCover = overrideDetails.originalState;
                 }
               } catch {}
-              const hasCover = ((expectedCover || detectedCover) === 'standard' || (expectedCover || detectedCover) === 'greater');
-              const hasConcealment = ['concealed', 'hidden', 'undetected'].includes(effectiveNewState);
+              const hasCover =
+                (expectedCover || detectedCover) === 'standard' ||
+                (expectedCover || detectedCover) === 'greater';
+              const hasConcealment = ['concealed', 'hidden', 'undetected'].includes(
+                effectiveNewState,
+              );
 
               changesByTarget.set(targetToken.document.id, {
                 target: targetToken,
                 state: effectiveNewState,
                 hasCover,
                 hasConcealment,
-                expectedCover
+                expectedCover,
               });
             }
           }
@@ -125,7 +134,10 @@ class DualSystemResultApplication {
                 overrideDurationMinutes: options.overrideDurationMinutes || 5,
               });
             } catch (avsSetError) {
-              console.warn('PF2E Visioner | Failed to pre-set AVS overrides (continuing):', avsSetError);
+              console.warn(
+                'PF2E Visioner | Failed to pre-set AVS overrides (continuing):',
+                avsSetError,
+              );
             }
           }
 
@@ -139,6 +151,8 @@ class DualSystemResultApplication {
               ...options,
               setAVSOverrides: false, // Must come after ...options to ensure it's not overridden
             });
+
+            allAppliedChanges.push(...data.changes); // Track for Sneaky feat processing
           } catch (applyError) {
             // Attempt to rollback any pre-set AVS flags to avoid leaving stale overrides
             try {
@@ -147,14 +161,20 @@ class DualSystemResultApplication {
                 const obsId = data.observer.document.id;
                 const tgtId = target.document.id;
                 try {
-                  await data.observer.document.unsetFlag('pf2e-visioner', `avs-override-to-${tgtId}`);
+                  await data.observer.document.unsetFlag(
+                    'pf2e-visioner',
+                    `avs-override-to-${tgtId}`,
+                  );
                 } catch {}
                 try {
                   await target.document.unsetFlag('pf2e-visioner', `avs-override-from-${obsId}`);
                 } catch {}
               }
             } catch (cleanupErr) {
-              console.warn('PF2E Visioner | Failed to cleanup AVS overrides after apply error:', cleanupErr);
+              console.warn(
+                'PF2E Visioner | Failed to cleanup AVS overrides after apply error:',
+                cleanupErr,
+              );
             }
             throw applyError;
           }
@@ -178,8 +198,40 @@ class DualSystemResultApplication {
       this._activeTransactions.set(transactionId, {
         sneakResults,
         timestamp: Date.now(),
-        options
+        options,
       });
+
+      // Apply Sneaky feat effects after all visibility changes have been processed
+      try {
+        console.log(
+          '🎯 PF2E Visioner | Dual system applying Sneaky feat effects for',
+          allAppliedChanges.length,
+          'changes',
+        );
+
+        // Add observer info to each change for Sneaky feat processing
+        const changesWithObservers = [];
+        for (const [observerId, data] of changesByObserver) {
+          for (const change of data.changes) {
+            // Add observer info to each change for Sneaky feat processing
+            const changeWithObserver = {
+              ...change,
+              observer: data.observer,
+              // Add outcome info if available from sneak results
+              outcome: this.#getOutcomeFromSneakResults(sneakResults, data.observer, change.target),
+            };
+            changesWithObservers.push(changeWithObserver);
+          }
+        }
+
+        await this.#applySneakyFeatEffects(changesWithObservers);
+      } catch (sneakyError) {
+        console.error(
+          'PF2E Visioner | Error applying Sneaky feat effects in dual system:',
+          sneakyError,
+        );
+        applicationResult.warnings.push(`Sneaky feat effects failed: ${sneakyError.message}`);
+      }
 
       applicationResult.success = applicationResult.errors.length === 0;
 
@@ -203,7 +255,6 @@ class DualSystemResultApplication {
         console.warn('PF2E Visioner | No transaction found for rollback:', transactionId);
         return false;
       }
-
 
       // For sneak actions, rollback means restoring the old visibility states
       const changesByObserver = new Map();
@@ -235,16 +286,20 @@ class DualSystemResultApplication {
           await SharedUtils.applyVisibilityChanges(data.observer, data.changes, {
             direction: transaction.options.direction || 'observer_to_target',
             setAVSOverrides: false, // Don't set overrides when rolling back
-            ...transaction.options
+            ...transaction.options,
           });
         } catch (error) {
-          console.error('PF2E Visioner | Failed to rollback changes for observer:', observerId, error);
+          console.error(
+            'PF2E Visioner | Failed to rollback changes for observer:',
+            observerId,
+            error,
+          );
         }
       }
 
       // Remove transaction from cache
       this._activeTransactions.delete(transactionId);
-      
+
       return true;
     } catch (error) {
       console.error('PF2E Visioner | Rollback failed:', error);
@@ -269,6 +324,67 @@ class DualSystemResultApplication {
       this._activeTransactions.delete(transactionId);
     }
   }
+
+  /**
+   * Get outcome from sneak results for a specific observer-target pair
+   * @param {Array} sneakResults - The original sneak results
+   * @param {Token} observer - The observer token
+   * @param {Actor} target - The target actor
+   * @returns {string} The outcome ('success', 'failure', etc.)
+   */
+  #getOutcomeFromSneakResults(sneakResults, observer, target) {
+    try {
+      console.log('🎯 PF2E Visioner | Looking up outcome for:', {
+        observerId: observer?.document?.id,
+        targetId: target?.document?.id,
+        sneakResultsCount: sneakResults?.length,
+      });
+
+      const result = sneakResults.find((r) => {
+        const observerMatch = r.token?.document?.id === observer?.document?.id;
+        const targetMatch = (r.actor?.document?.id || r.actor?.id) === target?.document?.id;
+        console.log('🎯 PF2E Visioner | Checking result:', {
+          rTokenId: r.token?.document?.id,
+          rActorId: r.actor?.document?.id || r.actor?.id,
+          observerMatch,
+          targetMatch,
+          outcome: r.outcome,
+        });
+        return observerMatch && targetMatch;
+      });
+
+      console.log('🎯 PF2E Visioner | Found result:', result?.outcome || 'none');
+      return result?.outcome || 'unknown';
+    } catch (error) {
+      console.warn('PF2E Visioner | Error getting outcome from sneak results:', error);
+      return 'unknown';
+    }
+  }
+
+  /**
+   * Apply Sneaky feat effects to successful sneak changes
+   * @param {Array} changes - The visibility changes that were applied
+   */
+  async #applySneakyFeatEffects(changes) {
+    try {
+      // Import the SneakActionHandler to reuse its Sneaky feat logic
+      const { SneakActionHandler } = await import('./actions/sneak-action.js');
+      const sneakHandler = new SneakActionHandler();
+
+      // Use the handler's private method through a public wrapper
+      // We'll need to add a public method to the handler for this
+      if (typeof sneakHandler.applySneakyFeatEffects === 'function') {
+        await sneakHandler.applySneakyFeatEffects(changes);
+      } else {
+        console.warn(
+          'PF2E Visioner | SneakActionHandler.applySneakyFeatEffects method not available',
+        );
+      }
+    } catch (error) {
+      console.error('PF2E Visioner | Error in dual system Sneaky feat effects:', error);
+      throw error;
+    }
+  }
 }
 
 const dualSystemApplication = new DualSystemResultApplication();
@@ -276,8 +392,11 @@ const dualSystemApplication = new DualSystemResultApplication();
 // Debug: Log that this file was loaded
 
 // Set up periodic cleanup (every 5 minutes)
-setInterval(() => {
-  dualSystemApplication.cleanup();
-}, 5 * 60 * 1000);
+setInterval(
+  () => {
+    dualSystemApplication.cleanup();
+  },
+  5 * 60 * 1000,
+);
 
 export default dualSystemApplication;

@@ -297,6 +297,25 @@ export class SeekActionHandler extends ActionHandlerBase {
       }
     } catch {}
 
+    // Sneaky feat check: Prevents becoming observed if the target has Sneaky feat effect active against this observer
+    let sneakyFeatApplied = false;
+    try {
+      // Get the observer token from the actor
+      const observerToken =
+        actionData.actorToken || actionData.actor?.token?.object || actionData.actor;
+
+      if (
+        !subject?._isWall &&
+        newVisibility === 'observed' &&
+        this.#hasSneakyFeatEffect(subject, observerToken)
+      ) {
+        newVisibility = 'hidden';
+        sneakyFeatApplied = true;
+      }
+    } catch (error) {
+      // Silently handle errors in sneaky feat check
+    }
+
     // Build display metadata for walls
     let wallMeta = {};
     if (subject?._isWall) {
@@ -333,6 +352,7 @@ export class SeekActionHandler extends ActionHandlerBase {
       oldVisibilityLabel: VISIBILITY_STATES[current]?.label || current,
       newVisibility,
       changed: newVisibility !== current,
+      sneakyFeatApplied,
       ...wallMeta,
     };
 
@@ -582,6 +602,73 @@ export class SeekActionHandler extends ActionHandlerBase {
       return (px / gridSize) * unitDist;
     } catch {
       return Infinity;
+    }
+  }
+
+  /**
+   * Check if a token has the Sneaky feat effect active against a specific observer
+   * @param {Token} target - The target token to check
+   * @param {Token} observer - The observer token (the one seeking)
+   * @returns {boolean} True if the target has Sneaky feat effect protecting against this observer
+   */
+  #hasSneakyFeatEffect(target, observer) {
+    if (!target?.actor || !observer) return false;
+
+    try {
+      // Use PF2E's roll option system to check for observer-specific protection
+      const observerSignature = `${observer.id}`;
+      const rollOptionKey = `sneaky-feat-vs-${observerSignature}`;
+
+      // Check if the target actor has the roll option active for this specific observer
+      // This uses PF2E's built-in roll option system with predicates
+      const rollOptions = target.actor.getRollOptions?.(['all']) || [];
+      const hasObserverSpecificProtection = rollOptions.includes(rollOptionKey);
+
+      // If we don't have the specific roll option, check if there's a specific rule for this observer
+      if (!hasObserverSpecificProtection) {
+        const effects =
+          target.actor.itemTypes?.effect ??
+          target.actor.items?.filter?.((i) => i?.type === 'effect') ??
+          [];
+
+        const sneakyEffect = effects.find((effect) => {
+          const effectSlug = effect?.system?.slug?.toLowerCase?.() || '';
+          return effectSlug === 'sneaky-feat-effect';
+        });
+
+        if (sneakyEffect) {
+          // Check if there's a specific rule for this observer
+          const hasRuleForObserver = sneakyEffect.system.rules?.some((rule) => {
+            return rule.option === `sneaky-feat-vs-${observerSignature}`;
+          });
+
+          if (hasRuleForObserver) {
+            return true; // Rule exists, so protection should be active
+          }
+
+          // No specific rule found - protection is not active
+          return false;
+        }
+      }
+
+      return hasObserverSpecificProtection;
+    } catch (error) {
+      // Fallback to flag-based checking
+      const effects =
+        target.actor.itemTypes?.effect ??
+        target.actor.items?.filter?.((i) => i?.type === 'effect') ??
+        [];
+
+      const sneakyEffect = effects.find((effect) => {
+        const effectSlug = effect?.system?.slug?.toLowerCase?.() || '';
+        return effectSlug === 'sneaky-feat-effect';
+      });
+
+      if (!sneakyEffect) return false;
+
+      const protectedObservers =
+        sneakyEffect.flags?.['pf2e-visioner']?.sneakyFeat?.protectedFromObservers || [];
+      return protectedObservers.some((obs) => obs.id === observer.id);
     }
   }
 

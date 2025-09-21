@@ -149,6 +149,12 @@
             </td>
             <td class="outcome {{outcome.outcomeClass}}" {{#if outcome.unmetCondition}}data-tooltip="{{outcome.unmetCondition}}"{{/if}}>
               {{outcome.outcomeLabel}}
+              {{#if outcome.sneakyFeatApplied}}
+                <span class="sneaky-feat-indicator" data-tooltip="{{localize 'PF2E_VISIONER.SNEAKY_FEAT.TOOLTIP'}}">
+                  <i class="fas fa-mask"></i>
+                  {{localize "PF2E_VISIONER.SNEAKY_FEAT.VISIBILITY_CAPPED"}}
+                </span>
+              {{/if}}
             </td>
             <td class="visibility-change">
               <div class="visibility-change-with-override">
