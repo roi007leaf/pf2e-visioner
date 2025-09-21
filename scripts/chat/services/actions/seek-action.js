@@ -135,7 +135,10 @@ export class SeekActionHandler extends ActionHandlerBase {
         current = 'hidden';
       }
     } else {
-      current = getVisibilityBetween(actionData.actor, subject);
+      // Get the observer token from the actor
+      const observerToken =
+        actionData.actorToken || actionData.actor?.token?.object || actionData.actor;
+      current = getVisibilityBetween(observerToken, subject);
 
       // Proficiency gating for hazards/loot (skip if That's Odd guarantees detection)
       try {
