@@ -434,12 +434,14 @@ npm run test:ci       # CI mode with strict requirements
 ### 🚨 CRITICAL: Infinite lightingRefresh Loop Fix (2025-01-20)
 
 **EMERGENCY BUG FIX COMPLETED**: Fixed infinite loop causing continuous `lightingRefresh` hooks that led to:
+
 - Constant token jittering and visual effects
-- Darkness slider resetting continuously  
+- Darkness slider resetting continuously
 - Memory leaks from excessive recalculations
 - Performance degradation with hundreds of calculations per second
 
 **Root Cause**: Infinite feedback loop in perception refresh system:
+
 1. `lightingRefresh` hook fires → `AutoVisibilitySystem.#onLightingRefresh()`
 2. Calls `recalculateAllVisibility()` → updates visibility states
 3. Calls `refreshEveryonesPerception()` → `refreshLocalPerception()`
@@ -447,18 +449,21 @@ npm run test:ci       # CI mode with strict requirements
 5. Loop back to step 1 infinitely
 
 **Fix Implemented**:
+
 - **Removed `refreshLighting: true`** from `scripts/services/socket.js` `refreshLocalPerception()`
 - **Removed `refreshLighting: true`** from `scripts/services/visual-effects.js` perception updates
 - **Kept vision and occlusion refresh** which are actually needed for visibility updates
 - **Added circuit breaker system** as emergency fallback to prevent future runaway calculations
 
 **Files Modified**:
+
 - `scripts/services/socket.js` - Removed `refreshLighting: true` from perception updates
 - `scripts/services/visual-effects.js` - Removed `refreshLighting: true` from sight changes
 - `scripts/visibility/auto-visibility/AutoVisibilitySystem.js` - Added circuit breaker system
 - `scripts/api.js` - Added `testDarknessSources()` and `resetCircuitBreaker()` debug methods
 
 **Impact**: ✅ FIXED - System now operates normally without continuous loops:
+
 - Token jittering eliminated
 - Darkness slider works correctly
 - Memory usage stable
@@ -466,6 +471,7 @@ npm run test:ci       # CI mode with strict requirements
 - Auto-visibility system functions properly without spam
 
 **FOLLOW-UP FIX**: Fixed the actual root cause of excessive recalculations:
+
 - **Problem**: Auto-visibility system was reacting to its own effect changes, creating another feedback loop
 - **Chain**: Visibility update → creates "Hidden" effects → `updateItem` hook → `#onItemChange` → triggers another recalculation
 - **Solution**: Added `#isUpdatingEffects` flag to ignore item changes when the system is updating effects
@@ -473,6 +479,7 @@ npm run test:ci       # CI mode with strict requirements
 - **Result**: No more excessive recalculations, circuit breaker messages only in debug mode
 
 **Technical Details**:
+
 - **Circuit breaker**: Limits recalculations to max 3 per 10-second window
 - **Emergency reset**: `game.modules.get('pf2e-visioner').api.resetCircuitBreaker()` available
 - **Debug methods**: `testDarknessSources()` to verify darkness light source detection
@@ -573,6 +580,49 @@ npm run test:ci       # CI mode with strict requirements
   - **Normal attacks**: Automatic cover detection and application, no interruption
   - **Override needed**: Hold keybind (X) while clicking attack to see popup with override options
   - **Roll dialogs**: When PF2e roll dialog appears, cover override buttons are injected for manual selection
+
+### ✅ Darkness Cross-Boundary Visibility Fix (2025-01-20)
+
+**CRITICAL BUG FIX COMPLETED**: Fixed darkness cross-boundary visibility system that was only working in one direction (tokens inside darkness could see tokens outside, but not vice versa).
+
+**Root Cause**: Two critical issues in the cross-boundary logic:
+
+1. **Incorrect darkness rank threshold**: System was checking for `darknessRank >= 4` (heightened darkness) but actual darkness sources had rank 3, so cross-boundary detection never triggered
+2. **Incomplete logic for tokens inside darkness**: Tokens inside darkness looking at tokens outside were not properly applying visibility rules based on their vision capabilities
+
+**Issues Fixed**:
+
+1. **Threshold Correction**: Changed cross-boundary detection from `darknessRank >= 4` to `darknessRank >= 1` to work with any darkness source
+2. **Bidirectional Logic**: Fixed both directions of cross-boundary visibility:
+   - **Observer outside → Target inside**: Now properly applies PF2E rules based on observer's vision
+   - **Observer inside → Target outside**: Now properly applies PF2E rules based on observer's vision
+3. **Correct PF2E Rules Implementation**:
+   - **Rank 1-3 darkness**: Regular darkvision sees **observed**
+   - **Rank 4+ darkness**: Regular darkvision sees **concealed**
+   - **Greater darkvision**: Always sees **observed** regardless of rank
+   - **No darkvision**: Always sees **hidden** in any darkness
+4. **Same-Area Logic**: Updated logic for tokens both inside darkness to use the same rank-based rules
+
+**Files Modified**:
+
+- `scripts/visibility/auto-visibility/VisibilityCalculator.js` - Fixed cross-boundary detection threshold and bidirectional logic
+- `scripts/visibility/auto-visibility/EventDrivenVisibilitySystem.js` - Reverted unnecessary timing-related changes
+
+**Technical Details**:
+
+- **Cross-boundary detection**: Now triggers for any darkness source (rank 1+) instead of only rank 4+
+- **Variable naming**: Updated from `observerInRank4Darkness` to `observerInDarkness` for clarity
+- **Vision capability checks**: Both directions now properly check observer's vision capabilities
+- **Rank-based rules**: Regular darkvision behavior depends on actual darkness rank (observed for 1-3, concealed for 4+)
+- **Comprehensive coverage**: All scenarios now work: inside→outside, outside→inside, both inside, both outside
+
+**Impact**: ✅ FIXED - Darkness cross-boundary visibility now works correctly in both directions:
+
+- Tokens outside darkness can see tokens inside darkness based on their vision capabilities
+- Tokens inside darkness can see tokens outside darkness based on their vision capabilities
+- All darkness ranks (1-4+) work correctly with proper PF2E rules
+- System handles all vision types: no darkvision, regular darkvision, greater darkvision
+- Both cross-boundary and same-area scenarios work consistently
 
 ---
 
