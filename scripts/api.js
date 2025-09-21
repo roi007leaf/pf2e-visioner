@@ -444,6 +444,9 @@ export class Pf2eVisionerApi {
       if (observerToken.actor.system?.traits?.senses?.tremorsense) {
         options.push('per-token-visibility:observer:has-tremorsense');
       }
+
+      // Note: Lifesense detection requires async import and is handled in the auto-visibility system
+      // For roll options, lifesense effects are applied through the visibility calculation system
     }
 
     return options;
@@ -1091,6 +1094,52 @@ export const autoVisibility = {
       );
     } else {
       ui.notifications.error('PF2E Visioner | Auto-visibility system not available');
+    }
+  },
+
+  /**
+   * Test lifesense detection for debugging
+   * @param {string} observerId - The ID of the observing token
+   * @param {string} targetId - The ID of the target token
+   * @returns {Object} Debug information about lifesense detection
+   */
+  testLifesense: async (observerId, targetId) => {
+    try {
+      const observer = canvas.tokens.get(observerId);
+      const target = canvas.tokens.get(targetId);
+
+      if (!observer || !target) {
+        return { error: 'Observer or target token not found' };
+      }
+
+      const { VisionAnalyzer } = await import('./visibility/auto-visibility/VisionAnalyzer.js');
+      const visionAnalyzer = VisionAnalyzer.getInstance();
+
+      const sensingSummary = visionAnalyzer.getSensingSummary(observer);
+      const canDetectType = visionAnalyzer.canDetectWithLifesense(target);
+      const canDetectInRange = visionAnalyzer.canDetectWithLifesenseInRange(observer, target);
+
+      // Calculate distance manually since #distanceFeet is private
+      const dx = observer.center.x - target.center.x;
+      const dy = observer.center.y - target.center.y;
+      const px = Math.hypot(dx, dy);
+      const gridSize = canvas?.grid?.size || 100;
+      const unitDist = canvas?.scene?.grid?.distance || 5;
+      const distance = (px / gridSize) * unitDist;
+
+      return {
+        observer: observer.name,
+        target: target.name,
+        targetCreatureType: target.actor?.system?.details?.creatureType || target.actor?.type,
+        targetTraits: target.actor?.system?.traits?.value || [],
+        observerLifesense: sensingSummary.lifesense,
+        canDetectCreatureType: canDetectType,
+        canDetectInRange: canDetectInRange,
+        distance: Math.round(distance * 10) / 10, // Round to 1 decimal
+        sensingSummary: sensingSummary,
+      };
+    } catch (error) {
+      return { error: error.message };
     }
   },
 

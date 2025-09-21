@@ -257,32 +257,241 @@
     color: white;
   }
 
-    /* Echolocation badge */
-    .seek-preview-dialog .seek-context-badges {
-      display: flex;
-      gap: 6px;
-      margin-top: 4px;
-      align-items: center;
+  /* Echolocation badge */
+  .seek-preview-dialog .seek-context-badges {
+    display: flex;
+    gap: 6px;
+    margin-top: 4px;
+    align-items: center;
+  }
+  .seek-preview-dialog .badge.badge-echolocation {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    line-height: 1;
+    padding: 4px 6px;
+    border-radius: 6px;
+    color: #0d47a1;
+    background: rgba(33, 150, 243, 0.15);
+    border: 1px solid rgba(33, 150, 243, 0.35);
+  }
+  .seek-preview-dialog .badge.badge-echolocation i {
+    color: #2196f3;
+  }
+  .seek-preview-dialog .badge.badge-echolocation .badge-range {
+    opacity: 0.85;
+  }
+
+  .seek-preview-dialog .badge.badge-lifesense {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    line-height: 1;
+    padding: 4px 8px;
+    border-radius: 6px;
+    color: #c62828;
+    background: rgba(244, 67, 54, 0.15);
+    border: 1px solid rgba(244, 67, 54, 0.35);
+  }
+  .seek-preview-dialog .badge.badge-lifesense i {
+    color: #f44336;
+  }
+  .seek-preview-dialog .badge.badge-lifesense .badge-range {
+    opacity: 0.85;
+  }
+
+  .seek-preview-dialog .badge.badge-tremorsense {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    line-height: 1;
+    padding: 4px 8px;
+    border-radius: 6px;
+    color: #8b4513;
+    background: rgba(139, 69, 19, 0.15);
+    border: 1px solid rgba(139, 69, 19, 0.35);
+  }
+  .seek-preview-dialog .badge.badge-tremorsense i {
+    color: #a0522d;
+  }
+  .seek-preview-dialog .badge.badge-tremorsense .badge-range {
+    opacity: 0.85;
+  }
+
+  .seek-preview-dialog .badge.badge-scent {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    line-height: 1;
+    padding: 4px 8px;
+    border-radius: 6px;
+    color: #9932cc;
+    background: rgba(153, 50, 204, 0.15);
+    border: 1px solid rgba(153, 50, 204, 0.35);
+  }
+  .seek-preview-dialog .badge.badge-scent i {
+    color: #ba55d3;
+  }
+  .seek-preview-dialog .badge.badge-scent .badge-range {
+    opacity: 0.85;
+  }
+  /* Noisy badge removed */
+
+  /* Sense the Unseen Section */
+  .seek-preview-dialog .sense-unseen-section {
+    margin: 16px 0 !important;
+    padding: 16px !important;
+    border: 2px solid #8b5cf6 !important;
+    border-radius: 12px !important;
+    background: linear-gradient(
+      135deg,
+      rgba(139, 92, 246, 0.08),
+      rgba(168, 85, 247, 0.12)
+    ) !important;
+    box-shadow: 0 4px 12px rgba(139, 92, 246, 0.15) !important;
+    position: relative !important;
+    overflow: hidden !important;
+  }
+
+  .seek-preview-dialog .sense-unseen-section::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, #8b5cf6, #a855f7, #c084fc);
+    border-radius: 12px 12px 0 0;
+  }
+
+  .seek-preview-dialog .sense-unseen-button {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 10px !important;
+    width: 100% !important;
+    padding: 14px 20px !important;
+    background: linear-gradient(135deg, #8b5cf6 0%, #a855f7 50%, #c084fc 100%) !important;
+    color: white !important;
+    border: none !important;
+    border-radius: 8px !important;
+    font-size: 15px !important;
+    font-weight: 700 !important;
+    cursor: pointer !important;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    box-shadow:
+      0 4px 14px rgba(139, 92, 246, 0.4),
+      inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3) !important;
+    position: relative !important;
+    overflow: hidden !important;
+    font-family: inherit !important;
+    text-decoration: none !important;
+    outline: none !important;
+  }
+
+  .seek-preview-dialog .sense-unseen-button::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    transition: left 0.5s ease;
+  }
+
+  .seek-preview-dialog .sense-unseen-button:hover::before {
+    left: 100%;
+  }
+
+  .seek-preview-dialog .sense-unseen-button:hover {
+    background: linear-gradient(135deg, #7c3aed 0%, #9333ea 50%, #a855f7 100%) !important;
+    transform: translateY(-2px) !important;
+    box-shadow:
+      0 6px 20px rgba(139, 92, 246, 0.5),
+      inset 0 1px 0 rgba(255, 255, 255, 0.3) !important;
+  }
+
+  .seek-preview-dialog .sense-unseen-button:active {
+    transform: translateY(-1px) !important;
+    box-shadow:
+      0 4px 14px rgba(139, 92, 246, 0.4),
+      inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
+  }
+
+  .seek-preview-dialog .sense-unseen-button i {
+    font-size: 18px;
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3));
+  }
+
+  .seek-preview-dialog .sense-unseen-button .button-label {
+    font-weight: 700;
+    letter-spacing: 0.5px;
+  }
+
+  /* Applied State */
+  .seek-preview-dialog .sense-unseen-button.applied {
+    background: linear-gradient(135deg, #10b981 0%, #059669 50%, #047857 100%);
+    cursor: not-allowed;
+    box-shadow:
+      0 4px 14px rgba(16, 185, 129, 0.4),
+      inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  }
+
+  .seek-preview-dialog .sense-unseen-button.applied:hover {
+    background: linear-gradient(135deg, #10b981 0%, #059669 50%, #047857 100%);
+    transform: none;
+    box-shadow:
+      0 4px 14px rgba(16, 185, 129, 0.4),
+      inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  }
+
+  .seek-preview-dialog .sense-unseen-button.applied::before {
+    display: none;
+  }
+
+  .seek-preview-dialog .sense-unseen-button.applied i {
+    animation: checkPulse 0.6s ease-out;
+  }
+
+  @keyframes checkPulse {
+    0% {
+      transform: scale(0.8);
+      opacity: 0;
     }
-    .seek-preview-dialog .badge.badge-echolocation {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      font-size: 11px;
-      line-height: 1;
-      padding: 4px 6px;
-      border-radius: 6px;
-      color: #0d47a1;
-      background: rgba(33, 150, 243, 0.15);
-      border: 1px solid rgba(33, 150, 243, 0.35);
+    50% {
+      transform: scale(1.2);
+      opacity: 1;
     }
-    .seek-preview-dialog .badge.badge-echolocation i {
-      color: #2196f3;
+    100% {
+      transform: scale(1);
+      opacity: 1;
     }
-    .seek-preview-dialog .badge.badge-echolocation .badge-range {
-      opacity: 0.85;
-    }
-    /* Noisy badge removed */
+  }
+
+  /* Applied section styling */
+  .seek-preview-dialog .sense-unseen-section.applied {
+    border-color: #10b981;
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.08), rgba(5, 150, 105, 0.12));
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.15);
+  }
+
+  .seek-preview-dialog .sense-unseen-section.applied::before {
+    background: linear-gradient(90deg, #10b981, #059669, #047857);
+  }
+
+  .seek-preview-dialog .sense-unseen-description {
+    margin: 8px 0 0 0;
+    font-size: 12px;
+    color: #6b7280;
+    font-style: italic;
+    line-height: 1.4;
+  }
 
   /* Point Out - Orange */
   .point-out-preview-dialog .results-table-container {

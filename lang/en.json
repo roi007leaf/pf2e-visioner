@@ -45,6 +45,16 @@
       "standard": "Standard Cover",
       "greater": "Greater Cover"
     },
+    "SPECIAL_SENSES": {
+      "lifesense": "Lifesense",
+      "lifesense_description": "You have a limited ability to sense life force. You gain lifesense as an imprecise sense with a range of 10 feet. This allows you to sense the life force of living and undead creatures within the listed range. The sense can distinguish between the vitality energy animating living creatures and the void energy animating undead creatures.",
+      "echolocation": "Echolocation",
+      "echolocation_description": "You can use sound to navigate and detect objects. You gain echolocation as a precise sense with a range of 40 feet. This allows you to detect all creatures and objects within range through sound reflection.",
+      "tremorsense": "Tremorsense",
+      "tremorsense_description": "You can sense vibrations through the ground. You gain tremorsense as an imprecise sense with a range of 30 feet. This allows you to detect creatures and objects in contact with the ground within range.",
+      "scent": "Scent",
+      "scent_description": "You have an enhanced sense of smell. You gain scent as an imprecise sense with a range of 30 feet. This allows you to detect living creatures by their scent within range."
+    },
     "COVER_OVERRIDE": {
       "POPUP_OVERRIDE": "Cover overridden via keybind popup: {original} → {final}"
     },
@@ -112,7 +122,25 @@
       "NO_TARGETS_IN_RANGE": "No valid targets within 30 feet range",
       "NO_TARGETS_IN_RANGE_CUSTOM": "No valid targets within {distance} feet range",
       "ECHOLOCATION_LABEL": "Echolocation",
-      "ECHOLOCATION_TOOLTIP": "Precise hearing active until the start of your next turn"
+      "ECHOLOCATION_TOOLTIP": "Precise hearing active until the start of your next turn",
+      "LIFESENSE_LABEL": "Lifesense",
+      "LIFESENSE_TOOLTIP": "Can sense living and undead creatures within range (imprecise sense)",
+      "UNMET_CONDITIONS": "Unmet Conditions",
+      "SENSE_UNSEEN_BUTTON": "Sense the Unseen (Reaction)",
+      "SENSE_UNSEEN_TOOLTIP": "Use your Sense the Unseen feat to make undetected creatures hidden",
+      "SENSE_UNSEEN_APPLIED": "Sense the Unseen Applied"
+    },
+    "REACTIONS": {
+      "BUTTON_LABEL": "Reactions",
+      "BUTTON_TOOLTIP": "Available reactions for this action",
+      "NO_REACTIONS": "No reactions available",
+      "DROPDOWN_TITLE": "Available Reactions",
+      "SENSE_THE_UNSEEN": {
+        "name": "Sense the Unseen",
+        "description": "Even though you failed at the triggering check, you automatically sense any Undetected creatures in the area where you're Seeking, making them merely Hidden to you.",
+        "trigger": "You fail a Seek to find an undetected creature",
+        "effect": "Make undetected creatures hidden to you"
+      }
     },
     "HIDE_AUTOMATION": {
       "BUTTON_APPLY": "Apply Hide Results",

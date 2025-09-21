@@ -105,6 +105,40 @@ body.pf2e-visioner-colorblind-protanopia .pf2e-visioner .state-indicator.visibil
   border-color: #9467bd !important;
 }
 
+/* Seek dialog badges - Protanopia */
+body.pf2e-visioner-colorblind-protanopia .seek-preview-dialog .badge.badge-echolocation {
+  color: #0072b2 !important;
+  background: rgba(0, 114, 178, 0.15) !important;
+  border: 1px solid rgba(0, 114, 178, 0.35) !important;
+}
+body.pf2e-visioner-colorblind-protanopia .seek-preview-dialog .badge.badge-echolocation i {
+  color: #0072b2 !important;
+}
+body.pf2e-visioner-colorblind-protanopia .seek-preview-dialog .badge.badge-lifesense {
+  color: #cc79a7 !important;
+  background: rgba(204, 121, 167, 0.15) !important;
+  border: 1px solid rgba(204, 121, 167, 0.35) !important;
+}
+body.pf2e-visioner-colorblind-protanopia .seek-preview-dialog .badge.badge-lifesense i {
+  color: #cc79a7 !important;
+}
+body.pf2e-visioner-colorblind-protanopia .seek-preview-dialog .badge.badge-tremorsense {
+  color: #f0e442 !important;
+  background: rgba(240, 228, 66, 0.15) !important;
+  border: 1px solid rgba(240, 228, 66, 0.35) !important;
+}
+body.pf2e-visioner-colorblind-protanopia .seek-preview-dialog .badge.badge-tremorsense i {
+  color: #f0e442 !important;
+}
+body.pf2e-visioner-colorblind-protanopia .seek-preview-dialog .badge.badge-scent {
+  color: #9467bd !important;
+  background: rgba(148, 103, 189, 0.15) !important;
+  border: 1px solid rgba(148, 103, 189, 0.35) !important;
+}
+body.pf2e-visioner-colorblind-protanopia .seek-preview-dialog .badge.badge-scent i {
+  color: #9467bd !important;
+}
+
 /* DEUTERANOPIA (Green-blind) - Use blues, yellows, and magentas instead of green/red */
 body.pf2e-visioner-colorblind-deuteranopia {
   /* Visibility state colors - avoid green and red */
@@ -197,6 +231,40 @@ body.pf2e-visioner-colorblind-deuteranopia .pf2e-visioner .state-indicator.visib
   border-color: #d946ef !important;
 }
 
+/* Seek dialog badges - Deuteranopia */
+body.pf2e-visioner-colorblind-deuteranopia .seek-preview-dialog .badge.badge-echolocation {
+  color: #0072b2 !important;
+  background: rgba(0, 114, 178, 0.15) !important;
+  border: 1px solid rgba(0, 114, 178, 0.35) !important;
+}
+body.pf2e-visioner-colorblind-deuteranopia .seek-preview-dialog .badge.badge-echolocation i {
+  color: #0072b2 !important;
+}
+body.pf2e-visioner-colorblind-deuteranopia .seek-preview-dialog .badge.badge-lifesense {
+  color: #d946ef !important;
+  background: rgba(217, 70, 239, 0.15) !important;
+  border: 1px solid rgba(217, 70, 239, 0.35) !important;
+}
+body.pf2e-visioner-colorblind-deuteranopia .seek-preview-dialog .badge.badge-lifesense i {
+  color: #d946ef !important;
+}
+body.pf2e-visioner-colorblind-deuteranopia .seek-preview-dialog .badge.badge-tremorsense {
+  color: #f0e442 !important;
+  background: rgba(240, 228, 66, 0.15) !important;
+  border: 1px solid rgba(240, 228, 66, 0.35) !important;
+}
+body.pf2e-visioner-colorblind-deuteranopia .seek-preview-dialog .badge.badge-tremorsense i {
+  color: #f0e442 !important;
+}
+body.pf2e-visioner-colorblind-deuteranopia .seek-preview-dialog .badge.badge-scent {
+  color: #ff8c00 !important;
+  background: rgba(255, 140, 0, 0.15) !important;
+  border: 1px solid rgba(255, 140, 0, 0.35) !important;
+}
+body.pf2e-visioner-colorblind-deuteranopia .seek-preview-dialog .badge.badge-scent i {
+  color: #ff8c00 !important;
+}
+
 /* TRITANOPIA (Blue-blind) - Use greens, yellows, and oranges instead of blue/purple */
 body.pf2e-visioner-colorblind-tritanopia {
   /* Visibility state colors - avoid blue and purple */
@@ -283,6 +351,40 @@ body.pf2e-visioner-colorblind-tritanopia .pf2e-visioner .bulk-state-header[data-
 body.pf2e-visioner-colorblind-tritanopia .pf2e-visioner .state-indicator.visibility-undetected {
   color: #dc143c !important;
   border-color: #dc143c !important;
+}
+
+/* Seek dialog badges - Tritanopia */
+body.pf2e-visioner-colorblind-tritanopia .seek-preview-dialog .badge.badge-echolocation {
+  color: #00b050 !important;
+  background: rgba(0, 176, 80, 0.15) !important;
+  border: 1px solid rgba(0, 176, 80, 0.35) !important;
+}
+body.pf2e-visioner-colorblind-tritanopia .seek-preview-dialog .badge.badge-echolocation i {
+  color: #00b050 !important;
+}
+body.pf2e-visioner-colorblind-tritanopia .seek-preview-dialog .badge.badge-lifesense {
+  color: #dc143c !important;
+  background: rgba(220, 20, 60, 0.15) !important;
+  border: 1px solid rgba(220, 20, 60, 0.35) !important;
+}
+body.pf2e-visioner-colorblind-tritanopia .seek-preview-dialog .badge.badge-lifesense i {
+  color: #dc143c !important;
+}
+body.pf2e-visioner-colorblind-tritanopia .seek-preview-dialog .badge.badge-tremorsense {
+  color: #ffd700 !important;
+  background: rgba(255, 215, 0, 0.15) !important;
+  border: 1px solid rgba(255, 215, 0, 0.35) !important;
+}
+body.pf2e-visioner-colorblind-tritanopia .seek-preview-dialog .badge.badge-tremorsense i {
+  color: #ffd700 !important;
+}
+body.pf2e-visioner-colorblind-tritanopia .seek-preview-dialog .badge.badge-scent {
+  color: #ff6600 !important;
+  background: rgba(255, 102, 0, 0.15) !important;
+  border: 1px solid rgba(255, 102, 0, 0.35) !important;
+}
+body.pf2e-visioner-colorblind-tritanopia .seek-preview-dialog .badge.badge-scent i {
+  color: #ff6600 !important;
 }
 
 /* ACHROMATOPSIA (Complete colorblind) - Use only grayscale with different brightness levels */
@@ -601,6 +703,16 @@ body.pf2e-visioner-colorblind-protanopia .enemy-select {
   border-color: #9467bd !important;
 }
 
+body.pf2e-visioner-colorblind-protanopia .outcome.out-of-range {
+  color: #888888 !important;
+  font-style: italic !important;
+}
+
+body.pf2e-visioner-colorblind-protanopia .outcome.unmet-conditions {
+  color: #f0e442 !important;
+  font-style: italic !important;
+}
+
 body.pf2e-visioner-colorblind-protanopia .state-icon.selected,
 body.pf2e-visioner-colorblind-protanopia .state-icon.calculated-outcome {
   background-color: var(--visibility-observed-bg-strong) !important;
@@ -823,6 +935,16 @@ body.pf2e-visioner-colorblind-deuteranopia .enemy-select {
   border-color: #d946ef !important;
 }
 
+body.pf2e-visioner-colorblind-deuteranopia .outcome.out-of-range {
+  color: #888888 !important;
+  font-style: italic !important;
+}
+
+body.pf2e-visioner-colorblind-deuteranopia .outcome.unmet-conditions {
+  color: #f0e442 !important;
+  font-style: italic !important;
+}
+
 body.pf2e-visioner-colorblind-deuteranopia .state-icon.selected,
 body.pf2e-visioner-colorblind-deuteranopia .state-icon.calculated-outcome {
   background-color: var(--visibility-observed-bg-strong) !important;
@@ -1038,6 +1160,16 @@ body.pf2e-visioner-colorblind-tritanopia .enemy-select {
   color: #dc143c !important;
   background-color: var(--visibility-undetected-bg-strong) !important;
   border-color: #dc143c !important;
+}
+
+body.pf2e-visioner-colorblind-tritanopia .outcome.out-of-range {
+  color: #888888 !important;
+  font-style: italic !important;
+}
+
+body.pf2e-visioner-colorblind-tritanopia .outcome.unmet-conditions {
+  color: #ffd700 !important;
+  font-style: italic !important;
 }
 
 body.pf2e-visioner-colorblind-tritanopia .state-icon.selected,
@@ -1264,6 +1396,16 @@ body.pf2e-visioner-colorblind-achromatopsia .enemy-select {
   color: #333333 !important;
   background-color: var(--visibility-undetected-bg-strong) !important;
   border-color: #333333 !important;
+}
+
+body.pf2e-visioner-colorblind-achromatopsia .outcome.out-of-range {
+  color: #888888 !important;
+  font-style: italic !important;
+}
+
+body.pf2e-visioner-colorblind-achromatopsia .outcome.unmet-conditions {
+  color: #cccccc !important;
+  font-style: italic !important;
 }
 
 body.pf2e-visioner-colorblind-achromatopsia .state-icon.selected,
@@ -2589,6 +2731,124 @@ body.pf2e-visioner-colorblind-achromatopsia .state-indicator:contains('Greater C
   --pf2e-visioner-brown: #555555; /* Medium-dark gray */
   --pf2e-visioner-brown-light: #f8f9fa;
   --pf2e-visioner-brown-lighter: #e9ecef;
+}
+
+/* Seek dialog badges - Achromatopsia */
+body.pf2e-visioner-colorblind-achromatopsia .seek-preview-dialog .badge.badge-echolocation {
+  color: #ffffff !important;
+  background: rgba(255, 255, 255, 0.15) !important;
+  border: 1px solid rgba(255, 255, 255, 0.35) !important;
+}
+body.pf2e-visioner-colorblind-achromatopsia .seek-preview-dialog .badge.badge-echolocation i {
+  color: #ffffff !important;
+}
+body.pf2e-visioner-colorblind-achromatopsia .seek-preview-dialog .badge.badge-lifesense {
+  color: #888888 !important;
+  background: rgba(136, 136, 136, 0.15) !important;
+  border: 1px solid rgba(136, 136, 136, 0.35) !important;
+}
+body.pf2e-visioner-colorblind-achromatopsia .seek-preview-dialog .badge.badge-lifesense i {
+  color: #888888 !important;
+}
+body.pf2e-visioner-colorblind-achromatopsia .seek-preview-dialog .badge.badge-tremorsense {
+  color: #cccccc !important;
+  background: rgba(204, 204, 204, 0.15) !important;
+  border: 1px solid rgba(204, 204, 204, 0.35) !important;
+}
+body.pf2e-visioner-colorblind-achromatopsia .seek-preview-dialog .badge.badge-tremorsense i {
+  color: #cccccc !important;
+}
+body.pf2e-visioner-colorblind-achromatopsia .seek-preview-dialog .badge.badge-scent {
+  color: #666666 !important;
+  background: rgba(102, 102, 102, 0.15) !important;
+  border: 1px solid rgba(102, 102, 102, 0.35) !important;
+}
+body.pf2e-visioner-colorblind-achromatopsia .seek-preview-dialog .badge.badge-scent i {
+  color: #666666 !important;
+}
+
+/* Sense the Unseen Button - All colorblind modes use high contrast */
+body.pf2e-visioner-colorblind-protanopia .seek-preview-dialog .sense-unseen-button,
+body.pf2e-visioner-colorblind-deuteranopia .seek-preview-dialog .sense-unseen-button,
+body.pf2e-visioner-colorblind-tritanopia .seek-preview-dialog .sense-unseen-button,
+body.pf2e-visioner-colorblind-achromatopsia .seek-preview-dialog .sense-unseen-button {
+  background: linear-gradient(135deg, #374151 0%, #4b5563 50%, #6b7280 100%) !important;
+  border: 2px solid #ffffff !important;
+  box-shadow:
+    0 4px 14px rgba(55, 65, 81, 0.4) !important,
+    inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
+}
+
+body.pf2e-visioner-colorblind-protanopia .seek-preview-dialog .sense-unseen-button:hover,
+body.pf2e-visioner-colorblind-deuteranopia .seek-preview-dialog .sense-unseen-button:hover,
+body.pf2e-visioner-colorblind-tritanopia .seek-preview-dialog .sense-unseen-button:hover,
+body.pf2e-visioner-colorblind-achromatopsia .seek-preview-dialog .sense-unseen-button:hover {
+  background: linear-gradient(135deg, #1f2937 0%, #374151 50%, #4b5563 100%) !important;
+  box-shadow:
+    0 6px 20px rgba(55, 65, 81, 0.5) !important,
+    inset 0 1px 0 rgba(255, 255, 255, 0.3) !important;
+}
+
+body.pf2e-visioner-colorblind-protanopia .seek-preview-dialog .sense-unseen-button.applied,
+body.pf2e-visioner-colorblind-deuteranopia .seek-preview-dialog .sense-unseen-button.applied,
+body.pf2e-visioner-colorblind-tritanopia .seek-preview-dialog .sense-unseen-button.applied,
+body.pf2e-visioner-colorblind-achromatopsia .seek-preview-dialog .sense-unseen-button.applied {
+  background: linear-gradient(135deg, #ffffff 0%, #f3f4f6 50%, #e5e7eb 100%) !important;
+  color: #000000 !important;
+  border-color: #000000 !important;
+  box-shadow:
+    0 4px 14px rgba(0, 0, 0, 0.2) !important,
+    inset 0 1px 0 rgba(0, 0, 0, 0.1) !important;
+}
+
+body.pf2e-visioner-colorblind-protanopia .seek-preview-dialog .sense-unseen-button.applied:hover,
+body.pf2e-visioner-colorblind-deuteranopia .seek-preview-dialog .sense-unseen-button.applied:hover,
+body.pf2e-visioner-colorblind-tritanopia .seek-preview-dialog .sense-unseen-button.applied:hover,
+body.pf2e-visioner-colorblind-achromatopsia
+  .seek-preview-dialog
+  .sense-unseen-button.applied:hover {
+  background: linear-gradient(135deg, #ffffff 0%, #f3f4f6 50%, #e5e7eb 100%) !important;
+  transform: none !important;
+}
+
+body.pf2e-visioner-colorblind-protanopia .seek-preview-dialog .sense-unseen-section,
+body.pf2e-visioner-colorblind-deuteranopia .seek-preview-dialog .sense-unseen-section,
+body.pf2e-visioner-colorblind-tritanopia .seek-preview-dialog .sense-unseen-section,
+body.pf2e-visioner-colorblind-achromatopsia .seek-preview-dialog .sense-unseen-section {
+  border-color: #ffffff !important;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.08),
+    rgba(243, 244, 246, 0.12)
+  ) !important;
+  box-shadow: 0 4px 12px rgba(255, 255, 255, 0.15) !important;
+}
+
+body.pf2e-visioner-colorblind-protanopia .seek-preview-dialog .sense-unseen-section::before,
+body.pf2e-visioner-colorblind-deuteranopia .seek-preview-dialog .sense-unseen-section::before,
+body.pf2e-visioner-colorblind-tritanopia .seek-preview-dialog .sense-unseen-section::before,
+body.pf2e-visioner-colorblind-achromatopsia .seek-preview-dialog .sense-unseen-section::before {
+  background: linear-gradient(90deg, #ffffff, #f3f4f6, #e5e7eb) !important;
+}
+
+body.pf2e-visioner-colorblind-protanopia .seek-preview-dialog .sense-unseen-section.applied,
+body.pf2e-visioner-colorblind-deuteranopia .seek-preview-dialog .sense-unseen-section.applied,
+body.pf2e-visioner-colorblind-tritanopia .seek-preview-dialog .sense-unseen-section.applied,
+body.pf2e-visioner-colorblind-achromatopsia .seek-preview-dialog .sense-unseen-section.applied {
+  border-color: #000000 !important;
+  background: linear-gradient(135deg, rgba(0, 0, 0, 0.08), rgba(55, 65, 81, 0.12)) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+}
+
+body.pf2e-visioner-colorblind-protanopia .seek-preview-dialog .sense-unseen-section.applied::before,
+body.pf2e-visioner-colorblind-deuteranopia
+  .seek-preview-dialog
+  .sense-unseen-section.applied::before,
+body.pf2e-visioner-colorblind-tritanopia .seek-preview-dialog .sense-unseen-section.applied::before,
+body.pf2e-visioner-colorblind-achromatopsia
+  .seek-preview-dialog
+  .sense-unseen-section.applied::before {
+  background: linear-gradient(90deg, #000000, #374151, #6b7280) !important;
 }
 
 /* End colorblind styles */

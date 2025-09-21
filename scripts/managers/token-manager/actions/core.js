@@ -5,20 +5,29 @@
 
 import { MODULE_ID } from '../../../constants.js';
 import { refreshEveryonesPerception } from '../../../services/socket.js';
-import { getCoverMap, getVisibilityMap, setCoverMap, setVisibilityMap, getSceneTargets } from '../../../utils.js';
+import {
+  getCoverMap,
+  getSceneTargets,
+  getVisibilityMap,
+  setCoverMap,
+  setVisibilityMap,
+} from '../../../utils.js';
 
 // Helper: compute allowed token IDs according to current filters
 function computeAllowedTokenIds(app) {
   try {
     const tokens = getSceneTargets(app.observer, app.encounterOnly, app.ignoreAllies) || [];
-    const hideFoundryHidden = app?.hideFoundryHidden ?? game.settings.get(MODULE_ID, 'hideFoundryHiddenTokens');
+    const hideFoundryHidden =
+      app?.hideFoundryHidden ?? game.settings.get(MODULE_ID, 'hideFoundryHiddenTokens');
     const ids = new Set();
     for (const t of tokens) {
       const id = t?.document?.id;
       if (!id) continue;
       if (hideFoundryHidden && t?.document?.hidden === true) continue;
       // off-table safety: ensure present on canvas
-      try { if (!canvas.tokens.get(id)) continue; } catch { }
+      try {
+        if (!canvas.tokens.get(id)) continue;
+      } catch {}
       ids.add(id);
     }
     return ids;
@@ -85,8 +94,12 @@ export async function formHandler(event, form, formData) {
         // Apply AVS overrides for manual token manager changes
         if (overrideMap.size > 0) {
           try {
-            const { default: AvsOverrideManager } = await import('../../../chat/services/infra/avs-override-manager.js');
-            await AvsOverrideManager.applyOverrides(app.observer, overrideMap, { source: 'manual_action' });
+            const { default: AvsOverrideManager } = await import(
+              '../../../chat/services/infra/avs-override-manager.js'
+            );
+            await AvsOverrideManager.applyOverrides(app.observer, overrideMap, {
+              source: 'manual_action',
+            });
           } catch (e) {
             console.warn('Token Manager: failed to create AVS overrides (observer mode):', e);
           }
@@ -150,7 +163,7 @@ export async function formHandler(event, form, formData) {
       if (!observerToken) continue;
       try {
         if (['loot', 'vehicle', 'party'].includes(observerToken?.actor?.type)) continue;
-      } catch { }
+      } catch {}
       const current = getVisibilityMap(observerToken) || {};
       const currentState = current[app.observer.document.id];
       if (currentState === newVisibilityState) continue;
@@ -174,7 +187,7 @@ export async function formHandler(event, form, formData) {
         if (!observerToken) continue;
         try {
           if (['loot', 'vehicle', 'party'].includes(observerToken?.actor?.type)) continue;
-        } catch { }
+        } catch {}
         observerUpdates.push({
           target: app.observer,
           state: newVisibilityState,
@@ -195,8 +208,12 @@ export async function formHandler(event, form, formData) {
         try {
           const observerToken = canvas.tokens.get(observerTokenId);
           if (observerToken && map.size > 0) {
-            const { default: AvsOverrideManager } = await import('../../../chat/services/infra/avs-override-manager.js');
-            await AvsOverrideManager.applyOverrides(observerToken, map, { source: 'manual_action' });
+            const { default: AvsOverrideManager } = await import(
+              '../../../chat/services/infra/avs-override-manager.js'
+            );
+            await AvsOverrideManager.applyOverrides(observerToken, map, {
+              source: 'manual_action',
+            });
           }
         } catch (e) {
           console.warn('Token Manager: failed to create AVS overrides (target mode):', e);
@@ -237,7 +254,7 @@ export async function formHandler(event, form, formData) {
           }
           continue;
         }
-      } catch { }
+      } catch {}
       if (currentState === newCoverState && newCoverState !== 'none') continue;
       if (!perObserverCover.has(observerTokenId))
         perObserverCover.set(observerTokenId, { token: observerToken, map: current });
@@ -254,7 +271,7 @@ export async function formHandler(event, form, formData) {
         if (!observerToken) continue;
         try {
           if (['loot', 'vehicle', 'party'].includes(observerToken?.actor?.type)) continue;
-        } catch { }
+        } catch {}
         observerUpdates.push({
           target: app.observer,
           state: newCoverState,
@@ -289,11 +306,11 @@ export async function formHandler(event, form, formData) {
       );
       try {
         await updateSpecificTokenPairs([]);
-      } catch { }
+      } catch {}
       try {
         await updateWallVisuals();
-      } catch { }
-    } catch { }
+      } catch {}
+    } catch {}
   })();
   return app.render();
 }
@@ -388,8 +405,12 @@ export async function applyCurrent(event, button) {
             }
           }
           if (changes.size > 0) {
-            const { default: AvsOverrideManager } = await import('../../../chat/services/infra/avs-override-manager.js');
-            await AvsOverrideManager.applyOverrides(app.observer, changes, { source: 'manual_action' });
+            const { default: AvsOverrideManager } = await import(
+              '../../../chat/services/infra/avs-override-manager.js'
+            );
+            await AvsOverrideManager.applyOverrides(app.observer, changes, {
+              source: 'manual_action',
+            });
           }
         } catch (e) {
           console.warn('Token Manager: failed to create AVS overrides (applyCurrent observer):', e);
@@ -434,7 +455,7 @@ export async function applyCurrent(event, button) {
           if (!observerToken) continue;
           try {
             if (['loot', 'vehicle', 'party'].includes(observerToken?.actor?.type)) continue;
-          } catch { }
+          } catch {}
           const observerVisibilityData = getVisibilityMap(observerToken) || {};
           // Skip if no actual change (treat undefined as 'observed')
           const prev = observerVisibilityData?.[app.observer.document.id] ?? 'observed';
@@ -450,7 +471,9 @@ export async function applyCurrent(event, button) {
             .updates.push({ target: app.observer, state: newState });
           // AVS override for target-mode edit
           try {
-            const { default: AvsOverrideManager } = await import('../../../chat/services/infra/avs-override-manager.js');
+            const { default: AvsOverrideManager } = await import(
+              '../../../chat/services/infra/avs-override-manager.js'
+            );
             const map = new Map();
             const expectedCover = app._savedModeData.target?.cover?.[observerTokenId];
             map.set(app.observer.document.id, {
@@ -459,7 +482,9 @@ export async function applyCurrent(event, button) {
               hasCover: expectedCover ? expectedCover !== 'none' : undefined,
               expectedCover,
             });
-            await AvsOverrideManager.applyOverrides(observerToken, map, { source: 'manual_action' });
+            await AvsOverrideManager.applyOverrides(observerToken, map, {
+              source: 'manual_action',
+            });
           } catch (e) {
             console.warn('Token Manager: failed to create AVS overrides (applyCurrent target):', e);
           }
@@ -495,7 +520,7 @@ export async function applyCurrent(event, button) {
             });
           }
         }
-      } catch { }
+      } catch {}
     }
 
     if (isCover) {
@@ -544,7 +569,7 @@ export async function applyCurrent(event, button) {
           try {
             const t = observer.actor?.type;
             if (t === 'loot' || t === 'vehicle' || t === 'party') continue;
-          } catch { }
+          } catch {}
           allOperations.push(async () => {
             const { batchUpdateCoverEffects } = await import('../../../cover/ephemeral.js');
             await batchUpdateCoverEffects(observer, updates);
@@ -578,7 +603,7 @@ export async function applyCurrent(event, button) {
       // Refresh wall indicators for current observer
       try {
         await updateWallVisuals(app.observer?.id || null);
-      } catch { }
+      } catch {}
     }
   } catch (error) {
     console.error('Token Manager: Error applying current type for both modes:', error);
@@ -647,7 +672,9 @@ export async function applyBoth(_event, _button) {
       await setVisibilityMap(app.observer, { ...currentMap, ...vis });
       // AVS overrides for observer-mode changes
       try {
-        const { default: AvsOverrideManager } = await import('../../../chat/services/infra/avs-override-manager.js');
+        const { default: AvsOverrideManager } = await import(
+          '../../../chat/services/infra/avs-override-manager.js'
+        );
         const map = new Map();
         for (const [tokenId, newState] of Object.entries(vis)) {
           const targetToken = canvas.tokens.get(tokenId);
@@ -662,7 +689,8 @@ export async function applyBoth(_event, _button) {
             expectedCover,
           });
         }
-        if (map.size > 0) await AvsOverrideManager.applyOverrides(app.observer, map, { source: 'manual_action' });
+        if (map.size > 0)
+          await AvsOverrideManager.applyOverrides(app.observer, map, { source: 'manual_action' });
       } catch (e) {
         console.warn('Token Manager: failed to create AVS overrides (applyBoth observer):', e);
       }
@@ -715,7 +743,9 @@ export async function applyBoth(_event, _button) {
         });
         // AVS overrides for target-mode changes
         try {
-          const { default: AvsOverrideManager } = await import('../../../chat/services/infra/avs-override-manager.js');
+          const { default: AvsOverrideManager } = await import(
+            '../../../chat/services/infra/avs-override-manager.js'
+          );
           const map = new Map();
           const expectedCover = app._savedModeData.target?.cover?.[observerTokenId];
           map.set(app.observer.document.id, {

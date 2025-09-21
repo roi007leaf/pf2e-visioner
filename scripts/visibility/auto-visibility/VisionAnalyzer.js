@@ -45,7 +45,12 @@ export class VisionAnalyzer {
    */
   getVisionCapabilities(token) {
     if (!token?.actor) {
-      return { hasVision: false, hasDarkvision: false, hasLowLightVision: false, hasGreaterDarkvision: false };
+      return {
+        hasVision: false,
+        hasDarkvision: false,
+        hasLowLightVision: false,
+        hasGreaterDarkvision: false,
+      };
     }
 
     const tokenId = token.document.id;
@@ -70,9 +75,155 @@ export class VisionAnalyzer {
   }
 
   /**
+   * Check if a target can be detected by lifesense based on creature type and traits
+   * Lifesense can detect living creatures (vitality energy) and undead creatures (void energy)
+   * @param {Token} target - The target token to check
+   * @returns {boolean} True if the target can be detected by lifesense
+   */
+  canDetectWithLifesense(target) {
+    try {
+      const actor = target?.actor;
+      if (!actor) return false;
+
+      // Check creature type
+      const creatureType = actor.system?.details?.creatureType || actor.type;
+
+      // Lifesense CANNOT detect these truly non-living, non-undead creature types
+      const nonDetectableTypes = ['construct'];
+      if (nonDetectableTypes.includes(creatureType)) return false;
+
+      // Check traits for construct trait (some creatures might have construct trait but different type)
+      const traits = actor.system?.traits?.value || actor.system?.details?.traits?.value || [];
+      if (
+        Array.isArray(traits) &&
+        traits.some((trait) =>
+          typeof trait === 'string'
+            ? trait.toLowerCase() === 'construct'
+            : trait?.value?.toLowerCase() === 'construct',
+        )
+      ) {
+        return false;
+      }
+
+      // Lifesense can detect undead creatures (void energy)
+      if (creatureType === 'undead') return true;
+      if (
+        Array.isArray(traits) &&
+        traits.some((trait) =>
+          typeof trait === 'string'
+            ? trait.toLowerCase() === 'undead'
+            : trait?.value?.toLowerCase() === 'undead',
+        )
+      ) {
+        return true;
+      }
+
+      // Check for explicit living trait
+      if (
+        Array.isArray(traits) &&
+        traits.some((trait) =>
+          typeof trait === 'string'
+            ? trait.toLowerCase() === 'living'
+            : trait?.value?.toLowerCase() === 'living',
+        )
+      ) {
+        return true;
+      }
+
+      // Default to detectable for unknown types (most creatures have either vitality or void energy)
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Check if a target can be detected by a specific special sense
+   * @param {Token} target - The target token to check
+   * @param {string} senseType - The type of special sense (lifesense, echolocation, etc.)
+   * @returns {boolean} True if detectable by the sense
+   */
+  async canDetectWithSpecialSense(target, senseType) {
+    try {
+      const { SPECIAL_SENSES } = await import('../../constants.js');
+      const senseConfig = SPECIAL_SENSES[senseType];
+      if (!senseConfig) return false;
+
+      const actor = target?.actor;
+      if (!actor) return false;
+
+      const creatureType = actor.system?.details?.creatureType || actor.type;
+      const traits = actor.system?.traits?.value || actor.system?.details?.traits?.value || [];
+
+      // Check if this sense can detect constructs
+      if (!senseConfig.detectsConstructs) {
+        if (creatureType === 'construct') return false;
+        if (
+          Array.isArray(traits) &&
+          traits.some((trait) =>
+            typeof trait === 'string'
+              ? trait.toLowerCase() === 'construct'
+              : trait?.value?.toLowerCase() === 'construct',
+          )
+        ) {
+          return false;
+        }
+      }
+
+      // Check if this sense can detect undead
+      if (!senseConfig.detectsUndead) {
+        if (creatureType === 'undead') return false;
+        if (
+          Array.isArray(traits) &&
+          traits.some((trait) =>
+            typeof trait === 'string'
+              ? trait.toLowerCase() === 'undead'
+              : trait?.value?.toLowerCase() === 'undead',
+          )
+        ) {
+          return false;
+        }
+      }
+
+      // Check if this sense can detect living creatures
+      if (!senseConfig.detectsLiving) {
+        const livingTypes = [
+          'character',
+          'npc',
+          'animal',
+          'beast',
+          'fey',
+          'humanoid',
+          'plant',
+          'fiend',
+          'celestial',
+          'monitor',
+          'elemental',
+        ];
+        if (livingTypes.includes(creatureType)) return false;
+        if (
+          Array.isArray(traits) &&
+          traits.some((trait) =>
+            typeof trait === 'string'
+              ? trait.toLowerCase() === 'living'
+              : trait?.value?.toLowerCase() === 'living',
+          )
+        ) {
+          return false;
+        }
+      }
+
+      // If we get here, the sense can detect this type of creature
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
    * Parse an actor's senses into a normalized summary.
    * Supports both array (NPC) and object (PC) formats and values under value.*
-   * Returns { precise: [{type, range}], imprecise: [{type, range}], hearing: { acuity, range }|null, echolocationActive, echolocationRange }
+   * Returns { precise: [{type, range}], imprecise: [{type, range}], hearing: { acuity, range }|null, echolocationActive, echolocationRange, lifesense: { range }|null }
    * Note: This does not include normal visual sight; see getVisionCapabilities for that.
    */
   getSensingSummary(token) {
@@ -83,13 +234,17 @@ export class VisionAnalyzer {
       hearing: null,
       echolocationActive: false,
       echolocationRange: 0,
+      lifesense: null,
     };
     if (!actor) return summary;
 
     // Echolocation detection: prefer PF2e effect item (effect-echolocation) over our module flag
     try {
-      const effects = actor.itemTypes?.effect ?? actor.items?.filter?.((i) => i?.type === 'effect') ?? [];
-      const hasEchoEffect = !!effects?.some?.((e) => (e?.slug || e?.system?.slug || e?.name)?.toLowerCase?.() === 'effect-echolocation');
+      const effects =
+        actor.itemTypes?.effect ?? actor.items?.filter?.((i) => i?.type === 'effect') ?? [];
+      const hasEchoEffect = !!effects?.some?.(
+        (e) => (e?.slug || e?.system?.slug || e?.name)?.toLowerCase?.() === 'effect-echolocation',
+      );
       if (hasEchoEffect) {
         summary.echolocationActive = true;
         summary.echolocationRange = 40; // RAW default; effect does not typically encode range separately
@@ -101,21 +256,45 @@ export class VisionAnalyzer {
           summary.echolocationRange = Number(echo.range) || 40;
         }
       }
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
 
     let senses = null;
     try {
       senses = actor.system?.perception?.senses ?? actor.perception?.senses ?? null;
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
     if (!senses) return summary;
 
     const pushSense = (type, acuity, range) => {
       const r = Number(range);
-      const entry = { type: String(type || '').toLowerCase(), range: Number.isFinite(r) ? r : Infinity };
+      const entry = {
+        type: String(type || '').toLowerCase(),
+        range: Number.isFinite(r) ? r : Infinity,
+      };
       const a = String(acuity || '').toLowerCase();
+
       if (entry.type === 'hearing') {
         summary.hearing = { acuity: a || 'imprecise', range: entry.range };
+      } else if (entry.type === 'lifesense') {
+        // Lifesense is always imprecise per PF2E rules
+        summary.lifesense = { range: entry.range };
+        summary.imprecise.push(entry);
+        return; // Don't process further as we've handled it specially
+      } else {
+        // Check if this is a special sense we track
+        const specialSenseTypes = ['echolocation', 'tremorsense', 'scent'];
+        if (specialSenseTypes.includes(entry.type)) {
+          summary[entry.type] = { range: entry.range };
+          // Add to appropriate acuity array
+          if (a === 'precise') summary.precise.push(entry);
+          else summary.imprecise.push(entry);
+          return; // Don't process further as we've handled it specially
+        }
       }
+
       if (a === 'precise') summary.precise.push(entry);
       else if (a === 'imprecise' || a === 'vague' || !a) summary.imprecise.push(entry);
       else summary.imprecise.push(entry);
@@ -138,7 +317,9 @@ export class VisionAnalyzer {
           pushSense(type, acuity, range);
         }
       }
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
 
     // Upgrade hearing to precise within echolocation range when active
     try {
@@ -147,9 +328,34 @@ export class VisionAnalyzer {
         // Represent precise-hearing as a precise sense with capped range
         summary.precise.push({ type: 'hearing', range: r });
       }
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
 
     return summary;
+  }
+
+  /**
+   * Check if lifesense can detect the target
+   * @param {Token} observer - The observing token
+   * @param {Token} target - The target token
+   * @returns {boolean} True if lifesense can detect the target
+   */
+  canDetectWithLifesenseInRange(observer, target) {
+    try {
+      const s = this.getSensingSummary(observer);
+      if (!s.lifesense) return false;
+
+      // Check if target can be detected by lifesense (living/undead)
+      if (!this.canDetectWithLifesense(target)) return false;
+
+      // Check range
+      const dist = this.#distanceFeet(observer, target);
+      const range = Number(s.lifesense.range);
+      return Number.isFinite(range) ? range >= dist : true;
+    } catch {
+      return false;
+    }
   }
 
   /**
@@ -160,15 +366,32 @@ export class VisionAnalyzer {
       const s = this.getSensingSummary(observer);
       if (!s.imprecise.length && !s.hearing) return false;
       const dist = this.#distanceFeet(observer, target);
+
+      // Check regular imprecise senses (including lifesense)
       for (const ent of s.imprecise) {
         if (!ent || typeof ent.range !== 'number') continue;
+
+        // Special handling for lifesense - must check if target is detectable
+        if (ent.type === 'lifesense') {
+          if (
+            this.canDetectWithLifesense(target) &&
+            (ent.range === Infinity || ent.range >= dist)
+          ) {
+            return true;
+          }
+          continue;
+        }
+
+        // Regular imprecise senses
         if (ent.range === Infinity || ent.range >= dist) return true;
       }
+
+      // Check hearing
       if (s.hearing) {
         const hr = Number(s.hearing.range);
         if (!Number.isFinite(hr) || hr >= dist) return true;
       }
-    } catch { }
+    } catch {}
     return false;
   }
 
@@ -185,7 +408,7 @@ export class VisionAnalyzer {
         if (ent.type === 'vision' || ent.type === 'sight') continue;
         if (ent.range === Infinity || ent.range >= dist) return true;
       }
-    } catch { }
+    } catch {}
     return false;
   }
 
@@ -210,7 +433,9 @@ export class VisionAnalyzer {
       const gridSize = canvas?.grid?.size || 100;
       const unitDist = canvas?.scene?.grid?.distance || 5;
       return (px / gridSize) * unitDist;
-    } catch { return Infinity; }
+    } catch {
+      return Infinity;
+    }
   }
 
   /**
@@ -221,7 +446,12 @@ export class VisionAnalyzer {
   #calculateVisionCapabilities(token) {
     const actor = token.actor;
     if (!actor) {
-      return { hasVision: false, hasDarkvision: false, hasLowLightVision: false, hasGreaterDarkvision: false };
+      return {
+        hasVision: false,
+        hasDarkvision: false,
+        hasLowLightVision: false,
+        hasGreaterDarkvision: false,
+      };
     }
 
     let hasVision = true;
@@ -290,7 +520,8 @@ export class VisionAnalyzer {
           if (senses['greater-darkvision'] || senses.greaterDarkvision) {
             hasDarkvision = true;
             hasGreaterDarkvision = true;
-            darkvisionRange = (senses['greater-darkvision']?.range || senses.greaterDarkvision?.range || Infinity);
+            darkvisionRange =
+              senses['greater-darkvision']?.range || senses.greaterDarkvision?.range || Infinity;
           }
           if (senses.darkvision) {
             hasDarkvision = true;
@@ -310,10 +541,17 @@ export class VisionAnalyzer {
       }
 
       // Greater darkvision via flags or custom fields
-      if (!hasGreaterDarkvision && (actor['greater-darkvision'] || actor.system?.['greater-darkvision'])) {
+      if (
+        !hasGreaterDarkvision &&
+        (actor['greater-darkvision'] || actor.system?.['greater-darkvision'])
+      ) {
         hasDarkvision = true;
         hasGreaterDarkvision = true;
-        darkvisionRange = actor['greater-darkvision'] || actor.system?.['greater-darkvision'] || darkvisionRange || Infinity;
+        darkvisionRange =
+          actor['greater-darkvision'] ||
+          actor.system?.['greater-darkvision'] ||
+          darkvisionRange ||
+          Infinity;
       }
 
       if (!hasLowLightVision && (actor['low-light-vision'] || actor.system?.['low-light-vision'])) {
@@ -330,7 +568,11 @@ export class VisionAnalyzer {
       if (!hasGreaterDarkvision && (flags['greater-darkvision'] || flags.greaterDarkvision)) {
         hasDarkvision = true;
         hasGreaterDarkvision = true;
-        darkvisionRange = (flags['greater-darkvision']?.range || flags.greaterDarkvision?.range || darkvisionRange || Infinity);
+        darkvisionRange =
+          flags['greater-darkvision']?.range ||
+          flags.greaterDarkvision?.range ||
+          darkvisionRange ||
+          Infinity;
       }
       if (!hasLowLightVision && flags['low-light-vision']) {
         hasLowLightVision = true;
@@ -340,9 +582,12 @@ export class VisionAnalyzer {
       // New: support PF2e ancestry feat "Greater Darkvision" for PCs that don't list a separate sense
       if (!hasGreaterDarkvision) {
         try {
-          const feats = actor.itemTypes?.feat
-            ?? (actor.items?.filter?.((i) => i?.type === 'feat') || []);
-          const hasFeat = !!feats?.some?.((it) => normalizeSlug(it?.system?.slug ?? it?.slug ?? it?.name) === 'greater-darkvision');
+          const feats =
+            actor.itemTypes?.feat ?? (actor.items?.filter?.((i) => i?.type === 'feat') || []);
+          const hasFeat = !!feats?.some?.(
+            (it) =>
+              normalizeSlug(it?.system?.slug ?? it?.slug ?? it?.name) === 'greater-darkvision',
+          );
           if (hasFeat) {
             hasGreaterDarkvision = true;
             hasDarkvision = true;
@@ -352,8 +597,7 @@ export class VisionAnalyzer {
           /* ignore feat read errors */
         }
       }
-    } catch {
-    }
+    } catch {}
 
     const result = {
       hasVision,
@@ -381,7 +625,13 @@ export class VisionAnalyzer {
     try {
       if (raw) {
         const res = this.#hasDirectLineOfSight(observer, target);
-        if (log.enabled()) log.debug(() => ({ step: 'los-raw', observer: observer?.name, target: target?.name, res }));
+        if (log.enabled())
+          log.debug(() => ({
+            step: 'los-raw',
+            observer: observer?.name,
+            target: target?.name,
+            res,
+          }));
         return res;
       }
       // Special handling for sneaking tokens - bypass Foundry's detection system
@@ -400,7 +650,13 @@ export class VisionAnalyzer {
         tolerance: 0,
         object: target,
       });
-      if (log.enabled()) log.debug(() => ({ step: 'los-foundry', observer: observer?.name, target: target?.name, result }));
+      if (log.enabled())
+        log.debug(() => ({
+          step: 'los-foundry',
+          observer: observer?.name,
+          target: target?.name,
+          result,
+        }));
 
       return result;
     } catch (error) {
@@ -424,7 +680,14 @@ export class VisionAnalyzer {
       const ray = new RayClass(observer.center, target.center);
       const blocked = canvas.walls?.checkCollision?.(ray, { type: 'sight' }) ?? false;
       const res = !blocked;
-      if (log.enabled()) log.debug(() => ({ step: 'raycast-sight', observer: observer?.name, target: target?.name, blocked, res }));
+      if (log.enabled())
+        log.debug(() => ({
+          step: 'raycast-sight',
+          observer: observer?.name,
+          target: target?.name,
+          blocked,
+          res,
+        }));
       return res;
     } catch (error) {
       console.warn(`${MODULE_ID} | Error in direct line of sight check:`, error);
@@ -466,7 +729,12 @@ export class VisionAnalyzer {
    * @returns {string} Visibility state
    */
   determineVisibilityFromLighting(lightLevel, observerVision) {
-    if (log.enabled()) log.debug(() => ({ step: 'determineVisibility', lightLevel: lightLevel?.level, observerVision }));
+    if (log.enabled())
+      log.debug(() => ({
+        step: 'determineVisibility',
+        lightLevel: lightLevel?.level,
+        observerVision,
+      }));
     // Blinded: Can't see anything (handled by hasVision = false)
     if (!observerVision.hasVision) {
       return 'hidden';

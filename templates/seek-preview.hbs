@@ -12,19 +12,61 @@
     <div class="seeker-details">
       <h3 class="seeker-name">{{seeker.name}}</h3>
       <p class="hint">{{seeker.actionLabel}}</p>
-      {{#if echolocationActive}}
+      {{#if activeSenses}}
         <div class="seek-context-badges">
-          {{#if echolocationActive}}
-            <span class="badge badge-echolocation" data-tooltip="{{localize 'PF2E_VISIONER.SEEK_AUTOMATION.ECHOLOCATION_TOOLTIP'}}">
-              <i class="fas fa-volume-high"></i>
-              <span class="badge-label">{{localize 'PF2E_VISIONER.SEEK_AUTOMATION.ECHOLOCATION_LABEL'}}</span>
-              <span class="badge-range">{{echolocationRange}} ft</span>
+          {{#each activeSenses as |sense|}}
+            <span class="badge badge-{{sense.type}}" data-tooltip="{{localize sense.config.description}}">
+              <i class="{{sense.config.icon}}"></i>
+              <span class="badge-label">{{localize sense.config.label}}</span>
+              <span class="badge-range">{{sense.range}} ft</span>
             </span>
-          {{/if}}
+          {{/each}}
         </div>
       {{/if}}
     </div>
   </div>
+
+  {{!-- Reactions System --}}
+  {{#if hasReactions}}
+    <div class="reactions-section">
+      <div class="reactions-header">
+        <button class="reactions-toggle-button {{#if hasReactions}}has-available{{/if}}" data-action="toggleReactions" data-tooltip="{{localize 'PF2E_VISIONER.REACTIONS.BUTTON_TOOLTIP'}}">
+          <i class="fas fa-bolt"></i>
+          <span class="button-label">{{localize 'PF2E_VISIONER.REACTIONS.BUTTON_LABEL'}}</span>
+          <i class="fas fa-chevron-down reactions-chevron"></i>
+        </button>
+      </div>
+      
+      <div class="reactions-dropdown" style="display: none;">
+        <div class="reactions-dropdown-header">
+          <h4>{{localize 'PF2E_VISIONER.REACTIONS.DROPDOWN_TITLE'}}</h4>
+        </div>
+        
+        <div class="reactions-list">
+          {{#each availableReactions}}
+            <div class="reaction-item {{#if applied}}applied{{else}}available{{/if}}">
+              <button class="reaction-button" data-reaction="{{key}}" {{#if applied}}disabled{{/if}}>
+                <div class="reaction-icon">
+                  <i class="{{icon}}"></i>
+                </div>
+                <div class="reaction-content">
+                  <div class="reaction-name">{{localize name}}</div>
+                  <div class="reaction-description">{{localize description}}</div>
+                </div>
+                <div class="reaction-status">
+                  {{#if applied}}
+                    <i class="fas fa-check-circle applied-icon"></i>
+                  {{else}}
+                    <i class="fas fa-arrow-right use-icon"></i>
+                  {{/if}}
+                </div>
+              </button>
+            </div>
+          {{/each}}
+        </div>
+      </div>
+    </div>
+  {{/if}}
 
   {{!-- Encounter Filter + Ignore Allies (Encounter-only shown when relevant; Ignore allies always shown) --}}
   <div class="encounter-filter-section">
@@ -105,7 +147,7 @@
                 </div>
               {{/if}}
             </td>
-            <td class="outcome {{outcome.outcomeClass}}">
+            <td class="outcome {{outcome.outcomeClass}}" {{#if outcome.unmetCondition}}data-tooltip="{{outcome.unmetCondition}}"{{/if}}>
               {{outcome.outcomeLabel}}
             </td>
             <td class="visibility-change">

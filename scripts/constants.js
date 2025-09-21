@@ -94,12 +94,145 @@ export const COVER_STATES = {
 };
 
 /**
+ * Special senses supported by the module
+ */
+export const SPECIAL_SENSES = {
+  lifesense: {
+    label: 'PF2E_VISIONER.SPECIAL_SENSES.lifesense',
+    description: 'PF2E_VISIONER.SPECIAL_SENSES.lifesense_description',
+    type: 'imprecise',
+    defaultRange: 10,
+    detectsLiving: true, // Vitality energy - most creature types
+    detectsUndead: true, // Void energy - undead creatures
+    detectsConstructs: false, // No life force or void energy
+    canDistinguish: true, // Can tell the difference between living and undead
+    icon: 'fas fa-heartbeat',
+    hasRangeLimit: true,
+  },
+  echolocation: {
+    label: 'PF2E_VISIONER.SPECIAL_SENSES.echolocation',
+    description: 'PF2E_VISIONER.SPECIAL_SENSES.echolocation_description',
+    type: 'precise', // Precise hearing
+    defaultRange: 40,
+    detectsLiving: true,
+    detectsUndead: true,
+    detectsConstructs: true, // Sound-based, detects all solid objects
+    canDistinguish: false,
+    icon: 'fas fa-volume-high',
+    hasRangeLimit: true,
+  },
+  tremorsense: {
+    label: 'PF2E_VISIONER.SPECIAL_SENSES.tremorsense',
+    description: 'PF2E_VISIONER.SPECIAL_SENSES.tremorsense_description',
+    type: 'imprecise',
+    defaultRange: 30,
+    detectsLiving: true,
+    detectsUndead: true,
+    detectsConstructs: true, // Vibration-based, detects all moving/grounded creatures
+    canDistinguish: false,
+    icon: 'fas fa-wave-square',
+    hasRangeLimit: true,
+  },
+  scent: {
+    label: 'PF2E_VISIONER.SPECIAL_SENSES.scent',
+    description: 'PF2E_VISIONER.SPECIAL_SENSES.scent_description',
+    type: 'imprecise',
+    defaultRange: 30,
+    detectsLiving: true,
+    detectsUndead: false, // Most undead don't have scent
+    detectsConstructs: false, // No biological scent
+    canDistinguish: true, // Can distinguish different scents
+    icon: 'fas fa-nose',
+    hasRangeLimit: true,
+  },
+};
+
+/**
+ * Available reactions that can be used during seek actions
+ */
+export const REACTIONS = {
+  senseTheUnseen: {
+    id: 'sense-the-unseen',
+    name: 'PF2E_VISIONER.REACTIONS.SENSE_THE_UNSEEN.name',
+    description: 'PF2E_VISIONER.REACTIONS.SENSE_THE_UNSEEN.description',
+    icon: 'fas fa-eye',
+    type: 'reaction',
+    trigger: 'PF2E_VISIONER.REACTIONS.SENSE_THE_UNSEEN.trigger',
+    effect: 'PF2E_VISIONER.REACTIONS.SENSE_THE_UNSEEN.effect',
+    // Condition check function - determines if this reaction is available
+    isAvailable: (context) => {
+      const { actor, outcomes } = context;
+      if (!actor) return false;
+
+      // Check for Sense the Unseen feat
+      const feats = actor.itemTypes?.feat ?? actor.items?.filter?.((i) => i?.type === 'feat') ?? [];
+      const hasFeat = feats.some((feat) => {
+        const name = feat?.name?.toLowerCase?.() || '';
+        const slug = feat?.system?.slug?.toLowerCase?.() || '';
+        return name.includes('sense the unseen') || slug.includes('sense-the-unseen');
+      });
+
+      if (!hasFeat) return false;
+
+      // Check for failed outcomes with undetected targets (only regular failures, not critical failures)
+      const hasFailedUndetected = outcomes.some(
+        (outcome) => outcome.outcome === 'failure' && outcome.currentVisibility === 'undetected',
+      );
+
+      return hasFailedUndetected;
+    },
+    // Apply function - executes the reaction effect
+    apply: async (context) => {
+      const { outcomes, dialog } = context;
+
+      // Find all failed outcomes where the target is currently undetected (only regular failures, not critical failures)
+      const failedUndetectedOutcomes = outcomes.filter(
+        (outcome) => outcome.outcome === 'failure' && outcome.currentVisibility === 'undetected',
+      );
+
+      if (failedUndetectedOutcomes.length === 0) {
+        return { success: false, message: 'No failed outcomes with undetected targets found.' };
+      }
+
+      // Apply Sense the Unseen: upgrade undetected to hidden
+      const targetIds = failedUndetectedOutcomes.map((o) => o.target?.id).filter(Boolean);
+
+      for (const outcome of failedUndetectedOutcomes) {
+        outcome.newVisibility = 'hidden';
+        outcome.changed = true;
+        outcome.senseUnseenApplied = true;
+        outcome.hasActionableChange = true;
+        outcome.overrideState = 'hidden';
+      }
+
+      // Also update original outcomes for persistence
+      if (Array.isArray(dialog._originalOutcomes)) {
+        for (const originalOutcome of dialog._originalOutcomes) {
+          if (targetIds.includes(originalOutcome.target?.id)) {
+            originalOutcome.newVisibility = 'hidden';
+            originalOutcome.changed = true;
+            originalOutcome.senseUnseenApplied = true;
+            originalOutcome.hasActionableChange = true;
+            originalOutcome.overrideState = 'hidden';
+          }
+        }
+      }
+
+      return {
+        success: true,
+        message: `Applied Sense the Unseen to ${failedUndetectedOutcomes.length} failed outcome(s). Undetected targets are now Hidden.`,
+        affectedOutcomes: failedUndetectedOutcomes,
+      };
+    },
+  },
+};
+
+/**
  * Sneak action flags
  */
 export const SNEAK_FLAGS = {
   SNEAK_ACTIVE: 'sneak-active', // Flag indicating token is currently sneaking
 };
-
 
 /**
  * Default module settings

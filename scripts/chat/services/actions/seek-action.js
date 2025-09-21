@@ -96,7 +96,7 @@ export class SeekActionHandler extends ActionHandlerBase {
           });
         }
       }
-    } catch { }
+    } catch {}
 
     // Do not pre-filter by encounter; the dialog applies encounter filter as needed
     return potential;
@@ -105,9 +105,7 @@ export class SeekActionHandler extends ActionHandlerBase {
   async analyzeOutcome(actionData, subject) {
     const { MODULE_ID } = await import('../../../constants.js');
     const { getVisibilityBetween } = await import('../../../utils.js');
-    const { extractStealthDC, determineOutcome } = await import(
-      '../infra/shared-utils.js'
-    );
+    const { extractStealthDC, determineOutcome } = await import('../infra/shared-utils.js');
 
     let current = 'hidden';
     let dc = 0;
@@ -116,11 +114,15 @@ export class SeekActionHandler extends ActionHandlerBase {
     let thatsOddAuto = false;
     try {
       const { FeatsHandler } = await import('../feats-handler.js');
-      const isAnomaly = !!(subject?._isWall || subject?.actor?.type === 'hazard' || subject?.actor?.type === 'loot');
-      if (isAnomaly && FeatsHandler.hasFeat(actionData.actor, ["thats-odd", "that's-odd"])) {
+      const isAnomaly = !!(
+        subject?._isWall ||
+        subject?.actor?.type === 'hazard' ||
+        subject?.actor?.type === 'loot'
+      );
+      if (isAnomaly && FeatsHandler.hasFeat(actionData.actor, ['thats-odd', "that's-odd"])) {
         thatsOddAuto = true;
       }
-    } catch { }
+    } catch {}
 
     if (subject && subject._isWall) {
       // Walls: use provided dc and evaluate new state vs current observer wall state
@@ -137,7 +139,11 @@ export class SeekActionHandler extends ActionHandlerBase {
 
       // Proficiency gating for hazards/loot (skip if That's Odd guarantees detection)
       try {
-        if (!thatsOddAuto && subject?.actor && (subject.actor.type === 'hazard' || subject.actor.type === 'loot')) {
+        if (
+          !thatsOddAuto &&
+          subject?.actor &&
+          (subject.actor.type === 'hazard' || subject.actor.type === 'loot')
+        ) {
           const minRank = Number(subject.document?.getFlag?.(MODULE_ID, 'minPerceptionRank') ?? 0);
           if (Number.isFinite(minRank) && minRank > 0) {
             const stat = actionData.actor?.actor?.getStatistic?.('perception');
@@ -166,7 +172,7 @@ export class SeekActionHandler extends ActionHandlerBase {
             }
           }
         }
-      } catch { }
+      } catch {}
 
       // For loot actors, use the custom Stealth DC flag configured on the token; otherwise use Perception DC
       dc = extractStealthDC(subject);
@@ -174,8 +180,9 @@ export class SeekActionHandler extends ActionHandlerBase {
     const total = Number(actionData?.roll?.total ?? 0);
     const die = Number(
       actionData?.roll?.dice?.[0]?.results?.[0]?.result ??
-      actionData?.roll?.dice?.[0]?.total ??
-      actionData?.roll?.terms?.[0]?.total ?? 0,
+        actionData?.roll?.dice?.[0]?.total ??
+        actionData?.roll?.terms?.[0]?.total ??
+        0,
     );
     const outcome = determineOutcome(total, die, dc);
     // Simple mapping: success → observed; failure → concealed/hidden depending on target state; crit-failure → undetected
@@ -184,12 +191,93 @@ export class SeekActionHandler extends ActionHandlerBase {
     // Feat-based post visibility adjustments (Keen Eyes, That's Odd)
     try {
       const { FeatsHandler } = await import('../feats-handler.js');
-      newVisibility = FeatsHandler.adjustVisibility('seek', actionData.actor, current, newVisibility, {
-        subjectType: subject?._isWall ? 'wall' : subject?.actor?.type,
-        isHiddenWall: !!subject?._isWall,
-        outcome,
-      });
-    } catch { }
+      newVisibility = FeatsHandler.adjustVisibility(
+        'seek',
+        actionData.actor,
+        current,
+        newVisibility,
+        {
+          subjectType: subject?._isWall ? 'wall' : subject?.actor?.type,
+          isHiddenWall: !!subject?._isWall,
+          outcome,
+        },
+      );
+    } catch {}
+
+    // Check special sense range limitations first
+    try {
+      if (!subject?._isWall) {
+        const { VisionAnalyzer } = await import(
+          '../../../visibility/auto-visibility/VisionAnalyzer.js'
+        );
+        const { SPECIAL_SENSES } = await import('../../../constants.js');
+        const va = VisionAnalyzer.getInstance();
+        const sensingSummary = va.getSensingSummary(actionData.actor);
+
+        // Check all ranged special senses
+        for (const [senseType, senseConfig] of Object.entries(SPECIAL_SENSES)) {
+          if (!senseConfig.hasRangeLimit) continue;
+
+          const senseData = sensingSummary[senseType];
+          if (!senseData) continue;
+
+          // Check if target can be detected by this sense
+          const canDetectType = await va.canDetectWithSpecialSense(subject, senseType);
+          if (!canDetectType) {
+            // Target is undetectable by this sense regardless of roll outcome
+            // Generate explanation for why this sense can't detect the target
+            const unmetCondition = this.#getUnmetConditionExplanation(
+              subject,
+              senseType,
+              senseConfig,
+            );
+
+            return {
+              target: subject,
+              dc,
+              roll: total,
+              die,
+              rollTotal: total,
+              dieResult: die,
+              margin: total - dc,
+              outcome: 'unmet-conditions',
+              currentVisibility: current,
+              oldVisibility: current,
+              newVisibility: current, // No visibility change
+              changed: false,
+              unmetConditions: true,
+              senseType,
+              senseRange: senseData.range,
+              unmetCondition,
+            };
+          }
+
+          // Check range limitation
+          const dist = this.#calculateDistance(actionData.actor, subject);
+
+          if (senseData.range !== Infinity && dist > senseData.range) {
+            // Target is out of range for this sense regardless of roll outcome
+            return {
+              target: subject,
+              dc,
+              roll: total,
+              die,
+              rollTotal: total,
+              dieResult: die,
+              margin: total - dc,
+              outcome: 'out-of-range',
+              currentVisibility: current,
+              oldVisibility: current,
+              newVisibility: current, // No visibility change
+              changed: false,
+              outOfRange: true,
+              senseType,
+              senseRange: senseData.range,
+            };
+          }
+        }
+      }
+    } catch {}
 
     // PF2e RAW correction: You CAN Seek with imprecise senses,
     // but the best you can do is make the target Hidden (never Observed).
@@ -207,7 +295,7 @@ export class SeekActionHandler extends ActionHandlerBase {
           newVisibility = 'hidden';
         }
       }
-    } catch { }
+    } catch {}
 
     // Build display metadata for walls
     let wallMeta = {};
@@ -227,7 +315,7 @@ export class SeekActionHandler extends ActionHandlerBase {
           wallIdentifier: name,
           wallImg: img,
         };
-      } catch { }
+      } catch {}
     }
 
     const base = {
@@ -276,7 +364,7 @@ export class SeekActionHandler extends ActionHandlerBase {
             if (wallCenter) {
               const distance = Math.sqrt(
                 Math.pow(wallCenter.x - actionData.seekTemplateCenter.x, 2) +
-                Math.pow(wallCenter.y - actionData.seekTemplateCenter.y, 2),
+                  Math.pow(wallCenter.y - actionData.seekTemplateCenter.y, 2),
               );
               const radiusPixels = (actionData.seekTemplateRadiusFeet * canvas.scene.grid.size) / 5;
               inside = distance <= radiusPixels;
@@ -296,7 +384,7 @@ export class SeekActionHandler extends ActionHandlerBase {
 
         if (!inside) return { ...base, changed: false };
       }
-    } catch { }
+    } catch {}
 
     return base;
   }
@@ -338,7 +426,7 @@ export class SeekActionHandler extends ActionHandlerBase {
           oldVisibility: outcome?.oldVisibility || outcome?.currentVisibility || null,
         };
       }
-    } catch { }
+    } catch {}
     return super.outcomeToChange(actionData, outcome);
   }
 
@@ -416,7 +504,7 @@ export class SeekActionHandler extends ActionHandlerBase {
             try {
               const { updateWallVisuals } = await import('../../../services/visual-effects.js');
               await updateWallVisuals(observer.id);
-            } catch { }
+            } catch {}
           } catch {
             /* ignore per-observer wall errors */
           }
@@ -459,7 +547,7 @@ export class SeekActionHandler extends ActionHandlerBase {
             return id ? tokenMap.has(id) : false;
           });
         }
-      } catch { }
+      } catch {}
 
       if (filtered.length === 0) {
         (await import('../infra/notifications.js')).notify.info('No changes to apply');
@@ -475,6 +563,86 @@ export class SeekActionHandler extends ActionHandlerBase {
     } catch (e) {
       (await import('../infra/notifications.js')).log.error(e);
       return 0;
+    }
+  }
+
+  /**
+   * Calculate distance between two tokens in feet
+   * @param {Token} token1 - First token
+   * @param {Token} token2 - Second token
+   * @returns {number} Distance in feet
+   */
+  #calculateDistance(token1, token2) {
+    try {
+      const dx = token1.center.x - token2.center.x;
+      const dy = token1.center.y - token2.center.y;
+      const px = Math.hypot(dx, dy);
+      const gridSize = canvas?.grid?.size || 100;
+      const unitDist = canvas?.scene?.grid?.distance || 5;
+      return (px / gridSize) * unitDist;
+    } catch {
+      return Infinity;
+    }
+  }
+
+  /**
+   * Generate explanation for why a special sense cannot detect a target
+   * @param {Token} target - The target token
+   * @param {string} senseType - The type of special sense
+   * @param {Object} senseConfig - The sense configuration from SPECIAL_SENSES
+   * @returns {string} Human-readable explanation
+   */
+  #getUnmetConditionExplanation(target, senseType, senseConfig) {
+    try {
+      const actor = target?.actor;
+      if (!actor) return 'Target has no actor data';
+
+      const creatureType = actor.system?.details?.creatureType || actor.type;
+      const traits = actor.system?.traits?.value || actor.system?.details?.traits?.value || [];
+
+      // Check what the sense can't detect and why
+      const isConstruct =
+        creatureType === 'construct' ||
+        (Array.isArray(traits) &&
+          traits.some((trait) =>
+            typeof trait === 'string'
+              ? trait.toLowerCase() === 'construct'
+              : trait?.value?.toLowerCase() === 'construct',
+          ));
+
+      const isUndead =
+        creatureType === 'undead' ||
+        (Array.isArray(traits) &&
+          traits.some((trait) =>
+            typeof trait === 'string'
+              ? trait.toLowerCase() === 'undead'
+              : trait?.value?.toLowerCase() === 'undead',
+          ));
+
+      // Generate specific explanations based on sense type and target type
+      if (senseType === 'lifesense') {
+        if (isConstruct) {
+          return 'Constructs have no life force or void energy to detect';
+        }
+      } else if (senseType === 'scent') {
+        if (isUndead) {
+          return 'Undead creatures typically have no biological scent';
+        }
+        if (isConstruct) {
+          return 'Constructs have no biological scent to detect';
+        }
+      } else if (senseType === 'echolocation') {
+        // Echolocation should detect everything, so this shouldn't happen
+        return 'Target cannot be detected by sound reflection';
+      } else if (senseType === 'tremorsense') {
+        // Tremorsense should detect most things, rare cases might be flying/incorporeal
+        return 'Target produces no detectable vibrations';
+      }
+
+      // Generic fallback
+      return `${creatureType.charAt(0).toUpperCase() + creatureType.slice(1)} creatures cannot be detected by ${senseType}`;
+    } catch {
+      return 'Target cannot be detected by this sense';
     }
   }
 }

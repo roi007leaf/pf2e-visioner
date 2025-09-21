@@ -870,6 +870,28 @@ function getChatAutomationCSS() {
             color: var(--visibility-undetected); /* Red */
         }
         
+        /* Out of Range - Gray - Unified */
+        .results-table tbody td.outcome.out-of-range,
+        .seek-results-table tbody td.outcome.out-of-range,
+        .hide-results-table tbody td.outcome.out-of-range,
+        .point-out-results-table tbody td.outcome.out-of-range,
+        .create-a-diversion-preview-dialog .results-table tbody td.outcome.out-of-range,
+        .sneak-results-table tbody td.outcome.out-of-range {
+            color: #888888; /* Gray */
+            font-style: italic;
+        }
+        
+        /* Unmet Conditions - Orange - Unified */
+        .results-table tbody td.outcome.unmet-conditions,
+        .seek-results-table tbody td.outcome.unmet-conditions,
+        .hide-results-table tbody td.outcome.unmet-conditions,
+        .point-out-results-table tbody td.outcome.unmet-conditions,
+        .create-a-diversion-preview-dialog .results-table tbody td.outcome.unmet-conditions,
+        .sneak-results-table tbody td.outcome.unmet-conditions {
+            color: #ff8c00; /* Orange */
+            font-style: italic;
+        }
+        
         /* Bulk Action Buttons */
         .seek-preview-dialog-bulk-action-btn {
             padding: 6px 12px;
@@ -2910,6 +2932,415 @@ function getChatAutomationCSS() {
             font-style: italic;
             color: var(--color-text-secondary, #ccc);
             font-size: 12px;
+        }
+
+        /* Sense the Unseen Button Styles - High Priority Override */
+        .seek-preview-dialog .sense-unseen-section {
+          margin: 16px 0 !important;
+          padding: 16px !important;
+          border: 2px solid #8b5cf6 !important;
+          border-radius: 12px !important;
+          background: linear-gradient(135deg, rgba(139, 92, 246, 0.08), rgba(168, 85, 247, 0.12)) !important;
+          box-shadow: 0 4px 12px rgba(139, 92, 246, 0.15) !important;
+          position: relative !important;
+          overflow: hidden !important;
+        }
+
+        .seek-preview-dialog .sense-unseen-section::before {
+          content: '' !important;
+          position: absolute !important;
+          top: 0 !important;
+          left: 0 !important;
+          right: 0 !important;
+          height: 3px !important;
+          background: linear-gradient(90deg, #8b5cf6, #a855f7, #c084fc) !important;
+          border-radius: 12px 12px 0 0 !important;
+        }
+
+        .seek-preview-dialog .sense-unseen-button {
+          display: flex !important;
+          align-items: center !important;
+          justify-content: center !important;
+          gap: 10px !important;
+          width: 100% !important;
+          padding: 14px 20px !important;
+          background: linear-gradient(135deg, #8b5cf6 0%, #a855f7 50%, #c084fc 100%) !important;
+          color: white !important;
+          border: none !important;
+          border-radius: 8px !important;
+          font-size: 15px !important;
+          font-weight: 700 !important;
+          cursor: pointer !important;
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+          box-shadow: 
+            0 4px 14px rgba(139, 92, 246, 0.4),
+            inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
+          text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3) !important;
+          position: relative !important;
+          overflow: hidden !important;
+          font-family: inherit !important;
+          text-decoration: none !important;
+          outline: none !important;
+        }
+
+        .seek-preview-dialog .sense-unseen-button::before {
+          content: '' !important;
+          position: absolute !important;
+          top: 0 !important;
+          left: -100% !important;
+          width: 100% !important;
+          height: 100% !important;
+          background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent) !important;
+          transition: left 0.5s ease !important;
+        }
+
+        .seek-preview-dialog .sense-unseen-button:hover::before {
+          left: 100% !important;
+        }
+
+        .seek-preview-dialog .sense-unseen-button:hover {
+          background: linear-gradient(135deg, #7c3aed 0%, #9333ea 50%, #a855f7 100%) !important;
+          transform: translateY(-2px) !important;
+          box-shadow: 
+            0 6px 20px rgba(139, 92, 246, 0.5),
+            inset 0 1px 0 rgba(255, 255, 255, 0.3) !important;
+        }
+
+        .seek-preview-dialog .sense-unseen-button:active {
+          transform: translateY(-1px) !important;
+          box-shadow: 
+            0 4px 14px rgba(139, 92, 246, 0.4),
+            inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
+        }
+
+        .seek-preview-dialog .sense-unseen-button i {
+          font-size: 18px !important;
+          filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3)) !important;
+        }
+
+        .seek-preview-dialog .sense-unseen-button .button-label {
+          font-weight: 700 !important;
+          letter-spacing: 0.5px !important;
+        }
+
+        /* Applied State - High Priority Override */
+        .seek-preview-dialog .sense-unseen-button.applied,
+        .sense-unseen-button.applied {
+          background: linear-gradient(135deg, #10b981 0%, #059669 50%, #047857 100%) !important;
+          cursor: not-allowed !important;
+          box-shadow: 
+            0 4px 14px rgba(16, 185, 129, 0.4),
+            inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
+          opacity: 0.9 !important;
+        }
+
+        .seek-preview-dialog .sense-unseen-button.applied:hover,
+        .sense-unseen-button.applied:hover {
+          background: linear-gradient(135deg, #10b981 0%, #059669 50%, #047857 100%) !important;
+          transform: none !important;
+          box-shadow: 
+            0 4px 14px rgba(16, 185, 129, 0.4),
+            inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
+          opacity: 0.9 !important;
+        }
+
+        .seek-preview-dialog .sense-unseen-button.applied::before {
+          display: none !important;
+        }
+
+        .seek-preview-dialog .sense-unseen-button.applied i {
+          animation: checkPulse 0.6s ease-out !important;
+        }
+
+        @keyframes checkPulse {
+          0% { transform: scale(0.8); opacity: 0; }
+          50% { transform: scale(1.2); opacity: 1; }
+          100% { transform: scale(1); opacity: 1; }
+        }
+
+        /* Applied section styling */
+        .seek-preview-dialog .sense-unseen-section.applied {
+          border-color: #10b981 !important;
+          background: linear-gradient(135deg, rgba(16, 185, 129, 0.08), rgba(5, 150, 105, 0.12)) !important;
+          box-shadow: 0 4px 12px rgba(16, 185, 129, 0.15) !important;
+        }
+
+        .seek-preview-dialog .sense-unseen-section.applied::before {
+          background: linear-gradient(90deg, #10b981, #059669, #047857) !important;
+        }
+
+        /* Reactions System Styles */
+        .seek-preview-dialog .reactions-section {
+          margin: 16px 0 !important;
+          width: auto !important;
+          display: block !important;
+          max-width: 100% !important;
+        }
+
+        .seek-preview-dialog .reactions-header {
+          display: flex !important;
+          align-items: center !important;
+          justify-content: flex-start !important;
+          padding: 0 !important;
+          margin-bottom: 12px !important;
+        }
+
+        .seek-preview-dialog .reactions-toggle-button {
+          display: inline-flex !important;
+          align-items: center !important;
+          justify-content: center !important;
+          gap: 8px !important;
+          width: auto !important;
+          min-width: 140px !important;
+          padding: 12px 16px !important;
+          background: linear-gradient(135deg, #f59e0b 0%, #fbbf24 50%, #fcd34d 100%) !important;
+          color: white !important;
+          border: none !important;
+          border-radius: 8px !important;
+          font-size: 14px !important;
+          font-weight: 600 !important;
+          cursor: pointer !important;
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+          box-shadow:
+            0 4px 14px rgba(245, 158, 11, 0.4),
+            inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
+          text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3) !important;
+          position: relative !important;
+          overflow: hidden !important;
+          font-family: inherit !important;
+          text-decoration: none !important;
+          outline: none !important;
+        }
+
+        .seek-preview-dialog .reactions-toggle-button:hover {
+          background: linear-gradient(135deg, #d97706 0%, #f59e0b 50%, #fbbf24 100%) !important;
+          transform: translateY(-1px) !important;
+          box-shadow:
+            0 6px 20px rgba(245, 158, 11, 0.5),
+            inset 0 1px 0 rgba(255, 255, 255, 0.3) !important;
+        }
+
+        .seek-preview-dialog .reactions-toggle-button.active {
+          background: linear-gradient(135deg, #d97706 0%, #f59e0b 50%, #fbbf24 100%) !important;
+        }
+
+        .seek-preview-dialog .reactions-chevron {
+          transition: transform 0.3s ease !important;
+          margin-left: 8px !important;
+        }
+
+        .seek-preview-dialog .reactions-chevron.rotated {
+          transform: rotate(180deg) !important;
+        }
+
+        /* Pulsing animation for available reactions */
+        .seek-preview-dialog .reactions-toggle-button.has-available {
+          animation: reactionPulse 2s ease-in-out infinite !important;
+        }
+
+        @keyframes reactionPulse {
+          0% { 
+            transform: scale(1);
+            box-shadow: 
+              0 4px 14px rgba(245, 158, 11, 0.4),
+              inset 0 1px 0 rgba(255, 255, 255, 0.2),
+              0 0 0 0 rgba(245, 158, 11, 0.8);
+          }
+          50% { 
+            transform: scale(1.05);
+            box-shadow: 
+              0 6px 20px rgba(245, 158, 11, 0.6),
+              inset 0 1px 0 rgba(255, 255, 255, 0.3),
+              0 0 0 10px rgba(245, 158, 11, 0);
+          }
+          100% { 
+            transform: scale(1);
+            box-shadow: 
+              0 4px 14px rgba(245, 158, 11, 0.4),
+              inset 0 1px 0 rgba(255, 255, 255, 0.2),
+              0 0 0 0 rgba(245, 158, 11, 0);
+          }
+        }
+
+        .seek-preview-dialog .reactions-dropdown {
+          padding: 12px 0 0 0 !important;
+          background: transparent !important;
+          border: none !important;
+          margin-top: 8px !important;
+          max-height: none !important;
+          overflow: visible !important;
+          height: auto !important;
+        }
+
+        .seek-preview-dialog .reactions-dropdown-header h4 {
+          margin: 0 0 12px 0 !important;
+          color: var(--color-text-primary, #f0f0f0) !important;
+          font-size: 16px !important;
+          font-weight: 600 !important;
+        }
+
+        .seek-preview-dialog .reactions-list {
+          display: flex !important;
+          flex-direction: column !important;
+          gap: 12px !important;
+          width: 100% !important;
+          max-width: none !important;
+        }
+
+        .seek-preview-dialog .reaction-item {
+          border-radius: 8px !important;
+          overflow: visible !important;
+          border: 1px solid rgba(245, 158, 11, 0.3) !important;
+          background: rgba(0, 0, 0, 0.1) !important;
+          margin-bottom: 8px !important;
+          min-height: auto !important;
+          height: auto !important;
+        }
+
+        .seek-preview-dialog .reaction-item.applied {
+          border-color: rgba(16, 185, 129, 0.5) !important;
+          background: rgba(16, 185, 129, 0.1) !important;
+        }
+
+        .seek-preview-dialog .reaction-item.available {
+          animation: reactionItemGlow 2.5s ease-in-out infinite !important;
+          border-color: rgba(245, 158, 11, 0.7) !important;
+        }
+
+        @keyframes reactionItemGlow {
+          0% { 
+            border-color: rgba(245, 158, 11, 0.7);
+            box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.5);
+            background: rgba(0, 0, 0, 0.1);
+          }
+          50% { 
+            border-color: rgba(245, 158, 11, 1);
+            box-shadow: 0 0 0 6px rgba(245, 158, 11, 0);
+            background: rgba(245, 158, 11, 0.05);
+          }
+          100% { 
+            border-color: rgba(245, 158, 11, 0.7);
+            box-shadow: 0 0 0 0 rgba(245, 158, 11, 0);
+            background: rgba(0, 0, 0, 0.1);
+          }
+        }
+
+        .seek-preview-dialog .reaction-button {
+          display: flex !important;
+          align-items: flex-start !important;
+          width: 100% !important;
+          padding: 16px !important;
+          background: transparent !important;
+          border: none !important;
+          color: var(--color-text-primary, #f0f0f0) !important;
+          cursor: pointer !important;
+          transition: all 0.2s ease !important;
+          text-align: left !important;
+          font-family: inherit !important;
+          min-height: auto !important;
+          height: auto !important;
+          box-sizing: border-box !important;
+        }
+
+        .seek-preview-dialog .reaction-button:hover:not(:disabled) {
+          background: rgba(245, 158, 11, 0.1) !important;
+        }
+
+        .seek-preview-dialog .reaction-button:disabled {
+          cursor: not-allowed !important;
+          opacity: 0.7 !important;
+        }
+
+        .seek-preview-dialog .reaction-icon {
+          flex-shrink: 0 !important;
+          width: 36px !important;
+          height: 36px !important;
+          display: flex !important;
+          align-items: center !important;
+          justify-content: center !important;
+          background: rgba(245, 158, 11, 0.2) !important;
+          border-radius: 6px !important;
+          margin-right: 12px !important;
+          margin-top: 2px !important;
+        }
+
+        .seek-preview-dialog .reaction-item.applied .reaction-icon {
+          background: rgba(16, 185, 129, 0.2) !important;
+        }
+
+        .seek-preview-dialog .reaction-icon i {
+          font-size: 16px !important;
+          color: #f59e0b !important;
+        }
+
+        .seek-preview-dialog .reaction-item.applied .reaction-icon i {
+          color: #10b981 !important;
+        }
+
+        .seek-preview-dialog .reaction-content {
+          flex: 1 !important;
+          margin-right: 12px !important;
+          padding-top: 4px !important;
+        }
+
+        .seek-preview-dialog .reaction-name {
+          font-weight: 600 !important;
+          font-size: 15px !important;
+          margin-bottom: 6px !important;
+          color: var(--color-text-primary, #f0f0f0) !important;
+          text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5) !important;
+          line-height: 1.2 !important;
+        }
+
+        .seek-preview-dialog .reaction-description {
+          font-size: 12px !important;
+          color: var(--color-text-dark-secondary, #cccccc) !important;
+          line-height: 1.5 !important;
+          text-shadow: 0 1px 1px rgba(0, 0, 0, 0.3) !important;
+          word-wrap: break-word !important;
+          overflow-wrap: break-word !important;
+          white-space: normal !important;
+          overflow: visible !important;
+          max-width: none !important;
+          width: 100% !important;
+        }
+
+        .seek-preview-dialog .reaction-status {
+          flex-shrink: 0 !important;
+          margin-left: 12px !important;
+          padding-top: 8px !important;
+          align-self: flex-start !important;
+        }
+
+        .seek-preview-dialog .applied-icon {
+          color: #10b981 !important;
+          font-size: 18px !important;
+        }
+
+        .seek-preview-dialog .use-icon {
+          color: #f59e0b !important;
+          font-size: 14px !important;
+          opacity: 0.7 !important;
+        }
+
+        .seek-preview-dialog .reaction-item.available .use-icon {
+          opacity: 1 !important;
+          animation: iconPulse 2s ease-in-out infinite !important;
+        }
+
+        @keyframes iconPulse {
+          0% { 
+            opacity: 0.7;
+            transform: scale(1);
+          }
+          50% { 
+            opacity: 1;
+            transform: scale(1.1);
+          }
+          100% { 
+            opacity: 0.7;
+            transform: scale(1);
+          }
         }
     `;
 }

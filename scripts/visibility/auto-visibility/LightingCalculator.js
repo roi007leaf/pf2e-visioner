@@ -131,7 +131,7 @@ export class LightingCalculator {
       const isHeightenedDarkness = darknessRank >= 4;
       const darknessResult = makeIlluminationResult(DARK, {
         isDarknessSource: true,
-        isHeightenedDarkness: isHeightenedDarkness,
+        isHeightenedDarkness,
         darknessRank,
       });
 

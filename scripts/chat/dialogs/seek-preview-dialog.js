@@ -3,7 +3,7 @@
  * Uses ApplicationV2 for modern FoundryVTT compatibility
  */
 
-import { MODULE_ID, MODULE_TITLE } from '../../constants.js';
+import { MODULE_ID, MODULE_TITLE, REACTIONS } from '../../constants.js';
 import { getVisibilityBetween } from '../../utils.js';
 import { getDesiredOverrideStatesForAction } from '../services/data/action-state-config.js';
 import { notify } from '../services/infra/notifications.js';
@@ -62,6 +62,7 @@ export class SeekPreviewDialog extends BaseActionDialog {
     super(options);
     this.actorToken = actorToken; // Renamed for clarity
     this.outcomes = outcomes;
+    this._appliedReactions = new Set(); // Track applied reactions
     // Preserve original outcomes so toggles (like Ignore Allies) can re-filter properly
     this._originalOutcomes = Array.isArray(outcomes) ? [...outcomes] : [];
     this.changes = changes;
@@ -119,7 +120,7 @@ export class SeekPreviewDialog extends BaseActionDialog {
           'target',
         );
       }
-    } catch { }
+    } catch {}
     // Optional walls exclusion for UI convenience
     if (this.ignoreWalls === true) {
       filteredOutcomes = Array.isArray(filteredOutcomes)
@@ -145,13 +146,14 @@ export class SeekPreviewDialog extends BaseActionDialog {
     try {
       const previous = Array.isArray(this.outcomes) ? this.outcomes : [];
       filteredOutcomes = filteredOutcomes.map((o) => {
-        const existing = o?._isWall && o?.wallId
-          ? previous.find((x) => x?._isWall && x?.wallId === o.wallId)
-          : previous.find((x) => x?.target?.id === o?.target?.id);
+        const existing =
+          o?._isWall && o?.wallId
+            ? previous.find((x) => x?._isWall && x?.wallId === o.wallId)
+            : previous.find((x) => x?.target?.id === o?.target?.id);
         const overrideState = existing?.overrideState ?? o?.overrideState ?? null;
         return { ...o, overrideState };
       });
-    } catch { }
+    } catch {}
 
     // Prepare outcomes for template
     let processedOutcomes = await Promise.all(
@@ -192,7 +194,7 @@ export class SeekPreviewDialog extends BaseActionDialog {
                       await setVisibilityBetween(pcToken, outcome.target, inferred, {
                         direction: 'observer_to_target',
                       });
-                    } catch { }
+                    } catch {}
                   }
                 }
 
@@ -201,7 +203,7 @@ export class SeekPreviewDialog extends BaseActionDialog {
                   await setVisibilityBetween(this.actorToken, outcome.target, inferred, {
                     direction: 'observer_to_target',
                   });
-                } catch { }
+                } catch {}
 
                 // Remove PF2e system condition to avoid double-state after Visioner owns it
                 try {
@@ -212,23 +214,25 @@ export class SeekPreviewDialog extends BaseActionDialog {
                   else if (actor?.toggleCondition)
                     await actor.toggleCondition(slug, { active: false });
                   else if (actor?.decreaseCondition) await actor.decreaseCondition(slug);
-                } catch { }
+                } catch {}
                 currentVisibility = inferred;
                 // Ensure in-memory outcomes reflect the actual new mapping right away
                 outcome.oldVisibility = currentVisibility;
                 outcome.newVisibility = currentVisibility;
               }
             }
-          } catch { }
+          } catch {}
         }
 
         // Prepare available states for override using per-action config
         const desired = getDesiredOverrideStatesForAction('seek');
         const availableStates = this.buildOverrideStates(desired, outcome);
 
-        const effectiveNewState = outcome.overrideState || outcome.newVisibility || currentVisibility;
+        const effectiveNewState =
+          outcome.overrideState || outcome.newVisibility || currentVisibility;
         // Prefer the recorded oldVisibility as the baseline; fall back to current live mapping
-        const baseOldState = outcome.oldVisibility != null ? outcome.oldVisibility : currentVisibility;
+        const baseOldState =
+          outcome.oldVisibility != null ? outcome.oldVisibility : currentVisibility;
         // Actionable if original differs from new or override
         const hasActionableChange =
           baseOldState != null && effectiveNewState != null && effectiveNewState !== baseOldState;
@@ -255,17 +259,21 @@ export class SeekPreviewDialog extends BaseActionDialog {
     try {
       if (this.hideFoundryHidden) {
         processedOutcomes = processedOutcomes.filter((o) => {
-          try { return o?._isWall || o?.target?.document?.hidden !== true; } catch { return true; }
+          try {
+            return o?._isWall || o?.target?.document?.hidden !== true;
+          } catch {
+            return true;
+          }
         });
       }
-    } catch { }
+    } catch {}
 
     // Show-only-changes visual filter
     try {
       if (this.showOnlyChanges) {
         processedOutcomes = processedOutcomes.filter((o) => !!o.hasActionableChange);
       }
-    } catch { }
+    } catch {}
 
     // Update original outcomes with hasActionableChange for Apply All button logic
     processedOutcomes.forEach((processedOutcome, index) => {
@@ -275,24 +283,53 @@ export class SeekPreviewDialog extends BaseActionDialog {
     });
 
     // Set actor context for seeker
-    // Echolocation flag on seeker (precise hearing until next turn)
-    let echolocationActive = false;
-    let echolocationRange = 0;
+    // Detect all special senses on seeker
+    let activeSenses = [];
     try {
-      // Prefer PF2e effect item slug
+      const { VisionAnalyzer } = await import('../../visibility/auto-visibility/VisionAnalyzer.js');
+      const { SPECIAL_SENSES } = await import('../../constants.js');
+      const visionAnalyzer = VisionAnalyzer.getInstance();
+      const sensingSummary = visionAnalyzer.getSensingSummary(this.actorToken);
+
+      // Check for echolocation via effect item first (legacy support)
       const effects = this.actorToken?.actor?.itemTypes?.effect ?? [];
-      const hasEchoEffect = !!effects?.some?.((e) => (e?.slug || e?.system?.slug || e?.name)?.toLowerCase?.() === 'effect-echolocation');
+      const hasEchoEffect = !!effects?.some?.(
+        (e) => (e?.slug || e?.system?.slug || e?.name)?.toLowerCase?.() === 'effect-echolocation',
+      );
       if (hasEchoEffect) {
-        echolocationActive = true;
-        echolocationRange = 40;
+        activeSenses.push({
+          type: 'echolocation',
+          range: 40,
+          config: SPECIAL_SENSES.echolocation,
+        });
       } else {
+        // Check for echolocation via flag (legacy support)
         const flag = this.actorToken?.actor?.getFlag?.('pf2e-visioner', 'echolocation');
         if (flag?.active) {
-          echolocationActive = true;
-          echolocationRange = Number(flag.range) || 40;
+          activeSenses.push({
+            type: 'echolocation',
+            range: Number(flag.range) || 40,
+            config: SPECIAL_SENSES.echolocation,
+          });
         }
       }
-    } catch { }
+
+      // Check for all special senses from sensing summary
+      for (const [senseType, senseConfig] of Object.entries(SPECIAL_SENSES)) {
+        if (sensingSummary[senseType]) {
+          // Avoid duplicate echolocation if already added via effect/flag
+          if (senseType === 'echolocation' && activeSenses.some((s) => s.type === 'echolocation')) {
+            continue;
+          }
+
+          activeSenses.push({
+            type: senseType,
+            range: sensingSummary[senseType].range,
+            config: senseConfig,
+          });
+        }
+      }
+    } catch {}
 
     context.seeker = {
       name: this.actorToken?.name || 'Unknown Actor',
@@ -300,8 +337,21 @@ export class SeekPreviewDialog extends BaseActionDialog {
       actionType: 'seek',
       actionLabel: 'Seek action results analysis',
     };
-    context.echolocationActive = echolocationActive;
-    context.echolocationRange = echolocationRange;
+    context.activeSenses = activeSenses;
+
+    // Legacy support for existing template logic
+    const echolocationSense = activeSenses.find((s) => s.type === 'echolocation');
+    const lifesenseSense = activeSenses.find((s) => s.type === 'lifesense');
+    context.echolocationActive = !!echolocationSense;
+    context.echolocationRange = echolocationSense?.range || 0;
+    context.lifesenseActive = !!lifesenseSense;
+    context.lifesenseRange = lifesenseSense?.range || 0;
+
+    // Reactions system - check for available reactions
+    const availableReactions = this.getAvailableReactions(processedOutcomes);
+    context.availableReactions = availableReactions;
+    context.hasReactions = availableReactions.length > 0;
+
     // No noisy environment indicator (feature removed)
     context.outcomes = processedOutcomes;
     context.ignoreWalls = !!this.ignoreWalls;
@@ -350,7 +400,7 @@ export class SeekPreviewDialog extends BaseActionDialog {
             .catch(() => this.render({ force: true }));
         });
       }
-    } catch { }
+    } catch {}
     // Hook up per-dialog Ignore Walls toggle
     try {
       const cbw = content.querySelector('input[data-action="toggleIgnoreWalls"]');
@@ -367,18 +417,50 @@ export class SeekPreviewDialog extends BaseActionDialog {
             .catch(() => this.render({ force: true }));
         });
       }
-    } catch { }
+    } catch {}
     // Hook up Hide Foundry-hidden visual filter
     try {
       const cbh = content.querySelector('input[data-action="toggleHideFoundryHidden"]');
       if (cbh) {
         cbh.addEventListener('change', async () => {
           this.hideFoundryHidden = !!cbh.checked;
-          try { await game.settings.set(MODULE_ID, 'hideFoundryHiddenTokens', this.hideFoundryHidden); } catch { }
+          try {
+            await game.settings.set(MODULE_ID, 'hideFoundryHiddenTokens', this.hideFoundryHidden);
+          } catch {}
           this.render({ force: true });
         });
       }
-    } catch { }
+    } catch {}
+
+    // Hook up reactions system
+    try {
+      // Reactions toggle button
+      const reactionsToggleBtn = content.querySelector('button[data-action="toggleReactions"]');
+      if (reactionsToggleBtn) {
+        reactionsToggleBtn.addEventListener('click', () => {
+          this.toggleReactionsDropdown();
+        });
+      }
+
+      // Individual reaction buttons
+      const reactionButtons = content.querySelectorAll('button[data-reaction]');
+      reactionButtons.forEach((button) => {
+        button.addEventListener('click', async () => {
+          const reactionKey = button.dataset.reaction;
+          await this.applyReaction(reactionKey);
+        });
+      });
+    } catch {}
+
+    // Hook up Sense the Unseen button (deprecated - for backward compatibility)
+    try {
+      const senseUnseenBtn = content.querySelector('button[data-action="applySenseUnseen"]');
+      if (senseUnseenBtn) {
+        senseUnseenBtn.addEventListener('click', async () => {
+          await this.applySenseUnseen();
+        });
+      }
+    } catch {}
     return content;
   }
 
@@ -403,7 +485,7 @@ export class SeekPreviewDialog extends BaseActionDialog {
           const { filterOutcomesByAllies } = await import('../services/infra/shared-utils.js');
           filtered = filterOutcomesByAllies(filtered, this.actorToken, this.ignoreAllies, 'target');
         }
-      } catch { }
+      } catch {}
 
       // Optional walls exclusion for UI convenience
       if (this.ignoreWalls === true) {
@@ -422,7 +504,7 @@ export class SeekPreviewDialog extends BaseActionDialog {
             this.actionData.seekTemplateRadiusFeet,
             'target',
           );
-        } catch { }
+        } catch {}
       }
 
       // Seek distance limits
@@ -433,7 +515,7 @@ export class SeekPreviewDialog extends BaseActionDialog {
           );
           filtered = filterOutcomesBySeekDistance(filtered, this.actorToken, 'target');
         }
-      } catch { }
+      } catch {}
       // Compute actionability and carry over any existing overrides from the currently displayed outcomes
       if (!Array.isArray(filtered)) return [];
       const processed = filtered.map((o) => {
@@ -455,7 +537,7 @@ export class SeekPreviewDialog extends BaseActionDialog {
                 currentVisibility =
                   getVisibilityBetween(this.actorToken, o.target) || currentVisibility;
               }
-            } catch { }
+            } catch {}
           }
           const effectiveNewState = overrideState || o.newVisibility || currentVisibility;
           const baseOldState = o.oldVisibility || currentVisibility;
@@ -471,16 +553,20 @@ export class SeekPreviewDialog extends BaseActionDialog {
       try {
         if (this.hideFoundryHidden) {
           visual = processed.filter((o) => {
-            try { return o?._isWall || o?.target?.document?.hidden !== true; } catch { return true; }
+            try {
+              return o?._isWall || o?.target?.document?.hidden !== true;
+            } catch {
+              return true;
+            }
           });
         }
-      } catch { }
+      } catch {}
       // Apply show-only-changes filter for both UI and Apply All
       try {
         if (this.showOnlyChanges) {
           visual = visual.filter((o) => !!o.hasActionableChange);
         }
-      } catch { }
+      } catch {}
       return visual;
     } catch {
       return Array.isArray(this.outcomes) ? this.outcomes : [];
@@ -553,7 +639,7 @@ export class SeekPreviewDialog extends BaseActionDialog {
         payload.overrides = overrides;
       }
       // Pass current live ignoreAllies so discovery in apply respects checkbox state
-      const appliedCount = await applyNowSeek(payload, { html: () => { }, attr: () => { } });
+      const appliedCount = await applyNowSeek(payload, { html: () => {}, attr: () => {} });
       notify.info(
         `${MODULE_TITLE}: Applied ${appliedCount ?? actionableOutcomes.length} visibility changes. Dialog remains open for additional actions.`,
       );
@@ -590,7 +676,7 @@ export class SeekPreviewDialog extends BaseActionDialog {
       const { revertNowSeek } = await import('../services/index.js');
       await revertNowSeek(
         { ...app.actionData, ignoreAllies: app.ignoreAllies },
-        { html: () => { }, attr: () => { } },
+        { html: () => {}, attr: () => {} },
       );
 
       app.updateRowButtonsToReverted(changedOutcomes);
@@ -637,12 +723,12 @@ export class SeekPreviewDialog extends BaseActionDialog {
         const overrides = {
           __wall__: { [outcome.wallId]: outcome.overrideState || outcome.newVisibility },
         };
-        await applyNowSeek({ ...actionData, overrides }, { html: () => { }, attr: () => { } });
+        await applyNowSeek({ ...actionData, overrides }, { html: () => {}, attr: () => {} });
         // Disable the row's Apply button for this wall
         app.updateRowButtonsToApplied([{ wallId: outcome.wallId }]);
       } else {
         const overrides = { [outcome.target.id]: outcome.overrideState || outcome.newVisibility };
-        await applyNowSeek({ ...actionData, overrides }, { html: () => { }, attr: () => { } });
+        await applyNowSeek({ ...actionData, overrides }, { html: () => {}, attr: () => {} });
         // Disable the row's Apply button for this token
         app.updateRowButtonsToApplied([{ target: { id: outcome.target.id } }]);
       }
@@ -746,7 +832,7 @@ export class SeekPreviewDialog extends BaseActionDialog {
     if (this._selectionHookId) {
       try {
         Hooks.off('controlToken', this._selectionHookId);
-      } catch { }
+      } catch {}
       this._selectionHookId = null;
     }
     _currentSeekDialogInstance = null;
@@ -785,6 +871,320 @@ export class SeekPreviewDialog extends BaseActionDialog {
    * Update bulk action button states based on current bulk action state
    */
   // removed: updateBulkActionButtons duplicated; using BaseActionDialog implementation
+
+  /**
+   * Toggle the reactions dropdown visibility
+   */
+  toggleReactionsDropdown() {
+    const dropdown = this.element?.querySelector('.reactions-dropdown');
+    const chevron = this.element?.querySelector('.reactions-chevron');
+    const toggleButton = this.element?.querySelector('.reactions-toggle-button');
+
+    if (!dropdown) return;
+
+    const isVisible = dropdown.style.display !== 'none';
+
+    if (isVisible) {
+      // Hide dropdown
+      dropdown.style.display = 'none';
+      chevron?.classList.remove('rotated');
+      toggleButton?.classList.remove('active');
+    } else {
+      // Show dropdown
+      dropdown.style.display = 'block';
+      chevron?.classList.add('rotated');
+      toggleButton?.classList.add('active');
+    }
+  }
+
+  /**
+   * Get available reactions for the current context
+   */
+  getAvailableReactions(outcomes) {
+    const actor = this.actorToken?.actor;
+    if (!actor) return [];
+
+    const context = { actor, outcomes, dialog: this };
+    const availableReactions = [];
+
+    // Check each reaction for availability
+    for (const [key, reaction] of Object.entries(REACTIONS)) {
+      try {
+        if (reaction.isAvailable && reaction.isAvailable(context)) {
+          availableReactions.push({
+            ...reaction,
+            key,
+            applied: this._appliedReactions?.has?.(key) || false,
+          });
+        }
+      } catch (error) {
+        console.warn(`Error checking availability for reaction ${key}:`, error);
+      }
+    }
+
+    return availableReactions;
+  }
+
+  /**
+   * Apply a specific reaction
+   */
+  async applyReaction(reactionKey) {
+    const reaction = REACTIONS[reactionKey];
+    if (!reaction) {
+      console.error(`Unknown reaction: ${reactionKey}`);
+      return;
+    }
+
+    // Prevent multiple applications
+    if (!this._appliedReactions) {
+      this._appliedReactions = new Set();
+    }
+
+    if (this._appliedReactions.has(reactionKey)) {
+      notify.info(`${game.i18n.localize(reaction.name)} has already been applied.`);
+      return;
+    }
+
+    try {
+      const context = {
+        actor: this.actorToken?.actor,
+        outcomes: this.outcomes,
+        dialog: this,
+      };
+
+      const result = await reaction.apply(context);
+
+      if (result.success) {
+        // Mark reaction as applied
+        this._appliedReactions.add(reactionKey);
+
+        // Reprocess outcomes to update display properties
+        await this.getFilteredOutcomes().then((reprocessedOutcomes) => {
+          this.outcomes = reprocessedOutcomes;
+        });
+
+        // Force a re-render to update the UI with new states
+        await this.render({ force: true });
+
+        // Update UI to show applied state after re-render
+        this.updateReactionButton(reactionKey, true);
+
+        // Update the reactions toggle button to stop animation if no more reactions are available
+        this.updateReactionsToggleButton();
+
+        notify.info(result.message);
+      } else {
+        notify.warn(result.message);
+      }
+    } catch (error) {
+      console.error(`Error applying reaction ${reactionKey}:`, error);
+      notify.error(`Error applying ${game.i18n.localize(reaction.name)}.`);
+    }
+  }
+
+  /**
+   * Update a reaction button to show applied state
+   */
+  updateReactionButton(reactionKey, applied) {
+    const button = this.element?.querySelector(`[data-reaction="${reactionKey}"]`);
+    if (!button) return;
+
+    if (applied) {
+      button.classList.add('applied');
+      button.disabled = true;
+
+      const reaction = REACTIONS[reactionKey];
+      const appliedText = `${game.i18n.localize(reaction.name)} Applied`;
+      button.innerHTML = `<i class="fas fa-check-circle"></i><span class="button-label">${appliedText}</span>`;
+
+      // Apply green styling
+      button.style.background = 'linear-gradient(135deg, #10b981 0%, #059669 50%, #047857 100%)';
+      button.style.cursor = 'not-allowed';
+      button.style.opacity = '0.9';
+    }
+  }
+
+  /**
+   * Updates the reactions toggle button state based on available reactions
+   */
+  updateReactionsToggleButton() {
+    const toggleButton = this.element?.querySelector('.reactions-toggle-button');
+    if (!toggleButton) return;
+
+    // Check if there are any available (non-applied) reactions
+    const availableReactions = this.getAvailableReactions(this.outcomes);
+    const hasAvailableReactions = availableReactions.some((reaction) => !reaction.applied);
+
+    if (hasAvailableReactions) {
+      // Keep the animation
+      toggleButton.classList.add('has-available');
+    } else {
+      // Stop the animation
+      toggleButton.classList.remove('has-available');
+    }
+  }
+
+  /**
+   * Update outcome rows to reflect changes
+   */
+  updateOutcomeRows(affectedOutcomes) {
+    for (const outcome of affectedOutcomes) {
+      const targetId = outcome.target?.id;
+      if (targetId) {
+        const row = this.element?.querySelector(`tr[data-target-id="${targetId}"]`);
+        if (row) {
+          // Update the visibility cell
+          const visibilityCell = row.querySelector('.visibility-change');
+          if (visibilityCell) {
+            visibilityCell.textContent = 'Hidden';
+            visibilityCell.className = 'visibility-change hidden';
+          }
+
+          // Update the outcome cell
+          const outcomeCell = row.querySelector('.outcome');
+          if (outcomeCell) {
+            outcomeCell.textContent = 'Hidden (Reaction)';
+            outcomeCell.className = 'outcome hidden';
+          }
+        }
+      }
+    }
+  }
+
+  /**
+   * Apply Sense the Unseen feat to upgrade failed outcomes
+   * @deprecated Use applyReaction('senseTheUnseen') instead
+   */
+  async applySenseUnseen() {
+    try {
+      const { notify } = await import('../services/infra/notifications.js');
+
+      // Find all failed outcomes where the target is currently undetected
+      const failedUndetectedOutcomes = this.outcomes.filter(
+        (outcome) => outcome.outcome === 'failure' && outcome.currentVisibility === 'undetected',
+      );
+
+      if (failedUndetectedOutcomes.length === 0) {
+        notify.warn('No failed outcomes with undetected targets found.');
+        return;
+      }
+
+      // Apply Sense the Unseen: upgrade undetected to hidden
+      // We need to update both the current outcomes and the original outcomes
+      const targetIds = failedUndetectedOutcomes.map((o) => o.target?.id).filter(Boolean);
+
+      for (const outcome of failedUndetectedOutcomes) {
+        outcome.newVisibility = 'hidden';
+        outcome.changed = true; // Force changed to true since we're upgrading undetected to hidden
+        outcome.senseUnseenApplied = true;
+        outcome.hasActionableChange = true; // Force actionable change to true
+        // Also set overrideState to ensure it's treated as a user override
+        outcome.overrideState = 'hidden';
+      }
+
+      // Also update the original outcomes so changes persist through re-renders
+      if (Array.isArray(this._originalOutcomes)) {
+        for (const originalOutcome of this._originalOutcomes) {
+          if (targetIds.includes(originalOutcome.target?.id)) {
+            originalOutcome.newVisibility = 'hidden';
+            originalOutcome.changed = true; // Force changed to true
+            originalOutcome.senseUnseenApplied = true;
+            originalOutcome.hasActionableChange = true; // Force actionable change to true
+            // Also set overrideState to ensure it's treated as a user override
+            originalOutcome.overrideState = 'hidden';
+          }
+        }
+      }
+
+      // Reprocess outcomes to update display properties
+      await this.getFilteredOutcomes().then((reprocessedOutcomes) => {
+        this.outcomes = reprocessedOutcomes;
+      });
+
+      // Update the button and section to show applied state
+      const button = this.element?.querySelector('button[data-action="applySenseUnseen"]');
+      const section = this.element?.querySelector('.sense-unseen-section');
+
+      if (button) {
+        // Set the applied flag to prevent multiple applications
+
+        // Update button content with success feedback using localized text
+        const appliedText = game.i18n.localize(
+          'PF2E_VISIONER.SEEK_AUTOMATION.SENSE_UNSEEN_APPLIED',
+        );
+
+        // Update the existing button instead of cloning
+        button.classList.add('applied');
+        button.disabled = true;
+        button.innerHTML = `<i class="fas fa-check-circle"></i><span class="button-label">${appliedText}</span>`;
+
+        // Force style update with inline styles as backup
+        button.style.background = 'linear-gradient(135deg, #10b981 0%, #059669 50%, #047857 100%)';
+        button.style.cursor = 'not-allowed';
+        button.style.opacity = '0.9';
+
+        // Remove all existing event listeners by cloning and replacing
+        const newButton = button.cloneNode(true);
+        button.parentNode.replaceChild(newButton, button);
+
+        // Ensure the cloned button also has the styles
+        newButton.style.background =
+          'linear-gradient(135deg, #10b981 0%, #059669 50%, #047857 100%)';
+        newButton.style.cursor = 'not-allowed';
+        newButton.style.opacity = '0.9';
+
+        // Add click handler to show info when disabled button is clicked
+        newButton.addEventListener('click', (e) => {
+          e.preventDefault();
+          notify.info(`${appliedText} - This feat has already been used for this seek action.`);
+        });
+      }
+
+      if (section) {
+        // Add applied class to section for visual feedback
+        section.classList.add('applied');
+      }
+
+      // Update bulk action state and refresh UI
+      this.bulkActionState = 'initial';
+      this.updateBulkActionButtons();
+      this.updateChangesCount();
+
+      notify.info(
+        `Applied Sense the Unseen to ${failedUndetectedOutcomes.length} failed outcome(s). Undetected targets are now Hidden.`,
+      );
+
+      // Update the affected outcome rows manually without full re-render
+      for (const outcome of failedUndetectedOutcomes) {
+        const targetId = outcome.target?.id;
+        if (targetId) {
+          const row = this.element?.querySelector(`tr[data-target-id="${targetId}"]`);
+          if (row) {
+            // Update the visibility cell
+            const visibilityCell = row.querySelector('.visibility-change');
+            if (visibilityCell) {
+              visibilityCell.textContent = 'Hidden';
+              visibilityCell.className = 'visibility-change hidden';
+            }
+
+            // Update the outcome cell
+            const outcomeCell = row.querySelector('.outcome');
+            if (outcomeCell) {
+              outcomeCell.textContent = 'Hidden (Sense the Unseen)';
+              outcomeCell.className = 'outcome hidden';
+            }
+          }
+        }
+      }
+
+      // Don't re-render to avoid resetting the button state
+      // The outcomes are already updated and the button styling is applied above
+    } catch (error) {
+      console.error('Error applying Sense the Unseen:', error);
+      const { notify } = await import('../services/infra/notifications.js');
+      notify.error('Error applying Sense the Unseen feat.');
+    }
+  }
 
   /**
    * Toggle encounter filtering and refresh results
