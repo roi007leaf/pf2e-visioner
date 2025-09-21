@@ -91,6 +91,10 @@ export class LightingCalculator {
         ],
       };
     }
+
+    // Convert the shape to clipper points
+    const tokenClipperPoints = shapeInWorld.toClipperPoints({scalingFactor: 1.0});
+
     // Approximate token radius as half the diagonal (for cheap distance checks)
     const tokenRadius = Math.hypot(tokenWidth / 2, tokenHeight / 2);
 
@@ -107,6 +111,15 @@ export class LightingCalculator {
       const dy = center.y - light.y;
       const radius = Math.max(light.data.bright, light.data.dim);
       if (dx * dx + dy * dy > radius * radius) continue;
+
+      // If our token clipper points don't intersect the darkness light shape, skip it
+      const solution = light.shape.intersectClipper(tokenClipperPoints);
+      if (!solution.length) continue;
+
+      // Turn the intersection points back into a PIXI polygon to check full containment
+      // For now "full containment" is just checking that the number of points match
+      const intersection = PIXI.Polygon.fromClipperPoints(solution[0], {scalingFactor: 1.0});
+      if (intersection.points.length !== shapeInWorld.points.length) continue;
 
       // Read heightened darkness rank from our module flag if present
       let darknessRank = Number(light.document?.getFlag?.(MODULE_ID, 'darknessRank') || 0) || 0;
@@ -169,20 +182,18 @@ export class LightingCalculator {
 
       // Do a cheap distance check to skip obviously out-of-range sources
       // We nudge out the radius a bit to not reject partially illuminated tokens
-      const cheapDistanceSquared =
+      const distanceSquared =
         (center.x - light.x) * (center.x - light.x) + (center.y - light.y) * (center.y - light.y);
-      const radiusSquared = Math.pow(Math.max(light.data.dim, light.data.bright) + tokenRadius, 2);
-      if (cheapDistanceSquared > radiusSquared) continue;
+      const bumpedRadius = Math.max(light.data.dim, light.data.bright) + tokenRadius;
+      if (distanceSquared > bumpedRadius * bumpedRadius) continue;
 
       // Do the complete polygon intersection check, and if there is any intersection, the token
       // is at least partially illuminated by this light
-      const intersection = light.shape.intersectPolygon(shapeInWorld, { scalingFactor: 1.0 });
-      if (!intersection.points.length) continue;
+      const solution = light.shape.intersectClipper(tokenClipperPoints);
+      if (!solution.length) continue;
 
       // See if we are in the bright area of the light
-      const distanceSquared =
-        (center.x - light.x) * (center.x - light.x) + (center.y - light.y) * (center.y - light.y);
-      const brightRadiusSquared = Math.pow(light.data.bright, 2);
+      const brightRadiusSquared = light.data.bright * light.data.bright;
 
       if (distanceSquared < brightRadiusSquared) return makeIlluminationResult(BRIGHT);
       illumination = Math.max(illumination, DIM);
