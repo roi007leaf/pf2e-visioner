@@ -227,18 +227,18 @@ export class SeekActionHandler extends ActionHandlerBase {
         // Resolve the observer token for accurate LoS and range tests
         const observerToken = actionData.actorToken || actionData.actor?.token?.object || actionData.actor;
         const visCaps = va.getVisionCapabilities(observerToken);
-        const hasLoS = va.hasLineOfSight?.(observerToken, subject) ?? true;
+        const hasLoS = va.hasLineOfSight?.(observerToken, subject, true) ?? true;
         const hasVisualPrecise = !!(
           visCaps?.hasVision && !visCaps?.isBlinded && hasLoS
         );
-        const hasNonVisualPrecise = va.hasPreciseNonVisualInRange(actionData.actor, subject);
+        const hasNonVisualPrecise = va.hasPreciseNonVisualInRange(observerToken, subject);
         const hasAnyPrecise = hasVisualPrecise || hasNonVisualPrecise;
 
         // Evaluate imprecise senses if we lack any precise sense, OR we are blinded AND do not have a non-visual precise sense
         const shouldEvaluateImprecise = !hasAnyPrecise || (visCaps?.isBlinded && !hasNonVisualPrecise);
         if (shouldEvaluateImprecise) {
-          const sensingSummary = va.getSensingSummary(actionData.actor);
-          const dist = this.#calculateDistance(actionData.actor, subject);
+          const sensingSummary = va.getSensingSummary(observerToken);
+          const dist = this.#calculateDistance(observerToken, subject);
 
           let anyImprecisePresent = false;
           let anyImpreciseViable = false;
@@ -298,28 +298,46 @@ export class SeekActionHandler extends ActionHandlerBase {
             }
           } catch { }
 
-          // If there is no precise sense available and no imprecise can detect, block
+          // If there is no precise sense available and no imprecise can detect
+          // If the last block indicates unmet-conditions, tests expect the overall outcome to be 'unmet-conditions'.
+          // Otherwise, keep dice outcome but annotate out-of-range and related metadata; final visibility will be clamped below.
           if (!hasAnyPrecise && (!anyImprecisePresent || !anyImpreciseViable)) {
             const reason = lastBlock?.type || 'out-of-range';
-            return {
-              target: subject,
-              dc,
-              roll: total,
-              die,
-              rollTotal: total,
-              dieResult: die,
-              margin: total - dc,
-              outcome: reason,
-              currentVisibility: current,
-              oldVisibility: current,
-              newVisibility: current,
-              changed: false,
-              unmetConditions: reason === 'unmet-conditions',
-              outOfRange: reason === 'out-of-range',
-              senseType: lastBlock?.senseType,
-              senseRange: lastBlock?.senseRange,
-              unmetCondition: lastBlock?.unmetCondition,
-            };
+            usedImprecise = false;
+            var __impreciseReason = reason;
+            var __impreciseSenseType = lastBlock?.senseType;
+            var __impreciseSenseRange = lastBlock?.senseRange;
+            var __impreciseUnmet = lastBlock?.unmetCondition;
+
+            // If the reason is unmet-conditions, short-circuit with a specific outcome the UI/tests can use
+            if (reason === 'unmet-conditions') {
+              const total = Number(actionData?.roll?.total ?? 0);
+              const die = Number(
+                actionData?.roll?.dice?.[0]?.results?.[0]?.result ??
+                actionData?.roll?.dice?.[0]?.total ??
+                actionData?.roll?.terms?.[0]?.total ??
+                0,
+              );
+              const dcBlocked = extractStealthDC(subject) || 0;
+              return {
+                target: subject,
+                dc: dcBlocked,
+                roll: total,
+                die,
+                rollTotal: total,
+                dieResult: die,
+                margin: total - dcBlocked,
+                outcome: 'unmet-conditions',
+                currentVisibility: current,
+                oldVisibility: current,
+                newVisibility: current,
+                changed: false,
+                unmetConditions: true,
+                unmetCondition: __impreciseUnmet,
+                senseType: __impreciseSenseType,
+                senseRange: __impreciseSenseRange,
+              };
+            }
           }
           // If a precise sense exists, we don't block even if imprecise can't detect; proceed normally
         }
@@ -339,7 +357,7 @@ export class SeekActionHandler extends ActionHandlerBase {
         const visCaps = va.getVisionCapabilities(observerToken);
         // Visual precise is only considered available if the observer both has vision and has LoS,
         // and current visibility (pre-seek) is at least precise quality (observed or concealed)
-        const hasLoS = va.hasLineOfSight?.(observerToken, subject) ?? true;
+        const hasLoS = va.hasLineOfSight?.(observerToken, subject, true) ?? true;
         const hasVisualPrecise = !!(
           visCaps?.hasVision && !visCaps?.isBlinded && hasLoS
         );
@@ -409,6 +427,12 @@ export class SeekActionHandler extends ActionHandlerBase {
       usedImprecise: !!usedImprecise,
       usedImpreciseSenseType: usedImpreciseSenseType || null,
       usedImpreciseSenseRange: usedImpreciseSenseRange ?? null,
+      // Informational flags when neither precise nor imprecise could detect
+      unmetConditions: typeof __impreciseReason !== 'undefined' && __impreciseReason === 'unmet-conditions' ? true : undefined,
+      outOfRange: typeof __impreciseReason !== 'undefined' && __impreciseReason === 'out-of-range' ? true : undefined,
+      senseType: typeof __impreciseSenseType !== 'undefined' ? __impreciseSenseType : undefined,
+      senseRange: typeof __impreciseSenseRange !== 'undefined' ? __impreciseSenseRange : undefined,
+      unmetCondition: typeof __impreciseUnmet !== 'undefined' ? __impreciseUnmet : undefined,
       ...wallMeta,
     };
 
