@@ -145,6 +145,9 @@ export function setTooltipMode(mode) {
  * Add event listeners to all current tokens
  */
 function addTokenEventListeners() {
+  if (!canvas?.tokens?.placeables) {
+    return;
+  }
   canvas.tokens.placeables.forEach((token) => {
     addTokenEventListener(token);
   });
@@ -193,6 +196,9 @@ export function initializeHoverTooltips() {
     cleanupTokenEventListeners();
     addTokenEventListeners();
     HoverTooltips.refreshSizes?.();
+    // Ensure both flags are set for consistency
+    HoverTooltips._initialized = true;
+    _initialized = true;
     return;
   }
   // Always initialize the tooltip system for keyboard shortcuts (Alt/O)
@@ -227,6 +233,7 @@ export function initializeHoverTooltips() {
 
   // Mark as initialized
   _initialized = true;
+  HoverTooltips._initialized = true;
 }
 
 /**
