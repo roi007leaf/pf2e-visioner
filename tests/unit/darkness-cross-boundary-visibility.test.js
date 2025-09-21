@@ -6,8 +6,6 @@
  * - Correct PF2E rules for different vision types and darkness ranks
  */
 
-import { LightingCalculator } from '../../scripts/visibility/auto-visibility/LightingCalculator.js';
-
 describe('Darkness Cross-Boundary Visibility Logic', () => {
   let origCanvas;
 
@@ -81,7 +79,7 @@ describe('Darkness Cross-Boundary Visibility Logic', () => {
   beforeEach(() => {
     jest.resetModules();
     origCanvas = global.canvas;
-    
+
     // Start with rank 3 darkness
     global.canvas = createMockCanvasWithDarkness(3);
   });
@@ -95,7 +93,7 @@ describe('Darkness Cross-Boundary Visibility Logic', () => {
       // Test that our mock canvas has the correct darkness source configuration
       const darknessSources = global.canvas.effects.darknessSources;
       expect(darknessSources).toHaveLength(1);
-      
+
       const darknessSource = darknessSources[0];
       expect(darknessSource.active).toBe(true);
       expect(darknessSource.x).toBe(500);
@@ -118,11 +116,11 @@ describe('Darkness Cross-Boundary Visibility Logic', () => {
     test('verifies the fix threshold change from rank 4+ to rank 1+', () => {
       // This test documents that the fix changed the threshold for cross-boundary
       // detection from darknessRank >= 4 to darknessRank >= 1
-      
+
       const thresholdChange = {
         before: 'darknessRank >= 4', // Only heightened darkness
-        after: 'darknessRank >= 1',  // Any darkness
-        reason: 'User had rank 3 darkness but cross-boundary logic was not being applied'
+        after: 'darknessRank >= 1', // Any darkness
+        reason: 'User had rank 3 darkness but cross-boundary logic was not being applied',
       };
 
       expect(thresholdChange.before).toBe('darknessRank >= 4');
@@ -135,33 +133,36 @@ describe('Darkness Cross-Boundary Visibility Logic', () => {
     test('documents the fix that was implemented', () => {
       // This test documents the darkness cross-boundary visibility fix
       // that was implemented in VisibilityCalculator.js
-      
+
       const fixDescription = {
-        issue: 'Only tokens inside darkness were being considered for visibility against tokens outside darkness, but not vice versa',
-        rootCause: 'Cross-boundary detection threshold was set to darknessRank >= 4, but user had rank 3 darkness',
-        solution: 'Changed threshold from darknessRank >= 4 to darknessRank >= 1 to apply logic for any darkness',
+        issue:
+          'Only tokens inside darkness were being considered for visibility against tokens outside darkness, but not vice versa',
+        rootCause:
+          'Cross-boundary detection threshold was set to darknessRank >= 4, but user had rank 3 darkness',
+        solution:
+          'Changed threshold from darknessRank >= 4 to darknessRank >= 1 to apply logic for any darkness',
         bidirectionalLogic: {
           observerOutside_targetInside: {
             noDarkvision: 'hidden',
             regularDarkvision: 'observed for rank 1-3, concealed for rank 4+',
-            greaterDarkvision: 'observed'
+            greaterDarkvision: 'observed',
           },
           observerInside_targetOutside: {
-            noDarkvision: 'hidden', 
+            noDarkvision: 'hidden',
             regularDarkvision: 'observed for rank 1-3, concealed for rank 4+',
-            greaterDarkvision: 'observed'
+            greaterDarkvision: 'observed',
           },
           bothInside: {
             noDarkvision: 'hidden',
-            regularDarkvision: 'observed for rank 1-3, concealed for rank 4+', 
-            greaterDarkvision: 'observed'
-          }
+            regularDarkvision: 'observed for rank 1-3, concealed for rank 4+',
+            greaterDarkvision: 'observed',
+          },
         },
         filesModified: [
           'scripts/visibility/auto-visibility/VisibilityCalculator.js',
           'scripts/visibility/auto-visibility/LightingCalculator.js',
-          'scripts/visibility/auto-visibility/EventDrivenVisibilitySystem.js'
-        ]
+          'scripts/visibility/auto-visibility/EventDrivenVisibilitySystem.js',
+        ],
       };
 
       // Test passes if the fix description is complete
