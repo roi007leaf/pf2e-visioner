@@ -231,58 +231,90 @@ export class VisibilityCalculator {
           observerLight: observerLightLevel,
           targetLight: lightLevel,
         })); // Check if we have a cross-boundary rank 4 darkness situation
-      const observerInRank4Darkness = (observerLightLevel?.darknessRank ?? 0) >= 4;
-      const targetInRank4Darkness = (lightLevel?.darknessRank ?? 0) >= 4;
 
-      if (observerInRank4Darkness !== targetInRank4Darkness) {
-        // Cross-boundary: one inside rank 4 darkness, one outside
+      const observerInDarkness = (observerLightLevel?.darknessRank ?? 0) >= 1;
+      const targetInDarkness = (lightLevel?.darknessRank ?? 0) >= 1;
+
+      if (observerInDarkness !== targetInDarkness) {
+        // Cross-boundary: one inside darkness, one outside
         if (log.enabled())
           log.debug(() => ({
-            step: 'rank4-cross-boundary',
+            step: 'darkness-cross-boundary',
             observer: observer.name,
             target: target.name,
-            observerInRank4: observerInRank4Darkness,
-            targetInRank4: targetInRank4Darkness,
+            observerInDarkness: observerInDarkness,
+            targetInDarkness: targetInDarkness,
             hasVision: observerVision.hasVision,
             hasDarkvision: observerVision.hasDarkvision,
             hasGreaterDarkvision: observerVision.hasGreaterDarkvision,
           }));
 
-        // For vision-capable observers crossing rank 4 darkness boundaries
-        if (observerVision.hasVision) {
-          if (observerVision.hasGreaterDarkvision) {
-            // Greater darkvision sees observed across rank 4 darkness boundaries
-            return 'observed';
-          } else if (observerVision.hasDarkvision) {
-            // Regular darkvision sees concealed across rank 4 darkness boundaries
-            return 'concealed';
+        // Cross-boundary darkness rules
+        if (observerInDarkness && !targetInDarkness) {
+          // Observer inside darkness, target outside - observer's vision matters
+          if (observerVision.hasVision) {
+            if (observerVision.hasGreaterDarkvision) {
+              // Greater darkvision sees observed across darkness boundaries
+              return 'observed';
+            } else if (observerVision.hasDarkvision) {
+              // Regular darkvision: observed for rank 3 and below, concealed for rank 4+
+              if (observerLightLevel?.darknessRank >= 4) {
+                return 'concealed';
+              } else {
+                return 'observed';
+              }
+            } else {
+              // No darkvision sees hidden when looking out of darkness
+              return 'hidden';
+            }
           }
-          // Non-darkvision continues to normal lighting calculation
+        } else if (!observerInDarkness && targetInDarkness) {
+          // Observer outside darkness, target inside - observer's vision capabilities matter
+          if (observerVision.hasVision) {
+            if (observerVision.hasGreaterDarkvision) {
+              // Greater darkvision sees observed when looking into darkness
+              return 'observed';
+            } else if (observerVision.hasDarkvision) {
+              // Regular darkvision: observed for rank 3 and below, concealed for rank 4+
+              if (lightLevel?.darknessRank >= 4) {
+                return 'concealed';
+              } else {
+                return 'observed';
+              }
+            } else {
+              // No darkvision sees hidden when looking into darkness
+              return 'hidden';
+            }
+          }
         }
       } else {
-        // Both tokens in same area (both inside or both outside rank 4 darkness)
+        // Both tokens in same area (both inside or both outside darkness)
         if (log.enabled())
           log.debug(() => ({
             step: 'same-area',
             observer: observer.name,
             target: target.name,
-            observerInRank4Darkness,
-            targetInRank4Darkness,
+            observerInDarkness,
+            targetInDarkness,
             targetLightLevel: lightLevel?.level,
             targetDarknessRank: lightLevel?.darknessRank,
           }));
 
-        // If both tokens are inside rank 4 darkness, apply rank 4 rules
-        if (observerInRank4Darkness && targetInRank4Darkness) {
+        // If both tokens are inside darkness, apply darkness rules
+        if (observerInDarkness && targetInDarkness) {
           if (observerVision.hasVision) {
             if (observerVision.hasGreaterDarkvision) {
-              // Greater darkvision sees observed within rank 4 darkness
+              // Greater darkvision sees observed within darkness
               return 'observed';
             } else if (observerVision.hasDarkvision) {
-              // Regular darkvision sees concealed within rank 4 darkness
-              return 'concealed';
+              // Regular darkvision: observed for rank 3 and below, concealed for rank 4+
+              if (lightLevel?.darknessRank >= 4) {
+                return 'concealed';
+              } else {
+                return 'observed';
+              }
             } else {
-              // No darkvision sees hidden in rank 4 darkness
+              // No darkvision sees hidden in darkness
               return 'hidden';
             }
           } else {
@@ -290,7 +322,7 @@ export class VisibilityCalculator {
             return 'hidden';
           }
         }
-        // If both tokens are outside rank 4 darkness, use normal lighting calculation
+        // If both tokens are outside darkness, use normal lighting calculation
       } // Step 6: Determine visibility based on light level and observer's vision
       let result = this.#visionAnalyzer.determineVisibilityFromLighting(lightLevel, observerVision);
 
