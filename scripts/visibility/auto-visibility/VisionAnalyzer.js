@@ -348,7 +348,9 @@ export class VisionAnalyzer {
             hasDarkvision = true;
             if (!darkvisionRange) darkvisionRange = Infinity;
           }
-        } catch { /* ignore feat read errors */ }
+        } catch (error) {
+          /* ignore feat read errors */
+        }
       }
     } catch {
     }
@@ -480,7 +482,6 @@ export class VisionAnalyzer {
     }
 
     let result;
-    const isMagicalDarkness = !!lightLevel?.isMagicalDarkness; // tagged by LightingCalculator when magical darkness
     switch (lightLevel.level) {
       case 'bright':
         result = 'observed';
@@ -494,18 +495,29 @@ export class VisionAnalyzer {
         }
         break;
 
-      case 'darkness':
-        if (isMagicalDarkness) {
-          // Magical darkness behavior: darkvision becomes concealed; greater darkvision still observed
-          if (observerVision.hasGreaterDarkvision) result = 'observed';
-          else if (observerVision.hasDarkvision) result = 'concealed';
-          else result = 'hidden';
-        } else if (observerVision.hasDarkvision) {
-          result = 'observed';
+      case 'darkness': {
+        // Check for heightened darkness (rank 4+ spells)
+        const darknessRank = lightLevel?.darknessRank || 1;
+
+        if (darknessRank >= 4) {
+          // Rank 4+ darkness: heightened darkness rules
+          if (observerVision.hasGreaterDarkvision) {
+            result = 'observed';
+          } else if (observerVision.hasDarkvision) {
+            result = 'concealed';
+          } else {
+            result = 'hidden';
+          }
         } else {
-          result = 'hidden';
+          // Rank 1-3 darkness: normal darkvision behavior
+          if (observerVision.hasDarkvision || observerVision.hasGreaterDarkvision) {
+            result = 'observed';
+          } else {
+            result = 'hidden';
+          }
         }
         break;
+      }
 
       default:
         result = 'observed';

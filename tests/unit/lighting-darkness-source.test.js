@@ -11,6 +11,24 @@ describe('LightingCalculator darkness source handling', () => {
         grid: { distance: 5 },
       },
       grid: { size: 100 },
+      effects: {
+        // Mock darkness sources for the LightingCalculator
+        darknessSources: [
+          {
+            active: true,
+            data: { bright: 10, dim: 20 },
+            x: 500,
+            y: 500,
+            document: {
+              hidden: false,
+              config: { negative: true, bright: 10, dim: 20 },
+              getFlag: () => undefined, // No special flags, just regular darkness
+            },
+          },
+        ],
+        lightSources: [],
+        getDarknessLevel: () => 0.1,
+      },
       lighting: {
         placeables: [
           // Darkness source: emitsLight false, negative flag true

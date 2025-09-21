@@ -116,7 +116,7 @@ export class Pf2eVisionerApi {
     await manager.render({ force: true });
     try {
       if (manager.element || manager.window) manager.bringToFront();
-    } catch (_) { }
+    } catch (_) {}
     return manager;
   }
 
@@ -171,7 +171,7 @@ export class Pf2eVisionerApi {
     await manager.render({ force: true });
     try {
       if (manager.element || manager.window) manager.bringToFront();
-    } catch (_) { }
+    } catch (_) {}
     return manager;
   }
 
@@ -214,14 +214,22 @@ export class Pf2eVisionerApi {
       try {
         if (!options?.isAutomatic && prepared.length) {
           if (!AvsOverrideManager) {
-            AvsOverrideManager = (await import('./chat/services/infra/avs-override-manager.js')).default;
+            AvsOverrideManager = (await import('./chat/services/infra/avs-override-manager.js'))
+              .default;
           }
           // Build changes map expected by applyOverrides: array of { target, state }
-            // Source tagged as manual_action for consistency with single setVisibility
-          await AvsOverrideManager.applyOverrides(observer, prepared.map(p => ({ target: p.target, state: p.state })), { source: 'manual_action' });
+          // Source tagged as manual_action for consistency with single setVisibility
+          await AvsOverrideManager.applyOverrides(
+            observer,
+            prepared.map((p) => ({ target: p.target, state: p.state })),
+            { source: 'manual_action' },
+          );
         }
       } catch (e) {
-        console.warn('PF2E Visioner API: Failed to apply AVS overrides during bulkSetVisibility', e);
+        console.warn(
+          'PF2E Visioner API: Failed to apply AVS overrides during bulkSetVisibility',
+          e,
+        );
       }
       await batchUpdateVisibilityEffects(observer, prepared, options);
     }
@@ -279,10 +287,15 @@ export class Pf2eVisionerApi {
       // For manual calls (default), create AVS overrides so AVS won't fight manual edits
       try {
         if (!options?.isAutomatic) {
-          const AvsOverrideManager = (await import('./chat/services/infra/avs-override-manager.js')).default;
-          await AvsOverrideManager.applyOverrides(observerToken, { target: targetToken, state }, {
-            source: 'manual_action',
-          });
+          const AvsOverrideManager = (await import('./chat/services/infra/avs-override-manager.js'))
+            .default;
+          await AvsOverrideManager.applyOverrides(
+            observerToken,
+            { target: targetToken, state },
+            {
+              source: 'manual_action',
+            },
+          );
         }
       } catch (e) {
         console.warn('PF2E Visioner API: Failed to set AVS overrides for manual visibility', e);
@@ -486,7 +499,7 @@ export class Pf2eVisionerApi {
       // Find all tokens with sneak-active flag and clear it
       const tokens = canvas.tokens?.placeables ?? [];
       const updates = tokens
-        .filter(t => t.document.getFlag('pf2e-visioner', 'sneak-active'))
+        .filter((t) => t.document.getFlag('pf2e-visioner', 'sneak-active'))
         .map((t) => ({
           _id: t.id,
           [`flags.${MODULE_ID}.-=sneak-active`]: null,
@@ -494,7 +507,9 @@ export class Pf2eVisionerApi {
 
       if (updates.length && scene.updateEmbeddedDocuments) {
         await scene.updateEmbeddedDocuments('Token', updates, { diff: false });
-        ui.notifications.info(`PF2E Visioner: Cleared sneak flags from ${updates.length} token(s).`);
+        ui.notifications.info(
+          `PF2E Visioner: Cleared sneak flags from ${updates.length} token(s).`,
+        );
       } else {
         ui.notifications.info('PF2E Visioner: No sneak flags found to clear.');
       }
@@ -538,9 +553,8 @@ export class Pf2eVisionerApi {
         _id: t.id,
         // Remove ALL visioner flags completely - using multiple approaches for safety
         [`flags.${MODULE_ID}`]: null,
-        [`flags.-=${MODULE_ID}`]: null
+        [`flags.-=${MODULE_ID}`]: null,
       }));
-
 
       if (updates.length && scene.updateEmbeddedDocuments) {
         try {
@@ -549,17 +563,17 @@ export class Pf2eVisionerApi {
             const remainingFlags = [];
             const explicitUpdates = [];
 
-            tokens.forEach(t => {
+            tokens.forEach((t) => {
               const flags = t.document.flags?.[MODULE_ID] || {};
               if (Object.keys(flags).length > 0) {
                 remainingFlags.push({
                   tokenName: t.name,
-                  remainingFlags: Object.keys(flags)
+                  remainingFlags: Object.keys(flags),
                 });
 
                 // Build explicit removal updates for stubborn flags
                 const explicitUpdate = { _id: t.id };
-                Object.keys(flags).forEach(flagKey => {
+                Object.keys(flags).forEach((flagKey) => {
                   explicitUpdate[`flags.${MODULE_ID}.-=${flagKey}`] = null;
                 });
                 explicitUpdates.push(explicitUpdate);
@@ -567,7 +581,10 @@ export class Pf2eVisionerApi {
             });
 
             if (remainingFlags.length > 0) {
-              console.warn('PF2E Visioner | ⚠️ Some flags were not removed, attempting explicit removal:', remainingFlags);
+              console.warn(
+                'PF2E Visioner | ⚠️ Some flags were not removed, attempting explicit removal:',
+                remainingFlags,
+              );
 
               // Try explicit flag removal
               if (explicitUpdates.length > 0) {
@@ -579,7 +596,6 @@ export class Pf2eVisionerApi {
               }
             }
           }, 100);
-
         } catch (error) {
           console.error('PF2E Visioner | Error updating tokens:', error);
         }
@@ -588,7 +604,7 @@ export class Pf2eVisionerApi {
       // 1.5) Additional safety: explicitly clear sneak flags
       try {
         await this.clearAllSneakFlags();
-      } catch { }
+      } catch {}
 
       // 2) Clear scene-level caches used by the module
       try {
@@ -599,7 +615,7 @@ export class Pf2eVisionerApi {
           await scene.unsetFlag(MODULE_ID, 'partyTokenStateCache');
           await scene.unsetFlag(MODULE_ID, 'deferredPartyUpdates');
         }
-      } catch { }
+      } catch {}
 
       // 3) Remove module-created effects from all actors and token-actors (handles unlinked tokens)
       try {
@@ -621,7 +637,7 @@ export class Pf2eVisionerApi {
           if (toDelete.length) {
             try {
               await actor.deleteEmbeddedDocuments('Item', toDelete);
-            } catch { }
+            } catch {}
           }
         }
 
@@ -645,10 +661,10 @@ export class Pf2eVisionerApi {
           if (toDelete.length) {
             try {
               await a.deleteEmbeddedDocuments('Item', toDelete);
-            } catch { }
+            } catch {}
           }
         }
-      } catch { }
+      } catch {}
 
       // 4) Clear AVS overrides from the new map-based system and hide the override indicator
       try {
@@ -660,7 +676,7 @@ export class Pf2eVisionerApi {
         try {
           const { default: indicator } = await import('./ui/override-validation-indicator.js');
           if (indicator && typeof indicator.hide === 'function') indicator.hide(true);
-        } catch { }
+        } catch {}
       } catch (error) {
         console.warn('PF2E Visioner | Error clearing AVS overrides:', error);
       }
@@ -669,19 +685,19 @@ export class Pf2eVisionerApi {
       try {
         const { cleanupAllCoverEffects } = await import('./cover/ephemeral.js');
         await cleanupAllCoverEffects();
-      } catch { }
+      } catch {}
 
       // 5) Rebuild effects and refresh visuals/perception
       // Removed effects-coordinator: bulk rebuild handled elsewhere
       try {
         await updateTokenVisuals();
-      } catch { }
+      } catch {}
       try {
         refreshEveryonesPerception();
-      } catch { }
+      } catch {}
       try {
         canvas.perception.update({ refreshVision: true });
-      } catch { }
+      } catch {}
 
       ui.notifications.info('PF2E Visioner: Cleared all scene data.');
       return true;
@@ -794,7 +810,7 @@ export class Pf2eVisionerApi {
       // 1.5) Additional safety: explicitly clear sneak flags from selected tokens
       try {
         const sneakUpdates = tokens
-          .filter(t => t.document.getFlag('pf2e-visioner', 'sneak-active'))
+          .filter((t) => t.document.getFlag('pf2e-visioner', 'sneak-active'))
           .map((t) => ({
             _id: t.id,
             [`flags.${MODULE_ID}.-=sneak-active`]: null,
@@ -802,7 +818,7 @@ export class Pf2eVisionerApi {
         if (sneakUpdates.length && scene.updateEmbeddedDocuments) {
           await scene.updateEmbeddedDocuments('Token', sneakUpdates, { diff: false });
         }
-      } catch { }
+      } catch {}
 
       // 2) Clear scene-level caches used by the module (only if clearing all tokens)
       try {
@@ -813,7 +829,7 @@ export class Pf2eVisionerApi {
           await scene.unsetFlag(MODULE_ID, 'partyTokenStateCache');
           await scene.unsetFlag(MODULE_ID, 'deferredPartyUpdates');
         }
-      } catch { }
+      } catch {}
 
       // 3) Remove module-created effects from all actors and token-actors (handles unlinked tokens)
       try {
@@ -835,7 +851,7 @@ export class Pf2eVisionerApi {
           if (toDelete.length) {
             try {
               await actor.deleteEmbeddedDocuments('Item', toDelete);
-            } catch { }
+            } catch {}
           }
         }
 
@@ -860,10 +876,10 @@ export class Pf2eVisionerApi {
           if (toDelete.length) {
             try {
               await a.deleteEmbeddedDocuments('Item', toDelete);
-            } catch { }
+            } catch {}
           }
         }
-      } catch { }
+      } catch {}
 
       // 4) Clean up any remaining effects related to the selected tokens specifically
       try {
@@ -873,7 +889,7 @@ export class Pf2eVisionerApi {
           // Clean up this token from all other tokens' maps and effects
           await cleanupDeletedToken(token.document);
         }
-      } catch { }
+      } catch {}
 
       // 5) Also remove the selected tokens from ALL other tokens' visibility/cover maps
       try {
@@ -895,12 +911,12 @@ export class Pf2eVisionerApi {
             await scene.updateEmbeddedDocuments('Token', updates, { diff: false });
           }
         }
-      } catch { }
+      } catch {}
 
       // 5.5) Clean up AVS override flags that reference the purged tokens
       try {
         const allTokens = canvas.tokens?.placeables ?? [];
-        const purgedTokenIds = tokens.map(t => t.id);
+        const purgedTokenIds = tokens.map((t) => t.id);
 
         for (const token of allTokens) {
           const updates = {};
@@ -923,7 +939,7 @@ export class Pf2eVisionerApi {
             await scene.updateEmbeddedDocuments('Token', [updates], { diff: false });
           }
         }
-      } catch { }
+      } catch {}
 
       // 5.5) Clear AVS overrides involving these tokens from the new map-based system and hide the override indicator
       try {
@@ -943,7 +959,7 @@ export class Pf2eVisionerApi {
         try {
           const { default: indicator } = await import('./ui/override-validation-indicator.js');
           if (indicator && typeof indicator.hide === 'function') indicator.hide(true);
-        } catch { }
+        } catch {}
       } catch (error) {
         console.warn('PF2E Visioner | Error clearing AVS overrides for selected tokens:', error);
       }
@@ -951,13 +967,13 @@ export class Pf2eVisionerApi {
       // 6) Rebuild effects and refresh visuals/perception
       try {
         await updateTokenVisuals();
-      } catch { }
+      } catch {}
       try {
         refreshEveryonesPerception();
-  } catch { }
+      } catch {}
       try {
         canvas.perception.update({ refreshVision: true });
-  } catch { }
+      } catch {}
 
       ui.notifications.info(
         `PF2E Visioner: Cleared all data for ${tokens.length} selected token${tokens.length === 1 ? '' : 's'}.`,
@@ -1055,7 +1071,6 @@ export const autoVisibility = {
     );
   },
 
-
   // Reset Scene Config flag (emergency fix)
   resetSceneConfigFlag: () => {
     if (autoVisibilitySystem.resetSceneConfigFlag) {
@@ -1071,10 +1086,104 @@ export const autoVisibility = {
     const autoVis = autoVisibilitySystem;
     if (autoVis && typeof autoVis.clearAllOverrides === 'function') {
       await autoVis.clearAllOverrides();
-      ui.notifications.info('PF2E Visioner | All AVS overrides cleared (memory and persistent flags)');
+      ui.notifications.info(
+        'PF2E Visioner | All AVS overrides cleared (memory and persistent flags)',
+      );
     } else {
       ui.notifications.error('PF2E Visioner | Auto-visibility system not available');
     }
+  },
+
+  /**
+   * Test darkness sources detection for debugging
+   * @returns {Array} Array of darkness sources with their properties
+   */
+  testDarknessSources: () => {
+    const darknessSources = canvas.effects?.darknessSources || [];
+    const result = darknessSources.map((light) => ({
+      id: light.document?.id || 'unknown',
+      x: light.x,
+      y: light.y,
+      active: light.active,
+      bright: light.data?.bright || 0,
+      dim: light.data?.dim || 0,
+      darknessRank: Number(light.document?.getFlag?.('pf2e-visioner', 'darknessRank') || 0) || 0,
+      flags: light.document?.flags || {},
+      hasDocument: !!light.document,
+      lightType: light.constructor?.name || 'unknown',
+    }));
+    console.log('PF2E Visioner | Darkness Sources:', result);
+    return result;
+  },
+
+  /**
+   * Debug lighting at specific token positions
+   * @param {Token} observer - Observer token (optional, uses first selected)
+   * @param {Token} target - Target token (optional, uses second selected)
+   * @returns {Object} Lighting information for both tokens
+   */
+  debugTokenLighting: async (observer = null, target = null) => {
+    const controlled = canvas.tokens.controlled;
+    if (!observer && !target && controlled.length !== 2) {
+      ui.notifications.warn('Select exactly 2 tokens or provide observer and target parameters');
+      return;
+    }
+
+    const obs = observer || controlled[0];
+    const tgt = target || controlled[1];
+
+    if (!obs || !tgt) {
+      ui.notifications.warn('Need both observer and target tokens');
+      return;
+    }
+
+    // Import the visibility calculator to get access to lighting calculator
+    const { visibilityCalculator } = await import('./visibility/auto-visibility/index.js');
+    const lightingCalculator = visibilityCalculator.getComponents().lightingCalculator;
+
+    const observerPos = {
+      x: obs.document.x + (obs.document.width * canvas.grid.size) / 2,
+      y: obs.document.y + (obs.document.height * canvas.grid.size) / 2,
+      elevation: obs.document.elevation || 0,
+    };
+
+    const targetPos = {
+      x: tgt.document.x + (tgt.document.width * canvas.grid.size) / 2,
+      y: tgt.document.y + (tgt.document.height * canvas.grid.size) / 2,
+      elevation: tgt.document.elevation || 0,
+    };
+
+    const observerLight = lightingCalculator.getLightLevelAt(observerPos, obs);
+    const targetLight = lightingCalculator.getLightLevelAt(targetPos, tgt);
+
+    const result = {
+      observer: {
+        name: obs.name,
+        position: observerPos,
+        lighting: observerLight,
+        inRank4Darkness: (observerLight?.darknessRank ?? 0) >= 4,
+      },
+      target: {
+        name: tgt.name,
+        position: targetPos,
+        lighting: targetLight,
+        inRank4Darkness: (targetLight?.darknessRank ?? 0) >= 4,
+      },
+      darknessSources: (canvas.effects?.darknessSources || []).map((light) => ({
+        id: light.document?.id || 'unknown',
+        x: light.x,
+        y: light.y,
+        active: light.active,
+        bright: light.data?.bright || 0,
+        dim: light.data?.dim || 0,
+        darknessRank: Number(light.document?.getFlag?.('pf2e-visioner', 'darknessRank') || 0) || 0,
+        hasDocument: !!light.document,
+        lightType: light.constructor?.name || 'unknown',
+      })),
+    };
+
+    console.log('PF2E Visioner | Token Lighting Debug:', result);
+    return result;
   },
 };
 
@@ -1083,3 +1192,6 @@ export const autoVisibility = {
  * Usage: game.modules.get("pf2e-visioner").api
  */
 export const api = Pf2eVisionerApi;
+
+// Attach the autoVisibility object to the main API
+api.autoVisibility = autoVisibility;

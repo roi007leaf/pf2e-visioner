@@ -6,7 +6,6 @@
 import { getLogger } from '../../utils/logger.js';
 const log = getLogger('VisibilityCalculator');
 
-
 export class VisibilityCalculator {
   /** @type {VisibilityCalculator} */
   static #instance = null;
@@ -21,6 +20,7 @@ export class VisibilityCalculator {
   #conditionManager;
 
   constructor() {
+    console.log('DEBUG: VisibilityCalculator constructor called!');
     if (VisibilityCalculator.#instance) {
       return VisibilityCalculator.#instance;
     }
@@ -114,44 +114,49 @@ export class VisibilityCalculator {
     }
 
     try {
-      // Touch unused parameter to satisfy linter while preserving API
-      void _observerPositionOverride;
-
       // Step 1: Check if observer is blinded (cannot see anything)
       const isBlinded = this.#conditionManager.isBlinded(observer);
-      if (log.enabled()) log.debug(() => ({ step: 'blinded-check', observer: observer.name, result: isBlinded }));
+      if (log.enabled())
+        log.debug(() => ({ step: 'blinded-check', observer: observer.name, result: isBlinded }));
       if (isBlinded) {
         // If blinded, but has precise non-visual sense in range, can still observe
         try {
           if (this.#visionAnalyzer.hasPreciseNonVisualInRange(observer, target)) return 'observed';
           // If any imprecise sense can detect, target is at least hidden rather than undetected
           if (this.#visionAnalyzer.canSenseImprecisely(observer, target)) return 'hidden';
-        } catch { }
+        } catch {}
         return 'hidden';
       }
 
       // Step 2: Check if target is completely invisible to observer
       const isInvisible = this.#conditionManager.isInvisibleTo(observer, target);
-      if (log.enabled()) log.debug(() => ({ step: 'invisible-check', observer: observer.name, target: target.name, result: isInvisible }));
+      if (log.enabled())
+        log.debug(() => ({
+          step: 'invisible-check',
+          observer: observer.name,
+          target: target.name,
+          result: isInvisible,
+        }));
       if (isInvisible) {
         // If observer has precise non-visual sense (e.g., tremorsense, echolocation) in range → observed
         try {
           if (this.#visionAnalyzer.hasPreciseNonVisualInRange(observer, target)) return 'observed';
           // If any imprecise sense can detect (e.g., hearing), invisible is at least hidden
           if (this.#visionAnalyzer.canSenseImprecisely(observer, target)) return 'hidden';
-        } catch { }
+        } catch {}
         // Otherwise invisible = undetected
         return 'undetected';
       }
 
       // Step 3: Check if observer is dazzled (everything appears concealed)
       const isDazzled = this.#conditionManager.isDazzled(observer);
-      if (log.enabled()) log.debug(() => ({ step: 'dazzled-check', observer: observer.name, result: isDazzled }));
+      if (log.enabled())
+        log.debug(() => ({ step: 'dazzled-check', observer: observer.name, result: isDazzled }));
       if (isDazzled) {
         // If you have a precise non-visual sense in range, dazzled doesn't matter for that target
         try {
           if (this.#visionAnalyzer.hasPreciseNonVisualInRange(observer, target)) return 'observed';
-        } catch { }
+        } catch {}
         // Otherwise, everything is concealed
         return 'concealed';
       }
@@ -159,17 +164,28 @@ export class VisibilityCalculator {
       // Step 4: Check line of sight directly against walls. If LoS is blocked, treat as hidden.
       try {
         const losClear = !!this.#visionAnalyzer.hasLineOfSight(observer, target, true);
-        if (log.enabled()) log.debug(() => ({ step: 'los-raw', observer: observer.name, target: target.name, losClear }));
+        if (log.enabled())
+          log.debug(() => ({
+            step: 'los-raw',
+            observer: observer.name,
+            target: target.name,
+            losClear,
+          }));
         if (!losClear) {
           // If LoS blocked, but a precise non-visual sense is in range → observed
           try {
-            if (this.#visionAnalyzer.hasPreciseNonVisualInRange(observer, target)) return 'observed';
+            if (this.#visionAnalyzer.hasPreciseNonVisualInRange(observer, target))
+              return 'observed';
             // If only imprecise sense can detect → hidden; if none → undetected
             if (this.#visionAnalyzer.canSenseImprecisely(observer, target)) return 'hidden';
             return 'undetected';
-          } catch { return 'hidden'; }
+          } catch {
+            return 'hidden';
+          }
         }
-      } catch { /* best effort: continue */ }
+      } catch {
+        /* best effort: continue */
+      }
 
       // Step 5: Check lighting conditions at target's position
       // Use position override if provided, otherwise calculate from document
@@ -178,28 +194,116 @@ export class VisibilityCalculator {
         y: target.document.y + (target.document.height * canvas.grid.size) / 2,
         elevation: target.document.elevation || 0,
       };
+
       // New API prefers passing a token; supports position objects for overrides
       const lightLevel = this.#lightingCalculator.getLightLevelAt(targetPosition, target);
       const observerVision = this.#visionAnalyzer.getVisionCapabilities(observer);
-      if (log.enabled()) log.debug(() => ({ step: 'lighting', target: target.name, pos: targetPosition, lightLevel }));
-      if (log.enabled()) log.debug(() => ({ step: 'vision-capabilities', observer: observer.name, observerVision }));
+      if (log.enabled())
+        log.debug(() => ({
+          step: 'lighting',
+          target: target.name,
+          pos: targetPosition,
+          lightLevel,
+        }));
+      if (log.enabled())
+        log.debug(() => ({ step: 'vision-capabilities', observer: observer.name, observerVision }));
 
-      // Step 6: Determine visibility based on light level and observer's vision
-      let result = this.#visionAnalyzer.determineVisibilityFromLighting(
-        lightLevel,
-        observerVision,
+      // Step 5.5: Check for rank 4 darkness cross-boundary concealment
+      // When one token is inside rank 4 darkness and the other is outside, darkvision sees concealed
+      const observerPosition = _observerPositionOverride || {
+        x: observer.document.x + (observer.document.width * canvas.grid.size) / 2,
+        y: observer.document.y + (observer.document.height * canvas.grid.size) / 2,
+        elevation: observer.document.elevation || 0,
+      };
+      const observerLightLevel = this.#lightingCalculator.getLightLevelAt(
+        observerPosition,
+        observer,
       );
+
+      // Debug logging
+      if (log.enabled())
+        log.debug(() => ({
+          step: 'cross-boundary-debug',
+          observer: observer.name,
+          target: target.name,
+          observerPos: observerPosition,
+          targetPos: targetPosition,
+          observerLight: observerLightLevel,
+          targetLight: lightLevel,
+        })); // Check if we have a cross-boundary rank 4 darkness situation
+      const observerInRank4Darkness = (observerLightLevel?.darknessRank ?? 0) >= 4;
+      const targetInRank4Darkness = (lightLevel?.darknessRank ?? 0) >= 4;
+
+      if (observerInRank4Darkness !== targetInRank4Darkness) {
+        // Cross-boundary: one inside rank 4 darkness, one outside
+        if (log.enabled())
+          log.debug(() => ({
+            step: 'rank4-cross-boundary',
+            observer: observer.name,
+            target: target.name,
+            observerInRank4: observerInRank4Darkness,
+            targetInRank4: targetInRank4Darkness,
+            hasVision: observerVision.hasVision,
+            hasDarkvision: observerVision.hasDarkvision,
+            hasGreaterDarkvision: observerVision.hasGreaterDarkvision,
+          }));
+
+        // For vision-capable observers crossing rank 4 darkness boundaries
+        if (observerVision.hasVision) {
+          if (observerVision.hasGreaterDarkvision) {
+            // Greater darkvision sees observed across rank 4 darkness boundaries
+            return 'observed';
+          } else if (observerVision.hasDarkvision) {
+            // Regular darkvision sees concealed across rank 4 darkness boundaries
+            return 'concealed';
+          }
+          // Non-darkvision continues to normal lighting calculation
+        }
+      } else {
+        // Both tokens in same area (both inside or both outside rank 4 darkness)
+        if (log.enabled())
+          log.debug(() => ({
+            step: 'same-area',
+            observer: observer.name,
+            target: target.name,
+            observerInRank4Darkness,
+            targetInRank4Darkness,
+            targetLightLevel: lightLevel?.level,
+            targetDarknessRank: lightLevel?.darknessRank,
+          }));
+
+        // If both tokens are inside rank 4 darkness, apply rank 4 rules
+        if (observerInRank4Darkness && targetInRank4Darkness) {
+          if (observerVision.hasVision) {
+            if (observerVision.hasGreaterDarkvision) {
+              // Greater darkvision sees observed within rank 4 darkness
+              return 'observed';
+            } else if (observerVision.hasDarkvision) {
+              // Regular darkvision sees concealed within rank 4 darkness
+              return 'concealed';
+            } else {
+              // No darkvision sees hidden in rank 4 darkness
+              return 'hidden';
+            }
+          } else {
+            // No vision sees hidden
+            return 'hidden';
+          }
+        }
+        // If both tokens are outside rank 4 darkness, use normal lighting calculation
+      } // Step 6: Determine visibility based on light level and observer's vision
+      let result = this.#visionAnalyzer.determineVisibilityFromLighting(lightLevel, observerVision);
 
       // Clamp per imprecise-only rule: if observer has no precise senses on target (including vision), but can sense imprecisely, treat as hidden
       try {
         const preciseNonVisual = this.#visionAnalyzer.hasPreciseNonVisualInRange(observer, target);
         const canImprecise = this.#visionAnalyzer.canSenseImprecisely(observer, target);
         const hasSight = observerVision?.hasVision !== false; // visual path already considered in determineVisibilityFromLighting
-        if (!preciseNonVisual && canImprecise) {
+
+        // Only downgrade if BOTH no visual senses AND no precise non-visual senses, but can sense imprecisely
+        if (!hasSight && !preciseNonVisual && canImprecise) {
           // If lighting result says observed but only imprecise senses apply (e.g., darkness without darkvision), degrade to hidden
           if (result === 'observed') {
-            // If lighting made it observed due to visual capabilities, keep observed; otherwise, convert to hidden
-            // When in darkness without darkvision, determineVisibilityFromLighting returns hidden/concealed; so only degrade in bright/dim cases where vision fails for other reasons
             result = 'hidden';
           }
           if (result === 'concealed') result = 'hidden';
@@ -211,12 +315,15 @@ export class VisibilityCalculator {
           // No senses can detect → undetected
           result = 'undetected';
         }
-      } catch { }
-      if (log.enabled()) log.info(() => ({ step: 'result', observer: observer.name, target: target.name, result }));
+      } catch {}
+      if (log.enabled())
+        log.info(() => ({ step: 'result', observer: observer.name, target: target.name, result }));
 
       return result;
     } catch (error) {
-      try { console.warn('PF2E Visioner | calcVis: error, default observed', error); } catch { }
+      try {
+        console.warn('PF2E Visioner | calcVis: error, default observed', error);
+      } catch {}
       return 'observed'; // Default fallback
     }
   }

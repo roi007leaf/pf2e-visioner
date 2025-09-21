@@ -51,6 +51,25 @@ function setupSceneWithDarkness({ rank = 0, magical = false } = {}) {
             grid: { distance: 5 },
         },
         grid: { size: 100 },
+        effects: {
+            // Mock darkness sources for the LightingCalculator
+            darknessSources: [
+                {
+                    active: true,
+                    data: { bright: 10, dim: 20 },
+                    x: 500,
+                    y: 500,
+                    document: {
+                        hidden: false,
+                        config: { negative: true, bright: 10, dim: 20 },
+                        flags,
+                        getFlag: (mod, key) => flags?.[mod]?.[key],
+                    },
+                },
+            ],
+            lightSources: [],
+            getDarknessLevel: () => 0.1,
+        },
         lighting: {
             placeables: [
                 {
@@ -86,7 +105,7 @@ describe('Darkness heightening and magical behavior', () => {
             const light = calc.getLightLevelAt(pos);
             expect(light.level).toBe('darkness');
             expect(light.isDarknessSource).toBe(true);
-            expect(light.isMagicalDarkness).toBe(false);
+            expect(light.isHeightenedDarkness).toBe(false);
 
             const tokDV = makeToken(makeActorWithDarkvision(), 'dv1');
             const visDV = va.determineVisibilityFromLighting(light, va.getVisionCapabilities(tokDV));
@@ -114,7 +133,7 @@ describe('Darkness heightening and magical behavior', () => {
             const light = calc.getLightLevelAt(pos);
             expect(light.level).toBe('darkness');
             expect(light.isDarknessSource).toBe(true);
-            expect(light.isMagicalDarkness).toBe(true);
+            expect(light.isHeightenedDarkness).toBe(true);
 
             const tokDV = makeToken(makeActorWithDarkvision(), 'dv2');
             const visDV = va.determineVisibilityFromLighting(light, va.getVisionCapabilities(tokDV));
@@ -125,30 +144,6 @@ describe('Darkness heightening and magical behavior', () => {
             expect(visNo).toBe('hidden');
 
             const tokG = makeToken(makeActorWithGreaterDarkvisionFeat(), 'gdv2');
-            const visG = va.determineVisibilityFromLighting(light, va.getVisionCapabilities(tokG));
-            expect(visG).toBe('observed');
-        } finally {
-            teardown();
-        }
-    });
-
-    it('explicit magical flag (rank 0): magical darkness behavior applies', () => {
-        const teardown = setupSceneWithDarkness({ rank: 0, magical: true });
-        try {
-            const calc = LightingCalculator.getInstance();
-            const va = VisionAnalyzer.getInstance();
-
-            const pos = { x: 505, y: 505 };
-            const light = calc.getLightLevelAt(pos);
-            expect(light.level).toBe('darkness');
-            expect(light.isDarknessSource).toBe(true);
-            expect(light.isMagicalDarkness).toBe(true);
-
-            const tokDV = makeToken(makeActorWithDarkvision(), 'dv3');
-            const visDV = va.determineVisibilityFromLighting(light, va.getVisionCapabilities(tokDV));
-            expect(visDV).toBe('concealed');
-
-            const tokG = makeToken(makeActorWithGreaterDarkvisionFeat(), 'gdv3');
             const visG = va.determineVisibilityFromLighting(light, va.getVisionCapabilities(tokG));
             expect(visG).toBe('observed');
         } finally {
