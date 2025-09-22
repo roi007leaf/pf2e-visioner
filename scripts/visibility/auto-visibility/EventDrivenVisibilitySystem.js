@@ -56,6 +56,30 @@ export class EventDrivenVisibilitySystem {
 
   /** @type {boolean} - Flag to prevent reacting to our own effect changes */
   #isUpdatingEffects = false;
+
+  /** @type {number} - Maximum distance to consider for visibility calculations (in grid units) */
+  #maxVisibilityDistance = 20;
+
+  /** @type {number} - Performance metrics for debugging */
+  #performanceMetrics = {
+    totalCalculations: 0,
+    skippedByDistance: 0,
+    skippedByLOS: 0,
+    spatialOptimizations: 0,
+    lastReset: Date.now(),
+    movementOptimizations: {
+      totalMovements: 0,
+      midpointSkipped: 0,
+      totalTime: 0,
+      averageTime: 0,
+      totalTokensChecked: 0,
+      totalDistanceChecks: 0,
+      totalLOSChecks: 0,
+      totalWallChecks: 0,
+      totalRaysCreated: 0,
+      averageOptimizationSavings: 0,
+    },
+  };
   /** @type {any} - Lazily loaded AVS Override Manager */
   #avsOverrideManager = null;
 
@@ -70,6 +94,15 @@ export class EventDrivenVisibilitySystem {
 
   /** @type {() => void} */
   #refreshPerception = null;
+
+  /** @type {number} - Debounce timer for visual updates */
+  #visualUpdateTimeout = null;
+
+  /** @type {number} - Debounce timer for full recalculations */
+  #fullRecalcTimeout = null;
+
+  /** @type {boolean} - Whether a full recalculation is pending */
+  #pendingFullRecalc = false;
 
   // AVS Override Management
   /** @type {Map<string, Object>} - Active overrides by "observerId-targetId" key */
@@ -141,6 +174,7 @@ export class EventDrivenVisibilitySystem {
       lightingCalculator,
       visionAnalyzer,
       invisibilityManager,
+      this, // Pass the EventDrivenVisibilitySystem instance for optimizations
     );
     // Store facades/utilities for later method use
     this.#optimizedVisibilityCalculator = optimizedVisibilityCalculator;
@@ -225,6 +259,7 @@ export class EventDrivenVisibilitySystem {
     try {
       this.#debug('onTokenUpdate', tokenDoc.id, tokenDoc.name, Object.keys(changes));
     } catch {}
+
     // If a token's emitted light changed, that can affect how EVERYONE sees EVERYONE.
     // Escalate to a global recalculation even if the emitter is hidden.
     const lightChangedEarly = Object.prototype.hasOwnProperty.call(changes, 'light');
@@ -233,6 +268,7 @@ export class EventDrivenVisibilitySystem {
       // Continue to process other changes (e.g., movement) so we can pin positions if present.
       // Do NOT early return here; just note that we'll also do a global pass.
     }
+
     // Simplified hidden handling: if hidden flag toggled, recalc everyone and exit.
     if (Object.prototype.hasOwnProperty.call(changes, 'hidden')) {
       try {
@@ -245,8 +281,13 @@ export class EventDrivenVisibilitySystem {
     }
 
     const isHidden = tokenDoc.hidden === true;
-    // If a hidden token moves while emitting light, treat it like a light move and recalc globally
     const positionChanged = changes.x !== undefined || changes.y !== undefined;
+    const lightChanged = changes.light !== undefined;
+    const visionChanged = changes.vision !== undefined;
+    const effectsChanged =
+      changes.actorData?.effects !== undefined || changes.actorData !== undefined;
+
+    // If a hidden token moves while emitting light, treat it like a light move and recalc globally
     const emitterMoved = positionChanged && this.#tokenEmitsLight(tokenDoc, changes);
     if (emitterMoved) {
       this.#debug('emitter-moved: global recalculation for token light move', tokenDoc.id);
@@ -273,6 +314,7 @@ export class EventDrivenVisibilitySystem {
       }
       return;
     }
+
     try {
       const tok = canvas.tokens?.get?.(tokenDoc.id);
       if (tok && this.#isExcludedToken(tok)) {
@@ -293,17 +335,6 @@ export class EventDrivenVisibilitySystem {
       /* ignore */
     }
 
-    // Check what actually changed
-    // positionChanged already computed above
-    const lightChanged = changes.light !== undefined;
-    const visionChanged = changes.vision !== undefined;
-    const effectsChanged =
-      changes.actorData?.effects !== undefined || changes.actorData !== undefined;
-
-    // Removed threshold-gated batching; we process immediately for all relevant changes
-
-    // Invalidate lighting cache immediately when position or light changed (even for tiny moves)
-
     // For any relevant change, store updated coordinates and trigger immediate processing
     if (positionChanged || lightChanged || visionChanged || effectsChanged) {
       // Store the updated document for position calculations
@@ -321,6 +352,7 @@ export class EventDrivenVisibilitySystem {
         w: tokenDoc.width,
         h: tokenDoc.height,
       });
+
       // Pin final destination center briefly so subsequent batches (e.g., flag updates) use it
       // while the token animates toward the new location.
       try {
@@ -342,12 +374,18 @@ export class EventDrivenVisibilitySystem {
       } catch {
         /* ignore */
       }
+
       // If light changed, we've already scheduled a global recalculation; still mark this token so
       // its updated position/flags participate with freshest data if it also moved.
       if (lightChanged) {
         this.#markAllTokensChangedImmediate();
       } else {
-        this.#markTokenChangedImmediate(tokenDoc.id);
+        // For position changes, use spatial optimization to only check relevant tokens
+        if (positionChanged) {
+          this.#markTokenChangedWithSpatialOptimization(tokenDoc, changes);
+        } else {
+          this.#markTokenChangedImmediate(tokenDoc.id);
+        }
       }
 
       // Queue override validation for the moved token and all tokens with overrides involving it
@@ -418,7 +456,7 @@ export class EventDrivenVisibilitySystem {
    */
   #onLightUpdate() {
     if (!this.#enabled || !game.user.isGM) return;
-    this.#markAllTokensChangedImmediate();
+    this.#markAllTokensChangedThrottled();
   }
 
   /**
@@ -426,7 +464,7 @@ export class EventDrivenVisibilitySystem {
    */
   #onLightCreate() {
     if (!this.#enabled || !game.user.isGM) return;
-    this.#markAllTokensChangedImmediate();
+    this.#markAllTokensChangedThrottled();
   }
 
   /**
@@ -434,7 +472,7 @@ export class EventDrivenVisibilitySystem {
    */
   #onLightDelete() {
     if (!this.#enabled || !game.user.isGM) return;
-    this.#markAllTokensChangedImmediate();
+    this.#markAllTokensChangedThrottled();
   }
 
   /**
@@ -445,7 +483,7 @@ export class EventDrivenVisibilitySystem {
 
     // Removed debug log
 
-    this.#markAllTokensChangedImmediate();
+    this.#markAllTokensChangedThrottled();
   }
 
   #onWallCreate() {
@@ -453,7 +491,7 @@ export class EventDrivenVisibilitySystem {
 
     // Removed debug log
 
-    this.#markAllTokensChangedImmediate();
+    this.#markAllTokensChangedThrottled();
   }
 
   #onWallDelete() {
@@ -461,7 +499,7 @@ export class EventDrivenVisibilitySystem {
 
     // Removed debug log
 
-    this.#markAllTokensChangedImmediate();
+    this.#markAllTokensChangedThrottled();
   }
 
   /**
@@ -714,6 +752,50 @@ export class EventDrivenVisibilitySystem {
   }
 
   /**
+   * Mark a token as changed with spatial optimization for movement
+   * Only checks tokens that could be affected by the movement
+   */
+  #markTokenChangedWithSpatialOptimization(tokenDoc, changes) {
+    const tokenId = tokenDoc.id;
+    this.#changedTokens.add(tokenId);
+
+    // Calculate old and new positions for spatial optimization
+    const oldPos = {
+      x: tokenDoc.x + (tokenDoc.width * canvas.grid.size) / 2,
+      y: tokenDoc.y + (tokenDoc.height * canvas.grid.size) / 2,
+    };
+    const newPos = {
+      x:
+        (changes.x !== undefined ? changes.x : tokenDoc.x) +
+        (tokenDoc.width * canvas.grid.size) / 2,
+      y:
+        (changes.y !== undefined ? changes.y : tokenDoc.y) +
+        (tokenDoc.height * canvas.grid.size) / 2,
+    };
+
+    // Get tokens that could be affected by this movement
+    const affectedTokens = this.#getAffectedTokensByMovement(oldPos, newPos, tokenId);
+
+    // Add affected tokens to the changed set
+    affectedTokens.forEach((token) => {
+      this.#changedTokens.add(token.document.id);
+    });
+
+    this.#debug('markTokenChangedWithSpatialOptimization', {
+      tokenId,
+      affectedCount: affectedTokens.length,
+      totalChanged: this.#changedTokens.size,
+      oldPos,
+      newPos,
+    });
+
+    // Use requestAnimationFrame for immediate processing with fresh coordinates from #updatedTokenDocs
+    if (!this.#processingBatch) {
+      requestAnimationFrame(() => this.#processBatch());
+    }
+  }
+
+  /**
    * Mark a token as changed - triggers IMMEDIATE processing with fresh coordinates
    */
   #markTokenChangedImmediate(tokenId) {
@@ -743,11 +825,33 @@ export class EventDrivenVisibilitySystem {
   }
 
   /**
+   * Throttled full recalculation to prevent excessive processing
+   * Debounces rapid-fire events that would cause constant full recalculations
+   */
+  #markAllTokensChangedThrottled() {
+    // If already pending, just extend the timeout
+    if (this.#pendingFullRecalc) {
+      if (this.#fullRecalcTimeout) {
+        clearTimeout(this.#fullRecalcTimeout);
+      }
+    } else {
+      this.#pendingFullRecalc = true;
+    }
+
+    this.#fullRecalcTimeout = setTimeout(() => {
+      this.#pendingFullRecalc = false;
+      this.#fullRecalcTimeout = null;
+      this.#markAllTokensChangedImmediate();
+    }, 100); // 100ms debounce for full recalculations
+  }
+
+  /**
    * Process all accumulated changes in a single batch - IMMEDIATE processing
    */
   async #processBatch() {
     if (this.#processingBatch || this.#changedTokens.size === 0) return;
 
+    const batchStartTime = performance.now();
     this.#processingBatch = true;
     this.#debug('processBatch:start', { changed: Array.from(this.#changedTokens) });
 
@@ -764,17 +868,20 @@ export class EventDrivenVisibilitySystem {
       }
 
       // Ensure canvas perception and token geometry are up-to-date before we sample LoS/lighting.
-      // This avoids the "one extra step" lag at borders when Foundry hasn't fully settled yet.
-      try {
-        this.#debug('refreshPerception:before');
-        this.#refreshPerception?.();
-        this.#debug('refreshPerception:after');
-      } catch {
-        /* best-effort */
+      // Defer perception refresh to prevent RAF violations
+      if (this.#updateCount > 0) {
+        this.#deferHeavyOperation(() => {
+          this.#scheduleVisualUpdate();
+        });
+        // Reduced RAF delay - only wait one frame instead of two
+        await new Promise((resolve) => requestAnimationFrame(resolve));
       }
-      // Wait two RAFs to allow rendering and perception to settle
-      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
       this.#debug('post-RAF settle');
+
+      const perceptionTime = performance.now();
+      this.#debug('perception timing', {
+        perceptionMs: (perceptionTime - batchStartTime).toFixed(2),
+      });
 
       // Removed debug log
       // const debugMode = game.settings.get(MODULE_ID, 'autoVisibilityDebugMode');
@@ -783,15 +890,18 @@ export class EventDrivenVisibilitySystem {
       // Only include tokens that are not excluded per policy
       const allTokens =
         canvas.tokens?.placeables?.filter((t) => t.actor && !this.#isExcludedToken(t)) || [];
-      this.#debug(
-        'eligible tokens',
-        allTokens.map((t) => t.document.id),
-      );
+      // this.#debug(
+      //   'eligible tokens',
+      //   allTokens.map((t) => t.document.id),
+      // );
       const updates = [];
 
       // Debug logging removed
 
-      // For each changed token, recalculate visibility with all other tokens
+      // For each changed token, recalculate visibility with spatially relevant tokens
+      const processingStartTime = performance.now();
+      let processedTokens = 0;
+
       for (const changedTokenId of this.#changedTokens) {
         const changedToken = allTokens.find((t) => t.document.id === changedTokenId);
         if (!changedToken) {
@@ -799,9 +909,39 @@ export class EventDrivenVisibilitySystem {
           continue;
         }
 
-        // Process visibility with all other tokens
-        for (const otherToken of allTokens) {
+        processedTokens++;
+
+        // Get spatially relevant tokens for this changed token
+        const changedTokenPos = this.#getTokenPosition(changedToken);
+        const relevantTokens = this.#getTokensInRange(
+          changedTokenPos,
+          this.#maxVisibilityDistance,
+          changedTokenId,
+        );
+
+        // this.#debug('spatial optimization', {
+        //   changedToken: changedTokenId,
+        //   totalTokens: allTokens.length,
+        //   relevantTokens: relevantTokens.length,
+        //   reduction: `${Math.round((1 - relevantTokens.length / allTokens.length) * 100)}%`,
+        // });
+
+        // Process visibility with spatially relevant tokens only
+        const tokenStartTime = performance.now();
+        let tokenCalculations = 0;
+        let tokensFilteredByLOS = 0;
+
+        for (const otherToken of relevantTokens) {
           if (otherToken.document.id === changedTokenId) continue;
+
+          // Strict LOS check - only process if tokens can actually see each other
+          if (!this.#canTokensSeeEachOther(changedToken, otherToken)) {
+            this.#performanceMetrics.skippedByLOS++;
+            tokensFilteredByLOS++;
+            continue;
+          }
+
+          tokenCalculations++;
 
           let effectiveVisibility1, effectiveVisibility2;
 
@@ -861,27 +1001,28 @@ export class EventDrivenVisibilitySystem {
             this.#getVisibilityMap?.(changedToken)?.[otherToken.document.id] || 'observed';
           const currentVisibility2 =
             this.#getVisibilityMap?.(otherToken)?.[changedToken.document.id] || 'observed';
-          this.#debug('current map', {
-            changed: changedTokenId,
-            other: otherToken.document.id,
-            v1: currentVisibility1,
-            v2: currentVisibility2,
-          });
+          // this.#debug('current map', {
+          //   changed: changedTokenId,
+          //   other: otherToken.document.id,
+          //   v1: currentVisibility1,
+          //   v2: currentVisibility2,
+          // });
 
-          // Only calculate visibility if we don't have overrides
+          // Calculate visibility in both directions - visibility can be asymmetric
+          // due to different lighting conditions, vision capabilities, etc.
           if (!hasOverride1 || !hasOverride2) {
+            this.#performanceMetrics.totalCalculations++;
+
             const changedTokenPosition = this.#getTokenPosition(changedToken);
             const otherTokenPosition = this.#getTokenPosition(otherToken);
-            this.#debug('positions', {
-              changed: changedTokenId,
-              other: otherToken.document.id,
-              posChanged: changedTokenPosition,
-              posOther: otherTokenPosition,
-              srcChanged: this.#getPositionSource(changedToken),
-              srcOther: this.#getPositionSource(otherToken),
-            });
-
-            // Debug logging removed
+            // this.#debug('positions', {
+            //   changed: changedTokenId,
+            //   other: otherToken.document.id,
+            //   posChanged: changedTokenPosition,
+            //   posOther: otherTokenPosition,
+            //   srcChanged: this.#getPositionSource(changedToken),
+            //   srcOther: this.#getPositionSource(otherToken),
+            // });
 
             // Calculate visibility in both directions using optimized calculator
             // Pass position overrides to ensure we use the latest coordinates
@@ -893,12 +1034,12 @@ export class EventDrivenVisibilitySystem {
                   changedTokenPosition,
                   otherTokenPosition,
                 );
-              this.#debug('calc', {
-                dir: 'changed->other',
-                changed: changedTokenId,
-                other: otherToken.document.id,
-                result: visibility1,
-              });
+              // this.#debug('calc', {
+              //   dir: 'changed->other',
+              //   changed: changedTokenId,
+              //   other: otherToken.document.id,
+              //   result: visibility1,
+              // });
               effectiveVisibility1 = visibility1;
             }
 
@@ -910,16 +1051,14 @@ export class EventDrivenVisibilitySystem {
                   otherTokenPosition,
                   changedTokenPosition,
                 );
-              this.#debug('calc', {
-                dir: 'other->changed',
-                changed: changedTokenId,
-                other: otherToken.document.id,
-                result: visibility2,
-              });
+              // this.#debug('calc', {
+              //   dir: 'other->changed',
+              //   changed: changedTokenId,
+              //   other: otherToken.document.id,
+              //   result: visibility2,
+              // });
               effectiveVisibility2 = visibility2;
             }
-
-            // Debug logging removed
           }
 
           // Note: Suppression of downgrades (e.g., keeping 'concealed' when new calc says 'hidden')
@@ -934,12 +1073,12 @@ export class EventDrivenVisibilitySystem {
           // exist on the mover or its observers, the persisted visibility map is kept in
           // sync in both directions (observer->target and target->observer).
           if (effectiveVisibility1 !== currentVisibility1) {
-            this.#debug('queue update', {
-              observer: changedTokenId,
-              target: otherToken.document.id,
-              from: currentVisibility1,
-              to: effectiveVisibility1,
-            });
+            // this.#debug('queue update', {
+            //   observer: changedTokenId,
+            //   target: otherToken.document.id,
+            //   from: currentVisibility1,
+            //   to: effectiveVisibility1,
+            // });
             updates.push({
               observer: changedToken,
               target: otherToken,
@@ -948,12 +1087,12 @@ export class EventDrivenVisibilitySystem {
           }
 
           if (effectiveVisibility2 !== currentVisibility2) {
-            this.#debug('queue update', {
-              observer: otherToken.document.id,
-              target: changedTokenId,
-              from: currentVisibility2,
-              to: effectiveVisibility2,
-            });
+            // this.#debug('queue update', {
+            //   observer: otherToken.document.id,
+            //   target: changedTokenId,
+            //   from: currentVisibility2,
+            //   to: effectiveVisibility2,
+            // });
             updates.push({
               observer: otherToken,
               target: changedToken,
@@ -963,17 +1102,30 @@ export class EventDrivenVisibilitySystem {
         }
       }
 
-      // Apply all updates immediately
-      if (updates.length > 0) {
+      // Deduplicate updates before applying them
+      // This prevents duplicate updates when both tokens in a pair are in the changed set
+      const uniqueUpdates = [];
+      const updateKeys = new Set();
+
+      for (const update of updates) {
+        const key = `${update.observer?.document?.id}-${update.target?.document?.id}`;
+        if (!updateKeys.has(key)) {
+          updateKeys.add(key);
+          uniqueUpdates.push(update);
+        }
+      }
+
+      // Apply all unique updates immediately
+      if (uniqueUpdates.length > 0) {
         this.#debug(
           'apply updates',
-          updates.map((u) => ({
+          uniqueUpdates.map((u) => ({
             o: u.observer?.document?.id,
             t: u.target?.document?.id,
             to: u.visibility,
           })),
         );
-        for (const update of updates) {
+        for (const update of uniqueUpdates) {
           this.#setVisibilityBetween?.(update.observer, update.target, update.visibility, {
             isAutomatic: true,
           });
@@ -996,27 +1148,333 @@ export class EventDrivenVisibilitySystem {
           /* noop */
         }
 
-        // Refresh perception once for all updates - IMMEDIATELY
-        this.#debug('refreshPerception:before-apply');
-        this.#refreshPerception?.();
-        this.#debug('refreshPerception:after-apply');
+        // Defer visual updates to prevent RAF violations
+        if (uniqueUpdates.length > 0) {
+          this.#deferHeavyOperation(() => {
+            this.#scheduleVisualUpdate();
+          });
+        }
 
-        this.#updateCount += updates.length;
+        this.#updateCount += uniqueUpdates.length;
       }
 
+      const processingEndTime = performance.now();
+      this.#debug('processing timing', {
+        processedTokens,
+        processingMs: (processingEndTime - processingStartTime).toFixed(2),
+      });
+
       // Clear processed changes
-      this.#debug('processBatch:clear', { updates: updates.length });
+      this.#debug('processBatch:clear', {
+        totalUpdates: updates.length,
+        uniqueUpdates: uniqueUpdates.length,
+        duplicatesRemoved: updates.length - uniqueUpdates.length,
+      });
       this.#changedTokens.clear();
       this.#updatedTokenDocs.clear();
 
       // Removed debug log
     } finally {
       this.#processingBatch = false;
-      this.#debug('processBatch:done');
+      const batchEndTime = performance.now();
+      this.#debug('processBatch:done', {
+        totalMs: (batchEndTime - batchStartTime).toFixed(2),
+      });
     }
   }
 
   // Removed unused #getMovementDistance
+
+  /**
+   * Get tokens within a certain distance of a position for spatial optimization
+   * @param {Object} position - {x, y} position to search around
+   * @param {number} maxDistance - Maximum distance in grid units
+   * @param {string} excludeTokenId - Token ID to exclude from results
+   * @returns {Token[]} Array of tokens within range
+   */
+  #getTokensInRange(position, maxDistance = this.#maxVisibilityDistance, excludeTokenId = null) {
+    const tokens =
+      canvas.tokens?.placeables?.filter((t) => {
+        if (!t.actor || this.#isExcludedToken(t)) return false;
+        if (excludeTokenId && t.document.id === excludeTokenId) return false;
+
+        const tokenPos = this.#getTokenPosition(t);
+        const distance = Math.hypot(tokenPos.x - position.x, tokenPos.y - position.y);
+
+        // Convert distance to grid units (assuming 1 grid unit = canvas.grid.size pixels)
+        const gridDistance = distance / (canvas.grid?.size || 1);
+        return gridDistance <= maxDistance;
+      }) || [];
+
+    this.#performanceMetrics.spatialOptimizations++;
+    return tokens;
+  }
+
+  /**
+   * Get tokens that could be affected by a token's movement from oldPos to newPos
+   * Only includes tokens that can actually see the moving token (not blocked by walls)
+   * @param {Object} oldPos - Previous position {x, y}
+   * @param {Object} newPos - New position {x, y}
+   * @param {string} movingTokenId - ID of the moving token
+   * @returns {Token[]} Array of potentially affected tokens
+   */
+  #getAffectedTokensByMovement(oldPos, newPos, movingTokenId) {
+    const startTime = performance.now();
+    const metrics = {
+      movementDistance: 0,
+      midpointSkipped: false,
+      tokensChecked: 0,
+      distanceChecks: 0,
+      losChecks: 0,
+      wallChecks: 0,
+      raysCreated: 0,
+      totalTime: 0,
+      optimizationSavings: 0,
+    };
+
+    const affectedTokens = new Set();
+    const allNearbyTokens = new Set();
+
+    // Calculate movement distance to optimize midpoint checking
+    const movementDistance = Math.hypot(newPos.x - oldPos.x, newPos.y - oldPos.y);
+    const gridMovementDistance = movementDistance / (canvas.grid?.size || 1);
+    metrics.movementDistance = gridMovementDistance;
+
+    // Get tokens near the starting position
+    const startTokens = this.#getTokensInRange(oldPos, this.#maxVisibilityDistance, movingTokenId);
+    startTokens.forEach((t) => allNearbyTokens.add(t));
+
+    // Get tokens near the ending position
+    const endTokens = this.#getTokensInRange(newPos, this.#maxVisibilityDistance, movingTokenId);
+    endTokens.forEach((t) => allNearbyTokens.add(t));
+
+    // Only check midpoint for longer movements (optimization)
+    if (gridMovementDistance > 2) {
+      const midPos = {
+        x: (oldPos.x + newPos.x) / 2,
+        y: (oldPos.y + newPos.y) / 2,
+      };
+      const midTokens = this.#getTokensInRange(midPos, this.#maxVisibilityDistance, movingTokenId);
+      midTokens.forEach((t) => allNearbyTokens.add(t));
+    } else {
+      metrics.midpointSkipped = true;
+    }
+
+    // Now filter by actual line of sight with optimized checks
+    for (const token of allNearbyTokens) {
+      metrics.tokensChecked++;
+      const tokenPos = this.#getTokenPosition(token);
+
+      // Quick distance check (avoid duplicate work from #getTokensInRange)
+      const oldDistance = Math.hypot(tokenPos.x - oldPos.x, tokenPos.y - oldPos.y);
+      const newDistance = Math.hypot(tokenPos.x - newPos.x, tokenPos.y - newPos.y);
+      metrics.distanceChecks += 2;
+      const maxGridDistance = this.#maxVisibilityDistance * (canvas.grid?.size || 1);
+
+      const canSeeOld =
+        oldDistance <= maxGridDistance &&
+        this.#canTokenSeePositionOptimized(token, oldPos, metrics);
+      const canSeeNew =
+        newDistance <= maxGridDistance &&
+        this.#canTokenSeePositionOptimized(token, newPos, metrics);
+      metrics.losChecks += 2;
+
+      // If the token can see either position, it's affected
+      if (canSeeOld || canSeeNew) {
+        affectedTokens.add(token);
+      }
+    }
+
+    const endTime = performance.now();
+    metrics.totalTime = endTime - startTime;
+
+    // Calculate optimization savings
+    const theoreticalChecks = allNearbyTokens.size * 2; // Old + New position checks
+    const actualChecks = metrics.losChecks;
+    metrics.optimizationSavings = (
+      ((theoreticalChecks - actualChecks) / theoreticalChecks) *
+      100
+    ).toFixed(1);
+
+    // Update cumulative metrics
+    this.#updateMovementMetrics(metrics);
+
+    this.#debug('movement filtering', {
+      movingToken: movingTokenId,
+      totalNearby: allNearbyTokens.size,
+      canSee: affectedTokens.size,
+      filtered: allNearbyTokens.size - affectedTokens.size,
+      movementDistance: gridMovementDistance.toFixed(1),
+      metrics: {
+        ...metrics,
+        totalTime: `${metrics.totalTime.toFixed(2)}ms`,
+        optimizationSavings: `${metrics.optimizationSavings}%`,
+      },
+    });
+
+    return Array.from(affectedTokens);
+  }
+
+  /**
+   * Debounced visual update to prevent excessive refresh calls
+   */
+  #scheduleVisualUpdate() {
+    if (this.#visualUpdateTimeout) {
+      clearTimeout(this.#visualUpdateTimeout);
+    }
+
+    this.#visualUpdateTimeout = setTimeout(() => {
+      try {
+        this.#debug('debounced visual update');
+        this.#refreshPerception?.();
+      } catch {
+        /* best-effort */
+      }
+      this.#visualUpdateTimeout = null;
+    }, 16); // ~60fps debounce
+  }
+
+  /**
+   * Defer heavy operations to prevent RAF violations
+   */
+  #deferHeavyOperation(operation) {
+    // Use setTimeout to move heavy operations off the main thread
+    setTimeout(() => {
+      try {
+        operation();
+      } catch (error) {
+        console.warn('PF2E Visioner | Deferred operation failed:', error);
+      }
+    }, 0);
+  }
+
+  /**
+   * Update cumulative movement optimization metrics
+   * @param {Object} metrics - Current movement metrics
+   */
+  #updateMovementMetrics(metrics) {
+    const mov = this.#performanceMetrics.movementOptimizations;
+
+    mov.totalMovements++;
+    if (metrics.midpointSkipped) mov.midpointSkipped++;
+
+    mov.totalTime += metrics.totalTime;
+    mov.averageTime = mov.totalTime / mov.totalMovements;
+
+    mov.totalTokensChecked += metrics.tokensChecked;
+    mov.totalDistanceChecks += metrics.distanceChecks;
+    mov.totalLOSChecks += metrics.losChecks;
+    mov.totalWallChecks += metrics.wallChecks;
+    mov.totalRaysCreated += metrics.raysCreated;
+
+    // Calculate running average of optimization savings
+    const currentSavings = parseFloat(metrics.optimizationSavings);
+    mov.averageOptimizationSavings =
+      (mov.averageOptimizationSavings * (mov.totalMovements - 1) + currentSavings) /
+      mov.totalMovements;
+  }
+
+  /**
+   * Optimized version of canTokenSeePosition with better performance tracking
+   * @param {Token} token - The observing token
+   * @param {Object} position - {x, y} position to check
+   * @param {Object} metrics - Metrics object to track performance
+   * @returns {boolean} True if the token can see the position
+   */
+  #canTokenSeePositionOptimized(token, position, metrics) {
+    try {
+      const tokenPos = this.#getTokenPosition(token);
+
+      // Create ray from token to position
+      const ray = new foundry.canvas.geometry.Ray(tokenPos, position);
+      metrics.raysCreated++;
+
+      // Check for walls blocking line of sight
+      if (canvas.walls?.length > 0) {
+        try {
+          const wallsInBounds = canvas.walls.quadtree.getObjects(ray.bounds);
+          metrics.wallChecks += wallsInBounds.length;
+
+          // Check if any walls actually block the line
+          for (const wall of wallsInBounds) {
+            // A wall is solid if it blocks movement (move > 0) and is not a door (door === 0 or door === null)
+            const isSolidWall =
+              wall.document.move > 0 && (wall.document.door === 0 || wall.document.door === null);
+
+            if (isSolidWall) {
+              // This is a solid wall, check if it intersects our ray
+              if (ray.intersectSegment(wall.coords)) {
+                return false; // Wall blocks line of sight
+              }
+            }
+          }
+        } catch {
+          // If we can't check walls properly, assume they can see (conservative approach)
+          return true;
+        }
+      }
+
+      return true;
+    } catch {
+      // If we can't determine, assume they can see (conservative approach)
+      return true;
+    }
+  }
+
+  /**
+   * Check if two tokens can see each other (bidirectional line of sight)
+   * @param {Token} token1 - First token
+   * @param {Token} token2 - Second token
+   * @returns {boolean} True if both tokens can see each other
+   */
+  #canTokensSeeEachOther(token1, token2) {
+    try {
+      const pos1 = this.#getTokenPosition(token1);
+      const pos2 = this.#getTokenPosition(token2);
+
+      // Quick distance check first
+      const distance = Math.hypot(pos1.x - pos2.x, pos1.y - pos2.y);
+      const gridDistance = distance / (canvas.grid?.size || 1);
+
+      if (gridDistance > this.#maxVisibilityDistance) {
+        return false;
+      }
+
+      // Check for walls blocking line of sight in both directions
+      const walls = canvas.walls?.objects?.children || [];
+
+      if (walls.length > 0) {
+        try {
+          // Create Ray using the correct FoundryVTT API
+          const ray = new foundry.canvas.geometry.Ray(pos1, pos2);
+
+          const wallsInBounds = canvas.walls.quadtree.getObjects(ray.bounds);
+
+          // Check if any walls actually block the line
+          for (const wall of wallsInBounds) {
+            // A wall is solid if it blocks movement (move > 0) and is not a door (door === 0 or door === null)
+            const isSolidWall =
+              wall.document.move > 0 && (wall.document.door === 0 || wall.document.door === null);
+
+            if (isSolidWall) {
+              // This is a solid wall, check if it intersects our ray
+              if (ray.intersectSegment(wall.coords)) {
+                return false; // Wall blocks line of sight
+              }
+            }
+          }
+        } catch {
+          // If we can't check walls properly, assume they can see (conservative approach)
+          return true;
+        }
+      }
+
+      return true;
+    } catch {
+      // If we can't determine, assume they can see (conservative approach)
+      return true;
+    }
+  }
 
   /**
    * Get the actual position for a token, using live canvas coordinates first
@@ -1031,7 +1489,7 @@ export class EventDrivenVisibilitySystem {
         y: updatedDoc.y + (updatedDoc.height * canvas.grid.size) / 2,
         elevation: updatedDoc.elevation || 0,
       };
-      this.#debug('getTokenPosition:updated', token.document.id, position);
+      // this.#debug('getTokenPosition:updated', token.document.id, position);
       return position;
     }
 
@@ -1054,7 +1512,7 @@ export class EventDrivenVisibilitySystem {
             : false;
         if (now <= pin.until && !close) {
           const position = { x: pin.x, y: pin.y, elevation: pin.elevation };
-          this.#debug('getTokenPosition:pinned', token.document.id, position);
+          // this.#debug('getTokenPosition:pinned', token.document.id, position);
           return position;
         }
         // Clear expired or matched pins
@@ -1074,7 +1532,7 @@ export class EventDrivenVisibilitySystem {
         y: canvasToken.document.y + (canvasToken.document.height * canvas.grid.size) / 2,
         elevation: canvasToken.document.elevation || 0,
       };
-      this.#debug('getTokenPosition:canvas', token.document.id, position);
+      // this.#debug('getTokenPosition:canvas', token.document.id, position);
       return position;
     }
 
@@ -1084,18 +1542,18 @@ export class EventDrivenVisibilitySystem {
       y: token.document.y + (token.document.height * canvas.grid.size) / 2,
       elevation: token.document.elevation || 0,
     };
-    this.#debug('getTokenPosition:doc', token.document.id, position);
+    // this.#debug('getTokenPosition:doc', token.document.id, position);
     return position;
   }
 
-  // Helper: where did we source the last position from?
-  #getPositionSource(token) {
-    if (this.#updatedTokenDocs.has(token.document.id)) return 'updated';
-    if (this.#pinnedPositions.has(token.document.id)) return 'pinned';
-    const canvasToken = canvas.tokens.get(token.document.id);
-    if (canvasToken && canvasToken.document) return 'canvas';
-    return 'doc';
-  }
+  // Helper: where did we source the last position from? (removed - only used in debug logs)
+  // #getPositionSource(token) {
+  //   if (this.#updatedTokenDocs.has(token.document.id)) return 'updated';
+  //   if (this.#pinnedPositions.has(token.document.id)) return 'pinned';
+  //   const canvasToken = canvas.tokens.get(token.document.id);
+  //   if (canvasToken && canvasToken.document) return 'canvas';
+  //   return 'doc';
+  // }
 
   // Determine if a token is currently emitting light or darkness based on its document light config
   // and common PF2e effect/item flags/names. Best-effort heuristic; returns true if likely emitting.
@@ -1139,11 +1597,48 @@ export class EventDrivenVisibilitySystem {
    * Keep exclusion minimal to avoid delaying state updates at visibility borders.
    * - Foundry hidden
    * - Defeated/unconscious/dead (cannot observe others)
+   * - Loot tokens (no vision capabilities)
+   * - Hazards (no vision capabilities)
    */
   #isExcludedToken(token) {
     try {
       if (!token?.document) return true;
       if (token.document.hidden) return true;
+
+      // Skip loot tokens and hazards - they don't have vision capabilities
+      try {
+        const actor = token.actor;
+        if (actor) {
+          const actorType = actor.type?.toLowerCase();
+          const actorName = actor.name?.toLowerCase() || '';
+
+          // Skip loot tokens
+          if (actorType === 'loot') {
+            // this.#debug('exclude loot token', token.document.id, actorName);
+            return true;
+          }
+
+          // Skip hazards
+          if (actorType === 'hazard') {
+            // this.#debug('exclude hazard token', token.document.id, actorName);
+            return true;
+          }
+
+          // Skip tokens with "loot" or "hazard" in their name (fallback detection)
+          if (
+            actorName.includes('loot') ||
+            actorName.includes('hazard') ||
+            actorName.includes('treasure') ||
+            actorName.includes('chest')
+          ) {
+            // this.#debug('exclude token by name pattern', token.document.id, actorName);
+            return true;
+          }
+        }
+      } catch {
+        // Non-fatal; ignore and proceed
+      }
+
       // Do not exclude based on sneak-active or viewport visibility; AVS must still process them
       // Skip defeated / unconscious / dead tokens: they can't currently observe others
       try {
@@ -1207,6 +1702,19 @@ export class EventDrivenVisibilitySystem {
 
     // Clear all pending changes
     this.#changedTokens.clear();
+
+    // Clear any pending visual updates
+    if (this.#visualUpdateTimeout) {
+      clearTimeout(this.#visualUpdateTimeout);
+      this.#visualUpdateTimeout = null;
+    }
+
+    // Clear any pending full recalculations
+    if (this.#fullRecalcTimeout) {
+      clearTimeout(this.#fullRecalcTimeout);
+      this.#fullRecalcTimeout = null;
+    }
+    this.#pendingFullRecalc = false;
   }
 
   /**
@@ -1230,8 +1738,263 @@ export class EventDrivenVisibilitySystem {
       processingBatch: this.#processingBatch,
       totalUpdates: this.#updateCount,
       optimized: true,
-      description: 'Zero-delay event-driven visibility system',
+      description: 'Zero-delay event-driven visibility system with spatial optimization',
+      performanceMetrics: this.#performanceMetrics,
+      maxVisibilityDistance: this.#maxVisibilityDistance,
     };
+  }
+
+  /**
+   * Get performance metrics for debugging
+   */
+  getPerformanceMetrics() {
+    const now = Date.now();
+    const timeSinceReset = now - this.#performanceMetrics.lastReset;
+    const calculationsPerSecond =
+      this.#performanceMetrics.totalCalculations / (timeSinceReset / 1000);
+
+    return {
+      ...this.#performanceMetrics,
+      calculationsPerSecond: Math.round(calculationsPerSecond * 100) / 100,
+      timeSinceReset: Math.round(timeSinceReset / 1000),
+      efficiency: {
+        spatialOptimizations: this.#performanceMetrics.spatialOptimizations,
+        skippedByDistance: this.#performanceMetrics.skippedByDistance,
+        skippedByLOS: this.#performanceMetrics.skippedByLOS,
+        totalSkipped:
+          this.#performanceMetrics.skippedByDistance + this.#performanceMetrics.skippedByLOS,
+        skipRate:
+          this.#performanceMetrics.totalCalculations > 0
+            ? Math.round(
+                ((this.#performanceMetrics.skippedByDistance +
+                  this.#performanceMetrics.skippedByLOS) /
+                  this.#performanceMetrics.totalCalculations) *
+                  100,
+              )
+            : 0,
+      },
+      movementOptimizations: {
+        ...this.#performanceMetrics.movementOptimizations,
+        averageTime:
+          Math.round(this.#performanceMetrics.movementOptimizations.averageTime * 100) / 100,
+        averageOptimizationSavings:
+          Math.round(
+            this.#performanceMetrics.movementOptimizations.averageOptimizationSavings * 100,
+          ) / 100,
+        midpointSkipRate:
+          this.#performanceMetrics.movementOptimizations.totalMovements > 0
+            ? Math.round(
+                (this.#performanceMetrics.movementOptimizations.midpointSkipped /
+                  this.#performanceMetrics.movementOptimizations.totalMovements) *
+                  100,
+              )
+            : 0,
+      },
+    };
+  }
+
+  /**
+   * Get detailed movement optimization metrics
+   */
+  getMovementMetrics() {
+    const mov = this.#performanceMetrics.movementOptimizations;
+    return {
+      totalMovements: mov.totalMovements,
+      midpointSkipped: mov.midpointSkipped,
+      midpointSkipRate:
+        mov.totalMovements > 0
+          ? Math.round((mov.midpointSkipped / mov.totalMovements) * 100) + '%'
+          : '0%',
+      totalTime: Math.round(mov.totalTime * 100) / 100 + 'ms',
+      averageTime: Math.round(mov.averageTime * 100) / 100 + 'ms',
+      totalTokensChecked: mov.totalTokensChecked,
+      totalDistanceChecks: mov.totalDistanceChecks,
+      totalLOSChecks: mov.totalLOSChecks,
+      totalWallChecks: mov.totalWallChecks,
+      totalRaysCreated: mov.totalRaysCreated,
+      averageOptimizationSavings: Math.round(mov.averageOptimizationSavings * 100) / 100 + '%',
+      efficiency: {
+        tokensPerMovement:
+          mov.totalMovements > 0 ? Math.round(mov.totalTokensChecked / mov.totalMovements) : 0,
+        checksPerToken:
+          mov.totalTokensChecked > 0 ? Math.round(mov.totalLOSChecks / mov.totalTokensChecked) : 0,
+        wallsPerCheck:
+          mov.totalLOSChecks > 0 ? Math.round(mov.totalWallChecks / mov.totalLOSChecks) : 0,
+      },
+    };
+  }
+
+  /**
+   * Reset performance metrics
+   */
+  resetPerformanceMetrics() {
+    this.#performanceMetrics = {
+      totalCalculations: 0,
+      skippedByDistance: 0,
+      skippedByLOS: 0,
+      spatialOptimizations: 0,
+      lastReset: Date.now(),
+      movementOptimizations: {
+        totalMovements: 0,
+        midpointSkipped: 0,
+        totalTime: 0,
+        averageTime: 0,
+        totalTokensChecked: 0,
+        totalDistanceChecks: 0,
+        totalLOSChecks: 0,
+        totalWallChecks: 0,
+        totalRaysCreated: 0,
+        averageOptimizationSavings: 0,
+      },
+    };
+  }
+
+  /**
+   * Set maximum visibility distance for spatial optimization
+   * @param {number} distance - Distance in grid units
+   */
+  setMaxVisibilityDistance(distance) {
+    this.#maxVisibilityDistance = Math.max(1, Math.min(50, distance));
+    this.#debug('maxVisibilityDistance set to', this.#maxVisibilityDistance);
+  }
+
+  /**
+   * Debug method to visualize which tokens are being checked for a moving token
+   * @param {string} movingTokenId - ID of the moving token
+   * @param {Object} oldPos - Old position {x, y}
+   * @param {Object} newPos - New position {x, y}
+   */
+  debugMovementAffectedTokens(movingTokenId, oldPos, newPos) {
+    const affectedTokens = this.#getAffectedTokensByMovement(oldPos, newPos, movingTokenId);
+
+    return affectedTokens;
+  }
+
+  /**
+   * Check if a token is excluded from AVS calculations (public method)
+   * @param {Token} token - Token to check
+   * @returns {boolean} Whether the token is excluded
+   */
+  isExcludedToken(token) {
+    return this.#isExcludedToken(token);
+  }
+
+  /**
+   * Get the maximum visibility distance (public method)
+   * @returns {number} Maximum visibility distance in grid units
+   */
+  getMaxVisibilityDistance() {
+    return this.#maxVisibilityDistance;
+  }
+
+  /**
+   * Check if two tokens can see each other (public method)
+   * @param {Token} token1 - First token
+   * @param {Token} token2 - Second token
+   * @returns {boolean} Whether the tokens can see each other
+   */
+  canTokensSeeEachOther(token1, token2) {
+    return this.#canTokensSeeEachOther(token1, token2);
+  }
+
+  /**
+   * Get token position (public method for debugging)
+   * @param {Token} token - Token to get position for
+   * @returns {Object} Position object with x, y coordinates
+   */
+  getTokenPosition(token) {
+    return this.#getTokenPosition(token);
+  }
+
+  /**
+   * Get visibility map for a token (public method for debugging)
+   * @param {Token} token - Token to get visibility map for
+   * @returns {Object} Visibility map object
+   */
+  getVisibilityMap(token) {
+    return this.#getVisibilityMap?.(token);
+  }
+
+  /**
+   * Get the optimized visibility calculator (public method for debugging)
+   * @returns {Object} The visibility calculator instance
+   */
+  getVisibilityCalculator() {
+    return this.#optimizedVisibilityCalculator;
+  }
+
+  /**
+   * Mark a token as changed (public method for debugging)
+   * @param {TokenDocument} tokenDoc - Token document
+   * @param {Object} changes - Changes made to the token
+   */
+  markTokenChanged(tokenDoc, changes) {
+    this.#markTokenChangedWithSpatialOptimization(tokenDoc, changes);
+  }
+
+  /**
+   * Get statistics about token exclusions for debugging
+   * @returns {Object} Statistics about excluded tokens
+   */
+  getExclusionStats() {
+    const allTokens = canvas.tokens?.placeables || [];
+    const stats = {
+      total: allTokens.length,
+      excluded: 0,
+      included: 0,
+      byType: {
+        hidden: 0,
+        loot: 0,
+        hazard: 0,
+        defeated: 0,
+        namePattern: 0,
+        other: 0,
+      },
+      excludedTokens: [],
+    };
+
+    for (const token of allTokens) {
+      if (this.#isExcludedToken(token)) {
+        stats.excluded++;
+        const actor = token.actor;
+        const actorType = actor?.type?.toLowerCase() || 'unknown';
+        const actorName = actor?.name?.toLowerCase() || '';
+
+        let exclusionReason = 'other';
+        if (token.document.hidden) {
+          exclusionReason = 'hidden';
+          stats.byType.hidden++;
+        } else if (actorType === 'loot') {
+          exclusionReason = 'loot';
+          stats.byType.loot++;
+        } else if (actorType === 'hazard') {
+          exclusionReason = 'hazard';
+          stats.byType.hazard++;
+        } else if (
+          actorName.includes('loot') ||
+          actorName.includes('hazard') ||
+          actorName.includes('treasure') ||
+          actorName.includes('chest')
+        ) {
+          exclusionReason = 'namePattern';
+          stats.byType.namePattern++;
+        } else {
+          exclusionReason = 'defeated';
+          stats.byType.defeated++;
+        }
+
+        stats.excludedTokens.push({
+          id: token.document.id,
+          name: token.name,
+          type: actorType,
+          reason: exclusionReason,
+        });
+      } else {
+        stats.included++;
+      }
+    }
+
+    return stats;
   }
 
   /**
@@ -2429,3 +3192,8 @@ export class EventDrivenVisibilitySystem {
 
 // Export singleton instance
 export const eventDrivenVisibilitySystem = EventDrivenVisibilitySystem.getInstance();
+
+// Make it available globally for other components to access
+if (typeof window !== 'undefined') {
+  window.Pf2eVisionerEventDrivenSystem = eventDrivenVisibilitySystem;
+}

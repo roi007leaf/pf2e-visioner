@@ -1165,11 +1165,6 @@ export class SneakActionHandler extends ActionHandlerBase {
    * @param {Array} changes - The visibility changes to apply
    */
   async applyChangesInternal(changes) {
-    console.log(
-      '🎯 PF2E Visioner | SneakActionHandler.applyChangesInternal called!',
-      changes?.length,
-      'changes',
-    );
 
     // First apply the normal visibility changes
     await super.applyChangesInternal(changes);
@@ -1194,35 +1189,18 @@ export class SneakActionHandler extends ActionHandlerBase {
    */
   async #applySneakyFeatEffects(changes, context = {}) {
     try {
-      console.log(
-        '🎯 PF2E Visioner | #applySneakyFeatEffects called with',
-        changes?.length,
-        'changes',
-      );
 
       for (const change of changes) {
         // In sneak action: observer = the one being sneaked against, target = the sneaker
         const observer = change?.observer; // The one being sneaked against
         const sneaker = change?.target; // The one doing the sneaking
 
-        console.log('🎯 PF2E Visioner | Processing change:', {
-          observer: observer?.name,
-          sneaker: sneaker?.name,
-          outcome: change?.outcome,
-          sneakAdeptApplied: change?.sneakAdeptApplied,
-          hasActor: !!sneaker?.actor,
-          hasObserver: !!observer,
-          fullChange: change,
-        });
-
         if (!sneaker?.actor || !observer) {
-          console.log('🎯 PF2E Visioner | Skipping - missing sneaker actor or observer');
           continue;
         }
 
         // Check if the sneaker has the Sneaky feat
         const hasSneakyFeat = this.#hasSneakyFeat(sneaker);
-        console.log('🎯 PF2E Visioner | Sneaker has Sneaky feat:', hasSneakyFeat);
         if (!hasSneakyFeat) continue;
 
         // Check if the sneak was successful (success or critical success) OR Sneak Adept applied
@@ -1231,22 +1209,7 @@ export class SneakActionHandler extends ActionHandlerBase {
           this.#wasSneakSuccessful(change) ||
           change?.sneakAdeptApplied ||
           change?.outcome === 'unknown';
-        console.log(
-          '🎯 PF2E Visioner | Sneak was successful:',
-          wasSuccessful,
-          'Outcome:',
-          change?.outcome,
-          'Sneak Adept:',
-          change?.sneakAdeptApplied,
-        );
         if (!wasSuccessful) continue;
-
-        console.log(
-          '🎯 PF2E Visioner | Applying Sneaky feat effect for',
-          sneaker.name,
-          'against',
-          observer.name,
-        );
         // Apply Sneaky feat effect to the sneaker, protecting against this observer
         await this.#applySneakyEffectForObserver(sneaker, observer);
       }
@@ -1306,12 +1269,6 @@ export class SneakActionHandler extends ActionHandlerBase {
    */
   async #applySneakyEffectForObserver(sneaker, observer) {
     try {
-      console.log(
-        '🎯 PF2E Visioner | Creating Sneaky feat effect for',
-        sneaker?.name,
-        'vs',
-        observer?.name,
-      );
 
       if (!sneaker?.actor || !observer) return;
 
@@ -1388,7 +1345,6 @@ export class SneakActionHandler extends ActionHandlerBase {
 
       // Add the effect to the actor
       await sneaker.actor.createEmbeddedDocuments('Item', [effectData]);
-      console.log('🎯 PF2E Visioner | Successfully created Sneaky feat effect!');
       notify.info(`Applied Sneaky feat protection from ${observerName} to ${sneaker.name}`);
     } catch (error) {
       console.error('PF2E Visioner | Error applying Sneaky effect for observer:', error);

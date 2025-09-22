@@ -203,11 +203,6 @@ class DualSystemResultApplication {
 
       // Apply Sneaky feat effects after all visibility changes have been processed
       try {
-        console.log(
-          '🎯 PF2E Visioner | Dual system applying Sneaky feat effects for',
-          allAppliedChanges.length,
-          'changes',
-        );
 
         // Add observer info to each change for Sneaky feat processing
         const changesWithObservers = [];
@@ -334,26 +329,13 @@ class DualSystemResultApplication {
    */
   #getOutcomeFromSneakResults(sneakResults, observer, target) {
     try {
-      console.log('🎯 PF2E Visioner | Looking up outcome for:', {
-        observerId: observer?.document?.id,
-        targetId: target?.document?.id,
-        sneakResultsCount: sneakResults?.length,
-      });
 
       const result = sneakResults.find((r) => {
         const observerMatch = r.token?.document?.id === observer?.document?.id;
         const targetMatch = (r.actor?.document?.id || r.actor?.id) === target?.document?.id;
-        console.log('🎯 PF2E Visioner | Checking result:', {
-          rTokenId: r.token?.document?.id,
-          rActorId: r.actor?.document?.id || r.actor?.id,
-          observerMatch,
-          targetMatch,
-          outcome: r.outcome,
-        });
         return observerMatch && targetMatch;
       });
 
-      console.log('🎯 PF2E Visioner | Found result:', result?.outcome || 'none');
       return result?.outcome || 'unknown';
     } catch (error) {
       console.warn('PF2E Visioner | Error getting outcome from sneak results:', error);

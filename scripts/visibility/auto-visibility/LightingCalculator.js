@@ -37,7 +37,7 @@ export class LightingCalculator {
    * @returns {Object} Light level information
    */
   getLightLevelAt(position, token) {
-    if (log.enabled()) log.debug(() => ({ step: 'start-getLightLevelAt', position }));
+    // if (log.enabled()) log.debug(() => ({ step: 'start-getLightLevelAt', position }));
 
     const DARK = 0;
     const DIM = 1;
@@ -51,7 +51,7 @@ export class LightingCalculator {
         lightIllumination: LIGHT_THRESHOLDS[illumination],
         ...extras,
       };
-      if (log.enabled()) log.debug(() => ({ step: 'illumination-result', res: result }));
+      // if (log.enabled()) log.debug(() => ({ step: 'illumination-result', res: result }));
       return result;
     }
 
@@ -164,10 +164,35 @@ export class LightingCalculator {
     // This needs to process darkness regions for full containment of token rather than just single point
     // const darknessRegions = scene.regions
     //   .filter((r) => r.behaviors.some((b) => b.type === 'adjustDarknessLevel'))
-    // console.log("[Visibility Calculator] darknessRegions", darknessRegions);
-    const sceneDarkness = scene.environment.globalLight?.enabled
-      ? canvas.effects.getDarknessLevel(center)
-      : 0.0;
+    let sceneDarkness = scene.environment.globalLight?.enabled
+      ? scene.environment.darknessLevel
+      : 1.0;
+    const darknessRegions = scene.regions
+      .filter((r) => r.behaviors.some((b) => b.active && b.type === 'adjustDarknessLevel'))
+      .filter((r) => r.polygonTree);
+    let darkBehaviors = [];
+    for (const region of darknessRegions) {
+      const polygonTree = region.polygonTree;
+      const circleTest = polygonTree.testCircle(center, tokenRadius);
+      if (circleTest < 1) continue;
+      const behaviors = region.behaviors.filter(
+        (b) => b.active && b.type === 'adjustDarknessLevel',
+      );
+      for (const b of behaviors) darkBehaviors.push(b);
+    }
+    for (const b of darkBehaviors) {
+      switch (b.system.mode) {
+        case 0:
+          sceneDarkness = b.system.modifier;
+          break; // override
+        case 1:
+          sceneDarkness *= b.system.modifier;
+          break; // brighten
+        case 2:
+          sceneDarkness = Math.min(sceneDarkness + b.system.modifier, 1.0);
+          break; // darken
+      }
+    }
 
     // If the token isn't fully in darkness by GI, then it is in bright light and we can skip the rest
     // This means a global DIM light is approximated using:

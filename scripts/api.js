@@ -1161,7 +1161,6 @@ export const autoVisibility = {
       hasDocument: !!light.document,
       lightType: light.constructor?.name || 'unknown',
     }));
-    console.log('PF2E Visioner | Darkness Sources:', result);
     return result;
   },
 
@@ -1231,9 +1230,18 @@ export const autoVisibility = {
       })),
     };
 
-    console.log('PF2E Visioner | Token Lighting Debug:', result);
     return result;
   },
+
+  // Performance optimization methods
+  getPerformanceMetrics: () => autoVisibilitySystem.getPerformanceMetrics(),
+  getMovementMetrics: () => autoVisibilitySystem.getMovementMetrics(),
+  resetPerformanceMetrics: () => autoVisibilitySystem.resetPerformanceMetrics(),
+  setMaxVisibilityDistance: (distance) => autoVisibilitySystem.setMaxVisibilityDistance(distance),
+  getStatus: () => autoVisibilitySystem.getStatus(),
+  debugMovementAffectedTokens: (movingTokenId, oldPos, newPos) =>
+    autoVisibilitySystem.debugMovementAffectedTokens(movingTokenId, oldPos, newPos),
+  getExclusionStats: () => autoVisibilitySystem.getExclusionStats(),
 };
 
 /**
