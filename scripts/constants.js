@@ -334,6 +334,17 @@ export const DEFAULT_SETTINGS = {
     default: false,
   },
 
+  // Client-side performance: filter AVS to tokens in this client's viewport
+  clientViewportFiltering: {
+    name: 'PF2E_VISIONER.SETTINGS.CLIENT_VIEWPORT_FILTERING.name',
+    hint: 'PF2E_VISIONER.SETTINGS.CLIENT_VIEWPORT_FILTERING.hint',
+    scope: 'client',
+    config: true,
+    restricted: false,
+    type: Boolean,
+    default: true,
+  },
+
   colorblindMode: {
     name: 'PF2E_VISIONER.SETTINGS.COLORBLIND_MODE.name',
     hint: 'PF2E_VISIONER.SETTINGS.COLORBLIND_MODE.hint',

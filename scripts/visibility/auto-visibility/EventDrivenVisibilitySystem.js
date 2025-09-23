@@ -846,6 +846,10 @@ export class EventDrivenVisibilitySystem {
     const batchStartTime = performance.now();
     this.#processingBatch = true;
     this.#debug('processBatch:start', { changed: Array.from(this.#changedTokens) });
+    // Stats object for precomputed lighting usage across this batch
+    let precomputeStats = null;
+    // Per-batch directional pair breakdown (initialized later inside try)
+    let batchDebugCounters = null;
 
     try {
       // Add a small delay only if there are sneaking tokens active to allow override flags to be set
@@ -880,8 +884,33 @@ export class EventDrivenVisibilitySystem {
       // const startTime = performance.now();
 
       // Only include tokens that are not excluded per policy
-      const allTokens =
+      let allTokens =
         canvas.tokens?.placeables?.filter((t) => t.actor && !this.#isExcludedToken(t)) || [];
+      // Optional client-side filtering: restrict to tokens inside this client's viewport
+      if (this.#isClientAwareFilteringEnabled()) {
+        const inView = this.#getViewportTokenIdSet();
+        if (inView && inView.size > 0) {
+          allTokens = allTokens.filter((t) => inView.has(t.document.id));
+        }
+      }
+      // Batch precompute: lighting results for each token's current center
+      let precomputedLights = null;
+      precomputeStats = { batch: 'process', targetUsed: 0, targetMiss: 0, observerUsed: 0, observerMiss: 0 };
+      try {
+        const { LightingCalculator } = await import('./LightingCalculator.js');
+        const lightingCalculator = LightingCalculator.getInstance?.();
+        if (lightingCalculator) {
+          precomputedLights = new Map();
+          for (const tok of allTokens) {
+            const pos = this.#getTokenPosition(tok);
+            const light = lightingCalculator.getLightLevelAt(pos, tok);
+            precomputedLights.set(tok.document.id, light);
+          }
+        }
+      } catch {
+        precomputedLights = null; // best-effort
+      }
+      const calcOptions = { precomputedLights, precomputeStats };
       // this.#debug(
       //   'eligible tokens',
       //   allTokens.map((t) => t.document.id),
@@ -894,6 +923,13 @@ export class EventDrivenVisibilitySystem {
       // Batch-local caches to avoid duplicate heavy calculations when both tokens are in the changed set
       const batchVisibilityCache = new Map(); // key: obsId|obsPos|tgtId|tgtPos -> state
       const batchLosCache = new Map(); // key: sortedPairIds|pos1|pos2 -> boolean
+      // Per-batch debug counters to explain directional work
+      batchDebugCounters = {
+        pairsConsidered: 0, // directional pairs (non-overridden) we attempted this batch
+        pairsComputed: 0,   // directional pairs that required a fresh compute
+        pairsCached: 0,     // directional pairs served from batch cache
+        pairsSkippedSpatial: 0, // directional pairs skipped by spatial range reduction (pre-LOS)
+      };
       const processingStartTime = performance.now();
       let processedTokens = 0;
 
@@ -908,11 +944,17 @@ export class EventDrivenVisibilitySystem {
 
         // Get spatially relevant tokens for this changed token
         const changedTokenPos = this.#getTokenPosition(changedToken);
-        const relevantTokens = this.#getTokensInRange(
+        let relevantTokens = this.#getTokensInRange(
           changedTokenPos,
           this.#maxVisibilityDistance,
           changedTokenId,
         );
+        if (this.#isClientAwareFilteringEnabled()) {
+          const inView = this.#getViewportTokenIdSet();
+          if (inView && inView.size > 0) {
+            relevantTokens = relevantTokens.filter((t) => inView.has(t.document.id));
+          }
+        }
 
         this.#debug('spatial optimization', {
           changedToken: changedTokenId,
@@ -920,6 +962,12 @@ export class EventDrivenVisibilitySystem {
           relevantTokens: relevantTokens.length,
           reduction: `${Math.round((1 - relevantTokens.length / allTokens.length) * 100)}%`,
         });
+
+        // Count spatially skipped directional pairs (pre-LOS): potential others minus relevant
+        // Each potential observer-target pair has two directions, so multiply by 2
+        const potentialOthers = Math.max(0, allTokens.length - 1);
+        const spatiallySkipped = Math.max(0, potentialOthers - relevantTokens.length);
+        batchDebugCounters.pairsSkippedSpatial += spatiallySkipped * 2;
 
         // Process visibility with spatially relevant tokens only
         const tokenStartTime = performance.now();
@@ -1032,6 +1080,8 @@ export class EventDrivenVisibilitySystem {
             // Calculate visibility in both directions using optimized calculator
             // Pass position overrides to ensure we use the latest coordinates
             if (!hasOverride1) {
+              // Directional pair considered (changed -> other)
+              batchDebugCounters.pairsConsidered++;
               const vKey1 = `${aId}|${posKeyA}>>${bId}|${posKeyB}`;
               let visibility1 = batchVisibilityCache.get(vKey1);
               if (visibility1 === undefined) {
@@ -1041,8 +1091,12 @@ export class EventDrivenVisibilitySystem {
                     otherToken,
                     changedTokenPosition,
                     otherTokenPosition,
+                    calcOptions,
                   );
                 batchVisibilityCache.set(vKey1, visibility1);
+                batchDebugCounters.pairsComputed++;
+              } else {
+                batchDebugCounters.pairsCached++;
               }
               // this.#debug('calc', {
               //   dir: 'changed->other',
@@ -1054,6 +1108,8 @@ export class EventDrivenVisibilitySystem {
             }
 
             if (!hasOverride2) {
+              // Directional pair considered (other -> changed)
+              batchDebugCounters.pairsConsidered++;
               const vKey2 = `${bId}|${posKeyB}>>${aId}|${posKeyA}`;
               let visibility2 = batchVisibilityCache.get(vKey2);
               if (visibility2 === undefined) {
@@ -1063,8 +1119,12 @@ export class EventDrivenVisibilitySystem {
                     changedToken,
                     otherTokenPosition,
                     changedTokenPosition,
+                    calcOptions,
                   );
                 batchVisibilityCache.set(vKey2, visibility2);
+                batchDebugCounters.pairsComputed++;
+              } else {
+                batchDebugCounters.pairsCached++;
               }
               // this.#debug('calc', {
               //   dir: 'other->changed',
@@ -1195,6 +1255,27 @@ export class EventDrivenVisibilitySystem {
       this.#debug('processBatch:done', {
         totalMs: (batchEndTime - batchStartTime).toFixed(2),
       });
+      try {
+        const on = !!game.settings.get(MODULE_ID, 'autoVisibilityDebugMode');
+        if (on && precomputeStats) {
+          const s = precomputeStats;
+          console.debug('PF2E Visioner | AVS precompute stats (processBatch):', {
+            targetUsed: s.targetUsed,
+            targetMiss: s.targetMiss,
+            observerUsed: s.observerUsed,
+            observerMiss: s.observerMiss,
+          });
+          // Emit per-batch breakdown to explain directional work
+          if (typeof batchDebugCounters !== 'undefined') {
+            console.debug('PF2E Visioner | AVS batch breakdown:', {
+              pairsConsidered: batchDebugCounters.pairsConsidered,
+              pairsComputed: batchDebugCounters.pairsComputed,
+              pairsCached: batchDebugCounters.pairsCached,
+              pairsSkippedSpatial: batchDebugCounters.pairsSkippedSpatial,
+            });
+          }
+        }
+      } catch { }
     }
   }
 
@@ -1361,6 +1442,50 @@ export class EventDrivenVisibilitySystem {
         console.warn('PF2E Visioner | Deferred operation failed:', error);
       }
     }, 0);
+  }
+
+  /**
+   * Whether client-aware (viewport) filtering is enabled on this client.
+   * Uses a setting if present; defaults to true.
+   */
+  #isClientAwareFilteringEnabled() {
+    try {
+      const v = game.settings.get(MODULE_ID, 'clientViewportFiltering');
+      return v !== false; // treat undefined as enabled
+    } catch {
+      return true;
+    }
+  }
+
+  /**
+   * Compute the set of token ids whose centers lie inside this client's viewport (with padding).
+   * Returns null if not available, allowing callers to skip filtering.
+   */
+  #getViewportTokenIdSet(paddingPx = 64) {
+    try {
+      const screen = canvas.app?.renderer?.screen;
+      const wt = canvas.stage?.worldTransform;
+      if (!screen || !wt || typeof wt.applyInverse !== 'function') return null;
+
+      const topLeft = wt.applyInverse({ x: 0, y: 0 });
+      const bottomRight = wt.applyInverse({ x: screen.width, y: screen.height });
+      const minX = Math.min(topLeft.x, bottomRight.x) - paddingPx;
+      const minY = Math.min(topLeft.y, bottomRight.y) - paddingPx;
+      const maxX = Math.max(topLeft.x, bottomRight.x) + paddingPx;
+      const maxY = Math.max(topLeft.y, bottomRight.y) + paddingPx;
+
+      const set = new Set();
+      const tokens = canvas.tokens?.placeables || [];
+      for (const t of tokens) {
+        const pos = this.#getTokenPosition(t);
+        if (pos.x >= minX && pos.x <= maxX && pos.y >= minY && pos.y <= maxY) {
+          set.add(t.document.id);
+        }
+      }
+      return set;
+    } catch {
+      return null;
+    }
   }
 
   /**
@@ -2097,7 +2222,7 @@ export class EventDrivenVisibilitySystem {
    * @param {Token} target - The target token
    * @returns {Promise<string>} Visibility state
    */
-  async calculateVisibility(observer, target) {
+  async calculateVisibility(observer, target, options = undefined) {
     try {
       // Short-circuit: AVS does not calculate for excluded participants (hidden, fails testVisibility, sneak-active)
       if (observer && this.#isExcludedToken(observer)) {
@@ -2115,7 +2240,7 @@ export class EventDrivenVisibilitySystem {
     } catch {
       // Best effort only
     }
-    return await this.#optimizedVisibilityCalculator.calculateVisibility(observer, target);
+    return await this.#optimizedVisibilityCalculator.calculateVisibility(observer, target, options);
   }
 
   /**
@@ -2599,8 +2724,56 @@ export class EventDrivenVisibilitySystem {
     this.#tokensQueuedForValidation.clear();
     this.#validationTimeoutId = null;
 
+    // Precompute lighting for the union of observers/targets involved in this batch
+    let precomputedLights = null;
+    const precomputeStats = { batch: 'validation', targetUsed: 0, targetMiss: 0, observerUsed: 0, observerMiss: 0 };
+    try {
+      const { LightingCalculator } = await import('./LightingCalculator.js');
+      const lightingCalculator = LightingCalculator.getInstance?.();
+      if (lightingCalculator) {
+        const participantIds = new Set();
+        for (const movedTokenId of tokensToValidate) {
+          const movedTok = canvas.tokens?.get?.(movedTokenId);
+          if (movedTok && !this.#isExcludedToken(movedTok)) participantIds.add(movedTokenId);
+          // Flags on mover (mover as target)
+          try {
+            const mFlags = movedTok?.document?.flags?.[MODULE_ID] || {};
+            for (const fk of Object.keys(mFlags)) {
+              if (fk.startsWith('avs-override-from-')) {
+                const observerId = fk.replace('avs-override-from-', '');
+                const obsTok = canvas.tokens?.get?.(observerId);
+                if (obsTok && !this.#isExcludedToken(obsTok)) participantIds.add(observerId);
+              }
+            }
+          } catch { }
+          // Flags on others (mover as observer)
+          try {
+            const others = canvas.tokens?.placeables || [];
+            for (const ot of others) {
+              if (!ot?.document || ot.id === movedTokenId) continue;
+              const fk = `avs-override-from-${movedTokenId}`;
+              if (ot.document.flags?.[MODULE_ID]?.[fk]) {
+                if (!this.#isExcludedToken(ot)) participantIds.add(ot.id);
+              }
+            }
+          } catch { }
+        }
+        // Compute once per participant at current position
+        precomputedLights = new Map();
+        for (const id of participantIds) {
+          const tok = canvas.tokens?.get?.(id);
+          if (!tok || this.#isExcludedToken(tok)) continue;
+          const pos = this.#getTokenPosition(tok);
+          const light = lightingCalculator.getLightLevelAt(pos, tok);
+          precomputedLights.set(id, light);
+        }
+      }
+    } catch {
+      precomputedLights = null; // best-effort only
+    }
+
     for (const tokenId of tokensToValidate) {
-      const result = await this.#validateOverridesForToken(tokenId);
+      const result = await this.#validateOverridesForToken(tokenId, { precomputedLights, precomputeStats });
       // If there are no invalid overrides, but awareness overrides exist, filter to only show changed details
       if (result && result.__showAwareness && Array.isArray(result.overrides)) {
         // Only surface the awareness indicator for the actual mover to keep the dataset mover-centric.
@@ -2637,6 +2810,18 @@ export class EventDrivenVisibilitySystem {
         }
       }
     }
+    try {
+      const on = !!game.settings.get(MODULE_ID, 'autoVisibilityDebugMode');
+      if (on) {
+        const s = precomputeStats;
+        console.debug('PF2E Visioner | AVS precompute stats (validation):', {
+          targetUsed: s.targetUsed,
+          targetMiss: s.targetMiss,
+          observerUsed: s.observerUsed,
+          observerMiss: s.observerMiss,
+        });
+      }
+    } catch { }
   }
 
   /**
@@ -2644,7 +2829,7 @@ export class EventDrivenVisibilitySystem {
    * @param {string} movedTokenId - ID of the token that moved
    */
 
-  async #validateOverridesForToken(movedTokenId) {
+  async #validateOverridesForToken(movedTokenId, options = undefined) {
     const movedToken = canvas.tokens?.get(movedTokenId);
     if (!movedToken) {
       return;
@@ -2692,12 +2877,13 @@ export class EventDrivenVisibilitySystem {
                   await optimizedVisibilityCalculator.calculateVisibilityWithoutOverrides(
                     movedToken,
                     t,
+                    options,
                   );
               } else {
-                visibility = await this.calculateVisibility(movedToken, t);
+                visibility = await this.calculateVisibility(movedToken, t, options);
               }
             } catch {
-              visibility = await this.calculateVisibility(movedToken, t);
+              visibility = await this.calculateVisibility(movedToken, t, options);
             }
             currentVisibility = visibility;
             const { CoverDetector } = await import('../../cover/auto-cover/CoverDetector.js');
@@ -2814,7 +3000,12 @@ export class EventDrivenVisibilitySystem {
     const invalidOverrides = [];
     for (const checkData of overridesToCheck) {
       const { override, observerId, targetId, type, flagKey, token } = checkData;
-      const checkResult = await this.#checkOverrideValidity(observerId, targetId, override);
+      const checkResult = await this.#checkOverrideValidity(
+        observerId,
+        targetId,
+        override,
+        options,
+      );
 
       if (checkResult) {
         invalidOverrides.push({
@@ -2862,12 +3053,13 @@ export class EventDrivenVisibilitySystem {
               visibility = await optimizedVisibilityCalculator.calculateVisibilityWithoutOverrides(
                 obs,
                 movedToken,
+                options,
               );
             } else {
-              visibility = await this.calculateVisibility(obs, movedToken);
+              visibility = await this.calculateVisibility(obs, movedToken, options);
             }
           } catch {
-            visibility = await this.calculateVisibility(obs, movedToken);
+            visibility = await this.calculateVisibility(obs, movedToken, options);
           }
           currentVisibility = visibility;
           const { CoverDetector } = await import('../../cover/auto-cover/CoverDetector.js');
@@ -2912,12 +3104,13 @@ export class EventDrivenVisibilitySystem {
               visibility = await optimizedVisibilityCalculator.calculateVisibilityWithoutOverrides(
                 movedToken,
                 t,
+                options,
               );
             } else {
-              visibility = await this.calculateVisibility(movedToken, t);
+              visibility = await this.calculateVisibility(movedToken, t, options);
             }
           } catch {
-            visibility = await this.calculateVisibility(movedToken, t);
+            visibility = await this.calculateVisibility(movedToken, t, options);
           }
           currentVisibility = visibility;
           const { CoverDetector } = await import('../../cover/auto-cover/CoverDetector.js');
@@ -2950,7 +3143,7 @@ export class EventDrivenVisibilitySystem {
    * @param {Object} override - Override object with hasCover/hasConcealment flags
    * @returns {Promise<{shouldRemove: boolean, reason: string}|null>}
    */
-  async #checkOverrideValidity(observerId, targetId, override) {
+  async #checkOverrideValidity(observerId, targetId, override, options = undefined) {
     const observer = canvas.tokens?.get(observerId);
     const target = canvas.tokens?.get(targetId);
 
@@ -3002,6 +3195,7 @@ export class EventDrivenVisibilitySystem {
           visibility = await optimizedVisibilityCalculator.calculateVisibilityWithoutOverrides(
             observer,
             target,
+            options,
           );
         } else {
           // Fallback: temporarily remove override, calculate, then restore
@@ -3013,7 +3207,11 @@ export class EventDrivenVisibilitySystem {
             // Remove override
             delete target.document.flags['pf2e-visioner'][observerFlagKey];
           }
-          visibility = await optimizedVisibilityCalculator.calculateVisibility(observer, target);
+          visibility = await optimizedVisibilityCalculator.calculateVisibility(
+            observer,
+            target,
+            options,
+          );
           // Restore override
           if (removedOverride) {
             target.document.flags['pf2e-visioner'][observerFlagKey] = removedOverride;
@@ -3021,7 +3219,7 @@ export class EventDrivenVisibilitySystem {
         }
       } catch {
         // Fallback to normal calculation if anything fails
-        visibility = await this.calculateVisibility(observer, target);
+        visibility = await this.calculateVisibility(observer, target, options);
       }
 
       // Get cover information using CoverDetector - checking if target has cover from observer

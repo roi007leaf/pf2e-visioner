@@ -61,13 +61,13 @@ export class VisibilityCalculator {
    * @param {Token} target
    * @returns {Promise<string>} Visibility state
    */
-  async calculateVisibility(observer, target) {
+  async calculateVisibility(observer, target, options = undefined) {
     // Check if we should skip this calculation based on spatial/LOS optimizations
     if (this._shouldSkipCalculation(observer, target)) {
       return 'observed'; // Default fallback
     }
 
-    return this.calculateVisibilityWithPosition(observer, target, null, null, false);
+    return this.calculateVisibilityWithPosition(observer, target, null, null, options);
   }
 
   /**
@@ -77,7 +77,7 @@ export class VisibilityCalculator {
    * @param {Token} target
    * @returns {Promise<string>} Visibility state
    */
-  async calculateVisibilityWithoutOverrides(observer, target) {
+  async calculateVisibilityWithoutOverrides(observer, target, options = undefined) {
     if (!observer?.actor || !target?.actor) {
       return 'observed';
     }
@@ -94,7 +94,7 @@ export class VisibilityCalculator {
     let result;
     try {
       // Use raw LoS to bypass detection wrappers for the override-free calculation
-      result = await this.calculateVisibilityWithPosition(observer, target, null, null, true);
+      result = await this.calculateVisibilityWithPosition(observer, target, null, null, options);
     } finally {
       // Restore override if it was present
       if (removedOverride) {
@@ -118,6 +118,7 @@ export class VisibilityCalculator {
     target,
     _observerPositionOverride = null,
     targetPositionOverride = null,
+    options = undefined,
   ) {
     if (!observer?.actor || !target?.actor) {
       return 'observed';
@@ -200,7 +201,22 @@ export class VisibilityCalculator {
       };
 
       // New API prefers passing a token; supports position objects for overrides
-      const lightLevel = this.#lightingCalculator.getLightLevelAt(targetPosition, target);
+      // Normalize options: legacy callers may pass a boolean in the 5th param; treat non-object as no options
+      const opts = options && typeof options === 'object' ? options : {};
+      const pre = opts.precomputedLights || null;
+      const stats = opts.precomputeStats || null;
+      const targetId = target?.document?.id;
+      let lightLevel;
+      if (pre && targetId && pre[targetId]) {
+        lightLevel = pre[targetId];
+        try { if (stats) stats.targetUsed = (stats.targetUsed || 0) + 1; } catch { }
+      } else if (pre && targetId && typeof pre.get === 'function' && pre.has(targetId)) {
+        lightLevel = pre.get(targetId);
+        try { if (stats) stats.targetUsed = (stats.targetUsed || 0) + 1; } catch { }
+      } else {
+        lightLevel = this.#lightingCalculator.getLightLevelAt(targetPosition, target);
+        try { if (stats) stats.targetMiss = (stats.targetMiss || 0) + 1; } catch { }
+      }
       const observerVision = this.#visionAnalyzer.getVisionCapabilities(observer);
       // if (log.enabled())
       //   log.debug(() => ({
@@ -219,10 +235,18 @@ export class VisibilityCalculator {
         y: observer.document.y + (observer.document.height * canvas.grid.size) / 2,
         elevation: observer.document.elevation || 0,
       };
-      const observerLightLevel = this.#lightingCalculator.getLightLevelAt(
-        observerPosition,
-        observer,
-      );
+      const observerId = observer?.document?.id;
+      let observerLightLevel;
+      if (pre && observerId && pre[observerId]) {
+        observerLightLevel = pre[observerId];
+        try { if (stats) stats.observerUsed = (stats.observerUsed || 0) + 1; } catch { }
+      } else if (pre && observerId && typeof pre.get === 'function' && pre.has(observerId)) {
+        observerLightLevel = pre.get(observerId);
+        try { if (stats) stats.observerUsed = (stats.observerUsed || 0) + 1; } catch { }
+      } else {
+        observerLightLevel = this.#lightingCalculator.getLightLevelAt(observerPosition, observer);
+        try { if (stats) stats.observerMiss = (stats.observerMiss || 0) + 1; } catch { }
+      }
 
       // Debug logging
       // if (log.enabled())
