@@ -638,13 +638,6 @@ export class VisionAnalyzer {
     try {
       if (raw) {
         const res = this.#hasDirectLineOfSight(observer, target);
-        if (log.enabled())
-          log.debug(() => ({
-            step: 'los-raw',
-            observer: observer?.name,
-            target: target?.name,
-            res,
-          }));
         return res;
       }
       // Special handling for sneaking tokens - bypass Foundry's detection system
@@ -695,7 +688,7 @@ export class VisionAnalyzer {
       const res = !blocked;
       if (log.enabled())
         log.debug(() => ({
-          step: 'raycast-sight',
+          step: 'direct-sight',
           observer: observer?.name,
           target: target?.name,
           blocked,

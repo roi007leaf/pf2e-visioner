@@ -174,13 +174,7 @@ export class VisibilityCalculator {
       // Step 4: Check line of sight directly against walls. If LoS is blocked, treat as hidden.
       try {
         const losClear = !!this.#visionAnalyzer.hasLineOfSight(observer, target, true);
-        // if (log.enabled())
-        //   log.debug(() => ({
-        //     step: 'los-raw',
-        //     observer: observer.name,
-        //     target: target.name,
-        //     losClear,
-        //   }));
+
         if (!losClear) {
           // If LoS blocked, but a precise non-visual sense is in range → observed
           try {
