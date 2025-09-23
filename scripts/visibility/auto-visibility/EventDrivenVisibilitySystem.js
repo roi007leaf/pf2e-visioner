@@ -115,6 +115,18 @@ export class EventDrivenVisibilitySystem {
   /** @type {number} - Timeout ID for batched override validation */
   #validationTimeoutId = null;
 
+  // Deduping and caching for override validation
+  /** @type {Map<string, {pos:string, time:number}>} - Last queued validation per token (anti-spam) */
+  #lastValidationRequest = new Map();
+  /** @type {Map<string, {result:any, expire:number, obsPos:string, tgtPos:string}>} - Short-lived pairwise validation cache */
+  #overrideValidityCache = new Map();
+  /** @type {number} - Minimum spacing between queue requests for same token (ms) */
+  #validationRequestDebounceMs = 250;
+  /** @type {number} - TTL for cached pairwise validity results (ms) */
+  #overrideValidityTtlMs = 750;
+  /** @type {number} - Last time cache was pruned */
+  #lastCachePruneAt = 0;
+
   // Position pinning to avoid flip-backs while Foundry animates to the new location
   /** @type {Map<string, {x:number,y:number,elevation:number,until:number}>} */
   #pinnedPositions = new Map();
@@ -258,7 +270,7 @@ export class EventDrivenVisibilitySystem {
     if (!this.#enabled || !game.user.isGM) return;
     try {
       this.#debug('onTokenUpdate', tokenDoc.id, tokenDoc.name, Object.keys(changes));
-    } catch {}
+    } catch { }
 
     // If a token's emitted light changed, that can affect how EVERYONE sees EVERYONE.
     // Escalate to a global recalculation even if the emitter is hidden.
@@ -291,7 +303,7 @@ export class EventDrivenVisibilitySystem {
     const emitterMoved = positionChanged && this.#tokenEmitsLight(tokenDoc, changes);
     if (emitterMoved) {
       this.#debug('emitter-moved: global recalculation for token light move', tokenDoc.id);
-      this.#markAllTokensChangedImmediate();
+      this.#markTokenChangedWithSpatialOptimization();
       // Continue processing to pin positions for freshest geometry where applicable
     }
 
@@ -306,7 +318,7 @@ export class EventDrivenVisibilitySystem {
             globalThis.game = globalThis.game || {};
             game.pf2eVisioner = game.pf2eVisioner || {};
             game.pf2eVisioner.lastMovedTokenId = tokenDoc.id;
-          } catch {}
+          } catch { }
           this.#queueOverrideValidation(tokenDoc.id);
         }
       } catch {
@@ -326,7 +338,7 @@ export class EventDrivenVisibilitySystem {
             globalThis.game = globalThis.game || {};
             game.pf2eVisioner = game.pf2eVisioner || {};
             game.pf2eVisioner.lastMovedTokenId = tokenDoc.id;
-          } catch {}
+          } catch { }
           this.#queueOverrideValidation(tokenDoc.id);
         }
         return;
@@ -396,32 +408,12 @@ export class EventDrivenVisibilitySystem {
           game.pf2eVisioner = game.pf2eVisioner || {};
           game.pf2eVisioner.lastMovedTokenId = tokenDoc.id;
           this.#debug('set lastMovedTokenId', tokenDoc.id);
-        } catch {}
+        } catch { }
+        // Only queue the mover. #validateOverridesForToken scans both directions:
+        // - mover as TARGET: reads flags on mover (avs-override-from-<observer>)
+        // - mover as OBSERVER: scans other tokens for flags (avs-override-from-<mover>)
+        // So enqueuing other tokens here is redundant and causes excess validations.
         this.#queueOverrideValidation(tokenDoc.id);
-        try {
-          const allTokens = canvas.tokens?.placeables || [];
-          for (const t of allTokens) {
-            if (!t?.id || t.id === tokenDoc.id) continue;
-            // Check if t has an override where the mover is the observer (avs-override-from-<moverId> on t)
-            const tFlags = t.document.flags['pf2e-visioner'] || {};
-            if (tFlags[`avs-override-from-${tokenDoc.id}`]) {
-              this.#debug('queueValidation (observer has flag for mover)', {
-                token: t.id,
-                mover: tokenDoc.id,
-              });
-              this.#queueOverrideValidation(t.id);
-            }
-            // Check if the mover has an override where t is the observer (avs-override-from-<t.id> on mover)
-            const moverFlags = tokenDoc.flags?.['pf2e-visioner'] || {};
-            if (moverFlags[`avs-override-from-${t.id}`]) {
-              this.#debug('queueValidation (mover has flag for observer)', {
-                token: t.id,
-                mover: tokenDoc.id,
-              });
-              this.#queueOverrideValidation(t.id);
-            }
-          }
-        } catch {}
       }
     }
   }
@@ -899,6 +891,9 @@ export class EventDrivenVisibilitySystem {
       // Debug logging removed
 
       // For each changed token, recalculate visibility with spatially relevant tokens
+      // Batch-local caches to avoid duplicate heavy calculations when both tokens are in the changed set
+      const batchVisibilityCache = new Map(); // key: obsId|obsPos|tgtId|tgtPos -> state
+      const batchLosCache = new Map(); // key: sortedPairIds|pos1|pos2 -> boolean
       const processingStartTime = performance.now();
       let processedTokens = 0;
 
@@ -919,12 +914,12 @@ export class EventDrivenVisibilitySystem {
           changedTokenId,
         );
 
-        // this.#debug('spatial optimization', {
-        //   changedToken: changedTokenId,
-        //   totalTokens: allTokens.length,
-        //   relevantTokens: relevantTokens.length,
-        //   reduction: `${Math.round((1 - relevantTokens.length / allTokens.length) * 100)}%`,
-        // });
+        this.#debug('spatial optimization', {
+          changedToken: changedTokenId,
+          totalTokens: allTokens.length,
+          relevantTokens: relevantTokens.length,
+          reduction: `${Math.round((1 - relevantTokens.length / allTokens.length) * 100)}%`,
+        });
 
         // Process visibility with spatially relevant tokens only
         const tokenStartTime = performance.now();
@@ -933,9 +928,23 @@ export class EventDrivenVisibilitySystem {
 
         for (const otherToken of relevantTokens) {
           if (otherToken.document.id === changedTokenId) continue;
+          // Compute positions once; reuse for LOS and visibility calculations
+          const changedTokenPosition = this.#getTokenPosition(changedToken);
+          const otherTokenPosition = this.#getTokenPosition(otherToken);
 
           // Strict LOS check - only process if tokens can actually see each other
-          if (!this.#canTokensSeeEachOther(changedToken, otherToken)) {
+          // Cache by sorted pair id and both positions to avoid duplicate checks in the same batch
+          const aId = changedToken.document.id;
+          const bId = otherToken.document.id;
+          const posKeyA = `${Math.round(changedTokenPosition.x)}:${Math.round(changedTokenPosition.y)}:${changedTokenPosition.elevation ?? 0}`;
+          const posKeyB = `${Math.round(otherTokenPosition.x)}:${Math.round(otherTokenPosition.y)}:${otherTokenPosition.elevation ?? 0}`;
+          const pairKey = aId < bId ? `${aId}|${posKeyA}::${bId}|${posKeyB}` : `${bId}|${posKeyB}::${aId}|${posKeyA}`;
+          let los = batchLosCache.get(pairKey);
+          if (los === undefined) {
+            los = this.#canTokensSeeEachOther(changedToken, otherToken);
+            batchLosCache.set(pairKey, los);
+          }
+          if (!los) {
             this.#performanceMetrics.skippedByLOS++;
             tokensFilteredByLOS++;
             continue;
@@ -1001,39 +1010,40 @@ export class EventDrivenVisibilitySystem {
             this.#getVisibilityMap?.(changedToken)?.[otherToken.document.id] || 'observed';
           const currentVisibility2 =
             this.#getVisibilityMap?.(otherToken)?.[changedToken.document.id] || 'observed';
-          // this.#debug('current map', {
-          //   changed: changedTokenId,
-          //   other: otherToken.document.id,
-          //   v1: currentVisibility1,
-          //   v2: currentVisibility2,
-          // });
+          this.#debug('current map', {
+            changed: changedTokenId,
+            other: otherToken.document.id,
+            v1: currentVisibility1,
+            v2: currentVisibility2,
+          });
 
           // Calculate visibility in both directions - visibility can be asymmetric
           // due to different lighting conditions, vision capabilities, etc.
           if (!hasOverride1 || !hasOverride2) {
             this.#performanceMetrics.totalCalculations++;
 
-            const changedTokenPosition = this.#getTokenPosition(changedToken);
-            const otherTokenPosition = this.#getTokenPosition(otherToken);
-            // this.#debug('positions', {
-            //   changed: changedTokenId,
-            //   other: otherToken.document.id,
-            //   posChanged: changedTokenPosition,
-            //   posOther: otherTokenPosition,
-            //   srcChanged: this.#getPositionSource(changedToken),
-            //   srcOther: this.#getPositionSource(otherToken),
-            // });
+            this.#debug('positions', {
+              changed: changedTokenId,
+              other: otherToken.document.id,
+              posChanged: changedTokenPosition,
+              posOther: otherTokenPosition,
+            });
 
             // Calculate visibility in both directions using optimized calculator
             // Pass position overrides to ensure we use the latest coordinates
             if (!hasOverride1) {
-              const visibility1 =
-                await this.#optimizedVisibilityCalculator.calculateVisibilityWithPosition(
-                  changedToken,
-                  otherToken,
-                  changedTokenPosition,
-                  otherTokenPosition,
-                );
+              const vKey1 = `${aId}|${posKeyA}>>${bId}|${posKeyB}`;
+              let visibility1 = batchVisibilityCache.get(vKey1);
+              if (visibility1 === undefined) {
+                visibility1 =
+                  await this.#optimizedVisibilityCalculator.calculateVisibilityWithPosition(
+                    changedToken,
+                    otherToken,
+                    changedTokenPosition,
+                    otherTokenPosition,
+                  );
+                batchVisibilityCache.set(vKey1, visibility1);
+              }
               // this.#debug('calc', {
               //   dir: 'changed->other',
               //   changed: changedTokenId,
@@ -1044,13 +1054,18 @@ export class EventDrivenVisibilitySystem {
             }
 
             if (!hasOverride2) {
-              const visibility2 =
-                await this.#optimizedVisibilityCalculator.calculateVisibilityWithPosition(
-                  otherToken,
-                  changedToken,
-                  otherTokenPosition,
-                  changedTokenPosition,
-                );
+              const vKey2 = `${bId}|${posKeyB}>>${aId}|${posKeyA}`;
+              let visibility2 = batchVisibilityCache.get(vKey2);
+              if (visibility2 === undefined) {
+                visibility2 =
+                  await this.#optimizedVisibilityCalculator.calculateVisibilityWithPosition(
+                    otherToken,
+                    changedToken,
+                    otherTokenPosition,
+                    changedTokenPosition,
+                  );
+                batchVisibilityCache.set(vKey2, visibility2);
+              }
               // this.#debug('calc', {
               //   dir: 'other->changed',
               //   changed: changedTokenId,
@@ -1349,6 +1364,19 @@ export class EventDrivenVisibilitySystem {
   }
 
   /**
+   * Prune expired entries from the override validation cache occasionally
+   */
+  #pruneOverrideCache() {
+    const now = Date.now();
+    // Limit pruning to ~once per 5s to keep overhead negligible
+    if (now - this.#lastCachePruneAt < 5000) return;
+    for (const [key, entry] of this.#overrideValidityCache) {
+      if (!entry || entry.expire <= now) this.#overrideValidityCache.delete(key);
+    }
+    this.#lastCachePruneAt = now;
+  }
+
+  /**
    * Update cumulative movement optimization metrics
    * @param {Object} metrics - Current movement metrics
    */
@@ -1570,11 +1598,11 @@ export class EventDrivenVisibilitySystem {
           names.push(
             ...tokenDoc.actor.effects.map((e) => String(e.name || e.label || '').toLowerCase()),
           );
-      } catch {}
+      } catch { }
       try {
         if (Array.isArray(tokenDoc.actor?.items))
           names.push(...tokenDoc.actor.items.map((i) => String(i.name || '').toLowerCase()));
-      } catch {}
+      } catch { }
       const hay = names.join(' ');
       if (
         /\b(light|torch|lantern|sunrod|everburning|glow|luminous|continual flame|dancing lights|darkness)\b/i.test(
@@ -1766,11 +1794,11 @@ export class EventDrivenVisibilitySystem {
         skipRate:
           this.#performanceMetrics.totalCalculations > 0
             ? Math.round(
-                ((this.#performanceMetrics.skippedByDistance +
-                  this.#performanceMetrics.skippedByLOS) /
-                  this.#performanceMetrics.totalCalculations) *
-                  100,
-              )
+              ((this.#performanceMetrics.skippedByDistance +
+                this.#performanceMetrics.skippedByLOS) /
+                this.#performanceMetrics.totalCalculations) *
+              100,
+            )
             : 0,
       },
       movementOptimizations: {
@@ -1784,10 +1812,10 @@ export class EventDrivenVisibilitySystem {
         midpointSkipRate:
           this.#performanceMetrics.movementOptimizations.totalMovements > 0
             ? Math.round(
-                (this.#performanceMetrics.movementOptimizations.midpointSkipped /
-                  this.#performanceMetrics.movementOptimizations.totalMovements) *
-                  100,
-              )
+              (this.#performanceMetrics.movementOptimizations.midpointSkipped /
+                this.#performanceMetrics.movementOptimizations.totalMovements) *
+              100,
+            )
             : 0,
       },
     };
@@ -2517,8 +2545,24 @@ export class EventDrivenVisibilitySystem {
    * @param {string} tokenId - ID of the token that moved
    */
   #queueOverrideValidation(tokenId) {
-    if (!this.#enabled || !game.user.isGM) {
-      return;
+    if (!this.#enabled || !game.user.isGM) return;
+
+    // Deduplicate rapid-fire requests for the same token at the same spot
+    try {
+      const tok = canvas.tokens?.get?.(tokenId);
+      const doc = tok?.document;
+      const cx = doc ? doc.x + (doc.width * (canvas.grid?.size || 1)) / 2 : 0;
+      const cy = doc ? doc.y + (doc.height * (canvas.grid?.size || 1)) / 2 : 0;
+      const posKey = `${Math.round(cx)}:${Math.round(cy)}:${doc?.elevation ?? 0}`;
+      const now = Date.now();
+      const last = this.#lastValidationRequest.get(tokenId);
+      if (last && last.pos === posKey && now - last.time < this.#validationRequestDebounceMs) {
+        // Ignore duplicate queue within debounce window at same position
+        return;
+      }
+      this.#lastValidationRequest.set(tokenId, { pos: posKey, time: now });
+    } catch {
+      /* best-effort guard */
     }
 
     this.#tokensQueuedForValidation.add(tokenId);
@@ -2530,6 +2574,7 @@ export class EventDrivenVisibilitySystem {
 
     // Validate after a short delay to handle waypoints and complete movements
     this.#validationTimeoutId = setTimeout(() => {
+      this.#pruneOverrideCache();
       this.#processQueuedValidations();
     }, 500); // 500ms delay to ensure movement is complete
   }
@@ -2879,7 +2924,7 @@ export class EventDrivenVisibilitySystem {
           const coverDetector = new CoverDetector();
           const observerPos = this.#getTokenPosition(movedToken);
           currentCover = coverDetector.detectFromPoint(observerPos, t);
-        } catch {}
+        } catch { }
         awareness.push({
           observerId: movedTokenId,
           targetId: t.id,
@@ -2893,7 +2938,7 @@ export class EventDrivenVisibilitySystem {
           currentCover,
         });
       }
-    } catch {}
+    } catch { }
 
     return { overrides: awareness, __showAwareness: awareness.length > 0 };
   }
@@ -2910,6 +2955,39 @@ export class EventDrivenVisibilitySystem {
     const target = canvas.tokens?.get(targetId);
 
     if (!observer || !target) return null;
+
+    // Short-lived cache: if same pair at same positions was just validated, reuse the result
+    let __obsPosKey;
+    let __tgtPosKey;
+    let __cacheKey;
+    let __now;
+    try {
+      const obsPos = this.#getTokenPosition(observer);
+      const tgtPos = this.#getTokenPosition(target);
+      const obsPosKey = `${Math.round(obsPos.x)}:${Math.round(obsPos.y)}:${obsPos.elevation ?? 0}`;
+      const tgtPosKey = `${Math.round(tgtPos.x)}:${Math.round(tgtPos.y)}:${tgtPos.elevation ?? 0}`;
+      const cacheKey = `${observerId}-${targetId}`;
+      const now = Date.now();
+      const cached = this.#overrideValidityCache.get(cacheKey);
+      if (
+        cached &&
+        cached.obsPos === obsPosKey &&
+        cached.tgtPos === tgtPosKey &&
+        cached.expire > now
+      ) {
+        return cached.result;
+      }
+      // Defer heavy work; after computation we'll populate cache
+      __obsPosKey = obsPosKey;
+      __tgtPosKey = tgtPosKey;
+      __cacheKey = cacheKey;
+      __now = now;
+      // Wrap the rest of the method in a try/finally-like behavior by storing keys in closure
+      // and setting cache before returning.
+      // The actual computation continues below.
+    } catch {
+      // If anything fails, just compute without cache
+    }
 
     try {
       // Calculate current visibility and get detailed information
@@ -3086,8 +3164,9 @@ export class EventDrivenVisibilitySystem {
       const srcKey = override.source || 'manual_action';
       if (sourceIconMap[srcKey]) reasonIconsForUi.push(sourceIconMap[srcKey]);
 
+      let result = null;
       if (reasons.length > 0) {
-        return {
+        result = {
           shouldRemove: true,
           reason: reasons.map((r) => r.text).join(' and '), // Keep text for logging
           reasonIcons: reasonIconsForUi, // Pass icon data for UI (with single ninja tag if applicable)
@@ -3096,7 +3175,20 @@ export class EventDrivenVisibilitySystem {
         };
       }
 
-      return null;
+      // Populate cache for this pair/position snapshot
+      try {
+        const expire = (__now || Date.now()) + this.#overrideValidityTtlMs;
+        this.#overrideValidityCache.set(__cacheKey || `${observerId}-${targetId}`, {
+          result,
+          expire,
+          obsPos: __obsPosKey,
+          tgtPos: __tgtPosKey,
+        });
+      } catch {
+        /* noop */
+      }
+
+      return result;
     } catch (error) {
       console.warn('PF2E Visioner | Error validating override:', error);
       return null;

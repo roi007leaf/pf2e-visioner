@@ -134,7 +134,7 @@ export class VisibilityCalculator {
           if (this.#visionAnalyzer.hasPreciseNonVisualInRange(observer, target)) return 'observed';
           // If any imprecise sense can detect, target is at least hidden rather than undetected
           if (this.#visionAnalyzer.canSenseImprecisely(observer, target)) return 'hidden';
-        } catch {}
+        } catch { }
         return 'hidden';
       }
 
@@ -153,7 +153,7 @@ export class VisibilityCalculator {
           if (this.#visionAnalyzer.hasPreciseNonVisualInRange(observer, target)) return 'observed';
           // If any imprecise sense can detect (e.g., hearing), invisible is at least hidden
           if (this.#visionAnalyzer.canSenseImprecisely(observer, target)) return 'hidden';
-        } catch {}
+        } catch { }
         // Otherwise invisible = undetected
         return 'undetected';
       }
@@ -166,7 +166,7 @@ export class VisibilityCalculator {
         // If you have a precise non-visual sense in range, dazzled doesn't matter for that target
         try {
           if (this.#visionAnalyzer.hasPreciseNonVisualInRange(observer, target)) return 'observed';
-        } catch {}
+        } catch { }
         // Otherwise, everything is concealed
         return 'concealed';
       }
@@ -256,6 +256,7 @@ export class VisibilityCalculator {
       // Note: We need to check linePassesThroughDarkness even when both tokens are in darkness
       const isCrossBoundary = observerInDarkness !== targetInDarkness || linePassesThroughDarkness;
 
+      debugger;
       if (isCrossBoundary) {
         // Cross-boundary: one inside darkness, one outside, OR line passes through darkness
 
@@ -374,7 +375,7 @@ export class VisibilityCalculator {
           // No senses can detect → undetected
           result = 'undetected';
         }
-      } catch {}
+      } catch { }
       if (log.enabled())
         log.info(() => ({ step: 'result', observer: observer.name, target: target.name, result }));
 
@@ -382,7 +383,7 @@ export class VisibilityCalculator {
     } catch (error) {
       try {
         console.warn('PF2E Visioner | calcVis: error, default observed', error);
-      } catch {}
+      } catch { }
       return 'observed'; // Default fallback
     }
   }
@@ -735,10 +736,6 @@ export class VisibilityCalculator {
       // Cast a ray between the tokens to check for darkness effects
       const ray = new foundry.canvas.geometry.Ray(observerPos, targetPos);
 
-      // Get all available light sources
-      const darknessSources = canvas.effects?.darknessSources || [];
-      const lightObjects = canvas.lighting?.objects?.children || canvas.lighting?.placeables || [];
-
       // Get all darkness sources that the ray passes through
       let lightSources = [];
       try {
@@ -859,24 +856,13 @@ export class VisibilityCalculator {
         }
 
         // Default to rank 1 if no specific rank is set (regular darkness)
+        debugger;
         if (darknessRank === 0) darknessRank = 1;
 
         darknessEffects.push({
           light: lightSource,
           darkness: lightSource.data?.darkness || 1,
           darknessRank: darknessRank,
-        });
-        passesThroughDarkness = true;
-      }
-
-      // Also check for global darkness effects (like scene darkness)
-      const sceneDarkness = canvas.scene?.environment.darknessLevel || 0;
-      if (sceneDarkness > 0) {
-        darknessEffects.push({
-          light: null,
-          darkness: sceneDarkness,
-          darknessRank: sceneDarkness,
-          type: 'scene',
         });
         passesThroughDarkness = true;
       }
