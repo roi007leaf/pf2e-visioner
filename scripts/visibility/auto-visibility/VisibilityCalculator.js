@@ -266,9 +266,47 @@ export class VisibilityCalculator {
       // Always check if line passes through darkness
       // This handles the case where tokens are on opposite sides of a darkness effect
 
-      const darknessResult = this.#doesLinePassThroughDarkness(observer, target);
-      const linePassesThroughDarkness = darknessResult.passesThroughDarkness;
-      const rayDarknessRank = darknessResult.maxDarknessRank;
+      // First try the canvas/shape-based detector (use overrides if provided for freshest positions)
+      let darknessResult = this.#doesLinePassThroughDarkness(
+        observer,
+        target,
+        observerPosition,
+        targetPosition,
+      ) || {
+        passesThroughDarkness: false,
+        maxDarknessRank: 0,
+      };
+      let linePassesThroughDarkness = !!darknessResult.passesThroughDarkness;
+      let rayDarknessRank = Number(darknessResult.maxDarknessRank || 0) || 0;
+
+      // If that didn't detect, double-check by sampling along the ray using LightingCalculator
+      // Use the already-computed observer/target positions (honors overrides)
+      if (!linePassesThroughDarkness) {
+        try {
+          const steps = 6; // check 5 interior points
+          let maxRank = 0;
+          let passes = false;
+          for (let i = 1; i < steps; i++) {
+            const t = i / steps;
+            const sx = observerPosition.x + (targetPosition.x - observerPosition.x) * t;
+            const sy = observerPosition.y + (targetPosition.y - observerPosition.y) * t;
+            const se = observerPosition.elevation ?? 0;
+            const samplePos = { x: sx, y: sy, elevation: se };
+            const sample = this.#lightingCalculator.getLightLevelAt(samplePos, observer);
+            const rank = Number(sample?.darknessRank ?? 0) || 0;
+            if (rank >= 1) {
+              passes = true;
+              if (rank > maxRank) maxRank = rank;
+            }
+          }
+          if (passes) {
+            linePassesThroughDarkness = true;
+            rayDarknessRank = Math.max(rayDarknessRank, maxRank);
+          }
+        } catch {
+          // best-effort; ignore sampling errors
+        }
+      }
 
       // Check for cross-boundary darkness: either different darkness states OR line passes through darkness
       // Note: We need to check linePassesThroughDarkness even when both tokens are in darkness
@@ -745,10 +783,10 @@ export class VisibilityCalculator {
    * @param {Token} target - The target token
    * @returns {boolean} True if the line passes through darkness
    */
-  #doesLinePassThroughDarkness(observer, target) {
+  #doesLinePassThroughDarkness(observer, target, observerPosOverride = null, targetPosOverride = null) {
     try {
-      const observerPos = this._getTokenPosition(observer);
-      const targetPos = this._getTokenPosition(target);
+      const observerPos = observerPosOverride || this._getTokenPosition(observer);
+      const targetPos = targetPosOverride || this._getTokenPosition(target);
 
       // Cast a ray between the tokens to check for darkness effects
       const ray = new foundry.canvas.geometry.Ray(observerPos, targetPos);
@@ -900,7 +938,7 @@ export class VisibilityCalculator {
         error: error.message,
         stack: error.stack,
       });
-      return false;
+      return { passesThroughDarkness: false, maxDarknessRank: 0 };
     }
   }
 }
