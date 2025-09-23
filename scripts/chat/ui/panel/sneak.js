@@ -53,7 +53,7 @@ function buildSneakDistanceChipHTML(tokenOrActor) {
         <span>Max Sneak Distance: <strong>${maxFeet} ft</strong></span>
       </span>`;
   } catch (e) {
-    console.debug('PF2E Visioner | Failed to build Sneak distance chip:', e);
+    console.error('PF2E Visioner | Failed to build Sneak distance chip:', e);
     return '';
   }
 }

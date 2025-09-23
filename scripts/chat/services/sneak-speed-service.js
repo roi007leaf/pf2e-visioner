@@ -52,7 +52,7 @@ export class SneakSpeedService {
       // Otherwise, apply a label-only effect to indicate Sneaking
       await SneakSpeedService.applySneakStartEffect(actor);
     } catch (e) {
-      console.debug('PF2E Visioner | applySneakWalkSpeed noop failed (continuing):', e);
+      console.error('PF2E Visioner | applySneakWalkSpeed noop failed (continuing):', e);
     }
   }
 
