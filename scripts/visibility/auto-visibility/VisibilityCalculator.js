@@ -250,7 +250,6 @@ export class VisibilityCalculator {
       // Note: We need to check linePassesThroughDarkness even when both tokens are in darkness
       const isCrossBoundary = observerInDarkness !== targetInDarkness || linePassesThroughDarkness;
 
-      debugger;
       if (isCrossBoundary) {
         // Cross-boundary: one inside darkness, one outside, OR line passes through darkness
 
@@ -850,7 +849,6 @@ export class VisibilityCalculator {
         }
 
         // Default to rank 1 if no specific rank is set (regular darkness)
-        debugger;
         if (darknessRank === 0) darknessRank = 1;
 
         darknessEffects.push({
