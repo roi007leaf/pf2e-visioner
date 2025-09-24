@@ -4,6 +4,8 @@
  * Shows validation dialogs and manages override cleanup
  */
 
+import { VisibilityCalculator } from './VisibilityCalculator.js';
+
 export class OverrideValidationSystem {
   /** @type {OverrideValidationSystem} */
   static #instance = null;
@@ -17,26 +19,26 @@ export class OverrideValidationSystem {
   /** @type {number} - Timeout ID for batched override validation */
   #validationTimeoutId = null;
 
-  /** @type {EventDrivenVisibilitySystem} - Reference to main visibility system */
-  #visibilitySystem = null;
+  /** @type {VisibilityCalculator} - Reference to main visibility system */
+  #visibilityCalculator = null;
 
-  constructor(visibilitySystem) {
+  constructor(visibilityCalculator) {
     if (OverrideValidationSystem.#instance) {
       return OverrideValidationSystem.#instance;
     }
 
-    this.#visibilitySystem = visibilitySystem;
+    this.#visibilityCalculator = visibilityCalculator;
     OverrideValidationSystem.#instance = this;
   }
 
   /**
    * Get singleton instance
-   * @param {EventDrivenVisibilitySystem} visibilitySystem - Main visibility system
+   * @param {VisibilityCalculator} visibilityCalculator - Main visibility system
    * @returns {OverrideValidationSystem}
    */
-  static getInstance(visibilitySystem) {
+  static getInstance(visibilityCalculator) {
     if (!OverrideValidationSystem.#instance) {
-      OverrideValidationSystem.#instance = new OverrideValidationSystem(visibilitySystem);
+      OverrideValidationSystem.#instance = new OverrideValidationSystem(visibilityCalculator);
     }
     return OverrideValidationSystem.#instance;
   }
@@ -108,22 +110,6 @@ export class OverrideValidationSystem {
     }
 
     const overridesToCheck = [];
-
-    // Check memory-based overrides first (backwards compatibility)
-    const activeOverrides = this.#visibilitySystem.getActiveOverrides();
-    for (const [overrideKey, override] of activeOverrides.entries()) {
-      const [observerId, targetId] = overrideKey.split('-');
-
-      if (observerId === movedTokenId || targetId === movedTokenId) {
-        overridesToCheck.push({
-          key: overrideKey,
-          override,
-          observerId,
-          targetId,
-          type: 'memory'
-        });
-      }
-    }
 
     // Check persistent flag-based overrides for all tokens
     const allTokens = canvas.tokens?.placeables || [];
@@ -211,9 +197,21 @@ export class OverrideValidationSystem {
     try {
 
       // Calculate current visibility and cover using the auto-visibility system
-      const visibility = await this.#visibilitySystem.calculateVisibility(observer, target);
+      const visibility = await this.#visibilityCalculator.calculateVisibility(observer, target);
 
-      if (!visibility) return null;
+      // If we cannot compute visibility (missing data or calculator unavailable),
+      // conservatively request validation for manual/sneak overrides after movement.
+      if (!visibility) {
+        if (override?.source === 'manual_action' || override?.source === 'sneak_action') {
+          return {
+            shouldRemove: true,
+            reason: 'validation requested after movement (insufficient data)',
+            currentVisibility: null,
+            currentCover: null
+          };
+        }
+        return null;
+      }
 
       const currentlyHasCover = visibility.cover !== 'none';
       const currentlyConcealed = visibility.visibility === 'concealed' || visibility.visibility === 'hidden';

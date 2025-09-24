@@ -27,7 +27,7 @@ function computeAllowedTokenIds(app) {
       // off-table safety: ensure present on canvas
       try {
         if (!canvas.tokens.get(id)) continue;
-      } catch {}
+      } catch { }
       ids.add(id);
     }
     return ids;
@@ -163,7 +163,7 @@ export async function formHandler(event, form, formData) {
       if (!observerToken) continue;
       try {
         if (['loot', 'vehicle', 'party'].includes(observerToken?.actor?.type)) continue;
-      } catch {}
+      } catch { }
       const current = getVisibilityMap(observerToken) || {};
       const currentState = current[app.observer.document.id];
       if (currentState === newVisibilityState) continue;
@@ -187,7 +187,7 @@ export async function formHandler(event, form, formData) {
         if (!observerToken) continue;
         try {
           if (['loot', 'vehicle', 'party'].includes(observerToken?.actor?.type)) continue;
-        } catch {}
+        } catch { }
         observerUpdates.push({
           target: app.observer,
           state: newVisibilityState,
@@ -254,7 +254,7 @@ export async function formHandler(event, form, formData) {
           }
           continue;
         }
-      } catch {}
+      } catch { }
       if (currentState === newCoverState && newCoverState !== 'none') continue;
       if (!perObserverCover.has(observerTokenId))
         perObserverCover.set(observerTokenId, { token: observerToken, map: current });
@@ -271,7 +271,7 @@ export async function formHandler(event, form, formData) {
         if (!observerToken) continue;
         try {
           if (['loot', 'vehicle', 'party'].includes(observerToken?.actor?.type)) continue;
-        } catch {}
+        } catch { }
         observerUpdates.push({
           target: app.observer,
           state: newCoverState,
@@ -301,16 +301,15 @@ export async function formHandler(event, form, formData) {
   (async () => {
     try {
       refreshEveryonesPerception();
-      const { updateSpecificTokenPairs, updateWallVisuals } = await import(
+      const { updateSpecificTokenPairs } = await import(
         '../../../services/visual-effects.js'
       );
       try {
         await updateSpecificTokenPairs([]);
-      } catch {}
-      try {
-        await updateWallVisuals();
-      } catch {}
-    } catch {}
+      } catch { }
+      // Removed redundant updateWallVisuals call - wall visual updates are properly handled
+      // by TokenEventHandler._handleWallFlagChanges when wall flags actually change
+    } catch { }
   })();
   return app.render();
 }
@@ -455,7 +454,7 @@ export async function applyCurrent(event, button) {
           if (!observerToken) continue;
           try {
             if (['loot', 'vehicle', 'party'].includes(observerToken?.actor?.type)) continue;
-          } catch {}
+          } catch { }
           const observerVisibilityData = getVisibilityMap(observerToken) || {};
           // Skip if no actual change (treat undefined as 'observed')
           const prev = observerVisibilityData?.[app.observer.document.id] ?? 'observed';
@@ -520,7 +519,7 @@ export async function applyCurrent(event, button) {
             });
           }
         }
-      } catch {}
+      } catch { }
     }
 
     if (isCover) {
@@ -569,7 +568,7 @@ export async function applyCurrent(event, button) {
           try {
             const t = observer.actor?.type;
             if (t === 'loot' || t === 'vehicle' || t === 'party') continue;
-          } catch {}
+          } catch { }
           allOperations.push(async () => {
             const { batchUpdateCoverEffects } = await import('../../../cover/ephemeral.js');
             await batchUpdateCoverEffects(observer, updates);
@@ -600,10 +599,8 @@ export async function applyCurrent(event, button) {
           }
         })();
       }
-      // Refresh wall indicators for current observer
-      try {
-        await updateWallVisuals(app.observer?.id || null);
-      } catch {}
+      // Removed redundant updateWallVisuals call - wall visual updates are properly handled
+      // by TokenEventHandler._handleWallFlagChanges when wall flags actually change
     }
   } catch (error) {
     console.error('Token Manager: Error applying current type for both modes:', error);

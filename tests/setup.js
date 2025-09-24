@@ -6,7 +6,7 @@
 // Mock Foundry VTT global objects
 global.game = {
   modules: {
-  get: jest.fn(() => ({
+    get: jest.fn(() => ({
       api: {},
       version: '2.6.1',
     })),
@@ -72,7 +72,7 @@ global.game = {
   },
   i18n: {
     localize: jest.fn((key) => key || 'mock.message'), // Simple mock that returns the key or a default
-  format: jest.fn((template) => template),
+    format: jest.fn((template) => template),
   },
 };
 
@@ -129,7 +129,7 @@ global.canvas = {
           if (t >= 0 && t <= 1 && u >= 0 && u <= 1) {
             return { t, wall }; // intersection found
           }
-  } catch {}
+        } catch { }
       }
       return null; // no intersection
     }),
@@ -184,6 +184,18 @@ global.foundry = {
       const lastKey = keys.pop();
       const target = keys.reduce((o, i) => (o[i] = o[i] || {}), obj);
       target[lastKey] = value;
+    }),
+    hasProperty: jest.fn((obj, path) => {
+      if (!obj || typeof obj !== 'object') return false;
+      const keys = path.split('.');
+      let current = obj;
+      for (const key of keys) {
+        if (current === null || current === undefined || !(key in current)) {
+          return false;
+        }
+        current = current[key];
+      }
+      return true;
     }),
     deepClone: jest.fn((obj) => JSON.parse(JSON.stringify(obj))),
     mergeObject: jest.fn((target, source, options = {}) => {
@@ -245,7 +257,7 @@ global.foundry = {
             this.element = document.createElement('div');
             return this;
           }
-          _onRender() {}
+          _onRender() { }
         },
     },
   },
@@ -333,8 +345,8 @@ global.console = {
       textBaseline: 'alphabetic',
 
       // path ops
-      beginPath: jest.fn(() => {}),
-      moveTo: jest.fn(() => {}),
+      beginPath: jest.fn(() => { }),
+      moveTo: jest.fn(() => { }),
       lineTo: jest.fn(() => {
         anyDrawn = true;
       }),
@@ -353,11 +365,11 @@ global.console = {
       fillRect: jest.fn(() => {
         anyDrawn = true;
       }),
-      clearRect: jest.fn(() => {}),
+      clearRect: jest.fn(() => { }),
 
       // gradients
       createLinearGradient: jest.fn(() => ({
-        addColorStop: jest.fn(() => {}),
+        addColorStop: jest.fn(() => { }),
       })),
 
       // text

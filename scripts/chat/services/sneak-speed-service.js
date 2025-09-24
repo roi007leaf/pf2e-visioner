@@ -128,7 +128,7 @@ export class SneakSpeedService {
           await actor.unsetFlag(MODULE_ID, EFFECT_ID_FLAG);
         }
       } catch (e) {
-        console.debug('PF2E Visioner | Failed removing sneak speed effect (continuing):', e);
+        console.error('PF2E Visioner | Failed removing sneak speed effect (continuing):', e);
       }
       // Clear legacy original speed flag if present (backward compatibility)
       const original = actor.getFlag?.(MODULE_ID, ORIGINAL_SPEED_FLAG);
