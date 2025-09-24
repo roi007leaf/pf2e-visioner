@@ -161,9 +161,7 @@ export class LightingCalculator {
     // Get the base scene darkness level
     const globalLight = scene.environment.globalLight;
     const maxDarknessInBright = globalLight?.darkness?.max || 0.0;
-    let sceneDarkness = globalLight?.enabled
-      ? scene.environment.darknessLevel
-      : 1.0;
+    let sceneDarkness = globalLight?.enabled ? scene.environment.darknessLevel : 1.0;
 
     // Find all the darkness regions that apply to our position
     const adlRegions = scene.regions.filter(
@@ -196,9 +194,8 @@ export class LightingCalculator {
             break; // darken
         }
 
-        // If the region is dark, it only applies if we are fully inside it
-        if (regionDarkness <= maxDarknessInBright || circleTest === 1)
-          sceneDarkness = regionDarkness;
+        // If the region is darker, it only applies if we are fully inside it
+        if (regionDarkness < sceneDarkness || circleTest === 1) sceneDarkness = regionDarkness;
       }
     }
 
