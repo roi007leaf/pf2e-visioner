@@ -47,7 +47,7 @@ export async function registerHooks() {
       const { updateWallVisuals } = await import('../services/visual-effects.js');
       const id = canvas.tokens.controlled?.[0]?.id || null;
       await updateWallVisuals(id);
-    } catch {}
+    } catch { }
   });
   Hooks.on('updateWall', async (doc, changes) => {
     try {
@@ -85,12 +85,12 @@ export async function registerHooks() {
                 await canvas.scene?.updateEmbeddedDocuments?.('Token', updates, { diff: false });
               }
             }
-          } catch (_) {}
+          } catch (_) { }
           // Mirror hidden flag to connected walls
           try {
             const { mirrorHiddenFlagToConnected } = await import('../services/connected-walls.js');
             await mirrorHiddenFlagToConnected(doc, true);
-          } catch (_) {}
+          } catch (_) { }
         } else {
           // If unhidden, remove entries for that wall from tokens
           try {
@@ -123,20 +123,20 @@ export async function registerHooks() {
                 await canvas.scene?.updateEmbeddedDocuments?.('Token', updates, { diff: false });
               }
             }
-          } catch (_) {}
+          } catch (_) { }
           // Mirror hidden flag to connected walls (set hidden=false)
           try {
             const { mirrorHiddenFlagToConnected } = await import('../services/connected-walls.js');
             await mirrorHiddenFlagToConnected(doc, false);
-          } catch (_) {}
+          } catch (_) { }
         }
       }
-    } catch (_) {}
+    } catch (_) { }
     try {
       const { updateWallVisuals } = await import('../services/visual-effects.js');
       const id = canvas.tokens.controlled?.[0]?.id || null;
       await updateWallVisuals(id);
-    } catch {}
+    } catch { }
   });
   Hooks.on('deleteWall', async (wallDocument) => {
     try {
@@ -144,44 +144,28 @@ export async function registerHooks() {
       const { cleanupDeletedWallVisuals } = await import('../services/visual-effects.js');
       await cleanupDeletedWallVisuals(wallDocument);
 
+      // Check if we have very few walls left - might indicate mass deletion
+      const remainingWalls = canvas?.walls?.placeables?.length || 0;
+      if (remainingWalls <= 2) {
+        // Likely a mass deletion scenario - do global cleanup to catch any orphaned indicators
+        const { cleanupAllWallIndicators } = await import('../services/visual-effects.js');
+        await cleanupAllWallIndicators();
+      }
+
       // Update wall visuals for remaining walls
       const { updateWallVisuals } = await import('../services/visual-effects.js');
       const id = canvas.tokens.controlled?.[0]?.id || null;
       await updateWallVisuals(id);
-    } catch {}
+    } catch { }
   });
 
-  // Debounced token selection handler to prevent jittering
-  let controlTokenTimeout = null;
-  Hooks.on('controlToken', async (_token, _controlled) => {
-    try {
-      // Clear any pending update to prevent rapid-fire calls
-      if (controlTokenTimeout) {
-        clearTimeout(controlTokenTimeout);
-      }
+  // Removed controlToken hook - was causing excessive updateWallVisuals calls on token selection.
+  // Wall visual updates should only occur when wall flags actually change, which is properly
+  // handled by TokenEventHandler._handleWallFlagChanges method.
 
-      // Debounce the visual update to prevent jittering
-      controlTokenTimeout = setTimeout(async () => {
-        try {
-          const { updateWallVisuals } = await import('../services/visual-effects.js');
-          const id = canvas.tokens.controlled?.[0]?.id || null;
-          await updateWallVisuals(id);
-        } catch (_) {}
-        controlTokenTimeout = null;
-      }, 50); // 50ms debounce
-    } catch (_) {}
-    const { updateWallVisuals } = await import('../services/visual-effects.js');
-    const id = canvas.tokens.controlled?.[0]?.id || null;
-    await updateWallVisuals(id);
-  });
-
-  Hooks.on('updateToken', async () => {
-    try {
-      const { updateWallVisuals } = await import('../services/visual-effects.js');
-      const id = canvas.tokens.controlled?.[0]?.id || null;
-      await updateWallVisuals(id);
-    } catch (_) {}
-  });
+  // NOTE: Removed global 'updateToken' hook that was calling updateWallVisuals on every token update
+  // This was causing hundreds of calls during movement animation. Wall visual updates are now
+  // properly handled by TokenEventHandler._handleWallFlagChanges only when wall flags actually change.
 
   // Prevent movement while awaiting Start Sneak confirmation
   Hooks.on('preUpdateToken', (tokenDoc, changes, options, userId) => {
@@ -207,27 +191,18 @@ export async function registerHooks() {
       console.warn('PF2E Visioner | preUpdateToken movement block failed:', e);
     }
   });
-  Hooks.on('createToken', async () => {
-    try {
-      const { updateWallVisuals } = await import('../services/visual-effects.js');
-      const id = canvas.tokens.controlled?.[0]?.id || null;
-      await updateWallVisuals(id);
-    } catch {}
-  });
-  Hooks.on('deleteToken', async () => {
-    try {
-      const { updateWallVisuals } = await import('../services/visual-effects.js');
-      const id = canvas.tokens.controlled?.[0]?.id || null;
-      await updateWallVisuals(id);
-    } catch {}
-  });
-  Hooks.on('refreshToken', async () => {
-    try {
-      const { updateWallVisuals } = await import('../services/visual-effects.js');
-      const id = canvas.tokens.controlled?.[0]?.id || null;
-      await updateWallVisuals(id);
-    } catch {}
-  });
+
+  // Removed createToken hook - was causing excessive updateWallVisuals calls on token creation.
+  // Wall visual updates should only occur when wall flags actually change, which is properly
+  // handled by TokenEventHandler._handleWallFlagChanges method.
+
+  // Removed deleteToken hook - was causing excessive updateWallVisuals calls on token deletion.
+  // Wall visual updates should only occur when wall flags actually change, which is properly
+  // handled by TokenEventHandler._handleWallFlagChanges method.
+
+  // NOTE: Removed problematic 'refreshToken' hook that was calling updateWallVisuals on every token refresh
+  // This was triggered by animation frames during movement, causing hundreds of calls. Wall visual updates are now
+  // properly handled by TokenEventHandler._handleWallFlagChanges only when wall flags actually change.
 
   // If the waiting-for-sneak-start effect is manually removed, clear the token flag so movement becomes allowed.
   Hooks.on('deleteItem', async (item) => {
@@ -237,11 +212,11 @@ export async function registerHooks() {
       const actor = item?.parent;
       if (!actor) return;
       // Find any active tokens for this actor on the current scene
-  const tokens = canvas.tokens?.placeables?.filter(t => t.actor?.id === actor.id) || [];
+      const tokens = canvas.tokens?.placeables?.filter(t => t.actor?.id === actor.id) || [];
       for (const t of tokens) {
         if (t.document.getFlag('pf2e-visioner', 'waitingSneak')) {
-          try { await t.document.unsetFlag('pf2e-visioner', 'waitingSneak'); } catch {}
-          try { if (t.locked) t.locked = false; } catch {}
+          try { await t.document.unsetFlag('pf2e-visioner', 'waitingSneak'); } catch { }
+          try { if (t.locked) t.locked = false; } catch { }
         }
       }
     } catch (e) {

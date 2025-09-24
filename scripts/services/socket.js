@@ -18,6 +18,7 @@ class SocketService {
     this._socket.register(POINT_OUT_CHANNEL, pointOutHandler);
     this._socket.register(SEEK_TEMPLATE_CHANNEL, seekTemplateHandler);
     this._socket.register(POINTOUT_REQUEST_CHANNEL, pointOutRequestHandler);
+    this._socket.register(WALL_VISUALS_CHANNEL, updateWallVisualsHandler);
     return this._socket;
   }
   get socket() {
@@ -40,6 +41,7 @@ export const REFRESH_CHANNEL = 'RefreshPerception';
 const POINT_OUT_CHANNEL = 'PointOut';
 const SEEK_TEMPLATE_CHANNEL = 'SeekTemplate';
 const POINTOUT_REQUEST_CHANNEL = 'PointOutRequest';
+const WALL_VISUALS_CHANNEL = 'UpdateWallVisuals';
 
 export function registerSocket() {
   _socketService.register();
@@ -54,13 +56,21 @@ export function refreshLocalPerception() {
     refreshSounds: true,
     refreshOcclusion: true,
   });
-  // Also refresh wall visuals/indicators for this client
+  // Removed redundant updateWallVisuals call - wall visual updates are properly handled
+  // by TokenEventHandler._handleWallFlagChanges when wall flags actually change
+}
+
+/*
+ * Handle wall visual updates for a specific observer token
+ * This ensures per-player visibility is applied on each client
+ */
+async function updateWallVisualsHandler(observerId) {
   try {
-    (async () => {
-      const { updateWallVisuals } = await import('./visual-effects.js');
-      await updateWallVisuals();
-    })();
-  } catch { }
+    const { updateWallVisuals } = await import('./visual-effects.js');
+    await updateWallVisuals(observerId);
+  } catch (error) {
+    console.warn(`[${MODULE_ID}] Error in wall visuals handler:`, error);
+  }
 }
 
 /*
@@ -80,11 +90,8 @@ export function refreshEveryonesPerception() {
     try {
       if (_socketService.socket) _socketService.executeForEveryone(REFRESH_CHANNEL);
 
-      (async () => {
-        const observerId = canvas.tokens.controlled?.[0]?.id || null;
-        const { updateWallVisuals } = await import('./visual-effects.js');
-        await updateWallVisuals(observerId);
-      })();
+      // Removed redundant updateWallVisuals call - wall visual updates are properly handled
+      // by TokenEventHandler._handleWallFlagChanges when wall flags actually change
     } catch { }
 
     _perceptionRefreshTimeout = null;
@@ -96,6 +103,15 @@ export function refreshEveryonesPerception() {
  */
 export function requestGMHandlePointOut(...args) {
   if (_socketService.socket) _socketService.executeAsGM(POINT_OUT_CHANNEL, ...args);
+}
+
+/*
+ * Update wall visuals for all clients with per-player visibility
+ */
+export function updateWallVisualsForEveryone(observerId) {
+  if (_socketService.socket) {
+    _socketService.executeForEveryone(WALL_VISUALS_CHANNEL, observerId);
+  }
 }
 
 /*

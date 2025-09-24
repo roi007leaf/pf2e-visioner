@@ -135,13 +135,6 @@ export class SneakActionHandler extends ActionHandlerBase {
         throw importError;
       }
 
-      // Check if the calculator is properly initialized
-      const status = optimizedVisibilityCalculator.getStatus();
-
-      if (!status.initialized) {
-        throw new Error('Visibility calculator is not initialized');
-      }
-
       // Import visibility map utilities
       const { getVisibilityMap } = await import('../../../stores/visibility-map.js');
 

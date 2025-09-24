@@ -8,7 +8,17 @@ import { getVisibilityBetween } from '../utils.js';
 
 /**
  * Update token visuals - now mostly handled by detection wrapper
- * This function mainly serves to trigger a token refresh
+ * This function mainly serves to trigger a t    } catch (error) {
+      console.warn(`[${MODULE_ID}] Error cleaning up all wall indicators:`, error);
+    }
+  } catch (error) {
+    console.warn(`[${MODULE_ID}] Error cleaning up all wall indicators:`, error);
+  }
+}
+
+/**
+ * Visual-only walls toggle per observer
+ * Hides walls for this client if the active observer has them set as hidden
  */
 export async function updateTokenVisuals() {
   if (!canvas?.tokens) return;
@@ -20,7 +30,7 @@ export async function updateTokenVisuals() {
   for (const token of canvas.tokens.placeables) {
     try {
       if (token?.visible) token.refresh();
-    } catch (_) {}
+    } catch (_) { }
   }
 }
 
@@ -41,10 +51,10 @@ export async function updateSpecificTokenPairs(pairs) {
     // Light refresh of the two tokens
     try {
       observer.refresh();
-    } catch (_) {}
+    } catch (_) { }
     try {
       target.refresh();
-    } catch (_) {}
+    } catch (_) { }
   }
 }
 
@@ -122,7 +132,7 @@ export async function cleanupDeletedWallVisuals(wallDocument) {
           if (child.children && child.children.length > 0) {
             searchAndRemoveIndicators(child);
           }
-        } catch (_) {}
+        } catch (_) { }
       }
 
       // Remove found indicators
@@ -132,7 +142,7 @@ export async function cleanupDeletedWallVisuals(wallDocument) {
             indicator.parent.removeChild(indicator);
           }
           indicator.destroy?.({ children: true, texture: true, baseTexture: true });
-        } catch (_) {}
+        } catch (_) { }
       }
     }
 
@@ -157,7 +167,7 @@ export async function cleanupDeletedWallVisuals(wallDocument) {
                 wall._pvHiddenIndicator.parent.removeChild(wall._pvHiddenIndicator);
               }
               wall._pvHiddenIndicator.destroy?.();
-            } catch (_) {}
+            } catch (_) { }
             wall._pvHiddenIndicator = null;
           }
         }
@@ -169,7 +179,7 @@ export async function cleanupDeletedWallVisuals(wallDocument) {
               try {
                 if (mask.parent) mask.parent.removeChild(mask);
                 mask.destroy?.();
-              } catch (_) {}
+              } catch (_) { }
               return false;
             }
             return true;
@@ -181,7 +191,7 @@ export async function cleanupDeletedWallVisuals(wallDocument) {
         if (wall._pvAnimationActive && (wall.id === wallId || wall.document?.id === wallId)) {
           wall._pvAnimationActive = false;
         }
-      } catch (_) {}
+      } catch (_) { }
     }
 
     // Clean up any token wall flags that reference the deleted wall
@@ -200,7 +210,7 @@ export async function cleanupDeletedWallVisuals(wallDocument) {
               [`flags.${MODULE_ID}.walls`]: newWallMap,
             });
           }
-        } catch (_) {}
+        } catch (_) { }
       }
 
       if (tokenUpdates.length > 0 && game.user?.isGM) {
@@ -218,9 +228,148 @@ export async function cleanupDeletedWallVisuals(wallDocument) {
         refreshOcclusion: false,
         refreshEffects: true,
       });
-    } catch (_) {}
+    } catch (_) { }
   } catch (error) {
     console.warn(`[${MODULE_ID}] Error cleaning up deleted wall visuals:`, error);
+  }
+}
+
+/**
+ * Clean up all wall indicators globally - useful for mass deletions
+ * This function removes all wall indicators from the canvas layers without
+ * needing to iterate over specific wall documents
+ */
+export async function cleanupAllWallIndicators() {
+  try {
+    // Clean up hover tooltips cover indicators first (these are created by Alt key for tokens)
+    try {
+      const { cleanupHoverTooltips } = await import('./hover-tooltips.js');
+      cleanupHoverTooltips();
+    } catch (_) { }
+
+    // Search through all potential canvas layers where wall indicators might exist
+    const layers = [
+      canvas.effects?.foreground,
+      canvas.effects,
+      canvas.walls,
+      canvas.interface,
+      canvas.stage, // Sometimes indicators can end up here
+    ].filter(Boolean);
+
+    // Look for any PIXI graphics objects that look like wall indicators
+    function searchAndRemoveAllIndicators(container) {
+      if (!container?.children) return;
+
+      const toRemove = [];
+      for (const child of container.children) {
+        try {
+          // Check if this looks like a wall indicator based on properties that wall indicators have
+          const isWallIndicator = (
+            child._pvWallId ||
+            child._wallDocumentId ||
+            child._associatedWallId ||
+            (child.name && child.name.includes('wall-indicator')) ||
+            (child._pvIndicatorType === 'wall') ||
+            // Add checks for UI-generated wall labels (created by refreshWallIdentifierLabels)
+            (child._tooltip && child._coverText) || // Cover status labels from Alt key
+            (child instanceof PIXI.Text && (child.style?.stroke === 0x000000 && child.style?.strokeThickness >= 3)) // Identifier labels
+          );
+
+          if (isWallIndicator) {
+            toRemove.push(child);
+          }
+
+          // Recursively search children
+          if (child.children && child.children.length > 0) {
+            searchAndRemoveAllIndicators(child);
+          }
+        } catch (_) { }
+      }
+
+      // Remove found indicators
+      for (const indicator of toRemove) {
+        try {
+          if (indicator.parent) {
+            indicator.parent.removeChild(indicator);
+          }
+          indicator.destroy?.({ children: true, texture: true, baseTexture: true });
+        } catch (_) { }
+      }
+    }
+
+    // Search all layers
+    for (const layer of layers) {
+      searchAndRemoveAllIndicators(layer);
+    }
+
+    // Also clean up any references on remaining wall objects
+    const walls = canvas?.walls?.placeables || [];
+    for (const wall of walls) {
+      try {
+        // Clean up hidden indicator references
+        if (wall._pvHiddenIndicator) {
+          try {
+            if (wall._pvHiddenIndicator.parent) {
+              wall._pvHiddenIndicator.parent.removeChild(wall._pvHiddenIndicator);
+            }
+            wall._pvHiddenIndicator.destroy?.();
+          } catch (_) { }
+          wall._pvHiddenIndicator = null;
+        }
+
+        // Clean up see-through masks
+        if (wall._pvSeeThroughMasks && Array.isArray(wall._pvSeeThroughMasks)) {
+          for (const mask of wall._pvSeeThroughMasks) {
+            try {
+              if (mask.parent) mask.parent.removeChild(mask);
+              mask.destroy?.();
+            } catch (_) { }
+          }
+          wall._pvSeeThroughMasks = [];
+        }
+
+        // Clean up UI wall labels (Alt key indicators)
+        if (wall._pvCoverIcon) {
+          try {
+            if (wall._pvCoverIcon.parent) {
+              wall._pvCoverIcon.parent.removeChild(wall._pvCoverIcon);
+            }
+            wall._pvCoverIcon.destroy?.();
+          } catch (_) { }
+          delete wall._pvCoverIcon;
+        }
+
+        // Clean up UI wall identifier labels 
+        if (wall._pvIdLabel) {
+          try {
+            if (wall._pvIdLabel.parent) {
+              wall._pvIdLabel.parent.removeChild(wall._pvIdLabel);
+            }
+            wall._pvIdLabel.destroy?.();
+          } catch (_) { }
+          delete wall._pvIdLabel;
+        }
+
+        // Stop any active animations
+        if (wall._pvAnimationActive) {
+          wall._pvAnimationActive = false;
+        }
+      } catch (_) { }
+    }
+
+
+
+    // Force a canvas refresh to ensure visual updates are applied
+    try {
+      canvas.perception?.update?.({
+        refreshLighting: false,
+        refreshVision: false,
+        refreshOcclusion: false,
+        refreshEffects: true,
+      });
+    } catch (_) { }
+  } catch (error) {
+    console.warn(`[${MODULE_ID}] Error cleaning up all wall indicators:`, error);
   }
 }
 
@@ -237,14 +386,13 @@ export async function updateWallVisuals(observerId = null) {
       return;
     }
 
-    // Quick exit if observer hasn't changed (prevents unnecessary work)
-    if (observerId === lastObserverId) {
-      return;
-    }
+    // Don't skip based on observer ID - wall flags may have changed
     lastObserverId = observerId;
 
     const walls = canvas?.walls?.placeables || [];
-    if (!walls.length) return;
+    if (!walls.length) {
+      return;
+    }
 
     // Prepare updates (GM only) to make hidden doors not block sight
     const updates = [];
@@ -253,13 +401,22 @@ export async function updateWallVisuals(observerId = null) {
     // Determine local observer token strictly from current selection (or provided id)
     let observer = null;
     try {
-      if (observerId) observer = canvas.tokens.get(observerId) || null;
-      if (!observer) observer = canvas.tokens.controlled?.[0] || null;
-      // Only show indicators when a player-owned token is selected
-      if (!observer || !observer.actor?.hasPlayerOwner) observer = null;
+      if (observerId) {
+        observer = canvas.tokens.get(observerId) || null;
+      }
+      if (!observer) {
+        observer = canvas.tokens.controlled?.[0] || null;
+      }
     } catch (_) {
       observer = null;
     }
+
+    // Only show indicators if the current user is actively controlling this token
+    if (observer && !canvas.tokens.controlled.includes(observer)) {
+      return;
+    }
+
+    // Don't require hasPlayerOwner - any controlled token should show indicators
     const wallMapForObserver = observer?.document?.getFlag?.(MODULE_ID, 'walls') || {};
 
     // Build an expanded set of observed wall IDs that includes any walls
@@ -269,6 +426,7 @@ export async function updateWallVisuals(observerId = null) {
         .filter(([, v]) => v === 'observed')
         .map(([id]) => id),
     );
+
     const expandedObserved = new Set(observedSet);
     try {
       const { getConnectedWallDocsBySourceId } = await import('./connected-walls.js');
@@ -278,17 +436,18 @@ export async function updateWallVisuals(observerId = null) {
         const connectedDocs = getConnectedWallDocsBySourceId(id) || [];
         for (const d of connectedDocs) expandedObserved.add(d.id);
       }
-    } catch (_) {}
+    } catch (_) { }
 
     // Collect token flag updates for player-owned tokens that can see hidden walls
     const tokenWallFlagUpdates = [];
     for (const wall of walls) {
       const d = wall.document;
       if (!d) continue;
+
       let flagHidden = false;
       try {
         flagHidden = !!d.getFlag?.(MODULE_ID, 'hiddenWall');
-      } catch (_) {}
+      } catch (_) { }
 
       // Remove previous indicator/masks if any (always clean before evaluating)
       try {
@@ -301,13 +460,14 @@ export async function updateWallVisuals(observerId = null) {
             try {
               m.parent?.removeChild(m);
               m.destroy?.();
-            } catch (_) {}
+            } catch (_) { }
           }
           wall._pvSeeThroughMasks = [];
         }
-      } catch (_) {}
+      } catch (_) { }
 
       const isExpandedObserved = expandedObserved.has(d.id);
+
       if (!flagHidden && !isExpandedObserved) {
         // If previously stored original sight exists, restore (GM only)
         if (isGM) {
@@ -320,7 +480,7 @@ export async function updateWallVisuals(observerId = null) {
                 [`flags.${MODULE_ID}.originalSight`]: null,
               });
             }
-          } catch (_) {}
+          } catch (_) { }
         }
         continue;
       }
@@ -330,7 +490,9 @@ export async function updateWallVisuals(observerId = null) {
         const c = Array.isArray(d.c) ? d.c : [d.x, d.y, d.x2, d.y2];
         const [x1, y1, x2, y2] = c;
         if ([x1, y1, x2, y2].every((n) => typeof n === 'number')) {
-          const shouldShowIndicator = isExpandedObserved;
+          // Check if the controlled token has this wall flagged as 'observed'
+          const tokenWallFlag = wallMapForObserver[d.id];
+          const shouldShowIndicator = tokenWallFlag === 'observed';
           const seeThrough = shouldShowIndicator && false && !!observer;
           if (shouldShowIndicator) {
             // Clean previous indicator
@@ -339,7 +501,7 @@ export async function updateWallVisuals(observerId = null) {
                 wall._pvHiddenIndicator.parent?.removeChild(wall._pvHiddenIndicator);
                 wall._pvHiddenIndicator.destroy?.();
               }
-            } catch (_) {}
+            } catch (_) { }
 
             const isDoor = Number(d.door) > 0; // 0 none, 1 door, 2 secret
             const color = isDoor ? 0xffd166 : 0x9b59b6; // Yellow for doors, purple for walls
@@ -353,7 +515,7 @@ export async function updateWallVisuals(observerId = null) {
             try {
               const flagVal = Number(canvas?.scene?.getFlag?.(MODULE_ID, 'hiddenIndicatorHalf'));
               if (Number.isFinite(flagVal) && flagVal > 0) half = flagVal;
-            } catch (_) {}
+            } catch (_) { }
             const g = new PIXI.Graphics();
             g.lineStyle(2, color, 0.9);
             g.beginFill(color, 0.3);
@@ -566,11 +728,11 @@ export async function updateWallVisuals(observerId = null) {
               (canvas.walls || wall).addChild(mask);
               if (!wall._pvSeeThroughMasks) wall._pvSeeThroughMasks = [];
               wall._pvSeeThroughMasks.push(mask);
-            } catch (_) {}
+            } catch (_) { }
           } else if (wall._pvSeeThroughMasks) {
             try {
               wall._pvSeeThroughMasks.forEach((m) => m.parent?.removeChild(m));
-            } catch (_) {}
+            } catch (_) { }
             wall._pvSeeThroughMasks = [];
           }
 
@@ -601,7 +763,7 @@ export async function updateWallVisuals(observerId = null) {
                       break;
                     }
                   }
-                } catch (_) {}
+                } catch (_) { }
 
                 if (anyObserved) {
                   const currentSight = Number(d.sight ?? 1);
@@ -625,12 +787,12 @@ export async function updateWallVisuals(observerId = null) {
                   }
                 }
               }
-            } catch (_) {}
+            } catch (_) { }
           }
 
           // Note: Auto-discovery disabled. Observed/Hidden should be controlled via the Token Manager.
         }
-      } catch (_) {}
+      } catch (_) { }
 
       // Door-specific unconditional relaxation removed; handled above under unified GM logic.
     }
@@ -651,7 +813,7 @@ export async function updateWallVisuals(observerId = null) {
         // Force token refresh so newly visible tokens render
         try {
           for (const t of canvas.tokens.placeables) t.refresh?.();
-        } catch (_) {}
+        } catch (_) { }
       } catch (e) {
         console.warn(`[${MODULE_ID}] Failed to update hidden door sight overrides`, e);
       }
@@ -660,8 +822,8 @@ export async function updateWallVisuals(observerId = null) {
     // Draw hidden-echo overlays for tokens relative to current observer (client-only visual)
     try {
       await updateHiddenTokenEchoes(observer);
-    } catch (_) {}
-  } catch (_) {}
+    } catch (_) { }
+  } catch (_) { }
 }
 
 /**
@@ -694,7 +856,7 @@ async function updateHiddenTokenEchoes(observer) {
         const connectedDocs = getConnectedWallDocsBySourceId(id) || [];
         for (const d of connectedDocs) expandedObserved.add(d.id);
       }
-    } catch (_) {}
+    } catch (_) { }
     const hiddenObservedWalls = walls.filter((w) => {
       try {
         return expandedObserved.has(w?.document?.id);
@@ -725,7 +887,7 @@ async function updateHiddenTokenEchoes(observer) {
       let vis = 'observed';
       try {
         vis = getVisibilityBetween(observer, t);
-      } catch (_) {}
+      } catch (_) { }
       if (vis !== 'hidden') {
         removeEcho(t);
         continue;
@@ -749,7 +911,7 @@ async function updateHiddenTokenEchoes(observer) {
       }
       drawEcho(t);
     }
-  } catch (_) {}
+  } catch (_) { }
 }
 
 function drawEcho(token) {
@@ -768,7 +930,7 @@ function drawEcho(token) {
       (canvas.tokens || token.parent)?.addChild(g);
       token._pvHiddenEcho = g;
     }
-  } catch (_) {}
+  } catch (_) { }
 }
 
 function removeEcho(token) {
@@ -777,7 +939,7 @@ function removeEcho(token) {
       token._pvHiddenEcho.parent?.removeChild(token._pvHiddenEcho);
       token._pvHiddenEcho.destroy?.();
     }
-  } catch (_) {}
+  } catch (_) { }
   token._pvHiddenEcho = null;
 }
 

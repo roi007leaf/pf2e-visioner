@@ -23,7 +23,7 @@ export function onReady() {
   if (game.user?.isGM) {
     // Run shortly after ready to avoid competing with other modules' migrations
     setTimeout(() => {
-      enableVisionForAllTokensAndPrototypes().catch(() => {});
+      enableVisionForAllTokensAndPrototypes().catch(() => { });
     }, 25);
   }
 }
@@ -31,9 +31,41 @@ export function onReady() {
 export async function onCanvasReady() {
   await updateTokenVisuals();
   try {
-    const id = canvas.tokens.controlled?.[0]?.id || null;
-    await updateWallVisuals(id);
-  } catch (_) {}
+    // After canvas refresh, restore indicators for currently controlled tokens that have wall flags
+    const controlledTokens = canvas.tokens.controlled || [];
+
+    if (controlledTokens.length > 0) {
+      // Process each controlled token to restore their indicators
+      for (const token of controlledTokens) {
+        const wallFlags = token?.document?.getFlag?.(MODULE_ID, 'walls') || {};
+        // Only restore if this token has wall flags
+        if (Object.keys(wallFlags).length > 0) {
+          await updateWallVisuals(token.document.id);
+        }
+      }
+    }
+
+    // Also set up a hook to restore indicators when tokens are controlled after canvas ready
+    const restoreIndicatorsOnControl = Hooks.on('controlToken', async (token, controlled) => {
+      if (controlled) {
+        const wallFlags = token?.document?.getFlag?.(MODULE_ID, 'walls') || {};
+        if (Object.keys(wallFlags).length > 0) {
+          await updateWallVisuals(token.document.id);
+        }
+      }
+    });
+
+    // Clean up the hook when canvas is torn down
+    Hooks.once('canvasTearDown', async () => {
+      Hooks.off('controlToken', restoreIndicatorsOnControl);
+
+      // Clean up any remaining wall indicators when canvas is torn down
+      try {
+        const { cleanupAllWallIndicators } = await import('../services/visual-effects.js');
+        await cleanupAllWallIndicators();
+      } catch (_) { }
+    });
+  } catch (_) { }
 
   // Always initialize tooltip system for keyboard shortcuts
   initializeHoverTooltips();
@@ -90,10 +122,10 @@ export async function onCanvasReady() {
             const wrapper = typeof window.$ === 'function' ? window.$(el) : el;
             await handleRenderChatMessage(msg, wrapper);
           }
-        } catch (_) {}
+        } catch (_) { }
       }, 50);
     }
-  } catch (_) {}
+  } catch (_) { }
 }
 
 async function enableVisionForAllTokensAndPrototypes() {
@@ -114,7 +146,7 @@ async function enableVisionForAllTokensAndPrototypes() {
           if (updates.length) {
             await scene.updateEmbeddedDocuments('Token', updates, { diff: false, render: false });
           }
-        } catch (_) {}
+        } catch (_) { }
       }
 
       // Update all actor prototype tokens
@@ -132,10 +164,10 @@ async function enableVisionForAllTokensAndPrototypes() {
               );
             }
           }
-        } catch (_) {}
+        } catch (_) { }
       }
     }
-  } catch (_) {}
+  } catch (_) { }
 }
 
 function setupFallbackHUDButton() {
@@ -213,7 +245,7 @@ function setupFallbackHUDButton() {
           const pos = JSON.parse(savedPos);
           if (pos.left) button.style.left = pos.left;
           if (pos.top) button.style.top = pos.top;
-        } catch (_) {}
+        } catch (_) { }
       }
 
       button.addEventListener('click', async (event) => {

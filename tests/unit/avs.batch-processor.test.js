@@ -1,0 +1,99 @@
+import '../setup.js';
+
+import { BatchProcessor } from '../../scripts/visibility/auto-visibility/core/BatchProcessor.js';
+import { GlobalLosCache } from '../../scripts/visibility/auto-visibility/utils/GlobalLosCache.js';
+import { GlobalVisibilityCache } from '../../scripts/visibility/auto-visibility/utils/GlobalVisibilityCache.js';
+
+const makeToken = (id, x, y) => createMockToken({ id, x, y, width: 1, height: 1, actor: createMockActor() });
+
+describe('BatchProcessor', () => {
+    let spatialAnalyzer;
+    let viewportFilter;
+    let optimizedVisibilityCalculator;
+    let globalLosCache;
+    let globalVisibilityCache;
+    let getTokenPosition;
+    let getActiveOverride;
+    let getVisibilityMap;
+    let processor;
+
+    beforeEach(() => {
+        global.canvas.grid.size = 100;
+        spatialAnalyzer = {
+            getTokensInRange: jest.fn((pos, max, changedId) => {
+                // return all tokens on canvas other than the changedId
+                return global.canvas.tokens.placeables.filter(t => t.document.id !== changedId);
+            }),
+            canTokensSeeEachOther: jest.fn(() => true),
+        };
+        viewportFilter = { isEnabled: jest.fn(() => false) };
+        optimizedVisibilityCalculator = {
+            // Return non-default state so updates are generated vs original 'observed'
+            calculateVisibilityWithPosition: jest.fn(async () => 'hidden'),
+        };
+        globalLosCache = new GlobalLosCache(1000);
+        globalVisibilityCache = new GlobalVisibilityCache(1000);
+        getTokenPosition = (t) => ({ x: t.document.x + 50, y: t.document.y + 50, elevation: 0 });
+        getActiveOverride = jest.fn(() => null);
+        const maps = new Map();
+        getVisibilityMap = (t) => maps.get(t.document.id) || {};
+
+        processor = new BatchProcessor({
+            spatialAnalyzer,
+            viewportFilter,
+            optimizedVisibilityCalculator,
+            globalLosCache,
+            globalVisibilityCache,
+            getTokenPosition,
+            getActiveOverride,
+            getVisibilityMap,
+            maxVisibilityDistance: 10,
+        });
+
+        // canvas tokens
+        const tA = makeToken('A', 0, 0);
+        const tB = makeToken('B', 100, 0);
+        const tC = makeToken('C', 300, 0);
+        global.canvas.tokens.placeables = [tA, tB, tC];
+    });
+
+    test('computes visibility and returns updates for changed tokens', async () => {
+        const allTokens = [...global.canvas.tokens.placeables];
+        const changed = new Set(['A']);
+        const res = await processor.process(allTokens, changed, { hasDarknessSources: false });
+        expect(res.processedTokens).toBe(1);
+        // expect updates (A->B, B->A, A->C, C->A)
+        const pairs = res.updates.map(u => [u.observer.document.id, u.target.document.id]);
+        expect(pairs).toEqual(expect.arrayContaining([
+            ['A', 'B'], ['B', 'A'], ['A', 'C'], ['C', 'A']
+        ]));
+        expect(res.breakdown.pairsConsidered).toBeGreaterThan(0);
+    });
+
+    test('uses global caches for LOS and visibility', async () => {
+        // prime caches
+        const allTokens = [...global.canvas.tokens.placeables];
+        const changed = new Set(['A']);
+        await processor.process(allTokens, changed, {});
+
+        // next run should hit global caches
+        const res2 = await processor.process(allTokens, changed, {});
+        expect(res2.breakdown.losGlobalHits).toBeGreaterThanOrEqual(1);
+        expect(res2.breakdown.visGlobalHits).toBeGreaterThanOrEqual(1);
+    });
+
+    test('skips LOS-failed pairs and counts pairsSkippedLOS', async () => {
+        spatialAnalyzer.canTokensSeeEachOther.mockReturnValue(false);
+        const res = await processor.process(global.canvas.tokens.placeables, new Set(['A']), {});
+        expect(res.breakdown.pairsSkippedLOS).toBeGreaterThan(0);
+        expect(res.updates.length).toBe(0);
+    });
+
+    test('respects active overrides to avoid calculation', async () => {
+        // set override for A->B only
+        getActiveOverride.mockImplementation((obs, tgt) => (obs === 'A' && tgt === 'B' ? { state: 'hidden' } : null));
+        const res = await processor.process(global.canvas.tokens.placeables, new Set(['A']), {});
+        // ensure we have at least one update for the overridden direction
+        expect(res.updates.some(u => u.observer.document.id === 'A' && u.target.document.id === 'B' && u.visibility === 'hidden')).toBe(true);
+    });
+});

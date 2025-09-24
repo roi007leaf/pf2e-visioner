@@ -78,6 +78,7 @@ export class SeekActionHandler extends ActionHandlerBase {
     }
 
     // Optional distance limitation based on settings (combat vs out-of-combat)
+    // Apply to both tokens and walls
     try {
       const inCombat = hasActiveEncounter();
       const limitInCombat = !!game.settings.get('pf2e-visioner', 'limitSeekRangeInCombat');
@@ -90,8 +91,15 @@ export class SeekActionHandler extends ActionHandlerBase {
             : game.settings.get('pf2e-visioner', 'customSeekDistanceOutOfCombat'),
         );
         if (Number.isFinite(maxFeet) && maxFeet > 0) {
-          potential = potential.filter((t) => {
-            const d = calculateTokenDistance(actionData.actor, t);
+          potential = potential.filter((subject) => {
+            let d;
+            if (subject._isWall) {
+              // Calculate distance to wall center
+              d = this.#calculateDistanceToWall(actionData.actor, subject.wall);
+            } else {
+              // Calculate distance to token
+              d = calculateTokenDistance(actionData.actor, subject);
+            }
             return !Number.isFinite(d) || d <= maxFeet;
           });
         }
@@ -676,6 +684,27 @@ export class SeekActionHandler extends ActionHandlerBase {
     try {
       const dx = token1.center.x - token2.center.x;
       const dy = token1.center.y - token2.center.y;
+      const px = Math.hypot(dx, dy);
+      const gridSize = canvas?.grid?.size || 100;
+      const unitDist = canvas?.scene?.grid?.distance || 5;
+      return (px / gridSize) * unitDist;
+    } catch {
+      return Infinity;
+    }
+  }
+
+  /**
+   * Calculate distance between a token and a wall in feet
+   * @param {Token} token - The token
+   * @param {Wall} wall - The wall object
+   * @returns {number} Distance in feet
+   */
+  #calculateDistanceToWall(token, wall) {
+    try {
+      if (!token?.center || !wall?.center) return Infinity;
+      
+      const dx = token.center.x - wall.center.x;
+      const dy = token.center.y - wall.center.y;
       const px = Math.hypot(dx, dy);
       const gridSize = canvas?.grid?.size || 100;
       const unitDist = canvas?.scene?.grid?.distance || 5;

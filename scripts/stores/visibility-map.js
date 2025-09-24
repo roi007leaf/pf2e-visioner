@@ -69,7 +69,7 @@ export async function setVisibilityBetween(
   try {
     // Set flag to prevent auto-visibility system from reacting to its own effect changes
     if (autoVisibilitySystem) {
-      autoVisibilitySystem._setUpdatingEffects(true);
+      autoVisibilitySystem.setUpdatingEffects(true);
     }
 
     await updateEphemeralEffectsForVisibility(observer, target, state, options);
@@ -78,7 +78,7 @@ export async function setVisibilityBetween(
   } finally {
     // Always clear the flag, even if there was an error
     if (autoVisibilitySystem) {
-      autoVisibilitySystem._setUpdatingEffects(false);
+      autoVisibilitySystem.setUpdatingEffects(false);
     }
   }
 }
