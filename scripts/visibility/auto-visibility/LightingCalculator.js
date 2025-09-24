@@ -66,6 +66,8 @@ export class LightingCalculator {
       x: position?.x ?? token?.center?.x ?? (token?.x ?? 0) + tokenWidth / 2,
       y: position?.y ?? token?.center?.y ?? (token?.y ?? 0) + tokenHeight / 2,
     };
+    const elevation = position?.elevation ?? token?.document?.elevation ?? 0;
+
     // Rebuild token shape in world coordinates anchored at provided center
     const baseX = position ? position.x - tokenWidth / 2 : token.x;
     const baseY = position ? position.y - tokenHeight / 2 : token.y;
@@ -94,13 +96,9 @@ export class LightingCalculator {
 
     // Convert the shape to clipper points
     const tokenClipperPoints = shapeInWorld.toClipperPoints({ scalingFactor: 1.0 });
-
-    // Approximate token radius as half the diagonal (for cheap distance checks)
-    const tokenRadius = Math.hypot(tokenWidth / 2, tokenHeight / 2);
+    const tokenRadius = (token?.externalRadius ?? Math.max(tokenWidth, tokenHeight)) / 2;
 
     // First process all non-hidden darkness sources since they override illumination
-    // Darkness applies if the token's center is within the darkness radius (no need for full polygon containment).
-    // This aligns with Foundry's perception behavior and avoids the "extra move" requirement at borders.
     let maxDarknessResult = null;
     const darknessSources = canvas.effects?.darknessSources || [];
 
@@ -157,48 +155,55 @@ export class LightingCalculator {
       }
     }
 
-    // Darkness cancels out all other illumination
+    // A darkness source cancels out all other illumination
     if (maxDarknessResult) return maxDarknessResult;
 
-    // Foundry/pf2e system determines dark to be 75% or higher darkness
-    // This needs to process darkness regions for full containment of token rather than just single point
-    // const darknessRegions = scene.regions
-    //   .filter((r) => r.behaviors.some((b) => b.type === 'adjustDarknessLevel'))
-    let sceneDarkness = scene.environment.globalLight?.enabled
-      ? scene.environment.darknessLevel
-      : 1.0;
-    const darknessRegions = scene.regions
-      .filter((r) => r.behaviors.some((b) => b.active && b.type === 'adjustDarknessLevel'))
-      .filter((r) => r.polygonTree);
-    let darkBehaviors = [];
-    for (const region of darknessRegions) {
+    // Get the base scene darkness level
+    const globalLight = scene.environment.globalLight;
+    const maxDarknessInBright = globalLight?.darkness?.max || 0.0;
+    let sceneDarkness = globalLight?.enabled ? scene.environment.darknessLevel : 1.0;
+
+    // Find all the darkness regions that apply to our position
+    const adlRegions = scene.regions.filter(
+      (r) =>
+        elevation >= r.elevation.bottom &&
+        elevation <= r.elevation.top &&
+        r.polygonTree &&
+        r.behaviors.some((b) => b.active && b.type === 'adjustDarknessLevel'),
+    );
+
+    // Apply all the darkness behaviors for regions that we intersect
+    for (const region of adlRegions) {
       const polygonTree = region.polygonTree;
       const circleTest = polygonTree.testCircle(center, tokenRadius);
-      if (circleTest < 1) continue;
-      const behaviors = region.behaviors.filter(
-        (b) => b.active && b.type === 'adjustDarknessLevel',
-      );
-      for (const b of behaviors) darkBehaviors.push(b);
-    }
-    for (const b of darkBehaviors) {
-      switch (b.system.mode) {
-        case 0:
-          sceneDarkness = b.system.modifier;
-          break; // override
-        case 1:
-          sceneDarkness *= b.system.modifier;
-          break; // brighten
-        case 2:
-          sceneDarkness = Math.min(sceneDarkness + b.system.modifier, 1.0);
-          break; // darken
+      if (circleTest === -1) continue;
+
+      // The region applies, so iterate its darkness behaviors
+      for (const behavior of region.behaviors) {
+        if (!behavior.active || behavior.type !== 'adjustDarknessLevel') continue;
+        let regionDarkness;
+        switch (behavior.system.mode) {
+          case 0:
+            regionDarkness = behavior.system.modifier;
+            break; // override
+          case 1:
+            regionDarkness = sceneDarkness * (1 - behavior.system.modifier);
+            break; // brighten
+          case 2:
+            regionDarkness = 1 - (1 - sceneDarkness) * (1 - behavior.system.modifier);
+            break; // darken
+        }
+
+        // If the region is darker, it only applies if we are fully inside it
+        if (regionDarkness < sceneDarkness || circleTest === 1) sceneDarkness = regionDarkness;
       }
     }
 
     // If the token isn't fully in darkness by GI, then it is in bright light and we can skip the rest
     // This means a global DIM light is approximated using:
-    //   - scene darkness >= 0.75
+    //   - scene darkness > globalLight.darkness.max
     //   - large dim radius ambient that ignores wall constraints
-    if (sceneDarkness < 0.75) return makeIlluminationResult(BRIGHT);
+    if (sceneDarkness <= maxDarknessInBright) return makeIlluminationResult(BRIGHT);
     let illumination = DARK;
 
     // iterate the lights, skipping hidden or inactive lights as well as global lights
