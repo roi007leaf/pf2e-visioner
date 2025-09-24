@@ -5,6 +5,7 @@
 
 import { MODULE_ID } from '../../constants.js';
 import { getLogger } from '../../utils/logger.js';
+import { SpatialAnalysisService } from './core/SpatialAnalysisService.js';
 const log = getLogger('VisibilityCalculator');
 
 export class VisibilityCalculator {
@@ -20,8 +21,11 @@ export class VisibilityCalculator {
   /** @type {ConditionManager} */
   #conditionManager;
 
-  /** @type {EventDrivenVisibilitySystem} */
-  #eventDrivenSystem;
+  /** @type {SpatialAnalysisService} */
+  #spatialAnalyzer;
+
+  /** @type {ExclusionManager} */
+  #exclusionManager;
 
   constructor() {
     if (VisibilityCalculator.#instance) {
@@ -46,13 +50,15 @@ export class VisibilityCalculator {
    * @param {LightingCalculator} lightingCalculator
    * @param {VisionAnalyzer} visionAnalyzer
    * @param {ConditionManager} ConditionManager
-   * @param {EventDrivenVisibilitySystem} eventDrivenSystem - Optional event-driven system for optimizations
+   * @param {SpatialAnalysisService} spatialAnalyzer - Optional spatial analysis service for optimizations
+   * @param {ExclusionManager} exclusionManager - Optional exclusion manager for token exclusions
    */
-  initialize(lightingCalculator, visionAnalyzer, ConditionManager, eventDrivenSystem = null) {
+  initialize(lightingCalculator, visionAnalyzer, ConditionManager, spatialAnalyzer = null, exclusionManager = null) {
     this.#lightingCalculator = lightingCalculator;
     this.#visionAnalyzer = visionAnalyzer;
     this.#conditionManager = ConditionManager;
-    this.#eventDrivenSystem = eventDrivenSystem;
+    this.#spatialAnalyzer = spatialAnalyzer;
+    this.#exclusionManager = exclusionManager;
   }
 
   /**
@@ -263,54 +269,59 @@ export class VisibilityCalculator {
       const observerInDarkness = (observerLightLevel?.darknessRank ?? 0) >= 1;
       const targetInDarkness = (lightLevel?.darknessRank ?? 0) >= 1;
 
-      // Always check if line passes through darkness
-      // This handles the case where tokens are on opposite sides of a darkness effect
+      // Darkness cross-boundary check: only if darkness is relevant or present
+      const hasDarknessSources = !!(options && typeof options === 'object' && options.hasDarknessSources);
+      let linePassesThroughDarkness = false;
+      let rayDarknessRank = 0;
+      if (hasDarknessSources || observerInDarkness || targetInDarkness) {
+        // First try the canvas/shape-based detector (use overrides if provided for freshest positions)
+        const darknessResult =
+          this.#doesLinePassThroughDarkness(
+            observer,
+            target,
+            observerPosition,
+            targetPosition,
+          ) || {
+            passesThroughDarkness: false,
+            maxDarknessRank: 0,
+          };
+        linePassesThroughDarkness = !!darknessResult.passesThroughDarkness;
+        rayDarknessRank = Number(darknessResult.maxDarknessRank || 0) || 0;
 
-      // First try the canvas/shape-based detector (use overrides if provided for freshest positions)
-      let darknessResult = this.#doesLinePassThroughDarkness(
-        observer,
-        target,
-        observerPosition,
-        targetPosition,
-      ) || {
-        passesThroughDarkness: false,
-        maxDarknessRank: 0,
-      };
-      let linePassesThroughDarkness = !!darknessResult.passesThroughDarkness;
-      let rayDarknessRank = Number(darknessResult.maxDarknessRank || 0) || 0;
-
-      // If that didn't detect, double-check by sampling along the ray using LightingCalculator
-      // Use the already-computed observer/target positions (honors overrides)
-      if (!linePassesThroughDarkness) {
-        try {
-          const steps = 6; // check 5 interior points
-          let maxRank = 0;
-          let passes = false;
-          for (let i = 1; i < steps; i++) {
-            const t = i / steps;
-            const sx = observerPosition.x + (targetPosition.x - observerPosition.x) * t;
-            const sy = observerPosition.y + (targetPosition.y - observerPosition.y) * t;
-            const se = observerPosition.elevation ?? 0;
-            const samplePos = { x: sx, y: sy, elevation: se };
-            const sample = this.#lightingCalculator.getLightLevelAt(samplePos, observer);
-            const rank = Number(sample?.darknessRank ?? 0) || 0;
-            if (rank >= 1) {
-              passes = true;
-              if (rank > maxRank) maxRank = rank;
+        // If that didn't detect, double-check by sampling along the ray using LightingCalculator
+        // Use the already-computed observer/target positions (honors overrides)
+        if (!linePassesThroughDarkness) {
+          try {
+            const steps = 6; // check 5 interior points
+            let maxRank = 0;
+            let passes = false;
+            for (let i = 1; i < steps; i++) {
+              const t = i / steps;
+              const sx = observerPosition.x + (targetPosition.x - observerPosition.x) * t;
+              const sy = observerPosition.y + (targetPosition.y - observerPosition.y) * t;
+              const se = observerPosition.elevation ?? 0;
+              const samplePos = { x: sx, y: sy, elevation: se };
+              const sample = this.#lightingCalculator.getLightLevelAt(samplePos, observer);
+              const rank = Number(sample?.darknessRank ?? 0) || 0;
+              if (rank >= 1) {
+                passes = true;
+                if (rank > maxRank) maxRank = rank;
+              }
             }
+            if (passes) {
+              linePassesThroughDarkness = true;
+              rayDarknessRank = Math.max(rayDarknessRank, maxRank);
+            }
+          } catch {
+            // best-effort; ignore sampling errors
           }
-          if (passes) {
-            linePassesThroughDarkness = true;
-            rayDarknessRank = Math.max(rayDarknessRank, maxRank);
-          }
-        } catch {
-          // best-effort; ignore sampling errors
         }
       }
 
       // Check for cross-boundary darkness: either different darkness states OR line passes through darkness
       // Note: We need to check linePassesThroughDarkness even when both tokens are in darkness
-      const isCrossBoundary = observerInDarkness !== targetInDarkness || linePassesThroughDarkness;
+      const isCrossBoundary =
+        (observerInDarkness !== targetInDarkness) || (linePassesThroughDarkness === true);
 
       if (isCrossBoundary) {
         // Cross-boundary: one inside darkness, one outside, OR line passes through darkness
@@ -456,11 +467,11 @@ export class VisibilityCalculator {
    * Clear caches in all components
    */
   clearCaches() {
-    if (this.#lightingCalculator) {
-      this.#lightingCalculator.clearLightCache();
-    }
-    if (this.#visionAnalyzer) {
-      this.#visionAnalyzer.clearCache();
+    // Note: LightingCalculator doesn't maintain internal caches that need clearing
+    // Lighting data is computed on-demand from Foundry's lighting system
+
+    if (this.#visionAnalyzer && typeof this.#visionAnalyzer.clearVisionCache === 'function') {
+      this.#visionAnalyzer.clearVisionCache();
     }
   }
 
@@ -504,38 +515,40 @@ export class VisibilityCalculator {
    */
   _shouldSkipCalculation(observer, target) {
     try {
-      // Use the stored EventDrivenVisibilitySystem instance, fallback to global if not available
-      let eventDrivenSystem = this.#eventDrivenSystem;
-      if (!eventDrivenSystem) {
-        eventDrivenSystem = this._getEventDrivenSystem();
-        if (!eventDrivenSystem) {
+      // Use the stored SpatialAnalysisService instance, fallback to global if not available
+      let spatialAnalyzer = this.#spatialAnalyzer;
+      if (!spatialAnalyzer) {
+        spatialAnalyzer = this._getSpatialAnalyzer();
+        if (!spatialAnalyzer) {
           return false; // If no system available, proceed with calculation
         }
       }
 
       // Check if tokens are excluded from AVS calculations
-      const observerExcluded = eventDrivenSystem.isExcludedToken?.(observer);
-      const targetExcluded = eventDrivenSystem.isExcludedToken?.(target);
+      const observerExcluded = this.#exclusionManager?.isExcludedToken?.(observer);
+      const targetExcluded = this.#exclusionManager?.isExcludedToken?.(target);
 
       if (observerExcluded || targetExcluded) {
         return true;
       }
 
       // Check spatial distance optimization
-      const maxDistance = eventDrivenSystem.getMaxVisibilityDistance?.() || 20;
+      const maxDistance = spatialAnalyzer.getMaxVisibilityDistance?.() || 20;
       const observerPos = this._getTokenPosition(observer);
       const targetPos = this._getTokenPosition(target);
 
-      const distance = Math.hypot(observerPos.x - targetPos.x, observerPos.y - targetPos.y);
-      const gridDistance = distance / (canvas.grid?.size || 1);
+      const dx = observerPos.x - targetPos.x;
+      const dy = observerPos.y - targetPos.y;
+      const gridSize = canvas.grid?.size || 1;
+      const gridDistanceSq = (dx * dx + dy * dy) / (gridSize * gridSize);
 
-      if (gridDistance > maxDistance) {
+      if (gridDistanceSq > (maxDistance * maxDistance)) {
         return true;
       }
 
       // Check line of sight optimization
-      if (eventDrivenSystem.canTokensSeeEachOther) {
-        const canSee = eventDrivenSystem.canTokensSeeEachOther(observer, target);
+      if (spatialAnalyzer.canTokensSeeEachOther) {
+        const canSee = spatialAnalyzer.canTokensSeeEachOther(observer, target);
         if (!canSee) {
           return true;
         }

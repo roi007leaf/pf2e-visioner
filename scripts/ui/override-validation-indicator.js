@@ -505,7 +505,7 @@ class OverrideValidationIndicator {
     // Read size preference (client setting); default medium
     let size = 'medium';
     try {
-      size = game.settings.get('pf2e-visioner', 'overrideIndicatorSize') || 'medium';
+      size = game.settings.get('pf2e-visioner', 'avsChangesIndicatorSize') || 'medium';
     } catch { /* setting might not exist yet during early loads */ }
 
     const presets = {

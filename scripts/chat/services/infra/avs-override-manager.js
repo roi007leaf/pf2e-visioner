@@ -62,6 +62,20 @@ export class AvsOverrideManager {
       try {
         if (observer?.document?.hidden === true) return false;
       } catch { }
+
+      // Skip creating overrides for hazard and loot tokens - they don't participate in visibility systems
+      const isHazardOrLoot = (token) => {
+        try {
+          const actorType = token?.actor?.type?.toLowerCase();
+          return actorType === 'hazard' || actorType === 'loot';
+        } catch {
+          return false;
+        }
+      };
+
+      if (isHazardOrLoot(observer)) {
+        return false; // Skip entirely if observer is hazard/loot
+      }
       // Only treat as sneak when explicitly requested by source; do not infer from token flags
       // Manual edits must remain symmetric even if the token is currently sneaking
       const isSneakAction = src === 'sneak_action';
@@ -82,6 +96,12 @@ export class AvsOverrideManager {
       for (const [, changeData] of changesByTarget) {
         const target = changeData.target;
         const state = changeData.state;
+
+        // Skip if target is hazard/loot
+        if (isHazardOrLoot(target)) {
+          continue; // Skip this target entirely
+        }
+
         const payload = {
           observer,
           target,
@@ -99,9 +119,9 @@ export class AvsOverrideManager {
         } else {
           // Symmetric
           await this.onAVSOverride(payload);
-          // Skip reverse if the swapped observer (original target) is Foundry-hidden
+          // Skip reverse if the swapped observer (original target) is Foundry-hidden or is hazard/loot
           try {
-            if (target?.document?.hidden === true) continue;
+            if (target?.document?.hidden === true || isHazardOrLoot(target)) continue;
           } catch { }
           await this.onAVSOverride({ ...payload, observer: target, target: observer });
         }
@@ -118,6 +138,20 @@ export class AvsOverrideManager {
     if (!observer?.document?.id || !target?.document?.id || !state) {
       console.warn('PF2E Visioner | Invalid AVS override data:', overrideData);
       return;
+    }
+
+    // Skip creating overrides for hazard and loot tokens - they don't participate in visibility systems
+    const isHazardOrLoot = (token) => {
+      try {
+        const actorType = token?.actor?.type?.toLowerCase();
+        return actorType === 'hazard' || actorType === 'loot';
+      } catch {
+        return false;
+      }
+    };
+
+    if (isHazardOrLoot(observer) || isHazardOrLoot(target)) {
+      return; // Skip override creation entirely for hazard/loot tokens
     }
     try {
       // If expectedCover isn't provided, compute it once at apply-time ONLY for non-manual sources
@@ -336,6 +370,18 @@ export class AvsOverrideManager {
       }
     } catch (err) {
       console.warn('PF2E Visioner | Post-override refresh issue:', err, reason, scope);
+    }
+  }
+
+  static async getOverride(observer, target) {
+    try {
+      const overrideFlagKey = `avs-override-from-${observer.document.id}`;
+      const overrideData = target.document.getFlag('pf2e-visioner', overrideFlagKey);
+      if (overrideData && overrideData.state) {
+        return overrideData.state;
+      }
+    } catch {
+      /* ignore */
     }
   }
 }

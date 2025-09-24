@@ -16,7 +16,7 @@ export async function updateTokenVisuals() {
   for (const token of canvas.tokens.placeables) {
     try {
       if (token?.visible) token.refresh();
-    } catch (_) {}
+    } catch (_) { }
   }
 }
 
@@ -42,15 +42,48 @@ export async function updateWallVisuals(observerId = null) {
     const updates = [];
     const isGM = !!game.user?.isGM;
 
-    // Determine local observer token strictly from current selection (or provided id)
+    // CRITICAL FIX: Only use currently controlled token, never fall back to other tokens
+    // This ensures wall indicators only show for the currently selected token's perspective
     let observer = null;
     try {
-      if (observerId) observer = canvas.tokens.get(observerId) || null;
-      if (!observer) observer = canvas.tokens.controlled?.[0] || null;
-      // Only show indicators when a player-owned token is selected
-      if (!observer || !observer.actor?.hasPlayerOwner) observer = null;
+      if (observerId) {
+        // Check if the provided observerId matches the currently controlled token
+        const providedToken = canvas.tokens.get(observerId) || null;
+        const currentlyControlled = canvas.tokens.controlled?.[0] || null;
+
+        // Strict isolation: only accept explicit observer if it matches the local controlled token
+        // Do not accept when nothing is controlled to avoid cross-client bleed
+        observer = (currentlyControlled && providedToken?.id === currentlyControlled.id)
+          ? providedToken
+          : null;
+      } else {
+        // When no observerId provided, ONLY use the currently controlled token
+        observer = canvas.tokens.controlled?.[0] || null;
+      }
     } catch (_) {
       observer = null;
+    }
+
+    // CRITICAL: If no observer (no controlled token), clear any indicators and exit
+    if (!observer) {
+      try {
+        for (const wall of walls) {
+          const d = wall.document;
+          if (wall._pvHiddenIndicator) {
+            wall._pvHiddenIndicator.parent?.removeChild?.(wall._pvHiddenIndicator);
+            wall._pvHiddenIndicator.destroy?.();
+            wall._pvHiddenIndicator = null;
+          }
+          // Clean masks if any
+          if (wall._pvSeeThroughMasks && Array.isArray(wall._pvSeeThroughMasks)) {
+            for (const m of wall._pvSeeThroughMasks) {
+              try { m.parent?.removeChild(m); m.destroy?.(); } catch (_) { }
+            }
+            wall._pvSeeThroughMasks = [];
+          }
+        }
+      } catch (_) { }
+      return;
     }
     const wallMapForObserver = observer?.document?.getFlag?.(MODULE_ID, 'walls') || {};
 
@@ -70,7 +103,7 @@ export async function updateWallVisuals(observerId = null) {
         const connectedDocs = getConnectedWallDocsBySourceId(id) || [];
         for (const d of connectedDocs) expandedObserved.add(d.id);
       }
-    } catch (_) {}
+    } catch (_) { }
 
     // Collect token flag updates for player-owned tokens that can see hidden walls
     const tokenWallFlagUpdates = [];
@@ -80,7 +113,7 @@ export async function updateWallVisuals(observerId = null) {
       let flagHidden = false;
       try {
         flagHidden = !!d.getFlag?.(MODULE_ID, 'hiddenWall');
-      } catch (_) {}
+      } catch (_) { }
 
       // Remove previous indicator/masks if any (always clean before evaluating)
       try {
@@ -93,11 +126,11 @@ export async function updateWallVisuals(observerId = null) {
             try {
               m.parent?.removeChild(m);
               m.destroy?.();
-            } catch (_) {}
+            } catch (_) { }
           }
           wall._pvSeeThroughMasks = [];
         }
-      } catch (_) {}
+      } catch (_) { }
 
       const isExpandedObserved = expandedObserved.has(d.id);
       if (!flagHidden && !isExpandedObserved) {
@@ -112,7 +145,7 @@ export async function updateWallVisuals(observerId = null) {
                 [`flags.${MODULE_ID}.originalSight`]: null,
               });
             }
-          } catch (_) {}
+          } catch (_) { }
         }
         continue;
       }
@@ -123,16 +156,45 @@ export async function updateWallVisuals(observerId = null) {
         const [x1, y1, x2, y2] = c;
         if ([x1, y1, x2, y2].every((n) => typeof n === 'number')) {
           const shouldShowIndicator = isExpandedObserved;
-          const seeThrough = shouldShowIndicator && false && !!observer;
 
-          if (shouldShowIndicator) {
+          // CRITICAL: Check if current player should see this wall indicator
+          // Only show indicators based on the currently controlled token's wall flags
+          let currentPlayerShouldSeeIndicator = false;
+
+          // For per-player visibility, we need to check the currently controlled token
+          const controlledTokens = canvas?.tokens?.controlled || [];
+          if (controlledTokens.length > 0) {
+            // Check the currently selected/controlled token
+            const controlledToken = controlledTokens[0]; // Use the first controlled token
+            const playerOwnsToken = controlledToken.document?.testUserPermission?.(game.user, "OWNER");
+            if (playerOwnsToken) {
+              const tokenWallFlags = controlledToken.document?.getFlag?.(MODULE_ID, 'walls') || {};
+              const wallFlagForControlledToken = tokenWallFlags[d.id];
+              // Only show indicator if the controlled token has this wall as 'observed' (not 'hidden')
+              if (wallFlagForControlledToken === 'observed') {
+                currentPlayerShouldSeeIndicator = true;
+              }
+            }
+          } else {
+            // STRICT ISOLATION: When no tokens are controlled, no indicators should show
+            // This prevents the fallback logic from showing indicators for all owned tokens
+            // Even GMs should only see indicators when they have a controlled token
+            currentPlayerShouldSeeIndicator = false;
+          }
+
+          // Override the shouldShowIndicator with the current player visibility check
+          const finalShouldShowIndicator = currentPlayerShouldSeeIndicator;
+
+          const seeThrough = finalShouldShowIndicator && false && !!observer;
+
+          if (finalShouldShowIndicator) {
             // Clean previous indicator
             try {
               if (wall._pvHiddenIndicator) {
                 wall._pvHiddenIndicator.parent?.removeChild(wall._pvHiddenIndicator);
                 wall._pvHiddenIndicator.destroy?.();
               }
-            } catch (_) {}
+            } catch (_) { }
 
             const isDoor = Number(d.door) > 0; // 0 none, 1 door, 2 secret
             const color = isDoor ? 0xffd166 : 0x9b59b6; // Yellow for doors, purple for walls
@@ -146,7 +208,7 @@ export async function updateWallVisuals(observerId = null) {
             try {
               const flagVal = Number(canvas?.scene?.getFlag?.(MODULE_ID, 'hiddenIndicatorHalf'));
               if (Number.isFinite(flagVal) && flagVal > 0) half = flagVal;
-            } catch (_) {}
+            } catch (_) { }
             const g = new PIXI.Graphics();
             g.lineStyle(2, color, 0.9);
             g.beginFill(color, 0.3);
@@ -320,11 +382,11 @@ export async function updateWallVisuals(observerId = null) {
               (canvas.walls || wall).addChild(mask);
               if (!wall._pvSeeThroughMasks) wall._pvSeeThroughMasks = [];
               wall._pvSeeThroughMasks.push(mask);
-            } catch (_) {}
+            } catch (_) { }
           } else if (wall._pvSeeThroughMasks) {
             try {
               wall._pvSeeThroughMasks.forEach((m) => m.parent?.removeChild(m));
-            } catch (_) {}
+            } catch (_) { }
             wall._pvSeeThroughMasks = [];
           }
 
@@ -352,7 +414,7 @@ export async function updateWallVisuals(observerId = null) {
                       break;
                     }
                   }
-                } catch (_) {}
+                } catch (_) { }
 
                 if (anyObserved) {
                   const currentSight = Number(d.sight ?? 1);
@@ -375,10 +437,10 @@ export async function updateWallVisuals(observerId = null) {
                   }
                 }
               }
-            } catch (_) {}
+            } catch (_) { }
           }
         }
-      } catch (_) {}
+      } catch (_) { }
     }
 
     // Apply updates immediately
@@ -400,7 +462,7 @@ export async function updateWallVisuals(observerId = null) {
         // Force token refresh
         try {
           for (const t of canvas.tokens.placeables) t.refresh?.();
-        } catch (_) {}
+        } catch (_) { }
       } catch (e) {
         console.warn(`[${MODULE_ID}] Failed to update hidden door sight overrides`, e);
       }
@@ -409,8 +471,8 @@ export async function updateWallVisuals(observerId = null) {
     // Update hidden token echoes
     try {
       await updateHiddenTokenEchoes(observer);
-    } catch (_) {}
-  } catch (_) {}
+    } catch (_) { }
+  } catch (_) { }
 }
 
 /**
@@ -426,10 +488,10 @@ export async function updateSpecificTokenPairs(pairs) {
 
     try {
       observer.refresh();
-    } catch (_) {}
+    } catch (_) { }
     try {
       target.refresh();
-    } catch (_) {}
+    } catch (_) { }
   }
 }
 
@@ -467,7 +529,7 @@ export async function cleanupDeletedWallVisuals(wallDocument) {
           if (child.children && child.children.length > 0) {
             searchAndRemoveIndicators(child);
           }
-        } catch (_) {}
+        } catch (_) { }
       }
 
       for (const indicator of toRemove) {
@@ -476,7 +538,7 @@ export async function cleanupDeletedWallVisuals(wallDocument) {
             indicator.parent.removeChild(indicator);
           }
           indicator.destroy?.({ children: true, texture: true, baseTexture: true });
-        } catch (_) {}
+        } catch (_) { }
       }
     }
 
@@ -497,7 +559,7 @@ export async function cleanupDeletedWallVisuals(wallDocument) {
                 wall._pvHiddenIndicator.parent.removeChild(wall._pvHiddenIndicator);
               }
               wall._pvHiddenIndicator.destroy?.();
-            } catch (_) {}
+            } catch (_) { }
             wall._pvHiddenIndicator = null;
           }
         }
@@ -508,7 +570,7 @@ export async function cleanupDeletedWallVisuals(wallDocument) {
               try {
                 if (mask.parent) mask.parent.removeChild(mask);
                 mask.destroy?.();
-              } catch (_) {}
+              } catch (_) { }
               return false;
             }
             return true;
@@ -519,7 +581,7 @@ export async function cleanupDeletedWallVisuals(wallDocument) {
         if (wall._pvAnimationActive && (wall.id === wallId || wall.document?.id === wallId)) {
           wall._pvAnimationActive = false;
         }
-      } catch (_) {}
+      } catch (_) { }
     }
 
     try {
@@ -537,7 +599,7 @@ export async function cleanupDeletedWallVisuals(wallDocument) {
               [`flags.${MODULE_ID}.walls`]: newWallMap,
             });
           }
-        } catch (_) {}
+        } catch (_) { }
       }
 
       if (tokenUpdates.length > 0 && game.user?.isGM) {
@@ -554,7 +616,7 @@ export async function cleanupDeletedWallVisuals(wallDocument) {
         refreshOcclusion: false,
         refreshEffects: true,
       });
-    } catch (_) {}
+    } catch (_) { }
   } catch (error) {
     console.warn(`[${MODULE_ID}] Error cleaning up deleted wall visuals:`, error);
   }
@@ -590,7 +652,7 @@ async function updateHiddenTokenEchoes(observer) {
         const connectedDocs = getConnectedWallDocsBySourceId(id) || [];
         for (const d of connectedDocs) expandedObserved.add(d.id);
       }
-    } catch (_) {}
+    } catch (_) { }
 
     const hiddenObservedWalls = walls.filter((w) => {
       try {
@@ -623,7 +685,7 @@ async function updateHiddenTokenEchoes(observer) {
       let vis = 'observed';
       try {
         vis = getVisibilityBetween(observer, t);
-      } catch (_) {}
+      } catch (_) { }
       if (vis !== 'hidden') {
         removeEcho(t);
         continue;
@@ -647,7 +709,7 @@ async function updateHiddenTokenEchoes(observer) {
       }
       drawEcho(t);
     }
-  } catch (_) {}
+  } catch (_) { }
 }
 
 function drawEcho(token) {
@@ -666,7 +728,7 @@ function drawEcho(token) {
       (canvas.tokens || token.parent)?.addChild(g);
       token._pvHiddenEcho = g;
     }
-  } catch (_) {}
+  } catch (_) { }
 }
 
 function removeEcho(token) {
@@ -675,7 +737,7 @@ function removeEcho(token) {
       token._pvHiddenEcho.parent?.removeChild(token._pvHiddenEcho);
       token._pvHiddenEcho.destroy?.();
     }
-  } catch (_) {}
+  } catch (_) { }
   token._pvHiddenEcho = null;
 }
 

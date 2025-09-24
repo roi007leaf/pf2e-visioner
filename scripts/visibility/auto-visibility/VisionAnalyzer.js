@@ -741,6 +741,7 @@ export class VisionAnalyzer {
         lightLevel: lightLevel?.level,
         observerVision,
       }));
+
     // Blinded: Can't see anything (handled by hasVision = false)
     if (!observerVision.hasVision) {
       return 'hidden';
