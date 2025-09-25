@@ -8,6 +8,7 @@ describe('BatchOrchestrator', () => {
     let telemetryReporter;
     let exclusionManager;
     let applied;
+    let visibilityMapService;
 
     beforeEach(() => {
         applied = [];
@@ -25,13 +26,14 @@ describe('BatchOrchestrator', () => {
         };
         telemetryReporter = { start: jest.fn(), stop: jest.fn() };
         exclusionManager = { isExcludedToken: jest.fn(() => false) };
-        const getAllTokens = () => global.canvas.tokens.placeables;
+        visibilityMapService = {
+            setVisibilityBetween: (o, t, v) => applied.push([o?.document?.id, t?.document?.id, v])
+        };
         orchestrator = new BatchOrchestrator({
             batchProcessor,
             telemetryReporter,
             exclusionManager,
-            setVisibilityBetween: (o, t, v) => applied.push([o?.document?.id, t?.document?.id, v]),
-            getAllTokens,
+            visibilityMapService,
             moduleId: 'pf2e-visioner',
         });
 

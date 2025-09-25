@@ -1,3 +1,5 @@
+import { HashGridIndex } from './HashGridIndex.js';
+
 /**
  * SpatialAnalysisService provides spatial analysis functionality.
  * Handles token positioning, distance calculations, LOS checks, and movement analysis.
@@ -214,32 +216,51 @@ export class SpatialAnalysisService {
             optimizationSavings: 0,
         };
 
+        // Distances used for candidate selection heuristics
+        const movementDistance = Math.hypot(newPos.x - oldPos.x, newPos.y - oldPos.y);
+        const gridMovementDistance = movementDistance / (canvas.grid?.size || 1);
+
         const affectedTokens = new Set();
         const allNearbyTokens = new Set();
 
-        // Calculate movement distance to optimize midpoint checking
-        const movementDistance = Math.hypot(newPos.x - oldPos.x, newPos.y - oldPos.y);
-        const gridMovementDistance = movementDistance / (canvas.grid?.size || 1);
-        metrics.movementDistance = gridMovementDistance;
+        // Build a transient grid index and sweep an expanded AABB over the movement path
+        try {
+            const index = new HashGridIndex();
+            const tokens = canvas.tokens?.placeables || [];
+            index.build(tokens, (t) => this.#positionManager.getTokenPosition(t));
 
-        // Get tokens near the starting position
-        const startTokens = this.getTokensInRange(oldPos, this.#maxVisibilityDistance, movingTokenId);
-        startTokens.forEach((t) => allNearbyTokens.add(t));
+            const gridSize = canvas.grid?.size || 1;
+            const radiusPx = this.#maxVisibilityDistance * gridSize;
 
-        // Get tokens near the ending position
-        const endTokens = this.getTokensInRange(newPos, this.#maxVisibilityDistance, movingTokenId);
-        endTokens.forEach((t) => allNearbyTokens.add(t));
+            const minX = Math.min(oldPos.x, newPos.x) - radiusPx;
+            const minY = Math.min(oldPos.y, newPos.y) - radiusPx;
+            const maxX = Math.max(oldPos.x, newPos.x) + radiusPx;
+            const maxY = Math.max(oldPos.y, newPos.y) + radiusPx;
+            const rect = { x: minX, y: minY, width: (maxX - minX), height: (maxY - minY) };
 
-        // Only check midpoint for longer movements (optimization)
-        if (gridMovementDistance > 2) {
-            const midPos = {
-                x: (oldPos.x + newPos.x) / 2,
-                y: (oldPos.y + newPos.y) / 2,
-            };
-            const midTokens = this.getTokensInRange(midPos, this.#maxVisibilityDistance, movingTokenId);
-            midTokens.forEach((t) => allNearbyTokens.add(t));
-        } else {
+            const pts = index.queryRect(rect);
+            for (const pt of pts) {
+                const tok = pt.token;
+                if (!tok?.actor) continue; // match getTokensInRange actor filter
+                if (!tok?.document?.id || tok.document.id === movingTokenId) continue;
+                if (this.#exclusionManager?.isExcludedToken?.(tok)) continue;
+                allNearbyTokens.add(tok);
+            }
+            // We skipped midpoint heuristic by design
             metrics.midpointSkipped = true;
+        } catch (e) {
+            // Fallback to original range queries if index fails
+            const startTokens = this.getTokensInRange(oldPos, this.#maxVisibilityDistance, movingTokenId);
+            startTokens.forEach((t) => allNearbyTokens.add(t));
+            const endTokens = this.getTokensInRange(newPos, this.#maxVisibilityDistance, movingTokenId);
+            endTokens.forEach((t) => allNearbyTokens.add(t));
+            if (gridMovementDistance > 2) {
+                const midPos = { x: (oldPos.x + newPos.x) / 2, y: (oldPos.y + newPos.y) / 2 };
+                const midTokens = this.getTokensInRange(midPos, this.#maxVisibilityDistance, movingTokenId);
+                midTokens.forEach((t) => allNearbyTokens.add(t));
+            } else {
+                metrics.midpointSkipped = true;
+            }
         }
 
         // Now filter by actual line of sight with optimized checks

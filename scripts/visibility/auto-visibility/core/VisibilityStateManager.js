@@ -101,7 +101,8 @@ export class VisibilityStateManager {
                 };
                 const newPos = {
                     x: (changes.x !== undefined ? changes.x : tokenDoc.x) + (tokenDoc.width * canvas.grid.size) / 2,
-                    y: (changes.y !== undefined ? changes.y : tokenDoc.y) + (tokenDoc.width * canvas.grid.size) / 2,
+                    // BUGFIX: use token height for Y center offset (was width)
+                    y: (changes.y !== undefined ? changes.y : tokenDoc.y) + (tokenDoc.height * canvas.grid.size) / 2,
                 };
 
                 // Get affected tokens from spatial analyzer

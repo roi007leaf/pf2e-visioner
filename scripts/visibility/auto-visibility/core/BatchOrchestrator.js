@@ -18,16 +18,16 @@ export class BatchOrchestrator {
      * @param {BatchProcessor} dependencies.batchProcessor - BatchProcessor instance
      * @param {TelemetryReporter} dependencies.telemetryReporter - TelemetryReporter instance
      * @param {ExclusionManager} dependencies.exclusionManager - ExclusionManager instance
-     * @param {(observer:Token, target:Token, visibility:string)=>void} dependencies.setVisibilityBetween
-     * @param {()=>Token[]} dependencies.getAllTokens - Function to get all canvas tokens
+      * @param {import('./ViewportFilterService.js').ViewportFilterService} [dependencies.viewportFilterService] - Optional viewport filter service for client-aware filtering
+      * @param {import('./VisibilityMapService.js').VisibilityMapService} dependencies.visibilityMapService - Visibility map service to persist results
      * @param {string} dependencies.moduleId - Module ID for settings
      */
     constructor(dependencies) {
         this.batchProcessor = dependencies.batchProcessor;
         this.telemetryReporter = dependencies.telemetryReporter;
         this.exclusionManager = dependencies.exclusionManager;
-        this.setVisibilityBetween = dependencies.setVisibilityBetween;
-        this.getAllTokens = dependencies.getAllTokens;
+        this.viewportFilterService = dependencies.viewportFilterService || null;
+        this.visibilityMapService = dependencies.visibilityMapService;
         this.moduleId = dependencies.moduleId;
 
         this.processingBatch = false;
@@ -35,7 +35,11 @@ export class BatchOrchestrator {
         // Coalescing and precompute cache
         this._pendingTokens = new Set();
         this._coalesceTimer = null;
-        this._lastPrecompute = { map: null, stats: null, ts: 0 };
+        this._lastPrecompute = { map: null, stats: null, posKeyMap: null, lightingHash: null, ts: 0 };
+        // Short-lived LOS memo reused across immediate micro-batches
+        this._lastLosMemo = { map: null, ts: 0 };
+        // Memoized module import to avoid dynamic import overhead in micro-batches
+        this._lightingPrecomputerModulePromise = null;
     }
 
     /**
@@ -75,52 +79,136 @@ export class BatchOrchestrator {
         const batchStartTime = performance.now();
         const batchId = `batch-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
-        // Start telemetry
+        // Timing measurements
+        const timings = {
+            batchStart: batchStartTime,
+            tokenPrep: 0,
+            lightingPrecompute: 0,
+            calcOptionsPrep: 0,
+            batchProcessing: 0,
+            resultApplication: 0,
+            batchEnd: 0
+        };
+
+        // Prepare tokens and calculation options (moved before telemetry start to report viewport-filtered changed count)
+        const tokenPrepStart = performance.now();
+        const allTokens = this._getAllTokens().filter(t => !this.exclusionManager.isExcludedToken(t));
+        timings.tokenPrep = performance.now() - tokenPrepStart;
+
+        // Filter the changed set to tokens present in the current viewport set
+        const visibleIdSet = new Set();
+        for (const t of allTokens) {
+            const id = t?.document?.id; if (id) visibleIdSet.add(id);
+        }
+        const visibleChangedTokens = new Set();
+        for (const id of changedTokens) { if (visibleIdSet.has(id)) visibleChangedTokens.add(id); }
+
+        // Start telemetry with viewport-filtered changed count
         this.telemetryReporter.start({
             batchId,
             clientId: game.user.id,
             clientName: game.user.name,
-            changedAtStartCount: changedTokens.size
+            changedAtStartCount: visibleChangedTokens.size
         });
 
+        let telemetryStopped = false;
         try {
-            // Prepare tokens and calculation options
-            const allTokens = this.getAllTokens().filter(t => !this.exclusionManager.isExcludedToken(t));
-
             // Precompute lighting for performance optimization
+            const lightingStart = performance.now();
             const { precomputedLights, precomputeStats } = await this._precomputeLighting(allTokens);
+            timings.lightingPrecompute = performance.now() - lightingStart;
 
             // Prepare calculation options
+            const calcOptionsStart = performance.now();
+            // Reuse short-lived LOS memo for bursty batches (e.g., animation frames)
+            const now = Date.now();
+            const BURST_TTL_MS = 150;
+            if (!this._lastLosMemo.map || (now - this._lastLosMemo.ts) >= BURST_TTL_MS) {
+                this._lastLosMemo.map = new Map();
+            }
+            this._lastLosMemo.ts = now;
             const calcOptions = {
                 hasDarknessSources: this._detectDarknessSources(),
                 precomputedLights,
-                precomputeStats
+                precomputeStats,
+                burstLosMemo: this._lastLosMemo.map
             };
+            timings.calcOptionsPrep = performance.now() - calcOptionsStart;
 
             // Execute batch processing
-            const batchResult = await this.batchProcessor.process(allTokens, changedTokens, calcOptions);
-            const batchEndTime = performance.now();
+            const batchProcessingStart = performance.now();
+            const batchResult = await this.batchProcessor.process(allTokens, visibleChangedTokens, calcOptions);
+            timings.batchProcessing = performance.now() - batchProcessingStart;
+
+            // Capture detailed timings from BatchProcessor
+            timings.detailedBatchTimings = batchResult.detailedTimings || {};
 
             // Apply results
+            const resultApplicationStart = performance.now();
             const uniqueUpdateCount = this._applyBatchResults(batchResult);
+            timings.resultApplication = performance.now() - resultApplicationStart;
+
+            const batchEndTime = performance.now();
+            timings.batchEnd = batchEndTime;
 
             // Stop telemetry with detailed metrics
             this._reportTelemetry({
                 batchId,
                 batchStartTime,
                 batchEndTime,
-                changedTokens,
+                changedTokens: visibleChangedTokens,
                 allTokens,
                 batchResult,
                 precomputeStats,
-                uniqueUpdateCount
+                uniqueUpdateCount,
+                timings
             });
+            telemetryStopped = true;
 
         } catch (error) {
             try {
                 console.error('PF2E Visioner | processBatch error:', error);
             } catch { }
         } finally {
+            // Defensive: ensure we stop telemetry even if an error occurred before normal stop
+            if (!telemetryStopped) {
+                try {
+                    const errorEndTime = performance.now();
+                    this.telemetryReporter.stop({
+                        batchId,
+                        clientId: game.user.id,
+                        clientName: game.user.name,
+                        batchStartTime,
+                        batchEndTime: errorEndTime,
+                        changedAtStartCount: visibleChangedTokens.size || changedTokens.size,
+                        allTokensCount: (canvas.tokens?.placeables?.length) || 0,
+                        viewportFilteringEnabled: this._getViewportFilteringEnabled(),
+                        hasDarknessSources: this._detectDarknessSources(),
+                        processedTokens: 0,
+                        uniqueUpdateCount: 0,
+                        breakdown: { visGlobalHits: 0, visGlobalMisses: 0, losGlobalHits: 0, losGlobalMisses: 0 },
+                        precomputeStats: { observerUsed: 0, observerMiss: 0, targetUsed: 0, targetMiss: 0 },
+                        debugMode: this._getDebugMode(),
+                        timings: {
+                            tokenPrep: 0,
+                            lightingPrecompute: 0,
+                            calcOptionsPrep: 0,
+                            batchProcessing: 0,
+                            resultApplication: 0,
+                            detailedBatchTimings: {
+                                cacheBuilding: 0,
+                                lightingPrecompute: 0,
+                                mainProcessingLoop: 0,
+                                spatialFiltering: 0,
+                                losCalculations: 0,
+                                visibilityCalculations: 0,
+                                cacheOperations: 0,
+                                updateCollection: 0
+                            }
+                        }
+                    });
+                } catch { /* noop */ }
+            }
             this.processingBatch = false;
             // If new tokens accumulated during processing, schedule an immediate follow-up batch
             try {
@@ -135,6 +223,45 @@ export class BatchOrchestrator {
     }
 
     /**
+     * Resolve the current token list, preferring viewport-filtered tokens when enabled.
+     * @returns {Token[]}
+     * @private
+     */
+    _getAllTokens() {
+        try {
+            const vf = this.viewportFilterService;
+            if (vf?.isClientAwareFilteringEnabled?.()) {
+                const ids = vf.getViewportTokenIdSet?.(64) || null;
+                if (ids && ids.size > 0) {
+                    const result = [];
+                    const all = canvas.tokens?.placeables || [];
+                    for (const t of all) {
+                        const id = t?.document?.id;
+                        if (id && ids.has(id)) result.push(t);
+                    }
+                    try {
+                        if (this._getDebugMode()) {
+                            console.debug('PF2E Visioner | Viewport filtering active', {
+                                total: all.length,
+                                inViewport: result.length
+                            });
+                        }
+                    } catch { /* noop */ }
+                    return result;
+                }
+                // Debug when viewport filtering yields empty set and we fall back
+                try {
+                    if (this._getDebugMode()) {
+                        const total = (canvas.tokens?.placeables || []).length;
+                        console.debug('PF2E Visioner | Viewport filtering returned empty; falling back to all tokens', { total });
+                    }
+                } catch { /* noop */ }
+            }
+        } catch { /* fall through */ }
+        return canvas.tokens?.placeables || [];
+    }
+
+    /**
      * Precompute lighting for all tokens.
      * @param {Token[]} allTokens - All tokens to precompute for
      * @returns {Promise<{precomputedLights: Map|null, precomputeStats: Object}>}
@@ -145,19 +272,46 @@ export class BatchOrchestrator {
         let precomputeStats = { batch: 'process', targetUsed: 0, targetMiss: 0, observerUsed: 0, observerMiss: 0 };
 
         try {
-            // Short-TTL reuse to keep micro-batches hot
+            // Extended TTL to better accommodate real-world batch timing patterns
             const now = Date.now();
-            const TTL_MS = 150; // reuse precompute for quick successive batches
-            if (this._lastPrecompute.map && (now - this._lastPrecompute.ts) < TTL_MS) {
-                precomputedLights = this._lastPrecompute.map;
-                precomputeStats = this._lastPrecompute.stats || precomputeStats;
-            } else {
-                const { LightingPrecomputer } = await import('./LightingPrecomputer.js');
-                const result = await LightingPrecomputer.precompute(allTokens);
-                precomputedLights = result.map;
-                precomputeStats = result.stats;
-                this._lastPrecompute = { map: precomputedLights, stats: precomputeStats, ts: now };
+            const TTL_MS = 2000; // Increased from 150ms to 2s based on telemetry showing 300-700ms gaps
+            if (!this._lightingPrecomputerModulePromise) {
+                this._lightingPrecomputerModulePromise = import('./LightingPrecomputer.js');
             }
+            const { LightingPrecomputer } = await this._lightingPrecomputerModulePromise;
+            // Within TTL, try to reuse previous values when token posKey unchanged
+            const previous = (this._lastPrecompute.map && (now - this._lastPrecompute.ts) < TTL_MS)
+                ? {
+                    map: this._lastPrecompute.map,
+                    posKeyMap: this._lastPrecompute.posKeyMap,
+                    lightingHash: this._lastPrecompute.lightingHash,
+                    ts: this._lastPrecompute.ts
+                }
+                : undefined;
+
+            // Track cache hit/miss for better telemetry
+            const wasReused = !!previous;
+            const result = await LightingPrecomputer.precompute(allTokens, undefined, previous);
+
+            // Check if lighting environment changed and clear BatchProcessor caches if needed
+            const lightingChanged = result.lightingHash && this._lastPrecompute.lightingHash &&
+                result.lightingHash !== this._lastPrecompute.lightingHash;
+            if (lightingChanged) {
+                this.clearPersistentCaches();
+            }
+            precomputedLights = result.map;
+            precomputeStats = result.stats || precomputeStats;
+            // Add cache reuse stats to precompute stats
+            precomputeStats.cacheReused = wasReused;
+            precomputeStats.cacheAge = previous ? (now - this._lastPrecompute.ts) : 0;
+            // Update memo and timestamp
+            this._lastPrecompute = {
+                map: precomputedLights,
+                stats: precomputeStats,
+                posKeyMap: result.posKeyMap || null,
+                lightingHash: result.lightingHash || null,
+                ts: now
+            };
         } catch (error) {
             // Best effort - continue without precomputation
             try {
@@ -227,7 +381,7 @@ export class BatchOrchestrator {
                 } catch {
                     // If guard fails, fall through to applying the update
                 }
-                this.setVisibilityBetween(update.observer, update.target, update.visibility);
+                this.visibilityMapService.setVisibilityBetween(update.observer, update.target, update.visibility);
             }
         }
 
@@ -248,7 +402,8 @@ export class BatchOrchestrator {
             allTokens,
             batchResult,
             precomputeStats,
-            uniqueUpdateCount
+            uniqueUpdateCount,
+            timings
         } = params;
 
         this.telemetryReporter.stop({
@@ -265,7 +420,8 @@ export class BatchOrchestrator {
             uniqueUpdateCount,
             breakdown: batchResult.breakdown,
             precomputeStats: batchResult.precomputeStats || precomputeStats,
-            debugMode: this._getDebugMode()
+            debugMode: this._getDebugMode(),
+            timings
         });
     }
 
@@ -303,5 +459,35 @@ export class BatchOrchestrator {
      */
     isProcessing() {
         return this.processingBatch;
+    }
+
+    /**
+     * Clear persistent caches when major scene changes occur.
+     * Call this on scene changes, token additions/deletions, etc.
+     */
+    clearPersistentCaches() {
+        try {
+            if (this.batchProcessor?._persistentCaches) {
+                this.batchProcessor._persistentCaches.sensesCache = null;
+                this.batchProcessor._persistentCaches.sensesCacheTs = 0;
+                this.batchProcessor._persistentCaches.idToTokenMap = null;
+                this.batchProcessor._persistentCaches.idToTokenMapTs = 0;
+                this.batchProcessor._persistentCaches.spatialIndex = null;
+                this.batchProcessor._persistentCaches.spatialIndexTs = 0;
+            }
+
+            // Clear global caches that might contain stale visibility calculations
+            if (this.batchProcessor?.globalLosCache) {
+                this.batchProcessor.globalLosCache.clear();
+            }
+            if (this.batchProcessor?.globalVisibilityCache) {
+                this.batchProcessor.globalVisibilityCache.clear();
+            }
+
+            // Also clear lighting precompute
+            this._lastPrecompute = { map: null, stats: null, posKeyMap: null, lightingHash: null, ts: 0 };
+        } catch {
+            // Best effort cache clearing
+        }
     }
 }

@@ -1,7 +1,15 @@
 import { GlobalLosCache } from "../utils/GlobalLosCache.js";
 import { GlobalVisibilityCache } from "../utils/GlobalVisibilityCache.js";
+import { HashGridIndex } from "./HashGridIndex.js";
+import { OverrideBatchCache } from "./OverrideBatchCache.js";
+import { OverrideService } from "./OverrideService.js";
+import { PositionBatchCache } from "./PositionBatchCache.js";
+import { PositionManager } from "./PositionManager.js";
+import { SensesCapabilitiesCache } from "./SensesCapabilitiesCache.js";
 import { SpatialAnalysisService } from "./SpatialAnalysisService.js";
 import { ViewportFilterService } from "./ViewportFilterService.js";
+import { VisibilityMapBatchCache } from "./VisibilityMapBatchCache.js";
+import { VisibilityMapService } from "./VisibilityMapService.js";
 
 /**
  * BatchProcessor centralizes the heavy per-batch computation:
@@ -20,9 +28,9 @@ export class BatchProcessor {
      * @param {Object} dependencies.optimizedVisibilityCalculator
      * @param {GlobalLosCache} dependencies.globalLosCache - Global LOS cache for optimization
      * @param {GlobalVisibilityCache} dependencies.globalVisibilityCache - Global visibility cache for optimization
-     * @param {(t:Token)=>{x:number,y:number,elevation:number}} dependencies.getTokenPosition
-     * @param {(observerId:string,targetId:string)=>{state:string}|null} dependencies.getActiveOverride
-     * @param {(token:Token)=>Record<string,string>} dependencies.getVisibilityMap
+     * @param {PositionManager} dependencies.positionManager
+    * @param {OverrideService} dependencies.overrideService
+    * @param {VisibilityMapService} dependencies.visibilityMapService
      * @param {number} dependencies.maxVisibilityDistance
      */
     constructor(dependencies) {
@@ -31,10 +39,23 @@ export class BatchProcessor {
         this.optimizedVisibilityCalculator = dependencies.optimizedVisibilityCalculator;
         this.globalLosCache = dependencies.globalLosCache;
         this.globalVisibilityCache = dependencies.globalVisibilityCache;
-        this.getTokenPosition = dependencies.getTokenPosition;
-        this.getActiveOverride = dependencies.getActiveOverride;
-        this.getVisibilityMap = dependencies.getVisibilityMap;
+        // Prefer injected PositionManager, but support legacy getTokenPosition for tests/back-compat
+        this.positionManager = dependencies.positionManager;
+        this.overrideService = dependencies.overrideService;
+        this.visibilityMapService = dependencies.visibilityMapService;
         this.maxVisibilityDistance = dependencies.maxVisibilityDistance;
+
+        // Persistent caches to reduce expensive rebuilding between batches
+        this._persistentCaches = {
+            sensesCache: null,
+            sensesCacheTs: 0,
+            idToTokenMap: null,
+            idToTokenMapTs: 0,
+            spatialIndex: null,
+            spatialIndexTs: 0,
+            // TTL for cache invalidation (5 seconds)
+            CACHE_TTL_MS: 5000
+        };
     }
 
     /**
@@ -42,9 +63,21 @@ export class BatchProcessor {
      * @param {Token[]} allTokens - tokens eligible for processing (already exclusion+viewport filtered)
      * @param {Set<string>} changedTokenIds - ids of tokens that changed this batch
      * @param {Object} calcOptions - options passed to calculator (precomputedLights, hasDarknessSources, precomputeStats)
-     * @returns {Promise<{updates:Array<{observer:Token,target:Token,visibility:string}>, breakdown:any, processedTokens:number, precomputeStats:any}>}
+     * @returns {Promise<{updates:Array<{observer:Token,target:Token,visibility:string}>, breakdown:any, processedTokens:number, precomputeStats:any, detailedTimings:Object}>}
      */
     async process(allTokens, changedTokenIds, calcOptions) {
+        // Detailed timing collection for performance analysis
+        const detailedTimings = {
+            cacheBuilding: 0,
+            lightingPrecompute: 0,
+            mainProcessingLoop: 0,
+            spatialFiltering: 0,
+            losCalculations: 0,
+            visibilityCalculations: 0,
+            cacheOperations: 0,
+            updateCollection: 0
+        };
+
         // Use injected dependencies and establish per-batch memoization
 
         const updates = [];
@@ -69,75 +102,156 @@ export class BatchProcessor {
         };
         let processedTokens = 0;
 
-        // Precompute token positions and position keys once per batch
-        const posById = new Map();
-        const posKeyById = new Map();
-        for (const t of allTokens) {
-            try {
-                const p = this.getTokenPosition(t);
-                posById.set(t.document.id, p);
-                const k = `${Math.round(p.x)}:${Math.round(p.y)}:${p.elevation ?? 0}`;
-                posKeyById.set(t.document.id, k);
-            } catch {
-                // Best-effort; missing positions will be computed on-demand below
-            }
+        // Time cache building operations with persistent cache optimization
+        const cacheStart = performance.now();
+        const now = Date.now();
+
+        // Precompute token positions and position keys once per batch (always needed fresh)
+        const posCache = new PositionBatchCache(this.positionManager);
+        posCache.build(allTokens);
+
+        // Position provider uses batch cache first, then PositionManager
+        const getPos = (t) => posCache.getPosition(t) || this.positionManager.getTokenPosition(t);
+
+        // Build or reuse spatial index with TTL-based invalidation
+        let index;
+        if (this._persistentCaches.spatialIndex &&
+            (now - this._persistentCaches.spatialIndexTs) < this._persistentCaches.CACHE_TTL_MS) {
+            // Reuse existing spatial index if recent enough
+            index = this._persistentCaches.spatialIndex;
+        } else {
+            // Build fresh spatial index
+            index = new HashGridIndex();
+            index.build(allTokens, (t) => getPos(t));
+            this._persistentCaches.spatialIndex = index;
+            this._persistentCaches.spatialIndexTs = now;
         }
 
-        // Cache visibility maps once per token for original state comparisons
-        const visMapById = new Map();
-        for (const t of allTokens) {
-            try {
-                visMapById.set(t.document.id, this.getVisibilityMap?.(t) || {});
-            } catch {
-                visMapById.set(t.document.id, {});
+        // Build or reuse id -> token map with TTL-based invalidation
+        let idToToken;
+        if (this._persistentCaches.idToTokenMap &&
+            (now - this._persistentCaches.idToTokenMapTs) < this._persistentCaches.CACHE_TTL_MS) {
+            // Reuse existing id map if recent enough
+            idToToken = this._persistentCaches.idToTokenMap;
+        } else {
+            // Build fresh id -> token map
+            idToToken = new Map();
+            for (const t of allTokens) {
+                const id = t?.document?.id;
+                if (id) idToToken.set(id, t);
             }
+            this._persistentCaches.idToTokenMap = idToToken;
+            this._persistentCaches.idToTokenMapTs = now;
         }
 
-        // Memoize overrides per directed pair (a->b)
-        const overrideMemo = new Map();
-        const getOverrideState = (aId, bId, tokenA, tokenB) => {
-            const key = `${aId}->${bId}`;
-            if (overrideMemo.has(key)) return overrideMemo.get(key);
-            let state = null;
+        // Build or reuse senses capabilities cache with TTL-based invalidation
+        let sensesCache = null;
+        try {
+            if (this._persistentCaches.sensesCache &&
+                (now - this._persistentCaches.sensesCacheTs) < this._persistentCaches.CACHE_TTL_MS) {
+                // Reuse existing senses cache if recent enough
+                sensesCache = this._persistentCaches.sensesCache;
+            } else {
+                // Build fresh senses cache
+                const { VisionAnalyzer } = await import('../VisionAnalyzer.js');
+                const visionAnalyzer = VisionAnalyzer.getInstance();
+                sensesCache = new SensesCapabilitiesCache(visionAnalyzer);
+                sensesCache.build(allTokens);
+                this._persistentCaches.sensesCache = sensesCache;
+                this._persistentCaches.sensesCacheTs = now;
+            }
+        } catch {
+            // best effort; fall back to on-demand analyzer reads
+        }
+
+        // Cache visibility maps once per token for original state comparisons (always needed fresh)
+        const visCache = new VisibilityMapBatchCache(this.visibilityMapService);
+        visCache.build(allTokens);
+
+        // Per-batch override memoization (always needed fresh)
+        const overridesCache = new OverrideBatchCache(this.overrideService);
+        overridesCache.build(allTokens);
+
+        detailedTimings.cacheBuilding = performance.now() - cacheStart;        // Precompute lighting per token once per batch (best-effort)
+        // Prefer orchestrator-provided precompute (via calcOptions) and DO NOT override with nulls.
+        const lightingStart = performance.now();
+        let precomputedLights = (calcOptions && calcOptions.precomputedLights) || null;
+        let precomputeStats = (calcOptions && calcOptions.precomputeStats) || null;
+        if (!precomputedLights) {
             try {
-                const avsOverride = this.getActiveOverride?.(aId, bId) || null;
-                if (avsOverride?.state) {
-                    state = avsOverride.state;
-                } else {
-                    // Legacy flag fallback on tokenB
-                    const overrideFlagKey = `avs-override-from-${aId}`;
-                    const flag = tokenB?.document?.getFlag?.('pf2e-visioner', overrideFlagKey);
-                    if (flag?.state) state = flag.state;
+                const { LightingPrecomputer } = await import('../LightingPrecomputer.js');
+                const positions = new Map();
+                for (const t of allTokens) {
+                    const id = t?.document?.id;
+                    if (!id) continue;
+                    const p = posCache.getPosition(t) || this.positionManager.getTokenPosition(t);
+                    positions.set(id, p);
                 }
+                const res = await LightingPrecomputer.precompute(allTokens, positions);
+                precomputedLights = res?.map || null;
+                precomputeStats = precomputeStats || res?.stats || null;
             } catch {
-                // noop
+                // optional: continue without precomputed lights
             }
-            overrideMemo.set(key, state);
-            return state;
+        }
+        detailedTimings.lightingPrecompute = performance.now() - lightingStart;
+        // Ensure we always pass a mutable stats object so calculator can record used/miss, even if no lights were precomputed.
+        if (!precomputeStats) {
+            precomputeStats = { batch: 'process', targetUsed: 0, targetMiss: 0, observerUsed: 0, observerMiss: 0 };
+        }
+
+        // Common calc options composed once per batch
+        const commonCalcOptions = {
+            ...calcOptions,
+            // Never pass undefined; explicitly pass null or the actual map
+            precomputedLights: precomputedLights || null,
+            precomputeStats, // guaranteed non-null object
+            sensesCache: sensesCache?.getMap?.(),
+            idToToken,
         };
 
+        // Time the main processing loop
+        const mainLoopStart = performance.now();
+        let spatialFilteringTime = 0;
+        let losCalculationTime = 0;
+        let visibilityCalculationTime = 0;
+        let cacheOperationTime = 0;
+        let updateCollectionTime = 0;
+
         for (const changedTokenId of changedTokenIds) {
-            const changedToken = allTokens.find((t) => t.document.id === changedTokenId);
+            const changedToken = idToToken.get(changedTokenId);
             if (!changedToken) {
                 continue;
             }
             processedTokens++;
 
-            // Use precomputed position if available
-            const changedTokenPos = posById.get(changedTokenId) || this.getTokenPosition(changedToken);
-            let relevantTokens = this.spatialAnalyzer.getTokensInRange(
-                changedTokenPos,
-                this.maxVisibilityDistance,
-                changedTokenId,
-            );
+            // Time spatial filtering operations
+            const spatialStart = performance.now();
+
+            // Use precomputed position if available (with early exit optimization)
+            const changedTokenPos = posCache.getPositionById(changedTokenId) || this.positionManager.getTokenPosition(changedToken);
+            if (!changedTokenPos) {
+                spatialFilteringTime += performance.now() - spatialStart;
+                continue;
+            }
+            // Use quadtree to preselect tokens in range (AABB+circle), then filter out excluded/self
+            const gridSize = canvas.grid?.size || 1;
+            const radiusPx = (this.maxVisibilityDistance || 20) * gridSize;
+            const candidates = index.queryCircle(changedTokenPos.x, changedTokenPos.y, radiusPx);
+            let relevantTokens = candidates
+                .map((pt) => pt.token)
+                .filter((t) => t?.document?.id && t.document.id !== changedTokenId);
 
             // Optional client-side viewport filtering for relevant tokens
             if (this.viewportFilter?.isEnabled?.()) {
-                const inView = this.viewportFilter.getTokenIdSet?.(64, undefined, this.getTokenPosition) || null;
+                // Prefer the per-batch cached positions and quadtree for fast viewport filtering
+                const inView = this.viewportFilter.getTokenIdSet?.(64, index, (t) => getPos(t)) || null;
                 if (inView && inView.size > 0) {
                     relevantTokens = relevantTokens.filter((t) => inView.has(t.document.id));
                 }
             }
+
+            spatialFilteringTime += performance.now() - spatialStart;
 
             const potentialOthers = Math.max(0, allTokens.length - 1);
             const spatiallySkipped = Math.max(0, potentialOthers - relevantTokens.length);
@@ -149,16 +263,19 @@ export class BatchProcessor {
                 const aId = changedToken.document.id;
                 const bId = otherToken.document.id;
                 const posA = changedTokenPos; // reuse memoized
-                const posB = posById.get(bId) || this.getTokenPosition(otherToken);
+                const posB = posCache.getPositionById(bId) || this.positionManager.getTokenPosition(otherToken);
 
-                const posKeyA = posKeyById.get(aId) || `${Math.round(posA.x)}:${Math.round(posA.y)}:${posA.elevation ?? 0}`;
-                const posKeyB = posKeyById.get(bId) || `${Math.round(posB.x)}:${Math.round(posB.y)}:${posB.elevation ?? 0}`;
-                const pairKey = aId < bId ? `${aId}|${posKeyA}::${bId}|${posKeyB}` : `${bId}|${posKeyB}::${aId}|${posKeyA}`;
+                const posKeyA = posCache.getPositionKeyById(aId, posA);
+                const posKeyB = posCache.getPositionKeyById(bId, posB);
+                // LOS keys use coarse grid-cell indices to improve cache reuse across micro-movements
+                const coarseA = posCache.getCoarseKeyById(aId, posA);
+                const coarseB = posCache.getCoarseKeyById(bId, posB);
+                const pairKey = posCache.makeLosPairKey(aId, coarseA, bId, coarseB);
 
                 // Capture ORIGINAL map values BEFORE any calculations or override application
                 // This ensures we compare against the true previous state, not values updated during processing
-                const originalVisibility1 = visMapById.get(aId)?.[bId] || 'observed';
-                const originalVisibility2 = visMapById.get(bId)?.[aId] || 'observed';
+                const originalVisibility1 = visCache.getMapById(aId)?.[bId] || 'observed';
+                const originalVisibility2 = visCache.getMapById(bId)?.[aId] || 'observed';
 
                 let effectiveVisibility1, effectiveVisibility2;
                 let hasOverride1 = false;
@@ -166,9 +283,9 @@ export class BatchProcessor {
 
                 // Active override (new system)
                 try {
-                    const s1 = getOverrideState(aId, bId, changedToken, otherToken);
+                    const s1 = overridesCache.getOverrideState(aId, bId, changedToken, otherToken);
                     if (s1) { effectiveVisibility1 = s1; hasOverride1 = true; }
-                    const s2 = getOverrideState(bId, aId, otherToken, changedToken);
+                    const s2 = overridesCache.getOverrideState(bId, aId, otherToken, changedToken);
                     if (s2) { effectiveVisibility2 = s2; hasOverride2 = true; }
                 } catch (overrideError) {
                     console.warn('PF2E Visioner | Failed to check visibility overrides:', overrideError);
@@ -191,8 +308,8 @@ export class BatchProcessor {
 
                 // Early short-circuit: if both directional vis states are in global cache and equal originals, skip pair entirely
                 {
-                    const vKey1 = `${aId}|${posKeyA}>>${bId}|${posKeyB}`;
-                    const vKey2 = `${bId}|${posKeyB}>>${aId}|${posKeyA}`;
+                    const vKey1 = posCache.makeDirectionalKey(aId, posKeyA, bId, posKeyB);
+                    const vKey2 = posCache.makeDirectionalKey(bId, posKeyB, aId, posKeyA);
                     let hit1 = null, hit2 = null;
                     if (this.globalVisibilityCache) {
                         const g1 = this.globalVisibilityCache.getWithMeta(vKey1);
@@ -219,11 +336,25 @@ export class BatchProcessor {
                     }
                 }
 
+                // Time LOS calculations
+                const losStart = performance.now();
+
                 // Check LOS with global cache integration (after early no-change short-circuit)
+                // Try per-batch cache first
                 let los = batchLosCache.get(pairKey);
                 if (los === undefined) {
+                    // Batch-level cache miss for LOS
+                    breakdown.losCacheMisses++;
+
+                    // Check orchestrator-provided short-lived memo (burst reuse across micro-batches)
+                    const burstLos = calcOptions?.burstLosMemo;
+                    if (burstLos && burstLos.has(pairKey)) {
+                        los = burstLos.get(pairKey);
+                        // Treat as a hit analogous to batch-local reuse for telemetry simplicity
+                        breakdown.losCacheHits++;
+                    }
                     // Check global LOS cache first
-                    if (this.globalLosCache) {
+                    if (los === undefined && this.globalLosCache) {
                         const globalResult = this.globalLosCache.getWithMeta(pairKey);
                         if (globalResult.state === 'hit') {
                             los = globalResult.value;
@@ -243,10 +374,17 @@ export class BatchProcessor {
                         if (this.globalLosCache) {
                             this.globalLosCache.set(pairKey, los);
                         }
+                        // Populate burst memo for immediate subsequent batches
+                        try { if (calcOptions?.burstLosMemo) calcOptions.burstLosMemo.set(pairKey, los); } catch { }
                     }
 
                     batchLosCache.set(pairKey, los);
+                } else {
+                    // Batch-level cache hit for LOS
+                    breakdown.losCacheHits++;
                 }
+
+                losCalculationTime += performance.now() - losStart;
 
                 if (!los) {
                     // tokens filtered by LOS are skipped
@@ -254,12 +392,19 @@ export class BatchProcessor {
                     continue;
                 }
 
+                // Time visibility calculations
+                const visibilityStart = performance.now();
+
                 // Compute visibility in both directions when not overridden
                 {
                     breakdown.pairsConsidered++;
-                    const vKey1 = `${aId}|${posKeyA}>>${bId}|${posKeyB}`;
+                    const cacheOpStart = performance.now();
+                    const vKey1 = posCache.makeDirectionalKey(aId, posKeyA, bId, posKeyB);
                     let visibility1 = batchVisibilityCache.get(vKey1);
+                    cacheOperationTime += performance.now() - cacheOpStart;
+
                     if (visibility1 === undefined) {
+                        const cacheCheckStart = performance.now();
                         // Check global visibility cache first
                         if (this.globalVisibilityCache) {
                             const globalResult = this.globalVisibilityCache.getWithMeta(vKey1);
@@ -273,24 +418,32 @@ export class BatchProcessor {
                                 breakdown.visGlobalMisses++;
                             }
                         }
+                        cacheOperationTime += performance.now() - cacheCheckStart;
 
                         // If not in global cache, compute it
                         if (visibility1 === undefined) {
+                            const calcStart = performance.now();
                             visibility1 = await this.optimizedVisibilityCalculator.calculateVisibilityWithPosition(
                                 changedToken,
                                 otherToken,
                                 posA,
                                 posB,
-                                calcOptions,
+                                commonCalcOptions,
                             );
+                            visibilityCalculationTime += performance.now() - calcStart;
+
                             // Store in global cache for future use
+                            const cacheStoreStart = performance.now();
                             if (this.globalVisibilityCache) {
                                 this.globalVisibilityCache.set(vKey1, visibility1);
                             }
+                            cacheOperationTime += performance.now() - cacheStoreStart;
                             breakdown.pairsComputed++;
                         }
 
+                        const batchCacheStart = performance.now();
                         batchVisibilityCache.set(vKey1, visibility1);
+                        cacheOperationTime += performance.now() - batchCacheStart;
                     } else {
                         breakdown.pairsCached++;
                     }
@@ -298,9 +451,13 @@ export class BatchProcessor {
                 }
                 {
                     breakdown.pairsConsidered++;
-                    const vKey2 = `${bId}|${posKeyB}>>${aId}|${posKeyA}`;
+                    const cacheOpStart = performance.now();
+                    const vKey2 = posCache.makeDirectionalKey(bId, posKeyB, aId, posKeyA);
                     let visibility2 = batchVisibilityCache.get(vKey2);
+                    cacheOperationTime += performance.now() - cacheOpStart;
+
                     if (visibility2 === undefined) {
+                        const cacheCheckStart = performance.now();
                         // Check global visibility cache first
                         if (this.globalVisibilityCache) {
                             const globalResult = this.globalVisibilityCache.getWithMeta(vKey2);
@@ -314,29 +471,40 @@ export class BatchProcessor {
                                 breakdown.visGlobalMisses++;
                             }
                         }
+                        cacheOperationTime += performance.now() - cacheCheckStart;
 
                         // If not in global cache, compute it
                         if (visibility2 === undefined) {
+                            const calcStart = performance.now();
                             visibility2 = await this.optimizedVisibilityCalculator.calculateVisibilityWithPosition(
                                 otherToken,
                                 changedToken,
                                 posB,
                                 posA,
-                                calcOptions,
+                                commonCalcOptions,
                             );
+                            visibilityCalculationTime += performance.now() - calcStart;
+
                             // Store in global cache for future use
+                            const cacheStoreStart = performance.now();
                             if (this.globalVisibilityCache) {
                                 this.globalVisibilityCache.set(vKey2, visibility2);
                             }
+                            cacheOperationTime += performance.now() - cacheStoreStart;
                             breakdown.pairsComputed++;
                         }
 
+                        const batchCacheStart = performance.now();
                         batchVisibilityCache.set(vKey2, visibility2);
+                        cacheOperationTime += performance.now() - batchCacheStart;
                     } else {
                         breakdown.pairsCached++;
                     }
                     effectiveVisibility2 = visibility2;
                 }
+
+                // Time update collection
+                const updateStart = performance.now();
 
                 // Queue updates if changed from ORIGINAL map state (before any calculations)
                 if (effectiveVisibility1 !== originalVisibility1) {
@@ -345,8 +513,18 @@ export class BatchProcessor {
                 if (effectiveVisibility2 !== originalVisibility2) {
                     updates.push({ observer: otherToken, target: changedToken, visibility: effectiveVisibility2 });
                 }
+
+                updateCollectionTime += performance.now() - updateStart;
             }
         }
+
+        // Finalize timing measurements
+        detailedTimings.mainProcessingLoop = performance.now() - mainLoopStart;
+        detailedTimings.spatialFiltering = spatialFilteringTime;
+        detailedTimings.losCalculations = losCalculationTime;
+        detailedTimings.visibilityCalculations = visibilityCalculationTime;
+        detailedTimings.cacheOperations = cacheOperationTime;
+        detailedTimings.updateCollection = updateCollectionTime;
 
         // Periodically prune expired cache entries
         if (this.globalLosCache) {
@@ -356,6 +534,6 @@ export class BatchProcessor {
             this.globalVisibilityCache.pruneIfDue(1000);
         }
 
-        return { updates, breakdown, processedTokens, precomputeStats: calcOptions?.precomputeStats };
+        return { updates, breakdown, processedTokens, precomputeStats, detailedTimings };
     }
 }

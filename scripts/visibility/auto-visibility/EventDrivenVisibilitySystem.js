@@ -78,8 +78,8 @@ export class EventDrivenVisibilitySystem {
   /** @type {any} - Optimized visibility calculator facade */
   #optimizedVisibilityCalculator = null;
 
-  /** @type {(observer: Token, target: Token) => any} */
-  #getVisibilityMap = null;
+  /** @type {import('./core/VisibilityMapService.js').VisibilityMapService} */
+  #visibilityMapService = null;
 
   constructor() {
     if (EventDrivenVisibilitySystem.#instance) {
@@ -111,7 +111,7 @@ export class EventDrivenVisibilitySystem {
       this.#positionManager = coreServices.positionManager;
       this.#exclusionManager = coreServices.exclusionManager;
       this.#optimizedVisibilityCalculator = coreServices.optimizedVisibilityCalculator;
-      this.#getVisibilityMap = coreServices.getVisibilityMap;
+      this.#visibilityMapService = coreServices.visibilityMapService;
 
       // Initialize extracted services
       this.#cacheManagementService = await this.#diContainer.get('cacheManagementService', { coreServices });
@@ -126,8 +126,9 @@ export class EventDrivenVisibilitySystem {
         optimizedVisibilityCalculator: coreServices.optimizedVisibilityCalculator,
         globalLosCache: coreServices.globalLosCache,
         globalVisibilityCache: coreServices.globalVisibilityCache,
-        getTokenPosition: (token) => coreServices.positionManager.getTokenPosition(token),
-        getVisibilityMap: (token) => coreServices.getVisibilityMap(token),
+        positionManager: coreServices.positionManager,
+        visibilityMapService: coreServices.visibilityMapService,
+        overrideService: coreServices.overrideService,
       });
 
       // Initialize BatchOrchestrator
@@ -135,9 +136,8 @@ export class EventDrivenVisibilitySystem {
         batchProcessor: this.#batchProcessor,
         telemetryReporter: coreServices.telemetryReporter,
         exclusionManager: coreServices.exclusionManager,
-        setVisibilityBetween: (observer, target, visibility) =>
-          coreServices.setVisibilityBetween(observer, target, visibility),
-        getAllTokens: () => canvas.tokens?.placeables || [],
+        viewportFilterService: this.#viewportFilterService,
+        visibilityMapService: coreServices.visibilityMapService,
         moduleId: MODULE_ID
       });
 
@@ -171,7 +171,9 @@ export class EventDrivenVisibilitySystem {
         coreServices.lightingCalculator,
         coreServices.visionAnalyzer,
         coreServices.conditionManager,
-        this
+        coreServices.spatialAnalysisService,
+        coreServices.exclusionManager,
+        coreServices.lightingRasterService
       );
 
       // Set system state
@@ -265,11 +267,11 @@ export class EventDrivenVisibilitySystem {
     try {
       // Short-circuit: AVS does not calculate for excluded participants (hidden, fails testVisibility, sneak-active)
       if (observer && this.#exclusionManager.isExcludedToken(observer)) {
-        const map = this.#getVisibilityMap?.(observer || {});
+        const map = this.#visibilityMapService?.getVisibilityMap?.(observer || {});
         return map?.[target?.document?.id] || 'observed';
       }
       if (target && this.#exclusionManager.isExcludedToken(target)) {
-        const map = this.#getVisibilityMap?.(observer || {});
+        const map = this.#visibilityMapService?.getVisibilityMap?.(observer || {});
         return map?.[target?.document?.id] || 'observed';
       }
       // Ensure we don't use stale cached vision capabilities when movement just happened
@@ -299,12 +301,13 @@ export class EventDrivenVisibilitySystem {
       // 1) Check for active override (persisted flag)
       const { default: AvsOverrideManager } = await import('../../chat/services/infra/avs-override-manager.js');
       const override = await AvsOverrideManager.getOverride(observer, target);
+      if (typeof override === 'string' && override) return override;
       if (override?.state) return override.state;
 
 
       // 2) Check current visibility map (observer -> target)
       try {
-        const current = this.#getVisibilityMap?.(observer)?.[target.document.id];
+        const current = this.#visibilityMapService?.getVisibilityMap?.(observer)?.[target.document.id];
         if (current) return current;
       } catch {
         /* ignore */
