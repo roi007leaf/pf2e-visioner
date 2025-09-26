@@ -372,17 +372,23 @@ describe('Event Handler Tests', () => {
             expect(mockHooks.on).toHaveBeenCalledWith('deleteAmbientLight', expect.any(Function));
         });
 
-        test('should handle light updates that affect visibility', () => {
+        test('should handle light updates that affect visibility', async () => {
             const mockLight = { id: 'light1' };
             const changes = { config: { bright: 20 } };
 
             // Mock hasProperty to return true for config.bright specifically
             global.foundry.utils.hasProperty.mockImplementation((obj, path) => {
-                console.log('Testing hasProperty:', obj, path);
-                if (path === 'config.bright' && obj.config && obj.config.bright !== undefined) {
-                    return true;
+                // Check for the exact path and ensure the property exists
+                const keys = path.split('.');
+                let current = obj;
+                for (const key of keys) {
+                    if (current && typeof current === 'object' && key in current) {
+                        current = current[key];
+                    } else {
+                        return false;
+                    }
                 }
-                return false;
+                return true;
             });
 
             // Ensure shouldProcessEvents returns true
@@ -391,12 +397,12 @@ describe('Event Handler Tests', () => {
             lightingHandler.initialize();
             const updateHandler = mockHooks.on.mock.calls.find(call => call[0] === 'updateAmbientLight')[1];
 
-            updateHandler(mockLight, changes, {}, 'user1');
+            await updateHandler(mockLight, changes, {}, 'user1');
 
             // Add debugging
             expect(mockSystemState.shouldProcessEvents).toHaveBeenCalled();
             expect(mockCacheManager.clearAllCaches).toHaveBeenCalled();
-            expect(mockVisibilityState.markAllTokensChangedThrottled).toHaveBeenCalled();
+            expect(mockVisibilityState.markAllTokensChangedImmediate).toHaveBeenCalled();
         });
 
         test('should ignore light updates that do not affect visibility', () => {
@@ -412,16 +418,16 @@ describe('Event Handler Tests', () => {
             expect(mockVisibilityState.markAllTokensChangedThrottled).not.toHaveBeenCalled();
         });
 
-        test('should always handle light creation', () => {
+        test('should always handle light creation', async () => {
             const mockLight = { id: 'light1' };
 
             lightingHandler.initialize();
             const createHandler = mockHooks.on.mock.calls.find(call => call[0] === 'createAmbientLight')[1];
 
-            createHandler(mockLight, {}, 'user1');
+            await createHandler(mockLight, {}, 'user1');
 
             expect(mockCacheManager.clearAllCaches).toHaveBeenCalled();
-            expect(mockVisibilityState.markAllTokensChangedThrottled).toHaveBeenCalled();
+            expect(mockVisibilityState.markAllTokensChangedImmediate).toHaveBeenCalled();
         });
     });
 

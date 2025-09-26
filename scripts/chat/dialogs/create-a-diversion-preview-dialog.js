@@ -57,6 +57,7 @@ export class CreateADiversionPreviewDialog extends BaseActionDialog {
       applyAll: CreateADiversionPreviewDialog._onApplyAll,
       revertAll: CreateADiversionPreviewDialog._onRevertAll,
       toggleEncounterFilter: CreateADiversionPreviewDialog._onToggleEncounterFilter,
+      toggleFilterByLOS: CreateADiversionPreviewDialog._onToggleFilterByLOS,
       overrideState: CreateADiversionPreviewDialog._onOverrideState,
     },
   };
@@ -82,7 +83,7 @@ export class CreateADiversionPreviewDialog extends BaseActionDialog {
       if (actorId) {
         processedOutcomes = processedOutcomes.filter((o) => o?.observer?.id !== actorId);
       }
-  } catch {}
+    } catch { }
 
     // Apply ignore-allies filtering for display
     try {
@@ -93,9 +94,23 @@ export class CreateADiversionPreviewDialog extends BaseActionDialog {
         this.ignoreAllies,
         'observer',
       );
-  } catch {}
+    } catch { }
 
-  // Prepare outcomes with additional UI data
+    // Apply LOS filtering if enabled
+    if (this.filterByLOS && this.divertingToken) {
+      try {
+        const { filterOutcomesByLOS } = await import('../services/infra/shared-utils.js');
+        processedOutcomes = await filterOutcomesByLOS(processedOutcomes, this.divertingToken, 'observer');
+      } catch { /* LOS filtering is non-critical */ }
+    }
+
+    // Apply defeated token filtering (exclude dead/unconscious tokens)
+    try {
+      const { filterOutcomesByDefeated } = await import('../services/infra/shared-utils.js');
+      processedOutcomes = filterOutcomesByDefeated(processedOutcomes, 'observer');
+    } catch { /* Defeated filtering is non-critical */ }
+
+    // Prepare outcomes with additional UI data
     processedOutcomes = processedOutcomes.map((outcome) => {
       const desired = getDesiredOverrideStatesForAction('create-a-diversion');
       const availableStates = this.buildOverrideStates(desired, outcome).map((s) => ({
@@ -146,7 +161,7 @@ export class CreateADiversionPreviewDialog extends BaseActionDialog {
     };
     context.outcomes = processedOutcomes;
     context.ignoreAllies = !!this.ignoreAllies;
-  context.hideFoundryHidden = !!this.hideFoundryHidden;
+    context.hideFoundryHidden = !!this.hideFoundryHidden;
 
     // Store processed outcomes in instance for Apply All to use
     this.processedOutcomes = processedOutcomes;
@@ -251,7 +266,7 @@ export class CreateADiversionPreviewDialog extends BaseActionDialog {
           this.render({ force: true });
         });
       }
-  } catch {}
+    } catch { }
 
     // Initialize bulk action buttons and handlers
     this.updateBulkActionButtons();
@@ -294,7 +309,7 @@ export class CreateADiversionPreviewDialog extends BaseActionDialog {
           inline: 'nearest',
         });
       }
-  } catch {}
+    } catch { }
   }
 
   /**
@@ -311,8 +326,8 @@ export class CreateADiversionPreviewDialog extends BaseActionDialog {
     try {
       const { applyNowDiversion } = await import('../services/index.js');
       const overrides = { [tokenId]: effectiveNewState };
-      await applyNowDiversion({ ...app.actionData, overrides }, { html: () => {}, attr: () => {} });
-  } catch {}
+      await applyNowDiversion({ ...app.actionData, overrides }, { html: () => { }, attr: () => { } });
+    } catch { }
 
     // Update button states
     app.updateRowButtonsToApplied([{ target: { id: tokenId }, hasActionableChange: true }]);
@@ -325,7 +340,7 @@ export class CreateADiversionPreviewDialog extends BaseActionDialog {
         revertAllButton.disabled = false;
         revertAllButton.innerHTML = '<i class="fas fa-undo"></i> Revert All';
       }
-  } catch {}
+    } catch { }
     app.updateChangesCount();
   }
 
@@ -348,7 +363,7 @@ export class CreateADiversionPreviewDialog extends BaseActionDialog {
       await applyVisibilityChanges(app.actionData.actor, changes, {
         direction: 'observer_to_target',
       });
-  } catch {}
+    } catch { }
 
     // Update button states
     app.updateRowButtonsToReverted([{ target: { id: tokenId }, hasActionableChange: true }]);
@@ -410,9 +425,9 @@ export class CreateADiversionPreviewDialog extends BaseActionDialog {
       }
       await applyNowDiversion(
         { ...app.actionData, ignoreAllies: app.ignoreAllies, overrides },
-        { html: () => {}, attr: () => {} },
+        { html: () => { }, attr: () => { } },
       );
-  } catch {}
+    } catch { }
 
     // Update UI for each row
     app.updateRowButtonsToApplied(
@@ -468,9 +483,9 @@ export class CreateADiversionPreviewDialog extends BaseActionDialog {
       const { revertNowDiversion } = await import('../services/index.js');
       await revertNowDiversion(
         { ...app.actionData, ignoreAllies: app.ignoreAllies },
-        { html: () => {}, attr: () => {} },
+        { html: () => { }, attr: () => { } },
       );
-  } catch {}
+    } catch { }
     app.updateRowButtonsToReverted(
       changedOutcomes.map((o) => ({ target: { id: o.observer.id }, hasActionableChange: true })),
     );
@@ -494,6 +509,17 @@ export class CreateADiversionPreviewDialog extends BaseActionDialog {
 
     // Re-render with new filter
     await app.render({ force: true });
+  }
+
+  /**
+   * Handle LOS filter toggle
+   */
+  static async _onToggleFilterByLOS(event, target) {
+    const app = currentDiversionDialog;
+    if (!app) return;
+    app.filterByLOS = target.checked;
+    app.bulkActionState = 'initial';
+    app.render({ force: true });
   }
 
   /**
@@ -534,7 +560,7 @@ export class CreateADiversionPreviewDialog extends BaseActionDialog {
    * @param {Token} observerToken - The observer token
    * @param {string} newVisibility - The new visibility state
    */
-  async applyVisibilityChange() {}
+  async applyVisibilityChange() { }
 
   /**
    * Update row buttons to applied state

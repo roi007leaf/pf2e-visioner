@@ -45,6 +45,10 @@
       <input type="checkbox" {{#if showOnlyChanges}}checked{{/if}} data-action="toggleShowOnlyChanges" data-tooltip="Show only rows with visibility changes" />
       <span class="encounter-filter-label">Show only changes</span>
     </label>
+    <label class="filter-by-los-checkbox">
+      <input type="checkbox" {{#if filterByLOS}}checked{{/if}} {{#if losFilterDisabled}}disabled{{/if}} data-action="toggleFilterByLOS" data-tooltip="{{localize 'PF2E_VISIONER.UI.FILTER_BY_LOS_TOOLTIP'}}" />
+      <span class="encounter-filter-label">{{localize "PF2E_VISIONER.UI.FILTER_BY_LOS_LABEL"}}</span>
+    </label>
   </div>
 
   {{!-- Results Table --}}

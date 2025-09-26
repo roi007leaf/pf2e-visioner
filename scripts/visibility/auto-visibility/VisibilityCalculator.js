@@ -183,24 +183,24 @@ export class VisibilityCalculator {
       }
 
       // Step 4: Check line of sight directly against walls. If LoS is blocked, treat as hidden.
-      try {
-        const losClear = !!this.#visionAnalyzer.hasLineOfSight(observer, target, true);
+      // try {
+      //   const losClear = !!this.#visionAnalyzer.hasLineOfSight(observer, target, true);
 
-        if (!losClear) {
-          // If LoS blocked, but a precise non-visual sense is in range → observed
-          try {
-            if (this.#visionAnalyzer.hasPreciseNonVisualInRange(observer, target))
-              return 'observed';
-            // If only imprecise sense can detect → hidden; if none → undetected
-            if (this.#visionAnalyzer.canSenseImprecisely(observer, target)) return 'hidden';
-            return 'undetected';
-          } catch {
-            return 'hidden';
-          }
-        }
-      } catch {
-        /* best effort: continue */
-      }
+      //   if (!losClear) {
+      //     // If LoS blocked, but a precise non-visual sense is in range → observed
+      //     try {
+      //       if (this.#visionAnalyzer.hasPreciseNonVisualInRange(observer, target))
+      //         return 'observed';
+      //       // If only imprecise sense can detect → hidden; if none → undetected
+      //       if (this.#visionAnalyzer.canSenseImprecisely(observer, target)) return 'hidden';
+      //       return 'undetected';
+      //     } catch {
+      //       return 'hidden';
+      //     }
+      //   }
+      // } catch {
+      //   /* best effort: continue */
+      // }
 
       // Step 5: Check lighting conditions at target's position
       // Use position override if provided, otherwise calculate from document

@@ -907,7 +907,21 @@ export function registerUIHooks() {
                   const { LightingCalculator } = await import('../visibility/auto-visibility/LightingCalculator.js');
                   LightingCalculator.getInstance().invalidateLightCache();
                 } catch { }
+
+                // Clear LightingPrecomputer caches for ambient light changes
+                try {
+                  const { LightingPrecomputer } = await import('../visibility/auto-visibility/core/LightingPrecomputer.js');
+                  LightingPrecomputer.clearLightingCaches();
+                } catch { }
+
                 canvas.perception.update({ refreshVision: true, initializeVision: true, refreshLighting: true });
+
+                // Trigger AVS recalculation for lighting environment changes
+                try {
+                  const { autoVisibility } = await import('../api.js');
+                  autoVisibility.recalculateAll(true); // Force recalculation
+                } catch { }
+
                 // Update tool icon/title immediately
                 refreshDarknessTool();
                 ui.controls.render(true);
@@ -926,6 +940,7 @@ export function registerUIHooks() {
                 await Promise.all(selected.map(async (l) => {
                   try { await l?.document?.update?.({ 'config.negative': true, 'config.darkness.negative': true }); } catch { }
                   try { await l?.document?.setFlag?.(MODULE_ID, 'heightenedDarkness', true); } catch { }
+                  try { await l?.document?.setFlag?.(MODULE_ID, 'darknessRank', 4); } catch { }
                 }));
               };
               const clearDarkness = async () => {
@@ -1212,6 +1227,7 @@ function onRenderLightConfig(app, html) {
         <div class="pvv-card">
           <label class="checkbox pvv-title-row">
             <input type="checkbox" name="flags.${MODULE_ID}.heightenedDarkness" ${checked ? 'checked' : ''}>
+            <input type="hidden" name="flags.${MODULE_ID}.darknessRank" value="${checked ? 4 : ''}">
             <div class="pvv-title-copy">
               <span class="pvv-title">Treat as Heightened Darkness <em class="pvv-subtle">(rank 4+)</em></span>
               <span class="pvv-subtle">In this area: darkvision sees Concealed; greater darkvision sees normally.</span>
@@ -1282,18 +1298,60 @@ function onRenderLightConfig(app, html) {
 
     // Sync native darkness checkbox when enabling magical darkness in the form
     try {
-      const magCb = form.querySelector(`input[name="flags.${MODULE_ID}.heightenedDarkness"]`);
+      // Find the checkbox and darknessRank input we just created
+      const magCb = fs.querySelector(`input[name="flags.${MODULE_ID}.heightenedDarkness"]`);
+      const darknessRankInput = fs.querySelector(`input[name="flags.${MODULE_ID}.darknessRank"]`);
+      // Debug logs removed
+
       const nativeNeg = () =>
         form.querySelector(
           'input[name="config.negative"], input[name$=".negative"], input[name*="darkness"][name*="negative"]'
         );
-      if (magCb) {
-        magCb.addEventListener('change', () => {
+      if (magCb && darknessRankInput) {
+        magCb.addEventListener('change', async (event) => {
+          // Debug logs removed
+
           if (magCb.checked) {
             const neg = nativeNeg();
             if (neg && !neg.checked) {
               try { neg.checked = true; neg.dispatchEvent(new Event('change', { bubbles: true })); } catch { }
             }
+          }
+
+          // Update darknessRank flag based on checkbox state using direct reference
+          // Use empty string when unchecked to unset the flag, '4' when checked
+          darknessRankInput.value = magCb.checked ? '4' : '';
+          // Debug logs removed
+
+          // Update the actual light document immediately for real-time effect
+          try {
+            if (magCb.checked) {
+              // Enable heightened darkness
+              await lightDoc?.setFlag?.(MODULE_ID, 'heightenedDarkness', true);
+              await lightDoc?.setFlag?.(MODULE_ID, 'darknessRank', 4);
+            } else {
+              // Disable heightened darkness
+              await lightDoc?.unsetFlag?.(MODULE_ID, 'heightenedDarkness');
+              await lightDoc?.unsetFlag?.(MODULE_ID, 'darknessRank');
+            }
+            // Debug logs removed
+          } catch (e) {
+            console.warn('PF2E Visioner | Failed to update light document flags:', e);
+          }
+
+          // Trigger AVS recalculation when heightened darkness checkbox changes
+          try {
+            // Clear LightingPrecomputer caches for ambient light changes
+            const { LightingPrecomputer } = await import('../visibility/auto-visibility/core/LightingPrecomputer.js');
+            LightingPrecomputer.clearLightingCaches();
+
+            // Trigger AVS recalculation for lighting environment changes
+            const { autoVisibility } = await import('../api.js');
+            autoVisibility.recalculateAll(true); // Force recalculation
+
+            // Debug logs removed
+          } catch (e) {
+            console.warn('PF2E Visioner | Failed to trigger AVS recalculation on heightened darkness change:', e);
           }
         });
       }
@@ -1302,8 +1360,24 @@ function onRenderLightConfig(app, html) {
       const syncVisibility = () => {
         try { fs.style.display = neg?.checked ? '' : 'none'; } catch { }
       };
+      const handleNativeDarknessChange = async () => {
+        syncVisibility();
+
+        // Trigger AVS recalculation when native darkness checkbox changes
+        try {
+          // Clear LightingPrecomputer caches for ambient light changes
+          const { LightingPrecomputer } = await import('../visibility/auto-visibility/core/LightingPrecomputer.js');
+          LightingPrecomputer.clearLightingCaches();
+
+          // Trigger AVS recalculation for lighting environment changes
+          const { autoVisibility } = await import('../api.js');
+          autoVisibility.recalculateAll(true); // Force recalculation
+        } catch (e) {
+          console.warn('PF2E Visioner | Failed to trigger AVS recalculation on native darkness change:', e);
+        }
+      };
       syncVisibility();
-      if (neg) neg.addEventListener('change', syncVisibility);
+      if (neg) neg.addEventListener('change', handleNativeDarknessChange);
     } catch { }
   } catch { }
 }

@@ -1,11 +1,15 @@
 /**
  * LightingPrecomputer precomputes light levels for a set of tokens at their current positions.
  */
+import { MODULE_ID } from '../../../constants.js';
 export class LightingPrecomputer {
     // Short-term memoization for lighting environment hash (200ms TTL for more aggressive caching)
     static #lightingHashMemo = { hash: null, ts: 0 };
     // Cache for expensive canvas.tokens API calls (100ms TTL for rapid batch sequences)
     static #cachedTokenData = { tokens: null, timestamp: 0 };
+    // Force flag to bypass burst optimization when lighting changes without token movement
+    static #forceFreshComputation = false;
+    static #forceResetTimeout = null;
     /**
      * @param {Map<string, {x:number,y:number,elevation:number}>} [positions] - optional position map
      * @param {Iterable<Token>} tokens - tokens to precompute for
@@ -25,7 +29,9 @@ export class LightingPrecomputer {
 
             // Super-fast path: within burst TTL, reuse previous results if token set and posKeys are unchanged.
             // This avoids computing the lighting environment hash entirely for micro-batches where nothing moved.
-            if (prevMap && prevPosKeyMap && previousTs && (nowTs - previousTs) < BURST_TTL_MS) {
+            // Skip this optimization if we've been told to force fresh computation (e.g., lighting changed)
+            const shouldBypassBurstOptimization = LightingPrecomputer.#forceFreshComputation;
+            if (prevMap && prevPosKeyMap && previousTs && (nowTs - previousTs) < BURST_TTL_MS && !shouldBypassBurstOptimization) {
                 const gs = canvas.grid?.size || 1;
                 const quant = Math.max(1, Math.floor(gs / 2)); // half-grid quantization
 
@@ -60,18 +66,23 @@ export class LightingPrecomputer {
                     stats.fastPathUsed = true;
                     // Preserve prior lighting hash if available; do not recompute
                     const lightingHash = previous?.lightingHash || null;
+                    // Don't reset the force flag here - let it persist for rapid batches
                     return { map: prevMap, stats, posKeyMap: prevPosKeyMap, lightingHash };
                 }
             }
 
             const { LightingCalculator } = await import('../LightingCalculator.js');
             const lightingCalculator = LightingCalculator.getInstance?.();
-            if (!lightingCalculator) return { map, stats, posKeyMap };
+            if (!lightingCalculator) {
+                // Don't reset the force flag on error - let it persist
+                return { map, stats, posKeyMap };
+            }
 
             // OPTIMIZATION: Compute lighting hash once and reuse throughout the batch
             currentLightingHash = LightingPrecomputer.#getLightingEnvironmentHash();
             const previousLightingHash = previous?.lightingHash;
-            const lightingChanged = currentLightingHash !== previousLightingHash;
+            // Treat lighting as changed if the force flag is set, ensuring a full recompute after cache clears
+            const lightingChanged = LightingPrecomputer.#forceFreshComputation || (currentLightingHash !== previousLightingHash);
             stats.lightingChanged = !!previousLightingHash && lightingChanged;
 
             // Early return optimization: if we have previous data, check if both token positions 
@@ -132,18 +143,36 @@ export class LightingPrecomputer {
                 const id = tok?.document?.id;
                 if (!id) continue;
                 try {
-                    const pos = positions?.get?.(id) || LightingPrecomputer.#getPos(tok);
+                    // Always get current position from token document to avoid stale data
+                    const currentPos = LightingPrecomputer.#getPos(tok);
+                    const providedPos = positions?.get?.(id);
+
+                    // Use provided position only if it matches current token position exactly
+                    let pos = currentPos;
+                    if (providedPos &&
+                        providedPos.x === currentPos.x &&
+                        providedPos.y === currentPos.y &&
+                        (providedPos.elevation || 0) === (currentPos.elevation || 0)) {
+                        pos = providedPos;
+                    }
+
                     const posKey = `${Math.round(pos.x / quant) * quant}:${Math.round(pos.y / quant) * quant}:${pos.elevation || 0}`;
                     posKeyMap.set(id, posKey);
 
                     // Reuse if previous value exists and position key unchanged AND lighting environment hasn't changed
-                    const canReuseCache = !lightingChanged && prevMap && prevPosKeyMap && prevPosKeyMap.get(id) === posKey && prevMap.has(id);
+                    // Additional safety: ensure the previous position key actually exists and matches exactly
+                    const prevPosKey = prevPosKeyMap?.get(id);
+                    const hasPrevData = prevMap?.has(id) && prevPosKey !== undefined;
+                    const positionUnchanged = hasPrevData && prevPosKey === posKey;
+                    const canReuseCache = !lightingChanged && positionUnchanged;
+
                     if (canReuseCache) {
                         map.set(id, prevMap.get(id));
                         stats.targetUsed += 1;
                         continue;
                     }
 
+                    // Position changed or no previous data - recalculate
                     const light = lightingCalculator.getLightLevelAt(pos, tok);
                     map.set(id, light);
                     stats.targetMiss += 1;
@@ -157,7 +186,7 @@ export class LightingPrecomputer {
         }
         // Use already computed lighting hash to avoid redundant computation
         const finalLightingHash = currentLightingHash || LightingPrecomputer.#getLightingEnvironmentHash();
-        const precomputeEnd = performance.now();
+        // Don't reset the force flag here - let it persist for a brief time to handle multiple rapid batches
         return { map, stats, posKeyMap, lightingHash: finalLightingHash };
     }
 
@@ -190,7 +219,15 @@ export class LightingPrecomputer {
                     if (light.hidden === true) continue;
                     const config = light.config || {};
                     // Only include properties that significantly affect lighting calculations
-                    lightHash += `${light.id}:${light.x}:${light.y}:${light.disabled ? 0 : 1}:${config.bright || 0}:${config.dim || 0}|`;
+                    // Include native darkness toggle and module flags that affect visibility logic
+                    const negative = config?.negative ? 1 : 0;
+                    let heightened = 0;
+                    let rank = 0;
+                    try {
+                        heightened = light.getFlag?.(MODULE_ID, 'heightenedDarkness') ? 1 : 0;
+                        rank = Number(light.getFlag?.(MODULE_ID, 'darknessRank') ?? 0) || 0;
+                    } catch { /* ignore flag access issues */ }
+                    lightHash += `${light.id}:${light.x}:${light.y}:${light.disabled ? 0 : 1}:${config.bright || 0}:${config.dim || 0}:${negative}:${heightened}:${rank}|`;
                 }
                 parts.push(`lights:${lightHash}`);
             } else {
@@ -200,7 +237,6 @@ export class LightingPrecomputer {
             // OPTIMIZED: Streamlined token light processing with aggressive caching
             try {
                 let tokens;
-                const canvasCallStart = performance.now();
 
                 // Use cached tokens if available and recent (within 100ms)
                 if (LightingPrecomputer.#cachedTokenData.tokens &&
@@ -213,7 +249,6 @@ export class LightingPrecomputer {
                         tokens: tokens,
                         timestamp: now
                     };
-                    const canvasCallTime = performance.now() - canvasCallStart;
                 }
 
                 if (tokens.length > 0) {
@@ -268,6 +303,27 @@ export class LightingPrecomputer {
             LightingPrecomputer.#lightingHashMemo = { hash: fallbackHash, ts: now };
             return fallbackHash;
         }
+    }
+
+    /**
+     * Clear all static caches to force fresh lighting calculations
+     * Called when ambient lights change to ensure lighting environment hash is recalculated
+     */
+    static clearLightingCaches() {
+        LightingPrecomputer.#lightingHashMemo = { hash: null, ts: 0 };
+        LightingPrecomputer.#cachedTokenData = { tokens: null, timestamp: 0 };
+        LightingPrecomputer.#forceFreshComputation = true; // Force bypass of burst optimization
+
+        // Clear any existing timeout
+        if (LightingPrecomputer.#forceResetTimeout) {
+            clearTimeout(LightingPrecomputer.#forceResetTimeout);
+        }
+
+        // Reset the force flag after a brief delay to allow multiple rapid batches to complete
+        LightingPrecomputer.#forceResetTimeout = setTimeout(() => {
+            LightingPrecomputer.#forceFreshComputation = false;
+            LightingPrecomputer.#forceResetTimeout = null;
+        }, 500); // 500ms should be enough for all rapid batches to complete
     }
 
     static #getPos(tok) {

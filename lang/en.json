@@ -47,13 +47,13 @@
     },
     "SPECIAL_SENSES": {
       "lifesense": "Lifesense",
-      "lifesense_description": "You have a limited ability to sense life force. You gain lifesense as an imprecise sense with a range of 10 feet. This allows you to sense the life force of living and undead creatures within the listed range. The sense can distinguish between the vitality energy animating living creatures and the void energy animating undead creatures.",
+      "lifesense_description": "You have a limited ability to sense life force. You gain lifesense as an imprecise sense. This allows you to sense the life force of living and undead creatures within the listed range. The sense can distinguish between the vitality energy animating living creatures and the void energy animating undead creatures.",
       "echolocation": "Echolocation",
-      "echolocation_description": "You can use sound to navigate and detect objects. You gain echolocation as a precise sense with a range of 40 feet. This allows you to detect all creatures and objects within range through sound reflection.",
+      "echolocation_description": "You can use sound to navigate and detect objects. You gain echolocation as a precise sense. This allows you to detect all creatures and objects within range through sound reflection.",
       "tremorsense": "Tremorsense",
-      "tremorsense_description": "You can sense vibrations through the ground. You gain tremorsense as an imprecise sense with a range of 30 feet. This allows you to detect creatures and objects in contact with the ground within range.",
+      "tremorsense_description": "You can sense vibrations through the ground. You gain tremorsense as an imprecise sense. This allows you to detect creatures and objects in contact with the ground within range.",
       "scent": "Scent",
-      "scent_description": "You have an enhanced sense of smell. You gain scent as an imprecise sense with a range of 30 feet. This allows you to detect living creatures by their scent within range."
+      "scent_description": "You have an enhanced sense of smell. You gain scent as an imprecise sense. This allows you to detect living creatures by their scent within range."
     },
     "COVER_OVERRIDE": {
       "POPUP_OVERRIDE": "Cover overridden via keybind popup: {original} → {final}"
@@ -477,7 +477,9 @@
       "REVERT_ALL": "Revert All",
       "REMOVE_OVERRIDES": "Remove Overrides",
       "BULK_SET_VISIBILITY": "Bulk Set Visibility",
-      "CLEAR_BULK_OVERRIDES": "Clear Bulk Overrides"
+      "CLEAR_BULK_OVERRIDES": "Clear Bulk Overrides",
+      "FILTER_BY_LOS_LABEL": "Filter By LoS",
+      "FILTER_BY_LOS_TOOLTIP": "Only show tokens that have line of sight to the acting token"
     },
     "WALL": {
       "VISIBLE_TO_YOU": "Hidden Wall",

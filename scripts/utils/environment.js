@@ -56,12 +56,12 @@ export default class EnvironmentHelper {
             return hasEnv('forest') && insideDifficult;
         }
         if (key === 'rubble') {
-            // Mountain OR Urban environment + difficult terrain
-            return (hasEnv('mountain') || hasEnv('desert') || hasEnv('underground')) && insideDifficult;
+            // Mountain, Underground, OR Urban environment + difficult terrain
+            return (hasEnv('mountain') || hasEnv('underground') || hasEnv('urban')) && insideDifficult;
         }
         if (key === 'snow') {
-            // Just Snow environment
-            return hasEnv('snow');
+            // Arctic environment + difficult terrain (snow is a feature that appears in arctic environments)
+            return hasEnv('arctic') && insideDifficult;
         }
 
         // Default direct match
@@ -97,7 +97,7 @@ export default class EnvironmentHelper {
 
     /**
      * Get environment regions containing the token that match the given environment key
-     * Applies Terrain Stalker combos: underbrush (forest + difficult), rubble (mountain|urban + difficult), snow (snow)
+     * Applies Terrain Stalker combos: underbrush (forest + difficult), rubble (mountain|underground|urban + difficult), snow (arctic + difficult)
      * @param {Token|Actor} tokenOrActor
      * @param {string} environmentKey
      * @returns {Array} Array of Region placeables matching the environment for this token
@@ -111,8 +111,8 @@ export default class EnvironmentHelper {
                 const has = (env) => types.has(normalizeSlug(env));
                 const difficult = RegionHelper.hasDifficultTerrain(region);
                 if (key === 'underbrush') return has('forest') && difficult;
-                if (key === 'rubble') return (has('mountain') || has('urban')) && difficult;
-                if (key === 'snow') return has('snow');
+                if (key === 'rubble') return (has('mountain') || has('underground') || has('urban')) && difficult;
+                if (key === 'snow') return has('arctic') && difficult;
                 return has(key);
             } catch { return false; }
         };

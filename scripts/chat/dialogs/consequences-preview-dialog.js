@@ -65,6 +65,7 @@ export class ConsequencesPreviewDialog extends BaseActionDialog {
       applyAll: ConsequencesPreviewDialog._onApplyAll,
       revertAll: ConsequencesPreviewDialog._onRevertAll,
       toggleEncounterFilter: ConsequencesPreviewDialog._onToggleEncounterFilter,
+      toggleFilterByLOS: ConsequencesPreviewDialog._onToggleFilterByLOS,
       overrideState: ConsequencesPreviewDialog._onOverrideState,
       removeOverrides: ConsequencesPreviewDialog._onRemoveOverrides,
     },
@@ -83,8 +84,8 @@ export class ConsequencesPreviewDialog extends BaseActionDialog {
       return;
     }
 
-  // Filter outcomes based on encounter filter
-  let filteredOutcomes = filterOutcomesByEncounter(app.outcomes, app.encounterOnly, 'target');
+    // Filter outcomes based on encounter filter
+    let filteredOutcomes = filterOutcomesByEncounter(app.outcomes, app.encounterOnly, 'target');
 
     // Apply ally filtering if ignore allies is enabled
     try {
@@ -116,6 +117,7 @@ export class ConsequencesPreviewDialog extends BaseActionDialog {
       const { AvsOverrideManager } = await import('../services/infra/avs-override-manager.js');
       await AvsOverrideManager.clearForConsequences(app.attackingToken, observers, { refresh: true });
       notify.info(`${MODULE_TITLE}: Removed overrides between ${app.attackingToken.name} and ${observers.length} observer(s).`);
+
       // Reset dialog bulk state and re-render to update counts/UI (data changed)
       try {
         app.bulkActionState = 'initial';
@@ -147,6 +149,20 @@ export class ConsequencesPreviewDialog extends BaseActionDialog {
         'target',
       );
     } catch { }
+
+    // Apply LOS filtering if enabled
+    if (this.filterByLOS && this.attackingToken) {
+      try {
+        const { filterOutcomesByLOS } = await import('../services/infra/shared-utils.js');
+        processedOutcomes = filterOutcomesByLOS(processedOutcomes, this.attackingToken, 'target');
+      } catch { /* LOS filtering is non-critical */ }
+    }
+
+    // Apply defeated token filtering (exclude dead/unconscious tokens)
+    try {
+      const { filterOutcomesByDefeated } = await import('../services/infra/shared-utils.js');
+      processedOutcomes = filterOutcomesByDefeated(processedOutcomes, 'target');
+    } catch { /* Defeated filtering is non-critical */ }
 
     // Prepare outcomes with additional UI data (and normalize shape)
     processedOutcomes = processedOutcomes.map((outcome) => {
@@ -510,6 +526,17 @@ export class ConsequencesPreviewDialog extends BaseActionDialog {
 
     // Re-render with new filter
     await app.render({ force: true });
+  }
+
+  /**
+   * Handle LOS filter toggle
+   */
+  static async _onToggleFilterByLOS(event, target) {
+    const app = currentConsequencesDialog;
+    if (!app) return;
+    app.filterByLOS = target.checked;
+    app.bulkActionState = 'initial';
+    app.render({ force: true });
   }
 
   /**

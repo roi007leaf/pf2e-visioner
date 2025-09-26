@@ -23,6 +23,14 @@ jest.mock('../../scripts/chat/services/infra/notifications.js', () => ({
   },
 }));
 
+// Mock shared-utils to prevent filtering from removing outcomes
+jest.mock('../../scripts/chat/services/infra/shared-utils.js', () => ({
+  filterOutcomesByAllies: jest.fn((outcomes) => outcomes), // Don't filter any outcomes
+  filterOutcomesByDefeated: jest.fn((outcomes) => outcomes), // Don't filter any outcomes  
+  filterOutcomesByEncounter: jest.fn((outcomes) => outcomes), // Don't filter any outcomes
+  hasActiveEncounter: jest.fn(() => false), // No active encounter
+}));
+
 import { SeekPreviewDialog } from '../../scripts/chat/dialogs/seek-preview-dialog.js';
 import { notify } from '../../scripts/chat/services/infra/notifications.js';
 

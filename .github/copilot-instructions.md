@@ -10,6 +10,7 @@ Purpose: Give coding AIs crisp, actionable guardrails for this repo. Follow thes
 - No hidden global side effects. Prefer services and stores with explicit wiring.
 - Keep hot paths synchronous where feasible. Async only when necessary and outside render-critical loops.
 - Check HANDOVER.md first.
+- Always run tests in terminal rather than internal tool.
 
 ## Architecture you must respect
 - Stores (single-responsibility): `scripts/stores/*` – visibility/cover maps, simple get/set.

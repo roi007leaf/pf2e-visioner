@@ -11,6 +11,21 @@ export class BaseActionDialog extends BasePreviewDialog {
     this.bulkActionState = this.bulkActionState ?? 'initial';
     // Per-dialog visual filter: show only rows with actionable changes
     if (typeof this.showOnlyChanges === 'undefined') this.showOnlyChanges = false;
+    // LOS filter: enabled out of combat by default, disabled in combat (UI disabled while in combat)
+    try {
+      // Default to enabled when out of combat, unless explicitly overridden
+      if (typeof options.filterByLOS === 'boolean') {
+        this.filterByLOS = options.filterByLOS;
+        console.log('BaseActionDialog: filterByLOS from options:', this.filterByLOS);
+      } else {
+        const inCombat = hasActiveEncounter();
+        this.filterByLOS = !inCombat;
+        console.log('BaseActionDialog: filterByLOS auto-set to', this.filterByLOS, '(inCombat:', inCombat, ')');
+      }
+    } catch (err) {
+      this.filterByLOS = false;
+      console.log('BaseActionDialog: filterByLOS error, defaulted to false:', err);
+    }
   }
 
   getApplyDirection() {
@@ -99,10 +114,31 @@ export class BaseActionDialog extends BasePreviewDialog {
         });
       }
     } catch { }
+
+    // Wire up Filter By LOS checkbox (disabled in combat via template binding)
+    try {
+      const cbLos = this.element.querySelector('input[data-action="toggleFilterByLOS"]');
+      if (cbLos) {
+        cbLos.onchange = null;
+        cbLos.addEventListener('change', async () => {
+          this.filterByLOS = !!cbLos.checked;
+          this.bulkActionState = 'initial';
+          // Let subclasses recompute filtered outcomes if they provide a method
+          try {
+            if (typeof this.getFilteredOutcomes === 'function') {
+              const list = await this.getFilteredOutcomes();
+              if (Array.isArray(list)) this.outcomes = list;
+            }
+          } catch { }
+          this.render({ force: true });
+        });
+      }
+    } catch { }
   }
 
   buildCommonContext(outcomes) {
     const changesCount = this.computeChangesCount(outcomes);
+    console.log('BaseActionDialog.buildCommonContext: filterByLOS =', this.filterByLOS, 'losFilterDisabled =', hasActiveEncounter());
 
     return {
       changesCount,
@@ -111,6 +147,9 @@ export class BaseActionDialog extends BasePreviewDialog {
       encounterOnly: !!this.encounterOnly,
       // Per-dialog ignore-allies checkbox state (defaults from global setting)
       ignoreAllies: this.ignoreAllies,
+      // LOS filter state; UI disables when in combat
+      filterByLOS: !!this.filterByLOS,
+      losFilterDisabled: hasActiveEncounter(),
       // Visual filter checkbox state
       showOnlyChanges: !!this.showOnlyChanges,
       bulkActionState: this.bulkActionState ?? 'initial',

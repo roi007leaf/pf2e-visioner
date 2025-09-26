@@ -51,7 +51,7 @@ export class LightingCalculator {
         lightIllumination: LIGHT_THRESHOLDS[illumination],
         ...extras,
       };
-      // if (log.enabled()) log.debug(() => ({ step: 'illumination-result', res: result }));
+      //console.trace(`getLightLevelAt(${token.name || token?.id || 'unknown'}, ${position ? `${position.x},${position.y}` : 'token center'}) => ${result.level}`);
       return result;
     }
 
@@ -79,19 +79,17 @@ export class LightingCalculator {
         shapeInWorld.points[i++] += baseY;
       }
     } else {
-      // Final fallback - create a simple object with points
-      shapeInWorld = {
-        points: [
-          baseX,
-          baseY,
-          baseX + tokenWidth,
-          baseY,
-          baseX + tokenWidth,
-          baseY + tokenHeight,
-          baseX,
-          baseY + tokenHeight,
-        ],
-      };
+      // Final fallback - create a PIXI.Polygon with the rectangle points
+      shapeInWorld = new PIXI.Polygon([
+        baseX,
+        baseY,
+        baseX + tokenWidth,
+        baseY,
+        baseX + tokenWidth,
+        baseY + tokenHeight,
+        baseX,
+        baseY + tokenHeight,
+      ]);
     }
 
     // Convert the shape to clipper points

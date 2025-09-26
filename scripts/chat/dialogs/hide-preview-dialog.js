@@ -33,6 +33,7 @@ export class HidePreviewDialog extends BaseActionDialog {
       applyChange: HidePreviewDialog._onApplyChange,
       revertChange: HidePreviewDialog._onRevertChange,
       toggleEncounterFilter: HidePreviewDialog._onToggleEncounterFilter,
+      toggleFilterByLOS: HidePreviewDialog._onToggleFilterByLOS,
       overrideState: HidePreviewDialog._onOverrideState,
       togglePrequisite: HidePreviewDialog._onTogglePrequisite,
       bulkOverrideSet: HidePreviewDialog._onBulkOverrideSet,
@@ -132,6 +133,20 @@ export class HidePreviewDialog extends BaseActionDialog {
         'target',
       );
     } catch { }
+
+    // Apply LOS filtering if enabled
+    if (this.filterByLOS && this.actorToken) {
+      try {
+        const { filterOutcomesByLOS } = await import('../services/infra/shared-utils.js');
+        filteredOutcomes = await filterOutcomesByLOS(filteredOutcomes, this.actorToken, 'target');
+      } catch { /* LOS filtering is non-critical */ }
+    }
+
+    // Apply defeated token filtering (exclude dead/unconscious tokens)
+    try {
+      const { filterOutcomesByDefeated } = await import('../services/infra/shared-utils.js');
+      filteredOutcomes = filterOutcomesByDefeated(filteredOutcomes, 'target');
+    } catch { /* Defeated filtering is non-critical */ }
 
     // Augment with end-position qualification like Sneak: concealed OR standard/greater cover qualifies
     try {
@@ -339,6 +354,14 @@ export class HidePreviewDialog extends BaseActionDialog {
         const { filterOutcomesByAllies } = await import('../services/infra/shared-utils.js');
         filtered = filterOutcomesByAllies(filtered, this.actorToken, this.ignoreAllies, 'target');
       } catch { }
+
+      // Apply LOS filtering if enabled
+      if (this.filterByLOS && this.actorToken) {
+        try {
+          const { filterOutcomesByLOS } = await import('../services/infra/shared-utils.js');
+          filtered = await filterOutcomesByLOS(filtered, this.actorToken, 'target');
+        } catch { /* LOS filtering is non-critical */ }
+      }
       if (!Array.isArray(filtered)) return [];
       // Preserve override selections and recompute actionability
       const merged = filtered.map((o) => {
@@ -533,6 +556,19 @@ export class HidePreviewDialog extends BaseActionDialog {
     app.bulkActionState = 'initial';
 
     // Re-render the dialog - _prepareContext will handle the filtering
+    app.render({ force: true });
+  }
+
+  static async _onToggleFilterByLOS(event, target) {
+    const app = currentHideDialog;
+    if (!app) return;
+    app.filterByLOS = target.checked;
+    app.bulkActionState = 'initial';
+    // Recompute filtered outcomes and preserve overrides before re-rendering
+    try {
+      const list = await app.getFilteredOutcomes();
+      if (Array.isArray(list)) app.outcomes = list;
+    } catch { }
     app.render({ force: true });
   }
 
@@ -904,14 +940,14 @@ export class HidePreviewDialog extends BaseActionDialog {
   }
 
   // Bulk override action handlers
-   
+
   static _onBulkOverrideSet(event, target) {
     const app = currentHideDialog;
     if (!app) return;
     app._onBulkOverrideSet(event);
   }
 
-   
+
   static _onBulkOverrideClear(event, target) {
     const app = currentHideDialog;
     if (!app) return;

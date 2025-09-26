@@ -47,7 +47,7 @@ export class LightingEventHandler {
     /**
      * Handle ambient light update - affects visibility for all tokens
      */
-    handleLightUpdate(document, changeData, options, userId) {
+    async handleLightUpdate(document, changeData, options, userId) {
         if (!this.systemState.shouldProcessEvents()) return;
 
         // Only clear caches if the change actually affects visibility
@@ -55,32 +55,61 @@ export class LightingEventHandler {
             if (this.cacheManager?.clearAllCaches) {
                 this.cacheManager.clearAllCaches();
             }
-            this.visibilityState.markAllTokensChangedThrottled();
+            // CRITICAL: Clear LightingPrecomputer caches when ambient lights change
+            // This ensures the lighting environment hash will be recalculated
+            try {
+                const { LightingPrecomputer } = await import('./LightingPrecomputer.js');
+                LightingPrecomputer.clearLightingCaches();
+            } catch (e) {
+                console.warn('Failed to clear LightingPrecomputer caches:', e);
+            }
+
+            // Use immediate processing for ambient lights to ensure responsive updates
+            // Ambient light changes are less frequent than token movements, so no need for throttling
+            this.visibilityState.markAllTokensChangedImmediate();
         }
     }
 
     /**
      * Handle ambient light creation - affects visibility for all tokens
      */
-    handleLightCreate() {
+    async handleLightCreate() {
         if (!this.systemState.shouldProcessEvents()) return;
         // New lights always affect visibility, so clear caches
         if (this.cacheManager?.clearAllCaches) {
             this.cacheManager.clearAllCaches();
         }
-        this.visibilityState.markAllTokensChangedThrottled();
+        // CRITICAL: Clear LightingPrecomputer caches when ambient lights are created
+        try {
+            const { LightingPrecomputer } = await import('./LightingPrecomputer.js');
+            LightingPrecomputer.clearLightingCaches();
+        } catch (e) {
+            console.warn('Failed to clear LightingPrecomputer caches:', e);
+        }
+
+        // Use immediate processing for ambient light creation
+        this.visibilityState.markAllTokensChangedImmediate();
     }
 
     /**
      * Handle ambient light deletion - affects visibility for all tokens
      */
-    handleLightDelete() {
+    async handleLightDelete() {
         if (!this.systemState.shouldProcessEvents()) return;
         // Deleted lights always affect visibility, so clear caches
         if (this.cacheManager?.clearAllCaches) {
             this.cacheManager.clearAllCaches();
         }
-        this.visibilityState.markAllTokensChangedThrottled();
+        // CRITICAL: Clear LightingPrecomputer caches when ambient lights are deleted
+        try {
+            const { LightingPrecomputer } = await import('./LightingPrecomputer.js');
+            LightingPrecomputer.clearLightingCaches();
+        } catch (e) {
+            console.warn('Failed to clear LightingPrecomputer caches:', e);
+        }
+
+        // Use immediate processing for ambient light deletion
+        this.visibilityState.markAllTokensChangedImmediate();
     }
 
     /**

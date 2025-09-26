@@ -8,17 +8,9 @@ import { CoverModifierService } from '../../../services/CoverModifierService.js'
 import { refreshEveryonesPerception } from '../../../services/socket.js';
 import { updateTokenVisuals } from '../../../services/visual-effects.js';
 import { setVisibilityBetween } from '../../../utils.js';
-import { notify } from './notifications.js';
 import AvsOverrideManager from './avs-override-manager.js';
+import { notify } from './notifications.js';
 
-/**
- * Set AVS pair overrides to prevent automatic recalculation of manually set visibility states
- * This is crucial for actions like sneak where we don't want AVS to override our manual changes
- * @param {Token} observer - The observing token
- * @param {Map} changesByTarget - Map of target changes
- * @param {Object} options - Application options
- */
-// setAVSPairOverrides has moved to AvsOverrideManager. Keep a thin delegate for backward compatibility.
 export async function setAVSPairOverrides(observer, changesByTarget, options = {}) {
   return AvsOverrideManager.setPairOverrides(observer, changesByTarget, options);
 }
@@ -204,7 +196,7 @@ export function determineOutcome(total, die, dc) {
   const ladder = ['critical-failure', 'failure', 'success', 'critical-success'];
   const idx = ladder.indexOf(outcome);
   const natural = Number(die);
-  
+
   if (natural === 20) {
     // Promote by one step unless already crit success
     return ladder[Math.min(idx + 1, ladder.length - 1)];
@@ -213,7 +205,7 @@ export function determineOutcome(total, die, dc) {
     // Demote by one step unless already crit failure
     return ladder[Math.max(idx - 1, 0)];
   }
-  
+
   return outcome;
 }
 
@@ -266,7 +258,7 @@ export async function applyVisibilityChanges(observer, changes, options = {}) {
     // Set AVS pair overrides to prevent automatic recalculation of these visibility states
     // This is crucial for sneak actions - we don't want AVS to override our manual visibility changes
     if (options.setAVSOverrides !== false) { // Default to true unless explicitly disabled
-      
+
       if (changesByTarget.size === 0) {
         console.warn('PF2E Visioner | No changes found - cannot set AVS overrides');
       } else {
@@ -360,9 +352,8 @@ export function markPanelComplete(panel, changes) {
     const completionMsg = `
             <div class="automation-completion">
                 <i class="fas fa-check-circle"></i>
-                <span>Applied ${changes.length} visibility change${
-                  changes.length !== 1 ? 's' : ''
-                }</span>
+                <span>Applied ${changes.length} visibility change${changes.length !== 1 ? 's' : ''
+      }</span>
             </div>
         `;
 
@@ -636,6 +627,139 @@ export function filterOutcomesByTemplate(outcomes, center, radiusFeet, tokenProp
 }
 
 /**
+ * Filter outcomes by Line of Sight (LOS) from an observer to each outcome's token.
+ * - By default keeps non-token subjects (e.g., walls) unfiltered.
+ * - Uses VisionAnalyzer.hasLineOfSight for robust checks (bypasses wrappers when sneaking).
+ * @param {Array} outcomes - Array of outcome rows
+ * @param {Token} observer - Acting/observer token to test LOS from
+ * @param {string} tokenProperty - Property on each outcome that holds the counterpart token (default: 'target')
+ * @param {boolean} filterWalls - Whether to apply LOS filtering to walls (default: false)
+ * @returns {Array} Filtered outcomes where observer has LOS to the token
+ */
+export async function filterOutcomesByLOS(outcomes, observer, tokenProperty = 'target', filterWalls = false, filterTokens = true) {
+  try {
+    console.log('LOS Filter: Starting with outcomes:', outcomes?.length, 'observer:', observer?.name);
+    if (!Array.isArray(outcomes) || !observer) {
+      console.log('LOS Filter: Early return - invalid params');
+      return outcomes;
+    }
+
+    // Lazy-load to avoid circular deps at module init
+    const { VisionAnalyzer } = await import('../../../visibility/auto-visibility/VisionAnalyzer.js');
+    const analyzer = VisionAnalyzer.getInstance();
+
+    const filtered = outcomes.map((o) => {
+      try {
+        // Handle wall outcomes
+        if (o?._isWall || o?.wallId) {
+          if (!filterWalls) {
+            console.log('LOS Filter: Keeping wall outcome (wall filtering disabled)');
+            return o;
+          }
+
+          // For walls, check if observer has line of sight to the wall center
+          try {
+            const wall = canvas.walls?.get?.(o.wallId) || o.wall;
+            if (wall && wall.document) {
+              // Create a temporary point at the wall's center for LOS checking
+              const wallCenter = {
+                x: (wall.document.c[0] + wall.document.c[2]) / 2,
+                y: (wall.document.c[1] + wall.document.c[3]) / 2,
+                center: {
+                  x: (wall.document.c[0] + wall.document.c[2]) / 2,
+                  y: (wall.document.c[1] + wall.document.c[3]) / 2
+                }
+              };
+              const hasLOSToWall = analyzer.hasLineOfSight(observer, wallCenter);
+              console.log(`LOS Filter: ${observer?.name} -> Wall ${wall.id}: LOS=${hasLOSToWall} => ${hasLOSToWall ? 'CAN DETECT (keeping)' : 'CANNOT DETECT (filtering out)'}`)
+              return hasLOSToWall ? o : null;
+            }
+          } catch (err) {
+            console.log('LOS Filter: Error checking wall LOS:', err);
+          }
+          // If we can't check the wall, keep it by default
+          console.log('LOS Filter: Keeping wall outcome (could not check LOS)');
+          return o;
+        }
+
+        const token = o?.[tokenProperty];
+        if (!token) {
+          console.log('LOS Filter: No token found for property', tokenProperty);
+          return null;
+        }
+
+        // Only filter tokens if filterTokens is enabled
+        if (filterTokens) {
+          // For sneak dialog: observer=sneaker, token=actual observer who might detect the sneaker
+          // We need to check if the token (actual observer) can detect the observer (sneaker)
+          const hasLOS = analyzer.hasLineOfSight(token, observer);
+
+          // Also check if the actual observer (token) can detect the sneaker (observer) with imprecise senses
+          let canDetectWithSenses = false;
+          try {
+            canDetectWithSenses = analyzer.canDetectWithLifesenseInRange(token, observer);
+          } catch (err) {
+            // Fallback: check for any imprecise senses manually
+            const senses = analyzer.getSensingSummary(token);
+            const distance = canvas.grid?.measureDistance?.(token.center || token, observer.center || observer) || 0;
+
+            // Check if the actual observer (token) has any imprecise senses that could reach the sneaker (observer)
+            canDetectWithSenses = senses.impreciseSenses?.some(sense => {
+              return sense.range >= distance;
+            }) || false;
+          }
+
+          const canDetect = hasLOS || canDetectWithSenses;
+          console.log(`LOS Filter: ${token.name} -> ${observer.name}: LOS=${hasLOS}, Senses=${canDetectWithSenses} => ${canDetect ? 'CAN DETECT (keeping in results)' : 'CANNOT DETECT (filtering out)'}`)
+
+          if (!canDetect) {
+            return null;
+          }
+        }
+
+        // If wall filtering is enabled, also filter walls within this outcome
+        if (filterWalls && o.walls && Array.isArray(o.walls)) {
+          const filteredWalls = o.walls.filter(wall => {
+            try {
+              if (!wall || !wall.document || !wall.document.c) return true;
+
+              // Calculate wall center from coordinates [x1, y1, x2, y2]
+              const wallCenter = {
+                x: (wall.document.c[0] + wall.document.c[2]) / 2,
+                y: (wall.document.c[1] + wall.document.c[3]) / 2
+              };
+
+              const hasLOSToWall = analyzer.hasLineOfSight(observer, wallCenter);
+              console.log(`LOS Filter: ${observer?.name} -> Wall ${wall.id}: LOS=${hasLOSToWall} => ${hasLOSToWall ? 'keeping' : 'filtering out'}`);
+              return hasLOSToWall;
+            } catch (err) {
+              console.log('LOS Filter: Error checking wall LOS in outcome:', err);
+              return true; // Keep wall if we can't check LOS
+            }
+          });
+
+          return {
+            ...o,
+            walls: filteredWalls
+          };
+        }
+
+        return o;
+      } catch (err) {
+        console.log('LOS Filter: Error checking LOS:', err);
+        return o;
+      }
+    }).filter(o => o !== null);
+
+    console.log(`LOS Filter: Filtered ${outcomes.length} -> ${filtered.length} outcomes`);
+    return filtered;
+  } catch (err) {
+    console.log('LOS Filter: Outer error:', err);
+    return outcomes;
+  }
+}
+
+/**
  * Calculate stealth roll total adjustments based on cover state
  * Removes cover-specific stealth bonuses when cover doesn't justify them
  * @param {number} baseTotal - The original roll total
@@ -675,7 +799,7 @@ export function calculateStealthRollTotals(
   // Fallback: try roll modifiers if still no original bonus found
   if (originalCoverBonus === 0) {
     const rollModifiers = actionData?.roll?.options?.modifiers || [];
-    
+
     const coverModifier = rollModifiers.find(
       (mod) => {
         const label = mod.label?.toLowerCase() || '';
@@ -724,7 +848,7 @@ export function calculateStealthRollTotals(
     // NORMAL CASE: No override, use the roll as it was made
     // The baseTotal already includes the original cover bonus that was applied when the roll was made
     // We should only adjust if there's actually a detected difference between what was applied and current cover
-    
+
     // If we have current cover detected and it matches what was originally applied, no adjustment needed
     if (originalCoverBonus === currentCoverBonus) {
       total = baseTotal;
@@ -739,7 +863,7 @@ export function calculateStealthRollTotals(
         // This can happen if the player moved between rolling and dialog opening
         // Show the adjusted total based on current cover detection
         total = baseTotal - originalCoverBonus + currentCoverBonus;
-        
+
         // Show the original roll in brackets if there's a difference
         originalTotal = baseTotal;
       }
@@ -753,4 +877,135 @@ export function calculateStealthRollTotals(
   }
 
   return { total, originalTotal, baseRollTotal };
+}
+
+/**
+ * Check if a token is defeated, unconscious, dead, or dying
+ * @param {Token} token - The token to check
+ * @returns {boolean} True if the token is defeated
+ */
+export function isTokenDefeated(token) {
+  try {
+    const actor = token?.actor;
+    if (!actor) return false;
+
+    if (token.actor.isDead) {
+      return true;
+    }
+
+    console.log(`[isTokenDefeated] Checking token: ${token?.name}, actor: ${actor?.name}`);
+
+    // HP based check (covers 0 or negative)
+    const hpValue = actor.hitPoints?.value ?? actor.system?.attributes?.hp?.value;
+    console.log(`[isTokenDefeated] HP value: ${hpValue}`);
+    if (typeof hpValue === 'number' && hpValue <= 0) {
+      console.log(`[isTokenDefeated] Token ${token?.name} is defeated by HP (${hpValue})`);
+      return true;
+    }
+
+    // Condition-based check (PF2e conditions can be stored in multiple places)
+    const conditionSlugs = new Set();
+
+    // Check itemTypes.condition array
+    if (Array.isArray(actor.itemTypes?.condition)) {
+      console.log(`[isTokenDefeated] Found itemTypes.condition:`, actor.itemTypes.condition.map(c => c?.slug || c?.name));
+      for (const c of actor.itemTypes.condition) {
+        if (c?.slug) conditionSlugs.add(c.slug);
+        else if (typeof c?.name === 'string') conditionSlugs.add(c.name.toLowerCase());
+      }
+    }
+
+    // Check actor.conditions array
+    if (Array.isArray(actor.conditions)) {
+      console.log(`[isTokenDefeated] Found conditions:`, actor.conditions.map(c => c?.slug || c?.name));
+      for (const c of actor.conditions) {
+        if (c?.slug) conditionSlugs.add(c.slug);
+        else if (typeof c?.name === 'string') conditionSlugs.add(c.name.toLowerCase());
+      }
+    }
+
+    // Check actor.appliedConditions (PF2e specific)
+    if (Array.isArray(actor.appliedConditions)) {
+      console.log(`[isTokenDefeated] Found appliedConditions:`, actor.appliedConditions.map(c => c?.slug || c?.name || c));
+      for (const c of actor.appliedConditions) {
+        if (typeof c === 'string') conditionSlugs.add(c);
+        else if (c?.slug) conditionSlugs.add(c.slug);
+        else if (typeof c?.name === 'string') conditionSlugs.add(c.name.toLowerCase());
+      }
+    }
+
+    // Check system.attributes.conditions (another possible location)
+    if (actor.system?.attributes?.conditions) {
+      const sysConditions = actor.system.attributes.conditions;
+      console.log(`[isTokenDefeated] Found system.attributes.conditions:`, sysConditions);
+      if (Array.isArray(sysConditions)) {
+        for (const c of sysConditions) {
+          if (typeof c === 'string') conditionSlugs.add(c);
+          else if (c?.slug) conditionSlugs.add(c.slug);
+          else if (typeof c?.name === 'string') conditionSlugs.add(c.name.toLowerCase());
+        }
+      } else if (typeof sysConditions === 'object') {
+        // Check if conditions are stored as properties
+        for (const [key, value] of Object.entries(sysConditions)) {
+          if (value === true || (typeof value === 'object' && value?.active)) {
+            conditionSlugs.add(key);
+          }
+        }
+      }
+    }
+
+    // Check token document effects/status effects
+    if (token?.document?.statusEffects || token?.statusEffects) {
+      const statusEffects = token.document?.statusEffects || token.statusEffects;
+      console.log(`[isTokenDefeated] Found statusEffects:`, statusEffects);
+      if (Array.isArray(statusEffects)) {
+        for (const effect of statusEffects) {
+          if (typeof effect === 'string') {
+            conditionSlugs.add(effect);
+          }
+        }
+      }
+    }
+
+    console.log(`[isTokenDefeated] All condition slugs:`, Array.from(conditionSlugs));
+
+    // Check for defeated conditions
+    const defeatedSlugs = ['unconscious', 'dead', 'dying'];
+    for (const slug of defeatedSlugs) {
+      if (conditionSlugs.has(slug)) {
+        console.log(`[isTokenDefeated] Token ${token?.name} is defeated by condition: ${slug}`);
+        return true;
+      }
+    }
+
+    console.log(`[isTokenDefeated] Token ${token?.name} is NOT defeated`);
+    return false;
+  } catch (err) {
+    console.error(`[isTokenDefeated] Error checking token ${token?.name}:`, err);
+    return false;
+  }
+}
+
+/**
+ * Filter outcomes by excluding defeated tokens
+ * @param {Array} outcomes - Array of outcome rows
+ * @param {string} tokenProperty - Property on each outcome that holds the token (default: 'target')
+ * @returns {Array} Filtered outcomes excluding defeated tokens
+ */
+export function filterOutcomesByDefeated(outcomes, tokenProperty = 'target') {
+  if (!Array.isArray(outcomes)) {
+    return outcomes;
+  }
+
+  return outcomes.filter((outcome) => {
+    try {
+      const token = outcome?.[tokenProperty];
+      if (!token) return true; // Keep non-token outcomes
+
+      // Filter out defeated tokens
+      return !isTokenDefeated(token);
+    } catch {
+      return true; // Keep outcome if we can't determine defeated status
+    }
+  });
 }
