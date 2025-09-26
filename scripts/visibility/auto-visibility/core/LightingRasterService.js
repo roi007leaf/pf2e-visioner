@@ -40,7 +40,7 @@ export class LightingRasterService {
     const gridSize = canvas.grid?.size || 100;
     const tokenWidth = (target?.document?.width ?? target?.width ?? 1) * gridSize;
     const tokenHeight = (target?.document?.height ?? target?.height ?? 1) * gridSize;
-    const targetRadius = (target?.externalRadius ?? Math.max(tokenWidth, tokenHeight)) / 2;
+    const targetRadius = target?.externalRadius ?? (Math.max(tokenWidth, tokenHeight) / 2);
 
     // If the two tokens are overlapping, we can't possibly pass through darkness
     if (aLen <= targetRadius) {
@@ -104,11 +104,14 @@ export class LightingRasterService {
       }
 
       // We are close enough to the light to possibly be affected, but before we check the shape, we will
-      // use the tangent point on the target farthest from the light center as the endpoint of the ray.
-      // This will handle most cases where we get false positives due to the center ray passing just
-      // inside the darkness while a portion of the target is still visible outside.
-      const dists = tangentPoints.map(pt => (pt.x - light.x)**2 + (pt.y - light.y)**2);
-      const tangentPoint = dists[0] > dists[1] ? tangentPoints[0] : tangentPoints[1];
+      // use the tangent point on the opposite side of the light from the original ray. This will handle
+      // most cases where we get false positives due to the center ray passing just inside the darkness
+      // while a portion of the target is still visible outside.
+      const lightCross = hX*aY - hY*aX;
+      let tangentPoint = tangentPoints[0];
+      const crossProduct = (tangentPoint.x - observerPos.x)*aY - (tangentPoint.y - observerPos.y)*aX;
+      if (crossProduct * lightCross > 0)
+        tangentPoint = tangentPoints[1];
 
       // Test the ray against the light's edges, any intersection means the ray passes through darkness
       const points = light?.shape?.points ?? [];
