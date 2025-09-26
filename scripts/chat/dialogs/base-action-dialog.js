@@ -14,14 +14,14 @@ export class BaseActionDialog extends BasePreviewDialog {
     // LOS filter: enabled out of combat by default, disabled in combat (UI disabled while in combat)
     try {
       // Default to enabled when out of combat, unless explicitly overridden
-      if (typeof options.filterByLOS === 'boolean') {
-        this.filterByLOS = options.filterByLOS;
+      if (typeof options.filterByDetection === 'boolean') {
+        this.filterByDetection = options.filterByDetection;
       } else {
         const inCombat = hasActiveEncounter();
-        this.filterByLOS = !inCombat;
+        this.filterByDetection = !inCombat;
       }
     } catch (err) {
-      this.filterByLOS = false;
+      this.filterByDetection = false;
     }
   }
 
@@ -112,13 +112,13 @@ export class BaseActionDialog extends BasePreviewDialog {
       }
     } catch { }
 
-    // Wire up Filter By LOS checkbox (disabled in combat via template binding)
+    // Wire up Filter By Detection checkbox (disabled in combat via template binding)
     try {
-      const cbLos = this.element.querySelector('input[data-action="toggleFilterByLOS"]');
-      if (cbLos) {
-        cbLos.onchange = null;
-        cbLos.addEventListener('change', async () => {
-          this.filterByLOS = !!cbLos.checked;
+      const cbDetection = this.element.querySelector('input[data-action="toggleFilterByDetection"]');
+      if (cbDetection) {
+        cbDetection.onchange = null;
+        cbDetection.addEventListener('change', async () => {
+          this.filterByDetection = !!cbDetection.checked;
           this.bulkActionState = 'initial';
           // Let subclasses recompute filtered outcomes if they provide a method
           try {
@@ -144,7 +144,7 @@ export class BaseActionDialog extends BasePreviewDialog {
       // Per-dialog ignore-allies checkbox state (defaults from global setting)
       ignoreAllies: this.ignoreAllies,
       // LOS filter state; UI disables when in combat
-      filterByLOS: !!this.filterByLOS,
+      filterByDetection: !!this.filterByDetection,
       // Visual filter checkbox state
       showOnlyChanges: !!this.showOnlyChanges,
       bulkActionState: this.bulkActionState ?? 'initial',

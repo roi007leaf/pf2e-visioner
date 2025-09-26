@@ -41,7 +41,7 @@ export class SeekPreviewDialog extends BaseActionDialog {
       applyChange: SeekPreviewDialog._onApplyChange,
       revertChange: SeekPreviewDialog._onRevertChange,
       toggleEncounterFilter: SeekPreviewDialog._onToggleEncounterFilter,
-      toggleFilterByLOS: SeekPreviewDialog._onToggleFilterByLOS,
+      toggleFilterByDetection: SeekPreviewDialog._onToggleFilterByDetection,
       overrideState: SeekPreviewDialog._onOverrideState,
     },
   };
@@ -143,9 +143,9 @@ export class SeekPreviewDialog extends BaseActionDialog {
     // Always apply wall LOS filtering for performance, optionally apply token LOS filtering if enabled
     if (this.actorToken) {
       try {
-        const { filterOutcomesByLOS } = await import('../services/infra/shared-utils.js');
-        // Always filter walls by LOS (true), filter tokens by LOS only if checkbox enabled (this.filterByLOS)
-        filteredOutcomes = await filterOutcomesByLOS(filteredOutcomes, this.actorToken, 'target', true, this.filterByLOS, 'observer_to_target');
+        const { filterOutcomesByDetection } = await import('../services/infra/shared-utils.js');
+        // Always filter walls by detection (true), filter tokens by detection only if checkbox enabled (this.filterByDetection)
+        filteredOutcomes = await filterOutcomesByDetection(filteredOutcomes, this.actorToken, 'target', true, this.filterByDetection, 'observer_to_target');
       } catch { /* LOS filtering is non-critical */ }
     }
 
@@ -716,9 +716,9 @@ export class SeekPreviewDialog extends BaseActionDialog {
       // Always apply wall LOS filtering for performance, optionally apply token LOS filtering if enabled
       if (this.actorToken) {
         try {
-          const { filterOutcomesByLOS } = await import('../services/infra/shared-utils.js');
-          // Always filter walls by LOS (true), filter tokens by LOS only if checkbox enabled (this.filterByLOS)
-          filtered = await filterOutcomesByLOS(filtered, this.actorToken, 'target', true, this.filterByLOS, 'observer_to_target');
+          const { filterOutcomesByDetection } = await import('../services/infra/shared-utils.js');
+          // Always filter walls by detection (true), filter tokens by detection only if checkbox enabled (this.filterByDetection)
+          filtered = await filterOutcomesByDetection(filtered, this.actorToken, 'target', true, this.filterByDetection, 'observer_to_target');
         } catch { }
       }
       // Compute actionability and carry over any existing overrides from the currently displayed outcomes
@@ -1407,10 +1407,10 @@ export class SeekPreviewDialog extends BaseActionDialog {
     app.render({ force: true });
   }
 
-  static async _onToggleFilterByLOS(event, target) {
+  static async _onToggleFilterByDetection(event, target) {
     const app = _currentSeekDialogInstance;
     if (!app) return;
-    app.filterByLOS = target.checked;
+    app.filterByDetection = target.checked;
     app.bulkActionState = 'initial';
     app.render({ force: true });
   }

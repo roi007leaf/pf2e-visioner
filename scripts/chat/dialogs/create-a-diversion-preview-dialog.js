@@ -57,7 +57,7 @@ export class CreateADiversionPreviewDialog extends BaseActionDialog {
       applyAll: CreateADiversionPreviewDialog._onApplyAll,
       revertAll: CreateADiversionPreviewDialog._onRevertAll,
       toggleEncounterFilter: CreateADiversionPreviewDialog._onToggleEncounterFilter,
-      toggleFilterByLOS: CreateADiversionPreviewDialog._onToggleFilterByLOS,
+      toggleFilterByDetection: CreateADiversionPreviewDialog._onToggleFilterByDetection,
       overrideState: CreateADiversionPreviewDialog._onOverrideState,
     },
   };
@@ -96,11 +96,11 @@ export class CreateADiversionPreviewDialog extends BaseActionDialog {
       );
     } catch { }
 
-    // Apply LOS filtering if enabled
-    if (this.filterByLOS && this.divertingToken) {
+    // Apply detection filtering if enabled
+    if (this.filterByDetection && this.divertingToken) {
       try {
-        const { filterOutcomesByLOS } = await import('../services/infra/shared-utils.js');
-        processedOutcomes = await filterOutcomesByLOS(processedOutcomes, this.divertingToken, 'observer', false, true, 'target_to_observer');
+        const { filterOutcomesByDetection } = await import('../services/infra/shared-utils.js');
+        processedOutcomes = await filterOutcomesByDetection(processedOutcomes, this.divertingToken, 'observer', false, true, 'target_to_observer');
       } catch { /* LOS filtering is non-critical */ }
     }
 
@@ -512,12 +512,12 @@ export class CreateADiversionPreviewDialog extends BaseActionDialog {
   }
 
   /**
-   * Handle LOS filter toggle
+   * Handle detection filter toggle
    */
-  static async _onToggleFilterByLOS(event, target) {
+  static async _onToggleFilterByDetection(event, target) {
     const app = currentDiversionDialog;
     if (!app) return;
-    app.filterByLOS = target.checked;
+    app.filterByDetection = target.checked;
     app.bulkActionState = 'initial';
     app.render({ force: true });
   }

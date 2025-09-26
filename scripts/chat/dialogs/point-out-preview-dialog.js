@@ -33,7 +33,7 @@ export class PointOutPreviewDialog extends BaseActionDialog {
       applyChange: PointOutPreviewDialog._onApplyChange,
       revertChange: PointOutPreviewDialog._onRevertChange,
       toggleEncounterFilter: PointOutPreviewDialog._onToggleEncounterFilter,
-      toggleFilterByLOS: PointOutPreviewDialog._onToggleFilterByLOS,
+      toggleFilterByDetection: PointOutPreviewDialog._onToggleFilterByDetection,
     },
   };
 
@@ -83,11 +83,11 @@ export class PointOutPreviewDialog extends BaseActionDialog {
       filteredOutcomes = filterOutcomesByAllies(filteredOutcomes, this.actorToken, this.ignoreAllies, 'target');
     } catch { }
 
-    // Apply LOS filtering if enabled
-    if (this.filterByLOS && this.actorToken) {
+    // Apply detection filtering if enabled
+    if (this.filterByDetection && this.actorToken) {
       try {
-        const { filterOutcomesByLOS } = await import('../services/infra/shared-utils.js');
-        filteredOutcomes = await filterOutcomesByLOS(filteredOutcomes, this.actorToken, 'target', false, true, 'observer_to_target');
+        const { filterOutcomesByDetection } = await import('../services/infra/shared-utils.js');
+        filteredOutcomes = await filterOutcomesByDetection(filteredOutcomes, this.actorToken, 'target', false, true, 'observer_to_target');
       } catch { /* LOS filtering is non-critical */ }
     }
 
@@ -238,10 +238,10 @@ export class PointOutPreviewDialog extends BaseActionDialog {
     } catch { }
 
     // Apply LOS filtering if enabled
-    if (this.filterByLOS && this.actorToken) {
+    if (this.filterByDetection && this.actorToken) {
       try {
-        const { filterOutcomesByLOS } = await import('../services/infra/shared-utils.js');
-        filtered = await filterOutcomesByLOS(filtered, this.actorToken, 'target', false, true, 'observer_to_target');
+        const { filterOutcomesByDetection } = await import('../services/infra/shared-utils.js');
+        filtered = await filterOutcomesByDetection(filtered, this.actorToken, 'target', false, true, 'observer_to_target');
       } catch { /* LOS filtering is non-critical */ }
     }
 
@@ -395,10 +395,10 @@ export class PointOutPreviewDialog extends BaseActionDialog {
     app.render({ force: true });
   }
 
-  static async _onToggleFilterByLOS(event, target) {
+  static async _onToggleFilterByDetection(event, target) {
     const app = currentPointOutDialog;
     if (!app) return;
-    app.filterByLOS = target.checked;
+    app.filterByDetection = target.checked;
     app.bulkActionState = 'initial';
     app.render({ force: true });
   }

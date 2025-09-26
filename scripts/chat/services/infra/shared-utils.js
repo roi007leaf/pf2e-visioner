@@ -634,12 +634,12 @@ export function filterOutcomesByTemplate(outcomes, center, radiusFeet, tokenProp
  * @param {Array} outcomes - Array of outcome rows
  * @param {Token} observer - Acting/observer token to test detection from
  * @param {string} tokenProperty - Property on each outcome that holds the counterpart token (default: 'target')
- * @param {boolean} filterWalls - Whether to apply LOS filtering to walls (default: false)
+ * @param {boolean} filterWalls - Whether to apply detection filtering to walls (default: false)
  * @param {boolean} filterTokens - Whether to apply detectability filtering to tokens (default: true)
  * @param {string} detectionDirection - Direction of detection: 'observer_to_target' (seek) or 'target_to_observer' (hide/sneak)
  * @returns {Array} Filtered outcomes where detection is possible
  */
-export async function filterOutcomesByLOS(outcomes, observer, tokenProperty = 'target', filterWalls = false, filterTokens = true, detectionDirection = 'target_to_observer') {
+export async function filterOutcomesByDetection(outcomes, observer, tokenProperty = 'target', filterWalls = false, filterTokens = true, detectionDirection = 'target_to_observer') {
   try {
     if (!Array.isArray(outcomes) || !observer) {
       return outcomes;

@@ -20,7 +20,7 @@ export class TakeCoverPreviewDialog extends BaseActionDialog {
       applyChange: TakeCoverPreviewDialog._onApplyChange,
       revertChange: TakeCoverPreviewDialog._onRevertChange,
       toggleEncounterFilter: TakeCoverPreviewDialog._onToggleEncounterFilter,
-      toggleFilterByLOS: TakeCoverPreviewDialog._onToggleFilterByLOS,
+      toggleFilterByDetection: TakeCoverPreviewDialog._onToggleFilterByDetection,
       overrideState: TakeCoverPreviewDialog._onOverrideState,
     },
   };
@@ -66,10 +66,10 @@ export class TakeCoverPreviewDialog extends BaseActionDialog {
       } catch { }
 
       // Apply LOS filtering if enabled
-      if (this.filterByLOS && this.actorToken) {
+      if (this.filterByDetection && this.actorToken) {
         try {
-          const { filterOutcomesByLOS } = await import('../services/infra/shared-utils.js');
-          filtered = await filterOutcomesByLOS(filtered, this.actorToken, 'target', false, true, 'target_to_observer');
+          const { filterOutcomesByDetection } = await import('../services/infra/shared-utils.js');
+          filtered = await filterOutcomesByDetection(filtered, this.actorToken, 'target', false, true, 'target_to_observer');
         } catch { /* LOS filtering is non-critical */ }
       }
 
@@ -113,11 +113,11 @@ export class TakeCoverPreviewDialog extends BaseActionDialog {
       );
     } catch { }
 
-    // Apply LOS filtering if enabled
-    if (this.filterByLOS && this.actorToken) {
+    // Apply detection filtering if enabled
+    if (this.filterByDetection && this.actorToken) {
       try {
-        const { filterOutcomesByLOS } = await import('../services/infra/shared-utils.js');
-        filteredOutcomes = await filterOutcomesByLOS(filteredOutcomes, this.actorToken, 'target', false, true, 'target_to_observer');
+        const { filterOutcomesByDetection } = await import('../services/infra/shared-utils.js');
+        filteredOutcomes = await filterOutcomesByDetection(filteredOutcomes, this.actorToken, 'target', false, true, 'target_to_observer');
       } catch { /* LOS filtering is non-critical */ }
     }
 
@@ -317,10 +317,10 @@ export class TakeCoverPreviewDialog extends BaseActionDialog {
     app.render({ force: true });
   }
 
-  static async _onToggleFilterByLOS(event, target) {
+  static async _onToggleFilterByDetection(event, target) {
     const app = currentTakeCoverDialog;
     if (!app) return;
-    app.filterByLOS = target.checked;
+    app.filterByDetection = target.checked;
     app.bulkActionState = 'initial';
     app.render({ force: true });
   }

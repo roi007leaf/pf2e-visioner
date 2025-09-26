@@ -511,8 +511,8 @@
       "REMOVE_OVERRIDES": "Remove Overrides",
       "BULK_SET_VISIBILITY": "Bulk Set Visibility",
       "CLEAR_BULK_OVERRIDES": "Clear Bulk Overrides",
-      "FILTER_BY_LOS_LABEL": "Filter By Detectable",
-      "FILTER_BY_LOS_TOOLTIP": "Only show tokens that can be detected (via line of sight OR other senses)"
+      "FILTER_BY_DETECTION_LABEL": "Filter By Detectable",
+      "FILTER_BY_DETECTION_TOOLTIP": "Only show tokens that can be detected (via line of sight OR other senses)"
     },
     "WALL": {
       "VISIBLE_TO_YOU": "Hidden Wall",

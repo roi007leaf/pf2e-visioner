@@ -65,7 +65,7 @@ export class ConsequencesPreviewDialog extends BaseActionDialog {
       applyAll: ConsequencesPreviewDialog._onApplyAll,
       revertAll: ConsequencesPreviewDialog._onRevertAll,
       toggleEncounterFilter: ConsequencesPreviewDialog._onToggleEncounterFilter,
-      toggleFilterByLOS: ConsequencesPreviewDialog._onToggleFilterByLOS,
+      toggleFilterByDetection: ConsequencesPreviewDialog._onToggleFilterByDetection,
       overrideState: ConsequencesPreviewDialog._onOverrideState,
       removeOverrides: ConsequencesPreviewDialog._onRemoveOverrides,
     },
@@ -150,12 +150,12 @@ export class ConsequencesPreviewDialog extends BaseActionDialog {
       );
     } catch { }
 
-    // Apply LOS filtering if enabled
-    if (this.filterByLOS && this.attackingToken) {
+    // Apply detection filtering if enabled
+    if (this.filterByDetection && this.attackingToken) {
       try {
-        const { filterOutcomesByLOS } = await import('../services/infra/shared-utils.js');
+        const { filterOutcomesByDetection } = await import('../services/infra/shared-utils.js');
         // Await the async filter to avoid turning processedOutcomes into a Promise
-        processedOutcomes = await filterOutcomesByLOS(
+        processedOutcomes = await filterOutcomesByDetection(
           processedOutcomes,
           this.attackingToken,
           'target',
@@ -537,12 +537,12 @@ export class ConsequencesPreviewDialog extends BaseActionDialog {
   }
 
   /**
-   * Handle LOS filter toggle
+   * Handle detection filter toggle
    */
-  static async _onToggleFilterByLOS(event, target) {
+  static async _onToggleFilterByDetection(event, target) {
     const app = currentConsequencesDialog;
     if (!app) return;
-    app.filterByLOS = target.checked;
+    app.filterByDetection = target.checked;
     app.bulkActionState = 'initial';
     app.render({ force: true });
   }

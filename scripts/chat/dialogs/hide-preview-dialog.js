@@ -33,7 +33,7 @@ export class HidePreviewDialog extends BaseActionDialog {
       applyChange: HidePreviewDialog._onApplyChange,
       revertChange: HidePreviewDialog._onRevertChange,
       toggleEncounterFilter: HidePreviewDialog._onToggleEncounterFilter,
-      toggleFilterByLOS: HidePreviewDialog._onToggleFilterByLOS,
+      toggleFilterByDetection: HidePreviewDialog._onToggleFilterByDetection,
       overrideState: HidePreviewDialog._onOverrideState,
       togglePrequisite: HidePreviewDialog._onTogglePrequisite,
       bulkOverrideSet: HidePreviewDialog._onBulkOverrideSet,
@@ -134,11 +134,11 @@ export class HidePreviewDialog extends BaseActionDialog {
       );
     } catch { }
 
-    // Apply LOS filtering if enabled
-    if (this.filterByLOS && this.actorToken) {
+    // Apply detection filtering if enabled
+    if (this.filterByDetection && this.actorToken) {
       try {
-        const { filterOutcomesByLOS } = await import('../services/infra/shared-utils.js');
-        filteredOutcomes = await filterOutcomesByLOS(filteredOutcomes, this.actorToken, 'target', false, true, 'target_to_observer');
+        const { filterOutcomesByDetection } = await import('../services/infra/shared-utils.js');
+        filteredOutcomes = await filterOutcomesByDetection(filteredOutcomes, this.actorToken, 'target', false, true, 'target_to_observer');
       } catch { /* LOS filtering is non-critical */ }
     }
 
@@ -356,10 +356,10 @@ export class HidePreviewDialog extends BaseActionDialog {
       } catch { }
 
       // Apply LOS filtering if enabled
-      if (this.filterByLOS && this.actorToken) {
+      if (this.filterByDetection && this.actorToken) {
         try {
-          const { filterOutcomesByLOS } = await import('../services/infra/shared-utils.js');
-          filtered = await filterOutcomesByLOS(filtered, this.actorToken, 'target', false, true, 'target_to_observer');
+          const { filterOutcomesByDetection } = await import('../services/infra/shared-utils.js');
+          filtered = await filterOutcomesByDetection(filtered, this.actorToken, 'target', false, true, 'target_to_observer');
         } catch { /* LOS filtering is non-critical */ }
       }
       if (!Array.isArray(filtered)) return [];
@@ -559,10 +559,10 @@ export class HidePreviewDialog extends BaseActionDialog {
     app.render({ force: true });
   }
 
-  static async _onToggleFilterByLOS(event, target) {
+  static async _onToggleFilterByDetection(event, target) {
     const app = currentHideDialog;
     if (!app) return;
-    app.filterByLOS = target.checked;
+    app.filterByDetection = target.checked;
     app.bulkActionState = 'initial';
     // Recompute filtered outcomes and preserve overrides before re-rendering
     try {

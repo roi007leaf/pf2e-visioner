@@ -147,7 +147,7 @@ export class SneakPreviewDialog extends BaseActionDialog {
       applyAll: SneakPreviewDialog._onApplyAll,
       revertAll: SneakPreviewDialog._onRevertAll,
       toggleEncounterFilter: SneakPreviewDialog._onToggleEncounterFilter,
-      toggleFilterByLOS: SneakPreviewDialog._onToggleFilterByLOS,
+      toggleFilterByDetection: SneakPreviewDialog._onToggleFilterByDetection,
       overrideState: SneakPreviewDialog._onOverrideState,
       togglePositionDisplay: SneakPreviewDialog._onTogglePositionDisplay,
       toggleStartPosition: SneakPreviewDialog._onToggleStartPosition,
@@ -191,12 +191,12 @@ export class SneakPreviewDialog extends BaseActionDialog {
       );
     } catch { }
 
-    // Apply LOS filtering if enabled (Note: Sneak uses 'token' property, not 'target')
-    if (this.filterByLOS && this.sneakingToken) {
+    // Apply detection filtering if enabled (Note: Sneak uses 'token' property, not 'target')
+    if (this.filterByDetection && this.sneakingToken) {
       try {
-        const { filterOutcomesByLOS } = await import('../services/infra/shared-utils.js');
-        filteredOutcomes = await filterOutcomesByLOS(filteredOutcomes, this.sneakingToken, 'token', false, true, 'target_to_observer');
-      } catch { /* LOS filtering is non-critical */ }
+        const { filterOutcomesByDetection } = await import('../services/infra/shared-utils.js');
+        filteredOutcomes = await filterOutcomesByDetection(filteredOutcomes, this.sneakingToken, 'token', false, true, 'target_to_observer');
+      } catch { /* Detection filtering is non-critical */ }
     }
 
     // Apply defeated token filtering (exclude dead/unconscious tokens)
@@ -629,12 +629,12 @@ export class SneakPreviewDialog extends BaseActionDialog {
       );
     } catch { }
 
-    // Apply LOS filtering if enabled (Note: Sneak uses 'token' property, not 'target')
-    if (this.filterByLOS && this.sneakingToken) {
+    // Apply detection filtering if enabled (Note: Sneak uses 'token' property, not 'target')
+    if (this.filterByDetection && this.sneakingToken) {
       try {
-        const { filterOutcomesByLOS } = await import('../services/infra/shared-utils.js');
-        filteredOutcomes = await filterOutcomesByLOS(filteredOutcomes, this.sneakingToken, 'token', false, true, 'target_to_observer');
-      } catch { /* LOS filtering is non-critical */ }
+        const { filterOutcomesByDetection } = await import('../services/infra/shared-utils.js');
+        filteredOutcomes = await filterOutcomesByDetection(filteredOutcomes, this.sneakingToken, 'token', false, true, 'target_to_observer');
+      } catch { /* Detection filtering is non-critical */ }
     }
 
     // Capture current end positions for all filtered outcomes
@@ -1963,10 +1963,10 @@ export class SneakPreviewDialog extends BaseActionDialog {
     app.render({ force: true });
   }
 
-  static async _onToggleFilterByLOS(event, target) {
+  static async _onToggleFilterByDetection(event, target) {
     const app = currentSneakDialog;
     if (!app) return;
-    app.filterByLOS = target.checked;
+    app.filterByDetection = target.checked;
     app.bulkActionState = 'initial';
     app.render({ force: true });
   }
