@@ -154,7 +154,12 @@ export class ConsequencesPreviewDialog extends BaseActionDialog {
     if (this.filterByLOS && this.attackingToken) {
       try {
         const { filterOutcomesByLOS } = await import('../services/infra/shared-utils.js');
-        processedOutcomes = filterOutcomesByLOS(processedOutcomes, this.attackingToken, 'target');
+        // Await the async filter to avoid turning processedOutcomes into a Promise
+        processedOutcomes = await filterOutcomesByLOS(
+          processedOutcomes,
+          this.attackingToken,
+          'target',
+        );
       } catch { /* LOS filtering is non-critical */ }
     }
 

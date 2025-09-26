@@ -300,6 +300,100 @@
     gap: 8px;
   }
 
+  /* Seek dialog – Senses buttons */
+  .seek-preview-dialog .senses-buttons-container {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin: 6px 0;
+  }
+
+  .seek-preview-dialog .senses-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: fit-content;
+    max-width: 100%;
+    padding: 8px 12px;
+    border-radius: 999px;
+    border: 1px solid color-mix(in srgb, var(--pf2e-visioner-info) 55%, transparent);
+    background: linear-gradient(180deg,
+      color-mix(in srgb, var(--pf2e-visioner-info) 18%, transparent) 0%,
+      color-mix(in srgb, var(--pf2e-visioner-info) 12%, transparent) 100%);
+    color: var(--color-text-light-primary);
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1;
+    transition: all 0.2s ease;
+    text-decoration: none;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  }
+
+  .seek-preview-dialog .senses-button:hover {
+    transform: translateY(-1px);
+    border-color: var(--pf2e-visioner-info);
+    box-shadow:
+      0 2px 6px rgba(0, 0, 0, 0.25),
+      0 0 0 2px color-mix(in srgb, var(--pf2e-visioner-info) 25%, transparent);
+  }
+
+  .seek-preview-dialog .senses-button i {
+    font-size: 14px;
+    line-height: 1;
+  }
+
+  .seek-preview-dialog .senses-button .button-text {
+    white-space: nowrap;
+  }
+
+  .seek-preview-dialog .senses-button .count-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 6px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 800;
+    background: color-mix(in srgb, #000 20%, var(--pf2e-visioner-info) 30%);
+    border: 1px solid color-mix(in srgb, var(--pf2e-visioner-info) 55%, transparent);
+    color: var(--color-text-light-primary);
+  }
+
+  .seek-preview-dialog .senses-button .chevron {
+    opacity: 0.9;
+    margin-left: 2px;
+  }
+
+  /* Inline used-sense indicator within the single button */
+  .seek-preview-dialog .senses-button .used-sense-indicator {
+    margin-left: 6px;
+    padding: 2px 6px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--color-text-light-primary);
+    background: color-mix(in srgb, var(--pf2e-visioner-warning) 22%, transparent);
+    border: 1px solid color-mix(in srgb, var(--pf2e-visioner-warning) 55%, transparent);
+  }
+
+  /* Variant accents – use module theme variables (no hardcoded hex) */
+  /* .senses-button.available-senses uses the themed base styles above */
+
+  .seek-preview-dialog .senses-button.used-senses {
+    background: color-mix(in srgb, var(--pf2e-visioner-warning) 20%, transparent);
+    border-color: color-mix(in srgb, var(--pf2e-visioner-warning) 60%, transparent);
+    color: var(--color-text-light-primary);
+  }
+
+  .seek-preview-dialog .senses-button.used-senses:hover {
+    background: color-mix(in srgb, var(--pf2e-visioner-warning) 30%, transparent);
+    border-color: var(--pf2e-visioner-warning);
+  }
+
   /* Original visibility change styling restored */
   .visibility-change-with-override {
     display: flex;

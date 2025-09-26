@@ -138,7 +138,6 @@ export class BaseActionDialog extends BasePreviewDialog {
 
   buildCommonContext(outcomes) {
     const changesCount = this.computeChangesCount(outcomes);
-    console.log('BaseActionDialog.buildCommonContext: filterByLOS =', this.filterByLOS, 'losFilterDisabled =', hasActiveEncounter());
 
     return {
       changesCount,
@@ -149,7 +148,6 @@ export class BaseActionDialog extends BasePreviewDialog {
       ignoreAllies: this.ignoreAllies,
       // LOS filter state; UI disables when in combat
       filterByLOS: !!this.filterByLOS,
-      losFilterDisabled: hasActiveEncounter(),
       // Visual filter checkbox state
       showOnlyChanges: !!this.showOnlyChanges,
       bulkActionState: this.bulkActionState ?? 'initial',

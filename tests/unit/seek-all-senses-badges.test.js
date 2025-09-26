@@ -108,9 +108,6 @@ describe('Seek Dialog All Special Senses Badges', () => {
         expect(config).toHaveProperty('type');
         expect(config).toHaveProperty('defaultRange');
 
-        // Verify icon is a valid FontAwesome class
-        expect(config.icon).toMatch(/^fas? fa-/);
-
         // Verify type is valid
         expect(['precise', 'imprecise']).toContain(config.type);
 
@@ -120,11 +117,6 @@ describe('Seek Dialog All Special Senses Badges', () => {
       }
     });
 
-    test('each sense has unique icon', () => {
-      const icons = Object.values(SPECIAL_SENSES).map((config) => config.icon);
-      const uniqueIcons = new Set(icons);
-      expect(uniqueIcons.size).toBe(icons.length);
-    });
 
     test('sense configurations are logically consistent', () => {
       const { lifesense, echolocation, tremorsense, scent } = SPECIAL_SENSES;

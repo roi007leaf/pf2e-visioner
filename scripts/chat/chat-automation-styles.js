@@ -7,44 +7,44 @@
  * Initialize and inject CSS styles for chat automation
  */
 export function injectChatAutomationStyles() {
-  // Re-enable CSS injection for chat automation styles
-  const css = getChatAutomationCSS();
+    // Re-enable CSS injection for chat automation styles
+    const css = getChatAutomationCSS();
 
-  // Check if styles are already injected
-  if (document.getElementById('pf2e-visioner-chat-styles')) {
-    return;
-  }
-
-  // Create and inject style element
-  const style = document.createElement('style');
-  style.id = 'pf2e-visioner-chat-styles';
-  style.textContent = css;
-  document.head.appendChild(style);
-
-  // Add event listener to fix scrolling in dialogs
-  Hooks.on('renderApplication', (app, html, data) => {
-    if (app.constructor.name.includes('PreviewDialog')) {
-      fixDialogScrolling(html);
+    // Check if styles are already injected
+    if (document.getElementById('pf2e-visioner-chat-styles')) {
+        return;
     }
-  });
+
+    // Create and inject style element
+    const style = document.createElement('style');
+    style.id = 'pf2e-visioner-chat-styles';
+    style.textContent = css;
+    document.head.appendChild(style);
+
+    // Add event listener to fix scrolling in dialogs
+    Hooks.on('renderApplication', (app, html, data) => {
+        if (app.constructor.name.includes('PreviewDialog')) {
+            fixDialogScrolling(html);
+        }
+    });
 }
 
 /**
  * Re-inject chat automation styles (for colorblind mode changes)
  */
 export function reinjectChatAutomationStyles() {
-  // Remove existing styles
-  const existingStyle = document.getElementById('pf2e-visioner-chat-styles');
-  if (existingStyle) {
-    existingStyle.remove();
-  }
+    // Remove existing styles
+    const existingStyle = document.getElementById('pf2e-visioner-chat-styles');
+    if (existingStyle) {
+        existingStyle.remove();
+    }
 
-  // Re-inject with updated styles
-  const css = getChatAutomationCSS();
-  const style = document.createElement('style');
-  style.id = 'pf2e-visioner-chat-styles';
-  style.textContent = css;
-  document.head.appendChild(style);
+    // Re-inject with updated styles
+    const css = getChatAutomationCSS();
+    const style = document.createElement('style');
+    style.id = 'pf2e-visioner-chat-styles';
+    style.textContent = css;
+    document.head.appendChild(style);
 }
 
 /**
@@ -52,27 +52,27 @@ export function reinjectChatAutomationStyles() {
  * @param {jQuery} html - The rendered HTML of the dialog
  */
 function fixDialogScrolling(html) {
-  // Ensure the results table container can scroll
-  const container = html.find('.results-table-container');
-  if (container.length) {
-    // Force the container to take up available space
-    container.css({
-      flex: '1 1 auto',
-      'overflow-y': 'auto',
-      'min-height': '150px',
-      'max-height': 'calc(100% - 180px)',
-    });
+    // Ensure the results table container can scroll
+    const container = html.find('.results-table-container');
+    if (container.length) {
+        // Force the container to take up available space
+        container.css({
+            flex: '1 1 auto',
+            'overflow-y': 'auto',
+            'min-height': '150px',
+            'max-height': 'calc(100% - 180px)',
+        });
 
-    // Ensure the table headers are sticky
-    const headers = container.find('thead th');
-    if (headers.length) {
-      headers.css({
-        position: 'sticky',
-        top: '0',
-        'z-index': '2',
-      });
+        // Ensure the table headers are sticky
+        const headers = container.find('thead th');
+        if (headers.length) {
+            headers.css({
+                position: 'sticky',
+                top: '0',
+                'z-index': '2',
+            });
+        }
     }
-  }
 }
 
 /**
@@ -80,7 +80,7 @@ function fixDialogScrolling(html) {
  * @returns {string} Complete CSS string
  */
 function getChatAutomationCSS() {
-  return `
+    return `
         /* Automation Panel Styles - Base */
         .pf2e-visioner-automation-panel {
             border-radius: 8px;
@@ -413,6 +413,8 @@ function getChatAutomationCSS() {
             border-radius: 50%;
             border: 2px solid var(--pf2e-visioner-purple);
             margin-right: 12px;
+            object-fit: cover;
+            object-position: top;
         }
         
         .hider-details {
@@ -525,6 +527,8 @@ function getChatAutomationCSS() {
             border-radius: 50%;
             border: 2px solid var(--pf2e-visioner-info);
             margin-right: 12px;
+            object-fit: cover;
+            object-position: top;
         }
         
         .seeker-name {
@@ -1957,6 +1961,8 @@ function getChatAutomationCSS() {
             border-radius: 50%;
             border: 2px solid var(--pf2e-visioner-purple);
             margin-right: 12px;
+            object-fit: cover;
+            object-position: top;
         }
         
         .hiding-name {
@@ -2166,12 +2172,6 @@ function getChatAutomationCSS() {
             margin-bottom: 16px;
         }
         
-        .sneak-preview-dialog .seeker-image img {
-            width: 48px;
-            height: 48px;
-            border-radius: 50%;
-            border: 2px solid white;
-        }
         
         .sneak-preview-dialog .sneaker-details h3 {
             margin: 0 0 4px 0;
@@ -2471,6 +2471,8 @@ function getChatAutomationCSS() {
             border-radius: 50%;
             border: 2px solid #ff6b6b;
             margin-right: 12px;
+            object-fit: cover;
+            object-position: top;
         }
         
         .consequences-preview-dialog .attacker-details {
@@ -2535,6 +2537,8 @@ function getChatAutomationCSS() {
             border-radius: 50%;
             border: 2px solid rgb(13, 201, 230);
             margin-right: 12px;
+            object-fit: cover;
+            object-position: top;
         }
         
         .create-a-diversion-preview-dialog .diverter-details {
@@ -2778,6 +2782,7 @@ function getChatAutomationCSS() {
             height: 32px;
             border-radius: 4px;
             object-fit: cover;
+            object-position: top;
         }
         
         .create-a-diversion-preview-dialog .roll-info {
