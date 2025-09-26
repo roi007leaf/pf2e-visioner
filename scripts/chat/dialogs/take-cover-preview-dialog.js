@@ -30,7 +30,6 @@ export class TakeCoverPreviewDialog extends BaseActionDialog {
   };
 
   constructor(actorToken, outcomes, changes, actionData, options = {}) {
-    console.log('TakeCoverPreviewDialog constructor called');
     super(options);
     this.actorToken = actorToken;
     this.outcomes = Array.isArray(outcomes) ? outcomes : [];
@@ -70,7 +69,7 @@ export class TakeCoverPreviewDialog extends BaseActionDialog {
       if (this.filterByLOS && this.actorToken) {
         try {
           const { filterOutcomesByLOS } = await import('../services/infra/shared-utils.js');
-          filtered = await filterOutcomesByLOS(filtered, this.actorToken, 'target');
+          filtered = await filterOutcomesByLOS(filtered, this.actorToken, 'target', false, true, 'target_to_observer');
         } catch { /* LOS filtering is non-critical */ }
       }
 
@@ -118,7 +117,7 @@ export class TakeCoverPreviewDialog extends BaseActionDialog {
     if (this.filterByLOS && this.actorToken) {
       try {
         const { filterOutcomesByLOS } = await import('../services/infra/shared-utils.js');
-        filteredOutcomes = await filterOutcomesByLOS(filteredOutcomes, this.actorToken, 'target');
+        filteredOutcomes = await filterOutcomesByLOS(filteredOutcomes, this.actorToken, 'target', false, true, 'target_to_observer');
       } catch { /* LOS filtering is non-critical */ }
     }
 

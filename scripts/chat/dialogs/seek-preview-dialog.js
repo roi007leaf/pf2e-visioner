@@ -145,7 +145,7 @@ export class SeekPreviewDialog extends BaseActionDialog {
       try {
         const { filterOutcomesByLOS } = await import('../services/infra/shared-utils.js');
         // Always filter walls by LOS (true), filter tokens by LOS only if checkbox enabled (this.filterByLOS)
-        filteredOutcomes = await filterOutcomesByLOS(filteredOutcomes, this.actorToken, 'target', true, this.filterByLOS);
+        filteredOutcomes = await filterOutcomesByLOS(filteredOutcomes, this.actorToken, 'target', true, this.filterByLOS, 'observer_to_target');
       } catch { /* LOS filtering is non-critical */ }
     }
 
@@ -718,7 +718,7 @@ export class SeekPreviewDialog extends BaseActionDialog {
         try {
           const { filterOutcomesByLOS } = await import('../services/infra/shared-utils.js');
           // Always filter walls by LOS (true), filter tokens by LOS only if checkbox enabled (this.filterByLOS)
-          filtered = await filterOutcomesByLOS(filtered, this.actorToken, 'target', true, this.filterByLOS);
+          filtered = await filterOutcomesByLOS(filtered, this.actorToken, 'target', true, this.filterByLOS, 'observer_to_target');
         } catch { }
       }
       // Compute actionability and carry over any existing overrides from the currently displayed outcomes

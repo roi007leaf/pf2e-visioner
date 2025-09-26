@@ -16,15 +16,12 @@ export class BaseActionDialog extends BasePreviewDialog {
       // Default to enabled when out of combat, unless explicitly overridden
       if (typeof options.filterByLOS === 'boolean') {
         this.filterByLOS = options.filterByLOS;
-        console.log('BaseActionDialog: filterByLOS from options:', this.filterByLOS);
       } else {
         const inCombat = hasActiveEncounter();
         this.filterByLOS = !inCombat;
-        console.log('BaseActionDialog: filterByLOS auto-set to', this.filterByLOS, '(inCombat:', inCombat, ')');
       }
     } catch (err) {
       this.filterByLOS = false;
-      console.log('BaseActionDialog: filterByLOS error, defaulted to false:', err);
     }
   }
 

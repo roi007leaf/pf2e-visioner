@@ -159,6 +159,9 @@ export class ConsequencesPreviewDialog extends BaseActionDialog {
           processedOutcomes,
           this.attackingToken,
           'target',
+          false,
+          true,
+          'observer_to_target'
         );
       } catch { /* LOS filtering is non-critical */ }
     }

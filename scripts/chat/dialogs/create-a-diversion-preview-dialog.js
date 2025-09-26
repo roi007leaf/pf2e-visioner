@@ -100,7 +100,7 @@ export class CreateADiversionPreviewDialog extends BaseActionDialog {
     if (this.filterByLOS && this.divertingToken) {
       try {
         const { filterOutcomesByLOS } = await import('../services/infra/shared-utils.js');
-        processedOutcomes = await filterOutcomesByLOS(processedOutcomes, this.divertingToken, 'observer');
+        processedOutcomes = await filterOutcomesByLOS(processedOutcomes, this.divertingToken, 'observer', false, true, 'target_to_observer');
       } catch { /* LOS filtering is non-critical */ }
     }
 

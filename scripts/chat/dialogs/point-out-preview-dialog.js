@@ -87,7 +87,7 @@ export class PointOutPreviewDialog extends BaseActionDialog {
     if (this.filterByLOS && this.actorToken) {
       try {
         const { filterOutcomesByLOS } = await import('../services/infra/shared-utils.js');
-        filteredOutcomes = await filterOutcomesByLOS(filteredOutcomes, this.actorToken, 'target');
+        filteredOutcomes = await filterOutcomesByLOS(filteredOutcomes, this.actorToken, 'target', false, true, 'observer_to_target');
       } catch { /* LOS filtering is non-critical */ }
     }
 
@@ -241,7 +241,7 @@ export class PointOutPreviewDialog extends BaseActionDialog {
     if (this.filterByLOS && this.actorToken) {
       try {
         const { filterOutcomesByLOS } = await import('../services/infra/shared-utils.js');
-        filtered = await filterOutcomesByLOS(filtered, this.actorToken, 'target');
+        filtered = await filterOutcomesByLOS(filtered, this.actorToken, 'target', false, true, 'observer_to_target');
       } catch { /* LOS filtering is non-critical */ }
     }
 

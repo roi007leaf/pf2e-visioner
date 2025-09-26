@@ -627,20 +627,21 @@ export function filterOutcomesByTemplate(outcomes, center, radiusFeet, tokenProp
 }
 
 /**
- * Filter outcomes by Line of Sight (LOS) from an observer to each outcome's token.
+ * Filter outcomes by detectability between an observer and each outcome's token.
+ * - Keeps tokens that can be detected via line of sight OR other senses (lifesense, tremorsense, etc.)
  * - By default keeps non-token subjects (e.g., walls) unfiltered.
- * - Uses VisionAnalyzer.hasLineOfSight for robust checks (bypasses wrappers when sneaking).
+ * - Uses VisionAnalyzer for robust detection checks (bypasses wrappers when sneaking).
  * @param {Array} outcomes - Array of outcome rows
- * @param {Token} observer - Acting/observer token to test LOS from
+ * @param {Token} observer - Acting/observer token to test detection from
  * @param {string} tokenProperty - Property on each outcome that holds the counterpart token (default: 'target')
  * @param {boolean} filterWalls - Whether to apply LOS filtering to walls (default: false)
- * @returns {Array} Filtered outcomes where observer has LOS to the token
+ * @param {boolean} filterTokens - Whether to apply detectability filtering to tokens (default: true)
+ * @param {string} detectionDirection - Direction of detection: 'observer_to_target' (seek) or 'target_to_observer' (hide/sneak)
+ * @returns {Array} Filtered outcomes where detection is possible
  */
-export async function filterOutcomesByLOS(outcomes, observer, tokenProperty = 'target', filterWalls = false, filterTokens = true) {
+export async function filterOutcomesByLOS(outcomes, observer, tokenProperty = 'target', filterWalls = false, filterTokens = true, detectionDirection = 'target_to_observer') {
   try {
-    console.log('LOS Filter: Starting with outcomes:', outcomes?.length, 'observer:', observer?.name);
     if (!Array.isArray(outcomes) || !observer) {
-      console.log('LOS Filter: Early return - invalid params');
       return outcomes;
     }
 
@@ -653,7 +654,6 @@ export async function filterOutcomesByLOS(outcomes, observer, tokenProperty = 't
         // Handle wall outcomes
         if (o?._isWall || o?.wallId) {
           if (!filterWalls) {
-            console.log('LOS Filter: Keeping wall outcome (wall filtering disabled)');
             return o;
           }
 
@@ -671,46 +671,58 @@ export async function filterOutcomesByLOS(outcomes, observer, tokenProperty = 't
                 }
               };
               const hasLOSToWall = analyzer.hasLineOfSight(observer, wallCenter);
-              console.log(`LOS Filter: ${observer?.name} -> Wall ${wall.id}: LOS=${hasLOSToWall} => ${hasLOSToWall ? 'CAN DETECT (keeping)' : 'CANNOT DETECT (filtering out)'}`)
               return hasLOSToWall ? o : null;
             }
           } catch (err) {
-            console.log('LOS Filter: Error checking wall LOS:', err);
           }
           // If we can't check the wall, keep it by default
-          console.log('LOS Filter: Keeping wall outcome (could not check LOS)');
           return o;
         }
 
         const token = o?.[tokenProperty];
         if (!token) {
-          console.log('LOS Filter: No token found for property', tokenProperty);
           return null;
         }
 
         // Only filter tokens if filterTokens is enabled
         if (filterTokens) {
-          // For sneak dialog: observer=sneaker, token=actual observer who might detect the sneaker
-          // We need to check if the token (actual observer) can detect the observer (sneaker)
-          const hasLOS = analyzer.hasLineOfSight(token, observer);
+          // Determine the direction of detection based on the action type
+          let hasLOS, canDetectWithSenses, detectorToken, targetToken, detectorName, targetName;
 
-          // Also check if the actual observer (token) can detect the sneaker (observer) with imprecise senses
-          let canDetectWithSenses = false;
+          if (detectionDirection === 'observer_to_target') {
+            // Seek: can the seeker (observer) detect the target?
+            detectorToken = observer;
+            targetToken = token;
+            hasLOS = analyzer.hasLineOfSight(observer, token);
+            detectorName = observer.name;
+            targetName = token.name;
+          } else {
+            // Hide/Sneak/Diversion: can the target detect the actor (observer)?
+            detectorToken = token;
+            targetToken = observer;
+            hasLOS = analyzer.hasLineOfSight(token, observer);
+            detectorName = token.name;
+            targetName = observer.name;
+          }
+
+          // Check if the detector can detect the target with imprecise senses
+          canDetectWithSenses = false;
           try {
-            canDetectWithSenses = analyzer.canDetectWithLifesenseInRange(token, observer);
+            canDetectWithSenses = analyzer.canDetectWithLifesenseInRange(detectorToken, targetToken);
           } catch (err) {
             // Fallback: check for any imprecise senses manually
-            const senses = analyzer.getSensingSummary(token);
-            const distance = canvas.grid?.measureDistance?.(token.center || token, observer.center || observer) || 0;
+            const senses = analyzer.getSensingSummary(detectorToken);
+            const distance = canvas.grid?.measureDistance?.(detectorToken.center || detectorToken, targetToken.center || targetToken) || 0;
 
-            // Check if the actual observer (token) has any imprecise senses that could reach the sneaker (observer)
+            // Check if the detector has any imprecise senses that could reach the target
             canDetectWithSenses = senses.impreciseSenses?.some(sense => {
               return sense.range >= distance;
             }) || false;
           }
 
           const canDetect = hasLOS || canDetectWithSenses;
-          console.log(`LOS Filter: ${token.name} -> ${observer.name}: LOS=${hasLOS}, Senses=${canDetectWithSenses} => ${canDetect ? 'CAN DETECT (keeping in results)' : 'CANNOT DETECT (filtering out)'}`)
+
+          // console.log(`${detectorName} detecting ${targetName}: LOS=${hasLOS}, Senses=${canDetectWithSenses}, Detectable=${canDetect} (${detectionDirection})`);
 
           if (!canDetect) {
             return null;
@@ -730,10 +742,9 @@ export async function filterOutcomesByLOS(outcomes, observer, tokenProperty = 't
               };
 
               const hasLOSToWall = analyzer.hasLineOfSight(observer, wallCenter);
-              console.log(`LOS Filter: ${observer?.name} -> Wall ${wall.id}: LOS=${hasLOSToWall} => ${hasLOSToWall ? 'keeping' : 'filtering out'}`);
               return hasLOSToWall;
             } catch (err) {
-              console.log('LOS Filter: Error checking wall LOS in outcome:', err);
+              console.error('Detection Filter: Error checking wall LOS in outcome:', err);
               return true; // Keep wall if we can't check LOS
             }
           });
@@ -746,15 +757,12 @@ export async function filterOutcomesByLOS(outcomes, observer, tokenProperty = 't
 
         return o;
       } catch (err) {
-        console.log('LOS Filter: Error checking LOS:', err);
         return o;
       }
     }).filter(o => o !== null);
 
-    console.log(`LOS Filter: Filtered ${outcomes.length} -> ${filtered.length} outcomes`);
     return filtered;
   } catch (err) {
-    console.log('LOS Filter: Outer error:', err);
     return outcomes;
   }
 }
@@ -893,13 +901,10 @@ export function isTokenDefeated(token) {
       return true;
     }
 
-    console.log(`[isTokenDefeated] Checking token: ${token?.name}, actor: ${actor?.name}`);
 
     // HP based check (covers 0 or negative)
     const hpValue = actor.hitPoints?.value ?? actor.system?.attributes?.hp?.value;
-    console.log(`[isTokenDefeated] HP value: ${hpValue}`);
     if (typeof hpValue === 'number' && hpValue <= 0) {
-      console.log(`[isTokenDefeated] Token ${token?.name} is defeated by HP (${hpValue})`);
       return true;
     }
 
@@ -908,7 +913,6 @@ export function isTokenDefeated(token) {
 
     // Check itemTypes.condition array
     if (Array.isArray(actor.itemTypes?.condition)) {
-      console.log(`[isTokenDefeated] Found itemTypes.condition:`, actor.itemTypes.condition.map(c => c?.slug || c?.name));
       for (const c of actor.itemTypes.condition) {
         if (c?.slug) conditionSlugs.add(c.slug);
         else if (typeof c?.name === 'string') conditionSlugs.add(c.name.toLowerCase());
@@ -917,7 +921,6 @@ export function isTokenDefeated(token) {
 
     // Check actor.conditions array
     if (Array.isArray(actor.conditions)) {
-      console.log(`[isTokenDefeated] Found conditions:`, actor.conditions.map(c => c?.slug || c?.name));
       for (const c of actor.conditions) {
         if (c?.slug) conditionSlugs.add(c.slug);
         else if (typeof c?.name === 'string') conditionSlugs.add(c.name.toLowerCase());
@@ -926,7 +929,6 @@ export function isTokenDefeated(token) {
 
     // Check actor.appliedConditions (PF2e specific)
     if (Array.isArray(actor.appliedConditions)) {
-      console.log(`[isTokenDefeated] Found appliedConditions:`, actor.appliedConditions.map(c => c?.slug || c?.name || c));
       for (const c of actor.appliedConditions) {
         if (typeof c === 'string') conditionSlugs.add(c);
         else if (c?.slug) conditionSlugs.add(c.slug);
@@ -937,7 +939,6 @@ export function isTokenDefeated(token) {
     // Check system.attributes.conditions (another possible location)
     if (actor.system?.attributes?.conditions) {
       const sysConditions = actor.system.attributes.conditions;
-      console.log(`[isTokenDefeated] Found system.attributes.conditions:`, sysConditions);
       if (Array.isArray(sysConditions)) {
         for (const c of sysConditions) {
           if (typeof c === 'string') conditionSlugs.add(c);
@@ -957,7 +958,6 @@ export function isTokenDefeated(token) {
     // Check token document effects/status effects
     if (token?.document?.statusEffects || token?.statusEffects) {
       const statusEffects = token.document?.statusEffects || token.statusEffects;
-      console.log(`[isTokenDefeated] Found statusEffects:`, statusEffects);
       if (Array.isArray(statusEffects)) {
         for (const effect of statusEffects) {
           if (typeof effect === 'string') {
@@ -967,18 +967,15 @@ export function isTokenDefeated(token) {
       }
     }
 
-    console.log(`[isTokenDefeated] All condition slugs:`, Array.from(conditionSlugs));
 
     // Check for defeated conditions
     const defeatedSlugs = ['unconscious', 'dead', 'dying'];
     for (const slug of defeatedSlugs) {
       if (conditionSlugs.has(slug)) {
-        console.log(`[isTokenDefeated] Token ${token?.name} is defeated by condition: ${slug}`);
         return true;
       }
     }
 
-    console.log(`[isTokenDefeated] Token ${token?.name} is NOT defeated`);
     return false;
   } catch (err) {
     console.error(`[isTokenDefeated] Error checking token ${token?.name}:`, err);
