@@ -12,31 +12,31 @@
     <div class="seeker-details">
       <h3 class="seeker-name">{{seeker.name}}</h3>
       <p class="hint">{{seeker.actionLabel}}</p>
-      <div class="senses-buttons-container" style="display: flex; flex-direction: column; gap: 6px; margin: 6px 0;"></div>
-        {{#if allSenses}}
-          <button class="senses-button available-senses" data-tooltip-html="senses-tooltip-content" style="display: inline-flex; align-items: center; justify-content: center; gap: 8px; width: fit-content; max-width: 100%; padding: 8px 12px; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--pf2e-visioner-info) 55%, transparent); background: linear-gradient(180deg, color-mix(in srgb, var(--pf2e-visioner-info) 18%, transparent) 0%, color-mix(in srgb, var(--pf2e-visioner-info) 12%, transparent) 100%); color: var(--color-text-light-primary); cursor: pointer; font-size: 12px; font-weight: 700; line-height: 1; transition: all 0.2s ease; text-decoration: none; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.06);">
-        <i class="fas fa-eye" style="font-size: 14px; line-height: 1;"></i>
-        <span class="button-text" style="white-space: nowrap;">Available Senses</span>
-        <span class="count-badge" aria-label="{{allSenses.length}} senses" style="display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; font-size: 11px; font-weight: 800; background: color-mix(in srgb, #000 20%, var(--pf2e-visioner-info) 30%); border: 1px solid color-mix(in srgb, var(--pf2e-visioner-info) 55%, transparent); color: var(--color-text-light-primary);">{{allSenses.length}}</span>
-        <i class="fas fa-chevron-down chevron" aria-hidden="true" style="opacity: 0.9; margin-left: 2px;"></i>
+      {{#if allSenses}}
+        <div class="senses-buttons-container-clean">
+          <button class="senses-button available-senses" data-tooltip-html="senses-tooltip-content">
+            <i class="fas fa-eye"></i>
+            <span class="button-text">Available Senses</span>
+            <span class="count-badge" aria-label="{{allSenses.length}} senses">{{allSenses.length}}</span>
+            <i class="fas fa-chevron-down chevron" aria-hidden="true"></i>
           </button>
           {{!-- Hidden tooltip content for available senses --}}
           <div id="senses-tooltip-content" class="senses-tooltip-content" style="display: none;">
-        <div class="tooltip-senses-grid">
-          {{#each allSenses as |sense|}}
-            <div class="tooltip-sense-item {{#if sense.isPrecise}}precise{{else}}imprecise{{/if}} {{#if sense.wasUsed}}used{{/if}}">
-          <i class="{{sense.config.icon}}"></i>
-          <span class="sense-name">{{localize sense.config.label}}</span>
-          <span class="sense-precision {{#if sense.isPrecise}}precise{{else}}imprecise{{/if}}">
-            {{#if sense.isPrecise}}{{localize 'PF2E_VISIONER.SENSE_PRECISION.PRECISE'}}{{else}}{{localize 'PF2E_VISIONER.SENSE_PRECISION.IMPRECISE'}}{{/if}}
-          </span>
-          <span class="sense-range">{{sense.displayRange}}&nbsp;ft</span>
+            <div class="tooltip-senses-grid">
+              {{#each allSenses as |sense|}}
+                <div class="tooltip-sense-item {{#if sense.isPrecise}}precise{{else}}imprecise{{/if}} {{#if sense.wasUsed}}used{{/if}}">
+                  <i class="{{sense.config.icon}}"></i>
+                  <span class="sense-name">{{localize sense.config.label}}</span>
+                  <span class="sense-precision {{#if sense.isPrecise}}precise{{else}}imprecise{{/if}}">
+                    {{#if sense.isPrecise}}{{localize 'PF2E_VISIONER.SENSE_PRECISION.PRECISE'}}{{else}}{{localize 'PF2E_VISIONER.SENSE_PRECISION.IMPRECISE'}}{{/if}}
+                  </span>
+                  <span class="sense-range">{{sense.displayRange}}&nbsp;ft</span>
+                </div>
+              {{/each}}
             </div>
-          {{/each}}
-        </div>
           </div>
-        {{/if}}
-      </div>
+        </div>
+      {{/if}}
     </div>
   </div>
 

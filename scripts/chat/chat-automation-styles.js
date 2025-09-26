@@ -1773,12 +1773,107 @@ function getChatAutomationCSS() {
         }
         
         /* Encounter Filter Section */
+        .senses-buttons-container-clean {
+            display: flex !important;
+            flex-direction: column !important;
+            gap: 6px !important;
+            margin: 6px 0 !important;
+            /* Match original styling but use safer flex implementation */
+            contain: layout !important; /* Prevents sticky positioning interference */
+        }
+
+        /* Senses Button Styling - Dynamic Override */
+        .seek-preview-dialog .senses-button {
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            gap: 8px !important;
+            width: fit-content !important;
+            max-width: 100% !important;
+            padding: 8px 12px !important;
+            border-radius: 999px !important;
+            border: 1px solid color-mix(in srgb, var(--pf2e-visioner-info) 55%, transparent) !important;
+            background: linear-gradient(180deg,
+                color-mix(in srgb, var(--pf2e-visioner-info) 18%, transparent) 0%,
+                color-mix(in srgb, var(--pf2e-visioner-info) 12%, transparent) 100%) !important;
+            color: var(--color-text-light-primary) !important;
+            cursor: pointer !important;
+            font-size: 12px !important;
+            font-weight: 700 !important;
+            line-height: 1 !important;
+            transition: all 0.2s ease !important;
+            text-decoration: none !important;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.06) !important;
+        }
+
+        .seek-preview-dialog .senses-button:hover {
+            transform: translateY(-1px) !important;
+            border-color: var(--pf2e-visioner-info) !important;
+            box-shadow:
+                0 2px 6px rgba(0, 0, 0, 0.25),
+                0 0 0 2px color-mix(in srgb, var(--pf2e-visioner-info) 25%, transparent) !important;
+        }
+
+        .seek-preview-dialog .senses-button i {
+            font-size: 14px !important;
+            line-height: 1 !important;
+        }
+
+        .seek-preview-dialog .senses-button .button-text {
+            white-space: nowrap !important;
+        }
+
+        .seek-preview-dialog .senses-button .count-badge {
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            min-width: 20px !important;
+            height: 20px !important;
+            padding: 0 6px !important;
+            border-radius: 999px !important;
+            font-size: 11px !important;
+            font-weight: 800 !important;
+            background: color-mix(in srgb, #000 20%, var(--pf2e-visioner-info) 30%) !important;
+            border: 1px solid color-mix(in srgb, var(--pf2e-visioner-info) 55%, transparent) !important;
+            color: var(--color-text-light-primary) !important;
+        }
+
+        .seek-preview-dialog .senses-button .chevron {
+            opacity: 0.9 !important;
+            margin-left: 2px !important;
+        }
+
+        .seek-preview-dialog .senses-button .used-sense-indicator {
+            margin-left: 6px !important;
+            padding: 2px 6px !important;
+            border-radius: 999px !important;
+            font-size: 11px !important;
+            font-weight: 700 !important;
+            color: var(--color-text-light-primary) !important;
+            background: color-mix(in srgb, var(--pf2e-visioner-warning) 22%, transparent) !important;
+            border: 1px solid color-mix(in srgb, var(--pf2e-visioner-warning) 55%, transparent) !important;
+        }
+
+        .seek-preview-dialog .senses-button.used-senses {
+            background: color-mix(in srgb, var(--pf2e-visioner-warning) 20%, transparent) !important;
+            border-color: color-mix(in srgb, var(--pf2e-visioner-warning) 60%, transparent) !important;
+            color: var(--color-text-light-primary) !important;
+        }
+
+        .seek-preview-dialog .senses-button.used-senses:hover {
+            background: color-mix(in srgb, var(--pf2e-visioner-warning) 30%, transparent) !important;
+            border-color: var(--pf2e-visioner-warning) !important;
+        }
+
         .encounter-filter-section {
             margin-bottom: 12px;
             padding: 8px 12px;
             background: var(--color-bg-option, rgba(255, 255, 255, 0.05));
             border-radius: 6px;
             border: 1px solid var(--color-border-light-primary, #555);
+            position: sticky;
+            top: 0;
+            z-index: 10;
         }
         
         .encounter-filter-checkbox {
