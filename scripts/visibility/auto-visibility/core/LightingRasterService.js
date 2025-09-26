@@ -24,16 +24,44 @@ export class LightingRasterService {
    * @returns {Promise<{passesThroughDarkness:boolean, maxDarknessRank:number}>}
    */
   async getRayDarknessInfo(observer, target, observerPos, targetPos) {
+    const darknessSources = canvas.effects?.darknessSources || [];
+    if (darknessSources.length === 0) {
+      return {passesThroughDarkness: false, maxDarknessRank: 0};
+    }
+
     // Get the vector from observer to target and its squared length. This will be one of the sides
     // of our right triangle, which we'll name 'a'
     const aX = targetPos.x - observerPos.x;
     const aY = targetPos.y - observerPos.y;
     const aDot = aX * aX + aY * aY;
+    const aLen = Math.sqrt(aDot);
+
+    // Figure out the target's radius in pixels
+    const gridSize = canvas.grid?.size || 100;
+    const tokenWidth = (target?.document?.width ?? target?.width ?? 1) * gridSize;
+    const tokenHeight = (target?.document?.height ?? target?.height ?? 1) * gridSize;
+    const targetRadius = (target?.externalRadius ?? Math.max(tokenWidth, tokenHeight)) / 2;
+
+    // If the two tokens are overlapping, we can't possibly pass through darkness
+    if (aLen <= targetRadius) {
+      return {passesThroughDarkness: false, maxDarknessRank: 0};
+    }
+
+    // Angle from target center to observer center
+    const angleToP = Math.atan2(-aY, -aX);
+
+    // Angle between center-external and tangent line
+    const theta = Math.acos(targetRadius / aLen);
+
+    // Two tangent points
+    const angles = [angleToP + theta, angleToP - theta];
+    const tangentPoints = angles.map(a => ({
+      x: targetPos.x + targetRadius * Math.cos(a),
+      y: targetPos.y + targetRadius * Math.sin(a)
+    }));
 
     // Process all non-hidden darkness sources
     let maxDarknessResult = null;
-    const darknessSources = canvas.effects?.darknessSources || [];
-
     for (const light of darknessSources) {
       if (!light.active) continue;
 
@@ -52,7 +80,7 @@ export class LightingRasterService {
       // Now project h onto a to get the length of the adjacent side of our triangle, which tells us
       // how far along a the perpendicular from the observer to light falls. Since a isn't normalized, we'll
       // keep in mind that p is scaled by |a|.
-      const p = hX * aX + hY * aY;
+      let p = hX * aX + hY * aY;
 
       // If p is negative, the perpendicular falls "before" the observer, so the observer is the point
       // of closest approach and we just need to test h against radius
@@ -70,18 +98,25 @@ export class LightingRasterService {
       }
 
       // By right triangle properties, the length of the perpindicular side squared is h^2 - (p/|a|)^2
-      // Multiplying through by |a|^2 to avoid a square root gives us h^2 * |a|^2 - p^2 which we can
-      // compare to radius^2 * |a|^2
-      else if (hDot * aDot - p * p > radiusDot * aDot) continue;
+      else {
+        p /= aLen; // p is now the true length of the adjacent side
+        if (hDot - p*p > radiusDot) continue;
+      }
 
-      // We know the light can possibly affect the ray, so now check for actual intersection.
+      // We are close enough to the light to possibly be affected, but before we check the shape, we will
+      // use the tangent point on the target farthest from the light center as the endpoint of the ray.
+      // This will handle most cases where we get false positives due to the center ray passing just
+      // inside the darkness while a portion of the target is still visible outside.
+      const dists = tangentPoints.map(pt => (pt.x - light.x)**2 + (pt.y - light.y)**2);
+      const tangentPoint = dists[0] > dists[1] ? tangentPoints[0] : tangentPoints[1];
+
       // Test the ray against the light's edges, any intersection means the ray passes through darkness
       const points = light?.shape?.points ?? [];
       let intersects = false;
       for (let i = 0; i < points.length; i += 2) {
         const a = {x: points[i], y: points[i+1]};
         const b = {x: points[(i+2)%points.length], y: points[(i+3)%points.length]};
-        if (foundry.utils.lineSegmentIntersects(observerPos, targetPos, a, b)) {
+        if (foundry.utils.lineSegmentIntersects(observerPos, tangentPoint, a, b)) {
           intersects = true;
           break;
         }
