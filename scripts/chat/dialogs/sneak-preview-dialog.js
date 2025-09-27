@@ -167,6 +167,23 @@ export class SneakPreviewDialog extends BaseActionDialog {
   async _prepareContext(options) {
     const context = await super._prepareContext(options);
 
+    // Determine movement type from token's current movement action (default to walk)
+    let movementType = 'walk';
+    try {
+      const raw = this.sneakingToken?.document?.movementAction || this.sneakingToken?.document?.movementType;
+      const v = String(raw || '').toLowerCase();
+      if (['walk', 'land', 'ground', 'move'].includes(v)) movementType = 'walk';
+      else if (['stride'].includes(v)) movementType = 'stride';
+      else if (['leap'].includes(v)) movementType = 'leap';
+      else if (['climb'].includes(v)) movementType = 'climb';
+      else if (['fly', 'flying'].includes(v)) movementType = 'fly';
+      else if (['swim'].includes(v)) movementType = 'swim';
+      else if (['burrow'].includes(v)) movementType = 'burrow';
+      else if (['teleport'].includes(v)) movementType = 'teleport';
+      else if (['deploy'].includes(v)) movementType = 'deploy';
+      else if (['travel'].includes(v)) movementType = 'travel';
+    } catch { }
+
     // Capture current end positions FIRST, before processing outcomes
     await this._captureCurrentEndPositionsForOutcomes(this.outcomes);
 
@@ -396,6 +413,7 @@ export class SneakPreviewDialog extends BaseActionDialog {
     // Compute and expose Max Sneak Distance indicator data
     try {
       const { SneakSpeedService } = await import('../services/sneak-speed-service.js');
+      const env = (await import('../../utils/environment.js')).default;
       const actor = this.sneakingToken?.actor || this.sneakingToken;
       const baseSpeed = Number(actor?.system?.movement?.speeds?.land?.value ?? 0) || 0;
       // Prefer original speed flag if present (effect applied), otherwise current value
@@ -428,6 +446,43 @@ export class SneakPreviewDialog extends BaseActionDialog {
       if (rawTotal > originalSpeed) {
         explanations.push(`Capped at base Speed (${originalSpeed} ft)`);
       }
+      const movementLabel = game.i18n.localize(`PF2E_VISIONER.MOVEMENT.${movementType}`);
+      // Choose an icon matching the movement type
+      const movementIcon = (() => {
+        switch (movementType) {
+          case 'stride':
+            return 'fas fa-running';
+          case 'leap':
+            return 'fas fa-person-running';
+          case 'climb':
+            return 'fas fa-mountain';
+          case 'fly':
+            return 'fas fa-feather';
+          case 'swim':
+            return 'fas fa-person-swimming';
+          case 'burrow':
+            return 'fas fa-person-digging';
+          case 'teleport':
+            return 'fas fa-bolt';
+          case 'travel':
+            return 'fas fa-route';
+          case 'deploy':
+            return 'fas fa-box-open';
+          case 'walk':
+          default:
+            return 'fas fa-person-walking';
+        }
+      })();
+      // Determine movement support (green/red chip)
+      let supported = true;
+      let speedVal = 0;
+      try {
+        const speeds = actor?.system?.movement?.speeds || {};
+        const key = movementType === 'walk' ? 'land' : movementType;
+        const sobj = speeds?.[key] || null;
+        speedVal = Number(sobj?.value ?? 0) || 0;
+        supported = speedVal > 0;
+      } catch { }
 
       context.sneakDistance = {
         maxFeet,
@@ -435,6 +490,13 @@ export class SneakPreviewDialog extends BaseActionDialog {
         multiplier,
         bonusFeet,
         tooltip: explanations.join('\n'),
+        movementType,
+        movementLabel,
+        movementIcon,
+        supported,
+        speed: speedVal,
+        statusClass: supported ? 'ok' : 'warn',
+        supportTooltip: supported ? `${movementLabel} speed: ${speedVal} ft` : `${movementLabel} speed unavailable for this actor`,
       };
     } catch { }
 
@@ -487,8 +549,22 @@ export class SneakPreviewDialog extends BaseActionDialog {
       // Terrain Stalker: active in chosen environment
       try {
         if (has('terrain-stalker')) {
-          const selection = FeatsHandler.getTerrainStalkerSelection(actorOrToken);
-          if (selection && FeatsHandler.isEnvironmentActive(actorOrToken, selection)) {
+          const selections = FeatsHandler.getTerrainStalkerSelections(actorOrToken) || [];
+          const active = selections.filter((sel) => {
+            try { return FeatsHandler.isEnvironmentActive(actorOrToken, sel); } catch { return false; }
+          });
+          if (active.length) {
+            const selectionText = active.join(', ');
+            // Also show all region environment types under the token (supports multiple)
+            let environmentsText = '—';
+            try {
+              const env = (await import('../../utils/environment.js')).default;
+              const ctx = env.getActiveContext(actorOrToken, { movementType }) || {};
+              const regionTypes = Array.from(ctx.regionTypes || []);
+              const sceneFallback = Array.from(ctx.sceneTypes || []);
+              const envList = regionTypes.length ? regionTypes : sceneFallback;
+              if (envList.length) environmentsText = envList.join(', ');
+            } catch { /* non-critical */ }
             badges.push({
               key: 'terrain-stalker',
               icon: 'fas fa-tree',
@@ -497,7 +573,7 @@ export class SneakPreviewDialog extends BaseActionDialog {
               ),
               tooltip: game.i18n.format(
                 'PF2E_VISIONER.SNEAK_AUTOMATION.BADGES.TERRAIN_STALKER_TOOLTIP',
-                { selection },
+                { selection: selectionText, environments: environmentsText },
               ),
             });
           }
@@ -506,30 +582,29 @@ export class SneakPreviewDialog extends BaseActionDialog {
       // Vanish into the Land: active in selected difficult terrain for Terrain Stalker
       try {
         if (has('vanish-into-the-land')) {
-          const selection = FeatsHandler.getTerrainStalkerSelection(actorOrToken);
-          if (selection) {
-            // Use EnvironmentHelper via FeatsHandler helper
-            let active = false;
+          const selections = FeatsHandler.getTerrainStalkerSelections(actorOrToken) || [];
+          let active = false;
+          for (const selection of selections) {
             try {
-              // Prefer precise difficult terrain check
+              // Prefer precise difficult terrain check (movement-aware)
               const env = (await import('../../utils/environment.js')).default;
-              const matches = env.getMatchingEnvironmentRegions(actorOrToken, selection) || [];
-              active = matches.length > 0;
+              const matches = env.getMatchingEnvironmentRegions(actorOrToken, selection, { movementType }) || [];
+              if (matches.length > 0) { active = true; break; }
             } catch {
-              active = FeatsHandler.isEnvironmentActive(actorOrToken, selection);
+              active = active || FeatsHandler.isEnvironmentActive(actorOrToken, selection);
             }
-            if (active) {
-              badges.push({
-                key: 'vanish-into-the-land',
-                icon: 'fas fa-leaf',
-                label: game.i18n.localize(
-                  'PF2E_VISIONER.SNEAK_AUTOMATION.BADGES.VANISH_INTO_THE_LAND_LABEL',
-                ),
-                tooltip: game.i18n.localize(
-                  'PF2E_VISIONER.SNEAK_AUTOMATION.BADGES.VANISH_INTO_THE_LAND_TOOLTIP',
-                ),
-              });
-            }
+          }
+          if (active) {
+            badges.push({
+              key: 'vanish-into-the-land',
+              icon: 'fas fa-leaf',
+              label: game.i18n.localize(
+                'PF2E_VISIONER.SNEAK_AUTOMATION.BADGES.VANISH_INTO_THE_LAND_LABEL',
+              ),
+              tooltip: game.i18n.localize(
+                'PF2E_VISIONER.SNEAK_AUTOMATION.BADGES.VANISH_INTO_THE_LAND_TOOLTIP',
+              ),
+            });
           }
         }
       } catch { }

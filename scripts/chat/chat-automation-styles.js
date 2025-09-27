@@ -687,6 +687,8 @@ function getChatAutomationCSS() {
             min-width: 50px;
             text-align: center;
             padding: 8px 4px;
+            object-fit: cover;
+            object-position: top;
         }
         
         /* Token Image Styling - Unified */
@@ -1335,6 +1337,8 @@ function getChatAutomationCSS() {
             border-radius: 50%;
             border: 2px solid var(--visibility-hidden);
             margin-right: 12px;
+            object-fit: cover;
+            object-position: top;
         }
         
         .actor-name {
@@ -2554,7 +2558,7 @@ function getChatAutomationCSS() {
             align-items: center;
             gap: 16px;
             padding: 16px;
-            background: linear-gradient(135deg, var(--visibility-undetected), var(--visibility-undetected));
+            background: linear-gradient(135deg, rgba(189, 11, 11, 0.14), rgba(255, 0, 0, 0.14));
             border-radius: 8px;
             margin-bottom: 16px;
             border-left: 4px solid #ff6b6b;

@@ -27,6 +27,9 @@
           <span class="distance-chip" data-tooltip="{{sneakDistance.tooltip}}">
             <i class="fas fa-shoe-prints"></i>
             <span>Max Sneak Distance: <strong>{{sneakDistance.maxFeet}} ft</strong></span>
+            {{#if sneakDistance.movementLabel}}
+              <span class="movement-chip {{sneakDistance.statusClass}}" data-tooltip="{{sneakDistance.supportTooltip}}"><i class="{{sneakDistance.movementIcon}}"></i> {{sneakDistance.movementLabel}}</span>
+            {{/if}}
           </span>
         </div>
       {{/if}}

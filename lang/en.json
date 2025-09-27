@@ -116,6 +116,18 @@
       "QUICK_STANDARD_COVER": "Set Standard Cover",
       "QUICK_GREATER_COVER": "Set Greater Cover"
     },
+    "MOVEMENT": {
+      "walk": "Walk",
+      "stride": "Stride",
+      "leap": "Leap",
+      "climb": "Climb",
+      "fly": "Fly",
+      "swim": "Swim",
+      "burrow": "Burrow",
+      "teleport": "Teleport",
+      "deploy": "Deploy",
+      "travel": "Travel"
+    },
     "NOTIFICATIONS": {
       "NO_OBSERVER_SELECTED": "Please select an observer token first",
       "MULTIPLE_OBSERVERS": "Multiple observer tokens selected - please select only one",
@@ -197,7 +209,7 @@
       "SETTING_HINT": "Automatically add buttons to Hide chat messages for applying visibility changes",
       "BADGES": {
         "TERRAIN_STALKER_LABEL": "Terrain Stalker",
-        "TERRAIN_STALKER_TOOLTIP": "Chosen terrain active: {{selection}}",
+        "TERRAIN_STALKER_TOOLTIP": "Chosen terrains active: {selection} (Region: {environments})",
         "VANISH_INTO_THE_LAND_LABEL": "Vanish into the Land",
         "VANISH_INTO_THE_LAND_TOOLTIP": "You can Hide and Sneak even without cover or concealment in your chosen difficult terrain",
         "VERY_VERY_SNEAKY_LABEL": "Very, Very Sneaky",
@@ -231,7 +243,7 @@
       "SETTING_HINT": "Automatically add buttons to Sneak chat messages for applying visibility changes",
       "BADGES": {
         "TERRAIN_STALKER_LABEL": "Terrain Stalker",
-        "TERRAIN_STALKER_TOOLTIP": "Chosen terrain active: {{selection}}",
+        "TERRAIN_STALKER_TOOLTIP": "Chosen terrains active: {selection} (Region: {environments})",
         "VANISH_INTO_THE_LAND_LABEL": "Vanish into the Land",
         "VANISH_INTO_THE_LAND_TOOLTIP": "You can Sneak even without cover or concealment in your chosen difficult terrain",
         "VERY_VERY_SNEAKY_LABEL": "Very, Very Sneaky",

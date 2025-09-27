@@ -240,6 +240,7 @@ export class TakeCoverPreviewDialog extends BaseActionDialog {
       ? processed.filter((o) => !!o.hasActionableChange)
       : processed;
     context.actorToken = this.actorToken;
+    context.actorTokenImage = this.resolveTokenImage(this.actorToken);
     context.outcomes = displayOutcomes;
     Object.assign(context, this.buildCommonContext(displayOutcomes));
     // Expose UI flags

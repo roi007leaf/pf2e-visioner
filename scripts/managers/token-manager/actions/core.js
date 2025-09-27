@@ -12,6 +12,7 @@ import {
   setCoverMap,
   setVisibilityMap,
 } from '../../../utils.js';
+import { clearApplyButtonAnimation } from '../apply-button-animation.js';
 
 // Helper: compute allowed token IDs according to current filters
 function computeAllowedTokenIds(app) {
@@ -38,9 +39,15 @@ function computeAllowedTokenIds(app) {
 
 /**
  * ApplicationV2 form handler
+ * @param {*} event - Form submission event
+ * @param {*} form - Form element
+ * @param {*} formData - Form data
+ * @param {Object} options - Additional options
+ * @param {boolean} options.forceOverride - Force override creation even when state matches current
  */
-export async function formHandler(event, form, formData) {
+export async function formHandler(event, form, formData, options = {}) {
   const app = this;
+  const { forceOverride = false } = options;
   const visibilityChanges = {};
   const coverChanges = {};
   const wallVisibilityChanges = {};
@@ -48,7 +55,14 @@ export async function formHandler(event, form, formData) {
   // Respect all filters using scene-level computation
   const allowedTokenIds = computeAllowedTokenIds(app);
 
-  const formDataObj = formData.object || formData;
+  // Convert FormData to object if needed
+  let formDataObj;
+  if (formData instanceof FormData) {
+    formDataObj = Object.fromEntries(formData);
+  } else {
+    formDataObj = formData.object || formData;
+  }
+
   for (const [key, value] of Object.entries(formDataObj)) {
     if (key.startsWith('visibility.')) {
       const tokenId = key.replace('visibility.', '');
@@ -80,16 +94,24 @@ export async function formHandler(event, form, formData) {
           const targetToken = canvas.tokens.get(tokenId);
           if (!targetToken) continue;
           const currentState = currentMap?.[tokenId];
-          if (currentState === newState) continue;
-          targetUpdates.push({ target: targetToken, state: newState });
-          // Include cover context if present for UI clarity
-          const expectedCover = coverChanges?.[tokenId];
-          overrideMap.set(tokenId, {
-            target: targetToken,
-            state: newState,
-            hasCover: expectedCover ? expectedCover !== 'none' : undefined,
-            expectedCover,
-          });
+          const stateChanged = currentState !== newState;
+
+          // Skip visual updates if state hasn't changed, but always create override if forced
+          if (stateChanged) {
+            targetUpdates.push({ target: targetToken, state: newState });
+          }
+
+          // Create override if state changed OR if forceOverride is true
+          if (stateChanged || forceOverride) {
+            // Include cover context if present for UI clarity
+            const expectedCover = coverChanges?.[tokenId];
+            overrideMap.set(tokenId, {
+              target: targetToken,
+              state: newState,
+              hasCover: expectedCover ? expectedCover !== 'none' : undefined,
+              expectedCover,
+            });
+          }
         }
         // Apply AVS overrides for manual token manager changes
         if (overrideMap.size > 0) {
@@ -166,7 +188,8 @@ export async function formHandler(event, form, formData) {
       } catch { }
       const current = getVisibilityMap(observerToken) || {};
       const currentState = current[app.observer.document.id];
-      if (currentState === newVisibilityState) continue;
+      const stateChanged = currentState !== newVisibilityState;
+      if (!stateChanged && !forceOverride) continue;
       if (!perObserverChanges.has(observerTokenId))
         perObserverChanges.set(observerTokenId, { token: observerToken, map: current });
       perObserverChanges.get(observerTokenId).map[app.observer.document.id] = newVisibilityState;
@@ -179,20 +202,24 @@ export async function formHandler(event, form, formData) {
       const observerUpdates = [];
       // Prepare AVS overrides per observer
       const overridesByObserver = new Map();
-      // Only include tokens that actually changed
+      // Include tokens that changed OR if forceOverride is true
       const changedIds = new Set(perObserverChanges.keys());
       for (const [observerTokenId, newVisibilityState] of Object.entries(visibilityChanges)) {
-        if (!changedIds.has(observerTokenId)) continue;
+        const hasChanged = changedIds.has(observerTokenId);
+        if (!hasChanged && !forceOverride) continue;
         const observerToken = canvas.tokens.get(observerTokenId);
         if (!observerToken) continue;
         try {
           if (['loot', 'vehicle', 'party'].includes(observerToken?.actor?.type)) continue;
         } catch { }
-        observerUpdates.push({
-          target: app.observer,
-          state: newVisibilityState,
-          observer: observerToken,
-        });
+        // Only add visual updates for actual state changes
+        if (hasChanged) {
+          observerUpdates.push({
+            target: app.observer,
+            state: newVisibilityState,
+            observer: observerToken,
+          });
+        }
         const expectedCover = coverChanges?.[observerTokenId];
         if (!overridesByObserver.has(observerTokenId))
           overridesByObserver.set(observerTokenId, new Map());
@@ -316,44 +343,61 @@ export async function formHandler(event, form, formData) {
 
 export async function applyCurrent(event, button) {
   const app = this;
-  const { runTasksWithProgress } = await import('../../progress.js');
   // Touch params to satisfy linters in some environments
   void event; // unused
   void button; // unused
 
   try {
+    // Extract current form values manually
     const allowedTokenIds = computeAllowedTokenIds(app);
     const visibilityInputs = app.element.querySelectorAll('input[name^="visibility."]');
     const coverInputs = app.element.querySelectorAll('input[name^="cover."]');
     const wallInputs = app.element.querySelectorAll('input[name^="walls."]');
+
+    // Create form data object from current inputs
+    const formDataObj = {};
+    visibilityInputs.forEach((input) => {
+      const tokenId = input.name.replace('visibility.', '');
+      if (allowedTokenIds && !allowedTokenIds.has(tokenId)) return;
+      formDataObj[input.name] = input.value;
+    });
+    coverInputs.forEach((input) => {
+      const tokenId = input.name.replace('cover.', '');
+      if (allowedTokenIds && !allowedTokenIds.has(tokenId)) return;
+      formDataObj[input.name] = input.value;
+    });
+    wallInputs.forEach((input) => {
+      const wallId = input.name.replace('walls.', '');
+      formDataObj[input.name] = input.value;
+    });
+
+    // Call formHandler with forceOverride to create overrides even when state matches
+    await formHandler.call(app, event, app.element, formDataObj, { forceOverride: true });
+
+    // Save the current state for reference (existing behavior)
     if (!app._savedModeData) app._savedModeData = {};
     if (!app._savedModeData[app.mode])
       app._savedModeData[app.mode] = { visibility: {}, cover: {}, walls: {} };
     if (!app._savedModeData[app.mode].visibility) app._savedModeData[app.mode].visibility = {};
     if (!app._savedModeData[app.mode].cover) app._savedModeData[app.mode].cover = {};
     if (!app._savedModeData[app.mode].walls) app._savedModeData[app.mode].walls = {};
-    visibilityInputs.forEach((input) => {
-      // Support unit tests where inputs are simple objects without DOM APIs
-      const row = typeof input?.closest === 'function' ? input.closest('tr.token-row') : null;
-      // Respect UI filters: skip Foundry-hidden rows when hidden, visually hidden rows, and off-table tokens
-      const tokenId = input.name.replace('visibility.', '');
-      // Strong whitelist by filters
-      if (allowedTokenIds && !allowedTokenIds.has(tokenId)) return;
-      app._savedModeData[app.mode].visibility[tokenId] = input.value;
-    });
-    coverInputs.forEach((input) => {
-      const row = typeof input?.closest === 'function' ? input.closest('tr.token-row') : null;
-      const tokenId = input.name.replace('cover.', '');
-      if (allowedTokenIds && !allowedTokenIds.has(tokenId)) return;
-      app._savedModeData[app.mode].cover[tokenId] = input.value;
-    });
-    wallInputs.forEach((input) => {
-      const wallId = input.name.replace('walls.', '');
-      if (!app._savedModeData[app.mode].walls) app._savedModeData[app.mode].walls = {};
-      app._savedModeData[app.mode].walls[wallId] = input.value;
-    });
+
+    // Use the same data we created for form submission
+    for (const [key, value] of Object.entries(formDataObj)) {
+      if (key.startsWith('visibility.')) {
+        const tokenId = key.replace('visibility.', '');
+        app._savedModeData[app.mode].visibility[tokenId] = value;
+      } else if (key.startsWith('cover.')) {
+        const tokenId = key.replace('cover.', '');
+        app._savedModeData[app.mode].cover[tokenId] = value;
+      } else if (key.startsWith('walls.')) {
+        const wallId = key.replace('walls.', '');
+        if (!app._savedModeData[app.mode].walls) app._savedModeData[app.mode].walls = {};
+        app._savedModeData[app.mode].walls[wallId] = value;
+      }
+    }
   } catch (error) {
-    console.error('Token Manager: Error saving current form state:', error);
+    console.error('Token Manager: Error applying current state:', error);
   }
 
   try {
@@ -362,7 +406,9 @@ export async function applyCurrent(event, button) {
     console.warn('Token Manager: Error closing dialog:', error);
   }
 
-  runTasksWithProgress(`${MODULE_ID}: Preparing Changes`, [
+  // Show progress indication
+  const { runTasksWithProgress } = await import('../../progress.js');
+  runTasksWithProgress(`${MODULE_ID}: Applying Current State`, [
     async () => await new Promise((r) => setTimeout(r, 100)),
   ]);
 
@@ -614,6 +660,13 @@ export async function applyCurrent(event, button) {
       console.warn('Token Manager: Error refreshing perception:', error);
     }
   })();
+
+  // Clear apply button animation since changes have been applied
+  try {
+    clearApplyButtonAnimation(app.element);
+  } catch (error) {
+    console.warn('Token Manager: Error clearing apply button animation:', error);
+  }
 }
 
 export async function applyBoth(_event, _button) {
@@ -843,6 +896,13 @@ export async function applyBoth(_event, _button) {
       console.warn('Token Manager: Error refreshing perception:', error);
     }
   })();
+
+  // Clear apply button animation since changes have been applied
+  try {
+    clearApplyButtonAnimation(app.element);
+  } catch (error) {
+    console.warn('Token Manager: Error clearing apply button animation:', error);
+  }
 }
 
 export async function resetAll(_event, _button) {

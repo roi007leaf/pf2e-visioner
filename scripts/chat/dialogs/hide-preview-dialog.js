@@ -291,25 +291,40 @@ export class HidePreviewDialog extends BaseActionDialog {
       }
       try {
         if (has('terrain-stalker')) {
-          const selection = FeatsHandler.getTerrainStalkerSelection(this.actorToken);
-          if (selection && FeatsHandler.isEnvironmentActive(this.actorToken, selection)) {
-            badges.push({ key: 'terrain-stalker', icon: 'fas fa-tree', label: game.i18n.localize('PF2E_VISIONER.HIDE_AUTOMATION.BADGES.TERRAIN_STALKER_LABEL'), tooltip: game.i18n.format('PF2E_VISIONER.HIDE_AUTOMATION.BADGES.TERRAIN_STALKER_TOOLTIP', { selection }) });
+          const selections = FeatsHandler.getTerrainStalkerSelections(this.actorToken) || [];
+          const active = selections.filter((sel) => {
+            try { return FeatsHandler.isEnvironmentActive(this.actorToken, sel); } catch { return false; }
+          });
+          if (active.length) {
+            const selectionText = active.join(', ');
+            // Also show all region environment types under the token (supports multiple)
+            let environmentsText = '—';
+            try {
+              const env = (await import('../../utils/environment.js')).default;
+              const ctx = env.getActiveContext(this.actorToken) || {};
+              const regionTypes = Array.from(ctx.regionTypes || []);
+              const sceneFallback = Array.from(ctx.sceneTypes || []);
+              const envList = regionTypes.length ? regionTypes : sceneFallback;
+              if (envList.length) environmentsText = envList.join(', ');
+            } catch { /* non-critical */ }
+            badges.push({ key: 'terrain-stalker', icon: 'fas fa-tree', label: game.i18n.localize('PF2E_VISIONER.HIDE_AUTOMATION.BADGES.TERRAIN_STALKER_LABEL'), tooltip: game.i18n.format('PF2E_VISIONER.HIDE_AUTOMATION.BADGES.TERRAIN_STALKER_TOOLTIP', { selection: selectionText, environments: environmentsText }) });
           }
         }
       } catch { }
       try {
         if (has('vanish-into-the-land')) {
-          const selection = FeatsHandler.getTerrainStalkerSelection(this.actorToken);
-          if (selection) {
-            let active = false;
+          const selections = FeatsHandler.getTerrainStalkerSelections(this.actorToken) || [];
+          let active = false;
+          let firstActive = null;
+          for (const selection of selections) {
             try {
               const env = (await import('../../utils/environment.js')).default;
               const matches = env.getMatchingEnvironmentRegions(this.actorToken, selection) || [];
-              active = matches.length > 0;
-            } catch { active = FeatsHandler.isEnvironmentActive(this.actorToken, selection); }
-            if (active) {
-              badges.push({ key: 'vanish-into-the-land', icon: 'fas fa-leaf', label: game.i18n.localize('PF2E_VISIONER.HIDE_AUTOMATION.BADGES.VANISH_INTO_THE_LAND_LABEL'), tooltip: game.i18n.localize('PF2E_VISIONER.HIDE_AUTOMATION.BADGES.VANISH_INTO_THE_LAND_TOOLTIP') });
-            }
+              if (matches.length > 0) { active = true; firstActive = firstActive || selection; break; }
+            } catch { active = active || FeatsHandler.isEnvironmentActive(this.actorToken, selection); if (active && !firstActive) firstActive = selection; }
+          }
+          if (active) {
+            badges.push({ key: 'vanish-into-the-land', icon: 'fas fa-leaf', label: game.i18n.localize('PF2E_VISIONER.HIDE_AUTOMATION.BADGES.VANISH_INTO_THE_LAND_LABEL'), tooltip: game.i18n.localize('PF2E_VISIONER.HIDE_AUTOMATION.BADGES.VANISH_INTO_THE_LAND_TOOLTIP') });
           }
         }
       } catch { }
@@ -325,6 +340,7 @@ export class HidePreviewDialog extends BaseActionDialog {
 
     // Calculate summary information
     context.actorToken = this.actorToken;
+    context.actorTokenImage = this.resolveTokenImage(this.actorToken);
     context.outcomes = processedOutcomes;
     context.ignoreAllies = !!this.ignoreAllies;
     context.hideFoundryHidden = !!this.hideFoundryHidden;

@@ -291,9 +291,12 @@ export class BatchProcessor {
                     console.warn('PF2E Visioner | Failed to check visibility overrides:', overrideError);
                 }
 
-                // If either direction has an active override (including legacy flags),
-                // avoid expensive calculations and apply only the override(s) as updates.
-                if (hasOverride1 || hasOverride2) {
+                // For observer movement: recalculate visibility even if observer has overrides
+                // Only skip if target has overrides that would prevent meaningful recalculation
+                const shouldSkipDueToTargetOverride = hasOverride2; // otherToken -> changedToken override
+
+                if (shouldSkipDueToTargetOverride) {
+                    // Target has override preventing recalculation - skip expensive calculation
                     if (hasOverride1) breakdown.pairsSkippedOverride += 1;
                     if (hasOverride2) breakdown.pairsSkippedOverride += 1;
 
@@ -304,6 +307,12 @@ export class BatchProcessor {
                         updates.push({ observer: otherToken, target: changedToken, visibility: effectiveVisibility2 });
                     }
                     continue;
+                }
+
+                // If only observer has override (hasOverride1), apply it but don't skip calculation
+                // The moving observer should recalculate visibility to targets regardless of existing overrides
+                if (hasOverride1 && effectiveVisibility1 !== originalVisibility1) {
+                    updates.push({ observer: changedToken, target: otherToken, visibility: effectiveVisibility1 });
                 }
 
                 // Early short-circuit: if both directional vis states are in global cache and equal originals, skip pair entirely
@@ -396,7 +405,8 @@ export class BatchProcessor {
                 const visibilityStart = performance.now();
 
                 // Compute visibility in both directions when not overridden
-                {
+                // Direction 1: changedToken -> otherToken (only calculate if no override)
+                if (!hasOverride1) {
                     breakdown.pairsConsidered++;
                     const cacheOpStart = performance.now();
                     const vKey1 = posCache.makeDirectionalKey(aId, posKeyA, bId, posKeyB);
@@ -449,7 +459,8 @@ export class BatchProcessor {
                     }
                     effectiveVisibility1 = visibility1;
                 }
-                {
+                // Direction 2: otherToken -> changedToken (only calculate if no override)
+                if (!hasOverride2) {
                     breakdown.pairsConsidered++;
                     const cacheOpStart = performance.now();
                     const vKey2 = posCache.makeDirectionalKey(bId, posKeyB, aId, posKeyA);
