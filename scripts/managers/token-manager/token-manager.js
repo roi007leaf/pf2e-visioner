@@ -8,6 +8,7 @@ import { getCoverMap, getVisibilityMap } from '../../utils.js';
 import { MODULE_ID } from '../../constants.js';
 import { bindTokenManagerActions } from './actions/index.js';
 import { toggleHideFoundryHidden, toggleIgnoreAllies, toggleIgnoreWalls } from './actions/ui.js';
+import { attachApplyButtonAnimation } from './apply-button-animation.js';
 import {
   addTokenBorder as addBorderUtil,
   removeTokenBorder as removeBorderUtil,
@@ -344,6 +345,11 @@ export class VisionerTokenManager extends foundry.applications.api.ApplicationV2
     attachSelectionHandlers(this.constructor);
     attachCanvasHoverHandlers(this.constructor);
     applySelectionHighlight(this.constructor);
+
+    // Setup apply button animation for form changes
+    try {
+      attachApplyButtonAnimation(this);
+    } catch (_) { }
 
     // Apply visual filter for Foundry-hidden tokens based on toggle
     try {
