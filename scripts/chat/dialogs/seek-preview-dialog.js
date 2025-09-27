@@ -41,6 +41,7 @@ export class SeekPreviewDialog extends BaseActionDialog {
       applyChange: SeekPreviewDialog._onApplyChange,
       revertChange: SeekPreviewDialog._onRevertChange,
       toggleEncounterFilter: SeekPreviewDialog._onToggleEncounterFilter,
+      toggleFilterByDetection: SeekPreviewDialog._onToggleFilterByDetection,
       overrideState: SeekPreviewDialog._onOverrideState,
     },
   };
@@ -138,6 +139,21 @@ export class SeekPreviewDialog extends BaseActionDialog {
     if (this.actorToken) {
       filteredOutcomes = filterOutcomesBySeekDistance(filteredOutcomes, this.actorToken, 'target');
     }
+
+    // Always apply wall LOS filtering for performance, optionally apply token LOS filtering if enabled
+    if (this.actorToken) {
+      try {
+        const { filterOutcomesByDetection } = await import('../services/infra/shared-utils.js');
+        // Always filter walls by detection (true), filter tokens by detection only if checkbox enabled (this.filterByDetection)
+        filteredOutcomes = await filterOutcomesByDetection(filteredOutcomes, this.actorToken, 'target', true, this.filterByDetection, 'observer_to_target');
+      } catch { /* LOS filtering is non-critical */ }
+    }
+
+    // Apply defeated token filtering (exclude dead/unconscious tokens)
+    try {
+      const { filterOutcomesByDefeated } = await import('../services/infra/shared-utils.js');
+      filteredOutcomes = filterOutcomesByDefeated(filteredOutcomes, 'target');
+    } catch { /* Defeated filtering is non-critical */ }
 
     // Prepare visibility states using centralized config
     const cfg = (s) => this.visibilityConfig(s);
@@ -283,67 +299,222 @@ export class SeekPreviewDialog extends BaseActionDialog {
     });
 
     // Set actor context for seeker
-    // Detect all special senses on seeker (capabilities)
-    let activeSenses = [];
+    // Detect ALL senses on seeker (capabilities) with precision indicators
+    let allSenses = [];
     try {
       const { VisionAnalyzer } = await import('../../visibility/auto-visibility/VisionAnalyzer.js');
       const { SPECIAL_SENSES } = await import('../../constants.js');
       const visionAnalyzer = VisionAnalyzer.getInstance();
       const sensingSummary = visionAnalyzer.getSensingSummary(this.actorToken);
+      const caps = visionAnalyzer.getVisionCapabilities(this.actorToken);
 
-      // Check for echolocation via effect item first (legacy support)
-      const effects = this.actorToken?.actor?.itemTypes?.effect ?? [];
-      const hasEchoEffect = !!effects?.some?.(
-        (e) => (e?.slug || e?.system?.slug || e?.name)?.toLowerCase?.() === 'effect-echolocation',
-      );
-      if (hasEchoEffect) {
-        activeSenses.push({
-          type: 'echolocation',
-          range: 40,
-          config: SPECIAL_SENSES.echolocation,
+      const isVisualType = (t) => {
+        const tt = String(t || '').toLowerCase();
+        return (
+          tt === 'vision' ||
+          tt === 'sight' ||
+          tt === 'darkvision' ||
+          tt === 'greater-darkvision' ||
+          tt === 'greaterdarkvision' ||
+          tt === 'low-light-vision' ||
+          tt === 'lowlightvision' ||
+          tt === 'see-invisibility' ||
+          tt === 'truesight' ||
+          tt.includes('vision') ||
+          tt.includes('sight') ||
+          tt.includes('invisibility')
+        );
+      };
+
+      // Add precise senses
+      for (const sense of sensingSummary.precise || []) {
+        const senseConfig = SPECIAL_SENSES[sense.type] || {
+          label: `PF2E_VISIONER.SENSES.${sense.type.toUpperCase()}`,
+          icon: 'fas fa-eye',
+          description: `PF2E_VISIONER.SENSES.${sense.type.toUpperCase()}_DESC`
+        };
+
+        allSenses.push({
+          type: sense.type,
+          range: sense.range,
+          isPrecise: true,
+          config: senseConfig,
         });
-      } else {
-        // Check for echolocation via flag (legacy support)
-        const flag = this.actorToken?.actor?.getFlag?.('pf2e-visioner', 'echolocation');
-        if (flag?.active) {
-          activeSenses.push({
-            type: 'echolocation',
-            range: Number(flag.range) || 40,
-            config: SPECIAL_SENSES.echolocation,
-          });
-        }
       }
 
-      // Check for all special senses from sensing summary
-      for (const [senseType, senseConfig] of Object.entries(SPECIAL_SENSES)) {
-        if (sensingSummary[senseType]) {
-          // Avoid duplicate echolocation if already added via effect/flag
-          if (senseType === 'echolocation' && activeSenses.some((s) => s.type === 'echolocation')) {
-            continue;
+      // Ensure plain vision is represented as a precise sense if the actor can see (not when blinded)
+      try {
+        if (caps?.hasVision && !caps?.isBlinded) {
+          // Only add if not already present
+          if (!allSenses.some((s) => s.type === 'vision')) {
+            const { SPECIAL_SENSES } = await import('../../constants.js');
+            const senseConfig = SPECIAL_SENSES['vision'] || {
+              label: 'PF2E_VISIONER.SPECIAL_SENSES.vision',
+              icon: 'fas fa-eye',
+              description: 'PF2E_VISIONER.SPECIAL_SENSES.vision_description',
+            };
+            allSenses.push({ type: 'vision', range: Infinity, isPrecise: true, config: senseConfig });
           }
+        }
+      } catch { }
 
-          activeSenses.push({
-            type: senseType,
-            range: sensingSummary[senseType].range,
-            config: senseConfig,
+      // Add imprecise senses
+      for (const sense of sensingSummary.imprecise || []) {
+        const senseConfig = SPECIAL_SENSES[sense.type] || {
+          label: `PF2E_VISIONER.SENSES.${sense.type.toUpperCase()}`,
+          icon: 'fas fa-wave-square',
+          description: `PF2E_VISIONER.SENSES.${sense.type.toUpperCase()}_DESC`
+        };
+
+        allSenses.push({
+          type: sense.type,
+          range: sense.range,
+          isPrecise: false,
+          config: senseConfig,
+        });
+      }
+
+      // Add hearing if present (use SPECIAL_SENSES.hearing when available)
+      if (sensingSummary.hearing) {
+        const hearingConfig = SPECIAL_SENSES.hearing || {
+          label: 'PF2E_VISIONER.SPECIAL_SENSES.hearing',
+          icon: 'fas fa-volume-up',
+          description: 'PF2E_VISIONER.SPECIAL_SENSES.hearing_description',
+        };
+
+        allSenses.push({
+          type: 'hearing',
+          range: sensingSummary.hearing.range,
+          isPrecise: sensingSummary.hearing.acuity === 'precise',
+          config: hearingConfig,
+        });
+      }
+
+      // Add echolocation if active (special handling)
+      if (sensingSummary.echolocationActive) {
+        const echolocationConfig = SPECIAL_SENSES.echolocation || {
+          label: 'PF2E_VISIONER.SENSES.ECHOLOCATION',
+          icon: 'fas fa-broadcast-tower',
+          description: 'PF2E_VISIONER.SENSES.ECHOLOCATION_DESC'
+        };
+
+        // Check if already added from precise/imprecise arrays
+        const existingEcho = allSenses.find(s => s.type === 'echolocation');
+        if (!existingEcho) {
+          allSenses.push({
+            type: 'echolocation',
+            range: sensingSummary.echolocationRange,
+            isPrecise: true, // Echolocation is typically precise
+            config: echolocationConfig,
           });
         }
       }
-    } catch { }
 
-    // Only show imprecise sense badges if they were ACTUALLY used by at least one outcome
+      // If blinded, filter out visual senses entirely from the list
+      try {
+        if (caps?.isBlinded) {
+          allSenses = allSenses.filter((s) => !isVisualType(s.type));
+        }
+      } catch { }
+
+      // Normalize displayRange for template (Infinity → ∞)
+      for (const s of allSenses) {
+        try {
+          s.displayRange = (s.range === Infinity || s.range === 'Infinity') ? '∞' : `${s.range}`;
+        } catch { }
+      }
+
+      // Sort senses: precise first, then by type name
+      allSenses.sort((a, b) => {
+        if (a.isPrecise !== b.isPrecise) {
+          return a.isPrecise ? -1 : 1; // Precise senses first
+        }
+        return a.type.localeCompare(b.type);
+      });
+
+    } catch (error) {
+      console.warn('PF2e Visioner | Error getting sensing summary:', error);
+    }
+
+    // Keep backwards compatibility: also create activeSenses for used imprecise senses
+    let activeSenses = null;
+    let usedSenseCount = 0;
+    let primaryUsedSenseLabel = null; // i18n key from sense.config.label
     try {
-      const usedTypes = new Set(
-        (processedOutcomes || [])
-          .filter((o) => o?.usedImprecise && typeof o?.usedImpreciseSenseType === 'string')
-          .map((o) => o.usedImpreciseSenseType),
-      );
-      if (usedTypes.size > 0) {
-        // Filter to only the imprecise senses that were used in any row
-        activeSenses = activeSenses.filter((s) => usedTypes.has(s.type));
+      // Build stats of used senses across outcomes, tracking precision
+      const usedStats = new Map(); // type -> { total: number, precise: number, imprecise: number }
+      // Prefer original, unfiltered outcomes so used-sense indicator isn't affected by UI filters
+      const usedSource = Array.isArray(this._originalOutcomes) && this._originalOutcomes.length
+        ? this._originalOutcomes
+        : processedOutcomes || [];
+
+      for (const o of usedSource) {
+        const t = typeof o?.usedSenseType === 'string' && o.usedSenseType ? String(o.usedSenseType) : null;
+        const p = typeof o?.usedSensePrecision === 'string' ? String(o.usedSensePrecision).toLowerCase() : null;
+        const legacyImpreciseType = o?.usedImprecise && typeof o?.usedImpreciseSenseType === 'string'
+          ? String(o.usedImpreciseSenseType)
+          : null;
+
+        if (t) {
+          if (!usedStats.has(t)) usedStats.set(t, { total: 0, precise: 0, imprecise: 0 });
+          const stat = usedStats.get(t);
+          stat.total += 1;
+          if (p === 'precise') stat.precise += 1;
+          else if (p === 'imprecise') stat.imprecise += 1;
+        }
+        // Back-compat: if legacy imprecise-only field is present, count it as imprecise
+        if (legacyImpreciseType) {
+          if (!usedStats.has(legacyImpreciseType)) usedStats.set(legacyImpreciseType, { total: 0, precise: 0, imprecise: 0 });
+          const stat = usedStats.get(legacyImpreciseType);
+          stat.total += 1;
+          stat.imprecise += 1;
+        }
+      }
+
+      // Choose a single used sense for the action: prefer the type with any precise usage; tie-breaker by highest precise count, then total
+      let chosenUsedType = null;
+      if (usedStats.size > 0) {
+        const entries = Array.from(usedStats.entries());
+        // Find best precise
+        const withPrecise = entries.filter(([, s]) => s.precise > 0);
+        if (withPrecise.length > 0) {
+          withPrecise.sort((a, b) => {
+            const ap = a[1].precise, bp = b[1].precise;
+            if (bp !== ap) return bp - ap; // more precise usages first
+            // tie-breaker by total usage
+            return b[1].total - a[1].total;
+          });
+          chosenUsedType = withPrecise[0][0];
+        } else {
+          // No precise usages; choose the most-used imprecise type
+          entries.sort((a, b) => {
+            const ai = a[1].imprecise, bi = b[1].imprecise;
+            if (bi !== ai) return bi - ai;
+            return b[1].total - a[1].total;
+          });
+          chosenUsedType = entries[0][0];
+        }
+      }
+
+      // Annotate all senses so tooltip highlights only the chosen one
+      if (Array.isArray(allSenses)) {
+        for (const s of allSenses) {
+          s.wasUsed = chosenUsedType ? s.type === chosenUsedType : false;
+        }
+      }
+
+      // For display purposes, we treat this as exactly one used sense if any were used
+      if (chosenUsedType) {
+        usedSenseCount = 1;
+        const match = allSenses?.find?.((s) => s.type === chosenUsedType);
+        primaryUsedSenseLabel = match?.config?.label ?? null; // localization key
       } else {
-        // If no imprecise sense was used, hide the badges entirely to avoid confusion
-        activeSenses = null;
+        usedSenseCount = 0;
+      }
+
+      // Back-compat: only expose imprecise activeSenses when the chosen type is imprecise
+      if (chosenUsedType) {
+        activeSenses = allSenses.filter((s) => !s.isPrecise && s.type === chosenUsedType);
       }
     } catch { }
 
@@ -353,11 +524,14 @@ export class SeekPreviewDialog extends BaseActionDialog {
       actionType: 'seek',
       actionLabel: 'Seek action results analysis',
     };
-    context.activeSenses = activeSenses;
+    context.allSenses = allSenses; // New: all senses with precision indicators
+    context.activeSenses = activeSenses; // Backwards compatibility: only used imprecise senses
+    context.usedSenseCount = usedSenseCount;
+    context.primaryUsedSenseLabel = primaryUsedSenseLabel; // i18n key for display when exactly one
 
     // Legacy support for existing template logic
-    const echolocationSense = activeSenses?.find?.((s) => s.type === 'echolocation');
-    const lifesenseSense = activeSenses?.find?.((s) => s.type === 'lifesense');
+    const echolocationSense = allSenses?.find?.((s) => s.type === 'echolocation');
+    const lifesenseSense = allSenses?.find?.((s) => s.type === 'lifesense');
     context.echolocationActive = !!echolocationSense;
     context.echolocationRange = echolocationSense?.range || 0;
     context.lifesenseActive = !!lifesenseSense;
@@ -400,6 +574,12 @@ export class SeekPreviewDialog extends BaseActionDialog {
    */
   _replaceHTML(result, content) {
     content.innerHTML = result;
+
+    // Hook up senses button tooltips
+    try {
+      this.setupSensesButtonTooltips(content);
+    } catch { }
+
     // Hook up per-dialog Ignore Allies toggle
     try {
       const cb = content.querySelector('input[data-action="toggleIgnoreAllies"]');
@@ -532,6 +712,15 @@ export class SeekPreviewDialog extends BaseActionDialog {
           filtered = filterOutcomesBySeekDistance(filtered, this.actorToken, 'target');
         }
       } catch { }
+
+      // Always apply wall LOS filtering for performance, optionally apply token LOS filtering if enabled
+      if (this.actorToken) {
+        try {
+          const { filterOutcomesByDetection } = await import('../services/infra/shared-utils.js');
+          // Always filter walls by detection (true), filter tokens by detection only if checkbox enabled (this.filterByDetection)
+          filtered = await filterOutcomesByDetection(filtered, this.actorToken, 'target', true, this.filterByDetection, 'observer_to_target');
+        } catch { }
+      }
       // Compute actionability and carry over any existing overrides from the currently displayed outcomes
       if (!Array.isArray(filtered)) return [];
       const processed = filtered.map((o) => {
@@ -831,6 +1020,9 @@ export class SeekPreviewDialog extends BaseActionDialog {
    * Override close to clear global reference
    */
   close(options) {
+    // Clean up tooltips
+    this.hideSensesTooltip();
+
     // Clean up only auto-created preview templates (not manual, which we delete immediately on placement)
     try {
       if (this.templateId && canvas.scene && !this.templateCenter) {
@@ -1215,6 +1407,14 @@ export class SeekPreviewDialog extends BaseActionDialog {
     app.render({ force: true });
   }
 
+  static async _onToggleFilterByDetection(event, target) {
+    const app = _currentSeekDialogInstance;
+    if (!app) return;
+    app.filterByDetection = target.checked;
+    app.bulkActionState = 'initial';
+    app.render({ force: true });
+  }
+
   /**
    * Add click handlers for state icon selection
    */
@@ -1234,6 +1434,95 @@ export class SeekPreviewDialog extends BaseActionDialog {
     const app = _currentSeekDialogInstance;
     if (!app) return;
     // This method is available for future enhancements if needed
+  }
+
+  /**
+   * Setup tooltips for senses buttons
+   */
+  setupSensesButtonTooltips(content) {
+    const sensesButtons = content.querySelectorAll('.senses-button[data-tooltip-html]');
+
+    sensesButtons.forEach((button) => {
+      const tooltipId = button.getAttribute('data-tooltip-html');
+      const tooltipContent = content.querySelector(`#${tooltipId}`);
+      if (!tooltipContent) return;
+
+      // Prevent built-in text tooltip from showing the raw id
+      button.setAttribute('data-tooltip', '');
+
+      const anchor = button; // ensure we anchor to the button element
+
+      const show = () => this.showSensesTooltip(anchor, tooltipContent);
+      const hide = () => this.hideSensesTooltip();
+
+      button.addEventListener('mouseenter', show);
+      button.addEventListener('mouseleave', hide);
+      button.addEventListener('focus', show);
+      button.addEventListener('blur', hide);
+    });
+  }
+
+  /**
+   * Show custom senses tooltip
+   */
+  showSensesTooltip(element, tooltipContent) {
+    // Remove any existing tooltip
+    this.hideSensesTooltip();
+
+    // Create tooltip element
+    const tooltip = document.createElement('div');
+    tooltip.className = 'senses-tooltip-content';
+    tooltip.innerHTML = tooltipContent.innerHTML;
+
+    // Only set essential positioning styles without overriding CSS styling
+    tooltip.style.position = 'absolute';
+    tooltip.style.zIndex = '10000';
+    tooltip.style.pointerEvents = 'none';
+    tooltip.style.opacity = '0';
+    tooltip.style.transition = 'opacity 0.2s ease';
+
+    document.body.appendChild(tooltip);
+
+    // Position tooltip
+    const rect = element.getBoundingClientRect();
+    const tooltipRect = tooltip.getBoundingClientRect();
+
+    let left = rect.left + (rect.width / 2) - (tooltipRect.width / 2);
+    let top = rect.bottom + 8;
+
+    // Adjust if tooltip would go off screen
+    if (left < 8) left = 8;
+    if (left + tooltipRect.width > window.innerWidth - 8) {
+      left = window.innerWidth - tooltipRect.width - 8;
+    }
+    if (top + tooltipRect.height > window.innerHeight - 8) {
+      top = rect.top - tooltipRect.height - 8;
+    }
+
+    tooltip.style.left = `${left}px`;
+    tooltip.style.top = `${top}px`;
+
+    // Show tooltip
+    requestAnimationFrame(() => {
+      tooltip.style.opacity = '1';
+    });
+
+    this._currentTooltip = tooltip;
+  }
+
+  /**
+   * Hide custom senses tooltip
+   */
+  hideSensesTooltip() {
+    if (this._currentTooltip) {
+      this._currentTooltip.style.opacity = '0';
+      setTimeout(() => {
+        if (this._currentTooltip && this._currentTooltip.parentNode) {
+          this._currentTooltip.parentNode.removeChild(this._currentTooltip);
+        }
+        this._currentTooltip = null;
+      }, 200);
+    }
   }
 
   /**

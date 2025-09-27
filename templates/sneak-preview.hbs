@@ -27,6 +27,9 @@
           <span class="distance-chip" data-tooltip="{{sneakDistance.tooltip}}">
             <i class="fas fa-shoe-prints"></i>
             <span>Max Sneak Distance: <strong>{{sneakDistance.maxFeet}} ft</strong></span>
+            {{#if sneakDistance.movementLabel}}
+              <span class="movement-chip {{sneakDistance.statusClass}}" data-tooltip="{{sneakDistance.supportTooltip}}"><i class="{{sneakDistance.movementIcon}}"></i> {{sneakDistance.movementLabel}}</span>
+            {{/if}}
           </span>
         </div>
       {{/if}}
@@ -41,6 +44,10 @@
       <span class="encounter-filter-label">{{localize "PF2E_VISIONER.UI.ENCOUNTER_FILTER_TEXT"}}</span>
     </label>
     {{/if}}
+    <label class="filter-by-los-checkbox">
+      <input type="checkbox" {{#if filterByDetection}}checked{{/if}} {{#if detectionFilterDisabled}}disabled{{/if}} data-action="toggleFilterByDetection" data-tooltip="{{localize 'PF2E_VISIONER.UI.FILTER_BY_DETECTION_TOOLTIP'}}" />
+      <span class="encounter-filter-label">{{localize 'PF2E_VISIONER.UI.FILTER_BY_DETECTION_LABEL'}}</span>
+    </label>
     <label class="ignore-allies-filter-checkbox">
       <input type="checkbox" {{#if ignoreAllies}}checked{{/if}} data-action="toggleIgnoreAllies" data-tooltip="Hide allies from the results list" />
       <span class="encounter-filter-label">Ignore allies</span>

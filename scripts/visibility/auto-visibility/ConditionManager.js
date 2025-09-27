@@ -87,6 +87,35 @@ export class ConditionManager {
   }
 
   /**
+   * Check if an observer is deafened (cannot hear anything)
+   * @param {Token} observer
+   * @returns {boolean}
+   */
+  isDeafened(observer) {
+    // Check if observer has deafened condition - try multiple methods
+    const hasConditionMethod = observer.actor?.hasCondition?.('deafened');
+    const systemConditionActive = observer.actor?.system?.conditions?.deafened?.active;
+    const conditionsHas = observer.actor?.conditions?.has?.('deafened');
+
+    // Also check for the 'deafened' condition in the conditions collection
+    let conditionsCollectionHas = false;
+    if (observer.actor?.conditions) {
+      try {
+        conditionsCollectionHas = observer.actor.conditions.some(
+          (condition) => condition.slug === 'deafened' || condition.key === 'deafened',
+        );
+      } catch (e) {
+        // Ignore errors in condition checking
+      }
+    }
+
+    const isDeafened =
+      hasConditionMethod || systemConditionActive || conditionsHas || conditionsCollectionHas;
+
+    return isDeafened;
+  }
+
+  /**
    * Check if target is invisible to observer (magical invisibility, etc.)
    * @param {Token} observer
    * @param {Token} target

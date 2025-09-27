@@ -63,6 +63,16 @@ export async function setVisibilityBetween(
   if (currentState !== state) {
     visibilityMap[target.document.id] = state;
     await setVisibilityMap(observer, visibilityMap);
+
+    // Notify UI listeners that a visibility map changed so tooltips can refresh
+    try {
+      Hooks.callAll?.('pf2e-visioner.visibilityMapUpdated', {
+        observerId: observer.document.id,
+        targetId: target.document.id,
+        state,
+        direction: options.direction || 'observer_to_target',
+      });
+    } catch (_) { }
   }
 
   if (options.skipEphemeralUpdate) return;

@@ -65,6 +65,7 @@ export class ConsequencesPreviewDialog extends BaseActionDialog {
       applyAll: ConsequencesPreviewDialog._onApplyAll,
       revertAll: ConsequencesPreviewDialog._onRevertAll,
       toggleEncounterFilter: ConsequencesPreviewDialog._onToggleEncounterFilter,
+      toggleFilterByDetection: ConsequencesPreviewDialog._onToggleFilterByDetection,
       overrideState: ConsequencesPreviewDialog._onOverrideState,
       removeOverrides: ConsequencesPreviewDialog._onRemoveOverrides,
     },
@@ -83,8 +84,8 @@ export class ConsequencesPreviewDialog extends BaseActionDialog {
       return;
     }
 
-  // Filter outcomes based on encounter filter
-  let filteredOutcomes = filterOutcomesByEncounter(app.outcomes, app.encounterOnly, 'target');
+    // Filter outcomes based on encounter filter
+    let filteredOutcomes = filterOutcomesByEncounter(app.outcomes, app.encounterOnly, 'target');
 
     // Apply ally filtering if ignore allies is enabled
     try {
@@ -116,6 +117,7 @@ export class ConsequencesPreviewDialog extends BaseActionDialog {
       const { AvsOverrideManager } = await import('../services/infra/avs-override-manager.js');
       await AvsOverrideManager.clearForConsequences(app.attackingToken, observers, { refresh: true });
       notify.info(`${MODULE_TITLE}: Removed overrides between ${app.attackingToken.name} and ${observers.length} observer(s).`);
+
       // Reset dialog bulk state and re-render to update counts/UI (data changed)
       try {
         app.bulkActionState = 'initial';
@@ -147,6 +149,28 @@ export class ConsequencesPreviewDialog extends BaseActionDialog {
         'target',
       );
     } catch { }
+
+    // Apply detection filtering if enabled
+    if (this.filterByDetection && this.attackingToken) {
+      try {
+        const { filterOutcomesByDetection } = await import('../services/infra/shared-utils.js');
+        // Await the async filter to avoid turning processedOutcomes into a Promise
+        processedOutcomes = await filterOutcomesByDetection(
+          processedOutcomes,
+          this.attackingToken,
+          'target',
+          false,
+          true,
+          'observer_to_target'
+        );
+      } catch { /* LOS filtering is non-critical */ }
+    }
+
+    // Apply defeated token filtering (exclude dead/unconscious tokens)
+    try {
+      const { filterOutcomesByDefeated } = await import('../services/infra/shared-utils.js');
+      processedOutcomes = filterOutcomesByDefeated(processedOutcomes, 'target');
+    } catch { /* Defeated filtering is non-critical */ }
 
     // Prepare outcomes with additional UI data (and normalize shape)
     processedOutcomes = processedOutcomes.map((outcome) => {
@@ -510,6 +534,17 @@ export class ConsequencesPreviewDialog extends BaseActionDialog {
 
     // Re-render with new filter
     await app.render({ force: true });
+  }
+
+  /**
+   * Handle detection filter toggle
+   */
+  static async _onToggleFilterByDetection(event, target) {
+    const app = currentConsequencesDialog;
+    if (!app) return;
+    app.filterByDetection = target.checked;
+    app.bulkActionState = 'initial';
+    app.render({ force: true });
   }
 
   /**

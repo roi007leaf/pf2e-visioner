@@ -56,19 +56,20 @@ export default class EnvironmentHelper {
             return hasEnv('forest') && insideDifficult;
         }
         if (key === 'rubble') {
-            // Mountain OR Urban environment + difficult terrain
-            return (hasEnv('mountain') || hasEnv('desert') || hasEnv('underground')) && insideDifficult;
+            // Mountain, Underground, OR Urban environment + difficult terrain
+            return (hasEnv('mountain') || hasEnv('underground') || hasEnv('urban')) && insideDifficult;
         }
         if (key === 'snow') {
-            // Just Snow environment
-            return hasEnv('snow');
+            // Arctic environment + difficult terrain (snow is a feature that appears in arctic environments)
+            return hasEnv('arctic') && insideDifficult;
         }
 
         // Default direct match
         return hasEnv(key);
     }
 
-    static getActiveContext(tokenOrActor) {
+    static getActiveContext(tokenOrActor, opts = {}) {
+        const movementType = opts?.movementType;
         // Scene envs
         let sceneTypes = new Set();
         try {
@@ -87,7 +88,7 @@ export default class EnvironmentHelper {
 
                     const envTypes = EnvironmentHelper.getRegionEnvironmentTypes(region);
                     for (const v of envTypes) regionTypes.add(v);
-                    if (!insideDifficult && EnvironmentHelper.regionHasDifficultTerrain(region)) insideDifficult = true;
+                    if (!insideDifficult && EnvironmentHelper.regionHasDifficultTerrain(region, movementType)) insideDifficult = true;
                 }
             }
         } catch { }
@@ -97,22 +98,23 @@ export default class EnvironmentHelper {
 
     /**
      * Get environment regions containing the token that match the given environment key
-     * Applies Terrain Stalker combos: underbrush (forest + difficult), rubble (mountain|urban + difficult), snow (snow)
+     * Applies Terrain Stalker combos: underbrush (forest + difficult), rubble (mountain|underground|urban + difficult), snow (arctic + difficult)
      * @param {Token|Actor} tokenOrActor
      * @param {string} environmentKey
      * @returns {Array} Array of Region placeables matching the environment for this token
      */
-    static getMatchingEnvironmentRegions(tokenOrActor, environmentKey) {
+    static getMatchingEnvironmentRegions(tokenOrActor, environmentKey, opts = {}) {
         const key = normalizeSlug(environmentKey);
         if (!key) return [];
+        const movementType = opts?.movementType;
         const matchesRegion = (region) => {
             try {
                 const types = RegionHelper.extractEnvironmentTypes(region);
                 const has = (env) => types.has(normalizeSlug(env));
-                const difficult = RegionHelper.hasDifficultTerrain(region);
+                const difficult = RegionHelper.hasDifficultTerrain(region, movementType);
                 if (key === 'underbrush') return has('forest') && difficult;
-                if (key === 'rubble') return (has('mountain') || has('urban')) && difficult;
-                if (key === 'snow') return has('snow');
+                if (key === 'rubble') return (has('mountain') || has('underground') || has('urban')) && difficult;
+                if (key === 'snow') return has('arctic') && difficult;
                 return has(key);
             } catch { return false; }
         };
@@ -150,9 +152,9 @@ export default class EnvironmentHelper {
         return RegionHelper.extractEnvironmentTypes(region);
     }
 
-    static regionHasDifficultTerrain(region) {
+    static regionHasDifficultTerrain(region, movementType) {
         // Delegate to RegionHelper for detection
-        return RegionHelper.hasDifficultTerrain(region);
+        return RegionHelper.hasDifficultTerrain(region, movementType);
     }
 
     static isTokenInsideRegion(token, region) {

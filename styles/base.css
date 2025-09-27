@@ -706,6 +706,33 @@
     border-radius: 4px;
     background: rgba(255, 215, 0, 0.05); /* subtle gold tint */
   }
+
+  /* Movement chip styling */
+  .movement-distance-indicator,
+  .sneak-distance-indicator {
+    margin-top: var(--spacing-sm);
+  }
+  .movement-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border: 1px solid var(--color-border-light-primary);
+    border-radius: var(--radius-md);
+    padding: 2px 6px;
+    background: var(--color-bg-option);
+    color: var(--color-text-primary);
+    font-size: 12px;
+  }
+  .movement-chip.ok {
+    border-color: var(--visibility-observed);
+    color: var(--visibility-observed);
+    background: var(--visibility-observed-bg-light);
+  }
+  .movement-chip.warn {
+    border-color: var(--visibility-undetected);
+    color: var(--visibility-undetected);
+    background: var(--visibility-undetected-bg-light);
+  }
 } /* End .pf2e-visioner scope */
 
 /* Tooltip badges are appended to <body>, so provide global styles */

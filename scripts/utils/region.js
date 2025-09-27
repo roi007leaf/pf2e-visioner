@@ -12,6 +12,26 @@ function normalizeSlug(value = '') {
     }
 }
 
+function normalizeMovementType(value) {
+    if (!value) return undefined;
+    try {
+        const v = String(value).toLowerCase();
+        const map = {
+            walk: ['walk', 'land', 'ground', 'stride', 'climb', 'climbing', 'move'],
+            fly: ['fly', 'flying', 'air', 'aerial'],
+            swim: ['swim', 'swimming', 'water', 'aquatic'],
+            burrow: ['burrow', 'tunnel', 'earth'],
+            deploy: ['deploy'],
+            travel: ['travel']
+        };
+        for (const [key, aliases] of Object.entries(map)) {
+            if (aliases.includes(v)) return key;
+        }
+        // Unknown -> return as-is; caller may provide exact key like 'walk'
+        return v;
+    } catch { return undefined; }
+}
+
 export default class RegionHelper {
     // Get region behaviors array (safe)
     static getBehaviors(region) {
@@ -77,9 +97,10 @@ export default class RegionHelper {
     }
 
     // Difficult terrain heuristic
-    static hasDifficultTerrain(region) {
+    static hasDifficultTerrain(region, movementType) {
         try {
             const behaviors = this.getBehaviors(region);
+            const mv = normalizeMovementType(movementType);
             for (const b of behaviors) {
                 const t = String(b?.type ?? '').toLowerCase();
                 const sys = b?.system ?? b?.value?.system ?? {};
@@ -87,13 +108,38 @@ export default class RegionHelper {
                 if (t === 'environmentfeature' || t.includes('environmentfeature')) {
                     if (sys?.terrain?.difficult) return true;
                 }
+                // Explicit support: modifyMovementCost behavior → difficult if any movement multiplier > 1
+                // Foundry/PF2e v13+ uses a behavior with system.difficulties.{walk,fly,...}
+                if (t === 'modifymovementcost' || t.includes('movementcost')) {
+                    const diffs = sys?.difficulties;
+                    if (diffs && typeof diffs === 'object') {
+                        try {
+                            if (mv) {
+                                // Prefer exact match for provided movement type
+                                const n = Number(diffs[mv]);
+                                if (Number.isFinite(n) && n > 1) return true;
+                                // Some data may use synonyms; attempt a light alias check for walk
+                                if (mv === 'walk' && Number.isFinite(Number(diffs['land'])) && Number(diffs['land']) > 1) return true;
+                            } else {
+                                // No specific movement -> any multiplier > 1 qualifies
+                                for (const v of Object.values(diffs)) {
+                                    const n = Number(v);
+                                    if (Number.isFinite(n) && n > 1) return true;
+                                }
+                            }
+                        } catch { /* ignore */ }
+                    }
+                    // If difficulties exists but no value > 1, don't treat as difficult here; continue to next behavior
+                }
                 // Fallback heuristics for older/custom data
                 if (t.includes('difficult')) return true;
                 if (sys?.terrain && typeof sys.terrain === 'object') {
                     try { if (sys.terrain.difficult) return true; } catch { }
                 }
                 const keys = Object.keys(sys).map((k) => k.toLowerCase());
-                if (keys.some((k) => k.includes('difficult'))) return true;
+                // Avoid misclassifying a mere 'difficulties' container as difficult terrain when all multipliers are 1
+                const hasGenericDifficultFlag = keys.some((k) => k !== 'difficulties' && k.includes('difficult'));
+                if (hasGenericDifficultFlag) return true;
             }
         } catch { }
         return false;

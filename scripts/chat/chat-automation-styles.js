@@ -7,44 +7,44 @@
  * Initialize and inject CSS styles for chat automation
  */
 export function injectChatAutomationStyles() {
-  // Re-enable CSS injection for chat automation styles
-  const css = getChatAutomationCSS();
+    // Re-enable CSS injection for chat automation styles
+    const css = getChatAutomationCSS();
 
-  // Check if styles are already injected
-  if (document.getElementById('pf2e-visioner-chat-styles')) {
-    return;
-  }
-
-  // Create and inject style element
-  const style = document.createElement('style');
-  style.id = 'pf2e-visioner-chat-styles';
-  style.textContent = css;
-  document.head.appendChild(style);
-
-  // Add event listener to fix scrolling in dialogs
-  Hooks.on('renderApplication', (app, html, data) => {
-    if (app.constructor.name.includes('PreviewDialog')) {
-      fixDialogScrolling(html);
+    // Check if styles are already injected
+    if (document.getElementById('pf2e-visioner-chat-styles')) {
+        return;
     }
-  });
+
+    // Create and inject style element
+    const style = document.createElement('style');
+    style.id = 'pf2e-visioner-chat-styles';
+    style.textContent = css;
+    document.head.appendChild(style);
+
+    // Add event listener to fix scrolling in dialogs
+    Hooks.on('renderApplication', (app, html, data) => {
+        if (app.constructor.name.includes('PreviewDialog')) {
+            fixDialogScrolling(html);
+        }
+    });
 }
 
 /**
  * Re-inject chat automation styles (for colorblind mode changes)
  */
 export function reinjectChatAutomationStyles() {
-  // Remove existing styles
-  const existingStyle = document.getElementById('pf2e-visioner-chat-styles');
-  if (existingStyle) {
-    existingStyle.remove();
-  }
+    // Remove existing styles
+    const existingStyle = document.getElementById('pf2e-visioner-chat-styles');
+    if (existingStyle) {
+        existingStyle.remove();
+    }
 
-  // Re-inject with updated styles
-  const css = getChatAutomationCSS();
-  const style = document.createElement('style');
-  style.id = 'pf2e-visioner-chat-styles';
-  style.textContent = css;
-  document.head.appendChild(style);
+    // Re-inject with updated styles
+    const css = getChatAutomationCSS();
+    const style = document.createElement('style');
+    style.id = 'pf2e-visioner-chat-styles';
+    style.textContent = css;
+    document.head.appendChild(style);
 }
 
 /**
@@ -52,27 +52,27 @@ export function reinjectChatAutomationStyles() {
  * @param {jQuery} html - The rendered HTML of the dialog
  */
 function fixDialogScrolling(html) {
-  // Ensure the results table container can scroll
-  const container = html.find('.results-table-container');
-  if (container.length) {
-    // Force the container to take up available space
-    container.css({
-      flex: '1 1 auto',
-      'overflow-y': 'auto',
-      'min-height': '150px',
-      'max-height': 'calc(100% - 180px)',
-    });
+    // Ensure the results table container can scroll
+    const container = html.find('.results-table-container');
+    if (container.length) {
+        // Force the container to take up available space
+        container.css({
+            flex: '1 1 auto',
+            'overflow-y': 'auto',
+            'min-height': '150px',
+            'max-height': 'calc(100% - 180px)',
+        });
 
-    // Ensure the table headers are sticky
-    const headers = container.find('thead th');
-    if (headers.length) {
-      headers.css({
-        position: 'sticky',
-        top: '0',
-        'z-index': '2',
-      });
+        // Ensure the table headers are sticky
+        const headers = container.find('thead th');
+        if (headers.length) {
+            headers.css({
+                position: 'sticky',
+                top: '0',
+                'z-index': '2',
+            });
+        }
     }
-  }
 }
 
 /**
@@ -80,7 +80,7 @@ function fixDialogScrolling(html) {
  * @returns {string} Complete CSS string
  */
 function getChatAutomationCSS() {
-  return `
+    return `
         /* Automation Panel Styles - Base */
         .pf2e-visioner-automation-panel {
             border-radius: 8px;
@@ -413,6 +413,8 @@ function getChatAutomationCSS() {
             border-radius: 50%;
             border: 2px solid var(--pf2e-visioner-purple);
             margin-right: 12px;
+            object-fit: cover;
+            object-position: top;
         }
         
         .hider-details {
@@ -525,6 +527,8 @@ function getChatAutomationCSS() {
             border-radius: 50%;
             border: 2px solid var(--pf2e-visioner-info);
             margin-right: 12px;
+            object-fit: cover;
+            object-position: top;
         }
         
         .seeker-name {
@@ -683,6 +687,8 @@ function getChatAutomationCSS() {
             min-width: 50px;
             text-align: center;
             padding: 8px 4px;
+            object-fit: cover;
+            object-position: top;
         }
         
         /* Token Image Styling - Unified */
@@ -1331,6 +1337,8 @@ function getChatAutomationCSS() {
             border-radius: 50%;
             border: 2px solid var(--visibility-hidden);
             margin-right: 12px;
+            object-fit: cover;
+            object-position: top;
         }
         
         .actor-name {
@@ -1769,12 +1777,107 @@ function getChatAutomationCSS() {
         }
         
         /* Encounter Filter Section */
+        .senses-buttons-container-clean {
+            display: flex !important;
+            flex-direction: column !important;
+            gap: 6px !important;
+            margin: 6px 0 !important;
+            /* Match original styling but use safer flex implementation */
+            contain: layout !important; /* Prevents sticky positioning interference */
+        }
+
+        /* Senses Button Styling - Dynamic Override */
+        .seek-preview-dialog .senses-button {
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            gap: 8px !important;
+            width: fit-content !important;
+            max-width: 100% !important;
+            padding: 8px 12px !important;
+            border-radius: 999px !important;
+            border: 1px solid color-mix(in srgb, var(--pf2e-visioner-info) 55%, transparent) !important;
+            background: linear-gradient(180deg,
+                color-mix(in srgb, var(--pf2e-visioner-info) 18%, transparent) 0%,
+                color-mix(in srgb, var(--pf2e-visioner-info) 12%, transparent) 100%) !important;
+            color: var(--color-text-light-primary) !important;
+            cursor: pointer !important;
+            font-size: 12px !important;
+            font-weight: 700 !important;
+            line-height: 1 !important;
+            transition: all 0.2s ease !important;
+            text-decoration: none !important;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.06) !important;
+        }
+
+        .seek-preview-dialog .senses-button:hover {
+            transform: translateY(-1px) !important;
+            border-color: var(--pf2e-visioner-info) !important;
+            box-shadow:
+                0 2px 6px rgba(0, 0, 0, 0.25),
+                0 0 0 2px color-mix(in srgb, var(--pf2e-visioner-info) 25%, transparent) !important;
+        }
+
+        .seek-preview-dialog .senses-button i {
+            font-size: 14px !important;
+            line-height: 1 !important;
+        }
+
+        .seek-preview-dialog .senses-button .button-text {
+            white-space: nowrap !important;
+        }
+
+        .seek-preview-dialog .senses-button .count-badge {
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            min-width: 20px !important;
+            height: 20px !important;
+            padding: 0 6px !important;
+            border-radius: 999px !important;
+            font-size: 11px !important;
+            font-weight: 800 !important;
+            background: color-mix(in srgb, #000 20%, var(--pf2e-visioner-info) 30%) !important;
+            border: 1px solid color-mix(in srgb, var(--pf2e-visioner-info) 55%, transparent) !important;
+            color: var(--color-text-light-primary) !important;
+        }
+
+        .seek-preview-dialog .senses-button .chevron {
+            opacity: 0.9 !important;
+            margin-left: 2px !important;
+        }
+
+        .seek-preview-dialog .senses-button .used-sense-indicator {
+            margin-left: 6px !important;
+            padding: 2px 6px !important;
+            border-radius: 999px !important;
+            font-size: 11px !important;
+            font-weight: 700 !important;
+            color: var(--color-text-light-primary) !important;
+            background: color-mix(in srgb, var(--pf2e-visioner-warning) 22%, transparent) !important;
+            border: 1px solid color-mix(in srgb, var(--pf2e-visioner-warning) 55%, transparent) !important;
+        }
+
+        .seek-preview-dialog .senses-button.used-senses {
+            background: color-mix(in srgb, var(--pf2e-visioner-warning) 20%, transparent) !important;
+            border-color: color-mix(in srgb, var(--pf2e-visioner-warning) 60%, transparent) !important;
+            color: var(--color-text-light-primary) !important;
+        }
+
+        .seek-preview-dialog .senses-button.used-senses:hover {
+            background: color-mix(in srgb, var(--pf2e-visioner-warning) 30%, transparent) !important;
+            border-color: var(--pf2e-visioner-warning) !important;
+        }
+
         .encounter-filter-section {
             margin-bottom: 12px;
             padding: 8px 12px;
             background: var(--color-bg-option, rgba(255, 255, 255, 0.05));
             border-radius: 6px;
             border: 1px solid var(--color-border-light-primary, #555);
+            position: sticky;
+            top: 0;
+            z-index: 10;
         }
         
         .encounter-filter-checkbox {
@@ -1957,6 +2060,8 @@ function getChatAutomationCSS() {
             border-radius: 50%;
             border: 2px solid var(--pf2e-visioner-purple);
             margin-right: 12px;
+            object-fit: cover;
+            object-position: top;
         }
         
         .hiding-name {
@@ -2166,12 +2271,6 @@ function getChatAutomationCSS() {
             margin-bottom: 16px;
         }
         
-        .sneak-preview-dialog .seeker-image img {
-            width: 48px;
-            height: 48px;
-            border-radius: 50%;
-            border: 2px solid white;
-        }
         
         .sneak-preview-dialog .sneaker-details h3 {
             margin: 0 0 4px 0;
@@ -2459,7 +2558,7 @@ function getChatAutomationCSS() {
             align-items: center;
             gap: 16px;
             padding: 16px;
-            background: linear-gradient(135deg, var(--visibility-undetected), var(--visibility-undetected));
+            background: linear-gradient(135deg, rgba(189, 11, 11, 0.14), rgba(255, 0, 0, 0.14));
             border-radius: 8px;
             margin-bottom: 16px;
             border-left: 4px solid #ff6b6b;
@@ -2471,6 +2570,8 @@ function getChatAutomationCSS() {
             border-radius: 50%;
             border: 2px solid #ff6b6b;
             margin-right: 12px;
+            object-fit: cover;
+            object-position: top;
         }
         
         .consequences-preview-dialog .attacker-details {
@@ -2535,6 +2636,8 @@ function getChatAutomationCSS() {
             border-radius: 50%;
             border: 2px solid rgb(13, 201, 230);
             margin-right: 12px;
+            object-fit: cover;
+            object-position: top;
         }
         
         .create-a-diversion-preview-dialog .diverter-details {
@@ -2778,6 +2881,7 @@ function getChatAutomationCSS() {
             height: 32px;
             border-radius: 4px;
             object-fit: cover;
+            object-position: top;
         }
         
         .create-a-diversion-preview-dialog .roll-info {

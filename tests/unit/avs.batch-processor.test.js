@@ -13,6 +13,7 @@ describe('BatchProcessor', () => {
     let globalLosCache;
     let globalVisibilityCache;
     let getTokenPosition;
+    let positionManager;
     let getActiveOverride;
     let getVisibilityMap;
     let processor;
@@ -38,12 +39,16 @@ describe('BatchProcessor', () => {
         const maps = new Map();
         getVisibilityMap = (t) => maps.get(t.document.id) || {};
 
+        // Provide positionManager for new dependency shape; keep legacy function for back-compat
+        positionManager = { getTokenPosition };
+
         processor = new BatchProcessor({
             spatialAnalyzer,
             viewportFilter,
             optimizedVisibilityCalculator,
             globalLosCache,
             globalVisibilityCache,
+            positionManager,
             getTokenPosition,
             getActiveOverride,
             getVisibilityMap,

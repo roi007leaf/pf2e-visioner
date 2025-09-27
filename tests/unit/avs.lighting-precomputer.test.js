@@ -22,8 +22,8 @@ describe('LightingPrecomputer', () => {
         const originalGetInstance = LC.LightingCalculator.getInstance;
         LC.LightingCalculator.getInstance = () => mockLC;
 
-        const t1 = createMockToken({ id: 'A', x: 0, y: 0 });
-        const t2 = createMockToken({ id: 'B', x: 0, y: 0 });
+        const t1 = createMockToken({ id: 'A', x: 10, y: 10, elevation: 0 });
+        const t2 = createMockToken({ id: 'B', x: 100, y: 10, elevation: 0 });
         const pos = new Map([
             ['A', { x: 10, y: 10, elevation: 0 }],
             ['B', { x: 100, y: 10, elevation: 0 }],

@@ -147,6 +147,7 @@ export class SneakPreviewDialog extends BaseActionDialog {
       applyAll: SneakPreviewDialog._onApplyAll,
       revertAll: SneakPreviewDialog._onRevertAll,
       toggleEncounterFilter: SneakPreviewDialog._onToggleEncounterFilter,
+      toggleFilterByDetection: SneakPreviewDialog._onToggleFilterByDetection,
       overrideState: SneakPreviewDialog._onOverrideState,
       togglePositionDisplay: SneakPreviewDialog._onTogglePositionDisplay,
       toggleStartPosition: SneakPreviewDialog._onToggleStartPosition,
@@ -165,6 +166,23 @@ export class SneakPreviewDialog extends BaseActionDialog {
 
   async _prepareContext(options) {
     const context = await super._prepareContext(options);
+
+    // Determine movement type from token's current movement action (default to walk)
+    let movementType = 'walk';
+    try {
+      const raw = this.sneakingToken?.document?.movementAction || this.sneakingToken?.document?.movementType;
+      const v = String(raw || '').toLowerCase();
+      if (['walk', 'land', 'ground', 'move'].includes(v)) movementType = 'walk';
+      else if (['stride'].includes(v)) movementType = 'stride';
+      else if (['leap'].includes(v)) movementType = 'leap';
+      else if (['climb'].includes(v)) movementType = 'climb';
+      else if (['fly', 'flying'].includes(v)) movementType = 'fly';
+      else if (['swim'].includes(v)) movementType = 'swim';
+      else if (['burrow'].includes(v)) movementType = 'burrow';
+      else if (['teleport'].includes(v)) movementType = 'teleport';
+      else if (['deploy'].includes(v)) movementType = 'deploy';
+      else if (['travel'].includes(v)) movementType = 'travel';
+    } catch { }
 
     // Capture current end positions FIRST, before processing outcomes
     await this._captureCurrentEndPositionsForOutcomes(this.outcomes);
@@ -188,7 +206,21 @@ export class SneakPreviewDialog extends BaseActionDialog {
         this.ignoreAllies,
         'token',
       );
-    } catch {}
+    } catch { }
+
+    // Apply detection filtering if enabled (Note: Sneak uses 'token' property, not 'target')
+    if (this.filterByDetection && this.sneakingToken) {
+      try {
+        const { filterOutcomesByDetection } = await import('../services/infra/shared-utils.js');
+        filteredOutcomes = await filterOutcomesByDetection(filteredOutcomes, this.sneakingToken, 'token', false, true, 'target_to_observer');
+      } catch { /* Detection filtering is non-critical */ }
+    }
+
+    // Apply defeated token filtering (exclude dead/unconscious tokens)
+    try {
+      const { filterOutcomesByDefeated } = await import('../services/infra/shared-utils.js');
+      filteredOutcomes = filterOutcomesByDefeated(filteredOutcomes, 'token');
+    } catch { /* Defeated filtering is non-critical */ }
 
     // Preserve any overrides the GM selected in the previous render
     try {
@@ -198,7 +230,7 @@ export class SneakPreviewDialog extends BaseActionDialog {
         const overrideState = existing?.overrideState ?? o?.overrideState ?? null;
         return { ...o, overrideState };
       });
-    } catch {}
+    } catch { }
 
     const cfg = (s) => this.visibilityConfig(s);
 
@@ -218,7 +250,7 @@ export class SneakPreviewDialog extends BaseActionDialog {
           this.sneakingToken,
         );
         outcome.liveEndVisibility = liveEndVis;
-      } catch {}
+      } catch { }
       if (outcome._tsFreeSneak) {
         // For Terrain Stalker free-sneak, force qualifications to pass for UI and keep newVisibility
         outcome._featPositionOverride = {
@@ -255,7 +287,7 @@ export class SneakPreviewDialog extends BaseActionDialog {
             inNaturalTerrain: inNatural,
             impreciseOnly: outcome?.impreciseOnly || false,
           });
-        } catch {}
+        } catch { }
         // Stash for UI rendering
         outcome._featPositionOverride = effective;
 
@@ -339,7 +371,7 @@ export class SneakPreviewDialog extends BaseActionDialog {
           }
         });
       }
-    } catch {}
+    } catch { }
 
     // Sort outcomes to prioritize qualifying positions (green checkmarks) at the top
     let sortedOutcomes = this._sortOutcomesByQualification(processedOutcomes);
@@ -349,7 +381,7 @@ export class SneakPreviewDialog extends BaseActionDialog {
       if (this.showOnlyChanges) {
         sortedOutcomes = sortedOutcomes.filter((o) => !!o.hasActionableChange);
       }
-    } catch {}
+    } catch { }
 
     // Update original outcomes with hasActionableChange for Apply All button logic
     sortedOutcomes.forEach((processedOutcome, index) => {
@@ -381,6 +413,7 @@ export class SneakPreviewDialog extends BaseActionDialog {
     // Compute and expose Max Sneak Distance indicator data
     try {
       const { SneakSpeedService } = await import('../services/sneak-speed-service.js');
+      const env = (await import('../../utils/environment.js')).default;
       const actor = this.sneakingToken?.actor || this.sneakingToken;
       const baseSpeed = Number(actor?.system?.movement?.speeds?.land?.value ?? 0) || 0;
       // Prefer original speed flag if present (effect applied), otherwise current value
@@ -392,7 +425,7 @@ export class SneakPreviewDialog extends BaseActionDialog {
         );
         if (Number.isFinite(Number(flagVal)) && Number(flagVal) > 0)
           originalSpeed = Number(flagVal);
-      } catch {}
+      } catch { }
 
       const maxFeet = await SneakSpeedService.getSneakMaxDistanceFeet(this.sneakingToken);
 
@@ -402,7 +435,7 @@ export class SneakPreviewDialog extends BaseActionDialog {
       try {
         multiplier = FeatsHandler.getSneakSpeedMultiplier(this.sneakingToken) ?? 0.5;
         bonusFeet = FeatsHandler.getSneakDistanceBonusFeet(this.sneakingToken) ?? 0;
-      } catch {}
+      } catch { }
 
       const explanations = [];
       explanations.push(`Base Speed: ${originalSpeed} ft`);
@@ -413,6 +446,43 @@ export class SneakPreviewDialog extends BaseActionDialog {
       if (rawTotal > originalSpeed) {
         explanations.push(`Capped at base Speed (${originalSpeed} ft)`);
       }
+      const movementLabel = game.i18n.localize(`PF2E_VISIONER.MOVEMENT.${movementType}`);
+      // Choose an icon matching the movement type
+      const movementIcon = (() => {
+        switch (movementType) {
+          case 'stride':
+            return 'fas fa-running';
+          case 'leap':
+            return 'fas fa-person-running';
+          case 'climb':
+            return 'fas fa-mountain';
+          case 'fly':
+            return 'fas fa-feather';
+          case 'swim':
+            return 'fas fa-person-swimming';
+          case 'burrow':
+            return 'fas fa-person-digging';
+          case 'teleport':
+            return 'fas fa-bolt';
+          case 'travel':
+            return 'fas fa-route';
+          case 'deploy':
+            return 'fas fa-box-open';
+          case 'walk':
+          default:
+            return 'fas fa-person-walking';
+        }
+      })();
+      // Determine movement support (green/red chip)
+      let supported = true;
+      let speedVal = 0;
+      try {
+        const speeds = actor?.system?.movement?.speeds || {};
+        const key = movementType === 'walk' ? 'land' : movementType;
+        const sobj = speeds?.[key] || null;
+        speedVal = Number(sobj?.value ?? 0) || 0;
+        supported = speedVal > 0;
+      } catch { }
 
       context.sneakDistance = {
         maxFeet,
@@ -420,8 +490,15 @@ export class SneakPreviewDialog extends BaseActionDialog {
         multiplier,
         bonusFeet,
         tooltip: explanations.join('\n'),
+        movementType,
+        movementLabel,
+        movementIcon,
+        supported,
+        speed: speedVal,
+        statusClass: supported ? 'ok' : 'warn',
+        supportTooltip: supported ? `${movementLabel} speed: ${speedVal} ft` : `${movementLabel} speed unavailable for this actor`,
       };
-    } catch {}
+    } catch { }
 
     // Compute feat prerequisite-relaxation badges (Terrain Stalker, Vanish into the Land, Very Very Sneaky, Legendary Sneak, Ceaseless Shadows, Distracting Shadows)
     try {
@@ -472,8 +549,22 @@ export class SneakPreviewDialog extends BaseActionDialog {
       // Terrain Stalker: active in chosen environment
       try {
         if (has('terrain-stalker')) {
-          const selection = FeatsHandler.getTerrainStalkerSelection(actorOrToken);
-          if (selection && FeatsHandler.isEnvironmentActive(actorOrToken, selection)) {
+          const selections = FeatsHandler.getTerrainStalkerSelections(actorOrToken) || [];
+          const active = selections.filter((sel) => {
+            try { return FeatsHandler.isEnvironmentActive(actorOrToken, sel); } catch { return false; }
+          });
+          if (active.length) {
+            const selectionText = active.join(', ');
+            // Also show all region environment types under the token (supports multiple)
+            let environmentsText = '—';
+            try {
+              const env = (await import('../../utils/environment.js')).default;
+              const ctx = env.getActiveContext(actorOrToken, { movementType }) || {};
+              const regionTypes = Array.from(ctx.regionTypes || []);
+              const sceneFallback = Array.from(ctx.sceneTypes || []);
+              const envList = regionTypes.length ? regionTypes : sceneFallback;
+              if (envList.length) environmentsText = envList.join(', ');
+            } catch { /* non-critical */ }
             badges.push({
               key: 'terrain-stalker',
               icon: 'fas fa-tree',
@@ -482,42 +573,41 @@ export class SneakPreviewDialog extends BaseActionDialog {
               ),
               tooltip: game.i18n.format(
                 'PF2E_VISIONER.SNEAK_AUTOMATION.BADGES.TERRAIN_STALKER_TOOLTIP',
-                { selection },
+                { selection: selectionText, environments: environmentsText },
               ),
             });
           }
         }
-      } catch {}
+      } catch { }
       // Vanish into the Land: active in selected difficult terrain for Terrain Stalker
       try {
         if (has('vanish-into-the-land')) {
-          const selection = FeatsHandler.getTerrainStalkerSelection(actorOrToken);
-          if (selection) {
-            // Use EnvironmentHelper via FeatsHandler helper
-            let active = false;
+          const selections = FeatsHandler.getTerrainStalkerSelections(actorOrToken) || [];
+          let active = false;
+          for (const selection of selections) {
             try {
-              // Prefer precise difficult terrain check
+              // Prefer precise difficult terrain check (movement-aware)
               const env = (await import('../../utils/environment.js')).default;
-              const matches = env.getMatchingEnvironmentRegions(actorOrToken, selection) || [];
-              active = matches.length > 0;
+              const matches = env.getMatchingEnvironmentRegions(actorOrToken, selection, { movementType }) || [];
+              if (matches.length > 0) { active = true; break; }
             } catch {
-              active = FeatsHandler.isEnvironmentActive(actorOrToken, selection);
-            }
-            if (active) {
-              badges.push({
-                key: 'vanish-into-the-land',
-                icon: 'fas fa-leaf',
-                label: game.i18n.localize(
-                  'PF2E_VISIONER.SNEAK_AUTOMATION.BADGES.VANISH_INTO_THE_LAND_LABEL',
-                ),
-                tooltip: game.i18n.localize(
-                  'PF2E_VISIONER.SNEAK_AUTOMATION.BADGES.VANISH_INTO_THE_LAND_TOOLTIP',
-                ),
-              });
+              active = active || FeatsHandler.isEnvironmentActive(actorOrToken, selection);
             }
           }
+          if (active) {
+            badges.push({
+              key: 'vanish-into-the-land',
+              icon: 'fas fa-leaf',
+              label: game.i18n.localize(
+                'PF2E_VISIONER.SNEAK_AUTOMATION.BADGES.VANISH_INTO_THE_LAND_LABEL',
+              ),
+              tooltip: game.i18n.localize(
+                'PF2E_VISIONER.SNEAK_AUTOMATION.BADGES.VANISH_INTO_THE_LAND_TOOLTIP',
+              ),
+            });
+          }
         }
-      } catch {}
+      } catch { }
       // Distracting Shadows: show informational badge when feat present (contextual per observer)
       if (has('distracting-shadows')) {
         badges.push({
@@ -532,7 +622,7 @@ export class SneakPreviewDialog extends BaseActionDialog {
         });
       }
       context.prereqBadges = badges;
-    } catch {}
+    } catch { }
 
     Object.assign(context, this.buildCommonContext(processedOutcomes));
 
@@ -566,7 +656,7 @@ export class SneakPreviewDialog extends BaseActionDialog {
             })
             .catch(() => this.render({ force: true }));
         });
-    } catch {}
+    } catch { }
     // Wire Hide Foundry-hidden visual filter toggle
     try {
       const cbh = this.element.querySelector('input[data-action="toggleHideFoundryHidden"]');
@@ -575,14 +665,14 @@ export class SneakPreviewDialog extends BaseActionDialog {
           this.hideFoundryHidden = !!cbh.checked;
           try {
             await game.settings.set(MODULE_ID, 'hideFoundryHiddenTokens', this.hideFoundryHidden);
-          } catch {}
+          } catch { }
           // Recompute outcomes to apply visual filter and keep positions updated
           const list = await this._recomputeOutcomesWithPositionData();
           if (Array.isArray(list)) this.outcomes = list;
           this.render({ force: true });
         });
       }
-    } catch {}
+    } catch { }
   }
 
   /**
@@ -612,7 +702,15 @@ export class SneakPreviewDialog extends BaseActionDialog {
         this.ignoreAllies,
         'token',
       );
-    } catch {}
+    } catch { }
+
+    // Apply detection filtering if enabled (Note: Sneak uses 'token' property, not 'target')
+    if (this.filterByDetection && this.sneakingToken) {
+      try {
+        const { filterOutcomesByDetection } = await import('../services/infra/shared-utils.js');
+        filteredOutcomes = await filterOutcomesByDetection(filteredOutcomes, this.sneakingToken, 'token', false, true, 'target_to_observer');
+      } catch { /* Detection filtering is non-critical */ }
+    }
 
     // Capture current end positions for all filtered outcomes
     await this._captureCurrentEndPositionsForOutcomes(filteredOutcomes);
@@ -661,7 +759,7 @@ export class SneakPreviewDialog extends BaseActionDialog {
             inNaturalTerrain: inNatural,
             impreciseOnly: outcome?.impreciseOnly || false,
           });
-        } catch {}
+        } catch { }
         outcome._featPositionOverride = effective;
 
         // Only override to observed if one or both positions don't qualify AFTER overrides
@@ -749,7 +847,7 @@ export class SneakPreviewDialog extends BaseActionDialog {
           }
         });
       }
-    } catch {}
+    } catch { }
     return processedOutcomes;
   }
 
@@ -792,7 +890,7 @@ export class SneakPreviewDialog extends BaseActionDialog {
                   outcome.token,
                   this.sneakingToken,
                 );
-            } catch {}
+            } catch { }
 
             // Create a basic position transition object for newly included tokens
             if (!outcome.positionTransition) {
@@ -1316,7 +1414,7 @@ export class SneakPreviewDialog extends BaseActionDialog {
           coverState =
             autoCoverSystem.detectCoverBetweenTokens(observerToken, this.sneakingToken) || 'none';
         }
-      } catch {}
+      } catch { }
       if (!coverState) {
         try {
           coverState = getCoverBetween(observerToken, this.sneakingToken);
@@ -1930,6 +2028,22 @@ export class SneakPreviewDialog extends BaseActionDialog {
       app: currentSneakDialog,
       actionType: 'Sneak',
     });
+  }
+
+  static async _onToggleEncounterFilter(event, target) {
+    const app = currentSneakDialog;
+    if (!app) return;
+    app.encounterOnly = target.checked;
+    app.bulkActionState = 'initial';
+    app.render({ force: true });
+  }
+
+  static async _onToggleFilterByDetection(event, target) {
+    const app = currentSneakDialog;
+    if (!app) return;
+    app.filterByDetection = target.checked;
+    app.bulkActionState = 'initial';
+    app.render({ force: true });
   }
 
   async close(options = {}) {

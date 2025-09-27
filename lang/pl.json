@@ -39,6 +39,30 @@
       "UNDETECTED_OVERLAY": "Ten token jest niewykryty przez ciebie",
       "CONCEALED_OVERLAY": "Ten token jest przysłonięty dla ciebie"
     },
+    "SPECIAL_SENSES": {
+      "vision": "(PL TODO) Vision",
+      "vision_description": "(PL TODO) Standard visual sense.",
+      "low_light_vision": "(PL TODO) Low-Light Vision",
+      "low_light_vision_description": "(PL TODO) See in dim light as bright.",
+      "infrared_vision": "(PL TODO) Infrared Vision",
+      "infrared_vision_description": "(PL TODO) Perceive heat signatures.",
+      "truesight": "(PL TODO) Truesight",
+      "truesight_description": "(PL TODO) See things as they truly are.",
+      "see_the_unseen": "(PL TODO) See the Unseen",
+      "see_the_unseen_description": "(PL TODO) Perceive otherwise unseen phenomena.",
+      "bloodsense": "(PL TODO) Bloodsense",
+      "bloodsense_description": "(PL TODO) Detect nearby blood.",
+      "magicsense": "(PL TODO) Magicsense",
+      "magicsense_description": "(PL TODO) Sense magical auras.",
+      "motion_sense": "(PL TODO) Motion Sense",
+      "motion_sense_description": "(PL TODO) Detect motion nearby.",
+      "spiritsense": "(PL TODO) Spiritsense",
+      "spiritsense_description": "(PL TODO) Sense spirits and undead.",
+      "thoughtsense": "(PL TODO) Thoughtsense",
+      "thoughtsense_description": "(PL TODO) Detect thinking creatures.",
+      "wavesense": "(PL TODO) Wavesense",
+      "wavesense_description": "(PL TODO) Perceive vibrations/waves through a medium."
+    },
     "MECHANICAL_EFFECTS": {
       "HIDDEN_FLAT_CHECK": "Wymagany płaski test ST 11 do ustalenia celu",
       "CONCEALED_FLAT_CHECK": "Wymagany płaski test ST 5 do ustalenia celu",
@@ -102,7 +126,12 @@
       "NO_TARGETS_IN_RANGE": "Brak ważnych celów w zasięgu 30 stóp.",
       "NO_TARGETS_IN_RANGE_CUSTOM": "Brak ważnych celów w zasięgu {distance} stóp.",
       "ECHOLOCATION_LABEL": "Echolokacja",
-      "ECHOLOCATION_TOOLTIP": "Dokładny słuch aktywny do początku twojej następnej tury"
+      "ECHOLOCATION_TOOLTIP": "Dokładny słuch aktywny do początku twojej następnej tury",
+      "PREVIEW_AVAILABLE_SENSES": "(PL TODO) Available Senses"
+    },
+    "SENSE_PRECISION": {
+      "PRECISE": "(PL TODO) Precise",
+      "IMPRECISE": "(PL TODO) Imprecise"
     },
     "HIDE_AUTOMATION": {
       "BUTTON_APPLY": "Zastosuj wyniki Ukrywania",

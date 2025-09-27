@@ -12,15 +12,29 @@
     <div class="seeker-details">
       <h3 class="seeker-name">{{seeker.name}}</h3>
       <p class="hint">{{seeker.actionLabel}}</p>
-      {{#if activeSenses}}
-        <div class="seek-context-badges">
-          {{#each activeSenses as |sense|}}
-            <span class="badge badge-{{sense.type}}" data-tooltip="{{localize sense.config.description}}">
-              <i class="{{sense.config.icon}}"></i>
-              <span class="badge-label">{{localize sense.config.label}}</span>
-              <span class="badge-range">{{sense.range}} ft</span>
-            </span>
-          {{/each}}
+      {{#if allSenses}}
+        <div class="senses-buttons-container-clean">
+          <button class="senses-button available-senses" data-tooltip-html="senses-tooltip-content">
+            <i class="fas fa-eye"></i>
+            <span class="button-text">Available Senses</span>
+            <span class="count-badge" aria-label="{{allSenses.length}} senses">{{allSenses.length}}</span>
+            <i class="fas fa-chevron-down chevron" aria-hidden="true"></i>
+          </button>
+          {{!-- Hidden tooltip content for available senses --}}
+          <div id="senses-tooltip-content" class="senses-tooltip-content" style="display: none;">
+            <div class="tooltip-senses-grid">
+              {{#each allSenses as |sense|}}
+                <div class="tooltip-sense-item {{#if sense.isPrecise}}precise{{else}}imprecise{{/if}} {{#if sense.wasUsed}}used{{/if}}">
+                  <i class="{{sense.config.icon}}"></i>
+                  <span class="sense-name">{{localize sense.config.label}}</span>
+                  <span class="sense-precision {{#if sense.isPrecise}}precise{{else}}imprecise{{/if}}">
+                    {{#if sense.isPrecise}}{{localize 'PF2E_VISIONER.SENSE_PRECISION.PRECISE'}}{{else}}{{localize 'PF2E_VISIONER.SENSE_PRECISION.IMPRECISE'}}{{/if}}
+                  </span>
+                  <span class="sense-range">{{sense.displayRange}}&nbsp;ft</span>
+                </div>
+              {{/each}}
+            </div>
+          </div>
         </div>
       {{/if}}
     </div>
@@ -92,6 +106,10 @@
       <input type="checkbox" {{#if ignoreWalls}}checked{{/if}} data-action="toggleIgnoreWalls" data-tooltip="Hide walls from the results list" />
       <span class="encounter-filter-label">Ignore walls</span>
     </label>
+  <label class="filter-by-los-checkbox">
+      <input type="checkbox" {{#if filterByDetection}}checked{{/if}} {{#if detectionFilterDisabled}}disabled{{/if}} data-action="toggleFilterByDetection" data-tooltip="{{localize 'PF2E_VISIONER.UI.FILTER_BY_DETECTION_TOOLTIP'}}" />
+      <span class="encounter-filter-label">{{localize "PF2E_VISIONER.UI.FILTER_BY_DETECTION_LABEL"}}</span>
+    </label>
   </div>
 
   {{!-- Results Table --}}
@@ -131,15 +149,6 @@
               {{else}}
                 <div class="token-name-and-tags">
                   <strong data-tooltip="{{outcome.target.name}}">{{outcome.target.name}}</strong>
-                  {{#if outcome.usedImprecise}}
-                    <span class="badge badge-imprecise" data-tooltip="Imprecise sense used: {{outcome.usedImpreciseSenseType}}">
-                      <i class="fas fa-wave-square"></i>
-                      <span class="badge-label">Imprecise ({{outcome.usedImpreciseSenseType}})</span>
-                      {{#if outcome.usedImpreciseSenseRange}}
-                        <span class="badge-range">{{outcome.usedImpreciseSenseRange}} ft</span>
-                      {{/if}}
-                    </span>
-                  {{/if}}
                 </div>
               {{/if}}
             </td>

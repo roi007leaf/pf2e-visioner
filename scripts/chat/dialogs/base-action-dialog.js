@@ -11,6 +11,18 @@ export class BaseActionDialog extends BasePreviewDialog {
     this.bulkActionState = this.bulkActionState ?? 'initial';
     // Per-dialog visual filter: show only rows with actionable changes
     if (typeof this.showOnlyChanges === 'undefined') this.showOnlyChanges = false;
+    // LOS filter: enabled out of combat by default, disabled in combat (UI disabled while in combat)
+    try {
+      // Default to enabled when out of combat, unless explicitly overridden
+      if (typeof options.filterByDetection === 'boolean') {
+        this.filterByDetection = options.filterByDetection;
+      } else {
+        const inCombat = hasActiveEncounter();
+        this.filterByDetection = !inCombat;
+      }
+    } catch (err) {
+      this.filterByDetection = false;
+    }
   }
 
   getApplyDirection() {
@@ -99,6 +111,26 @@ export class BaseActionDialog extends BasePreviewDialog {
         });
       }
     } catch { }
+
+    // Wire up Filter By Detection checkbox (disabled in combat via template binding)
+    try {
+      const cbDetection = this.element.querySelector('input[data-action="toggleFilterByDetection"]');
+      if (cbDetection) {
+        cbDetection.onchange = null;
+        cbDetection.addEventListener('change', async () => {
+          this.filterByDetection = !!cbDetection.checked;
+          this.bulkActionState = 'initial';
+          // Let subclasses recompute filtered outcomes if they provide a method
+          try {
+            if (typeof this.getFilteredOutcomes === 'function') {
+              const list = await this.getFilteredOutcomes();
+              if (Array.isArray(list)) this.outcomes = list;
+            }
+          } catch { }
+          this.render({ force: true });
+        });
+      }
+    } catch { }
   }
 
   buildCommonContext(outcomes) {
@@ -111,6 +143,8 @@ export class BaseActionDialog extends BasePreviewDialog {
       encounterOnly: !!this.encounterOnly,
       // Per-dialog ignore-allies checkbox state (defaults from global setting)
       ignoreAllies: this.ignoreAllies,
+      // LOS filter state; UI disables when in combat
+      filterByDetection: !!this.filterByDetection,
       // Visual filter checkbox state
       showOnlyChanges: !!this.showOnlyChanges,
       bulkActionState: this.bulkActionState ?? 'initial',

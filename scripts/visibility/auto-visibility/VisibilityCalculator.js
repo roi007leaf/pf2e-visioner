@@ -27,6 +27,9 @@ export class VisibilityCalculator {
   /** @type {ExclusionManager} */
   #exclusionManager;
 
+  /** @type {import('./core/LightingRasterService.js').LightingRasterService|null} */
+  #lightingRasterService = null;
+
   constructor() {
     if (VisibilityCalculator.#instance) {
       return VisibilityCalculator.#instance;
@@ -53,12 +56,13 @@ export class VisibilityCalculator {
    * @param {SpatialAnalysisService} spatialAnalyzer - Optional spatial analysis service for optimizations
    * @param {ExclusionManager} exclusionManager - Optional exclusion manager for token exclusions
    */
-  initialize(lightingCalculator, visionAnalyzer, ConditionManager, spatialAnalyzer = null, exclusionManager = null) {
+  initialize(lightingCalculator, visionAnalyzer, ConditionManager, spatialAnalyzer = null, exclusionManager = null, lightingRasterService = null) {
     this.#lightingCalculator = lightingCalculator;
     this.#visionAnalyzer = visionAnalyzer;
     this.#conditionManager = ConditionManager;
     this.#spatialAnalyzer = spatialAnalyzer;
     this.#exclusionManager = exclusionManager;
+    this.#lightingRasterService = lightingRasterService || null;
   }
 
   /**
@@ -179,24 +183,24 @@ export class VisibilityCalculator {
       }
 
       // Step 4: Check line of sight directly against walls. If LoS is blocked, treat as hidden.
-      try {
-        const losClear = !!this.#visionAnalyzer.hasLineOfSight(observer, target, true);
+      // try {
+      //   const losClear = !!this.#visionAnalyzer.hasLineOfSight(observer, target, true);
 
-        if (!losClear) {
-          // If LoS blocked, but a precise non-visual sense is in range → observed
-          try {
-            if (this.#visionAnalyzer.hasPreciseNonVisualInRange(observer, target))
-              return 'observed';
-            // If only imprecise sense can detect → hidden; if none → undetected
-            if (this.#visionAnalyzer.canSenseImprecisely(observer, target)) return 'hidden';
-            return 'undetected';
-          } catch {
-            return 'hidden';
-          }
-        }
-      } catch {
-        /* best effort: continue */
-      }
+      //   if (!losClear) {
+      //     // If LoS blocked, but a precise non-visual sense is in range → observed
+      //     try {
+      //       if (this.#visionAnalyzer.hasPreciseNonVisualInRange(observer, target))
+      //         return 'observed';
+      //       // If only imprecise sense can detect → hidden; if none → undetected
+      //       if (this.#visionAnalyzer.canSenseImprecisely(observer, target)) return 'hidden';
+      //       return 'undetected';
+      //     } catch {
+      //       return 'hidden';
+      //     }
+      //   }
+      // } catch {
+      //   /* best effort: continue */
+      // }
 
       // Step 5: Check lighting conditions at target's position
       // Use position override if provided, otherwise calculate from document
@@ -223,7 +227,18 @@ export class VisibilityCalculator {
         lightLevel = this.#lightingCalculator.getLightLevelAt(targetPosition, target);
         try { if (stats) stats.targetMiss = (stats.targetMiss || 0) + 1; } catch { }
       }
-      const observerVision = this.#visionAnalyzer.getVisionCapabilities(observer);
+      // Prefer precomputed senses capabilities when provided via calc options
+      let observerVision = null;
+      try {
+        const capsMap = opts?.sensesCache;
+        const oid = observer?.document?.id;
+        if (capsMap && oid && (capsMap.get?.(oid) || capsMap[oid])) {
+          observerVision = capsMap.get ? capsMap.get(oid) : capsMap[oid];
+        }
+      } catch { /* ignore */ }
+      if (!observerVision) {
+        observerVision = this.#visionAnalyzer.getVisionCapabilities(observer);
+      }
       // if (log.enabled())
       //   log.debug(() => ({
       //     step: 'lighting',
@@ -274,48 +289,31 @@ export class VisibilityCalculator {
       let linePassesThroughDarkness = false;
       let rayDarknessRank = 0;
       if (hasDarknessSources || observerInDarkness || targetInDarkness) {
-        // First try the canvas/shape-based detector (use overrides if provided for freshest positions)
-        const darknessResult =
-          this.#doesLinePassThroughDarkness(
+        // Prefer the raster service when available for a fast approximation
+        let darknessResult = null;
+        try {
+          if (this.#lightingRasterService && typeof this.#lightingRasterService.getRayDarknessInfo === 'function') {
+            darknessResult = await this.#lightingRasterService.getRayDarknessInfo(
+              observer,
+              target,
+              observerPosition,
+              targetPosition
+            );
+          }
+        } catch { /* ignore and fallback */ }
+
+        if (!darknessResult) {
+          // Fallback to precise shape-based detector
+          darknessResult = this.#doesLinePassThroughDarkness(
             observer,
             target,
             observerPosition,
             targetPosition,
-          ) || {
-            passesThroughDarkness: false,
-            maxDarknessRank: 0,
-          };
+          ) || { passesThroughDarkness: false, maxDarknessRank: 0 };
+        }
+
         linePassesThroughDarkness = !!darknessResult.passesThroughDarkness;
         rayDarknessRank = Number(darknessResult.maxDarknessRank || 0) || 0;
-
-        // If that didn't detect, double-check by sampling along the ray using LightingCalculator
-        // Use the already-computed observer/target positions (honors overrides)
-        if (!linePassesThroughDarkness) {
-          try {
-            const steps = 6; // check 5 interior points
-            let maxRank = 0;
-            let passes = false;
-            for (let i = 1; i < steps; i++) {
-              const t = i / steps;
-              const sx = observerPosition.x + (targetPosition.x - observerPosition.x) * t;
-              const sy = observerPosition.y + (targetPosition.y - observerPosition.y) * t;
-              const se = observerPosition.elevation ?? 0;
-              const samplePos = { x: sx, y: sy, elevation: se };
-              const sample = this.#lightingCalculator.getLightLevelAt(samplePos, observer);
-              const rank = Number(sample?.darknessRank ?? 0) || 0;
-              if (rank >= 1) {
-                passes = true;
-                if (rank > maxRank) maxRank = rank;
-              }
-            }
-            if (passes) {
-              linePassesThroughDarkness = true;
-              rayDarknessRank = Math.max(rayDarknessRank, maxRank);
-            }
-          } catch {
-            // best-effort; ignore sampling errors
-          }
-        }
       }
 
       // Check for cross-boundary darkness: either different darkness states OR line passes through darkness
@@ -422,6 +420,7 @@ export class VisibilityCalculator {
 
       // Clamp per imprecise-only rule: if observer has no precise senses on target (including vision), but can sense imprecisely, treat as hidden
       try {
+        // When caches are present we still defer range checks to analyzer, as they depend on positions
         const preciseNonVisual = this.#visionAnalyzer.hasPreciseNonVisualInRange(observer, target);
         const canImprecise = this.#visionAnalyzer.canSenseImprecisely(observer, target);
         const hasSight = observerVision?.hasVision !== false; // visual path already considered in determineVisibilityFromLighting

@@ -385,14 +385,15 @@ export class FeatsHandler {
     // you can Hide and Sneak even without cover or being Concealed.
     if (feats.has('vanish-into-the-land')) {
       try {
-        const selection = FeatsHandler._getTerrainStalkerSelection(actor);
-        if (selection) {
+        const selections = FeatsHandler._getTerrainStalkerSelections(actor);
+        for (const selection of selections) {
           const regions = EnvironmentHelper.getMatchingEnvironmentRegions(tokenOrActor, selection) || [];
           if (regions.length > 0) {
-            // In matching difficult terrain for TS selection: relax both start and end requirements
+            // In matching difficult terrain for ANY TS selection: relax both start and end requirements
             if (!startQualifies) startQualifies = true;
             if (!endQualifies) endQualifies = true;
             if (!reason) reason = `Vanish into the Land (${selection} difficult terrain)`;
+            break;
           }
         }
       } catch { /* best-effort only */ }
@@ -401,10 +402,13 @@ export class FeatsHandler {
     // Terrain Stalker: Can Hide or Sneak while observed in chosen terrain
     if (!startQualifies && feats.has('terrain-stalker')) {
       try {
-        const selection = FeatsHandler._getTerrainStalkerSelection(actor);
-        if (selection && EnvironmentHelper.isEnvironmentActive(tokenOrActor, selection)) {
-          startQualifies = true;
-          if (!reason) reason = `Terrain Stalker (${selection})`;
+        const selections = FeatsHandler._getTerrainStalkerSelections(actor);
+        for (const selection of selections) {
+          if (selection && EnvironmentHelper.isEnvironmentActive(tokenOrActor, selection)) {
+            startQualifies = true;
+            if (!reason) reason = `Terrain Stalker (${selection})`;
+            break;
+          }
         }
       } catch {
         // Fall back to legacy tag hints if any provided
@@ -528,7 +532,9 @@ export class FeatsHandler {
    */
   static getTerrainStalkerSelection(tokenOrActor) {
     const actor = FeatsHandlerInternal.resolveActor(tokenOrActor);
-    return FeatsHandler._getTerrainStalkerSelection(actor);
+    // Back-compat: return the first selection if multiple are present
+    const list = FeatsHandler._getTerrainStalkerSelections(actor);
+    return Array.isArray(list) && list.length ? list[0] : null;
   }
 
   /**
@@ -538,24 +544,39 @@ export class FeatsHandler {
    * @returns {string|null}
    * @private
    */
-  static _getTerrainStalkerSelection(actor) {
+  static _getTerrainStalkerSelections(actor) {
+    const selections = new Set();
     try {
       const items = actor?.items ?? [];
-      const ts = items.find((it) => it?.type === 'feat' && normalizeSlug(it.system?.slug ?? it.slug ?? it.name) === 'terrain-stalker');
-      if (!ts) return null;
-      const rules = Array.isArray(ts.system?.rules) ? ts.system.rules : [];
-      // Prefer an explicit selection property on any rule
-      for (const r of rules) {
-        const sel = r?.selection ?? r?.value?.selection ?? null;
-        if (typeof sel === 'string' && sel) return normalizeSlug(sel);
+      for (const it of items) {
+        try {
+          if (it?.type !== 'feat') continue;
+          const slug = normalizeSlug(it.system?.slug ?? it.slug ?? it.name);
+          if (slug !== 'terrain-stalker') continue;
+          const rules = Array.isArray(it.system?.rules) ? it.system.rules : [];
+          for (const r of rules) {
+            const sel = r?.selection ?? r?.value?.selection ?? null;
+            if (typeof sel === 'string' && sel) selections.add(normalizeSlug(sel));
+          }
+          // Some builds place selection only in the first rule
+          if (!rules?.length) {
+            const maybe = it.system?.selection ?? it.system?.value?.selection ?? null;
+            if (typeof maybe === 'string' && maybe) selections.add(normalizeSlug(maybe));
+          }
+        } catch { /* skip malformed item */ }
       }
-      // Fallback: some rule elements nest selection differently
-      const first = rules[0];
-      const fallback = first?.selection ?? first?.value?.selection ?? null;
-      return typeof fallback === 'string' && fallback ? normalizeSlug(fallback) : null;
-    } catch {
-      return null;
-    }
+    } catch { }
+    return Array.from(selections);
+  }
+
+  /**
+   * Public helper: return all Terrain Stalker selections for this actor (supports multiple feats)
+   * @param {Token|Actor} tokenOrActor
+   * @returns {string[]} normalized selection keys (may be empty)
+   */
+  static getTerrainStalkerSelections(tokenOrActor) {
+    const actor = FeatsHandlerInternal.resolveActor(tokenOrActor);
+    return FeatsHandler._getTerrainStalkerSelections(actor);
   }
 }
 

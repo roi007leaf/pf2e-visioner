@@ -45,6 +45,30 @@
       "UNDETECTED_OVERLAY": "Vous ne détectez pas ce jeton",
       "CONCEALED_OVERLAY": "Ce jeton vous est masqué"
     },
+    "SPECIAL_SENSES": {
+      "vision": "(FR TODO) Vision",
+      "vision_description": "(FR TODO) Standard visual sense.",
+      "low_light_vision": "(FR TODO) Vision en faible luminosité",
+      "low_light_vision_description": "(FR TODO) Vous voyez en faible luminosité comme en pleine lumière.",
+      "infrared_vision": "(FR TODO) Vision infrarouge",
+      "infrared_vision_description": "(FR TODO) Vous percevez les signatures thermiques.",
+      "truesight": "(FR TODO) Vision véritable",
+      "truesight_description": "(FR TODO) Vous voyez les choses telles qu'elles sont réellement.",
+      "see_the_unseen": "(FR TODO) Voir l'invisible",
+      "see_the_unseen_description": "(FR TODO) Vous percevez des phénomènes autrement invisibles.",
+      "bloodsense": "(FR TODO) Sens du sang",
+      "bloodsense_description": "(FR TODO) Vous détectez le sang à proximité.",
+      "magicsense": "(FR TODO) Sens de la magie",
+      "magicsense_description": "(FR TODO) Vous sentez les auras magiques.",
+      "motion_sense": "(FR TODO) Sens du mouvement",
+      "motion_sense_description": "(FR TODO) Vous détectez les mouvements à proximité.",
+      "spiritsense": "(FR TODO) Sens des esprits",
+      "spiritsense_description": "(FR TODO) Vous percevez les esprits et morts-vivants.",
+      "thoughtsense": "(FR TODO) Sens de la pensée",
+      "thoughtsense_description": "(FR TODO) Vous détectez les créatures pensantes.",
+      "wavesense": "(FR TODO) Sens des ondes",
+      "wavesense_description": "(FR TODO) Vous percevez les vibrations/ondes dans un médium."
+    },
     "MECHANICAL_EFFECTS": {
       "HIDDEN_FLAT_CHECK": "un test nu DD 11 est requis pour cibler",
       "CONCEALED_FLAT_CHECK": "Un test nu DD 5 est requis pour cibler",
@@ -110,7 +134,12 @@
       "ECHOLOCATION_LABEL": "Écholocalisation",
       "ECHOLOCATION_TOOLTIP": "Ouïe précise active jusqu'au début de votre prochain tour",
       "NOISY_LABEL": "",
-      "NOISY_TOOLTIP": ""
+      "NOISY_TOOLTIP": "",
+      "PREVIEW_AVAILABLE_SENSES": "(FR TODO) Available Senses"
+    },
+    "SENSE_PRECISION": {
+      "PRECISE": "(FR TODO) Precise",
+      "IMPRECISE": "(FR TODO) Imprecise"
     },
     "HIDE_AUTOMATION": {
       "BUTTON_APPLY": "Applique les résultats de Se cacher",

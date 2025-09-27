@@ -33,6 +33,7 @@ export class HidePreviewDialog extends BaseActionDialog {
       applyChange: HidePreviewDialog._onApplyChange,
       revertChange: HidePreviewDialog._onRevertChange,
       toggleEncounterFilter: HidePreviewDialog._onToggleEncounterFilter,
+      toggleFilterByDetection: HidePreviewDialog._onToggleFilterByDetection,
       overrideState: HidePreviewDialog._onOverrideState,
       togglePrequisite: HidePreviewDialog._onTogglePrequisite,
       bulkOverrideSet: HidePreviewDialog._onBulkOverrideSet,
@@ -132,6 +133,20 @@ export class HidePreviewDialog extends BaseActionDialog {
         'target',
       );
     } catch { }
+
+    // Apply detection filtering if enabled
+    if (this.filterByDetection && this.actorToken) {
+      try {
+        const { filterOutcomesByDetection } = await import('../services/infra/shared-utils.js');
+        filteredOutcomes = await filterOutcomesByDetection(filteredOutcomes, this.actorToken, 'target', false, true, 'target_to_observer');
+      } catch { /* LOS filtering is non-critical */ }
+    }
+
+    // Apply defeated token filtering (exclude dead/unconscious tokens)
+    try {
+      const { filterOutcomesByDefeated } = await import('../services/infra/shared-utils.js');
+      filteredOutcomes = filterOutcomesByDefeated(filteredOutcomes, 'target');
+    } catch { /* Defeated filtering is non-critical */ }
 
     // Augment with end-position qualification like Sneak: concealed OR standard/greater cover qualifies
     try {
@@ -276,25 +291,40 @@ export class HidePreviewDialog extends BaseActionDialog {
       }
       try {
         if (has('terrain-stalker')) {
-          const selection = FeatsHandler.getTerrainStalkerSelection(this.actorToken);
-          if (selection && FeatsHandler.isEnvironmentActive(this.actorToken, selection)) {
-            badges.push({ key: 'terrain-stalker', icon: 'fas fa-tree', label: game.i18n.localize('PF2E_VISIONER.HIDE_AUTOMATION.BADGES.TERRAIN_STALKER_LABEL'), tooltip: game.i18n.format('PF2E_VISIONER.HIDE_AUTOMATION.BADGES.TERRAIN_STALKER_TOOLTIP', { selection }) });
+          const selections = FeatsHandler.getTerrainStalkerSelections(this.actorToken) || [];
+          const active = selections.filter((sel) => {
+            try { return FeatsHandler.isEnvironmentActive(this.actorToken, sel); } catch { return false; }
+          });
+          if (active.length) {
+            const selectionText = active.join(', ');
+            // Also show all region environment types under the token (supports multiple)
+            let environmentsText = '—';
+            try {
+              const env = (await import('../../utils/environment.js')).default;
+              const ctx = env.getActiveContext(this.actorToken) || {};
+              const regionTypes = Array.from(ctx.regionTypes || []);
+              const sceneFallback = Array.from(ctx.sceneTypes || []);
+              const envList = regionTypes.length ? regionTypes : sceneFallback;
+              if (envList.length) environmentsText = envList.join(', ');
+            } catch { /* non-critical */ }
+            badges.push({ key: 'terrain-stalker', icon: 'fas fa-tree', label: game.i18n.localize('PF2E_VISIONER.HIDE_AUTOMATION.BADGES.TERRAIN_STALKER_LABEL'), tooltip: game.i18n.format('PF2E_VISIONER.HIDE_AUTOMATION.BADGES.TERRAIN_STALKER_TOOLTIP', { selection: selectionText, environments: environmentsText }) });
           }
         }
       } catch { }
       try {
         if (has('vanish-into-the-land')) {
-          const selection = FeatsHandler.getTerrainStalkerSelection(this.actorToken);
-          if (selection) {
-            let active = false;
+          const selections = FeatsHandler.getTerrainStalkerSelections(this.actorToken) || [];
+          let active = false;
+          let firstActive = null;
+          for (const selection of selections) {
             try {
               const env = (await import('../../utils/environment.js')).default;
               const matches = env.getMatchingEnvironmentRegions(this.actorToken, selection) || [];
-              active = matches.length > 0;
-            } catch { active = FeatsHandler.isEnvironmentActive(this.actorToken, selection); }
-            if (active) {
-              badges.push({ key: 'vanish-into-the-land', icon: 'fas fa-leaf', label: game.i18n.localize('PF2E_VISIONER.HIDE_AUTOMATION.BADGES.VANISH_INTO_THE_LAND_LABEL'), tooltip: game.i18n.localize('PF2E_VISIONER.HIDE_AUTOMATION.BADGES.VANISH_INTO_THE_LAND_TOOLTIP') });
-            }
+              if (matches.length > 0) { active = true; firstActive = firstActive || selection; break; }
+            } catch { active = active || FeatsHandler.isEnvironmentActive(this.actorToken, selection); if (active && !firstActive) firstActive = selection; }
+          }
+          if (active) {
+            badges.push({ key: 'vanish-into-the-land', icon: 'fas fa-leaf', label: game.i18n.localize('PF2E_VISIONER.HIDE_AUTOMATION.BADGES.VANISH_INTO_THE_LAND_LABEL'), tooltip: game.i18n.localize('PF2E_VISIONER.HIDE_AUTOMATION.BADGES.VANISH_INTO_THE_LAND_TOOLTIP') });
           }
         }
       } catch { }
@@ -310,6 +340,7 @@ export class HidePreviewDialog extends BaseActionDialog {
 
     // Calculate summary information
     context.actorToken = this.actorToken;
+    context.actorTokenImage = this.resolveTokenImage(this.actorToken);
     context.outcomes = processedOutcomes;
     context.ignoreAllies = !!this.ignoreAllies;
     context.hideFoundryHidden = !!this.hideFoundryHidden;
@@ -339,6 +370,14 @@ export class HidePreviewDialog extends BaseActionDialog {
         const { filterOutcomesByAllies } = await import('../services/infra/shared-utils.js');
         filtered = filterOutcomesByAllies(filtered, this.actorToken, this.ignoreAllies, 'target');
       } catch { }
+
+      // Apply LOS filtering if enabled
+      if (this.filterByDetection && this.actorToken) {
+        try {
+          const { filterOutcomesByDetection } = await import('../services/infra/shared-utils.js');
+          filtered = await filterOutcomesByDetection(filtered, this.actorToken, 'target', false, true, 'target_to_observer');
+        } catch { /* LOS filtering is non-critical */ }
+      }
       if (!Array.isArray(filtered)) return [];
       // Preserve override selections and recompute actionability
       const merged = filtered.map((o) => {
@@ -533,6 +572,19 @@ export class HidePreviewDialog extends BaseActionDialog {
     app.bulkActionState = 'initial';
 
     // Re-render the dialog - _prepareContext will handle the filtering
+    app.render({ force: true });
+  }
+
+  static async _onToggleFilterByDetection(event, target) {
+    const app = currentHideDialog;
+    if (!app) return;
+    app.filterByDetection = target.checked;
+    app.bulkActionState = 'initial';
+    // Recompute filtered outcomes and preserve overrides before re-rendering
+    try {
+      const list = await app.getFilteredOutcomes();
+      if (Array.isArray(list)) app.outcomes = list;
+    } catch { }
     app.render({ force: true });
   }
 
@@ -904,14 +956,14 @@ export class HidePreviewDialog extends BaseActionDialog {
   }
 
   // Bulk override action handlers
-   
+
   static _onBulkOverrideSet(event, target) {
     const app = currentHideDialog;
     if (!app) return;
     app._onBulkOverrideSet(event);
   }
 
-   
+
   static _onBulkOverrideClear(event, target) {
     const app = currentHideDialog;
     if (!app) return;

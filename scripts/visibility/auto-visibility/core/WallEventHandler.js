@@ -113,7 +113,7 @@ export class WallEventHandler {
     /**
      * Handle wall creation - affects line of sight for all tokens
      */
-    handleWallCreate(document, options, userId) {
+    handleWallCreate() {
         if (!this.systemState.shouldProcessEvents()) return;
 
         // New walls always affect LOS, so clear caches
@@ -129,7 +129,7 @@ export class WallEventHandler {
     /**
      * Handle wall deletion - affects line of sight for all tokens
      */
-    handleWallDelete(document, options, userId) {
+    handleWallDelete(document) {
         if (!this.systemState.shouldProcessEvents()) return;
 
         // Deleted walls always affect LOS, so clear caches

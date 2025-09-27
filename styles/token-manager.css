@@ -198,4 +198,44 @@
     background: transparent;
     border-color: var(--color-border-light-primary);
   }
+
+  /* Animation for apply buttons when changes are pending */
+  @keyframes pulse-glow {
+    0%, 100% {
+      box-shadow: 0 0 5px rgba(255, 215, 0, 0.3);
+      border-color: var(--color-border-highlight-alt);
+    }
+    50% {
+      box-shadow: 0 0 15px rgba(255, 215, 0, 0.6), 0 0 25px rgba(255, 215, 0, 0.4);
+      border-color: rgba(255, 215, 0, 0.8);
+    }
+  }
+
+  .vm-action-button.apply.has-changes {
+    animation: pulse-glow 2s ease-in-out infinite;
+    position: relative;
+  }
+
+  .vm-action-button.apply.has-changes::before {
+    content: "";
+    position: absolute;
+    top: -2px;
+    left: -2px;
+    right: -2px;
+    bottom: -2px;
+    border-radius: 6px;
+    background: linear-gradient(45deg, transparent, rgba(255, 215, 0, 0.1), transparent);
+    opacity: 0.8;
+    z-index: -1;
+    animation: pulse-glow 2s ease-in-out infinite;
+  }
+
+  /* Pause animation on hover to prevent interference */
+  .vm-action-button.apply.has-changes:hover {
+    animation-play-state: paused;
+  }
+
+  .vm-action-button.apply.has-changes:hover::before {
+    animation-play-state: paused;
+  }
 } /* End .pf2e-visioner scope */

@@ -35,7 +35,7 @@ export class ViewportFilterService {
      * @param {number} paddingPx - Padding around viewport in pixels
      * @returns {Set<string>|null} Set of token IDs in viewport, or null if unavailable
      */
-    getViewportTokenIdSet(paddingPx = 64) {
+    getViewportTokenIdSet(paddingPx = 64, spatialIndex = null, posProvider = null) {
         try {
             const screen = canvas.app?.renderer?.screen;
             const wt = canvas.stage?.worldTransform;
@@ -49,17 +49,21 @@ export class ViewportFilterService {
             const maxY = Math.max(topLeft.y, bottomRight.y) + paddingPx;
 
             const tokenIdSet = new Set();
-            const tokens = canvas.tokens?.placeables || [];
+            const rect = { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
 
-            for (const token of tokens) {
-                if (!this.#positionManager) {
-                    // Fallback to basic token position if no position manager
-                    const pos = { x: token.x, y: token.y };
-                    if (pos.x >= minX && pos.x <= maxX && pos.y >= minY && pos.y <= maxY) {
-                        tokenIdSet.add(token.document.id);
-                    }
-                } else {
-                    const pos = this.#positionManager.getTokenPosition(token);
+            if (spatialIndex && typeof spatialIndex.queryRect === 'function') {
+                // Use quadtree to get candidates quickly
+                const pts = spatialIndex.queryRect(rect);
+                for (const pt of pts) {
+                    if (pt?.token?.document?.id) tokenIdSet.add(pt.token.document.id);
+                }
+            } else {
+                // Fallback: iterate tokens
+                const tokens = canvas.tokens?.placeables || [];
+                const getter = posProvider || (this.#positionManager ? (t) => this.#positionManager.getTokenPosition(t) : (t) => ({ x: t.x, y: t.y }));
+                for (const token of tokens) {
+                    const pos = getter(token);
+                    if (!pos) continue;
                     if (pos.x >= minX && pos.x <= maxX && pos.y >= minY && pos.y <= maxY) {
                         tokenIdSet.add(token.document.id);
                     }
@@ -84,7 +88,9 @@ export class ViewportFilterService {
 
         return {
             isEnabled: () => this.isClientAwareFilteringEnabled(),
-            getTokenIdSet: () => this.getViewportTokenIdSet()
+            // Allow callers to pass spatialIndex and/or a custom posProvider
+            getTokenIdSet: (paddingPx = 64, spatialIndex = null, posProvider = null) =>
+                this.getViewportTokenIdSet(paddingPx, spatialIndex, posProvider)
         };
     }
 

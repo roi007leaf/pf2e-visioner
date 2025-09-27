@@ -37,6 +37,12 @@ export class DependencyInjectionContainer {
             return optimizedVisibilityCalculator;
         });
 
+        // Lighting raster service (fast-path darkness sampling)
+        this.#factories.set('lightingRasterService', async () => {
+            const { LightingRasterService } = await import('./LightingRasterService.js');
+            return new LightingRasterService();
+        });
+
         // Cache services
         this.#factories.set('globalLosCache', async () => {
             const { GlobalLosCache } = await import('../utils/GlobalLosCache.js');
@@ -48,10 +54,16 @@ export class DependencyInjectionContainer {
             return new GlobalVisibilityCache(3000); // 3 second TTL
         });
 
-        // Visibility map functions
-        this.#factories.set('visibilityMapFunctions', async () => {
-            const { getVisibilityMap, setVisibilityBetween } = await import('../../../stores/visibility-map.js');
-            return { getVisibilityMap, setVisibilityBetween };
+        // Visibility map service
+        this.#factories.set('visibilityMapService', async () => {
+            const { VisibilityMapService } = await import('./VisibilityMapService.js');
+            return new VisibilityMapService();
+        });
+
+        // Override service
+        this.#factories.set('overrideService', async () => {
+            const { OverrideService } = await import('./OverrideService.js');
+            return new OverrideService();
         });
 
         // Core manager services (require AVS instance)
@@ -105,9 +117,9 @@ export class DependencyInjectionContainer {
                 optimizedVisibilityCalculator: dependencies.optimizedVisibilityCalculator,
                 globalLosCache: dependencies.globalLosCache,
                 globalVisibilityCache: dependencies.globalVisibilityCache,
-                getTokenPosition: dependencies.getTokenPosition,
-                getActiveOverride: dependencies.getActiveOverride,
-                getVisibilityMap: dependencies.getVisibilityMap,
+                positionManager: dependencies.positionManager,
+                overrideService: dependencies.overrideService,
+                visibilityMapService: dependencies.visibilityMapService,
                 debug: dependencies.debug,
                 maxVisibilityDistance: dependencies.maxVisibilityDistance
             });
@@ -120,8 +132,8 @@ export class DependencyInjectionContainer {
                 batchProcessor: dependencies.batchProcessor,
                 telemetryReporter: dependencies.telemetryReporter,
                 exclusionManager: dependencies.exclusionManager,
-                setVisibilityBetween: dependencies.setVisibilityBetween,
-                getAllTokens: dependencies.getAllTokens,
+                viewportFilterService: dependencies.viewportFilterService,
+                visibilityMapService: dependencies.visibilityMapService,
                 moduleId: dependencies.moduleId
             });
         });
@@ -209,7 +221,6 @@ export class DependencyInjectionContainer {
             optimizedVisibilityCalculator,
             globalLosCache,
             globalVisibilityCache,
-            visibilityMapFunctions,
             performanceMetricsCollector,
             systemStateProvider
         ] = await Promise.all([
@@ -219,7 +230,6 @@ export class DependencyInjectionContainer {
             this.get('optimizedVisibilityCalculator'),
             this.get('globalLosCache'),
             this.get('globalVisibilityCache'),
-            this.get('visibilityMapFunctions'),
             this.get('performanceMetricsCollector'),
             this.get('systemStateProvider')
         ]);
@@ -253,18 +263,22 @@ export class DependencyInjectionContainer {
             visionAnalyzer,
             conditionManager,
             optimizedVisibilityCalculator,
+            lightingRasterService: await this.get('lightingRasterService'),
 
             // Caches
             globalLosCache,
             globalVisibilityCache,
 
-            // Visibility map functions
-            getVisibilityMap: visibilityMapFunctions.getVisibilityMap,
-            setVisibilityBetween: visibilityMapFunctions.setVisibilityBetween,
+            // Visibility map service
+            visibilityMapService: await this.get('visibilityMapService'),
+
+            // Override service
+            overrideService: await this.get('overrideService'),
 
             // Managers
             telemetryReporter,
             spatialAnalysisService,
+            maxVisibilityDistance: spatialAnalysisService?.getMaxVisibilityDistance?.(),
             overrideValidationManager,
             positionManager,
             exclusionManager,

@@ -277,7 +277,11 @@ export class VisionAnalyzer {
       const a = String(acuity || '').toLowerCase();
 
       if (entry.type === 'hearing') {
-        summary.hearing = { acuity: a || 'imprecise', range: entry.range };
+        // Only add hearing if not deafened
+        if (!this.#isDeafened(token)) {
+          summary.hearing = { acuity: a || 'imprecise', range: entry.range };
+        }
+        return; // Don't process further - hearing shouldn't go in imprecise array when deafened
       } else if (entry.type === 'lifesense') {
         // Lifesense is always imprecise per PF2E rules
         summary.lifesense = { range: entry.range };
@@ -419,6 +423,10 @@ export class VisionAnalyzer {
           t.includes('vision') ||
           t.includes('sight');
         if (isVisual) continue;
+
+        // Special check for echolocation - requires hearing (can't use if deafened)
+        if (t === 'echolocation' && this.#isDeafened(observer)) continue;
+
         if (ent.range === Infinity || ent.range >= dist) return true;
       }
     } catch { }
@@ -636,35 +644,36 @@ export class VisionAnalyzer {
     if (!observer || !target) return false;
 
     try {
-      if (raw) {
-        const res = this.#hasDirectLineOfSight(observer, target);
-        return res;
+      // First check if the observer has vision capabilities at all
+      // Creatures with "no vision" cannot have line of sight to anything
+      const observerCapabilities = this.getVisionCapabilities(observer);
+      if (!observerCapabilities.hasVision) {
+        if (log.enabled())
+          log.debug(() => ({
+            step: 'los-no-vision',
+            observer: observer?.name,
+            target: target?.name,
+            result: false,
+            reason: 'observer has no vision'
+          }));
+        return false;
       }
-      // Special handling for sneaking tokens - bypass Foundry's detection system
-      // to avoid interference from detection wrapper
-      const isTargetSneaking = target.document.getFlag('pf2e-visioner', 'sneak-active');
-      const isObserverSneaking = observer.document.getFlag('pf2e-visioner', 'sneak-active');
 
-      if (isTargetSneaking || isObserverSneaking) {
-        // For sneaking tokens, use direct ray casting instead of Foundry's testVisibility
-        // This bypasses the detection wrapper and gives us true line-of-sight
-        return this.#hasDirectLineOfSight(observer, target);
-      }
+      // Always use direct line-of-sight check for LOS filtering
+      // canvas.visibility.testVisibility() is designed for current observer vision,
+      // not for arbitrary token-to-token line of sight checks
+      const res = this.#hasDirectLineOfSight(observer, target);
 
-      // For normal tokens, use FoundryVTT's built-in visibility testing
-      const result = canvas.visibility.testVisibility(target.center, {
-        tolerance: 0,
-        object: target,
-      });
       if (log.enabled())
         log.debug(() => ({
-          step: 'los-foundry',
+          step: 'los-check',
           observer: observer?.name,
           target: target?.name,
-          result,
+          result: res,
+          method: 'direct'
         }));
 
-      return result;
+      return res;
     } catch (error) {
       console.warn(`${MODULE_ID} | Error testing line of sight:`, error);
       return false;
@@ -680,15 +689,83 @@ export class VisionAnalyzer {
    */
   #hasDirectLineOfSight(observer, target) {
     try {
-      // Use Foundry's walls collision test for sight. This checks only topology (walls),
-      // bypassing detection modes/wrappers that affect canvas.visibility.testVisibility.
-      const RayClass = foundry?.canvas?.geometry?.Ray || foundry?.utils?.Ray;
-      const ray = new RayClass(observer.center, target.center);
-      const blocked = canvas.walls?.checkCollision?.(ray, { type: 'sight' }) ?? false;
+      // Use observer's vision polygon to check if target shape is visible
+      // This accounts for vision range, field of view, walls, and lighting
+      const visionShape = observer.vision?.shape;
+      const targetShape = target.shape;
+
+      if (!visionShape || !targetShape) {
+        // Fallback to wall collision detection if vision data unavailable
+        return this.#fallbackWallCollisionCheck(observer, target);
+      }
+
+      // Check if any part of the target's shape intersects with the observer's vision polygon
+      const canSee = visionShape.intersectPolygon(targetShape);
+
+      if (log.enabled())
+        log.debug(() => ({
+          step: 'vision-polygon-check',
+          observer: observer?.name,
+          target: target?.name,
+          hasVisionShape: !!visionShape,
+          hasTargetShape: !!targetShape,
+          canSee,
+        }));
+
+      return canSee;
+    } catch (error) {
+      console.warn(`${MODULE_ID} | Error in vision polygon check:`, error);
+      // Fallback to wall collision detection on error
+      return this.#fallbackWallCollisionCheck(observer, target);
+    }
+  }
+
+  /**
+   * Fallback wall collision check when vision polygon is unavailable
+   * @param {Token} observer
+   * @param {Token} target
+   * @returns {boolean}
+   * @private
+   */
+  #fallbackWallCollisionCheck(observer, target) {
+    try {
+      let blocked = false;
+
+      try {
+        const sightBlocked = CONFIG.Canvas?.polygonBackends?.sight?.testCollision?.(
+          observer.center,
+          target.center,
+          { type: "sight", mode: "any" }
+        ) ?? false;
+
+        const soundBlocked = CONFIG.Canvas?.polygonBackends?.sound?.testCollision?.(
+          observer.center,
+          target.center,
+          { type: "sound", mode: "any" }
+        ) ?? false;
+
+        // Only consider truly blocked if BOTH sight and sound are blocked
+        // This helps filter out darkness light sources that only block sight
+        blocked = sightBlocked && soundBlocked;
+
+        // For visibility calculations, only sight blocking matters
+        // Walls that block sight (but not sound) should still make tokens hidden
+        blocked = sightBlocked;
+      } catch (e) {
+        // Fallback to canvas.walls.checkCollision if polygonBackends fails
+        try {
+          const RayClass = foundry?.canvas?.geometry?.Ray || foundry?.utils?.Ray;
+          const ray = new RayClass(observer.center, target.center);
+          blocked = canvas.walls?.checkCollision?.(ray, { type: 'sight' }) ?? false;
+        } catch (e2) {
+          return false; // If all methods fail, assume no LOS
+        }
+      }
+
       const res = !blocked;
       if (log.enabled())
         log.debug(() => ({
-          step: 'direct-sight',
+          step: 'fallback-wall-collision',
           observer: observer?.name,
           target: target?.name,
           blocked,
@@ -696,12 +773,8 @@ export class VisionAnalyzer {
         }));
       return res;
     } catch (error) {
-      console.warn(`${MODULE_ID} | Error in direct line of sight check:`, error);
-      // Fallback to Foundry's method if direct check fails
-      return canvas.visibility.testVisibility(target.center, {
-        tolerance: 0,
-        object: target,
-      });
+      console.warn(`${MODULE_ID} | Error in fallback wall collision check:`, error);
+      return false;
     }
   }
 
@@ -831,6 +904,16 @@ export class VisionAnalyzer {
   }
 
   /**
+   * Check if an observer is deafened (cannot hear anything)
+   * @param {Token} observer
+   * @returns {boolean}
+   * @private
+   */
+  #isDeafened(observer) {
+    return this.#hasCondition(observer?.actor, 'deafened');
+  }
+
+  /**
    * Check if an actor has a specific condition
    * @param {Actor} actor
    * @param {string} conditionSlug - The condition slug (e.g., 'blinded', 'dazzled')
@@ -876,4 +959,6 @@ export class VisionAnalyzer {
       return false;
     }
   }
+
+
 }

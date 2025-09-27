@@ -280,4 +280,12 @@ export class PositionManager {
             this.pinEpsilon = config.pinEpsilon;
         }
     }
+
+    /**
+     * Getter for current pin duration (ms)
+     * @returns {number}
+     */
+    getPinDurationMs() {
+        return this.pinDurationMs;
+    }
 }

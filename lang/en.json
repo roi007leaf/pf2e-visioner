@@ -46,14 +46,42 @@
       "greater": "Greater Cover"
     },
     "SPECIAL_SENSES": {
+      "vision": "Vision",
+      "vision_description": "Your standard visual sense used to perceive your surroundings.",
       "lifesense": "Lifesense",
-      "lifesense_description": "You have a limited ability to sense life force. You gain lifesense as an imprecise sense with a range of 10 feet. This allows you to sense the life force of living and undead creatures within the listed range. The sense can distinguish between the vitality energy animating living creatures and the void energy animating undead creatures.",
+      "lifesense_description": "You have a limited ability to sense life force. You gain lifesense as an imprecise sense. This allows you to sense the life force of living and undead creatures within the listed range. The sense can distinguish between the vitality energy animating living creatures and the void energy animating undead creatures.",
       "echolocation": "Echolocation",
-      "echolocation_description": "You can use sound to navigate and detect objects. You gain echolocation as a precise sense with a range of 40 feet. This allows you to detect all creatures and objects within range through sound reflection.",
+      "echolocation_description": "You can use sound to navigate and detect objects. You gain echolocation as a precise sense. This allows you to detect all creatures and objects within range through sound reflection.",
       "tremorsense": "Tremorsense",
-      "tremorsense_description": "You can sense vibrations through the ground. You gain tremorsense as an imprecise sense with a range of 30 feet. This allows you to detect creatures and objects in contact with the ground within range.",
+      "tremorsense_description": "You can sense vibrations through the ground. You gain tremorsense as an imprecise sense. This allows you to detect creatures and objects in contact with the ground within range.",
       "scent": "Scent",
-      "scent_description": "You have an enhanced sense of smell. You gain scent as an imprecise sense with a range of 30 feet. This allows you to detect living creatures by their scent within range."
+      "scent_description": "You have an enhanced sense of smell. You gain scent as an imprecise sense. This allows you to detect living creatures by their scent within range.",
+      "darkvision": "Darkvision",
+      "darkvision_description": "You can see in darkness and dim light just as well as in bright light, though you can’t distinguish color in darkness.",
+      "greater_darkvision": "Greater Darkvision",
+      "greater_darkvision_description": "You can see in darkness and dim light as if it were bright light—colors included.",
+      "hearing": "Hearing",
+      "hearing_description": "You can detect creatures and events via sound within range (imprecise).",
+      "low_light_vision": "Low-Light Vision",
+      "low_light_vision_description": "You can see in dim light as though it were bright light.",
+      "infrared_vision": "Infrared Vision",
+      "infrared_vision_description": "You can perceive heat signatures in your surroundings.",
+      "truesight": "Truesight",
+      "truesight_description": "You can see things as they truly are, ignoring illusions and invisibility within range.",
+      "see_the_unseen": "See the Unseen",
+      "see_the_unseen_description": "You can perceive otherwise unseen phenomena within range.",
+      "bloodsense": "Bloodsense",
+      "bloodsense_description": "You can detect the presence and location of creatures by sensing blood within range.",
+      "magicsense": "Magicsense",
+      "magicsense_description": "You can sense magical auras or effects within range.",
+      "motion_sense": "Motion Sense",
+      "motion_sense_description": "You can detect motion in your surroundings within range.",
+      "spiritsense": "Spiritsense",
+      "spiritsense_description": "You can sense the presence of spirits and undead within range.",
+      "thoughtsense": "Thoughtsense",
+      "thoughtsense_description": "You can detect nearby thinking creatures within range.",
+      "wavesense": "Wavesense",
+      "wavesense_description": "You perceive vibrations or waves through a medium within range."
     },
     "COVER_OVERRIDE": {
       "POPUP_OVERRIDE": "Cover overridden via keybind popup: {original} → {final}"
@@ -88,6 +116,18 @@
       "QUICK_STANDARD_COVER": "Set Standard Cover",
       "QUICK_GREATER_COVER": "Set Greater Cover"
     },
+    "MOVEMENT": {
+      "walk": "Walk",
+      "stride": "Stride",
+      "leap": "Leap",
+      "climb": "Climb",
+      "fly": "Fly",
+      "swim": "Swim",
+      "burrow": "Burrow",
+      "teleport": "Teleport",
+      "deploy": "Deploy",
+      "travel": "Travel"
+    },
     "NOTIFICATIONS": {
       "NO_OBSERVER_SELECTED": "Please select an observer token first",
       "MULTIPLE_OBSERVERS": "Multiple observer tokens selected - please select only one",
@@ -105,6 +145,7 @@
       "PROCESSING": "Processing Seek results...",
       "PREVIEW_TITLE": "Seek Results Preview",
       "PREVIEW_HINT": "Seek action results analysis",
+      "PREVIEW_AVAILABLE_SENSES": "Available Senses",
       "ROLL_VS_DC": "Roll vs Stealth DC",
       "OUTCOME": "Outcome",
       "VISIBILITY_CHANGE": "Visibility Change",
@@ -129,6 +170,10 @@
       "SENSE_UNSEEN_BUTTON": "Sense the Unseen (Reaction)",
       "SENSE_UNSEEN_TOOLTIP": "Use your Sense the Unseen feat to make undetected creatures hidden",
       "SENSE_UNSEEN_APPLIED": "Sense the Unseen Applied"
+    },
+    "SENSE_PRECISION": {
+      "PRECISE": "Precise",
+      "IMPRECISE": "Imprecise"
     },
     "REACTIONS": {
       "BUTTON_LABEL": "Reactions",
@@ -164,7 +209,7 @@
       "SETTING_HINT": "Automatically add buttons to Hide chat messages for applying visibility changes",
       "BADGES": {
         "TERRAIN_STALKER_LABEL": "Terrain Stalker",
-        "TERRAIN_STALKER_TOOLTIP": "Chosen terrain active: {{selection}}",
+        "TERRAIN_STALKER_TOOLTIP": "Chosen terrains active: {selection} (Region: {environments})",
         "VANISH_INTO_THE_LAND_LABEL": "Vanish into the Land",
         "VANISH_INTO_THE_LAND_TOOLTIP": "You can Hide and Sneak even without cover or concealment in your chosen difficult terrain",
         "VERY_VERY_SNEAKY_LABEL": "Very, Very Sneaky",
@@ -198,7 +243,7 @@
       "SETTING_HINT": "Automatically add buttons to Sneak chat messages for applying visibility changes",
       "BADGES": {
         "TERRAIN_STALKER_LABEL": "Terrain Stalker",
-        "TERRAIN_STALKER_TOOLTIP": "Chosen terrain active: {{selection}}",
+        "TERRAIN_STALKER_TOOLTIP": "Chosen terrains active: {selection} (Region: {environments})",
         "VANISH_INTO_THE_LAND_LABEL": "Vanish into the Land",
         "VANISH_INTO_THE_LAND_TOOLTIP": "You can Sneak even without cover or concealment in your chosen difficult terrain",
         "VERY_VERY_SNEAKY_LABEL": "Very, Very Sneaky",
@@ -477,7 +522,9 @@
       "REVERT_ALL": "Revert All",
       "REMOVE_OVERRIDES": "Remove Overrides",
       "BULK_SET_VISIBILITY": "Bulk Set Visibility",
-      "CLEAR_BULK_OVERRIDES": "Clear Bulk Overrides"
+      "CLEAR_BULK_OVERRIDES": "Clear Bulk Overrides",
+      "FILTER_BY_DETECTION_LABEL": "Filter By Detectable",
+      "FILTER_BY_DETECTION_TOOLTIP": "Only show tokens that can be detected (via line of sight OR other senses)"
     },
     "WALL": {
       "VISIBLE_TO_YOU": "Hidden Wall",

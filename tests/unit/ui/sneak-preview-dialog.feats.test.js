@@ -6,6 +6,39 @@ jest.mock('../../../scripts/visibility/auto-visibility/index.js', () => ({
   },
 }));
 
+// Mock FeatsHandler to properly handle very-very-sneaky feat
+jest.mock('../../../scripts/chat/services/feats-handler.js', () => ({
+  FeatsHandler: {
+    isEnvironmentActive: jest.fn().mockReturnValue(false),
+    overridePrerequisites: jest.fn().mockImplementation((tokenOrActor, base, extra = {}) => {
+      // Check if actor has very-very-sneaky feat
+      const actor = tokenOrActor.actor || tokenOrActor;
+      const hasVeryVerySneaky = actor?.items?.some(item =>
+        item.type === 'feat' && item.system?.slug === 'very-very-sneaky'
+      );
+
+      if (hasVeryVerySneaky) {
+        return {
+          ...base,
+          startQualifies: true,
+          endQualifies: true,
+          bothQualify: true,
+          reason: 'Very, Very Sneaky removes end cover/concealment requirement'
+        };
+      }
+      return base;
+    })
+  }
+}));
+
+// Mock shared-utils to prevent filtering from removing outcomes
+jest.mock('../../../scripts/chat/services/infra/shared-utils.js', () => ({
+  filterOutcomesByAllies: jest.fn((outcomes) => outcomes), // Don't filter any outcomes
+  filterOutcomesByDefeated: jest.fn((outcomes) => outcomes), // Don't filter any outcomes
+  filterOutcomesByEncounter: jest.fn((outcomes) => outcomes), // Don't filter any outcomes
+  hasActiveEncounter: jest.fn(() => false), // No active encounter
+}));
+
 describe('SneakPreviewDialog - feat-based end-position relaxation', () => {
   test('very-very-sneaky relaxes end position requirement', async () => {
     // Lazy import to align with module system
@@ -25,13 +58,13 @@ describe('SneakPreviewDialog - feat-based end-position relaxation', () => {
       actor: {
         id: 'actor-1',
         name: 'Sneaky Goblin',
-        items: [ { type: 'feat', system: { slug: 'very-very-sneaky' } } ],
+        items: [{ type: 'feat', system: { slug: 'very-very-sneaky' } }],
         document: { id: 'actor-1' },
       },
     };
 
     // Observer token with no cover / not concealed at end
-  const observer = { id: 'obs-1', name: 'Watcher', document: { id: 'obs-1', hidden: false, getFlag: jest.fn(() => ({})) } };
+    const observer = { id: 'obs-1', name: 'Watcher', document: { id: 'obs-1', hidden: false, getFlag: jest.fn(() => ({})) } };
 
     // Mock a basic outcome with positionTransition lacking end cover/concealment
     const outcomes = [{
@@ -66,7 +99,9 @@ describe('SneakPreviewDialog - feat-based end-position relaxation', () => {
 
     // The dialog should have integrated FeatsHandler.overrideSneakPrerequisites and marked
     // end position as qualifying despite no cover/concealment when the actor has very-very-sneaky
+    expect(dialog.outcomes).toHaveLength(1);
     const processed = dialog.outcomes[0];
+    expect(processed).toBeDefined();
     expect(processed._featPositionOverride).toBeDefined();
     expect(processed._featPositionOverride.endQualifies).toBe(true);
 
