@@ -32,7 +32,7 @@ export async function onTokenCreated(scene, tokenDoc) {
   try {
     if (game.settings.get(MODULE_ID, 'enableAllTokensVision')) {
       const currentEnabled = tokenDoc?.vision ?? tokenDoc?.sight?.enabled ?? undefined;
-      if (currentEnabled !== true) {
+      if (currentEnabled !== true && tokenDoc?.actor?.type !== 'loot') {
         await tokenDoc.update?.(
           { vision: true, sight: { enabled: true } },
           { diff: false, render: false, animate: false },

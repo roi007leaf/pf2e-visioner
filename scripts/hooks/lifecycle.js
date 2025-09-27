@@ -135,7 +135,7 @@ async function enableVisionForAllTokensAndPrototypes() {
       const scenes = Array.from(game.scenes?.contents ?? []);
       for (const scene of scenes) {
         try {
-          const tokens = Array.from(scene.tokens?.contents ?? []);
+          const tokens = Array.from(scene.tokens?.contents ?? []).filter(t => t.actor?.type !== "loot");
           const updates = [];
           for (const t of tokens) {
             const hasVision = t?.vision === true || t?.sight?.enabled === true;
@@ -150,7 +150,7 @@ async function enableVisionForAllTokensAndPrototypes() {
       }
 
       // Update all actor prototype tokens
-      const actors = Array.from(game.actors?.contents ?? []);
+      const actors = Array.from(game.actors?.contents ?? []).filter(a => a?.type !== "loot");
       for (const actor of actors) {
         try {
           const pt = actor?.prototypeToken;
