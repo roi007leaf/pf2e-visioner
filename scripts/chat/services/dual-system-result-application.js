@@ -98,7 +98,7 @@ class DualSystemResultApplication {
               try {
                 detectedCover =
                   autoCoverSystem.detectCoverBetweenTokens(data.observer, targetToken) || 'none';
-              } catch {}
+              } catch { }
               // Pull expected/original cover from attached autoCover details on the matching sneak result, if any
               try {
                 const matching = (sneakResults || []).find(
@@ -110,7 +110,7 @@ class DualSystemResultApplication {
                 if (overrideDetails && overrideDetails.originalState) {
                   expectedCover = overrideDetails.originalState;
                 }
-              } catch {}
+              } catch { }
               const hasCover =
                 (expectedCover || detectedCover) === 'standard' ||
                 (expectedCover || detectedCover) === 'greater';
@@ -165,10 +165,10 @@ class DualSystemResultApplication {
                     'pf2e-visioner',
                     `avs-override-to-${tgtId}`,
                   );
-                } catch {}
+                } catch { }
                 try {
                   await target.document.unsetFlag('pf2e-visioner', `avs-override-from-${obsId}`);
-                } catch {}
+                } catch { }
               }
             } catch (cleanupErr) {
               console.warn(
@@ -201,32 +201,8 @@ class DualSystemResultApplication {
         options,
       });
 
-      // Apply Sneaky feat effects after all visibility changes have been processed
-      try {
-
-        // Add observer info to each change for Sneaky feat processing
-        const changesWithObservers = [];
-        for (const [observerId, data] of changesByObserver) {
-          for (const change of data.changes) {
-            // Add observer info to each change for Sneaky feat processing
-            const changeWithObserver = {
-              ...change,
-              observer: data.observer,
-              // Add outcome info if available from sneak results
-              outcome: this.#getOutcomeFromSneakResults(sneakResults, data.observer, change.target),
-            };
-            changesWithObservers.push(changeWithObserver);
-          }
-        }
-
-        await this.#applySneakyFeatEffects(changesWithObservers);
-      } catch (sneakyError) {
-        console.error(
-          'PF2E Visioner | Error applying Sneaky feat effects in dual system:',
-          sneakyError,
-        );
-        applicationResult.warnings.push(`Sneaky feat effects failed: ${sneakyError.message}`);
-      }
+      // Sneaky feat effects are now handled by turn-sneak-tracker.js service
+      // No additional effect application needed here
 
       applicationResult.success = applicationResult.errors.length === 0;
 
@@ -320,53 +296,8 @@ class DualSystemResultApplication {
     }
   }
 
-  /**
-   * Get outcome from sneak results for a specific observer-target pair
-   * @param {Array} sneakResults - The original sneak results
-   * @param {Token} observer - The observer token
-   * @param {Actor} target - The target actor
-   * @returns {string} The outcome ('success', 'failure', etc.)
-   */
-  #getOutcomeFromSneakResults(sneakResults, observer, target) {
-    try {
-
-      const result = sneakResults.find((r) => {
-        const observerMatch = r.token?.document?.id === observer?.document?.id;
-        const targetMatch = (r.actor?.document?.id || r.actor?.id) === target?.document?.id;
-        return observerMatch && targetMatch;
-      });
-
-      return result?.outcome || 'unknown';
-    } catch (error) {
-      console.warn('PF2E Visioner | Error getting outcome from sneak results:', error);
-      return 'unknown';
-    }
-  }
-
-  /**
-   * Apply Sneaky feat effects to successful sneak changes
-   * @param {Array} changes - The visibility changes that were applied
-   */
-  async #applySneakyFeatEffects(changes) {
-    try {
-      // Import the SneakActionHandler to reuse its Sneaky feat logic
-      const { SneakActionHandler } = await import('./actions/sneak-action.js');
-      const sneakHandler = new SneakActionHandler();
-
-      // Use the handler's private method through a public wrapper
-      // We'll need to add a public method to the handler for this
-      if (typeof sneakHandler.applySneakyFeatEffects === 'function') {
-        await sneakHandler.applySneakyFeatEffects(changes);
-      } else {
-        console.warn(
-          'PF2E Visioner | SneakActionHandler.applySneakyFeatEffects method not available',
-        );
-      }
-    } catch (error) {
-      console.error('PF2E Visioner | Error in dual system Sneaky feat effects:', error);
-      throw error;
-    }
-  }
+  // Removed incorrect Sneaky feat effect methods
+  // Turn-based feat mechanics are handled by turn-sneak-tracker.js service
 }
 
 const dualSystemApplication = new DualSystemResultApplication();

@@ -6,6 +6,7 @@ import { getDesiredOverrideStatesForAction } from '../services/data/action-state
 import { FeatsHandler } from '../services/feats-handler.js';
 import { notify } from '../services/infra/notifications.js';
 import sneakPositionTracker from '../services/position/PositionTracker.js';
+import turnSneakTracker from '../services/turn-sneak-tracker.js';
 import { BaseActionDialog } from './base-action-dialog.js';
 
 // Store reference to current sneak dialog
@@ -326,6 +327,10 @@ export class SneakPreviewDialog extends BaseActionDialog {
       const hasActionableChange =
         baseOldState != null && effectiveNewState != null && effectiveNewState !== baseOldState;
 
+      // Check if this outcome has deferred end position checks
+      const hasSneakyFeat = turnSneakTracker.hasSneakyFeat(this.sneakingToken);
+      const isEndCheckDeferred = hasSneakyFeat && turnSneakTracker.shouldDeferEndPositionCheck(this.sneakingToken, outcome.token);
+
       // Get position transition data for this outcome
       const positionTransition = this._getPositionTransitionForToken(outcome.token);
       const positionDisplay = this._preparePositionDisplay(
@@ -511,6 +516,21 @@ export class SneakPreviewDialog extends BaseActionDialog {
           return false;
         }
       };
+      // Sneaky/Very Sneaky: allows consecutive sneak actions with deferred end position checks
+      if (has('sneaky') || has('very-sneaky')) {
+        const isVery = has('very-sneaky');
+        const turnState = turnSneakTracker.getTurnSneakState(actorOrToken);
+        const sneakCount = turnState?.sneakActions?.length || 0;
+
+        badges.push({
+          key: isVery ? 'very-sneaky' : 'sneaky',
+          icon: 'fas fa-ninja',
+          label: isVery ? 'Very Sneaky' : 'Sneaky',
+          tooltip: sneakCount > 1
+            ? `${isVery ? 'Very Sneaky' : 'Sneaky'} feat active - End position checks deferred to turn end (${sneakCount} consecutive sneaks this turn)`
+            : `${isVery ? 'Very Sneaky' : 'Sneaky'} feat available - Consecutive sneaks will defer end position checks`
+        });
+      }
       // Ceaseless Shadows: removes cover/concealment requirement entirely
       if (has('ceaseless-shadows')) {
         badges.push({
@@ -641,6 +661,7 @@ export class SneakPreviewDialog extends BaseActionDialog {
     this.updateBulkActionButtons();
     this.markInitialSelections();
     this._resetCoverBonusButtonStates();
+    this._updateSneakyFeatIndicators();
 
     try {
       const cb = this.element.querySelector('input[data-action="toggleIgnoreAllies"]');
@@ -1357,6 +1378,16 @@ export class SneakPreviewDialog extends BaseActionDialog {
     if (!observerToken || !this.sneakingToken) return false;
 
     try {
+      // Check if turn tracker has deferred the end position check for Sneaky feats
+      if (turnSneakTracker?.shouldDeferEndPositionCheck?.(this.sneakingToken, observerToken)) {
+        // End position check is deferred - return true for UI
+        return true;
+      }
+    } catch (error) {
+      console.warn('PF2E Visioner | Error checking deferred sneak state:', error);
+    }
+
+    try {
       // Priority 0: AVS override flag (observer -> sneaking token)
       const observerId = observerToken.document?.id || observerToken.id;
       const overrideFlag = this.sneakingToken?.document?.getFlag?.(
@@ -2044,6 +2075,38 @@ export class SneakPreviewDialog extends BaseActionDialog {
     app.filterByDetection = target.checked;
     app.bulkActionState = 'initial';
     app.render({ force: true });
+  }
+
+  /**
+   * Update Sneaky feat deferred check indicators in the UI
+   * @private
+   */
+  _updateSneakyFeatIndicators() {
+    try {
+      const sneaker = this.sneakingToken;
+      if (!sneaker) return;
+
+      // Check if Sneaky feat is active
+      const turnState = turnSneakTracker?.getTurnSneakState?.(sneaker);
+      if (!turnState) return;
+
+      const shouldShowIndicators = turnSneakTracker?.shouldDeferEndPositionCheck?.(sneaker.id) ?? false;
+
+      // Show/hide deferred check indicators
+      const indicators = this.element?.querySelectorAll?.('.sneaky-feat-indicator') || [];
+      indicators.forEach(indicator => {
+        const sneakingTokenId = indicator.dataset.sneakingToken;
+        const observerTokenId = indicator.dataset.observerToken;
+
+        if (sneakingTokenId === sneaker.id && shouldShowIndicators) {
+          indicator.style.display = '';
+        } else {
+          indicator.style.display = 'none';
+        }
+      });
+    } catch (error) {
+      console.warn('PF2E Visioner | Error updating Sneaky feat indicators:', error);
+    }
   }
 
   async close(options = {}) {

@@ -238,6 +238,9 @@ export class ConsequencesPreviewDialog extends BaseActionDialog {
     // Log the number of changes for debugging
     Object.assign(context, this.buildCommonContext(processedOutcomes));
 
+    // Check if Auto-Visibility System is enabled for conditional UI elements
+    context.avsEnabled = game.settings.get(MODULE_ID, 'autoVisibilityEnabled');
+
     return context;
   }
 

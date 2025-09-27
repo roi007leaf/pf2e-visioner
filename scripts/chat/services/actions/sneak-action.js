@@ -7,6 +7,7 @@ import errorHandlingService, { SYSTEM_TYPES } from '../infra/error-handling-serv
 import { notify } from '../infra/notifications.js';
 import { calculateStealthRollTotals, shouldFilterAlly } from '../infra/shared-utils.js';
 import sneakCore from '../sneak-core.js';
+import turnSneakTracker from '../turn-sneak-tracker.js';
 import { ActionHandlerBase } from './base-action.js';
 
 export class SneakActionHandler extends ActionHandlerBase {
@@ -56,6 +57,15 @@ export class SneakActionHandler extends ActionHandlerBase {
 
       // Initialize sneak visibility states immediately when sneaking starts
       await this._initializeSneakVisibility(actionData);
+
+      // Check for Sneaky/Very Sneaky feat and start turn tracking if present
+      const sneakingToken = this._getSneakingToken(actionData);
+      if (sneakingToken && turnSneakTracker.hasSneakyFeat(sneakingToken)) {
+        const trackingStarted = turnSneakTracker.startTurnSneak(sneakingToken, actionData);
+        if (trackingStarted) {
+          console.log('PF2E Visioner | Started turn-based sneak tracking for', sneakingToken.name);
+        }
+      }
 
       // Basic validation without recursion - just check if we have observers
       const observers = await this.discoverSubjects(actionData);
@@ -1080,6 +1090,7 @@ export class SneakActionHandler extends ActionHandlerBase {
 
     const startPos = positionTransition.startPosition;
     const endPos = positionTransition.endPosition;
+    const sneakingToken = this._getSneakingToken(actionData);
 
     // PF2E Rules: Start position must be Hidden or Undetected to attempt Sneak
     // End position needs cover or concealment to maintain stealth
@@ -1090,6 +1101,25 @@ export class SneakActionHandler extends ActionHandlerBase {
       endPos.coverState === 'standard' ||
       endPos.coverState === 'greater' ||
       endPos.avsVisibility === 'concealed';
+
+    // Check for Sneaky/Very Sneaky feat mechanics
+    if (sneakingToken && observerToken && turnSneakTracker.hasSneakyFeat(sneakingToken)) {
+      const shouldDefer = turnSneakTracker.shouldDeferEndPositionCheck(sneakingToken, observerToken);
+      if (shouldDefer) {
+        // Defer end position check to end of turn
+        turnSneakTracker.recordDeferredCheck(sneakingToken, observerToken, {
+          position: endPos,
+          visibility: endPos.avsVisibility,
+          coverState: endPos.coverState
+        });
+
+        // For now, allow the sneak to proceed (end check happens at turn end)
+        endQualifies = true;
+
+        console.log(`PF2E Visioner | Deferred end-position check for ${sneakingToken.name} vs ${observerToken.name} (Sneaky feat)`);
+      }
+    }
+
     let bothQualify = startQualifies && endQualifies;
 
     let result = {
@@ -1153,87 +1183,15 @@ export class SneakActionHandler extends ActionHandlerBase {
     }
   }
 
-  /**
-   * Override applyChangesInternal to add Sneaky feat effect application
-   * @param {Array} changes - The visibility changes to apply
-   */
-  async applyChangesInternal(changes) {
+  // Removed incorrect Sneaky feat effect application
+  // The correct feat mechanics are now handled by turn-sneak-tracker.js
 
-    // First apply the normal visibility changes
-    await super.applyChangesInternal(changes);
+  // Removed incorrect Sneaky feat effect methods
+  // The correct feat mechanics (turn-based consecutive sneaks) are handled by turn-sneak-tracker.js
 
-    // Then apply Sneaky feat effects for successful sneak outcomes
-    await this.#applySneakyFeatEffects(changes);
-  }
-
-  /**
-   * Public method to apply Sneaky feat effects (for use by dual system)
-   * @param {Array} changes - The visibility changes that were applied
-   * @param {Object} context - Additional context (e.g., observer information)
-   */
-  async applySneakyFeatEffects(changes, context = {}) {
-    return this.#applySneakyFeatEffects(changes, context);
-  }
-
-  /**
-   * Apply Sneaky feat effects to tokens that successfully sneaked and have the feat
-   * @param {Array} changes - The visibility changes that were applied
-   * @param {Object} context - Additional context (e.g., observer information)
-   */
-  async #applySneakyFeatEffects(changes, context = {}) {
-    try {
-
-      for (const change of changes) {
-        // In sneak action: observer = the one being sneaked against, target = the sneaker
-        const observer = change?.observer; // The one being sneaked against
-        const sneaker = change?.target; // The one doing the sneaking
-
-        if (!sneaker?.actor || !observer) {
-          continue;
-        }
-
-        // Check if the sneaker has the Sneaky feat
-        const hasSneakyFeat = this.#hasSneakyFeat(sneaker);
-        if (!hasSneakyFeat) continue;
-
-        // Check if the sneak was successful (success or critical success) OR Sneak Adept applied
-        // If outcome is 'unknown' but we have observer/target and Sneaky feat, assume it was successful
-        const wasSuccessful =
-          this.#wasSneakSuccessful(change) ||
-          change?.sneakAdeptApplied ||
-          change?.outcome === 'unknown';
-        if (!wasSuccessful) continue;
-        // Apply Sneaky feat effect to the sneaker, protecting against this observer
-        await this.#applySneakyEffectForObserver(sneaker, observer);
-      }
-    } catch (error) {
-      console.error('PF2E Visioner | Error applying Sneaky feat effects:', error);
-    }
-  }
-
-  /**
-   * Check if a token has the Sneaky feat (including Very Sneaky)
-   * @param {Token} token - The token to check
-   * @returns {boolean} True if the token has the Sneaky or Very Sneaky feat
-   */
-  #hasSneakyFeat(token) {
-    if (!token?.actor) return false;
-
-    const feats =
-      token.actor.itemTypes?.feat ?? token.actor.items?.filter?.((i) => i?.type === 'feat') ?? [];
-    return feats.some((feat) => {
-      const name = feat?.name?.toLowerCase?.() || '';
-      const slug = feat?.system?.slug?.toLowerCase?.() || '';
-      // Check for Sneaky feat and Very Sneaky feat, but exclude Very, Very Sneaky (different mechanics)
-      return (
-        name === 'sneaky' ||
-        slug === 'sneaky' ||
-        name === 'very sneaky' ||
-        slug === 'very-sneaky' ||
-        name.includes('sneaky') && !name.includes('very, very') && !slug.includes('very-very')
-      );
-    });
-  }
+  // All Sneaky feat helper methods removed - they implemented incorrect mechanics
+  // The correct feat mechanics (turn-based consecutive sneaks with deferred end-position checks) 
+  // are handled by the turn-sneak-tracker.js service
 
   /**
    * Check if an actor has the Sneak Adept feat
@@ -1249,163 +1207,5 @@ export class SneakActionHandler extends ActionHandlerBase {
       const slug = feat?.system?.slug?.toLowerCase?.() || '';
       return name.includes('sneak adept') || slug.includes('sneak-adept');
     });
-  }
-
-  /**
-   * Check if a sneak was successful based on the outcome
-   * @param {Object} change - The visibility change object
-   * @returns {boolean} True if the sneak was successful
-   */
-  #wasSneakSuccessful(change) {
-    // A sneak is successful if the outcome was success or critical success
-    const outcome = change?.outcome;
-    return outcome === 'success' || outcome === 'critical-success';
-  }
-
-  /**
-   * Apply the Sneaky feat effect to a token
-   * @param {Token} token - The token to apply the effect to
-   * @param {Array} changes - The visibility changes that were applied
-   */
-  async #applySneakyEffectForObserver(sneaker, observer) {
-    try {
-
-      if (!sneaker?.actor || !observer) return;
-
-      const observerName = observer.name || 'Unknown Observer';
-      const observerSignature = `${observer.id}`;
-
-      // Check if main Sneaky feat effect already exists
-      let existingEffect = sneaker.actor.itemTypes?.effect?.find((effect) => {
-        const slug = effect?.system?.slug?.toLowerCase?.() || '';
-        return slug === 'sneaky-feat-effect';
-      });
-
-      if (existingEffect) {
-        // Effect exists, add new observer rule if not already present
-        await this.#addObserverRuleToSneakyEffect(existingEffect, observer);
-        return;
-      }
-
-      // Create new Sneaky feat effect with first observer rule
-      const effectData = {
-        name: 'Sneaky Feat Effect',
-        type: 'effect',
-        system: {
-          slug: 'sneaky-feat-effect',
-          description: {
-            value: `You cannot become observed by creatures you successfully sneaked against: ${observerName}`,
-          },
-          duration: {
-            value: -1, // Permanent until manually removed
-            unit: 'unlimited',
-            sustained: false,
-            expiry: 'turn-end',
-          },
-          level: {
-            value: 1,
-          },
-          traits: {
-            value: ['feat'],
-          },
-          rules: [
-            {
-              key: 'RollOption',
-              domain: 'all',
-              option: 'sneaky-feat-active',
-              value: true,
-            },
-            {
-              key: 'RollOption',
-              domain: 'all',
-              option: `sneaky-feat-vs-${observerSignature}`,
-              predicate: [`target:signature:${observerSignature}`],
-              value: true,
-              label: `Sneaky Feat vs ${observerName} (${sneaker.name})`,
-            },
-          ],
-        },
-        flags: {
-          'pf2e-visioner': {
-            sneakyFeat: {
-              protectedFromObservers: [
-                {
-                  id: observer.id,
-                  name: observerName,
-                  signature: observerSignature,
-                  addedAt: Date.now(),
-                },
-              ],
-              appliedAt: Date.now(),
-            },
-          },
-        },
-        img: 'systems/pf2e/icons/conditions/unnoticed.webp',
-      };
-
-      // Add the effect to the actor
-      await sneaker.actor.createEmbeddedDocuments('Item', [effectData]);
-      notify.info(`Applied Sneaky feat protection from ${observerName} to ${sneaker.name}`);
-    } catch (error) {
-      console.error('PF2E Visioner | Error applying Sneaky effect for observer:', error);
-    }
-  }
-
-  /**
-   * Add observer-specific rule to existing Sneaky feat effect
-   * @param {Item} effect - The existing Sneaky feat effect
-   * @param {Token} observer - The observer to add protection against
-   */
-  async #addObserverRuleToSneakyEffect(effect, observer) {
-    try {
-      const observerName = observer.name || 'Unknown Observer';
-      const observerSignature = `${observer.id}`;
-
-      // Get existing protected observers
-      const existingObservers =
-        effect.flags?.['pf2e-visioner']?.sneakyFeat?.protectedFromObservers || [];
-
-      // Check if this observer is already protected
-      if (existingObservers.some((obs) => obs.id === observer.id)) {
-        return; // Already protected
-      }
-
-      // Add new observer to the list
-      const newObserver = {
-        id: observer.id,
-        name: observerName,
-        signature: observerSignature,
-        addedAt: Date.now(),
-      };
-      const updatedObservers = [...existingObservers, newObserver];
-
-      // Get existing rules and add new observer rule
-      const existingRules = effect.system.rules || [];
-      const newRule = {
-        key: 'RollOption',
-        domain: 'all',
-        option: `sneaky-feat-vs-${observerSignature}`,
-        predicate: [`target:signature:${observerSignature}`],
-        value: true,
-        label: `Sneaky Feat vs ${observerName})`,
-      };
-
-      const updatedRules = [...existingRules, newRule];
-      const observerNames = updatedObservers.map((obs) => obs.name).join(', ');
-
-      // Update the effect
-      const updateData = {
-        'system.description.value': `You cannot become observed by creatures you successfully sneaked against: ${observerNames}`,
-        'system.rules': updatedRules,
-        'flags.pf2e-visioner.sneakyFeat.protectedFromObservers': updatedObservers,
-        'flags.pf2e-visioner.sneakyFeat.lastUpdated': Date.now(),
-      };
-
-      await effect.update(updateData);
-
-      notify.info(`Added Sneaky feat protection from ${observerName}`);
-    } catch (error) {
-      console.error('PF2E Visioner | Error adding observer rule to Sneaky effect:', error);
-    }
   }
 }

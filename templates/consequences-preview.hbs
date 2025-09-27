@@ -119,9 +119,11 @@
       <button type="button" class="bulk-action-btn revert-all" data-action="revertAll" data-tooltip="{{localize 'PF2E_VISIONER.UI.REVERT_ALL'}}" disabled>
         <i class="fas fa-undo"></i> {{localize 'PF2E_VISIONER.UI.REVERT_ALL'}}
       </button>
+      {{#if avsEnabled}}
       <button type="button" class="bulk-action-btn apply-visibility-remove-overrides" data-action="removeOverrides" data-tooltip="{{localize 'PF2E_VISIONER.UI.REMOVE_OVERRIDES'}}">
         <i class="fas fa-eye-slash"></i> {{localize 'PF2E_VISIONER.UI.REMOVE_OVERRIDES'}}
       </button>
+      {{/if}}
     </div>
   </div>
 </div>

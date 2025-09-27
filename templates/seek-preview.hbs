@@ -106,10 +106,12 @@
       <input type="checkbox" {{#if ignoreWalls}}checked{{/if}} data-action="toggleIgnoreWalls" data-tooltip="Hide walls from the results list" />
       <span class="encounter-filter-label">Ignore walls</span>
     </label>
+  {{#unless detectionFilterDisabled}}
   <label class="filter-by-los-checkbox">
-      <input type="checkbox" {{#if filterByDetection}}checked{{/if}} {{#if detectionFilterDisabled}}disabled{{/if}} data-action="toggleFilterByDetection" data-tooltip="{{localize 'PF2E_VISIONER.UI.FILTER_BY_DETECTION_TOOLTIP'}}" />
+      <input type="checkbox" {{#if filterByDetection}}checked{{/if}} data-action="toggleFilterByDetection" data-tooltip="{{localize 'PF2E_VISIONER.UI.FILTER_BY_DETECTION_TOOLTIP'}}" />
       <span class="encounter-filter-label">{{localize "PF2E_VISIONER.UI.FILTER_BY_DETECTION_LABEL"}}</span>
     </label>
+  {{/unless}}
   </div>
 
   {{!-- Results Table --}}

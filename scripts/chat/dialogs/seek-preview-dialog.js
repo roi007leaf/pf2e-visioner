@@ -136,12 +136,25 @@ export class SeekPreviewDialog extends BaseActionDialog {
         'target',
       );
     }
+    // Check if seek range limitation is active
+    let isRangeLimited = false;
     if (this.actorToken) {
+      try {
+        const { hasActiveEncounter } = await import('../services/infra/shared-utils.js');
+        const inCombat = hasActiveEncounter();
+        const applyInCombat = !!game.settings.get(MODULE_ID, 'limitSeekRangeInCombat');
+        const applyOutOfCombat = !!game.settings.get(MODULE_ID, 'limitSeekRangeOutOfCombat');
+        isRangeLimited = (inCombat && applyInCombat) || (!inCombat && applyOutOfCombat);
+      } catch { }
+
       filteredOutcomes = filterOutcomesBySeekDistance(filteredOutcomes, this.actorToken, 'target');
     }
 
-    // Always apply wall LOS filtering for performance, optionally apply token LOS filtering if enabled
-    if (this.actorToken) {
+    // Apply LOS filtering only when NOT using template mode OR range limitation (both define affected area/range)
+    const isTemplateMode = !!(this.actionData.seekTemplateCenter && this.actionData.seekTemplateRadiusFeet);
+    const skipLOSFiltering = isTemplateMode || isRangeLimited;
+
+    if (this.actorToken && !skipLOSFiltering) {
       try {
         const { filterOutcomesByDetection } = await import('../services/infra/shared-utils.js');
         // Always filter walls by detection (true), filter tokens by detection only if checkbox enabled (this.filterByDetection)
@@ -607,6 +620,23 @@ export class SeekPreviewDialog extends BaseActionDialog {
     context.ignoreWalls = !!this.ignoreWalls;
     context.ignoreAllies = !!this.ignoreAllies;
     context.hideFoundryHidden = !!this.hideFoundryHidden;
+
+    // Flags for template mode and range limitation to hide inappropriate filters
+    const templateMode = !!(this.actionData.seekTemplateCenter && this.actionData.seekTemplateRadiusFeet);
+
+    // Check if range limitation is active (recompute for context)
+    let rangeLimited = false;
+    try {
+      const { hasActiveEncounter } = await import('../services/infra/shared-utils.js');
+      const inCombat = hasActiveEncounter();
+      const applyInCombat = !!game.settings.get(MODULE_ID, 'limitSeekRangeInCombat');
+      const applyOutOfCombat = !!game.settings.get(MODULE_ID, 'limitSeekRangeOutOfCombat');
+      rangeLimited = (inCombat && applyInCombat) || (!inCombat && applyOutOfCombat);
+    } catch { }
+
+    context.isTemplateMode = templateMode;
+    context.isRangeLimited = rangeLimited;
+    context.detectionFilterDisabled = templateMode || rangeLimited;
 
     // Keep original outcomes intact; provide common context from processed list
     this.outcomes = processedOutcomes;

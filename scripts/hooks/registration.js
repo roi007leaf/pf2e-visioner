@@ -18,6 +18,15 @@ export async function registerHooks() {
   registerOptimized();
   registerChatHooks();
 
+  // Initialize turn-based sneak tracker for Sneaky/Very Sneaky feats
+  try {
+    const turnSneakTracker = await import('../chat/services/turn-sneak-tracker.js');
+    // The tracker auto-registers its hooks in the constructor
+    console.log('PF2E Visioner | Turn sneak tracker initialized');
+  } catch (error) {
+    console.error('PF2E Visioner | Failed to initialize turn sneak tracker:', error);
+  }
+
   // Hook to capture token positions at the moment stealth rolls are made
   Hooks.on('preCreateChatMessage', async (message) => {
     try {

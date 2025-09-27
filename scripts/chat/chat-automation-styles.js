@@ -1954,6 +1954,8 @@ function getChatAutomationCSS() {
             border-radius: 50%;
             border: 2px solid var(--pf2e-visioner-gray);
             margin-right: 12px;
+            object-fit: cover;
+            object-position: top;
         }
         
         .sneaker-details {
@@ -2624,7 +2626,7 @@ function getChatAutomationCSS() {
             align-items: center;
             gap: 16px;
             padding: 16px;
-            background: linear-gradient(135deg, var(--pf2e-visioner-teal), var(--pf2e-visioner-teal));
+            background: linear-gradient(135deg, rgb(37, 244, 251, 0.2), rgb(37, 244, 251, 0.1));
             border-radius: 8px;
             margin-bottom: 16px;
             border-left: 4px solid rgb(37, 244, 251);

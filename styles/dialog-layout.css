@@ -3127,3 +3127,18 @@
 .pf2e-visioner .override-validation-dialog .btn-keep-all:hover {
   background: #157347;
 }
+
+/* Sneaky Feat Indicators */
+.pf2e-visioner .sneaky-feat-indicator {
+  margin-left: 6px;
+  color: var(--pf2e-visioner-feat-orange, #ff8c00);
+  opacity: 0.8;
+}
+
+.pf2e-visioner .sneaky-feat-indicator i {
+  font-size: 12px;
+}
+
+.pf2e-visioner .sneaky-feat-indicator:hover {
+  opacity: 1;
+}
