@@ -37,6 +37,8 @@ export class TakeCoverPreviewDialog extends BaseActionDialog {
     this.actionData = { ...(actionData || {}), actionType: 'take-cover' };
     this.encounterOnly = game.settings.get(MODULE_ID, 'defaultEncounterFilter');
     this.ignoreAllies = game.settings.get(MODULE_ID, 'ignoreAllies');
+    this.filterByDetection = false; // Default to false for take cover
+    this.showOnlyChanges = false; // Default to false
     // Per-user default: visually hide Foundry-hidden tokens
     try {
       this.hideFoundryHidden = !!game.settings.get(MODULE_ID, 'hideFoundryHiddenTokens');
@@ -246,6 +248,9 @@ export class TakeCoverPreviewDialog extends BaseActionDialog {
     // Expose UI flags
     context.hideFoundryHidden = !!this.hideFoundryHidden;
     context.ignoreAllies = !!this.ignoreAllies;
+    context.filterByDetection = !!this.filterByDetection;
+    context.showOnlyChanges = !!this.showOnlyChanges;
+    context.encounterOnly = !!this.encounterOnly;
     return context;
   }
 
@@ -291,8 +296,25 @@ export class TakeCoverPreviewDialog extends BaseActionDialog {
       const cba = this.element.querySelector('input[data-action="toggleIgnoreAllies"]');
       if (cba) {
         cba.onchange = null;
-        cba.addEventListener('change', () => {
+        cba.addEventListener('change', async () => {
           this.ignoreAllies = !!cba.checked;
+          this.bulkActionState = 'initial';
+          // Update the filtered outcomes and re-render
+          try {
+            await game.settings.set(MODULE_ID, 'ignoreAllies', this.ignoreAllies);
+          } catch { }
+          this.render({ force: true });
+        });
+      }
+    } catch { }
+
+    // Wire up Show Only Changes checkbox
+    try {
+      const cbsc = this.element.querySelector('input[data-action="toggleShowOnlyChanges"]');
+      if (cbsc) {
+        cbsc.onchange = null;
+        cbsc.addEventListener('change', () => {
+          this.showOnlyChanges = !!cbsc.checked;
           this.bulkActionState = 'initial';
           this.render({ force: true });
         });
