@@ -380,21 +380,7 @@ export class SeekActionHandler extends ActionHandlerBase {
               );
             };
 
-            // Prefer non-visual precise sense if available in range
-            if (hasNonVisualPrecise && Array.isArray(sensingSummary.precise)) {
-              const match = sensingSummary.precise.find((ent) => {
-                if (!ent) return false;
-                if (isVisualType(ent.type)) return false;
-                const r = Number(ent.range);
-                return !Number.isFinite(r) || r >= dist;
-              });
-              if (match) {
-                usedSenseType = String(match.type || '').toLowerCase();
-                usedSensePrecision = 'precise';
-              }
-            }
-
-            // Otherwise use a visual precise sense
+            // Prefer visual precise senses first (highest priority in PF2e mechanics)
             if (!usedSenseType && hasVisualPrecise) {
               // Try to pick the most specific available
               const preferredOrder = [
@@ -423,6 +409,20 @@ export class SeekActionHandler extends ActionHandlerBase {
               }
               if (chosen) {
                 usedSenseType = String(chosen.type || '').toLowerCase();
+                usedSensePrecision = 'precise';
+              }
+            }
+
+            // Fall back to non-visual precise sense if no visual sense was used
+            if (!usedSenseType && hasNonVisualPrecise && Array.isArray(sensingSummary.precise)) {
+              const match = sensingSummary.precise.find((ent) => {
+                if (!ent) return false;
+                if (isVisualType(ent.type)) return false;
+                const r = Number(ent.range);
+                return !Number.isFinite(r) || r >= dist;
+              });
+              if (match) {
+                usedSenseType = String(match.type || '').toLowerCase();
                 usedSensePrecision = 'precise';
               }
             }

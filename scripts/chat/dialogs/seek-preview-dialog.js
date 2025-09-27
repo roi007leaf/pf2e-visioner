@@ -471,28 +471,88 @@ export class SeekPreviewDialog extends BaseActionDialog {
         }
       }
 
-      // Choose a single used sense for the action: prefer the type with any precise usage; tie-breaker by highest precise count, then total
+      // Choose a single used sense for the action using proper PF2e mechanics hierarchy:
+      // 1. Vision (highest priority)
+      // 2. Next precise sense with unlimited range
+      // 3. Precise sense with limited range (sorted from furthest to closest)
+      // 4. Imprecise sense with unlimited range
+      // 5. Imprecise sense with limited range
       let chosenUsedType = null;
       if (usedStats.size > 0) {
         const entries = Array.from(usedStats.entries());
-        // Find best precise
-        const withPrecise = entries.filter(([, s]) => s.precise > 0);
-        if (withPrecise.length > 0) {
-          withPrecise.sort((a, b) => {
-            const ap = a[1].precise, bp = b[1].precise;
-            if (bp !== ap) return bp - ap; // more precise usages first
-            // tie-breaker by total usage
-            return b[1].total - a[1].total;
+
+        // Helper function to check if a sense type is vision-based
+        const isVisionType = (senseType) => {
+          const t = String(senseType || '').toLowerCase();
+          return (
+            t === 'vision' ||
+            t === 'sight' ||
+            t === 'darkvision' ||
+            t === 'greater-darkvision' ||
+            t === 'greaterdarkvision' ||
+            t === 'low-light-vision' ||
+            t === 'lowlightvision' ||
+            t === 'see-invisibility' ||
+            t === 'truesight' ||
+            t.includes('vision') ||
+            t.includes('sight')
+          );
+        };
+
+        // Get sense range from allSenses array
+        const getSenseRange = (senseType) => {
+          const senseData = allSenses?.find?.(s => s.type === senseType);
+          return senseData?.range ?? 0;
+        };
+
+        // Create candidates with hierarchy data
+        const candidates = entries
+          .filter(([type, stats]) => stats.precise > 0 || stats.imprecise > 0)
+          .map(([type, stats]) => {
+            const range = getSenseRange(type);
+            const isVision = isVisionType(type);
+            const hasPrecise = stats.precise > 0;
+            const hasUnlimitedRange = range === Infinity || range === 'Infinity';
+
+            return {
+              type,
+              stats,
+              range: range === Infinity || range === 'Infinity' ? Infinity : (typeof range === 'number' ? range : 0),
+              isVision,
+              hasPrecise,
+              hasUnlimitedRange,
+              // Calculate priority based on hierarchy
+              priority: isVision ? 1 :
+                (hasPrecise && hasUnlimitedRange) ? 2 :
+                  (hasPrecise && !hasUnlimitedRange) ? 3 :
+                    (!hasPrecise && hasUnlimitedRange) ? 4 : 5
+            };
           });
-          chosenUsedType = withPrecise[0][0];
-        } else {
-          // No precise usages; choose the most-used imprecise type
-          entries.sort((a, b) => {
-            const ai = a[1].imprecise, bi = b[1].imprecise;
-            if (bi !== ai) return bi - ai;
-            return b[1].total - a[1].total;
+
+        if (candidates.length > 0) {
+          // Sort by hierarchy priority, then by range (for same priority), then by usage count
+          candidates.sort((a, b) => {
+            // Primary sort: hierarchy priority (lower number = higher priority)
+            if (a.priority !== b.priority) {
+              return a.priority - b.priority;
+            }
+
+            // Secondary sort: for same priority level, prefer higher range (further reaching senses)
+            if (a.priority === 3 && b.priority === 3) { // Both are precise limited range
+              if (a.range !== b.range) {
+                return b.range - a.range; // Higher range first
+              }
+            } else if (a.priority === 5 && b.priority === 5) { // Both are imprecise limited range
+              if (a.range !== b.range) {
+                return b.range - a.range; // Higher range first
+              }
+            }
+
+            // Tertiary sort: by total usage count
+            return b.stats.total - a.stats.total;
           });
-          chosenUsedType = entries[0][0];
+
+          chosenUsedType = candidates[0].type;
         }
       }
 

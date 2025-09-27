@@ -288,6 +288,14 @@ export class ConsequencesPreviewDialog extends BaseActionDialog {
       encounterFilter.checked = this.encounterOnly;
     }
 
+    // Initialize filter by detection checkbox state
+    const filterByDetectionCheckbox = this.element.querySelector(
+      'input[data-action="toggleFilterByDetection"]',
+    );
+    if (filterByDetectionCheckbox) {
+      filterByDetectionCheckbox.checked = !!this.filterByDetection;
+    }
+
     // Initialize bulk action buttons and handlers
     this.updateBulkActionButtons();
     this.addIconClickHandlers();

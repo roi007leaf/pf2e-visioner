@@ -274,34 +274,54 @@ export class VisionAnalyzer {
         type: String(type || '').toLowerCase(),
         range: Number.isFinite(r) ? r : Infinity,
       };
-      const a = String(acuity || '').toLowerCase();
+      let a = String(acuity || 'imprecise').toLowerCase();
 
-      if (entry.type === 'hearing') {
-        // Only add hearing if not deafened
-        if (!this.#isDeafened(token)) {
-          summary.hearing = { acuity: a || 'imprecise', range: entry.range };
-        }
-        return; // Don't process further - hearing shouldn't go in imprecise array when deafened
-      } else if (entry.type === 'lifesense') {
-        // Lifesense is always imprecise per PF2E rules
-        summary.lifesense = { range: entry.range };
-        summary.imprecise.push(entry);
-        return; // Don't process further as we've handled it specially
-      } else {
-        // Check if this is a special sense we track
-        const specialSenseTypes = ['echolocation', 'tremorsense', 'scent'];
-        if (specialSenseTypes.includes(entry.type)) {
-          summary[entry.type] = { range: entry.range };
-          // Add to appropriate acuity array
-          if (a === 'precise') summary.precise.push(entry);
-          else summary.imprecise.push(entry);
-          return; // Don't process further as we've handled it specially
-        }
+      // Skip visual senses if blinded
+      if ((entry.type === 'vision' ||
+        entry.type === 'sight' ||
+        entry.type === 'darkvision' ||
+        entry.type === 'greater-darkvision' ||
+        entry.type === 'greaterdarkvision' ||
+        entry.type === 'low-light-vision' ||
+        entry.type === 'lowlightvision' ||
+        entry.type.includes('vision') ||
+        entry.type.includes('sight')) && this.#isBlinded(token)) {
+        return; // Skip all visual senses if blinded
       }
 
-      if (a === 'precise') summary.precise.push(entry);
-      else if (a === 'imprecise' || a === 'vague' || !a) summary.imprecise.push(entry);
-      else summary.imprecise.push(entry);
+      // Special case: hearing blocked by deafened condition
+      if (entry.type === 'hearing' && this.#isDeafened(token)) {
+        return; // Skip hearing if deafened
+      }
+
+      // Special case: echolocation upgrades hearing to precise within echolocation range
+      if (entry.type === 'hearing' && summary.echolocationActive) {
+        a = 'precise';
+        entry.range = summary.echolocationRange || 40; // Use echolocation range
+      }
+
+      // Store hearing separately for backward compatibility
+      if (entry.type === 'hearing') {
+        summary.hearing = { acuity: a, range: entry.range };
+      }
+
+      // Store lifesense separately for backward compatibility  
+      if (entry.type === 'lifesense') {
+        summary.lifesense = { range: entry.range };
+      }
+
+      // Store other senses separately for backward compatibility (tremorsense, scent, etc.)
+      if (entry.type !== 'hearing' && entry.type !== 'lifesense') {
+        summary[entry.type] = { range: entry.range };
+      }
+
+      // Add to appropriate acuity array based on final acuity value
+      if (a === 'precise') {
+        summary.precise.push(entry);
+      } else {
+        // imprecise, vague, or default to imprecise
+        summary.imprecise.push(entry);
+      }
     };
 
     try {
@@ -320,17 +340,6 @@ export class VisionAnalyzer {
           const range = val?.range ?? obj?.range;
           pushSense(type, acuity, range);
         }
-      }
-    } catch {
-      /* ignore */
-    }
-
-    // Upgrade hearing to precise within echolocation range when active
-    try {
-      if (summary.hearing && summary.echolocationActive) {
-        const r = summary.echolocationRange || summary.hearing.range || 40;
-        // Represent precise-hearing as a precise sense with capped range
-        summary.precise.push({ type: 'hearing', range: r });
       }
     } catch {
       /* ignore */
@@ -410,6 +419,7 @@ export class VisionAnalyzer {
       for (const ent of s.precise) {
         if (!ent || typeof ent.range !== 'number') continue;
         // Exclude all visual senses: plain vision/sight, darkvision, greater-darkvision, low-light-vision, truesight, infrared vision, etc.
+        // Exception: see-invisibility is treated as non-visual for invisibility detection purposes
         const t = String(ent.type || '').toLowerCase();
         const isVisual =
           t === 'vision' ||
@@ -419,10 +429,13 @@ export class VisionAnalyzer {
           t === 'greaterdarkvision' ||
           t === 'low-light-vision' ||
           t === 'lowlightvision' ||
-          t === 'truesight' ||
           t.includes('vision') ||
           t.includes('sight');
-        if (isVisual) continue;
+
+        // Special case: see-invisibility should not be excluded even though it contains "sight"
+        const isSeeInvisibility = t === 'see-invisibility' || t === 'seeinvisibility';
+
+        if (isVisual && !isSeeInvisibility) continue;
 
         // Special check for echolocation - requires hearing (can't use if deafened)
         if (t === 'echolocation' && this.#isDeafened(observer)) continue;
@@ -911,6 +924,16 @@ export class VisionAnalyzer {
    */
   #isDeafened(observer) {
     return this.#hasCondition(observer?.actor, 'deafened');
+  }
+
+  /**
+   * Check if an observer is blinded (cannot see anything)
+   * @param {Token} observer
+   * @returns {boolean}
+   * @private
+   */
+  #isBlinded(observer) {
+    return this.#hasCondition(observer?.actor, 'blinded');
   }
 
   /**

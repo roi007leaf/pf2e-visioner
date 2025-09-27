@@ -4,6 +4,8 @@
  * SINGLETON PATTERN
  */
 
+import { VisionAnalyzer } from './VisionAnalyzer.js';
+
 export class ConditionManager {
   /** @type {ConditionManager} */
   static #instance = null;
@@ -117,6 +119,9 @@ export class ConditionManager {
 
   /**
    * Check if target is invisible to observer (magical invisibility, etc.)
+   * Based on PF2E rules: "A creature with the invisible condition is automatically 
+   * undetected to any creatures relying on sight as their only precise sense. 
+   * Precise senses other than sight ignore the invisible condition"
    * @param {Token} observer
    * @param {Token} target
    * @returns {boolean}
@@ -142,15 +147,30 @@ export class ConditionManager {
     const hasInvisible =
       hasConditionMethod || systemConditionActive || conditionsHas || conditionsCollectionHas;
 
-    if (hasInvisible) {
-      // Check if observer can see invisibility
-      const canSeeInvisible =
-        observer.actor?.perception?.senses?.has?.('see-invisibility') ||
-        observer.actor?.system?.perception?.senses?.['see-invisibility'];
-
-      return !canSeeInvisible;
+    if (!hasInvisible) {
+      return false;
     }
-    return false;
+
+    // Target has invisible condition - check if observer can overcome it
+
+    // Check if observer has precise non-visual senses that can detect the target
+    // PF2E Rule: "Precise senses other than sight ignore the invisible condition"
+    // This includes see-invisibility, echolocation, tremorsense, etc.
+    try {
+      // Get VisionAnalyzer instance to check for precise non-visual senses
+      const visionAnalyzer = VisionAnalyzer.getInstance();
+      if (visionAnalyzer && visionAnalyzer.hasPreciseNonVisualInRange) {
+        const hasPreciseNonVisual = visionAnalyzer.hasPreciseNonVisualInRange(observer, target);
+        if (hasPreciseNonVisual) {
+          return false; // Precise non-visual sense ignores invisibility
+        }
+      }
+    } catch (e) {
+      // If we can't check precise non-visual senses, fall back to treating as invisible
+    }
+
+    // Target is invisible and observer has no way to overcome it
+    return true;
   }
 
   /**

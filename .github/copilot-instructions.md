@@ -11,6 +11,8 @@ Purpose: Give coding AIs crisp, actionable guardrails for this repo. Follow thes
 - Keep hot paths synchronous where feasible. Async only when necessary and outside render-critical loops.
 - Check HANDOVER.md first.
 - Always run tests in terminal rather than internal tool.
+- Every bugfix requires a test if there isn't any.
+- Dont write long functions, break to several functions to keep readable.
 
 ## Architecture you must respect
 - Stores (single-responsibility): `scripts/stores/*` – visibility/cover maps, simple get/set.
