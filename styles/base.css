@@ -210,6 +210,33 @@
   --color-text-primary-color: #333333;
 }
 
+/* Legend icon utility classes (used in sneak preview headers) */
+.pf2e-visioner .legend-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 0.85em;
+  line-height: 1;
+}
+.pf2e-visioner .legend-icon i {
+  font-size: 0.9em;
+}
+.pf2e-visioner .legend-icon .legend-plus {
+  font-weight: 600;
+  margin-left: 1px;
+}
+.pf2e-visioner .legend-visibility-hidden i,
+.pf2e-visioner .legend-visibility-hidden .legend-plus {
+  color: var(--visibility-hidden);
+}
+.pf2e-visioner .legend-visibility-concealed i {
+  color: var(--visibility-concealed);
+}
+.pf2e-visioner .legend-cover-standard i,
+.pf2e-visioner .legend-cover-standard .legend-plus {
+  color: var(--cover-standard);
+}
+
 .pf2e-visioner {
   /* Common utility classes */
   .pf2e-visioner-flex {
@@ -679,6 +706,33 @@
     border-radius: 4px;
     background: rgba(255, 215, 0, 0.05); /* subtle gold tint */
   }
+
+  /* Movement chip styling */
+  .movement-distance-indicator,
+  .sneak-distance-indicator {
+    margin-top: var(--spacing-sm);
+  }
+  .movement-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border: 1px solid var(--color-border-light-primary);
+    border-radius: var(--radius-md);
+    padding: 2px 6px;
+    background: var(--color-bg-option);
+    color: var(--color-text-primary);
+    font-size: 12px;
+  }
+  .movement-chip.ok {
+    border-color: var(--visibility-observed);
+    color: var(--visibility-observed);
+    background: var(--visibility-observed-bg-light);
+  }
+  .movement-chip.warn {
+    border-color: var(--visibility-undetected);
+    color: var(--visibility-undetected);
+    background: var(--visibility-undetected-bg-light);
+  }
 } /* End .pf2e-visioner scope */
 
 /* Tooltip badges are appended to <body>, so provide global styles */
@@ -726,3 +780,6 @@
 .pf2e-visioner-tooltip-badge.cover-greater {
   color: var(--cover-greater);
 }
+
+/* Import enhanced multi-target processing styles */
+@import url('./enhanced-multi-target-processing.css');

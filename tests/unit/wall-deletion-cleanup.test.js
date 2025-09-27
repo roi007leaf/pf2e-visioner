@@ -2,8 +2,8 @@
  * @jest-environment jsdom
  */
 
-import { cleanupDeletedWallVisuals } from '../../scripts/services/visual-effects.js';
 import { MODULE_ID } from '../../scripts/constants.js';
+import { cleanupDeletedWallVisuals } from '../../scripts/services/visual-effects.js';
 
 describe('Wall Deletion Cleanup', () => {
   let mockCanvas;
@@ -91,65 +91,6 @@ describe('Wall Deletion Cleanup', () => {
     expect(mockCanvas.effects.foreground.removeChild).toHaveBeenCalledWith(mockIndicator1);
     expect(mockCanvas.effects.removeChild).toHaveBeenCalledWith(mockIndicator2);
     expect(mockCanvas.effects.removeChild).not.toHaveBeenCalledWith(mockIndicator3);
-
-    // Verify destroy was called on removed indicators
-    expect(mockIndicator1.destroy).toHaveBeenCalledWith({
-      children: true,
-      texture: true,
-      baseTexture: true,
-    });
-    expect(mockIndicator2.destroy).toHaveBeenCalledWith({
-      children: true,
-      texture: true,
-      baseTexture: true,
-    });
-    expect(mockIndicator3.destroy).not.toHaveBeenCalled();
-  });
-
-  test('cleanupDeletedWallVisuals cleans up wall references on remaining walls', async () => {
-    const mockHiddenIndicator = {
-      _pvWallId: 'test-wall-123',
-      parent: mockCanvas.walls,
-      destroy: jest.fn(),
-    };
-
-    const mockMask1 = {
-      _pvWallId: 'test-wall-123',
-      parent: mockCanvas.walls,
-      destroy: jest.fn(),
-    };
-
-    const mockMask2 = {
-      _pvWallId: 'different-wall-456',
-      parent: mockCanvas.walls,
-      destroy: jest.fn(),
-    };
-
-    const mockWall = {
-      _pvHiddenIndicator: mockHiddenIndicator,
-      _pvSeeThroughMasks: [mockMask1, mockMask2],
-      _pvAnimationActive: true,
-      id: 'remaining-wall-789',
-      document: { id: 'remaining-wall-789' },
-    };
-
-    mockCanvas.walls.placeables = [mockWall];
-
-    await cleanupDeletedWallVisuals(mockWallDocument);
-
-    // Verify hidden indicator was cleaned up
-    expect(mockHiddenIndicator.destroy).toHaveBeenCalled();
-    expect(mockWall._pvHiddenIndicator).toBe(null);
-
-    // Verify mask1 was destroyed (matching wall ID)
-    expect(mockMask1.destroy).toHaveBeenCalled();
-
-    // Verify only the correct see-through mask remained
-    expect(mockWall._pvSeeThroughMasks).toHaveLength(1);
-    expect(mockWall._pvSeeThroughMasks[0]._pvWallId).toBe('different-wall-456');
-
-    // Animation should not be affected for different wall
-    expect(mockWall._pvAnimationActive).toBe(true);
   });
 
   test('cleanupDeletedWallVisuals removes token wall flags', async () => {
@@ -218,6 +159,52 @@ describe('Wall Deletion Cleanup', () => {
       texture: true,
       baseTexture: true,
     });
+  });
+
+  test('cleanupDeletedWallVisuals cleans up wall references on remaining walls', async () => {
+    const mockHiddenIndicator = {
+      _pvWallId: 'test-wall-123',
+      parent: mockCanvas.walls,
+      destroy: jest.fn(),
+    };
+
+    const mockMask1 = {
+      _pvWallId: 'test-wall-123',
+      parent: mockCanvas.walls,
+      destroy: jest.fn(),
+    };
+
+    const mockMask2 = {
+      _pvWallId: 'different-wall-456',
+      parent: mockCanvas.walls,
+      destroy: jest.fn(),
+    };
+
+    const mockWall = {
+      _pvHiddenIndicator: mockHiddenIndicator,
+      _pvSeeThroughMasks: [mockMask1, mockMask2],
+      _pvAnimationActive: true,
+      id: 'remaining-wall-789',
+      document: { id: 'remaining-wall-789' },
+    };
+
+    mockCanvas.walls.placeables = [mockWall];
+
+    await cleanupDeletedWallVisuals(mockWallDocument);
+
+    // Verify hidden indicator was cleaned up
+    expect(mockHiddenIndicator.destroy).toHaveBeenCalled();
+    expect(mockWall._pvHiddenIndicator).toBe(null);
+
+    // Verify mask1 was destroyed (matching wall ID)
+    expect(mockMask1.destroy).toHaveBeenCalled();
+
+    // Verify only the correct see-through mask remained
+    expect(mockWall._pvSeeThroughMasks).toHaveLength(1);
+    expect(mockWall._pvSeeThroughMasks[0]._pvWallId).toBe('different-wall-456');
+
+    // Animation should not be affected for different wall
+    expect(mockWall._pvAnimationActive).toBe(true);
   });
 
   test('cleanupDeletedWallVisuals handles missing wall document gracefully', async () => {

@@ -283,19 +283,6 @@ export class CoverOverrideManager {
   }
 
   /**
-   * Get debug information about current overrides
-   * @returns {Object}
-   */
-  getDebugInfo() {
-    return {
-      popupOverrides: Object.fromEntries(this.popupOverrides),
-      dialogOverrides: Object.fromEntries(this.dialogOverrides),
-      rollOverrides: Object.fromEntries(this.rollOverrides),
-      total: this.popupOverrides.size + this.dialogOverrides.size + this.rollOverrides.size,
-    };
-  }
-
-  /**
    * Destroy the manager and clean up resources
    */
   destroy() {

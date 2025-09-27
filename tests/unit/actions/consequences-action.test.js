@@ -13,7 +13,6 @@ describe('Attack Consequences Action Comprehensive Tests', () => {
     // Store original settings
     originalSettings = {
       ignoreAllies: game.settings.get('pf2e-visioner', 'ignoreAllies'),
-      enforceRawRequirements: game.settings.get('pf2e-visioner', 'enforceRawRequirements'),
     };
   });
 
@@ -279,7 +278,7 @@ describe('Attack Consequences Action Comprehensive Tests', () => {
       };
 
       // Call revert with targetTokenId specified
-      await handler.revert(actionData, { html: () => {}, attr: () => {} });
+      await handler.revert(actionData, { html: () => { }, attr: () => { } });
 
       // EXPECTED BEHAVIOR: Only the target token should be reverted
       expect(appliedChanges).toHaveLength(1); // Should only revert enemy1
@@ -296,44 +295,11 @@ describe('Attack Consequences Action Comprehensive Tests', () => {
     });
   });
 
-  describe('RAW Enforcement Integration Tests', () => {
-    test('chat apply-changes respects RAW enforcement', () => {
-      game.settings.set('pf2e-visioner', 'enforceRawRequirements', true);
 
-      const mockOutcomes = [
-        { token: { id: 'valid1' }, hasActionableChange: true, newVisibility: 'observed' },
-        { token: { id: 'invalid1' }, hasActionableChange: false, newVisibility: 'observed' },
-      ];
-
-      // When RAW enforcement is on, only actionable changes should be applied
-      const validOutcomes = mockOutcomes.filter((o) => o.hasActionableChange);
-
-      expect(validOutcomes).toHaveLength(1);
-      expect(validOutcomes[0].token.id).toBe('valid1');
-    });
-
-    test('dialog apply-all respects RAW enforcement', () => {
-      game.settings.set('pf2e-visioner', 'enforceRawRequirements', true);
-
-      const mockDialog = {
-        outcomes: [
-          { token: { id: 'valid1' }, hasActionableChange: true, newVisibility: 'observed' },
-          { token: { id: 'invalid1' }, hasActionableChange: false, newVisibility: 'observed' },
-        ],
-      };
-
-      const validOutcomes = mockDialog.outcomes.filter((o) => o.hasActionableChange);
-
-      expect(validOutcomes).toHaveLength(1);
-      expect(validOutcomes[0].token.id).toBe('valid1');
-    });
-  });
 
   describe('hasActionableChange Calculation Tests', () => {
     describe('Without RAW Enforcement', () => {
-      beforeEach(() => {
-        game.settings.set('pf2e-visioner', 'enforceRawRequirements', false);
-      });
+
 
       test('consequences from hidden to observed (success) is actionable', () => {
         const {
@@ -397,66 +363,7 @@ describe('Attack Consequences Action Comprehensive Tests', () => {
       });
     });
 
-    describe('With General RAW Enforcement', () => {
-      beforeEach(() => {
-        game.settings.set('pf2e-visioner', 'enforceRawRequirements', true);
-      });
 
-      test('consequences from hidden with RAW enforcement still produces normal outcomes', () => {
-        const {
-          getDefaultNewStateFor,
-        } = require('../../../scripts/chat/services/data/action-state-config.js');
-
-        const oldState = 'hidden';
-        const outcomes = ['critical-success', 'success', 'failure', 'critical-failure'];
-
-        outcomes.forEach((outcome) => {
-          const newState = getDefaultNewStateFor('consequences', oldState, outcome);
-          const hasActionableChange = newState !== oldState;
-
-          // General RAW enforcement doesn't change outcome mapping, only target selection
-          // Consequences always changes hidden to observed
-          expect(hasActionableChange).toBe(true);
-          expect(newState).toBe('observed');
-        });
-      });
-
-      test('consequences from undetected with RAW enforcement still produces normal outcomes', () => {
-        const {
-          getDefaultNewStateFor,
-        } = require('../../../scripts/chat/services/data/action-state-config.js');
-
-        const oldState = 'undetected';
-        const outcomes = ['critical-success', 'success', 'failure', 'critical-failure'];
-
-        outcomes.forEach((outcome) => {
-          const newState = getDefaultNewStateFor('consequences', oldState, outcome);
-          const hasActionableChange = newState !== oldState;
-
-          // General RAW enforcement doesn't change outcome mapping, only target selection
-          // Consequences always changes undetected to observed
-          expect(hasActionableChange).toBe(true);
-          expect(newState).toBe('observed');
-        });
-      });
-
-      test('consequences from observed/concealed with RAW enforcement still produces no change', () => {
-        const {
-          getDefaultNewStateFor,
-        } = require('../../../scripts/chat/services/data/action-state-config.js');
-
-        const nonAffectedStates = ['observed', 'concealed'];
-        const outcomes = ['critical-success', 'success', 'failure', 'critical-failure'];
-
-        nonAffectedStates.forEach((oldState) => {
-          outcomes.forEach((outcome) => {
-            const newState = getDefaultNewStateFor('consequences', oldState, outcome);
-            // Consequences mapping is empty for observed/concealed states
-            expect(newState).toBeNull();
-          });
-        });
-      });
-    });
 
     test('hasActionableChange correctly identifies state transitions', () => {
       const {

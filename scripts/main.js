@@ -88,6 +88,7 @@ Hooks.once('init', async () => {
       'pf2e-visioner.visibility-table': 'modules/pf2e-visioner/templates/visibility-table.hbs',
       'pf2e-visioner.cover-table': 'modules/pf2e-visioner/templates/cover-table.hbs',
       'pf2e-visioner.table-section': 'modules/pf2e-visioner/templates/table-section.hbs',
+      'pf2e-visioner.bulk-override': 'modules/pf2e-visioner/templates/partials/bulk-override.hbs',
     });
 
     // Register settings and keybindings
@@ -116,7 +117,9 @@ Hooks.once('init', async () => {
     // Initialize rule elements
     initializeRuleElements();
 
-    // Region behaviors are now registered immediately on module load via import
+    // Initialize Auto-Visibility System (OPTIMIZED - Zero Delays)
+    const { autoVisibilitySystem } = await import('./visibility/auto-visibility/index.js');
+    await autoVisibilitySystem.initialize();
 
     // Apply colorblind mode after settings are registered
     updateColorblindMode();
@@ -190,9 +193,11 @@ Hooks.on('renderApplication', (app, html) => {
 });
 
 // Hook to ensure colorblind mode is applied when chat messages are rendered
-Hooks.on('renderChatMessage', (message, html) => {
+Hooks.on('renderChatMessageHTML', (message, html) => {
   // Apply colorblind mode to chat messages that contain PF2E Visioner automation panels
-  const automationPanels = html.find('.pf2e-visioner-automation-panel');
+  // Ensure html is a jQuery object for FoundryVTT v13+ compatibility
+  const $html = $(html);
+  const automationPanels = $html.find('.pf2e-visioner-automation-panel');
   if (automationPanels.length > 0) {
     const colorblindMode = game.settings.get('pf2e-visioner', 'colorblindMode');
     if (colorblindMode !== 'none') {

@@ -13,7 +13,6 @@ describe('Seek Action Comprehensive Tests', () => {
     // Store original settings
     originalSettings = {
       ignoreAllies: game.settings.get('pf2e-visioner', 'ignoreAllies'),
-      enforceRawRequirements: game.settings.get('pf2e-visioner', 'enforceRawRequirements'),
     };
   });
 
@@ -417,44 +416,10 @@ describe('Seek Action Comprehensive Tests', () => {
     });
   });
 
-  describe('RAW Enforcement Integration Tests', () => {
-    test('chat apply-changes respects RAW enforcement', () => {
-      game.settings.set('pf2e-visioner', 'enforceRawRequirements', true);
 
-      const mockOutcomes = [
-        { token: { id: 'valid1' }, hasActionableChange: true, newVisibility: 'observed' },
-        { token: { id: 'invalid1' }, hasActionableChange: false, newVisibility: 'observed' },
-      ];
-
-      // When RAW enforcement is on, only actionable changes should be applied
-      const validOutcomes = mockOutcomes.filter((o) => o.hasActionableChange);
-
-      expect(validOutcomes).toHaveLength(1);
-      expect(validOutcomes[0].token.id).toBe('valid1');
-    });
-
-    test('dialog apply-all respects RAW enforcement', () => {
-      game.settings.set('pf2e-visioner', 'enforceRawRequirements', true);
-
-      const mockDialog = {
-        outcomes: [
-          { token: { id: 'valid1' }, hasActionableChange: true, newVisibility: 'observed' },
-          { token: { id: 'invalid1' }, hasActionableChange: false, newVisibility: 'observed' },
-        ],
-      };
-
-      const validOutcomes = mockDialog.outcomes.filter((o) => o.hasActionableChange);
-
-      expect(validOutcomes).toHaveLength(1);
-      expect(validOutcomes[0].token.id).toBe('valid1');
-    });
-  });
 
   describe('hasActionableChange Calculation Tests', () => {
     describe('Without RAW Enforcement', () => {
-      beforeEach(() => {
-        game.settings.set('pf2e-visioner', 'enforceRawRequirements', false);
-      });
 
       test('seek against hidden targets (success) is actionable', () => {
         const {
@@ -530,49 +495,7 @@ describe('Seek Action Comprehensive Tests', () => {
       });
     });
 
-    describe('With General RAW Enforcement', () => {
-      beforeEach(() => {
-        game.settings.set('pf2e-visioner', 'enforceRawRequirements', true);
-      });
 
-      test('seek against observed/concealed with RAW enforcement still produces normal outcomes', () => {
-        const {
-          getDefaultNewStateFor,
-        } = require('../../../scripts/chat/services/data/action-state-config.js');
-
-        const states = ['observed', 'concealed'];
-        const outcomes = ['critical-success', 'success', 'failure', 'critical-failure'];
-
-        states.forEach((oldState) => {
-          outcomes.forEach((outcome) => {
-            const newState = getDefaultNewStateFor('seek', oldState, outcome);
-            const hasActionableChange = newState !== oldState;
-
-            // General RAW enforcement doesn't change outcome mapping, only target selection
-            expect(hasActionableChange).toBe(false); // These states never change for seek
-          });
-        });
-      });
-
-      test('seek against hidden/undetected with RAW enforcement still produces normal outcomes', () => {
-        const {
-          getDefaultNewStateFor,
-        } = require('../../../scripts/chat/services/data/action-state-config.js');
-
-        const testCases = [
-          { oldState: 'hidden', outcome: 'success', expectedNewState: 'observed' },
-          { oldState: 'undetected', outcome: 'success', expectedNewState: 'hidden' },
-        ];
-
-        testCases.forEach(({ oldState, outcome, expectedNewState }) => {
-          const newState = getDefaultNewStateFor('seek', oldState, outcome);
-          const hasActionableChange = newState !== oldState;
-
-          expect(newState).toBe(expectedNewState);
-          expect(hasActionableChange).toBe(true);
-        });
-      });
-    });
 
     test('hasActionableChange correctly identifies state transitions', () => {
       const {

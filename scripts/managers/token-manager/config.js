@@ -16,7 +16,7 @@ export const TOKEN_MANAGER_DEFAULT_OPTIONS = {
     resizable: true,
   },
   position: {
-    width: 600,
+    width: 650,
     height: 650,
   },
   actions: {

@@ -240,7 +240,7 @@
   .visibility-table thead th {
     background: var(--color-bg-header);
     color: var(--color-text-header);
-    font-weight: 600;
+    font-weight: 400;
     border-bottom: 2px solid var(--color-border-dark);
     text-align: left;
     padding: 8px 12px;

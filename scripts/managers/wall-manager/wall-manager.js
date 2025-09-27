@@ -15,7 +15,7 @@ export class VisionerWallManager extends foundry.applications.api.ApplicationV2 
       icon: 'fas fa-grip-lines-vertical',
       resizable: true,
     },
-    position: { width: 650, height: 600 },
+    position: { width: 700, height: 600 },
     actions: {
       apply: VisionerWallManager._onApply,
       close: VisionerWallManager._onClose,
@@ -75,7 +75,7 @@ export class VisionerWallManager extends foundry.applications.api.ApplicationV2 
       this._bindSelectionSync(content);
       this._bindCoverToggle(content);
       this._bindSearchAndFilter(content);
-    } catch (_) {}
+    } catch (_) { }
     return content;
   }
 
@@ -285,14 +285,14 @@ export class VisionerWallManager extends foundry.applications.api.ApplicationV2 
       console.error(`[${MODULE_ID}] Wall Manager apply failed`, e);
       try {
         await app.close();
-      } catch (_) {}
+      } catch (_) { }
     }
   }
 
   static async _onClose(_event, _button) {
     try {
       await this.close();
-    } catch (_) {}
+    } catch (_) { }
   }
 
   static async _onSelectWall(event, button) {
@@ -315,7 +315,7 @@ export class VisionerWallManager extends foundry.applications.api.ApplicationV2 
       try {
         // Release all currently selected walls
         wall.layer?.releaseAll?.();
-      } catch (_) {}
+      } catch (_) { }
 
       try {
         // Select the target wall
@@ -323,7 +323,7 @@ export class VisionerWallManager extends foundry.applications.api.ApplicationV2 
       } catch (_) {
         try {
           wall.control?.();
-        } catch (_) {}
+        } catch (_) { }
       }
 
       try {
@@ -342,7 +342,7 @@ export class VisionerWallManager extends foundry.applications.api.ApplicationV2 
         setTimeout(() => {
           button.style.color = '';
         }, 1000);
-      } catch (_) {}
+      } catch (_) { }
     } catch (e) {
       console.warn(`[${MODULE_ID}] Select wall failed`, e);
     }
@@ -431,7 +431,7 @@ export class VisionerWallManager extends foundry.applications.api.ApplicationV2 
             tr.style.outline = on ? '2px solid var(--color-text-hyperlink, #ff9800)' : '';
             tr.style.background = on ? 'rgba(255, 152, 0, 0.12)' : '';
           });
-        } catch (_) {}
+        } catch (_) { }
       };
       const onControl = () => highlight();
       const onDelete = async (wallDocument) => {
@@ -439,7 +439,7 @@ export class VisionerWallManager extends foundry.applications.api.ApplicationV2 
           // Clean up visual effects for deleted wall first
           const { cleanupDeletedWallVisuals } = await import('../../services/visual-effects.js');
           await cleanupDeletedWallVisuals(wallDocument);
-        } catch (_) {}
+        } catch (_) { }
         highlight();
       };
       Hooks.on('controlWall', onControl);
@@ -450,24 +450,24 @@ export class VisionerWallManager extends foundry.applications.api.ApplicationV2 
       this._unbindSelectionSync = () => {
         try {
           Hooks.off('controlWall', onControl);
-        } catch (_) {}
+        } catch (_) { }
         try {
           Hooks.off('deleteWall', onDelete);
-        } catch (_) {}
+        } catch (_) { }
         try {
           Hooks.off('createWall', onControl);
-        } catch (_) {}
+        } catch (_) { }
         try {
           Hooks.off('updateWall', onControl);
-        } catch (_) {}
+        } catch (_) { }
         this._unbindSelectionSync = null;
       };
       this.once?.('close', () => {
         try {
           this._unbindSelectionSync?.();
-        } catch (_) {}
+        } catch (_) { }
       });
-    } catch (_) {}
+    } catch (_) { }
   }
 
   _bindCoverToggle(root) {

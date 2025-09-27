@@ -411,7 +411,7 @@ export class CoverDetector {
         point.y >= tokenRect.y1 &&
         point.y <= tokenRect.y2
       );
-    } catch (_) {
+    } catch {
       return false;
     }
   }
@@ -501,7 +501,7 @@ export class CoverDetector {
       }
 
       return foundAnyOverride ? highestCover : null;
-    } catch (_) {
+    } catch {
       return null;
     }
   }
@@ -526,7 +526,7 @@ export class CoverDetector {
         }
       }
       return best;
-    } catch (_) {
+    } catch {
       return null;
     }
   }
@@ -580,7 +580,7 @@ export class CoverDetector {
       // Remove the arbitrary center weight reduction - let the actual blockage speak for itself
       // This provides more intuitive and predictable cover calculations
       return rawPct;
-    } catch (_) {
+    } catch {
       return 0;
     }
   }
@@ -692,7 +692,7 @@ export class CoverDetector {
           tgtSpan,
         );
       }
-    } catch (_) {
+    } catch {
       // If elevation filtering fails, return all blockers
       return blockers;
     }
@@ -735,7 +735,7 @@ export class CoverDetector {
 
         // Check if the blocker's vertical span intersects with the line of sight elevation range
         return this._verticalSpansIntersect(blockerSpan, lineOfSightElevationAtBlocker);
-      } catch (_) {
+      } catch {
         // If we can't determine elevation, include the blocker to be safe
         return true;
       }
@@ -789,7 +789,7 @@ export class CoverDetector {
 
         // Very permissive check: blocker provides cover if it has ANY overlap with the sight line range
         return blockerSpan.bottom < sightLineRange.top && blockerSpan.top > sightLineRange.bottom;
-      } catch (_) {
+      } catch {
         // If we can't determine elevation, include the blocker to be safe
         return true;
       }
@@ -840,7 +840,7 @@ export class CoverDetector {
 
         // Check if the blocker's vertical span intersects with the adjusted line of sight range
         return blockerSpan.bottom < adjustedRange.top && blockerSpan.top > adjustedRange.bottom;
-      } catch (_) {
+      } catch {
         // If we can't determine elevation, include the blocker to be safe
         return true;
       }
@@ -897,7 +897,7 @@ export class CoverDetector {
 
         // No corner-to-corner line intersects this blocker
         return false;
-      } catch (_) {
+      } catch {
         // If we can't determine elevation, include the blocker to be safe
         return true;
       }
@@ -1052,7 +1052,7 @@ export class CoverDetector {
           if (vis === 'undetected') {
             continue;
           }
-        } catch (_) {}
+        } catch { }
       }
       if (filters.ignoreDead && blocker.actor?.hitPoints?.value === 0) {
         continue;
@@ -1068,7 +1068,7 @@ export class CoverDetector {
           if (isProne) {
             continue;
           }
-        } catch (_) {}
+        } catch { }
       }
       if (filters.ignoreAllies && blocker.actor?.alliance === filters.attackerAlliance) {
         continue;
@@ -1117,7 +1117,7 @@ export class CoverDetector {
       // Small+ targets cannot get cover from tiny blockers (already covered by rule 3)
 
       return true;
-    } catch (_) {
+    } catch {
       // If we can't determine sizes/positions, allow cover to be safe
       return true;
     }
@@ -1153,7 +1153,7 @@ export class CoverDetector {
         token1GridY < token2GridY + token2Height && token1GridY + token1Height > token2GridY;
 
       return xOverlap && yOverlap;
-    } catch (_) {
+    } catch {
       return false;
     }
   }
@@ -1184,7 +1184,7 @@ export class CoverDetector {
       };
 
       return sizeMap[size] || 'medium';
-    } catch (_) {
+    } catch {
       return 'medium';
     }
   }
@@ -1488,7 +1488,7 @@ export class CoverDetector {
 
       // No overrides found, use calculated cover
       return calculatedCover;
-    } catch (_) {
+    } catch {
       return calculatedCover;
     }
   }

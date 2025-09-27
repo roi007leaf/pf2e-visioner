@@ -3,7 +3,7 @@
  * Uses ApplicationV2 for modern FoundryVTT compatibility
  */
 
-import { MODULE_ID, MODULE_TITLE } from '../../constants.js';
+import { MODULE_ID, MODULE_TITLE, REACTIONS } from '../../constants.js';
 import { getVisibilityBetween } from '../../utils.js';
 import { getDesiredOverrideStatesForAction } from '../services/data/action-state-config.js';
 import { notify } from '../services/infra/notifications.js';
@@ -41,6 +41,7 @@ export class SeekPreviewDialog extends BaseActionDialog {
       applyChange: SeekPreviewDialog._onApplyChange,
       revertChange: SeekPreviewDialog._onRevertChange,
       toggleEncounterFilter: SeekPreviewDialog._onToggleEncounterFilter,
+      toggleFilterByDetection: SeekPreviewDialog._onToggleFilterByDetection,
       overrideState: SeekPreviewDialog._onOverrideState,
     },
   };
@@ -62,6 +63,7 @@ export class SeekPreviewDialog extends BaseActionDialog {
     super(options);
     this.actorToken = actorToken; // Renamed for clarity
     this.outcomes = outcomes;
+    this._appliedReactions = new Set(); // Track applied reactions
     // Preserve original outcomes so toggles (like Ignore Allies) can re-filter properly
     this._originalOutcomes = Array.isArray(outcomes) ? [...outcomes] : [];
     this.changes = changes;
@@ -76,6 +78,12 @@ export class SeekPreviewDialog extends BaseActionDialog {
     this.ignoreAllies = game.settings.get(MODULE_ID, 'ignoreAllies');
     // Per-dialog ignore walls (default off)
     this.ignoreWalls = false;
+    // Visual filter default from per-user setting
+    try {
+      this.hideFoundryHidden = game.settings.get(MODULE_ID, 'hideFoundryHiddenTokens');
+    } catch {
+      this.hideFoundryHidden = true;
+    }
 
     // Set global reference
     _currentSeekDialogInstance = this;
@@ -113,7 +121,7 @@ export class SeekPreviewDialog extends BaseActionDialog {
           'target',
         );
       }
-    } catch (_) {}
+    } catch { }
     // Optional walls exclusion for UI convenience
     if (this.ignoreWalls === true) {
       filteredOutcomes = Array.isArray(filteredOutcomes)
@@ -128,15 +136,56 @@ export class SeekPreviewDialog extends BaseActionDialog {
         'target',
       );
     }
+    // Check if seek range limitation is active
+    let isRangeLimited = false;
     if (this.actorToken) {
+      try {
+        const { hasActiveEncounter } = await import('../services/infra/shared-utils.js');
+        const inCombat = hasActiveEncounter();
+        const applyInCombat = !!game.settings.get(MODULE_ID, 'limitSeekRangeInCombat');
+        const applyOutOfCombat = !!game.settings.get(MODULE_ID, 'limitSeekRangeOutOfCombat');
+        isRangeLimited = (inCombat && applyInCombat) || (!inCombat && applyOutOfCombat);
+      } catch { }
+
       filteredOutcomes = filterOutcomesBySeekDistance(filteredOutcomes, this.actorToken, 'target');
     }
+
+    // Apply LOS filtering only when NOT using template mode OR range limitation (both define affected area/range)
+    const isTemplateMode = !!(this.actionData.seekTemplateCenter && this.actionData.seekTemplateRadiusFeet);
+    const skipLOSFiltering = isTemplateMode || isRangeLimited;
+
+    if (this.actorToken && !skipLOSFiltering) {
+      try {
+        const { filterOutcomesByDetection } = await import('../services/infra/shared-utils.js');
+        // Always filter walls by detection (true), filter tokens by detection only if checkbox enabled (this.filterByDetection)
+        filteredOutcomes = await filterOutcomesByDetection(filteredOutcomes, this.actorToken, 'target', true, this.filterByDetection, 'observer_to_target');
+      } catch { /* LOS filtering is non-critical */ }
+    }
+
+    // Apply defeated token filtering (exclude dead/unconscious tokens)
+    try {
+      const { filterOutcomesByDefeated } = await import('../services/infra/shared-utils.js');
+      filteredOutcomes = filterOutcomesByDefeated(filteredOutcomes, 'target');
+    } catch { /* Defeated filtering is non-critical */ }
 
     // Prepare visibility states using centralized config
     const cfg = (s) => this.visibilityConfig(s);
 
+    // Preserve any GM override selections from the previously displayed list
+    try {
+      const previous = Array.isArray(this.outcomes) ? this.outcomes : [];
+      filteredOutcomes = filteredOutcomes.map((o) => {
+        const existing =
+          o?._isWall && o?.wallId
+            ? previous.find((x) => x?._isWall && x?.wallId === o.wallId)
+            : previous.find((x) => x?.target?.id === o?.target?.id);
+        const overrideState = existing?.overrideState ?? o?.overrideState ?? null;
+        return { ...o, overrideState };
+      });
+    } catch { }
+
     // Prepare outcomes for template
-    const processedOutcomes = await Promise.all(
+    let processedOutcomes = await Promise.all(
       filteredOutcomes.map(async (outcome) => {
         // Get current visibility state; walls use their stored state instead of token-vs-token
         let currentVisibility = outcome.oldVisibility || outcome.currentVisibility;
@@ -174,7 +223,7 @@ export class SeekPreviewDialog extends BaseActionDialog {
                       await setVisibilityBetween(pcToken, outcome.target, inferred, {
                         direction: 'observer_to_target',
                       });
-                    } catch (_) {}
+                    } catch { }
                   }
                 }
 
@@ -183,7 +232,7 @@ export class SeekPreviewDialog extends BaseActionDialog {
                   await setVisibilityBetween(this.actorToken, outcome.target, inferred, {
                     direction: 'observer_to_target',
                   });
-                } catch (_) {}
+                } catch { }
 
                 // Remove PF2e system condition to avoid double-state after Visioner owns it
                 try {
@@ -194,14 +243,14 @@ export class SeekPreviewDialog extends BaseActionDialog {
                   else if (actor?.toggleCondition)
                     await actor.toggleCondition(slug, { active: false });
                   else if (actor?.decreaseCondition) await actor.decreaseCondition(slug);
-                } catch (_) {}
+                } catch { }
                 currentVisibility = inferred;
                 // Ensure in-memory outcomes reflect the actual new mapping right away
                 outcome.oldVisibility = currentVisibility;
                 outcome.newVisibility = currentVisibility;
               }
             }
-          } catch (_) {}
+          } catch { }
         }
 
         // Prepare available states for override using per-action config
@@ -210,7 +259,9 @@ export class SeekPreviewDialog extends BaseActionDialog {
 
         const effectiveNewState =
           outcome.overrideState || outcome.newVisibility || currentVisibility;
-        const baseOldState = currentVisibility != null ? currentVisibility : outcome.oldVisibility;
+        // Prefer the recorded oldVisibility as the baseline; fall back to current live mapping
+        const baseOldState =
+          outcome.oldVisibility != null ? outcome.oldVisibility : currentVisibility;
         // Actionable if original differs from new or override
         const hasActionableChange =
           baseOldState != null && effectiveNewState != null && effectiveNewState !== baseOldState;
@@ -233,6 +284,26 @@ export class SeekPreviewDialog extends BaseActionDialog {
       }),
     );
 
+    // Visual filtering: hide Foundry-hidden tokens from display if enabled
+    try {
+      if (this.hideFoundryHidden) {
+        processedOutcomes = processedOutcomes.filter((o) => {
+          try {
+            return o?._isWall || o?.target?.document?.hidden !== true;
+          } catch {
+            return true;
+          }
+        });
+      }
+    } catch { }
+
+    // Show-only-changes visual filter
+    try {
+      if (this.showOnlyChanges) {
+        processedOutcomes = processedOutcomes.filter((o) => !!o.hasActionableChange);
+      }
+    } catch { }
+
     // Update original outcomes with hasActionableChange for Apply All button logic
     processedOutcomes.forEach((processedOutcome, index) => {
       if (this.outcomes[index]) {
@@ -241,15 +312,331 @@ export class SeekPreviewDialog extends BaseActionDialog {
     });
 
     // Set actor context for seeker
+    // Detect ALL senses on seeker (capabilities) with precision indicators
+    let allSenses = [];
+    try {
+      const { VisionAnalyzer } = await import('../../visibility/auto-visibility/VisionAnalyzer.js');
+      const { SPECIAL_SENSES } = await import('../../constants.js');
+      const visionAnalyzer = VisionAnalyzer.getInstance();
+      const sensingSummary = visionAnalyzer.getSensingSummary(this.actorToken);
+      const caps = visionAnalyzer.getVisionCapabilities(this.actorToken);
+
+      const isVisualType = (t) => {
+        const tt = String(t || '').toLowerCase();
+        return (
+          tt === 'vision' ||
+          tt === 'sight' ||
+          tt === 'darkvision' ||
+          tt === 'greater-darkvision' ||
+          tt === 'greaterdarkvision' ||
+          tt === 'low-light-vision' ||
+          tt === 'lowlightvision' ||
+          tt === 'see-invisibility' ||
+          tt === 'truesight' ||
+          tt.includes('vision') ||
+          tt.includes('sight') ||
+          tt.includes('invisibility')
+        );
+      };
+
+      // Add precise senses
+      for (const sense of sensingSummary.precise || []) {
+        const senseConfig = SPECIAL_SENSES[sense.type] || {
+          label: `PF2E_VISIONER.SENSES.${sense.type.toUpperCase()}`,
+          icon: 'fas fa-eye',
+          description: `PF2E_VISIONER.SENSES.${sense.type.toUpperCase()}_DESC`
+        };
+
+        allSenses.push({
+          type: sense.type,
+          range: sense.range,
+          isPrecise: true,
+          config: senseConfig,
+        });
+      }
+
+      // Ensure plain vision is represented as a precise sense if the actor can see (not when blinded)
+      try {
+        if (caps?.hasVision && !caps?.isBlinded) {
+          // Only add if not already present
+          if (!allSenses.some((s) => s.type === 'vision')) {
+            const { SPECIAL_SENSES } = await import('../../constants.js');
+            const senseConfig = SPECIAL_SENSES['vision'] || {
+              label: 'PF2E_VISIONER.SPECIAL_SENSES.vision',
+              icon: 'fas fa-eye',
+              description: 'PF2E_VISIONER.SPECIAL_SENSES.vision_description',
+            };
+            allSenses.push({ type: 'vision', range: Infinity, isPrecise: true, config: senseConfig });
+          }
+        }
+      } catch { }
+
+      // Add imprecise senses
+      for (const sense of sensingSummary.imprecise || []) {
+        const senseConfig = SPECIAL_SENSES[sense.type] || {
+          label: `PF2E_VISIONER.SENSES.${sense.type.toUpperCase()}`,
+          icon: 'fas fa-wave-square',
+          description: `PF2E_VISIONER.SENSES.${sense.type.toUpperCase()}_DESC`
+        };
+
+        allSenses.push({
+          type: sense.type,
+          range: sense.range,
+          isPrecise: false,
+          config: senseConfig,
+        });
+      }
+
+      // Add hearing if present (use SPECIAL_SENSES.hearing when available)
+      if (sensingSummary.hearing) {
+        const hearingConfig = SPECIAL_SENSES.hearing || {
+          label: 'PF2E_VISIONER.SPECIAL_SENSES.hearing',
+          icon: 'fas fa-volume-up',
+          description: 'PF2E_VISIONER.SPECIAL_SENSES.hearing_description',
+        };
+
+        allSenses.push({
+          type: 'hearing',
+          range: sensingSummary.hearing.range,
+          isPrecise: sensingSummary.hearing.acuity === 'precise',
+          config: hearingConfig,
+        });
+      }
+
+      // Add echolocation if active (special handling)
+      if (sensingSummary.echolocationActive) {
+        const echolocationConfig = SPECIAL_SENSES.echolocation || {
+          label: 'PF2E_VISIONER.SENSES.ECHOLOCATION',
+          icon: 'fas fa-broadcast-tower',
+          description: 'PF2E_VISIONER.SENSES.ECHOLOCATION_DESC'
+        };
+
+        // Check if already added from precise/imprecise arrays
+        const existingEcho = allSenses.find(s => s.type === 'echolocation');
+        if (!existingEcho) {
+          allSenses.push({
+            type: 'echolocation',
+            range: sensingSummary.echolocationRange,
+            isPrecise: true, // Echolocation is typically precise
+            config: echolocationConfig,
+          });
+        }
+      }
+
+      // If blinded, filter out visual senses entirely from the list
+      try {
+        if (caps?.isBlinded) {
+          allSenses = allSenses.filter((s) => !isVisualType(s.type));
+        }
+      } catch { }
+
+      // Normalize displayRange for template (Infinity → ∞)
+      for (const s of allSenses) {
+        try {
+          s.displayRange = (s.range === Infinity || s.range === 'Infinity') ? '∞' : `${s.range}`;
+        } catch { }
+      }
+
+      // Sort senses: precise first, then by type name
+      allSenses.sort((a, b) => {
+        if (a.isPrecise !== b.isPrecise) {
+          return a.isPrecise ? -1 : 1; // Precise senses first
+        }
+        return a.type.localeCompare(b.type);
+      });
+
+    } catch (error) {
+      console.warn('PF2e Visioner | Error getting sensing summary:', error);
+    }
+
+    // Keep backwards compatibility: also create activeSenses for used imprecise senses
+    let activeSenses = null;
+    let usedSenseCount = 0;
+    let primaryUsedSenseLabel = null; // i18n key from sense.config.label
+    try {
+      // Build stats of used senses across outcomes, tracking precision
+      const usedStats = new Map(); // type -> { total: number, precise: number, imprecise: number }
+      // Prefer original, unfiltered outcomes so used-sense indicator isn't affected by UI filters
+      const usedSource = Array.isArray(this._originalOutcomes) && this._originalOutcomes.length
+        ? this._originalOutcomes
+        : processedOutcomes || [];
+
+      for (const o of usedSource) {
+        const t = typeof o?.usedSenseType === 'string' && o.usedSenseType ? String(o.usedSenseType) : null;
+        const p = typeof o?.usedSensePrecision === 'string' ? String(o.usedSensePrecision).toLowerCase() : null;
+        const legacyImpreciseType = o?.usedImprecise && typeof o?.usedImpreciseSenseType === 'string'
+          ? String(o.usedImpreciseSenseType)
+          : null;
+
+        if (t) {
+          if (!usedStats.has(t)) usedStats.set(t, { total: 0, precise: 0, imprecise: 0 });
+          const stat = usedStats.get(t);
+          stat.total += 1;
+          if (p === 'precise') stat.precise += 1;
+          else if (p === 'imprecise') stat.imprecise += 1;
+        }
+        // Back-compat: if legacy imprecise-only field is present, count it as imprecise
+        if (legacyImpreciseType) {
+          if (!usedStats.has(legacyImpreciseType)) usedStats.set(legacyImpreciseType, { total: 0, precise: 0, imprecise: 0 });
+          const stat = usedStats.get(legacyImpreciseType);
+          stat.total += 1;
+          stat.imprecise += 1;
+        }
+      }
+
+      // Choose a single used sense for the action using proper PF2e mechanics hierarchy:
+      // 1. Vision (highest priority)
+      // 2. Next precise sense with unlimited range
+      // 3. Precise sense with limited range (sorted from furthest to closest)
+      // 4. Imprecise sense with unlimited range
+      // 5. Imprecise sense with limited range
+      let chosenUsedType = null;
+      if (usedStats.size > 0) {
+        const entries = Array.from(usedStats.entries());
+
+        // Helper function to check if a sense type is vision-based
+        const isVisionType = (senseType) => {
+          const t = String(senseType || '').toLowerCase();
+          return (
+            t === 'vision' ||
+            t === 'sight' ||
+            t === 'darkvision' ||
+            t === 'greater-darkvision' ||
+            t === 'greaterdarkvision' ||
+            t === 'low-light-vision' ||
+            t === 'lowlightvision' ||
+            t === 'see-invisibility' ||
+            t === 'truesight' ||
+            t.includes('vision') ||
+            t.includes('sight')
+          );
+        };
+
+        // Get sense range from allSenses array
+        const getSenseRange = (senseType) => {
+          const senseData = allSenses?.find?.(s => s.type === senseType);
+          return senseData?.range ?? 0;
+        };
+
+        // Create candidates with hierarchy data
+        const candidates = entries
+          .filter(([type, stats]) => stats.precise > 0 || stats.imprecise > 0)
+          .map(([type, stats]) => {
+            const range = getSenseRange(type);
+            const isVision = isVisionType(type);
+            const hasPrecise = stats.precise > 0;
+            const hasUnlimitedRange = range === Infinity || range === 'Infinity';
+
+            return {
+              type,
+              stats,
+              range: range === Infinity || range === 'Infinity' ? Infinity : (typeof range === 'number' ? range : 0),
+              isVision,
+              hasPrecise,
+              hasUnlimitedRange,
+              // Calculate priority based on hierarchy
+              priority: isVision ? 1 :
+                (hasPrecise && hasUnlimitedRange) ? 2 :
+                  (hasPrecise && !hasUnlimitedRange) ? 3 :
+                    (!hasPrecise && hasUnlimitedRange) ? 4 : 5
+            };
+          });
+
+        if (candidates.length > 0) {
+          // Sort by hierarchy priority, then by range (for same priority), then by usage count
+          candidates.sort((a, b) => {
+            // Primary sort: hierarchy priority (lower number = higher priority)
+            if (a.priority !== b.priority) {
+              return a.priority - b.priority;
+            }
+
+            // Secondary sort: for same priority level, prefer higher range (further reaching senses)
+            if (a.priority === 3 && b.priority === 3) { // Both are precise limited range
+              if (a.range !== b.range) {
+                return b.range - a.range; // Higher range first
+              }
+            } else if (a.priority === 5 && b.priority === 5) { // Both are imprecise limited range
+              if (a.range !== b.range) {
+                return b.range - a.range; // Higher range first
+              }
+            }
+
+            // Tertiary sort: by total usage count
+            return b.stats.total - a.stats.total;
+          });
+
+          chosenUsedType = candidates[0].type;
+        }
+      }
+
+      // Annotate all senses so tooltip highlights only the chosen one
+      if (Array.isArray(allSenses)) {
+        for (const s of allSenses) {
+          s.wasUsed = chosenUsedType ? s.type === chosenUsedType : false;
+        }
+      }
+
+      // For display purposes, we treat this as exactly one used sense if any were used
+      if (chosenUsedType) {
+        usedSenseCount = 1;
+        const match = allSenses?.find?.((s) => s.type === chosenUsedType);
+        primaryUsedSenseLabel = match?.config?.label ?? null; // localization key
+      } else {
+        usedSenseCount = 0;
+      }
+
+      // Back-compat: only expose imprecise activeSenses when the chosen type is imprecise
+      if (chosenUsedType) {
+        activeSenses = allSenses.filter((s) => !s.isPrecise && s.type === chosenUsedType);
+      }
+    } catch { }
+
     context.seeker = {
       name: this.actorToken?.name || 'Unknown Actor',
       image: this.resolveTokenImage(this.actorToken),
       actionType: 'seek',
       actionLabel: 'Seek action results analysis',
     };
+    context.allSenses = allSenses; // New: all senses with precision indicators
+    context.activeSenses = activeSenses; // Backwards compatibility: only used imprecise senses
+    context.usedSenseCount = usedSenseCount;
+    context.primaryUsedSenseLabel = primaryUsedSenseLabel; // i18n key for display when exactly one
+
+    // Legacy support for existing template logic
+    const echolocationSense = allSenses?.find?.((s) => s.type === 'echolocation');
+    const lifesenseSense = allSenses?.find?.((s) => s.type === 'lifesense');
+    context.echolocationActive = !!echolocationSense;
+    context.echolocationRange = echolocationSense?.range || 0;
+    context.lifesenseActive = !!lifesenseSense;
+    context.lifesenseRange = lifesenseSense?.range || 0;
+
+    // Reactions system - check for available reactions
+    const availableReactions = this.getAvailableReactions(processedOutcomes);
+    context.availableReactions = availableReactions;
+    context.hasReactions = availableReactions.length > 0;
+
+    // No noisy environment indicator (feature removed)
     context.outcomes = processedOutcomes;
     context.ignoreWalls = !!this.ignoreWalls;
     context.ignoreAllies = !!this.ignoreAllies;
+    context.hideFoundryHidden = !!this.hideFoundryHidden;
+
+    // Flags for template mode and range limitation to hide inappropriate filters
+    const templateMode = !!(this.actionData.seekTemplateCenter && this.actionData.seekTemplateRadiusFeet);
+
+    // Check if range limitation is active (recompute for context)
+    let rangeLimited = false;
+    try {
+      const { hasActiveEncounter } = await import('../services/infra/shared-utils.js');
+      const inCombat = hasActiveEncounter();
+      const applyInCombat = !!game.settings.get(MODULE_ID, 'limitSeekRangeInCombat');
+      const applyOutOfCombat = !!game.settings.get(MODULE_ID, 'limitSeekRangeOutOfCombat');
+      rangeLimited = (inCombat && applyInCombat) || (!inCombat && applyOutOfCombat);
+    } catch { }
+
+    context.isTemplateMode = templateMode;
+    context.isRangeLimited = rangeLimited;
+    context.detectionFilterDisabled = templateMode || rangeLimited;
 
     // Keep original outcomes intact; provide common context from processed list
     this.outcomes = processedOutcomes;
@@ -264,7 +651,7 @@ export class SeekPreviewDialog extends BaseActionDialog {
   /**
    * Render the HTML for the application
    */
-  async _renderHTML(context, options) {
+  async _renderHTML(context) {
     const html = await foundry.applications.handlebars.renderTemplate(
       this.constructor.PARTS.content.template,
       context,
@@ -275,8 +662,14 @@ export class SeekPreviewDialog extends BaseActionDialog {
   /**
    * Replace the HTML content of the application
    */
-  _replaceHTML(result, content, options) {
+  _replaceHTML(result, content) {
     content.innerHTML = result;
+
+    // Hook up senses button tooltips
+    try {
+      this.setupSensesButtonTooltips(content);
+    } catch { }
+
     // Hook up per-dialog Ignore Allies toggle
     try {
       const cb = content.querySelector('input[data-action="toggleIgnoreAllies"]');
@@ -293,7 +686,7 @@ export class SeekPreviewDialog extends BaseActionDialog {
             .catch(() => this.render({ force: true }));
         });
       }
-    } catch (_) {}
+    } catch { }
     // Hook up per-dialog Ignore Walls toggle
     try {
       const cbw = content.querySelector('input[data-action="toggleIgnoreWalls"]');
@@ -310,7 +703,50 @@ export class SeekPreviewDialog extends BaseActionDialog {
             .catch(() => this.render({ force: true }));
         });
       }
-    } catch (_) {}
+    } catch { }
+    // Hook up Hide Foundry-hidden visual filter
+    try {
+      const cbh = content.querySelector('input[data-action="toggleHideFoundryHidden"]');
+      if (cbh) {
+        cbh.addEventListener('change', async () => {
+          this.hideFoundryHidden = !!cbh.checked;
+          try {
+            await game.settings.set(MODULE_ID, 'hideFoundryHiddenTokens', this.hideFoundryHidden);
+          } catch { }
+          this.render({ force: true });
+        });
+      }
+    } catch { }
+
+    // Hook up reactions system
+    try {
+      // Reactions toggle button
+      const reactionsToggleBtn = content.querySelector('button[data-action="toggleReactions"]');
+      if (reactionsToggleBtn) {
+        reactionsToggleBtn.addEventListener('click', () => {
+          this.toggleReactionsDropdown();
+        });
+      }
+
+      // Individual reaction buttons
+      const reactionButtons = content.querySelectorAll('button[data-reaction]');
+      reactionButtons.forEach((button) => {
+        button.addEventListener('click', async () => {
+          const reactionKey = button.dataset.reaction;
+          await this.applyReaction(reactionKey);
+        });
+      });
+    } catch { }
+
+    // Hook up Sense the Unseen button (deprecated - for backward compatibility)
+    try {
+      const senseUnseenBtn = content.querySelector('button[data-action="applySenseUnseen"]');
+      if (senseUnseenBtn) {
+        senseUnseenBtn.addEventListener('click', async () => {
+          await this.applySenseUnseen();
+        });
+      }
+    } catch { }
     return content;
   }
 
@@ -335,7 +771,7 @@ export class SeekPreviewDialog extends BaseActionDialog {
           const { filterOutcomesByAllies } = await import('../services/infra/shared-utils.js');
           filtered = filterOutcomesByAllies(filtered, this.actorToken, this.ignoreAllies, 'target');
         }
-      } catch (_) {}
+      } catch { }
 
       // Optional walls exclusion for UI convenience
       if (this.ignoreWalls === true) {
@@ -354,7 +790,7 @@ export class SeekPreviewDialog extends BaseActionDialog {
             this.actionData.seekTemplateRadiusFeet,
             'target',
           );
-        } catch (_) {}
+        } catch { }
       }
 
       // Seek distance limits
@@ -365,7 +801,16 @@ export class SeekPreviewDialog extends BaseActionDialog {
           );
           filtered = filterOutcomesBySeekDistance(filtered, this.actorToken, 'target');
         }
-      } catch (_) {}
+      } catch { }
+
+      // Always apply wall LOS filtering for performance, optionally apply token LOS filtering if enabled
+      if (this.actorToken) {
+        try {
+          const { filterOutcomesByDetection } = await import('../services/infra/shared-utils.js');
+          // Always filter walls by detection (true), filter tokens by detection only if checkbox enabled (this.filterByDetection)
+          filtered = await filterOutcomesByDetection(filtered, this.actorToken, 'target', true, this.filterByDetection, 'observer_to_target');
+        } catch { }
+      }
       // Compute actionability and carry over any existing overrides from the currently displayed outcomes
       if (!Array.isArray(filtered)) return [];
       const processed = filtered.map((o) => {
@@ -387,19 +832,38 @@ export class SeekPreviewDialog extends BaseActionDialog {
                 currentVisibility =
                   getVisibilityBetween(this.actorToken, o.target) || currentVisibility;
               }
-            } catch (_) {}
+            } catch { }
           }
           const effectiveNewState = overrideState || o.newVisibility || currentVisibility;
           const baseOldState = o.oldVisibility || currentVisibility;
           const hasActionableChange =
             baseOldState != null && effectiveNewState != null && effectiveNewState !== baseOldState;
           return { ...o, overrideState, hasActionableChange };
-        } catch (_) {
+        } catch {
           return { ...o };
         }
       });
-      return processed;
-    } catch (_) {
+      // Visual filtering: hide Foundry-hidden tokens from display if enabled
+      let visual = processed;
+      try {
+        if (this.hideFoundryHidden) {
+          visual = processed.filter((o) => {
+            try {
+              return o?._isWall || o?.target?.document?.hidden !== true;
+            } catch {
+              return true;
+            }
+          });
+        }
+      } catch { }
+      // Apply show-only-changes filter for both UI and Apply All
+      try {
+        if (this.showOnlyChanges) {
+          visual = visual.filter((o) => !!o.hasActionableChange);
+        }
+      } catch { }
+      return visual;
+    } catch {
       return Array.isArray(this.outcomes) ? this.outcomes : [];
     }
   }
@@ -422,7 +886,7 @@ export class SeekPreviewDialog extends BaseActionDialog {
   /**
    * Apply all visibility changes
    */
-  static async _onApplyAll(event, button) {
+  static async _onApplyAll() {
     const app = _currentSeekDialogInstance;
 
     if (!app) {
@@ -470,7 +934,7 @@ export class SeekPreviewDialog extends BaseActionDialog {
         payload.overrides = overrides;
       }
       // Pass current live ignoreAllies so discovery in apply respects checkbox state
-      const appliedCount = await applyNowSeek(payload, { html: () => {}, attr: () => {} });
+      const appliedCount = await applyNowSeek(payload, { html: () => { }, attr: () => { } });
       notify.info(
         `${MODULE_TITLE}: Applied ${appliedCount ?? actionableOutcomes.length} visibility changes. Dialog remains open for additional actions.`,
       );
@@ -484,7 +948,7 @@ export class SeekPreviewDialog extends BaseActionDialog {
       app.updateChangesCount();
 
       // Don't close dialog - allow user to continue working
-    } catch (error) {
+    } catch {
       notify.error(`${MODULE_TITLE}: Error applying changes.`);
     }
   }
@@ -492,7 +956,7 @@ export class SeekPreviewDialog extends BaseActionDialog {
   /**
    * Revert all changes to original state
    */
-  static async _onRevertAll(event, button) {
+  static async _onRevertAll() {
     const app = _currentSeekDialogInstance;
     if (!app) return;
 
@@ -507,7 +971,7 @@ export class SeekPreviewDialog extends BaseActionDialog {
       const { revertNowSeek } = await import('../services/index.js');
       await revertNowSeek(
         { ...app.actionData, ignoreAllies: app.ignoreAllies },
-        { html: () => {}, attr: () => {} },
+        { html: () => { }, attr: () => { } },
       );
 
       app.updateRowButtonsToReverted(changedOutcomes);
@@ -554,18 +1018,18 @@ export class SeekPreviewDialog extends BaseActionDialog {
         const overrides = {
           __wall__: { [outcome.wallId]: outcome.overrideState || outcome.newVisibility },
         };
-        await applyNowSeek({ ...actionData, overrides }, { html: () => {}, attr: () => {} });
+        await applyNowSeek({ ...actionData, overrides }, { html: () => { }, attr: () => { } });
         // Disable the row's Apply button for this wall
         app.updateRowButtonsToApplied([{ wallId: outcome.wallId }]);
       } else {
         const overrides = { [outcome.target.id]: outcome.overrideState || outcome.newVisibility };
-        await applyNowSeek({ ...actionData, overrides }, { html: () => {}, attr: () => {} });
+        await applyNowSeek({ ...actionData, overrides }, { html: () => { }, attr: () => { } });
         // Disable the row's Apply button for this token
         app.updateRowButtonsToApplied([{ target: { id: outcome.target.id } }]);
       }
 
       app.updateChangesCount();
-    } catch (error) {
+    } catch {
       notify.error(`${MODULE_TITLE}: Error applying change.`);
     }
   }
@@ -632,7 +1096,7 @@ export class SeekPreviewDialog extends BaseActionDialog {
         { target: { id: outcome._isWall ? null : outcome.target.id }, wallId },
       ]);
       app.updateChangesCount();
-    } catch (error) {
+    } catch {
       notify.error(`${MODULE_TITLE}: Error reverting change.`);
     }
   }
@@ -646,6 +1110,9 @@ export class SeekPreviewDialog extends BaseActionDialog {
    * Override close to clear global reference
    */
   close(options) {
+    // Clean up tooltips
+    this.hideSensesTooltip();
+
     // Clean up only auto-created preview templates (not manual, which we delete immediately on placement)
     try {
       if (this.templateId && canvas.scene && !this.templateCenter) {
@@ -663,7 +1130,7 @@ export class SeekPreviewDialog extends BaseActionDialog {
     if (this._selectionHookId) {
       try {
         Hooks.off('controlToken', this._selectionHookId);
-      } catch (_) {}
+      } catch { }
       this._selectionHookId = null;
     }
     _currentSeekDialogInstance = null;
@@ -704,14 +1171,336 @@ export class SeekPreviewDialog extends BaseActionDialog {
   // removed: updateBulkActionButtons duplicated; using BaseActionDialog implementation
 
   /**
+   * Toggle the reactions dropdown visibility
+   */
+  toggleReactionsDropdown() {
+    const dropdown = this.element?.querySelector('.reactions-dropdown');
+    const chevron = this.element?.querySelector('.reactions-chevron');
+    const toggleButton = this.element?.querySelector('.reactions-toggle-button');
+
+    if (!dropdown) return;
+
+    const isVisible = dropdown.style.display !== 'none';
+
+    if (isVisible) {
+      // Hide dropdown
+      dropdown.style.display = 'none';
+      chevron?.classList.remove('rotated');
+      toggleButton?.classList.remove('active');
+    } else {
+      // Show dropdown
+      dropdown.style.display = 'block';
+      chevron?.classList.add('rotated');
+      toggleButton?.classList.add('active');
+    }
+  }
+
+  /**
+   * Get available reactions for the current context
+   */
+  getAvailableReactions(outcomes) {
+    const actor = this.actorToken?.actor;
+    if (!actor) return [];
+
+    const context = { actor, outcomes, dialog: this };
+    const availableReactions = [];
+
+    // Check each reaction for availability
+    for (const [key, reaction] of Object.entries(REACTIONS)) {
+      try {
+        if (reaction.isAvailable && reaction.isAvailable(context)) {
+          availableReactions.push({
+            ...reaction,
+            key,
+            applied: this._appliedReactions?.has?.(key) || false,
+          });
+        }
+      } catch (error) {
+        console.warn(`Error checking availability for reaction ${key}:`, error);
+      }
+    }
+
+    return availableReactions;
+  }
+
+  /**
+   * Apply a specific reaction
+   */
+  async applyReaction(reactionKey) {
+    const reaction = REACTIONS[reactionKey];
+    if (!reaction) {
+      console.error(`Unknown reaction: ${reactionKey}`);
+      return;
+    }
+
+    // Prevent multiple applications
+    if (!this._appliedReactions) {
+      this._appliedReactions = new Set();
+    }
+
+    if (this._appliedReactions.has(reactionKey)) {
+      notify.info(`${game.i18n.localize(reaction.name)} has already been applied.`);
+      return;
+    }
+
+    try {
+      const context = {
+        actor: this.actorToken?.actor,
+        outcomes: this.outcomes,
+        dialog: this,
+      };
+
+      const result = await reaction.apply(context);
+
+      if (result.success) {
+        // Mark reaction as applied
+        this._appliedReactions.add(reactionKey);
+
+        // Reprocess outcomes to update display properties
+        await this.getFilteredOutcomes().then((reprocessedOutcomes) => {
+          this.outcomes = reprocessedOutcomes;
+        });
+
+        // Force a re-render to update the UI with new states
+        await this.render({ force: true });
+
+        // Update UI to show applied state after re-render
+        this.updateReactionButton(reactionKey, true);
+
+        // Update the reactions toggle button to stop animation if no more reactions are available
+        this.updateReactionsToggleButton();
+
+        notify.info(result.message);
+      } else {
+        notify.warn(result.message);
+      }
+    } catch (error) {
+      console.error(`Error applying reaction ${reactionKey}:`, error);
+      notify.error(`Error applying ${game.i18n.localize(reaction.name)}.`);
+    }
+  }
+
+  /**
+   * Update a reaction button to show applied state
+   */
+  updateReactionButton(reactionKey, applied) {
+    const button = this.element?.querySelector(`[data-reaction="${reactionKey}"]`);
+    if (!button) return;
+
+    if (applied) {
+      button.classList.add('applied');
+      button.disabled = true;
+
+      const reaction = REACTIONS[reactionKey];
+      const appliedText = `${game.i18n.localize(reaction.name)} Applied`;
+      button.innerHTML = `<i class="fas fa-check-circle"></i><span class="button-label">${appliedText}</span>`;
+
+      // Apply green styling
+      button.style.background = 'linear-gradient(135deg, #10b981 0%, #059669 50%, #047857 100%)';
+      button.style.cursor = 'not-allowed';
+      button.style.opacity = '0.9';
+    }
+  }
+
+  /**
+   * Updates the reactions toggle button state based on available reactions
+   */
+  updateReactionsToggleButton() {
+    const toggleButton = this.element?.querySelector('.reactions-toggle-button');
+    if (!toggleButton) return;
+
+    // Check if there are any available (non-applied) reactions
+    const availableReactions = this.getAvailableReactions(this.outcomes);
+    const hasAvailableReactions = availableReactions.some((reaction) => !reaction.applied);
+
+    if (hasAvailableReactions) {
+      // Keep the animation
+      toggleButton.classList.add('has-available');
+    } else {
+      // Stop the animation
+      toggleButton.classList.remove('has-available');
+    }
+  }
+
+  /**
+   * Update outcome rows to reflect changes
+   */
+  updateOutcomeRows(affectedOutcomes) {
+    for (const outcome of affectedOutcomes) {
+      const targetId = outcome.target?.id;
+      if (targetId) {
+        const row = this.element?.querySelector(`tr[data-target-id="${targetId}"]`);
+        if (row) {
+          // Update the visibility cell
+          const visibilityCell = row.querySelector('.visibility-change');
+          if (visibilityCell) {
+            visibilityCell.textContent = 'Hidden';
+            visibilityCell.className = 'visibility-change hidden';
+          }
+
+          // Update the outcome cell
+          const outcomeCell = row.querySelector('.outcome');
+          if (outcomeCell) {
+            outcomeCell.textContent = 'Hidden (Reaction)';
+            outcomeCell.className = 'outcome hidden';
+          }
+        }
+      }
+    }
+  }
+
+  /**
+   * Apply Sense the Unseen feat to upgrade failed outcomes
+   * @deprecated Use applyReaction('senseTheUnseen') instead
+   */
+  async applySenseUnseen() {
+    try {
+      const { notify } = await import('../services/infra/notifications.js');
+
+      // Find all failed outcomes where the target is currently undetected
+      const failedUndetectedOutcomes = this.outcomes.filter(
+        (outcome) => outcome.outcome === 'failure' && outcome.currentVisibility === 'undetected',
+      );
+
+      if (failedUndetectedOutcomes.length === 0) {
+        notify.warn('No failed outcomes with undetected targets found.');
+        return;
+      }
+
+      // Apply Sense the Unseen: upgrade undetected to hidden
+      // We need to update both the current outcomes and the original outcomes
+      const targetIds = failedUndetectedOutcomes.map((o) => o.target?.id).filter(Boolean);
+
+      for (const outcome of failedUndetectedOutcomes) {
+        outcome.newVisibility = 'hidden';
+        outcome.changed = true; // Force changed to true since we're upgrading undetected to hidden
+        outcome.senseUnseenApplied = true;
+        outcome.hasActionableChange = true; // Force actionable change to true
+        // Also set overrideState to ensure it's treated as a user override
+        outcome.overrideState = 'hidden';
+      }
+
+      // Also update the original outcomes so changes persist through re-renders
+      if (Array.isArray(this._originalOutcomes)) {
+        for (const originalOutcome of this._originalOutcomes) {
+          if (targetIds.includes(originalOutcome.target?.id)) {
+            originalOutcome.newVisibility = 'hidden';
+            originalOutcome.changed = true; // Force changed to true
+            originalOutcome.senseUnseenApplied = true;
+            originalOutcome.hasActionableChange = true; // Force actionable change to true
+            // Also set overrideState to ensure it's treated as a user override
+            originalOutcome.overrideState = 'hidden';
+          }
+        }
+      }
+
+      // Reprocess outcomes to update display properties
+      await this.getFilteredOutcomes().then((reprocessedOutcomes) => {
+        this.outcomes = reprocessedOutcomes;
+      });
+
+      // Update the button and section to show applied state
+      const button = this.element?.querySelector('button[data-action="applySenseUnseen"]');
+      const section = this.element?.querySelector('.sense-unseen-section');
+
+      if (button) {
+        // Set the applied flag to prevent multiple applications
+
+        // Update button content with success feedback using localized text
+        const appliedText = game.i18n.localize(
+          'PF2E_VISIONER.SEEK_AUTOMATION.SENSE_UNSEEN_APPLIED',
+        );
+
+        // Update the existing button instead of cloning
+        button.classList.add('applied');
+        button.disabled = true;
+        button.innerHTML = `<i class="fas fa-check-circle"></i><span class="button-label">${appliedText}</span>`;
+
+        // Force style update with inline styles as backup
+        button.style.background = 'linear-gradient(135deg, #10b981 0%, #059669 50%, #047857 100%)';
+        button.style.cursor = 'not-allowed';
+        button.style.opacity = '0.9';
+
+        // Remove all existing event listeners by cloning and replacing
+        const newButton = button.cloneNode(true);
+        button.parentNode.replaceChild(newButton, button);
+
+        // Ensure the cloned button also has the styles
+        newButton.style.background =
+          'linear-gradient(135deg, #10b981 0%, #059669 50%, #047857 100%)';
+        newButton.style.cursor = 'not-allowed';
+        newButton.style.opacity = '0.9';
+
+        // Add click handler to show info when disabled button is clicked
+        newButton.addEventListener('click', (e) => {
+          e.preventDefault();
+          notify.info(`${appliedText} - This feat has already been used for this seek action.`);
+        });
+      }
+
+      if (section) {
+        // Add applied class to section for visual feedback
+        section.classList.add('applied');
+      }
+
+      // Update bulk action state and refresh UI
+      this.bulkActionState = 'initial';
+      this.updateBulkActionButtons();
+      this.updateChangesCount();
+
+      notify.info(
+        `Applied Sense the Unseen to ${failedUndetectedOutcomes.length} failed outcome(s). Undetected targets are now Hidden.`,
+      );
+
+      // Update the affected outcome rows manually without full re-render
+      for (const outcome of failedUndetectedOutcomes) {
+        const targetId = outcome.target?.id;
+        if (targetId) {
+          const row = this.element?.querySelector(`tr[data-target-id="${targetId}"]`);
+          if (row) {
+            // Update the visibility cell
+            const visibilityCell = row.querySelector('.visibility-change');
+            if (visibilityCell) {
+              visibilityCell.textContent = 'Hidden';
+              visibilityCell.className = 'visibility-change hidden';
+            }
+
+            // Update the outcome cell
+            const outcomeCell = row.querySelector('.outcome');
+            if (outcomeCell) {
+              outcomeCell.textContent = 'Hidden (Sense the Unseen)';
+              outcomeCell.className = 'outcome hidden';
+            }
+          }
+        }
+      }
+
+      // Don't re-render to avoid resetting the button state
+      // The outcomes are already updated and the button styling is applied above
+    } catch (error) {
+      console.error('Error applying Sense the Unseen:', error);
+      const { notify } = await import('../services/infra/notifications.js');
+      notify.error('Error applying Sense the Unseen feat.');
+    }
+  }
+
+  /**
    * Toggle encounter filtering and refresh results
    */
-  static async _onToggleEncounterFilter(event, button) {
+  static async _onToggleEncounterFilter() {
     const app = _currentSeekDialogInstance;
     if (!app) return;
 
     // Toggle filter and re-render; context preparation applies encounter filter
     app.encounterOnly = !app.encounterOnly;
+    app.bulkActionState = 'initial';
+    app.render({ force: true });
+  }
+
+  static async _onToggleFilterByDetection(event, target) {
+    const app = _currentSeekDialogInstance;
+    if (!app) return;
+    app.filterByDetection = target.checked;
     app.bulkActionState = 'initial';
     app.render({ force: true });
   }
@@ -731,19 +1520,105 @@ export class SeekPreviewDialog extends BaseActionDialog {
   /**
    * Handle state override action (for potential future use)
    */
-  static async _onOverrideState(event, button) {
+  static async _onOverrideState() {
     const app = _currentSeekDialogInstance;
     if (!app) return;
-
-    const targetId = button.dataset.target;
-    const newState = button.dataset.state;
     // This method is available for future enhancements if needed
+  }
+
+  /**
+   * Setup tooltips for senses buttons
+   */
+  setupSensesButtonTooltips(content) {
+    const sensesButtons = content.querySelectorAll('.senses-button[data-tooltip-html]');
+
+    sensesButtons.forEach((button) => {
+      const tooltipId = button.getAttribute('data-tooltip-html');
+      const tooltipContent = content.querySelector(`#${tooltipId}`);
+      if (!tooltipContent) return;
+
+      // Prevent built-in text tooltip from showing the raw id
+      button.setAttribute('data-tooltip', '');
+
+      const anchor = button; // ensure we anchor to the button element
+
+      const show = () => this.showSensesTooltip(anchor, tooltipContent);
+      const hide = () => this.hideSensesTooltip();
+
+      button.addEventListener('mouseenter', show);
+      button.addEventListener('mouseleave', hide);
+      button.addEventListener('focus', show);
+      button.addEventListener('blur', hide);
+    });
+  }
+
+  /**
+   * Show custom senses tooltip
+   */
+  showSensesTooltip(element, tooltipContent) {
+    // Remove any existing tooltip
+    this.hideSensesTooltip();
+
+    // Create tooltip element
+    const tooltip = document.createElement('div');
+    tooltip.className = 'senses-tooltip-content';
+    tooltip.innerHTML = tooltipContent.innerHTML;
+
+    // Only set essential positioning styles without overriding CSS styling
+    tooltip.style.position = 'absolute';
+    tooltip.style.zIndex = '10000';
+    tooltip.style.pointerEvents = 'none';
+    tooltip.style.opacity = '0';
+    tooltip.style.transition = 'opacity 0.2s ease';
+
+    document.body.appendChild(tooltip);
+
+    // Position tooltip
+    const rect = element.getBoundingClientRect();
+    const tooltipRect = tooltip.getBoundingClientRect();
+
+    let left = rect.left + (rect.width / 2) - (tooltipRect.width / 2);
+    let top = rect.bottom + 8;
+
+    // Adjust if tooltip would go off screen
+    if (left < 8) left = 8;
+    if (left + tooltipRect.width > window.innerWidth - 8) {
+      left = window.innerWidth - tooltipRect.width - 8;
+    }
+    if (top + tooltipRect.height > window.innerHeight - 8) {
+      top = rect.top - tooltipRect.height - 8;
+    }
+
+    tooltip.style.left = `${left}px`;
+    tooltip.style.top = `${top}px`;
+
+    // Show tooltip
+    requestAnimationFrame(() => {
+      tooltip.style.opacity = '1';
+    });
+
+    this._currentTooltip = tooltip;
+  }
+
+  /**
+   * Hide custom senses tooltip
+   */
+  hideSensesTooltip() {
+    if (this._currentTooltip) {
+      this._currentTooltip.style.opacity = '0';
+      setTimeout(() => {
+        if (this._currentTooltip && this._currentTooltip.parentNode) {
+          this._currentTooltip.parentNode.removeChild(this._currentTooltip);
+        }
+        this._currentTooltip = null;
+      }, 200);
+    }
   }
 
   /**
    * Handle close action
    */
-  static _onClose(event, button) {
+  static _onClose() {
     const app = _currentSeekDialogInstance;
     if (app) {
       app.close();

@@ -45,14 +45,22 @@ export class DiversionActionHandler extends ActionHandlerBase {
     const dc = extractPerceptionDC(subject);
     const total = Number(actionData?.roll?.total ?? 0);
     const die = Number(
-      actionData?.roll?.dice?.[0]?.total ?? actionData?.roll?.terms?.[0]?.total ?? 0,
+      actionData?.roll?.dice?.[0]?.results?.[0]?.result ??
+      actionData?.roll?.dice?.[0]?.total ??
+      actionData?.roll?.terms?.[0]?.total ?? 0,
     );
     const margin = total - dc;
     const outcome = determineOutcome(total, die, dc);
 
     // Default new state via centralized mapping
     const { getDefaultNewStateFor } = await import('../data/action-state-config.js');
-    const newVisibility = getDefaultNewStateFor('create-a-diversion', current, outcome) || current;
+    let newVisibility = getDefaultNewStateFor('create-a-diversion', current, outcome) || current;
+    try {
+      const { FeatsHandler } = await import('../feats-handler.js');
+      newVisibility = FeatsHandler.adjustVisibility('create-a-diversion', actionData.actor, current, newVisibility, {
+        outcome,
+      });
+    } catch { }
 
     return {
       observer: subject,

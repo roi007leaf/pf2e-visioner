@@ -1,5 +1,6 @@
 {
   "PF2E_VISIONER": {
+    "ENVIRONMENT": {},
     "MODULE_TITLE": "PF2E Visioner",
     "TOKEN_MANAGER": {
       "TITLE": "Menedżer widoczności tokenów",
@@ -37,6 +38,30 @@
       "HIDDEN_OVERLAY": "Ten token jest ukryty przed Twoim widokiem",
       "UNDETECTED_OVERLAY": "Ten token jest niewykryty przez ciebie",
       "CONCEALED_OVERLAY": "Ten token jest przysłonięty dla ciebie"
+    },
+    "SPECIAL_SENSES": {
+      "vision": "(PL TODO) Vision",
+      "vision_description": "(PL TODO) Standard visual sense.",
+      "low_light_vision": "(PL TODO) Low-Light Vision",
+      "low_light_vision_description": "(PL TODO) See in dim light as bright.",
+      "infrared_vision": "(PL TODO) Infrared Vision",
+      "infrared_vision_description": "(PL TODO) Perceive heat signatures.",
+      "truesight": "(PL TODO) Truesight",
+      "truesight_description": "(PL TODO) See things as they truly are.",
+      "see_the_unseen": "(PL TODO) See the Unseen",
+      "see_the_unseen_description": "(PL TODO) Perceive otherwise unseen phenomena.",
+      "bloodsense": "(PL TODO) Bloodsense",
+      "bloodsense_description": "(PL TODO) Detect nearby blood.",
+      "magicsense": "(PL TODO) Magicsense",
+      "magicsense_description": "(PL TODO) Sense magical auras.",
+      "motion_sense": "(PL TODO) Motion Sense",
+      "motion_sense_description": "(PL TODO) Detect motion nearby.",
+      "spiritsense": "(PL TODO) Spiritsense",
+      "spiritsense_description": "(PL TODO) Sense spirits and undead.",
+      "thoughtsense": "(PL TODO) Thoughtsense",
+      "thoughtsense_description": "(PL TODO) Detect thinking creatures.",
+      "wavesense": "(PL TODO) Wavesense",
+      "wavesense_description": "(PL TODO) Perceive vibrations/waves through a medium."
     },
     "MECHANICAL_EFFECTS": {
       "HIDDEN_FLAT_CHECK": "Wymagany płaski test ST 11 do ustalenia celu",
@@ -99,7 +124,14 @@
       "RANGE_LIMIT_ACTIVE": "Aktywne ograniczenie zasięgu: Wyświetlane są tylko cele znajdujące się w odległości do 30 stóp.",
       "RANGE_LIMIT_ACTIVE_CUSTOM": "Aktywne ograniczenie zasięgu: Wyświetlane są tylko cele znajdujące się w odległości {distance} stóp.",
       "NO_TARGETS_IN_RANGE": "Brak ważnych celów w zasięgu 30 stóp.",
-      "NO_TARGETS_IN_RANGE_CUSTOM": "Brak ważnych celów w zasięgu {distance} stóp."
+      "NO_TARGETS_IN_RANGE_CUSTOM": "Brak ważnych celów w zasięgu {distance} stóp.",
+      "ECHOLOCATION_LABEL": "Echolokacja",
+      "ECHOLOCATION_TOOLTIP": "Dokładny słuch aktywny do początku twojej następnej tury",
+      "PREVIEW_AVAILABLE_SENSES": "(PL TODO) Available Senses"
+    },
+    "SENSE_PRECISION": {
+      "PRECISE": "(PL TODO) Precise",
+      "IMPRECISE": "(PL TODO) Imprecise"
     },
     "HIDE_AUTOMATION": {
       "BUTTON_APPLY": "Zastosuj wyniki Ukrywania",
@@ -165,6 +197,86 @@
         "name": "Włącz podpowiedzi po najechaniu kursorem",
         "hint": "Pokaż podpowiedzi dotyczące statusu widoczności po najechaniu kursorem na tokeny"
       },
+      "TOKEN_HUD_BUTTON": {
+        "name": "(PL) Przycisk HUD tokenu",
+        "hint": "(PL) Pokaż przycisk Visioner w HUD tokenu"
+      },
+      "VISIONER_SCENE_CONTROLS": {
+        "name": "(PL) Kontrolki sceny Visioner",
+        "hint": "(PL) Pokaż przyciski Visioner na paskach narzędzi"
+      },
+      "AVS_CHANGES_INDICATOR_SIZE": {
+        "name": "(PL) Rozmiar wskaźnika zmian AVS",
+        "hint": "(PL) Kontroluje rozmiar pływającego przycisku wskaźnika zmian AVS i jego podpowiedzi.",
+        "CHOICES": {
+          "small": "(PL) Mały",
+          "medium": "(PL) Średni",
+          "large": "(PL) Duży",
+          "xlarge": "(PL) Bardzo duży"
+        }
+      },
+      "REMOVE_PLAYER_TARGET_TOOLTIPS": {
+        "name": "(PL) Usuń podpowiedzi celu dla graczy",
+        "hint": "(PL) Gracze nie widzą podpowiedzi celu"
+      },
+      "MANAGER_ROLL_COMPARISON": {
+        "name": "(PL) Porównanie rzutów w menedżerze",
+        "hint": "(PL) Pokaż ostatni wynik rzutu vs ST"
+      },
+      "TOKEN_INTERSECTION_MODE": {
+        "name": "(PL) Tryb przecięcia tokenów",
+        "hint": "(PL) Sposób oceny blokujących tokenów",
+        "CHOICES": {
+          "any": "(PL) Dowolny",
+          "length10": "(PL) 10%",
+          "coverage": "(PL) Pokrycie boku",
+          "tactical": "(PL) Taktyczny"
+        }
+      },
+      "AUTO_COVER_IGNORE_UNDETECTED": {
+        "name": "(PL) Ignoruj niewykryte tokeny",
+        "hint": "(PL) Niewykryte tokeny nie blokują osłony"
+      },
+      "AUTO_COVER_VISUALIZATION_COMBAT_ONLY": {
+        "name": "(PL) Wizualizacja osłony tylko w walce",
+        "hint": "(PL) Pokazuj auto-osłonę tylko podczas walki"
+      },
+      "AUTO_COVER_GM_RESPECT_FOG": {
+        "name": "(PL) MG respektuje mgłę dla osłony",
+        "hint": "(PL) MG widzi osłonę jak gracze (mgła)"
+      },
+      "AUTO_COVER_IGNORE_DEAD": {
+        "name": "(PL) Ignoruj martwe tokeny",
+        "hint": "(PL) Tokeny z 0 HP nie blokują osłony"
+      },
+      "AUTO_COVER_IGNORE_ALLIES": {
+        "name": "(PL) Ignoruj sojuszników dla osłony",
+        "hint": "(PL) Sojusznicy nie blokują osłony"
+      },
+      "WALL_STANDARD_THRESHOLD": {
+        "name": "(PL) Próg standardowej osłony przez ścianę (%)",
+        "hint": "(PL) Procent zasłonięcia dla standardowej osłony"
+      },
+      "WALL_GREATER_THRESHOLD": {
+        "name": "(PL) Próg większej osłony przez ścianę (%)",
+        "hint": "(PL) Procent zasłonięcia dla większej osłony"
+      },
+      "WALLS_ALLOW_GREATER": {
+        "name": "(PL) Ściany mogą zapewniać większą osłonę",
+        "hint": "(PL) Gdy wyłączone, ściany nie dają większej osłony"
+      },
+      "IGNORE_PRONE_TOKENS": {
+        "name": "(PL) Ignoruj leżące tokeny",
+        "hint": "(PL) Leżące tokeny nie blokują osłony"
+      },
+      "KEYBIND_OPEN_MANAGER_TARGET_MODE": {
+        "name": "(PL) Skrót otwiera menedżera w trybie Celu",
+        "hint": "(PL) Domyślnie otwiera w trybie Celu"
+      },
+      "VISIONER_QUICK_EDIT_TOOL": {
+        "name": "(PL) Narzędzie szybkiej edycji Visioner",
+        "hint": "(PL) Pokaż narzędzie szybkiej edycji na pasku"
+      },
       "ALLOW_PLAYER_TOOLTIPS": {
         "name": "Zezwól na podpowiedzi dla gracza",
         "hint": "Po włączeniu tej opcji gracze mogą zobaczyć podpowiedzi dotyczące widoczności z własnej perspektywy po najechaniu kursorem na tokeny."
@@ -193,7 +305,11 @@
       },
       "IGNORE_ALLIES_DEFAULT": {
         "name": "Ignoruj sojuszników (domyślnie)",
-        "hint": "Ustawia domyślny stan pola wyboru „Ignoruj sojuszników” w oknach dialogowych Visioner i Menedżerze tokenów. Można przełączać tę opcję na żywo w każdym oknie dialogowym, aby filtrować wyniki w czasie rzeczywistym."
+        "hint": "Ustawia domyślny stan pola 'Ignoruj sojuszników' w oknach Visioner i Menedżerze Tokenów. Można zmienić na bieżąco w każdym dialogu."
+      },
+      "HIDE_FOUNDRY_HIDDEN_TOKENS": {
+        "name": "Ukryj ukryte w Foundry tokeny w UI",
+        "hint": "Gdy włączone, tokeny oznaczone jako ukryte (core Foundry) są filtrowane z okien/dialogów Visioner (poza przypadkami specjalnymi). Tylko filtr wizualny po stronie klienta."
       },
       "ENABLE_ALL_TOKENS_VISION": {
         "name": "Włącz wizję dla wszystkich tokenów",
@@ -292,7 +408,12 @@
     "UI": {
       "ENCOUNTER_FILTER_TEXT": "Pokaż tylko tokeny spotkań",
       "COVER_OVERRIDE": "Pomijanie osłony",
-      "ROLL": "Rzut"
+      "ROLL": "Rzut",
+      "APPLY_ALL": "Apply All",
+      "REVERT_ALL": "Revert All",
+      "REMOVE_OVERRIDES": "Remove Overrides",
+      "BULK_SET_VISIBILITY": "Bulk Set Visibility",
+      "CLEAR_BULK_OVERRIDES": "Clear Bulk Overrides"
     },
     "WALL": {
       "VISIBLE_TO_YOU": "Ukryta ściana",
@@ -303,6 +424,10 @@
       "OPEN_TOKEN_MANAGER": {
         "name": "Otwórz menedżera widoczności tokenów",
         "hint": "Otwórz menedżera tokenów dla wybranych tokenów"
+      },
+      "OPEN_QUICK_PANEL": {
+        "name": "(PL) Otwórz Panel Szybkiego Dostępu Visioner",
+        "hint": "(PL) Otwiera kompaktowy panel szybkiej edycji Visioner"
       },
       "OPEN_VISIBILITY_MANAGER": {
         "name": "Otwórz menedżera widoczności tokenów",
@@ -315,7 +440,46 @@
       "TOGGLE_OBSERVER_MODE": {
         "name": "Włącz/wyłącz tryb obserwatora dla podpowiedzi po najechaniu kursorem",
         "hint": "Przytrzymaj ten klawisz, aby przełączyć podpowiedzi po najechaniu kursorem do trybu obserwatora (jak token po najechaniu kursorem widzi inne)."
+      },
+      "SHOW_AUTO_COVER_OVERLAY": {
+        "name": "(PL) Pokaż nakładkę auto-osłony",
+        "hint": "(PL) Przytrzymaj aby pokazać znaczniki auto-osłony"
+      },
+      "HOLD_COVER_VISUALIZATION": {
+        "name": "(PL) Przytrzymaj aby wizualizować osłonę",
+        "hint": "(PL) Przytrzymaj aby zobaczyć pola osłony"
+      },
+      "OPEN_WALL_MANAGER": {
+        "name": "(PL) Otwórz Menedżera Ścian",
+        "hint": "(PL) Otwiera okno Menedżera Ścian Visioner"
       }
+    },
+    "AVS_OVERRIDE_DIALOG": {
+      "NO_OVERRIDES": "(PL TODO) No AVS overrides are currently active for this token.",
+      "CLOSE": "(PL TODO) Close",
+      "CLEAR_ALL": "(PL TODO) Clear All Overrides",
+      "CLEAR_ALL_CONFIRM_TITLE": "(PL TODO) Clear All AVS Overrides",
+      "OVERRIDE_REMOVED": "(PL TODO) AVS override removed: {observer} → {target}",
+      "ALL_OVERRIDES_CLEARED": "(PL TODO) All AVS overrides cleared for {token}",
+      "ERROR_REMOVING_OVERRIDE": "(PL TODO) Error removing AVS override",
+      "ERROR_CLEARING_OVERRIDES": "(PL TODO) Error clearing AVS overrides"
+    },
+    "REGION_BEHAVIOR": {
+      "TYPE_LABEL": "(PL TODO) PF2e Visioner Visibility",
+      "VISIBILITY_STATE": {
+        "label": "(PL TODO) Visibility State",
+        "hint": "(PL TODO) The visibility state to apply between tokens inside and outside the region"
+      },
+      "APPLY_TO_INSIDE_TOKENS": {
+        "label": "(PL TODO) Apply to Inside Tokens",
+        "hint": "(PL TODO) If enabled, tokens inside the region will have the visibility state applied to other tokens inside the region as well"
+      },
+      "TWO_WAY_REGION": {
+        "label": "(PL TODO) Two-Way Region",
+        "hint": "(PL TODO) If enabled, tokens outside the region will also have the visibility state applied to tokens inside the region"
+      },
+      "VISIBILITY_UPDATED": "(PL TODO) Region visibility updated for {count} token relationships",
+      "UPDATE_ERROR": "(PL TODO) Failed to update region visibility relationships"
     }
   }
 }

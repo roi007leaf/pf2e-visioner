@@ -27,6 +27,12 @@ export class CreateADiversionPreviewDialog extends BaseActionDialog {
     };
     this.encounterOnly = game.settings.get(MODULE_ID, 'defaultEncounterFilter');
     this.ignoreAllies = game.settings.get(MODULE_ID, 'ignoreAllies');
+    // Visual filter default from per-user setting
+    try {
+      this.hideFoundryHidden = game.settings.get(MODULE_ID, 'hideFoundryHiddenTokens');
+    } catch {
+      this.hideFoundryHidden = true;
+    }
     this.bulkActionState = 'initial'; // 'initial', 'applied', 'reverted'
 
     // Set global reference
@@ -51,6 +57,7 @@ export class CreateADiversionPreviewDialog extends BaseActionDialog {
       applyAll: CreateADiversionPreviewDialog._onApplyAll,
       revertAll: CreateADiversionPreviewDialog._onRevertAll,
       toggleEncounterFilter: CreateADiversionPreviewDialog._onToggleEncounterFilter,
+      toggleFilterByDetection: CreateADiversionPreviewDialog._onToggleFilterByDetection,
       overrideState: CreateADiversionPreviewDialog._onOverrideState,
     },
   };
@@ -76,7 +83,7 @@ export class CreateADiversionPreviewDialog extends BaseActionDialog {
       if (actorId) {
         processedOutcomes = processedOutcomes.filter((o) => o?.observer?.id !== actorId);
       }
-    } catch (_) {}
+    } catch { }
 
     // Apply ignore-allies filtering for display
     try {
@@ -87,7 +94,21 @@ export class CreateADiversionPreviewDialog extends BaseActionDialog {
         this.ignoreAllies,
         'observer',
       );
-    } catch (_) {}
+    } catch { }
+
+    // Apply detection filtering if enabled
+    if (this.filterByDetection && this.divertingToken) {
+      try {
+        const { filterOutcomesByDetection } = await import('../services/infra/shared-utils.js');
+        processedOutcomes = await filterOutcomesByDetection(processedOutcomes, this.divertingToken, 'observer', false, true, 'target_to_observer');
+      } catch { /* LOS filtering is non-critical */ }
+    }
+
+    // Apply defeated token filtering (exclude dead/unconscious tokens)
+    try {
+      const { filterOutcomesByDefeated } = await import('../services/infra/shared-utils.js');
+      processedOutcomes = filterOutcomesByDefeated(processedOutcomes, 'observer');
+    } catch { /* Defeated filtering is non-critical */ }
 
     // Prepare outcomes with additional UI data
     processedOutcomes = processedOutcomes.map((outcome) => {
@@ -119,6 +140,20 @@ export class CreateADiversionPreviewDialog extends BaseActionDialog {
       };
     });
 
+    // Visual filtering: hide Foundry-hidden tokens from display if enabled
+    try {
+      if (this.hideFoundryHidden) {
+        processedOutcomes = processedOutcomes.filter((o) => o?.observer?.document?.hidden !== true);
+      }
+    } catch { }
+
+    // Show-only-changes visual filter
+    try {
+      if (this.showOnlyChanges) {
+        processedOutcomes = processedOutcomes.filter((o) => !!o.hasActionableChange);
+      }
+    } catch { }
+
     // Prepare diverting token with proper image path
     context.divertingToken = {
       ...this.divertingToken,
@@ -126,6 +161,7 @@ export class CreateADiversionPreviewDialog extends BaseActionDialog {
     };
     context.outcomes = processedOutcomes;
     context.ignoreAllies = !!this.ignoreAllies;
+    context.hideFoundryHidden = !!this.hideFoundryHidden;
 
     // Store processed outcomes in instance for Apply All to use
     this.processedOutcomes = processedOutcomes;
@@ -141,7 +177,7 @@ export class CreateADiversionPreviewDialog extends BaseActionDialog {
   /**
    * Render the HTML for the application
    */
-  async _renderHTML(context, options) {
+  async _renderHTML(context) {
     const html = await foundry.applications.handlebars.renderTemplate(
       this.constructor.PARTS.content.template,
       context,
@@ -152,7 +188,7 @@ export class CreateADiversionPreviewDialog extends BaseActionDialog {
   /**
    * Replace the HTML content of the application
    */
-  _replaceHTML(result, content, options) {
+  _replaceHTML(result, content) {
     content.innerHTML = result;
     return content;
   }
@@ -160,7 +196,7 @@ export class CreateADiversionPreviewDialog extends BaseActionDialog {
   /**
    * Get available visibility states for override
    */
-  getAvailableStates(_outcome) {
+  getAvailableStates() {
     return [];
   }
 
@@ -207,6 +243,18 @@ export class CreateADiversionPreviewDialog extends BaseActionDialog {
       encounterFilter.checked = this.encounterOnly;
     }
 
+    try {
+      const cbh = this.element.querySelector('input[data-action="toggleHideFoundryHidden"]');
+      if (cbh) {
+        cbh.onchange = null;
+        cbh.addEventListener('change', async () => {
+          this.hideFoundryHidden = !!cbh.checked;
+          try { await game.settings.set(MODULE_ID, 'hideFoundryHiddenTokens', this.hideFoundryHidden); } catch { }
+          this.render({ force: true });
+        });
+      }
+    } catch { }
+
     // Wire ignore-allies checkbox if present
     try {
       const cb = this.element.querySelector('input[data-action="toggleIgnoreAllies"]');
@@ -218,7 +266,7 @@ export class CreateADiversionPreviewDialog extends BaseActionDialog {
           this.render({ force: true });
         });
       }
-    } catch (_) {}
+    } catch { }
 
     // Initialize bulk action buttons and handlers
     this.updateBulkActionButtons();
@@ -261,7 +309,7 @@ export class CreateADiversionPreviewDialog extends BaseActionDialog {
           inline: 'nearest',
         });
       }
-    } catch (_) {}
+    } catch { }
   }
 
   /**
@@ -278,8 +326,8 @@ export class CreateADiversionPreviewDialog extends BaseActionDialog {
     try {
       const { applyNowDiversion } = await import('../services/index.js');
       const overrides = { [tokenId]: effectiveNewState };
-      await applyNowDiversion({ ...app.actionData, overrides }, { html: () => {}, attr: () => {} });
-    } catch (_) {}
+      await applyNowDiversion({ ...app.actionData, overrides }, { html: () => { }, attr: () => { } });
+    } catch { }
 
     // Update button states
     app.updateRowButtonsToApplied([{ target: { id: tokenId }, hasActionableChange: true }]);
@@ -292,7 +340,7 @@ export class CreateADiversionPreviewDialog extends BaseActionDialog {
         revertAllButton.disabled = false;
         revertAllButton.innerHTML = '<i class="fas fa-undo"></i> Revert All';
       }
-    } catch (_) {}
+    } catch { }
     app.updateChangesCount();
   }
 
@@ -315,7 +363,7 @@ export class CreateADiversionPreviewDialog extends BaseActionDialog {
       await applyVisibilityChanges(app.actionData.actor, changes, {
         direction: 'observer_to_target',
       });
-    } catch (_) {}
+    } catch { }
 
     // Update button states
     app.updateRowButtonsToReverted([{ target: { id: tokenId }, hasActionableChange: true }]);
@@ -328,7 +376,7 @@ export class CreateADiversionPreviewDialog extends BaseActionDialog {
   /**
    * Handle apply all changes
    */
-  static async _onApplyAll(event, target) {
+  static async _onApplyAll() {
     // Get the dialog instance
     const app = currentDiversionDialog;
     if (!app) {
@@ -350,9 +398,7 @@ export class CreateADiversionPreviewDialog extends BaseActionDialog {
     }
 
     // Count active changes in the rendered dialog context
-    const totalChanges = app.element.querySelector(
-      '.create-a-diversion-preview-dialog-changes-count',
-    )?.textContent;
+    // Count is displayed in UI; Apply All uses filtered outcomes below
 
     // Use the processed outcomes that have already been filtered by encounter and ignore allies settings
     const filteredOutcomes = app.processedOutcomes || app.outcomes || [];
@@ -379,9 +425,9 @@ export class CreateADiversionPreviewDialog extends BaseActionDialog {
       }
       await applyNowDiversion(
         { ...app.actionData, ignoreAllies: app.ignoreAllies, overrides },
-        { html: () => {}, attr: () => {} },
+        { html: () => { }, attr: () => { } },
       );
-    } catch (_) {}
+    } catch { }
 
     // Update UI for each row
     app.updateRowButtonsToApplied(
@@ -400,7 +446,7 @@ export class CreateADiversionPreviewDialog extends BaseActionDialog {
   /**
    * Handle revert all changes
    */
-  static async _onRevertAll(event, target) {
+  static async _onRevertAll() {
     // Get the dialog instance
     const app = currentDiversionDialog;
     if (!app) {
@@ -416,9 +462,7 @@ export class CreateADiversionPreviewDialog extends BaseActionDialog {
     }
 
     // Count active changes in the rendered dialog context
-    const totalChanges = app.element.querySelector(
-      '.create-a-diversion-preview-dialog-changes-count',
-    )?.textContent;
+    // Count is displayed in UI; Revert All uses filtered outcomes below
 
     // Use the processed outcomes that have already been filtered by encounter and ignore allies settings
     const filteredOutcomes = app.processedOutcomes || app.outcomes || [];
@@ -439,9 +483,9 @@ export class CreateADiversionPreviewDialog extends BaseActionDialog {
       const { revertNowDiversion } = await import('../services/index.js');
       await revertNowDiversion(
         { ...app.actionData, ignoreAllies: app.ignoreAllies },
-        { html: () => {}, attr: () => {} },
+        { html: () => { }, attr: () => { } },
       );
-    } catch (_) {}
+    } catch { }
     app.updateRowButtonsToReverted(
       changedOutcomes.map((o) => ({ target: { id: o.observer.id }, hasActionableChange: true })),
     );
@@ -465,6 +509,17 @@ export class CreateADiversionPreviewDialog extends BaseActionDialog {
 
     // Re-render with new filter
     await app.render({ force: true });
+  }
+
+  /**
+   * Handle detection filter toggle
+   */
+  static async _onToggleFilterByDetection(event, target) {
+    const app = currentDiversionDialog;
+    if (!app) return;
+    app.filterByDetection = target.checked;
+    app.bulkActionState = 'initial';
+    app.render({ force: true });
   }
 
   /**
@@ -505,7 +560,7 @@ export class CreateADiversionPreviewDialog extends BaseActionDialog {
    * @param {Token} observerToken - The observer token
    * @param {string} newVisibility - The new visibility state
    */
-  async applyVisibilityChange(_observerToken, _newVisibility) {}
+  async applyVisibilityChange() { }
 
   /**
    * Update row buttons to applied state

@@ -4,20 +4,20 @@
 <table class="visibility-table">
   {{#if showOutcomeColumn}}
   <colgroup>
-    <col style="width:10%" />
-    <col style="width:15%" />
-    <col style="width:26%" />
-    <col style="width:18%" />
-    <col style="width:12%" />
-    <col style="width:19%" />
+  <col class="col-w-6" />  {{!-- Token --}}
+  <col class="col-w-16" /> {{!-- Name --}}
+  <col class="col-w-34" /> {{!-- Visibility selection (now includes trash when present) --}}
+  <col class="col-w-16" /> {{!-- Current State --}}
+  <col class="col-w-8" />  {{!-- DC --}}
+  <col class="col-w-20" /> {{!-- Outcome --}}
   </colgroup>
   {{else}}
   <colgroup>
-    <col style="width:10%" />
-    <col style="width:20%" />
-    <col style="width:32%" />
-    <col style="width:22%" />
-    <col style="width:16%" />
+  <col class="col-w-6" />  {{!-- Token --}}
+  <col class="col-w-20" /> {{!-- Name --}}
+  <col class="col-w-38" /> {{!-- Visibility selection (now includes trash when present) --}}
+  <col class="col-w-16" /> {{!-- Current State --}}
+  <col class="col-w-20" /> {{!-- DC --}}
   </colgroup>
   {{/if}}
   <thead>
@@ -34,9 +34,16 @@
   </thead>
   <tbody>
     {{#each tokens as |target|}}
-      <tr class="token-row {{sectionType}}-row {{#if target.dispositionClass}}{{target.dispositionClass}}-npc{{/if}}" data-token-id="{{target.id}}">
+  <tr class="token-row {{sectionType}}-row {{#if target.dispositionClass}}{{target.dispositionClass}}-npc{{/if}}" data-token-id="{{target.id}}" data-foundry-hidden="{{target.isFoundryHidden}}">
         <td class="token-image">
-          <img src="{{target.img}}" width="28" height="28" />
+          <div class="token-img-wrapper">
+            <img src="{{target.img}}" width="28" height="28" />
+            {{#if target.isFoundryHidden}}
+              <span class="foundry-hidden-indicator" data-tooltip="Foundry Hidden">
+                <i class="fas fa-eye-slash"></i>
+              </span>
+            {{/if}}
+          </div>
         </td>
         <td class="token-name">
           <strong>{{target.name}}</strong>
@@ -50,6 +57,11 @@
                 <i class="{{state.icon}}"></i>
               </button>
             {{/each}}
+            {{#if target.hasAvsOverride}}
+              <button type="button" class="state-icon remove-override" data-action="removeAvsOverride" data-token-id="{{target.id}}" data-tooltip="Remove AVS Override">
+                <i class="fas fa-trash"></i>
+              </button>
+            {{/if}}
             <input type="hidden" name="visibility.{{target.id}}" value="{{target.currentVisibilityState}}" />
           </div>
         </td>

@@ -3,19 +3,41 @@
  */
 
 import { MODULE_ID } from '../constants.js';
+import { AutoCoverHooks } from '../cover/auto-cover/AutoCoverHooks.js';
 import { onHighlightObjects } from '../services/hover-tooltips.js';
 import { registerChatHooks } from './chat.js';
 import { registerCombatHooks } from './combat.js';
 import { onCanvasReady, onReady } from './lifecycle.js';
 import { registerTokenHooks } from './token-events.js';
 import { registerUIHooks } from './ui.js';
-import { AutoCoverHooks } from '../cover/auto-cover/AutoCoverHooks.js';
 
-export function registerHooks() {
+export async function registerHooks() {
   Hooks.on('ready', onReady);
   Hooks.on('canvasReady', onCanvasReady);
-
+  const { registerHooks: registerOptimized } = await import('../hooks/optimized-registration.js');
+  registerOptimized();
   registerChatHooks();
+
+  // Initialize turn-based sneak tracker for Sneaky/Very Sneaky feats
+  try {
+    await import('../chat/services/turn-sneak-tracker.js');
+    // The tracker auto-registers its hooks in the constructor
+  } catch (error) {
+    console.error('PF2E Visioner | Failed to initialize turn sneak tracker:', error);
+  }
+
+  // Hook to capture token positions at the moment stealth rolls are made
+  Hooks.on('preCreateChatMessage', async (message) => {
+    try {
+      // Import the position capture service
+      const { captureRollTimePosition } = await import(
+        '../chat/services/position-capture-service.js'
+      );
+      await captureRollTimePosition(message);
+    } catch (error) {
+      console.warn('PF2E Visioner | Failed to capture roll-time position:', error);
+    }
+  });
 
   Hooks.on('highlightObjects', onHighlightObjects);
 
@@ -33,7 +55,7 @@ export function registerHooks() {
       const { updateWallVisuals } = await import('../services/visual-effects.js');
       const id = canvas.tokens.controlled?.[0]?.id || null;
       await updateWallVisuals(id);
-    } catch (_) {}
+    } catch { }
   });
   Hooks.on('updateWall', async (doc, changes) => {
     try {
@@ -71,12 +93,12 @@ export function registerHooks() {
                 await canvas.scene?.updateEmbeddedDocuments?.('Token', updates, { diff: false });
               }
             }
-          } catch (_) {}
+          } catch (_) { }
           // Mirror hidden flag to connected walls
           try {
             const { mirrorHiddenFlagToConnected } = await import('../services/connected-walls.js');
             await mirrorHiddenFlagToConnected(doc, true);
-          } catch (_) {}
+          } catch (_) { }
         } else {
           // If unhidden, remove entries for that wall from tokens
           try {
@@ -109,20 +131,20 @@ export function registerHooks() {
                 await canvas.scene?.updateEmbeddedDocuments?.('Token', updates, { diff: false });
               }
             }
-          } catch (_) {}
+          } catch (_) { }
           // Mirror hidden flag to connected walls (set hidden=false)
           try {
             const { mirrorHiddenFlagToConnected } = await import('../services/connected-walls.js');
             await mirrorHiddenFlagToConnected(doc, false);
-          } catch (_) {}
+          } catch (_) { }
         }
       }
-    } catch (_) {}
+    } catch (_) { }
     try {
       const { updateWallVisuals } = await import('../services/visual-effects.js');
       const id = canvas.tokens.controlled?.[0]?.id || null;
       await updateWallVisuals(id);
-    } catch (_) {}
+    } catch { }
   });
   Hooks.on('deleteWall', async (wallDocument) => {
     try {
@@ -130,46 +152,104 @@ export function registerHooks() {
       const { cleanupDeletedWallVisuals } = await import('../services/visual-effects.js');
       await cleanupDeletedWallVisuals(wallDocument);
 
+      // Check if we have very few walls left - might indicate mass deletion
+      const remainingWalls = canvas?.walls?.placeables?.length || 0;
+      if (remainingWalls <= 2) {
+        // Likely a mass deletion scenario - do global cleanup to catch any orphaned indicators
+        const { cleanupAllWallIndicators } = await import('../services/visual-effects.js');
+        await cleanupAllWallIndicators();
+      }
+
       // Update wall visuals for remaining walls
       const { updateWallVisuals } = await import('../services/visual-effects.js');
       const id = canvas.tokens.controlled?.[0]?.id || null;
       await updateWallVisuals(id);
-    } catch (_) {}
+    } catch { }
   });
-  // Refresh indicators on selection changes so only selected player tokens reveal observed walls
-  Hooks.on('controlToken', async (_token, _controlled) => {
+
+  // Removed controlToken hook - was causing excessive updateWallVisuals calls on token selection.
+  // Wall visual updates should only occur when wall flags actually change, which is properly
+  // handled by TokenEventHandler._handleWallFlagChanges method.
+
+  // NOTE: Removed global 'updateToken' hook that was calling updateWallVisuals on every token update
+  // This was causing hundreds of calls during movement animation. Wall visual updates are now
+  // properly handled by TokenEventHandler._handleWallFlagChanges only when wall flags actually change.
+
+  // Prevent movement while awaiting Start Sneak confirmation
+  Hooks.on('preUpdateToken', (tokenDoc, changes, options, userId) => {
     try {
-      const { updateWallVisuals } = await import('../services/visual-effects.js');
-      const id = canvas.tokens.controlled?.[0]?.id || null;
-      await updateWallVisuals(id);
-    } catch (_) {}
+      // Only care about positional movement
+      if (!('x' in changes || 'y' in changes)) return;
+      // Allow GMs to always move
+      if (game.users?.get(userId)?.isGM) return;
+      const actor = tokenDoc?.actor;
+      if (!actor) return;
+      // Determine waiting state either via our custom token flag or effect slug.
+      const hasWaitingFlag = tokenDoc.getFlag?.(MODULE_ID, 'waitingSneak');
+      let waitingEffect = null;
+      // Only search effects if we don't already have the flag (cheap boolean first)
+      if (!hasWaitingFlag) {
+        waitingEffect = actor.itemTypes?.effect?.find?.(e => e?.system?.slug === 'waiting-for-sneak-start');
+      }
+      if (!hasWaitingFlag && !waitingEffect) return;
+      // Block movement for non-GM users
+      ui.notifications?.warn?.('You cannot move until Sneak has started.');
+      return false; // Cancel update
+    } catch (e) {
+      console.warn('PF2E Visioner | preUpdateToken movement block failed:', e);
+    }
   });
-  Hooks.on('updateToken', async () => {
+
+  // Removed createToken hook - was causing excessive updateWallVisuals calls on token creation.
+  // Wall visual updates should only occur when wall flags actually change, which is properly
+  // handled by TokenEventHandler._handleWallFlagChanges method.
+
+  // Removed deleteToken hook - was causing excessive updateWallVisuals calls on token deletion.
+  // Wall visual updates should only occur when wall flags actually change, which is properly
+  // handled by TokenEventHandler._handleWallFlagChanges method.
+
+  // NOTE: Removed problematic 'refreshToken' hook that was calling updateWallVisuals on every token refresh
+  // This was triggered by animation frames during movement, causing hundreds of calls. Wall visual updates are now
+  // properly handled by TokenEventHandler._handleWallFlagChanges only when wall flags actually change.
+
+  // If effects are manually removed, clear corresponding token flags
+  Hooks.on('deleteItem', async (item) => {
     try {
-      const { updateWallVisuals } = await import('../services/visual-effects.js');
-      const id = canvas.tokens.controlled?.[0]?.id || null;
-      await updateWallVisuals(id);
-    } catch (_) {}
-  });
-  Hooks.on('createToken', async () => {
-    try {
-      const { updateWallVisuals } = await import('../services/visual-effects.js');
-      const id = canvas.tokens.controlled?.[0]?.id || null;
-      await updateWallVisuals(id);
-    } catch (_) {}
-  });
-  Hooks.on('deleteToken', async () => {
-    try {
-      const { updateWallVisuals } = await import('../services/visual-effects.js');
-      const id = canvas.tokens.controlled?.[0]?.id || null;
-      await updateWallVisuals(id);
-    } catch (_) {}
-  });
-  Hooks.on('refreshToken', async () => {
-    try {
-      const { updateWallVisuals } = await import('../services/visual-effects.js');
-      const id = canvas.tokens.controlled?.[0]?.id || null;
-      await updateWallVisuals(id);
-    } catch (_) {}
+      if (item?.type !== 'effect') return;
+
+      const actor = item?.parent;
+      if (!actor) return;
+
+      // Find any active tokens for this actor on the current scene
+      const tokens = canvas.tokens?.placeables?.filter(t => t.actor?.id === actor.id) || [];
+
+      // Handle waiting-for-sneak-start effect removal
+      if (item?.system?.slug === 'waiting-for-sneak-start') {
+        for (const t of tokens) {
+          if (t.document.getFlag('pf2e-visioner', 'waitingSneak')) {
+            try { await t.document.unsetFlag('pf2e-visioner', 'waitingSneak'); } catch { }
+            try { if (t.locked) t.locked = false; } catch { }
+          }
+        }
+      }
+
+      // Handle Sneaking effect removal - clear sneak-active flag as failsafe
+      const isSneakingEffect = item?.flags?.['pf2e-visioner']?.sneakingEffect;
+      if (isSneakingEffect) {
+        for (const t of tokens) {
+          const hasSneakActive = t.document.getFlag('pf2e-visioner', 'sneak-active');
+          if (hasSneakActive) {
+            try {
+              await t.document.unsetFlag('pf2e-visioner', 'sneak-active');
+            } catch {
+              console.error(`PF2E Visioner | Failed to clear sneak-active flag for ${t.name}`);
+            }
+          }
+        }
+      }
+
+    } catch (e) {
+      console.warn('PF2E Visioner | deleteItem cleanup failed:', e);
+    }
   });
 }

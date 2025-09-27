@@ -64,7 +64,7 @@ export class DetectionWrapper {
 export function initializeDetectionWrapper() {
   try {
     (DetectionWrapper._instance ||= new DetectionWrapper()).register();
-  } catch (_) {}
+  } catch (_) { }
 }
 
 /**
@@ -83,6 +83,14 @@ const VISIBILITY_VALUES = {
  */
 function detectionModeTestVisibility(visionSource, mode, config = {}) {
   if (!mode.enabled) return false;
+
+  // Check if target is currently sneaking - if so, force hidden visibility
+  // This prevents other tokens from seeing the sneaking token
+  const isSneaking = config.object?.document?.getFlag(MODULE_ID, 'sneak-active');
+  if (isSneaking) {
+    return false;
+  }
+
   if (!this._canDetect(visionSource, config.object, config)) return false;
   return config.tests.some((test) => this._testPoint(visionSource, mode, config.object, test));
 }
@@ -115,7 +123,7 @@ function canDetectWrapper(threshold) {
           return false;
         }
       }
-    } catch (_) {}
+    } catch (_) { }
 
     // Check our module's visibility settings
     const origin = visionSource.object;

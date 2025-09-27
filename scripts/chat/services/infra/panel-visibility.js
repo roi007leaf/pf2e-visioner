@@ -28,6 +28,11 @@ export function shouldInjectPanel(message, actionData) {
         return true;
       }
 
+      // Allow players for Sneak so they can press "Start Sneak"
+      if (actionData.actionType === 'sneak') {
+        return true;
+      }
+
       return false;
     }
 
@@ -39,7 +44,7 @@ export function shouldInjectPanel(message, actionData) {
       }
     }
     return true;
-  } catch (_) {
+  } catch {
     // On any unexpected error, default to showing the panel for GM only
     return !!game.user?.isGM;
   }
