@@ -524,7 +524,7 @@ export class SneakPreviewDialog extends BaseActionDialog {
 
         badges.push({
           key: isVery ? 'very-sneaky' : 'sneaky',
-          icon: 'fas fa-ninja',
+          icon: 'fas fa-user-ninja',
           label: isVery ? 'Very Sneaky' : 'Sneaky',
           tooltip: sneakCount > 1
             ? `${isVery ? 'Very Sneaky' : 'Sneaky'} feat active - End position checks deferred to turn end (${sneakCount} consecutive sneaks this turn)`
@@ -1961,6 +1961,15 @@ export class SneakPreviewDialog extends BaseActionDialog {
   async _clearSneakActiveFlag() {
     try {
       if (this.sneakingToken) {
+        // Check if sneak-active flag should persist until end of turn for Sneaky/Very Sneaky feat users
+        const shouldPreserve = turnSneakTracker?.shouldPreserveSneakActiveFlag?.(this.sneakingToken);
+
+        if (shouldPreserve) {
+          console.log(`PF2E Visioner | Preserving sneak-active flag and Sneaking effect for ${this.sneakingToken.name} until end of turn (Sneaky/Very Sneaky feat)`);
+          // Don't clear the flag or effect - let TurnSneakTracker handle it at end of turn
+          return;
+        }
+
         await this.sneakingToken.document.unsetFlag('pf2e-visioner', 'sneak-active');
         try {
           const { SneakSpeedService } = await import('../services/sneak-speed-service.js');

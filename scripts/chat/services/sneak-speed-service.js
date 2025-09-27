@@ -9,6 +9,8 @@
  * - A legacy flag (sneak-original-walk-speed) may exist from previous versions and is cleared on restore
  */
 
+import turnSneakTracker from './turn-sneak-tracker.js';
+
 const MODULE_ID = 'pf2e-visioner';
 const ORIGINAL_SPEED_FLAG = 'sneak-original-walk-speed';
 const EFFECT_ID_FLAG = 'sneak-speed-effect-id';
@@ -90,7 +92,7 @@ export class SneakSpeedService {
               // Keep duration flexible; we’ll remove explicitly on restore
               duration: { unit: 'unlimited' },
             },
-            flags: { [MODULE_ID]: { sneakSpeedEffect: true } },
+            flags: { [MODULE_ID]: { sneakingEffect: true } },
           };
           const created = await actor.createEmbeddedDocuments('Item', [effectData]);
           const effect = Array.isArray(created) ? created[0] : null;
@@ -117,6 +119,14 @@ export class SneakSpeedService {
       const actor = SneakSpeedService.resolveActor(tokenOrActor);
       if (!actor) return;
 
+      // Check if we should preserve the Sneaking effect for Sneaky/Very Sneaky feat users
+      const shouldPreserveEffect = SneakSpeedService._shouldPreserveSneakingEffect(tokenOrActor, actor);
+
+      if (shouldPreserveEffect) {
+        console.log(`PF2E Visioner | Preserving Sneaking effect for ${actor.name} until end of turn (Sneaky/Very Sneaky feat)`);
+        return; // Don't remove the effect yet
+      }
+
       // Remove created effect if it exists
       try {
         const effectId = actor.getFlag?.(MODULE_ID, EFFECT_ID_FLAG);
@@ -137,6 +147,69 @@ export class SneakSpeedService {
       }
     } catch (error) {
       console.warn('PF2E Visioner | Failed to restore sneak walk speed:', error);
+    }
+  }
+
+  /**
+   * Check if the Sneaking effect should be preserved for Sneaky/Very Sneaky feat users
+   * @param {Token|Actor} tokenOrActor - Original token or actor reference
+   * @param {Actor} actor - Resolved actor
+   * @returns {boolean} True if effect should be preserved until end of turn
+   * @private
+   */
+  static _shouldPreserveSneakingEffect(tokenOrActor, actor) {
+    try {
+      // If we have the original token, use it directly
+      if (tokenOrActor && tokenOrActor.actor && typeof turnSneakTracker?.shouldPreserveSneakActiveFlag === 'function') {
+        return turnSneakTracker.shouldPreserveSneakActiveFlag(tokenOrActor);
+      }
+
+      // Otherwise, try to find a token for this actor on the current scene
+      if (canvas?.tokens?.placeables && actor) {
+        const token = canvas.tokens.placeables.find(t => t.actor?.id === actor.id);
+        if (token && typeof turnSneakTracker?.shouldPreserveSneakActiveFlag === 'function') {
+          return turnSneakTracker.shouldPreserveSneakActiveFlag(token);
+        }
+      }
+    } catch (error) {
+      console.warn('PF2E Visioner | Error checking Sneaking effect preservation:', error);
+    }
+
+    return false; // Default to not preserving if we can't determine
+  }
+
+  /**
+   * Force restore sneak walk speed without checking feat preservation
+   * Used by TurnSneakTracker for end-of-turn cleanup
+   * @param {Token|Actor} tokenOrActor
+   * @private
+   */
+  static async _forceRestoreSneakWalkSpeed(tokenOrActor) {
+    try {
+      const actor = SneakSpeedService.resolveActor(tokenOrActor);
+      if (!actor) return;
+
+      // Force remove created effect if it exists (bypass feat check)
+      try {
+        const effectId = actor.getFlag?.(MODULE_ID, EFFECT_ID_FLAG);
+        if (effectId) {
+          const effectExists = actor.items?.get?.(effectId) || actor.items?.find?.((i) => i.id === effectId);
+          if (effectExists && typeof actor.deleteEmbeddedDocuments === 'function') {
+            await actor.deleteEmbeddedDocuments('Item', [effectId]);
+          }
+          await actor.unsetFlag(MODULE_ID, EFFECT_ID_FLAG);
+        }
+      } catch (e) {
+        console.error('PF2E Visioner | Failed force removing sneak speed effect (continuing):', e);
+      }
+
+      // Clear legacy original speed flag if present (backward compatibility)
+      const original = actor.getFlag?.(MODULE_ID, ORIGINAL_SPEED_FLAG);
+      if (original !== undefined && original !== null) {
+        await actor.unsetFlag(MODULE_ID, ORIGINAL_SPEED_FLAG);
+      }
+    } catch (error) {
+      console.warn('PF2E Visioner | Failed to force restore sneak walk speed:', error);
     }
   }
 

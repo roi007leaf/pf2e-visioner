@@ -1169,6 +1169,15 @@ export class SneakActionHandler extends ActionHandlerBase {
   async _clearSneakFlag(actionData) {
     try {
       if (actionData?.sneakingToken) {
+        // Check if sneak-active flag should persist until end of turn for Sneaky/Very Sneaky feat users
+        const shouldPreserve = turnSneakTracker?.shouldPreserveSneakActiveFlag?.(actionData.sneakingToken);
+
+        if (shouldPreserve) {
+          console.log(`PF2E Visioner | Preserving sneak-active flag and Sneaking effect for ${actionData.sneakingToken.name} until end of turn (Sneaky/Very Sneaky feat)`);
+          // Don't clear the flag or effect - let TurnSneakTracker handle it at end of turn
+          return;
+        }
+
         await actionData.sneakingToken.document.unsetFlag('pf2e-visioner', 'sneak-active');
         // Restore walk speed after sneak ends
         try {

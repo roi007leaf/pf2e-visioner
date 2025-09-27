@@ -167,6 +167,22 @@ class TurnSneakTracker {
     }
 
     /**
+     * Check if a token's sneak-active flag should persist until end of turn
+     * This applies to tokens with Sneaky/Very Sneaky feats that are actively tracked
+     * @param {Token} token - Token to check
+     * @returns {boolean} True if sneak-active flag should persist until end of turn
+     */
+    shouldPreserveSneakActiveFlag(token) {
+        if (!token) return false;
+
+        // Only preserve if token has the feat and is being actively tracked
+        if (!this.hasSneakyFeat(token)) return false;
+
+        const turnState = this.getTurnSneakState(token);
+        return turnState && turnState.isActive;
+    }
+
+    /**
      * Handle end of turn - perform deferred prerequisite checks
      * @param {Combatant} combatant - Combatant whose turn ended
      * @param {Combat} encounter - Combat encounter
@@ -270,6 +286,38 @@ class TurnSneakTracker {
             } catch (error) {
                 console.error('PF2E Visioner | Error processing deferred check:', error);
             }
+        }
+
+        // Clear sneak-active flag and Sneaking effect now that end-of-turn evaluation is complete
+        await this._clearSneakActiveFlag(sneakingToken);
+        await this._clearSneakingEffect(sneakingToken);
+    }
+
+    /**
+     * Clear sneak-active flag from a token
+     * @param {Token} token - Token to clear flag from
+     */
+    async _clearSneakActiveFlag(token) {
+        try {
+            await token.document.unsetFlag('pf2e-visioner', 'sneak-active');
+            console.log(`PF2E Visioner | Cleared sneak-active flag for ${token.name} at end of turn`);
+        } catch (error) {
+            console.warn('PF2E Visioner | Failed to clear sneak-active flag:', error);
+        }
+    }
+
+    /**
+     * Clear Sneaking effect from a token
+     * @param {Token} token - Token to clear effect from
+     */
+    async _clearSneakingEffect(token) {
+        try {
+            const { SneakSpeedService } = await import('../sneak-speed-service.js');
+            // Force removal of the Sneaking effect by calling restore with bypass flag
+            await SneakSpeedService._forceRestoreSneakWalkSpeed(token);
+            console.log(`PF2E Visioner | Cleared Sneaking effect for ${token.name} at end of turn`);
+        } catch (error) {
+            console.warn('PF2E Visioner | Failed to clear Sneaking effect:', error);
         }
     }
 

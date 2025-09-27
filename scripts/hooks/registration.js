@@ -213,21 +213,42 @@ export async function registerHooks() {
   // This was triggered by animation frames during movement, causing hundreds of calls. Wall visual updates are now
   // properly handled by TokenEventHandler._handleWallFlagChanges only when wall flags actually change.
 
-  // If the waiting-for-sneak-start effect is manually removed, clear the token flag so movement becomes allowed.
+  // If effects are manually removed, clear corresponding token flags
   Hooks.on('deleteItem', async (item) => {
     try {
       if (item?.type !== 'effect') return;
-      if (item?.system?.slug !== 'waiting-for-sneak-start') return;
+
       const actor = item?.parent;
       if (!actor) return;
+
       // Find any active tokens for this actor on the current scene
       const tokens = canvas.tokens?.placeables?.filter(t => t.actor?.id === actor.id) || [];
-      for (const t of tokens) {
-        if (t.document.getFlag('pf2e-visioner', 'waitingSneak')) {
-          try { await t.document.unsetFlag('pf2e-visioner', 'waitingSneak'); } catch { }
-          try { if (t.locked) t.locked = false; } catch { }
+
+      // Handle waiting-for-sneak-start effect removal
+      if (item?.system?.slug === 'waiting-for-sneak-start') {
+        for (const t of tokens) {
+          if (t.document.getFlag('pf2e-visioner', 'waitingSneak')) {
+            try { await t.document.unsetFlag('pf2e-visioner', 'waitingSneak'); } catch { }
+            try { if (t.locked) t.locked = false; } catch { }
+          }
         }
       }
+
+      // Handle Sneaking effect removal - clear sneak-active flag as failsafe
+      const isSneakingEffect = item?.flags?.['pf2e-visioner']?.sneakingEffect;
+      if (isSneakingEffect) {
+        for (const t of tokens) {
+          const hasSneakActive = t.document.getFlag('pf2e-visioner', 'sneak-active');
+          if (hasSneakActive) {
+            try {
+              await t.document.unsetFlag('pf2e-visioner', 'sneak-active');
+            } catch {
+              console.error(`PF2E Visioner | Failed to clear sneak-active flag for ${t.name}`);
+            }
+          }
+        }
+      }
+
     } catch (e) {
       console.warn('PF2E Visioner | deleteItem cleanup failed:', e);
     }
