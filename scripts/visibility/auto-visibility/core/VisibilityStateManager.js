@@ -33,10 +33,14 @@ export class VisibilityStateManager {
     /** @type {Function} - Callback to get exclusion manager (injected dependency) */
     #exclusionManager = null;
 
+    /** @type {import('./SystemStateProvider.js').SystemStateProvider} - System state provider for AVS enabled checks */
+    #systemStateProvider = null;
+
     constructor(dependencies = {}) {
         this.#batchProcessor = dependencies.batchProcessor;
         this.#spatialAnalyzer = dependencies.spatialAnalyzer;
         this.#exclusionManager = dependencies.exclusionManager;
+        this.#systemStateProvider = dependencies.systemStateProvider;
     }
 
     /**
@@ -173,6 +177,14 @@ export class VisibilityStateManager {
             return;
         }
 
+        // Critical check: Don't process batches when AVS is disabled
+        if (this.#systemStateProvider &&
+            typeof this.#systemStateProvider.isEnabled === 'function' &&
+            !this.#systemStateProvider.isEnabled()) {
+            // AVS is disabled - clear any pending changes and don't process
+            this.#changedTokens.clear();
+            return;
+        }
 
         this.#processingBatch = true;
         try {

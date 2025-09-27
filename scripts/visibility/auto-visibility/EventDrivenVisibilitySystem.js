@@ -149,7 +149,8 @@ export class EventDrivenVisibilitySystem {
         batchProcessor: (changedTokens) => this.#batchOrchestrator.enqueueTokens(changedTokens),
         spatialAnalyzer: (oldPos, newPos, tokenId) =>
           coreServices.spatialAnalysisService.getAffectedTokens(oldPos, newPos, tokenId),
-        exclusionManager: () => coreServices.exclusionManager
+        exclusionManager: () => coreServices.exclusionManager,
+        systemStateProvider: this.#systemStateProvider
       });
 
       // Initialize all event handlers using EventHandlerFactory

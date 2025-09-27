@@ -104,7 +104,8 @@ export class DependencyInjectionContainer {
             return new VisibilityStateManager({
                 batchProcessor: dependencies.batchProcessor,
                 spatialAnalyzer: dependencies.spatialAnalyzer,
-                exclusionManager: dependencies.exclusionManager
+                exclusionManager: dependencies.exclusionManager,
+                systemStateProvider: dependencies.systemStateProvider
             });
         });
 

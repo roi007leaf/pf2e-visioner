@@ -282,8 +282,8 @@ export class SneakPreviewDialog extends BaseActionDialog {
             }
           })();
           effective = FeatsHandler.overridePrerequisites(this.sneakingToken, effective, {
-            startVisibility: sp.avsVisibility,
-            endVisibility: ep.avsVisibility,
+            startVisibility: sp.effectiveVisibility,
+            endVisibility: ep.effectiveVisibility,
             endCoverState: ep.coverState,
             inNaturalTerrain: inNatural,
             impreciseOnly: outcome?.impreciseOnly || false,
@@ -774,8 +774,8 @@ export class SneakPreviewDialog extends BaseActionDialog {
             }
           })();
           effective = FeatsHandler.overridePrerequisites(this.sneakingToken, effective, {
-            startVisibility: sp.avsVisibility,
-            endVisibility: ep.avsVisibility,
+            startVisibility: sp.effectiveVisibility,
+            endVisibility: ep.effectiveVisibility,
             endCoverState: ep.coverState,
             inNaturalTerrain: inNatural,
             impreciseOnly: outcome?.impreciseOnly || false,
@@ -902,7 +902,7 @@ export class SneakPreviewDialog extends BaseActionDialog {
           // Update the outcome with fresh end position data
           if (currentEndPosition) {
             outcome.endCover = currentEndPosition.coverState;
-            outcome.endVisibility = currentEndPosition.avsVisibility;
+            outcome.endVisibility = currentEndPosition.effectiveVisibility;
 
             // Also compute a live end visibility ignoring overrides for higher-fidelity dim/dark checks
             try {
@@ -923,22 +923,22 @@ export class SneakPreviewDialog extends BaseActionDialog {
               const startCover = startState?.cover || 'none';
 
               outcome.positionTransition = {
-                hasChanged: startVisibility !== currentEndPosition.avsVisibility,
+                hasChanged: startVisibility !== currentEndPosition.effectiveVisibility,
                 transitionType:
-                  startVisibility !== currentEndPosition.avsVisibility ? 'improved' : 'unchanged',
-                avsVisibilityChanged: startVisibility !== currentEndPosition.avsVisibility,
+                  startVisibility !== currentEndPosition.effectiveVisibility ? 'improved' : 'unchanged',
+                avsVisibilityChanged: startVisibility !== currentEndPosition.effectiveVisibility,
                 coverStateChanged: startCover !== currentEndPosition.coverState,
                 stealthBonusChange: 0,
                 impactOnDC: 0,
                 startPosition: {
-                  avsVisibility: startVisibility,
+                  effectiveVisibility: startVisibility,
                   coverState: startCover,
                   stealthBonus: 0,
                   distance: currentEndPosition.distance || 0,
                   lightingConditions: currentEndPosition.lightingConditions || 'bright',
                 },
                 endPosition: {
-                  avsVisibility: currentEndPosition.avsVisibility,
+                  effectiveVisibility: currentEndPosition.effectiveVisibility,
                   coverState: currentEndPosition.coverState,
                   stealthBonus: 0,
                   distance: currentEndPosition.distance || 0,
@@ -1063,10 +1063,10 @@ export class SneakPreviewDialog extends BaseActionDialog {
 
       // Start position display
       startPosition: {
-        visibility: startPos.avsVisibility,
-        visibilityLabel: this._getVisibilityLabel(startPos.avsVisibility),
-        visibilityIcon: this._getVisibilityIcon(startPos.avsVisibility),
-        visibilityClass: this._getVisibilityClass(startPos.avsVisibility),
+        visibility: startPos.effectiveVisibility,
+        visibilityLabel: this._getVisibilityLabel(startPos.effectiveVisibility),
+        visibilityIcon: this._getVisibilityIcon(startPos.effectiveVisibility),
+        visibilityClass: this._getVisibilityClass(startPos.effectiveVisibility),
         cover: startPos.coverState,
         coverLabel: this._getCoverLabel(startPos.coverState),
         coverIcon: this._getCoverIcon(startPos.coverState),
@@ -1084,10 +1084,10 @@ export class SneakPreviewDialog extends BaseActionDialog {
 
       // End position display
       endPosition: {
-        visibility: endPos.avsVisibility,
-        visibilityLabel: this._getVisibilityLabel(endPos.avsVisibility),
-        visibilityIcon: this._getVisibilityIcon(endPos.avsVisibility),
-        visibilityClass: this._getVisibilityClass(endPos.avsVisibility),
+        visibility: endPos.effectiveVisibility,
+        visibilityLabel: this._getVisibilityLabel(endPos.effectiveVisibility),
+        visibilityIcon: this._getVisibilityIcon(endPos.effectiveVisibility),
+        visibilityClass: this._getVisibilityClass(endPos.effectiveVisibility),
         cover: endPos.coverState,
         coverLabel: this._getCoverLabel(endPos.coverState),
         coverIcon: this._getCoverIcon(endPos.coverState),

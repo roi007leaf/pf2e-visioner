@@ -168,7 +168,7 @@ export class HidePreviewDialog extends BaseActionDialog {
           try {
             const { FeatsHandler } = await import('../services/feats-handler.js');
             const startVisibility = outcome.oldVisibility || outcome.currentVisibility || 'observed';
-            const endVisibility = endPos?.avsVisibility || startVisibility;
+            const endVisibility = endPos?.effectiveVisibility || startVisibility;
             const endCoverState = endPos?.coverState || 'none';
             // Construct a base prerequisite object (start: need cover/concealment unless feats)
             let base = {
@@ -195,13 +195,13 @@ export class HidePreviewDialog extends BaseActionDialog {
 
           outcome.positionDisplay = {
             endPosition: {
-              visibility: endPos.avsVisibility,
+              visibility: endPos.effectiveVisibility,
               cover: endPos.coverState,
               qualifies,
             },
           };
           outcome.hasPositionData = true;
-          outcome.positionTransition = { endPosition: { avsVisibility: endPos.avsVisibility, coverState: endPos.coverState } };
+          outcome.positionTransition = { endPosition: { effectiveVisibility: endPos.effectiveVisibility, coverState: endPos.coverState } };
           // Apply prereq gating: if end doesn't qualify → observed; else ensure the calculated outcome is used
           if (!qualifies) {
             outcome.newVisibility = 'observed';
@@ -790,7 +790,7 @@ export class HidePreviewDialog extends BaseActionDialog {
     try {
       if (!endPos) return false;
       if (endPos.coverState && (endPos.coverState === 'standard' || endPos.coverState === 'greater')) return true;
-      if (endPos.avsVisibility === 'concealed') return true;
+      if (endPos.effectiveVisibility === 'concealed') return true;
       return false;
     } catch { return false; }
   }
