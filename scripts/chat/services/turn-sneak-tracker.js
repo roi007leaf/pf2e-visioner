@@ -201,8 +201,15 @@ class TurnSneakTracker {
 
             console.log('PF2E Visioner | Processing end-of-turn sneak checks for:', turnState.sneakingToken.name);
 
-            // Perform deferred end-position checks
-            await this._processDeferredChecks(turnState);
+            // Perform deferred end-position checks if any exist
+            if (turnState.deferredChecks.size > 0) {
+                await this._processDeferredChecks(turnState);
+            } else {
+                // Even if no deferred checks, still need to clean up preserved sneak state
+                console.log('PF2E Visioner | No deferred checks, but cleaning up preserved sneak state for:', turnState.sneakingToken.name);
+                await this._clearSneakActiveFlag(turnState.sneakingToken);
+                await this._clearSneakingEffect(turnState.sneakingToken);
+            }
 
             // Clean up turn state
             turnState.isActive = false;
@@ -234,10 +241,17 @@ class TurnSneakTracker {
 
             for (const [combatantId, turnState] of this._turnSneakStates.entries()) {
                 if (turnState.round !== currentRound || turnState.turn !== currentTurn) {
-                    // Turn changed, process any remaining deferred checks
-                    if (turnState.isActive && turnState.deferredChecks.size > 0) {
-                        console.log('PF2E Visioner | Processing deferred sneak checks from combat update for:', turnState.sneakingToken.name);
-                        await this._processDeferredChecks(turnState);
+                    // Turn changed, process any remaining deferred checks or clean up preserved state
+                    if (turnState.isActive) {
+                        if (turnState.deferredChecks.size > 0) {
+                            console.log('PF2E Visioner | Processing deferred sneak checks from combat update for:', turnState.sneakingToken.name);
+                            await this._processDeferredChecks(turnState);
+                        } else {
+                            // Even if no deferred checks, still need to clean up preserved sneak state
+                            console.log('PF2E Visioner | Combat update - no deferred checks, but cleaning up preserved sneak state for:', turnState.sneakingToken.name);
+                            await this._clearSneakActiveFlag(turnState.sneakingToken);
+                            await this._clearSneakingEffect(turnState.sneakingToken);
+                        }
                     }
 
                     // Clean up
@@ -312,7 +326,7 @@ class TurnSneakTracker {
      */
     async _clearSneakingEffect(token) {
         try {
-            const { SneakSpeedService } = await import('../sneak-speed-service.js');
+            const { SneakSpeedService } = await import('./sneak-speed-service.js');
             // Force removal of the Sneaking effect by calling restore with bypass flag
             await SneakSpeedService._forceRestoreSneakWalkSpeed(token);
             console.log(`PF2E Visioner | Cleared Sneaking effect for ${token.name} at end of turn`);

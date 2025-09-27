@@ -114,10 +114,10 @@ export class SneakActionHandler extends ActionHandlerBase {
       // Set sneak flag on the token to indicate it's currently sneaking
       await sneakingToken.document.setFlag('pf2e-visioner', SNEAK_FLAGS.SNEAK_ACTIVE, true);
 
-      // Apply walk speed halving while sneaking
+      // Apply Sneaking effect while sneaking
       try {
         const { SneakSpeedService } = await import('../sneak-speed-service.js');
-        await SneakSpeedService.applySneakStartEffect(sneakingToken);
+        await SneakSpeedService.applySneakWalkSpeed(sneakingToken);
       } catch (speedErr) {
         console.warn('PF2E Visioner | Failed to apply sneak walk speed:', speedErr);
       }

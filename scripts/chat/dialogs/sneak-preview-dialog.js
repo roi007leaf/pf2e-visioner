@@ -2099,16 +2099,25 @@ export class SneakPreviewDialog extends BaseActionDialog {
       const turnState = turnSneakTracker?.getTurnSneakState?.(sneaker);
       if (!turnState) return;
 
-      const shouldShowIndicators = turnSneakTracker?.shouldDeferEndPositionCheck?.(sneaker.id) ?? false;
-
       // Show/hide deferred check indicators
       const indicators = this.element?.querySelectorAll?.('.sneaky-feat-indicator') || [];
       indicators.forEach(indicator => {
         const sneakingTokenId = indicator.dataset.sneakingToken;
         const observerTokenId = indicator.dataset.observerToken;
 
-        if (sneakingTokenId === sneaker.id && shouldShowIndicators) {
-          indicator.style.display = '';
+        if (sneakingTokenId === sneaker.id) {
+          // Find the observer token for this indicator
+          const observerToken = canvas.tokens?.get?.(observerTokenId);
+
+          // Check if end position check should be deferred for this specific observer
+          const shouldShowForThisObserver = observerToken &&
+            (turnSneakTracker?.shouldDeferEndPositionCheck?.(sneaker, observerToken) ?? false);
+
+          if (shouldShowForThisObserver) {
+            indicator.style.display = '';
+          } else {
+            indicator.style.display = 'none';
+          }
         } else {
           indicator.style.display = 'none';
         }

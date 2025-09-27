@@ -1,6 +1,27 @@
 /**
  * Sneak Speed Service
- * - Applies a label-only "Sneaking" effect when Sneak starts (no speed change)
+ * - Applies a label-only "Sneaking" effect when Sneak starts (n          const effectData = {
+            name: label,
+            type: 'effect',
+            img: 'icons/creatures/mammals/cat-hunched-glowing-red.webp',
+            system: {
+              slug: 'sneaking',
+              rules: [],
+              tokenIcon: { show: true },
+              unidentified: false,
+              // Keep duration flexible; we'll remove explicitly on restore
+              duration: { value: -1, unit: 'unlimited', expiry: null, sustained: false },
+              start: { value: game.time.worldTime },
+              description: { value: 'Currently sneaking. Visual indication of active sneak status.' },
+              level: { value: 0 },
+              traits: { rarity: 'common', value: [] },
+              source: { value: 'pf2e-visioner' },
+            },
+            flags: { 
+              core: { sourceId: null }, 
+              [MODULE_ID]: { sneakingEffect: true } 
+            },
+          };e)
  * - Removes that effect when Sneak ends
  * - Provides a helper to compute max Sneak distance (floor(base*multiplier) + bonuses, capped at Speed)
  *
@@ -35,26 +56,40 @@ export class SneakSpeedService {
   /**
    * Back-compat shim: legacy API expected to halve speed unless a feat grants full speed.
    * New behavior: we don't change base speed; we apply a label-only effect to indicate Sneaking.
-   * If multiplier resolves to 1.0, we skip any effect/flags entirely (as tests expect).
+   * We now always create the Sneaking effect for visual indication, regardless of speed multiplier.
    * @param {Token|Actor} tokenOrActor
    */
   static async applySneakWalkSpeed(tokenOrActor) {
     try {
       const actor = SneakSpeedService.resolveActor(tokenOrActor);
-      if (!actor) return;
-      let multiplier = 0.5;
-      try {
-        const { FeatsHandler } = await import('./feats-handler.js');
-        multiplier = FeatsHandler.getSneakSpeedMultiplier(actor) ?? 0.5;
-      } catch { /* default multiplier */ }
+      if (!actor) {
+        console.warn('PF2E Visioner | applySneakWalkSpeed: Could not resolve actor from', tokenOrActor);
+        return;
+      }
 
-      // If full-speed Sneak, do nothing (skip effect/flags)
-      if (multiplier >= 0.999) return;
+      console.log(`PF2E Visioner | Creating Sneaking effect for ${actor.name}`);
 
-      // Otherwise, apply a label-only effect to indicate Sneaking
+      // Always apply a label-only effect to indicate Sneaking, regardless of speed multiplier
       await SneakSpeedService.applySneakStartEffect(actor);
+
+      console.log(`PF2E Visioner | Sneaking effect creation completed for ${actor.name}`);
+      console.log('PF2E Visioner | To manually clear sneaking effect, run: game.modules.get("pf2e-visioner").api.clearSneakingEffect()');
+
+      // Expose a debug function globally for manual clearing
+      if (typeof window !== 'undefined') {
+        window.clearSneakingEffectDebug = async () => {
+          const controlled = canvas?.tokens?.controlled?.[0];
+          if (controlled?.actor) {
+            await SneakSpeedService._forceRestoreSneakWalkSpeed(controlled);
+            console.log('Cleared sneaking effect for', controlled.name);
+          } else {
+            console.warn('No token selected. Please select a token first.');
+          }
+        };
+      }
     } catch (e) {
-      console.error('PF2E Visioner | applySneakWalkSpeed noop failed (continuing):', e);
+      console.error('PF2E Visioner | applySneakWalkSpeed failed:', e);
+      console.error('PF2E Visioner | Stack trace:', e.stack);
     }
   }
 
@@ -69,12 +104,37 @@ export class SneakSpeedService {
     try {
       const actor = SneakSpeedService.resolveActor(tokenOrActor);
       if (!actor) return;
+
       // If already applied effect, do nothing
       const existingEffectId = actor.getFlag?.(MODULE_ID, EFFECT_ID_FLAG);
-      if (existingEffectId) return;
+      if (existingEffectId) {
+        // Debug: Check if the effect actually exists and its properties
+        const existingEffect = actor.items?.get?.(existingEffectId) || actor.items?.find?.(i => i.id === existingEffectId);
+        if (existingEffect) {
+          console.log('PF2E Visioner | Existing effect found:', {
+            name: existingEffect.name,
+            id: existingEffect.id,
+            type: existingEffect.type,
+            tokenIcon: existingEffect.system?.tokenIcon,
+            slug: existingEffect.system?.slug,
+            isVisible: existingEffect.system?.tokenIcon?.show
+          });
+        } else {
+          console.warn('PF2E Visioner | Effect ID flagged but effect not found in actor items. Clearing stale flag.');
+          await actor.unsetFlag(MODULE_ID, EFFECT_ID_FLAG);
+          // Don't return - continue to create new effect
+        }
+
+        if (existingEffect) return;
+      }
 
       const current = Number(actor.system?.movement?.speeds?.land?.value ?? 0);
-      if (!Number.isFinite(current) || current <= 0) return;
+      if (!Number.isFinite(current) || current <= 0) {
+        console.warn('PF2E Visioner | applySneakStartEffect: Invalid speed for', actor.name, 'current speed:', current);
+        return;
+      }
+
+      console.log('PF2E Visioner | applySneakStartEffect: Creating effect for', actor.name, 'with speed:', current);
 
       // Try to use a PF2e effect with ActiveEffectLike to multiply base speed by the calculated multiplier
       try {
@@ -94,11 +154,19 @@ export class SneakSpeedService {
             },
             flags: { [MODULE_ID]: { sneakingEffect: true } },
           };
+          console.log('PF2E Visioner | applySneakStartEffect: Calling createEmbeddedDocuments for', actor.name, 'with data:', effectData);
+
           const created = await actor.createEmbeddedDocuments('Item', [effectData]);
           const effect = Array.isArray(created) ? created[0] : null;
+
+          console.log('PF2E Visioner | applySneakStartEffect: createEmbeddedDocuments result for', actor.name, 'created:', created, 'effect:', effect);
+
           if (effect?.id) {
             await actor.setFlag(MODULE_ID, EFFECT_ID_FLAG, effect.id);
+            console.log('PF2E Visioner | applySneakStartEffect: Successfully created and flagged effect for', actor.name, 'with ID:', effect.id);
             return; // Done via effect
+          } else {
+            console.warn('PF2E Visioner | applySneakStartEffect: Effect creation failed - no valid effect returned for', actor.name);
           }
         }
       } catch (effectErr) {

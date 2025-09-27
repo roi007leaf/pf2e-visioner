@@ -296,6 +296,24 @@ describe('TurnSneakTracker', () => {
             expect(tracker.getTurnSneakState(mockToken)).toBe(null);
         });
 
+        test('clears sneak-active flag and Sneaking effect even without deferred checks', async () => {
+            const actionData = { some: 'data' };
+            tracker.startTurnSneak(mockToken, actionData);
+
+            // Mock the cleanup methods to verify they're called
+            jest.spyOn(tracker, '_clearSneakActiveFlag').mockResolvedValue();
+            jest.spyOn(tracker, '_clearSneakingEffect').mockResolvedValue();
+
+            // Don't add any deferred checks - this is the key difference from other tests
+
+            await tracker._onTurnEnd(mockCombatant, mockCombat, 'user1');
+
+            // Verify cleanup methods were called even without deferred checks
+            expect(tracker._clearSneakActiveFlag).toHaveBeenCalledWith(mockToken);
+            expect(tracker._clearSneakingEffect).toHaveBeenCalledWith(mockToken);
+            expect(tracker.getTurnSneakState(mockToken)).toBe(null);
+        });
+
         test('handles turn end for non-GM user', async () => {
             global.game.user.isGM = false;
 
@@ -343,6 +361,28 @@ describe('TurnSneakTracker', () => {
 
             await tracker._onCombatUpdate(newCombat, updateData, {}, 'user1');
 
+            expect(tracker.getTurnSneakState(mockToken)).toBe(null);
+        });
+
+        test('clears sneak-active flag and Sneaking effect on combat update without deferred checks', async () => {
+            const actionData = { some: 'data' };
+            tracker.startTurnSneak(mockToken, actionData);
+
+            // Mock the cleanup methods to verify they're called
+            jest.spyOn(tracker, '_clearSneakActiveFlag').mockResolvedValue();
+            jest.spyOn(tracker, '_clearSneakingEffect').mockResolvedValue();
+
+            // Simulate turn change
+            const updateData = { turn: 1 };
+            const newCombat = { round: 1, turn: 1 };
+
+            // Don't add any deferred checks - this is the key difference
+
+            await tracker._onCombatUpdate(newCombat, updateData, {}, 'user1');
+
+            // Verify cleanup methods were called even without deferred checks
+            expect(tracker._clearSneakActiveFlag).toHaveBeenCalledWith(mockToken);
+            expect(tracker._clearSneakingEffect).toHaveBeenCalledWith(mockToken);
             expect(tracker.getTurnSneakState(mockToken)).toBe(null);
         });
 
