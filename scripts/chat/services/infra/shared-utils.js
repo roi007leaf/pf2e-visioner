@@ -708,16 +708,15 @@ export async function filterOutcomesByDetection(outcomes, observer, tokenPropert
           // Check if the detector can detect the target with imprecise senses
           canDetectWithSenses = false;
           try {
-            canDetectWithSenses = analyzer.canDetectWithLifesenseInRange(detectorToken, targetToken);
+            // Use the comprehensive imprecise sense detection that handles tremorsense, lifesense, etc.
+            canDetectWithSenses = analyzer.canSenseImprecisely(detectorToken, targetToken);
           } catch (err) {
-            // Fallback: check for any imprecise senses manually
-            const senses = analyzer.getSensingSummary(detectorToken);
-            const distance = canvas.grid?.measureDistance?.(detectorToken.center || detectorToken, targetToken.center || targetToken) || 0;
-
-            // Check if the detector has any imprecise senses that could reach the target
-            canDetectWithSenses = senses.impreciseSenses?.some(sense => {
-              return sense.range >= distance;
-            }) || false;
+            // Fallback: check for lifesense specifically
+            try {
+              canDetectWithSenses = analyzer.canDetectWithLifesenseInRange(detectorToken, targetToken);
+            } catch {
+              canDetectWithSenses = false;
+            }
           }
 
           const canDetect = hasLOS || canDetectWithSenses;

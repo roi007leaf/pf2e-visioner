@@ -85,6 +85,11 @@ export class SeekPreviewDialog extends BaseActionDialog {
       this.hideFoundryHidden = true;
     }
 
+    // Ensure filterByDetection is properly initialized (fallback if BaseActionDialog didn't set it)
+    if (typeof this.filterByDetection === 'undefined') {
+      this.filterByDetection = false; // Conservative default
+    }
+
     // Set global reference
     _currentSeekDialogInstance = this;
   }

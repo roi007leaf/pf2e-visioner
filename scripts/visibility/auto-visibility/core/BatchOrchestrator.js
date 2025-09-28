@@ -146,6 +146,12 @@ export class BatchOrchestrator {
             // Apply results
             const resultApplicationStart = performance.now();
             const uniqueUpdateCount = this._applyBatchResults(batchResult);
+
+            // Force perception refresh after applying visibility changes to ensure immediate visual updates
+            if (uniqueUpdateCount > 0) {
+                this._refreshPerceptionAfterBatch();
+            }
+
             timings.resultApplication = performance.now() - resultApplicationStart;
 
             const batchEndTime = performance.now();
@@ -338,6 +344,44 @@ export class BatchOrchestrator {
             return darknessSources > 0 || globalDarkness >= 0.75 || hasRegionDarkness;
         } catch {
             return false;
+        }
+    }
+
+    /**
+     * Refresh canvas perception after batch processing to ensure immediate visual updates.
+     * This prevents the need for users to reselect tokens to see visibility changes.
+     * @private
+     */
+    _refreshPerceptionAfterBatch() {
+        try {
+            // Update canvas perception to reflect visibility changes immediately
+            if (canvas?.perception?.update) {
+                canvas.perception.update({
+                    refreshVision: true,
+                    refreshOcclusion: true
+                });
+            }
+
+            // Also refresh everyone's perception via socket to ensure all clients see changes
+            this._refreshEveryonesPerception();
+        } catch (error) {
+            // Fail silently to avoid disrupting batch processing
+            try {
+                console.warn('PF2E Visioner | Failed to refresh perception after batch:', error);
+            } catch { /* noop */ }
+        }
+    }
+
+    /**
+     * Trigger perception refresh on all clients via socket.
+     * @private
+     */
+    async _refreshEveryonesPerception() {
+        try {
+            const { refreshEveryonesPerception } = await import('../../../services/socket.js');
+            refreshEveryonesPerception();
+        } catch {
+            // Best effort - continue if socket service unavailable
         }
     }
 

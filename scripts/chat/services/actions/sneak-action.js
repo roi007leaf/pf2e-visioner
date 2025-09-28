@@ -62,9 +62,7 @@ export class SneakActionHandler extends ActionHandlerBase {
       const sneakingToken = this._getSneakingToken(actionData);
       if (sneakingToken && turnSneakTracker.hasSneakyFeat(sneakingToken)) {
         const trackingStarted = turnSneakTracker.startTurnSneak(sneakingToken, actionData);
-        if (trackingStarted) {
-          console.log('PF2E Visioner | Started turn-based sneak tracking for', sneakingToken.name);
-        }
+
       }
 
       // Basic validation without recursion - just check if we have observers
@@ -165,7 +163,7 @@ export class SneakActionHandler extends ActionHandlerBase {
 
           // Calculate how the observer sees the sneaking token (this is what sneak affects)
           const observerToSneaking =
-            await optimizedVisibilityCalculator.calculateVisibilityWithPosition(
+            await optimizedVisibilityCalculator.calculateVisibilityBetweenTokens(
               observer,
               sneakingToken,
               observerPosition,
@@ -1139,7 +1137,6 @@ export class SneakActionHandler extends ActionHandlerBase {
         // For now, allow the sneak to proceed (end check happens at turn end)
         endQualifies = true;
 
-        console.log(`PF2E Visioner | Deferred end-position check for ${sneakingToken.name} vs ${observerToken.name} (Sneaky feat)`);
       }
     }
 

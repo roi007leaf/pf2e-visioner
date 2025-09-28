@@ -49,6 +49,13 @@ export async function registerHooks() {
   registerCombatHooks();
   AutoCoverHooks.registerHooks();
 
+  // Register effect perception hooks for automatic perception refresh
+  // These work independently of the Auto-Visibility System
+  const { onCreateActiveEffect, onUpdateActiveEffect, onDeleteActiveEffect } = await import('./effect-perception.js');
+  Hooks.on('createActiveEffect', onCreateActiveEffect);
+  Hooks.on('updateActiveEffect', onUpdateActiveEffect);
+  Hooks.on('deleteActiveEffect', onDeleteActiveEffect);
+
   // Wall lifecycle: refresh indicators and see-through state when walls change
   Hooks.on('createWall', async () => {
     try {

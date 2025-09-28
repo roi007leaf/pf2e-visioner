@@ -66,13 +66,10 @@ export class SneakSpeedService {
         return;
       }
 
-      console.log(`PF2E Visioner | Creating Sneaking effect for ${actor.name}`);
 
       // Always apply a label-only effect to indicate Sneaking, regardless of speed multiplier
       await SneakSpeedService.applySneakStartEffect(actor);
 
-      console.log(`PF2E Visioner | Sneaking effect creation completed for ${actor.name}`);
-      console.log('PF2E Visioner | To manually clear sneaking effect, run: game.modules.get("pf2e-visioner").api.clearSneakingEffect()');
 
       // Expose a debug function globally for manual clearing
       if (typeof window !== 'undefined') {
@@ -80,7 +77,6 @@ export class SneakSpeedService {
           const controlled = canvas?.tokens?.controlled?.[0];
           if (controlled?.actor) {
             await SneakSpeedService._forceRestoreSneakWalkSpeed(controlled);
-            console.log('Cleared sneaking effect for', controlled.name);
           } else {
             console.warn('No token selected. Please select a token first.');
           }
@@ -110,16 +106,8 @@ export class SneakSpeedService {
         // Debug: Check if the effect actually exists and its properties
         const existingEffect = actor.items?.get?.(existingEffectId) || actor.items?.find?.(i => i.id === existingEffectId);
         if (existingEffect) {
-          console.log('PF2E Visioner | Existing effect found:', {
-            name: existingEffect.name,
-            id: existingEffect.id,
-            type: existingEffect.type,
-            tokenIcon: existingEffect.system?.tokenIcon,
-            slug: existingEffect.system?.slug,
-            isVisible: existingEffect.system?.tokenIcon?.show
-          });
+          return; // Effect already applied
         } else {
-          console.warn('PF2E Visioner | Effect ID flagged but effect not found in actor items. Clearing stale flag.');
           await actor.unsetFlag(MODULE_ID, EFFECT_ID_FLAG);
           // Don't return - continue to create new effect
         }
@@ -132,8 +120,6 @@ export class SneakSpeedService {
         console.warn('PF2E Visioner | applySneakStartEffect: Invalid speed for', actor.name, 'current speed:', current);
         return;
       }
-
-      console.log('PF2E Visioner | applySneakStartEffect: Creating effect for', actor.name, 'with speed:', current);
 
       // Try to use a PF2e effect with ActiveEffectLike to multiply base speed by the calculated multiplier
       try {
@@ -153,16 +139,13 @@ export class SneakSpeedService {
             },
             flags: { [MODULE_ID]: { sneakingEffect: true } },
           };
-          console.log('PF2E Visioner | applySneakStartEffect: Calling createEmbeddedDocuments for', actor.name, 'with data:', effectData);
 
           const created = await actor.createEmbeddedDocuments('Item', [effectData]);
           const effect = Array.isArray(created) ? created[0] : null;
 
-          console.log('PF2E Visioner | applySneakStartEffect: createEmbeddedDocuments result for', actor.name, 'created:', created, 'effect:', effect);
 
           if (effect?.id) {
             await actor.setFlag(MODULE_ID, EFFECT_ID_FLAG, effect.id);
-            console.log('PF2E Visioner | applySneakStartEffect: Successfully created and flagged effect for', actor.name, 'with ID:', effect.id);
             return; // Done via effect
           } else {
             console.warn('PF2E Visioner | applySneakStartEffect: Effect creation failed - no valid effect returned for', actor.name);

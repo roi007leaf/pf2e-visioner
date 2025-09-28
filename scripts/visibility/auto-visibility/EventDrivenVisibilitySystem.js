@@ -129,6 +129,7 @@ export class EventDrivenVisibilitySystem {
         positionManager: coreServices.positionManager,
         visibilityMapService: coreServices.visibilityMapService,
         overrideService: coreServices.overrideService,
+        visionAnalyzer: coreServices.visionAnalyzer,
       });
 
       // Initialize BatchOrchestrator

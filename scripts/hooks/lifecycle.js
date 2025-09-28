@@ -46,13 +46,46 @@ export async function onCanvasReady() {
     }
 
     // Also set up a hook to restore indicators when tokens are controlled after canvas ready
+    // OPTIMIZED: Only update wall visuals if the token actually has wall flags to avoid triggering AVS
     const restoreIndicatorsOnControl = Hooks.on('controlToken', async (token, controlled) => {
+      // CRITICAL: Set global flag to suppress lighting refreshes during token control operations
+      try {
+        globalThis.game = globalThis.game || {};
+        globalThis.game.pf2eVisioner = globalThis.game.pf2eVisioner || {};
+        globalThis.game.pf2eVisioner.suppressLightingRefresh = true;
+
+        // Track this controlToken event to prevent AVS from responding to related lighting refreshes
+        const { LightingEventHandler } = await import('../visibility/auto-visibility/core/LightingEventHandler.js');
+        LightingEventHandler.trackControlTokenEvent();
+      } catch {
+        // Best effort - if the import fails, continue without tracking
+      }
+
       if (controlled) {
         const wallFlags = token?.document?.getFlag?.(MODULE_ID, 'walls') || {};
         if (Object.keys(wallFlags).length > 0) {
-          await updateWallVisuals(token.document.id);
+          // CRITICAL: Always use the optimized version that doesn't trigger lightingRefresh
+          // NEVER call the original updateWallVisuals on token selection
+          try {
+            const { updateWallIndicatorsOnly } = await import('../services/visual-effects.js');
+            await updateWallIndicatorsOnly(token.document.id);
+          } catch (error) {
+            // If the optimized method fails, do nothing rather than triggering AVS
+            console.warn('PF2E Visioner | Failed to use optimized wall indicator update, skipping:', error);
+          }
         }
       }
+
+      // Clear the suppression flag after a short delay
+      setTimeout(() => {
+        try {
+          if (globalThis.game?.pf2eVisioner) {
+            globalThis.game.pf2eVisioner.suppressLightingRefresh = false;
+          }
+        } catch {
+          // Best effort
+        }
+      }, 50);
     });
 
     // Clean up the hook when canvas is torn down

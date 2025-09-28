@@ -19,15 +19,6 @@ function hasFormChanges(app) {
         const coverInputs = app.element.querySelectorAll('input[name^="cover."]');
         const wallInputs = app.element.querySelectorAll('input[name^="walls."]');
 
-        console.debug('Token Manager: Checking form changes', {
-            visibilityInputCount: visibilityInputs.length,
-            coverInputCount: coverInputs.length,
-            wallInputCount: wallInputs.length,
-            mode: app.mode,
-            hasVisibilityData: !!app.visibilityData,
-            hasCoverData: !!app.coverData
-        });
-
         // Check visibility changes
         for (const input of visibilityInputs) {
             const tokenId = input.name.replace('visibility.', '');
@@ -49,13 +40,6 @@ function hasFormChanges(app) {
                 }
                 if (originalValue === undefined) originalValue = 'observed';
             }
-
-            console.debug('Token Manager: Visibility comparison', {
-                tokenId,
-                currentValue,
-                originalValue,
-                different: currentValue !== originalValue
-            });
 
             if (currentValue !== originalValue) {
                 return true;
@@ -120,12 +104,6 @@ export function updateApplyButtonAnimation(app) {
     try {
         const applyButtons = app.element.querySelectorAll('.vm-action-button.apply');
         const hasChanges = hasFormChanges(app);
-
-        console.debug('Token Manager: Apply button animation update', {
-            hasChanges,
-            buttonCount: applyButtons.length,
-            mode: app.mode
-        });
 
         for (const button of applyButtons) {
             if (hasChanges) {

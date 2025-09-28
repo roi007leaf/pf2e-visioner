@@ -263,9 +263,25 @@ export class VisionAnalyzer {
     let senses = null;
     try {
       senses = actor.system?.perception?.senses ?? actor.perception?.senses ?? null;
+
     } catch {
       /* ignore */
     }
+
+    // If no senses found in traditional location or empty array/collection, check detectionModes as fallback
+    const shouldFallback = !senses || (Array.isArray(senses) && senses.length === 0) || (senses?.size !== undefined && senses.size === 0);
+    if (shouldFallback || token.name === 'Kyra') {
+      try {
+        const detectionModes = token.document?.detectionModes ?? [];
+
+        if (Array.isArray(detectionModes) && detectionModes.length > 0) {
+          senses = detectionModes.filter(dm => dm.enabled && dm.id !== 'basicSight' && dm.id !== 'lightPerception');
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+
     if (!senses) return summary;
 
     const pushSense = (type, acuity, range) => {
@@ -327,11 +343,32 @@ export class VisionAnalyzer {
     try {
       if (Array.isArray(senses)) {
         for (const s of senses) {
-          const type = s?.type ?? s?.slug ?? s?.name ?? s?.label;
-          const val = s?.value ?? s;
-          const acuity = val?.acuity ?? s?.acuity ?? val?.value;
-          const range = val?.range ?? s?.range;
-          pushSense(type, acuity, range);
+          // Check if this is a detection mode (has id but no traditional sense properties)
+          if (s?.id && !s?.type && !s?.slug && !s?.name && !s?.label) {
+            // This is a detection mode format
+            const detectionType = s.id;
+            const range = s.range;
+            let acuity;
+
+            // Set default acuity based on detection mode type
+            if (detectionType === 'hearing') {
+              acuity = 'imprecise'; // Hearing is typically imprecise
+            } else if (detectionType === 'tremorsense' || detectionType === 'blindsight') {
+              acuity = 'precise'; // These are typically precise
+            } else {
+              acuity = 'imprecise'; // Default to imprecise for unknown types
+            }
+
+            pushSense(detectionType, acuity, range);
+          } else {
+            // Handle traditional senses format
+            const type = s?.type ?? s?.slug ?? s?.name ?? s?.label ?? s?.id;
+            const val = s?.value ?? s;
+            let acuity = val?.acuity ?? s?.acuity ?? val?.value;
+            let range = val?.range ?? s?.range;
+
+            pushSense(type, acuity, range);
+          }
         }
       } else if (typeof senses === 'object') {
         for (const [type, obj] of Object.entries(senses)) {
@@ -377,8 +414,11 @@ export class VisionAnalyzer {
   canSenseImprecisely(observer, target) {
     try {
       const s = this.getSensingSummary(observer);
-      if (!s.imprecise.length && !s.hearing) return false;
       const dist = this.#distanceFeet(observer, target);
+
+
+
+      if (!s.imprecise.length && !s.hearing) return false;
 
       // Check regular imprecise senses (including lifesense)
       for (const ent of s.imprecise) {
@@ -395,14 +435,26 @@ export class VisionAnalyzer {
           continue;
         }
 
+        // Special handling for tremorsense - target must be in contact with ground (elevation 0)
+        if (ent.type === 'tremorsense') {
+          const targetElevation = target?.document?.elevation || 0;
+          if (targetElevation > 0) {
+            continue; // Cannot detect flying/elevated creatures with tremorsense
+          }
+        }
+
         // Regular imprecise senses
-        if (ent.range === Infinity || ent.range >= dist) return true;
+        if (ent.range === Infinity || ent.range >= dist) {
+          return true;
+        }
       }
 
       // Check hearing
       if (s.hearing) {
         const hr = Number(s.hearing.range);
-        if (!Number.isFinite(hr) || hr >= dist) return true;
+        if (!Number.isFinite(hr) || hr >= dist) {
+          return true;
+        }
       }
     } catch { }
     return false;
@@ -439,6 +491,14 @@ export class VisionAnalyzer {
 
         // Special check for echolocation - requires hearing (can't use if deafened)
         if (t === 'echolocation' && this.#isDeafened(observer)) continue;
+
+        // Special check for tremorsense - target must be in contact with ground (elevation 0)
+        if (t === 'tremorsense') {
+          const targetElevation = target?.document?.elevation || 0;
+          if (targetElevation > 0) {
+            continue; // Cannot detect flying/elevated creatures with tremorsense
+          }
+        }
 
         if (ent.range === Infinity || ent.range >= dist) return true;
       }
@@ -694,6 +754,69 @@ export class VisionAnalyzer {
   }
 
   /**
+ * True if source can detect target via the 'feelTremor' detection mode.
+ * (Respects range/angle/ground rules from the mode; ignores walls because walls:false.)
+ */
+  canDetectViaTremor(sourceToken, targetToken) {
+    const modeData = sourceToken.document.detectionModes?.find(dm => dm.id === "feelTremor" && dm.enabled !== false);
+    if (!modeData) return false;
+    const mode = CONFIG.Canvas.detectionModes[modeData.id];
+    const visionSource = sourceToken.vision;
+    if (!mode || !visionSource) return false;
+
+    const point = targetToken.getCenterPoint(targetToken.center.x, targetToken.center.y);
+    const tests = [{ point, los: new Map() }];
+    return !!mode.testVisibility(visionSource, modeData, { object: targetToken, tests });
+  }
+
+  /**
+   * True if there is a *wall* blocking direct 'sight' between source and target.
+   * This ignores FOV/angles and only asks "is there a sight-type wall in between?"
+   */
+  isBehindWall(sourceToken, targetToken) {
+    const origin = sourceToken.getCenterPoint({ elevation: sourceToken.document.elevation });
+    const dest = targetToken.getCenterPoint({ elevation: targetToken.document.elevation });
+
+    // Preferred: use the sight polygon backend's collision test
+    const backend = CONFIG.Canvas.polygonBackends?.sight;
+    if (backend?.testCollision) {
+      // mode:"any" → return truthy if any wall collides
+      return !!backend.testCollision(origin, dest, {
+        type: "sight",
+        mode: "any",
+        // Supplying the vision source can let the backend apply relevant filters
+        source: sourceToken.vision
+      });
+    }
+
+    // Fallback (older/alt builds): use the walls layer API if present
+    if (canvas.walls?.checkCollision) {
+      return !!canvas.walls.checkCollision(origin, dest, { type: "sight" });
+    }
+    if (canvas.walls?.testCollision) {
+      const ray = new foundry.canvas.geometry.Ray(origin, dest);
+      return !!canvas.walls.testCollision(ray, { type: "sight" });
+    }
+
+    console.warn("No wall-collision API available");
+    debugger;
+    return false;
+  }
+
+  /**
+   * Combined helper: can detect via tremor, and if so, whether that’s through a wall.
+   */
+  tremorDetectionResult(sourceToken, targetToken) {
+    const detectable = this.canDetectViaTremor(sourceToken, targetToken);
+    debugger;
+    if (!detectable) return { detectable: false, throughWall: false };
+
+    // If detectable and a sight wall is between → it's a through-wall tremor detection
+    const throughWall = this.isBehindWall(sourceToken, targetToken);
+    return { detectable: true, throughWall };
+  }
+
+  /**
    * Direct line-of-sight check that bypasses Foundry's detection system
    * @param {Token} observer
    * @param {Token} target
@@ -702,30 +825,9 @@ export class VisionAnalyzer {
    */
   #hasDirectLineOfSight(observer, target) {
     try {
-      // Use observer's vision polygon to check if target shape is visible
-      // This accounts for vision range, field of view, walls, and lighting
-      const visionShape = observer.vision?.shape;
-      const targetShape = target.shape;
-
-      if (!visionShape || !targetShape) {
-        // Fallback to wall collision detection if vision data unavailable
-        return this.#fallbackWallCollisionCheck(observer, target);
-      }
-
-      // Check if any part of the target's shape intersects with the observer's vision polygon
-      const canSee = visionShape.intersectPolygon(targetShape);
-
-      if (log.enabled())
-        log.debug(() => ({
-          step: 'vision-polygon-check',
-          observer: observer?.name,
-          target: target?.name,
-          hasVisionShape: !!visionShape,
-          hasTargetShape: !!targetShape,
-          canSee,
-        }));
-
-      return canSee;
+      // Use proper sight-based wall collision check for visual line of sight
+      // This should NOT use tremor detection, which ignores walls
+      return this.#fallbackWallCollisionCheck(observer, target);
     } catch (error) {
       console.warn(`${MODULE_ID} | Error in vision polygon check:`, error);
       // Fallback to wall collision detection on error
@@ -979,6 +1081,87 @@ export class VisionAnalyzer {
         `${MODULE_ID} | Error checking condition ${conditionSlug} for ${actor.name}:`,
         error,
       );
+      return false;
+    }
+  }
+
+  /**
+   * Check if observer can detect elevated targets
+   * @param {Token} observer - The observing token
+   * @param {Token} target - The target token
+   * @returns {boolean} True if observer can detect elevated targets
+   */
+  canDetectElevatedTarget(observer, target) {
+    const targetElevation = target.document?.elevation || 0;
+    const observerElevation = observer.document?.elevation || 0;
+
+    // If both are at same elevation, no elevation issue
+    if (targetElevation === observerElevation) {
+      return true;
+    }
+
+    // If target is not elevated, any sense can detect it
+    if (targetElevation <= 0) {
+      return true;
+    }
+
+    // Get sensing summary to check what senses the observer has
+    const sensingSummary = this.getSensingSummary(observer, observer.actor);
+
+    // Check for senses that can work across elevation differences
+    // Visual senses (darkvision, low-light vision) can see elevated targets if there's line of sight
+    const observerVision = this.getVisionCapabilities(observer);
+    if (observerVision.hasDarkvision || observerVision.hasLowLightVision || observerVision.hasVision) {
+      return true;
+    }
+
+    // Echolocation can detect flying/elevated targets  
+    if (sensingSummary.echolocation) {
+      return true;
+    }
+
+    // Scent can potentially detect elevated targets (depending on air currents, etc.)
+    if (sensingSummary.scent) {
+      return true;
+    }
+
+    // Check if observer ONLY has ground-based senses like tremorsense
+    const hasOnlyGroundBasedSenses = sensingSummary.tremorsense &&
+      !observerVision.hasDarkvision &&
+      !observerVision.hasLowLightVision &&
+      !observerVision.hasVision &&
+      !sensingSummary.echolocation &&
+      !sensingSummary.scent;
+
+    if (hasOnlyGroundBasedSenses) {
+      return false;
+    }
+
+    // If we get here, observer likely has some form of non-ground-based sense
+    return true;
+  }
+
+  /**
+   * Check if observer has tremorsense in range of target
+   * @param {Token} observer - The observing token
+   * @param {Token} target - The target token
+   * @returns {boolean} True if observer has tremorsense that can reach the target
+   */
+  hasTremorsenseInRange(observer, target) {
+    try {
+      const sensingSummary = this.getSensingSummary(observer);
+
+      // Check if observer has tremorsense
+      if (!sensingSummary || !sensingSummary.tremorsense) {
+        return false;
+      }
+
+      const dist = this.#distanceFeet(observer, target);
+      const tremorsenseRange = sensingSummary.tremorsense.range;
+
+      // Check if target is within tremorsense range
+      return tremorsenseRange === Infinity || tremorsenseRange >= dist;
+    } catch {
       return false;
     }
   }

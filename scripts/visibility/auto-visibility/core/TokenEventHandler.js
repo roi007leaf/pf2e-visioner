@@ -150,7 +150,7 @@ export class TokenEventHandler {
         const keys = Object.keys(changes || {});
         const hasPrefix = (prefix) => keys.some((k) => k === prefix || k.startsWith(prefix + '.'));
         return {
-            positionChanged: changes.x !== undefined || changes.y !== undefined,
+            positionChanged: changes.x !== undefined || changes.y !== undefined || changes.elevation !== undefined,
             lightChanged: changes.light !== undefined || hasPrefix('light'),
             visionChanged: changes.vision !== undefined || hasPrefix('vision'),
             effectsChanged: changes.actorData?.effects !== undefined || changes.actorData !== undefined,
@@ -264,7 +264,7 @@ export class TokenEventHandler {
                 this.positionManager.pinPosition(tokenDoc.id, {
                     x: cx,
                     y: cy,
-                    elevation: tokenDoc.elevation || 0,
+                    elevation: changes.elevation !== undefined ? changes.elevation : (tokenDoc.elevation || 0),
                     until: Date.now() + pinDuration,
                 });
 

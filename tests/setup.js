@@ -836,7 +836,7 @@ global.createMockToken = (data = {}) => {
       x: x * gridSize + (width * gridSize) / 2,
       y: y * gridSize + (height * gridSize) / 2,
     },
-    getCenter: jest.fn(
+    getCenterPoint: jest.fn(
       () =>
         data.center || {
           x: x * gridSize + (width * gridSize) / 2,

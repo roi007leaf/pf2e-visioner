@@ -40,7 +40,7 @@ export class CoverDetector {
       const pseudoAttacker = {
         id: 'template-origin',
         center: { x: Number(origin.x) || 0, y: Number(origin.y) || 0 },
-        getCenter: () => ({ x: Number(origin.x) || 0, y: Number(origin.y) || 0 }),
+        getCenterPoint: () => ({ x: Number(origin.x) || 0, y: Number(origin.y) || 0, elevation: 0 }),
         actor: null,
         document: { x: origin.x, y: origin.y, width: 0, height: 0 },
       };
@@ -67,8 +67,8 @@ export class CoverDetector {
       // Exclude same token (attacker and target are the same)
       if (attacker.id === target.id) return 'none';
 
-      const p1 = attacker.center ?? attacker.getCenter();
-      const p2 = target.center ?? target.getCenter();
+      const p1 = attacker.center ?? attacker.getCenterPoint();
+      const p2 = target.center ?? target.getCenterPoint();
 
       // Check if there's any blocking terrain (walls) in the way
       const segmentAnalysis = this._analyzeSegmentObstructions(p1, p2);
@@ -515,7 +515,7 @@ export class CoverDetector {
       let best = null;
       let bestD = Infinity;
       for (const t of tokens) {
-        const c = t.center ?? t.getCenter?.();
+        const c = t.center ?? t.getCenterPoint?.();
         if (!c) continue;
         const dx = c.x - p.x;
         const dy = c.y - p.y;
@@ -710,13 +710,13 @@ export class CoverDetector {
    */
   _filterBlockersByElevationCenterToCenter(attacker, target, blockers, attSpan, tgtSpan) {
     // Get horizontal positions
-    const attPos = attacker.center ?? attacker.getCenter();
-    const tgtPos = target.center ?? target.getCenter();
+    const attPos = attacker.center ?? attacker.getCenterPoint();
+    const tgtPos = target.center ?? target.getCenterPoint();
 
     return blockers.filter((blocker) => {
       try {
         const blockerSpan = getTokenVerticalSpanFt(blocker);
-        const blockerPos = blocker.center ?? blocker.getCenter();
+        const blockerPos = blocker.center ?? blocker.getCenterPoint();
 
         // Check if blocker is horizontally between attacker and target
         // If not, it can't block regardless of elevation
@@ -755,13 +755,13 @@ export class CoverDetector {
    */
   _filterBlockersByElevationPermissive(attacker, target, blockers, attSpan, tgtSpan) {
     // Get horizontal positions
-    const attPos = attacker.center ?? attacker.getCenter();
-    const tgtPos = target.center ?? target.getCenter();
+    const attPos = attacker.center ?? attacker.getCenterPoint();
+    const tgtPos = target.center ?? target.getCenterPoint();
 
     return blockers.filter((blocker) => {
       try {
         const blockerSpan = getTokenVerticalSpanFt(blocker);
-        const blockerPos = blocker.center ?? blocker.getCenter();
+        const blockerPos = blocker.center ?? blocker.getCenterPoint();
 
         // Check if blocker is horizontally between attacker and target
         if (!this._isHorizontallyBetween(attPos, tgtPos, blockerPos)) {
@@ -809,13 +809,13 @@ export class CoverDetector {
    */
   _filterBlockersByElevationModerate(attacker, target, blockers, attSpan, tgtSpan) {
     // Get horizontal positions
-    const attPos = attacker.center ?? attacker.getCenter();
-    const tgtPos = target.center ?? target.getCenter();
+    const attPos = attacker.center ?? attacker.getCenterPoint();
+    const tgtPos = target.center ?? target.getCenterPoint();
 
     return blockers.filter((blocker) => {
       try {
         const blockerSpan = getTokenVerticalSpanFt(blocker);
-        const blockerPos = blocker.center ?? blocker.getCenter();
+        const blockerPos = blocker.center ?? blocker.getCenterPoint();
 
         // Check if blocker is horizontally between attacker and target
         if (!this._isHorizontallyBetween(attPos, tgtPos, blockerPos)) {
@@ -869,7 +869,7 @@ export class CoverDetector {
     return blockers.filter((blocker) => {
       try {
         const blockerSpan = getTokenVerticalSpanFt(blocker);
-        const blockerPos = blocker.center ?? blocker.getCenter();
+        const blockerPos = blocker.center ?? blocker.getCenterPoint();
 
         // Check if any corner-to-corner line could potentially intersect this blocker
         for (const attackerCorner of attackerCorners) {
@@ -1374,8 +1374,8 @@ export class CoverDetector {
       if (!blockers.length) return 'none';
 
       // Get centers
-      const p1 = attacker.center ?? attacker.getCenter();
-      const p2 = target.center ?? target.getCenter();
+      const p1 = attacker.center ?? attacker.getCenterPoint();
+      const p2 = target.center ?? target.getCenterPoint();
 
       // Calculate total coverage by all blockers
       let totalCoverage = 0;

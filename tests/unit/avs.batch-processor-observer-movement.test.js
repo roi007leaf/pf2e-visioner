@@ -27,7 +27,7 @@ describe('BatchProcessor - Observer Movement Override Fix', () => {
             getTokensInViewport: jest.fn(tokens => new Set(tokens.map(t => t.document.id)))
         };
         optimizedVisibilityCalculator = {
-            calculateVisibilityWithPosition: jest.fn(async () => 'concealed')
+            calculateVisibilityBetweenTokens: jest.fn(async () => 'concealed')
         };
         globalLosCache = new GlobalLosCache();
         globalVisibilityCache = new GlobalVisibilityCache();
@@ -76,7 +76,7 @@ describe('BatchProcessor - Observer Movement Override Fix', () => {
         const res = await processor.process(global.canvas.tokens.placeables, new Set(['A']), {});
 
         // Should still perform calculation despite observer override
-        expect(optimizedVisibilityCalculator.calculateVisibilityWithPosition).toHaveBeenCalled();
+        expect(optimizedVisibilityCalculator.calculateVisibilityBetweenTokens).toHaveBeenCalled();
 
         // Should have updates for both the override and the recalculated visibility
         expect(res.updates.length).toBeGreaterThan(0);
@@ -117,7 +117,7 @@ describe('BatchProcessor - Observer Movement Override Fix', () => {
 
         // Should skip calculation when both directions have overrides
         expect(res.breakdown.pairsSkippedOverride).toBe(2); // Both directions skipped
-        expect(optimizedVisibilityCalculator.calculateVisibilityWithPosition).not.toHaveBeenCalled();
+        expect(optimizedVisibilityCalculator.calculateVisibilityBetweenTokens).not.toHaveBeenCalled();
     });
 
     test('should calculate visibility when no overrides exist', async () => {
@@ -128,7 +128,7 @@ describe('BatchProcessor - Observer Movement Override Fix', () => {
         const res = await processor.process(global.canvas.tokens.placeables, new Set(['A']), {});
 
         // Should perform calculation when no overrides
-        expect(optimizedVisibilityCalculator.calculateVisibilityWithPosition).toHaveBeenCalled();
+        expect(optimizedVisibilityCalculator.calculateVisibilityBetweenTokens).toHaveBeenCalled();
         expect(res.breakdown.pairsSkippedOverride).toBe(0);
     });
 });

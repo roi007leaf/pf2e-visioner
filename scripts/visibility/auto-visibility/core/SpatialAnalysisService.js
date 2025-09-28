@@ -41,10 +41,10 @@ export class SpatialAnalysisService {
     }
 
     /**
-     * Check if two tokens can see each other (bidirectional line of sight)
+     * Check if two tokens can see each other (bidirectional line of sight or special senses)
      * @param {Token} token1 - First token
      * @param {Token} token2 - Second token
-     * @returns {boolean} True if both tokens can see each other
+     * @returns {boolean} True if either token can detect the other through sight or special senses
      */
     canTokensSeeEachOther(token1, token2) {
         try {
@@ -56,11 +56,16 @@ export class SpatialAnalysisService {
             const gridDistance = distance / (canvas.grid?.size || 1);
 
             if (gridDistance > this.#maxVisibilityDistance) {
-                return false;
+                // Still need to check if special senses have longer ranges
+                if (!this._hasSpecialSenseInRange(token1, token2, gridDistance) &&
+                    !this._hasSpecialSenseInRange(token2, token1, gridDistance)) {
+                    return false;
+                }
             }
 
             // Check for walls blocking line of sight in both directions
             const walls = canvas.walls?.objects?.children || [];
+            let wallsBlockSight = false;
 
             if (walls.length > 0) {
                 try {
@@ -77,7 +82,8 @@ export class SpatialAnalysisService {
                         if (isSolidWall) {
                             // This is a solid wall, check if it intersects our ray
                             if (ray.intersectSegment(wall.coords)) {
-                                return false; // Wall blocks line of sight
+                                wallsBlockSight = true;
+                                break;
                             }
                         }
                     }
@@ -87,10 +93,133 @@ export class SpatialAnalysisService {
                 }
             }
 
-            return true;
+            // If walls don't block sight, they can see each other normally
+            if (!wallsBlockSight) {
+                return true;
+            }
+
+            // Walls block normal sight - check if either token has special senses that work through walls
+            return this._hasSpecialSenseInRange(token1, token2, gridDistance) ||
+                this._hasSpecialSenseInRange(token2, token1, gridDistance);
         } catch {
             // If we can't determine, assume they can see (conservative approach)
             return true;
+        }
+    }
+
+    /**
+     * Check if observer has special senses that can detect target at given distance
+     * @param {Token} observer - Observing token
+     * @param {Token} target - Target token
+     * @param {number} gridDistance - Distance between tokens in grid units
+     * @returns {boolean} True if observer has special sense that can detect target
+     * @private
+     */
+    _hasSpecialSenseInRange(observer, target, gridDistance) {
+        try {
+            // Check for tremorsense (works through walls, ground contact required)
+            const tremorsense = this._getSenseRange(observer, 'tremorsense');
+            if (tremorsense > 0 && gridDistance <= tremorsense) {
+                // Tremorsense works if both tokens are on the ground
+                const observerElevation = observer.document?.elevation || 0;
+                const targetElevation = target.document?.elevation || 0;
+                if (observerElevation === 0 && targetElevation === 0) {
+                    return true;
+                }
+            }
+
+            // Check for echolocation (works through some obstacles)
+            const echolocation = this._getSenseRange(observer, 'echolocation');
+            if (echolocation > 0 && gridDistance <= echolocation) {
+                return true;
+            }
+
+            // Check for lifesense (detects living creatures through walls)
+            const lifesense = this._getSenseRange(observer, 'lifesense');
+            if (lifesense > 0 && gridDistance <= lifesense) {
+                // Only works on living creatures
+                if (this._isLivingCreature(target)) {
+                    return true;
+                }
+            }
+
+            // Check for other precise non-visual senses
+            const senseAcuity = this._getSenseRange(observer, 'senseAcuity');
+            if (senseAcuity > 0 && gridDistance <= senseAcuity) {
+                return true;
+            }
+
+            return false;
+        } catch {
+            return false;
+        }
+    }
+
+    /**
+     * Get the range of a specific sense for a token
+     * @param {Token} token - Token to check senses for
+     * @param {string} senseType - Type of sense to check
+     * @returns {number} Range in grid units, 0 if sense not present
+     * @private
+     */
+    _getSenseRange(token, senseType) {
+        try {
+            // Try to get sense information from the actor
+            const actor = token.actor;
+            if (!actor?.system?.perception?.senses) {
+                return 0;
+            }
+
+            // Check different possible sense formats in PF2e
+            const senses = actor.system.perception.senses;
+
+            // Look for the sense in various formats
+            const senseData = senses[senseType] ||
+                senses.find(s => s.type === senseType || s.label?.toLowerCase().includes(senseType));
+
+            if (senseData) {
+                // Handle different range formats
+                if (typeof senseData.range === 'number') {
+                    return senseData.range;
+                }
+                if (typeof senseData === 'object' && senseData.value) {
+                    return parseInt(senseData.value) || 0;
+                }
+                if (typeof senseData === 'number') {
+                    return senseData;
+                }
+            }
+
+            return 0;
+        } catch {
+            return 0;
+        }
+    }
+
+    /**
+     * Check if a token represents a living creature
+     * @param {Token} token - Token to check
+     * @returns {boolean} True if token is a living creature
+     * @private
+     */
+    _isLivingCreature(token) {
+        try {
+            const actor = token.actor;
+            if (!actor) return false;
+
+            // Check actor type - living types
+            const livingTypes = ['character', 'npc', 'familiar'];
+            if (livingTypes.includes(actor.type)) {
+                // Check for undead, construct, or other non-living traits
+                const traits = actor.system?.traits?.value || [];
+                const nonLivingTraits = ['undead', 'construct', 'fiend', 'celestial'];
+
+                return !nonLivingTraits.some(trait => traits.includes(trait));
+            }
+
+            return false;
+        } catch {
+            return false;
         }
     }
 

@@ -440,12 +440,12 @@ export class FeatsHandler {
             if (!observer || !actorToken) return false;
 
             // Determine ray endpoints
-            const p1 = observer?.center || observer?.getCenter?.();
+            const p1 = observer?.center || observer?.getCenterPoint?.();
             let p2 = null;
             if (pointHint && typeof pointHint.x === 'number' && typeof pointHint.y === 'number') {
               p2 = { x: pointHint.x, y: pointHint.y };
             } else {
-              p2 = actorToken?.center || actorToken?.getCenter?.();
+              p2 = actorToken?.center || actorToken?.getCenterPoint?.();
             }
             if (!p1 || !p2) return false;
 

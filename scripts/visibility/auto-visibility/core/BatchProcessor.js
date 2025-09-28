@@ -31,6 +31,7 @@ export class BatchProcessor {
      * @param {PositionManager} dependencies.positionManager
     * @param {OverrideService} dependencies.overrideService
     * @param {VisibilityMapService} dependencies.visibilityMapService
+     * @param {VisionAnalyzer} dependencies.visionAnalyzer - VisionAnalyzer for senses detection
      * @param {number} dependencies.maxVisibilityDistance
      */
     constructor(dependencies) {
@@ -43,6 +44,7 @@ export class BatchProcessor {
         this.positionManager = dependencies.positionManager;
         this.overrideService = dependencies.overrideService;
         this.visibilityMapService = dependencies.visibilityMapService;
+        this.visionAnalyzer = dependencies.visionAnalyzer;
         this.maxVisibilityDistance = dependencies.maxVisibilityDistance;
 
         // Persistent caches to reduce expensive rebuilding between batches
@@ -260,6 +262,7 @@ export class BatchProcessor {
             for (const otherToken of relevantTokens) {
                 if (otherToken.document.id === changedTokenId) continue;
 
+
                 const aId = changedToken.document.id;
                 const bId = otherToken.document.id;
                 const posA = changedTokenPos; // reuse memoized
@@ -291,9 +294,11 @@ export class BatchProcessor {
                     console.warn('PF2E Visioner | Failed to check visibility overrides:', overrideError);
                 }
 
+
                 // For observer movement: recalculate visibility even if observer has overrides
                 // Only skip if target has overrides that would prevent meaningful recalculation
                 const shouldSkipDueToTargetOverride = hasOverride2; // otherToken -> changedToken override
+
 
                 if (shouldSkipDueToTargetOverride) {
                     // Target has override preventing recalculation - skip expensive calculation
@@ -338,9 +343,11 @@ export class BatchProcessor {
                             breakdown.visGlobalMisses++;
                         }
                     }
+
                     if (hit1 !== null && hit2 !== null && hit1 === originalVisibility1 && hit2 === originalVisibility2) {
                         // Nothing to update for this pair; skip LOS and further work
                         breakdown.pairsSkippedNoChange++;
+
                         continue;
                     }
                 }
@@ -379,6 +386,8 @@ export class BatchProcessor {
                     // If not in global cache, compute it
                     if (los === undefined) {
                         los = this.spatialAnalyzer.canTokensSeeEachOther(changedToken, otherToken);
+
+
                         // Store in global cache for future use
                         if (this.globalLosCache) {
                             this.globalLosCache.set(pairKey, los);
@@ -396,9 +405,19 @@ export class BatchProcessor {
                 losCalculationTime += performance.now() - losStart;
 
                 if (!los) {
-                    // tokens filtered by LOS are skipped
-                    breakdown.pairsSkippedLOS++;
-                    continue;
+                    // Check if observer has non-visual senses that could work without LoS
+                    // Calculate distance using the existing position data
+                    const distance = Math.sqrt(Math.pow(posA.x - posB.x, 2) + Math.pow(posA.y - posB.y, 2)) / canvas.grid.size;
+                    const hasNonVisualSenses = this.#canUseNonVisualSenses(changedToken, otherToken, distance);
+
+
+
+                    if (!hasNonVisualSenses) {
+                        // No LoS and no non-visual senses available - skip this pair
+                        breakdown.pairsSkippedLOS++;
+                        continue; // Skip to next pair instead of computing visibility
+                    }
+                    // Either has non-visual senses OR blocked LoS (will be undetected) - proceed with visibility calculation
                 }
 
                 // Time visibility calculations
@@ -432,8 +451,9 @@ export class BatchProcessor {
 
                         // If not in global cache, compute it
                         if (visibility1 === undefined) {
+
                             const calcStart = performance.now();
-                            visibility1 = await this.optimizedVisibilityCalculator.calculateVisibilityWithPosition(
+                            visibility1 = await this.optimizedVisibilityCalculator.calculateVisibilityBetweenTokens(
                                 changedToken,
                                 otherToken,
                                 posA,
@@ -486,8 +506,9 @@ export class BatchProcessor {
 
                         // If not in global cache, compute it
                         if (visibility2 === undefined) {
+
                             const calcStart = performance.now();
-                            visibility2 = await this.optimizedVisibilityCalculator.calculateVisibilityWithPosition(
+                            visibility2 = await this.optimizedVisibilityCalculator.calculateVisibilityBetweenTokens(
                                 otherToken,
                                 changedToken,
                                 posB,
@@ -546,5 +567,45 @@ export class BatchProcessor {
         }
 
         return { updates, breakdown, processedTokens, precomputeStats, detailedTimings };
+    }
+
+    /**
+     * Check if observer has non-visual senses (tremorsense, hearing) that could work without LoS.
+     * @param {Token} observer - The observing token
+     * @param {Token} target - The target token  
+     * @param {number} distance - Distance between tokens in grid units
+     * @returns {boolean} True if observer has non-visual senses that could detect the target
+     */
+    #canUseNonVisualSenses(observer, target, distance) {
+        // Get observer's sensing summary using the VisionAnalyzer (proper dependency injection)
+        const sensingSummary = this.visionAnalyzer.getSensingSummary(observer);
+        if (!sensingSummary) {
+            return false;
+        }
+
+        // Check for tremorsense in precise or imprecise senses - works through walls if both tokens on ground
+        const allSenses = [...(sensingSummary.precise || []), ...(sensingSummary.imprecise || [])];
+        const tremorsenseSense = allSenses.find(sense => sense.type === 'tremorsense');
+        if (tremorsenseSense) {
+            const tremorsenseRange = tremorsenseSense.range || 30;
+            const observerElevation = observer.document.elevation || 0;
+            const targetElevation = target.document.elevation || 0;
+
+            // Tremorsense works if both tokens are on ground and within range
+            if (observerElevation === 0 && targetElevation === 0 && distance <= tremorsenseRange) {
+                return true;
+            }
+        }
+
+        // Check for hearing - could work through thin walls depending on range
+        if (sensingSummary.hearing && sensingSummary.hearing.range) {
+            const hearingRange = sensingSummary.hearing.range || 60;
+            if (distance <= hearingRange) {
+                return true;
+            }
+        }
+
+        // Could add other non-visual senses here (scent, etc.)
+        return false;
     }
 }

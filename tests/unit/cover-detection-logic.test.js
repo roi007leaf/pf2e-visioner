@@ -47,7 +47,7 @@ describe('Cover Detection Core Logic', () => {
       const token = {
         id: 'same-token',
         center: { x: 100, y: 100 },
-        getCenter: () => ({ x: 100, y: 100 }),
+        getCenterPoint: () => ({ x: 100, y: 100 }),
       };
 
       const result = autoCoverSystem.detectCoverBetweenTokens(token, token);
@@ -58,7 +58,7 @@ describe('Cover Detection Core Logic', () => {
       const validToken = {
         id: 'valid',
         center: { x: 100, y: 100 },
-        getCenter: () => ({ x: 100, y: 100 }),
+        getCenterPoint: () => ({ x: 100, y: 100 }),
       };
 
       expect(autoCoverSystem.detectCoverBetweenTokens(null, validToken)).toBe('none');
@@ -70,13 +70,13 @@ describe('Cover Detection Core Logic', () => {
       const attacker = {
         id: 'attacker',
         center: { x: 100, y: 100 },
-        getCenter: () => ({ x: 100, y: 100 }),
+        getCenterPoint: () => ({ x: 100, y: 100 }),
       };
 
       const target = {
         id: 'target',
         center: { x: 300, y: 100 },
-        getCenter: () => ({ x: 300, y: 100 }),
+        getCenterPoint: () => ({ x: 300, y: 100 }),
       };
 
       // Setup canvas with an OPEN door between them
@@ -110,21 +110,21 @@ describe('Cover Detection Core Logic', () => {
       const attacker = {
         id: 'attacker',
         center: { x: 100, y: 100 },
-        getCenter: () => ({ x: 100, y: 100 }),
+        getCenterPoint: () => ({ x: 100, y: 100 }),
         document: { width: 1, height: 1 },
       };
 
       const target = {
         id: 'target',
         center: { x: 300, y: 100 },
-        getCenter: () => ({ x: 300, y: 100 }),
+        getCenterPoint: () => ({ x: 300, y: 100 }),
         document: { width: 1, height: 1 },
       };
 
       const blocker = {
         id: 'blocker',
         center: { x: 200, y: 100 }, // Directly between attacker and target
-        getCenter: () => ({ x: 200, y: 100 }),
+        getCenterPoint: () => ({ x: 200, y: 100 }),
         document: {
           x: 175,
           y: 75, // Token bounds
@@ -166,21 +166,21 @@ describe('Cover Detection Core Logic', () => {
       const attacker = {
         id: 'attacker',
         center: { x: 100, y: 100 },
-        getCenter: () => ({ x: 100, y: 100 }),
+        getCenterPoint: () => ({ x: 100, y: 100 }),
         document: { width: 1, height: 1 },
       };
 
       const target = {
         id: 'target',
         center: { x: 300, y: 100 },
-        getCenter: () => ({ x: 300, y: 100 }),
+        getCenterPoint: () => ({ x: 300, y: 100 }),
         document: { width: 1, height: 1 },
       };
 
       const deadBlocker = {
         id: 'dead-blocker',
         center: { x: 200, y: 100 },
-        getCenter: () => ({ x: 200, y: 100 }),
+        getCenterPoint: () => ({ x: 200, y: 100 }),
         document: {
           x: 175,
           y: 75,
@@ -214,21 +214,21 @@ describe('Cover Detection Core Logic', () => {
       const attacker = {
         id: 'attacker',
         center: { x: 100, y: 100 },
-        getCenter: () => ({ x: 100, y: 100 }),
+        getCenterPoint: () => ({ x: 100, y: 100 }),
         document: { width: 1, height: 1 },
       };
 
       const target = {
         id: 'target',
         center: { x: 400, y: 100 },
-        getCenter: () => ({ x: 400, y: 100 }),
+        getCenterPoint: () => ({ x: 400, y: 100 }),
         document: { width: 1, height: 1 },
       };
 
       const blocker = {
         id: 'blocker',
         center: { x: 200, y: 100 },
-        getCenter: () => ({ x: 200, y: 100 }),
+        getCenterPoint: () => ({ x: 200, y: 100 }),
         document: { x: 175, y: 75, width: 1, height: 1 },
         actor: {
           type: 'npc',
@@ -275,13 +275,13 @@ describe('Cover Detection Core Logic', () => {
       const attacker = {
         id: 'attacker',
         center: null,
-        getCenter: () => null,
+        getCenterPoint: () => null,
       };
 
       const target = {
         id: 'target',
         center: { x: 300, y: 100 },
-        getCenter: () => ({ x: 300, y: 100 }),
+        getCenterPoint: () => ({ x: 300, y: 100 }),
       };
 
       global.canvas = {
@@ -298,13 +298,13 @@ describe('Cover Detection Core Logic', () => {
       const attacker = {
         id: 'attacker',
         center: { x: 100, y: 100 },
-        getCenter: () => ({ x: 100, y: 100 }),
+        getCenterPoint: () => ({ x: 100, y: 100 }),
       };
 
       const target = {
         id: 'target',
         center: { x: 300, y: 100 },
-        getCenter: () => ({ x: 300, y: 100 }),
+        getCenterPoint: () => ({ x: 300, y: 100 }),
       };
 
       global.canvas = {
@@ -323,13 +323,13 @@ describe('Cover Detection Core Logic', () => {
       const attacker = {
         id: 'attacker',
         center: { x: 100, y: 100 },
-        getCenter: () => ({ x: 100, y: 100 }),
+        getCenterPoint: () => ({ x: 100, y: 100 }),
       };
 
       const target = {
         id: 'target',
         center: { x: 300, y: 100 },
-        getCenter: () => ({ x: 300, y: 100 }),
+        getCenterPoint: () => ({ x: 300, y: 100 }),
       };
 
       // Setup canvas with corrupted wall data

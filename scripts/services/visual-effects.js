@@ -806,10 +806,14 @@ export async function updateWallVisuals(observerId = null) {
             diff: false,
           });
         // After sight changes, refresh perception
-        canvas.perception.update({
-          refreshVision: true,
-          refreshOcclusion: true,
-        });
+        // CRITICAL: Only refresh perception if this wasn't called from token selection
+        const isFromTokenSelection = this._isFromTokenSelection?.() ?? false;
+        if (!isFromTokenSelection) {
+          canvas.perception.update({
+            refreshVision: true,
+            refreshOcclusion: true,
+          });
+        }
         // Force token refresh so newly visible tokens render
         try {
           for (const t of canvas.tokens.placeables) t.refresh?.();
@@ -893,8 +897,8 @@ async function updateHiddenTokenEchoes(observer) {
         continue;
       }
       // Only show echo if token lies behind at least one hidden+observed wall, and not blocked by any regular walls
-      const p1 = observer.center || observer.getCenter?.();
-      const p2 = t.center || t.getCenter?.();
+      const p1 = observer.center || observer.getCenterPoint?.();
+      const p2 = t.center || t.getCenterPoint?.();
       if (!p1 || !p2) {
         removeEcho(t);
         continue;
@@ -917,7 +921,7 @@ async function updateHiddenTokenEchoes(observer) {
 function drawEcho(token) {
   try {
     const center = token.center ||
-      token.getCenter?.() || { x: token.x + token.w / 2, y: token.y + token.h / 2 };
+      token.getCenterPoint?.() || { x: token.x + token.w / 2, y: token.y + token.h / 2, elevation: token.elevation };
     const g = token._pvHiddenEcho || new PIXI.Graphics();
     g.clear();
     const color = 0xffa500; // orange
@@ -974,4 +978,153 @@ function segmentsIntersect(p1, p2, q1, q2) {
   if (o3 === 0 && onSeg(q1, q2, p1)) return true;
   if (o4 === 0 && onSeg(q1, q2, p2)) return true;
   return false;
+}
+
+/**
+ * Optimized wall indicator update that ONLY handles visual indicators
+ * Does not trigger lighting refresh or AVS processing
+ * Used specifically for controlToken hooks to avoid unnecessary AVS runs
+ * @param {string} observerId - The observer token ID
+ */
+export async function updateWallIndicatorsOnly(observerId = null) {
+  try {
+    // Respect setting toggle
+    if (!game.settings?.get?.(MODULE_ID, 'hiddenWallsEnabled')) {
+      return;
+    }
+
+    const walls = canvas?.walls?.placeables || [];
+    if (!walls.length) {
+      return;
+    }
+
+    // Determine local observer token strictly from current selection (or provided id)
+    let observer = null;
+    try {
+      if (observerId) {
+        observer = canvas.tokens.get(observerId) || null;
+      }
+      if (!observer) {
+        observer = canvas.tokens.controlled?.[0] || null;
+      }
+    } catch (_) {
+      observer = null;
+    }
+
+    // Only show indicators if the current user is actively controlling this token
+    if (observer && !canvas.tokens.controlled.includes(observer)) {
+      return;
+    }
+
+    const wallMapForObserver = observer?.document?.getFlag?.(MODULE_ID, 'walls') || {};
+
+    // Build an expanded set of observed wall IDs that includes any walls
+    // connected to an observed wall via the connectedWalls identifier list.
+    const observedSet = new Set(
+      Object.entries(wallMapForObserver)
+        .filter(([, v]) => v === 'observed')
+        .map(([id]) => id),
+    );
+
+    const expandedObserved = new Set(observedSet);
+    try {
+      const { getConnectedWallDocsBySourceId } = await import('./connected-walls.js');
+      for (const wall of walls) {
+        const id = wall?.document?.id;
+        if (!id || !observedSet.has(id)) continue;
+        const connectedDocs = getConnectedWallDocsBySourceId(id) || [];
+        for (const d of connectedDocs) expandedObserved.add(d.id);
+      }
+    } catch (_) { }
+
+    // OPTIMIZED: Only handle visual indicators, no document updates or lighting changes
+    for (const wall of walls) {
+      const d = wall.document;
+      if (!d) continue;
+
+      let flagHidden = false;
+      try {
+        flagHidden = !!d.getFlag?.(MODULE_ID, 'hiddenWall');
+      } catch (_) { }
+
+      // Remove previous indicator/masks if any (always clean before evaluating)
+      try {
+        if (wall._pvHiddenIndicator && wall._pvHiddenIndicator.parent) {
+          wall._pvHiddenIndicator.parent.removeChild(wall._pvHiddenIndicator);
+        }
+        wall._pvHiddenIndicator = null;
+        if (wall._pvSeeThroughMasks && Array.isArray(wall._pvSeeThroughMasks)) {
+          for (const m of wall._pvSeeThroughMasks) {
+            try {
+              m.parent?.removeChild(m);
+              m.destroy?.();
+            } catch (_) { }
+          }
+          wall._pvSeeThroughMasks = [];
+        }
+      } catch (_) { }
+
+      const isExpandedObserved = expandedObserved.has(d.id);
+
+      if (!flagHidden && !isExpandedObserved) {
+        continue;
+      }
+
+      // Draw indicator for this client only if the wall is observed for the local observer
+      try {
+        const c = Array.isArray(d.c) ? d.c : [d.x, d.y, d.x2, d.y2];
+        const [x1, y1, x2, y2] = c;
+        if ([x1, y1, x2, y2].every((n) => typeof n === 'number')) {
+          // Check if the controlled token has this wall flagged as 'observed'
+          const tokenWallFlag = wallMapForObserver[d.id];
+          const shouldShowIndicator = tokenWallFlag === 'observed';
+
+          if (shouldShowIndicator) {
+            // Create simple visual indicator without complex animations
+            const isDoor = Number(d.door) > 0;
+            const color = isDoor ? 0xffd166 : 0x9b59b6;
+            const dx = x2 - x1;
+            const dy = y2 - y1;
+            const len = Math.hypot(dx, dy) || 1;
+            const nx = -dy / len;
+            const ny = dx / len;
+
+            let half = 10;
+            try {
+              const flagVal = Number(canvas?.scene?.getFlag?.(MODULE_ID, 'hiddenIndicatorHalf'));
+              if (Number.isFinite(flagVal) && flagVal > 0) half = flagVal;
+            } catch (_) { }
+
+            const g = new PIXI.Graphics();
+            g.lineStyle(2, color, 0.9);
+            g.beginFill(color, 0.3);
+            g.drawPolygon([
+              x1 + nx * half,
+              y1 + ny * half,
+              x2 + nx * half,
+              y2 + ny * half,
+              x2 - nx * half,
+              y2 - ny * half,
+              x1 - nx * half,
+              y1 - ny * half,
+            ]);
+            g.endFill();
+
+            g._pvWallId = d.id;
+            g._wallDocumentId = d.id;
+            g.zIndex = 1000;
+            g.eventMode = 'none';
+            g.alpha = 1.0;
+
+            canvas.interface.addChild(g);
+            wall._pvHiddenIndicator = g;
+          }
+        }
+      } catch (error) {
+        console.warn(`PF2E Visioner | Error creating wall indicator for wall ${d.id}:`, error);
+      }
+    }
+  } catch (error) {
+    console.warn(`PF2E Visioner | Error in updateWallIndicatorsOnly:`, error);
+  }
 }

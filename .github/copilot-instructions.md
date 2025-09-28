@@ -13,6 +13,8 @@ Purpose: Give coding AIs crisp, actionable guardrails for this repo. Follow thes
 - Always run tests in terminal rather than internal tool.
 - Every bugfix requires a test if there isn't any.
 - Dont write long functions, break to several functions to keep readable.
+- Never mix test code and production code.
+- Use i18n keys for all user-facing text. Update lang/*.json as needed.
 
 ## Architecture you must respect
 - Stores (single-responsibility): `scripts/stores/*` – visibility/cover maps, simple get/set.

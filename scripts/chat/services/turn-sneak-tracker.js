@@ -194,7 +194,6 @@ class TurnSneakTracker {
         const existing = turnState.rollOutcomes.get(observerId);
         if (existing && existing.failed) {
             // Observer already failed a previous roll - they remain observed
-            console.log(`PF2E Visioner | Observer ${observerToken.name} already failed previous sneak roll - remaining observed`);
             return false; // Block this outcome from being applied
         }
 
@@ -216,7 +215,6 @@ class TurnSneakTracker {
                 currentVisibility: 'observed',
                 reason: `Failed sneak roll (${outcome})`
             });
-            console.log(`PF2E Visioner | Sneak roll failed against ${observerToken.name} - becoming observed immediately`);
         } else {
             // Successful roll - maintain or improve visibility
             turnState.observerStates.set(observerId, {
@@ -315,17 +313,13 @@ class TurnSneakTracker {
             // Verify this is actually the sneaking token's turn ending
             const sneakingCombatantId = this._getCombatantId(turnState.sneakingToken);
             if (sneakingCombatantId !== combatantId) {
-                console.log('PF2E Visioner | Turn end for different combatant, skipping sneak processing');
                 return;
             }
 
-            console.log('PF2E Visioner | Processing end-of-turn sneak checks for:', turnState.sneakingToken.name);
 
             // Perform deferred end-position checks if any exist
             if (turnState.deferredChecks.size > 0) {
                 await this._processDeferredChecks(turnState);
-            } else {
-                console.log('PF2E Visioner | No deferred checks for:', turnState.sneakingToken.name);
             }
 
             // Clean up turn state
@@ -364,10 +358,7 @@ class TurnSneakTracker {
                         // Turn changed, process any remaining deferred checks
                         if (turnState.isActive) {
                             if (turnState.deferredChecks.size > 0) {
-                                console.log('PF2E Visioner | Processing deferred sneak checks from combat update for:', turnState.sneakingToken.name);
                                 await this._processDeferredChecks(turnState);
-                            } else {
-                                console.log('PF2E Visioner | Combat update - no deferred checks for:', turnState.sneakingToken.name);
                             }
                         }
                     }
@@ -393,7 +384,6 @@ class TurnSneakTracker {
         const sneakingToken = turnState.sneakingToken;
         const currentPosition = this._captureTokenPosition(sneakingToken);
 
-        console.log(`PF2E Visioner | Processing ${turnState.deferredChecks.size} deferred checks for ${sneakingToken.name}`);
 
         // Collect results for end-of-turn dialog
         const dialogResults = [];
@@ -415,7 +405,6 @@ class TurnSneakTracker {
                 const currentVisibility = this.getCurrentVisibilityForObserver(sneakingToken, observerToken) || 'observed';
 
                 if (!qualifies) {
-                    console.log(`PF2E Visioner | End position check failed - ${sneakingToken.name} would become observed by ${observerToken.name}`);
 
                     // Don't apply penalty automatically - let dialog handle it
                     // Record result for dialog to show user what would happen
@@ -433,7 +422,6 @@ class TurnSneakTracker {
                         hasVisibilityChanges = true;
                     }
                 } else {
-                    console.log(`PF2E Visioner | End position check passed for ${sneakingToken.name} vs ${observerToken.name}`);
 
                     // Record successful validation (no change needed)
                     dialogResults.push({

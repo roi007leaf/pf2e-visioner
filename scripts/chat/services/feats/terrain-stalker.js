@@ -176,13 +176,13 @@ export class TerrainStalkerService {
                             y: observer?.center?.y ?? observer?.document?.y ?? 0,
                             elevation: observer?.document?.elevation || 0,
                         };
-                        startVis = await optimizedVisibilityCalculator.calculateVisibilityWithPosition(
+                        startVis = await optimizedVisibilityCalculator.calculateVisibilityBetweenTokens(
                             observer,
                             targetToken,
                             observerPos,
                             startPos,
                         );
-                        endVis = await optimizedVisibilityCalculator.calculateVisibilityWithPosition(
+                        endVis = await optimizedVisibilityCalculator.calculateVisibilityBetweenTokens(
                             observer,
                             targetToken,
                             observerPos,
