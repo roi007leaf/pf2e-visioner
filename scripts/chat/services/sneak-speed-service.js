@@ -30,7 +30,6 @@
  * - A legacy flag (sneak-original-walk-speed) may exist from previous versions and is cleared on restore
  */
 
-import turnSneakTracker from './turn-sneak-tracker.js';
 
 const MODULE_ID = 'pf2e-visioner';
 const ORIGINAL_SPEED_FLAG = 'sneak-original-walk-speed';
@@ -187,14 +186,6 @@ export class SneakSpeedService {
       const actor = SneakSpeedService.resolveActor(tokenOrActor);
       if (!actor) return;
 
-      // Check if we should preserve the Sneaking effect for Sneaky/Very Sneaky feat users
-      const shouldPreserveEffect = SneakSpeedService._shouldPreserveSneakingEffect(tokenOrActor, actor);
-
-      if (shouldPreserveEffect) {
-        console.log(`PF2E Visioner | Preserving Sneaking effect for ${actor.name} until end of turn (Sneaky/Very Sneaky feat)`);
-        return; // Don't remove the effect yet
-      }
-
       // Remove created effect if it exists
       try {
         const effectId = actor.getFlag?.(MODULE_ID, EFFECT_ID_FLAG);
@@ -218,33 +209,7 @@ export class SneakSpeedService {
     }
   }
 
-  /**
-   * Check if the Sneaking effect should be preserved for Sneaky/Very Sneaky feat users
-   * @param {Token|Actor} tokenOrActor - Original token or actor reference
-   * @param {Actor} actor - Resolved actor
-   * @returns {boolean} True if effect should be preserved until end of turn
-   * @private
-   */
-  static _shouldPreserveSneakingEffect(tokenOrActor, actor) {
-    try {
-      // If we have the original token, use it directly
-      if (tokenOrActor && tokenOrActor.actor && typeof turnSneakTracker?.shouldPreserveSneakActiveFlag === 'function') {
-        return turnSneakTracker.shouldPreserveSneakActiveFlag(tokenOrActor);
-      }
 
-      // Otherwise, try to find a token for this actor on the current scene
-      if (canvas?.tokens?.placeables && actor) {
-        const token = canvas.tokens.placeables.find(t => t.actor?.id === actor.id);
-        if (token && typeof turnSneakTracker?.shouldPreserveSneakActiveFlag === 'function') {
-          return turnSneakTracker.shouldPreserveSneakActiveFlag(token);
-        }
-      }
-    } catch (error) {
-      console.warn('PF2E Visioner | Error checking Sneaking effect preservation:', error);
-    }
-
-    return false; // Default to not preserving if we can't determine
-  }
 
   /**
    * Force restore sneak walk speed without checking feat preservation

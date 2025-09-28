@@ -19,6 +19,7 @@ function buildSneakDistanceChipHTML(tokenOrActor) {
     const hasLegendarySneak = FeatsHandler.hasFeat(actor, 'legendary-sneak');
     const hasVeryVerySneaky = FeatsHandler.hasFeat(actor, 'very-very-sneaky');
     const hasVerySneaky = FeatsHandler.hasFeat(actor, 'very-sneaky');
+    const hasSneaky = FeatsHandler.hasFeat(actor, 'sneaky');
 
     const fullSpeedFeats = [];
     if (hasSwiftSneak) fullSpeedFeats.push('Swift Sneak');
@@ -36,7 +37,7 @@ function buildSneakDistanceChipHTML(tokenOrActor) {
       }
     }
     if (bonusFeet > 0) {
-      tooltipLines.push(`Feat bonus: +${bonusFeet} ft${hasVerySneaky ? ' (Very Sneaky)' : ''}`);
+      tooltipLines.push(`Feat bonus: +${bonusFeet} ft${hasVerySneaky ? ' (Very Sneaky)' : ''}${hasSneaky ? ' (Sneaky)' : ''}`);
     }
     if (raw > baseSpeed) {
       tooltipLines.push(`Capped at base Speed (${baseSpeed} ft)`);

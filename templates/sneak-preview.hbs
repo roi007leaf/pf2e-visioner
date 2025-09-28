@@ -12,16 +12,32 @@
     <div class="sneaker-details">
       <h3 class="sneaker-name">{{sneaker.name}}</h3>
       <p class="hint">{{sneaker.actionLabel}}</p>
-      {{#if prereqBadges}}
-        <div class="action-context-badges">
-          {{#each prereqBadges as |b|}}
-            <span class="badge badge-feat" data-tooltip="{{b.tooltip}}">
-              <i class="{{b.icon}}"></i>
-              <span class="badge-label">{{b.label}}</span>
-            </span>
-          {{/each}}
+      
+      {{#if isEndOfTurnDialog}}
+        <div class="end-of-turn-notice">
+          <div class="notice-header">
+            <i class="fas fa-clock"></i>
+            <strong>End-of-Turn Position Validation</strong>
+          </div>
+          <p class="notice-text">
+            Your Sneaky/Very Sneaky feat allowed chaining multiple sneaks this turn. 
+            These are the final position checks for observers who passed their Perception rolls.
+          </p>
         </div>
       {{/if}}
+      
+      {{#unless isEndOfTurnDialog}}
+        {{#if prereqBadges}}
+          <div class="action-context-badges">
+        {{#each prereqBadges as |b|}}
+          <span class="badge badge-feat" data-tooltip="{{b.tooltip}}">
+            <i class="{{b.icon}}"></i>
+            <span class="badge-label">{{b.label}}</span>
+          </span>
+        {{/each}}
+          </div>
+        {{/if}}
+      {{/unless}}
       {{#if sneakDistance}}
         <div class="sneak-distance-indicator">
           <span class="distance-chip" data-tooltip="{{sneakDistance.tooltip}}">
@@ -60,28 +76,62 @@
       <input type="checkbox" {{#if showOnlyChanges}}checked{{/if}} data-action="toggleShowOnlyChanges" data-tooltip="Show only rows with visibility changes" />
       <span class="encounter-filter-label">Show only changes</span>
     </label>
+
   </div>
 
-  {{!-- Apply All Cover Section - Above Table --}}
-  <div class="apply-all-cover-section-top">
-    <span class="apply-all-label">Apply All Cover:</span>
-    <div class="apply-all-cover-buttons">
-      <button type="button" class="apply-all-cover-btn module-style" data-action="applyAllCover" data-bonus="0" data-tooltip="Apply no cover bonus to all observers">
-        <i class="fas fa-shield-slash"></i> +0
-      </button>
-      <button type="button" class="apply-all-cover-btn module-style" data-action="applyAllCover" data-bonus="2" data-tooltip="Apply standard cover bonus to all observers">
-        <i class="fas fa-shield-alt"></i> +2
-      </button>
-      <button type="button" class="apply-all-cover-btn module-style" data-action="applyAllCover" data-bonus="4" data-tooltip="Apply greater cover bonus to all observers">
-        <i class="fas fa-shield"></i> +4
+  {{!-- Bulk Actions Section - All buttons in a flex row --}}
+  <div class="bulk-actions-container">
+    {{!-- Bulk Defer Button --}}
+    {{#if canBulkDefer}}
+    <div class="bulk-action-group">
+      <button type="button" class="bulk-defer-btn {{#if hasDeferableTokens}}available{{/if}}" 
+              data-action="bulkDefer" 
+              data-tooltip="Defer all eligible position checks to end of turn">
+        <i class="fas fa-hourglass-half"></i>
+        <span>Defer All Eligible</span>
       </button>
     </div>
+    {{/if}}
+
+
+
+    {{!-- End-of-Turn Validation Button --}}
+    {{#if canProcessEndTurn}}
+    <div class="bulk-action-group">
+      <button type="button" class="end-turn-validation-btn {{#if canProcessEndTurn}}available{{/if}}" 
+              data-action="processEndTurnValidation" 
+              data-tooltip="Process {{deferredChecksCount}} deferred position check{{#unless (eq deferredChecksCount 1)}}s{{/unless}} for end-of-turn validation">
+        <i class="fas fa-clock"></i>
+        <span>End Turn Validation ({{deferredChecksCount}})</span>
+      </button>
+    </div>
+    {{/if}}
+
+    {{!-- Apply All Cover Group --}}
+    <div class="bulk-action-group">
+      <span class="bulk-action-label">Apply All Cover:</span>
+      <div class="apply-all-cover-buttons">
+        <button type="button" class="apply-all-cover-btn module-style" data-action="applyAllCover" data-bonus="0" data-tooltip="Apply no cover bonus to all observers">
+          <i class="fas fa-shield-slash"></i> +0
+        </button>
+        <button type="button" class="apply-all-cover-btn module-style" data-action="applyAllCover" data-bonus="2" data-tooltip="Apply standard cover bonus to all observers">
+          <i class="fas fa-shield-alt"></i> +2
+        </button>
+        <button type="button" class="apply-all-cover-btn module-style" data-action="applyAllCover" data-bonus="4" data-tooltip="Apply greater cover bonus to all observers">
+          <i class="fas fa-shield"></i> +4
+        </button>
+      </div>
+    </div>
+
+    {{!-- Bulk Set Visibility Group --}}
+    {{#if bulkOverrideStates}}
+    <div class="bulk-action-group">
+      {{> "pf2e-visioner.bulk-override"}}
+    </div>
+    {{/if}}
   </div>
 
   {{!-- Results Table --}}
-  {{#if bulkOverrideStates}}
-    {{> "pf2e-visioner.bulk-override"}}
-  {{/if}}
   <div class="results-table-container">
     <table class="visibility-table sneak-results-table">
       <thead>
@@ -109,10 +159,11 @@
       </thead>
       <tbody>
         {{#each outcomes as |outcome|}}
-          <tr class="token-row result-{{outcome.outcome}} {{#if outcome.hasPositionData}}has-position-data{{/if}}" 
+          <tr class="token-row result-{{outcome.outcome}} {{#if outcome.hasPositionData}}has-position-data{{/if}} {{#if outcome.isDeferred}}deferred-row{{/if}}" 
               data-token-id="{{outcome.token.id}}" 
               data-outcome="{{outcome.outcome}}"
-              data-result-type="{{outcome.outcome}}">
+              data-result-type="{{outcome.outcome}}"
+              {{#if outcome.isDeferred}}data-deferred="true"{{/if}}>
             <td class="token-image">
               <span class="token-img-wrapper">
                 <img src="{{outcome.tokenImage}}" width="28" height="28" />
@@ -133,11 +184,16 @@
                           data-action="toggleStartPosition" 
                           data-token-id="{{outcome.token.id}}" 
                           data-requirement="start"
-                          data-tooltip="{{#if outcome.positionDisplay.startPosition.qualifies}}Start position qualifies for sneak{{else}}Start position does not qualify for sneak{{/if}}">
+                          {{#if outcome.isDeferred}}disabled{{/if}}
+                          data-tooltip="{{#if (and consecutiveSneaks (gt consecutiveSneaks 1))}}Start position qualification from previous sneak action{{else}}{{#if outcome.positionDisplay.startPosition.qualifies}}Start position qualifies for sneak{{else}}Start position does not qualify for sneak{{/if}}{{/if}}">
+                    {{#if (and consecutiveSneaks (gt consecutiveSneaks 1))}}
+                      <i class="fas fa-clock"></i>
+                    {{else}}
                     {{#if outcome.positionDisplay.startPosition.qualifies}}
                       <i class="fas fa-check"></i>
                     {{else}}
                       <i class="fas fa-times"></i>
+                    {{/if}}
                     {{/if}}
                   </button>
                 </div>
@@ -155,17 +211,46 @@
                           data-action="toggleEndPosition" 
                           data-token-id="{{outcome.token.id}}" 
                           data-requirement="end"
-                          data-tooltip="{{#if outcome.positionDisplay.endPosition.qualifies}}End position qualifies for sneak{{else}}End position does not qualify for sneak{{/if}}">
-                    {{#if outcome.positionDisplay.endPosition.qualifies}}
-                      <i class="fas fa-check"></i>
+                          data-tooltip="{{#if (and consecutiveSneaks (gt consecutiveSneaks 1))}}End position will be checked at end of turn (consecutive sneak){{else}}{{#if outcome.positionDisplay.endPosition.qualifies}}End position qualifies for sneak{{else}}End position does not qualify for sneak{{/if}}{{/if}}">
+                    {{#if (and consecutiveSneaks (gt consecutiveSneaks 1))}}
+                      <i class="fas fa-clock"></i>
                     {{else}}
-                      <i class="fas fa-times"></i>
+                      {{#if outcome.positionDisplay.endPosition.qualifies}}
+                        <i class="fas fa-check"></i>
+                      {{else}}
+                        <i class="fas fa-times"></i>
+                      {{/if}}
                     {{/if}}
                   </button>
-                  {{!-- Sneaky feat deferred check indicator --}}
-                  <span class="sneaky-feat-indicator" data-sneaking-token="{{../sneaker.id}}" data-observer-token="{{outcome.token.id}}" style="display: none;">
-                    <i class="fas fa-user-ninja" data-tooltip="End position check deferred to turn end (Sneaky/Very Sneaky feat)"></i>
-                  </span>
+                  
+                  {{!-- Defer Button for Sneaky/Very Sneaky Feat --}}
+                  {{#if outcome.isDeferred}}
+                    {{#if outcome.canDefer}}
+                      {{!-- Deferred but can defer again (manual end position change) --}}
+                      <button type="button" class="defer-btn" 
+                              data-action="toggleDefer" 
+                              data-token-id="{{outcome.token.id}}"
+                              data-tooltip="Defer end position check to end of turn (Sneaky feat)">
+                        <i class="fas fa-hourglass"></i>
+                      </button>
+                    {{else}}
+                      {{!-- Currently deferred and cannot defer again --}}
+                      <button type="button" class="defer-btn deferred active" 
+                              data-action="toggleDefer" 
+                              data-token-id="{{outcome.token.id}}"
+                              data-tooltip="Currently deferred to end of turn (Sneaky feat)" disabled>
+                        <i class="fas fa-clock"></i>
+                      </button>
+                    {{/if}}
+                  {{else}}
+                    {{!-- Not deferred --}}
+                    <button type="button" class="defer-btn {{#unless outcome.canDefer}}hidden{{/unless}}" 
+                            data-action="toggleDefer" 
+                            data-token-id="{{outcome.token.id}}"
+                            data-tooltip="Defer end position check to end of turn (Sneaky feat)">
+                      <i class="fas fa-hourglass"></i>
+                    </button>
+                  {{/if}}
                 </div>
               {{else}}
                 <div class="no-position-data" data-tooltip="End position data not available">
@@ -225,11 +310,12 @@
               <div class="visibility-change-with-override">
                 {{{visibilityIcon outcome.oldVisibility}}}
                 <i class="fas fa-arrow-right position-arrow" aria-hidden="true"></i>
-                <div class="override-icons" data-token-id="{{outcome.token.id}}">
+                <div class="override-icons {{#if outcome.isDeferred}}disabled{{/if}}" data-token-id="{{outcome.token.id}}">
                   {{#each outcome.availableStates as |state|}}
                     <button type="button" class="state-icon {{#if state.selected}}selected{{/if}} {{#if state.calculatedOutcome}}calculated-outcome{{/if}} {{state.cssClass}}" 
                             data-state="{{state.value}}" data-token-id="{{outcome.token.id}}" 
-                            data-tooltip="{{#if state.calculatedOutcome}}AVS Recommended: {{/if}}{{state.label}}">
+                            {{#if outcome.isDeferred}}disabled{{/if}}
+                            data-tooltip="{{#if outcome.isDeferred}}Disabled - deferred to end of turn{{else if state.calculatedOutcome}}AVS Recommended: {{state.label}}{{else}}{{state.label}}{{/if}}">
                       <i class="{{state.icon}}"></i>
                     </button>
                   {{/each}}
@@ -246,11 +332,30 @@
               {{/if}}
             </td>
             <td class="actions">
-              {{#if outcome.hasActionableChange}}
-                <button type="button" class="row-action-btn apply-change" data-action="applyChange" data-token-id="{{outcome.token.id}}" data-tooltip="Apply this visibility change">
+              {{#if outcome.isDeferred}}
+                <div class="deferred-actions-container" data-debug="deferred-container-{{outcome.token.id}}">
+                  <span class="deferred-action" data-tooltip="Actions disabled - deferred to end of turn">
+                    <i class="fas fa-clock"></i> Deferred
+                  </span>
+                  <button type="button" class="undefer-btn" 
+                          data-action="undeferCheck" 
+                          data-token-id="{{outcome.token.id}}"
+                          data-tooltip="Remove defer and process this check now"
+                          data-debug="undefer-btn-{{outcome.token.id}}"
+                          style="pointer-events: auto !important; z-index: 999; position: relative;">
+                    <i class="fas fa-times"></i>
+                    Undefer
+                  </button>
+                </div>
+              {{else if outcome.hasActionableChange}}
+                <button type="button" class="row-action-btn apply-change" 
+                {{#if outcome.isDeferred}}disabled{{/if}}
+                data-action="applyChange" data-token-id="{{outcome.token.id}}" data-tooltip="Apply this visibility change">
                   <i class="fas fa-check"></i>
                 </button>
-                <button type="button" class="row-action-btn revert-change" data-action="revertChange" data-token-id="{{outcome.token.id}}" data-tooltip="Revert to original visibility">
+                <button type="button" class="row-action-btn revert-change" 
+                {{#if outcome.isDeferred}}disabled{{/if}}
+                data-action="revertChange" data-token-id="{{outcome.token.id}}" data-tooltip="Revert to original visibility">
                   <i class="fas fa-undo"></i>
                 </button>
               {{else}}
@@ -270,12 +375,28 @@
     </div>
     
     <div class="sneak-preview-dialog-bulk-actions-buttons">
-      <button type="button" class="bulk-action-btn apply-all" data-action="applyAll" data-tooltip="Apply all visibility changes">
-        <i class="fas fa-check-circle"></i> Apply All
-      </button>
-      <button type="button" class="bulk-action-btn revert-all" data-action="revertAll" data-tooltip="Revert all changes to original state">
-        <i class="fas fa-undo"></i> Revert All
-      </button>
+      {{#if isEndOfTurnDialog}}
+        <button type="button" class="bulk-action-btn apply-all" data-action="applyAll" data-tooltip="Acknowledge end-of-turn position validation results">
+          <i class="fas fa-check-circle"></i> Acknowledge Results
+        </button>
+        <button type="button" class="bulk-action-btn close-dialog" data-action="close" data-tooltip="Close dialog (results are automatically applied)">
+          <i class="fas fa-times"></i> Close
+        </button>
+      {{else}}
+        <button type="button" class="bulk-action-btn apply-all" data-action="applyAll" data-tooltip="Apply all visibility changes">
+          <i class="fas fa-check-circle"></i> Apply All
+        </button>
+        <button type="button" class="bulk-action-btn revert-all" data-action="revertAll" data-tooltip="Revert all changes to original state">
+          <i class="fas fa-undo"></i> Revert All
+        </button>
+        {{#if canBulkUndefer}}
+        <button type="button" class="bulk-action-btn undefer-all {{#if hasDeferredTokens}}available{{/if}}" 
+                data-action="bulkUndefer" 
+                data-tooltip="Undefer all currently deferred tokens and restore their original state">
+          <i class="fas fa-clock"></i> Undefer All
+        </button>
+        {{/if}}
+      {{/if}}
     </div>
   </div>
 </div>

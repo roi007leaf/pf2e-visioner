@@ -8,7 +8,6 @@ import { PointOutActionHandler } from './actions/point-out-action.js';
 import { SeekActionHandler } from './actions/seek-action.js';
 import { SneakActionHandler } from './actions/sneak-action.js';
 import { TakeCoverActionHandler } from './actions/take-cover-action.js';
-import turnSneakTracker from './turn-sneak-tracker.js';
 
 export async function applyNowSeek(actionData, button) {
   const handler = new SeekActionHandler();
@@ -85,15 +84,7 @@ export async function applyNowSneak(actionData, button) {
       if (!actionData.overrides || Object.keys(actionData.overrides).length === 0) {
         const sneakingToken = handler._getSneakingToken(actionData);
         if (sneakingToken) {
-          // Check if sneak-active flag should persist until end of turn for Sneaky/Very Sneaky feat users
-          const shouldPreserve = turnSneakTracker?.shouldPreserveSneakActiveFlag?.(sneakingToken);
-
-          if (shouldPreserve) {
-            console.log(`PF2E Visioner | Preserving sneak-active flag for ${sneakingToken.name} until end of turn (Sneaky/Very Sneaky feat)`);
-            // Don't clear the flag - let TurnSneakTracker handle it at end of turn
-          } else {
-            await sneakingToken.document.unsetFlag('pf2e-visioner', 'sneak-active');
-          }
+          await sneakingToken.document.unsetFlag('pf2e-visioner', 'sneak-active');
         }
       }
 

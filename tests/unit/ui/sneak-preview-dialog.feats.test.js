@@ -108,4 +108,63 @@ describe('SneakPreviewDialog - feat-based end-position relaxation', () => {
     // And it should not force newVisibility to observed due to end position
     expect(processed.newVisibility).not.toBe('observed');
   });
+
+  test('end-of-turn dialog initializes all filter properties correctly', async () => {
+    // Lazy import to align with module system
+    const mod = require('../../../scripts/chat/dialogs/sneak-preview-dialog.js');
+    const { SneakPreviewDialog } = mod;
+
+    const sneakingToken = {
+      id: 'sneaker',
+      name: 'Test Sneaker',
+      actor: { id: 'actor1' },
+      document: {
+        getFlag: jest.fn().mockReturnValue({}),
+      },
+    };
+
+    const outcomes = [{
+      token: {
+        id: 'observer1',
+        name: 'Observer',
+        document: {
+          getFlag: jest.fn().mockReturnValue({}),
+        },
+      },
+      newVisibility: 'hidden',
+      previousVisibility: 'observed',
+    }];
+
+    // Create end-of-turn dialog
+    const endOfTurnDialog = new SneakPreviewDialog(
+      sneakingToken,
+      outcomes,
+      {},
+      {},
+      { isEndOfTurnDialog: true }
+    );
+
+    // Verify all filter properties are properly initialized
+    expect(endOfTurnDialog.isEndOfTurnDialog).toBe(true);
+    expect(endOfTurnDialog.encounterOnly).toBeDefined();
+    expect(endOfTurnDialog.ignoreAllies).toBeDefined();
+    expect(endOfTurnDialog.hideFoundryHidden).toBeDefined();
+    expect(endOfTurnDialog.filterByDetection).toBeDefined();
+    expect(endOfTurnDialog.showChangesOnly).toBeDefined();
+
+    // Verify defaults are appropriate
+    expect(typeof endOfTurnDialog.encounterOnly).toBe('boolean');
+    expect(typeof endOfTurnDialog.ignoreAllies).toBe('boolean');
+    expect(typeof endOfTurnDialog.hideFoundryHidden).toBe('boolean');
+    expect(typeof endOfTurnDialog.filterByDetection).toBe('boolean');
+    expect(typeof endOfTurnDialog.showChangesOnly).toBe('boolean');
+
+    // Prepare context to ensure filters are passed to template
+    const context = await endOfTurnDialog._prepareContext({});
+    expect(context.encounterOnly).toBe(endOfTurnDialog.encounterOnly);
+    expect(context.ignoreAllies).toBe(endOfTurnDialog.ignoreAllies);
+    expect(context.hideFoundryHidden).toBe(endOfTurnDialog.hideFoundryHidden);
+    expect(context.filterByDetection).toBe(endOfTurnDialog.filterByDetection);
+    expect(context.showOnlyChanges).toBe(endOfTurnDialog.showChangesOnly);
+  });
 });

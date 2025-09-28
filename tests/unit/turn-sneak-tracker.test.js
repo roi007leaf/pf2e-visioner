@@ -279,12 +279,13 @@ describe('TurnSneakTracker', () => {
 
             // Mock position check to fail
             jest.spyOn(tracker, '_checkEndPositionQualifies').mockResolvedValue(false);
-            jest.spyOn(tracker, '_applyEndPositionPenalty').mockResolvedValue();
+            jest.spyOn(tracker, '_showEndOfTurnDialog').mockResolvedValue();
 
             await tracker._onTurnEnd(mockCombatant, mockCombat, 'user1');
 
             expect(tracker._checkEndPositionQualifies).toHaveBeenCalled();
-            expect(tracker._applyEndPositionPenalty).toHaveBeenCalledWith(mockToken, mockObserver);
+            // Penalties are no longer automatically applied - instead dialog is shown
+            expect(tracker._showEndOfTurnDialog).toHaveBeenCalled();
         });
 
         test('cleans up turn state after processing', async () => {
@@ -296,21 +297,15 @@ describe('TurnSneakTracker', () => {
             expect(tracker.getTurnSneakState(mockToken)).toBe(null);
         });
 
-        test('clears sneak-active flag and Sneaking effect even without deferred checks', async () => {
+        test('cleans up turn state even without deferred checks', async () => {
             const actionData = { some: 'data' };
             tracker.startTurnSneak(mockToken, actionData);
-
-            // Mock the cleanup methods to verify they're called
-            jest.spyOn(tracker, '_clearSneakActiveFlag').mockResolvedValue();
-            jest.spyOn(tracker, '_clearSneakingEffect').mockResolvedValue();
 
             // Don't add any deferred checks - this is the key difference from other tests
 
             await tracker._onTurnEnd(mockCombatant, mockCombat, 'user1');
 
-            // Verify cleanup methods were called even without deferred checks
-            expect(tracker._clearSneakActiveFlag).toHaveBeenCalledWith(mockToken);
-            expect(tracker._clearSneakingEffect).toHaveBeenCalledWith(mockToken);
+            // Verify turn state was cleaned up
             expect(tracker.getTurnSneakState(mockToken)).toBe(null);
         });
 
@@ -364,13 +359,9 @@ describe('TurnSneakTracker', () => {
             expect(tracker.getTurnSneakState(mockToken)).toBe(null);
         });
 
-        test('clears sneak-active flag and Sneaking effect on combat update without deferred checks', async () => {
+        test('cleans up turn state on combat update without deferred checks', async () => {
             const actionData = { some: 'data' };
             tracker.startTurnSneak(mockToken, actionData);
-
-            // Mock the cleanup methods to verify they're called
-            jest.spyOn(tracker, '_clearSneakActiveFlag').mockResolvedValue();
-            jest.spyOn(tracker, '_clearSneakingEffect').mockResolvedValue();
 
             // Simulate turn change
             const updateData = { turn: 1 };
@@ -380,9 +371,7 @@ describe('TurnSneakTracker', () => {
 
             await tracker._onCombatUpdate(newCombat, updateData, {}, 'user1');
 
-            // Verify cleanup methods were called even without deferred checks
-            expect(tracker._clearSneakActiveFlag).toHaveBeenCalledWith(mockToken);
-            expect(tracker._clearSneakingEffect).toHaveBeenCalledWith(mockToken);
+            // Verify turn state was cleaned up
             expect(tracker.getTurnSneakState(mockToken)).toBe(null);
         });
 

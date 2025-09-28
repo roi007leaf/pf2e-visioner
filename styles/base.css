@@ -781,5 +781,90 @@
   color: var(--cover-greater);
 }
 
+/* Deferred rows styling */
+.sneak-results-table .token-row.deferred-row {
+  opacity: 0.6;
+}
+
+.sneak-results-table .token-row.deferred-row .deferred-indicator {
+  color: #7d3ba5;
+  font-size: 0.85em;
+  font-style: italic;
+}
+
+.sneak-results-table .token-row.deferred-row .deferred-indicator i {
+  margin-right: 2px;
+}
+
+.sneak-results-table .token-row.deferred-row .deferred-action {
+  color: #7d3ba5;
+  font-style: italic;
+  font-size: 0.9em;
+}
+
+.sneak-results-table .token-row.deferred-row .cover-bonus-controls.disabled button,
+.sneak-results-table .token-row.deferred-row .override-icons.disabled button {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.sneak-results-table .token-row.deferred-row .cover-bonus-controls.disabled button:hover,
+.sneak-results-table .token-row.deferred-row .override-icons.disabled button:hover {
+  opacity: 0.4;
+}
+
+/* Wall Config Cover Button Styling - Target the actual classes used in wall-quick.hbs */
+.pv-wall-quick .cover-override-buttons .visioner-icon-btn {
+  width: 28px;
+  height: 28px;
+  padding: 4px;
+  background: var(--color-bg-option);
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-border-light-primary);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  position: relative;
+}
+
+.pv-wall-quick .cover-override-buttons .visioner-icon-btn:hover {
+  border-color: var(--pf2e-visioner-primary);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.pv-wall-quick .cover-override-buttons .visioner-icon-btn.active {
+  border-color: var(--pf2e-visioner-primary);
+  border-width: 2px;
+  box-shadow: 0 0 0 1px var(--pf2e-visioner-primary);
+}
+
+/* Ensure cover colors are applied properly in wall config */
+.pv-wall-quick .cover-override-buttons .cover-none {
+  color: var(--cover-none);
+}
+
+.pv-wall-quick .cover-override-buttons .cover-standard {
+  color: var(--cover-standard);
+}
+
+.pv-wall-quick .cover-override-buttons .cover-greater {
+  color: var(--cover-greater);
+}
+
+.pv-wall-quick .cover-override-buttons .icon-color-gray {
+  color: var(--color-text-dark-secondary);
+}
+
+/* Utility classes */
+.hidden {
+  display: none !important;
+}
+
 /* Import enhanced multi-target processing styles */
 @import url('./enhanced-multi-target-processing.css');

@@ -751,6 +751,29 @@ export class SneakActionHandler extends ActionHandlerBase {
       } catch { }
     }
 
+    // Track roll outcomes for Sneaky/Very Sneaky feat mechanics
+    let shouldApplyOutcome = true;
+    try {
+      const sneakingToken = this._getSneakingToken(actionData);
+      if (sneakingToken && turnSneakTracker.hasSneakyFeat(sneakingToken)) {
+        // Record the roll outcome for this observer
+        shouldApplyOutcome = turnSneakTracker.recordRollOutcome(
+          sneakingToken,
+          subject,
+          adjustedOutcome,
+          newVisibility
+        );
+
+        // If roll outcome tracking indicates this observer already failed a previous roll,
+        // override the newVisibility to 'observed' regardless of current roll success
+        if (!shouldApplyOutcome) {
+          newVisibility = 'observed';
+        }
+      }
+    } catch (error) {
+      console.warn('PF2E Visioner | Error tracking roll outcome for Sneaky feat:', error);
+    }
+
     // Calculate what the visibility change would have been with original outcome
     if (originalTotal) {
       try {
@@ -1169,15 +1192,6 @@ export class SneakActionHandler extends ActionHandlerBase {
   async _clearSneakFlag(actionData) {
     try {
       if (actionData?.sneakingToken) {
-        // Check if sneak-active flag should persist until end of turn for Sneaky/Very Sneaky feat users
-        const shouldPreserve = turnSneakTracker?.shouldPreserveSneakActiveFlag?.(actionData.sneakingToken);
-
-        if (shouldPreserve) {
-          console.log(`PF2E Visioner | Preserving sneak-active flag and Sneaking effect for ${actionData.sneakingToken.name} until end of turn (Sneaky/Very Sneaky feat)`);
-          // Don't clear the flag or effect - let TurnSneakTracker handle it at end of turn
-          return;
-        }
-
         await actionData.sneakingToken.document.unsetFlag('pf2e-visioner', 'sneak-active');
         // Restore walk speed after sneak ends
         try {

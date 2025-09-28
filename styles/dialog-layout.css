@@ -119,6 +119,325 @@
       box-shadow: 0 2px 8px rgba(220, 53, 69, 0.3);
     }
 
+    /* Defer button for Sneaky feat mechanics */
+    .defer-btn {
+      border: 2px solid #8538b2;
+      background: linear-gradient(135deg, #6b2c91 0%, #512c7b 100%);
+      color: white;
+      padding: 8px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 600;
+      transition: all 0.3s ease;
+      box-shadow: 0 2px 6px rgba(133, 56, 178, 0.2);
+      min-width: 42px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-left: 8px;
+      position: relative;
+    }
+
+    .defer-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(133, 56, 178, 0.3);
+      background: linear-gradient(135deg, #7d3ba5 0%, #5c3489 100%);
+      border-color: #9438b2;
+    }
+
+    .defer-btn.deferred.active {
+      background: linear-gradient(135deg, #ff9800 0%, #f57c00 100%);
+      color: white;
+      border-color: #ff6f00;
+      box-shadow: 0 2px 8px rgba(255, 152, 0, 0.4);
+      animation: defer-pulse 2s ease-in-out infinite alternate;
+    }
+
+    .defer-btn.deferred.active:hover {
+      background: linear-gradient(135deg, #ff6f00 0%, #e65100 100%);
+      border-color: #d84315;
+      animation: none;
+      box-shadow: 0 4px 15px rgba(255, 111, 0, 0.5);
+    }
+
+    @keyframes defer-pulse {
+      0% {
+        box-shadow: 0 2px 8px rgba(255, 152, 0, 0.4);
+      }
+      100% {
+        box-shadow: 0 2px 8px rgba(255, 152, 0, 0.4), 0 0 20px rgba(255, 152, 0, 0.3);
+      }
+    }
+
+    /* When a row is deferred, dim it slightly but keep most elements functional */
+    tr.deferred-row {
+      opacity: 0.85; /* Less dimming to show elements are still functional */
+    }
+
+    /* Only disable visibility change icons and start position button for deferred rows */
+    tr.deferred-row .visibility-change .override-icons.disabled,
+    tr.deferred-row .start-position .position-requirement-btn[disabled] {
+      pointer-events: none !important;
+      opacity: 0.5;
+    }
+
+    /* Ensure actions column is fully interactive for deferred rows */
+    tr.deferred-row td.actions {
+      pointer-events: auto !important;
+    }
+
+    /* Keep defer/undefer buttons fully functional */
+    tr.deferred-row td .defer-btn {
+      pointer-events: auto !important;
+    }
+
+    tr.deferred-row td .undefer-btn {
+      pointer-events: auto !important;
+      opacity: 1 !important; /* Override row opacity to make button fully visible */
+    }
+
+    tr.deferred-row td .deferred-actions-container {
+      pointer-events: auto !important;
+    }
+
+    /* Consecutive sneak position buttons with clock icons */
+    .position-requirement-btn .fa-clock {
+      color: #ff9800;
+      animation: clock-tick 2s ease-in-out infinite alternate;
+    }
+
+    @keyframes clock-tick {
+      0% {
+        color: #ff9800;
+        text-shadow: 0 0 5px rgba(255, 152, 0, 0.3);
+      }
+      100% {
+        color: #f57c00;
+        text-shadow: 0 0 10px rgba(255, 152, 0, 0.5);
+      }
+    }
+
+    /* Adjust position button styling for consecutive sneaks */
+    .position-requirement-btn:has(.fa-clock) {
+      background: linear-gradient(135deg, rgba(255, 152, 0, 0.1) 0%, rgba(245, 124, 0, 0.1) 100%);
+      border-color: #ff9800;
+    }
+
+    /* Undefer button for removing defer status */
+    .undefer-btn {
+      border: 2px solid #663399;
+      background: linear-gradient(135deg, #663399 0%, #552288 100%);
+      color: white;
+      padding: 6px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 600;
+      transition: all 0.3s ease;
+      box-shadow: 0 2px 6px rgba(102, 51, 153, 0.2);
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      margin-left: 6px;
+      position: relative;
+    }
+
+    .undefer-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(102, 51, 153, 0.3);
+      background: linear-gradient(135deg, #7744aa 0%, #663399 100%);
+      border-color: #552288;
+    }
+
+    .undefer-btn:focus {
+      outline: none;
+      box-shadow: 0 0 0 3px rgba(102, 51, 153, 0.3);
+    }
+
+    tr.row-deferred td .undefer-btn {
+      pointer-events: auto; /* Keep undefer button clickable */
+    }
+
+    /* Deferred actions container in Actions column */
+    .deferred-actions-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .deferred-action {
+      color: #7d3ba5;
+      font-style: italic;
+      font-size: 0.9em;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    /* Make undefer button in actions column more compact */
+    .actions .undefer-btn {
+      padding: 4px 8px;
+      font-size: 11px;
+      min-width: auto;
+      margin-left: 0;
+      opacity: 1 !important; /* Ensure button is always fully visible */
+      pointer-events: auto !important; /* Ensure button is always clickable */
+      z-index: 10; /* Ensure button is above any overlays */
+      position: relative; /* Enable z-index */
+    }
+
+    /* Bulk defer button styling */
+    .bulk-defer-section {
+      margin: 10px 0;
+      text-align: center;
+    }
+
+    .bulk-defer-btn {
+      background: linear-gradient(135deg, #64748b, #475569);
+      border: 2px solid #64748b;
+      border-radius: 8px;
+      color: #f1f5f9;
+      cursor: pointer;
+      font-size: 14px;
+      padding: 10px 18px;
+      transition: all 0.3s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      position: relative;
+      opacity: 0.7;
+    }
+
+    .bulk-defer-btn:hover {
+      background: linear-gradient(135deg, #7581a0, #5a6578);
+      border-color: #7581a0;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(100, 116, 139, 0.3);
+      opacity: 0.85;
+    }
+
+    .bulk-defer-btn.available {
+      background: linear-gradient(135deg, #8538b2, #512c7b);
+      border-color: #9438b2;
+      color: #fff;
+      opacity: 1;
+      animation: bulk-defer-pulse 2.5s ease-in-out infinite alternate;
+      box-shadow: 0 2px 8px rgba(133, 56, 178, 0.3);
+    }
+
+    .bulk-defer-btn.available:hover {
+      background: linear-gradient(135deg, #994fd1, #7538b2);
+      border-color: #a14fd1;
+      animation: none;
+      box-shadow: 0 4px 20px rgba(133, 56, 178, 0.5);
+      transform: translateY(-3px);
+    }
+
+    @keyframes bulk-defer-pulse {
+      0% {
+        box-shadow: 0 2px 8px rgba(133, 56, 178, 0.3);
+      }
+      100% {
+        box-shadow: 0 2px 8px rgba(133, 56, 178, 0.3), 0 0 25px rgba(133, 56, 178, 0.4);
+      }
+    }
+
+    /* End-Turn Validation Button */
+    .end-turn-validation-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 16px;
+      border: 2px solid #64748b;
+      border-radius: 6px;
+      background: linear-gradient(135deg, #475569 0%, #334155 100%);
+      color: #94a3b8;
+      font-size: 14px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      opacity: 0.6;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .end-turn-validation-btn:hover {
+      border-color: #78716c;
+      color: #e2e8f0;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+
+    .end-turn-validation-btn.available {
+      border-color: #059669;
+      background: linear-gradient(135deg, #064e3b 0%, #047857 100%);
+      color: #d1fae5;
+      opacity: 1;
+      animation: end-turn-ready-pulse 2s ease-in-out infinite alternate;
+    }
+
+    .end-turn-validation-btn.available:hover {
+      border-color: #10b981;
+      background: linear-gradient(135deg, #047857 0%, #059669 100%);
+      color: #ecfdf5;
+      transform: translateY(-2px);
+      box-shadow: 0 6px 16px rgba(5, 150, 105, 0.3);
+    }
+
+    @keyframes end-turn-ready-pulse {
+      0% {
+        box-shadow: 0 2px 8px rgba(5, 150, 105, 0.3);
+      }
+      100% {
+        box-shadow: 0 2px 8px rgba(5, 150, 105, 0.3), 0 0 25px rgba(5, 150, 105, 0.4);
+      }
+    }
+
+    /* Bulk Actions Container - Flex Row Layout */
+    .bulk-actions-container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      align-items: center;
+      justify-content: center;
+      margin: 16px 0;
+      padding: 12px;
+      background: rgba(0, 0, 0, 0.1);
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .bulk-action-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 10px;
+      border: 1px solid var(--color-border-light-primary);
+      background: var(--color-bg-option, rgba(0, 0, 0, 0.15));
+      border-radius: 6px;
+      margin: 6px 0;
+    }
+
+    .bulk-action-label {
+      font-size: 14px;
+      font-weight: 600;
+      color: #e2e8f0;
+      margin-right: 8px;
+      white-space: nowrap;
+    }
+
+    .apply-all-cover-buttons {
+      display: flex;
+      gap: 4px;
+    }
+
     /* Cover bonus buttons - row layout with prettier styling */
     .cover-bonus-controls {
       display: flex;
@@ -1090,7 +1409,7 @@
   th.actions,
 .override-validation-dialog .results-table-container table.override-validation-table td.actions {
   width: 16%;
-  text-align: right;
+  text-align: center;
 }
 
 /* Explicit alignment and spacing for Override Validation table */
@@ -1105,7 +1424,8 @@
   thead
   th.observer,
 .override-validation-dialog .results-table-container table.override-validation-table td.observer {
-  text-align: left;
+  text-align: center;
+  font-size: small;
 }
 
 /* Target column should also be left-aligned (observer-oriented table) */
@@ -1115,7 +1435,8 @@
   thead
   th.target,
 .override-validation-dialog .results-table-container table.override-validation-table td.target {
-  text-align: left;
+  text-align: center;
+  font-size: small;
 }
 
 /* Observer cell avatar sizing and layout */
@@ -1125,17 +1446,18 @@
   gap: 8px;
 }
 .override-validation-dialog td.observer img.chip-avatar {
-  width: 28px !important;
-  height: 28px !important;
+  width: 48px !important;
+  height: 48px !important;
   border-radius: 50%;
   object-fit: cover;
   display: inline-block;
   cursor: pointer;
+  object-position: top;
 }
 /* Safety net in case class is missing */
 .override-validation-dialog td.observer img {
-  max-width: 32px;
-  max-height: 32px;
+  max-width: 48px;
+  max-height: 48px;
   border-radius: 50%;
   object-fit: cover;
 }
@@ -1147,17 +1469,18 @@
   gap: 8px;
 }
 .override-validation-dialog td.target img.chip-avatar {
-  width: 28px !important;
-  height: 28px !important;
+  width: 48px !important;
+  height: 48px !important;
   border-radius: 50%;
   object-fit: cover;
   display: inline-block;
   cursor: pointer;
+  object-position: top;
 }
 /* Safety net for target cells */
 .override-validation-dialog td.target img {
-  max-width: 32px;
-  max-height: 32px;
+  max-width: 48px;
+  max-height: 48px;
   border-radius: 50%;
   object-fit: cover;
 }
@@ -1211,8 +1534,9 @@
   thead
   th.source,
 .override-validation-dialog .results-table-container table.override-validation-table td.source {
-  text-align: left;
+  text-align: center;
   white-space: nowrap; /* keep badge tidy */
+  font-size: small;
 }
 
 .override-validation-dialog
@@ -1221,7 +1545,7 @@
   thead
   th.status,
 .override-validation-dialog .results-table-container table.override-validation-table td.status {
-  text-align: left;
+  text-align: center;
 }
 
 /* Status icons styling */
@@ -1864,6 +2188,65 @@
   color: var(--pf2e-visioner-danger);
   opacity: 0.65;
   box-shadow: none;
+}
+
+/* Undefer All (purple accent) */
+.bulk-action-btn.undefer-all {
+  background: var(--color-shadow-primary);
+  color: var(--color-text-light-primary);
+  border-color: #663399;
+}
+
+.bulk-action-btn.undefer-all:hover:not(:disabled) {
+  background: #663399;
+  border-color: #552288;
+  box-shadow: 0 2px 6px rgba(102, 51, 153, 0.4);
+}
+
+.bulk-action-btn.undefer-all:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 2px rgba(102, 51, 153, 0.2),
+    0 0 0 4px #663399;
+}
+
+.bulk-action-btn.undefer-all:disabled {
+  background: #f8f5fc;
+  color: #9966cc;
+  opacity: 0.65;
+  box-shadow: none;
+}
+
+/* Ready to restore state for undefer button */
+.bulk-action-btn.undefer-all.ready-to-restore {
+  background: var(--pf2e-visioner-purple);
+  color: white;
+  border-color: var(--pf2e-visioner-purple);
+  animation: pulse-purple 1.5s ease-in-out infinite alternate;
+}
+
+.bulk-action-btn.undefer-all.ready-to-restore:hover:not(:disabled) {
+  background: var(--pf2e-visioner-purple);
+  filter: brightness(1.1);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(142, 36, 170, 0.4);
+}
+
+/* Pending restore visual indication for deferred rows */
+.sneak-preview-table tr.pending-restore {
+  background: rgba(142, 36, 170, 0.1);
+  border-left: 3px solid var(--pf2e-visioner-purple);
+  animation: highlight-pending 2s ease-in-out infinite alternate;
+}
+
+@keyframes pulse-purple {
+  0% { box-shadow: 0 2px 6px rgba(142, 36, 170, 0.4); }
+  100% { box-shadow: 0 2px 6px rgba(142, 36, 170, 0.7), 0 0 20px rgba(142, 36, 170, 0.3); }
+}
+
+@keyframes highlight-pending {
+  0% { background: rgba(142, 36, 170, 0.1); }
+  100% { background: rgba(142, 36, 170, 0.2); }
 }
 
 /* Bulk Override Bar */
@@ -3141,4 +3524,55 @@
 
 .pf2e-visioner .sneaky-feat-indicator:hover {
   opacity: 1;
+}
+
+/* End-of-Turn Dialog Notice */
+.pf2e-visioner .end-of-turn-notice {
+  margin: 8px 0 12px 0;
+  padding: 10px;
+  background: var(--color-bg-secondary, #2a2a2a);
+  border: 1px solid var(--pf2e-visioner-feat-orange, #ff8c00);
+  border-radius: 4px;
+}
+
+.pf2e-visioner .end-of-turn-notice .notice-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--pf2e-visioner-feat-orange, #ff8c00);
+  font-size: 13px;
+  margin-bottom: 4px;
+}
+
+.pf2e-visioner .end-of-turn-notice .notice-text {
+  margin: 0;
+  font-size: 12px;
+  color: var(--color-text-light-primary, #ccc);
+  line-height: 1.4;
+}
+
+/* Deferred Checks Notice */
+.pf2e-visioner .deferred-checks-notice {
+  margin: 8px 0 12px 0;
+  padding: 10px;
+  background: var(--color-bg-secondary, #2a2a2a);
+  border: 1px solid var(--color-border-light-primary, #9f9f9f);
+  border-left: 3px solid #8b5cf6;
+  border-radius: 4px;
+}
+
+.pf2e-visioner .deferred-checks-notice .notice-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #8b5cf6;
+  font-size: 13px;
+  margin-bottom: 4px;
+}
+
+.pf2e-visioner .deferred-checks-notice .notice-text {
+  margin: 0;
+  font-size: 12px;
+  color: var(--color-text-light-primary, #ccc);
+  line-height: 1.4;
 }

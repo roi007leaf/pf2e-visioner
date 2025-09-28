@@ -87,6 +87,8 @@ class TurnSneakTracker {
                 sneakActions: [],
                 startPosition: null,
                 deferredChecks: new Map(), // Map<observerId, {position, visibility}>
+                rollOutcomes: new Map(), // Map<observerId, {failed: boolean, lastOutcome: string}>
+                observerStates: new Map(), // Map<observerId, {currentVisibility: string}>
                 isActive: true
             };
             this._turnSneakStates.set(combatantId, turnState);
@@ -137,7 +139,7 @@ class TurnSneakTracker {
      * @param {Token} observerToken - Observer token
      * @param {Object} positionData - Position and visibility data
      */
-    recordDeferredCheck(sneakingToken, observerToken, positionData) {
+    recordDeferredCheck(sneakingToken, observerToken, positionData, originalOutcome = null) {
         const combatantId = this._getCombatantId(sneakingToken);
         if (!combatantId) return;
 
@@ -150,8 +152,133 @@ class TurnSneakTracker {
             position: positionData.position || this._captureTokenPosition(sneakingToken),
             visibility: positionData.visibility,
             coverState: positionData.coverState,
+            originalOutcome: originalOutcome, // Store the complete original outcome for dialog reconstruction
             timestamp: Date.now()
         });
+    }
+
+    /**
+     * Remove a deferred check for a specific observer
+     * @param {Token} sneakingToken - Token performing sneak
+     * @param {Token} observerToken - Observer token
+     */
+    removeDeferredCheck(sneakingToken, observerToken) {
+        const combatantId = this._getCombatantId(sneakingToken);
+        if (!combatantId) return;
+
+        const turnState = this._turnSneakStates.get(combatantId);
+        if (!turnState) return;
+
+        const observerId = observerToken.document?.id || observerToken.id;
+        turnState.deferredChecks.delete(observerId);
+    }
+
+    /**
+     * Record roll outcome for a specific observer during sneak chain
+     * @param {Token} sneakingToken - Token performing sneak
+     * @param {Token} observerToken - Observer token
+     * @param {string} outcome - Roll outcome: 'success', 'failure', 'critical-success', 'critical-failure'
+     * @param {string} newVisibility - New visibility state that would result from this roll
+     * @returns {boolean} True if outcome recorded, false if observer already failed a previous roll
+     */
+    recordRollOutcome(sneakingToken, observerToken, outcome, newVisibility) {
+        const combatantId = this._getCombatantId(sneakingToken);
+        if (!combatantId) return true; // Not in feat mode, allow normal processing
+
+        const turnState = this._turnSneakStates.get(combatantId);
+        if (!turnState || !turnState.isActive) return true; // Not in feat mode, allow normal processing
+
+        const observerId = observerToken.document?.id || observerToken.id;
+
+        // Check if this observer already failed a roll in this sneak chain
+        const existing = turnState.rollOutcomes.get(observerId);
+        if (existing && existing.failed) {
+            // Observer already failed a previous roll - they remain observed
+            console.log(`PF2E Visioner | Observer ${observerToken.name} already failed previous sneak roll - remaining observed`);
+            return false; // Block this outcome from being applied
+        }
+
+        // Determine if this is a failed roll
+        const isFailure = outcome === 'failure' || outcome === 'critical-failure';
+
+        // Record the outcome
+        turnState.rollOutcomes.set(observerId, {
+            failed: isFailure,
+            lastOutcome: outcome,
+            lastVisibility: newVisibility,
+            timestamp: Date.now()
+        });
+
+        // Update current state tracking
+        if (isFailure) {
+            // Failed roll - observer sees sneaking token as observed immediately
+            turnState.observerStates.set(observerId, {
+                currentVisibility: 'observed',
+                reason: `Failed sneak roll (${outcome})`
+            });
+            console.log(`PF2E Visioner | Sneak roll failed against ${observerToken.name} - becoming observed immediately`);
+        } else {
+            // Successful roll - maintain or improve visibility
+            turnState.observerStates.set(observerId, {
+                currentVisibility: newVisibility,
+                reason: `Successful sneak roll (${outcome})`
+            });
+        }
+
+        return !isFailure; // Allow outcome application only if not a failure (since failures make observer see as observed)
+    }
+
+    /**
+     * Get the current visibility state for an observer during a sneak chain
+     * @param {Token} sneakingToken - Token performing sneak
+     * @param {Token} observerToken - Observer token
+     * @returns {string|null} Current visibility state or null if not tracked
+     */
+    getCurrentVisibilityForObserver(sneakingToken, observerToken) {
+        const combatantId = this._getCombatantId(sneakingToken);
+        if (!combatantId) return null;
+
+        const turnState = this._turnSneakStates.get(combatantId);
+        if (!turnState || !turnState.isActive) return null;
+
+        const observerId = observerToken.document?.id || observerToken.id;
+        const observerState = turnState.observerStates.get(observerId);
+
+        return observerState ? observerState.currentVisibility : null;
+    }
+
+    /**
+     * Check if a specific observer token has been deferred in the current turn
+     * @param {Token} sneakingToken - Token performing sneak
+     * @param {Token} observerToken - Observer token to check
+     * @returns {boolean} True if this specific observer has been deferred
+     */
+    isObserverDeferred(sneakingToken, observerToken) {
+        const combatantId = this._getCombatantId(sneakingToken);
+        if (!combatantId) return false;
+
+        const turnState = this._turnSneakStates.get(combatantId);
+        if (!turnState || !turnState.isActive) return false;
+
+        const observerId = observerToken.document?.id || observerToken.id;
+        return turnState.deferredChecks.has(observerId);
+    }
+
+    /**
+     * Get deferred check data for a specific observer
+     * @param {Token} sneakingToken - Token performing sneak
+     * @param {Token} observerToken - Observer token
+     * @returns {Object|null} Deferred check data or null
+     */
+    getDeferredData(sneakingToken, observerToken) {
+        const combatantId = this._getCombatantId(sneakingToken);
+        if (!combatantId) return null;
+
+        const turnState = this._turnSneakStates.get(combatantId);
+        if (!turnState || !turnState.isActive) return null;
+
+        const observerId = observerToken.document?.id || observerToken.id;
+        return turnState.deferredChecks.get(observerId) || null;
     }
 
     /**
@@ -166,21 +293,7 @@ class TurnSneakTracker {
         return this._turnSneakStates.get(combatantId) || null;
     }
 
-    /**
-     * Check if a token's sneak-active flag should persist until end of turn
-     * This applies to tokens with Sneaky/Very Sneaky feats that are actively tracked
-     * @param {Token} token - Token to check
-     * @returns {boolean} True if sneak-active flag should persist until end of turn
-     */
-    shouldPreserveSneakActiveFlag(token) {
-        if (!token) return false;
 
-        // Only preserve if token has the feat and is being actively tracked
-        if (!this.hasSneakyFeat(token)) return false;
-
-        const turnState = this.getTurnSneakState(token);
-        return turnState && turnState.isActive;
-    }
 
     /**
      * Handle end of turn - perform deferred prerequisite checks
@@ -199,16 +312,20 @@ class TurnSneakTracker {
             const turnState = this._turnSneakStates.get(combatantId);
             if (!turnState || !turnState.isActive) return;
 
+            // Verify this is actually the sneaking token's turn ending
+            const sneakingCombatantId = this._getCombatantId(turnState.sneakingToken);
+            if (sneakingCombatantId !== combatantId) {
+                console.log('PF2E Visioner | Turn end for different combatant, skipping sneak processing');
+                return;
+            }
+
             console.log('PF2E Visioner | Processing end-of-turn sneak checks for:', turnState.sneakingToken.name);
 
             // Perform deferred end-position checks if any exist
             if (turnState.deferredChecks.size > 0) {
                 await this._processDeferredChecks(turnState);
             } else {
-                // Even if no deferred checks, still need to clean up preserved sneak state
-                console.log('PF2E Visioner | No deferred checks, but cleaning up preserved sneak state for:', turnState.sneakingToken.name);
-                await this._clearSneakActiveFlag(turnState.sneakingToken);
-                await this._clearSneakingEffect(turnState.sneakingToken);
+                console.log('PF2E Visioner | No deferred checks for:', turnState.sneakingToken.name);
             }
 
             // Clean up turn state
@@ -241,20 +358,21 @@ class TurnSneakTracker {
 
             for (const [combatantId, turnState] of this._turnSneakStates.entries()) {
                 if (turnState.round !== currentRound || turnState.turn !== currentTurn) {
-                    // Turn changed, process any remaining deferred checks or clean up preserved state
-                    if (turnState.isActive) {
-                        if (turnState.deferredChecks.size > 0) {
-                            console.log('PF2E Visioner | Processing deferred sneak checks from combat update for:', turnState.sneakingToken.name);
-                            await this._processDeferredChecks(turnState);
-                        } else {
-                            // Even if no deferred checks, still need to clean up preserved sneak state
-                            console.log('PF2E Visioner | Combat update - no deferred checks, but cleaning up preserved sneak state for:', turnState.sneakingToken.name);
-                            await this._clearSneakActiveFlag(turnState.sneakingToken);
-                            await this._clearSneakingEffect(turnState.sneakingToken);
+                    // Verify this is the sneaking token's turn that ended
+                    const sneakingCombatantId = this._getCombatantId(turnState.sneakingToken);
+                    if (sneakingCombatantId === combatantId) {
+                        // Turn changed, process any remaining deferred checks
+                        if (turnState.isActive) {
+                            if (turnState.deferredChecks.size > 0) {
+                                console.log('PF2E Visioner | Processing deferred sneak checks from combat update for:', turnState.sneakingToken.name);
+                                await this._processDeferredChecks(turnState);
+                            } else {
+                                console.log('PF2E Visioner | Combat update - no deferred checks for:', turnState.sneakingToken.name);
+                            }
                         }
                     }
 
-                    // Clean up
+                    // Clean up regardless (turn ended for this combatant)
                     turnState.isActive = false;
                     this._turnSneakStates.delete(combatantId);
                 }
@@ -277,24 +395,56 @@ class TurnSneakTracker {
 
         console.log(`PF2E Visioner | Processing ${turnState.deferredChecks.size} deferred checks for ${sneakingToken.name}`);
 
+        // Collect results for end-of-turn dialog
+        const dialogResults = [];
+        let hasVisibilityChanges = false;
+
         for (const [observerId, checkData] of turnState.deferredChecks.entries()) {
             try {
                 const observerToken = checkData.observerToken;
 
-                // Check if current position qualifies for stealth
+                // Check if current position qualifies for stealth using original start position as reference
                 const qualifies = await this._checkEndPositionQualifies(
                     sneakingToken,
                     observerToken,
-                    currentPosition
+                    currentPosition,
+                    checkData.originalOutcome
                 );
 
-                if (!qualifies) {
-                    console.log(`PF2E Visioner | End position check failed - setting ${sneakingToken.name} to observed by ${observerToken.name}`);
+                // Get current visibility state for comparison
+                const currentVisibility = this.getCurrentVisibilityForObserver(sneakingToken, observerToken) || 'observed';
 
-                    // Apply penalty: become observed by this observer
-                    await this._applyEndPositionPenalty(sneakingToken, observerToken);
+                if (!qualifies) {
+                    console.log(`PF2E Visioner | End position check failed - ${sneakingToken.name} would become observed by ${observerToken.name}`);
+
+                    // Don't apply penalty automatically - let dialog handle it
+                    // Record result for dialog to show user what would happen
+                    dialogResults.push({
+                        observerToken,
+                        previousVisibility: currentVisibility,
+                        newVisibility: 'observed',
+                        positionQualified: false,
+                        reason: 'End position lacks cover or concealment',
+                        needsApplication: currentVisibility !== 'observed', // Only needs application if would actually change
+                        originalOutcome: checkData.originalOutcome // Include original outcome data
+                    });
+
+                    if (currentVisibility !== 'observed') {
+                        hasVisibilityChanges = true;
+                    }
                 } else {
                     console.log(`PF2E Visioner | End position check passed for ${sneakingToken.name} vs ${observerToken.name}`);
+
+                    // Record successful validation (no change needed)
+                    dialogResults.push({
+                        observerToken,
+                        previousVisibility: currentVisibility,
+                        newVisibility: currentVisibility,
+                        positionQualified: true,
+                        reason: 'End position maintains cover or concealment',
+                        needsApplication: false, // No change needed
+                        originalOutcome: checkData.originalOutcome // Include original outcome data
+                    });
                 }
 
             } catch (error) {
@@ -302,36 +452,84 @@ class TurnSneakTracker {
             }
         }
 
-        // Clear sneak-active flag and Sneaking effect now that end-of-turn evaluation is complete
-        await this._clearSneakActiveFlag(sneakingToken);
-        await this._clearSneakingEffect(sneakingToken);
-    }
-
-    /**
-     * Clear sneak-active flag from a token
-     * @param {Token} token - Token to clear flag from
-     */
-    async _clearSneakActiveFlag(token) {
-        try {
-            await token.document.unsetFlag('pf2e-visioner', 'sneak-active');
-            console.log(`PF2E Visioner | Cleared sneak-active flag for ${token.name} at end of turn`);
-        } catch (error) {
-            console.warn('PF2E Visioner | Failed to clear sneak-active flag:', error);
+        // Show end-of-turn dialog if there were any results to display
+        if (dialogResults.length > 0) {
+            await this._showEndOfTurnDialog(sneakingToken, dialogResults, hasVisibilityChanges);
         }
+
+        // Deferred checks processing complete - flag and effect already cleared after each sneak
     }
 
     /**
-     * Clear Sneaking effect from a token
-     * @param {Token} token - Token to clear effect from
+     * Show end-of-turn dialog for deferred position check results
+     * @param {Token} sneakingToken - Token that performed sneaks
+     * @param {Array} dialogResults - Array of check results
+     * @param {boolean} hasVisibilityChanges - Whether any visibility actually changed
      */
-    async _clearSneakingEffect(token) {
+    async _showEndOfTurnDialog(sneakingToken, dialogResults, hasVisibilityChanges) {
         try {
-            const { SneakSpeedService } = await import('./sneak-speed-service.js');
-            // Force removal of the Sneaking effect by calling restore with bypass flag
-            await SneakSpeedService._forceRestoreSneakWalkSpeed(token);
-            console.log(`PF2E Visioner | Cleared Sneaking effect for ${token.name} at end of turn`);
+            // Import dialog dynamically to avoid circular dependencies
+            const { SneakPreviewDialog } = await import('../dialogs/sneak-preview-dialog.js');
+
+            // Create action data structure compatible with SneakPreviewDialog
+            const actionData = {
+                actor: sneakingToken.actor,
+                sneakingToken: sneakingToken,
+                isEndOfTurnValidation: true,
+                deferredResults: dialogResults,
+                hasChanges: hasVisibilityChanges
+            };
+
+            // Create outcomes array using original outcome data where available
+            const outcomes = dialogResults.map(result => {
+                // Start with the original outcome if available, otherwise create minimal outcome
+                const baseOutcome = result.originalOutcome ? { ...result.originalOutcome } : {
+                    token: {
+                        id: result.observerToken.id,
+                        name: result.observerToken.name,
+                        document: result.observerToken.document
+                    }
+                };
+
+                // Merge with end-of-turn validation results
+                const outcome = {
+                    ...baseOutcome, // Preserve all original roll data (DC, roll result, etc.)
+                    newVisibility: result.newVisibility,
+                    previousVisibility: result.previousVisibility,
+                    positionQualified: result.positionQualified,
+                    reason: result.reason,
+                    hasActionableChange: result.newVisibility !== result.previousVisibility,
+                    hasRevertableChange: false, // End-of-turn results can't be reverted
+                    changed: result.newVisibility !== result.previousVisibility,
+                    isEndOfTurnCheck: true,
+                    needsApplication: result.needsApplication, // Pass through the needs application flag
+                    // Explicitly preserve original position data for end-of-turn dialog display
+                    positionTransition: baseOutcome.positionTransition || null,
+                    positionDisplay: baseOutcome.positionDisplay || null,
+                    canDefer: false // End-of-turn outcomes can't be deferred again
+                };
+
+                return outcome;
+            });
+
+            // Show dialog with special title and messaging for end-of-turn
+            const dialog = new SneakPreviewDialog(
+                sneakingToken,
+                outcomes,
+                {}, // Empty changes object for end-of-turn dialog
+                actionData,
+                {
+                    title: `End-of-Turn Stealth Validation - ${sneakingToken.name}`,
+                    isEndOfTurnDialog: true
+                }
+            );
+
+            dialog.render(true);
+
         } catch (error) {
-            console.warn('PF2E Visioner | Failed to clear Sneaking effect:', error);
+            console.error('PF2E Visioner | Error showing end-of-turn dialog:', error);
+            // Fall back to console notification if dialog fails
+            ui.notifications?.info(`End-of-turn stealth validation completed for ${sneakingToken.name}`);
         }
     }
 
@@ -342,7 +540,7 @@ class TurnSneakTracker {
      * @param {Object} position - Current position data
      * @returns {boolean} True if position qualifies
      */
-    async _checkEndPositionQualifies(sneakingToken, observerToken, position) {
+    async _checkEndPositionQualifies(sneakingToken, observerToken, position, originalOutcome = null) {
         try {
             // Calculate current cover state
             let coverState = 'none';
@@ -367,7 +565,16 @@ class TurnSneakTracker {
                 console.warn('PF2E Visioner | Failed to calculate visibility for end position check:', error);
             }
 
-            // PF2e rules: Need standard/greater cover OR concealment to maintain stealth
+            // For deferred checks, use the original start position qualification as reference
+            if (originalOutcome) {
+                // Extract the original start visibility state that qualified for sneak
+                const originalStartVisibility = this._getOriginalStartVisibility(originalOutcome, observerToken);
+
+                // End position should maintain at least the same qualification level as start
+                return this._endPositionMaintainsQualification(coverState, visibility, originalStartVisibility);
+            }
+
+            // Fallback: PF2e rules - Need standard/greater cover OR concealment to maintain stealth
             const hasSufficientCover = coverState === 'standard' || coverState === 'greater';
             const hasConcealment = visibility === 'concealed';
 
@@ -377,6 +584,61 @@ class TurnSneakTracker {
             console.error('PF2E Visioner | Error checking end position qualification:', error);
             return false; // Fail safe
         }
+    }
+
+    /**
+     * Extract the original start visibility that qualified for the sneak
+     * @param {Object} originalOutcome - Original outcome data from sneak
+     * @param {Token} observerToken - Observer token
+     * @returns {string} Start visibility state ('hidden', 'undetected', etc.)
+     * @private
+     */
+    _getOriginalStartVisibility(originalOutcome, observerToken) {
+        // Try various sources of start visibility data
+        if (originalOutcome.startVisibility) {
+            return originalOutcome.startVisibility;
+        }
+
+        if (originalOutcome.startState?.visibility) {
+            return originalOutcome.startState.visibility;
+        }
+
+        // Check position display data
+        if (originalOutcome.positionDisplay?.startPosition?.visibility) {
+            return originalOutcome.positionDisplay.startPosition.visibility;
+        }
+
+        // Fallback - assume was hidden if sneak was allowed to proceed
+        console.warn('PF2E Visioner | Could not determine original start visibility, assuming hidden');
+        return 'hidden';
+    }
+
+    /**
+     * Check if end position maintains the qualification level of the start position
+     * @param {string} coverState - Current cover state ('none', 'lesser', 'standard', 'greater')
+     * @param {string} visibility - Current visibility state ('observed', 'concealed', 'hidden', 'undetected')
+     * @param {string} originalStartVisibility - Original start visibility that qualified for sneak
+     * @returns {boolean} True if end position maintains qualification
+     * @private
+     */
+    _endPositionMaintainsQualification(coverState, visibility, originalStartVisibility) {
+        // PF2e Rules: Start must be Hidden or Undetected, end needs cover or concealment
+
+        // If start was undetected, end position needs to maintain undetected or at least hidden
+        if (originalStartVisibility === 'undetected') {
+            return visibility === 'undetected' || visibility === 'hidden' ||
+                coverState === 'standard' || coverState === 'greater' ||
+                visibility === 'concealed';
+        }
+
+        // If start was hidden, end position needs cover or concealment to maintain stealth
+        if (originalStartVisibility === 'hidden') {
+            return coverState === 'standard' || coverState === 'greater' ||
+                visibility === 'concealed' || visibility === 'hidden' || visibility === 'undetected';
+        }
+
+        // Fallback for other start states - use standard end position rules
+        return coverState === 'standard' || coverState === 'greater' || visibility === 'concealed';
     }
 
     /**

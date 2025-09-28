@@ -337,7 +337,7 @@ export class FeatsHandler {
     if (!actor) return 0;
     const feats = getActorFeatSlugs(actor);
     let bonus = 0;
-    if (feats.has('very-sneaky')) bonus += 5;
+    if (feats.has('very-sneaky') || feats.has('sneaky')) bonus += 5;
     // Room for other feats that extend Sneak distance (stack carefully)
     return bonus;
   }
