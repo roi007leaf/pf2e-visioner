@@ -615,19 +615,40 @@ export class Pf2eVisionerApi {
         }
       }
 
-      // 1.5) Additional safety: explicitly clear sneak flags
+      // 1.5) Additional safety: explicitly clear all types of flags
       try {
         await this.clearAllSneakFlags();
+
+        // Also clear other flag types that might be missed
+        const explicitFlagUpdates = tokens.map((t) => ({
+          _id: t.id,
+          [`flags.${MODULE_ID}.-=waitingSneak`]: null,
+          [`flags.${MODULE_ID}.-=invisibility`]: null,
+          [`flags.${MODULE_ID}.-=coverOverride`]: null,
+          [`flags.${MODULE_ID}.-=sneak-speed-effect-id`]: null,
+        }));
+
+        if (explicitFlagUpdates.length && scene.updateEmbeddedDocuments) {
+          await scene.updateEmbeddedDocuments('Token', explicitFlagUpdates, { diff: false });
+        }
       } catch {}
 
-      // 2) Clear scene-level caches used by the module
+      // 2) Clear ALL scene-level flags used by the module
       try {
         // Only GMs can update scene flags
         if (game.user.isGM) {
-          // Clear all scene-level flags instead of just setting deletedEntryCache
+          // Clear all known scene-level flags
           await scene.unsetFlag(MODULE_ID, 'deletedEntryCache');
           await scene.unsetFlag(MODULE_ID, 'partyTokenStateCache');
           await scene.unsetFlag(MODULE_ID, 'deferredPartyUpdates');
+
+          // Clear any other scene flags that might exist
+          const sceneFlags = scene.flags?.[MODULE_ID] || {};
+          for (const flagKey of Object.keys(sceneFlags)) {
+            try {
+              await scene.unsetFlag(MODULE_ID, flagKey);
+            } catch {}
+          }
         }
       } catch {}
 
@@ -639,11 +660,14 @@ export class Pf2eVisionerApi {
           const toDelete = effects
             .filter((e) => {
               const f = e.flags?.[MODULE_ID] || {};
+              const slug = e?.system?.slug;
               return (
                 f.isEphemeralOffGuard ||
                 f.isEphemeralCover ||
                 f.aggregateOffGuard === true ||
-                f.aggregateCover === true
+                f.aggregateCover === true ||
+                f.sneakingEffect === true ||
+                slug === 'waiting-for-sneak-start'
               );
             })
             .map((e) => e.id)
@@ -659,15 +683,20 @@ export class Pf2eVisionerApi {
         for (const tok of tokens) {
           const a = tok?.actor;
           if (!a) continue;
+
+          // Remove effects
           const effects = a?.itemTypes?.effect ?? [];
           const toDelete = effects
             .filter((e) => {
               const f = e.flags?.[MODULE_ID] || {};
+              const slug = e?.system?.slug;
               return (
                 f.isEphemeralOffGuard ||
                 f.isEphemeralCover ||
                 f.aggregateOffGuard === true ||
-                f.aggregateCover === true
+                f.aggregateCover === true ||
+                f.sneakingEffect === true ||
+                slug === 'waiting-for-sneak-start'
               );
             })
             .map((e) => e.id)
@@ -677,6 +706,11 @@ export class Pf2eVisionerApi {
               await a.deleteEmbeddedDocuments('Item', toDelete);
             } catch {}
           }
+
+          // Remove actor-level flags (like echolocation)
+          try {
+            await a.unsetFlag(MODULE_ID, 'echolocation');
+          } catch {}
         }
       } catch {}
 
@@ -701,7 +735,20 @@ export class Pf2eVisionerApi {
         await cleanupAllCoverEffects();
       } catch {}
 
-      // 5) Rebuild effects and refresh visuals/perception
+      // 5.5) Clean up chat message flags that might contain Visioner data
+      try {
+        const messages = game.messages?.contents ?? [];
+        for (const message of messages) {
+          const flags = message.flags?.[MODULE_ID] || {};
+          if (Object.keys(flags).length > 0) {
+            try {
+              await message.unsetFlag(MODULE_ID);
+            } catch {}
+          }
+        }
+      } catch {}
+
+      // 6) Rebuild effects and refresh visuals/perception
       // Removed effects-coordinator: bulk rebuild handled elsewhere
       try {
         await updateTokenVisuals();
@@ -821,16 +868,45 @@ export class Pf2eVisionerApi {
         return false;
       }
 
-      // 1.5) Additional safety: explicitly clear sneak flags from selected tokens
+      // 1.5) Additional safety: explicitly clear ALL visioner flags from selected tokens
       try {
-        const sneakUpdates = tokens
-          .filter((t) => t.document.getFlag('pf2e-visioner', 'sneak-active'))
-          .map((t) => ({
-            _id: t.id,
-            [`flags.${MODULE_ID}.-=sneak-active`]: null,
-          }));
-        if (sneakUpdates.length && scene.updateEmbeddedDocuments) {
-          await scene.updateEmbeddedDocuments('Token', sneakUpdates, { diff: false });
+        const flagUpdates = tokens.map((t) => ({
+          _id: t.id,
+          [`flags.${MODULE_ID}.-=sneak-active`]: null,
+          [`flags.${MODULE_ID}.-=waitingSneak`]: null,
+          [`flags.${MODULE_ID}.-=invisibility`]: null,
+          [`flags.${MODULE_ID}.-=coverOverride`]: null,
+          [`flags.${MODULE_ID}.-=visibility`]: null,
+          [`flags.${MODULE_ID}.-=cover`]: null,
+          [`flags.${MODULE_ID}.-=sneak-speed-effect-id`]: null,
+        }));
+
+        // Also clear any AVS override flags
+        const allTokens = canvas.tokens?.placeables ?? [];
+        const selectedTokenIds = tokens.map((t) => t.id);
+
+        for (const token of tokens) {
+          const flags = token.document.flags?.[MODULE_ID] || {};
+          const additionalUpdates = {};
+
+          // Find and remove any AVS override flags
+          for (const flagKey of Object.keys(flags)) {
+            if (flagKey.startsWith('avs-override-')) {
+              additionalUpdates[`flags.${MODULE_ID}.-=${flagKey}`] = null;
+            }
+          }
+
+          // Apply additional updates if any
+          if (Object.keys(additionalUpdates).length > 0) {
+            const existingUpdate = flagUpdates.find((u) => u._id === token.id);
+            if (existingUpdate) {
+              Object.assign(existingUpdate, additionalUpdates);
+            }
+          }
+        }
+
+        if (flagUpdates.length && scene.updateEmbeddedDocuments) {
+          await scene.updateEmbeddedDocuments('Token', flagUpdates, { diff: false });
         }
       } catch {}
 
@@ -845,19 +921,25 @@ export class Pf2eVisionerApi {
         }
       } catch {}
 
-      // 3) Remove module-created effects from all actors and token-actors (handles unlinked tokens)
+      // 3) Remove module-created effects ONLY from selected tokens' actors
       try {
-        const actors = Array.from(game.actors ?? []);
-        for (const actor of actors) {
+        for (const token of tokens) {
+          const actor = token?.actor;
+          if (!actor) continue;
+
+          // Remove effects from this selected token's actor
           const effects = actor?.itemTypes?.effect ?? [];
           const toDelete = effects
             .filter((e) => {
               const f = e.flags?.[MODULE_ID] || {};
+              const slug = e?.system?.slug;
               return (
                 f.isEphemeralOffGuard ||
                 f.isEphemeralCover ||
                 f.aggregateOffGuard === true ||
-                f.aggregateCover === true
+                f.aggregateCover === true ||
+                f.sneakingEffect === true ||
+                slug === 'waiting-for-sneak-start'
               );
             })
             .map((e) => e.id)
@@ -867,31 +949,11 @@ export class Pf2eVisionerApi {
               await actor.deleteEmbeddedDocuments('Item', toDelete);
             } catch {}
           }
-        }
 
-        // Also purge effects on token-actors (unlinked tokens won't be in game.actors)
-        const allTokens = canvas.tokens?.placeables ?? [];
-        for (const tok of allTokens) {
-          const a = tok?.actor;
-          if (!a) continue;
-          const effects = a?.itemTypes?.effect ?? [];
-          const toDelete = effects
-            .filter((e) => {
-              const f = e.flags?.[MODULE_ID] || {};
-              return (
-                f.isEphemeralOffGuard ||
-                f.isEphemeralCover ||
-                f.aggregateOffGuard === true ||
-                f.aggregateCover === true
-              );
-            })
-            .map((e) => e.id)
-            .filter((id) => !!a.items.get(id));
-          if (toDelete.length) {
-            try {
-              await a.deleteEmbeddedDocuments('Item', toDelete);
-            } catch {}
-          }
+          // Remove actor-level flags (like echolocation) from this selected token's actor
+          try {
+            await actor.unsetFlag(MODULE_ID, 'echolocation');
+          } catch {}
         }
       } catch {}
 
@@ -905,21 +967,51 @@ export class Pf2eVisionerApi {
         }
       } catch {}
 
-      // 5) Also remove the selected tokens from ALL other tokens' visibility/cover maps
+      // 5) Remove the selected tokens from ALL other tokens' visibility/cover maps and clean up references
       try {
         const allTokens = canvas.tokens?.placeables ?? [];
-        const otherTokens = allTokens.filter(
-          (t) => !tokens.some((selected) => selected.id === t.id),
-        );
+        const selectedTokenIds = tokens.map((t) => t.id);
+        const otherTokens = allTokens.filter((t) => !selectedTokenIds.includes(t.id));
 
         if (otherTokens.length > 0) {
-          const updates = otherTokens
-            .map((t) => {
-              const update = { _id: t.id };
-              update[`flags.${MODULE_ID}`] = null;
-              return update;
-            })
-            .filter((update) => Object.keys(update).length > 1); // Only include updates that have changes
+          const updates = [];
+
+          for (const token of otherTokens) {
+            const update = { _id: token.id };
+            let hasChanges = false;
+
+            // Remove selected tokens from this token's visibility map
+            const visibilityMap = token.document.getFlag(MODULE_ID, 'visibility') || {};
+            const cleanedVisibilityMap = { ...visibilityMap };
+            for (const selectedId of selectedTokenIds) {
+              if (cleanedVisibilityMap[selectedId]) {
+                delete cleanedVisibilityMap[selectedId];
+                hasChanges = true;
+              }
+            }
+            if (hasChanges) {
+              update[`flags.${MODULE_ID}.visibility`] = cleanedVisibilityMap;
+            }
+
+            // Remove selected tokens from this token's cover map
+            const coverMap = token.document.getFlag(MODULE_ID, 'cover') || {};
+            const cleanedCoverMap = { ...coverMap };
+            hasChanges = false;
+            for (const selectedId of selectedTokenIds) {
+              if (cleanedCoverMap[selectedId]) {
+                delete cleanedCoverMap[selectedId];
+                hasChanges = true;
+              }
+            }
+            if (hasChanges) {
+              update[`flags.${MODULE_ID}.cover`] = cleanedCoverMap;
+            }
+
+            // Only add update if there are actual changes
+            if (Object.keys(update).length > 1) {
+              updates.push(update);
+            }
+          }
 
           if (updates.length > 0 && scene.updateEmbeddedDocuments) {
             await scene.updateEmbeddedDocuments('Token', updates, { diff: false });
@@ -927,14 +1019,16 @@ export class Pf2eVisionerApi {
         }
       } catch {}
 
-      // 5.5) Clean up AVS override flags that reference the purged tokens
+      // 5.5) Clean up AVS override flags that reference the purged tokens from ALL tokens
       try {
         const allTokens = canvas.tokens?.placeables ?? [];
         const purgedTokenIds = tokens.map((t) => t.id);
+        const batchUpdates = [];
 
         for (const token of allTokens) {
-          const updates = {};
+          const updates = { _id: token.id };
           const flags = token.document.flags?.[MODULE_ID] || {};
+          let hasUpdates = false;
 
           // Find and remove override flags that reference purged tokens
           for (const flagKey of Object.keys(flags)) {
@@ -943,28 +1037,38 @@ export class Pf2eVisionerApi {
               const match = flagKey.match(/^avs-override-(?:to|from)-(.+)$/);
               if (match && purgedTokenIds.includes(match[1])) {
                 updates[`flags.${MODULE_ID}.-=${flagKey}`] = null;
+                hasUpdates = true;
               }
             }
           }
 
-          // Apply updates if there are any
-          if (Object.keys(updates).length > 0) {
-            updates._id = token.id;
-            await scene.updateEmbeddedDocuments('Token', [updates], { diff: false });
+          // Add to batch if there are updates
+          if (hasUpdates) {
+            batchUpdates.push(updates);
           }
+        }
+
+        // Apply all updates in a single batch
+        if (batchUpdates.length > 0 && scene.updateEmbeddedDocuments) {
+          await scene.updateEmbeddedDocuments('Token', batchUpdates, { diff: false });
         }
       } catch {}
 
-      // 5.5) Clear AVS overrides involving these tokens from the new map-based system and hide the override indicator
+      // 6) Clear AVS overrides involving these tokens from the new map-based system and hide the override indicator
       try {
         const autoVis = autoVisibilitySystem;
         if (autoVis && autoVis.removeOverride) {
-          // Also remove overrides between selected tokens
-          for (const token1 of tokens) {
-            for (const token2 of tokens) {
-              if (token1.id !== token2.id) {
-                if (await autoVis.removeOverride(token1.id, token2.id)) {
-                }
+          const allTokens = canvas.tokens?.placeables ?? [];
+          const selectedTokenIds = tokens.map((t) => t.id);
+
+          // Remove overrides between selected tokens and all other tokens
+          for (const selectedToken of tokens) {
+            for (const otherToken of allTokens) {
+              if (selectedToken.id !== otherToken.id) {
+                try {
+                  await autoVis.removeOverride(selectedToken.id, otherToken.id);
+                  await autoVis.removeOverride(otherToken.id, selectedToken.id);
+                } catch {}
               }
             }
           }
@@ -978,7 +1082,35 @@ export class Pf2eVisionerApi {
         console.warn('PF2E Visioner | Error clearing AVS overrides for selected tokens:', error);
       }
 
-      // 6) Rebuild effects and refresh visuals/perception
+      // 7) Clean up any chat message flags that reference the purged tokens
+      try {
+        const messages = game.messages?.contents ?? [];
+        for (const message of messages) {
+          const flags = message.flags?.[MODULE_ID] || {};
+          const updates = {};
+          let hasUpdates = false;
+
+          // Check for coverOverride flags that might reference purged tokens
+          if (flags.coverOverride) {
+            // This is a more complex check - we'd need to examine the structure
+            // For now, we'll leave this as a placeholder for future enhancement
+          }
+
+          // Check for sneak-related flags that might reference purged tokens
+          if (flags.sneakStartStates || flags.startStates) {
+            // These might contain references to purged tokens
+            // For now, we'll leave this as a placeholder for future enhancement
+          }
+
+          if (hasUpdates) {
+            try {
+              await message.update({ [`flags.${MODULE_ID}`]: { ...flags, ...updates } });
+            } catch {}
+          }
+        }
+      } catch {}
+
+      // 8) Rebuild effects and refresh visuals/perception
       try {
         await updateTokenVisuals();
       } catch {}
