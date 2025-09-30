@@ -62,7 +62,6 @@ export class SneakActionHandler extends ActionHandlerBase {
       const sneakingToken = this._getSneakingToken(actionData);
       if (sneakingToken && turnSneakTracker.hasSneakyFeat(sneakingToken)) {
         const trackingStarted = turnSneakTracker.startTurnSneak(sneakingToken, actionData);
-
       }
 
       // Basic validation without recursion - just check if we have observers
@@ -102,12 +101,17 @@ export class SneakActionHandler extends ActionHandlerBase {
    */
   async _initializeSneakVisibility(actionData) {
     try {
+      // Skip initialization if this is a preview-only operation
+      if (actionData.previewOnly) {
+        return;
+      }
+
       // Get the sneaking token
       const sneakingToken = this._getSneakingToken(actionData);
       if (!sneakingToken) {
-        console.warn('PF2E Visioner | Cannot initialize sneak visibility - token not found');
         return;
       }
+
 
       // Set sneak flag on the token to indicate it's currently sneaking
       await sneakingToken.document.setFlag('pf2e-visioner', SNEAK_FLAGS.SNEAK_ACTIVE, true);
@@ -265,6 +269,7 @@ export class SneakActionHandler extends ActionHandlerBase {
     // Try multiple ways to get the token, compatible with v13 APIs
     let token = null;
 
+
     // Direct token references
     token = actionData.actorToken || actionData.sneakingToken;
     if (token) {
@@ -273,14 +278,16 @@ export class SneakActionHandler extends ActionHandlerBase {
 
     // From actor's token object
     if (actionData.actor?.token?.object) {
-      return actionData.actor.token.object;
+      const foundToken = actionData.actor.token.object;
+      return foundToken;
     }
 
     // From actor's active tokens
     if (actionData.actor?.getActiveTokens) {
       const activeTokens = actionData.actor.getActiveTokens();
       if (activeTokens.length > 0) {
-        return activeTokens[0];
+        const foundToken = activeTokens[0];
+        return foundToken;
       }
     }
 
@@ -529,7 +536,7 @@ export class SneakActionHandler extends ActionHandlerBase {
           const upgraded = FeatsHandler.upgradeCoverForCreature(actionData.actor, coverState);
           coverState = upgraded.state;
           var _csCanTakeCover = upgraded.canTakeCover;
-        } catch { }
+        } catch {}
         const coverConfig = COVER_STATES[coverState || 'none'];
         const actualStealthBonus = coverConfig?.bonusStealth || 0;
         result.autoCover = {
@@ -580,9 +587,9 @@ export class SneakActionHandler extends ActionHandlerBase {
     const dc = adjustedDC;
     const die = Number(
       actionData?.roll?.dice?.[0]?.results?.[0]?.result ??
-      actionData?.roll?.dice?.[0]?.total ??
-      actionData?.roll?.terms?.[0]?.total ??
-      0,
+        actionData?.roll?.dice?.[0]?.total ??
+        actionData?.roll?.terms?.[0]?.total ??
+        0,
     );
     const margin = total - dc;
     const originalMargin = originalTotal ? originalTotal - dc : margin;
@@ -670,7 +677,7 @@ export class SneakActionHandler extends ActionHandlerBase {
               endCover === 'standard' || endCover === 'greater' || endVis === 'concealed';
             if (!endQualifies) newVisibility = 'observed';
           }
-        } catch { }
+        } catch {}
         // Feat-based post visibility adjustments (e.g., Vanish into the Land)
         try {
           const { FeatsHandler } = await import('../feats-handler.js');
@@ -691,7 +698,7 @@ export class SneakActionHandler extends ActionHandlerBase {
               outcome: adjustedOutcome,
             },
           );
-        } catch { }
+        } catch {}
       } else {
         // Fall back to standard outcome determination
         const { getDefaultNewStateFor } = await import('../data/action-state-config.js');
@@ -716,7 +723,7 @@ export class SneakActionHandler extends ActionHandlerBase {
               outcome: adjustedOutcome,
             },
           );
-        } catch { }
+        } catch {}
       }
     } catch (error) {
       console.warn(
@@ -746,7 +753,7 @@ export class SneakActionHandler extends ActionHandlerBase {
             outcome: adjustedOutcome,
           },
         );
-      } catch { }
+      } catch {}
     }
 
     // Track roll outcomes for Sneaky/Very Sneaky feat mechanics
@@ -759,7 +766,7 @@ export class SneakActionHandler extends ActionHandlerBase {
           sneakingToken,
           subject,
           adjustedOutcome,
-          newVisibility
+          newVisibility,
         );
 
         // If roll outcome tracking indicates this observer already failed a previous roll,
@@ -871,7 +878,7 @@ export class SneakActionHandler extends ActionHandlerBase {
         let manualState = null;
         try {
           manualState = getVisibilityBetween(subject, actionData.actor);
-        } catch { }
+        } catch {}
         if (manualState) return manualState;
         // 3. AVS calculation (position tracker)
         return positionTransition?.startPosition?.avsVisibility || current;
@@ -901,13 +908,13 @@ export class SneakActionHandler extends ActionHandlerBase {
       // Enhanced outcome determination data
       enhancedOutcomeData: enhancedOutcome
         ? {
-          outcomeReason: enhancedOutcome.outcomeReason,
-          avsDecisionUsed: enhancedOutcome.avsDecisionUsed,
-          positionQualifications: enhancedOutcome.positionQualifications,
-          rollData: enhancedOutcome.rollData,
-          rollEnhanced: enhancedOutcome.rollEnhanced,
-          explanation: enhancedOutcome.explanation || null,
-        }
+            outcomeReason: enhancedOutcome.outcomeReason,
+            avsDecisionUsed: enhancedOutcome.avsDecisionUsed,
+            positionQualifications: enhancedOutcome.positionQualifications,
+            rollData: enhancedOutcome.rollData,
+            rollEnhanced: enhancedOutcome.rollEnhanced,
+            explanation: enhancedOutcome.explanation || null,
+          }
         : null,
       // Feats adjustment notes
       featNotes,
@@ -1125,18 +1132,20 @@ export class SneakActionHandler extends ActionHandlerBase {
 
     // Check for Sneaky/Very Sneaky feat mechanics
     if (sneakingToken && observerToken && turnSneakTracker.hasSneakyFeat(sneakingToken)) {
-      const shouldDefer = turnSneakTracker.shouldDeferEndPositionCheck(sneakingToken, observerToken);
+      const shouldDefer = turnSneakTracker.shouldDeferEndPositionCheck(
+        sneakingToken,
+        observerToken,
+      );
       if (shouldDefer) {
         // Defer end position check to end of turn
         turnSneakTracker.recordDeferredCheck(sneakingToken, observerToken, {
           position: endPos,
           visibility: endPos.avsVisibility,
-          coverState: endPos.coverState
+          coverState: endPos.coverState,
         });
 
         // For now, allow the sneak to proceed (end check happens at turn end)
         endQualifies = true;
-
       }
     }
 
@@ -1210,7 +1219,7 @@ export class SneakActionHandler extends ActionHandlerBase {
   // The correct feat mechanics (turn-based consecutive sneaks) are handled by turn-sneak-tracker.js
 
   // All Sneaky feat helper methods removed - they implemented incorrect mechanics
-  // The correct feat mechanics (turn-based consecutive sneaks with deferred end-position checks) 
+  // The correct feat mechanics (turn-based consecutive sneaks with deferred end-position checks)
   // are handled by the turn-sneak-tracker.js service
 
   /**

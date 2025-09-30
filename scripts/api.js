@@ -24,7 +24,7 @@ import {
   setVisibilityBetween,
   showNotification,
 } from './utils.js';
-import { autoVisibilitySystem } from './visibility/auto-visibility/index.js';
+import { autoVisibilitySystem, ConditionManager } from './visibility/auto-visibility/index.js';
 
 /**
  * Main API class for the module
@@ -116,7 +116,7 @@ export class Pf2eVisionerApi {
     await manager.render({ force: true });
     try {
       if (manager.element || manager.window) manager.bringToFront();
-    } catch (_) { }
+    } catch (_) {}
     return manager;
   }
 
@@ -171,7 +171,7 @@ export class Pf2eVisionerApi {
     await manager.render({ force: true });
     try {
       if (manager.element || manager.window) manager.bringToFront();
-    } catch (_) { }
+    } catch (_) {}
     return manager;
   }
 
@@ -483,6 +483,17 @@ export class Pf2eVisionerApi {
   }
 
   /**
+   * Get the ConditionManager instance for managing invisible condition states
+   * @returns {ConditionManager} The condition manager instance
+   */
+  static getConditionManager() {
+    if (!this._conditionManager) {
+      this._conditionManager = new ConditionManager();
+    }
+    return this._conditionManager;
+  }
+
+  /**
    * Clear all sneak-active flags from all tokens in the scene
    * @returns {Promise<boolean>} Success status
    */
@@ -607,7 +618,7 @@ export class Pf2eVisionerApi {
       // 1.5) Additional safety: explicitly clear sneak flags
       try {
         await this.clearAllSneakFlags();
-      } catch { }
+      } catch {}
 
       // 2) Clear scene-level caches used by the module
       try {
@@ -618,7 +629,7 @@ export class Pf2eVisionerApi {
           await scene.unsetFlag(MODULE_ID, 'partyTokenStateCache');
           await scene.unsetFlag(MODULE_ID, 'deferredPartyUpdates');
         }
-      } catch { }
+      } catch {}
 
       // 3) Remove module-created effects from all actors and token-actors (handles unlinked tokens)
       try {
@@ -640,7 +651,7 @@ export class Pf2eVisionerApi {
           if (toDelete.length) {
             try {
               await actor.deleteEmbeddedDocuments('Item', toDelete);
-            } catch { }
+            } catch {}
           }
         }
 
@@ -664,10 +675,10 @@ export class Pf2eVisionerApi {
           if (toDelete.length) {
             try {
               await a.deleteEmbeddedDocuments('Item', toDelete);
-            } catch { }
+            } catch {}
           }
         }
-      } catch { }
+      } catch {}
 
       // 4) Clear AVS overrides from the new map-based system and hide the override indicator
       try {
@@ -679,7 +690,7 @@ export class Pf2eVisionerApi {
         try {
           const { default: indicator } = await import('./ui/override-validation-indicator.js');
           if (indicator && typeof indicator.hide === 'function') indicator.hide(true);
-        } catch { }
+        } catch {}
       } catch (error) {
         console.warn('PF2E Visioner | Error clearing AVS overrides:', error);
       }
@@ -688,19 +699,19 @@ export class Pf2eVisionerApi {
       try {
         const { cleanupAllCoverEffects } = await import('./cover/ephemeral.js');
         await cleanupAllCoverEffects();
-      } catch { }
+      } catch {}
 
       // 5) Rebuild effects and refresh visuals/perception
       // Removed effects-coordinator: bulk rebuild handled elsewhere
       try {
         await updateTokenVisuals();
-      } catch { }
+      } catch {}
       try {
         refreshEveryonesPerception();
-      } catch { }
+      } catch {}
       try {
         canvas.perception.update({ refreshVision: true });
-      } catch { }
+      } catch {}
 
       ui.notifications.info('PF2E Visioner: Cleared all scene data.');
       return true;
@@ -821,7 +832,7 @@ export class Pf2eVisionerApi {
         if (sneakUpdates.length && scene.updateEmbeddedDocuments) {
           await scene.updateEmbeddedDocuments('Token', sneakUpdates, { diff: false });
         }
-      } catch { }
+      } catch {}
 
       // 2) Clear scene-level caches used by the module (only if clearing all tokens)
       try {
@@ -832,7 +843,7 @@ export class Pf2eVisionerApi {
           await scene.unsetFlag(MODULE_ID, 'partyTokenStateCache');
           await scene.unsetFlag(MODULE_ID, 'deferredPartyUpdates');
         }
-      } catch { }
+      } catch {}
 
       // 3) Remove module-created effects from all actors and token-actors (handles unlinked tokens)
       try {
@@ -854,7 +865,7 @@ export class Pf2eVisionerApi {
           if (toDelete.length) {
             try {
               await actor.deleteEmbeddedDocuments('Item', toDelete);
-            } catch { }
+            } catch {}
           }
         }
 
@@ -879,10 +890,10 @@ export class Pf2eVisionerApi {
           if (toDelete.length) {
             try {
               await a.deleteEmbeddedDocuments('Item', toDelete);
-            } catch { }
+            } catch {}
           }
         }
-      } catch { }
+      } catch {}
 
       // 4) Clean up any remaining effects related to the selected tokens specifically
       try {
@@ -892,7 +903,7 @@ export class Pf2eVisionerApi {
           // Clean up this token from all other tokens' maps and effects
           await cleanupDeletedToken(token.document);
         }
-      } catch { }
+      } catch {}
 
       // 5) Also remove the selected tokens from ALL other tokens' visibility/cover maps
       try {
@@ -914,7 +925,7 @@ export class Pf2eVisionerApi {
             await scene.updateEmbeddedDocuments('Token', updates, { diff: false });
           }
         }
-      } catch { }
+      } catch {}
 
       // 5.5) Clean up AVS override flags that reference the purged tokens
       try {
@@ -942,7 +953,7 @@ export class Pf2eVisionerApi {
             await scene.updateEmbeddedDocuments('Token', [updates], { diff: false });
           }
         }
-      } catch { }
+      } catch {}
 
       // 5.5) Clear AVS overrides involving these tokens from the new map-based system and hide the override indicator
       try {
@@ -962,7 +973,7 @@ export class Pf2eVisionerApi {
         try {
           const { default: indicator } = await import('./ui/override-validation-indicator.js');
           if (indicator && typeof indicator.hide === 'function') indicator.hide(true);
-        } catch { }
+        } catch {}
       } catch (error) {
         console.warn('PF2E Visioner | Error clearing AVS overrides for selected tokens:', error);
       }
@@ -970,13 +981,13 @@ export class Pf2eVisionerApi {
       // 6) Rebuild effects and refresh visuals/perception
       try {
         await updateTokenVisuals();
-      } catch { }
+      } catch {}
       try {
         refreshEveryonesPerception();
-      } catch { }
+      } catch {}
       try {
         canvas.perception.update({ refreshVision: true });
-      } catch { }
+      } catch {}
 
       ui.notifications.info(
         `PF2E Visioner: Cleared all data for ${tokens.length} selected token${tokens.length === 1 ? '' : 's'}.`,

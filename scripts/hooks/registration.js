@@ -51,7 +51,9 @@ export async function registerHooks() {
 
   // Register effect perception hooks for automatic perception refresh
   // These work independently of the Auto-Visibility System
-  const { onCreateActiveEffect, onUpdateActiveEffect, onDeleteActiveEffect } = await import('./effect-perception.js');
+  const { onCreateActiveEffect, onUpdateActiveEffect, onDeleteActiveEffect } = await import(
+    './effect-perception.js'
+  );
   Hooks.on('createActiveEffect', onCreateActiveEffect);
   Hooks.on('updateActiveEffect', onUpdateActiveEffect);
   Hooks.on('deleteActiveEffect', onDeleteActiveEffect);
@@ -62,7 +64,7 @@ export async function registerHooks() {
       const { updateWallVisuals } = await import('../services/visual-effects.js');
       const id = canvas.tokens.controlled?.[0]?.id || null;
       await updateWallVisuals(id);
-    } catch { }
+    } catch {}
   });
   Hooks.on('updateWall', async (doc, changes) => {
     try {
@@ -100,12 +102,12 @@ export async function registerHooks() {
                 await canvas.scene?.updateEmbeddedDocuments?.('Token', updates, { diff: false });
               }
             }
-          } catch (_) { }
+          } catch (_) {}
           // Mirror hidden flag to connected walls
           try {
             const { mirrorHiddenFlagToConnected } = await import('../services/connected-walls.js');
             await mirrorHiddenFlagToConnected(doc, true);
-          } catch (_) { }
+          } catch (_) {}
         } else {
           // If unhidden, remove entries for that wall from tokens
           try {
@@ -138,20 +140,20 @@ export async function registerHooks() {
                 await canvas.scene?.updateEmbeddedDocuments?.('Token', updates, { diff: false });
               }
             }
-          } catch (_) { }
+          } catch (_) {}
           // Mirror hidden flag to connected walls (set hidden=false)
           try {
             const { mirrorHiddenFlagToConnected } = await import('../services/connected-walls.js');
             await mirrorHiddenFlagToConnected(doc, false);
-          } catch (_) { }
+          } catch (_) {}
         }
       }
-    } catch (_) { }
+    } catch (_) {}
     try {
       const { updateWallVisuals } = await import('../services/visual-effects.js');
       const id = canvas.tokens.controlled?.[0]?.id || null;
       await updateWallVisuals(id);
-    } catch { }
+    } catch {}
   });
   Hooks.on('deleteWall', async (wallDocument) => {
     try {
@@ -171,7 +173,7 @@ export async function registerHooks() {
       const { updateWallVisuals } = await import('../services/visual-effects.js');
       const id = canvas.tokens.controlled?.[0]?.id || null;
       await updateWallVisuals(id);
-    } catch { }
+    } catch {}
   });
 
   // Removed controlToken hook - was causing excessive updateWallVisuals calls on token selection.
@@ -182,11 +184,31 @@ export async function registerHooks() {
   // This was causing hundreds of calls during movement animation. Wall visual updates are now
   // properly handled by TokenEventHandler._handleWallFlagChanges only when wall flags actually change.
 
-  // Prevent movement while awaiting Start Sneak confirmation
-  Hooks.on('preUpdateToken', (tokenDoc, changes, options, userId) => {
+  // Handle token movement events
+  Hooks.on('preUpdateToken', async (tokenDoc, changes, options, userId) => {
     try {
       // Only care about positional movement
       if (!('x' in changes || 'y' in changes)) return;
+
+      // Clear established invisible states when invisible creatures move
+      // This allows them to be re-detected through sound/movement
+      const token = tokenDoc.object;
+      if (token?.actor) {
+        const isInvisible =
+          token.actor.hasCondition?.('invisible') ||
+          token.actor.system?.conditions?.invisible?.active ||
+          token.actor.conditions?.has?.('invisible');
+
+        if (isInvisible) {
+          // Get the condition manager and clear established states
+          const conditionManager = game.modules.get('pf2e-visioner')?.api?.getConditionManager?.();
+          if (conditionManager?.clearEstablishedInvisibleStates) {
+            await conditionManager.clearEstablishedInvisibleStates(token);
+          }
+        }
+      }
+
+      // Prevent movement while awaiting Start Sneak confirmation
       // Allow GMs to always move
       if (game.users?.get(userId)?.isGM) return;
       const actor = tokenDoc?.actor;
@@ -196,14 +218,16 @@ export async function registerHooks() {
       let waitingEffect = null;
       // Only search effects if we don't already have the flag (cheap boolean first)
       if (!hasWaitingFlag) {
-        waitingEffect = actor.itemTypes?.effect?.find?.(e => e?.system?.slug === 'waiting-for-sneak-start');
+        waitingEffect = actor.itemTypes?.effect?.find?.(
+          (e) => e?.system?.slug === 'waiting-for-sneak-start',
+        );
       }
       if (!hasWaitingFlag && !waitingEffect) return;
       // Block movement for non-GM users
       ui.notifications?.warn?.('You cannot move until Sneak has started.');
       return false; // Cancel update
     } catch (e) {
-      console.warn('PF2E Visioner | preUpdateToken movement block failed:', e);
+      console.warn('PF2E Visioner | preUpdateToken hook failed:', e);
     }
   });
 
@@ -228,14 +252,18 @@ export async function registerHooks() {
       if (!actor) return;
 
       // Find any active tokens for this actor on the current scene
-      const tokens = canvas.tokens?.placeables?.filter(t => t.actor?.id === actor.id) || [];
+      const tokens = canvas.tokens?.placeables?.filter((t) => t.actor?.id === actor.id) || [];
 
       // Handle waiting-for-sneak-start effect removal
       if (item?.system?.slug === 'waiting-for-sneak-start') {
         for (const t of tokens) {
           if (t.document.getFlag('pf2e-visioner', 'waitingSneak')) {
-            try { await t.document.unsetFlag('pf2e-visioner', 'waitingSneak'); } catch { }
-            try { if (t.locked) t.locked = false; } catch { }
+            try {
+              await t.document.unsetFlag('pf2e-visioner', 'waitingSneak');
+            } catch {}
+            try {
+              if (t.locked) t.locked = false;
+            } catch {}
           }
         }
       }
@@ -254,7 +282,6 @@ export async function registerHooks() {
           }
         }
       }
-
     } catch (e) {
       console.warn('PF2E Visioner | deleteItem cleanup failed:', e);
     }

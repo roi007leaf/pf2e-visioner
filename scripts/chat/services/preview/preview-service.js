@@ -33,7 +33,7 @@ export async function previewActionResults(actionData) {
                 const tokens = actor.getActiveTokens(true);
                 if (tokens?.length) return tokens[0];
               }
-            } catch { }
+            } catch {}
             return null;
           };
           const seekerToken = resolveToken(actionData?.actor);
@@ -70,7 +70,7 @@ export async function previewActionResults(actionData) {
               );
               return;
             }
-          } catch { }
+          } catch {}
 
           // Do NOT pre-filter allies at discovery time; let the dialog control it live
           const subjects = await handler.discoverSubjects({ ...actionData, ignoreAllies: false });
@@ -130,7 +130,7 @@ export async function previewActionResults(actionData) {
             );
             return;
           }
-        } catch { }
+        } catch {}
         // Do NOT pre-filter allies; let dialog control it
         const subjects = await handler.discoverSubjects({ ...actionData, ignoreAllies: false });
         const outcomes = await Promise.all(
@@ -147,23 +147,27 @@ export async function previewActionResults(actionData) {
         const { SneakActionHandler } = await import('../actions/sneak-action.js');
         const { SneakPreviewDialog } = await import('../../dialogs/sneak-preview-dialog.js');
         const handler = new SneakActionHandler();
+
+        // Mark as preview-only to prevent side effects like setting sneak flags or creating effects
+        const previewActionData = { ...actionData, previewOnly: true };
+
         // Ensure roll and any needed context are present (mirrors other actions)
-        await handler.ensurePrerequisites(actionData);
-        // If a Check Modifiers dialog is open, copy its rollId into actionData.context for override consumption
+        await handler.ensurePrerequisites(previewActionData);
+        // If a Check Modifiers dialog is open, copy its rollId into previewActionData.context for override consumption
         try {
           const stealthDialog = Object.values(ui.windows).find(
             (w) => w?.constructor?.name === 'CheckModifiersDialog',
           );
           const rollId = stealthDialog?._pvRollId || stealthDialog?.context?._visionerRollId;
           if (rollId) {
-            actionData.context = actionData.context || {};
-            actionData.context._visionerRollId = rollId;
+            previewActionData.context = previewActionData.context || {};
+            previewActionData.context._visionerRollId = rollId;
           }
-        } catch { }
+        } catch {}
         // RAW enforcement gate: do not open dialog if prerequisites fail
         try {
           const { checkForValidTargets } = await import('../infra/target-checker.js');
-          const canSneak = checkForValidTargets({ ...actionData, actionType: 'sneak' });
+          const canSneak = checkForValidTargets({ ...previewActionData, actionType: 'sneak' });
           if (!canSneak) {
             const { notify } = await import('../infra/notifications.js');
             notify.warn(
@@ -171,15 +175,18 @@ export async function previewActionResults(actionData) {
             );
             return;
           }
-        } catch { }
+        } catch {}
         // Do NOT pre-filter allies; let dialog control it
-        const subjects = await handler.discoverSubjects({ ...actionData, ignoreAllies: false });
+        const subjects = await handler.discoverSubjects({
+          ...previewActionData,
+          ignoreAllies: false,
+        });
         const outcomes = await Promise.all(
-          subjects.map((s) => handler.analyzeOutcome(actionData, s)),
+          subjects.map((s) => handler.analyzeOutcome(previewActionData, s)),
         );
         const changes = outcomes.filter((o) => o && o.changed);
         // Get the token from the actor
-        const token = actionData.actor?.token || actionData.actor;
+        const token = previewActionData.actor?.token || previewActionData.actor;
         if (!token) {
           console.error('PF2E Visioner | No token found for sneak action');
           return;
@@ -197,13 +204,16 @@ export async function previewActionResults(actionData) {
             startStates = token.document.flags['pf2e-visioner'].startStates;
           }
         } catch (error) {
-          console.error('PF2E Visioner | Could not retrieve start states in preview service:', error);
+          console.error(
+            'PF2E Visioner | Could not retrieve start states in preview service:',
+            error,
+          );
         }
 
         // Create dialog with start states included
         new SneakPreviewDialog(token, outcomes, changes, {
           ...actionData,
-          startStates
+          startStates,
         }).render(true);
         return;
       }
@@ -258,7 +268,7 @@ export async function previewActionResults(actionData) {
             );
             return;
           }
-        } catch { }
+        } catch {}
 
         const subjects = await handler.discoverSubjects({ ...actionData, ignoreAllies: false });
         const outcomes = await Promise.all(

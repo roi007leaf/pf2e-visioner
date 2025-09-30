@@ -14,6 +14,7 @@
 export { eventDrivenVisibilitySystem as autoVisibilitySystem } from './EventDrivenVisibilitySystem.js';
 
 // Export components for manual use if needed
+export { ConditionManager } from './ConditionManager.js';
 export { optimizedPerceptionManager } from './PerceptionManager.js';
 export { optimizedTokenUpdateManager } from './TokenUpdateManager.js';
 export { optimizedVisibilityCalculator, visibilityCalculator } from './VisibilityCalculator.js';

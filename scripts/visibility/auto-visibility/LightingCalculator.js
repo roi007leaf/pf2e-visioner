@@ -74,7 +74,7 @@ export class LightingCalculator {
     let shapeInWorld;
     if (token && token.shape) {
       shapeInWorld = token.shape.clone();
-      for (let i = 0; i < shapeInWorld.points.length;) {
+      for (let i = 0; i < shapeInWorld.points.length; ) {
         shapeInWorld.points[i++] += baseX;
         shapeInWorld.points[i++] += baseY;
       }
@@ -94,7 +94,7 @@ export class LightingCalculator {
 
     // Convert the shape to clipper points
     const tokenClipperPoints = shapeInWorld.toClipperPoints({ scalingFactor: 1.0 });
-    const tokenRadius = token?.externalRadius ?? (Math.max(tokenWidth, tokenHeight) / 2);
+    const tokenRadius = token?.externalRadius ?? Math.max(tokenWidth, tokenHeight) / 2;
 
     // First process all non-hidden darkness sources since they override illumination
     let maxDarknessResult = null;

@@ -50,7 +50,14 @@ export class VisibilityCalculator {
    * @param {SpatialAnalysisService} spatialAnalyzer - Optional spatial analysis service for optimizations
    * @param {ExclusionManager} exclusionManager - Optional exclusion manager for token exclusions
    */
-  initialize(lightingCalculator, visionAnalyzer, ConditionManager, spatialAnalyzer = null, exclusionManager = null, lightingRasterService = null) {
+  initialize(
+    lightingCalculator,
+    visionAnalyzer,
+    ConditionManager,
+    spatialAnalyzer = null,
+    exclusionManager = null,
+    lightingRasterService = null,
+  ) {
     this.#lightingCalculator = lightingCalculator;
     this.#visionAnalyzer = visionAnalyzer;
     this.#conditionManager = ConditionManager;
@@ -64,23 +71,23 @@ export class VisibilityCalculator {
    * @returns {Promise<string>} Visibility state
    */
   async calculateVisibility(observer, target, options = undefined) {
-    console.log(`🔥 calculateVisibility: ${observer?.name} -> ${target?.name}`);
-
     // Check if we should skip this calculation based on spatial/LOS optimizations
     const shouldSkip = this._shouldSkipCalculation(observer, target);
-    console.log(`🔥 _shouldSkipCalculation returned: ${shouldSkip}`);
 
     if (shouldSkip) {
-      console.log('🔥 SKIPPING CALCULATION - returning observed (THIS IS THE BUG!)');
       return { state: 'observed', reason: 'skip_calculation_fallback' };
-    } 
+    }
 
-    console.log('🔥 Proceeding to calculateVisibilityBetweenTokens');
-    const result = await this.calculateVisibilityBetweenTokens(observer, target, null, null, options);
-    
+    const result = await this.calculateVisibilityBetweenTokens(
+      observer,
+      target,
+      null,
+      null,
+      options,
+    );
+
     // Extract state for backward compatibility
     if (typeof result === 'object' && result.state) {
-      console.log(`🔥 RESULT: ${result.state} (reason: ${result.reason})`);
       return result.state;
     }
     return result;
@@ -138,8 +145,14 @@ export class VisibilityCalculator {
     options = undefined,
   ) {
     // Use the new baseline-first workflow
-    const result = await this.#calculateVisibilityWithNewWorkflow(observer, target, _observerPositionOverride, targetPositionOverride, options);
-    
+    const result = await this.#calculateVisibilityWithNewWorkflow(
+      observer,
+      target,
+      _observerPositionOverride,
+      targetPositionOverride,
+      options,
+    );
+
     // For backwards compatibility, return just the state for now
     // TODO: Update calling code to handle {state, reason} objects
     if (typeof result === 'object' && result.state) {
@@ -151,7 +164,13 @@ export class VisibilityCalculator {
    * Light-condition-based visibility calculation workflow
    * Each lighting condition has its own specific workflow
    */
-  async #calculateVisibilityWithNewWorkflow(observer, target, _observerPositionOverride, targetPositionOverride, options) {
+  async #calculateVisibilityWithNewWorkflow(
+    observer,
+    target,
+    _observerPositionOverride,
+    targetPositionOverride,
+    options,
+  ) {
     if (!observer?.actor || !target?.actor) {
       return { state: 'observed', reason: 'missing_actor' };
     }
@@ -169,34 +188,89 @@ export class VisibilityCalculator {
 
       // Step 2: Route to appropriate lighting workflow based on actual lighting level
       const lightingLevel = lightLevel?.level || 'bright'; // 'bright', 'dim', or 'darkness'
-      const darknessRank = lightLevel?.darknessRank ?? 0;
       const isDarknessSource = lightLevel?.isDarknessSource ?? false;
       const isHeightenedDarkness = lightLevel?.isHeightenedDarkness ?? false;
-      
+
       let result;
       if (lightingLevel === 'bright') {
         // Bright light workflow
-        result = await this.#handleBrightLightWorkflow(observer, target, observerVision, targetPosition, options);
+        result = await this.#handleBrightLightWorkflow(
+          observer,
+          target,
+          observerVision,
+          targetPosition,
+          options,
+        );
       } else if (lightingLevel === 'dim') {
         // Dim light workflow
-        result = await this.#handleDimLightWorkflow(observer, target, observerVision, lightLevel, targetPosition, options);
+        result = await this.#handleDimLightWorkflow(
+          observer,
+          target,
+          observerVision,
+          lightLevel,
+          targetPosition,
+          options,
+        );
       } else if (lightingLevel === 'darkness') {
         // Darkness workflow - route based on darkness spell rank and observer capabilities
         if (isDarknessSource && isHeightenedDarkness) {
           // Rank 4+ heightened darkness spells
-          result = await this.#handleHeightenedDarknessWorkflow(observer, target, observerVision, lightLevel, targetPosition, options);
+          result = await this.#handleHeightenedDarknessWorkflow(
+            observer,
+            target,
+            observerVision,
+            lightLevel,
+            targetPosition,
+            options,
+          );
         } else if (isDarknessSource) {
           // Rank 1-3 darkness spells
-          result = await this.#handleDarknessSpellWorkflow(observer, target, observerVision, lightLevel, targetPosition, options);
+          result = await this.#handleDarknessSpellWorkflow(
+            observer,
+            target,
+            observerVision,
+            lightLevel,
+            targetPosition,
+            options,
+          );
         } else {
           // Natural darkness (no light sources)
-          result = await this.#handleNaturalDarknessWorkflow(observer, target, observerVision, lightLevel, targetPosition, options);
+          result = await this.#handleNaturalDarknessWorkflow(
+            observer,
+            target,
+            observerVision,
+            lightLevel,
+            targetPosition,
+            options,
+          );
         }
       } else {
         // Fallback to bright light if lighting level is unknown
-        result = await this.#handleBrightLightWorkflow(observer, target, observerVision, targetPosition, options);
+        result = await this.#handleBrightLightWorkflow(
+          observer,
+          target,
+          observerVision,
+          targetPosition,
+          options,
+        );
       }
-      
+
+      // CRITICAL FIX: Check invisible condition LAST, after determining base visibility state
+      // This allows us to apply proper PF2E invisible condition transitions based on what the
+      // observer would normally see (the base state we just calculated)
+
+      const invisibilityResult = await this.#checkInvisibilityConditionWithBaseState(
+        observer,
+        target,
+        result.state,
+        targetPositionOverride,
+        options,
+      );
+
+      if (invisibilityResult) {
+        return invisibilityResult;
+      }
+
       return result;
     } catch (error) {
       console.error('PF2E Visioner | Error in visibility workflow:', error);
@@ -231,22 +305,27 @@ export class VisibilityCalculator {
     if (elevationResult) return elevationResult;
 
     // Step 2.5: Check for cross-boundary scenarios (observer in darkness, target in bright light)
-    const lightLevel = { level: 'bright', darknessRank: 0, isDarknessSource: false, isHeightenedDarkness: false };
-    const crossBoundaryResult = await this.#checkCrossBoundaryDarkness(observer, target, observerVision, lightLevel, targetPosition, options);
+    const lightLevel = {
+      level: 'bright',
+      darknessRank: 0,
+      isDarknessSource: false,
+      isHeightenedDarkness: false,
+    };
+    const crossBoundaryResult = await this.#checkCrossBoundaryDarkness(
+      observer,
+      target,
+      observerVision,
+      lightLevel,
+      targetPosition,
+      options,
+    );
     if (crossBoundaryResult) return crossBoundaryResult;
 
     // Step 3: Check conditions (bright light = optimal visibility for normal vision)
     const blindnessResult = this.#checkBlindnessCondition(observer, target);
     if (blindnessResult) return blindnessResult;
 
-    const invisibilityResult = await this.#checkInvisibilityCondition(observer, target, null, options);
-    if (invisibilityResult) {
-      const dazzledResult = this.#checkDazzledCondition(observer, target);
-      if (dazzledResult && (invisibilityResult === 'observed' || invisibilityResult === 'concealed')) {
-        return dazzledResult;
-      }
-      return invisibilityResult;
-    }
+    // Note: Invisible condition check moved to end of workflow for proper base state handling
 
     const dazzledResult = this.#checkDazzledCondition(observer, target);
     if (dazzledResult) return dazzledResult;
@@ -255,13 +334,18 @@ export class VisibilityCalculator {
     return { state: 'observed', reason: 'bright_light_clear' };
   }
 
-
-
   /**
    * Handle dim light workflow (lightingType = 'dim')
    * Check vision → LoS → apply dim light concealment → check conditions → return result
    */
-  async #handleDimLightWorkflow(observer, target, observerVision, lightLevel, targetPosition, options) {
+  async #handleDimLightWorkflow(
+    observer,
+    target,
+    observerVision,
+    lightLevel,
+    targetPosition,
+    options,
+  ) {
     // Step 1: Check vision capabilities
     if (!observerVision.hasVision) {
       return await this.#handleNoVisionScenario(observer, target, options);
@@ -275,15 +359,26 @@ export class VisibilityCalculator {
     if (elevationResult) return elevationResult;
 
     // Step 2.5: Check for cross-boundary scenarios (darkness between tokens or observer in different lighting)
-    const crossBoundaryResult = await this.#checkCrossBoundaryDarkness(observer, target, observerVision, lightLevel, targetPosition, options);
+    const crossBoundaryResult = await this.#checkCrossBoundaryDarkness(
+      observer,
+      target,
+      observerVision,
+      lightLevel,
+      targetPosition,
+      options,
+    );
     if (crossBoundaryResult) return crossBoundaryResult;
 
     // Step 3: Determine base visibility in dim light
     let baseVisibility = 'concealed'; // Dim light causes concealment for normal vision
-    
+
     // Low-light vision and darkvision can see normally in dim light
-    if (observerVision.hasLowLightVision || observerVision.hasDarkvision || 
-        observerVision.hasGreaterDarkvision || observerVision.hasRegularDarkvision) {
+    if (
+      observerVision.hasLowLightVision ||
+      observerVision.hasDarkvision ||
+      observerVision.hasGreaterDarkvision ||
+      observerVision.hasRegularDarkvision
+    ) {
       baseVisibility = 'observed';
     }
 
@@ -291,14 +386,7 @@ export class VisibilityCalculator {
     const blindnessResult = this.#checkBlindnessCondition(observer, target);
     if (blindnessResult) return blindnessResult;
 
-    const invisibilityResult = await this.#checkInvisibilityCondition(observer, target, null, options);
-    if (invisibilityResult) {
-      const dazzledResult = this.#checkDazzledCondition(observer, target);
-      if (dazzledResult && (invisibilityResult === 'observed' || invisibilityResult === 'concealed')) {
-        return dazzledResult;
-      }
-      return invisibilityResult;
-    }
+    // Note: Invisible condition check moved to end of workflow for proper base state handling
 
     const dazzledResult = this.#checkDazzledCondition(observer, target);
     if (dazzledResult) return dazzledResult;
@@ -310,23 +398,41 @@ export class VisibilityCalculator {
    * Handle darkness spell workflow (lightingLevel = 'darkness', isDarknessSource = true, darknessRank 1-3)
    * Check darkvision capability → handle cross-boundary scenarios → check conditions → return result
    */
-  async #handleDarknessSpellWorkflow(observer, target, observerVision, lightLevel, targetPosition, options) {
+  async #handleDarknessSpellWorkflow(
+    observer,
+    target,
+    observerVision,
+    lightLevel,
+    targetPosition,
+    options,
+  ) {
     // Step 1: Check vision capabilities
     if (!observerVision.hasVision) {
       return await this.#handleNoVisionScenario(observer, target, options);
     }
 
     // Step 2: Check if darkvision is effective in rank 1-3 darkness spells
-    if (observerVision.hasGreaterDarkvision || observerVision.hasDarkvision || observerVision.hasRegularDarkvision) {
+    if (
+      observerVision.hasGreaterDarkvision ||
+      observerVision.hasDarkvision ||
+      observerVision.hasRegularDarkvision
+    ) {
       // Darkvision works normally in rank 1-3 darkness spells
       const losResult = this.#handleLineOfSightCheck(observer, target);
       if (losResult) return losResult;
 
       const elevationResult = this.#checkElevationRules(observer, target);
       if (elevationResult) return elevationResult;
-      
+
       // Check for cross-boundary scenarios
-      const crossBoundaryResult = await this.#checkCrossBoundaryDarkness(observer, target, observerVision, lightLevel, targetPosition, options);
+      const crossBoundaryResult = await this.#checkCrossBoundaryDarkness(
+        observer,
+        target,
+        observerVision,
+        lightLevel,
+        targetPosition,
+        options,
+      );
       if (crossBoundaryResult) return crossBoundaryResult;
 
       // Check conditions with darkvision active (darkvision sees observed in rank 1-3 darkness)
@@ -341,7 +447,14 @@ export class VisibilityCalculator {
    * Handle heightened darkness workflow (lightingLevel = 'darkness', isDarknessSource = true, isHeightenedDarkness = true)
    * Check greater darkvision → handle darkvision concealment → check non-visual senses → check conditions → return result
    */
-  async #handleHeightenedDarknessWorkflow(observer, target, observerVision, lightLevel, targetPosition, options) {
+  async #handleHeightenedDarknessWorkflow(
+    observer,
+    target,
+    observerVision,
+    lightLevel,
+    targetPosition,
+    options,
+  ) {
     // Step 1: Check vision capabilities
     if (!observerVision.hasVision) {
       return await this.#handleNoVisionScenario(observer, target, options);
@@ -357,7 +470,14 @@ export class VisibilityCalculator {
       if (elevationResult) return elevationResult;
 
       // Check for cross-boundary scenarios
-      const crossBoundaryResult = await this.#checkCrossBoundaryDarkness(observer, target, observerVision, lightLevel, targetPosition, options);
+      const crossBoundaryResult = await this.#checkCrossBoundaryDarkness(
+        observer,
+        target,
+        observerVision,
+        lightLevel,
+        targetPosition,
+        options,
+      );
       if (crossBoundaryResult) return crossBoundaryResult;
 
       // Check conditions with greater darkvision active (sees observed)
@@ -371,11 +491,23 @@ export class VisibilityCalculator {
       if (elevationResult) return elevationResult;
 
       // Check for cross-boundary scenarios
-      const crossBoundaryResult = await this.#checkCrossBoundaryDarkness(observer, target, observerVision, lightLevel, targetPosition, options);
+      const crossBoundaryResult = await this.#checkCrossBoundaryDarkness(
+        observer,
+        target,
+        observerVision,
+        lightLevel,
+        targetPosition,
+        options,
+      );
       if (crossBoundaryResult) return crossBoundaryResult;
 
       // Check conditions with regular darkvision seeing concealed in rank 4+ heightened darkness
-      const result = await this.#applyConditionsWithDarkvision(observer, target, 'concealed', options);
+      const result = await this.#applyConditionsWithDarkvision(
+        observer,
+        target,
+        'concealed',
+        options,
+      );
       return this.#wrapWithReason(result, 'heightened_darkness_darkvision');
     } else {
       // No darkvision in rank 4+ heightened darkness spell area
@@ -383,29 +515,45 @@ export class VisibilityCalculator {
     }
   }
 
-
-
   /**
    * Handle natural darkness workflow (lightingLevel = 'darkness', isDarknessSource = false)
    * This is just absence of light, not a magical darkness spell
    */
-  async #handleNaturalDarknessWorkflow(observer, target, observerVision, lightLevel, targetPosition, options) {
+  async #handleNaturalDarknessWorkflow(
+    observer,
+    target,
+    observerVision,
+    lightLevel,
+    targetPosition,
+    options,
+  ) {
     // Step 1: Check vision capabilities
     if (!observerVision.hasVision) {
       return await this.#handleNoVisionScenario(observer, target, options);
     }
 
     // Step 2: Natural darkness - darkvision works normally
-    if (observerVision.hasGreaterDarkvision || observerVision.hasDarkvision || observerVision.hasRegularDarkvision) {
+    if (
+      observerVision.hasGreaterDarkvision ||
+      observerVision.hasDarkvision ||
+      observerVision.hasRegularDarkvision
+    ) {
       // Darkvision works normally in natural darkness
       const losResult = this.#handleLineOfSightCheck(observer, target);
       if (losResult) return losResult;
 
       const elevationResult = this.#checkElevationRules(observer, target);
       if (elevationResult) return elevationResult;
-      
+
       // Check for cross-boundary scenarios
-      const crossBoundaryResult = await this.#checkCrossBoundaryDarkness(observer, target, observerVision, lightLevel, targetPosition, options);
+      const crossBoundaryResult = await this.#checkCrossBoundaryDarkness(
+        observer,
+        target,
+        observerVision,
+        lightLevel,
+        targetPosition,
+        options,
+      );
       if (crossBoundaryResult) return crossBoundaryResult;
 
       // Check conditions with darkvision active (natural darkness = observed)
@@ -422,52 +570,42 @@ export class VisibilityCalculator {
    */
   async #handleNoVisionScenario(observer, target, options) {
     try {
-      console.log(`🔍 handleNoVisionScenario: ${observer.name} -> ${target.name}`);
-
       // Check elevation rules first (even for no-vision scenarios)
       const elevationResult = this.#checkElevationRules(observer, target);
       if (elevationResult) {
-        console.log(`🔍 Elevation blocked: ${elevationResult}`);
         return elevationResult;
       }
 
       const hasPreciseNonVisual = this.#visionAnalyzer.hasPreciseNonVisualInRange(observer, target);
       const canSenseImprecisely = this.#visionAnalyzer.canSenseImprecisely(observer, target);
 
-      console.log(`� VISIBILITY-CALC: Main visibility check`, {
-        observer: observer?.name,
-        target: target?.name,
-        observerElevation: observer?.document?.elevation || 0,
-        targetElevation: target?.document?.elevation || 0,
-        hasPreciseNonVisual,
-        canSenseImprecisely
-      });
-      
-      // Debug tremorsense range issue for third test
-      if (observer?.id === 'observer1' && target?.id === 'target1') {
-        const observerVision = this.#visionAnalyzer.getVisionCapabilities(observer);
-        console.log('🔥 RANGE DEBUG: Observer vision capabilities:', observerVision);
-        console.log('🔥 RANGE DEBUG: Observer position:', {x: observer.x, y: observer.y});
-        console.log('🔥 RANGE DEBUG: Target position:', {x: target.x, y: target.y});
-        console.log('🔥 RANGE DEBUG: Distance calculation:', Math.sqrt((target.x - observer.x) ** 2 + (target.y - observer.y) ** 2) / 5);
-      }
-
       if (hasPreciseNonVisual) {
-        console.log(`🔍 Using precise non-visual -> observed`);
-        const result = await this.#applyConditionsWithDarkvision(observer, target, 'observed', options);
+        const result = await this.#applyConditionsWithDarkvision(
+          observer,
+          target,
+          'observed',
+          options,
+        );
         return this.#wrapWithReason(result, 'precise_non_visual_sense');
       }
 
       if (canSenseImprecisely) {
-        console.log(`� VISIBILITY-CALC: Using imprecise sense -> HIDDEN`);
-        const result = await this.#applyConditionsWithDarkvision(observer, target, 'hidden', options);
+        const result = await this.#applyConditionsWithDarkvision(
+          observer,
+          target,
+          'hidden',
+          options,
+        );
         return this.#wrapWithReason(result, 'imprecise_sense');
       }
 
-      console.log(`� VISIBILITY-CALC: No senses available -> UNDETECTED`);
-
       // No senses at all - check conditions for undetected base
-      const result = await this.#applyConditionsWithDarkvision(observer, target, 'undetected', options);
+      const result = await this.#applyConditionsWithDarkvision(
+        observer,
+        target,
+        'undetected',
+        options,
+      );
       return this.#wrapWithReason(result, 'no_senses');
     } catch (error) {
       return { state: 'hidden', reason: 'error_fallback' };
@@ -492,14 +630,8 @@ export class VisibilityCalculator {
     const blindnessResult = this.#checkBlindnessCondition(observer, target);
     if (blindnessResult) return this.#wrapWithReason(blindnessResult, 'blindness_condition');
 
-    const invisibilityResult = await this.#checkInvisibilityCondition(observer, target, null, options);
-    if (invisibilityResult) {
-      const dazzledResult = this.#checkDazzledCondition(observer, target);
-      if (dazzledResult && (invisibilityResult === 'observed' || invisibilityResult === 'concealed')) {
-        return this.#wrapWithReason(dazzledResult, 'dazzled_condition');
-      }
-      return this.#wrapWithReason(invisibilityResult, 'invisibility_condition');
-    }
+    // NOTE: Invisible condition is now handled in the main workflow via #checkInvisibilityConditionWithBaseState
+    // This ensures proper PF2E rule application based on the calculated base visibility state
 
     const dazzledResult = this.#checkDazzledCondition(observer, target);
     if (dazzledResult) {
@@ -514,7 +646,14 @@ export class VisibilityCalculator {
   /**
    * Check for cross-boundary darkness scenarios (simplified)
    */
-  async #checkCrossBoundaryDarkness(observer, target, observerVision, targetLightLevel, targetPosition, options) {
+  async #checkCrossBoundaryDarkness(
+    observer,
+    target,
+    observerVision,
+    targetLightLevel,
+    targetPosition,
+    options,
+  ) {
     try {
       // Cross-boundary darkness check
       // Get observer position and light level
@@ -536,33 +675,59 @@ export class VisibilityCalculator {
         observerLightLevel = this.#lightingCalculator.getLightLevelAt(observerPosition, observer);
       }
 
-      console.log('🔍 Observer light level:', observerLightLevel);
-      console.log('🔍 Target light level:', targetLightLevel);
-
       const observerInDarkness = (observerLightLevel?.darknessRank ?? 0) >= 1;
       const targetInDarkness = (targetLightLevel?.darknessRank ?? 0) >= 1;
-
-      console.log('🔍 Observer in darkness:', observerInDarkness);
-      console.log('🔍 Target in darkness:', targetInDarkness);
-
       // Check if this is truly a cross-boundary scenario OR if line passes through darkness
       const differentLightingStates = observerInDarkness !== targetInDarkness;
-      
+
       if (differentLightingStates) {
         // Different lighting states detected
         // Use existing cross-boundary darkness handling
         return await this.#handleCrossBoundaryDarkness(
-          observer, target, observerVision, targetLightLevel, observerPosition, targetPosition, pre, {}, options
+          observer,
+          target,
+          observerVision,
+          targetLightLevel,
+          observerPosition,
+          targetPosition,
+          pre,
+          {},
+          options,
         );
       } else {
-        // Even if both are in same lighting state, check if line passes through darkness
-        // Same lighting state - checking for darkness intersection
-        return await this.#handleCrossBoundaryDarkness(
-          observer, target, observerVision, targetLightLevel, observerPosition, targetPosition, pre, {}, options
-        );
+        // Both tokens are in same lighting state - check if line passes through different darkness
+        // Only apply cross-boundary rules if line actually passes through different darkness areas
+        const { linePassesThroughDarkness, rayDarknessRank } =
+          await this.#checkDarknessRayIntersection(
+            observer,
+            target,
+            observerPosition,
+            targetPosition,
+          );
+
+        // Only trigger cross-boundary handling if line passes through darkness of different rank
+        if (
+          linePassesThroughDarkness &&
+          rayDarknessRank !== (targetLightLevel?.darknessRank ?? 0)
+        ) {
+          return await this.#handleCrossBoundaryDarkness(
+            observer,
+            target,
+            observerVision,
+            targetLightLevel,
+            observerPosition,
+            targetPosition,
+            pre,
+            {},
+            options,
+          );
+        }
+
+        // Same lighting state and no cross-boundary darkness - continue with normal processing
+        return null;
       }
     } catch (error) {
-      console.log('🔍 ERROR in cross-boundary check:', error);
+      console.error('🔍 ERROR in cross-boundary check:', error);
       return null; // Continue with normal processing
     }
   }
@@ -619,7 +784,6 @@ export class VisibilityCalculator {
    */
   _shouldSkipCalculation(observer, target) {
     // TEMPORARY: Disable skip optimization to fix tremorsense ground-level detection
-    console.log('🔥 _shouldSkipCalculation: DISABLED - always returning false');
     return false;
   }
 
@@ -629,11 +793,7 @@ export class VisibilityCalculator {
    * @returns {number} Maximum range in grid units, or 0 if no special senses
    */
   _getMaxSpecialSenseRange(observerVision) {
-    console.log(`🔥 _getMaxSpecialSenseRange: ENTRY - Full vision object:`, observerVision);
-    console.log(`🔥 _getMaxSpecialSenseRange: Vision object keys:`, Object.keys(observerVision || {}));
-
     if (!observerVision) {
-      console.log(`🔥 _getMaxSpecialSenseRange: No observerVision - returning 0`);
       return 0;
     }
 
@@ -641,76 +801,68 @@ export class VisibilityCalculator {
 
     // PART 1: Check detection modes from vision capabilities (single source of truth)
     const detectionModes = observerVision.detectionModes || {};
-    console.log(`🔥 _getMaxSpecialSenseRange: detectionModes from vision:`, detectionModes);
 
     // Check for non-visual detection modes (based on CONFIG.Canvas.detectionModes)
     const nonVisualDetectionModes = {
-      'feelTremor': 'tremorsense',
-      'hearing': 'hearing',
-      'senseInvisibility': 'sense-invisibility',
+      feelTremor: 'tremorsense',
+      hearing: 'hearing',
+      senseInvisibility: 'sense-invisibility',
       // Potential non-CONFIG modes that might exist
-      'blindsense': 'blindsense',  
-      'echolocation': 'echolocation',
-      'lifesense': 'lifesense',
-      'scent': 'scent'
+      blindsense: 'blindsense',
+      echolocation: 'echolocation',
+      lifesense: 'lifesense',
+      scent: 'scent',
     };
 
     for (const [modeName, senseName] of Object.entries(nonVisualDetectionModes)) {
-      if (detectionModes[modeName] && detectionModes[modeName].enabled && detectionModes[modeName].range > 0) {
+      if (
+        detectionModes[modeName] &&
+        detectionModes[modeName].enabled &&
+        detectionModes[modeName].range > 0
+      ) {
         const range = detectionModes[modeName].range;
-        console.log(`🔥 _getMaxSpecialSenseRange: Found ${modeName} (${senseName}) with range ${range}`);
         maxRange = Math.max(maxRange, range);
       }
     }
 
     // Log all properties to find where other senses might be stored
     for (const [key, value] of Object.entries(observerVision)) {
-      if (key !== 'observer') { // Skip the observer we added
-        console.log(`🔥 _getMaxSpecialSenseRange: ${key}:`, value);
+      if (key !== 'observer') {
+        // Skip the observer we added
       }
     }
 
     const sensingSummary = observerVision.sensingSummary || {};
-    console.log(`🔥 _getMaxSpecialSenseRange: sensingSummary:`, sensingSummary);
 
     const allSenses = [...(sensingSummary.imprecise || []), ...(sensingSummary.precise || [])];
-    console.log(`🔥 _getMaxSpecialSenseRange: allSenses:`, allSenses);
 
     // PART 2: Check traditional senses in sensingSummary
     const nonVisualSenseTypes = ['tremorsense', 'blindsense', 'echolocation', 'lifesense'];
 
     for (const sense of allSenses) {
-      console.log(`🔥 _getMaxSpecialSenseRange: Checking traditional sense:`, sense);
       if (nonVisualSenseTypes.includes(sense.type)) {
         const range = sense.range || 0;
-        console.log(`🔥 _getMaxSpecialSenseRange: Found traditional ${sense.type} with range ${range}`);
         maxRange = Math.max(maxRange, range);
       }
     }
 
-    console.log(`🔥 _getMaxSpecialSenseRange: Max range from detection modes + senses: ${maxRange}`);
-
     // FALLBACK: If no senses found in vision object, check observer actor directly
     if (maxRange === 0 && observerVision.observer) {
-      console.log(`🔥 _getMaxSpecialSenseRange: Trying fallback - checking observer actor directly`);
       const actor = observerVision.observer?.actor;
       if (actor) {
         const actorSenses = actor.system?.perception?.senses || actor.system?.senses || [];
-        console.log(`🔥 _getMaxSpecialSenseRange: Actor senses:`, actorSenses);
 
         for (const sense of actorSenses) {
           if (sense.type === 'tremorsense') {
             const range = sense.range || sense.value || 60; // Default to 60 if no range specified
-            console.log(`🔥 _getMaxSpecialSenseRange: Found tremorsense via fallback with range ${range}`);
             maxRange = Math.max(maxRange, range);
           }
         }
       }
     }
 
-    console.log(`🔥 _getMaxSpecialSenseRange: Final max range: ${maxRange}`);
     return maxRange;
-  }  /**
+  } /**
    * Check if observer has non-visual senses that can work without line of sight
    * @param {Object} observerVision - Vision capabilities object
    * @returns {boolean} True if observer has tremorsense, blindsense, or other non-visual senses
@@ -823,38 +975,6 @@ export class VisibilityCalculator {
   }
 
   /**
-   * Helper method to determine if observer can see normally in current conditions
-   * Used for invisibility state determination
-   * @param {Token} observer - The observing token
-   * @param {Token} target - The target token  
-   * @param {Object} lightLevel - Light level at target position
-   * @param {Object} observerVision - Observer's vision capabilities
-   * @returns {boolean} - Whether the observer can see normally
-   */
-  #canObserverSeeNormally(observer, target, lightLevel, observerVision) {
-    try {
-      // Check if observer has effective vision in current lighting
-      if (!observerVision?.hasVision) {
-        return false;
-      }
-
-      const darknessRank = lightLevel?.darknessRank ?? 0;
-
-      if (darknessRank <= 0) {
-        return true; // Normal lighting (bright: -1, normal: 0)
-      } else if (darknessRank >= 1 && darknessRank <= 3 && observerVision.hasDarkvision) {
-        return true; // Darkvision works in rank 1-3 darkness  
-      } else if (darknessRank >= 4 && observerVision.hasGreaterDarkvision) {
-        return true; // Greater darkvision works in rank 4+ darkness
-      }
-
-      return false;
-    } catch {
-      return false;
-    }
-  }
-
-  /**
    * Check if a ray intersects with a circle
    * @param {foundry.canvas.geometry.Ray} ray - The ray to check
    * @param {number} centerX - Circle center X coordinate
@@ -867,11 +987,9 @@ export class VisibilityCalculator {
       const rayStart = ray.A;
       const rayEnd = ray.B;
 
-
       // Check if either endpoint is inside the circle
       const distStart = Math.sqrt((rayStart.x - centerX) ** 2 + (rayStart.y - centerY) ** 2);
       const distEnd = Math.sqrt((rayEnd.x - centerX) ** 2 + (rayEnd.y - centerY) ** 2);
-
 
       if (distStart <= radius || distEnd <= radius) {
         return true;
@@ -899,7 +1017,6 @@ export class VisibilityCalculator {
       const closestY = rayStart.y + t * dy;
 
       const distToCenter = Math.sqrt((closestX - centerX) ** 2 + (closestY - centerY) ** 2);
-
 
       return distToCenter <= radius;
     } catch (error) {
@@ -967,7 +1084,12 @@ export class VisibilityCalculator {
    * @param {Token} target - The target token
    * @returns {boolean} True if the line passes through darkness
    */
-  #doesLinePassThroughDarkness(observer, target, observerPosOverride = null, targetPosOverride = null) {
+  #doesLinePassThroughDarkness(
+    observer,
+    target,
+    observerPosOverride = null,
+    targetPosOverride = null,
+  ) {
     try {
       const observerPos = observerPosOverride || this._getTokenPosition(observer);
       const targetPos = targetPosOverride || this._getTokenPosition(target);
@@ -976,7 +1098,6 @@ export class VisibilityCalculator {
 
       // Cast a ray between the tokens to check for darkness effects
       const ray = new foundry.canvas.geometry.Ray(observerPos, targetPos);
-
 
       // Get all darkness sources that the ray passes through
       let lightSources = [];
@@ -1001,7 +1122,7 @@ export class VisibilityCalculator {
           if (!isDarkness || !isActive || !isVisible) {
             return false;
           }
-          
+
           // Check if the ray intersects with the light source's area
           // For circular darkness sources, use precise circle-line intersection
           let intersects = false;
@@ -1013,39 +1134,21 @@ export class VisibilityCalculator {
             const dimValue = light.data?.dim || light.config?.dim || light.dim || 0;
             const totalRadius = brightValue + dimValue;
 
-            // For darkness sources with visual coverage but no bright/dim values, 
+            // For darkness sources with visual coverage but no bright/dim values,
             // Use the actual configured radius without artificial expansion
-            let radius = totalRadius > 0 ? totalRadius : (light.radius || 0);
+            let radius = totalRadius > 0 ? totalRadius : light.radius || 0;
 
             const centerX = light.x;
             const centerY = light.y;
 
-            console.log('🌑   → Intersection params:', {
-              brightValue,
-              dimValue,
-              totalRadius,
-              radius,
-              centerX,
-              centerY,
-              lightData: light.data,
-              lightConfig: light.config,
-              lightRadius: light.radius,
-              hasShape: !!light.shape,
-              hasBounds: !!light.bounds
-            });            if (radius > 0) {
-              console.log('🌑   → Using circle intersection test with radius:', radius);
+            if (radius > 0) {
               // Use precise circle-line intersection for circular darkness sources
               intersects = this.#rayIntersectsCircle(ray, centerX, centerY, radius);
-              console.log('🌑   → Circle intersection result:', intersects);
             } else {
-              console.log('🌑   → No radius, using fallback methods');
               // Fallback to shape-based intersection for non-circular sources
               if (light.shape) {
-                console.log('🌑   → Using shape intersection, shape points:', light.shape.points?.length || 0);
                 intersects = this.#rayIntersectsShape(ray, light.shape);
-                console.log('🌑   → Shape intersection result:', intersects);
               } else {
-                console.log('🌑   → No shape, using bounds check');
                 // Final fallback to bounds check
                 const lightBounds = light.bounds;
                 if (!lightBounds) {
@@ -1091,10 +1194,6 @@ export class VisibilityCalculator {
             return false;
           }
 
-          console.log('🌑   → Final intersection result:', intersects);
-          if (intersects) {
-            console.log('🌑   → ✅ INTERSECTION FOUND! Source should be included');
-          }
           return intersects;
         });
       } catch (error) {
@@ -1192,96 +1291,153 @@ export class VisibilityCalculator {
     if (isBlinded) {
       // If blinded, but has precise non-visual sense in range, can still observe
       try {
-        if (this.#visionAnalyzer.hasPreciseNonVisualInRange(observer, target)) return { state: 'observed', reason: 'blinded_but_precise_sense' };
+        if (this.#visionAnalyzer.hasPreciseNonVisualInRange(observer, target))
+          return { state: 'observed', reason: 'blinded_but_precise_sense' };
         // If any imprecise sense can detect, target is at least hidden rather than undetected
-        if (this.#visionAnalyzer.canSenseImprecisely(observer, target)) return { state: 'hidden', reason: 'blinded_but_imprecise_sense' };
-      } catch { }
+        if (this.#visionAnalyzer.canSenseImprecisely(observer, target))
+          return { state: 'hidden', reason: 'blinded_but_imprecise_sense' };
+      } catch {}
       return { state: 'hidden', reason: 'blinded_no_senses' };
     }
     return null;
   }
 
-
-
   /**
-   * @param {Token} target - The target token
-   * @param {Object} targetPositionOverride - Optional position override for target
-   * @param {Object} options - Calculation options
-   * @returns {string|null} Visibility result if invisible, null if not invisible
+   * Check invisible condition using the calculated base visibility state
+   * This is the correct approach: determine what observer would normally see,
+   * then apply invisible condition transitions based on that base state
+   * @param {Token} observer
+   * @param {Token} target
+   * @param {string} baseState - The visibility state without invisible condition
+   * @param {Object} targetPositionOverride
+   * @param {Object} options
+   * @returns {Object|null} Invisibility result or null if not invisible
    * @private
    */
-  async #checkInvisibilityCondition(observer, target, targetPositionOverride, options) {
+  async #checkInvisibilityConditionWithBaseState(
+    observer,
+    target,
+    baseState,
+    targetPositionOverride,
+    options,
+  ) {
     const isInvisible = this.#conditionManager.isInvisibleTo(observer, target);
+
     if (isInvisible) {
-      // If observer has precise non-visual sense (e.g., tremorsense, echolocation) in range → observed
+      // CRITICAL: Check for non-visual senses first - they completely bypass invisible condition
+      // Both precise AND imprecise non-visual senses are unaffected by invisibility
       try {
-        if (this.#visionAnalyzer.hasPreciseNonVisualInRange(observer, target)) return { state: 'observed', reason: 'invisible_but_precise_sense' };
-        // If any imprecise sense can detect (e.g., hearing), invisible is at least hidden
-        if (this.#visionAnalyzer.canSenseImprecisely(observer, target)) return { state: 'hidden', reason: 'invisible_but_imprecise_sense' };
-      } catch { }
-
-      // Use ConditionManager to determine proper invisibility state based on PF2E rules
-      try {
-        // We need to compute light level and vision capabilities to determine canSeeNormally
-        const targetPosition = targetPositionOverride || {
-          x: target.document.x + (target.document.width * canvas.grid.size) / 2,
-          y: target.document.y + (target.document.height * canvas.grid.size) / 2,
-          elevation: target.document.elevation || 0,
-        };
-
-        // Get lighting at target position
-        const opts = options && typeof options === 'object' ? options : {};
-        const pre = opts.precomputedLights || null;
-        const targetId = target?.document?.id;
-        let tempLightLevel;
-        if (pre && targetId && pre[targetId]) {
-          tempLightLevel = pre[targetId];
-        } else if (pre && targetId && typeof pre.get === 'function' && pre.has(targetId)) {
-          tempLightLevel = pre.get(targetId);
-        } else {
-          tempLightLevel = this.#lightingCalculator.getLightLevelAt(targetPosition, target);
+        // If observer has precise non-visual sense (e.g., tremorsense, echolocation) in range → observed
+        if (this.#visionAnalyzer.hasPreciseNonVisualInRange(observer, target)) {
+          return { state: 'observed', reason: 'invisible_bypassed_precise_nonvisual_sense' };
         }
 
-        // Get observer vision capabilities
-        let tempObserverVision = null;
+        // Check for specific imprecise non-visual senses that bypass invisibility
+        // Tremorsense, scent, lifesense, etc. are unaffected by invisibility
+        const capabilities = this.#visionAnalyzer.getVisionCapabilities(observer);
+        const dist = this.#visionAnalyzer.distanceFeet(observer, target);
+
+        // Check tremorsense using VisionAnalyzer's direct method
+        const canDetectViaTremor = this.#visionAnalyzer.canDetectViaTremor(observer, target);
+
+        if (canDetectViaTremor) {
+          return { state: 'hidden', reason: 'invisible_bypassed_tremorsense' };
+        }
+
+        // Check scent
+        if (
+          capabilities.scent &&
+          (capabilities.scent.range === Infinity || capabilities.scent.range >= dist)
+        ) {
+          return { state: 'hidden', reason: 'invisible_bypassed_scent' };
+        }
+
+        // Check lifesense
+        if (
+          capabilities.lifesense &&
+          (capabilities.lifesense.range === Infinity || capabilities.lifesense.range >= dist) &&
+          this.#visionAnalyzer.canDetectWithLifesense(target)
+        ) {
+          return { state: 'hidden', reason: 'invisible_bypassed_lifesense' };
+        }
+      } catch (error) {
+        console.warn('Error checking non-visual senses:', error);
+      }
+
+      // CRITICAL: Check if there's already an established invisible state for this observer-target pair
+      // This prevents lighting changes from affecting already-established invisible states
+      // Note: Established states are cleared when invisible condition is applied or creature moves
+      const observerId = observer?.document?.id;
+      const targetId = target?.document?.id;
+
+      if (observerId && targetId) {
+        const invisibilityFlags = target.document.flags?.['pf2e-visioner']?.invisibility || {};
+        const observerFlags = invisibilityFlags[observerId] || {};
+        const establishedState = observerFlags.establishedState;
+
+        if (establishedState) {
+          return { state: establishedState, reason: `invisible_established_${establishedState}` };
+        }
+      }
+
+      // No established state exists - calculate it based on current base state and establish it
+      let invisibleState;
+      switch (baseState) {
+        case 'observed':
+        case 'concealed':
+          invisibleState = 'hidden';
+          break;
+        case 'hidden':
+          invisibleState = 'undetected';
+          break;
+        case 'undetected':
+        default:
+          invisibleState = 'undetected';
+          break;
+      }
+
+      // Establish this state for future calculations (until creature takes action)
+      if (observerId && targetId) {
         try {
-          const capsMap = opts?.sensesCache;
-          const oid = observer?.document?.id;
-          if (capsMap && oid && (capsMap.get?.(oid) || capsMap[oid])) {
-            tempObserverVision = capsMap.get ? capsMap.get(oid) : capsMap[oid];
-          }
-        } catch { /* ignore */ }
-        if (!tempObserverVision) {
-          tempObserverVision = this.#visionAnalyzer.getVisionCapabilities(observer);
+          const currentFlags = target.document.flags?.['pf2e-visioner']?.invisibility || {};
+          const updatedFlags = {
+            ...currentFlags,
+            [observerId]: {
+              ...currentFlags[observerId],
+              establishedState: invisibleState,
+              establishedAt: Date.now(),
+            },
+          };
+          await target.document.setFlag('pf2e-visioner', 'invisibility', updatedFlags);
+        } catch (error) {
+          console.warn('Failed to establish invisible state:', error);
         }
+      }
 
-        // Check if observer can see normally in current conditions
-        const canSeeNormally = this.#canObserverSeeNormally(observer, target, tempLightLevel, tempObserverVision);
+      // Note: Non-visual senses (both precise and imprecise) are checked first and bypass invisible condition entirely
+      // Only visual-based observers with imprecise senses (like hearing) follow invisible condition rules
+      // Non-visual imprecise senses are handled above and bypass invisibility completely
 
-        // Create a sneak override checker function
+      // Check for sneak override that might upgrade to undetected
+      try {
         const hasSneakOverride = async (obs, tgt) => {
           try {
             const targetFlags = tgt?.document?.flags?.['pf2e-visioner'] || {};
             const sneakOverrideKey = `sneak-override-from-${obs?.document?.id}`;
-            return !!(targetFlags[sneakOverrideKey]?.success);
+            return !!targetFlags[sneakOverrideKey]?.success;
           } catch {
             return false;
           }
         };
 
-        const invisibilityState = await this.#conditionManager.getInvisibilityState(
-          observer,
-          target,
-          hasSneakOverride,
-          canSeeNormally
-        );
+        if (await hasSneakOverride(observer, target)) {
+          invisibleState = 'undetected';
+        }
+      } catch {}
 
-        return { state: invisibilityState, reason: 'invisible_pf2e_rules' };
-      } catch (error) {
-        // Fallback to default invisibility logic if getInvisibilityState fails
-        return { state: 'undetected', reason: 'invisible_fallback' };
-      }
+      return { state: invisibleState, reason: `invisible_from_${baseState}` };
     }
+
     return null;
   }
 
@@ -1297,8 +1453,9 @@ export class VisibilityCalculator {
     if (isDazzled) {
       // If you have a precise non-visual sense in range, dazzled doesn't matter for that target
       try {
-        if (this.#visionAnalyzer.hasPreciseNonVisualInRange(observer, target)) return { state: 'observed', reason: 'dazzled_but_precise_sense' };
-      } catch { }
+        if (this.#visionAnalyzer.hasPreciseNonVisualInRange(observer, target))
+          return { state: 'observed', reason: 'dazzled_but_precise_sense' };
+      } catch {}
       // Otherwise, everything is concealed
       return { state: 'concealed', reason: 'dazzled_condition' };
     }
@@ -1320,7 +1477,9 @@ export class VisibilityCalculator {
       if (capsMap && oid && (capsMap.get?.(oid) || capsMap[oid])) {
         observerVision = capsMap.get ? capsMap.get(oid) : capsMap[oid];
       }
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
     if (!observerVision) {
       observerVision = this.#visionAnalyzer.getVisionCapabilities(observer);
     }
@@ -1355,12 +1514,6 @@ export class VisibilityCalculator {
     }
   }
 
-
-
-
-
-
-
   /**
    * Handle line of sight checking with cross-boundary darkness rules
    * @param {Token} observer - The observing token
@@ -1382,17 +1535,23 @@ export class VisibilityCalculator {
         const observerInDarkness = (observerLight?.darknessRank ?? 0) >= 4;
         const targetInDarkness = (targetLight?.darknessRank ?? 0) >= 4;
 
-        const hasDarknessSources = canvas.lighting.sources.some(source =>
-          source.object &&
-          source.object.document &&
-          source.object.document.flags &&
-          source.object.document.flags.pf2e &&
-          source.object.document.flags.pf2e.darknessRank >= 4
+        const hasDarknessSources = canvas.lighting.sources.some(
+          (source) =>
+            source.object &&
+            source.object.document &&
+            source.object.document.flags &&
+            source.object.document.flags.pf2e &&
+            source.object.document.flags.pf2e.darknessRank >= 4,
         );
 
         if (hasDarknessSources && (observerInDarkness || targetInDarkness)) {
           // Check ray intersection for cross-boundary darkness
-          const rasterResult = this.#lightingRasterService?.linePassesThroughDarkness(observerPos.x, observerPos.y, targetPos.x, targetPos.y) || { passesThroughDarkness: false, maxDarknessRank: 0 };
+          const rasterResult = this.#lightingRasterService?.linePassesThroughDarkness(
+            observerPos.x,
+            observerPos.y,
+            targetPos.x,
+            targetPos.y,
+          ) || { passesThroughDarkness: false, maxDarknessRank: 0 };
           let passesThroughDarkness = rasterResult.passesThroughDarkness;
           let maxDarknessRank = rasterResult.maxDarknessRank;
 
@@ -1441,19 +1600,15 @@ export class VisibilityCalculator {
 
       // For precise non-visual senses, return immediately
       if (hasPreciseNonVisual) return { state: 'observed', reason: 'precise_sense_blocked_los' };
-      
+
       // For imprecise senses, we need to check elevation rules first
       if (canSenseImprecisely) {
-        console.log('🔍 SPECIAL-SENSES: Has imprecise senses, checking elevation rules');
-        
         // Check if elevation would block the imprecise sense
         const elevationResult = this.#checkElevationRules(observer, target);
         if (elevationResult) {
-          console.log('🔍 SPECIAL-SENSES: Elevation rules blocked detection:', elevationResult);
           return elevationResult; // This would be {state: 'undetected', reason: ...} for tremorsense vs elevated targets
         }
-        
-        console.log('🔍 SPECIAL-SENSES: Elevation rules passed, returning hidden for imprecise sense');
+
         return { state: 'hidden', reason: 'imprecise_sense_blocked_los' };
       }
 
@@ -1473,58 +1628,26 @@ export class VisibilityCalculator {
   #checkElevationRules(observer, target) {
     const observerElevation = observer.document?.elevation || 0;
     const targetElevation = target.document?.elevation || 0;
-    
-    console.log('🔍 ELEVATION DEBUG:', {
-      observerName: observer.name,
-      targetName: target.name,
-      observerElevation,
-      targetElevation,
-      elevationDifference: Math.abs(targetElevation - observerElevation)
-    });
 
     if (targetElevation > 0 && targetElevation !== observerElevation) {
-      console.log('🔍 ELEVATION: Target is elevated, checking for tremorsense...');
-      
       // Check if observer has tremorsense (feelTremor detection mode)
       const observerVision = this.#visionAnalyzer.getVisionCapabilities(observer);
-      
-      console.log('🔍 TREMORSENSE: Vision capabilities:', {
-        imprecise: observerVision.imprecise,
-        precise: observerVision.precise,
-        detectionModes: observerVision.detectionModes
-      });
-      
-      console.log('🔍 TREMORSENSE: Detection modes debug:', {
-        visionDetectionModes: observerVision.detectionModes,
-        actor: observer.actor?.name,
-        actorSenses: observer.actor?.system?.perception?.senses
-      });
-      
+
       // Check for tremorsense in vision capabilities (single source of truth)
-      const hasTremorsenseFromVision = observerVision.detectionModes?.feelTremor?.enabled && 
-                                     observerVision.detectionModes?.feelTremor?.range > 0;
-      
+      const hasTremorsenseFromVision =
+        observerVision.detectionModes?.feelTremor?.enabled &&
+        observerVision.detectionModes?.feelTremor?.range > 0;
+
       // Fallback check in sensing summary for compatibility
-      const hasTremorsenseFromSenses = [...(observerVision.imprecise || []), ...(observerVision.precise || [])]
-                                     .some(sense => sense.type === 'tremorsense');
-      
+      const hasTremorsenseFromSenses = [
+        ...(observerVision.imprecise || []),
+        ...(observerVision.precise || []),
+      ].some((sense) => sense.type === 'tremorsense');
+
       const hasTremorsense = hasTremorsenseFromVision || hasTremorsenseFromSenses;
-        
-      console.log('🔍 TREMORSENSE: Detection result:', {
-        hasTremorsense,
-        hasTremorsenseFromVision,
-        hasTremorsenseFromSenses,
-        feelTremorInVision: observerVision.detectionModes?.feelTremor
-      });
 
       if (hasTremorsense) {
         // Debug logging
-        console.log('🔍 Tremorsense elevation check:', {
-          hasTremorsense,
-          observerElevation,
-          targetElevation,
-          observerVision
-        });
 
         const hasViableSensesForElevation =
           observerVision.hasDarkvision ||
@@ -1562,7 +1685,17 @@ export class VisibilityCalculator {
    * @returns {Promise<string|null>} Visibility state if darkness rules apply, null otherwise
    * @private
    */
-  async #handleCrossBoundaryDarkness(observer, target, observerVision, lightLevel, _observerPositionOverride, targetPosition, pre, stats, options) {
+  async #handleCrossBoundaryDarkness(
+    observer,
+    target,
+    observerVision,
+    lightLevel,
+    _observerPositionOverride,
+    targetPosition,
+    pre,
+    stats,
+    options,
+  ) {
     // Get observer position and light level
     const observerPosition = _observerPositionOverride || {
       x: observer.document.x + (observer.document.width * canvas.grid.size) / 2,
@@ -1577,21 +1710,34 @@ export class VisibilityCalculator {
 
     // Check for darkness ray intersection
     const { linePassesThroughDarkness, rayDarknessRank } = await this.#checkDarknessRayIntersection(
-      observer, target, observerPosition, targetPosition
+      observer,
+      target,
+      observerPosition,
+      targetPosition,
     );
 
     // Check for cross-boundary darkness scenarios
-    const isCrossBoundary = (observerInDarkness !== targetInDarkness) || linePassesThroughDarkness;
+    const isCrossBoundary = observerInDarkness !== targetInDarkness || linePassesThroughDarkness;
 
     if (isCrossBoundary) {
       return this.#applyCrossBoundaryDarknessRules(
-        observerVision, observerInDarkness, targetInDarkness, linePassesThroughDarkness,
-        rayDarknessRank, observerLightLevel, lightLevel
+        observerVision,
+        observerInDarkness,
+        targetInDarkness,
+        linePassesThroughDarkness,
+        rayDarknessRank,
+        observerLightLevel,
+        lightLevel,
       );
     } else {
       return this.#applySameBoundaryDarknessRules(
-        observerVision, observerInDarkness, targetInDarkness, linePassesThroughDarkness,
-        rayDarknessRank, observerLightLevel, lightLevel
+        observerVision,
+        observerInDarkness,
+        targetInDarkness,
+        linePassesThroughDarkness,
+        rayDarknessRank,
+        observerLightLevel,
+        lightLevel,
       );
     }
   }
@@ -1611,13 +1757,19 @@ export class VisibilityCalculator {
 
     if (pre && observerId && pre[observerId]) {
       observerLightLevel = pre[observerId];
-      try { if (stats) stats.observerUsed = (stats.observerUsed || 0) + 1; } catch { }
+      try {
+        if (stats) stats.observerUsed = (stats.observerUsed || 0) + 1;
+      } catch {}
     } else if (pre && observerId && typeof pre.get === 'function' && pre.has(observerId)) {
       observerLightLevel = pre.get(observerId);
-      try { if (stats) stats.observerUsed = (stats.observerUsed || 0) + 1; } catch { }
+      try {
+        if (stats) stats.observerUsed = (stats.observerUsed || 0) + 1;
+      } catch {}
     } else {
       observerLightLevel = this.#lightingCalculator.getLightLevelAt(observerPosition, observer);
-      try { if (stats) stats.observerMiss = (stats.observerMiss || 0) + 1; } catch { }
+      try {
+        if (stats) stats.observerMiss = (stats.observerMiss || 0) + 1;
+      } catch {}
     }
 
     return observerLightLevel;
@@ -1639,24 +1791,40 @@ export class VisibilityCalculator {
     // Prefer raster service for fast approximation
     let darknessResult = null;
     try {
-      if (this.#lightingRasterService && typeof this.#lightingRasterService.getRayDarknessInfo === 'function') {
+      if (
+        this.#lightingRasterService &&
+        typeof this.#lightingRasterService.getRayDarknessInfo === 'function'
+      ) {
         darknessResult = await this.#lightingRasterService.getRayDarknessInfo(
-          observer, target, observerPosition, targetPosition
+          observer,
+          target,
+          observerPosition,
+          targetPosition,
         );
       }
-    } catch (error) { 
+    } catch (error) {
       // Raster service failed, will use fallback
     }
 
     if (!darknessResult) {
       // Fallback to precise shape-based detector
       darknessResult = this.#doesLinePassThroughDarkness(
-        observer, target, observerPosition, targetPosition,
+        observer,
+        target,
+        observerPosition,
+        targetPosition,
       ) || { passesThroughDarkness: false, maxDarknessRank: 0 };
-    } else if (darknessResult && darknessResult.passesThroughDarkness === false && darknessResult.maxDarknessRank === 0) {
+    } else if (
+      darknessResult &&
+      darknessResult.passesThroughDarkness === false &&
+      darknessResult.maxDarknessRank === 0
+    ) {
       // Double-check with precise detector if raster found no darkness
       const preciseResult = this.#doesLinePassThroughDarkness(
-        observer, target, observerPosition, targetPosition,
+        observer,
+        target,
+        observerPosition,
+        targetPosition,
       ) || { passesThroughDarkness: false, maxDarknessRank: 0 };
 
       if (preciseResult.passesThroughDarkness || preciseResult.maxDarknessRank > 0) {
@@ -1725,7 +1893,7 @@ export class VisibilityCalculator {
    * @private
    */
   #filterIntersectedDarknessSources(ray, allSources) {
-    return allSources.filter(light => {
+    return allSources.filter((light) => {
       const isDarkness = light.isDarknessSource || light.document?.config?.negative || false;
       const isActive = light.active !== false;
       const isVisible = light.visible !== false;
@@ -1738,7 +1906,7 @@ export class VisibilityCalculator {
         const brightValue = light.data?.bright || light.config?.bright || light.bright || 0;
         const dimValue = light.data?.dim || light.config?.dim || light.dim || 0;
         const totalRadius = brightValue + dimValue;
-        let radius = totalRadius > 0 ? totalRadius : (light.radius || 0);
+        let radius = totalRadius > 0 ? totalRadius : light.radius || 0;
 
         const centerX = light.x;
         const centerY = light.y;
@@ -1781,8 +1949,8 @@ export class VisibilityCalculator {
         darknessRank = Number(config.darknessRank || config.spellLevel || 0) || 0;
       }
 
-      // Default to rank 4 if we can't determine
-      if (darknessRank === 0) darknessRank = 4;
+      // Default to rank 2 if we can't determine (most darkness spells are rank 1-3)
+      if (darknessRank === 0) darknessRank = 2;
 
       maxFoundRank = Math.max(maxFoundRank, darknessRank);
     }
@@ -1829,7 +1997,8 @@ export class VisibilityCalculator {
     let fallbackRank = 0;
 
     for (const lightSource of allSources) {
-      const isDarkness = lightSource.isDarknessSource || lightSource.document?.config?.negative || false;
+      const isDarkness =
+        lightSource.isDarknessSource || lightSource.document?.config?.negative || false;
       if (!isDarkness) continue;
 
       const ambientDoc = this.#findAmbientLightDocument(lightSource);
@@ -1910,78 +2079,67 @@ export class VisibilityCalculator {
    * @returns {string|null} Visibility result or null to continue processing
    * @private
    */
-  #applyCrossBoundaryDarknessRules(observerVision, observerInDarkness, targetInDarkness, linePassesThroughDarkness, rayDarknessRank, observerLightLevel, lightLevel) {
-    console.log('🌙 CROSS-BOUNDARY DEBUG:');
-    console.log('  observerInDarkness:', observerInDarkness);
-    console.log('  targetInDarkness:', targetInDarkness);
-    console.log('  linePassesThroughDarkness:', linePassesThroughDarkness);
-    console.log('  rayDarknessRank:', rayDarknessRank);
-    console.log('  observerVision.hasDarkvision:', observerVision.hasDarkvision);
-    console.log('  observerVision.hasGreaterDarkvision:', observerVision.hasGreaterDarkvision);
-    console.log('  observerLightLevel:', observerLightLevel);
-    console.log('  targetLightLevel:', lightLevel);
-
+  #applyCrossBoundaryDarknessRules(
+    observerVision,
+    observerInDarkness,
+    targetInDarkness,
+    linePassesThroughDarkness,
+    rayDarknessRank,
+    observerLightLevel,
+    lightLevel,
+  ) {
     if (observerInDarkness && !targetInDarkness) {
       // Observer inside darkness, target outside
-      console.log('🌙 CASE: Observer inside darkness, target outside');
       if (observerVision.hasVision) {
         if (observerVision.hasGreaterDarkvision) {
-          console.log('🌙 RESULT: Greater darkvision → observed');
           return { state: 'observed', reason: 'greater_darkvision_through_darkness' };
         } else if (observerVision.hasDarkvision) {
           const effectiveDarknessRank = Math.max(
             rayDarknessRank,
             observerLightLevel?.darknessRank ?? 0,
           );
-          console.log('🌙 effectiveDarknessRank:', effectiveDarknessRank);
-          const result = effectiveDarknessRank >= 4 ? { state: 'concealed', reason: 'darkvision_cross_boundary_rank_4+' } : { state: 'observed', reason: 'darkvision_cross_boundary' };
-          console.log('🌙 RESULT: Regular darkvision →', result);
+          const result =
+            effectiveDarknessRank >= 4
+              ? { state: 'concealed', reason: 'darkvision_cross_boundary_rank_4+' }
+              : { state: 'observed', reason: 'darkvision_cross_boundary' };
           return result;
         } else {
-          console.log('🌙 RESULT: No darkvision → hidden');
-          return {state: 'hidden', reason: 'no_darkvision_in_darkness'};
+          return { state: 'hidden', reason: 'no_darkvision_in_darkness' };
         }
       }
     } else if (!observerInDarkness && targetInDarkness) {
       // Observer outside darkness, target inside
-      console.log('🌙 CASE: Observer outside darkness, target inside');
       if (observerVision.hasVision) {
         if (observerVision.hasGreaterDarkvision) {
-          console.log('🌙 RESULT: Greater darkvision → observed');
           return { state: 'observed', reason: 'greater_darkvision_through_darkness' };
         } else if (observerVision.hasDarkvision) {
-          const effectiveDarknessRank = Math.max(
-            rayDarknessRank,
-            lightLevel?.darknessRank ?? 0,
-          );
-          console.log('🌙 effectiveDarknessRank:', effectiveDarknessRank);
-          const result = effectiveDarknessRank >= 4 ? { state: 'concealed', reason: 'darkvision_cross_boundary_rank_4+' } : { state: 'observed', reason: 'darkvision_cross_boundary' };
-          console.log('🌙 RESULT: Regular darkvision →', result);
+          const effectiveDarknessRank = Math.max(rayDarknessRank, lightLevel?.darknessRank ?? 0);
+          const result =
+            effectiveDarknessRank >= 4
+              ? { state: 'concealed', reason: 'darkvision_cross_boundary_rank_4+' }
+              : { state: 'observed', reason: 'darkvision_cross_boundary' };
           return result;
         } else {
-          console.log('🌙 RESULT: No darkvision → hidden');
-          return {state: 'hidden', reason: 'no_darkvision_in_darkness'};
+          return { state: 'hidden', reason: 'no_darkvision_in_darkness' };
         }
       }
     } else if (linePassesThroughDarkness) {
       // Line passes through darkness but both tokens are in same lighting state
-      console.log('🌙 CASE: Line passes through darkness, both tokens in same lighting');
       if (observerVision.hasVision) {
         if (observerVision.hasGreaterDarkvision) {
-          console.log('🌙 RESULT: Greater darkvision → observed');
           return { state: 'observed', reason: 'greater_darkvision_through_darkness' };
         } else if (observerVision.hasDarkvision) {
-          const result = rayDarknessRank >= 4 ? { state: 'concealed', reason: 'darkness_rank_4+' } : { state: 'observed', reason: 'darkvision_through_darkness' };
-          console.log('🌙 RESULT: Regular darkvision →', result);
+          const result =
+            rayDarknessRank >= 4
+              ? { state: 'concealed', reason: 'darkness_rank_4+' }
+              : { state: 'observed', reason: 'darkvision_through_darkness' };
           return result;
         } else {
-          console.log('🌙 RESULT: No darkvision → hidden');
           return { state: 'hidden', reason: 'no_darkvision_in_darkness' };
         }
       }
     }
 
-    console.log('🌙 NO CROSS-BOUNDARY CASE MATCHED - returning null');
     return null;
   }
 
@@ -1997,16 +2155,26 @@ export class VisibilityCalculator {
    * @returns {string|null} Visibility result or null to continue processing
    * @private
    */
-  #applySameBoundaryDarknessRules(observerVision, observerInDarkness, targetInDarkness, linePassesThroughDarkness, rayDarknessRank, observerLightLevel, lightLevel) {
+  #applySameBoundaryDarknessRules(
+    observerVision,
+    observerInDarkness,
+    targetInDarkness,
+    linePassesThroughDarkness,
+    rayDarknessRank,
+    observerLightLevel,
+    lightLevel,
+  ) {
     // Both tokens outside darkness but line passes through darkness
     if (!observerInDarkness && !targetInDarkness && linePassesThroughDarkness) {
       if (observerVision.hasVision) {
         if (observerVision.hasGreaterDarkvision) {
-          return {state: 'observed', reason: 'greater_darkvision_through_darkness'};
+          return { state: 'observed', reason: 'greater_darkvision_through_darkness' };
         } else if (observerVision.hasDarkvision) {
-          return rayDarknessRank >= 4 ? {state: 'concealed', reason: 'darkness_rank_4+_darkvision'} : {state: 'observed', reason: 'darkvision_through_darkness'};
+          return rayDarknessRank >= 4
+            ? { state: 'concealed', reason: 'darkness_rank_4+_darkvision' }
+            : { state: 'observed', reason: 'darkvision_through_darkness' };
         } else {
-          return {state: 'hidden', reason: 'no_darkvision_in_darkness'};
+          return { state: 'hidden', reason: 'no_darkvision_in_darkness' };
         }
       }
     }
@@ -2025,7 +2193,9 @@ export class VisibilityCalculator {
           return { state: 'observed', reason: 'greater_darkvision_through_darkness' };
         } else if (observerVision.hasDarkvision) {
           // Regular darkvision sees concealed in rank 4+ darkness, observed otherwise
-          return effectiveDarknessRank >= 4 ? { state: 'concealed', reason: 'darkness_rank_4+' } : { state: 'observed', reason: 'darkvision_through_darkness' };
+          return effectiveDarknessRank >= 4
+            ? { state: 'concealed', reason: 'darkness_rank_4+' }
+            : { state: 'observed', reason: 'darkvision_through_darkness' };
         } else {
           return { state: 'hidden', reason: 'no_darkvision_in_darkness' };
         }

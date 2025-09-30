@@ -229,7 +229,7 @@ export class VisionAnalyzer {
   getSensingSummary(token) {
     // Delegate to the comprehensive getVisionCapabilities method
     const capabilities = this.getVisionCapabilities(token);
-    
+
     // Return only the sensing summary portion for backward compatibility
     return {
       precise: capabilities.precise || [],
@@ -239,11 +239,28 @@ export class VisionAnalyzer {
       echolocationRange: capabilities.echolocationRange || 0,
       lifesense: capabilities.lifesense || null,
       // Include individual senses for backward compatibility
-      ...Object.fromEntries(Object.entries(capabilities).filter(([key]) => 
-        !['hasVision', 'hasDarkvision', 'hasLowLightVision', 'darkvisionRange', 'lowLightRange', 
-          'isBlinded', 'isDazzled', 'hasGreaterDarkvision', 'detectionModes', 'precise', 'imprecise', 
-          'hearing', 'echolocationActive', 'echolocationRange', 'lifesense'].includes(key)
-      ))
+      ...Object.fromEntries(
+        Object.entries(capabilities).filter(
+          ([key]) =>
+            ![
+              'hasVision',
+              'hasDarkvision',
+              'hasLowLightVision',
+              'darkvisionRange',
+              'lowLightRange',
+              'isBlinded',
+              'isDazzled',
+              'hasGreaterDarkvision',
+              'detectionModes',
+              'precise',
+              'imprecise',
+              'hearing',
+              'echolocationActive',
+              'echolocationRange',
+              'lifesense',
+            ].includes(key),
+        ),
+      ),
     };
   }
 
@@ -282,10 +299,10 @@ export class VisionAnalyzer {
 
       if (!capabilities.imprecise.length && !capabilities.hearing) {
         return false;
-      }      // Check regular imprecise senses (including lifesense)
+      } // Check regular imprecise senses (including lifesense)
       for (let i = 0; i < capabilities.imprecise.length; i++) {
         const ent = capabilities.imprecise[i];
-        
+
         if (!ent || typeof ent.range !== 'number') continue;
 
         // Special handling for lifesense - must check if target is detectable
@@ -299,7 +316,7 @@ export class VisionAnalyzer {
           continue;
         }
 
-        // Special handling for tremorsense - target must be in contact with ground (elevation 0)  
+        // Special handling for tremorsense - target must be in contact with ground (elevation 0)
         if (ent.type === 'tremorsense') {
           if (targetElevation > 0) {
             continue; // Cannot detect flying/elevated creatures with tremorsense
@@ -309,7 +326,7 @@ export class VisionAnalyzer {
         // Regular imprecise senses - ensure range comparison uses correct units
         // dist is in feet, ent.range should also be in feet
         const shouldReturn = ent.range === Infinity || ent.range >= dist;
-        
+
         if (shouldReturn) {
           return true;
         }
@@ -323,13 +340,14 @@ export class VisionAnalyzer {
           if (targetElevation > 0) {
             // If observer only has tremorsense + hearing (no vision), hearing alone might not be enough
             // to precisely locate an elevated target behind a wall
-            const hasOnlyGroundBasedSenses = capabilities.tremorsense &&
+            const hasOnlyGroundBasedSenses =
+              capabilities.tremorsense &&
               !capabilities.hasDarkvision &&
               !capabilities.hasLowLightVision &&
               !capabilities.hasVision &&
               !capabilities.echolocationActive &&
               !capabilities.scent;
-            
+
             if (hasOnlyGroundBasedSenses) {
               // Observer only has tremorsense + basic hearing, cannot precisely locate elevated targets
               return false;
@@ -341,7 +359,7 @@ export class VisionAnalyzer {
     } catch (error) {
       // Log error but continue
     }
-    
+
     return false;
   }
 
@@ -387,7 +405,7 @@ export class VisionAnalyzer {
 
         if (ent.range === Infinity || ent.range >= dist) return true;
       }
-    } catch { }
+    } catch {}
     return false;
   }
 
@@ -410,14 +428,14 @@ export class VisionAnalyzer {
       // Use Foundry's built-in distance calculation method
       // PF2e's distanceTo returns distance in grid squares, so convert to feet
       const gridDistance = a.distanceTo?.(b) ?? Infinity;
-      
+
       // Convert grid squares to feet using the scene's grid distance setting
       const gridUnits = global.canvas?.scene?.grid?.distance || 5;
       const feetDistance = gridDistance * gridUnits;
-      
+
       // Round down to nearest 5-foot increment (PF2e uses 5-foot squares)
       const result = Math.floor(feetDistance / 5) * 5;
-      
+
       return result;
     } catch (error) {
       return Infinity;
@@ -431,12 +449,7 @@ export class VisionAnalyzer {
    */
   #calculateVisionCapabilities(token) {
     const actor = token.actor;
-    console.log('🔥 #calculateVisionCapabilities ENTRY:', {
-      tokenName: token?.name,
-      actorName: actor?.name,
-      hasActor: !!actor
-    });
-    
+
     if (!actor) {
       return {
         hasVision: false,
@@ -600,20 +613,20 @@ export class VisionAnalyzer {
           detectionModes[mode.id] = {
             enabled: mode.enabled,
             range: mode.range,
-            source: 'detectionModes'
+            source: 'detectionModes',
           };
         }
       }
-      
+
       // Also check traditional senses for non-visual senses (echolocation, lifesense, etc.)
       if (senses) {
         const nonVisualSenseMap = {
-          'tremorsense': 'feelTremor',
-          'echolocation': 'echolocation', 
-          'lifesense': 'lifesense',
-          'blindsense': 'blindsense'
+          tremorsense: 'feelTremor',
+          echolocation: 'echolocation',
+          lifesense: 'lifesense',
+          blindsense: 'blindsense',
         };
-        
+
         if (Array.isArray(senses)) {
           // NPC format: array of sense objects
           for (const sense of senses) {
@@ -624,7 +637,7 @@ export class VisionAnalyzer {
                 detectionModes[detectionModeId] = {
                   enabled: true,
                   range: sense.range,
-                  source: 'senses'
+                  source: 'senses',
                 };
               }
             }
@@ -639,7 +652,7 @@ export class VisionAnalyzer {
                 detectionModes[detectionModeId] = {
                   enabled: true,
                   range: senseData.range,
-                  source: 'senses'
+                  source: 'senses',
                 };
               }
             }
@@ -649,19 +662,12 @@ export class VisionAnalyzer {
 
       // Add comprehensive sensing summary (merge getSensingSummary functionality)
       sensingSummary = this.#calculateSensingSummary(token, senses, detectionModes);
-    } catch { }
+    } catch {}
 
     // Ensure sensingSummary exists even if try block failed
     if (!sensingSummary) {
       sensingSummary = this.#calculateSensingSummary(token, null, detectionModes);
     }
-
-    // Debug logging for detection modes
-    if (Object.keys(detectionModes).length > 0) {
-      console.log(`🔍 VISION-CAPABILITIES: ${token.name} detection modes:`, detectionModes);
-    }
-    
-
 
     const result = {
       hasVision,
@@ -681,7 +687,7 @@ export class VisionAnalyzer {
       echolocationRange: sensingSummary.echolocationRange,
       lifesense: sensingSummary.lifesense,
       // Individual senses for backward compatibility
-      ...sensingSummary.individualSenses
+      ...sensingSummary.individualSenses,
     };
 
     return result;
@@ -703,7 +709,7 @@ export class VisionAnalyzer {
       echolocationActive: false,
       echolocationRange: 0,
       lifesense: null,
-      individualSenses: {} // For backward compatibility
+      individualSenses: {}, // For backward compatibility
     };
 
     const actor = token?.actor;
@@ -711,7 +717,8 @@ export class VisionAnalyzer {
 
     // Check for echolocation effects
     try {
-      const effects = actor.itemTypes?.effect ?? actor.items?.filter?.((i) => i?.type === 'effect') ?? [];
+      const effects =
+        actor.itemTypes?.effect ?? actor.items?.filter?.((i) => i?.type === 'effect') ?? [];
       const hasEchoEffect = !!effects?.some?.(
         (e) => (e?.slug || e?.system?.slug || e?.name)?.toLowerCase?.() === 'effect-echolocation',
       );
@@ -725,19 +732,13 @@ export class VisionAnalyzer {
           summary.echolocationRange = Number(echo.range) || 40;
         }
       }
-    } catch { /* ignore */ }
-
-    // Debug: Show available detection modes from CONFIG
-    if (typeof CONFIG !== 'undefined' && CONFIG.Canvas?.detectionModes) {
-      const availableModes = Object.keys(CONFIG.Canvas.detectionModes);
-      console.log(`🔍 VISION-CONFIG: Available detection modes: ${availableModes.join(', ')}`);
+    } catch {
+      /* ignore */
     }
 
     // Process detection modes first (these take precedence)
     for (const [modeId, modeData] of Object.entries(detectionModes)) {
       if (!modeData.enabled || modeData.range <= 0) continue;
-
-      console.log(`🔍 VISION-PROCESSING: Detection mode '${modeId}' with range ${modeData.range} from ${modeData.source}`);
 
       let senseType = modeId;
       let acuity = 'imprecise'; // Default
@@ -746,28 +747,21 @@ export class VisionAnalyzer {
       // Based on CONFIG.Canvas.detectionModes from Foundry/PF2e
       const detectionModeMapping = {
         // Core tremorsense detection - imprecise by default unless explicitly marked precise
-        'feelTremor': { type: 'tremorsense', acuity: 'imprecise' },
-        
-        // Hearing-based detection
-        'hearing': { type: 'hearing', acuity: 'imprecise' },
-        
-        // Other non-visual senses (may not be in CONFIG but could exist)
-        'echolocation': { type: 'echolocation', acuity: 'precise' },
-        'lifesense': { type: 'lifesense', acuity: 'precise' },
-        'blindsense': { type: 'blindsense', acuity: 'precise' },
-        'scent': { type: 'scent', acuity: 'imprecise' },
-        
-        // Invisibility detection (precise when it comes to invisibility)
-        'senseInvisibility': { type: 'sense-invisibility', acuity: 'precise' },
-        'seeInvisibility': { type: 'see-invisibility', acuity: 'precise' }
-      };
+        feelTremor: { type: 'tremorsense', acuity: 'imprecise' },
 
-      // Validate that this is a known detection mode (optional debug)
-      const knownDetectionModes = typeof CONFIG !== 'undefined' ? 
-        Object.keys(CONFIG.Canvas?.detectionModes || {}) : [];
-      if (knownDetectionModes.length > 0 && !knownDetectionModes.includes(modeId)) {
-        console.warn(`🔍 VISION: Unknown detection mode '${modeId}' not in CONFIG.Canvas.detectionModes`);
-      }
+        // Hearing-based detection
+        hearing: { type: 'hearing', acuity: 'imprecise' },
+
+        // Other non-visual senses (may not be in CONFIG but could exist)
+        echolocation: { type: 'echolocation', acuity: 'precise' },
+        lifesense: { type: 'lifesense', acuity: 'precise' },
+        blindsense: { type: 'blindsense', acuity: 'precise' },
+        scent: { type: 'scent', acuity: 'imprecise' },
+
+        // Invisibility detection (precise when it comes to invisibility)
+        senseInvisibility: { type: 'sense-invisibility', acuity: 'precise' },
+        seeInvisibility: { type: 'see-invisibility', acuity: 'precise' },
+      };
 
       if (detectionModeMapping[modeId]) {
         senseType = detectionModeMapping[modeId].type;
@@ -804,7 +798,9 @@ export class VisionAnalyzer {
             this.#addSenseToSummary(summary, type, acuity, range, token);
           }
         }
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
     }
 
     return summary;
@@ -830,15 +826,18 @@ export class VisionAnalyzer {
     let a = String(acuity || 'imprecise').toLowerCase();
 
     // Skip visual senses if blinded
-    if ((entry.type === 'vision' ||
-      entry.type === 'sight' ||
-      entry.type === 'darkvision' ||
-      entry.type === 'greater-darkvision' ||
-      entry.type === 'greaterdarkvision' ||
-      entry.type === 'low-light-vision' ||
-      entry.type === 'lowlightvision' ||
-      entry.type.includes('vision') ||
-      entry.type.includes('sight')) && this.#hasCondition(token.actor, 'blinded')) {
+    if (
+      (entry.type === 'vision' ||
+        entry.type === 'sight' ||
+        entry.type === 'darkvision' ||
+        entry.type === 'greater-darkvision' ||
+        entry.type === 'greaterdarkvision' ||
+        entry.type === 'low-light-vision' ||
+        entry.type === 'lowlightvision' ||
+        entry.type.includes('vision') ||
+        entry.type.includes('sight')) &&
+      this.#hasCondition(token.actor, 'blinded')
+    ) {
       return;
     }
 
@@ -892,7 +891,7 @@ export class VisionAnalyzer {
             observer: observer?.name,
             target: target?.name,
             result: false,
-            reason: 'observer has no vision'
+            reason: 'observer has no vision',
           }));
         return false;
       }
@@ -908,30 +907,60 @@ export class VisionAnalyzer {
           observer: observer?.name,
           target: target?.name,
           result: res,
-          method: 'direct'
+          method: 'direct',
         }));
 
       return res;
     } catch (error) {
-      console.warn(`${MODULE_ID} | Error testing line of sight:`, error);
+      console.error(`${MODULE_ID} | Error testing line of sight:`, error);
       return false;
     }
   }
 
   /**
- * True if source can detect target via the 'feelTremor' detection mode.
- * (Respects range/angle/ground rules from the mode; ignores walls because walls:false.)
- */
+   * True if source can detect target via the 'feelTremor' detection mode.
+   * (Respects range/angle/ground rules from the mode; ignores walls because walls:false.)
+   */
   canDetectViaTremor(sourceToken, targetToken) {
-    const modeData = sourceToken.document.detectionModes?.find(dm => dm.id === "feelTremor" && dm.enabled !== false);
+    const modeData = sourceToken.document.detectionModes?.find(
+      (dm) => dm.id === 'feelTremor' && dm.enabled !== false,
+    );
     if (!modeData) return false;
-    const mode = CONFIG.Canvas.detectionModes[modeData.id];
-    const visionSource = sourceToken.vision;
-    if (!mode || !visionSource) return false;
 
-    const point = targetToken.getCenterPoint(targetToken.center.x, targetToken.center.y);
-    const tests = [{ point, los: new Map() }];
-    return !!mode.testVisibility(visionSource, modeData, { object: targetToken, tests });
+    // Manual tremorsense check since vision system might not be available for non-visual tokens
+    let distance;
+    try {
+      distance = this.distanceFeet(sourceToken, targetToken);
+      // If distance calculation fails, try a direct calculation
+      if (distance === Infinity || isNaN(distance)) {
+        const dx = sourceToken.center.x - targetToken.center.x;
+        const dy = sourceToken.center.y - targetToken.center.y;
+        const pixelDistance = Math.sqrt(dx * dx + dy * dy);
+        // Convert pixels to feet (assuming 5ft grid squares)
+        const gridSize = canvas?.scene?.grid?.size || 100;
+        const gridDistance = canvas?.scene?.grid?.distance || 5;
+        distance = (pixelDistance / gridSize) * gridDistance;
+      }
+    } catch (error) {
+      console.error('Distance calculation failed:', error);
+      distance = Infinity;
+    }
+
+    const range = modeData.range || 30;
+    const targetElevation = targetToken?.document?.elevation || 0;
+
+    // Tremorsense requirements:
+    // 1. Within range
+    // 2. Target must be on ground (elevation 0)
+    if (distance > range) {
+      return false;
+    }
+
+    if (targetElevation > 0) {
+      return false;
+    }
+
+    return true;
   }
 
   /**
@@ -947,23 +976,22 @@ export class VisionAnalyzer {
     if (backend?.testCollision) {
       // mode:"any" → return truthy if any wall collides
       return !!backend.testCollision(origin, dest, {
-        type: "sight",
-        mode: "any",
+        type: 'sight',
+        mode: 'any',
         // Supplying the vision source can let the backend apply relevant filters
-        source: sourceToken.vision
+        source: sourceToken.vision,
       });
     }
 
     // Fallback (older/alt builds): use the walls layer API if present
     if (canvas.walls?.checkCollision) {
-      return !!canvas.walls.checkCollision(origin, dest, { type: "sight" });
+      return !!canvas.walls.checkCollision(origin, dest, { type: 'sight' });
     }
     if (canvas.walls?.testCollision) {
       const ray = new foundry.canvas.geometry.Ray(origin, dest);
-      return !!canvas.walls.testCollision(ray, { type: "sight" });
+      return !!canvas.walls.testCollision(ray, { type: 'sight' });
     }
 
-    console.warn("No wall-collision API available");
     return false;
   }
 
@@ -992,7 +1020,7 @@ export class VisionAnalyzer {
       // This should NOT use tremor detection, which ignores walls
       return this.#fallbackWallCollisionCheck(observer, target);
     } catch (error) {
-      console.warn(`${MODULE_ID} | Error in vision polygon check:`, error);
+      console.error(`${MODULE_ID} | Error in vision polygon check:`, error);
       // Fallback to wall collision detection on error
       return this.#fallbackWallCollisionCheck(observer, target);
     }
@@ -1010,17 +1038,17 @@ export class VisionAnalyzer {
       let blocked = false;
 
       try {
-        const sightBlocked = CONFIG.Canvas?.polygonBackends?.sight?.testCollision?.(
-          observer.center,
-          target.center,
-          { type: "sight", mode: "any" }
-        ) ?? false;
+        const sightBlocked =
+          CONFIG.Canvas?.polygonBackends?.sight?.testCollision?.(observer.center, target.center, {
+            type: 'sight',
+            mode: 'any',
+          }) ?? false;
 
-        const soundBlocked = CONFIG.Canvas?.polygonBackends?.sound?.testCollision?.(
-          observer.center,
-          target.center,
-          { type: "sound", mode: "any" }
-        ) ?? false;
+        const soundBlocked =
+          CONFIG.Canvas?.polygonBackends?.sound?.testCollision?.(observer.center, target.center, {
+            type: 'sound',
+            mode: 'any',
+          }) ?? false;
 
         // Only consider truly blocked if BOTH sight and sound are blocked
         // This helps filter out darkness light sources that only block sight
@@ -1051,7 +1079,7 @@ export class VisionAnalyzer {
         }));
       return res;
     } catch (error) {
-      console.warn(`${MODULE_ID} | Error in fallback wall collision check:`, error);
+      console.error(`${MODULE_ID} | Error in fallback wall collision check:`, error);
       return false;
     }
   }
@@ -1230,7 +1258,7 @@ export class VisionAnalyzer {
 
       return false;
     } catch (error) {
-      console.warn(
+      console.error(
         `${MODULE_ID} | Error checking condition ${conditionSlug} for ${actor.name}:`,
         error,
       );
@@ -1248,43 +1276,35 @@ export class VisionAnalyzer {
     const targetElevation = target.document?.elevation || 0;
     const observerElevation = observer.document?.elevation || 0;
 
-    console.log('🔍 VISIONANALYZER: canDetectElevatedTarget called:', {
-      observer: observer.name,
-      target: target.name,
-      observerElevation,
-      targetElevation
-    });
-
     // If both are at same elevation, no elevation issue
     if (targetElevation === observerElevation) {
-      console.log('✅ VISIONANALYZER: Same elevation, returning true');
       return true;
     }
 
     // If target is not elevated, any sense can detect it
     if (targetElevation <= 0) {
-      console.log('✅ VISIONANALYZER: Target not elevated, returning true');
       return true;
     }
 
     // Get comprehensive capabilities to check what senses the observer has
     const capabilities = this.getVisionCapabilities(observer);
-    console.log('🔍 VISIONANALYZER: capabilities:', capabilities);
-    console.log('🔍 VISIONANALYZER: precise senses:', capabilities.precise);
-    console.log('🔍 VISIONANALYZER: imprecise senses:', capabilities.imprecise);
 
     // Check for senses that can work across elevation differences
     // Visual senses (darkvision, low-light vision) can see elevated targets if there's line of sight
     const observerVision = this.getVisionCapabilities(observer);
-    
+
     // Visual senses can detect elevated targets only if there's actual line of sight
     // Having vision but being blocked by walls doesn't help with elevated targets
-    if ((observerVision.hasDarkvision || observerVision.hasLowLightVision || observerVision.hasVision) 
-        && this.hasLineOfSight(observer, target)) {
+    if (
+      (observerVision.hasDarkvision ||
+        observerVision.hasLowLightVision ||
+        observerVision.hasVision) &&
+      this.hasLineOfSight(observer, target)
+    ) {
       return true;
     }
 
-    // Echolocation can detect flying/elevated targets  
+    // Echolocation can detect flying/elevated targets
     if (capabilities.echolocationActive) {
       return true;
     }
@@ -1295,10 +1315,11 @@ export class VisionAnalyzer {
     }
 
     // Check if observer has non-visual senses that can detect elevated targets
-    const hasViableElevationSenses = capabilities.echolocationActive || 
-                                     capabilities.scent ||
-                                     capabilities.hasDarkvision ||
-                                     capabilities.hasLowLightVision;
+    const hasViableElevationSenses =
+      capabilities.echolocationActive ||
+      capabilities.scent ||
+      capabilities.hasDarkvision ||
+      capabilities.hasLowLightVision;
 
     // If observer has viable elevation senses, they can detect elevated targets
     if (hasViableElevationSenses) {
@@ -1334,6 +1355,4 @@ export class VisionAnalyzer {
       return false;
     }
   }
-
-
 }

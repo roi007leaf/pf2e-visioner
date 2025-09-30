@@ -71,7 +71,7 @@ class HoverTooltipsImpl {
         '--pf2e-visioner-tooltip-badge-radius',
         `${borderRadius}px`,
       );
-    } catch (_) { }
+    } catch (_) {}
   }
 }
 export const HoverTooltips = new HoverTooltipsImpl();
@@ -249,11 +249,13 @@ export function initializeHoverTooltips() {
         // small defer to avoid layout thrash if many updates fire
         setTimeout(() => {
           showVisibilityIndicators(tok);
-          try { showCoverIndicators(tok); } catch (_) { }
+          try {
+            showCoverIndicators(tok);
+          } catch (_) {}
         }, 0);
       }
     });
-  } catch (_) { }
+  } catch (_) {}
 
   // Note: Alt key handled via highlightObjects hook registered in main hooks
   // O key event listeners added globally in registerHooks
@@ -327,7 +329,7 @@ export function onHighlightObjects(highlight) {
         showVisibilityIndicators(HoverTooltips.currentHoveredToken);
         try {
           showCoverIndicators(HoverTooltips.currentHoveredToken);
-        } catch (_) { }
+        } catch (_) {}
       }, 50);
     }
   }
@@ -430,7 +432,7 @@ function showVisibilityIndicators(hoveredToken) {
   // Already suppressed above if Alt overlay is active
   try {
     showCoverIndicators(hoveredToken);
-  } catch (_) { }
+  } catch (_) {}
 }
 
 /**
@@ -596,7 +598,7 @@ export function showAutoCoverComputedOverlay(sourceToken) {
         addCoverIndicator(target, sourceToken, state, 'target');
       }
     }
-  } catch (_) { }
+  } catch (_) {}
 }
 
 export function hideAutoCoverComputedOverlay() {
@@ -739,7 +741,7 @@ function addVisibilityIndicator(
       const coverState = coverMap[relationToken.document.id] || 'none';
       if (coverState !== 'none') coverConfig = COVER_STATES[coverState];
     }
-  } catch (_) { }
+  } catch (_) {}
 
   // Compute aligned positions using world->screen transform
   const globalPoint = canvas.tokens.toGlobal(new PIXI.Point(indicator.x, indicator.y));
@@ -782,7 +784,7 @@ function addVisibilityIndicator(
         const coverMap = getCoverMap(coverMapSource);
         coverStateName = coverMap[relationToken.document.id] || 'none';
       }
-    } catch (_) { }
+    } catch (_) {}
     indicator._coverBadgeEl = placeBadge(
       coverLeft,
       centerY,
@@ -813,11 +815,11 @@ function ensureBadgeTicker() {
   HoverTooltips.badgeTicker = () => {
     try {
       updateBadgePositions();
-    } catch (_) { }
+    } catch (_) {}
   };
   try {
     canvas.app.ticker.add(HoverTooltips.badgeTicker);
-  } catch (_) { }
+  } catch (_) {}
 }
 
 function updateBadgePositions() {
@@ -992,7 +994,7 @@ function hideAllVisibilityIndicators() {
         try {
           if (indicator._coverBadgeEl.parentNode)
             indicator._coverBadgeEl.parentNode.removeChild(indicator._coverBadgeEl);
-        } catch (_) { }
+        } catch (_) {}
         delete indicator._coverBadgeEl;
       }
 
@@ -1015,7 +1017,7 @@ function hideAllVisibilityIndicators() {
         indicator._visBadgeEl.parentNode.removeChild(indicator._visBadgeEl);
       }
       delete indicator._visBadgeEl;
-    } catch (_) { }
+    } catch (_) {}
   });
 
   // Clear the map
@@ -1030,7 +1032,7 @@ function hideAllVisibilityIndicators() {
       canvas.app?.ticker?.remove?.(HoverTooltips.badgeTicker);
       HoverTooltips.badgeTicker = null;
     }
-  } catch (_) { }
+  } catch (_) {}
 }
 
 /**
@@ -1039,7 +1041,7 @@ function hideAllVisibilityIndicators() {
 function hideAllCoverIndicators() {
   try {
     game.tooltip.deactivate();
-  } catch (_) { }
+  } catch (_) {}
   HoverTooltips.coverIndicators.forEach((indicator) => {
     try {
       if (indicator._coverBadgeEl && indicator._coverBadgeEl.parentNode) {
@@ -1054,7 +1056,7 @@ function hideAllCoverIndicators() {
       }
       if (indicator.parent) indicator.parent.removeChild(indicator);
       indicator.destroy({ children: true, texture: true, baseTexture: true });
-    } catch (_) { }
+    } catch (_) {}
   });
   HoverTooltips.coverIndicators.clear();
   // Stop ticker if nothing remains
@@ -1067,7 +1069,7 @@ function hideAllCoverIndicators() {
       canvas.app?.ticker?.remove?.(HoverTooltips.badgeTicker);
       HoverTooltips.badgeTicker = null;
     }
-  } catch (_) { }
+  } catch (_) {}
 }
 
 /**

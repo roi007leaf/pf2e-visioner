@@ -28,7 +28,7 @@ export class LightingRasterService {
   async getRayDarknessInfo(observer, target, observerPos, targetPos) {
     const darknessSources = canvas.effects?.darknessSources || [];
     if (darknessSources.length === 0) {
-      return {passesThroughDarkness: false, maxDarknessRank: 0};
+      return { passesThroughDarkness: false, maxDarknessRank: 0 };
     }
 
     // Get the vector from observer to target and its squared length. This will be one of the sides
@@ -42,11 +42,11 @@ export class LightingRasterService {
     const gridSize = canvas.grid?.size || 100;
     const tokenWidth = (target?.document?.width ?? target?.width ?? 1) * gridSize;
     const tokenHeight = (target?.document?.height ?? target?.height ?? 1) * gridSize;
-    const targetRadius = target?.externalRadius ?? (Math.max(tokenWidth, tokenHeight) / 2);
+    const targetRadius = target?.externalRadius ?? Math.max(tokenWidth, tokenHeight) / 2;
 
     // If the two tokens are overlapping, we can't possibly pass through darkness
     if (aLen <= targetRadius) {
-      return {passesThroughDarkness: false, maxDarknessRank: 0};
+      return { passesThroughDarkness: false, maxDarknessRank: 0 };
     }
 
     // Angle from target center to observer center
@@ -57,9 +57,9 @@ export class LightingRasterService {
 
     // Two tangent points
     const angles = [angleToP + theta, angleToP - theta];
-    const tangentPoints = angles.map(a => ({
+    const tangentPoints = angles.map((a) => ({
       x: targetPos.x + targetRadius * Math.cos(a),
-      y: targetPos.y + targetRadius * Math.sin(a)
+      y: targetPos.y + targetRadius * Math.sin(a),
     }));
 
     // Process all non-hidden darkness sources
@@ -102,25 +102,25 @@ export class LightingRasterService {
       // By right triangle properties, the length of the perpindicular side squared is h^2 - (p/|a|)^2
       else {
         p /= aLen; // p is now the true length of the adjacent side
-        if (hDot - p*p > radiusDot) continue;
+        if (hDot - p * p > radiusDot) continue;
       }
 
       // We are close enough to the light to possibly be affected, but before we check the shape, we will
       // use the tangent point on the opposite side of the light from the original ray. This will handle
       // most cases where we get false positives due to the center ray passing just inside the darkness
       // while a portion of the target is still visible outside.
-      const lightCross = hX*aY - hY*aX;
+      const lightCross = hX * aY - hY * aX;
       let tangentPoint = tangentPoints[0];
-      const crossProduct = (tangentPoint.x - observerPos.x)*aY - (tangentPoint.y - observerPos.y)*aX;
-      if (crossProduct * lightCross > 0)
-        tangentPoint = tangentPoints[1];
+      const crossProduct =
+        (tangentPoint.x - observerPos.x) * aY - (tangentPoint.y - observerPos.y) * aX;
+      if (crossProduct * lightCross > 0) tangentPoint = tangentPoints[1];
 
       // Test the ray against the light's edges, any intersection means the ray passes through darkness
       const points = light?.shape?.points ?? [];
       let intersects = false;
       for (let i = 0; i < points.length; i += 2) {
-        const a = {x: points[i], y: points[i+1]};
-        const b = {x: points[(i+2)%points.length], y: points[(i+3)%points.length]};
+        const a = { x: points[i], y: points[i + 1] };
+        const b = { x: points[(i + 2) % points.length], y: points[(i + 3) % points.length] };
         if (foundry.utils.lineSegmentIntersects(observerPos, tangentPoint, a, b)) {
           intersects = true;
           break;
@@ -130,63 +130,67 @@ export class LightingRasterService {
 
       //
       // Read heightened darkness rank from our module flag if present
-      let darknessRank = Number(light.document?.getFlag?.(MODULE_ID, 'darknessRank') || 0) || 0;
-      console.log('🌑 RASTER: Initial rank from light.document:', darknessRank, 'for light:', light.id);
+      let darknessRank = 0;
+      const initialFlagValue = light.document?.getFlag?.(MODULE_ID, 'darknessRank');
+      if (initialFlagValue === '') {
+        darknessRank = 3; // Empty string = rank 3 darkness
+      } else if (initialFlagValue && !isNaN(Number(initialFlagValue))) {
+        darknessRank = Number(initialFlagValue);
+      }
 
       // If no document but has sourceId, try to find the source document and read its flags
       if (darknessRank === 0 && !light.document && light.sourceId) {
-        console.log('🌑 RASTER: No document, trying sourceId:', light.sourceId);
         try {
           // sourceId format is usually "DocumentType.documentId"
           const [docType, docId] = light.sourceId.split('.');
-          console.log('🌑 RASTER: Parsed sourceId - docType:', docType, 'docId:', docId);
           if (docType === 'AmbientLight' && docId) {
             const sourceDocument = canvas.scene.lights.get(docId);
-            console.log('🌑 RASTER: Found source document:', !!sourceDocument, 'id:', sourceDocument?.id);
             if (sourceDocument) {
-              darknessRank = Number(sourceDocument.getFlag?.(MODULE_ID, 'darknessRank') || 0) || 0;
-              console.log('🌑 RASTER: Darkness rank from source document:', darknessRank);
+              const sourceFlagValue = sourceDocument.getFlag?.(MODULE_ID, 'darknessRank');
+              if (sourceFlagValue === '') {
+                darknessRank = 3; // Empty string = rank 3 darkness
+              } else if (sourceFlagValue && !isNaN(Number(sourceFlagValue))) {
+                darknessRank = Number(sourceFlagValue);
+              }
             }
           }
         } catch (error) {
-          console.log('🌑 RASTER: Error parsing sourceId:', error.message);
+          console.error('🌑 RASTER: Error parsing sourceId:', error.message);
         }
       }
 
       // Try alternative method if we still have no rank
       if (darknessRank === 0 && light.sourceId) {
-        console.log('🌑 RASTER: Still no rank, trying alternative lookup for sourceId:', light.sourceId);
         try {
           const [docType, docId] = light.sourceId.split('.');
           if (docType === 'AmbientLight' && docId) {
             const sourceDocument = canvas.scene.lights.get(docId);
             if (sourceDocument) {
-              console.log('🌑 RASTER: Alternative lookup - found document with flags:', Object.keys(sourceDocument.flags || {}));
               if (sourceDocument.flags && sourceDocument.flags[MODULE_ID]) {
-                console.log('🌑 RASTER: Module flags found:', sourceDocument.flags[MODULE_ID]);
-                darknessRank = Number(sourceDocument.flags[MODULE_ID].darknessRank || 0) || 0;
-                console.log('🌑 RASTER: Final darkness rank:', darknessRank);
+                const flagValue = sourceDocument.flags[MODULE_ID].darknessRank;
+                if (flagValue === '') {
+                  darknessRank = 3; // Empty string = rank 3 darkness
+                } else if (flagValue && !isNaN(Number(flagValue))) {
+                  darknessRank = Number(flagValue);
+                }
               }
             }
           }
         } catch (error) {
-          console.log('🌑 RASTER: Alternative lookup error:', error.message);
+          console.error('🌑 RASTER: Alternative lookup error:', error.message);
         }
       }
 
-      // Default to rank 4 if we couldn't find a specific rank (typical darkness spell)
+      // Default to rank 2 if we couldn't find a specific rank (most darkness spells are rank 1-3)
       if (darknessRank === 0) {
-        darknessRank = 4;
-        console.log('🌑 RASTER: No specific rank found, defaulting to rank 4');
+        darknessRank = 2;
       }
 
       // Heightened darkness only applies for rank 4+ spells
       const darknessResult = {
         passesThroughDarkness: true,
         maxDarknessRank: darknessRank,
-      }
-      
-      console.log('🌑 RASTER: Final darkness result:', darknessResult);
+      };
 
       // Keep the darkness source with the highest rank, or if ranks are equal, keep the first one
       if (
@@ -199,6 +203,6 @@ export class LightingRasterService {
 
     // A darkness source cancels out all other illumination
     if (maxDarknessResult) return maxDarknessResult;
-    return {passesThroughDarkness: false, maxDarknessRank: 0};
+    return { passesThroughDarkness: false, maxDarknessRank: 0 };
   }
 }
