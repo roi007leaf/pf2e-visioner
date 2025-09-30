@@ -37,6 +37,9 @@ export class ActorEventHandler {
             changes.items !== undefined;
 
         if (hasConditionChanges) {
+            // Check specifically for invisibility condition changes to set proper flags
+            this._handleInvisibilityConditionChange(actor, changes);
+
             const tokens =
                 canvas.tokens?.placeables.filter(
                     (t) => t.actor?.id === actor.id && !this.exclusionManager.isExcludedToken(t),
@@ -59,6 +62,9 @@ export class ActorEventHandler {
             return;
         }
 
+        // Handle invisibility condition changes in post-update
+        this._handleInvisibilityConditionChange(actor);
+
         // Find tokens for this actor - skip hidden tokens
         const tokens =
             canvas.tokens?.placeables.filter(
@@ -67,6 +73,25 @@ export class ActorEventHandler {
 
         if (tokens.length > 0) {
             tokens.forEach((token) => this.visibilityState.markTokenChangedImmediate(token.document.id));
+        }
+    }
+
+    /**
+     * Handle invisibility condition changes to set proper PF2e transition flags
+     * @param {Actor} actor - The actor whose conditions may have changed
+     * @param {Object} changes - Optional changes object from preUpdateActor
+     * @private
+     */
+    async _handleInvisibilityConditionChange(actor, changes = null) {
+        try {
+            // Import ConditionManager dynamically to avoid circular dependencies
+            const { ConditionManager } = await import('../ConditionManager.js');
+            const conditionManager = ConditionManager.getInstance();
+            
+            // Call the condition manager to handle invisibility flags
+            await conditionManager.handleInvisibilityChange(actor);
+        } catch (error) {
+            console.warn('PF2E Visioner | Failed to handle invisibility condition change:', error);
         }
     }
 }

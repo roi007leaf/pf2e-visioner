@@ -1,3 +1,5 @@
+import { MODULE_ID } from '../../../constants.js';
+
 /**
  * LightingRasterService
  * Fast, approximate darkness sampling along a ray using LightingCalculator.
@@ -129,21 +131,53 @@ export class LightingRasterService {
       //
       // Read heightened darkness rank from our module flag if present
       let darknessRank = Number(light.document?.getFlag?.(MODULE_ID, 'darknessRank') || 0) || 0;
+      console.log('🌑 RASTER: Initial rank from light.document:', darknessRank, 'for light:', light.id);
 
       // If no document but has sourceId, try to find the source document and read its flags
       if (darknessRank === 0 && !light.document && light.sourceId) {
+        console.log('🌑 RASTER: No document, trying sourceId:', light.sourceId);
         try {
           // sourceId format is usually "DocumentType.documentId"
+          const [docType, docId] = light.sourceId.split('.');
+          console.log('🌑 RASTER: Parsed sourceId - docType:', docType, 'docId:', docId);
+          if (docType === 'AmbientLight' && docId) {
+            const sourceDocument = canvas.scene.lights.get(docId);
+            console.log('🌑 RASTER: Found source document:', !!sourceDocument, 'id:', sourceDocument?.id);
+            if (sourceDocument) {
+              darknessRank = Number(sourceDocument.getFlag?.(MODULE_ID, 'darknessRank') || 0) || 0;
+              console.log('🌑 RASTER: Darkness rank from source document:', darknessRank);
+            }
+          }
+        } catch (error) {
+          console.log('🌑 RASTER: Error parsing sourceId:', error.message);
+        }
+      }
+
+      // Try alternative method if we still have no rank
+      if (darknessRank === 0 && light.sourceId) {
+        console.log('🌑 RASTER: Still no rank, trying alternative lookup for sourceId:', light.sourceId);
+        try {
           const [docType, docId] = light.sourceId.split('.');
           if (docType === 'AmbientLight' && docId) {
             const sourceDocument = canvas.scene.lights.get(docId);
             if (sourceDocument) {
-              darknessRank = Number(sourceDocument.getFlag?.(MODULE_ID, 'darknessRank') || 0) || 0;
+              console.log('🌑 RASTER: Alternative lookup - found document with flags:', Object.keys(sourceDocument.flags || {}));
+              if (sourceDocument.flags && sourceDocument.flags[MODULE_ID]) {
+                console.log('🌑 RASTER: Module flags found:', sourceDocument.flags[MODULE_ID]);
+                darknessRank = Number(sourceDocument.flags[MODULE_ID].darknessRank || 0) || 0;
+                console.log('🌑 RASTER: Final darkness rank:', darknessRank);
+              }
             }
           }
         } catch (error) {
-          // Silently continue if we can't parse the sourceId
+          console.log('🌑 RASTER: Alternative lookup error:', error.message);
         }
+      }
+
+      // Default to rank 4 if we couldn't find a specific rank (typical darkness spell)
+      if (darknessRank === 0) {
+        darknessRank = 4;
+        console.log('🌑 RASTER: No specific rank found, defaulting to rank 4');
       }
 
       // Heightened darkness only applies for rank 4+ spells
@@ -151,11 +185,13 @@ export class LightingRasterService {
         passesThroughDarkness: true,
         maxDarknessRank: darknessRank,
       }
+      
+      console.log('🌑 RASTER: Final darkness result:', darknessResult);
 
       // Keep the darkness source with the highest rank, or if ranks are equal, keep the first one
       if (
         maxDarknessResult === null ||
-        darknessResult.darknessRank > maxDarknessResult.darknessRank
+        darknessResult.maxDarknessRank > maxDarknessResult.maxDarknessRank
       ) {
         maxDarknessResult = darknessResult;
       }

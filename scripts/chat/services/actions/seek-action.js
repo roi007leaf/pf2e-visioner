@@ -1,6 +1,7 @@
 import { MODULE_ID, VISIBILITY_STATES } from '../../../constants.js';
 import { appliedSeekChangesByMessage } from '../data/message-cache.js';
 import { ActionHandlerBase } from './base-action.js';
+import { VisionAnalyzer } from '../../../visibility/auto-visibility/VisionAnalyzer.js';
 
 export class SeekActionHandler extends ActionHandlerBase {
   constructor() {
@@ -738,20 +739,32 @@ export class SeekActionHandler extends ActionHandlerBase {
 
   /**
    * Calculate distance between two tokens in feet
+   * Uses standardized distance calculation with proper PF2e grid-to-feet conversion
    * @param {Token} token1 - First token
    * @param {Token} token2 - Second token
    * @returns {number} Distance in feet
    */
   #calculateDistance(token1, token2) {
     try {
-      const dx = token1.center.x - token2.center.x;
-      const dy = token1.center.y - token2.center.y;
-      const px = Math.hypot(dx, dy);
-      const gridSize = canvas?.grid?.size || 100;
-      const unitDist = canvas?.scene?.grid?.distance || 5;
-      return (px / gridSize) * unitDist;
-    } catch {
-      return Infinity;
+      // Use standardized VisionAnalyzer distance calculation
+      const visionAnalyzer = VisionAnalyzer.getInstance();
+      return visionAnalyzer.distanceFeet(token1, token2);
+    } catch (error) {
+      console.error(`${MODULE_ID}: Error calculating distance using VisionAnalyzer:`, error);
+      
+      // Fallback calculation
+      try {
+        const dx = token1.center.x - token2.center.x;
+        const dy = token1.center.y - token2.center.y;
+        const px = Math.hypot(dx, dy);
+        const gridSize = canvas?.grid?.size || 100;
+        const unitDist = canvas?.scene?.grid?.distance || 5;
+        const feetDistance = (px / gridSize) * unitDist;
+        // Apply same 5-foot rounding as VisionAnalyzer
+        return Math.floor(feetDistance / 5) * 5;
+      } catch {
+        return Infinity;
+      }
     }
   }
 

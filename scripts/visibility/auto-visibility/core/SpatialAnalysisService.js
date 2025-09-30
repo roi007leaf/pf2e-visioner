@@ -1,4 +1,5 @@
 import { HashGridIndex } from './HashGridIndex.js';
+import { VisionAnalyzer } from '../VisionAnalyzer.js';
 
 /**
  * SpatialAnalysisService provides spatial analysis functionality.
@@ -7,13 +8,17 @@ import { HashGridIndex } from './HashGridIndex.js';
 export class SpatialAnalysisService {
     #positionManager;
     #exclusionManager;
-    #maxVisibilityDistance = 20; // Default max visibility distance in grid units
+    #maxVisibilityDistance = 100; // Default max visibility distance in feet (updated from grid units)
+    #dynamicMaxDistance = null; // Cache for dynamically calculated max distance
+    #lastDistanceCalcTime = 0; // Timestamp of last distance calculation
     #performanceMetrics;
+    #visionAnalyzer;
 
     constructor(positionManager, exclusionManager, performanceMetrics) {
         this.#positionManager = positionManager;
         this.#exclusionManager = exclusionManager;
         this.#performanceMetrics = performanceMetrics;
+        this.#visionAnalyzer = VisionAnalyzer.getInstance();
     }
 
     /**
@@ -28,12 +33,18 @@ export class SpatialAnalysisService {
             if (!t.actor || this.#exclusionManager.isExcludedToken(t)) return false;
             if (excludeTokenId && t.document.id === excludeTokenId) return false;
 
-            const tokenPos = this.#positionManager.getTokenPosition(t);
-            const distance = Math.hypot(tokenPos.x - position.x, tokenPos.y - position.y);
-
-            // Convert distance to grid units (assuming 1 grid unit = canvas.grid.size pixels)
-            const gridDistance = distance / (canvas.grid?.size || 1);
-            return gridDistance <= maxDistance;
+            // Create a temporary token-like object for the position to use with distanceFeet
+            const positionToken = { center: position, distanceTo: (other) => {
+                const otherCenter = other.center || { x: other.x, y: other.y };
+                const dx = position.x - otherCenter.x;
+                const dy = position.y - otherCenter.y;
+                const pixelDistance = Math.hypot(dx, dy);
+                return pixelDistance / (canvas.grid?.size || 1); // Return in grid squares
+            }};
+            
+            // Use standardized distance calculation
+            const distanceFeet = this.#visionAnalyzer.distanceFeet(positionToken, t);
+            return distanceFeet <= maxDistance;
         }) || [];
 
         this.#performanceMetrics.incrementSpatialOptimizations();
@@ -48,17 +59,13 @@ export class SpatialAnalysisService {
      */
     canTokensSeeEachOther(token1, token2) {
         try {
-            const pos1 = this.#positionManager.getTokenPosition(token1);
-            const pos2 = this.#positionManager.getTokenPosition(token2);
+            // Use standardized distance calculation in feet
+            const distanceFeet = this.#visionAnalyzer.distanceFeet(token1, token2);
 
-            // Quick distance check first
-            const distance = Math.hypot(pos1.x - pos2.x, pos1.y - pos2.y);
-            const gridDistance = distance / (canvas.grid?.size || 1);
-
-            if (gridDistance > this.#maxVisibilityDistance) {
+            if (distanceFeet > this.#maxVisibilityDistance) {
                 // Still need to check if special senses have longer ranges
-                if (!this._hasSpecialSenseInRange(token1, token2, gridDistance) &&
-                    !this._hasSpecialSenseInRange(token2, token1, gridDistance)) {
+                if (!this._hasSpecialSenseInRange(token1, token2, distanceFeet) &&
+                    !this._hasSpecialSenseInRange(token2, token1, distanceFeet)) {
                     return false;
                 }
             }
@@ -69,6 +76,10 @@ export class SpatialAnalysisService {
 
             if (walls.length > 0) {
                 try {
+                    // Get token positions for wall collision check
+                    const pos1 = this.#positionManager.getTokenPosition(token1);
+                    const pos2 = this.#positionManager.getTokenPosition(token2);
+                    
                     // Create Ray using the correct FoundryVTT API
                     const ray = new foundry.canvas.geometry.Ray(pos1, pos2);
                     const wallsInBounds = canvas.walls.quadtree.getObjects(ray.bounds);
@@ -99,8 +110,8 @@ export class SpatialAnalysisService {
             }
 
             // Walls block normal sight - check if either token has special senses that work through walls
-            return this._hasSpecialSenseInRange(token1, token2, gridDistance) ||
-                this._hasSpecialSenseInRange(token2, token1, gridDistance);
+            return this._hasSpecialSenseInRange(token1, token2, distanceFeet) ||
+                this._hasSpecialSenseInRange(token2, token1, distanceFeet);
         } catch {
             // If we can't determine, assume they can see (conservative approach)
             return true;
@@ -111,15 +122,15 @@ export class SpatialAnalysisService {
      * Check if observer has special senses that can detect target at given distance
      * @param {Token} observer - Observing token
      * @param {Token} target - Target token
-     * @param {number} gridDistance - Distance between tokens in grid units
+     * @param {number} distanceFeet - Distance between tokens in feet
      * @returns {boolean} True if observer has special sense that can detect target
      * @private
      */
-    _hasSpecialSenseInRange(observer, target, gridDistance) {
+    _hasSpecialSenseInRange(observer, target, distanceFeet) {
         try {
             // Check for tremorsense (works through walls, ground contact required)
             const tremorsense = this._getSenseRange(observer, 'tremorsense');
-            if (tremorsense > 0 && gridDistance <= tremorsense) {
+            if (tremorsense > 0 && distanceFeet <= tremorsense) {
                 // Tremorsense works if both tokens are on the ground
                 const observerElevation = observer.document?.elevation || 0;
                 const targetElevation = target.document?.elevation || 0;
@@ -130,13 +141,13 @@ export class SpatialAnalysisService {
 
             // Check for echolocation (works through some obstacles)
             const echolocation = this._getSenseRange(observer, 'echolocation');
-            if (echolocation > 0 && gridDistance <= echolocation) {
+            if (echolocation > 0 && distanceFeet <= echolocation) {
                 return true;
             }
 
             // Check for lifesense (detects living creatures through walls)
             const lifesense = this._getSenseRange(observer, 'lifesense');
-            if (lifesense > 0 && gridDistance <= lifesense) {
+            if (lifesense > 0 && distanceFeet <= lifesense) {
                 // Only works on living creatures
                 if (this._isLivingCreature(target)) {
                     return true;
@@ -145,7 +156,7 @@ export class SpatialAnalysisService {
 
             // Check for other precise non-visual senses
             const senseAcuity = this._getSenseRange(observer, 'senseAcuity');
-            if (senseAcuity > 0 && gridDistance <= senseAcuity) {
+            if (senseAcuity > 0 && distanceFeet <= senseAcuity) {
                 return true;
             }
 
@@ -159,7 +170,7 @@ export class SpatialAnalysisService {
      * Get the range of a specific sense for a token
      * @param {Token} token - Token to check senses for
      * @param {string} senseType - Type of sense to check
-     * @returns {number} Range in grid units, 0 if sense not present
+     * @returns {number} Range in feet, 0 if sense not present
      * @private
      */
     _getSenseRange(token, senseType) {
@@ -397,17 +408,32 @@ export class SpatialAnalysisService {
             metrics.tokensChecked++;
             const tokenPos = this.#positionManager.getTokenPosition(token);
 
-            // Quick distance check (avoid duplicate work from getTokensInRange)
-            const oldDistance = Math.hypot(tokenPos.x - oldPos.x, tokenPos.y - oldPos.y);
-            const newDistance = Math.hypot(tokenPos.x - newPos.x, tokenPos.y - newPos.y);
+            // Quick distance check using standardized feet calculation
+            // Create temporary token-like objects for distance calculation
+            const oldPosToken = { center: oldPos, distanceTo: (other) => {
+                const otherCenter = other.center || { x: other.x, y: other.y };
+                const dx = oldPos.x - otherCenter.x;
+                const dy = oldPos.y - otherCenter.y;
+                const pixelDistance = Math.hypot(dx, dy);
+                return pixelDistance / (canvas.grid?.size || 1); // Return in grid squares
+            }};
+            const newPosToken = { center: newPos, distanceTo: (other) => {
+                const otherCenter = other.center || { x: other.x, y: other.y };
+                const dx = newPos.x - otherCenter.x;
+                const dy = newPos.y - otherCenter.y;
+                const pixelDistance = Math.hypot(dx, dy);
+                return pixelDistance / (canvas.grid?.size || 1); // Return in grid squares
+            }};
+            
+            const oldDistanceFeet = this.#visionAnalyzer.distanceFeet(token, oldPosToken);
+            const newDistanceFeet = this.#visionAnalyzer.distanceFeet(token, newPosToken);
             metrics.distanceChecks += 2;
-            const maxGridDistance = this.#maxVisibilityDistance * (canvas.grid?.size || 1);
 
             const canSeeOld =
-                oldDistance <= maxGridDistance &&
+                oldDistanceFeet <= this.#maxVisibilityDistance &&
                 this.canTokenSeePositionOptimized(token, oldPos, metrics);
             const canSeeNew =
-                newDistance <= maxGridDistance &&
+                newDistanceFeet <= this.#maxVisibilityDistance &&
                 this.canTokenSeePositionOptimized(token, newPos, metrics);
             metrics.losChecks += 2;
 
@@ -496,8 +522,63 @@ export class SpatialAnalysisService {
         }
     }
 
+    /**
+     * Calculate the maximum visibility distance considering all special senses in the scene
+     * @returns {number} Maximum visibility distance in grid units
+     * @private
+     */
+    #calculateDynamicMaxDistance() {
+        const now = Date.now();
+        
+        // Cache the calculation for 5 seconds to avoid recalculating every frame
+        if (this.#dynamicMaxDistance !== null && (now - this.#lastDistanceCalcTime) < 5000) {
+            return this.#dynamicMaxDistance;
+        }
+
+        let maxDistance = this.#maxVisibilityDistance; // Start with base distance
+        
+        try {
+            const tokens = canvas.tokens?.placeables || [];
+            
+            for (const token of tokens) {
+                if (!token.actor) continue;
+                
+                // Check for tremorsense
+                const tremorsenseRange = this._getSenseRange(token, 'tremorsense');
+                if (tremorsenseRange > 0) {
+                    maxDistance = Math.max(maxDistance, tremorsenseRange);
+                }
+                
+                // Check for echolocation
+                const echolocationRange = this._getSenseRange(token, 'echolocation');
+                if (echolocationRange > 0) {
+                    maxDistance = Math.max(maxDistance, echolocationRange);
+                }
+                
+                // Check for lifesense
+                const lifesenseRange = this._getSenseRange(token, 'lifesense');
+                if (lifesenseRange > 0) {
+                    maxDistance = Math.max(maxDistance, lifesenseRange);
+                }
+                
+                // Check for blindsense/blindsight
+                const blindsenseRange = this._getSenseRange(token, 'blindsense') || this._getSenseRange(token, 'blindsight');
+                if (blindsenseRange > 0) {
+                    maxDistance = Math.max(maxDistance, blindsenseRange);
+                }
+            }
+        } catch (error) {
+            console.warn('PF2E Visioner | Error calculating dynamic max distance:', error);
+        }
+        
+        this.#dynamicMaxDistance = maxDistance;
+        this.#lastDistanceCalcTime = now;
+        
+        return maxDistance;
+    }
+
     getMaxVisibilityDistance() {
-        return this.#maxVisibilityDistance;
+        return this.#calculateDynamicMaxDistance();
     }
 
 }

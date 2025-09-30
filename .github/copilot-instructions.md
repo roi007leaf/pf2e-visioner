@@ -50,6 +50,7 @@ Contract for state
 - Run linting and keep ESModule imports tidy.
 - Prefer deterministic tests; use provided Foundry/PF2e mocks.
 - Never change production code to accommodate tests. fix the test instead.
+- Never run a test with debug logs, if debug is needed set debugger expressions and tell me to run in debug and ill tell you waht you need to know
 
 ## Do/Don’t examples
 Do

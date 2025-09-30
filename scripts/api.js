@@ -1118,13 +1118,8 @@ export const autoVisibility = {
       const canDetectType = visionAnalyzer.canDetectWithLifesense(target);
       const canDetectInRange = visionAnalyzer.canDetectWithLifesenseInRange(observer, target);
 
-      // Calculate distance manually since #distanceFeet is private
-      const dx = observer.center.x - target.center.x;
-      const dy = observer.center.y - target.center.y;
-      const px = Math.hypot(dx, dy);
-      const gridSize = canvas?.grid?.size || 100;
-      const unitDist = canvas?.scene?.grid?.distance || 5;
-      const distance = (px / gridSize) * unitDist;
+      // Use standardized distance calculation (now that distanceFeet is public)
+      const distance = visionAnalyzer.distanceFeet(observer, target);
 
       return {
         observer: observer.name,

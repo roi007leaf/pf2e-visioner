@@ -87,6 +87,12 @@ export class EffectEventHandler {
             effectName.includes('deaf') ||
             effectName.includes('true seeing');
 
+        // Handle invisibility condition changes specifically
+        const isInvisibilityEffect = effectName.includes('invisible');
+        if (isInvisibilityEffect && effect.parent?.documentName === 'Actor') {
+            this._handleInvisibilityEffectChange(effect.parent, action);
+        }
+
         // Strong hint that this effect toggles a LIGHT/DARKNESS emitter on the token
         const lightEmitterHint =
             effectName.includes('light') ||
@@ -126,6 +132,25 @@ export class EffectEventHandler {
                     );
                 }
             }
+        }
+    }
+
+    /**
+     * Handle invisibility active effect changes to set proper PF2e transition flags
+     * @param {Actor} actor - The actor whose invisibility effect changed
+     * @param {string} action - The action performed ('created', 'updated', 'deleted')
+     * @private
+     */
+    async _handleInvisibilityEffectChange(actor, action) {
+        try {
+            // Import ConditionManager dynamically to avoid circular dependencies
+            const { ConditionManager } = await import('../ConditionManager.js');
+            const conditionManager = ConditionManager.getInstance();
+            
+            // Call the condition manager to handle invisibility flags
+            await conditionManager.handleInvisibilityChange(actor);
+        } catch (error) {
+            console.warn('PF2E Visioner | Failed to handle invisibility effect change:', error);
         }
     }
 }
