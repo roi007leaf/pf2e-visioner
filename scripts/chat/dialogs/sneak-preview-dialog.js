@@ -24,7 +24,8 @@ export class SneakPreviewDialog extends BaseActionDialog {
 
     // Check if this is an end-of-turn dialog
     const isEndOfTurnDialog = options?.isEndOfTurnDialog || false;
-    const dialogTitle = options?.title || (isEndOfTurnDialog ? 'End-of-Turn Stealth Validation' : 'Sneak Results');
+    const dialogTitle =
+      options?.title || (isEndOfTurnDialog ? 'End-of-Turn Stealth Validation' : 'Sneak Results');
 
     super({
       id: `sneak-preview-${sneakingToken.id}${isEndOfTurnDialog ? '-end-of-turn' : ''}`,
@@ -205,7 +206,8 @@ export class SneakPreviewDialog extends BaseActionDialog {
     // Determine movement type from token's current movement action (default to walk)
     let movementType = 'walk';
     try {
-      const raw = this.sneakingToken?.document?.movementAction || this.sneakingToken?.document?.movementType;
+      const raw =
+        this.sneakingToken?.document?.movementAction || this.sneakingToken?.document?.movementType;
       const v = String(raw || '').toLowerCase();
       if (['walk', 'land', 'ground', 'move'].includes(v)) movementType = 'walk';
       else if (['stride'].includes(v)) movementType = 'stride';
@@ -217,7 +219,7 @@ export class SneakPreviewDialog extends BaseActionDialog {
       else if (['teleport'].includes(v)) movementType = 'teleport';
       else if (['deploy'].includes(v)) movementType = 'deploy';
       else if (['travel'].includes(v)) movementType = 'travel';
-    } catch { }
+    } catch {}
 
     // Capture current end positions FIRST, before processing outcomes
     await this._captureCurrentEndPositionsForOutcomes(this.outcomes);
@@ -241,21 +243,32 @@ export class SneakPreviewDialog extends BaseActionDialog {
         this.ignoreAllies,
         'token',
       );
-    } catch { }
+    } catch {}
 
-    // Apply detection filtering if enabled (Note: Sneak uses 'token' property, not 'target')
+    // Apply viewport filtering if enabled (Note: Sneak uses 'token' property, not 'target')
     if (this.filterByDetection && this.sneakingToken) {
       try {
         const { filterOutcomesByDetection } = await import('../services/infra/shared-utils.js');
-        filteredOutcomes = await filterOutcomesByDetection(filteredOutcomes, this.sneakingToken, 'token', false, true, 'target_to_observer');
-      } catch { /* Detection filtering is non-critical */ }
+        filteredOutcomes = await filterOutcomesByDetection(
+          filteredOutcomes,
+          this.sneakingToken,
+          'token',
+          false,
+          true,
+          'target_to_observer',
+        );
+      } catch {
+        /* Viewport filtering is non-critical */
+      }
     }
 
     // Apply defeated token filtering (exclude dead/unconscious tokens)
     try {
       const { filterOutcomesByDefeated } = await import('../services/infra/shared-utils.js');
       filteredOutcomes = filterOutcomesByDefeated(filteredOutcomes, 'token');
-    } catch { /* Defeated filtering is non-critical */ }
+    } catch {
+      /* Defeated filtering is non-critical */
+    }
 
     // Preserve any overrides the GM selected in the previous render
     try {
@@ -265,7 +278,7 @@ export class SneakPreviewDialog extends BaseActionDialog {
         const overrideState = existing?.overrideState ?? o?.overrideState ?? null;
         return { ...o, overrideState };
       });
-    } catch { }
+    } catch {}
 
     const cfg = (s) => this.visibilityConfig(s);
 
@@ -285,7 +298,7 @@ export class SneakPreviewDialog extends BaseActionDialog {
           this.sneakingToken,
         );
         outcome.liveEndVisibility = liveEndVis;
-      } catch { }
+      } catch {}
       if (outcome._tsFreeSneak) {
         // For Terrain Stalker free-sneak, force qualifications to pass for UI and keep newVisibility
         outcome._featPositionOverride = {
@@ -322,7 +335,7 @@ export class SneakPreviewDialog extends BaseActionDialog {
             inNaturalTerrain: inNatural,
             impreciseOnly: outcome?.impreciseOnly || false,
           });
-        } catch { }
+        } catch {}
         // Stash for UI rendering
         outcome._featPositionOverride = effective;
 
@@ -336,7 +349,11 @@ export class SneakPreviewDialog extends BaseActionDialog {
 
           // Use standard calculation when prerequisites are met
           const { getDefaultNewStateFor } = await import('../services/data/action-state-config.js');
-          const calculatedVisibility = getDefaultNewStateFor('sneak', currentVisibility, rollOutcome);
+          const calculatedVisibility = getDefaultNewStateFor(
+            'sneak',
+            currentVisibility,
+            rollOutcome,
+          );
           outcome.newVisibility = calculatedVisibility || currentVisibility;
         }
       }
@@ -355,8 +372,6 @@ export class SneakPreviewDialog extends BaseActionDialog {
 
     // Process outcomes to add additional properties including position data
     let processedOutcomes = filteredOutcomes.map((outcome) => {
-
-
       // Get current visibility state - how this observer sees the sneaking token
       const currentVisibility =
         getVisibilityBetween(outcome.token, this.sneakingToken) ||
@@ -376,7 +391,8 @@ export class SneakPreviewDialog extends BaseActionDialog {
       const hasSneakyFeat = turnSneakTracker.hasSneakyFeat(this.sneakingToken);
 
       // Check if this token was already deferred in previous sneak actions this turn
-      const wasPreviouslyDeferred = turnSneakTracker?.isObserverDeferred?.(this.sneakingToken, outcome.token) || false;
+      const wasPreviouslyDeferred =
+        turnSneakTracker?.isObserverDeferred?.(this.sneakingToken, outcome.token) || false;
 
       // Get position transition data for this outcome (needed for eligibility check)
       const positionTransition = this._getPositionTransitionForToken(outcome.token);
@@ -387,7 +403,12 @@ export class SneakPreviewDialog extends BaseActionDialog {
       );
 
       // Check Sneaky feat eligibility: start position must qualify and (sneak succeeded but end position doesn't qualify)
-      const canDefer = this._isEligibleForSneakyDefer(outcome, positionDisplay, hasSneakyFeat, wasPreviouslyDeferred);
+      const canDefer = this._isEligibleForSneakyDefer(
+        outcome,
+        positionDisplay,
+        hasSneakyFeat,
+        wasPreviouslyDeferred,
+      );
 
       // Is deferred either in current dialog or from previous sneak actions
       const isDeferred = this._deferredChecks?.has(outcome.token.id) || wasPreviouslyDeferred;
@@ -432,7 +453,7 @@ export class SneakPreviewDialog extends BaseActionDialog {
           }
         });
       }
-    } catch { }
+    } catch {}
 
     // Sort outcomes to prioritize qualifying positions (green checkmarks) at the top
     let sortedOutcomes = this._sortOutcomesByQualification(processedOutcomes);
@@ -442,7 +463,7 @@ export class SneakPreviewDialog extends BaseActionDialog {
       if (this.showOnlyChanges) {
         sortedOutcomes = sortedOutcomes.filter((o) => !!o.hasActionableChange);
       }
-    } catch { }
+    } catch {}
 
     // Update original outcomes with hasActionableChange for Apply All button logic
     sortedOutcomes.forEach((processedOutcome, index) => {
@@ -456,9 +477,9 @@ export class SneakPreviewDialog extends BaseActionDialog {
       name: this.sneakingToken.name,
       image: this.resolveTokenImage(this.sneakingToken),
       actionType: 'sneak',
-      actionLabel: this.isEndOfTurnDialog ?
-        'End-of-turn position validation for Sneaky/Very Sneaky feat' :
-        'Enhanced sneak action results with position tracking',
+      actionLabel: this.isEndOfTurnDialog
+        ? 'End-of-turn position validation for Sneaky/Very Sneaky feat'
+        : 'Enhanced sneak action results with position tracking',
     };
 
     context.sneakingToken = this.sneakingToken;
@@ -472,12 +493,16 @@ export class SneakPreviewDialog extends BaseActionDialog {
 
     // Bulk defer functionality
     const hasSneakyFeat = turnSneakTracker.hasSneakyFeat(this.sneakingToken);
-    const deferableOutcomes = sortedOutcomes.filter(outcome => outcome.canDefer && !outcome.isDeferred);
+    const deferableOutcomes = sortedOutcomes.filter(
+      (outcome) => outcome.canDefer && !outcome.isDeferred,
+    );
     context.canBulkDefer = hasSneakyFeat && !this.isEndOfTurnDialog;
     context.hasDeferableTokens = deferableOutcomes.length > 0;
 
     // Bulk undefer functionality
-    const deferredOutcomes = sortedOutcomes.filter(outcome => outcome.isDeferred || this._deferredChecks?.has(outcome.token?.id));
+    const deferredOutcomes = sortedOutcomes.filter(
+      (outcome) => outcome.isDeferred || this._deferredChecks?.has(outcome.token?.id),
+    );
     context.canBulkUndefer = hasSneakyFeat && !this.isEndOfTurnDialog;
     context.hasDeferredTokens = deferredOutcomes.length > 0;
 
@@ -508,7 +533,7 @@ export class SneakPreviewDialog extends BaseActionDialog {
         );
         if (Number.isFinite(Number(flagVal)) && Number(flagVal) > 0)
           originalSpeed = Number(flagVal);
-      } catch { }
+      } catch {}
 
       const maxFeet = await SneakSpeedService.getSneakMaxDistanceFeet(this.sneakingToken);
 
@@ -518,7 +543,7 @@ export class SneakPreviewDialog extends BaseActionDialog {
       try {
         multiplier = FeatsHandler.getSneakSpeedMultiplier(this.sneakingToken) ?? 0.5;
         bonusFeet = FeatsHandler.getSneakDistanceBonusFeet(this.sneakingToken) ?? 0;
-      } catch { }
+      } catch {}
 
       const explanations = [];
       explanations.push(`Base Speed: ${originalSpeed} ft`);
@@ -565,7 +590,7 @@ export class SneakPreviewDialog extends BaseActionDialog {
         const sobj = speeds?.[key] || null;
         speedVal = Number(sobj?.value ?? 0) || 0;
         supported = speedVal > 0;
-      } catch { }
+      } catch {}
 
       context.sneakDistance = {
         maxFeet,
@@ -579,9 +604,11 @@ export class SneakPreviewDialog extends BaseActionDialog {
         supported,
         speed: speedVal,
         statusClass: supported ? 'ok' : 'warn',
-        supportTooltip: supported ? `${movementLabel} speed: ${speedVal} ft` : `${movementLabel} speed unavailable for this actor`,
+        supportTooltip: supported
+          ? `${movementLabel} speed: ${speedVal} ft`
+          : `${movementLabel} speed unavailable for this actor`,
       };
-    } catch { }
+    } catch {}
 
     // Compute feat prerequisite-relaxation badges (Terrain Stalker, Vanish into the Land, Very Very Sneaky, Legendary Sneak, Ceaseless Shadows, Distracting Shadows)
     try {
@@ -604,9 +631,10 @@ export class SneakPreviewDialog extends BaseActionDialog {
           key: isVery ? 'very-sneaky' : 'sneaky',
           icon: 'fas fa-user-ninja',
           label: isVery ? 'Very Sneaky' : 'Sneaky',
-          tooltip: sneakCount > 1
-            ? `${isVery ? 'Very Sneaky' : 'Sneaky'} feat active - End position checks deferred to turn end (${sneakCount} consecutive sneaks this turn)`
-            : `${isVery ? 'Very Sneaky' : 'Sneaky'} feat available - Consecutive sneaks will defer end position checks`
+          tooltip:
+            sneakCount > 1
+              ? `${isVery ? 'Very Sneaky' : 'Sneaky'} feat active - End position checks deferred to turn end (${sneakCount} consecutive sneaks this turn)`
+              : `${isVery ? 'Very Sneaky' : 'Sneaky'} feat available - Consecutive sneaks will defer end position checks`,
         });
       }
       // Ceaseless Shadows: removes cover/concealment requirement entirely
@@ -649,7 +677,11 @@ export class SneakPreviewDialog extends BaseActionDialog {
         if (has('terrain-stalker')) {
           const selections = FeatsHandler.getTerrainStalkerSelections(actorOrToken) || [];
           const active = selections.filter((sel) => {
-            try { return FeatsHandler.isEnvironmentActive(actorOrToken, sel); } catch { return false; }
+            try {
+              return FeatsHandler.isEnvironmentActive(actorOrToken, sel);
+            } catch {
+              return false;
+            }
           });
           if (active.length) {
             const selectionText = active.join(', ');
@@ -662,7 +694,9 @@ export class SneakPreviewDialog extends BaseActionDialog {
               const sceneFallback = Array.from(ctx.sceneTypes || []);
               const envList = regionTypes.length ? regionTypes : sceneFallback;
               if (envList.length) environmentsText = envList.join(', ');
-            } catch { /* non-critical */ }
+            } catch {
+              /* non-critical */
+            }
             badges.push({
               key: 'terrain-stalker',
               icon: 'fas fa-tree',
@@ -676,7 +710,7 @@ export class SneakPreviewDialog extends BaseActionDialog {
             });
           }
         }
-      } catch { }
+      } catch {}
       // Vanish into the Land: active in selected difficult terrain for Terrain Stalker
       try {
         if (has('vanish-into-the-land')) {
@@ -686,8 +720,12 @@ export class SneakPreviewDialog extends BaseActionDialog {
             try {
               // Prefer precise difficult terrain check (movement-aware)
               const env = (await import('../../utils/environment.js')).default;
-              const matches = env.getMatchingEnvironmentRegions(actorOrToken, selection, { movementType }) || [];
-              if (matches.length > 0) { active = true; break; }
+              const matches =
+                env.getMatchingEnvironmentRegions(actorOrToken, selection, { movementType }) || [];
+              if (matches.length > 0) {
+                active = true;
+                break;
+              }
             } catch {
               active = active || FeatsHandler.isEnvironmentActive(actorOrToken, selection);
             }
@@ -705,7 +743,7 @@ export class SneakPreviewDialog extends BaseActionDialog {
             });
           }
         }
-      } catch { }
+      } catch {}
       // Distracting Shadows: show informational badge when feat present (contextual per observer)
       if (has('distracting-shadows')) {
         badges.push({
@@ -720,15 +758,15 @@ export class SneakPreviewDialog extends BaseActionDialog {
         });
       }
       context.prereqBadges = badges;
-    } catch { }
+    } catch {}
 
     // Add deferred checks information for global display
     try {
       const turnState = turnSneakTracker?.getTurnSneakState?.(this.sneakingToken);
       if (turnState && turnState.isActive) {
         const hasSneakyFeat = turnSneakTracker.hasSneakyFeat(this.sneakingToken);
-        const hasAnyDeferredChecks = processedOutcomes.some(outcome =>
-          turnSneakTracker.shouldDeferEndPositionCheck(this.sneakingToken, outcome.token)
+        const hasAnyDeferredChecks = processedOutcomes.some((outcome) =>
+          turnSneakTracker.shouldDeferEndPositionCheck(this.sneakingToken, outcome.token),
         );
 
         if (hasSneakyFeat && hasAnyDeferredChecks) {
@@ -762,7 +800,7 @@ export class SneakPreviewDialog extends BaseActionDialog {
     // Update bulk defer button asynchronously (don't block render)
     try {
       await this._updateBulkDeferButton();
-    } catch { }
+    } catch {}
 
     try {
       const cb = this.element.querySelector('input[data-action="toggleIgnoreAllies"]');
@@ -778,7 +816,7 @@ export class SneakPreviewDialog extends BaseActionDialog {
             })
             .catch(() => this.render({ force: true }));
         });
-    } catch { }
+    } catch {}
     // Wire Hide Foundry-hidden visual filter toggle
     try {
       const cbh = this.element.querySelector('input[data-action="toggleHideFoundryHidden"]');
@@ -787,14 +825,14 @@ export class SneakPreviewDialog extends BaseActionDialog {
           this.hideFoundryHidden = !!cbh.checked;
           try {
             await game.settings.set(MODULE_ID, 'hideFoundryHiddenTokens', this.hideFoundryHidden);
-          } catch { }
+          } catch {}
           // Recompute outcomes to apply visual filter and keep positions updated
           const list = await this._recomputeOutcomesWithPositionData();
           if (Array.isArray(list)) this.outcomes = list;
           this.render({ force: true });
         });
       }
-    } catch { }
+    } catch {}
   }
 
   /**
@@ -815,7 +853,7 @@ export class SneakPreviewDialog extends BaseActionDialog {
         if (!tokenId || !row) return;
 
         // Find the outcome for this token
-        const outcome = this.outcomes.find(o => o.token?.id === tokenId);
+        const outcome = this.outcomes.find((o) => o.token?.id === tokenId);
         if (!outcome) return;
 
         // Toggle defer state
@@ -853,7 +891,7 @@ export class SneakPreviewDialog extends BaseActionDialog {
             outcome._featPositionOverride = {
               startQualifies: this._startPositionQualifiesForSneak(outcome.token, outcome),
               endQualifies: this._endPositionQualifiesForSneak(outcome.token, outcome),
-              reason: 'Deferred position qualifications'
+              reason: 'Deferred position qualifications',
             };
           }
 
@@ -866,10 +904,15 @@ export class SneakPreviewDialog extends BaseActionDialog {
             const positionData = {
               position: positionTransition?.endPosition,
               visibility: outcome.newVisibility,
-              coverState: outcome.endCover || 'none'
+              coverState: outcome.endCover || 'none',
             };
 
-            turnSneakTracker.recordDeferredCheck(this.sneakingToken, outcome.token, positionData, outcome);
+            turnSneakTracker.recordDeferredCheck(
+              this.sneakingToken,
+              outcome.token,
+              positionData,
+              outcome,
+            );
           } catch (error) {
             // Failed to record deferred check - continue silently
           }
@@ -917,7 +960,7 @@ export class SneakPreviewDialog extends BaseActionDialog {
 
     // Exclude deferred outcomes from Apply All operations
     if (this._deferredChecks && this._deferredChecks.size > 0) {
-      filteredOutcomes = filteredOutcomes.filter(outcome => {
+      filteredOutcomes = filteredOutcomes.filter((outcome) => {
         const tokenId = outcome.token?.id || outcome.target?.id;
         return tokenId && !this._deferredChecks.has(tokenId);
       });
@@ -952,7 +995,9 @@ export class SneakPreviewDialog extends BaseActionDialog {
       if (!outcome.canDefer) return;
 
       // Find the corresponding defer button in the DOM
-      const button = this.element.querySelector(`[data-action="toggleDefer"][data-token-id="${tokenId}"]`);
+      const button = this.element.querySelector(
+        `[data-action="toggleDefer"][data-token-id="${tokenId}"]`,
+      );
       const row = button?.closest('tr');
 
       if (!button || !row) return;
@@ -970,10 +1015,15 @@ export class SneakPreviewDialog extends BaseActionDialog {
         const positionData = {
           position: positionTransition?.endPosition,
           visibility: outcome.newVisibility,
-          coverState: outcome.endCover || 'none'
+          coverState: outcome.endCover || 'none',
         };
 
-        turnSneakTracker.recordDeferredCheck(this.sneakingToken, outcome.token, positionData, outcome);
+        turnSneakTracker.recordDeferredCheck(
+          this.sneakingToken,
+          outcome.token,
+          positionData,
+          outcome,
+        );
       } catch (error) {
         // Failed to record deferred check for bulk defer - continue silently
       }
@@ -987,12 +1037,16 @@ export class SneakPreviewDialog extends BaseActionDialog {
 
       // Show notification about successful deferrals
       if (typeof ui !== 'undefined' && ui.notifications) {
-        ui.notifications.info(`Deferred ${deferredCount} eligible position check${deferredCount !== 1 ? 's' : ''} to end of turn (Sneaky feat).`);
+        ui.notifications.info(
+          `Deferred ${deferredCount} eligible position check${deferredCount !== 1 ? 's' : ''} to end of turn (Sneaky feat).`,
+        );
       }
     } else {
       // Show notification when no eligible outcomes found
       if (typeof ui !== 'undefined' && ui.notifications) {
-        ui.notifications.warn('No eligible outcomes found for deferral. Sneaky feat only applies to successful sneaks with failing end positions.');
+        ui.notifications.warn(
+          'No eligible outcomes found for deferral. Sneaky feat only applies to successful sneaks with failing end positions.',
+        );
       }
     }
   }
@@ -1040,7 +1094,9 @@ export class SneakPreviewDialog extends BaseActionDialog {
       }
 
       // Update DOM elements
-      const button = this.element.querySelector(`[data-action="toggleDefer"][data-token-id="${tokenId}"]`);
+      const button = this.element.querySelector(
+        `[data-action="toggleDefer"][data-token-id="${tokenId}"]`,
+      );
       const row = button?.closest('tr');
 
       if (button && row) {
@@ -1072,12 +1128,12 @@ export class SneakPreviewDialog extends BaseActionDialog {
 
           // Recalculate only end position qualification with current position
           const positionTransition = this._getPositionTransitionForToken(outcome.token);
-          const endQualifies = positionTransition ?
-            this._endPositionQualifiesForSneak(outcome.token, positionTransition.endPosition) :
-            false;
+          const endQualifies = positionTransition
+            ? this._endPositionQualifiesForSneak(outcome.token, positionTransition.endPosition)
+            : false;
 
           // Update the outcome with preserved start data and recalculated end data
-          const outcomeIndex = this.outcomes.findIndex(o => o.token?.id === tokenId);
+          const outcomeIndex = this.outcomes.findIndex((o) => o.token?.id === tokenId);
           if (outcomeIndex >= 0) {
             this.outcomes[outcomeIndex] = {
               ...this.outcomes[outcomeIndex],
@@ -1085,7 +1141,7 @@ export class SneakPreviewDialog extends BaseActionDialog {
               startCover: preservedStartCover,
               startVisibility: preservedStartVisibility,
               endQualifies: endQualifies,
-              isDeferred: false // No longer deferred
+              isDeferred: false, // No longer deferred
             };
           }
         } catch (error) {
@@ -1104,12 +1160,14 @@ export class SneakPreviewDialog extends BaseActionDialog {
       this._setBulkUndeferButtonToRestoreMode();
 
       // Re-render to update button states and visibility for all changes
-      this.render(false, { force: true }).catch(error => {
+      this.render(false, { force: true }).catch((error) => {
         // Error during bulk undefer render - continue silently
       });
 
       if (typeof ui !== 'undefined' && ui.notifications) {
-        ui.notifications.info(`Bulk undeferred ${undeferredCount} token${undeferredCount === 1 ? '' : 's'}`);
+        ui.notifications.info(
+          `Bulk undeferred ${undeferredCount} token${undeferredCount === 1 ? '' : 's'}`,
+        );
       }
     } else {
       if (typeof ui !== 'undefined' && ui.notifications) {
@@ -1129,7 +1187,7 @@ export class SneakPreviewDialog extends BaseActionDialog {
     // Restore all tokens that were bulk undeferred
     this._bulkUndeferredOutcomes.forEach((originalOutcome, tokenId) => {
       // Find the current outcome
-      const outcomeIndex = this.outcomes.findIndex(o => o.token?.id === tokenId);
+      const outcomeIndex = this.outcomes.findIndex((o) => o.token?.id === tokenId);
       if (outcomeIndex < 0) return;
 
       // Restore the original outcome state
@@ -1139,7 +1197,9 @@ export class SneakPreviewDialog extends BaseActionDialog {
       this._deferredChecks.add(tokenId);
 
       // Update DOM elements
-      const button = this.element.querySelector(`[data-action="toggleDefer"][data-token-id="${tokenId}"]`);
+      const button = this.element.querySelector(
+        `[data-action="toggleDefer"][data-token-id="${tokenId}"]`,
+      );
       const row = button?.closest('tr');
 
       if (button && row) {
@@ -1156,10 +1216,15 @@ export class SneakPreviewDialog extends BaseActionDialog {
         const positionData = {
           position: positionTransition?.endPosition,
           visibility: originalOutcome.newVisibility,
-          coverState: originalOutcome.endCover || 'none'
+          coverState: originalOutcome.endCover || 'none',
         };
 
-        turnSneakTracker.recordDeferredCheck(this.sneakingToken, originalOutcome.token, positionData, originalOutcome);
+        turnSneakTracker.recordDeferredCheck(
+          this.sneakingToken,
+          originalOutcome.token,
+          positionData,
+          originalOutcome,
+        );
       } catch (error) {
         // Failed to record deferred check in bulk restore - continue silently
       }
@@ -1175,13 +1240,15 @@ export class SneakPreviewDialog extends BaseActionDialog {
       this._forceResetBulkUndeferButton();
 
       // Update bulk defer button state
-      this._updateBulkDeferButton();      // Re-render to update all states
-      this.render(false, { force: true }).catch(error => {
+      this._updateBulkDeferButton(); // Re-render to update all states
+      this.render(false, { force: true }).catch((error) => {
         // Error during bulk restore render - continue silently
       });
 
       if (typeof ui !== 'undefined' && ui.notifications) {
-        ui.notifications.info(`Restored ${restoredCount} token${restoredCount === 1 ? '' : 's'} to original deferred state with all position data`);
+        ui.notifications.info(
+          `Restored ${restoredCount} token${restoredCount === 1 ? '' : 's'} to original deferred state with all position data`,
+        );
       }
     } else {
       if (typeof ui !== 'undefined' && ui.notifications) {
@@ -1202,13 +1269,13 @@ export class SneakPreviewDialog extends BaseActionDialog {
     const visibleOutcomes = this._lastRenderedOutcomes || [];
 
     // Check for eligible deferrals
-    const hasEligible = visibleOutcomes.some(outcome => {
+    const hasEligible = visibleOutcomes.some((outcome) => {
       // Use the canDefer flag that already considers all eligibility criteria
       return outcome.canDefer && !outcome.isDeferred;
     });
 
     // Check for currently deferred tokens
-    const hasDeferred = visibleOutcomes.some(outcome => {
+    const hasDeferred = visibleOutcomes.some((outcome) => {
       return outcome.isDeferred || this._deferredChecks.has(outcome.token?.id);
     });
 
@@ -1232,8 +1299,6 @@ export class SneakPreviewDialog extends BaseActionDialog {
       }
     }
   }
-
-
 
   /**
    * Recomputes outcomes with position data when toggles change
@@ -1262,14 +1327,23 @@ export class SneakPreviewDialog extends BaseActionDialog {
         this.ignoreAllies,
         'token',
       );
-    } catch { }
+    } catch {}
 
-    // Apply detection filtering if enabled (Note: Sneak uses 'token' property, not 'target')
+    // Apply viewport filtering if enabled (Note: Sneak uses 'token' property, not 'target')
     if (this.filterByDetection && this.sneakingToken) {
       try {
         const { filterOutcomesByDetection } = await import('../services/infra/shared-utils.js');
-        filteredOutcomes = await filterOutcomesByDetection(filteredOutcomes, this.sneakingToken, 'token', false, true, 'target_to_observer');
-      } catch { /* Detection filtering is non-critical */ }
+        filteredOutcomes = await filterOutcomesByDetection(
+          filteredOutcomes,
+          this.sneakingToken,
+          'token',
+          false,
+          true,
+          'target_to_observer',
+        );
+      } catch {
+        /* Viewport filtering is non-critical */
+      }
     }
 
     // Capture current end positions for all filtered outcomes
@@ -1319,7 +1393,7 @@ export class SneakPreviewDialog extends BaseActionDialog {
             inNaturalTerrain: inNatural,
             impreciseOnly: outcome?.impreciseOnly || false,
           });
-        } catch { }
+        } catch {}
         outcome._featPositionOverride = effective;
 
         // Only override to observed if one or both positions don't qualify AFTER overrides
@@ -1363,7 +1437,8 @@ export class SneakPreviewDialog extends BaseActionDialog {
       const hasSneakyFeat = turnSneakTracker.hasSneakyFeat(this.sneakingToken);
 
       // Check if this token was already deferred in previous sneak actions this turn
-      const wasPreviouslyDeferred = turnSneakTracker?.isObserverDeferred?.(this.sneakingToken, outcome.token) || false;
+      const wasPreviouslyDeferred =
+        turnSneakTracker?.isObserverDeferred?.(this.sneakingToken, outcome.token) || false;
 
       // Get position transition data for this outcome (needed for eligibility check)
       const positionTransition = this._getPositionTransitionForToken(outcome.token);
@@ -1374,7 +1449,12 @@ export class SneakPreviewDialog extends BaseActionDialog {
       );
 
       // Check Sneaky feat eligibility: start position must qualify and (sneak succeeded but end position doesn't qualify)
-      const canDefer = this._isEligibleForSneakyDefer(outcome, positionDisplay, hasSneakyFeat, wasPreviouslyDeferred);
+      const canDefer = this._isEligibleForSneakyDefer(
+        outcome,
+        positionDisplay,
+        hasSneakyFeat,
+        wasPreviouslyDeferred,
+      );
 
       // Is deferred either in current dialog or from previous sneak actions
       const isDeferred = this._deferredChecks?.has(outcome.token.id) || wasPreviouslyDeferred;
@@ -1419,7 +1499,7 @@ export class SneakPreviewDialog extends BaseActionDialog {
           }
         });
       }
-    } catch { }
+    } catch {}
     return processedOutcomes;
   }
 
@@ -1462,7 +1542,7 @@ export class SneakPreviewDialog extends BaseActionDialog {
                   outcome.token,
                   this.sneakingToken,
                 );
-            } catch { }
+            } catch {}
 
             // Create a basic position transition object for newly included tokens
             if (!outcome.positionTransition) {
@@ -1476,7 +1556,9 @@ export class SneakPreviewDialog extends BaseActionDialog {
               outcome.positionTransition = {
                 hasChanged: startVisibility !== currentEndPosition.effectiveVisibility,
                 transitionType:
-                  startVisibility !== currentEndPosition.effectiveVisibility ? 'improved' : 'unchanged',
+                  startVisibility !== currentEndPosition.effectiveVisibility
+                    ? 'improved'
+                    : 'unchanged',
                 avsVisibilityChanged: startVisibility !== currentEndPosition.effectiveVisibility,
                 coverStateChanged: startCover !== currentEndPosition.coverState,
                 stealthBonusChange: 0,
@@ -1536,7 +1618,7 @@ export class SneakPreviewDialog extends BaseActionDialog {
     // For end-of-turn dialogs, check if we have preserved original position data
     if (this.isEndOfTurnDialog) {
       // Look for the outcome with this token to check for preserved position data
-      const outcome = this.outcomes?.find(o => o.token?.id === token.id);
+      const outcome = this.outcomes?.find((o) => o.token?.id === token.id);
       if (outcome && outcome.positionTransition) {
         return outcome.positionTransition; // Use preserved original position data
       }
@@ -1562,14 +1644,14 @@ export class SneakPreviewDialog extends BaseActionDialog {
       if (preservedDisplay.startPosition) {
         preservedDisplay.startPosition = {
           ...preservedDisplay.startPosition,
-          qualifies: this._startPositionQualifiesForSneak(observerToken, outcome)
+          qualifies: this._startPositionQualifiesForSneak(observerToken, outcome),
         };
       }
 
       if (preservedDisplay.endPosition) {
         preservedDisplay.endPosition = {
           ...preservedDisplay.endPosition,
-          qualifies: this._endPositionQualifiesForSneak(observerToken, outcome)
+          qualifies: this._endPositionQualifiesForSneak(observerToken, outcome),
         };
       }
 
@@ -1657,7 +1739,8 @@ export class SneakPreviewDialog extends BaseActionDialog {
         lightingIcon: this._getLightingIcon(startPos.lightingConditions),
         qualifies: (() => {
           // If token is deferred, always show start position as qualifying
-          const isCurrentlyDeferred = this._deferredChecks?.has(observerToken.id) ||
+          const isCurrentlyDeferred =
+            this._deferredChecks?.has(observerToken.id) ||
             turnSneakTracker?.isObserverDeferred?.(this.sneakingToken, observerToken);
           if (isCurrentlyDeferred) return true;
 
@@ -2085,7 +2168,7 @@ export class SneakPreviewDialog extends BaseActionDialog {
           coverState =
             autoCoverSystem.detectCoverBetweenTokens(observerToken, this.sneakingToken) || 'none';
         }
-      } catch { }
+      } catch {}
       if (!coverState) {
         try {
           coverState = getCoverBetween(observerToken, this.sneakingToken);
@@ -2158,7 +2241,8 @@ export class SneakPreviewDialog extends BaseActionDialog {
 
     // Clear any deferred position overrides when manually toggling position
     // Manual action should take precedence over stored defer state, but only for non-deferred tokens
-    const isCurrentlyDeferred = app._deferredChecks?.has(outcome.token.id) ||
+    const isCurrentlyDeferred =
+      app._deferredChecks?.has(outcome.token.id) ||
       turnSneakTracker?.isObserverDeferred?.(app.sneakingToken, outcome.token);
 
     if (outcome._featPositionOverride && !isCurrentlyDeferred) {
@@ -2305,9 +2389,11 @@ export class SneakPreviewDialog extends BaseActionDialog {
     outcome.newVisibility = newVisibility;
 
     // Auto-undefer if the sneak fails (failure or critical failure outcome)
-    if ((rollOutcome === 'failure' || rollOutcome === 'critical-failure') &&
-      outcome.isDeferred && this._deferredChecks?.has(outcome.token.id)) {
-
+    if (
+      (rollOutcome === 'failure' || rollOutcome === 'critical-failure') &&
+      outcome.isDeferred &&
+      this._deferredChecks?.has(outcome.token.id)
+    ) {
       try {
         // Remove from local deferred set
         this._deferredChecks.delete(outcome.token.id);
@@ -2322,7 +2408,9 @@ export class SneakPreviewDialog extends BaseActionDialog {
         this._updateDeferButtonForToken(outcome.token.id, false);
 
         if (typeof ui !== 'undefined' && ui.notifications) {
-          ui.notifications.info(`${outcome.token.name} automatically undeferred - sneak check failed`);
+          ui.notifications.info(
+            `${outcome.token.name} automatically undeferred - sneak check failed`,
+          );
         }
       } catch (error) {
         // Failed to auto-undefer on failed sneak - continue silently
@@ -2345,10 +2433,16 @@ export class SneakPreviewDialog extends BaseActionDialog {
 
     // Get current defer eligibility requirements
     const hasSneakyFeat = turnSneakTracker.hasSneakyFeat(this.sneakingToken);
-    const wasPreviouslyDeferred = turnSneakTracker?.isObserverDeferred?.(this.sneakingToken, outcome.token) || false;
+    const wasPreviouslyDeferred =
+      turnSneakTracker?.isObserverDeferred?.(this.sneakingToken, outcome.token) || false;
 
     // Check Sneaky feat eligibility: start position must qualify and (sneak succeeded but end position doesn't qualify)
-    const canDefer = this._isEligibleForSneakyDefer(outcome, outcome.positionDisplay, hasSneakyFeat, wasPreviouslyDeferred);
+    const canDefer = this._isEligibleForSneakyDefer(
+      outcome,
+      outcome.positionDisplay,
+      hasSneakyFeat,
+      wasPreviouslyDeferred,
+    );
 
     // Update the outcome
     outcome.canDefer = canDefer;
@@ -2615,7 +2709,7 @@ export class SneakPreviewDialog extends BaseActionDialog {
     }
 
     // Find the outcome for this token
-    const outcome = app.outcomes.find(o => o.token?.id === tokenId);
+    const outcome = app.outcomes.find((o) => o.token?.id === tokenId);
     if (!outcome) {
       // No outcome found for token
       return;
@@ -2686,12 +2780,12 @@ export class SneakPreviewDialog extends BaseActionDialog {
 
         // Recalculate only end position qualification with current position
         const positionTransition = app._getPositionTransitionForToken(outcome.token);
-        const endQualifies = positionTransition ?
-          app._endPositionQualifiesForSneak(outcome.token, positionTransition.endPosition) :
-          false;
+        const endQualifies = positionTransition
+          ? app._endPositionQualifiesForSneak(outcome.token, positionTransition.endPosition)
+          : false;
 
         // Update the outcome with preserved start data and recalculated end data
-        const outcomeIndex = app.outcomes.findIndex(o => o.token?.id === tokenId);
+        const outcomeIndex = app.outcomes.findIndex((o) => o.token?.id === tokenId);
         if (outcomeIndex >= 0) {
           app.outcomes[outcomeIndex] = {
             ...app.outcomes[outcomeIndex],
@@ -2699,7 +2793,7 @@ export class SneakPreviewDialog extends BaseActionDialog {
             startCover: preservedStartCover,
             startVisibility: preservedStartVisibility,
             endQualifies: endQualifies,
-            isDeferred: false // No longer deferred
+            isDeferred: false, // No longer deferred
           };
         }
       } else {
@@ -2854,20 +2948,26 @@ export class SneakPreviewDialog extends BaseActionDialog {
       if (this._bulkUndeferButtonState === 'restore') {
         bulkUndeferButton.classList.add('ready-to-restore');
         bulkUndeferButton.innerHTML = '<i class="fas fa-undo"></i> Restore Defers';
-        bulkUndeferButton.setAttribute('data-tooltip', 'Restore all previously deferred tokens to deferred state');
+        bulkUndeferButton.setAttribute(
+          'data-tooltip',
+          'Restore all previously deferred tokens to deferred state',
+        );
       } else {
         bulkUndeferButton.classList.remove('ready-to-restore');
         bulkUndeferButton.innerHTML = '<i class="fas fa-clock"></i> Undefer All';
-        bulkUndeferButton.setAttribute('data-tooltip', 'Undefer all currently deferred tokens and restore their original state');
+        bulkUndeferButton.setAttribute(
+          'data-tooltip',
+          'Undefer all currently deferred tokens and restore their original state',
+        );
       }
 
       // Remove pending visual indication from any rows
       const pendingRows = this.element.querySelectorAll('tr.pending-restore');
-      pendingRows.forEach(row => {
+      pendingRows.forEach((row) => {
         row.classList.remove('pending-restore');
       });
     }
-  }/**
+  } /**
    * Set bulk undefer button to "Restore Defers" mode after undefer all is executed
    * @private
    */
@@ -2877,7 +2977,10 @@ export class SneakPreviewDialog extends BaseActionDialog {
     if (bulkUndeferButton) {
       bulkUndeferButton.classList.add('ready-to-restore');
       bulkUndeferButton.innerHTML = '<i class="fas fa-undo"></i> Restore Defers';
-      bulkUndeferButton.setAttribute('data-tooltip', 'Restore all previously deferred tokens to deferred state');
+      bulkUndeferButton.setAttribute(
+        'data-tooltip',
+        'Restore all previously deferred tokens to deferred state',
+      );
     }
   }
 
@@ -2892,15 +2995,18 @@ export class SneakPreviewDialog extends BaseActionDialog {
     if (bulkUndeferButton) {
       bulkUndeferButton.classList.remove('ready-to-restore');
       bulkUndeferButton.innerHTML = '<i class="fas fa-clock"></i> Undefer All';
-      bulkUndeferButton.setAttribute('data-tooltip', 'Undefer all currently deferred tokens and restore their original state');
+      bulkUndeferButton.setAttribute(
+        'data-tooltip',
+        'Undefer all currently deferred tokens and restore their original state',
+      );
 
       // Remove pending visual indication from any rows
       const pendingRows = this.element.querySelectorAll('tr.pending-restore');
-      pendingRows.forEach(row => {
+      pendingRows.forEach((row) => {
         row.classList.remove('pending-restore');
       });
     }
-  }  /**
+  } /**
    * Calculates outcome based on margin
    * @param {number} margin - Roll margin vs DC
    * @returns {string} Outcome type
@@ -3016,7 +3122,9 @@ export class SneakPreviewDialog extends BaseActionDialog {
         if (outcome.needsApplication && !outcome.positionQualified) {
           // Apply visibility change: set to observed
           try {
-            const { getVisibilityMap, setVisibilityMap } = await import('../../stores/visibility-map.js');
+            const { getVisibilityMap, setVisibilityMap } = await import(
+              '../../stores/visibility-map.js'
+            );
 
             // Set visibility to observed in observer's visibility map
             const observerVisibilityMap = getVisibilityMap(outcome.token);
@@ -3025,7 +3133,6 @@ export class SneakPreviewDialog extends BaseActionDialog {
             // Update the visibility map
             await setVisibilityMap(outcome.token, observerVisibilityMap);
             appliedCount++;
-
           } catch (error) {
             // Error applying end-of-turn visibility change - continue silently
           }
@@ -3047,18 +3154,21 @@ export class SneakPreviewDialog extends BaseActionDialog {
 
         // Show notification
         if (typeof ui !== 'undefined' && ui.notifications) {
-          ui.notifications.info(`Applied ${appliedCount} end-of-turn visibility change${appliedCount !== 1 ? 's' : ''} for ${app.sneakingToken.name}`);
+          ui.notifications.info(
+            `Applied ${appliedCount} end-of-turn visibility change${appliedCount !== 1 ? 's' : ''} for ${app.sneakingToken.name}`,
+          );
         }
       } else {
         // Show notification when no changes were needed
         if (typeof ui !== 'undefined' && ui.notifications) {
-          ui.notifications.info(`No visibility changes needed - ${app.sneakingToken.name} maintains stealth positions`);
+          ui.notifications.info(
+            `No visibility changes needed - ${app.sneakingToken.name} maintains stealth positions`,
+          );
         }
       }
 
       // Close dialog after applying
       app.close();
-
     } catch (error) {
       // Error applying end-of-turn results
       if (typeof ui !== 'undefined' && ui.notifications) {
@@ -3089,8 +3199,8 @@ export class SneakPreviewDialog extends BaseActionDialog {
       const deferredTokenIds = Array.from(app._deferredChecks);
 
       // Find the corresponding outcomes for deferred tokens
-      const deferredOutcomes = app.outcomes.filter(outcome =>
-        deferredTokenIds.includes(outcome.token?.id)
+      const deferredOutcomes = app.outcomes.filter((outcome) =>
+        deferredTokenIds.includes(outcome.token?.id),
       );
 
       if (deferredOutcomes.length === 0) {
@@ -3109,8 +3219,8 @@ export class SneakPreviewDialog extends BaseActionDialog {
         {
           isEndOfTurnDialog: true,
           title: `End-of-Turn Position Validation - ${app.sneakingToken.name}`,
-          deferredFromDialog: app // Reference to the original dialog
-        }
+          deferredFromDialog: app, // Reference to the original dialog
+        },
       );
 
       // Show the end-of-turn dialog
@@ -3118,9 +3228,10 @@ export class SneakPreviewDialog extends BaseActionDialog {
 
       // Notify about the validation
       if (typeof ui !== 'undefined' && ui.notifications) {
-        ui.notifications.info(`Processing ${deferredOutcomes.length} deferred position check${deferredOutcomes.length !== 1 ? 's' : ''} for end-of-turn validation.`);
+        ui.notifications.info(
+          `Processing ${deferredOutcomes.length} deferred position check${deferredOutcomes.length !== 1 ? 's' : ''} for end-of-turn validation.`,
+        );
       }
-
     } catch (error) {
       // Error processing end-of-turn validation
       if (typeof ui !== 'undefined' && ui.notifications) {
@@ -3180,8 +3291,6 @@ export class SneakPreviewDialog extends BaseActionDialog {
     app.bulkActionState = 'initial';
     app.render({ force: true });
   }
-
-
 
   async close(options = {}) {
     await this._clearSneakActiveFlag();

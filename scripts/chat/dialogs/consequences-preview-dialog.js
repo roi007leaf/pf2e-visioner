@@ -156,7 +156,7 @@ export class ConsequencesPreviewDialog extends BaseActionDialog {
       );
     } catch {}
 
-    // Apply detection filtering if enabled
+    // Apply viewport filtering if enabled
     if (this.filterByDetection && this.attackingToken) {
       try {
         const { filterOutcomesByDetection } = await import('../services/infra/shared-utils.js');
@@ -593,7 +593,7 @@ export class ConsequencesPreviewDialog extends BaseActionDialog {
   }
 
   /**
-   * Handle detection filter toggle
+   * Handle viewport filter toggle
    */
   static async _onToggleFilterByDetection(event, target) {
     const app = currentConsequencesDialog;

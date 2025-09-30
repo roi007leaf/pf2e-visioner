@@ -40,27 +40,27 @@ export class EffectEventHandler {
    * Handle active effect creation events
    * @param {ActiveEffect} effect - The created effect
    */
-  #onEffectCreate(effect) {
+  async #onEffectCreate(effect) {
     if (!this.#systemStateProvider.shouldProcessEvents()) return;
-    this.#handleEffectChange(effect, 'created');
+    await this.#handleEffectChange(effect, 'created');
   }
 
   /**
    * Handle active effect update events
    * @param {ActiveEffect} effect - The updated effect
    */
-  #onEffectUpdate(effect) {
+  async #onEffectUpdate(effect) {
     if (!this.#systemStateProvider.shouldProcessEvents()) return;
-    this.#handleEffectChange(effect, 'updated');
+    await this.#handleEffectChange(effect, 'updated');
   }
 
   /**
    * Handle active effect deletion events
    * @param {ActiveEffect} effect - The deleted effect
    */
-  #onEffectDelete(effect) {
+  async #onEffectDelete(effect) {
     if (!this.#systemStateProvider.shouldProcessEvents()) return;
-    this.#handleEffectChange(effect, 'deleted');
+    await this.#handleEffectChange(effect, 'deleted');
   }
 
   /**
@@ -68,7 +68,7 @@ export class EffectEventHandler {
    * @param {ActiveEffect} effect - The effect that changed
    * @param {string} action - The action performed ('created', 'updated', 'deleted')
    */
-  #handleEffectChange(effect, action) {
+  async #handleEffectChange(effect, action) {
     // Check if this effect is related to invisibility, vision, or conditions that affect sight
     const effectName = effect.name?.toLowerCase() || effect.label?.toLowerCase() || '';
     const effectSlug = effect.system?.slug?.toLowerCase() || '';
@@ -135,7 +135,37 @@ export class EffectEventHandler {
             this.#visibilityStateManager.markTokenChangedImmediate(token.document.id),
           );
         }
+
+        // Ensure immediate perception refresh after marking tokens as changed
+        // This guarantees that condition changes are reflected immediately in the UI
+        await this.#refreshPerceptionAfterEffectChange();
       }
+    }
+  }
+
+  /**
+   * Refresh perception immediately after effect changes to ensure visibility updates are applied
+   * @private
+   */
+  async #refreshPerceptionAfterEffectChange() {
+    try {
+      // Use the optimized perception manager for consistent refresh behavior
+      const { optimizedPerceptionManager } = await import('../PerceptionManager.js');
+      if (optimizedPerceptionManager?.refreshPerception) {
+        optimizedPerceptionManager.refreshPerception();
+      } else {
+        // Fallback to direct canvas perception update
+        if (canvas?.perception?.update) {
+          canvas.perception.update({
+            refreshVision: true,
+            refreshOcclusion: true,
+            refreshLighting: false,
+          });
+        }
+      }
+    } catch (error) {
+      // Fail silently to avoid disrupting effect processing
+      console.warn('PF2E Visioner | Failed to refresh perception after effect change:', error);
     }
   }
 
