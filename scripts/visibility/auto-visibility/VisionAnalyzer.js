@@ -715,6 +715,9 @@ export class VisionAnalyzer {
     const actor = token?.actor;
     if (!actor) return summary;
 
+    // Track which senses have been added to prevent duplicates
+    const addedSenses = new Set();
+
     // Check for echolocation effects
     try {
       const effects =
@@ -744,23 +747,19 @@ export class VisionAnalyzer {
       let acuity = 'imprecise'; // Default
 
       // Map detection mode IDs to sense types and determine acuity
-      // Based on CONFIG.Canvas.detectionModes from Foundry/PF2e
+      // Only supporting the detection modes specified in the requirements
       const detectionModeMapping = {
-        // Core tremorsense detection - imprecise by default unless explicitly marked precise
-        feelTremor: { type: 'tremorsense', acuity: 'imprecise' },
-
-        // Hearing-based detection
-        hearing: { type: 'hearing', acuity: 'imprecise' },
-
-        // Other non-visual senses (may not be in CONFIG but could exist)
-        echolocation: { type: 'echolocation', acuity: 'precise' },
-        lifesense: { type: 'lifesense', acuity: 'precise' },
-        blindsense: { type: 'blindsense', acuity: 'precise' },
-        scent: { type: 'scent', acuity: 'imprecise' },
-
-        // Invisibility detection (precise when it comes to invisibility)
-        senseInvisibility: { type: 'sense-invisibility', acuity: 'precise' },
+        // Visual detection modes (type 0 - sight-based)
+        lightPerception: { type: 'light-perception', acuity: 'precise' },
+        basicSight: { type: 'basic-sight', acuity: 'precise' },
         seeInvisibility: { type: 'see-invisibility', acuity: 'precise' },
+        seeAll: { type: 'see-all', acuity: 'precise' },
+
+        // Non-visual detection modes
+        senseInvisibility: { type: 'sense-invisibility', acuity: 'precise' }, // type 3
+        feelTremor: { type: 'tremorsense', acuity: 'imprecise' }, // type 2
+        senseAll: { type: 'sense-all', acuity: 'precise' }, // type 3
+        hearing: { type: 'hearing', acuity: 'imprecise' }, // type 1
       };
 
       if (detectionModeMapping[modeId]) {
@@ -768,7 +767,7 @@ export class VisionAnalyzer {
         acuity = detectionModeMapping[modeId].acuity;
       }
 
-      this.#addSenseToSummary(summary, senseType, acuity, modeData.range, token);
+      this.#addSenseToSummary(summary, senseType, acuity, modeData.range, token, addedSenses);
     }
 
     // Process traditional senses (if not already added by detection modes)
@@ -787,7 +786,7 @@ export class VisionAnalyzer {
               let acuity = val?.acuity ?? s?.acuity ?? val?.value;
               let range = val?.range ?? s?.range;
 
-              this.#addSenseToSummary(summary, type, acuity, range, token);
+              this.#addSenseToSummary(summary, type, acuity, range, token, addedSenses);
             }
           }
         } else if (typeof senses === 'object') {
@@ -795,7 +794,7 @@ export class VisionAnalyzer {
             const val = obj?.value ?? obj;
             const acuity = val?.acuity ?? obj?.acuity ?? val?.value;
             const range = val?.range ?? obj?.range;
-            this.#addSenseToSummary(summary, type, acuity, range, token);
+            this.#addSenseToSummary(summary, type, acuity, range, token, addedSenses);
           }
         }
       } catch {
@@ -813,10 +812,20 @@ export class VisionAnalyzer {
    * @param {string} acuity - Sense acuity (precise/imprecise)
    * @param {number} range - Sense range
    * @param {Token} token - The token (for condition checks)
+   * @param {Set} addedSenses - Set to track which senses have been added
    * @private
    */
-  #addSenseToSummary(summary, type, acuity, range, token) {
+  #addSenseToSummary(summary, type, acuity, range, token, addedSenses) {
     if (!type) return;
+
+    // Check if this sense has already been added
+    const senseKey = `${type.toLowerCase()}-${range}`;
+    if (addedSenses && addedSenses.has(senseKey)) {
+      return; // Skip duplicate
+    }
+    if (addedSenses) {
+      addedSenses.add(senseKey);
+    }
 
     const r = Number(range);
     const entry = {
@@ -852,15 +861,19 @@ export class VisionAnalyzer {
       entry.range = summary.echolocationRange || 40;
     }
 
+    // Special case: echolocation as a sense type should be precise
+    if (entry.type === 'echolocation') {
+      a = 'precise';
+    }
+
     // Store special senses for backward compatibility
     if (entry.type === 'hearing') {
       summary.hearing = { acuity: a, range: entry.range };
-    }
-    if (entry.type === 'lifesense') {
-      summary.lifesense = { range: entry.range };
-    }
-    if (entry.type !== 'hearing' && entry.type !== 'lifesense') {
-      summary.individualSenses[entry.type] = { range: entry.range };
+    } else if (entry.type === 'lifesense') {
+      summary.lifesense = { acuity: a, range: entry.range };
+    } else {
+      // Store all other senses with acuity for backward compatibility
+      summary.individualSenses[entry.type] = { acuity: a, range: entry.range };
     }
 
     // Add to appropriate acuity array
