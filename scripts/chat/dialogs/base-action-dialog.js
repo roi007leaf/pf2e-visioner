@@ -1,4 +1,4 @@
-import { MODULE_TITLE } from '../../constants.js';
+import { MODULE_ID, MODULE_TITLE } from '../../constants.js';
 import { getVisibilityStateConfig } from '../services/data/visibility-states.js';
 import '../services/hbs-helpers.js';
 import { notify } from '../services/infra/notifications.js';
@@ -73,6 +73,66 @@ export class BaseActionDialog extends BasePreviewDialog {
       }));
   }
 
+  /**
+   * Check if a token's current visibility state is controlled by AVS (no manual override)
+   * @param {Object} outcome - The outcome object containing token and visibility info
+   * @returns {boolean} True if AVS is controlling the visibility, false if there's a manual override
+   */
+  isCurrentStateAvsControlled(outcome) {
+    try {
+      // Check if AVS is enabled
+      const avsEnabled = game.settings.get(MODULE_ID, 'autoVisibilityEnabled');
+      if (!avsEnabled) return false;
+
+      // Get the token and observer from the outcome
+      const token = outcome.target || outcome.token;
+      const observer = outcome.observer || this.actionData?.actor;
+
+      if (!token || !observer) return false;
+
+      // Check for manual override flag
+      // In most action dialogs, the override is stored on the target token with key from observer
+      const hasOverride = !!token.document?.getFlag(
+        MODULE_ID,
+        `avs-override-from-${observer.document?.id || observer.id}`,
+      );
+
+      return !hasOverride; // If no override exists, AVS is controlling
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Check if a token's old visibility state is controlled by AVS (no manual override)
+   * @param {Object} outcome - The outcome object containing token and visibility info
+   * @returns {boolean} True if AVS is controlling the old visibility, false if there's a manual override
+   */
+  isOldStateAvsControlled(outcome) {
+    try {
+      // Check if AVS is enabled
+      const avsEnabled = game.settings.get(MODULE_ID, 'autoVisibilityEnabled');
+      if (!avsEnabled) return false;
+
+      // Get the token and observer from the outcome
+      const token = outcome.target || outcome.token;
+      const observer = outcome.observer || this.actionData?.actor;
+
+      if (!token || !observer) return false;
+
+      // Check for manual override flag
+      // In most action dialogs, the override is stored on the target token with key from observer
+      const hasOverride = !!token.document?.getFlag(
+        MODULE_ID,
+        `avs-override-from-${observer.document?.id || observer.id}`,
+      );
+
+      return !hasOverride; // If no override exists, AVS is controlling
+    } catch {
+      return false;
+    }
+  }
+
   computeChangesCount(outcomes) {
     if (!Array.isArray(outcomes)) return 0;
     return outcomes.filter((o) => o?.hasActionableChange).length;
@@ -91,12 +151,12 @@ export class BaseActionDialog extends BasePreviewDialog {
           this.render({ force: true });
         });
       }
-    } catch { }
+    } catch {}
 
     // Ensure bulk override buttons get listeners
     try {
       this._attachBulkOverrideHandlers();
-    } catch { }
+    } catch {}
 
     // Wire up Show Only Changes checkbox
     try {
@@ -110,11 +170,13 @@ export class BaseActionDialog extends BasePreviewDialog {
           this.render({ force: true });
         });
       }
-    } catch { }
+    } catch {}
 
     // Wire up Filter By Detection checkbox (disabled in combat via template binding)
     try {
-      const cbDetection = this.element.querySelector('input[data-action="toggleFilterByDetection"]');
+      const cbDetection = this.element.querySelector(
+        'input[data-action="toggleFilterByDetection"]',
+      );
       if (cbDetection) {
         cbDetection.onchange = null;
         cbDetection.addEventListener('change', async () => {
@@ -126,11 +188,11 @@ export class BaseActionDialog extends BasePreviewDialog {
               const list = await this.getFilteredOutcomes();
               if (Array.isArray(list)) this.outcomes = list;
             }
-          } catch { }
+          } catch {}
           this.render({ force: true });
         });
       }
-    } catch { }
+    } catch {}
   }
 
   buildCommonContext(outcomes) {
@@ -158,7 +220,7 @@ export class BaseActionDialog extends BasePreviewDialog {
     try {
       if (this._cachedBulkStates && Array.isArray(this._cachedBulkStates))
         return this._cachedBulkStates;
-      const states = ['observed', 'concealed', 'hidden', 'undetected'];
+      const states = ['avs', 'observed', 'concealed', 'hidden', 'undetected'];
       this._cachedBulkStates = states.map((s) => ({ value: s, ...this.visibilityConfig(s) }));
       return this._cachedBulkStates;
     } catch {
@@ -196,7 +258,7 @@ export class BaseActionDialog extends BasePreviewDialog {
       });
       const clearBtn = root.querySelector('button[data-action="bulkOverrideClear"]');
       if (clearBtn) clearBtn.addEventListener('click', (ev) => this._onBulkOverrideClear(ev));
-    } catch { }
+    } catch {}
   }
 
   _onBulkOverrideSet(event) {
@@ -253,7 +315,7 @@ export class BaseActionDialog extends BasePreviewDialog {
       const message = emptyNotice || 'No encounter tokens found, showing all';
       try {
         notify.info(`${MODULE_TITLE}: ${message}`);
-      } catch { }
+      } catch {}
     }
     return filtered;
   }
@@ -273,7 +335,7 @@ export class BaseActionDialog extends BasePreviewDialog {
     import('../services/ui/dialog-utils.js').then(({ updateRowButtonsToApplied }) => {
       try {
         updateRowButtonsToApplied(this.element, normalized);
-      } catch { }
+      } catch {}
     });
   }
 
@@ -285,7 +347,7 @@ export class BaseActionDialog extends BasePreviewDialog {
     import('../services/ui/dialog-utils.js').then(({ updateRowButtonsToReverted }) => {
       try {
         updateRowButtonsToReverted(this.element, normalized);
-      } catch { }
+      } catch {}
       try {
         // After reverting, reset each row's selection to its initial calculated outcome
         if (!Array.isArray(outcomes)) return;
@@ -317,9 +379,9 @@ export class BaseActionDialog extends BasePreviewDialog {
               (x) => String(this.getOutcomeTokenId(x)) === String(tokenId),
             );
             if (outcome) outcome.overrideState = null;
-          } catch { }
+          } catch {}
         }
-      } catch { }
+      } catch {}
     });
   }
 
@@ -327,7 +389,7 @@ export class BaseActionDialog extends BasePreviewDialog {
     import('../services/ui/dialog-utils.js').then(({ updateBulkActionButtons }) => {
       try {
         updateBulkActionButtons(this.element, this.bulkActionState);
-      } catch { }
+      } catch {}
     });
   }
 
@@ -335,7 +397,7 @@ export class BaseActionDialog extends BasePreviewDialog {
     import('../services/ui/dialog-utils.js').then(({ updateChangesCount }) => {
       try {
         updateChangesCount(this.element, this.getChangesCounterClass());
-      } catch { }
+      } catch {}
     });
   }
 
@@ -360,7 +422,7 @@ export class BaseActionDialog extends BasePreviewDialog {
         const icon = container.querySelector(`.state-icon[data-state="${desiredState}"]`);
         if (icon) icon.classList.add('selected');
       }
-    } catch { }
+    } catch {}
   }
 
   // Outcome display helpers (string-based). Subclasses can override if needed
@@ -429,7 +491,7 @@ export class BaseActionDialog extends BasePreviewDialog {
       } else {
         container.innerHTML = '<span class="no-action">No Change</span>';
       }
-    } catch { }
+    } catch {}
   }
 
   addIconClickHandlers() {
@@ -473,7 +535,7 @@ export class BaseActionDialog extends BasePreviewDialog {
               wallId,
               row: event.currentTarget.closest('tr'),
             });
-          } catch { }
+          } catch {}
           // Direct DOM fallback to ensure row shows buttons immediately
           try {
             const rowEl = event.currentTarget.closest('tr');
@@ -499,23 +561,23 @@ export class BaseActionDialog extends BasePreviewDialog {
                 }
               }
             }
-          } catch { }
+          } catch {}
           try {
             // Maintain a lightweight list of changed outcomes for convenience
             this.changes = Array.isArray(this.outcomes)
               ? this.outcomes.filter((o) => {
-                const baseOld = o.oldVisibility ?? o.currentVisibility ?? null;
-                const baseNew = o.overrideState ?? o.newVisibility ?? null;
-                return baseOld != null && baseNew != null && baseOld !== baseNew;
-              })
+                  const baseOld = o.oldVisibility ?? o.currentVisibility ?? null;
+                  const baseNew = o.overrideState ?? o.newVisibility ?? null;
+                  return baseOld != null && baseNew != null && baseOld !== baseNew;
+                })
               : [];
-          } catch { }
+          } catch {}
         }
         this.updateChangesCount();
         // If "Show only changes" is active, re-render so filtering reflects override adjustments
         try {
           if (this.showOnlyChanges) this.render({ force: true });
-        } catch { }
+        } catch {}
       });
     });
   }
@@ -538,7 +600,7 @@ export class BaseActionDialog extends BasePreviewDialog {
         if (!row) continue;
         this.updateActionButtonsForToken(tokenId || null, !!o.hasActionableChange, { wallId, row });
       }
-    } catch { }
+    } catch {}
   }
 
   /**
@@ -571,6 +633,35 @@ export class BaseActionDialog extends BasePreviewDialog {
 
     // Check if there's actually a change to apply
     const effectiveNewState = outcome.overrideState || outcome.newVisibility;
+
+    // If AVS is selected, remove any existing override
+    if (effectiveNewState === 'avs') {
+      try {
+        const { default: AvsOverrideManager } = await import(
+          '../services/infra/avs-override-manager.js'
+        );
+        const observerId = app.actionData?.actor?.document?.id || app.actionData?.actor?.id;
+        const targetId = outcome.target?.id || outcome.token?.id || tokenId;
+        if (observerId && targetId) {
+          await AvsOverrideManager.removeOverride(observerId, targetId);
+          // Refresh UI to update override indicators
+          const { updateTokenVisuals } = await import('../../services/visual-effects.js');
+          await updateTokenVisuals();
+          const targetName = outcome.target?.name || outcome.token?.name || 'token';
+          notify.info(
+            `${MODULE_TITLE}: Removed override for ${targetName} - AVS will control visibility`,
+          );
+        }
+      } catch (e) {
+        console.warn('Failed to remove AVS override:', e);
+        const targetName = outcome.target?.name || outcome.token?.name || 'token';
+        notify.info(`${MODULE_TITLE}: AVS will control visibility for ${targetName}`);
+      }
+      app.updateRowButtonsToApplied([{ target: { id: tokenId } }]);
+      app.updateChangesCount();
+      return;
+    }
+
     const hasChange = effectiveNewState !== outcome.oldVisibility;
 
     if (!hasChange) {
@@ -738,22 +829,56 @@ export class BaseActionDialog extends BasePreviewDialog {
       // This sets AVS pair overrides which will prevent future AVS calculations
       // for these token pairs until reverted
       const overrides = {};
+      const avsRemovals = [];
       outcomesWithChanges.forEach((outcome) => {
         const effectiveNewState = outcome.overrideState || outcome.newVisibility;
         const tokenId = outcome.token?.id || outcome.target?.id;
         if (tokenId) {
-          overrides[tokenId] = effectiveNewState;
+          if (effectiveNewState === 'avs') {
+            // AVS selections - remove any existing overrides
+            const tokenName = outcome.token?.name || outcome.target?.name || 'token';
+            avsRemovals.push({ id: tokenId, name: tokenName });
+          } else {
+            overrides[tokenId] = effectiveNewState;
+          }
         }
       });
 
-      const actionData = {
-        ...app.actionData,
-        ignoreAllies: app.ignoreAllies,
-        encounterOnly: app.encounterOnly,
-        overrides,
-      };
+      // Remove AVS overrides if any
+      if (avsRemovals.length > 0) {
+        try {
+          const { default: AvsOverrideManager } = await import(
+            '../services/infra/avs-override-manager.js'
+          );
+          const observerId = app.actionData?.actor?.document?.id || app.actionData?.actor?.id;
+          if (observerId) {
+            for (const removal of avsRemovals) {
+              await AvsOverrideManager.removeOverride(observerId, removal.id);
+            }
+            // Refresh UI to update override indicators
+            const { updateTokenVisuals } = await import('../../services/visual-effects.js');
+            await updateTokenVisuals();
+            const names = avsRemovals.map((r) => r.name).join(', ');
+            notify.info(`${MODULE_TITLE}: Removed overrides for ${avsRemovals.length} token(s)`);
+          }
+        } catch (e) {
+          console.warn('Failed to remove AVS overrides:', e);
+          const names = avsRemovals.map((r) => r.name).join(', ');
+          notify.info(`${MODULE_TITLE}: AVS will control visibility for ${avsRemovals.length}`);
+        }
+      }
 
-      await applyFunction(actionData, target);
+      // Apply overrides only if there are any
+      if (Object.keys(overrides).length > 0) {
+        const actionData = {
+          ...app.actionData,
+          ignoreAllies: app.ignoreAllies,
+          encounterOnly: app.encounterOnly,
+          overrides,
+        };
+
+        await applyFunction(actionData, target);
+      }
 
       // Update all outcomes to reflect applied state
       outcomesWithChanges.forEach((outcome) => {

@@ -67,7 +67,6 @@ export class ConsequencesPreviewDialog extends BaseActionDialog {
       toggleEncounterFilter: ConsequencesPreviewDialog._onToggleEncounterFilter,
       toggleFilterByDetection: ConsequencesPreviewDialog._onToggleFilterByDetection,
       overrideState: ConsequencesPreviewDialog._onOverrideState,
-      removeOverrides: ConsequencesPreviewDialog._onRemoveOverrides,
     },
   };
 
@@ -76,64 +75,6 @@ export class ConsequencesPreviewDialog extends BaseActionDialog {
       template: 'modules/pf2e-visioner/templates/consequences-preview.hbs',
     },
   };
-
-  static async _onRemoveOverrides() {
-    const app = currentConsequencesDialog;
-    if (!app) {
-      console.error('Consequences Dialog not found');
-      return;
-    }
-
-    // Filter outcomes based on encounter filter
-    let filteredOutcomes = filterOutcomesByEncounter(app.outcomes, app.encounterOnly, 'target');
-
-    // Apply ally filtering if ignore allies is enabled
-    try {
-      const { filterOutcomesByAllies } = await import('../services/infra/shared-utils.js');
-      filteredOutcomes = filterOutcomesByAllies(
-        filteredOutcomes,
-        app.attackingToken,
-        app.ignoreAllies,
-        'target',
-      );
-    } catch {}
-
-    // Respect Hide Foundry-hidden toggle for Apply All
-    try {
-      if (app.hideFoundryHidden) {
-        filteredOutcomes = filteredOutcomes.filter((o) => o?.target?.document?.hidden !== true);
-      }
-    } catch {}
-
-    // Get all observer tokens
-    const observers = filteredOutcomes.map((o) => o?.target).filter(Boolean);
-    if (observers.length === 0) {
-      notify.warn(`${MODULE_TITLE}: No observers found to remove overrides.`);
-      return;
-    }
-
-    // Import AVS override manager and clear overrides between attacker and observers
-    try {
-      const { default: AvsOverrideManager } = await import(
-        '../services/infra/avs-override-manager.js'
-      );
-      await AvsOverrideManager.clearForConsequences(app.attackingToken, observers, {
-        refresh: true,
-      });
-      notify.info(
-        `${MODULE_TITLE}: Removed overrides between ${app.attackingToken.name} and ${observers.length} observer(s).`,
-      );
-
-      // Reset dialog bulk state and re-render to update counts/UI (data changed)
-      try {
-        app.bulkActionState = 'initial';
-        await app.render({ force: true });
-      } catch {}
-    } catch (err) {
-      console.error('Error clearing overrides:', err);
-      notify.error(`${MODULE_TITLE}: Failed to remove overrides.`);
-    }
-  }
 
   async _prepareContext(options) {
     const context = await super._prepareContext(options);
@@ -184,14 +125,15 @@ export class ConsequencesPreviewDialog extends BaseActionDialog {
 
     // Prepare outcomes with additional UI data (and normalize shape)
     processedOutcomes = processedOutcomes.map((outcome) => {
-      const effectiveNewState = outcome.overrideState || 'observed'; // Default to observed
+      const effectiveNewState = outcome.overrideState || 'avs'; // Default to AVS
       const baseOldState = outcome.currentVisibility;
-      // For consequences, actionable change means:
-      // 1. Token sees attacker as hidden/undetected AND will change to different state, OR
-      // 2. GM has selected an override state that differs from current state
-      const isHiddenOrUndetected = baseOldState === 'hidden' || baseOldState === 'undetected';
-      const hasOverrideChange = outcome.overrideState && outcome.overrideState !== baseOldState;
-      const hasActionableChange = isHiddenOrUndetected || hasOverrideChange;
+      // Use the centralized logic that handles AVS cases
+      const hasActionableChange = this.calculateHasActionableChange({
+        ...outcome,
+        newVisibility: effectiveNewState,
+        currentVisibility: baseOldState,
+        overrideState: outcome.overrideState,
+      });
 
       // Build override icon states for the row
       const desired = getDesiredOverrideStatesForAction('consequences');
@@ -200,6 +142,9 @@ export class ConsequencesPreviewDialog extends BaseActionDialog {
         { ...outcome, newVisibility: effectiveNewState },
         { selectFrom: 'overrideState', calcFrom: 'newVisibility' },
       );
+      // Check if the old visibility state is AVS-controlled
+      const isOldStateAvsControlled = this.isOldStateAvsControlled(outcome);
+
       return {
         ...outcome,
         // Normalize to match BaseActionDialog helpers
@@ -210,6 +155,7 @@ export class ConsequencesPreviewDialog extends BaseActionDialog {
         oldVisibilityState: getVisibilityStateConfig(baseOldState),
         newVisibilityState: getVisibilityStateConfig(effectiveNewState),
         availableStates,
+        isOldStateAvsControlled,
       };
     });
 
@@ -310,6 +256,11 @@ export class ConsequencesPreviewDialog extends BaseActionDialog {
    * Calculate if there's an actionable change (considering overrides)
    */
   calculateHasActionableChange(outcome) {
+    // Special case: If current state is AVS-controlled and override is 'avs', no change
+    if (outcome.overrideState === 'avs' && this.isCurrentStateAvsControlled(outcome)) {
+      return false;
+    }
+
     // For consequences, actionable change means:
     // 1. Token sees attacker as hidden/undetected AND will change to different state, OR
     // 2. GM has selected an override state that differs from current state
@@ -394,7 +345,35 @@ export class ConsequencesPreviewDialog extends BaseActionDialog {
     const outcome = app.outcomes.find((o) => o.target.id === tokenId);
     if (!outcome) return;
 
-    const effectiveNewState = outcome.overrideState || 'observed';
+    const effectiveNewState = outcome.overrideState || 'avs';
+
+    // If AVS is selected, remove any existing override
+    if (effectiveNewState === 'avs') {
+      try {
+        const { default: AvsOverrideManager } = await import(
+          '../services/infra/avs-override-manager.js'
+        );
+        const observerId = app.actionData?.actor?.document?.id || app.actionData?.actor?.id;
+        if (observerId) {
+          await AvsOverrideManager.removeOverride(observerId, outcome.target.id);
+          // Refresh UI to update override indicators
+          const { updateTokenVisuals } = await import('../../services/visual-effects.js');
+          await updateTokenVisuals();
+          notify.info(
+            `${MODULE_TITLE}: Removed override for ${outcome.target.name} - AVS will control visibility`,
+          );
+        }
+      } catch (e) {
+        console.warn('Failed to remove AVS override:', e);
+        notify.info(`${MODULE_TITLE}: AVS will control visibility for ${outcome.target.name}`);
+      }
+      app.updateRowButtonsToApplied([
+        { target: { id: outcome.target.id }, hasActionableChange: false },
+      ]);
+      app.updateChangesCount();
+      return;
+    }
+
     try {
       const { applyNowConsequences } = await import('../services/index.js');
       const overrides = { [outcome.target.id]: effectiveNewState };
@@ -486,21 +465,57 @@ export class ConsequencesPreviewDialog extends BaseActionDialog {
     }
 
     const overrides = {};
+    const avsRemovals = [];
     for (const o of changedOutcomes) {
       const id = o?.target?.id;
-      const state = o?.overrideState || 'observed';
-      if (id && state) overrides[id] = state;
+      const state = o?.overrideState || 'avs';
+      if (id && state) {
+        if (state === 'avs') {
+          // AVS selections - remove any existing overrides
+          avsRemovals.push({ id, name: o.target.name });
+        } else {
+          overrides[id] = state;
+        }
+      }
     }
-    const { applyNowConsequences } = await import('../services/index.js');
-    await applyNowConsequences(
-      {
-        ...app.actionData,
-        overrides,
-        ignoreAllies: app.ignoreAllies,
-        encounterOnly: app.encounterOnly,
-      },
-      { html: () => {}, attr: () => {} },
-    );
+
+    // Remove AVS overrides if any
+    if (avsRemovals.length > 0) {
+      try {
+        const { default: AvsOverrideManager } = await import(
+          '../services/infra/avs-override-manager.js'
+        );
+        const observerId = app.actionData?.actor?.document?.id || app.actionData?.actor?.id;
+        if (observerId) {
+          for (const removal of avsRemovals) {
+            await AvsOverrideManager.removeOverride(observerId, removal.id);
+          }
+          // Refresh UI to update override indicators
+          const { updateTokenVisuals } = await import('../../services/visual-effects.js');
+          await updateTokenVisuals();
+          const names = avsRemovals.map((r) => r.name).join(', ');
+          notify.info(`${MODULE_TITLE}: Removed overrides for ${avsRemovals.length} token(s)`);
+        }
+      } catch (e) {
+        console.warn('Failed to remove AVS overrides:', e);
+        const names = avsRemovals.map((r) => r.name).join(', ');
+        notify.info(`${MODULE_TITLE}: AVS will control visibility for ${avsRemovals.length}`);
+      }
+    }
+
+    // Apply overrides only if there are any
+    if (Object.keys(overrides).length > 0) {
+      const { applyNowConsequences } = await import('../services/index.js');
+      await applyNowConsequences(
+        {
+          ...app.actionData,
+          overrides,
+          ignoreAllies: app.ignoreAllies,
+          encounterOnly: app.encounterOnly,
+        },
+        { html: () => {}, attr: () => {} },
+      );
+    }
 
     // Update UI for each row
     for (const outcome of changedOutcomes) {

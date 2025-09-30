@@ -82,12 +82,12 @@ export class ConsequencesActionHandler extends ActionHandlerBase {
       oldVisibility: currentVisibility,
       oldVisibilityLabel: VISIBILITY_STATES[currentVisibility]?.label || currentVisibility,
       changed: currentVisibility === 'hidden' || currentVisibility === 'undetected',
-      newVisibility: 'observed',
+      newVisibility: 'avs',
     };
   }
   outcomeToChange(actionData, outcome) {
-    // Use the outcome's newVisibility if set (from overrides), otherwise default to "observed"
-    const newVisibility = outcome.newVisibility || 'observed';
+    // Use the outcome's newVisibility if set (from overrides), otherwise default to AVS
+    const newVisibility = outcome.newVisibility || 'avs';
     return {
       observer: outcome.target,
       target: actionData.actor,

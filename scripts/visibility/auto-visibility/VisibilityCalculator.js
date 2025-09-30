@@ -723,11 +723,44 @@ export class VisibilityCalculator {
           );
         }
 
+        // COMPREHENSIVE FIX: Handle ALL non-darkvision scenarios involving darkness
+        // This covers "in and in", "out looking in", and "in looking out" scenarios
+
+        if (
+          (observerInDarkness || targetInDarkness) &&
+          !observerVision.hasDarkvision &&
+          !observerVision.hasGreaterDarkvision &&
+          !observerVision.hasRegularDarkvision
+        ) {
+          // Check for special senses first
+          const hasPreciseNonVisual = this.#visionAnalyzer.hasPreciseNonVisualInRange(
+            observer,
+            target,
+          );
+          const canSenseImprecisely = this.#visionAnalyzer.canSenseImprecisely(observer, target);
+
+          if (hasPreciseNonVisual) {
+            return { state: 'observed', reason: 'precise_non_visual_in_darkness' };
+          }
+          if (canSenseImprecisely) {
+            return { state: 'hidden', reason: 'imprecise_sense_in_darkness' };
+          }
+
+          // Observer has vision but can't see in darkness = hidden (not undetected)
+          const scenario =
+            observerInDarkness && targetInDarkness
+              ? 'both_in_darkness'
+              : observerInDarkness && !targetInDarkness
+                ? 'observer_in_target_out'
+                : 'observer_out_target_in';
+          return { state: 'hidden', reason: `no_darkvision_${scenario}` };
+        }
+
         // Same lighting state and no cross-boundary darkness - continue with normal processing
         return null;
       }
     } catch (error) {
-      console.error('🔍 ERROR in cross-boundary check:', error);
+      console.error('ERROR in cross-boundary check:', error);
       return null; // Continue with normal processing
     }
   }

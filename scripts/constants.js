@@ -9,6 +9,14 @@ export const MODULE_TITLE = 'PF2E Visioner';
  * Visibility states supported by the module - aligned with PF2E detection conditions
  */
 export const VISIBILITY_STATES = {
+  avs: {
+    label: 'PF2E_VISIONER.VISIBILITY_STATES.avs',
+    pf2eCondition: null,
+    visible: true,
+    icon: 'fas fa-bolt',
+    color: 'var(--visibility-avs, #9c27b0)', // Purple - AVS control
+    cssClass: 'visibility-avs',
+  },
   observed: {
     label: 'PF2E_VISIONER.VISIBILITY_STATES.observed',
     pf2eCondition: null,
@@ -97,7 +105,7 @@ export const COVER_STATES = {
  * Special senses supported by the module
  */
 export const SPECIAL_SENSES = {
-  'vision': {
+  vision: {
     label: 'PF2E_VISIONER.SPECIAL_SENSES.vision',
     description: 'PF2E_VISIONER.SPECIAL_SENSES.vision_description',
     type: 'precise',
@@ -110,7 +118,7 @@ export const SPECIAL_SENSES = {
     hasRangeLimit: true,
   },
   // Vision senses commonly used in PF2e
-  'darkvision': {
+  darkvision: {
     label: 'PF2E_VISIONER.SPECIAL_SENSES.darkvision',
     description: 'PF2E_VISIONER.SPECIAL_SENSES.darkvision_description',
     type: 'precise',
@@ -182,7 +190,7 @@ export const SPECIAL_SENSES = {
     icon: 'fas fa-volume-high',
     hasRangeLimit: true,
   },
-  'truesight': {
+  truesight: {
     label: 'PF2E_VISIONER.SPECIAL_SENSES.truesight',
     description: 'PF2E_VISIONER.SPECIAL_SENSES.truesight_description',
     type: 'precise',
@@ -230,7 +238,7 @@ export const SPECIAL_SENSES = {
     icon: 'fas fa-nose',
     hasRangeLimit: true,
   },
-  'bloodsense': {
+  bloodsense: {
     label: 'PF2E_VISIONER.SPECIAL_SENSES.bloodsense',
     description: 'PF2E_VISIONER.SPECIAL_SENSES.bloodsense_description',
     type: 'imprecise',
@@ -242,7 +250,7 @@ export const SPECIAL_SENSES = {
     icon: 'fas fa-tint',
     hasRangeLimit: true,
   },
-  'magicsense': {
+  magicsense: {
     label: 'PF2E_VISIONER.SPECIAL_SENSES.magicsense',
     description: 'PF2E_VISIONER.SPECIAL_SENSES.magicsense_description',
     type: 'imprecise',
@@ -266,7 +274,7 @@ export const SPECIAL_SENSES = {
     icon: 'fas fa-running',
     hasRangeLimit: true,
   },
-  'spiritsense': {
+  spiritsense: {
     label: 'PF2E_VISIONER.SPECIAL_SENSES.spiritsense',
     description: 'PF2E_VISIONER.SPECIAL_SENSES.spiritsense_description',
     type: 'imprecise',
@@ -278,7 +286,7 @@ export const SPECIAL_SENSES = {
     icon: 'fas fa-ghost',
     hasRangeLimit: true,
   },
-  'thoughtsense': {
+  thoughtsense: {
     label: 'PF2E_VISIONER.SPECIAL_SENSES.thoughtsense',
     description: 'PF2E_VISIONER.SPECIAL_SENSES.thoughtsense_description',
     type: 'imprecise',
@@ -290,7 +298,7 @@ export const SPECIAL_SENSES = {
     icon: 'fas fa-brain',
     hasRangeLimit: true,
   },
-  'wavesense': {
+  wavesense: {
     label: 'PF2E_VISIONER.SPECIAL_SENSES.wavesense',
     description: 'PF2E_VISIONER.SPECIAL_SENSES.wavesense_description',
     type: 'imprecise',

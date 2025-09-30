@@ -378,7 +378,9 @@ function showVisibilityIndicators(hoveredToken) {
 
     otherTokens.forEach((targetToken) => {
       const visibilityMap = getVisibilityMap(hoveredToken);
-      const visibilityState = visibilityMap[targetToken.document.id] || 'observed';
+      let visibilityState = visibilityMap[targetToken.document.id] || 'observed';
+      // Never show 'avs' in tooltips - it's a control mechanism, not a visibility state
+      if (visibilityState === 'avs') visibilityState = 'observed';
 
       if (visibilityState !== 'observed') {
         // Pass relation token (targetToken) to compute cover vs hoveredToken
@@ -399,7 +401,9 @@ function showVisibilityIndicators(hoveredToken) {
         // Show how each other token sees the player's token
         nonPlayerTokens.forEach((otherToken) => {
           const visibilityMap = getVisibilityMap(otherToken);
-          const visibilityState = visibilityMap[hoveredToken.document.id] || 'observed';
+          let visibilityState = visibilityMap[hoveredToken.document.id] || 'observed';
+          // Never show 'avs' in tooltips - it's a control mechanism, not a visibility state
+          if (visibilityState === 'avs') visibilityState = 'observed';
 
           if (visibilityState !== 'observed') {
             // Show indicator on the OTHER token to show how it sees the player's token
@@ -412,7 +416,9 @@ function showVisibilityIndicators(hoveredToken) {
 
       otherTokens.forEach((observerToken) => {
         const visibilityMap = getVisibilityMap(observerToken);
-        const visibilityState = visibilityMap[hoveredToken?.document?.id] || 'observed';
+        let visibilityState = visibilityMap[hoveredToken?.document?.id] || 'observed';
+        // Never show 'avs' in tooltips - it's a control mechanism, not a visibility state
+        if (visibilityState === 'avs') visibilityState = 'observed';
 
         if (visibilityState !== 'observed') {
           // Show indicator on the observer token
@@ -530,7 +536,9 @@ function showVisibilityIndicatorsForToken(observerToken, forceMode = null) {
     // Default mode: Show how the observer token sees others
     otherTokens.forEach((targetToken) => {
       const visibilityMap = getVisibilityMap(observerToken);
-      const visibilityState = visibilityMap[targetToken.document.id] || 'observed';
+      let visibilityState = visibilityMap[targetToken.document.id] || 'observed';
+      // Never show 'avs' in tooltips - it's a control mechanism, not a visibility state
+      if (visibilityState === 'avs') visibilityState = 'observed';
 
       if (visibilityState !== 'observed') {
         addVisibilityIndicator(
@@ -553,7 +561,9 @@ function showVisibilityIndicatorsForToken(observerToken, forceMode = null) {
 
       otherTokensForPlayer.forEach((otherToken) => {
         const visibilityMap = getVisibilityMap(otherToken);
-        const visibilityState = visibilityMap[observerToken.document.id] || 'observed';
+        let visibilityState = visibilityMap[observerToken.document.id] || 'observed';
+        // Never show 'avs' in tooltips - it's a control mechanism, not a visibility state
+        if (visibilityState === 'avs') visibilityState = 'observed';
 
         if (visibilityState !== 'observed') {
           // Show indicator on the OTHER token
@@ -564,7 +574,9 @@ function showVisibilityIndicatorsForToken(observerToken, forceMode = null) {
       // GM sees all perspectives
       otherTokens.forEach((otherToken) => {
         const visibilityMap = getVisibilityMap(otherToken);
-        const visibilityState = visibilityMap[observerToken.document.id] || 'observed';
+        let visibilityState = visibilityMap[observerToken.document.id] || 'observed';
+        // Never show 'avs' in tooltips - it's a control mechanism, not a visibility state
+        if (visibilityState === 'avs') visibilityState = 'observed';
 
         if (visibilityState !== 'observed') {
           // Show indicator on the OTHER token

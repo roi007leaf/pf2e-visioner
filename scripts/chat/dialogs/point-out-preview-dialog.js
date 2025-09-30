@@ -121,8 +121,14 @@ export class PointOutPreviewDialog extends BaseActionDialog {
 
       const effectiveNewState = outcome.overrideState || outcome.newVisibility;
       const baseOldState = outcome.oldVisibility || outcome.currentVisibility;
-      const hasActionableChange =
-        baseOldState != null && effectiveNewState != null && effectiveNewState !== baseOldState;
+      // Special case: If current state is AVS-controlled and override is 'avs', no change
+      let hasActionableChange = false;
+      if (outcome.overrideState === 'avs' && this.isCurrentStateAvsControlled(outcome)) {
+        hasActionableChange = false;
+      } else {
+        hasActionableChange =
+          baseOldState != null && effectiveNewState != null && effectiveNewState !== baseOldState;
+      }
 
       return {
         ...outcome,

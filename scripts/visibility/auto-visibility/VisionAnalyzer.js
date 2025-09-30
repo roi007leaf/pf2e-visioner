@@ -238,6 +238,7 @@ export class VisionAnalyzer {
       echolocationActive: capabilities.echolocationActive || false,
       echolocationRange: capabilities.echolocationRange || 0,
       lifesense: capabilities.lifesense || null,
+      individualSenses: capabilities.individualSenses || {},
       // Include individual senses for backward compatibility
       ...Object.fromEntries(
         Object.entries(capabilities).filter(
@@ -258,6 +259,7 @@ export class VisionAnalyzer {
               'echolocationActive',
               'echolocationRange',
               'lifesense',
+              'individualSenses',
             ].includes(key),
         ),
       ),
@@ -368,10 +370,13 @@ export class VisionAnalyzer {
    */
   hasPreciseNonVisualInRange(observer, target) {
     try {
-      const capabilities = this.getVisionCapabilities(observer);
-      if (!capabilities.precise.length) return false;
+      // Use getSensingSummary instead of getVisionCapabilities to include traditional senses overrides
+      const sensingSummary = this.getSensingSummary(observer);
+      if (!sensingSummary.precise?.length) {
+        return false;
+      }
       const dist = this.distanceFeet(observer, target);
-      for (const ent of capabilities.precise) {
+      for (const ent of sensingSummary.precise) {
         if (!ent || typeof ent.range !== 'number') continue;
         // Exclude all visual senses: plain vision/sight, darkvision, greater-darkvision, low-light-vision, truesight, infrared vision, etc.
         // Exception: see-invisibility is treated as non-visual for invisibility detection purposes
@@ -384,16 +389,21 @@ export class VisionAnalyzer {
           t === 'greaterdarkvision' ||
           t === 'low-light-vision' ||
           t === 'lowlightvision' ||
+          t === 'light-perception' || // Light perception is visual and doesn't work in darkness
           t.includes('vision') ||
           t.includes('sight');
 
         // Special case: see-invisibility should not be excluded even though it contains "sight"
         const isSeeInvisibility = t === 'see-invisibility' || t === 'seeinvisibility';
 
-        if (isVisual && !isSeeInvisibility) continue;
+        if (isVisual && !isSeeInvisibility) {
+          continue;
+        }
 
         // Special check for echolocation - requires hearing (can't use if deafened)
-        if (t === 'echolocation' && this.#isDeafened(observer)) continue;
+        if (t === 'echolocation' && this.#isDeafened(observer)) {
+          continue;
+        }
 
         // Special check for tremorsense - target must be in contact with ground (elevation 0)
         if (t === 'tremorsense') {
@@ -403,7 +413,9 @@ export class VisionAnalyzer {
           }
         }
 
-        if (ent.range === Infinity || ent.range >= dist) return true;
+        if (ent.range === Infinity || ent.range >= dist) {
+          return true;
+        }
       }
     } catch {}
     return false;
@@ -425,19 +437,33 @@ export class VisionAnalyzer {
    */
   distanceFeet(a, b) {
     try {
-      // Use Foundry's built-in distance calculation method
-      // PF2e's distanceTo returns distance in grid squares, so convert to feet
-      const gridDistance = a.distanceTo?.(b) ?? Infinity;
+      // First try Foundry's built-in distance calculation method
+      if (typeof a.distanceTo === 'function') {
+        const gridDistance = a.distanceTo(b);
+        if (Number.isFinite(gridDistance)) {
+          // Convert grid squares to feet using the scene's grid distance setting
+          const gridUnits = game.canvas?.scene?.grid?.distance || 5;
+          const feetDistance = gridDistance * gridUnits;
+          // Round down to nearest 5-foot increment (PF2e uses 5-foot squares)
+          return Math.floor(feetDistance / 5) * 5;
+        }
+      }
 
-      // Convert grid squares to feet using the scene's grid distance setting
-      const gridUnits = global.canvas?.scene?.grid?.distance || 5;
-      const feetDistance = gridDistance * gridUnits;
+      // Fallback: manual distance calculation
+      if (a.center && b.center) {
+        const dx = a.center.x - b.center.x;
+        const dy = a.center.y - b.center.y;
+        const pixels = Math.hypot(dx, dy);
+        const gridSize = game.canvas?.grid?.size || 100;
+        const gridUnits = game.canvas?.scene?.grid?.distance || 5;
+        const feetDistance = (pixels / gridSize) * gridUnits;
+        // Round down to nearest 5-foot increment
+        return Math.floor(feetDistance / 5) * 5;
+      }
 
-      // Round down to nearest 5-foot increment (PF2e uses 5-foot squares)
-      const result = Math.floor(feetDistance / 5) * 5;
-
-      return result;
+      return Infinity;
     } catch (error) {
+      console.warn(`${MODULE_ID}: Error calculating distance:`, error);
       return Infinity;
     }
   }
@@ -618,47 +644,7 @@ export class VisionAnalyzer {
         }
       }
 
-      // Also check traditional senses for non-visual senses (echolocation, lifesense, etc.)
-      if (senses) {
-        const nonVisualSenseMap = {
-          tremorsense: 'feelTremor',
-          echolocation: 'echolocation',
-          lifesense: 'lifesense',
-          blindsense: 'blindsense',
-        };
-
-        if (Array.isArray(senses)) {
-          // NPC format: array of sense objects
-          for (const sense of senses) {
-            const detectionModeId = nonVisualSenseMap[sense.type];
-            if (detectionModeId && sense.range > 0) {
-              // Only add if not already present from detectionModes (detectionModes takes precedence)
-              if (!detectionModes[detectionModeId]) {
-                detectionModes[detectionModeId] = {
-                  enabled: true,
-                  range: sense.range,
-                  source: 'senses',
-                };
-              }
-            }
-          }
-        } else {
-          // PC format: object with sense properties
-          for (const [senseType, senseData] of Object.entries(senses)) {
-            const detectionModeId = nonVisualSenseMap[senseType];
-            if (detectionModeId && senseData?.range > 0) {
-              // Only add if not already present from detectionModes (detectionModes takes precedence)
-              if (!detectionModes[detectionModeId]) {
-                detectionModes[detectionModeId] = {
-                  enabled: true,
-                  range: senseData.range,
-                  source: 'senses',
-                };
-              }
-            }
-          }
-        }
-      }
+      // Note: Traditional senses will be processed after detection modes and can override them
 
       // Add comprehensive sensing summary (merge getSensingSummary functionality)
       sensingSummary = this.#calculateSensingSummary(token, senses, detectionModes);
@@ -678,6 +664,7 @@ export class VisionAnalyzer {
       isBlinded,
       isDazzled,
       hasGreaterDarkvision,
+      hasRegularDarkvision: hasDarkvision && !hasGreaterDarkvision, // Regular darkvision (not greater)
       detectionModes, // Detection modes from both sources
       // Sensing summary (replaces getSensingSummary)
       precise: sensingSummary.precise,
@@ -687,6 +674,7 @@ export class VisionAnalyzer {
       echolocationRange: sensingSummary.echolocationRange,
       lifesense: sensingSummary.lifesense,
       // Individual senses for backward compatibility
+      individualSenses: sensingSummary.individualSenses,
       ...sensingSummary.individualSenses,
     };
 
@@ -764,13 +752,22 @@ export class VisionAnalyzer {
 
       if (detectionModeMapping[modeId]) {
         senseType = detectionModeMapping[modeId].type;
-        acuity = detectionModeMapping[modeId].acuity;
+        // Use acuity from detection mode data if available, otherwise use mapping default
+        if (
+          modeData.acuity &&
+          typeof modeData.acuity === 'string' &&
+          modeData.acuity.trim() !== ''
+        ) {
+          acuity = modeData.acuity;
+        } else {
+          acuity = detectionModeMapping[modeId].acuity;
+        }
       }
 
       this.#addSenseToSummary(summary, senseType, acuity, modeData.range, token, addedSenses);
     }
 
-    // Process traditional senses (if not already added by detection modes)
+    // Process traditional senses - these can override detection modes with correct acuity
     if (senses) {
       try {
         if (Array.isArray(senses)) {
@@ -780,13 +777,14 @@ export class VisionAnalyzer {
               // Skip - already processed in detection modes
               continue;
             } else {
-              // Traditional sense format
+              // Traditional sense format - allow overriding detection modes
               const type = s?.type ?? s?.slug ?? s?.name ?? s?.label ?? s?.id;
               const val = s?.value ?? s;
               let acuity = val?.acuity ?? s?.acuity ?? val?.value;
               let range = val?.range ?? s?.range;
 
-              this.#addSenseToSummary(summary, type, acuity, range, token, addedSenses);
+              // Override any existing sense with the same type
+              this.#addSenseToSummary(summary, type, acuity, range, token, addedSenses, true);
             }
           }
         } else if (typeof senses === 'object') {
@@ -794,7 +792,8 @@ export class VisionAnalyzer {
             const val = obj?.value ?? obj;
             const acuity = val?.acuity ?? obj?.acuity ?? val?.value;
             const range = val?.range ?? obj?.range;
-            this.#addSenseToSummary(summary, type, acuity, range, token, addedSenses);
+            // Override any existing sense with the same type
+            this.#addSenseToSummary(summary, type, acuity, range, token, addedSenses, true);
           }
         }
       } catch {
@@ -815,14 +814,44 @@ export class VisionAnalyzer {
    * @param {Set} addedSenses - Set to track which senses have been added
    * @private
    */
-  #addSenseToSummary(summary, type, acuity, range, token, addedSenses) {
+  #addSenseToSummary(summary, type, acuity, range, token, addedSenses, allowOverride = false) {
     if (!type) return;
 
+    const senseType = String(type).toLowerCase();
+
     // Check if this sense has already been added
-    const senseKey = `${type.toLowerCase()}-${range}`;
-    if (addedSenses && addedSenses.has(senseKey)) {
+    const senseKey = `${senseType}-${range}`;
+    if (addedSenses && addedSenses.has(senseKey) && !allowOverride) {
       return; // Skip duplicate
     }
+
+    // If overriding, remove existing sense from arrays first
+    if (allowOverride) {
+      // Remove from precise array
+      const preciseIndex = summary.precise.findIndex((s) => s.type === senseType);
+      if (preciseIndex !== -1) {
+        summary.precise.splice(preciseIndex, 1);
+      }
+
+      // Remove from imprecise array
+      const impreciseIndex = summary.imprecise.findIndex((s) => s.type === senseType);
+      if (impreciseIndex !== -1) {
+        summary.imprecise.splice(impreciseIndex, 1);
+      }
+
+      // Remove from individualSenses
+      if (summary.individualSenses && summary.individualSenses[senseType]) {
+        delete summary.individualSenses[senseType];
+      }
+
+      // Remove from special sense properties
+      if (senseType === 'hearing') {
+        summary.hearing = null;
+      } else if (senseType === 'lifesense') {
+        summary.lifesense = null;
+      }
+    }
+
     if (addedSenses) {
       addedSenses.add(senseKey);
     }
@@ -861,8 +890,8 @@ export class VisionAnalyzer {
       entry.range = summary.echolocationRange || 40;
     }
 
-    // Special case: echolocation as a sense type should be precise
-    if (entry.type === 'echolocation') {
+    // Special case: echolocation as a sense type should be precise (if no acuity specified)
+    if (entry.type === 'echolocation' && (!acuity || acuity === 'imprecise')) {
       a = 'precise';
     }
 
@@ -876,11 +905,13 @@ export class VisionAnalyzer {
       summary.individualSenses[entry.type] = { acuity: a, range: entry.range };
     }
 
-    // Add to appropriate acuity array
-    if (a === 'precise') {
-      summary.precise.push(entry);
-    } else {
-      summary.imprecise.push(entry);
+    // Add to appropriate acuity array (but skip hearing since it has a dedicated property and was causing duplicates)
+    if (entry.type !== 'hearing') {
+      if (a === 'precise') {
+        summary.precise.push(entry);
+      } else {
+        summary.imprecise.push(entry);
+      }
     }
   }
 

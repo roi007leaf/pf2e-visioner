@@ -1,11 +1,14 @@
 import { MODULE_ID, VISIBILITY_STATES } from '../../../constants.js';
+import { VisionAnalyzer } from '../../../visibility/auto-visibility/VisionAnalyzer.js';
 import { appliedSeekChangesByMessage } from '../data/message-cache.js';
 import { ActionHandlerBase } from './base-action.js';
-import { VisionAnalyzer } from '../../../visibility/auto-visibility/VisionAnalyzer.js';
 
 export class SeekActionHandler extends ActionHandlerBase {
   constructor() {
     super('seek');
+    // Store used sense per seek action (not per subject)
+    this._usedSenseType = null;
+    this._usedSensePrecision = null;
   }
   getApplyActionName() {
     return 'apply-now-seek';
@@ -105,7 +108,7 @@ export class SeekActionHandler extends ActionHandlerBase {
           });
         }
       }
-    } catch { }
+    } catch {}
 
     // Do not pre-filter by encounter; the dialog applies encounter filter as needed
     return potential;
@@ -131,7 +134,7 @@ export class SeekActionHandler extends ActionHandlerBase {
       if (isAnomaly && FeatsHandler.hasFeat(actionData.actor, ['thats-odd', "that's-odd"])) {
         thatsOddAuto = true;
       }
-    } catch { }
+    } catch {}
 
     if (subject && subject._isWall) {
       // Walls: use provided dc and evaluate new state vs current observer wall state
@@ -184,7 +187,7 @@ export class SeekActionHandler extends ActionHandlerBase {
             }
           }
         }
-      } catch { }
+      } catch {}
 
       // For loot actors, use the custom Stealth DC flag configured on the token; otherwise use Perception DC
       dc = extractStealthDC(subject);
@@ -192,9 +195,9 @@ export class SeekActionHandler extends ActionHandlerBase {
     const total = Number(actionData?.roll?.total ?? 0);
     const die = Number(
       actionData?.roll?.dice?.[0]?.results?.[0]?.result ??
-      actionData?.roll?.dice?.[0]?.total ??
-      actionData?.roll?.terms?.[0]?.total ??
-      0,
+        actionData?.roll?.dice?.[0]?.total ??
+        actionData?.roll?.terms?.[0]?.total ??
+        0,
     );
     const outcome = determineOutcome(total, die, dc);
     // Simple mapping: success → observed; failure → concealed/hidden depending on target state; crit-failure → undetected
@@ -214,7 +217,7 @@ export class SeekActionHandler extends ActionHandlerBase {
           outcome,
         },
       );
-    } catch { }
+    } catch {}
 
     // Check special sense limitations only if NO precise sense is available to the seeker,
     // or if the seeker is blinded we also consider imprecise fallback senses (hearing, lifesense, etc.).
@@ -223,9 +226,7 @@ export class SeekActionHandler extends ActionHandlerBase {
     let usedImprecise = false;
     let usedImpreciseSenseType = null;
     let usedImpreciseSenseRange = null;
-    // New: track general used sense (precise or imprecise) for UI highlighting
-    let usedSenseType = null; // e.g., 'vision', 'darkvision', 'hearing', 'lifesense', ...
-    let usedSensePrecision = null; // 'precise' | 'imprecise'
+    // Used sense is now tracked at class level (this._usedSenseType, this._usedSensePrecision)
 
     try {
       if (!subject?._isWall) {
@@ -237,18 +238,143 @@ export class SeekActionHandler extends ActionHandlerBase {
 
         // Determine if the seeker has any precise sense to use (visual or non-visual)
         // Resolve the observer token for accurate LoS and range tests
-        const observerToken = actionData.actorToken || actionData.actor?.token?.object || actionData.actor;
+        const observerToken =
+          actionData.actorToken || actionData.actor?.token?.object || actionData.actor;
         const visCaps = va.getVisionCapabilities(observerToken);
         const hasLoS = va.hasLineOfSight?.(observerToken, subject, true) ?? true;
-        const hasVisualPrecise = !!(
-          visCaps?.hasVision && !visCaps?.isBlinded && hasLoS
-        );
+        const hasVisualPrecise = !!(visCaps?.hasVision && !visCaps?.isBlinded && hasLoS);
         const hasNonVisualPrecise = va.hasPreciseNonVisualInRange(observerToken, subject);
         const hasAnyPrecise = hasVisualPrecise || hasNonVisualPrecise;
 
-        // Evaluate imprecise senses if we lack any precise sense, OR we are blinded AND do not have a non-visual precise sense
-        const shouldEvaluateImprecise = !hasAnyPrecise || (visCaps?.isBlinded && !hasNonVisualPrecise);
-        if (shouldEvaluateImprecise) {
+        // Check if we have any precise senses available (regardless of range for this specific target)
+        const sensingSummaryForUsedSense = va.getSensingSummary(observerToken);
+        const hasPreciseSensesAvailable = sensingSummaryForUsedSense.precise?.length > 0;
+
+        // Only determine used sense once per seek action (not per subject)
+        if ((hasAnyPrecise || hasPreciseSensesAvailable) && !this._usedSenseType) {
+          try {
+            // Check for ANY precise sense (visual OR non-visual) in the sensing summary
+            const sensingSummaryForCheck = va.getSensingSummary(observerToken);
+            const hasAnyPreciseFromSummary = sensingSummaryForCheck.precise?.some((s) => {
+              return s && s.range > 0; // Any precise sense with positive range
+            });
+
+            // Use either the original logic or the direct summary check
+            const effectiveHasAnyPrecise = hasAnyPrecise || hasAnyPreciseFromSummary;
+
+            if (!subject?._isWall && effectiveHasAnyPrecise) {
+              const sensingSummary = va.getSensingSummary(observerToken);
+              const dist = this.#calculateDistance(observerToken, subject);
+
+              // Helper to decide if a sense type is visual
+              const isVisualType = (t) => {
+                const tt = String(t || '').toLowerCase();
+                return (
+                  tt === 'vision' ||
+                  tt === 'sight' ||
+                  tt === 'darkvision' ||
+                  tt === 'greater-darkvision' ||
+                  tt === 'greaterdarkvision' ||
+                  tt === 'low-light-vision' ||
+                  tt === 'lowlightvision' ||
+                  tt === 'truesight' ||
+                  tt.includes('vision') ||
+                  tt.includes('sight')
+                );
+              };
+
+              // Prefer visual precise senses first (highest priority in PF2e mechanics)
+              // Check sensing summary directly for visual precise senses
+              const hasVisualPreciseFromSummary = sensingSummary.precise?.some(
+                (s) => s && isVisualType(s.type) && s.range > 0,
+              );
+
+              if (hasVisualPrecise || hasVisualPreciseFromSummary) {
+                // Try to pick the most specific available
+                const preferredOrder = [
+                  'truesight',
+                  'greater-darkvision',
+                  'darkvision',
+                  'low-light-vision',
+                  'infrared-vision',
+                  'vision',
+                ];
+                // Build candidate list from sensing summary
+                const visuals = Array.isArray(sensingSummary.precise)
+                  ? sensingSummary.precise.filter((ent) => ent && isVisualType(ent.type))
+                  : [];
+                // Ensure plain vision as a fallback (may not be listed by PF2e data)
+                visuals.push({ type: 'vision', range: Infinity });
+                let chosen = null;
+                for (const pref of preferredOrder) {
+                  chosen = visuals.find((ent) => {
+                    const t = String(ent.type || '').toLowerCase();
+                    if (t !== pref) return false;
+                    const r = Number(ent.range);
+                    return !Number.isFinite(r) || r >= dist;
+                  });
+                  if (chosen) break;
+                }
+                if (chosen) {
+                  this._usedSenseType = String(chosen.type || '').toLowerCase();
+                  this._usedSensePrecision = 'precise';
+                }
+              }
+
+              // Fall back to non-visual precise sense if no visual sense was used
+              // Check sensing summary directly for non-visual precise senses
+              const hasNonVisualPreciseFromSummary = sensingSummary.precise?.some(
+                (s) => s && !isVisualType(s.type) && s.range > 0,
+              );
+              const effectiveHasNonVisualPrecise =
+                hasNonVisualPrecise || hasNonVisualPreciseFromSummary;
+
+              if (
+                !this._usedSenseType &&
+                effectiveHasNonVisualPrecise &&
+                Array.isArray(sensingSummary.precise)
+              ) {
+                // First try to find a precise sense that's in range
+                let match = sensingSummary.precise.find((ent) => {
+                  if (!ent) return false;
+
+                  if (isVisualType(ent.type)) {
+                    return false;
+                  }
+                  const r = Number(ent.range);
+                  // If distance calculation failed (Infinity), be more lenient for used sense tracking
+                  // since we already know from the sensing summary that precise senses are available
+                  const inRange = !Number.isFinite(r) || r >= dist || (dist === Infinity && r > 0);
+                  return inRange;
+                });
+
+                // If no precise sense is in range, use the best available precise sense anyway
+                // (for UI indication of what sense the character is attempting to use)
+                if (!match) {
+                  match = sensingSummary.precise.find((ent) => {
+                    if (!ent) return false;
+                    if (isVisualType(ent.type)) return false;
+                    return true; // Use any non-visual precise sense for UI indication
+                  });
+                }
+                if (match) {
+                  this._usedSenseType = String(match.type || '').toLowerCase();
+                  this._usedSensePrecision = 'precise';
+                }
+              }
+            }
+          } catch {}
+        }
+
+        // PRIORITY 2: Evaluate imprecise senses as fallback (only if no precise senses available)
+        const shouldEvaluateImprecise =
+          !hasAnyPrecise || (visCaps?.isBlinded && !hasNonVisualPrecise);
+
+        // Also check if we have imprecise senses available for used sense indication
+        const hasImpreciseSensesAvailable =
+          sensingSummaryForUsedSense.imprecise?.length > 0 || sensingSummaryForUsedSense.hearing;
+
+        if (shouldEvaluateImprecise || (!this._usedSenseType && hasImpreciseSensesAvailable)) {
           const sensingSummary = va.getSensingSummary(observerToken);
           const dist = this.#calculateDistance(observerToken, subject);
 
@@ -268,13 +394,17 @@ export class SeekActionHandler extends ActionHandlerBase {
                 usedImprecise = true;
                 usedImpreciseSenseType = 'hearing';
                 usedImpreciseSenseRange = hr;
-                usedSenseType = 'hearing';
-                usedSensePrecision = 'imprecise';
+
+                // Only set usedSenseType if it hasn't been set by precise sense logic (priority)
+                if (!this._usedSenseType) {
+                  this._usedSenseType = 'hearing';
+                  this._usedSensePrecision = 'imprecise';
+                }
               } else {
                 lastBlock = { type: 'out-of-range', senseType: 'hearing', senseRange: hr };
               }
             }
-          } catch { }
+          } catch {}
 
           // Consider imprecise special senses and other imprecise entries (e.g., lifesense)
           try {
@@ -294,25 +424,41 @@ export class SeekActionHandler extends ActionHandlerBase {
               if (cfg) {
                 const canDetectType = await va.canDetectWithSpecialSense(subject, senseType);
                 if (!canDetectType) {
-                  const unmetCondition = this.#getUnmetConditionExplanation(subject, senseType, cfg);
-                  lastBlock = { type: 'unmet-conditions', senseType, senseRange: r, unmetCondition };
+                  const unmetCondition = this.#getUnmetConditionExplanation(
+                    subject,
+                    senseType,
+                    cfg,
+                  );
+                  lastBlock = {
+                    type: 'unmet-conditions',
+                    senseType,
+                    senseRange: r,
+                    unmetCondition,
+                  };
                   continue;
                 }
               }
 
-              if (r >= dist) {
+              // Use lenient range check for imprecise senses too (same as precise sense tracking)
+              const inRange = r >= dist || (dist === Infinity && r > 0);
+
+              if (inRange) {
                 anyImpreciseViable = true;
                 usedImprecise = true;
                 usedImpreciseSenseType = senseType;
                 usedImpreciseSenseRange = r;
-                usedSenseType = senseType;
-                usedSensePrecision = 'imprecise';
+
+                // Only set usedSenseType if it hasn't been set by precise sense logic (priority)
+                if (!this._usedSenseType) {
+                  this._usedSenseType = senseType;
+                  this._usedSensePrecision = 'imprecise';
+                }
                 break;
               } else {
                 lastBlock = { type: 'out-of-range', senseType, senseRange: r };
               }
             }
-          } catch { }
+          } catch {}
 
           // If there is no precise sense available and no imprecise can detect
           // If the last block indicates unmet-conditions, tests expect the overall outcome to be 'unmet-conditions'.
@@ -330,9 +476,9 @@ export class SeekActionHandler extends ActionHandlerBase {
               const total = Number(actionData?.roll?.total ?? 0);
               const die = Number(
                 actionData?.roll?.dice?.[0]?.results?.[0]?.result ??
-                actionData?.roll?.dice?.[0]?.total ??
-                actionData?.roll?.terms?.[0]?.total ??
-                0,
+                  actionData?.roll?.dice?.[0]?.total ??
+                  actionData?.roll?.terms?.[0]?.total ??
+                  0,
               );
               const dcBlocked = extractStealthDC(subject) || 0;
               return {
@@ -355,82 +501,28 @@ export class SeekActionHandler extends ActionHandlerBase {
               };
             }
           }
-          // If a precise sense exists, we don't block even if imprecise can't detect; proceed normally
-        }
 
-        // If we have a precise sense available, record which precise sense is used for this subject
-        try {
-          if (!subject?._isWall && hasAnyPrecise && !usedSenseType) {
+          // If no used sense has been set yet, use the best available imprecise sense for UI indication
+          if (!this._usedSenseType && hasImpreciseSensesAvailable) {
             const sensingSummary = va.getSensingSummary(observerToken);
-            const dist = this.#calculateDistance(observerToken, subject);
 
-            // Helper to decide if a sense type is visual
-            const isVisualType = (t) => {
-              const tt = String(t || '').toLowerCase();
-              return (
-                tt === 'vision' ||
-                tt === 'sight' ||
-                tt === 'darkvision' ||
-                tt === 'greater-darkvision' ||
-                tt === 'greaterdarkvision' ||
-                tt === 'low-light-vision' ||
-                tt === 'lowlightvision' ||
-                tt === 'truesight' ||
-                tt.includes('vision') ||
-                tt.includes('sight')
-              );
-            };
-
-            // Prefer visual precise senses first (highest priority in PF2e mechanics)
-            if (!usedSenseType && hasVisualPrecise) {
-              // Try to pick the most specific available
-              const preferredOrder = [
-                'truesight',
-                'greater-darkvision',
-                'darkvision',
-                'low-light-vision',
-                'infrared-vision',
-                'vision',
-              ];
-              // Build candidate list from sensing summary
-              const visuals = Array.isArray(sensingSummary.precise)
-                ? sensingSummary.precise.filter((ent) => ent && isVisualType(ent.type))
-                : [];
-              // Ensure plain vision as a fallback (may not be listed by PF2e data)
-              visuals.push({ type: 'vision', range: Infinity });
-              let chosen = null;
-              for (const pref of preferredOrder) {
-                chosen = visuals.find((ent) => {
-                  const t = String(ent.type || '').toLowerCase();
-                  if (t !== pref) return false;
-                  const r = Number(ent.range);
-                  return !Number.isFinite(r) || r >= dist;
-                });
-                if (chosen) break;
-              }
-              if (chosen) {
-                usedSenseType = String(chosen.type || '').toLowerCase();
-                usedSensePrecision = 'precise';
-              }
+            // Prefer hearing if available
+            if (sensingSummary.hearing) {
+              this._usedSenseType = 'hearing';
+              this._usedSensePrecision = 'imprecise';
             }
-
-            // Fall back to non-visual precise sense if no visual sense was used
-            if (!usedSenseType && hasNonVisualPrecise && Array.isArray(sensingSummary.precise)) {
-              const match = sensingSummary.precise.find((ent) => {
-                if (!ent) return false;
-                if (isVisualType(ent.type)) return false;
-                const r = Number(ent.range);
-                return !Number.isFinite(r) || r >= dist;
-              });
-              if (match) {
-                usedSenseType = String(match.type || '').toLowerCase();
-                usedSensePrecision = 'precise';
-              }
+            // Otherwise use the first imprecise sense
+            else if (sensingSummary.imprecise?.length > 0) {
+              const firstImpreciseSense = sensingSummary.imprecise[0];
+              this._usedSenseType = String(firstImpreciseSense.type || '').toLowerCase();
+              this._usedSensePrecision = 'imprecise';
             }
           }
-        } catch { }
+
+          // If a precise sense exists, we don't block even if imprecise can't detect; proceed normally
+        }
       }
-    } catch { }
+    } catch {}
 
     // PF2e RAW correction: You CAN Seek with imprecise senses,
     // but the best you can do is make the target Hidden (never Observed).
@@ -441,20 +533,34 @@ export class SeekActionHandler extends ActionHandlerBase {
           '../../../visibility/auto-visibility/VisionAnalyzer.js'
         );
         const va = VisionAnalyzer.getInstance();
-        const observerToken = actionData.actorToken || actionData.actor?.token?.object || actionData.actor;
+        const observerToken =
+          actionData.actorToken || actionData.actor?.token?.object || actionData.actor;
         const visCaps = va.getVisionCapabilities(observerToken);
         // Visual precise is only considered available if the observer both has vision and has LoS,
         // and current visibility (pre-seek) is at least precise quality (observed or concealed)
         const hasLoS = va.hasLineOfSight?.(observerToken, subject, true) ?? true;
-        const hasVisualPrecise = !!(
-          visCaps?.hasVision && !visCaps?.isBlinded && hasLoS
-        );
+        const hasVisualPrecise = !!(visCaps?.hasVision && !visCaps?.isBlinded && hasLoS);
         const hasNonVisualPrecise = va.hasPreciseNonVisualInRange(observerToken, subject);
-        if (!hasVisualPrecise && !hasNonVisualPrecise) {
+
+        // Also check the sensing summary directly as a fallback
+        const sensingSummaryForOutcome = va.getSensingSummary(observerToken);
+        const hasPreciseNonVisualFromSummaryForOutcome = sensingSummaryForOutcome.precise?.some(
+          (s) => {
+            const t = String(s.type || '').toLowerCase();
+            const isVisual =
+              t === 'vision' || t === 'sight' || t.includes('vision') || t.includes('sight');
+            return !isVisual && s.range > 0;
+          },
+        );
+
+        const effectiveHasNonVisualPrecise =
+          hasNonVisualPrecise || hasPreciseNonVisualFromSummaryForOutcome;
+
+        if (!hasVisualPrecise && !effectiveHasNonVisualPrecise) {
           newVisibility = 'hidden';
         }
       }
-    } catch { }
+    } catch {}
 
     // Build display metadata for walls
     let wallMeta = {};
@@ -474,7 +580,7 @@ export class SeekActionHandler extends ActionHandlerBase {
           wallIdentifier: name,
           wallImg: img,
         };
-      } catch { }
+      } catch {}
     }
 
     const base = {
@@ -495,12 +601,18 @@ export class SeekActionHandler extends ActionHandlerBase {
       usedImprecise: !!usedImprecise,
       usedImpreciseSenseType: usedImpreciseSenseType || null,
       usedImpreciseSenseRange: usedImpreciseSenseRange ?? null,
-      // New general used-sense fields for UI (covers precise and imprecise)
-      usedSenseType: usedSenseType || (usedImprecise ? usedImpreciseSenseType : null) || null,
-      usedSensePrecision: usedSensePrecision || (usedImprecise ? 'imprecise' : null) || null,
+      // Used sense information for UI display (set once per seek action, not per subject)
+      usedSenseType: this._usedSenseType,
+      usedSensePrecision: this._usedSensePrecision,
       // Informational flags when neither precise nor imprecise could detect
-      unmetConditions: typeof __impreciseReason !== 'undefined' && __impreciseReason === 'unmet-conditions' ? true : undefined,
-      outOfRange: typeof __impreciseReason !== 'undefined' && __impreciseReason === 'out-of-range' ? true : undefined,
+      unmetConditions:
+        typeof __impreciseReason !== 'undefined' && __impreciseReason === 'unmet-conditions'
+          ? true
+          : undefined,
+      outOfRange:
+        typeof __impreciseReason !== 'undefined' && __impreciseReason === 'out-of-range'
+          ? true
+          : undefined,
       senseType: typeof __impreciseSenseType !== 'undefined' ? __impreciseSenseType : undefined,
       senseRange: typeof __impreciseSenseRange !== 'undefined' ? __impreciseSenseRange : undefined,
       unmetCondition: typeof __impreciseUnmet !== 'undefined' ? __impreciseUnmet : undefined,
@@ -535,7 +647,7 @@ export class SeekActionHandler extends ActionHandlerBase {
             if (wallCenter) {
               const distance = Math.sqrt(
                 Math.pow(wallCenter.x - actionData.seekTemplateCenter.x, 2) +
-                Math.pow(wallCenter.y - actionData.seekTemplateCenter.y, 2),
+                  Math.pow(wallCenter.y - actionData.seekTemplateCenter.y, 2),
               );
               const radiusPixels = (actionData.seekTemplateRadiusFeet * canvas.scene.grid.size) / 5;
               inside = distance <= radiusPixels;
@@ -555,7 +667,7 @@ export class SeekActionHandler extends ActionHandlerBase {
 
         if (!inside) return { ...base, changed: false };
       }
-    } catch { }
+    } catch {}
 
     return base;
   }
@@ -597,7 +709,7 @@ export class SeekActionHandler extends ActionHandlerBase {
           oldVisibility: outcome?.oldVisibility || outcome?.currentVisibility || null,
         };
       }
-    } catch { }
+    } catch {}
     return super.outcomeToChange(actionData, outcome);
   }
 
@@ -675,7 +787,7 @@ export class SeekActionHandler extends ActionHandlerBase {
             try {
               const { updateWallVisuals } = await import('../../../services/visual-effects.js');
               await updateWallVisuals(observer.id);
-            } catch { }
+            } catch {}
           } catch {
             /* ignore per-observer wall errors */
           }
@@ -718,7 +830,7 @@ export class SeekActionHandler extends ActionHandlerBase {
             return id ? tokenMap.has(id) : false;
           });
         }
-      } catch { }
+      } catch {}
 
       if (filtered.length === 0) {
         (await import('../infra/notifications.js')).notify.info('No changes to apply');
@@ -751,7 +863,7 @@ export class SeekActionHandler extends ActionHandlerBase {
       return visionAnalyzer.distanceFeet(token1, token2);
     } catch (error) {
       console.error(`${MODULE_ID}: Error calculating distance using VisionAnalyzer:`, error);
-      
+
       // Fallback calculation
       try {
         const dx = token1.center.x - token2.center.x;

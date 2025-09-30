@@ -63,7 +63,7 @@ export async function buildContext(app, options) {
   try {
     app.visibilityData = getVisibilityMap(app.observer) || {};
     app.coverData = getCoverMap(app.observer) || {};
-  } catch { }
+  } catch {}
 
   const isLootObserver = app.observer?.actor?.type === 'loot';
   if (isLootObserver) {
@@ -100,197 +100,345 @@ export async function buildContext(app, options) {
 
   let allTargets;
   if (app.mode === 'observer') {
-    allTargets = sceneTokens.map((token) => {
-      const currentVisibilityState = app.visibilityData[token.document.id] || 'observed';
-      const currentCoverState = app.coverData[token.document.id] || 'none';
+    allTargets = await Promise.all(
+      sceneTokens.map(async (token) => {
+        // Get manual visibility state from the map, or null if none exists
+        const manualVisibilityState = app.visibilityData[token.document.id] || null;
+        // For display purposes, we'll determine the actual current state later
+        // Don't default to 'observed' here - we'll handle that in the logic below
+        const currentVisibilityState = manualVisibilityState;
+        const currentCoverState = app.coverData[token.document.id] || 'none';
 
-      const disposition = token.document.disposition || 0;
-      // Foundry hidden means the TokenDocument.hidden property is strictly true
-      const isFoundryHidden = token?.document?.hidden === true;
+        const disposition = token.document.disposition || 0;
+        // Foundry hidden means the TokenDocument.hidden property is strictly true
+        const isFoundryHidden = token?.document?.hidden === true;
 
-      const perceptionDC = extractPerceptionDC(token);
-      const stealthDC = extractStealthDC(token);
-      const showOutcomeSetting = game.settings.get(MODULE_ID, 'integrateRollOutcome');
-      let showOutcome = false;
-      let outcomeLabel = '';
-      let outcomeClass = '';
-      if (showOutcomeSetting) {
-        const lastRoll = getLastRollTotalForActor(app.observer?.actor, null);
-        if (typeof lastRoll === 'number' && typeof stealthDC === 'number') {
-          const diff = lastRoll - stealthDC;
-          if (diff >= 10) {
-            outcomeLabel = 'Critical Success';
-            outcomeClass = 'critical-success';
-          } else if (diff >= 0) {
-            outcomeLabel = 'Success';
-            outcomeClass = 'success';
-          } else if (diff <= -10) {
-            outcomeLabel = 'Critical Failure';
-            outcomeClass = 'critical-failure';
-          } else {
-            outcomeLabel = 'Failure';
-            outcomeClass = 'failure';
+        const perceptionDC = extractPerceptionDC(token);
+        const stealthDC = extractStealthDC(token);
+        const showOutcomeSetting = game.settings.get(MODULE_ID, 'integrateRollOutcome');
+        let showOutcome = false;
+        let outcomeLabel = '';
+        let outcomeClass = '';
+        if (showOutcomeSetting) {
+          const lastRoll = getLastRollTotalForActor(app.observer?.actor, null);
+          if (typeof lastRoll === 'number' && typeof stealthDC === 'number') {
+            const diff = lastRoll - stealthDC;
+            if (diff >= 10) {
+              outcomeLabel = 'Critical Success';
+              outcomeClass = 'critical-success';
+            } else if (diff >= 0) {
+              outcomeLabel = 'Success';
+              outcomeClass = 'success';
+            } else if (diff <= -10) {
+              outcomeLabel = 'Critical Failure';
+              outcomeClass = 'critical-failure';
+            } else {
+              outcomeLabel = 'Failure';
+              outcomeClass = 'failure';
+            }
+            showOutcome = true;
           }
-          showOutcome = true;
         }
-      }
-      const isRowLoot = token.actor?.type === 'loot';
-      const allowedVisKeys =
-        isLootObserver || isRowLoot ? ['observed', 'hidden'] : Object.keys(VISIBILITY_STATES);
-      const visibilityStates = allowedVisKeys.map((key) => ({
-        value: key,
-        label: game.i18n.localize(VISIBILITY_STATES[key].label),
-        selected: currentVisibilityState === key,
-        icon: VISIBILITY_STATES[key].icon,
-        color: VISIBILITY_STATES[key].color,
-        cssClass: VISIBILITY_STATES[key].cssClass,
-      }));
+        const isRowLoot = token.actor?.type === 'loot';
+        const allowedVisKeys =
+          isLootObserver || isRowLoot
+            ? ['avs', 'observed', 'hidden']
+            : Object.keys(VISIBILITY_STATES);
+        const visibilityStates = allowedVisKeys.map((key) => {
+          // Determine if this state should be selected
+          let selected = false;
 
-      // Determine if an AVS override exists for this pair (observer -> target) in observer mode
-      let hasAvsOverride = false;
-      try {
-        hasAvsOverride = !!token.document.getFlag(
-          MODULE_ID,
-          `avs-override-from-${app.observer.document.id}`,
-        );
-      } catch { /* ignore */ }
+          // This will be set after we determine the override/AVS logic
+          return {
+            value: key,
+            label: game.i18n.localize(VISIBILITY_STATES[key].label),
+            selected, // Will be updated below
+            icon: VISIBILITY_STATES[key].icon,
+            color: VISIBILITY_STATES[key].color,
+            cssClass: VISIBILITY_STATES[key].cssClass,
+          };
+        });
 
-      return {
-        id: token.document.id,
-        name: token.document.name,
-        img: getTokenImage(token),
-        isFoundryHidden,
-        isLoot: !!isRowLoot,
-        currentVisibilityState: allowedVisKeys.includes(currentVisibilityState)
-          ? currentVisibilityState
-          : 'observed',
-        currentCoverState,
-        isPC: token.actor?.hasPlayerOwner || token.actor?.type === 'character',
-        disposition: disposition,
-        dispositionClass:
-          disposition === -1 ? 'hostile' : disposition === 1 ? 'friendly' : 'neutral',
-        visibilityStates,
-        coverStates: Object.entries(COVER_STATES).map(([key, config]) => ({
-          value: key,
-          label: game.i18n.localize(config.label),
-          selected: currentCoverState === key,
-          icon: config.icon,
-          color: config.color,
-          cssClass: config.cssClass,
-          bonusAC: config.bonusAC,
-          bonusReflex: config.bonusReflex,
-          bonusStealth: config.bonusStealth,
-          canHide: config.canHide,
-        })),
-        perceptionDC,
-        stealthDC,
-        showOutcome,
-        outcomeLabel,
-        outcomeClass,
-        hasAvsOverride,
-      };
-    });
+        // Determine current state and selection logic
+        let hasAvsOverride = false;
+        let isAvsControlled = false;
+        let actualCurrentState = currentVisibilityState;
+
+        try {
+          // Check if AVS is enabled first
+          const avsEnabled = game.settings.get(MODULE_ID, 'autoVisibilityEnabled');
+          if (avsEnabled) {
+            // Check for AVS override flag
+            const avsOverrideFlag = token.document.getFlag(
+              MODULE_ID,
+              `avs-override-from-${app.observer.document.id}`,
+            );
+
+            if (avsOverrideFlag) {
+              // There's an override - use the override state
+              hasAvsOverride = true;
+              actualCurrentState = avsOverrideFlag.state || 'observed';
+              isAvsControlled = false; // Override is controlling, not AVS
+            } else {
+              // No override - AVS is controlling (regardless of map data)
+              hasAvsOverride = false;
+              isAvsControlled = true; // AVS is controlling
+
+              // Get the actual current state from the visibility map
+              try {
+                const { getVisibilityMap } = await import('../../stores/visibility-map.js');
+                const visibilityMap = getVisibilityMap(app.observer);
+                actualCurrentState = visibilityMap[token.document.id] || 'observed';
+                // Debug: console.log(`[AVS Debug] Observer mode - ${token.document.name}:`, { actualCurrentState, visibilityMapState: visibilityMap[token.document.id] });
+              } catch (error) {
+                console.error(`[AVS Debug] Observer mode - Error getting visibility map:`, error);
+                actualCurrentState = 'observed'; // Fallback if map access fails
+              }
+            }
+          } else {
+            // If AVS is disabled, nothing is AVS controlled
+            isAvsControlled = false;
+            actualCurrentState = currentVisibilityState || 'observed';
+          }
+        } catch {
+          isAvsControlled = false;
+          actualCurrentState = currentVisibilityState || 'observed';
+        }
+
+        // Update selection based on override/AVS logic
+        visibilityStates.forEach((state) => {
+          if (hasAvsOverride) {
+            // Override exists - select the override state
+            state.selected = state.value === actualCurrentState;
+          } else if (isAvsControlled) {
+            // No override, AVS controlling - select AVS button
+            state.selected = state.value === 'avs';
+          } else if (manualVisibilityState) {
+            // Manual state exists - select the manual state
+            state.selected = state.value === actualCurrentState;
+          } else {
+            // No state at all - don't select anything
+            state.selected = false;
+          }
+        });
+
+        const result = {
+          id: token.document.id,
+          name: token.document.name,
+          img: getTokenImage(token),
+          isFoundryHidden,
+          isLoot: !!isRowLoot,
+          currentVisibilityState:
+            allowedVisKeys.includes(actualCurrentState) && actualCurrentState !== 'avs'
+              ? actualCurrentState
+              : 'observed',
+          currentCoverState,
+          isPC: token.actor?.hasPlayerOwner || token.actor?.type === 'character',
+          disposition: disposition,
+          dispositionClass:
+            disposition === -1 ? 'hostile' : disposition === 1 ? 'friendly' : 'neutral',
+          isAvsControlled,
+          hasAvsOverride,
+          visibilityStates,
+          coverStates: Object.entries(COVER_STATES).map(([key, config]) => ({
+            value: key,
+            label: game.i18n.localize(config.label),
+            selected: currentCoverState === key,
+            icon: config.icon,
+            color: config.color,
+            cssClass: config.cssClass,
+            bonusAC: config.bonusAC,
+            bonusReflex: config.bonusReflex,
+            bonusStealth: config.bonusStealth,
+            canHide: config.canHide,
+          })),
+          perceptionDC,
+          stealthDC,
+          showOutcome,
+          outcomeLabel,
+          outcomeClass,
+        };
+
+        // Debug: if (isAvsControlled) console.log(`[AVS Debug] ${token.document.name}:`, { currentVisibilityState: result.currentVisibilityState, isAvsControlled: result.isAvsControlled });
+
+        return result;
+      }),
+    );
   } else {
-    allTargets = sceneTokens.map((observerToken) => {
-      const observerVisibilityData = getVisibilityMap(observerToken);
-      const observerCoverData = getCoverMap(observerToken);
-      let currentVisibilityState = observerVisibilityData[app.observer.document.id] || 'observed';
-      const currentCoverState = observerCoverData[app.observer.document.id] || 'none';
-      // Foundry hidden means the TokenDocument.hidden property is strictly true
-      const isFoundryHidden = observerToken?.document?.hidden === true;
+    allTargets = await Promise.all(
+      sceneTokens.map(async (observerToken) => {
+        const observerVisibilityData = getVisibilityMap(observerToken);
+        const observerCoverData = getCoverMap(observerToken);
+        // Get manual visibility state from the map, or null if none exists
+        const manualVisibilityState = observerVisibilityData[app.observer.document.id] || null;
+        // Don't default to 'observed' here - we'll handle that in the logic below
+        let currentVisibilityState = manualVisibilityState;
+        const currentCoverState = observerCoverData[app.observer.document.id] || 'none';
+        // Foundry hidden means the TokenDocument.hidden property is strictly true
+        const isFoundryHidden = observerToken?.document?.hidden === true;
 
-      // For sneaking tokens, show the AVS internal state instead of the detection wrapper state
-      if (app.observer.document.getFlag(MODULE_ID, 'sneak-active')) {
-        // Read from the observer token's visibility map to see how it sees the sneaking token
-        const avsInternalState = observerVisibilityData?.[app.observer.document.id];
-        if (avsInternalState) {
-          currentVisibilityState = avsInternalState;
-        }
-      }
-
-      const disposition = observerToken.document.disposition || 0;
-
-      const perceptionDC = extractPerceptionDC(observerToken);
-      const stealthDC = extractPerceptionDC(observerToken);
-      const showOutcomeSetting = game.settings.get(MODULE_ID, 'integrateRollOutcome');
-      let showOutcome = false;
-      let outcomeLabel = '';
-      let outcomeClass = '';
-      if (showOutcomeSetting) {
-        const lastRoll = getLastRollTotalForActor(app.observer?.actor, null);
-        if (typeof lastRoll === 'number' && typeof perceptionDC === 'number') {
-          const diff = lastRoll - perceptionDC;
-          if (diff >= 10) {
-            outcomeLabel = 'Critical Success';
-            outcomeClass = 'critical-success';
-          } else if (diff >= 0) {
-            outcomeLabel = 'Success';
-            outcomeClass = 'success';
-          } else if (diff <= -10) {
-            outcomeLabel = 'Critical Failure';
-            outcomeClass = 'critical-failure';
-          } else {
-            outcomeLabel = 'Failure';
-            outcomeClass = 'failure';
+        // For sneaking tokens, show the AVS internal state instead of the detection wrapper state
+        if (app.observer.document.getFlag(MODULE_ID, 'sneak-active')) {
+          // Read from the observer token's visibility map to see how it sees the sneaking token
+          const avsInternalState = observerVisibilityData?.[app.observer.document.id];
+          if (avsInternalState) {
+            currentVisibilityState = avsInternalState;
           }
-          showOutcome = true;
         }
-      }
-      const isRowLoot = observerToken.actor?.type === 'loot' || isLootObserver;
-      const allowedVisKeys = isRowLoot ? ['observed', 'hidden'] : Object.keys(VISIBILITY_STATES);
-      const visibilityStates = allowedVisKeys.map((key) => ({
-        value: key,
-        label: game.i18n.localize(VISIBILITY_STATES[key].label),
-        selected: currentVisibilityState === key,
-        icon: VISIBILITY_STATES[key].icon,
-        color: VISIBILITY_STATES[key].color,
-        cssClass: VISIBILITY_STATES[key].cssClass,
-      }));
 
-      // In target mode, overrides are stored on the target (app.observer) with key from row observer id
-      let hasAvsOverride = false;
-      try {
-        hasAvsOverride = !!app.observer.document.getFlag(
-          MODULE_ID,
-          `avs-override-from-${observerToken.document.id}`,
-        );
-      } catch { /* ignore */ }
+        const disposition = observerToken.document.disposition || 0;
 
-      return {
-        id: observerToken.document.id,
-        name: observerToken.document.name,
-        img: getTokenImage(observerToken),
-        isFoundryHidden,
-        isLoot: !!(observerToken.actor?.type === 'loot'),
-        currentVisibilityState: allowedVisKeys.includes(currentVisibilityState)
-          ? currentVisibilityState
-          : 'observed',
-        currentCoverState,
-        isPC: observerToken.actor?.hasPlayerOwner || observerToken.actor?.type === 'character',
-        disposition: disposition,
-        dispositionClass:
-          disposition === -1 ? 'hostile' : disposition === 1 ? 'friendly' : 'neutral',
-        visibilityStates,
-        coverStates: Object.entries(COVER_STATES).map(([key, config]) => ({
-          value: key,
-          label: game.i18n.localize(config.label),
-          selected: currentCoverState === key,
-          icon: config.icon,
-          color: config.color,
-          cssClass: config.cssClass,
-          bonusAC: config.bonusAC,
-          bonusReflex: config.bonusReflex,
-          bonusStealth: config.bonusStealth,
-          canHide: config.canHide,
-        })),
-        perceptionDC,
-        stealthDC,
-        showOutcome,
-        outcomeLabel,
-        outcomeClass,
-        hasAvsOverride,
-      };
-    });
+        const perceptionDC = extractPerceptionDC(observerToken);
+        const stealthDC = extractPerceptionDC(observerToken);
+        const showOutcomeSetting = game.settings.get(MODULE_ID, 'integrateRollOutcome');
+        let showOutcome = false;
+        let outcomeLabel = '';
+        let outcomeClass = '';
+        if (showOutcomeSetting) {
+          const lastRoll = getLastRollTotalForActor(app.observer?.actor, null);
+          if (typeof lastRoll === 'number' && typeof perceptionDC === 'number') {
+            const diff = lastRoll - perceptionDC;
+            if (diff >= 10) {
+              outcomeLabel = 'Critical Success';
+              outcomeClass = 'critical-success';
+            } else if (diff >= 0) {
+              outcomeLabel = 'Success';
+              outcomeClass = 'success';
+            } else if (diff <= -10) {
+              outcomeLabel = 'Critical Failure';
+              outcomeClass = 'critical-failure';
+            } else {
+              outcomeLabel = 'Failure';
+              outcomeClass = 'failure';
+            }
+            showOutcome = true;
+          }
+        }
+        const isRowLoot = observerToken.actor?.type === 'loot' || isLootObserver;
+        const allowedVisKeys = isRowLoot
+          ? ['avs', 'observed', 'hidden']
+          : Object.keys(VISIBILITY_STATES);
+        // Debug: console.log(`[AVS Debug] Target mode allowedVisKeys for ${observerToken.document.name}:`, { isRowLoot, isLootObserver, allowedVisKeys });
+        const visibilityStates = allowedVisKeys.map((key) => {
+          // Determine if this state should be selected
+          let selected = false;
+
+          // This will be set after we determine the override/AVS logic
+          return {
+            value: key,
+            label: game.i18n.localize(VISIBILITY_STATES[key].label),
+            selected, // Will be updated below
+            icon: VISIBILITY_STATES[key].icon,
+            color: VISIBILITY_STATES[key].color,
+            cssClass: VISIBILITY_STATES[key].cssClass,
+          };
+        });
+
+        // In target mode, determine current state and selection logic
+        let hasAvsOverride = false;
+        let isAvsControlled = false;
+        let actualCurrentState = currentVisibilityState;
+
+        try {
+          // Check if AVS is enabled first
+          const avsEnabled = game.settings.get(MODULE_ID, 'autoVisibilityEnabled');
+          if (avsEnabled) {
+            // Check for AVS override flag
+            const avsOverrideFlag = app.observer.document.getFlag(
+              MODULE_ID,
+              `avs-override-from-${observerToken.document.id}`,
+            );
+
+            if (avsOverrideFlag) {
+              // There's an override - use the override state
+              hasAvsOverride = true;
+              actualCurrentState = avsOverrideFlag.state || 'observed';
+              isAvsControlled = false; // Override is controlling, not AVS
+            } else {
+              // No override - AVS is controlling (regardless of map data)
+              hasAvsOverride = false;
+              isAvsControlled = true; // AVS is controlling
+
+              // Get the actual current state from the visibility map
+              try {
+                const { getVisibilityMap } = await import('../../stores/visibility-map.js');
+                const visibilityMap = getVisibilityMap(observerToken);
+                actualCurrentState = visibilityMap[app.observer.document.id] || 'observed';
+                // Debug: console.log(`[AVS Debug] Target mode - ${app.observer.document.name}:`, { actualCurrentState, visibilityMapState: visibilityMap[app.observer.document.id] });
+              } catch (error) {
+                console.error(`[AVS Debug] Target mode - Error getting visibility map:`, error);
+                actualCurrentState = 'observed'; // Fallback if map access fails
+              }
+            }
+          } else {
+            // If AVS is disabled, nothing is AVS controlled
+            isAvsControlled = false;
+            actualCurrentState = currentVisibilityState || 'observed';
+          }
+        } catch {
+          isAvsControlled = false;
+          actualCurrentState = currentVisibilityState || 'observed';
+        }
+
+        // Update selection based on override/AVS logic
+        visibilityStates.forEach((state) => {
+          if (hasAvsOverride) {
+            // Override exists - select the override state
+            state.selected = state.value === actualCurrentState;
+          } else if (isAvsControlled) {
+            // No override, AVS controlling - select AVS button
+            state.selected = state.value === 'avs';
+          } else if (manualVisibilityState) {
+            // Manual state exists - select the manual state
+            state.selected = state.value === actualCurrentState;
+          } else {
+            // No state at all - don't select anything
+            state.selected = false;
+          }
+        });
+
+        const result = {
+          id: observerToken.document.id,
+          name: observerToken.document.name,
+          img: getTokenImage(observerToken),
+          isFoundryHidden,
+          isLoot: !!(observerToken.actor?.type === 'loot'),
+          currentVisibilityState:
+            allowedVisKeys.includes(actualCurrentState) && actualCurrentState !== 'avs'
+              ? actualCurrentState
+              : 'observed',
+          currentCoverState,
+          isPC: observerToken.actor?.hasPlayerOwner || observerToken.actor?.type === 'character',
+          disposition: disposition,
+          dispositionClass:
+            disposition === -1 ? 'hostile' : disposition === 1 ? 'friendly' : 'neutral',
+          isAvsControlled,
+          hasAvsOverride,
+          visibilityStates,
+          coverStates: Object.entries(COVER_STATES).map(([key, config]) => ({
+            value: key,
+            label: game.i18n.localize(config.label),
+            selected: currentCoverState === key,
+            icon: config.icon,
+            color: config.color,
+            cssClass: config.cssClass,
+            bonusAC: config.bonusAC,
+            bonusReflex: config.bonusReflex,
+            bonusStealth: config.bonusStealth,
+            canHide: config.canHide,
+          })),
+          perceptionDC,
+          stealthDC,
+          showOutcome,
+          outcomeLabel,
+          outcomeClass,
+        };
+
+        // Debug: if (isAvsControlled) console.log(`[AVS Debug] ${observerToken.document.name}:`, { currentVisibilityState: result.currentVisibilityState, isAvsControlled: result.isAvsControlled });
+
+        return result;
+      }),
+    );
   }
 
   const visibilityPrecedence = { observed: 0, concealed: 1, hidden: 2, undetected: 3 };
@@ -317,12 +465,8 @@ export async function buildContext(app, options) {
     return sortByStatusAndName(a, b);
   };
 
-  context.pcTargets = allTargets
-    .filter((t) => t.isPC && !t.isLoot)
-    .sort(sortWithOverridesFirst);
-  context.npcTargets = allTargets
-    .filter((t) => !t.isPC && !t.isLoot)
-    .sort(sortWithOverridesFirst);
+  context.pcTargets = allTargets.filter((t) => t.isPC && !t.isLoot).sort(sortWithOverridesFirst);
+  context.npcTargets = allTargets.filter((t) => !t.isPC && !t.isLoot).sort(sortWithOverridesFirst);
   context.lootTargets =
     app.mode === 'observer' ? allTargets.filter((t) => t.isLoot).sort(sortByStatusAndName) : [];
   context.targets = allTargets;
@@ -384,7 +528,7 @@ export async function buildContext(app, options) {
               showOutcome = true;
             }
           }
-        } catch { }
+        } catch {}
         return {
           id: d.id,
           identifier: idf && String(idf).trim() ? String(idf) : fallback,
@@ -400,7 +544,7 @@ export async function buildContext(app, options) {
       });
       context.includeWalls = context.wallTargets.length > 0;
     }
-  } catch { }
+  } catch {}
 
   context.visibilityStates = Object.entries(VISIBILITY_STATES).map(([key, config]) => ({
     key,

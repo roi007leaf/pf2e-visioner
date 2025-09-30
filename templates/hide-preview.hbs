@@ -177,8 +177,15 @@
             </td>
             <td class="visibility-change">
               <div class="visibility-change-inline">
-                <span class="state-icon" data-state="{{outcome.oldVisibility}}" data-tooltip="{{outcome.oldVisibility}}">
-                  {{{visibilityIcon outcome.oldVisibility}}}
+                <span class="old-visibility-state {{#if outcome.isOldStateAvsControlled}}avs-controlled{{/if}}">
+                  <span class="state-icon" data-state="{{outcome.oldVisibility}}" data-tooltip="{{outcome.oldVisibility}}">
+                    {{{visibilityIcon outcome.oldVisibility}}}
+                  </span>
+                  {{#if outcome.isOldStateAvsControlled}}
+                    <span class="avs-tag-small" data-tooltip="Controlled by Auto-Visibility System">
+                      <i class="fas fa-bolt"></i>
+                    </span>
+                  {{/if}}
                 </span>
                 <i class="fas fa-arrow-right visibility-arrow"></i>
                 <div class="override-icons">

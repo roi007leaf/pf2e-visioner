@@ -232,9 +232,9 @@ export class HidePreviewDialog extends BaseActionDialog {
               coverState: endPos.coverState,
             },
           };
-          // Apply prereq gating: if end doesn't qualify → observed; else ensure the calculated outcome is used
+          // Apply prereq gating: if end doesn't qualify → AVS; else ensure the calculated outcome is used
           if (!qualifies) {
-            outcome.newVisibility = 'observed';
+            outcome.newVisibility = 'avs';
             outcome.overrideState = null;
           } else {
             // Use the calculated mapping when qualified
@@ -271,8 +271,17 @@ export class HidePreviewDialog extends BaseActionDialog {
       const availableStates = this.getAvailableStatesForOutcome(outcome);
       const effectiveNewState = outcome.overrideState ?? outcome.newVisibility;
       const baseOldState = outcome.oldVisibility || outcome.currentVisibility;
-      const hasActionableChange =
-        baseOldState != null && effectiveNewState != null && effectiveNewState !== baseOldState;
+      // Special case: If current state is AVS-controlled and override is 'avs', no change
+      let hasActionableChange = false;
+      if (outcome.overrideState === 'avs' && this.isCurrentStateAvsControlled(outcome)) {
+        hasActionableChange = false;
+      } else {
+        hasActionableChange =
+          baseOldState != null && effectiveNewState != null && effectiveNewState !== baseOldState;
+      }
+
+      // Check if the old visibility state is AVS-controlled
+      const isOldStateAvsControlled = this.isOldStateAvsControlled(outcome);
 
       return {
         ...outcome,
@@ -288,6 +297,7 @@ export class HidePreviewDialog extends BaseActionDialog {
         marginText: this.formatMargin(outcome.margin),
         oldVisibilityState: getVisibilityStateConfig(baseOldState),
         newVisibilityState: getVisibilityStateConfig(effectiveNewState),
+        isOldStateAvsControlled,
       };
     });
 
@@ -500,8 +510,16 @@ export class HidePreviewDialog extends BaseActionDialog {
           const currentVisibility = o.oldVisibility || o.currentVisibility;
           const effectiveNewState = overrideState || o.newVisibility || currentVisibility;
           const baseOldState = o.oldVisibility || currentVisibility;
-          const hasActionableChange =
-            baseOldState != null && effectiveNewState != null && effectiveNewState !== baseOldState;
+          // Special case: If current state is AVS-controlled and override is 'avs', no change
+          let hasActionableChange = false;
+          if (overrideState === 'avs' && this.isCurrentStateAvsControlled(o)) {
+            hasActionableChange = false;
+          } else {
+            hasActionableChange =
+              baseOldState != null &&
+              effectiveNewState != null &&
+              effectiveNewState !== baseOldState;
+          }
           return { ...o, overrideState, hasActionableChange };
         } catch {
           return { ...o };
@@ -614,8 +632,13 @@ export class HidePreviewDialog extends BaseActionDialog {
       // Recompute actionable flag for UI buttons
       try {
         const oldState = outcome.oldVisibility ?? outcome.currentVisibility ?? null;
-        outcome.hasActionableChange =
-          oldState != null && effectiveState != null && effectiveState !== oldState;
+        // Special case: If current state is AVS-controlled and override is 'avs', no change
+        if (outcome.overrideState === 'avs' && this.isCurrentStateAvsControlled(outcome)) {
+          outcome.hasActionableChange = false;
+        } else {
+          outcome.hasActionableChange =
+            oldState != null && effectiveState != null && effectiveState !== oldState;
+        }
         const tokenId = outcome?.target?.id ?? null;
         if (tokenId) this.updateActionButtonsForToken(tokenId, outcome.hasActionableChange);
       } catch {}
@@ -766,17 +789,53 @@ export class HidePreviewDialog extends BaseActionDialog {
 
     // Route via services with overrides for user selections
     const overrides = {};
+    const avsRemovals = [];
     for (const o of changedOutcomes) {
       const id = o?.target?.id;
       const state = o?.overrideState || o?.newVisibility;
-      if (id && state) overrides[id] = state;
+      if (id && state) {
+        if (state === 'avs') {
+          // AVS selections - remove any existing overrides
+          avsRemovals.push({ id, name: o.target.name });
+        } else {
+          overrides[id] = state;
+        }
+      }
     }
-    await (
-      await import('../services/index.js')
-    ).applyNowHide(
-      { ...app.actionData, ignoreAllies: app.ignoreAllies, overrides },
-      { html: () => {}, attr: () => {} },
-    );
+
+    // Remove AVS overrides if any
+    if (avsRemovals.length > 0) {
+      try {
+        const { default: AvsOverrideManager } = await import(
+          '../services/infra/avs-override-manager.js'
+        );
+        const observerId = app.actionData?.actor?.document?.id || app.actionData?.actor?.id;
+        if (observerId) {
+          for (const removal of avsRemovals) {
+            await AvsOverrideManager.removeOverride(observerId, removal.id);
+          }
+          // Refresh UI to update override indicators
+          const { updateTokenVisuals } = await import('../../services/visual-effects.js');
+          await updateTokenVisuals();
+          const names = avsRemovals.map((r) => r.name).join(', ');
+          notify.info(`${MODULE_TITLE}: Removed overrides for ${avsRemovals.length} token(s)`);
+        }
+      } catch (e) {
+        console.warn('Failed to remove AVS overrides:', e);
+        const names = avsRemovals.map((r) => r.name).join(', ');
+        notify.info(`${MODULE_TITLE}: AVS will control visibility for ${avsRemovals.length}`);
+      }
+    }
+
+    // Apply overrides only if there are any
+    if (Object.keys(overrides).length > 0) {
+      await (
+        await import('../services/index.js')
+      ).applyNowHide(
+        { ...app.actionData, ignoreAllies: app.ignoreAllies, overrides },
+        { html: () => {}, attr: () => {} },
+      );
+    }
 
     // Update button states
     app.bulkActionState = 'applied';
@@ -847,6 +906,32 @@ export class HidePreviewDialog extends BaseActionDialog {
 
     // Check if there's actually a change to apply
     const effectiveNewState = outcome.overrideState || outcome.newVisibility;
+
+    // If AVS is selected, remove any existing override
+    if (effectiveNewState === 'avs') {
+      try {
+        const { default: AvsOverrideManager } = await import(
+          '../services/infra/avs-override-manager.js'
+        );
+        const observerId = app.actionData?.actor?.document?.id || app.actionData?.actor?.id;
+        if (observerId) {
+          await AvsOverrideManager.removeOverride(observerId, outcome.target.id);
+          // Refresh UI to update override indicators
+          const { updateTokenVisuals } = await import('../../services/visual-effects.js');
+          await updateTokenVisuals();
+          notify.info(
+            `${MODULE_TITLE}: Removed override for ${outcome.target.name} - AVS will control visibility`,
+          );
+        }
+      } catch (e) {
+        console.warn('Failed to remove AVS override:', e);
+        notify.info(`${MODULE_TITLE}: AVS will control visibility for ${outcome.target.name}`);
+      }
+      app.updateRowButtonsToApplied([{ target: { id: tokenId }, hasActionableChange: false }]);
+      app.updateChangesCount();
+      return;
+    }
+
     const hasChange = effectiveNewState !== outcome.oldVisibility;
 
     if (!hasChange) {
@@ -939,8 +1024,8 @@ export class HidePreviewDialog extends BaseActionDialog {
 
     // Apply the position qualification logic for hide
     if (!endQualifies) {
-      // If end position doesn't qualify for hide -> observed (hide fails)
-      newVisibility = 'observed';
+      // If end position doesn't qualify for hide -> AVS (hide fails)
+      newVisibility = 'avs';
     } else {
       // If position qualifies -> use stored calculated outcome or recompute from mapping
       const { getDefaultNewStateFor } = await import('../services/data/action-state-config.js');
@@ -969,8 +1054,13 @@ export class HidePreviewDialog extends BaseActionDialog {
       // Update action button states
       const effectiveNew = outcome.overrideState || outcome.newVisibility;
       const oldState = outcome.oldVisibility || outcome.currentVisibility;
-      outcome.hasActionableChange =
-        effectiveNew != null && oldState != null && effectiveNew !== oldState;
+      // Special case: If current state is AVS-controlled and override is 'avs', no change
+      if (outcome.overrideState === 'avs' && this.isCurrentStateAvsControlled(outcome)) {
+        outcome.hasActionableChange = false;
+      } else {
+        outcome.hasActionableChange =
+          effectiveNew != null && oldState != null && effectiveNew !== oldState;
+      }
       this.updateActionButtonsForToken(outcome.target.id, outcome.hasActionableChange);
     }
   }
@@ -1003,9 +1093,9 @@ export class HidePreviewDialog extends BaseActionDialog {
       target.setAttribute('data-tooltip', 'Prerequisite not met');
     }
 
-    // Recalculate visibility: if not qualified → observed; else restore calculated outcome
+    // Recalculate visibility: if not qualified → AVS; else restore calculated outcome
     if (!position.qualifies) {
-      outcome.newVisibility = 'observed';
+      outcome.newVisibility = 'avs';
       outcome.overrideState = null;
     } else {
       // Use stored calculated outcome or recompute from mapping
@@ -1041,8 +1131,13 @@ export class HidePreviewDialog extends BaseActionDialog {
         }
         const effectiveNew = outcome.overrideState || outcome.newVisibility;
         const oldState = outcome.oldVisibility || outcome.currentVisibility;
-        outcome.hasActionableChange =
-          effectiveNew != null && oldState != null && effectiveNew !== oldState;
+        // Special case: If current state is AVS-controlled and override is 'avs', no change
+        if (outcome.overrideState === 'avs' && this.isCurrentStateAvsControlled(outcome)) {
+          outcome.hasActionableChange = false;
+        } else {
+          outcome.hasActionableChange =
+            effectiveNew != null && oldState != null && effectiveNew !== oldState;
+        }
         app.updateActionButtonsForToken(tokenId, outcome.hasActionableChange);
       }
     } catch {}

@@ -280,9 +280,18 @@ export class SeekPreviewDialog extends BaseActionDialog {
         // Prefer the recorded oldVisibility as the baseline; fall back to current live mapping
         const baseOldState =
           outcome.oldVisibility != null ? outcome.oldVisibility : currentVisibility;
-        // Actionable if original differs from new or override
-        const hasActionableChange =
-          baseOldState != null && effectiveNewState != null && effectiveNewState !== baseOldState;
+        // Special case: If current state is AVS-controlled and override is 'avs', no change
+        let hasActionableChange = false;
+        if (outcome.overrideState === 'avs' && this.isCurrentStateAvsControlled(outcome)) {
+          hasActionableChange = false;
+        } else {
+          // Actionable if original differs from new or override
+          hasActionableChange =
+            baseOldState != null && effectiveNewState != null && effectiveNewState !== baseOldState;
+        }
+
+        // Check if the old visibility state is AVS-controlled
+        const isOldStateAvsControlled = this.isOldStateAvsControlled(outcome);
 
         return {
           ...outcome,
@@ -298,6 +307,7 @@ export class SeekPreviewDialog extends BaseActionDialog {
           overrideState: outcome.overrideState || outcome.newVisibility,
           hasActionableChange,
           noProficiency: !!outcome.noProficiency,
+          isOldStateAvsControlled,
         };
       }),
     );
@@ -965,13 +975,45 @@ export class SeekPreviewDialog extends BaseActionDialog {
     // Provide overrides map to services path
     const overrides = {};
     const wallOverrides = {};
+    const avsRemovals = [];
     for (const o of actionableOutcomes) {
       const state = o?.overrideState || o?.newVisibility;
       if (o?._isWall && o?.wallId) {
         if (state) wallOverrides[o.wallId] = state;
       } else {
         const id = o?.target?.id;
-        if (id && state) overrides[id] = state;
+        if (id && state) {
+          if (state === 'avs') {
+            // AVS selections - remove any existing overrides
+            avsRemovals.push({ id, name: o.target.name });
+          } else {
+            overrides[id] = state;
+          }
+        }
+      }
+    }
+
+    // Remove AVS overrides if any
+    if (avsRemovals.length > 0) {
+      try {
+        const { default: AvsOverrideManager } = await import(
+          '../services/infra/avs-override-manager.js'
+        );
+        const observerId = app.actionData?.actor?.document?.id || app.actionData?.actor?.id;
+        if (observerId) {
+          for (const removal of avsRemovals) {
+            await AvsOverrideManager.removeOverride(observerId, removal.id);
+          }
+          // Refresh UI to update override indicators
+          const { updateTokenVisuals } = await import('../../services/visual-effects.js');
+          await updateTokenVisuals();
+          const names = avsRemovals.map((r) => r.name).join(', ');
+          notify.info(`${MODULE_TITLE}: Removed overrides for ${avsRemovals.length} token(s)`);
+        }
+      } catch (e) {
+        console.warn('Failed to remove AVS overrides:', e);
+        const names = avsRemovals.map((r) => r.name).join(', ');
+        notify.info(`${MODULE_TITLE}: AVS will control visibility for ${avsRemovals.length}`);
       }
     }
 
@@ -1072,10 +1114,35 @@ export class SeekPreviewDialog extends BaseActionDialog {
         // Disable the row's Apply button for this wall
         app.updateRowButtonsToApplied([{ wallId: outcome.wallId }]);
       } else {
-        const overrides = { [outcome.target.id]: outcome.overrideState || outcome.newVisibility };
-        await applyNowSeek({ ...actionData, overrides }, { html: () => {}, attr: () => {} });
-        // Disable the row's Apply button for this token
-        app.updateRowButtonsToApplied([{ target: { id: outcome.target.id } }]);
+        const effectiveNewState = outcome.overrideState || outcome.newVisibility;
+
+        // If AVS is selected, remove any existing override
+        if (effectiveNewState === 'avs') {
+          try {
+            const { default: AvsOverrideManager } = await import(
+              '../services/infra/avs-override-manager.js'
+            );
+            const observerId = app.actionData?.actor?.document?.id || app.actionData?.actor?.id;
+            if (observerId) {
+              await AvsOverrideManager.removeOverride(observerId, outcome.target.id);
+              // Refresh UI to update override indicators
+              const { updateTokenVisuals } = await import('../../services/visual-effects.js');
+              await updateTokenVisuals();
+              notify.info(
+                `${MODULE_TITLE}: Removed override for ${outcome.target.name} - AVS will control visibility`,
+              );
+            }
+          } catch (e) {
+            console.warn('Failed to remove AVS override:', e);
+            notify.info(`${MODULE_TITLE}: AVS will control visibility for ${outcome.target.name}`);
+          }
+          app.updateRowButtonsToApplied([{ target: { id: outcome.target.id } }]);
+        } else {
+          const overrides = { [outcome.target.id]: effectiveNewState };
+          await applyNowSeek({ ...actionData, overrides }, { html: () => {}, attr: () => {} });
+          // Disable the row's Apply button for this token
+          app.updateRowButtonsToApplied([{ target: { id: outcome.target.id } }]);
+        }
       }
 
       app.updateChangesCount();

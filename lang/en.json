@@ -34,6 +34,7 @@
       "COVER_TAB": "Cover"
     },
     "VISIBILITY_STATES": {
+      "avs": "AVS",
       "observed": "Observed",
       "concealed": "Concealed",
       "hidden": "Hidden",
@@ -523,8 +524,8 @@
       "REMOVE_OVERRIDES": "Remove Overrides",
       "BULK_SET_VISIBILITY": "Bulk Set Visibility",
       "CLEAR_BULK_OVERRIDES": "Clear Bulk Overrides",
-      "FILTER_BY_DETECTION_LABEL": "Filter By Detectable",
-      "FILTER_BY_DETECTION_TOOLTIP": "Only show tokens that can be detected (via line of sight OR other senses)"
+      "FILTER_BY_DETECTION_LABEL": "Filter By Viewport",
+      "FILTER_BY_DETECTION_TOOLTIP": "Only show tokens that are within the current viewport"
     },
     "WALL": {
       "VISIBLE_TO_YOU": "Hidden Wall",

@@ -18,6 +18,7 @@
       "COVER_TAB": "Osłona"
     },
     "VISIBILITY_STATES": {
+      "avs": "AVS",
       "observed": "Obserwowany",
       "hidden": "Ukryty",
       "undetected": "Niewykryty",
@@ -413,7 +414,9 @@
       "REVERT_ALL": "Revert All",
       "REMOVE_OVERRIDES": "Remove Overrides",
       "BULK_SET_VISIBILITY": "Bulk Set Visibility",
-      "CLEAR_BULK_OVERRIDES": "Clear Bulk Overrides"
+      "CLEAR_BULK_OVERRIDES": "Clear Bulk Overrides",
+      "FILTER_BY_DETECTION_LABEL": "(PL TODO) Filter By Viewport",
+      "FILTER_BY_DETECTION_TOOLTIP": "(PL TODO) Only show tokens that are within the current viewport"
     },
     "WALL": {
       "VISIBLE_TO_YOU": "Ukryta ściana",

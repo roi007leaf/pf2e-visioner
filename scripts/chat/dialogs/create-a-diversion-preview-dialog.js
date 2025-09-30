@@ -134,8 +134,13 @@ export class CreateADiversionPreviewDialog extends BaseActionDialog {
 
       const effectiveNewState = outcome.overrideState || outcome.newVisibility;
       const baseOldState = outcome.currentVisibility;
-      const hasActionableChange =
-        baseOldState != null && effectiveNewState != null && effectiveNewState !== baseOldState;
+      // Use the centralized logic that handles AVS cases
+      const hasActionableChange = this.calculateHasActionableChange({
+        ...outcome,
+        newVisibility: effectiveNewState,
+        currentVisibility: baseOldState,
+        overrideState: outcome.overrideState,
+      });
 
       return {
         ...outcome,
@@ -220,11 +225,16 @@ export class CreateADiversionPreviewDialog extends BaseActionDialog {
    * Calculate if there's an actionable change (considering overrides)
    */
   calculateHasActionableChange(outcome) {
+    // Special case: If current state is AVS-controlled and override is 'avs', no change
+    if (outcome.overrideState === 'avs' && this.isCurrentStateAvsControlled(outcome)) {
+      return false;
+    }
+
     const effectiveNewState = outcome.overrideState || outcome.newVisibility;
     const hasChange = effectiveNewState !== outcome.currentVisibility;
 
     // Return true if either the original calculation determined a change OR there's an override
-    return hasChange || (outcome.changed && effectiveNewState !== 'observed');
+    return hasChange || (outcome.changed && effectiveNewState !== 'avs');
   }
 
   /**
@@ -418,9 +428,7 @@ export class CreateADiversionPreviewDialog extends BaseActionDialog {
 
     // Only apply changes to filtered outcomes that have actionable changes
     const changedOutcomes = filteredOutcomes.filter((outcome) => {
-      return (
-        outcome.hasActionableChange || (outcome.changed && outcome.newVisibility !== 'observed')
-      );
+      return outcome.hasActionableChange || (outcome.changed && outcome.newVisibility !== 'avs');
     });
 
     if (changedOutcomes.length === 0) {
@@ -482,9 +490,7 @@ export class CreateADiversionPreviewDialog extends BaseActionDialog {
 
     // Only revert changes to filtered outcomes that have actionable changes
     const changedOutcomes = filteredOutcomes.filter((outcome) => {
-      return (
-        outcome.hasActionableChange || (outcome.changed && outcome.newVisibility !== 'observed')
-      );
+      return outcome.hasActionableChange || (outcome.changed && outcome.newVisibility !== 'avs');
     });
 
     if (changedOutcomes.length === 0) {

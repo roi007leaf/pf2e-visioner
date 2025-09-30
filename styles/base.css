@@ -14,12 +14,19 @@
   --pf2e-visioner-info: var(--pf2e-visioner-info-color, #2196f3);
 
   /* Visibility state colors */
+  --visibility-avs: var(--visibility-avs-color, #9c27b0); /* Purple - AVS control */
   --visibility-observed: var(--visibility-observed-color, #4caf50); /* Green - safe/visible */
   --visibility-concealed: var(--visibility-concealed-color, #ffc107); /* Yellow - caution */
   --visibility-hidden: var(--visibility-hidden-color, #ff6600); /* Bright orange - warning */
   --visibility-undetected: var(--visibility-undetected-color, #f44336); /* Red - danger */
 
   /* Visibility state background colors (with alpha) */
+  --visibility-avs-bg-light: var(--visibility-avs-bg-light-color, rgba(156, 39, 176, 0.05));
+  --visibility-avs-bg: var(--visibility-avs-bg-color, rgba(156, 39, 176, 0.1));
+  --visibility-avs-bg-medium: var(--visibility-avs-bg-medium-color, rgba(156, 39, 176, 0.15));
+  --visibility-avs-bg-strong: var(--visibility-avs-bg-strong-color, rgba(156, 39, 176, 0.2));
+  --visibility-avs-bg-solid: var(--visibility-avs-bg-solid-color, rgba(156, 39, 176, 0.9));
+
   --visibility-observed-bg-light: var(
     --visibility-observed-bg-light-color,
     rgba(76, 175, 80, 0.05)
@@ -828,14 +835,13 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 12px;
   position: relative;
 }
 
 .pv-wall-quick .cover-override-buttons .visioner-icon-btn:hover {
   border-color: var(--pf2e-visioner-primary);
   transform: translateY(-1px);
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .pv-wall-quick .cover-override-buttons .visioner-icon-btn.active {

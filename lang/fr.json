@@ -29,6 +29,7 @@
       "COVER_TAB": "Abri"
     },
     "VISIBILITY_STATES": {
+      "avs": "AVS",
       "observed": "Observé",
       "hidden": "Caché",
       "undetected": "Non détecté",
@@ -412,7 +413,9 @@
     "UI": {
       "ENCOUNTER_FILTER_TEXT": "Montrer seulement les jetons de la rencontre",
       "COVER_OVERRIDE": "Outrepasser l'abri",
-      "ROLL": "Lancer"
+      "ROLL": "Lancer",
+      "FILTER_BY_DETECTION_LABEL": "(FR TODO) Filter By Viewport",
+      "FILTER_BY_DETECTION_TOOLTIP": "(FR TODO) Only show tokens that are within the current viewport"
     },
     "WALL": {
       "VISIBLE_TO_YOU": "Mur caché",

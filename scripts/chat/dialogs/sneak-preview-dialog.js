@@ -384,8 +384,14 @@ export class SneakPreviewDialog extends BaseActionDialog {
 
       const effectiveNewState = outcome.overrideState || outcome.newVisibility;
       const baseOldState = outcome.oldVisibility || currentVisibility;
-      const hasActionableChange =
-        baseOldState != null && effectiveNewState != null && effectiveNewState !== baseOldState;
+      // Special case: If current state is AVS-controlled and override is 'avs', no change
+      let hasActionableChange = false;
+      if (outcome.overrideState === 'avs' && this.isCurrentStateAvsControlled(outcome)) {
+        hasActionableChange = false;
+      } else {
+        hasActionableChange =
+          baseOldState != null && effectiveNewState != null && effectiveNewState !== baseOldState;
+      }
 
       // Check if this outcome has deferred end position checks
       const hasSneakyFeat = turnSneakTracker.hasSneakyFeat(this.sneakingToken);
@@ -413,6 +419,9 @@ export class SneakPreviewDialog extends BaseActionDialog {
       // Is deferred either in current dialog or from previous sneak actions
       const isDeferred = this._deferredChecks?.has(outcome.token.id) || wasPreviouslyDeferred;
 
+      // Check if the old visibility state is AVS-controlled
+      const isOldStateAvsControlled = this.isOldStateAvsControlled(outcome);
+
       return {
         ...outcome,
         outcomeClass: this.getOutcomeClass(outcome.outcome),
@@ -439,6 +448,7 @@ export class SneakPreviewDialog extends BaseActionDialog {
         // Defer functionality
         canDefer,
         isDeferred,
+        isOldStateAvsControlled,
       };
     });
 
@@ -1430,8 +1440,14 @@ export class SneakPreviewDialog extends BaseActionDialog {
 
       const effectiveNewState = outcome.overrideState || outcome.newVisibility;
       const baseOldState = outcome.oldVisibility || currentVisibility;
-      const hasActionableChange =
-        baseOldState != null && effectiveNewState != null && effectiveNewState !== baseOldState;
+      // Special case: If current state is AVS-controlled and override is 'avs', no change
+      let hasActionableChange = false;
+      if (outcome.overrideState === 'avs' && this.isCurrentStateAvsControlled(outcome)) {
+        hasActionableChange = false;
+      } else {
+        hasActionableChange =
+          baseOldState != null && effectiveNewState != null && effectiveNewState !== baseOldState;
+      }
 
       // Check if this outcome has deferred end position checks
       const hasSneakyFeat = turnSneakTracker.hasSneakyFeat(this.sneakingToken);
