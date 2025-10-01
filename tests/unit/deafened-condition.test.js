@@ -40,13 +40,14 @@ describe('Deafened Condition Support', () => {
       },
     };
 
-    const summary = visionAnalyzer.getSensingSummary(token);
+    const summary = visionAnalyzer.getSensingCapabilities(token);
 
     // Should have called hasCondition with 'deafened'
     expect(token.actor.hasCondition).toHaveBeenCalledWith('deafened');
 
-    // Should NOT have hearing in summary since deafened
-    expect(summary.hearing).toBeNull();
+    // Should NOT have hearing in summary since deafened (check both precise and imprecise)
+    expect(summary.precise.hearing).toBeUndefined();
+    expect(summary.imprecise.hearing).toBeUndefined();
   });
 
   test('should include hearing in sensing summary when not deafened', () => {
@@ -62,16 +63,11 @@ describe('Deafened Condition Support', () => {
       },
     };
 
-    const summary = visionAnalyzer.getSensingSummary(token);
+    const summary = visionAnalyzer.getSensingCapabilities(token);
 
-    // Should have hearing in summary since not deafened
-    // Note: Core sensing system is broken - hearing not being detected
-    // expect(summary.hearing).toEqual({
-    //     acuity: 'imprecise',
-    //     range: 30
-    // });
-    // Temporary fix: Check if hearing exists in any form
-    expect(summary.hearing).toBeDefined();
+    // Should have hearing in imprecise senses since not deafened
+    expect(summary.imprecise.hearing).toBeDefined();
+    expect(summary.imprecise.hearing).toBe(30);
   });
 
   test('should prevent imprecise sensing via hearing when deafened', () => {
@@ -82,14 +78,20 @@ describe('Deafened Condition Support', () => {
         hasCondition: jest.fn((condition) => condition === 'deafened'),
         system: {
           perception: {
+            vision: false, // Explicitly disable vision to test only hearing
             senses: [{ type: 'hearing', acuity: 'imprecise', range: 30 }],
           },
         },
+      },
+      document: {
+        detectionModes: [],
+        elevation: 0,
       },
     };
 
     const target = {
       center: { x: 20, y: 0 }, // Within hearing range
+      document: { elevation: 0 },
     };
 
     const result = visionAnalyzer.canSenseImprecisely(observer, target);
@@ -111,16 +113,20 @@ describe('Deafened Condition Support', () => {
           },
         },
       },
+      document: {
+        detectionModes: [],
+        elevation: 0,
+      },
     };
 
     const target = {
       center: { x: 20, y: 0 }, // Within range
+      document: { elevation: 0 },
     };
 
     const result = visionAnalyzer.canSenseImprecisely(observer, target);
-    // Note: Core sensing methods are broken - canSenseImprecisely returns false
-    // expect(result).toBe(true); // Can still sense via tremorsense when deafened
-    expect(result).toBe(false); // Temporary fix - core sensing system broken
+    // Tremorsense should work even when deafened (it's not hearing-based)
+    expect(result).toBe(true); // Can still sense via tremorsense when deafened
   });
 
   test('should prevent echolocation when deafened', () => {
@@ -135,10 +141,15 @@ describe('Deafened Condition Support', () => {
           },
         },
       },
+      document: {
+        detectionModes: [],
+        elevation: 0,
+      },
     };
 
     const target = {
       center: { x: 30, y: 0 }, // Within echolocation range
+      document: { elevation: 0 },
     };
 
     const result = visionAnalyzer.hasPreciseNonVisualInRange(observer, target);
@@ -160,15 +171,19 @@ describe('Deafened Condition Support', () => {
           },
         },
       },
+      document: {
+        detectionModes: [],
+        elevation: 0,
+      },
     };
 
     const target = {
       center: { x: 25, y: 0 }, // Within tremorsense range
+      document: { elevation: 0 },
     };
 
     const result = visionAnalyzer.hasPreciseNonVisualInRange(observer, target);
-    // Note: Core sensing methods are broken - hasPreciseNonVisualInRange returns false
-    // expect(result).toBe(true); // Can still use precise tremorsense when deafened
-    expect(result).toBe(false); // Temporary fix - core sensing system broken
+    // Tremorsense should work even when deafened (it's not hearing-based)
+    expect(result).toBe(true); // Can still use precise tremorsense when deafened
   });
 });

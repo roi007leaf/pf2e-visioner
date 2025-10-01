@@ -173,8 +173,6 @@ export class EventDrivenVisibilitySystem {
         coreServices.lightingCalculator,
         coreServices.visionAnalyzer,
         coreServices.conditionManager,
-        coreServices.spatialAnalysisService,
-        coreServices.exclusionManager,
         coreServices.lightingRasterService
       );
 

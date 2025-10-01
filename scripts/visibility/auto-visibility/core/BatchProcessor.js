@@ -210,6 +210,8 @@ export class BatchProcessor {
             precomputeStats, // guaranteed non-null object
             sensesCache: sensesCache?.getMap?.(),
             idToToken,
+            // Use stateless calculator for better performance and testability
+            useStatelessCalculator: true,
         };
 
         // Time the main processing loop
@@ -578,7 +580,7 @@ export class BatchProcessor {
      */
     #canUseNonVisualSenses(observer, target, distance) {
         // Get observer's sensing summary using the VisionAnalyzer (proper dependency injection)
-        const sensingSummary = this.visionAnalyzer.getSensingSummary(observer);
+        const { sensingSummary } = this.visionAnalyzer.getVisionCapabilities(observer);
         if (!sensingSummary) {
             return false;
         }

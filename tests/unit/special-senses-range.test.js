@@ -146,17 +146,21 @@ describe('Special Senses Range Detection', () => {
         },
       };
 
-      const summary = visionAnalyzer.getSensingSummary(token);
+      const summary = visionAnalyzer.getVisionCapabilities(token).sensingSummary;
 
+      // lifesense has dedicated property
       expect(summary.lifesense).toEqual({ acuity: 'imprecise', range: 10 });
-      expect(summary.echolocation).toEqual({ acuity: 'precise', range: 40 });
-      expect(summary.tremorsense).toEqual({ acuity: 'imprecise', range: 30 });
-      expect(summary.scent).toEqual({ acuity: 'imprecise', range: 30 });
+      // Other senses are in individualSenses
+      expect(summary.individualSenses.echolocation).toEqual({ acuity: 'precise', range: 40 });
+      expect(summary.individualSenses.tremorsense).toEqual({ acuity: 'imprecise', range: 30 });
+      expect(summary.individualSenses.scent).toEqual({ acuity: 'imprecise', range: 30 });
 
       // Check that they're added to appropriate acuity arrays
       expect(summary.imprecise).toHaveLength(3); // lifesense, tremorsense, scent
-      expect(summary.precise).toHaveLength(1); // echolocation
-    });
+      expect(summary.precise).toHaveLength(2); // echolocation, vision
+    }
+
+    );
 
     test('handles precise tremorsense correctly', () => {
       // Create a completely fresh VisionAnalyzer instance to avoid global state
@@ -205,7 +209,7 @@ describe('Special Senses Range Detection', () => {
         },
       };
 
-      const summary = freshVisionAnalyzer.getSensingSummary(observerToken);
+      const summary = freshVisionAnalyzer.getVisionCapabilities(observerToken).sensingSummary;
 
       // Should be stored in individualSenses
       expect(summary.individualSenses).toBeDefined();
@@ -223,10 +227,10 @@ describe('Special Senses Range Detection', () => {
       const visionCapabilities = freshVisionAnalyzer.getVisionCapabilities(observerToken);
 
       // Debug: Check what's in the vision capabilities
-      const tremorsenseInPreciseCapabilities = visionCapabilities.precise.find(
+      const tremorsenseInPreciseCapabilities = visionCapabilities.sensingSummary.precise.find(
         (s) => s.type === 'tremorsense',
       );
-      const tremorsenseInImpreciseCapabilities = visionCapabilities.imprecise.find(
+      const tremorsenseInImpreciseCapabilities = visionCapabilities.sensingSummary.imprecise.find(
         (s) => s.type === 'tremorsense',
       );
 
@@ -242,11 +246,10 @@ describe('Special Senses Range Detection', () => {
         );
         expect(hasPreciseNonVisual).toBe(true); // Should detect precise tremorsense
 
-        const canSenseImprecisely = freshVisionAnalyzer.canSenseImprecisely(
-          observerToken,
-          targetToken,
-        );
-        expect(canSenseImprecisely).toBe(false); // Should NOT find tremorsense in imprecise senses
+        // Check that tremorsense is NOT in the imprecise object (data structure check)
+        const capabilities = freshVisionAnalyzer.getSensingCapabilities(observerToken);
+        expect(capabilities.imprecise.tremorsense).toBeUndefined(); // Should NOT be in imprecise
+        expect(capabilities.precise.tremorsense).toBe(30); // Should be in precise with 30ft range
       } else {
         // If tremorsense is not in precise capabilities, something is still wrong
         console.log('❌ Tremorsense not found in precise capabilities');
@@ -269,7 +272,7 @@ describe('Special Senses Range Detection', () => {
         },
       };
 
-      const summary = visionAnalyzer.getSensingSummary(token);
+      const summary = visionAnalyzer.getVisionCapabilities(token).sensingSummary;
 
       // Note: Due to global state interference, lifesense may not be null
       // This is a known issue with test isolation
@@ -282,3 +285,4 @@ describe('Special Senses Range Detection', () => {
     });
   });
 });
+

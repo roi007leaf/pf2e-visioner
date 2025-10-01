@@ -95,14 +95,13 @@ describe('VisionAnalyzer Wall Collision with Deafened Condition', () => {
       mockObserver.actor.hasCondition.mockImplementation((condition) => condition === 'deafened'); // only deafened, not blinded
       mockObserver.actor.system.perception.senses = {}; // no other senses
 
-      // Sight is blocked but sound is not
-      CONFIG.Canvas.polygonBackends.sight.testCollision.mockReturnValue(true);
-      CONFIG.Canvas.polygonBackends.sound.testCollision.mockReturnValue(false);
+      // Mock canvas.walls.checkCollision to return true (wall blocks sight)
+      canvas.walls.checkCollision.mockReturnValue(true);
 
       const hasLOS = visionAnalyzer.hasLineOfSight(mockObserver, mockTarget);
 
       expect(hasLOS).toBe(false); // Should be blocked (undetected)
-      expect(CONFIG.Canvas.polygonBackends.sight.testCollision).toHaveBeenCalled();
+      expect(canvas.walls.checkCollision).toHaveBeenCalled();
     });
 
     test('should block visual LOS when deafened observer has tremorsense and sight is blocked', () => {
@@ -112,16 +111,15 @@ describe('VisionAnalyzer Wall Collision with Deafened Condition', () => {
         tremorsense: { acuity: 'imprecise', range: 30 },
       };
 
-      // Sight is blocked but sound is not
-      CONFIG.Canvas.polygonBackends.sight.testCollision.mockReturnValue(true);
-      CONFIG.Canvas.polygonBackends.sound.testCollision.mockReturnValue(false);
+      // Mock canvas.walls.checkCollision to return true (wall blocks sight)
+      canvas.walls.checkCollision.mockReturnValue(true);
 
       const hasLOS = visionAnalyzer.hasLineOfSight(mockObserver, mockTarget);
 
       // Line of sight specifically refers to visual sight, which is blocked
       // The observer can still detect via tremorsense, but that's handled by detection logic
       expect(hasLOS).toBe(false);
-      expect(CONFIG.Canvas.polygonBackends.sight.testCollision).toHaveBeenCalled();
+      expect(canvas.walls.checkCollision).toHaveBeenCalled();
     });
 
     test('should block visual LOS when deafened observer has scent and sight is blocked', () => {
@@ -129,28 +127,30 @@ describe('VisionAnalyzer Wall Collision with Deafened Condition', () => {
       mockObserver.actor.hasCondition.mockImplementation((condition) => condition === 'deafened'); // only deafened, not blinded
       mockObserver.actor.system.perception.senses = {
         scent: { acuity: 'imprecise', range: 30 },
-      }; // Sight is blocked but sound is not
-      CONFIG.Canvas.polygonBackends.sight.testCollision.mockReturnValue(true);
-      CONFIG.Canvas.polygonBackends.sound.testCollision.mockReturnValue(false);
+      };
+
+      // Mock canvas.walls.checkCollision to return true (wall blocks sight)
+      canvas.walls.checkCollision.mockReturnValue(true);
 
       const hasLOS = visionAnalyzer.hasLineOfSight(mockObserver, mockTarget);
 
       // Line of sight specifically refers to visual sight, which is blocked
       // The observer can still detect via scent, but that's handled by detection logic
       expect(hasLOS).toBe(false);
+      expect(canvas.walls.checkCollision).toHaveBeenCalled();
     });
 
     test('should work normally when not deafened regardless of other senses', () => {
       // Setup: Observer is not deafened
       mockObserver.actor.hasCondition.mockReturnValue(false); // not deafened
 
-      // Sight is blocked but sound is not
-      CONFIG.Canvas.polygonBackends.sight.testCollision.mockReturnValue(true);
-      CONFIG.Canvas.polygonBackends.sound.testCollision.mockReturnValue(false);
+      // Mock canvas.walls.checkCollision to return true (wall blocks sight)
+      canvas.walls.checkCollision.mockReturnValue(true);
 
       const hasLOS = visionAnalyzer.hasLineOfSight(mockObserver, mockTarget);
 
       expect(hasLOS).toBe(false); // Normal sight blocking applies
+      expect(canvas.walls.checkCollision).toHaveBeenCalled();
     });
 
     test('should allow LOS when neither sight nor sound is blocked', () => {
@@ -158,13 +158,13 @@ describe('VisionAnalyzer Wall Collision with Deafened Condition', () => {
       mockObserver.actor.hasCondition.mockImplementation((condition) => condition === 'deafened'); // only deafened, not blinded
       mockObserver.actor.system.perception.senses = {}; // no other senses
 
-      // Neither sight nor sound is blocked
-      CONFIG.Canvas.polygonBackends.sight.testCollision.mockReturnValue(false);
-      CONFIG.Canvas.polygonBackends.sound.testCollision.mockReturnValue(false);
+      // Mock canvas.walls.checkCollision to return false (no walls blocking)
+      canvas.walls.checkCollision.mockReturnValue(false);
 
       const hasLOS = visionAnalyzer.hasLineOfSight(mockObserver, mockTarget);
 
       expect(hasLOS).toBe(true); // Should allow detection (no walls blocking)
+      expect(canvas.walls.checkCollision).toHaveBeenCalled();
     });
   });
 
@@ -178,7 +178,7 @@ describe('VisionAnalyzer Wall Collision with Deafened Condition', () => {
         scent: { acuity: 'imprecise', range: 15 }, // Should be included
       };
 
-      const summary = visionAnalyzer.getSensingSummary(mockObserver);
+      const summary = visionAnalyzer.getVisionCapabilities(mockObserver).sensingSummary;
 
       // Hearing should be excluded due to deafened condition
       expect(summary.hearing).toBeNull();
@@ -209,3 +209,4 @@ describe('VisionAnalyzer Wall Collision with Deafened Condition', () => {
     });
   });
 });
+

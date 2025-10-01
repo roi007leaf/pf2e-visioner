@@ -38,7 +38,14 @@ describe('Terrain Stalker free-sneak', () => {
     function makeToken(x, y) {
         return {
             center: { x, y },
-            document: { x, y, elevation: 0, id: `${x},${y}` },
+            document: {
+                x,
+                y,
+                elevation: 0,
+                id: `${x},${y}`,
+                getFlag: jest.fn(() => ({})),
+                flags: {}
+            },
             id: `${x},${y}`,
             actor: { id: `a-${x}-${y}` },
             name: `T-${x}-${y}`,

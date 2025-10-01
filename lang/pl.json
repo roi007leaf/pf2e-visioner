@@ -30,6 +30,28 @@
       "standard": "Standardowa osłona",
       "greater": "Większa osłona"
     },
+    "SENSES": {
+      "LIGHT-PERCEPTION": "(PL TODO) Light Perception",
+      "LIGHT-PERCEPTION_DESC": "(PL TODO) You can perceive light and darkness. This sense allows you to see in natural darkness but is affected by magical darkness.",
+      "VISION": "(PL TODO) Vision",
+      "VISION_DESC": "(PL TODO) Your standard visual sense used to perceive your surroundings.",
+      "DARKVISION": "(PL TODO) Darkvision",
+      "DARKVISION_DESC": "(PL TODO) You can see in darkness and dim light just as well as in bright light, though you can't distinguish color in darkness.",
+      "GREATER-DARKVISION": "(PL TODO) Greater Darkvision",
+      "GREATER-DARKVISION_DESC": "(PL TODO) You can see in darkness and dim light as if it were bright light—colors included.",
+      "LOW-LIGHT-VISION": "(PL TODO) Low-Light Vision",
+      "LOW-LIGHT-VISION_DESC": "(PL TODO) You can see in dim light as though it were bright light.",
+      "HEARING": "(PL TODO) Hearing",
+      "HEARING_DESC": "(PL TODO) You can detect creatures and events via sound within range (imprecise).",
+      "TREMORSENSE": "(PL TODO) Tremorsense",
+      "TREMORSENSE_DESC": "(PL TODO) You can sense vibrations through the ground within range (imprecise).",
+      "SCENT": "(PL TODO) Scent",
+      "SCENT_DESC": "(PL TODO) You have an enhanced sense of smell, allowing you to detect living creatures within range (imprecise).",
+      "ECHOLOCATION": "(PL TODO) Echolocation",
+      "ECHOLOCATION_DESC": "(PL TODO) You can use sound to navigate and detect objects within range (precise).",
+      "LIFESENSE": "(PL TODO) Lifesense",
+      "LIFESENSE_DESC": "(PL TODO) You can sense the life force of living and undead creatures within range (imprecise)."
+    },
     "COVER_OVERRIDE": {
       "POPUP_OVERRIDE": "Osłona zastąpiona za pomocą wyskakującego okienka skrótów klawiszowych: {original} → {final}",
       "DIALOG_OVERRIDE": "Osłona zastąpiona w oknie dialogowym rzutu: {original} → {final}",

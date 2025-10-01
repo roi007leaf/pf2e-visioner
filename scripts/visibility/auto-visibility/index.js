@@ -19,8 +19,13 @@ export { optimizedPerceptionManager } from './PerceptionManager.js';
 export { optimizedTokenUpdateManager } from './TokenUpdateManager.js';
 export { optimizedVisibilityCalculator, visibilityCalculator } from './VisibilityCalculator.js';
 
+// Export stateless visibility calculator for testing and custom use cases
+export { calculateVisibility as calculateVisibilityStateless } from '../StatelessVisibilityCalculator.js';
+export { calculateVisibilityFromTokens, tokenStateToInput } from '../VisibilityCalculatorAdapter.js';
+
 // Export optimized socket service
 export {
   forceRefreshEveryonesPerception,
-  refreshEveryonesPerceptionOptimized,
+  refreshEveryonesPerceptionOptimized
 } from '../../services/optimized-socket.js';
+

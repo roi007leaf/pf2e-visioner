@@ -63,8 +63,10 @@ export class BaseActionDialog extends BasePreviewDialog {
     const selectFrom = options.selectFrom || 'overrideState';
     const calcFrom = options.calcFrom || 'newVisibility';
     const selectedValue = outcome?.[selectFrom] || outcome?.[calcFrom] || null;
+    const avsEnabled = game.settings.get(MODULE_ID, 'autoVisibilityEnabled');
     return desiredStates
       .filter((s) => typeof s === 'string' && s.length > 0)
+      .filter((s) => s !== 'avs' || avsEnabled)
       .map((state) => ({
         value: state,
         ...this.visibilityConfig(state),
@@ -220,7 +222,16 @@ export class BaseActionDialog extends BasePreviewDialog {
     try {
       if (this._cachedBulkStates && Array.isArray(this._cachedBulkStates))
         return this._cachedBulkStates;
-      const states = ['avs', 'observed', 'concealed', 'hidden', 'undetected'];
+
+      // Check if AVS is enabled to filter out 'avs' state
+      const avsEnabled = game.settings.get(MODULE_ID, 'autoVisibilityEnabled');
+      let states = ['avs', 'observed', 'concealed', 'hidden', 'undetected'];
+
+      // Remove 'avs' if AVS is disabled
+      if (!avsEnabled) {
+        states = states.filter(s => s !== 'avs');
+      }
+
       this._cachedBulkStates = states.map((s) => ({ value: s, ...this.visibilityConfig(s) }));
       return this._cachedBulkStates;
     } catch {
@@ -231,12 +242,20 @@ export class BaseActionDialog extends BasePreviewDialog {
   _deriveBulkStatesFromOutcomes(outcomes) {
     try {
       if (!Array.isArray(outcomes) || outcomes.length === 0) return [];
+
+      // Check if AVS is enabled to filter out 'avs' state
+      const avsEnabled = game.settings.get(MODULE_ID, 'autoVisibilityEnabled');
+
       const set = new Set();
       for (const o of outcomes) {
         if (Array.isArray(o.availableStates)) {
           for (const st of o.availableStates) {
             const value = st?.value ?? st?.key;
-            if (typeof value === 'string') set.add(value);
+            if (typeof value === 'string') {
+              // Skip 'avs' if AVS is disabled
+              if (value === 'avs' && !avsEnabled) continue;
+              set.add(value);
+            }
           }
         }
       }
@@ -270,7 +289,13 @@ export class BaseActionDialog extends BasePreviewDialog {
         if (!tokenId && !o._isWall) continue;
         const oldState = o.oldVisibility ?? o.currentVisibility ?? null;
         o.overrideState = state;
-        o.hasActionableChange = oldState != null && state !== null && state !== oldState;
+
+        const isOldStateAvsControlled = this.isOldStateAvsControlled(o);
+        const statesMatch = state === oldState;
+        o.hasActionableChange =
+          (oldState != null && state !== null && !statesMatch) ||
+          (statesMatch && isOldStateAvsControlled);
+
         if (o.hasActionableChange) o.hasRevertableChange = true;
       }
       // Update UI to reflect new actionable states
@@ -292,7 +317,13 @@ export class BaseActionDialog extends BasePreviewDialog {
         o.overrideState = null;
         const effective = o.newVisibility;
         const oldState = o.oldVisibility ?? o.currentVisibility ?? null;
-        o.hasActionableChange = oldState != null && effective != null && effective !== oldState;
+
+        const isOldStateAvsControlled = this.isOldStateAvsControlled(o);
+        const statesMatch = effective === oldState;
+        o.hasActionableChange =
+          (oldState != null && effective != null && !statesMatch) ||
+          (statesMatch && isOldStateAvsControlled);
+
         if (!o.hasActionableChange) o.hasRevertableChange = false;
       }
       // Update UI to reflect recalculated actionable states
@@ -527,7 +558,13 @@ export class BaseActionDialog extends BasePreviewDialog {
         if (outcome) {
           outcome.overrideState = newState;
           const oldState = outcome.oldVisibility ?? outcome.currentVisibility ?? null;
-          const hasActionableChange = oldState != null && newState != null && newState !== oldState;
+
+          const isOldStateAvsControlled = this.isOldStateAvsControlled(outcome);
+          const statesMatch = newState === oldState;
+          const hasActionableChange =
+            (oldState != null && newState != null && !statesMatch) ||
+            (statesMatch && isOldStateAvsControlled);
+
           // Persist actionable state on outcome so templates and bulk ops reflect immediately
           outcome.hasActionableChange = hasActionableChange;
           try {
@@ -762,19 +799,23 @@ export class BaseActionDialog extends BasePreviewDialog {
     }
 
     try {
-      // Remove AVS override if one was created (when visibility was set to non-AVS state)
-      const effectiveOldState = outcome.oldVisibility;
-      if (effectiveOldState && effectiveOldState !== 'avs' && effectiveOldState !== outcome.currentVisibility) {
+      // Remove AVS override if one was created during apply
+      // This handles the case where user applied an override (even with same state as AVS calculated)
+      // We check if an override exists rather than checking state differences
+      if (!wallId) {
         try {
           const { default: AvsOverrideManager } = await import('../../services/infra/avs-override-manager.js');
           const observerId = app.actionData?.actor?.document?.id || app.actionData?.actor?.id;
           const targetId = outcome.target?.id || outcome.token?.id || tokenId;
 
           if (observerId && targetId) {
-            await AvsOverrideManager.removeOverride(observerId, targetId);
-            // Refresh UI to update override indicators
-            const { updateTokenVisuals } = await import('../../services/visual-effects.js');
-            await updateTokenVisuals();
+            const hasOverride = await AvsOverrideManager.getOverride(observerId, targetId);
+            if (hasOverride) {
+              await AvsOverrideManager.removeOverride(observerId, targetId);
+              // Refresh UI to update override indicators
+              const { updateTokenVisuals } = await import('../../services/visual-effects.js');
+              await updateTokenVisuals();
+            }
           }
         } catch (e) {
           console.warn('Failed to remove AVS override during revert:', e);

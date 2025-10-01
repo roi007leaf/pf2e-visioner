@@ -33,7 +33,7 @@ describe('Debug Hearing Detection', () => {
     console.log('Mock token detectionModes:', mockToken.document.detectionModes);
     console.log('Mock actor senses:', mockActor.system.perception.senses);
 
-    const result = visionAnalyzer.getSensingSummary(mockToken, mockActor);
+    const result = visionAnalyzer.getVisionCapabilities(mockToken, mockActor).sensingSummary;
 
     console.log('Result:', JSON.stringify(result, null, 2));
 

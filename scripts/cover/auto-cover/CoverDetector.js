@@ -1492,6 +1492,56 @@ export class CoverDetector {
       return calculatedCover;
     }
   }
+
+  /**
+   * Check if target has cover from creatures larger than it between observer and target point.
+   * Used by Distracting Shadows feat: creatures at least one size larger can provide cover
+   * for Hide/Sneak prerequisite checks.
+   * 
+   * @param {Token} observer - The observing token
+   * @param {Token} target - The target token (actor using feat)
+   * @param {Object} targetPoint - Optional specific point instead of target center {x, y}
+   * @returns {boolean} True if at least one qualifying larger creature blocks the line
+   */
+  hasLargeCreatureCover(observer, target, targetPoint = null) {
+    try {
+      if (!observer || !target) return false;
+
+      const p1 = observer?.center || observer?.getCenterPoint?.();
+      let p2 = null;
+      if (targetPoint && typeof targetPoint.x === 'number' && typeof targetPoint.y === 'number') {
+        p2 = { x: targetPoint.x, y: targetPoint.y };
+      } else {
+        p2 = target?.center || target?.getCenterPoint?.();
+      }
+      if (!p1 || !p2) return false;
+
+      const targetRank = getSizeRank(target);
+      const tokens = canvas?.tokens?.placeables || [];
+
+      for (const blocker of tokens) {
+        if (!blocker?.actor) continue;
+        if (blocker.id === target.id || blocker.id === observer.id) continue;
+        if (blocker.document?.hidden) continue;
+
+        const type = blocker.actor?.type;
+        if (type === 'loot' || type === 'hazard') continue;
+
+        const blockerRank = getSizeRank(blocker);
+        if (!(blockerRank >= targetRank + 1)) continue;
+
+        const rect = getTokenRect(blocker);
+        const len = segmentRectIntersectionLength(p1, p2, rect);
+        if (len > 0) {
+          return true;
+        }
+      }
+      return false;
+    } catch (e) {
+      console.warn('PF2E Visioner | CoverDetector.hasLargeCreatureCover failed:', e);
+      return false;
+    }
+  }
 }
 
 const coverDetector = new CoverDetector();

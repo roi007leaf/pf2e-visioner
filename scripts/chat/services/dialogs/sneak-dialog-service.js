@@ -52,7 +52,7 @@ export class SneakDialogService {
           notify.warn("You don't have permission to start Sneak for this token.");
           return;
         }
-      } catch {}
+      } catch { }
 
       // Get message and messageId from actionData
       const messageId = actionData.messageId || actionData.message?.id;
@@ -83,11 +83,11 @@ export class SneakDialogService {
         try {
           const tokenObj = canvas.tokens.get(token.id);
           if (tokenObj) tokenObj.locked = false;
-        } catch {}
+        } catch { }
         // Clear waiting flag so movement is allowed
         try {
           await token.document.unsetFlag('pf2e-visioner', 'waitingSneak');
-        } catch {}
+        } catch { }
       } catch (cleanupErr) {
         console.warn('PF2E Visioner | Cleanup waiting effect failed:', cleanupErr);
       }
@@ -120,7 +120,13 @@ export class SneakDialogService {
             }
           } else {
             // Use manual/Foundry visibility detection
-            visibilityState = observer.document.canObserve(token.document) ? 'observed' : 'hidden';
+            // canObserve is a method on TokenDocument, accessed via observer.document
+            try {
+              visibilityState = observer.document.canObserve?.(token.document) ? 'observed' : 'hidden';
+            } catch {
+              // Fallback if canObserve is not available
+              visibilityState = 'observed';
+            }
           }
 
           // Get cover state based on Auto-Cover system availability

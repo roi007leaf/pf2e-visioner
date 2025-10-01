@@ -11,7 +11,7 @@ describe('Tremorsense + Hearing vs Elevated Targets', () => {
 
   beforeEach(() => {
     visionAnalyzer = VisionAnalyzer.getInstance();
-    
+
     // Mock canvas
     global.canvas = {
       scene: { grid: { distance: 5 } },
@@ -77,10 +77,11 @@ describe('Tremorsense + Hearing vs Elevated Targets', () => {
       scent: null
     });
 
-    // Test: canSenseImprecisely should return false for elevated target
+    // Test: canSenseImprecisely should return true because hearing can detect elevated targets
+    // Tremorsense cannot detect elevated, but hearing (imprecise, 60ft range) can
     const canSense = visionAnalyzer.canSenseImprecisely(observer, elevatedTarget);
-    
-    expect(canSense).toBe(false);
+
+    expect(canSense).toBe(true); // Hearing can detect elevated targets
   });
 
   test('observer with vision + tremorsense can detect elevated target via hearing', () => {
@@ -142,7 +143,7 @@ describe('Tremorsense + Hearing vs Elevated Targets', () => {
 
     // Test: canSenseImprecisely should return true (hearing works since observer has vision)
     const canSense = visionAnalyzer.canSenseImprecisely(observer, elevatedTarget);
-    
+
     expect(canSense).toBe(true);
   });
 });

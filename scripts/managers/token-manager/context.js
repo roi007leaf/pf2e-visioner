@@ -63,7 +63,7 @@ export async function buildContext(app, options) {
   try {
     app.visibilityData = getVisibilityMap(app.observer) || {};
     app.coverData = getCoverMap(app.observer) || {};
-  } catch {}
+  } catch { }
 
   const isLootObserver = app.observer?.actor?.type === 'loot';
   if (isLootObserver) {
@@ -140,10 +140,20 @@ export async function buildContext(app, options) {
           }
         }
         const isRowLoot = token.actor?.type === 'loot';
-        const allowedVisKeys =
+
+        // Check if AVS is enabled to determine if 'avs' button should be available
+        const avsEnabled = game.settings.get(MODULE_ID, 'autoVisibilityEnabled');
+
+        let allowedVisKeys =
           isLootObserver || isRowLoot
             ? ['avs', 'observed', 'hidden']
             : Object.keys(VISIBILITY_STATES);
+
+        // Remove 'avs' from allowed keys if AVS is disabled
+        if (!avsEnabled) {
+          allowedVisKeys = allowedVisKeys.filter(key => key !== 'avs');
+        }
+
         const visibilityStates = allowedVisKeys.map((key) => {
           // Determine if this state should be selected
           let selected = false;
@@ -315,9 +325,19 @@ export async function buildContext(app, options) {
           }
         }
         const isRowLoot = observerToken.actor?.type === 'loot' || isLootObserver;
-        const allowedVisKeys = isRowLoot
+
+        // Check if AVS is enabled to determine if 'avs' button should be available
+        const avsEnabledForTarget = game.settings.get(MODULE_ID, 'autoVisibilityEnabled');
+
+        let allowedVisKeys = isRowLoot
           ? ['avs', 'observed', 'hidden']
           : Object.keys(VISIBILITY_STATES);
+
+        // Remove 'avs' from allowed keys if AVS is disabled
+        if (!avsEnabledForTarget) {
+          allowedVisKeys = allowedVisKeys.filter(key => key !== 'avs');
+        }
+
         // Debug: console.log(`[AVS Debug] Target mode allowedVisKeys for ${observerToken.document.name}:`, { isRowLoot, isLootObserver, allowedVisKeys });
         const visibilityStates = allowedVisKeys.map((key) => {
           // Determine if this state should be selected
@@ -528,7 +548,7 @@ export async function buildContext(app, options) {
               showOutcome = true;
             }
           }
-        } catch {}
+        } catch { }
         return {
           id: d.id,
           identifier: idf && String(idf).trim() ? String(idf) : fallback,
@@ -544,16 +564,21 @@ export async function buildContext(app, options) {
       });
       context.includeWalls = context.wallTargets.length > 0;
     }
-  } catch {}
+  } catch { }
 
-  context.visibilityStates = Object.entries(VISIBILITY_STATES).map(([key, config]) => ({
-    key,
-    value: key,
-    label: game.i18n.localize(config.label),
-    icon: config.icon,
-    color: config.color,
-    cssClass: config.cssClass,
-  }));
+  // Check if AVS is enabled to filter out 'avs' state from bulk actions
+  const avsEnabled = game.settings.get(MODULE_ID, 'autoVisibilityEnabled');
+
+  context.visibilityStates = Object.entries(VISIBILITY_STATES)
+    .filter(([key]) => avsEnabled || key !== 'avs') // Filter out 'avs' if AVS is disabled
+    .map(([key, config]) => ({
+      key,
+      value: key,
+      label: game.i18n.localize(config.label),
+      icon: config.icon,
+      color: config.color,
+      cssClass: config.cssClass,
+    }));
 
   context.coverStates = Object.entries(COVER_STATES).map(([key, config]) => ({
     key,
