@@ -83,7 +83,7 @@ export class CreateADiversionPreviewDialog extends BaseActionDialog {
       if (actorId) {
         processedOutcomes = processedOutcomes.filter((o) => o?.observer?.id !== actorId);
       }
-    } catch {}
+    } catch { }
 
     // Apply ignore-allies filtering for display
     try {
@@ -94,7 +94,7 @@ export class CreateADiversionPreviewDialog extends BaseActionDialog {
         this.ignoreAllies,
         'observer',
       );
-    } catch {}
+    } catch { }
 
     // Apply viewport filtering if enabled
     if (this.filterByDetection && this.divertingToken) {
@@ -161,14 +161,14 @@ export class CreateADiversionPreviewDialog extends BaseActionDialog {
       if (this.hideFoundryHidden) {
         processedOutcomes = processedOutcomes.filter((o) => o?.observer?.document?.hidden !== true);
       }
-    } catch {}
+    } catch { }
 
     // Show-only-changes visual filter
     try {
       if (this.showOnlyChanges) {
         processedOutcomes = processedOutcomes.filter((o) => !!o.hasActionableChange);
       }
-    } catch {}
+    } catch { }
 
     // Prepare diverting token with proper image path
     context.divertingToken = {
@@ -231,10 +231,16 @@ export class CreateADiversionPreviewDialog extends BaseActionDialog {
     }
 
     const effectiveNewState = outcome.overrideState || outcome.newVisibility;
-    const hasChange = effectiveNewState !== outcome.currentVisibility;
+    const oldState = outcome.currentVisibility;
 
-    // Return true if either the original calculation determined a change OR there's an override
-    return hasChange || (outcome.changed && effectiveNewState !== 'avs');
+    // Use AVS-aware logic: allow manual override of AVS-controlled states even if same value
+    const isOldStateAvsControlled = this.isOldStateAvsControlled(outcome);
+    const statesMatch = oldState != null && effectiveNewState != null && effectiveNewState === oldState;
+    const hasActionableChange =
+      (oldState != null && effectiveNewState != null && effectiveNewState !== oldState) ||
+      (statesMatch && isOldStateAvsControlled);
+
+    return hasActionableChange;
   }
 
   /**
@@ -272,11 +278,11 @@ export class CreateADiversionPreviewDialog extends BaseActionDialog {
           this.hideFoundryHidden = !!cbh.checked;
           try {
             await game.settings.set(MODULE_ID, 'hideFoundryHiddenTokens', this.hideFoundryHidden);
-          } catch {}
+          } catch { }
           this.render({ force: true });
         });
       }
-    } catch {}
+    } catch { }
 
     // Wire ignore-allies checkbox if present
     try {
@@ -289,7 +295,7 @@ export class CreateADiversionPreviewDialog extends BaseActionDialog {
           this.render({ force: true });
         });
       }
-    } catch {}
+    } catch { }
 
     // Initialize bulk action buttons and handlers
     this.updateBulkActionButtons();
@@ -332,7 +338,7 @@ export class CreateADiversionPreviewDialog extends BaseActionDialog {
           inline: 'nearest',
         });
       }
-    } catch {}
+    } catch { }
   }
 
   /**
@@ -349,8 +355,8 @@ export class CreateADiversionPreviewDialog extends BaseActionDialog {
     try {
       const { applyNowDiversion } = await import('../services/index.js');
       const overrides = { [tokenId]: effectiveNewState };
-      await applyNowDiversion({ ...app.actionData, overrides }, { html: () => {}, attr: () => {} });
-    } catch {}
+      await applyNowDiversion({ ...app.actionData, overrides }, { html: () => { }, attr: () => { } });
+    } catch { }
 
     // Update button states
     app.updateRowButtonsToApplied([{ target: { id: tokenId }, hasActionableChange: true }]);
@@ -363,7 +369,7 @@ export class CreateADiversionPreviewDialog extends BaseActionDialog {
         revertAllButton.disabled = false;
         revertAllButton.innerHTML = '<i class="fas fa-undo"></i> Revert All';
       }
-    } catch {}
+    } catch { }
     app.updateChangesCount();
   }
 
@@ -386,7 +392,7 @@ export class CreateADiversionPreviewDialog extends BaseActionDialog {
       await applyVisibilityChanges(app.actionData.actor, changes, {
         direction: 'observer_to_target',
       });
-    } catch {}
+    } catch { }
 
     // Update button states
     app.updateRowButtonsToReverted([{ target: { id: tokenId }, hasActionableChange: true }]);
@@ -446,9 +452,9 @@ export class CreateADiversionPreviewDialog extends BaseActionDialog {
       }
       await applyNowDiversion(
         { ...app.actionData, ignoreAllies: app.ignoreAllies, overrides },
-        { html: () => {}, attr: () => {} },
+        { html: () => { }, attr: () => { } },
       );
-    } catch {}
+    } catch { }
 
     // Update UI for each row
     app.updateRowButtonsToApplied(
@@ -502,9 +508,9 @@ export class CreateADiversionPreviewDialog extends BaseActionDialog {
       const { revertNowDiversion } = await import('../services/index.js');
       await revertNowDiversion(
         { ...app.actionData, ignoreAllies: app.ignoreAllies },
-        { html: () => {}, attr: () => {} },
+        { html: () => { }, attr: () => { } },
       );
-    } catch {}
+    } catch { }
     app.updateRowButtonsToReverted(
       changedOutcomes.map((o) => ({ target: { id: o.observer.id }, hasActionableChange: true })),
     );
@@ -579,7 +585,7 @@ export class CreateADiversionPreviewDialog extends BaseActionDialog {
    * @param {Token} observerToken - The observer token
    * @param {string} newVisibility - The new visibility state
    */
-  async applyVisibilityChange() {}
+  async applyVisibilityChange() { }
 
   /**
    * Update row buttons to applied state
@@ -628,7 +634,47 @@ export class CreateADiversionPreviewDialog extends BaseActionDialog {
   }
 
   /**
-   * Add click handlers for state icons
+   * Add click handlers for state icons - Override to use AVS-aware logic
    */
-  // Use BaseActionDialog.addIconClickHandlers
+  addIconClickHandlers() {
+    const stateIcons = this.element.querySelectorAll('.state-icon');
+    stateIcons.forEach((icon) => {
+      icon.addEventListener('click', (event) => {
+        // Only handle clicks within override selection container
+        const overrideIcons = event.currentTarget.closest('.override-icons');
+        if (!overrideIcons) return;
+
+        // Robustly resolve target id from data attributes or row
+        let targetId = event.currentTarget.dataset.target || event.currentTarget.dataset.tokenId;
+        if (!targetId) {
+          const row = event.currentTarget.closest('tr[data-token-id]');
+          targetId = row?.dataset?.tokenId;
+        }
+        const newState = event.currentTarget.dataset.state;
+        overrideIcons
+          .querySelectorAll('.state-icon')
+          .forEach((i) => i.classList.remove('selected'));
+        event.currentTarget.classList.add('selected');
+        const hiddenInput = overrideIcons?.querySelector('input[type="hidden"]');
+        if (hiddenInput) hiddenInput.value = newState;
+        let outcome = this.outcomes?.find?.(
+          (o) => String(this.getOutcomeTokenId(o)) === String(targetId),
+        );
+        if (outcome) {
+          outcome.overrideState = newState;
+
+          // Use our AVS-aware calculation method
+          const hasActionableChange = this.calculateHasActionableChange(outcome);
+
+          // Persist actionable state on outcome so templates and bulk ops reflect immediately
+          outcome.hasActionableChange = hasActionableChange;
+          try {
+            this.updateActionButtonsForToken(targetId || null, hasActionableChange, {
+              row: event.currentTarget.closest('tr'),
+            });
+          } catch { }
+        }
+      });
+    });
+  }
 }

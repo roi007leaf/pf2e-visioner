@@ -95,7 +95,7 @@ export class ConsequencesPreviewDialog extends BaseActionDialog {
         this.ignoreAllies,
         'target',
       );
-    } catch {}
+    } catch { }
 
     // Apply viewport filtering if enabled
     if (this.filterByDetection && this.attackingToken) {
@@ -164,7 +164,7 @@ export class ConsequencesPreviewDialog extends BaseActionDialog {
       if (this.hideFoundryHidden) {
         processedOutcomes = processedOutcomes.filter((o) => o?.target?.document?.hidden !== true);
       }
-    } catch {}
+    } catch { }
 
     // Prepare attacking token with proper image path
     context.attackingToken = {
@@ -189,7 +189,7 @@ export class ConsequencesPreviewDialog extends BaseActionDialog {
           o.newVisibility = po.newVisibility;
         }
       }
-    } catch {}
+    } catch { }
 
     // Log the number of changes for debugging
     Object.assign(context, this.buildCommonContext(processedOutcomes));
@@ -261,14 +261,17 @@ export class ConsequencesPreviewDialog extends BaseActionDialog {
       return false;
     }
 
-    // For consequences, actionable change means:
-    // 1. Token sees attacker as hidden/undetected AND will change to different state, OR
-    // 2. GM has selected an override state that differs from current state
-    const isHiddenOrUndetected =
-      outcome.currentVisibility === 'hidden' || outcome.currentVisibility === 'undetected';
-    const hasOverrideChange =
-      outcome.overrideState && outcome.overrideState !== outcome.currentVisibility;
-    return isHiddenOrUndetected || hasOverrideChange;
+    const effectiveNewState = outcome.overrideState || outcome.newVisibility;
+    const oldState = outcome.currentVisibility;
+
+    // Use AVS-aware logic: allow manual override of AVS-controlled states even if same value
+    const isOldStateAvsControlled = this.isOldStateAvsControlled(outcome);
+    const statesMatch = oldState != null && effectiveNewState != null && effectiveNewState === oldState;
+    const hasActionableChange =
+      (oldState != null && effectiveNewState != null && effectiveNewState !== oldState) ||
+      (statesMatch && isOldStateAvsControlled);
+
+    return hasActionableChange;
   }
 
   /**
@@ -309,7 +312,7 @@ export class ConsequencesPreviewDialog extends BaseActionDialog {
           this.render({ force: true });
         });
       }
-    } catch {}
+    } catch { }
     // Wire Hide Foundry-hidden visual filter toggle
     try {
       const cbh = this.element.querySelector('input[data-action="toggleHideFoundryHidden"]');
@@ -319,11 +322,11 @@ export class ConsequencesPreviewDialog extends BaseActionDialog {
           this.hideFoundryHidden = !!cbh.checked;
           try {
             await game.settings.set(MODULE_ID, 'hideFoundryHiddenTokens', this.hideFoundryHidden);
-          } catch {}
+          } catch { }
           this.render({ force: true });
         });
       }
-    } catch {}
+    } catch { }
   }
 
   /**
@@ -384,9 +387,9 @@ export class ConsequencesPreviewDialog extends BaseActionDialog {
           ignoreAllies: app.ignoreAllies,
           encounterOnly: app.encounterOnly,
         },
-        { html: () => {}, attr: () => {} },
+        { html: () => { }, attr: () => { } },
       );
-    } catch {}
+    } catch { }
 
     // Update button states
     app.updateRowButtonsToApplied([{ target: { id: tokenId }, hasActionableChange: true }]);
@@ -407,8 +410,8 @@ export class ConsequencesPreviewDialog extends BaseActionDialog {
       const { revertNowConsequences } = await import('../services/index.js');
       // Pass the specific tokenId for per-row revert
       const actionDataWithTarget = { ...app.actionData, targetTokenId: tokenId };
-      await revertNowConsequences(actionDataWithTarget, { html: () => {}, attr: () => {} });
-    } catch {}
+      await revertNowConsequences(actionDataWithTarget, { html: () => { }, attr: () => { } });
+    } catch { }
 
     // Update button states
     app.updateRowButtonsToReverted([{ target: { id: tokenId }, hasActionableChange: true }]);
@@ -445,14 +448,14 @@ export class ConsequencesPreviewDialog extends BaseActionDialog {
         app.ignoreAllies,
         'target',
       );
-    } catch {}
+    } catch { }
 
     // Respect Hide Foundry-hidden toggle for Revert All
     try {
       if (app.hideFoundryHidden) {
         filteredOutcomes = filteredOutcomes.filter((o) => o?.target?.document?.hidden !== true);
       }
-    } catch {}
+    } catch { }
 
     // Only apply changes to filtered outcomes that have actionable changes
     const changedOutcomes = filteredOutcomes.filter((outcome) => {
@@ -513,7 +516,7 @@ export class ConsequencesPreviewDialog extends BaseActionDialog {
           ignoreAllies: app.ignoreAllies,
           encounterOnly: app.encounterOnly,
         },
-        { html: () => {}, attr: () => {} },
+        { html: () => { }, attr: () => { } },
       );
     }
 
@@ -563,14 +566,14 @@ export class ConsequencesPreviewDialog extends BaseActionDialog {
         app.ignoreAllies,
         'target',
       );
-    } catch {}
+    } catch { }
 
     // Respect Hide Foundry-hidden toggle for Revert All (UI only)
     try {
       if (app.hideFoundryHidden) {
         filteredOutcomes = filteredOutcomes.filter((o) => o?.target?.document?.hidden !== true);
       }
-    } catch {}
+    } catch { }
 
     // Only revert changes to filtered outcomes that have actionable changes
     const changedOutcomes = filteredOutcomes.filter((outcome) => {
@@ -583,7 +586,7 @@ export class ConsequencesPreviewDialog extends BaseActionDialog {
     }
 
     const { revertNowConsequences } = await import('../services/index.js');
-    await revertNowConsequences(app.actionData, { html: () => {}, attr: () => {} });
+    await revertNowConsequences(app.actionData, { html: () => { }, attr: () => { } });
     for (const outcome of changedOutcomes) {
       app.updateRowButtonsToReverted([
         { target: { id: outcome.target.id }, hasActionableChange: true },
@@ -669,7 +672,7 @@ export class ConsequencesPreviewDialog extends BaseActionDialog {
   }
 
   // Use base implementations for selection, bulk button state, and icon handlers
-  async applyVisibilityChange() {}
+  async applyVisibilityChange() { }
 
   updateActionButtonsForToken(tokenId, hasActionableChange) {
     // Delegate to base which renders Apply/Revert or "No Change"

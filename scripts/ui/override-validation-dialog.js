@@ -83,10 +83,11 @@ export class OverrideValidationDialog extends foundry.applications.api.Handlebar
         badgeClass = 'badge-generic';
       }
       // Resolve token images if available on the canvas
+      // Use actor portrait for consistency with Token Manager
       const observerToken = canvas.tokens?.get(override.observerId);
       const targetToken = canvas.tokens?.get(override.targetId);
-      const observerImg = observerToken?.document?.texture?.src ?? observerToken?.texture?.src ?? observerToken?.document?.img ?? null;
-      const targetImg = targetToken?.document?.texture?.src ?? targetToken?.texture?.src ?? targetToken?.document?.img ?? null;
+      const observerImg = observerToken?.actor?.img ?? observerToken?.document?.texture?.src ?? observerToken?.texture?.src ?? observerToken?.document?.img ?? 'icons/svg/book.svg';
+      const targetImg = targetToken?.actor?.img ?? targetToken?.document?.texture?.src ?? targetToken?.texture?.src ?? targetToken?.document?.img ?? 'icons/svg/book.svg';
 
       // Pick analysis icons from actual current state when provided by validator
       // Prefer current states provided by the validator/caller; fall back to safe defaults
@@ -177,7 +178,7 @@ export class OverrideValidationDialog extends foundry.applications.api.Handlebar
     try { headerToken = canvas.tokens?.placeables?.find(t => t?.document?.name === this.tokenName) || null; } catch { }
     const targetHeader = {
       name: this.tokenName,
-      img: headerToken?.document?.texture?.src ?? headerToken?.texture?.src ?? headerToken?.document?.img ?? null
+      img: headerToken?.actor?.img ?? headerToken?.document?.texture?.src ?? headerToken?.texture?.src ?? headerToken?.document?.img ?? 'icons/svg/book.svg'
     };
 
     const result = {

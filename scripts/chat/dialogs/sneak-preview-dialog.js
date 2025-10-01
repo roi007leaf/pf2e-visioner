@@ -219,7 +219,7 @@ export class SneakPreviewDialog extends BaseActionDialog {
       else if (['teleport'].includes(v)) movementType = 'teleport';
       else if (['deploy'].includes(v)) movementType = 'deploy';
       else if (['travel'].includes(v)) movementType = 'travel';
-    } catch {}
+    } catch { }
 
     // Capture current end positions FIRST, before processing outcomes
     await this._captureCurrentEndPositionsForOutcomes(this.outcomes);
@@ -243,7 +243,7 @@ export class SneakPreviewDialog extends BaseActionDialog {
         this.ignoreAllies,
         'token',
       );
-    } catch {}
+    } catch { }
 
     // Apply viewport filtering if enabled (Note: Sneak uses 'token' property, not 'target')
     if (this.filterByDetection && this.sneakingToken) {
@@ -278,7 +278,7 @@ export class SneakPreviewDialog extends BaseActionDialog {
         const overrideState = existing?.overrideState ?? o?.overrideState ?? null;
         return { ...o, overrideState };
       });
-    } catch {}
+    } catch { }
 
     const cfg = (s) => this.visibilityConfig(s);
 
@@ -298,7 +298,7 @@ export class SneakPreviewDialog extends BaseActionDialog {
           this.sneakingToken,
         );
         outcome.liveEndVisibility = liveEndVis;
-      } catch {}
+      } catch { }
       if (outcome._tsFreeSneak) {
         // For Terrain Stalker free-sneak, force qualifications to pass for UI and keep newVisibility
         outcome._featPositionOverride = {
@@ -335,7 +335,7 @@ export class SneakPreviewDialog extends BaseActionDialog {
             inNaturalTerrain: inNatural,
             impreciseOnly: outcome?.impreciseOnly || false,
           });
-        } catch {}
+        } catch { }
         // Stash for UI rendering
         outcome._featPositionOverride = effective;
 
@@ -463,7 +463,7 @@ export class SneakPreviewDialog extends BaseActionDialog {
           }
         });
       }
-    } catch {}
+    } catch { }
 
     // Sort outcomes to prioritize qualifying positions (green checkmarks) at the top
     let sortedOutcomes = this._sortOutcomesByQualification(processedOutcomes);
@@ -473,7 +473,7 @@ export class SneakPreviewDialog extends BaseActionDialog {
       if (this.showOnlyChanges) {
         sortedOutcomes = sortedOutcomes.filter((o) => !!o.hasActionableChange);
       }
-    } catch {}
+    } catch { }
 
     // Update original outcomes with hasActionableChange for Apply All button logic
     sortedOutcomes.forEach((processedOutcome, index) => {
@@ -543,7 +543,7 @@ export class SneakPreviewDialog extends BaseActionDialog {
         );
         if (Number.isFinite(Number(flagVal)) && Number(flagVal) > 0)
           originalSpeed = Number(flagVal);
-      } catch {}
+      } catch { }
 
       const maxFeet = await SneakSpeedService.getSneakMaxDistanceFeet(this.sneakingToken);
 
@@ -553,7 +553,7 @@ export class SneakPreviewDialog extends BaseActionDialog {
       try {
         multiplier = FeatsHandler.getSneakSpeedMultiplier(this.sneakingToken) ?? 0.5;
         bonusFeet = FeatsHandler.getSneakDistanceBonusFeet(this.sneakingToken) ?? 0;
-      } catch {}
+      } catch { }
 
       const explanations = [];
       explanations.push(`Base Speed: ${originalSpeed} ft`);
@@ -600,7 +600,7 @@ export class SneakPreviewDialog extends BaseActionDialog {
         const sobj = speeds?.[key] || null;
         speedVal = Number(sobj?.value ?? 0) || 0;
         supported = speedVal > 0;
-      } catch {}
+      } catch { }
 
       context.sneakDistance = {
         maxFeet,
@@ -618,7 +618,7 @@ export class SneakPreviewDialog extends BaseActionDialog {
           ? `${movementLabel} speed: ${speedVal} ft`
           : `${movementLabel} speed unavailable for this actor`,
       };
-    } catch {}
+    } catch { }
 
     // Compute feat prerequisite-relaxation badges (Terrain Stalker, Vanish into the Land, Very Very Sneaky, Legendary Sneak, Ceaseless Shadows, Distracting Shadows)
     try {
@@ -720,7 +720,7 @@ export class SneakPreviewDialog extends BaseActionDialog {
             });
           }
         }
-      } catch {}
+      } catch { }
       // Vanish into the Land: active in selected difficult terrain for Terrain Stalker
       try {
         if (has('vanish-into-the-land')) {
@@ -753,7 +753,7 @@ export class SneakPreviewDialog extends BaseActionDialog {
             });
           }
         }
-      } catch {}
+      } catch { }
       // Distracting Shadows: show informational badge when feat present (contextual per observer)
       if (has('distracting-shadows')) {
         badges.push({
@@ -768,7 +768,7 @@ export class SneakPreviewDialog extends BaseActionDialog {
         });
       }
       context.prereqBadges = badges;
-    } catch {}
+    } catch { }
 
     // Add deferred checks information for global display
     try {
@@ -810,7 +810,7 @@ export class SneakPreviewDialog extends BaseActionDialog {
     // Update bulk defer button asynchronously (don't block render)
     try {
       await this._updateBulkDeferButton();
-    } catch {}
+    } catch { }
 
     try {
       const cb = this.element.querySelector('input[data-action="toggleIgnoreAllies"]');
@@ -826,7 +826,7 @@ export class SneakPreviewDialog extends BaseActionDialog {
             })
             .catch(() => this.render({ force: true }));
         });
-    } catch {}
+    } catch { }
     // Wire Hide Foundry-hidden visual filter toggle
     try {
       const cbh = this.element.querySelector('input[data-action="toggleHideFoundryHidden"]');
@@ -835,14 +835,14 @@ export class SneakPreviewDialog extends BaseActionDialog {
           this.hideFoundryHidden = !!cbh.checked;
           try {
             await game.settings.set(MODULE_ID, 'hideFoundryHiddenTokens', this.hideFoundryHidden);
-          } catch {}
+          } catch { }
           // Recompute outcomes to apply visual filter and keep positions updated
           const list = await this._recomputeOutcomesWithPositionData();
           if (Array.isArray(list)) this.outcomes = list;
           this.render({ force: true });
         });
       }
-    } catch {}
+    } catch { }
   }
 
   /**
@@ -1337,7 +1337,7 @@ export class SneakPreviewDialog extends BaseActionDialog {
         this.ignoreAllies,
         'token',
       );
-    } catch {}
+    } catch { }
 
     // Apply viewport filtering if enabled (Note: Sneak uses 'token' property, not 'target')
     if (this.filterByDetection && this.sneakingToken) {
@@ -1403,7 +1403,7 @@ export class SneakPreviewDialog extends BaseActionDialog {
             inNaturalTerrain: inNatural,
             impreciseOnly: outcome?.impreciseOnly || false,
           });
-        } catch {}
+        } catch { }
         outcome._featPositionOverride = effective;
 
         // Only override to observed if one or both positions don't qualify AFTER overrides
@@ -1515,7 +1515,7 @@ export class SneakPreviewDialog extends BaseActionDialog {
           }
         });
       }
-    } catch {}
+    } catch { }
     return processedOutcomes;
   }
 
@@ -1558,7 +1558,7 @@ export class SneakPreviewDialog extends BaseActionDialog {
                   outcome.token,
                   this.sneakingToken,
                 );
-            } catch {}
+            } catch { }
 
             // Create a basic position transition object for newly included tokens
             if (!outcome.positionTransition) {
@@ -2184,7 +2184,7 @@ export class SneakPreviewDialog extends BaseActionDialog {
           coverState =
             autoCoverSystem.detectCoverBetweenTokens(observerToken, this.sneakingToken) || 'none';
         }
-      } catch {}
+      } catch { }
       if (!coverState) {
         try {
           coverState = getCoverBetween(observerToken, this.sneakingToken);
@@ -3311,5 +3311,53 @@ export class SneakPreviewDialog extends BaseActionDialog {
   async close(options = {}) {
     await this._clearSneakActiveFlag();
     return super.close(options);
+  }
+
+  // Override addIconClickHandlers to use AVS-aware logic
+  addIconClickHandlers() {
+    const stateIcons = this.element.querySelectorAll('.state-icon');
+    stateIcons.forEach((icon) => {
+      icon.addEventListener('click', (event) => {
+        // Only handle clicks within override selection container
+        const overrideIcons = event.currentTarget.closest('.override-icons');
+        if (!overrideIcons) return;
+
+        // Robustly resolve target id from data attributes or row
+        let targetId = event.currentTarget.dataset.target || event.currentTarget.dataset.tokenId;
+        if (!targetId) {
+          const row = event.currentTarget.closest('tr[data-token-id]');
+          targetId = row?.dataset?.tokenId;
+        }
+        const newState = event.currentTarget.dataset.state;
+        overrideIcons
+          .querySelectorAll('.state-icon')
+          .forEach((i) => i.classList.remove('selected'));
+        event.currentTarget.classList.add('selected');
+        const hiddenInput = overrideIcons?.querySelector('input[type="hidden"]');
+        if (hiddenInput) hiddenInput.value = newState;
+        let outcome = this.outcomes?.find?.(
+          (o) => String(this.getOutcomeTokenId(o)) === String(targetId),
+        );
+        if (outcome) {
+          outcome.overrideState = newState;
+          const oldState = outcome.oldVisibility ?? outcome.currentVisibility ?? null;
+
+          // Use AVS-aware logic instead of the base logic
+          const isOldStateAvsControlled = this.isOldStateAvsControlled(outcome);
+          const statesMatch = oldState != null && newState != null && newState === oldState;
+          const hasActionableChange =
+            (oldState != null && newState != null && newState !== oldState) ||
+            (statesMatch && isOldStateAvsControlled);
+
+          // Persist actionable state on outcome so templates and bulk ops reflect immediately
+          outcome.hasActionableChange = hasActionableChange;
+          try {
+            this.updateActionButtonsForToken(targetId || null, hasActionableChange, {
+              row: event.currentTarget.closest('tr'),
+            });
+          } catch { }
+        }
+      });
+    });
   }
 }

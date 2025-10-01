@@ -151,12 +151,12 @@ export class BaseActionDialog extends BasePreviewDialog {
           this.render({ force: true });
         });
       }
-    } catch {}
+    } catch { }
 
     // Ensure bulk override buttons get listeners
     try {
       this._attachBulkOverrideHandlers();
-    } catch {}
+    } catch { }
 
     // Wire up Show Only Changes checkbox
     try {
@@ -170,7 +170,7 @@ export class BaseActionDialog extends BasePreviewDialog {
           this.render({ force: true });
         });
       }
-    } catch {}
+    } catch { }
 
     // Wire up Filter By Detection checkbox (disabled in combat via template binding)
     try {
@@ -188,11 +188,11 @@ export class BaseActionDialog extends BasePreviewDialog {
               const list = await this.getFilteredOutcomes();
               if (Array.isArray(list)) this.outcomes = list;
             }
-          } catch {}
+          } catch { }
           this.render({ force: true });
         });
       }
-    } catch {}
+    } catch { }
   }
 
   buildCommonContext(outcomes) {
@@ -258,7 +258,7 @@ export class BaseActionDialog extends BasePreviewDialog {
       });
       const clearBtn = root.querySelector('button[data-action="bulkOverrideClear"]');
       if (clearBtn) clearBtn.addEventListener('click', (ev) => this._onBulkOverrideClear(ev));
-    } catch {}
+    } catch { }
   }
 
   _onBulkOverrideSet(event) {
@@ -315,7 +315,7 @@ export class BaseActionDialog extends BasePreviewDialog {
       const message = emptyNotice || 'No encounter tokens found, showing all';
       try {
         notify.info(`${MODULE_TITLE}: ${message}`);
-      } catch {}
+      } catch { }
     }
     return filtered;
   }
@@ -335,7 +335,7 @@ export class BaseActionDialog extends BasePreviewDialog {
     import('../services/ui/dialog-utils.js').then(({ updateRowButtonsToApplied }) => {
       try {
         updateRowButtonsToApplied(this.element, normalized);
-      } catch {}
+      } catch { }
     });
   }
 
@@ -347,7 +347,7 @@ export class BaseActionDialog extends BasePreviewDialog {
     import('../services/ui/dialog-utils.js').then(({ updateRowButtonsToReverted }) => {
       try {
         updateRowButtonsToReverted(this.element, normalized);
-      } catch {}
+      } catch { }
       try {
         // After reverting, reset each row's selection to its initial calculated outcome
         if (!Array.isArray(outcomes)) return;
@@ -379,9 +379,9 @@ export class BaseActionDialog extends BasePreviewDialog {
               (x) => String(this.getOutcomeTokenId(x)) === String(tokenId),
             );
             if (outcome) outcome.overrideState = null;
-          } catch {}
+          } catch { }
         }
-      } catch {}
+      } catch { }
     });
   }
 
@@ -389,7 +389,7 @@ export class BaseActionDialog extends BasePreviewDialog {
     import('../services/ui/dialog-utils.js').then(({ updateBulkActionButtons }) => {
       try {
         updateBulkActionButtons(this.element, this.bulkActionState);
-      } catch {}
+      } catch { }
     });
   }
 
@@ -397,7 +397,7 @@ export class BaseActionDialog extends BasePreviewDialog {
     import('../services/ui/dialog-utils.js').then(({ updateChangesCount }) => {
       try {
         updateChangesCount(this.element, this.getChangesCounterClass());
-      } catch {}
+      } catch { }
     });
   }
 
@@ -422,7 +422,7 @@ export class BaseActionDialog extends BasePreviewDialog {
         const icon = container.querySelector(`.state-icon[data-state="${desiredState}"]`);
         if (icon) icon.classList.add('selected');
       }
-    } catch {}
+    } catch { }
   }
 
   // Outcome display helpers (string-based). Subclasses can override if needed
@@ -491,7 +491,7 @@ export class BaseActionDialog extends BasePreviewDialog {
       } else {
         container.innerHTML = '<span class="no-action">No Change</span>';
       }
-    } catch {}
+    } catch { }
   }
 
   addIconClickHandlers() {
@@ -535,7 +535,7 @@ export class BaseActionDialog extends BasePreviewDialog {
               wallId,
               row: event.currentTarget.closest('tr'),
             });
-          } catch {}
+          } catch { }
           // Direct DOM fallback to ensure row shows buttons immediately
           try {
             const rowEl = event.currentTarget.closest('tr');
@@ -561,23 +561,23 @@ export class BaseActionDialog extends BasePreviewDialog {
                 }
               }
             }
-          } catch {}
+          } catch { }
           try {
             // Maintain a lightweight list of changed outcomes for convenience
             this.changes = Array.isArray(this.outcomes)
               ? this.outcomes.filter((o) => {
-                  const baseOld = o.oldVisibility ?? o.currentVisibility ?? null;
-                  const baseNew = o.overrideState ?? o.newVisibility ?? null;
-                  return baseOld != null && baseNew != null && baseOld !== baseNew;
-                })
+                const baseOld = o.oldVisibility ?? o.currentVisibility ?? null;
+                const baseNew = o.overrideState ?? o.newVisibility ?? null;
+                return baseOld != null && baseNew != null && baseOld !== baseNew;
+              })
               : [];
-          } catch {}
+          } catch { }
         }
         this.updateChangesCount();
         // If "Show only changes" is active, re-render so filtering reflects override adjustments
         try {
           if (this.showOnlyChanges) this.render({ force: true });
-        } catch {}
+        } catch { }
       });
     });
   }
@@ -600,7 +600,7 @@ export class BaseActionDialog extends BasePreviewDialog {
         if (!row) continue;
         this.updateActionButtonsForToken(tokenId || null, !!o.hasActionableChange, { wallId, row });
       }
-    } catch {}
+    } catch { }
   }
 
   /**
@@ -662,7 +662,12 @@ export class BaseActionDialog extends BasePreviewDialog {
       return;
     }
 
-    const hasChange = effectiveNewState !== outcome.oldVisibility;
+    // Use AVS-aware logic: allow manual override of AVS-controlled states even if same value
+    const isOldStateAvsControlled = (typeof app.isOldStateAvsControlled === 'function')
+      ? app.isOldStateAvsControlled(outcome)
+      : false;
+    const statesMatch = effectiveNewState === outcome.oldVisibility;
+    const hasChange = (effectiveNewState !== outcome.oldVisibility) || (statesMatch && isOldStateAvsControlled);
 
     if (!hasChange) {
       notify.warn(`${MODULE_TITLE}: No changes to apply for this ${wallId ? 'wall' : 'token'}`);
@@ -757,6 +762,25 @@ export class BaseActionDialog extends BasePreviewDialog {
     }
 
     try {
+      // Remove AVS override if one was created (when visibility was set to non-AVS state)
+      const effectiveOldState = outcome.oldVisibility;
+      if (effectiveOldState && effectiveOldState !== 'avs' && effectiveOldState !== outcome.currentVisibility) {
+        try {
+          const { default: AvsOverrideManager } = await import('../../services/infra/avs-override-manager.js');
+          const observerId = app.actionData?.actor?.document?.id || app.actionData?.actor?.id;
+          const targetId = outcome.target?.id || outcome.token?.id || tokenId;
+
+          if (observerId && targetId) {
+            await AvsOverrideManager.removeOverride(observerId, targetId);
+            // Refresh UI to update override indicators
+            const { updateTokenVisuals } = await import('../../services/visual-effects.js');
+            await updateTokenVisuals();
+          }
+        } catch (e) {
+          console.warn('Failed to remove AVS override during revert:', e);
+        }
+      }
+
       // Revert to original visibility
       outcome.oldVisibility = outcome.currentVisibility; // Reset to original visibility
       outcome.overrideState = null;
@@ -945,6 +969,39 @@ export class BaseActionDialog extends BasePreviewDialog {
         return;
       }
 
+      // Remove AVS overrides for all outcomes that have non-AVS states
+      const observerId = app.actionData?.actor?.document?.id || app.actionData?.actor?.id;
+      let removedOverrides = 0;
+
+      if (observerId) {
+        try {
+          const { default: AvsOverrideManager } = await import('../../services/infra/avs-override-manager.js');
+
+          for (const outcome of appliedOutcomes) {
+            const effectiveOldState = outcome.oldVisibility;
+            if (effectiveOldState && effectiveOldState !== 'avs' && effectiveOldState !== outcome.currentVisibility) {
+              const targetId = outcome.target?.id || outcome.token?.id;
+              if (targetId) {
+                try {
+                  await AvsOverrideManager.removeOverride(observerId, targetId);
+                  removedOverrides++;
+                } catch (e) {
+                  console.warn(`Failed to remove AVS override for ${targetId}:`, e);
+                }
+              }
+            }
+          }
+
+          // Refresh UI to update override indicators if any were removed
+          if (removedOverrides > 0) {
+            const { updateTokenVisuals } = await import('../../services/visual-effects.js');
+            await updateTokenVisuals();
+          }
+        } catch (e) {
+          console.warn('Failed to remove AVS overrides during revert all:', e);
+        }
+      }
+
       // Revert all outcomes to their original state
       appliedOutcomes.forEach((outcome) => {
         outcome.oldVisibility = outcome.currentVisibility; // Reset to original visibility
@@ -967,7 +1024,10 @@ export class BaseActionDialog extends BasePreviewDialog {
         app.updateBulkActionButtons();
       }
 
-      notify.info(`${MODULE_TITLE}: Reverted changes for ${appliedOutcomes.length} tokens`);
+      const message = removedOverrides > 0
+        ? `${MODULE_TITLE}: Reverted changes for ${appliedOutcomes.length} tokens (removed ${removedOverrides} overrides)`
+        : `${MODULE_TITLE}: Reverted changes for ${appliedOutcomes.length} tokens`;
+      notify.info(message);
     } catch (error) {
       console.error(`[${actionType} Dialog] Error reverting all changes:`, error);
       notify.error(`${MODULE_TITLE}: Failed to revert changes - see console for details`);

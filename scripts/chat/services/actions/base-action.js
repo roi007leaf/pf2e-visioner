@@ -1,5 +1,6 @@
 // Base class for action logic. Subclasses must implement abstract hooks.
 
+import { MODULE_ID } from '../../../constants.js';
 import { log, notify } from '../infra/notifications.js';
 
 export class ActionHandlerBase {
@@ -105,12 +106,49 @@ export class ActionHandlerBase {
         if (typeof overrideState !== 'string' || !overrideState) continue;
         outcome.newVisibility = overrideState;
         const baseOld = outcome.oldVisibility ?? outcome.currentVisibility;
-        if (baseOld) outcome.changed = overrideState !== baseOld;
+        if (baseOld) {
+          // If old state matches new state, check if old state was AVS-controlled
+          // If it was AVS-controlled, we should still apply the manual override
+          const isOldStateAvsControlled = this.isOldStateAvsControlled(outcome, actionData);
+          outcome.changed = (overrideState !== baseOld) || isOldStateAvsControlled;
+        }
       }
       return outcomes;
     } catch (error) {
       console.error('Error applying overrides:', error);
       return outcomes;
+    }
+  }
+
+  /**
+   * Check if the old/current visibility state is controlled by AVS (not a manual override)
+   * @param {Object} outcome - The outcome object
+   * @param {Object} actionData - The action data containing actor info
+   * @returns {boolean} True if the old state is AVS-controlled, false if manually overridden
+   */
+  isOldStateAvsControlled(outcome, actionData) {
+    try {
+      // Check if AVS is enabled
+      const avsEnabled = game.settings.get(MODULE_ID, 'autoVisibilityEnabled');
+      if (!avsEnabled) return false;
+
+      // Get the token and observer from the outcome
+      const token = outcome.target || outcome.token;
+      const observer = actionData?.actor;
+
+      if (!token || !observer) return false;
+
+      // Check for manual override flag
+      // If there's an existing manual override flag, then the old state is NOT AVS-controlled
+      const hasOverride = !!token.document?.getFlag(
+        MODULE_ID,
+        `avs-override-from-${observer.document?.id || observer.id}`,
+      );
+
+      return !hasOverride; // If no override exists, AVS is controlling
+    } catch (error) {
+      console.warn('Error checking if old state is AVS-controlled:', error);
+      return false; // Default to not AVS-controlled on error
     }
   }
 
