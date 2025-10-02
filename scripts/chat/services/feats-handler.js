@@ -358,6 +358,23 @@ export class FeatsHandler {
       reason = reason || 'Ceaseless Shadows removes cover/concealment requirement';
     }
 
+    // Camouflage: In natural terrain, you can Hide and Sneak even without cover or being concealed.
+    // Natural terrain includes: aquatic, arctic, desert, forest, mountain, plains, sky, swamp, underground
+    // (but NOT urban environments)
+    if (feats.has('camouflage')) {
+      try {
+        const naturalTerrains = ['aquatic', 'arctic', 'desert', 'forest', 'mountain', 'plains', 'sky', 'swamp', 'underground'];
+        const inNaturalTerrain = naturalTerrains.some(terrain =>
+          EnvironmentHelper.isEnvironmentActive(tokenOrActor, terrain)
+        );
+        if (inNaturalTerrain) {
+          startQualifies = true;
+          endQualifies = true;
+          if (!reason) reason = 'Camouflage removes cover/concealment requirement in natural terrain';
+        }
+      } catch { /* best-effort only */ }
+    }
+
     // Legendary Sneak: You can Hide and Sneak even without cover or being concealed.
     // RAW: bypass both start and end prerequisites entirely.
     if (feats.has('legendary-sneak')) {
@@ -409,13 +426,6 @@ export class FeatsHandler {
           if (!reason) reason = 'Terrain Stalker (chosen terrain)';
         }
       }
-    }
-
-    // Foil Senses: Can Hide or Sneak against observers with only imprecise senses
-    // We approximate via a context hint impreciseOnly
-    if (!startQualifies && feats.has('foil-senses') && extra?.impreciseOnly) {
-      startQualifies = true;
-      if (!reason) reason = 'Foil Senses vs. imprecise senses';
     }
 
     // Distracting Shadows: You can use creatures that are at least one size larger than you

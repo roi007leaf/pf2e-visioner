@@ -660,6 +660,28 @@ export class SneakPreviewDialog extends BaseActionDialog {
           ),
         });
       }
+      // Camouflage: removes cover/concealment requirement in natural terrain
+      try {
+        if (has('camouflage')) {
+          const env = (await import('../../utils/environment.js')).default;
+          const naturalTerrains = ['aquatic', 'arctic', 'desert', 'forest', 'mountain', 'plains', 'sky', 'swamp', 'underground'];
+          const inNaturalTerrain = naturalTerrains.some(terrain =>
+            env.isEnvironmentActive(actorOrToken, terrain)
+          );
+          if (inNaturalTerrain) {
+            badges.push({
+              key: 'camouflage',
+              icon: 'fas fa-tree',
+              label: game.i18n.localize(
+                'PF2E_VISIONER.SNEAK_AUTOMATION.BADGES.CAMOUFLAGE_LABEL',
+              ),
+              tooltip: game.i18n.localize(
+                'PF2E_VISIONER.SNEAK_AUTOMATION.BADGES.CAMOUFLAGE_TOOLTIP',
+              ),
+            });
+          }
+        }
+      } catch { }
       // Legendary Sneak: relaxes start prerequisite
       if (has('legendary-sneak')) {
         badges.push({

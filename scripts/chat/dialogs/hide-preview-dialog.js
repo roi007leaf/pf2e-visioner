@@ -348,6 +348,25 @@ export class HidePreviewDialog extends BaseActionDialog {
           ),
         });
       }
+      try {
+        if (has('camouflage')) {
+          const env = (await import('../../utils/environment.js')).default;
+          const naturalTerrains = ['aquatic', 'arctic', 'desert', 'forest', 'mountain', 'plains', 'sky', 'swamp', 'underground'];
+          const inNaturalTerrain = naturalTerrains.some(terrain =>
+            env.isEnvironmentActive(this.actorToken, terrain)
+          );
+          if (inNaturalTerrain) {
+            badges.push({
+              key: 'camouflage',
+              icon: 'fas fa-tree',
+              label: game.i18n.localize('PF2E_VISIONER.HIDE_AUTOMATION.BADGES.CAMOUFLAGE_LABEL'),
+              tooltip: game.i18n.localize(
+                'PF2E_VISIONER.HIDE_AUTOMATION.BADGES.CAMOUFLAGE_TOOLTIP',
+              ),
+            });
+          }
+        }
+      } catch { }
       if (has('legendary-sneak')) {
         badges.push({
           key: 'legendary-sneak',
