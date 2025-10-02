@@ -1,6 +1,7 @@
 import { MODULE_ID } from '../../../constants.js';
 import { BatchProcessor } from './BatchProcessor.js';
 import { ExclusionManager } from './ExclusionManager.js';
+import { LightingPrecomputer } from './LightingPrecomputer.js';
 import { TelemetryReporter } from './TelemetryReporter.js';
 
 /**
@@ -180,7 +181,7 @@ export class BatchOrchestrator {
     } catch (error) {
       try {
         console.error('PF2E Visioner | processBatch error:', error);
-      } catch {}
+      } catch { }
     } finally {
       // Defensive: ensure we stop telemetry even if an error occurred before normal stop
       if (!telemetryStopped) {
@@ -319,11 +320,11 @@ export class BatchOrchestrator {
       const previous =
         this._lastPrecompute.map && now - this._lastPrecompute.ts < TTL_MS
           ? {
-              map: this._lastPrecompute.map,
-              posKeyMap: this._lastPrecompute.posKeyMap,
-              lightingHash: this._lastPrecompute.lightingHash,
-              ts: this._lastPrecompute.ts,
-            }
+            map: this._lastPrecompute.map,
+            posKeyMap: this._lastPrecompute.posKeyMap,
+            lightingHash: this._lastPrecompute.lightingHash,
+            ts: this._lastPrecompute.ts,
+          }
           : undefined;
 
       // Track cache hit/miss for better telemetry
@@ -355,7 +356,7 @@ export class BatchOrchestrator {
       // Best effort - continue without precomputation
       try {
         console.warn('PF2E Visioner | Failed to precompute lighting:', error);
-      } catch {}
+      } catch { }
     }
 
     return { precomputedLights, precomputeStats };
@@ -572,6 +573,11 @@ export class BatchOrchestrator {
 
       // Also clear lighting precompute
       this._lastPrecompute = { map: null, stats: null, posKeyMap: null, lightingHash: null, ts: 0 };
+
+      // Clear LightingPrecomputer static caches (hash memo, token data, force flag)
+      if (LightingPrecomputer?.clearLightingCaches) {
+        LightingPrecomputer.clearLightingCaches();
+      }
     } catch {
       // Best effort cache clearing
     }

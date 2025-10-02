@@ -47,7 +47,7 @@ export class TokenEventHandler {
 
     try {
       this.systemState.debug('onTokenUpdate', tokenDoc.id, tokenDoc.name, Object.keys(changes));
-    } catch {}
+    } catch { }
 
     // Analyze changes once to derive flags used throughout handling
     const changeFlags = this._analyzeChanges(changes);
@@ -77,6 +77,16 @@ export class TokenEventHandler {
         setTimeout(() => this.visibilityState.markAllTokensChangedImmediate(), 50);
       }
       // Continue processing other changes (e.g., movement) for position pinning
+    }
+
+    // Movement action changes (flying vs grounded) affect tremorsense detection
+    // Clear caches to avoid stale tremorsense results
+    if (changeFlags.movementActionChanged) {
+      try {
+        this.cacheManager?.clearAllCaches?.();
+      } catch {
+        /* best-effort */
+      }
     }
 
     // Hidden flag toggle - recalculate everyone
@@ -204,6 +214,7 @@ export class TokenEventHandler {
       visionChanged: changes.vision !== undefined || hasPrefix('vision'),
       effectsChanged: changes.actorData?.effects !== undefined || changes.actorData !== undefined,
       wallFlagsChanged: changes.flags?.[MODULE_ID]?.walls !== undefined,
+      movementActionChanged: changes.movementAction !== undefined,
     };
   }
 
@@ -223,7 +234,7 @@ export class TokenEventHandler {
           globalThis.game = globalThis.game || {};
           game.pf2eVisioner = game.pf2eVisioner || {};
           game.pf2eVisioner.lastMovedTokenId = tokenDoc.id;
-        } catch {}
+        } catch { }
         this.overrideValidationManager.queueOverrideValidation(tokenDoc.id);
       }
     } catch {
@@ -244,7 +255,7 @@ export class TokenEventHandler {
             globalThis.game = globalThis.game || {};
             game.pf2eVisioner = game.pf2eVisioner || {};
             game.pf2eVisioner.lastMovedTokenId = tokenDoc.id;
-          } catch {}
+          } catch { }
           this.overrideValidationManager.queueOverrideValidation(tokenDoc.id);
         }
         return true; // Token was excluded
@@ -261,7 +272,8 @@ export class TokenEventHandler {
       changeFlags.lightChanged ||
       changeFlags.visionChanged ||
       changeFlags.effectsChanged ||
-      changeFlags.wallFlagsChanged
+      changeFlags.wallFlagsChanged ||
+      changeFlags.movementActionChanged
     );
   }
 
@@ -338,6 +350,10 @@ export class TokenEventHandler {
   _handleVisibilityRecalculation(tokenDoc, changes, changeFlags) {
     if (changeFlags.lightChanged) {
       this.visibilityState.markAllTokensChangedImmediate();
+    } else if (changeFlags.movementActionChanged) {
+      // Movement action affects tremorsense detection (flying vs grounded)
+      // Need to recalculate for tokens that might detect this one via tremorsense
+      this.visibilityState.markTokenChangedImmediate(tokenDoc.id);
     } else if (changeFlags.positionChanged) {
       this.visibilityState.markTokenChangedWithSpatialOptimization(tokenDoc, changes);
     } else {
@@ -352,7 +368,7 @@ export class TokenEventHandler {
       game.pf2eVisioner = game.pf2eVisioner || {};
       game.pf2eVisioner.lastMovedTokenId = tokenDoc.id;
       this.systemState.debug('set lastMovedTokenId', tokenDoc.id);
-    } catch {}
+    } catch { }
 
     // Queue override validation for the moved token
     this.overrideValidationManager.queueOverrideValidation(tokenDoc.id);

@@ -10,6 +10,9 @@
  * Follows SOLID principles by focusing solely on item event processing
  * and delegating state management to injected dependencies.
  */
+
+import { VisionAnalyzer } from '../VisionAnalyzer.js';
+
 export class ItemEventHandler {
     /** @type {SystemStateProvider} */
     #systemStateProvider = null;
@@ -131,6 +134,18 @@ export class ItemEventHandler {
                     lightEmitter: lightEmitterHint
                 });
 
+                // Clear VisionAnalyzer cache for affected tokens
+                // This ensures vision/sensing capabilities are recalculated with new conditions
+                const visionAnalyzer = VisionAnalyzer.getInstance();
+                tokens.forEach((token) => {
+                    visionAnalyzer.clearCache(token);
+                    this.#systemStateProvider.debug('ItemEventHandler: cleared VisionAnalyzer cache', {
+                        tokenName: token.name,
+                        itemName: item.name,
+                        action
+                    });
+                });
+
                 if (lightEmitterHint) {
                     // Emitting light changed: recalc ALL because others are affected by the emitter's aura
                     this.#visibilityStateManager.markAllTokensChangedImmediate();
@@ -178,6 +193,12 @@ export class ItemEventHandler {
                     actorId: actor.id,
                     tokensAffected: tokens.length,
                     equipped: changes.system?.equipped
+                });
+
+                // Clear VisionAnalyzer cache for affected tokens
+                const visionAnalyzer = VisionAnalyzer.getInstance();
+                tokens.forEach((token) => {
+                    visionAnalyzer.clearCache(token);
                 });
 
                 tokens.forEach((token) =>

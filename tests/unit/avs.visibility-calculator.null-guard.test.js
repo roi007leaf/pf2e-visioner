@@ -11,6 +11,7 @@ describe('VisibilityCalculator null guards', () => {
                 hasPreciseNonVisualInRange: jest.fn(() => false),
                 canSenseImprecisely: jest.fn(() => false),
                 hasLineOfSight: jest.fn(() => true),
+                isSoundBlocked: jest.fn(() => false),
                 determineVisibilityFromLighting: jest.fn(() => 'observed'),
                 clearVisionCache: jest.fn(),
             },

@@ -16,7 +16,7 @@
  * @param {string} input.target.coverLevel - "none" | "lesser" | "standard" | "greater"
  * @param {boolean} input.target.concealment - Whether target has concealment
  * @param {string[]} input.target.auxiliary - Additional conditions like ["invisible"]
- * @param {number} input.target.elevation - Target's elevation (for tremorsense checks)
+ * @param {number} input.target.movementAction - Target's movement action (for tremorsense checks)
  * @param {Object} input.observer - Observer state
  * @param {Object} input.observer.precise - Precise senses with ranges
  * @param {Object} input.observer.precise.vision - {range: number|"Infinity"}
@@ -32,11 +32,12 @@
  * @param {boolean} input.observer.conditions.blinded - Is observer blinded
  * @param {boolean} input.observer.conditions.deafened - Is observer deafened
  * @param {boolean} input.observer.conditions.dazzled - Is observer dazzled
- * @param {number} input.observer.elevation - Observer's elevation (for tremorsense checks)
+ * @param {number} input.observer.movementAction - Observer's movement action (for tremorsense checks)
  * @param {Object|null} input.rayDarkness - Ray darkness information (if ray passes through darkness)
  * @param {boolean} input.rayDarkness.passesThroughDarkness - Whether ray passes through darkness
  * @param {number} input.rayDarkness.rank - Darkness rank along the ray (1-3 = magical, 4+ = greater magical)
  * @param {string} input.rayDarkness.lightingLevel - Lighting level of darkness along ray
+ * @param {boolean} input.soundBlocked - Whether sound is blocked between observer and target (walls with sound restriction)
  * 
  * @returns {Object} Visibility result
  * @returns {string} result.state - "observed" | "concealed" | "hidden" | "undetected"
@@ -49,12 +50,15 @@ export function calculateVisibility(input) {
     const target = normalizeTargetState(input.target);
     const observer = normalizeObserverState(input.observer);
     const rayDarkness = input.rayDarkness || null;
+    const soundBlocked = input.soundBlocked ?? false;
+    const hasLineOfSight = input.hasLineOfSight ?? true; // Default to true (fail open)
+
 
     // Decision tree: follow PF2e visibility rules in priority order
 
     // 1. Check if observer is completely incapacitated (blinded)
     if (observer.conditions.blinded) {
-        return handleBlindedObserver(observer, target);
+        return handleBlindedObserver(observer, target, soundBlocked);
     }
 
     // 2. Check for precise non-visual senses (bypass most conditions)
@@ -64,10 +68,10 @@ export function calculateVisibility(input) {
     }
 
     // 3. Determine visual detection capability based on lighting and senses
-    const visualDetection = determineVisualDetection(observer, target, rayDarkness);
+    const visualDetection = determineVisualDetection(observer, target, rayDarkness, hasLineOfSight);
 
     // 4. Check for imprecise senses if visual detection fails
-    const impreciseResult = checkImpreciseSenses(observer, target, visualDetection);
+    const impreciseResult = checkImpreciseSenses(observer, target, soundBlocked, visualDetection);
 
     if (impreciseResult && !visualDetection.canDetect) {
         return impreciseResult;
@@ -75,7 +79,8 @@ export function calculateVisibility(input) {
 
     // 5. Apply visual detection result with modifiers
     if (visualDetection.canDetect) {
-        return applyVisualModifiers(visualDetection, observer, target);
+        const result = applyVisualModifiers(visualDetection, observer, target);
+        return result;
     }
 
     // 6. Default: undetected (no senses can detect)
@@ -94,7 +99,7 @@ function normalizeTargetState(target) {
         coverLevel: target.coverLevel || 'none',
         concealment: target.concealment ?? false,
         auxiliary: Array.isArray(target.auxiliary) ? target.auxiliary : [],
-        elevation: target.elevation ?? 0
+        movementAction: target.movementAction ?? 0
     };
 }
 
@@ -115,21 +120,21 @@ function normalizeObserverState(observer) {
             dazzled: conditions.dazzled ?? false
         },
         lightingLevel: observer.lightingLevel || 'bright', // Observer's own lighting level
-        elevation: observer.elevation ?? 0 // Observer's elevation for tremorsense checks
+        movementAction: observer.movementAction ?? 0 // Observer's movement action for tremorsense checks
     };
 }
 
 /**
  * Handle blinded observer - can only use non-visual senses
  */
-function handleBlindedObserver(observer, target) {
+function handleBlindedObserver(observer, target, soundBlocked) {
     // Check for non-visual senses that still work when blinded
     const nonVisualPrecise = checkPreciseNonVisualSenses(observer, target);
     if (nonVisualPrecise) {
         return nonVisualPrecise;
     }
 
-    const nonVisualImprecise = checkImpreciseSenses(observer, target, { canDetect: false });
+    const nonVisualImprecise = checkImpreciseSenses(observer, target, soundBlocked, { canDetect: false });
     if (nonVisualImprecise) {
         return nonVisualImprecise;
     }
@@ -159,7 +164,7 @@ function checkPreciseNonVisualSenses(observer, target) {
         'greaterDarkvision',
         'low-light-vision',
         'lowLightVision',
-        'light-perception' // CRITICAL: light-perception is a visual sense affected by lighting
+        'light-perception'
     ]);
 
     // Check all precise non-visual senses dynamically
@@ -192,7 +197,17 @@ function checkPreciseNonVisualSenses(observer, target) {
 /**
  * Determine if observer can detect target visually based on lighting and vision capabilities
  */
-function determineVisualDetection(observer, target, rayDarkness = null) {
+function determineVisualDetection(observer, target, rayDarkness = null, hasLineOfSight = true) {
+    // CRITICAL: If there's no line of sight (sight-blocking wall), visual detection fails
+    if (!hasLineOfSight) {
+        return {
+            canDetect: false,
+            sense: null,
+            isPrecise: false,
+            baseState: null
+        };
+    }
+
     const { lightingLevel } = target;
     const { precise, conditions, lightingLevel: observerLighting } = observer;
 
@@ -203,15 +218,16 @@ function determineVisualDetection(observer, target, rayDarkness = null) {
     // Priority: greaterMagicalDarkness > magicalDarkness > darkness > dim > bright
     let effectiveLightingLevel = lightingLevel;
 
-    // If observer is in magical darkness, that can impair their vision
+    // If observer is in magical darkness, that affects their vision even if target is in light
     if (observerLighting === 'greaterMagicalDarkness') {
         effectiveLightingLevel = 'greaterMagicalDarkness';
     } else if (observerLighting === 'magicalDarkness' && effectiveLightingLevel !== 'greaterMagicalDarkness') {
         effectiveLightingLevel = 'magicalDarkness';
-    } else if (observerLighting === 'darkness' && effectiveLightingLevel === 'bright') {
-        // Observer in darkness looking at bright target: darkness takes priority for normal vision
-        effectiveLightingLevel = 'darkness';
     }
+
+    // CRITICAL FIX: Observer in regular darkness can still see targets in bright/dim light!
+    // Regular darkness only matters if BOTH are in darkness, not cross-boundary
+    // Do NOT override effectiveLightingLevel if target is in bright/dim light
 
     // If ray passes through darkness, consider that as well
     if (rayDarkness && rayDarkness.passesThroughDarkness) {
@@ -226,8 +242,6 @@ function determineVisualDetection(observer, target, rayDarkness = null) {
     }
 
     // Check visual senses in priority order
-    // CRITICAL: Darkvision must be checked BEFORE light-perception
-    // Some creatures have both, and darkvision is superior
 
     // Greater darkvision: works in all lighting, including magical darkness
     if (precise.greaterDarkvision || precise['greater-darkvision']) {
@@ -240,9 +254,8 @@ function determineVisualDetection(observer, target, rayDarkness = null) {
     }
 
     // Regular darkvision: works in darkness and dim light
-    // SPECIAL CASE: If observer is in greater magical darkness (rank 4+), darkvision sees everything as concealed
     // In greater magical darkness (rank 4+), sees concealed
-    // In magical darkness (rank 1-3), sees observed
+    // In magical darkness (rank 1-3) or natural darkness, sees observed
     if (precise.darkvision) {
         // If effective lighting is rank 4+ magical darkness (from observer, target, or ray), darkvision sees concealed
         if (effectiveLightingLevel === 'greaterMagicalDarkness') {
@@ -281,27 +294,8 @@ function determineVisualDetection(observer, target, rayDarkness = null) {
         }
     }
 
-    // Light-perception: Special PF2e sense
-    // In PF2e, light-perception allows seeing in natural darkness but is NOT darkvision
-    // CRITICAL: Checked AFTER darkvision because creatures with both should use darkvision
-    // In ANY magical darkness (rank 1+), light-perception cannot see without actual darkvision
-    if (precise['light-perception']) {
-        // Any magical darkness: light-perception fails (needs actual darkvision)
-        if (effectiveLightingLevel === 'greaterMagicalDarkness' || effectiveLightingLevel === 'magicalDarkness') {
-            return { canDetect: false };
-        }
-
-        // In natural darkness or dim/bright light: sees clearly
-        return {
-            canDetect: true,
-            sense: 'light-perception',
-            isPrecise: true,
-            baseState: isDazzled ? 'concealed' : 'observed'
-        };
-    }
-
     // Low-light vision: treats dim light as bright light, but doesn't help in any darkness
-    if (precise.lowLightVision) {
+    if (precise.lowLightVision || precise['low-light-vision']) {
         if (effectiveLightingLevel === 'bright' || effectiveLightingLevel === 'dim') {
             return {
                 canDetect: true,
@@ -310,17 +304,22 @@ function determineVisualDetection(observer, target, rayDarkness = null) {
                 baseState: isDazzled ? 'concealed' : 'observed'
             };
         } else {
-            // Low-light vision doesn't work in any type of darkness (including ray darkness)
+            // Low-light vision doesn't work in any type of darkness
             return { canDetect: false };
         }
     }
 
-    // Normal vision: works in bright light, concealed in dim light, fails in any darkness
-    if (precise.vision) {
+    // Light-perception and normal vision: work the same way
+    // Both work in bright light, concealed in dim light, fail in any darkness
+    if (precise['light-perception'] || precise.vision) {
+        const senseUsed = precise['light-perception'] ? 'light-perception' : 'vision';
+
+        console.log(`[StatelessCalc] Using ${senseUsed}, effectiveLightingLevel=${effectiveLightingLevel}`);
+
         if (effectiveLightingLevel === 'bright') {
             return {
                 canDetect: true,
-                sense: 'vision',
+                sense: senseUsed,
                 isPrecise: true,
                 baseState: isDazzled ? 'concealed' : 'observed'
             };
@@ -328,12 +327,13 @@ function determineVisualDetection(observer, target, rayDarkness = null) {
             // Dim light causes concealment for normal vision
             return {
                 canDetect: true,
-                sense: 'vision',
+                sense: senseUsed,
                 isPrecise: true,
-                baseState: 'concealed' // Always concealed in dim light with normal vision
+                baseState: 'concealed' // Always concealed in dim light
             };
         } else {
-            // Any type of darkness: normal vision cannot detect
+            // Any type of darkness: cannot detect
+            console.log(`[StatelessCalc] ${senseUsed} fails in ${effectiveLightingLevel}`);
             return { canDetect: false };
         }
     }
@@ -345,10 +345,14 @@ function determineVisualDetection(observer, target, rayDarkness = null) {
 /**
  * Check imprecise senses (hearing, tremorsense, lifesense, scent)
  * These provide hidden state when they detect
+ * @param {Object} observer - Observer state
+ * @param {Object} target - Target state
+ * @param {boolean} soundBlocked - Whether sound is blocked between observer and target
+ * @param {Object} visualDetection - Visual detection result (unused but kept for backward compatibility)
  */
-function checkImpreciseSenses(observer, target, visualDetection) {
-    const { imprecise, conditions, elevation: observerElevation } = observer;
-    const { auxiliary, elevation: targetElevation } = target;
+function checkImpreciseSenses(observer, target, soundBlocked = false, visualDetection) {
+    const { imprecise, conditions, movementAction: observerMovementAction } = observer;
+    const { auxiliary, movementAction: targetMovementAction } = target;
     const isInvisible = auxiliary.includes('invisible');
 
     // Check each imprecise sense in priority order
@@ -358,7 +362,7 @@ function checkImpreciseSenses(observer, target, visualDetection) {
     // CRITICAL: Tremorsense only works if target is on the ground at the same elevation
     if (imprecise.tremorsense) {
         // Check if target is elevated (not on the ground at observer's level)
-        const isTargetElevated = targetElevation !== observerElevation;
+        const isTargetElevated = targetMovementAction === 'fly' || observerMovementAction === 'fly';
 
         if (!isTargetElevated) {
             // Target is at same elevation - tremorsense detects them
@@ -397,10 +401,13 @@ function checkImpreciseSenses(observer, target, visualDetection) {
     }
 
     // Hearing: affected by deafened condition and DOES NOT bypass invisibility
+    // CRITICAL: Hearing is blocked by sound-blocking walls
     // Hearing follows special invisibility rules: 
     // - Normally detects at hidden level
     // - With invisible target: returns undetected (invisibility makes target undetected to visual senses)
-    if (imprecise.hearing && !conditions.deafened) {
+    // - With sound blocked: cannot detect (treated as if observer is deafened for this target)
+
+    if (imprecise.hearing && !conditions.deafened && !soundBlocked) {
         if (isInvisible) {
             return {
                 state: 'undetected',
@@ -416,8 +423,10 @@ function checkImpreciseSenses(observer, target, visualDetection) {
         };
     }
 
+
     // No imprecise senses detected the target
     // This includes cases where tremorsense was the only sense but target was elevated
+    // or hearing was the only sense but sound was blocked
     return null;
 }
 

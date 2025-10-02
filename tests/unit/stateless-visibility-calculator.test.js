@@ -1540,7 +1540,7 @@ describe('StatelessVisibilityCalculator', () => {
             });
         });
 
-        test('observer in darkness with normal vision, target in bright light = hidden (with hearing)', () => {
+        test('observer in darkness with normal vision, target in bright light = observed (target is well-lit)', () => {
             const input = {
                 target: {
                     lightingLevel: 'bright',
@@ -1561,11 +1561,11 @@ describe('StatelessVisibilityCalculator', () => {
             };
 
             const result = calculateVisibility(input);
-            // Normal vision fails when observer is in darkness
-            expect(result.state).toBe('hidden');
+            // Observer in darkness can see target in bright light (target is well-lit)
+            expect(result.state).toBe('observed');
             expect(result.detection).toEqual({
-                isPrecise: false,
-                sense: 'hearing'
+                isPrecise: true,
+                sense: 'vision'
             });
         });
 
@@ -2019,15 +2019,14 @@ describe('StatelessVisibilityCalculator', () => {
                     coverLevel: 'none',
                     concealment: false,
                     auxiliary: [],
-                    elevation: 0
+                    movementAction: 'stride'
                 },
                 observer: {
                     precise: {},
                     imprecise: {
                         tremorsense: { range: 30 }
                     },
-                    conditions: {},
-                    elevation: 0
+                    conditions: {}
                 }
             };
 
@@ -2046,15 +2045,14 @@ describe('StatelessVisibilityCalculator', () => {
                     coverLevel: 'none',
                     concealment: false,
                     auxiliary: [],
-                    elevation: 10
+                    movementAction: 'fly'
                 },
                 observer: {
                     precise: {},
                     imprecise: {
                         tremorsense: { range: 30 }
                     },
-                    conditions: {},
-                    elevation: 0
+                    conditions: {}
                 }
             };
 
@@ -2071,15 +2069,14 @@ describe('StatelessVisibilityCalculator', () => {
                     coverLevel: 'none',
                     concealment: false,
                     auxiliary: [],
-                    elevation: 0
+                    movementAction: 'fly'
                 },
                 observer: {
                     precise: {},
                     imprecise: {
                         tremorsense: { range: 30 }
                     },
-                    conditions: {},
-                    elevation: 10
+                    conditions: {}
                 }
             };
 
@@ -2096,7 +2093,7 @@ describe('StatelessVisibilityCalculator', () => {
                     coverLevel: 'none',
                     concealment: false,
                     auxiliary: [],
-                    elevation: 10
+                    movementAction: 'fly'
                 },
                 observer: {
                     precise: {},
@@ -2104,8 +2101,7 @@ describe('StatelessVisibilityCalculator', () => {
                         tremorsense: { range: 30 },
                         hearing: { range: 60 }
                     },
-                    conditions: {},
-                    elevation: 0
+                    conditions: {}
                 }
             };
 
@@ -2125,15 +2121,14 @@ describe('StatelessVisibilityCalculator', () => {
                     coverLevel: 'none',
                     concealment: false,
                     auxiliary: ['invisible'],
-                    elevation: 10
+                    movementAction: 'fly'
                 },
                 observer: {
                     precise: {},
                     imprecise: {
                         tremorsense: { range: 30 }
                     },
-                    conditions: {},
-                    elevation: 0
+                    conditions: {}
                 }
             };
 
@@ -2150,15 +2145,14 @@ describe('StatelessVisibilityCalculator', () => {
                     coverLevel: 'none',
                     concealment: false,
                     auxiliary: [], // NOT invisible - just elevated
-                    elevation: 10
+                    movementAction: 'fly'
                 },
                 observer: {
                     precise: {}, // NO vision at all
                     imprecise: {
                         tremorsense: { range: 30 }
                     },
-                    conditions: {},
-                    elevation: 0
+                    conditions: {}
                 }
             };
 
@@ -2175,15 +2169,14 @@ describe('StatelessVisibilityCalculator', () => {
                     coverLevel: 'none',
                     concealment: false,
                     auxiliary: [],
-                    elevation: 10
+                    movementAction: 'fly'
                 },
                 observer: {
                     precise: {},
                     imprecise: {
                         scent: { range: 30 }
                     },
-                    conditions: {},
-                    elevation: 0
+                    conditions: {}
                 }
             };
 

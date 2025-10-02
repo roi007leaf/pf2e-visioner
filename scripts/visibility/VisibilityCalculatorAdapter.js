@@ -34,6 +34,13 @@ export async function tokenStateToInput(
     const targetState = extractTargetState(target, lightingCalculator, options);
     const observerState = extractObserverState(observer, visionAnalyzer, conditionManager, lightingCalculator, options);
 
+    // Check if there's line of sight (no sight-blocking walls)
+    const hasLineOfSight = visionAnalyzer.hasLineOfSight(observer, target);
+
+    // Check if sound is blocked between observer and target
+    const soundBlocked = visionAnalyzer.isSoundBlocked(observer, target);
+
+
     // Get ray darkness information if lightingRasterService is available
     let rayDarkness = null;
     // Calculate positions
@@ -79,7 +86,9 @@ export async function tokenStateToInput(
     return {
         target: targetState,
         observer: observerState,
-        rayDarkness: rayDarkness
+        rayDarkness: rayDarkness,
+        soundBlocked: soundBlocked,  // Add sound blocking information
+        hasLineOfSight: hasLineOfSight  // Add line of sight information
     };
 }
 
@@ -102,6 +111,8 @@ function extractTargetState(target, lightingCalculator, options) {
         const darknessRank = lightLevel.darknessRank ?? 0;
         const isDarknessSource = lightLevel.isDarknessSource ?? false;
 
+        console.log(`[TARGET ${target.name}] lightLevel.level=${lightLevel.level}, darknessRank=${darknessRank}, isDarknessSource=${isDarknessSource}`);
+
         if (darknessRank >= 4 && isDarknessSource) {
             // Rank 4+ magical darkness (e.g., heightened Darkness spell)
             lightingLevel = 'greaterMagicalDarkness';
@@ -116,6 +127,8 @@ function extractTargetState(target, lightingCalculator, options) {
         } else {
             lightingLevel = 'bright';
         }
+
+        console.log(`[TARGET ${target.name}] mapped to lightingLevel=${lightingLevel}`);
     }
 
     // Extract cover level from token flags or calculate
@@ -132,7 +145,7 @@ function extractTargetState(target, lightingCalculator, options) {
         coverLevel,
         concealment,
         auxiliary,
-        elevation: target.document.elevation || 0 // Add elevation for tremorsense checks
+        movementAction: target.document.movementAction // Add elevation for tremorsense checks
     };
 }
 
@@ -177,6 +190,8 @@ function extractObserverState(observer, visionAnalyzer, conditionManager, lighti
         const darknessRank = observerLightLevel.darknessRank ?? 0;
         const isDarknessSource = observerLightLevel.isDarknessSource ?? false;
 
+        console.log(`[OBSERVER ${observer.name}] lightLevel.level=${observerLightLevel.level}, darknessRank=${darknessRank}, isDarknessSource=${isDarknessSource}`);
+
         if (darknessRank >= 4 && isDarknessSource) {
             observerLightingLevel = 'greaterMagicalDarkness';
         } else if (darknessRank >= 1 && isDarknessSource) {
@@ -195,7 +210,7 @@ function extractObserverState(observer, visionAnalyzer, conditionManager, lighti
         imprecise,
         conditions,
         lightingLevel: observerLightingLevel, // Observer's own lighting level
-        elevation: observer.document.elevation || 0, // Observer's elevation for tremorsense checks
+        movementAction: observer.document.movementAction, // Observer's movement action for tremorsense checks
         _visionAnalyzer: visionAnalyzer, // Pass through for fallback checks
         _observer: observer // Pass through for fallback checks
     };

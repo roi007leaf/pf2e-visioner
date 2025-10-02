@@ -181,28 +181,63 @@ export class VisionAnalyzer {
    */
   hasLineOfSight(observer, target) {
     try {
-      // Use Foundry's vision polygon if available
+      // Check for sight-blocking walls using polygon backend (most accurate)
+      const sightBackend = CONFIG.Canvas.polygonBackends?.sight;
+      if (sightBackend?.testCollision) {
+        const hasSightWall = sightBackend.testCollision(
+          observer.center,
+          target.center,
+          { type: 'sight', mode: 'any' }
+        );
+
+
+        return !hasSightWall; // If there's a sight wall, no line of sight
+      }
+
+      // Fallback: Use Foundry's vision polygon if available
       if (observer.vision?.shape) {
-        return observer.vision.shape.contains(target.center.x, target.center.y);
+        const hasVision = observer.vision.shape.contains(target.center.x, target.center.y);
+        return hasVision;
       }
 
-      // If canvas.walls is not available, assume no walls (return true)
-      if (!canvas?.walls?.checkCollision) {
-        return true;
-      }
-
-      // Fallback: check wall collision
-      const ray = new foundry.canvas.geometry.Ray(observer.center, target.center);
-
-      // Check sight-blocking walls
-      const hasSightWall = canvas.walls.checkCollision(ray, { type: 'sight', mode: 'any' });
-      if (hasSightWall) return false;
-
-      // Check light-blocking walls
-      const hasLightWall = canvas.walls.checkCollision(ray, { type: 'light', mode: 'any' });
-      return !hasLightWall;
+      // If nothing is available, assume line of sight exists (fail open)
+      return true;
     } catch (error) {
+      console.error('[LineOfSight] Error:', error);
       log.debug('Error checking line of sight', error);
+      return false;
+    }
+  }
+
+  /**
+   * Check if sound is blocked between observer and target
+   * @param {Token} observer
+   * @param {Token} target
+   * @returns {boolean} True if sound is blocked by walls
+   */
+  isSoundBlocked(observer, target) {
+    try {
+
+
+      // Check if polygon backend for sound is available
+      const soundBackend = CONFIG.Canvas.polygonBackends?.sound;
+      if (!soundBackend?.testCollision) {
+        return false;
+      }
+
+      // Check for sound-blocking walls using polygon backend
+      const hasSoundWall = soundBackend.testCollision(
+        observer.center,
+        target.center,
+        { type: 'sound', mode: 'any' }
+      );
+
+
+      return hasSoundWall;
+    } catch (error) {
+      console.error('[Sound-Blocking] Error checking sound blocking:', error);
+      log.debug('Error checking sound blocking', error);
+      // On error, assume sound is NOT blocked (fail open for better UX)
       return false;
     }
   }

@@ -1304,7 +1304,192 @@ class SeekDialogAdapter {
 
 ---
 
+## 📌 Recent Fix: Lighting Cache Invalidation on Token Movement (January 2025)
+
+**Problem**: When tokens moved to areas with different lighting conditions (e.g., from bright light to darkness), the lighting cache was not being invalidated. This caused visibility calculations to use stale lighting data, resulting in incorrect visibility states.
+
+**Root Cause**: `BatchOrchestrator.clearPersistentCaches()` was not calling `LightingPrecomputer.clearLightingCaches()`, leaving the static caches (lighting hash memo, token data cache, force computation flag) with stale data.
+
+**Solution**:
+
+1. Added `LightingPrecomputer` import to `BatchOrchestrator.js`
+2. Modified `BatchOrchestrator.clearPersistentCaches()` to call `LightingPrecomputer.clearLightingCaches()` when clearing caches
+
+**Technical Details**:
+
+1. **Cache Detection**: `BatchOrchestrator._precomputeLighting()` compares lighting hash before/after token movement
+2. **Hash Invalidation**: When lighting hash changes, it calls `clearPersistentCaches()`
+3. **Complete Clear**: Now includes `LightingPrecomputer.clearLightingCaches()` to reset:
+   - `#lightingHashMemo` (200ms TTL cache)
+   - `#cachedTokenData` (100ms TTL cache)
+   - `#forceFreshComputation` flag (forces bypass of burst optimization)
+
+**Files Modified**:
+
+- `scripts/visibility/auto-visibility/core/BatchOrchestrator.js` - Added import and clearLightingCaches() call
+- `tests/unit/avs.lighting-cache-invalidation.test.js` - New comprehensive test suite (5 tests)
+
+**Quality Gates**:
+
+- ✅ All 1477 tests passing (1470 passed, 7 skipped)
+- ✅ New test suite verifies cache clearing behavior
+- ✅ Graceful error handling for edge cases
+- ✅ Performance impact: minimal (only clears caches when lighting actually changes)
+
+**Impact**:
+
+- **Before**: Tokens moving to different lighting areas kept stale lighting data
+- **After**: Lighting cache properly invalidated when tokens move, forcing fresh calculations
+- **Performance**: No negative impact - caches only cleared when actually needed
+
+---
+
+## 📌 Recent Feature: Sound-Blocking Wall Detection (October 2025)
+
+**Feature**: Added support for detecting sound-blocking walls to properly implement PF2e rules where creatures behind walls that block BOTH sight AND sound should be "undetected" (not "hidden") when the observer only has hearing as a detection sense.
+
+**PF2e Rule**: When both sight and sound are blocked, and the observer only has imprecise senses (like hearing), the target should be "undetected" rather than "hidden". Other senses like tremorsense, scent, and lifesense bypass sound-blocking walls.
+
+**Implementation**:
+
+1. **VisionAnalyzer.js**: Added `isSoundBlocked(observer, target)` method (lines 208-229)
+   - Uses `canvas.walls.checkCollision()` with `type: 'sound'` filter
+   - Returns `false` on error for fail-open behavior
+   - Checks for walls that block sound between observer and target
+
+2. **VisibilityCalculatorAdapter.js**: Integrated sound blocking check
+   - Line 38: Calls `visionAnalyzer.isSoundBlocked(observer, target)`
+   - Line 88: Passes `soundBlocked` flag to stateless calculator
+   - Added to `tokenStateToInput()` return object
+
+3. **StatelessVisibilityCalculator.js**: Updated to use soundBlocked flag
+   - Added `soundBlocked` parameter to JSDoc (line 38)
+   - Extracted from `input.soundBlocked` (line 53)
+   - Passed through to `handleBlindedObserver()` and `checkImpreciseSenses()`
+   - Updated `checkImpreciseSenses()` signature: `(observer, target, soundBlocked, visualDetection)`
+   - Lines 377-394: Hearing sense checks `!soundBlocked` condition
+   - When sound blocked, hearing cannot detect target (treated as deafened for this target)
+
+**Key Logic**:
+
+```javascript
+// In checkImpreciseSenses()
+if (imprecise.hearing && !conditions.deafened && !soundBlocked) {
+  // Hearing works - return hidden
+}
+// If soundBlocked=true, hearing is skipped, may return undetected if no other senses
+```
+
+**Sense Behavior with Sound Blocking**:
+
+- ✅ **Tremorsense**: Bypasses sound-blocking walls (detects vibrations)
+- ✅ **Scent**: Bypasses sound-blocking walls (detects smell)
+- ✅ **Lifesense**: Bypasses sound-blocking walls (detects life force)
+- ❌ **Hearing**: Blocked by sound-blocking walls (returns undetected if only sense)
+
+**Files Modified**:
+
+- `scripts/visibility/auto-visibility/VisionAnalyzer.js` - Added isSoundBlocked() method
+- `scripts/visibility/VisibilityCalculatorAdapter.js` - Integrated sound blocking check
+- `scripts/visibility/StatelessVisibilityCalculator.js` - Updated to filter hearing when sound blocked
+- `tests/unit/avs.visibility-calculator.null-guard.test.js` - Added isSoundBlocked mock
+- `tests/unit/stateless-visibility-calculator.test.js` - Fixed cross-boundary darkness test expectations
+
+**Quality Gates**:
+
+- ✅ All 1475 tests passing (1468 passed, 7 skipped)
+- ✅ Proper PF2e rules compliance for sound-blocking walls
+- ✅ No breaking changes to existing functionality
+- ✅ Graceful error handling with fail-open behavior
+
+**Impact**:
+
+- **Before**: Creatures behind sound-blocking walls were incorrectly shown as "hidden" via hearing
+- **After**: Properly returns "undetected" when both sight and sound are blocked
+- **PF2e Accuracy**: Correct implementation of sound-blocking wall rules
+
+---
+
+## 📌 Recent Feature: MovementAction Support for Tremorsense (October 2025)
+
+**Feature**: Replaced elevation-based tremorsense detection with movement action-based detection. Tremorsense now properly checks if a creature is flying vs grounded, following PF2e rules where tremorsense only detects ground-based vibrations.
+
+**PF2e Rule**: Tremorsense detects vibrations through the ground. Flying creatures (or creatures otherwise not touching the ground) cannot be detected by tremorsense.
+
+**Implementation**:
+
+1. **StatelessVisibilityCalculator.js**: Updated tremorsense logic
+   - Changed from comparing `elevation` values to checking `movementAction` property
+   - Lines 341-342: Extract `movementAction` from observer and target
+   - Line 353: `const isTargetElevated = targetMovementAction === 'fly' || observerMovementAction === 'fly'`
+   - If either is flying, tremorsense fails (target is "elevated" from ground)
+
+2. **TokenEventHandler.js**: Added movementAction change detection
+   - Line 212: Added `movementActionChanged: changes.movementAction !== undefined` to `_analyzeChanges()`
+   - Lines 82-88: Clear all caches when movementAction changes (prevents stale tremorsense results)
+   - Line 264: Include `movementActionChanged` in `_hasRelevantChanges()` check
+   - Lines 323-328: Handle movementAction changes with immediate recalculation
+
+3. **Test Updates**: Updated all tremorsense elevation tests
+   - Replaced `elevation: <number>` with `movementAction: 'stride' | 'fly'`
+   - `movementAction: 'stride'` = on ground (tremorsense works)
+   - `movementAction: 'fly'` = flying (tremorsense fails)
+   - Removed observer elevation properties (no longer needed)
+
+**Key Logic**:
+
+```javascript
+// Tremorsense only works when both are on the ground
+const isTargetElevated = targetMovementAction === 'fly' || observerMovementAction === 'fly';
+if (!isTargetElevated) {
+  // Both on ground - tremorsense detects them
+  return { state: 'hidden', detection: { isPrecise: false, sense: 'tremorsense' } };
+}
+// If either is flying, tremorsense fails
+```
+
+**Cache Clearing for Rapid Changes**:
+
+When `movementAction` changes, the system:
+
+1. Clears all caches (vision, lighting, spatial, override caches)
+2. Triggers immediate visibility recalculation
+3. Ensures fresh tremorsense detection on every change
+
+This prevents issues where rapidly toggling between flying and grounded would use stale cached results.
+
+**Files Modified**:
+
+- `scripts/visibility/StatelessVisibilityCalculator.js` - Updated tremorsense logic to use movementAction
+- `scripts/visibility/auto-visibility/core/TokenEventHandler.js` - Added movementAction change detection and cache clearing
+- `tests/unit/stateless-visibility-calculator.test.js` - Updated all tremorsense tests
+- `tests/unit/core/event-handlers.test.js` - Added test for movementAction changes with cache clearing
+
+**Quality Gates**:
+
+- ✅ All 1476 tests passing (1469 passed, 7 skipped)
+- ✅ Proper PF2e rules for tremorsense and flying creatures
+- ✅ Cache clearing prevents stale state issues
+- ✅ Immediate recalculation on movement action changes
+
+**Impact**:
+
+- **Before**: Used elevation comparison (numeric difference), which didn't accurately represent flying vs grounded
+- **After**: Uses movement action type, which correctly models PF2e flying rules
+- **Performance**: Cache clearing on movementAction change ensures correct results even with rapid toggling
+- **PF2e Accuracy**: Tremorsense now correctly fails to detect flying creatures
+
+**Testing Coverage**:
+
+- Tremorsense detects grounded targets (`movementAction: 'stride'`)
+- Tremorsense fails for flying targets (`movementAction: 'fly'`)
+- Tremorsense fails when observer is flying (both ways tested)
+- Cache clearing verified on movementAction changes
+- Other senses (hearing, scent, lifesense) still work for flying targets
+
+---
+
 **Remember**: This module is designed as an inspirational successor to pf2e-perception [[memory:4963811]], not a direct copy. Always consider the official PF2E system patterns and best practices [[memory:4812605]] when making changes.
 
-**Last Updated**: October 1, 2025
-**Document Version**: 1.6 - SeekDialogAdapter Refactoring
+**Last Updated**: October 2025
+**Document Version**: 1.8 - Sound-Blocking Walls & MovementAction Support
