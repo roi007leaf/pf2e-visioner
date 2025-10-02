@@ -29,6 +29,7 @@
       "COVER_TAB": "Abri"
     },
     "VISIBILITY_STATES": {
+      "avs": "AVS",
       "observed": "Observé",
       "hidden": "Caché",
       "undetected": "Non détecté",
@@ -39,6 +40,28 @@
       "lesser": "Abri inférieur",
       "standard": "Abri standard",
       "greater": "Abri supérieur"
+    },
+    "SENSES": {
+      "LIGHT-PERCEPTION": "(FR TODO) Light Perception",
+      "LIGHT-PERCEPTION_DESC": "(FR TODO) You can perceive light and darkness. This sense allows you to see in natural darkness but is affected by magical darkness.",
+      "VISION": "(FR TODO) Vision",
+      "VISION_DESC": "(FR TODO) Your standard visual sense used to perceive your surroundings.",
+      "DARKVISION": "(FR TODO) Darkvision",
+      "DARKVISION_DESC": "(FR TODO) You can see in darkness and dim light just as well as in bright light, though you can't distinguish color in darkness.",
+      "GREATER-DARKVISION": "(FR TODO) Greater Darkvision",
+      "GREATER-DARKVISION_DESC": "(FR TODO) You can see in darkness and dim light as if it were bright light—colors included.",
+      "LOW-LIGHT-VISION": "(FR TODO) Low-Light Vision",
+      "LOW-LIGHT-VISION_DESC": "(FR TODO) You can see in dim light as though it were bright light.",
+      "HEARING": "(FR TODO) Hearing",
+      "HEARING_DESC": "(FR TODO) You can detect creatures and events via sound within range (imprecise).",
+      "TREMORSENSE": "(FR TODO) Tremorsense",
+      "TREMORSENSE_DESC": "(FR TODO) You can sense vibrations through the ground within range (imprecise).",
+      "SCENT": "(FR TODO) Scent",
+      "SCENT_DESC": "(FR TODO) You have an enhanced sense of smell, allowing you to detect living creatures within range (imprecise).",
+      "ECHOLOCATION": "(FR TODO) Echolocation",
+      "ECHOLOCATION_DESC": "(FR TODO) You can use sound to navigate and detect objects within range (precise).",
+      "LIFESENSE": "(FR TODO) Lifesense",
+      "LIFESENSE_DESC": "(FR TODO) You can sense the life force of living and undead creatures within range (imprecise)."
     },
     "VISUAL_EFFECTS": {
       "HIDDEN_OVERLAY": "Ce jeton vous est caché",
@@ -412,7 +435,9 @@
     "UI": {
       "ENCOUNTER_FILTER_TEXT": "Montrer seulement les jetons de la rencontre",
       "COVER_OVERRIDE": "Outrepasser l'abri",
-      "ROLL": "Lancer"
+      "ROLL": "Lancer",
+      "FILTER_BY_DETECTION_LABEL": "(FR TODO) Filter By Viewport",
+      "FILTER_BY_DETECTION_TOOLTIP": "(FR TODO) Only show tokens that are within the current viewport"
     },
     "WALL": {
       "VISIBLE_TO_YOU": "Mur caché",

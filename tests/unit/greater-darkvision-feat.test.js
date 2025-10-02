@@ -1,5 +1,6 @@
 import { LightingCalculator } from '../../scripts/visibility/auto-visibility/LightingCalculator.js';
 import { VisionAnalyzer } from '../../scripts/visibility/auto-visibility/VisionAnalyzer.js';
+import { calculateVisibility } from '../../scripts/visibility/StatelessVisibilityCalculator.js';
 
 // Mock PIXI for tests
 global.PIXI = {
@@ -37,9 +38,16 @@ function createMockShape() {
 
 // Minimal fake token/actor helpers
 function makeActorWithFeat(slug) {
+  const senses = {};
+
+  // Add the sense to perception.senses based on feat slug
+  if (slug === 'greater-darkvision') {
+    senses['greater-darkvision'] = { range: Infinity, acuity: 'precise' };
+  }
+
   return {
     type: 'character',
-    system: { perception: { senses: {} } },
+    system: { perception: { senses } },
     itemTypes: {
       feat: [{ type: 'feat', system: { slug } }],
     },
@@ -125,15 +133,38 @@ describe('Greater Darkvision from feat', () => {
     try {
       const actor = makeActorWithFeat('greater-darkvision');
       const token = makeToken(actor);
-      // Add a proper shape to the token to avoid the fallback case
       token.shape = createMockShape();
       const va = VisionAnalyzer.getInstance();
 
       const light = LightingCalculator.getInstance().getLightLevelAt({ x: 505, y: 505 }, token);
       const caps = va.getVisionCapabilities(token);
-      const vis = va.determineVisibilityFromLighting(light, caps);
+
+      // Use StatelessVisibilityCalculator instead of deprecated method
+      const input = {
+        observer: {
+          precise: {
+            vision: { range: Infinity },
+            darkvision: { range: Infinity },
+            greaterDarkvision: { range: Infinity }
+          },
+          imprecise: {},
+          conditions: {
+            blinded: caps.isBlinded || false,
+            deafened: caps.isDeafened || false,
+            dazzled: caps.isDazzled || false
+          }
+        },
+        target: {
+          lightingLevel: light.level === 'darkness' ? 'darkness' : 'bright',
+          coverLevel: 'none',
+          concealment: false,
+          auxiliary: []
+        }
+      };
+
+      const result = calculateVisibility(input);
       expect(light.level).toBe('darkness');
-      expect(vis).toBe('observed');
+      expect(result.state).toBe('observed');
     } finally {
       teardown();
     }

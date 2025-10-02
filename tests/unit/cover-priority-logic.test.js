@@ -20,14 +20,14 @@ function setupCommonMocks({
   const mockAttacker = {
     id: 'attacker-1',
     center: { x: 100, y: 100 },
-    getCenter: () => ({ x: 100, y: 100 }),
+    getCenterPoint: () => ({ x: 100, y: 100 }),
     actor: { type: 'character', alliance: 'party' },
     document: { x: 100, y: 100, width: 50, height: 50 },
   };
   const mockTarget = {
     id: 'target-1',
     center: { x: 300, y: 100 },
-    getCenter: () => ({ x: 300, y: 100 }),
+    getCenterPoint: () => ({ x: 300, y: 100 }),
     actor: { type: 'npc', alliance: 'hostile' },
     document: { x: 300, y: 100, width: 50, height: 50 },
   };
@@ -35,7 +35,7 @@ function setupCommonMocks({
     {
       id: 'blocker-1',
       center: { x: 200, y: 100 },
-      getCenter: () => ({ x: 200, y: 100 }),
+      getCenterPoint: () => ({ x: 200, y: 100 }),
       actor: { type: 'npc', alliance: 'hostile' },
       document: { x: 200, y: 100, width: 50, height: 50 },
     },

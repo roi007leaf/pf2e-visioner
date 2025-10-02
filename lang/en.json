@@ -34,6 +34,7 @@
       "COVER_TAB": "Cover"
     },
     "VISIBILITY_STATES": {
+      "avs": "AVS",
       "observed": "Observed",
       "concealed": "Concealed",
       "hidden": "Hidden",
@@ -44,6 +45,28 @@
       "lesser": "Lesser Cover",
       "standard": "Standard Cover",
       "greater": "Greater Cover"
+    },
+    "SENSES": {
+      "LIGHT-PERCEPTION": "Light Perception",
+      "LIGHT-PERCEPTION_DESC": "You can perceive light and darkness. This sense allows you to see in natural darkness but is affected by magical darkness.",
+      "VISION": "Vision",
+      "VISION_DESC": "Your standard visual sense used to perceive your surroundings.",
+      "DARKVISION": "Darkvision",
+      "DARKVISION_DESC": "You can see in darkness and dim light just as well as in bright light, though you can't distinguish color in darkness.",
+      "GREATER-DARKVISION": "Greater Darkvision",
+      "GREATER-DARKVISION_DESC": "You can see in darkness and dim light as if it were bright light—colors included.",
+      "LOW-LIGHT-VISION": "Low-Light Vision",
+      "LOW-LIGHT-VISION_DESC": "You can see in dim light as though it were bright light.",
+      "HEARING": "Hearing",
+      "HEARING_DESC": "You can detect creatures and events via sound within range (imprecise).",
+      "TREMORSENSE": "Tremorsense",
+      "TREMORSENSE_DESC": "You can sense vibrations through the ground within range (imprecise).",
+      "SCENT": "Scent",
+      "SCENT_DESC": "You have an enhanced sense of smell, allowing you to detect living creatures within range (imprecise).",
+      "ECHOLOCATION": "Echolocation",
+      "ECHOLOCATION_DESC": "You can use sound to navigate and detect objects within range (precise).",
+      "LIFESENSE": "Lifesense",
+      "LIFESENSE_DESC": "You can sense the life force of living and undead creatures within range (imprecise)."
     },
     "SPECIAL_SENSES": {
       "vision": "Vision",
@@ -523,8 +546,8 @@
       "REMOVE_OVERRIDES": "Remove Overrides",
       "BULK_SET_VISIBILITY": "Bulk Set Visibility",
       "CLEAR_BULK_OVERRIDES": "Clear Bulk Overrides",
-      "FILTER_BY_DETECTION_LABEL": "Filter By Detectable",
-      "FILTER_BY_DETECTION_TOOLTIP": "Only show tokens that can be detected (via line of sight OR other senses)"
+      "FILTER_BY_DETECTION_LABEL": "Filter By Viewport",
+      "FILTER_BY_DETECTION_TOOLTIP": "Only show tokens that are within the current viewport"
     },
     "WALL": {
       "VISIBLE_TO_YOU": "Hidden Wall",
@@ -578,6 +601,10 @@
       "TWO_WAY_REGION": {
         "label": "Two-Way Region",
         "hint": "If enabled, tokens outside the region will also have the visibility state applied to tokens inside the region"
+      },
+      "CONCEALMENT_ENABLED": {
+        "label": "Enable Concealment",
+        "hint": "If enabled, rays that cross this region's boundaries will grant concealment to the target"
       },
       "VISIBILITY_UPDATED": "Region visibility updated for {count} token relationships",
       "UPDATE_ERROR": "Failed to update region visibility relationships"

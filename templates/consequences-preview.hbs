@@ -73,7 +73,14 @@
             </td>
             <td class="visibility-change">
               <div class="visibility-change-with-override">
-                {{{visibilityIcon outcome.currentVisibility}}}
+                <span class="old-visibility-state {{#if outcome.isOldStateAvsControlled}}avs-controlled{{/if}}">
+                  {{{visibilityIcon outcome.currentVisibility}}}
+                  {{#if outcome.isOldStateAvsControlled}}
+                    <span class="avs-tag-small" data-tooltip="Controlled by Auto-Visibility System">
+                      <i class="fas fa-bolt"></i>
+                    </span>
+                  {{/if}}
+                </span>
                 <i class="fas fa-arrow-right visibility-arrow"></i>
                 <div class="override-icons" data-token-id="{{outcome.target.id}}">
                   {{#each outcome.availableStates as |state|}}
@@ -119,11 +126,6 @@
       <button type="button" class="bulk-action-btn revert-all" data-action="revertAll" data-tooltip="{{localize 'PF2E_VISIONER.UI.REVERT_ALL'}}" disabled>
         <i class="fas fa-undo"></i> {{localize 'PF2E_VISIONER.UI.REVERT_ALL'}}
       </button>
-      {{#if avsEnabled}}
-      <button type="button" class="bulk-action-btn apply-visibility-remove-overrides" data-action="removeOverrides" data-tooltip="{{localize 'PF2E_VISIONER.UI.REMOVE_OVERRIDES'}}">
-        <i class="fas fa-eye-slash"></i> {{localize 'PF2E_VISIONER.UI.REMOVE_OVERRIDES'}}
-      </button>
-      {{/if}}
     </div>
   </div>
 </div>

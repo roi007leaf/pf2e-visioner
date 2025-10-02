@@ -33,26 +33,70 @@ class OverrideValidationIndicator {
 
   // Determine whether an override item represents a meaningful change to display
   // We include differences in:
-  // - visibility state
+  // - visibility state (excluding 'avs' state)
   // - cover level
   // - concealment expectation vs current (concealed or hidden)
   #hasDisplayChange(o) {
     if (!o) return false;
+
+    // Filter out overrides with no state or 'avs' state
+    if (!o.state || o.state === 'avs') {
+      return false;
+    }
+
     const prevVis = o.state || (o.hasConcealment ? 'concealed' : 'observed');
     const prevCover = (o.expectedCover ?? (o.hasCover ? 'standard' : 'none'));
     const curVis = o.currentVisibility || 'observed';
     const curCover = o.currentCover || 'none';
-    const prevCon = !!o.hasConcealment;
-    const curCon = curVis === 'concealed' || curVis === 'hidden';
-    return prevVis !== curVis || prevCover !== curCover || prevCon !== curCon;
+
+    // Filter out 'avs' visibility states from display
+    if (prevVis === 'avs' || curVis === 'avs') {
+      return false;
+    }
+
+    // Only show if there are actual state differences
+    return prevVis !== curVis || prevCover !== curCover;
+  }
+
+  // Determine whether an override should be shown based on sneak status
+  // For tokens with active sneak flag, only show observer changes (where the sneaking token is observing others)
+  // and filter out target changes (where others are observing the sneaking token)
+  #shouldShowOverride(o) {
+    if (!o || !o.observerId || !o.targetId) return true; // If missing data, show by default
+
+    try {
+      // Get the observer and target tokens
+      const observerToken = canvas?.tokens?.get?.(o.observerId);
+      const targetToken = canvas?.tokens?.get?.(o.targetId);
+
+      // Check if observer is sneaking
+      const observerIsSneaking = !!observerToken?.document?.getFlag?.('pf2e-visioner', 'sneak-active');
+
+      // Check if target is sneaking  
+      const targetIsSneaking = !!targetToken?.document?.getFlag?.('pf2e-visioner', 'sneak-active');
+
+      // If observer is sneaking, only show overrides where they are the observer (what they can see)
+      if (observerIsSneaking) {
+        return true; // Show observer changes (sneaking token observing others)
+      }
+
+      // If target is sneaking, filter out overrides where they are the target (others observing them)
+      if (targetIsSneaking) {
+        return false; // Hide target changes (others observing sneaking token)
+      }
+
+      return true; // Show all other overrides
+    } catch {
+      return true; // On error, show by default
+    }
   }
 
   show(overrideData, tokenName, movedTokenId = null, options = {}) {
     // Keep a raw copy for clearAll regardless of display filters
     const all = Array.isArray(overrideData) ? overrideData : [];
     this._rawOverrides = all;
-    // Filter for display: show only entries that actually changed (visibility or cover)
-    const overrides = all.filter((o) => this.#hasDisplayChange(o));
+    // Filter for display: show only entries that actually changed (visibility or cover) and handle sneak filtering
+    const overrides = all.filter((o) => this.#hasDisplayChange(o) && this.#shouldShowOverride(o));
     // Do not show indicator if there are no override details
     if (!overrides.length) {
       // If we just showed with items, avoid immediate hide flicker; let caller decide to force-hide
@@ -97,8 +141,8 @@ class OverrideValidationIndicator {
     this.#ensureStyles();
     const all = Array.isArray(overrideData) ? overrideData : [];
     this._rawOverrides = all;
-    // Maintain the same filtering rule for display
-    const overrides = all.filter((o) => this.#hasDisplayChange(o));
+    // Maintain the same filtering rule for display - including sneak filtering
+    const overrides = all.filter((o) => this.#hasDisplayChange(o) && this.#shouldShowOverride(o));
     this._data = { overrides, tokenName };
     this.#updateBadge();
     if (this._tooltipEl?.isConnected) this.#renderTooltipContents();
@@ -311,11 +355,14 @@ class OverrideValidationIndicator {
   #renderTooltipContents() {
     if (!this._tooltipEl) return;
     // Render the already-filtered display items to keep counts and grouping consistent
+    // The _data.overrides should already be filtered by both #hasDisplayChange and #shouldShowOverride
     const all = this._data?.overrides || [];
     const movedId = this._data?.movedTokenId ?? (globalThis?.game?.pf2eVisioner?.lastMovedTokenId ?? null);
 
     const mkVis = (key) => {
-      const cfg = VISIBILITY_STATES?.[key] || { icon: 'fas fa-eye', label: 'Observed', cssClass: 'visibility-observed' };
+      if (key === 'avs') return '';
+      const cfg = VISIBILITY_STATES?.[key];
+      // Filter out 'avs' state from visibility display
       const label = game?.i18n?.localize?.(cfg.label) || cfg.label || '';
       const cls = cfg.cssClass || `visibility-${key}`;
       return `<i class="${cfg.icon} state-indicator ${cls}" data-kind="visibility" data-state="${key}" data-tooltip="${label}"></i>`;
@@ -328,16 +375,25 @@ class OverrideValidationIndicator {
     };
 
     const buildRow = (o) => {
+      // Items that reach here have already been filtered by #hasDisplayChange() and #shouldShowOverride()
+      // So we should always display them, even if they don't show state changes
+      if (!o) return '';
+
       const prevVis = o.state || (o.hasConcealment ? 'concealed' : 'observed');
       const prevCover = (o.expectedCover ?? (o.hasCover ? 'standard' : 'none'));
       const curVis = o.currentVisibility || 'observed';
       const curCover = o.currentCover || 'none';
+
+      // Filter out 'avs' states from display but still show the row
+      const showVisChange = prevVis !== curVis && prevVis !== 'avs' && curVis !== 'avs';
+      const showCoverChange = prevCover !== curCover;
+
       const reasons = (o.reasonIcons || []).map((r) => `<i class="${r.icon}" data-tooltip="${r.text}"></i>`).join('');
       return `
         <div class="tip-row">
           <div class="who">${o.observerName} <i class="fas fa-arrow-right"></i> ${o.targetName}</div>
-          ${prevVis !== curVis ? `<div class="state-pair vis">${mkVis(prevVis)} <i class="fas fa-arrow-right"></i> ${mkVis(curVis)}</div>` : ''}
-          ${prevCover !== curCover ? `<div class="state-pair cover">${mkCover(prevCover)} <i class="fas fa-arrow-right"></i> ${mkCover(curCover)}</div>` : ''}
+          ${showVisChange ? `<div class="state-pair vis">${mkVis(prevVis)} <i class="fas fa-arrow-right"></i> ${mkVis(curVis)}</div>` : ''}
+          ${showCoverChange ? `<div class="state-pair cover">${mkCover(prevCover)} <i class="fas fa-arrow-right"></i> ${mkCover(curCover)}</div>` : ''}
           ${reasons ? `<div class="reasons">${reasons}</div>` : ''}
         </div>
       `;

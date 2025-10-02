@@ -4,12 +4,16 @@
  * 
  * Follows SOLID principles by depending on abstractions rather than concrete implementations.
  */
+
+import { VisionAnalyzer } from '../VisionAnalyzer.js';
+
 export class WallEventHandler {
     constructor(systemStateProvider, visibilityStateManager, cacheManager = null) {
         this.systemState = systemStateProvider;
         this.visibilityState = visibilityStateManager;
         this.cacheManager = cacheManager;
         this.visualUpdateTimeout = null;
+        this.visionAnalyzer = VisionAnalyzer.getInstance();
     }
 
     /**
@@ -41,7 +45,11 @@ export class WallEventHandler {
             'move'                           // Movement restriction (can affect visibility in some cases)
         ];
 
-        return geometryFields.some(field => foundry.utils.hasProperty(changeData, field));
+        const affectedFields = geometryFields.filter(field =>
+            foundry.utils.hasProperty(changeData, field)
+        );
+
+        return affectedFields.length > 0;
     }
 
     /**
@@ -101,6 +109,10 @@ export class WallEventHandler {
             if (this.cacheManager?.clearAllCaches) {
                 this.cacheManager.clearAllCaches();
             }
+            // Clear VisionAnalyzer cache for all tokens since wall changes affect everyone
+            if (this.visionAnalyzer?.clearCache) {
+                this.visionAnalyzer.clearCache();
+            }
             this.visibilityState.markAllTokensChangedThrottled();
         }
 
@@ -120,6 +132,10 @@ export class WallEventHandler {
         if (this.cacheManager?.clearAllCaches) {
             this.cacheManager.clearAllCaches();
         }
+        // Clear VisionAnalyzer cache for all tokens since wall changes affect everyone
+        if (this.visionAnalyzer?.clearCache) {
+            this.visionAnalyzer.clearCache();
+        }
         this.visibilityState.markAllTokensChangedThrottled();
 
         // New walls might be hidden walls, so update visuals
@@ -135,6 +151,10 @@ export class WallEventHandler {
         // Deleted walls always affect LOS, so clear caches
         if (this.cacheManager?.clearAllCaches) {
             this.cacheManager.clearAllCaches();
+        }
+        // Clear VisionAnalyzer cache for all tokens since wall changes affect everyone
+        if (this.visionAnalyzer?.clearCache) {
+            this.visionAnalyzer.clearCache();
         }
         this.visibilityState.markAllTokensChangedThrottled();
 

@@ -8,6 +8,7 @@ import { CoverModifierService } from '../../../services/CoverModifierService.js'
 import { refreshEveryonesPerception } from '../../../services/socket.js';
 import { updateTokenVisuals } from '../../../services/visual-effects.js';
 import { setVisibilityBetween } from '../../../utils.js';
+import { VisionAnalyzer } from '../../../visibility/auto-visibility/VisionAnalyzer.js';
 import AvsOverrideManager from './avs-override-manager.js';
 import { notify } from './notifications.js';
 
@@ -53,63 +54,50 @@ export function extractStealthDC(token) {
 
 /**
  * Calculate distance between tokens for sorting
+ * Uses standardized distance calculation with proper PF2e grid-to-feet conversion
  * @param {Token} token1 - First token
  * @param {Token} token2 - Second token
  * @returns {number} Distance in feet
  */
 export function calculateTokenDistance(token1, token2) {
-  // Try to use token's distanceTo method if available (PF2e system provides this)
-  if (token1.distanceTo) {
+  try {
+    // Use standardized VisionAnalyzer distance calculation
+    const visionAnalyzer = VisionAnalyzer.getInstance();
+    return visionAnalyzer.distanceFeet(token1, token2);
+  } catch (error) {
+    console.error(
+      `${MODULE_TITLE}: Error calculating distance between tokens using VisionAnalyzer:`,
+      error,
+    );
+
+    // Fallback to simple distance calculation
     try {
-      // Use token's direct distanceTo method
-      return token1.distanceTo(token2);
-    } catch (error) {
-      console.error(
-        `${MODULE_TITLE}: Error calculating distance between tokens, using fallback methods:`,
-        error,
-      );
+      // Get the center points of each token
+      const t1Center = {
+        x: token1.x + (token1.width * canvas.grid.size) / 2,
+        y: token1.y + (token1.height * canvas.grid.size) / 2,
+      };
+
+      const t2Center = {
+        x: token2.x + (token2.width * canvas.grid.size) / 2,
+        y: token2.y + (token2.height * canvas.grid.size) / 2,
+      };
+
+      // Calculate distance between centers in pixels
+      const dx = t1Center.x - t2Center.x;
+      const dy = t1Center.y - t2Center.y;
+      const pixelDistance = Math.sqrt(dx * dx + dy * dy);
+
+      // Convert to feet using same logic as VisionAnalyzer (5ft grid with rounding)
+      const gridUnits = global.canvas?.scene?.grid?.distance || 5;
+      const gridDistance = pixelDistance / (canvas.grid.size || 1);
+      const feetDistance = gridDistance * gridUnits;
+      return Math.floor(feetDistance / 5) * 5;
+    } catch (fallbackError) {
+      console.error(`${MODULE_TITLE}: Fallback distance calculation failed:`, fallbackError);
+      return Infinity;
     }
   }
-
-  // Try to use PF2e system's distance calculation if available
-  if (game.system.id === 'pf2e' && game.pf2e?.utils?.distance) {
-    try {
-      // Use PF2e's distance calculation
-      return game.pf2e.utils.distance.getDistance(token1, token2);
-    } catch (error) {
-      // Fall back to other methods if PF2e's function fails
-    }
-  }
-
-  // Try using Foundry's built-in measurement
-  if (canvas.grid && canvas.grid.measureDistance) {
-    try {
-      // Try to use Foundry's built-in distance calculation
-      return canvas.grid.measureDistance(token1.center, token2.center);
-    } catch (error) {
-      // Fall back to manual calculation if the built-in one fails
-    }
-  }
-
-  // Fallback manual calculation
-  // Get the center points of each token
-  const t1Center = {
-    x: token1.x + (token1.width * canvas.grid.size) / 2,
-    y: token1.y + (token1.height * canvas.grid.size) / 2,
-  };
-
-  const t2Center = {
-    x: token2.x + (token2.width * canvas.grid.size) / 2,
-    y: token2.y + (token2.height * canvas.grid.size) / 2,
-  };
-
-  // Calculate distance between centers in pixels
-  const dx = t1Center.x - t2Center.x;
-  const dy = t1Center.y - t2Center.y;
-  const pixelDistance = Math.sqrt(dx * dx + dy * dy);
-
-  // Convert to feet (assuming 5ft grid)
-  return (pixelDistance / canvas.grid.size) * 5;
 }
 
 /**
@@ -257,7 +245,8 @@ export async function applyVisibilityChanges(observer, changes, options = {}) {
 
     // Set AVS pair overrides to prevent automatic recalculation of these visibility states
     // This is crucial for sneak actions - we don't want AVS to override our manual visibility changes
-    if (options.setAVSOverrides !== false) { // Default to true unless explicitly disabled
+    if (options.setAVSOverrides !== false) {
+      // Default to true unless explicitly disabled
 
       if (changesByTarget.size === 0) {
         console.warn('PF2E Visioner | No changes found - cannot set AVS overrides');
@@ -352,8 +341,9 @@ export function markPanelComplete(panel, changes) {
     const completionMsg = `
             <div class="automation-completion">
                 <i class="fas fa-check-circle"></i>
-                <span>Applied ${changes.length} visibility change${changes.length !== 1 ? 's' : ''
-      }</span>
+                <span>Applied ${changes.length} visibility change${
+                  changes.length !== 1 ? 's' : ''
+                }</span>
             </div>
         `;
 
@@ -627,139 +617,141 @@ export function filterOutcomesByTemplate(outcomes, center, radiusFeet, tokenProp
 }
 
 /**
- * Filter outcomes by detectability between an observer and each outcome's token.
- * - Keeps tokens that can be detected via line of sight OR other senses (lifesense, tremorsense, etc.)
+ * Filter outcomes by viewport visibility.
+ * - Keeps tokens that are within the current viewport bounds
  * - By default keeps non-token subjects (e.g., walls) unfiltered.
- * - Uses VisionAnalyzer for robust detection checks (bypasses wrappers when sneaking).
  * @param {Array} outcomes - Array of outcome rows
- * @param {Token} observer - Acting/observer token to test detection from
+ * @param {Token} observer - Acting/observer token (unused but kept for API compatibility)
  * @param {string} tokenProperty - Property on each outcome that holds the counterpart token (default: 'target')
- * @param {boolean} filterWalls - Whether to apply detection filtering to walls (default: false)
- * @param {boolean} filterTokens - Whether to apply detectability filtering to tokens (default: true)
- * @param {string} detectionDirection - Direction of detection: 'observer_to_target' (seek) or 'target_to_observer' (hide/sneak)
- * @returns {Array} Filtered outcomes where detection is possible
+ * @param {boolean} filterWalls - Whether to apply viewport filtering to walls (default: false)
+ * @param {boolean} filterTokens - Whether to apply viewport filtering to tokens (default: true)
+ * @param {string} detectionDirection - Unused but kept for API compatibility
+ * @returns {Array} Filtered outcomes where tokens are within viewport
  */
-export async function filterOutcomesByDetection(outcomes, observer, tokenProperty = 'target', filterWalls = false, filterTokens = true, detectionDirection = 'target_to_observer') {
+export async function filterOutcomesByDetection(
+  outcomes,
+  observer,
+  tokenProperty = 'target',
+  filterWalls = false,
+  filterTokens = true,
+  detectionDirection = 'target_to_observer',
+) {
   try {
-    if (!Array.isArray(outcomes) || !observer) {
+    if (!Array.isArray(outcomes)) {
       return outcomes;
     }
 
-    // Lazy-load to avoid circular deps at module init
-    const { VisionAnalyzer } = await import('../../../visibility/auto-visibility/VisionAnalyzer.js');
-    const analyzer = VisionAnalyzer.getInstance();
+    // Use the existing ViewportFilterService for proper viewport filtering
+    const { ViewportFilterService } = await import(
+      '../../../visibility/auto-visibility/core/ViewportFilterService.js'
+    );
+    const viewportService = new ViewportFilterService();
 
-    const filtered = outcomes.map((o) => {
-      try {
-        // Handle wall outcomes
-        if (o?._isWall || o?.wallId) {
-          if (!filterWalls) {
+    // Get viewport bounds and token set
+    const viewportBounds = viewportService.getViewportBounds(64); // 64px padding
+    const viewportTokenIds = viewportService.getViewportTokenIdSet(64);
+
+    if (!viewportBounds && !viewportTokenIds) {
+      // If viewport detection fails, return all outcomes
+      return outcomes;
+    }
+
+    const filtered = outcomes
+      .map((o) => {
+        try {
+          // Handle wall outcomes
+          if (o?._isWall || o?.wallId) {
+            if (!filterWalls) {
+              return o;
+            }
+
+            // For walls, check if wall intersects with viewport
+            if (viewportBounds) {
+              try {
+                const wall = canvas.walls?.get?.(o.wallId) || o.wall;
+                if (wall && wall.document) {
+                  const [x1, y1, x2, y2] = wall.document.c;
+
+                  // Check if wall intersects viewport bounds
+                  const wallInViewport = !(
+                    Math.max(x1, x2) < viewportBounds.minX ||
+                    Math.min(x1, x2) > viewportBounds.maxX ||
+                    Math.max(y1, y2) < viewportBounds.minY ||
+                    Math.min(y1, y2) > viewportBounds.maxY
+                  );
+
+                  return wallInViewport ? o : null;
+                }
+              } catch (err) {
+                // If we can't check the wall, keep it by default
+                return o;
+              }
+            }
             return o;
           }
 
-          // For walls, check if observer has line of sight to the wall center
-          try {
-            const wall = canvas.walls?.get?.(o.wallId) || o.wall;
-            if (wall && wall.document) {
-              // Create a temporary point at the wall's center for LOS checking
-              const wallCenter = {
-                x: (wall.document.c[0] + wall.document.c[2]) / 2,
-                y: (wall.document.c[1] + wall.document.c[3]) / 2,
-                center: {
-                  x: (wall.document.c[0] + wall.document.c[2]) / 2,
-                  y: (wall.document.c[1] + wall.document.c[3]) / 2
-                }
-              };
-              const hasLOSToWall = analyzer.hasLineOfSight(observer, wallCenter);
-              return hasLOSToWall ? o : null;
-            }
-          } catch (err) {
-          }
-          // If we can't check the wall, keep it by default
-          return o;
-        }
-
-        const token = o?.[tokenProperty];
-        if (!token) {
-          return null;
-        }
-
-        // Only filter tokens if filterTokens is enabled
-        if (filterTokens) {
-          // Determine the direction of detection based on the action type
-          let hasLOS, canDetectWithSenses, detectorToken, targetToken, detectorName, targetName;
-
-          if (detectionDirection === 'observer_to_target') {
-            // Seek: can the seeker (observer) detect the target?
-            detectorToken = observer;
-            targetToken = token;
-            hasLOS = analyzer.hasLineOfSight(observer, token);
-            detectorName = observer.name;
-            targetName = token.name;
-          } else {
-            // Hide/Sneak/Diversion: can the target detect the actor (observer)?
-            detectorToken = token;
-            targetToken = observer;
-            hasLOS = analyzer.hasLineOfSight(token, observer);
-            detectorName = token.name;
-            targetName = observer.name;
-          }
-
-          // Check if the detector can detect the target with imprecise senses
-          canDetectWithSenses = false;
-          try {
-            canDetectWithSenses = analyzer.canDetectWithLifesenseInRange(detectorToken, targetToken);
-          } catch (err) {
-            // Fallback: check for any imprecise senses manually
-            const senses = analyzer.getSensingSummary(detectorToken);
-            const distance = canvas.grid?.measureDistance?.(detectorToken.center || detectorToken, targetToken.center || targetToken) || 0;
-
-            // Check if the detector has any imprecise senses that could reach the target
-            canDetectWithSenses = senses.impreciseSenses?.some(sense => {
-              return sense.range >= distance;
-            }) || false;
-          }
-
-          const canDetect = hasLOS || canDetectWithSenses;
-
-          // console.log(`${detectorName} detecting ${targetName}: LOS=${hasLOS}, Senses=${canDetectWithSenses}, Detectable=${canDetect} (${detectionDirection})`);
-
-          if (!canDetect) {
+          const token = o?.[tokenProperty];
+          if (!token) {
             return null;
           }
-        }
 
-        // If wall filtering is enabled, also filter walls within this outcome
-        if (filterWalls && o.walls && Array.isArray(o.walls)) {
-          const filteredWalls = o.walls.filter(wall => {
-            try {
-              if (!wall || !wall.document || !wall.document.c) return true;
+          // Only filter tokens if filterTokens is enabled
+          if (filterTokens) {
+            // Use the viewport service to check if token is in viewport
+            if (viewportTokenIds) {
+              const tokenId = token.document?.id;
+              if (tokenId && !viewportTokenIds.has(tokenId)) {
+                return null;
+              }
+            } else if (viewportBounds) {
+              // Fallback to bounds checking if token ID set is unavailable
+              const tokenInViewport =
+                token.x >= viewportBounds.minX &&
+                token.x <= viewportBounds.maxX &&
+                token.y >= viewportBounds.minY &&
+                token.y <= viewportBounds.maxY;
 
-              // Calculate wall center from coordinates [x1, y1, x2, y2]
-              const wallCenter = {
-                x: (wall.document.c[0] + wall.document.c[2]) / 2,
-                y: (wall.document.c[1] + wall.document.c[3]) / 2
-              };
-
-              const hasLOSToWall = analyzer.hasLineOfSight(observer, wallCenter);
-              return hasLOSToWall;
-            } catch (err) {
-              console.error('Detection Filter: Error checking wall LOS in outcome:', err);
-              return true; // Keep wall if we can't check LOS
+              if (!tokenInViewport) {
+                return null;
+              }
             }
-          });
+          }
 
-          return {
-            ...o,
-            walls: filteredWalls
-          };
+          // If wall filtering is enabled, also filter walls within this outcome
+          if (filterWalls && o.walls && Array.isArray(o.walls) && viewportBounds) {
+            const filteredWalls = o.walls.filter((wall) => {
+              try {
+                if (!wall || !wall.document || !wall.document.c) return true;
+
+                const [x1, y1, x2, y2] = wall.document.c;
+
+                // Check if wall intersects viewport bounds
+                const wallInViewport = !(
+                  Math.max(x1, x2) < viewportBounds.minX ||
+                  Math.min(x1, x2) > viewportBounds.maxX ||
+                  Math.max(y1, y2) < viewportBounds.minY ||
+                  Math.min(y1, y2) > viewportBounds.maxY
+                );
+
+                return wallInViewport;
+              } catch (err) {
+                console.error('Viewport Filter: Error checking wall viewport in outcome:', err);
+                return true; // Keep wall if we can't check viewport
+              }
+            });
+
+            return {
+              ...o,
+              walls: filteredWalls,
+            };
+          }
+
+          return o;
+        } catch (err) {
+          return o;
         }
-
-        return o;
-      } catch (err) {
-        return o;
-      }
-    }).filter(o => o !== null);
+      })
+      .filter((o) => o !== null);
 
     return filtered;
   } catch (err) {
@@ -808,20 +800,18 @@ export function calculateStealthRollTotals(
   if (originalCoverBonus === 0) {
     const rollModifiers = actionData?.roll?.options?.modifiers || [];
 
-    const coverModifier = rollModifiers.find(
-      (mod) => {
-        const label = mod.label?.toLowerCase() || '';
-        const slug = mod.slug?.toLowerCase() || '';
-        // Only match modifiers that are specifically cover-related, not just containing "cover"
-        return (
-          slug === 'pf2e-visioner-cover' || // Our own cover modifier
-          label.includes('cover bonus') ||
-          label.includes('cover stealth') ||
-          (label.includes('cover') && label.includes('stealth')) ||
-          slug.includes('cover-stealth')
-        );
-      }
-    );
+    const coverModifier = rollModifiers.find((mod) => {
+      const label = mod.label?.toLowerCase() || '';
+      const slug = mod.slug?.toLowerCase() || '';
+      // Only match modifiers that are specifically cover-related, not just containing "cover"
+      return (
+        slug === 'pf2e-visioner-cover' || // Our own cover modifier
+        label.includes('cover bonus') ||
+        label.includes('cover stealth') ||
+        (label.includes('cover') && label.includes('stealth')) ||
+        slug.includes('cover-stealth')
+      );
+    });
     if (coverModifier) {
       originalCoverBonus = Number(coverModifier.modifier || 0);
     }
@@ -864,7 +854,9 @@ export function calculateStealthRollTotals(
       // Safety check: if current cover is 'none' and we detect a large original bonus,
       // it might be a detection error. Cap the adjustment to prevent unreasonable results.
       if (currentCoverState === 'none' && originalCoverBonus > 4) {
-        console.warn('PF2E Visioner | Large cover bonus detected for no-cover situation. Limiting adjustment.');
+        console.warn(
+          'PF2E Visioner | Large cover bonus detected for no-cover situation. Limiting adjustment.',
+        );
         total = baseTotal;
       } else {
         // There's a mismatch - the roll was made with different cover than what we detect now
@@ -900,7 +892,6 @@ export function isTokenDefeated(token) {
     if (token.actor.isDead) {
       return true;
     }
-
 
     // HP based check (covers 0 or negative)
     const hpValue = actor.hitPoints?.value ?? actor.system?.attributes?.hp?.value;
@@ -966,7 +957,6 @@ export function isTokenDefeated(token) {
         }
       }
     }
-
 
     // Check for defeated conditions
     const defeatedSlugs = ['unconscious', 'dead', 'dying'];

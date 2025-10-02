@@ -3,17 +3,18 @@
 export function getDesiredOverrideStatesForAction(actionType) {
   switch (actionType) {
     case 'seek':
+      return ['observed', 'hidden'];
     case 'hide':
     case 'create-a-diversion':
-      return ['observed', 'hidden'];
+      return ['avs', 'observed', 'hidden'];
     case 'sneak':
-      return ['observed', 'hidden', 'undetected'];
+      return ['avs', 'observed', 'hidden', 'undetected'];
     case 'point-out':
       return ['hidden'];
     case 'consequences':
-      return ['observed', 'concealed', 'hidden', 'undetected'];
+      return ['avs', 'observed', 'concealed', 'hidden', 'undetected'];
     default:
-      return ['observed', 'concealed', 'hidden', 'undetected'];
+      return ['avs', 'observed', 'concealed', 'hidden', 'undetected'];
   }
 }
 

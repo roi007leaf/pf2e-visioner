@@ -602,7 +602,7 @@ describe('Event Handler Tests', () => {
     describe('TokenEventHandler', () => {
         let tokenHandler;
         let mockSystemState, mockVisibilityState, mockSpatialAnalyzer;
-        let mockExclusionManager, mockOverrideValidationManager, mockPositionManager;
+        let mockExclusionManager, mockOverrideValidationManager, mockPositionManager, mockCacheManager;
 
         beforeEach(() => {
             mockSystemState = createMockSystemStateProvider();
@@ -611,6 +611,7 @@ describe('Event Handler Tests', () => {
             mockExclusionManager = createMockExclusionManager();
             mockOverrideValidationManager = createMockOverrideValidationManager();
             mockPositionManager = createMockPositionManager();
+            mockCacheManager = createMockCacheManager();
 
             tokenHandler = new TokenEventHandler(
                 mockSystemState,
@@ -618,7 +619,8 @@ describe('Event Handler Tests', () => {
                 mockSpatialAnalyzer,
                 mockExclusionManager,
                 mockOverrideValidationManager,
-                mockPositionManager
+                mockPositionManager,
+                mockCacheManager
             );
         });
 
@@ -660,6 +662,25 @@ describe('Event Handler Tests', () => {
             tokenHandler.handleTokenUpdate(mockTokenDoc, changes);
 
             expect(mockVisibilityState.markAllTokensChangedImmediate).toHaveBeenCalled();
+        });
+
+        test('should handle movementAction changes for tremorsense detection', () => {
+            const mockTokenDoc = {
+                id: 'token1',
+                name: 'Test Token',
+                x: 100,
+                y: 100,
+                width: 1,
+                height: 1,
+                hidden: false,
+            };
+            const changes = { movementAction: 'fly' };
+
+            tokenHandler.handleTokenUpdate(mockTokenDoc, changes);
+
+            // Movement action affects tremorsense, should clear caches and trigger recalculation
+            expect(mockCacheManager.clearAllCaches).toHaveBeenCalled();
+            expect(mockVisibilityState.markTokenChangedImmediate).toHaveBeenCalledWith('token1');
         });
 
         test('should handle hidden flag changes', () => {

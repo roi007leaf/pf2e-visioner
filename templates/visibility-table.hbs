@@ -57,27 +57,74 @@
                 <i class="{{state.icon}}"></i>
               </button>
             {{/each}}
-            {{#if target.hasAvsOverride}}
-              <button type="button" class="state-icon remove-override" data-action="removeAvsOverride" data-token-id="{{target.id}}" data-tooltip="Remove AVS Override">
-                <i class="fas fa-trash"></i>
-              </button>
-            {{/if}}
-            <input type="hidden" name="visibility.{{target.id}}" value="{{target.currentVisibilityState}}" />
+            <input type="hidden" name="visibility.{{target.id}}" value="{{#if target.isAvsControlled}}avs{{else}}{{target.currentVisibilityState}}{{/if}}" />
           </div>
         </td>
         <td class="current-state">
-          {{#each target.visibilityStates as |state|}}
-            {{#if state.selected}}
-              <span class="state-indicator {{state.cssClass}}"
-                    {{#if (eq state.value "hidden")}}data-tooltip="{{localize 'PF2E_VISIONER.MECHANICAL_EFFECTS.HIDDEN_TOOLTIP'}}"{{/if}}
-                    {{#if (eq state.value "concealed")}}data-tooltip="{{localize 'PF2E_VISIONER.MECHANICAL_EFFECTS.CONCEALED_TOOLTIP'}}"{{/if}}
-                    {{#if (eq state.value "undetected")}}data-tooltip="{{localize 'PF2E_VISIONER.MECHANICAL_EFFECTS.UNDETECTED_TOOLTIP'}}"{{/if}}
-                    {{#if (eq state.value "observed")}}data-tooltip="{{localize 'PF2E_VISIONER.MECHANICAL_EFFECTS.VISIBLE_TOOLTIP'}}"{{/if}}>
-                <i class="{{state.icon}}"></i>
-                {{state.label}}
+          {{#if target.isAvsControlled}}
+            {{!-- When AVS is controlling, show the actual current state with AVS chip --}}
+            {{#if (eq target.currentVisibilityState "observed")}}
+              <span class="state-indicator visibility-observed" data-tooltip="{{localize 'PF2E_VISIONER.MECHANICAL_EFFECTS.VISIBLE_TOOLTIP'}}">
+                <i class="fas fa-eye"></i>
+                Observed
+                <span class="avs-chip">
+                  <i class="fas fa-bolt"></i>
+                  AVS
+                </span>
+              </span>
+            {{else if (eq target.currentVisibilityState "concealed")}}
+              <span class="state-indicator visibility-concealed" data-tooltip="{{localize 'PF2E_VISIONER.MECHANICAL_EFFECTS.CONCEALED_TOOLTIP'}}">
+                <i class="fas fa-eye-slash"></i>
+                Concealed
+                <span class="avs-chip">
+                  <i class="fas fa-bolt"></i>
+                  AVS
+                </span>
+              </span>
+            {{else if (eq target.currentVisibilityState "hidden")}}
+              <span class="state-indicator visibility-hidden" data-tooltip="{{localize 'PF2E_VISIONER.MECHANICAL_EFFECTS.HIDDEN_TOOLTIP'}}">
+                <i class="fas fa-eye-slash"></i>
+                Hidden
+                <span class="avs-chip">
+                  <i class="fas fa-bolt"></i>
+                  AVS
+                </span>
+              </span>
+            {{else if (eq target.currentVisibilityState "undetected")}}
+              <span class="state-indicator visibility-undetected" data-tooltip="{{localize 'PF2E_VISIONER.MECHANICAL_EFFECTS.UNDETECTED_TOOLTIP'}}">
+                <i class="fas fa-ghost"></i>
+                Undetected
+                <span class="avs-chip">
+                  <i class="fas fa-bolt"></i>
+                  AVS
+                </span>
+              </span>
+            {{else}}
+              {{!-- Fallback - should not show 'avs' as a state --}}
+              <span class="state-indicator visibility-observed" data-tooltip="{{localize 'PF2E_VISIONER.MECHANICAL_EFFECTS.VISIBLE_TOOLTIP'}}">
+                <i class="fas fa-eye"></i>
+                Observed
+                <span class="avs-chip">
+                  <i class="fas fa-bolt"></i>
+                  AVS
+                </span>
               </span>
             {{/if}}
-          {{/each}}
+          {{else}}
+            {{!-- When not AVS controlled, show the selected state --}}
+            {{#each target.visibilityStates as |state|}}
+              {{#if state.selected}}
+                <span class="state-indicator {{state.cssClass}}"
+                      {{#if (eq state.value "hidden")}}data-tooltip="{{localize 'PF2E_VISIONER.MECHANICAL_EFFECTS.HIDDEN_TOOLTIP'}}"{{/if}}
+                      {{#if (eq state.value "concealed")}}data-tooltip="{{localize 'PF2E_VISIONER.MECHANICAL_EFFECTS.CONCEALED_TOOLTIP'}}"{{/if}}
+                      {{#if (eq state.value "undetected")}}data-tooltip="{{localize 'PF2E_VISIONER.MECHANICAL_EFFECTS.UNDETECTED_TOOLTIP'}}"{{/if}}
+                      {{#if (eq state.value "observed")}}data-tooltip="{{localize 'PF2E_VISIONER.MECHANICAL_EFFECTS.VISIBLE_TOOLTIP'}}"{{/if}}>
+                  <i class="{{state.icon}}"></i>
+                  {{state.label}}
+                </span>
+              {{/if}}
+            {{/each}}
+          {{/if}}
         </td>
         <td class="dc-column">
           {{#if ../isTargetMode}}

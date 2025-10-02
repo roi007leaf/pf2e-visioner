@@ -13,6 +13,16 @@ Purpose: Give coding AIs crisp, actionable guardrails for this repo. Follow thes
 - Always run tests in terminal rather than internal tool.
 - Every bugfix requires a test if there isn't any.
 - Dont write long functions, break to several functions to keep readable.
+- Never mix test code and production code.
+- Use i18n keys for all user-facing text. Update lang/*.json as needed.
+- Dont delete debug logs until the user confirms bug is fixed.
+- Do not add comments
+- Do not modify code you haven't specifically been instructed to modify
+- Do not rename functions unless you have been instructed to
+- Do not refactor code unprompted
+- Maintain clean and readable code
+- If you don't know — say you don't know
+- If an old unit test fails, do not modify the test to make it pass
 
 ## Architecture you must respect
 - Stores (single-responsibility): `scripts/stores/*` – visibility/cover maps, simple get/set.
@@ -48,6 +58,8 @@ Contract for state
 - Run linting and keep ESModule imports tidy.
 - Prefer deterministic tests; use provided Foundry/PF2e mocks.
 - Never change production code to accommodate tests. fix the test instead.
+- Never run a test with debug logs, if debug is needed set debugger expressions and tell me to run in debug and ill tell you waht you need to know
+- Use Jest not Vitest
 
 ## Do/Don’t examples
 Do

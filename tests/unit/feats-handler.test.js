@@ -60,23 +60,14 @@ describe('FeatsHandler - all feats coverage', () => {
       expect(adjusted).toBe('undetected');
     });
 
-    test('legendary-sneak / very-sneaky / very-very-sneaky each add +1 and clamp total shift', () => {
-      const actor = createActorWithFeats(['legendary-sneak', 'very-sneaky', 'very-very-sneaky']);
-      const { shift } = FeatsHandler.getOutcomeAdjustment(actor, 'sneak', {});
-      // would be +3 unbounded; handler clamps overall to +2
+    test('terrain-stalker + vanish-into-the-land each add +1 and clamp total shift', () => {
+      const actor = createActorWithFeats(['terrain-stalker', 'vanish-into-the-land']);
+      const { shift } = FeatsHandler.getOutcomeAdjustment(actor, 'sneak', {
+        terrainMatches: true,
+        inNaturalTerrain: true
+      });
+      // Each provides +1, totaling +2 (which is the cap)
       expect(shift).toBe(2);
-    });
-
-    test('distracting-shadows grants +1 in dim or darker', () => {
-      const actor = createActorWithFeats(['distracting-shadows']);
-      const { shift } = FeatsHandler.getOutcomeAdjustment(actor, 'sneak', { inDimOrDarker: true });
-      expect(shift).toBe(1);
-    });
-
-    test('ceaseless-shadows grants +1 when moving through shadowy areas', () => {
-      const actor = createActorWithFeats(['ceaseless-shadows']);
-      const { shift } = FeatsHandler.getOutcomeAdjustment(actor, 'sneak', { inShadowyMovement: true });
-      expect(shift).toBe(1);
     });
 
     test('shadow-self grants +1 in dim or darker', () => {
@@ -86,13 +77,13 @@ describe('FeatsHandler - all feats coverage', () => {
     });
 
     describe('hide feat adjusters', () => {
-      test('terrain-stalker, foil-senses, vanish-into-the-land apply on hide', () => {
-        const actor = createActorWithFeats(['terrain-stalker', 'foil-senses', 'vanish-into-the-land']);
+      test('terrain-stalker, legendary-sneak, vanish-into-the-land apply on hide', () => {
+        const actor = createActorWithFeats(['terrain-stalker', 'legendary-sneak', 'vanish-into-the-land']);
         const { shift } = FeatsHandler.getOutcomeAdjustment(actor, 'hide', {
           terrainMatches: true,
           inNaturalTerrain: true,
         });
-        // +1 +1 +1 = 3 but clamped to 2
+        // terrain-stalker +1, legendary-sneak +1, vanish-into-the-land +1 = 3 but clamped to 2
         expect(shift).toBe(2);
       });
 
@@ -135,23 +126,5 @@ describe('FeatsHandler - all feats coverage', () => {
       });
     });
 
-    describe('multi-feat accumulation and clamp', () => {
-      test('multiple sneak feats accumulate but clamp to +2', () => {
-        const actor = createActorWithFeats([
-          'terrain-stalker',
-          'foil-senses',
-          'legendary-sneak',
-          'very-sneaky',
-          'very-very-sneaky',
-        ]);
-        const { shift } = FeatsHandler.getOutcomeAdjustment(actor, 'sneak', { terrainMatches: true });
-        expect(shift).toBe(2);
-
-        const base = 'failure';
-        const outcome = FeatsHandler.applyOutcomeShift(base, shift);
-        // failure shifted by +2 -> critical-success per ordered list
-        expect(outcome).toBe('critical-success');
-      });
-    });
   });
 });

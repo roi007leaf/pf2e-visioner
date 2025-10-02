@@ -476,7 +476,33 @@ export function registerUIHooks() {
       ui.controls.render();
     } catch { }
   };
-  Hooks.on('controlToken', refreshTokenTool);
+  Hooks.on('controlToken', (token, controlled) => {
+    // CRITICAL: Set global flag to suppress lighting refreshes during token control operations
+    try {
+      globalThis.game = globalThis.game || {};
+      globalThis.game.pf2eVisioner = globalThis.game.pf2eVisioner || {};
+      globalThis.game.pf2eVisioner.suppressLightingRefresh = true;
+
+      // Track this controlToken event to prevent AVS from responding to related lighting refreshes
+      import('../visibility/auto-visibility/core/LightingEventHandler.js').then(({ LightingEventHandler }) => {
+        LightingEventHandler.trackControlTokenEvent();
+      });
+
+      // Clear the suppression flag after a short delay
+      setTimeout(() => {
+        try {
+          if (globalThis.game?.pf2eVisioner) {
+            globalThis.game.pf2eVisioner.suppressLightingRefresh = false;
+          }
+        } catch {
+          // Best effort
+        }
+      }, 50);
+    } catch {
+      // Best effort - continue without tracking if import fails
+    }
+    refreshTokenTool();
+  });
   Hooks.on('deleteToken', refreshTokenTool);
   Hooks.on('createToken', refreshTokenTool);
   Hooks.on('updateToken', refreshTokenTool);

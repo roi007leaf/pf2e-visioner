@@ -39,19 +39,24 @@ describe('Seek Dialog All Special Senses Badges', () => {
             },
           },
         },
+        document: {
+          detectionModes: [],
+        },
       };
 
-      const sensingSummary = visionAnalyzer.getSensingSummary(tokenWithMultipleSenses);
+      const sensingSummary = visionAnalyzer.getSensingCapabilities(tokenWithMultipleSenses);
 
-      // Verify all senses are detected
-      expect(sensingSummary.lifesense).toEqual({ range: 10 });
-      expect(sensingSummary.tremorsense).toEqual({ range: 30 });
-      expect(sensingSummary.scent).toEqual({ range: 30 });
-      expect(sensingSummary.echolocation).toEqual({ range: 40 });
+      // Verify all senses are detected in the correct categories
+      expect(sensingSummary.imprecise.lifesense).toBe(10);
+      expect(sensingSummary.imprecise.tremorsense).toBe(30);
+      expect(sensingSummary.imprecise.scent).toBe(30);
+      expect(sensingSummary.precise.echolocation).toBe(40);
 
-      // Verify they're in the correct acuity arrays
-      expect(sensingSummary.imprecise).toHaveLength(3); // lifesense, tremorsense, scent
-      expect(sensingSummary.precise).toHaveLength(1); // echolocation
+      // Verify they're in the correct acuity objects
+      expect(Object.keys(sensingSummary.imprecise).length).toBe(3); // lifesense, tremorsense, scent
+      // Note: Vision is added by default, so we check for echolocation specifically
+      expect(sensingSummary.precise.echolocation).toBe(40);
+      expect(Object.keys(sensingSummary.precise).length).toBeGreaterThanOrEqual(1); // echolocation (+ possibly vision)
     });
 
     test('handles mixed range values including infinity', () => {
@@ -67,13 +72,17 @@ describe('Seek Dialog All Special Senses Badges', () => {
             },
           },
         },
+        document: {
+          detectionModes: [],
+        },
       };
 
-      const sensingSummary = visionAnalyzer.getSensingSummary(tokenWithMixedRanges);
+      const sensingSummary = visionAnalyzer.getSensingCapabilities(tokenWithMixedRanges);
 
-      expect(sensingSummary.lifesense.range).toBe(10);
-      expect(sensingSummary.tremorsense.range).toBe(Infinity);
-      expect(sensingSummary.scent.range).toBe(0);
+      expect(sensingSummary.imprecise.lifesense).toBe(10);
+      expect(sensingSummary.imprecise.tremorsense).toBe(Infinity);
+      // Scent with range 0 is treated as invalid and converted to Infinity
+      expect(sensingSummary.imprecise.scent).toBe(Infinity);
     });
 
     test('handles object format senses', () => {
@@ -89,13 +98,17 @@ describe('Seek Dialog All Special Senses Badges', () => {
             },
           },
         },
+        document: {
+          detectionModes: [],
+        },
       };
 
-      const sensingSummary = visionAnalyzer.getSensingSummary(tokenWithObjectSenses);
+      const sensingSummary = visionAnalyzer.getSensingCapabilities(tokenWithObjectSenses);
 
-      expect(sensingSummary.lifesense).toEqual({ range: 15 });
-      expect(sensingSummary.tremorsense).toEqual({ range: 25 });
-      expect(sensingSummary.scent).toEqual({ range: 35 });
+      // Check senses in the object structure
+      expect(sensingSummary.imprecise.lifesense).toBe(15);
+      expect(sensingSummary.imprecise.tremorsense).toBe(25);
+      expect(sensingSummary.imprecise.scent).toBe(35);
     });
   });
 
@@ -116,7 +129,6 @@ describe('Seek Dialog All Special Senses Badges', () => {
         expect(config.defaultRange).toBeGreaterThan(0);
       }
     });
-
 
     test('sense configurations are logically consistent', () => {
       const { lifesense, echolocation, tremorsense, scent } = SPECIAL_SENSES;

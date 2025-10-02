@@ -1,5 +1,6 @@
 import { LightingCalculator } from '../../scripts/visibility/auto-visibility/LightingCalculator.js';
 import { VisionAnalyzer } from '../../scripts/visibility/auto-visibility/VisionAnalyzer.js';
+import { calculateVisibility } from '../../scripts/visibility/StatelessVisibilityCalculator.js';
 
 // Mock PIXI for tests
 global.PIXI = {
@@ -25,7 +26,13 @@ function makeActorWithDarkvision() {
 function makeActorWithGreaterDarkvisionFeat() {
   return {
     type: 'character',
-    system: { perception: { senses: {} } },
+    system: {
+      perception: {
+        senses: {
+          'greater-darkvision': { range: Infinity, acuity: 'precise' }
+        }
+      }
+    },
     itemTypes: {
       feat: [{ type: 'feat', system: { slug: 'greater-darkvision' } }],
     },
@@ -144,17 +151,67 @@ describe('Darkness heightening and magical behavior', () => {
       expect(light.isDarknessSource).toBe(true);
       expect(light.isHeightenedDarkness).toBe(false);
 
+      // Test with darkvision - should see observed in rank 3 darkness
       const tokDV = makeToken(makeActorWithDarkvision(), 'dv1');
-      const visDV = va.determineVisibilityFromLighting(light, va.getVisionCapabilities(tokDV));
-      expect(visDV).toBe('observed');
+      const inputDV = {
+        observer: {
+          precise: {
+            vision: { range: Infinity },
+            darkvision: { range: Infinity },
+            greaterDarkvision: null
+          },
+          imprecise: {},
+          conditions: { blinded: false, deafened: false, dazzled: false }
+        },
+        target: {
+          lightingLevel: 'darkness',
+          coverLevel: 'none',
+          concealment: false,
+          auxiliary: []
+        }
+      };
+      const resultDV = calculateVisibility(inputDV);
+      expect(resultDV.state).toBe('observed');
 
+      // Test without darkvision - should be hidden in darkness
       const tokNo = makeToken(makeActorWithoutDarkvision(), 'no1');
-      const visNo = va.determineVisibilityFromLighting(light, va.getVisionCapabilities(tokNo));
-      expect(visNo).toBe('hidden');
+      const inputNo = {
+        observer: {
+          precise: { vision: { range: Infinity } },
+          imprecise: {},
+          conditions: { blinded: false, deafened: false, dazzled: false }
+        },
+        target: {
+          lightingLevel: 'darkness',
+          coverLevel: 'none',
+          concealment: false,
+          auxiliary: []
+        }
+      };
+      const resultNo = calculateVisibility(inputNo);
+      expect(resultNo.state).toBe('undetected');
 
+      // Test with greater darkvision - should see observed in rank 3 darkness
       const tokG = makeToken(makeActorWithGreaterDarkvisionFeat(), 'gdv1');
-      const visG = va.determineVisibilityFromLighting(light, va.getVisionCapabilities(tokG));
-      expect(visG).toBe('observed');
+      const inputG = {
+        observer: {
+          precise: {
+            vision: { range: Infinity },
+            darkvision: { range: Infinity },
+            greaterDarkvision: { range: Infinity }
+          },
+          imprecise: {},
+          conditions: { blinded: false, deafened: false, dazzled: false }
+        },
+        target: {
+          lightingLevel: 'darkness',
+          coverLevel: 'none',
+          concealment: false,
+          auxiliary: []
+        }
+      };
+      const resultG = calculateVisibility(inputG);
+      expect(resultG.state).toBe('observed');
     } finally {
       teardown();
     }
@@ -190,17 +247,67 @@ describe('Darkness heightening and magical behavior', () => {
       expect(light.isDarknessSource).toBe(true);
       expect(light.isHeightenedDarkness).toBe(true);
 
+      // Test with darkvision - should see concealed in rank 4+ darkness
       const tokDV = makeToken(makeActorWithDarkvision(), 'dv2');
-      const visDV = va.determineVisibilityFromLighting(light, va.getVisionCapabilities(tokDV));
-      expect(visDV).toBe('concealed');
+      const inputDV = {
+        observer: {
+          precise: {
+            vision: { range: Infinity },
+            darkvision: { range: Infinity },
+            greaterDarkvision: null
+          },
+          imprecise: {},
+          conditions: { blinded: false, deafened: false, dazzled: false }
+        },
+        target: {
+          lightingLevel: 'greaterMagicalDarkness',
+          coverLevel: 'none',
+          concealment: false,
+          auxiliary: []
+        }
+      };
+      const resultDV = calculateVisibility(inputDV);
+      expect(resultDV.state).toBe('concealed');
 
+      // Test without darkvision - should be undetected in rank 4+ darkness
       const tokNo = makeToken(makeActorWithoutDarkvision(), 'no2');
-      const visNo = va.determineVisibilityFromLighting(light, va.getVisionCapabilities(tokNo));
-      expect(visNo).toBe('hidden');
+      const inputNo = {
+        observer: {
+          precise: { vision: { range: Infinity } },
+          imprecise: {},
+          conditions: { blinded: false, deafened: false, dazzled: false }
+        },
+        target: {
+          lightingLevel: 'greaterMagicalDarkness',
+          coverLevel: 'none',
+          concealment: false,
+          auxiliary: []
+        }
+      };
+      const resultNo = calculateVisibility(inputNo);
+      expect(resultNo.state).toBe('undetected');
 
+      // Test with greater darkvision - should see observed in rank 4+ darkness
       const tokG = makeToken(makeActorWithGreaterDarkvisionFeat(), 'gdv2');
-      const visG = va.determineVisibilityFromLighting(light, va.getVisionCapabilities(tokG));
-      expect(visG).toBe('observed');
+      const inputG = {
+        observer: {
+          precise: {
+            vision: { range: Infinity },
+            darkvision: { range: Infinity },
+            greaterDarkvision: { range: Infinity }
+          },
+          imprecise: {},
+          conditions: { blinded: false, deafened: false, dazzled: false }
+        },
+        target: {
+          lightingLevel: 'greaterMagicalDarkness',
+          coverLevel: 'none',
+          concealment: false,
+          auxiliary: []
+        }
+      };
+      const resultG = calculateVisibility(inputG);
+      expect(resultG.state).toBe('observed');
     } finally {
       teardown();
     }

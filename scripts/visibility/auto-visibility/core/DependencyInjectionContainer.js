@@ -121,6 +121,7 @@ export class DependencyInjectionContainer {
                 positionManager: dependencies.positionManager,
                 overrideService: dependencies.overrideService,
                 visibilityMapService: dependencies.visibilityMapService,
+                visionAnalyzer: dependencies.visionAnalyzer,
                 debug: dependencies.debug,
                 maxVisibilityDistance: dependencies.maxVisibilityDistance
             });

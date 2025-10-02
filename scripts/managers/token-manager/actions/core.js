@@ -28,7 +28,7 @@ function computeAllowedTokenIds(app) {
       // off-table safety: ensure present on canvas
       try {
         if (!canvas.tokens.get(id)) continue;
-      } catch { }
+      } catch {}
       ids.add(id);
     }
     return ids;
@@ -82,8 +82,14 @@ export async function formHandler(event, form, formData, options = {}) {
       const merged = { ...currentMap };
       // Track changes for AVS overrides (manual_action)
       const overrideMap = new Map();
+      const avsRemovals = new Set();
       for (const [tokenId, newState] of Object.entries(visibilityChanges)) {
-        if (merged[tokenId] !== newState) merged[tokenId] = newState;
+        if (newState === 'avs') {
+          // AVS state means remove override, don't set a manual state
+          avsRemovals.add(tokenId);
+        } else {
+          if (merged[tokenId] !== newState) merged[tokenId] = newState;
+        }
       }
       await setVisibilityMap(app.observer, merged);
 
@@ -94,6 +100,12 @@ export async function formHandler(event, form, formData, options = {}) {
           const targetToken = canvas.tokens.get(tokenId);
           if (!targetToken) continue;
           const currentState = currentMap?.[tokenId];
+
+          if (newState === 'avs') {
+            // AVS state: no visual update, just mark for override removal
+            continue;
+          }
+
           const stateChanged = currentState !== newState;
 
           // Skip visual updates if state hasn't changed, but always create override if forced
@@ -124,6 +136,29 @@ export async function formHandler(event, form, formData, options = {}) {
             });
           } catch (e) {
             console.warn('Token Manager: failed to create AVS overrides (observer mode):', e);
+          }
+        }
+
+        // Remove AVS overrides for tokens set to AVS state
+        if (avsRemovals.size > 0) {
+          try {
+            const { default: AvsOverrideManager } = await import(
+              '../../../chat/services/infra/avs-override-manager.js'
+            );
+            const tokenNames = [];
+            for (const tokenId of avsRemovals) {
+              const token = canvas.tokens.get(tokenId);
+              if (token) tokenNames.push(token.document.name);
+              await AvsOverrideManager.removeOverride(app.observer.document.id, tokenId);
+            }
+            if (tokenNames.length > 0) {
+              const { notify } = await import('../../../chat/services/infra/notifications.js');
+              notify.info(
+                `AVS will now control visibility for ${tokenNames.length} token${tokenNames.length === 1 ? '' : 's'}`,
+              );
+            }
+          } catch (e) {
+            console.warn('Token Manager: failed to remove AVS overrides (observer mode):', e);
           }
         }
         if (targetUpdates.length > 0) {
@@ -180,12 +215,20 @@ export async function formHandler(event, form, formData, options = {}) {
     }
   } else {
     const perObserverChanges = new Map();
+    const avsRemovals = new Set();
     for (const [observerTokenId, newVisibilityState] of Object.entries(visibilityChanges)) {
       const observerToken = canvas.tokens.get(observerTokenId);
       if (!observerToken) continue;
       try {
         if (['loot', 'vehicle', 'party'].includes(observerToken?.actor?.type)) continue;
-      } catch { }
+      } catch {}
+
+      if (newVisibilityState === 'avs') {
+        // AVS state means remove override, don't set a manual state
+        avsRemovals.add(observerTokenId);
+        continue;
+      }
+
       const current = getVisibilityMap(observerToken) || {};
       const currentState = current[app.observer.document.id];
       const stateChanged = currentState !== newVisibilityState;
@@ -205,13 +248,18 @@ export async function formHandler(event, form, formData, options = {}) {
       // Include tokens that changed OR if forceOverride is true
       const changedIds = new Set(perObserverChanges.keys());
       for (const [observerTokenId, newVisibilityState] of Object.entries(visibilityChanges)) {
+        if (newVisibilityState === 'avs') {
+          // AVS state: no visual update, just mark for override removal
+          continue;
+        }
+
         const hasChanged = changedIds.has(observerTokenId);
         if (!hasChanged && !forceOverride) continue;
         const observerToken = canvas.tokens.get(observerTokenId);
         if (!observerToken) continue;
         try {
           if (['loot', 'vehicle', 'party'].includes(observerToken?.actor?.type)) continue;
-        } catch { }
+        } catch {}
         // Only add visual updates for actual state changes
         if (hasChanged) {
           observerUpdates.push({
@@ -244,6 +292,29 @@ export async function formHandler(event, form, formData, options = {}) {
           }
         } catch (e) {
           console.warn('Token Manager: failed to create AVS overrides (target mode):', e);
+        }
+      }
+
+      // Remove AVS overrides for tokens set to AVS state
+      if (avsRemovals.size > 0) {
+        try {
+          const { default: AvsOverrideManager } = await import(
+            '../../../chat/services/infra/avs-override-manager.js'
+          );
+          const tokenNames = [];
+          for (const observerTokenId of avsRemovals) {
+            const token = canvas.tokens.get(observerTokenId);
+            if (token) tokenNames.push(token.document.name);
+            await AvsOverrideManager.removeOverride(observerTokenId, app.observer.document.id);
+          }
+          if (tokenNames.length > 0) {
+            const { notify } = await import('../../../chat/services/infra/notifications.js');
+            notify.info(
+              `AVS will now control visibility for ${tokenNames.length} token${tokenNames.length === 1 ? '' : 's'}`,
+            );
+          }
+        } catch (e) {
+          console.warn('Token Manager: failed to remove AVS overrides (target mode):', e);
         }
       }
       if (observerUpdates.length > 0) {
@@ -281,7 +352,7 @@ export async function formHandler(event, form, formData, options = {}) {
           }
           continue;
         }
-      } catch { }
+      } catch {}
       if (currentState === newCoverState && newCoverState !== 'none') continue;
       if (!perObserverCover.has(observerTokenId))
         perObserverCover.set(observerTokenId, { token: observerToken, map: current });
@@ -298,7 +369,7 @@ export async function formHandler(event, form, formData, options = {}) {
         if (!observerToken) continue;
         try {
           if (['loot', 'vehicle', 'party'].includes(observerToken?.actor?.type)) continue;
-        } catch { }
+        } catch {}
         observerUpdates.push({
           target: app.observer,
           state: newCoverState,
@@ -328,15 +399,13 @@ export async function formHandler(event, form, formData, options = {}) {
   (async () => {
     try {
       refreshEveryonesPerception();
-      const { updateSpecificTokenPairs } = await import(
-        '../../../services/visual-effects.js'
-      );
+      const { updateSpecificTokenPairs } = await import('../../../services/visual-effects.js');
       try {
         await updateSpecificTokenPairs([]);
-      } catch { }
+      } catch {}
       // Removed redundant updateWallVisuals call - wall visual updates are properly handled
       // by TokenEventHandler._handleWallFlagChanges when wall flags actually change
-    } catch { }
+    } catch {}
   })();
   return app.render();
 }
@@ -500,7 +569,7 @@ export async function applyCurrent(event, button) {
           if (!observerToken) continue;
           try {
             if (['loot', 'vehicle', 'party'].includes(observerToken?.actor?.type)) continue;
-          } catch { }
+          } catch {}
           const observerVisibilityData = getVisibilityMap(observerToken) || {};
           // Skip if no actual change (treat undefined as 'observed')
           const prev = observerVisibilityData?.[app.observer.document.id] ?? 'observed';
@@ -565,7 +634,7 @@ export async function applyCurrent(event, button) {
             });
           }
         }
-      } catch { }
+      } catch {}
     }
 
     if (isCover) {
@@ -614,7 +683,7 @@ export async function applyCurrent(event, button) {
           try {
             const t = observer.actor?.type;
             if (t === 'loot' || t === 'vehicle' || t === 'party') continue;
-          } catch { }
+          } catch {}
           allOperations.push(async () => {
             const { batchUpdateCoverEffects } = await import('../../../cover/ephemeral.js');
             await batchUpdateCoverEffects(observer, updates);

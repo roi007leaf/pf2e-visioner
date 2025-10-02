@@ -85,17 +85,11 @@ const SNEAK_FEAT_ADJUSTERS = {
   // Examples: These are conservative interpretations meant to be refined.
   'terrain-stalker': (ctx) => (ctx.terrainMatches ? +1 : 0),
   'vanish-into-the-land': (ctx) => (ctx.inNaturalTerrain ? +1 : 0),
-  'legendary-sneak': () => +1,
-  'very-sneaky': () => +1,
-  'very-very-sneaky': () => +1,
-  'distracting-shadows': (ctx) => (ctx.inDimOrDarker ? +1 : 0),
-  'ceaseless-shadows': (ctx) => (ctx.inShadowyMovement ? +1 : 0),
   'shadow-self': (ctx) => (ctx.inDimOrDarker ? +1 : 0),
 };
 
 const HIDE_FEAT_ADJUSTERS = {
   'terrain-stalker': (ctx) => (ctx.terrainMatches ? +1 : 0),
-  'very-very-sneaky': () => +1,
   'vanish-into-the-land': (ctx) => (ctx.inNaturalTerrain ? +1 : 0),
   'legendary-sneak': () => +1,
 };
@@ -145,8 +139,7 @@ function getAdjusterMapForAction(action) {
  * @param {object} context - environment context (lighting, terrain, observer senses)
  * @returns {{ shift: number, notes: string[] }} - Net shift and contributing notes
  */
-import { segmentRectIntersectionLength } from '../../helpers/line-intersection.js';
-import { getSizeRank, getTokenRect } from '../../helpers/size-elevation-utils.js';
+import coverDetector from '../../cover/auto-cover/CoverDetector.js';
 import EnvironmentHelper from '../../utils/environment.js';
 
 export class FeatsHandler {
@@ -435,65 +428,20 @@ export class FeatsHandler {
         const observer = extra?.observer || null;
         const actorToken = FeatsHandlerInternal.resolveToken(tokenOrActor) || tokenOrActor;
 
-        const computeHasLargeCreatureCover = (pointHint = null) => {
-          try {
-            if (!observer || !actorToken) return false;
-
-            // Determine ray endpoints
-            const p1 = observer?.center || observer?.getCenter?.();
-            let p2 = null;
-            if (pointHint && typeof pointHint.x === 'number' && typeof pointHint.y === 'number') {
-              p2 = { x: pointHint.x, y: pointHint.y };
-            } else {
-              p2 = actorToken?.center || actorToken?.getCenter?.();
-            }
-            if (!p1 || !p2) return false;
-
-            // Actor size rank for comparison
-            const actorRank = getSizeRank(actorToken);
-
-            // Iterate potential blockers
-            const tokens = canvas?.tokens?.placeables || [];
-            for (const blocker of tokens) {
-              if (!blocker?.actor) continue;
-              // Skip self/observer
-              if (blocker.id === actorToken.id || blocker.id === observer.id) continue;
-              if (blocker.document?.hidden) continue; // ignore Foundry-hidden
-              const type = blocker.actor?.type;
-              if (type === 'loot' || type === 'hazard') continue;
-
-              // Require at least one size larger than the actor
-              let blockerRank = 0;
-              try { blockerRank = getSizeRank(blocker); } catch { blockerRank = 0; }
-              if (!(blockerRank >= actorRank + 1)) continue;
-
-              const rect = getTokenRect(blocker);
-              const len = segmentRectIntersectionLength(p1, p2, rect);
-              if (len > 0) {
-                return true; // Found a qualifying larger creature along the path
-              }
-            }
-            return false;
-          } catch (e) {
-            console.warn('PF2E Visioner | Distracting Shadows cover check failed:', e);
-            return false;
-          }
-        };
-
         // Compute start/end large-creature cover signals
         const startHint = extra?.startPoint || extra?.startCenter || extra?.storedStartPosition?.center || null;
         const endHint = extra?.endPoint || extra?.endCenter || null;
 
         const startHasLargeCover = typeof extra?.startHasLargeCreatureCover === 'boolean'
           ? extra.startHasLargeCreatureCover
-          : computeHasLargeCreatureCover(startHint);
+          : coverDetector.hasLargeCreatureCover(observer, actorToken, startHint);
 
         // For end: prefer explicit boolean, else compute using endHint if provided.
         // If no hint is available (e.g., end position is virtual during preview), allow a conservative
         // fallback: if system detected only 'lesser' cover at end, consider it sufficient for prerequisites.
         let endHasLargeCover = typeof extra?.endHasLargeCreatureCover === 'boolean'
           ? extra.endHasLargeCreatureCover
-          : (endHint ? computeHasLargeCreatureCover(endHint) : false);
+          : (endHint ? coverDetector.hasLargeCreatureCover(observer, actorToken, endHint) : false);
         if (!endHasLargeCover && extra?.endCoverState === 'lesser') {
           endHasLargeCover = true; // Treat creature-provided lesser cover as sufficient for DS prerequisites
         }

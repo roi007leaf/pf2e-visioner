@@ -43,6 +43,10 @@ class HoverTooltipsImpl {
       const { fontPx, iconPx, borderPx } = computeSizesFromSetting(raw ?? this.tooltipFontSize);
       this.tooltipFontSize = fontPx;
       this.tooltipIconSize = iconPx;
+
+      // Invalidate HUD cache when sizes change
+      delete this._hudActiveCache;
+
       document.documentElement.style.setProperty(
         '--pf2e-visioner-tooltip-font-size',
         `${fontPx}px`,
@@ -249,7 +253,9 @@ export function initializeHoverTooltips() {
         // small defer to avoid layout thrash if many updates fire
         setTimeout(() => {
           showVisibilityIndicators(tok);
-          try { showCoverIndicators(tok); } catch (_) { }
+          try {
+            showCoverIndicators(tok);
+          } catch (_) { }
         }, 0);
       }
     });
@@ -279,8 +285,16 @@ function onTokenHover(hoveredToken) {
     return;
   }
 
-  HoverTooltips.currentHoveredToken = hoveredToken;
-  showVisibilityIndicators(hoveredToken);
+  // Debounce rapid hover changes to prevent PIXI churn
+  if (HoverTooltips._hoverDebounceTimer) {
+    clearTimeout(HoverTooltips._hoverDebounceTimer);
+  }
+
+  HoverTooltips._hoverDebounceTimer = setTimeout(() => {
+    HoverTooltips.currentHoveredToken = hoveredToken;
+    showVisibilityIndicators(hoveredToken);
+    delete HoverTooltips._hoverDebounceTimer;
+  }, 50); // 50ms debounce - fast enough to feel instant, slow enough to skip intermediate hovers
 }
 
 /**
@@ -288,6 +302,12 @@ function onTokenHover(hoveredToken) {
  * @param {Token} token - The token that was hovered
  */
 function onTokenHoverEnd(token) {
+  // Clear any pending hover debounce
+  if (HoverTooltips._hoverDebounceTimer) {
+    clearTimeout(HoverTooltips._hoverDebounceTimer);
+    delete HoverTooltips._hoverDebounceTimer;
+  }
+
   if (HoverTooltips.currentHoveredToken === token) {
     HoverTooltips.currentHoveredToken = null;
     hideAllVisibilityIndicators();
@@ -376,7 +396,9 @@ function showVisibilityIndicators(hoveredToken) {
 
     otherTokens.forEach((targetToken) => {
       const visibilityMap = getVisibilityMap(hoveredToken);
-      const visibilityState = visibilityMap[targetToken.document.id] || 'observed';
+      let visibilityState = visibilityMap[targetToken.document.id] || 'observed';
+      // Never show 'avs' in tooltips - it's a control mechanism, not a visibility state
+      if (visibilityState === 'avs') visibilityState = 'observed';
 
       if (visibilityState !== 'observed') {
         // Pass relation token (targetToken) to compute cover vs hoveredToken
@@ -397,7 +419,9 @@ function showVisibilityIndicators(hoveredToken) {
         // Show how each other token sees the player's token
         nonPlayerTokens.forEach((otherToken) => {
           const visibilityMap = getVisibilityMap(otherToken);
-          const visibilityState = visibilityMap[hoveredToken.document.id] || 'observed';
+          let visibilityState = visibilityMap[hoveredToken.document.id] || 'observed';
+          // Never show 'avs' in tooltips - it's a control mechanism, not a visibility state
+          if (visibilityState === 'avs') visibilityState = 'observed';
 
           if (visibilityState !== 'observed') {
             // Show indicator on the OTHER token to show how it sees the player's token
@@ -410,7 +434,9 @@ function showVisibilityIndicators(hoveredToken) {
 
       otherTokens.forEach((observerToken) => {
         const visibilityMap = getVisibilityMap(observerToken);
-        const visibilityState = visibilityMap[hoveredToken?.document?.id] || 'observed';
+        let visibilityState = visibilityMap[hoveredToken?.document?.id] || 'observed';
+        // Never show 'avs' in tooltips - it's a control mechanism, not a visibility state
+        if (visibilityState === 'avs') visibilityState = 'observed';
 
         if (visibilityState !== 'observed') {
           // Show indicator on the observer token
@@ -528,7 +554,9 @@ function showVisibilityIndicatorsForToken(observerToken, forceMode = null) {
     // Default mode: Show how the observer token sees others
     otherTokens.forEach((targetToken) => {
       const visibilityMap = getVisibilityMap(observerToken);
-      const visibilityState = visibilityMap[targetToken.document.id] || 'observed';
+      let visibilityState = visibilityMap[targetToken.document.id] || 'observed';
+      // Never show 'avs' in tooltips - it's a control mechanism, not a visibility state
+      if (visibilityState === 'avs') visibilityState = 'observed';
 
       if (visibilityState !== 'observed') {
         addVisibilityIndicator(
@@ -551,7 +579,9 @@ function showVisibilityIndicatorsForToken(observerToken, forceMode = null) {
 
       otherTokensForPlayer.forEach((otherToken) => {
         const visibilityMap = getVisibilityMap(otherToken);
-        const visibilityState = visibilityMap[observerToken.document.id] || 'observed';
+        let visibilityState = visibilityMap[observerToken.document.id] || 'observed';
+        // Never show 'avs' in tooltips - it's a control mechanism, not a visibility state
+        if (visibilityState === 'avs') visibilityState = 'observed';
 
         if (visibilityState !== 'observed') {
           // Show indicator on the OTHER token
@@ -562,7 +592,9 @@ function showVisibilityIndicatorsForToken(observerToken, forceMode = null) {
       // GM sees all perspectives
       otherTokens.forEach((otherToken) => {
         const visibilityMap = getVisibilityMap(otherToken);
-        const visibilityState = visibilityMap[observerToken.document.id] || 'observed';
+        let visibilityState = visibilityMap[observerToken.document.id] || 'observed';
+        // Never show 'avs' in tooltips - it's a control mechanism, not a visibility state
+        if (visibilityState === 'avs') visibilityState = 'observed';
 
         if (visibilityState !== 'observed') {
           // Show indicator on the OTHER token
@@ -754,8 +786,11 @@ function addVisibilityIndicator(
     el.style.position = 'fixed';
     el.style.pointerEvents = 'none';
     el.style.zIndex = '60';
-    el.style.left = `${Math.round(leftPx)}px`;
-    el.style.top = `${Math.round(topPx)}px`;
+    // Use transform for GPU acceleration - set left/top to 0 and use translate
+    el.style.left = '0';
+    el.style.top = '0';
+    el.style.transform = `translate(${Math.round(leftPx)}px, ${Math.round(topPx)}px)`;
+    el.style.willChange = 'transform'; // Hint to browser for GPU layer
     el.innerHTML = `<span class="pf2e-visioner-tooltip-badge ${kind === 'cover' ? `cover-${stateClass}` : `visibility-${stateClass}`}" style="--pf2e-visioner-tooltip-badge-width: ${badgeWidth}px; --pf2e-visioner-tooltip-badge-height: ${badgeHeight}px; --pf2e-visioner-tooltip-badge-radius: ${borderRadius}px;">
       <i class="${iconClass}"></i>
     </span>`;
@@ -810,34 +845,68 @@ function addVisibilityIndicator(
 
 function ensureBadgeTicker() {
   if (HoverTooltips.badgeTicker) return;
+
+  // Invalidate canvas rect cache when ticker starts (viewport may have changed)
+  HoverTooltips._canvasRectInvalidated = true;
+
+  // Track canvas transform to detect when movement stops
+  let lastTransform = null;
+  let framesStatic = 0;
+  const STATIC_THRESHOLD = 3; // Stop ticker after 3 frames of no movement
+
   HoverTooltips.badgeTicker = () => {
     try {
+      // Check if canvas transform has changed
+      const currentTransform = `${canvas.stage.pivot.x},${canvas.stage.pivot.y},${canvas.stage.scale.x}`;
+
+      if (currentTransform === lastTransform) {
+        framesStatic++;
+
+        // If canvas hasn't moved for several frames, stop ticker to save CPU
+        if (framesStatic > STATIC_THRESHOLD) {
+          // Do one final update then pause
+          updateBadgePositions();
+
+          // Remove ticker - will be re-added on next pan/zoom
+          canvas.app?.ticker?.remove?.(HoverTooltips.badgeTicker);
+          HoverTooltips.badgeTicker = null;
+          return;
+        }
+      } else {
+        framesStatic = 0;
+        lastTransform = currentTransform;
+        HoverTooltips._canvasRectInvalidated = true; // Viewport changed
+      }
+
       updateBadgePositions();
     } catch (_) { }
   };
+
   try {
     canvas.app.ticker.add(HoverTooltips.badgeTicker);
   } catch (_) { }
 }
 
 function updateBadgePositions() {
-  const canvasRect = canvas.app.view.getBoundingClientRect();
-  let sizeConfig;
-  try {
-    const raw = game.settings?.get?.(MODULE_ID, 'tooltipFontSize');
-    sizeConfig = computeSizesFromSetting(raw ?? HoverTooltips.tooltipFontSize);
-  } catch (_) {
-    sizeConfig = {
-      fontPx: tooltipFontSize,
-      iconPx: tooltipIconSize,
-      borderPx: 3,
-    };
+  // Cache getBoundingClientRect to avoid layout thrashing (expensive DOM query)
+  if (!HoverTooltips._canvasRectCache || HoverTooltips._canvasRectInvalidated) {
+    HoverTooltips._canvasRectCache = canvas.app.view.getBoundingClientRect();
+    HoverTooltips._canvasRectInvalidated = false;
   }
-  const badgeWidth = Math.round(sizeConfig.iconPx + sizeConfig.borderPx * 2 + 8);
-  const badgeHeight = Math.round(sizeConfig.iconPx + sizeConfig.borderPx * 2 + 6);
-  const spacing = Math.max(6, Math.round(sizeConfig.iconPx / 2));
-  const hudActive = !!game.modules?.get?.('pf2e-hud')?.active;
-  const verticalOffset = hudActive ? 26 : -6;
+  const canvasRect = HoverTooltips._canvasRectCache;
+
+  // Use cached sizes instead of reading from settings every frame
+  const iconPx = HoverTooltips.tooltipIconSize;
+  const borderPx = 3; // Fixed border width
+  const badgeWidth = Math.round(iconPx + borderPx * 2 + 8);
+  const badgeHeight = Math.round(iconPx + borderPx * 2 + 6);
+  const spacing = Math.max(6, Math.round(iconPx / 2));
+
+  // Cache HUD active check (checking modules is expensive)
+  if (HoverTooltips._hudActiveCache === undefined) {
+    HoverTooltips._hudActiveCache = !!game.modules?.get?.('pf2e-hud')?.active;
+  }
+  const verticalOffset = HoverTooltips._hudActiveCache ? 26 : -6;
 
   HoverTooltips.visibilityIndicators.forEach((indicator) => {
     if (!indicator || (!indicator._visBadgeEl && !indicator._coverBadgeEl)) return;
@@ -848,14 +917,12 @@ function updateBadgePositions() {
     if (indicator._visBadgeEl && indicator._coverBadgeEl) {
       const visLeft = centerX - spacing / 2 - badgeWidth;
       const coverLeft = centerX + spacing / 2;
-      indicator._visBadgeEl.style.left = `${Math.round(visLeft)}px`;
-      indicator._visBadgeEl.style.top = `${Math.round(centerY)}px`;
-      indicator._coverBadgeEl.style.left = `${Math.round(coverLeft)}px`;
-      indicator._coverBadgeEl.style.top = `${Math.round(centerY)}px`;
+      // Use transform for GPU acceleration instead of left/top
+      indicator._visBadgeEl.style.transform = `translate(${Math.round(visLeft)}px, ${Math.round(centerY)}px)`;
+      indicator._coverBadgeEl.style.transform = `translate(${Math.round(coverLeft)}px, ${Math.round(centerY)}px)`;
     } else if (indicator._visBadgeEl) {
       const visLeft = centerX - badgeWidth / 2;
-      indicator._visBadgeEl.style.left = `${Math.round(visLeft)}px`;
-      indicator._visBadgeEl.style.top = `${Math.round(centerY)}px`;
+      indicator._visBadgeEl.style.transform = `translate(${Math.round(visLeft)}px, ${Math.round(centerY)}px)`;
     }
   });
 
@@ -866,8 +933,7 @@ function updateBadgePositions() {
     const centerX = canvasRect.left + globalPoint.x;
     const centerY = canvasRect.top + globalPoint.y - badgeHeight / 2 + verticalOffset;
     const left = centerX - badgeWidth / 2;
-    indicator._coverBadgeEl.style.left = `${Math.round(left)}px`;
-    indicator._coverBadgeEl.style.top = `${Math.round(centerY)}px`;
+    indicator._coverBadgeEl.style.transform = `translate(${Math.round(left)}px, ${Math.round(centerY)}px)`;
   });
 }
 
@@ -913,8 +979,10 @@ function addCoverIndicator(targetToken, observerToken, coverState) {
   el.style.position = 'fixed';
   el.style.pointerEvents = 'none';
   el.style.zIndex = '60';
-  el.style.left = `${Math.round(centerX - badgeWidth / 2)}px`;
-  el.style.top = `${Math.round(centerY)}px`;
+  el.style.left = '0';
+  el.style.top = '0';
+  el.style.transform = `translate(${Math.round(centerX - badgeWidth / 2)}px, ${Math.round(centerY)}px)`;
+  el.style.willChange = 'transform';
   const colorblindMode = game.settings.get(MODULE_ID, 'colorblindMode');
   const colorblindmodeMap = {
     protanopia: {
@@ -987,35 +1055,18 @@ function hideAllVisibilityIndicators() {
         }
         delete indicator._tooltipAnchor;
       }
-      // Clean up cover badge element if present
-      if (indicator._coverBadgeEl) {
-        try {
-          if (indicator._coverBadgeEl.parentNode)
-            indicator._coverBadgeEl.parentNode.removeChild(indicator._coverBadgeEl);
-        } catch (_) { }
-        delete indicator._coverBadgeEl;
-      }
 
-      // Remove from parent
+      // Remove from parent before destroying
       if (indicator.parent) {
         indicator.parent.removeChild(indicator);
       }
 
-      // Destroy the indicator
-      indicator.destroy({ children: true, texture: true, baseTexture: true });
+      // Destroy the indicator - simplified flags to reduce overhead
+      // Don't need to destroy textures/baseTextures for containers without graphics
+      indicator.destroy({ children: false });
     } catch (e) {
       console.warn('PF2E Visioner: Error cleaning up indicator', e);
     }
-  });
-
-  // Also clean up DOM-based visibility badges
-  HoverTooltips.visibilityIndicators.forEach((indicator) => {
-    try {
-      if (indicator._visBadgeEl && indicator._visBadgeEl.parentNode) {
-        indicator._visBadgeEl.parentNode.removeChild(indicator._visBadgeEl);
-      }
-      delete indicator._visBadgeEl;
-    } catch (_) { }
   });
 
   // Clear the map
@@ -1029,6 +1080,9 @@ function hideAllVisibilityIndicators() {
     if (HoverTooltips.badgeTicker) {
       canvas.app?.ticker?.remove?.(HoverTooltips.badgeTicker);
       HoverTooltips.badgeTicker = null;
+      // Invalidate canvas rect cache when ticker stops
+      delete HoverTooltips._canvasRectCache;
+      HoverTooltips._canvasRectInvalidated = true;
     }
   } catch (_) { }
 }
@@ -1053,7 +1107,8 @@ function hideAllCoverIndicators() {
         delete indicator._tooltipAnchor;
       }
       if (indicator.parent) indicator.parent.removeChild(indicator);
-      indicator.destroy({ children: true, texture: true, baseTexture: true });
+      // Simplified destroy - no textures to clean up
+      indicator.destroy({ children: false });
     } catch (_) { }
   });
   HoverTooltips.coverIndicators.clear();
@@ -1066,6 +1121,9 @@ function hideAllCoverIndicators() {
     ) {
       canvas.app?.ticker?.remove?.(HoverTooltips.badgeTicker);
       HoverTooltips.badgeTicker = null;
+      // Invalidate canvas rect cache when ticker stops
+      delete HoverTooltips._canvasRectCache;
+      HoverTooltips._canvasRectInvalidated = true;
     }
   } catch (_) { }
 }

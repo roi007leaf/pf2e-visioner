@@ -836,7 +836,7 @@ global.createMockToken = (data = {}) => {
       x: x * gridSize + (width * gridSize) / 2,
       y: y * gridSize + (height * gridSize) / 2,
     },
-    getCenter: jest.fn(
+    getCenterPoint: jest.fn(
       () =>
         data.center || {
           x: x * gridSize + (width * gridSize) / 2,
@@ -950,30 +950,32 @@ beforeEach(() => {
   // global.game.settings.register?.mockClear?.();
 
   // Reset canvas state - ensure tokens object exists first
-  if (!global.canvas.tokens) {
-    global.canvas.tokens = {
-      controlled: [],
-      placeables: [],
-      get: jest.fn((id) => {
+  if (global.canvas) {
+    if (!global.canvas.tokens) {
+      global.canvas.tokens = {
+        controlled: [],
+        placeables: [],
+        get: jest.fn((id) => {
+          try {
+            return global.canvas.tokens.placeables.find((t) => t.id === id) || null;
+          } catch {
+            return null;
+          }
+        }),
+        addChild: jest.fn(),
+        removeChild: jest.fn(),
+      };
+    } else {
+      global.canvas.tokens.controlled = [];
+      global.canvas.tokens.placeables = [];
+      global.canvas.tokens.get = jest.fn((id) => {
         try {
           return global.canvas.tokens.placeables.find((t) => t.id === id) || null;
         } catch {
           return null;
         }
-      }),
-      addChild: jest.fn(),
-      removeChild: jest.fn(),
-    };
-  } else {
-    global.canvas.tokens.controlled = [];
-    global.canvas.tokens.placeables = [];
-    global.canvas.tokens.get = jest.fn((id) => {
-      try {
-        return global.canvas.tokens.placeables.find((t) => t.id === id) || null;
-      } catch {
-        return null;
-      }
-    });
+      });
+    }
   }
 
   // Ensure these properties exist before trying to set them

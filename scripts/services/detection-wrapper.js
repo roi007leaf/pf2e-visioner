@@ -64,7 +64,7 @@ export class DetectionWrapper {
 export function initializeDetectionWrapper() {
   try {
     (DetectionWrapper._instance ||= new DetectionWrapper()).register();
-  } catch (_) { }
+  } catch (_) {}
 }
 
 /**
@@ -123,7 +123,7 @@ function canDetectWrapper(threshold) {
           return false;
         }
       }
-    } catch (_) { }
+    } catch (_) {}
 
     // Check our module's visibility settings
     const origin = visionSource.object;

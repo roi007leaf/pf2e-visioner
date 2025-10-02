@@ -41,7 +41,7 @@ function makeToken({ id, gx, gy, elevationFt = 0, heightFt = null, sizeSquares =
       type: 'character',
       system: { traits: { size: { value: sizeSquares >= 2 ? 'lg' : 'med' } } },
     },
-    getCenter: jest.fn(() => ({
+    getCenterPoint: jest.fn(() => ({
       x: x + (width * canvas.grid.size) / 2,
       y: y + (height * canvas.grid.size) / 2,
     })),

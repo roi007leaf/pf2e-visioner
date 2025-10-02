@@ -41,14 +41,17 @@ export class VisionerTokenManager extends foundry.applications.api.ApplicationV2
       toggleIgnoreWalls: toggleIgnoreWalls,
       toggleHideFoundryHidden: toggleHideFoundryHidden,
       toggleTab: VisionerTokenManager.toggleTab,
+      bulkPCAvs: VisionerTokenManager.bulkSetVisibilityState,
       bulkPCHidden: VisionerTokenManager.bulkSetVisibilityState,
       bulkPCUndetected: VisionerTokenManager.bulkSetVisibilityState,
       bulkPCConcealed: VisionerTokenManager.bulkSetVisibilityState,
       bulkPCObserved: VisionerTokenManager.bulkSetVisibilityState,
+      bulkNPCAvs: VisionerTokenManager.bulkSetVisibilityState,
       bulkNPCHidden: VisionerTokenManager.bulkSetVisibilityState,
       bulkNPCUndetected: VisionerTokenManager.bulkSetVisibilityState,
       bulkNPCConcealed: VisionerTokenManager.bulkSetVisibilityState,
       bulkNPCObserved: VisionerTokenManager.bulkSetVisibilityState,
+      bulkLootAvs: VisionerTokenManager.bulkSetVisibilityState,
       bulkLootObserved: VisionerTokenManager.bulkSetVisibilityState,
       bulkLootHidden: VisionerTokenManager.bulkSetVisibilityState,
       bulkWallsObserved: VisionerTokenManager.bulkSetVisibilityState,
@@ -110,7 +113,7 @@ export class VisionerTokenManager extends foundry.applications.api.ApplicationV2
   static {
     try {
       bindTokenManagerActions(VisionerTokenManager);
-    } catch (_) { }
+    } catch (_) {}
   }
 
   /**
@@ -143,8 +146,11 @@ export class VisionerTokenManager extends foundry.applications.api.ApplicationV2
     this._updateTokenHook = Hooks.on('updateToken', (tokenDoc, changes) => {
       if (this.rendered && this.observer) {
         // Check if the observer token moved or if any relevant token moved
-        if (tokenDoc.id === this.observer.id ||
-          (changes.x !== undefined || changes.y !== undefined)) {
+        if (
+          tokenDoc.id === this.observer.id ||
+          changes.x !== undefined ||
+          changes.y !== undefined
+        ) {
           // Small delay to allow AVS to process the movement
           setTimeout(() => {
             if (this.rendered) {
@@ -328,20 +334,20 @@ export class VisionerTokenManager extends foundry.applications.api.ApplicationV2
           this.setPosition({ width: minWidth });
         }
       }
-    } catch (_) { }
+    } catch (_) {}
     // No row→token hover anymore (to avoid conflict with canvas→row). Keep icon handlers.
     // Provided by managers/token-manager/actions.js via bindTokenManagerActions
     // Setup canvas selection → row highlighting and canvas hover → row
     try {
       // Bind per-row icon click handlers (visibility/cover selection)
       this.addIconClickHandlers?.();
-    } catch (_) { }
+    } catch (_) {}
     try {
       // Add token image click handlers for panning and selection
       this.addTokenImageClickHandlers?.();
-    } catch (_) { }
+    } catch (_) {}
     try {
-    } catch (_) { }
+    } catch (_) {}
     attachSelectionHandlers(this.constructor);
     attachCanvasHoverHandlers(this.constructor);
     applySelectionHighlight(this.constructor);
@@ -349,16 +355,18 @@ export class VisionerTokenManager extends foundry.applications.api.ApplicationV2
     // Setup apply button animation for form changes
     try {
       attachApplyButtonAnimation(this);
-    } catch (_) { }
+    } catch (_) {}
 
     // Apply visual filter for Foundry-hidden tokens based on toggle
     try {
-      const hide = this.hideFoundryHidden ?? game.settings.get(MODULE_ID, 'hideFoundryHiddenTokens');
-      const rows = this.element?.querySelectorAll?.('tr.token-row[data-foundry-hidden="true"]') || [];
+      const hide =
+        this.hideFoundryHidden ?? game.settings.get(MODULE_ID, 'hideFoundryHiddenTokens');
+      const rows =
+        this.element?.querySelectorAll?.('tr.token-row[data-foundry-hidden="true"]') || [];
       rows.forEach((r) => {
         r.style.display = hide ? 'none' : '';
       });
-    } catch (_) { }
+    } catch (_) {}
   }
 
   /**
@@ -379,7 +387,7 @@ export class VisionerTokenManager extends foundry.applications.api.ApplicationV2
           .querySelectorAll('tr.token-row.row-hover')
           ?.forEach((el) => el.classList.remove('row-hover'));
       }
-    } catch (_) { }
+    } catch (_) {}
 
     // Clear the current instance reference
     if (VisionerTokenManager.currentInstance === this) {

@@ -35,6 +35,11 @@ export class VisibilityOverrideManager {
    * @param {string} source - Source of the override (e.g., 'manual_action', 'sneak', 'dialog')
    */
   setVisibilityOverride(observer, target, visibilityState, durationMinutes = 5, source = 'manual') {
+    // Filter out 'avs' visibility state
+    if (visibilityState === 'avs') {
+      return;
+    }
+
     const key = this._generateKey(observer, target);
     const expiryTime = Date.now() + (durationMinutes * 60 * 1000);
 

@@ -166,7 +166,9 @@
         box-shadow: 0 2px 8px rgba(255, 152, 0, 0.4);
       }
       100% {
-        box-shadow: 0 2px 8px rgba(255, 152, 0, 0.4), 0 0 20px rgba(255, 152, 0, 0.3);
+        box-shadow:
+          0 2px 8px rgba(255, 152, 0, 0.4),
+          0 0 20px rgba(255, 152, 0, 0.3);
       }
     }
 
@@ -343,7 +345,9 @@
         box-shadow: 0 2px 8px rgba(133, 56, 178, 0.3);
       }
       100% {
-        box-shadow: 0 2px 8px rgba(133, 56, 178, 0.3), 0 0 25px rgba(133, 56, 178, 0.4);
+        box-shadow:
+          0 2px 8px rgba(133, 56, 178, 0.3),
+          0 0 25px rgba(133, 56, 178, 0.4);
       }
     }
 
@@ -396,7 +400,9 @@
         box-shadow: 0 2px 8px rgba(5, 150, 105, 0.3);
       }
       100% {
-        box-shadow: 0 2px 8px rgba(5, 150, 105, 0.3), 0 0 25px rgba(5, 150, 105, 0.4);
+        box-shadow:
+          0 2px 8px rgba(5, 150, 105, 0.3),
+          0 0 25px rgba(5, 150, 105, 0.4);
       }
     }
 
@@ -637,9 +643,11 @@
     padding: 8px 12px;
     border-radius: 999px;
     border: 1px solid color-mix(in srgb, var(--pf2e-visioner-info) 55%, transparent);
-    background: linear-gradient(180deg,
+    background: linear-gradient(
+      180deg,
       color-mix(in srgb, var(--pf2e-visioner-info) 18%, transparent) 0%,
-      color-mix(in srgb, var(--pf2e-visioner-info) 12%, transparent) 100%);
+      color-mix(in srgb, var(--pf2e-visioner-info) 12%, transparent) 100%
+    );
     color: var(--color-text-light-primary);
     cursor: pointer;
     font-size: 12px;
@@ -647,7 +655,9 @@
     line-height: 1;
     transition: all 0.2s ease;
     text-decoration: none;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    box-shadow:
+      0 1px 3px rgba(0, 0, 0, 0.18),
+      inset 0 1px 0 rgba(255, 255, 255, 0.06);
   }
 
   .seek-preview-dialog .senses-button:hover {
@@ -882,12 +892,17 @@
   gap: 8px;
 }
 .pf2e-visioner .override-validation-dialog .override-validation-modern .chip .chip-avatar {
-  width: 28px;
-  height: 28px;
-  /* border-radius intentionally omitted to defer to cell-specific avatar rules */
-  object-fit: cover;
+  width: 48px !important;
+  height: 48px !important;
+  border-radius: 4px !important;
+  object-fit: cover !important;
+  object-position: top !important;
   flex-shrink: 0;
+  border: 1px solid rgba(255, 255, 255, 0.3) !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3) !important;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease !important;
 }
+
 .pf2e-visioner.override-validation-dialog .override-validation-modern .tables-scroll-container,
 .pf2e-visioner .override-validation-dialog .override-validation-modern .tables-scroll-container {
   flex: 1 1 0%;
@@ -1136,7 +1151,16 @@
 .pf2e-visioner .override-validation-dialog td.observer img.chip-avatar,
 .pf2e-visioner .override-validation-dialog td.target img.chip-avatar {
   cursor: pointer !important;
+  width: 48px !important;
+  height: 48px !important;
+  border-radius: 4px !important;
+  object-fit: cover !important;
+  object-position: top !important;
+  border: 1px solid rgba(255, 255, 255, 0.3) !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3) !important;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease !important;
 }
+
 .pf2e-visioner .override-validation-dialog .chip-avatar {
   width: 16px;
   height: 16px;
@@ -1261,7 +1285,6 @@
 }
 .pf2e-visioner .override-validation-dialog .btn.btn-keep-all {
   border-color: rgba(244, 67, 54, 0.35);
-
 }
 
 /* Responsive */
@@ -1448,12 +1471,16 @@
 .override-validation-dialog td.observer img.chip-avatar {
   width: 48px !important;
   height: 48px !important;
-  border-radius: 50%;
-  object-fit: cover;
+  border-radius: 4px !important;
+  object-fit: cover !important;
+  object-position: top !important;
   display: inline-block;
   cursor: pointer;
-  object-position: top;
+  border: 1px solid rgba(255, 255, 255, 0.3) !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3) !important;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease !important;
 }
+
 /* Safety net in case class is missing */
 .override-validation-dialog td.observer img {
   max-width: 48px;
@@ -1471,8 +1498,9 @@
 .override-validation-dialog td.target img.chip-avatar {
   width: 48px !important;
   height: 48px !important;
-  border-radius: 50%;
-  object-fit: cover;
+  border-radius: 4px !important;
+  object-fit: cover !important;
+  object-position: top !important;
   display: inline-block;
   cursor: pointer;
   object-position: top;
@@ -1617,7 +1645,6 @@
   display: flex;
   align-items: center;
   gap: 4px;
-  font-size: 10px;
   color: var(--color-text-dark-secondary);
   display: inline-flex;
 }
@@ -2011,6 +2038,13 @@
 }
 
 /* Selected state styling for each visibility state */
+.consequences-preview-dialog .override-icons .state-icon[data-state='avs'].selected {
+  background: var(--visibility-avs-bg-strong);
+  border: 2px solid var(--visibility-avs);
+  box-shadow: 0 0 8px var(--visibility-avs);
+  transform: scale(1.1);
+}
+
 .consequences-preview-dialog .override-icons .state-icon[data-state='observed'].selected {
   background: var(--visibility-observed-bg-strong);
   border: 2px solid var(--visibility-observed);
@@ -2040,6 +2074,18 @@
 }
 
 /* Selected dot indicator for each visibility state */
+.consequences-preview-dialog .override-icons .state-icon[data-state='avs'].selected::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  width: 8px;
+  height: 8px;
+  background-color: var(--visibility-avs);
+  border-radius: 50%;
+  border: 1px solid var(--color-text-light-primary);
+}
+
 .consequences-preview-dialog .override-icons .state-icon[data-state='observed'].selected::after {
   content: '';
   position: absolute;
@@ -2240,13 +2286,23 @@
 }
 
 @keyframes pulse-purple {
-  0% { box-shadow: 0 2px 6px rgba(142, 36, 170, 0.4); }
-  100% { box-shadow: 0 2px 6px rgba(142, 36, 170, 0.7), 0 0 20px rgba(142, 36, 170, 0.3); }
+  0% {
+    box-shadow: 0 2px 6px rgba(142, 36, 170, 0.4);
+  }
+  100% {
+    box-shadow:
+      0 2px 6px rgba(142, 36, 170, 0.7),
+      0 0 20px rgba(142, 36, 170, 0.3);
+  }
 }
 
 @keyframes highlight-pending {
-  0% { background: rgba(142, 36, 170, 0.1); }
-  100% { background: rgba(142, 36, 170, 0.2); }
+  0% {
+    background: rgba(142, 36, 170, 0.1);
+  }
+  100% {
+    background: rgba(142, 36, 170, 0.2);
+  }
 }
 
 /* Bulk Override Bar */
@@ -2745,7 +2801,6 @@
     min-width: 28px;
     height: 28px;
     padding: 4px;
-    font-size: 12px;
   }
 
   .wall-type-select {

@@ -180,7 +180,14 @@
             </td>
             <td class="visibility-change">
               <div class="visibility-change-with-override">
-                {{{visibilityIcon outcome.oldVisibility}}}
+                <span class="old-visibility-state {{#if outcome.isOldStateAvsControlled}}avs-controlled{{/if}}">
+                  {{{visibilityIcon outcome.oldVisibility}}}
+                  {{#if outcome.isOldStateAvsControlled}}
+                    <span class="avs-tag-small" data-tooltip="Controlled by Auto-Visibility System">
+                      <i class="fas fa-bolt"></i>
+                    </span>
+                  {{/if}}
+                </span>
                 <i class="fas fa-arrow-right position-arrow" aria-hidden="true"></i>
                 <div class="override-icons" data-target="{{#unless outcome._isWall}}{{outcome.target.id}}{{/unless}}" data-wall-id="{{#if outcome._isWall}}{{outcome.wallId}}{{/if}}">
                   {{#each outcome.availableStates as |state|}}

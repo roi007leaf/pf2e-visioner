@@ -118,6 +118,21 @@ export class LightingEventHandler {
      */
     handleLightingRefresh() {
         if (!this.systemState.shouldProcessEvents()) return;
+
+        // CRITICAL: Check if we're currently in a token control operation
+        // If so, ignore this refresh to prevent unnecessary AVS processing
+        if (globalThis.game?.pf2eVisioner?.suppressLightingRefresh) {
+            this.systemState.debug?.('LightingEventHandler: suppressing lightingRefresh during token operation');
+            return;
+        }
+
+        // CRITICAL: Check if this lighting refresh was triggered by token selection
+        // If so, ignore it to prevent unnecessary AVS processing
+        if (this.#isLightingRefreshFromTokenSelection()) {
+            this.systemState.debug?.('LightingEventHandler: ignoring lightingRefresh from token selection');
+            return;
+        }
+
         // If Scene Config is open, these refreshes are likely live previews; defer until close
         if (this.systemState.isSceneConfigOpen?.()) {
             this.systemState.markPendingLightingChange?.();
@@ -128,5 +143,36 @@ export class LightingEventHandler {
             this.cacheManager?.clearAllCaches?.();
         } catch { /* best-effort */ }
         this.visibilityState.markAllTokensChangedThrottled();
+    }
+
+    /**
+     * Check if a lighting refresh event was likely triggered by token selection
+     * @returns {boolean} True if this refresh should be ignored
+     */
+    #isLightingRefreshFromTokenSelection() {
+        try {
+            // Get the current time
+            const now = Date.now();
+
+            // Check if there was a recent controlToken event (within last 100ms)
+            const lastControlEvent = this.constructor._lastControlTokenTime || 0;
+            const timeSinceControl = now - lastControlEvent;
+
+            // If a controlToken happened very recently, this lighting refresh is likely from that
+            if (timeSinceControl < 100) {
+                return true;
+            }
+
+            return false;
+        } catch {
+            return false;
+        }
+    }
+
+    /**
+     * Track when controlToken events occur
+     */
+    static trackControlTokenEvent() {
+        LightingEventHandler._lastControlTokenTime = Date.now();
     }
 }

@@ -5,6 +5,7 @@
 
 import { MODULE_ID, MODULE_TITLE, REACTIONS } from '../../constants.js';
 import { getVisibilityBetween } from '../../utils.js';
+import { SeekDialogAdapter } from '../../visibility/auto-visibility/SeekDialogAdapter.js';
 import { getDesiredOverrideStatesForAction } from '../services/data/action-state-config.js';
 import { notify } from '../services/infra/notifications.js';
 import {
@@ -85,6 +86,11 @@ export class SeekPreviewDialog extends BaseActionDialog {
       this.hideFoundryHidden = true;
     }
 
+    // Ensure filterByDetection is properly initialized (fallback if BaseActionDialog didn't set it)
+    if (typeof this.filterByDetection === 'undefined') {
+      this.filterByDetection = false; // Conservative default
+    }
+
     // Set global reference
     _currentSeekDialogInstance = this;
   }
@@ -151,22 +157,35 @@ export class SeekPreviewDialog extends BaseActionDialog {
     }
 
     // Apply LOS filtering only when NOT using template mode OR range limitation (both define affected area/range)
-    const isTemplateMode = !!(this.actionData.seekTemplateCenter && this.actionData.seekTemplateRadiusFeet);
+    const isTemplateMode = !!(
+      this.actionData.seekTemplateCenter && this.actionData.seekTemplateRadiusFeet
+    );
     const skipLOSFiltering = isTemplateMode || isRangeLimited;
 
     if (this.actorToken && !skipLOSFiltering) {
       try {
         const { filterOutcomesByDetection } = await import('../services/infra/shared-utils.js');
-        // Always filter walls by detection (true), filter tokens by detection only if checkbox enabled (this.filterByDetection)
-        filteredOutcomes = await filterOutcomesByDetection(filteredOutcomes, this.actorToken, 'target', true, this.filterByDetection, 'observer_to_target');
-      } catch { /* LOS filtering is non-critical */ }
+        // Always filter walls by viewport (true), filter tokens by viewport only if checkbox enabled (this.filterByDetection)
+        filteredOutcomes = await filterOutcomesByDetection(
+          filteredOutcomes,
+          this.actorToken,
+          'target',
+          true,
+          this.filterByDetection,
+          'observer_to_target',
+        );
+      } catch {
+        /* Viewport filtering is non-critical */
+      }
     }
 
     // Apply defeated token filtering (exclude dead/unconscious tokens)
     try {
       const { filterOutcomesByDefeated } = await import('../services/infra/shared-utils.js');
       filteredOutcomes = filterOutcomesByDefeated(filteredOutcomes, 'target');
-    } catch { /* Defeated filtering is non-critical */ }
+    } catch {
+      /* Defeated filtering is non-critical */
+    }
 
     // Prepare visibility states using centralized config
     const cfg = (s) => this.visibilityConfig(s);
@@ -262,9 +281,20 @@ export class SeekPreviewDialog extends BaseActionDialog {
         // Prefer the recorded oldVisibility as the baseline; fall back to current live mapping
         const baseOldState =
           outcome.oldVisibility != null ? outcome.oldVisibility : currentVisibility;
-        // Actionable if original differs from new or override
-        const hasActionableChange =
-          baseOldState != null && effectiveNewState != null && effectiveNewState !== baseOldState;
+
+        // Check if the old visibility state is AVS-controlled
+        const isOldStateAvsControlled = this.isOldStateAvsControlled(outcome);
+
+        // Special case: If current state is AVS-controlled and override is 'avs', no change
+        let hasActionableChange = false;
+        if (outcome.overrideState === 'avs' && this.isCurrentStateAvsControlled(outcome)) {
+          hasActionableChange = false;
+        } else {
+          const statesMatch = effectiveNewState === baseOldState;
+          hasActionableChange =
+            (baseOldState != null && effectiveNewState != null && !statesMatch) ||
+            (statesMatch && isOldStateAvsControlled);
+        }
 
         return {
           ...outcome,
@@ -280,6 +310,7 @@ export class SeekPreviewDialog extends BaseActionDialog {
           overrideState: outcome.overrideState || outcome.newVisibility,
           hasActionableChange,
           noProficiency: !!outcome.noProficiency,
+          isOldStateAvsControlled,
         };
       }),
     );
@@ -316,135 +347,16 @@ export class SeekPreviewDialog extends BaseActionDialog {
     let allSenses = [];
     try {
       const { VisionAnalyzer } = await import('../../visibility/auto-visibility/VisionAnalyzer.js');
-      const { SPECIAL_SENSES } = await import('../../constants.js');
       const visionAnalyzer = VisionAnalyzer.getInstance();
-      const sensingSummary = visionAnalyzer.getSensingSummary(this.actorToken);
-      const caps = visionAnalyzer.getVisionCapabilities(this.actorToken);
+      const adapter = new SeekDialogAdapter(visionAnalyzer);
 
-      const isVisualType = (t) => {
-        const tt = String(t || '').toLowerCase();
-        return (
-          tt === 'vision' ||
-          tt === 'sight' ||
-          tt === 'darkvision' ||
-          tt === 'greater-darkvision' ||
-          tt === 'greaterdarkvision' ||
-          tt === 'low-light-vision' ||
-          tt === 'lowlightvision' ||
-          tt === 'see-invisibility' ||
-          tt === 'truesight' ||
-          tt.includes('vision') ||
-          tt.includes('sight') ||
-          tt.includes('invisibility')
-        );
-      };
-
-      // Add precise senses
-      for (const sense of sensingSummary.precise || []) {
-        const senseConfig = SPECIAL_SENSES[sense.type] || {
-          label: `PF2E_VISIONER.SENSES.${sense.type.toUpperCase()}`,
-          icon: 'fas fa-eye',
-          description: `PF2E_VISIONER.SENSES.${sense.type.toUpperCase()}_DESC`
-        };
-
-        allSenses.push({
-          type: sense.type,
-          range: sense.range,
-          isPrecise: true,
-          config: senseConfig,
-        });
-      }
-
-      // Ensure plain vision is represented as a precise sense if the actor can see (not when blinded)
-      try {
-        if (caps?.hasVision && !caps?.isBlinded) {
-          // Only add if not already present
-          if (!allSenses.some((s) => s.type === 'vision')) {
-            const { SPECIAL_SENSES } = await import('../../constants.js');
-            const senseConfig = SPECIAL_SENSES['vision'] || {
-              label: 'PF2E_VISIONER.SPECIAL_SENSES.vision',
-              icon: 'fas fa-eye',
-              description: 'PF2E_VISIONER.SPECIAL_SENSES.vision_description',
-            };
-            allSenses.push({ type: 'vision', range: Infinity, isPrecise: true, config: senseConfig });
-          }
-        }
-      } catch { }
-
-      // Add imprecise senses
-      for (const sense of sensingSummary.imprecise || []) {
-        const senseConfig = SPECIAL_SENSES[sense.type] || {
-          label: `PF2E_VISIONER.SENSES.${sense.type.toUpperCase()}`,
-          icon: 'fas fa-wave-square',
-          description: `PF2E_VISIONER.SENSES.${sense.type.toUpperCase()}_DESC`
-        };
-
-        allSenses.push({
-          type: sense.type,
-          range: sense.range,
-          isPrecise: false,
-          config: senseConfig,
-        });
-      }
-
-      // Add hearing if present (use SPECIAL_SENSES.hearing when available)
-      if (sensingSummary.hearing) {
-        const hearingConfig = SPECIAL_SENSES.hearing || {
-          label: 'PF2E_VISIONER.SPECIAL_SENSES.hearing',
-          icon: 'fas fa-volume-up',
-          description: 'PF2E_VISIONER.SPECIAL_SENSES.hearing_description',
-        };
-
-        allSenses.push({
-          type: 'hearing',
-          range: sensingSummary.hearing.range,
-          isPrecise: sensingSummary.hearing.acuity === 'precise',
-          config: hearingConfig,
-        });
-      }
-
-      // Add echolocation if active (special handling)
-      if (sensingSummary.echolocationActive) {
-        const echolocationConfig = SPECIAL_SENSES.echolocation || {
-          label: 'PF2E_VISIONER.SENSES.ECHOLOCATION',
-          icon: 'fas fa-broadcast-tower',
-          description: 'PF2E_VISIONER.SENSES.ECHOLOCATION_DESC'
-        };
-
-        // Check if already added from precise/imprecise arrays
-        const existingEcho = allSenses.find(s => s.type === 'echolocation');
-        if (!existingEcho) {
-          allSenses.push({
-            type: 'echolocation',
-            range: sensingSummary.echolocationRange,
-            isPrecise: true, // Echolocation is typically precise
-            config: echolocationConfig,
-          });
-        }
-      }
-
-      // If blinded, filter out visual senses entirely from the list
-      try {
-        if (caps?.isBlinded) {
-          allSenses = allSenses.filter((s) => !isVisualType(s.type));
-        }
-      } catch { }
-
-      // Normalize displayRange for template (Infinity → ∞)
-      for (const s of allSenses) {
-        try {
-          s.displayRange = (s.range === Infinity || s.range === 'Infinity') ? '∞' : `${s.range}`;
-        } catch { }
-      }
-
-      // Sort senses: precise first, then by type name
-      allSenses.sort((a, b) => {
-        if (a.isPrecise !== b.isPrecise) {
-          return a.isPrecise ? -1 : 1; // Precise senses first
-        }
-        return a.type.localeCompare(b.type);
+      allSenses = await adapter.getAllSensesForDisplay(this.actorToken, {
+        includeVision: true,
+        includeHearing: true,
+        includeEcholocation: true,
+        filterVisualIfBlinded: true,
+        usedSenseType: null,
       });
-
     } catch (error) {
       console.warn('PF2e Visioner | Error getting sensing summary:', error);
     }
@@ -457,16 +369,22 @@ export class SeekPreviewDialog extends BaseActionDialog {
       // Build stats of used senses across outcomes, tracking precision
       const usedStats = new Map(); // type -> { total: number, precise: number, imprecise: number }
       // Prefer original, unfiltered outcomes so used-sense indicator isn't affected by UI filters
-      const usedSource = Array.isArray(this._originalOutcomes) && this._originalOutcomes.length
-        ? this._originalOutcomes
-        : processedOutcomes || [];
+      const usedSource =
+        Array.isArray(this._originalOutcomes) && this._originalOutcomes.length
+          ? this._originalOutcomes
+          : processedOutcomes || [];
 
       for (const o of usedSource) {
-        const t = typeof o?.usedSenseType === 'string' && o.usedSenseType ? String(o.usedSenseType) : null;
-        const p = typeof o?.usedSensePrecision === 'string' ? String(o.usedSensePrecision).toLowerCase() : null;
-        const legacyImpreciseType = o?.usedImprecise && typeof o?.usedImpreciseSenseType === 'string'
-          ? String(o.usedImpreciseSenseType)
-          : null;
+        const t =
+          typeof o?.usedSenseType === 'string' && o.usedSenseType ? String(o.usedSenseType) : null;
+        const p =
+          typeof o?.usedSensePrecision === 'string'
+            ? String(o.usedSensePrecision).toLowerCase()
+            : null;
+        const legacyImpreciseType =
+          o?.usedImprecise && typeof o?.usedImpreciseSenseType === 'string'
+            ? String(o.usedImpreciseSenseType)
+            : null;
 
         if (t) {
           if (!usedStats.has(t)) usedStats.set(t, { total: 0, precise: 0, imprecise: 0 });
@@ -477,7 +395,8 @@ export class SeekPreviewDialog extends BaseActionDialog {
         }
         // Back-compat: if legacy imprecise-only field is present, count it as imprecise
         if (legacyImpreciseType) {
-          if (!usedStats.has(legacyImpreciseType)) usedStats.set(legacyImpreciseType, { total: 0, precise: 0, imprecise: 0 });
+          if (!usedStats.has(legacyImpreciseType))
+            usedStats.set(legacyImpreciseType, { total: 0, precise: 0, imprecise: 0 });
           const stat = usedStats.get(legacyImpreciseType);
           stat.total += 1;
           stat.imprecise += 1;
@@ -514,7 +433,7 @@ export class SeekPreviewDialog extends BaseActionDialog {
 
         // Get sense range from allSenses array
         const getSenseRange = (senseType) => {
-          const senseData = allSenses?.find?.(s => s.type === senseType);
+          const senseData = allSenses?.find?.((s) => s.type === senseType);
           return senseData?.range ?? 0;
         };
 
@@ -530,15 +449,25 @@ export class SeekPreviewDialog extends BaseActionDialog {
             return {
               type,
               stats,
-              range: range === Infinity || range === 'Infinity' ? Infinity : (typeof range === 'number' ? range : 0),
+              range:
+                range === Infinity || range === 'Infinity'
+                  ? Infinity
+                  : typeof range === 'number'
+                    ? range
+                    : 0,
               isVision,
               hasPrecise,
               hasUnlimitedRange,
               // Calculate priority based on hierarchy
-              priority: isVision ? 1 :
-                (hasPrecise && hasUnlimitedRange) ? 2 :
-                  (hasPrecise && !hasUnlimitedRange) ? 3 :
-                    (!hasPrecise && hasUnlimitedRange) ? 4 : 5
+              priority: isVision
+                ? 1
+                : hasPrecise && hasUnlimitedRange
+                  ? 2
+                  : hasPrecise && !hasUnlimitedRange
+                    ? 3
+                    : !hasPrecise && hasUnlimitedRange
+                      ? 4
+                      : 5,
             };
           });
 
@@ -551,11 +480,13 @@ export class SeekPreviewDialog extends BaseActionDialog {
             }
 
             // Secondary sort: for same priority level, prefer higher range (further reaching senses)
-            if (a.priority === 3 && b.priority === 3) { // Both are precise limited range
+            if (a.priority === 3 && b.priority === 3) {
+              // Both are precise limited range
               if (a.range !== b.range) {
                 return b.range - a.range; // Higher range first
               }
-            } else if (a.priority === 5 && b.priority === 5) { // Both are imprecise limited range
+            } else if (a.priority === 5 && b.priority === 5) {
+              // Both are imprecise limited range
               if (a.range !== b.range) {
                 return b.range - a.range; // Higher range first
               }
@@ -622,7 +553,9 @@ export class SeekPreviewDialog extends BaseActionDialog {
     context.hideFoundryHidden = !!this.hideFoundryHidden;
 
     // Flags for template mode and range limitation to hide inappropriate filters
-    const templateMode = !!(this.actionData.seekTemplateCenter && this.actionData.seekTemplateRadiusFeet);
+    const templateMode = !!(
+      this.actionData.seekTemplateCenter && this.actionData.seekTemplateRadiusFeet
+    );
 
     // Check if range limitation is active (recompute for context)
     let rangeLimited = false;
@@ -807,8 +740,15 @@ export class SeekPreviewDialog extends BaseActionDialog {
       if (this.actorToken) {
         try {
           const { filterOutcomesByDetection } = await import('../services/infra/shared-utils.js');
-          // Always filter walls by detection (true), filter tokens by detection only if checkbox enabled (this.filterByDetection)
-          filtered = await filterOutcomesByDetection(filtered, this.actorToken, 'target', true, this.filterByDetection, 'observer_to_target');
+          // Always filter walls by viewport (true), filter tokens by viewport only if checkbox enabled (this.filterByDetection)
+          filtered = await filterOutcomesByDetection(
+            filtered,
+            this.actorToken,
+            'target',
+            true,
+            this.filterByDetection,
+            'observer_to_target',
+          );
         } catch { }
       }
       // Compute actionability and carry over any existing overrides from the currently displayed outcomes
@@ -836,8 +776,13 @@ export class SeekPreviewDialog extends BaseActionDialog {
           }
           const effectiveNewState = overrideState || o.newVisibility || currentVisibility;
           const baseOldState = o.oldVisibility || currentVisibility;
+
+          const isOldStateAvsControlled = this.isOldStateAvsControlled(o);
+          const statesMatch = effectiveNewState === baseOldState;
           const hasActionableChange =
-            baseOldState != null && effectiveNewState != null && effectiveNewState !== baseOldState;
+            (baseOldState != null && effectiveNewState != null && !statesMatch) ||
+            (statesMatch && isOldStateAvsControlled);
+
           return { ...o, overrideState, hasActionableChange };
         } catch {
           return { ...o };
@@ -915,13 +860,45 @@ export class SeekPreviewDialog extends BaseActionDialog {
     // Provide overrides map to services path
     const overrides = {};
     const wallOverrides = {};
+    const avsRemovals = [];
     for (const o of actionableOutcomes) {
       const state = o?.overrideState || o?.newVisibility;
       if (o?._isWall && o?.wallId) {
         if (state) wallOverrides[o.wallId] = state;
       } else {
         const id = o?.target?.id;
-        if (id && state) overrides[id] = state;
+        if (id && state) {
+          if (state === 'avs') {
+            // AVS selections - remove any existing overrides
+            avsRemovals.push({ id, name: o.target.name });
+          } else {
+            overrides[id] = state;
+          }
+        }
+      }
+    }
+
+    // Remove AVS overrides if any
+    if (avsRemovals.length > 0) {
+      try {
+        const { default: AvsOverrideManager } = await import(
+          '../services/infra/avs-override-manager.js'
+        );
+        const observerId = app.actionData?.actor?.document?.id || app.actionData?.actor?.id;
+        if (observerId) {
+          for (const removal of avsRemovals) {
+            await AvsOverrideManager.removeOverride(observerId, removal.id);
+          }
+          // Refresh UI to update override indicators
+          const { updateTokenVisuals } = await import('../../services/visual-effects.js');
+          await updateTokenVisuals();
+          const names = avsRemovals.map((r) => r.name).join(', ');
+          notify.info(`${MODULE_TITLE}: Removed overrides for ${avsRemovals.length} token(s)`);
+        }
+      } catch (e) {
+        console.warn('Failed to remove AVS overrides:', e);
+        const names = avsRemovals.map((r) => r.name).join(', ');
+        notify.info(`${MODULE_TITLE}: AVS will control visibility for ${avsRemovals.length}`);
       }
     }
 
@@ -1022,10 +999,35 @@ export class SeekPreviewDialog extends BaseActionDialog {
         // Disable the row's Apply button for this wall
         app.updateRowButtonsToApplied([{ wallId: outcome.wallId }]);
       } else {
-        const overrides = { [outcome.target.id]: outcome.overrideState || outcome.newVisibility };
-        await applyNowSeek({ ...actionData, overrides }, { html: () => { }, attr: () => { } });
-        // Disable the row's Apply button for this token
-        app.updateRowButtonsToApplied([{ target: { id: outcome.target.id } }]);
+        const effectiveNewState = outcome.overrideState || outcome.newVisibility;
+
+        // If AVS is selected, remove any existing override
+        if (effectiveNewState === 'avs') {
+          try {
+            const { default: AvsOverrideManager } = await import(
+              '../services/infra/avs-override-manager.js'
+            );
+            const observerId = app.actionData?.actor?.document?.id || app.actionData?.actor?.id;
+            if (observerId) {
+              await AvsOverrideManager.removeOverride(observerId, outcome.target.id);
+              // Refresh UI to update override indicators
+              const { updateTokenVisuals } = await import('../../services/visual-effects.js');
+              await updateTokenVisuals();
+              notify.info(
+                `${MODULE_TITLE}: Removed override for ${outcome.target.name} - AVS will control visibility`,
+              );
+            }
+          } catch (e) {
+            console.warn('Failed to remove AVS override:', e);
+            notify.info(`${MODULE_TITLE}: AVS will control visibility for ${outcome.target.name}`);
+          }
+          app.updateRowButtonsToApplied([{ target: { id: outcome.target.id } }]);
+        } else {
+          const overrides = { [outcome.target.id]: effectiveNewState };
+          await applyNowSeek({ ...actionData, overrides }, { html: () => { }, attr: () => { } });
+          // Disable the row's Apply button for this token
+          app.updateRowButtonsToApplied([{ target: { id: outcome.target.id } }]);
+        }
       }
 
       app.updateChangesCount();
@@ -1053,6 +1055,27 @@ export class SeekPreviewDialog extends BaseActionDialog {
     }
 
     try {
+      // Remove AVS override if one was created during apply
+      // This is critical when the user applied an override with the same state as AVS calculated
+      if (!outcome._isWall) {
+        try {
+          const { default: AvsOverrideManager } = await import(
+            '../services/infra/avs-override-manager.js'
+          );
+          const observerId = app.actionData?.actor?.document?.id || app.actionData?.actor?.id;
+          if (observerId && outcome.target?.id) {
+            const hasOverride = await AvsOverrideManager.getOverride(observerId, outcome.target.id);
+            if (hasOverride) {
+              await AvsOverrideManager.removeOverride(observerId, outcome.target.id);
+              const { updateTokenVisuals } = await import('../../services/visual-effects.js');
+              await updateTokenVisuals();
+            }
+          }
+        } catch (e) {
+          console.warn('Failed to remove AVS override during revert:', e);
+        }
+      }
+
       // Apply the original visibility state for just this specific token/wall
       if (outcome._isWall) {
         // For walls, revert wall visibility
@@ -1577,7 +1600,7 @@ export class SeekPreviewDialog extends BaseActionDialog {
     const rect = element.getBoundingClientRect();
     const tooltipRect = tooltip.getBoundingClientRect();
 
-    let left = rect.left + (rect.width / 2) - (tooltipRect.width / 2);
+    let left = rect.left + rect.width / 2 - tooltipRect.width / 2;
     let top = rect.bottom + 8;
 
     // Adjust if tooltip would go off screen

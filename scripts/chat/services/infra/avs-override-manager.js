@@ -24,6 +24,9 @@ function asChangesByTarget(changesInput, defaultState = null) {
     const state = ch.state || ch.overrideState || ch.newVisibility || defaultState;
     if (!state) continue;
 
+    // Skip 'avs' visibility state
+    if (state === 'avs') continue;
+
     // Prefer provided flags; otherwise infer conservatively
     const expectedCover = ch.expectedCover;
     const hasCover = typeof ch.hasCover === 'boolean'
@@ -137,6 +140,11 @@ export class AvsOverrideManager {
     let { hasCover, hasConcealment, expectedCover } = overrideData || {};
     if (!observer?.document?.id || !target?.document?.id || !state) {
       console.warn('PF2E Visioner | Invalid AVS override data:', overrideData);
+      return;
+    }
+
+    // Filter out 'avs' visibility state from override processing
+    if (state === 'avs') {
       return;
     }
 

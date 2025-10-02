@@ -761,7 +761,7 @@ class CoverVisualization {
     }
 
     const selectedToken = selectedTokens[0]; // Use first selected token
-    const selectedCenter = selectedToken.center ?? selectedToken.getCenter();
+    const selectedCenter = selectedToken.center ?? selectedToken.getCenterPoint();
     const respectFogForGM = game.settings?.get?.(
       MODULE_ID,
       'autoCoverVisualizationRespectFogForGM',
@@ -800,10 +800,10 @@ class CoverVisualization {
     for (const token of canvas.tokens.placeables) {
       if (!token?.actor || token.id === selectedToken.id) continue;
 
-      const tokenCenter = token.center ?? token.getCenter();
+      const tokenCenter = token.center ?? token.getCenterPoint();
       const distance = Math.sqrt(
         Math.pow(tokenCenter.x - selectedCenter.x, 2) +
-          Math.pow(tokenCenter.y - selectedCenter.y, 2),
+        Math.pow(tokenCenter.y - selectedCenter.y, 2),
       );
       const gridDistance = Math.ceil(distance / gridSize);
       maxDistance = Math.max(maxDistance, gridDistance);
@@ -864,7 +864,7 @@ class CoverVisualization {
         const tempAttacker = {
           ...selectedToken,
           center: { x: worldX, y: worldY },
-          getCenter: () => ({ x: worldX, y: worldY }),
+          getCenterPoint: () => ({ x: worldX, y: worldY, elevation: selectedCenter.elevation }),
           id: selectedToken.id + '-temp-pos',
           document: {
             ...selectedToken.document,
@@ -997,7 +997,7 @@ class CoverVisualization {
   drawCurrentPosition(selectedToken) {
     if (!this.overlayGraphics) return;
 
-    const center = selectedToken.center ?? selectedToken.getCenter();
+    const center = selectedToken.center ?? selectedToken.getCenterPoint();
     const gridSize = game.canvas.grid.size;
 
     // Draw a bright white border to show current position

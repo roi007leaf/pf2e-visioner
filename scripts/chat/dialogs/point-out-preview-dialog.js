@@ -80,22 +80,38 @@ export class PointOutPreviewDialog extends BaseActionDialog {
     // Apply ally filtering
     try {
       const { filterOutcomesByAllies } = await import('../services/infra/shared-utils.js');
-      filteredOutcomes = filterOutcomesByAllies(filteredOutcomes, this.actorToken, this.ignoreAllies, 'target');
-    } catch { }
+      filteredOutcomes = filterOutcomesByAllies(
+        filteredOutcomes,
+        this.actorToken,
+        this.ignoreAllies,
+        'target',
+      );
+    } catch {}
 
-    // Apply detection filtering if enabled
+    // Apply viewport filtering if enabled
     if (this.filterByDetection && this.actorToken) {
       try {
         const { filterOutcomesByDetection } = await import('../services/infra/shared-utils.js');
-        filteredOutcomes = await filterOutcomesByDetection(filteredOutcomes, this.actorToken, 'target', false, true, 'observer_to_target');
-      } catch { /* LOS filtering is non-critical */ }
+        filteredOutcomes = await filterOutcomesByDetection(
+          filteredOutcomes,
+          this.actorToken,
+          'target',
+          false,
+          true,
+          'observer_to_target',
+        );
+      } catch {
+        /* Viewport filtering is non-critical */
+      }
     }
 
     // Apply defeated token filtering (exclude dead/unconscious tokens)
     try {
       const { filterOutcomesByDefeated } = await import('../services/infra/shared-utils.js');
       filteredOutcomes = filterOutcomesByDefeated(filteredOutcomes, 'target');
-    } catch { /* Defeated filtering is non-critical */ }
+    } catch {
+      /* Defeated filtering is non-critical */
+    }
 
     const cfg = (s) => this.visibilityConfig(s);
 
@@ -105,8 +121,14 @@ export class PointOutPreviewDialog extends BaseActionDialog {
 
       const effectiveNewState = outcome.overrideState || outcome.newVisibility;
       const baseOldState = outcome.oldVisibility || outcome.currentVisibility;
-      const hasActionableChange =
-        baseOldState != null && effectiveNewState != null && effectiveNewState !== baseOldState;
+      // Special case: If current state is AVS-controlled and override is 'avs', no change
+      let hasActionableChange = false;
+      if (outcome.overrideState === 'avs' && this.isCurrentStateAvsControlled(outcome)) {
+        hasActionableChange = false;
+      } else {
+        hasActionableChange =
+          baseOldState != null && effectiveNewState != null && effectiveNewState !== baseOldState;
+      }
 
       return {
         ...outcome,
@@ -124,14 +146,14 @@ export class PointOutPreviewDialog extends BaseActionDialog {
       if (this.hideFoundryHidden) {
         processedOutcomes = processedOutcomes.filter((o) => o?.target?.document?.hidden !== true);
       }
-    } catch { }
+    } catch {}
 
     // Show-only-changes visual filter
     try {
       if (this.showOnlyChanges) {
         processedOutcomes = processedOutcomes.filter((o) => !!o.hasActionableChange);
       }
-    } catch { }
+    } catch {}
 
     // Update original outcomes with hasActionableChange for Apply All button logic
     processedOutcomes.forEach((processedOutcome, index) => {
@@ -187,11 +209,13 @@ export class PointOutPreviewDialog extends BaseActionDialog {
         cbh.onchange = null;
         cbh.addEventListener('change', async () => {
           this.hideFoundryHidden = !!cbh.checked;
-          try { await game.settings.set(MODULE_ID, 'hideFoundryHiddenTokens', this.hideFoundryHidden); } catch { }
+          try {
+            await game.settings.set(MODULE_ID, 'hideFoundryHiddenTokens', this.hideFoundryHidden);
+          } catch {}
           this.render({ force: true });
         });
       }
-    } catch { }
+    } catch {}
 
     // Ping the exact token pointed at in the chat message (speaker's target), if available
     try {
@@ -211,11 +235,11 @@ export class PointOutPreviewDialog extends BaseActionDialog {
           import('../services/gm-ping.js').then(({ pingTokenCenter }) => {
             try {
               pingTokenCenter(token, 'Point Out Target');
-            } catch { }
+            } catch {}
           });
         }
       }
-    } catch { }
+    } catch {}
   }
 
   // Token id in Point Out outcomes is under `target`
@@ -235,14 +259,23 @@ export class PointOutPreviewDialog extends BaseActionDialog {
     try {
       const { filterOutcomesByAllies } = await import('../services/infra/shared-utils.js');
       filtered = filterOutcomesByAllies(filtered, this.actorToken, this.ignoreAllies, 'target');
-    } catch { }
+    } catch {}
 
-    // Apply LOS filtering if enabled
+    // Apply viewport filtering if enabled
     if (this.filterByDetection && this.actorToken) {
       try {
         const { filterOutcomesByDetection } = await import('../services/infra/shared-utils.js');
-        filtered = await filterOutcomesByDetection(filtered, this.actorToken, 'target', false, true, 'observer_to_target');
-      } catch { /* LOS filtering is non-critical */ }
+        filtered = await filterOutcomesByDetection(
+          filtered,
+          this.actorToken,
+          'target',
+          false,
+          true,
+          'observer_to_target',
+        );
+      } catch {
+        /* Viewport filtering is non-critical */
+      }
     }
 
     // Hide Foundry hidden tokens
@@ -250,7 +283,7 @@ export class PointOutPreviewDialog extends BaseActionDialog {
       if (this.hideFoundryHidden) {
         filtered = filtered.filter((o) => o?.target?.document?.hidden !== true);
       }
-    } catch { }
+    } catch {}
 
     // Show only actionable visibility changes
     try {
@@ -261,7 +294,7 @@ export class PointOutPreviewDialog extends BaseActionDialog {
           return baseOld != null && effectiveNew != null && effectiveNew !== baseOld;
         });
       }
-    } catch { }
+    } catch {}
 
     return filtered;
   }
@@ -322,7 +355,7 @@ export class PointOutPreviewDialog extends BaseActionDialog {
         if (id && state) overrides[id] = state;
       }
       const { applyNowPointOut } = await import('../services/index.js');
-      await applyNowPointOut({ ...app.actionData, overrides }, { html: () => { }, attr: () => { } });
+      await applyNowPointOut({ ...app.actionData, overrides }, { html: () => {}, attr: () => {} });
 
       app.bulkActionState = 'applied';
       app.updateBulkActionButtons();
@@ -355,7 +388,7 @@ export class PointOutPreviewDialog extends BaseActionDialog {
     try {
       // Build revert data internally in the service; no need to pre-filter payload here
       const { revertNowPointOut } = await import('../services/index.js');
-      await revertNowPointOut(app.actionData, { html: () => { }, attr: () => { } });
+      await revertNowPointOut(app.actionData, { html: () => {}, attr: () => {} });
 
       // Respect Hide Foundry-hidden and other filters when updating UI
       let filteredOutcomes = filterOutcomesByEncounter(app.outcomes, app.encounterOnly, 'target');
@@ -367,12 +400,12 @@ export class PointOutPreviewDialog extends BaseActionDialog {
           app.ignoreAllies,
           'target',
         );
-      } catch { }
+      } catch {}
       try {
         if (app.hideFoundryHidden) {
           filteredOutcomes = filteredOutcomes.filter((o) => o?.target?.document?.hidden !== true);
         }
-      } catch { }
+      } catch {}
 
       app.bulkActionState = 'reverted';
       app.updateBulkActionButtons();
@@ -421,7 +454,7 @@ export class PointOutPreviewDialog extends BaseActionDialog {
     try {
       const overrides = { [outcome.target.id]: outcome.overrideState || outcome.newVisibility };
       const { applyNowPointOut } = await import('../services/index.js');
-      await applyNowPointOut({ ...app.actionData, overrides }, { html: () => { }, attr: () => { } });
+      await applyNowPointOut({ ...app.actionData, overrides }, { html: () => {}, attr: () => {} });
 
       // Update row using base helper
       app.updateRowButtonsToApplied([
@@ -455,7 +488,7 @@ export class PointOutPreviewDialog extends BaseActionDialog {
       const { revertNowPointOut } = await import('../services/index.js');
       // Pass the specific tokenId for per-row revert
       const actionDataWithTarget = { ...app.actionData, targetTokenId: tokenId };
-      await revertNowPointOut(actionDataWithTarget, { html: () => { }, attr: () => { } });
+      await revertNowPointOut(actionDataWithTarget, { html: () => {}, attr: () => {} });
 
       // Update row using base helper
       app.updateRowButtonsToReverted([
@@ -473,7 +506,7 @@ export class PointOutPreviewDialog extends BaseActionDialog {
     if (this._selectionHookId) {
       try {
         Hooks.off('controlToken', this._selectionHookId);
-      } catch { }
+      } catch {}
       this._selectionHookId = null;
     }
     currentPointOutDialog = null;

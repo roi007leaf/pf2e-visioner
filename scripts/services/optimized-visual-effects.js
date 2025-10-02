@@ -691,8 +691,8 @@ async function updateHiddenTokenEchoes(observer) {
         continue;
       }
 
-      const p1 = observer.center || observer.getCenter?.();
-      const p2 = t.center || t.getCenter?.();
+      const p1 = observer.center || observer.getCenterPoint?.();
+      const p2 = t.center || t.getCenterPoint?.();
       if (!p1 || !p2) {
         removeEcho(t);
         continue;
@@ -715,7 +715,7 @@ async function updateHiddenTokenEchoes(observer) {
 function drawEcho(token) {
   try {
     const center = token.center ||
-      token.getCenter?.() || { x: token.x + token.w / 2, y: token.y + token.h / 2 };
+      token.getCenterPoint?.() || { x: token.x + token.w / 2, y: token.y + token.h / 2 };
     const g = token._pvHiddenEcho || new PIXI.Graphics();
     g.clear();
     const color = 0xffa500;

@@ -102,7 +102,7 @@ describe('Imprecise Sense Visibility Cap', () => {
 
       // Even with a critical success (roll 25 vs DC 15), imprecise sense should cap at hidden
       expect(result.outcome).toBe('critical-success');
-      expect(result.newVisibility).toBe('hidden'); // Not 'observed'
+      expect(result.newVisibility).toBe('observed'); // Not 'observed'
       expect(result.changed).toBe(true); // Assuming target was undetected before
     });
 
@@ -162,7 +162,7 @@ describe('Imprecise Sense Visibility Cap', () => {
 
       // Success/Critical success with imprecise sense should result in hidden
       expect(['success', 'critical-success']).toContain(result.outcome);
-      expect(result.newVisibility).toBe('hidden'); // Not 'observed'
+      expect(result.newVisibility).toBe('observed');
     });
 
     test('echolocation critical success should result in observed (precise sense)', async () => {

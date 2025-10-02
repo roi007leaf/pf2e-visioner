@@ -30,7 +30,7 @@ describe('BatchProcessor', () => {
         viewportFilter = { isEnabled: jest.fn(() => false) };
         optimizedVisibilityCalculator = {
             // Return non-default state so updates are generated vs original 'observed'
-            calculateVisibilityWithPosition: jest.fn(async () => 'hidden'),
+            calculateVisibilityBetweenTokens: jest.fn(async () => 'hidden'),
         };
         globalLosCache = new GlobalLosCache(1000);
         globalVisibilityCache = new GlobalVisibilityCache(1000);
@@ -42,6 +42,11 @@ describe('BatchProcessor', () => {
         // Provide positionManager for new dependency shape; keep legacy function for back-compat
         positionManager = { getTokenPosition };
 
+        // Mock the VisionAnalyzer dependency
+        const mockVisionAnalyzer = {
+            getVisionCapabilities: jest.fn(() => ({ sensingSummary: { imprecise: [], precise: [], hearing: null } }))
+        };
+
         processor = new BatchProcessor({
             spatialAnalyzer,
             viewportFilter,
@@ -52,6 +57,7 @@ describe('BatchProcessor', () => {
             getTokenPosition,
             getActiveOverride,
             getVisibilityMap,
+            visionAnalyzer: mockVisionAnalyzer,
             maxVisibilityDistance: 10,
         });
 
