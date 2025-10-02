@@ -281,11 +281,11 @@ export class AvsOverrideManager {
 
     try {
       const { default: indicator } = await import('../../../ui/override-validation-indicator.js');
-      if (indicator && typeof indicator.update === 'function') {
-        indicator.update([], '');
+      if (indicator && typeof indicator.hide === 'function') {
+        indicator.hide(true);
       }
     } catch (e) {
-      console.warn('PF2E Visioner | Failed to update override indicator after cleanup:', e);
+      console.warn('PF2E Visioner | Failed to hide override indicator after cleanup:', e);
     }
   }
 
