@@ -14,9 +14,10 @@ describe('BaseActionDialog - Override Removal Integration', () => {
         const dialogPath = path.join(__dirname, '../../../scripts/chat/dialogs/base-action-dialog.js');
         const content = fs.readFileSync(dialogPath, 'utf8');
 
-        // Verify onRevertChange includes override removal
-        expect(content).toMatch(/AvsOverrideManager.*removeOverride.*observerId.*targetId/);
-        expect(content).toMatch(/effectiveOldState.*!==.*'avs'/);
+        // Verify onRevertChange includes override removal with direction-aware logic
+        expect(content).toMatch(/AvsOverrideManager.*removeOverride/);
+        expect(content).toMatch(/getApplyDirection/);
+        expect(content).toMatch(/observer_to_target/);
 
         // Verify onRevertAll includes override removal
         expect(content).toMatch(/for.*const outcome of appliedOutcomes/);
