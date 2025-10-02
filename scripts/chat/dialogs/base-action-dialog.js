@@ -144,56 +144,9 @@ export class BaseActionDialog extends BasePreviewDialog {
     super._onRender?.(context, options);
     this._applySelectionHighlight();
 
-    // Live re-filtering for per-dialog Ignore Allies checkbox
-    try {
-      const cb = this.element.querySelector('input[data-action="toggleIgnoreAllies"]');
-      if (cb) {
-        cb.addEventListener('change', () => {
-          this.ignoreAllies = !!cb.checked;
-          this.render({ force: true });
-        });
-      }
-    } catch { }
-
     // Ensure bulk override buttons get listeners
     try {
       this._attachBulkOverrideHandlers();
-    } catch { }
-
-    // Wire up Show Only Changes checkbox
-    try {
-      const cbSoc = this.element.querySelector('input[data-action="toggleShowOnlyChanges"]');
-      if (cbSoc) {
-        // Prevent duplicate handlers on re-render
-        cbSoc.onchange = null;
-        cbSoc.addEventListener('change', () => {
-          this.showOnlyChanges = !!cbSoc.checked;
-          // Reset bulk state visual; filtering doesn’t change data
-          this.render({ force: true });
-        });
-      }
-    } catch { }
-
-    // Wire up Filter By Detection checkbox (disabled in combat via template binding)
-    try {
-      const cbDetection = this.element.querySelector(
-        'input[data-action="toggleFilterByDetection"]',
-      );
-      if (cbDetection) {
-        cbDetection.onchange = null;
-        cbDetection.addEventListener('change', async () => {
-          this.filterByDetection = !!cbDetection.checked;
-          this.bulkActionState = 'initial';
-          // Let subclasses recompute filtered outcomes if they provide a method
-          try {
-            if (typeof this.getFilteredOutcomes === 'function') {
-              const list = await this.getFilteredOutcomes();
-              if (Array.isArray(list)) this.outcomes = list;
-            }
-          } catch { }
-          this.render({ force: true });
-        });
-      }
     } catch { }
   }
 

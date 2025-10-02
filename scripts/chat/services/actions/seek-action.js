@@ -37,6 +37,8 @@ export class SeekActionHandler extends ActionHandlerBase {
 
     const allTokens = canvas?.tokens?.placeables || [];
     const actorId = actionData?.actor?.id || actionData?.actor?.document?.id || null;
+
+
     let potential = allTokens
       .filter((t) => t && t.actor)
       // Exclude the acting token reliably by id when possible
@@ -53,6 +55,7 @@ export class SeekActionHandler extends ActionHandlerBase {
         if (preferIgnore !== true) return true; // keep allies when unchecked or unspecified
         return !shouldFilterAlly(actionData.actor, t, 'enemies', true);
       });
+
 
     // Add hidden walls as discoverable subjects (as pseudo-tokens with dc)
     try {
@@ -94,7 +97,9 @@ export class SeekActionHandler extends ActionHandlerBase {
             ? game.settings.get('pf2e-visioner', 'customSeekDistance')
             : game.settings.get('pf2e-visioner', 'customSeekDistanceOutOfCombat'),
         );
+
         if (Number.isFinite(maxFeet) && maxFeet > 0) {
+          const beforeCount = potential.length;
           potential = potential.filter((subject) => {
             let d;
             if (subject._isWall) {
@@ -103,8 +108,10 @@ export class SeekActionHandler extends ActionHandlerBase {
             } else {
               // Calculate distance to token
               d = calculateTokenDistance(actionData.actor, subject);
+
             }
-            return !Number.isFinite(d) || d <= maxFeet;
+            const withinRange = !Number.isFinite(d) || d <= maxFeet;
+            return withinRange;
           });
         }
       }

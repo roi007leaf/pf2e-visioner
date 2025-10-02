@@ -7,8 +7,8 @@
   </div>
   <div class="observer-content">
     <div class="observer-main">
-      <button type="button" class="mode-toggle {{#if isObserverMode}}observer-active{{else}}target-active{{/if}}" data-action="toggleMode" data-tooltip="Click to switch between Observer and Target modes" {{#if lootObserver}}disabled{{/if}}>
-        {{#if (or lootObserver)}}
+      <button type="button" class="mode-toggle {{#if isObserverMode}}observer-active{{else}}target-active{{/if}}" data-action="toggleMode" data-tooltip="Click to switch between Observer and Target modes" {{#if (or lootObserver hazardObserver)}}disabled{{/if}}>
+        {{#if (or lootObserver hazardObserver)}}
           <div class="toggle-option active">
             <i class="fas fa-user-secret"></i>
             <span>Target</span>

@@ -274,18 +274,8 @@ export class VisionAnalyzer {
    */
   distanceFeet(a, b) {
     try {
-      // Use Foundry's distance calculation
-      if (typeof a.distanceTo === 'function') {
-        const gridDistance = a.distanceTo(b);
-        if (Number.isFinite(gridDistance)) {
-          const gridUnits = game.canvas?.scene?.grid?.distance || 5;
-          const feetDistance = gridDistance * gridUnits;
-          // Round down to nearest 5-foot increment (PF2e squares)
-          return Math.floor(feetDistance / 5) * 5;
-        }
-      }
-
-      // Fallback: manual calculation
+      // Always use manual Euclidean calculation for consistent results
+      // Foundry's distanceTo() uses grid-based movement which inflates diagonal distances
       if (a.center && b.center) {
         const dx = a.center.x - b.center.x;
         const dy = a.center.y - b.center.y;
@@ -293,7 +283,8 @@ export class VisionAnalyzer {
         const gridSize = game.canvas?.grid?.size || 100;
         const gridUnits = game.canvas?.scene?.grid?.distance || 5;
         const feetDistance = (pixels / gridSize) * gridUnits;
-        return Math.floor(feetDistance / 5) * 5;
+        const rounded = Math.floor(feetDistance / 5) * 5;
+        return rounded;
       }
 
       return Infinity;
@@ -551,7 +542,7 @@ export class VisionAnalyzer {
     // Filter out visual senses if blinded
     if (isBlinded) {
       const visualSenseTypes = ['vision', 'sight', 'darkvision', 'greater-darkvision', 'low-light-vision',
-        'see-invisibility', 'see-all', 'light-perception'];
+        'see-invisibility', 'see-all'];
       for (const senseType of visualSenseTypes) {
         delete enhanced.precise[senseType];
         delete enhanced.imprecise[senseType];

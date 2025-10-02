@@ -18,6 +18,50 @@
 const PRECISE = 'precise';
 const IMPRECISE = 'imprecise';
 
+// Normalize sense type names to canonical forms
+const SENSE_TYPE_ALIASES = {
+    'light-perception': 'vision',
+    'lightperception': 'vision',
+
+    'lowlightvision': 'low-light-vision',
+    'low-light': 'low-light-vision',
+
+    'darkvision': 'darkvision',
+    'dark-vision': 'darkvision',
+
+    'greater-darkvision': 'greater-darkvision',
+    'greaterdarkvision': 'greater-darkvision',
+
+    'vision': 'vision',
+    'sight': 'vision',
+    'basicsight': 'vision',
+    'basic-sight': 'vision',
+
+    'tremorsense': 'tremorsense',
+    'feeltremor': 'tremorsense',
+    'feel-tremor': 'tremorsense',
+
+    'scent': 'scent',
+    'smell': 'scent',
+
+    'lifesense': 'lifesense',
+    'life-sense': 'lifesense',
+
+    'hearing': 'hearing',
+
+    'see-invisibility': 'see-invisibility',
+    'seeinvisibility': 'see-invisibility',
+
+    'see-all': 'see-all',
+    'seeall': 'see-all',
+
+    'sense-all': 'sense-all',
+    'senseall': 'sense-all',
+
+    'echolocation': 'echolocation',
+    'echo-location': 'echolocation',
+};
+
 export class SensingCapabilitiesBuilder {
     /**
      * Build sensing capabilities from token/actor data
@@ -51,7 +95,7 @@ export class SensingCapabilitiesBuilder {
      */
     static #processDetectionModes(capabilities, detectionModes) {
         const modeMapping = {
-            lightPerception: { type: 'light-perception', acuity: PRECISE },
+            lightPerception: { type: 'vision', acuity: PRECISE },
             basicSight: { type: 'vision', acuity: PRECISE },
             seeInvisibility: { type: 'see-invisibility', acuity: PRECISE },
             senseInvisibility: { type: 'sense-invisibility', acuity: PRECISE },
@@ -125,7 +169,8 @@ export class SensingCapabilitiesBuilder {
     }) {
         if (!type) return;
 
-        const senseType = String(type).toLowerCase().trim();
+        const rawType = String(type).toLowerCase().trim();
+        const senseType = SENSE_TYPE_ALIASES[rawType] || rawType;
         const normalizedRange = this.#normalizeRange(range);
         const normalizedAcuity = String(acuity || IMPRECISE).toLowerCase().trim();
 
@@ -135,12 +180,25 @@ export class SensingCapabilitiesBuilder {
             delete capabilities.imprecise[senseType];
         }
 
-        // Check if already exists with same range (skip if not override)
-        if (!allowOverride) {
-            if (capabilities.precise[senseType] === normalizedRange ||
-                capabilities.imprecise[senseType] === normalizedRange) {
-                return;
+        // If this sense already exists in the precise category, don't add it to imprecise
+        if (capabilities.precise[senseType] !== undefined) {
+            // If new range is better (longer) and acuity is the same or better, upgrade
+            if (normalizedAcuity === PRECISE && normalizedRange > capabilities.precise[senseType]) {
+                capabilities.precise[senseType] = normalizedRange;
             }
+            return;
+        }
+
+        // If adding as precise and it exists as imprecise, upgrade it
+        if (normalizedAcuity === PRECISE && capabilities.imprecise[senseType] !== undefined) {
+            delete capabilities.imprecise[senseType];
+            capabilities.precise[senseType] = normalizedRange;
+            return;
+        }
+
+        // Check if already exists with same range in imprecise (skip if not override)
+        if (!allowOverride && capabilities.imprecise[senseType] === normalizedRange) {
+            return;
         }
 
         // Add to appropriate category

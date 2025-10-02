@@ -419,7 +419,8 @@ export class SeekDialogAdapter {
 
         // Add imprecise senses ONLY if they don't already exist as precise
         for (const [senseType, range] of Object.entries(capabilities.imprecise)) {
-            const existingPrecise = allSenses.find(s => s.type === senseType);
+            // Check if this sense type already exists in the precise list
+            const existingPrecise = allSenses.find(s => s.type === senseType && s.isPrecise);
             if (!existingPrecise) {
                 const senseConfig = SPECIAL_SENSES[senseType] || {
                     label: `PF2E_VISIONER.SENSES.${senseType.toUpperCase()}`,

@@ -55,8 +55,6 @@
       "DARKVISION_DESC": "You can see in darkness and dim light just as well as in bright light, though you can't distinguish color in darkness.",
       "GREATER-DARKVISION": "Greater Darkvision",
       "GREATER-DARKVISION_DESC": "You can see in darkness and dim light as if it were bright light—colors included.",
-      "LOW-LIGHT-VISION": "Low-Light Vision",
-      "LOW-LIGHT-VISION_DESC": "You can see in dim light as though it were bright light.",
       "HEARING": "Hearing",
       "HEARING_DESC": "You can detect creatures and events via sound within range (imprecise).",
       "TREMORSENSE": "Tremorsense",

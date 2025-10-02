@@ -66,7 +66,8 @@ export async function buildContext(app, options) {
   } catch { }
 
   const isLootObserver = app.observer?.actor?.type === 'loot';
-  if (isLootObserver) {
+  const isHazardObserver = app.observer?.actor?.type === 'hazard';
+  if (isLootObserver || isHazardObserver) {
     app.mode = 'target';
     if (app.activeTab === 'cover') app.activeTab = 'visibility';
   }
@@ -77,7 +78,8 @@ export async function buildContext(app, options) {
   context.isVisibilityTab = app.activeTab === 'visibility';
   context.isCoverTab = app.activeTab === 'cover';
   context.lootObserver = !!isLootObserver;
-  context.hideCoverTab = !!isLootObserver;
+  context.hazardObserver = !!isHazardObserver;
+  context.hideCoverTab = context.lootObserver || context.hazardObserver;
 
   context.showEncounterFilter = hasActiveEncounter();
   context.encounterOnly = app.encounterOnly;
@@ -152,7 +154,7 @@ export async function buildContext(app, options) {
         const avsEnabled = game.settings.get(MODULE_ID, 'autoVisibilityEnabled');
 
         let allowedVisKeys =
-          isLootObserver || isNonAvsToken
+          isNonAvsToken
             ? ['observed', 'hidden']
             : Object.keys(VISIBILITY_STATES);
 
@@ -161,20 +163,22 @@ export async function buildContext(app, options) {
           allowedVisKeys = allowedVisKeys.filter(key => key !== 'avs');
         }
 
-        const visibilityStates = allowedVisKeys.map((key) => {
-          // Determine if this state should be selected
-          let selected = false;
+        const visibilityStates = allowedVisKeys
+          .filter(key => !isNonAvsToken || key !== 'avs') // Extra safety: never include 'avs' for loot/hazard
+          .map((key) => {
+            // Determine if this state should be selected
+            let selected = false;
 
-          // This will be set after we determine the override/AVS logic
-          return {
-            value: key,
-            label: game.i18n.localize(VISIBILITY_STATES[key].label),
-            selected, // Will be updated below
-            icon: VISIBILITY_STATES[key].icon,
-            color: VISIBILITY_STATES[key].color,
-            cssClass: VISIBILITY_STATES[key].cssClass,
-          };
-        });
+            // This will be set after we determine the override/AVS logic
+            return {
+              value: key,
+              label: game.i18n.localize(VISIBILITY_STATES[key].label),
+              selected, // Will be updated below
+              icon: VISIBILITY_STATES[key].icon,
+              color: VISIBILITY_STATES[key].color,
+              cssClass: VISIBILITY_STATES[key].cssClass,
+            };
+          });
 
         // Determine current state and selection logic
         let hasAvsOverride = false;
@@ -197,9 +201,9 @@ export async function buildContext(app, options) {
               actualCurrentState = avsOverrideFlag.state || 'observed';
               isAvsControlled = false; // Override is controlling, not AVS
             } else {
-              // No override - AVS is controlling (regardless of map data)
+              // No override - AVS is controlling (unless it's a hazard/loot token)
               hasAvsOverride = false;
-              isAvsControlled = true; // AVS is controlling
+              isAvsControlled = !isNonAvsToken; // AVS is controlling only if NOT hazard/loot
 
               // Get the actual current state from the visibility map
               try {
@@ -337,7 +341,7 @@ export async function buildContext(app, options) {
           }
         }
         const isRowLoot = observerToken.actor?.type === 'loot' || isLootObserver;
-        const isRowHazard = observerToken.actor?.type === 'hazard';
+        const isRowHazard = observerToken.actor?.type === 'hazard' || isHazardObserver;
         const isNonAvsToken = isRowLoot || isRowHazard;
 
         // Check if AVS is enabled to determine if 'avs' button should be available
@@ -353,20 +357,22 @@ export async function buildContext(app, options) {
         }
 
         // Debug: console.log(`[AVS Debug] Target mode allowedVisKeys for ${observerToken.document.name}:`, { isRowLoot, isLootObserver, allowedVisKeys });
-        const visibilityStates = allowedVisKeys.map((key) => {
-          // Determine if this state should be selected
-          let selected = false;
+        const visibilityStates = allowedVisKeys
+          .filter(key => !isNonAvsToken || key !== 'avs') // Extra safety: never include 'avs' for loot/hazard
+          .map((key) => {
+            // Determine if this state should be selected
+            let selected = false;
 
-          // This will be set after we determine the override/AVS logic
-          return {
-            value: key,
-            label: game.i18n.localize(VISIBILITY_STATES[key].label),
-            selected, // Will be updated below
-            icon: VISIBILITY_STATES[key].icon,
-            color: VISIBILITY_STATES[key].color,
-            cssClass: VISIBILITY_STATES[key].cssClass,
-          };
-        });
+            // This will be set after we determine the override/AVS logic
+            return {
+              value: key,
+              label: game.i18n.localize(VISIBILITY_STATES[key].label),
+              selected, // Will be updated below
+              icon: VISIBILITY_STATES[key].icon,
+              color: VISIBILITY_STATES[key].color,
+              cssClass: VISIBILITY_STATES[key].cssClass,
+            };
+          });
 
         // In target mode, determine current state and selection logic
         let hasAvsOverride = false;
@@ -389,9 +395,9 @@ export async function buildContext(app, options) {
               actualCurrentState = avsOverrideFlag.state || 'observed';
               isAvsControlled = false; // Override is controlling, not AVS
             } else {
-              // No override - AVS is controlling (regardless of map data)
+              // No override - AVS is controlling (unless it's a hazard/loot token)
               hasAvsOverride = false;
-              isAvsControlled = true; // AVS is controlling
+              isAvsControlled = !isNonAvsToken; // AVS is controlling only if NOT hazard/loot
 
               // Get the actual current state from the visibility map
               try {
@@ -589,8 +595,18 @@ export async function buildContext(app, options) {
   // Check if AVS is enabled to filter out 'avs' state from bulk actions
   const avsEnabled = game.settings.get(MODULE_ID, 'autoVisibilityEnabled');
 
+  // For loot/hazard observers, only show Observed and Hidden in legend and bulk actions
+  const allowedLegendKeys = (isLootObserver || context.hazardObserver)
+    ? ['observed', 'hidden']
+    : null;
+
   context.visibilityStates = Object.entries(VISIBILITY_STATES)
-    .filter(([key]) => avsEnabled || key !== 'avs') // Filter out 'avs' if AVS is disabled
+    .filter(([key]) => {
+      // If observer is loot/hazard, only allow observed and hidden
+      if (allowedLegendKeys) return allowedLegendKeys.includes(key);
+      // Otherwise filter out 'avs' if AVS is disabled
+      return avsEnabled || key !== 'avs';
+    })
     .map(([key, config]) => ({
       key,
       value: key,

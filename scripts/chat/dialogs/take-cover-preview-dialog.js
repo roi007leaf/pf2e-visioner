@@ -21,6 +21,9 @@ export class TakeCoverPreviewDialog extends BaseActionDialog {
       revertChange: TakeCoverPreviewDialog._onRevertChange,
       toggleEncounterFilter: TakeCoverPreviewDialog._onToggleEncounterFilter,
       toggleFilterByDetection: TakeCoverPreviewDialog._onToggleFilterByDetection,
+      toggleHideFoundryHidden: TakeCoverPreviewDialog._onToggleHideFoundryHidden,
+      toggleIgnoreAllies: TakeCoverPreviewDialog._onToggleIgnoreAllies,
+      toggleShowOnlyChanges: TakeCoverPreviewDialog._onToggleShowOnlyChanges,
       overrideState: TakeCoverPreviewDialog._onOverrideState,
     },
   };
@@ -65,7 +68,7 @@ export class TakeCoverPreviewDialog extends BaseActionDialog {
       try {
         const { filterOutcomesByAllies } = await import('../services/infra/shared-utils.js');
         filtered = filterOutcomesByAllies(filtered, this.actorToken, this.ignoreAllies, 'target');
-      } catch {}
+      } catch { }
 
       // Apply viewport filtering if enabled
       if (this.filterByDetection && this.actorToken) {
@@ -89,14 +92,14 @@ export class TakeCoverPreviewDialog extends BaseActionDialog {
         if (this.hideFoundryHidden) {
           filtered = filtered.filter((o) => o?.target?.document?.hidden !== true);
         }
-      } catch {}
+      } catch { }
 
       // Apply show-only-changes visual filter
       try {
         if (this.showOnlyChanges) {
           filtered = filtered.filter((o) => !!o.hasActionableChange);
         }
-      } catch {}
+      } catch { }
 
       return filtered;
     } catch {
@@ -122,7 +125,7 @@ export class TakeCoverPreviewDialog extends BaseActionDialog {
         this.ignoreAllies,
         'target',
       );
-    } catch {}
+    } catch { }
 
     // Apply viewport filtering if enabled
     if (this.filterByDetection && this.actorToken) {
@@ -153,7 +156,7 @@ export class TakeCoverPreviewDialog extends BaseActionDialog {
       if (this.hideFoundryHidden) {
         filteredOutcomes = filteredOutcomes.filter((o) => o?.target?.document?.hidden !== true);
       }
-    } catch {}
+    } catch { }
 
     // Map cover constants to templating-friendly config
     const coverCfg = (s) => {
@@ -168,7 +171,7 @@ export class TakeCoverPreviewDialog extends BaseActionDialog {
       let label = cfg.label;
       try {
         label = game.i18n.localize(cfg.label);
-      } catch {}
+      } catch { }
       return {
         label,
         icon: cfg.icon || 'fas fa-shield-alt',
@@ -230,7 +233,7 @@ export class TakeCoverPreviewDialog extends BaseActionDialog {
               if (val === 4) coverLevel = 'greater';
               else if (val === 2) coverLevel = 'standard';
               else if (val === 1) coverLevel = 'lesser';
-            } catch {}
+            } catch { }
           }
 
           if (coverLevel) {
@@ -256,8 +259,7 @@ export class TakeCoverPreviewDialog extends BaseActionDialog {
       }
     }
 
-    // Keep full processed list for logic, but filter display based on showOnlyChanges
-    this.outcomes = processed;
+    // Filter display based on showOnlyChanges
     const displayOutcomes = this.showOnlyChanges
       ? processed.filter((o) => !!o.hasActionableChange)
       : processed;
@@ -292,54 +294,6 @@ export class TakeCoverPreviewDialog extends BaseActionDialog {
     this.markInitialSelections();
     this.updateBulkActionButtons();
     this.updateChangesCount();
-
-    // Wire up "Hide Foundry-hidden tokens" checkbox each render
-    try {
-      const cbh = this.element.querySelector('input[data-action="toggleHideFoundryHidden"]');
-      if (cbh) {
-        // Avoid stacking listeners on re-render
-        cbh.onchange = null;
-        cbh.addEventListener('change', async () => {
-          const checked = !!cbh.checked;
-          this.hideFoundryHidden = checked;
-          try {
-            await game.settings.set(MODULE_ID, 'hideFoundryHiddenTokens', checked);
-          } catch {}
-          this.bulkActionState = 'initial';
-          this.render({ force: true });
-        });
-      }
-    } catch {}
-
-    // Wire up Ignore Allies checkbox
-    try {
-      const cba = this.element.querySelector('input[data-action="toggleIgnoreAllies"]');
-      if (cba) {
-        cba.onchange = null;
-        cba.addEventListener('change', async () => {
-          this.ignoreAllies = !!cba.checked;
-          this.bulkActionState = 'initial';
-          // Update the filtered outcomes and re-render
-          try {
-            await game.settings.set(MODULE_ID, 'ignoreAllies', this.ignoreAllies);
-          } catch {}
-          this.render({ force: true });
-        });
-      }
-    } catch {}
-
-    // Wire up Show Only Changes checkbox
-    try {
-      const cbsc = this.element.querySelector('input[data-action="toggleShowOnlyChanges"]');
-      if (cbsc) {
-        cbsc.onchange = null;
-        cbsc.addEventListener('change', () => {
-          this.showOnlyChanges = !!cbsc.checked;
-          this.bulkActionState = 'initial';
-          this.render({ force: true });
-        });
-      }
-    } catch {}
   }
 
   getChangesCounterClass() {
@@ -353,19 +307,129 @@ export class TakeCoverPreviewDialog extends BaseActionDialog {
   }
 
   static async _onToggleEncounterFilter(event, target) {
+    event.preventDefault();
+    event.stopPropagation();
+
     const app = currentTakeCoverDialog;
     if (!app) return;
-    app.encounterOnly = target.checked;
+    const newValue = !app.encounterOnly;
+    app.encounterOnly = newValue;
     app.bulkActionState = 'initial';
-    app.render({ force: true });
+    await app.render({ force: true });
+
+    requestAnimationFrame(() => {
+      const checkbox = app.element.querySelector('input[data-action="toggleEncounterFilter"]');
+      if (checkbox) {
+        checkbox.checked = newValue;
+        if (newValue) {
+          checkbox.setAttribute('checked', '');
+        } else {
+          checkbox.removeAttribute('checked');
+        }
+      }
+    });
   }
 
   static async _onToggleFilterByDetection(event, target) {
+    event.preventDefault();
+    event.stopPropagation();
+
     const app = currentTakeCoverDialog;
     if (!app) return;
-    app.filterByDetection = target.checked;
+    const newValue = !app.filterByDetection;
+    app.filterByDetection = newValue;
     app.bulkActionState = 'initial';
-    app.render({ force: true });
+    await app.render({ force: true });
+
+    requestAnimationFrame(() => {
+      const checkbox = app.element.querySelector('input[data-action="toggleFilterByDetection"]');
+      if (checkbox) {
+        checkbox.checked = newValue;
+        if (newValue) {
+          checkbox.setAttribute('checked', '');
+        } else {
+          checkbox.removeAttribute('checked');
+        }
+      }
+    });
+  }
+
+  static async _onToggleHideFoundryHidden(event, target) {
+    event.preventDefault();
+    event.stopPropagation();
+
+    const app = currentTakeCoverDialog;
+    if (!app) return;
+    const newValue = !app.hideFoundryHidden;
+    app.hideFoundryHidden = newValue;
+    try {
+      await game.settings.set(MODULE_ID, 'hideFoundryHiddenTokens', newValue);
+    } catch { }
+    app.bulkActionState = 'initial';
+    await app.render({ force: true });
+
+    requestAnimationFrame(() => {
+      const checkbox = app.element.querySelector('input[data-action="toggleHideFoundryHidden"]');
+      if (checkbox) {
+        checkbox.checked = newValue;
+        if (newValue) {
+          checkbox.setAttribute('checked', '');
+        } else {
+          checkbox.removeAttribute('checked');
+        }
+      }
+    });
+  }
+
+  static async _onToggleIgnoreAllies(event, target) {
+    event.preventDefault();
+    event.stopPropagation();
+
+    const app = currentTakeCoverDialog;
+    if (!app) return;
+    const newValue = !app.ignoreAllies;
+    app.ignoreAllies = newValue;
+    try {
+      await game.settings.set(MODULE_ID, 'ignoreAllies', newValue);
+    } catch { }
+    app.bulkActionState = 'initial';
+    await app.render({ force: true });
+
+    requestAnimationFrame(() => {
+      const checkbox = app.element.querySelector('input[data-action="toggleIgnoreAllies"]');
+      if (checkbox) {
+        checkbox.checked = newValue;
+        if (newValue) {
+          checkbox.setAttribute('checked', '');
+        } else {
+          checkbox.removeAttribute('checked');
+        }
+      }
+    });
+  }
+
+  static async _onToggleShowOnlyChanges(event, target) {
+    event.preventDefault();
+    event.stopPropagation();
+
+    const app = currentTakeCoverDialog;
+    if (!app) return;
+    const newValue = !app.showOnlyChanges;
+    app.showOnlyChanges = newValue;
+    app.bulkActionState = 'initial';
+    await app.render({ force: true });
+
+    requestAnimationFrame(() => {
+      const checkbox = app.element.querySelector('input[data-action="toggleShowOnlyChanges"]');
+      if (checkbox) {
+        checkbox.checked = newValue;
+        if (newValue) {
+          checkbox.setAttribute('checked', '');
+        } else {
+          checkbox.removeAttribute('checked');
+        }
+      }
+    });
   }
 
   static async _onApplyAll() {
@@ -402,7 +466,7 @@ export class TakeCoverPreviewDialog extends BaseActionDialog {
       if (id && s) overrides[id] = s;
     }
     const { applyNowTakeCover } = await import('../services/index.js');
-    await applyNowTakeCover({ ...app.actionData, overrides }, { html: () => {}, attr: () => {} });
+    await applyNowTakeCover({ ...app.actionData, overrides }, { html: () => { }, attr: () => { } });
     app.bulkActionState = 'applied';
     app.updateBulkActionButtons();
     app.updateRowButtonsToApplied(
@@ -422,7 +486,7 @@ export class TakeCoverPreviewDialog extends BaseActionDialog {
       return;
     }
     const { revertNowTakeCover } = await import('../services/index.js');
-    await revertNowTakeCover(app.actionData, { html: () => {}, attr: () => {} });
+    await revertNowTakeCover(app.actionData, { html: () => { }, attr: () => { } });
     app.bulkActionState = 'reverted';
     app.updateBulkActionButtons();
     // Respect filters for UI row updates
@@ -444,7 +508,7 @@ export class TakeCoverPreviewDialog extends BaseActionDialog {
     if (eff === base) return;
     const overrides = { [tokenId]: eff };
     const { applyNowTakeCover } = await import('../services/index.js');
-    await applyNowTakeCover({ ...app.actionData, overrides }, { html: () => {}, attr: () => {} });
+    await applyNowTakeCover({ ...app.actionData, overrides }, { html: () => { }, attr: () => { } });
     app.updateRowButtonsToApplied([{ target: { id: tokenId }, hasActionableChange: true }]);
     app.updateChangesCount();
   }
@@ -456,7 +520,7 @@ export class TakeCoverPreviewDialog extends BaseActionDialog {
     const { revertNowTakeCover } = await import('../services/index.js');
     // Pass the specific tokenId for per-row revert
     const actionDataWithTarget = { ...app.actionData, targetTokenId: tokenId };
-    await revertNowTakeCover(actionDataWithTarget, { html: () => {}, attr: () => {} });
+    await revertNowTakeCover(actionDataWithTarget, { html: () => { }, attr: () => { } });
     app.updateRowButtonsToReverted([{ target: { id: tokenId }, hasActionableChange: true }]);
     app.updateChangesCount();
   }

@@ -63,7 +63,9 @@ export function calculateTokenDistance(token1, token2) {
   try {
     // Use standardized VisionAnalyzer distance calculation
     const visionAnalyzer = VisionAnalyzer.getInstance();
-    return visionAnalyzer.distanceFeet(token1, token2);
+    const result = visionAnalyzer.distanceFeet(token1, token2);
+
+    return result;
   } catch (error) {
     console.error(
       `${MODULE_TITLE}: Error calculating distance between tokens using VisionAnalyzer:`,
@@ -105,7 +107,7 @@ export function calculateTokenDistance(token1, token2) {
  * @returns {boolean} True if there's an active encounter with combatants
  */
 export function hasActiveEncounter() {
-  return game.combat?.started && game.combat?.combatants?.size > 0;
+  return !!(game.combat?.started && game.combat?.combatants?.size > 0);
 }
 
 /**
@@ -520,28 +522,48 @@ export function filterOutcomesByEncounter(outcomes, encounterOnly, tokenProperty
  */
 export function filterOutcomesBySeekDistance(outcomes, seeker, tokenProperty = 'target') {
   try {
-    if (!Array.isArray(outcomes) || !seeker) return outcomes;
+    if (!Array.isArray(outcomes) || !seeker) {
+      return outcomes;
+    }
 
     const inCombat = hasActiveEncounter();
     const applyInCombat = !!game.settings.get(MODULE_ID, 'limitSeekRangeInCombat');
     const applyOutOfCombat = !!game.settings.get(MODULE_ID, 'limitSeekRangeOutOfCombat');
     const shouldApply = (inCombat && applyInCombat) || (!inCombat && applyOutOfCombat);
-    if (!shouldApply) return outcomes;
+
+
+    if (!shouldApply) {
+      return outcomes;
+    }
 
     const maxDistance = Number(
       inCombat
         ? game.settings.get(MODULE_ID, 'customSeekDistance')
         : game.settings.get(MODULE_ID, 'customSeekDistanceOutOfCombat'),
     );
-    if (!Number.isFinite(maxDistance) || maxDistance <= 0) return outcomes;
 
-    return outcomes.filter((outcome) => {
+
+    if (!Number.isFinite(maxDistance) || maxDistance <= 0) {
+      console.warn(`${MODULE_TITLE} | filterOutcomesBySeekDistance: Invalid max distance (${maxDistance}) - returning all outcomes`);
+      return outcomes;
+    }
+
+    const filtered = outcomes.filter((outcome) => {
       const token = outcome?.[tokenProperty];
-      if (!token) return false;
+      if (!token) {
+        return false;
+      }
       const dist = calculateTokenDistance(seeker, token);
-      return Number.isFinite(dist) ? dist <= maxDistance : true;
+      const isWithinRange = Number.isFinite(dist) ? dist <= maxDistance : true;
+
+
+      return isWithinRange;
     });
-  } catch (_) {
+
+
+    return filtered;
+  } catch (error) {
+    console.error(`${MODULE_TITLE} | filterOutcomesBySeekDistance: Error filtering by distance:`, error);
     return outcomes;
   }
 }
@@ -634,9 +656,9 @@ export async function filterOutcomesByDetection(
   tokenProperty = 'target',
   filterWalls = false,
   filterTokens = true,
-  detectionDirection = 'target_to_observer',
 ) {
   try {
+
     if (!Array.isArray(outcomes)) {
       return outcomes;
     }
@@ -752,6 +774,12 @@ export async function filterOutcomesByDetection(
         }
       })
       .filter((o) => o !== null);
+
+    const removedCount = outcomes.length - filtered.length;
+
+    if (removedCount > 0) {
+      const removed = outcomes.filter(o => !filtered.includes(o));
+    }
 
     return filtered;
   } catch (err) {

@@ -96,6 +96,23 @@ export class SeekPreviewDialog extends BaseActionDialog {
   }
 
   /**
+   * Override buildOverrideStates to filter out 'avs' option for loot tokens
+   * Loot tokens should never show the AVS tag since AVS doesn't apply to them
+   */
+  buildOverrideStates(desiredStates, outcome, options = {}) {
+    const states = super.buildOverrideStates(desiredStates, outcome, options);
+
+    const token = outcome?.target || outcome?.token;
+    const isLoot = token?.actor?.type === 'loot';
+
+    if (isLoot) {
+      return states.filter(s => s.value !== 'avs');
+    }
+
+    return states;
+  }
+
+  /**
    * Add hover functionality after rendering
    */
   // Hover/selection behavior is provided by BasePreviewDialog
@@ -106,16 +123,36 @@ export class SeekPreviewDialog extends BaseActionDialog {
   async _prepareContext(options) {
     const context = await super._prepareContext(options);
 
+    // On first render, check if range limiting is active and force filterByDetection to false
+    if (!this._hasInitializedFilters) {
+      const { hasActiveEncounter } = await import('../services/infra/shared-utils.js');
+      const inCombat = hasActiveEncounter();
+      const limitInCombat = !!game.settings.get(MODULE_ID, 'limitSeekRangeInCombat');
+      const limitOutOfCombat = !!game.settings.get(MODULE_ID, 'limitSeekRangeOutOfCombat');
+      const hasRangeLimit = (inCombat && limitInCombat) || (!inCombat && limitOutOfCombat);
+
+      // If range limiting is active, force viewport filter to OFF (it's redundant)
+      if (hasRangeLimit) {
+        this.filterByDetection = false;
+      }
+
+      this._hasInitializedFilters = true;
+    }
+
     // Start from original list so re-renders can re-include allies when the checkbox is unchecked
     const baseList = Array.isArray(this._originalOutcomes)
       ? this._originalOutcomes
       : this.outcomes || [];
+
+
     // Filter outcomes with encounter helper, ally filtering, optional walls toggle, template (if provided), then distance limits if enabled
     let filteredOutcomes = this.applyEncounterFilter(
       baseList,
       'target',
       'No encounter targets found, showing all',
     );
+
+
     // Apply ally filtering for display purposes
     try {
       if (this.actorToken) {
@@ -142,7 +179,9 @@ export class SeekPreviewDialog extends BaseActionDialog {
         'target',
       );
     }
-    // Check if seek range limitation is active
+
+    // Apply distance filtering FIRST (cheaper operation)
+    // This reduces the number of tokens we need to check for viewport/detection
     let isRangeLimited = false;
     if (this.actorToken) {
       try {
@@ -153,16 +192,16 @@ export class SeekPreviewDialog extends BaseActionDialog {
         isRangeLimited = (inCombat && applyInCombat) || (!inCombat && applyOutOfCombat);
       } catch { }
 
+      // Apply distance filter first
       filteredOutcomes = filterOutcomesBySeekDistance(filteredOutcomes, this.actorToken, 'target');
     }
 
-    // Apply LOS filtering only when NOT using template mode OR range limitation (both define affected area/range)
+    // Then apply LOS/viewport filtering if enabled (to add back detectable tokens)
     const isTemplateMode = !!(
       this.actionData.seekTemplateCenter && this.actionData.seekTemplateRadiusFeet
     );
-    const skipLOSFiltering = isTemplateMode || isRangeLimited;
 
-    if (this.actorToken && !skipLOSFiltering) {
+    if (this.actorToken && !isTemplateMode && this.filterByDetection) {
       try {
         const { filterOutcomesByDetection } = await import('../services/infra/shared-utils.js');
         // Always filter walls by viewport (true), filter tokens by viewport only if checkbox enabled (this.filterByDetection)
@@ -569,7 +608,7 @@ export class SeekPreviewDialog extends BaseActionDialog {
 
     context.isTemplateMode = templateMode;
     context.isRangeLimited = rangeLimited;
-    context.detectionFilterDisabled = templateMode || rangeLimited;
+    context.detectionFilterDisabled = templateMode;
 
     // Keep original outcomes intact; provide common context from processed list
     this.outcomes = processedOutcomes;
@@ -726,7 +765,7 @@ export class SeekPreviewDialog extends BaseActionDialog {
         } catch { }
       }
 
-      // Seek distance limits
+      // Apply distance filtering FIRST (cheaper operation)
       try {
         if (this.actorToken) {
           const { filterOutcomesBySeekDistance } = await import(
@@ -736,8 +775,8 @@ export class SeekPreviewDialog extends BaseActionDialog {
         }
       } catch { }
 
-      // Always apply wall LOS filtering for performance, optionally apply token LOS filtering if enabled
-      if (this.actorToken) {
+      // Then apply viewport/LOS filtering if enabled
+      if (this.actorToken && this.filterByDetection) {
         try {
           const { filterOutcomesByDetection } = await import('../services/infra/shared-utils.js');
           // Always filter walls by viewport (true), filter tokens by viewport only if checkbox enabled (this.filterByDetection)

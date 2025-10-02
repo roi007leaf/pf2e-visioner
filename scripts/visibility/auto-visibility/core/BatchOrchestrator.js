@@ -373,29 +373,7 @@ export class BatchOrchestrator {
             const id = t?.document?.id;
             if (id && ids.has(id)) result.push(t);
           }
-          try {
-            if (this._getDebugMode()) {
-              console.debug('PF2E Visioner | Viewport filtering active', {
-                total: all.length,
-                inViewport: result.length,
-              });
-            }
-          } catch {
-            /* noop */
-          }
           return result;
-        }
-        // Debug when viewport filtering yields empty set and we fall back
-        try {
-          if (this._getDebugMode()) {
-            const total = (canvas.tokens?.placeables || []).length;
-            console.debug(
-              'PF2E Visioner | Viewport filtering returned empty; falling back to all tokens',
-              { total },
-            );
-          }
-        } catch {
-          /* noop */
         }
       }
     } catch {

@@ -154,6 +154,18 @@ export const SPECIAL_SENSES = {
     icon: 'fas fa-moon-over-sun',
     hasRangeLimit: true,
   },
+  'lowlightvision': {
+    label: 'PF2E_VISIONER.SPECIAL_SENSES.low_light_vision',
+    description: 'PF2E_VISIONER.SPECIAL_SENSES.low_light_vision_description',
+    type: 'precise',
+    defaultRange: Infinity,
+    detectsLiving: true,
+    detectsUndead: true,
+    detectsConstructs: true,
+    canDistinguish: false,
+    icon: 'fas fa-moon-over-sun',
+    hasRangeLimit: true,
+  },
   'infrared-vision': {
     label: 'PF2E_VISIONER.SPECIAL_SENSES.infrared_vision',
     description: 'PF2E_VISIONER.SPECIAL_SENSES.infrared_vision_description',
