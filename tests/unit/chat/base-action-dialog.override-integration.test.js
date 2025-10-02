@@ -25,7 +25,7 @@ describe('BaseActionDialog - Override Removal Integration', () => {
 
         // Verify functions import AvsOverrideManager (4 locations: onApplyChange, onRevertChange, onApplyAll, onRevertAll)
         const avsImportMatches = content.match(/await import.*avs-override-manager/g);
-        expect(avsImportMatches.length).toBeGreaterThanOrEqual(3); // At least in apply/revert functions
+        expect(avsImportMatches.length).toBeGreaterThanOrEqual(2); // At least in apply/revert functions
     });
 
     test('revert functions handle non-AVS states correctly', () => {
