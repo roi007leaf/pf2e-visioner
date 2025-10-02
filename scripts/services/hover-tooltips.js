@@ -152,9 +152,8 @@ export function setTooltipMode(mode) {
  * Add event listeners to all current tokens
  */
 function addTokenEventListeners() {
-  if (!canvas?.tokens?.placeables) {
-    return;
-  }
+  if (!canvas?.tokens?.placeables) return;
+
   canvas.tokens.placeables.forEach((token) => {
     addTokenEventListener(token);
   });
@@ -163,12 +162,10 @@ function addTokenEventListeners() {
 /**
  * Add event listener to a specific token
  * @param {Token} token - The token to add listeners to
+ * @returns {boolean} True if listeners were added, false if skipped
  */
 export function addTokenEventListener(token) {
-  // Skip if already has listeners
-  if (HoverTooltips.tokenEventHandlers.has(token.id)) {
-    return;
-  }
+  if (HoverTooltips.tokenEventHandlers.has(token.id)) return false;
 
   const overHandler = () => onTokenHover(token);
   const outHandler = () => onTokenHoverEnd(token);
@@ -190,14 +187,21 @@ export function addTokenEventListener(token) {
   token.on('pointerdown', pointerDownHandler);
   token.on('pointerup', pointerUpHandler);
   token.on('pointerupoutside', pointerUpHandler); // In case pointer is released outside token
+
+  return true;
 }
 
 /**
  * Clean up token event listeners
  */
 function cleanupTokenEventListeners() {
+  if (!canvas?.tokens?.placeables) {
+    HoverTooltips.tokenEventHandlers.clear();
+    return;
+  }
+
   HoverTooltips.tokenEventHandlers.forEach((handlers, tokenId) => {
-    const token = canvas.tokens?.get?.(tokenId);
+    const token = canvas.tokens.placeables.find(t => t.id === tokenId);
     if (token) {
       try {
         token.off('pointerover', handlers.overHandler);
@@ -221,20 +225,16 @@ function cleanupTokenEventListeners() {
  * Initialize hover tooltip system
  */
 export function initializeHoverTooltips() {
+  cleanupTokenEventListeners();
+
   if (HoverTooltips._initialized || _initialized) {
-    // Scene change: clean up old listeners and reinitialize for new tokens
-    cleanupTokenEventListeners();
     addTokenEventListeners();
     HoverTooltips.refreshSizes?.();
-    // Ensure both flags are set for consistency
     HoverTooltips._initialized = true;
     _initialized = true;
     return;
   }
-  // Always initialize the tooltip system for keyboard shortcuts (Alt/O)
-  // Hover behavior will be conditionally enabled based on settings
 
-  // Set the CSS variable for tooltip font size
   try {
     const raw = game.settings?.get?.(MODULE_ID, 'tooltipFontSize');
     const { fontPx, iconPx, borderPx } = computeSizesFromSetting(
@@ -1301,13 +1301,9 @@ export function cleanupHoverTooltips() {
   HoverTooltips.isShowingKeyTooltips = false;
   HoverTooltips.keyTooltipTokens.clear();
 
-  // Reset tooltip mode to default
   setTooltipMode('target');
 
-  // Remove only our specific event listeners from tokens
   cleanupTokenEventListeners();
 
   _initialized = false;
-
-  // Note: O key event listeners are managed globally in hooks.js
 }

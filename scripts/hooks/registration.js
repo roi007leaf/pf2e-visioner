@@ -14,6 +14,7 @@ import { registerUIHooks } from './ui.js';
 export async function registerHooks() {
   Hooks.on('ready', onReady);
   Hooks.on('canvasReady', onCanvasReady);
+
   const { registerHooks: registerOptimized } = await import('../hooks/optimized-registration.js');
   registerOptimized();
   registerChatHooks();
@@ -64,7 +65,7 @@ export async function registerHooks() {
       const { updateWallVisuals } = await import('../services/visual-effects.js');
       const id = canvas.tokens.controlled?.[0]?.id || null;
       await updateWallVisuals(id);
-    } catch {}
+    } catch { }
   });
   Hooks.on('updateWall', async (doc, changes) => {
     try {
@@ -102,12 +103,12 @@ export async function registerHooks() {
                 await canvas.scene?.updateEmbeddedDocuments?.('Token', updates, { diff: false });
               }
             }
-          } catch (_) {}
+          } catch (_) { }
           // Mirror hidden flag to connected walls
           try {
             const { mirrorHiddenFlagToConnected } = await import('../services/connected-walls.js');
             await mirrorHiddenFlagToConnected(doc, true);
-          } catch (_) {}
+          } catch (_) { }
         } else {
           // If unhidden, remove entries for that wall from tokens
           try {
@@ -140,20 +141,20 @@ export async function registerHooks() {
                 await canvas.scene?.updateEmbeddedDocuments?.('Token', updates, { diff: false });
               }
             }
-          } catch (_) {}
+          } catch (_) { }
           // Mirror hidden flag to connected walls (set hidden=false)
           try {
             const { mirrorHiddenFlagToConnected } = await import('../services/connected-walls.js');
             await mirrorHiddenFlagToConnected(doc, false);
-          } catch (_) {}
+          } catch (_) { }
         }
       }
-    } catch (_) {}
+    } catch (_) { }
     try {
       const { updateWallVisuals } = await import('../services/visual-effects.js');
       const id = canvas.tokens.controlled?.[0]?.id || null;
       await updateWallVisuals(id);
-    } catch {}
+    } catch { }
   });
   Hooks.on('deleteWall', async (wallDocument) => {
     try {
@@ -173,7 +174,7 @@ export async function registerHooks() {
       const { updateWallVisuals } = await import('../services/visual-effects.js');
       const id = canvas.tokens.controlled?.[0]?.id || null;
       await updateWallVisuals(id);
-    } catch {}
+    } catch { }
   });
 
   // Removed controlToken hook - was causing excessive updateWallVisuals calls on token selection.
@@ -260,10 +261,10 @@ export async function registerHooks() {
           if (t.document.getFlag('pf2e-visioner', 'waitingSneak')) {
             try {
               await t.document.unsetFlag('pf2e-visioner', 'waitingSneak');
-            } catch {}
+            } catch { }
             try {
               if (t.locked) t.locked = false;
-            } catch {}
+            } catch { }
           }
         }
       }

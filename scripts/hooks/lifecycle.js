@@ -87,20 +87,8 @@ export async function onCanvasReady() {
         }
       }, 50);
     });
-
-    // Clean up the hook when canvas is torn down
-    Hooks.once('canvasTearDown', async () => {
-      Hooks.off('controlToken', restoreIndicatorsOnControl);
-
-      // Clean up any remaining wall indicators when canvas is torn down
-      try {
-        const { cleanupAllWallIndicators } = await import('../services/visual-effects.js');
-        await cleanupAllWallIndicators();
-      } catch (_) { }
-    });
   } catch (_) { }
 
-  // Always initialize tooltip system for keyboard shortcuts
   initializeHoverTooltips();
 
   // Always bind keyboard shortcuts (Alt handled via highlightObjects hook, O key handled here)
