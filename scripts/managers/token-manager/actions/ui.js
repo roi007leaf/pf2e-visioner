@@ -430,32 +430,7 @@ export function bindDomIconHandlers(TokenManagerClass) {
         icon.classList.add('selected');
         const hiddenInput = iconSelection.querySelector('input[type="hidden"]');
         if (hiddenInput) hiddenInput.value = newState;
-
-        // Update the current state display
-        const row = icon.closest('tr.token-row');
-        if (row) {
-          const currentStateCell = row.querySelector('td.current-state');
-          if (currentStateCell) {
-            // Get the state label and icon from the clicked button
-            const stateLabel = icon.getAttribute('data-tooltip') || icon.dataset.state;
-            const stateIcon = icon.querySelector('i')?.className || '';
-
-            // Determine the CSS class for the state indicator
-            let cssClass = '';
-            if (newState === 'observed') cssClass = 'visibility-observed';
-            else if (newState === 'hidden') cssClass = 'visibility-hidden';
-            else if (newState === 'concealed') cssClass = 'visibility-concealed';
-            else if (newState === 'undetected') cssClass = 'visibility-undetected';
-            else if (newState === 'avs') cssClass = 'visibility-avs';
-            else if (newState === 'none') cssClass = 'cover-none';
-            else if (newState === 'lesser') cssClass = 'cover-lesser';
-            else if (newState === 'standard') cssClass = 'cover-standard';
-            else if (newState === 'greater') cssClass = 'cover-greater';
-
-            // Update the current state indicator
-            currentStateCell.innerHTML = `<span class="state-indicator ${cssClass}"><i class="${stateIcon}"></i> ${stateLabel}</span>`;
-          }
-        }
+        // Note: Current State column will update only after Apply/Apply Both is pressed
       });
     });
   };

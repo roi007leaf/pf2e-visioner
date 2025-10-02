@@ -173,6 +173,7 @@ export function isTokenInEncounter(token) {
  */
 export function determineOutcome(total, die, dc) {
   const margin = total - dc;
+
   // Determine base outcome by margin
   let outcome;
   if (margin >= 10) outcome = 'critical-success';
@@ -341,9 +342,8 @@ export function markPanelComplete(panel, changes) {
     const completionMsg = `
             <div class="automation-completion">
                 <i class="fas fa-check-circle"></i>
-                <span>Applied ${changes.length} visibility change${
-                  changes.length !== 1 ? 's' : ''
-                }</span>
+                <span>Applied ${changes.length} visibility change${changes.length !== 1 ? 's' : ''
+      }</span>
             </div>
         `;
 

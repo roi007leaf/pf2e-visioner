@@ -219,4 +219,6 @@ describe('VisibilityRegionBehavior', () => {
       expect(updates).toEqual([]);
     });
   });
+
+
 });

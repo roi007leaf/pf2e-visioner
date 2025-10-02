@@ -598,9 +598,10 @@ export class SneakActionHandler extends ActionHandlerBase {
     const baseTotal = Number(actionData?.roll?.total ?? 0);
 
     // Use shared utility to calculate stealth roll totals with cover adjustments
+    // Pass null for autoCover - cover bonuses should only apply when user explicitly selects them via UI buttons
     const { total, originalTotal, baseRollTotal } = calculateStealthRollTotals(
       baseTotal,
-      result?.autoCover,
+      null,
       actionData,
     );
 
@@ -622,7 +623,6 @@ export class SneakActionHandler extends ActionHandlerBase {
     let featNotes = [];
     try {
       const { FeatsHandler } = await import('../feats-handler.js');
-      // Basic context: lighting at the sneaking token's position
 
       const { shift, notes } = FeatsHandler.getOutcomeAdjustment(actionData.actor, 'sneak');
       if (shift) {
@@ -862,13 +862,13 @@ export class SneakActionHandler extends ActionHandlerBase {
       subject,
     );
 
-    return {
+    const outcomeData = {
       token: subject,
       dc: finalDC, // Use adjusted DC
       originalDC: dc, // Keep original for reference
-      rollTotal: baseTotal, // Show the actual roll the player made
+      rollTotal: baseTotal, // Show the base roll total (cover will be added when user presses buttons)
       dieResult: die,
-      margin: baseTotal - finalDC, // Margin of actual roll vs final DC
+      margin: total - finalDC, // Margin using adjusted total
       adjustedMargin: finalMargin, // Internal adjusted margin for calculations
       originalMargin,
       baseMargin,
@@ -941,6 +941,8 @@ export class SneakActionHandler extends ActionHandlerBase {
       // Sneak Adept feat application flag
       sneakAdeptApplied,
     };
+
+    return outcomeData;
   }
 
   /**
