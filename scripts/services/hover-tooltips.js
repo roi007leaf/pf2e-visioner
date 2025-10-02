@@ -243,14 +243,14 @@ export function initializeHoverTooltips() {
       hideAllVisibilityIndicators();
       hideAllCoverIndicators();
     }
-    
+
     // Clear any existing timeout
     if (panTimeout) clearTimeout(panTimeout);
-    
+
     // Set timeout to restore tooltips after pan stops
     panTimeout = setTimeout(() => {
       HoverTooltips._isPanning = false;
-      
+
       // Restore tooltips based on what was showing before
       if (HoverTooltips._savedKeyTooltipsActive) {
         // Restore Alt/O overlay
@@ -265,7 +265,7 @@ export function initializeHoverTooltips() {
         HoverTooltips.currentHoveredToken = token;
         showVisibilityIndicators(token);
       }
-      
+
       // Clean up saved state
       delete HoverTooltips._savedHoveredToken;
       delete HoverTooltips._savedKeyTooltipsActive;
@@ -317,7 +317,7 @@ export function initializeHoverTooltips() {
 function onTokenHover(hoveredToken) {
   // Skip if currently panning
   if (HoverTooltips._isPanning) return;
-  
+
   // Only show hover tooltips if allowed for this user with current mode AND token
   // Suppress hover overlays entirely while Alt overlay is active
   if (HoverTooltips.isShowingKeyTooltips) return;
