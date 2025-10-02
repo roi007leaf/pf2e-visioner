@@ -232,6 +232,47 @@ export function initializeHoverTooltips() {
   // Add event listeners to canvas for token hover
   addTokenEventListeners();
 
+  // Handle canvas pan: hide tooltips during pan, show after
+  let panTimeout = null;
+  Hooks.on('canvasPan', () => {
+    // Hide tooltips immediately when pan starts
+    if (!HoverTooltips._isPanning) {
+      HoverTooltips._isPanning = true;
+      HoverTooltips._savedHoveredToken = HoverTooltips.currentHoveredToken;
+      HoverTooltips._savedKeyTooltipsActive = HoverTooltips.isShowingKeyTooltips;
+      hideAllVisibilityIndicators();
+      hideAllCoverIndicators();
+    }
+    
+    // Clear any existing timeout
+    if (panTimeout) clearTimeout(panTimeout);
+    
+    // Set timeout to restore tooltips after pan stops
+    panTimeout = setTimeout(() => {
+      HoverTooltips._isPanning = false;
+      
+      // Restore tooltips based on what was showing before
+      if (HoverTooltips._savedKeyTooltipsActive) {
+        // Restore Alt/O overlay
+        if (HoverTooltips.tooltipMode === 'observer') {
+          showControlledTokenVisibilityObserver();
+        } else {
+          showControlledTokenVisibility();
+        }
+      } else if (HoverTooltips._savedHoveredToken) {
+        // Restore hover tooltips
+        const token = HoverTooltips._savedHoveredToken;
+        HoverTooltips.currentHoveredToken = token;
+        showVisibilityIndicators(token);
+      }
+      
+      // Clean up saved state
+      delete HoverTooltips._savedHoveredToken;
+      delete HoverTooltips._savedKeyTooltipsActive;
+      panTimeout = null;
+    }, 150); // 150ms after pan stops
+  });
+
   // Refresh badges immediately when visibility map changes (no need to re-hover)
   try {
     Hooks.on('pf2e-visioner.visibilityMapUpdated', () => {
@@ -274,6 +315,9 @@ export function initializeHoverTooltips() {
  * @param {Token} hoveredToken - The token being hovered
  */
 function onTokenHover(hoveredToken) {
+  // Skip if currently panning
+  if (HoverTooltips._isPanning) return;
+  
   // Only show hover tooltips if allowed for this user with current mode AND token
   // Suppress hover overlays entirely while Alt overlay is active
   if (HoverTooltips.isShowingKeyTooltips) return;
