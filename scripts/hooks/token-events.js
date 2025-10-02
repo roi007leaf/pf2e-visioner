@@ -39,7 +39,7 @@ export async function onTokenCreated(scene, tokenDoc) {
         );
       }
     }
-  } catch (_) {}
+  } catch (_) { }
   setTimeout(async () => {
     await updateTokenVisuals();
     // Add hover tooltip listeners to the new token
@@ -122,6 +122,13 @@ export async function onTokenDeleted(...args) {
         cleanupDeletedTokenEffects(tokenDoc),
         cleanupDeletedTokenCoverEffects(tokenDoc),
       ]);
+
+      try {
+        const { default: AvsOverrideManager } = await import('../chat/services/infra/avs-override-manager.js');
+        await AvsOverrideManager.removeAllOverridesInvolving(tokenDoc.id);
+      } catch (error) {
+        console.error('PF2E Visioner: AVS override cleanup failed', error);
+      }
     }
     setTimeout(async () => {
       try {

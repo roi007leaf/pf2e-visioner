@@ -241,6 +241,45 @@ export class AvsOverrideManager {
     return false;
   }
 
+  static async removeAllOverridesInvolving(tokenId) {
+    if (!tokenId) return;
+    if (!canvas?.tokens?.placeables) return;
+
+    const allTokens = canvas.tokens.placeables;
+    const tokensToRecalculate = new Set([tokenId]);
+
+    for (const token of allTokens) {
+      try {
+        const flags = token.document.flags?.[MODULE_ID] || {};
+        for (const flagKey of Object.keys(flags)) {
+          if (flagKey.startsWith('avs-override-from-')) {
+            const overrideData = flags[flagKey];
+
+            if (overrideData?.observerId === tokenId || overrideData?.targetId === tokenId) {
+              try {
+                await token.document.unsetFlag(MODULE_ID, flagKey);
+                tokensToRecalculate.add(token.id);
+              } catch (e) {
+                console.warn(`PF2E Visioner | Failed to remove override flag ${flagKey} from token ${token.name}:`, e);
+              }
+            }
+          }
+        }
+      } catch (e) {
+        console.warn(`PF2E Visioner | Error processing token ${token?.name || 'unknown'} during override cleanup:`, e);
+      }
+    }
+
+    if (tokensToRecalculate.size > 1) {
+      try {
+        const { eventDrivenVisibilitySystem } = await import('../../../visibility/auto-visibility/EventDrivenVisibilitySystem.js');
+        await eventDrivenVisibilitySystem.recalculateForTokens(Array.from(tokensToRecalculate));
+      } catch (e) {
+        console.warn('PF2E Visioner | Failed to recalculate visibility after override cleanup:', e);
+      }
+    }
+  }
+
   // Clear all overrides across all tokens
   static async clearAllOverrides() {
     const allTokens = canvas.tokens?.placeables || [];
