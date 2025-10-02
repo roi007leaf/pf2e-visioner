@@ -10,7 +10,48 @@ This document provides a comprehensive overview of the PF2E Visioner module's cu
 - **PF2E System**: v6.0.0+
 - **License**: GPL-3.0
 
-## � Recent Changes (October 2025)
+## 🔄 Recent Changes (October 2025)
+
+### Wall Changes Now Trigger Proper Cache Clearing (October 2, 2025)
+
+**Bug Fixed**: Wall property changes (direction, sight/sound blocking) weren't updating visibility states when observers had conditions like deafened.
+
+**Root Causes**:
+
+1. **VisionAnalyzer Cache Stale**: `WallEventHandler` only cleared `CacheManager` caches but not the `VisionAnalyzer` cache containing observer sensing capabilities (conditions, senses)
+2. **Global Cache Preventing Updates**: Stale global visibility cache caused batch processor to skip recalculations, thinking nothing changed
+
+**The Fix**:
+
+- **WallEventHandler** now clears BOTH cache layers when walls change:
+  - `cacheManager.clearAllCaches()` - Clears LOS and global visibility caches
+  - `visionAnalyzer.clearCache()` - **NEW**: Clears observer capability cache
+- Applied to all wall event handlers:
+  - `handleWallUpdate()` - When wall properties change
+  - `handleWallCreate()` - When walls are created
+  - `handleWallDelete()` - When walls are deleted
+
+**Behavior Now**:
+
+- Changing wall direction (left → both) immediately recalculates visibility
+- Changing sight/sound blocking immediately updates detection states
+- Observer conditions (deafened, blinded) properly re-evaluated after wall changes
+- Global visibility cache correctly cleared and repopulated
+
+**Testing**:
+
+- Added `tests/unit/wall-change-cache-clear.test.js` with 7 comprehensive tests
+- Verified cache clearing for sight, sound, and direction changes
+- Integration test confirms deafened condition scenario works
+
+**Files Modified**:
+
+- `scripts/visibility/auto-visibility/core/WallEventHandler.js` - Added VisionAnalyzer cache clearing
+- `tests/unit/wall-change-cache-clear.test.js` - New test coverage
+
+**Pattern Consistency**: This matches the pattern already used in `ItemEventHandler` for condition changes.
+
+### Sight and Sound Blocking Wall Support � Recent Changes (October 2025)
 
 ### Sight and Sound Blocking Wall Support
 
