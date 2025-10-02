@@ -94,6 +94,13 @@ export class VisionerWallManager extends foundry.applications.api.ApplicationV2 
 
       const updates = [];
       const byId = new Map();
+
+      // Get all visible wall rows (not hidden by filters)
+      const visibleRows = Array.from(form.querySelectorAll('tbody tr[data-wall-id]')).filter(
+        (row) => row.style.display !== 'none',
+      );
+      const visibleWallIds = new Set(visibleRows.map((row) => row.getAttribute('data-wall-id')));
+
       // Read inputs directly so unchecked checkboxes are captured as false
       const inputs = form.querySelectorAll(
         'input[name^="wall."], select[name^="wall."], button[data-wall-id][data-cover-override]',
@@ -103,6 +110,9 @@ export class VisionerWallManager extends foundry.applications.api.ApplicationV2 
         const m = name.match(/^wall\.(?<id>[^.]+)\.(?<field>hiddenWall|identifier|dc|doorType)$/);
         if (m) {
           const { id, field } = m.groups;
+          // Only process inputs for visible walls
+          if (!visibleWallIds.has(id)) return;
+
           if (!byId.has(id)) byId.set(id, {});
           let value;
           if (field === 'hiddenWall') {
@@ -121,6 +131,9 @@ export class VisionerWallManager extends foundry.applications.api.ApplicationV2 
         // Handle cover override buttons
         if (input.hasAttribute('data-wall-id') && input.hasAttribute('data-cover-override')) {
           const wallId = input.getAttribute('data-wall-id');
+          // Only process cover overrides for visible walls
+          if (!visibleWallIds.has(wallId)) return;
+
           const coverValue = input.getAttribute('data-cover-override');
           const isActive = input.classList.contains('active');
 

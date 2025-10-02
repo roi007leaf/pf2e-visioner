@@ -92,6 +92,11 @@ export async function buildContext(app, options) {
 
   const sceneTokens = getSceneTargets(app.observer, app.encounterOnly, app.ignoreAllies);
 
+  // In target mode, filter out hazards (they can't observe other tokens)
+  const filteredTokens = app.mode === 'target'
+    ? sceneTokens.filter(token => token.actor?.type !== 'hazard')
+    : sceneTokens;
+
   context.observer = {
     id: app.observer.document.id,
     name: app.observer.document.name,
@@ -101,7 +106,7 @@ export async function buildContext(app, options) {
   let allTargets;
   if (app.mode === 'observer') {
     allTargets = await Promise.all(
-      sceneTokens.map(async (token) => {
+      filteredTokens.map(async (token) => {
         // Get manual visibility state from the map, or null if none exists
         const manualVisibilityState = app.visibilityData[token.document.id] || null;
         // For display purposes, we'll determine the actual current state later
@@ -140,13 +145,15 @@ export async function buildContext(app, options) {
           }
         }
         const isRowLoot = token.actor?.type === 'loot';
+        const isRowHazard = token.actor?.type === 'hazard';
+        const isNonAvsToken = isRowLoot || isRowHazard;
 
         // Check if AVS is enabled to determine if 'avs' button should be available
         const avsEnabled = game.settings.get(MODULE_ID, 'autoVisibilityEnabled');
 
         let allowedVisKeys =
-          isLootObserver || isRowLoot
-            ? ['avs', 'observed', 'hidden']
+          isLootObserver || isNonAvsToken
+            ? ['observed', 'hidden']
             : Object.keys(VISIBILITY_STATES);
 
         // Remove 'avs' from allowed keys if AVS is disabled
@@ -217,7 +224,10 @@ export async function buildContext(app, options) {
 
         // Update selection based on override/AVS logic
         visibilityStates.forEach((state) => {
-          if (hasAvsOverride) {
+          if (isNonAvsToken) {
+            // For loot/hazard tokens, select based on the actual current state from the map
+            state.selected = state.value === actualCurrentState;
+          } else if (hasAvsOverride) {
             // Override exists - select the override state
             state.selected = state.value === actualCurrentState;
           } else if (isAvsControlled) {
@@ -238,6 +248,8 @@ export async function buildContext(app, options) {
           img: getTokenImage(token),
           isFoundryHidden,
           isLoot: !!isRowLoot,
+          isHazard: !!isRowHazard,
+          isNonAvsToken,
           currentVisibilityState:
             allowedVisKeys.includes(actualCurrentState) && actualCurrentState !== 'avs'
               ? actualCurrentState
@@ -247,7 +259,7 @@ export async function buildContext(app, options) {
           disposition: disposition,
           dispositionClass:
             disposition === -1 ? 'hostile' : disposition === 1 ? 'friendly' : 'neutral',
-          isAvsControlled,
+          isAvsControlled: isNonAvsToken ? false : isAvsControlled,
           hasAvsOverride,
           visibilityStates,
           coverStates: Object.entries(COVER_STATES).map(([key, config]) => ({
@@ -276,7 +288,7 @@ export async function buildContext(app, options) {
     );
   } else {
     allTargets = await Promise.all(
-      sceneTokens.map(async (observerToken) => {
+      filteredTokens.map(async (observerToken) => {
         const observerVisibilityData = getVisibilityMap(observerToken);
         const observerCoverData = getCoverMap(observerToken);
         // Get manual visibility state from the map, or null if none exists
@@ -325,12 +337,14 @@ export async function buildContext(app, options) {
           }
         }
         const isRowLoot = observerToken.actor?.type === 'loot' || isLootObserver;
+        const isRowHazard = observerToken.actor?.type === 'hazard';
+        const isNonAvsToken = isRowLoot || isRowHazard;
 
         // Check if AVS is enabled to determine if 'avs' button should be available
         const avsEnabledForTarget = game.settings.get(MODULE_ID, 'autoVisibilityEnabled');
 
-        let allowedVisKeys = isRowLoot
-          ? ['avs', 'observed', 'hidden']
+        let allowedVisKeys = isNonAvsToken
+          ? ['observed', 'hidden']
           : Object.keys(VISIBILITY_STATES);
 
         // Remove 'avs' from allowed keys if AVS is disabled
@@ -402,7 +416,10 @@ export async function buildContext(app, options) {
 
         // Update selection based on override/AVS logic
         visibilityStates.forEach((state) => {
-          if (hasAvsOverride) {
+          if (isNonAvsToken) {
+            // For loot/hazard tokens, select based on the actual current state from the map
+            state.selected = state.value === actualCurrentState;
+          } else if (hasAvsOverride) {
             // Override exists - select the override state
             state.selected = state.value === actualCurrentState;
           } else if (isAvsControlled) {
@@ -423,6 +440,8 @@ export async function buildContext(app, options) {
           img: getTokenImage(observerToken),
           isFoundryHidden,
           isLoot: !!(observerToken.actor?.type === 'loot'),
+          isHazard: !!(observerToken.actor?.type === 'hazard'),
+          isNonAvsToken,
           currentVisibilityState:
             allowedVisKeys.includes(actualCurrentState) && actualCurrentState !== 'avs'
               ? actualCurrentState
@@ -432,7 +451,7 @@ export async function buildContext(app, options) {
           disposition: disposition,
           dispositionClass:
             disposition === -1 ? 'hostile' : disposition === 1 ? 'friendly' : 'neutral',
-          isAvsControlled,
+          isAvsControlled: isNonAvsToken ? false : isAvsControlled,
           hasAvsOverride,
           visibilityStates,
           coverStates: Object.entries(COVER_STATES).map(([key, config]) => ({
@@ -485,8 +504,9 @@ export async function buildContext(app, options) {
     return sortByStatusAndName(a, b);
   };
 
-  context.pcTargets = allTargets.filter((t) => t.isPC && !t.isLoot).sort(sortWithOverridesFirst);
-  context.npcTargets = allTargets.filter((t) => !t.isPC && !t.isLoot).sort(sortWithOverridesFirst);
+  context.pcTargets = allTargets.filter((t) => t.isPC && !t.isLoot && !t.isHazard).sort(sortWithOverridesFirst);
+  context.npcTargets = allTargets.filter((t) => !t.isPC && !t.isLoot && !t.isHazard).sort(sortWithOverridesFirst);
+  context.hazardTargets = app.mode === 'observer' ? allTargets.filter((t) => t.isHazard).sort(sortByStatusAndName) : [];
   context.lootTargets =
     app.mode === 'observer' ? allTargets.filter((t) => t.isLoot).sort(sortByStatusAndName) : [];
   context.targets = allTargets;
@@ -596,6 +616,7 @@ export async function buildContext(app, options) {
   context.hasTargets = allTargets.length > 0;
   context.hasPCs = context.pcTargets.length > 0;
   context.hasNPCs = context.npcTargets.length > 0;
+  context.hasHazards = app.mode === 'observer' && context.hazardTargets.length > 0;
   context.hasLoots = app.mode === 'observer' && context.lootTargets.length > 0;
   context.includeWalls = context.includeWalls || false;
   try {

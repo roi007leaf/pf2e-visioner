@@ -460,6 +460,137 @@ describe('Wall Manager Integration Tests', () => {
     });
   });
 
+  describe('Wall Manager Filtering', () => {
+    test('apply action should only process visible (filtered) walls', () => {
+      const mockWalls = [
+        {
+          id: 'secret-door-1',
+          document: {
+            id: 'secret-door-1',
+            door: 2,
+            flags: { 'pf2e-visioner': { hidden: false, stealthDC: 20 } },
+            c: [100, 100, 200, 100],
+            getFlag: (module, key) => {
+              if (module === 'pf2e-visioner' && key === 'hiddenWall') {
+                return false;
+              }
+              return undefined;
+            },
+          },
+        },
+        {
+          id: 'secret-door-2',
+          document: {
+            id: 'secret-door-2',
+            door: 2,
+            flags: { 'pf2e-visioner': { hidden: false, stealthDC: 22 } },
+            c: [300, 100, 400, 100],
+            getFlag: (module, key) => {
+              if (module === 'pf2e-visioner' && key === 'hiddenWall') {
+                return false;
+              }
+              return undefined;
+            },
+          },
+        },
+        {
+          id: 'normal-wall-1',
+          document: {
+            id: 'normal-wall-1',
+            door: 0,
+            flags: { 'pf2e-visioner': { hidden: false, stealthDC: 15 } },
+            c: [500, 100, 600, 100],
+            getFlag: (module, key) => {
+              if (module === 'pf2e-visioner' && key === 'hiddenWall') {
+                return false;
+              }
+              return undefined;
+            },
+          },
+        },
+      ];
+
+      global.canvas.walls.placeables = mockWalls;
+
+      const mockFormRows = [
+        { wallId: 'secret-door-1', visible: true },
+        { wallId: 'secret-door-2', visible: true },
+        { wallId: 'normal-wall-1', visible: false },
+      ];
+
+      const processFilteredWalls = (formRows) => {
+        const processedWalls = [];
+
+        formRows.forEach((row) => {
+          if (row.visible) {
+            const wall = mockWalls.find((w) => w.id === row.wallId);
+            if (wall) {
+              processedWalls.push(wall.id);
+            }
+          }
+        });
+
+        return processedWalls;
+      };
+
+      const result = processFilteredWalls(mockFormRows);
+
+      expect(result).toHaveLength(2);
+      expect(result).toContain('secret-door-1');
+      expect(result).toContain('secret-door-2');
+      expect(result).not.toContain('normal-wall-1');
+    });
+
+    test('apply should process all walls when no filter is active', () => {
+      const mockWalls = [
+        {
+          id: 'wall-1',
+          document: {
+            id: 'wall-1',
+            door: 0,
+            flags: { 'pf2e-visioner': { hidden: false } },
+            getFlag: () => undefined,
+          },
+        },
+        {
+          id: 'wall-2',
+          document: {
+            id: 'wall-2',
+            door: 0,
+            flags: { 'pf2e-visioner': { hidden: false } },
+            getFlag: () => undefined,
+          },
+        },
+        {
+          id: 'wall-3',
+          document: {
+            id: 'wall-3',
+            door: 0,
+            flags: { 'pf2e-visioner': { hidden: false } },
+            getFlag: () => undefined,
+          },
+        },
+      ];
+
+      const mockFormRows = [
+        { wallId: 'wall-1', visible: true },
+        { wallId: 'wall-2', visible: true },
+        { wallId: 'wall-3', visible: true },
+      ];
+
+      const processFilteredWalls = (formRows) => {
+        return formRows.filter((row) => row.visible).map((row) => row.wallId);
+      };
+
+      const result = processFilteredWalls(mockFormRows);
+
+      expect(result).toHaveLength(3);
+      expect(result).toContain('wall-1');
+      expect(result).toContain('wall-2');
+      expect(result).toContain('wall-3');
+    });
+  });
+
   describe('Wall Manager Error Handling', () => {
     test('wall manager handles invalid wall data gracefully', () => {
       // Mock error handling

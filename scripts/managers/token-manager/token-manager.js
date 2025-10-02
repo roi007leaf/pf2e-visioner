@@ -1,6 +1,13 @@
 /**
  * ApplicationV2-based Visioner Token Manager
- * Handles both visibility and cover management for tokens
+      bulkNPCObserved: VisionerTokenManager.bulkSetVisibilityState,
+      bulkHazardsObserved: VisionerTokenManager.bulkSetVisibilityState,
+      bulkHazardsHidden: VisionerTokenManager.bulkSetVisibilityState,
+      bulkLootObserved: VisionerTokenManager.bulkSetVisibilityState,
+      bulkLootHidden: VisionerTokenManager.bulkSetVisibilityState,
+      bulkWallsObserved: VisionerTokenManager.bulkSetVisibilityState,
+      bulkWallsHidden: VisionerTokenManager.bulkSetVisibilityState,
+      bulkPCNoCover: VisionerTokenManager.bulkSetCoverState, Handles both visibility and cover management for tokens
  */
 
 import { getCoverMap, getVisibilityMap } from '../../utils.js';
@@ -51,19 +58,14 @@ export class VisionerTokenManager extends foundry.applications.api.ApplicationV2
       bulkNPCUndetected: VisionerTokenManager.bulkSetVisibilityState,
       bulkNPCConcealed: VisionerTokenManager.bulkSetVisibilityState,
       bulkNPCObserved: VisionerTokenManager.bulkSetVisibilityState,
-      bulkLootAvs: VisionerTokenManager.bulkSetVisibilityState,
-      bulkLootObserved: VisionerTokenManager.bulkSetVisibilityState,
-      bulkLootHidden: VisionerTokenManager.bulkSetVisibilityState,
-      bulkWallsObserved: VisionerTokenManager.bulkSetVisibilityState,
-      bulkWallsHidden: VisionerTokenManager.bulkSetVisibilityState,
-      bulkPCNoCover: VisionerTokenManager.bulkSetCoverState,
-      bulkPCLesserCover: VisionerTokenManager.bulkSetCoverState,
-      bulkPCStandardCover: VisionerTokenManager.bulkSetCoverState,
-      bulkPCGreaterCover: VisionerTokenManager.bulkSetCoverState,
       bulkNPCNoCover: VisionerTokenManager.bulkSetCoverState,
       bulkNPCLesserCover: VisionerTokenManager.bulkSetCoverState,
       bulkNPCStandardCover: VisionerTokenManager.bulkSetCoverState,
       bulkNPCGreaterCover: VisionerTokenManager.bulkSetCoverState,
+      bulkHazardsNoCover: VisionerTokenManager.bulkSetCoverState,
+      bulkHazardsLesserCover: VisionerTokenManager.bulkSetCoverState,
+      bulkHazardsStandardCover: VisionerTokenManager.bulkSetCoverState,
+      bulkHazardsGreaterCover: VisionerTokenManager.bulkSetCoverState,
     };
     return cfg;
   })();
@@ -113,7 +115,7 @@ export class VisionerTokenManager extends foundry.applications.api.ApplicationV2
   static {
     try {
       bindTokenManagerActions(VisionerTokenManager);
-    } catch (_) {}
+    } catch (_) { }
   }
 
   /**
@@ -334,20 +336,20 @@ export class VisionerTokenManager extends foundry.applications.api.ApplicationV2
           this.setPosition({ width: minWidth });
         }
       }
-    } catch (_) {}
+    } catch (_) { }
     // No row→token hover anymore (to avoid conflict with canvas→row). Keep icon handlers.
     // Provided by managers/token-manager/actions.js via bindTokenManagerActions
     // Setup canvas selection → row highlighting and canvas hover → row
     try {
       // Bind per-row icon click handlers (visibility/cover selection)
       this.addIconClickHandlers?.();
-    } catch (_) {}
+    } catch (_) { }
     try {
       // Add token image click handlers for panning and selection
       this.addTokenImageClickHandlers?.();
-    } catch (_) {}
+    } catch (_) { }
     try {
-    } catch (_) {}
+    } catch (_) { }
     attachSelectionHandlers(this.constructor);
     attachCanvasHoverHandlers(this.constructor);
     applySelectionHighlight(this.constructor);
@@ -355,7 +357,7 @@ export class VisionerTokenManager extends foundry.applications.api.ApplicationV2
     // Setup apply button animation for form changes
     try {
       attachApplyButtonAnimation(this);
-    } catch (_) {}
+    } catch (_) { }
 
     // Apply visual filter for Foundry-hidden tokens based on toggle
     try {
@@ -366,7 +368,7 @@ export class VisionerTokenManager extends foundry.applications.api.ApplicationV2
       rows.forEach((r) => {
         r.style.display = hide ? 'none' : '';
       });
-    } catch (_) {}
+    } catch (_) { }
   }
 
   /**
@@ -387,7 +389,7 @@ export class VisionerTokenManager extends foundry.applications.api.ApplicationV2
           .querySelectorAll('tr.token-row.row-hover')
           ?.forEach((el) => el.classList.remove('row-hover'));
       }
-    } catch (_) {}
+    } catch (_) { }
 
     // Clear the current instance reference
     if (VisionerTokenManager.currentInstance === this) {

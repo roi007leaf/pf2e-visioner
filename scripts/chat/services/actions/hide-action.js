@@ -1,4 +1,4 @@
-import { COVER_STATES, VISIBILITY_STATES } from '../../../constants.js';
+import { COVER_STATES, MODULE_ID, VISIBILITY_STATES } from '../../../constants.js';
 import autoCoverSystem from '../../../cover/auto-cover/AutoCoverSystem.js';
 import stealthCheckUseCase from '../../../cover/auto-cover/usecases/StealthCheckUseCase.js';
 import { getCoverBetween } from '../../../utils.js';
@@ -19,6 +19,26 @@ export class HideActionHandler extends ActionHandlerBase {
   }
   getOutcomeTokenId(outcome) {
     return outcome?.target?.id ?? null;
+  }
+  isOldStateAvsControlled(outcome, actionData) {
+    try {
+      const avsEnabled = game.settings.get(MODULE_ID, 'autoVisibilityEnabled');
+      if (!avsEnabled) return false;
+
+      const observer = outcome.target;
+      const actor = actionData?.actor;
+
+      if (!observer || !actor) return false;
+
+      const hasOverride = !!actor.document?.getFlag(
+        MODULE_ID,
+        `avs-override-from-${observer.document?.id || observer.id}`,
+      );
+
+      return !hasOverride;
+    } catch {
+      return false;
+    }
   }
   async ensurePrerequisites(actionData) {
     const { ensureActionRoll } = await import('../infra/roll-utils.js');

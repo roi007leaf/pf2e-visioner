@@ -1,4 +1,4 @@
-import { COVER_STATES, SNEAK_FLAGS, VISIBILITY_STATES } from '../../../constants.js';
+import { COVER_STATES, MODULE_ID, SNEAK_FLAGS, VISIBILITY_STATES } from '../../../constants.js';
 import autoCoverSystem from '../../../cover/auto-cover/AutoCoverSystem.js';
 import stealthCheckUseCase from '../../../cover/auto-cover/usecases/StealthCheckUseCase.js';
 import { getCoverBetween } from '../../../utils.js';
@@ -24,6 +24,26 @@ export class SneakActionHandler extends ActionHandlerBase {
   }
   getOutcomeTokenId(outcome) {
     return outcome?.token?.id ?? outcome?.target?.id ?? null;
+  }
+  isOldStateAvsControlled(outcome, actionData) {
+    try {
+      const avsEnabled = game.settings.get(MODULE_ID, 'autoVisibilityEnabled');
+      if (!avsEnabled) return false;
+
+      const observer = outcome.token || outcome.target;
+      const actor = actionData?.actor;
+
+      if (!observer || !actor) return false;
+
+      const hasOverride = !!actor.document?.getFlag(
+        MODULE_ID,
+        `avs-override-from-${observer.document?.id || observer.id}`,
+      );
+
+      return !hasOverride;
+    } catch {
+      return false;
+    }
   }
 
   /**
@@ -536,7 +556,7 @@ export class SneakActionHandler extends ActionHandlerBase {
           const upgraded = FeatsHandler.upgradeCoverForCreature(actionData.actor, coverState);
           coverState = upgraded.state;
           var _csCanTakeCover = upgraded.canTakeCover;
-        } catch {}
+        } catch { }
         const coverConfig = COVER_STATES[coverState || 'none'];
         const actualStealthBonus = coverConfig?.bonusStealth || 0;
         result.autoCover = {
@@ -587,9 +607,9 @@ export class SneakActionHandler extends ActionHandlerBase {
     const dc = adjustedDC;
     const die = Number(
       actionData?.roll?.dice?.[0]?.results?.[0]?.result ??
-        actionData?.roll?.dice?.[0]?.total ??
-        actionData?.roll?.terms?.[0]?.total ??
-        0,
+      actionData?.roll?.dice?.[0]?.total ??
+      actionData?.roll?.terms?.[0]?.total ??
+      0,
     );
     const margin = total - dc;
     const originalMargin = originalTotal ? originalTotal - dc : margin;
@@ -677,7 +697,7 @@ export class SneakActionHandler extends ActionHandlerBase {
               endCover === 'standard' || endCover === 'greater' || endVis === 'concealed';
             if (!endQualifies) newVisibility = 'observed';
           }
-        } catch {}
+        } catch { }
         // Feat-based post visibility adjustments (e.g., Vanish into the Land)
         try {
           const { FeatsHandler } = await import('../feats-handler.js');
@@ -698,7 +718,7 @@ export class SneakActionHandler extends ActionHandlerBase {
               outcome: adjustedOutcome,
             },
           );
-        } catch {}
+        } catch { }
       } else {
         // Fall back to standard outcome determination
         const { getDefaultNewStateFor } = await import('../data/action-state-config.js');
@@ -723,7 +743,7 @@ export class SneakActionHandler extends ActionHandlerBase {
               outcome: adjustedOutcome,
             },
           );
-        } catch {}
+        } catch { }
       }
     } catch (error) {
       console.warn(
@@ -753,7 +773,7 @@ export class SneakActionHandler extends ActionHandlerBase {
             outcome: adjustedOutcome,
           },
         );
-      } catch {}
+      } catch { }
     }
 
     // Track roll outcomes for Sneaky/Very Sneaky feat mechanics
@@ -878,7 +898,7 @@ export class SneakActionHandler extends ActionHandlerBase {
         let manualState = null;
         try {
           manualState = getVisibilityBetween(subject, actionData.actor);
-        } catch {}
+        } catch { }
         if (manualState) return manualState;
         // 3. AVS calculation (position tracker)
         return positionTransition?.startPosition?.avsVisibility || current;
@@ -908,13 +928,13 @@ export class SneakActionHandler extends ActionHandlerBase {
       // Enhanced outcome determination data
       enhancedOutcomeData: enhancedOutcome
         ? {
-            outcomeReason: enhancedOutcome.outcomeReason,
-            avsDecisionUsed: enhancedOutcome.avsDecisionUsed,
-            positionQualifications: enhancedOutcome.positionQualifications,
-            rollData: enhancedOutcome.rollData,
-            rollEnhanced: enhancedOutcome.rollEnhanced,
-            explanation: enhancedOutcome.explanation || null,
-          }
+          outcomeReason: enhancedOutcome.outcomeReason,
+          avsDecisionUsed: enhancedOutcome.avsDecisionUsed,
+          positionQualifications: enhancedOutcome.positionQualifications,
+          rollData: enhancedOutcome.rollData,
+          rollEnhanced: enhancedOutcome.rollEnhanced,
+          explanation: enhancedOutcome.explanation || null,
+        }
         : null,
       // Feats adjustment notes
       featNotes,

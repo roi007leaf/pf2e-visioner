@@ -531,4 +531,91 @@ describe('Attack Consequences Action Comprehensive Tests', () => {
       expect(actionableOutcomes).toHaveLength(2);
     });
   });
+
+  describe('Manual Override with Same State (AVS-controlled)', () => {
+    test('isOldStateAvsControlled checks the correct token', () => {
+      const { ConsequencesActionHandler } = require('../../../scripts/chat/services/actions/consequences-action.js');
+      const MODULE_ID = 'pf2e-visioner';
+
+      const handler = new ConsequencesActionHandler();
+
+      const observerId = 'observer-123';
+      const attackerId = 'attacker-456';
+
+      const mockObserver = {
+        id: observerId,
+        document: { id: observerId },
+      };
+
+      const mockAttacker = {
+        id: attackerId,
+        document: {
+          id: attackerId,
+          getFlag: jest.fn(() => undefined),
+        },
+      };
+
+      const outcome = { target: mockObserver };
+      const actionData = { actor: mockAttacker };
+
+      game.settings.get = jest.fn((module, key) => {
+        if (module === MODULE_ID && key === 'autoVisibilityEnabled') return true;
+        return false;
+      });
+
+      const isAvsControlled = handler.isOldStateAvsControlled(outcome, actionData);
+
+      expect(isAvsControlled).toBe(true);
+      expect(mockAttacker.document.getFlag).toHaveBeenCalledWith(
+        MODULE_ID,
+        `avs-override-from-${observerId}`,
+      );
+    });
+
+    test('applyOverrides marks outcome as changed when state matches but old is AVS-controlled', () => {
+      const { ConsequencesActionHandler } = require('../../../scripts/chat/services/actions/consequences-action.js');
+      const MODULE_ID = 'pf2e-visioner';
+
+      const handler = new ConsequencesActionHandler();
+
+      const observerId = 'observer-123';
+      const attackerId = 'attacker-456';
+
+      const mockObserver = {
+        id: observerId,
+        document: { id: observerId },
+      };
+
+      const mockAttacker = {
+        id: attackerId,
+        document: {
+          id: attackerId,
+          getFlag: jest.fn(() => undefined),
+        },
+      };
+
+      const outcome = {
+        target: mockObserver,
+        currentVisibility: 'hidden',
+        oldVisibility: 'hidden',
+      };
+
+      const actionData = {
+        actor: mockAttacker,
+        overrides: { [observerId]: 'hidden' },
+      };
+
+      game.settings.get = jest.fn((module, key) => {
+        if (module === MODULE_ID && key === 'autoVisibilityEnabled') return true;
+        return false;
+      });
+
+      const outcomes = [outcome];
+      handler.applyOverrides(actionData, outcomes);
+
+      expect(outcomes[0].changed).toBe(true);
+      expect(outcomes[0].newVisibility).toBe('hidden');
+    });
+  });
 });
+

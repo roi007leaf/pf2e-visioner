@@ -1,4 +1,4 @@
-import { VISIBILITY_STATES } from '../../../constants.js';
+import { MODULE_ID, VISIBILITY_STATES } from '../../../constants.js';
 import { appliedDiversionChangesByMessage } from '../data/message-cache.js';
 import { shouldFilterAlly } from '../infra/shared-utils.js';
 import { ActionHandlerBase } from './base-action.js';
@@ -12,6 +12,26 @@ export class DiversionActionHandler extends ActionHandlerBase {
   }
   getOutcomeTokenId(outcome) {
     return outcome?.observer?.id ?? outcome?.target?.id ?? null;
+  }
+  isOldStateAvsControlled(outcome, actionData) {
+    try {
+      const avsEnabled = game.settings.get(MODULE_ID, 'autoVisibilityEnabled');
+      if (!avsEnabled) return false;
+
+      const observer = outcome.observer || outcome.token || outcome.target;
+      const actor = actionData?.actor;
+
+      if (!observer || !actor) return false;
+
+      const hasOverride = !!actor.document?.getFlag(
+        MODULE_ID,
+        `avs-override-from-${observer.document?.id || observer.id}`,
+      );
+
+      return !hasOverride;
+    } catch {
+      return false;
+    }
   }
   async discoverSubjects(actionData) {
     // Observers are all other tokens; exclude acting token, loot, and hazards

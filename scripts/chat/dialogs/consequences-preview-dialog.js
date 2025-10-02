@@ -252,6 +252,27 @@ export class ConsequencesPreviewDialog extends BaseActionDialog {
     return content;
   }
 
+  isOldStateAvsControlled(outcome) {
+    try {
+      const avsEnabled = game.settings.get(MODULE_ID, 'autoVisibilityEnabled');
+      if (!avsEnabled) return false;
+
+      const observer = outcome.target;
+      const attacker = this.attackingToken || this.actionData?.actor;
+
+      if (!observer || !attacker) return false;
+
+      const hasOverride = !!attacker.document?.getFlag(
+        MODULE_ID,
+        `avs-override-from-${observer.document?.id || observer.id}`,
+      );
+
+      return !hasOverride;
+    } catch {
+      return false;
+    }
+  }
+
   /**
    * Calculate if there's an actionable change (considering overrides)
    */

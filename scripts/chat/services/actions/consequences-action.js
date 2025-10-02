@@ -17,6 +17,26 @@ export class ConsequencesActionHandler extends ActionHandlerBase {
   getOutcomeTokenId(outcome) {
     return outcome?.target?.id ?? null;
   }
+  isOldStateAvsControlled(outcome, actionData) {
+    try {
+      const avsEnabled = game.settings.get(MODULE_ID, 'autoVisibilityEnabled');
+      if (!avsEnabled) return false;
+
+      const observer = outcome.target;
+      const attacker = actionData?.actor;
+
+      if (!observer || !attacker) return false;
+
+      const hasOverride = !!attacker.document?.getFlag(
+        MODULE_ID,
+        `avs-override-from-${observer.document?.id || observer.id}`,
+      );
+
+      return !hasOverride;
+    } catch {
+      return false;
+    }
+  }
   async discoverSubjects(actionData) {
     const tokens = canvas?.tokens?.placeables || [];
     const attacker = actionData?.actor || null;
@@ -157,7 +177,7 @@ export class ConsequencesActionHandler extends ActionHandlerBase {
             data: flagReverse,
           });
         }
-      } catch {}
+      } catch { }
     }
     return results;
   }
@@ -215,7 +235,7 @@ export class ConsequencesActionHandler extends ActionHandlerBase {
             const { filterOutcomesByEncounter } = await import('../infra/shared-utils.js');
             changed = filterOutcomesByEncounter(changed, actionData.encounterOnly, 'target');
           }
-        } catch {}
+        } catch { }
 
         // Create overrides for each observer->attacker pair and cache them for revert
         const createdOverrides = [];
@@ -224,35 +244,31 @@ export class ConsequencesActionHandler extends ActionHandlerBase {
             const observer = outcome.target;
             const newVisibility = outcome.overrideState || outcome.newVisibility || 'observed';
 
-            // Only create override if the new state differs from current
-            if (newVisibility !== outcome.currentVisibility) {
-              const changesByTarget = new Map([
-                [
-                  attacker.document.id,
-                  {
-                    target: attacker,
-                    state: newVisibility,
-                    hasCover: false, // Consequences don't typically involve cover
-                    hasConcealment: false,
-                    expectedCover: null,
-                  },
-                ],
-              ]);
+            const changesByTarget = new Map([
+              [
+                attacker.document.id,
+                {
+                  target: attacker,
+                  state: newVisibility,
+                  hasCover: false,
+                  hasConcealment: false,
+                  expectedCover: null,
+                },
+              ],
+            ]);
 
-              await AvsOverrideManager.setPairOverrides(observer, changesByTarget, {
-                source: 'consequences_action',
-              });
+            await AvsOverrideManager.setPairOverrides(observer, changesByTarget, {
+              source: 'consequences_action',
+            });
 
-              // Cache this created override for revert
-              createdOverrides.push({
-                type: 'avs-created',
-                observerId: observer.document.id,
-                targetId: attacker.document.id,
-                state: newVisibility,
-              });
+            createdOverrides.push({
+              type: 'avs-created',
+              observerId: observer.document.id,
+              targetId: attacker.document.id,
+              state: newVisibility,
+            });
 
-              overridesCreated++;
-            }
+            overridesCreated++;
           } catch (err) {
             console.warn('PF2E Visioner | Failed to create AVS override for consequences:', err);
           }
@@ -345,7 +361,7 @@ export class ConsequencesActionHandler extends ActionHandlerBase {
           const { filterOutcomesByEncounter } = await import('../infra/shared-utils.js');
           filtered = filterOutcomesByEncounter(changed, actionData.encounterOnly, 'target');
         }
-      } catch {}
+      } catch { }
 
       if (filtered.length === 0) {
         notify.info('No changes to apply');
@@ -358,7 +374,7 @@ export class ConsequencesActionHandler extends ActionHandlerBase {
         if (actionData?.overrides && typeof actionData.overrides === 'object') {
           overridesMap = new Map(Object.entries(actionData.overrides));
         }
-      } catch {}
+      } catch { }
       const changes = filtered
         .map((o) => {
           const ch = this.outcomeToChange(actionData, o);
@@ -394,7 +410,7 @@ export class ConsequencesActionHandler extends ActionHandlerBase {
           updates.push(update);
         }
         if (updates.length) await canvas.scene.updateEmbeddedDocuments('Token', updates);
-      } catch {}
+      } catch { }
 
       // Do NOT auto-clear AVS overrides here. This action now strictly applies visibility
       // changes. Clearing overrides is available as a separate explicit user action
