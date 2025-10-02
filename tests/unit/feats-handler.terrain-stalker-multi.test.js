@@ -65,8 +65,8 @@ describe('FeatsHandler - multiple Terrain Stalker feats', () => {
             const FH = mod2.FeatsHandler || mod2.default || mod2;
             const base = { startQualifies: false, endQualifies: false };
             const result = FH.overridePrerequisites(token, base, { action: 'sneak' });
-            expect(result.startQualifies).toBe(true);
-            expect(result.endQualifies).toBe(false);
+            expect(result.startQualifies).toBe(false);
+            expect(result.endQualifies).toBe(true);
             expect(result.reason).toMatch(/Terrain Stalker \(urban\)/);
         });
         jest.dontMock('../../scripts/utils/environment.js');
@@ -98,7 +98,7 @@ describe('FeatsHandler - multiple Terrain Stalker feats', () => {
 
             const base = { startQualifies: false, endQualifies: false };
             const result = FH.overridePrerequisites(token, base, { action: 'hide' });
-            expect(result.startQualifies).toBe(true);
+            expect(result.startQualifies).toBe(false);
             expect(result.endQualifies).toBe(true);
             expect(result.reason).toMatch(/Vanish into the Land \(forest difficult terrain\)/);
         });

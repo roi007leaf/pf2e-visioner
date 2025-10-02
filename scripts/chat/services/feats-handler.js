@@ -382,8 +382,7 @@ export class FeatsHandler {
         for (const selection of selections) {
           const regions = EnvironmentHelper.getMatchingEnvironmentRegions(tokenOrActor, selection) || [];
           if (regions.length > 0) {
-            // In matching difficult terrain for ANY TS selection: relax both start and end requirements
-            if (!startQualifies) startQualifies = true;
+            // In matching difficult terrain for ANY TS selection: relax end requirement
             if (!endQualifies) endQualifies = true;
             if (!reason) reason = `Vanish into the Land (${selection} difficult terrain)`;
             break;
@@ -393,20 +392,20 @@ export class FeatsHandler {
     }
 
     // Terrain Stalker: Can Hide or Sneak while observed in chosen terrain
-    if (!startQualifies && feats.has('terrain-stalker')) {
+    if (!endQualifies && feats.has('terrain-stalker')) {
       try {
         const selections = FeatsHandler._getTerrainStalkerSelections(actor);
         for (const selection of selections) {
           if (selection && EnvironmentHelper.isEnvironmentActive(tokenOrActor, selection)) {
-            startQualifies = true;
+            endQualifies = true;
             if (!reason) reason = `Terrain Stalker (${selection})`;
             break;
           }
         }
       } catch {
         // Fall back to legacy tag hints if any provided
-        if (extra?.startTerrainTag || extra?.endTerrainTag) {
-          startQualifies = true;
+        if (extra?.endTerrainTag) {
+          endQualifies = true;
           if (!reason) reason = 'Terrain Stalker (chosen terrain)';
         }
       }
