@@ -278,6 +278,15 @@ export class AvsOverrideManager {
         console.warn('PF2E Visioner | Failed to recalculate visibility after override cleanup:', e);
       }
     }
+
+    try {
+      const { default: indicator } = await import('../../../ui/override-validation-indicator.js');
+      if (indicator && typeof indicator.update === 'function') {
+        indicator.update([], '');
+      }
+    } catch (e) {
+      console.warn('PF2E Visioner | Failed to update override indicator after cleanup:', e);
+    }
   }
 
   // Clear all overrides across all tokens

@@ -197,16 +197,20 @@ export function addTokenEventListener(token) {
  */
 function cleanupTokenEventListeners() {
   HoverTooltips.tokenEventHandlers.forEach((handlers, tokenId) => {
-    const token = canvas.tokens.get(tokenId);
+    const token = canvas.tokens?.get?.(tokenId);
     if (token) {
-      token.off('pointerover', handlers.overHandler);
-      token.off('pointerout', handlers.outHandler);
-      if (handlers.pointerDownHandler) {
-        token.off('pointerdown', handlers.pointerDownHandler);
-      }
-      if (handlers.pointerUpHandler) {
-        token.off('pointerup', handlers.pointerUpHandler);
-        token.off('pointerupoutside', handlers.pointerUpHandler);
+      try {
+        token.off('pointerover', handlers.overHandler);
+        token.off('pointerout', handlers.outHandler);
+        if (handlers.pointerDownHandler) {
+          token.off('pointerdown', handlers.pointerDownHandler);
+        }
+        if (handlers.pointerUpHandler) {
+          token.off('pointerup', handlers.pointerUpHandler);
+          token.off('pointerupoutside', handlers.pointerUpHandler);
+        }
+      } catch (e) {
+        console.warn('PF2E Visioner: Error removing token event listeners', e);
       }
     }
   });
