@@ -28,11 +28,17 @@ describe('Sight and Sound Blocking', () => {
             id: 'observer-1',
             name: 'Observer',
             center: { x: 100, y: 100 },
+            document: {
+                detectionModes: [
+                    { id: 'hearing', enabled: true, range: 60 }
+                ]
+            },
             actor: {
                 system: {
                     perception: {
                         senses: [
-                            { type: 'low-light-vision', range: Infinity }
+                            { type: 'low-light-vision', range: Infinity },
+                            { type: 'hearing', acuity: 'imprecise', range: 60 }
                         ]
                     }
                 },
@@ -150,8 +156,8 @@ describe('Sight and Sound Blocking', () => {
         it('should block visual detection when hasLineOfSight is false', () => {
             const input = {
                 observer: {
-                    precise: { 'light-perception': Infinity },
-                    imprecise: { hearing: 60 },
+                    precise: { 'light-perception': { range: Infinity } },
+                    imprecise: { hearing: { range: 60 } },
                     conditions: { blinded: false, deafened: false, dazzled: false },
                     lightingLevel: 'bright'
                 },
@@ -176,8 +182,8 @@ describe('Sight and Sound Blocking', () => {
         it('should result in undetected when both sight and sound blocked', () => {
             const input = {
                 observer: {
-                    precise: { 'light-perception': Infinity },
-                    imprecise: { hearing: 60 },
+                    precise: { 'light-perception': { range: Infinity } },
+                    imprecise: { hearing: { range: 60 } },
                     conditions: { blinded: false, deafened: false, dazzled: false },
                     lightingLevel: 'bright'
                 },
@@ -202,8 +208,8 @@ describe('Sight and Sound Blocking', () => {
         it('should result in undetected when no sight and observer deafened', () => {
             const input = {
                 observer: {
-                    precise: { 'light-perception': Infinity },
-                    imprecise: { hearing: 60 },
+                    precise: { 'light-perception': { range: Infinity } },
+                    imprecise: { hearing: { range: 60 } },
                     conditions: { blinded: false, deafened: true, dazzled: false }, // Deafened
                     lightingLevel: 'bright'
                 },
@@ -228,8 +234,11 @@ describe('Sight and Sound Blocking', () => {
         it('should allow detection with precise non-visual sense even without LoS', () => {
             const input = {
                 observer: {
-                    precise: { 'light-perception': Infinity, tremorsense: 60 }, // Has tremorsense
-                    imprecise: { hearing: 60 },
+                    precise: {
+                        'light-perception': { range: Infinity },
+                        tremorsense: { range: 60 } // Has tremorsense
+                    },
+                    imprecise: { hearing: { range: 60 } },
                     conditions: { blinded: false, deafened: false, dazzled: false },
                     lightingLevel: 'bright'
                 },
@@ -255,8 +264,8 @@ describe('Sight and Sound Blocking', () => {
         it('should allow visual detection when hasLineOfSight is true', () => {
             const input = {
                 observer: {
-                    precise: { 'light-perception': Infinity },
-                    imprecise: { hearing: 60 },
+                    precise: { 'light-perception': { range: Infinity } },
+                    imprecise: { hearing: { range: 60 } },
                     conditions: { blinded: false, deafened: false, dazzled: false },
                     lightingLevel: 'bright'
                 },
@@ -338,8 +347,8 @@ describe('Sight and Sound Blocking', () => {
             // Calculate visibility
             const input = {
                 observer: {
-                    precise: { 'light-perception': Infinity },
-                    imprecise: { hearing: 60 },
+                    precise: { 'light-perception': { range: Infinity } },
+                    imprecise: { hearing: { range: 60 } },
                     conditions: { blinded: false, deafened: false, dazzled: false },
                     lightingLevel: 'bright'
                 },
@@ -375,8 +384,8 @@ describe('Sight and Sound Blocking', () => {
             // Calculate visibility
             const input = {
                 observer: {
-                    precise: { 'light-perception': Infinity },
-                    imprecise: { hearing: 60 },
+                    precise: { 'light-perception': { range: Infinity } },
+                    imprecise: { hearing: { range: 60 } },
                     conditions: { blinded: false, deafened: false, dazzled: false },
                     lightingLevel: 'bright'
                 },

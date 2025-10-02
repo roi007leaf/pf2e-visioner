@@ -49,7 +49,6 @@ export class ConcealmentRegionBehavior extends RegionBehaviorBase {
 
     static checkRayCrossesRegionBoundary(region, originPoint, targetPoint) {
         if (!region || !originPoint || !targetPoint) {
-            console.log(`[ConcealmentRegion] Missing parameters`, { hasRegion: !!region, hasOrigin: !!originPoint, hasTarget: !!targetPoint });
             return false;
         }
 
@@ -66,17 +65,14 @@ export class ConcealmentRegionBehavior extends RegionBehaviorBase {
             }
         }
 
-        console.log(`[ConcealmentRegion] Region ${region.id} behavior:`, behavior);
 
         if (!behavior) {
-            console.log(`[ConcealmentRegion] Region ${region.id} has no concealment behavior`);
             return false;
         }
 
         // Check if behavior is enabled (check both enabled and disabled flags)
         const isEnabled = behavior.enabled !== false && behavior.disabled !== true;
         if (!isEnabled) {
-            console.log(`[ConcealmentRegion] Region ${region.id} behavior is disabled`);
             return false;
         }
 
@@ -86,16 +82,13 @@ export class ConcealmentRegionBehavior extends RegionBehaviorBase {
         };
 
         const boundarySegments = ConcealmentRegionBehavior._extractRegionBoundarySegments(region);
-        console.log(`[ConcealmentRegion] Region ${region.id} has ${boundarySegments.length} boundary segments`);
 
         for (const segment of boundarySegments) {
             if (segmentsIntersect(raySegment.p1, raySegment.p2, segment.p1, segment.p2)) {
-                console.log(`[ConcealmentRegion] Ray intersects boundary segment`, { segment, ray: raySegment });
                 return true;
             }
         }
 
-        console.log(`[ConcealmentRegion] Ray does not cross region ${region.id}`);
         return false;
     }
 
@@ -143,20 +136,12 @@ export class ConcealmentRegionBehavior extends RegionBehaviorBase {
 
     static getAllConcealmentRegions() {
         if (typeof canvas === 'undefined' || !canvas.scene?.regions) {
-            console.log(`[ConcealmentRegion] Canvas or regions not available`);
             return [];
         }
 
-        console.log(`[ConcealmentRegion] Checking ${canvas.scene.regions.size} regions`);
         const regions = [];
         for (const region of canvas.scene.regions) {
-            console.log(`[ConcealmentRegion] Region ${region.id} structure:`, {
-                hasDocument: !!region.document,
-                document: region.document,
-                behaviors: region?.document?.behaviors,
-                behaviorsArray: Array.from(region?.document?.behaviors || []),
-                directBehaviors: region.behaviors
-            });
+
 
             // EmbeddedCollection needs to be converted to array or iterated
             let hasConcealmentBehavior = false;
@@ -164,38 +149,32 @@ export class ConcealmentRegionBehavior extends RegionBehaviorBase {
             const behaviorsCollection = region.behaviors || region?.document?.behaviors;
             if (behaviorsCollection) {
                 for (const behavior of behaviorsCollection) {
-                    console.log(`[ConcealmentRegion] Checking behavior:`, { type: behavior.type, enabled: behavior.enabled, disabled: behavior.disabled });
 
                     // Check if this is our concealment behavior and it's enabled
                     if (behavior.type === `${MODULE_ID}.Pf2eVisionerConcealment`) {
                         // In Foundry v13, check both 'enabled' and absence of 'disabled'
                         const isEnabled = behavior.enabled !== false && behavior.disabled !== true;
-                        console.log(`[ConcealmentRegion] Found concealment behavior, isEnabled=${isEnabled}`);
                         hasConcealmentBehavior = isEnabled;
                         break;
                     }
                 }
             }
 
-            console.log(`[ConcealmentRegion] Region ${region.id}: hasConcealmentBehavior=${hasConcealmentBehavior}`);
 
             if (hasConcealmentBehavior) {
                 regions.push(region);
             }
         }
 
-        console.log(`[ConcealmentRegion] Found ${regions.length} concealment regions`);
         return regions;
     }
 
     static doesRayHaveConcealment(originPoint, targetPoint) {
-        console.log(`[ConcealmentRegion] doesRayHaveConcealment called`, { originPoint, targetPoint });
         const regions = ConcealmentRegionBehavior.getAllConcealmentRegions();
 
         for (const region of regions) {
             // Check if ray crosses the region boundary
             const crosses = ConcealmentRegionBehavior.checkRayCrossesRegionBoundary(region, originPoint, targetPoint);
-            console.log(`[ConcealmentRegion] Region ${region.id} crosses: ${crosses}`);
             if (crosses) {
                 return true;
             }
@@ -203,15 +182,12 @@ export class ConcealmentRegionBehavior extends RegionBehaviorBase {
             // Check if both tokens are inside the same region
             const originInside = region.testPoint(originPoint, originPoint.elevation || 0);
             const targetInside = region.testPoint(targetPoint, targetPoint.elevation || 0);
-            console.log(`[ConcealmentRegion] Region ${region.id} contains both tokens: origin=${originInside}, target=${targetInside}`);
 
             if (originInside && targetInside) {
-                console.log(`[ConcealmentRegion] Both tokens inside region ${region.id} - applying concealment`);
                 return true;
             }
         }
 
-        console.log(`[ConcealmentRegion] No concealment regions crossed or containing both tokens`);
         return false;
     }
 }

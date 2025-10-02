@@ -175,33 +175,57 @@ export class VisionAnalyzer {
 
   /**
    * Check if observer has line of sight to target
+   * Uses shape-based collision detection like LightingCalculator
    * @param {Token} observer
    * @param {Token} target
    * @returns {boolean}
    */
   hasLineOfSight(observer, target) {
     try {
-      // Check for sight-blocking walls using polygon backend (most accurate)
       const sightBackend = CONFIG.Canvas.polygonBackends?.sight;
-      if (sightBackend?.testCollision) {
-        const hasSightWall = sightBackend.testCollision(
-          observer.center,
-          target.center,
+      if (!sightBackend?.testCollision) {
+        return true;
+      }
+
+      const observerCenter = observer.center;
+      const targetCenter = target.center;
+
+      // Fast path: Test center-to-center first (most common case)
+      const centerHasWall = sightBackend.testCollision(
+        observerCenter,
+        targetCenter,
+        { type: 'sight', mode: 'any' }
+      );
+
+      if (!centerHasWall) {
+        return true;
+      }
+
+      // Slow path: Center is blocked, test perimeter points for partial visibility
+      // Use 4 points (cardinal directions) to minimize performance impact
+      const gridSize = canvas.grid?.size || 100;
+      const tokenWidth = (target?.document?.width ?? target?.width ?? 1) * gridSize;
+      const tokenHeight = (target?.document?.height ?? target?.height ?? 1) * gridSize;
+      const targetRadius = target.externalRadius ?? Math.max(tokenWidth, tokenHeight) / 2;
+
+      // Test 4 cardinal points: right, bottom, left, top
+      const angles = [0, Math.PI / 2, Math.PI, (3 * Math.PI) / 2];
+      for (const angle of angles) {
+        const testX = targetCenter.x + Math.cos(angle) * targetRadius;
+        const testY = targetCenter.y + Math.sin(angle) * targetRadius;
+
+        const hasWall = sightBackend.testCollision(
+          observerCenter,
+          { x: testX, y: testY },
           { type: 'sight', mode: 'any' }
         );
 
-
-        return !hasSightWall; // If there's a sight wall, no line of sight
+        if (!hasWall) {
+          return true;
+        }
       }
 
-      // Fallback: Use Foundry's vision polygon if available
-      if (observer.vision?.shape) {
-        const hasVision = observer.vision.shape.contains(target.center.x, target.center.y);
-        return hasVision;
-      }
-
-      // If nothing is available, assume line of sight exists (fail open)
-      return true;
+      return false;
     } catch (error) {
       console.error('[LineOfSight] Error:', error);
       log.debug('Error checking line of sight', error);

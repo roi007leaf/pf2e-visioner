@@ -312,7 +312,6 @@ function determineVisualDetection(observer, target, rayDarkness = null, hasLineO
     if (precise['light-perception'] || precise.vision) {
         const senseUsed = precise['light-perception'] ? 'light-perception' : 'vision';
 
-        console.log(`[StatelessCalc] Using ${senseUsed}, effectiveLightingLevel=${effectiveLightingLevel}`);
 
         if (effectiveLightingLevel === 'bright') {
             return {
@@ -331,7 +330,6 @@ function determineVisualDetection(observer, target, rayDarkness = null, hasLineO
             };
         } else {
             // Any type of darkness: cannot detect
-            console.log(`[StatelessCalc] ${senseUsed} fails in ${effectiveLightingLevel}`);
             return { canDetect: false };
         }
     }

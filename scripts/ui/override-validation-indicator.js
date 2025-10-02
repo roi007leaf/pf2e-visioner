@@ -358,7 +358,6 @@ class OverrideValidationIndicator {
     // The _data.overrides should already be filtered by both #hasDisplayChange and #shouldShowOverride
     const all = this._data?.overrides || [];
     const movedId = this._data?.movedTokenId ?? (globalThis?.game?.pf2eVisioner?.lastMovedTokenId ?? null);
-    console.log('OVERRIDES:', this._data?.overrides);
 
     const mkVis = (key) => {
       if (key === 'avs') return '';

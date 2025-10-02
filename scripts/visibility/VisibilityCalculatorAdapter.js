@@ -115,7 +115,6 @@ function extractTargetState(target, lightingCalculator, options, observerPositio
         const darknessRank = lightLevel.darknessRank ?? 0;
         const isDarknessSource = lightLevel.isDarknessSource ?? false;
 
-        console.log(`[TARGET ${target.name}] lightLevel.level=${lightLevel.level}, darknessRank=${darknessRank}, isDarknessSource=${isDarknessSource}`);
 
         if (darknessRank >= 4 && isDarknessSource) {
             // Rank 4+ magical darkness (e.g., heightened Darkness spell)
@@ -132,25 +131,19 @@ function extractTargetState(target, lightingCalculator, options, observerPositio
             lightingLevel = 'bright';
         }
 
-        console.log(`[TARGET ${target.name}] mapped to lightingLevel=${lightingLevel}`);
     }
 
 
     // Check for concealment (from terrain, effects, etc.)
     let concealment = extractConcealment(target, options);
-    console.log(`[CONCEALMENT] Target ${target.name}: extractConcealment returned ${concealment}`);
 
     // Check for region-based concealment (if observer position is available)
     if (!concealment && observerPosition && targetPosition) {
-        console.log(`[CONCEALMENT] Checking region concealment for ${target.name}`, { observerPosition, targetPosition });
         const regionConcealment = checkRegionConcealment(observerPosition, targetPosition);
-        console.log(`[CONCEALMENT] Region concealment result: ${regionConcealment}`);
         concealment = regionConcealment;
     } else if (!observerPosition || !targetPosition) {
-        console.log(`[CONCEALMENT] Skipping region check - missing positions`, { hasObserver: !!observerPosition, hasTarget: !!targetPosition });
     }
 
-    console.log(`[CONCEALMENT] Final concealment for ${target.name}: ${concealment}`);
 
     // Extract auxiliary conditions (invisible, etc.)
     const auxiliary = extractAuxiliaryConditions(target, options);
@@ -204,7 +197,6 @@ function extractObserverState(observer, visionAnalyzer, conditionManager, lighti
         const darknessRank = observerLightLevel.darknessRank ?? 0;
         const isDarknessSource = observerLightLevel.isDarknessSource ?? false;
 
-        console.log(`[OBSERVER ${observer.name}] lightLevel.level=${observerLightLevel.level}, darknessRank=${darknessRank}, isDarknessSource=${isDarknessSource}`);
 
         if (darknessRank >= 4 && isDarknessSource) {
             observerLightingLevel = 'greaterMagicalDarkness';
@@ -336,12 +328,10 @@ function extractConcealment(target, options) {
  */
 function checkRegionConcealment(observerPosition, targetPosition) {
     try {
-        console.log(`[REGION_CONCEALMENT] Checking ray from`, observerPosition, 'to', targetPosition);
         const result = ConcealmentRegionBehavior.doesRayHaveConcealment(observerPosition, targetPosition);
-        console.log(`[REGION_CONCEALMENT] Result: ${result}`);
         return result;
     } catch (error) {
-        console.warn('PF2e Visioner | Error checking region concealment:', error);
+        console.error('PF2e Visioner | Error checking region concealment:', error);
         return false;
     }
 }
