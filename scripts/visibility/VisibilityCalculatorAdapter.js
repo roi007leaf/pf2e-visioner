@@ -8,6 +8,7 @@
  */
 
 import { MODULE_ID } from '../constants.js';
+import { ConcealmentRegionBehavior } from '../regions/ConcealmentRegionBehavior.js';
 import { calculateVisibility } from './StatelessVisibilityCalculator.js';
 
 /**
@@ -31,19 +32,7 @@ export async function tokenStateToInput(
     lightingRasterService,
     options = {}
 ) {
-    const targetState = extractTargetState(target, lightingCalculator, options);
-    const observerState = extractObserverState(observer, visionAnalyzer, conditionManager, lightingCalculator, options);
-
-    // Check if there's line of sight (no sight-blocking walls)
-    const hasLineOfSight = visionAnalyzer.hasLineOfSight(observer, target);
-
-    // Check if sound is blocked between observer and target
-    const soundBlocked = visionAnalyzer.isSoundBlocked(observer, target);
-
-
-    // Get ray darkness information if lightingRasterService is available
-    let rayDarkness = null;
-    // Calculate positions
+    // Calculate positions first (needed by multiple functions)
     const observerPosition = {
         x: observer.document.x + (observer.document.width * canvas.grid.size) / 2,
         y: observer.document.y + (observer.document.height * canvas.grid.size) / 2,
@@ -55,6 +44,19 @@ export async function tokenStateToInput(
         y: target.document.y + (target.document.height * canvas.grid.size) / 2,
         elevation: target.document.elevation || 0
     };
+
+    const targetState = extractTargetState(target, lightingCalculator, options, observerPosition, targetPosition);
+    const observerState = extractObserverState(observer, visionAnalyzer, conditionManager, lightingCalculator, options);
+
+    // Check if there's line of sight (no sight-blocking walls)
+    const hasLineOfSight = visionAnalyzer.hasLineOfSight(observer, target);
+
+    // Check if sound is blocked between observer and target
+    const soundBlocked = visionAnalyzer.isSoundBlocked(observer, target);
+
+
+    // Get ray darkness information if lightingRasterService is available
+    let rayDarkness = null;
 
     // Check if ray passes through darkness
     const { linePassesThroughDarkness, rayDarknessRank } =
@@ -95,13 +97,15 @@ export async function tokenStateToInput(
 /**
  * Extract target state from token and game state
  */
-function extractTargetState(target, lightingCalculator, options) {
+function extractTargetState(target, lightingCalculator, options, observerPosition = null, targetPosition = null) {
     // Get lighting level at target position
-    const targetPosition = {
-        x: target.document.x + (target.document.width * canvas.grid.size) / 2,
-        y: target.document.y + (target.document.height * canvas.grid.size) / 2,
-        elevation: target.document.elevation || 0
-    };
+    if (!targetPosition) {
+        targetPosition = {
+            x: target.document.x + (target.document.width * canvas.grid.size) / 2,
+            y: target.document.y + (target.document.height * canvas.grid.size) / 2,
+            elevation: target.document.elevation || 0
+        };
+    }
 
     const lightLevel = lightingCalculator.getLightLevelAt(targetPosition, target);
 
@@ -131,18 +135,28 @@ function extractTargetState(target, lightingCalculator, options) {
         console.log(`[TARGET ${target.name}] mapped to lightingLevel=${lightingLevel}`);
     }
 
-    // Extract cover level from token flags or calculate
-    const coverLevel = extractCoverLevel(target, options);
 
     // Check for concealment (from terrain, effects, etc.)
-    const concealment = extractConcealment(target, options);
+    let concealment = extractConcealment(target, options);
+    console.log(`[CONCEALMENT] Target ${target.name}: extractConcealment returned ${concealment}`);
+
+    // Check for region-based concealment (if observer position is available)
+    if (!concealment && observerPosition && targetPosition) {
+        console.log(`[CONCEALMENT] Checking region concealment for ${target.name}`, { observerPosition, targetPosition });
+        const regionConcealment = checkRegionConcealment(observerPosition, targetPosition);
+        console.log(`[CONCEALMENT] Region concealment result: ${regionConcealment}`);
+        concealment = regionConcealment;
+    } else if (!observerPosition || !targetPosition) {
+        console.log(`[CONCEALMENT] Skipping region check - missing positions`, { hasObserver: !!observerPosition, hasTarget: !!targetPosition });
+    }
+
+    console.log(`[CONCEALMENT] Final concealment for ${target.name}: ${concealment}`);
 
     // Extract auxiliary conditions (invisible, etc.)
     const auxiliary = extractAuxiliaryConditions(target, options);
 
     return {
         lightingLevel,
-        coverLevel,
         concealment,
         auxiliary,
         movementAction: target.document.movementAction // Add elevation for tremorsense checks
@@ -295,30 +309,6 @@ function extractImpreciseSenses(capabilities) {
 }
 
 /**
- * Extract cover level from target
- */
-function extractCoverLevel(target, options) {
-    // Check flags for cover overrides
-    const flags = target?.document?.flags?.['pf2e-visioner'] || {};
-
-    // Cover might be stored in various places depending on module version
-    if (flags.coverLevel) {
-        return flags.coverLevel;
-    }
-
-    // Check for PF2e cover
-    if (target.actor?.system?.attributes?.cover) {
-        const cover = target.actor.system.attributes.cover;
-        if (cover === 'greater') return 'greater';
-        if (cover === 'standard') return 'standard';
-        if (cover === 'lesser') return 'lesser';
-    }
-
-    // Default: no cover
-    return 'none';
-}
-
-/**
  * Extract concealment from target
  */
 function extractConcealment(target, options) {
@@ -336,6 +326,24 @@ function extractConcealment(target, options) {
     }
 
     return false;
+}
+
+/**
+ * Check if ray crosses concealment region boundaries
+ * @param {Object} observerPosition - Observer's position {x, y}
+ * @param {Object} targetPosition - Target's position {x, y}
+ * @returns {boolean} True if ray crosses any concealment region boundary
+ */
+function checkRegionConcealment(observerPosition, targetPosition) {
+    try {
+        console.log(`[REGION_CONCEALMENT] Checking ray from`, observerPosition, 'to', targetPosition);
+        const result = ConcealmentRegionBehavior.doesRayHaveConcealment(observerPosition, targetPosition);
+        console.log(`[REGION_CONCEALMENT] Result: ${result}`);
+        return result;
+    } catch (error) {
+        console.warn('PF2e Visioner | Error checking region concealment:', error);
+        return false;
+    }
 }
 
 /**

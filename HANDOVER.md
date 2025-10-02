@@ -10,7 +10,53 @@ This document provides a comprehensive overview of the PF2E Visioner module's cu
 - **PF2E System**: v6.0.0+
 - **License**: GPL-3.0
 
-## 🏗️ Architecture Overview
+## � Recent Changes (October 2025)
+
+### Sight and Sound Blocking Wall Support
+
+**Feature**: Proper detection of sight-blocking and sound-blocking walls using FoundryVTT's polygon backend API.
+
+**Implementation Details**:
+
+- **VisionAnalyzer**: Added `hasLineOfSight()` and `isSoundBlocked()` methods
+  - Uses `CONFIG.Canvas.polygonBackends.sight.testCollision()` for sight-blocking detection
+  - Uses `CONFIG.Canvas.polygonBackends.sound.testCollision()` for sound-blocking detection
+  - Both methods fail-open (return false/true) if polygon backend unavailable
+- **StatelessVisibilityCalculator**: Added `hasLineOfSight` parameter to input
+  - Visual detection fails immediately if `hasLineOfSight === false`
+  - Combined with `soundBlocked` flag for comprehensive wall-based detection
+  - Results in "undetected" state when both sight and sound are blocked
+- **VisibilityCalculatorAdapter**: Integrated line-of-sight and sound-blocking checks
+  - Calls `visionAnalyzer.hasLineOfSight()` and `visionAnalyzer.isSoundBlocked()`
+  - Passes both flags to the calculator for proper state determination
+  - Clean architectural separation: no manipulation of `coverLevel` for wall-blocking
+
+**Cache Management**:
+
+- **ItemEventHandler**: Now clears VisionAnalyzer cache when conditions change
+  - Detects PF2e condition changes (conditions are items with type="condition")
+  - Clears cache for affected tokens to force recalculation of sensing capabilities
+  - Ensures deafened/blinded conditions are immediately reflected in visibility
+
+**Behavior**:
+
+- **Sight-only blocking**: Visual detection fails → falls back to hearing → "hidden" state
+- **Sound-only blocking**: Hearing fails → visual detection works → "observed" state
+- **Sight + sound blocking**: Both fail → "undetected" state
+- **Sight blocked + deafened observer**: Visual fails, hearing fails → "undetected" state
+- **Precise non-visual senses** (tremorsense, scent, lifesense): Still work through walls
+
+**Testing**: Comprehensive unit tests in `tests/unit/visibility/sight-sound-blocking.test.js`
+
+**Files Modified**:
+
+- `scripts/visibility/auto-visibility/VisionAnalyzer.js` - Added wall detection methods
+- `scripts/visibility/StatelessVisibilityCalculator.js` - Added hasLineOfSight check
+- `scripts/visibility/VisibilityCalculatorAdapter.js` - Integrated wall checks
+- `scripts/visibility/auto-visibility/core/ItemEventHandler.js` - Added cache clearing
+- `scripts/hooks/effect-perception.js` - Enhanced for condition changes (debug logging)
+
+## �🏗️ Architecture Overview
 
 ### Core Philosophy
 

@@ -13,7 +13,6 @@
  * @param {Object} input - Standardized visibility calculation input
  * @param {Object} input.target - Target state
  * @param {string} input.target.lightingLevel - "bright" | "dim" | "darkness" | "magicalDarkness" | "greaterMagicalDarkness"
- * @param {string} input.target.coverLevel - "none" | "lesser" | "standard" | "greater"
  * @param {boolean} input.target.concealment - Whether target has concealment
  * @param {string[]} input.target.auxiliary - Additional conditions like ["invisible"]
  * @param {number} input.target.movementAction - Target's movement action (for tremorsense checks)
@@ -96,7 +95,6 @@ export function calculateVisibility(input) {
 function normalizeTargetState(target) {
     return {
         lightingLevel: target.lightingLevel || 'bright',
-        coverLevel: target.coverLevel || 'none',
         concealment: target.concealment ?? false,
         auxiliary: Array.isArray(target.auxiliary) ? target.auxiliary : [],
         movementAction: target.movementAction ?? 0
@@ -435,7 +433,7 @@ function checkImpreciseSenses(observer, target, soundBlocked = false, visualDete
  */
 function applyVisualModifiers(visualDetection, observer, target) {
     let finalState = visualDetection.baseState;
-    const { auxiliary, concealment, coverLevel } = target;
+    const { auxiliary, concealment } = target;
 
     // 1. Apply invisibility (most significant modifier)
     if (auxiliary.includes('invisible')) {

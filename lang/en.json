@@ -602,6 +602,10 @@
         "label": "Two-Way Region",
         "hint": "If enabled, tokens outside the region will also have the visibility state applied to tokens inside the region"
       },
+      "CONCEALMENT_ENABLED": {
+        "label": "Enable Concealment",
+        "hint": "If enabled, rays that cross this region's boundaries will grant concealment to the target"
+      },
       "VISIBILITY_UPDATED": "Region visibility updated for {count} token relationships",
       "UPDATE_ERROR": "Failed to update region visibility relationships"
     },

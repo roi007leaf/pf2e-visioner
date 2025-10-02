@@ -20,6 +20,20 @@ describe('Wall Sight Blocking Fix', () => {
       },
     };
 
+    // Mock polygon backend API (replaces deprecated canvas.walls.checkCollision)
+    global.CONFIG = {
+      Canvas: {
+        polygonBackends: {
+          sight: {
+            testCollision: jest.fn().mockReturnValue(false), // Default: no collision
+          },
+          sound: {
+            testCollision: jest.fn().mockReturnValue(false), // Default: no collision
+          },
+        },
+      },
+    };
+
     visionAnalyzer = new VisionAnalyzer();
   });
 
@@ -56,23 +70,16 @@ describe('Wall Sight Blocking Fix', () => {
         },
       };
 
-      // Mock the canvas wall collision detection to return sight blocked but sound not blocked
-      global.canvas.walls = {
-        checkCollision: jest.fn((ray, options) => {
-          if (options.type === 'sight') return true; // Sight is blocked
-          return false;
-        }),
-      };
+      // Mock the polygon backend to return collision for sight (blocked)
+      global.CONFIG.Canvas.polygonBackends.sight.testCollision.mockReturnValue(true);
+      global.CONFIG.Canvas.polygonBackends.sound.testCollision.mockReturnValue(false);
 
       // Should return false (no line of sight) because sight is blocked
       const result = visionAnalyzer.hasLineOfSight(observer, target);
       expect(result).toBe(false);
 
       // Verify sight was checked
-      expect(global.canvas.walls.checkCollision).toHaveBeenCalledWith(
-        expect.anything(),
-        expect.objectContaining({ type: 'sight' }),
-      );
+      expect(global.CONFIG.Canvas.polygonBackends.sight.testCollision).toHaveBeenCalled();
     });
 
     test('should detect line of sight when neither sight nor sound is blocked', () => {
@@ -103,14 +110,11 @@ describe('Wall Sight Blocking Fix', () => {
         },
       };
 
-      // Mock the canvas wall collision detection to return no blocking
-      global.canvas.walls = {
-        checkCollision: jest.fn(() => false), // Neither sight nor sound blocked
-      };
-
-      const result = visionAnalyzer.hasLineOfSight(observer, target);
+      // Mock the polygon backend to return no collision (not blocked)
+      global.CONFIG.Canvas.polygonBackends.sight.testCollision.mockReturnValue(false);
 
       // Should have line of sight (return true)
+      const result = visionAnalyzer.hasLineOfSight(observer, target);
       expect(result).toBe(true);
     });
 
@@ -142,13 +146,8 @@ describe('Wall Sight Blocking Fix', () => {
         },
       };
 
-      // Mock the canvas wall collision detection - sight blocked
-      global.canvas.walls = {
-        checkCollision: jest.fn((ray, options) => {
-          if (options.type === 'sight') return true; // Sight is blocked
-          return false;
-        }),
-      };
+      // Mock the polygon backend to return collision for sight (blocked)
+      global.CONFIG.Canvas.polygonBackends.sight.testCollision.mockReturnValue(true);
 
       const result = visionAnalyzer.hasLineOfSight(observer, target);
 
@@ -176,7 +175,7 @@ describe('Wall Sight Blocking Fix', () => {
         shape: null,
       };
 
-      // Mock foundry but no canvas.walls
+      // Mock foundry ray class
       global.foundry = {
         canvas: {
           geometry: {
@@ -185,12 +184,13 @@ describe('Wall Sight Blocking Fix', () => {
         },
       };
 
-      delete global.canvas.walls;
+      // Delete polygon backend to test graceful fallback
+      delete global.CONFIG.Canvas.polygonBackends;
 
-      // Should not throw and should assume line of sight when no walls to check
+      // Should not throw and should assume line of sight when no polygon backend available
       expect(() => {
         const result = visionAnalyzer.hasLineOfSight(observer, target);
-        expect(result).toBe(true); // Returns true when no walls are detected to block
+        expect(result).toBe(true); // Returns true (fail-open) when no backend available
       }).not.toThrow();
     });
 
