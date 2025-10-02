@@ -24,6 +24,12 @@ export class TelemetryReporter {
 
             // Calculate timing breakdown
             const totalMs = Number((info.batchEndTime - info.batchStartTime).toFixed(2));
+
+            // If this batch is part of a movement session, add session time to total
+            const sessionTotalMs = info.movementSession
+                ? Number((info.movementSession.sessionDurationMs + totalMs).toFixed(2))
+                : totalMs;
+
             const timingBreakdown = {
                 tokenPrep: Number((t.tokenPrep || 0).toFixed(2)),
                 lightingPrecompute: Number((t.lightingPrecompute || 0).toFixed(2)),
@@ -48,12 +54,13 @@ export class TelemetryReporter {
             // Calculate percentages for easy reading
             const timingPercentages = {};
             const detailedPercentages = {};
-            if (totalMs > 0) {
+            const baseTimeForPercentages = totalMs; // Use batch time for percentage calculations
+            if (baseTimeForPercentages > 0) {
                 Object.keys(timingBreakdown).forEach(phase => {
-                    timingPercentages[`${phase}Pct`] = Number(((timingBreakdown[phase] / totalMs) * 100).toFixed(1));
+                    timingPercentages[`${phase}Pct`] = Number(((timingBreakdown[phase] / baseTimeForPercentages) * 100).toFixed(1));
                 });
                 Object.keys(detailedBreakdown).forEach(phase => {
-                    detailedPercentages[`${phase}Pct`] = Number(((detailedBreakdown[phase] / totalMs) * 100).toFixed(1));
+                    detailedPercentages[`${phase}Pct`] = Number(((detailedBreakdown[phase] / baseTimeForPercentages) * 100).toFixed(1));
                 });
             }
 
@@ -61,13 +68,21 @@ export class TelemetryReporter {
                 batchId: info.batchId,
                 clientId: info.clientId,
                 clientName: info.clientName,
-                totalMs,
+                totalMs: sessionTotalMs, // Total including movement session if present
+                batchOnlyMs: info.movementSession ? totalMs : undefined, // Batch processing time alone
                 changedCountAtStart: info.changedAtStartCount,
                 tokensIncluded: info.allTokensCount,
                 viewportFiltering: !!info.viewportFilteringEnabled,
                 hasDarknessSources: !!info.hasDarknessSources,
                 processedTokens: info.processedTokens || 0,
                 uniqueUpdates: info.uniqueUpdateCount || 0,
+                // Movement session context if this batch completed a movement
+                movementSession: info.movementSession ? {
+                    sessionId: info.movementSession.sessionId,
+                    sessionDurationMs: info.movementSession.sessionDurationMs,
+                    positionUpdates: info.movementSession.positionUpdates,
+                    tokensAccumulated: info.movementSession.tokensAccumulated,
+                } : null,
                 // Surface a few key breakdown counters at top-level for quick glance
                 pairsConsidered: info.breakdown?.pairsConsidered || 0,
                 pairsComputed: info.breakdown?.pairsComputed || 0,

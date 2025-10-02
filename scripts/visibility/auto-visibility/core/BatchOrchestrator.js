@@ -41,6 +41,86 @@ export class BatchOrchestrator {
     this._lastLosMemo = { map: null, ts: 0 };
     // Memoized module import to avoid dynamic import overhead in micro-batches
     this._lightingPrecomputerModulePromise = null;
+
+    // Movement detection to delay batch processing until movement stops
+    this._isTokenMoving = false;
+    this._movementStopTimer = null;
+    this._movementStopDelayMs = 300;
+
+    // Movement session telemetry tracking
+    this._movementSession = null;
+  }
+
+  /**
+   * Notify orchestrator that a token has started moving.
+   * This will delay batch processing until movement stops.
+   */
+  notifyTokenMovementStart() {
+    // Start a new movement session if not already moving
+    if (!this._isTokenMoving) {
+      this._movementSession = {
+        startTime: performance.now(),
+        positionUpdates: 0,
+        tokensAccumulated: new Set(),
+        sessionId: `movement-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      };
+      console.log('PF2E Visioner | Movement session START', {
+        sessionId: this._movementSession.sessionId,
+        startedAtIso: new Date().toISOString(),
+      });
+    }
+
+    this._isTokenMoving = true;
+    if (this._movementSession) {
+      this._movementSession.positionUpdates++;
+    }
+
+    // Clear existing stop timer and restart it
+    if (this._movementStopTimer) {
+      clearTimeout(this._movementStopTimer);
+    }
+
+    // Set timer to detect when movement stops
+    this._movementStopTimer = setTimeout(() => {
+      if (!this._movementSession) {
+        console.warn('PF2E Visioner | Movement stop timer fired but no session exists');
+        this._isTokenMoving = false;
+        this._movementStopTimer = null;
+        return;
+      }
+
+      const sessionDurationMs = performance.now() - this._movementSession.startTime;
+      const sessionData = {
+        sessionId: this._movementSession.sessionId,
+        sessionDurationMs: Number(sessionDurationMs.toFixed(2)),
+        positionUpdates: this._movementSession.positionUpdates,
+        tokensAccumulated: this._movementSession.tokensAccumulated.size,
+        pendingTokensCount: this._pendingTokens.size,
+      };
+
+      this._isTokenMoving = false;
+      this._movementStopTimer = null;
+
+      // If there are pending tokens, process them immediately now that movement stopped
+      if (this._pendingTokens.size > 0) {
+        const toProcess = new Set(this._pendingTokens);
+        this._pendingTokens.clear();
+        if (this._coalesceTimer) {
+          clearTimeout(this._coalesceTimer);
+          this._coalesceTimer = null;
+        }
+
+        // Pass session data to the batch for telemetry
+        this.processBatch(toProcess, { movementSession: sessionData });
+      } else {
+        // No pending tokens - report session ended without batch
+        console.log('PF2E Visioner | Movement session STOP (no batch needed)', {
+          ...sessionData,
+          finishedAtIso: new Date().toISOString(),
+        });
+        this._movementSession = null;
+      }
+    }, this._movementStopDelayMs);
   }
 
   /**
@@ -49,13 +129,36 @@ export class BatchOrchestrator {
    */
   enqueueTokens(changedTokens) {
     try {
-      for (const id of changedTokens) this._pendingTokens.add(id);
+      for (const id of changedTokens) {
+        this._pendingTokens.add(id);
+        // Track accumulated tokens in movement session
+        if (this._movementSession) {
+          this._movementSession.tokensAccumulated.add(id);
+        }
+      }
+
       // If a batch is currently processing, just accumulate; we'll flush in finally()
       if (this.processingBatch) return;
-      if (this._coalesceTimer) return;
+
+      // If tokens are moving, just accumulate - don't start batch processing yet
+      // The movement stop timer will trigger the batch when movement completes
+      if (this._isTokenMoving) return;
+
+      // Cancel any existing coalesce timer to restart it with fresh changes
+      if (this._coalesceTimer) {
+        clearTimeout(this._coalesceTimer);
+      }
+
       // Coalesce for one frame (~16ms)
       this._coalesceTimer = setTimeout(async () => {
         this._coalesceTimer = null;
+
+        // Double-check movement flag before processing (in case movement started during coalesce)
+        if (this._isTokenMoving) {
+          // Movement started during coalesce - let movement timer handle it
+          return;
+        }
+
         const toProcess = new Set(this._pendingTokens);
         this._pendingTokens.clear();
         await this.processBatch(toProcess);
@@ -64,14 +167,14 @@ export class BatchOrchestrator {
       // Fallback: process immediately if coalescing fails
       this.processBatch(changedTokens);
     }
-  }
-
-  /**
+  }  /**
    * Process a batch of changed tokens through the complete pipeline.
    * @param {Set<string>} changedTokens - Set of token IDs that need processing
+   * @param {Object} [options] - Optional processing metadata
+   * @param {Object} [options.movementSession] - Movement session data if this batch completes a movement
    * @returns {Promise<void>}
    */
-  async processBatch(changedTokens) {
+  async processBatch(changedTokens, options = {}) {
     if (this.processingBatch || changedTokens.size === 0) {
       return;
     }
@@ -79,6 +182,7 @@ export class BatchOrchestrator {
     this.processingBatch = true;
     const batchStartTime = performance.now();
     const batchId = `batch-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const movementSession = options.movementSession || null;
 
     // Timing measurements
     const timings = {
@@ -136,6 +240,8 @@ export class BatchOrchestrator {
         precomputedLights,
         precomputeStats,
         burstLosMemo: this._lastLosMemo.map,
+        // Enable fast mode during active token movement to reduce LOS precision
+        fastMode: this._isTokenMoving,
       };
       timings.calcOptionsPrep = performance.now() - calcOptionsStart;
 
@@ -176,8 +282,14 @@ export class BatchOrchestrator {
         precomputeStats,
         uniqueUpdateCount,
         timings,
+        movementSession,
       });
       telemetryStopped = true;
+
+      // Clear movement session after successful batch
+      if (movementSession) {
+        this._movementSession = null;
+      }
     } catch (error) {
       try {
         console.error('PF2E Visioner | processBatch error:', error);
@@ -491,8 +603,26 @@ export class BatchOrchestrator {
       precomputeStats,
       uniqueUpdateCount,
       timings,
+      movementSession,
     } = params;
 
+    // If this batch is part of a movement session, include session telemetry
+    if (movementSession) {
+      console.log('PF2E Visioner | Movement session STOP (with batch)', {
+        sessionId: movementSession.sessionId,
+        sessionDurationMs: movementSession.sessionDurationMs,
+        positionUpdates: movementSession.positionUpdates,
+        tokensAccumulated: movementSession.tokensAccumulated,
+        batchId,
+        batchProcessingMs: Number((batchEndTime - batchStartTime).toFixed(2)),
+        totalTimeMs: Number((movementSession.sessionDurationMs + (batchEndTime - batchStartTime)).toFixed(2)),
+        processedTokens: batchResult.processedTokens || 0,
+        uniqueUpdates: uniqueUpdateCount,
+        finishedAtIso: new Date().toISOString(),
+      });
+    }
+
+    // Regular batch telemetry
     this.telemetryReporter.stop({
       batchId,
       clientId: game.user.id,
@@ -509,6 +639,7 @@ export class BatchOrchestrator {
       precomputeStats: batchResult.precomputeStats || precomputeStats,
       debugMode: this._getDebugMode(),
       timings,
+      movementSession, // Include movement session data in batch telemetry
     });
   }
 

@@ -165,7 +165,8 @@ export class EventDrivenVisibilitySystem {
           overrideValidationManager: coreServices.overrideValidationManager,
           positionManager: coreServices.positionManager,
           cacheManager: this.#cacheManagementService
-        }
+        },
+        { batchOrchestrator: this.#batchOrchestrator }
       );
 
       // Initialize the optimized visibility calculator with the core components

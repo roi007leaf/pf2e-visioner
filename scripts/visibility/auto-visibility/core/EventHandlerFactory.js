@@ -18,9 +18,10 @@ export class EventHandlerFactory {
      * @param {SystemStateProvider} systemStateProvider 
      * @param {VisibilityStateManager} visibilityStateManager 
      * @param {Object} managers - Collection of manager instances
+     * @param {Object} [options] - Optional dependencies like batchOrchestrator
      * @returns {Promise<Object>} Collection of initialized event handlers
      */
-    static async createHandlers(systemStateProvider, visibilityStateManager, managers) {
+    static async createHandlers(systemStateProvider, visibilityStateManager, managers, options = {}) {
         const {
             spatialAnalysisService,
             exclusionManager,
@@ -28,6 +29,8 @@ export class EventHandlerFactory {
             positionManager,
             cacheManager
         } = managers;
+
+        const { batchOrchestrator = null } = options;
 
         // Define handler configurations
         const handlerConfigs = [
@@ -41,7 +44,8 @@ export class EventHandlerFactory {
                     exclusionManager,
                     overrideValidationManager,
                     positionManager,
-                    cacheManager
+                    cacheManager,
+                    batchOrchestrator
                 ]
             },
             {
@@ -133,8 +137,10 @@ export class EventHandlerFactory {
                 spatialAnalysisService: coreServices.spatialAnalysisService,
                 exclusionManager: coreServices.exclusionManager,
                 overrideValidationManager: coreServices.overrideValidationManager,
-                positionManager: coreServices.positionManager
+                positionManager: coreServices.positionManager,
+                cacheManager: coreServices.cacheManager
             },
+            { batchOrchestrator }
         );
     }
 }

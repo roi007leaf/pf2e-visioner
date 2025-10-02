@@ -18,6 +18,7 @@ export class TokenEventHandler {
     overrideValidationManager,
     positionManager,
     cacheManager = null,
+    batchOrchestrator = null,
   ) {
     this.systemState = systemStateProvider;
     this.visibilityState = visibilityStateManager;
@@ -26,6 +27,7 @@ export class TokenEventHandler {
     this.overrideValidationManager = overrideValidationManager;
     this.positionManager = positionManager;
     this.cacheManager = cacheManager;
+    this.batchOrchestrator = batchOrchestrator;
   }
 
   initialize() {
@@ -355,6 +357,10 @@ export class TokenEventHandler {
       // Need to recalculate for tokens that might detect this one via tremorsense
       this.visibilityState.markTokenChangedImmediate(tokenDoc.id);
     } else if (changeFlags.positionChanged) {
+      // Notify batch orchestrator that token is moving to delay processing
+      if (this.batchOrchestrator?.notifyTokenMovementStart) {
+        this.batchOrchestrator.notifyTokenMovementStart();
+      }
       this.visibilityState.markTokenChangedWithSpatialOptimization(tokenDoc, changes);
     } else {
       this.visibilityState.markTokenChangedImmediate(tokenDoc.id);

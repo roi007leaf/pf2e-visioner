@@ -377,9 +377,10 @@ export class ConsequencesPreviewDialog extends BaseActionDialog {
         const { default: AvsOverrideManager } = await import(
           '../services/infra/avs-override-manager.js'
         );
-        const observerId = app.actionData?.actor?.document?.id || app.actionData?.actor?.id;
-        if (observerId) {
-          await AvsOverrideManager.removeOverride(observerId, outcome.target.id);
+        const attackerId = app.actionData?.actor?.document?.id || app.actionData?.actor?.id;
+        const observerId = outcome.target.id;
+        if (attackerId && observerId) {
+          await AvsOverrideManager.removeOverride(observerId, attackerId);
           // Refresh UI to update override indicators
           const { updateTokenVisuals } = await import('../../services/visual-effects.js');
           await updateTokenVisuals();
@@ -509,10 +510,11 @@ export class ConsequencesPreviewDialog extends BaseActionDialog {
         const { default: AvsOverrideManager } = await import(
           '../services/infra/avs-override-manager.js'
         );
-        const observerId = app.actionData?.actor?.document?.id || app.actionData?.actor?.id;
-        if (observerId) {
+        const attackerId = app.actionData?.actor?.document?.id || app.actionData?.actor?.id;
+        if (attackerId) {
           for (const removal of avsRemovals) {
-            await AvsOverrideManager.removeOverride(observerId, removal.id);
+            const observerId = removal.id;
+            await AvsOverrideManager.removeOverride(observerId, attackerId);
           }
           // Refresh UI to update override indicators
           const { updateTokenVisuals } = await import('../../services/visual-effects.js');

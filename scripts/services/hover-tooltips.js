@@ -24,6 +24,9 @@ class HoverTooltipsImpl {
     this.tooltipFontSize = 16;
     this.tooltipIconSize = 14;
     this.badgeTicker = null;
+    this._isTokenMoving = false;
+    this._movementDebounceTimer = null;
+    this._isDragging = false;
   }
   init() {
     if (this._initialized) return this.refreshSizes();
@@ -169,12 +172,24 @@ export function addTokenEventListener(token) {
 
   const overHandler = () => onTokenHover(token);
   const outHandler = () => onTokenHoverEnd(token);
+  const pointerDownHandler = () => onTokenPointerDown(token);
+  const pointerUpHandler = () => onTokenPointerUp(token);
 
   // Store handlers for later cleanup
-  HoverTooltips.tokenEventHandlers.set(token.id, { overHandler, outHandler });
+  HoverTooltips.tokenEventHandlers.set(token.id, {
+    overHandler,
+    outHandler,
+    pointerDownHandler,
+    pointerUpHandler
+  });
 
   token.on('pointerover', overHandler);
   token.on('pointerout', outHandler);
+
+  // Listen for pointer down/up to detect drag operations
+  token.on('pointerdown', pointerDownHandler);
+  token.on('pointerup', pointerUpHandler);
+  token.on('pointerupoutside', pointerUpHandler); // In case pointer is released outside token
 }
 
 /**
@@ -186,6 +201,13 @@ function cleanupTokenEventListeners() {
     if (token) {
       token.off('pointerover', handlers.overHandler);
       token.off('pointerout', handlers.outHandler);
+      if (handlers.pointerDownHandler) {
+        token.off('pointerdown', handlers.pointerDownHandler);
+      }
+      if (handlers.pointerUpHandler) {
+        token.off('pointerup', handlers.pointerUpHandler);
+        token.off('pointerupoutside', handlers.pointerUpHandler);
+      }
     }
   });
   HoverTooltips.tokenEventHandlers.clear();
@@ -273,34 +295,88 @@ export function initializeHoverTooltips() {
     }, 150); // 150ms after pan stops
   });
 
-  // Refresh badges immediately when visibility map changes (no need to re-hover)
+  // Refresh badges when visibility map changes (debounced to avoid performance issues during rapid updates)
   try {
+    let visibilityUpdateDebounce = null;
     Hooks.on('pf2e-visioner.visibilityMapUpdated', () => {
-      // If Alt overlay is active, re-render it; otherwise refresh current hover
-      if (HoverTooltips.isShowingKeyTooltips) {
-        // Rebuild Alt overlay for controlled tokens
-        hideAllVisibilityIndicators();
-        hideAllCoverIndicators();
-        // small defer to coalesce multiple updates
-        setTimeout(() => {
-          // Preserve mode; Alt overlay uses target mode rendering from controlled token(s)
-          showControlledTokenVisibility();
-        }, 0);
-      } else if (HoverTooltips.currentHoveredToken) {
-        // Re-render indicators for the currently hovered token
-        const tok = HoverTooltips.currentHoveredToken;
-        hideAllVisibilityIndicators();
-        hideAllCoverIndicators();
-        // small defer to avoid layout thrash if many updates fire
-        setTimeout(() => {
-          showVisibilityIndicators(tok);
-          try {
-            showCoverIndicators(tok);
-          } catch (_) { }
-        }, 0);
+      // Skip updates entirely during active token movement to prevent performance issues
+      if (HoverTooltips._isTokenMoving) {
+        return;
       }
+
+      // Clear any pending update
+      if (visibilityUpdateDebounce) {
+        clearTimeout(visibilityUpdateDebounce);
+      }
+
+      // Debounce tooltip updates during rapid visibility changes (e.g., token movement)
+      // This prevents constant re-rendering during AVS batch processing
+      visibilityUpdateDebounce = setTimeout(() => {
+        visibilityUpdateDebounce = null;
+
+        // If Alt overlay is active, re-render it; otherwise refresh current hover
+        if (HoverTooltips.isShowingKeyTooltips) {
+          // Rebuild Alt overlay for controlled tokens
+          hideAllVisibilityIndicators();
+          hideAllCoverIndicators();
+          setTimeout(() => {
+            showControlledTokenVisibility();
+          }, 0);
+        } else if (HoverTooltips.currentHoveredToken) {
+          // Re-render indicators for the currently hovered token
+          const tok = HoverTooltips.currentHoveredToken;
+          hideAllVisibilityIndicators();
+          hideAllCoverIndicators();
+          setTimeout(() => {
+            showVisibilityIndicators(tok);
+            try {
+              showCoverIndicators(tok);
+            } catch (_) { }
+          }, 0);
+        }
+      }, 150); // 150ms debounce - batch multiple rapid updates
     });
   } catch (_) { }
+
+  // Detect token movement and pause tooltip updates during movement
+  // This prevents tooltips from consuming CPU during drag operations
+  Hooks.on('preUpdateToken', (tokenDoc, changes, options, userId) => {
+    // Check if this is a position or animation change
+    if (changes.x !== undefined || changes.y !== undefined || changes.rotation !== undefined) {
+      // Mark movement as active
+      HoverTooltips._isTokenMoving = true;
+
+      // Clear any existing debounce timer
+      if (HoverTooltips._movementDebounceTimer) {
+        clearTimeout(HoverTooltips._movementDebounceTimer);
+      }
+
+      // Set a timer to mark movement as complete after updates stop
+      HoverTooltips._movementDebounceTimer = setTimeout(() => {
+        HoverTooltips._isTokenMoving = false;
+        HoverTooltips._movementDebounceTimer = null;
+
+        // Refresh tooltips after movement completes
+        if (HoverTooltips.currentHoveredToken) {
+          const tok = HoverTooltips.currentHoveredToken;
+          hideAllVisibilityIndicators();
+          hideAllCoverIndicators();
+          setTimeout(() => {
+            showVisibilityIndicators(tok);
+            try {
+              showCoverIndicators(tok);
+            } catch (_) { }
+          }, 0);
+        } else if (HoverTooltips.isShowingKeyTooltips) {
+          hideAllVisibilityIndicators();
+          hideAllCoverIndicators();
+          setTimeout(() => {
+            showControlledTokenVisibility();
+          }, 0);
+        }
+      }, 200); // Wait 200ms after last movement update before refreshing
+    }
+  });
 
   // Note: Alt key handled via highlightObjects hook registered in main hooks
   // O key event listeners added globally in registerHooks
@@ -315,8 +391,8 @@ export function initializeHoverTooltips() {
  * @param {Token} hoveredToken - The token being hovered
  */
 function onTokenHover(hoveredToken) {
-  // Skip if currently panning
-  if (HoverTooltips._isPanning) return;
+  // Skip if currently panning, during active token movement, or during drag
+  if (HoverTooltips._isPanning || HoverTooltips._isTokenMoving || HoverTooltips._isDragging) return;
 
   // Only show hover tooltips if allowed for this user with current mode AND token
   // Suppress hover overlays entirely while Alt overlay is active
@@ -357,6 +433,31 @@ function onTokenHoverEnd(token) {
     hideAllVisibilityIndicators();
     hideAllCoverIndicators();
   }
+}
+
+/**
+ * Handle token pointer down (potential drag start)
+ * @param {Token} token - The token being clicked
+ */
+function onTokenPointerDown(token) {
+  // Mark as potentially dragging to prevent tooltips
+  HoverTooltips._isDragging = true;
+
+  // Hide any visible tooltips immediately
+  hideAllVisibilityIndicators();
+  hideAllCoverIndicators();
+  HoverTooltips.currentHoveredToken = null;
+}
+
+/**
+ * Handle token pointer up (drag end)
+ * @param {Token} token - The token that was released
+ */
+function onTokenPointerUp(token) {
+  // Small delay before clearing drag flag to prevent tooltips appearing immediately
+  setTimeout(() => {
+    HoverTooltips._isDragging = false;
+  }, 150);
 }
 
 /**
@@ -898,8 +999,20 @@ function ensureBadgeTicker() {
   let framesStatic = 0;
   const STATIC_THRESHOLD = 3; // Stop ticker after 3 frames of no movement
 
+  // Time-based throttle to reduce updates during rapid movement
+  let lastUpdateTime = 0;
+  const UPDATE_THROTTLE_MS = 16; // ~60fps max (one frame at 60fps = 16.67ms)
+
   HoverTooltips.badgeTicker = () => {
     try {
+      const now = performance.now();
+
+      // Throttle updates based on time, not just frame count
+      // This prevents excessive updates during rapid canvas changes
+      if (now - lastUpdateTime < UPDATE_THROTTLE_MS) {
+        return;
+      }
+
       // Check if canvas transform has changed
       const currentTransform = `${canvas.stage.pivot.x},${canvas.stage.pivot.y},${canvas.stage.scale.x}`;
 
@@ -910,6 +1023,7 @@ function ensureBadgeTicker() {
         if (framesStatic > STATIC_THRESHOLD) {
           // Do one final update then pause
           updateBadgePositions();
+          lastUpdateTime = now;
 
           // Remove ticker - will be re-added on next pan/zoom
           canvas.app?.ticker?.remove?.(HoverTooltips.badgeTicker);
@@ -923,6 +1037,7 @@ function ensureBadgeTicker() {
       }
 
       updateBadgePositions();
+      lastUpdateTime = now;
     } catch (_) { }
   };
 

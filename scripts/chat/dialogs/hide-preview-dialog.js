@@ -877,10 +877,11 @@ export class HidePreviewDialog extends BaseActionDialog {
         const { default: AvsOverrideManager } = await import(
           '../services/infra/avs-override-manager.js'
         );
-        const observerId = app.actionData?.actor?.document?.id || app.actionData?.actor?.id;
-        if (observerId) {
+        const hiderId = app.actionData?.actor?.document?.id || app.actionData?.actor?.id;
+        if (hiderId) {
           for (const removal of avsRemovals) {
-            await AvsOverrideManager.removeOverride(observerId, removal.id);
+            const observerId = removal.id;
+            await AvsOverrideManager.removeOverride(observerId, hiderId);
           }
           // Refresh UI to update override indicators
           const { updateTokenVisuals } = await import('../../services/visual-effects.js');
@@ -981,9 +982,10 @@ export class HidePreviewDialog extends BaseActionDialog {
         const { default: AvsOverrideManager } = await import(
           '../services/infra/avs-override-manager.js'
         );
-        const observerId = app.actionData?.actor?.document?.id || app.actionData?.actor?.id;
-        if (observerId) {
-          await AvsOverrideManager.removeOverride(observerId, outcome.target.id);
+        const hiderId = app.actionData?.actor?.document?.id || app.actionData?.actor?.id;
+        const observerId = outcome.target.id;
+        if (hiderId && observerId) {
+          await AvsOverrideManager.removeOverride(observerId, hiderId);
           // Refresh UI to update override indicators
           const { updateTokenVisuals } = await import('../../services/visual-effects.js');
           await updateTokenVisuals();

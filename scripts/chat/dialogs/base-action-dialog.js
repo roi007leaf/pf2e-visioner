@@ -677,10 +677,14 @@ export class BaseActionDialog extends BasePreviewDialog {
         const { default: AvsOverrideManager } = await import(
           '../services/infra/avs-override-manager.js'
         );
-        const observerId = app.actionData?.actor?.document?.id || app.actionData?.actor?.id;
+        const actorId = app.actionData?.actor?.document?.id || app.actionData?.actor?.id;
         const targetId = outcome.target?.id || outcome.token?.id || tokenId;
-        if (observerId && targetId) {
-          await AvsOverrideManager.removeOverride(observerId, targetId);
+        if (actorId && targetId) {
+          // Determine the correct direction based on the action semantics
+          const direction = app.getApplyDirection?.() || 'observer_to_target';
+          const observerId = direction === 'observer_to_target' ? actorId : targetId;
+          const overrideTargetId = direction === 'observer_to_target' ? targetId : actorId;
+          await AvsOverrideManager.removeOverride(observerId, overrideTargetId);
           // Refresh UI to update override indicators
           const { updateTokenVisuals } = await import('../../services/visual-effects.js');
           await updateTokenVisuals();
@@ -805,13 +809,17 @@ export class BaseActionDialog extends BasePreviewDialog {
       if (!wallId) {
         try {
           const { default: AvsOverrideManager } = await import('../../services/infra/avs-override-manager.js');
-          const observerId = app.actionData?.actor?.document?.id || app.actionData?.actor?.id;
+          const actorId = app.actionData?.actor?.document?.id || app.actionData?.actor?.id;
           const targetId = outcome.target?.id || outcome.token?.id || tokenId;
 
-          if (observerId && targetId) {
-            const hasOverride = await AvsOverrideManager.getOverride(observerId, targetId);
+          if (actorId && targetId) {
+            // Determine the correct direction based on the action semantics
+            const direction = app.getApplyDirection?.() || 'observer_to_target';
+            const observerId = direction === 'observer_to_target' ? actorId : targetId;
+            const overrideTargetId = direction === 'observer_to_target' ? targetId : actorId;
+            const hasOverride = await AvsOverrideManager.getOverride(observerId, overrideTargetId);
             if (hasOverride) {
-              await AvsOverrideManager.removeOverride(observerId, targetId);
+              await AvsOverrideManager.removeOverride(observerId, overrideTargetId);
               // Refresh UI to update override indicators
               const { updateTokenVisuals } = await import('../../services/visual-effects.js');
               await updateTokenVisuals();
@@ -915,10 +923,15 @@ export class BaseActionDialog extends BasePreviewDialog {
           const { default: AvsOverrideManager } = await import(
             '../services/infra/avs-override-manager.js'
           );
-          const observerId = app.actionData?.actor?.document?.id || app.actionData?.actor?.id;
-          if (observerId) {
+          const actorId = app.actionData?.actor?.document?.id || app.actionData?.actor?.id;
+          if (actorId) {
+            // Determine the correct direction based on the action semantics
+            const direction = app.getApplyDirection?.() || 'observer_to_target';
             for (const removal of avsRemovals) {
-              await AvsOverrideManager.removeOverride(observerId, removal.id);
+              const targetId = removal.id;
+              const observerId = direction === 'observer_to_target' ? actorId : targetId;
+              const overrideTargetId = direction === 'observer_to_target' ? targetId : actorId;
+              await AvsOverrideManager.removeOverride(observerId, overrideTargetId);
             }
             // Refresh UI to update override indicators
             const { updateTokenVisuals } = await import('../../services/visual-effects.js');
@@ -1011,12 +1024,14 @@ export class BaseActionDialog extends BasePreviewDialog {
       }
 
       // Remove AVS overrides for all outcomes that have non-AVS states
-      const observerId = app.actionData?.actor?.document?.id || app.actionData?.actor?.id;
+      const actorId = app.actionData?.actor?.document?.id || app.actionData?.actor?.id;
       let removedOverrides = 0;
 
-      if (observerId) {
+      if (actorId) {
         try {
           const { default: AvsOverrideManager } = await import('../../services/infra/avs-override-manager.js');
+          // Determine the correct direction based on the action semantics
+          const direction = app.getApplyDirection?.() || 'observer_to_target';
 
           for (const outcome of appliedOutcomes) {
             const effectiveOldState = outcome.oldVisibility;
@@ -1024,7 +1039,9 @@ export class BaseActionDialog extends BasePreviewDialog {
               const targetId = outcome.target?.id || outcome.token?.id;
               if (targetId) {
                 try {
-                  await AvsOverrideManager.removeOverride(observerId, targetId);
+                  const observerId = direction === 'observer_to_target' ? actorId : targetId;
+                  const overrideTargetId = direction === 'observer_to_target' ? targetId : actorId;
+                  await AvsOverrideManager.removeOverride(observerId, overrideTargetId);
                   removedOverrides++;
                 } catch (e) {
                   console.warn(`Failed to remove AVS override for ${targetId}:`, e);
