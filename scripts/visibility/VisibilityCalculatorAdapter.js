@@ -49,10 +49,9 @@ export async function tokenStateToInput(
     const observerState = extractObserverState(observer, visionAnalyzer, conditionManager, lightingCalculator, options);
 
     // Check if there's line of sight (no sight-blocking walls)
-    const hasLineOfSight = visionAnalyzer.hasLineOfSight(observer, target);
-
-    // Check if sound is blocked between observer and target
-    const soundBlocked = visionAnalyzer.isSoundBlocked(observer, target);
+    // However, if either observer or target is in magical darkness, the darkness polygon might be
+    // incorrectly treated as a sight-blocking wall. In those cases, ignore the LOS check and let
+    // the darkvision/lighting logic handle visibility properly.
 
 
     // Get ray darkness information if lightingRasterService is available
@@ -67,6 +66,19 @@ export async function tokenStateToInput(
             observerPosition,
             targetPosition
         );
+
+    const inDarkness =
+        targetState.lightingLevel === 'magicalDarkness' ||
+        targetState.lightingLevel === 'greaterMagicalDarkness' ||
+        observerState.lightingLevel === 'magicalDarkness' ||
+        observerState.lightingLevel === 'greaterMagicalDarkness' ||
+        linePassesThroughDarkness || rayDarknessRank > 0;
+
+    const hasLineOfSight = inDarkness ? true : visionAnalyzer.hasLineOfSight(observer, target);
+
+    // Check if sound is blocked between observer and target
+    const soundBlocked = visionAnalyzer.isSoundBlocked(observer, target);
+
 
     if (linePassesThroughDarkness && rayDarknessRank > 0) {
         // Map darkness rank to lighting level for the ray
