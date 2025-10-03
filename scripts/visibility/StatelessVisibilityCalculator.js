@@ -162,6 +162,36 @@ function canLifesenseDetect(target) {
 }
 
 /**
+ * Check if observer has any precise non-visual senses
+ * Used for determining if dazzled condition applies (only applies if vision is the ONLY precise sense)
+ * @param {Object} observer - Observer state
+ * @returns {boolean} True if observer has at least one precise non-visual sense
+ */
+function checkHasPreciseNonVisualSense(observer) {
+    const { precise } = observer;
+
+    // Visual senses that should be excluded
+    const visualSenses = new Set([
+        'vision',
+        'darkvision',
+        'greater-darkvision',
+        'greaterDarkvision',
+        'low-light-vision',
+        'lowLightVision',
+        'light-perception'
+    ]);
+
+    // Check if there are any precise non-visual senses with range > 0
+    for (const [senseType, senseData] of Object.entries(precise)) {
+        if (!visualSenses.has(senseType) && senseData && senseData.range > 0) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+/**
  * Check precise non-visual senses (these bypass invisibility and most conditions)
  * Precise non-visual senses include echolocation, blindsense, thoughtsense, tremorsense, etc.
  * These work regardless of lighting and are unaffected by invisibility
@@ -250,8 +280,15 @@ function determineVisualDetection(observer, target, rayDarkness = null, hasLineO
     const { lightingLevel } = target;
     const { precise, conditions, lightingLevel: observerLighting } = observer;
 
-    // Dazzled condition makes everything concealed (but doesn't prevent detection)
+    // Dazzled condition: "If vision is your only precise sense, all creatures and objects are Concealed from you."
+    // This means dazzled ONLY applies concealment if the observer has no precise non-visual senses
     const isDazzled = conditions.dazzled;
+
+    // Check if observer has any precise non-visual senses
+    const hasPreciseNonVisualSense = checkHasPreciseNonVisualSense(observer);
+
+    // Dazzled only applies if vision is the ONLY precise sense
+    const dazzledApplies = isDazzled && !hasPreciseNonVisualSense;
 
     // Determine effective lighting level: use the most restrictive of target, observer, or ray
     // Priority: greaterMagicalDarkness > magicalDarkness > darkness > dim > bright
@@ -288,7 +325,7 @@ function determineVisualDetection(observer, target, rayDarkness = null, hasLineO
             canDetect: true,
             sense: 'greaterDarkvision',
             isPrecise: true,
-            baseState: isDazzled ? 'concealed' : 'observed'
+            baseState: dazzledApplies ? 'concealed' : 'observed'
         };
     }
 
@@ -312,7 +349,7 @@ function determineVisualDetection(observer, target, rayDarkness = null, hasLineO
                 canDetect: true,
                 sense: 'darkvision',
                 isPrecise: true,
-                baseState: isDazzled ? 'concealed' : 'observed'
+                baseState: dazzledApplies ? 'concealed' : 'observed'
             };
         } else if (effectiveLightingLevel === 'dim') {
             // In dim light, darkvision sees clearly
@@ -320,7 +357,7 @@ function determineVisualDetection(observer, target, rayDarkness = null, hasLineO
                 canDetect: true,
                 sense: 'darkvision',
                 isPrecise: true,
-                baseState: isDazzled ? 'concealed' : 'observed'
+                baseState: dazzledApplies ? 'concealed' : 'observed'
             };
         } else if (effectiveLightingLevel === 'bright') {
             // In bright light, darkvision works like normal vision
@@ -328,7 +365,7 @@ function determineVisualDetection(observer, target, rayDarkness = null, hasLineO
                 canDetect: true,
                 sense: 'darkvision',
                 isPrecise: true,
-                baseState: isDazzled ? 'concealed' : 'observed'
+                baseState: dazzledApplies ? 'concealed' : 'observed'
             };
         }
     }
@@ -340,7 +377,7 @@ function determineVisualDetection(observer, target, rayDarkness = null, hasLineO
                 canDetect: true,
                 sense: 'lowLightVision',
                 isPrecise: true,
-                baseState: isDazzled ? 'concealed' : 'observed'
+                baseState: dazzledApplies ? 'concealed' : 'observed'
             };
         } else {
             // Low-light vision doesn't work in any type of darkness
@@ -359,7 +396,7 @@ function determineVisualDetection(observer, target, rayDarkness = null, hasLineO
                 canDetect: true,
                 sense: senseUsed,
                 isPrecise: true,
-                baseState: isDazzled ? 'concealed' : 'observed'
+                baseState: dazzledApplies ? 'concealed' : 'observed'
             };
         } else if (effectiveLightingLevel === 'dim') {
             // Dim light causes concealment for normal vision
@@ -516,6 +553,7 @@ export const _internal = {
     normalizeObserverState,
     handleBlindedObserver,
     checkPreciseNonVisualSenses,
+    checkHasPreciseNonVisualSense,
     determineVisualDetection,
     checkImpreciseSenses,
     applyVisualModifiers,

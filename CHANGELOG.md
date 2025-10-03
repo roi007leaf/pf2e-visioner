@@ -9,6 +9,7 @@ This is a **major release** featuring comprehensive refactoring, new automation 
 ### ✨ New Features
 
 #### Enhanced Sneak Mechanics
+
 - **Improved State Management**: Sneak actions now properly track and manage visibility states throughout the action lifecycle
 - **Visual Indicators**: Enhanced feedback for sneaking tokens with improved UI
 - **End-of-Turn Position Validation**: New dialog system for validating position requirements at turn end with defer functionality
@@ -16,22 +17,26 @@ This is a **major release** featuring comprehensive refactoring, new automation 
 - **Sneak-Aware Filtering**: Override validation indicator now filters appropriately based on sneak states
 
 #### Region Behavior Enhancements
+
 - **Visibility Region Behavior**: Added new visibility types to region behavior system
 - **Concealment Region Behavior**: New concealment region type with proper activation/deactivation
 - **Improved Logic**: Optimized concealment region behavior with better detection and state management
 
 #### Feat Support
+
 - **Camouflage Feat**: Implemented Camouflage feat support to bypass cover/concealment requirements in natural terrain
   - Properly evaluates terrain stalker selections
   - Integrates with cover and concealment detection
 - **Terrain Stalker**: Enhanced Terrain Stalker logic to correctly relax end position requirements
 
 #### Chat Automation Improvements
+
 - **Enhanced Dialogs**: Improved filtering logic in chat dialogs (Seek, Hide, Sneak, Consequences, Point Out) for better clarity and consistency
 - **Consequences Dialog**: Refactored preview dialog and action handler with improved error handling and override management
 - **Override-Only Consequences**: Consequences button now only shows for overrides, reducing clutter
 
 #### Visibility Detection
+
 - **Lifesense Detection**: Enhanced lifesense detection by adding trait checks
   - Detects "mindless" trait for undead/constructs
   - Updated related visuals and tests
@@ -40,6 +45,7 @@ This is a **major release** featuring comprehensive refactoring, new automation 
 ### 🔄 Refactoring & Architecture
 
 #### Visibility System Refactor
+
 - **New Calculation Workflow**: Implemented completely new visibility calculation workflow with comprehensive separation of concerns
 - **StatelessVisibilityCalculator**: Main calculation logic extracted to ~200 lines (from 900+ lines)
   - Extracted 22+ focused methods with single responsibilities
@@ -49,6 +55,7 @@ This is a **major release** featuring comprehensive refactoring, new automation 
 - **AVS Control Mechanism**: Added Auto Visibility System control flags to manage visibility state automation
 
 #### Code Quality Improvements
+
 - **Event Listener Management**: Simplified event listener management and cleanup in hover tooltips
 - **Error Handling**: Enhanced error handling when removing token event listeners
 - **Flag Management**: Comprehensive improvements to flag management and cleanup processes
@@ -123,6 +130,7 @@ This is a **major release** featuring comprehensive refactoring, new automation 
 ### 🔧 Technical
 
 #### Test Coverage
+
 - **Comprehensive New Tests**: Added extensive test suite for new features
   - Greater Darkvision feat detection tests (unit, integration, debug)
   - Wall change cache clearing tests
@@ -137,18 +145,21 @@ This is a **major release** featuring comprehensive refactoring, new automation 
   - Direction-aware override tests enhanced
 
 #### Performance
+
 - **Batch Processing Optimizations**: Enhanced visibility handling with movement detection and batch processing
   - Reduced redundant calculations
   - Better caching strategies
   - Improved AVS override cleanup
 
 #### Documentation
+
 - **Comprehensive Guidelines**: Added extensive PF2E Visioner development guidelines
   - Architecture documentation updated
   - Copilot instructions enhanced
   - Debug guides for Wall Height integration
 
 #### Debug & Logging
+
 - **Enhanced Debug Messages**: Added debug logging for feat-based vision detection
 - **Import Verification**: Better import count verification in tests
 - **Error Messages**: Improved error messages throughout the codebase
