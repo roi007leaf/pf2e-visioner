@@ -353,7 +353,6 @@ export class FeatsHandler {
 
     // Ceaseless Shadows: You no longer need cover or concealment to Hide or Sneak
     if (feats.has('ceaseless-shadows')) {
-      startQualifies = true;
       endQualifies = true;
       reason = reason || 'Ceaseless Shadows removes cover/concealment requirement';
     }
@@ -368,7 +367,6 @@ export class FeatsHandler {
           EnvironmentHelper.isEnvironmentActive(tokenOrActor, terrain)
         );
         if (inNaturalTerrain) {
-          startQualifies = true;
           endQualifies = true;
           if (!reason) reason = 'Camouflage removes cover/concealment requirement in natural terrain';
         }
@@ -376,16 +374,14 @@ export class FeatsHandler {
     }
 
     // Legendary Sneak: You can Hide and Sneak even without cover or being concealed.
-    // RAW: bypass both start and end prerequisites entirely.
+    // RAW: bypass end prerequisites entirely.
     if (feats.has('legendary-sneak')) {
-      startQualifies = true;
       endQualifies = true;
       if (!reason) reason = 'Legendary Sneak removes cover/concealment requirement';
     }
 
     // Very, Very Sneaky: End position does not require cover or concealment either
     if (!endQualifies && feats.has('very-very-sneaky')) {
-      startQualifies = true;
       endQualifies = true;
       if (!reason) reason = 'Very, Very Sneaky removes end cover/concealment requirement';
     }
@@ -438,12 +434,7 @@ export class FeatsHandler {
         const actorToken = FeatsHandlerInternal.resolveToken(tokenOrActor) || tokenOrActor;
 
         // Compute start/end large-creature cover signals
-        const startHint = extra?.startPoint || extra?.startCenter || extra?.storedStartPosition?.center || null;
         const endHint = extra?.endPoint || extra?.endCenter || null;
-
-        const startHasLargeCover = typeof extra?.startHasLargeCreatureCover === 'boolean'
-          ? extra.startHasLargeCreatureCover
-          : coverDetector.hasLargeCreatureCover(observer, actorToken, startHint);
 
         // For end: prefer explicit boolean, else compute using endHint if provided.
         // If no hint is available (e.g., end position is virtual during preview), allow a conservative
@@ -455,10 +446,6 @@ export class FeatsHandler {
           endHasLargeCover = true; // Treat creature-provided lesser cover as sufficient for DS prerequisites
         }
 
-        if (!startQualifies && startHasLargeCover) {
-          startQualifies = true;
-          if (!reason) reason = 'Distracting Shadows: using larger creature as cover (start)';
-        }
         if (!endQualifies && endHasLargeCover) {
           endQualifies = true;
           if (!reason) reason = 'Distracting Shadows: using larger creature as cover (end)';
