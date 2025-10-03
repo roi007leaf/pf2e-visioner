@@ -648,6 +648,8 @@ export class VisionAnalyzer {
         this.#processSensesForVisionTypes(result);
       }
 
+      this.#checkForVisionFeats(actor, result);
+
       // Build detection modes object
       this.#buildDetectionModes(token, result);
 
@@ -698,6 +700,35 @@ export class VisionAnalyzer {
         const ll = senses['low-light-vision'] || senses.lowLightVision;
         result.lowLightRange = ll?.range || Infinity;
       }
+    }
+  }
+
+  #checkForVisionFeats(actor, result) {
+    if (!actor) return;
+
+    try {
+      const feats = actor.itemTypes?.feat ?? actor.items?.filter?.((i) => i?.type === 'feat') ?? [];
+
+      for (const feat of feats) {
+        const slug = feat?.system?.slug?.toLowerCase?.() || '';
+
+        if (slug === 'greater-darkvision' && !result.hasGreaterDarkvision) {
+          log.debug('Greater Darkvision feat detected (not in senses)', { actor: actor.name });
+          result.hasDarkvision = true;
+          result.hasGreaterDarkvision = true;
+          if (!result.darkvisionRange) {
+            result.darkvisionRange = Infinity;
+          }
+        } else if (slug === 'darkvision' && !result.hasDarkvision) {
+          log.debug('Darkvision feat detected (not in senses)', { actor: actor.name });
+          result.hasDarkvision = true;
+          if (!result.darkvisionRange) {
+            result.darkvisionRange = Infinity;
+          }
+        }
+      }
+    } catch (error) {
+      log.debug('Error checking vision feats', error);
     }
   }
 
