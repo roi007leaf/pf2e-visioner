@@ -158,11 +158,11 @@ function checkSeekTargets(actionData, potentialTargets) {
     } catch (_) { }
 
     const visibility = getVisibilityBetween(actionData.actor, target);
-    if (['concealed', 'hidden', 'undetected'].includes(visibility)) return true;
+    if (['hidden', 'undetected'].includes(visibility)) return true;
     if (target.actor) {
       const conditions = target.actor.conditions?.conditions || [];
       const isHiddenOrUndetected = conditions.some((c) =>
-        ['hidden', 'undetected', 'concealed'].includes(c.slug),
+        ['hidden', 'undetected'].includes(c.slug),
       );
       if (isHiddenOrUndetected) return true;
     }
@@ -170,7 +170,6 @@ function checkSeekTargets(actionData, potentialTargets) {
       const rollOptions = actionData.actor.actor.getRollOptions();
       const hasHiddenOrUndetected = rollOptions.some(
         (opt) =>
-          opt.includes('target:concealed') ||
           opt.includes('target:hidden') ||
           opt.includes('target:undetected'),
       );

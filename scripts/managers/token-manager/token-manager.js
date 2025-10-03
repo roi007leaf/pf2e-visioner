@@ -1,13 +1,6 @@
 /**
  * ApplicationV2-based Visioner Token Manager
-      bulkNPCObserved: VisionerTokenManager.bulkSetVisibilityState,
-      bulkHazardsObserved: VisionerTokenManager.bulkSetVisibilityState,
-      bulkHazardsHidden: VisionerTokenManager.bulkSetVisibilityState,
-      bulkLootObserved: VisionerTokenManager.bulkSetVisibilityState,
-      bulkLootHidden: VisionerTokenManager.bulkSetVisibilityState,
-      bulkWallsObserved: VisionerTokenManager.bulkSetVisibilityState,
-      bulkWallsHidden: VisionerTokenManager.bulkSetVisibilityState,
-      bulkPCNoCover: VisionerTokenManager.bulkSetCoverState, Handles both visibility and cover management for tokens
+ * Handles both visibility and cover management for tokens
  */
 
 import { getCoverMap, getVisibilityMap } from '../../utils.js';
@@ -58,6 +51,10 @@ export class VisionerTokenManager extends foundry.applications.api.ApplicationV2
       bulkNPCUndetected: VisionerTokenManager.bulkSetVisibilityState,
       bulkNPCConcealed: VisionerTokenManager.bulkSetVisibilityState,
       bulkNPCObserved: VisionerTokenManager.bulkSetVisibilityState,
+      bulkPCNoCover: VisionerTokenManager.bulkSetCoverState,
+      bulkPCLesserCover: VisionerTokenManager.bulkSetCoverState,
+      bulkPCStandardCover: VisionerTokenManager.bulkSetCoverState,
+      bulkPCGreaterCover: VisionerTokenManager.bulkSetCoverState,
       bulkNPCNoCover: VisionerTokenManager.bulkSetCoverState,
       bulkNPCLesserCover: VisionerTokenManager.bulkSetCoverState,
       bulkNPCStandardCover: VisionerTokenManager.bulkSetCoverState,
