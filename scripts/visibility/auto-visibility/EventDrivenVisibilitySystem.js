@@ -122,7 +122,7 @@ export class EventDrivenVisibilitySystem {
       // Initialize BatchProcessor with proper dependency injection
       this.#batchProcessor = await this.#diContainer.get('batchProcessor', {
         spatialAnalyzer: coreServices.spatialAnalysisService,
-        viewportFilter: this.#viewportFilterService?.createViewportFilterConfig(),
+        viewportFilterService: this.#viewportFilterService?.createViewportFilterConfig(),
         optimizedVisibilityCalculator: coreServices.optimizedVisibilityCalculator,
         globalLosCache: coreServices.globalLosCache,
         globalVisibilityCache: coreServices.globalVisibilityCache,

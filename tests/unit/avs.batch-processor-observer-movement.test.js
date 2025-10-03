@@ -8,7 +8,7 @@ const makeToken = (id, x, y) => createMockToken({ id, x, y, width: 1, height: 1,
 
 describe('BatchProcessor - Observer Movement Override Fix', () => {
     let spatialAnalyzer;
-    let viewportFilter;
+    let viewportFilterService;
     let optimizedVisibilityCalculator;
     let globalLosCache;
     let globalVisibilityCache;
@@ -23,7 +23,7 @@ describe('BatchProcessor - Observer Movement Override Fix', () => {
             canTokensSeeEachOther: jest.fn(() => true),
             getAffectedTokensByMovement: jest.fn(() => new Set())
         };
-        viewportFilter = {
+        viewportFilterService = {
             getTokensInViewport: jest.fn(tokens => new Set(tokens.map(t => t.document.id)))
         };
         optimizedVisibilityCalculator = {
@@ -42,7 +42,7 @@ describe('BatchProcessor - Observer Movement Override Fix', () => {
 
         processor = new BatchProcessor({
             spatialAnalyzer,
-            viewportFilter,
+            viewportFilterService,
             optimizedVisibilityCalculator,
             globalLosCache,
             globalVisibilityCache,

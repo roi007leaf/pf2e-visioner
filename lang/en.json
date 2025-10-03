@@ -327,10 +327,6 @@
         "name": "Auto-Visibility Debug Mode",
         "hint": "Enable detailed console logging for the auto-visibility system. Useful for troubleshooting visibility calculations."
       },
-      "CLIENT_VIEWPORT_FILTERING": {
-        "name": "Client Viewport Filtering (Experimental)",
-        "hint": "Per-client optimization: Only process auto-visibility for tokens inside this client's current viewport. Greatly reduces work on large maps while you’re zoomed in. GM-only map updates still run globally when needed."
-      },
       "COLORBLIND_MODE": {
         "name": "Colorblind Mode",
         "hint": "Select a colorblind mode to adjust colors for better visibility (client-side setting)",

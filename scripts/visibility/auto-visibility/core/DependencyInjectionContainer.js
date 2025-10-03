@@ -114,7 +114,7 @@ export class DependencyInjectionContainer {
             const { BatchProcessor } = await import('./BatchProcessor.js');
             return new BatchProcessor({
                 spatialAnalyzer: dependencies.spatialAnalyzer,
-                viewportFilter: dependencies.viewportFilter,
+                viewportFilterService: dependencies.viewportFilterService,
                 optimizedVisibilityCalculator: dependencies.optimizedVisibilityCalculator,
                 globalLosCache: dependencies.globalLosCache,
                 globalVisibilityCache: dependencies.globalVisibilityCache,

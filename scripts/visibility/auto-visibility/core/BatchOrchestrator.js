@@ -640,13 +640,7 @@ export class BatchOrchestrator {
    * @private
    */
   _getViewportFilteringEnabled() {
-    try {
-      // Treat undefined as enabled by default to favor performance
-      const v = game.settings?.get(this.moduleId, 'clientViewportFiltering');
-      return v !== false;
-    } catch {
-      return true;
-    }
+    return true;
   }
 
   /**

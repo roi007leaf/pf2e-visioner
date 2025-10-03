@@ -8,7 +8,7 @@ const makeToken = (id, x, y) => createMockToken({ id, x, y, width: 1, height: 1,
 
 describe('BatchProcessor', () => {
     let spatialAnalyzer;
-    let viewportFilter;
+    let viewportFilterService;
     let optimizedVisibilityCalculator;
     let globalLosCache;
     let globalVisibilityCache;
@@ -27,7 +27,7 @@ describe('BatchProcessor', () => {
             }),
             canTokensSeeEachOther: jest.fn(() => true),
         };
-        viewportFilter = { isEnabled: jest.fn(() => false) };
+        viewportFilterService = { isEnabled: jest.fn(() => false) };
         optimizedVisibilityCalculator = {
             // Return non-default state so updates are generated vs original 'observed'
             calculateVisibilityBetweenTokens: jest.fn(async () => 'hidden'),
@@ -49,7 +49,7 @@ describe('BatchProcessor', () => {
 
         processor = new BatchProcessor({
             spatialAnalyzer,
-            viewportFilter,
+            viewportFilterService,
             optimizedVisibilityCalculator,
             globalLosCache,
             globalVisibilityCache,

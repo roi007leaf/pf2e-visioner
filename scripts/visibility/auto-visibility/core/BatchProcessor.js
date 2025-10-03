@@ -24,7 +24,7 @@ export class BatchProcessor {
      * Creates a new BatchProcessor with injected dependencies.
      * @param {Object} dependencies - All required dependencies
      * @param {SpatialAnalysisService} dependencies.spatialAnalyzer - SpatialAnalyzer instance
-     * @param {ViewportFilterService|null} dependencies.viewportFilter - ViewportFilter instance (optional)
+     * @param {ViewportFilterService|null} dependencies.viewportFilterService - ViewportFilterService instance (optional)
      * @param {Object} dependencies.optimizedVisibilityCalculator
      * @param {GlobalLosCache} dependencies.globalLosCache - Global LOS cache for optimization
      * @param {GlobalVisibilityCache} dependencies.globalVisibilityCache - Global visibility cache for optimization
@@ -36,7 +36,7 @@ export class BatchProcessor {
      */
     constructor(dependencies) {
         this.spatialAnalyzer = dependencies.spatialAnalyzer;
-        this.viewportFilter = dependencies.viewportFilter;
+        this.viewportFilterService = dependencies.viewportFilterService;
         this.optimizedVisibilityCalculator = dependencies.optimizedVisibilityCalculator;
         this.globalLosCache = dependencies.globalLosCache;
         this.globalVisibilityCache = dependencies.globalVisibilityCache;
@@ -247,13 +247,12 @@ export class BatchProcessor {
                 .filter((t) => t?.document?.id && t.document.id !== changedTokenId);
 
             // Optional client-side viewport filtering for relevant tokens
-            if (this.viewportFilter?.isEnabled?.()) {
-                // Prefer the per-batch cached positions and quadtree for fast viewport filtering
-                const inView = this.viewportFilter.getTokenIdSet?.(64, index, (t) => getPos(t)) || null;
-                if (inView && inView.size > 0) {
-                    relevantTokens = relevantTokens.filter((t) => inView.has(t.document.id));
-                }
+            // Prefer the per-batch cached positions and quadtree for fast viewport filtering
+            const inView = this.viewportFilterService.getTokenIdSet?.(64, index, (t) => getPos(t)) || null;
+            if (inView && inView.size > 0) {
+                relevantTokens = relevantTokens.filter((t) => inView.has(t.document.id));
             }
+
 
             spatialFilteringTime += performance.now() - spatialStart;
 

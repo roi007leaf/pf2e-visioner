@@ -3,8 +3,6 @@
  * Manages viewport bounds detection and token filtering based on client view
  */
 
-import { MODULE_ID } from '../../../constants.js';
-
 export class ViewportFilterService {
     /** @type {PositionManager} */
     #positionManager = null;
@@ -22,12 +20,7 @@ export class ViewportFilterService {
      * @returns {boolean} Whether viewport filtering is enabled
      */
     isClientAwareFilteringEnabled() {
-        try {
-            const v = game.settings.get(MODULE_ID, 'clientViewportFiltering');
-            return v !== false; // treat undefined as enabled
-        } catch {
-            return true; // Default to enabled
-        }
+        return true;
     }
 
     /**
