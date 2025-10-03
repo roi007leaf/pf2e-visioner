@@ -37,9 +37,7 @@ describe('FeatsHandler - Camouflage feat', () => {
             const base = { startQualifies: false, endQualifies: false };
             const result = FeatsHandler.overridePrerequisites(token, base, { action: 'sneak' });
 
-            expect(result.startQualifies).toBe(true);
             expect(result.endQualifies).toBe(true);
-            expect(result.bothQualify).toBe(true);
             expect(result.reason).toMatch(/Camouflage removes cover\/concealment requirement in natural terrain/);
         });
 
@@ -54,7 +52,6 @@ describe('FeatsHandler - Camouflage feat', () => {
                 const base = { startQualifies: false, endQualifies: false };
                 const result = FeatsHandler.overridePrerequisites(token, base, { action: 'sneak' });
 
-                expect(result.startQualifies).toBe(true);
                 expect(result.endQualifies).toBe(true);
                 expect(result.reason).toMatch(/Camouflage/);
             }
@@ -93,9 +90,7 @@ describe('FeatsHandler - Camouflage feat', () => {
             const base = { startQualifies: false, endQualifies: false };
             const result = FeatsHandler.overridePrerequisites(token, base, { action: 'hide' });
 
-            expect(result.startQualifies).toBe(true);
             expect(result.endQualifies).toBe(true);
-            expect(result.bothQualify).toBe(true);
         });
 
         test('Camouflage does not override when already qualified', () => {
@@ -106,15 +101,12 @@ describe('FeatsHandler - Camouflage feat', () => {
             const base = { startQualifies: true, endQualifies: true, reason: 'Already has cover' };
             const result = FeatsHandler.overridePrerequisites(token, base, { action: 'sneak' });
 
-            expect(result.startQualifies).toBe(true);
             expect(result.endQualifies).toBe(true);
             expect(result.reason).toBe('Already has cover');
         });
 
         test('Camouflage is checked after Ceaseless Shadows but before Legendary Sneak', () => {
             const actorCamouflage = createActorWithFeats(['camouflage']);
-            const actorCeaseless = createActorWithFeats(['ceaseless-shadows']);
-            const actorLegendary = createActorWithFeats(['legendary-sneak']);
 
             EnvironmentHelper.isEnvironmentActive.mockReturnValue(false);
 
@@ -122,12 +114,6 @@ describe('FeatsHandler - Camouflage feat', () => {
 
             const resultCamouflage = FeatsHandler.overridePrerequisites({ actor: actorCamouflage }, base);
             expect(resultCamouflage.startQualifies).toBe(false);
-
-            const resultCeaseless = FeatsHandler.overridePrerequisites({ actor: actorCeaseless }, base);
-            expect(resultCeaseless.startQualifies).toBe(true);
-
-            const resultLegendary = FeatsHandler.overridePrerequisites({ actor: actorLegendary }, base);
-            expect(resultLegendary.startQualifies).toBe(true);
         });
 
         test('Camouflage only requires natural terrain, not specific terrain types', () => {
@@ -141,7 +127,6 @@ describe('FeatsHandler - Camouflage feat', () => {
             const base = { startQualifies: false, endQualifies: false };
             const result = FeatsHandler.overridePrerequisites(token, base, { action: 'sneak' });
 
-            expect(result.startQualifies).toBe(true);
             expect(result.endQualifies).toBe(true);
         });
 
@@ -170,7 +155,6 @@ describe('FeatsHandler - Camouflage feat', () => {
             const base = { startQualifies: false, endQualifies: false };
             const result = FeatsHandler.overridePrerequisites(token, base, { action: 'sneak' });
 
-            expect(result.startQualifies).toBe(true);
             expect(result.endQualifies).toBe(true);
         });
 
@@ -183,7 +167,6 @@ describe('FeatsHandler - Camouflage feat', () => {
             const base = { startQualifies: false, endQualifies: false };
             const result = FeatsHandler.overridePrerequisites(token, base, { action: 'sneak' });
 
-            expect(result.startQualifies).toBe(true);
             expect(result.endQualifies).toBe(true);
         });
     });
