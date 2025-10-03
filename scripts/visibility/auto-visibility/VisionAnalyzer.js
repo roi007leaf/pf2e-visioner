@@ -18,6 +18,7 @@
  * SINGLETON PATTERN
  */
 
+import { doesWallBlockVertically } from '../../helpers/wall-height-integration.js';
 import { getLogger } from '../../utils/logger.js';
 import { SensingCapabilitiesBuilder } from './SensingCapabilitiesBuilder.js';
 
@@ -190,7 +191,6 @@ export class VisionAnalyzer {
       const observerCenter = observer.center;
       const targetCenter = target.center;
 
-      // Fast path: Test center-to-center first (most common case)
       const centerHasWall = sightBackend.testCollision(
         observerCenter,
         targetCenter,
@@ -201,14 +201,11 @@ export class VisionAnalyzer {
         return true;
       }
 
-      // Slow path: Center is blocked, test perimeter points for partial visibility
-      // Use 4 points (cardinal directions) to minimize performance impact
       const gridSize = canvas.grid?.size || 100;
       const tokenWidth = (target?.document?.width ?? target?.width ?? 1) * gridSize;
       const tokenHeight = (target?.document?.height ?? target?.height ?? 1) * gridSize;
       const targetRadius = target.externalRadius ?? Math.max(tokenWidth, tokenHeight) / 2;
 
-      // Test 4 cardinal points: right, bottom, left, top
       const angles = [0, Math.PI / 2, Math.PI, (3 * Math.PI) / 2];
       for (const angle of angles) {
         const testX = targetCenter.x + Math.cos(angle) * targetRadius;
@@ -225,6 +222,38 @@ export class VisionAnalyzer {
         }
       }
 
+      const walls = canvas.walls?.placeables || [];
+      const blockingWalls = walls.filter(wall => {
+        const wallDoc = wall.document;
+        if (wallDoc.sight === 0) return false;
+
+        const isDoor = Number(wallDoc.door) > 0;
+        const doorState = Number(wallDoc.ds ?? wallDoc.doorState ?? 0);
+        if (isDoor && doorState === 1) return false;
+
+        return true;
+      });
+
+      for (const wall of blockingWalls) {
+        const wallDoc = wall.document;
+        console.log('PF2E Visioner | VisionAnalyzer | Checking wall for vertical blocking:', {
+          wallId: wallDoc?.id,
+          observerName: observer?.name,
+          targetName: target?.name
+        });
+        const canSeeOver = !doesWallBlockVertically(observer, target, wallDoc);
+        console.log('PF2E Visioner | VisionAnalyzer | Wall check result:', {
+          wallId: wallDoc?.id,
+          canSeeOver,
+          doesBlockVertically: !canSeeOver
+        });
+        if (canSeeOver) {
+          console.log('PF2E Visioner | VisionAnalyzer | Observer can see over/under wall, has line of sight');
+          return true;
+        }
+      }
+
+      console.log('PF2E Visioner | VisionAnalyzer | No walls allow seeing over/under, no line of sight');
       return false;
     } catch (error) {
       console.error('[LineOfSight] Error:', error);

@@ -4,7 +4,6 @@
  */
 
 import { MODULE_ID } from '../../constants.js';
-// Removed unused imports that were only used by the removed center intersection mode
 import {
   intersectsBetweenTokens,
   segmentRectIntersectionLength,
@@ -15,6 +14,10 @@ import {
   getTokenRect,
   getTokenVerticalSpanFt,
 } from '../../helpers/size-elevation-utils.js';
+import {
+  doesWallBlockVertically,
+  getEffectiveWallHeightForCover,
+} from '../../helpers/wall-height-integration.js';
 
 import { getVisibilityBetween } from '../../utils.js';
 
@@ -71,7 +74,7 @@ export class CoverDetector {
       const p2 = target.center ?? target.getCenterPoint();
 
       // Check if there's any blocking terrain (walls) in the way
-      const segmentAnalysis = this._analyzeSegmentObstructions(p1, p2);
+      const segmentAnalysis = this._analyzeSegmentObstructions(p1, p2, attacker, target);
       const hasWallsInTheWay = segmentAnalysis.hasBlockingTerrain;
 
       // NEW LOGIC: Priority based on wall presence
@@ -100,7 +103,7 @@ export class CoverDetector {
         return tokenCover;
       } else {
         // Case 2: There IS a wall in the way - use new wall cover rules
-        const wallCover = this._evaluateWallsCover(p1, p2);
+        const wallCover = this._evaluateWallsCover(p1, p2, attacker, target);
         return wallCover;
       }
     } catch (error) {
@@ -229,43 +232,52 @@ export class CoverDetector {
    * Evaluate walls cover using center-to-center segment analysis
    * @param {Object} p1 - Attacker center point
    * @param {Object} p2 - Target center point
+   * @param {Object} attacker - Attacker token (optional, for Wall Height filtering)
+   * @param {Object} target - Target token (optional, for Wall Height filtering)
    * @returns {string} Cover category ('none', 'lesser', 'standard', 'greater')
    * @private
    */
-  _evaluateWallsCover(p1, p2) {
+  _evaluateWallsCover(p1, p2, attacker = null, target = null) {
     if (!canvas?.walls) return 'none';
 
-    // First check for manual wall cover overrides - if present, use it directly and skip all other checks
     const wallOverride = this._checkWallCoverOverrides(p1, p2);
     if (wallOverride !== null) {
       return wallOverride;
     }
 
-    // Analyze the center-to-center segment
-    const segmentAnalysis = this._analyzeSegmentObstructions(p1, p2);
+    const segmentAnalysis = this._analyzeSegmentObstructions(p1, p2, attacker, target);
 
-    // Determine cover category based on new rules
     let coverCategory = 'none';
 
-    // Rule 1: No obstructions
     if (!segmentAnalysis.hasBlockingTerrain && !segmentAnalysis.hasCreatures) {
       coverCategory = 'none';
     }
-    // Rule 2: Creature space only, no blocking terrain
     else if (!segmentAnalysis.hasBlockingTerrain && segmentAnalysis.hasCreatures) {
       coverCategory = 'lesser';
     }
-    // Rule 3: Any blocking terrain
     else if (segmentAnalysis.hasBlockingTerrain) {
-      // Calculate wall coverage percentage using existing method
       const target = this._findNearestTokenToPoint(p2);
+      const attacker = this._findNearestTokenToPoint(p1);
       let wallCoveragePercent = 0;
 
       if (target) {
         wallCoveragePercent = this._estimateWallCoveragePercent(p1, target);
+
+        if (attacker && target) {
+          const walls = segmentAnalysis.blockingWalls || [];
+
+          for (const wallDoc of walls) {
+            const effectiveHeight = getEffectiveWallHeightForCover(attacker, target, wallDoc);
+
+            if (effectiveHeight !== null && effectiveHeight === 0) {
+              wallCoveragePercent = Math.max(0, wallCoveragePercent - 100);
+            } else if (effectiveHeight !== null && effectiveHeight < 5) {
+              wallCoveragePercent = Math.max(0, wallCoveragePercent * (effectiveHeight / 5));
+            }
+          }
+        }
       }
 
-      // Get threshold settings
       const stdThreshold = Math.max(
         0,
         Number(game.settings.get('pf2e-visioner', 'wallCoverStandardThreshold') ?? 50),
@@ -276,13 +288,11 @@ export class CoverDetector {
       );
       const allowGreater = !!game.settings.get('pf2e-visioner', 'wallCoverAllowGreater');
 
-      // Determine cover level based on coverage percentage
       if (allowGreater && wallCoveragePercent >= grtThreshold) {
         coverCategory = 'greater';
       } else if (wallCoveragePercent >= stdThreshold) {
         coverCategory = 'standard';
       } else {
-        // Fallback for cases where coverage calculation fails but walls are detected
         coverCategory = 'standard';
       }
     }
@@ -294,11 +304,21 @@ export class CoverDetector {
    * Analyze what obstructions the center-to-center segment passes through
    * @param {Object} p1 - Start point (attacker center)
    * @param {Object} p2 - End point (target center)
+   * @param {Object} attacker - Attacker token (optional, for Wall Height filtering)
+   * @param {Object} target - Target token (optional, for Wall Height filtering)
    * @returns {Object} Analysis object with obstruction details
    * @private
    */
-  _analyzeSegmentObstructions(p1, p2) {
+  _analyzeSegmentObstructions(p1, p2, attacker = null, target = null) {
     const segmentLength = Math.sqrt((p2.x - p1.x) ** 2 + (p2.y - p1.y) ** 2);
+
+    console.log('PF2E Visioner | CoverDetector | _analyzeSegmentObstructions:', {
+      hasAttacker: !!attacker,
+      hasTarget: !!target,
+      attackerName: attacker?.name,
+      targetName: target?.name,
+      segmentLength
+    });
 
     const analysis = {
       hasBlockingTerrain: false,
@@ -311,11 +331,26 @@ export class CoverDetector {
 
     // Check for blocking walls/terrain
     const walls = canvas?.walls?.objects?.children || [];
+    console.log('PF2E Visioner | CoverDetector | Checking', walls.length, 'walls');
+
     for (const wall of walls) {
       const wallDoc = wall.document || wall;
 
       // Skip walls that don't block from the attacker's direction
       if (!this._doesWallBlockFromDirection(wallDoc, p1)) continue;
+
+      // Skip walls that don't block vertically (Wall Height integration)
+      if (attacker && target) {
+        const blocksVertically = doesWallBlockVertically(attacker, target, wallDoc);
+        console.log('PF2E Visioner | CoverDetector | Wall vertical check:', {
+          wallId: wallDoc?.id,
+          blocksVertically
+        });
+        if (!blocksVertically) {
+          console.log('PF2E Visioner | CoverDetector | Skipping wall - does not block vertically');
+          continue;
+        }
+      }
 
       const coords = wall?.coords;
       if (!coords) continue;
@@ -333,14 +368,16 @@ export class CoverDetector {
       );
 
       if (intersection) {
+        console.log('PF2E Visioner | CoverDetector | Wall intersects segment:', wallDoc?.id);
         analysis.hasBlockingTerrain = true;
-        analysis.blockingWalls.push({
-          wall: wallDoc,
-          intersection: intersection,
-          coords: coords,
-        });
+        analysis.blockingWalls.push(wallDoc);
       }
     }
+
+    console.log('PF2E Visioner | CoverDetector | Segment analysis result:', {
+      hasBlockingTerrain: analysis.hasBlockingTerrain,
+      blockingWallsCount: analysis.blockingWalls.length
+    });
 
     // Check for creatures along the segment
     const tokens = canvas?.tokens?.placeables || [];
@@ -647,6 +684,67 @@ export class CoverDetector {
   }
 
   /**
+   * Check if a blocker is blocked by walls (Wall Height integration)
+   * If there's a wall between attacker and blocker that the attacker can see over/under,
+   * the blocker shouldn't provide cover.
+   * @param {Object} attacker - Attacker token
+   * @param {Object} blocker - Blocking token candidate
+   * @returns {boolean} True if blocker is blocked by walls and shouldn't provide cover
+   * @private
+   */
+  _isBlockerBlockedByWalls(attacker, blocker) {
+    if (!canvas?.walls) return false;
+
+    console.log('PF2E Visioner | CoverDetector | Checking if blocker is blocked by walls:', {
+      attackerName: attacker?.name,
+      blockerName: blocker?.name
+    });
+
+    const p1 = attacker.center ?? attacker.getCenterPoint();
+    const p2 = blocker.center ?? blocker.getCenterPoint();
+
+    const walls = canvas.walls.objects.children || [];
+    for (const wall of walls) {
+      const wallDoc = wall.document || wall;
+
+      if (!this._doesWallBlockFromDirection(wallDoc, p1)) continue;
+
+      const blocksVertically = doesWallBlockVertically(attacker, blocker, wallDoc);
+      console.log('PF2E Visioner | CoverDetector | Wall vertical blocking check:', {
+        wallId: wallDoc?.id,
+        blocksVertically
+      });
+
+      if (!blocksVertically) {
+        console.log('PF2E Visioner | CoverDetector | Wall does not block vertically, skipping');
+        continue;
+      }
+
+      const coords = wall?.coords;
+      if (!coords) continue;
+
+      const intersection = this._lineIntersectionPoint(
+        p1.x,
+        p1.y,
+        p2.x,
+        p2.y,
+        coords[0],
+        coords[1],
+        coords[2],
+        coords[3],
+      );
+
+      if (intersection) {
+        console.log('PF2E Visioner | CoverDetector | Wall intersects line between attacker and blocker, blocker is blocked');
+        return true;
+      }
+    }
+
+    console.log('PF2E Visioner | CoverDetector | No walls block the blocker');
+    return false;
+  }
+
+  /**
    * Filter blockers by elevation using center-to-center line of sight
    * @param {Object} attacker - Attacker token
    * @param {Object} target - Target token
@@ -663,6 +761,11 @@ export class CoverDetector {
 
     return blockers.filter((blocker) => {
       try {
+        // Wall Height: Check if blocker is blocked by walls
+        if (this._isBlockerBlockedByWalls(attacker, blocker)) {
+          return false;
+        }
+
         const blockerSpan = getTokenVerticalSpanFt(blocker);
         const blockerPos = blocker.center ?? blocker.getCenterPoint();
 
@@ -708,6 +811,11 @@ export class CoverDetector {
 
     return blockers.filter((blocker) => {
       try {
+        // Wall Height: Check if blocker is blocked by walls
+        if (this._isBlockerBlockedByWalls(attacker, blocker)) {
+          return false;
+        }
+
         const blockerSpan = getTokenVerticalSpanFt(blocker);
         const blockerPos = blocker.center ?? blocker.getCenterPoint();
 
@@ -762,6 +870,11 @@ export class CoverDetector {
 
     return blockers.filter((blocker) => {
       try {
+        // Wall Height: Check if blocker is blocked by walls
+        if (this._isBlockerBlockedByWalls(attacker, blocker)) {
+          return false;
+        }
+
         const blockerSpan = getTokenVerticalSpanFt(blocker);
         const blockerPos = blocker.center ?? blocker.getCenterPoint();
 
@@ -816,6 +929,11 @@ export class CoverDetector {
 
     return blockers.filter((blocker) => {
       try {
+        // Wall Height: Check if blocker is blocked by walls
+        if (this._isBlockerBlockedByWalls(attacker, blocker)) {
+          return false;
+        }
+
         const blockerSpan = getTokenVerticalSpanFt(blocker);
         const blockerPos = blocker.center ?? blocker.getCenterPoint();
 
