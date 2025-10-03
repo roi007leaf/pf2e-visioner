@@ -80,11 +80,18 @@ export async function applyNowSneak(actionData, button) {
     if (result.success) {
       handler.updateButtonToRevert(button);
 
-      // Only clear sneak-active flag if applying to all tokens (no overrides)
+      // Only clear sneak-active flag and restore speed if applying to all tokens (no overrides)
       if (!actionData.overrides || Object.keys(actionData.overrides).length === 0) {
         const sneakingToken = handler._getSneakingToken(actionData);
         if (sneakingToken) {
           await sneakingToken.document.unsetFlag('pf2e-visioner', 'sneak-active');
+          // Restore walk speed and remove sneaking effect
+          try {
+            const { SneakSpeedService } = await import('./sneak-speed-service.js');
+            await SneakSpeedService.restoreSneakWalkSpeed(sneakingToken);
+          } catch (speedErr) {
+            console.warn('PF2E Visioner | Failed to restore sneak walk speed:', speedErr);
+          }
         }
       }
 
