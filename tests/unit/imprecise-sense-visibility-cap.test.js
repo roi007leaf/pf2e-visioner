@@ -93,6 +93,10 @@ describe('Imprecise Sense Visibility Cap', () => {
       jest.spyOn(visionAnalyzer, 'getVisionCapabilities').mockReturnValue({
         hasVision: false,
         isBlinded: true,
+        sensingSummary: {
+          precise: [], // No precise non-visual senses
+          imprecise: [{ type: 'lifesense', range: 10 }], // Has lifesense but it's imprecise
+        },
       });
 
       // Mock no precise non-visual senses in range
@@ -102,8 +106,8 @@ describe('Imprecise Sense Visibility Cap', () => {
 
       // Even with a critical success (roll 25 vs DC 15), imprecise sense should cap at hidden
       expect(result.outcome).toBe('critical-success');
-      expect(result.newVisibility).toBe('observed'); // Not 'observed'
-      expect(result.changed).toBe(true); // Assuming target was undetected before
+      expect(result.newVisibility).toBe('hidden'); // Not 'observed' - imprecise sense caps at hidden
+      expect(result.changed).toBe(true); // Assuming target was observed before
     });
 
     test('tremorsense success should result in hidden, not observed', async () => {
@@ -153,6 +157,10 @@ describe('Imprecise Sense Visibility Cap', () => {
       jest.spyOn(visionAnalyzer, 'getVisionCapabilities').mockReturnValue({
         hasVision: false,
         isBlinded: true,
+        sensingSummary: {
+          precise: [], // No precise non-visual senses
+          imprecise: [{ type: 'tremorsense', range: 30 }], // Has tremorsense but it's imprecise
+        },
       });
 
       // Mock no precise non-visual senses in range
@@ -162,7 +170,7 @@ describe('Imprecise Sense Visibility Cap', () => {
 
       // Success/Critical success with imprecise sense should result in hidden
       expect(['success', 'critical-success']).toContain(result.outcome);
-      expect(result.newVisibility).toBe('observed');
+      expect(result.newVisibility).toBe('hidden');
     });
 
     test('echolocation critical success should result in observed (precise sense)', async () => {
@@ -212,6 +220,10 @@ describe('Imprecise Sense Visibility Cap', () => {
       jest.spyOn(visionAnalyzer, 'getVisionCapabilities').mockReturnValue({
         hasVision: false,
         isBlinded: true,
+        sensingSummary: {
+          precise: [{ type: 'echolocation', range: 40 }], // Echolocation is precise
+          imprecise: [],
+        },
       });
 
       // Mock precise non-visual sense in range (echolocation)
@@ -271,6 +283,10 @@ describe('Imprecise Sense Visibility Cap', () => {
       jest.spyOn(visionAnalyzer, 'getVisionCapabilities').mockReturnValue({
         hasVision: true,
         isBlinded: false,
+        sensingSummary: {
+          precise: [{ type: 'vision', range: Infinity }],
+          imprecise: [],
+        },
       });
 
       const result = await seekHandler.analyzeOutcome(actionData, target);
@@ -332,6 +348,10 @@ describe('Imprecise Sense Visibility Cap', () => {
       jest.spyOn(visionAnalyzer, 'getVisionCapabilities').mockReturnValue({
         hasVision: false,
         isBlinded: true,
+        sensingSummary: {
+          precise: [{ type: 'echolocation', range: 40 }],
+          imprecise: [{ type: 'lifesense', range: 10 }],
+        },
       });
 
       // Mock echolocation as precise non-visual sense in range

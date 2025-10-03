@@ -159,18 +159,6 @@ export class SeekActionHandler extends ActionHandlerBase {
         actionData.actorToken || actionData.actor?.token?.object || actionData.actor;
       current = getVisibilityBetween(observerToken, subject);
 
-      // If no explicit visibility entry exists between the tokens, treat them as undetected by default.
-      try {
-        const visibilityMap =
-          observerToken?.document?.getFlag?.(MODULE_ID, 'visibility') || Object.create(null);
-        const targetId = subject?.document?.id ?? subject?.id;
-        const hasExplicitEntry =
-          targetId != null && Object.prototype.hasOwnProperty.call(visibilityMap, targetId);
-        if (current === 'observed' && !hasExplicitEntry) {
-          current = 'undetected';
-        }
-      } catch { }
-
       // Proficiency gating for hazards/loot (skip if That's Odd guarantees detection)
       try {
         if (

@@ -450,7 +450,7 @@ describe('SeekActionHandler.analyzeOutcome', () => {
             expect(result.die).toBe(0);
         });
 
-        test('handles no explicit visibility entry → defaults to undetected', async () => {
+        test('handles no explicit visibility entry - trusts AVS/getVisibilityBetween result', async () => {
             const { getVisibilityBetween } = await import('../../scripts/utils.js');
             getVisibilityBetween.mockReturnValue('observed');
 
@@ -458,8 +458,8 @@ describe('SeekActionHandler.analyzeOutcome', () => {
 
             const result = await handler.analyzeOutcome(mockActionData, mockTarget);
 
-            // Should treat as undetected if observed but no explicit entry exists
-            expect(result.currentVisibility).toBe('undetected');
+            // Should trust the getVisibilityBetween result (no fallback to undetected)
+            expect(result.currentVisibility).toBe('observed');
         });
     });
 });
