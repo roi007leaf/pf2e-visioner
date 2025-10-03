@@ -592,6 +592,14 @@
     },
     "REGION_BEHAVIOR": {
       "TYPE_LABEL": "PF2e Visioner Visibility",
+      "TYPES": {
+        "CONCEALMENT": {
+          "label": "Visioner Concealment"
+        },
+        "VISIBILITY": {
+          "label": "Visioner Visibility"
+        }
+      },
       "VISIBILITY_STATE": {
         "label": "Visibility State",
         "hint": "The visibility state to apply between tokens inside and outside the region"

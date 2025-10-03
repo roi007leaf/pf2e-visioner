@@ -79,8 +79,8 @@
   ],
   "documentTypes": {
     "RegionBehavior": {
-      "Pf2eVisionerVisibility": {},
-      "Pf2eVisionerConcealment": {}
+      "Pf2eVisionerVisibility": {"label": "PF2E_VISIONER.REGION_BEHAVIOR.TYPES.VISIBILITY.label"},
+      "Pf2eVisionerConcealment": {"label": "PF2E_VISIONER.REGION_BEHAVIOR.TYPES.CONCEALMENT.label"}
     }
   },
   "socket": true,
