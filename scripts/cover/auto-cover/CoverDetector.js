@@ -149,6 +149,55 @@ export class CoverDetector {
   }
 
   /**
+   * Check if a wall would naturally block from a given direction (without considering overrides)
+   * Checks door state and wall directionality
+   * @param {Object} wallDoc - Wall document
+   * @param {Object} attackerPos - Attacker position {x, y}
+   * @returns {boolean} True if wall would naturally block from attacker position
+   * @private
+   */
+  _wouldWallNaturallyBlock(wallDoc, attackerPos) {
+    try {
+      if (wallDoc.sight === 0) return false;
+
+      const isDoor = Number(wallDoc.door) > 0;
+      const doorState = Number(wallDoc.ds ?? wallDoc.doorState ?? 0);
+
+      let doorAllowsBlocking = true;
+      if (isDoor && doorState === 1) {
+        doorAllowsBlocking = false;
+      }
+
+      let directionAllowsBlocking = true;
+      if (wallDoc.dir != null && typeof wallDoc.dir === 'number') {
+        if (wallDoc.dir === 0) {
+          directionAllowsBlocking = true;
+        } else {
+          const [x1, y1, x2, y2] = Array.isArray(wallDoc.c)
+            ? wallDoc.c
+            : [wallDoc.x, wallDoc.y, wallDoc.x2, wallDoc.y2];
+
+          const wallDx = x2 - x1;
+          const wallDy = y2 - y1;
+          const attackerDx = attackerPos.x - x1;
+          const attackerDy = attackerPos.y - y1;
+          const crossProduct = wallDx * attackerDy - wallDy * attackerDx;
+
+          if (wallDoc.dir === 1) {
+            directionAllowsBlocking = crossProduct < 0;
+          } else if (wallDoc.dir === 2) {
+            directionAllowsBlocking = crossProduct > 0;
+          }
+        }
+      }
+
+      return doorAllowsBlocking && directionAllowsBlocking;
+    } catch {
+      return true;
+    }
+  }
+
+  /**
    * Check if a wall blocks sight from a given direction based on its sight settings
    * A wall blocks only if BOTH door state AND direction allow blocking, then applies cover overrides only when wall would naturally block
    * @param {Object} wallDoc - Wall document
@@ -158,81 +207,21 @@ export class CoverDetector {
    */
   _doesWallBlockFromDirection(wallDoc, attackerPos) {
     try {
-      // If wall doesn't block sight at all, it doesn't provide cover
-      if (wallDoc.sight === 0) return false; // NONE
+      const wouldNaturallyBlock = this._wouldWallNaturallyBlock(wallDoc, attackerPos);
 
-      // Check if this is a door and if it's open
-      const isDoor = Number(wallDoc.door) > 0; // 0 none, 1 door, 2 secret (treat as door-like)
-      const doorState = Number(wallDoc.ds ?? wallDoc.doorState ?? 0); // 0 closed/secret, 1 open, 2 locked
-
-      // First check: Does the door state allow blocking?
-      let doorAllowsBlocking = true;
-      if (isDoor && doorState === 1) {
-        doorAllowsBlocking = false; // Open doors don't block
-      }
-
-      // Second check: Does the directional logic allow blocking from this direction?
-      let directionAllowsBlocking = true;
-      if (wallDoc.dir != null && typeof wallDoc.dir === 'number') {
-        // Foundry wall direction constants:
-        // BOTH: 0 - wall blocks from both directions
-        // LEFT: 1 - wall blocks only when ray strikes its left side
-        // RIGHT: 2 - wall blocks only when a ray strikes its right side
-
-        if (wallDoc.dir === 0) {
-          directionAllowsBlocking = true; // BOTH - blocks from both directions
-        } else {
-          // Get wall coordinates
-          const [x1, y1, x2, y2] = Array.isArray(wallDoc.c)
-            ? wallDoc.c
-            : [wallDoc.x, wallDoc.y, wallDoc.x2, wallDoc.y2];
-
-          // Calculate wall direction vector
-          const wallDx = x2 - x1;
-          const wallDy = y2 - y1;
-
-          // Calculate vector from wall start to attacker
-          const attackerDx = attackerPos.x - x1;
-          const attackerDy = attackerPos.y - y1;
-
-          // Use cross product to determine which side of the wall the attacker is on
-          // Positive cross product means attacker is on the "left" side of the wall (as drawn)
-          // Negative cross product means attacker is on the "right" side of the wall
-          const crossProduct = wallDx * attackerDy - wallDy * attackerDx;
-
-          // Apply the actual wall direction logic
-          if (wallDoc.dir === 1) {
-            // LEFT - wall blocks only when ray strikes left side
-            directionAllowsBlocking = crossProduct < 0; // Attacker on left side = wall blocks
-          } else if (wallDoc.dir === 2) {
-            // RIGHT - wall blocks only when ray strikes right side
-            directionAllowsBlocking = crossProduct > 0; // Attacker on right side = wall blocks
-          }
-        }
-      }
-
-      // Wall blocks only if BOTH door state and direction allow it
-      const wouldNaturallyBlock = doorAllowsBlocking && directionAllowsBlocking;
-
-      // Now check for manual cover override - but only apply it if the wall would naturally block from this direction
       const coverOverride = wallDoc.getFlag?.(MODULE_ID, 'coverOverride');
       if (coverOverride && coverOverride !== 'auto') {
-        // Only apply override if the wall would naturally block from this direction
         if (wouldNaturallyBlock) {
-          // If override is 'none', don't block despite natural blocking
           if (coverOverride === 'none') return false;
-          // For any other override (lesser, standard, greater), the wall blocks
           return true;
         }
-        // If wall wouldn't naturally block, ignore the override
         return false;
       }
 
-      // Return the natural blocking behavior
       return wouldNaturallyBlock;
     } catch (error) {
       console.warn('PF2E Visioner | Error checking wall direction:', error);
-      return true; // Default to blocking if we can't determine
+      return true;
     }
   }
 
@@ -246,10 +235,10 @@ export class CoverDetector {
   _evaluateWallsCover(p1, p2) {
     if (!canvas?.walls) return 'none';
 
-    // First check for manual wall cover overrides
+    // First check for manual wall cover overrides - if present, use it directly and skip all other checks
     const wallOverride = this._checkWallCoverOverrides(p1, p2);
-    if (wallOverride === 'none') {
-      return 'none';
+    if (wallOverride !== null) {
+      return wallOverride;
     }
 
     // Analyze the center-to-center segment
@@ -296,16 +285,6 @@ export class CoverDetector {
         // Fallback for cases where coverage calculation fails but walls are detected
         coverCategory = 'standard';
       }
-    }
-
-    // Apply wall override as ceiling if present
-    if (wallOverride !== null) {
-      const coverOrder = ['none', 'lesser', 'standard', 'greater'];
-      const calculatedIndex = coverOrder.indexOf(coverCategory);
-      const overrideIndex = coverOrder.indexOf(wallOverride);
-
-      // Return the lower of the two (override acts as ceiling)
-      return calculatedIndex <= overrideIndex ? coverCategory : wallOverride;
     }
 
     return coverCategory;
@@ -418,6 +397,7 @@ export class CoverDetector {
 
   /**
    * Check for manual wall cover overrides along the line of sight
+   * Overrides only apply if the wall would naturally block from the attacker's direction
    * @param {Object} p1 - Start point
    * @param {Object} p2 - End point
    * @returns {string|null} Cover override ('none', 'lesser', 'standard', 'greater') or null if no override
@@ -428,20 +408,18 @@ export class CoverDetector {
       const ray = this._createRay(p1, p2);
       const walls = canvas.walls.objects?.children || [];
 
-      let highestCover = 'none';
+      let highestCover = null;
       const coverOrder = ['none', 'lesser', 'standard', 'greater'];
 
       for (const wall of walls) {
         const wallDoc = wall.document || wall;
         const coverOverride = wallDoc.getFlag?.(MODULE_ID, 'coverOverride');
 
-        // Skip walls without cover override
-        if (!coverOverride) continue;
+        if (!coverOverride || coverOverride === 'auto') continue;
 
-        // Check if this wall blocks from the attacker's direction
-        if (!this._doesWallBlockFromDirection(wallDoc, p1)) continue;
+        // Check if wall would naturally block from this direction (respects door state and directionality)
+        if (!this._wouldWallNaturallyBlock(wallDoc, p1)) continue;
 
-        // Check if this wall intersects the ray
         const coords = wall?.coords;
         if (!coords) continue;
 
@@ -457,50 +435,20 @@ export class CoverDetector {
         );
 
         if (intersection) {
-          // This wall intersects the line of sight and has a cover override
-          const coverIndex = coverOrder.indexOf(coverOverride);
-          const currentIndex = coverOrder.indexOf(highestCover);
-
-          if (coverIndex > currentIndex) {
+          if (highestCover === null) {
             highestCover = coverOverride;
-          }
-        }
-      }
+          } else {
+            const coverIndex = coverOrder.indexOf(coverOverride);
+            const currentIndex = coverOrder.indexOf(highestCover);
 
-      // Return the highest cover found, or null if no overrides were found
-      // If highestCover is still 'none' (initial value), no overrides were found -> return null (auto-detection)
-      // If highestCover is 'none' from an actual override -> return 'none' (force no cover)
-      // Otherwise return the override value
-
-      let foundAnyOverride = false;
-      for (const wall of walls) {
-        const wallDoc = wall.document || wall;
-        const coverOverride = wallDoc.getFlag?.(MODULE_ID, 'coverOverride');
-        if (coverOverride) {
-          // Check if this wall blocks from the attacker's direction
-          if (!this._doesWallBlockFromDirection(wallDoc, p1)) continue;
-
-          const coords = wall?.coords;
-          if (coords) {
-            const intersection = this._lineIntersectionPoint(
-              ray.A.x,
-              ray.A.y,
-              ray.B.x,
-              ray.B.y,
-              coords[0],
-              coords[1],
-              coords[2],
-              coords[3],
-            );
-            if (intersection) {
-              foundAnyOverride = true;
-              break;
+            if (coverIndex > currentIndex) {
+              highestCover = coverOverride;
             }
           }
         }
       }
 
-      return foundAnyOverride ? highestCover : null;
+      return highestCover;
     } catch {
       return null;
     }

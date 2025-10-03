@@ -470,7 +470,7 @@ export class SneakPreviewDialog extends BaseActionDialog {
 
     // Show-only-changes visual filter
     try {
-      if (this.showOnlyChanges) {
+      if (this.showChangesOnly) {
         sortedOutcomes = sortedOutcomes.filter((o) => !!o.hasActionableChange);
       }
     } catch { }
@@ -496,6 +496,7 @@ export class SneakPreviewDialog extends BaseActionDialog {
     context.outcomes = sortedOutcomes;
     context.ignoreAllies = !!this.ignoreAllies;
     context.hideFoundryHidden = !!this.hideFoundryHidden;
+    context.showChangesOnly = !!this.showChangesOnly;
     context.isEndOfTurnDialog = this.isEndOfTurnDialog;
 
     // Store the currently rendered outcomes for bulk actions to use
