@@ -74,6 +74,20 @@ export async function onCanvasReady() {
             console.warn('PF2E Visioner | Failed to use optimized wall indicator update, skipping:', error);
           }
         }
+
+        try {
+          const { updateSystemHiddenTokenHighlights } = await import('../services/visual-effects.js');
+          await updateSystemHiddenTokenHighlights(token.document.id);
+        } catch (error) {
+          console.warn('PF2E Visioner | Failed to update system-hidden token highlights:', error);
+        }
+      } else {
+        try {
+          const { updateSystemHiddenTokenHighlights } = await import('../services/visual-effects.js');
+          await updateSystemHiddenTokenHighlights(null);
+        } catch (error) {
+          console.warn('PF2E Visioner | Failed to clear system-hidden token highlights:', error);
+        }
       }
 
       // Clear the suppression flag after a short delay
@@ -90,6 +104,48 @@ export async function onCanvasReady() {
   } catch (_) { }
 
   initializeHoverTooltips();
+
+  // Listen for condition changes to update lifesense highlights
+  // Note: Trait changes are handled by ActorEventHandler for full AVS recalculation
+
+  // Listen for item updates on actors (conditions are items in PF2e)
+  Hooks.on('createItem', async (item, options, userId) => {
+    try {
+      if (item.type !== 'condition') return;
+
+      const actor = item.parent;
+      if (!actor) return;
+
+      const controlledTokens = canvas?.tokens?.controlled || [];
+      const affectedToken = controlledTokens.find(t => t.actor?.id === actor.id);
+
+      if (affectedToken) {
+        const { updateSystemHiddenTokenHighlights } = await import('../services/visual-effects.js');
+        await updateSystemHiddenTokenHighlights(affectedToken.document.id);
+      }
+    } catch (error) {
+      console.warn('PF2E Visioner | Failed to update highlights on condition add:', error);
+    }
+  });
+
+  Hooks.on('deleteItem', async (item, options, userId) => {
+    try {
+      if (item.type !== 'condition') return;
+
+      const actor = item.parent;
+      if (!actor) return;
+
+      const controlledTokens = canvas?.tokens?.controlled || [];
+      const affectedToken = controlledTokens.find(t => t.actor?.id === actor.id);
+
+      if (affectedToken) {
+        const { updateSystemHiddenTokenHighlights } = await import('../services/visual-effects.js');
+        await updateSystemHiddenTokenHighlights(affectedToken.document.id);
+      }
+    } catch (error) {
+      console.warn('PF2E Visioner | Failed to update highlights on condition remove:', error);
+    }
+  });
 
   // Always bind keyboard shortcuts (Alt handled via highlightObjects hook, O key handled here)
   // Bind 'O' key on keydown/keyup for observer overlay

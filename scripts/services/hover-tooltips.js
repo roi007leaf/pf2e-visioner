@@ -1307,3 +1307,7 @@ export function cleanupHoverTooltips() {
 
   _initialized = false;
 }
+
+// Export internal functions for use by lifesense indicators
+export { hideAllCoverIndicators, hideAllVisibilityIndicators, showVisibilityIndicators };
+

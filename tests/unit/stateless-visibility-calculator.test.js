@@ -559,7 +559,7 @@ describe('StatelessVisibilityCalculator', () => {
     });
 
     describe('Observer conditions', () => {
-        test('blinded observer + no other senses = hidden', () => {
+        test('blinded observer + no other senses = undetected', () => {
             const input = {
                 target: {
                     lightingLevel: 'bright',
@@ -579,7 +579,7 @@ describe('StatelessVisibilityCalculator', () => {
             };
 
             const result = calculateVisibility(input);
-            expect(result.state).toBe('hidden');
+            expect(result.state).toBe('undetected');
             expect(result.detection).toBe(null);
         });
 
@@ -1349,7 +1349,7 @@ describe('StatelessVisibilityCalculator', () => {
             });
         });
 
-        test('blinded + dazzled + vision = hidden (both conditions, no other senses)', () => {
+        test('blinded + dazzled + vision = undetected (both conditions, no other senses)', () => {
             const input = {
                 target: {
                     lightingLevel: 'bright',
@@ -1370,8 +1370,8 @@ describe('StatelessVisibilityCalculator', () => {
             };
 
             const result = calculateVisibility(input);
-            // Blinded takes precedence, both disable vision
-            expect(result.state).toBe('hidden');
+            // Blinded takes precedence, both disable vision, no other senses = undetected
+            expect(result.state).toBe('undetected');
             expect(result.detection).toBe(null);
         });
     });

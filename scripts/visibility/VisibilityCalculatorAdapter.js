@@ -160,10 +160,14 @@ function extractTargetState(target, lightingCalculator, options, observerPositio
     // Extract auxiliary conditions (invisible, etc.)
     const auxiliary = extractAuxiliaryConditions(target, options);
 
+    // Extract traits from actor (for lifesense and other sense checks)
+    const traits = target?.actor?.system?.traits?.value ?? [];
+
     return {
         lightingLevel,
         concealment,
         auxiliary,
+        traits,
         movementAction: target.document.movementAction // Add elevation for tremorsense checks
     };
 }

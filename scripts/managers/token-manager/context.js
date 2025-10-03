@@ -285,8 +285,6 @@ export async function buildContext(app, options) {
           outcomeClass,
         };
 
-        // Debug: if (isAvsControlled) console.log(`[AVS Debug] ${token.document.name}:`, { currentVisibilityState: result.currentVisibilityState, isAvsControlled: result.isAvsControlled });
-
         return result;
       }),
     );

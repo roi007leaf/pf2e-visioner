@@ -5,6 +5,7 @@
 
 import { MODULE_ID } from '../constants.js';
 import { getVisibilityBetween } from '../utils.js';
+import { _internal as visibilityCalculatorInternal } from '../visibility/StatelessVisibilityCalculator.js';
 
 /**
  * Update token visuals - now mostly handled by detection wrapper
@@ -1126,5 +1127,324 @@ export async function updateWallIndicatorsOnly(observerId = null) {
     }
   } catch (error) {
     console.warn(`PF2E Visioner | Error in updateWallIndicatorsOnly:`, error);
+  }
+}
+
+export async function updateSystemHiddenTokenHighlights(observerId = null) {
+  try {
+    if (!game.settings?.get?.(MODULE_ID, 'autoVisibilityEnabled')) {
+      return;
+    }
+
+    const tokens = canvas?.tokens?.placeables || [];
+    if (!tokens.length) {
+      return;
+    }
+
+    let observer = null;
+    try {
+      if (observerId) {
+        observer = canvas.tokens.get(observerId) || null;
+      }
+      if (!observer) {
+        observer = canvas.tokens.controlled?.[0] || null;
+      }
+    } catch (_) {
+      observer = null;
+    }
+
+    if (!observer) {
+      for (const token of tokens) {
+        try {
+          if (token._pvSystemHiddenIndicator) {
+            if (token._pvSystemHiddenIndicator._pvTargetHookId !== undefined) {
+              Hooks.off('targetToken', token._pvSystemHiddenIndicator._pvTargetHookId);
+            }
+            token._pvSystemHiddenIndicator.parent?.removeChild(token._pvSystemHiddenIndicator);
+            token._pvSystemHiddenIndicator.destroy?.();
+            token._pvSystemHiddenIndicator = null;
+          }
+        } catch (_) { }
+      }
+      return;
+    }
+
+    const observerSenses = observer.actor?.system?.perception?.senses || [];
+
+    const lifesenseSense = observerSenses.find?.(sense => sense.type === 'lifesense');
+
+    const observerHasLifesense = !!lifesenseSense;
+    const lifesenseIsPrecise = lifesenseSense?.acuity === 'precise';
+
+    const observerConditions = observer.actor?.conditions?.active || [];
+    const allConditions = observer.actor?.itemTypes?.condition || [];
+
+    const isBlinded = observerConditions.some?.(c => c.slug === 'blinded') ??
+      allConditions.some?.(c => c.slug === 'blinded') ?? false;
+    const isDeafened = observerConditions.some?.(c => c.slug === 'deafened') ??
+      allConditions.some?.(c => c.slug === 'deafened') ?? false;
+
+    const isUsingLifesense = observerHasLifesense && (lifesenseIsPrecise || (isBlinded && isDeafened));
+
+    if (!isUsingLifesense) {
+      for (const token of tokens) {
+        try {
+          if (token._pvSystemHiddenIndicator) {
+            if (token._pvSystemHiddenIndicator._pvTargetHookId !== undefined) {
+              Hooks.off('targetToken', token._pvSystemHiddenIndicator._pvTargetHookId);
+            }
+            token._pvSystemHiddenIndicator.parent?.removeChild(token._pvSystemHiddenIndicator);
+            token._pvSystemHiddenIndicator.destroy?.();
+            token._pvSystemHiddenIndicator = null;
+          }
+        } catch (_) { }
+      }
+      return;
+    }
+
+    for (const token of tokens) {
+      try {
+        if (token._pvSystemHiddenIndicator) {
+          if (token._pvSystemHiddenIndicator._pvTargetHookId !== undefined) {
+            Hooks.off('targetToken', token._pvSystemHiddenIndicator._pvTargetHookId);
+          }
+          token._pvSystemHiddenIndicator.parent?.removeChild(token._pvSystemHiddenIndicator);
+          token._pvSystemHiddenIndicator.destroy?.();
+          token._pvSystemHiddenIndicator = null;
+        }
+      } catch (_) { }
+
+      if (token.id === observer.id) continue;
+
+      // Skip tokens without actors or with non-creature actors (hazards, loot, etc.)
+      if (!token.actor) continue;
+      const actorType = token.actor.type;
+      if (actorType === 'hazard' || actorType === 'loot' || actorType === 'vehicle') continue;
+
+      const isSystemHidden = !token.visible || token.renderable === false;
+
+      const targetTraits = token.actor?.system?.traits?.value || [];
+      const canBeDetectedByLifesense = visibilityCalculatorInternal.canLifesenseDetect({ traits: targetTraits });
+
+      if (isSystemHidden && canBeDetectedByLifesense) {
+        try {
+          const size = token.document.width * canvas.grid.size;
+          const centerX = token.center?.x ?? (token.document.x + size / 2);
+          const centerY = token.center?.y ?? (token.document.y + size / 2);
+
+          const g = new PIXI.Graphics();
+          g.position.set(centerX, centerY);
+          g.zIndex = 900;
+          g.eventMode = 'static';
+          g.cursor = 'pointer';
+          g.interactive = true;
+          g.buttonMode = true;
+          g.alpha = 0.8;
+          g._pvTokenId = token.document.id;
+          g._pvObserverId = observer.document.id;
+
+          const updateIndicatorColor = () => {
+            const targetToken = canvas.tokens.get(token.document.id);
+            const isTargeted = targetToken?.isTargeted ?? false;
+
+            let color = 0x00d4ff;
+            if (isTargeted) {
+              const disposition = token.document.disposition ?? CONST.TOKEN_DISPOSITIONS.NEUTRAL;
+
+              switch (disposition) {
+                case CONST.TOKEN_DISPOSITIONS.FRIENDLY:
+                  color = 0x00ff00;
+                  break;
+                case CONST.TOKEN_DISPOSITIONS.HOSTILE:
+                  color = 0xff0000;
+                  break;
+                case CONST.TOKEN_DISPOSITIONS.NEUTRAL:
+                  color = 0xffa500;
+                  break;
+                default:
+                  color = 0x00d4ff;
+              }
+            }
+
+            const lineWidth = 3;
+            const alpha = 0.6;
+
+            g.clear();
+            g.lineStyle(lineWidth, color, alpha);
+            g.beginFill(color, alpha * 0.05);
+            g.drawRect(-size / 2, -size / 2, size, size);
+            g.endFill();
+
+            return color;
+          };
+
+          updateIndicatorColor();
+
+          g.hitArea = new PIXI.Rectangle(-size / 2, -size / 2, size, size);
+
+          g.on('rightdown', (event) => {
+            try {
+              const targetToken = canvas.tokens.get(token.document.id);
+              if (targetToken) {
+                const shiftKey = event.data?.originalEvent?.shiftKey ?? false;
+                targetToken.setTarget(!targetToken.isTargeted, { releaseOthers: !shiftKey });
+                event.stopPropagation();
+              }
+            } catch (err) {
+              console.warn('PF2E Visioner | Error right-click targeting system-hidden token:', err);
+            }
+          });
+
+          g.on('pointerover', async () => {
+            g.alpha = 1.0;
+
+            // Show hover tooltips if enabled
+            try {
+              const tooltipsEnabled = game.settings?.get?.(MODULE_ID, 'enableHoverTooltips');
+              if (tooltipsEnabled) {
+                const { HoverTooltips } = await import('./hover-tooltips.js');
+                if (!HoverTooltips.isShowingKeyTooltips && !HoverTooltips._isPanning) {
+                  // Store the token so tooltip system knows what to show
+                  HoverTooltips.currentHoveredToken = token;
+
+                  // Import the visibility indicator function
+                  const hoverModule = await import('./hover-tooltips.js');
+                  // Call the internal visibility indicator function
+                  if (typeof hoverModule.showVisibilityIndicators === 'function') {
+                    hoverModule.showVisibilityIndicators(token);
+                  }
+                }
+              }
+            } catch (err) {
+              console.warn('PF2E Visioner | Error showing hover tooltips for lifesense indicator:', err);
+            }
+          });
+
+          g.on('pointerout', async () => {
+            g.alpha = 0.8;
+
+            // Hide hover tooltips
+            try {
+              const { HoverTooltips } = await import('./hover-tooltips.js');
+              if (HoverTooltips.currentHoveredToken === token) {
+                HoverTooltips.currentHoveredToken = null;
+
+                const hoverModule = await import('./hover-tooltips.js');
+                if (typeof hoverModule.hideAllVisibilityIndicators === 'function') {
+                  hoverModule.hideAllVisibilityIndicators();
+                }
+                if (typeof hoverModule.hideAllCoverIndicators === 'function') {
+                  hoverModule.hideAllCoverIndicators();
+                }
+              }
+            } catch (err) {
+              console.warn('PF2E Visioner | Error hiding hover tooltips for lifesense indicator:', err);
+            }
+          });
+
+          const hookId = Hooks.on('targetToken', (user, targetToken, targeted) => {
+            if (targetToken.id === token.document.id) {
+              updateIndicatorColor();
+            }
+          });
+
+          g._pvTargetHookId = hookId;
+
+          const displayName = token.document.displayName ?? 0;
+          const shouldShowName = displayName >= 30;
+
+          if (shouldShowName) {
+            const tokenName = token.document.name || 'Unknown';
+            const textStyle = new PIXI.TextStyle({
+              fontFamily: 'Signika, sans-serif',
+              fontSize: Math.max(20, size / 4),
+              fill: 0xffffff,
+              stroke: 0x000000,
+              strokeThickness: 4,
+              dropShadow: true,
+              dropShadowColor: 0x000000,
+              dropShadowBlur: 4,
+              dropShadowAngle: Math.PI / 4,
+              dropShadowDistance: 2,
+              align: 'center',
+              wordWrap: true,
+              wordWrapWidth: size * 1.5,
+            });
+
+            const nameText = new PIXI.Text(tokenName, textStyle);
+            nameText.anchor.set(0.5, 0.5);
+            nameText.position.set(0, size * 0.6);
+            nameText.alpha = 0.9;
+            g.addChild(nameText);
+          }
+
+          const effectContainer = new PIXI.Container();
+          effectContainer._pvTokenId = token.document.id;
+          g.addChild(effectContainer);
+
+          const pulse = new PIXI.Graphics();
+          pulse._pvTokenId = token.document.id;
+          effectContainer.addChild(pulse);
+
+          let startTime = Date.now();
+          const animate = () => {
+            try {
+              if (!g.parent || !canvas?.ready) {
+                return;
+              }
+
+              const elapsed = (Date.now() - startTime) / 1000;
+
+              const targetToken = canvas.tokens.get(token.document.id);
+              const isTargeted = targetToken?.isTargeted ?? false;
+
+              let animColor = 0x00d4ff;
+              if (isTargeted) {
+                const disposition = token.document.disposition ?? CONST.TOKEN_DISPOSITIONS.NEUTRAL;
+
+                switch (disposition) {
+                  case CONST.TOKEN_DISPOSITIONS.FRIENDLY:
+                    animColor = 0x00ff00;
+                    break;
+                  case CONST.TOKEN_DISPOSITIONS.HOSTILE:
+                    animColor = 0xff0000;
+                    break;
+                  case CONST.TOKEN_DISPOSITIONS.NEUTRAL:
+                    animColor = 0xffa500;
+                    break;
+                  default:
+                    animColor = 0x00d4ff;
+                }
+              }
+
+              pulse.clear();
+              const breathe = 1.0 + 0.08 * Math.sin(elapsed * 2.0);
+              const pulseAlpha = 0.3 + 0.15 * Math.sin(elapsed * 1.5);
+
+              pulse.lineStyle(2, animColor, pulseAlpha);
+              const expansion = 4 * breathe;
+              pulse.drawRect(
+                -size / 2 - expansion,
+                -size / 2 - expansion,
+                size + expansion * 2,
+                size + expansion * 2
+              );
+
+              requestAnimationFrame(animate);
+            } catch (error) {
+              console.error(`[PF2E-Visioner] System-hidden token animation error:`, error);
+            }
+          }; requestAnimationFrame(animate);
+
+          const parent = canvas.interface || canvas.effects?.foreground || canvas.tokens;
+          parent.addChild(g);
+          token._pvSystemHiddenIndicator = g;
+        } catch (error) {
+          console.warn(`PF2E Visioner | Error creating system-hidden indicator for token ${token.document.id}:`, error);
+        }
+      }
+    }
+  } catch (error) {
+    console.warn(`PF2E Visioner | Error in updateSystemHiddenTokenHighlights:`, error);
   }
 }

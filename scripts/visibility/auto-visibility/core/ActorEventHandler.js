@@ -33,15 +33,20 @@ export class ActorEventHandler {
       return;
     }
 
+    // Check for trait changes (affects lifesense detection)
+    const hasTraitChanges = changes.system?.traits !== undefined;
+
     // Check for condition-related changes
     const hasConditionChanges =
       changes.system?.conditions !== undefined ||
       changes.actorData?.effects !== undefined ||
       changes.items !== undefined;
 
-    if (hasConditionChanges) {
+    if (hasConditionChanges || hasTraitChanges) {
       // Check specifically for invisibility condition changes to set proper flags
-      this._handleInvisibilityConditionChange(actor, changes);
+      if (hasConditionChanges) {
+        this._handleInvisibilityConditionChange(actor, changes);
+      }
 
       const tokens =
         canvas.tokens?.placeables.filter(

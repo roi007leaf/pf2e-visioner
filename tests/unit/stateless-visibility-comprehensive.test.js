@@ -46,7 +46,7 @@ describe('StatelessVisibilityCalculator - Comprehensive Coverage', () => {
             expect(result.state).toBe('hidden');
         });
 
-        test('blinded observer + no senses → hidden', () => {
+        test('blinded observer + no senses → undetected', () => {
             const input = {
                 observer: {
                     precise: {},
@@ -62,7 +62,7 @@ describe('StatelessVisibilityCalculator - Comprehensive Coverage', () => {
             };
 
             const result = calculateVisibility(input);
-            expect(result.state).toBe('hidden');
+            expect(result.state).toBe('undetected');
         });
     });
 

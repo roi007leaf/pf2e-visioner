@@ -2236,6 +2236,20 @@
   box-shadow: none;
 }
 
+/* Clear Overrides button in bulk actions section */
+.bulk-action-btn.bulk-override-clear-btn {
+  background: rgba(244, 67, 54, 0.12);
+  color: var(--pf2e-visioner-danger, #f44336);
+  border-color: var(--pf2e-visioner-danger, #f44336);
+}
+
+.bulk-action-btn.bulk-override-clear-btn:hover:not(:disabled) {
+  background: var(--pf2e-visioner-danger, #f44336);
+  color: #fff;
+  border-color: var(--pf2e-visioner-danger-hover, #d32f2f);
+  box-shadow: 0 2px 6px rgba(244, 67, 54, 0.4);
+}
+
 /* Undefer All (purple accent) */
 .bulk-action-btn.undefer-all {
   background: var(--color-shadow-primary);
@@ -2310,13 +2324,18 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* When bulk-override-bar is NOT inside bulk-action-group, add the container styling */
+.bulk-override-bar:not(.bulk-action-group .bulk-override-bar) {
   padding: 6px 10px;
   margin: 6px 0 10px 0;
   border: 1px solid var(--color-border-light-primary);
   background: var(--color-bg-option, rgba(0, 0, 0, 0.15));
   border-radius: 6px;
-  flex-wrap: wrap;
 }
+
 .bulk-override-bar .bulk-override-label {
   display: inline-flex;
   align-items: center;

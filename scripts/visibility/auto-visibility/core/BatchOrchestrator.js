@@ -64,10 +64,7 @@ export class BatchOrchestrator {
         tokensAccumulated: new Set(),
         sessionId: `movement-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       };
-      console.log('PF2E Visioner | Movement session START', {
-        sessionId: this._movementSession.sessionId,
-        startedAtIso: new Date().toISOString(),
-      });
+
     }
 
     this._isTokenMoving = true;

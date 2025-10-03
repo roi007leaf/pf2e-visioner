@@ -15,6 +15,7 @@
  * @param {string} input.target.lightingLevel - "bright" | "dim" | "darkness" | "magicalDarkness" | "greaterMagicalDarkness"
  * @param {boolean} input.target.concealment - Whether target has concealment
  * @param {string[]} input.target.auxiliary - Additional conditions like ["invisible"]
+ * @param {string[]} input.target.traits - Target traits like ["undead", "construct"]
  * @param {number} input.target.movementAction - Target's movement action (for tremorsense checks)
  * @param {Object} input.observer - Observer state
  * @param {Object} input.observer.precise - Precise senses with ranges
@@ -97,6 +98,7 @@ function normalizeTargetState(target) {
         lightingLevel: target.lightingLevel || 'bright',
         concealment: target.concealment ?? false,
         auxiliary: Array.isArray(target.auxiliary) ? target.auxiliary : [],
+        traits: Array.isArray(target.traits) ? target.traits : [],
         movementAction: target.movementAction ?? 0
     };
 }
@@ -137,11 +139,26 @@ function handleBlindedObserver(observer, target, soundBlocked) {
         return nonVisualImprecise;
     }
 
-    // Blinded with no non-visual senses = hidden (not undetected, because target might make noise)
+    // Blinded with no working non-visual senses = undetected
+    // (This means they have no precise non-visual senses AND no imprecise non-visual senses that work)
     return {
-        state: 'hidden',
+        state: 'undetected',
         detection: null
     };
+}
+
+/**
+ * Check if lifesense can detect the target based on creature traits
+ * @param {Object} target - Target state
+ * @returns {boolean} Whether lifesense can detect this target
+ */
+function canLifesenseDetect(target) {
+    const { traits } = target;
+    const isUndead = traits.includes('undead');
+    const isConstruct = traits.includes('construct');
+    const isLiving = !isUndead && !isConstruct;
+
+    return isLiving || isUndead;
 }
 
 /**
@@ -177,7 +194,21 @@ function checkPreciseNonVisualSenses(observer, target) {
             continue;
         }
 
-        // Any non-visual precise sense allows observation
+        // Special handling for lifesense: check creature traits
+        if (senseType === 'lifesense') {
+            if (senseData && senseData.range > 0 && canLifesenseDetect(target)) {
+                return {
+                    state: 'observed',
+                    detection: {
+                        isPrecise: true,
+                        sense: 'lifesense'
+                    }
+                };
+            }
+            continue;
+        }
+
+        // Any other non-visual precise sense allows observation
         if (senseData && senseData.range > 0) {
             return {
                 state: 'observed',
@@ -196,6 +227,16 @@ function checkPreciseNonVisualSenses(observer, target) {
  * Determine if observer can detect target visually based on lighting and vision capabilities
  */
 function determineVisualDetection(observer, target, rayDarkness = null, hasLineOfSight = true) {
+    // CRITICAL: Blinded observers cannot use any visual senses
+    if (observer.conditions.blinded) {
+        return {
+            canDetect: false,
+            sense: null,
+            isPrecise: false,
+            baseState: null
+        };
+    }
+
     // CRITICAL: If there's no line of sight (sight-blocking wall), visual detection fails
     if (!hasLineOfSight) {
         return {
@@ -384,9 +425,11 @@ function checkImpreciseSenses(observer, target, soundBlocked = false, visualDete
         };
     }
 
-    // Lifesense: detects living creatures, BYPASSES invisibility
-    if (imprecise.lifesense) {
-        // Note: This assumes target is alive. In full implementation, would check target properties
+    // Lifesense: detects living or undead creatures, BYPASSES invisibility
+    // Can be configured to detect either living creatures OR undead
+    // Living = absence of "undead" and "construct" traits
+    // Undead = presence of "undead" trait
+    if (imprecise.lifesense && canLifesenseDetect(target)) {
         return {
             state: 'hidden',
             detection: {
@@ -475,5 +518,6 @@ export const _internal = {
     checkPreciseNonVisualSenses,
     determineVisualDetection,
     checkImpreciseSenses,
-    applyVisualModifiers
+    applyVisualModifiers,
+    canLifesenseDetect
 };
