@@ -183,32 +183,56 @@ export class VisionAnalyzer {
    */
   hasLineOfSight(observer, target) {
     try {
-      const sightBackend = CONFIG.Canvas.polygonBackends?.sight;
-      const moveBackend = CONFIG.Canvas.polygonBackends?.move;
+      const ray = new foundry.canvas.geometry.Ray(observer.center, target.center);
 
-      if (!sightBackend?.testCollision) {
-        console.warn('[VisionAnalyzer] No sight backend available, defaulting to true');
-        return true;
+      // Check for walls that block BOTH movement AND (sight OR sound)
+      // Darkness walls typically block ONLY movement, not sight/sound
+      // Physical walls block movement + sight/sound
+      for (const wall of canvas.walls.placeables) {
+        // Skip walls that don't block movement (not physical barriers)
+        if (wall.document.move === CONST.WALL_SENSE_TYPES.NONE) {
+          continue;
+        }
+
+        // Skip walls that block ONLY movement (darkness walls)
+        // Physical walls must also block sight or sound
+        const blocksSight = wall.document.sight !== CONST.WALL_SENSE_TYPES.NONE;
+        const blocksSound = wall.document.sound !== CONST.WALL_SENSE_TYPES.NONE;
+
+        if (!blocksSight && !blocksSound) {
+          continue;
+        }
+
+        // Check if the ray intersects this physical wall
+        const intersection = foundry.utils.lineLineIntersection(
+          { x: ray.A.x, y: ray.A.y },
+          { x: ray.B.x, y: ray.B.y },
+          { x: wall.document.c[0], y: wall.document.c[1] },
+          { x: wall.document.c[2], y: wall.document.c[3] }
+        );
+
+        // Check if intersection is within the ray segment (0 <= t0 <= 1)
+        if (intersection && typeof intersection.t0 === 'number' && intersection.t0 >= 0 && intersection.t0 <= 1) {
+          // Compute t1 for the wall segment
+          const wallDx = wall.document.c[2] - wall.document.c[0];
+          const wallDy = wall.document.c[3] - wall.document.c[1];
+          let t1;
+
+          // Use the larger component to avoid division by near-zero
+          if (Math.abs(wallDx) > Math.abs(wallDy)) {
+            t1 = (intersection.x - wall.document.c[0]) / wallDx;
+          } else {
+            t1 = (intersection.y - wall.document.c[1]) / wallDy;
+          }
+
+          // Check if t1 is also within [0, 1] (intersection within wall segment)
+          if (t1 >= 0 && t1 <= 1) {
+            return false; // Wall blocks line of sight
+          }
+        }
       }
 
-      const observerCenter = observer.center;
-      const targetCenter = target.center;
-
-      // Check for physical walls using move backend (ignores darkness)
-      // Fall back to sight backend if move backend unavailable
-      const backend = moveBackend?.testCollision ? moveBackend : sightBackend;
-      const backendType = moveBackend?.testCollision ? 'move' : 'sight';
-
-      const centerHasWall = backend.testCollision(
-        observerCenter,
-        targetCenter,
-        { type: backendType, mode: 'any' }
-      );
-
-      // PF2e rules: Line of sight is determined by center-to-center only
-      // This checks for PHYSICAL walls only, not darkness
-      // Darkness + darkvision logic is handled in StatelessVisibilityCalculator
-      return !centerHasWall;
+      return true; // No walls block line of sight
     } catch (error) {
       console.error('[LineOfSight] Error:', error);
       log.debug('Error checking line of sight', error);
