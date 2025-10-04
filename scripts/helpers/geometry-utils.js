@@ -5,6 +5,49 @@
  */
 
 /**
+ * Calculate distance between two tokens or positions in feet (PF2e rules)
+ * Uses Foundry's token.distanceTo which respects PF2e's 5-10-5 diagonal movement pattern
+ * 
+ * @param {Token|Object} tokenOrPosA - First token or position with x, y properties
+ * @param {Token|Object} tokenOrPosB - Second token or position with x, y properties
+ * @param {number} [gridSize=100] - Grid size in pixels (default: 100) - only used for position fallback
+ * @param {number} [gridDistance=5] - Distance per grid square in feet (default: 5) - only used for position fallback
+ * @returns {number} Distance in feet using PF2e diagonal rules
+ */
+export function calculateDistanceInFeet(tokenOrPosA, tokenOrPosB, gridSize = 100, gridDistance = 5) {
+  try {
+    if (tokenOrPosA?.distanceTo && typeof tokenOrPosA.distanceTo === 'function') {
+      return tokenOrPosA.distanceTo(tokenOrPosB);
+    }
+  } catch (e) {
+    //noop
+  }
+
+  const posA = tokenOrPosA.center || tokenOrPosA;
+  const posB = tokenOrPosB.center || tokenOrPosB;
+
+  const dx = Math.abs(posB.x - posA.x);
+  const dy = Math.abs(posB.y - posA.y);
+
+  const gridX = Math.round(dx / gridSize);
+  const gridY = Math.round(dy / gridSize);
+
+  const diagonal = Math.min(gridX, gridY);
+  const straight = Math.abs(gridX - gridY);
+
+  const fullDiagonalPairs = Math.floor(diagonal / 2);
+  const remainingDiagonal = diagonal % 2;
+
+  const distance =
+    (fullDiagonalPairs * 2 * gridDistance) +
+    (fullDiagonalPairs * gridDistance) +
+    (remainingDiagonal * gridDistance) +
+    (straight * gridDistance);
+
+  return Math.floor(distance / gridDistance) * gridDistance;
+}
+
+/**
  * Check if a point is inside a rectangle
  * @param {number} px - Point x coordinate
  * @param {number} py - Point y coordinate

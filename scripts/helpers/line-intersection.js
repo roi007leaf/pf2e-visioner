@@ -159,8 +159,8 @@ export function intersectsBetweenTokens(attacker, target, rect, mode, blocker) {
     return false;
   }
 
-  const p1 = attacker.center ?? attacker.getCenter?.();
-  const p2 = target.center ?? target.getCenter?.();
+  const p1 = attacker.center ?? attacker.getCenterPoint?.();
+  const p2 = target.center ?? target.getCenterPoint?.();
 
   // Primary check: center-to-center ray
   if (p1 && p2 && centerLineIntersectsRect(p1, p2, rect, mode)) return true;

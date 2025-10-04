@@ -603,7 +603,7 @@ describe('Wall Direction Checking', () => {
 
       coverDetector._lineIntersectionPoint = jest.fn(() => ({ x: 50, y: 0 }));
 
-      // Mock settings to control the coverage calculation (used with ceiling logic)
+      // Mock settings (not used when override is present)
       global.game.settings.get = jest.fn((module, setting) => {
         if (setting === 'wallCoverStandardThreshold') return 30;
         if (setting === 'wallCoverGreaterThreshold') return 55;
@@ -612,13 +612,12 @@ describe('Wall Direction Checking', () => {
       });
 
       // Test 1: Attack from blocking side (negative cross product for LEFT)
-      // Wall would naturally block from this direction, so override applies as ceiling
-      // Coverage calculation happens, then override acts as ceiling (returns lower of the two)
+      // Wall would naturally block from this direction, so override applies directly
       const p1_blocking = { x: 50, y: -50 };
       const p2_blocking = { x: 50, y: 50 };
 
       const result_blocking = coverDetector._evaluateWallsCover(p1_blocking, p2_blocking);
-      expect(result_blocking).toBe('standard'); // Returns calculated cover (lower than 'greater' override ceiling)
+      expect(result_blocking).toBe('greater'); // Override applies directly
 
       // Test 2: Attack from non-blocking side (positive cross product for LEFT)
       // Wall would not naturally block from this direction, so override is ignored

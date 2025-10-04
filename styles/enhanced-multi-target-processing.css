@@ -1,0 +1,558 @@
+/**
+ * Enhanced Multi-Target Processing Styles
+ * Styles for progress indicators, position displays, and performance optimizations
+ */
+
+/* Multi-Target Progress Indicator */
+.multi-target-progress {
+  margin: 10px 0;
+  padding: 15px;
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 6px;
+  border-left: 4px solid var(--color-border-highlight-alt);
+}
+
+.multi-target-progress .progress-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.multi-target-progress .progress-bar {
+  width: 100%;
+  height: 8px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+  overflow: hidden;
+  position: relative;
+}
+
+.multi-target-progress .progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #4caf50, #45a049);
+  border-radius: 4px;
+  transition: width 0.3s ease;
+  position: relative;
+}
+
+.multi-target-progress .progress-fill::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+  animation: progress-shimmer 2s infinite;
+}
+
+@keyframes progress-shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.multi-target-progress .progress-text {
+  font-size: 12px;
+  color: var(--color-text-dark-secondary);
+  text-align: center;
+  font-weight: 500;
+}
+
+/* Phase-specific styling */
+.multi-target-progress[data-phase='position-capture'] .progress-fill {
+  background: linear-gradient(90deg, #2196f3, #1976d2);
+}
+
+.multi-target-progress[data-phase='outcome-analysis'] .progress-fill {
+  background: linear-gradient(90deg, #ff9800, #f57c00);
+}
+
+.multi-target-progress[data-phase='position-integration'] .progress-fill {
+  background: linear-gradient(90deg, #9c27b0, #7b1fa2);
+}
+
+.multi-target-progress[data-phase='finalization'] .progress-fill {
+  background: linear-gradient(90deg, #4caf50, #388e3c);
+}
+
+/* Enhanced Position Display */
+.enhanced-position-tracking .position-display {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11px;
+}
+
+.enhanced-position-tracking .position-transition {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.enhanced-position-tracking .position-transition.position-improved {
+  background: rgba(76, 175, 80, 0.1);
+  border-left: 3px solid #4caf50;
+}
+
+.enhanced-position-tracking .position-transition.position-worsened {
+  background: rgba(244, 67, 54, 0.1);
+  border-left: 3px solid #f44336;
+}
+
+.enhanced-position-tracking .position-transition.position-unchanged {
+  background: rgba(158, 158, 158, 0.1);
+  border-left: 3px solid #9e9e9e;
+}
+
+.enhanced-position-tracking .position-state {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+}
+
+.enhanced-position-tracking .position-state .state-icon {
+  width: 12px;
+  height: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.enhanced-position-tracking .position-state .state-label {
+  font-weight: 500;
+}
+
+/* Visibility state colors */
+.enhanced-position-tracking .visibility-observed {
+  color: #f44336;
+}
+.enhanced-position-tracking .visibility-concealed {
+  color: #ff9800;
+}
+.enhanced-position-tracking .visibility-hidden {
+  color: #2196f3;
+}
+.enhanced-position-tracking .visibility-undetected {
+  color: #4caf50;
+}
+
+/* Cover state colors */
+.enhanced-position-tracking .cover-none {
+  color: #9e9e9e;
+}
+.enhanced-position-tracking .cover-lesser {
+  color: #ffeb3b;
+}
+.enhanced-position-tracking .cover-standard {
+  color: #ff9800;
+}
+.enhanced-position-tracking .cover-greater {
+  color: #4caf50;
+}
+
+/* Position Quality Indicators */
+.enhanced-position-tracking .position-quality {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 9px;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.enhanced-position-tracking .position-quality.excellent {
+  background: #4caf50;
+  color: white;
+}
+
+.enhanced-position-tracking .position-quality.good {
+  background: #8bc34a;
+  color: white;
+}
+
+.enhanced-position-tracking .position-quality.fair {
+  background: #ffeb3b;
+  color: #333;
+}
+
+.enhanced-position-tracking .position-quality.poor {
+  background: #ff9800;
+  color: white;
+}
+
+.enhanced-position-tracking .position-quality.terrible {
+  background: #f44336;
+  color: white;
+}
+
+.enhanced-position-tracking .position-quality.unknown {
+  background: #9e9e9e;
+  color: white;
+}
+
+/* Stealth Potential Indicators */
+.enhanced-position-tracking .stealth-potential {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  padding: 2px 4px;
+  border-radius: 2px;
+}
+
+.enhanced-position-tracking .stealth-potential.excellent {
+  background: rgba(76, 175, 80, 0.2);
+  color: #2e7d32;
+}
+
+.enhanced-position-tracking .stealth-potential.good {
+  background: rgba(139, 195, 74, 0.2);
+  color: #558b2f;
+}
+
+.enhanced-position-tracking .stealth-potential.fair {
+  background: rgba(255, 235, 59, 0.2);
+  color: #f57f17;
+}
+
+.enhanced-position-tracking .stealth-potential.poor {
+  background: rgba(255, 152, 0, 0.2);
+  color: #ef6c00;
+}
+
+/* Risk Level Indicators */
+.enhanced-position-tracking .risk-level {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  padding: 2px 4px;
+  border-radius: 2px;
+  font-weight: 500;
+}
+
+.enhanced-position-tracking .risk-level.low {
+  background: rgba(76, 175, 80, 0.15);
+  color: #2e7d32;
+}
+
+.enhanced-position-tracking .risk-level.medium {
+  background: rgba(255, 152, 0, 0.15);
+  color: #ef6c00;
+}
+
+.enhanced-position-tracking .risk-level.high {
+  background: rgba(244, 67, 54, 0.15);
+  color: #c62828;
+}
+
+/* Tactical Advice Display */
+.enhanced-position-tracking .tactical-advice {
+  font-size: 10px;
+  font-style: italic;
+  color: var(--color-text-dark-secondary);
+  margin-top: 4px;
+  padding: 4px 6px;
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 3px;
+  border-left: 2px solid var(--color-border-highlight);
+}
+
+/* System Status Indicators */
+.enhanced-position-tracking .system-status {
+  display: flex;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.enhanced-position-tracking .system-indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  position: relative;
+}
+
+.enhanced-position-tracking .system-indicator.avs-enabled {
+  background: #4caf50;
+}
+
+.enhanced-position-tracking .system-indicator.avs-disabled {
+  background: #9e9e9e;
+}
+
+.enhanced-position-tracking .system-indicator.auto-cover-enabled {
+  background: #2196f3;
+}
+
+.enhanced-position-tracking .system-indicator.auto-cover-disabled {
+  background: #9e9e9e;
+}
+
+.enhanced-position-tracking .system-indicator.has-errors {
+  background: #f44336;
+  animation: error-pulse 2s infinite;
+}
+
+@keyframes error-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+/* Position Display Mode Toggle */
+.enhanced-position-tracking .position-display-toggle {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.enhanced-position-tracking .position-display-toggle button {
+  padding: 4px 8px;
+  font-size: 10px;
+  border: 1px solid var(--color-border-light-tertiary);
+  background: var(--color-bg);
+  color: var(--color-text-dark-primary);
+  border-radius: 3px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.enhanced-position-tracking .position-display-toggle button:hover {
+  background: var(--color-bg-alt);
+  border-color: var(--color-border-highlight);
+}
+
+.enhanced-position-tracking .position-display-toggle button.active {
+  background: var(--color-border-highlight);
+  color: white;
+  border-color: var(--color-border-highlight);
+}
+
+/* Enhanced Table Styling */
+.enhanced-position-tracking table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.enhanced-position-tracking .outcome-row {
+  transition: background-color 0.2s ease;
+}
+
+.enhanced-position-tracking .outcome-row:hover {
+  background: rgba(0, 0, 0, 0.02);
+}
+
+.enhanced-position-tracking .outcome-row.has-position-data {
+  border-left: 3px solid var(--color-border-highlight-alt);
+}
+
+.enhanced-position-tracking .position-column {
+  width: 200px;
+  padding: 8px;
+  vertical-align: top;
+}
+
+/* Performance Optimization Indicators */
+.enhanced-position-tracking .performance-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  color: var(--color-text-dark-secondary);
+  margin-top: 8px;
+  padding: 4px 8px;
+  background: rgba(0, 0, 0, 0.03);
+  border-radius: 4px;
+}
+
+.enhanced-position-tracking .performance-info .cache-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.enhanced-position-tracking .performance-info .cache-indicator.cache-hit {
+  color: #4caf50;
+}
+
+.enhanced-position-tracking .performance-info .cache-indicator.cache-miss {
+  color: #ff9800;
+}
+
+.enhanced-position-tracking .performance-info .processing-time {
+  font-weight: 500;
+}
+
+/* Batch Processing Indicators */
+.enhanced-position-tracking .batch-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 10px;
+  color: var(--color-text-dark-secondary);
+  margin-bottom: 8px;
+  padding: 4px 8px;
+  background: rgba(33, 150, 243, 0.1);
+  border-radius: 4px;
+  border-left: 3px solid #2196f3;
+}
+
+.enhanced-position-tracking .batch-info .batch-size {
+  font-weight: 500;
+}
+
+.enhanced-position-tracking .batch-info .parallel-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.enhanced-position-tracking .batch-info .parallel-indicator.enabled {
+  color: #4caf50;
+}
+
+.enhanced-position-tracking .batch-info .parallel-indicator.disabled {
+  color: #9e9e9e;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .enhanced-position-tracking .position-column {
+    width: 150px;
+  }
+
+  .enhanced-position-tracking .position-display {
+    font-size: 10px;
+  }
+
+  .enhanced-position-tracking .multi-target-progress {
+    margin: 8px 0;
+    padding: 10px;
+  }
+}
+
+/* Dark Theme Adjustments */
+.dark .enhanced-position-tracking .multi-target-progress {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.dark .enhanced-position-tracking .position-transition {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.dark .enhanced-position-tracking .tactical-advice {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.dark .enhanced-position-tracking .performance-info {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+/* Accessibility Improvements */
+.enhanced-position-tracking .sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.enhanced-position-tracking .position-state[aria-label] {
+  cursor: help;
+}
+
+.enhanced-position-tracking .system-indicator[title] {
+  cursor: help;
+}
+
+/* High Contrast Mode */
+@media (prefers-contrast: high) {
+  .enhanced-position-tracking .position-quality.excellent {
+    background: #000;
+    color: #fff;
+    border: 2px solid #4caf50;
+  }
+
+  .enhanced-position-tracking .position-quality.good {
+    background: #000;
+    color: #fff;
+    border: 2px solid #8bc34a;
+  }
+
+  .enhanced-position-tracking .position-quality.fair {
+    background: #fff;
+    color: #000;
+    border: 2px solid #ffeb3b;
+  }
+
+  .enhanced-position-tracking .position-quality.poor {
+    background: #fff;
+    color: #000;
+    border: 2px solid #ff9800;
+  }
+
+  .enhanced-position-tracking .position-quality.terrible {
+    background: #fff;
+    color: #000;
+    border: 2px solid #f44336;
+  }
+}
+
+/* Animation for loading states */
+.enhanced-position-tracking .loading-shimmer {
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+/* Tooltip styling for position details */
+.enhanced-position-tracking .position-tooltip {
+  position: absolute;
+  z-index: 1000;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border-light-tertiary);
+  border-radius: 4px;
+  padding: 8px;
+  font-size: 11px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  max-width: 250px;
+  word-wrap: break-word;
+}
+
+.enhanced-position-tracking .position-tooltip .tooltip-header {
+  font-weight: bold;
+  margin-bottom: 4px;
+  color: var(--color-text-dark-primary);
+}
+
+.enhanced-position-tracking .position-tooltip .tooltip-content {
+  color: var(--color-text-dark-secondary);
+  line-height: 1.3;
+}

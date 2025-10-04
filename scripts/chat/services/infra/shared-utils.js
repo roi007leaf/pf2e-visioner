@@ -8,7 +8,14 @@ import { CoverModifierService } from '../../../services/CoverModifierService.js'
 import { refreshEveryonesPerception } from '../../../services/socket.js';
 import { updateTokenVisuals } from '../../../services/visual-effects.js';
 import { setVisibilityBetween } from '../../../utils.js';
+import { VisionAnalyzer } from '../../../visibility/auto-visibility/VisionAnalyzer.js';
+import AvsOverrideManager from './AvsOverrideManager.js';
 import { notify } from './notifications.js';
+
+export async function setAVSPairOverrides(observer, changesByTarget, options = {}) {
+  return AvsOverrideManager.setPairOverrides(observer, changesByTarget, options);
+}
+
 /**
  * Validate if a token is a valid Seek target
  * @param {Token} token - Potential target token
@@ -47,63 +54,52 @@ export function extractStealthDC(token) {
 
 /**
  * Calculate distance between tokens for sorting
+ * Uses standardized distance calculation with proper PF2e grid-to-feet conversion
  * @param {Token} token1 - First token
  * @param {Token} token2 - Second token
  * @returns {number} Distance in feet
  */
 export function calculateTokenDistance(token1, token2) {
-  // Try to use token's distanceTo method if available (PF2e system provides this)
-  if (token1.distanceTo) {
+  try {
+    // Use standardized VisionAnalyzer distance calculation
+    const visionAnalyzer = VisionAnalyzer.getInstance();
+    const result = visionAnalyzer.distanceFeet(token1, token2);
+
+    return result;
+  } catch (error) {
+    console.error(
+      `${MODULE_TITLE}: Error calculating distance between tokens using VisionAnalyzer:`,
+      error,
+    );
+
+    // Fallback to simple distance calculation
     try {
-      // Use token's direct distanceTo method
-      return token1.distanceTo(token2);
-    } catch (error) {
-      console.error(
-        `${MODULE_TITLE}: Error calculating distance between tokens, using fallback methods:`,
-        error,
-      );
+      // Get the center points of each token
+      const t1Center = {
+        x: token1.x + (token1.width * canvas.grid.size) / 2,
+        y: token1.y + (token1.height * canvas.grid.size) / 2,
+      };
+
+      const t2Center = {
+        x: token2.x + (token2.width * canvas.grid.size) / 2,
+        y: token2.y + (token2.height * canvas.grid.size) / 2,
+      };
+
+      // Calculate distance between centers in pixels
+      const dx = t1Center.x - t2Center.x;
+      const dy = t1Center.y - t2Center.y;
+      const pixelDistance = Math.sqrt(dx * dx + dy * dy);
+
+      // Convert to feet using same logic as VisionAnalyzer (5ft grid with rounding)
+      const gridUnits = global.canvas?.scene?.grid?.distance || 5;
+      const gridDistance = pixelDistance / (canvas.grid.size || 1);
+      const feetDistance = gridDistance * gridUnits;
+      return Math.floor(feetDistance / 5) * 5;
+    } catch (fallbackError) {
+      console.error(`${MODULE_TITLE}: Fallback distance calculation failed:`, fallbackError);
+      return Infinity;
     }
   }
-
-  // Try to use PF2e system's distance calculation if available
-  if (game.system.id === 'pf2e' && game.pf2e?.utils?.distance) {
-    try {
-      // Use PF2e's distance calculation
-      return game.pf2e.utils.distance.getDistance(token1, token2);
-    } catch (error) {
-      // Fall back to other methods if PF2e's function fails
-    }
-  }
-
-  // Try using Foundry's built-in measurement
-  if (canvas.grid && canvas.grid.measureDistance) {
-    try {
-      // Try to use Foundry's built-in distance calculation
-      return canvas.grid.measureDistance(token1.center, token2.center);
-    } catch (error) {
-      // Fall back to manual calculation if the built-in one fails
-    }
-  }
-
-  // Fallback manual calculation
-  // Get the center points of each token
-  const t1Center = {
-    x: token1.x + (token1.width * canvas.grid.size) / 2,
-    y: token1.y + (token1.height * canvas.grid.size) / 2,
-  };
-
-  const t2Center = {
-    x: token2.x + (token2.width * canvas.grid.size) / 2,
-    y: token2.y + (token2.height * canvas.grid.size) / 2,
-  };
-
-  // Calculate distance between centers in pixels
-  const dx = t1Center.x - t2Center.x;
-  const dy = t1Center.y - t2Center.y;
-  const pixelDistance = Math.sqrt(dx * dx + dy * dy);
-
-  // Convert to feet (assuming 5ft grid)
-  return (pixelDistance / canvas.grid.size) * 5;
 }
 
 /**
@@ -111,7 +107,7 @@ export function calculateTokenDistance(token1, token2) {
  * @returns {boolean} True if there's an active encounter with combatants
  */
 export function hasActiveEncounter() {
-  return game.combat?.started && game.combat?.combatants?.size > 0;
+  return !!(game.combat?.started && game.combat?.combatants?.size > 0);
 }
 
 /**
@@ -133,8 +129,13 @@ export function isTokenInEncounter(token) {
     const isFamiliar = actor?.type === 'familiar';
     const isEidolon = actor?.type === 'eidolon' || actor?.isOfType?.('eidolon');
 
-    // Always include familiars regardless of encounter filter
-    if (isFamiliar) return true;
+    // Check if familiar's master is in the encounter
+    if (isFamiliar) {
+      const masterId = actor?.system?.master?.id;
+      if (masterId && game.combat.combatants.some((c) => c.actorId === masterId)) {
+        return true;
+      }
+    }
 
     // Try PF2e master linkage on eidolon
     const master = isEidolon ? actor?.system?.eidolon?.master : null;
@@ -174,6 +175,7 @@ export function isTokenInEncounter(token) {
  */
 export function determineOutcome(total, die, dc) {
   const margin = total - dc;
+
   // Determine base outcome by margin
   let outcome;
   if (margin >= 10) outcome = 'critical-success';
@@ -185,6 +187,7 @@ export function determineOutcome(total, die, dc) {
   const ladder = ['critical-failure', 'failure', 'success', 'critical-success'];
   const idx = ladder.indexOf(outcome);
   const natural = Number(die);
+
   if (natural === 20) {
     // Promote by one step unless already crit success
     return ladder[Math.min(idx + 1, ladder.length - 1)];
@@ -193,6 +196,7 @@ export function determineOutcome(total, die, dc) {
     // Demote by one step unless already crit failure
     return ladder[Math.max(idx - 1, 0)];
   }
+
   return outcome;
 }
 
@@ -239,6 +243,22 @@ export async function applyVisibilityChanges(observer, changes, options = {}) {
           target: targetToken,
           state: effectiveNewState,
         });
+      }
+    }
+
+    // Set AVS pair overrides to prevent automatic recalculation of these visibility states
+    // This is crucial for sneak actions - we don't want AVS to override our manual visibility changes
+    if (options.setAVSOverrides !== false) {
+      // Default to true unless explicitly disabled
+
+      if (changesByTarget.size === 0) {
+        console.warn('PF2E Visioner | No changes found - cannot set AVS overrides');
+      } else {
+        try {
+          await AvsOverrideManager.setPairOverrides(observer, changesByTarget, options);
+        } catch (avsError) {
+          console.warn('PF2E Visioner | Failed to set AVS pair overrides:', avsError);
+        }
       }
     }
 
@@ -324,9 +344,8 @@ export function markPanelComplete(panel, changes) {
     const completionMsg = `
             <div class="automation-completion">
                 <i class="fas fa-check-circle"></i>
-                <span>Applied ${changes.length} visibility change${
-                  changes.length !== 1 ? 's' : ''
-                }</span>
+                <span>Applied ${changes.length} visibility change${changes.length !== 1 ? 's' : ''
+      }</span>
             </div>
         `;
 
@@ -503,28 +522,48 @@ export function filterOutcomesByEncounter(outcomes, encounterOnly, tokenProperty
  */
 export function filterOutcomesBySeekDistance(outcomes, seeker, tokenProperty = 'target') {
   try {
-    if (!Array.isArray(outcomes) || !seeker) return outcomes;
+    if (!Array.isArray(outcomes) || !seeker) {
+      return outcomes;
+    }
 
     const inCombat = hasActiveEncounter();
     const applyInCombat = !!game.settings.get(MODULE_ID, 'limitSeekRangeInCombat');
     const applyOutOfCombat = !!game.settings.get(MODULE_ID, 'limitSeekRangeOutOfCombat');
     const shouldApply = (inCombat && applyInCombat) || (!inCombat && applyOutOfCombat);
-    if (!shouldApply) return outcomes;
+
+
+    if (!shouldApply) {
+      return outcomes;
+    }
 
     const maxDistance = Number(
       inCombat
         ? game.settings.get(MODULE_ID, 'customSeekDistance')
         : game.settings.get(MODULE_ID, 'customSeekDistanceOutOfCombat'),
     );
-    if (!Number.isFinite(maxDistance) || maxDistance <= 0) return outcomes;
 
-    return outcomes.filter((outcome) => {
+
+    if (!Number.isFinite(maxDistance) || maxDistance <= 0) {
+      console.warn(`${MODULE_TITLE} | filterOutcomesBySeekDistance: Invalid max distance (${maxDistance}) - returning all outcomes`);
+      return outcomes;
+    }
+
+    const filtered = outcomes.filter((outcome) => {
       const token = outcome?.[tokenProperty];
-      if (!token) return false;
+      if (!token) {
+        return false;
+      }
       const dist = calculateTokenDistance(seeker, token);
-      return Number.isFinite(dist) ? dist <= maxDistance : true;
+      const isWithinRange = Number.isFinite(dist) ? dist <= maxDistance : true;
+
+
+      return isWithinRange;
     });
-  } catch (_) {
+
+
+    return filtered;
+  } catch (error) {
+    console.error(`${MODULE_TITLE} | filterOutcomesBySeekDistance: Error filtering by distance:`, error);
     return outcomes;
   }
 }
@@ -600,6 +639,155 @@ export function filterOutcomesByTemplate(outcomes, center, radiusFeet, tokenProp
 }
 
 /**
+ * Filter outcomes by viewport visibility.
+ * - Keeps tokens that are within the current viewport bounds
+ * - By default keeps non-token subjects (e.g., walls) unfiltered.
+ * @param {Array} outcomes - Array of outcome rows
+ * @param {Token} observer - Acting/observer token (unused but kept for API compatibility)
+ * @param {string} tokenProperty - Property on each outcome that holds the counterpart token (default: 'target')
+ * @param {boolean} filterWalls - Whether to apply viewport filtering to walls (default: false)
+ * @param {boolean} filterTokens - Whether to apply viewport filtering to tokens (default: true)
+ * @param {string} detectionDirection - Unused but kept for API compatibility
+ * @returns {Array} Filtered outcomes where tokens are within viewport
+ */
+export async function filterOutcomesByDetection(
+  outcomes,
+  observer,
+  tokenProperty = 'target',
+  filterWalls = false,
+  filterTokens = true,
+) {
+  try {
+
+    if (!Array.isArray(outcomes)) {
+      return outcomes;
+    }
+
+    // Use the existing ViewportFilterService for proper viewport filtering
+    const { ViewportFilterService } = await import(
+      '../../../visibility/auto-visibility/core/ViewportFilterService.js'
+    );
+    const viewportService = new ViewportFilterService();
+
+    // Get viewport bounds and token set
+    const viewportBounds = viewportService.getViewportBounds(64); // 64px padding
+    const viewportTokenIds = viewportService.getViewportTokenIdSet(64);
+
+    if (!viewportBounds && !viewportTokenIds) {
+      // If viewport detection fails, return all outcomes
+      return outcomes;
+    }
+
+    const filtered = outcomes
+      .map((o) => {
+        try {
+          // Handle wall outcomes
+          if (o?._isWall || o?.wallId) {
+            if (!filterWalls) {
+              return o;
+            }
+
+            // For walls, check if wall intersects with viewport
+            if (viewportBounds) {
+              try {
+                const wall = canvas.walls?.get?.(o.wallId) || o.wall;
+                if (wall && wall.document) {
+                  const [x1, y1, x2, y2] = wall.document.c;
+
+                  // Check if wall intersects viewport bounds
+                  const wallInViewport = !(
+                    Math.max(x1, x2) < viewportBounds.minX ||
+                    Math.min(x1, x2) > viewportBounds.maxX ||
+                    Math.max(y1, y2) < viewportBounds.minY ||
+                    Math.min(y1, y2) > viewportBounds.maxY
+                  );
+
+                  return wallInViewport ? o : null;
+                }
+              } catch (err) {
+                // If we can't check the wall, keep it by default
+                return o;
+              }
+            }
+            return o;
+          }
+
+          const token = o?.[tokenProperty];
+          if (!token) {
+            return null;
+          }
+
+          // Only filter tokens if filterTokens is enabled
+          if (filterTokens) {
+            // Use the viewport service to check if token is in viewport
+            if (viewportTokenIds) {
+              const tokenId = token.document?.id;
+              if (tokenId && !viewportTokenIds.has(tokenId)) {
+                return null;
+              }
+            } else if (viewportBounds) {
+              // Fallback to bounds checking if token ID set is unavailable
+              const tokenInViewport =
+                token.x >= viewportBounds.minX &&
+                token.x <= viewportBounds.maxX &&
+                token.y >= viewportBounds.minY &&
+                token.y <= viewportBounds.maxY;
+
+              if (!tokenInViewport) {
+                return null;
+              }
+            }
+          }
+
+          // If wall filtering is enabled, also filter walls within this outcome
+          if (filterWalls && o.walls && Array.isArray(o.walls) && viewportBounds) {
+            const filteredWalls = o.walls.filter((wall) => {
+              try {
+                if (!wall || !wall.document || !wall.document.c) return true;
+
+                const [x1, y1, x2, y2] = wall.document.c;
+
+                // Check if wall intersects viewport bounds
+                const wallInViewport = !(
+                  Math.max(x1, x2) < viewportBounds.minX ||
+                  Math.min(x1, x2) > viewportBounds.maxX ||
+                  Math.max(y1, y2) < viewportBounds.minY ||
+                  Math.min(y1, y2) > viewportBounds.maxY
+                );
+
+                return wallInViewport;
+              } catch (err) {
+                console.error('Viewport Filter: Error checking wall viewport in outcome:', err);
+                return true; // Keep wall if we can't check viewport
+              }
+            });
+
+            return {
+              ...o,
+              walls: filteredWalls,
+            };
+          }
+
+          return o;
+        } catch (err) {
+          return o;
+        }
+      })
+      .filter((o) => o !== null);
+
+    const removedCount = outcomes.length - filtered.length;
+
+    if (removedCount > 0) {
+      const removed = outcomes.filter(o => !filtered.includes(o));
+    }
+
+    return filtered;
+  } catch (err) {
+    return outcomes;
+  }
+}
+
+/**
  * Calculate stealth roll total adjustments based on cover state
  * Removes cover-specific stealth bonuses when cover doesn't justify them
  * @param {number} baseTotal - The original roll total
@@ -639,10 +827,19 @@ export function calculateStealthRollTotals(
   // Fallback: try roll modifiers if still no original bonus found
   if (originalCoverBonus === 0) {
     const rollModifiers = actionData?.roll?.options?.modifiers || [];
-    const coverModifier = rollModifiers.find(
-      (mod) =>
-        mod.label?.toLowerCase().includes('cover') || mod.slug?.toLowerCase().includes('cover'),
-    );
+
+    const coverModifier = rollModifiers.find((mod) => {
+      const label = mod.label?.toLowerCase() || '';
+      const slug = mod.slug?.toLowerCase() || '';
+      // Only match modifiers that are specifically cover-related, not just containing "cover"
+      return (
+        slug === 'pf2e-visioner-cover' || // Our own cover modifier
+        label.includes('cover bonus') ||
+        label.includes('cover stealth') ||
+        (label.includes('cover') && label.includes('stealth')) ||
+        slug.includes('cover-stealth')
+      );
+    });
     if (coverModifier) {
       originalCoverBonus = Number(coverModifier.modifier || 0);
     }
@@ -674,12 +871,30 @@ export function calculateStealthRollTotals(
     // Brackets: Show what this specific observer DETECTED (before override)
     originalTotal = baseTotal - originalCoverBonus + originalStateBonus;
   } else {
-    // NORMAL CASE: Show detected cover result, no override involved
-    total = baseTotal - originalCoverBonus + currentCoverBonus;
+    // NORMAL CASE: No override, use the roll as it was made
+    // The baseTotal already includes the original cover bonus that was applied when the roll was made
+    // We should only adjust if there's actually a detected difference between what was applied and current cover
 
-    // Only show brackets if cover bonus is different from original
-    if (currentCoverBonus !== originalCoverBonus) {
-      originalTotal = baseTotal;
+    // If we have current cover detected and it matches what was originally applied, no adjustment needed
+    if (originalCoverBonus === currentCoverBonus) {
+      total = baseTotal;
+    } else {
+      // Safety check: if current cover is 'none' and we detect a large original bonus,
+      // it might be a detection error. Cap the adjustment to prevent unreasonable results.
+      if (currentCoverState === 'none' && originalCoverBonus > 4) {
+        console.warn(
+          'PF2E Visioner | Large cover bonus detected for no-cover situation. Limiting adjustment.',
+        );
+        total = baseTotal;
+      } else {
+        // There's a mismatch - the roll was made with different cover than what we detect now
+        // This can happen if the player moved between rolling and dialog opening
+        // Show the adjusted total based on current cover detection
+        total = baseTotal - originalCoverBonus + currentCoverBonus;
+
+        // Show the original roll in brackets if there's a difference
+        originalTotal = baseTotal;
+      }
     }
   }
 
@@ -690,4 +905,122 @@ export function calculateStealthRollTotals(
   }
 
   return { total, originalTotal, baseRollTotal };
+}
+
+/**
+ * Check if a token is defeated, unconscious, dead, or dying
+ * @param {Token} token - The token to check
+ * @returns {boolean} True if the token is defeated
+ */
+export function isTokenDefeated(token) {
+  try {
+    const actor = token?.actor;
+    if (!actor) return false;
+
+    if (token.actor.isDead) {
+      return true;
+    }
+
+    // HP based check (covers 0 or negative)
+    const hpValue = actor.hitPoints?.value ?? actor.system?.attributes?.hp?.value;
+    if (typeof hpValue === 'number' && hpValue <= 0) {
+      return true;
+    }
+
+    // Condition-based check (PF2e conditions can be stored in multiple places)
+    const conditionSlugs = new Set();
+
+    // Check itemTypes.condition array
+    if (Array.isArray(actor.itemTypes?.condition)) {
+      for (const c of actor.itemTypes.condition) {
+        if (c?.slug) conditionSlugs.add(c.slug);
+        else if (typeof c?.name === 'string') conditionSlugs.add(c.name.toLowerCase());
+      }
+    }
+
+    // Check actor.conditions array
+    if (Array.isArray(actor.conditions)) {
+      for (const c of actor.conditions) {
+        if (c?.slug) conditionSlugs.add(c.slug);
+        else if (typeof c?.name === 'string') conditionSlugs.add(c.name.toLowerCase());
+      }
+    }
+
+    // Check actor.appliedConditions (PF2e specific)
+    if (Array.isArray(actor.appliedConditions)) {
+      for (const c of actor.appliedConditions) {
+        if (typeof c === 'string') conditionSlugs.add(c);
+        else if (c?.slug) conditionSlugs.add(c.slug);
+        else if (typeof c?.name === 'string') conditionSlugs.add(c.name.toLowerCase());
+      }
+    }
+
+    // Check system.attributes.conditions (another possible location)
+    if (actor.system?.attributes?.conditions) {
+      const sysConditions = actor.system.attributes.conditions;
+      if (Array.isArray(sysConditions)) {
+        for (const c of sysConditions) {
+          if (typeof c === 'string') conditionSlugs.add(c);
+          else if (c?.slug) conditionSlugs.add(c.slug);
+          else if (typeof c?.name === 'string') conditionSlugs.add(c.name.toLowerCase());
+        }
+      } else if (typeof sysConditions === 'object') {
+        // Check if conditions are stored as properties
+        for (const [key, value] of Object.entries(sysConditions)) {
+          if (value === true || (typeof value === 'object' && value?.active)) {
+            conditionSlugs.add(key);
+          }
+        }
+      }
+    }
+
+    // Check token document effects/status effects
+    if (token?.document?.statusEffects || token?.statusEffects) {
+      const statusEffects = token.document?.statusEffects || token.statusEffects;
+      if (Array.isArray(statusEffects)) {
+        for (const effect of statusEffects) {
+          if (typeof effect === 'string') {
+            conditionSlugs.add(effect);
+          }
+        }
+      }
+    }
+
+    // Check for defeated conditions
+    const defeatedSlugs = ['unconscious', 'dead', 'dying'];
+    for (const slug of defeatedSlugs) {
+      if (conditionSlugs.has(slug)) {
+        return true;
+      }
+    }
+
+    return false;
+  } catch (err) {
+    console.error(`[isTokenDefeated] Error checking token ${token?.name}:`, err);
+    return false;
+  }
+}
+
+/**
+ * Filter outcomes by excluding defeated tokens
+ * @param {Array} outcomes - Array of outcome rows
+ * @param {string} tokenProperty - Property on each outcome that holds the token (default: 'target')
+ * @returns {Array} Filtered outcomes excluding defeated tokens
+ */
+export function filterOutcomesByDefeated(outcomes, tokenProperty = 'target') {
+  if (!Array.isArray(outcomes)) {
+    return outcomes;
+  }
+
+  return outcomes.filter((outcome) => {
+    try {
+      const token = outcome?.[tokenProperty];
+      if (!token) return true; // Keep non-token outcomes
+
+      // Filter out defeated tokens
+      return !isTokenDefeated(token);
+    } catch {
+      return true; // Keep outcome if we can't determine defeated status
+    }
+  });
 }

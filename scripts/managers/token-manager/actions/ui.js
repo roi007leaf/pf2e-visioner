@@ -26,7 +26,7 @@ export async function toggleMode(event, button) {
   const app = this;
   try {
     if (app?.observer?.actor?.type === 'loot') return;
-  } catch (_) {}
+  } catch (_) { }
 
   const currentPosition = app.position;
   try {
@@ -160,7 +160,7 @@ export async function toggleTab(event, button) {
     try {
       const { applySelectionHighlight } = await import('../highlighting.js');
       applySelectionHighlight(this.constructor);
-    } catch (_) {}
+    } catch (_) { }
   }
 }
 
@@ -185,6 +185,17 @@ export async function toggleIgnoreAllies(event, button) {
 export async function toggleIgnoreWalls(event, button) {
   const app = this;
   app.ignoreWalls = !app.ignoreWalls;
+  await app.render({ force: true });
+}
+
+export async function toggleHideFoundryHidden(event, button) {
+  const app = this;
+  // Flip local state
+  app.hideFoundryHidden = !app.hideFoundryHidden;
+  try {
+    // Persist per-user preference
+    await game.settings.set(MODULE_ID, 'hideFoundryHiddenTokens', !!app.hideFoundryHidden);
+  } catch (_) { }
   await app.render({ force: true });
 }
 
@@ -419,6 +430,7 @@ export function bindDomIconHandlers(TokenManagerClass) {
         icon.classList.add('selected');
         const hiddenInput = iconSelection.querySelector('input[type="hidden"]');
         if (hiddenInput) hiddenInput.value = newState;
+        // Note: Current State column will update only after Apply/Apply Both is pressed
       });
     });
   };

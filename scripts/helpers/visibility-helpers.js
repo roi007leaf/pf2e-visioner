@@ -23,7 +23,7 @@ function getPF2eConditionIcon(visibilityState) {
     // Fallback to direct path
     return `systems/pf2e/icons/conditions/${visibilityState}.webp`;
   } catch (error) {
-    console.warn(`PF2E Visioner: Failed to get condition icon for ${visibilityState}:`, error);
+    console.error(`PF2E Visioner: Failed to get condition icon for ${visibilityState}:`, error);
     // Ultimate fallback to a generic effect icon
     return 'icons/svg/aura.svg';
   }
@@ -60,11 +60,11 @@ export function createAggregateEffectData(visibilityState, signature, options = 
       duration:
         options.durationRounds >= 0
           ? {
-              value: options.durationRounds,
-              unit: 'rounds',
-              expiry: 'turn-end',
-              sustained: false,
-            }
+            value: options.durationRounds,
+            unit: 'rounds',
+            expiry: 'turn-end',
+            sustained: false,
+          }
           : { value: -1, unit: 'unlimited', expiry: null, sustained: false },
       tokenIcon: { show: false },
       unidentified: true,

@@ -2,3 +2,5 @@ node_modules/
 coverage/
 pf2e/
 .claude/
+.vscode/settings.json
+.vscode/tasks.json

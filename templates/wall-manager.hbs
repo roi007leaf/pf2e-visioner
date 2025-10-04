@@ -1,24 +1,24 @@
 <form class="pf2e-visioner-wall-manager">
-  <div class="header-actions" style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
-    <span style="flex:1"></span>
+  <div class="header-actions">
+    <span class="spacer"></span>
   </div>
 
   <!-- Search and Filter Controls -->
-  <div class="search-filter-container" style="display:flex; gap:8px; align-items:center; margin-bottom:12px; padding:8px; background:rgba(0,0,0,0.1); border-radius:4px;">
-    <div style="display:flex; align-items:center; gap:4px;">
+  <div class="search-filter-container">
+    <div class="inline-flex">
       <i class="fas fa-search"></i>
-      <input type="text" id="wall-search" placeholder="Search by identifier or wall ID..." style="flex:1; min-width:200px;" />
+      <input type="text" id="wall-search" placeholder="Search by identifier or wall ID..." />
     </div>
-    <div style="display:flex; align-items:center; gap:4px;">
+    <div class="inline-flex">
       <label for="wall-type-filter">Type:</label>
-      <select id="wall-type-filter" style="min-width:100px;">
+      <select id="wall-type-filter">
         <option value="">All Types</option>
         <option value="0">Walls</option>
         <option value="1">Doors</option>
         <option value="2">Secret Doors</option>
       </select>
     </div>
-    <div style="display:flex; align-items:center; gap:4px;">
+    <div class="inline-flex">
       <label for="hidden-filter">Hidden:</label>
       <select id="hidden-filter">
         <option value="">All</option>
@@ -26,7 +26,7 @@
         <option value="false">Non-Hidden Only</option>
       </select>
     </div>
-    <div style="display:flex; align-items:center; gap:4px;">
+    <div class="inline-flex">
       <label for="cover-filter">Cover:</label>
       <select id="cover-filter">
         <option value="">All Cover Types</option>
@@ -36,27 +36,27 @@
         <option value="greater">Greater Max</option>
       </select>
     </div>
-    <button type="button" id="clear-filters" class="visioner-btn" style="padding:4px 8px;"><i class="fas fa-times"></i> Clear</button>
-    <div class="bulk-hidden-buttons" style="display:flex; gap:2px; align-items:center;">
+    <button type="button" id="clear-filters" class="visioner-btn"><i class="fas fa-times"></i> Clear</button>
+    <div class="bulk-hidden-buttons">
       <button type="button" class="visioner-icon-btn" data-action="bulkHiddenOn" data-tooltip="Set all walls to Hidden">
-        <i class="fas fa-eye-slash" style="color:var(--color-text-primary)"></i>
+        <i class="fas fa-eye-slash icon-color-text-primary"></i>
       </button>
       <button type="button" class="visioner-icon-btn" data-action="bulkHiddenOff" data-tooltip="Set all walls to Non-Hidden">
-        <i class="fas fa-eye" style="color:var(--color-text-primary)"></i>
+        <i class="fas fa-eye icon-color-text-primary"></i>
       </button>
     </div>
-    <div class="bulk-cover-buttons" style="display:flex; gap:2px; align-items:center;">
+    <div class="bulk-cover-buttons">
       <button type="button" class="visioner-icon-btn" data-action="bulkCoverAuto" data-tooltip="Set all walls to Auto Cover">
-        <i class="fas fa-bolt-auto" style="color:#888"></i>
+        <i class="fas fa-bolt-auto icon-color-gray"></i>
       </button>
       <button type="button" class="visioner-icon-btn" data-action="bulkCoverNone" data-tooltip="Set all walls to No Cover">
-        <i class="fas fa-shield-slash" style="color:var(--cover-none)"></i>
+        <i class="fas fa-shield-slash icon-color-cover-none"></i>
       </button>
       <button type="button" class="visioner-icon-btn" data-action="bulkCoverStandard" data-tooltip="Set all walls to Standard Cover">
-        <i class="fas fa-shield-alt" style="color:var(--cover-standard)"></i>
+        <i class="fas fa-shield-alt icon-color-cover-standard"></i>
       </button>
       <button type="button" class="visioner-icon-btn" data-action="bulkCoverGreater" data-tooltip="Set all walls to Greater Cover">
-        <i class="fas fa-shield" style="color:var(--cover-greater)"></i>
+        <i class="fas fa-shield icon-color-cover-greater"></i>
       </button>
     </div>
   </div>
@@ -67,18 +67,18 @@
     <thead class="sticky-header">
       <tr class="sticky-row">
         <th>Type</th>
-        <th style="width:16%">Identifier</th>
-        <th style="width:10%">Hidden</th>
-        <th style="width:30%">Cover</th>
-        <th style="width:10%">Stealth DC</th>
-        <th style="width:8%">Select</th>
-        <th style="width:26%">Wall Id</th>
+        <th class="col-w-16">Identifier</th>
+        <th class="col-w-10">Hidden</th>
+        <th class="col-w-30">Cover</th>
+        <th class="col-w-10">Stealth DC</th>
+        <th class="col-w-8">Select</th>
+        <th class="col-w-26">Wall Id</th>
       </tr>
     </thead>
     <tbody>
       {{#each rows as |w|}}
         <tr data-wall-id="{{w.id}}">
-          <td style="text-align:center">
+          <td class="text-center">
             <div class="wall-type-container">
               <button type="button" class="wall-type-button" data-wall-id="{{w.id}}" data-current-type="{{w.doorType}}" data-tooltip="Left-click: next type | Right-click: previous type">
                 <img src="{{w.img}}" width="24" height="24" alt="{{#if (eq w.doorType 2)}}Secret Door{{else if (eq w.doorType 1)}}Door{{else}}Wall{{/if}}" />
@@ -89,39 +89,39 @@
           <td>
             <input type="text" name="wall.{{w.id}}.identifier" value="{{w.identifier}}" placeholder="Hidden Wall" />
           </td>
-          <td style="text-align:center">
+          <td class="text-center">
             <input type="checkbox" name="wall.{{w.id}}.hiddenWall" {{#if w.hiddenWall}}checked{{/if}} data-tooltip="Mark this wall as hidden from players" />
           </td>
-          <td style="text-align:center">
-            <div class="cover-override-buttons" style="display:flex; gap:2px; flex-wrap:wrap; justify-content:center;">
+          <td class="text-center">
+            <div class="cover-override-buttons">
               <button type="button" class="visioner-icon-btn {{#unless w.coverOverride}}active{{/unless}}" 
                       data-action="setCoverOverride" data-wall-id="{{w.id}}" data-cover-override="auto" 
-                      data-tooltip="Automatic Detection - Wall provides cover based on coverage thresholds" title="Automatic Detection">
-                <i class="fas fa-bolt-auto" style="color:#888"></i>
+                      data-tooltip="Automatic Detection - Wall provides cover based on coverage thresholds" data-tooltip="Automatic Detection">
+                <i class="fas fa-bolt-auto icon-color-gray"></i>
               </button>
               <button type="button" class="visioner-icon-btn {{#if (eq w.coverOverride 'none')}}active{{/if}}" 
                       data-action="setCoverOverride" data-wall-id="{{w.id}}" data-cover-override="none" 
-                      data-tooltip="No Cover - Wall never provides cover regardless of thresholds" title="No Cover">
-                <i class="fas fa-shield-slash" style="color:var(--cover-none)"></i>
+                      data-tooltip="No Cover - Wall never provides cover regardless of thresholds" data-tooltip="No Cover">
+                <i class="fas fa-shield-slash icon-color-cover-none"></i>
               </button>
               <button type="button" class="visioner-icon-btn {{#if (eq w.coverOverride 'standard')}}active{{/if}}" 
                       data-action="setCoverOverride" data-wall-id="{{w.id}}" data-cover-override="standard" 
-                      data-tooltip="Standard Cover Maximum - Wall provides up to standard cover based on thresholds" title="Standard Cover">
-                <i class="fas fa-shield-alt" style="color:var(--cover-standard)"></i>
+                      data-tooltip="Standard Cover Maximum - Wall provides up to standard cover based on thresholds" data-tooltip="Standard Cover">
+                <i class="fas fa-shield-alt icon-color-cover-standard"></i>
               </button>
               <button type="button" class="visioner-icon-btn {{#if (eq w.coverOverride 'greater')}}active{{/if}}" 
                       data-action="setCoverOverride" data-wall-id="{{w.id}}" data-cover-override="greater" 
-                      data-tooltip="Greater Cover Maximum - Wall provides up to greater cover based on thresholds" title="Greater Cover">
-                <i class="fas fa-shield" style="color:var(--cover-greater)"></i>
+                      data-tooltip="Greater Cover Maximum - Wall provides up to greater cover based on thresholds" data-tooltip="Greater Cover">
+                <i class="fas fa-shield icon-color-cover-greater"></i>
               </button>
             </div>
           </td>
-          <td style="text-align:center">
+          <td class="text-center">
             <input type="number" min="0" step="1" name="wall.{{w.id}}.dc" value="{{w.dc}}" class="wall-dc-input" placeholder="DC" />
           </td>
-          <td style="text-align:center">
+          <td class="text-center">
             <button type="button" class="visioner-icon-btn" data-action="selectWall" data-wall-id="{{w.id}}" data-tooltip="Select wall and pan to it">
-              <i class="fas fa-crosshairs" style="color:var(--color-text-primary)"></i>
+              <i class="fas fa-crosshairs icon-color-text-primary"></i>
             </button>
           </td>
           <td><code>{{w.id}}</code></td>
@@ -130,8 +130,7 @@
     </tbody>
   </table>
   </div>
-
-  <div class="wall-count" style="text-align:right; margin-bottom:8px; font-size:12px; color:var(--color-text-secondary);">Total: <span id="wall-count-total">{{rows.length}}</span> | Showing: <span id="wall-count-visible">{{rows.length}}</span></div>
+  <div class="wall-count">Total: <span id="wall-count-total">{{rows.length}}</span> | Showing: <span id="wall-count-visible">{{rows.length}}</span></div>
 
   <footer class="sheet-footer">
     <button type="button" class="visioner-btn visioner-primary" data-action="apply"><i class="fas fa-check"></i> Apply</button>

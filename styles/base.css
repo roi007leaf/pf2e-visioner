@@ -14,12 +14,19 @@
   --pf2e-visioner-info: var(--pf2e-visioner-info-color, #2196f3);
 
   /* Visibility state colors */
+  --visibility-avs: var(--visibility-avs-color, #9c27b0); /* Purple - AVS control */
   --visibility-observed: var(--visibility-observed-color, #4caf50); /* Green - safe/visible */
   --visibility-concealed: var(--visibility-concealed-color, #ffc107); /* Yellow - caution */
   --visibility-hidden: var(--visibility-hidden-color, #ff6600); /* Bright orange - warning */
   --visibility-undetected: var(--visibility-undetected-color, #f44336); /* Red - danger */
 
   /* Visibility state background colors (with alpha) */
+  --visibility-avs-bg-light: var(--visibility-avs-bg-light-color, rgba(156, 39, 176, 0.05));
+  --visibility-avs-bg: var(--visibility-avs-bg-color, rgba(156, 39, 176, 0.1));
+  --visibility-avs-bg-medium: var(--visibility-avs-bg-medium-color, rgba(156, 39, 176, 0.15));
+  --visibility-avs-bg-strong: var(--visibility-avs-bg-strong-color, rgba(156, 39, 176, 0.2));
+  --visibility-avs-bg-solid: var(--visibility-avs-bg-solid-color, rgba(156, 39, 176, 0.9));
+
   --visibility-observed-bg-light: var(
     --visibility-observed-bg-light-color,
     rgba(76, 175, 80, 0.05)
@@ -208,6 +215,33 @@
   --color-text-light-highlight-color: #ffffff;
   --color-bg-option-color: #ffffff;
   --color-text-primary-color: #333333;
+}
+
+/* Legend icon utility classes (used in sneak preview headers) */
+.pf2e-visioner .legend-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 0.85em;
+  line-height: 1;
+}
+.pf2e-visioner .legend-icon i {
+  font-size: 0.9em;
+}
+.pf2e-visioner .legend-icon .legend-plus {
+  font-weight: 600;
+  margin-left: 1px;
+}
+.pf2e-visioner .legend-visibility-hidden i,
+.pf2e-visioner .legend-visibility-hidden .legend-plus {
+  color: var(--visibility-hidden);
+}
+.pf2e-visioner .legend-visibility-concealed i {
+  color: var(--visibility-concealed);
+}
+.pf2e-visioner .legend-cover-standard i,
+.pf2e-visioner .legend-cover-standard .legend-plus {
+  color: var(--cover-standard);
 }
 
 .pf2e-visioner {
@@ -679,6 +713,33 @@
     border-radius: 4px;
     background: rgba(255, 215, 0, 0.05); /* subtle gold tint */
   }
+
+  /* Movement chip styling */
+  .movement-distance-indicator,
+  .sneak-distance-indicator {
+    margin-top: var(--spacing-sm);
+  }
+  .movement-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border: 1px solid var(--color-border-light-primary);
+    border-radius: var(--radius-md);
+    padding: 2px 6px;
+    background: var(--color-bg-option);
+    color: var(--color-text-primary);
+    font-size: 12px;
+  }
+  .movement-chip.ok {
+    border-color: var(--visibility-observed);
+    color: var(--visibility-observed);
+    background: var(--visibility-observed-bg-light);
+  }
+  .movement-chip.warn {
+    border-color: var(--visibility-undetected);
+    color: var(--visibility-undetected);
+    background: var(--visibility-undetected-bg-light);
+  }
 } /* End .pf2e-visioner scope */
 
 /* Tooltip badges are appended to <body>, so provide global styles */
@@ -726,3 +787,90 @@
 .pf2e-visioner-tooltip-badge.cover-greater {
   color: var(--cover-greater);
 }
+
+/* Deferred rows styling */
+.sneak-results-table .token-row.deferred-row {
+  opacity: 0.6;
+}
+
+.sneak-results-table .token-row.deferred-row .deferred-indicator {
+  color: #7d3ba5;
+  font-size: 0.85em;
+  font-style: italic;
+}
+
+.sneak-results-table .token-row.deferred-row .deferred-indicator i {
+  margin-right: 2px;
+}
+
+.sneak-results-table .token-row.deferred-row .deferred-action {
+  color: #7d3ba5;
+  font-style: italic;
+  font-size: 0.9em;
+}
+
+.sneak-results-table .token-row.deferred-row .cover-bonus-controls.disabled button,
+.sneak-results-table .token-row.deferred-row .override-icons.disabled button {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.sneak-results-table .token-row.deferred-row .cover-bonus-controls.disabled button:hover,
+.sneak-results-table .token-row.deferred-row .override-icons.disabled button:hover {
+  opacity: 0.4;
+}
+
+/* Wall Config Cover Button Styling - Target the actual classes used in wall-quick.hbs */
+.pv-wall-quick .cover-override-buttons .visioner-icon-btn {
+  width: 28px;
+  height: 28px;
+  padding: 4px;
+  background: var(--color-bg-option);
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-border-light-primary);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.pv-wall-quick .cover-override-buttons .visioner-icon-btn:hover {
+  border-color: var(--pf2e-visioner-primary);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.pv-wall-quick .cover-override-buttons .visioner-icon-btn.active {
+  border-color: var(--pf2e-visioner-primary);
+  border-width: 2px;
+  box-shadow: 0 0 0 1px var(--pf2e-visioner-primary);
+}
+
+/* Ensure cover colors are applied properly in wall config */
+.pv-wall-quick .cover-override-buttons .cover-none {
+  color: var(--cover-none);
+}
+
+.pv-wall-quick .cover-override-buttons .cover-standard {
+  color: var(--cover-standard);
+}
+
+.pv-wall-quick .cover-override-buttons .cover-greater {
+  color: var(--cover-greater);
+}
+
+.pv-wall-quick .cover-override-buttons .icon-color-gray {
+  color: var(--color-text-dark-secondary);
+}
+
+/* Utility classes */
+.hidden {
+  display: none !important;
+}
+
+/* Import enhanced multi-target processing styles */
+@import url('./enhanced-multi-target-processing.css');

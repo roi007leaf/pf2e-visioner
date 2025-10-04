@@ -12,7 +12,7 @@ export {
   getVisibilityBetween,
   getVisibilityMap,
   setVisibilityBetween,
-  setVisibilityMap,
+  setVisibilityMap
 } from './stores/visibility-map.js';
 
 /**
@@ -225,6 +225,21 @@ export function isValidToken(token) {
 }
 
 /**
+ * Check if a token is a loot token
+ * Loot tokens should only use Foundry's native hidden state (two states: hidden or observed)
+ * @param {Token|Object} token - The token to check (can be Token or token document)
+ * @returns {boolean} True if the token is a loot type
+ */
+export function isLootToken(token) {
+  try {
+    const actorType = token?.actor?.type ?? token?.document?.actor?.type;
+    return actorType === 'loot';
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Get all valid scene targets for the observer token
  * @param {Token} observer - The observer token
  * @param {boolean} encounterOnly - Whether to filter to encounter tokens only
@@ -409,6 +424,6 @@ export function getLastRollTotalForActor(actor, requiredSlug = null) {
         /* ignore and continue */
       }
     }
-  } catch (_) {}
+  } catch (_) { }
   return null;
 }

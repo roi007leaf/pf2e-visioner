@@ -13,7 +13,6 @@ describe('Point Out Action Comprehensive Tests', () => {
     // Store original settings
     originalSettings = {
       ignoreAllies: game.settings.get('pf2e-visioner', 'ignoreAllies'),
-      enforceRawRequirements: game.settings.get('pf2e-visioner', 'enforceRawRequirements'),
     };
   });
 
@@ -224,44 +223,10 @@ describe('Point Out Action Comprehensive Tests', () => {
     });
   });
 
-  describe('RAW Enforcement Integration Tests', () => {
-    test('chat apply-changes respects RAW enforcement', () => {
-      game.settings.set('pf2e-visioner', 'enforceRawRequirements', true);
 
-      const mockOutcomes = [
-        { token: { id: 'valid1' }, hasActionableChange: true, newVisibility: 'observed' },
-        { token: { id: 'invalid1' }, hasActionableChange: false, newVisibility: 'observed' },
-      ];
-
-      // When RAW enforcement is on, only actionable changes should be applied
-      const validOutcomes = mockOutcomes.filter((o) => o.hasActionableChange);
-
-      expect(validOutcomes).toHaveLength(1);
-      expect(validOutcomes[0].token.id).toBe('valid1');
-    });
-
-    test('dialog apply-all respects RAW enforcement', () => {
-      game.settings.set('pf2e-visioner', 'enforceRawRequirements', true);
-
-      const mockDialog = {
-        outcomes: [
-          { token: { id: 'valid1' }, hasActionableChange: true, newVisibility: 'observed' },
-          { token: { id: 'invalid1' }, hasActionableChange: false, newVisibility: 'observed' },
-        ],
-      };
-
-      const validOutcomes = mockDialog.outcomes.filter((o) => o.hasActionableChange);
-
-      expect(validOutcomes).toHaveLength(1);
-      expect(validOutcomes[0].token.id).toBe('valid1');
-    });
-  });
 
   describe('hasActionableChange Calculation Tests', () => {
     describe('Without RAW Enforcement', () => {
-      beforeEach(() => {
-        game.settings.set('pf2e-visioner', 'enforceRawRequirements', false);
-      });
 
       test('point-out action maps all states to hidden for success outcomes', () => {
         const {
@@ -297,41 +262,7 @@ describe('Point Out Action Comprehensive Tests', () => {
       });
     });
 
-    describe('With General RAW Enforcement', () => {
-      beforeEach(() => {
-        game.settings.set('pf2e-visioner', 'enforceRawRequirements', true);
-      });
 
-      test('point-out with RAW enforcement still produces normal outcomes', () => {
-        const {
-          getDefaultNewStateFor,
-        } = require('../../../scripts/chat/services/data/action-state-config.js');
-
-        // General RAW enforcement doesn't change outcome mapping, only target selection
-        const allStates = ['observed', 'concealed', 'hidden', 'undetected'];
-        const successOutcomes = ['critical-success', 'success'];
-        const failureOutcomes = ['failure', 'critical-failure'];
-
-        allStates.forEach((oldState) => {
-          successOutcomes.forEach((outcome) => {
-            const newState = getDefaultNewStateFor('point-out', oldState, outcome);
-            expect(newState).toBe('hidden');
-          });
-          failureOutcomes.forEach((outcome) => {
-            const newState = getDefaultNewStateFor('point-out', oldState, outcome);
-            expect(newState).toBe('hidden');
-          });
-        });
-      });
-
-      test('point-out RAW enforcement concept validation', () => {
-        // RAW enforcement for point-out would likely involve:
-        // - Checking if the target can actually be pointed out
-        // - Validating the pointer has line of sight
-        // - Ensuring the action is mechanically possible
-        expect(true).toBe(true); // Concept validated
-      });
-    });
 
     test('hasActionableChange correctly identifies state transitions', () => {
       const {

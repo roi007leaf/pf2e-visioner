@@ -42,19 +42,19 @@ class StealthCheckUseCase extends BaseAutoCoverUseCase {
         if (existing) {
           try {
             if ('modifier' in existing) existing.modifier = bonus;
-          } catch (_) {}
+          } catch (_) { }
           try {
             if ('value' in existing) existing.value = bonus;
-          } catch (_) {}
+          } catch (_) { }
           try {
             if ('label' in existing) existing.label = label;
-          } catch (_) {}
+          } catch (_) { }
           try {
             if ('name' in existing) existing.name = label;
-          } catch (_) {}
+          } catch (_) { }
           try {
             existing.enabled = true;
-          } catch (_) {}
+          } catch (_) { }
         } else {
           let coverModifier;
           try {
@@ -100,7 +100,7 @@ class StealthCheckUseCase extends BaseAutoCoverUseCase {
       } catch (e) {
         console.warn('PF2E Visioner | Dialog re-render failed:', e);
       }
-    } catch (_) {}
+    } catch (_) { }
   }
 
   /**
@@ -141,7 +141,7 @@ class StealthCheckUseCase extends BaseAutoCoverUseCase {
           // Only use this if we haven't already determined state from template data
           state = this._detectCover(originRec.point, target);
         }
-      } catch (_) {}
+      } catch (_) { }
 
       if (!state) {
         // First check for manual cover between tokens
@@ -150,7 +150,7 @@ class StealthCheckUseCase extends BaseAutoCoverUseCase {
           if (manualCover && manualCover !== 'none') {
             state = manualCover;
           }
-        } catch (_) {}
+        } catch (_) { }
 
         // Fallback to auto-detection if no manual cover
         if (!state) {
@@ -264,7 +264,7 @@ class StealthCheckUseCase extends BaseAutoCoverUseCase {
                   ? manualCover
                   : highestFoundManualCover;
             }
-          } catch (_) {}
+          } catch (_) { }
 
           // Fallback to auto-detection if no manual cover
           if (!s) {
@@ -276,7 +276,7 @@ class StealthCheckUseCase extends BaseAutoCoverUseCase {
             detectedState = coverPrecedence[detectedState] < coverPrecedence[s] ? s : detectedState;
           }
         }
-      } catch (_) {}
+      } catch (_) { }
 
       // Inject cover override UI, using a callback to apply stealth-specific behavior on chosen state
       try {
@@ -340,10 +340,15 @@ class StealthCheckUseCase extends BaseAutoCoverUseCase {
               // Calculate the new bonus for the chosen state
               const newBonus = getCoverStealthBonusByState(detectedState);
 
-              // Update the current dialog's modifiers immediately (in onChosen allow zero to be kept)
-              this._applyDialogCoverModifier(dialog, newBonus, getCoverLabel(chosen), {
-                keepWhenZero: true,
-              });
+              // Check if this is a sneak action - if so, don't apply cover bonus
+              const isSneakAction = this._isSneakAction(dialog.context || {});
+
+              if (!isSneakAction) {
+                // Update the current dialog's modifiers immediately (in onChosen allow zero to be kept)
+                this._applyDialogCoverModifier(dialog, newBonus, getCoverLabel(chosen), {
+                  keepWhenZero: true,
+                });
+              }
               // Apply cover state between tokens (for both attacks and saves)
               if (hider && target && detectedState !== 'none') {
                 await this.autoCoverSystem.setCoverBetween(hider, target, detectedState, {
@@ -357,8 +362,8 @@ class StealthCheckUseCase extends BaseAutoCoverUseCase {
           },
         );
         dialog.check.calculateTotal();
-      } catch (e) {}
-    } catch (_) {}
+      } catch (e) { }
+    } catch (_) { }
   }
 
   async onRenderChatMessage(message, html) {
@@ -392,7 +397,7 @@ class StealthCheckUseCase extends BaseAutoCoverUseCase {
           console.warn('PF2E Visioner | Failed to cleanup ephemeral cover effects:', e);
         }
       }
-    } catch (_) {}
+    } catch (_) { }
   }
 
   /**
@@ -403,6 +408,46 @@ class StealthCheckUseCase extends BaseAutoCoverUseCase {
    */
   async handleCheckRoll(check, context) {
     try {
+      // CRITICAL: Capture start positions for movement tracking when stealth check begins
+      try {
+
+        // Resolve the hider (actor making the stealth check)
+        let hider = context?.actor?.getActiveTokens?.()?.[0] || context?.token?.object || null;
+        if (!hider) hider = this._resolveStealtherFromCtx(context);
+
+        if (hider && (hider.isOwner || game.user.isGM)) {
+
+          // Store the current position coordinates for historical tracking
+          const storedStartPosition = {
+            x: hider.x,
+            y: hider.y,
+            center: { x: hider.center.x, y: hider.center.y },
+            tokenId: hider.id,
+            tokenName: hider.name,
+            timestamp: Date.now(),
+          };
+
+
+          // Import sneak action service to capture positions
+          const { SneakActionHandler } = await import('../../../chat/services/actions/SneakAction.js');
+          const sneakActionService = new SneakActionHandler();
+
+          // Create action data for position capture
+          const actionData = {
+            actor: context.actor || hider.actor,
+            messageId: `stealth-check-${Date.now()}`, // Temporary ID until real message is created
+            timestamp: Date.now(),
+            rollId: context._visionerRollId,
+          };
+
+          // Capture start positions immediately when stealth check begins, using stored coordinates
+          await sneakActionService._captureStartPositions(actionData, storedStartPosition);
+
+        }
+      } catch (error) {
+        console.warn('PF2E Visioner | Failed to capture start positions during stealth check:', error);
+      }
+
       try {
         // Resolve the hider (actor making the stealth check)
         let hider = context?.actor?.getActiveTokens?.()?.[0] || context?.token?.object || null;
@@ -420,7 +465,7 @@ class StealthCheckUseCase extends BaseAutoCoverUseCase {
                 state = stealthDialog._pvCoverOverride;
                 isOverride = true;
               }
-            } catch (_) {}
+            } catch (_) { }
 
             // If not overridden, evaluate cover against all other tokens and pick the best (highest stealth bonus)
             const observers = (canvas?.tokens?.placeables || []).filter(
@@ -443,7 +488,7 @@ class StealthCheckUseCase extends BaseAutoCoverUseCase {
                             ? manualCover
                             : highestFoundManualCover;
                       }
-                    } catch (_) {}
+                    } catch (_) { }
 
                     // Fallback to auto-detection if no manual cover
                     if (!s) {
@@ -454,9 +499,9 @@ class StealthCheckUseCase extends BaseAutoCoverUseCase {
                       detectedState =
                         coverPrecedence[detectedState] < coverPrecedence[s] ? s : detectedState;
                     }
-                  } catch (_) {}
+                  } catch (_) { }
                 }
-              } catch (_) {}
+              } catch (_) { }
               state = detectedState;
             }
 
@@ -465,7 +510,8 @@ class StealthCheckUseCase extends BaseAutoCoverUseCase {
             const originalBonus = Number(COVER_STATES?.[originalDetectedState]?.bonusStealth ?? 0);
 
             try {
-              const { chosen, rollId } = await this.coverUIManager.showPopupAndApply(state);
+              const popupResult = await this.coverUIManager.showPopupAndApply(state);
+              const { chosen, rollId } = popupResult || {};
               if (chosen) {
                 context._visionerRollId = rollId;
                 const finalState =
@@ -522,7 +568,7 @@ class StealthCheckUseCase extends BaseAutoCoverUseCase {
                 rollId: context?._visionerRollId,
                 source: isOverride ? 'override' : 'automatic',
               };
-            } catch (_) {}
+            } catch (_) { }
           } catch (e) {
             console.warn('PF2E Visioner | ⚠️ Stealth cover handling failed', e);
           }
@@ -533,7 +579,11 @@ class StealthCheckUseCase extends BaseAutoCoverUseCase {
 
       const coverInfo = context?._visionerStealth;
       const bonus = Number(coverInfo?.bonus) || 0;
-      if (bonus > 1) {
+
+      // Check if this is a Sneak action (not Hide) to skip cover bonus
+      const isSneakAction = this._isSneakAction(context);
+
+      if (bonus > 1 && !isSneakAction) {
         const state = coverInfo?.state ?? 'standard';
         // Ensure predicate support
         const optSet = new Set(Array.isArray(context.options) ? context.options : []);
@@ -545,19 +595,19 @@ class StealthCheckUseCase extends BaseAutoCoverUseCase {
         try {
           pf2eMod = game?.pf2e?.Modifier
             ? new game.pf2e.Modifier({
-                slug: 'pf2e-visioner-cover',
-                label,
-                modifier: bonus,
-                type: 'circumstance',
-                enabled: true, // Explicitly set enabled to true
-              })
+              slug: 'pf2e-visioner-cover',
+              label,
+              modifier: bonus,
+              type: 'circumstance',
+              enabled: true, // Explicitly set enabled to true
+            })
             : {
-                slug: 'pf2e-visioner-cover',
-                label,
-                modifier: bonus,
-                type: 'circumstance',
-                enabled: true, // Explicitly set enabled to true
-              };
+              slug: 'pf2e-visioner-cover',
+              label,
+              modifier: bonus,
+              type: 'circumstance',
+              enabled: true, // Explicitly set enabled to true
+            };
         } catch (_) {
           pf2eMod = {
             slug: 'pf2e-visioner-cover',
@@ -597,6 +647,36 @@ class StealthCheckUseCase extends BaseAutoCoverUseCase {
   }
 
   /**
+   * Determines if the current action is a Sneak action (as opposed to Hide)
+   * @param {Object} context - Roll context
+   * @returns {boolean} True if this is a Sneak action
+   * @private
+   */
+  _isSneakAction(context) {
+    try {
+      // Check for the standard PF2E sneak action roll option
+      const options = context?.options;
+      let hasActionSneak = false;
+
+      if (options) {
+        if (Array.isArray(options)) {
+          hasActionSneak = options.includes('action:sneak');
+        } else if (options instanceof Set) {
+          hasActionSneak = options.has('action:sneak');
+        } else if (typeof options.includes === 'function') {
+          hasActionSneak = options.includes('action:sneak');
+        }
+      }
+
+      // Debug logging removed - sneak action detection working correctly
+      return hasActionSneak;
+    } catch (error) {
+      console.warn('PF2E Visioner | Error detecting Sneak action:', error);
+      return false;
+    }
+  }
+
+  /**
    * Resolve stealther token from stealth check context
    * @param {Object} ctx - Context object
    * @returns {Object|null}
@@ -628,3 +708,4 @@ export default stealthCheckUseCase;
 
 // Also export the class for reference
 export { StealthCheckUseCase };
+

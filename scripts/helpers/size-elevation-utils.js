@@ -152,7 +152,7 @@ export function getTokenCorners(token, rect, sizeValue) {
     ];
   } catch (_) {
     // Fallback to token center if anything goes wrong
-    const c = token.center ?? token.getCenter?.() ?? { x: 0, y: 0 };
+    const c = token.center ?? token.getCenterPoint?.() ?? { x: 0, y: 0 };
     return [c, c, c, c];
   }
 }
@@ -179,7 +179,7 @@ export function getTokenBoundaryPoints(token) {
       { x: cx, y: cy }, // center
     ];
   } catch (_) {
-    const c = token.center ?? token.getCenter?.() ?? { x: 0, y: 0 };
+    const c = token.center ?? token.getCenterPoint?.() ?? { x: 0, y: 0 };
     return [c];
   }
 }

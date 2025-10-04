@@ -1,5 +1,17 @@
 {
   "PF2E_VISIONER": {
+    "ENVIRONMENT": {
+      "SCENE_NOISY_LABEL": "",
+      "SCENE_NOISY_HINT": "",
+      "TOGGLE_SCENE_NOISY_ON": "",
+      "TOGGLE_SCENE_NOISY_OFF": "",
+      "TOGGLE_REGION_NOISY_SELECT": "",
+      "TOGGLE_REGION_NOISY_ON": "",
+      "TOGGLE_REGION_NOISY_OFF": "",
+      "NOISY_ENABLED_SCENE": "",
+      "NOISY_DISABLED_SCENE": "",
+      "NOISY_TOGGLED_REGIONS": ""
+    },
     "MODULE_TITLE": "PF2E Visioner",
     "TOKEN_MANAGER": {
       "TITLE": "Gestionnaire de visibilité de jeton",
@@ -17,6 +29,7 @@
       "COVER_TAB": "Abri"
     },
     "VISIBILITY_STATES": {
+      "avs": "AVS",
       "observed": "Observé",
       "hidden": "Caché",
       "undetected": "Non détecté",
@@ -28,10 +41,54 @@
       "standard": "Abri standard",
       "greater": "Abri supérieur"
     },
+    "SENSES": {
+      "LIGHT-PERCEPTION": "(FR TODO) Light Perception",
+      "LIGHT-PERCEPTION_DESC": "(FR TODO) You can perceive light and darkness. This sense allows you to see in natural darkness but is affected by magical darkness.",
+      "VISION": "(FR TODO) Vision",
+      "VISION_DESC": "(FR TODO) Your standard visual sense used to perceive your surroundings.",
+      "DARKVISION": "(FR TODO) Darkvision",
+      "DARKVISION_DESC": "(FR TODO) You can see in darkness and dim light just as well as in bright light, though you can't distinguish color in darkness.",
+      "GREATER-DARKVISION": "(FR TODO) Greater Darkvision",
+      "GREATER-DARKVISION_DESC": "(FR TODO) You can see in darkness and dim light as if it were bright light—colors included.",
+      "HEARING": "(FR TODO) Hearing",
+      "HEARING_DESC": "(FR TODO) You can detect creatures and events via sound within range (imprecise).",
+      "TREMORSENSE": "(FR TODO) Tremorsense",
+      "TREMORSENSE_DESC": "(FR TODO) You can sense vibrations through the ground within range (imprecise).",
+      "SCENT": "(FR TODO) Scent",
+      "SCENT_DESC": "(FR TODO) You have an enhanced sense of smell, allowing you to detect living creatures within range (imprecise).",
+      "ECHOLOCATION": "(FR TODO) Echolocation",
+      "ECHOLOCATION_DESC": "(FR TODO) You can use sound to navigate and detect objects within range (precise).",
+      "LIFESENSE": "(FR TODO) Lifesense",
+      "LIFESENSE_DESC": "(FR TODO) You can sense the life force of living and undead creatures within range (imprecise)."
+    },
     "VISUAL_EFFECTS": {
       "HIDDEN_OVERLAY": "Ce jeton vous est caché",
       "UNDETECTED_OVERLAY": "Vous ne détectez pas ce jeton",
       "CONCEALED_OVERLAY": "Ce jeton vous est masqué"
+    },
+    "SPECIAL_SENSES": {
+      "vision": "(FR TODO) Vision",
+      "vision_description": "(FR TODO) Standard visual sense.",
+      "low_light_vision": "(FR TODO) Vision en faible luminosité",
+      "low_light_vision_description": "(FR TODO) Vous voyez en faible luminosité comme en pleine lumière.",
+      "infrared_vision": "(FR TODO) Vision infrarouge",
+      "infrared_vision_description": "(FR TODO) Vous percevez les signatures thermiques.",
+      "truesight": "(FR TODO) Vision véritable",
+      "truesight_description": "(FR TODO) Vous voyez les choses telles qu'elles sont réellement.",
+      "see_the_unseen": "(FR TODO) Voir l'invisible",
+      "see_the_unseen_description": "(FR TODO) Vous percevez des phénomènes autrement invisibles.",
+      "bloodsense": "(FR TODO) Sens du sang",
+      "bloodsense_description": "(FR TODO) Vous détectez le sang à proximité.",
+      "magicsense": "(FR TODO) Sens de la magie",
+      "magicsense_description": "(FR TODO) Vous sentez les auras magiques.",
+      "motion_sense": "(FR TODO) Sens du mouvement",
+      "motion_sense_description": "(FR TODO) Vous détectez les mouvements à proximité.",
+      "spiritsense": "(FR TODO) Sens des esprits",
+      "spiritsense_description": "(FR TODO) Vous percevez les esprits et morts-vivants.",
+      "thoughtsense": "(FR TODO) Sens de la pensée",
+      "thoughtsense_description": "(FR TODO) Vous détectez les créatures pensantes.",
+      "wavesense": "(FR TODO) Sens des ondes",
+      "wavesense_description": "(FR TODO) Vous percevez les vibrations/ondes dans un médium."
     },
     "MECHANICAL_EFFECTS": {
       "HIDDEN_FLAT_CHECK": "un test nu DD 11 est requis pour cibler",
@@ -92,9 +149,18 @@
       "SETTING_HINT": "Ajoute automatiquement les boutons Chercher aux messages de la conversation pour appliquer les changements de visibilité",
       "OUT_OF_RANGE": "Hors de portée",
       "RANGE_LIMIT_ACTIVE": "La limite de portée est active : Montre seulement les cibles dans un rayon de 9 mètres",
-      "RANGE_LIMIT_ACTIVE_CUSTOM": "Limite de portée active : Montre seumlement les cibles dans les {distance} pieds ",
+      "RANGE_LIMIT_ACTIVE_CUSTOM": "Limite de portée active : Montre seumement les cibles dans les {distance} pieds ",
       "NO_TARGETS_IN_RANGE": "PAs de cibles valides dans la portée de 9 mètres",
-      "NO_TARGETS_IN_RANGE_CUSTOM": "Pas de cibles valides dans la portée de {distance} pieds"
+      "NO_TARGETS_IN_RANGE_CUSTOM": "Pas de cibles valides dans la portée de {distance} pieds",
+      "ECHOLOCATION_LABEL": "Écholocalisation",
+      "ECHOLOCATION_TOOLTIP": "Ouïe précise active jusqu'au début de votre prochain tour",
+      "NOISY_LABEL": "",
+      "NOISY_TOOLTIP": "",
+      "PREVIEW_AVAILABLE_SENSES": "(FR TODO) Available Senses"
+    },
+    "SENSE_PRECISION": {
+      "PRECISE": "(FR TODO) Precise",
+      "IMPRECISE": "(FR TODO) Imprecise"
     },
     "HIDE_AUTOMATION": {
       "BUTTON_APPLY": "Applique les résultats de Se cacher",
@@ -160,6 +226,86 @@
         "name": "Activer les infobulles au survol",
         "hint": "Montre les infobulles du statut de visibilité au survol des jetons (nécessite un redémarrage)"
       },
+      "TOKEN_HUD_BUTTON": {
+        "name": "(FR) Bouton HUD du jeton",
+        "hint": "(FR) Affiche un bouton Visioner dans le HUD du jeton"
+      },
+      "VISIONER_SCENE_CONTROLS": {
+        "name": "(FR) Contrôles de scène Visioner",
+        "hint": "(FR) Affiche les boutons Visioner dans les barres d'outils Scènes"
+      },
+      "AVS_CHANGES_INDICATOR_SIZE": {
+        "name": "(FR) Taille de l'indicateur de changements AVS",
+        "hint": "(FR) Contrôle la taille du bouton flottant de l'indicateur de changements AVS et de son info-bulle.",
+        "CHOICES": {
+          "small": "(FR) Petit",
+          "medium": "(FR) Moyen",
+          "large": "(FR) Grand",
+          "xlarge": "(FR) Très grand"
+        }
+      },
+      "REMOVE_PLAYER_TARGET_TOOLTIPS": {
+        "name": "(FR) Retirer les infobulles de cible des joueurs",
+        "hint": "(FR) Empêche les joueurs de voir les infobulles de cible"
+      },
+      "MANAGER_ROLL_COMPARISON": {
+        "name": "(FR) Comparaison des jets dans le gestionnaire",
+        "hint": "(FR) Affiche la dernière comparaison jet vs DD"
+      },
+      "TOKEN_INTERSECTION_MODE": {
+        "name": "(FR) Mode d'intersection des jetons",
+        "hint": "(FR) Comment évaluer les bloqueurs de jetons",
+        "CHOICES": {
+          "any": "(FR) N'importe lequel",
+          "length10": "(FR) 10%",
+          "coverage": "(FR) Couverture latérale",
+          "tactical": "(FR) Tactique"
+        }
+      },
+      "AUTO_COVER_IGNORE_UNDETECTED": {
+        "name": "(FR) Ignorer les jetons non détectés",
+        "hint": "(FR) Les jetons non détectés ne bloquent pas l'abri"
+      },
+      "AUTO_COVER_VISUALIZATION_COMBAT_ONLY": {
+        "name": "(FR) Visualisation d'abri seulement en combat",
+        "hint": "(FR) N'afficher l'abri automatique qu'en combat"
+      },
+      "AUTO_COVER_GM_RESPECT_FOG": {
+        "name": "(FR) Le MJ respecte le brouillard pour l'abri",
+        "hint": "(FR) Le MJ voit l'abri comme les joueurs (respect du brouillard)"
+      },
+      "AUTO_COVER_IGNORE_DEAD": {
+        "name": "(FR) Ignorer les jetons morts",
+        "hint": "(FR) Les jetons à 0 PV ne bloquent pas l'abri"
+      },
+      "AUTO_COVER_IGNORE_ALLIES": {
+        "name": "(FR) Ignorer les alliés pour l'abri",
+        "hint": "(FR) Les alliés ne bloquent pas l'abri"
+      },
+      "WALL_STANDARD_THRESHOLD": {
+        "name": "(FR) Seuil standard d'abri par mur (%)",
+        "hint": "(FR) Pourcentage de blocage pour obtenir un abri standard"
+      },
+      "WALL_GREATER_THRESHOLD": {
+        "name": "(FR) Seuil supérieur d'abri par mur (%)",
+        "hint": "(FR) Pourcentage de blocage pour obtenir un abri supérieur"
+      },
+      "WALLS_ALLOW_GREATER": {
+        "name": "(FR) Les murs peuvent donner un abri supérieur",
+        "hint": "(FR) Quand désactivé, les murs ne donnent jamais un abri supérieur"
+      },
+      "IGNORE_PRONE_TOKENS": {
+        "name": "(FR) Ignorer les jetons à terre",
+        "hint": "(FR) Les jetons à terre ne bloquent pas l'abri"
+      },
+      "KEYBIND_OPEN_MANAGER_TARGET_MODE": {
+        "name": "(FR) Raccourci ouvre le gestionnaire en mode Cible",
+        "hint": "(FR) Ouvrir par défaut en mode Cible"
+      },
+      "VISIONER_QUICK_EDIT_TOOL": {
+        "name": "(FR) Outil d'édition rapide Visioner",
+        "hint": "(FR) Affiche l'outil d'édition rapide sur la barre"
+      },
       "ALLOW_PLAYER_TOOLTIPS": {
         "name": "Permet les infobulles pour les joueurs",
         "hint": "Lorsque c'est activé, les joueurs euvent vois les indications de visibilité de leur perspective au survol des jetons (nécessite un redémarrage)"
@@ -187,8 +333,12 @@
         }
       },
       "IGNORE_ALLIES_DEFAULT": {
-        "name": "Ignorer les alliés",
-        "hint": "S'il est activé, les PNJ ne verront que les membres du groupe dans les dialogues et les joeuurs ne verront que les PNJ. Ceci simplifie la gestion de la visibilité en cachant les relations interalliées."
+        "name": "Ignorer les alliés (défaut)",
+        "hint": "Définit l'état par défaut de la case 'Ignorer les alliés' dans les dialogues Visioner et le gestionnaire de jetons. Modifiable à la volée dans chaque dialogue."
+      },
+      "HIDE_FOUNDRY_HIDDEN_TOKENS": {
+        "name": "Masquer les jetons cachés Foundry dans l'UI",
+        "hint": "Si activé, les jetons marqués cachés via le drapeau natif Foundry sont filtrés des dialogues/gestionnaires Visioner (sauf besoins explicites). Filtre visuel côté client uniquement."
       },
       "ENABLE_ALL_TOKENS_VISION": {
         "name": "Activer Vision pour tous les jetons",
@@ -283,7 +433,9 @@
     "UI": {
       "ENCOUNTER_FILTER_TEXT": "Montrer seulement les jetons de la rencontre",
       "COVER_OVERRIDE": "Outrepasser l'abri",
-      "ROLL": "Lancer"
+      "ROLL": "Lancer",
+      "FILTER_BY_DETECTION_LABEL": "(FR TODO) Filter By Viewport",
+      "FILTER_BY_DETECTION_TOOLTIP": "(FR TODO) Only show tokens that are within the current viewport"
     },
     "WALL": {
       "VISIBLE_TO_YOU": "Mur caché",
@@ -294,6 +446,10 @@
       "OPEN_TOKEN_MANAGER": {
         "name": "Ouvrir le gestionnaire du jeton",
         "hint": "Ouvre le gestionnaire du jeton pour les jetons sélectionnés"
+      },
+      "OPEN_QUICK_PANEL": {
+        "name": "(FR) Ouvrir le panneau rapide Visioner",
+        "hint": "(FR) Ouvre le panneau d'édition rapide compact"
       },
       "OPEN_VISIBILITY_MANAGER": {
         "name": "Ouvrir le gestionnaire de visibilité du jeton",
@@ -306,7 +462,54 @@
       "TOGGLE_OBSERVER_MODE": {
         "name": "Activer/Désactiver le mode observateur pour les infobulles au survol",
         "hint": "Maintenir enfoncé cette clé pour passer de l'infobulle au survol au mode observateur (comment le jeton survolé voit les autres)"
+      },
+      "SHOW_AUTO_COVER_OVERLAY": {
+        "name": "(FR) Afficher la superposition d'abri auto",
+        "hint": "(FR) Maintenir pour afficher les badges d'abri automatique"
+      },
+      "HOLD_COVER_VISUALIZATION": {
+        "name": "(FR) Maintenir pour la visualisation d'abri",
+        "hint": "(FR) Maintenir pour visualiser les zones d'abri"
+      },
+      "OPEN_WALL_MANAGER": {
+        "name": "(FR) Ouvrir le gestionnaire de murs",
+        "hint": "(FR) Ouvre la boîte de gestion des murs Visioner"
       }
+    },
+    "AVS_OVERRIDE_DIALOG": {
+      "NO_OVERRIDES": "(FR TODO) No AVS overrides are currently active for this token.",
+      "CLOSE": "(FR TODO) Close",
+      "CLEAR_ALL": "(FR TODO) Clear All Overrides",
+      "CLEAR_ALL_CONFIRM_TITLE": "(FR TODO) Clear All AVS Overrides",
+      "OVERRIDE_REMOVED": "(FR TODO) AVS override removed: {observer} → {target}",
+      "ALL_OVERRIDES_CLEARED": "(FR TODO) All AVS overrides cleared for {token}",
+      "ERROR_REMOVING_OVERRIDE": "(FR TODO) Error removing AVS override",
+      "ERROR_CLEARING_OVERRIDES": "(FR TODO) Error clearing AVS overrides"
+    },
+    "REGION_BEHAVIOR": {
+      "TYPE_LABEL": "(FR TODO) PF2e Visioner Visibility",
+      "TYPES": {
+        "CONCEALMENT": {
+          "label": "(FR TODO) Visioner Concealment"
+        },
+        "VISIBILITY": {
+          "label": "(FR TODO) Visioner Visibility"
+        }
+      },
+      "VISIBILITY_STATE": {
+        "label": "(FR TODO) Visibility State",
+        "hint": "(FR TODO) The visibility state to apply between tokens inside and outside the region"
+      },
+      "APPLY_TO_INSIDE_TOKENS": {
+        "label": "(FR TODO) Apply to Inside Tokens",
+        "hint": "(FR TODO) If enabled, tokens inside the region will have the visibility state applied to other tokens inside the region as well"
+      },
+      "TWO_WAY_REGION": {
+        "label": "(FR TODO) Two-Way Region",
+        "hint": "(FR TODO) If enabled, tokens outside the region will also have the visibility state applied to tokens inside the region"
+      },
+      "VISIBILITY_UPDATED": "(FR TODO) Region visibility updated for {count} token relationships",
+      "UPDATE_ERROR": "(FR TODO) Failed to update region visibility relationships"
     }
   }
 }

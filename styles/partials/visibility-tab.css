@@ -93,6 +93,18 @@
     color: var(--visibility-undetected, #f44336) !important;
   }
 
+  .bulk-state-header.visibility-avs,
+  .bulk-state-header.visibility-avs i {
+    color: #ffffff !important;
+    border-color: var(--visibility-avs, #9c27b0) !important;
+  }
+
+  .bulk-state-header.visibility-avs:hover,
+  .bulk-state-header.visibility-avs:hover i {
+    background: var(--visibility-avs-bg-strong, rgba(156, 39, 176, 0.3)) !important;
+    color: #ffffff !important;
+  }
+
   /* Loading State */
   .bulk-state-header.loading {
     opacity: 0.7;

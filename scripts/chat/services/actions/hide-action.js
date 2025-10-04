@@ -4,7 +4,7 @@ import stealthCheckUseCase from '../../../cover/auto-cover/usecases/StealthCheck
 import { getCoverBetween } from '../../../utils.js';
 import { appliedHideChangesByMessage } from '../data/message-cache.js';
 import { calculateStealthRollTotals, shouldFilterAlly } from '../infra/shared-utils.js';
-import { ActionHandlerBase } from './base-action.js';
+import { ActionHandlerBase } from './BaseAction.js';
 
 export class HideActionHandler extends ActionHandlerBase {
   constructor() {
@@ -20,6 +20,26 @@ export class HideActionHandler extends ActionHandlerBase {
   getOutcomeTokenId(outcome) {
     return outcome?.target?.id ?? null;
   }
+  isOldStateAvsControlled(outcome, actionData) {
+    try {
+      const avsEnabled = game.settings.get(MODULE_ID, 'autoVisibilityEnabled');
+      if (!avsEnabled) return false;
+
+      const observer = outcome.target;
+      const actor = actionData?.actor;
+
+      if (!observer || !actor) return false;
+
+      const hasOverride = !!actor.document?.getFlag(
+        MODULE_ID,
+        `avs-override-from-${observer.document?.id || observer.id}`,
+      );
+
+      return !hasOverride;
+    } catch {
+      return false;
+    }
+  }
   async ensurePrerequisites(actionData) {
     const { ensureActionRoll } = await import('../infra/roll-utils.js');
     ensureActionRoll(actionData);
@@ -29,7 +49,6 @@ export class HideActionHandler extends ActionHandlerBase {
     const tokens = canvas?.tokens?.placeables || [];
     const actorToken = actionData?.actor;
     const actorId = actorToken?.id || actorToken?.document?.id || null;
-    const enforceRAW = game.settings.get(MODULE_ID, 'enforceRawRequirements');
     const base = tokens
       .filter((t) => t && t.actor)
       .filter((t) => (actorId ? t.id !== actorId : t !== actorToken))
@@ -49,35 +68,7 @@ export class HideActionHandler extends ActionHandlerBase {
       // Hide should not list loot or hazards as observers
       .filter((t) => t.actor?.type !== 'loot' && t.actor?.type !== 'hazard');
 
-    if (!enforceRAW) return base;
-
-    // RAW filter: only observers that currently see the actor as Concealed
-    // OR (Observed AND actor has Standard or Greater cover) are relevant.
-    const { getVisibilityBetween, getCoverBetween } = await import('../../../utils.js');
-    return base.filter((observer) => {
-      try {
-        const vis = getVisibilityBetween(observer, actorToken);
-        if (vis === 'concealed') return true;
-        if (vis === 'observed') {
-          // Prefer live auto-cover for relevance (do not mutate state), then fall back to stored map
-          let cover = 'none';
-          if (this.autoCoverSystem.isEnabled()) {
-            try {
-              cover = this.stealthCheckUseCase._detectCover(actorToken, observer) || 'none';
-            } catch (_) {}
-          }
-          if (cover === 'none' || cover === 'lesser') {
-            try {
-              cover = getCoverBetween(observer, actorToken);
-            } catch (_) {
-              cover = 'none';
-            }
-          }
-          return cover === 'standard' || cover === 'greater';
-        }
-      } catch (_) {}
-      return false;
-    });
+    return base;
   }
   async analyzeOutcome(actionData, subject) {
     const { getVisibilityBetween } = await import('../../../utils.js');
@@ -176,6 +167,13 @@ export class HideActionHandler extends ActionHandlerBase {
 
       // Create autoCover object if we have a cover state OR if there's an override
       if (coverState || isOverride) {
+        // Feat: Ceaseless Shadows upgrades cover from a creature's perspective
+        try {
+          const { FeatsHandler } = await import('../feats-handler.js');
+          const upgraded = FeatsHandler.upgradeCoverForCreature(actionData.actor, coverState);
+          coverState = upgraded.state;
+          var _csCanTakeCover = upgraded.canTakeCover;
+        } catch { }
         const coverConfig = COVER_STATES[coverState || 'none'];
         const actualStealthBonus = coverConfig?.bonusStealth || 0;
         result.autoCover = {
@@ -185,6 +183,8 @@ export class HideActionHandler extends ActionHandlerBase {
           color: coverConfig?.color || '#999',
           cssClass: coverConfig?.cssClass || '',
           bonus: actualStealthBonus,
+          // Ceaseless Shadows: gaining Standard or better allows Take Cover
+          canTakeCover: _csCanTakeCover || ((coverState === 'standard' || coverState === 'greater') ? true : undefined),
           isOverride: isOverride && originalDetectedState !== coverState,
           source: coverSource,
           // Add override details for template display (only if actually overridden)
@@ -220,15 +220,32 @@ export class HideActionHandler extends ActionHandlerBase {
     );
 
     const die = Number(
-      actionData?.roll?.dice?.[0]?.total ?? actionData?.roll?.terms?.[0]?.total ?? 0,
+      actionData?.roll?.dice?.[0]?.results?.[0]?.result ??
+      actionData?.roll?.dice?.[0]?.total ??
+      actionData?.roll?.terms?.[0]?.total ?? 0,
     );
     const margin = total - adjustedDC;
     const originalMargin = originalTotal ? originalTotal - adjustedDC : margin;
     const baseMargin = baseRollTotal ? baseRollTotal - adjustedDC : margin;
-    const outcome = determineOutcome(total, die, adjustedDC);
+    let outcome = determineOutcome(total, die, adjustedDC);
     const originalOutcome = originalTotal
       ? determineOutcome(originalTotal, die, adjustedDC)
       : outcome;
+
+    // Feat-based outcome shift (parallel to Sneak)
+    let adjustedOutcome = outcome;
+    let featNotes = [];
+    try {
+      const { FeatsHandler } = await import('../feats-handler.js');
+      // Basic lighting context similar to sneak (dim/dark advantages)
+      const { shift, notes } = FeatsHandler.getOutcomeAdjustment(actionData.actor, 'hide');
+      if (shift) {
+        adjustedOutcome = FeatsHandler.applyOutcomeShift(outcome, shift);
+        featNotes = notes;
+      }
+    } catch (e) {
+      console.warn('PF2E Visioner | Hide feats adjustment failed:', e);
+    }
 
     // Generate outcome labels
     const getOutcomeLabel = (outcomeValue) => {
@@ -250,12 +267,67 @@ export class HideActionHandler extends ActionHandlerBase {
     // Maintain previous behavior for visibility change while enriching display fields
     // Use centralized mapping for defaults
     const { getDefaultNewStateFor } = await import('../data/action-state-config.js');
-    let newVisibility = getDefaultNewStateFor('hide', current, outcome) || current;
+    let newVisibility = getDefaultNewStateFor('hide', current, adjustedOutcome) || current;
+    // Feat-based post visibility adjustments
+    try {
+      const { FeatsHandler } = await import('../feats-handler.js');
+      const inNatural = (() => { try { return FeatsHandler.isEnvironmentActive(actionData.actor, 'natural'); } catch { return false; } })();
+      newVisibility = FeatsHandler.adjustVisibility('hide', actionData.actor, current, newVisibility, {
+        inNaturalTerrain: inNatural,
+        outcome: adjustedOutcome,
+      });
+    } catch { }
+
+    // Prerequisite qualification similar to Sneak (start + end with feat overrides)
+    let positionQualification = null;
+    try {
+      const { default: positionTracker } = await import('../position/PositionTracker.js');
+      const endSnapshot = await positionTracker._capturePositionState(
+        actionData.actor,
+        subject,
+        Date.now(),
+        { forceFresh: true, useCurrentPositionForCover: true }
+      );
+      const startVisibility = current;
+      const endVisibility = endSnapshot?.avsVisibility || current;
+      const endCoverState = endSnapshot?.coverState || 'none';
+      // Hide: you must have cover or concealment now to attempt (observed without either disqualifies unless feats)
+      const startQualifies = (startVisibility === 'hidden' || startVisibility === 'undetected' || startVisibility === 'concealed') || (endCoverState === 'standard' || endCoverState === 'greater');
+      const endQualifies = (endCoverState === 'standard' || endCoverState === 'greater') || endVisibility === 'concealed';
+      let qualification = { startQualifies, endQualifies, bothQualify: startQualifies && endQualifies, reason: 'Hide prerequisites evaluated' };
+      try {
+        const { FeatsHandler } = await import('../feats-handler.js');
+        const inNatural = (() => { try { return FeatsHandler.isEnvironmentActive(actionData.actor, 'natural'); } catch { return false; } })();
+        qualification = FeatsHandler.overridePrerequisites(actionData.actor, qualification, {
+          action: 'hide',
+          observer: subject,
+          startVisibility,
+          endVisibility,
+          endCoverState,
+          inNaturalTerrain: inNatural,
+          // Position hints for Distracting Shadows
+          startCenter: actionData?.storedStartPosition?.center || undefined,
+          endCenter: endSnapshot?.endPositionCenter || undefined,
+        });
+      } catch { }
+      positionQualification = qualification;
+      if (!qualification.endQualifies) newVisibility = 'observed';
+    } catch { /* non-fatal prereq */ }
 
     // Calculate what the visibility change would have been with original outcome
-    const originalNewVisibility = originalTotal
+    let originalNewVisibility = originalTotal
       ? getDefaultNewStateFor('hide', current, originalOutcome) || current
       : newVisibility;
+    if (originalTotal) {
+      try {
+        const { FeatsHandler } = await import('../feats-handler.js');
+        const inNatural = (() => { try { return FeatsHandler.isEnvironmentActive(actionData.actor, 'natural'); } catch { return false; } })();
+        originalNewVisibility = FeatsHandler.adjustVisibility('hide', actionData.actor, current, originalNewVisibility, {
+          inNaturalTerrain: inNatural,
+          outcome: originalOutcome,
+        });
+      } catch { }
+    }
 
     // Check if we should show override displays (only if there's a meaningful difference)
     const shouldShowOverride =
@@ -273,7 +345,7 @@ export class HideActionHandler extends ActionHandlerBase {
       margin,
       originalMargin,
       baseMargin,
-      outcome,
+      outcome: adjustedOutcome,
       originalOutcome,
       originalOutcomeLabel,
       originalNewVisibility,
@@ -288,6 +360,8 @@ export class HideActionHandler extends ActionHandlerBase {
       originalRollTotal: originalTotal,
       // Add base roll total for triple-bracket display
       baseRollTotal: baseRollTotal,
+      featNotes,
+      positionQualification,
     };
   }
   outcomeToChange(actionData, outcome) {

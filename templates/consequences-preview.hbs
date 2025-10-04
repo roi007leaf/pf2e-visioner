@@ -7,7 +7,7 @@
   {{!-- Attacking Token Information Panel --}}
   <div class="attacker-info">
     <div class="attacker-image">
-      <img src="{{attackingToken.image}}" />
+      <img src="{{attackingToken.image}}" data-tooltip="{{attackingToken.name}}" />
     </div>
     <div class="attacker-details">
       <h3 class="attacker-name">{{attackingToken.name}}</h3>
@@ -22,20 +22,33 @@
   </div>
 
   {{!-- Encounter Filter + Ignore Allies --}}
-  <div class="encounter-filter-section" style="display:flex; gap:16px; align-items:center;">
+  <div class="encounter-filter-section">
     {{#if showEncounterFilter}}
-    <label class="encounter-filter-checkbox" style="display:flex; align-items:center; gap:8px;">
+  <label class="encounter-filter-checkbox">
       <input type="checkbox" {{#if encounterOnly}}checked{{/if}} data-action="toggleEncounterFilter" data-tooltip="Only show tokens in the current encounter" />
       <span class="encounter-filter-label">{{localize "PF2E_VISIONER.UI.ENCOUNTER_FILTER_TEXT"}}</span>
     </label>
     {{/if}}
-    <label class="ignore-allies-filter-checkbox" style="display:flex; align-items:center; gap:8px;">
+  <label class="hide-foundry-hidden-filter-checkbox">
+      <input type="checkbox" {{#if hideFoundryHidden}}checked{{/if}} data-action="toggleHideFoundryHidden" data-tooltip="Visually hide tokens that are Foundry-hidden (document.hidden)" />
+      <span class="encounter-filter-label">Hide Foundry-hidden tokens</span>
+    </label>
+  <label class="ignore-allies-filter-checkbox">
       <input type="checkbox" {{#if ignoreAllies}}checked{{/if}} data-action="toggleIgnoreAllies" data-tooltip="Hide allies from the results list" />
       <span class="encounter-filter-label">Ignore allies</span>
+    </label>
+  <label class="filter-by-detection-checkbox">
+      <input type="checkbox" {{#if filterByDetection}}checked{{/if}} data-action="toggleFilterByDetection" data-tooltip="{{localize 'PF2E_VISIONER.UI.FILTER_BY_DETECTION_TOOLTIP'}}" />
+      <span class="encounter-filter-label">{{localize "PF2E_VISIONER.UI.FILTER_BY_DETECTION_LABEL"}}</span>
     </label>
   </div>
 
   {{!-- Results Table --}}
+  {{#if bulkOverrideStates}}
+  <div class="bulk-action-group">
+    {{> "pf2e-visioner.bulk-override"}}
+  </div>
+  {{/if}}
   <div class="results-table-container">
     <table class="visibility-table consequences-results-table">
       <thead>
@@ -50,15 +63,25 @@
         {{#each outcomes as |outcome|}}
           <tr class="token-row" data-token-id="{{outcome.target.id}}">
             <td class="token-image">
-              <img src="{{outcome.tokenImage}}" width="28" height="28" />
+              <span class="token-img-wrapper">
+                <img src="{{outcome.tokenImage}}" data-tooltip="{{outcome.target.name}}" width="28" height="28" />
+                {{#if outcome.target.document.hidden}}
+                  <span class="foundry-hidden-indicator" data-tooltip="Foundry Hidden"><i class="fas fa-eye-slash"></i></span>
+                {{/if}}
+              </span>
             </td>
             <td class="token-name">
-              <strong>{{outcome.target.name}}</strong>
+              <strong data-tooltip="{{outcome.target.name}}">{{outcome.target.name}}</strong>
             </td>
             <td class="visibility-change">
-              <div class="visibility-change-inline">
-                <span class="state-icon" data-state="{{outcome.oldVisibility}}" data-tooltip="{{outcome.oldVisibilityLabel}}">
-                  {{{visibilityIcon outcome.oldVisibility}}}
+              <div class="visibility-change-with-override">
+                <span class="old-visibility-state {{#if outcome.isOldStateAvsControlled}}avs-controlled{{/if}}">
+                  {{{visibilityIcon outcome.currentVisibility}}}
+                  {{#if outcome.isOldStateAvsControlled}}
+                    <span class="avs-tag-small" data-tooltip="Controlled by Auto-Visibility System">
+                      <i class="fas fa-bolt"></i>
+                    </span>
+                  {{/if}}
                 </span>
                 <i class="fas fa-arrow-right visibility-arrow"></i>
                 <div class="override-icons" data-token-id="{{outcome.target.id}}">
@@ -99,11 +122,11 @@
       <span class="consequences-preview-dialog-changes-count">{{changesCount}}</span> of <span class="consequences-preview-dialog-total-count">{{totalCount}}</span> targets will have visibility changes.
     </div>
     <div class="consequences-preview-dialog-bulk-actions-buttons">
-      <button type="button" class="bulk-action-btn apply-all" data-action="applyAll" data-tooltip="Apply all visibility changes">
-        <i class="fas fa-check-circle"></i> Apply All
+      <button type="button" class="bulk-action-btn apply-all" data-action="applyAll" data-tooltip="{{localize 'PF2E_VISIONER.UI.APPLY_ALL'}}">
+        <i class="fas fa-check-circle"></i> {{localize 'PF2E_VISIONER.UI.APPLY_ALL'}}
       </button>
-      <button type="button" class="bulk-action-btn revert-all" data-action="revertAll" data-tooltip="Revert all changes to original state" disabled>
-        <i class="fas fa-undo"></i> Revert All
+      <button type="button" class="bulk-action-btn revert-all" data-action="revertAll" data-tooltip="{{localize 'PF2E_VISIONER.UI.REVERT_ALL'}}" disabled>
+        <i class="fas fa-undo"></i> {{localize 'PF2E_VISIONER.UI.REVERT_ALL'}}
       </button>
     </div>
   </div>

@@ -105,6 +105,14 @@ body.pf2e-visioner-colorblind-protanopia .pf2e-visioner .state-indicator.visibil
   border-color: #9467bd !important;
 }
 
+body.pf2e-visioner-colorblind-protanopia .pf2e-visioner .state-icon[data-state='avs'],
+body.pf2e-visioner-colorblind-protanopia .pf2e-visioner .bulk-state-header[data-state='avs'],
+body.pf2e-visioner-colorblind-protanopia .pf2e-visioner .bulk-state-header[data-state='avs'] i,
+body.pf2e-visioner-colorblind-protanopia .pf2e-visioner .state-indicator.visibility-avs {
+  color: #ffffff !important;
+  border-color: #9c27b0 !important;
+}
+
 /* DEUTERANOPIA (Green-blind) - Use blues, yellows, and magentas instead of green/red */
 body.pf2e-visioner-colorblind-deuteranopia {
   /* Visibility state colors - avoid green and red */
@@ -197,6 +205,14 @@ body.pf2e-visioner-colorblind-deuteranopia .pf2e-visioner .state-indicator.visib
   border-color: #d946ef !important;
 }
 
+body.pf2e-visioner-colorblind-deuteranopia .pf2e-visioner .state-icon[data-state='avs'],
+body.pf2e-visioner-colorblind-deuteranopia .pf2e-visioner .bulk-state-header[data-state='avs'],
+body.pf2e-visioner-colorblind-deuteranopia .pf2e-visioner .bulk-state-header[data-state='avs'] i,
+body.pf2e-visioner-colorblind-deuteranopia .pf2e-visioner .state-indicator.visibility-avs {
+  color: #ffffff !important;
+  border-color: #9c27b0 !important;
+}
+
 /* TRITANOPIA (Blue-blind) - Use greens, yellows, and oranges instead of blue/purple */
 body.pf2e-visioner-colorblind-tritanopia {
   /* Visibility state colors - avoid blue and purple */
@@ -283,6 +299,14 @@ body.pf2e-visioner-colorblind-tritanopia .pf2e-visioner .bulk-state-header[data-
 body.pf2e-visioner-colorblind-tritanopia .pf2e-visioner .state-indicator.visibility-undetected {
   color: #dc143c !important;
   border-color: #dc143c !important;
+}
+
+body.pf2e-visioner-colorblind-tritanopia .pf2e-visioner .state-icon[data-state='avs'],
+body.pf2e-visioner-colorblind-tritanopia .pf2e-visioner .bulk-state-header[data-state='avs'],
+body.pf2e-visioner-colorblind-tritanopia .pf2e-visioner .bulk-state-header[data-state='avs'] i,
+body.pf2e-visioner-colorblind-tritanopia .pf2e-visioner .state-indicator.visibility-avs {
+  color: #ffffff !important;
+  border-color: #9c27b0 !important;
 }
 
 /* ACHROMATOPSIA (Complete colorblind) - Use only grayscale with different brightness levels */
@@ -377,6 +401,14 @@ body.pf2e-visioner-colorblind-achromatopsia
 body.pf2e-visioner-colorblind-achromatopsia .pf2e-visioner .state-indicator.visibility-undetected {
   color: #333333 !important;
   border-color: #333333 !important;
+}
+
+body.pf2e-visioner-colorblind-achromatopsia .pf2e-visioner .state-icon[data-state='avs'],
+body.pf2e-visioner-colorblind-achromatopsia .pf2e-visioner .bulk-state-header[data-state='avs'],
+body.pf2e-visioner-colorblind-achromatopsia .pf2e-visioner .bulk-state-header[data-state='avs'] i,
+body.pf2e-visioner-colorblind-achromatopsia .pf2e-visioner .state-indicator.visibility-avs {
+  color: #ffffff !important;
+  border-color: #9c27b0 !important;
 }
 
 /* ========================================

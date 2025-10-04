@@ -6,7 +6,7 @@
 // Mock Foundry VTT global objects
 global.game = {
   modules: {
-    get: jest.fn((id) => ({
+    get: jest.fn(() => ({
       api: {},
       version: '2.6.1',
     })),
@@ -47,8 +47,6 @@ global.game = {
           coverFromUndetected: false,
           coverFromObserved: false,
           coverFromConcealed: false,
-          sneakRawEnforcement: false,
-          enforceRawRequirements: false,
         },
       };
       return defaults[moduleId]?.[settingId] ?? false;
@@ -74,7 +72,7 @@ global.game = {
   },
   i18n: {
     localize: jest.fn((key) => key || 'mock.message'), // Simple mock that returns the key or a default
-    format: jest.fn((template, data) => template),
+    format: jest.fn((template) => template),
   },
 };
 
@@ -131,7 +129,7 @@ global.canvas = {
           if (t >= 0 && t <= 1 && u >= 0 && u <= 1) {
             return { t, wall }; // intersection found
           }
-        } catch (_) {}
+        } catch { }
       }
       return null; // no intersection
     }),
@@ -187,6 +185,18 @@ global.foundry = {
       const target = keys.reduce((o, i) => (o[i] = o[i] || {}), obj);
       target[lastKey] = value;
     }),
+    hasProperty: jest.fn((obj, path) => {
+      if (!obj || typeof obj !== 'object') return false;
+      const keys = path.split('.');
+      let current = obj;
+      for (const key of keys) {
+        if (current === null || current === undefined || !(key in current)) {
+          return false;
+        }
+        current = current[key];
+      }
+      return true;
+    }),
     deepClone: jest.fn((obj) => JSON.parse(JSON.stringify(obj))),
     mergeObject: jest.fn((target, source, options = {}) => {
       const merged = { ...target };
@@ -227,7 +237,7 @@ global.foundry = {
           this.window = null;
         }
 
-        render(options = {}) {
+        render() {
           this.rendered = true;
           return Promise.resolve(this);
         }
@@ -236,6 +246,19 @@ global.foundry = {
           // Mock implementation
         }
       },
+      HandlebarsApplicationMixin: (Base) =>
+        class MockHandlebarsApplication extends Base {
+          static PARTS = { content: { template: '' } };
+          async _prepareContext() {
+            return {};
+          }
+          async render() {
+            // create a minimal element to attach listeners in tests
+            this.element = document.createElement('div');
+            return this;
+          }
+          _onRender() { }
+        },
     },
   },
 };
@@ -254,6 +277,51 @@ global.console = {
   error: jest.fn(),
   debug: jest.fn(),
 };
+
+// Track timers to ensure clean Jest shutdown (avoid open handle warnings)
+(() => {
+  const activeTimeouts = new Set();
+  const activeIntervals = new Set();
+  const originalSetTimeout = global.setTimeout;
+  const originalSetInterval = global.setInterval;
+  const originalClearTimeout = global.clearTimeout;
+  const originalClearInterval = global.clearInterval;
+
+  global.setTimeout = function (fn, ms, ...args) {
+    const id = originalSetTimeout(() => {
+      try { fn?.(...args); } finally { activeTimeouts.delete(id); }
+    }, ms);
+    activeTimeouts.add(id);
+    return id;
+  };
+
+  global.setInterval = function (fn, ms, ...args) {
+    const id = originalSetInterval(fn, ms, ...args);
+    activeIntervals.add(id);
+    return id;
+  };
+
+  global.clearTimeout = function (id) {
+    activeTimeouts.delete(id);
+    return originalClearTimeout(id);
+  };
+  global.clearInterval = function (id) {
+    activeIntervals.delete(id);
+    return originalClearInterval(id);
+  };
+
+  afterEach(() => {
+    // Clear any leftover timers
+    for (const t of Array.from(activeTimeouts)) {
+      try { originalClearTimeout(t); } catch { }
+      activeTimeouts.delete(t);
+    }
+    for (const i of Array.from(activeIntervals)) {
+      try { originalClearInterval(i); } catch { }
+      activeIntervals.delete(i);
+    }
+  });
+})();
 
 // Mock DOM elements with a safe Canvas mock to avoid OOM
 // Use the real document for non-canvas elements, and return a lightweight canvas for 'canvas'.
@@ -277,8 +345,8 @@ global.console = {
       textBaseline: 'alphabetic',
 
       // path ops
-      beginPath: jest.fn(() => {}),
-      moveTo: jest.fn(() => {}),
+      beginPath: jest.fn(() => { }),
+      moveTo: jest.fn(() => { }),
       lineTo: jest.fn(() => {
         anyDrawn = true;
       }),
@@ -297,11 +365,11 @@ global.console = {
       fillRect: jest.fn(() => {
         anyDrawn = true;
       }),
-      clearRect: jest.fn(() => {}),
+      clearRect: jest.fn(() => { }),
 
       // gradients
       createLinearGradient: jest.fn(() => ({
-        addColorStop: jest.fn(() => {}),
+        addColorStop: jest.fn(() => { }),
       })),
 
       // text
@@ -377,7 +445,7 @@ global.window = {
 };
 
 // Mock shouldFilterAlly function to break circular dependency
-global.shouldFilterAlly = jest.fn((observer, token, filterType, ignoreAllies) => {
+global.shouldFilterAlly = jest.fn(() => {
   // Simple mock: return false (don't filter) for testing
   return false;
 });
@@ -768,7 +836,7 @@ global.createMockToken = (data = {}) => {
       x: x * gridSize + (width * gridSize) / 2,
       y: y * gridSize + (height * gridSize) / 2,
     },
-    getCenter: jest.fn(
+    getCenterPoint: jest.fn(
       () =>
         data.center || {
           x: x * gridSize + (width * gridSize) / 2,
@@ -882,17 +950,32 @@ beforeEach(() => {
   // global.game.settings.register?.mockClear?.();
 
   // Reset canvas state - ensure tokens object exists first
-  if (!global.canvas.tokens) {
-    global.canvas.tokens = {
-      controlled: [],
-      placeables: [],
-      get: jest.fn(),
-      addChild: jest.fn(),
-      removeChild: jest.fn(),
-    };
-  } else {
-    global.canvas.tokens.controlled = [];
-    global.canvas.tokens.placeables = [];
+  if (global.canvas) {
+    if (!global.canvas.tokens) {
+      global.canvas.tokens = {
+        controlled: [],
+        placeables: [],
+        get: jest.fn((id) => {
+          try {
+            return global.canvas.tokens.placeables.find((t) => t.id === id) || null;
+          } catch {
+            return null;
+          }
+        }),
+        addChild: jest.fn(),
+        removeChild: jest.fn(),
+      };
+    } else {
+      global.canvas.tokens.controlled = [];
+      global.canvas.tokens.placeables = [];
+      global.canvas.tokens.get = jest.fn((id) => {
+        try {
+          return global.canvas.tokens.placeables.find((t) => t.id === id) || null;
+        } catch {
+          return null;
+        }
+      });
+    }
   }
 
   // Ensure these properties exist before trying to set them
