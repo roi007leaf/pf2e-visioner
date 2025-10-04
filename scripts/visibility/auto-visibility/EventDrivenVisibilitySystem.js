@@ -186,7 +186,7 @@ export class EventDrivenVisibilitySystem {
 
     // Initialize AVS override manager if available
     try {
-      const { default: AvsOverrideManager } = await import('../../chat/services/infra/avs-override-manager.js');
+      const { default: AvsOverrideManager } = await import('../../chat/services/infra/AvsOverrideManager.js');
       AvsOverrideManager.registerHooks?.();
     } catch {
       /* best-effort */
@@ -300,7 +300,7 @@ export class EventDrivenVisibilitySystem {
       if (!observer?.document?.id || !target?.document?.id) return 'observed';
 
       // 1) Check for active override (persisted flag)
-      const { default: AvsOverrideManager } = await import('../../chat/services/infra/avs-override-manager.js');
+      const { default: AvsOverrideManager } = await import('../../chat/services/infra/AvsOverrideManager.js');
       const override = await AvsOverrideManager.getOverride(observer, target);
       if (typeof override === 'string' && override) return override;
       if (override?.state) return override.state;
@@ -366,7 +366,7 @@ export class EventDrivenVisibilitySystem {
    */
   async clearAllOverrides() {
     try {
-      const { default: AvsOverrideManager } = await import('../../chat/services/infra/avs-override-manager.js');
+      const { default: AvsOverrideManager } = await import('../../chat/services/infra/AvsOverrideManager.js');
       return await AvsOverrideManager.clearAllOverrides();
     } catch (err) {
       console.error('PF2E Visioner | clearAllOverrides failed:', err);
@@ -381,7 +381,7 @@ export class EventDrivenVisibilitySystem {
    */
   async removeOverride(observerId, targetId) {
     try {
-      const { default: AvsOverrideManager } = await import('../../chat/services/infra/avs-override-manager.js');
+      const { default: AvsOverrideManager } = await import('../../chat/services/infra/AvsOverrideManager.js');
       return await AvsOverrideManager.removeOverride(observerId, targetId);
     } catch (err) {
       console.error('PF2E Visioner | removeOverride failed:', { observerId, targetId, err });

@@ -169,7 +169,7 @@ export class HideActionHandler extends ActionHandlerBase {
       if (coverState || isOverride) {
         // Feat: Ceaseless Shadows upgrades cover from a creature's perspective
         try {
-          const { FeatsHandler } = await import('../feats-handler.js');
+          const { FeatsHandler } = await import('../FeatsHandler.js');
           const upgraded = FeatsHandler.upgradeCoverForCreature(actionData.actor, coverState);
           coverState = upgraded.state;
           var _csCanTakeCover = upgraded.canTakeCover;
@@ -236,7 +236,7 @@ export class HideActionHandler extends ActionHandlerBase {
     let adjustedOutcome = outcome;
     let featNotes = [];
     try {
-      const { FeatsHandler } = await import('../feats-handler.js');
+      const { FeatsHandler } = await import('../FeatsHandler.js');
       // Basic lighting context similar to sneak (dim/dark advantages)
       const { shift, notes } = FeatsHandler.getOutcomeAdjustment(actionData.actor, 'hide');
       if (shift) {
@@ -270,7 +270,7 @@ export class HideActionHandler extends ActionHandlerBase {
     let newVisibility = getDefaultNewStateFor('hide', current, adjustedOutcome) || current;
     // Feat-based post visibility adjustments
     try {
-      const { FeatsHandler } = await import('../feats-handler.js');
+      const { FeatsHandler } = await import('../FeatsHandler.js');
       const inNatural = (() => { try { return FeatsHandler.isEnvironmentActive(actionData.actor, 'natural'); } catch { return false; } })();
       newVisibility = FeatsHandler.adjustVisibility('hide', actionData.actor, current, newVisibility, {
         inNaturalTerrain: inNatural,
@@ -296,7 +296,7 @@ export class HideActionHandler extends ActionHandlerBase {
       const endQualifies = (endCoverState === 'standard' || endCoverState === 'greater') || endVisibility === 'concealed';
       let qualification = { startQualifies, endQualifies, bothQualify: startQualifies && endQualifies, reason: 'Hide prerequisites evaluated' };
       try {
-        const { FeatsHandler } = await import('../feats-handler.js');
+        const { FeatsHandler } = await import('../FeatsHandler.js');
         const inNatural = (() => { try { return FeatsHandler.isEnvironmentActive(actionData.actor, 'natural'); } catch { return false; } })();
         qualification = FeatsHandler.overridePrerequisites(actionData.actor, qualification, {
           action: 'hide',
@@ -320,7 +320,7 @@ export class HideActionHandler extends ActionHandlerBase {
       : newVisibility;
     if (originalTotal) {
       try {
-        const { FeatsHandler } = await import('../feats-handler.js');
+        const { FeatsHandler } = await import('../FeatsHandler.js');
         const inNatural = (() => { try { return FeatsHandler.isEnvironmentActive(actionData.actor, 'natural'); } catch { return false; } })();
         originalNewVisibility = FeatsHandler.adjustVisibility('hide', actionData.actor, current, originalNewVisibility, {
           inNaturalTerrain: inNatural,

@@ -20,7 +20,7 @@ import '../../setup.js';
 describe('Token Manager - AVS Cache Bug Fix', () => {
     test('AvsOverrideManager has clearGlobalCaches method', async () => {
         const { AvsOverrideManager } = await import(
-            '../../../scripts/chat/services/infra/avs-override-manager.js'
+            '../../../scripts/chat/services/infra/AvsOverrideManager.js'
         );
 
         expect(typeof AvsOverrideManager.clearGlobalCaches).toBe('function');
@@ -28,7 +28,7 @@ describe('Token Manager - AVS Cache Bug Fix', () => {
 
     test('clearGlobalCaches attempts to clear orchestrator caches', async () => {
         const { AvsOverrideManager } = await import(
-            '../../../scripts/chat/services/infra/avs-override-manager.js'
+            '../../../scripts/chat/services/infra/AvsOverrideManager.js'
         );
 
         // Mock the autoVisibilitySystem module

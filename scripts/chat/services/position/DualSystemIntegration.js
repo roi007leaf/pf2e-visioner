@@ -5,7 +5,7 @@
  */
 
 import { COVER_STATES, MODULE_ID } from '../../../constants.js';
-import errorHandlingService, { SYSTEM_TYPES } from '../infra/error-handling-service.js';
+import errorHandlingService, { SYSTEM_TYPES } from '../infra/ErrorHandlingService.js';
 
 /**
  * Options for system integration calls

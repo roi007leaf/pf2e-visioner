@@ -237,7 +237,7 @@ export class UnifiedApplyRevert {
     switch (strategy) {
       case 'sneak-core': {
         // Use SneakCore for sneak actions
-        const { default: sneakCore } = await import('./sneak-core.js');
+        const { default: sneakCore } = await import('./SneakCore.js');
         const result = await sneakCore.applyResults(context.sessionId, context.outcomes);
         
         return {
@@ -297,7 +297,7 @@ export class UnifiedApplyRevert {
     switch (strategy) {
       case 'sneak-core-revert': {
         // Use SneakCore for sneak revert
-        const { default: sneakCore } = await import('./sneak-core.js');
+        const { default: sneakCore } = await import('./SneakCore.js');
         const success = await sneakCore.revertResults(context.sessionId);
         
         return {
@@ -311,7 +311,7 @@ export class UnifiedApplyRevert {
       
       case 'transaction-rollback': {
         // Use transaction rollback
-        const { default: dualSystemApplication } = await import('./dual-system-result-application.js');
+        const { default: dualSystemApplication } = await import('./DualSystemResultApplication.js');
         const success = await dualSystemApplication.rollbackTransaction(
           storedOperation.result.transactionId
         );

@@ -275,7 +275,7 @@ export class SneakSpeedService {
     let multiplier = 0.5;
     let bonusFeet = 0;
     try {
-      const { FeatsHandler } = await import('./feats-handler.js');
+      const { FeatsHandler } = await import('./FeatsHandler.js');
       multiplier = FeatsHandler.getSneakSpeedMultiplier(actor) ?? 0.5;
       bonusFeet = FeatsHandler.getSneakDistanceBonusFeet(actor) ?? 0;
     } catch {}

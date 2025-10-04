@@ -293,7 +293,7 @@ export class AvsOverrideManager {
     }
 
     try {
-      const { default: indicator } = await import('../../../ui/override-validation-indicator.js');
+      const { default: indicator } = await import('../../../ui/OverrideValidationIndicator.js');
       if (indicator && typeof indicator.hide === 'function') {
         indicator.hide(true);
       }
@@ -417,14 +417,14 @@ export class AvsOverrideManager {
 
       // 3. Hover indicators: clear so they repopulate lazily
       try {
-        const mod = await import('../../../services/hover-tooltips.js');
+        const mod = await import('../../../services/HoverTooltips.js');
         if (typeof mod.hideAllVisibilityIndicators === 'function') {
           mod.hideAllVisibilityIndicators();
         }
       } catch { }
 
       try {
-        const mod = await import('../../../ui/override-validation-indicator.js');
+        const mod = await import('../../../ui/OverrideValidationIndicator.js');
         if (typeof mod.hide === 'function') {
           mod.hide(true);
         }
@@ -433,7 +433,7 @@ export class AvsOverrideManager {
       // 4. Override validation indicator: update (empty) so badge count drops immediately after batch clears
       if (scope === 'batch') {
         try {
-          const { default: indicator } = await import('../../../ui/override-validation-indicator.js');
+          const { default: indicator } = await import('../../../ui/OverrideValidationIndicator.js');
           indicator.update([], '');
         } catch { }
       }

@@ -132,7 +132,7 @@ export class OverrideValidationManager {
                 });
                 if (filtered.length > 0) {
                     try {
-                        const { default: indicator } = await import('../../../ui/override-validation-indicator.js');
+                        const { default: indicator } = await import('../../../ui/OverrideValidationIndicator.js');
                         const movedId = globalThis?.game?.pf2eVisioner?.lastMovedTokenId || tokenId;
                         const moverName = canvas.tokens?.get(movedId)?.document?.name || 'Token';
                         indicator.show(filtered, moverName, movedId, { pulse: false });
@@ -520,13 +520,13 @@ export class OverrideValidationManager {
                 movedTokenName;
         }
         try {
-            const { default: indicator } = await import('../../../ui/override-validation-indicator.js');
+            const { default: indicator } = await import('../../../ui/OverrideValidationIndicator.js');
             const headerId = lastMoved || movedTokenId || null;
             indicator.show(overrideData, movedTokenName, headerId);
         } catch (err) {
             console.warn('PF2E Visioner | Failed to show indicator, falling back to dialog:', err);
             try {
-                const { OverrideValidationDialog } = await import('../../../ui/override-validation-dialog.js');
+                const { OverrideValidationDialog } = await import('../../../ui/OverrideValidationDialog.js');
                 await OverrideValidationDialog.show(overrideData, movedTokenName, lastMoved || movedTokenId || null);
             } catch (error) {
                 console.error('PF2E Visioner | Error showing override validation dialog:', error);

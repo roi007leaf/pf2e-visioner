@@ -5,7 +5,7 @@
  * entering and exiting regions.
  */
 
-import AvsOverrideManager from '../chat/services/infra/avs-override-manager.js';
+import AvsOverrideManager from '../chat/services/infra/AvsOverrideManager.js';
 import { VISIBILITY_STATES } from '../constants.js';
 import { segmentsIntersect } from '../helpers/geometry-utils.js';
 import { getVisibility } from '../stores/visibility-map.js';
@@ -526,7 +526,7 @@ export class VisibilityRegionBehavior extends RegionBehaviorBase {
 
       // Update override validation indicator after all changes
       try {
-        const { OverrideValidationIndicator } = await import('../ui/override-validation-indicator.js');
+        const { OverrideValidationIndicator } = await import('../ui/OverrideValidationIndicator.js');
         const indicator = OverrideValidationIndicator.getInstance();
         // If we removed overrides (AVS mode), hide the indicator
         if (removalsToProcess.length > 0 && updatesByObserver.size === 0) {

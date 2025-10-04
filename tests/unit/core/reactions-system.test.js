@@ -31,7 +31,7 @@ jest.mock('../../../scripts/chat/services/infra/shared-utils.js', () => ({
   hasActiveEncounter: jest.fn(() => false), // No active encounter
 }));
 
-import { SeekPreviewDialog } from '../../../scripts/chat/dialogs/seek-preview-dialog.js';
+import { SeekPreviewDialog } from '../../../scripts/chat/dialogs/SeekPreviewDialog.js';
 import { notify } from '../../../scripts/chat/services/infra/notifications.js';
 
 describe('Reactions System', () => {

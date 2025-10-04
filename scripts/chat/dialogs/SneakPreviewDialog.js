@@ -3,11 +3,11 @@ import autoCoverSystem from '../../cover/auto-cover/AutoCoverSystem.js';
 import { getCoverBetween, getVisibilityBetween } from '../../utils.js';
 import { optimizedVisibilityCalculator } from '../../visibility/auto-visibility/index.js';
 import { getDesiredOverrideStatesForAction } from '../services/data/action-state-config.js';
-import { FeatsHandler } from '../services/feats-handler.js';
+import { FeatsHandler } from '../services/FeatsHandler.js';
 import { notify } from '../services/infra/notifications.js';
 import { hasActiveEncounter } from '../services/infra/shared-utils.js';
 import sneakPositionTracker from '../services/position/PositionTracker.js';
-import turnSneakTracker from '../services/turn-sneak-tracker.js';
+import turnSneakTracker from '../services/TurnSneakTracker.js';
 import { BaseActionDialog } from './base-action-dialog.js';
 
 // Store reference to current sneak dialog
@@ -531,7 +531,7 @@ export class SneakPreviewDialog extends BaseActionDialog {
 
     // Compute and expose Max Sneak Distance indicator data
     try {
-      const { SneakSpeedService } = await import('../services/sneak-speed-service.js');
+      const { SneakSpeedService } = await import('../services/SneakSpeedService.js');
       const env = (await import('../../utils/environment.js')).default;
       const actor = this.sneakingToken?.actor || this.sneakingToken;
       const baseSpeed = Number(actor?.system?.movement?.speeds?.land?.value ?? 0) || 0;
@@ -3066,7 +3066,7 @@ export class SneakPreviewDialog extends BaseActionDialog {
       if (this.sneakingToken) {
         await this.sneakingToken.document.unsetFlag('pf2e-visioner', 'sneak-active');
         try {
-          const { SneakSpeedService } = await import('../services/sneak-speed-service.js');
+          const { SneakSpeedService } = await import('../services/SneakSpeedService.js');
           await SneakSpeedService.restoreSneakWalkSpeed(this.sneakingToken);
         } catch (speedErr) {
           // Failed to restore sneak walk speed - continue silently

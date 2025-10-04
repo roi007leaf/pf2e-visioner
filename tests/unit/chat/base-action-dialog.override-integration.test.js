@@ -24,7 +24,7 @@ describe('BaseActionDialog - Override Removal Integration', () => {
         expect(content).toMatch(/removedOverrides\+\+/);
 
         // Verify functions import AvsOverrideManager (4 locations: onApplyChange, onRevertChange, onApplyAll, onRevertAll)
-        const avsImportMatches = content.match(/await import.*avs-override-manager/g);
+        const avsImportMatches = content.match(/await import.*AvsOverrideManager\.js/g);
         expect(avsImportMatches.length).toBeGreaterThanOrEqual(2); // At least in apply/revert functions
     });
 

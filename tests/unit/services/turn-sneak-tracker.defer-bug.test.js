@@ -3,7 +3,7 @@ import '../../setup.js';
 describe('TurnSneakTracker - defer bug fix', () => {
     test('specific token deferrals do not affect other tokens in subsequent sneaks', async () => {
         // Lazy import
-        const { TurnSneakTracker } = require('../../../scripts/chat/services/turn-sneak-tracker.js');
+        const { TurnSneakTracker } = require('../../../scripts/chat/services/TurnSneakTracker.js');
 
         const tracker = new TurnSneakTracker();
 
@@ -85,7 +85,7 @@ describe('TurnSneakTracker - defer bug fix', () => {
     });
 
     test('isObserverDeferred method correctly identifies specific deferred observers', () => {
-        const { TurnSneakTracker } = require('../../../scripts/chat/services/turn-sneak-tracker.js');
+        const { TurnSneakTracker } = require('../../../scripts/chat/services/TurnSneakTracker.js');
 
         const tracker = new TurnSneakTracker();
 
@@ -153,7 +153,7 @@ describe('TurnSneakTracker - defer bug fix', () => {
     });
 
     test('defer button appears when GM manually sets end position to not qualifying', () => {
-        const { SneakPreviewDialog } = require('../../../scripts/chat/dialogs/sneak-preview-dialog.js');
+        const { SneakPreviewDialog } = require('../../../scripts/chat/dialogs/SneakPreviewDialog.js');
 
         // Mock sneaking token with Sneaky feat
         const sneakingToken = {
@@ -210,7 +210,7 @@ describe('TurnSneakTracker - defer bug fix', () => {
     });
 
     test('defer eligibility updates correctly when position qualifications change', () => {
-        const { SneakPreviewDialog } = require('../../../scripts/chat/dialogs/sneak-preview-dialog.js');
+        const { SneakPreviewDialog } = require('../../../scripts/chat/dialogs/SneakPreviewDialog.js');
 
         // Mock sneaking token with Sneaky feat
         const sneakingToken = {

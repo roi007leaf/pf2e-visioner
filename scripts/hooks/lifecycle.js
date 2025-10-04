@@ -4,7 +4,7 @@
 
 import { injectChatAutomationStyles } from '../chat/chat-automation-styles.js';
 import { MODULE_ID } from '../constants.js';
-import { initializeHoverTooltips } from '../services/hover-tooltips.js';
+import { initializeHoverTooltips } from '../services/HoverTooltips.js';
 import { registerSocket } from '../services/socket.js';
 import { updateTokenVisuals, updateWallVisuals } from '../services/visual-effects.js';
 
@@ -178,7 +178,7 @@ export async function onCanvasReady() {
     async (ev) => {
       if (ev.key?.toLowerCase() !== 'o') return;
       const { HoverTooltips, showControlledTokenVisibilityObserver } = await import(
-        '../services/hover-tooltips.js'
+        '../services/HoverTooltips.js'
       );
       if (
         !HoverTooltips.isShowingKeyTooltips &&
@@ -196,7 +196,7 @@ export async function onCanvasReady() {
       if (ev.key?.toLowerCase() !== 'o') return;
       try {
         // Reuse the existing release path via onHighlightObjects(false)
-        const { onHighlightObjects } = await import('../services/hover-tooltips.js');
+        const { onHighlightObjects } = await import('../services/HoverTooltips.js');
         onHighlightObjects(false);
         // Note: Don't call cleanupHoverTooltips() here as it would reset currentHoveredToken
         // and prevent hover tooltips from being restored

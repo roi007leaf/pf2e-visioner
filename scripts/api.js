@@ -4,7 +4,7 @@
 
 import { MODULE_ID } from './constants.js';
 import autoCoverSystem from './cover/auto-cover/AutoCoverSystem.js';
-import { VisionerTokenManager } from './managers/token-manager/token-manager.js';
+import { VisionerTokenManager } from './managers/token-manager/TokenManager.js';
 import {
   rebuildAndRefresh,
   removeAllReferencesToTarget,
@@ -214,7 +214,7 @@ export class Pf2eVisionerApi {
       try {
         if (!options?.isAutomatic && prepared.length) {
           if (!AvsOverrideManager) {
-            AvsOverrideManager = (await import('./chat/services/infra/avs-override-manager.js'))
+            AvsOverrideManager = (await import('./chat/services/infra/AvsOverrideManager.js'))
               .default;
           }
           // Build changes map expected by applyOverrides: array of { target, state }
@@ -287,7 +287,7 @@ export class Pf2eVisionerApi {
       // For manual calls (default), create AVS overrides so AVS won't fight manual edits
       try {
         if (!options?.isAutomatic) {
-          const AvsOverrideManager = (await import('./chat/services/infra/avs-override-manager.js'))
+          const AvsOverrideManager = (await import('./chat/services/infra/AvsOverrideManager.js'))
             .default;
           await AvsOverrideManager.applyOverrides(
             observerToken,
@@ -722,7 +722,7 @@ export class Pf2eVisionerApi {
         }
         // Hide the override validation indicator if present
         try {
-          const { default: indicator } = await import('./ui/override-validation-indicator.js');
+          const { default: indicator } = await import('./ui/OverrideValidationIndicator.js');
           if (indicator && typeof indicator.hide === 'function') indicator.hide(true);
         } catch { }
       } catch (error) {
@@ -1075,7 +1075,7 @@ export class Pf2eVisionerApi {
         }
         // Hide the override validation indicator if present
         try {
-          const { default: indicator } = await import('./ui/override-validation-indicator.js');
+          const { default: indicator } = await import('./ui/OverrideValidationIndicator.js');
           if (indicator && typeof indicator.hide === 'function') indicator.hide(true);
         } catch { }
       } catch (error) {

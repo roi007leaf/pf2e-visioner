@@ -180,7 +180,7 @@ export class HidePreviewDialog extends BaseActionDialog {
           let qualifies = this._endPositionQualifiesForHide(endPos);
           // Apply feat-based prerequisite overrides (Very Very Sneaky, Legendary Sneak, etc.)
           try {
-            const { FeatsHandler } = await import('../services/feats-handler.js');
+            const { FeatsHandler } = await import('../services/FeatsHandler.js');
             const startVisibility =
               outcome.oldVisibility || outcome.currentVisibility || 'observed';
             const endVisibility = endPos?.effectiveVisibility || startVisibility;
@@ -248,7 +248,7 @@ export class HidePreviewDialog extends BaseActionDialog {
       /* optional */
     }
 
-    // Note: autoCover data is already calculated in hide-action.js and should be preserved
+    // Note: autoCover data is already calculated in HideAction.js and should be preserved
     // No need to call getCoverBetween here as it would overwrite the rich autoCover object
 
     // Show notification if encounter filter results in empty list
@@ -329,7 +329,7 @@ export class HidePreviewDialog extends BaseActionDialog {
 
     // Compute feat prerequisite-relaxation badges for Hide action
     try {
-      const { FeatsHandler } = await import('../services/feats-handler.js');
+      const { FeatsHandler } = await import('../services/FeatsHandler.js');
       const has = (slug) => {
         try {
           return FeatsHandler.hasFeat(this.actorToken, slug);
@@ -894,7 +894,7 @@ export class HidePreviewDialog extends BaseActionDialog {
     if (avsRemovals.length > 0) {
       try {
         const { default: AvsOverrideManager } = await import(
-          '../services/infra/avs-override-manager.js'
+          '../services/infra/AvsOverrideManager.js'
         );
         const hiderId = app.actionData?.actor?.document?.id || app.actionData?.actor?.id;
         if (hiderId) {
@@ -999,7 +999,7 @@ export class HidePreviewDialog extends BaseActionDialog {
     if (effectiveNewState === 'avs') {
       try {
         const { default: AvsOverrideManager } = await import(
-          '../services/infra/avs-override-manager.js'
+          '../services/infra/AvsOverrideManager.js'
         );
         const hiderId = app.actionData?.actor?.document?.id || app.actionData?.actor?.id;
         const observerId = outcome.target.id;
@@ -1258,7 +1258,7 @@ export class HidePreviewDialog extends BaseActionDialog {
       if (hidingActor && observerToken && effectiveVisibility) {
         // Import required modules
         const { setVisibilityBetween } = await import('../../stores/visibility-map.js');
-        const AvsOverrideManager = (await import('../services/infra/avs-override-manager.js'))
+        const AvsOverrideManager = (await import('../services/infra/AvsOverrideManager.js'))
           .default;
 
         // Find the hiding token

@@ -2,7 +2,7 @@
  * @jest-environment jsdom
  */
 
-import { SeekPreviewDialog } from '../../../scripts/chat/dialogs/seek-preview-dialog.js';
+import { SeekPreviewDialog } from '../../../scripts/chat/dialogs/SeekPreviewDialog.js';
 
 // Mock game object and settings
 global.game = {

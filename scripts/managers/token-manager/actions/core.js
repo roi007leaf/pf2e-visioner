@@ -129,7 +129,7 @@ export async function formHandler(event, form, formData, options = {}) {
         if (overrideMap.size > 0) {
           try {
             const { default: AvsOverrideManager } = await import(
-              '../../../chat/services/infra/avs-override-manager.js'
+              '../../../chat/services/infra/AvsOverrideManager.js'
             );
             await AvsOverrideManager.applyOverrides(app.observer, overrideMap, {
               source: 'manual_action',
@@ -143,7 +143,7 @@ export async function formHandler(event, form, formData, options = {}) {
         if (avsRemovals.size > 0) {
           try {
             const { default: AvsOverrideManager } = await import(
-              '../../../chat/services/infra/avs-override-manager.js'
+              '../../../chat/services/infra/AvsOverrideManager.js'
             );
             const tokenNames = [];
             for (const tokenId of avsRemovals) {
@@ -284,7 +284,7 @@ export async function formHandler(event, form, formData, options = {}) {
           const observerToken = canvas.tokens.get(observerTokenId);
           if (observerToken && map.size > 0) {
             const { default: AvsOverrideManager } = await import(
-              '../../../chat/services/infra/avs-override-manager.js'
+              '../../../chat/services/infra/AvsOverrideManager.js'
             );
             await AvsOverrideManager.applyOverrides(observerToken, map, {
               source: 'manual_action',
@@ -299,7 +299,7 @@ export async function formHandler(event, form, formData, options = {}) {
       if (avsRemovals.size > 0) {
         try {
           const { default: AvsOverrideManager } = await import(
-            '../../../chat/services/infra/avs-override-manager.js'
+            '../../../chat/services/infra/AvsOverrideManager.js'
           );
           const tokenNames = [];
           for (const observerTokenId of avsRemovals) {
@@ -526,7 +526,7 @@ export async function applyCurrent(event, button) {
           }
           if (changes.size > 0) {
             const { default: AvsOverrideManager } = await import(
-              '../../../chat/services/infra/avs-override-manager.js'
+              '../../../chat/services/infra/AvsOverrideManager.js'
             );
             await AvsOverrideManager.applyOverrides(app.observer, changes, {
               source: 'manual_action',
@@ -592,7 +592,7 @@ export async function applyCurrent(event, button) {
           // AVS override for target-mode edit
           try {
             const { default: AvsOverrideManager } = await import(
-              '../../../chat/services/infra/avs-override-manager.js'
+              '../../../chat/services/infra/AvsOverrideManager.js'
             );
             const map = new Map();
             const expectedCover = app._savedModeData.target?.cover?.[observerTokenId];
@@ -798,7 +798,7 @@ export async function applyBoth(_event, _button) {
       // AVS overrides for observer-mode changes
       try {
         const { default: AvsOverrideManager } = await import(
-          '../../../chat/services/infra/avs-override-manager.js'
+          '../../../chat/services/infra/AvsOverrideManager.js'
         );
         const map = new Map();
         for (const [tokenId, newState] of Object.entries(vis)) {
@@ -869,7 +869,7 @@ export async function applyBoth(_event, _button) {
         // AVS overrides for target-mode changes
         try {
           const { default: AvsOverrideManager } = await import(
-            '../../../chat/services/infra/avs-override-manager.js'
+            '../../../chat/services/infra/AvsOverrideManager.js'
           );
           const map = new Map();
           const expectedCover = app._savedModeData.target?.cover?.[observerTokenId];

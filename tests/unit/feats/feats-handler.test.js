@@ -15,7 +15,7 @@ describe('FeatsHandler - all feats coverage', () => {
 
   beforeAll(() => {
     // Use CJS require pattern; the module exports both named and default
-    const mod = require('../../../scripts/chat/services/feats-handler.js');
+    const mod = require('../../../scripts/chat/services/FeatsHandler.js');
     FeatsHandler = mod.FeatsHandler || mod.default || mod;
   });
 

@@ -7,7 +7,7 @@ import {
   addTokenEventListener,
   cleanupHoverTooltips,
   initializeHoverTooltips,
-} from '../services/hover-tooltips.js';
+} from '../services/HoverTooltips.js';
 import { updateTokenVisuals } from '../services/visual-effects.js';
 
 export async function onTokenCreated(scene, tokenDoc) {
@@ -124,7 +124,7 @@ export async function onTokenDeleted(...args) {
       ]);
 
       try {
-        const { default: AvsOverrideManager } = await import('../chat/services/infra/avs-override-manager.js');
+        const { default: AvsOverrideManager } = await import('../chat/services/infra/AvsOverrideManager.js');
         await AvsOverrideManager.removeAllOverridesInvolving(tokenDoc.id);
       } catch (error) {
         console.error('PF2E Visioner: AVS override cleanup failed', error);

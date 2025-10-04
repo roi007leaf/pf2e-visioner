@@ -132,7 +132,7 @@ export class SeekActionHandler extends ActionHandlerBase {
     // Determine anomaly and That's Odd feat early
     let thatsOddAuto = false;
     try {
-      const { FeatsHandler } = await import('../feats-handler.js');
+      const { FeatsHandler } = await import('../FeatsHandler.js');
       const isAnomaly = !!(
         subject?._isWall ||
         subject?.actor?.type === 'hazard' ||
@@ -212,7 +212,7 @@ export class SeekActionHandler extends ActionHandlerBase {
     let newVisibility = getDefaultNewStateFor('seek', current, outcome) || current;
     // Feat-based post visibility adjustments (Keen Eyes, That's Odd)
     try {
-      const { FeatsHandler } = await import('../feats-handler.js');
+      const { FeatsHandler } = await import('../FeatsHandler.js');
       newVisibility = FeatsHandler.adjustVisibility(
         'seek',
         actionData.actor,

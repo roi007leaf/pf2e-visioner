@@ -7,7 +7,7 @@
  */
 
 import { VISIBILITY_STATES } from '../../../constants.js';
-import errorHandlingService, { SYSTEM_TYPES } from '../infra/error-handling-service.js';
+import errorHandlingService, { SYSTEM_TYPES } from '../infra/ErrorHandlingService.js';
 
 /**
  * State transition data structure

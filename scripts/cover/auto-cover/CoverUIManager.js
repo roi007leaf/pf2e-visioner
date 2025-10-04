@@ -5,7 +5,7 @@
 import { COVER_STATES, MODULE_ID } from '../../constants.js';
 import { getCoverBonusByState, getCoverLabel } from '../../helpers/cover-helpers.js';
 import { getCoverBetween } from '../../utils.js';
-import { CoverQuickOverrideDialog } from '../quick-override-dialog.js';
+import { CoverQuickOverrideDialog } from '../QuickOverrideDialog.js';
 import autoCoverSystem from './AutoCoverSystem.js';
 
 export class CoverUIManager {

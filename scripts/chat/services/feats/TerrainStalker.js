@@ -14,7 +14,7 @@ export class TerrainStalkerService {
      */
     static async checkFreeSneak(actionData, subject, ctx) {
         try {
-            const { FeatsHandler } = await import('../feats-handler.js');
+            const { FeatsHandler } = await import('../FeatsHandler.js');
             const { default: EnvironmentHelper } = await import('../../../utils/environment.js');
             const acting = ctx?.getSneakingToken?.(actionData) || actionData?.actor;
             if (!acting) return { applies: false, reason: 'Sneaking token not found' };

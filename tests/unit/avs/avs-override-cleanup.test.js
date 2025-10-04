@@ -3,7 +3,7 @@
  * Tests that AVS overrides are properly cleaned up when tokens are deleted
  */
 
-import { AvsOverrideManager } from '../../../scripts/chat/services/infra/avs-override-manager.js';
+import { AvsOverrideManager } from '../../../scripts/chat/services/infra/AvsOverrideManager.js';
 import { MODULE_ID } from '../../../scripts/constants.js';
 import '../../setup.js';
 

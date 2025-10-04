@@ -457,7 +457,7 @@ class TurnSneakTracker {
     async _showEndOfTurnDialog(sneakingToken, dialogResults, hasVisibilityChanges) {
         try {
             // Import dialog dynamically to avoid circular dependencies
-            const { SneakPreviewDialog } = await import('../dialogs/sneak-preview-dialog.js');
+            const { SneakPreviewDialog } = await import('../dialogs/SneakPreviewDialog.js');
 
             // Create action data structure compatible with SneakPreviewDialog
             const actionData = {

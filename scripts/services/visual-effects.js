@@ -244,7 +244,7 @@ export async function cleanupAllWallIndicators() {
   try {
     // Clean up hover tooltips cover indicators first (these are created by Alt key for tokens)
     try {
-      const { cleanupHoverTooltips } = await import('./hover-tooltips.js');
+      const { cleanupHoverTooltips } = await import('./HoverTooltips.js');
       cleanupHoverTooltips();
     } catch (_) { }
 
@@ -1341,13 +1341,13 @@ export async function updateSystemHiddenTokenHighlights(observerId = null, posit
             try {
               const tooltipsEnabled = game.settings?.get?.(MODULE_ID, 'enableHoverTooltips');
               if (tooltipsEnabled) {
-                const { HoverTooltips } = await import('./hover-tooltips.js');
+                const { HoverTooltips } = await import('./HoverTooltips.js');
                 if (!HoverTooltips.isShowingKeyTooltips && !HoverTooltips._isPanning) {
                   // Store the token so tooltip system knows what to show
                   HoverTooltips.currentHoveredToken = token;
 
                   // Import the visibility indicator function
-                  const hoverModule = await import('./hover-tooltips.js');
+                  const hoverModule = await import('./HoverTooltips.js');
                   // Call the internal visibility indicator function
                   if (typeof hoverModule.showVisibilityIndicators === 'function') {
                     hoverModule.showVisibilityIndicators(token);
@@ -1364,11 +1364,11 @@ export async function updateSystemHiddenTokenHighlights(observerId = null, posit
 
             // Hide hover tooltips
             try {
-              const { HoverTooltips } = await import('./hover-tooltips.js');
+              const { HoverTooltips } = await import('./HoverTooltips.js');
               if (HoverTooltips.currentHoveredToken === token) {
                 HoverTooltips.currentHoveredToken = null;
 
-                const hoverModule = await import('./hover-tooltips.js');
+                const hoverModule = await import('./HoverTooltips.js');
                 if (typeof hoverModule.hideAllVisibilityIndicators === 'function') {
                   hoverModule.hideAllVisibilityIndicators();
                 }

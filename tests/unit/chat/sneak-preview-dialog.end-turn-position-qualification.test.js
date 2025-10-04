@@ -14,7 +14,7 @@ describe('SneakPreviewDialog End-of-Turn Position Qualification Fix', () => {
         // Read the actual source file to verify our changes are there
         const fs = require('fs');
         const path = require('path');
-        const filePath = path.join(__dirname, '../../../scripts/chat/dialogs/sneak-preview-dialog.js');
+        const filePath = path.join(__dirname, '../../../scripts/chat/dialogs/SneakPreviewDialog.js');
         const sourceCode = fs.readFileSync(filePath, 'utf8');
 
         // Verify that the preserved qualification check is now conditional on !this.isEndOfTurnDialog
@@ -33,7 +33,7 @@ describe('SneakPreviewDialog End-of-Turn Position Qualification Fix', () => {
         // Verify that the constructor properly sets the isEndOfTurnDialog property
         const fs = require('fs');
         const path = require('path');
-        const filePath = path.join(__dirname, '../../../scripts/chat/dialogs/sneak-preview-dialog.js');
+        const filePath = path.join(__dirname, '../../../scripts/chat/dialogs/SneakPreviewDialog.js');
         const sourceCode = fs.readFileSync(filePath, 'utf8');
 
         // Verify the constructor sets isEndOfTurnDialog property
@@ -45,7 +45,7 @@ describe('SneakPreviewDialog End-of-Turn Position Qualification Fix', () => {
         // Verify that _preparePositionDisplay also respects end-of-turn dialog context
         const fs = require('fs');
         const path = require('path');
-        const filePath = path.join(__dirname, '../../../scripts/chat/dialogs/sneak-preview-dialog.js');
+        const filePath = path.join(__dirname, '../../../scripts/chat/dialogs/SneakPreviewDialog.js');
         const sourceCode = fs.readFileSync(filePath, 'utf8');
 
         // Verify the _preparePositionDisplay function has end-of-turn logic with live qualification recalculation

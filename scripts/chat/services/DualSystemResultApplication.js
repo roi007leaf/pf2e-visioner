@@ -5,7 +5,7 @@
  */
 
 import autoCoverSystem from '../../cover/auto-cover/AutoCoverSystem.js';
-import AvsOverrideManager from './infra/avs-override-manager.js';
+import AvsOverrideManager from './infra/AvsOverrideManager.js';
 import * as SharedUtils from './infra/shared-utils.js';
 
 class DualSystemResultApplication {
@@ -201,7 +201,7 @@ class DualSystemResultApplication {
         options,
       });
 
-      // Sneaky feat effects are now handled by turn-sneak-tracker.js service
+      // Sneaky feat effects are now handled by TurnSneakTracker.js service
       // No additional effect application needed here
 
       applicationResult.success = applicationResult.errors.length === 0;
@@ -297,7 +297,7 @@ class DualSystemResultApplication {
   }
 
   // Removed incorrect Sneaky feat effect methods
-  // Turn-based feat mechanics are handled by turn-sneak-tracker.js service
+  // Turn-based feat mechanics are handled by TurnSneakTracker.js service
 }
 
 const dualSystemApplication = new DualSystemResultApplication();

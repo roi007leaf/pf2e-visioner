@@ -4,7 +4,7 @@ import '../../setup.js';
 let FeatsHandler;
 
 beforeAll(() => {
-    const mod = require('../../../scripts/chat/services/feats-handler.js');
+    const mod = require('../../../scripts/chat/services/FeatsHandler.js');
     FeatsHandler = mod.FeatsHandler || mod.default || mod;
 });
 
@@ -61,7 +61,7 @@ describe('FeatsHandler - multiple Terrain Stalker feats', () => {
                     getMatchingEnvironmentRegions: jest.fn().mockReturnValue([]),
                 },
             }));
-            const mod2 = require('../../../scripts/chat/services/feats-handler.js');
+            const mod2 = require('../../../scripts/chat/services/FeatsHandler.js');
             const FH = mod2.FeatsHandler || mod2.default || mod2;
             const base = { startQualifies: false, endQualifies: false };
             const result = FH.overridePrerequisites(token, base, { action: 'sneak' });
@@ -92,7 +92,7 @@ describe('FeatsHandler - multiple Terrain Stalker feats', () => {
                 },
             }));
 
-            const mod2 = require('../../../scripts/chat/services/feats-handler.js');
+            const mod2 = require('../../../scripts/chat/services/FeatsHandler.js');
             const FH = mod2.FeatsHandler || mod2.default || mod2;
 
             const base = { startQualifies: false, endQualifies: false };

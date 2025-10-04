@@ -280,7 +280,7 @@ export class OverrideValidationDialog extends foundry.applications.api.Handlebar
       const toRemove = this.invalidOverrides.filter(o => group === 'observer' ? o.observerId === moved : o.targetId === moved);
       for (const override of toRemove) {
         try {
-          const { default: AvsOverrideManager } = await import('../chat/services/infra/avs-override-manager.js');
+          const { default: AvsOverrideManager } = await import('../chat/services/infra/AvsOverrideManager.js');
           await AvsOverrideManager.removeOverride(override.observerId, override.targetId);
         } catch (err) {
           console.error('PF2E Visioner | Error removing override:', err);
@@ -294,7 +294,7 @@ export class OverrideValidationDialog extends foundry.applications.api.Handlebar
       ui.notifications.info(`Accepted ${toRemove.length} change(s) in ${group} table`);
       if (!this.invalidOverrides.length) {
         setTimeout(() => this.close(), 300);
-        try { const { default: indicator } = await import('./override-validation-indicator.js'); indicator.hide(); } catch { }
+        try { const { default: indicator } = await import('./OverrideValidationIndicator.js'); indicator.hide(); } catch { }
       }
     } catch (e) {
       console.error('PF2E Visioner | Error during group clear:', e);
@@ -339,7 +339,7 @@ export class OverrideValidationDialog extends foundry.applications.api.Handlebar
       if (this.invalidOverrides.length === 0) {
         setTimeout(() => this.close(), 1000);
         try {
-          const { default: indicator } = await import('./override-validation-indicator.js');
+          const { default: indicator } = await import('./OverrideValidationIndicator.js');
           indicator.hide();
         } catch { }
       }
@@ -366,7 +366,7 @@ export class OverrideValidationDialog extends foundry.applications.api.Handlebar
       const target = canvas.tokens?.get(override.targetId);
 
       if (observer && target) {
-        const { default: AvsOverrideManager } = await import('../chat/services/infra/avs-override-manager.js');
+        const { default: AvsOverrideManager } = await import('../chat/services/infra/AvsOverrideManager.js');
         await AvsOverrideManager.removeOverride(override.observerId, override.targetId);
 
         // Remove from the dialog's data
@@ -395,7 +395,7 @@ export class OverrideValidationDialog extends foundry.applications.api.Handlebar
         if (this.invalidOverrides.length === 0) {
           setTimeout(() => this.close(), 1000);
           try {
-            const { default: indicator } = await import('./override-validation-indicator.js');
+            const { default: indicator } = await import('./OverrideValidationIndicator.js');
             indicator.hide();
           } catch { }
         }
@@ -416,7 +416,7 @@ export class OverrideValidationDialog extends foundry.applications.api.Handlebar
     // Remove all invalid overrides
     for (const override of this.invalidOverrides) {
       try {
-        const { default: AvsOverrideManager } = await import('../chat/services/infra/avs-override-manager.js');
+        const { default: AvsOverrideManager } = await import('../chat/services/infra/AvsOverrideManager.js');
         await AvsOverrideManager.removeOverride(override.observerId, override.targetId);
       } catch (error) {
         console.error('PF2E Visioner | Error removing override:', error);
@@ -425,7 +425,7 @@ export class OverrideValidationDialog extends foundry.applications.api.Handlebar
 
     ui.notifications.info(`Accepted ${this.invalidOverrides.length} change(s)`);
     try {
-      const { default: indicator } = await import('./override-validation-indicator.js');
+      const { default: indicator } = await import('./OverrideValidationIndicator.js');
       indicator.hide();
     } catch { }
   }
@@ -435,7 +435,7 @@ export class OverrideValidationDialog extends foundry.applications.api.Handlebar
     await this.close();
     ui.notifications.info('Rejected all AVS changes');
     try {
-      const { default: indicator } = await import('./override-validation-indicator.js');
+      const { default: indicator } = await import('./OverrideValidationIndicator.js');
       indicator.hide();
     } catch { }
   }

@@ -18,7 +18,7 @@ describe('ConsequencesPreviewDialog - AVS Tag Display', () => {
         };
         global.game = mockGame;
 
-        const dialogModule = await import('../../../scripts/chat/dialogs/consequences-preview-dialog.js');
+        const dialogModule = await import('../../../scripts/chat/dialogs/ConsequencesPreviewDialog.js');
         ConsequencesPreviewDialog = dialogModule.ConsequencesPreviewDialog;
     });
 

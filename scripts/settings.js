@@ -461,7 +461,7 @@ export function registerSettings() {
         settingConfig.onChange = async (value) => {
           try {
             const { initializeHoverTooltips, cleanupHoverTooltips } = await import(
-              './services/hover-tooltips.js'
+              './services/HoverTooltips.js'
             );
             if (value) initializeHoverTooltips();
             else cleanupHoverTooltips();
@@ -511,7 +511,7 @@ export function registerSettings() {
         // No reload: will take effect on next hover; ensure initialized when allowed
         settingConfig.onChange = async () => {
           try {
-            const { initializeHoverTooltips } = await import('./services/hover-tooltips.js');
+            const { initializeHoverTooltips } = await import('./services/HoverTooltips.js');
             if (
               game.settings.get(MODULE_ID, 'enableHoverTooltips') &&
               game.settings.get(MODULE_ID, 'allowPlayerTooltips')
@@ -615,7 +615,7 @@ export function registerSettings() {
         // Live-apply by refreshing indicator styles
         settingConfig.onChange = async () => {
           try {
-            const { default: indicator } = await import('./ui/override-validation-indicator.js');
+            const { default: indicator } = await import('./ui/OverrideValidationIndicator.js');
             indicator.refreshStyles?.();
           } catch {
             /* noop */
@@ -684,7 +684,7 @@ export function registerKeybindings() {
       case 'openQuickPanel':
         keybindingConfig.onDown = async () => {
           try {
-            const { VisionerQuickPanel } = await import('./managers/quick-panel.js');
+            const { VisionerQuickPanel } = await import('./managers/QuickPanel.js');
             const existing =
               VisionerQuickPanel.current ||
               Object.values(ui.windows || {}).find((w) => w instanceof VisionerQuickPanel) ||
@@ -725,11 +725,11 @@ export function registerKeybindings() {
         break;
       case 'toggleObserverMode':
         keybindingConfig.onDown = async () => {
-          const { setTooltipMode } = await import('./services/hover-tooltips.js');
+          const { setTooltipMode } = await import('./services/HoverTooltips.js');
           setTooltipMode('observer');
         };
         keybindingConfig.onUp = async () => {
-          const { setTooltipMode } = await import('./services/hover-tooltips.js');
+          const { setTooltipMode } = await import('./services/HoverTooltips.js');
           setTooltipMode('target');
         };
         break;
@@ -737,7 +737,7 @@ export function registerKeybindings() {
         keybindingConfig.onDown = async () => {
           try {
             const { HoverTooltips, showAutoCoverComputedOverlay, hideAutoCoverComputedOverlay } =
-              await import('./services/hover-tooltips.js');
+              await import('./services/HoverTooltips.js');
             // Decide source token: hovered or first controlled
             let token = HoverTooltips.currentHoveredToken;
             if (!token) token = canvas.tokens.controlled?.[0] || null;
@@ -749,14 +749,14 @@ export function registerKeybindings() {
         };
         keybindingConfig.onUp = async () => {
           try {
-            const { hideAutoCoverComputedOverlay } = await import('./services/hover-tooltips.js');
+            const { hideAutoCoverComputedOverlay } = await import('./services/HoverTooltips.js');
             hideAutoCoverComputedOverlay();
           } catch { }
         };
         break;
       case 'openWallManager':
         keybindingConfig.onDown = async () => {
-          const { VisionerWallManager } = await import('./managers/wall-manager/wall-manager.js');
+          const { VisionerWallManager } = await import('./managers/wall-manager/WallManager.js');
           // If already open, bring to front; else open new
           const existing =
             Object.values(ui.windows || {}).find((w) => w instanceof VisionerWallManager) || null;

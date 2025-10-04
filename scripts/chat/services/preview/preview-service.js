@@ -42,7 +42,7 @@ export async function previewActionResults(actionData) {
 
           // Prevent duplicate seek dialogs by closing any existing one first
           try {
-            const { SeekPreviewDialog } = await import('../../dialogs/seek-preview-dialog.js');
+            const { SeekPreviewDialog } = await import('../../dialogs/SeekPreviewDialog.js');
             // Check if there's already a seek dialog open and close it
             if (SeekPreviewDialog.currentSeekDialog) {
               await SeekPreviewDialog.currentSeekDialog.close();
@@ -55,7 +55,7 @@ export async function previewActionResults(actionData) {
           }
 
           const { SeekActionHandler } = await import('../actions/seek-action.js');
-          const { SeekPreviewDialog } = await import('../../dialogs/seek-preview-dialog.js');
+          const { SeekPreviewDialog } = await import('../../dialogs/SeekPreviewDialog.js');
           const handler = new SeekActionHandler();
           await handler.ensurePrerequisites(actionData);
 
@@ -99,7 +99,7 @@ export async function previewActionResults(actionData) {
       }
       case 'point-out': {
         const { PointOutActionHandler } = await import('../actions/point-out-action.js');
-        const { PointOutPreviewDialog } = await import('../../dialogs/point-out-preview-dialog.js');
+        const { PointOutPreviewDialog } = await import('../../dialogs/PointOutPreviewDialog.js');
         const handler = new PointOutActionHandler();
         const subjects = await handler.discoverSubjects(actionData);
 
@@ -116,8 +116,8 @@ export async function previewActionResults(actionData) {
         return;
       }
       case 'hide': {
-        const { HideActionHandler } = await import('../actions/hide-action.js');
-        const { HidePreviewDialog } = await import('../../dialogs/hide-preview-dialog.js');
+        const { HideActionHandler } = await import('../actions/HideAction.js');
+        const { HidePreviewDialog } = await import('../../dialogs/HidePreviewDialog.js');
         const handler = new HideActionHandler();
         await handler.ensurePrerequisites(actionData);
         try {
@@ -145,7 +145,7 @@ export async function previewActionResults(actionData) {
       }
       case 'sneak': {
         const { SneakActionHandler } = await import('../actions/sneak-action.js');
-        const { SneakPreviewDialog } = await import('../../dialogs/sneak-preview-dialog.js');
+        const { SneakPreviewDialog } = await import('../../dialogs/SneakPreviewDialog.js');
         const handler = new SneakActionHandler();
 
         // Mark as preview-only to prevent side effects like setting sneak flags or creating effects
@@ -220,7 +220,7 @@ export async function previewActionResults(actionData) {
       case 'create-a-diversion': {
         const { DiversionActionHandler } = await import('../actions/diversion-action.js');
         const { CreateADiversionPreviewDialog } = await import(
-          '../../dialogs/create-a-diversion-preview-dialog.js'
+          '../../dialogs/CreateADiversionPreviewDialog.js'
         );
         const handler = new DiversionActionHandler();
         const subjects = await handler.discoverSubjects({ ...actionData, ignoreAllies: false });
@@ -236,7 +236,7 @@ export async function previewActionResults(actionData) {
       case 'take-cover': {
         const { TakeCoverActionHandler } = await import('../actions/take-cover-action.js');
         const { TakeCoverPreviewDialog } = await import(
-          '../../dialogs/take-cover-preview-dialog.js'
+          '../../dialogs/TakeCoverPreviewDialog.js'
         );
         const handler = new TakeCoverActionHandler();
         const subjects = await handler.discoverSubjects({ ...actionData, ignoreAllies: false });
@@ -250,7 +250,7 @@ export async function previewActionResults(actionData) {
       case 'consequences': {
         const { ConsequencesActionHandler } = await import('../actions/consequences-action.js');
         const { ConsequencesPreviewDialog } = await import(
-          '../../dialogs/consequences-preview-dialog.js'
+          '../../dialogs/ConsequencesPreviewDialog.js'
         );
         const handler = new ConsequencesActionHandler();
 

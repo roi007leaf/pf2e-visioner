@@ -2,7 +2,7 @@
 import { registerKeybindings, registerSettings } from './settings.js';
 
 // Import detection wrapper
-import { initializeDetectionWrapper } from './services/detection-wrapper.js';
+import { initializeDetectionWrapper } from './services/DetectionWrapper.js';
 
 // Import hooks
 import { registerHooks } from './hooks.js';
@@ -12,7 +12,7 @@ import { initializeDialogScrollFix } from './services/dialog-scroll-fix.js';
 // Import rule elements
 import { initializeRuleElements } from './rule-elements/index.js';
 // Import cover visualization
-import { initCoverVisualization } from './cover/cover-visualization.js';
+import { initCoverVisualization } from './cover/CoverVisualization.js';
 // Import region behavior registration (executes immediately)
 import './regions/register.js';
 

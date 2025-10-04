@@ -7,7 +7,7 @@
 import { COVER_STATES } from '../../constants.js';
 import autoCoverSystem from '../../cover/auto-cover/AutoCoverSystem.js';
 import { getCoverBetween, getVisibilityBetween } from '../../utils.js';
-import errorHandlingService, { SYSTEM_TYPES } from './infra/error-handling-service.js';
+import errorHandlingService, { SYSTEM_TYPES } from './infra/ErrorHandlingService.js';
 
 /**
  * Simplified system result structure

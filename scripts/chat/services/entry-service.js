@@ -41,7 +41,7 @@ export async function handleRenderChatMessage(message, html) {
       if (!targetId) {
         if (isRecentMessage) {
           try {
-            import('../../../scripts/chat/dialogs/point-out-warning-dialog.js').then(
+            import('../../../scripts/chat/dialogs/PointOutWarningDialog.js').then(
               ({ showPointOutWarningDialog }) => {
                 showPointOutWarningDialog();
               },
@@ -90,7 +90,7 @@ export async function handleRenderChatMessage(message, html) {
       // If no target found, show warning dialog to GM
       if (!targetId && isRecentMessage) {
         try {
-          import('../../../scripts/chat/dialogs/point-out-warning-dialog.js').then(
+          import('../../../scripts/chat/dialogs/PointOutWarningDialog.js').then(
             ({ showPointOutWarningDialog }) => {
               showPointOutWarningDialog(false); // Pass isGM = false since it's for the GM's own action (show player-style message)
             },
@@ -190,7 +190,7 @@ export async function handleRenderChatMessage(message, html) {
 
           if (stillNoTarget) {
             try {
-              import('../../../scripts/chat/dialogs/point-out-warning-dialog.js').then(
+              import('../../../scripts/chat/dialogs/PointOutWarningDialog.js').then(
                 ({ showPointOutWarningDialog }) => {
                   showPointOutWarningDialog(true); // Pass isGM = true
                 },

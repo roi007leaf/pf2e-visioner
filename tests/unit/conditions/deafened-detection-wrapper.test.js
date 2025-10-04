@@ -2,7 +2,7 @@
  * Tests for deafened condition handling in detection wrapper
  */
 
-import { DetectionWrapper } from '../../../scripts/services/detection-wrapper.js';
+import { DetectionWrapper } from '../../../scripts/services/DetectionWrapper.js';
 
 // Mock dependencies
 const mockLibWrapper = {
@@ -28,7 +28,7 @@ global.CONFIG = {
 };
 
 // Import the module functions we want to test
-import '../../../scripts/services/detection-wrapper.js';
+import '../../../scripts/services/DetectionWrapper.js';
 
 describe('Deafened Detection Wrapper', () => {
     let detectionWrapper;

@@ -45,7 +45,7 @@ describe('AvsOverrideManager (AVS overrides lifecycle)', () => {
         __esModule: true,
         setVisibilityBetween: jest.fn().mockResolvedValue(true),
       }));
-      AvsOverrideManager = (await import('../../../scripts/chat/services/infra/avs-override-manager.js')).default;
+      AvsOverrideManager = (await import('../../../scripts/chat/services/infra/AvsOverrideManager.js')).default;
       mockedSetVisibility = (await import('../../../scripts/utils.js')).setVisibilityBetween;
     });
 
@@ -93,7 +93,7 @@ describe('AvsOverrideManager (AVS overrides lifecycle)', () => {
         __esModule: true,
         setVisibilityBetween: jest.fn().mockResolvedValue(true),
       }));
-      AvsOverrideManager = (await import('../../../scripts/chat/services/infra/avs-override-manager.js')).default;
+      AvsOverrideManager = (await import('../../../scripts/chat/services/infra/AvsOverrideManager.js')).default;
       mockedSetVisibility = (await import('../../../scripts/utils.js')).setVisibilityBetween;
     });
 
@@ -135,7 +135,7 @@ describe('AvsOverrideManager (AVS overrides lifecycle)', () => {
         __esModule: true,
         setVisibilityBetween: jest.fn().mockResolvedValue(true),
       }));
-      AvsOverrideManager = (await import('../../../scripts/chat/services/infra/avs-override-manager.js')).default;
+      AvsOverrideManager = (await import('../../../scripts/chat/services/infra/AvsOverrideManager.js')).default;
       mockedSetVisibility = (await import('../../../scripts/utils.js')).setVisibilityBetween;
     });
 
@@ -163,7 +163,7 @@ describe('AvsOverrideManager (AVS overrides lifecycle)', () => {
         __esModule: true,
         setVisibilityBetween: jest.fn().mockResolvedValue(true),
       }));
-      AvsOverrideManager = (await import('../../../scripts/chat/services/infra/avs-override-manager.js')).default;
+      AvsOverrideManager = (await import('../../../scripts/chat/services/infra/AvsOverrideManager.js')).default;
       mockedSetVisibility = (await import('../../../scripts/utils.js')).setVisibilityBetween;
     });
 
@@ -191,7 +191,7 @@ describe('AvsOverrideManager (AVS overrides lifecycle)', () => {
         __esModule: true,
         setVisibilityBetween: jest.fn().mockResolvedValue(true),
       }));
-      AvsOverrideManager = (await import('../../../scripts/chat/services/infra/avs-override-manager.js')).default;
+      AvsOverrideManager = (await import('../../../scripts/chat/services/infra/AvsOverrideManager.js')).default;
       mockedSetVisibility = (await import('../../../scripts/utils.js')).setVisibilityBetween;
     });
 
@@ -217,7 +217,7 @@ describe('AvsOverrideManager (AVS overrides lifecycle)', () => {
         __esModule: true,
         setVisibilityBetween: jest.fn().mockResolvedValue(true),
       }));
-      AvsOverrideManager = (await import('../../../scripts/chat/services/infra/avs-override-manager.js')).default;
+      AvsOverrideManager = (await import('../../../scripts/chat/services/infra/AvsOverrideManager.js')).default;
       mockedSetVisibility = (await import('../../../scripts/utils.js')).setVisibilityBetween;
     });
 
@@ -251,7 +251,7 @@ describe('AvsOverrideManager (AVS overrides lifecycle)', () => {
     canvas.tokens.get.mockImplementation((id) => (id === 'B' ? B : null));
 
     const { default: AvsOverrideManager } = await import(
-      '../../../scripts/chat/services/infra/avs-override-manager.js'
+      '../../../scripts/chat/services/infra/AvsOverrideManager.js'
     );
 
     const result = await AvsOverrideManager.removeOverride('A', 'B');
@@ -261,7 +261,7 @@ describe('AvsOverrideManager (AVS overrides lifecycle)', () => {
 
   test('removeOverride returns false when target missing or flag absent', async () => {
     const { default: AvsOverrideManager } = await import(
-      '../../../scripts/chat/services/infra/avs-override-manager.js'
+      '../../../scripts/chat/services/infra/AvsOverrideManager.js'
     );
 
     canvas.tokens.get.mockReturnValue(null);
@@ -290,7 +290,7 @@ describe('AvsOverrideManager (AVS overrides lifecycle)', () => {
     canvas.tokens.placeables = [T1, T2];
 
     const { default: AvsOverrideManager } = await import(
-      '../../../scripts/chat/services/infra/avs-override-manager.js'
+      '../../../scripts/chat/services/infra/AvsOverrideManager.js'
     );
 
     await AvsOverrideManager.clearAllOverrides();

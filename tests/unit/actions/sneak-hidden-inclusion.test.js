@@ -17,7 +17,7 @@ describe('Sneak hidden-token inclusion', () => {
     });
 
     test('startSneak captures start states for hidden tokens', async () => {
-        const { SneakDialogService } = await import('../../../scripts/chat/services/dialogs/sneak-dialog-service.js');
+        const { SneakDialogService } = await import('../../../scripts/chat/services/dialogs/SneakDialogService.js');
         const message = { id: 'msg1', setFlag: jest.fn(async () => { }), flags: { 'pf2e-visioner': {} } };
         game.messages = { get: jest.fn(() => message) };
 

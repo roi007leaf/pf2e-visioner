@@ -291,7 +291,7 @@ export class ActionHandlerBase {
       // Check if this action type supports dual system application
       if (this.supportsDualSystemApplication && this.supportsDualSystemApplication()) {
         // Use dual system application for enhanced actions like sneak
-        const { default: dualSystemApplication } = await import('../dual-system-result-application.js');
+        const { default: dualSystemApplication } = await import('../DualSystemResultApplication.js');
 
         // Convert outcomes to sneak results format for dual system application
         const sneakResults = this.convertOutcomesToSneakResults(filtered, actionData);

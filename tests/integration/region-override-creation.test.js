@@ -4,7 +4,7 @@
  */
 
 import { jest } from '@jest/globals';
-import AvsOverrideManager from '../../scripts/chat/services/infra/avs-override-manager.js';
+import AvsOverrideManager from '../../scripts/chat/services/infra/AvsOverrideManager.js';
 import { VisibilityRegionBehavior } from '../../scripts/regions/VisibilityRegionBehavior.js';
 import * as visibilityMap from '../../scripts/stores/visibility-map.js';
 

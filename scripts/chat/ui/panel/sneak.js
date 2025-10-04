@@ -1,4 +1,4 @@
-import { FeatsHandler } from '../../services/feats-handler.js';
+import { FeatsHandler } from '../../services/FeatsHandler.js';
 
 function buildSneakDistanceChipHTML(tokenOrActor) {
   try {

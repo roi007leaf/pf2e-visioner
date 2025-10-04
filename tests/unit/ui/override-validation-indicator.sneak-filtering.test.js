@@ -4,7 +4,7 @@
  * Tests the filtering through the public show() method behavior
  */
 
-import { OverrideValidationIndicator } from '../../../scripts/ui/override-validation-indicator.js';
+import { OverrideValidationIndicator } from '../../../scripts/ui/OverrideValidationIndicator.js';
 
 // Mock canvas and tokens
 global.canvas = {

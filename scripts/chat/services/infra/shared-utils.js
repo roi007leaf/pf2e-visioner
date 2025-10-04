@@ -9,7 +9,7 @@ import { refreshEveryonesPerception } from '../../../services/socket.js';
 import { updateTokenVisuals } from '../../../services/visual-effects.js';
 import { setVisibilityBetween } from '../../../utils.js';
 import { VisionAnalyzer } from '../../../visibility/auto-visibility/VisionAnalyzer.js';
-import AvsOverrideManager from './avs-override-manager.js';
+import AvsOverrideManager from './AvsOverrideManager.js';
 import { notify } from './notifications.js';
 
 export async function setAVSPairOverrides(observer, changesByTarget, options = {}) {

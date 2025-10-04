@@ -4,7 +4,7 @@
 
 import { MODULE_ID } from '../constants.js';
 import { AutoCoverHooks } from '../cover/auto-cover/AutoCoverHooks.js';
-import { onHighlightObjects } from '../services/hover-tooltips.js';
+import { onHighlightObjects } from '../services/HoverTooltips.js';
 import { registerChatHooks } from './chat.js';
 import { registerCombatHooks } from './combat.js';
 import { onCanvasReady, onReady } from './lifecycle.js';
@@ -21,7 +21,7 @@ export async function registerHooks() {
 
   // Initialize turn-based sneak tracker for Sneaky/Very Sneaky feats
   try {
-    await import('../chat/services/turn-sneak-tracker.js');
+    await import('../chat/services/TurnSneakTracker.js');
     // The tracker auto-registers its hooks in the constructor
   } catch (error) {
     console.error('PF2E Visioner | Failed to initialize turn sneak tracker:', error);

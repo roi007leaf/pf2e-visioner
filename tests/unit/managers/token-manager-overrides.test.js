@@ -4,11 +4,11 @@
 
 import '../../setup.js';
 
-import { VisionerTokenManager } from '../../../scripts/managers/token-manager/token-manager.js';
+import { VisionerTokenManager } from '../../../scripts/managers/token-manager/TokenManager.js';
 
 // We'll spy on AvsOverrideManager.applyOverrides via dynamic import resolution
 jest.mock(
-  '../../../scripts/chat/services/infra/avs-override-manager.js',
+  '../../../scripts/chat/services/infra/AvsOverrideManager.js',
   () => ({
     __esModule: true,
     default: {
@@ -61,7 +61,7 @@ describe('Token Manager AVS override creation', () => {
   await VisionerTokenManager.applyCurrent.call(manager, {}, {});
 
   // Verify dynamic import spy was called with manual_action source and correct observer
-  const avs = await import('../../../scripts/chat/services/infra/avs-override-manager.js');
+  const avs = await import('../../../scripts/chat/services/infra/AvsOverrideManager.js');
   expect(avs.default.applyOverrides).toHaveBeenCalledTimes(1);
   const [observerArg, mapArg, optionsArg] = avs.default.applyOverrides.mock.calls[0];
   expect(observerArg).toBe(observer);
@@ -98,7 +98,7 @@ describe('Token Manager AVS override creation', () => {
   await VisionerTokenManager.applyCurrent.call(manager, {}, {});
 
   // Verify dynamic import spy was called at least once, with manual_action
-  const avs = await import('../../../scripts/chat/services/infra/avs-override-manager.js');
+  const avs = await import('../../../scripts/chat/services/infra/AvsOverrideManager.js');
   expect(avs.default.applyOverrides).toHaveBeenCalled();
   const someCallHasManual = avs.default.applyOverrides.mock.calls.some(([, , opts]) => opts?.source === 'manual_action');
   expect(someCallHasManual).toBe(true);

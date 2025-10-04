@@ -1,5 +1,5 @@
 import { MODULE_ID } from '../constants.js';
-import { HoverTooltips } from '../services/hover-tooltips.js';
+import { HoverTooltips } from '../services/HoverTooltips.js';
 import { getVisibilityBetween } from '../utils.js';
 import autoCoverSystem from './auto-cover/AutoCoverSystem.js';
 /**

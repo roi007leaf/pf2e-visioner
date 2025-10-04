@@ -5,7 +5,7 @@
 import '../../setup.js';
 
 // Mock FeatsHandler to simulate Terrain Stalker selection and environment
-jest.mock('../../../scripts/chat/services/feats-handler.js', () => ({
+jest.mock('../../../scripts/chat/services/FeatsHandler.js', () => ({
     FeatsHandler: {
         getTerrainStalkerSelection: jest.fn(() => 'underbrush'),
         isEnvironmentActive: jest.fn(() => true),

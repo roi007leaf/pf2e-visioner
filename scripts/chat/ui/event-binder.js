@@ -48,12 +48,12 @@ export function bindAutomationEvents(panel, message, actionData) {
         'apply-now-consequences': applyNowConsequences,
         'apply-now-take-cover': applyNowTakeCover,
         'start-sneak': async (actionData, buttonEl) => {
-          const { SneakDialogService } = await import('../services/dialogs/sneak-dialog-service.js');
+          const { SneakDialogService } = await import('../services/dialogs/SneakDialogService.js');
           const service = new SneakDialogService();
           return service.startSneak(actionData, buttonEl);
         },
         'open-sneak-results': async (actionData) => {
-          const { SneakDialogService } = await import('../services/dialogs/sneak-dialog-service.js');
+          const { SneakDialogService } = await import('../services/dialogs/SneakDialogService.js');
           return SneakDialogService.openSneakResults(actionData);
         },
       };
@@ -210,7 +210,7 @@ export function bindAutomationEvents(panel, message, actionData) {
         // show a no-changes notification and skip applying
         if (action === 'apply-now-hide') {
           try {
-            const { HideActionHandler } = await import('../services/actions/hide-action.js');
+            const { HideActionHandler } = await import('../services/actions/HideAction.js');
             const { filterOutcomesByEncounter } = await import('../services/infra/shared-utils.js');
             const handler = new HideActionHandler();
             await handler.ensurePrerequisites(actionData);

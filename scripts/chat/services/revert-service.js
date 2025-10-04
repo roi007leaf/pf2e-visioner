@@ -2,7 +2,7 @@
 
 import { ConsequencesActionHandler } from './actions/consequences-action.js';
 import { DiversionActionHandler } from './actions/diversion-action.js';
-import { HideActionHandler } from './actions/hide-action.js';
+import { HideActionHandler } from './actions/HideAction.js';
 import { PointOutActionHandler } from './actions/point-out-action.js';
 import { SeekActionHandler } from './actions/seek-action.js';
 import { SneakActionHandler } from './actions/sneak-action.js';

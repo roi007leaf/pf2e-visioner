@@ -7,7 +7,7 @@
 
 // Mocks for modules imported by the indicator during clearAll()
 const mockRemoveOverride = jest.fn().mockResolvedValue(true);
-jest.mock('../../../scripts/chat/services/infra/avs-override-manager.js', () => ({
+jest.mock('../../../scripts/chat/services/infra/AvsOverrideManager.js', () => ({
     __esModule: true,
     default: { removeOverride: (...args) => mockRemoveOverride(...args) },
 }));
@@ -53,7 +53,7 @@ describe('override-validation-indicator clearAll immediate recompute', () => {
         global.canvas.tokens.placeables = [observer, target];
 
         // Import indicator after mocks are set
-        const mod = await import('../../../scripts/ui/override-validation-indicator.js');
+        const mod = await import('../../../scripts/ui/OverrideValidationIndicator.js');
         const indicator = mod.default;
 
         // Prime indicator with one override pair

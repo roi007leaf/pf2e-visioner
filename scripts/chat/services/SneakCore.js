@@ -5,8 +5,8 @@
  */
 
 import { shouldFilterAlly } from './infra/shared-utils.js';
-import simplifiedPositionTracker from './simplified-position-tracker.js';
-import unifiedSystemIntegration from './unified-system-integration.js';
+import simplifiedPositionTracker from './SimplifiedPositionTracker.js';
+import unifiedSystemIntegration from './UnifiedSystemIntegration.js';
 
 /**
  * Unified sneak state data structure
@@ -143,7 +143,7 @@ export class SneakCore {
       const sneakResults = this._convertToSneakResults(outcomes, state);
 
       // Apply using dual system (only visibility changes for sneak)
-      const { default: dualSystemApplication } = await import('./dual-system-result-application.js');
+      const { default: dualSystemApplication } = await import('./DualSystemResultApplication.js');
 
       const result = await dualSystemApplication.applySneakResults(sneakResults, {
         direction: 'observer_to_target',
@@ -176,7 +176,7 @@ export class SneakCore {
     }
 
     try {
-      const { default: dualSystemApplication } = await import('./dual-system-result-application.js');
+      const { default: dualSystemApplication } = await import('./DualSystemResultApplication.js');
       const success = await dualSystemApplication.rollbackTransaction(cachedResult.transactionId);
 
       if (success) {

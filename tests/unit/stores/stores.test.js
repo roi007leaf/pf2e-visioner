@@ -10,7 +10,7 @@ import {
   setVisibilityBetween,
   setVisibilityMap
 } from '../../../scripts/stores/visibility-map.js';
-import { VisibilityOverrideManager } from '../../../scripts/stores/visibility-override-manager.js';
+import { VisibilityOverrideManager } from '../../../scripts/stores/VisibilityOverrideManager.js';
 
 describe('Store Functions', () => {
   test('should import visibility functions', () => {
@@ -408,14 +408,14 @@ describe('VisibilityOverrideManager', () => {
 
 describe('Global VisibilityOverrideManager functions', () => {
   test('should export default manager instance', () => {
-    const defaultManager = require('../../../scripts/stores/visibility-override-manager.js').default;
+    const defaultManager = require('../../../scripts/stores/VisibilityOverrideManager.js').default;
     expect(defaultManager).toBeInstanceOf(VisibilityOverrideManager);
   });
 
   test('should register global debug helper', () => {
     // Re-import to trigger global setup
-    delete require.cache[require.resolve('../../../scripts/stores/visibility-override-manager.js')];
-    require('../../../scripts/stores/visibility-override-manager.js');
+    delete require.cache[require.resolve('../../../scripts/stores/VisibilityOverrideManager.js')];
+    require('../../../scripts/stores/VisibilityOverrideManager.js');
 
   });
 
@@ -427,10 +427,10 @@ describe('Global VisibilityOverrideManager functions', () => {
     jest.useFakeTimers();
 
     // Clear module cache and mock setInterval before importing
-    delete require.cache[require.resolve('../../../scripts/stores/visibility-override-manager.js')];
+    delete require.cache[require.resolve('../../../scripts/stores/VisibilityOverrideManager.js')];
 
     // Import the module - this will execute the setInterval setup
-    const module = require('../../../scripts/stores/visibility-override-manager.js');
+    const module = require('../../../scripts/stores/VisibilityOverrideManager.js');
     const defaultManager = module.default;
 
     // Add test data

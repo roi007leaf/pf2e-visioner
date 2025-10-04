@@ -5,7 +5,7 @@
 // Import test setup first to define global mock functions
 import '../../setup.js';
 
-import { VisionerTokenManager } from '../../../scripts/managers/token-manager/token-manager.js';
+import { VisionerTokenManager } from '../../../scripts/managers/token-manager/TokenManager.js';
 
 // ✅ REMOVED DANGEROUS UTILS.JS MOCK
 // Now using real imports to test actual integration
@@ -670,7 +670,7 @@ describe('VisionerTokenManager', () => {
 
         // Simulate button press - this should actually call the bulk function
         const { VisionerTokenManager } = await import(
-          '../../../scripts/managers/token-manager/token-manager.js'
+          '../../../scripts/managers/token-manager/TokenManager.js'
         );
 
         // Test that the static method exists and can be called
@@ -711,7 +711,7 @@ describe('VisionerTokenManager', () => {
         manager.close = jest.fn(); // Mock close method
 
         const { VisionerTokenManager } = await import(
-          '../../../scripts/managers/token-manager/token-manager.js'
+          '../../../scripts/managers/token-manager/TokenManager.js'
         );
 
         // Test that the static method exists
@@ -744,7 +744,7 @@ describe('VisionerTokenManager', () => {
         manager.close = jest.fn();
 
         const { VisionerTokenManager } = await import(
-          '../../../scripts/managers/token-manager/token-manager.js'
+          '../../../scripts/managers/token-manager/TokenManager.js'
         );
 
         // Test applyBoth method exists and can be called
@@ -787,7 +787,7 @@ describe('VisionerTokenManager', () => {
         };
 
         const { VisionerTokenManager } = await import(
-          '../../../scripts/managers/token-manager/token-manager.js'
+          '../../../scripts/managers/token-manager/TokenManager.js'
         );
 
         expect(typeof VisionerTokenManager.bulkSetCoverState).toBe('function');
@@ -818,7 +818,7 @@ describe('VisionerTokenManager', () => {
         manager.close = jest.fn();
 
         const { VisionerTokenManager } = await import(
-          '../../../scripts/managers/token-manager/token-manager.js'
+          '../../../scripts/managers/token-manager/TokenManager.js'
         );
 
         await VisionerTokenManager.applyCurrent.call(manager, {}, {});

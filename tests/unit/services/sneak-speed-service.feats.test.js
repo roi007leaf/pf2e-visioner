@@ -19,13 +19,13 @@ function actorWithSpeedAndFeats(speed, slugs = []) {
 }
 
 async function importService() {
-  return await import('../../../scripts/chat/services/sneak-speed-service.js');
+  return await import('../../../scripts/chat/services/SneakSpeedService.js');
 }
 
 
 describe('SneakSpeedService feat interactions', () => {
   test('getSneakSpeedMultiplier: default 0.5, full speed with legendary-sneak/swift-sneak', async () => {
-    const { FeatsHandler } = await import('../../../scripts/chat/services/feats-handler.js');
+    const { FeatsHandler } = await import('../../../scripts/chat/services/FeatsHandler.js');
     const a1 = actorWithSpeedAndFeats(30, []);
     const a2 = actorWithSpeedAndFeats(30, ['legendary-sneak']);
     const a3 = actorWithSpeedAndFeats(30, ['swift-sneak']);
@@ -36,7 +36,7 @@ describe('SneakSpeedService feat interactions', () => {
   });
 
   test('getSneakDistanceBonusFeet: +5 with very-sneaky', async () => {
-    const { FeatsHandler } = await import('../../../scripts/chat/services/feats-handler.js');
+    const { FeatsHandler } = await import('../../../scripts/chat/services/FeatsHandler.js');
     const a1 = actorWithSpeedAndFeats(25, []);
     const a2 = actorWithSpeedAndFeats(25, ['very-sneaky']);
 

@@ -375,7 +375,7 @@ export class ConsequencesPreviewDialog extends BaseActionDialog {
     if (effectiveNewState === 'avs') {
       try {
         const { default: AvsOverrideManager } = await import(
-          '../services/infra/avs-override-manager.js'
+          '../services/infra/AvsOverrideManager.js'
         );
         const attackerId = app.actionData?.actor?.document?.id || app.actionData?.actor?.id;
         const observerId = outcome.target.id;
@@ -508,7 +508,7 @@ export class ConsequencesPreviewDialog extends BaseActionDialog {
     if (avsRemovals.length > 0) {
       try {
         const { default: AvsOverrideManager } = await import(
-          '../services/infra/avs-override-manager.js'
+          '../services/infra/AvsOverrideManager.js'
         );
         const attackerId = app.actionData?.actor?.document?.id || app.actionData?.actor?.id;
         if (attackerId) {

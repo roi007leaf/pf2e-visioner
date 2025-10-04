@@ -151,7 +151,7 @@ class OverrideValidationIndicator {
   async openDialog() {
     if (!this._data?.overrides?.length) return;
     try {
-      const { OverrideValidationDialog } = await import('./override-validation-dialog.js');
+      const { OverrideValidationDialog } = await import('./OverrideValidationDialog.js');
       // Expose moved token id for grouping via a global scratch, then show dialog
       try { game.pf2eVisioner = game.pf2eVisioner || {}; game.pf2eVisioner.lastMovedTokenId = this._data.movedTokenId || null; } catch { }
       await OverrideValidationDialog.show(this._data.overrides, this._data.tokenName, this._data.movedTokenId || null);
@@ -166,7 +166,7 @@ class OverrideValidationIndicator {
     const raw = Array.isArray(this._rawOverrides) ? this._rawOverrides : [];
     if (!raw.length) return;
     try {
-      const { default: AvsOverrideManager } = await import('../chat/services/infra/avs-override-manager.js');
+      const { default: AvsOverrideManager } = await import('../chat/services/infra/AvsOverrideManager.js');
       // Track pairs we clear to immediately recompute their natural AVS states
       const affectedPairs = new Set(); // key: `${observerId}-${targetId}`
       for (const { observerId, targetId } of raw) {

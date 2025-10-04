@@ -7,7 +7,7 @@ jest.mock('../../../scripts/visibility/auto-visibility/index.js', () => ({
 }));
 
 // Mock FeatsHandler to properly handle very-very-sneaky feat
-jest.mock('../../../scripts/chat/services/feats-handler.js', () => ({
+jest.mock('../../../scripts/chat/services/FeatsHandler.js', () => ({
   FeatsHandler: {
     isEnvironmentActive: jest.fn().mockReturnValue(false),
     overridePrerequisites: jest.fn().mockImplementation((tokenOrActor, base, extra = {}) => {
@@ -42,7 +42,7 @@ jest.mock('../../../scripts/chat/services/infra/shared-utils.js', () => ({
 describe('SneakPreviewDialog - feat-based end-position relaxation', () => {
   test('very-very-sneaky relaxes end position requirement', async () => {
     // Lazy import to align with module system
-    const mod = require('../../../scripts/chat/dialogs/sneak-preview-dialog.js');
+    const mod = require('../../../scripts/chat/dialogs/SneakPreviewDialog.js');
     const { SneakPreviewDialog } = mod;
 
     // Build a minimal sneaking token with Very, Very Sneaky feat
@@ -111,7 +111,7 @@ describe('SneakPreviewDialog - feat-based end-position relaxation', () => {
 
   test('end-of-turn dialog initializes all filter properties correctly', async () => {
     // Lazy import to align with module system
-    const mod = require('../../../scripts/chat/dialogs/sneak-preview-dialog.js');
+    const mod = require('../../../scripts/chat/dialogs/SneakPreviewDialog.js');
     const { SneakPreviewDialog } = mod;
 
     const sneakingToken = {

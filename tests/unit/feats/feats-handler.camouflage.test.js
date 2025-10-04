@@ -22,7 +22,7 @@ describe('FeatsHandler - Camouflage feat', () => {
     beforeEach(() => {
         jest.resetModules();
         jest.clearAllMocks();
-        const mod = require('../../../scripts/chat/services/feats-handler.js');
+        const mod = require('../../../scripts/chat/services/FeatsHandler.js');
         FeatsHandler = mod.FeatsHandler || mod.default || mod;
         const envMod = require('../../../scripts/utils/environment.js');
         EnvironmentHelper = envMod.default;

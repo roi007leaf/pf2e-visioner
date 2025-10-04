@@ -2,7 +2,7 @@
  * Tests for turn-based sneak tracker (Sneaky and Very Sneaky feats)
  */
 
-import { TurnSneakTracker } from '../../../scripts/chat/services/turn-sneak-tracker.js';
+import { TurnSneakTracker } from '../../../scripts/chat/services/TurnSneakTracker.js';
 
 describe('TurnSneakTracker', () => {
     let tracker;

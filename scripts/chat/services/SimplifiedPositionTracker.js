@@ -4,8 +4,8 @@
  * Uses unified system integration as the single source of truth
  */
 
-import unifiedSystemIntegration from './unified-system-integration.js';
-import errorHandlingService, { SYSTEM_TYPES } from './infra/error-handling-service.js';
+import unifiedSystemIntegration from './UnifiedSystemIntegration.js';
+import errorHandlingService, { SYSTEM_TYPES } from './infra/ErrorHandlingService.js';
 
 /**
  * Simplified position state

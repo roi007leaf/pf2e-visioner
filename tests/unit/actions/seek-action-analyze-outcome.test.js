@@ -324,7 +324,7 @@ describe('SeekActionHandler.analyzeOutcome', () => {
     describe("That's Odd Feat Auto-Detection", () => {
         test('hazard with That\'s Odd feat → auto-detected as observed', async () => {
             // Mock FeatsHandler
-            jest.doMock('../../../scripts/chat/services/feats-handler.js', () => ({
+            jest.doMock('../../../scripts/chat/services/FeatsHandler.js', () => ({
                 FeatsHandler: {
                     hasFeat: jest.fn(() => true),
                     adjustVisibility: jest.fn((action, actor, current, newVis) => newVis),

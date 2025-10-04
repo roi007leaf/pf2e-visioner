@@ -21,14 +21,14 @@ describe('OverrideValidationSystem - movement validation', () => {
       },
     });
     // Mock both resolution variants used by SUTs
-    jest.doMock('../../ui/override-validation-dialog.js', dialogMockModule, { virtual: true });
-    jest.doMock('../../../scripts/ui/override-validation-dialog.js', dialogMockModule, { virtual: true });
+    jest.doMock('../../ui/OverrideValidationDialog.js', dialogMockModule, { virtual: true });
+    jest.doMock('../../../scripts/ui/OverrideValidationDialog.js', dialogMockModule, { virtual: true });
 
     // Mock AvsOverrideManager.removeOverride to observe calls
     const removeOverride = jest.fn().mockResolvedValue(true);
     const avsMgrMockModule = () => ({ __esModule: true, default: { removeOverride } });
-    jest.doMock('../../chat/services/infra/avs-override-manager.js', avsMgrMockModule, { virtual: true });
-    jest.doMock('../../../scripts/chat/services/infra/avs-override-manager.js', avsMgrMockModule, {
+    jest.doMock('../../chat/services/infra/AvsOverrideManager.js', avsMgrMockModule, { virtual: true });
+    jest.doMock('../../../scripts/chat/services/infra/AvsOverrideManager.js', avsMgrMockModule, {
       virtual: true,
     });
 

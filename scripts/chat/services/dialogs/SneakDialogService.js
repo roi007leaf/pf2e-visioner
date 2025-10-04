@@ -6,7 +6,7 @@
 import { SNEAK_FLAGS } from '../../../constants.js';
 import autoCoverSystem from '../../../cover/auto-cover/AutoCoverSystem.js';
 import { getCoverBetween, getVisibilityBetween } from '../../../utils.js';
-import { SneakPreviewDialog } from '../../dialogs/sneak-preview-dialog.js';
+import { SneakPreviewDialog } from '../../dialogs/SneakPreviewDialog.js';
 
 export class SneakDialogService {
   /**
@@ -201,7 +201,7 @@ export class SneakDialogService {
 
       // Apply speed halving while sneaking
       try {
-        const { SneakSpeedService } = await import('../sneak-speed-service.js');
+        const { SneakSpeedService } = await import('../SneakSpeedService.js');
         await SneakSpeedService.applySneakStartEffect(token);
       } catch (speedErr) {
         console.warn('PF2E Visioner | Failed to apply sneak walk speed:', speedErr);

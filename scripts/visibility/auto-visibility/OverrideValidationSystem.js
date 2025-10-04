@@ -323,7 +323,7 @@ export class OverrideValidationSystem {
 
     // Dynamically import the dialog
     try {
-      const { OverrideValidationDialog } = await import('../../ui/override-validation-dialog.js');
+      const { OverrideValidationDialog } = await import('../../ui/OverrideValidationDialog.js');
 
       // Show the dialog and wait for the user's decision
       // Try to provide moved token id/name when available
@@ -343,7 +343,7 @@ export class OverrideValidationSystem {
           case 'clear-all':
             // Remove all overrides
             {
-              const { default: AvsOverrideManager } = await import('../../chat/services/infra/avs-override-manager.js');
+              const { default: AvsOverrideManager } = await import('../../chat/services/infra/AvsOverrideManager.js');
               for (const { observerId, targetId } of invalidOverrides) {
                 await AvsOverrideManager.removeOverride(observerId, targetId);
               }
@@ -355,7 +355,7 @@ export class OverrideValidationSystem {
             // Remove only manual overrides
             let clearedCount = 0;
             {
-              const { default: AvsOverrideManager } = await import('../../chat/services/infra/avs-override-manager.js');
+              const { default: AvsOverrideManager } = await import('../../chat/services/infra/AvsOverrideManager.js');
               for (const { observerId, targetId, override } of invalidOverrides) {
                 if (override.source === 'manual_action') {
                   await AvsOverrideManager.removeOverride(observerId, targetId);
@@ -396,7 +396,7 @@ export class OverrideValidationSystem {
 
         if (result) {
           {
-            const { default: AvsOverrideManager } = await import('../../chat/services/infra/avs-override-manager.js');
+            const { default: AvsOverrideManager } = await import('../../chat/services/infra/AvsOverrideManager.js');
             await AvsOverrideManager.removeOverride(first.observerId, first.targetId);
           }
           ui.notifications.info(`Removed visibility override: ${observer.document.name} → ${target.document.name}`);

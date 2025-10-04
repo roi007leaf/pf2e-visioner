@@ -3,11 +3,11 @@ import autoCoverSystem from '../../../cover/auto-cover/AutoCoverSystem.js';
 import stealthCheckUseCase from '../../../cover/auto-cover/usecases/StealthCheckUseCase.js';
 import { getCoverBetween } from '../../../utils.js';
 import { appliedSneakChangesByMessage } from '../data/message-cache.js';
-import errorHandlingService, { SYSTEM_TYPES } from '../infra/error-handling-service.js';
+import errorHandlingService, { SYSTEM_TYPES } from '../infra/ErrorHandlingService.js';
 import { notify } from '../infra/notifications.js';
 import { calculateStealthRollTotals, shouldFilterAlly } from '../infra/shared-utils.js';
-import sneakCore from '../sneak-core.js';
-import turnSneakTracker from '../turn-sneak-tracker.js';
+import sneakCore from '../SneakCore.js';
+import turnSneakTracker from '../TurnSneakTracker.js';
 import { ActionHandlerBase } from './base-action.js';
 
 export class SneakActionHandler extends ActionHandlerBase {
@@ -138,7 +138,7 @@ export class SneakActionHandler extends ActionHandlerBase {
 
       // Apply Sneaking effect while sneaking
       try {
-        const { SneakSpeedService } = await import('../sneak-speed-service.js');
+        const { SneakSpeedService } = await import('../SneakSpeedService.js');
         await SneakSpeedService.applySneakWalkSpeed(sneakingToken);
       } catch (speedErr) {
         console.warn('PF2E Visioner | Failed to apply sneak walk speed:', speedErr);
@@ -552,7 +552,7 @@ export class SneakActionHandler extends ActionHandlerBase {
       if (coverState || isOverride) {
         // Feat: Ceaseless Shadows upgrades cover from a creature's perspective
         try {
-          const { FeatsHandler } = await import('../feats-handler.js');
+          const { FeatsHandler } = await import('../FeatsHandler.js');
           const upgraded = FeatsHandler.upgradeCoverForCreature(actionData.actor, coverState);
           coverState = upgraded.state;
           var _csCanTakeCover = upgraded.canTakeCover;
@@ -622,7 +622,7 @@ export class SneakActionHandler extends ActionHandlerBase {
     let adjustedOutcome = outcome;
     let featNotes = [];
     try {
-      const { FeatsHandler } = await import('../feats-handler.js');
+      const { FeatsHandler } = await import('../FeatsHandler.js');
 
       const { shift, notes } = FeatsHandler.getOutcomeAdjustment(actionData.actor, 'sneak');
       if (shift) {
@@ -688,7 +688,7 @@ export class SneakActionHandler extends ActionHandlerBase {
         newVisibility = enhancedOutcome.newVisibility;
         // Enforce end-position prerequisite unless a feat removes it
         try {
-          const { FeatsHandler } = await import('../feats-handler.js');
+          const { FeatsHandler } = await import('../FeatsHandler.js');
           const skip = FeatsHandler.shouldSkipEndCoverRequirement(actionData.actor, 'sneak');
           if (!skip) {
             const endCover = positionTransition?.endPosition?.coverState;
@@ -700,7 +700,7 @@ export class SneakActionHandler extends ActionHandlerBase {
         } catch { }
         // Feat-based post visibility adjustments (e.g., Vanish into the Land)
         try {
-          const { FeatsHandler } = await import('../feats-handler.js');
+          const { FeatsHandler } = await import('../FeatsHandler.js');
           const inNatural = (() => {
             try {
               return FeatsHandler.isEnvironmentActive(actionData.actor, 'natural');
@@ -725,7 +725,7 @@ export class SneakActionHandler extends ActionHandlerBase {
         newVisibility = getDefaultNewStateFor('sneak', current, adjustedOutcome) || current;
         // Feat-based post visibility adjustments
         try {
-          const { FeatsHandler } = await import('../feats-handler.js');
+          const { FeatsHandler } = await import('../FeatsHandler.js');
           const inNatural = (() => {
             try {
               return FeatsHandler.isEnvironmentActive(actionData.actor, 'natural');
@@ -755,7 +755,7 @@ export class SneakActionHandler extends ActionHandlerBase {
       newVisibility = getDefaultNewStateFor('sneak', current, adjustedOutcome) || current;
       // Feat-based post visibility adjustments
       try {
-        const { FeatsHandler } = await import('../feats-handler.js');
+        const { FeatsHandler } = await import('../FeatsHandler.js');
         const inNatural = (() => {
           try {
             return FeatsHandler.isEnvironmentActive(actionData.actor, 'natural');
@@ -952,7 +952,7 @@ export class SneakActionHandler extends ActionHandlerBase {
    */
   async _checkTerrainStalkerFreeSneak(actionData, subject) {
     try {
-      const { TerrainStalkerService } = await import('../feats/terrain-stalker.js');
+      const { TerrainStalkerService } = await import('../feats/TerrainStalker.js');
       return await TerrainStalkerService.checkFreeSneak(actionData, subject, {
         discoverSubjects: (ad) => this.discoverSubjects(ad),
         sneakCore: this.sneakCore,
@@ -1184,7 +1184,7 @@ export class SneakActionHandler extends ActionHandlerBase {
 
     // Allow feats to override prerequisites (e.g., Legendary Sneak, Distracting Shadows)
     try {
-      const { FeatsHandler } = await import('../feats-handler.js');
+      const { FeatsHandler } = await import('../FeatsHandler.js');
       const acting = this._getSneakingToken?.(actionData) || actionData?.actor || null;
       const inNatural = (() => {
         try {
@@ -1223,7 +1223,7 @@ export class SneakActionHandler extends ActionHandlerBase {
         await actionData.sneakingToken.document.unsetFlag('pf2e-visioner', 'sneak-active');
         // Restore walk speed after sneak ends
         try {
-          const { SneakSpeedService } = await import('../sneak-speed-service.js');
+          const { SneakSpeedService } = await import('../SneakSpeedService.js');
           await SneakSpeedService.restoreSneakWalkSpeed(actionData.sneakingToken);
         } catch (speedErr) {
           console.warn('PF2E Visioner | Failed to restore sneak walk speed:', speedErr);
@@ -1235,14 +1235,14 @@ export class SneakActionHandler extends ActionHandlerBase {
   }
 
   // Removed incorrect Sneaky feat effect application
-  // The correct feat mechanics are now handled by turn-sneak-tracker.js
+  // The correct feat mechanics are now handled by TurnSneakTracker.js
 
   // Removed incorrect Sneaky feat effect methods
-  // The correct feat mechanics (turn-based consecutive sneaks) are handled by turn-sneak-tracker.js
+  // The correct feat mechanics (turn-based consecutive sneaks) are handled by TurnSneakTracker.js
 
   // All Sneaky feat helper methods removed - they implemented incorrect mechanics
   // The correct feat mechanics (turn-based consecutive sneaks with deferred end-position checks)
-  // are handled by the turn-sneak-tracker.js service
+  // are handled by the TurnSneakTracker.js service
 
   /**
    * Check if an actor has the Sneak Adept feat

@@ -3,7 +3,7 @@
 // constants import not required in this module after helper removal
 import { ConsequencesActionHandler } from './actions/consequences-action.js';
 import { DiversionActionHandler } from './actions/diversion-action.js';
-import { HideActionHandler } from './actions/hide-action.js';
+import { HideActionHandler } from './actions/HideAction.js';
 import { PointOutActionHandler } from './actions/point-out-action.js';
 import { SeekActionHandler } from './actions/seek-action.js';
 import { SneakActionHandler } from './actions/sneak-action.js';
@@ -28,7 +28,7 @@ export async function applyNowSneak(actionData, button) {
   try {
     // For sneak actions, use the dual system application singleton instead of the old handler
     // The module exports a default singleton instance
-    const dualModule = await import('./dual-system-result-application.js');
+    const dualModule = await import('./DualSystemResultApplication.js');
     const dualSystemApplication = dualModule.default;
 
     // Get the cached outcomes from the action handler
@@ -87,7 +87,7 @@ export async function applyNowSneak(actionData, button) {
           await sneakingToken.document.unsetFlag('pf2e-visioner', 'sneak-active');
           // Restore walk speed and remove sneaking effect
           try {
-            const { SneakSpeedService } = await import('./sneak-speed-service.js');
+            const { SneakSpeedService } = await import('./SneakSpeedService.js');
             await SneakSpeedService.restoreSneakWalkSpeed(sneakingToken);
           } catch (speedErr) {
             console.warn('PF2E Visioner | Failed to restore sneak walk speed:', speedErr);

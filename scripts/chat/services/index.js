@@ -17,7 +17,7 @@ export * from './ui/ui-injector.js';
 export * from './actions/base-action.js';
 export * from './actions/consequences-action.js';
 export * from './actions/diversion-action.js';
-export * from './actions/hide-action.js';
+export * from './actions/HideAction.js';
 export * from './actions/point-out-action.js';
 export * from './actions/seek-action.js';
 // Temporarily disabled old sneak system to use new state-based approach

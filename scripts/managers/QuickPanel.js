@@ -1,4 +1,4 @@
-import AvsOverrideManager from '../chat/services/infra/avs-override-manager.js';
+import AvsOverrideManager from '../chat/services/infra/AvsOverrideManager.js';
 import { COVER_STATES, VISIBILITY_STATES } from '../constants.js';
 import { setCoverBetween, setVisibilityBetween } from '../utils.js';
 

@@ -254,7 +254,7 @@ describe('Sneak Action Comprehensive Tests', () => {
       const targetTokenId = 'observer1';
       const targetOutcome = mockOutcomes.find((o) => o.token.id === targetTokenId);
 
-      // Simulate sneak dialog per-row revert logic (from sneak-preview-dialog.js)
+      // Simulate sneak dialog per-row revert logic (from SneakPreviewDialog.js)
       const revertVisibility = targetOutcome.oldVisibility || targetOutcome.currentVisibility;
       const changes = [{ target: targetOutcome.token, newVisibility: revertVisibility }];
 

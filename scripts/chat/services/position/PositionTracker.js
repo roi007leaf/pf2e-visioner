@@ -7,7 +7,7 @@
 // import { getVisibilityBetween } from '../../../utils.js';
 import { LightingCalculator } from '../../../visibility/auto-visibility/LightingCalculator.js';
 import { visibilityCalculator } from '../../../visibility/auto-visibility/VisibilityCalculator.js';
-import errorHandlingService, { SYSTEM_TYPES } from '../infra/error-handling-service.js';
+import errorHandlingService, { SYSTEM_TYPES } from '../infra/ErrorHandlingService.js';
 import dualSystemIntegration from './DualSystemIntegration.js';
 import performanceOptimizer from './PerformanceOptimizer.js';
 import positionCacheManager from './PositionCacheManager.js';

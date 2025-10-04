@@ -184,7 +184,7 @@ export class ConsequencesActionHandler extends ActionHandlerBase {
 
   async #removeOverridesForConsequences(attacker, observers) {
     const removed = [];
-    const { default: AvsOverrideManager } = await import('../infra/avs-override-manager.js');
+    const { default: AvsOverrideManager } = await import('../infra/AvsOverrideManager.js');
     for (const obs of observers) {
       try {
         const obsId = obs?.document?.id;
@@ -219,7 +219,7 @@ export class ConsequencesActionHandler extends ActionHandlerBase {
         await this.#removeOverridesForConsequences(attacker, subjects);
 
         // 3. Create new AVS overrides based on the visibility changes
-        const { default: AvsOverrideManager } = await import('../infra/avs-override-manager.js');
+        const { default: AvsOverrideManager } = await import('../infra/AvsOverrideManager.js');
         let overridesCreated = 0;
 
         // Get outcomes and apply any UI overrides
@@ -277,7 +277,7 @@ export class ConsequencesActionHandler extends ActionHandlerBase {
         // 4. Refresh override validation indicator
         try {
           const { default: indicator } = await import(
-            '../../../../scripts/ui/override-validation-indicator.js'
+            '../../../../scripts/ui/OverrideValidationIndicator.js'
           );
           const allTokens = canvas.tokens?.placeables || [];
           const remaining = [];
@@ -442,7 +442,7 @@ export class ConsequencesActionHandler extends ActionHandlerBase {
           return;
         }
 
-        const { default: AvsOverrideManager } = await import('../infra/avs-override-manager.js');
+        const { default: AvsOverrideManager } = await import('../infra/AvsOverrideManager.js');
         let actionsPerformed = 0;
 
         // 1. Remove newly created overrides

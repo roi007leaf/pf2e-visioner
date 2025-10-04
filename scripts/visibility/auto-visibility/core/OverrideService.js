@@ -31,7 +31,7 @@ export class OverrideService {
     getActiveOverrideForTokens(observer, target) {
         try {
             // Use dynamic require to avoid ESM async import in hot paths; tests can mock this module.
-            const mod = (0, eval)('require')('../../chat/services/infra/avs-override-manager.js');
+            const mod = (0, eval)('require')('../../chat/services/infra/AvsOverrideManager.js');
             const AvsOverrideManager = mod?.default;
             // Manager API is async (getOverride), but we cannot await here in hot path.
             // Try using a sync helper if present; otherwise return null and let legacy flags handle it.

@@ -615,7 +615,7 @@ export function registerUIHooks() {
           button: true,
           onChange: async () => {
             const { VisionerWallManager } = await import(
-              '../managers/wall-manager/wall-manager.js'
+              '../managers/wall-manager/WallManager.js'
             );
             new VisionerWallManager().render(true);
           },
@@ -746,7 +746,7 @@ export function registerUIHooks() {
             button: true,
             onChange: async () => {
               try {
-                const { VisionerQuickPanel } = await import('../managers/quick-panel.js');
+                const { VisionerQuickPanel } = await import('../managers/QuickPanel.js');
                 if (!game.user?.isGM) return;
                 new VisionerQuickPanel({}).render(true);
               } catch { }
@@ -839,7 +839,7 @@ export function registerUIHooks() {
               if (selectedTokens.length > 0) {
                 // Tokens selected - offer to clear all selected tokens' data
                 const tokenNames = selectedTokens.map((t) => t.name).join(', ');
-                const { VisionerConfirmDialog } = await import('../ui/dialogs/confirm-dialog.js');
+                const { VisionerConfirmDialog } = await import('../ui/dialogs/ConfirmDialog.js');
                 const confirmed = await VisionerConfirmDialog.confirm({
                   title: 'PF2E Visioner',
                   content: `<p>Clear all PF2E Visioner data for <strong>${selectedTokens.length === 1 ? tokenNames : `${selectedTokens.length} selected tokens`}</strong>? This will reset all visibility and cover relationships for ${selectedTokens.length === 1 ? 'this token' : 'all selected tokens'}.</p>`,
@@ -853,7 +853,7 @@ export function registerUIHooks() {
                 await api.clearAllDataForSelectedTokens(selectedTokens);
               } else {
                 // No tokens or multiple tokens selected - offer to clear entire scene
-                const { VisionerConfirmDialog } = await import('../ui/dialogs/confirm-dialog.js');
+                const { VisionerConfirmDialog } = await import('../ui/dialogs/ConfirmDialog.js');
                 const confirmed = await VisionerConfirmDialog.confirm({
                   title: 'PF2E Visioner',
                   content: `<p>Clear all PF2E Visioner data for this scene? This cannot be undone.</p>`,
@@ -952,7 +952,7 @@ export function registerUIHooks() {
                 refreshDarknessTool();
                 ui.controls.render(true);
               };
-              const { DarknessModeDialog } = await import('../ui/dialogs/darkness-mode-dialog.js');
+              const { DarknessModeDialog } = await import('../ui/dialogs/DarknessModeDialog.js');
               const choice = await DarknessModeDialog.choose();
               if (!choice) return;
 
@@ -1224,7 +1224,7 @@ function onRenderWallConfig(app, html) {
           ev.preventDefault();
           ev.stopPropagation();
           const { VisionerWallQuickSettings } = await import(
-            '../managers/wall-manager/wall-quick.js'
+            '../managers/wall-manager/WallQuick.js'
           );
           new VisionerWallQuickSettings(app.document).render(true);
         });

@@ -921,7 +921,7 @@ export class SeekPreviewDialog extends BaseActionDialog {
     if (avsRemovals.length > 0) {
       try {
         const { default: AvsOverrideManager } = await import(
-          '../services/infra/avs-override-manager.js'
+          '../services/infra/AvsOverrideManager.js'
         );
         const observerId = app.actionData?.actor?.document?.id || app.actionData?.actor?.id;
         if (observerId) {
@@ -1044,7 +1044,7 @@ export class SeekPreviewDialog extends BaseActionDialog {
         if (effectiveNewState === 'avs') {
           try {
             const { default: AvsOverrideManager } = await import(
-              '../services/infra/avs-override-manager.js'
+              '../services/infra/AvsOverrideManager.js'
             );
             const observerId = app.actionData?.actor?.document?.id || app.actionData?.actor?.id;
             if (observerId) {
@@ -1099,7 +1099,7 @@ export class SeekPreviewDialog extends BaseActionDialog {
       if (!outcome._isWall) {
         try {
           const { default: AvsOverrideManager } = await import(
-            '../services/infra/avs-override-manager.js'
+            '../services/infra/AvsOverrideManager.js'
           );
           const observerId = app.actionData?.actor?.document?.id || app.actionData?.actor?.id;
           if (observerId && outcome.target?.id) {

@@ -3,7 +3,7 @@ import { getVisibilityStateConfig } from '../services/data/visibility-states.js'
 import '../services/hbs-helpers.js';
 import { notify } from '../services/infra/notifications.js';
 import { filterOutcomesByEncounter, hasActiveEncounter } from '../services/infra/shared-utils.js';
-import { BasePreviewDialog } from './base-preview-dialog.js';
+import { BasePreviewDialog } from './BasePreviewDialog.js';
 
 export class BaseActionDialog extends BasePreviewDialog {
   constructor(options = {}) {
@@ -628,7 +628,7 @@ export class BaseActionDialog extends BasePreviewDialog {
     if (effectiveNewState === 'avs') {
       try {
         const { default: AvsOverrideManager } = await import(
-          '../services/infra/avs-override-manager.js'
+          '../services/infra/AvsOverrideManager.js'
         );
         const actorId = app.actionData?.actor?.document?.id || app.actionData?.actor?.id;
         const targetId = outcome.target?.id || outcome.token?.id || tokenId;
@@ -761,7 +761,7 @@ export class BaseActionDialog extends BasePreviewDialog {
       // We check if an override exists rather than checking state differences
       if (!wallId) {
         try {
-          const { default: AvsOverrideManager } = await import('../../services/infra/avs-override-manager.js');
+          const { default: AvsOverrideManager } = await import('../../services/infra/AvsOverrideManager.js');
           const actorId = app.actionData?.actor?.document?.id || app.actionData?.actor?.id;
           const targetId = outcome.target?.id || outcome.token?.id || tokenId;
 
@@ -874,7 +874,7 @@ export class BaseActionDialog extends BasePreviewDialog {
       if (avsRemovals.length > 0) {
         try {
           const { default: AvsOverrideManager } = await import(
-            '../services/infra/avs-override-manager.js'
+            '../services/infra/AvsOverrideManager.js'
           );
           const actorId = app.actionData?.actor?.document?.id || app.actionData?.actor?.id;
           if (actorId) {
@@ -982,7 +982,7 @@ export class BaseActionDialog extends BasePreviewDialog {
 
       if (actorId) {
         try {
-          const { default: AvsOverrideManager } = await import('../../services/infra/avs-override-manager.js');
+          const { default: AvsOverrideManager } = await import('../../services/infra/AvsOverrideManager.js');
           // Determine the correct direction based on the action semantics
           const direction = app.getApplyDirection?.() || 'observer_to_target';
 
