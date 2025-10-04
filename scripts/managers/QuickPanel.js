@@ -188,20 +188,37 @@ export class VisionerQuickPanel extends foundry.applications.api.ApplicationV2 {
       }
     }
     try {
-      for (const [obs, tgt] of pairs) {
-        // First, set AVS overrides so auto-visibility won't fight manual edits
-        try {
-          await AvsOverrideManager.applyOverrides(obs, { target: tgt, state }, {
-            source: 'manual_action',
-          });
-        } catch (e) {
-          console.warn('[pf2e-visioner] quick panel: failed to set AVS overrides', e);
+      if (state === 'avs') {
+        for (const [obs, tgt] of pairs) {
+          try {
+            await AvsOverrideManager.removeOverride(obs.document.id, tgt.document.id);
+          } catch (e) {
+            console.warn('[pf2e-visioner] quick panel: failed to remove AVS override', e);
+          }
         }
+        ui.notifications?.info?.(`AVS will now control visibility for ${pairs.length} pair(s).`);
+      } else {
+        for (const [obs, tgt] of pairs) {
+          try {
+            await AvsOverrideManager.applyOverrides(obs, { target: tgt, state }, {
+              source: 'manual_action',
+            });
+          } catch (e) {
+            console.warn('[pf2e-visioner] quick panel: failed to set AVS overrides', e);
+          }
 
-        // Then, apply the immediate visibility change for responsiveness
-        await setVisibilityBetween(obs, tgt, state);
+          await setVisibilityBetween(obs, tgt, state);
+        }
+        ui.notifications?.info?.(`Applied ${state} to ${pairs.length} pair(s).`);
       }
-      ui.notifications?.info?.(`Applied ${state} to ${pairs.length} pair(s).`);
+
+      try {
+        const { default: OverrideValidationManager } = await import('../visibility/auto-visibility/core/OverrideValidationManager.js');
+        const movedTokenIds = new Set(pairs.map(([obs]) => obs.id));
+        await OverrideValidationManager.onTokenMoveCompleteAwareness([...movedTokenIds]);
+      } catch (e) {
+        console.warn('[pf2e-visioner] quick panel: failed to update override indicator', e);
+      }
     } catch (e) {
       console.error('[pf2e-visioner] quick visibility error', e);
     }

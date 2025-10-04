@@ -59,7 +59,22 @@ describe('Lifesense Range Filtering', () => {
                         senses: []
                     }
                 }
-            }
+            },
+            get center() {
+                return {
+                    x: this.document.x + (this.document.width * 100) / 2,
+                    y: this.document.y + (this.document.height * 100) / 2
+                };
+            },
+            distanceTo: jest.fn(function (target) {
+                const obsCenter = this.center;
+                const tgtCenter = target.center;
+                const dx = Math.abs(tgtCenter.x - obsCenter.x);
+                const dy = Math.abs(tgtCenter.y - obsCenter.y);
+                const pixels = Math.sqrt(dx * dx + dy * dy);
+                const feet = (pixels / 100) * 5;
+                return Math.floor(feet / 5) * 5;
+            })
         };
 
         // Mock target token (invisible creature)
@@ -83,6 +98,12 @@ describe('Lifesense Range Filtering', () => {
                     }
                 },
                 conditions: []
+            },
+            get center() {
+                return {
+                    x: this.document.x + (this.document.width * 100) / 2,
+                    y: this.document.y + (this.document.height * 100) / 2
+                };
             }
         };
 

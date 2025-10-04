@@ -48,10 +48,8 @@ export async function tokenStateToInput(
 
     const targetState = extractTargetState(target, lightingCalculator, options, observerPosition, targetPosition);
 
-    // Calculate distance for sense range filtering using PF2e rules (5-foot increments)
-    const gridSize = canvas.grid.size;
-    const gridDistance = canvas.dimensions?.distance ?? 5;
-    const distanceInFeet = calculateDistanceInFeet(observerPosition, targetPosition, gridSize, gridDistance);
+    // Calculate distance for sense range filtering using PF2e rules (5-10-5 diagonal pattern)
+    const distanceInFeet = calculateDistanceInFeet(observer, target);
 
     const observerState = extractObserverState(observer, visionAnalyzer, conditionManager, lightingCalculator, options, distanceInFeet);
 

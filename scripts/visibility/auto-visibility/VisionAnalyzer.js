@@ -275,14 +275,7 @@ export class VisionAnalyzer {
    */
   distanceFeet(a, b) {
     try {
-      // Use centralized distance calculation with PF2e rounding rules
-      if (a.center && b.center) {
-        const gridSize = game.canvas?.grid?.size || 100;
-        const gridDistance = game.canvas?.scene?.grid?.distance || 5;
-        return calculateDistanceInFeet(a.center, b.center, gridSize, gridDistance);
-      }
-
-      return Infinity;
+      return calculateDistanceInFeet(a, b);
     } catch (error) {
       log.debug('Error calculating distance', error);
       return Infinity;

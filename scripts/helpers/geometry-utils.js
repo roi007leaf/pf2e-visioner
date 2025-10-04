@@ -5,25 +5,46 @@
  */
 
 /**
- * Calculate distance between two positions in feet (PF2e rules)
- * Uses Euclidean distance rounded down to nearest 5-foot increment
+ * Calculate distance between two tokens or positions in feet (PF2e rules)
+ * Uses Foundry's token.distanceTo which respects PF2e's 5-10-5 diagonal movement pattern
  * 
- * @param {Object} posA - First position with x, y properties
- * @param {Object} posB - Second position with x, y properties
- * @param {number} [gridSize=100] - Grid size in pixels (default: 100)
- * @param {number} [gridDistance=5] - Distance per grid square in feet (default: 5)
- * @returns {number} Distance in feet, rounded down to nearest 5-foot increment
+ * @param {Token|Object} tokenOrPosA - First token or position with x, y properties
+ * @param {Token|Object} tokenOrPosB - Second token or position with x, y properties
+ * @param {number} [gridSize=100] - Grid size in pixels (default: 100) - only used for position fallback
+ * @param {number} [gridDistance=5] - Distance per grid square in feet (default: 5) - only used for position fallback
+ * @returns {number} Distance in feet using PF2e diagonal rules
  */
-export function calculateDistanceInFeet(posA, posB, gridSize = 100, gridDistance = 5) {
-  const dx = posB.x - posA.x;
-  const dy = posB.y - posA.y;
-  const pixels = Math.sqrt(dx * dx + dy * dy);
-  const gridUnits = pixels / gridSize;
-  const rawFeet = gridUnits * gridDistance;
+export function calculateDistanceInFeet(tokenOrPosA, tokenOrPosB, gridSize = 100, gridDistance = 5) {
+  try {
+    if (tokenOrPosA?.distanceTo && typeof tokenOrPosA.distanceTo === 'function') {
+      return tokenOrPosA.distanceTo(tokenOrPosB);
+    }
+  } catch (e) {
+    //noop
+  }
 
-  // PF2e uses 5-foot increments for range measurement
-  // Round down to nearest 5-foot increment
-  return Math.floor(rawFeet / 5) * 5;
+  const posA = tokenOrPosA.center || tokenOrPosA;
+  const posB = tokenOrPosB.center || tokenOrPosB;
+
+  const dx = Math.abs(posB.x - posA.x);
+  const dy = Math.abs(posB.y - posA.y);
+
+  const gridX = Math.round(dx / gridSize);
+  const gridY = Math.round(dy / gridSize);
+
+  const diagonal = Math.min(gridX, gridY);
+  const straight = Math.abs(gridX - gridY);
+
+  const fullDiagonalPairs = Math.floor(diagonal / 2);
+  const remainingDiagonal = diagonal % 2;
+
+  const distance =
+    (fullDiagonalPairs * 2 * gridDistance) +
+    (fullDiagonalPairs * gridDistance) +
+    (remainingDiagonal * gridDistance) +
+    (straight * gridDistance);
+
+  return Math.floor(distance / gridDistance) * gridDistance;
 }
 
 /**
