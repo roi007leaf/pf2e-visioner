@@ -18,6 +18,7 @@
  * SINGLETON PATTERN
  */
 
+import { calculateDistanceInFeet } from '../../helpers/geometry-utils.js';
 import { getLogger } from '../../utils/logger.js';
 import { SensingCapabilitiesBuilder } from './SensingCapabilitiesBuilder.js';
 
@@ -274,17 +275,11 @@ export class VisionAnalyzer {
    */
   distanceFeet(a, b) {
     try {
-      // Always use manual Euclidean calculation for consistent results
-      // Foundry's distanceTo() uses grid-based movement which inflates diagonal distances
+      // Use centralized distance calculation with PF2e rounding rules
       if (a.center && b.center) {
-        const dx = a.center.x - b.center.x;
-        const dy = a.center.y - b.center.y;
-        const pixels = Math.hypot(dx, dy);
         const gridSize = game.canvas?.grid?.size || 100;
-        const gridUnits = game.canvas?.scene?.grid?.distance || 5;
-        const feetDistance = (pixels / gridSize) * gridUnits;
-        const rounded = Math.floor(feetDistance / 5) * 5;
-        return rounded;
+        const gridDistance = game.canvas?.scene?.grid?.distance || 5;
+        return calculateDistanceInFeet(a.center, b.center, gridSize, gridDistance);
       }
 
       return Infinity;
@@ -506,13 +501,6 @@ export class VisionAnalyzer {
     // Extract vision data and conditions
     const visionData = this.#extractVisionData(token, actor);
 
-    console.log('PF2E Visioner | VisionAnalyzer - Extracted senses', {
-      tokenName: token.name,
-      actorType: actor?.type,
-      sensesType: Array.isArray(visionData.senses) ? 'array' : typeof visionData.senses,
-      senses: visionData.senses,
-      detectionModes: visionData.detectionModes
-    });
 
     // Build sensing capabilities using SensingCapabilitiesBuilder
     const rawSensing = SensingCapabilitiesBuilder.build({
@@ -524,20 +512,10 @@ export class VisionAnalyzer {
       },
     });
 
-    console.log('PF2E Visioner | VisionAnalyzer - Raw sensing after build', {
-      tokenName: token.name,
-      precise: rawSensing.precise,
-      imprecise: rawSensing.imprecise
-    });
 
     // Enhance with special sense interpretation and echolocation detection
     const sensing = this.#enhanceSensingCapabilities(rawSensing, actor);
 
-    console.log('PF2E Visioner | VisionAnalyzer - Enhanced sensing', {
-      tokenName: token.name,
-      precise: sensing.precise,
-      imprecise: sensing.imprecise
-    });
 
     // Build legacy format for backward compatibility
     const legacy = this.#buildLegacyFormat(visionData, sensing);

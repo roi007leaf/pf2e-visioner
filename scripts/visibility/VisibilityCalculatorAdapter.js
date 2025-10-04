@@ -8,6 +8,7 @@
  */
 
 import { MODULE_ID } from '../constants.js';
+import { calculateDistanceInFeet } from '../helpers/geometry-utils.js';
 import { ConcealmentRegionBehavior } from '../regions/ConcealmentRegionBehavior.js';
 import { calculateVisibility } from './StatelessVisibilityCalculator.js';
 
@@ -47,12 +48,10 @@ export async function tokenStateToInput(
 
     const targetState = extractTargetState(target, lightingCalculator, options, observerPosition, targetPosition);
 
-    // Calculate distance for sense range filtering
-    const dx = targetPosition.x - observerPosition.x;
-    const dy = targetPosition.y - observerPosition.y;
-    const gridDistance = Math.sqrt(dx * dx + dy * dy) / canvas.grid.size;
-    const distanceUnit = canvas.dimensions?.distance ?? 5;
-    const distanceInFeet = gridDistance * distanceUnit;
+    // Calculate distance for sense range filtering using PF2e rules (5-foot increments)
+    const gridSize = canvas.grid.size;
+    const gridDistance = canvas.dimensions?.distance ?? 5;
+    const distanceInFeet = calculateDistanceInFeet(observerPosition, targetPosition, gridSize, gridDistance);
 
     const observerState = extractObserverState(observer, visionAnalyzer, conditionManager, lightingCalculator, options, distanceInFeet);
 

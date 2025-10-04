@@ -5,6 +5,28 @@
  */
 
 /**
+ * Calculate distance between two positions in feet (PF2e rules)
+ * Uses Euclidean distance rounded down to nearest 5-foot increment
+ * 
+ * @param {Object} posA - First position with x, y properties
+ * @param {Object} posB - Second position with x, y properties
+ * @param {number} [gridSize=100] - Grid size in pixels (default: 100)
+ * @param {number} [gridDistance=5] - Distance per grid square in feet (default: 5)
+ * @returns {number} Distance in feet, rounded down to nearest 5-foot increment
+ */
+export function calculateDistanceInFeet(posA, posB, gridSize = 100, gridDistance = 5) {
+  const dx = posB.x - posA.x;
+  const dy = posB.y - posA.y;
+  const pixels = Math.sqrt(dx * dx + dy * dy);
+  const gridUnits = pixels / gridSize;
+  const rawFeet = gridUnits * gridDistance;
+
+  // PF2e uses 5-foot increments for range measurement
+  // Round down to nearest 5-foot increment
+  return Math.floor(rawFeet / 5) * 5;
+}
+
+/**
  * Check if a point is inside a rectangle
  * @param {number} px - Point x coordinate
  * @param {number} py - Point y coordinate

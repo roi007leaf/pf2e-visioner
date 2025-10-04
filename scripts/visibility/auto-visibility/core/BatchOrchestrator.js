@@ -110,11 +110,7 @@ export class BatchOrchestrator {
         // Pass session data to the batch for telemetry
         this.processBatch(toProcess, { movementSession: sessionData });
       } else {
-        // No pending tokens - report session ended without batch
-        console.log('PF2E Visioner | Movement session STOP (no batch needed)', {
-          ...sessionData,
-          finishedAtIso: new Date().toISOString(),
-        });
+
         this._movementSession = null;
       }
     }, this._movementStopDelayMs);
@@ -590,21 +586,6 @@ export class BatchOrchestrator {
       movementSession,
     } = params;
 
-    // If this batch is part of a movement session, include session telemetry
-    if (movementSession) {
-      console.log('PF2E Visioner | Movement session STOP (with batch)', {
-        sessionId: movementSession.sessionId,
-        sessionDurationMs: movementSession.sessionDurationMs,
-        positionUpdates: movementSession.positionUpdates,
-        tokensAccumulated: movementSession.tokensAccumulated,
-        batchId,
-        batchProcessingMs: Number((batchEndTime - batchStartTime).toFixed(2)),
-        totalTimeMs: Number((movementSession.sessionDurationMs + (batchEndTime - batchStartTime)).toFixed(2)),
-        processedTokens: batchResult.processedTokens || 0,
-        uniqueUpdates: uniqueUpdateCount,
-        finishedAtIso: new Date().toISOString(),
-      });
-    }
 
     // Regular batch telemetry
     this.telemetryReporter.stop({

@@ -193,8 +193,9 @@ describe('Lifesense Range Filtering', () => {
             expect(result.detection).toBeNull();
         });
 
-        test('should be undetected when exactly 11 ft away (just beyond 10 ft range)', async () => {
+        test('should be hidden when 11 ft away (rounds down to 10 ft, within lifesense range)', async () => {
             // Position target 11 ft away (2.2 grid units * 5 ft = 11 ft)
+            // In PF2e, 11 ft rounds down to 10 ft, so it's within lifesense range 10
             mockTarget.document.x = 220;
 
             const input = await tokenStateToInput(
@@ -206,7 +207,32 @@ describe('Lifesense Range Filtering', () => {
                 mockLightingRasterService
             );
 
-            // Verify lifesense was filtered out (11 ft > 10 ft range)
+            // Verify lifesense is included (11 ft rounds down to 10 ft)
+            expect(input.observer.imprecise.lifesense).toBeDefined();
+            expect(input.observer.imprecise.lifesense.range).toBe(10);
+
+            input.target.auxiliary = ['invisible'];
+            const result = calculateVisibility(input);
+
+            expect(result.state).toBe('hidden');
+            expect(result.detection.sense).toBe('lifesense');
+        });
+
+        test('should be undetected when 15+ ft away (beyond 10 ft lifesense range)', async () => {
+            // Position target 15 ft away (3 grid units * 5 ft = 15 ft)
+            // In PF2e, 15 ft rounds down to 15 ft, beyond lifesense range 10
+            mockTarget.document.x = 300;
+
+            const input = await tokenStateToInput(
+                mockObserver,
+                mockTarget,
+                mockLightingCalculator,
+                mockVisionAnalyzer,
+                mockConditionManager,
+                mockLightingRasterService
+            );
+
+            // Verify lifesense was filtered out (15 ft > 10 ft range)
             expect(input.observer.imprecise.lifesense).toBeUndefined();
 
             input.target.auxiliary = ['invisible'];

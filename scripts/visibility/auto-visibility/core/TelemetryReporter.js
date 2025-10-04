@@ -6,14 +6,14 @@ export class TelemetryReporter {
 
     start(info) {
         try {
-            const payload = {
-                batchId: info.batchId,
-                clientId: info.clientId,
-                clientName: info.clientName,
-                changedCount: info.changedAtStartCount,
-                startedAtIso: new Date().toISOString(),
-            };
-            console.log('PF2E Visioner | AVS batch START', payload);
+            // const payload = {
+            //     batchId: info.batchId,
+            //     clientId: info.clientId,
+            //     clientName: info.clientName,
+            //     changedCount: info.changedAtStartCount,
+            //     startedAtIso: new Date().toISOString(),
+            // };
+            // console.log('PF2E Visioner | AVS batch START', payload);
         } catch { /* noop */ }
     }
 
@@ -64,62 +64,62 @@ export class TelemetryReporter {
                 });
             }
 
-            const payload = {
-                batchId: info.batchId,
-                clientId: info.clientId,
-                clientName: info.clientName,
-                totalMs: sessionTotalMs, // Total including movement session if present
-                batchOnlyMs: info.movementSession ? totalMs : undefined, // Batch processing time alone
-                changedCountAtStart: info.changedAtStartCount,
-                tokensIncluded: info.allTokensCount,
-                viewportFiltering: !!info.viewportFilteringEnabled,
-                hasDarknessSources: !!info.hasDarknessSources,
-                processedTokens: info.processedTokens || 0,
-                uniqueUpdates: info.uniqueUpdateCount || 0,
-                // Movement session context if this batch completed a movement
-                movementSession: info.movementSession ? {
-                    sessionId: info.movementSession.sessionId,
-                    sessionDurationMs: info.movementSession.sessionDurationMs,
-                    positionUpdates: info.movementSession.positionUpdates,
-                    tokensAccumulated: info.movementSession.tokensAccumulated,
-                } : null,
-                // Surface a few key breakdown counters at top-level for quick glance
-                pairsConsidered: info.breakdown?.pairsConsidered || 0,
-                pairsComputed: info.breakdown?.pairsComputed || 0,
-                pairsCached: info.breakdown?.pairsCached || 0,
-                losCacheHits: info.breakdown?.losCacheHits || 0,
-                losCacheMisses: info.breakdown?.losCacheMisses || 0,
-                // Global cache parity
-                losGlobalHits: info.breakdown?.losGlobalHits || 0,
-                losGlobalMisses: info.breakdown?.losGlobalMisses || 0,
-                losGlobalExpired: info.breakdown?.losGlobalExpired || 0,
-                visGlobalHits: info.breakdown?.visGlobalHits || 0,
-                visGlobalMisses: info.breakdown?.visGlobalMisses || 0,
-                visGlobalExpired: info.breakdown?.visGlobalExpired || 0,
-                precompute: {
-                    targetUsed: s.targetUsed || 0,
-                    targetMiss: s.targetMiss || 0,
-                    observerUsed: s.observerUsed || 0,
-                    observerMiss: s.observerMiss || 0,
-                    // Cache performance metrics
-                    cacheReused: s.cacheReused || false,
-                    cacheAge: s.cacheAge || 0,
-                    fastPathUsed: s.fastPathUsed || false,
-                    lightingChanged: !!s.lightingChanged
-                },
-                // Detailed timing breakdown
-                timings: {
-                    ...timingBreakdown,
-                    ...timingPercentages
-                },
-                detailedTimings: {
-                    ...detailedBreakdown,
-                    ...detailedPercentages
-                },
-                breakdown: info.breakdown,
-                finishedAtIso: new Date().toISOString(),
-            };
-            console.log('PF2E Visioner | AVS batch STOP', payload);
+            // const payload = {
+            //     batchId: info.batchId,
+            //     clientId: info.clientId,
+            //     clientName: info.clientName,
+            //     totalMs: sessionTotalMs, // Total including movement session if present
+            //     batchOnlyMs: info.movementSession ? totalMs : undefined, // Batch processing time alone
+            //     changedCountAtStart: info.changedAtStartCount,
+            //     tokensIncluded: info.allTokensCount,
+            //     viewportFiltering: !!info.viewportFilteringEnabled,
+            //     hasDarknessSources: !!info.hasDarknessSources,
+            //     processedTokens: info.processedTokens || 0,
+            //     uniqueUpdates: info.uniqueUpdateCount || 0,
+            //     // Movement session context if this batch completed a movement
+            //     movementSession: info.movementSession ? {
+            //         sessionId: info.movementSession.sessionId,
+            //         sessionDurationMs: info.movementSession.sessionDurationMs,
+            //         positionUpdates: info.movementSession.positionUpdates,
+            //         tokensAccumulated: info.movementSession.tokensAccumulated,
+            //     } : null,
+            //     // Surface a few key breakdown counters at top-level for quick glance
+            //     pairsConsidered: info.breakdown?.pairsConsidered || 0,
+            //     pairsComputed: info.breakdown?.pairsComputed || 0,
+            //     pairsCached: info.breakdown?.pairsCached || 0,
+            //     losCacheHits: info.breakdown?.losCacheHits || 0,
+            //     losCacheMisses: info.breakdown?.losCacheMisses || 0,
+            //     // Global cache parity
+            //     losGlobalHits: info.breakdown?.losGlobalHits || 0,
+            //     losGlobalMisses: info.breakdown?.losGlobalMisses || 0,
+            //     losGlobalExpired: info.breakdown?.losGlobalExpired || 0,
+            //     visGlobalHits: info.breakdown?.visGlobalHits || 0,
+            //     visGlobalMisses: info.breakdown?.visGlobalMisses || 0,
+            //     visGlobalExpired: info.breakdown?.visGlobalExpired || 0,
+            //     precompute: {
+            //         targetUsed: s.targetUsed || 0,
+            //         targetMiss: s.targetMiss || 0,
+            //         observerUsed: s.observerUsed || 0,
+            //         observerMiss: s.observerMiss || 0,
+            //         // Cache performance metrics
+            //         cacheReused: s.cacheReused || false,
+            //         cacheAge: s.cacheAge || 0,
+            //         fastPathUsed: s.fastPathUsed || false,
+            //         lightingChanged: !!s.lightingChanged
+            //     },
+            //     // Detailed timing breakdown
+            //     timings: {
+            //         ...timingBreakdown,
+            //         ...timingPercentages
+            //     },
+            //     detailedTimings: {
+            //         ...detailedBreakdown,
+            //         ...detailedPercentages
+            //     },
+            //     breakdown: info.breakdown,
+            //     finishedAtIso: new Date().toISOString(),
+            // };
+            // console.log('PF2E Visioner | AVS batch STOP', payload);
         } catch { /* noop */ }
     }
 
