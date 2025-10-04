@@ -14,7 +14,9 @@
     "minimum": "13.341",
     "verified": "13.348"
   },
-  "esmodules": ["scripts/main.js"],
+  "esmodules": [
+    "scripts/main.js"
+  ],
   "styles": [
     {
       "src": "styles/base.css"
@@ -75,19 +77,42 @@
         "PLAYER": "OBSERVER",
         "ASSISTANT": "OWNER"
       }
+    },
+    {
+      "name": "pf2e-visioner-effects",
+      "label": "PF2E Visioner Effects",
+      "path": "packs/pf2e-visioner-effects",
+      "type": "Item",
+      "ownership": {
+        "PLAYER": "OBSERVER",
+        "ASSISTANT": "OWNER"
+      },
+      "system": "pf2e"
     }
   ],
   "documentTypes": {
     "RegionBehavior": {
-      "Pf2eVisionerVisibility": {"label": "PF2E_VISIONER.REGION_BEHAVIOR.TYPES.VISIBILITY.label"},
-      "Pf2eVisionerConcealment": {"label": "PF2E_VISIONER.REGION_BEHAVIOR.TYPES.CONCEALMENT.label"}
+      "Pf2eVisionerVisibility": {
+        "label": "PF2E_VISIONER.REGION_BEHAVIOR.TYPES.VISIBILITY.label"
+      },
+      "Pf2eVisionerConcealment": {
+        "label": "PF2E_VISIONER.REGION_BEHAVIOR.TYPES.CONCEALMENT.label"
+      }
     }
   },
   "socket": true,
   "flags": {
     "hotReload": {
-      "extensions": ["css", "hbs", "json"],
-      "paths": ["styles", "templates", "lang"]
+      "extensions": [
+        "css",
+        "hbs",
+        "json"
+      ],
+      "paths": [
+        "styles",
+        "templates",
+        "lang"
+      ]
     }
   },
   "relationships": {
