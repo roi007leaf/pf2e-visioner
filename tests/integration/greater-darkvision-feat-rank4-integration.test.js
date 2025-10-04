@@ -41,6 +41,7 @@ function createMockShape() {
 
 describe('Integration: Greater Darkvision Feat + Rank 4 Darkness', () => {
     let origCanvas;
+    let origConfig;
     let lightingCalculator;
     let visionAnalyzer;
     let conditionManager;
@@ -49,6 +50,25 @@ describe('Integration: Greater Darkvision Feat + Rank 4 Darkness', () => {
         VisionAnalyzer.getInstance().clearCache();
 
         origCanvas = global.canvas;
+        origConfig = global.CONFIG;
+
+        // Mock polygon backends for wall collision detection
+        global.CONFIG = {
+            Canvas: {
+                polygonBackends: {
+                    move: {
+                        testCollision: () => false // No physical walls in this test
+                    },
+                    sight: {
+                        testCollision: () => false
+                    },
+                    sound: {
+                        testCollision: () => false
+                    }
+                }
+            }
+        };
+
         global.canvas = {
             scene: {
                 environment: { darknessLevel: 0.1, globalLight: { enabled: false } },
@@ -119,6 +139,7 @@ describe('Integration: Greater Darkvision Feat + Rank 4 Darkness', () => {
 
     afterEach(() => {
         global.canvas = origCanvas;
+        global.CONFIG = origConfig;
     });
 
     test('PC with greater darkvision feat can see through rank 4 darkness', async () => {
