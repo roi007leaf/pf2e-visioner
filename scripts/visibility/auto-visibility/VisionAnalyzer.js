@@ -184,49 +184,31 @@ export class VisionAnalyzer {
   hasLineOfSight(observer, target) {
     try {
       const sightBackend = CONFIG.Canvas.polygonBackends?.sight;
+      const moveBackend = CONFIG.Canvas.polygonBackends?.move;
+
       if (!sightBackend?.testCollision) {
+        console.warn('[VisionAnalyzer] No sight backend available, defaulting to true');
         return true;
       }
 
       const observerCenter = observer.center;
       const targetCenter = target.center;
 
-      // Fast path: Test center-to-center first (most common case)
-      const centerHasWall = sightBackend.testCollision(
+      // Check for physical walls using move backend (ignores darkness)
+      // Fall back to sight backend if move backend unavailable
+      const backend = moveBackend?.testCollision ? moveBackend : sightBackend;
+      const backendType = moveBackend?.testCollision ? 'move' : 'sight';
+
+      const centerHasWall = backend.testCollision(
         observerCenter,
         targetCenter,
-        { type: 'sight', mode: 'any' }
+        { type: backendType, mode: 'any' }
       );
 
-      if (!centerHasWall) {
-        return true;
-      }
-
-      // Slow path: Center is blocked, test perimeter points for partial visibility
-      // Use 4 points (cardinal directions) to minimize performance impact
-      const gridSize = canvas.grid?.size || 100;
-      const tokenWidth = (target?.document?.width ?? target?.width ?? 1) * gridSize;
-      const tokenHeight = (target?.document?.height ?? target?.height ?? 1) * gridSize;
-      const targetRadius = target.externalRadius ?? Math.max(tokenWidth, tokenHeight) / 2;
-
-      // Test 4 cardinal points: right, bottom, left, top
-      const angles = [0, Math.PI / 2, Math.PI, (3 * Math.PI) / 2];
-      for (const angle of angles) {
-        const testX = targetCenter.x + Math.cos(angle) * targetRadius;
-        const testY = targetCenter.y + Math.sin(angle) * targetRadius;
-
-        const hasWall = sightBackend.testCollision(
-          observerCenter,
-          { x: testX, y: testY },
-          { type: 'sight', mode: 'any' }
-        );
-
-        if (!hasWall) {
-          return true;
-        }
-      }
-
-      return false;
+      // PF2e rules: Line of sight is determined by center-to-center only
+      // This checks for PHYSICAL walls only, not darkness
+      // Darkness + darkvision logic is handled in StatelessVisibilityCalculator
+      return !centerHasWall;
     } catch (error) {
       console.error('[LineOfSight] Error:', error);
       log.debug('Error checking line of sight', error);

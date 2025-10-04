@@ -72,16 +72,7 @@ export async function tokenStateToInput(
             targetPosition
         );
 
-    const inDarkness =
-        targetState.lightingLevel === 'magicalDarkness' ||
-        targetState.lightingLevel === 'greaterMagicalDarkness' ||
-        observerState.lightingLevel === 'magicalDarkness' ||
-        observerState.lightingLevel === 'greaterMagicalDarkness' ||
-        linePassesThroughDarkness || rayDarknessRank > 0;
-
-    const hasLineOfSight = inDarkness ? true : visionAnalyzer.hasLineOfSight(observer, target);
-
-    // Check if sound is blocked between observer and target
+    const hasLineOfSight = visionAnalyzer.hasLineOfSight(observer, target);
     const soundBlocked = visionAnalyzer.isSoundBlocked(observer, target);
 
 
