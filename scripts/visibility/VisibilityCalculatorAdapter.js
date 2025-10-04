@@ -268,7 +268,8 @@ function extractPreciseSenses(capabilities, distanceInFeet) {
     for (const sense of preciseSenses) {
         if (sense.type && sense.range !== undefined) {
             // Only include senses that are within range
-            if (sense.range >= distanceInFeet || !Number.isFinite(sense.range)) {
+            // CRITICAL: Exclude range-0 senses (they don't exist/are disabled)
+            if (sense.range > 0 && (sense.range >= distanceInFeet || !Number.isFinite(sense.range))) {
                 precise[sense.type] = { range: sense.range };
             }
         }
@@ -332,8 +333,9 @@ function extractImpreciseSenses(capabilities, distanceInFeet) {
     for (const sense of impreciseSenses) {
         if (sense.type && sense.range !== undefined) {
             // Only include senses that are within range
+            // CRITICAL: Exclude range-0 senses (they don't exist/are disabled)
             const senseRange = sense.range || 0;
-            if (senseRange >= distanceInFeet || !Number.isFinite(senseRange)) {
+            if (senseRange > 0 && (senseRange >= distanceInFeet || !Number.isFinite(senseRange))) {
                 imprecise[sense.type] = { range: senseRange };
             }
         }
@@ -343,7 +345,8 @@ function extractImpreciseSenses(capabilities, distanceInFeet) {
     // In PF2e, hearing defaults to Infinity range unless explicitly limited or deafened
     if (sensingSummary.hearing) {
         const hearingRange = sensingSummary.hearing.range ?? Infinity;
-        if (hearingRange >= distanceInFeet || !Number.isFinite(hearingRange)) {
+        // CRITICAL: Exclude range-0 hearing (explicitly disabled)
+        if (hearingRange > 0 && (hearingRange >= distanceInFeet || !Number.isFinite(hearingRange))) {
             imprecise.hearing = { range: hearingRange };
         }
     } else if (!capabilities.conditions?.deafened) {
