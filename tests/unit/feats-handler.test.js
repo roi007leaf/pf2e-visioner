@@ -70,12 +70,6 @@ describe('FeatsHandler - all feats coverage', () => {
       expect(shift).toBe(2);
     });
 
-    test('shadow-self grants +1 in dim or darker', () => {
-      const actor = createActorWithFeats(['shadow-self']);
-      const { shift } = FeatsHandler.getOutcomeAdjustment(actor, 'sneak', { inDimOrDarker: true });
-      expect(shift).toBe(1);
-    });
-
     describe('hide feat adjusters', () => {
       test('terrain-stalker, legendary-sneak, vanish-into-the-land apply on hide', () => {
         const actor = createActorWithFeats(['terrain-stalker', 'legendary-sneak', 'vanish-into-the-land']);

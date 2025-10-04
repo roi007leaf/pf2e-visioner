@@ -232,6 +232,35 @@ export async function registerHooks() {
     }
   });
 
+  Hooks.on('updateToken', async (tokenDoc, changes, options, userId) => {
+    try {
+      if (!('x' in changes || 'y' in changes)) return;
+
+      const controlledTokens = canvas?.tokens?.controlled || [];
+      if (controlledTokens.length === 0) return;
+
+      const movedTokenId = tokenDoc.id;
+      const targetPosition = {
+        x: changes.x ?? tokenDoc.x,
+        y: changes.y ?? tokenDoc.y
+      };
+
+      Hooks.once('pf2eVisionerAvsBatchComplete', async (batchData) => {
+        const { updateSystemHiddenTokenHighlights } = await import('../services/visual-effects.js');
+
+        for (const controlledToken of controlledTokens) {
+          const positionOverride = controlledToken.document.id === movedTokenId
+            ? targetPosition
+            : null;
+
+          await updateSystemHiddenTokenHighlights(controlledToken.document.id, positionOverride);
+        }
+      });
+    } catch (error) {
+      console.warn('PF2E Visioner | updateToken hook failed:', error);
+    }
+  });
+
   // Removed createToken hook - was causing excessive updateWallVisuals calls on token creation.
   // Wall visual updates should only occur when wall flags actually change, which is properly
   // handled by TokenEventHandler._handleWallFlagChanges method.

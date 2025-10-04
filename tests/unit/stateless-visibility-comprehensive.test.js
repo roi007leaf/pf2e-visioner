@@ -102,7 +102,7 @@ describe('StatelessVisibilityCalculator - Comprehensive Coverage', () => {
             };
 
             const result = calculateVisibility(input);
-            expect(result.state).toBe('undetected');
+            expect(result.state).toBe('hidden');
         });
 
         test('invisible target + deafened observer (no hearing) → undetected', () => {

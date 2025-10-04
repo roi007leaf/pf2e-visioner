@@ -116,13 +116,25 @@ export async function onCanvasReady() {
       const actor = item.parent;
       if (!actor) return;
 
-      const controlledTokens = canvas?.tokens?.controlled || [];
-      const affectedToken = controlledTokens.find(t => t.actor?.id === actor.id);
-
-      if (affectedToken) {
-        const { updateSystemHiddenTokenHighlights } = await import('../services/visual-effects.js');
-        await updateSystemHiddenTokenHighlights(affectedToken.document.id);
+      // Trigger perception refresh to recalculate visibility based on new conditions
+      if (canvas?.perception) {
+        canvas.perception.update({
+          refreshVision: true,
+          refreshOcclusion: true
+        });
       }
+
+      // Update indicators for any controlled tokens after a brief delay
+      // to allow perception refresh to complete
+      setTimeout(async () => {
+        const controlledTokens = canvas?.tokens?.controlled || [];
+        if (controlledTokens.length === 0) return;
+
+        const { updateSystemHiddenTokenHighlights } = await import('../services/visual-effects.js');
+        for (const controlledToken of controlledTokens) {
+          await updateSystemHiddenTokenHighlights(controlledToken.document.id);
+        }
+      }, 100);
     } catch (error) {
       console.warn('PF2E Visioner | Failed to update highlights on condition add:', error);
     }
@@ -135,13 +147,25 @@ export async function onCanvasReady() {
       const actor = item.parent;
       if (!actor) return;
 
-      const controlledTokens = canvas?.tokens?.controlled || [];
-      const affectedToken = controlledTokens.find(t => t.actor?.id === actor.id);
-
-      if (affectedToken) {
-        const { updateSystemHiddenTokenHighlights } = await import('../services/visual-effects.js');
-        await updateSystemHiddenTokenHighlights(affectedToken.document.id);
+      // Trigger perception refresh to recalculate visibility based on removed conditions
+      if (canvas?.perception) {
+        canvas.perception.update({
+          refreshVision: true,
+          refreshOcclusion: true
+        });
       }
+
+      // Update indicators for any controlled tokens after a brief delay
+      // to allow perception refresh to complete
+      setTimeout(async () => {
+        const controlledTokens = canvas?.tokens?.controlled || [];
+        if (controlledTokens.length === 0) return;
+
+        const { updateSystemHiddenTokenHighlights } = await import('../services/visual-effects.js');
+        for (const controlledToken of controlledTokens) {
+          await updateSystemHiddenTokenHighlights(controlledToken.document.id);
+        }
+      }, 100);
     } catch (error) {
       console.warn('PF2E Visioner | Failed to update highlights on condition remove:', error);
     }

@@ -1130,7 +1130,7 @@ export async function updateWallIndicatorsOnly(observerId = null) {
   }
 }
 
-export async function updateSystemHiddenTokenHighlights(observerId = null) {
+export async function updateSystemHiddenTokenHighlights(observerId = null, positionOverride = null) {
   try {
     if (!game.settings?.get?.(MODULE_ID, 'autoVisibilityEnabled')) {
       return;
@@ -1184,7 +1184,22 @@ export async function updateSystemHiddenTokenHighlights(observerId = null) {
     const isDeafened = observerConditions.some?.(c => c.slug === 'deafened') ??
       allConditions.some?.(c => c.slug === 'deafened') ?? false;
 
-    const isUsingLifesense = observerHasLifesense && (lifesenseIsPrecise || (isBlinded && isDeafened));
+    // Check if any tokens are invisible (for invisible + deafened case)
+    const hasInvisibleTargets = tokens.some(t => {
+      if (!t || t.id === observer.id) return false;
+      const isInvisible = t.actor?.itemTypes?.condition?.some?.(c => c.slug === 'invisible') ?? false;
+      return isInvisible;
+    });
+
+    // Lifesense is used when:
+    // 1. Observer has precise lifesense, OR
+    // 2. Observer is both blinded AND deafened (only non-visual, non-auditory senses work), OR
+    // 3. Observer is deafened AND there are invisible targets (invisible + deafened = only non-auditory senses work)
+    const isUsingLifesense = observerHasLifesense && (
+      lifesenseIsPrecise ||
+      (isBlinded && isDeafened) ||
+      (isDeafened && hasInvisibleTargets)
+    );
 
     if (!isUsingLifesense) {
       for (const token of tokens) {
@@ -1213,7 +1228,9 @@ export async function updateSystemHiddenTokenHighlights(observerId = null) {
           token._pvSystemHiddenIndicator = null;
         }
       } catch (_) { }
+    }
 
+    for (const token of tokens) {
       if (token.id === observer.id) continue;
 
       // Skip tokens without actors or with non-creature actors (hazards, loot, etc.)
@@ -1226,7 +1243,29 @@ export async function updateSystemHiddenTokenHighlights(observerId = null) {
       const targetTraits = token.actor?.system?.traits?.value || [];
       const canBeDetectedByLifesense = visibilityCalculatorInternal.canLifesenseDetect({ traits: targetTraits });
 
-      if (isSystemHidden && canBeDetectedByLifesense) {
+      // Check if token is within lifesense range
+      // Use document positions to ensure we have the latest coordinates
+      // If positionOverride is provided, use it instead of querying the document
+      const observerDocX = positionOverride?.x ?? observer.document.x;
+      const observerDocY = positionOverride?.y ?? observer.document.y;
+
+      const observerCenterX = observerDocX + (observer.document.width * canvas.grid.size) / 2;
+      const observerCenterY = observerDocY + (observer.document.height * canvas.grid.size) / 2;
+      const targetCenterX = token.document.x + (token.document.width * canvas.grid.size) / 2;
+      const targetCenterY = token.document.y + (token.document.height * canvas.grid.size) / 2;
+
+      const lifesenseRange = lifesenseSense?.range ?? 0;
+
+      // Use modern Foundry API for distance measurement
+      const path = canvas.grid.measurePath([
+        { x: observerCenterX, y: observerCenterY },
+        { x: targetCenterX, y: targetCenterY }
+      ]);
+      const distance = path.distance; // This is in grid spaces by default
+
+      const isWithinLifesenseRange = lifesenseRange === Infinity || distance <= lifesenseRange;
+
+      if (isSystemHidden && canBeDetectedByLifesense && isWithinLifesenseRange) {
         try {
           const size = token.document.width * canvas.grid.size;
           const centerX = token.center?.x ?? (token.document.x + size / 2);

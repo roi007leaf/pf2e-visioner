@@ -506,6 +506,14 @@ export class VisionAnalyzer {
     // Extract vision data and conditions
     const visionData = this.#extractVisionData(token, actor);
 
+    console.log('PF2E Visioner | VisionAnalyzer - Extracted senses', {
+      tokenName: token.name,
+      actorType: actor?.type,
+      sensesType: Array.isArray(visionData.senses) ? 'array' : typeof visionData.senses,
+      senses: visionData.senses,
+      detectionModes: visionData.detectionModes
+    });
+
     // Build sensing capabilities using SensingCapabilitiesBuilder
     const rawSensing = SensingCapabilitiesBuilder.build({
       senses: visionData.senses,
@@ -516,8 +524,20 @@ export class VisionAnalyzer {
       },
     });
 
+    console.log('PF2E Visioner | VisionAnalyzer - Raw sensing after build', {
+      tokenName: token.name,
+      precise: rawSensing.precise,
+      imprecise: rawSensing.imprecise
+    });
+
     // Enhance with special sense interpretation and echolocation detection
     const sensing = this.#enhanceSensingCapabilities(rawSensing, actor);
+
+    console.log('PF2E Visioner | VisionAnalyzer - Enhanced sensing', {
+      tokenName: token.name,
+      precise: sensing.precise,
+      imprecise: sensing.imprecise
+    });
 
     // Build legacy format for backward compatibility
     const legacy = this.#buildLegacyFormat(visionData, sensing);

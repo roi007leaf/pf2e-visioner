@@ -52,6 +52,7 @@ export function calculateVisibility(input) {
     const rayDarkness = input.rayDarkness || null;
     const soundBlocked = input.soundBlocked ?? false;
     const hasLineOfSight = input.hasLineOfSight ?? true; // Default to true (fail open)
+    const isInvisible = target.auxiliary.includes('invisible');
 
 
     // Decision tree: follow PF2e visibility rules in priority order
@@ -61,16 +62,40 @@ export function calculateVisibility(input) {
         return handleBlindedObserver(observer, target, soundBlocked);
     }
 
-    // 2. Check for precise non-visual senses (bypass most conditions)
+    // 1.5. CRITICAL: If target is invisible AND observer is deafened (or sound blocked),
+    // observer cannot use vision OR hearing. Only non-visual, non-auditory senses work.
+    if (isInvisible && (observer.conditions.deafened || soundBlocked)) {
+        // Check precise non-visual senses (echolocation, tremorsense, etc.)
+        const preciseNonVisualResult = checkPreciseNonVisualSenses(observer, target);
+        if (preciseNonVisualResult) {
+            return preciseNonVisualResult;
+        }
+
+        // Check imprecise non-visual, non-auditory senses (lifesense, tremorsense, scent)
+        // Hearing is excluded because observer is deafened or sound is blocked
+        const nonAuditoryResult = checkNonAuditorySenses(observer, target);
+        if (nonAuditoryResult) {
+            return nonAuditoryResult;
+        }
+
+        // No senses can detect invisible + deafened/soundblocked = undetected
+        return {
+            state: 'undetected',
+            detection: null
+        };
+    }
+
+    // 2. Check for precise non-visual senses (bypass invisibility and most conditions)
     const preciseNonVisualResult = checkPreciseNonVisualSenses(observer, target);
     if (preciseNonVisualResult) {
         return preciseNonVisualResult;
     }
 
-    // 3. Determine visual detection capability based on lighting and senses
+    // 3. Determine visual detection capability
+    // NOTE: Returns canDetect: false if target is invisible, blinded, or no line of sight
     const visualDetection = determineVisualDetection(observer, target, rayDarkness, hasLineOfSight);
 
-    // 4. Check for imprecise senses if visual detection fails
+    // 4. Check for imprecise non-visual senses if visual detection fails
     const impreciseResult = checkImpreciseSenses(observer, target, soundBlocked, visualDetection);
 
     if (impreciseResult && !visualDetection.canDetect) {
@@ -145,6 +170,56 @@ function handleBlindedObserver(observer, target, soundBlocked) {
         state: 'undetected',
         detection: null
     };
+}
+
+/**
+ * Check non-auditory imprecise senses (lifesense, tremorsense, scent)
+ * Used when observer is deafened or sound is blocked - hearing cannot work
+ * @param {Object} observer - Observer state
+ * @param {Object} target - Target state
+ * @returns {Object|null} Detection result or null
+ */
+function checkNonAuditorySenses(observer, target) {
+    const { imprecise, movementAction: observerMovementAction } = observer;
+    const { movementAction: targetMovementAction } = target;
+
+    // Tremorsense: detects ground-based vibrations, BYPASSES invisibility
+    if (imprecise.tremorsense) {
+        const isTargetElevated = targetMovementAction === 'fly' || observerMovementAction === 'fly';
+        if (!isTargetElevated) {
+            return {
+                state: 'hidden',
+                detection: {
+                    isPrecise: false,
+                    sense: 'tremorsense'
+                }
+            };
+        }
+    }
+
+    // Scent: detects by smell, BYPASSES invisibility
+    if (imprecise.scent) {
+        return {
+            state: 'hidden',
+            detection: {
+                isPrecise: false,
+                sense: 'scent'
+            }
+        };
+    }
+
+    // Lifesense: detects living or undead creatures, BYPASSES invisibility
+    if (imprecise.lifesense && canLifesenseDetect(target)) {
+        return {
+            state: 'hidden',
+            detection: {
+                isPrecise: false,
+                sense: 'lifesense'
+            }
+        };
+    }
+
+    return null;
 }
 
 /**
@@ -269,6 +344,17 @@ function determineVisualDetection(observer, target, rayDarkness = null, hasLineO
 
     // CRITICAL: If there's no line of sight (sight-blocking wall), visual detection fails
     if (!hasLineOfSight) {
+        return {
+            canDetect: false,
+            sense: null,
+            isPrecise: false,
+            baseState: null
+        };
+    }
+
+    // CRITICAL: Invisible targets cannot be detected by visual senses
+    const isInvisible = target.auxiliary.includes('invisible');
+    if (isInvisible) {
         return {
             canDetect: false,
             sense: null,
@@ -554,6 +640,7 @@ export const _internal = {
     handleBlindedObserver,
     checkPreciseNonVisualSenses,
     checkHasPreciseNonVisualSense,
+    checkNonAuditorySenses,
     determineVisualDetection,
     checkImpreciseSenses,
     applyVisualModifiers,

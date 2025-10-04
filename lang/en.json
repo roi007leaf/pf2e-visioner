@@ -590,7 +590,7 @@
       "TYPE_LABEL": "PF2e Visioner Visibility",
       "TYPES": {
         "CONCEALMENT": {
-          "label": "Visioner Concealment"
+          "label": "AVS Concealment"
         },
         "VISIBILITY": {
           "label": "Visioner Visibility"

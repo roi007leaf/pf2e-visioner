@@ -287,6 +287,15 @@ export class BatchOrchestrator {
       if (movementSession) {
         this._movementSession = null;
       }
+
+      // Fire custom hook to notify other systems that AVS batch is complete
+      Hooks.callAll('pf2eVisionerAvsBatchComplete', {
+        batchId,
+        changedTokens: Array.from(visibleChangedTokens),
+        allTokens,
+        uniqueUpdateCount,
+        timings
+      });
     } catch (error) {
       try {
         console.error('PF2E Visioner | processBatch error:', error);

@@ -85,7 +85,6 @@ const SNEAK_FEAT_ADJUSTERS = {
   // Examples: These are conservative interpretations meant to be refined.
   'terrain-stalker': (ctx) => (ctx.terrainMatches ? +1 : 0),
   'vanish-into-the-land': (ctx) => (ctx.inNaturalTerrain ? +1 : 0),
-  'shadow-self': (ctx) => (ctx.inDimOrDarker ? +1 : 0),
 };
 
 const HIDE_FEAT_ADJUSTERS = {

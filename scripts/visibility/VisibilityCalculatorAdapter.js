@@ -46,7 +46,15 @@ export async function tokenStateToInput(
     };
 
     const targetState = extractTargetState(target, lightingCalculator, options, observerPosition, targetPosition);
-    const observerState = extractObserverState(observer, visionAnalyzer, conditionManager, lightingCalculator, options);
+
+    // Calculate distance for sense range filtering
+    const dx = targetPosition.x - observerPosition.x;
+    const dy = targetPosition.y - observerPosition.y;
+    const gridDistance = Math.sqrt(dx * dx + dy * dy) / canvas.grid.size;
+    const distanceUnit = canvas.dimensions?.distance ?? 5;
+    const distanceInFeet = gridDistance * distanceUnit;
+
+    const observerState = extractObserverState(observer, visionAnalyzer, conditionManager, lightingCalculator, options, distanceInFeet);
 
     // Check if there's line of sight (no sight-blocking walls)
     // However, if either observer or target is in magical darkness, the darkness polygon might be
@@ -177,20 +185,23 @@ function extractTargetState(target, lightingCalculator, options, observerPositio
  * 
  * Extracts observer's vision capabilities, senses, conditions, and lighting level.
  * Uses capabilities.sensingSummary as the single source of truth for all senses.
+ * Filters senses by range to ensure only in-range senses are passed to visibility calculator.
  * 
  * @param {Token} observer - The observing token
  * @param {Object} visionAnalyzer - Vision analyzer instance
  * @param {Object} conditionManager - Condition manager instance
  * @param {Object} lightingCalculator - Lighting calculator instance
  * @param {Object} options - Additional options
+ * @param {number} distanceInFeet - Distance to target in feet (for range filtering)
  * @returns {Object} Observer state for StatelessVisibilityCalculator
  */
-function extractObserverState(observer, visionAnalyzer, conditionManager, lightingCalculator, options) {
+function extractObserverState(observer, visionAnalyzer, conditionManager, lightingCalculator, options, distanceInFeet) {
     const visionCapabilities = visionAnalyzer.getVisionCapabilities(observer);
 
     // Extract precise and imprecise senses from sensingSummary (single source of truth)
-    const precise = extractPreciseSenses(visionCapabilities);
-    const imprecise = extractImpreciseSenses(visionCapabilities);
+    // Filter by range - only include senses that can reach the target
+    const precise = extractPreciseSenses(visionCapabilities, distanceInFeet);
+    const imprecise = extractImpreciseSenses(visionCapabilities, distanceInFeet);
 
     // Extract observer conditions
     const conditions = {
@@ -241,8 +252,13 @@ function extractObserverState(observer, visionAnalyzer, conditionManager, lighti
 /**
  * Extract precise senses from vision capabilities
  * Uses sensingSummary as single source of truth - NO hardcoded ranges
+ * Filters senses by range - only includes senses that can reach the target distance.
+ * 
+ * @param {Object} capabilities - Vision capabilities from VisionAnalyzer
+ * @param {number} distanceInFeet - Distance to target in feet
+ * @returns {Object} Precise senses object filtered by range
  */
-function extractPreciseSenses(capabilities) {
+function extractPreciseSenses(capabilities, distanceInFeet) {
     const precise = {};
     const sensingSummary = capabilities.sensingSummary || {};
 
@@ -251,27 +267,39 @@ function extractPreciseSenses(capabilities) {
     const preciseSenses = sensingSummary.precise || [];
     for (const sense of preciseSenses) {
         if (sense.type && sense.range !== undefined) {
-            precise[sense.type] = { range: sense.range };
+            // Only include senses that are within range
+            if (sense.range >= distanceInFeet || !Number.isFinite(sense.range)) {
+                precise[sense.type] = { range: sense.range };
+            }
         }
     }
 
     // CRITICAL: Also check top-level vision capability flags
     // These are set by VisionAnalyzer but may not be in sensingSummary.precise
     if (capabilities.hasGreaterDarkvision) {
-        if (!precise.greaterDarkvision && !precise['greater-darkvision']) {
-            precise.greaterDarkvision = { range: capabilities.darkvisionRange || Infinity };
+        const range = capabilities.darkvisionRange || Infinity;
+        if (range >= distanceInFeet || !Number.isFinite(range)) {
+            if (!precise.greaterDarkvision && !precise['greater-darkvision']) {
+                precise.greaterDarkvision = { range };
+            }
         }
     }
 
     if (capabilities.hasDarkvision && !capabilities.hasGreaterDarkvision) {
-        if (!precise.darkvision) {
-            precise.darkvision = { range: capabilities.darkvisionRange || Infinity };
+        const range = capabilities.darkvisionRange || Infinity;
+        if (range >= distanceInFeet || !Number.isFinite(range)) {
+            if (!precise.darkvision) {
+                precise.darkvision = { range };
+            }
         }
     }
 
     if (capabilities.hasLowLightVision) {
-        if (!precise.lowLightVision && !precise['low-light-vision']) {
-            precise.lowLightVision = { range: capabilities.lowLightRange || Infinity };
+        const range = capabilities.lowLightRange || Infinity;
+        if (range >= distanceInFeet || !Number.isFinite(range)) {
+            if (!precise.lowLightVision && !precise['low-light-vision']) {
+                precise.lowLightVision = { range };
+            }
         }
     }
 
@@ -289,8 +317,13 @@ function extractPreciseSenses(capabilities) {
 /**
  * Extract imprecise senses from vision capabilities
  * Uses sensingSummary as single source of truth
+ * Filters senses by range - only includes senses that can reach the target distance.
+ * 
+ * @param {Object} capabilities - Vision capabilities from VisionAnalyzer
+ * @param {number} distanceInFeet - Distance to target in feet
+ * @returns {Object} Imprecise senses object filtered by range
  */
-function extractImpreciseSenses(capabilities) {
+function extractImpreciseSenses(capabilities, distanceInFeet) {
     const imprecise = {};
     const sensingSummary = capabilities.sensingSummary || {};
 
@@ -298,18 +331,23 @@ function extractImpreciseSenses(capabilities) {
     const impreciseSenses = sensingSummary.imprecise || [];
     for (const sense of impreciseSenses) {
         if (sense.type && sense.range !== undefined) {
-            imprecise[sense.type] = { range: sense.range || 0 };
+            // Only include senses that are within range
+            const senseRange = sense.range || 0;
+            if (senseRange >= distanceInFeet || !Number.isFinite(senseRange)) {
+                imprecise[sense.type] = { range: senseRange };
+            }
         }
     }
 
     // Extract hearing from sensingSummary with proper fallback
     // In PF2e, hearing defaults to Infinity range unless explicitly limited or deafened
     if (sensingSummary.hearing) {
-        imprecise.hearing = {
-            range: sensingSummary.hearing.range ?? Infinity
-        };
+        const hearingRange = sensingSummary.hearing.range ?? Infinity;
+        if (hearingRange >= distanceInFeet || !Number.isFinite(hearingRange)) {
+            imprecise.hearing = { range: hearingRange };
+        }
     } else if (!capabilities.conditions?.deafened) {
-        // Default: creatures have hearing unless deafened
+        // Default: creatures have hearing unless deafened (always in range with Infinity)
         imprecise.hearing = { range: Infinity };
     }
 
@@ -413,6 +451,14 @@ export async function calculateVisibilityFromTokens(
         lightingRasterService,
         options
     );
+
+    // Add debug context for logging (not used by stateless calculator)
+    input._debug = {
+        observerName: observer?.name,
+        targetName: target?.name,
+        observerId: observer?.id,
+        targetId: target?.id
+    };
 
     // Calculate using stateless calculator
     return calculateVisibility(input);

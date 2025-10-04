@@ -103,6 +103,9 @@ export class SensingCapabilitiesBuilder {
             seeAll: { type: 'see-all', acuity: PRECISE },
             senseAll: { type: 'sense-all', acuity: PRECISE },
             hearing: { type: 'hearing', acuity: IMPRECISE },
+            darkvision: { type: 'darkvision', acuity: PRECISE },
+            greaterDarkvision: { type: 'greater-darkvision', acuity: PRECISE },
+            lowLightVision: { type: 'low-light-vision', acuity: PRECISE },
         };
 
         for (const [modeId, modeData] of Object.entries(detectionModes)) {
@@ -174,6 +177,16 @@ export class SensingCapabilitiesBuilder {
         const normalizedRange = this.#normalizeRange(range);
         const normalizedAcuity = String(acuity || IMPRECISE).toLowerCase().trim();
 
+        if (rawType.includes('lifesense') || senseType === 'lifesense') {
+            console.log('PF2E Visioner | SensingCapabilitiesBuilder - Processing lifesense', {
+                rawType,
+                senseType,
+                acuity: normalizedAcuity,
+                range: normalizedRange,
+                allowOverride
+            });
+        }
+
         // Handle override: remove from both categories if it exists
         if (allowOverride) {
             delete capabilities.precise[senseType];
@@ -206,6 +219,15 @@ export class SensingCapabilitiesBuilder {
             capabilities.precise[senseType] = normalizedRange;
         } else {
             capabilities.imprecise[senseType] = normalizedRange;
+        }
+
+        if (rawType.includes('lifesense') || senseType === 'lifesense') {
+            console.log('PF2E Visioner | SensingCapabilitiesBuilder - Added lifesense', {
+                category: normalizedAcuity === PRECISE ? 'precise' : 'imprecise',
+                senseType,
+                range: normalizedRange,
+                capabilities: { precise: capabilities.precise, imprecise: capabilities.imprecise }
+            });
         }
     }
 
