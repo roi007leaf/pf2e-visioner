@@ -292,10 +292,28 @@ function checkPreciseNonVisualSenses(observer, target) {
     // - Work in any lighting condition
     // - Bypass invisibility completely
     // - Are not affected by dazzled or blinded (they're non-visual)
+    // - EXCEPTION: Echolocation requires hearing (blocked by deafened condition)
 
     for (const [senseType, senseData] of Object.entries(precise)) {
         // Skip visual senses
         if (visualSenses.has(senseType)) {
+            continue;
+        }
+
+        // Special handling for echolocation: requires hearing (blocked if deafened)
+        if (senseType === 'echolocation') {
+            if (conditions.deafened) {
+                continue; // Cannot use echolocation when deafened
+            }
+            if (senseData && senseData.range > 0) {
+                return {
+                    state: 'observed',
+                    detection: {
+                        isPrecise: true,
+                        sense: 'echolocation'
+                    }
+                };
+            }
             continue;
         }
 
@@ -517,6 +535,8 @@ function checkImpreciseSenses(observer, target, soundBlocked = false, visualDete
 
     // Check each imprecise sense in priority order
     // Note: These senses detect at "hidden" level (precise location unknown)
+    // Priority: Tremorsense > Lifesense > Hearing > Scent
+    // (Scent is last because it has no conditions/restrictions)
 
     // Tremorsense: detects ground-based vibrations, BYPASSES invisibility
     // CRITICAL: Tremorsense only works if target is on the ground at the same elevation
@@ -537,21 +557,11 @@ function checkImpreciseSenses(observer, target, soundBlocked = false, visualDete
         // If elevated, tremorsense fails - continue to check other senses
     }
 
-    // Scent: detects by smell, BYPASSES invisibility
-    if (imprecise.scent) {
-        return {
-            state: 'hidden',
-            detection: {
-                isPrecise: false,
-                sense: 'scent'
-            }
-        };
-    }
-
     // Lifesense: detects living or undead creatures, BYPASSES invisibility
     // Can be configured to detect either living creatures OR undead
     // Living = absence of "undead" and "construct" traits
     // Undead = presence of "undead" trait
+    // Has creature type restrictions, so check before unconditional senses
     if (imprecise.lifesense && canLifesenseDetect(target)) {
         return {
             state: 'hidden',
@@ -581,6 +591,18 @@ function checkImpreciseSenses(observer, target, soundBlocked = false, visualDete
             detection: {
                 isPrecise: false,
                 sense: 'hearing'
+            }
+        };
+    }
+
+    // Scent: detects by smell, BYPASSES invisibility
+    // No conditions or restrictions - checked last as fallback
+    if (imprecise.scent) {
+        return {
+            state: 'hidden',
+            detection: {
+                isPrecise: false,
+                sense: 'scent'
             }
         };
     }
