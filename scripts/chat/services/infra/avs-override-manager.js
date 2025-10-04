@@ -193,9 +193,20 @@ export class AvsOverrideManager {
     }
 
     try {
+      await this.clearGlobalCaches();
       await this.applyOverrideFromFlag(observer, target, state);
     } catch (e) {
       console.error('PF2E Visioner | Error applying AVS override from flag:', e);
+    }
+  }
+
+  static async clearGlobalCaches() {
+    try {
+      const { autoVisibilitySystem } = await import('../../../visibility/auto-visibility/index.js');
+      if (autoVisibilitySystem?.orchestrator?.clearPersistentCaches) {
+        autoVisibilitySystem.orchestrator.clearPersistentCaches();
+      }
+    } catch (e) {
     }
   }
 
@@ -228,6 +239,7 @@ export class AvsOverrideManager {
       const flagExists = targetToken.document.getFlag(MODULE_ID, flagKey);
       if (flagExists) {
         await targetToken.document.unsetFlag(MODULE_ID, flagKey);
+        await this.clearGlobalCaches();
         try {
           const { eventDrivenVisibilitySystem } = await import('../../../visibility/auto-visibility/EventDrivenVisibilitySystem.js');
           // Recalc both sides to be thorough
@@ -271,6 +283,7 @@ export class AvsOverrideManager {
     }
 
     if (tokensToRecalculate.size > 1) {
+      await this.clearGlobalCaches();
       try {
         const { eventDrivenVisibilitySystem } = await import('../../../visibility/auto-visibility/EventDrivenVisibilitySystem.js');
         await eventDrivenVisibilitySystem.recalculateForTokens(Array.from(tokensToRecalculate));
