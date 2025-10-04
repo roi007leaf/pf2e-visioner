@@ -87,6 +87,7 @@ export class EventHandlerFactory {
 
         const handlers = {};
 
+
         for (const config of handlerConfigs) {
             try {
                 handlers[config.name] = new config.Handler(...config.deps);
@@ -96,6 +97,7 @@ export class EventHandlerFactory {
                 // Continue with other handlers even if one fails
             }
         }
+
 
         return handlers;
     }

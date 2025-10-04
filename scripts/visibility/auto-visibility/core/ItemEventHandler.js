@@ -33,10 +33,12 @@ export class ItemEventHandler {
      * Initialize the item event handler by registering hooks
      */
     initialize() {
+
         // Item events (conditions, equipment, spells)
         Hooks.on('createItem', this.#onItemCreate.bind(this));
         Hooks.on('updateItem', this.#onItemUpdate.bind(this));
         Hooks.on('deleteItem', this.#onItemDelete.bind(this));
+
     }
 
     /**
@@ -78,6 +80,8 @@ export class ItemEventHandler {
      */
     #onItemDelete(item) {
         if (!this.#systemStateProvider.shouldProcessEvents()) return;
+
+
         this.#handleItemChange(item, 'deleted');
     }
 
@@ -129,6 +133,7 @@ export class ItemEventHandler {
         const itemName = item.name?.toLowerCase() || '';
         const itemType = item.type?.toLowerCase() || '';
 
+
         // Expand the types that might affect visibility
         const isRelevantType =
             itemType === 'condition' ||
@@ -165,6 +170,7 @@ export class ItemEventHandler {
             itemName.includes('everburning') ||
             itemName.includes('glow') ||
             itemName.includes('luminous');
+
 
         if (
             isRelevantType &&

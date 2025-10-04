@@ -47,6 +47,9 @@ export class EventDrivenVisibilitySystem {
   /** @type {EventDrivenVisibilitySystem} */
   static #instance = null;
 
+  /** @type {boolean} - Track if system has been initialized */
+  #initialized = false;
+
   /** @type {BatchProcessor} - Handles batch processing of visibility calculations */
   // Core systems
   #batchProcessor = null;
@@ -99,6 +102,10 @@ export class EventDrivenVisibilitySystem {
    * Initialize the system using dependency injection - cleaner architecture
    */
   async initialize() {
+
+    if (this.#initialized) {
+      return;
+    }
 
     try {
       // Initialize dependency injection container
@@ -181,6 +188,8 @@ export class EventDrivenVisibilitySystem {
 
       // Set system state
       this.#systemStateProvider.setEnabled(game.settings.get(MODULE_ID, 'autoVisibilityEnabled'));
+
+      this.#initialized = true;
     } catch (error) {
       console.error('PF2E Visioner | EventDrivenVisibilitySystem - Initialization failed:', error);
       throw error;
@@ -198,7 +207,12 @@ export class EventDrivenVisibilitySystem {
   /**
    * Enable the system
    */
-  enable() {
+  async enable() {
+
+    // Initialize if not already done
+    if (!this.#initialized) {
+      await this.initialize();
+    }
 
     this.#systemStateProvider.setEnabled(true);
 
