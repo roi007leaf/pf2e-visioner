@@ -39,6 +39,9 @@ export const TOKEN_MANAGER_DEFAULT_OPTIONS = {
     bulkNPCUndetected: null,
     bulkNPCConcealed: null,
     bulkNPCObserved: null,
+    // Hazard-specific bulk actions for visibility (hazard table only)
+    bulkHazardsObserved: null,
+    bulkHazardsHidden: null,
     // Loot-specific bulk actions for visibility (loot table only)
     bulkLootObserved: null,
     bulkLootHidden: null,

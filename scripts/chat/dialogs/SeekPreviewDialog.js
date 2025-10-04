@@ -43,6 +43,10 @@ export class SeekPreviewDialog extends BaseActionDialog {
       revertChange: SeekPreviewDialog._onRevertChange,
       toggleEncounterFilter: SeekPreviewDialog._onToggleEncounterFilter,
       toggleFilterByDetection: SeekPreviewDialog._onToggleFilterByDetection,
+      toggleIgnoreAllies: SeekPreviewDialog._onToggleIgnoreAllies,
+      toggleHideFoundryHidden: SeekPreviewDialog._onToggleHideFoundryHidden,
+      toggleIgnoreWalls: SeekPreviewDialog._onToggleIgnoreWalls,
+      toggleShowOnlyChanges: SeekPreviewDialog._onToggleShowOnlyChanges,
       overrideState: SeekPreviewDialog._onOverrideState,
     },
   };
@@ -85,6 +89,8 @@ export class SeekPreviewDialog extends BaseActionDialog {
     } catch {
       this.hideFoundryHidden = true;
     }
+    // Show only changes filter (default off)
+    this.showOnlyChanges = false;
 
     // Ensure filterByDetection is properly initialized (fallback if BaseActionDialog didn't set it)
     if (typeof this.filterByDetection === 'undefined') {
@@ -1567,6 +1573,108 @@ export class SeekPreviewDialog extends BaseActionDialog {
     app.render({ force: true });
   }
 
+  static async _onToggleIgnoreAllies(event, target) {
+    event.preventDefault();
+    event.stopPropagation();
+
+    const app = _currentSeekDialogInstance;
+    if (!app) return;
+    const newValue = !app.ignoreAllies;
+    app.ignoreAllies = newValue;
+    try {
+      await game.settings.set(MODULE_ID, 'ignoreAllies', newValue);
+    } catch { }
+    app.bulkActionState = 'initial';
+    await app.render({ force: true });
+
+    requestAnimationFrame(() => {
+      const checkbox = app.element.querySelector('input[data-action="toggleIgnoreAllies"]');
+      if (checkbox) {
+        checkbox.checked = newValue;
+        if (newValue) {
+          checkbox.setAttribute('checked', '');
+        } else {
+          checkbox.removeAttribute('checked');
+        }
+      }
+    });
+  }
+
+  static async _onToggleHideFoundryHidden(event, target) {
+    event.preventDefault();
+    event.stopPropagation();
+
+    const app = _currentSeekDialogInstance;
+    if (!app) return;
+    const newValue = !app.hideFoundryHidden;
+    app.hideFoundryHidden = newValue;
+    try {
+      await game.settings.set(MODULE_ID, 'hideFoundryHiddenTokens', newValue);
+    } catch { }
+    app.bulkActionState = 'initial';
+    await app.render({ force: true });
+
+    requestAnimationFrame(() => {
+      const checkbox = app.element.querySelector('input[data-action="toggleHideFoundryHidden"]');
+      if (checkbox) {
+        checkbox.checked = newValue;
+        if (newValue) {
+          checkbox.setAttribute('checked', '');
+        } else {
+          checkbox.removeAttribute('checked');
+        }
+      }
+    });
+  }
+
+  static async _onToggleIgnoreWalls(event, target) {
+    event.preventDefault();
+    event.stopPropagation();
+
+    const app = _currentSeekDialogInstance;
+    if (!app) return;
+    const newValue = !app.ignoreWalls;
+    app.ignoreWalls = newValue;
+    app.bulkActionState = 'initial';
+    await app.render({ force: true });
+
+    requestAnimationFrame(() => {
+      const checkbox = app.element.querySelector('input[data-action="toggleIgnoreWalls"]');
+      if (checkbox) {
+        checkbox.checked = newValue;
+        if (newValue) {
+          checkbox.setAttribute('checked', '');
+        } else {
+          checkbox.removeAttribute('checked');
+        }
+      }
+    });
+  }
+
+  static async _onToggleShowOnlyChanges(event, target) {
+    event.preventDefault();
+    event.stopPropagation();
+
+    const app = _currentSeekDialogInstance;
+    if (!app) return;
+    const newValue = !app.showOnlyChanges;
+    app.showOnlyChanges = newValue;
+    app.bulkActionState = 'initial';
+    await app.render({ force: true });
+
+    requestAnimationFrame(() => {
+      const checkbox = app.element.querySelector('input[data-action="toggleShowOnlyChanges"]');
+      if (checkbox) {
+        checkbox.checked = newValue;
+        if (newValue) {
+          checkbox.setAttribute('checked', '');
+        } else {
+          checkbox.removeAttribute('checked');
+        }
+      }
+    });
+  }
+
   /**
    * Add click handlers for state icon selection
    */
@@ -1580,12 +1688,94 @@ export class SeekPreviewDialog extends BaseActionDialog {
   }
 
   /**
-   * Handle state override action (for potential future use)
+   * Calculate if there's an actionable change (considering overrides)
    */
-  static async _onOverrideState() {
+  calculateHasActionableChange(outcome) {
+    // Special case: If current state is AVS-controlled and override is 'avs', no change
+    if (outcome.overrideState === 'avs' && this.isCurrentStateAvsControlled(outcome)) {
+      return false;
+    }
+
+    const effectiveNewState = outcome.overrideState || outcome.newVisibility;
+    const baseOldState = outcome.oldVisibility != null ? outcome.oldVisibility : outcome.currentVisibility;
+
+    // Use AVS-aware logic: allow manual override of AVS-controlled states even if same value
+    const isOldStateAvsControlled = this.isOldStateAvsControlled(outcome);
+    const statesMatch = baseOldState != null && effectiveNewState != null && effectiveNewState === baseOldState;
+    const hasActionableChange =
+      (baseOldState != null && effectiveNewState != null && effectiveNewState !== baseOldState) ||
+      (statesMatch && isOldStateAvsControlled);
+
+    return hasActionableChange;
+  }
+
+  /**
+   * Handle state override action
+   */
+  static async _onOverrideState(event, target) {
     const app = _currentSeekDialogInstance;
     if (!app) return;
-    // This method is available for future enhancements if needed
+
+    const tokenId = target.dataset.target || target.dataset.tokenId;
+    const wallId = target.dataset.wallId;
+    const newState = target.dataset.state;
+
+    if (!tokenId && !wallId) return;
+
+    // Find the outcome (support both tokens and walls)
+    const outcome = app.outcomes.find((o) => {
+      if (wallId) return o._isWall && o.wallId === wallId;
+      return o.target?.id === tokenId;
+    });
+
+    if (!outcome) return;
+
+    // Toggle the override state
+    if (outcome.overrideState === newState) {
+      // Clicking the same state removes the override
+      outcome.overrideState = null;
+    } else {
+      // Set new override state
+      outcome.overrideState = newState;
+    }
+
+    // Recalculate hasActionableChange
+    outcome.hasActionableChange = app.calculateHasActionableChange(outcome);
+
+    // Update icon selection visually
+    const identifier = wallId || tokenId;
+    app.updateIconSelection(identifier, outcome.overrideState, !!wallId);
+
+    // Update action buttons for this row
+    app.updateActionButtonsForToken(identifier, outcome.hasActionableChange, { isWall: !!wallId });
+
+    // Update changes count
+    app.updateChangesCount();
+  }
+
+  /**
+   * Update icon selection visually
+   */
+  updateIconSelection(identifier, selectedState, isWall = false) {
+    const selector = isWall ? `[data-wall-id="${identifier}"]` : `[data-token-id="${identifier}"]`;
+    const row = this.element.querySelector(selector)?.closest('tr');
+    if (!row) return;
+
+    const icons = row.querySelectorAll('.state-icon');
+    icons.forEach((icon) => {
+      const state = icon.dataset.state;
+      if (state === selectedState) {
+        icon.classList.add('selected');
+      } else {
+        icon.classList.remove('selected');
+      }
+    });
+
+    // Update hidden input
+    const hiddenInput = row.querySelector('input[type="hidden"]');
+    if (hiddenInput) {
+      hiddenInput.value = selectedState || '';
+    }
   }
 
   /**
