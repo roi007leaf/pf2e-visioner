@@ -61,54 +61,88 @@ describe('Sight and Sound Blocking', () => {
             }
         };
 
-        // Mock global CONFIG object
+        // Mock canvas walls
+        global.canvas = {
+            walls: {
+                placeables: [] // Default: no walls
+            }
+        };
+
+        // Mock CONST for wall sense types
+        global.CONST = {
+            WALL_SENSE_TYPES: {
+                NONE: 0,
+                LIMITED: 10,
+                NORMAL: 20,
+                PROXIMITY: 30,
+                DISTANCE: 40,
+            }
+        };
+
+        // Mock CONFIG for sound blocking (sound uses polygon backend)
         global.CONFIG = {
             Canvas: {
                 polygonBackends: {
-                    sight: {
-                        testCollision: jest.fn(() => false)
-                    },
                     sound: {
-                        testCollision: jest.fn(() => false)
+                        testCollision: jest.fn(() => false) // Default: no sound blocking
                     }
                 }
             }
         };
 
-        // Mock console.log to reduce test output noise
+        // Mock foundry utilities
+        global.foundry = {
+            canvas: {
+                geometry: {
+                    Ray: jest.fn().mockImplementation((a, b) => ({ A: a, B: b }))
+                }
+            },
+            utils: {
+                lineLineIntersection: jest.fn()
+            }
+        };
+
+        // Mock console to reduce test output noise
         global.console.log = jest.fn();
         global.console.error = jest.fn();
     });
 
     describe('VisionAnalyzer - hasLineOfSight', () => {
         it('should return true when no sight-blocking wall', () => {
-            CONFIG.Canvas.polygonBackends.sight.testCollision.mockReturnValue(false);
+            global.canvas.walls.placeables = []; // No walls
 
             const result = visionAnalyzer.hasLineOfSight(mockObserver, mockTarget);
 
             expect(result).toBe(true);
-            expect(CONFIG.Canvas.polygonBackends.sight.testCollision).toHaveBeenCalledWith(
-                mockObserver.center,
-                mockTarget.center,
-                { type: 'sight', mode: 'any' }
-            );
         });
 
         it('should return false when sight-blocking wall present', () => {
-            CONFIG.Canvas.polygonBackends.sight.testCollision.mockReturnValue(true);
+            // Mock a wall that blocks sight
+            global.canvas.walls.placeables = [
+                {
+                    document: {
+                        move: CONST.WALL_SENSE_TYPES.NORMAL,
+                        sight: CONST.WALL_SENSE_TYPES.NORMAL, // Blocks sight
+                        sound: CONST.WALL_SENSE_TYPES.NONE,
+                        c: [200, 50, 200, 250] // Wall between observer and target
+                    }
+                }
+            ];
+
+            // Mock intersection
+            global.foundry.utils.lineLineIntersection.mockReturnValue({
+                x: 200,
+                y: 200,
+                t0: 0.5 // Midpoint
+            });
 
             const result = visionAnalyzer.hasLineOfSight(mockObserver, mockTarget);
 
             expect(result).toBe(false);
-            expect(CONFIG.Canvas.polygonBackends.sight.testCollision).toHaveBeenCalledWith(
-                mockObserver.center,
-                mockTarget.center,
-                { type: 'sight', mode: 'any' }
-            );
         });
 
         it('should return true when polygon backend not available', () => {
-            CONFIG.Canvas.polygonBackends.sight = null;
+            global.canvas.walls.placeables = []; // No walls
 
             const result = visionAnalyzer.hasLineOfSight(mockObserver, mockTarget);
 
@@ -335,8 +369,24 @@ describe('Sight and Sound Blocking', () => {
     describe('Integration: Full Visibility Flow', () => {
         it('should handle sight-blocking wall with hearing detection', () => {
             // Setup: Wall blocks sight, but not sound
-            CONFIG.Canvas.polygonBackends.sight.testCollision.mockReturnValue(true);
-            CONFIG.Canvas.polygonBackends.sound.testCollision.mockReturnValue(false);
+            global.canvas.walls.placeables = [
+                {
+                    document: {
+                        move: CONST.WALL_SENSE_TYPES.NORMAL,
+                        sight: CONST.WALL_SENSE_TYPES.NORMAL, // Blocks sight
+                        sound: CONST.WALL_SENSE_TYPES.NONE, // Doesn't block sound
+                        c: [200, 50, 200, 250]
+                    }
+                }
+            ];
+
+            global.foundry.utils.lineLineIntersection.mockReturnValue({
+                x: 200,
+                y: 200,
+                t0: 0.5
+            });
+
+            global.CONFIG.Canvas.polygonBackends.sound.testCollision.mockReturnValue(false);
 
             const hasLineOfSight = visionAnalyzer.hasLineOfSight(mockObserver, mockTarget);
             const soundBlocked = visionAnalyzer.isSoundBlocked(mockObserver, mockTarget);
@@ -372,8 +422,24 @@ describe('Sight and Sound Blocking', () => {
 
         it('should handle sight+sound blocking wall resulting in undetected', () => {
             // Setup: Wall blocks both sight and sound
-            CONFIG.Canvas.polygonBackends.sight.testCollision.mockReturnValue(true);
-            CONFIG.Canvas.polygonBackends.sound.testCollision.mockReturnValue(true);
+            global.canvas.walls.placeables = [
+                {
+                    document: {
+                        move: CONST.WALL_SENSE_TYPES.NORMAL,
+                        sight: CONST.WALL_SENSE_TYPES.NORMAL, // Blocks sight
+                        sound: CONST.WALL_SENSE_TYPES.NORMAL, // Blocks sound
+                        c: [200, 50, 200, 250]
+                    }
+                }
+            ];
+
+            global.foundry.utils.lineLineIntersection.mockReturnValue({
+                x: 200,
+                y: 200,
+                t0: 0.5
+            });
+
+            global.CONFIG.Canvas.polygonBackends.sound.testCollision.mockReturnValue(true);
 
             const hasLineOfSight = visionAnalyzer.hasLineOfSight(mockObserver, mockTarget);
             const soundBlocked = visionAnalyzer.isSoundBlocked(mockObserver, mockTarget);

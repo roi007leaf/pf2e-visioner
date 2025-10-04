@@ -12,6 +12,9 @@ describe('Wall Sight Blocking Fix', () => {
     global.canvas = {
       grid: { size: 100 },
       scene: { grid: { distance: 5 } },
+      walls: {
+        placeables: [], // Default: no walls
+      },
     };
 
     global.game = {
@@ -20,17 +23,26 @@ describe('Wall Sight Blocking Fix', () => {
       },
     };
 
-    // Mock polygon backend API (replaces deprecated canvas.walls.checkCollision)
-    global.CONFIG = {
-      Canvas: {
-        polygonBackends: {
-          sight: {
-            testCollision: jest.fn().mockReturnValue(false), // Default: no collision
-          },
-          sound: {
-            testCollision: jest.fn().mockReturnValue(false), // Default: no collision
-          },
+    // Mock CONST for wall sense types
+    global.CONST = {
+      WALL_SENSE_TYPES: {
+        NONE: 0,
+        LIMITED: 10,
+        NORMAL: 20,
+        PROXIMITY: 30,
+        DISTANCE: 40,
+      },
+    };
+
+    // Mock foundry utilities
+    global.foundry = {
+      canvas: {
+        geometry: {
+          Ray: jest.fn().mockImplementation((a, b) => ({ A: a, B: b })),
         },
+      },
+      utils: {
+        lineLineIntersection: jest.fn(),
       },
     };
 
@@ -45,11 +57,11 @@ describe('Wall Sight Blocking Fix', () => {
     test('should detect no line of sight when wall blocks sight but not sound', () => {
       const observer = {
         center: { x: 0, y: 0 },
-        vision: null, // Force fallback to wall collision check
+        vision: null,
         actor: {
           system: {
             perception: {
-              vision: true, // Observer has vision capabilities
+              vision: true,
             },
           },
         },
@@ -58,38 +70,40 @@ describe('Wall Sight Blocking Fix', () => {
 
       const target = {
         center: { x: 100, y: 0 },
-        shape: null, // Force fallback to wall collision check
+        shape: null,
       };
 
-      // Mock foundry ray class
-      global.foundry = {
-        canvas: {
-          geometry: {
-            Ray: jest.fn().mockImplementation((a, b) => ({ A: a, B: b })),
+      // Mock a wall that blocks sight but not sound
+      global.canvas.walls.placeables = [
+        {
+          document: {
+            move: CONST.WALL_SENSE_TYPES.NORMAL, // Blocks movement
+            sight: CONST.WALL_SENSE_TYPES.NORMAL, // Blocks sight
+            sound: CONST.WALL_SENSE_TYPES.NONE, // Doesn't block sound
+            c: [50, -10, 50, 10], // Wall crossing the path
           },
         },
-      };
+      ];
 
-      // Mock the polygon backend to return collision for sight (blocked)
-      global.CONFIG.Canvas.polygonBackends.sight.testCollision.mockReturnValue(true);
-      global.CONFIG.Canvas.polygonBackends.sound.testCollision.mockReturnValue(false);
+      // Mock intersection to indicate the wall blocks the path
+      global.foundry.utils.lineLineIntersection.mockReturnValue({
+        x: 50,
+        y: 0,
+        t0: 0.5, // Intersection at midpoint of ray
+      });
 
-      // Should return false (no line of sight) because sight is blocked
       const result = visionAnalyzer.hasLineOfSight(observer, target);
       expect(result).toBe(false);
-
-      // Verify sight was checked
-      expect(global.CONFIG.Canvas.polygonBackends.sight.testCollision).toHaveBeenCalled();
     });
 
     test('should detect line of sight when neither sight nor sound is blocked', () => {
       const observer = {
         center: { x: 0, y: 0 },
-        vision: null, // Force fallback to wall collision check
+        vision: null,
         actor: {
           system: {
             perception: {
-              vision: true, // Observer has vision capabilities
+              vision: true,
             },
           },
         },
@@ -98,34 +112,40 @@ describe('Wall Sight Blocking Fix', () => {
 
       const target = {
         center: { x: 100, y: 0 },
-        shape: null, // Force fallback to wall collision check
+        shape: null,
       };
 
-      // Mock foundry ray class
-      global.foundry = {
-        canvas: {
-          geometry: {
-            Ray: jest.fn().mockImplementation((a, b) => ({ A: a, B: b })),
+      // Mock a wall that blocks ONLY movement (darkness wall - should be skipped)
+      global.canvas.walls.placeables = [
+        {
+          document: {
+            move: CONST.WALL_SENSE_TYPES.NORMAL, // Blocks movement
+            sight: CONST.WALL_SENSE_TYPES.NONE, // Doesn't block sight
+            sound: CONST.WALL_SENSE_TYPES.NONE, // Doesn't block sound
+            c: [50, -10, 50, 10],
           },
         },
-      };
+      ];
 
-      // Mock the polygon backend to return no collision (not blocked)
-      global.CONFIG.Canvas.polygonBackends.sight.testCollision.mockReturnValue(false);
+      // Even if there's an intersection, darkness walls should be skipped
+      global.foundry.utils.lineLineIntersection.mockReturnValue({
+        x: 50,
+        y: 0,
+        t0: 0.5,
+      });
 
-      // Should have line of sight (return true)
       const result = visionAnalyzer.hasLineOfSight(observer, target);
-      expect(result).toBe(true);
+      expect(result).toBe(true); // Should have line of sight because wall is darkness-only
     });
 
     test('should detect no line of sight when sight is blocked (main fix test)', () => {
       const observer = {
         center: { x: 0, y: 0 },
-        vision: null, // Force fallback to wall collision check
+        vision: null,
         actor: {
           system: {
             perception: {
-              vision: true, // Observer has vision capabilities
+              vision: true,
             },
           },
         },
@@ -134,25 +154,28 @@ describe('Wall Sight Blocking Fix', () => {
 
       const target = {
         center: { x: 100, y: 0 },
-        shape: null, // Force fallback to wall collision check
+        shape: null,
       };
 
-      // Mock foundry ray class
-      global.foundry = {
-        canvas: {
-          geometry: {
-            Ray: jest.fn().mockImplementation((a, b) => ({ A: a, B: b })),
+      // Mock a physical wall that blocks sight
+      global.canvas.walls.placeables = [
+        {
+          document: {
+            move: CONST.WALL_SENSE_TYPES.NORMAL,
+            sight: CONST.WALL_SENSE_TYPES.NORMAL, // Blocks sight
+            sound: CONST.WALL_SENSE_TYPES.NONE, // Doesn't block sound (but that's OK)
+            c: [50, -10, 50, 10],
           },
         },
-      };
+      ];
 
-      // Mock the polygon backend to return collision for sight (blocked)
-      global.CONFIG.Canvas.polygonBackends.sight.testCollision.mockReturnValue(true);
+      global.foundry.utils.lineLineIntersection.mockReturnValue({
+        x: 50,
+        y: 0,
+        t0: 0.5,
+      });
 
       const result = visionAnalyzer.hasLineOfSight(observer, target);
-
-      // Should return false (no line of sight) because sight is blocked
-      // This is the core fix - we only need sight to be blocked, not sight AND sound
       expect(result).toBe(false);
     });
 
@@ -163,7 +186,7 @@ describe('Wall Sight Blocking Fix', () => {
         actor: {
           system: {
             perception: {
-              vision: true, // Observer has vision capabilities
+              vision: true,
             },
           },
         },
@@ -175,22 +198,12 @@ describe('Wall Sight Blocking Fix', () => {
         shape: null,
       };
 
-      // Mock foundry ray class
-      global.foundry = {
-        canvas: {
-          geometry: {
-            Ray: jest.fn().mockImplementation((a, b) => ({ A: a, B: b })),
-          },
-        },
-      };
+      // Simulate missing walls
+      global.canvas.walls.placeables = [];
 
-      // Delete polygon backend to test graceful fallback
-      delete global.CONFIG.Canvas.polygonBackends;
-
-      // Should not throw and should assume line of sight when no polygon backend available
       expect(() => {
         const result = visionAnalyzer.hasLineOfSight(observer, target);
-        expect(result).toBe(true); // Returns true (fail-open) when no backend available
+        expect(result).toBe(true); // No walls = no blocking
       }).not.toThrow();
     });
 
@@ -201,7 +214,7 @@ describe('Wall Sight Blocking Fix', () => {
         actor: {
           system: {
             perception: {
-              vision: false, // Observer has NO vision capabilities (like Adhukait)
+              vision: false, // Observer has NO vision capabilities
             },
           },
         },
@@ -213,19 +226,8 @@ describe('Wall Sight Blocking Fix', () => {
         shape: null,
       };
 
-      // Mock foundry ray class
-      global.foundry = {
-        canvas: {
-          geometry: {
-            Ray: jest.fn().mockImplementation((a, b) => ({ A: a, B: b })),
-          },
-        },
-      };
-
-      // Mock no walls blocking
-      global.canvas.walls = {
-        checkCollision: jest.fn(() => false),
-      };
+      // No walls blocking
+      global.canvas.walls.placeables = [];
 
       const result = visionAnalyzer.hasLineOfSight(observerWithNoVision, target);
 

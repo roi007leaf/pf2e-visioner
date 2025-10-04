@@ -52,21 +52,27 @@ describe('Integration: Greater Darkvision Feat + Rank 4 Darkness', () => {
         origCanvas = global.canvas;
         origConfig = global.CONFIG;
 
-        // Mock polygon backends for wall collision detection
-        global.CONFIG = {
-            Canvas: {
-                polygonBackends: {
-                    move: {
-                        testCollision: () => false // No physical walls in this test
-                    },
-                    sight: {
-                        testCollision: () => false
-                    },
-                    sound: {
-                        testCollision: () => false
-                    }
-                }
-            }
+        // Mock CONST for wall sense types
+        global.CONST = {
+            WALL_SENSE_TYPES: {
+                NONE: 0,
+                LIMITED: 10,
+                NORMAL: 20,
+                PROXIMITY: 30,
+                DISTANCE: 40,
+            },
+        };
+
+        // Mock foundry utilities
+        global.foundry = {
+            canvas: {
+                geometry: {
+                    Ray: jest.fn().mockImplementation((a, b) => ({ A: a, B: b })),
+                },
+            },
+            utils: {
+                lineLineIntersection: jest.fn(() => null), // No walls intersect by default
+            },
         };
 
         global.canvas = {
@@ -127,7 +133,9 @@ describe('Integration: Greater Darkvision Feat + Rank 4 Darkness', () => {
             visibility: {
                 testVisibility: () => true,
             },
-            walls: { checkCollision: () => false },
+            walls: {
+                placeables: [], // No physical walls in this test
+            },
         };
 
         canvas.scene.lights.set('darkness-source-1', canvas.lighting.placeables[0].document);

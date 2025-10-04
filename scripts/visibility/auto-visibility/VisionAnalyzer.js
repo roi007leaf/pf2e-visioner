@@ -248,8 +248,6 @@ export class VisionAnalyzer {
    */
   isSoundBlocked(observer, target) {
     try {
-
-
       // Check if polygon backend for sound is available
       const soundBackend = CONFIG.Canvas.polygonBackends?.sound;
       if (!soundBackend?.testCollision) {
