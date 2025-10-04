@@ -862,6 +862,21 @@ global.createMockActor = (data = {}) => ({
   hasPlayerOwner: data.hasPlayerOwner || false,
   isOwner: data.isOwner || false,
   isLinked: data.isLinked !== undefined ? data.isLinked : false, // For linked actor tests
+  getRollOptions: function () {
+    const options = [];
+    if (this.itemTypes?.effect) {
+      for (const effect of this.itemTypes.effect) {
+        if (effect.system?.rules) {
+          for (const rule of effect.system.rules) {
+            if (rule.key === 'RollOption' && rule.option) {
+              options.push(rule.option);
+            }
+          }
+        }
+      }
+    }
+    return options;
+  },
   ...data,
 });
 

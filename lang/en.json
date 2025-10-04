@@ -622,6 +622,19 @@
     "SNEAK_ADEPT_FEAT": {
       "OUTCOME_UPGRADED": "Sneak Adept",
       "TOOLTIP": "Failure upgraded to Success due to Sneak Adept feat. It's almost impossible to spot this creature."
+    },
+    "MINIMUM_VISIBILITY": {
+      "EFFECT_TARGET_NAME": "Minimum Visibility (As Target)",
+      "EFFECT_TARGET_DESCRIPTION": "Sets a minimum visibility state for this token when others observe it. The token cannot appear better than the selected state.",
+      "EFFECT_OBSERVER_NAME": "Minimum Visibility (As Observer)",
+      "EFFECT_OBSERVER_DESCRIPTION": "Sets a minimum visibility state for all tokens observed by this token. Other tokens cannot appear better than the selected state.",
+      "CHOICE_LABEL": "Minimum Visibility State",
+      "CHOICE_OBSERVED": "Observed",
+      "CHOICE_CONCEALED": "Concealed",
+      "CHOICE_HIDDEN": "Hidden",
+      "CHOICE_UNDETECTED": "Undetected",
+      "TOOLTIP_TARGET": "Minimum Visibility (As Target): Others cannot see this token better than {state}",
+      "TOOLTIP_OBSERVER": "Minimum Visibility (As Observer): This token cannot see others better than {state}"
     }
   }
 }

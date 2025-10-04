@@ -8,7 +8,6 @@
  */
 
 import { calculateVisibilityFromTokens } from '../VisibilityCalculatorAdapter.js';
-import { SpatialAnalysisService } from './core/SpatialAnalysisService.js';
 
 export class VisibilityCalculator {
   /** @type {VisibilityCalculator} */
@@ -25,6 +24,9 @@ export class VisibilityCalculator {
 
   /** @type {LightingRasterService} */
   #lightingRasterService = null;
+
+  /** @type {MinimumVisibilityService} */
+  #minimumVisibilityService = null;
 
   constructor() {
     if (VisibilityCalculator.#instance) {
@@ -49,19 +51,21 @@ export class VisibilityCalculator {
    * @param {LightingCalculator} lightingCalculator
    * @param {VisionAnalyzer} visionAnalyzer
    * @param {ConditionManager} ConditionManager
-   * @param {SpatialAnalysisService} spatialAnalyzer - Optional spatial analysis service for optimizations
-   * @param {ExclusionManager} exclusionManager - Optional exclusion manager for token exclusions
+   * @param {LightingRasterService} lightingRasterService - Optional lighting raster service for ray darkness checks
+   * @param {MinimumVisibilityService} minimumVisibilityService - Optional minimum visibility service for enforcing visibility limits
    */
   initialize(
     lightingCalculator,
     visionAnalyzer,
     ConditionManager,
     lightingRasterService,
+    minimumVisibilityService = null,
   ) {
     this.#lightingCalculator = lightingCalculator;
     this.#visionAnalyzer = visionAnalyzer;
     this.#conditionManager = ConditionManager;
     this.#lightingRasterService = lightingRasterService || null;
+    this.#minimumVisibilityService = minimumVisibilityService;
   }
 
   /**
@@ -164,7 +168,8 @@ export class VisibilityCalculator {
         lightingCalculator: this.#lightingCalculator,
         visionAnalyzer: this.#visionAnalyzer,
         conditionManager: this.#conditionManager,
-        lightingRasterService: this.#lightingRasterService
+        lightingRasterService: this.#lightingRasterService,
+        minimumVisibilityService: this.#minimumVisibilityService
       },
       options
     );

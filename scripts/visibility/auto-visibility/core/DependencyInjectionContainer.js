@@ -66,6 +66,12 @@ export class DependencyInjectionContainer {
             return new OverrideService();
         });
 
+        // Minimum visibility service
+        this.#factories.set('minimumVisibilityService', async () => {
+            const { MinimumVisibilityService } = await import('../../../services/minimum-visibility-service.js');
+            return new MinimumVisibilityService();
+        });
+
         // Core manager services (require AVS instance)
         this.#factories.set('telemetryReporter', async () => {
             const { TelemetryReporter } = await import('./TelemetryReporter.js');
@@ -123,7 +129,8 @@ export class DependencyInjectionContainer {
                 visibilityMapService: dependencies.visibilityMapService,
                 visionAnalyzer: dependencies.visionAnalyzer,
                 debug: dependencies.debug,
-                maxVisibilityDistance: dependencies.maxVisibilityDistance
+                maxVisibilityDistance: dependencies.maxVisibilityDistance,
+                minimumVisibilityService: dependencies.minimumVisibilityService
             });
         });
 
@@ -276,6 +283,9 @@ export class DependencyInjectionContainer {
 
             // Override service
             overrideService: await this.get('overrideService'),
+
+            // Minimum visibility service
+            minimumVisibilityService: await this.get('minimumVisibilityService'),
 
             // Managers
             telemetryReporter,

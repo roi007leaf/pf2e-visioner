@@ -130,6 +130,7 @@ export class EventDrivenVisibilitySystem {
         visibilityMapService: coreServices.visibilityMapService,
         overrideService: coreServices.overrideService,
         visionAnalyzer: coreServices.visionAnalyzer,
+        minimumVisibilityService: coreServices.minimumVisibilityService
       });
 
       // Initialize BatchOrchestrator
@@ -174,7 +175,8 @@ export class EventDrivenVisibilitySystem {
         coreServices.lightingCalculator,
         coreServices.visionAnalyzer,
         coreServices.conditionManager,
-        coreServices.lightingRasterService
+        coreServices.lightingRasterService,
+        coreServices.minimumVisibilityService
       );
 
       // Set system state

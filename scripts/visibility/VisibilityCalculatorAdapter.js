@@ -392,6 +392,7 @@ function extractAuxiliaryConditions(target, options) {
  * @param {Object} dependencies.visionAnalyzer - Vision analyzer instance
  * @param {Object} dependencies.conditionManager - Condition manager instance
  * @param {Object} dependencies.lightingRasterService - Lighting raster service instance (for ray darkness checks)
+ * @param {Object} dependencies.minimumVisibilityService - Optional minimum visibility service for enforcing visibility limits
  * @param {Object} options - Optional calculation options
  * @returns {Promise<Object>} Visibility result with state and detection info
  */
@@ -401,7 +402,13 @@ export async function calculateVisibilityFromTokens(
     dependencies,
     options = {}
 ) {
-    const { lightingCalculator, visionAnalyzer, conditionManager, lightingRasterService } = dependencies;
+    const { lightingCalculator, visionAnalyzer, conditionManager, lightingRasterService, minimumVisibilityService } = dependencies;
+
+    console.log('PF2E Visioner | calculateVisibilityFromTokens called', {
+        hasMinimumVisibilityService: !!minimumVisibilityService,
+        observer: observer?.name || observer?.id,
+        target: target?.name || target?.id
+    });
 
     // Convert tokens to standardized input (now async due to ray darkness check)
     const input = await tokenStateToInput(
@@ -415,7 +422,32 @@ export async function calculateVisibilityFromTokens(
     );
 
     // Calculate using stateless calculator
-    return calculateVisibility(input);
+    const result = calculateVisibility(input);
+
+    // Apply visibility limits if service is available
+    if (minimumVisibilityService) {
+        const limitedState = minimumVisibilityService.applyMinimumVisibilityForPair(
+            observer,
+            target,
+            result.state
+        );
+
+        if (limitedState !== result.state) {
+            console.log('PF2E Visioner | MinimumVisibilityService: Applied limit', {
+                observer: observer.name || observer.id,
+                target: target.name || target.id,
+                calculated: result.state,
+                limited: limitedState
+            });
+        }
+
+        return {
+            ...result,
+            state: limitedState
+        };
+    }
+
+    return result;
 }
 
 

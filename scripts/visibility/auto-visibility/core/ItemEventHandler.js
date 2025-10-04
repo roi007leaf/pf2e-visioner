@@ -56,6 +56,17 @@ export class ItemEventHandler {
     #onItemUpdate(item, changes) {
         if (!this.#systemStateProvider.shouldProcessEvents()) return;
 
+        // Check for roll option toggle changes (PF2e stores toggleable rule states in flags)
+        const rollOptionToggled = this.#detectRollOptionToggle(item, changes);
+
+        if (rollOptionToggled) {
+            this.#systemStateProvider.debug('ItemEventHandler: roll option toggled', {
+                itemName: item.name,
+                changes: changes,
+                hasMinimumVisibility: this.#hasMinimumVisibilityRollOption(item)
+            });
+        }
+
         // Handle both general item changes and equipment-specific changes
         this.#handleItemChange(item, 'updated');
         this.#handleEquipmentChange(item, changes);
@@ -68,6 +79,44 @@ export class ItemEventHandler {
     #onItemDelete(item) {
         if (!this.#systemStateProvider.shouldProcessEvents()) return;
         this.#handleItemChange(item, 'deleted');
+    }
+
+    /**
+     * Detect if a roll option toggle state changed
+     * @param {Item} item - The item being updated
+     * @param {Object} changes - The changes object
+     * @returns {boolean} True if a roll option toggle changed
+     */
+    #detectRollOptionToggle(item, changes) {
+        // PF2e stores toggleable rule states in various places:
+        // 1. flags.pf2e.rulesSelections - for ChoiceSet selections
+        // 2. system.rules[].toggleable - for the rule definition
+        // 3. Item active state changes
+
+        const hasRuleChanges = changes.system?.rules !== undefined;
+        const hasFlagChanges = changes.flags?.pf2e !== undefined;
+        const hasActiveChange = changes.system?.active !== undefined;
+
+        // If any of these changed and the item has visibility roll options, it's a toggle
+        if ((hasRuleChanges || hasFlagChanges || hasActiveChange) && this.#hasMinimumVisibilityRollOption(item)) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Check if an item has minimum visibility roll options
+     * @param {Item} item - The item to check
+     * @returns {boolean} True if item has minimum visibility roll options
+     */
+    #hasMinimumVisibilityRollOption(item) {
+        return item.system?.rules?.some?.(rule =>
+            rule.key === 'RollOption' &&
+            (rule.option?.includes('minimum-visibility-target:') ||
+                rule.option?.includes('maximum-visibility-observer:') ||
+                rule.option?.includes('minimum-visibility-observer:'))
+        ) ?? false;
     }
 
     /**
@@ -88,7 +137,10 @@ export class ItemEventHandler {
             itemType === 'feat' ||
             itemType === 'action';
 
+        const hasMinimumVisibilityRollOption = this.#hasMinimumVisibilityRollOption(item);
+
         const isVisibilityRelated =
+            hasMinimumVisibilityRollOption ||
             itemName.includes('invisible') ||
             itemName.includes('hidden') ||
             itemName.includes('concealed') ||
@@ -100,7 +152,8 @@ export class ItemEventHandler {
             itemName.includes('see invisibility') ||
             itemName.includes('true seeing') ||
             itemName.includes('dancing lights') ||
-            itemName.includes('continual flame');
+            itemName.includes('continual flame') ||
+            itemName.includes('minimum visibility');
 
         // Strong hint that this item toggles an emitting LIGHT/DARKNESS on the token
         const lightEmitterHint =
@@ -131,7 +184,8 @@ export class ItemEventHandler {
                     action,
                     actorId: actor.id,
                     tokensAffected: tokens.length,
-                    lightEmitter: lightEmitterHint
+                    lightEmitter: lightEmitterHint,
+                    minimumVisibility: hasMinimumVisibilityRollOption
                 });
 
                 // Clear VisionAnalyzer cache for affected tokens

@@ -20,6 +20,8 @@ import { VisibilityMapService } from "./VisibilityMapService.js";
  * Returns the list of updates to apply plus per-batch breakdown counters.
  */
 export class BatchProcessor {
+    #minimumVisibilityService = null;
+
     /**
      * Creates a new BatchProcessor with injected dependencies.
      * @param {Object} dependencies - All required dependencies
@@ -33,6 +35,7 @@ export class BatchProcessor {
     * @param {VisibilityMapService} dependencies.visibilityMapService
      * @param {VisionAnalyzer} dependencies.visionAnalyzer - VisionAnalyzer for senses detection
      * @param {number} dependencies.maxVisibilityDistance
+     * @param {MinimumVisibilityService} dependencies.minimumVisibilityService - Service for minimum visibility enforcement
      */
     constructor(dependencies) {
         this.spatialAnalyzer = dependencies.spatialAnalyzer;
@@ -46,6 +49,7 @@ export class BatchProcessor {
         this.visibilityMapService = dependencies.visibilityMapService;
         this.visionAnalyzer = dependencies.visionAnalyzer;
         this.maxVisibilityDistance = dependencies.maxVisibilityDistance;
+        this.#minimumVisibilityService = dependencies.minimumVisibilityService || null;
 
         // Persistent caches to reduce expensive rebuilding between batches
         this._persistentCaches = {
@@ -539,12 +543,32 @@ export class BatchProcessor {
                 // Time update collection
                 const updateStart = performance.now();
 
-                // Queue updates if changed from ORIGINAL map state (before any calculations)
-                if (effectiveVisibility1 !== originalVisibility1) {
-                    updates.push({ observer: changedToken, target: otherToken, visibility: effectiveVisibility1 });
+                // Enforce minimum visibility floors before queueing updates
+                // Direction 1: changedToken sees otherToken - check otherToken's "as target" minimum
+                let finalVisibility1 = effectiveVisibility1;
+                let finalVisibility2 = effectiveVisibility2;
+
+                if (this.#minimumVisibilityService) {
+                    finalVisibility1 = this.#minimumVisibilityService.applyMinimumVisibilityForPair(changedToken, otherToken, effectiveVisibility1);
+                    finalVisibility2 = this.#minimumVisibilityService.applyMinimumVisibilityForPair(otherToken, changedToken, effectiveVisibility2);
+
+                    if (finalVisibility1 !== effectiveVisibility1 || finalVisibility2 !== effectiveVisibility2) {
+                        console.log('PF2E Visioner | BatchProcessor: Visibility limits applied', {
+                            pair: `${changedToken.name} <-> ${otherToken.name}`,
+                            direction1: { effective: effectiveVisibility1, final: finalVisibility1 },
+                            direction2: { effective: effectiveVisibility2, final: finalVisibility2 }
+                        });
+                    }
+                } else {
+                    console.warn('PF2E Visioner | BatchProcessor: minimumVisibilityService not available!');
                 }
-                if (effectiveVisibility2 !== originalVisibility2) {
-                    updates.push({ observer: otherToken, target: changedToken, visibility: effectiveVisibility2 });
+
+                // Queue updates if changed from ORIGINAL map state (before any calculations)
+                if (finalVisibility1 !== originalVisibility1) {
+                    updates.push({ observer: changedToken, target: otherToken, visibility: finalVisibility1 });
+                }
+                if (finalVisibility2 !== originalVisibility2) {
+                    updates.push({ observer: otherToken, target: changedToken, visibility: finalVisibility2 });
                 }
 
                 updateCollectionTime += performance.now() - updateStart;

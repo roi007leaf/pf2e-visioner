@@ -87,3 +87,21 @@ export function createAggregateEffectData(visibilityState, signature, options = 
     },
   };
 }
+
+export function getMinimumVisibilityAsTarget(token) {
+  if (!token?.actor) return null;
+
+  const effects = token.actor.itemTypes?.effect ?? [];
+  const minimumEffect = effects.find((e) => {
+    const rollOptions = e.system?.rules?.find?.(r => r.key === 'RollOption')?.option;
+    return rollOptions?.startsWith?.('minimum-visibility-target:');
+  });
+
+  if (!minimumEffect) return null;
+
+  const rollOptionRule = minimumEffect.system?.rules?.find?.(r => r.key === 'RollOption');
+  if (!rollOptionRule?.option) return null;
+
+  const match = rollOptionRule.option.match(/^minimum-visibility-target:(concealed|hidden|undetected)$/);
+  return match ? match[1] : null;
+}
