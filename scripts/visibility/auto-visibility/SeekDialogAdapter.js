@@ -57,7 +57,7 @@ export class SeekDialogAdapter {
 
     /**
      * Determine which sense the observer is using to detect the target
-     * This is the main method that replaces ~240 lines in seek-action.js
+     * This is the main method that replaces ~240 lines in SeekAction.js
      * 
      * @param {Token} observer - The observing token
      * @param {Token} target - The target token

@@ -301,7 +301,7 @@ export class SneakDialogService {
       }
 
       // Generate fresh outcomes using the sneak action handler to calculate end positions
-      const { SneakActionHandler } = await import('../actions/sneak-action.js');
+      const { SneakActionHandler } = await import('../actions/SneakAction.js');
       const sneakHandler = new SneakActionHandler();
 
       // Update actionData to use the correctly resolved token to prevent token resolution inconsistencies

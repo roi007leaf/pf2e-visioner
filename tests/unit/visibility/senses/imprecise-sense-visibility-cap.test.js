@@ -2,7 +2,7 @@
  * @jest-environment jsdom
  */
 
-import { SeekActionHandler } from '../../../../scripts/chat/services/actions/seek-action.js';
+import { SeekActionHandler } from '../../../../scripts/chat/services/actions/SeekAction.js';
 import { VisionAnalyzer } from '../../../../scripts/visibility/auto-visibility/VisionAnalyzer.js';
 
 // Mock canvas and game globals

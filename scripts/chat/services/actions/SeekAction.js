@@ -1,7 +1,7 @@
 import { MODULE_ID, VISIBILITY_STATES } from '../../../constants.js';
 import { SeekDialogAdapter } from '../../../visibility/auto-visibility/SeekDialogAdapter.js';
 import { appliedSeekChangesByMessage } from '../data/message-cache.js';
-import { ActionHandlerBase } from './base-action.js';
+import { ActionHandlerBase } from './BaseAction.js';
 
 export class SeekActionHandler extends ActionHandlerBase {
   constructor() {

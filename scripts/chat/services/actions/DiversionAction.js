@@ -1,7 +1,7 @@
 import { MODULE_ID, VISIBILITY_STATES } from '../../../constants.js';
 import { appliedDiversionChangesByMessage } from '../data/message-cache.js';
 import { shouldFilterAlly } from '../infra/shared-utils.js';
-import { ActionHandlerBase } from './base-action.js';
+import { ActionHandlerBase } from './BaseAction.js';
 
 export class DiversionActionHandler extends ActionHandlerBase {
   constructor() {

@@ -33,8 +33,8 @@ describe('Sneak Action Comprehensive Tests', () => {
 
         expect(getDefaultNewStateFor('sneak', 'observed', 'critical-success')).toBe('undetected');
         expect(getDefaultNewStateFor('sneak', 'observed', 'success')).toBe('undetected');
-        expect(getDefaultNewStateFor('sneak', 'observed', 'failure')).toBe('hidden');
-        expect(getDefaultNewStateFor('sneak', 'observed', 'critical-failure')).toBe('observed');
+        expect(getDefaultNewStateFor('sneak', 'observed', 'failure')).toBe('avs');
+        expect(getDefaultNewStateFor('sneak', 'observed', 'critical-failure')).toBe('avs');
       });
 
       test('sneak from concealed state produces correct outcomes', () => {
@@ -44,8 +44,8 @@ describe('Sneak Action Comprehensive Tests', () => {
 
         expect(getDefaultNewStateFor('sneak', 'concealed', 'critical-success')).toBe('undetected');
         expect(getDefaultNewStateFor('sneak', 'concealed', 'success')).toBe('undetected');
-        expect(getDefaultNewStateFor('sneak', 'concealed', 'failure')).toBe('hidden');
-        expect(getDefaultNewStateFor('sneak', 'concealed', 'critical-failure')).toBe('concealed');
+        expect(getDefaultNewStateFor('sneak', 'concealed', 'failure')).toBe('avs');
+        expect(getDefaultNewStateFor('sneak', 'concealed', 'critical-failure')).toBe('avs');
       });
 
       test('sneak from hidden state produces correct outcomes', () => {
@@ -55,8 +55,8 @@ describe('Sneak Action Comprehensive Tests', () => {
 
         expect(getDefaultNewStateFor('sneak', 'hidden', 'critical-success')).toBe('undetected');
         expect(getDefaultNewStateFor('sneak', 'hidden', 'success')).toBe('undetected');
-        expect(getDefaultNewStateFor('sneak', 'hidden', 'failure')).toBe('hidden');
-        expect(getDefaultNewStateFor('sneak', 'hidden', 'critical-failure')).toBe('observed');
+        expect(getDefaultNewStateFor('sneak', 'hidden', 'failure')).toBe('avs');
+        expect(getDefaultNewStateFor('sneak', 'hidden', 'critical-failure')).toBe('avs');
       });
 
       test('sneak from undetected state produces correct outcomes', () => {
@@ -66,8 +66,8 @@ describe('Sneak Action Comprehensive Tests', () => {
 
         expect(getDefaultNewStateFor('sneak', 'undetected', 'critical-success')).toBe('undetected');
         expect(getDefaultNewStateFor('sneak', 'undetected', 'success')).toBe('undetected');
-        expect(getDefaultNewStateFor('sneak', 'undetected', 'failure')).toBe('hidden');
-        expect(getDefaultNewStateFor('sneak', 'undetected', 'critical-failure')).toBe('observed');
+        expect(getDefaultNewStateFor('sneak', 'undetected', 'failure')).toBe('avs');
+        expect(getDefaultNewStateFor('sneak', 'undetected', 'critical-failure')).toBe('avs');
       });
     });
   });
@@ -291,8 +291,8 @@ describe('Sneak Action Comprehensive Tests', () => {
         {
           oldState: 'observed',
           outcome: 'critical-failure',
-          expectedNewState: 'observed',
-          shouldBeActionable: false,
+          expectedNewState: 'avs',
+          shouldBeActionable: true,
         },
         {
           oldState: 'hidden',
@@ -303,8 +303,8 @@ describe('Sneak Action Comprehensive Tests', () => {
         {
           oldState: 'hidden',
           outcome: 'failure',
-          expectedNewState: 'hidden',
-          shouldBeActionable: false,
+          expectedNewState: 'avs',
+          shouldBeActionable: true,
         },
         {
           oldState: 'undetected',
@@ -315,7 +315,7 @@ describe('Sneak Action Comprehensive Tests', () => {
         {
           oldState: 'undetected',
           outcome: 'critical-failure',
-          expectedNewState: 'observed',
+          expectedNewState: 'avs',
           shouldBeActionable: true,
         },
       ];
@@ -451,6 +451,45 @@ describe('Sneak Action Comprehensive Tests', () => {
 
       expect(validOutcomes).toHaveLength(1);
       expect(validOutcomes[0].token.id).toBe('valid');
+    });
+  });
+
+  describe('Dialog AVS State Selection', () => {
+    test('failed sneak with no position data should select AVS state in dialog', () => {
+      const {
+        getDefaultNewStateFor,
+      } = require('../../../scripts/chat/services/data/action-state-config.js');
+
+      const newVisibility = getDefaultNewStateFor('sneak', 'hidden', 'failure');
+      expect(newVisibility).toBe('avs');
+    });
+
+    test('critical failure sneak should select AVS state in dialog', () => {
+      const {
+        getDefaultNewStateFor,
+      } = require('../../../scripts/chat/services/data/action-state-config.js');
+
+      const newVisibility = getDefaultNewStateFor('sneak', 'hidden', 'critical-failure');
+      expect(newVisibility).toBe('avs');
+    });
+
+    test('outcome with newVisibility=avs should have changed=false', () => {
+      const outcome = {
+        newVisibility: 'avs',
+        oldVisibility: 'hidden',
+        changed: false,
+      };
+
+      expect(outcome.newVisibility).toBe('avs');
+      expect(outcome.changed).toBe(false);
+    });
+
+    test('outcome changed property respects avs state', () => {
+      const currentState = 'hidden';
+      const newVisibility = 'avs';
+      const changed = newVisibility !== 'avs' && newVisibility !== currentState;
+
+      expect(changed).toBe(false);
     });
   });
 });

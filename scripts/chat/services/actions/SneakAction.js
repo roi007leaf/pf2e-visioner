@@ -8,7 +8,7 @@ import { notify } from '../infra/notifications.js';
 import { calculateStealthRollTotals, shouldFilterAlly } from '../infra/shared-utils.js';
 import sneakCore from '../SneakCore.js';
 import turnSneakTracker from '../TurnSneakTracker.js';
-import { ActionHandlerBase } from './base-action.js';
+import { ActionHandlerBase } from './BaseAction.js';
 
 export class SneakActionHandler extends ActionHandlerBase {
   constructor() {
@@ -695,7 +695,7 @@ export class SneakActionHandler extends ActionHandlerBase {
             const endVis = positionTransition?.endPosition?.avsVisibility;
             const endQualifies =
               endCover === 'standard' || endCover === 'greater' || endVis === 'concealed';
-            if (!endQualifies) newVisibility = 'observed';
+            if (!endQualifies) newVisibility = 'avs';
           }
         } catch { }
         // Feat-based post visibility adjustments (e.g., Vanish into the Land)
@@ -790,9 +790,9 @@ export class SneakActionHandler extends ActionHandlerBase {
         );
 
         // If roll outcome tracking indicates this observer already failed a previous roll,
-        // override the newVisibility to 'observed' regardless of current roll success
+        // override the newVisibility to 'avs' to let AVS control it
         if (!shouldApplyOutcome) {
-          newVisibility = 'observed';
+          newVisibility = 'avs';
         }
       }
     } catch (error) {

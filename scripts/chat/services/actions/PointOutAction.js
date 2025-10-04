@@ -1,6 +1,6 @@
 import { VISIBILITY_STATES } from '../../../constants.js';
 import { appliedPointOutChangesByMessage } from '../data/message-cache.js';
-import { ActionHandlerBase } from './base-action.js';
+import { ActionHandlerBase } from './BaseAction.js';
 
 export class PointOutActionHandler extends ActionHandlerBase {
   constructor() {
@@ -44,7 +44,7 @@ export class PointOutActionHandler extends ActionHandlerBase {
         // For GM-authored or unknown, fall back to this user's current target first
         if (game.user.targets?.size) target = Array.from(game.user.targets)[0];
       }
-    } catch (_) {}
+    } catch (_) { }
     if (!target) {
       const visFlag = msg?.flags?.['pf2e-visioner']?.pointOut?.targetTokenId;
       if (visFlag) target = canvas.tokens.get(visFlag) || null;
@@ -60,7 +60,7 @@ export class PointOutActionHandler extends ActionHandlerBase {
     // Exclude loot targets from Point Out
     try {
       if (target?.actor?.type === 'loot') return [];
-    } catch (_) {}
+    } catch (_) { }
 
     // Allies are same-disposition tokens that currently cannot see the target
     const { getVisibilityBetween } = await import('../../../utils.js');

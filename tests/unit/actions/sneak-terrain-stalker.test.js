@@ -53,7 +53,7 @@ describe('Terrain Stalker free-sneak', () => {
     }
 
     test('applies when moved <= 1 grid and path >= 10 ft from enemies and all undetected', async () => {
-        const { SneakActionHandler } = require('../../../scripts/chat/services/actions/sneak-action.js');
+        const { SneakActionHandler } = require('../../../scripts/chat/services/actions/SneakAction.js');
         const handler = new SneakActionHandler();
 
         // Sneaker moved exactly 1 square: (0,0) -> (100,0)
@@ -88,7 +88,7 @@ describe('Terrain Stalker free-sneak', () => {
     });
 
     test('does not apply if moved > 1 grid', async () => {
-        const { SneakActionHandler } = require('../../../scripts/chat/services/actions/sneak-action.js');
+        const { SneakActionHandler } = require('../../../scripts/chat/services/actions/SneakAction.js');
         const handler = new SneakActionHandler();
 
         // Move > 1 square: (0,0) -> (110, 0) ~ 5.5 ft
@@ -116,7 +116,7 @@ describe('Terrain Stalker free-sneak', () => {
     });
 
     test('does not apply if path comes within < 10 ft of an enemy', async () => {
-        const { SneakActionHandler } = require('../../../scripts/chat/services/actions/sneak-action.js');
+        const { SneakActionHandler } = require('../../../scripts/chat/services/actions/SneakAction.js');
         const handler = new SneakActionHandler();
 
         // Segment: (0,0) -> (100,0). Enemy at (50, 100) => 100 px = 5 ft from path
@@ -139,7 +139,7 @@ describe('Terrain Stalker free-sneak', () => {
     });
 
     test('does not apply if any enemy does not see sneaker as undetected', async () => {
-        const { SneakActionHandler } = require('../../../scripts/chat/services/actions/sneak-action.js');
+        const { SneakActionHandler } = require('../../../scripts/chat/services/actions/SneakAction.js');
         const { eventDrivenVisibilitySystem } = require('../../../scripts/visibility/auto-visibility/EventDrivenVisibilitySystem.js');
 
         // Make one enemy return observed

@@ -33,7 +33,7 @@ export async function previewActionResults(actionData) {
                 const tokens = actor.getActiveTokens(true);
                 if (tokens?.length) return tokens[0];
               }
-            } catch {}
+            } catch { }
             return null;
           };
           const seekerToken = resolveToken(actionData?.actor);
@@ -54,7 +54,7 @@ export async function previewActionResults(actionData) {
             // Ignore errors when closing existing dialog
           }
 
-          const { SeekActionHandler } = await import('../actions/seek-action.js');
+          const { SeekActionHandler } = await import('../actions/SeekAction.js');
           const { SeekPreviewDialog } = await import('../../dialogs/SeekPreviewDialog.js');
           const handler = new SeekActionHandler();
           await handler.ensurePrerequisites(actionData);
@@ -70,7 +70,7 @@ export async function previewActionResults(actionData) {
               );
               return;
             }
-          } catch {}
+          } catch { }
 
           // Do NOT pre-filter allies at discovery time; let the dialog control it live
           const subjects = await handler.discoverSubjects({ ...actionData, ignoreAllies: false });
@@ -98,7 +98,7 @@ export async function previewActionResults(actionData) {
         }
       }
       case 'point-out': {
-        const { PointOutActionHandler } = await import('../actions/point-out-action.js');
+        const { PointOutActionHandler } = await import('../actions/PointOutAction.js');
         const { PointOutPreviewDialog } = await import('../../dialogs/PointOutPreviewDialog.js');
         const handler = new PointOutActionHandler();
         const subjects = await handler.discoverSubjects(actionData);
@@ -130,7 +130,7 @@ export async function previewActionResults(actionData) {
             );
             return;
           }
-        } catch {}
+        } catch { }
         // Do NOT pre-filter allies; let dialog control it
         const subjects = await handler.discoverSubjects({ ...actionData, ignoreAllies: false });
         const outcomes = await Promise.all(
@@ -144,7 +144,7 @@ export async function previewActionResults(actionData) {
         return;
       }
       case 'sneak': {
-        const { SneakActionHandler } = await import('../actions/sneak-action.js');
+        const { SneakActionHandler } = await import('../actions/SneakAction.js');
         const { SneakPreviewDialog } = await import('../../dialogs/SneakPreviewDialog.js');
         const handler = new SneakActionHandler();
 
@@ -163,7 +163,7 @@ export async function previewActionResults(actionData) {
             previewActionData.context = previewActionData.context || {};
             previewActionData.context._visionerRollId = rollId;
           }
-        } catch {}
+        } catch { }
         // RAW enforcement gate: do not open dialog if prerequisites fail
         try {
           const { checkForValidTargets } = await import('../infra/target-checker.js');
@@ -175,7 +175,7 @@ export async function previewActionResults(actionData) {
             );
             return;
           }
-        } catch {}
+        } catch { }
         // Do NOT pre-filter allies; let dialog control it
         const subjects = await handler.discoverSubjects({
           ...previewActionData,
@@ -218,7 +218,7 @@ export async function previewActionResults(actionData) {
         return;
       }
       case 'create-a-diversion': {
-        const { DiversionActionHandler } = await import('../actions/diversion-action.js');
+        const { DiversionActionHandler } = await import('../actions/DiversionAction.js');
         const { CreateADiversionPreviewDialog } = await import(
           '../../dialogs/CreateADiversionPreviewDialog.js'
         );
@@ -234,7 +234,7 @@ export async function previewActionResults(actionData) {
         return;
       }
       case 'take-cover': {
-        const { TakeCoverActionHandler } = await import('../actions/take-cover-action.js');
+        const { TakeCoverActionHandler } = await import('../actions/TakeCoverAction.js');
         const { TakeCoverPreviewDialog } = await import(
           '../../dialogs/TakeCoverPreviewDialog.js'
         );
@@ -248,7 +248,7 @@ export async function previewActionResults(actionData) {
         return;
       }
       case 'consequences': {
-        const { ConsequencesActionHandler } = await import('../actions/consequences-action.js');
+        const { ConsequencesActionHandler } = await import('../actions/ConsequencesAction.js');
         const { ConsequencesPreviewDialog } = await import(
           '../../dialogs/ConsequencesPreviewDialog.js'
         );
@@ -268,7 +268,7 @@ export async function previewActionResults(actionData) {
             );
             return;
           }
-        } catch {}
+        } catch { }
 
         const subjects = await handler.discoverSubjects({ ...actionData, ignoreAllies: false });
         const outcomes = await Promise.all(

@@ -1,13 +1,13 @@
 // Apply helpers for chat automation actions
 
 // constants import not required in this module after helper removal
-import { ConsequencesActionHandler } from './actions/consequences-action.js';
-import { DiversionActionHandler } from './actions/diversion-action.js';
+import { ConsequencesActionHandler } from './actions/ConsequencesAction.js';
+import { DiversionActionHandler } from './actions/DiversionAction.js';
 import { HideActionHandler } from './actions/HideAction.js';
-import { PointOutActionHandler } from './actions/point-out-action.js';
-import { SeekActionHandler } from './actions/seek-action.js';
-import { SneakActionHandler } from './actions/sneak-action.js';
-import { TakeCoverActionHandler } from './actions/take-cover-action.js';
+import { PointOutActionHandler } from './actions/PointOutAction.js';
+import { SeekActionHandler } from './actions/SeekAction.js';
+import { SneakActionHandler } from './actions/SneakAction.js';
+import { TakeCoverActionHandler } from './actions/TakeCoverAction.js';
 
 export async function applyNowSeek(actionData, button) {
   const handler = new SeekActionHandler();

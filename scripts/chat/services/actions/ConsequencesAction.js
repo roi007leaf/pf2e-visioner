@@ -2,7 +2,7 @@ import { MODULE_ID, VISIBILITY_STATES } from '../../../constants.js';
 import { appliedConsequencesChangesByMessage } from '../data/message-cache.js';
 import { log, notify } from '../infra/notifications.js';
 import { shouldFilterAlly } from '../infra/shared-utils.js';
-import { ActionHandlerBase } from './base-action.js';
+import { ActionHandlerBase } from './BaseAction.js';
 
 export class ConsequencesActionHandler extends ActionHandlerBase {
   constructor() {

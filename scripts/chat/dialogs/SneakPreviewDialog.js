@@ -339,9 +339,9 @@ export class SneakPreviewDialog extends BaseActionDialog {
         // Stash for UI rendering
         outcome._featPositionOverride = effective;
 
-        // Only override to observed if one or both positions don't qualify AFTER overrides
+        // Only override to AVS if one or both positions don't qualify AFTER overrides
         if (!effective.startQualifies || !effective.endQualifies) {
-          outcome.newVisibility = 'observed';
+          outcome.newVisibility = 'avs';
         } else {
           // Both positions qualify - calculate proper outcome based on roll result
           const currentVisibility = outcome.oldVisibility || outcome.currentVisibility;
@@ -386,7 +386,9 @@ export class SneakPreviewDialog extends BaseActionDialog {
       const baseOldState = outcome.oldVisibility || currentVisibility;
       // Special case: If current state is AVS-controlled and override is 'avs', no change
       let hasActionableChange = false;
-      if (outcome.overrideState === 'avs' && this.isCurrentStateAvsControlled(outcome)) {
+      if (typeof outcome.changed === 'boolean') {
+        hasActionableChange = outcome.changed;
+      } else if (outcome.overrideState === 'avs' && this.isCurrentStateAvsControlled(outcome)) {
         hasActionableChange = false;
       } else {
         hasActionableChange =
@@ -1429,9 +1431,9 @@ export class SneakPreviewDialog extends BaseActionDialog {
         } catch { }
         outcome._featPositionOverride = effective;
 
-        // Only override to observed if one or both positions don't qualify AFTER overrides
+        // Only override to AVS if one or both positions don't qualify AFTER overrides
         if (!effective.startQualifies || !effective.endQualifies) {
-          outcome.newVisibility = 'observed';
+          outcome.newVisibility = 'avs';
           outcome.overrideState = null;
         } else {
           // Both positions qualify - calculate proper outcome based on roll result
@@ -1465,7 +1467,9 @@ export class SneakPreviewDialog extends BaseActionDialog {
       const baseOldState = outcome.oldVisibility || currentVisibility;
       // Special case: If current state is AVS-controlled and override is 'avs', no change
       let hasActionableChange = false;
-      if (outcome.overrideState === 'avs' && this.isCurrentStateAvsControlled(outcome)) {
+      if (typeof outcome.changed === 'boolean') {
+        hasActionableChange = outcome.changed;
+      } else if (outcome.overrideState === 'avs' && this.isCurrentStateAvsControlled(outcome)) {
         hasActionableChange = false;
       } else {
         hasActionableChange =
@@ -2395,7 +2399,7 @@ export class SneakPreviewDialog extends BaseActionDialog {
     } else {
       // Calculate qualifications from position transition data
       const { default: EnhancedSneakOutcome } = await import(
-        '../services/actions/enhanced-sneak-outcome.js'
+        '../services/actions/EnhancedSneakOutcome.js'
       );
       startQualifies = EnhancedSneakOutcome.doesPositionQualifyForSneak(
         positionTransition.startPosition?.avsVisibility,
@@ -2415,8 +2419,8 @@ export class SneakPreviewDialog extends BaseActionDialog {
 
     // Apply the position qualification logic
     if (!startQualifies || !endQualifies) {
-      // If start OR end position doesn't qualify for sneak -> observed (sneak fails)
-      newVisibility = 'observed';
+      // If start OR end position doesn't qualify for sneak -> AVS (defer to system)
+      newVisibility = 'avs';
     } else {
       // If both positions qualify -> use standard calculation from action-state-config.js
       const { getDefaultNewStateFor } = await import('../services/data/action-state-config.js');

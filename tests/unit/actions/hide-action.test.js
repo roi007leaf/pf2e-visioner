@@ -43,8 +43,8 @@ describe('Hide Action Comprehensive Tests', () => {
 
       expect(getDefaultNewStateFor('hide', 'observed', 'critical-success')).toBe('hidden');
       expect(getDefaultNewStateFor('hide', 'observed', 'success')).toBe('hidden');
-      expect(getDefaultNewStateFor('hide', 'observed', 'failure')).toBe('observed');
-      expect(getDefaultNewStateFor('hide', 'observed', 'critical-failure')).toBe('observed');
+      expect(getDefaultNewStateFor('hide', 'observed', 'failure')).toBe('avs');
+      expect(getDefaultNewStateFor('hide', 'observed', 'critical-failure')).toBe('avs');
     });
 
     test('hide from concealed state produces correct outcomes', () => {
@@ -54,8 +54,8 @@ describe('Hide Action Comprehensive Tests', () => {
 
       expect(getDefaultNewStateFor('hide', 'concealed', 'critical-success')).toBe('hidden');
       expect(getDefaultNewStateFor('hide', 'concealed', 'success')).toBe('hidden');
-      expect(getDefaultNewStateFor('hide', 'concealed', 'failure')).toBe('concealed');
-      expect(getDefaultNewStateFor('hide', 'concealed', 'critical-failure')).toBe('concealed');
+      expect(getDefaultNewStateFor('hide', 'concealed', 'failure')).toBe('avs');
+      expect(getDefaultNewStateFor('hide', 'concealed', 'critical-failure')).toBe('avs');
     });
 
     test('hide from hidden state produces correct outcomes', () => {
@@ -65,8 +65,8 @@ describe('Hide Action Comprehensive Tests', () => {
 
       expect(getDefaultNewStateFor('hide', 'hidden', 'critical-success')).toBe('hidden');
       expect(getDefaultNewStateFor('hide', 'hidden', 'success')).toBe('hidden');
-      expect(getDefaultNewStateFor('hide', 'hidden', 'failure')).toBe('observed');
-      expect(getDefaultNewStateFor('hide', 'hidden', 'critical-failure')).toBe('observed');
+      expect(getDefaultNewStateFor('hide', 'hidden', 'failure')).toBe('avs');
+      expect(getDefaultNewStateFor('hide', 'hidden', 'critical-failure')).toBe('avs');
     });
 
     test('hide from undetected state produces correct outcomes', () => {
@@ -76,8 +76,8 @@ describe('Hide Action Comprehensive Tests', () => {
 
       expect(getDefaultNewStateFor('hide', 'undetected', 'critical-success')).toBe('undetected');
       expect(getDefaultNewStateFor('hide', 'undetected', 'success')).toBe('undetected');
-      expect(getDefaultNewStateFor('hide', 'undetected', 'failure')).toBe('observed');
-      expect(getDefaultNewStateFor('hide', 'undetected', 'critical-failure')).toBe('observed');
+      expect(getDefaultNewStateFor('hide', 'undetected', 'failure')).toBe('avs');
+      expect(getDefaultNewStateFor('hide', 'undetected', 'critical-failure')).toBe('avs');
     });
   });
 
@@ -279,7 +279,7 @@ describe('Hide Action Comprehensive Tests', () => {
         expect(hasActionableChange).toBe(true);
       });
 
-      test('hide from observed to observed (failure) is not actionable', () => {
+      test('hide from observed to avs (failure) is actionable', () => {
         const {
           getDefaultNewStateFor,
         } = require('../../../scripts/chat/services/data/action-state-config.js');
@@ -288,8 +288,8 @@ describe('Hide Action Comprehensive Tests', () => {
         const newState = getDefaultNewStateFor('hide', oldState, 'failure');
         const hasActionableChange = newState !== oldState;
 
-        expect(newState).toBe('observed');
-        expect(hasActionableChange).toBe(false);
+        expect(newState).toBe('avs');
+        expect(hasActionableChange).toBe(true);
       });
 
       test('hide from hidden to hidden (success) is not actionable', () => {
@@ -305,7 +305,7 @@ describe('Hide Action Comprehensive Tests', () => {
         expect(hasActionableChange).toBe(false);
       });
 
-      test('hide from undetected to observed (failure) is actionable', () => {
+      test('hide from undetected to avs (failure) is actionable', () => {
         const {
           getDefaultNewStateFor,
         } = require('../../../scripts/chat/services/data/action-state-config.js');
@@ -314,7 +314,7 @@ describe('Hide Action Comprehensive Tests', () => {
         const newState = getDefaultNewStateFor('hide', oldState, 'failure');
         const hasActionableChange = newState !== oldState;
 
-        expect(newState).toBe('observed');
+        expect(newState).toBe('avs');
         expect(hasActionableChange).toBe(true);
       });
     });
@@ -335,8 +335,8 @@ describe('Hide Action Comprehensive Tests', () => {
         {
           oldState: 'observed',
           outcome: 'failure',
-          expectedNewState: 'observed',
-          shouldBeActionable: false,
+          expectedNewState: 'avs',
+          shouldBeActionable: true,
         },
         {
           oldState: 'hidden',
@@ -347,7 +347,7 @@ describe('Hide Action Comprehensive Tests', () => {
         {
           oldState: 'hidden',
           outcome: 'failure',
-          expectedNewState: 'observed',
+          expectedNewState: 'avs',
           shouldBeActionable: true,
         },
         {
@@ -359,7 +359,7 @@ describe('Hide Action Comprehensive Tests', () => {
         {
           oldState: 'undetected',
           outcome: 'failure',
-          expectedNewState: 'observed',
+          expectedNewState: 'avs',
           shouldBeActionable: true,
         },
       ];
@@ -477,6 +477,45 @@ describe('Hide Action Comprehensive Tests', () => {
 
       expect(validOutcomes).toHaveLength(1);
       expect(validOutcomes[0].token.id).toBe('valid');
+    });
+  });
+
+  describe('Dialog AVS State Selection', () => {
+    test('failed hide with no position data should select AVS state in dialog', () => {
+      const {
+        getDefaultNewStateFor,
+      } = require('../../../scripts/chat/services/data/action-state-config.js');
+
+      const newVisibility = getDefaultNewStateFor('hide', 'observed', 'failure');
+      expect(newVisibility).toBe('avs');
+    });
+
+    test('critical failure hide should select AVS state in dialog', () => {
+      const {
+        getDefaultNewStateFor,
+      } = require('../../../scripts/chat/services/data/action-state-config.js');
+
+      const newVisibility = getDefaultNewStateFor('hide', 'observed', 'critical-failure');
+      expect(newVisibility).toBe('avs');
+    });
+
+    test('outcome with newVisibility=avs should have changed=false', () => {
+      const outcome = {
+        newVisibility: 'avs',
+        oldVisibility: 'observed',
+        changed: false,
+      };
+
+      expect(outcome.newVisibility).toBe('avs');
+      expect(outcome.changed).toBe(false);
+    });
+
+    test('outcome changed property respects avs state', () => {
+      const currentState = 'observed';
+      const newVisibility = 'avs';
+      const changed = newVisibility !== 'avs' && newVisibility !== currentState;
+
+      expect(changed).toBe(false);
     });
   });
 });

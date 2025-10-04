@@ -8,7 +8,7 @@ describe('Sneak hidden-token inclusion', () => {
 
         canvas.tokens.placeables = [sneaker, enemyVisible, enemyHidden];
 
-        const { SneakActionHandler } = await import('../../../scripts/chat/services/actions/sneak-action.js');
+        const { SneakActionHandler } = await import('../../../scripts/chat/services/actions/SneakAction.js');
         const handler = new SneakActionHandler();
         const subjects = await handler.discoverSubjects({ actor: sneaker });
 

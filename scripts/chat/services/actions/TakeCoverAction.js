@@ -1,7 +1,7 @@
 import { COVER_STATES } from '../../../constants.js';
 import { appliedTakeCoverChangesByMessage } from '../data/message-cache.js';
 import { shouldFilterAlly } from '../infra/shared-utils.js';
-import { ActionHandlerBase } from './base-action.js';
+import { ActionHandlerBase } from './BaseAction.js';
 
 // Take Cover raises the cover level that the ACTOR (taking cover) has AGAINST each other token (observers).
 // Cover storage/orientation is observer -> target. For Take Cover that means:

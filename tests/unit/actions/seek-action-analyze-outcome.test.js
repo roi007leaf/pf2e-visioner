@@ -3,7 +3,7 @@
  * Tests all possible outcomes, visibility states, and special cases
  */
 
-import { SeekActionHandler } from '../../../scripts/chat/services/actions/seek-action.js';
+import { SeekActionHandler } from '../../../scripts/chat/services/actions/SeekAction.js';
 
 // Mock VisionAnalyzer
 jest.mock('../../../scripts/visibility/auto-visibility/VisionAnalyzer.js', () => ({

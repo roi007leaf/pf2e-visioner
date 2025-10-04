@@ -250,7 +250,7 @@ describe('Attack Consequences Action Comprehensive Tests', () => {
 
       // Mock the ConsequencesActionHandler
       const { ConsequencesActionHandler } = await import(
-        '../../../scripts/chat/services/actions/consequences-action.js'
+        '../../../scripts/chat/services/actions/ConsequencesAction.js'
       );
       const handler = new ConsequencesActionHandler();
 
@@ -534,7 +534,7 @@ describe('Attack Consequences Action Comprehensive Tests', () => {
 
   describe('Manual Override with Same State (AVS-controlled)', () => {
     test('isOldStateAvsControlled checks the correct token', () => {
-      const { ConsequencesActionHandler } = require('../../../scripts/chat/services/actions/consequences-action.js');
+      const { ConsequencesActionHandler } = require('../../../scripts/chat/services/actions/ConsequencesAction.js');
       const MODULE_ID = 'pf2e-visioner';
 
       const handler = new ConsequencesActionHandler();
@@ -573,7 +573,7 @@ describe('Attack Consequences Action Comprehensive Tests', () => {
     });
 
     test('applyOverrides marks outcome as changed when state matches but old is AVS-controlled', () => {
-      const { ConsequencesActionHandler } = require('../../../scripts/chat/services/actions/consequences-action.js');
+      const { ConsequencesActionHandler } = require('../../../scripts/chat/services/actions/ConsequencesAction.js');
       const MODULE_ID = 'pf2e-visioner';
 
       const handler = new ConsequencesActionHandler();
