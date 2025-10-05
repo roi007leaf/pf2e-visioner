@@ -100,7 +100,15 @@ export class ItemEventHandler {
             itemName.includes('see invisibility') ||
             itemName.includes('true seeing') ||
             itemName.includes('dancing lights') ||
-            itemName.includes('continual flame');
+            itemName.includes('continual flame') ||
+            itemName.includes('echolocation') ||
+            itemName.includes('tremorsense') ||
+            itemName.includes('blindsight') ||
+            itemName.includes('blindsense') ||
+            itemName.includes('scent') ||
+            itemName.includes('thoughtsense') ||
+            itemName.includes('lifesense') ||
+            itemName.includes('deaf');
 
         // Strong hint that this item toggles an emitting LIGHT/DARKNESS on the token
         const lightEmitterHint =

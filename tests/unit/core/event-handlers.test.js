@@ -350,6 +350,56 @@ describe('Event Handler Tests', () => {
 
             expect(mockVisibilityState.markTokenChangedImmediate).toHaveBeenCalledWith('token1');
         });
+
+        test('should handle echolocation effect item', () => {
+            const mockItem = {
+                name: 'Effect: Echolocation',
+                type: 'effect',
+                parent: {
+                    documentName: 'Actor',
+                    id: 'actor1',
+                },
+            };
+
+            mockCanvas.tokens.placeables = [
+                { actor: { id: 'actor1' }, document: { id: 'token1' } },
+            ];
+
+            itemHandler.initialize();
+            const createHandler = mockHooks.on.mock.calls.find(call => call[0] === 'createItem')[1];
+
+            createHandler(mockItem);
+
+            expect(mockVisibilityState.markTokenChangedImmediate).toHaveBeenCalledWith('token1');
+        });
+
+        test('should handle special sense effect items (tremorsense, scent, lifesense)', () => {
+            const specialSenses = ['Tremorsense', 'Scent', 'Lifesense', 'Blindsight', 'Thoughtsense'];
+
+            specialSenses.forEach((senseName) => {
+                jest.clearAllMocks();
+
+                const mockItem = {
+                    name: `Effect: ${senseName}`,
+                    type: 'effect',
+                    parent: {
+                        documentName: 'Actor',
+                        id: 'actor1',
+                    },
+                };
+
+                mockCanvas.tokens.placeables = [
+                    { actor: { id: 'actor1' }, document: { id: 'token1' } },
+                ];
+
+                itemHandler.initialize();
+                const createHandler = mockHooks.on.mock.calls.find(call => call[0] === 'createItem')[1];
+
+                createHandler(mockItem);
+
+                expect(mockVisibilityState.markTokenChangedImmediate).toHaveBeenCalledWith('token1');
+            });
+        });
     });
 
     describe('LightingEventHandler', () => {
