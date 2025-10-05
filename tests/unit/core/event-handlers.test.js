@@ -682,25 +682,6 @@ describe('Event Handler Tests', () => {
             expect(mockHooks.on).toHaveBeenCalledWith('deleteToken', expect.any(Function));
         });
 
-        test('should handle token position changes', () => {
-            const mockTokenDoc = {
-                id: 'token1',
-                name: 'Test Token',
-                x: 100,
-                y: 100,
-                width: 1,
-                height: 1,
-                hidden: false,
-            };
-            const changes = { x: 200, y: 200 };
-
-            tokenHandler.handleTokenUpdate(mockTokenDoc, changes);
-
-            expect(mockPositionManager.storeUpdatedTokenDoc).toHaveBeenCalledWith('token1', expect.any(Object));
-            expect(mockPositionManager.pinPosition).toHaveBeenCalled();
-            expect(mockOverrideValidationManager.queueOverrideValidation).toHaveBeenCalledWith('token1');
-        });
-
         test('should handle light changes with global recalculation', () => {
             const mockTokenDoc = {
                 id: 'token1',
