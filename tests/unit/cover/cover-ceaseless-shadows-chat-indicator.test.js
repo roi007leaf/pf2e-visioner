@@ -42,4 +42,47 @@ describe('Ceaseless Shadows chat indicator', () => {
         }
         if (prevIsGM !== undefined) global.game.user.isGM = prevIsGM;
     });
+
+    test('feat upgrade indicator NOT shown when blocker has coverOverride', async () => {
+        const message = makeMessage({
+            'pf2e-visioner': {
+                coverFeatUpgrade: {
+                    from: 'lesser',
+                    to: 'standard',
+                    feat: 'ceaseless-shadows',
+                    ts: Date.now(),
+                    hasBlockerWithOverride: true
+                }
+            }
+        });
+
+        let indicatorAdded = false;
+        const html = {
+            find: (selector) => {
+                if (selector && selector.includes('pf2e-visioner-cover-feat-indicator')) {
+                    indicatorAdded = true;
+                }
+                return {
+                    length: 0,
+                    first: () => ({ length: 0 }),
+                    after: () => { },
+                    append: () => { },
+                    html: () => { },
+                    is: () => false,
+                    prepend: () => { }
+                };
+            }
+        };
+
+        const prevIsGM = global.game?.user?.isGM;
+        if (!global.game) global.game = { user: { isGM: true } };
+        else global.game.user.isGM = true;
+        const mgr = getManager();
+        if (typeof mgr.injectCoverOverrideIndicator === 'function') {
+            await mgr.injectCoverOverrideIndicator(message, html, true);
+        }
+        if (prevIsGM !== undefined) global.game.user.isGM = prevIsGM;
+
+        expect(indicatorAdded).toBe(false);
+    });
 });

@@ -1224,6 +1224,12 @@ export class CoverDetector {
 
       const result = any ? (standard ? 'standard' : 'lesser') : 'none';
       let finalState = result;
+
+      const hasBlockerWithOverride = blockers.some(blocker => {
+        const override = blocker.document?.getFlag?.(MODULE_ID, 'coverOverride');
+        return override && override !== 'auto';
+      });
+
       try {
         const upgraded = FeatsHandler.upgradeCoverForCreature(attacker, result)?.state || result;
         if (upgraded !== result) {
@@ -1236,6 +1242,7 @@ export class CoverDetector {
                 to: upgraded,
                 feat: 'ceaseless-shadows',
                 ts: Date.now(),
+                hasBlockerWithOverride,
               });
             }
           } catch { }

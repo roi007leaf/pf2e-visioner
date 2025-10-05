@@ -376,7 +376,7 @@ export class CoverUIManager {
                  </span>`;
       }
 
-      if (featUpgradeInfo) {
+      if (featUpgradeInfo && !featUpgradeInfo.hasBlockerWithOverride) {
         try {
           const { from, to, feat } = featUpgradeInfo;
           const fromLabel = getCoverLabel(from);
