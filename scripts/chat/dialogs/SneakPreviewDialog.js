@@ -2355,21 +2355,12 @@ export class SneakPreviewDialog extends BaseActionDialog {
 
         // Update bulk defer button availability
         app._updateBulkDeferButton();
-
-        notify.success(
-          `${outcome.token.name} automatically undeferred - end position now qualifies for sneak`,
-        );
       } catch (error) {
         // Failed to auto-undefer token - show fallback notification
         notify.info(
           `${outcome.token.name} ${positionType} position ${position.qualifies ? 'now qualifies' : 'no longer qualifies'} for sneak`,
         );
       }
-    } else {
-      // Normal notification for non-auto-undefer cases
-      notify.info(
-        `${outcome.token.name} ${positionType} position ${position.qualifies ? 'now qualifies' : 'no longer qualifies'} for sneak`,
-      );
     }
   }
 
