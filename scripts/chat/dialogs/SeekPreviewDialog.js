@@ -597,7 +597,7 @@ export class SeekPreviewDialog extends BaseActionDialog {
           key: 'keen-eyes',
           icon: 'fas fa-eye',
           label: 'Keen Eyes',
-          tooltip: 'Undetected creatures become Hidden, Hidden creatures become Observed when you Seek.',
+          tooltip: 'You gain a +2 circumstance bonus when using Seek (System application). Undetected creatures treated as Hidden, Hidden creatures treated as Observed when you Seek.',
         });
       }
 
@@ -607,7 +607,7 @@ export class SeekPreviewDialog extends BaseActionDialog {
           key: 'thats-odd',
           icon: 'fas fa-exclamation-triangle',
           label: "That's Odd",
-          tooltip: 'You gain a +2 circumstance bonus when using Seek and you spot hidden doors, traps, and hazards more easily (failure will become a success).',
+          tooltip: 'You spot hidden doors, traps, and hazards more easily (failure will become a success).',
         });
       }
 
