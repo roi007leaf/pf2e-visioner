@@ -236,6 +236,16 @@ export async function registerHooks() {
     try {
       if (!('x' in changes || 'y' in changes)) return;
 
+      const token = tokenDoc.object;
+
+      // Skip if token is currently animating or being dragged
+      const isAnimating = token?._animation?.state !== 'completed';
+      const isDragging = token?._dragHandle !== undefined && token?._dragHandle !== null;
+
+      if (isAnimating || isDragging) {
+        return;
+      }
+
       const controlledTokens = canvas?.tokens?.controlled || [];
       if (controlledTokens.length === 0) return;
 

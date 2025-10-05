@@ -41,8 +41,9 @@ export class TokenEventHandler {
    * Handles token document updates
    * @param {Object} tokenDoc - The token document
    * @param {Object} changes - The changes object
+   * @param {Object} options - Update options (includes animation flag)
    */
-  handleTokenUpdate(tokenDoc, changes) {
+  handleTokenUpdate(tokenDoc, changes, options = {}) {
     if (!this.systemState.shouldProcessEvents()) {
       return;
     }
@@ -53,6 +54,20 @@ export class TokenEventHandler {
 
     // Analyze changes once to derive flags used throughout handling
     const changeFlags = this._analyzeChanges(changes);
+
+    // Skip position updates during animation/dragging - only process completed movements
+    const hasPositionChange = changes.x !== undefined || changes.y !== undefined;
+    if (hasPositionChange) {
+      const token = tokenDoc.object;
+
+      // Check if token is currently animating or being dragged
+      const isAnimating = token?._animation?.state !== 'completed';
+      const isDragging = token?._dragHandle !== undefined && token?._dragHandle !== null;
+
+      if (isAnimating || isDragging) {
+        return;
+      }
+    }
 
     // Early light change detection (handles nested dotted paths like "light.bright")
     if (changeFlags.lightChanged) {
