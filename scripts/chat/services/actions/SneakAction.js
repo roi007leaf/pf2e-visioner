@@ -1252,7 +1252,11 @@ export class SneakActionHandler extends ActionHandlerBase {
   #hasSneakAdeptFeat(actor) {
     if (!actor) return false;
 
-    const feats = actor.itemTypes?.feat ?? actor.items?.filter?.((i) => i?.type === 'feat') ?? [];
+    // Handle both Token and Actor objects - get the actual Actor
+    const actualActor = actor.actor ?? actor;
+    if (!actualActor) return false;
+
+    const feats = actualActor.itemTypes?.feat ?? actualActor.items?.filter?.((i) => i?.type === 'feat') ?? [];
     return feats.some((feat) => {
       const name = feat?.name?.toLowerCase?.() || '';
       const slug = feat?.system?.slug?.toLowerCase?.() || '';

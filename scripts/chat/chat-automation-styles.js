@@ -953,6 +953,24 @@ function getChatAutomationCSS() {
             border-color: rgba(59, 130, 246, 0.5) !important;
             color: #93c5fd !important; /* Light blue text */
         }
+
+        /* Crossed-out outcome text for Sneak Adept */
+        .outcome-text-crossed {
+            text-decoration: line-through !important;
+            text-decoration-thickness: 2px !important;
+            text-decoration-color: #ff0015ff !important;
+            margin-right: 4px !important;
+            color: var(--visibility-concealed) !important; /* Red color for failed outcome */
+            position: relative !important;
+        }
+
+
+
+        /* Ensure success text stands out after crossed-out failure */
+        .outcome-primary .outcome-text-crossed + .outcome-text {
+            color: #4a9eff !important; /* Teal for success */
+            font-weight: 600 !important;
+        }
         
         /* Bulk Action Buttons */
         .seek-preview-dialog-bulk-action-btn {

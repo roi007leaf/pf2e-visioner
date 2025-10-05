@@ -792,6 +792,20 @@ export class SneakPreviewDialog extends BaseActionDialog {
           ),
         });
       }
+
+      // Sneak Adept: check if any outcomes were upgraded from failure
+      try {
+        const hasSneakAdeptUpgrade = processedOutcomes.some(outcome => outcome.sneakAdeptApplied);
+        if (hasSneakAdeptUpgrade) {
+          badges.push({
+            key: 'sneak-adept',
+            icon: 'fas fa-arrow-up',
+            label: game.i18n.localize('PF2E_VISIONER.SNEAK_ADEPT_FEAT.OUTCOME_UPGRADED'),
+            tooltip: game.i18n.localize('PF2E_VISIONER.SNEAK_ADEPT_FEAT.TOOLTIP'),
+          });
+        }
+      } catch { }
+
       context.prereqBadges = badges;
     } catch { }
 
