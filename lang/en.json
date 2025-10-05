@@ -107,6 +107,9 @@
     "COVER_OVERRIDE": {
       "POPUP_OVERRIDE": "Cover overridden via keybind popup: {original} → {final}"
     },
+    "FEAT": {
+      "CEASELESS_SHADOWS": "Ceaseless Shadows"
+    },
     "AVS_OVERRIDE_DIALOG": {
       "NO_OVERRIDES": "No AVS overrides are currently active for this token.",
       "CLOSE": "Close",
@@ -537,6 +540,7 @@
     },
     "UI": {
       "ENCOUNTER_FILTER_TEXT": "Show only encounter tokens",
+      "CEASELESS_SHADOWS_UPGRADE_TOOLTIP": "{FEAT}: {FROM} → {TO} (feat upgrade)",
       "COVER_OVERRIDE": "Cover Override",
       "ROLL": "Roll",
       "APPLY_ALL": "Apply All",
