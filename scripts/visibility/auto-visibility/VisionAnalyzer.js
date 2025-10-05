@@ -253,10 +253,18 @@ export class VisionAnalyzer {
    * Check if sound is blocked between observer and target
    * @param {Token} observer
    * @param {Token} target
-   * @returns {boolean} True if sound is blocked by walls
+   * @returns {boolean} True if sound is blocked by walls or Silence effect
    */
   isSoundBlocked(observer, target) {
     try {
+      // Check for Silence spell effect on observer or target
+      const observerHasSilence = this.#hasSilenceEffect(observer.actor);
+      const targetHasSilence = this.#hasSilenceEffect(target.actor);
+
+      if (observerHasSilence || targetHasSilence) {
+        return true;
+      }
+
       // Check if polygon backend for sound is available
       const soundBackend = CONFIG.Canvas.polygonBackends?.sound;
       if (!soundBackend?.testCollision) {
@@ -276,6 +284,26 @@ export class VisionAnalyzer {
       console.error('[Sound-Blocking] Error checking sound blocking:', error);
       log.debug('Error checking sound blocking', error);
       // On error, assume sound is NOT blocked (fail open for better UX)
+      return false;
+    }
+  }
+
+  /**
+   * Check if actor has Silence effect active
+   * @private
+   * @param {Actor} actor
+   * @returns {boolean} True if Silence effect is active
+   */
+  #hasSilenceEffect(actor) {
+    try {
+      const effects = actor.itemTypes?.effect ?? actor.items?.filter?.(i => i?.type === 'effect') ?? [];
+      return effects?.some?.(effect => {
+        const slug = effect?.slug || effect?.system?.slug || '';
+        const name = effect?.name?.toLowerCase() || '';
+        return slug.toLowerCase() === 'spell-effect-silence' ||
+          name.includes('silence');
+      });
+    } catch {
       return false;
     }
   }

@@ -66,7 +66,7 @@ export function calculateVisibility(input) {
     // observer cannot use vision OR hearing. Only non-visual, non-auditory senses work.
     if (isInvisible && (observer.conditions.deafened || soundBlocked)) {
         // Check precise non-visual senses (echolocation, tremorsense, etc.)
-        const preciseNonVisualResult = checkPreciseNonVisualSenses(observer, target);
+        const preciseNonVisualResult = checkPreciseNonVisualSenses(observer, target, soundBlocked);
         if (preciseNonVisualResult) {
             return preciseNonVisualResult;
         }
@@ -86,7 +86,7 @@ export function calculateVisibility(input) {
     }
 
     // 2. Check for precise non-visual senses (bypass invisibility and most conditions)
-    const preciseNonVisualResult = checkPreciseNonVisualSenses(observer, target);
+    const preciseNonVisualResult = checkPreciseNonVisualSenses(observer, target, soundBlocked);
     if (preciseNonVisualResult) {
         return preciseNonVisualResult;
     }
@@ -154,7 +154,7 @@ function normalizeObserverState(observer) {
  */
 function handleBlindedObserver(observer, target, soundBlocked) {
     // Check for non-visual senses that still work when blinded
-    const nonVisualPrecise = checkPreciseNonVisualSenses(observer, target);
+    const nonVisualPrecise = checkPreciseNonVisualSenses(observer, target, soundBlocked);
     if (nonVisualPrecise) {
         return nonVisualPrecise;
     }
@@ -270,8 +270,11 @@ function checkHasPreciseNonVisualSense(observer) {
  * Check precise non-visual senses (these bypass invisibility and most conditions)
  * Precise non-visual senses include echolocation, blindsense, thoughtsense, tremorsense, etc.
  * These work regardless of lighting and are unaffected by invisibility
+ * @param {Object} observer - Observer state
+ * @param {Object} target - Target state
+ * @param {boolean} soundBlocked - Whether sound is blocked (affects echolocation)
  */
-function checkPreciseNonVisualSenses(observer, target) {
+function checkPreciseNonVisualSenses(observer, target, soundBlocked = false) {
     const { precise, conditions } = observer;
     const { auxiliary } = target;
 
@@ -292,7 +295,7 @@ function checkPreciseNonVisualSenses(observer, target) {
     // - Work in any lighting condition
     // - Bypass invisibility completely
     // - Are not affected by dazzled or blinded (they're non-visual)
-    // - EXCEPTION: Echolocation requires hearing (blocked by deafened condition)
+    // - EXCEPTION: Echolocation requires hearing (blocked by deafened condition or Silence)
 
     for (const [senseType, senseData] of Object.entries(precise)) {
         // Skip visual senses
@@ -300,10 +303,10 @@ function checkPreciseNonVisualSenses(observer, target) {
             continue;
         }
 
-        // Special handling for echolocation: requires hearing (blocked if deafened)
+        // Special handling for echolocation: requires hearing (blocked if deafened or sound blocked)
         if (senseType === 'echolocation') {
-            if (conditions.deafened) {
-                continue; // Cannot use echolocation when deafened
+            if (conditions.deafened || soundBlocked) {
+                continue; // Cannot use echolocation when deafened or sound is blocked
             }
             if (senseData && senseData.range > 0) {
                 return {
