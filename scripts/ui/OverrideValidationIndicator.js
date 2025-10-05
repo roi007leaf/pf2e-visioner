@@ -173,7 +173,7 @@ class OverrideValidationIndicator {
         await AvsOverrideManager.removeOverride(observerId, targetId);
         if (observerId && targetId) affectedPairs.add(`${observerId}-${targetId}`);
       }
-      ui.notifications?.info?.(`Cleared ${raw.length} invalid override(s)`);
+      ui.notifications?.info?.(`Accepted ${raw.length} AVS change(s)`);
       this.hide();
 
       // Immediately recalculate AVS and refresh visuals/perception
@@ -222,7 +222,7 @@ class OverrideValidationIndicator {
     try {
       // Retain overrides and dismiss indicator; dialog handles the semantics of "keep".
       this.hide();
-      ui.notifications?.info?.('Kept all current overrides');
+      ui.notifications?.info?.('Rejected all AVS changes');
     } catch (e) {
       console.error('PF2E Visioner | Failed to keep overrides from indicator:', e);
     }
