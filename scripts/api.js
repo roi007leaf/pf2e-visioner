@@ -521,11 +521,6 @@ export class Pf2eVisionerApi {
 
       if (updates.length && scene.updateEmbeddedDocuments) {
         await scene.updateEmbeddedDocuments('Token', updates, { diff: false });
-        ui.notifications.info(
-          `PF2E Visioner: Cleared sneak flags from ${updates.length} token(s).`,
-        );
-      } else {
-        ui.notifications.info('PF2E Visioner: No sneak flags found to clear.');
       }
 
       return true;

@@ -364,9 +364,11 @@ export const REACTIONS = {
 
       if (!hasFeat) return false;
 
-      // Check for failed outcomes with undetected targets (only regular failures, not critical failures)
+      // Check for failed outcomes with undetected targets (regular or critical failures)
       const hasFailedUndetected = outcomes.some(
-        (outcome) => outcome.outcome === 'failure' && outcome.currentVisibility === 'undetected',
+        (outcome) =>
+          (outcome.outcome === 'failure' || outcome.outcome === 'critical-failure') &&
+          outcome.currentVisibility === 'undetected',
       );
 
       return hasFailedUndetected;
@@ -375,9 +377,11 @@ export const REACTIONS = {
     apply: async (context) => {
       const { outcomes, dialog } = context;
 
-      // Find all failed outcomes where the target is currently undetected (only regular failures, not critical failures)
+      // Find all failed outcomes where the target is currently undetected (regular or critical failures)
       const failedUndetectedOutcomes = outcomes.filter(
-        (outcome) => outcome.outcome === 'failure' && outcome.currentVisibility === 'undetected',
+        (outcome) =>
+          (outcome.outcome === 'failure' || outcome.outcome === 'critical-failure') &&
+          outcome.currentVisibility === 'undetected',
       );
 
       if (failedUndetectedOutcomes.length === 0) {

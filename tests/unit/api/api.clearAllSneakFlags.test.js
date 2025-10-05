@@ -31,9 +31,9 @@ describe('api.clearAllSneakFlags', () => {
 
   test('warns when no active scene', async () => {
     game.user.isGM = true;
-  const origScene = canvas.scene;
-  // Temporarily remove scene
-  canvas.scene = null;
+    const origScene = canvas.scene;
+    // Temporarily remove scene
+    canvas.scene = null;
 
     const { Pf2eVisionerApi } = await import('../../../scripts/api.js');
     const result = await Pf2eVisionerApi.clearAllSneakFlags();
@@ -41,8 +41,8 @@ describe('api.clearAllSneakFlags', () => {
     expect(result).toBe(false);
     expect(ui.notifications.warn).toHaveBeenCalledWith('No active scene.');
 
-  // restore
-  canvas.scene = origScene;
+    // restore
+    canvas.scene = origScene;
   });
 
   test('clears sneak-active flags and reports count', async () => {
@@ -85,9 +85,6 @@ describe('api.clearAllSneakFlags', () => {
       ]),
       { diff: false },
     );
-    expect(ui.notifications.info).toHaveBeenCalledWith(
-      expect.stringContaining('Cleared sneak flags from 2 token(s).'),
-    );
   });
 
   test('no updates when no tokens have flag', async () => {
@@ -100,8 +97,5 @@ describe('api.clearAllSneakFlags', () => {
 
     expect(ok).toBe(true);
     expect(canvas.scene.updateEmbeddedDocuments).not.toHaveBeenCalled();
-    expect(ui.notifications.info).toHaveBeenCalledWith(
-      'PF2E Visioner: No sneak flags found to clear.',
-    );
   });
 });

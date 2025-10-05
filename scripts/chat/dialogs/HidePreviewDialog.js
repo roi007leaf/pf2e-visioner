@@ -906,7 +906,7 @@ export class HidePreviewDialog extends BaseActionDialog {
           const { updateTokenVisuals } = await import('../../services/visual-effects.js');
           await updateTokenVisuals();
           const names = avsRemovals.map((r) => r.name).join(', ');
-          notify.info(`${MODULE_TITLE}: Removed overrides for ${avsRemovals.length} token(s)`);
+          notify.info(`${MODULE_TITLE}: Accepted AVS changes for ${avsRemovals.length} token(s)`);
         }
       } catch (e) {
         console.warn('Failed to remove AVS overrides:', e);
@@ -1009,7 +1009,7 @@ export class HidePreviewDialog extends BaseActionDialog {
           const { updateTokenVisuals } = await import('../../services/visual-effects.js');
           await updateTokenVisuals();
           notify.info(
-            `${MODULE_TITLE}: Removed override for ${outcome.target.name} - AVS will control visibility`,
+            `${MODULE_TITLE}: Accepted AVS change for ${outcome.target.name}`,
           );
         }
       } catch (e) {
@@ -1291,10 +1291,6 @@ export class HidePreviewDialog extends BaseActionDialog {
     } catch (applyError) {
       console.warn('PF2E Visioner | Failed to apply immediate visibility change:', applyError);
     }
-
-    notify.info(
-      `${outcome.target.name}: ${position.qualifies ? 'prerequisite met' : 'prerequisite not met'}`,
-    );
   }
 
   // Bulk override action handlers

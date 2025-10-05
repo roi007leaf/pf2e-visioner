@@ -121,7 +121,7 @@ describe('Reactions System', () => {
       expect(availableReactions).toHaveLength(0);
     });
 
-    test('should not detect reactions for critical failures with undetected targets', () => {
+    test('should detect reactions for critical failures with undetected targets (updated rule)', () => {
       const criticalFailureOutcomes = [
         {
           target: { id: 'target1', name: 'Target 1' },
@@ -134,7 +134,8 @@ describe('Reactions System', () => {
 
       const availableReactions = dialog.getAvailableReactions(criticalFailureOutcomes);
 
-      expect(availableReactions).toHaveLength(0);
+      expect(availableReactions).toHaveLength(1);
+      expect(availableReactions[0].key).toBe('senseTheUnseen');
     });
   });
 
@@ -204,8 +205,7 @@ describe('Reactions System', () => {
       expect(notify.warn).toHaveBeenCalledWith('No failed outcomes with undetected targets found.');
     });
 
-    test('should not apply reaction to critical failures', async () => {
-      // Create outcomes with critical failure undetected target
+    test('should apply reaction to critical failures (updated rule)', async () => {
       const criticalFailureOutcomes = [
         {
           target: { id: 'target1', name: 'Target 1' },
@@ -215,16 +215,10 @@ describe('Reactions System', () => {
           changed: false,
         },
       ];
-
       dialog.outcomes = criticalFailureOutcomes;
-
       await dialog.applyReaction('senseTheUnseen');
-
-      // Should not have changed the critical failure outcome
-      expect(dialog.outcomes[0].newVisibility).toBe('undetected');
-      expect(dialog.outcomes[0].changed).toBe(false);
-      expect(dialog.outcomes[0].senseUnseenApplied).toBeUndefined();
-      expect(notify.warn).toHaveBeenCalledWith('No failed outcomes with undetected targets found.');
+      expect(dialog.outcomes[0].newVisibility).toBe('hidden');
+      expect(dialog.outcomes[0].senseUnseenApplied).toBe(true);
     });
   });
 

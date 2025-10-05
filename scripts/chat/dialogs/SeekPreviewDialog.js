@@ -977,7 +977,7 @@ export class SeekPreviewDialog extends BaseActionDialog {
           const { updateTokenVisuals } = await import('../../services/visual-effects.js');
           await updateTokenVisuals();
           const names = avsRemovals.map((r) => r.name).join(', ');
-          notify.info(`${MODULE_TITLE}: Removed overrides for ${avsRemovals.length} token(s)`);
+          notify.info(`${MODULE_TITLE}: Accepted AVS changes for ${avsRemovals.length} token(s)`);
         }
       } catch (e) {
         console.warn('Failed to remove AVS overrides:', e);
@@ -1098,7 +1098,7 @@ export class SeekPreviewDialog extends BaseActionDialog {
               const { updateTokenVisuals } = await import('../../services/visual-effects.js');
               await updateTokenVisuals();
               notify.info(
-                `${MODULE_TITLE}: Removed override for ${outcome.target.name} - AVS will control visibility`,
+                `${MODULE_TITLE}: Accepted AVS change for ${outcome.target.name}`,
               );
             }
           } catch (e) {
@@ -1466,7 +1466,7 @@ export class SeekPreviewDialog extends BaseActionDialog {
 
       // Find all failed outcomes where the target is currently undetected
       const failedUndetectedOutcomes = this.outcomes.filter(
-        (outcome) => outcome.outcome === 'failure' && outcome.currentVisibility === 'undetected',
+        (outcome) => (outcome.outcome === 'failure' || outcome.outcome === 'critical-failure') && outcome.currentVisibility === 'undetected',
       );
 
       if (failedUndetectedOutcomes.length === 0) {
@@ -1556,7 +1556,7 @@ export class SeekPreviewDialog extends BaseActionDialog {
       this.updateChangesCount();
 
       notify.info(
-        `Applied Sense the Unseen to ${failedUndetectedOutcomes.length} failed outcome(s). Undetected targets are now Hidden.`,
+        `Applied Sense the Unseen to ${failedUndetectedOutcomes.length} failed outcome(s). Undetected targets will be Hidden after applying.`,
       );
 
       // Update the affected outcome rows manually without full re-render

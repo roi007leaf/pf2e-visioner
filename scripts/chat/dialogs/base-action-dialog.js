@@ -296,10 +296,6 @@ export class BaseActionDialog extends BasePreviewDialog {
     if (filtered.length === 0 && this.encounterOnly && hasActiveEncounter()) {
       this.encounterOnly = false;
       filtered = outcomes;
-      const message = emptyNotice || 'No encounter tokens found, showing all';
-      try {
-        notify.info(`${MODULE_TITLE}: ${message}`);
-      } catch { }
     }
     return filtered;
   }
@@ -643,13 +639,12 @@ export class BaseActionDialog extends BasePreviewDialog {
           await updateTokenVisuals();
           const targetName = outcome.target?.name || outcome.token?.name || 'token';
           notify.info(
-            `${MODULE_TITLE}: Removed override for ${targetName} - AVS will control visibility`,
+            `${MODULE_TITLE}: Accepted AVS change for ${targetName}`,
           );
         }
       } catch (e) {
         console.warn('Failed to remove AVS override:', e);
         const targetName = outcome.target?.name || outcome.token?.name || 'token';
-        notify.info(`${MODULE_TITLE}: AVS will control visibility for ${targetName}`);
       }
       app.updateRowButtonsToApplied([{ target: { id: tokenId } }]);
       app.updateChangesCount();
@@ -712,8 +707,6 @@ export class BaseActionDialog extends BasePreviewDialog {
         app.updateChangesCount();
       }
 
-      const tokenName = outcome.token?.name || outcome.target?.name || 'token';
-      notify.info(`${MODULE_TITLE}: Applied ${actionType.toLowerCase()} result for ${tokenName}`);
     } catch (error) {
       console.error(`[${actionType} Dialog] Error applying change:`, error);
       notify.error(`${MODULE_TITLE}: Failed to apply change - see console for details`);
@@ -801,8 +794,6 @@ export class BaseActionDialog extends BasePreviewDialog {
         app.updateChangesCount();
       }
 
-      const tokenName = outcome.token?.name || outcome.target?.name || 'token';
-      notify.info(`${MODULE_TITLE}: Reverted changes for ${tokenName}`);
     } catch (error) {
       console.error(`[${actionType} Dialog] Error reverting change:`, error);
       notify.error(`${MODULE_TITLE}: Failed to revert change - see console for details`);
@@ -889,13 +880,10 @@ export class BaseActionDialog extends BasePreviewDialog {
             // Refresh UI to update override indicators
             const { updateTokenVisuals } = await import('../../services/visual-effects.js');
             await updateTokenVisuals();
-            const names = avsRemovals.map((r) => r.name).join(', ');
-            notify.info(`${MODULE_TITLE}: Removed overrides for ${avsRemovals.length} token(s)`);
+            notify.info(`${MODULE_TITLE}: Accepted AVS changes for ${avsRemovals.length} token(s)`);
           }
         } catch (e) {
           console.warn('Failed to remove AVS overrides:', e);
-          const names = avsRemovals.map((r) => r.name).join(', ');
-          notify.info(`${MODULE_TITLE}: AVS will control visibility for ${avsRemovals.length}`);
         }
       }
 
@@ -1035,10 +1023,6 @@ export class BaseActionDialog extends BasePreviewDialog {
         app.updateBulkActionButtons();
       }
 
-      const message = removedOverrides > 0
-        ? `${MODULE_TITLE}: Reverted changes for ${appliedOutcomes.length} tokens (removed ${removedOverrides} overrides)`
-        : `${MODULE_TITLE}: Reverted changes for ${appliedOutcomes.length} tokens`;
-      notify.info(message);
     } catch (error) {
       console.error(`[${actionType} Dialog] Error reverting all changes:`, error);
       notify.error(`${MODULE_TITLE}: Failed to revert changes - see console for details`);

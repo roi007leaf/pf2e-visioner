@@ -147,6 +147,19 @@ describe('Sense the Unseen Feat Logic', () => {
 
       expect(hasFailedOutcomes).toBe(false);
     });
+
+    test('should detect critical failure outcomes with undetected targets (new rule)', () => {
+      const outcomes = [
+        { outcome: 'critical-failure', currentVisibility: 'undetected' },
+        { outcome: 'success', currentVisibility: 'undetected' },
+      ];
+      const hasFailedOutcomes = outcomes.some(
+        (o) =>
+          (o.outcome === 'failure' || o.outcome === 'critical-failure') &&
+          o.currentVisibility === 'undetected',
+      );
+      expect(hasFailedOutcomes).toBe(true);
+    });
   });
 
   describe('Sense the Unseen application logic', () => {
@@ -237,6 +250,48 @@ describe('Sense the Unseen Feat Logic', () => {
       );
 
       expect(failedUndetectedOutcomes).toHaveLength(0);
+    });
+
+    test('REACTIONS.senseTheUnseen should expose availability on critical failure only', async () => {
+      const { REACTIONS } = await import('../../../scripts/constants.js');
+      const actor = {
+        itemTypes: {
+          feat: [
+            { name: 'Sense the Unseen', system: { slug: 'sense-the-unseen' } },
+          ],
+        },
+      };
+      const outcomes = [
+        { target: { id: 'a' }, outcome: 'critical-failure', currentVisibility: 'undetected' },
+      ];
+      const context = { actor, outcomes };
+      const available = REACTIONS.senseTheUnseen.isAvailable(context);
+      expect(available).toBe(true);
+    });
+
+    test('REACTIONS.senseTheUnseen apply upgrades critical failure undetected outcomes', async () => {
+      const { REACTIONS } = await import('../../../scripts/constants.js');
+      const outcomes = [
+        {
+          target: { id: 't1', name: 'Hidden Rogue' },
+          outcome: 'critical-failure',
+          currentVisibility: 'undetected',
+          newVisibility: 'undetected',
+          changed: false,
+        },
+      ];
+      const dialog = { _originalOutcomes: outcomes };
+      const context = {
+        actor: {
+          itemTypes: { feat: [{ name: 'Sense the Unseen', system: { slug: 'sense-the-unseen' } }] },
+        },
+        outcomes,
+        dialog,
+      };
+      const result = await REACTIONS.senseTheUnseen.apply(context);
+      expect(result.success).toBe(true);
+      expect(result.affectedOutcomes[0].newVisibility).toBe('hidden');
+      expect(outcomes[0].newVisibility).toBe('hidden');
     });
   });
 });

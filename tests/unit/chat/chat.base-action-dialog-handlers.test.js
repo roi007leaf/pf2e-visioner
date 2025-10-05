@@ -67,9 +67,6 @@ describe('BaseActionDialog generic handlers', () => {
       target,
     );
     expect(app.updateRowButtonsToApplied).toHaveBeenCalled();
-    expect(ui.notifications.info).toHaveBeenCalledWith(
-      expect.stringContaining('Applied sneak result'),
-    );
   });
 
   test('onRevertChange reverts token and updates UI', async () => {
@@ -96,8 +93,5 @@ describe('BaseActionDialog generic handlers', () => {
     });
 
     expect(app.updateRowButtonsToReverted).toHaveBeenCalled();
-    expect(ui.notifications.info).toHaveBeenCalledWith(
-      expect.stringContaining('Reverted changes'),
-    );
   });
 });

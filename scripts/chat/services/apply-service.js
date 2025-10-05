@@ -96,10 +96,7 @@ export async function applyNowSneak(actionData, button) {
       }
 
       const appliedCount = outcomesToApply.length;
-      const message = appliedCount === 1
-        ? `Sneak change applied to ${outcomesToApply[0].token?.name || 'token'}`
-        : `Sneak changes applied to ${appliedCount} tokens`;
-      ui.notifications.info(message);
+
       return appliedCount;
     } else {
       console.error('PF2E Visioner | Dual system application failed:', result.errors);

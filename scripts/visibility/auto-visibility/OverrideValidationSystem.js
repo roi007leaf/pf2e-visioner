@@ -348,7 +348,7 @@ export class OverrideValidationSystem {
                 await AvsOverrideManager.removeOverride(observerId, targetId);
               }
             }
-            ui.notifications.info(`Cleared ${invalidOverrides.length} invalid override${invalidOverrides.length > 1 ? 's' : ''}`);
+            ui.notifications.info(`Accepted ${invalidOverrides.length} AVS change${invalidOverrides.length > 1 ? 's' : ''}`);
             break;
 
           case 'clear-manual': {
@@ -364,14 +364,14 @@ export class OverrideValidationSystem {
               }
             }
             if (clearedCount > 0) {
-              ui.notifications.info(`Cleared ${clearedCount} manual override${clearedCount > 1 ? 's' : ''}`);
+              ui.notifications.info(`Accepted ${clearedCount} AVS change${clearedCount > 1 ? 's' : ''}`);
             }
             break;
           }
 
           case 'keep':
             // Do nothing - keep all overrides
-            ui.notifications.info('Kept all current overrides');
+            ui.notifications.info('Rejected AVS changes');
             break;
 
           default:
@@ -399,7 +399,6 @@ export class OverrideValidationSystem {
             const { default: AvsOverrideManager } = await import('../../chat/services/infra/AvsOverrideManager.js');
             await AvsOverrideManager.removeOverride(first.observerId, first.targetId);
           }
-          ui.notifications.info(`Removed visibility override: ${observer.document.name} → ${target.document.name}`);
         }
       }
     }
