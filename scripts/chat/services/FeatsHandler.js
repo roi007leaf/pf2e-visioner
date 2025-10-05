@@ -256,7 +256,6 @@ export class FeatsHandler {
 
     // Seek-specific post adjustments
     if (action === 'seek') {
-      // Echolocation: now handled by PF2e effect item 'effect-echolocation'. No flag setting here.
       // Keen Eyes: treat Undetected as Hidden; Hidden as Observed on Seek
       if (feats.has('keen-eyes')) {
         newVisibility = step(newVisibility, towardsObserved, +1);

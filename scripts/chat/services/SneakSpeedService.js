@@ -108,8 +108,6 @@ export class SneakSpeedService {
       return;
     }
 
-    console.trace('PF2E Visioner | Call stack for applySneakStartEffect:');
-
     // Check if effect creation is already in progress for this actor
     if (_activeEffectCreation.has(actor.id)) {
       return;
@@ -278,7 +276,7 @@ export class SneakSpeedService {
       const { FeatsHandler } = await import('./FeatsHandler.js');
       multiplier = FeatsHandler.getSneakSpeedMultiplier(actor) ?? 0.5;
       bonusFeet = FeatsHandler.getSneakDistanceBonusFeet(actor) ?? 0;
-    } catch {}
+    } catch { }
 
     const raw = Math.floor(baseSpeed * multiplier) + bonusFeet;
     // Cannot exceed base Speed as per Very Sneaky text
