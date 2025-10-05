@@ -19,7 +19,7 @@ export class OverrideValidationDialog extends foundry.applications.api.Handlebar
     id: "override-validation-dialog",
     tag: "div",
     window: {
-      title: "AVS Change Validation",
+      title: "AVS Changes Validation",
       icon: "fas fa-exclamation-triangle",
       // Include module root class so shared styles apply consistently
       contentClasses: ["pf2e-visioner", "override-validation-dialog"],
