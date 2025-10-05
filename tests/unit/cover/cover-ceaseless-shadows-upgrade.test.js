@@ -47,9 +47,9 @@ const buildToken = (id, x, y, sizeRank = 2, feats = []) => ({
 });
 
 describe('CoverDetector - Ceaseless Shadows cover upgrade', () => {
-    test('upgrades lesser->standard and standard->greater for attacker with feat', () => {
-        const attacker = buildToken('att', 0, 0, 2, ['ceaseless-shadows']);
-        const target = buildToken('tgt', 300, 0, 2, []);
+    test('upgrades lesser->standard and standard->greater for target with feat', () => {
+        const attacker = buildToken('att', 0, 0, 2, []);
+        const target = buildToken('tgt', 300, 0, 2, ['ceaseless-shadows']); // TARGET has the feat
 
         // Two blockers: one big (gives standard), one small (lesser if alone)
         const bigBlocker = buildToken('blk1', 150, 0, 5, []); // +3 size ranks => standard
@@ -67,9 +67,9 @@ describe('CoverDetector - Ceaseless Shadows cover upgrade', () => {
         expect(c2).toBe('greater');
     });
 
-    test('no upgrade when attacker lacks feat', () => {
-        const attacker = buildToken('att2', 0, 0, 2, []); // no feat
-        const target = buildToken('tgt2', 300, 0, 2, []);
+    test('no upgrade when target lacks feat', () => {
+        const attacker = buildToken('att2', 0, 0, 2, []);
+        const target = buildToken('tgt2', 300, 0, 2, []); // TARGET has no feat
         const smallBlocker = buildToken('blk3', 150, 0, 2, []); // equal size => lesser
 
         canvas.tokens.placeables = [attacker, target, smallBlocker];
