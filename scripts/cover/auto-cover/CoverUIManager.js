@@ -123,7 +123,7 @@ export class CoverUIManager {
                   }
                   return;
                 }
-              } catch (_) {}
+              } catch (_) { }
             },
             true,
           );
@@ -209,6 +209,7 @@ export class CoverUIManager {
 
       // Check if this message has cover override information
       let overrideInfo = message?.flags?.['pf2e-visioner']?.coverOverride;
+      let featUpgradeInfo = message?.flags?.['pf2e-visioner']?.coverFeatUpgrade;
 
       // Also check for manual cover by examining the message for token references
       let manualCoverInfo = null;
@@ -246,7 +247,7 @@ export class CoverUIManager {
       }
 
       // If no override info and no manual cover, nothing to show
-      if (!overrideInfo && !manualCoverInfo) {
+      if (!overrideInfo && !manualCoverInfo && !featUpgradeInfo) {
         return;
       }
 
@@ -256,7 +257,7 @@ export class CoverUIManager {
 
       // Check if indicator already exists to avoid duplicates
       if (
-        $html.find('.pf2e-visioner-cover-override-indicator, .pf2e-visioner-cover-manual-indicator')
+        $html.find('.pf2e-visioner-cover-override-indicator, .pf2e-visioner-cover-manual-indicator, .pf2e-visioner-cover-feat-indicator')
           .length > 0
       ) {
         return;
@@ -375,6 +376,53 @@ export class CoverUIManager {
                  </span>`;
       }
 
+      if (featUpgradeInfo) {
+        try {
+          const { from, to, feat } = featUpgradeInfo;
+          const fromLabel = getCoverLabel(from);
+          const toLabel = getCoverLabel(to);
+          const toColor = COVER_STATES?.[to]?.color || 'var(--color-text-dark-primary, #191813)';
+          const toIcon = COVER_STATES?.[to]?.icon || 'fas fa-shield';
+          const featName = game.i18n?.localize?.('PF2E_VISIONER.FEAT.CEASELESS_SHADOWS') || 'Ceaseless Shadows';
+          const tooltip = game.i18n?.localize?.('PF2E_VISIONER.UI.CEASELESS_SHADOWS_UPGRADE_TOOLTIP')
+            ?.replace?.('{FROM}', fromLabel)
+            ?.replace?.('{TO}', toLabel)
+            ?.replace?.('{FEAT}', featName) || `${featName}: ${fromLabel} → ${toLabel}`;
+          indicatorHtml += `
+                 <span class="pf2e-visioner-cover-feat-indicator" style="
+                   margin-left: 4px;
+                   padding: 2px 4px;
+                   background: rgba(25, 24, 19, 0.15);
+                   border-radius: 3px;
+                   font-size: 1em;
+                   display: inline-flex;
+                   align-items: center;
+                   gap: 3px;
+                   vertical-align: middle;
+                   border: 1px solid rgba(25, 24, 19, 0.3);
+                 ">
+                   <i class="fas fa-book" style="
+                     color: var(--color-text-dark-primary, #191813);
+                     font-size: 0.7em;
+                     opacity: 0.8;
+                   "></i>
+                   <span 
+                     data-tooltip="${tooltip}"
+                     data-tooltip-direction="UP"
+                     style="
+                       color: ${toColor};
+                       cursor: help;
+                       display: inline-flex;
+                       align-items: center;
+                       filter: brightness(0.9);
+                     "
+                   >
+                     <i class="${toIcon}" style="font-size: 0.9em;"></i>
+                   </span>
+                 </span>`;
+        } catch (e) { }
+      }
+
       if (!indicatorHtml) return;
 
       // Find the specific AC span element (the adjusted AC value)
@@ -453,6 +501,7 @@ export class CoverUIManager {
       }
 
       const hasOverride = !!message?.flags?.['pf2e-visioner']?.coverOverride;
+      const hasFeatUpgrade = !!message?.flags?.['pf2e-visioner']?.coverFeatUpgrade;
 
       // Also check for manual cover
       let hasManualCover = false;
@@ -479,7 +528,7 @@ export class CoverUIManager {
         );
       }
 
-      return hasOverride || hasManualCover;
+      return hasOverride || hasManualCover || hasFeatUpgrade;
     } catch (e) {
       console.warn('PF2E Visioner | Error in shouldShowCoverOverrideIndicator:', e);
       return false;

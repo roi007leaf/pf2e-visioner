@@ -3,6 +3,7 @@
  * Handles the logic for detecting cover between tokens or points
  */
 
+import FeatsHandler from '../../chat/services/FeatsHandler.js';
 import { MODULE_ID } from '../../constants.js';
 // Removed unused imports that were only used by the removed center intersection mode
 import {
@@ -19,6 +20,9 @@ import {
 import { getVisibilityBetween } from '../../utils.js';
 
 export class CoverDetector {
+  constructor() {
+    this._featUpgradeRecords = new Map();
+  }
   // Define token disposition constants for use within this class
   static TOKEN_DISPOSITIONS = {
     FRIENDLY: 1,
@@ -1219,12 +1223,41 @@ export class CoverDetector {
       }
 
       const result = any ? (standard ? 'standard' : 'lesser') : 'none';
-
-      return result;
+      let finalState = result;
+      try {
+        const upgraded = FeatsHandler.upgradeCoverForCreature(attacker, result)?.state || result;
+        if (upgraded !== result) {
+          try {
+            const aId = attacker?.id;
+            const tId = target?.id;
+            if (aId && tId) {
+              this._featUpgradeRecords.set(`${aId}:${tId}`, {
+                from: result,
+                to: upgraded,
+                feat: 'ceaseless-shadows',
+                ts: Date.now(),
+              });
+            }
+          } catch { }
+        }
+        finalState = upgraded;
+      } catch { }
+      return finalState;
     } catch (error) {
       console.error('PF2E Visioner | Error in evaluateCreatureSizeCover:', error);
       return 'none';
     }
+  }
+
+  consumeFeatCoverUpgrade(attackerId, targetId) {
+    try {
+      const key = `${attackerId}:${targetId}`;
+      if (!this._featUpgradeRecords.has(key)) return null;
+      const rec = this._featUpgradeRecords.get(key);
+      this._featUpgradeRecords.delete(key);
+      if (Date.now() - rec.ts > 15000) return null;
+      return rec;
+    } catch { return null; }
   }
 
   // Using segmentIntersectsRect from geometry-utils.js instead of _rayIntersectRect
