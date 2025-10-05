@@ -194,6 +194,15 @@ export class VisionAnalyzer {
           continue;
         }
 
+        // Skip open doors - they don't block line of sight
+        // door: 0 = not a door, 1 = door, 2 = secret door
+        // ds: 0 = closed, 1 = open, 2 = locked
+        const isDoor = wall.document.door > 0;
+        const isOpen = wall.document.ds === 1;
+        if (isDoor && isOpen) {
+          continue;
+        }
+
         // Skip walls that block ONLY movement (darkness walls)
         // Physical walls must also block sight or sound
         const blocksSight = wall.document.sight !== CONST.WALL_SENSE_TYPES.NONE;

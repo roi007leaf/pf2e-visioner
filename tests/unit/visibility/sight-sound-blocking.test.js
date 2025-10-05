@@ -148,6 +148,94 @@ describe('Sight and Sound Blocking', () => {
 
             expect(result).toBe(true); // Fail open
         });
+
+        it('should return true when an open door is in the way', () => {
+            global.canvas.walls.placeables = [
+                {
+                    document: {
+                        move: CONST.WALL_SENSE_TYPES.NORMAL,
+                        sight: CONST.WALL_SENSE_TYPES.NORMAL,
+                        sound: CONST.WALL_SENSE_TYPES.NONE,
+                        door: 1,
+                        ds: 1,
+                        c: [200, 50, 200, 250]
+                    }
+                }
+            ];
+
+            const result = visionAnalyzer.hasLineOfSight(mockObserver, mockTarget);
+
+            expect(result).toBe(true);
+        });
+
+        it('should return false when a closed door is in the way', () => {
+            global.canvas.walls.placeables = [
+                {
+                    document: {
+                        move: CONST.WALL_SENSE_TYPES.NORMAL,
+                        sight: CONST.WALL_SENSE_TYPES.NORMAL,
+                        sound: CONST.WALL_SENSE_TYPES.NONE,
+                        door: 1,
+                        ds: 0,
+                        c: [200, 50, 200, 250]
+                    }
+                }
+            ];
+
+            global.foundry.utils.lineLineIntersection.mockReturnValue({
+                x: 200,
+                y: 200,
+                t0: 0.5
+            });
+
+            const result = visionAnalyzer.hasLineOfSight(mockObserver, mockTarget);
+
+            expect(result).toBe(false);
+        });
+
+        it('should return false when a locked door is in the way', () => {
+            global.canvas.walls.placeables = [
+                {
+                    document: {
+                        move: CONST.WALL_SENSE_TYPES.NORMAL,
+                        sight: CONST.WALL_SENSE_TYPES.NORMAL,
+                        sound: CONST.WALL_SENSE_TYPES.NONE,
+                        door: 1,
+                        ds: 2,
+                        c: [200, 50, 200, 250]
+                    }
+                }
+            ];
+
+            global.foundry.utils.lineLineIntersection.mockReturnValue({
+                x: 200,
+                y: 200,
+                t0: 0.5
+            });
+
+            const result = visionAnalyzer.hasLineOfSight(mockObserver, mockTarget);
+
+            expect(result).toBe(false);
+        });
+
+        it('should return true when an open secret door is in the way', () => {
+            global.canvas.walls.placeables = [
+                {
+                    document: {
+                        move: CONST.WALL_SENSE_TYPES.NORMAL,
+                        sight: CONST.WALL_SENSE_TYPES.NORMAL,
+                        sound: CONST.WALL_SENSE_TYPES.NONE,
+                        door: 2,
+                        ds: 1,
+                        c: [200, 50, 200, 250]
+                    }
+                }
+            ];
+
+            const result = visionAnalyzer.hasLineOfSight(mockObserver, mockTarget);
+
+            expect(result).toBe(true);
+        });
     });
 
     describe('VisionAnalyzer - isSoundBlocked', () => {
