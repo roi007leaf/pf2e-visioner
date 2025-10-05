@@ -18,6 +18,7 @@
  * SINGLETON PATTERN
  */
 
+import { MODULE_ID } from '../../constants.js';
 import { calculateDistanceInFeet } from '../../helpers/geometry-utils.js';
 import { getLogger } from '../../utils/logger.js';
 import { SensingCapabilitiesBuilder } from './SensingCapabilitiesBuilder.js';
@@ -183,7 +184,14 @@ export class VisionAnalyzer {
    */
   hasLineOfSight(observer, target) {
     try {
+      // Check if LOS calculation is disabled
+      const losDisabled = game.settings.get(MODULE_ID, 'disableLineOfSightCalculation');
+      if (losDisabled) {
+        return true; // Always allow LOS when disabled
+      }
+
       const ray = new foundry.canvas.geometry.Ray(observer.center, target.center);
+      let limitedWallCrossings = 0;
 
       // Check for walls that block BOTH movement AND (sight OR sound)
       // Darkness walls typically block ONLY movement, not sight/sound
@@ -236,7 +244,44 @@ export class VisionAnalyzer {
 
           // Check if t1 is also within [0, 1] (intersection within wall segment)
           if (t1 >= 0 && t1 <= 1) {
-            return false; // Wall blocks line of sight
+            // Ray intersects this wall
+
+            // Check for directional walls (one-way walls)
+            // dir: 0 = both directions, 1 = left side blocks, 2 = right side blocks
+            if (wall.document.dir && wall.document.dir !== 0) {
+              const observerDx = observer.center.x - wall.document.c[0];
+              const observerDy = observer.center.y - wall.document.c[1];
+
+              // Cross product determines which side the observer is on
+              const crossProduct = wallDx * observerDy - wallDy * observerDx;
+
+              // dir=1: blocks from left (negative cross product)
+              // dir=2: blocks from right (positive cross product)
+              const blocksFromObserverSide =
+                (wall.document.dir === 1 && crossProduct < 0) ||
+                (wall.document.dir === 2 && crossProduct > 0);
+
+              if (!blocksFromObserverSide) {
+                continue; // One-way wall doesn't block from this direction
+              }
+            }
+
+            // Check if this is a Limited wall (sight/light/sound = LIMITED)
+            const isLimitedSight = wall.document.sight === CONST.WALL_SENSE_TYPES.LIMITED;
+            const isLimitedLight = wall.document.light === CONST.WALL_SENSE_TYPES.LIMITED;
+            const isLimitedSound = wall.document.sound === CONST.WALL_SENSE_TYPES.LIMITED;
+            const isLimited = isLimitedSight || isLimitedLight || isLimitedSound;
+
+            if (isLimited) {
+              // Limited walls: count crossings, block only if > 1
+              limitedWallCrossings++;
+              if (limitedWallCrossings > 1) {
+                return false; // More than one Limited wall crossed
+              }
+            } else {
+              // Normal wall: blocks immediately
+              return false;
+            }
           }
         }
       }

@@ -496,6 +496,10 @@
         "name": "(FR TODO) Auto-Visibility Debug Mode",
         "hint": "(FR TODO) Enable detailed console logging for the auto-visibility system. Useful for troubleshooting visibility calculations."
       },
+      "DISABLE_LINE_OF_SIGHT": {
+        "name": "(FR TODO) Disable Line of Sight Calculations",
+        "hint": "(FR TODO) Disable line-of-sight calculations for visibility. When enabled, visibility will be determined solely by distance and senses, ignoring walls and obstacles. Useful for performance optimization or specific game styles."
+      },
       "USE_LINE_OF_SIGHT_FOR_VISIBILITY": {
         "name": "(FR TODO) Use Line-of-Sight Ray Casting for Visibility",
         "hint": "(FR TODO) When enabled, uses ray-casting to check if walls block line-of-sight for visibility determination. WARNING: This can cause tokens to incorrectly appear hidden/undetected when they're only partially obscured. Recommended to leave DISABLED and rely on Foundry's native vision system. Only enable if you need strict center-to-center LOS checking."

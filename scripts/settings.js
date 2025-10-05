@@ -68,6 +68,7 @@ const SETTINGS_GROUPS = {
         'autoVisibilityEnabled',
         'avsChangesIndicatorSize',
         'autoVisibilityDebugMode',
+        'disableLineOfSightCalculation',
       ],
     },
   ],

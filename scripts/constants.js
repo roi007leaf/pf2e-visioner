@@ -528,6 +528,16 @@ export const DEFAULT_SETTINGS = {
     default: false,
   },
 
+  disableLineOfSightCalculation: {
+    name: 'PF2E_VISIONER.SETTINGS.DISABLE_LINE_OF_SIGHT.name',
+    hint: 'PF2E_VISIONER.SETTINGS.DISABLE_LINE_OF_SIGHT.hint',
+    scope: 'world',
+    config: true,
+    restricted: true,
+    type: Boolean,
+    default: false,
+  },
+
   colorblindMode: {
     name: 'PF2E_VISIONER.SETTINGS.COLORBLIND_MODE.name',
     hint: 'PF2E_VISIONER.SETTINGS.COLORBLIND_MODE.hint',
