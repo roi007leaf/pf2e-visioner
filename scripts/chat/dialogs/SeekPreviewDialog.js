@@ -578,6 +578,45 @@ export class SeekPreviewDialog extends BaseActionDialog {
     context.usedSenseCount = usedSenseCount;
     context.primaryUsedSenseLabel = primaryUsedSenseLabel; // i18n key for display when exactly one
 
+    // Add feat badges for seek-relevant feats (Keen Eyes, That's Odd)
+    try {
+      const { FeatsHandler } = await import('../services/FeatsHandler.js');
+      const badges = [];
+      const actorOrToken = this.actorToken;
+      const has = (slug) => {
+        try {
+          return FeatsHandler.hasFeat(actorOrToken, slug);
+        } catch {
+          return false;
+        }
+      };
+
+      // Keen Eyes: treat Undetected as Hidden; Hidden as Observed on Seek
+      if (has('keen-eyes')) {
+        badges.push({
+          key: 'keen-eyes',
+          icon: 'fas fa-eye',
+          label: 'Keen Eyes',
+          tooltip: 'Undetected creatures become Hidden, Hidden creatures become Observed when you Seek.',
+        });
+      }
+
+      // That's Odd: anomalies (hazards/loot/hidden walls) are easier to notice
+      if (has("thats-odd") || has("that's-odd")) {
+        badges.push({
+          key: 'thats-odd',
+          icon: 'fas fa-exclamation-triangle',
+          label: "That's Odd",
+          tooltip: 'You gain a +2 circumstance bonus when using Seek and you spot hidden doors, traps, and hazards more easily (failure will become a success).',
+        });
+      }
+
+      context.seekFeatBadges = badges;
+    } catch (error) {
+      console.warn('PF2E Visioner | Failed to build seek feat badges:', error);
+      context.seekFeatBadges = [];
+    }
+
     // Legacy support for existing template logic
     const echolocationSense = allSenses?.find?.((s) => s.type === 'echolocation');
     const lifesenseSense = allSenses?.find?.((s) => s.type === 'lifesense');

@@ -37,6 +37,16 @@
           </div>
         </div>
       {{/if}}
+      {{#if seekFeatBadges}}
+        <div class="action-context-badges">
+      {{#each seekFeatBadges as |b|}}
+        <span class="badge badge-feat" data-tooltip="{{b.tooltip}}">
+          <i class="{{b.icon}}"></i>
+          <span class="badge-label">{{b.label}}</span>
+        </span>
+      {{/each}}
+        </div>
+      {{/if}}
     </div>
   </div>
 
