@@ -1231,7 +1231,8 @@ export class CoverDetector {
       });
 
       try {
-        const upgraded = FeatsHandler.upgradeCoverForCreature(attacker, result)?.state || result;
+        // Ceaseless Shadows: the TARGET (being attacked) has the feat and gets upgraded cover
+        const upgraded = FeatsHandler.upgradeCoverForCreature(target, result)?.state || result;
         if (upgraded !== result) {
           try {
             const aId = attacker?.id;
