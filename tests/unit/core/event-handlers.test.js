@@ -307,6 +307,8 @@ describe('Event Handler Tests', () => {
         });
 
         test('should handle visibility-affecting items', () => {
+            jest.useFakeTimers();
+
             const mockItem = {
                 name: 'See Invisibility',
                 type: 'spell',
@@ -325,7 +327,14 @@ describe('Event Handler Tests', () => {
 
             createHandler(mockItem);
 
+            // Visibility-affecting items have a 300ms delay
+            expect(mockVisibilityState.markTokenChangedImmediate).not.toHaveBeenCalled();
+
+            jest.advanceTimersByTime(300);
+
             expect(mockVisibilityState.markTokenChangedImmediate).toHaveBeenCalledWith('token1');
+
+            jest.useRealTimers();
         });
 
         test('should handle equipment changes', () => {
@@ -352,6 +361,8 @@ describe('Event Handler Tests', () => {
         });
 
         test('should handle echolocation effect item', () => {
+            jest.useFakeTimers();
+
             const mockItem = {
                 name: 'Effect: Echolocation',
                 type: 'effect',
@@ -370,13 +381,21 @@ describe('Event Handler Tests', () => {
 
             createHandler(mockItem);
 
+            // Visibility-affecting items have a 300ms delay
+            expect(mockVisibilityState.markTokenChangedImmediate).not.toHaveBeenCalled();
+
+            jest.advanceTimersByTime(300);
+
             expect(mockVisibilityState.markTokenChangedImmediate).toHaveBeenCalledWith('token1');
+
+            jest.useRealTimers();
         });
 
         test('should handle special sense effect items (tremorsense, scent, lifesense)', () => {
             const specialSenses = ['Tremorsense', 'Scent', 'Lifesense', 'Blindsight', 'Thoughtsense'];
 
             specialSenses.forEach((senseName) => {
+                jest.useFakeTimers();
                 jest.clearAllMocks();
 
                 const mockItem = {
@@ -397,7 +416,14 @@ describe('Event Handler Tests', () => {
 
                 createHandler(mockItem);
 
+                // Visibility-affecting items have a 300ms delay
+                expect(mockVisibilityState.markTokenChangedImmediate).not.toHaveBeenCalled();
+
+                jest.advanceTimersByTime(300);
+
                 expect(mockVisibilityState.markTokenChangedImmediate).toHaveBeenCalledWith('token1');
+
+                jest.useRealTimers();
             });
         });
     });

@@ -62,53 +62,37 @@ export function calculateVisibility(input) {
         return handleBlindedObserver(observer, target, soundBlocked);
     }
 
-    // 1.5. CRITICAL: If target is invisible AND observer is deafened (or sound blocked),
-    // observer cannot use vision OR hearing. Only non-visual, non-auditory senses work.
-    if (isInvisible && (observer.conditions.deafened || soundBlocked)) {
-        // Check precise non-visual senses (echolocation, tremorsense, etc.)
-        const preciseNonVisualResult = checkPreciseNonVisualSenses(observer, target, soundBlocked);
-        if (preciseNonVisualResult) {
-            return preciseNonVisualResult;
-        }
+    // 2. Check all available senses and return the best detection result
+    // This ensures non-visual senses (like lifesense) work through walls even without blinded/deafened
+    const allDetectionResults = [];
 
-        // Check imprecise non-visual, non-auditory senses (lifesense, tremorsense, scent)
-        // Hearing is excluded because observer is deafened or sound is blocked
-        const nonAuditoryResult = checkNonAuditorySenses(observer, target);
-        if (nonAuditoryResult) {
-            return nonAuditoryResult;
-        }
-
-        // No senses can detect invisible + deafened/soundblocked = undetected
-        return {
-            state: 'undetected',
-            detection: null
-        };
-    }
-
-    // 2. Check for precise non-visual senses (bypass invisibility and most conditions)
+    // 2a. Check precise non-visual senses (bypass invisibility, lighting, and walls)
     const preciseNonVisualResult = checkPreciseNonVisualSenses(observer, target, soundBlocked);
     if (preciseNonVisualResult) {
-        return preciseNonVisualResult;
+        allDetectionResults.push(preciseNonVisualResult);
     }
 
-    // 3. Determine visual detection capability
-    // NOTE: Returns canDetect: false if target is invisible, blinded, or no line of sight
+    // 2b. Determine visual detection capability (affected by LOS, lighting, invisibility)
     const visualDetection = determineVisualDetection(observer, target, rayDarkness, hasLineOfSight);
-
-    // 4. Check for imprecise non-visual senses if visual detection fails
-    const impreciseResult = checkImpreciseSenses(observer, target, soundBlocked, visualDetection);
-
-    if (impreciseResult && !visualDetection.canDetect) {
-        return impreciseResult;
-    }
-
-    // 5. Apply visual detection result with modifiers
     if (visualDetection.canDetect) {
-        const result = applyVisualModifiers(visualDetection, observer, target);
-        return result;
+        const visualResult = applyVisualModifiers(visualDetection, observer, target);
+        allDetectionResults.push(visualResult);
     }
 
-    // 6. Default: undetected (no senses can detect)
+    // 2c. Check imprecise senses (work through walls but provide worse detection)
+    const impreciseResult = checkImpreciseSenses(observer, target, soundBlocked, visualDetection);
+    if (impreciseResult) {
+        allDetectionResults.push(impreciseResult);
+    }
+
+    // 3. Return the best detection result based on priority
+    // Priority: observed (precise) > concealed > hidden (imprecise) > undetected
+    const bestResult = selectBestDetection(allDetectionResults);
+    if (bestResult) {
+        return bestResult;
+    }
+
+    // 4. Default: undetected (no senses can detect)
     return {
         state: 'undetected',
         detection: null
@@ -234,6 +218,61 @@ function canLifesenseDetect(target) {
     const isLiving = !isUndead && !isConstruct;
 
     return isLiving || isUndead;
+}
+
+/**
+ * Select the best detection result from multiple sense detection results
+ * Priority: observed (precise senses) > concealed > hidden (imprecise senses) > undetected
+ * When states are equal, prefer visual senses over non-visual senses (vision is primary)
+ * @param {Array<Object>} results - Array of detection results
+ * @returns {Object|null} The best detection result, or null if no results
+ */
+function selectBestDetection(results) {
+    if (!results || results.length === 0) {
+        return null;
+    }
+
+    // State priority ranking (lower number = better detection)
+    const statePriority = {
+        'observed': 1,
+        'concealed': 2,
+        'hidden': 3,
+        'undetected': 4
+    };
+
+    // Visual senses (preferred when state is equal)
+    const visualSenses = new Set([
+        'vision',
+        'darkvision',
+        'greater-darkvision',
+        'greaterDarkvision',
+        'low-light-vision',
+        'lowLightVision',
+        'light-perception'
+    ]);
+
+    // Sort by state priority (best first), then by visual preference
+    const sorted = results.sort((a, b) => {
+        const aPriority = statePriority[a.state] || 999;
+        const bPriority = statePriority[b.state] || 999;
+
+        // First compare by state priority
+        if (aPriority !== bPriority) {
+            return aPriority - bPriority;
+        }
+
+        // If states are equal, prefer visual senses (vision is the primary sense)
+        const aIsVisual = a.detection?.sense && visualSenses.has(a.detection.sense);
+        const bIsVisual = b.detection?.sense && visualSenses.has(b.detection.sense);
+
+        if (aIsVisual && !bIsVisual) return -1; // a is visual, prefer it
+        if (!aIsVisual && bIsVisual) return 1;  // b is visual, prefer it
+
+        return 0;
+    });
+
+    // Return the best result
+    return sorted[0];
 }
 
 /**
@@ -669,5 +708,6 @@ export const _internal = {
     determineVisualDetection,
     checkImpreciseSenses,
     applyVisualModifiers,
-    canLifesenseDetect
+    canLifesenseDetect,
+    selectBestDetection
 };

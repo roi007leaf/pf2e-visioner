@@ -71,7 +71,7 @@ export class EventHandlerFactory {
             {
                 name: 'itemEventHandler',
                 Handler: ItemEventHandler,
-                deps: [systemStateProvider, visibilityStateManager, exclusionManager]
+                deps: [systemStateProvider, visibilityStateManager, exclusionManager, cacheManager]
             },
             {
                 name: 'effectEventHandler',
@@ -123,7 +123,7 @@ export class EventHandlerFactory {
 
         // Create visibility state manager
         const visibilityStateManager = await container.get('visibilityStateManager', {
-            batchProcessor: (changedTokens) => batchOrchestrator.processBatch(changedTokens),
+            batchProcessor: (changedTokens) => batchOrchestrator.enqueueTokens(changedTokens),
             spatialAnalyzer: (oldPos, newPos, tokenId) =>
                 coreServices.spatialAnalysisService.getAffectedTokens(oldPos, newPos, tokenId),
             exclusionManager: () => coreServices.exclusionManager

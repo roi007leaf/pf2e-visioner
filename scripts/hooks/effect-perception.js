@@ -138,7 +138,25 @@ async function refreshPerceptionForTokens(tokens) {
   if (validTokens.length === 0) return;
 
   try {
-    // Force a comprehensive perception refresh to ensure effect changes are applied
+    // Check if AVS is enabled - if so, the EffectEventHandler/ItemEventHandler will handle it
+    const avsEnabled = game.settings?.get?.('pf2e-visioner', 'autoVisibilityEnabled');
+
+    if (avsEnabled) {
+      // AVS is enabled - EffectEventHandler and ItemEventHandler will handle the recalculation
+      // We still update lifesense indicators for immediate visual feedback
+      try {
+        const { updateSystemHiddenTokenHighlights } = await import('../services/visual-effects.js');
+        const controlledTokens = canvas?.tokens?.controlled || [];
+        for (const controlledToken of controlledTokens) {
+          await updateSystemHiddenTokenHighlights(controlledToken.document.id);
+        }
+      } catch (error) {
+        console.warn('PF2E Visioner | Failed to update lifesense indicators:', error);
+      }
+      return; // EffectEventHandler will handle the rest
+    }
+
+    // AVS is disabled - manually refresh Foundry's perception system
     await canvas.perception.update({
       initializeVision: true,
       initializeLighting: false,
@@ -146,6 +164,17 @@ async function refreshPerceptionForTokens(tokens) {
       refreshLighting: false,
       refreshOcclusion: true
     });
+
+    // Update lifesense indicators
+    try {
+      const { updateSystemHiddenTokenHighlights } = await import('../services/visual-effects.js');
+      const controlledTokens = canvas?.tokens?.controlled || [];
+      for (const controlledToken of controlledTokens) {
+        await updateSystemHiddenTokenHighlights(controlledToken.document.id);
+      }
+    } catch (error) {
+      console.warn('PF2E Visioner | Failed to update lifesense indicators:', error);
+    }
 
   } catch (error) {
     console.warn(`PF2E Visioner | Failed to refresh perception for effect changes:`, error);

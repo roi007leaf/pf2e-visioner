@@ -23,10 +23,14 @@ export class ItemEventHandler {
     /** @type {ExclusionManager} */
     #exclusionManager = null;
 
-    constructor(systemStateProvider, visibilityStateManager, exclusionManager) {
+    /** @type {CacheManagementService} */
+    #cacheManager = null;
+
+    constructor(systemStateProvider, visibilityStateManager, exclusionManager, cacheManager) {
         this.#systemStateProvider = systemStateProvider;
         this.#visibilityStateManager = visibilityStateManager;
         this.#exclusionManager = exclusionManager;
+        this.#cacheManager = cacheManager;
     }
 
     /**
@@ -157,8 +161,17 @@ export class ItemEventHandler {
                 if (lightEmitterHint) {
                     // Emitting light changed: recalc ALL because others are affected by the emitter's aura
                     this.#visibilityStateManager.markAllTokensChangedImmediate();
+                } else if (isVisibilityRelated) {
+                    // Visibility-affecting condition changed - delay batch and clear cache
+                    // Wait for PF2e to update flags and conditions asynchronously (~250-300ms)
+                    setTimeout(() => {
+                        this.#cacheManager?.getGlobalVisibilityCache()?.clear();
+                        tokens.forEach((token) =>
+                            this.#visibilityStateManager.markTokenChangedImmediate(token.document.id)
+                        );
+                    }, 300);
                 } else {
-                    // Only recalculate visibility for tokens with this actor
+                    // Non-visibility items - process immediately
                     tokens.forEach((token) =>
                         this.#visibilityStateManager.markTokenChangedImmediate(token.document.id)
                     );

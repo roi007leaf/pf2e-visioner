@@ -236,16 +236,6 @@ export async function registerHooks() {
     try {
       if (!('x' in changes || 'y' in changes)) return;
 
-      const token = tokenDoc.object;
-
-      // Skip if token is currently animating or being dragged
-      const isAnimating = token?._animation?.state !== 'completed';
-      const isDragging = token?._dragHandle !== undefined && token?._dragHandle !== null;
-
-      if (isAnimating || isDragging) {
-        return;
-      }
-
       const controlledTokens = canvas?.tokens?.controlled || [];
       if (controlledTokens.length === 0) return;
 
@@ -255,19 +245,34 @@ export async function registerHooks() {
         y: changes.y ?? tokenDoc.y
       };
 
-      Hooks.once('pf2eVisionerAvsBatchComplete', async (batchData) => {
-        const { updateSystemHiddenTokenHighlights } = await import('../services/visual-effects.js');
+      const { updateSystemHiddenTokenHighlights } = await import('../services/visual-effects.js');
 
-        for (const controlledToken of controlledTokens) {
-          const positionOverride = controlledToken.document.id === movedTokenId
-            ? targetPosition
-            : null;
+      for (const controlledToken of controlledTokens) {
+        const positionOverride = controlledToken.document.id === movedTokenId
+          ? targetPosition
+          : null;
 
-          await updateSystemHiddenTokenHighlights(controlledToken.document.id, positionOverride);
-        }
-      });
+        await updateSystemHiddenTokenHighlights(controlledToken.document.id, positionOverride);
+      }
     } catch (error) {
       console.warn('PF2E Visioner | updateToken hook failed:', error);
+    }
+  });
+
+  Hooks.on('refreshToken', async (token) => {
+    try {
+      const controlledTokens = canvas?.tokens?.controlled || [];
+      if (controlledTokens.length === 0) return;
+
+      const { updateSystemHiddenTokenHighlights } = await import('../services/visual-effects.js');
+
+      for (const controlledToken of controlledTokens) {
+        if (controlledToken.document.id === token.document.id) {
+          await updateSystemHiddenTokenHighlights(controlledToken.document.id);
+        }
+      }
+    } catch (error) {
+      console.warn('PF2E Visioner | refreshToken hook for lifesense indicators failed:', error);
     }
   });
 

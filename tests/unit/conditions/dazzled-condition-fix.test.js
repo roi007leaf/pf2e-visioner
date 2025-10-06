@@ -86,8 +86,9 @@ describe('Dazzled Condition - Correct Implementation', () => {
 
             const result = calculateVisibility(input);
             // With thoughtsense (precise non-visual), dazzled should NOT apply
+            // When both vision and thoughtsense return observed, prefer vision (primary sense)
             expect(result.state).toBe('observed');
-            expect(result.detection.sense).toBe('thoughtsense');
+            expect(result.detection.sense).toBe('vision');
         });
 
         test('dazzled observer with precise echolocation sees target as OBSERVED (not concealed)', () => {
@@ -110,8 +111,9 @@ describe('Dazzled Condition - Correct Implementation', () => {
 
             const result = calculateVisibility(input);
             // With echolocation (precise non-visual), dazzled should NOT apply
+            // When both vision and echolocation return observed, prefer vision (primary sense)
             expect(result.state).toBe('observed');
-            expect(result.detection.sense).toBe('echolocation');
+            expect(result.detection.sense).toBe('darkvision');
         });
 
         test('dazzled observer with precise lifesense sees living target as OBSERVED (not concealed)', () => {
@@ -135,8 +137,9 @@ describe('Dazzled Condition - Correct Implementation', () => {
 
             const result = calculateVisibility(input);
             // With precise lifesense, dazzled should NOT apply
+            // When both vision and lifesense return observed, prefer vision (primary sense)
             expect(result.state).toBe('observed');
-            expect(result.detection.sense).toBe('lifesense');
+            expect(result.detection.sense).toBe('vision');
         });
 
         test('dazzled observer with precise scent sees target as OBSERVED via visual sense when using vision', () => {
@@ -159,9 +162,10 @@ describe('Dazzled Condition - Correct Implementation', () => {
 
             const result = calculateVisibility(input);
             // With precise scent (non-visual), dazzled should NOT apply even when using vision
-            // Because vision is NOT the ONLY precise sense
+            // Because vision is NOT the ONLY precise sense (both return observed, dazzled doesn't apply)
+            // When both vision and scent return observed, prefer vision (primary sense)
             expect(result.state).toBe('observed');
-            expect(result.detection.sense).toBe('scent');
+            expect(result.detection.sense).toBe('vision');
         });
     });
 

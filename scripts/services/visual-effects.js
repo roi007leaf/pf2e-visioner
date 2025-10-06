@@ -1179,30 +1179,15 @@ export async function updateSystemHiddenTokenHighlights(observerId = null, posit
     const observerHasLifesense = !!lifesenseSense;
     const lifesenseIsPrecise = lifesenseSense?.acuity === 'precise';
 
-    const observerConditions = observer.actor?.conditions?.active || [];
-    const allConditions = observer.actor?.itemTypes?.condition || [];
-
-    const isBlinded = observerConditions.some?.(c => c.slug === 'blinded') ??
-      allConditions.some?.(c => c.slug === 'blinded') ?? false;
-    const isDeafened = observerConditions.some?.(c => c.slug === 'deafened') ??
-      allConditions.some?.(c => c.slug === 'deafened') ?? false;
-
-    // Check if any tokens are invisible (for invisible + deafened case)
-    const hasInvisibleTargets = tokens.some(t => {
-      if (!t || t.id === observer.id) return false;
-      const isInvisible = t.actor?.itemTypes?.condition?.some?.(c => c.slug === 'invisible') ?? false;
-      return isInvisible;
-    });
-
-    // Lifesense is used when:
-    // 1. Observer has precise lifesense, OR
-    // 2. Observer is both blinded AND deafened (only non-visual, non-auditory senses work), OR
-    // 3. Observer is deafened AND there are invisible targets (invisible + deafened = only non-auditory senses work)
-    const isUsingLifesense = observerHasLifesense && (
-      lifesenseIsPrecise ||
-      (isBlinded && isDeafened) ||
-      (isDeafened && hasInvisibleTargets)
-    );
+    // Lifesense indicator should show when the observer has lifesense
+    // The indicator will then be shown on targets that:
+    // 1. Are within lifesense range
+    // 2. Can be detected by lifesense (living/undead creatures)
+    // 3. Are system-hidden (not visible to the client)
+    // 
+    // This allows lifesense to work through walls, in darkness, and with invisible creatures
+    // without requiring specific conditions like blinded/deafened
+    const isUsingLifesense = observerHasLifesense;
 
     if (!isUsingLifesense) {
       for (const token of tokens) {
@@ -1478,7 +1463,9 @@ export async function updateSystemHiddenTokenHighlights(observerId = null, posit
             }
           }; requestAnimationFrame(animate);
 
-          const parent = canvas.interface || canvas.effects?.foreground || canvas.tokens;
+          // Use controls layer for lifesense indicators - it bypasses fog of war
+          // We create these for all users (not just GM) to show lifesense detection
+          const parent = canvas.controls || canvas.interface || canvas.tokens;
           parent.addChild(g);
           token._pvSystemHiddenIndicator = g;
         } catch (error) {
