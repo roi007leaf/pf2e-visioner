@@ -314,6 +314,9 @@ export class Pf2eVisionerApi {
       // Check vision capabilities
       const visionCaps = visionAnalyzer.getVisionCapabilities(observerToken);
 
+      // Calculate distance for sense range checks
+      const distance = visionAnalyzer.distanceFeet(observerToken, targetToken);
+
       // Check special detection
       const detection = {
         darkvision: visionCaps.hasDarkvision,
@@ -324,22 +327,253 @@ export class Pf2eVisionerApi {
 
       const hasLifesense = visionCaps.sensingSummary?.lifesense?.range > 0;
       if (hasLifesense) {
-        detection.lifesense = visionAnalyzer.canDetectWithLifesenseInRange(observerToken, targetToken);
+        // Check if target is within lifesense range and is a living/undead creature
+        const inRange = distance <= (visionCaps.sensingSummary.lifesense.range || 0);
+        const traits = targetToken.actor?.system?.traits?.value || [];
+        const isLivingOrUndead = !traits.includes('construct') && !traits.includes('object');
+        detection.lifesense = inRange && isLivingOrUndead;
       }
 
       const hasTremorsense = visionCaps.sensingSummary?.tremorsense?.range > 0;
       if (hasTremorsense) {
-        const distance = visionAnalyzer.distanceFeet(observerToken, targetToken);
         const bothOnGround = (observerToken.document.elevation || 0) === 0 && (targetToken.document.elevation || 0) === 0;
         detection.tremorsense = bothOnGround && distance <= (visionCaps.sensingSummary.tremorsense.range || 0);
+      }
+
+      // Build comprehensive senses object from sensingSummary
+      const sensingSummary = visionCaps.sensingSummary || {};
+      const senses = {
+        darkvision: {
+          has: visionCaps.hasDarkvision,
+          range: visionCaps.darkvisionRange || 0,
+          active: visionCaps.hasDarkvision && (lightingFactor === 'darkness' || lightingFactor.includes('magicalDarkness')),
+          type: 'precise',
+        },
+        lowLightVision: {
+          has: visionCaps.hasLowLightVision,
+          active: visionCaps.hasLowLightVision && lightingFactor === 'dim',
+          type: 'precise',
+        },
+        lifesense: {
+          has: hasLifesense,
+          range: sensingSummary.lifesense?.range || 0,
+          active: detection.lifesense,
+          inRange: hasLifesense && distance <= (sensingSummary.lifesense?.range || 0),
+          type: 'precise',
+        },
+        tremorsense: {
+          has: hasTremorsense,
+          range: sensingSummary.tremorsense?.range || 0,
+          active: detection.tremorsense,
+          inRange: hasTremorsense && distance <= (sensingSummary.tremorsense?.range || 0),
+          type: 'precise',
+        },
+        scent: {
+          has: (sensingSummary.scent?.range || 0) > 0,
+          range: sensingSummary.scent?.range || 0,
+          inRange: (sensingSummary.scent?.range || 0) > 0 && distance <= (sensingSummary.scent?.range || 0),
+          type: 'imprecise',
+        },
+        hearing: {
+          has: (sensingSummary.hearing?.range || 0) > 0 || !observerConditions.includes('deafened'),
+          range: sensingSummary.hearing?.range || Infinity,
+          inRange: distance <= (sensingSummary.hearing?.range || Infinity),
+          type: 'imprecise',
+        },
+      };
+
+      // Add all precise senses from sensingSummary
+      if (sensingSummary.precise) {
+        for (const sense of sensingSummary.precise) {
+          const senseKey = sense.type?.replace(/-/g, '') || sense.type;
+          if (senseKey && !senses[senseKey]) {
+            senses[senseKey] = {
+              has: sense.range > 0,
+              range: sense.range || 0,
+              inRange: sense.range > 0 && distance <= sense.range,
+              type: 'precise',
+            };
+          }
+        }
+      }
+
+      // Add all imprecise senses from sensingSummary
+      if (sensingSummary.imprecise) {
+        for (const sense of sensingSummary.imprecise) {
+          const senseKey = sense.type?.replace(/-/g, '') || sense.type;
+          if (senseKey && !senses[senseKey]) {
+            senses[senseKey] = {
+              has: sense.range > 0,
+              range: sense.range || 0,
+              inRange: sense.range > 0 && distance <= sense.range,
+              type: 'imprecise',
+            };
+          }
+        }
+      }
+
+      // Build comprehensive reasons array explaining WHY the visibility state is what it is
+      const reasons = [];
+
+      // 1. OBSERVER CONDITIONS (highest priority - completely override senses)
+      if (observerConditions.includes('blinded')) {
+        reasons.push('Observer is blinded (cannot use visual senses)');
+      }
+
+      const isDeafened = observerConditions.includes('deafened');
+      if (isDeafened && targetConditions.includes('invisible')) {
+        reasons.push('Observer is deafened (cannot hear invisible target)');
+      }
+
+      // Check for dazzled condition
+      const isDazzled = observerToken.actor?.itemTypes?.condition?.some(c => c.slug === 'dazzled');
+      if (isDazzled && (visibility === 'concealed' || lightingFactor === 'bright')) {
+        // Dazzled causes concealment in bright light if vision is the only precise sense
+        const hasNonVisualPreciseSense = detection.lifesense || detection.tremorsense ||
+          Object.entries(sensingSummary.precise || []).some(([type]) =>
+            !['vision', 'darkvision', 'low-light-vision', 'greater-darkvision'].includes(type)
+          );
+        if (!hasNonVisualPreciseSense && lightingFactor === 'bright') {
+          reasons.push('Observer is dazzled in bright light');
+        }
+      }
+
+      // 2. TARGET CONDITIONS (override most other factors)
+      if (targetConditions.includes('invisible')) {
+        reasons.push('Target is invisible');
+      }
+      if (targetConditions.includes('undetected')) {
+        reasons.push('Target has undetected condition');
+      }
+      if (targetConditions.includes('hidden')) {
+        reasons.push('Target has hidden condition');
+      }
+      if (targetConditions.includes('concealed')) {
+        reasons.push('Target has concealed condition');
+      }
+
+      // 3. LIGHTING CONDITIONS (main cause of concealment/hidden for most cases)
+      if (visibility === 'concealed' || visibility === 'hidden') {
+        // Greater magical darkness (rank 4+) - conceals EVEN with normal darkvision
+        if (lightingFactor.includes('magicalDarkness')) {
+          const rank = targetLight.darknessRank || 0;
+          if (rank >= 4) {
+            if (visionCaps.hasDarkvision && !visionCaps.hasGreaterDarkvision) {
+              reasons.push(`Greater magical darkness (rank ${rank}) conceals even with darkvision`);
+            } else if (!visionCaps.hasDarkvision) {
+              reasons.push(`Target is in magical darkness (rank ${rank}) without darkvision`);
+            }
+            // Note: Greater darkvision can see through rank 4 darkness
+          } else if (rank >= 1) {
+            // Regular magical darkness (rank 1-3) - works like normal darkness
+            if (!visionCaps.hasDarkvision) {
+              reasons.push(`Target is in magical darkness (rank ${rank}) without darkvision`);
+            }
+          }
+        }
+        // Regular darkness without darkvision
+        else if (lightingFactor === 'darkness' && !visionCaps.hasDarkvision) {
+          reasons.push('Target is in darkness without darkvision');
+        }
+        // Dim light without low-light vision (causes concealment)
+        else if (lightingFactor === 'dim' && !visionCaps.hasLowLightVision) {
+          reasons.push('Target is in dim light without low-light vision');
+        }
+      }
+
+      // 4. SPECIAL SENSE DETECTION (can detect otherwise hidden targets)
+      // Helper to determine acuity of a sense
+      const getSenseAcuity = (senseType) => {
+        // Check if sense is in precise array
+        if (sensingSummary.precise?.some(s => s.type === senseType)) {
+          return 'precise';
+        }
+        // Check if sense is in imprecise array
+        if (sensingSummary.imprecise?.some(s => s.type === senseType)) {
+          return 'imprecise';
+        }
+        // Default fallback
+        return 'imprecise';
+      };
+
+      // Lifesense detection
+      if (detection.lifesense) {
+        const acuity = getSenseAcuity('lifesense');
+        reasons.push(`Detected by lifesense (${acuity})`);
+      }
+
+      // Tremorsense detection
+      if (detection.tremorsense) {
+        const acuity = getSenseAcuity('tremorsense');
+        reasons.push(`Detected by tremorsense (${acuity})`);
+      }
+
+      // Check for other precise non-visual senses
+      if (sensingSummary.precise) {
+        for (const sense of sensingSummary.precise) {
+          const senseType = sense.type;
+          // Skip lifesense and tremorsense (already handled above)
+          // Skip visual senses (they're not "special" detection)
+          if (!['vision', 'darkvision', 'low-light-vision', 'greater-darkvision', 'lifesense', 'tremorsense'].includes(senseType)) {
+            if (sense.range > 0 && distance <= sense.range) {
+              const senseName = senseType.replace(/-/g, ' ');
+              reasons.push(`Detected by ${senseName} (precise)`);
+            }
+          }
+        }
+      }
+
+      // Imprecise senses (provide hidden state, not observed)
+      if (visibility === 'hidden') {
+        // Check if detection is via imprecise senses
+        const hasHearing = sensingSummary.hearing && !isDeafened && distance <= (sensingSummary.hearing.range || Infinity);
+        const hasScent = sensingSummary.scent && distance <= (sensingSummary.scent?.range || 0);
+
+        if (hasHearing && targetConditions.includes('invisible')) {
+          reasons.push('Heard with hearing (imprecise) - invisible creature is hidden');
+        } else if (hasScent) {
+          reasons.push('Detected by scent (imprecise)');
+        }
+      }
+
+      // 5. NORMAL VISIBILITY (explain why target IS visible)
+      if (visibility === 'observed' && reasons.length === 0) {
+        // Explain why they can see the target
+        if (lightingFactor === 'bright') {
+          reasons.push('Target is in bright light with normal vision');
+        } else if (lightingFactor === 'dim' && visionCaps.hasLowLightVision) {
+          reasons.push('Low-light vision sees clearly in dim light');
+        } else if ((lightingFactor === 'darkness' || lightingFactor.includes('magicalDarkness')) && visionCaps.hasDarkvision) {
+          if (lightingFactor.includes('magicalDarkness')) {
+            const rank = targetLight.darknessRank || 0;
+            if (rank < 4) {
+              reasons.push(`Darkvision sees through magical darkness (rank ${rank})`);
+            } else if (visionCaps.hasGreaterDarkvision) {
+              reasons.push(`Greater darkvision sees through magical darkness (rank ${rank})`);
+            }
+          } else {
+            reasons.push('Darkvision sees clearly in darkness');
+          }
+        }
+      }
+
+      // 6. UNDETECTED - explain why completely undetected
+      if (visibility === 'undetected' && reasons.length === 0) {
+        if (targetConditions.includes('invisible')) {
+          if (isDeafened) {
+            reasons.push('Target is invisible and observer is deafened');
+          } else {
+            reasons.push('Target is invisible and cannot be detected by available senses');
+          }
+        } else {
+          reasons.push('Target cannot be detected by any available senses');
+        }
       }
 
       return {
         state: visibility,
         lighting: lightingFactor,
-        targetConditions,
-        observerConditions,
-        detection,
+        reasons,
       };
     } catch (error) {
       console.error('Error getting visibility factors:', error);
