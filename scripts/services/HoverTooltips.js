@@ -1009,7 +1009,7 @@ function addVisibilityIndicator(
 
   // Ensure ticker updates DOM badge positions during pan/zoom
   ensureBadgeTicker();
-}function ensureBadgeTicker() {
+} function ensureBadgeTicker() {
   if (HoverTooltips.badgeTicker) return;
 
   // Invalidate canvas rect cache when ticker starts (viewport may have changed)
