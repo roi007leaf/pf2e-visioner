@@ -25,7 +25,6 @@ window.pf2eVisioner.systems.autoCover = autoCoverSystem;
 // Initialize the system when imported
 const initialize = () => {
   // Register hooks when this module is loaded
-  console.debug('PF2E Visioner | Initializing auto-cover system');
 
   // Now that the system is in the global namespace, register hooks
   AutoCoverHooks.registerHooks();

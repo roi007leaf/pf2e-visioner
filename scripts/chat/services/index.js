@@ -14,11 +14,13 @@ export * from './ui/dialog-utils.js';
 export * from './ui/ui-injector.js';
 
 // Action handler classes
-export * from './actions/base-action.js';
-export * from './actions/consequences-action.js';
-export * from './actions/diversion-action.js';
-export * from './actions/hide-action.js';
-export * from './actions/point-out-action.js';
-export * from './actions/seek-action.js';
-export * from './actions/sneak-action.js';
-export * from './actions/take-cover-action.js';
+export * from './actions/BaseAction.js';
+export * from './actions/ConsequencesAction.js';
+export * from './actions/DiversionAction.js';
+export * from './actions/HideAction.js';
+export * from './actions/PointOutAction.js';
+export * from './actions/SeekAction.js';
+// Temporarily disabled old sneak system to use new state-based approach
+// export * from './actions/sneak-action.js';
+export * from './actions/TakeCoverAction.js';
+

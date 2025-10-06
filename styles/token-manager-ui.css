@@ -49,6 +49,48 @@
     color: var(--pf2e-visioner-danger);
     border: 1px solid var(--visibility-undetected);
   }
+  /* Override removal column */
+  .visioner-token-manager .override-column {
+    text-align: center;
+    width: 30px;
+  }
+  .visioner-token-manager button.remove-override {
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--pf2e-visioner-danger, #c92a2a);
+    cursor: pointer;
+    padding: 2px 4px;
+    border-radius: 4px;
+    font-size: 12px;
+    line-height: 1;
+  }
+  .visioner-token-manager button.remove-override:hover {
+    background: rgba(255, 0, 0, 0.15);
+    border-color: rgba(255, 0, 0, 0.4);
+    color: #ff4d4f;
+  }
+  /* Foundry-hidden token indicator */
+  .visioner-token-manager .token-image .token-img-wrapper {
+    position: relative;
+    display: inline-block;
+  }
+  .visioner-token-manager .foundry-hidden-indicator {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.7);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.6);
+    box-shadow: 0 0 3px rgba(0, 0, 0, 0.5);
+    pointer-events: none;
+  }
   /*
  * Token Manager UI Improvements
  * Modern, compact UI for the token manager
@@ -210,6 +252,12 @@
 }
 
 /* Visibility State Indicator Colors - Professional styling */
+.state-indicator.visibility-avs {
+  background: rgba(156, 39, 176, 0.25) !important; /* Subtle purple background */
+  color: #9c27b0 !important; /* Purple text */
+  border-color: #9c27b0 !important; /* Purple border */
+}
+
 .state-indicator.visibility-observed {
   background: rgba(76, 175, 80, 0.25) !important; /* Subtle green background */
   color: #4caf50 !important; /* Green text */
@@ -232,4 +280,51 @@
   background: rgba(244, 67, 54, 0.25) !important; /* Subtle red background */
   color: #f44336 !important; /* Red text */
   border-color: #f44336 !important; /* Red border */
+}
+
+/* AVS Chip Styling */
+.avs-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: 6px;
+  padding: 1px 4px;
+  background: var(--visibility-avs);
+  color: white;
+  border-radius: 8px;
+  font-size: 9px;
+  font-weight: bold;
+  line-height: 1;
+  vertical-align: middle;
+}
+
+.avs-chip i {
+  font-size: 8px;
+}
+
+/* Small AVS Tag for Action Dialogs */
+.old-visibility-state {
+  position: relative;
+  display: inline-block;
+}
+
+.avs-tag-small {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  width: 8px;
+  height: 8px;
+  background: var(--visibility-avs);
+  color: white;
+  border-radius: 50%;
+  font-size: 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  box-shadow: 0 0 0 1px white;
+}
+
+.avs-tag-small i {
+  font-size: 5px;
 }

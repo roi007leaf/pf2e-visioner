@@ -3,11 +3,11 @@
 --}}
 <table class="cover-table">
   <colgroup>
-    <col style="width:7%" />
-    <col style="width:10%" />
-    <col style="width:28%" />
-    <col style="width:17%" />
-    <col style="width:38%" />
+  <col class="col-w-7" />
+  <col class="col-w-10" />
+  <col class="col-w-28" />
+  <col class="col-w-17" />
+  <col class="col-w-38" />
   </colgroup>
   <thead>
     <tr>
@@ -21,9 +21,16 @@
   <tbody>
     {{#each tokens as |target|}}
       {{#unless target.isLoot}}
-        <tr class="token-row {{sectionType}}-row {{#if target.dispositionClass}}{{target.dispositionClass}}-npc{{/if}}" data-token-id="{{target.id}}">
+        <tr class="token-row {{sectionType}}-row {{#if target.dispositionClass}}{{target.dispositionClass}}-npc{{/if}}" data-token-id="{{target.id}}" data-foundry-hidden="{{target.isFoundryHidden}}">
           <td class="token-image">
-            <img src="{{target.img}}" width="28" height="28" />
+            <div class="token-img-wrapper">
+              <img src="{{target.img}}" width="28" height="28" />
+              {{#if target.isFoundryHidden}}
+                <span class="foundry-hidden-indicator" data-tooltip="Foundry Hidden">
+                  <i class="fas fa-eye-slash"></i>
+                </span>
+              {{/if}}
+            </div>
           </td>
           <td class="token-name">
             <strong>{{target.name}}</strong>

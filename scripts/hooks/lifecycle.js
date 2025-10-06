@@ -4,7 +4,7 @@
 
 import { injectChatAutomationStyles } from '../chat/chat-automation-styles.js';
 import { MODULE_ID } from '../constants.js';
-import { initializeHoverTooltips } from '../services/hover-tooltips.js';
+import { initializeHoverTooltips } from '../services/HoverTooltips.js';
 import { registerSocket } from '../services/socket.js';
 import { updateTokenVisuals, updateWallVisuals } from '../services/visual-effects.js';
 
@@ -23,7 +23,7 @@ export function onReady() {
   if (game.user?.isGM) {
     // Run shortly after ready to avoid competing with other modules' migrations
     setTimeout(() => {
-      enableVisionForAllTokensAndPrototypes().catch(() => {});
+      enableVisionForAllTokensAndPrototypes().catch(() => { });
     }, 25);
   }
 }
@@ -31,12 +31,145 @@ export function onReady() {
 export async function onCanvasReady() {
   await updateTokenVisuals();
   try {
-    const id = canvas.tokens.controlled?.[0]?.id || null;
-    await updateWallVisuals(id);
-  } catch (_) {}
+    // After canvas refresh, restore indicators for currently controlled tokens that have wall flags
+    const controlledTokens = canvas.tokens.controlled || [];
 
-  // Always initialize tooltip system for keyboard shortcuts
+    if (controlledTokens.length > 0) {
+      // Process each controlled token to restore their indicators
+      for (const token of controlledTokens) {
+        const wallFlags = token?.document?.getFlag?.(MODULE_ID, 'walls') || {};
+        // Only restore if this token has wall flags
+        if (Object.keys(wallFlags).length > 0) {
+          await updateWallVisuals(token.document.id);
+        }
+      }
+    }
+
+    // Also set up a hook to restore indicators when tokens are controlled after canvas ready
+    // OPTIMIZED: Only update wall visuals if the token actually has wall flags to avoid triggering AVS
+    const restoreIndicatorsOnControl = Hooks.on('controlToken', async (token, controlled) => {
+      // CRITICAL: Set global flag to suppress lighting refreshes during token control operations
+      try {
+        globalThis.game = globalThis.game || {};
+        globalThis.game.pf2eVisioner = globalThis.game.pf2eVisioner || {};
+        globalThis.game.pf2eVisioner.suppressLightingRefresh = true;
+
+        // Track this controlToken event to prevent AVS from responding to related lighting refreshes
+        const { LightingEventHandler } = await import('../visibility/auto-visibility/core/LightingEventHandler.js');
+        LightingEventHandler.trackControlTokenEvent();
+      } catch {
+        // Best effort - if the import fails, continue without tracking
+      }
+
+      if (controlled) {
+        const wallFlags = token?.document?.getFlag?.(MODULE_ID, 'walls') || {};
+        if (Object.keys(wallFlags).length > 0) {
+          // CRITICAL: Always use the optimized version that doesn't trigger lightingRefresh
+          // NEVER call the original updateWallVisuals on token selection
+          try {
+            const { updateWallIndicatorsOnly } = await import('../services/visual-effects.js');
+            await updateWallIndicatorsOnly(token.document.id);
+          } catch (error) {
+            // If the optimized method fails, do nothing rather than triggering AVS
+            console.warn('PF2E Visioner | Failed to use optimized wall indicator update, skipping:', error);
+          }
+        }
+
+        try {
+          const { updateSystemHiddenTokenHighlights } = await import('../services/visual-effects.js');
+          await updateSystemHiddenTokenHighlights(token.document.id);
+        } catch (error) {
+          console.warn('PF2E Visioner | Failed to update system-hidden token highlights:', error);
+        }
+      } else {
+        try {
+          const { updateSystemHiddenTokenHighlights } = await import('../services/visual-effects.js');
+          await updateSystemHiddenTokenHighlights(null);
+        } catch (error) {
+          console.warn('PF2E Visioner | Failed to clear system-hidden token highlights:', error);
+        }
+      }
+
+      // Clear the suppression flag after a short delay
+      setTimeout(() => {
+        try {
+          if (globalThis.game?.pf2eVisioner) {
+            globalThis.game.pf2eVisioner.suppressLightingRefresh = false;
+          }
+        } catch {
+          // Best effort
+        }
+      }, 50);
+    });
+  } catch (_) { }
+
   initializeHoverTooltips();
+
+  // Listen for condition changes to update lifesense highlights
+  // Note: Trait changes are handled by ActorEventHandler for full AVS recalculation
+
+  // Listen for item updates on actors (conditions are items in PF2e)
+  Hooks.on('createItem', async (item, options, userId) => {
+    try {
+      if (item.type !== 'condition') return;
+
+      const actor = item.parent;
+      if (!actor) return;
+
+      // Trigger perception refresh to recalculate visibility based on new conditions
+      if (canvas?.perception) {
+        canvas.perception.update({
+          refreshVision: true,
+          refreshOcclusion: true
+        });
+      }
+
+      // Update indicators for any controlled tokens after a brief delay
+      // to allow perception refresh to complete
+      setTimeout(async () => {
+        const controlledTokens = canvas?.tokens?.controlled || [];
+        if (controlledTokens.length === 0) return;
+
+        const { updateSystemHiddenTokenHighlights } = await import('../services/visual-effects.js');
+        for (const controlledToken of controlledTokens) {
+          await updateSystemHiddenTokenHighlights(controlledToken.document.id);
+        }
+      }, 100);
+    } catch (error) {
+      console.warn('PF2E Visioner | Failed to update highlights on condition add:', error);
+    }
+  });
+
+  Hooks.on('deleteItem', async (item, options, userId) => {
+    try {
+      if (item.type !== 'condition') return;
+
+      const actor = item.parent;
+      if (!actor) return;
+
+      // Trigger perception refresh to recalculate visibility based on removed conditions
+      if (canvas?.perception) {
+        canvas.perception.update({
+          refreshVision: true,
+          refreshOcclusion: true
+        });
+      }
+
+      // Update indicators for any controlled tokens after a brief delay
+      // to allow perception refresh to complete
+      setTimeout(async () => {
+        const controlledTokens = canvas?.tokens?.controlled || [];
+        if (controlledTokens.length === 0) return;
+
+        const { updateSystemHiddenTokenHighlights } = await import('../services/visual-effects.js');
+        for (const controlledToken of controlledTokens) {
+          await updateSystemHiddenTokenHighlights(controlledToken.document.id);
+        }
+      }, 100);
+    } catch (error) {
+      console.warn('PF2E Visioner | Failed to update highlights on condition remove:', error);
+    }
+  });
 
   // Always bind keyboard shortcuts (Alt handled via highlightObjects hook, O key handled here)
   // Bind 'O' key on keydown/keyup for observer overlay
@@ -45,7 +178,7 @@ export async function onCanvasReady() {
     async (ev) => {
       if (ev.key?.toLowerCase() !== 'o') return;
       const { HoverTooltips, showControlledTokenVisibilityObserver } = await import(
-        '../services/hover-tooltips.js'
+        '../services/HoverTooltips.js'
       );
       if (
         !HoverTooltips.isShowingKeyTooltips &&
@@ -63,7 +196,7 @@ export async function onCanvasReady() {
       if (ev.key?.toLowerCase() !== 'o') return;
       try {
         // Reuse the existing release path via onHighlightObjects(false)
-        const { onHighlightObjects } = await import('../services/hover-tooltips.js');
+        const { onHighlightObjects } = await import('../services/HoverTooltips.js');
         onHighlightObjects(false);
         // Note: Don't call cleanupHoverTooltips() here as it would reset currentHoveredToken
         // and prevent hover tooltips from being restored
@@ -90,10 +223,20 @@ export async function onCanvasReady() {
             const wrapper = typeof window.$ === 'function' ? window.$(el) : el;
             await handleRenderChatMessage(msg, wrapper);
           }
-        } catch (_) {}
+        } catch (_) { }
       }, 50);
     }
-  } catch (_) {}
+  } catch (_) { }
+
+  // Hide override validation indicator when scene changes
+  Hooks.on('canvasTearDown', async () => {
+    try {
+      const { default: indicator } = await import('../ui/OverrideValidationIndicator.js');
+      indicator.hide(true);
+    } catch (error) {
+      console.warn('PF2E Visioner | Failed to hide indicator on scene change:', error);
+    }
+  });
 }
 
 async function enableVisionForAllTokensAndPrototypes() {
@@ -103,7 +246,7 @@ async function enableVisionForAllTokensAndPrototypes() {
       const scenes = Array.from(game.scenes?.contents ?? []);
       for (const scene of scenes) {
         try {
-          const tokens = Array.from(scene.tokens?.contents ?? []);
+          const tokens = Array.from(scene.tokens?.contents ?? []).filter(t => t.actor?.type !== "loot");
           const updates = [];
           for (const t of tokens) {
             const hasVision = t?.vision === true || t?.sight?.enabled === true;
@@ -114,11 +257,11 @@ async function enableVisionForAllTokensAndPrototypes() {
           if (updates.length) {
             await scene.updateEmbeddedDocuments('Token', updates, { diff: false, render: false });
           }
-        } catch (_) {}
+        } catch (_) { }
       }
 
       // Update all actor prototype tokens
-      const actors = Array.from(game.actors?.contents ?? []);
+      const actors = Array.from(game.actors?.contents ?? []).filter(a => a?.type !== "loot");
       for (const actor of actors) {
         try {
           const pt = actor?.prototypeToken;
@@ -132,10 +275,10 @@ async function enableVisionForAllTokensAndPrototypes() {
               );
             }
           }
-        } catch (_) {}
+        } catch (_) { }
       }
     }
-  } catch (_) {}
+  } catch (_) { }
 }
 
 function setupFallbackHUDButton() {
@@ -213,7 +356,7 @@ function setupFallbackHUDButton() {
           const pos = JSON.parse(savedPos);
           if (pos.left) button.style.left = pos.left;
           if (pos.top) button.style.top = pos.top;
-        } catch (_) {}
+        } catch (_) { }
       }
 
       button.addEventListener('click', async (event) => {

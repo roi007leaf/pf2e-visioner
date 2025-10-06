@@ -10,6 +10,7 @@ import {
 } from '../../../helpers/cover-helpers.js';
 import { getCoverBetween } from '../../../utils.js';
 import autoCoverSystem from '../AutoCoverSystem.js';
+import coverDetector from '../CoverDetector.js';
 import { BaseAutoCoverUseCase } from './BaseUseCase.js';
 class AttackRollUseCase extends BaseAutoCoverUseCase {
   constructor() {
@@ -92,6 +93,20 @@ class AttackRollUseCase extends BaseAutoCoverUseCase {
     } catch (e) {
       console.warn('PF2E Visioner | Failed to check cover override:', e);
     }
+
+    try {
+      const upgradeRec = coverDetector.consumeFeatCoverUpgrade(speakerTokenId, targetTokenId);
+      if (upgradeRec) {
+        if (!data.flags) data.flags = {};
+        if (!data.flags['pf2e-visioner']) data.flags['pf2e-visioner'] = {};
+        data.flags['pf2e-visioner'].coverFeatUpgrade = upgradeRec;
+        if (doc && doc.updateSource) {
+          try {
+            doc.updateSource({ 'flags.pf2e-visioner.coverFeatUpgrade': upgradeRec });
+          } catch (_) { }
+        }
+      }
+    } catch (_) { }
   }
 
   /**
@@ -177,7 +192,7 @@ class AttackRollUseCase extends BaseAutoCoverUseCase {
                 dcObj.statistic = st;
               }
             }
-          } catch (_) {}
+          } catch (_) { }
         },
       );
     } catch (e) {
@@ -228,7 +243,7 @@ class AttackRollUseCase extends BaseAutoCoverUseCase {
           console.warn('PF2E Visioner | Failed to cleanup ephemeral cover effects:', e);
         }
       }
-    } catch (_) {}
+    } catch (_) { }
   }
 
   /**
@@ -251,7 +266,7 @@ class AttackRollUseCase extends BaseAutoCoverUseCase {
             skipEphemeralUpdate: false,
             direction: 'observer_to_target',
           });
-        } catch (_) {}
+        } catch (_) { }
 
         const manualCover = getCoverBetween(attacker, target);
         const detected = this._detectCover(attacker, target);
@@ -349,7 +364,7 @@ class AttackRollUseCase extends BaseAutoCoverUseCase {
           flags: { 'pf2e-visioner': { forThisRoll: true, ephemeralOffGuardRoll: true } },
         });
       }
-    } catch (_) {}
+    } catch (_) { }
     const clonedActor = tgtActor.clone({ items }, { keepId: true });
     const dcObj = context.dc;
     if (dcObj?.slug) {
@@ -411,3 +426,4 @@ export default attackRollUseCase;
 
 // Also export the class for reference
 export { AttackRollUseCase };
+

@@ -1,5 +1,17 @@
 {
   "PF2E_VISIONER": {
+    "ENVIRONMENT": {
+      "SCENE_NOISY_LABEL": "",
+      "SCENE_NOISY_HINT": "",
+      "TOGGLE_SCENE_NOISY_ON": "",
+      "TOGGLE_SCENE_NOISY_OFF": "",
+      "TOGGLE_REGION_NOISY_SELECT": "",
+      "TOGGLE_REGION_NOISY_ON": "",
+      "TOGGLE_REGION_NOISY_OFF": "",
+      "NOISY_ENABLED_SCENE": "",
+      "NOISY_DISABLED_SCENE": "",
+      "NOISY_TOGGLED_REGIONS": ""
+    },
     "MODULE_TITLE": "PF2E Visioner",
     "TOKEN_MANAGER": {
       "TITLE": "Gestionnaire de visibilité de jeton",
@@ -17,6 +29,7 @@
       "COVER_TAB": "Abri"
     },
     "VISIBILITY_STATES": {
+      "avs": "AVS",
       "observed": "Observé",
       "hidden": "Caché",
       "undetected": "Non détecté",
@@ -28,10 +41,75 @@
       "standard": "Abri standard",
       "greater": "Abri supérieur"
     },
+    "SENSES": {
+      "LIGHT-PERCEPTION": "(FR TODO) Light Perception",
+      "LIGHT-PERCEPTION_DESC": "(FR TODO) You can perceive light and darkness. This sense allows you to see in natural darkness but is affected by magical darkness.",
+      "VISION": "(FR TODO) Vision",
+      "VISION_DESC": "(FR TODO) Your standard visual sense used to perceive your surroundings.",
+      "DARKVISION": "(FR TODO) Darkvision",
+      "DARKVISION_DESC": "(FR TODO) You can see in darkness and dim light just as well as in bright light, though you can't distinguish color in darkness.",
+      "GREATER-DARKVISION": "(FR TODO) Greater Darkvision",
+      "GREATER-DARKVISION_DESC": "(FR TODO) You can see in darkness and dim light as if it were bright light—colors included.",
+      "HEARING": "(FR TODO) Hearing",
+      "HEARING_DESC": "(FR TODO) You can detect creatures and events via sound within range (imprecise).",
+      "TREMORSENSE": "(FR TODO) Tremorsense",
+      "TREMORSENSE_DESC": "(FR TODO) You can sense vibrations through the ground within range (imprecise).",
+      "SCENT": "(FR TODO) Scent",
+      "SCENT_DESC": "(FR TODO) You have an enhanced sense of smell, allowing you to detect living creatures within range (imprecise).",
+      "ECHOLOCATION": "(FR TODO) Echolocation",
+      "ECHOLOCATION_DESC": "(FR TODO) You can use sound to navigate and detect objects within range (precise).",
+      "LIFESENSE": "(FR TODO) Lifesense",
+      "LIFESENSE_DESC": "(FR TODO) You can sense the life force of living and undead creatures within range (imprecise)."
+    },
     "VISUAL_EFFECTS": {
       "HIDDEN_OVERLAY": "Ce jeton vous est caché",
       "UNDETECTED_OVERLAY": "Vous ne détectez pas ce jeton",
-      "CONCEALED_OVERLAY": "Ce jeton vous est masqué"
+      "CONCEALED_OVERLAY": "Ce jeton vous est masqué",
+      "CONCEALED_FLAT_CHECK": "(FR TODO) DC 5 flat check required for targeting",
+      "UNDETECTED_CONDITION": "(FR TODO) Undetected condition applied with full mechanical effects",
+      "CONCEALED_TOOLTIP": "(FR TODO) Concealed: You must succeed at a DC 5 flat check when targeting with an attack, spell, or other effect",
+      "UNDETECTED_TOOLTIP": "(FR TODO) Undetected: You don't know the target's location. You are off-guard to the target and you can't easily target it. Using the Seek action can help find an undetected creature",
+      "DAZZLED_OVERRIDE": "(FR TODO) All creatures appear Concealed due to Dazzled condition",
+      "NO_COVER_TOOLTIP": "(FR TODO) No Cover: No bonuses or penalties",
+      "GREATER_COVER_TOOLTIP": "(FR TODO) Greater Cover: +4 circumstance bonus to AC, Reflex saves, and Stealth checks. Can Hide behind this cover."
+    },
+    "SPECIAL_SENSES": {
+      "vision": "(FR TODO) Vision",
+      "vision_description": "(FR TODO) Standard visual sense.",
+      "low_light_vision": "(FR TODO) Vision en faible luminosité",
+      "low_light_vision_description": "(FR TODO) Vous voyez en faible luminosité comme en pleine lumière.",
+      "infrared_vision": "(FR TODO) Vision infrarouge",
+      "infrared_vision_description": "(FR TODO) Vous percevez les signatures thermiques.",
+      "truesight": "(FR TODO) Vision véritable",
+      "truesight_description": "(FR TODO) Vous voyez les choses telles qu'elles sont réellement.",
+      "see_the_unseen": "(FR TODO) Voir l'invisible",
+      "see_the_unseen_description": "(FR TODO) Vous percevez des phénomènes autrement invisibles.",
+      "bloodsense": "(FR TODO) Sens du sang",
+      "bloodsense_description": "(FR TODO) Vous détectez le sang à proximité.",
+      "magicsense": "(FR TODO) Sens de la magie",
+      "magicsense_description": "(FR TODO) Vous sentez les auras magiques.",
+      "motion_sense": "(FR TODO) Sens du mouvement",
+      "motion_sense_description": "(FR TODO) Vous détectez les mouvements à proximité.",
+      "spiritsense": "(FR TODO) Sens des esprits",
+      "spiritsense_description": "(FR TODO) Vous percevez les esprits et morts-vivants.",
+      "thoughtsense": "(FR TODO) Sens de la pensée",
+      "thoughtsense_description": "(FR TODO) Vous détectez les créatures pensantes.",
+      "wavesense": "(FR TODO) Sens des ondes",
+      "wavesense_description": "(FR TODO) Vous percevez les vibrations/ondes dans un médium.",
+      "lifesense": "(FR TODO) Lifesense",
+      "lifesense_description": "(FR TODO) You have a limited ability to sense life force. You gain lifesense as an imprecise sense. This allows you to sense the life force of living and undead creatures within the listed range. The sense can distinguish between the vitality energy animating living creatures and the void energy animating undead creatures.",
+      "echolocation": "(FR TODO) Echolocation",
+      "echolocation_description": "(FR TODO) You can use sound to navigate and detect objects. You gain echolocation as a precise sense. This allows you to detect all creatures and objects within range through sound reflection.",
+      "tremorsense": "(FR TODO) Tremorsense",
+      "tremorsense_description": "(FR TODO) You can sense vibrations through the ground. You gain tremorsense as an imprecise sense. This allows you to detect creatures and objects in contact with the ground within range.",
+      "scent": "(FR TODO) Scent",
+      "scent_description": "(FR TODO) You have an enhanced sense of smell. You gain scent as an imprecise sense. This allows you to detect living creatures by their scent within range.",
+      "darkvision": "(FR TODO) Darkvision",
+      "darkvision_description": "(FR TODO) You can see in darkness and dim light just as well as in bright light, though you can’t distinguish color in darkness.",
+      "greater_darkvision": "(FR TODO) Greater Darkvision",
+      "greater_darkvision_description": "(FR TODO) You can see in darkness and dim light as if it were bright light—colors included.",
+      "hearing": "(FR TODO) Hearing",
+      "hearing_description": "(FR TODO) You can detect creatures and events via sound within range (imprecise)."
     },
     "MECHANICAL_EFFECTS": {
       "HIDDEN_FLAT_CHECK": "un test nu DD 11 est requis pour cibler",
@@ -92,9 +170,24 @@
       "SETTING_HINT": "Ajoute automatiquement les boutons Chercher aux messages de la conversation pour appliquer les changements de visibilité",
       "OUT_OF_RANGE": "Hors de portée",
       "RANGE_LIMIT_ACTIVE": "La limite de portée est active : Montre seulement les cibles dans un rayon de 9 mètres",
-      "RANGE_LIMIT_ACTIVE_CUSTOM": "Limite de portée active : Montre seumlement les cibles dans les {distance} pieds ",
+      "RANGE_LIMIT_ACTIVE_CUSTOM": "Limite de portée active : Montre seumement les cibles dans les {distance} pieds ",
       "NO_TARGETS_IN_RANGE": "PAs de cibles valides dans la portée de 9 mètres",
-      "NO_TARGETS_IN_RANGE_CUSTOM": "Pas de cibles valides dans la portée de {distance} pieds"
+      "NO_TARGETS_IN_RANGE_CUSTOM": "Pas de cibles valides dans la portée de {distance} pieds",
+      "ECHOLOCATION_LABEL": "Écholocalisation",
+      "ECHOLOCATION_TOOLTIP": "Ouïe précise active jusqu'au début de votre prochain tour",
+      "NOISY_LABEL": "",
+      "NOISY_TOOLTIP": "",
+      "PREVIEW_AVAILABLE_SENSES": "(FR TODO) Available Senses",
+      "LIFESENSE_LABEL": "(FR TODO) Lifesense",
+      "LIFESENSE_TOOLTIP": "(FR TODO) Can sense living and undead creatures within range (imprecise sense)",
+      "UNMET_CONDITIONS": "(FR TODO) Unmet Conditions",
+      "SENSE_UNSEEN_BUTTON": "(FR TODO) Sense the Unseen (Reaction)",
+      "SENSE_UNSEEN_TOOLTIP": "(FR TODO) Use your Sense the Unseen feat to make undetected creatures hidden",
+      "SENSE_UNSEEN_APPLIED": "(FR TODO) Sense the Unseen Applied"
+    },
+    "SENSE_PRECISION": {
+      "PRECISE": "(FR TODO) Precise",
+      "IMPRECISE": "(FR TODO) Imprecise"
     },
     "HIDE_AUTOMATION": {
       "BUTTON_APPLY": "Applique les résultats de Se cacher",
@@ -115,7 +208,23 @@
       "OPEN_RESULTS_TOOLTIP": "Ouvrir la boite de dialogue des résultats de Se Cacher pour appliquer les changements individuels ou de masse",
       "ENCOUNTER_ONLY": "Montrer seulement les jetons de la rencontre",
       "SETTING_NAME": "Activer l'automatisation de Se Cacher",
-      "SETTING_HINT": "Ajouter automatiquement des boutons pour Se Cacher dans les messages de la conversation pour appliquer les changements de visibilité"
+      "SETTING_HINT": "Ajouter automatiquement des boutons pour Se Cacher dans les messages de la conversation pour appliquer les changements de visibilité",
+      "BADGES": {
+        "TERRAIN_STALKER_LABEL": "(FR TODO) Terrain Stalker",
+        "TERRAIN_STALKER_TOOLTIP": "(FR TODO) Chosen terrains active: {selection} (Region: {environments})",
+        "VANISH_INTO_THE_LAND_LABEL": "(FR TODO) Vanish into the Land",
+        "VANISH_INTO_THE_LAND_TOOLTIP": "(FR TODO) You can Hide and Sneak even without cover or concealment in your chosen difficult terrain",
+        "VERY_VERY_SNEAKY_LABEL": "(FR TODO) Very, Very Sneaky",
+        "VERY_VERY_SNEAKY_TOOLTIP": "(FR TODO) Cover/concealment requirement is bypassed",
+        "LEGENDARY_SNEAK_LABEL": "(FR TODO) Legendary Sneak",
+        "LEGENDARY_SNEAK_TOOLTIP": "(FR TODO) Cover/concealment requirement is bypassed",
+        "CEASELESS_SHADOWS_LABEL": "(FR TODO) Ceaseless Shadows",
+        "CEASELESS_SHADOWS_TOOLTIP": "(FR TODO) Cover/concealment prerequisites are removed",
+        "CAMOUFLAGE_LABEL": "(FR TODO) Camouflage",
+        "CAMOUFLAGE_TOOLTIP": "(FR TODO) Cover/concealment requirement is bypassed in natural terrain",
+        "DISTRACTING_SHADOWS_LABEL": "(FR TODO) Distracting Shadows",
+        "DISTRACTING_SHADOWS_TOOLTIP": "(FR TODO) You may use larger creatures as cover for Hide/Sneak prerequisites"
+      }
     },
     "SNEAK_AUTOMATION": {
       "BUTTON_APPLY": "Appliquer les résultats d'Être furtif",
@@ -135,7 +244,23 @@
       "OPEN_RESULTS_TOOLTIP": "Ouvrir la boite de dialogue des résultats d'Être furtif pour appliquer les changements individuels ou de masse",
       "ENCOUNTER_ONLY": "Montrer seulement les jetons de la rencontre",
       "SETTING_NAME": "Activer l'automatisation d'Être furtif",
-      "SETTING_HINT": "Ajouter automatiquement des boutons pour Être furtif dans les messages de la conversation pour appliquer les changements de visibilité"
+      "SETTING_HINT": "Ajouter automatiquement des boutons pour Être furtif dans les messages de la conversation pour appliquer les changements de visibilité",
+      "BADGES": {
+        "TERRAIN_STALKER_LABEL": "(FR TODO) Terrain Stalker",
+        "TERRAIN_STALKER_TOOLTIP": "(FR TODO) Chosen terrains active: {selection} (Region: {environments})",
+        "VANISH_INTO_THE_LAND_LABEL": "(FR TODO) Vanish into the Land",
+        "VANISH_INTO_THE_LAND_TOOLTIP": "(FR TODO) You can Sneak even without cover or concealment in your chosen difficult terrain",
+        "VERY_VERY_SNEAKY_LABEL": "(FR TODO) Very, Very Sneaky",
+        "VERY_VERY_SNEAKY_TOOLTIP": "(FR TODO) Cover/concealment requirement is bypassed",
+        "LEGENDARY_SNEAK_LABEL": "(FR TODO) Legendary Sneak",
+        "LEGENDARY_SNEAK_TOOLTIP": "(FR TODO) Cover/concealment requirement is bypassed",
+        "CEASELESS_SHADOWS_LABEL": "(FR TODO) Ceaseless Shadows",
+        "CEASELESS_SHADOWS_TOOLTIP": "(FR TODO) Cover/concealment prerequisites are removed",
+        "CAMOUFLAGE_LABEL": "(FR TODO) Camouflage",
+        "CAMOUFLAGE_TOOLTIP": "(FR TODO) Cover/concealment requirement is bypassed in natural terrain",
+        "DISTRACTING_SHADOWS_LABEL": "(FR TODO) Distracting Shadows",
+        "DISTRACTING_SHADOWS_TOOLTIP": "(FR TODO) You may use larger creatures as cover for Hide/Sneak prerequisites"
+      }
     },
     "CREATE_A_DIVERSION_AUTOMATION": {
       "BUTTON_APPLY": "Appliquer les résultats de la Diversion ",
@@ -159,6 +284,86 @@
       "ENABLE_HOVER_TOOLTIPS": {
         "name": "Activer les infobulles au survol",
         "hint": "Montre les infobulles du statut de visibilité au survol des jetons (nécessite un redémarrage)"
+      },
+      "TOKEN_HUD_BUTTON": {
+        "name": "(FR) Bouton HUD du jeton",
+        "hint": "(FR) Affiche un bouton Visioner dans le HUD du jeton"
+      },
+      "VISIONER_SCENE_CONTROLS": {
+        "name": "(FR) Contrôles de scène Visioner",
+        "hint": "(FR) Affiche les boutons Visioner dans les barres d'outils Scènes"
+      },
+      "AVS_CHANGES_INDICATOR_SIZE": {
+        "name": "(FR) Taille de l'indicateur de changements AVS",
+        "hint": "(FR) Contrôle la taille du bouton flottant de l'indicateur de changements AVS et de son info-bulle.",
+        "CHOICES": {
+          "small": "(FR) Petit",
+          "medium": "(FR) Moyen",
+          "large": "(FR) Grand",
+          "xlarge": "(FR) Très grand"
+        }
+      },
+      "REMOVE_PLAYER_TARGET_TOOLTIPS": {
+        "name": "(FR) Retirer les infobulles de cible des joueurs",
+        "hint": "(FR) Empêche les joueurs de voir les infobulles de cible"
+      },
+      "MANAGER_ROLL_COMPARISON": {
+        "name": "(FR) Comparaison des jets dans le gestionnaire",
+        "hint": "(FR) Affiche la dernière comparaison jet vs DD"
+      },
+      "TOKEN_INTERSECTION_MODE": {
+        "name": "(FR) Mode d'intersection des jetons",
+        "hint": "(FR) Comment évaluer les bloqueurs de jetons",
+        "CHOICES": {
+          "any": "(FR) N'importe lequel",
+          "length10": "(FR) 10%",
+          "coverage": "(FR) Couverture latérale",
+          "tactical": "(FR) Tactique"
+        }
+      },
+      "AUTO_COVER_IGNORE_UNDETECTED": {
+        "name": "(FR) Ignorer les jetons non détectés",
+        "hint": "(FR) Les jetons non détectés ne bloquent pas l'abri"
+      },
+      "AUTO_COVER_VISUALIZATION_COMBAT_ONLY": {
+        "name": "(FR) Visualisation d'abri seulement en combat",
+        "hint": "(FR) N'afficher l'abri automatique qu'en combat"
+      },
+      "AUTO_COVER_GM_RESPECT_FOG": {
+        "name": "(FR) Le MJ respecte le brouillard pour l'abri",
+        "hint": "(FR) Le MJ voit l'abri comme les joueurs (respect du brouillard)"
+      },
+      "AUTO_COVER_IGNORE_DEAD": {
+        "name": "(FR) Ignorer les jetons morts",
+        "hint": "(FR) Les jetons à 0 PV ne bloquent pas l'abri"
+      },
+      "AUTO_COVER_IGNORE_ALLIES": {
+        "name": "(FR) Ignorer les alliés pour l'abri",
+        "hint": "(FR) Les alliés ne bloquent pas l'abri"
+      },
+      "WALL_STANDARD_THRESHOLD": {
+        "name": "(FR) Seuil standard d'abri par mur (%)",
+        "hint": "(FR) Pourcentage de blocage pour obtenir un abri standard"
+      },
+      "WALL_GREATER_THRESHOLD": {
+        "name": "(FR) Seuil supérieur d'abri par mur (%)",
+        "hint": "(FR) Pourcentage de blocage pour obtenir un abri supérieur"
+      },
+      "WALLS_ALLOW_GREATER": {
+        "name": "(FR) Les murs peuvent donner un abri supérieur",
+        "hint": "(FR) Quand désactivé, les murs ne donnent jamais un abri supérieur"
+      },
+      "IGNORE_PRONE_TOKENS": {
+        "name": "(FR) Ignorer les jetons à terre",
+        "hint": "(FR) Les jetons à terre ne bloquent pas l'abri"
+      },
+      "KEYBIND_OPEN_MANAGER_TARGET_MODE": {
+        "name": "(FR) Raccourci ouvre le gestionnaire en mode Cible",
+        "hint": "(FR) Ouvrir par défaut en mode Cible"
+      },
+      "VISIONER_QUICK_EDIT_TOOL": {
+        "name": "(FR) Outil d'édition rapide Visioner",
+        "hint": "(FR) Affiche l'outil d'édition rapide sur la barre"
       },
       "ALLOW_PLAYER_TOOLTIPS": {
         "name": "Permet les infobulles pour les joueurs",
@@ -187,8 +392,12 @@
         }
       },
       "IGNORE_ALLIES_DEFAULT": {
-        "name": "Ignorer les alliés",
-        "hint": "S'il est activé, les PNJ ne verront que les membres du groupe dans les dialogues et les joeuurs ne verront que les PNJ. Ceci simplifie la gestion de la visibilité en cachant les relations interalliées."
+        "name": "Ignorer les alliés (défaut)",
+        "hint": "Définit l'état par défaut de la case 'Ignorer les alliés' dans les dialogues Visioner et le gestionnaire de jetons. Modifiable à la volée dans chaque dialogue."
+      },
+      "HIDE_FOUNDRY_HIDDEN_TOKENS": {
+        "name": "Masquer les jetons cachés Foundry dans l'UI",
+        "hint": "Si activé, les jetons marqués cachés via le drapeau natif Foundry sont filtrés des dialogues/gestionnaires Visioner (sauf besoins explicites). Filtre visuel côté client uniquement."
       },
       "ENABLE_ALL_TOKENS_VISION": {
         "name": "Activer Vision pour tous les jetons",
@@ -278,12 +487,56 @@
       "SNEAK_RAW_ENFORCEMENT": {
         "name": "Sneak Raw Enforcement",
         "hint": "Si activé, Être furtif suivra les règles telles qu'écrites. Si désactivé, Être furtif sera plus indulgent."
+      },
+      "AUTO_VISIBILITY_ENABLED": {
+        "name": "(FR TODO) Enable Auto-Visibility System",
+        "hint": "(FR TODO) Automatically set visibility flags based on lighting conditions and creature senses. This system will analyze scene lighting, token positions, and creature abilities to determine appropriate visibility states (observed, concealed, hidden, undetected)."
+      },
+      "AUTO_VISIBILITY_DEBUG_MODE": {
+        "name": "(FR TODO) Auto-Visibility Debug Mode",
+        "hint": "(FR TODO) Enable detailed console logging for the auto-visibility system. Useful for troubleshooting visibility calculations."
+      },
+      "DISABLE_LINE_OF_SIGHT": {
+        "name": "(FR TODO) Disable Line of Sight Calculations",
+        "hint": "(FR TODO) Disable line-of-sight calculations for visibility. When enabled, visibility will be determined solely by distance and senses, ignoring walls and obstacles. Useful for performance optimization or specific game styles."
+      },
+      "USE_LINE_OF_SIGHT_FOR_VISIBILITY": {
+        "name": "(FR TODO) Use Line-of-Sight Ray Casting for Visibility",
+        "hint": "(FR TODO) When enabled, uses ray-casting to check if walls block line-of-sight for visibility determination. WARNING: This can cause tokens to incorrectly appear hidden/undetected when they're only partially obscured. Recommended to leave DISABLED and rely on Foundry's native vision system. Only enable if you need strict center-to-center LOS checking."
+      },
+      "GDV_VISUAL_OVERRIDE_ENABLED": {
+        "name": "(FR TODO) Greater Darkvision Visual Override",
+        "hint": "(FR TODO) Client-only: When your selected token has Greater Darkvision, lighten darkness areas so visuals match Visioner rules."
+      },
+      "GDV_OVERLAY_ALPHA": {
+        "name": "(FR TODO) GDV Overlay Intensity",
+        "hint": "(FR TODO) Client-only: How strongly to counteract darkness tint for Greater Darkvision (0–1)."
+      },
+      "GDV_TOKEN_GRAYSCALE": {
+        "name": "(FR TODO) GDV: Black & White Tokens",
+        "hint": "(FR TODO) Client-only: When seeing via (greater) darkvision, render tokens in grayscale to match rules text (black and white vision)."
+      },
+      "REMOVE_PLAYER_OBSERVER_TOOLTIPS": {
+        "name": "(FR TODO) Remove Observer Hover Tooltips from Players",
+        "hint": "(FR TODO) Stops players from seeing observer-perspective hover tooltips (O key / observer mode)"
+      },
+      "HIDE_QUICK_EDIT_TOOL": {
+        "name": "(FR TODO) Hide Quick Edit Tool",
+        "hint": "(FR TODO) If enabled, the Quick Edit tool will be hidden from the token controls toolbar."
       }
     },
     "UI": {
       "ENCOUNTER_FILTER_TEXT": "Montrer seulement les jetons de la rencontre",
       "COVER_OVERRIDE": "Outrepasser l'abri",
-      "ROLL": "Lancer"
+      "ROLL": "Lancer",
+      "FILTER_BY_DETECTION_LABEL": "(FR TODO) Filter By Viewport",
+      "FILTER_BY_DETECTION_TOOLTIP": "(FR TODO) Only show tokens that are within the current viewport",
+      "CEASELESS_SHADOWS_UPGRADE_TOOLTIP": "(FR TODO) {FEAT}: {FROM} → {TO} (feat upgrade)",
+      "APPLY_ALL": "(FR TODO) Apply All",
+      "REVERT_ALL": "(FR TODO) Revert All",
+      "REMOVE_OVERRIDES": "(FR TODO) Remove Overrides",
+      "BULK_SET_VISIBILITY": "(FR TODO) Bulk Set Visibility",
+      "CLEAR_BULK_OVERRIDES": "(FR TODO) Clear Bulk Overrides"
     },
     "WALL": {
       "VISIBLE_TO_YOU": "Mur caché",
@@ -294,6 +547,10 @@
       "OPEN_TOKEN_MANAGER": {
         "name": "Ouvrir le gestionnaire du jeton",
         "hint": "Ouvre le gestionnaire du jeton pour les jetons sélectionnés"
+      },
+      "OPEN_QUICK_PANEL": {
+        "name": "(FR) Ouvrir le panneau rapide Visioner",
+        "hint": "(FR) Ouvre le panneau d'édition rapide compact"
       },
       "OPEN_VISIBILITY_MANAGER": {
         "name": "Ouvrir le gestionnaire de visibilité du jeton",
@@ -306,7 +563,106 @@
       "TOGGLE_OBSERVER_MODE": {
         "name": "Activer/Désactiver le mode observateur pour les infobulles au survol",
         "hint": "Maintenir enfoncé cette clé pour passer de l'infobulle au survol au mode observateur (comment le jeton survolé voit les autres)"
+      },
+      "SHOW_AUTO_COVER_OVERLAY": {
+        "name": "(FR) Afficher la superposition d'abri auto",
+        "hint": "(FR) Maintenir pour afficher les badges d'abri automatique"
+      },
+      "HOLD_COVER_VISUALIZATION": {
+        "name": "(FR) Maintenir pour la visualisation d'abri",
+        "hint": "(FR) Maintenir pour visualiser les zones d'abri"
+      },
+      "OPEN_WALL_MANAGER": {
+        "name": "(FR) Ouvrir le gestionnaire de murs",
+        "hint": "(FR) Ouvre la boîte de gestion des murs Visioner"
       }
+    },
+    "AVS_OVERRIDE_DIALOG": {
+      "NO_OVERRIDES": "(FR TODO) No AVS overrides are currently active for this token.",
+      "CLOSE": "(FR TODO) Close",
+      "CLEAR_ALL": "(FR TODO) Clear All Overrides",
+      "CLEAR_ALL_CONFIRM_TITLE": "(FR TODO) Clear All AVS Overrides",
+      "OVERRIDE_REMOVED": "(FR TODO) AVS override removed: {observer} → {target}",
+      "ALL_OVERRIDES_CLEARED": "(FR TODO) All AVS overrides cleared for {token}",
+      "ERROR_REMOVING_OVERRIDE": "(FR TODO) Error removing AVS override",
+      "ERROR_CLEARING_OVERRIDES": "(FR TODO) Error clearing AVS overrides"
+    },
+    "REGION_BEHAVIOR": {
+      "TYPE_LABEL": "(FR TODO) PF2e Visioner Visibility",
+      "TYPES": {
+        "CONCEALMENT": {
+          "label": "(FR TODO) Visioner Concealment"
+        },
+        "VISIBILITY": {
+          "label": "(FR TODO) Visioner Visibility"
+        }
+      },
+      "VISIBILITY_STATE": {
+        "label": "(FR TODO) Visibility State",
+        "hint": "(FR TODO) The visibility state to apply between tokens inside and outside the region"
+      },
+      "APPLY_TO_INSIDE_TOKENS": {
+        "label": "(FR TODO) Apply to Inside Tokens",
+        "hint": "(FR TODO) If enabled, tokens inside the region will have the visibility state applied to other tokens inside the region as well"
+      },
+      "TWO_WAY_REGION": {
+        "label": "(FR TODO) Two-Way Region",
+        "hint": "(FR TODO) If enabled, tokens outside the region will also have the visibility state applied to tokens inside the region"
+      },
+      "VISIBILITY_UPDATED": "(FR TODO) Region visibility updated for {count} token relationships",
+      "UPDATE_ERROR": "(FR TODO) Failed to update region visibility relationships",
+      "CONCEALMENT_ENABLED": {
+        "label": "(FR TODO) Enable Concealment",
+        "hint": "(FR TODO) If enabled, rays that cross this region's boundaries will grant concealment to the target"
+      }
+    },
+    "COVER_OVERRIDE": {
+      "POPUP_OVERRIDE": "(FR TODO) Cover overridden via keybind popup: {original} → {final}"
+    },
+    "FEAT": {
+      "CEASELESS_SHADOWS": "(FR TODO) Ceaseless Shadows"
+    },
+    "UI_ACTIONS": {
+      "MANAGE_VISIBILITY": "(FR TODO) Manage Token Visibility",
+      "MANAGE_COVER": "(FR TODO) Manage Token Cover",
+      "QUICK_CONCEALED": "(FR TODO) Set as Concealed",
+      "QUICK_OBSERVED": "(FR TODO) Set as Observed",
+      "QUICK_NO_COVER": "(FR TODO) Set No Cover",
+      "QUICK_LESSER_COVER": "(FR TODO) Set Lesser Cover",
+      "QUICK_STANDARD_COVER": "(FR TODO) Set Standard Cover",
+      "QUICK_GREATER_COVER": "(FR TODO) Set Greater Cover"
+    },
+    "MOVEMENT": {
+      "walk": "(FR TODO) Walk",
+      "stride": "(FR TODO) Stride",
+      "leap": "(FR TODO) Leap",
+      "climb": "(FR TODO) Climb",
+      "fly": "(FR TODO) Fly",
+      "swim": "(FR TODO) Swim",
+      "burrow": "(FR TODO) Burrow",
+      "teleport": "(FR TODO) Teleport",
+      "deploy": "(FR TODO) Deploy",
+      "travel": "(FR TODO) Travel"
+    },
+    "REACTIONS": {
+      "BUTTON_LABEL": "(FR TODO) Reactions",
+      "BUTTON_TOOLTIP": "(FR TODO) Available reactions for this action",
+      "NO_REACTIONS": "(FR TODO) No reactions available",
+      "DROPDOWN_TITLE": "(FR TODO) Available Reactions",
+      "SENSE_THE_UNSEEN": {
+        "name": "(FR TODO) Sense the Unseen",
+        "description": "(FR TODO) Even though you failed at the triggering check, you automatically sense any Undetected creatures in the area where you're Seeking, making them merely Hidden to you.",
+        "trigger": "(FR TODO) You fail a Seek to find an undetected creature",
+        "effect": "(FR TODO) Make undetected creatures hidden to you"
+      }
+    },
+    "SNEAKY_FEAT": {
+      "VISIBILITY_CAPPED": "(FR TODO) Sneaky Feat",
+      "TOOLTIP": "(FR TODO) Visibility capped at Hidden due to Sneaky feat effect. This creature successfully sneaked against you."
+    },
+    "SNEAK_ADEPT_FEAT": {
+      "OUTCOME_UPGRADED": "(FR TODO) Sneak Adept",
+      "TOOLTIP": "(FR TODO) Failure upgraded to Success due to Sneak Adept feat. It's almost impossible to spot this creature."
     }
   }
 }

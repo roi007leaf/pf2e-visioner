@@ -252,3 +252,10 @@ pf2e-visioner/
 - Integration tests can focus on component interactions
 - UI components can be tested separately from business logic
 - Mock dependencies are easier to create with this structure
+
+## AVS performance components (September 2025)
+
+- LightingRasterService: fast, approximate darkness sampling along a ray using LightingCalculator. Used as an optional fast path inside VisibilityCalculator. On errors or absence, it falls back to the precise shape-based detector. No behavior changes, only speed.
+- HashGridIndex: uniform spatial hash replacing the transient quadtree for per-batch candidate queries (build, queryRect, queryCircle). It’s API-compatible with SpatialBatchIndex and typically faster for Foundry-scale token counts.
+
+Both components are per-batch/transient and side-effect free. They follow our golden rules: no timers, batch-only, no lighting refresh. A unit test checks HashGrid vs. SpatialBatch parity on deterministic data.

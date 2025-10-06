@@ -7,29 +7,56 @@
   {{!-- Hiding Token Information Panel --}}
   <div class="hider-info">
     <div class="hider-image">
-      <img src="{{actorToken.document.texture.src}}" alt="{{actorToken.name}}" />
+      <img src="{{actorTokenImage}}" alt="{{actorToken.name}}" />
     </div>
     <div class="hider-details">
       <h3 class="hider-name">{{actorToken.name}}</h3>
       <p class="hint">Attempting to hide from observers</p>
+      {{#if prereqBadges}}
+        <div class="action-context-badges">
+          {{#each prereqBadges as |b|}}
+            <span class="badge badge-feat" data-tooltip="{{b.tooltip}}">
+              <i class="{{b.icon}}"></i>
+              <span class="badge-label">{{b.label}}</span>
+            </span>
+          {{/each}}
+        </div>
+      {{/if}}
     </div>
   </div>
 
   {{!-- Encounter Filter + Ignore Allies (Encounter-only shown when relevant; Ignore allies always shown) --}}
-  <div class="encounter-filter-section" style="display:flex; gap:16px; align-items:center;">
+  <div class="encounter-filter-section">
     {{#if showEncounterFilter}}
-    <label class="encounter-filter-checkbox" style="display:flex; align-items:center; gap:8px;">
+    <label class="encounter-filter-checkbox">
       <input type="checkbox" {{#if encounterOnly}}checked{{/if}} data-action="toggleEncounterFilter" data-tooltip="Only show tokens in the current encounter" />
       <span class="encounter-filter-label">{{localize "PF2E_VISIONER.UI.ENCOUNTER_FILTER_TEXT"}}</span>
     </label>
     {{/if}}
-    <label class="ignore-allies-filter-checkbox" style="display:flex; align-items:center; gap:8px;">
+    <label class="ignore-allies-filter-checkbox">
       <input type="checkbox" {{#if ignoreAllies}}checked{{/if}} data-action="toggleIgnoreAllies" data-tooltip="Hide allies from the results list" />
       <span class="encounter-filter-label">Ignore allies</span>
+    </label>
+    <label class="hide-foundry-hidden-filter-checkbox">
+      <input type="checkbox" {{#if hideFoundryHidden}}checked{{/if}} data-action="toggleHideFoundryHidden" data-tooltip="Visually hide tokens that are Foundry-hidden (document.hidden)" />
+      <span class="encounter-filter-label">Hide Foundry-hidden tokens</span>
+    </label>
+    <label class="show-only-changes-filter-checkbox">
+      <input type="checkbox" {{#if showOnlyChanges}}checked{{/if}} data-action="toggleShowOnlyChanges" data-tooltip="Show only rows with visibility changes" />
+      <span class="encounter-filter-label">Show only changes</span>
+    </label>
+    <label class="filter-by-los-checkbox">
+      <input type="checkbox" {{#if filterByDetection}}checked{{/if}} data-action="toggleFilterByDetection" data-tooltip="{{localize 'PF2E_VISIONER.UI.FILTER_BY_DETECTION_TOOLTIP'}}" />
+      <span class="encounter-filter-label">{{localize "PF2E_VISIONER.UI.FILTER_BY_DETECTION_LABEL"}}</span>
     </label>
   </div>
 
   {{!-- Results Table --}}
+  {{#if bulkOverrideStates}}
+  <div class="bulk-action-group">
+    {{> "pf2e-visioner.bulk-override"}}
+  </div>
+  {{/if}}
   <div class="results-table-container">
     <table class="visibility-table hide-results-table">
       <thead>
@@ -37,6 +64,13 @@
           <th class="token-image">Token</th>
           <th class="token-name">Name</th>
           <th class="auto-cover">Cover</th>
+          <th class="end-position">Prequisite<br>
+            <span class="legend-icon state-indicator visibility-concealed" data-state="concealed" data-tooltip="Concealed">
+              <i class="fas fa-cloud" aria-hidden="true"></i>
+            </span>/<span class="legend-icon state-indicator cover-standard" data-state="standard-cover" data-tooltip="Standard or Greater">
+              <i class="fas fa-shield-alt" aria-hidden="true"></i><span class="legend-plus">+</span>
+            </span>
+          </th>
           <th class="roll-result">Roll vs Perception DC</th>
           <th class="outcome">Outcome</th>
           <th class="visibility-change">Visibility Change</th>
@@ -47,10 +81,15 @@
         {{#each outcomes as |outcome|}}
           <tr class="token-row" data-token-id="{{outcome.target.id}}">
             <td class="token-image">
-              <img src="{{outcome.tokenImage}}" alt="{{outcome.target.name}}" width="28" height="28" />
+              <span class="token-img-wrapper">
+                <img src="{{outcome.tokenImage}}" alt="{{outcome.target.name}}" width="28" height="28" />
+                {{#if outcome.target.document.hidden}}
+                  <span class="foundry-hidden-indicator" data-tooltip="Foundry Hidden"><i class="fas fa-eye-slash"></i></span>
+                {{/if}}
+              </span>
             </td>
             <td class="token-name">
-              <strong>{{outcome.target.name}}</strong>
+              <strong data-tooltip="{{outcome.target.name}}">{{outcome.target.name}}</strong>
             </td>
             <td class="auto-cover">
               {{#if outcome.autoCover}}
@@ -61,26 +100,12 @@
                       <span class="auto-cover-override-detailed" 
                             data-tooltip="Cover overridden {{#if (eq outcome.autoCover.source 'popup')}}via keybind popup{{else if (eq outcome.autoCover.source 'dialog')}}in roll dialog{{else}}manually{{/if}}: {{outcome.autoCover.overrideDetails.originalLabel}} → {{outcome.autoCover.overrideDetails.finalLabel}}">
                         <!-- Original state (no crossing out) -->
-                        <span class="original-cover" style="
-                          color: {{outcome.autoCover.overrideDetails.originalColor}};
-                          display: inline-flex;
-                          align-items: center;
-                        ">
-                          <i class="{{outcome.autoCover.overrideDetails.originalIcon}}" style="font-size: 1.1em;"></i>
+                        <span class="original-cover" style="color: {{outcome.autoCover.overrideDetails.originalColor}};">
+                          <i class="{{outcome.autoCover.overrideDetails.originalIcon}}"></i>
                         </span>
-                        <!-- Arrow -->
-                        <i class="fas fa-arrow-right" style="
-                          color: #999;
-                          font-size: 1em;
-                          margin: 0 2px;
-                        "></i>
-                        <!-- Final state -->
-                        <span class="final-cover" style="
-                          color: {{outcome.autoCover.overrideDetails.finalColor}};
-                          display: inline-flex;
-                          align-items: center;
-                        ">
-                          <i class="{{outcome.autoCover.overrideDetails.finalIcon}}" style="font-size: 1.1em;"></i>
+                        <i class="fas fa-arrow-right position-arrow"></i>
+                        <span class="final-cover" style="color: {{outcome.autoCover.overrideDetails.finalColor}};">
+                          <i class="{{outcome.autoCover.overrideDetails.finalIcon}}"></i>
                         </span>
                       </span>
                     {{else}}
@@ -98,8 +123,29 @@
                 </div>
               {{else}}
                 <span class="auto-cover-icon no-cover" data-tooltip="No Cover (+0 Stealth)">
-                  <i class="fas fa-shield-slash cover-none" style="color: var(--cover-none, #4caf50);"></i>
+                  <i class="fas fa-shield-slash cover-none"></i>
                 </span>
+              {{/if}}
+            </td>
+            <td class="end-position">
+              {{#if outcome.hasPositionData}}
+                <div class="position-requirements-row">
+                  <button type="button" class="position-requirement-btn {{#if outcome.positionDisplay.endPosition.qualifies}}position-check active{{else}}position-x{{/if}}"
+                          data-action="togglePrequisite"
+                          data-token-id="{{outcome.target.id}}"
+                          data-requirement="end"
+                          data-tooltip="{{#if outcome.positionDisplay.endPosition.qualifies}}Prerequisite met{{else}}Prerequisite not met{{/if}}">
+                    {{#if outcome.positionDisplay.endPosition.qualifies}}
+                      <i class="fas fa-check"></i>
+                    {{else}}
+                      <i class="fas fa-times"></i>
+                    {{/if}}
+                  </button>
+                </div>
+              {{else}}
+                <div class="no-position-data" data-tooltip="End position data not available">
+                  <i class="fas fa-question-circle"></i>
+                </div>
               {{/if}}
             </td>
             <td class="roll-result">
@@ -107,7 +153,7 @@
                 <div class="roll-dc-line">
                   <span class="roll-total">{{outcome.rollTotal}}</span>
                   {{#if (and outcome.shouldShowOverride outcome.originalRollTotal)}}
-                    <span class="original-roll-total" style="font-size: 1em; opacity: 0.7; margin-left: 2px;">
+                    <span class="original-roll-total" style="margin-left: 2px;">
                       ({{outcome.originalRollTotal}})
                     </span>
                   {{/if}}
@@ -116,7 +162,7 @@
                 </div>
                 <div class="margin-display">({{#if (gt outcome.margin 0)}}+{{/if}}{{outcome.margin}})
                   {{#if (and outcome.shouldShowOverride outcome.originalMargin)}}
-                    <span style="font-size: 1em; opacity: 0.7; margin-left: 2px;">
+                    <span class="pv-note" style="margin-left: 2px;">
                       ({{#if (gt outcome.originalMargin 0)}}+{{/if}}{{outcome.originalMargin}})
                     </span>
                   {{/if}}
@@ -126,30 +172,37 @@
             <td class="outcome {{outcome.outcomeClass}}">
               <div>{{outcome.outcomeLabel}}</div>
               {{#if (and outcome.shouldShowOverride outcome.originalOutcomeLabel)}}
-                <div style="font-size: 1em; opacity: 0.7; margin-top: 2px;">
+                <div class="pv-note" style="margin-top: 2px;">
                   ({{outcome.originalOutcomeLabel}})
                 </div>
               {{/if}}
             </td>
             <td class="visibility-change">
               <div class="visibility-change-inline">
-                <span class="state-icon" data-state="{{outcome.oldVisibility}}" data-tooltip="{{outcome.oldVisibilityLabel}}">
-                  {{{visibilityIcon outcome.oldVisibility}}}
+                <span class="old-visibility-state {{#if outcome.isOldStateAvsControlled}}avs-controlled{{/if}}">
+                  <span class="state-icon" data-state="{{outcome.oldVisibility}}" data-tooltip="{{capitalize outcome.oldVisibility}}">
+                    {{{visibilityIcon outcome.oldVisibility}}}
+                  </span>
+                  {{#if outcome.isOldStateAvsControlled}}
+                    <span class="avs-tag-small" data-tooltip="Controlled by Auto-Visibility System">
+                      <i class="fas fa-bolt"></i>
+                    </span>
+                  {{/if}}
                 </span>
                 <i class="fas fa-arrow-right visibility-arrow"></i>
                 <div class="override-icons">
                   {{#each outcome.availableStates as |state|}}
                     <span class="state-icon {{#if (eq state.value outcome.overrideState)}}selected{{/if}} {{#if state.calculatedOutcome}}calculated-outcome{{/if}}" 
-                          data-state="{{state.value}}" data-token-id="{{../outcome.target.id}}" data-tooltip="{{state.label}}">
+                          data-state="{{state.value}}" data-token-id="{{../outcome.target.id}}" data-tooltip="{{capitalize state.label}}">
                       {{{visibilityIcon state.value}}}
                     </span>
                   {{/each}}
                 </div>
               </div>
               {{#if (and outcome.shouldShowOverride outcome.originalNewVisibility)}}
-                <div class="original-visibility-change" style="font-size: 1em; opacity: 0.7; padding-top: 5px; display: flex; align-items: center;">
+                <div class="original-visibility-change">
                   <span>Original Change:</span>
-                  <span class="state-icon" data-state="{{outcome.originalNewVisibility}}" data-tooltip="Original Cover: {{outcome.originalNewVisibility}}" style="margin-left: 4px;">
+                  <span class="state-icon" data-state="{{outcome.originalNewVisibility}}" data-tooltip="Original Cover: {{outcome.originalNewVisibility}}">
                     {{{visibilityIcon outcome.originalNewVisibility}}}
                   </span>
                 </div>

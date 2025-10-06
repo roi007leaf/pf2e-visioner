@@ -13,7 +13,6 @@ describe('Attack Consequences Action Comprehensive Tests', () => {
     // Store original settings
     originalSettings = {
       ignoreAllies: game.settings.get('pf2e-visioner', 'ignoreAllies'),
-      enforceRawRequirements: game.settings.get('pf2e-visioner', 'enforceRawRequirements'),
     };
   });
 
@@ -251,7 +250,7 @@ describe('Attack Consequences Action Comprehensive Tests', () => {
 
       // Mock the ConsequencesActionHandler
       const { ConsequencesActionHandler } = await import(
-        '../../../scripts/chat/services/actions/consequences-action.js'
+        '../../../scripts/chat/services/actions/ConsequencesAction.js'
       );
       const handler = new ConsequencesActionHandler();
 
@@ -279,7 +278,7 @@ describe('Attack Consequences Action Comprehensive Tests', () => {
       };
 
       // Call revert with targetTokenId specified
-      await handler.revert(actionData, { html: () => {}, attr: () => {} });
+      await handler.revert(actionData, { html: () => { }, attr: () => { } });
 
       // EXPECTED BEHAVIOR: Only the target token should be reverted
       expect(appliedChanges).toHaveLength(1); // Should only revert enemy1
@@ -296,44 +295,11 @@ describe('Attack Consequences Action Comprehensive Tests', () => {
     });
   });
 
-  describe('RAW Enforcement Integration Tests', () => {
-    test('chat apply-changes respects RAW enforcement', () => {
-      game.settings.set('pf2e-visioner', 'enforceRawRequirements', true);
 
-      const mockOutcomes = [
-        { token: { id: 'valid1' }, hasActionableChange: true, newVisibility: 'observed' },
-        { token: { id: 'invalid1' }, hasActionableChange: false, newVisibility: 'observed' },
-      ];
-
-      // When RAW enforcement is on, only actionable changes should be applied
-      const validOutcomes = mockOutcomes.filter((o) => o.hasActionableChange);
-
-      expect(validOutcomes).toHaveLength(1);
-      expect(validOutcomes[0].token.id).toBe('valid1');
-    });
-
-    test('dialog apply-all respects RAW enforcement', () => {
-      game.settings.set('pf2e-visioner', 'enforceRawRequirements', true);
-
-      const mockDialog = {
-        outcomes: [
-          { token: { id: 'valid1' }, hasActionableChange: true, newVisibility: 'observed' },
-          { token: { id: 'invalid1' }, hasActionableChange: false, newVisibility: 'observed' },
-        ],
-      };
-
-      const validOutcomes = mockDialog.outcomes.filter((o) => o.hasActionableChange);
-
-      expect(validOutcomes).toHaveLength(1);
-      expect(validOutcomes[0].token.id).toBe('valid1');
-    });
-  });
 
   describe('hasActionableChange Calculation Tests', () => {
     describe('Without RAW Enforcement', () => {
-      beforeEach(() => {
-        game.settings.set('pf2e-visioner', 'enforceRawRequirements', false);
-      });
+
 
       test('consequences from hidden to observed (success) is actionable', () => {
         const {
@@ -397,66 +363,7 @@ describe('Attack Consequences Action Comprehensive Tests', () => {
       });
     });
 
-    describe('With General RAW Enforcement', () => {
-      beforeEach(() => {
-        game.settings.set('pf2e-visioner', 'enforceRawRequirements', true);
-      });
 
-      test('consequences from hidden with RAW enforcement still produces normal outcomes', () => {
-        const {
-          getDefaultNewStateFor,
-        } = require('../../../scripts/chat/services/data/action-state-config.js');
-
-        const oldState = 'hidden';
-        const outcomes = ['critical-success', 'success', 'failure', 'critical-failure'];
-
-        outcomes.forEach((outcome) => {
-          const newState = getDefaultNewStateFor('consequences', oldState, outcome);
-          const hasActionableChange = newState !== oldState;
-
-          // General RAW enforcement doesn't change outcome mapping, only target selection
-          // Consequences always changes hidden to observed
-          expect(hasActionableChange).toBe(true);
-          expect(newState).toBe('observed');
-        });
-      });
-
-      test('consequences from undetected with RAW enforcement still produces normal outcomes', () => {
-        const {
-          getDefaultNewStateFor,
-        } = require('../../../scripts/chat/services/data/action-state-config.js');
-
-        const oldState = 'undetected';
-        const outcomes = ['critical-success', 'success', 'failure', 'critical-failure'];
-
-        outcomes.forEach((outcome) => {
-          const newState = getDefaultNewStateFor('consequences', oldState, outcome);
-          const hasActionableChange = newState !== oldState;
-
-          // General RAW enforcement doesn't change outcome mapping, only target selection
-          // Consequences always changes undetected to observed
-          expect(hasActionableChange).toBe(true);
-          expect(newState).toBe('observed');
-        });
-      });
-
-      test('consequences from observed/concealed with RAW enforcement still produces no change', () => {
-        const {
-          getDefaultNewStateFor,
-        } = require('../../../scripts/chat/services/data/action-state-config.js');
-
-        const nonAffectedStates = ['observed', 'concealed'];
-        const outcomes = ['critical-success', 'success', 'failure', 'critical-failure'];
-
-        nonAffectedStates.forEach((oldState) => {
-          outcomes.forEach((outcome) => {
-            const newState = getDefaultNewStateFor('consequences', oldState, outcome);
-            // Consequences mapping is empty for observed/concealed states
-            expect(newState).toBeNull();
-          });
-        });
-      });
-    });
 
     test('hasActionableChange correctly identifies state transitions', () => {
       const {
@@ -624,4 +531,91 @@ describe('Attack Consequences Action Comprehensive Tests', () => {
       expect(actionableOutcomes).toHaveLength(2);
     });
   });
+
+  describe('Manual Override with Same State (AVS-controlled)', () => {
+    test('isOldStateAvsControlled checks the correct token', () => {
+      const { ConsequencesActionHandler } = require('../../../scripts/chat/services/actions/ConsequencesAction.js');
+      const MODULE_ID = 'pf2e-visioner';
+
+      const handler = new ConsequencesActionHandler();
+
+      const observerId = 'observer-123';
+      const attackerId = 'attacker-456';
+
+      const mockObserver = {
+        id: observerId,
+        document: { id: observerId },
+      };
+
+      const mockAttacker = {
+        id: attackerId,
+        document: {
+          id: attackerId,
+          getFlag: jest.fn(() => undefined),
+        },
+      };
+
+      const outcome = { target: mockObserver };
+      const actionData = { actor: mockAttacker };
+
+      game.settings.get = jest.fn((module, key) => {
+        if (module === MODULE_ID && key === 'autoVisibilityEnabled') return true;
+        return false;
+      });
+
+      const isAvsControlled = handler.isOldStateAvsControlled(outcome, actionData);
+
+      expect(isAvsControlled).toBe(true);
+      expect(mockAttacker.document.getFlag).toHaveBeenCalledWith(
+        MODULE_ID,
+        `avs-override-from-${observerId}`,
+      );
+    });
+
+    test('applyOverrides marks outcome as changed when state matches but old is AVS-controlled', () => {
+      const { ConsequencesActionHandler } = require('../../../scripts/chat/services/actions/ConsequencesAction.js');
+      const MODULE_ID = 'pf2e-visioner';
+
+      const handler = new ConsequencesActionHandler();
+
+      const observerId = 'observer-123';
+      const attackerId = 'attacker-456';
+
+      const mockObserver = {
+        id: observerId,
+        document: { id: observerId },
+      };
+
+      const mockAttacker = {
+        id: attackerId,
+        document: {
+          id: attackerId,
+          getFlag: jest.fn(() => undefined),
+        },
+      };
+
+      const outcome = {
+        target: mockObserver,
+        currentVisibility: 'hidden',
+        oldVisibility: 'hidden',
+      };
+
+      const actionData = {
+        actor: mockAttacker,
+        overrides: { [observerId]: 'hidden' },
+      };
+
+      game.settings.get = jest.fn((module, key) => {
+        if (module === MODULE_ID && key === 'autoVisibilityEnabled') return true;
+        return false;
+      });
+
+      const outcomes = [outcome];
+      handler.applyOverrides(actionData, outcomes);
+
+      expect(outcomes[0].changed).toBe(true);
+      expect(outcomes[0].newVisibility).toBe('hidden');
+    });
+  });
 });
+

@@ -15,15 +15,32 @@
     </div>
 
     <!-- Encounter Filter Section -->
-    {{#if showEncounterFilter}}
     <div class="encounter-filter-section">
+        {{#if showEncounterFilter}}
         <label class="encounter-filter-checkbox">
             <input type="checkbox" {{#if encounterOnly}}checked{{/if}} data-action="toggleEncounterFilter" data-tooltip="Only show tokens in the current encounter" />
             <span class="encounter-filter-label">{{localize "PF2E_VISIONER.SEEK_AUTOMATION.ENCOUNTER_ONLY"}}</span>
         </label>
-    </div>
-    {{/if}}
+        {{/if}}
 
+            <label class="filter-by-los-checkbox">
+                <input type="checkbox" {{#if filterByDetection}}checked{{/if}} data-action="toggleFilterByDetection" data-tooltip="{{localize 'PF2E_VISIONER.UI.FILTER_BY_DETECTION_TOOLTIP'}}" />
+                <span class="encounter-filter-label">{{localize 'PF2E_VISIONER.UI.FILTER_BY_DETECTION_LABEL'}}</span>
+            </label>
+        <label class="hide-foundry-hidden-filter-checkbox">
+            <input type="checkbox" {{#if hideFoundryHidden}}checked{{/if}} data-action="toggleHideFoundryHidden" data-tooltip="Visually hide tokens that are Foundry-hidden (document.hidden)" />
+            <span class="encounter-filter-label">Hide Foundry-hidden tokens</span>
+        </label>
+        <label class="show-only-changes-filter-checkbox">
+            <input type="checkbox" {{#if showOnlyChanges}}checked{{/if}} data-action="toggleShowOnlyChanges" data-tooltip="Show only rows with visibility changes" />
+            <span class="encounter-filter-label">Show only changes</span>
+        </label>
+    </div>
+
+        <!-- Bulk Override Bar -->
+        {{#if bulkOverrideStates}}
+            {{> "pf2e-visioner.bulk-override"}}
+        {{/if}}
     <!-- Results Table -->
     <div class="results-table-container">
         <table class="point-out-results-table">
@@ -31,22 +48,27 @@
                 <tr>
                     <th class="token-image">Token</th>
                     <th class="token-name">Ally</th>
-                    <th class="visibility-change">Visibility Change</th>
-                    <th class="actions">Actions</th>
+          <th class="visibility-change">Visibility Change</th>
+          <th class="actions">Actions</th>
                 </tr>
             </thead>
             <tbody>
                 {{#each outcomes}}
-                <tr data-token-id="{{target.id}}" class="token-row {{#if hasActionableChange}}actionable{{else}}no-change{{/if}}">
-                    <td class="token-image">
-                        {{#if tokenImage}}
-                        <img src="{{tokenImage}}" alt="{{target.name}}" />
-                        {{else}}
-                        <i class="fas fa-user"></i>
-                        {{/if}}
-                    </td>
+                <tr data-token-id="{{target.id}}" class="{{#if hasActionableChange}}actionable{{else}}no-change{{/if}}">
+                                        <td class="token-image">
+                                                {{#if tokenImage}}
+                                                <span class="token-img-wrapper">
+                                                    <img src="{{tokenImage}}" alt="{{target.name}}" />
+                                                    {{#if target.document.hidden}}
+                                                        <span class="foundry-hidden-indicator" data-tooltip="Foundry Hidden"><i class="fas fa-eye-slash"></i></span>
+                                                    {{/if}}
+                                                </span>
+                                                {{else}}
+                                                <i class="fas fa-user"></i>
+                                                {{/if}}
+                                        </td>
                     <td class="token-name">
-                        <strong>{{target.name}}</strong>
+                        <strong data-tooltip="{{target.name}}">{{target.name}}</strong>
                     </td>
                     <td class="visibility-change">
                         <span class="state-icon" data-state="{{oldVisibility}}" data-tooltip="{{oldVisibilityState.label}}">

@@ -1,5 +1,5 @@
 /**
- * Tooltip helpers split from hover-tooltips.js to reduce file size and improve cohesion.
+ * Tooltip helpers split from HoverTooltips.js to reduce file size and improve cohesion.
  */
 
 import { MODULE_ID } from '../constants.js';

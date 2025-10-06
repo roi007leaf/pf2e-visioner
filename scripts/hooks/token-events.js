@@ -7,7 +7,7 @@ import {
   addTokenEventListener,
   cleanupHoverTooltips,
   initializeHoverTooltips,
-} from '../services/hover-tooltips.js';
+} from '../services/HoverTooltips.js';
 import { updateTokenVisuals } from '../services/visual-effects.js';
 
 export async function onTokenCreated(scene, tokenDoc) {
@@ -32,14 +32,14 @@ export async function onTokenCreated(scene, tokenDoc) {
   try {
     if (game.settings.get(MODULE_ID, 'enableAllTokensVision')) {
       const currentEnabled = tokenDoc?.vision ?? tokenDoc?.sight?.enabled ?? undefined;
-      if (currentEnabled !== true) {
+      if (currentEnabled !== true && tokenDoc?.actor?.type !== 'loot') {
         await tokenDoc.update?.(
           { vision: true, sight: { enabled: true } },
           { diff: false, render: false, animate: false },
         );
       }
     }
-  } catch (_) {}
+  } catch (_) { }
   setTimeout(async () => {
     await updateTokenVisuals();
     // Add hover tooltip listeners to the new token
@@ -122,6 +122,13 @@ export async function onTokenDeleted(...args) {
         cleanupDeletedTokenEffects(tokenDoc),
         cleanupDeletedTokenCoverEffects(tokenDoc),
       ]);
+
+      try {
+        const { default: AvsOverrideManager } = await import('../chat/services/infra/AvsOverrideManager.js');
+        await AvsOverrideManager.removeAllOverridesInvolving(tokenDoc.id);
+      } catch (error) {
+        console.error('PF2E Visioner: AVS override cleanup failed', error);
+      }
     }
     setTimeout(async () => {
       try {
@@ -161,6 +168,13 @@ export function registerTokenHooks() {
 
   // Additional hook: when tokens are rendered on canvas (more reliable timing)
   Hooks.on('renderToken', (token, html, data) => {
+    // Add hover tooltip listeners when token is rendered (most reliable timing)
+    if (game.settings.get('pf2e-visioner', 'enableHoverTooltips')) {
+      if (token?.id) {
+        addTokenEventListener(token);
+      }
+    }
+
     // Check if this might be a party token restoration
     if (token?.document?.actor?.signature) {
       // Use a small delay to ensure token is fully rendered

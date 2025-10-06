@@ -3,6 +3,7 @@
  * Handles the logic for detecting cover between tokens or points
  */
 
+import FeatsHandler from '../../chat/services/FeatsHandler.js';
 import { MODULE_ID } from '../../constants.js';
 // Removed unused imports that were only used by the removed center intersection mode
 import {
@@ -19,6 +20,9 @@ import {
 import { getVisibilityBetween } from '../../utils.js';
 
 export class CoverDetector {
+  constructor() {
+    this._featUpgradeRecords = new Map();
+  }
   // Define token disposition constants for use within this class
   static TOKEN_DISPOSITIONS = {
     FRIENDLY: 1,
@@ -40,7 +44,7 @@ export class CoverDetector {
       const pseudoAttacker = {
         id: 'template-origin',
         center: { x: Number(origin.x) || 0, y: Number(origin.y) || 0 },
-        getCenter: () => ({ x: Number(origin.x) || 0, y: Number(origin.y) || 0 }),
+        getCenterPoint: () => ({ x: Number(origin.x) || 0, y: Number(origin.y) || 0, elevation: 0 }),
         actor: null,
         document: { x: origin.x, y: origin.y, width: 0, height: 0 },
       };
@@ -67,8 +71,8 @@ export class CoverDetector {
       // Exclude same token (attacker and target are the same)
       if (attacker.id === target.id) return 'none';
 
-      const p1 = attacker.center ?? attacker.getCenter();
-      const p2 = target.center ?? target.getCenter();
+      const p1 = attacker.center ?? attacker.getCenterPoint();
+      const p2 = target.center ?? target.getCenterPoint();
 
       // Check if there's any blocking terrain (walls) in the way
       const segmentAnalysis = this._analyzeSegmentObstructions(p1, p2);
@@ -149,6 +153,55 @@ export class CoverDetector {
   }
 
   /**
+   * Check if a wall would naturally block from a given direction (without considering overrides)
+   * Checks door state and wall directionality
+   * @param {Object} wallDoc - Wall document
+   * @param {Object} attackerPos - Attacker position {x, y}
+   * @returns {boolean} True if wall would naturally block from attacker position
+   * @private
+   */
+  _wouldWallNaturallyBlock(wallDoc, attackerPos) {
+    try {
+      if (wallDoc.sight === 0) return false;
+
+      const isDoor = Number(wallDoc.door) > 0;
+      const doorState = Number(wallDoc.ds ?? wallDoc.doorState ?? 0);
+
+      let doorAllowsBlocking = true;
+      if (isDoor && doorState === 1) {
+        doorAllowsBlocking = false;
+      }
+
+      let directionAllowsBlocking = true;
+      if (wallDoc.dir != null && typeof wallDoc.dir === 'number') {
+        if (wallDoc.dir === 0) {
+          directionAllowsBlocking = true;
+        } else {
+          const [x1, y1, x2, y2] = Array.isArray(wallDoc.c)
+            ? wallDoc.c
+            : [wallDoc.x, wallDoc.y, wallDoc.x2, wallDoc.y2];
+
+          const wallDx = x2 - x1;
+          const wallDy = y2 - y1;
+          const attackerDx = attackerPos.x - x1;
+          const attackerDy = attackerPos.y - y1;
+          const crossProduct = wallDx * attackerDy - wallDy * attackerDx;
+
+          if (wallDoc.dir === 1) {
+            directionAllowsBlocking = crossProduct < 0;
+          } else if (wallDoc.dir === 2) {
+            directionAllowsBlocking = crossProduct > 0;
+          }
+        }
+      }
+
+      return doorAllowsBlocking && directionAllowsBlocking;
+    } catch {
+      return true;
+    }
+  }
+
+  /**
    * Check if a wall blocks sight from a given direction based on its sight settings
    * A wall blocks only if BOTH door state AND direction allow blocking, then applies cover overrides only when wall would naturally block
    * @param {Object} wallDoc - Wall document
@@ -158,81 +211,21 @@ export class CoverDetector {
    */
   _doesWallBlockFromDirection(wallDoc, attackerPos) {
     try {
-      // If wall doesn't block sight at all, it doesn't provide cover
-      if (wallDoc.sight === 0) return false; // NONE
+      const wouldNaturallyBlock = this._wouldWallNaturallyBlock(wallDoc, attackerPos);
 
-      // Check if this is a door and if it's open
-      const isDoor = Number(wallDoc.door) > 0; // 0 none, 1 door, 2 secret (treat as door-like)
-      const doorState = Number(wallDoc.ds ?? wallDoc.doorState ?? 0); // 0 closed/secret, 1 open, 2 locked
-
-      // First check: Does the door state allow blocking?
-      let doorAllowsBlocking = true;
-      if (isDoor && doorState === 1) {
-        doorAllowsBlocking = false; // Open doors don't block
-      }
-
-      // Second check: Does the directional logic allow blocking from this direction?
-      let directionAllowsBlocking = true;
-      if (wallDoc.dir != null && typeof wallDoc.dir === 'number') {
-        // Foundry wall direction constants:
-        // BOTH: 0 - wall blocks from both directions
-        // LEFT: 1 - wall blocks only when ray strikes its left side
-        // RIGHT: 2 - wall blocks only when a ray strikes its right side
-
-        if (wallDoc.dir === 0) {
-          directionAllowsBlocking = true; // BOTH - blocks from both directions
-        } else {
-          // Get wall coordinates
-          const [x1, y1, x2, y2] = Array.isArray(wallDoc.c)
-            ? wallDoc.c
-            : [wallDoc.x, wallDoc.y, wallDoc.x2, wallDoc.y2];
-
-          // Calculate wall direction vector
-          const wallDx = x2 - x1;
-          const wallDy = y2 - y1;
-
-          // Calculate vector from wall start to attacker
-          const attackerDx = attackerPos.x - x1;
-          const attackerDy = attackerPos.y - y1;
-
-          // Use cross product to determine which side of the wall the attacker is on
-          // Positive cross product means attacker is on the "left" side of the wall (as drawn)
-          // Negative cross product means attacker is on the "right" side of the wall
-          const crossProduct = wallDx * attackerDy - wallDy * attackerDx;
-
-          // Apply the actual wall direction logic
-          if (wallDoc.dir === 1) {
-            // LEFT - wall blocks only when ray strikes left side
-            directionAllowsBlocking = crossProduct < 0; // Attacker on left side = wall blocks
-          } else if (wallDoc.dir === 2) {
-            // RIGHT - wall blocks only when ray strikes right side
-            directionAllowsBlocking = crossProduct > 0; // Attacker on right side = wall blocks
-          }
-        }
-      }
-
-      // Wall blocks only if BOTH door state and direction allow it
-      const wouldNaturallyBlock = doorAllowsBlocking && directionAllowsBlocking;
-
-      // Now check for manual cover override - but only apply it if the wall would naturally block from this direction
       const coverOverride = wallDoc.getFlag?.(MODULE_ID, 'coverOverride');
       if (coverOverride && coverOverride !== 'auto') {
-        // Only apply override if the wall would naturally block from this direction
         if (wouldNaturallyBlock) {
-          // If override is 'none', don't block despite natural blocking
           if (coverOverride === 'none') return false;
-          // For any other override (lesser, standard, greater), the wall blocks
           return true;
         }
-        // If wall wouldn't naturally block, ignore the override
         return false;
       }
 
-      // Return the natural blocking behavior
       return wouldNaturallyBlock;
     } catch (error) {
       console.warn('PF2E Visioner | Error checking wall direction:', error);
-      return true; // Default to blocking if we can't determine
+      return true;
     }
   }
 
@@ -246,10 +239,10 @@ export class CoverDetector {
   _evaluateWallsCover(p1, p2) {
     if (!canvas?.walls) return 'none';
 
-    // First check for manual wall cover overrides
+    // First check for manual wall cover overrides - if present, use it directly and skip all other checks
     const wallOverride = this._checkWallCoverOverrides(p1, p2);
-    if (wallOverride === 'none') {
-      return 'none';
+    if (wallOverride !== null) {
+      return wallOverride;
     }
 
     // Analyze the center-to-center segment
@@ -296,16 +289,6 @@ export class CoverDetector {
         // Fallback for cases where coverage calculation fails but walls are detected
         coverCategory = 'standard';
       }
-    }
-
-    // Apply wall override as ceiling if present
-    if (wallOverride !== null) {
-      const coverOrder = ['none', 'lesser', 'standard', 'greater'];
-      const calculatedIndex = coverOrder.indexOf(coverCategory);
-      const overrideIndex = coverOrder.indexOf(wallOverride);
-
-      // Return the lower of the two (override acts as ceiling)
-      return calculatedIndex <= overrideIndex ? coverCategory : wallOverride;
     }
 
     return coverCategory;
@@ -411,13 +394,14 @@ export class CoverDetector {
         point.y >= tokenRect.y1 &&
         point.y <= tokenRect.y2
       );
-    } catch (_) {
+    } catch {
       return false;
     }
   }
 
   /**
    * Check for manual wall cover overrides along the line of sight
+   * Overrides only apply if the wall would naturally block from the attacker's direction
    * @param {Object} p1 - Start point
    * @param {Object} p2 - End point
    * @returns {string|null} Cover override ('none', 'lesser', 'standard', 'greater') or null if no override
@@ -428,20 +412,18 @@ export class CoverDetector {
       const ray = this._createRay(p1, p2);
       const walls = canvas.walls.objects?.children || [];
 
-      let highestCover = 'none';
+      let highestCover = null;
       const coverOrder = ['none', 'lesser', 'standard', 'greater'];
 
       for (const wall of walls) {
         const wallDoc = wall.document || wall;
         const coverOverride = wallDoc.getFlag?.(MODULE_ID, 'coverOverride');
 
-        // Skip walls without cover override
-        if (!coverOverride) continue;
+        if (!coverOverride || coverOverride === 'auto') continue;
 
-        // Check if this wall blocks from the attacker's direction
-        if (!this._doesWallBlockFromDirection(wallDoc, p1)) continue;
+        // Check if wall would naturally block from this direction (respects door state and directionality)
+        if (!this._wouldWallNaturallyBlock(wallDoc, p1)) continue;
 
-        // Check if this wall intersects the ray
         const coords = wall?.coords;
         if (!coords) continue;
 
@@ -457,51 +439,21 @@ export class CoverDetector {
         );
 
         if (intersection) {
-          // This wall intersects the line of sight and has a cover override
-          const coverIndex = coverOrder.indexOf(coverOverride);
-          const currentIndex = coverOrder.indexOf(highestCover);
-
-          if (coverIndex > currentIndex) {
+          if (highestCover === null) {
             highestCover = coverOverride;
-          }
-        }
-      }
+          } else {
+            const coverIndex = coverOrder.indexOf(coverOverride);
+            const currentIndex = coverOrder.indexOf(highestCover);
 
-      // Return the highest cover found, or null if no overrides were found
-      // If highestCover is still 'none' (initial value), no overrides were found -> return null (auto-detection)
-      // If highestCover is 'none' from an actual override -> return 'none' (force no cover)
-      // Otherwise return the override value
-
-      let foundAnyOverride = false;
-      for (const wall of walls) {
-        const wallDoc = wall.document || wall;
-        const coverOverride = wallDoc.getFlag?.(MODULE_ID, 'coverOverride');
-        if (coverOverride) {
-          // Check if this wall blocks from the attacker's direction
-          if (!this._doesWallBlockFromDirection(wallDoc, p1)) continue;
-
-          const coords = wall?.coords;
-          if (coords) {
-            const intersection = this._lineIntersectionPoint(
-              ray.A.x,
-              ray.A.y,
-              ray.B.x,
-              ray.B.y,
-              coords[0],
-              coords[1],
-              coords[2],
-              coords[3],
-            );
-            if (intersection) {
-              foundAnyOverride = true;
-              break;
+            if (coverIndex > currentIndex) {
+              highestCover = coverOverride;
             }
           }
         }
       }
 
-      return foundAnyOverride ? highestCover : null;
-    } catch (_) {
+      return highestCover;
+    } catch {
       return null;
     }
   }
@@ -515,7 +467,7 @@ export class CoverDetector {
       let best = null;
       let bestD = Infinity;
       for (const t of tokens) {
-        const c = t.center ?? t.getCenter?.();
+        const c = t.center ?? t.getCenterPoint?.();
         if (!c) continue;
         const dx = c.x - p.x;
         const dy = c.y - p.y;
@@ -526,7 +478,7 @@ export class CoverDetector {
         }
       }
       return best;
-    } catch (_) {
+    } catch {
       return null;
     }
   }
@@ -580,7 +532,7 @@ export class CoverDetector {
       // Remove the arbitrary center weight reduction - let the actual blockage speak for itself
       // This provides more intuitive and predictable cover calculations
       return rawPct;
-    } catch (_) {
+    } catch {
       return 0;
     }
   }
@@ -692,7 +644,7 @@ export class CoverDetector {
           tgtSpan,
         );
       }
-    } catch (_) {
+    } catch {
       // If elevation filtering fails, return all blockers
       return blockers;
     }
@@ -710,13 +662,13 @@ export class CoverDetector {
    */
   _filterBlockersByElevationCenterToCenter(attacker, target, blockers, attSpan, tgtSpan) {
     // Get horizontal positions
-    const attPos = attacker.center ?? attacker.getCenter();
-    const tgtPos = target.center ?? target.getCenter();
+    const attPos = attacker.center ?? attacker.getCenterPoint();
+    const tgtPos = target.center ?? target.getCenterPoint();
 
     return blockers.filter((blocker) => {
       try {
         const blockerSpan = getTokenVerticalSpanFt(blocker);
-        const blockerPos = blocker.center ?? blocker.getCenter();
+        const blockerPos = blocker.center ?? blocker.getCenterPoint();
 
         // Check if blocker is horizontally between attacker and target
         // If not, it can't block regardless of elevation
@@ -735,7 +687,7 @@ export class CoverDetector {
 
         // Check if the blocker's vertical span intersects with the line of sight elevation range
         return this._verticalSpansIntersect(blockerSpan, lineOfSightElevationAtBlocker);
-      } catch (_) {
+      } catch {
         // If we can't determine elevation, include the blocker to be safe
         return true;
       }
@@ -755,13 +707,13 @@ export class CoverDetector {
    */
   _filterBlockersByElevationPermissive(attacker, target, blockers, attSpan, tgtSpan) {
     // Get horizontal positions
-    const attPos = attacker.center ?? attacker.getCenter();
-    const tgtPos = target.center ?? target.getCenter();
+    const attPos = attacker.center ?? attacker.getCenterPoint();
+    const tgtPos = target.center ?? target.getCenterPoint();
 
     return blockers.filter((blocker) => {
       try {
         const blockerSpan = getTokenVerticalSpanFt(blocker);
-        const blockerPos = blocker.center ?? blocker.getCenter();
+        const blockerPos = blocker.center ?? blocker.getCenterPoint();
 
         // Check if blocker is horizontally between attacker and target
         if (!this._isHorizontallyBetween(attPos, tgtPos, blockerPos)) {
@@ -789,7 +741,7 @@ export class CoverDetector {
 
         // Very permissive check: blocker provides cover if it has ANY overlap with the sight line range
         return blockerSpan.bottom < sightLineRange.top && blockerSpan.top > sightLineRange.bottom;
-      } catch (_) {
+      } catch {
         // If we can't determine elevation, include the blocker to be safe
         return true;
       }
@@ -809,13 +761,13 @@ export class CoverDetector {
    */
   _filterBlockersByElevationModerate(attacker, target, blockers, attSpan, tgtSpan) {
     // Get horizontal positions
-    const attPos = attacker.center ?? attacker.getCenter();
-    const tgtPos = target.center ?? target.getCenter();
+    const attPos = attacker.center ?? attacker.getCenterPoint();
+    const tgtPos = target.center ?? target.getCenterPoint();
 
     return blockers.filter((blocker) => {
       try {
         const blockerSpan = getTokenVerticalSpanFt(blocker);
-        const blockerPos = blocker.center ?? blocker.getCenter();
+        const blockerPos = blocker.center ?? blocker.getCenterPoint();
 
         // Check if blocker is horizontally between attacker and target
         if (!this._isHorizontallyBetween(attPos, tgtPos, blockerPos)) {
@@ -840,7 +792,7 @@ export class CoverDetector {
 
         // Check if the blocker's vertical span intersects with the adjusted line of sight range
         return blockerSpan.bottom < adjustedRange.top && blockerSpan.top > adjustedRange.bottom;
-      } catch (_) {
+      } catch {
         // If we can't determine elevation, include the blocker to be safe
         return true;
       }
@@ -869,7 +821,7 @@ export class CoverDetector {
     return blockers.filter((blocker) => {
       try {
         const blockerSpan = getTokenVerticalSpanFt(blocker);
-        const blockerPos = blocker.center ?? blocker.getCenter();
+        const blockerPos = blocker.center ?? blocker.getCenterPoint();
 
         // Check if any corner-to-corner line could potentially intersect this blocker
         for (const attackerCorner of attackerCorners) {
@@ -897,7 +849,7 @@ export class CoverDetector {
 
         // No corner-to-corner line intersects this blocker
         return false;
-      } catch (_) {
+      } catch {
         // If we can't determine elevation, include the blocker to be safe
         return true;
       }
@@ -1052,7 +1004,7 @@ export class CoverDetector {
           if (vis === 'undetected') {
             continue;
           }
-        } catch (_) {}
+        } catch { }
       }
       if (filters.ignoreDead && blocker.actor?.hitPoints?.value === 0) {
         continue;
@@ -1068,7 +1020,7 @@ export class CoverDetector {
           if (isProne) {
             continue;
           }
-        } catch (_) {}
+        } catch { }
       }
       if (filters.ignoreAllies && blocker.actor?.alliance === filters.attackerAlliance) {
         continue;
@@ -1117,7 +1069,7 @@ export class CoverDetector {
       // Small+ targets cannot get cover from tiny blockers (already covered by rule 3)
 
       return true;
-    } catch (_) {
+    } catch {
       // If we can't determine sizes/positions, allow cover to be safe
       return true;
     }
@@ -1153,7 +1105,7 @@ export class CoverDetector {
         token1GridY < token2GridY + token2Height && token1GridY + token1Height > token2GridY;
 
       return xOverlap && yOverlap;
-    } catch (_) {
+    } catch {
       return false;
     }
   }
@@ -1184,7 +1136,7 @@ export class CoverDetector {
       };
 
       return sizeMap[size] || 'medium';
-    } catch (_) {
+    } catch {
       return 'medium';
     }
   }
@@ -1271,12 +1223,49 @@ export class CoverDetector {
       }
 
       const result = any ? (standard ? 'standard' : 'lesser') : 'none';
+      let finalState = result;
 
-      return result;
+      const hasBlockerWithOverride = blockers.some(blocker => {
+        const override = blocker.document?.getFlag?.(MODULE_ID, 'coverOverride');
+        return override && override !== 'auto';
+      });
+
+      try {
+        // Ceaseless Shadows: the TARGET (being attacked) has the feat and gets upgraded cover
+        const upgraded = FeatsHandler.upgradeCoverForCreature(target, result)?.state || result;
+        if (upgraded !== result) {
+          try {
+            const aId = attacker?.id;
+            const tId = target?.id;
+            if (aId && tId) {
+              this._featUpgradeRecords.set(`${aId}:${tId}`, {
+                from: result,
+                to: upgraded,
+                feat: 'ceaseless-shadows',
+                ts: Date.now(),
+                hasBlockerWithOverride,
+              });
+            }
+          } catch { }
+        }
+        finalState = upgraded;
+      } catch { }
+      return finalState;
     } catch (error) {
       console.error('PF2E Visioner | Error in evaluateCreatureSizeCover:', error);
       return 'none';
     }
+  }
+
+  consumeFeatCoverUpgrade(attackerId, targetId) {
+    try {
+      const key = `${attackerId}:${targetId}`;
+      if (!this._featUpgradeRecords.has(key)) return null;
+      const rec = this._featUpgradeRecords.get(key);
+      this._featUpgradeRecords.delete(key);
+      if (Date.now() - rec.ts > 15000) return null;
+      return rec;
+    } catch { return null; }
   }
 
   // Using segmentIntersectsRect from geometry-utils.js instead of _rayIntersectRect
@@ -1374,8 +1363,8 @@ export class CoverDetector {
       if (!blockers.length) return 'none';
 
       // Get centers
-      const p1 = attacker.center ?? attacker.getCenter();
-      const p2 = target.center ?? target.getCenter();
+      const p1 = attacker.center ?? attacker.getCenterPoint();
+      const p2 = target.center ?? target.getCenterPoint();
 
       // Calculate total coverage by all blockers
       let totalCoverage = 0;
@@ -1488,8 +1477,58 @@ export class CoverDetector {
 
       // No overrides found, use calculated cover
       return calculatedCover;
-    } catch (_) {
+    } catch {
       return calculatedCover;
+    }
+  }
+
+  /**
+   * Check if target has cover from creatures larger than it between observer and target point.
+   * Used by Distracting Shadows feat: creatures at least one size larger can provide cover
+   * for Hide/Sneak prerequisite checks.
+   * 
+   * @param {Token} observer - The observing token
+   * @param {Token} target - The target token (actor using feat)
+   * @param {Object} targetPoint - Optional specific point instead of target center {x, y}
+   * @returns {boolean} True if at least one qualifying larger creature blocks the line
+   */
+  hasLargeCreatureCover(observer, target, targetPoint = null) {
+    try {
+      if (!observer || !target) return false;
+
+      const p1 = observer?.center || observer?.getCenterPoint?.();
+      let p2 = null;
+      if (targetPoint && typeof targetPoint.x === 'number' && typeof targetPoint.y === 'number') {
+        p2 = { x: targetPoint.x, y: targetPoint.y };
+      } else {
+        p2 = target?.center || target?.getCenterPoint?.();
+      }
+      if (!p1 || !p2) return false;
+
+      const targetRank = getSizeRank(target);
+      const tokens = canvas?.tokens?.placeables || [];
+
+      for (const blocker of tokens) {
+        if (!blocker?.actor) continue;
+        if (blocker.id === target.id || blocker.id === observer.id) continue;
+        if (blocker.document?.hidden) continue;
+
+        const type = blocker.actor?.type;
+        if (type === 'loot' || type === 'hazard') continue;
+
+        const blockerRank = getSizeRank(blocker);
+        if (!(blockerRank >= targetRank + 1)) continue;
+
+        const rect = getTokenRect(blocker);
+        const len = segmentRectIntersectionLength(p1, p2, rect);
+        if (len > 0) {
+          return true;
+        }
+      }
+      return false;
+    } catch (e) {
+      console.warn('PF2E Visioner | CoverDetector.hasLargeCreatureCover failed:', e);
+      return false;
     }
   }
 }

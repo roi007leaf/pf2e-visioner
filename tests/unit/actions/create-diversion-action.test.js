@@ -13,7 +13,6 @@ describe('Create a Diversion Action Comprehensive Tests', () => {
     // Store original settings
     originalSettings = {
       ignoreAllies: game.settings.get('pf2e-visioner', 'ignoreAllies'),
-      enforceRawRequirements: game.settings.get('pf2e-visioner', 'enforceRawRequirements'),
     };
   });
 
@@ -299,44 +298,8 @@ describe('Create a Diversion Action Comprehensive Tests', () => {
     });
   });
 
-  describe('RAW Enforcement Integration Tests', () => {
-    test('chat apply-changes respects RAW enforcement', () => {
-      game.settings.set('pf2e-visioner', 'enforceRawRequirements', true);
-
-      const mockOutcomes = [
-        { token: { id: 'valid1' }, hasActionableChange: true, newVisibility: 'hidden' },
-        { token: { id: 'invalid1' }, hasActionableChange: false, newVisibility: 'hidden' },
-      ];
-
-      // When RAW enforcement is on, only actionable changes should be applied
-      const validOutcomes = mockOutcomes.filter((o) => o.hasActionableChange);
-
-      expect(validOutcomes).toHaveLength(1);
-      expect(validOutcomes[0].token.id).toBe('valid1');
-    });
-
-    test('dialog apply-all respects RAW enforcement', () => {
-      game.settings.set('pf2e-visioner', 'enforceRawRequirements', true);
-
-      const mockDialog = {
-        outcomes: [
-          { token: { id: 'valid1' }, hasActionableChange: true, newVisibility: 'hidden' },
-          { token: { id: 'invalid1' }, hasActionableChange: false, newVisibility: 'hidden' },
-        ],
-      };
-
-      const validOutcomes = mockDialog.outcomes.filter((o) => o.hasActionableChange);
-
-      expect(validOutcomes).toHaveLength(1);
-      expect(validOutcomes[0].token.id).toBe('valid1');
-    });
-  });
-
   describe('hasActionableChange Calculation Tests', () => {
     describe('Without RAW Enforcement', () => {
-      beforeEach(() => {
-        game.settings.set('pf2e-visioner', 'enforceRawRequirements', false);
-      });
 
       test('create-a-diversion from observed to hidden (success) is actionable', () => {
         const {
@@ -401,65 +364,6 @@ describe('Create a Diversion Action Comprehensive Tests', () => {
 
         expect(newState).toBe('concealed');
         expect(hasActionableChange).toBe(false);
-      });
-    });
-
-    describe('With General RAW Enforcement', () => {
-      beforeEach(() => {
-        game.settings.set('pf2e-visioner', 'enforceRawRequirements', true);
-      });
-
-      test('create-a-diversion from observed with RAW enforcement still produces normal outcomes', () => {
-        const {
-          getDefaultNewStateFor,
-        } = require('../../../scripts/chat/services/data/action-state-config.js');
-
-        const oldState = 'observed';
-        const outcomes = ['critical-success', 'success', 'failure', 'critical-failure'];
-
-        outcomes.forEach((outcome) => {
-          const newState = getDefaultNewStateFor('create-a-diversion', oldState, outcome);
-          const hasActionableChange = newState !== oldState;
-
-          // General RAW enforcement doesn't change outcome mapping, only target selection
-          expect(hasActionableChange).toBe(outcome === 'success' || outcome === 'critical-success');
-        });
-      });
-
-      test('create-a-diversion from concealed with RAW enforcement still produces normal outcomes', () => {
-        const {
-          getDefaultNewStateFor,
-        } = require('../../../scripts/chat/services/data/action-state-config.js');
-
-        const oldState = 'concealed';
-        const outcomes = ['critical-success', 'success', 'failure', 'critical-failure'];
-
-        outcomes.forEach((outcome) => {
-          const newState = getDefaultNewStateFor('create-a-diversion', oldState, outcome);
-          const hasActionableChange = newState !== oldState;
-
-          // General RAW enforcement doesn't change outcome mapping, only target selection
-          expect(hasActionableChange).toBe(outcome === 'success' || outcome === 'critical-success');
-        });
-      });
-
-      test('create-a-diversion from hidden/undetected with RAW enforcement still produces normal outcomes', () => {
-        const {
-          getDefaultNewStateFor,
-        } = require('../../../scripts/chat/services/data/action-state-config.js');
-
-        const testCases = [
-          { oldState: 'hidden', outcome: 'failure', expectedNewState: 'observed' },
-          { oldState: 'undetected', outcome: 'failure', expectedNewState: 'observed' },
-        ];
-
-        testCases.forEach(({ oldState, outcome, expectedNewState }) => {
-          const newState = getDefaultNewStateFor('create-a-diversion', oldState, outcome);
-          const hasActionableChange = newState !== oldState;
-
-          expect(newState).toBe(expectedNewState);
-          expect(hasActionableChange).toBe(true);
-        });
       });
     });
 

@@ -3,22 +3,22 @@
     <legend>PF2E Visioner</legend>
     <div class="form-group">
       <label>Cover</label>
-      <div class="cover-override-buttons" style="display: flex; gap: 4px; margin-top: 4px;">
+  <div class="cover-override-buttons pv-u-flex pv-u-gap-4" style="margin-top:4px;">
         <button type="button" class="visioner-icon-btn {{#unless coverOverride}}active{{/unless}}" 
                 data-cover-override="auto" data-tooltip="Automatic Detection - Wall provides cover based on coverage thresholds">
-          <i class="fas fa-bolt-auto" style="color:#888"></i>
+          <i class="fas fa-bolt-auto icon-color-gray"></i>
         </button>
         <button type="button" class="visioner-icon-btn {{#if (eq coverOverride 'none')}}active{{/if}}" 
                 data-cover-override="none" data-tooltip="No Cover - Wall never provides cover regardless of thresholds">
-          <i class="fas fa-shield-slash" style="color:var(--cover-none)"></i>
+          <i class="fas fa-shield-slash cover-none"></i>
         </button>
         <button type="button" class="visioner-icon-btn {{#if (eq coverOverride 'standard')}}active{{/if}}" 
                 data-cover-override="standard" data-tooltip="Standard Cover Maximum - Wall provides up to standard cover based on thresholds">
-          <i class="fas fa-shield-alt" style="color:var(--cover-standard)"></i>
+          <i class="fas fa-shield-alt cover-standard"></i>
         </button>
         <button type="button" class="visioner-icon-btn {{#if (eq coverOverride 'greater')}}active{{/if}}" 
                 data-cover-override="greater" data-tooltip="Greater Cover Maximum - Wall provides up to greater cover based on thresholds">
-          <i class="fas fa-shield" style="color:var(--cover-greater)"></i>
+          <i class="fas fa-shield cover-greater"></i>
         </button>
       </div>
       <input type="hidden" name="coverOverride" value="{{coverOverride}}">
@@ -31,17 +31,17 @@
         data-trigger-change="hidden-wall-sections" />
       <p class="notes">Adds a visible indicator for players;</p>
     </div>
-    <div class="form-group hidden-wall-section" style="{{#unless hiddenWall}}display: none;{{/unless}}">
+  <div class="form-group hidden-wall-section {{#unless hiddenWall}}is-hidden{{/unless}}">
       <label>Wall Identifier</label>
       <input type="text" name="identifier" value="{{identifier}}" />
       <p class="notes">Shown in the Token Manager for observers.</p>
     </div>
-    <div class="form-group hidden-wall-section" style="{{#unless hiddenWall}}display: none;{{/unless}}">
+  <div class="form-group hidden-wall-section {{#unless hiddenWall}}is-hidden{{/unless}}">
       <label>Wall Stealth DC</label>
       <input type="number" name="dc" min="0" step="1" value="{{dc}}" />
       <p class="notes">Optional per-wall DC for Seek; blank uses default setting.</p>
     </div>
-    <div class="form-group hidden-wall-section" style="{{#unless hiddenWall}}display: none;{{/unless}}">
+  <div class="form-group hidden-wall-section {{#unless hiddenWall}}is-hidden{{/unless}}">
       <label>Connected Walls (Identifiers)</label>
       <input type="text" name="connected" value="{{connectedCsv}}" placeholder="comma-separated identifiers" />
       <p class="notes">List identifiers of other walls linked to this one. Actions that affect this wall will also apply
@@ -49,7 +49,7 @@
     </div>
     {{/if}}
   </fieldset>
-  <footer class="sheet-footer" style="display:flex; gap:8px; justify-content:flex-end;">
+  <footer class="sheet-footer pv-u-flex pv-u-gap-8 pv-u-justify-end">
     <button type="button" data-action="apply" class="visioner-btn visioner-primary"><i class="fas fa-check"></i>
       Apply</button>
     <button type="button" data-action="close" class="visioner-btn"><i class="fas fa-times"></i> Close</button>

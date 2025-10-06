@@ -1,9 +1,9 @@
 /**
- * FoundryVTT hooks registration and handling
+ * FoundryVTT hooks registration and handling - OPTIMIZED VERSION
  */
 
 /**
- * Register all FoundryVTT hooks
+ * Register all FoundryVTT hooks - using optimized zero-delay versions
  */
 export function registerHooks() {
   // Always delegate to modular registration

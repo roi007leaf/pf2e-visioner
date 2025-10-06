@@ -5,8 +5,8 @@
 import { MODULE_ID } from '../constants.js';
 import { cleanupCoverEffectsForObserver } from '../cover/ephemeral.js';
 import {
-  batchUpdateVisibilityEffects,
-  cleanupEphemeralEffectsForTarget,
+    batchUpdateVisibilityEffects,
+    cleanupEphemeralEffectsForTarget,
 } from '../visibility/ephemeral.js';
 import { refreshEveryonesPerception } from './socket.js';
 import { updateTokenVisuals } from './visual-effects.js';
@@ -16,11 +16,15 @@ export async function unsetMapsForTokens(scene, tokens) {
     if (!scene || !Array.isArray(tokens) || tokens.length === 0) return;
     const updates = tokens.map((t) => ({
       _id: t.id,
-      [`flags.${MODULE_ID}.-=visibility`]: null,
-      [`flags.${MODULE_ID}.-=cover`]: null,
+      // Remove ALL visioner flags completely
+      [`flags.${MODULE_ID}`]: null,
     }));
-    await scene.updateEmbeddedDocuments('Token', updates, { diff: false });
-  } catch (_) {}
+    
+    
+    const result = await scene.updateEmbeddedDocuments('Token', updates, { diff: false });
+  } catch (error) {
+    console.error('PF2E Visioner | Error in unsetMapsForTokens:', error);
+  }
 }
 
 export function collectModuleEffectIds(actor) {

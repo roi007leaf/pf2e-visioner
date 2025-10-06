@@ -103,24 +103,6 @@ export async function extractActionData(message) {
     } catch (_) {}
   }
 
-  let isHiddenOrUndetectedToken = false;
-  if (actorToken?.actor) {
-    const itemTypeConditions = actorToken.actor.itemTypes?.condition || [];
-    const legacyConditions = actorToken.actor.conditions?.conditions || [];
-    isHiddenOrUndetectedToken =
-      itemTypeConditions.some((c) => c?.slug === 'hidden' || c?.slug === 'undetected') ||
-      legacyConditions.some((c) => c?.slug === 'hidden' || c?.slug === 'undetected');
-  }
-  if (!isHiddenOrUndetectedToken && context?.options) {
-    isHiddenOrUndetectedToken = context.options.some(
-      (opt) =>
-        opt.includes('effect:hidden-from') ||
-        opt.includes('effect:undetected-from') ||
-        opt.includes('hidden-from') ||
-        opt.includes('undetected-from'),
-    );
-  }
-
   // Debug logging for action type detection
 
   let actionType = null;
@@ -132,23 +114,10 @@ export async function extractActionData(message) {
   else if (isCreateADiversionAction) actionType = 'create-a-diversion';
   else if (isTakeCoverAction) actionType = 'take-cover';
   else if (isAttackRoll && !isDamageTakenMessage) {
-    if (isHiddenOrUndetectedToken) actionType = 'consequences';
-    else if (actorToken) {
-      try {
-        // Fallback: if any token on the scene currently treats the attacker as hidden/undetected per Visioner map, enable consequences
-        const tokens = canvas?.tokens?.placeables || [];
-        if (tokens.length) {
-          // Lazy-load only when needed to keep extractor fast on non-attack messages
-          const { getVisibilityBetween } = await import('../../utils.js');
-          const hasHiddenVsAny = tokens.some((t) => {
-            if (!t?.actor || t === actorToken) return false;
-            const vis = getVisibilityBetween(t, actorToken);
-            return vis === 'hidden' || vis === 'undetected';
-          });
-          if (hasHiddenVsAny) actionType = 'consequences';
-        }
-      } catch (_) {}
-    }
+    const flags = actorToken?.document?.flags?.['pf2e-visioner'] || {};
+    const hasHiddenOverride = Object.entries(flags).some(([k,v]) =>
+      k.startsWith('avs-override-from-') && ['hidden', 'undetected'].includes(v?.state));
+    if (hasHiddenOverride) actionType = 'consequences';
   }
 
   if (!actionType) return null;
