@@ -615,7 +615,7 @@ export class Pf2eVisionerApi {
 
       // Get observer's vision capabilities
       const visionCaps = visionAnalyzer.getVisionCapabilities(observerToken);
-      
+
       // Get lighting at target's position
       const lightingCalc = optimizedVisibilityCalculator.getComponents().lightingCalculator;
       const targetPos = {
