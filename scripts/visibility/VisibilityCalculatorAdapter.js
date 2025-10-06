@@ -72,7 +72,8 @@ export async function tokenStateToInput(
             targetPosition
         );
 
-    const hasLineOfSight = visionAnalyzer.hasLineOfSight(observer, target);
+    // Allow skipping LOS check via options (useful for diagnostic APIs)
+    const hasLineOfSight = options?.skipLOS ? true : visionAnalyzer.hasLineOfSight(observer, target);
     const soundBlocked = visionAnalyzer.isSoundBlocked(observer, target);
 
 
