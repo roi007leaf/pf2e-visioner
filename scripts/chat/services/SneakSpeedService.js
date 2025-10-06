@@ -21,7 +21,7 @@
               core: { sourceId: null }, 
               [MODULE_ID]: { sneakingEffect: true } 
             },
-          };e)
+          }
  * - Removes that effect when Sneak ends
  * - Provides a helper to compute max Sneak distance (floor(base*multiplier) + bonuses, capped at Speed)
  *
