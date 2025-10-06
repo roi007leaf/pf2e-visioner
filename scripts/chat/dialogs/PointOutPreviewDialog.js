@@ -122,13 +122,20 @@ export class PointOutPreviewDialog extends BaseActionDialog {
 
       const effectiveNewState = outcome.overrideState || outcome.newVisibility;
       const baseOldState = outcome.oldVisibility || outcome.currentVisibility;
-      // Special case: If current state is AVS-controlled and override is 'avs', no change
+      const isOldStateAvsControlled = this.isOldStateAvsControlled(outcome);
+
+      // Determine if there's an actionable change
       let hasActionableChange = false;
       if (outcome.overrideState === 'avs' && this.isCurrentStateAvsControlled(outcome)) {
+        // Special case: If current state is AVS-controlled and override is 'avs', no change
         hasActionableChange = false;
+      } else if (outcome.overrideState) {
+        // If user has set an override, use AVS-aware logic
+        const statesMatch = baseOldState === effectiveNewState;
+        hasActionableChange = (!statesMatch) || (statesMatch && isOldStateAvsControlled);
       } else {
-        hasActionableChange =
-          baseOldState != null && effectiveNewState != null && effectiveNewState !== baseOldState;
+        // No override - use the calculated 'changed' flag from the action
+        hasActionableChange = outcome.changed === true;
       }
 
       return {
@@ -406,77 +413,32 @@ export class PointOutPreviewDialog extends BaseActionDialog {
   }
 
   static async _onToggleEncounterFilter(event, target) {
-    event.preventDefault();
-    event.stopPropagation();
-
     const app = currentPointOutDialog;
     if (!app) return;
-    const newValue = !app.encounterOnly;
-    app.encounterOnly = newValue;
+
+    app.encounterOnly = target.checked;
     app.bulkActionState = 'initial';
     await app.render({ force: true });
-
-    requestAnimationFrame(() => {
-      const checkbox = app.element.querySelector('input[data-action="toggleEncounterFilter"]');
-      if (checkbox) {
-        checkbox.checked = newValue;
-        if (newValue) {
-          checkbox.setAttribute('checked', '');
-        } else {
-          checkbox.removeAttribute('checked');
-        }
-      }
-    });
   }
 
   static async _onToggleFilterByDetection(event, target) {
-    event.preventDefault();
-    event.stopPropagation();
-
     const app = currentPointOutDialog;
     if (!app) return;
-    const newValue = !app.filterByDetection;
-    app.filterByDetection = newValue;
+
+    app.filterByDetection = target.checked;
     app.bulkActionState = 'initial';
     await app.render({ force: true });
-
-    requestAnimationFrame(() => {
-      const checkbox = app.element.querySelector('input[data-action="toggleFilterByDetection"]');
-      if (checkbox) {
-        checkbox.checked = newValue;
-        if (newValue) {
-          checkbox.setAttribute('checked', '');
-        } else {
-          checkbox.removeAttribute('checked');
-        }
-      }
-    });
   }
 
   static async _onToggleHideFoundryHidden(event, target) {
-    event.preventDefault();
-    event.stopPropagation();
-
     const app = currentPointOutDialog;
     if (!app) return;
-    const newValue = !app.hideFoundryHidden;
-    app.hideFoundryHidden = newValue;
+
+    app.hideFoundryHidden = target.checked;
     try {
-      await game.settings.set(MODULE_ID, 'hideFoundryHiddenTokens', newValue);
+      await game.settings.set(MODULE_ID, 'hideFoundryHiddenTokens', target.checked);
     } catch { }
     await app.render({ force: true });
-
-    requestAnimationFrame(() => {
-      const checkbox = app.element.querySelector('input[data-action="toggleHideFoundryHidden"]');
-      if (checkbox) {
-        checkbox.checked = newValue;
-        if (newValue) {
-          checkbox.setAttribute('checked', '');
-        } else {
-          checkbox.removeAttribute('checked');
-        }
-      }
-    });
   }  /**
    * Apply individual visibility change
    */

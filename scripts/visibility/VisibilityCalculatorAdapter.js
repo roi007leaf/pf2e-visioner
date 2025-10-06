@@ -33,6 +33,15 @@ export async function tokenStateToInput(
     lightingRasterService,
     options = {}
 ) {
+    // Guard against null tokens
+    if (!observer || !target) {
+        console.warn('PF2E Visioner | tokenStateToInput called with null token', {
+            observer: observer?.name || 'null',
+            target: target?.name || 'null'
+        });
+        return null;
+    }
+
     // Calculate positions first (needed by multiple functions)
     const observerPosition = {
         x: observer.document.x + (observer.document.width * canvas.grid.size) / 2,
@@ -443,6 +452,15 @@ export async function calculateVisibilityFromTokens(
         lightingRasterService,
         options
     );
+
+    // Handle null input (invalid tokens)
+    if (!input) {
+        return {
+            state: 'undetected',
+            detectionType: 'none',
+            senses: []
+        };
+    }
 
     // Add debug context for logging (not used by stateless calculator)
     input._debug = {

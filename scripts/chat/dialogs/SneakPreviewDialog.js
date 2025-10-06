@@ -384,15 +384,20 @@ export class SneakPreviewDialog extends BaseActionDialog {
 
       const effectiveNewState = outcome.overrideState || outcome.newVisibility;
       const baseOldState = outcome.oldVisibility || currentVisibility;
-      // Special case: If current state is AVS-controlled and override is 'avs', no change
+      const isOldStateAvsControlled = this.isOldStateAvsControlled(outcome);
+
+      // Determine if there's an actionable change
       let hasActionableChange = false;
-      if (typeof outcome.changed === 'boolean') {
-        hasActionableChange = outcome.changed;
-      } else if (outcome.overrideState === 'avs' && this.isCurrentStateAvsControlled(outcome)) {
+      if (outcome.overrideState === 'avs' && this.isCurrentStateAvsControlled(outcome)) {
+        // Special case: If current state is AVS-controlled and override is 'avs', no change
         hasActionableChange = false;
+      } else if (outcome.overrideState) {
+        // If user has set an override, check if it differs from current state
+        const statesMatch = baseOldState === effectiveNewState;
+        hasActionableChange = (!statesMatch) || (statesMatch && isOldStateAvsControlled);
       } else {
-        hasActionableChange =
-          baseOldState != null && effectiveNewState != null && effectiveNewState !== baseOldState;
+        // No override - use the calculated 'changed' flag from the action
+        hasActionableChange = outcome.changed === true;
       }
 
       // Check if this outcome has deferred end position checks
@@ -420,9 +425,6 @@ export class SneakPreviewDialog extends BaseActionDialog {
 
       // Is deferred either in current dialog or from previous sneak actions
       const isDeferred = this._deferredChecks?.has(outcome.token.id) || wasPreviouslyDeferred;
-
-      // Check if the old visibility state is AVS-controlled
-      const isOldStateAvsControlled = this.isOldStateAvsControlled(outcome);
 
       return {
         ...outcome,
@@ -1479,15 +1481,20 @@ export class SneakPreviewDialog extends BaseActionDialog {
 
       const effectiveNewState = outcome.overrideState || outcome.newVisibility;
       const baseOldState = outcome.oldVisibility || currentVisibility;
-      // Special case: If current state is AVS-controlled and override is 'avs', no change
+      const isOldStateAvsControlled = this.isOldStateAvsControlled(outcome);
+
+      // Determine if there's an actionable change
       let hasActionableChange = false;
-      if (typeof outcome.changed === 'boolean') {
-        hasActionableChange = outcome.changed;
-      } else if (outcome.overrideState === 'avs' && this.isCurrentStateAvsControlled(outcome)) {
+      if (outcome.overrideState === 'avs' && this.isCurrentStateAvsControlled(outcome)) {
+        // Special case: If current state is AVS-controlled and override is 'avs', no change
         hasActionableChange = false;
+      } else if (outcome.overrideState) {
+        // If user has set an override, check if it differs from current state
+        const statesMatch = baseOldState === effectiveNewState;
+        hasActionableChange = (!statesMatch) || (statesMatch && isOldStateAvsControlled);
       } else {
-        hasActionableChange =
-          baseOldState != null && effectiveNewState != null && effectiveNewState !== baseOldState;
+        // No override - use the calculated 'changed' flag from the action
+        hasActionableChange = outcome.changed === true;
       }
 
       // Check if this outcome has deferred end position checks

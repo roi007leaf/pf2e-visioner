@@ -364,6 +364,12 @@ export class SneakActionHandler extends ActionHandlerBase {
   }
 
   async analyzeOutcome(actionData, subject) {
+    // Guard against null subject (observer)
+    if (!subject) {
+      console.warn('PF2E Visioner | SneakAction.analyzeOutcome called with null subject');
+      return null;
+    }
+
     try {
       // Initialize sneak session if not already started
       if (!this._currentSessionId) {

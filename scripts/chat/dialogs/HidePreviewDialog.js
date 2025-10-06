@@ -274,17 +274,20 @@ export class HidePreviewDialog extends BaseActionDialog {
       // Check if the old visibility state is AVS-controlled
       const isOldStateAvsControlled = this.isOldStateAvsControlled(outcome);
 
-      // Special case: If current state is AVS-controlled and override is 'avs', no change
+      // Determine if there's an actionable change
       let hasActionableChange = false;
       if (outcome.overrideState === 'avs' && this.isCurrentStateAvsControlled(outcome)) {
+        // Special case: If current state is AVS-controlled and override is 'avs', no change
         hasActionableChange = false;
-      } else {
-        // If old state matches new state, check if old state was AVS-controlled
-        // If it was AVS-controlled, we should still apply the manual override
+      } else if (outcome.overrideState) {
+        // If user has set an override, check if it differs from current state
         const statesMatch = baseOldState != null && effectiveNewState != null && effectiveNewState === baseOldState;
         hasActionableChange =
           (baseOldState != null && effectiveNewState != null && effectiveNewState !== baseOldState) ||
           (statesMatch && isOldStateAvsControlled);
+      } else {
+        // No override - use the calculated 'changed' flag from the action
+        hasActionableChange = outcome.changed === true;
       }
 
 

@@ -307,129 +307,49 @@ export class TakeCoverPreviewDialog extends BaseActionDialog {
   }
 
   static async _onToggleEncounterFilter(event, target) {
-    event.preventDefault();
-    event.stopPropagation();
-
     const app = currentTakeCoverDialog;
     if (!app) return;
-    const newValue = !app.encounterOnly;
-    app.encounterOnly = newValue;
+    app.encounterOnly = target.checked;
     app.bulkActionState = 'initial';
     await app.render({ force: true });
-
-    requestAnimationFrame(() => {
-      const checkbox = app.element.querySelector('input[data-action="toggleEncounterFilter"]');
-      if (checkbox) {
-        checkbox.checked = newValue;
-        if (newValue) {
-          checkbox.setAttribute('checked', '');
-        } else {
-          checkbox.removeAttribute('checked');
-        }
-      }
-    });
   }
 
   static async _onToggleFilterByDetection(event, target) {
-    event.preventDefault();
-    event.stopPropagation();
-
     const app = currentTakeCoverDialog;
     if (!app) return;
-    const newValue = !app.filterByDetection;
-    app.filterByDetection = newValue;
+    app.filterByDetection = target.checked;
     app.bulkActionState = 'initial';
     await app.render({ force: true });
-
-    requestAnimationFrame(() => {
-      const checkbox = app.element.querySelector('input[data-action="toggleFilterByDetection"]');
-      if (checkbox) {
-        checkbox.checked = newValue;
-        if (newValue) {
-          checkbox.setAttribute('checked', '');
-        } else {
-          checkbox.removeAttribute('checked');
-        }
-      }
-    });
   }
 
   static async _onToggleHideFoundryHidden(event, target) {
-    event.preventDefault();
-    event.stopPropagation();
-
     const app = currentTakeCoverDialog;
     if (!app) return;
-    const newValue = !app.hideFoundryHidden;
-    app.hideFoundryHidden = newValue;
+    app.hideFoundryHidden = target.checked;
     try {
-      await game.settings.set(MODULE_ID, 'hideFoundryHiddenTokens', newValue);
+      await game.settings.set(MODULE_ID, 'hideFoundryHiddenTokens', target.checked);
     } catch { }
     app.bulkActionState = 'initial';
     await app.render({ force: true });
-
-    requestAnimationFrame(() => {
-      const checkbox = app.element.querySelector('input[data-action="toggleHideFoundryHidden"]');
-      if (checkbox) {
-        checkbox.checked = newValue;
-        if (newValue) {
-          checkbox.setAttribute('checked', '');
-        } else {
-          checkbox.removeAttribute('checked');
-        }
-      }
-    });
   }
 
   static async _onToggleIgnoreAllies(event, target) {
-    event.preventDefault();
-    event.stopPropagation();
-
     const app = currentTakeCoverDialog;
     if (!app) return;
-    const newValue = !app.ignoreAllies;
-    app.ignoreAllies = newValue;
+    app.ignoreAllies = target.checked;
     try {
-      await game.settings.set(MODULE_ID, 'ignoreAllies', newValue);
+      await game.settings.set(MODULE_ID, 'ignoreAllies', target.checked);
     } catch { }
     app.bulkActionState = 'initial';
     await app.render({ force: true });
-
-    requestAnimationFrame(() => {
-      const checkbox = app.element.querySelector('input[data-action="toggleIgnoreAllies"]');
-      if (checkbox) {
-        checkbox.checked = newValue;
-        if (newValue) {
-          checkbox.setAttribute('checked', '');
-        } else {
-          checkbox.removeAttribute('checked');
-        }
-      }
-    });
   }
 
   static async _onToggleShowOnlyChanges(event, target) {
-    event.preventDefault();
-    event.stopPropagation();
-
     const app = currentTakeCoverDialog;
     if (!app) return;
-    const newValue = !app.showOnlyChanges;
-    app.showOnlyChanges = newValue;
+    app.showOnlyChanges = target.checked;
     app.bulkActionState = 'initial';
     await app.render({ force: true });
-
-    requestAnimationFrame(() => {
-      const checkbox = app.element.querySelector('input[data-action="toggleShowOnlyChanges"]');
-      if (checkbox) {
-        checkbox.checked = newValue;
-        if (newValue) {
-          checkbox.setAttribute('checked', '');
-        } else {
-          checkbox.removeAttribute('checked');
-        }
-      }
-    });
   }
 
   static async _onApplyAll() {

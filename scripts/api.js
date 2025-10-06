@@ -418,15 +418,18 @@ export class Pf2eVisionerApi {
 
       // Build comprehensive reasons array explaining WHY the visibility state is what it is
       const reasons = [];
+      const slugs = [];
 
       // 1. OBSERVER CONDITIONS (highest priority - completely override senses)
       if (observerConditions.includes('blinded')) {
         reasons.push('Observer is blinded (cannot use visual senses)');
+        slugs.push('blinded');
       }
 
       const isDeafened = observerConditions.includes('deafened');
       if (isDeafened && targetConditions.includes('invisible')) {
         reasons.push('Observer is deafened (cannot hear invisible target)');
+        slugs.push('invisible');
       }
 
       // Check for dazzled condition
@@ -439,21 +442,26 @@ export class Pf2eVisionerApi {
           );
         if (!hasNonVisualPreciseSense && lightingFactor === 'bright') {
           reasons.push('Observer is dazzled in bright light');
+          slugs.push('dazzled');
         }
       }
 
       // 2. TARGET CONDITIONS (override most other factors)
       if (targetConditions.includes('invisible')) {
         reasons.push('Target is invisible');
+        slugs.push('invisible');
       }
       if (targetConditions.includes('undetected')) {
         reasons.push('Target has undetected condition');
+        slugs.push('undetected');
       }
       if (targetConditions.includes('hidden')) {
         reasons.push('Target has hidden condition');
+        slugs.push('hidden');
       }
       if (targetConditions.includes('concealed')) {
         reasons.push('Target has concealed condition');
+        slugs.push('concealed');
       }
 
       // 3. LIGHTING CONDITIONS (main cause of concealment/hidden for most cases)
@@ -464,24 +472,29 @@ export class Pf2eVisionerApi {
           if (rank >= 4) {
             if (visionCaps.hasDarkvision && !visionCaps.hasGreaterDarkvision) {
               reasons.push(`Greater magical darkness (rank ${rank}) conceals even with darkvision`);
+              slugs.push('magical-darkness');
             } else if (!visionCaps.hasDarkvision) {
               reasons.push(`Target is in magical darkness (rank ${rank}) without darkvision`);
+              slugs.push('magical-darkness');
             }
             // Note: Greater darkvision can see through rank 4 darkness
           } else if (rank >= 1) {
             // Regular magical darkness (rank 1-3) - works like normal darkness
             if (!visionCaps.hasDarkvision) {
               reasons.push(`Target is in magical darkness (rank ${rank}) without darkvision`);
+              slugs.push('magical-darkness');
             }
           }
         }
         // Regular darkness without darkvision
         else if (lightingFactor === 'darkness' && !visionCaps.hasDarkvision) {
           reasons.push('Target is in darkness without darkvision');
+          slugs.push('darkness');
         }
         // Dim light without low-light vision (causes concealment)
         else if (lightingFactor === 'dim' && !visionCaps.hasLowLightVision) {
           reasons.push('Target is in dim light without low-light vision');
+          slugs.push('dim-light');
         }
       }
 
@@ -504,12 +517,14 @@ export class Pf2eVisionerApi {
       if (detection.lifesense) {
         const acuity = getSenseAcuity('lifesense');
         reasons.push(`Detected by lifesense (${acuity})`);
+        slugs.push('lifesense');
       }
 
       // Tremorsense detection
       if (detection.tremorsense) {
         const acuity = getSenseAcuity('tremorsense');
         reasons.push(`Detected by tremorsense (${acuity})`);
+        slugs.push('tremorsense');
       }
 
       // Check for other precise non-visual senses
@@ -522,6 +537,7 @@ export class Pf2eVisionerApi {
             if (sense.range > 0 && distance <= sense.range) {
               const senseName = senseType.replace(/-/g, ' ');
               reasons.push(`Detected by ${senseName} (precise)`);
+              slugs.push(senseType);
             }
           }
         }
@@ -535,8 +551,10 @@ export class Pf2eVisionerApi {
 
         if (hasHearing && targetConditions.includes('invisible')) {
           reasons.push('Heard with hearing (imprecise) - invisible creature is hidden');
+          slugs.push('hearing');
         } else if (hasScent) {
           reasons.push('Detected by scent (imprecise)');
+          slugs.push('scent');
         }
       }
 
@@ -545,18 +563,23 @@ export class Pf2eVisionerApi {
         // Explain why they can see the target
         if (lightingFactor === 'bright') {
           reasons.push('Target is in bright light with normal vision');
+          slugs.push('bright-light');
         } else if (lightingFactor === 'dim' && visionCaps.hasLowLightVision) {
           reasons.push('Low-light vision sees clearly in dim light');
+          slugs.push('low-light-vision');
         } else if ((lightingFactor === 'darkness' || lightingFactor.includes('magicalDarkness')) && visionCaps.hasDarkvision) {
           if (lightingFactor.includes('magicalDarkness')) {
             const rank = targetLight.darknessRank || 0;
             if (rank < 4) {
               reasons.push(`Darkvision sees through magical darkness (rank ${rank})`);
+              slugs.push('darkvision');
             } else if (visionCaps.hasGreaterDarkvision) {
               reasons.push(`Greater darkvision sees through magical darkness (rank ${rank})`);
+              slugs.push('greater-darkvision');
             }
           } else {
             reasons.push('Darkvision sees clearly in darkness');
+            slugs.push('darkvision');
           }
         }
       }
@@ -566,11 +589,14 @@ export class Pf2eVisionerApi {
         if (targetConditions.includes('invisible')) {
           if (isDeafened) {
             reasons.push('Target is invisible and observer is deafened');
+            slugs.push('invisible');
           } else {
             reasons.push('Target is invisible and cannot be detected by available senses');
+            slugs.push('invisible');
           }
         } else {
           reasons.push('Target cannot be detected by any available senses');
+          slugs.push('undetected');
         }
       }
 
@@ -578,6 +604,7 @@ export class Pf2eVisionerApi {
         state: visibility,
         lighting: lightingFactor,
         reasons,
+        slugs,
       };
     } catch (error) {
       console.error('Error getting visibility factors:', error);

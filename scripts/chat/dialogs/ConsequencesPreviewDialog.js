@@ -285,14 +285,18 @@ export class ConsequencesPreviewDialog extends BaseActionDialog {
     const effectiveNewState = outcome.overrideState || outcome.newVisibility;
     const oldState = outcome.currentVisibility;
 
-    // Use AVS-aware logic: allow manual override of AVS-controlled states even if same value
-    const isOldStateAvsControlled = this.isOldStateAvsControlled(outcome);
-    const statesMatch = oldState != null && effectiveNewState != null && effectiveNewState === oldState;
-    const hasActionableChange =
-      (oldState != null && effectiveNewState != null && effectiveNewState !== oldState) ||
-      (statesMatch && isOldStateAvsControlled);
+    // If user has set an override, use AVS-aware logic
+    if (outcome.overrideState) {
+      const isOldStateAvsControlled = this.isOldStateAvsControlled(outcome);
+      const statesMatch = oldState != null && effectiveNewState != null && effectiveNewState === oldState;
+      return (
+        (oldState != null && effectiveNewState != null && effectiveNewState !== oldState) ||
+        (statesMatch && isOldStateAvsControlled)
+      );
+    }
 
-    return hasActionableChange;
+    // No override - use the calculated 'changed' flag from the action
+    return outcome.changed === true;
   }
 
   /**

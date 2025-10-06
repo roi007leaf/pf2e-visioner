@@ -330,15 +330,20 @@ export class SeekPreviewDialog extends BaseActionDialog {
         // Check if the old visibility state is AVS-controlled
         const isOldStateAvsControlled = this.isOldStateAvsControlled(outcome);
 
-        // Special case: If current state is AVS-controlled and override is 'avs', no change
+        // Determine if there's an actionable change
         let hasActionableChange = false;
         if (outcome.overrideState === 'avs' && this.isCurrentStateAvsControlled(outcome)) {
+          // Special case: If current state is AVS-controlled and override is 'avs', no change
           hasActionableChange = false;
-        } else {
+        } else if (outcome.overrideState) {
+          // If user has set an override, check if it differs from current state
           const statesMatch = effectiveNewState === baseOldState;
           hasActionableChange =
             (baseOldState != null && effectiveNewState != null && !statesMatch) ||
             (statesMatch && isOldStateAvsControlled);
+        } else {
+          // No override - use the calculated 'changed' flag from the action
+          hasActionableChange = outcome.changed === true;
         }
 
         return {
@@ -1594,12 +1599,11 @@ export class SeekPreviewDialog extends BaseActionDialog {
   /**
    * Toggle encounter filtering and refresh results
    */
-  static async _onToggleEncounterFilter() {
+  static async _onToggleEncounterFilter(event, target) {
     const app = _currentSeekDialogInstance;
     if (!app) return;
 
-    // Toggle filter and re-render; context preparation applies encounter filter
-    app.encounterOnly = !app.encounterOnly;
+    app.encounterOnly = target.checked;
     app.bulkActionState = 'initial';
     app.render({ force: true });
   }
@@ -1613,105 +1617,41 @@ export class SeekPreviewDialog extends BaseActionDialog {
   }
 
   static async _onToggleIgnoreAllies(event, target) {
-    event.preventDefault();
-    event.stopPropagation();
-
     const app = _currentSeekDialogInstance;
     if (!app) return;
-    const newValue = !app.ignoreAllies;
-    app.ignoreAllies = newValue;
+    app.ignoreAllies = target.checked;
     try {
-      await game.settings.set(MODULE_ID, 'ignoreAllies', newValue);
+      await game.settings.set(MODULE_ID, 'ignoreAllies', target.checked);
     } catch { }
     app.bulkActionState = 'initial';
     await app.render({ force: true });
-
-    requestAnimationFrame(() => {
-      const checkbox = app.element.querySelector('input[data-action="toggleIgnoreAllies"]');
-      if (checkbox) {
-        checkbox.checked = newValue;
-        if (newValue) {
-          checkbox.setAttribute('checked', '');
-        } else {
-          checkbox.removeAttribute('checked');
-        }
-      }
-    });
   }
 
   static async _onToggleHideFoundryHidden(event, target) {
-    event.preventDefault();
-    event.stopPropagation();
-
     const app = _currentSeekDialogInstance;
     if (!app) return;
-    const newValue = !app.hideFoundryHidden;
-    app.hideFoundryHidden = newValue;
+    app.hideFoundryHidden = target.checked;
     try {
-      await game.settings.set(MODULE_ID, 'hideFoundryHiddenTokens', newValue);
+      await game.settings.set(MODULE_ID, 'hideFoundryHiddenTokens', target.checked);
     } catch { }
     app.bulkActionState = 'initial';
     await app.render({ force: true });
-
-    requestAnimationFrame(() => {
-      const checkbox = app.element.querySelector('input[data-action="toggleHideFoundryHidden"]');
-      if (checkbox) {
-        checkbox.checked = newValue;
-        if (newValue) {
-          checkbox.setAttribute('checked', '');
-        } else {
-          checkbox.removeAttribute('checked');
-        }
-      }
-    });
   }
 
   static async _onToggleIgnoreWalls(event, target) {
-    event.preventDefault();
-    event.stopPropagation();
-
     const app = _currentSeekDialogInstance;
     if (!app) return;
-    const newValue = !app.ignoreWalls;
-    app.ignoreWalls = newValue;
+    app.ignoreWalls = target.checked;
     app.bulkActionState = 'initial';
     await app.render({ force: true });
-
-    requestAnimationFrame(() => {
-      const checkbox = app.element.querySelector('input[data-action="toggleIgnoreWalls"]');
-      if (checkbox) {
-        checkbox.checked = newValue;
-        if (newValue) {
-          checkbox.setAttribute('checked', '');
-        } else {
-          checkbox.removeAttribute('checked');
-        }
-      }
-    });
   }
 
   static async _onToggleShowOnlyChanges(event, target) {
-    event.preventDefault();
-    event.stopPropagation();
-
     const app = _currentSeekDialogInstance;
     if (!app) return;
-    const newValue = !app.showOnlyChanges;
-    app.showOnlyChanges = newValue;
+    app.showOnlyChanges = target.checked;
     app.bulkActionState = 'initial';
     await app.render({ force: true });
-
-    requestAnimationFrame(() => {
-      const checkbox = app.element.querySelector('input[data-action="toggleShowOnlyChanges"]');
-      if (checkbox) {
-        checkbox.checked = newValue;
-        if (newValue) {
-          checkbox.setAttribute('checked', '');
-        } else {
-          checkbox.removeAttribute('checked');
-        }
-      }
-    });
   }
 
   /**
@@ -1738,14 +1678,18 @@ export class SeekPreviewDialog extends BaseActionDialog {
     const effectiveNewState = outcome.overrideState || outcome.newVisibility;
     const baseOldState = outcome.oldVisibility != null ? outcome.oldVisibility : outcome.currentVisibility;
 
-    // Use AVS-aware logic: allow manual override of AVS-controlled states even if same value
-    const isOldStateAvsControlled = this.isOldStateAvsControlled(outcome);
-    const statesMatch = baseOldState != null && effectiveNewState != null && effectiveNewState === baseOldState;
-    const hasActionableChange =
-      (baseOldState != null && effectiveNewState != null && effectiveNewState !== baseOldState) ||
-      (statesMatch && isOldStateAvsControlled);
+    // If user has set an override, use AVS-aware logic
+    if (outcome.overrideState) {
+      const isOldStateAvsControlled = this.isOldStateAvsControlled(outcome);
+      const statesMatch = baseOldState != null && effectiveNewState != null && effectiveNewState === baseOldState;
+      return (
+        (baseOldState != null && effectiveNewState != null && effectiveNewState !== baseOldState) ||
+        (statesMatch && isOldStateAvsControlled)
+      );
+    }
 
-    return hasActionableChange;
+    // No override - use the calculated 'changed' flag from the action
+    return outcome.changed === true;
   }
 
   /**
