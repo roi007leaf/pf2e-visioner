@@ -73,6 +73,21 @@ export class TokenEventHandler {
       const isDragging = token?._dragHandle !== undefined && token?._dragHandle !== null;
 
       if (isAnimating || isDragging) {
+        // If animating (e.g., remote player movement), wait for animation to complete
+        if (isAnimating && token?._animation?.promise) {
+          const tokenId = tokenDoc.id;
+          token._animation.promise.then(() => {
+            // After animation completes, trigger validation directly
+            try {
+              if (this.overrideValidationManager) {
+                this.overrideValidationManager.queueOverrideValidation(tokenId);
+                this.overrideValidationManager.processQueuedValidations().catch(() => { });
+              }
+            } catch (e) {
+              console.warn('PF2E Visioner | Error processing validation after animation:', e);
+            }
+          }).catch(() => { /* ignore animation errors */ });
+        }
         return;
       }
     }
