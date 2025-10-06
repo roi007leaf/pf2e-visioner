@@ -829,6 +829,219 @@ export class Pf2eVisionerApi {
   }
 
   /**
+   * Explain why a token has a specific visibility state from an observer's perspective
+   * Returns detailed information about lighting, vision capabilities, conditions, and LOS
+   * @param {string|Token} observer - The observer token or token ID
+   * @param {string|Token} target - The target token or token ID
+   * @returns {Promise<Object>} Detailed explanation of visibility factors
+   */
+  static async explainVisibility(observer, target) {
+    try {
+      // Resolve tokens
+      const observerToken = typeof observer === 'string' ? canvas.tokens.get(observer) : observer;
+      const targetToken = typeof target === 'string' ? canvas.tokens.get(target) : target;
+
+      if (!observerToken || !targetToken) {
+        return { error: 'Observer or target token not found' };
+      }
+
+      // Get the auto-visibility system components
+      const { optimizedVisibilityCalculator } = await import('./visibility/auto-visibility/VisibilityCalculator.js');
+      const { VisionAnalyzer } = await import('./visibility/auto-visibility/VisionAnalyzer.js');
+      const visionAnalyzer = VisionAnalyzer.getInstance();
+
+      // Calculate current visibility
+      const visibility = await optimizedVisibilityCalculator.calculateVisibility(observerToken, targetToken);
+
+      // Get observer's vision capabilities
+      const visionCaps = visionAnalyzer.getVisionCapabilities(observerToken);
+
+      // Get lighting at target's position
+      const lightingCalc = optimizedVisibilityCalculator.getComponents().lightingCalculator;
+      const targetPos = {
+        x: targetToken.document.x + (targetToken.document.width * canvas.grid.size) / 2,
+        y: targetToken.document.y + (targetToken.document.height * canvas.grid.size) / 2,
+        elevation: targetToken.document.elevation || 0,
+      };
+      const targetLight = lightingCalc.getLightLevelAt(targetPos, targetToken);
+
+      // Check line of sight
+      const ray = new foundry.utils.Ray(
+        { x: observerToken.center.x, y: observerToken.center.y },
+        { x: targetToken.center.x, y: targetToken.center.y }
+      );
+      const losResult = canvas.walls?.checkCollision(ray, { type: 'sight', mode: 'any' });
+
+      // Get distance
+      const distance = visionAnalyzer.distanceFeet(observerToken, targetToken);
+
+      // Check for conditions
+      const targetConditions = {
+        invisible: targetToken.actor?.itemTypes?.condition?.some(c => c.slug === 'invisible') || false,
+        undetected: targetToken.actor?.itemTypes?.condition?.some(c => c.slug === 'undetected') || false,
+        hidden: targetToken.actor?.itemTypes?.condition?.some(c => c.slug === 'hidden') || false,
+        concealed: targetToken.actor?.itemTypes?.condition?.some(c => c.slug === 'concealed') || false,
+      };
+
+      const observerConditions = {
+        blinded: observerToken.actor?.itemTypes?.condition?.some(c => c.slug === 'blinded') || false,
+      };
+
+      // Check for special senses
+      const hasLifesense = visionCaps.sensingSummary?.lifesense?.range > 0;
+      const canDetectWithLifesense = hasLifesense && visionAnalyzer.canDetectWithLifesenseInRange(observerToken, targetToken);
+
+      const hasTremorsense = visionCaps.sensingSummary?.tremorsense?.range > 0;
+      const bothOnGround = (observerToken.document.elevation || 0) === 0 && (targetToken.document.elevation || 0) === 0;
+      const canDetectWithTremorsense = hasTremorsense && bothOnGround && distance <= (visionCaps.sensingSummary.tremorsense.range || 0);
+
+      // Build explanation
+      const explanation = {
+        visibility,
+        observer: {
+          name: observerToken.name,
+          id: observerToken.id,
+          darkvision: visionCaps.hasDarkvision,
+          darkvisionRange: visionCaps.darkvisionRange || 0,
+          lowLightVision: visionCaps.hasLowLightVision,
+          senses: visionCaps.sensingSummary,
+          conditions: observerConditions,
+          blinded: observerConditions.blinded,
+        },
+        target: {
+          name: targetToken.name,
+          id: targetToken.id,
+          lighting: {
+            level: targetLight.level,
+            darknessRank: targetLight.darknessRank || 0,
+            isDarkness: (targetLight.darknessRank || 0) >= 4,
+            description: this._describeLighting(targetLight),
+          },
+          conditions: targetConditions,
+          elevation: targetToken.document.elevation || 0,
+        },
+        distance: {
+          feet: Math.round(distance * 10) / 10,
+          gridUnits: Math.round(distance / (canvas.grid.distance || 5) * 10) / 10,
+        },
+        lineOfSight: {
+          blocked: losResult,
+          hasLOS: !losResult,
+        },
+        specialDetection: {
+          lifesense: canDetectWithLifesense,
+          tremorsense: canDetectWithTremorsense,
+        },
+        reasons: this._buildVisibilityReasons(
+          visibility,
+          visionCaps,
+          targetLight,
+          targetConditions,
+          observerConditions,
+          losResult,
+          canDetectWithLifesense,
+          canDetectWithTremorsense
+        ),
+      };
+
+      return explanation;
+    } catch (error) {
+      console.error('PF2E Visioner: Error explaining visibility:', error);
+      return { error: error.message };
+    }
+  }
+
+  /**
+   * Helper: Describe lighting level in human-readable terms
+   * @private
+   */
+  static _describeLighting(light) {
+    if (!light) return 'unknown';
+    if (light.darknessRank >= 4) return `magical darkness (rank ${light.darknessRank})`;
+    if (light.darknessRank >= 1) return `magical darkness (rank ${light.darknessRank})`;
+    if (light.level === 'bright') return 'bright light';
+    if (light.level === 'dim') return 'dim light';
+    if (light.level === 'darkness') return 'darkness';
+    return light.level || 'unknown';
+  }
+
+  /**
+   * Helper: Build array of human-readable reasons for visibility state
+   * @private
+   */
+  static _buildVisibilityReasons(visibility, visionCaps, targetLight, targetConditions, observerConditions, losBlocked, lifesense, tremorsense) {
+    const reasons = [];
+
+    // Observer conditions
+    if (observerConditions.blinded) {
+      reasons.push('Observer is blinded');
+    }
+
+    // Target conditions
+    if (targetConditions.invisible) {
+      reasons.push('Target has invisible condition');
+    }
+    if (targetConditions.undetected) {
+      reasons.push('Target has undetected condition');
+    }
+    if (targetConditions.hidden) {
+      reasons.push('Target has hidden condition');
+    }
+    if (targetConditions.concealed) {
+      reasons.push('Target has concealed condition');
+    }
+
+    // LOS
+    if (losBlocked) {
+      reasons.push('Line of sight is blocked by walls');
+    }
+
+    // Lighting and vision
+    if (targetLight.level === 'darkness' || targetLight.darknessRank >= 4) {
+      if (visionCaps.hasDarkvision) {
+        if (targetLight.darknessRank >= 4) {
+          reasons.push(`In magical darkness (rank ${targetLight.darknessRank}) - darkvision cannot see through`);
+        } else {
+          reasons.push('In darkness but observer has darkvision');
+        }
+      } else {
+        reasons.push('In darkness and observer lacks darkvision');
+      }
+    } else if (targetLight.level === 'dim') {
+      if (!visionCaps.hasLowLightVision && !visionCaps.hasDarkvision) {
+        reasons.push('In dim light and observer lacks low-light vision');
+      } else {
+        reasons.push('In dim light but observer has low-light vision or darkvision');
+      }
+    } else if (targetLight.level === 'bright') {
+      reasons.push('In bright light');
+    }
+
+    // Special senses
+    if (lifesense) {
+      reasons.push('Detected by lifesense');
+    }
+    if (tremorsense) {
+      reasons.push('Detected by tremorsense (both on ground)');
+    }
+
+    // Result explanation
+    if (visibility === 'observed') {
+      if (reasons.length === 0 || reasons.some(r => r.includes('bright light'))) {
+        reasons.push('→ Clearly visible (observed)');
+      }
+    } else if (visibility === 'concealed') {
+      reasons.push('→ Partially obscured (concealed)');
+    } else if (visibility === 'hidden') {
+      reasons.push('→ Location known but not visible (hidden)');
+    } else if (visibility === 'undetected') {
+      reasons.push('→ Completely undetected');
+    }
+
+    return reasons;
+  }
+
+  /**
    * Clear all sneak-active flags from all tokens in the scene
    * @returns {Promise<boolean>} Success status
    */
