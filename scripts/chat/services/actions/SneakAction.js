@@ -550,14 +550,8 @@ export class SneakActionHandler extends ActionHandlerBase {
 
       // Create autoCover object if we have a cover state OR if there's an override
       if (coverState || isOverride) {
-        // Feat: Ceaseless Shadows upgrades cover from a creature's perspective
-        try {
-          const { FeatsHandler } = await import('../FeatsHandler.js');
-          const upgraded = FeatsHandler.upgradeCoverForCreature(actionData.actor, coverState);
-          coverState = upgraded.state;
-          var _csCanTakeCover = upgraded.canTakeCover;
-        } catch { }
         const coverConfig = COVER_STATES[coverState || 'none'];
+        const _csCanTakeCover = (coverState === 'standard' || coverState === 'greater') ? true : undefined;
         const actualStealthBonus = coverConfig?.bonusStealth || 0;
         result.autoCover = {
           state: coverState || 'none',
