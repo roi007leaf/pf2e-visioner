@@ -2,7 +2,7 @@
  * UI-related hooks: Token HUD, Token Directory, TokenConfig injection
  */
 
-import { MODULE_ID } from '../constants.js';
+import { COVER_STATES, MODULE_ID } from '../constants.js';
 import { onRenderTokenHUD } from '../services/token-hud.js';
 
 export function registerUIHooks() {
@@ -139,9 +139,8 @@ export function registerUIHooks() {
     } catch { }
   };
   // Helper: get cover status info for a wall
-  const getWallCoverInfo = async (wallDocument) => {
+  const getWallCoverInfo = (wallDocument) => {
     try {
-      const { COVER_STATES } = await import('../constants.js');
       const coverOverride = wallDocument?.getFlag?.(MODULE_ID, 'coverOverride');
 
       if (!coverOverride) {
@@ -179,7 +178,7 @@ export function registerUIHooks() {
   let isAltPressed = false;
 
   // Utility: label identifiers and cover status for walls when Alt is held
-  const refreshWallIdentifierLabels = async () => {
+  const refreshWallIdentifierLabels = () => {
     try {
       const walls = canvas?.walls?.placeables || [];
       const layer = canvas?.controls || canvas?.hud || canvas?.stage;
@@ -224,7 +223,7 @@ export function registerUIHooks() {
       // Create/update labels for walls
       for (const w of walls) {
         const idf = w?.document?.getFlag?.(MODULE_ID, 'wallIdentifier');
-        const coverInfo = await getWallCoverInfo(w.document);
+        const coverInfo = getWallCoverInfo(w.document);
 
         // Check conditions for showing each type of label
         const shouldShowIdentifier = !!w?.controlled && isWallTool && !!idf;
@@ -554,6 +553,7 @@ export function registerUIHooks() {
   Hooks.on('updateAmbientLight', refreshLightingTool);
 
   // Refresh wall labels when camera zoom changes
+  let hasPendingCanvasPanUpdate = false;
   Hooks.on('canvasPan', () => {
     refreshWallIdentifierLabels().catch(() => { });
   });

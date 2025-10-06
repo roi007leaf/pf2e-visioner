@@ -63,7 +63,8 @@ export async function extractActionData(message) {
       (context.options?.includes('action:hide') || context.slug === 'hide')) ||
       (message.flavor?.toLowerCase?.().includes?.('hide') &&
         !message.flavor?.toLowerCase?.().includes?.('create a diversion') &&
-        !message.flavor?.toLowerCase?.().includes?.('sneak attack'))) &&
+        !message.flavor?.toLowerCase?.().includes?.('sneak attack') &&
+        !message.flavor?.toLowerCase?.().includes?.('saving throw'))) &&
     !message.flavor?.toLowerCase?.().includes?.('sneak');
 
   const isAttackRoll =

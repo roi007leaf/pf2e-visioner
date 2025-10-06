@@ -85,10 +85,14 @@
   );
 
   /* Cover state colors */
-  --cover-none: var(--cover-none-color, #4caf50); /* Green - no cover */
-  --cover-lesser: var(--cover-lesser-color, #ffc107); /* Yellow - minor cover */
-  --cover-standard: var(--cover-standard-color, #ff6600); /* Orange - significant cover */
-  --cover-greater: var(--cover-greater-color, #f44336); /* Red - major cover */
+  --cover-none: var(--cover-none-color, #4caf50);
+  /* Green - no cover */
+  --cover-lesser: var(--cover-lesser-color, #ffc107);
+  /* Yellow - minor cover */
+  --cover-standard: var(--cover-standard-color, #ff6600);
+  /* Orange - significant cover */
+  --cover-greater: var(--cover-greater-color, #f44336);
+  /* Red - major cover */
 
   /* Cover state background colors with transparency */
   --cover-none-bg-strong: var(--cover-none-bg-strong-color, rgba(76, 175, 80, 0.3));
@@ -158,7 +162,7 @@
 
   /* Additional Foundry variables used in original CSS */
   --color-shadow-highlight: rgba(255, 100, 0, 0.3);
-  --color-text-dark-secondary: var(--color-text-dark-secondary-color, #999);
+  /* Removed --color-text-dark-secondary override to avoid conflicts with other modules like dorako-ui */
   --color-bg-header: var(--color-bg-option);
   --color-text-header: var(--color-text-primary);
   --color-border-dark: var(--color-border-light-primary);
@@ -203,7 +207,7 @@
   --pf2e-visioner-primary-hover-color: #e55a00;
   --pf2e-visioner-danger-hover-color: #d32f2f;
   --color-text-dark-primary-color: #333;
-  --color-text-dark-secondary-color: #999;
+  /* Removed --color-text-dark-secondary-color definition to use system/theme defaults */
   --color-text-light-primary-color: #ffffff;
   --color-bg-btn-primary-color: #28a745;
   --color-bg-btn-primary-active-color: #218838;
@@ -428,7 +432,7 @@
   }
 
   .reset-mode i {
-    color: var(--color-text-dark-secondary);
+    color: var(--pf2e-visioner-gray);
   }
 
   .auto-cover-icon {
@@ -652,6 +656,7 @@
       opacity: 0;
       transform: translateY(-10px);
     }
+
     to {
       opacity: 1;
       transform: translateY(0);
@@ -691,18 +696,23 @@
   .pf2e-visioner-m-0 {
     margin: 0;
   }
+
   .pf2e-visioner-p-0 {
     padding: 0;
   }
+
   .pf2e-visioner-mt-sm {
     margin-top: var(--spacing-sm);
   }
+
   .pf2e-visioner-mb-sm {
     margin-bottom: var(--spacing-sm);
   }
+
   .pf2e-visioner-pt-sm {
     padding-top: var(--spacing-sm);
   }
+
   .pf2e-visioner-pb-sm {
     padding-bottom: var(--spacing-sm);
   }
@@ -711,7 +721,8 @@
     border: 2px solid var(--color-border-highlight);
     padding: 4px;
     border-radius: 4px;
-    background: rgba(255, 215, 0, 0.05); /* subtle gold tint */
+    background: rgba(255, 215, 0, 0.05);
+    /* subtle gold tint */
   }
 
   /* Movement chip styling */
@@ -752,7 +763,8 @@
   border-radius: var(--pf2e-visioner-tooltip-badge-radius, 8px);
   width: var(--pf2e-visioner-tooltip-badge-width, 24px);
   height: var(--pf2e-visioner-tooltip-badge-height, 20px);
-  color: var(--visibility-observed); /* default fallback */
+  color: var(--visibility-observed);
+  /* default fallback */
 }
 
 .pf2e-visioner-tooltip-badge i {
@@ -764,12 +776,15 @@
 .pf2e-visioner-tooltip-badge.visibility-observed {
   color: var(--visibility-observed);
 }
+
 .pf2e-visioner-tooltip-badge.visibility-concealed {
   color: var(--visibility-concealed);
 }
+
 .pf2e-visioner-tooltip-badge.visibility-hidden {
   color: var(--visibility-hidden);
 }
+
 .pf2e-visioner-tooltip-badge.visibility-undetected {
   color: var(--visibility-undetected);
 }
@@ -778,12 +793,15 @@
 .pf2e-visioner-tooltip-badge.cover-none {
   color: var(--cover-none);
 }
+
 .pf2e-visioner-tooltip-badge.cover-lesser {
   color: var(--cover-lesser);
 }
+
 .pf2e-visioner-tooltip-badge.cover-standard {
   color: var(--cover-standard);
 }
+
 .pf2e-visioner-tooltip-badge.cover-greater {
   color: var(--cover-greater);
 }
