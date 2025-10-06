@@ -7,8 +7,8 @@
   </div>
   <div class="observer-content">
     <div class="observer-main">
-      <button type="button" class="mode-toggle {{#if isObserverMode}}observer-active{{else}}target-active{{/if}}" data-action="toggleMode" data-tooltip="Click to switch between Observer and Target modes" {{#if lootObserver}}disabled{{/if}}>
-        {{#if (or lootObserver)}}
+      <button type="button" class="mode-toggle {{#if isObserverMode}}observer-active{{else}}target-active{{/if}}" data-action="toggleMode" data-tooltip="Click to switch between Observer and Target modes" {{#if (or lootObserver hazardObserver)}}disabled{{/if}}>
+        {{#if (or lootObserver hazardObserver)}}
           <div class="toggle-option active">
             <i class="fas fa-user-secret"></i>
             <span>Target</span>
@@ -41,20 +41,24 @@
       {{/if}}
       
       {{!-- Encounter Filter + Ignore Allies --}}
-      <div class="encounter-filter-section" style="display:flex; gap:16px; align-items:center;">
+  <div class="encounter-filter-section">
         {{#if showEncounterFilter}}
-        <label class="encounter-filter-checkbox" style="display:flex; align-items:center; gap:8px;">
+  <label class="encounter-filter-checkbox">
           <input type="checkbox" {{#if encounterOnly}}checked{{/if}} data-action="toggleEncounterFilter" data-tooltip="Only show tokens in the current encounter" />
           <span class="encounter-filter-label">{{localize "PF2E_VISIONER.UI.ENCOUNTER_FILTER_TEXT"}}</span>
         </label>
         {{/if}}
-        <label class="ignore-allies-filter-checkbox" style="display:flex; align-items:center; gap:8px;">
+  <label class="ignore-allies-filter-checkbox">
           <input type="checkbox" {{#if ignoreAllies}}checked{{/if}} data-action="toggleIgnoreAllies" data-tooltip="Hide allies from the results list" />
           <span class="encounter-filter-label">Ignore allies</span>
         </label>
+  <label class="hide-foundry-hidden-filter-checkbox">
+          <input type="checkbox" {{#if hideFoundryHidden}}checked{{/if}} data-action="toggleHideFoundryHidden" data-tooltip="Visually hide tokens that are Foundry-hidden (document.hidden)" />
+          <span class="encounter-filter-label">Hide Foundry-hidden tokens</span>
+        </label>
         {{#if isObserverMode}}
           {{#if isVisibilityTab}}
-            <label class="ignore-walls-filter-checkbox" style="display:flex; align-items:center; gap:8px;">
+            <label class="ignore-walls-filter-checkbox">
               <input type="checkbox" {{#if ignoreWalls}}checked{{/if}} data-action="toggleIgnoreWalls" data-tooltip="Hide walls from the results list" />
               <span class="encounter-filter-label">Ignore walls</span>
             </label>

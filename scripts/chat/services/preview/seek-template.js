@@ -3,26 +3,6 @@
 export async function setupSeekTemplate(actionData) {
   const { notify } = await import('../infra/notifications.js');
 
-  // Check RAW enforcement before allowing template setup
-  const { MODULE_ID } = await import('../../../constants.js');
-  const enforceRAW = game.settings.get(MODULE_ID, 'enforceRawRequirements');
-
-  if (enforceRAW) {
-    try {
-      const { checkForValidTargets } = await import('../infra/target-checker.js');
-      const canSeek = checkForValidTargets({ ...actionData, actionType: 'seek' });
-      if (!canSeek) {
-        notify.warn(
-          'Cannot setup Seek template. According to RAW, you can only Seek targets that are Undetected or Hidden from you.',
-        );
-        return;
-      }
-    } catch (error) {
-      console.warn('Error checking RAW requirements for seek template:', error);
-      // Continue with template setup if we can't check RAW requirements
-    }
-  }
-
   notify.info(game.i18n.localize('PF2E_VISIONER.SEEK_AUTOMATION.SETUP_TEMPLATE_TOOLTIP'));
 
   // Clean up any existing seek templates for this actor before creating a new one
@@ -58,7 +38,7 @@ export async function setupSeekTemplate(actionData) {
               [`flags.pf2e-visioner.messageId`]: actionData.messageId,
               [`flags.pf2e-visioner.actorTokenId`]: actionData.actor.id,
             });
-          } catch (_) {}
+          } catch (_) { }
           actionData.seekTemplateCenter = { x: doc.x, y: doc.y };
           actionData.seekTemplateRadiusFeet = Number(doc.distance) || distance;
           // Determine presence of potential targets within template by proximity
@@ -100,7 +80,7 @@ export async function setupSeekTemplate(actionData) {
                     [`flags.pf2e-visioner.actorTokenId`]: actionData.actor.id,
                   },
                 ]);
-              } catch (_) {}
+              } catch (_) { }
               actionData.seekTemplateCenter = { x: created.x, y: created.y };
               actionData.seekTemplateRadiusFeet = Number(created.distance) || distance;
               const tokens = canvas?.tokens?.placeables || [];
@@ -148,7 +128,7 @@ export async function setupSeekTemplate(actionData) {
             ['flags.pf2e-visioner.messageId']: actionData.messageId,
             ['flags.pf2e-visioner.actorTokenId']: actionData.actor.id,
           });
-        } catch (_) {}
+        } catch (_) { }
         updateSeekTemplateButton(actionData, true);
         const { requestGMOpenSeekWithTemplate } = await import('../../socket.js');
         try {
@@ -172,7 +152,7 @@ export async function setupSeekTemplate(actionData) {
               },
             });
           }
-        } catch (_) {}
+        } catch (_) { }
         const roll = actionData.roll || game.messages.get(actionData.messageId)?.rolls?.[0] || null;
         const rollTotal = roll?.total ?? null;
         const dieResult = roll?.dice?.[0]?.total ?? roll?.terms?.[0]?.total ?? null;
@@ -232,7 +212,7 @@ export async function setupSeekTemplate(actionData) {
                 },
               });
             }
-          } catch (_) {}
+          } catch (_) { }
           const roll =
             actionData.roll || game.messages.get(actionData.messageId)?.rolls?.[0] || null;
           const rollTotal = roll?.total ?? null;

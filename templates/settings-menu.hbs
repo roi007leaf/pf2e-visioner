@@ -1,56 +1,60 @@
-<form class="pf2e-visioner-settings" style="max-height: 70vh; overflow-y: auto; padding-right: 6px; padding-bottom: 28px;">
-  <section class="pv-settings-hero" style="display:flex; gap:16px; align-items:center; padding:8px 10px; border-bottom: 1px solid var(--color-border-light-primary);">
-    <div class="pv-hero-icon" style="width:42px; height:42px; display:flex; align-items:center; justify-content:center; border-radius:8px; background: rgba(100,150,255,0.12);">
-      <i class="fa-solid fa-face-hand-peeking" style="font-size:22px;"></i>
+<form class="pf2e-visioner-settings">
+  <section class="pv-settings-hero">
+    <div class="pv-hero-icon">
+      <i class="fa-solid fa-face-hand-peeking"></i>
     </div>
-    <div class="pv-hero-copy" style="display:flex; flex-direction:column; gap:2px;">
-      <div style="font-weight:700; font-size:15px;">PF2E Visioner</div>
-      <div style="opacity:0.9;">Streamlined perception and <strong>Auto‑Cover</strong> tools for PF2e. Configure settings below.</div>
+    <div class="pv-hero-copy">
+      <div class="pv-hero-title">PF2E Visioner</div>
+      <div class="pv-hero-subtitle">Configure settings below.</div>
     </div>
   </section>
 
-  <nav class="pv-settings-tabs" style="display:flex; gap:8px; padding:8px 10px; border-bottom:1px solid var(--color-border-light-primary); position:sticky; top:0; background: var(--color-bg-primary); z-index:1;">
+  <nav class="pv-settings-tabs">
     {{#each categories as |cat|}}
-      <button type="button" class="tab {{#if cat.active}}active{{/if}}" data-action="switchGroup" data-key="{{cat.key}}" style="padding:6px 10px; border-radius:6px; border:1px solid var(--color-border-light-primary); {{#if cat.active}}background: rgba(100,150,255,0.15); font-weight:700;{{/if}}">{{cat.title}}</button>
+      <button type="button" class="tab {{#if cat.active}}active{{/if}}" data-action="switchGroup" data-key="{{cat.key}}">{{cat.title}}</button>
     {{/each}}
   </nav>
 
-  {{#each groups as |group|}}
-    <fieldset style="margin-top:10px; border-radius:8px; padding:8px;">
-      <legend style="font-weight:700; letter-spacing:.2px; padding:0 4px;">{{group.title}}</legend>
-      {{#each group.items as |item|}}
-        {{#if (eq item.inputType "checkbox")}}
-          <div class="pv-form-row" style="margin-bottom: 10px; display:flex; align-items:center; justify-content:space-between; gap:12px;">
-            <div style="flex:1 1 auto;">
+  <div class="pv-settings-content">
+    {{#each groups as |group|}}
+      <fieldset class="pv-settings-fieldset">
+        <legend>{{group.title}}</legend>
+        {{#each group.items as |item|}}
+          {{!-- compute indentation padding based on depth (0 parent, 1 child) --}}
+          {{#if (eq item.inputType "checkbox")}}
+            <div class="pv-form-row pv-row-flex" data-depth="{{item.depth}}" style="--pv-depth: {{item.depth}};">
+              <div class="pv-col-grow">
+                <label>{{item.name}}</label>
+                {{#if item.hint}}<div class="notes pv-note">{{item.hint}}</div>{{/if}}
+              </div>
+              <div class="pv-col-static">
+                <input type="checkbox" name="settings.{{item.key}}" {{#if item.value}}checked{{/if}} data-tooltip="{{item.hint}}">
+              </div>
+            </div>
+          {{else}}
+            <div class="pv-form-row" data-depth="{{item.depth}}" style="--pv-depth: {{item.depth}};">
               <label>{{item.name}}</label>
-              {{#if item.hint}}<div class="notes" style="opacity:.8;">{{item.hint}}</div>{{/if}}
+              {{#if item.hint}}<div class="notes pv-note">{{item.hint}}</div>{{/if}}
+              {{#if (eq item.inputType "number")}}
+                <input type="number" name="settings.{{item.key}}" value="{{item.value}}" min="{{item.min}}" max="{{item.max}}" step="{{item.step}}">
+              {{else if (eq item.inputType "select")}}
+                <select name="settings.{{item.key}}">
+                  {{#each item.choices as |opt|}}
+                    <option value="{{opt.value}}" {{#if opt.selected}}selected{{/if}}>{{localize opt.label}}</option>
+                  {{/each}}
+                </select>
+              {{else}}
+                <input type="text" name="settings.{{item.key}}" value="{{item.value}}">
+              {{/if}}
             </div>
-            <div style="flex:0 0 auto; display:flex; align-items:center;">
-              <input type="checkbox" name="settings.{{item.key}}" {{#if item.value}}checked{{/if}} data-tooltip="{{item.hint}}">
-            </div>
-          </div>
-        {{else}}
-          <div class="pv-form-row" style="margin-bottom: 10px;">
-            <label>{{item.name}}</label>
-            {{#if item.hint}}<div class="notes" style="opacity:.8;">{{item.hint}}</div>{{/if}}
-            {{#if (eq item.inputType "number")}}
-              <input type="number" name="settings.{{item.key}}" value="{{item.value}}" min="{{item.min}}" max="{{item.max}}" step="{{item.step}}">
-            {{else if (eq item.inputType "select")}}
-              <select name="settings.{{item.key}}">
-                {{#each item.choices as |opt|}}
-                  <option value="{{opt.value}}" {{#if opt.selected}}selected{{/if}}>{{localize opt.label}}</option>
-                {{/each}}
-              </select>
-            {{else}}
-              <input type="text" name="settings.{{item.key}}" value="{{item.value}}">
-            {{/if}}
-          </div>
-        {{/if}}
-      {{/each}}
-    </fieldset>
-  {{/each}}
-  <footer class="pv-fab-footer" style="position: sticky; bottom: 10px; display:flex; justify-content:flex-end; padding: 0 10px; background: transparent; z-index: 2; margin-top: 10px; pointer-events: none;">
-    <button type="button" class="pv-fab-save" data-action="submit" data-tooltip="{{localize "Save"}}" aria-label="{{localize "Save"}}" style="pointer-events: all; width: 46px; height: 46px; border-radius: 50%; background: var(--color-primary-500, #ff8400); color: #fff; border: none; box-shadow: 0 2px 8px rgba(0,0,0,0.25); display:flex; align-items:center; justify-content:center;">
+          {{/if}}
+        {{/each}}
+      </fieldset>
+    {{/each}}
+  </div>
+  
+  <footer class="pv-fab-footer">
+    <button type="button" class="pv-fab-save" data-action="submit" data-tooltip="{{localize "Save"}}" aria-label="{{localize "Save"}}">
       <i class="fas fa-save"></i>
     </button>
   </footer>

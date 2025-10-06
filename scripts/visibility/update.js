@@ -16,6 +16,9 @@ export async function updateSingleVisibilityEffect(
   options = {},
 ) {
   if (!observerToken?.actor || !targetToken?.actor) return;
+
+  // Debug logging for Hidden effect creation
+  const debugMode = game.settings.get(MODULE_ID, 'autoVisibilityDebugMode');
   // Determine receiver based on effectTarget
   const direction = options.direction || 'observer_to_target';
   const effectTarget =
@@ -150,9 +153,11 @@ export async function updateSingleVisibilityEffect(
         await effectReceiverToken.actor.deleteEmbeddedDocuments('Item', effectsToDelete);
       }
     }
-    if (effectsToUpdate.length > 0)
+    if (effectsToUpdate.length > 0) {
       await effectReceiverToken.actor.updateEmbeddedDocuments('Item', effectsToUpdate);
-    if (effectsToCreate.length > 0)
+    }
+    if (effectsToCreate.length > 0) {
       await effectReceiverToken.actor.createEmbeddedDocuments('Item', effectsToCreate);
+    }
   });
 }

@@ -2,7 +2,7 @@ import { MODULE_ID } from '../constants.js';
 import { showNotification } from '../utils.js';
 
 // Avoid name collision with Foundry/socket.io global `socket`
-let visionerSocket = null;
+// No module-scoped socket reference required; use the service wrapper
 
 class SocketService {
   constructor() {
@@ -18,6 +18,7 @@ class SocketService {
     this._socket.register(POINT_OUT_CHANNEL, pointOutHandler);
     this._socket.register(SEEK_TEMPLATE_CHANNEL, seekTemplateHandler);
     this._socket.register(POINTOUT_REQUEST_CHANNEL, pointOutRequestHandler);
+    this._socket.register(WALL_VISUALS_CHANNEL, updateWallVisualsHandler);
     return this._socket;
   }
   get socket() {
@@ -33,13 +34,17 @@ class SocketService {
 
 const _socketService = new SocketService();
 
-const REFRESH_CHANNEL = 'RefreshPerception';
+// Export the socket service for use by other modules
+export { _socketService };
+
+export const REFRESH_CHANNEL = 'RefreshPerception';
 const POINT_OUT_CHANNEL = 'PointOut';
 const SEEK_TEMPLATE_CHANNEL = 'SeekTemplate';
 const POINTOUT_REQUEST_CHANNEL = 'PointOutRequest';
+const WALL_VISUALS_CHANNEL = 'UpdateWallVisuals';
 
 export function registerSocket() {
-  visionerSocket = _socketService.register();
+  _socketService.register();
 }
 
 /*
@@ -47,33 +52,50 @@ export function registerSocket() {
  */
 export function refreshLocalPerception() {
   canvas.perception.update({
-    refreshLighting: true,
     refreshVision: true,
     refreshSounds: true,
     refreshOcclusion: true,
   });
-  // Also refresh wall visuals/indicators for this client
+  // Removed redundant updateWallVisuals call - wall visual updates are properly handled
+  // by TokenEventHandler._handleWallFlagChanges when wall flags actually change
+}
+
+/*
+ * Handle wall visual updates for a specific observer token
+ * This ensures per-player visibility is applied on each client
+ */
+async function updateWallVisualsHandler(observerId) {
   try {
-    (async () => {
-      const { updateWallVisuals } = await import('./visual-effects.js');
-      await updateWallVisuals();
-    })();
-  } catch (_) {}
+    const { updateWallVisuals } = await import('./visual-effects.js');
+    await updateWallVisuals(observerId);
+  } catch (error) {
+    console.warn(`[${MODULE_ID}] Error in wall visuals handler:`, error);
+  }
 }
 
 /*
  * Forces a refresh on all clients including this one
  * (will call refreshLocalPerception on local client)
  */
+// Debouncing for refreshEveryonesPerception to prevent spam
+let _perceptionRefreshTimeout = null;
+
 export function refreshEveryonesPerception() {
-  if (_socketService.socket) _socketService.executeForEveryone(REFRESH_CHANNEL);
-  try {
-    (async () => {
-      const observerId = canvas.tokens.controlled?.[0]?.id || null;
-      const { updateWallVisuals } = await import('./visual-effects.js');
-      await updateWallVisuals(observerId);
-    })();
-  } catch (_) {}
+  // Debounce to prevent excessive calls that cause jittering and slider resets
+  if (_perceptionRefreshTimeout) {
+    clearTimeout(_perceptionRefreshTimeout);
+  }
+
+  _perceptionRefreshTimeout = setTimeout(() => {
+    try {
+      if (_socketService.socket) _socketService.executeForEveryone(REFRESH_CHANNEL);
+
+      // Removed redundant updateWallVisuals call - wall visual updates are properly handled
+      // by TokenEventHandler._handleWallFlagChanges when wall flags actually change
+    } catch { }
+
+    _perceptionRefreshTimeout = null;
+  }, 100); // 100ms debounce to prevent spam
 }
 
 /*
@@ -84,9 +106,18 @@ export function requestGMHandlePointOut(...args) {
 }
 
 /*
+ * Update wall visuals for all clients with per-player visibility
+ */
+export function updateWallVisualsForEveryone(observerId) {
+  if (_socketService.socket) {
+    _socketService.executeForEveryone(WALL_VISUALS_CHANNEL, observerId);
+  }
+}
+
+/*
  * Runs on GM machine with data sent from client
  */
-function pointOutHandler(...args) {
+function pointOutHandler() {
   //do what you want to do
 }
 
@@ -186,7 +217,7 @@ async function pointOutRequestHandler({ pointerTokenId, targetTokenId, messageId
       });
       try {
         await msg.render(true);
-      } catch (_) {}
+      } catch { }
     }
 
     // Update GM panel actions if already rendered
@@ -215,7 +246,7 @@ async function pointOutRequestHandler({ pointerTokenId, targetTokenId, messageId
           } else {
             try {
               panel.remove();
-            } catch (_) {
+            } catch {
               actions.innerHTML = '';
             }
           }
@@ -333,11 +364,11 @@ async function seekTemplateHandler({
         if (playerUser && _socketService.socket?.executeForUser) {
           _socketService.socket.executeForUser(userId, REFRESH_CHANNEL);
         }
-      } catch (_) {}
+      } catch { }
       // Re-render the chat message so the injected panel can be updated/removed appropriately
       try {
         await msg.render(true);
-      } catch (_) {}
+      } catch { }
     }
 
     // If the automation panel is already injected for this message on the GM, swap its action to "Open Seek Results"
@@ -365,7 +396,7 @@ async function seekTemplateHandler({
             // No targets: remove the entire panel to avoid showing Setup Seek Template
             try {
               panel.remove();
-            } catch (_) {
+            } catch {
               actions.innerHTML = '';
             }
           }

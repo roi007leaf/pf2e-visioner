@@ -97,3 +97,4 @@ function renderVisibilityButton(app, html) {
   // Add the button to the column
   column.appendChild(buttonElement);
 }
+

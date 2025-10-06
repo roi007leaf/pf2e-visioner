@@ -18,7 +18,7 @@ describe('Door Cover Integration Tests', () => {
     mockAttacker = {
       id: 'attacker1',
       center: { x: 100, y: 100 },
-      getCenter: () => ({ x: 100, y: 100 }),
+      getCenterPoint: () => ({ x: 100, y: 100 }),
       actor: { alliance: 'party' },
       document: {
         x: 100,
@@ -32,7 +32,7 @@ describe('Door Cover Integration Tests', () => {
     mockTarget = {
       id: 'target1',
       center: { x: 300, y: 100 },
-      getCenter: () => ({ x: 300, y: 100 }),
+      getCenterPoint: () => ({ x: 300, y: 100 }),
       actor: { alliance: 'opposition' },
       document: {
         x: 300,

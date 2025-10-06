@@ -7,33 +7,129 @@
   {{!-- Seeker Information Panel --}}
   <div class="seeker-info">
     <div class="seeker-image">
-      <img src="{{seeker.image}}" />
+      <img src="{{seeker.image}}" data-tooltip="{{seeker.name}}" />
     </div>
     <div class="seeker-details">
       <h3 class="seeker-name">{{seeker.name}}</h3>
       <p class="hint">{{seeker.actionLabel}}</p>
+      {{#if allSenses}}
+        <div class="senses-buttons-container-clean">
+          <button class="senses-button available-senses" data-tooltip-html="senses-tooltip-content">
+            <i class="fas fa-eye"></i>
+            <span class="button-text">Available Senses</span>
+            <span class="count-badge" aria-label="{{allSenses.length}} senses">{{allSenses.length}}</span>
+            <i class="fas fa-chevron-down chevron" aria-hidden="true"></i>
+          </button>
+          {{!-- Hidden tooltip content for available senses --}}
+          <div id="senses-tooltip-content" class="senses-tooltip-content" style="display: none;">
+            <div class="tooltip-senses-grid">
+              {{#each allSenses as |sense|}}
+                <div class="tooltip-sense-item {{#if sense.isPrecise}}precise{{else}}imprecise{{/if}} {{#if sense.wasUsed}}used{{/if}}">
+                  <i class="{{sense.config.icon}}"></i>
+                  <span class="sense-name">{{localize sense.config.label}}</span>
+                  <span class="sense-precision {{#if sense.isPrecise}}precise{{else}}imprecise{{/if}}">
+                    {{#if sense.isPrecise}}{{localize 'PF2E_VISIONER.SENSE_PRECISION.PRECISE'}}{{else}}{{localize 'PF2E_VISIONER.SENSE_PRECISION.IMPRECISE'}}{{/if}}
+                  </span>
+                  <span class="sense-range">{{sense.displayRange}}&nbsp;ft</span>
+                </div>
+              {{/each}}
+            </div>
+          </div>
+        </div>
+      {{/if}}
+      {{#if seekFeatBadges}}
+        <div class="action-context-badges">
+      {{#each seekFeatBadges as |b|}}
+        <span class="badge badge-feat" data-tooltip="{{b.tooltip}}">
+          <i class="{{b.icon}}"></i>
+          <span class="badge-label">{{b.label}}</span>
+        </span>
+      {{/each}}
+        </div>
+      {{/if}}
     </div>
   </div>
 
+  {{!-- Reactions System --}}
+  {{#if hasReactions}}
+    <div class="reactions-section">
+      <div class="reactions-header">
+        <button class="reactions-toggle-button {{#if hasReactions}}has-available{{/if}}" data-action="toggleReactions" data-tooltip="{{localize 'PF2E_VISIONER.REACTIONS.BUTTON_TOOLTIP'}}">
+          <i class="fas fa-bolt"></i>
+          <span class="button-label">{{localize 'PF2E_VISIONER.REACTIONS.BUTTON_LABEL'}}</span>
+          <i class="fas fa-chevron-down reactions-chevron"></i>
+        </button>
+      </div>
+      
+      <div class="reactions-dropdown" style="display: none;">
+        <div class="reactions-dropdown-header">
+          <h4>{{localize 'PF2E_VISIONER.REACTIONS.DROPDOWN_TITLE'}}</h4>
+        </div>
+        
+        <div class="reactions-list">
+          {{#each availableReactions}}
+            <div class="reaction-item {{#if applied}}applied{{else}}available{{/if}}">
+              <button class="reaction-button" data-reaction="{{key}}" {{#if applied}}disabled{{/if}}>
+                <div class="reaction-icon">
+                  <i class="{{icon}}"></i>
+                </div>
+                <div class="reaction-content">
+                  <div class="reaction-name">{{localize name}}</div>
+                  <div class="reaction-description">{{localize description}}</div>
+                </div>
+                <div class="reaction-status">
+                  {{#if applied}}
+                    <i class="fas fa-check-circle applied-icon"></i>
+                  {{else}}
+                    <i class="fas fa-arrow-right use-icon"></i>
+                  {{/if}}
+                </div>
+              </button>
+            </div>
+          {{/each}}
+        </div>
+      </div>
+    </div>
+  {{/if}}
+
   {{!-- Encounter Filter + Ignore Allies (Encounter-only shown when relevant; Ignore allies always shown) --}}
-  <div class="encounter-filter-section" style="display:flex; gap:16px; align-items:center;">
+  <div class="encounter-filter-section">
     {{#if showEncounterFilter}}
-    <label class="encounter-filter-checkbox" style="display:flex; align-items:center; gap:8px;">
+  <label class="encounter-filter-checkbox">
       <input type="checkbox" {{#if encounterOnly}}checked{{/if}} data-action="toggleEncounterFilter" data-tooltip="Only show tokens in the current encounter" />
       <span class="encounter-filter-label">{{localize "PF2E_VISIONER.UI.ENCOUNTER_FILTER_TEXT"}}</span>
     </label>
     {{/if}}
-    <label class="ignore-allies-filter-checkbox" style="display:flex; align-items:center; gap:8px;">
+  <label class="ignore-allies-filter-checkbox">
       <input type="checkbox" {{#if ignoreAllies}}checked{{/if}} data-action="toggleIgnoreAllies" data-tooltip="Hide allies from the results list" />
       <span class="encounter-filter-label">Ignore allies</span>
     </label>
-    <label class="ignore-walls-filter-checkbox" style="display:flex; align-items:center; gap:8px;">
+  <label class="hide-foundry-hidden-filter-checkbox">
+      <input type="checkbox" {{#if hideFoundryHidden}}checked{{/if}} data-action="toggleHideFoundryHidden" data-tooltip="Visually hide tokens that are Foundry-hidden (document.hidden)" />
+      <span class="encounter-filter-label">Hide Foundry-hidden tokens</span>
+    </label>
+  <label class="show-only-changes-filter-checkbox">
+      <input type="checkbox" {{#if showOnlyChanges}}checked{{/if}} data-action="toggleShowOnlyChanges" data-tooltip="Show only rows with visibility changes" />
+      <span class="encounter-filter-label">Show only changes</span>
+    </label>
+  <label class="ignore-walls-filter-checkbox">
       <input type="checkbox" {{#if ignoreWalls}}checked{{/if}} data-action="toggleIgnoreWalls" data-tooltip="Hide walls from the results list" />
       <span class="encounter-filter-label">Ignore walls</span>
     </label>
+  {{#unless detectionFilterDisabled}}
+  <label class="filter-by-los-checkbox">
+      <input type="checkbox" {{#if filterByDetection}}checked{{/if}} data-action="toggleFilterByDetection" data-tooltip="{{localize 'PF2E_VISIONER.UI.FILTER_BY_DETECTION_TOOLTIP'}}" />
+      <span class="encounter-filter-label">{{localize "PF2E_VISIONER.UI.FILTER_BY_DETECTION_LABEL"}}</span>
+    </label>
+  {{/unless}}
   </div>
 
   {{!-- Results Table --}}
+  {{#if bulkOverrideStates}}
+  <div class="bulk-action-group">
+    {{> "pf2e-visioner.bulk-override"}}
+  </div>
+  {{/if}}
   <div class="results-table-container">
     <table class="visibility-table seek-results-table">
       <thead>
@@ -51,16 +147,23 @@
           <tr class="token-row" {{#unless outcome._isWall}}data-token-id="{{outcome.target.id}}"{{/unless}} {{#if outcome._isWall}}data-wall-id="{{outcome.wallId}}"{{/if}}>
             <td class="token-image">
               {{#if outcome._isWall}}
-                <img src="{{outcome.wallImg}}" width="28" height="28" />
+                <img src="{{outcome.wallImg}}" data-tooltip="{{outcome.wallIdentifier}}" width="28" height="28" />
               {{else}}
-                <img src="{{outcome.tokenImage}}" width="28" height="28" />
+                <span class="token-img-wrapper">
+                  <img src="{{outcome.tokenImage}}" data-tooltip="{{outcome.target.name}}" width="28" height="28" />
+                  {{#if outcome.target.document.hidden}}
+                    <span class="foundry-hidden-indicator" data-tooltip="Foundry Hidden"><i class="fas fa-eye-slash"></i></span>
+                  {{/if}}
+                </span>
               {{/if}}
             </td>
             <td class="token-name">
               {{#if outcome._isWall}}
-                <strong>{{outcome.wallIdentifier}}</strong>
+                <strong data-tooltip="{{outcome.wallIdentifier}}">{{outcome.wallIdentifier}}</strong>
               {{else}}
-                <strong>{{outcome.target.name}}</strong>
+                <div class="token-name-and-tags">
+                  <strong data-tooltip="{{outcome.target.name}}">{{outcome.target.name}}</strong>
+                </div>
               {{/if}}
             </td>
             <td class="roll-result">
@@ -78,15 +181,26 @@
                 </div>
               {{/if}}
             </td>
-            <td class="outcome {{outcome.outcomeClass}}">
+            <td class="outcome {{outcome.outcomeClass}}" {{#if outcome.unmetCondition}}data-tooltip="{{outcome.unmetCondition}}"{{/if}}>
               {{outcome.outcomeLabel}}
+              {{#if outcome.sneakyFeatApplied}}
+                <span class="sneaky-feat-indicator" data-tooltip="{{localize 'PF2E_VISIONER.SNEAKY_FEAT.TOOLTIP'}}">
+                  <i class="fas fa-mask"></i>
+                  {{localize "PF2E_VISIONER.SNEAKY_FEAT.VISIBILITY_CAPPED"}}
+                </span>
+              {{/if}}
             </td>
             <td class="visibility-change">
-              <div class="visibility-change-inline">
-                <span class="state-icon" data-state="{{outcome.oldVisibility}}" data-tooltip="{{outcome.oldVisibilityLabel}}">
+              <div class="visibility-change-with-override">
+                <span class="old-visibility-state {{#if outcome.isOldStateAvsControlled}}avs-controlled{{/if}}">
                   {{{visibilityIcon outcome.oldVisibility}}}
+                  {{#if outcome.isOldStateAvsControlled}}
+                    <span class="avs-tag-small" data-tooltip="Controlled by Auto-Visibility System">
+                      <i class="fas fa-bolt"></i>
+                    </span>
+                  {{/if}}
                 </span>
-                <i class="fas fa-arrow-right visibility-arrow"></i>
+                <i class="fas fa-arrow-right position-arrow" aria-hidden="true"></i>
                 <div class="override-icons" data-target="{{#unless outcome._isWall}}{{outcome.target.id}}{{/unless}}" data-wall-id="{{#if outcome._isWall}}{{outcome.wallId}}{{/if}}">
                   {{#each outcome.availableStates as |state|}}
                     <button type="button" class="state-icon {{#if state.selected}}selected{{/if}} {{#if state.calculatedOutcome}}calculated-outcome{{/if}} {{state.cssClass}}" 

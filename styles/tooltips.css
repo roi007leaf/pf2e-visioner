@@ -391,3 +391,78 @@
 .hover-visibility-tooltip {
   transition: opacity 0.2s ease;
 }
+
+/* Senses tooltip content (appended to body) */
+.senses-tooltip-content {
+  background: linear-gradient(135deg, rgba(0, 0, 0, 0.92), rgba(24, 24, 24, 0.95));
+  color: var(--color-text-light-primary);
+  border: 1px solid var(--color-border-light-primary);
+  border-radius: 10px;
+  padding: 12px 14px;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.5);
+  /* Allow a wider panel but keep it within the viewport */
+  width: clamp(420px, 60vw, 640px);
+  max-width: 640px;
+}
+
+.senses-tooltip-content h4 {
+  margin: 0 0 8px 0;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.senses-tooltip-content .tooltip-senses-grid {
+  display: grid;
+  /* Auto-fit 2–3 columns depending on available width */
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 8px 12px;
+}
+
+.senses-tooltip-content .tooltip-sense-item {
+  display: grid;
+  grid-template-columns: 18px 1fr auto;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.senses-tooltip-content .tooltip-sense-item i {
+  text-align: center;
+  opacity: 0.9;
+}
+
+.senses-tooltip-content .sense-name {
+  font-weight: 600;
+  font-size: 12px;
+}
+
+.senses-tooltip-content .sense-precision.precise,
+.senses-tooltip-content .tooltip-sense-item.used {
+  color: var(--pf2e-visioner-success);
+}
+
+.senses-tooltip-content .sense-precision.imprecise,
+.senses-tooltip-content .tooltip-sense-item.used {
+  color: var(--pf2e-visioner-warning);
+}
+
+.senses-tooltip-content .sense-range {
+  font-size: 11px;
+  opacity: 0.85;
+}
+
+/* Emphasize entries that were used during this Seek */
+.senses-tooltip-content .tooltip-sense-item.used {
+  outline: 2px solid color-mix(in srgb, var(--pf2e-visioner-warning) 45%, transparent);
+  background: color-mix(in srgb, rgba(0, 217, 255) 14%, rgba(255, 255, 255, 0.04));
+  color: white
+}
+
+.senses-tooltip-content .tooltip-sense-item.used .sense-name::after {
+  content: ' • used';
+  font-weight: 700;
+  color: rgba(0, 217, 255);
+  margin-left: 4px;
+}

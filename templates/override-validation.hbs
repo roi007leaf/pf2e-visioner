@@ -1,0 +1,194 @@
+<div class="override-validation-modern" data-ui="override-v2">
+  
+  <!-- Header Section -->
+  <div class="validation-header">
+    <div class="header-content">
+      <p class="subtitle">
+        Token <strong><em>{{tokenName}}</em></strong> has moved. AVS wants to make <strong>{{overrideCount}}</strong> change{{#unless (eq overrideCount 1)}}s{{/unless}}.
+        <i class="fas fa-info-circle" data-tooltip="Movement or lighting changes can invalidate previously set visibility overrides. Review each AVS change below to decide whether to accept or reject it."></i>
+      </p>
+    </div>
+  </div>
+
+  <!-- Tables Scroll Container -->
+  <div class="tables-scroll-container">
+
+  <!-- Observer-Oriented Overrides Table -->
+  {{#if observerOrientedOverrides.length}}
+  <div class="results-table-container observer-table">
+    <div class="table-header">
+      <h4>Changes as Observer</h4>
+      <div class="table-actions">
+        <button type="button" class="bulk-action-btn btn-clear-observer" data-tooltip="Accept all changes in this table">
+          <i class="fas fa-check"></i> Accept
+        </button>
+      </div>
+    </div>
+    <table class="visibility-table override-validation-table">
+      <thead>
+        <tr>
+          <th class="target">Target</th>
+          <th class="source">Source</th>
+          <th class="status">Status</th>
+          <th class="actions">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{#each observerOrientedOverrides}}
+          <tr class="token-row" data-override-id="{{id}}" data-token-id="{{targetId}}">
+            <td class="target">
+              <div class="chip chip--token target" data-token-id="{{targetId}}">
+                {{#if targetImg}}
+                  <img class="chip-avatar" src="{{targetImg}}" alt="{{targetName}}" width="28" height="28"/>
+                {{else}}
+                  <i class="fas fa-eye"></i>
+                {{/if}}
+                <span class="chip-label">{{targetName}}</span>
+              </div>
+            </td>
+            <td class="source">
+              <div class="override-badge {{badgeClass}}">
+                <i class="fas {{badgeIcon}}"></i>
+                <span>{{badgeLabel}}</span>
+              </div>
+            </td>
+            <td class="status">
+              <div class="status-icons column" role="group" aria-label="State change">
+                <div class="state-row">
+                  {{#unless (eq prevVisibility.key statusVisibility.key)}}
+                    <button type="button" class="visioner-icon-btn prev-visibility" aria-label="{{prevVisibility.label}}" data-tooltip="{{prevVisibility.label}}">
+                      <i class="{{prevVisibility.icon}} visibility-{{prevVisibility.key}}" data-state="{{prevVisibility.key}}"></i>
+                    </button>
+                    <i class="fas fa-arrow-right state-arrow" aria-hidden="true"></i>
+                    <button type="button" class="visioner-icon-btn status-visibility" aria-label="{{statusVisibility.label}}" data-tooltip="{{statusVisibility.label}}">
+                      <i class="{{statusVisibility.icon}} visibility-{{statusVisibility.key}}" data-state="{{statusVisibility.key}}"></i>
+                    </button>
+                  {{/unless}}
+                </div>
+        <div class="state-row">
+          {{#unless (eq prevCover.key statusCover.key)}}
+            <i class="prev-cover {{prevCover.icon}} cover-{{prevCover.key}}" data-state="{{prevCover.key}}" data-tooltip="{{prevCover.label}}"></i>
+            <i class="fas fa-arrow-right state-arrow" aria-hidden="true"></i>
+            <i class="status-cover {{statusCover.icon}} cover-{{statusCover.key}}" data-state="{{statusCover.key}}" aria-label="{{statusCover.label}}" data-tooltip="{{statusCover.label}}"></i>
+          {{/unless}}
+        </div>
+              </div>
+              <div class="status-description" data-tooltip="{{reason}}">
+                <i class="fas fa-info-circle"></i>
+                <span>{{#if currentVisibilityDescription}}{{currentVisibilityDescription}}{{else}}{{reason}}{{/if}}</span>
+              </div>
+            </td>
+            <td class="actions">
+              <div class="actions-section pv-u-flex pv-u-align-center pv-u-gap-8 pv-u-justify-end">
+                <button type="button" class="row-action-btn apply-change btn btn-clear" data-override-id="{{id}}" data-tooltip="Accept this change">
+                  <i class="fas fa-check"></i>
+                </button>
+                <button type="button" class="row-action-btn revert-change btn btn-keep" data-override-id="{{id}}" data-tooltip="Reject this change">
+                  <i class="fas fa-times"></i>
+                </button>
+              </div>
+            </td>
+          </tr>
+        {{/each}}
+      </tbody>
+    </table>
+  </div>
+  {{/if}}
+
+  <!-- Target-Oriented Overrides Table -->
+  {{#if targetOrientedOverrides.length}}
+  <div class="results-table-container target-table">
+    <div class="table-header">
+      <h4>Changes as Target</h4>
+      <div class="table-actions">
+        <button type="button" class="bulk-action-btn btn-clear-target" data-tooltip="Accept all changes in this table">
+          <i class="fas fa-check"></i> Accept
+        </button>
+      </div>
+    </div>
+    <table class="visibility-table override-validation-table">
+      <thead>
+        <tr>
+          <th class="observer">Observer</th>
+          <th class="source">Source</th>
+          <th class="status">Status</th>
+          <th class="actions">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{#each targetOrientedOverrides}}
+          <tr class="token-row" data-override-id="{{id}}" data-token-id="{{observerId}}">
+            <td class="observer">
+              <div class="chip chip--token observer" data-token-id="{{observerId}}">
+                {{#if observerImg}}
+                  <img class="chip-avatar" src="{{observerImg}}" alt="{{observerName}}" width="28" height="28"/>
+                {{else}}
+                  <i class="fas fa-eye"></i>
+                {{/if}}
+                <span class="chip-label">{{observerName}}</span>
+              </div>
+            </td>
+            <td class="source">
+              <div class="override-badge {{badgeClass}}">
+                <i class="fas {{badgeIcon}}"></i>
+                <span>{{badgeLabel}}</span>
+              </div>
+            </td>
+            <td class="status">
+              <div class="status-icons column" role="group" aria-label="State change">
+                <div class="state-row">
+                  {{#unless (eq prevVisibility.key statusVisibility.key)}}
+                  <button type="button" class="visioner-icon-btn prev-visibility" aria-label="{{prevVisibility.label}}" data-tooltip="{{prevVisibility.label}}">
+                    <i class="{{prevVisibility.icon}} visibility-{{prevVisibility.key}}" data-state="{{prevVisibility.key}}"></i>
+                  </button>
+                  <i class="fas fa-arrow-right state-arrow" aria-hidden="true"></i>
+                  <button type="button" class="visioner-icon-btn status-visibility" aria-label="{{statusVisibility.label}}" data-tooltip="{{statusVisibility.label}}">
+                    <i class="{{statusVisibility.icon}} visibility-{{statusVisibility.key}}" data-state="{{statusVisibility.key}}"></i>
+                  </button>
+                  {{/unless}}
+                </div>
+        <div class="state-row">
+          {{#unless (eq prevCover.key statusCover.key)}}
+            <i class="prev-cover {{prevCover.icon}} cover-{{prevCover.key}}" data-state="{{prevCover.key}}" data-tooltip="{{prevCover.label}}"></i>
+            <i class="fas fa-arrow-right state-arrow" aria-hidden="true"></i>
+            <i class="status-cover {{statusCover.icon}} cover-{{statusCover.key}}" data-state="{{statusCover.key}}" aria-label="{{statusCover.label}}" data-tooltip="{{statusCover.label}}"></i>
+          {{/unless}}
+        </div>
+              </div>
+              <div class="status-description" data-tooltip="{{reason}}">
+                <i class="fas fa-info-circle"></i>
+                <span>{{#if currentVisibilityDescription}}{{currentVisibilityDescription}}{{else}}{{reason}}{{/if}}</span>
+              </div>
+            </td>
+            <td class="actions">
+              <div class="actions-section pv-u-flex pv-u-align-center pv-u-gap-8 pv-u-justify-end">
+                <button type="button" class="row-action-btn apply-change btn btn-clear" data-override-id="{{id}}" data-tooltip="Accept this change">
+                  <i class="fas fa-check"></i>
+                </button>
+                <button type="button" class="row-action-btn revert-change btn btn-keep" data-override-id="{{id}}" data-tooltip="Reject this change">
+                  <i class="fas fa-times"></i>
+                </button>
+              </div>
+            </td>
+          </tr>
+        {{/each}}
+      </tbody>
+    </table>
+  </div>
+  {{/if}}
+
+  </div> <!-- /.tables-scroll-container -->
+
+  <!-- Bulk Actions -->
+  <div class="override-validation-bulk-actions-header">
+    <div class="override-validation-bulk-actions-info">Apply action to all changes at once</div>
+    <div class="override-validation-bulk-actions-buttons">
+      <button type="button" class="bulk-action-btn apply-all btn-clear-all" data-tooltip="Accept all changes">
+        <i class="fas fa-check-circle"></i> Accept All
+      </button>
+      <button type="button" class="bulk-action-btn revert-all btn-keep-all" data-tooltip="Reject all changes">
+        <i class="fas fa-times-circle"></i> Reject All
+      </button>
+    </div>
+  </div>
+</div>

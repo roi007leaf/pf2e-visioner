@@ -1,5 +1,188 @@
 # Changelog
 
+## [4.0.0] - 2025-10-03
+
+### 🎉 Major Release - Architecture Refactor & Enhanced Automation
+
+This is a **major release** featuring comprehensive refactoring, new automation features, and critical bug fixes.
+
+### ✨ New Features
+
+#### Enhanced Sneak Mechanics
+
+- **Improved State Management**: Sneak actions now properly track and manage visibility states throughout the action lifecycle
+- **Visual Indicators**: Enhanced feedback for sneaking tokens with improved UI
+- **End-of-Turn Position Validation**: New dialog system for validating position requirements at turn end with defer functionality
+- **AVS Control Integration**: Sneak and Hide actions now properly integrate with Auto Visibility System (AVS) control logic
+- **Sneak-Aware Filtering**: Override validation indicator now filters appropriately based on sneak states
+
+#### Region Behavior Enhancements
+
+- **Visibility Region Behavior**: Added new visibility types to region behavior system
+- **Concealment Region Behavior**: New concealment region type with proper activation/deactivation
+- **Improved Logic**: Optimized concealment region behavior with better detection and state management
+
+#### Feat Support
+
+- **Camouflage Feat**: Implemented Camouflage feat support to bypass cover/concealment requirements in natural terrain
+  - Properly evaluates terrain stalker selections
+  - Integrates with cover and concealment detection
+- **Terrain Stalker**: Enhanced Terrain Stalker logic to correctly relax end position requirements
+
+#### Chat Automation Improvements
+
+- **Enhanced Dialogs**: Improved filtering logic in chat dialogs (Seek, Hide, Sneak, Consequences, Point Out) for better clarity and consistency
+- **Consequences Dialog**: Refactored preview dialog and action handler with improved error handling and override management
+- **Override-Only Consequences**: Consequences button now only shows for overrides, reducing clutter
+
+#### Visibility Detection
+
+- **Lifesense Detection**: Enhanced lifesense detection by adding trait checks
+  - Detects "mindless" trait for undead/constructs
+  - Updated related visuals and tests
+- **Acuity Preservation**: VisionAnalyzer now preserves sense acuity information for better detection accuracy
+
+### 🔄 Refactoring & Architecture
+
+#### Visibility System Refactor
+
+- **New Calculation Workflow**: Implemented completely new visibility calculation workflow with comprehensive separation of concerns
+- **StatelessVisibilityCalculator**: Main calculation logic extracted to ~200 lines (from 900+ lines)
+  - Extracted 22+ focused methods with single responsibilities
+  - Improved readability and maintainability
+  - Modular, debuggable architecture
+- **Movement Action Integration**: Refactored visibility calculation logic to incorporate movement actions and sound blocking
+- **AVS Control Mechanism**: Added Auto Visibility System control flags to manage visibility state automation
+
+#### Code Quality Improvements
+
+- **Event Listener Management**: Simplified event listener management and cleanup in hover tooltips
+- **Error Handling**: Enhanced error handling when removing token event listeners
+- **Flag Management**: Comprehensive improvements to flag management and cleanup processes
+- **Test Structure**: Enhanced test structure with better mocks and clearer organization
+
+### 🐛 Fixed
+
+#### Critical Visibility Bugs
+
+- **Greater Darkvision Feat Detection**: Fixed critical bug where player characters with the Greater Darkvision feat could not see through rank 4 magical darkness
+  - **Root Cause**: VisionAnalyzer was only checking `actor.system.perception.senses`, which the PF2e system doesn't always populate when vision comes from feats (vs. ancestry traits)
+  - **Solution**: Added fallback mechanism to explicitly check actor feats when vision capabilities aren't found in senses
+  - **PF2e Rules Compliance**: Now correctly implements:
+    - Greater Darkvision + rank 4+ darkness = **observed** ✓
+    - Darkvision + rank 4+ darkness = **concealed** ✓
+    - No darkvision + rank 4+ darkness = **hidden** ✓
+  - **Backward Compatible**: Senses always take priority over feats; only applies feat detection as fallback
+
+- **Darkvision Feat Detection**: Also fixed detection of regular Darkvision feat using the same fallback mechanism
+
+#### Wall & Vision Fixes
+
+- **Wall Change Cache Clearing**: Wall property changes now trigger proper cache clearing for VisionAnalyzer
+  - Wall direction changes (left → both) immediately recalculate visibility
+  - Sight/sound blocking changes immediately update detection states
+  - Observer conditions (deafened, blinded) properly re-evaluated after wall changes
+
+- **Line of Sight in Darkness**: Adjusted line of sight checks to properly account for magical darkness in visibility calculations
+  - Now correctly handles cross-boundary darkness scenarios
+  - Improved detection of darkness along vision rays
+
+- **Sight Blocking Logic**: Refined vision analyzer tests to use `canvas.walls.checkCollision` for accurate sight blocking
+  - More consistent with Foundry's native vision system
+  - Better integration with Wall Height module
+
+#### Cover Detection Fixes
+
+- **Wall Blocking Logic**: Updated wall blocking logic in CoverDetector for improved readability and accuracy
+  - Wall direction tests adjusted to reflect changes in cover override logic
+  - Better handling of partial walls and directional blocking
+
+#### Action & Dialog Fixes
+
+- **Visibility State Trust**: Updated visibility handling to trust AVS/getVisibilityBetween results
+  - Removed redundant 'concealed' checks from conditions
+  - Improved error logging in visibility helpers
+
+- **Override Indicator**: Enhanced override indicator handling with proper cleanup
+  - Fixed cleanup method calls after token deletion
+  - Proper event listener removal
+
+- **Tooltip Management**: Cleaned up tooltip visibility handling during canvas panning and hovering
+  - Tooltips now properly hide during panning
+  - Better state management for hover interactions
+
+#### Feat Logic Fixes
+
+- **Feat Qualification**: Removed unnecessary start qualification checks for Camouflage and other feats
+  - Simplified feat handling logic
+  - Clearer requirements for cover/concealment bypass
+
+### 🗑️ Removed
+
+- **Client Viewport Filtering**: Removed client viewport filtering feature as it was causing performance issues
+  - Updated related references in code and tests
+  - Simplified rendering pipeline
+
+- **Deprecated Tests**: Removed outdated test suites
+  - Echolocation and legacy lifesense tests (replaced with new implementation)
+  - Override removal tests for action dialogs (functionality moved)
+
+### 🔧 Technical
+
+#### Test Coverage
+
+- **Comprehensive New Tests**: Added extensive test suite for new features
+  - Greater Darkvision feat detection tests (unit, integration, debug)
+  - Wall change cache clearing tests
+  - Sneak mechanics and filtering tests
+  - Region behavior tests
+  - AVS control mechanism tests
+  - Lifesense trait detection tests
+
+- **Test Refactoring**: Refactored existing tests for clarity and consistency
+  - Greater Darkvision feat tests restructured
+  - Import verification tests updated
+  - Direction-aware override tests enhanced
+
+#### Performance
+
+- **Batch Processing Optimizations**: Enhanced visibility handling with movement detection and batch processing
+  - Reduced redundant calculations
+  - Better caching strategies
+  - Improved AVS override cleanup
+
+#### Documentation
+
+- **Comprehensive Guidelines**: Added extensive PF2E Visioner development guidelines
+  - Architecture documentation updated
+  - Copilot instructions enhanced
+  - Debug guides for Wall Height integration
+
+#### Debug & Logging
+
+- **Enhanced Debug Messages**: Added debug logging for feat-based vision detection
+- **Import Verification**: Better import count verification in tests
+- **Error Messages**: Improved error messages throughout the codebase
+
+### ⚠️ Breaking Changes
+
+While we've maintained backward compatibility where possible, this major version includes:
+
+- **Refactored Visibility Calculation API**: Internal visibility calculation methods have new signatures
+  - Public API remains unchanged
+  - Internal integrations may need updates
+- **AVS Control Flags**: New control mechanism may affect custom integrations with visibility system
+- **Region Behavior Types**: New region behavior types may require scene updates for advanced users
+
+### 📊 Statistics
+
+- **Test Suites**: 134+ test suites, 1556+ tests passing
+- **Code Reduction**: Main visibility calculator reduced by 78% (900 → 200 lines)
+- **New Methods**: 22+ new focused methods in visibility calculation
+- **Files Modified**: 50+ files updated across the codebase
+
+---
+
 ## [3.1.5] - 2025-09-06
 
 ### 🐛 Fixed

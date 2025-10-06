@@ -13,8 +13,6 @@ describe('Sneak Action Comprehensive Tests', () => {
     // Store original settings
     originalSettings = {
       ignoreAllies: game.settings.get('pf2e-visioner', 'ignoreAllies'),
-      enforceRawRequirements: game.settings.get('pf2e-visioner', 'enforceRawRequirements'),
-      sneakRawEnforcement: game.settings.get('pf2e-visioner', 'sneakRawEnforcement'),
     };
   });
 
@@ -25,25 +23,8 @@ describe('Sneak Action Comprehensive Tests', () => {
     });
   });
 
-  describe('Panel Generation and Button Actions', () => {
-    test('chat panel generates correct apply-changes button', () => {
-      const { buildSneakPanel } = require('../../../scripts/chat/ui/panel/sneak.js');
-
-      game.user.isGM = true;
-      const panel = buildSneakPanel();
-
-      expect(panel.actionButtonsHtml).toContain('data-action="apply-now-sneak"');
-      expect(panel.actionButtonsHtml).not.toContain('data-action="apply-now-hide"');
-      expect(panel.actionButtonsHtml).toContain('Apply Changes');
-    });
-  });
-
   describe('Status Mapping Tests', () => {
     describe('Without RAW Enforcement', () => {
-      beforeEach(() => {
-        game.settings.set('pf2e-visioner', 'enforceRawRequirements', false);
-        game.settings.set('pf2e-visioner', 'sneakRawEnforcement', false);
-      });
 
       test('sneak from observed state produces correct outcomes', () => {
         const {
@@ -52,8 +33,8 @@ describe('Sneak Action Comprehensive Tests', () => {
 
         expect(getDefaultNewStateFor('sneak', 'observed', 'critical-success')).toBe('undetected');
         expect(getDefaultNewStateFor('sneak', 'observed', 'success')).toBe('undetected');
-        expect(getDefaultNewStateFor('sneak', 'observed', 'failure')).toBe('hidden');
-        expect(getDefaultNewStateFor('sneak', 'observed', 'critical-failure')).toBe('observed');
+        expect(getDefaultNewStateFor('sneak', 'observed', 'failure')).toBe('avs');
+        expect(getDefaultNewStateFor('sneak', 'observed', 'critical-failure')).toBe('avs');
       });
 
       test('sneak from concealed state produces correct outcomes', () => {
@@ -63,8 +44,8 @@ describe('Sneak Action Comprehensive Tests', () => {
 
         expect(getDefaultNewStateFor('sneak', 'concealed', 'critical-success')).toBe('undetected');
         expect(getDefaultNewStateFor('sneak', 'concealed', 'success')).toBe('undetected');
-        expect(getDefaultNewStateFor('sneak', 'concealed', 'failure')).toBe('hidden');
-        expect(getDefaultNewStateFor('sneak', 'concealed', 'critical-failure')).toBe('concealed');
+        expect(getDefaultNewStateFor('sneak', 'concealed', 'failure')).toBe('avs');
+        expect(getDefaultNewStateFor('sneak', 'concealed', 'critical-failure')).toBe('avs');
       });
 
       test('sneak from hidden state produces correct outcomes', () => {
@@ -74,8 +55,8 @@ describe('Sneak Action Comprehensive Tests', () => {
 
         expect(getDefaultNewStateFor('sneak', 'hidden', 'critical-success')).toBe('undetected');
         expect(getDefaultNewStateFor('sneak', 'hidden', 'success')).toBe('undetected');
-        expect(getDefaultNewStateFor('sneak', 'hidden', 'failure')).toBe('hidden');
-        expect(getDefaultNewStateFor('sneak', 'hidden', 'critical-failure')).toBe('observed');
+        expect(getDefaultNewStateFor('sneak', 'hidden', 'failure')).toBe('avs');
+        expect(getDefaultNewStateFor('sneak', 'hidden', 'critical-failure')).toBe('avs');
       });
 
       test('sneak from undetected state produces correct outcomes', () => {
@@ -85,37 +66,8 @@ describe('Sneak Action Comprehensive Tests', () => {
 
         expect(getDefaultNewStateFor('sneak', 'undetected', 'critical-success')).toBe('undetected');
         expect(getDefaultNewStateFor('sneak', 'undetected', 'success')).toBe('undetected');
-        expect(getDefaultNewStateFor('sneak', 'undetected', 'failure')).toBe('hidden');
-        expect(getDefaultNewStateFor('sneak', 'undetected', 'critical-failure')).toBe('observed');
-      });
-    });
-
-    describe('With Sneak RAW Enforcement', () => {
-      beforeEach(() => {
-        game.settings.set('pf2e-visioner', 'enforceRawRequirements', false);
-        game.settings.set('pf2e-visioner', 'sneakRawEnforcement', true);
-      });
-
-      test('sneak from observed state with RAW produces no changes', () => {
-        const {
-          getDefaultNewStateFor,
-        } = require('../../../scripts/chat/services/data/action-state-config.js');
-
-        expect(getDefaultNewStateFor('sneak', 'observed', 'critical-success')).toBe('observed');
-        expect(getDefaultNewStateFor('sneak', 'observed', 'success')).toBe('observed');
-        expect(getDefaultNewStateFor('sneak', 'observed', 'failure')).toBe('observed');
-        expect(getDefaultNewStateFor('sneak', 'observed', 'critical-failure')).toBe('observed');
-      });
-
-      test('sneak from hidden state with RAW produces correct outcomes', () => {
-        const {
-          getDefaultNewStateFor,
-        } = require('../../../scripts/chat/services/data/action-state-config.js');
-
-        expect(getDefaultNewStateFor('sneak', 'hidden', 'critical-success')).toBe('undetected');
-        expect(getDefaultNewStateFor('sneak', 'hidden', 'success')).toBe('undetected');
-        expect(getDefaultNewStateFor('sneak', 'hidden', 'failure')).toBe('hidden');
-        expect(getDefaultNewStateFor('sneak', 'hidden', 'critical-failure')).toBe('observed');
+        expect(getDefaultNewStateFor('sneak', 'undetected', 'failure')).toBe('avs');
+        expect(getDefaultNewStateFor('sneak', 'undetected', 'critical-failure')).toBe('avs');
       });
     });
   });
@@ -302,7 +254,7 @@ describe('Sneak Action Comprehensive Tests', () => {
       const targetTokenId = 'observer1';
       const targetOutcome = mockOutcomes.find((o) => o.token.id === targetTokenId);
 
-      // Simulate sneak dialog per-row revert logic (from sneak-preview-dialog.js)
+      // Simulate sneak dialog per-row revert logic (from SneakPreviewDialog.js)
       const revertVisibility = targetOutcome.oldVisibility || targetOutcome.currentVisibility;
       const changes = [{ target: targetOutcome.token, newVisibility: revertVisibility }];
 
@@ -321,136 +273,9 @@ describe('Sneak Action Comprehensive Tests', () => {
     });
   });
 
-  describe('RAW Enforcement Integration Tests', () => {
-    test('chat apply-changes respects RAW enforcement', () => {
-      game.settings.set('pf2e-visioner', 'enforceRawRequirements', true);
 
-      const mockOutcomes = [
-        { token: { id: 'valid1' }, hasActionableChange: true, newVisibility: 'undetected' },
-        { token: { id: 'invalid1' }, hasActionableChange: false, newVisibility: 'undetected' },
-      ];
-
-      // When RAW enforcement is on, only actionable changes should be applied
-      const validOutcomes = mockOutcomes.filter((o) => o.hasActionableChange);
-
-      expect(validOutcomes).toHaveLength(1);
-      expect(validOutcomes[0].token.id).toBe('valid1');
-    });
-
-    test('dialog apply-all respects RAW enforcement', () => {
-      game.settings.set('pf2e-visioner', 'enforceRawRequirements', true);
-
-      const mockDialog = {
-        outcomes: [
-          { token: { id: 'valid1' }, hasActionableChange: true, newVisibility: 'undetected' },
-          { token: { id: 'invalid1' }, hasActionableChange: false, newVisibility: 'undetected' },
-        ],
-      };
-
-      const validOutcomes = mockDialog.outcomes.filter((o) => o.hasActionableChange);
-
-      expect(validOutcomes).toHaveLength(1);
-      expect(validOutcomes[0].token.id).toBe('valid1');
-    });
-  });
 
   describe('hasActionableChange Calculation Tests', () => {
-    describe('Without RAW Enforcement', () => {
-      beforeEach(() => {
-        game.settings.set('pf2e-visioner', 'enforceRawRequirements', false);
-        game.settings.set('pf2e-visioner', 'sneakRawEnforcement', false);
-      });
-
-      test('sneak from observed to undetected (success) is actionable', () => {
-        const {
-          getDefaultNewStateFor,
-        } = require('../../../scripts/chat/services/data/action-state-config.js');
-
-        const oldState = 'observed';
-        const newState = getDefaultNewStateFor('sneak', oldState, 'success');
-        const hasActionableChange = newState !== oldState;
-
-        expect(newState).toBe('undetected');
-        expect(hasActionableChange).toBe(true);
-      });
-
-      test('sneak from observed to observed (critical failure) is not actionable', () => {
-        const {
-          getDefaultNewStateFor,
-        } = require('../../../scripts/chat/services/data/action-state-config.js');
-
-        const oldState = 'observed';
-        const newState = getDefaultNewStateFor('sneak', oldState, 'critical-failure');
-        const hasActionableChange = newState !== oldState;
-
-        expect(newState).toBe('observed');
-        expect(hasActionableChange).toBe(false);
-      });
-
-      test('sneak from hidden to undetected (success) is actionable', () => {
-        const {
-          getDefaultNewStateFor,
-        } = require('../../../scripts/chat/services/data/action-state-config.js');
-
-        const oldState = 'hidden';
-        const newState = getDefaultNewStateFor('sneak', oldState, 'success');
-        const hasActionableChange = newState !== oldState;
-
-        expect(newState).toBe('undetected');
-        expect(hasActionableChange).toBe(true);
-      });
-
-      test('sneak from undetected to undetected (success) is not actionable', () => {
-        const {
-          getDefaultNewStateFor,
-        } = require('../../../scripts/chat/services/data/action-state-config.js');
-
-        const oldState = 'undetected';
-        const newState = getDefaultNewStateFor('sneak', oldState, 'success');
-        const hasActionableChange = newState !== oldState;
-
-        expect(newState).toBe('undetected');
-        expect(hasActionableChange).toBe(false);
-      });
-    });
-
-    describe('With Sneak RAW Enforcement', () => {
-      beforeEach(() => {
-        game.settings.set('pf2e-visioner', 'enforceRawRequirements', false);
-        game.settings.set('pf2e-visioner', 'sneakRawEnforcement', true);
-      });
-
-      test('sneak from observed with RAW enforcement is never actionable', () => {
-        const {
-          getDefaultNewStateFor,
-        } = require('../../../scripts/chat/services/data/action-state-config.js');
-
-        const oldState = 'observed';
-        const outcomes = ['critical-success', 'success', 'failure', 'critical-failure'];
-
-        outcomes.forEach((outcome) => {
-          const newState = getDefaultNewStateFor('sneak', oldState, outcome);
-          const hasActionableChange = newState !== oldState;
-
-          expect(newState).toBe('observed');
-          expect(hasActionableChange).toBe(false);
-        });
-      });
-
-      test('sneak from hidden with RAW enforcement can still be actionable', () => {
-        const {
-          getDefaultNewStateFor,
-        } = require('../../../scripts/chat/services/data/action-state-config.js');
-
-        const oldState = 'hidden';
-        const newState = getDefaultNewStateFor('sneak', oldState, 'success');
-        const hasActionableChange = newState !== oldState;
-
-        expect(newState).toBe('undetected');
-        expect(hasActionableChange).toBe(true);
-      });
-    });
-
     test('hasActionableChange correctly identifies state transitions', () => {
       const {
         getDefaultNewStateFor,
@@ -466,8 +291,8 @@ describe('Sneak Action Comprehensive Tests', () => {
         {
           oldState: 'observed',
           outcome: 'critical-failure',
-          expectedNewState: 'observed',
-          shouldBeActionable: false,
+          expectedNewState: 'avs',
+          shouldBeActionable: true,
         },
         {
           oldState: 'hidden',
@@ -478,8 +303,8 @@ describe('Sneak Action Comprehensive Tests', () => {
         {
           oldState: 'hidden',
           outcome: 'failure',
-          expectedNewState: 'hidden',
-          shouldBeActionable: false,
+          expectedNewState: 'avs',
+          shouldBeActionable: true,
         },
         {
           oldState: 'undetected',
@@ -490,7 +315,7 @@ describe('Sneak Action Comprehensive Tests', () => {
         {
           oldState: 'undetected',
           outcome: 'critical-failure',
-          expectedNewState: 'observed',
+          expectedNewState: 'avs',
           shouldBeActionable: true,
         },
       ];
@@ -505,58 +330,7 @@ describe('Sneak Action Comprehensive Tests', () => {
     });
   });
 
-  describe('RAW Enforcement Target Eligibility Tests', () => {
-    test('RAW enforcement concept validation', () => {
-      // This test validates the concept that RAW enforcement should prevent
-      // actions when the actor is not in the appropriate state
 
-      // Without RAW enforcement - all outcomes are possible
-      game.settings.set('pf2e-visioner', 'enforceRawRequirements', false);
-      expect(game.settings.get('pf2e-visioner', 'enforceRawRequirements')).toBe(false);
-
-      // With RAW enforcement - action validity should be restricted
-      game.settings.set('pf2e-visioner', 'enforceRawRequirements', true);
-      expect(game.settings.get('pf2e-visioner', 'enforceRawRequirements')).toBe(true);
-
-      // Key concept: When RAW enforcement is ON and you're observed by all targets,
-      // the discoverSubjects function should return an empty array (no valid targets),
-      // effectively preventing the sneak action from being performed.
-
-      // This prevents the invalid state transition you mentioned:
-      // "if you're observed with enforce raw turned on you shouldn't be able to sneak at all"
-      expect(true).toBe(true); // Concept validated
-    });
-
-    test('RAW enforcement prevents action when inappropriate', () => {
-      // Mock scenario: Sneaker is observed by all potential targets
-      const observedByAll = true;
-      const rawEnforcement = true;
-
-      // Logic: If RAW enforcement is on AND sneaker is observed by all targets
-      // THEN no targets should be valid for sneak action
-      const shouldAllowSneak = !rawEnforcement || !observedByAll;
-
-      expect(shouldAllowSneak).toBe(false);
-
-      // This demonstrates that your concern is valid - RAW enforcement should
-      // prevent the sneak action entirely when in inappropriate states
-    });
-
-    test('RAW enforcement allows action when appropriate', () => {
-      // Mock scenario: Sneaker is hidden/undetected from some targets
-      const hiddenFromSome = true;
-      const rawEnforcement = true;
-
-      // Logic: If RAW enforcement is on AND sneaker is hidden from some targets
-      // THEN those targets should be valid for sneak action
-      const shouldAllowSneak = !rawEnforcement || hiddenFromSome;
-
-      expect(shouldAllowSneak).toBe(true);
-
-      // This validates that RAW enforcement doesn't block ALL actions,
-      // only inappropriate ones
-    });
-  });
 
   describe('Global Settings Fallback Tests', () => {
     test('sneak action uses global ignoreAllies when not explicitly provided', () => {
@@ -677,6 +451,45 @@ describe('Sneak Action Comprehensive Tests', () => {
 
       expect(validOutcomes).toHaveLength(1);
       expect(validOutcomes[0].token.id).toBe('valid');
+    });
+  });
+
+  describe('Dialog AVS State Selection', () => {
+    test('failed sneak with no position data should select AVS state in dialog', () => {
+      const {
+        getDefaultNewStateFor,
+      } = require('../../../scripts/chat/services/data/action-state-config.js');
+
+      const newVisibility = getDefaultNewStateFor('sneak', 'hidden', 'failure');
+      expect(newVisibility).toBe('avs');
+    });
+
+    test('critical failure sneak should select AVS state in dialog', () => {
+      const {
+        getDefaultNewStateFor,
+      } = require('../../../scripts/chat/services/data/action-state-config.js');
+
+      const newVisibility = getDefaultNewStateFor('sneak', 'hidden', 'critical-failure');
+      expect(newVisibility).toBe('avs');
+    });
+
+    test('outcome with newVisibility=avs should have changed=false', () => {
+      const outcome = {
+        newVisibility: 'avs',
+        oldVisibility: 'hidden',
+        changed: false,
+      };
+
+      expect(outcome.newVisibility).toBe('avs');
+      expect(outcome.changed).toBe(false);
+    });
+
+    test('outcome changed property respects avs state', () => {
+      const currentState = 'hidden';
+      const newVisibility = 'avs';
+      const changed = newVisibility !== 'avs' && newVisibility !== currentState;
+
+      expect(changed).toBe(false);
     });
   });
 });

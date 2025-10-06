@@ -1,8 +1,25 @@
 {
   "PF2E_VISIONER": {
+    "ENVIRONMENT": {},
     "MODULE_TITLE": "PF2E Visioner",
+    "MECHANICAL_EFFECTS": {
+      "HIDDEN_FLAT_CHECK": "DC 11 flat check required for targeting",
+      "CONCEALED_FLAT_CHECK": "DC 5 flat check required for targeting",
+      "UNDETECTED_CONDITION": "Undetected condition applied with full mechanical effects",
+      "VISIBLE_NO_EFFECTS": "No penalties when targeting; no additional effects",
+      "HIDDEN_TOOLTIP": "Hidden: You are off-guard to the target and must succeed at a DC 11 flat check when targeting with an attack, spell, or other effect",
+      "CONCEALED_TOOLTIP": "Concealed: You must succeed at a DC 5 flat check when targeting with an attack, spell, or other effect",
+      "UNDETECTED_TOOLTIP": "Undetected: You don't know the target's location. You are off-guard to the target and you can't easily target it. Using the Seek action can help find an undetected creature",
+      "VISIBLE_TOOLTIP": "Visible: No penalties or effects",
+      "BLINDED_OVERRIDE": "All creatures appear Hidden due to Blinded condition",
+      "DAZZLED_OVERRIDE": "All creatures appear Concealed due to Dazzled condition",
+      "NO_COVER_TOOLTIP": "No Cover: No bonuses or penalties",
+      "LESSER_COVER_TOOLTIP": "Lesser Cover: +1 circumstance bonus to AC",
+      "STANDARD_COVER_TOOLTIP": "Standard Cover: +2 circumstance bonus to AC, Reflex saves, and Stealth checks. Can Hide behind this cover.",
+      "GREATER_COVER_TOOLTIP": "Greater Cover: +4 circumstance bonus to AC, Reflex saves, and Stealth checks. Can Hide behind this cover."
+    },
     "TOKEN_MANAGER": {
-      "TITLE": "Visioner Token Manager",
+      "TITLE": "Visioner Manager",
       "OBSERVER": "Observer Token",
       "TARGET": "Target Token",
       "VISIBILITY_STATE": "Visibility State",
@@ -17,10 +34,11 @@
       "COVER_TAB": "Cover"
     },
     "VISIBILITY_STATES": {
+      "avs": "AVS",
       "observed": "Observed",
+      "concealed": "Concealed",
       "hidden": "Hidden",
-      "undetected": "Undetected",
-      "concealed": "Concealed"
+      "undetected": "Undetected"
     },
     "COVER_STATES": {
       "none": "No Cover",
@@ -28,44 +46,111 @@
       "standard": "Standard Cover",
       "greater": "Greater Cover"
     },
+    "SENSES": {
+      "LIGHT-PERCEPTION": "Light Perception",
+      "LIGHT-PERCEPTION_DESC": "You can perceive light and darkness. This sense allows you to see in natural darkness but is affected by magical darkness.",
+      "VISION": "Vision",
+      "VISION_DESC": "Your standard visual sense used to perceive your surroundings.",
+      "DARKVISION": "Darkvision",
+      "DARKVISION_DESC": "You can see in darkness and dim light just as well as in bright light, though you can't distinguish color in darkness.",
+      "GREATER-DARKVISION": "Greater Darkvision",
+      "GREATER-DARKVISION_DESC": "You can see in darkness and dim light as if it were bright light—colors included.",
+      "HEARING": "Hearing",
+      "HEARING_DESC": "You can detect creatures and events via sound within range (imprecise).",
+      "TREMORSENSE": "Tremorsense",
+      "TREMORSENSE_DESC": "You can sense vibrations through the ground within range (imprecise).",
+      "SCENT": "Scent",
+      "SCENT_DESC": "You have an enhanced sense of smell, allowing you to detect living creatures within range (imprecise).",
+      "ECHOLOCATION": "Echolocation",
+      "ECHOLOCATION_DESC": "You can use sound to navigate and detect objects within range (precise).",
+      "LIFESENSE": "Lifesense",
+      "LIFESENSE_DESC": "You can sense the life force of living and undead creatures within range (imprecise)."
+    },
+    "SPECIAL_SENSES": {
+      "vision": "Vision",
+      "vision_description": "Your standard visual sense used to perceive your surroundings.",
+      "lifesense": "Lifesense",
+      "lifesense_description": "You have a limited ability to sense life force. You gain lifesense as an imprecise sense. This allows you to sense the life force of living and undead creatures within the listed range. The sense can distinguish between the vitality energy animating living creatures and the void energy animating undead creatures.",
+      "echolocation": "Echolocation",
+      "echolocation_description": "You can use sound to navigate and detect objects. You gain echolocation as a precise sense. This allows you to detect all creatures and objects within range through sound reflection.",
+      "tremorsense": "Tremorsense",
+      "tremorsense_description": "You can sense vibrations through the ground. You gain tremorsense as an imprecise sense. This allows you to detect creatures and objects in contact with the ground within range.",
+      "scent": "Scent",
+      "scent_description": "You have an enhanced sense of smell. You gain scent as an imprecise sense. This allows you to detect living creatures by their scent within range.",
+      "darkvision": "Darkvision",
+      "darkvision_description": "You can see in darkness and dim light just as well as in bright light, though you can’t distinguish color in darkness.",
+      "greater_darkvision": "Greater Darkvision",
+      "greater_darkvision_description": "You can see in darkness and dim light as if it were bright light—colors included.",
+      "hearing": "Hearing",
+      "hearing_description": "You can detect creatures and events via sound within range (imprecise).",
+      "low_light_vision": "Low-Light Vision",
+      "low_light_vision_description": "You can see in dim light as though it were bright light.",
+      "infrared_vision": "Infrared Vision",
+      "infrared_vision_description": "You can perceive heat signatures in your surroundings.",
+      "truesight": "Truesight",
+      "truesight_description": "You can see things as they truly are, ignoring illusions and invisibility within range.",
+      "see_the_unseen": "See the Unseen",
+      "see_the_unseen_description": "You can perceive otherwise unseen phenomena within range.",
+      "bloodsense": "Bloodsense",
+      "bloodsense_description": "You can detect the presence and location of creatures by sensing blood within range.",
+      "magicsense": "Magicsense",
+      "magicsense_description": "You can sense magical auras or effects within range.",
+      "motion_sense": "Motion Sense",
+      "motion_sense_description": "You can detect motion in your surroundings within range.",
+      "spiritsense": "Spiritsense",
+      "spiritsense_description": "You can sense the presence of spirits and undead within range.",
+      "thoughtsense": "Thoughtsense",
+      "thoughtsense_description": "You can detect nearby thinking creatures within range.",
+      "wavesense": "Wavesense",
+      "wavesense_description": "You perceive vibrations or waves through a medium within range."
+    },
     "COVER_OVERRIDE": {
-      "POPUP_OVERRIDE": "Cover overridden via keybind popup: {original} → {final}",
-      "DIALOG_OVERRIDE": "Cover overridden in roll dialog: {original} → {final}",
-      "GENERIC_OVERRIDE": "Cover overridden: {original} → {final}"
+      "POPUP_OVERRIDE": "Cover overridden via keybind popup: {original} → {final}"
+    },
+    "FEAT": {
+      "CEASELESS_SHADOWS": "Ceaseless Shadows"
+    },
+    "AVS_OVERRIDE_DIALOG": {
+      "NO_OVERRIDES": "No AVS overrides are currently active for this token.",
+      "CLOSE": "Close",
+      "CLEAR_ALL": "Clear All Overrides",
+      "CLEAR_ALL_CONFIRM_TITLE": "Clear All AVS Overrides",
+      "OVERRIDE_REMOVED": "AVS override removed: {observer} → {target}",
+      "ALL_OVERRIDES_CLEARED": "All AVS overrides cleared for {token}",
+      "ERROR_REMOVING_OVERRIDE": "Error removing AVS override",
+      "ERROR_CLEARING_OVERRIDES": "Error clearing AVS overrides"
     },
     "VISUAL_EFFECTS": {
-      "HIDDEN_OVERLAY": "This token is hidden from your view",
-      "UNDETECTED_OVERLAY": "This token is undetected by you",
-      "CONCEALED_OVERLAY": "This token is concealed from you"
-    },
-    "MECHANICAL_EFFECTS": {
-      "HIDDEN_FLAT_CHECK": "DC 11 flat check required for targeting",
+      "CONCEALED_OVERLAY": "This token is concealed from you",
       "CONCEALED_FLAT_CHECK": "DC 5 flat check required for targeting",
       "UNDETECTED_CONDITION": "Undetected condition applied with full mechanical effects",
-      "VISIBLE_NO_EFFECTS": "No targeting penalties or effects",
-      "HIDDEN_TOOLTIP": "Hidden: You are off-guard to the target, and you must succeed at a DC 11 flat check when targeting it with an attack, spell, or other effect",
       "CONCEALED_TOOLTIP": "Concealed: You must succeed at a DC 5 flat check when targeting with an attack, spell, or other effect",
       "UNDETECTED_TOOLTIP": "Undetected: You don't know the target's location. You are off-guard to the target and you can't easily target it. Using the Seek action can help find an undetected creature",
-      "VISIBLE_TOOLTIP": "Visible: No penalties or effects",
-      "BLINDED_OVERRIDE": "All creatures appear Hidden due to Blinded condition",
       "DAZZLED_OVERRIDE": "All creatures appear Concealed due to Dazzled condition",
       "NO_COVER_TOOLTIP": "No Cover: No bonuses or penalties",
-      "LESSER_COVER_TOOLTIP": "Lesser Cover: +1 circumstance bonus to AC",
-      "STANDARD_COVER_TOOLTIP": "Standard Cover: +2 circumstance bonus to AC, Reflex saves, and Stealth checks. Can Hide behind this cover.",
       "GREATER_COVER_TOOLTIP": "Greater Cover: +4 circumstance bonus to AC, Reflex saves, and Stealth checks. Can Hide behind this cover."
     },
-    "CONTEXT_MENU": {
-      "MANAGE_TOKEN": "Manage Token",
+    "UI_ACTIONS": {
       "MANAGE_VISIBILITY": "Manage Token Visibility",
       "MANAGE_COVER": "Manage Token Cover",
-      "QUICK_HIDDEN": "Set as Hidden",
-      "QUICK_UNDETECTED": "Set as Undetected",
       "QUICK_CONCEALED": "Set as Concealed",
       "QUICK_OBSERVED": "Set as Observed",
       "QUICK_NO_COVER": "Set No Cover",
       "QUICK_LESSER_COVER": "Set Lesser Cover",
       "QUICK_STANDARD_COVER": "Set Standard Cover",
       "QUICK_GREATER_COVER": "Set Greater Cover"
+    },
+    "MOVEMENT": {
+      "walk": "Walk",
+      "stride": "Stride",
+      "leap": "Leap",
+      "climb": "Climb",
+      "fly": "Fly",
+      "swim": "Swim",
+      "burrow": "Burrow",
+      "teleport": "Teleport",
+      "deploy": "Deploy",
+      "travel": "Travel"
     },
     "NOTIFICATIONS": {
       "NO_OBSERVER_SELECTED": "Please select an observer token first",
@@ -84,6 +169,7 @@
       "PROCESSING": "Processing Seek results...",
       "PREVIEW_TITLE": "Seek Results Preview",
       "PREVIEW_HINT": "Seek action results analysis",
+      "PREVIEW_AVAILABLE_SENSES": "Available Senses",
       "ROLL_VS_DC": "Roll vs Stealth DC",
       "OUTCOME": "Outcome",
       "VISIBILITY_CHANGE": "Visibility Change",
@@ -99,7 +185,31 @@
       "RANGE_LIMIT_ACTIVE": "Range limit active: Only showing targets within 30 feet",
       "RANGE_LIMIT_ACTIVE_CUSTOM": "Range limit active: Only showing targets within {distance} feet",
       "NO_TARGETS_IN_RANGE": "No valid targets within 30 feet range",
-      "NO_TARGETS_IN_RANGE_CUSTOM": "No valid targets within {distance} feet range"
+      "NO_TARGETS_IN_RANGE_CUSTOM": "No valid targets within {distance} feet range",
+      "ECHOLOCATION_LABEL": "Echolocation",
+      "ECHOLOCATION_TOOLTIP": "Precise hearing active until the start of your next turn",
+      "LIFESENSE_LABEL": "Lifesense",
+      "LIFESENSE_TOOLTIP": "Can sense living and undead creatures within range (imprecise sense)",
+      "UNMET_CONDITIONS": "Unmet Conditions",
+      "SENSE_UNSEEN_BUTTON": "Sense the Unseen (Reaction)",
+      "SENSE_UNSEEN_TOOLTIP": "Use your Sense the Unseen feat to make undetected creatures hidden",
+      "SENSE_UNSEEN_APPLIED": "Sense the Unseen Applied"
+    },
+    "SENSE_PRECISION": {
+      "PRECISE": "Precise",
+      "IMPRECISE": "Imprecise"
+    },
+    "REACTIONS": {
+      "BUTTON_LABEL": "Reactions",
+      "BUTTON_TOOLTIP": "Available reactions for this action",
+      "NO_REACTIONS": "No reactions available",
+      "DROPDOWN_TITLE": "Available Reactions",
+      "SENSE_THE_UNSEEN": {
+        "name": "Sense the Unseen",
+        "description": "Even though you failed at the triggering check, you automatically sense any Undetected creatures in the area where you're Seeking, making them merely Hidden to you.",
+        "trigger": "You fail a Seek to find an undetected creature",
+        "effect": "Make undetected creatures hidden to you"
+      }
     },
     "HIDE_AUTOMATION": {
       "BUTTON_APPLY": "Apply Hide Results",
@@ -120,7 +230,23 @@
       "OPEN_RESULTS_TOOLTIP": "Open the Hide results dialog to apply individual or bulk visibility changes",
       "ENCOUNTER_ONLY": "Show only encounter tokens",
       "SETTING_NAME": "Enable Hide Automation",
-      "SETTING_HINT": "Automatically add buttons to Hide chat messages for applying visibility changes"
+      "SETTING_HINT": "Automatically add buttons to Hide chat messages for applying visibility changes",
+      "BADGES": {
+        "TERRAIN_STALKER_LABEL": "Terrain Stalker",
+        "TERRAIN_STALKER_TOOLTIP": "Chosen terrains active: {selection} (Region: {environments})",
+        "VANISH_INTO_THE_LAND_LABEL": "Vanish into the Land",
+        "VANISH_INTO_THE_LAND_TOOLTIP": "You can Hide and Sneak even without cover or concealment in your chosen difficult terrain",
+        "VERY_VERY_SNEAKY_LABEL": "Very, Very Sneaky",
+        "VERY_VERY_SNEAKY_TOOLTIP": "Cover/concealment requirement is bypassed",
+        "LEGENDARY_SNEAK_LABEL": "Legendary Sneak",
+        "LEGENDARY_SNEAK_TOOLTIP": "Cover/concealment requirement is bypassed",
+        "CEASELESS_SHADOWS_LABEL": "Ceaseless Shadows",
+        "CEASELESS_SHADOWS_TOOLTIP": "Cover/concealment prerequisites are removed",
+        "CAMOUFLAGE_LABEL": "Camouflage",
+        "CAMOUFLAGE_TOOLTIP": "Cover/concealment requirement is bypassed in natural terrain",
+        "DISTRACTING_SHADOWS_LABEL": "Distracting Shadows",
+        "DISTRACTING_SHADOWS_TOOLTIP": "You may use larger creatures as cover for Hide/Sneak prerequisites"
+      }
     },
     "SNEAK_AUTOMATION": {
       "BUTTON_APPLY": "Apply Sneak Results",
@@ -140,7 +266,23 @@
       "OPEN_RESULTS_TOOLTIP": "Open the Sneak results dialog to apply individual or bulk visibility changes",
       "ENCOUNTER_ONLY": "Show only encounter tokens",
       "SETTING_NAME": "Enable Sneak Automation",
-      "SETTING_HINT": "Automatically add buttons to Sneak chat messages for applying visibility changes"
+      "SETTING_HINT": "Automatically add buttons to Sneak chat messages for applying visibility changes",
+      "BADGES": {
+        "TERRAIN_STALKER_LABEL": "Terrain Stalker",
+        "TERRAIN_STALKER_TOOLTIP": "Chosen terrains active: {selection} (Region: {environments})",
+        "VANISH_INTO_THE_LAND_LABEL": "Vanish into the Land",
+        "VANISH_INTO_THE_LAND_TOOLTIP": "You can Sneak even without cover or concealment in your chosen difficult terrain",
+        "VERY_VERY_SNEAKY_LABEL": "Very, Very Sneaky",
+        "VERY_VERY_SNEAKY_TOOLTIP": "Cover/concealment requirement is bypassed",
+        "LEGENDARY_SNEAK_LABEL": "Legendary Sneak",
+        "LEGENDARY_SNEAK_TOOLTIP": "Cover/concealment requirement is bypassed",
+        "CEASELESS_SHADOWS_LABEL": "Ceaseless Shadows",
+        "CEASELESS_SHADOWS_TOOLTIP": "Cover/concealment prerequisites are removed",
+        "CAMOUFLAGE_LABEL": "Camouflage",
+        "CAMOUFLAGE_TOOLTIP": "Cover/concealment requirement is bypassed in natural terrain",
+        "DISTRACTING_SHADOWS_LABEL": "Distracting Shadows",
+        "DISTRACTING_SHADOWS_TOOLTIP": "You may use larger creatures as cover for Hide/Sneak prerequisites"
+      }
     },
     "CREATE_A_DIVERSION_AUTOMATION": {
       "BUTTON_APPLY": "Apply Diversion Results",
@@ -180,6 +322,18 @@
           "xlarge": "Extra Large"
         }
       },
+      "AUTO_VISIBILITY_ENABLED": {
+        "name": "Enable Auto-Visibility System",
+        "hint": "Automatically set visibility flags based on lighting conditions and creature senses. This system will analyze scene lighting, token positions, and creature abilities to determine appropriate visibility states (observed, concealed, hidden, undetected)."
+      },
+      "AUTO_VISIBILITY_DEBUG_MODE": {
+        "name": "Auto-Visibility Debug Mode",
+        "hint": "Enable detailed console logging for the auto-visibility system. Useful for troubleshooting visibility calculations."
+      },
+      "DISABLE_LINE_OF_SIGHT": {
+        "name": "Disable Line of Sight Calculations",
+        "hint": "Disable line-of-sight calculations for visibility. When enabled, visibility will be determined solely by distance and senses, ignoring walls and obstacles. Useful for performance optimization or specific game styles."
+      },
       "COLORBLIND_MODE": {
         "name": "Colorblind Mode",
         "hint": "Select a colorblind mode to adjust colors for better visibility (client-side setting)",
@@ -192,37 +346,52 @@
         }
       },
       "IGNORE_ALLIES_DEFAULT": {
-        "name": "Ignore Allies (default)",
-        "hint": "Sets the default state of the 'Ignore allies' checkbox in Visioner dialogs and the Token Manager. You can toggle it live per dialog to filter results in real time."
+        "name": "Set Default \"Ignore Allies\" State",
+        "hint": "Determines whether the Ignore Allies checkbox in Visioner Manager/Action dialogs starts enabled or disabled but can still be toggled manually"
+      },
+      "HIDE_FOUNDRY_HIDDEN_TOKENS": {
+        "name": "Set Default \"Hide Foundry Hidden\" State",
+        "hint": "Determines whether the Hide Foundry Hidden checkbox in Visioner Manager/Action dialogs starts enabled or disabled but can still be toggled manually"
       },
       "ENABLE_ALL_TOKENS_VISION": {
-        "name": "Enable Vision for All Tokens",
-        "hint": "When enabled, all tokens will have vision enabled by default."
+        "name": "Vision for NPCs",
+        "hint": "Enables token vision for all NPC tokens to more easily see point of view"
+      },
+      "GDV_VISUAL_OVERRIDE_ENABLED": {
+        "name": "Greater Darkvision Visual Override",
+        "hint": "Client-only: When your selected token has Greater Darkvision, lighten darkness areas so visuals match Visioner rules."
+      },
+      "GDV_OVERLAY_ALPHA": {
+        "name": "GDV Overlay Intensity",
+        "hint": "Client-only: How strongly to counteract darkness tint for Greater Darkvision (0–1)."
+      },
+      "GDV_TOKEN_GRAYSCALE": {
+        "name": "GDV: Black & White Tokens",
+        "hint": "Client-only: When seeing via (greater) darkvision, render tokens in grayscale to match rules text (black and white vision)."
       },
       "DEFAULT_ENCOUNTER_FILTER": {
-        "name": "Default Encounter Filter State",
-        "hint": "When enabled, the encounter filter checkbox in dialogs will be checked by default when there's an active encounter"
+        "name": "Set Default \"Encounter Only\" State",
+        "hint": "Determines whether the Encounter Only checkbox in Visioner Manager/Action dialogs starts enabled or disabled but can still be toggled manually\n(This checkbox only appears in dialogs during encounters)"
       },
       "LIMIT_SEEK_RANGE": {
-        "name": "Limit Seek Range in Combat",
-        "hint": "When enabled, Seek actions in combat will only detect targets within the specified distance"
+        "name": "Limit Combat Seek Range",
+        "hint": "Target will be decided based on the specified distance from token using Seek while in combat"
       },
-      "LIMIT_SEEK_RANGE_DISABLED_BY_TEMPLATE": "Range limit disabled: Using template",
       "SEEK_USE_TEMPLATE": {
-        "name": "Use Seek Template (15 ft Burst)",
-        "hint": "When enabled, it will be possible to setup a 15-foot burst template and only consider targets within the template"
+        "name": "Use Seek Template",
+        "hint": "When Seeking, targets will be decided using a 15-foot burst template. Template button replaces standard Visioner buttons in Seek chat card"
       },
       "LIMIT_SEEK_RANGE_OUT_OF_COMBAT": {
-        "name": "Limit Seek Range out of Combat",
-        "hint": "When enabled, Seek actions outside of combat will only detect targets within the specified distance"
+        "name": "Limit Exploration Seek Range",
+        "hint": "Target will be decided based on the specified distance from token using Seek while out of combat"
       },
       "CUSTOM_SEEK_DISTANCE": {
-        "name": "Seek Range Value",
-        "hint": "Set the maximum distance (in feet) for Seek actions when range limitation is enabled"
+        "name": "Combat Seek Range:",
+        "hint": "Maximum Distance for Seek in combat"
       },
       "CUSTOM_SEEK_DISTANCE_OOC": {
-        "name": "Seek Range Value (Out of Combat)",
-        "hint": "Set the maximum distance (in feet) for Seek actions when out-of-combat range limitation is enabled"
+        "name": "Exploration Seek Range:",
+        "hint": "Maximum Distance for Seek out of combat"
       },
       "USE_HUD_BUTTON": {
         "name": "Use Token HUD Button",
@@ -231,6 +400,14 @@
       "BLOCK_PLAYER_TARGET_TOOLTIPS": {
         "name": "Block Target Tooltips for Players",
         "hint": "When enabled, players won't see tooltips when hovering over tokens in target mode (how others see the hovered token). They can still see tooltips when holding O key or pressing Alt."
+      },
+      "REMOVE_PLAYER_TARGET_TOOLTIPS": {
+        "name": "Remove Target Hover Tooltips from Players",
+        "hint": "Stops players from seeing hover tooltips from target perspective for owned tokens"
+      },
+      "REMOVE_PLAYER_OBSERVER_TOOLTIPS": {
+        "name": "Remove Observer Hover Tooltips from Players",
+        "hint": "Stops players from seeing observer-perspective hover tooltips (O key / observer mode)"
       },
       "INTEGRATE_COVER_VISIBILITY": {
         "name": "Integrate Cover with Visibility Rules",
@@ -253,32 +430,32 @@
         "hint": "Used when a loot token needs a Perception DC and doesn't have a system stat."
       },
       "LOOT_STEALTH_DC": {
-        "name": "Default Stealth DC for Loot Actors",
-        "hint": "DC used when considering loot tokens as Seek targets."
+        "name": "Loot Actor Stealth DC",
+        "hint": "Default DC used when using Seek to find hidden Loot Actors. Stealth DC can be changed in the Loot Actor's token settings"
       },
       "WALL_STEALTH_DC": {
-        "name": "Default Stealth DC for Walls",
-        "hint": "DC used when considering hidden walls as Seek targets (when a wall has no explicit DC set)."
+        "name": "Wall Stealth DC",
+        "hint": "Default DC used when using Seek to find hidden Walls. Stealth DC can be changed in the Wall's settings"
       },
       "HIDE_QUICK_EDIT_TOOL": {
         "name": "Hide Quick Edit Tool",
         "hint": "If enabled, the Quick Edit tool will be hidden from the token controls toolbar."
       },
       "INCLUDE_LOOT_ACTORS": {
-        "name": "Include loot actors in visibility manager",
-        "hint": "Allow configuring visibility states for loot actors (chests, containers) per observer. Visual only; no PF2E conditions are applied."
+        "name": "Hidden Loot Actors",
+        "hint": "Allows configuring of loot actors conditional visibility states within the Visioner manager \n(visual only - no conditions)"
       },
       "INCLUDE_WALLS": {
-        "name": "Include walls as hideable objects (experimental)",
-        "hint": "Show walls in the manager to mark them as visible/hidden per observer. Current implementation is visual-only and does not change occlusion or collision."
+        "name": "Hidden Walls",
+        "hint": "Allows configuring of walls conditional visibility states within the Visioner manager. Visual indicator when succeeding at Seek"
       },
       "HIDDEN_WALLS": {
-        "name": "Enable Hidden Walls",
-        "hint": "Enable per-wall Hidden toggle and player indicators. If a hidden wall is a door, it won't block sight."
+        "name": "Hidden Walls",
+        "hint": "Allows configuring of walls conditional visibility states within the Visioner manager. Visual indicator when succeeding at Seek"
       },
       "AUTO_COVER": {
-        "name": "Auto-cover",
-        "hint": "When enabled, the module will automatically apply cover to tokens based on blocking token path."
+        "name": "Enable Auto-Cover",
+        "hint": "Allows cover to be automatically applied based on token coverage in relation to walls and other tokens"
       },
       "EXPERIMENTAL_SEE_THROUGH_WALLS": {
         "name": "Experimental: Per-Token See-Through Walls (Client-Only)",
@@ -287,12 +464,96 @@
       "SNEAK_RAW_ENFORCEMENT": {
         "name": "Sneak Raw Enforcement",
         "hint": "When enabled, Sneak will follow RAW rules. When disabled, Sneak will be more forgiving."
+      },
+      "TOKEN_HUD_BUTTON": {
+        "name": "Token HUD Button",
+        "hint": "Adds a button to Foundry's token HUD for opening up the Visioner Manager. When disabled, a movable floating button will appear while a token is selected"
+      },
+      "VISIONER_SCENE_CONTROLS": {
+        "name": "Visioner Scene Controls",
+        "hint": "Adds specific Visioner features as buttons to Token Controls and Wall Controls on the left sidebar. If disabled, features can still be accessed via individual token/wall settings or keybinds"
+      },
+      "AVS_CHANGES_INDICATOR_SIZE": {
+        "name": "AVS Changes Indicator Size",
+        "hint": "Controls the size of the floating AVS changes indicator button and its tooltip.",
+        "CHOICES": {
+          "small": "Small",
+          "medium": "Medium",
+          "large": "Large",
+          "xlarge": "Extra Large"
+        }
+      },
+      "MANAGER_ROLL_COMPARISON": {
+        "name": "Visioner Manager Roll Comparison",
+        "hint": "Adds a roll comparison column to the Visioner Manager comparing the last relevant roll vs relevant DC"
+      },
+      "TOKEN_INTERSECTION_MODE": {
+        "name": "Token Ray Intersection Mode",
+        "hint": "How cover is evaluated based on tokens as blockers",
+        "CHOICES": {
+          "any": "Any - Any intersection. Lesser Cover; Standard Cover if two sizes or larger than attacker and target",
+          "length10": "10% - Intersect 10% or more of blocker side",
+          "coverage": "Side Coverage - Thresholds based on percentage of side coverage. 50% Standard/70% Greater",
+          "tactical": "Tactical - Corner to corner calculation for more precise calculations"
+        }
+      },
+      "AUTO_COVER_IGNORE_UNDETECTED": {
+        "name": "Ignore Undetected Tokens",
+        "hint": "Undetected tokens, per Visioner effect, will not provide Auto-Cover"
+      },
+      "AUTO_COVER_VISUALIZATION_COMBAT_ONLY": {
+        "name": "Restrict Auto-Cover Visualization to Combat",
+        "hint": "Limits the use of Auto-Cover Visualization keybind to only be usable during an active combat"
+      },
+      "AUTO_COVER_GM_RESPECT_FOG": {
+        "name": "GM Token Auto-Cover Visualization",
+        "hint": "GM will see the limits to the Auto-Cover Visualization based on token's vision"
+      },
+      "AUTO_COVER_IGNORE_DEAD": {
+        "name": "Ignore Dead Tokens",
+        "hint": "Dead tokens will not provide Auto-Cover"
+      },
+      "AUTO_COVER_IGNORE_ALLIES": {
+        "name": "Ignore Ally Tokens",
+        "hint": "Ally tokens will not provide Auto-Cover"
+      },
+      "WALL_STANDARD_THRESHOLD": {
+        "name": "Wall Standard Threshold:",
+        "hint": "Percent of the target token that must be blocked to grant Standard Cover"
+      },
+      "WALL_GREATER_THRESHOLD": {
+        "name": "Wall Greater Threshold:",
+        "hint": "Percent of the target token that must be blocked to grant Greater Cover"
+      },
+      "WALLS_ALLOW_GREATER": {
+        "name": "Walls Allow Greater Cover",
+        "hint": "Allows walls to grant Greater Cover based on configurable threshold"
+      },
+      "IGNORE_PRONE_TOKENS": {
+        "name": "Ignore Prone Tokens",
+        "hint": "Prone tokens will not provide Auto-Cover"
+      },
+      "KEYBIND_OPEN_MANAGER_TARGET_MODE": {
+        "name": "Keybinding Opens Manager in Target Mode",
+        "hint": "Open Visioner Manager in Target mode rather than Observer via keybinding."
+      },
+      "VISIONER_QUICK_EDIT_TOOL": {
+        "name": "Visioner Quick Edit Tool",
+        "hint": "Adds a button to Token Controls sidebar to open the Visioner Quick Edit tool. If disabled, the tool can be accessed with a keybind"
       }
     },
     "UI": {
       "ENCOUNTER_FILTER_TEXT": "Show only encounter tokens",
+      "CEASELESS_SHADOWS_UPGRADE_TOOLTIP": "{FEAT}: {FROM} → {TO} (feat upgrade)",
       "COVER_OVERRIDE": "Cover Override",
-      "ROLL": "Roll"
+      "ROLL": "Roll",
+      "APPLY_ALL": "Apply All",
+      "REVERT_ALL": "Revert All",
+      "REMOVE_OVERRIDES": "Remove Overrides",
+      "BULK_SET_VISIBILITY": "Bulk Set Visibility",
+      "CLEAR_BULK_OVERRIDES": "Clear Bulk Overrides",
+      "FILTER_BY_DETECTION_LABEL": "Filter By Viewport",
+      "FILTER_BY_DETECTION_TOOLTIP": "Only show tokens that are within the current viewport"
     },
     "WALL": {
       "VISIBLE_TO_YOU": "Hidden Wall",
@@ -301,7 +562,7 @@
     },
     "KEYBINDINGS": {
       "OPEN_TOKEN_MANAGER": {
-        "name": "Open Visioner Token Manager",
+        "name": "Open Visioner Manager",
         "hint": "Open the token manager for selected tokens"
       },
       "OPEN_VISIBILITY_MANAGER": {
@@ -315,10 +576,34 @@
       "TOGGLE_OBSERVER_MODE": {
         "name": "Toggle Observer Mode for Hover Tooltips",
         "hint": "Hold this key to switch hover tooltips to observer mode (how hovered token sees others)"
+      },
+      "OPEN_QUICK_PANEL": {
+        "name": "Open Visioner Quick Panel",
+        "hint": "Open the compact Visioner Quick Edit panel."
+      },
+      "SHOW_AUTO_COVER_OVERLAY": {
+        "name": "Show Auto-Cover Overlay",
+        "hint": "Press to show auto-cover badges for the hovered token (or controlled token if none)."
+      },
+      "HOLD_COVER_VISUALIZATION": {
+        "name": "Hold for Cover Visualization",
+        "hint": "Hold this key while hovering over tokens to visualize cover fields. Shows optimal positioning for attacks."
+      },
+      "OPEN_WALL_MANAGER": {
+        "name": "Open Wall Manager",
+        "hint": "Open the Visioner Wall Manager dialog to bulk edit wall settings."
       }
     },
     "REGION_BEHAVIOR": {
       "TYPE_LABEL": "PF2e Visioner Visibility",
+      "TYPES": {
+        "CONCEALMENT": {
+          "label": "AVS Concealment"
+        },
+        "VISIBILITY": {
+          "label": "Visioner Visibility"
+        }
+      },
       "VISIBILITY_STATE": {
         "label": "Visibility State",
         "hint": "The visibility state to apply between tokens inside and outside the region"
@@ -331,8 +616,20 @@
         "label": "Two-Way Region",
         "hint": "If enabled, tokens outside the region will also have the visibility state applied to tokens inside the region"
       },
+      "CONCEALMENT_ENABLED": {
+        "label": "Enable Concealment",
+        "hint": "If enabled, rays that cross this region's boundaries will grant concealment to the target"
+      },
       "VISIBILITY_UPDATED": "Region visibility updated for {count} token relationships",
       "UPDATE_ERROR": "Failed to update region visibility relationships"
+    },
+    "SNEAKY_FEAT": {
+      "VISIBILITY_CAPPED": "Sneaky Feat",
+      "TOOLTIP": "Visibility capped at Hidden due to Sneaky feat effect. This creature successfully sneaked against you."
+    },
+    "SNEAK_ADEPT_FEAT": {
+      "OUTCOME_UPGRADED": "Sneak Adept",
+      "TOOLTIP": "Failure upgraded to Success due to Sneak Adept feat. It's almost impossible to spot this creature."
     }
   }
 }

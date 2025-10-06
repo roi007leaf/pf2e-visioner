@@ -3,7 +3,6 @@
  * All styles scoped to .pf2e-visioner to avoid conflicts
  */
 
-/* Import shared UI component styles */
 @import url('shared-ui-components.css');
 
 .pf2e-visioner {
@@ -27,6 +26,7 @@
   .consequences-preview-dialog .window-content,
   .take-cover-preview-dialog .window-content {
     height: 100%;
+    min-height: 0; /* allow inner flex children to shrink and scroll */
     padding: 10px;
     overflow: hidden;
   }
@@ -45,6 +45,20 @@
     overflow: hidden;
   }
 
+  /* Make the table area scroll within action dialogs (not override dialog) */
+  .point-out-preview-dialog .results-table-container,
+  .seek-preview-dialog .results-table-container,
+  .hide-preview-dialog .results-table-container,
+  .sneak-preview-dialog .results-table-container,
+  .create-a-diversion-preview-dialog .results-table-container,
+  .consequences-preview-dialog .results-table-container,
+  .take-cover-preview-dialog .results-table-container {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+
   /* Force header to not grow */
   .actor-info,
   .hider-info,
@@ -53,966 +67,3589 @@
     flex: 0 0 auto;
   }
 
-  /* Force table container to grow and scroll */
-  .results-table-container {
-    flex: 1 1 auto;
-    overflow-y: scroll !important;
-    overflow-x: hidden;
-    border: 1px solid var(--color-border-light-primary);
-    margin-bottom: 10px;
-    /* Default scrollbar styling */
-    scrollbar-width: thin;
-    scrollbar-color: rgba(73, 80, 87, 0.6) transparent;
-  }
-
-  /* Force footer to not grow */
-  .point-out-preview-dialog-bulk-actions-header,
-  .seek-preview-dialog-bulk-actions-header,
-  .hide-preview-dialog-bulk-actions-header,
-  .sneak-preview-dialog-bulk-actions-header,
-  .create-a-diversion-preview-dialog-bulk-actions-header,
-  .consequences-preview-dialog-bulk-actions-header,
-  .take-cover-preview-dialog-bulk-actions-header {
-    flex: 0 0 auto;
-    border-top: 1px solid var(--color-border-light-primary);
-    padding-top: 10px;
-    display: flex;
-    justify-content: space-between;
-  }
-
-  /* Basic table styling */
-  .visibility-table,
-  .point-out-results-table,
-  .seek-results-table,
-  .hide-results-table,
-  .sneak-results-table,
-  .create-a-diversion-results-table,
-  .consequences-results-table,
-  .take-cover-results-table {
-    width: 100%;
-  }
-
-  /* Sticky headers */
-  .results-table-container thead th {
-    position: sticky;
-    top: 0;
-    z-index: 10;
-  }
-
-  /* Name column word wrapping */
-  .token-name strong,
-  .hider-name,
-  .seeker-name,
-  .attacker-name,
-  .diverter-name,
-  .sneaker-name,
-  .actor-name,
-  .observer-name {
-    white-space: normal;
-    word-wrap: normal;
-    word-break: normal;
-    overflow-wrap: break-word;
-    hyphens: auto; /* Allows hyphenation for very long words */
-  }
-
-  .results-table-container td.token-name {
-    white-space: normal;
-    word-wrap: normal;
-    overflow-wrap: break-word;
-    word-break: normal;
-    max-width: 150px; /* Forces wrapping when needed */
-  }
-
-  /* Token image clickable styling */
-  .token-image img {
-    cursor: pointer;
-    transition:
-      transform 0.2s ease,
-      box-shadow 0.2s ease;
-    border-radius: 4px;
-    object-fit: cover;
-    object-position: top;
-    display: block;
-    margin: 0 auto;
-  }
-
-  /* Row styling */
-  .results-table-container tr:nth-child(even) {
-    background-color: rgba(0, 0, 0, 0.1);
-  }
-
-  /* Selection-based highlight parity with token manager */
-  .results-table-container tr.token-row.row-hover,
-  .results-table-container tr[data-token-id].row-hover {
-    outline: 2px solid var(--pf2e-visioner-primary);
-    outline-offset: -2px;
-    box-shadow: inset 0 0 0 2px var(--visibility-hidden-bg-strong);
-    background: var(--visibility-hidden-bg) !important;
-  }
-
-  /* Theme-colored row highlight per dialog */
-  .seek-preview-dialog .results-table-container tr.row-hover,
-  .seek-preview-dialog .results-table-container tr[data-token-id].row-hover {
-    outline-color: var(--pf2e-visioner-info);
-    box-shadow: inset 0 0 0 2px rgba(44, 90, 160, 0.35);
-    background: rgba(44, 90, 160, 0.1) !important;
-  }
-
-  .hide-preview-dialog .results-table-container tr.row-hover,
-  .hide-preview-dialog .results-table-container tr[data-token-id].row-hover {
-    outline-color: var(--pf2e-visioner-purple);
-    box-shadow: inset 0 0 0 2px rgba(142, 36, 170, 0.35);
-    background: rgba(142, 36, 170, 0.1) !important;
-  }
-
-  .point-out-preview-dialog .results-table-container tr.row-hover,
-  .point-out-preview-dialog .results-table-container tr[data-token-id].row-hover {
-    outline-color: var(--pf2e-visioner-warning);
-    box-shadow: inset 0 0 0 2px var(--visibility-hidden-bg-strong);
-    background: var(--visibility-hidden-bg) !important;
-  }
-
-  .sneak-preview-dialog .results-table-container tr.row-hover,
-  .sneak-preview-dialog .results-table-container tr[data-token-id].row-hover {
-    outline-color: var(--pf2e-visioner-gray);
-    box-shadow: inset 0 0 0 2px rgba(108, 117, 125, 0.35);
-    background: rgba(108, 117, 125, 0.1) !important;
-  }
-
-  .create-a-diversion-preview-dialog .results-table-container tr.row-hover,
-  .create-a-diversion-preview-dialog .results-table-container tr[data-token-id].row-hover {
-    outline-color: var(--pf2e-visioner-teal);
-    box-shadow: inset 0 0 0 2px rgba(23, 162, 184, 0.35);
-    background: rgba(23, 162, 184, 0.1) !important;
-  }
-
-  .consequences-preview-dialog .results-table-container tr.row-hover,
-  .consequences-preview-dialog .results-table-container tr[data-token-id].row-hover {
-    outline-color: var(--pf2e-visioner-danger);
-    box-shadow: inset 0 0 0 2px rgba(220, 53, 69, 0.35);
-    background: rgba(220, 53, 69, 0.1) !important;
-  }
-
-  /* Take Cover - Brown */
-  .take-cover-preview-dialog .results-table-container tr.row-hover,
-  .take-cover-preview-dialog .results-table-container tr[data-token-id].row-hover {
-    outline-color: var(--pf2e-visioner-brown);
-    box-shadow: inset 0 0 0 2px rgba(121, 85, 72, 0.35);
-    background: rgba(121, 85, 72, 0.1) !important;
-  }
-
-  /* WebKit scrollbar styling (default) */
-  .results-table-container::-webkit-scrollbar {
-    width: 8px;
-  }
-
-  .results-table-container::-webkit-scrollbar-track {
-    background: transparent;
-  }
-
-  .results-table-container::-webkit-scrollbar-thumb {
-    background: rgba(73, 80, 87, 0.6);
-    border-radius: 4px;
-  }
-
-  .results-table-container::-webkit-scrollbar-thumb:hover {
-    background: rgba(73, 80, 87, 0.8);
-  }
-
-  /* Theme-specific styling */
-
-  /* Hide - Purple */
-  .hide-preview-dialog .results-table-container {
-    scrollbar-color: rgba(142, 36, 170, 0.6) transparent;
-  }
-
-  .hide-preview-dialog .results-table-container::-webkit-scrollbar-thumb {
-    background: rgba(142, 36, 170, 0.6);
-  }
-
-  .hide-preview-dialog .results-table-container::-webkit-scrollbar-thumb:hover {
-    background: rgba(142, 36, 170, 0.8);
-  }
-
-  .hide-preview-dialog .results-table-container thead th {
-    background-color: var(--pf2e-visioner-purple);
-    color: white;
-  }
-
-  /* Seek - Blue */
-  .seek-preview-dialog .results-table-container {
-    scrollbar-color: rgba(44, 90, 160, 0.6) transparent;
-  }
-
-  .seek-preview-dialog .results-table-container::-webkit-scrollbar-thumb {
-    background: rgba(44, 90, 160, 0.6);
-  }
-
-  .seek-preview-dialog .results-table-container::-webkit-scrollbar-thumb:hover {
-    background: rgba(44, 90, 160, 0.8);
-  }
-
-  .seek-preview-dialog .results-table-container thead th {
-    background-color: var(--pf2e-visioner-info);
-    color: white;
-  }
-
-  /* Point Out - Orange */
-  .point-out-preview-dialog .results-table-container {
-    scrollbar-color: var(--visibility-hidden) transparent;
-  }
-
-  .point-out-preview-dialog .results-table-container::-webkit-scrollbar-thumb {
-    background: var(--visibility-hidden);
-  }
-
-  .point-out-preview-dialog .results-table-container::-webkit-scrollbar-thumb:hover {
-    background: var(--visibility-hidden);
-  }
-
-  .point-out-preview-dialog .results-table-container thead th {
-    background-color: var(--pf2e-visioner-warning);
-    color: white;
-  }
-
-  /* Override any CSS variable backgrounds that might be interfering */
-  .point-out-preview-dialog .results-table-container tbody tr[style*='--color-bg-primary'],
-  .point-out-preview-dialog
-    .results-table-container
-    tbody
-    tr[style*='background: var(--color-bg-primary'],
-  .point-out-preview-dialog
-    .results-table-container
-    tbody
-    tr[style*='background-color: var(--color-bg-primary'] {
-    background: transparent !important;
-  }
-
-  .point-out-preview-dialog
-    .results-table-container
-    tbody
-    tr[style*='--color-bg-primary']:nth-child(even),
-  .point-out-preview-dialog
-    .results-table-container
-    tbody
-    tr[style*='background: var(--color-bg-primary']:nth-child(even),
-  .point-out-preview-dialog
-    .results-table-container
-    tbody
-    tr[style*='background-color: var(--color-bg-primary']:nth-child(even) {
-    background-color: rgba(0, 0, 0, 0.1) !important;
-  }
-
-  /* Sneak - Gray */
-  .sneak-preview-dialog .results-table-container {
-    scrollbar-color: rgba(108, 117, 125, 0.6) transparent;
-  }
-
-  .sneak-preview-dialog .results-table-container::-webkit-scrollbar-thumb {
-    background: rgba(108, 117, 125, 0.6);
-  }
-
-  .sneak-preview-dialog .results-table-container::-webkit-scrollbar-thumb:hover {
-    background: rgba(108, 117, 125, 0.8);
-  }
-
-  .sneak-preview-dialog .results-table-container thead th {
-    background-color: var(--pf2e-visioner-gray);
-    color: white;
-  }
-
-  /* Create a Diversion - Teal */
-  .create-a-diversion-preview-dialog .results-table-container {
-    scrollbar-color: rgba(23, 162, 184, 0.6) transparent;
-  }
-
-  .create-a-diversion-preview-dialog .results-table-container::-webkit-scrollbar-thumb {
-    background: rgba(23, 162, 184, 0.6);
-  }
-
-  .create-a-diversion-preview-dialog .results-table-container::-webkit-scrollbar-thumb:hover {
-    background: rgba(23, 162, 184, 0.8);
-  }
-
-  .create-a-diversion-preview-dialog .results-table-container thead th {
-    background-color: var(--pf2e-visioner-teal);
-    color: white;
-  }
-
-  /* Consequences - Red */
-  .consequences-preview-dialog .results-table-container {
-    scrollbar-color: rgba(220, 53, 69, 0.6) transparent;
-  }
-
-  .consequences-preview-dialog .results-table-container::-webkit-scrollbar-thumb {
-    background: rgba(220, 53, 69, 0.6);
-  }
-
-  .consequences-preview-dialog .results-table-container::-webkit-scrollbar-thumb:hover {
-    background: rgba(220, 53, 69, 0.8);
-  }
-
-  .consequences-preview-dialog .results-table-container thead th {
-    background-color: var(--pf2e-visioner-danger);
-    color: white;
-  }
-
-  /* Take Cover - Brown theme */
-  .take-cover-preview-dialog .results-table-container {
-    scrollbar-color: rgba(121, 85, 72, 0.6) transparent;
-  }
-  .take-cover-preview-dialog .results-table-container::-webkit-scrollbar-thumb {
-    background: rgba(121, 85, 72, 0.6);
-  }
-  .take-cover-preview-dialog .results-table-container::-webkit-scrollbar-thumb:hover {
-    background: rgba(121, 85, 72, 0.8);
-  }
-  .take-cover-preview-dialog .results-table-container thead th {
-    background-color: var(--pf2e-visioner-brown);
-    color: var(--color-text-light-primary);
-  }
-
-  /* Visibility change layout for consequences dialog */
-  .consequences-preview-dialog .visibility-change {
-    width: 100px;
-  }
-
-  /* Visibility change layout for consequences dialog */
-  .consequences-preview-dialog .actions {
-    width: 50px;
-  }
-
-  .consequences-preview-dialog .visibility-change-with-override {
-    display: flex;
-    flex-direction: row;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-  }
-
-  .consequences-preview-dialog .visibility-arrow {
-    color: var(--color-text-dark-secondary);
-    font-size: 14px;
-    margin: 0 4px;
-  }
-
-  .consequences-preview-dialog .override-icons {
-    display: flex;
-    gap: 4px;
-  }
-
-  /* State icon styling for consequences dialog */
-  .consequences-preview-dialog .override-icons .state-icon {
-    width: 28px;
-    height: 28px;
-    border: 1px solid var(--color-border-light-primary);
-    border-radius: 4px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    background: rgba(0, 0, 0, 0.1);
-    transition: all 0.2s ease;
-    position: relative;
-  }
-
-  .consequences-preview-dialog .override-icons .state-icon:hover {
-    background: rgba(255, 255, 255, 0.1);
-    transform: translateY(-1px);
-  }
-
-  /* State icon colors are now inline in the template */
-
-  /* Animation for initial outcome */
-  @keyframes initialGlow {
-    0% {
-      box-shadow: 0 0 8px var(--visibility-observed);
-      border-color: var(--visibility-observed);
-      transform: scale(1.05);
-    }
-    50% {
-      box-shadow: 0 0 20px var(--visibility-observed);
-      border-color: var(--cover-none);
-      transform: scale(1.1);
-    }
-    100% {
-      box-shadow: 0 0 8px var(--visibility-observed);
-      border-color: var(--visibility-observed);
-      transform: scale(1.05);
-    }
-  }
-
-  .consequences-preview-dialog .override-icons .state-icon.initial-outcome {
-    animation: initialGlow 1.5s ease-in-out infinite;
-    border: 2px solid var(--visibility-observed) !important;
-    background-color: var(--visibility-observed-bg);
-  }
-
-  /* Selected state styling for each visibility state */
-  .consequences-preview-dialog .override-icons .state-icon[data-state='observed'].selected {
-    background: var(--visibility-observed-bg-strong);
-    border: 2px solid var(--visibility-observed);
-    box-shadow: 0 0 8px var(--visibility-observed);
-    transform: scale(1.1);
-  }
-
-  .consequences-preview-dialog .override-icons .state-icon[data-state='concealed'].selected {
-    background: rgba(255, 193, 7, 0.2);
-    border: 2px solid var(--visibility-concealed);
-    box-shadow: 0 0 8px rgba(255, 193, 7, 0.5);
-    transform: scale(1.1);
-  }
-
-  .consequences-preview-dialog .override-icons .state-icon[data-state='hidden'].selected {
-    background: var(--visibility-hidden-bg-strong);
-    border: 2px solid var(--visibility-hidden);
-    box-shadow: 0 0 8px rgba(255, 102, 0, 0.5);
-    transform: scale(1.1);
-  }
-
-  .consequences-preview-dialog .override-icons .state-icon[data-state='undetected'].selected {
-    background: var(--visibility-undetected-bg-strong);
-    border: 2px solid var(--visibility-undetected);
-    box-shadow: 0 0 8px var(--visibility-undetected);
-    transform: scale(1.1);
-  }
-
-  /* Selected dot indicator for each visibility state */
-  .consequences-preview-dialog .override-icons .state-icon[data-state='observed'].selected::after {
-    content: '';
-    position: absolute;
-    bottom: -2px;
-    right: -2px;
-    width: 8px;
-    height: 8px;
-    background-color: var(--visibility-observed);
-    border-radius: 50%;
-    border: 1px solid var(--color-text-light-primary);
-  }
-
-  .consequences-preview-dialog .override-icons .state-icon[data-state='concealed'].selected::after {
-    content: '';
-    position: absolute;
-    bottom: -2px;
-    right: -2px;
-    width: 8px;
-    height: 8px;
-    background-color: var(--visibility-concealed);
-    border-radius: 50%;
-    border: 1px solid var(--color-text-light-primary);
-  }
-
-  .consequences-preview-dialog .override-icons .state-icon[data-state='hidden'].selected::after {
-    content: '';
-    position: absolute;
-    bottom: -2px;
-    right: -2px;
-    width: 8px;
-    height: 8px;
-    background-color: var(--visibility-hidden);
-    border-radius: 50%;
-    border: 1px solid var(--color-text-light-primary);
-  }
-
-  .consequences-preview-dialog
-    .override-icons
-    .state-icon[data-state='undetected'].selected::after {
-    content: '';
-    position: absolute;
-    bottom: -2px;
-    right: -2px;
-    width: 8px;
-    height: 8px;
-    background-color: var(--visibility-undetected);
-    border-radius: 50%;
-    border: 1px solid var(--color-text-light-primary);
-  }
-
-  /* Bulk action buttons styling */
-  .bulk-action-btn {
-    padding: 8px 16px;
-    border: 1px solid var(--color-border-light-primary);
-    border-radius: 4px;
-    background: var(--color-bg-option);
-    color: var(--color-text-primary);
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 13px;
-    font-weight: 500;
-    transition: all 0.2s ease;
-    min-width: 100px;
-    justify-content: center;
-  }
-
-  .bulk-action-btn:hover {
-    background: var(--color-bg-option-active);
-    border-color: var(--color-border-highlight);
-    transform: translateY(-1px);
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-  }
-
-  .bulk-action-btn:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-    transform: none;
-    box-shadow: none;
-  }
-
-  .bulk-action-btn.apply-all {
-    background: var(--color-bg-btn-primary);
-    color: var(--color-text-light-primary);
-    border-color: var(--color-border-highlight-alt);
-  }
-
-  .bulk-action-btn.apply-all:hover:not(:disabled) {
-    background: var(--color-bg-btn-primary-active);
-    border-color: var(--color-border-highlight);
-  }
-
-  .bulk-action-btn.revert-all {
-    background: var(--color-bg-btn-secondary);
-    color: var(--color-text-light-primary);
-    border-color: var(--color-border-light-primary);
-  }
-
-  .bulk-action-btn.revert-all:hover:not(:disabled) {
-    background: var(--color-bg-btn-secondary-active);
-    border-color: var(--color-border-highlight);
-  }
-
-  /* Row action buttons styling */
-  .row-action-btn {
-    width: 30px;
-    height: 30px;
-    margin: 0 3px;
-    border: 1px solid var(--color-border-light-primary);
-    border-radius: 4px;
-    background: var(--color-bg-option);
-    color: var(--color-text-primary);
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 12px;
-    transition: all 0.2s ease;
-  }
-
-  .row-action-btn:hover {
-    background: var(--color-bg-option-active);
-    border-color: var(--color-border-highlight);
-    transform: translateY(-1px);
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-  }
-
-  .row-action-btn.apply-change {
-    background: var(--color-bg-btn-primary);
-    color: var(--color-text-light-primary);
-    border-color: var(--color-bg-btn-primary);
-  }
-
-  .row-action-btn.apply-change:hover {
-    background: var(--color-bg-btn-primary-active);
-    border-color: var(--color-bg-btn-primary-active);
-  }
-
-  .row-action-btn.revert-change {
-    background: var(--color-bg-btn-secondary);
-    color: var(--color-text-dark-primary);
-    border-color: var(--color-bg-btn-secondary);
-  }
-
-  .row-action-btn.revert-change:hover {
-    background: var(--color-bg-btn-secondary-active);
-    border-color: var(--color-bg-btn-secondary-active);
-  }
-
-  /* Action buttons styling for specific dialogs */
-  .consequences-preview-dialog .row-action-btn {
-    width: 30px;
-    height: 30px;
-    margin: 0 3px;
-    border-radius: 4px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  /* Wall Manager specific styles */
-  .pf2e-visioner-wall-manager {
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-
-    .search-filter-container {
-      flex-wrap: wrap;
-      gap: 8px;
-      flex-shrink: 0;
-    }
-
-    .search-filter-container > div {
+  /* Enhanced Sneak & Hide Preview Dialog Styles (shared position requirement buttons) */
+  .sneak-preview-dialog,
+  .sneak-preview-content,
+  .hide-preview-dialog,
+  .hide-preview-content,
+  .pf2e-visioner .sneak-preview-dialog,
+  .pf2e-visioner .sneak-preview-content,
+  .pf2e-visioner .hide-preview-dialog,
+  .pf2e-visioner .hide-preview-content {
+    /* Position requirement buttons - row layout with polish */
+    .position-requirements-row {
       display: flex;
+      justify-content: center;
       align-items: center;
-      gap: 4px;
-      white-space: nowrap;
     }
 
-    .search-filter-container input,
-    .search-filter-container select {
-      padding: 4px 8px;
-      border: 1px solid var(--color-border-light-primary);
-      border-radius: 3px;
-      background: var(--color-bg-input);
-      color: var(--color-text-primary);
-      font-size: 12px;
-    }
-
-    .search-filter-container input:focus,
-    .search-filter-container select:focus {
-      outline: none;
-      border-color: var(--color-text-hyperlink);
-      box-shadow: 0 0 3px rgba(255, 152, 0, 0.3);
-    }
-
-    /* Fix dropdown option styling for better contrast */
-    .search-filter-container select option {
-      background: var(--color-bg-primary, #2a2a2a);
-      color: var(--color-text-primary, #ffffff);
-      padding: 4px 8px;
-    }
-
-    .search-filter-container select option:hover {
-      background: var(--color-bg-option-hover, #3a3a3a);
-    }
-
-    .search-filter-container select option:checked {
-      background: var(--color-bg-option-active, #4a4a4a);
-      color: var(--color-text-light-primary, #ffffff);
-    }
-
-    .table-container {
-      flex: 1;
-      min-height: 0;
-      height: 400px;
-      max-height: 400px;
-      background: var(--color-bg-primary);
-      scrollbar-width: thin;
-      scrollbar-color: var(--color-scrollbar-thumb) var(--color-scrollbar-track);
-      margin-bottom: 12px;
-      border: 1px solid rgba(255, 255, 255, 0.2);
-      border-radius: 4px;
-      overflow: auto;
-      position: relative;
-    }
-
-    .table-container::-webkit-scrollbar {
-      width: 8px;
-    }
-
-    .table-container::-webkit-scrollbar-track {
-      background: var(--color-scrollbar-track);
-      border-radius: 4px;
-    }
-
-    .table-container::-webkit-scrollbar-thumb {
-      background: var(--color-scrollbar-thumb);
-      border-radius: 4px;
-    }
-
-    .table-container::-webkit-scrollbar-thumb:hover {
-      background: var(--color-scrollbar-thumb-hover);
-    }
-
-    .sticky-header-table {
-      width: 100%;
-      border-collapse: collapse;
-      margin: 0;
-    }
-
-    .sticky-header {
-      position: sticky !important;
-      top: 0 !important;
-      z-index: 999 !important;
-      background: var(--color-bg-header, #2a2a2a) !important;
-    }
-
-    .sticky-row {
-      position: sticky !important;
-      top: 0 !important;
-      z-index: 999 !important;
-      background: var(--color-bg-header, #2a2a2a) !important;
-    }
-
-    .sticky-header th {
-      padding: 8px;
-      border-bottom: 2px solid var(--color-border-dark);
-      font-weight: bold;
-      text-align: center;
-      background: var(--color-bg-header, #2a2a2a) !important;
-      position: sticky !important;
-      top: 0 !important;
-      z-index: 999 !important;
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-    }
-
-    .sticky-header-table tbody td {
-      padding: 6px 8px;
-      border-bottom: 1px solid var(--color-border-light);
-      vertical-align: middle;
-    }
-
-    .sticky-header-table tbody tr:hover {
-      background: rgba(255, 255, 255, 0.05);
-    }
-
-    .wall-count {
-      font-size: 12px;
-      color: var(--color-text-secondary);
-      white-space: nowrap;
-    }
-
-    .header-actions {
-      flex-shrink: 0;
-      margin-bottom: 8px;
-    }
-
-    .header-actions .visioner-btn {
-      padding: 6px 12px;
-      border: 1px solid var(--color-border-light-primary);
-      border-radius: 4px;
-      background: var(--color-bg-btn-secondary, #6c757d);
-      color: var(--color-text-btn-secondary, #ffffff);
+    .position-requirement-btn {
+      border: 2px solid #ddd;
+      background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+      color: #495057;
+      padding: 8px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
       font-weight: 500;
-      font-size: 12px;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-    }
-
-    .header-actions .visioner-btn:hover {
-      background: var(--color-bg-btn-secondary-hover, #5a6268);
-      border-color: var(--color-border-hover, var(--color-text-hyperlink));
-      transform: translateY(-1px);
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
-    }
-
-    .header-actions .visioner-btn:active {
-      transform: translateY(0);
-      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
-    }
-
-    .header-actions .visioner-btn i {
-      font-size: 11px;
-    }
-
-    /* Bulk cover button styling */
-    .header-actions .visioner-btn[data-action='bulkCoverAuto'] {
-      background: var(--color-bg-btn-secondary, #6c757d);
-      border-color: var(--color-border-light-primary);
-    }
-
-    .header-actions .visioner-btn[data-action='bulkCoverNone'] {
-      background: var(--cover-none-bg, #dc3545);
-      border-color: var(--cover-none-border, #dc3545);
-      color: var(--cover-none-text, #ffffff);
-    }
-
-    .header-actions .visioner-btn[data-action='bulkCoverStandard'] {
-      background: var(--cover-standard-bg, #fd7e14);
-      border-color: var(--cover-standard-border, #fd7e14);
-      color: var(--cover-standard-text, #ffffff);
-    }
-
-    .header-actions .visioner-btn[data-action='bulkCoverGreater'] {
-      background: var(--cover-greater-bg, #e83e8c);
-      border-color: var(--cover-greater-border, #e83e8c);
-      color: var(--cover-greater-text, #ffffff);
-    }
-
-    .header-actions .visioner-btn[data-action='bulkCoverNone']:hover {
-      background: var(--cover-none-bg-hover, #c82333);
-      border-color: var(--cover-none-border-hover, #c82333);
-    }
-
-    .header-actions .visioner-btn[data-action='bulkCoverStandard']:hover {
-      background: var(--cover-standard-bg-hover, #e8690b);
-      border-color: var(--cover-standard-border-hover, #e8690b);
-    }
-
-    .header-actions .visioner-btn[data-action='bulkCoverGreater']:hover {
-      background: var(--cover-greater-bg-hover, #d63384);
-      border-color: var(--cover-greater-border-hover, #d63384);
-    }
-
-    .sheet-footer {
-      flex-shrink: 0;
-      margin-top: 8px;
-      padding-top: 8px;
-      border-top: 1px solid var(--color-border-light);
-      background: var(--color-bg-primary);
-      display: flex;
-      gap: 8px;
-      justify-content: flex-end;
-    }
-
-    .sheet-footer .visioner-btn {
-      padding: 8px 16px;
-      border-radius: 4px;
-      font-weight: 500;
-      transition: all 0.2s ease;
-      border: 1px solid transparent;
-      cursor: pointer;
-    }
-
-    .sheet-footer .visioner-btn.visioner-primary {
-      background: var(--color-bg-btn-primary, #28a745);
-      color: var(--color-text-btn-primary, #ffffff);
-      border-color: var(--color-border-btn-primary, #28a745);
-    }
-
-    .sheet-footer .visioner-btn.visioner-primary:hover {
-      background: var(--color-bg-btn-primary-hover, #218838);
-      border-color: var(--color-border-btn-primary-hover, #218838);
-      transform: translateY(-1px);
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-    }
-
-    .sheet-footer .visioner-btn:not(.visioner-primary) {
-      background: var(--color-bg-btn-secondary, #6c757d);
-      color: var(--color-text-btn-secondary, #ffffff);
-      border-color: var(--color-border-btn-secondary, #6c757d);
-    }
-
-    .sheet-footer .visioner-btn:not(.visioner-primary):hover {
-      background: var(--color-bg-btn-secondary-hover, #5a6268);
-      border-color: var(--color-border-btn-secondary-hover, #5a6268);
-      transform: translateY(-1px);
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
-    }
-
-    .sheet-footer .visioner-btn:active {
-      transform: translateY(0);
-      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
-    }
-
-    .sheet-footer .visioner-btn i {
-      margin-right: 6px;
-    }
-
-    .cover-override-buttons {
-      gap: 2px !important;
-    }
-
-    .cover-override-buttons .visioner-icon-btn {
-      min-width: 28px;
-      height: 28px;
-      padding: 4px;
-      font-size: 12px;
-    }
-
-    .wall-type-select {
-      width: 100%;
-      max-width: 100px;
-      padding: 4px 6px;
-      border: 1px solid var(--color-border-light-primary);
-      border-radius: 3px;
-      background: var(--color-bg-input);
-      color: var(--color-text-primary);
-      font-size: 11px;
-      cursor: pointer;
-    }
-
-    .wall-type-select:focus {
-      outline: none;
-      border-color: var(--color-text-hyperlink);
-      box-shadow: 0 0 3px rgba(255, 152, 0, 0.3);
-    }
-
-    .wall-type-select:hover {
-      border-color: var(--color-border-hover, var(--color-text-hyperlink));
-    }
-
-    .wall-type-container {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 4px;
-    }
-
-    .wall-type-button {
-      background: none;
-      border: 2px solid transparent;
-      border-radius: 4px;
-      padding: 2px;
-      cursor: pointer;
-      transition: all 0.2s ease;
+      transition: all 0.3s ease;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      min-width: 40px;
       display: flex;
       align-items: center;
       justify-content: center;
     }
 
-    .wall-type-button:hover {
-      border-color: var(--color-text-hyperlink, #ff9800);
-      background: rgba(255, 152, 0, 0.1);
-      transform: scale(1.05);
+    .position-requirement-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
     }
 
-    .wall-type-button:active {
-      transform: scale(0.95);
+    .position-requirement-btn.position-check.active {
+      background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+      color: white;
+      border-color: #1e7e34;
+      box-shadow: 0 2px 8px rgba(40, 167, 69, 0.3);
     }
 
-    .wall-type-button img {
-      display: block;
-      border-radius: 2px;
-      pointer-events: none;
+    .position-requirement-btn.position-x {
+      background: linear-gradient(135deg, #dc3545 0%, #e74c3c 100%);
+      color: white;
+      border-color: #bd2130;
+      box-shadow: 0 2px 8px rgba(220, 53, 69, 0.3);
     }
 
-    .wall-dc-input {
-      width: 100%;
-      max-width: 60px;
-      padding: 4px 6px;
-      border: 1px solid var(--color-border-light-primary);
-      border-radius: 3px;
-      background: var(--color-bg-input);
-      color: var(--color-text-primary);
-      font-size: 11px;
-      text-align: center;
-      cursor: text;
+    /* Defer button for Sneaky feat mechanics */
+    .defer-btn {
+      border: 2px solid #8538b2;
+      background: linear-gradient(135deg, #6b2c91 0%, #512c7b 100%);
+      color: white;
+      padding: 8px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 600;
+      transition: all 0.3s ease;
+      box-shadow: 0 2px 6px rgba(133, 56, 178, 0.2);
+      min-width: 42px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-left: 8px;
+      position: relative;
     }
 
-    .wall-dc-input:focus {
+    .defer-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(133, 56, 178, 0.3);
+      background: linear-gradient(135deg, #7d3ba5 0%, #5c3489 100%);
+      border-color: #9438b2;
+    }
+
+    .defer-btn.deferred.active {
+      background: linear-gradient(135deg, #ff9800 0%, #f57c00 100%);
+      color: white;
+      border-color: #ff6f00;
+      box-shadow: 0 2px 8px rgba(255, 152, 0, 0.4);
+      animation: defer-pulse 2s ease-in-out infinite alternate;
+    }
+
+    .defer-btn.deferred.active:hover {
+      background: linear-gradient(135deg, #ff6f00 0%, #e65100 100%);
+      border-color: #d84315;
+      animation: none;
+      box-shadow: 0 4px 15px rgba(255, 111, 0, 0.5);
+    }
+
+    @keyframes defer-pulse {
+      0% {
+        box-shadow: 0 2px 8px rgba(255, 152, 0, 0.4);
+      }
+      100% {
+        box-shadow:
+          0 2px 8px rgba(255, 152, 0, 0.4),
+          0 0 20px rgba(255, 152, 0, 0.3);
+      }
+    }
+
+    /* When a row is deferred, dim it slightly but keep most elements functional */
+    tr.deferred-row {
+      opacity: 0.85; /* Less dimming to show elements are still functional */
+    }
+
+    /* Only disable visibility change icons and start position button for deferred rows */
+    tr.deferred-row .visibility-change .override-icons.disabled,
+    tr.deferred-row .start-position .position-requirement-btn[disabled] {
+      pointer-events: none !important;
+      opacity: 0.5;
+    }
+
+    /* Ensure actions column is fully interactive for deferred rows */
+    tr.deferred-row td.actions {
+      pointer-events: auto !important;
+    }
+
+    /* Keep defer/undefer buttons fully functional */
+    tr.deferred-row td .defer-btn {
+      pointer-events: auto !important;
+    }
+
+    tr.deferred-row td .undefer-btn {
+      pointer-events: auto !important;
+      opacity: 1 !important; /* Override row opacity to make button fully visible */
+    }
+
+    tr.deferred-row td .deferred-actions-container {
+      pointer-events: auto !important;
+    }
+
+    /* Consecutive sneak position buttons with clock icons */
+    .position-requirement-btn .fa-clock {
+      color: #ff9800;
+      animation: clock-tick 2s ease-in-out infinite alternate;
+    }
+
+    @keyframes clock-tick {
+      0% {
+        color: #ff9800;
+        text-shadow: 0 0 5px rgba(255, 152, 0, 0.3);
+      }
+      100% {
+        color: #f57c00;
+        text-shadow: 0 0 10px rgba(255, 152, 0, 0.5);
+      }
+    }
+
+    /* Adjust position button styling for consecutive sneaks */
+    .position-requirement-btn:has(.fa-clock) {
+      background: linear-gradient(135deg, rgba(255, 152, 0, 0.1) 0%, rgba(245, 124, 0, 0.1) 100%);
+      border-color: #ff9800;
+    }
+
+    /* Undefer button for removing defer status */
+    .undefer-btn {
+      border: 2px solid #663399;
+      background: linear-gradient(135deg, #663399 0%, #552288 100%);
+      color: white;
+      padding: 6px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 600;
+      transition: all 0.3s ease;
+      box-shadow: 0 2px 6px rgba(102, 51, 153, 0.2);
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      margin-left: 6px;
+      position: relative;
+    }
+
+    .undefer-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(102, 51, 153, 0.3);
+      background: linear-gradient(135deg, #7744aa 0%, #663399 100%);
+      border-color: #552288;
+    }
+
+    .undefer-btn:focus {
       outline: none;
-      border-color: var(--color-text-hyperlink);
-      box-shadow: 0 0 3px rgba(255, 152, 0, 0.3);
+      box-shadow: 0 0 0 3px rgba(102, 51, 153, 0.3);
     }
 
-    .wall-dc-input:hover {
-      border-color: var(--color-border-hover, var(--color-text-hyperlink));
+    tr.row-deferred td .undefer-btn {
+      pointer-events: auto; /* Keep undefer button clickable */
     }
 
-    .wall-dc-input::placeholder {
-      color: var(--color-text-secondary);
+    /* Deferred actions container in Actions column */
+    .deferred-actions-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .deferred-action {
+      color: #7d3ba5;
+      font-style: italic;
+      font-size: 0.9em;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    /* Make undefer button in actions column more compact */
+    .actions .undefer-btn {
+      padding: 4px 8px;
+      font-size: 11px;
+      min-width: auto;
+      margin-left: 0;
+      opacity: 1 !important; /* Ensure button is always fully visible */
+      pointer-events: auto !important; /* Ensure button is always clickable */
+      z-index: 10; /* Ensure button is above any overlays */
+      position: relative; /* Enable z-index */
+    }
+
+    /* Bulk defer button styling */
+    .bulk-defer-section {
+      margin: 10px 0;
+      text-align: center;
+    }
+
+    .bulk-defer-btn {
+      background: linear-gradient(135deg, #64748b, #475569);
+      border: 2px solid #64748b;
+      border-radius: 8px;
+      color: #f1f5f9;
+      cursor: pointer;
+      font-size: 14px;
+      padding: 10px 18px;
+      transition: all 0.3s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      position: relative;
       opacity: 0.7;
     }
 
-    /* Responsive design for smaller screens */
-    @media (max-width: 800px) {
-      .search-filter-container {
-        flex-direction: column;
-        align-items: stretch;
-      }
+    .bulk-defer-btn:hover {
+      background: linear-gradient(135deg, #7581a0, #5a6578);
+      border-color: #7581a0;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(100, 116, 139, 0.3);
+      opacity: 0.85;
+    }
 
-      .search-filter-container > div {
-        justify-content: space-between;
-      }
+    .bulk-defer-btn.available {
+      background: linear-gradient(135deg, #8538b2, #512c7b);
+      border-color: #9438b2;
+      color: #fff;
+      opacity: 1;
+      animation: bulk-defer-pulse 2.5s ease-in-out infinite alternate;
+      box-shadow: 0 2px 8px rgba(133, 56, 178, 0.3);
+    }
 
-      .search-filter-container input {
-        min-width: unset;
-        flex: 1;
+    .bulk-defer-btn.available:hover {
+      background: linear-gradient(135deg, #994fd1, #7538b2);
+      border-color: #a14fd1;
+      animation: none;
+      box-shadow: 0 4px 20px rgba(133, 56, 178, 0.5);
+      transform: translateY(-3px);
+    }
+
+    @keyframes bulk-defer-pulse {
+      0% {
+        box-shadow: 0 2px 8px rgba(133, 56, 178, 0.3);
       }
+      100% {
+        box-shadow:
+          0 2px 8px rgba(133, 56, 178, 0.3),
+          0 0 25px rgba(133, 56, 178, 0.4);
+      }
+    }
+
+    /* End-Turn Validation Button */
+    .end-turn-validation-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 16px;
+      border: 2px solid #64748b;
+      border-radius: 6px;
+      background: linear-gradient(135deg, #475569 0%, #334155 100%);
+      color: #94a3b8;
+      font-size: 14px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      opacity: 0.6;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .end-turn-validation-btn:hover {
+      border-color: #78716c;
+      color: #e2e8f0;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+
+    .end-turn-validation-btn.available {
+      border-color: #059669;
+      background: linear-gradient(135deg, #064e3b 0%, #047857 100%);
+      color: #d1fae5;
+      opacity: 1;
+      animation: end-turn-ready-pulse 2s ease-in-out infinite alternate;
+    }
+
+    .end-turn-validation-btn.available:hover {
+      border-color: #10b981;
+      background: linear-gradient(135deg, #047857 0%, #059669 100%);
+      color: #ecfdf5;
+      transform: translateY(-2px);
+      box-shadow: 0 6px 16px rgba(5, 150, 105, 0.3);
+    }
+
+    @keyframes end-turn-ready-pulse {
+      0% {
+        box-shadow: 0 2px 8px rgba(5, 150, 105, 0.3);
+      }
+      100% {
+        box-shadow:
+          0 2px 8px rgba(5, 150, 105, 0.3),
+          0 0 25px rgba(5, 150, 105, 0.4);
+      }
+    }
+
+    /* Bulk Actions Container - Flex Row Layout */
+    .bulk-actions-container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      align-items: center;
+      justify-content: center;
+      margin: 16px 0;
+      padding: 12px;
+      background: rgba(0, 0, 0, 0.1);
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .bulk-action-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 10px;
+      border: 1px solid var(--color-border-light-primary);
+      background: var(--color-bg-option, rgba(0, 0, 0, 0.15));
+      border-radius: 6px;
+      margin: 6px 0;
+    }
+
+    .bulk-action-label {
+      font-size: 14px;
+      font-weight: 600;
+      color: #e2e8f0;
+      margin-right: 8px;
+      white-space: nowrap;
+    }
+
+    .apply-all-cover-buttons {
+      display: flex;
+      gap: 4px;
+    }
+
+    /* Cover bonus buttons - row layout with prettier styling */
+    .cover-bonus-controls {
+      display: flex;
+      gap: 4px;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .cover-bonus-btn {
+      background: transparent;
+      border: 1px solid var(--color-border-light-primary);
+      border-radius: 4px;
+      padding: 3px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      font-size: 11px;
+      min-width: 20px;
+      height: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0.6;
+      position: relative;
+    }
+
+    .cover-bonus-btn:hover {
+      opacity: 1;
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    .cover-bonus-btn.active {
+      opacity: 1;
+      border-width: 2px !important;
+    }
+
+    .cover-bonus-btn.active::after {
+      content: '';
+      position: absolute;
+      top: -2px;
+      right: -2px;
+      width: 6px;
+      height: 6px;
+      background: currentColor;
+      border-radius: 50%;
+      box-shadow: 0 0 4px rgba(255, 255, 255, 0.8);
+    }
+
+    /* Cover state colors for buttons */
+    .cover-bonus-btn[data-bonus='0'] {
+      color: var(--cover-none, #9e9e9e);
+    }
+
+    .cover-bonus-btn[data-bonus='2'] {
+      color: var(--cover-standard, #ff9800);
+    }
+
+    .cover-bonus-btn[data-bonus='4'] {
+      color: var(--cover-greater, #4caf50);
+    }
+
+    /* Apply All Cover Section - Top of dialog, module style */
+    .apply-all-cover-section-top {
+      display: flex !important;
+      flex-direction: row !important;
+      align-items: center !important;
+      gap: 12px !important;
+      padding: 8px 12px !important;
+      margin: 8px 0 12px 0 !important;
+      background: var(--color-bg-base, #2b2b2b) !important;
+      border: 1px solid var(--color-border-base, #555) !important;
+      border-radius: 4px !important;
+      box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.1) !important;
+    }
+
+    .apply-all-label {
+      font-weight: 500;
+      color: var(--color-text-primary, #f0f0f0);
+      font-size: 13px;
+      white-space: nowrap;
+    }
+
+    .apply-all-cover-buttons {
+      display: flex !important;
+      flex-direction: row !important;
+      gap: 4px !important;
+    }
+
+    /* COVER_STATES design for cover bonus buttons */
+    .cover-bonus-btn.module-style,
+    .apply-all-cover-btn.module-style {
+      background: transparent;
+      border: 1px solid var(--color-border-light-primary);
+      border-radius: 4px;
+      padding: 3px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      font-size: 11px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 2px;
+      opacity: 0.6;
+      position: relative;
+      min-width: 20px;
+      height: 20px;
+    }
+
+    .cover-bonus-btn.module-style:hover,
+    .apply-all-cover-btn.module-style:hover {
+      opacity: 1;
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    .cover-bonus-btn.module-style.active,
+    .apply-all-cover-btn.module-style.active {
+      opacity: 1;
+      border-width: 2px !important;
+    }
+
+    .cover-bonus-btn.module-style.active::after,
+    .apply-all-cover-btn.module-style.active::after {
+      content: '';
+      position: absolute;
+      top: -2px;
+      right: -2px;
+      width: 6px;
+      height: 6px;
+      background: currentColor;
+      border-radius: 50%;
+      box-shadow: 0 0 4px rgba(255, 255, 255, 0.8);
+    }
+
+    /* Apply All Cover buttons - slightly larger */
+    .apply-all-cover-btn.module-style {
+      padding: 6px 8px;
+      min-width: 42px;
+      height: 28px;
+      font-size: 11px;
+    }
+
+    /* Cover state colors for module-style buttons */
+    .cover-bonus-btn.module-style[data-bonus='0'],
+    .apply-all-cover-btn.module-style[data-bonus='0'] {
+      color: var(--cover-none, #9e9e9e);
+    }
+
+    .cover-bonus-btn.module-style[data-bonus='2'],
+    .apply-all-cover-btn.module-style[data-bonus='2'] {
+      color: var(--cover-standard, #ff9800);
+    }
+
+    .cover-bonus-btn.module-style[data-bonus='4'],
+    .apply-all-cover-btn.module-style[data-bonus='4'] {
+      color: var(--cover-greater, #4caf50);
+    }
+  }
+
+  /* Additional specificity for Apply All Cover section */
+  .pf2e-visioner .sneak-preview-content .apply-all-cover-section-top,
+  .sneak-preview-content .apply-all-cover-section-top,
+  .apply-all-cover-section-top {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+  }
+
+  .pf2e-visioner .sneak-preview-content .apply-all-cover-buttons,
+  .sneak-preview-content .apply-all-cover-buttons,
+  .apply-all-cover-buttons {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 4px !important;
+  }
+
+  .pf2e-visioner .standard-actions-section {
+    display: flex;
+    gap: 8px;
+  }
+
+  /* Seek dialog – Senses buttons */
+  .seek-preview-dialog .senses-buttons-container {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin: 6px 0;
+  }
+
+  .seek-preview-dialog .senses-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: fit-content;
+    max-width: 100%;
+    padding: 8px 12px;
+    border-radius: 999px;
+    border: 1px solid color-mix(in srgb, var(--pf2e-visioner-info) 55%, transparent);
+    background: linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--pf2e-visioner-info) 18%, transparent) 0%,
+      color-mix(in srgb, var(--pf2e-visioner-info) 12%, transparent) 100%
+    );
+    color: var(--color-text-light-primary);
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1;
+    transition: all 0.2s ease;
+    text-decoration: none;
+    box-shadow:
+      0 1px 3px rgba(0, 0, 0, 0.18),
+      inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  }
+
+  .seek-preview-dialog .senses-button:hover {
+    transform: translateY(-1px);
+    border-color: var(--pf2e-visioner-info);
+    box-shadow:
+      0 2px 6px rgba(0, 0, 0, 0.25),
+      0 0 0 2px color-mix(in srgb, var(--pf2e-visioner-info) 25%, transparent);
+  }
+
+  .seek-preview-dialog .senses-button i {
+    font-size: 14px;
+    line-height: 1;
+  }
+
+  .seek-preview-dialog .senses-button .button-text {
+    white-space: nowrap;
+  }
+
+  .seek-preview-dialog .senses-button .count-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 6px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 800;
+    background: color-mix(in srgb, #000 20%, var(--pf2e-visioner-info) 30%);
+    border: 1px solid color-mix(in srgb, var(--pf2e-visioner-info) 55%, transparent);
+    color: var(--color-text-light-primary);
+  }
+
+  .seek-preview-dialog .senses-button .chevron {
+    opacity: 0.9;
+    margin-left: 2px;
+  }
+
+  /* Inline used-sense indicator within the single button */
+  .seek-preview-dialog .senses-button .used-sense-indicator {
+    margin-left: 6px;
+    padding: 2px 6px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--color-text-light-primary);
+    background: color-mix(in srgb, var(--pf2e-visioner-warning) 22%, transparent);
+    border: 1px solid color-mix(in srgb, var(--pf2e-visioner-warning) 55%, transparent);
+  }
+
+  /* Variant accents – use module theme variables (no hardcoded hex) */
+  /* .senses-button.available-senses uses the themed base styles above */
+
+  .seek-preview-dialog .senses-button.used-senses {
+    background: color-mix(in srgb, var(--pf2e-visioner-warning) 20%, transparent);
+    border-color: color-mix(in srgb, var(--pf2e-visioner-warning) 60%, transparent);
+    color: var(--color-text-light-primary);
+  }
+
+  .seek-preview-dialog .senses-button.used-senses:hover {
+    background: color-mix(in srgb, var(--pf2e-visioner-warning) 30%, transparent);
+    border-color: var(--pf2e-visioner-warning);
+  }
+
+  /* Original visibility change styling restored */
+  .visibility-change-with-override {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    justify-content: center;
+  }
+
+  .override-icons {
+    display: flex;
+    gap: 2px;
+  }
+
+  .state-icon {
+    border: 1px solid #ddd;
+    background: #f8f9fa;
+    padding: 4px 6px;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 12px;
+    transition: all 0.2s ease;
+  }
+
+  .state-icon:hover {
+    background: #e9ecef;
+  }
+
+  .state-icon.selected {
+    background: #007bff;
+    color: white;
+    border-color: #0056b3;
+  }
+
+  /* Action buttons styling */
+  .row-action-btn {
+    border: 1px solid #ccc;
+    background: #f5f5f5;
+    color: #666;
+    padding: 4px 6px;
+    border-radius: 2px;
+    cursor: pointer;
+    font-size: 12px;
+    margin: 1px;
+    transition: all 0.2s ease;
+  }
+
+  .row-action-btn:hover {
+    background: #e0e0e0;
+  }
+
+  .apply-change {
+    background: #4caf50 !important;
+    color: white !important;
+    border-color: #45a049 !important;
+  }
+
+  .revert-change {
+    background: #ff9800 !important;
+    color: white !important;
+    border-color: #f57c00 !important;
+  }
+
+  .no-action {
+    color: #999;
+    font-style: italic;
+    font-size: 11px;
+  }
+
+  /* Table styling improvements */
+  .sneak-results-table {
+    width: 100%;
+    table-layout: auto;
+
+    .token-image {
+      width: 40px;
+      text-align: center;
+    }
+
+    .token-name {
+      min-width: 100px;
+    }
+
+    .cover-bonus {
+      text-align: center;
+      min-width: 90px;
+    }
+
+    .start-position,
+    .end-position {
+      text-align: center;
+      min-width: 70px;
+    }
+
+    .roll-result {
+      text-align: center;
+      min-width: 90px;
+    }
+
+    .outcome {
+      text-align: center;
+      min-width: 80px;
+    }
+
+    .visibility-change {
+      text-align: center;
+      min-width: 120px;
+    }
+
+    .actions {
+      text-align: center;
+      min-width: 100px;
+    }
+  }
+
+  /* Header styling for new columns */
+  th.start-position,
+  th.end-position {
+    text-align: center;
+    font-size: 11px;
+  }
+
+  th.start-position small,
+  th.end-position small {
+    display: block;
+    font-weight: normal;
+    font-size: 9px;
+    line-height: 1.2;
+  }
+
+  th.cover-bonus {
+    text-align: center;
+    font-size: 12px;
+  }
+
+  th.roll-result {
+    text-align: center;
+    font-size: 11px;
+  }
+}
+
+/* ==============================
+   Override Validation Dialog UI
+   ============================== */
+.pf2e-visioner.override-validation-dialog .window-content,
+.pf2e-visioner .override-validation-dialog .window-content {
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0; /* allow children to shrink and scroll */
+  /* Bound the content area so inner flex children can create a scroll region */
+  overflow: hidden;
+}
+
+/* Inline template styles migrated from override-validation.hbs */
+.pf2e-visioner
+  .override-validation-dialog
+  .override-validation-modern
+  .override-validation-table
+  thead
+  th {
+  padding: 10px 12px;
+}
+.pf2e-visioner .override-validation-dialog .override-validation-modern .chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.pf2e-visioner .override-validation-dialog .override-validation-modern .chip .chip-avatar {
+  width: 48px !important;
+  height: 48px !important;
+  border-radius: 4px !important;
+  object-fit: cover !important;
+  object-position: top !important;
+  flex-shrink: 0;
+  border: 1px solid rgba(255, 255, 255, 0.3) !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3) !important;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease !important;
+}
+
+.pf2e-visioner.override-validation-dialog .override-validation-modern .tables-scroll-container,
+.pf2e-visioner .override-validation-dialog .override-validation-modern .tables-scroll-container {
+  flex: 1 1 0%;
+  min-height: 0; /* allow inner content to expand and scroll */
+  overflow-y: auto;
+  margin-top: 8px;
+  padding-right: 4px;
+  max-height: 100%;
+}
+.pf2e-visioner .override-validation-dialog .override-validation-modern .results-table-container {
+  margin-bottom: 8px;
+}
+
+/* Fallback: if some theme overrides the inner container, allow the whole modern container to scroll */
+.pf2e-visioner.override-validation-dialog .override-validation-modern,
+.pf2e-visioner .override-validation-dialog .override-validation-modern {
+  overflow: hidden; /* primary: inner container scrolls */
+}
+.pf2e-visioner.override-validation-dialog
+  .override-validation-modern:has(
+    .tables-scroll-container:not(:is([style*='overflow'], .no-scroll))
+  ) {
+  overflow: hidden;
+}
+.pf2e-visioner.override-validation-dialog
+  .override-validation-modern:not(:has(.tables-scroll-container)) {
+  overflow: auto; /* last-resort scroll if inner container missing */
+}
+.pf2e-visioner .override-validation-dialog .override-validation-modern .table-header {
+  display: grid;
+  grid-template-columns: 1fr auto; /* title expands, actions stick to right */
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0 4px 0;
+  padding: 8px 12px; /* add horizontal padding to header */
+  width: 100%;
+  box-sizing: border-box;
+}
+/* Support when both classes are on the same root element (not nested) */
+.pf2e-visioner.override-validation-dialog .override-validation-modern .table-header {
+  display: grid;
+  grid-template-columns: 1fr auto; /* title expands, actions stick to right */
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0 4px 0;
+  padding: 8px 12px; /* add horizontal padding to header */
+  width: 100%;
+  box-sizing: border-box;
+}
+.pf2e-visioner .override-validation-dialog .override-validation-modern .table-header h4 {
+  margin: 0;
+}
+.pf2e-visioner
+  .override-validation-dialog
+  .override-validation-modern
+  .table-header
+  .table-actions
+  .bulk-action-btn {
+  font-size: 12px;
+}
+
+/* Ensure the table actions container sits on the far right */
+.pf2e-visioner
+  .override-validation-dialog
+  .override-validation-modern
+  .table-header
+  .table-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-self: end; /* anchor at the far right */
+  width: auto;
+}
+/* Support combined-class root for actions alignment */
+.pf2e-visioner.override-validation-dialog .override-validation-modern .table-header .table-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-self: end; /* anchor at the far right */
+  width: auto;
+}
+
+/* Add comfortable padding to table header cells */
+.override-validation-dialog .results-table-container table.override-validation-table thead th,
+.pf2e-visioner.override-validation-dialog
+  .results-table-container
+  table.override-validation-table
+  thead
+  th,
+.pf2e-visioner
+  .override-validation-dialog
+  .results-table-container
+  table.override-validation-table
+  thead
+  th {
+  padding: 10px 12px;
+}
+
+/* Fallbacks: ensure alignment even if classes are applied on a single root or nesting differs */
+.pf2e-visioner .override-validation-modern .table-header,
+.pf2e-visioner.override-validation-dialog .override-validation-modern .table-header,
+.override-validation-dialog .override-validation-modern .table-header {
+  display: grid !important;
+  grid-template-columns: 1fr auto !important;
+  align-items: center !important;
+  gap: 8px !important;
+  padding: 8px 12px !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+.pf2e-visioner .override-validation-modern .table-header .table-actions,
+.pf2e-visioner.override-validation-dialog .override-validation-modern .table-header .table-actions,
+.override-validation-dialog .override-validation-modern .table-header .table-actions {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-self: end !important;
+}
+
+/* Ensure the column header row has left padding */
+.override-validation-table thead th,
+.pf2e-visioner .override-validation-table thead th,
+.override-validation-dialog .override-validation-table thead th {
+  padding-left: 12px !important;
+}
+
+.pf2e-visioner.override-validation-dialog .override-validation-modern,
+.pf2e-visioner .override-validation-dialog .override-validation-modern {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1 1 auto;
+  height: 100%;
+  min-height: 0; /* enable inner scroll regions to size properly */
+}
+
+/* Header */
+.pf2e-visioner .override-validation-dialog .validation-header {
+  display: grid;
+  grid-template-columns: 28px 1fr;
+  gap: 10px;
+  align-items: center;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--color-border-light-primary);
+}
+.pf2e-visioner .override-validation-dialog .validation-header .header-icon {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: var(--visibility-concealed-bg, rgba(255, 179, 0, 0.12));
+  color: var(--visibility-concealed, #ffb300);
+  border: 1px solid var(--visibility-concealed-bg-strong, rgba(255, 179, 0, 0.3));
+}
+.pf2e-visioner .override-validation-dialog .validation-header h2 {
+  margin: 0;
+  line-height: 1.05;
+  font-size: 22px;
+  font-weight: 800;
+}
+.pf2e-visioner .override-validation-dialog .validation-header .subtitle {
+  margin: 4px 0 0 0;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+}
+
+/* Info card */
+.pf2e-visioner .override-validation-dialog .info-card {
+  display: grid;
+  grid-template-columns: 24px 1fr;
+  gap: 10px;
+  align-items: start;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border-light-primary);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.12);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+.pf2e-visioner .override-validation-dialog .info-card .info-icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 188, 212, 0.12);
+  color: #00bcd4;
+  border: 1px solid rgba(0, 188, 212, 0.35);
+}
+.pf2e-visioner .override-validation-dialog .info-card h4 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+}
+.pf2e-visioner .override-validation-dialog .info-card p {
+  margin: 3px 0 0 0;
+  font-size: 13px;
+}
+
+/* List header */
+.pf2e-visioner .override-validation-dialog .override-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.pf2e-visioner .override-validation-dialog .override-list .list-header {
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--color-border-light-primary);
+}
+.pf2e-visioner .override-validation-dialog .override-list .col-label.text-right {
+  text-align: right;
+}
+
+/* Items */
+.pf2e-visioner .override-validation-dialog .override-item {
+  border: 1px solid var(--color-border-light-primary);
+  border-radius: 10px;
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.02);
+}
+.pf2e-visioner .override-validation-dialog .override-item:nth-child(even) {
+  background: rgba(255, 255, 255, 0.03);
+}
+.pf2e-visioner .override-validation-dialog .override-item:hover {
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.06) inset;
+}
+
+/* Chips */
+.pf2e-visioner .override-validation-dialog .chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border: 1px solid var(--color-border-light-primary);
+  background: var(--color-bg-base);
+  border-radius: 16px;
+  font-weight: 600;
+  font-size: 12px;
+}
+.pf2e-visioner .override-validation-dialog .chip.chip--token,
+.pf2e-visioner .override-validation-dialog .chip.chip--token .chip-avatar,
+.pf2e-visioner .override-validation-dialog td.observer img.chip-avatar,
+.pf2e-visioner .override-validation-dialog td.target img.chip-avatar {
+  cursor: pointer !important;
+  width: 48px !important;
+  height: 48px !important;
+  border-radius: 4px !important;
+  object-fit: cover !important;
+  object-position: top !important;
+  border: 1px solid rgba(255, 255, 255, 0.3) !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3) !important;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease !important;
+}
+
+.pf2e-visioner .override-validation-dialog .chip-avatar {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+.pf2e-visioner .override-validation-dialog .chip .chip-label {
+  line-height: 1;
+}
+
+/* Status */
+.pf2e-visioner .override-validation-dialog .status-description {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--color-text-primary);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* Badge */
+.pf2e-visioner .override-validation-dialog .override-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+  font-size: 12px;
+  padding: 4px 8px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+}
+.pf2e-visioner .override-validation-dialog .override-badge.badge-sneak {
+  background: rgba(0, 0, 0, 0.15);
+  color: #cfd8dc;
+  border-color: rgba(207, 216, 220, 0.25);
+}
+.pf2e-visioner .override-validation-dialog .override-badge.badge-hide {
+  background: rgba(83, 109, 254, 0.12);
+  color: #c5cae9;
+  border-color: rgba(83, 109, 254, 0.35);
+}
+.pf2e-visioner .override-validation-dialog .override-badge.badge-manual {
+  background: rgba(255, 152, 0, 0.12);
+  color: #ffe0b2;
+  border-color: rgba(255, 152, 0, 0.35);
+}
+.pf2e-visioner .override-validation-dialog .override-badge.badge-generic {
+  background: rgba(158, 158, 158, 0.14);
+  color: #eeeeee;
+  border-color: rgba(158, 158, 158, 0.3);
+}
+
+/* Buttons */
+.pf2e-visioner .override-validation-dialog .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 13px;
+  border: 1px solid var(--color-border-light-primary);
+  background: transparent;
+  color: var(--color-text-primary);
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    transform 0.05s ease;
+}
+.pf2e-visioner .override-validation-dialog .btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: var(--color-border-highlight);
+}
+.pf2e-visioner .override-validation-dialog .btn:active {
+  transform: translateY(1px);
+}
+.pf2e-visioner .override-validation-dialog .btn.btn-clear {
+  border-color: rgba(244, 67, 54, 0.35);
+  color: #ffcdd2;
+}
+.pf2e-visioner .override-validation-dialog .btn.btn-clear:hover {
+  background: rgba(244, 67, 54, 0.12);
+  border-color: rgba(244, 67, 54, 0.6);
+}
+.pf2e-visioner .override-validation-dialog .btn.btn-keep {
+  background: #2e7d32;
+  color: #e8f5e9;
+  border-color: #2e7d32;
+}
+.pf2e-visioner .override-validation-dialog .btn.btn-keep:hover {
+  background: #27692b;
+  border-color: #27692b;
+}
+
+/* Bulk */
+.pf2e-visioner .override-validation-dialog .bulk-actions {
+  margin-top: 6px;
+  padding-top: 8px;
+  border-top: 1px solid var(--color-border-light-primary);
+}
+.pf2e-visioner .override-validation-dialog .bulk-actions h4 {
+  margin: 0 0 6px 0;
+  font-size: 16px;
+}
+.pf2e-visioner .override-validation-dialog .bulk-actions p {
+  margin: 0 0 8px 0;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+.pf2e-visioner .override-validation-dialog .bulk-buttons {
+  display: flex;
+  gap: 8px;
+}
+.pf2e-visioner .override-validation-dialog .btn.btn-bulk {
+  flex: 1 1 0;
+  justify-content: flex-start;
+}
+.pf2e-visioner .override-validation-dialog .btn.btn-clear-all {
+  background: #2e7d32;
+  color: #e8f5e9;
+  border-color: #2e7d32;
+}
+.pf2e-visioner .override-validation-dialog .btn.btn-keep-all {
+  border-color: rgba(244, 67, 54, 0.35);
+}
+
+/* Responsive */
+@media (max-width: 840px) {
+  .pf2e-visioner .override-validation-dialog .list-header {
+    display: none;
+  }
+  .pf2e-visioner .override-validation-dialog .override-row {
+    grid-template-columns: 1fr !important;
+    row-gap: 8px;
+  }
+  .pf2e-visioner .override-validation-dialog .actions-section {
+    justify-content: flex-start !important;
+  }
+}
+/* Force table container to grow and scroll */
+.results-table-container {
+  flex: 0 0 auto; /* let the scroll parent control height; containers size to content */
+  overflow-y: visible;
+  overflow-x: hidden;
+  border: 1px solid var(--color-border-light-primary);
+  margin-bottom: 10px;
+  /* Default scrollbar styling */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(73, 80, 87, 0.6) transparent;
+}
+
+/* === Override Validation v2 (scoped by data-ui attribute) === */
+.pf2e-visioner .override-validation-dialog [data-ui='override-v2'] .validation-header .header-icon {
+  width: 30px;
+  height: 30px;
+  font-size: 13px;
+  border-radius: 9px;
+}
+
+.pf2e-visioner .override-validation-dialog [data-ui='override-v2'] .btn.btn-keep {
+  background: #1f8a3b;
+  border-color: #1f8a3b;
+}
+.pf2e-visioner .override-validation-dialog [data-ui='override-v2'] .btn.btn-keep:hover {
+  background: #187233;
+  border-color: #187233;
+}
+
+.pf2e-visioner .override-validation-dialog [data-ui='override-v2'] .override-badge,
+.pf2e-visioner .override-validation-dialog [data-ui='override-v2'] .chip .chip-label {
+  white-space: nowrap;
+}
+
+.pf2e-visioner .override-validation-dialog [data-ui='override-v2'] .override-item:nth-child(even) {
+  background: rgba(255, 255, 255, 0.035);
+}
+
+/* Force footer to not grow */
+.point-out-preview-dialog-bulk-actions-header,
+.seek-preview-dialog-bulk-actions-header,
+.hide-preview-dialog-bulk-actions-header,
+.sneak-preview-dialog-bulk-actions-header,
+.create-a-diversion-preview-dialog-bulk-actions-header,
+.consequences-preview-dialog-bulk-actions-header,
+.take-cover-preview-dialog-bulk-actions-header {
+  flex: 0 0 auto;
+  border-top: 1px solid var(--color-border-light-primary);
+  padding-top: 10px;
+  display: flex;
+  justify-content: space-between;
+}
+
+/* Override Validation footer (non-action dialog) */
+.override-validation-bulk-actions-header {
+  flex: 0 0 auto;
+  border-top: 1px solid var(--color-border-light-primary);
+  padding-top: 10px;
+  display: flex;
+  justify-content: space-between;
+}
+.override-validation-bulk-actions-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+/* Basic table styling */
+.visibility-table,
+.point-out-results-table,
+.seek-results-table,
+.hide-results-table,
+.sneak-results-table,
+.create-a-diversion-results-table,
+.consequences-results-table,
+.take-cover-results-table {
+  width: 100%;
+}
+
+/* Remove default cell spacing so there's no visual gap between the sticky header and first row */
+.override-validation-dialog .results-table-container table.override-validation-table {
+  border-collapse: collapse;
+  border-spacing: 0;
+}
+
+/* Sticky headers */
+.results-table-container thead th {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+/* Override Validation table column sizing to mirror action dialogs */
+.override-validation-dialog
+  .results-table-container
+  table.override-validation-table
+  thead
+  th.observer,
+.override-validation-dialog .results-table-container table.override-validation-table td.observer {
+  width: 34%;
+}
+/* In the observer-oriented table, the first column is 'target' — mirror width */
+.override-validation-dialog
+  .results-table-container
+  table.override-validation-table
+  thead
+  th.target,
+.override-validation-dialog .results-table-container table.override-validation-table td.target {
+  width: 34%;
+}
+.override-validation-dialog
+  .results-table-container
+  table.override-validation-table
+  thead
+  th.source,
+.override-validation-dialog .results-table-container table.override-validation-table td.source {
+  width: 20%;
+}
+.override-validation-dialog
+  .results-table-container
+  table.override-validation-table
+  thead
+  th.status,
+.override-validation-dialog .results-table-container table.override-validation-table td.status {
+  width: 30%;
+}
+.override-validation-dialog
+  .results-table-container
+  table.override-validation-table
+  thead
+  th.actions,
+.override-validation-dialog .results-table-container table.override-validation-table td.actions {
+  width: 16%;
+  text-align: center;
+}
+
+/* Explicit alignment and spacing for Override Validation table */
+.override-validation-dialog .results-table-container table.override-validation-table th,
+.override-validation-dialog .results-table-container table.override-validation-table td {
+  vertical-align: middle;
+}
+
+.override-validation-dialog
+  .results-table-container
+  table.override-validation-table
+  thead
+  th.observer,
+.override-validation-dialog .results-table-container table.override-validation-table td.observer {
+  text-align: center;
+  font-size: small;
+}
+
+/* Target column should also be left-aligned (observer-oriented table) */
+.override-validation-dialog
+  .results-table-container
+  table.override-validation-table
+  thead
+  th.target,
+.override-validation-dialog .results-table-container table.override-validation-table td.target {
+  text-align: center;
+  font-size: small;
+}
+
+/* Observer cell avatar sizing and layout */
+.override-validation-dialog td.observer .chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.override-validation-dialog td.observer img.chip-avatar {
+  width: 48px !important;
+  height: 48px !important;
+  border-radius: 4px !important;
+  object-fit: cover !important;
+  object-position: top !important;
+  display: inline-block;
+  cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.3) !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3) !important;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease !important;
+}
+
+/* Safety net in case class is missing */
+.override-validation-dialog td.observer img {
+  max-width: 48px;
+  max-height: 48px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+/* Target cell avatar sizing and layout (observer-oriented table) */
+.override-validation-dialog td.target .chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.override-validation-dialog td.target img.chip-avatar {
+  width: 48px !important;
+  height: 48px !important;
+  border-radius: 4px !important;
+  object-fit: cover !important;
+  object-position: top !important;
+  display: inline-block;
+  cursor: pointer;
+  object-position: top;
+  /* Ensure parity with observer cell avatars (explicit here because some themes override nested selectors) */
+  border: 1px solid rgba(255, 255, 255, 0.3) !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3) !important;
+}
+/* Safety net for target cells */
+.override-validation-dialog td.target img {
+  max-width: 48px;
+  max-height: 48px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+/* Target header styles (like token manager) */
+.override-validation-dialog .target-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border: 1px solid var(--color-border-light-primary);
+  border-radius: 8px;
+  background: var(--color-bg-option);
+  margin: 6px 0 8px 0;
+}
+.override-validation-dialog .target-header .target-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 4px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--color-border-light-primary);
+}
+.override-validation-dialog .target-header .target-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.override-validation-dialog .target-header .target-meta {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.1;
+}
+.override-validation-dialog .target-header .target-label {
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.override-validation-dialog .target-header .target-name {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.override-validation-dialog
+  .results-table-container
+  table.override-validation-table
+  thead
+  th.source,
+.override-validation-dialog .results-table-container table.override-validation-table td.source {
+  text-align: center;
+  white-space: nowrap; /* keep badge tidy */
+  font-size: small;
+}
+
+.override-validation-dialog
+  .results-table-container
+  table.override-validation-table
+  thead
+  th.status,
+.override-validation-dialog .results-table-container table.override-validation-table td.status {
+  text-align: center;
+}
+
+/* Status icons styling */
+.override-validation-dialog .status-icons {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 6px;
+  flex-direction: column;
+}
+.override-validation-dialog .status-icons .visioner-icon-btn {
+  /* Icon-only look: no box, no background */
+  width: auto;
+  height: auto;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: default;
+}
+.override-validation-dialog .status-icons .state-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.override-validation-dialog .status-icons .state-arrow {
+  color: var(--color-text-dark-secondary);
+  opacity: 0.7;
+}
+/* In the override dialog, render state indicators as plain icons (no pill background) */
+.pf2e-visioner .override-validation-dialog .status-icons i[class*='visibility-'],
+.pf2e-visioner .override-validation-dialog .status-icons i[class*='cover-'] {
+  background: transparent !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  border: none !important;
+}
+.pf2e-visioner .override-validation-dialog .status-icons i[class*='visibility-'],
+.pf2e-visioner .override-validation-dialog .status-icons i[class*='cover-'] {
+  line-height: 1;
+}
+.pf2e-visioner .override-validation-dialog .status-icons .visioner-icon-btn:focus {
+  outline: none;
+  box-shadow: none;
+}
+/* Make sure the icon buttons themselves don't reintroduce borders/background via theme */
+.pf2e-visioner .override-validation-dialog .status-icons .visioner-icon-btn {
+  background: transparent !important;
+  border: none !important;
+}
+/* Make previous-state (left) icons slightly subdued */
+.override-validation-dialog .status-icons .prev-visibility i,
+.override-validation-dialog .status-icons .prev-cover i,
+.override-validation-dialog .status-icons i.prev-visibility,
+.override-validation-dialog .status-icons i.prev-cover {
+  opacity: 0.7;
+  font-size: medium;
+}
+
+/* Cover Effects */
+.override-validation-dialog .cover-effect,
+.no-effect.cover-none,
+.cover-lesser,
+.cover-standard,
+.cover-greater {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--color-text-dark-secondary);
+  display: inline-flex;
+}
+
+/* Current-state (right) icons are emphasized with a gentle glow */
+.override-validation-dialog .status-icons .status-visibility i,
+.override-validation-dialog .status-icons .prev-visibility i,
+.override-validation-dialog .status-icons i.prev-visibility,
+.override-validation-dialog .status-icons .prev-cover i,
+.override-validation-dialog .status-icons i.prev-cover,
+.override-validation-dialog .status-icons .status-cover i,
+.override-validation-dialog .status-icons i.status-visibility,
+.override-validation-dialog .status-icons i.status-cover {
+  text-shadow: 0 0 8px color-mix(in srgb, currentColor 55%, transparent);
+  font-size: medium;
+  border: none !important;
+  padding: 0;
+}
+
+/* Ensure all cover icons match perceived size of visibility icons; tweak weights if needed */
+/* Upscale all cover icons slightly to match visibility icon visual size */
+.pf2e-visioner .override-validation-dialog .status-icons i[class*='cover-'] {
+  font-size: 20px !important;
+}
+.override-validation-dialog .status-description {
+  display: none; /* hide textual status until Keep/Clear updates it */
+  margin-top: 4px;
+}
+
+/* No special-case scaling; all cover icons use the same size now */
+
+/* Name column word wrapping */
+.token-name strong {
+  white-space: normal;
+  word-wrap: normal;
+  word-break: normal;
+  overflow-wrap: break-word;
+  hyphens: auto; /* Allows hyphenation for very long words */
+}
+
+.results-table-container td.token-name {
+  white-space: normal;
+  word-wrap: normal;
+  overflow-wrap: break-word;
+  word-break: normal;
+  max-width: 150px; /* Forces wrapping when needed */
+}
+
+/* Token image clickable styling */
+.token-image img {
+  cursor: pointer;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+  border-radius: 4px;
+  object-fit: cover;
+  object-position: top;
+  display: block;
+  margin: 0 auto;
+}
+
+/* Row styling */
+.results-table-container tr:nth-child(even) {
+  background-color: rgba(0, 0, 0, 0.1);
+}
+
+/* Selection-based highlight parity with token manager */
+.results-table-container tr.token-row.row-hover,
+.results-table-container tr[data-token-id].row-hover {
+  outline: 2px solid var(--pf2e-visioner-primary);
+  outline-offset: -2px;
+  box-shadow: inset 0 0 0 2px var(--visibility-hidden-bg-strong);
+  background: var(--visibility-hidden-bg) !important;
+}
+
+/* Theme-colored row highlight per dialog */
+.seek-preview-dialog .results-table-container tr.row-hover,
+.seek-preview-dialog .results-table-container tr[data-token-id].row-hover {
+  outline-color: var(--pf2e-visioner-info);
+  box-shadow: inset 0 0 0 2px rgba(44, 90, 160, 0.35);
+  background: rgba(44, 90, 160, 0.1) !important;
+}
+
+.hide-preview-dialog .results-table-container tr.row-hover,
+.hide-preview-dialog .results-table-container tr[data-token-id].row-hover {
+  outline-color: var(--pf2e-visioner-purple);
+  box-shadow: inset 0 0 0 2px rgba(142, 36, 170, 0.35);
+  background: rgba(142, 36, 170, 0.1) !important;
+}
+
+.point-out-preview-dialog .results-table-container tr.row-hover,
+.point-out-preview-dialog .results-table-container tr[data-token-id].row-hover {
+  outline-color: var(--pf2e-visioner-warning);
+  box-shadow: inset 0 0 0 2px var(--visibility-hidden-bg-strong);
+  background: var(--visibility-hidden-bg) !important;
+}
+
+.sneak-preview-dialog .results-table-container tr.row-hover,
+.sneak-preview-dialog .results-table-container tr[data-token-id].row-hover {
+  outline-color: var(--pf2e-visioner-gray);
+  box-shadow: inset 0 0 0 2px rgba(108, 117, 125, 0.35);
+  background: rgba(108, 117, 125, 0.1) !important;
+}
+
+.create-a-diversion-preview-dialog .results-table-container tr.row-hover,
+.create-a-diversion-preview-dialog .results-table-container tr[data-token-id].row-hover {
+  outline-color: var(--pf2e-visioner-teal);
+  box-shadow: inset 0 0 0 2px rgba(23, 162, 184, 0.35);
+  background: rgba(23, 162, 184, 0.1) !important;
+}
+
+.consequences-preview-dialog .results-table-container tr.row-hover,
+.consequences-preview-dialog .results-table-container tr[data-token-id].row-hover {
+  outline-color: var(--pf2e-visioner-danger);
+  box-shadow: inset 0 0 0 2px rgba(220, 53, 69, 0.35);
+  background: rgba(220, 53, 69, 0.1) !important;
+}
+
+/* Take Cover - Brown */
+.take-cover-preview-dialog .results-table-container tr.row-hover,
+.take-cover-preview-dialog .results-table-container tr[data-token-id].row-hover {
+  outline-color: var(--pf2e-visioner-brown);
+  box-shadow: inset 0 0 0 2px rgba(121, 85, 72, 0.35);
+  background: rgba(121, 85, 72, 0.1) !important;
+}
+
+/* WebKit scrollbar styling (default) */
+.results-table-container::-webkit-scrollbar {
+  width: 8px;
+}
+
+.results-table-container::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.results-table-container::-webkit-scrollbar-thumb {
+  background: rgba(73, 80, 87, 0.6);
+  border-radius: 4px;
+}
+
+.results-table-container::-webkit-scrollbar-thumb:hover {
+  background: rgba(73, 80, 87, 0.8);
+}
+
+/* Theme-specific styling */
+
+/* Hide - Purple */
+.hide-preview-dialog .results-table-container {
+  scrollbar-color: rgba(142, 36, 170, 0.6) transparent;
+}
+
+.hide-preview-dialog .results-table-container::-webkit-scrollbar-thumb {
+  background: rgba(142, 36, 170, 0.6);
+}
+
+.hide-preview-dialog .results-table-container::-webkit-scrollbar-thumb:hover {
+  background: rgba(142, 36, 170, 0.8);
+}
+
+.hide-preview-dialog .results-table-container thead th {
+  background-color: var(--pf2e-visioner-purple);
+  color: white;
+}
+
+/* Seek - Blue */
+.seek-preview-dialog .results-table-container {
+  scrollbar-color: rgba(44, 90, 160, 0.6) transparent;
+}
+
+.seek-preview-dialog .results-table-container::-webkit-scrollbar-thumb {
+  background: rgba(44, 90, 160, 0.6);
+}
+
+.seek-preview-dialog .results-table-container::-webkit-scrollbar-thumb:hover {
+  background: rgba(44, 90, 160, 0.8);
+}
+
+.seek-preview-dialog .results-table-container thead th {
+  background-color: var(--pf2e-visioner-info);
+  color: white;
+}
+
+/* Point Out - Orange */
+.point-out-preview-dialog .results-table-container {
+  scrollbar-color: var(--visibility-hidden) transparent;
+}
+
+.point-out-preview-dialog .results-table-container::-webkit-scrollbar-thumb {
+  background: var(--visibility-hidden);
+}
+
+.point-out-preview-dialog .results-table-container::-webkit-scrollbar-thumb:hover {
+  background: var(--visibility-hidden);
+}
+
+.point-out-preview-dialog .results-table-container thead th {
+  background-color: var(--pf2e-visioner-warning);
+  color: white;
+}
+
+/* Sneak - Gray */
+.sneak-preview-dialog .results-table-container {
+  scrollbar-color: rgba(108, 117, 125, 0.6) transparent;
+}
+
+.sneak-preview-dialog .results-table-container::-webkit-scrollbar-thumb {
+  background: rgba(108, 117, 125, 0.6);
+}
+
+.sneak-preview-dialog .results-table-container::-webkit-scrollbar-thumb:hover {
+  background: rgba(108, 117, 125, 0.8);
+}
+
+.sneak-preview-dialog .results-table-container thead th {
+  background-color: var(--pf2e-visioner-gray);
+  color: white;
+}
+
+/* Sneak Position Qualification Indicators */
+.sneak-preview-dialog .position-qualification {
+  display: inline-flex;
+  align-items: center;
+  margin-right: 8px;
+  vertical-align: middle;
+}
+
+.sneak-preview-dialog .qualification-check {
+  color: #28a745;
+  font-size: 14px;
+  font-weight: bold;
+}
+
+.sneak-preview-dialog .qualification-fail {
+  color: #dc3545;
+  font-size: 14px;
+  font-weight: bold;
+}
+
+/* Split Position Columns Layout */
+.sneak-preview-dialog .position-state {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px;
+}
+
+.sneak-preview-dialog .position-indicators {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.sneak-preview-dialog .start-position,
+.sneak-preview-dialog .end-position {
+  text-align: center;
+  min-width: 120px;
+  padding: 6px;
+}
+
+.sneak-preview-dialog .start-position .position-state,
+.sneak-preview-dialog .end-position .position-state {
+  justify-content: center;
+}
+
+/* Create a Diversion - Teal */
+.create-a-diversion-preview-dialog .results-table-container {
+  scrollbar-color: rgba(23, 162, 184, 0.6) transparent;
+}
+
+.create-a-diversion-preview-dialog .results-table-container::-webkit-scrollbar-thumb {
+  background: rgba(23, 162, 184, 0.6);
+}
+
+.create-a-diversion-preview-dialog .results-table-container::-webkit-scrollbar-thumb:hover {
+  background: rgba(23, 162, 184, 0.8);
+}
+
+.create-a-diversion-preview-dialog .results-table-container thead th {
+  background-color: var(--pf2e-visioner-teal);
+  color: white;
+}
+
+/* Consequences - Red */
+.consequences-preview-dialog .results-table-container {
+  scrollbar-color: rgba(220, 53, 69, 0.6) transparent;
+}
+
+.consequences-preview-dialog .results-table-container::-webkit-scrollbar-thumb {
+  background: rgba(220, 53, 69, 0.6);
+}
+
+.consequences-preview-dialog .results-table-container::-webkit-scrollbar-thumb:hover {
+  background: rgba(220, 53, 69, 0.8);
+}
+
+.consequences-preview-dialog .results-table-container thead th {
+  background-color: var(--pf2e-visioner-danger);
+  color: white;
+}
+
+/* Take Cover - Brown theme */
+.take-cover-preview-dialog .results-table-container {
+  scrollbar-color: rgba(121, 85, 72, 0.6) transparent;
+}
+.take-cover-preview-dialog .results-table-container::-webkit-scrollbar-thumb {
+  background: rgba(121, 85, 72, 0.6);
+}
+.take-cover-preview-dialog .results-table-container::-webkit-scrollbar-thumb:hover {
+  background: rgba(121, 85, 72, 0.8);
+}
+.take-cover-preview-dialog .results-table-container thead th {
+  background-color: var(--pf2e-visioner-brown);
+  color: var(--color-text-light-primary);
+}
+
+/* Visibility change layout for consequences dialog */
+.consequences-preview-dialog .visibility-change {
+  width: 100px;
+}
+
+/* Visibility change layout for consequences dialog */
+.consequences-preview-dialog .actions {
+  width: 50px;
+}
+
+.consequences-preview-dialog .visibility-change-with-override {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.consequences-preview-dialog .visibility-arrow {
+  color: var(--color-text-dark-secondary);
+  font-size: 14px;
+  margin: 0 4px;
+}
+
+.consequences-preview-dialog .override-icons {
+  display: flex;
+  gap: 4px;
+}
+
+/* State icon styling for consequences dialog */
+.consequences-preview-dialog .override-icons .state-icon {
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--color-border-light-primary);
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  background: rgba(0, 0, 0, 0.1);
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.consequences-preview-dialog .override-icons .state-icon:hover {
+  background: rgba(255, 255, 255, 0.1);
+  transform: translateY(-1px);
+}
+
+/* State icon colors are now inline in the template */
+
+/* Animation for initial outcome */
+@keyframes initialGlow {
+  0% {
+    box-shadow: 0 0 8px var(--visibility-observed);
+    border-color: var(--visibility-observed);
+    transform: scale(1.05);
+  }
+  50% {
+    box-shadow: 0 0 20px var(--visibility-observed);
+    border-color: var(--cover-none);
+    transform: scale(1.1);
+  }
+  100% {
+    box-shadow: 0 0 8px var(--visibility-observed);
+    border-color: var(--visibility-observed);
+    transform: scale(1.05);
+  }
+}
+
+.consequences-preview-dialog .override-icons .state-icon.initial-outcome {
+  animation: initialGlow 1.5s ease-in-out infinite;
+  border: 2px solid var(--visibility-observed) !important;
+  background-color: var(--visibility-observed-bg);
+}
+
+/* Selected state styling for each visibility state */
+.consequences-preview-dialog .override-icons .state-icon[data-state='avs'].selected {
+  background: var(--visibility-avs-bg-strong);
+  border: 2px solid var(--visibility-avs);
+  box-shadow: 0 0 8px var(--visibility-avs);
+  transform: scale(1.1);
+}
+
+.consequences-preview-dialog .override-icons .state-icon[data-state='observed'].selected {
+  background: var(--visibility-observed-bg-strong);
+  border: 2px solid var(--visibility-observed);
+  box-shadow: 0 0 8px var(--visibility-observed);
+  transform: scale(1.1);
+}
+
+.consequences-preview-dialog .override-icons .state-icon[data-state='concealed'].selected {
+  background: rgba(255, 193, 7, 0.2);
+  border: 2px solid var(--visibility-concealed);
+  box-shadow: 0 0 8px rgba(255, 193, 7, 0.5);
+  transform: scale(1.1);
+}
+
+.consequences-preview-dialog .override-icons .state-icon[data-state='hidden'].selected {
+  background: var(--visibility-hidden-bg-strong);
+  border: 2px solid var(--visibility-hidden);
+  box-shadow: 0 0 8px rgba(255, 102, 0, 0.5);
+  transform: scale(1.1);
+}
+
+.consequences-preview-dialog .override-icons .state-icon[data-state='undetected'].selected {
+  background: var(--visibility-undetected-bg-strong);
+  border: 2px solid var(--visibility-undetected);
+  box-shadow: 0 0 8px var(--visibility-undetected);
+  transform: scale(1.1);
+}
+
+/* Selected dot indicator for each visibility state */
+.consequences-preview-dialog .override-icons .state-icon[data-state='avs'].selected::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  width: 8px;
+  height: 8px;
+  background-color: var(--visibility-avs);
+  border-radius: 50%;
+  border: 1px solid var(--color-text-light-primary);
+}
+
+.consequences-preview-dialog .override-icons .state-icon[data-state='observed'].selected::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  width: 8px;
+  height: 8px;
+  background-color: var(--visibility-observed);
+  border-radius: 50%;
+  border: 1px solid var(--color-text-light-primary);
+}
+
+.consequences-preview-dialog .override-icons .state-icon[data-state='concealed'].selected::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  width: 8px;
+  height: 8px;
+  background-color: var(--visibility-concealed);
+  border-radius: 50%;
+  border: 1px solid var(--color-text-light-primary);
+}
+
+.consequences-preview-dialog .override-icons .state-icon[data-state='hidden'].selected::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  width: 8px;
+  height: 8px;
+  background-color: var(--visibility-hidden);
+  border-radius: 50%;
+  border: 1px solid var(--color-text-light-primary);
+}
+
+.consequences-preview-dialog .override-icons .state-icon[data-state='undetected'].selected::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  width: 8px;
+  height: 8px;
+  background-color: var(--visibility-undetected);
+  border-radius: 50%;
+  border: 1px solid var(--color-text-light-primary);
+}
+
+/* Bulk action buttons styling */
+.bulk-action-btn {
+  padding: 8px 16px;
+  border: 1px solid var(--color-border-light-primary);
+  border-radius: 4px;
+  background: var(--color-bg-option);
+  color: var(--color-text-primary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  min-width: 100px;
+  justify-content: center;
+}
+
+/* Header-scoped bulk button: make "Clear These" look like a real button */
+.override-validation-dialog .table-header .bulk-action-btn.btn-clear-observer,
+.override-validation-dialog .table-header .bulk-action-btn.btn-clear-target {
+  background: var(--pf2e-visioner-success);
+  border-color: var(--pf2e-visioner-success-hover);
+  color: var(--color-text-light-primary);
+  border-color: var(--color-border-light-primary);
+  padding: 6px 12px; /* compact in header */
+  border-radius: 6px;
+  font-weight: 600;
+}
+.override-validation-dialog .table-header .bulk-action-btn.btn-clear-observer:hover,
+.override-validation-dialog .table-header .bulk-action-btn.btn-clear-target:hover {
+  background: var(--pf2e-visioner-success);
+  border-color: var(--pf2e-visioner-success-hover);
+  color: #fff;
+}
+
+.bulk-action-btn:hover {
+  background: var(--color-bg-option-active);
+  border-color: var(--color-border-highlight);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.bulk-action-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.bulk-action-btn.apply-all {
+  background: var(--color-bg-btn-primary);
+  color: var(--color-text-light-primary);
+  border-color: var(--color-border-highlight-alt);
+}
+
+.bulk-action-btn.apply-all:hover:not(:disabled) {
+  background: var(--color-bg-btn-primary-active);
+  border-color: var(--color-border-highlight);
+}
+
+.bulk-action-btn.revert-all {
+  background: var(--color-bg-btn-secondary);
+  color: var(--color-text-light-primary);
+  border-color: var(--color-border-light-primary);
+}
+
+.bulk-action-btn.revert-all:hover:not(:disabled) {
+  background: var(--color-bg-btn-secondary-active);
+  border-color: var(--color-border-highlight);
+}
+
+/* Remove Overrides (danger / destructive accent) */
+.bulk-action-btn.apply-visibility-remove-overrides {
+  background: var(--pf2e-visioner-danger-light); /* subtle red-tinted background */
+  color: var(--pf2e-visioner-danger);
+  border-color: var(--pf2e-visioner-danger);
+  position: relative;
+  overflow: hidden; /* allow decorative focus ring */
+}
+
+.bulk-action-btn.apply-visibility-remove-overrides:hover:not(:disabled) {
+  background: var(--pf2e-visioner-danger);
+  color: #fff;
+  border-color: var(--pf2e-visioner-danger-hover);
+  box-shadow: 0 2px 6px rgba(244, 67, 54, 0.4);
+}
+
+.bulk-action-btn.apply-visibility-remove-overrides:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 2px var(--pf2e-visioner-danger-light),
+    0 0 0 4px var(--pf2e-visioner-danger);
+}
+
+.bulk-action-btn.apply-visibility-remove-overrides:disabled {
+  background: var(--pf2e-visioner-danger-lighter);
+  color: var(--pf2e-visioner-danger);
+  opacity: 0.65;
+  box-shadow: none;
+}
+
+/* Clear Overrides button in bulk actions section */
+.bulk-action-btn.bulk-override-clear-btn {
+  background: rgba(244, 67, 54, 0.12);
+  color: var(--pf2e-visioner-danger, #f44336);
+  border-color: var(--pf2e-visioner-danger, #f44336);
+}
+
+.bulk-action-btn.bulk-override-clear-btn:hover:not(:disabled) {
+  background: var(--pf2e-visioner-danger, #f44336);
+  color: #fff;
+  border-color: var(--pf2e-visioner-danger-hover, #d32f2f);
+  box-shadow: 0 2px 6px rgba(244, 67, 54, 0.4);
+}
+
+/* Undefer All (purple accent) */
+.bulk-action-btn.undefer-all {
+  background: var(--color-shadow-primary);
+  color: var(--color-text-light-primary);
+  border-color: #663399;
+}
+
+.bulk-action-btn.undefer-all:hover:not(:disabled) {
+  background: #663399;
+  border-color: #552288;
+  box-shadow: 0 2px 6px rgba(102, 51, 153, 0.4);
+}
+
+.bulk-action-btn.undefer-all:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 2px rgba(102, 51, 153, 0.2),
+    0 0 0 4px #663399;
+}
+
+.bulk-action-btn.undefer-all:disabled {
+  background: #f8f5fc;
+  color: #9966cc;
+  opacity: 0.65;
+  box-shadow: none;
+}
+
+/* Ready to restore state for undefer button */
+.bulk-action-btn.undefer-all.ready-to-restore {
+  background: var(--pf2e-visioner-purple);
+  color: white;
+  border-color: var(--pf2e-visioner-purple);
+  animation: pulse-purple 1.5s ease-in-out infinite alternate;
+}
+
+.bulk-action-btn.undefer-all.ready-to-restore:hover:not(:disabled) {
+  background: var(--pf2e-visioner-purple);
+  filter: brightness(1.1);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(142, 36, 170, 0.4);
+}
+
+/* Pending restore visual indication for deferred rows */
+.sneak-preview-table tr.pending-restore {
+  background: rgba(142, 36, 170, 0.1);
+  border-left: 3px solid var(--pf2e-visioner-purple);
+  animation: highlight-pending 2s ease-in-out infinite alternate;
+}
+
+@keyframes pulse-purple {
+  0% {
+    box-shadow: 0 2px 6px rgba(142, 36, 170, 0.4);
+  }
+  100% {
+    box-shadow:
+      0 2px 6px rgba(142, 36, 170, 0.7),
+      0 0 20px rgba(142, 36, 170, 0.3);
+  }
+}
+
+@keyframes highlight-pending {
+  0% {
+    background: rgba(142, 36, 170, 0.1);
+  }
+  100% {
+    background: rgba(142, 36, 170, 0.2);
+  }
+}
+
+/* Bulk Override Bar */
+.bulk-override-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* When bulk-override-bar is NOT inside bulk-action-group, add the container styling */
+.bulk-override-bar:not(.bulk-action-group .bulk-override-bar) {
+  padding: 6px 10px;
+  margin: 6px 0 10px 0;
+  border: 1px solid var(--color-border-light-primary);
+  background: var(--color-bg-option, rgba(0, 0, 0, 0.15));
+  border-radius: 6px;
+}
+
+.bulk-override-bar .bulk-override-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  white-space: nowrap;
+}
+.bulk-override-bar .bulk-override-states {
+  display: inline-flex;
+  gap: 4px;
+  flex-wrap: nowrap;
+}
+.bulk-override-bar .bulk-override-state-btn {
+  border: 1px solid var(--color-border-light-primary);
+  background: var(--color-bg-base, #2b2b2b);
+  padding: 4px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  min-width: 30px;
+  transition: all 0.15s ease;
+  position: relative;
+}
+.bulk-override-bar .bulk-override-state-btn:hover {
+  background: var(--color-bg-option-active, rgba(255, 255, 255, 0.08));
+  transform: translateY(-1px);
+}
+.bulk-override-bar .bulk-override-actions {
+  margin-left: auto;
+  display: inline-flex;
+}
+.bulk-override-bar .bulk-override-clear-btn {
+  border: 1px solid var(--pf2e-visioner-danger, #f44336);
+  color: var(--pf2e-visioner-danger, #f44336);
+  background: rgba(244, 67, 54, 0.12);
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  transition: all 0.15s ease;
+}
+.bulk-override-bar .bulk-override-clear-btn:hover {
+  background: var(--pf2e-visioner-danger, #f44336);
+  color: #fff;
+  box-shadow: 0 2px 4px rgba(244, 67, 54, 0.4);
+}
+
+/* Visibility state color tints on bulk buttons (reuse cssClass) */
+.bulk-override-state-btn.visibility-observed {
+  color: var(--visibility-observed, #90caf9);
+}
+.bulk-override-state-btn.visibility-concealed {
+  color: var(--visibility-concealed, #ffb300);
+}
+.bulk-override-state-btn.visibility-hidden {
+  color: var(--visibility-hidden, #ff6600);
+}
+.bulk-override-state-btn.visibility-undetected {
+  color: var(--visibility-undetected, #f44336);
+}
+
+/* Row action buttons styling */
+.row-action-btn {
+  width: 30px;
+  height: 30px;
+  margin: 0 3px;
+  border: 1px solid var(--color-border-light-primary);
+  border-radius: 4px;
+  background: var(--color-bg-option);
+  color: var(--color-text-primary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  transition: all 0.2s ease;
+}
+
+.row-action-btn:hover {
+  background: var(--color-bg-option-active);
+  border-color: var(--color-border-highlight);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.row-action-btn.apply-change {
+  background: var(--color-bg-btn-primary);
+  color: var(--color-text-light-primary);
+  border-color: var(--color-bg-btn-primary);
+}
+
+.row-action-btn.apply-change:hover {
+  background: var(--color-bg-btn-primary-active);
+  border-color: var(--color-bg-btn-primary-active);
+}
+
+.row-action-btn.revert-change {
+  background: var(--color-bg-btn-secondary);
+  color: var(--color-text-dark-primary);
+  border-color: var(--color-bg-btn-secondary);
+}
+
+.row-action-btn.revert-change:hover {
+  background: var(--color-bg-btn-secondary-active);
+  border-color: var(--color-bg-btn-secondary-active);
+}
+
+/* Action buttons styling for specific dialogs */
+.consequences-preview-dialog .row-action-btn {
+  width: 30px;
+  height: 30px;
+  margin: 0 3px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Wall Manager specific styles */
+.pf2e-visioner-wall-manager {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+
+  .search-filter-container {
+    flex-wrap: wrap;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+
+  .search-filter-container > div {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
+  }
+
+  .search-filter-container input,
+  .search-filter-container select {
+    padding: 4px 8px;
+    border: 1px solid var(--color-border-light-primary);
+    border-radius: 3px;
+    background: var(--color-bg-input);
+    color: var(--color-text-primary);
+    font-size: 12px;
+  }
+
+  .search-filter-container input:focus,
+  .search-filter-container select:focus {
+    outline: none;
+    border-color: var(--color-text-hyperlink);
+    box-shadow: 0 0 3px rgba(255, 152, 0, 0.3);
+  }
+
+  /* Fix dropdown option styling for better contrast */
+  .search-filter-container select option {
+    background: var(--color-bg-primary, #2a2a2a);
+    color: var(--color-text-primary, #ffffff);
+    padding: 4px 8px;
+  }
+
+  .search-filter-container select option:hover {
+    background: var(--color-bg-option-hover, #3a3a3a);
+  }
+
+  .search-filter-container select option:checked {
+    background: var(--color-bg-option-active, #4a4a4a);
+    color: var(--color-text-light-primary, #ffffff);
+  }
+
+  .table-container {
+    flex: 1;
+    min-height: 0;
+    height: 400px;
+    max-height: 400px;
+    background: var(--color-bg-primary);
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-scrollbar-thumb) var(--color-scrollbar-track);
+    margin-bottom: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+    overflow: auto;
+    position: relative;
+  }
+
+  .table-container::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  .table-container::-webkit-scrollbar-track {
+    background: var(--color-scrollbar-track);
+    border-radius: 4px;
+  }
+
+  .table-container::-webkit-scrollbar-thumb {
+    background: var(--color-scrollbar-thumb);
+    border-radius: 4px;
+  }
+
+  .table-container::-webkit-scrollbar-thumb:hover {
+    background: var(--color-scrollbar-thumb-hover);
+  }
+
+  .sticky-header-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 0;
+  }
+
+  .sticky-header {
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 999 !important;
+    background: var(--color-bg-header, #2a2a2a) !important;
+  }
+
+  .sticky-row {
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 999 !important;
+    background: var(--color-bg-header, #2a2a2a) !important;
+  }
+
+  .sticky-header th {
+    padding: 8px;
+    border-bottom: 2px solid var(--color-border-dark);
+    font-weight: bold;
+    text-align: center;
+    background: var(--color-bg-header, #2a2a2a) !important;
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 999 !important;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  }
+
+  /* ==========================================================
+   Scrollbars: enforce for action dialogs (flat selectors)
+   This section appears at the end to win the cascade.
+   Keeps Override Validation using its own scroll container.
+   ========================================================== */
+
+  /* Ensure action dialog window-content can host inner scroll areas */
+  .pf2e-visioner.point-out-preview-dialog .window-content,
+  .pf2e-visioner .point-out-preview-dialog .window-content,
+  .pf2e-visioner.seek-preview-dialog .window-content,
+  .pf2e-visioner .seek-preview-dialog .window-content,
+  .pf2e-visioner.hide-preview-dialog .window-content,
+  .pf2e-visioner .hide-preview-dialog .window-content,
+  .pf2e-visioner.sneak-preview-dialog .window-content,
+  .pf2e-visioner .sneak-preview-dialog .window-content,
+  .pf2e-visioner.create-a-diversion-preview-dialog .window-content,
+  .pf2e-visioner .create-a-diversion-preview-dialog .window-content,
+  .pf2e-visioner.consequences-preview-dialog .window-content,
+  .pf2e-visioner .consequences-preview-dialog .window-content,
+  .pf2e-visioner.take-cover-preview-dialog .window-content,
+  .pf2e-visioner .take-cover-preview-dialog .window-content {
+    height: 100%;
+    min-height: 0; /* allow inner flex children to shrink and scroll */
+    padding: 10px;
+    overflow: hidden;
+  }
+
+  /* Content wrappers should be flex columns filling the dialog */
+  .pf2e-visioner.point-out-preview-dialog .point-out-preview-content,
+  .pf2e-visioner .point-out-preview-content,
+  .pf2e-visioner.seek-preview-dialog .seek-preview-content,
+  .pf2e-visioner .seek-preview-content,
+  .pf2e-visioner.hide-preview-dialog .hide-preview-content,
+  .pf2e-visioner .hide-preview-content,
+  .pf2e-visioner.sneak-preview-dialog .sneak-preview-content,
+  .pf2e-visioner .sneak-preview-content,
+  .pf2e-visioner.create-a-diversion-preview-dialog .create-a-diversion-preview-content,
+  .pf2e-visioner .create-a-diversion-preview-content,
+  .pf2e-visioner.consequences-preview-dialog .consequences-preview-content,
+  .pf2e-visioner .consequences-preview-content,
+  .pf2e-visioner.take-cover-preview-dialog .take-cover-preview-content,
+  .pf2e-visioner .take-cover-preview-content {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  /* Scroll the results tables area within action dialogs */
+  .pf2e-visioner.point-out-preview-dialog .results-table-container,
+  .pf2e-visioner .point-out-preview-dialog .results-table-container,
+  .pf2e-visioner.seek-preview-dialog .results-table-container,
+  .pf2e-visioner .seek-preview-dialog .results-table-container,
+  .pf2e-visioner.hide-preview-dialog .results-table-container,
+  .pf2e-visioner .hide-preview-dialog .results-table-container,
+  .pf2e-visioner.sneak-preview-dialog .results-table-container,
+  .pf2e-visioner .sneak-preview-dialog .results-table-container,
+  .pf2e-visioner.create-a-diversion-preview-dialog .results-table-container,
+  .pf2e-visioner .create-a-diversion-preview-dialog .results-table-container,
+  .pf2e-visioner.consequences-preview-dialog .results-table-container,
+  .pf2e-visioner .consequences-preview-dialog .results-table-container,
+  .pf2e-visioner.take-cover-preview-dialog .results-table-container,
+  .pf2e-visioner .take-cover-preview-dialog .results-table-container {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: auto;
+  }
+
+  /* Give action dialogs a reliable fixed height so inner scrollbars can appear (wins over inline height:auto) */
+  .pf2e-visioner.point-out-preview-dialog,
+  .pf2e-visioner.seek-preview-dialog,
+  .pf2e-visioner.hide-preview-dialog,
+  .pf2e-visioner.sneak-preview-dialog,
+  .pf2e-visioner.create-a-diversion-preview-dialog,
+  .pf2e-visioner.consequences-preview-dialog,
+  .pf2e-visioner.take-cover-preview-dialog {
+    height: 600px !important;
+  }
+
+  /* Preserve Override Validation behavior: no nested scrollbars here */
+  .pf2e-visioner .override-validation-dialog .results-table-container {
+    flex: 0 0 auto !important;
+    overflow-y: visible !important;
+  }
+
+  .sticky-header-table tbody td {
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--color-border-light);
+    vertical-align: middle;
+  }
+
+  .sticky-header-table tbody tr:hover {
+    background: rgba(255, 255, 255, 0.05);
+  }
+
+  .wall-count {
+    font-size: 12px;
+    color: var(--color-text-secondary);
+    white-space: nowrap;
+  }
+
+  .header-actions {
+    flex-shrink: 0;
+    margin-bottom: 8px;
+  }
+
+  .header-actions .visioner-btn {
+    padding: 6px 12px;
+    border: 1px solid var(--color-border-light-primary);
+    border-radius: 4px;
+    background: var(--color-bg-btn-secondary, #6c757d);
+    color: var(--color-text-btn-secondary, #ffffff);
+    font-weight: 500;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .header-actions .visioner-btn:hover {
+    background: var(--color-bg-btn-secondary-hover, #5a6268);
+    border-color: var(--color-border-hover, var(--color-text-hyperlink));
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+  }
+
+  .header-actions .visioner-btn:active {
+    transform: translateY(0);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  }
+
+  .header-actions .visioner-btn i {
+    font-size: 11px;
+  }
+
+  /* Bulk cover button styling */
+  .header-actions .visioner-btn[data-action='bulkCoverAuto'] {
+    background: var(--color-bg-btn-secondary, #6c757d);
+    border-color: var(--color-border-light-primary);
+  }
+
+  .header-actions .visioner-btn[data-action='bulkCoverNone'] {
+    background: var(--cover-none-bg, #dc3545);
+    border-color: var(--cover-none-border, #dc3545);
+    color: var(--cover-none-text, #ffffff);
+  }
+
+  .header-actions .visioner-btn[data-action='bulkCoverStandard'] {
+    background: var(--cover-standard-bg, #fd7e14);
+    border-color: var(--cover-standard-border, #fd7e14);
+    color: var(--cover-standard-text, #ffffff);
+  }
+
+  .header-actions .visioner-btn[data-action='bulkCoverGreater'] {
+    background: var(--cover-greater-bg, #e83e8c);
+    border-color: var(--cover-greater-border, #e83e8c);
+    color: var(--cover-greater-text, #ffffff);
+  }
+
+  .header-actions .visioner-btn[data-action='bulkCoverNone']:hover {
+    background: var(--cover-none-bg-hover, #c82333);
+    border-color: var(--cover-none-border-hover, #c82333);
+  }
+
+  .header-actions .visioner-btn[data-action='bulkCoverStandard']:hover {
+    background: var(--cover-standard-bg-hover, #e8690b);
+    border-color: var(--cover-standard-border-hover, #e8690b);
+  }
+
+  .header-actions .visioner-btn[data-action='bulkCoverGreater']:hover {
+    background: var(--cover-greater-bg-hover, #d63384);
+    border-color: var(--cover-greater-border-hover, #d63384);
+  }
+
+  .sheet-footer {
+    flex-shrink: 0;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid var(--color-border-light);
+    background: var(--color-bg-primary);
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+  }
+
+  .sheet-footer .visioner-btn {
+    padding: 8px 16px;
+    border-radius: 4px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    border: 1px solid transparent;
+    cursor: pointer;
+  }
+
+  .sheet-footer .visioner-btn.visioner-primary {
+    background: var(--color-bg-btn-primary, #28a745);
+    color: var(--color-text-btn-primary, #ffffff);
+    border-color: var(--color-border-btn-primary, #28a745);
+  }
+
+  .sheet-footer .visioner-btn.visioner-primary:hover {
+    background: var(--color-bg-btn-primary-hover, #218838);
+    border-color: var(--color-border-btn-primary-hover, #218838);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  }
+
+  .sheet-footer .visioner-btn:not(.visioner-primary) {
+    background: var(--color-bg-btn-secondary, #6c757d);
+    color: var(--color-text-btn-secondary, #ffffff);
+    border-color: var(--color-border-btn-secondary, #6c757d);
+  }
+
+  .sheet-footer .visioner-btn:not(.visioner-primary):hover {
+    background: var(--color-bg-btn-secondary-hover, #5a6268);
+    border-color: var(--color-border-btn-secondary-hover, #5a6268);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+  }
+
+  .sheet-footer .visioner-btn:active {
+    transform: translateY(0);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  }
+
+  .sheet-footer .visioner-btn i {
+    margin-right: 6px;
+  }
+
+  .cover-override-buttons {
+    gap: 2px !important;
+  }
+
+  .cover-override-buttons .visioner-icon-btn {
+    min-width: 28px;
+    height: 28px;
+    padding: 4px;
+  }
+
+  .wall-type-select {
+    width: 100%;
+    max-width: 100px;
+    padding: 4px 6px;
+    border: 1px solid var(--color-border-light-primary);
+    border-radius: 3px;
+    background: var(--color-bg-input);
+    color: var(--color-text-primary);
+    font-size: 11px;
+    cursor: pointer;
+  }
+
+  .wall-type-select:focus {
+    outline: none;
+    border-color: var(--color-text-hyperlink);
+    box-shadow: 0 0 3px rgba(255, 152, 0, 0.3);
+  }
+
+  .wall-type-select:hover {
+    border-color: var(--color-border-hover, var(--color-text-hyperlink));
+  }
+
+  .wall-type-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .wall-type-button {
+    background: none;
+    border: 2px solid transparent;
+    border-radius: 4px;
+    padding: 2px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .wall-type-button:hover {
+    border-color: var(--color-text-hyperlink, #ff9800);
+    background: rgba(255, 152, 0, 0.1);
+    transform: scale(1.05);
+  }
+
+  .wall-type-button:active {
+    transform: scale(0.95);
+  }
+
+  .wall-type-button img {
+    display: block;
+    border-radius: 2px;
+    pointer-events: none;
+  }
+
+  .wall-dc-input {
+    width: 100%;
+    max-width: 60px;
+    padding: 4px 6px;
+    border: 1px solid var(--color-border-light-primary);
+    border-radius: 3px;
+    background: var(--color-bg-input);
+    color: var(--color-text-primary);
+    font-size: 11px;
+    text-align: center;
+    cursor: text;
+  }
+
+  .wall-dc-input:focus {
+    outline: none;
+    border-color: var(--color-text-hyperlink);
+    box-shadow: 0 0 3px rgba(255, 152, 0, 0.3);
+  }
+
+  .wall-dc-input:hover {
+    border-color: var(--color-border-hover, var(--color-text-hyperlink));
+  }
+
+  .wall-dc-input::placeholder {
+    color: var(--color-text-secondary);
+    opacity: 0.7;
+  }
+
+  /* Responsive design for smaller screens */
+  @media (max-width: 800px) {
+    .search-filter-container {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .search-filter-container > div {
+      justify-content: space-between;
+    }
+
+    .search-filter-container input {
+      min-width: unset;
+      flex: 1;
+    }
+  }
+
+  /* Override Validation Dialog Styles - Modern Professional Design */
+  .override-validation-dialog {
+    font-family: 'Signika', sans-serif;
+  }
+
+  .override-validation-dialog .override-validation-modern {
+    padding: 0;
+    min-width: 540px;
+    max-width: 700px;
+    background: var(--color-bg-base);
+    color: var(--color-text-primary);
+  }
+
+  /* Header Section - toned down to match module scale */
+  .override-validation-dialog .validation-header {
+    background: var(--color-bg);
+    border-bottom: 1px solid var(--color-border-light-primary);
+    padding: 0.9rem 1.1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .override-validation-dialog .header-icon {
+    flex-shrink: 0;
+    width: 36px;
+    height: 36px;
+    background: #0d6efd;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 1.05rem;
+    box-shadow: 0 2px 6px rgba(13, 110, 253, 0.25);
+  }
+
+  .override-validation-dialog .header-content {
+    flex: 1;
+  }
+
+  .override-validation-dialog .header-content h2 {
+    margin: 0 0 0.25rem 0;
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: var(--color-text-primary);
+    line-height: 1.2;
+  }
+
+  .override-validation-dialog .subtitle {
+    margin: 0;
+    color: var(--color-text-secondary);
+    font-size: 0.95rem;
+    line-height: 1.4;
+  }
+
+  /* Info Card */
+  .override-validation-dialog .info-card {
+    background: var(--color-bg-option);
+    border-left: 3px solid #2196f3;
+    border-radius: 8px;
+    padding: 0.9rem 1rem;
+    margin: 0.9rem 1.25rem 1rem 1.25rem;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.6rem;
+  }
+
+  .override-validation-dialog .info-icon {
+    flex-shrink: 0;
+    width: 32px;
+    height: 32px;
+    background: #2196f3;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 0.9rem;
+  }
+
+  .override-validation-dialog .info-content h4 {
+    margin: 0 0 0.5rem 0;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--color-text-primary);
+  }
+
+  .override-validation-dialog .info-content p {
+    margin: 0;
+    color: var(--color-text-secondary);
+    font-size: 0.9rem;
+    line-height: 1.5;
+  }
+
+  /* Override List */
+  .override-validation-dialog .override-list {
+    padding: 0 1.5rem;
+    margin-bottom: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .override-validation-dialog .override-item {
+    background: var(--color-bg-option);
+    border: 2px solid var(--color-border-light-primary);
+    border-radius: 12px;
+    padding: 1rem;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  }
+
+  /* Flex-row layout for each override card */
+  .override-validation-dialog .override-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+
+  .override-validation-dialog .token-section {
+    flex: 1 1 40%;
+    min-width: 240px;
+  }
+
+  .override-validation-dialog .status-section {
+    flex: 1 1 40%;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    min-width: 280px;
+  }
+
+  .override-validation-dialog .actions-section {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    justify-content: flex-end;
+  }
+
+  .override-validation-dialog .override-item:hover {
+    border-color: var(--color-border-highlight);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    transform: translateY(-2px);
+  }
+
+  .override-validation-dialog .override-relationship {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem;
+  }
+
+  .override-validation-dialog .token-pair {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .override-validation-dialog .observer,
+  .override-validation-dialog .target {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    background: var(--color-bg-base);
+    border: 1px solid var(--color-border-light-primary);
+    padding: 0.4rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--color-text-primary);
+  }
+
+  .override-validation-dialog .observer i {
+    color: #28a745;
+  }
+
+  .override-validation-dialog .target i {
+    color: #6f42c1;
+  }
+
+  .override-validation-dialog .arrow {
+    color: var(--color-text-secondary);
+    font-size: 0.8rem;
+  }
+
+  .override-validation-dialog .override-badge {
+    background: linear-gradient(135deg, #6f42c1 0%, #9c27b0 100%);
+    color: white;
+    padding: 0.3rem 0.75rem;
+    border-radius: 16px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    box-shadow: 0 2px 4px rgba(111, 66, 193, 0.3);
+  }
+
+  /* Override Status */
+  /* Back-compat: keep .override-status behaving like our new .status-section */
+  .override-validation-dialog .override-status,
+  .override-validation-dialog .status-description,
+  .override-validation-dialog .status-section {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .override-validation-dialog .status-info,
+  .override-validation-dialog .status-description {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--color-text-secondary);
+    font-size: 0.9rem;
+  }
+
+  .override-validation-dialog .status-info i,
+  .override-validation-dialog .status-description i {
+    color: #0d6efd;
+  }
+
+  /* Action Buttons */
+  .override-validation-dialog .override-actions,
+  .override-validation-dialog .actions-section {
+    display: flex;
+    gap: 0.5rem;
+    flex-shrink: 0;
+  }
+
+  .override-validation-dialog .btn {
+    padding: 0.5rem 1rem;
+    border: 2px solid;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    min-width: 70px;
+    justify-content: center;
+    background: var(--color-bg-base);
+  }
+
+  .override-validation-dialog .btn-clear {
+    border-color: #dc3545;
+    color: #dc3545;
+  }
+
+  .override-validation-dialog .btn-clear:hover {
+    background: #dc3545;
+    color: white;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(220, 53, 69, 0.3);
+  }
+
+  .override-validation-dialog .btn-keep {
+    border-color: #198754;
+    color: #198754;
+  }
+
+  .override-validation-dialog .btn-keep:hover {
+    background: #198754;
+    color: white;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(25, 135, 84, 0.3);
+  }
+
+  /* Bulk Actions */
+  .override-validation-dialog .bulk-actions {
+    background: var(--color-bg-option);
+    border-radius: 10px;
+    padding: 1rem;
+    margin: 0 1.25rem 1.25rem 1.25rem;
+    border: 1px solid var(--color-border-light-primary);
+  }
+
+  .override-validation-dialog .bulk-actions h4 {
+    margin: 0 0 0.5rem 0;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--color-text-primary);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    justify-content: center;
+  }
+
+  .override-validation-dialog .bulk-actions h4 i {
+    color: #0d6efd;
+  }
+
+  .override-validation-dialog .bulk-actions p {
+    margin: 0 0 1rem 0;
+    color: var(--color-text-secondary);
+    font-size: 0.9rem;
+    text-align: center;
+  }
+
+  .override-validation-dialog .bulk-buttons {
+    display: flex;
+    gap: 0.75rem;
+    justify-content: center;
+  }
+
+  .override-validation-dialog .btn-bulk {
+    background: var(--color-bg-base);
+    border: 1px solid var(--color-border-light-primary);
+    border-radius: 10px;
+    padding: 0.8rem 1.2rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 130px;
+    text-align: center;
+    color: var(--color-text-primary);
+  }
+
+  .override-validation-dialog .btn-bulk:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+  }
+
+  .override-validation-dialog .btn-clear-all {
+    border-color: #dc3545;
+  }
+
+  .override-validation-dialog .btn-clear-all:hover {
+    background: #dc3545;
+    color: white;
+    border-color: #dc3545;
+  }
+
+  .override-validation-dialog .btn-keep-all {
+    border-color: #198754;
+  }
+
+  .override-validation-dialog .btn-keep-all:hover {
+    background: #198754;
+    color: white;
+    border-color: #198754;
+  }
+
+  .override-validation-dialog .btn-bulk i {
+    font-size: 1.5rem;
+    margin-bottom: 0.25rem;
+  }
+
+  .override-validation-dialog .btn-clear-all i {
+    color: #dc3545;
+  }
+
+  .override-validation-dialog .btn-keep-all i {
+    color: #198754;
+  }
+
+  .override-validation-dialog .btn-bulk:hover i {
+    color: inherit;
+  }
+
+  .override-validation-dialog .btn-bulk span {
+    font-weight: 600;
+    font-size: 1rem;
+  }
+
+  .override-validation-dialog .btn-bulk small {
+    font-size: 0.8rem;
+    opacity: 0.8;
+    line-height: 1.2;
+  }
+
+  /* Responsive Design */
+  @media (max-width: 600px) {
+    .override-validation-dialog .override-validation-modern {
+      min-width: auto;
+      max-width: 90vw;
+    }
+
+    .override-validation-dialog .validation-header {
+      padding: 1rem;
+      flex-direction: column;
+      text-align: center;
+      gap: 0.75rem;
+    }
+
+    /* Stack the flex-row into a column on small screens */
+    .override-validation-dialog .override-row {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 0.75rem;
+    }
+
+    .override-validation-dialog .token-pair {
+      width: 100%;
+      justify-content: space-between;
+    }
+    .override-validation-dialog .status-section,
+    .override-validation-dialog .override-status {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0.5rem;
+    }
+
+    .override-validation-dialog .bulk-buttons {
+      flex-direction: column;
+    }
+
+    .override-validation-dialog .btn-bulk {
+      min-width: auto;
     }
   }
 } /* End .pf2e-visioner scope */
+
+/* --- Explicit scoped overrides to guarantee layout (non-nested for broad browser support) --- */
+.pf2e-visioner .override-validation-dialog .override-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.pf2e-visioner .override-validation-dialog .override-item {
+  background: var(--color-bg-option);
+  border: 1px solid var(--color-border-light-primary);
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+.pf2e-visioner .override-validation-dialog .override-row {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) minmax(320px, 1fr) auto;
+  align-items: center;
+  column-gap: 14px;
+}
+.pf2e-visioner .override-validation-dialog .token-section {
+  flex: 1 1 40%;
+  min-width: 220px;
+}
+.pf2e-visioner .override-validation-dialog .status-section {
+  flex: 1 1 40%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 260px;
+}
+.pf2e-visioner .override-validation-dialog .actions-section {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.pf2e-visioner .override-validation-dialog .token-pair {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.pf2e-visioner .override-validation-dialog .observer,
+.pf2e-visioner .override-validation-dialog .target {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--color-border-light-primary);
+  padding: 4px 10px;
+  border-radius: 16px;
+  font-weight: 500;
+  color: var(--color-text-primary);
+}
+.pf2e-visioner .override-validation-dialog .observer i {
+  color: #2ecc71;
+}
+.pf2e-visioner .override-validation-dialog .target i {
+  color: #e67e22;
+}
+.pf2e-visioner .override-validation-dialog .arrow {
+  color: var(--color-text-secondary);
+  opacity: 0.9;
+}
+.pf2e-visioner .override-validation-dialog .status-description {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--color-text-primary);
+}
+.pf2e-visioner .override-validation-dialog .override-badge {
+  background: var(--color-bg-base);
+  border: 1px solid var(--color-border-light-primary);
+  padding: 4px 10px;
+  border-radius: 14px;
+  font-size: 12px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.pf2e-visioner .override-validation-dialog .override-badge.badge-sneak {
+  background: rgba(13, 110, 253, 0.15);
+  border-color: #0d6efd;
+  color: #cfe2ff;
+}
+.pf2e-visioner .override-validation-dialog .override-badge.badge-hide {
+  background: rgba(111, 66, 193, 0.15);
+  border-color: #6f42c1;
+  color: #e0cffc;
+}
+.pf2e-visioner .override-validation-dialog .override-badge.badge-manual {
+  background: rgba(25, 135, 84, 0.12);
+  border-color: #198754;
+  color: #d1e7dd;
+}
+.pf2e-visioner .override-validation-dialog .override-badge.badge-generic {
+  background: var(--color-bg-option);
+}
+.pf2e-visioner .override-validation-dialog .btn {
+  padding: 6px 12px;
+  border: 1px solid;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  background: var(--color-bg-base);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.pf2e-visioner .override-validation-dialog .btn.btn-clear {
+  border-color: #dc3545;
+  color: #dc3545;
+}
+.pf2e-visioner .override-validation-dialog .btn.btn-keep {
+  border-color: #198754;
+  background: #198754;
+  color: #fff;
+}
+.pf2e-visioner .override-validation-dialog .btn.btn-clear:hover {
+  background: #dc3545;
+  color: #fff;
+}
+.pf2e-visioner .override-validation-dialog .btn.btn-keep:hover {
+  background: #157347;
+  color: #fff;
+}
+
+@media (max-width: 600px) {
+  .pf2e-visioner .override-validation-dialog .override-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+  .pf2e-visioner .override-validation-dialog .actions-section {
+    justify-content: flex-start;
+  }
+}
+
+/* --- Action-dialog-aligned overrides (explicit selectors) --- */
+.pf2e-visioner .override-validation-dialog .validation-header {
+  background: var(--color-bg);
+  border-bottom: 1px solid var(--color-border-light-primary);
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.pf2e-visioner .override-validation-dialog .header-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #0d6efd;
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  box-shadow: 0 2px 6px rgba(13, 110, 253, 0.25);
+}
+.pf2e-visioner .override-validation-dialog .header-content h2 {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 700;
+}
+.pf2e-visioner .override-validation-dialog .subtitle {
+  margin: 2px 0 0 0;
+  font-size: 0.95rem;
+  color: var(--color-text-secondary);
+}
+
+.pf2e-visioner .override-validation-dialog .info-card {
+  margin: 10px 14px;
+  padding: 10px 12px;
+  border-left: 3px solid #2196f3;
+}
+.pf2e-visioner .override-validation-dialog .info-icon {
+  background: #2196f3;
+  width: 28px;
+  height: 28px;
+  font-size: 12px;
+}
+.pf2e-visioner .override-validation-dialog .info-content h4 {
+  margin: 0 0 4px 0;
+  font-size: 1rem;
+  font-weight: 700;
+}
+.pf2e-visioner .override-validation-dialog .info-content p {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.pf2e-visioner .override-validation-dialog .override-list {
+  padding: 0 14px;
+  gap: 10px;
+}
+.pf2e-visioner .override-validation-dialog .status-description i {
+  color: #0dcaf0;
+}
+.pf2e-visioner .override-validation-dialog .override-badge.badge-sneak {
+  background: rgba(13, 110, 253, 0.18);
+  border-color: #0d6efd;
+  color: #d7e7ff;
+}
+.pf2e-visioner .override-validation-dialog .override-badge.badge-hide {
+  background: rgba(111, 66, 193, 0.18);
+  border-color: #6f42c1;
+  color: #e7d7ff;
+}
+.pf2e-visioner .override-validation-dialog .override-badge.badge-manual {
+  background: rgba(25, 135, 84, 0.18);
+  border-color: #198754;
+  color: #dbefe4;
+}
+
+.pf2e-visioner .override-validation-dialog .bulk-actions {
+  margin: 12px 14px 14px;
+}
+.pf2e-visioner .override-validation-dialog .bulk-actions h4 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  font-size: 1rem;
+  justify-content: flex-start;
+}
+.pf2e-visioner .override-validation-dialog .btn-bulk {
+  font-size: 12px;
+}
+.pf2e-visioner .override-validation-dialog .btn-clear-all {
+  color: #dc3545;
+}
+.pf2e-visioner .override-validation-dialog .btn-keep-all {
+  background: #198754;
+  color: #fff;
+  border-color: #198754;
+}
+.pf2e-visioner .override-validation-dialog .btn-keep-all:hover {
+  background: #157347;
+}
+
+/* Sneaky Feat Indicators */
+.pf2e-visioner .sneaky-feat-indicator {
+  margin-left: 6px;
+  color: var(--pf2e-visioner-feat-orange, #ff8c00);
+  opacity: 0.8;
+}
+
+.pf2e-visioner .sneaky-feat-indicator i {
+  font-size: 12px;
+}
+
+.pf2e-visioner .sneaky-feat-indicator:hover {
+  opacity: 1;
+}
+
+/* End-of-Turn Dialog Notice */
+.pf2e-visioner .end-of-turn-notice {
+  margin: 8px 0 12px 0;
+  padding: 10px;
+  background: var(--color-bg-secondary, #2a2a2a);
+  border: 1px solid var(--pf2e-visioner-feat-orange, #ff8c00);
+  border-radius: 4px;
+}
+
+.pf2e-visioner .end-of-turn-notice .notice-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--pf2e-visioner-feat-orange, #ff8c00);
+  font-size: 13px;
+  margin-bottom: 4px;
+}
+
+.pf2e-visioner .end-of-turn-notice .notice-text {
+  margin: 0;
+  font-size: 12px;
+  color: var(--color-text-light-primary, #ccc);
+  line-height: 1.4;
+}
+
+/* Deferred Checks Notice */
+.pf2e-visioner .deferred-checks-notice {
+  margin: 8px 0 12px 0;
+  padding: 10px;
+  background: var(--color-bg-secondary, #2a2a2a);
+  border: 1px solid var(--color-border-light-primary, #9f9f9f);
+  border-left: 3px solid #8b5cf6;
+  border-radius: 4px;
+}
+
+.pf2e-visioner .deferred-checks-notice .notice-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #8b5cf6;
+  font-size: 13px;
+  margin-bottom: 4px;
+}
+
+.pf2e-visioner .deferred-checks-notice .notice-text {
+  margin: 0;
+  font-size: 12px;
+  color: var(--color-text-light-primary, #ccc);
+  line-height: 1.4;
+}

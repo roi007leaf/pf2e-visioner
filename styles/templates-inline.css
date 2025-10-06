@@ -1,0 +1,270 @@
+/* Extracted styles from template inline style attributes.
+ * This file consolidates previously inline-only declarations to improve caching,
+ * theming, and maintainability. Classes prefixed with pv- or pf2e-visioner-
+ * to avoid collisions. Further consolidation welcome as more templates migrate.
+ */
+
+/* Settings Menu */
+.pf2e-visioner-settings {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+.pv-settings-hero {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  padding: 10px 10px 8px;
+  border-bottom: 1px solid var(--color-border-light-primary);
+  background: var(--color-bg-primary, #1e1e1e);
+  flex-shrink: 0;
+}
+.pv-hero-icon {
+  width: 42px;
+  height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: rgba(100, 150, 255, 0.12);
+}
+.pv-hero-icon i { font-size: 22px; }
+.pv-hero-copy { display: flex; flex-direction: column; gap: 2px; }
+.pv-hero-title { font-weight: 700; font-size: 15px; }
+.pv-hero-subtitle { opacity: 0.9; }
+
+.pv-settings-tabs {
+  display: flex;
+  gap: 8px;
+  padding: 8px 10px 6px;
+  border-bottom: 1px solid var(--color-border-light-primary);
+  background: var(--color-bg-primary);
+  flex-shrink: 0;
+}
+.pv-settings-tabs .tab {
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--color-border-light-primary);
+  background: transparent;
+  transition: background .15s ease, font-weight .15s ease;
+}
+.pv-settings-tabs .tab.active { background: rgba(100,150,255,0.15); font-weight:700; }
+
+.pv-settings-content { flex:1; overflow-y:auto; padding-right:6px; }
+
+.pv-settings-fieldset { margin-top:10px; border-radius:8px; padding:8px; }
+.pv-settings-fieldset legend { font-weight:700; letter-spacing:.2px; padding:0 4px; }
+
+.pv-form-row { margin-bottom:10px; }
+.pv-form-row.pv-row-flex { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.pv-form-row .pv-col-grow { flex:1 1 auto; }
+.pv-form-row .pv-col-static { flex:0 0 auto; display:flex; align-items:center; }
+.pv-note { opacity:.8; }
+
+.pv-fab-footer { flex-shrink:0; display:flex; justify-content:flex-end; padding:10px; background: var(--color-bg-primary); border-top:1px solid var(--color-border-light-primary); pointer-events:none; }
+.pv-fab-save { pointer-events:all; width:46px; height:46px; border-radius:50%; background: var(--color-primary-500, #ff8400); color:#fff; border:none; box-shadow:0 2px 8px rgba(0,0,0,0.25); display:flex; align-items:center; justify-content:center; }
+
+/* WALL MANAGER (initial subset; more will be migrated) */
+.pf2e-visioner-wall-manager .header-actions { display:flex; gap:8px; align-items:center; margin-bottom:8px; }
+.pf2e-visioner-wall-manager .header-actions .spacer { flex:1; }
+
+.pf2e-visioner-wall-manager .search-filter-container { display:flex; gap:8px; align-items:center; margin-bottom:12px; padding:8px; background:rgba(0,0,0,0.1); border-radius:4px; }
+.pf2e-visioner-wall-manager .inline-flex { display:flex; align-items:center; gap:4px; }
+.pf2e-visioner-wall-manager #wall-search { flex:1; min-width:200px; }
+.pf2e-visioner-wall-manager #wall-type-filter { min-width:100px; }
+
+.pf2e-visioner-wall-manager .bulk-hidden-buttons, .pf2e-visioner-wall-manager .bulk-cover-buttons { display:flex; gap:2px; align-items:center; }
+
+.pf2e-visioner-wall-manager .cover-override-buttons { display:flex; gap:2px; flex-wrap:wrap; justify-content:center; }
+
+/* Icon color utilities extracted */
+.icon-color-text-primary { color: var(--color-text-primary); }
+.icon-color-gray { color:#888; }
+.icon-color-cover-none { color:var(--cover-none); }
+.icon-color-cover-standard { color:var(--cover-standard); }
+.icon-color-cover-greater { color:var(--cover-greater); }
+
+/* Generic flex & spacing utilities (scoped by common prefix to avoid clashes) */
+.pv-u-flex { display:flex; }
+.pv-u-inline-flex { display:inline-flex; }
+.pv-u-flex-col { flex-direction:column; }
+.pv-u-flex-wrap { flex-wrap:wrap; }
+.pv-u-align-center { align-items:center; }
+.pv-u-justify-between { justify-content:space-between; }
+.pv-u-justify-center { justify-content:center; }
+.pv-u-justify-end { justify-content:flex-end; }
+.pv-u-gap-2 { gap:2px; }
+.pv-u-gap-4 { gap:4px; }
+.pv-u-gap-6 { gap:6px; }
+.pv-u-gap-8 { gap:8px; }
+.pv-u-gap-12 { gap:12px; }
+.pv-u-gap-16 { gap:16px; }
+.pv-u-mb-8 { margin-bottom:8px; }
+.pv-u-mb-10 { margin-bottom:10px; }
+.pv-u-mb-12 { margin-bottom:12px; }
+.pv-u-mt-6 { margin-top:6px; }
+.pv-u-text-center { text-align:center; }
+.pv-u-flex-1 { flex:1; }
+.pv-u-flex-grow { flex:1 1 auto; }
+.pv-u-flex-static { flex:0 0 auto; }
+.pv-u-pointer-none { pointer-events:none; }
+.pv-u-pointer-all { pointer-events:all; }
+
+/* Encounter & preview filter sections */
+.encounter-filter-section,
+.enhanced-controls-section { display:flex; gap:16px; align-items:center; }
+.enhanced-controls-section { flex-wrap:wrap; }
+.encounter-filter-checkbox,
+.hide-foundry-hidden-filter-checkbox,
+.ignore-allies-filter-checkbox,
+.ignore-walls-filter-checkbox,
+.show-only-changes-filter-checkbox { display:flex; align-items:center; gap:8px; }
+
+/* Distance chip / indicators */
+.sneak-distance-indicator { margin-top:6px; display:flex; gap:8px; align-items:center; }
+.distance-chip { display:inline-flex; align-items:center; gap:6px; padding:2px 8px; border-radius:12px; background: var(--color-border); color: var(--color-text); font-size:0.9em; }
+
+/* Visibility change bars & icons (shared) */
+.original-visibility-change { font-size:1em; opacity:0.7; padding-top:5px; display:flex; align-items:center; }
+.original-visibility-change .state-icon { margin-left:4px; }
+.visibility-change { text-align:center; }
+
+/* Override icon groups */
+.visibility-change-with-override { display:flex; align-items:center; gap:6px; }
+.override-icons { display:flex; gap:6px; }
+
+/* Generic notes text */
+.pv-text-subtle, .pv-note, .original-roll-total { opacity:0.7; }
+
+/* Cover override detailed group icons */
+.auto-cover-override-detailed .original-cover i,
+.auto-cover-override-detailed .final-cover i,
+.original-cover i,
+.final-cover i { font-size:1.1em; }
+
+/* Hidden wall form groups (conditional display handled inline via handlebars) */
+
+/* Table width utility classes */
+.col-w-16 { width:16%; }
+.col-w-10 { width:10%; }
+.col-w-30 { width:30%; }
+.col-w-8 { width:8%; }
+.col-w-26 { width:26%; }
+.col-w-6 { width:6%; }
+.col-w-7 { width:7%; }
+.col-w-11 { width:11%; }
+.col-w-12 { width:12%; }
+.col-w-14 { width:14%; }
+.col-w-15 { width:15%; }
+.col-w-17 { width:17%; }
+.col-w-18 { width:18%; }
+.col-w-19 { width:19%; }
+.col-w-20 { width:20%; }
+.col-w-22 { width:22%; }
+.col-w-24 { width:24%; }
+.col-w-25 { width:25%; }
+.col-w-28 { width:28%; }
+.col-w-32 { width:32%; }
+.col-w-38 { width:38%; }
+
+/* Visibility / cover table alignment */
+.text-center { text-align:center; }
+
+/* Quick inline hide utility (replacing conditional display inline styles) */
+.is-hidden { display:none !important; }
+
+/* Position / arrow icons */
+.position-arrow { color:#999; font-size:1em; margin:0 2px; }
+
+/* Icon sizing utilities */
+.icon-fs-11 { font-size:1.1em; }
+
+.text-center { text-align:center; }
+
+.wall-count { text-align:right; margin-bottom:8px; font-size:12px; color:var(--color-text-secondary); }
+
+/* Floating action button hover/focus states (optional future) */
+.pv-fab-save:hover { filter:brightness(1.05); }
+.pv-fab-save:focus { outline:2px solid var(--color-border-highlight); }
+
+/* --- Light Config: Heightened Darkness (appealing card) --- */
+.pf2e-visioner-light-settings { margin-top:6px; border-radius:8px; }
+.pf2e-visioner-light-settings legend { font-weight:700; letter-spacing:.2px; padding:0 4px; }
+.pf2e-visioner-light-settings .pvv-card {
+  margin-top:4px;
+  padding:8px 10px;
+  border:1px solid var(--color-border-light-primary, rgba(255,255,255,0.12));
+  border-radius:8px;
+  background: var(--color-bg-primary, rgba(0,0,0,0.15));
+}
+.pf2e-visioner-light-settings .pvv-title-row {
+  display:flex; align-items:flex-start; gap:8px; margin:0; cursor:default;
+}
+.pf2e-visioner-light-settings .pvv-title-copy { display:flex; flex-direction:column; gap:2px; }
+.pf2e-visioner-light-settings .pvv-title { font-weight:600; }
+.pf2e-visioner-light-settings .pvv-subtle { opacity:0.85; font-size: var(--font-size-12, 12px); }
+.pf2e-visioner-light-settings .pvv-chip-row { margin:6px 0 0 1.6rem; }
+.pf2e-visioner-light-settings .pvv-chip {
+  display:inline-flex; align-items:center; gap:6px; padding:2px 8px;
+  border-radius:12px; background:rgba(255,255,255,0.08);
+  border:1px solid rgba(255,255,255,0.12); font-size: var(--font-size-12, 12px);
+}
+.pf2e-visioner-light-settings .pvv-chip i { opacity:0.9; }
+.pf2e-visioner-light-settings .pvv-help { margin:6px 0 0 1.6rem; line-height:1.2; opacity:.85; font-size: var(--font-size-12, 12px); }
+
+/* --- Dialog: Darkness Mode chooser --- */
+.pvv-darkness-dialog .pvv-darkness-chooser { display:flex; flex-direction:column; gap:8px; }
+.pvv-darkness-dialog { max-width: 640px; }
+.pvv-darkness-dialog .window-content { max-width: 640px; }
+.pvv-darkness-dialog .pvv-darkness-chooser .notes { margin:0 0 4px 0; }
+.pvv-darkness-dialog .pvv-options { display:flex; gap:10px; flex-wrap:wrap; }
+.pvv-darkness-dialog .pvv-option {
+  flex:1 1 260px; min-width:230px; max-width: 100%; display:flex; align-items:flex-start; gap:10px;
+  border:1px solid var(--color-border-light-primary);
+  border-radius:10px; padding:10px 12px; cursor:pointer; transition:background .15s ease, border-color .15s ease, box-shadow .15s ease, transform .03s ease;
+}
+.pvv-darkness-dialog .pvv-option:focus { outline:2px solid var(--color-border-highlight, #88c0ff); outline-offset:2px; }
+.pvv-darkness-dialog .pvv-option:hover { box-shadow:0 1px 0 rgba(255,255,255,0.08) inset; transform:translateY(-1px); }
+.pvv-darkness-dialog .pvv-option .pvv-option-icon { width:28px; height:28px; display:flex; align-items:center; justify-content:center; border-radius:6px; }
+.pvv-darkness-dialog .pvv-option .pvv-option-title { font-weight:700; }
+.pvv-darkness-dialog .pvv-option .pvv-option-sub { opacity:.8; font-size: var(--font-size-12, 12px); }
+
+/* Variants */
+.pvv-darkness-dialog .pvv-variant-plain { background: linear-gradient(180deg, rgba(60,60,70,0.35), rgba(40,40,50,0.25)); }
+.pvv-darkness-dialog .pvv-variant-plain .pvv-option-icon { background: rgba(120,130,255,0.14); color:#c9d4ff; }
+.pvv-darkness-dialog .pvv-variant-plain:hover { border-color: rgba(130,140,255,0.5); }
+
+.pvv-darkness-dialog .pvv-variant-heightened { background: linear-gradient(180deg, rgba(100,55,120,0.35), rgba(80,45,100,0.25)); }
+.pvv-darkness-dialog .pvv-variant-heightened .pvv-option-icon { background: rgba(200,100,255,0.16); color:#efc8ff; }
+.pvv-darkness-dialog .pvv-variant-heightened:hover { border-color: rgba(200,100,255,0.5); }
+
+.pvv-darkness-dialog .pvv-help-inline { margin-top:4px; font-size: var(--font-size-12, 12px); }
+.pvv-darkness-dialog .pvv-footer { display:flex; gap:8px; justify-content:flex-end; margin-top:8px; }
+.pvv-darkness-dialog .pvv-btn-clear { background: rgba(255,170,70,0.14); border:1px solid rgba(255,170,70,0.4); }
+.pvv-darkness-dialog .pvv-btn-clear:hover { filter:brightness(1.05); }
+.pvv-darkness-dialog .pvv-btn-cancel { background: rgba(180,180,180,0.12); border:1px solid rgba(180,180,180,0.35); }
+.pvv-darkness-dialog .pvv-btn-cancel:hover { filter:brightness(1.05); }
+
+/* --- Dialog: Confirm (Purge/Warning) --- */
+.visioner-confirm.pvv-confirm-dialog { display:flex; flex-direction:column; gap:10px; }
+.pvv-confirm-hero { display:flex; gap:10px; align-items:flex-start; padding:8px 10px; border:1px solid var(--color-border-light-primary); border-radius:10px; }
+.pvv-confirm-hero-icon { width:32px; height:32px; display:flex; align-items:center; justify-content:center; border-radius:8px; flex-shrink:0; }
+.pvv-confirm-hero-copy { flex:1; line-height:1.3; }
+.pvv-confirm-footer { display:flex; gap:8px; justify-content:flex-end; }
+.pvv-btn { padding:6px 10px; border-radius:8px; border:1px solid var(--color-border-light-primary); background: rgba(180,180,180,0.12); cursor:pointer; }
+.pvv-btn:hover { filter:brightness(1.05); }
+.pvv-btn-primary { background: rgba(255,255,255,0.12); border-color: rgba(255,255,255,0.35); }
+.pvv-btn-secondary { background: rgba(180,180,180,0.12); border-color: rgba(180,180,180,0.35); }
+
+/* Variants */
+.pvv-confirm-danger .pvv-confirm-hero { background: linear-gradient(180deg, rgba(120,40,40,0.25), rgba(80,25,25,0.25)); border-color: rgba(255,90,90,0.45); }
+.pvv-confirm-danger .pvv-confirm-hero-icon { background: rgba(255,100,100,0.16); color:#ffd0d0; }
+.pvv-confirm-danger .pvv-btn-primary { background: rgba(255,100,100,0.16); border-color: rgba(255,100,100,0.5); }
+
+.pvv-confirm-warning .pvv-confirm-hero { background: linear-gradient(180deg, rgba(120,90,40,0.25), rgba(90,70,30,0.25)); border-color: rgba(255,200,120,0.45); }
+.pvv-confirm-warning .pvv-confirm-hero-icon { background: rgba(255,200,120,0.16); color:#ffe6bf; }
+.pvv-confirm-warning .pvv-btn-primary { background: rgba(255,200,120,0.16); border-color: rgba(255,200,120,0.5); }
+
+.pvv-confirm-info .pvv-confirm-hero { background: linear-gradient(180deg, rgba(70,90,120,0.25), rgba(40,55,80,0.25)); border-color: rgba(140,180,255,0.45); }
+.pvv-confirm-info .pvv-confirm-hero-icon { background: rgba(140,180,255,0.16); color:#d6e4ff; }
+.pvv-confirm-info .pvv-btn-primary { background: rgba(140,180,255,0.16); border-color: rgba(140,180,255,0.5); }

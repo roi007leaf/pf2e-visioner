@@ -79,7 +79,7 @@ describe('Ignore Allies Complete Integration', () => {
   describe('2. Token Manager Class Integration', () => {
     test('VisionerTokenManager should have static toggleIgnoreAllies method', async () => {
       const { VisionerTokenManager } = await import(
-        '../../scripts/managers/token-manager/token-manager.js'
+        '../../scripts/managers/token-manager/TokenManager.js'
       );
 
       expect(VisionerTokenManager.toggleIgnoreAllies).toBeDefined();
@@ -89,7 +89,7 @@ describe('Ignore Allies Complete Integration', () => {
 
     test('CRITICAL: toggleIgnoreAllies should be registered in ApplicationV2 actions', async () => {
       const { VisionerTokenManager } = await import(
-        '../../scripts/managers/token-manager/token-manager.js'
+        '../../scripts/managers/token-manager/TokenManager.js'
       );
 
       // This is the test that would have caught the bug!
@@ -108,7 +108,7 @@ describe('Ignore Allies Complete Integration', () => {
 
     test('toggleIgnoreAllies should be alongside other working actions', async () => {
       const { VisionerTokenManager } = await import(
-        '../../scripts/managers/token-manager/token-manager.js'
+        '../../scripts/managers/token-manager/TokenManager.js'
       );
 
       const actions = VisionerTokenManager.DEFAULT_OPTIONS.actions;
@@ -177,7 +177,7 @@ describe('Ignore Allies Complete Integration', () => {
   describe('4. End-to-End Workflow Simulation', () => {
     test('complete workflow: action registration -> method call -> state change', async () => {
       const { VisionerTokenManager } = await import(
-        '../../scripts/managers/token-manager/token-manager.js'
+        '../../scripts/managers/token-manager/TokenManager.js'
       );
 
       // 1. Verify action is registered (this would have caught the bug)
@@ -235,7 +235,7 @@ describe('Ignore Allies Complete Integration', () => {
   describe('5. Regression Prevention', () => {
     test('should prevent the exact bug that occurred: missing action registration', async () => {
       const { VisionerTokenManager } = await import(
-        '../../scripts/managers/token-manager/token-manager.js'
+        '../../scripts/managers/token-manager/TokenManager.js'
       );
 
       // This test specifically checks for the bug that occurred
@@ -257,7 +257,7 @@ describe('Ignore Allies Complete Integration', () => {
 
     test('should verify all toggle actions are consistently registered', async () => {
       const { VisionerTokenManager } = await import(
-        '../../scripts/managers/token-manager/token-manager.js'
+        '../../scripts/managers/token-manager/TokenManager.js'
       );
 
       const actions = VisionerTokenManager.DEFAULT_OPTIONS.actions;
@@ -285,7 +285,7 @@ describe('Ignore Allies Complete Integration', () => {
   describe('6. Future-Proofing', () => {
     test('should detect if new toggle actions are added but not registered', async () => {
       const { VisionerTokenManager } = await import(
-        '../../scripts/managers/token-manager/token-manager.js'
+        '../../scripts/managers/token-manager/TokenManager.js'
       );
 
       // Get all static methods that look like toggle actions
