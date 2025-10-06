@@ -81,6 +81,9 @@ export class EventDrivenVisibilitySystem {
   /** @type {import('./core/VisibilityMapService.js').VisibilityMapService} */
   #visibilityMapService = null;
 
+  /** @type {import('./core/OverrideValidationManager.js').OverrideValidationManager} */
+  overrideValidationManager = null;
+
   constructor() {
     if (EventDrivenVisibilitySystem.#instance) {
       return EventDrivenVisibilitySystem.#instance;
@@ -112,6 +115,7 @@ export class EventDrivenVisibilitySystem {
       this.#exclusionManager = coreServices.exclusionManager;
       this.#optimizedVisibilityCalculator = coreServices.optimizedVisibilityCalculator;
       this.#visibilityMapService = coreServices.visibilityMapService;
+      this.overrideValidationManager = coreServices.overrideValidationManager;
 
       // Initialize extracted services
       this.#cacheManagementService = await this.#diContainer.get('cacheManagementService', { coreServices });
@@ -139,6 +143,7 @@ export class EventDrivenVisibilitySystem {
         exclusionManager: coreServices.exclusionManager,
         viewportFilterService: this.#viewportFilterService,
         visibilityMapService: coreServices.visibilityMapService,
+        overrideValidationManager: coreServices.overrideValidationManager,
         moduleId: MODULE_ID
       });
 

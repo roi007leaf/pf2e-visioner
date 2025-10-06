@@ -58,6 +58,14 @@ export class TokenEventHandler {
     // Skip position updates during animation/dragging - only process completed movements
     const hasPositionChange = changes.x !== undefined || changes.y !== undefined;
     if (hasPositionChange) {
+
+      // Set lastMovedTokenId BEFORE returning early so the hook can pick it up
+      try {
+        globalThis.game = globalThis.game || {};
+        game.pf2eVisioner = game.pf2eVisioner || {};
+        game.pf2eVisioner.lastMovedTokenId = tokenDoc.id;
+      } catch { }
+
       const token = tokenDoc.object;
 
       // Check if token is currently animating or being dragged

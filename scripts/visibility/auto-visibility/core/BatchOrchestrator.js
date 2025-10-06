@@ -21,6 +21,7 @@ export class BatchOrchestrator {
    * @param {ExclusionManager} dependencies.exclusionManager - ExclusionManager instance
    * @param {import('./ViewportFilterService.js').ViewportFilterService} [dependencies.viewportFilterService] - Optional viewport filter service for client-aware filtering
    * @param {import('./VisibilityMapService.js').VisibilityMapService} dependencies.visibilityMapService - Visibility map service to persist results
+   * @param {import('./OverrideValidationManager.js').OverrideValidationManager} [dependencies.overrideValidationManager] - Optional override validation manager
    * @param {string} dependencies.moduleId - Module ID for settings
    */
   constructor(dependencies) {
@@ -29,6 +30,7 @@ export class BatchOrchestrator {
     this.exclusionManager = dependencies.exclusionManager;
     this.viewportFilterService = dependencies.viewportFilterService || null;
     this.visibilityMapService = dependencies.visibilityMapService;
+    this.overrideValidationManager = dependencies.overrideValidationManager || null;
     this.moduleId = dependencies.moduleId;
 
     this.processingBatch = false;
@@ -250,7 +252,21 @@ export class BatchOrchestrator {
       // Capture detailed timings from BatchProcessor
       timings.detailedBatchTimings = batchResult.detailedTimings || {};
 
-      // Apply results
+      // Queue and process override validation BEFORE applying results
+      // This allows validation to compare override state against OLD map values
+      // before they get overwritten with NEW calculated values
+      try {
+        const lastMovedId = globalThis?.game?.pf2eVisioner?.lastMovedTokenId;
+        if (lastMovedId && this.overrideValidationManager) {
+          this.overrideValidationManager.queueOverrideValidation(lastMovedId);
+          // Process immediately while maps still have OLD values
+          await this.overrideValidationManager.processQueuedValidations();
+        }
+      } catch (e) {
+        console.warn('PF2E Visioner | Error processing override validation in batch:', e);
+      }
+
+      // Apply results - this writes NEW values to maps
       const resultApplicationStart = performance.now();
       const uniqueUpdateCount = this._applyBatchResults(batchResult);
 

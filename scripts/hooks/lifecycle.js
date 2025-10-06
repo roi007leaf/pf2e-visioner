@@ -227,6 +227,16 @@ export async function onCanvasReady() {
       }, 50);
     }
   } catch (_) { }
+
+  // Hide override validation indicator when scene changes
+  Hooks.on('canvasTearDown', async () => {
+    try {
+      const { default: indicator } = await import('../ui/OverrideValidationIndicator.js');
+      indicator.hide(true);
+    } catch (error) {
+      console.warn('PF2E Visioner | Failed to hide indicator on scene change:', error);
+    }
+  });
 }
 
 async function enableVisionForAllTokensAndPrototypes() {

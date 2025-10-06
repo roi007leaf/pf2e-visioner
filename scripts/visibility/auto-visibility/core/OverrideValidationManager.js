@@ -31,7 +31,9 @@ export class OverrideValidationManager {
 
     queue(tokenId) {
         // GM-only; EVS already guards enabled
-        if (!game.user?.isGM) return;
+        if (!game.user?.isGM) {
+            return;
+        }
         // Deduplicate rapid requests at the same position
         try {
             const tok = canvas.tokens?.get?.(tokenId);
@@ -49,15 +51,13 @@ export class OverrideValidationManager {
         } catch { /* best-effort */ }
 
         this._tokensQueuedForValidation.add(tokenId);
-        if (this._validationTimeoutId) clearTimeout(this._validationTimeoutId);
-        this._validationTimeoutId = setTimeout(() => {
-            this._pruneCache();
-            this.processQueuedValidations();
-        }, 500);
+        // No timeout - caller will trigger processQueuedValidations when ready
     }
 
     async processQueuedValidations() {
-        if (!game.user?.isGM) return;
+        if (!game.user?.isGM) {
+            return;
+        }
         // Best-effort settle to allow canvas updates to apply before validations
         try { await new Promise((resolve) => requestAnimationFrame(resolve)); } catch { }
 
@@ -121,14 +121,17 @@ export class OverrideValidationManager {
             if (result && result.__showAwareness && Array.isArray(result.overrides)) {
                 try {
                     const lastMovedId = globalThis?.game?.pf2eVisioner?.lastMovedTokenId || null;
-                    if (lastMovedId && tokenId !== lastMovedId) continue;
+                    if (lastMovedId && tokenId !== lastMovedId) {
+                        continue;
+                    }
                 } catch { }
                 const filtered = result.overrides.filter((o) => {
                     const prevVis = o.state || (o.hasConcealment ? 'concealed' : 'observed');
                     const prevCover = o.expectedCover ?? (o.hasCover ? 'standard' : 'none');
                     const curVis = o.currentVisibility || 'observed';
                     const curCover = o.currentCover || 'none';
-                    return prevVis !== curVis || prevCover !== curCover;
+                    const isDifferent = prevVis !== curVis || prevCover !== curCover;
+                    return isDifferent;
                 });
                 if (filtered.length > 0) {
                     try {

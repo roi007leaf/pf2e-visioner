@@ -136,6 +136,7 @@ export class DependencyInjectionContainer {
                 exclusionManager: dependencies.exclusionManager,
                 viewportFilterService: dependencies.viewportFilterService,
                 visibilityMapService: dependencies.visibilityMapService,
+                overrideValidationManager: dependencies.overrideValidationManager,
                 moduleId: dependencies.moduleId
             });
         });
