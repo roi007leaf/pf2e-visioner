@@ -160,12 +160,46 @@ function addTokenEventListeners() {
 }
 
 /**
+ * Remove event listener from a specific token by ID
+ * @param {string} tokenId - The token ID to remove listeners from
+ */
+function removeTokenEventListener(tokenId) {
+  const handlers = HoverTooltips.tokenEventHandlers.get(tokenId);
+  if (!handlers) return;
+
+  const token = canvas?.tokens?.placeables?.find(t => t.id === tokenId);
+  if (token) {
+    try {
+      token.off('pointerover', handlers.overHandler);
+      token.off('pointerout', handlers.outHandler);
+      if (handlers.pointerDownHandler) {
+        token.off('pointerdown', handlers.pointerDownHandler);
+      }
+      if (handlers.pointerUpHandler) {
+        token.off('pointerup', handlers.pointerUpHandler);
+        token.off('pointerupoutside', handlers.pointerUpHandler);
+      }
+    } catch (e) {
+      console.warn('PF2E Visioner: Error removing token event listeners', e);
+    }
+  }
+
+  HoverTooltips.tokenEventHandlers.delete(tokenId);
+}
+
+/**
  * Add event listener to a specific token
  * @param {Token} token - The token to add listeners to
  * @returns {boolean} True if listeners were added, false if skipped
  */
 export function addTokenEventListener(token) {
-  if (HoverTooltips.tokenEventHandlers.has(token.id)) return false;
+  if (!token || !token.id) return false;
+
+  // If we already have handlers for this token ID, remove them first
+  // This handles cases where the token PIXI object was recreated by Foundry
+  if (HoverTooltips.tokenEventHandlers.has(token.id)) {
+    removeTokenEventListener(token.id);
+  }
 
   const overHandler = () => onTokenHover(token);
   const outHandler = () => onTokenHoverEnd(token);
@@ -201,22 +235,7 @@ function cleanupTokenEventListeners() {
   }
 
   HoverTooltips.tokenEventHandlers.forEach((handlers, tokenId) => {
-    const token = canvas.tokens.placeables.find(t => t.id === tokenId);
-    if (token) {
-      try {
-        token.off('pointerover', handlers.overHandler);
-        token.off('pointerout', handlers.outHandler);
-        if (handlers.pointerDownHandler) {
-          token.off('pointerdown', handlers.pointerDownHandler);
-        }
-        if (handlers.pointerUpHandler) {
-          token.off('pointerup', handlers.pointerUpHandler);
-          token.off('pointerupoutside', handlers.pointerUpHandler);
-        }
-      } catch (e) {
-        console.warn('PF2E Visioner: Error removing token event listeners', e);
-      }
-    }
+    removeTokenEventListener(tokenId);
   });
   HoverTooltips.tokenEventHandlers.clear();
 }
@@ -448,9 +467,9 @@ function onTokenPointerDown(token) {
   HoverTooltips._isDragging = true;
 
   // Hide any visible tooltips immediately
+  // Note: Don't set currentHoveredToken = null here, let onTokenHoverEnd handle it
   hideAllVisibilityIndicators();
   hideAllCoverIndicators();
-  HoverTooltips.currentHoveredToken = null;
 }
 
 /**
@@ -990,9 +1009,7 @@ function addVisibilityIndicator(
 
   // Ensure ticker updates DOM badge positions during pan/zoom
   ensureBadgeTicker();
-}
-
-function ensureBadgeTicker() {
+}function ensureBadgeTicker() {
   if (HoverTooltips.badgeTicker) return;
 
   // Invalidate canvas rect cache when ticker starts (viewport may have changed)
@@ -1236,9 +1253,7 @@ function hideAllVisibilityIndicators() {
   HoverTooltips.visibilityIndicators.clear();
 
   // Reset tracking variables to ensure clean state
-  keyTooltipTokens.clear();
-
-  // Stop ticker when no indicators remain
+  keyTooltipTokens.clear();  // Stop ticker when no indicators remain
   try {
     if (HoverTooltips.badgeTicker) {
       canvas.app?.ticker?.remove?.(HoverTooltips.badgeTicker);

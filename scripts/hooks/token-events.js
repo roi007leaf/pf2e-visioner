@@ -168,6 +168,13 @@ export function registerTokenHooks() {
 
   // Additional hook: when tokens are rendered on canvas (more reliable timing)
   Hooks.on('renderToken', (token, html, data) => {
+    // Add hover tooltip listeners when token is rendered (most reliable timing)
+    if (game.settings.get('pf2e-visioner', 'enableHoverTooltips')) {
+      if (token?.id) {
+        addTokenEventListener(token);
+      }
+    }
+
     // Check if this might be a party token restoration
     if (token?.document?.actor?.signature) {
       // Use a small delay to ensure token is fully rendered

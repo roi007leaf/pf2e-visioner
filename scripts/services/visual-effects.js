@@ -243,9 +243,12 @@ export async function cleanupDeletedWallVisuals(wallDocument) {
 export async function cleanupAllWallIndicators() {
   try {
     // Clean up hover tooltips cover indicators first (these are created by Alt key for tokens)
+    // NOTE: We only cleanup indicators, not the entire hover tooltip system
+    // because we don't want to remove event listeners from tokens
     try {
-      const { cleanupHoverTooltips } = await import('./HoverTooltips.js');
-      cleanupHoverTooltips();
+      const { hideAllVisibilityIndicators, hideAllCoverIndicators } = await import('./HoverTooltips.js');
+      hideAllVisibilityIndicators();
+      hideAllCoverIndicators();
     } catch (_) { }
 
     // Search through all potential canvas layers where wall indicators might exist
