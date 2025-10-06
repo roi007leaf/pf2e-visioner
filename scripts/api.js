@@ -287,6 +287,8 @@ export class Pf2eVisionerApi {
       let lightingFactor = 'bright';
       if (targetLight.darknessRank >= 4) {
         lightingFactor = targetLight.darknessRank === 4 ? 'greaterMagicalDarkness' : `magicalDarkness${targetLight.darknessRank}`;
+      } else if (targetLight.darknessRank >= 1) {
+        lightingFactor = 'magicalDarkness';
       } else if (targetLight.level === 'darkness') {
         lightingFactor = 'darkness';
       } else if (targetLight.level === 'dim') {
@@ -718,6 +720,7 @@ export class Pf2eVisionerApi {
   static _describeLighting(light) {
     if (!light) return 'unknown';
     if (light.darknessRank >= 4) return `magical darkness (rank ${light.darknessRank})`;
+    if (light.darknessRank >= 1) return `magical darkness (rank ${light.darknessRank})`;
     if (light.level === 'bright') return 'bright light';
     if (light.level === 'dim') return 'dim light';
     if (light.level === 'darkness') return 'darkness';
