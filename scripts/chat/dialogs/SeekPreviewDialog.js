@@ -1873,8 +1873,7 @@ export class SeekPreviewDialog extends BaseActionDialog {
   }
 
   /**
-   * Override to check ALL target tokens for override flags (not just the controlled token)
-   * This handles the case where an actor has multiple tokens on the scene
+   * Check if the old visibility state is AVS-controlled (no manual override exists)
    * @param {Object} outcome - The outcome object containing target and observer information
    * @returns {boolean} True if the old state is AVS-controlled
    */
@@ -1893,25 +1892,19 @@ export class SeekPreviewDialog extends BaseActionDialog {
       if (!avsEnabled) return false;
 
       const target = outcome.target;
-      const targetActorId = target?.actor?.id;
-      const seekerId = this.actorToken?.document?.id || this.actorToken?.id;
+      if (!target) return false;
 
-      if (!targetActorId || !seekerId) return false;
+      const seekerToken = this.actorToken;
+      if (!seekerToken) return false;
 
+      const seekerId = seekerToken.document?.id || seekerToken.id;
       const flagKey = `avs-override-from-${seekerId}`;
 
-      // Check ALL target tokens for override flag
-      const allTargetTokens = canvas.tokens.placeables.filter(
-        t => t.actor?.id === targetActorId
-      );
-
-      for (const targetToken of allTargetTokens) {
-        if (targetToken.document?.getFlag('pf2e-visioner', flagKey)) {
-          return false; // Override exists on ANY target token, so NOT AVS-controlled
-        }
+      if (target.document?.getFlag('pf2e-visioner', flagKey)) {
+        return false;
       }
 
-      return true; // No override found on any target token, so AVS-controlled
+      return true;
     } catch {
       return false;
     }

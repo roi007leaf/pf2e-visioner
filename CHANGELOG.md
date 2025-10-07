@@ -4,14 +4,15 @@
 
 ### 🐛 Bug Fixes
 
-- Implemented movement blocking for players awaiting Sneak confirmation; prevents unintended actions during sneak attempts
-- End of turn validation dialog now correctly appears when required, ensuring GMs can address deferred sneak checks
+- Implemented movement blocking for players awaiting Sneak confirmation, preventing unintended actions during sneak attempts
+- End-of-turn validation button now correctly appears when required, ensuring GMs can address deferred sneak checks
 - Seek dialog now properly filters out hazards and loot from the defeated token filter, ensuring they always appear in results
-- All dialog now show or hide the actions (apply\revert) buttons based on the following criteria:
-  - If the old visibility state is AVS calculated and the new state is not AVS calculated - show actions
-  - If the old visibility state is AVS calculated and the new state is AVS - hide actions
-  - If the old visibility state is not AVS calculated and AVS is selected or a state other than the old one - show actions
-  - If the old visibility state is not AVS calculated and the new state is the same state - hide actions
+- All dialogs now show or hide action buttons (Apply/Revert) based on the following criteria:
+  - If the old visibility state is AVS-calculated and the new state is not AVS-calculated - show actions
+  - If the old visibility state is AVS-calculated and the new state is AVS - hide actions
+  - If the old visibility state is not AVS-calculated and AVS is selected or a state other than the old one - show actions
+  - If the old visibility state is not AVS-calculated and the new state is the same state - hide actions
+- All dialogs now check only the specific token that initiated the action when determining if the old state is AVS-controlled
 
 ## [4.0.1] - 2025-10-07
 
