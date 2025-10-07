@@ -179,7 +179,7 @@ export function registerUIHooks() {
 
   // Utility: label identifiers and cover status for walls when Alt is held
   const refreshWallIdentifierLabels = () => {
-    try {
+    return Promise.resolve().then(() => {
       const walls = canvas?.walls?.placeables || [];
       const layer = canvas?.controls || canvas?.hud || canvas?.stage;
 
@@ -416,7 +416,7 @@ export function registerUIHooks() {
           /* ignore label errors */
         }
       }
-    } catch { }
+    }).catch(() => { });
   };
 
   const refreshWallTool = () => {

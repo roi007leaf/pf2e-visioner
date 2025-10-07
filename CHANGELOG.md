@@ -1,5 +1,12 @@
 # Changelog
 
+## [4.0.0] - 2025-10-07
+
+### 🐛 Hotfix
+
+- Fixed issue with token visibility not updating correctly
+- Improved error handling in UI hooks
+
 ## [4.0.0] - 2025-10-03
 
 ### 🎉 Major Release - Architecture Refactor & Enhanced Automation
