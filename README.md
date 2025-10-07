@@ -10,7 +10,7 @@ PF2E Visioner is a comprehensive visibility and cover toolkit for Foundry VTT's 
 
 ---
 
-Documentation: ![Here](https://github.com/roi007leaf/pf2e-visioner/wiki)
+Documentation: https://github.com/roi007leaf/pf2e-visioner/wiki
 
 ## ✅ Requirements
 
