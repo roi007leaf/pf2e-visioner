@@ -7,7 +7,7 @@ import { getCoverMap, getVisibilityMap } from '../../utils.js';
 
 import { MODULE_ID } from '../../constants.js';
 import { bindTokenManagerActions } from './actions/index.js';
-import { toggleHideFoundryHidden, toggleIgnoreAllies, toggleIgnoreWalls } from './actions/ui.js';
+import { bulkSetWallState, toggleHideFoundryHidden, toggleIgnoreAllies, toggleIgnoreWalls } from './actions/ui.js';
 import { attachApplyButtonAnimation } from './apply-button-animation.js';
 import {
   addTokenBorder as addBorderUtil,
@@ -67,6 +67,8 @@ export class VisionerTokenManager extends foundry.applications.api.ApplicationV2
       bulkHazardsLesserCover: VisionerTokenManager.bulkSetCoverState,
       bulkHazardsStandardCover: VisionerTokenManager.bulkSetCoverState,
       bulkHazardsGreaterCover: VisionerTokenManager.bulkSetCoverState,
+      bulkWallsObserved: bulkSetWallState,
+      bulkWallsHidden: bulkSetWallState,
     };
     return cfg;
   })();

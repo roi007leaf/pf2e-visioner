@@ -119,7 +119,7 @@ export class TakeCoverActionHandler extends ActionHandlerBase {
     return {
       // Orientation: observer = subject (row token), target = actor (taking cover)
       observer: outcome.target,
-      target: actionData.actor,
+      target: actionData.actorToken || actionData.actor,
       newCover: desired,
       oldCover: outcome.oldCover || outcome.oldVisibility || outcome.currentCover,
     };
@@ -163,7 +163,7 @@ export class TakeCoverActionHandler extends ActionHandlerBase {
     return entries
       .map((e) => ({
         observer: this.getTokenById(e.observerId),
-        target: actionData.actor,
+        target: actionData.actorToken || actionData.actor,
         newCover: e.oldCover,
       }))
       .filter((c) => c.observer);

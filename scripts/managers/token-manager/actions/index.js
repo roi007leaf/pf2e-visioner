@@ -3,6 +3,7 @@ import {
   bindDomIconHandlers,
   bulkSetCoverState,
   bulkSetVisibilityState,
+  bulkSetWallState,
   toggleEncounterFilter,
   toggleIgnoreAllies,
   toggleIgnoreWalls,
@@ -16,12 +17,13 @@ export {
   bindDomIconHandlers,
   bulkSetCoverState,
   bulkSetVisibilityState,
+  bulkSetWallState,
   toggleEncounterFilter,
   toggleIgnoreAllies,
   toggleIgnoreWalls,
   toggleMode,
   toggleStateSelector,
-  toggleTab,
+  toggleTab
 };
 
 export function bindTokenManagerActions(TokenManagerClass) {
@@ -37,5 +39,6 @@ export function bindTokenManagerActions(TokenManagerClass) {
   TokenManagerClass.toggleTab = toggleTab;
   TokenManagerClass.bulkSetVisibilityState = bulkSetVisibilityState;
   TokenManagerClass.bulkSetCoverState = bulkSetCoverState;
+  TokenManagerClass.bulkSetWallState = bulkSetWallState;
   bindDomIconHandlers(TokenManagerClass);
 }

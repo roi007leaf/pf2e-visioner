@@ -13,7 +13,7 @@ export const VISIBILITY_STATES = {
     label: 'PF2E_VISIONER.VISIBILITY_STATES.avs',
     pf2eCondition: null,
     visible: true,
-    icon: 'fas fa-bolt',
+    icon: 'fas fa-bolt-auto',
     color: 'var(--visibility-avs, #9c27b0)', // Purple - AVS control
     cssClass: 'visibility-avs',
   },

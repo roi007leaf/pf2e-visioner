@@ -411,6 +411,101 @@ export async function bulkSetCoverState(event, button) {
   }
 }
 
+export async function bulkSetWallState(event, button) {
+  try {
+    const state = button.dataset.state;
+    const targetType = button.dataset.targetType;
+    if (!state || targetType !== 'walls') {
+      return;
+    }
+
+    button.classList.add('loading');
+    button.disabled = true;
+    const originalText = button.innerHTML;
+    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+
+    const targetEl = button || event?.currentTarget || event?.target || null;
+    const form =
+      (targetEl && typeof targetEl.closest === 'function' ? targetEl.closest('form') : null) ||
+      this?.element?.querySelector?.('form') ||
+      this?.element ||
+      null;
+
+    if (!form) {
+      button.classList.remove('loading');
+      button.disabled = false;
+      button.innerHTML = originalText;
+      return;
+    }
+
+    const section = button.closest('.table-section');
+    if (!section) {
+      button.classList.remove('loading');
+      button.disabled = false;
+      button.innerHTML = originalText;
+      return;
+    }
+
+    const iconSelections = section.querySelectorAll('.icon-selection');
+    const updates = [];
+    const iconSelectionsArray = Array.from(iconSelections);
+
+    const chunkSize = 100;
+    for (let i = 0; i < iconSelectionsArray.length; i += chunkSize) {
+      const chunk = iconSelectionsArray.slice(i, i + chunkSize);
+
+      chunk.forEach((iconSelection) => {
+        const hiddenInput = iconSelection.querySelector('input[type="hidden"]');
+        const current = hiddenInput?.value;
+
+        if (current === state) return;
+
+        const currentSelected = iconSelection.querySelector('.state-icon.selected');
+        const targetIcon = iconSelection.querySelector(`[data-state="${state}"]`);
+
+        if (hiddenInput && targetIcon) {
+          updates.push({
+            hiddenInput,
+            currentSelected,
+            targetIcon,
+          });
+        }
+      });
+
+      if (i + chunkSize < iconSelectionsArray.length) {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      }
+    }
+
+    if (updates.length > 0) {
+      requestAnimationFrame(() => {
+        updates.forEach((update) => {
+          if (update.currentSelected) {
+            update.currentSelected.classList.remove('selected');
+          }
+          update.targetIcon.classList.add('selected');
+          update.hiddenInput.value = state;
+        });
+      });
+    }
+
+    setTimeout(() => {
+      button.classList.remove('loading');
+      button.disabled = false;
+      button.innerHTML = originalText;
+    }, 100);
+  } catch (error) {
+    console.error('Error in bulk set wall state:', error);
+    showNotification('An error occurred while setting bulk wall state', 'error');
+
+    if (button) {
+      button.classList.remove('loading');
+      button.disabled = false;
+      button.innerHTML = button.dataset.originalText || 'Error';
+    }
+  }
+}
+
 export function bindDomIconHandlers(TokenManagerClass) {
   TokenManagerClass.prototype.addIconClickHandlers = function addIconClickHandlers() {
     const element = this.element;

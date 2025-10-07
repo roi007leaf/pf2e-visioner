@@ -21,9 +21,31 @@ export async function previewActionResults(actionData) {
 
         try {
           // Helper to robustly resolve a Token from various actor/token shapes
+          // Priority: message speaker > controlled token > actionData token > resolved token
           const resolveToken = (tokenOrActor) => {
             try {
               if (!tokenOrActor) return null;
+
+              // First priority: Check if we have a message with a speaker token ID
+              if (actionData.message?.speaker?.token) {
+                const speakerToken = canvas.tokens.get(actionData.message.speaker.token);
+                if (speakerToken) {
+                  return speakerToken;
+                }
+              }
+
+              // Second priority: Check if there's a controlled token that matches this actor
+              const controlled = canvas?.tokens?.controlled?.[0];
+              if (controlled) {
+                // Check if the controlled token belongs to the same actor
+                const actorId = tokenOrActor?.actor?.id || tokenOrActor?.document?.actor?.id || tokenOrActor?.id;
+                const controlledActorId = controlled?.actor?.id;
+
+                if (actorId && controlledActorId && actorId === controlledActorId) {
+                  return controlled;
+                }
+              }
+
               if (tokenOrActor.isToken || tokenOrActor.center) return tokenOrActor;
               if (tokenOrActor.object?.isToken || tokenOrActor.object?.center)
                 return tokenOrActor.object;
@@ -37,6 +59,11 @@ export async function previewActionResults(actionData) {
             return null;
           };
           const seekerToken = resolveToken(actionData?.actor);
+
+          // Ensure actionData has the correct token reference for wall visibility checks
+          if (seekerToken && !actionData.actorToken) {
+            actionData.actorToken = seekerToken;
+          }
 
           // No gating by precise sense: PF2e allows Seek with imprecise senses; outcomes are capped elsewhere
 

@@ -268,32 +268,63 @@ export class HidePreviewDialog extends BaseActionDialog {
 
     // Process outcomes to add additional properties needed by template
     let processedOutcomes = filteredOutcomes.map((outcome) => {
+      // Check ALL tokens for the hiding actor to find override flags (multi-token actor support)
+      // In Hide, outcome.target is the observer (opposite of Sneak where outcome.token is the observer)
+      const observerId = outcome.target?.document?.id || outcome.target?.id;
+      const hidingActorId = this.actorToken?.actor?.id;
+
+      let currentVisibility = outcome.oldVisibility || outcome.currentVisibility;
+
+      if (hidingActorId && observerId) {
+        const allHidingTokenIds = canvas.tokens.placeables
+          .filter(t => t.actor?.id === hidingActorId)
+          .map(t => t.document.id);
+
+        const flagKeyToFind = `avs-override-from-${observerId}`;
+
+        let overrideFlag = null;
+        for (const hidingTokenId of allHidingTokenIds) {
+          const hidingToken = canvas.tokens.get(hidingTokenId);
+          if (!hidingToken) continue;
+
+          const flags = hidingToken.document?.flags?.['pf2e-visioner'] || {};
+
+          const flag = flags[flagKeyToFind];
+
+          if (flag?.state) {
+            overrideFlag = flag;
+            currentVisibility = flag.state;
+            break;
+          }
+        }
+      }
+
       const availableStates = this.getAvailableStatesForOutcome(outcome);
       const effectiveNewState = outcome.overrideState ?? outcome.newVisibility;
-      const baseOldState = outcome.oldVisibility || outcome.currentVisibility;
+      const baseOldState = currentVisibility;
+
       // Check if the old visibility state is AVS-controlled
       const isOldStateAvsControlled = this.isOldStateAvsControlled(outcome);
 
-      // Determine if there's an actionable change
+      // Determine if there's an actionable change - same logic as icon click handler
       let hasActionableChange = false;
-      if (outcome.overrideState === 'avs' && this.isCurrentStateAvsControlled(outcome)) {
-        // Special case: If current state is AVS-controlled and override is 'avs', no change
+      if (isOldStateAvsControlled && effectiveNewState === 'avs') {
+        // Old is AVS-controlled and new is AVS - no change
         hasActionableChange = false;
-      } else if (outcome.overrideState) {
-        // If user has set an override, check if it differs from current state
-        const statesMatch = baseOldState != null && effectiveNewState != null && effectiveNewState === baseOldState;
-        hasActionableChange =
-          (baseOldState != null && effectiveNewState != null && effectiveNewState !== baseOldState) ||
-          (statesMatch && isOldStateAvsControlled);
+      } else if (isOldStateAvsControlled) {
+        // Old was AVS-controlled, but new is a manual state - always actionable
+        hasActionableChange = true;
       } else {
-        // No override - use the calculated 'changed' flag from the action
-        hasActionableChange = outcome.changed === true;
+        // Old was NOT AVS-controlled - check if states match
+        const statesMatch = baseOldState === effectiveNewState;
+        hasActionableChange = !statesMatch;
       }
 
 
 
       return {
         ...outcome,
+        oldVisibility: baseOldState,
         positionDisplay: outcome.positionDisplay,
         hasPositionData: !!outcome.hasPositionData,
         availableStates,
@@ -661,22 +692,27 @@ export class HidePreviewDialog extends BaseActionDialog {
     this.outcomes.forEach((outcome) => {
       // Mark the effective state (override if present, otherwise calculated) as selected in the UI
       const effectiveState = outcome.overrideState ?? outcome.newVisibility;
-      // Recompute actionable flag for UI buttons
+      // Recompute actionable flag for UI buttons using the SAME logic as _prepareContext
       try {
         const oldState = outcome.oldVisibility ?? outcome.currentVisibility ?? null;
         const isOldStateAvsControlled = this.isOldStateAvsControlled(outcome);
 
-        // Special case: If current state is AVS-controlled and override is 'avs', no change
-        if (outcome.overrideState === 'avs' && this.isCurrentStateAvsControlled(outcome)) {
-          outcome.hasActionableChange = false;
+        // Use the SAME logic as _prepareContext and addIconClickHandlers
+        let hasActionableChange = false;
+        if (isOldStateAvsControlled && effectiveState === 'avs') {
+          // Old is AVS-controlled and new is AVS - no change
+          hasActionableChange = false;
+        } else if (isOldStateAvsControlled) {
+          // Old was AVS-controlled, but new is a manual state - always actionable
+          hasActionableChange = true;
         } else {
-          // If old state matches new state, check if old state was AVS-controlled
-          // If it was AVS-controlled, we should still apply the manual override
-          const statesMatch = oldState != null && effectiveState != null && effectiveState === oldState;
-          outcome.hasActionableChange =
-            (oldState != null && effectiveState != null && effectiveState !== oldState) ||
-            (statesMatch && isOldStateAvsControlled);
+          // Old was NOT AVS-controlled - check if states match
+          const statesMatch = oldState === effectiveState;
+          hasActionableChange = !statesMatch;
         }
+
+        outcome.hasActionableChange = hasActionableChange;
+
         const tokenId = outcome?.target?.id ?? null;
         if (tokenId) this.updateActionButtonsForToken(tokenId, outcome.hasActionableChange);
       } catch { }
@@ -722,14 +758,81 @@ export class HidePreviewDialog extends BaseActionDialog {
         );
         if (outcome) {
           outcome.overrideState = newState;
-          const oldState = outcome.oldVisibility ?? outcome.currentVisibility ?? null;
+
+          console.log('DEBUG Hide addIconClickHandlers - Clicked icon with newState:', newState);
+          console.log('DEBUG Hide addIconClickHandlers - Observer (target):', outcome.target?.name);
+          console.log('DEBUG Hide addIconClickHandlers - Hider:', this.actorToken?.name);
+
+          // Check ALL tokens for the hiding actor to find override flags (multi-token actor support)
+          // In Hide, outcome.target is the observer (opposite of Sneak)
+          const observerId = outcome.target?.document?.id || outcome.target?.id;
+          const hidingActorId = this.actorToken?.actor?.id;
+
+          console.log('DEBUG Hide addIconClickHandlers - observerId:', observerId);
+          console.log('DEBUG Hide addIconClickHandlers - hidingActorId:', hidingActorId);
+
+          let currentVisibility = outcome.oldVisibility ?? outcome.currentVisibility ?? null;
+
+          console.log('DEBUG Hide addIconClickHandlers - Initial currentVisibility:', currentVisibility);
+
+          if (hidingActorId && observerId) {
+            const allHidingTokenIds = canvas.tokens.placeables
+              .filter(t => t.actor?.id === hidingActorId)
+              .map(t => t.document.id);
+
+            console.log('DEBUG Hide addIconClickHandlers - All hiding token IDs:', allHidingTokenIds);
+
+            const flagKeyToFind = `avs-override-from-${observerId}`;
+            console.log('DEBUG Hide addIconClickHandlers - Looking for override flag key:', flagKeyToFind);
+
+            let overrideFlag = null;
+            for (const hidingTokenId of allHidingTokenIds) {
+              const hidingToken = canvas.tokens.get(hidingTokenId);
+              if (!hidingToken) continue;
+
+              const flags = hidingToken.document?.flags?.['pf2e-visioner'] || {};
+              const flag = flags[flagKeyToFind];
+
+              if (flag?.state) {
+                console.log('DEBUG Hide addIconClickHandlers - Found override flag on token:', hidingToken.name, 'State:', flag.state);
+                overrideFlag = flag;
+                currentVisibility = flag.state;
+                break;
+              }
+            }
+
+            if (!overrideFlag) {
+              console.log('DEBUG Hide addIconClickHandlers - No override flag found - state is AVS-controlled');
+            }
+          }
+
+          const oldState = currentVisibility;
+
+          console.log('DEBUG Hide addIconClickHandlers - Final oldState:', oldState);
 
           // Use our AVS-aware logic instead of the base logic
           const isOldStateAvsControlled = this.isOldStateAvsControlled(outcome);
+          console.log('DEBUG Hide addIconClickHandlers - isOldStateAvsControlled:', isOldStateAvsControlled);
+
           const statesMatch = oldState != null && newState != null && newState === oldState;
-          const hasActionableChange =
-            (oldState != null && newState != null && newState !== oldState) ||
-            (statesMatch && isOldStateAvsControlled);
+          console.log('DEBUG Hide addIconClickHandlers - statesMatch:', statesMatch);
+
+          // Special case: if old state is AVS-controlled and user selects AVS bolt, no change
+          let hasActionableChange = false;
+          if (isOldStateAvsControlled && newState === 'avs') {
+            console.log('DEBUG Hide addIconClickHandlers - Old is AVS-controlled and selected AVS - NO CHANGE');
+            hasActionableChange = false;
+          } else if (isOldStateAvsControlled) {
+            // Old was AVS-controlled, but user is selecting a manual state - always actionable
+            console.log('DEBUG Hide addIconClickHandlers - Old is AVS-controlled, selecting manual state - ACTIONABLE');
+            hasActionableChange = true;
+          } else {
+            // Old was NOT AVS-controlled - check if states match
+            hasActionableChange = !statesMatch;
+            console.log('DEBUG Hide addIconClickHandlers - Old is manual, statesMatch:', statesMatch, '- hasActionableChange:', hasActionableChange);
+          }
+
+          console.log('DEBUG Hide addIconClickHandlers - Final hasActionableChange:', hasActionableChange);
 
           // Persist actionable state on outcome so templates and bulk ops reflect immediately
           outcome.hasActionableChange = hasActionableChange;
@@ -1312,59 +1415,77 @@ export class HidePreviewDialog extends BaseActionDialog {
 
   /**
    * Check if the old visibility state is AVS-controlled (no manual override exists)
+   * Override to check ALL hiding tokens for override flags (not just the controlled token)
+   * This handles the case where an actor has multiple tokens on the scene
    * @param {Object} outcome - The outcome object containing target and observer information
    * @returns {boolean} True if the old state is AVS-controlled
    */
   isOldStateAvsControlled(outcome) {
     try {
-      // Check if AVS is enabled
       const avsEnabled = game.settings.get('pf2e-visioner', 'autoVisibilityEnabled');
       if (!avsEnabled) return false;
 
-      // In hide actions: outcome.target is the observer, this.actorToken is the target being hidden
-      const hidingToken = this.actorToken; // The token that's hiding
-      const observer = outcome.target; // The token observing the hiding token
+      const observer = outcome.target;
+      const hidingActorId = this.actorToken?.actor?.id;
 
-      if (!hidingToken || !observer) return false;
+      if (!hidingActorId || !observer) return false;
 
-      // Check for manual override flag on the hiding token from this observer
-      // The flag indicates if this observer has manually overridden the visibility of the hiding token
       const observerId = observer.document?.id || observer.id;
       const flagKey = `avs-override-from-${observerId}`;
-      const hasOverride = !!hidingToken.document?.getFlag('pf2e-visioner', flagKey); return !hasOverride; // If no override exists, AVS is controlling
+
+      // Check ALL hiding tokens for override flag (same logic as Sneak)
+      const allHidingTokens = canvas.tokens.placeables.filter(
+        t => t.actor?.id === hidingActorId
+      );
+
+      for (const hidingToken of allHidingTokens) {
+        if (hidingToken.document?.getFlag('pf2e-visioner', flagKey)) {
+          return false; // Override exists on ANY hiding token, so NOT AVS-controlled
+        }
+      }
+
+      return true; // No override found on any hiding token, so AVS-controlled
     } catch (error) {
       console.warn('Error checking if old state is AVS-controlled:', error);
-      return false; // Default to not AVS-controlled on error
+      return false;
     }
   }
 
   /**
    * Check if the current visibility state is AVS-controlled (no manual override exists)
+   * Override to check ALL hiding tokens for override flags (not just the controlled token)
+   * This handles the case where an actor has multiple tokens on the scene
    * @param {Object} outcome - The outcome object containing target and observer information
    * @returns {boolean} True if the current state is AVS-controlled
    */
   isCurrentStateAvsControlled(outcome) {
     try {
-      // Check if AVS is enabled
       const avsEnabled = game.settings.get('pf2e-visioner', 'autoVisibilityEnabled');
       if (!avsEnabled) return false;
 
-      // In hide actions: outcome.target is the observer, this.actorToken is the target being hidden
-      const hidingToken = this.actorToken; // The token that's hiding
-      const observer = outcome.target; // The token observing the hiding token
+      const observer = outcome.target;
+      const hidingActorId = this.actorToken?.actor?.id;
 
-      if (!hidingToken || !observer) return false;
+      if (!hidingActorId || !observer) return false;
 
-      // Check for manual override flag on the hiding token from this observer
-      const hasOverride = !!hidingToken.document?.getFlag(
-        'pf2e-visioner',
-        `avs-override-from-${observer.document?.id || observer.id}`,
+      const observerId = observer.document?.id || observer.id;
+      const flagKey = `avs-override-from-${observerId}`;
+
+      // Check ALL hiding tokens for override flag (same logic as Sneak)
+      const allHidingTokens = canvas.tokens.placeables.filter(
+        t => t.actor?.id === hidingActorId
       );
 
-      return !hasOverride; // If no override exists, AVS is controlling
+      for (const hidingToken of allHidingTokens) {
+        if (hidingToken.document?.getFlag('pf2e-visioner', flagKey)) {
+          return false; // Override exists on ANY hiding token, so NOT AVS-controlled
+        }
+      }
+
+      return true; // No override found on any hiding token, so AVS-controlled
     } catch (error) {
       console.warn('Error checking if current state is AVS-controlled:', error);
-      return false; // Default to not AVS-controlled on error
+      return false;
     }
   }
 }

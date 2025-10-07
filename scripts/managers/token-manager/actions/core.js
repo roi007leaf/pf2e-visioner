@@ -115,7 +115,6 @@ export async function formHandler(event, form, formData, options = {}) {
 
           // Create override if state changed OR if forceOverride is true
           if (stateChanged || forceOverride) {
-            // Include cover context if present for UI clarity
             const expectedCover = coverChanges?.[tokenId];
             overrideMap.set(tokenId, {
               target: targetToken,
@@ -125,7 +124,6 @@ export async function formHandler(event, form, formData, options = {}) {
             });
           }
         }
-        // Apply AVS overrides for manual token manager changes
         if (overrideMap.size > 0) {
           try {
             const { default: AvsOverrideManager } = await import(
@@ -209,6 +207,22 @@ export async function formHandler(event, form, formData, options = {}) {
           for (const id of ids) merged[id] = state;
         }
         await app.observer.document.setFlag(MODULE_ID, 'walls', merged);
+
+        // Sync wall visibility to all other tokens of the same actor
+        try {
+          const actorId = app.observer?.actor?.id;
+          if (actorId) {
+            const allTokensOfSameActor = canvas.tokens.placeables.filter(
+              t => t.actor?.id === actorId && t.document.id !== app.observer.document.id
+            );
+
+            for (const token of allTokensOfSameActor) {
+              await token.document.setFlag(MODULE_ID, 'walls', merged);
+            }
+          }
+        } catch (syncError) {
+          console.warn('Token Manager: failed to sync wall visibility to other tokens', syncError);
+        }
       } catch (error) {
         console.warn('Token Manager: failed to persist wall visibility states', error);
       }
@@ -278,7 +292,6 @@ export async function formHandler(event, form, formData, options = {}) {
           expectedCover,
         });
       }
-      // Apply AVS overrides for each observer pair
       for (const [observerTokenId, map] of overridesByObserver.entries()) {
         try {
           const observerToken = canvas.tokens.get(observerTokenId);
@@ -764,8 +777,9 @@ export async function applyBoth(_event, _button) {
     const allowedTokenIds = computeAllowedTokenIds(app);
     const visibilityInputs = app.element.querySelectorAll('input[name^="visibility."]');
     const coverInputs = app.element.querySelectorAll('input[name^="cover."]');
+    const wallInputs = app.element.querySelectorAll('input[name^="walls."]');
     if (!app._savedModeData) app._savedModeData = {};
-    if (!app._savedModeData[app.mode]) app._savedModeData[app.mode] = { visibility: {}, cover: {} };
+    if (!app._savedModeData[app.mode]) app._savedModeData[app.mode] = { visibility: {}, cover: {}, walls: {} };
     visibilityInputs.forEach((input) => {
       const row = typeof input?.closest === 'function' ? input.closest('tr.token-row') : null;
       const tokenId = input.name.replace('visibility.', '');
@@ -777,6 +791,11 @@ export async function applyBoth(_event, _button) {
       const tokenId = input.name.replace('cover.', '');
       if (allowedTokenIds && !allowedTokenIds.has(tokenId)) return;
       app._savedModeData[app.mode].cover[tokenId] = input.value;
+    });
+    wallInputs.forEach((input) => {
+      const wallId = input.name.replace('walls.', '');
+      if (!app._savedModeData[app.mode].walls) app._savedModeData[app.mode].walls = {};
+      app._savedModeData[app.mode].walls[wallId] = input.value;
     });
   } catch (error) {
     console.error('Token Manager: Error saving current form state:', error);
@@ -847,6 +866,23 @@ export async function applyBoth(_event, _button) {
             cover: state,
           });
         }
+      }
+    }
+
+    const walls = app._savedModeData.observer?.walls || {};
+    if (Object.keys(walls).length > 0) {
+      try {
+        const currentWalls = app.observer?.document?.getFlag?.(MODULE_ID, 'walls') || {};
+        const merged = { ...currentWalls };
+        const { expandWallIdWithConnected } = await import('../../../services/connected-walls.js');
+        for (const [wallId, state] of Object.entries(walls)) {
+          if (state !== 'hidden' && state !== 'observed') continue;
+          const ids = expandWallIdWithConnected(wallId);
+          for (const id of ids) merged[id] = state;
+        }
+        await app.observer.document.setFlag(MODULE_ID, 'walls', merged);
+      } catch (error) {
+        console.warn('Token Manager: failed to persist wall visibility states (applyBoth):', error);
       }
     }
 

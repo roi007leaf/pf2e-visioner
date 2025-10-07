@@ -235,7 +235,7 @@ class OverrideValidationIndicator {
     // Use only component class; rely on body-level custom properties (colorblind modes set vars globally)
     el.className = 'pf2e-visioner-override-indicator';
     el.innerHTML = `
-      <div class="indicator-icon"><i class="fas fa-exclamation-triangle"></i></div>
+      <div class="indicator-icon"><i class="fas fa-bolt-auto"></i></div>
       <div class="indicator-badge">0</div>
     `;
 
@@ -435,7 +435,7 @@ class OverrideValidationIndicator {
     }
 
     this._tooltipEl.innerHTML = `
-      <div class="tip-header"><i class="fas fa-exclamation-triangle"></i> ${this._data?.overrides?.length || 0} change(s) to validate</div>
+      <div class="tip-header"><i class="fas fa-bolt-auto"></i> ${this._data?.overrides?.length || 0} change(s) to validate</div>
       ${contentHTML}
       <div class="tip-footer">
         <div class="footer-bottom"><span>Left-click: open details</span></div>

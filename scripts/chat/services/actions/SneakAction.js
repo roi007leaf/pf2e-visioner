@@ -970,7 +970,7 @@ export class SneakActionHandler extends ActionHandlerBase {
     const observer = outcome.token || outcome.target;
     const change = {
       observer,
-      target: actionData.actor,
+      target: actionData.actorToken || actionData.actor,
       newVisibility: outcome.newVisibility,
       oldVisibility: outcome.oldVisibility,
     };
@@ -1087,7 +1087,7 @@ export class SneakActionHandler extends ActionHandlerBase {
     return entries
       .map((e) => ({
         observer: this.getTokenById(e.observerId),
-        target: actionData.actor,
+        target: actionData.actorToken || actionData.actor,
         newVisibility: e.oldVisibility,
       }))
       .filter((c) => c.observer && c.target && c.newVisibility);
@@ -1100,7 +1100,7 @@ export class SneakActionHandler extends ActionHandlerBase {
     const filtered = outcomes.filter(Boolean).filter((o) => o.changed);
     return filtered.map((o) => ({
       observer: o.token || o.target,
-      target: actionData.actor,
+      target: actionData.actorToken || actionData.actor,
       newVisibility: o.oldVisibility || o.currentVisibility,
     }));
   }
