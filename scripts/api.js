@@ -466,8 +466,7 @@ export class Pf2eVisionerApi {
 
       // 3. LIGHTING CONDITIONS (main cause of concealment/hidden for most cases)
       if (visibility === 'concealed' || visibility === 'hidden') {
-        // Greater magical darkness (rank 4+) - conceals EVEN with normal darkvision
-        if (lightingFactor.includes('magicalDarkness')) {
+        if (lightingFactor == "greaterMagicalDarkness" || lightingFactor.startsWith('magicalDarkness')) {
           const rank = targetLight.darknessRank || 0;
           if (rank >= 4) {
             if (visionCaps.hasDarkvision && !visionCaps.hasGreaterDarkvision) {
