@@ -184,12 +184,6 @@ export class VisionAnalyzer {
    */
   hasLineOfSight(observer, target) {
     try {
-      // Check if LOS calculation is disabled
-      const losDisabled = game.settings.get(MODULE_ID, 'disableLineOfSightCalculation');
-      if (losDisabled) {
-        return true; // Always allow LOS when disabled
-      }
-
       // If the observer has an los shape, use that for line of sight
       const los = observer.vision?.los;
       if (!!los?.points) {
@@ -205,6 +199,12 @@ export class VisionAnalyzer {
           const intersection = los.intersectClipper(tokenClipperPoints);
           return intersection.length > 0;
         }
+      }
+
+      // Check if LOS calculation is disabled
+      const losDisabled = game.settings.get(MODULE_ID, 'disableLineOfSightCalculation');
+      if (losDisabled) {
+        return true; // Always allow LOS when disabled
       }
 
       const ray = new foundry.canvas.geometry.Ray(observer.center, target.center);
