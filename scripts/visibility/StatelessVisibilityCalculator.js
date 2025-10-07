@@ -54,7 +54,6 @@ export function calculateVisibility(input) {
     const hasLineOfSight = input.hasLineOfSight ?? true; // Default to true (fail open)
     const isInvisible = target.auxiliary.includes('invisible');
 
-
     // Decision tree: follow PF2e visibility rules in priority order
 
     // 1. Check if observer is completely incapacitated (blinded)
@@ -326,7 +325,9 @@ function checkPreciseNonVisualSenses(observer, target, soundBlocked = false) {
         'greaterDarkvision',
         'low-light-vision',
         'lowLightVision',
-        'light-perception'
+        'light-perception',
+        'see-invisibility',  // Visual sense that counters invisibility
+        'seeInvisibility'
     ]);
 
     // Check all precise non-visual senses dynamically
@@ -412,9 +413,12 @@ function determineVisualDetection(observer, target, rayDarkness = null, hasLineO
         };
     }
 
-    // CRITICAL: Invisible targets cannot be detected by visual senses
+    // Check if observer has see-invisibility sense BEFORE checking invisibility
+    const hasSeeInvisibility = observer.precise['see-invisibility'] || observer.precise.seeInvisibility;
+
+    // CRITICAL: Invisible targets cannot be detected by visual senses UNLESS observer has see-invisibility
     const isInvisible = target.auxiliary.includes('invisible');
-    if (isInvisible) {
+    if (isInvisible && !hasSeeInvisibility) {
         return {
             canDetect: false,
             sense: null,
@@ -464,6 +468,17 @@ function determineVisualDetection(observer, target, rayDarkness = null, hasLineO
     }
 
     // Check visual senses in priority order
+
+    // See-invisibility: allows detection of invisible creatures as concealed
+    // This is checked FIRST because it specifically counters invisibility
+    if (hasSeeInvisibility && isInvisible) {
+        return {
+            canDetect: true,
+            sense: 'see-invisibility',
+            isPrecise: true,
+            baseState: 'concealed' // Invisible creatures seen with see-invisibility are concealed
+        };
+    }
 
     // Greater darkvision: works in all lighting, including magical darkness
     if (precise.greaterDarkvision || precise['greater-darkvision']) {
@@ -664,7 +679,8 @@ function applyVisualModifiers(visualDetection, observer, target) {
     const { auxiliary, concealment } = target;
 
     // 1. Apply invisibility (most significant modifier)
-    if (auxiliary.includes('invisible')) {
+    // EXCEPTION: see-invisibility sense already handled invisibility in determineVisualDetection
+    if (auxiliary.includes('invisible') && visualDetection.sense !== 'see-invisibility') {
         // In PF2e, invisible creatures are undetected
         // (they can still be detected by imprecise senses like hearing, tremorsense, etc.,
         // but those are handled separately in the imprecise sense detection logic)

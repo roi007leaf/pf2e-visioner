@@ -102,6 +102,7 @@ export class ItemEventHandler {
             itemName.includes('darkvision') ||
             itemName.includes('low-light') ||
             itemName.includes('see invisibility') ||
+            itemName.includes('see the unseen') ||
             itemName.includes('true seeing') ||
             itemName.includes('dancing lights') ||
             itemName.includes('continual flame') ||
