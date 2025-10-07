@@ -1,5 +1,11 @@
 # Changelog
 
+## [4.0.4] - 2025-10-07
+
+### 🐛 Bug Fixes
+
+- Handle a case where gridless scene darkness sources were not properly accounted for their points of shape
+
 ## [4.0.3] - 2025-10-07
 
 ### 🐛 Bug Fixes
