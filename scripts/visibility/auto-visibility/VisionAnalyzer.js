@@ -187,7 +187,7 @@ export class VisionAnalyzer {
       // If the observer has an los shape, use that for line of sight against the target's circle
       // Darkness sources may affect true LOS, so only return true/false if we can be sure
       const los = observer.vision?.los;
-      if (!!los?.points) {
+      if (los?.points) {
         const radius = target.externalRadius;
         const circle = new PIXI.Circle(target.center.x, target.center.y, radius);
         const intersection = los.intersectCircle(circle, {density: 8, scalingFactor: 1.0});
