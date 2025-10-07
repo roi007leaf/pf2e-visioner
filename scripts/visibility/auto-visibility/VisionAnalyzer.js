@@ -190,6 +190,23 @@ export class VisionAnalyzer {
         return true; // Always allow LOS when disabled
       }
 
+      // If the observer has an los shape, use that for line of sight
+      const los = observer.vision?.los;
+      if (!!los?.points) {
+        const baseX = target.x;
+        const baseY = target.y;
+        if (target && target.shape) {
+          const shapeInWorld = target.shape.clone();
+          for (let i = 0; i < shapeInWorld.points.length; ) {
+            shapeInWorld.points[i++] += baseX;
+            shapeInWorld.points[i++] += baseY;
+          }
+          const tokenClipperPoints = shapeInWorld.toClipperPoints({ scalingFactor: 1.0 });
+          const intersection = los.intersectClipper(tokenClipperPoints);
+          return intersection.length > 0;
+        }
+      }
+
       const ray = new foundry.canvas.geometry.Ray(observer.center, target.center);
       let limitedWallCrossings = 0;
 
