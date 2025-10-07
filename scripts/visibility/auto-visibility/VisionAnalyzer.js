@@ -204,7 +204,7 @@ export class VisionAnalyzer {
       // Check if LOS calculation is disabled
       const losDisabled = game.settings.get(MODULE_ID, 'disableLineOfSightCalculation');
       if (losDisabled) {
-        return true; // Always allow LOS when disabled
+        return undefined; // return undefined if LOS calculation is disabled
       }
 
       const ray = new foundry.canvas.geometry.Ray(observer.center, target.center);
