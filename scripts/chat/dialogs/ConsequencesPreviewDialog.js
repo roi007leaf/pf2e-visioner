@@ -253,9 +253,9 @@ export class ConsequencesPreviewDialog extends BaseActionDialog {
   }
 
   /**
-   * Override to check ALL attacker tokens for override flags (not just the controlled token)
-   * This handles the case where an actor has multiple tokens on the scene
+   * Override to check the specific attacking token for override flags
    * Note: In Consequences, the override is stored ON the attacker WITH KEY from the target
+   * Unlike Sneak/Hide, we only check the specific attacking token, not all tokens of the actor
    */
   isOldStateAvsControlled(outcome) {
     try {
@@ -263,25 +263,19 @@ export class ConsequencesPreviewDialog extends BaseActionDialog {
       if (!avsEnabled) return false;
 
       const observer = outcome.target;
-      const attackerActorId = this.attackingToken?.actor?.id;
+      const attackerToken = this.attackingToken;
 
-      if (!observer || !attackerActorId) return false;
+      if (!observer || !attackerToken) return false;
 
       const observerId = observer.document?.id || observer.id;
       const flagKey = `avs-override-from-${observerId}`;
 
-      // Check ALL attacker tokens for override flag
-      const allAttackerTokens = canvas.tokens.placeables.filter(
-        t => t.actor?.id === attackerActorId
-      );
-
-      for (const attackerToken of allAttackerTokens) {
-        if (attackerToken.document?.getFlag(MODULE_ID, flagKey)) {
-          return false; // Override exists on ANY attacker token, so NOT AVS-controlled
-        }
+      // Check only the specific attacking token for override flag
+      if (attackerToken.document?.getFlag(MODULE_ID, flagKey)) {
+        return false; // Override exists, so NOT AVS-controlled
       }
 
-      return true; // No override found on any attacker token, so AVS-controlled
+      return true; // No override found, so AVS-controlled
     } catch {
       return false;
     }
