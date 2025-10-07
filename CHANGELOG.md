@@ -1,5 +1,11 @@
 # Changelog
 
+## [4.0.3] - 2025-10-07
+
+### 🐛 Bug Fixes
+
+- Remove console logs
+
 ## [4.0.2] - 2025-10-07
 
 ### 🐛 Bug Fixes
