@@ -906,28 +906,17 @@ export class SneakPreviewDialog extends BaseActionDialog {
       if (!avsEnabled) return false;
 
       const observerId = token?.document?.id || token?.id;
-      const sneakerActorId = this.sneakingToken?.actor?.id;
+      if (!observerId) return false;
 
-      if (!sneakerActorId || !observerId) return false;
+      const sneakerToken = this.sneakingToken;
+      if (!sneakerToken) return false;
 
-      // Check ALL sneaker tokens for override flag (same logic as _prepareContext)
-      const allSneakerTokenIds = canvas.tokens.placeables
-        .filter(t => t.actor?.id === sneakerActorId)
-        .map(t => t.document.id);
-
-      const flagKeyToFind = `avs-override-from-${observerId}`;
-
-      for (const sneakerTokenId of allSneakerTokenIds) {
-        const sneakerToken = canvas.tokens.get(sneakerTokenId);
-        if (!sneakerToken) continue;
-
-        const flags = sneakerToken.document?.flags?.['pf2e-visioner'] || {};
-        if (flags[flagKeyToFind]) {
-          return false; // Override exists, so NOT AVS-controlled
-        }
+      const flagKey = `avs-override-from-${observerId}`;
+      if (sneakerToken.document?.getFlag(MODULE_ID, flagKey)) {
+        return false;
       }
 
-      return true; // No override found on any sneaker token, so AVS-controlled
+      return true;
     } catch {
       return false;
     }

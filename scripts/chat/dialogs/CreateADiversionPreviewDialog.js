@@ -679,8 +679,7 @@ export class CreateADiversionPreviewDialog extends BaseActionDialog {
   }
 
   /**
-   * Override to check ALL diverting tokens for override flags (not just the controlled token)
-   * This handles the case where an actor has multiple tokens on the scene
+   * Check if the old state is AVS-controlled
    * @param {Object} outcome - The outcome object containing target and observer information
    * @returns {boolean} True if the old state is AVS-controlled
    */
@@ -690,25 +689,19 @@ export class CreateADiversionPreviewDialog extends BaseActionDialog {
       if (!avsEnabled) return false;
 
       const observer = outcome.target || outcome.observer;
-      const divertingActorId = this.divertingToken?.actor?.id;
+      if (!observer) return false;
 
-      if (!divertingActorId || !observer) return false;
+      const divertingToken = this.divertingToken;
+      if (!divertingToken) return false;
 
       const observerId = observer.document?.id || observer.id;
       const flagKey = `avs-override-from-${observerId}`;
 
-      // Check ALL diverting tokens for override flag
-      const allDivertingTokens = canvas.tokens.placeables.filter(
-        t => t.actor?.id === divertingActorId
-      );
-
-      for (const divertingToken of allDivertingTokens) {
-        if (divertingToken.document?.getFlag('pf2e-visioner', flagKey)) {
-          return false; // Override exists on ANY diverting token, so NOT AVS-controlled
-        }
+      if (divertingToken.document?.getFlag('pf2e-visioner', flagKey)) {
+        return false;
       }
 
-      return true; // No override found on any diverting token, so AVS-controlled
+      return true;
     } catch {
       return false;
     }

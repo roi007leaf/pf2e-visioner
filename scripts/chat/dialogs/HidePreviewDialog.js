@@ -1415,8 +1415,6 @@ export class HidePreviewDialog extends BaseActionDialog {
 
   /**
    * Check if the old visibility state is AVS-controlled (no manual override exists)
-   * Override to check ALL hiding tokens for override flags (not just the controlled token)
-   * This handles the case where an actor has multiple tokens on the scene
    * @param {Object} outcome - The outcome object containing target and observer information
    * @returns {boolean} True if the old state is AVS-controlled
    */
@@ -1426,25 +1424,19 @@ export class HidePreviewDialog extends BaseActionDialog {
       if (!avsEnabled) return false;
 
       const observer = outcome.target;
-      const hidingActorId = this.actorToken?.actor?.id;
+      if (!observer) return false;
 
-      if (!hidingActorId || !observer) return false;
+      const hidingToken = this.actorToken;
+      if (!hidingToken) return false;
 
       const observerId = observer.document?.id || observer.id;
       const flagKey = `avs-override-from-${observerId}`;
 
-      // Check ALL hiding tokens for override flag (same logic as Sneak)
-      const allHidingTokens = canvas.tokens.placeables.filter(
-        t => t.actor?.id === hidingActorId
-      );
-
-      for (const hidingToken of allHidingTokens) {
-        if (hidingToken.document?.getFlag('pf2e-visioner', flagKey)) {
-          return false; // Override exists on ANY hiding token, so NOT AVS-controlled
-        }
+      if (hidingToken.document?.getFlag('pf2e-visioner', flagKey)) {
+        return false;
       }
 
-      return true; // No override found on any hiding token, so AVS-controlled
+      return true;
     } catch (error) {
       console.warn('Error checking if old state is AVS-controlled:', error);
       return false;
@@ -1453,8 +1445,6 @@ export class HidePreviewDialog extends BaseActionDialog {
 
   /**
    * Check if the current visibility state is AVS-controlled (no manual override exists)
-   * Override to check ALL hiding tokens for override flags (not just the controlled token)
-   * This handles the case where an actor has multiple tokens on the scene
    * @param {Object} outcome - The outcome object containing target and observer information
    * @returns {boolean} True if the current state is AVS-controlled
    */
@@ -1464,25 +1454,19 @@ export class HidePreviewDialog extends BaseActionDialog {
       if (!avsEnabled) return false;
 
       const observer = outcome.target;
-      const hidingActorId = this.actorToken?.actor?.id;
+      if (!observer) return false;
 
-      if (!hidingActorId || !observer) return false;
+      const hidingToken = this.actorToken;
+      if (!hidingToken) return false;
 
       const observerId = observer.document?.id || observer.id;
       const flagKey = `avs-override-from-${observerId}`;
 
-      // Check ALL hiding tokens for override flag (same logic as Sneak)
-      const allHidingTokens = canvas.tokens.placeables.filter(
-        t => t.actor?.id === hidingActorId
-      );
-
-      for (const hidingToken of allHidingTokens) {
-        if (hidingToken.document?.getFlag('pf2e-visioner', flagKey)) {
-          return false; // Override exists on ANY hiding token, so NOT AVS-controlled
-        }
+      if (hidingToken.document?.getFlag('pf2e-visioner', flagKey)) {
+        return false;
       }
 
-      return true; // No override found on any hiding token, so AVS-controlled
+      return true;
     } catch (error) {
       console.warn('Error checking if current state is AVS-controlled:', error);
       return false;
