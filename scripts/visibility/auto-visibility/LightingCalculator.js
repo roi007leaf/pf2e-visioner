@@ -72,9 +72,10 @@ export class LightingCalculator {
     const baseX = position ? position.x - tokenWidth / 2 : token.x;
     const baseY = position ? position.y - tokenHeight / 2 : token.y;
     let shapeInWorld;
-    if (token && token.shape) {
+    if (token && token.shape && token.shape?.points?.length) {
       shapeInWorld = token.shape.clone();
-      for (let i = 0; i < shapeInWorld.points.length; ) {
+      const numberOfPoints = shapeInWorld.points.length || 0;
+      for (let i = 0; i < numberOfPoints;) {
         shapeInWorld.points[i++] += baseX;
         shapeInWorld.points[i++] += baseY;
       }
