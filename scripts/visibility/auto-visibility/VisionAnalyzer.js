@@ -184,21 +184,13 @@ export class VisionAnalyzer {
    */
   hasLineOfSight(observer, target) {
     try {
-      // If the observer has an los shape, use that for line of sight
+      // If the observer has an los shape, use that for line of sight against the target's circle
       const los = observer.vision?.los;
       if (!!los?.points) {
-        const baseX = target.x;
-        const baseY = target.y;
-        if (target && target.shape) {
-          const shapeInWorld = target.shape.clone();
-          for (let i = 0; i < shapeInWorld.points.length; ) {
-            shapeInWorld.points[i++] += baseX;
-            shapeInWorld.points[i++] += baseY;
-          }
-          const tokenClipperPoints = shapeInWorld.toClipperPoints({ scalingFactor: 1.0 });
-          const intersection = los.intersectClipper(tokenClipperPoints);
-          return intersection.length > 0;
-        }
+        const radius = target.externalRadius;
+        const circle = new PIXI.Circle(target.center.x, target.center.y, radius);
+        const intersection = los.intersectCircle(circle, {density: 8, scalingFactor: 1.0});
+        return intersection?.points?.length > 0;
       }
 
       // Check if LOS calculation is disabled
