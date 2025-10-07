@@ -759,31 +759,21 @@ export class HidePreviewDialog extends BaseActionDialog {
         if (outcome) {
           outcome.overrideState = newState;
 
-          console.log('DEBUG Hide addIconClickHandlers - Clicked icon with newState:', newState);
-          console.log('DEBUG Hide addIconClickHandlers - Observer (target):', outcome.target?.name);
-          console.log('DEBUG Hide addIconClickHandlers - Hider:', this.actorToken?.name);
-
           // Check ALL tokens for the hiding actor to find override flags (multi-token actor support)
           // In Hide, outcome.target is the observer (opposite of Sneak)
           const observerId = outcome.target?.document?.id || outcome.target?.id;
           const hidingActorId = this.actorToken?.actor?.id;
 
-          console.log('DEBUG Hide addIconClickHandlers - observerId:', observerId);
-          console.log('DEBUG Hide addIconClickHandlers - hidingActorId:', hidingActorId);
-
           let currentVisibility = outcome.oldVisibility ?? outcome.currentVisibility ?? null;
 
-          console.log('DEBUG Hide addIconClickHandlers - Initial currentVisibility:', currentVisibility);
 
           if (hidingActorId && observerId) {
             const allHidingTokenIds = canvas.tokens.placeables
               .filter(t => t.actor?.id === hidingActorId)
               .map(t => t.document.id);
 
-            console.log('DEBUG Hide addIconClickHandlers - All hiding token IDs:', allHidingTokenIds);
 
             const flagKeyToFind = `avs-override-from-${observerId}`;
-            console.log('DEBUG Hide addIconClickHandlers - Looking for override flag key:', flagKeyToFind);
 
             let overrideFlag = null;
             for (const hidingTokenId of allHidingTokenIds) {
@@ -794,7 +784,6 @@ export class HidePreviewDialog extends BaseActionDialog {
               const flag = flags[flagKeyToFind];
 
               if (flag?.state) {
-                console.log('DEBUG Hide addIconClickHandlers - Found override flag on token:', hidingToken.name, 'State:', flag.state);
                 overrideFlag = flag;
                 currentVisibility = flag.state;
                 break;
@@ -802,37 +791,29 @@ export class HidePreviewDialog extends BaseActionDialog {
             }
 
             if (!overrideFlag) {
-              console.log('DEBUG Hide addIconClickHandlers - No override flag found - state is AVS-controlled');
             }
           }
 
           const oldState = currentVisibility;
 
-          console.log('DEBUG Hide addIconClickHandlers - Final oldState:', oldState);
 
           // Use our AVS-aware logic instead of the base logic
           const isOldStateAvsControlled = this.isOldStateAvsControlled(outcome);
-          console.log('DEBUG Hide addIconClickHandlers - isOldStateAvsControlled:', isOldStateAvsControlled);
 
           const statesMatch = oldState != null && newState != null && newState === oldState;
-          console.log('DEBUG Hide addIconClickHandlers - statesMatch:', statesMatch);
 
           // Special case: if old state is AVS-controlled and user selects AVS bolt, no change
           let hasActionableChange = false;
           if (isOldStateAvsControlled && newState === 'avs') {
-            console.log('DEBUG Hide addIconClickHandlers - Old is AVS-controlled and selected AVS - NO CHANGE');
             hasActionableChange = false;
           } else if (isOldStateAvsControlled) {
             // Old was AVS-controlled, but user is selecting a manual state - always actionable
-            console.log('DEBUG Hide addIconClickHandlers - Old is AVS-controlled, selecting manual state - ACTIONABLE');
             hasActionableChange = true;
           } else {
             // Old was NOT AVS-controlled - check if states match
             hasActionableChange = !statesMatch;
-            console.log('DEBUG Hide addIconClickHandlers - Old is manual, statesMatch:', statesMatch, '- hasActionableChange:', hasActionableChange);
           }
 
-          console.log('DEBUG Hide addIconClickHandlers - Final hasActionableChange:', hasActionableChange);
 
           // Persist actionable state on outcome so templates and bulk ops reflect immediately
           outcome.hasActionableChange = hasActionableChange;
