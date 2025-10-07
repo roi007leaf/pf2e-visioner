@@ -55,7 +55,7 @@
     <div class="reactions-section">
       <div class="reactions-header">
         <button class="reactions-toggle-button {{#if hasReactions}}has-available{{/if}}" data-action="toggleReactions" data-tooltip="{{localize 'PF2E_VISIONER.REACTIONS.BUTTON_TOOLTIP'}}">
-          <i class="fas fa-bolt"></i>
+          <i class="fas fa-bolt-auto"></i>
           <span class="button-label">{{localize 'PF2E_VISIONER.REACTIONS.BUTTON_LABEL'}}</span>
           <i class="fas fa-chevron-down reactions-chevron"></i>
         </button>
@@ -196,7 +196,7 @@
                   {{{visibilityIcon outcome.oldVisibility}}}
                   {{#if outcome.isOldStateAvsControlled}}
                     <span class="avs-tag-small" data-tooltip="Controlled by Auto-Visibility System">
-                      <i class="fas fa-bolt"></i>
+                      <i class="fas fa-bolt-auto"></i>
                     </span>
                   {{/if}}
                 </span>

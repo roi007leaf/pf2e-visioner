@@ -186,12 +186,34 @@ export async function registerHooks() {
   // properly handled by TokenEventHandler._handleWallFlagChanges only when wall flags actually change.
 
   // Handle token movement events
-  Hooks.on('preUpdateToken', async (tokenDoc, changes, options, userId) => {
+  Hooks.on('preUpdateToken', (tokenDoc, changes, options, userId) => {
     try {
       // Only care about positional movement
       if (!('x' in changes || 'y' in changes)) return;
 
-      // Clear established invisible states when invisible creatures move
+      // Prevent movement while awaiting Start Sneak confirmation (MUST BE SYNCHRONOUS)
+      // Allow GMs to always move
+      if (!game.users?.get(userId)?.isGM) {
+        const actor = tokenDoc?.actor;
+        if (actor) {
+          // Determine waiting state either via our custom token flag or effect slug.
+          const hasWaitingFlag = tokenDoc.getFlag?.(MODULE_ID, 'waitingSneak');
+          let waitingEffect = null;
+          // Only search effects if we don't already have the flag (cheap boolean first)
+          if (!hasWaitingFlag) {
+            waitingEffect = actor.itemTypes?.effect?.find?.(
+              (e) => e?.system?.slug === 'waiting-for-sneak-start',
+            );
+          }
+          if (hasWaitingFlag || waitingEffect) {
+            // Block movement for non-GM users
+            ui.notifications?.warn?.('You cannot move until Sneak has started.');
+            return false; // Cancel update
+          }
+        }
+      }
+
+      // Clear established invisible states when invisible creatures move (async, fire and forget)
       // This allows them to be re-detected through sound/movement
       const token = tokenDoc.object;
       if (token?.actor) {
@@ -204,29 +226,10 @@ export async function registerHooks() {
           // Get the condition manager and clear established states
           const conditionManager = game.modules.get('pf2e-visioner')?.api?.getConditionManager?.();
           if (conditionManager?.clearEstablishedInvisibleStates) {
-            await conditionManager.clearEstablishedInvisibleStates(token);
+            conditionManager.clearEstablishedInvisibleStates(token).catch(() => { });
           }
         }
       }
-
-      // Prevent movement while awaiting Start Sneak confirmation
-      // Allow GMs to always move
-      if (game.users?.get(userId)?.isGM) return;
-      const actor = tokenDoc?.actor;
-      if (!actor) return;
-      // Determine waiting state either via our custom token flag or effect slug.
-      const hasWaitingFlag = tokenDoc.getFlag?.(MODULE_ID, 'waitingSneak');
-      let waitingEffect = null;
-      // Only search effects if we don't already have the flag (cheap boolean first)
-      if (!hasWaitingFlag) {
-        waitingEffect = actor.itemTypes?.effect?.find?.(
-          (e) => e?.system?.slug === 'waiting-for-sneak-start',
-        );
-      }
-      if (!hasWaitingFlag && !waitingEffect) return;
-      // Block movement for non-GM users
-      ui.notifications?.warn?.('You cannot move until Sneak has started.');
-      return false; // Cancel update
     } catch (e) {
       console.warn('PF2E Visioner | preUpdateToken hook failed:', e);
     }

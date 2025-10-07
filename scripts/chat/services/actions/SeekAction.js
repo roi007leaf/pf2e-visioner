@@ -148,7 +148,26 @@ export class SeekActionHandler extends ActionHandlerBase {
       dc = Number(subject.dc) || 15;
       // visibility state applies to wall map per observer; reuse actor for presentation
       try {
-        const map = actionData.actor?.document?.getFlag?.(MODULE_ID, 'walls') || {};
+        // Prefer actorToken if available, otherwise fall back to actor
+        const observerToken = actionData.actorToken || actionData.actor;
+        let map = observerToken?.document?.getFlag?.(MODULE_ID, 'walls') || {};
+
+        // If no wall data on this token, check other tokens of the same actor
+        if (Object.keys(map).length === 0 && observerToken?.actor?.id) {
+          const actorId = observerToken.actor.id;
+          const allTokensOfSameActor = canvas.tokens.placeables.filter(
+            t => t.actor?.id === actorId
+          );
+
+          for (const token of allTokensOfSameActor) {
+            const tokenMap = token.document?.getFlag?.(MODULE_ID, 'walls') || {};
+            if (Object.keys(tokenMap).length > 0) {
+              map = tokenMap;
+              break;
+            }
+          }
+        }
+
         current = map?.[subject.wall?.id] || 'hidden';
       } catch {
         current = 'hidden';
@@ -484,11 +503,11 @@ export class SeekActionHandler extends ActionHandlerBase {
       if (e?.wallId) {
         // Revert wall state on the seeker back to previous visibility (default hidden)
         const prev = typeof e.oldVisibility === 'string' ? e.oldVisibility : 'hidden';
-        changes.push({ observer: actionData.actor, wallId: e.wallId, newWallState: prev });
+        changes.push({ observer: actionData.actorToken || actionData.actor, wallId: e.wallId, newWallState: prev });
       } else if (e?.targetId) {
         const tgt = this.getTokenById(e.targetId);
         if (tgt)
-          changes.push({ observer: actionData.actor, target: tgt, newVisibility: e.oldVisibility });
+          changes.push({ observer: actionData.actorToken || actionData.actor, target: tgt, newVisibility: e.oldVisibility });
       }
     }
     return changes;
@@ -500,7 +519,7 @@ export class SeekActionHandler extends ActionHandlerBase {
       if (outcome?._isWall && outcome?.wallId) {
         const effective = outcome?.overrideState || outcome?.newVisibility || null;
         return {
-          observer: actionData.actor,
+          observer: actionData.actorToken || actionData.actor,
           wallId: outcome.wallId,
           newWallState: effective,
           oldVisibility: outcome?.oldVisibility || outcome?.currentVisibility || null,

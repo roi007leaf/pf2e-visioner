@@ -361,7 +361,7 @@ export class HideActionHandler extends ActionHandlerBase {
   outcomeToChange(actionData, outcome) {
     return {
       observer: outcome.target,
-      target: actionData.actor,
+      target: actionData.actorToken || actionData.actor,
       newVisibility: outcome.newVisibility,
       oldVisibility: outcome.oldVisibility,
     };
@@ -376,7 +376,7 @@ export class HideActionHandler extends ActionHandlerBase {
     return entries
       .map((e) => ({
         observer: this.getTokenById(e.observerId),
-        target: actionData.actor,
+        target: actionData.actorToken || actionData.actor,
         newVisibility: e.oldVisibility,
       }))
       .filter((c) => c.observer && c.target && c.newVisibility);
@@ -390,7 +390,7 @@ export class HideActionHandler extends ActionHandlerBase {
     const filtered = outcomes.filter(Boolean).filter((o) => o.changed);
     return filtered.map((o) => ({
       observer: o.target,
-      target: actionData.actor,
+      target: actionData.actorToken || actionData.actor,
       newVisibility: o.oldVisibility || o.currentVisibility,
     }));
   }

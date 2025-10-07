@@ -102,16 +102,22 @@ export class SeekPreviewDialog extends BaseActionDialog {
   }
 
   /**
-   * Override buildOverrideStates to filter out 'avs' option for loot tokens
-   * Loot tokens should never show the AVS tag since AVS doesn't apply to them
+   * Override buildOverrideStates to filter out 'avs' option for loot tokens, hazards, and walls
+   * These entities should never show the AVS tag since AVS doesn't apply to them
    */
   buildOverrideStates(desiredStates, outcome, options = {}) {
     const states = super.buildOverrideStates(desiredStates, outcome, options);
 
+    // Walls never use AVS
+    if (outcome._isWall) {
+      return states.filter(s => s.value !== 'avs');
+    }
+
     const token = outcome?.target || outcome?.token;
     const isLoot = token?.actor?.type === 'loot';
+    const isHazard = token?.actor?.type === 'hazard';
 
-    if (isLoot) {
+    if (isLoot || isHazard) {
       return states.filter(s => s.value !== 'avs');
     }
 
@@ -342,8 +348,10 @@ export class SeekPreviewDialog extends BaseActionDialog {
             (baseOldState != null && effectiveNewState != null && !statesMatch) ||
             (statesMatch && isOldStateAvsControlled);
         } else {
-          // No override - use the calculated 'changed' flag from the action
-          hasActionableChange = outcome.changed === true;
+          // No override - check if there's a change OR if old state was AVS-controlled
+          // (moving from AVS to manual state is always actionable)
+          const statesMatch = baseOldState === effectiveNewState;
+          hasActionableChange = outcome.changed === true || (statesMatch && isOldStateAvsControlled);
         }
 
         return {
@@ -1688,8 +1696,11 @@ export class SeekPreviewDialog extends BaseActionDialog {
       );
     }
 
-    // No override - use the calculated 'changed' flag from the action
-    return outcome.changed === true;
+    // No override - check if there's a change OR if old state was AVS-controlled
+    // (moving from AVS to manual state is always actionable)
+    const isOldStateAvsControlled = this.isOldStateAvsControlled(outcome);
+    const statesMatch = baseOldState === effectiveNewState;
+    return outcome.changed === true || (statesMatch && isOldStateAvsControlled);
   }
 
   /**
@@ -1859,5 +1870,64 @@ export class SeekPreviewDialog extends BaseActionDialog {
       app.close();
       _currentSeekDialogInstance = null; // Clear reference when closing
     }
+  }
+
+  /**
+   * Override to check ALL target tokens for override flags (not just the controlled token)
+   * This handles the case where an actor has multiple tokens on the scene
+   * @param {Object} outcome - The outcome object containing target and observer information
+   * @returns {boolean} True if the old state is AVS-controlled
+   */
+  isOldStateAvsControlled(outcome) {
+    try {
+      // Loot, hazards, and walls are never AVS-controlled - they're always manual
+      if (outcome._isLoot || outcome._isHazard || outcome._isWall) {
+        return false;
+      }
+      // Also check actor type for loot/hazards
+      if (outcome.target?.actor?.type === 'loot' || outcome.target?.actor?.type === 'hazard') {
+        return false;
+      }
+
+      const avsEnabled = game.settings.get('pf2e-visioner', 'autoVisibilityEnabled');
+      if (!avsEnabled) return false;
+
+      const target = outcome.target;
+      const targetActorId = target?.actor?.id;
+      const seekerId = this.actorToken?.document?.id || this.actorToken?.id;
+
+      if (!targetActorId || !seekerId) return false;
+
+      const flagKey = `avs-override-from-${seekerId}`;
+
+      // Check ALL target tokens for override flag
+      const allTargetTokens = canvas.tokens.placeables.filter(
+        t => t.actor?.id === targetActorId
+      );
+
+      for (const targetToken of allTargetTokens) {
+        if (targetToken.document?.getFlag('pf2e-visioner', flagKey)) {
+          return false; // Override exists on ANY target token, so NOT AVS-controlled
+        }
+      }
+
+      return true; // No override found on any target token, so AVS-controlled
+    } catch {
+      return false;
+    }
+  }
+
+  isCurrentStateAvsControlled(outcome) {
+    // Loot, hazards, and walls are never AVS-controlled - they're always manual
+    if (outcome._isLoot || outcome._isHazard || outcome._isWall) {
+      return false;
+    }
+    // Also check actor type for loot/hazards
+    if (outcome.target?.actor?.type === 'loot' || outcome.target?.actor?.type === 'hazard') {
+      return false;
+    }
+
+    // For regular tokens, use the base implementation
+    return super.isCurrentStateAvsControlled(outcome);
   }
 }

@@ -112,12 +112,19 @@ export class BaseActionDialog extends BasePreviewDialog {
    */
   isOldStateAvsControlled(outcome) {
     try {
+      // Walls, loot, and hazards never use AVS
+      if (outcome._isWall) return false;
+
+      const token = outcome.target || outcome.token;
+      const isLoot = token?.actor?.type === 'loot';
+      const isHazard = token?.actor?.type === 'hazard';
+      if (isLoot || isHazard) return false;
+
       // Check if AVS is enabled
       const avsEnabled = game.settings.get(MODULE_ID, 'autoVisibilityEnabled');
       if (!avsEnabled) return false;
 
-      // Get the token and observer from the outcome
-      const token = outcome.target || outcome.token;
+      // Get the observer from the outcome
       const observer = outcome.observer || this.actionData?.actor;
 
       if (!token || !observer) return false;

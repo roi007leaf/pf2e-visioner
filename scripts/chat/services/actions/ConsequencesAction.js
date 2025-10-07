@@ -110,7 +110,7 @@ export class ConsequencesActionHandler extends ActionHandlerBase {
     const newVisibility = outcome.newVisibility || 'avs';
     return {
       observer: outcome.target,
-      target: actionData.actor,
+      target: actionData.actorToken || actionData.actor,
       newVisibility,
       oldVisibility: outcome.currentVisibility,
     };
@@ -123,7 +123,7 @@ export class ConsequencesActionHandler extends ActionHandlerBase {
       .filter((e) => e.type !== 'avs-removed') // ignore AVS removal entries here (handled by custom revert)
       .map((e) => ({
         observer: this.getTokenById(e.observerId),
-        target: actionData?.actor || null,
+        target: actionData.actorToken || actionData?.actor || null,
         newVisibility: e.oldVisibility,
       }))
       .filter((c) => c.observer && c.target);
@@ -136,7 +136,7 @@ export class ConsequencesActionHandler extends ActionHandlerBase {
     const filtered = outcomes.filter(Boolean).filter((o) => o.changed);
     return filtered.map((o) => ({
       observer: o.target,
-      target: actionData.actor,
+      target: actionData.actorToken || actionData.actor,
       newVisibility: o.currentVisibility,
     }));
   }

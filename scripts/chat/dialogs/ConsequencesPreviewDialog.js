@@ -252,22 +252,36 @@ export class ConsequencesPreviewDialog extends BaseActionDialog {
     return content;
   }
 
+  /**
+   * Override to check ALL attacker tokens for override flags (not just the controlled token)
+   * This handles the case where an actor has multiple tokens on the scene
+   * Note: In Consequences, the override is stored ON the attacker WITH KEY from the target
+   */
   isOldStateAvsControlled(outcome) {
     try {
       const avsEnabled = game.settings.get(MODULE_ID, 'autoVisibilityEnabled');
       if (!avsEnabled) return false;
 
       const observer = outcome.target;
-      const attacker = this.attackingToken || this.actionData?.actor;
+      const attackerActorId = this.attackingToken?.actor?.id;
 
-      if (!observer || !attacker) return false;
+      if (!observer || !attackerActorId) return false;
 
-      const hasOverride = !!attacker.document?.getFlag(
-        MODULE_ID,
-        `avs-override-from-${observer.document?.id || observer.id}`,
+      const observerId = observer.document?.id || observer.id;
+      const flagKey = `avs-override-from-${observerId}`;
+
+      // Check ALL attacker tokens for override flag
+      const allAttackerTokens = canvas.tokens.placeables.filter(
+        t => t.actor?.id === attackerActorId
       );
 
-      return !hasOverride;
+      for (const attackerToken of allAttackerTokens) {
+        if (attackerToken.document?.getFlag(MODULE_ID, flagKey)) {
+          return false; // Override exists on ANY attacker token, so NOT AVS-controlled
+        }
+      }
+
+      return true; // No override found on any attacker token, so AVS-controlled
     } catch {
       return false;
     }
@@ -277,26 +291,22 @@ export class ConsequencesPreviewDialog extends BaseActionDialog {
    * Calculate if there's an actionable change (considering overrides)
    */
   calculateHasActionableChange(outcome) {
-    // Special case: If current state is AVS-controlled and override is 'avs', no change
-    if (outcome.overrideState === 'avs' && this.isCurrentStateAvsControlled(outcome)) {
-      return false;
-    }
-
     const effectiveNewState = outcome.overrideState || outcome.newVisibility;
     const oldState = outcome.currentVisibility;
+    const isOldStateAvsControlled = this.isOldStateAvsControlled(outcome);
 
-    // If user has set an override, use AVS-aware logic
-    if (outcome.overrideState) {
-      const isOldStateAvsControlled = this.isOldStateAvsControlled(outcome);
-      const statesMatch = oldState != null && effectiveNewState != null && effectiveNewState === oldState;
-      return (
-        (oldState != null && effectiveNewState != null && effectiveNewState !== oldState) ||
-        (statesMatch && isOldStateAvsControlled)
-      );
+    // Use the SAME logic as Hide and Sneak
+    if (isOldStateAvsControlled && effectiveNewState === 'avs') {
+      // Old is AVS-controlled and new is AVS - no change
+      return false;
+    } else if (isOldStateAvsControlled) {
+      // Old was AVS-controlled, but new is a manual state - always actionable
+      return true;
+    } else {
+      // Old was NOT AVS-controlled - check if states match
+      const statesMatch = oldState === effectiveNewState;
+      return !statesMatch;
     }
-
-    // No override - use the calculated 'changed' flag from the action
-    return outcome.changed === true;
   }
 
   /**

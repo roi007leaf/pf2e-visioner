@@ -100,7 +100,7 @@ export class DiversionActionHandler extends ActionHandlerBase {
     const observer = outcome.observer || outcome.token || outcome.target;
     return {
       observer,
-      target: actionData.actor,
+      target: actionData.actorToken || actionData.actor,
       newVisibility: outcome.newVisibility,
       oldVisibility: outcome.currentVisibility,
     };
@@ -115,7 +115,7 @@ export class DiversionActionHandler extends ActionHandlerBase {
     return entries
       .map((e) => ({
         observer: this.getTokenById(e.observerId),
-        target: actionData.actor,
+        target: actionData.actorToken || actionData.actor,
         newVisibility: e.oldVisibility,
       }))
       .filter((c) => c.observer && c.target && c.newVisibility);
@@ -127,7 +127,7 @@ export class DiversionActionHandler extends ActionHandlerBase {
     const filtered = outcomes.filter(Boolean).filter((o) => o.changed);
     return filtered.map((o) => ({
       observer: o.observer || o.token || o.target,
-      target: actionData.actor,
+      target: actionData.actorToken || actionData.actor,
       newVisibility: o.oldVisibility || o.currentVisibility,
     }));
   }

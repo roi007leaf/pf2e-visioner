@@ -156,7 +156,7 @@ export class ActionHandlerBase {
   // Default: observer is actor, target is outcome.target
   outcomeToChange(actionData, outcome) {
     return {
-      observer: actionData.actor,
+      observer: actionData.actorToken || actionData.actor,
       target: outcome.target,
       newVisibility: outcome.newVisibility,
       oldVisibility: outcome.oldVisibility ?? outcome.currentVisibility,
@@ -508,7 +508,7 @@ export class ActionHandlerBase {
     for (const subject of subjects) outcomes.push(await this.analyzeOutcome(actionData, subject));
     const filtered = outcomes.filter(Boolean).filter((o) => o.changed);
     return filtered.map((o) => ({
-      observer: actionData.actor,
+      observer: actionData.actorToken || actionData.actor,
       target: o.target,
       newVisibility: o.oldVisibility || o.currentVisibility,
     }));

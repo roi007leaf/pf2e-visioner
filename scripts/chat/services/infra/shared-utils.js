@@ -436,6 +436,8 @@ export function filterOutcomesByAllies(
     return outcomes.filter((o) => {
       // Do not filter wall outcomes
       if (o?._isWall || o?.wallId) return true;
+      // Do not filter hazards and loot - they should always appear in seek results
+      if (o?._isHazard || o?._isLoot) return true;
       const token = o?.[tokenProperty];
       if (!token) return false;
       return !shouldFilterAlly(actorToken, token, 'enemies', true);
@@ -1017,7 +1019,12 @@ export function filterOutcomesByDefeated(outcomes, tokenProperty = 'target') {
       const token = outcome?.[tokenProperty];
       if (!token) return true; // Keep non-token outcomes
 
-      // Filter out defeated tokens
+      // Always keep hazards and loot regardless of HP/defeated status
+      if (token?.actor?.type === 'hazard' || token?.actor?.type === 'loot') {
+        return true;
+      }
+
+      // Filter out defeated tokens (for characters/NPCs only)
       return !isTokenDefeated(token);
     } catch {
       return true; // Keep outcome if we can't determine defeated status

@@ -33,12 +33,8 @@ export async function tokenStateToInput(
     lightingRasterService,
     options = {}
 ) {
-    // Guard against null tokens
-    if (!observer || !target) {
-        console.warn('PF2E Visioner | tokenStateToInput called with null token', {
-            observer: observer?.name || 'null',
-            target: target?.name || 'null'
-        });
+    // Guard against null tokens or missing documents
+    if (!observer || !target || !observer.document || !target.document) {
         return null;
     }
 

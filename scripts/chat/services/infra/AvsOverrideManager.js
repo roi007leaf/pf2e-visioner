@@ -211,12 +211,16 @@ export class AvsOverrideManager {
   }
 
   static async storeOverrideFlag(observer, target, data) {
-    const flagKey = `avs-override-from-${observer.document.id}`;
+    const observerDocId = observer.document.id;
+    const targetDocId = target.document.id;
+
+    const flagKey = `avs-override-from-${observerDocId}`;
+
     const flagData = {
       ...data,
       timestamp: Date.now(),
-      observerId: observer.document.id,
-      targetId: target.document.id,
+      observerId: observerDocId,
+      targetId: targetDocId,
       observerName: observer.name,
       targetName: target.name,
     };

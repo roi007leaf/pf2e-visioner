@@ -311,7 +311,7 @@
                   {{{visibilityIcon outcome.oldVisibility}}}
                   {{#if outcome.isOldStateAvsControlled}}
                     <span class="avs-tag-small" data-tooltip="Controlled by Auto-Visibility System">
-                      <i class="fas fa-bolt"></i>
+                      <i class="fas fa-bolt-auto"></i>
                     </span>
                   {{/if}}
                 </span>
@@ -319,6 +319,7 @@
                 <div class="override-icons {{#if outcome.isDeferred}}disabled{{/if}}" data-token-id="{{outcome.token.id}}">
                   {{#each outcome.availableStates as |state|}}
                     <button type="button" class="state-icon {{#if state.selected}}selected{{/if}} {{#if state.calculatedOutcome}}calculated-outcome{{/if}} {{state.cssClass}}" 
+                            data-action="overrideState"
                             data-state="{{state.value}}" data-token-id="{{outcome.token.id}}" 
                             {{#if outcome.isDeferred}}disabled{{/if}}
                             data-tooltip="{{#if outcome.isDeferred}}Disabled - deferred to end of turn{{else if state.calculatedOutcome}}AVS Recommended: {{state.label}}{{else}}{{state.label}}{{/if}}">

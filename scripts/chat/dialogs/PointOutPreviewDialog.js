@@ -134,8 +134,10 @@ export class PointOutPreviewDialog extends BaseActionDialog {
         const statesMatch = baseOldState === effectiveNewState;
         hasActionableChange = (!statesMatch) || (statesMatch && isOldStateAvsControlled);
       } else {
-        // No override - use the calculated 'changed' flag from the action
-        hasActionableChange = outcome.changed === true;
+        // No override - check if there's a change OR if old state was AVS-controlled
+        // (moving from AVS to manual state is always actionable)
+        const statesMatch = baseOldState === effectiveNewState;
+        hasActionableChange = outcome.changed === true || (statesMatch && isOldStateAvsControlled);
       }
 
       return {

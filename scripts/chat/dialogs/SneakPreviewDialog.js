@@ -372,32 +372,80 @@ export class SneakPreviewDialog extends BaseActionDialog {
 
     // Process outcomes to add additional properties including position data
     let processedOutcomes = filteredOutcomes.map((outcome) => {
-      // Get current visibility state - how this observer sees the sneaking token
-      const currentVisibility =
-        getVisibilityBetween(outcome.token, this.sneakingToken) ||
+      const observerId = outcome.token?.document?.id || outcome.token?.id;
+      const sneakerDocId = this.sneakingToken?.document?.id;
+      const sneakerTokenId = this.sneakingToken?.id;
+
+      const sneakerActorId = this.sneakingToken?.actor?.id;
+
+      const allSneakerTokenIds = canvas.tokens.placeables
+        .filter(t => t.actor?.id === sneakerActorId)
+        .map(t => t.document.id);
+
+      let overrideFlag = null;
+      const flagKeyToFind = `avs-override-from-${observerId}`;
+
+      for (const sneakerTokenId of allSneakerTokenIds) {
+        const sneakerToken = canvas.tokens.get(sneakerTokenId);
+        if (!sneakerToken) continue;
+
+        const flags = sneakerToken.document?.flags?.['pf2e-visioner'] || {};
+        const flag = flags[flagKeyToFind];
+
+        if (flag) {
+          overrideFlag = flag;
+          break;
+        }
+      }
+
+      let currentVisibility =
+        this.getVisibilityBetween?.(outcome.token, this.sneakingToken) ||
         outcome.oldVisibility ||
         outcome.currentVisibility;
+
+      if (overrideFlag?.state) {
+        currentVisibility = overrideFlag.state;
+      }
 
       // Prepare available states for override
       const desired = getDesiredOverrideStatesForAction('sneak');
       const availableStates = this.buildOverrideStates(desired, outcome);
 
       const effectiveNewState = outcome.overrideState || outcome.newVisibility;
-      const baseOldState = outcome.oldVisibility || currentVisibility;
+      // Use currentVisibility (which includes override) instead of outcome.oldVisibility
+      const baseOldState = currentVisibility || outcome.oldVisibility;
       const isOldStateAvsControlled = this.isOldStateAvsControlled(outcome);
 
       // Determine if there's an actionable change
       let hasActionableChange = false;
-      if (outcome.overrideState === 'avs' && this.isCurrentStateAvsControlled(outcome)) {
-        // Special case: If current state is AVS-controlled and override is 'avs', no change
-        hasActionableChange = false;
-      } else if (outcome.overrideState) {
-        // If user has set an override, check if it differs from current state
-        const statesMatch = baseOldState === effectiveNewState;
-        hasActionableChange = (!statesMatch) || (statesMatch && isOldStateAvsControlled);
+
+      if (isOldStateAvsControlled) {
+        // Old state was AVS-controlled
+        const isCurrentAvs = this.isCurrentStateAvsControlled(outcome);
+
+        if (outcome.overrideState === 'avs' && isCurrentAvs) {
+          // Bolt explicitly chosen - no change (staying in AVS)
+          hasActionableChange = false;
+        } else if (outcome.overrideState) {
+          // Any other button explicitly chosen - moving from AVS to manual
+          hasActionableChange = true;
+        } else {
+          // No override - check if calculated state differs from old
+          const statesMatch = baseOldState === effectiveNewState;
+          hasActionableChange = !statesMatch;
+        }
       } else {
-        // No override - use the calculated 'changed' flag from the action
-        hasActionableChange = outcome.changed === true;
+        // Old state was NOT AVS-controlled
+        const statesMatch = baseOldState === effectiveNewState;
+        const choosingAvs = outcome.overrideState === 'avs';
+
+        if (statesMatch && !choosingAvs) {
+          // Same state and not choosing AVS - no change
+          hasActionableChange = false;
+        } else {
+          // Different state OR choosing AVS - actionable
+          hasActionableChange = true;
+        }
       }
 
       // Check if this outcome has deferred end position checks
@@ -426,10 +474,11 @@ export class SneakPreviewDialog extends BaseActionDialog {
       // Is deferred either in current dialog or from previous sneak actions
       const isDeferred = this._deferredChecks?.has(outcome.token.id) || wasPreviouslyDeferred;
 
-      return {
+      const processedOutcome = {
         ...outcome,
         outcomeClass: this.getOutcomeClass(outcome.outcome),
         outcomeLabel: this.getOutcomeLabel(outcome.outcome),
+        oldVisibility: baseOldState,  // Add this to update the icon
         oldVisibilityState: cfg(baseOldState),
         newVisibilityState: cfg(effectiveNewState),
         marginText: this.formatMargin(outcome.margin),
@@ -454,6 +503,8 @@ export class SneakPreviewDialog extends BaseActionDialog {
         isDeferred,
         isOldStateAvsControlled,
       };
+
+      return processedOutcome;
     });
 
     // Visual filtering: hide Foundry-hidden tokens from display if enabled
@@ -522,9 +573,9 @@ export class SneakPreviewDialog extends BaseActionDialog {
     context.hasDeferredTokens = deferredOutcomes.length > 0;
 
     // End-of-turn validation functionality
-    const hasActiveDeferredChecks = this._deferredChecks && this._deferredChecks.size > 0;
+    const hasActiveDeferredChecks = deferredOutcomes.length > 0;
     context.canProcessEndTurn = hasSneakyFeat && !this.isEndOfTurnDialog && hasActiveDeferredChecks;
-    context.deferredChecksCount = this._deferredChecks ? this._deferredChecks.size : 0;
+    context.deferredChecksCount = deferredOutcomes.length;
 
     // Enhanced context with position tracking data
     context.hasPositionData = this._hasPositionData;
@@ -840,9 +891,51 @@ export class SneakPreviewDialog extends BaseActionDialog {
     return outcome?.token?.id ?? null;
   }
 
+  /**
+   * Override to check ALL sneaker tokens for override flags (not just the controlled token)
+   * This handles the case where an actor has multiple tokens on the scene
+   */
+  isOldStateAvsControlled(outcome) {
+    try {
+      const token = outcome.token;
+      const isLoot = token?.actor?.type === 'loot';
+      const isHazard = token?.actor?.type === 'hazard';
+      if (isLoot || isHazard) return false;
+
+      const avsEnabled = game.settings.get(MODULE_ID, 'autoVisibilityEnabled');
+      if (!avsEnabled) return false;
+
+      const observerId = token?.document?.id || token?.id;
+      const sneakerActorId = this.sneakingToken?.actor?.id;
+
+      if (!sneakerActorId || !observerId) return false;
+
+      // Check ALL sneaker tokens for override flag (same logic as _prepareContext)
+      const allSneakerTokenIds = canvas.tokens.placeables
+        .filter(t => t.actor?.id === sneakerActorId)
+        .map(t => t.document.id);
+
+      const flagKeyToFind = `avs-override-from-${observerId}`;
+
+      for (const sneakerTokenId of allSneakerTokenIds) {
+        const sneakerToken = canvas.tokens.get(sneakerTokenId);
+        if (!sneakerToken) continue;
+
+        const flags = sneakerToken.document?.flags?.['pf2e-visioner'] || {};
+        if (flags[flagKeyToFind]) {
+          return false; // Override exists, so NOT AVS-controlled
+        }
+      }
+
+      return true; // No override found on any sneaker token, so AVS-controlled
+    } catch {
+      return false;
+    }
+  }
+
   async _onRender(context, options) {
     super._onRender(context, options);
-    this.addIconClickHandlers();
+    // this.addIconClickHandlers(); // Disabled - using action registration via _onOverrideState instead
     this.updateBulkActionButtons();
     this.markInitialSelections();
     this._resetCoverBonusButtonStates();
@@ -851,6 +944,7 @@ export class SneakPreviewDialog extends BaseActionDialog {
     // Update bulk defer button asynchronously (don't block render)
     try {
       await this._updateBulkDeferButton();
+      this._updateEndTurnValidationButton();
     } catch { }
 
     try {
@@ -971,6 +1065,7 @@ export class SneakPreviewDialog extends BaseActionDialog {
 
         // Update bulk defer button availability
         this._updateBulkDeferButton();
+        this._updateEndTurnValidationButton();
       });
     });
 
@@ -1085,6 +1180,7 @@ export class SneakPreviewDialog extends BaseActionDialog {
     if (deferredCount > 0) {
       // Update the bulk defer button state
       this._updateBulkDeferButton();
+      this._updateEndTurnValidationButton();
 
       // Show notification about successful deferrals
       if (typeof ui !== 'undefined' && ui.notifications) {
@@ -1206,6 +1302,7 @@ export class SneakPreviewDialog extends BaseActionDialog {
     if (undeferredCount > 0) {
       // Update the bulk defer button state
       this._updateBulkDeferButton();
+      this._updateEndTurnValidationButton();
 
       // Change the bulk undefer button to "Restore Defers" mode
       this._setBulkUndeferButtonToRestoreMode();
@@ -1292,6 +1389,7 @@ export class SneakPreviewDialog extends BaseActionDialog {
 
       // Update bulk defer button state
       this._updateBulkDeferButton(); // Re-render to update all states
+      this._updateEndTurnValidationButton();
       this.render(false, { force: true }).catch((error) => {
         // Error during bulk restore render - continue silently
       });
@@ -1349,6 +1447,39 @@ export class SneakPreviewDialog extends BaseActionDialog {
         bulkUndeferButton.classList.remove('available');
       }
     }
+  }
+
+  _updateEndTurnValidationButton() {
+    const endTurnButton = this.element.querySelector('[data-action="processEndTurnValidation"]');
+    if (!endTurnButton) return;
+
+    const visibleOutcomes = this._lastRenderedOutcomes || [];
+    const hasDeferred = visibleOutcomes.some((outcome) => {
+      return outcome.isDeferred || this._deferredChecks.has(outcome.token?.id);
+    });
+
+    const buttonContainer = endTurnButton.closest('.bulk-action-group');
+    if (buttonContainer) {
+      if (hasDeferred) {
+        buttonContainer.style.display = '';
+        endTurnButton.classList.add('available');
+      } else {
+        buttonContainer.style.display = 'none';
+        endTurnButton.classList.remove('available');
+      }
+    }
+
+    const deferredCount = visibleOutcomes.filter((outcome) =>
+      outcome.isDeferred || this._deferredChecks.has(outcome.token?.id)
+    ).length;
+
+    const countSpan = endTurnButton.querySelector('span');
+    if (countSpan) {
+      countSpan.textContent = `End Turn Validation (${deferredCount})`;
+    }
+
+    const tooltip = `Process ${deferredCount} deferred position check${deferredCount === 1 ? '' : 's'} for end-of-turn validation`;
+    endTurnButton.setAttribute('data-tooltip', tooltip);
   }
 
   /**
@@ -1485,16 +1616,34 @@ export class SneakPreviewDialog extends BaseActionDialog {
 
       // Determine if there's an actionable change
       let hasActionableChange = false;
-      if (outcome.overrideState === 'avs' && this.isCurrentStateAvsControlled(outcome)) {
-        // Special case: If current state is AVS-controlled and override is 'avs', no change
-        hasActionableChange = false;
-      } else if (outcome.overrideState) {
-        // If user has set an override, check if it differs from current state
-        const statesMatch = baseOldState === effectiveNewState;
-        hasActionableChange = (!statesMatch) || (statesMatch && isOldStateAvsControlled);
+
+      if (isOldStateAvsControlled) {
+        // Old state was AVS-controlled
+        const isCurrentAvs = this.isCurrentStateAvsControlled(outcome);
+
+        if (outcome.overrideState === 'avs' && isCurrentAvs) {
+          // Bolt explicitly chosen - no change (staying in AVS)
+          hasActionableChange = false;
+        } else if (outcome.overrideState) {
+          // Any other button explicitly chosen - moving from AVS to manual
+          hasActionableChange = true;
+        } else {
+          // No override - check if calculated state differs from old
+          const statesMatch = baseOldState === effectiveNewState;
+          hasActionableChange = !statesMatch;
+        }
       } else {
-        // No override - use the calculated 'changed' flag from the action
-        hasActionableChange = outcome.changed === true;
+        // Old state was NOT AVS-controlled
+        const statesMatch = baseOldState === effectiveNewState;
+        const choosingAvs = outcome.overrideState === 'avs';
+
+        if (statesMatch && !choosingAvs) {
+          // Same state and not choosing AVS - no change
+          hasActionableChange = false;
+        } else {
+          // Different state OR choosing AVS - actionable
+          hasActionableChange = true;
+        }
       }
 
       // Check if this outcome has deferred end position checks
@@ -2362,6 +2511,7 @@ export class SneakPreviewDialog extends BaseActionDialog {
 
         // Update bulk defer button availability
         app._updateBulkDeferButton();
+        app._updateEndTurnValidationButton();
       } catch (error) {
         // Failed to auto-undefer token - show fallback notification
         notify.info(
@@ -2532,6 +2682,7 @@ export class SneakPreviewDialog extends BaseActionDialog {
 
     // Update bulk defer button availability
     this._updateBulkDeferButton();
+    this._updateEndTurnValidationButton();
   }
 
   /**
@@ -2824,6 +2975,7 @@ export class SneakPreviewDialog extends BaseActionDialog {
 
     // Update bulk defer button availability
     app._updateBulkDeferButton();
+    app._updateEndTurnValidationButton();
 
     // Selectively recalculate: preserve start position, recalculate end position only
     try {
@@ -3345,6 +3497,108 @@ export class SneakPreviewDialog extends BaseActionDialog {
     app.showChangesOnly = target.checked;
     app.bulkActionState = 'initial';
     app.render({ force: true });
+  }
+
+  static async _onOverrideState(event, target) {
+    const app = currentSneakDialog;
+    if (!app) return;
+
+    const tokenId = target.dataset.target || target.dataset.tokenId;
+    const newState = target.dataset.state;
+
+    if (!tokenId) return;
+
+    const outcome = app.outcomes.find((o) => String(app.getOutcomeTokenId(o)) === String(tokenId));
+
+    if (!outcome) return;
+
+    if (outcome.overrideState === newState) {
+      outcome.overrideState = null;
+    } else {
+      outcome.overrideState = newState;
+    }
+
+    let currentVisibility =
+      app.getVisibilityBetween?.(outcome.token, app.sneakingToken) ||
+      outcome.oldVisibility ||
+      outcome.currentVisibility;
+
+    const observerId = outcome.token?.document?.id || outcome.token?.id;
+    const sneakerActorId = app.sneakingToken?.actor?.id;
+
+    const allSneakerTokenIds = canvas.tokens.placeables
+      .filter(t => t.actor?.id === sneakerActorId)
+      .map(t => t.document.id);
+
+    let overrideFlag = null;
+    const flagKeyToFind = `avs-override-from-${observerId}`;
+
+    for (const sneakerTokenId of allSneakerTokenIds) {
+      const sneakerToken = canvas.tokens.get(sneakerTokenId);
+      if (!sneakerToken) continue;
+
+      const flags = sneakerToken.document?.flags?.['pf2e-visioner'] || {};
+      const flag = flags[flagKeyToFind];
+
+      if (flag) {
+        overrideFlag = flag;
+        break;
+      }
+    }
+
+    if (overrideFlag?.state) {
+      currentVisibility = overrideFlag.state;
+    }
+
+    const baseOldState = outcome.oldVisibility || currentVisibility;
+    const effectiveNewState = outcome.overrideState || outcome.newVisibility;
+    const isOldStateAvsControlled = app.isOldStateAvsControlled(outcome);
+    const isCurrentAvs = app.isCurrentStateAvsControlled(outcome);
+
+    let hasActionableChange;
+    if (isOldStateAvsControlled) {
+      if (outcome.overrideState === 'avs' && isCurrentAvs) {
+        hasActionableChange = false;
+      } else if (outcome.overrideState) {
+        hasActionableChange = true;
+      } else {
+        const statesMatch = baseOldState === effectiveNewState;
+        hasActionableChange = !statesMatch;
+      }
+    } else {
+      const statesMatch = baseOldState === effectiveNewState;
+      const choosingAvs = outcome.overrideState === 'avs';
+      hasActionableChange = statesMatch && !choosingAvs ? false : true;
+    }
+
+    outcome.hasActionableChange = hasActionableChange;
+
+    app.updateIconSelection(tokenId, outcome.overrideState, false);
+    app.updateActionButtonsForToken(tokenId, hasActionableChange, {
+      row: target.closest('tr'),
+    });
+    app.updateChangesCount();
+  }
+
+  updateIconSelection(identifier, selectedState, isWall = false) {
+    const selector = isWall ? `[data-wall-id="${identifier}"]` : `[data-token-id="${identifier}"]`;
+    const row = this.element.querySelector(selector)?.closest('tr');
+    if (!row) return;
+
+    const icons = row.querySelectorAll('.state-icon');
+    icons.forEach((icon) => {
+      const state = icon.dataset.state;
+      if (state === selectedState) {
+        icon.classList.add('selected');
+      } else {
+        icon.classList.remove('selected');
+      }
+    });
+
+    const hiddenInput = row.querySelector('input[type="hidden"]');
+    if (hiddenInput) {
+      hiddenInput.value = selectedState || '';
+    }
   }
 
   async close(options = {}) {
