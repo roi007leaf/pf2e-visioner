@@ -5,6 +5,7 @@
 ### ✨ Features
 
 - Support for petal step feat (tremorsense logic)
+- Recalculate AVS states when addin\removnig supported feats
 
 ## [4.1.0] - 2025-10-08
 
