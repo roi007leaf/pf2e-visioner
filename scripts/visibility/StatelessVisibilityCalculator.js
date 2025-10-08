@@ -580,6 +580,13 @@ function determineVisualDetection(observer, target, rayDarkness = null, hasLineO
 /**
  * Check imprecise senses (hearing, tremorsense, lifesense, scent)
  * These provide hidden state when they detect
+ * 
+ * IMPORTANT: Checks ALL imprecise senses and returns the BEST detection based on priority.
+ * This ensures that tremorsense/lifesense are used even if hearing also works.
+ * 
+ * Priority: Tremorsense > Lifesense > Scent > Hearing
+ * (Hearing is last because it doesn't bypass invisibility and can make targets undetected)
+ * 
  * @param {Object} observer - Observer state
  * @param {Object} target - Target state
  * @param {boolean} soundBlocked - Whether sound is blocked between observer and target
@@ -590,13 +597,12 @@ function checkImpreciseSenses(observer, target, soundBlocked = false, visualDete
     const { auxiliary, movementAction: targetMovementAction } = target;
     const isInvisible = auxiliary.includes('invisible');
 
-    // Check each imprecise sense in priority order
-    // Note: These senses detect at "hidden" level (precise location unknown)
-    // Priority: Tremorsense > Lifesense > Hearing > Scent
-    // (Scent is last because it has no conditions/restrictions)
+    // Collect all working senses with their priority
+    const workingSenses = [];
 
     // Tremorsense: detects ground-based vibrations, BYPASSES invisibility
     // CRITICAL: Tremorsense only works if target is on the ground at the same elevation
+    // Priority: 1 (highest)
     if (imprecise.tremorsense) {
         // Check if target is elevated (not on the ground at observer's level)
         const isTargetElevated = targetMovementAction === 'fly' || observerMovementAction === 'fly';
@@ -606,30 +612,45 @@ function checkImpreciseSenses(observer, target, soundBlocked = false, visualDete
 
         if (!isTargetElevated && !hasPetalStep) {
             // Target is at same elevation and doesn't have Petal Step - tremorsense detects them
-            return {
+            workingSenses.push({
+                priority: 1,
                 state: 'hidden',
                 detection: {
                     isPrecise: false,
                     sense: 'tremorsense'
                 }
-            };
+            });
         }
-        // If elevated or has Petal Step, tremorsense fails - continue to check other senses
     }
 
     // Lifesense: detects living or undead creatures, BYPASSES invisibility
     // Can be configured to detect either living creatures OR undead
     // Living = absence of "undead" and "construct" traits
     // Undead = presence of "undead" trait
-    // Has creature type restrictions, so check before unconditional senses
+    // Priority: 2
     if (imprecise.lifesense && canLifesenseDetect(target)) {
-        return {
+        workingSenses.push({
+            priority: 2,
             state: 'hidden',
             detection: {
                 isPrecise: false,
                 sense: 'lifesense'
             }
-        };
+        });
+    }
+
+    // Scent: detects by smell, BYPASSES invisibility
+    // No conditions or restrictions
+    // Priority: 3
+    if (imprecise.scent) {
+        workingSenses.push({
+            priority: 3,
+            state: 'hidden',
+            detection: {
+                isPrecise: false,
+                sense: 'scent'
+            }
+        });
     }
 
     // Hearing: affected by deafened condition and DOES NOT bypass invisibility
@@ -638,40 +659,39 @@ function checkImpreciseSenses(observer, target, soundBlocked = false, visualDete
     // - Normally detects at hidden level
     // - With invisible target: returns undetected (invisibility makes target undetected to visual senses)
     // - With sound blocked: cannot detect (treated as if observer is deafened for this target)
-
+    // Priority: 4 (lowest - because it can return "undetected" for invisible targets)
     if (imprecise.hearing && !conditions.deafened && !soundBlocked) {
         if (isInvisible) {
-            return {
+            workingSenses.push({
+                priority: 4,
                 state: 'undetected',
                 detection: null  // Invisible makes target undetected to visual-based detection
-            };
+            });
+        } else {
+            workingSenses.push({
+                priority: 4,
+                state: 'hidden',
+                detection: {
+                    isPrecise: false,
+                    sense: 'hearing'
+                }
+            });
         }
-        return {
-            state: 'hidden',
-            detection: {
-                isPrecise: false,
-                sense: 'hearing'
-            }
-        };
     }
 
-    // Scent: detects by smell, BYPASSES invisibility
-    // No conditions or restrictions - checked last as fallback
-    if (imprecise.scent) {
-        return {
-            state: 'hidden',
-            detection: {
-                isPrecise: false,
-                sense: 'scent'
-            }
-        };
+    // Return the best sense (lowest priority number = highest priority)
+    if (workingSenses.length === 0) {
+        return null;
     }
 
+    // Sort by priority (ascending) and return the best
+    workingSenses.sort((a, b) => a.priority - b.priority);
+    const best = workingSenses[0];
 
-    // No imprecise senses detected the target
-    // This includes cases where tremorsense was the only sense but target was elevated
-    // or hearing was the only sense but sound was blocked
-    return null;
+    return {
+        state: best.state,
+        detection: best.detection
+    };
 }
 
 /**

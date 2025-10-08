@@ -23,7 +23,7 @@ Purpose: Give coding AIs crisp, actionable guardrails for this repo. Follow thes
 - Maintain clean and readable code
 - If you don't know — say you don't know
 - If an old unit test fails, do not modify the test to make it pass
-
+- Don't add hardcoded strings for UI, use i18n keys
 ## Architecture you must respect
 - Stores (single-responsibility): `scripts/stores/*` – visibility/cover maps, simple get/set.
 - Services (cross-cutting): `scripts/services/*` – orchestration, perception refresh, visuals, sockets.

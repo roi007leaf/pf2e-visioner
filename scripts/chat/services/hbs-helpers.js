@@ -153,6 +153,35 @@ try {
     return parts.join(', ') || 'Position changed';
   });
 
+  // Render sense icon with appropriate styling
+  // Usage: {{{senseIcon senseName}}}
+  Handlebars.registerHelper('senseIcon', function (sense) {
+    if (!sense) return '';
+    
+    const iconMap = {
+      'tremorsense': 'fa-solid fa-tower-broadcast',
+      'lifesense': 'fa-solid fa-heartbeat',
+      'scent': 'fa-solid fa-wind',
+      'hearing': 'fa-solid fa-ear-listen',
+      'greater-darkvision': 'fa-solid fa-moon',
+      'greaterDarkvision': 'fa-solid fa-moon',
+      'darkvision': 'fa-regular fa-moon',
+      'low-light-vision': 'fa-solid fa-moon-over-sun',
+      'lowLightVision': 'fa-solid fa-moon-over-sun',
+      'see-invisibility': 'fa-solid fa-user-dashed',
+      'light-perception': 'fa-solid fa-eye',
+      'vision': 'fa-solid fa-eye',
+      'echolocation': 'fa-solid fa-wave-pulse'
+    };
+    
+    const icon = iconMap[sense] || 'fa-solid fa-eye';
+    const senseName = sense.replace(/-/g, ' ').replace(/([A-Z])/g, ' $1').trim();
+    const label = senseName.charAt(0).toUpperCase() + senseName.slice(1);
+    
+    const html = `<i class="${icon} sense-icon" data-tooltip="${label}"></i>`;
+    return new Handlebars.SafeString(html);
+  });
+
 } catch (_) {
   // In non-Foundry environments Handlebars may be unavailable; ignore
 }

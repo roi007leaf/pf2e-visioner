@@ -354,6 +354,22 @@ export class SeekPreviewDialog extends BaseActionDialog {
           hasActionableChange = outcome.changed === true || (statesMatch && isOldStateAvsControlled);
         }
 
+        // Get detection info from detection map (only if AVS is enabled)
+        let detectionInfo = null;
+        let detectedBySense = null;
+        const avsEnabled = game.settings?.get?.('pf2e-visioner', 'autoVisibilityEnabled') ?? false;
+        if (avsEnabled && !outcome._isWall && this.actorToken && outcome.target) {
+          try {
+            const { getDetectionBetween } = await import('../../stores/detection-map.js');
+            detectionInfo = getDetectionBetween(this.actorToken, outcome.target);
+            if (detectionInfo && detectionInfo.sense) {
+              detectedBySense = detectionInfo.sense;
+            }
+          } catch {
+            // Failed to get detection info, not critical
+          }
+        }
+
         return {
           ...outcome,
           outcomeClass: outcome.noProficiency ? 'neutral' : this.getOutcomeClass(outcome.outcome),
@@ -369,6 +385,7 @@ export class SeekPreviewDialog extends BaseActionDialog {
           hasActionableChange,
           noProficiency: !!outcome.noProficiency,
           isOldStateAvsControlled,
+          detectedBySense,
         };
       }),
     );
@@ -667,6 +684,9 @@ export class SeekPreviewDialog extends BaseActionDialog {
     context.isTemplateMode = templateMode;
     context.isRangeLimited = rangeLimited;
     context.detectionFilterDisabled = templateMode;
+
+    // Check if AVS is enabled for conditional display of detection badges
+    context.avsEnabled = game.settings?.get?.('pf2e-visioner', 'autoVisibilityEnabled') ?? false;
 
     // Keep original outcomes intact; provide common context from processed list
     this.outcomes = processedOutcomes;
