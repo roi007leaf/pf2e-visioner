@@ -25,7 +25,6 @@
 
 - Support for petal step feat (tremorsense logic)
 
-
 ## [4.1.0] - 2025-10-08
 
 ### 🐛 Bug Fixes
