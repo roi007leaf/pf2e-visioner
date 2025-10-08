@@ -2,6 +2,9 @@
 
 ## [4.1.0] - 2025-10-08
 
+### 🐛 Bug Fixes
+- movmentType fly now shows as undetected again for tokens senseing with Tremorsense 
+
 ### ✨ Features
 
 - **Wall Height Integration**: Added automatic support for the Wall Height module
@@ -9,6 +12,8 @@
   - Visibility and line of sight calculations factor in wall heights when determining obstruction
   - Elevation-aware filtering prevents low walls from blocking sight between elevated tokens
   - No configuration required - automatically activates when Wall Height module is present
+
+- All the module now uses locale keys (good luck translators!)
 
 ## [4.0.4] - 2025-10-07
 
