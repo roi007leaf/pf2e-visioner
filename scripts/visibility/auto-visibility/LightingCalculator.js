@@ -199,11 +199,11 @@ export class LightingCalculator {
     }
 
     // If the token isn't fully in darkness by GI, then it is in bright light and we can skip the rest
-    // This means a global DIM light is approximated using:
-    //   - scene darkness > globalLight.darkness.max
-    //   - large dim radius ambient that ignores wall constraints
-    if (sceneDarkness <= maxDarknessInBright) return makeIlluminationResult(BRIGHT);
-    let illumination = DARK;
+    // Addendum: dimThreshhold is a scene-level setting that allows a token to be considered in dim light
+    // rather than as bright
+    const dimThreshold = Math.min(scene.flags?.[MODULE_ID]?.dimThreshold || 0.25, maxDarknessInBright);
+    if (sceneDarkness <= dimThreshold) return makeIlluminationResult(BRIGHT);
+    let illumination = (sceneDarkness <= maxDarknessInBright) ? DIM : DARK;
 
     // iterate the lights, skipping hidden or inactive lights as well as global lights
     for (const light of canvas.effects.lightSources) {
