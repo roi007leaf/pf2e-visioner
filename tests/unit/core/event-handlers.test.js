@@ -884,7 +884,7 @@ describe('Event Handler Tests', () => {
             wallHandler.handleWallUpdate(mockWall, changes);
 
             expect(mockCacheManager.clearAllCaches).toHaveBeenCalled();
-            expect(mockVisibilityState.markAllTokensChangedThrottled).toHaveBeenCalled();
+            expect(mockVisibilityState.markAllTokensChangedImmediate).toHaveBeenCalled();
         });
 
         test('should ignore wall updates that do not affect line of sight', () => {
@@ -894,7 +894,7 @@ describe('Event Handler Tests', () => {
             wallHandler.handleWallUpdate(mockWall, changes);
 
             expect(mockCacheManager.clearAllCaches).not.toHaveBeenCalled();
-            expect(mockVisibilityState.markAllTokensChangedThrottled).not.toHaveBeenCalled();
+            expect(mockVisibilityState.markAllTokensChangedImmediate).not.toHaveBeenCalled();
         });
 
         test('should always handle wall creation', () => {
@@ -903,7 +903,7 @@ describe('Event Handler Tests', () => {
             wallHandler.handleWallCreate(mockWall);
 
             expect(mockCacheManager.clearAllCaches).toHaveBeenCalled();
-            expect(mockVisibilityState.markAllTokensChangedThrottled).toHaveBeenCalled();
+            expect(mockVisibilityState.markAllTokensChangedImmediate).toHaveBeenCalled();
         });
 
         test('should always handle wall deletion', () => {
@@ -912,7 +912,7 @@ describe('Event Handler Tests', () => {
             wallHandler.handleWallDelete(mockWall);
 
             expect(mockCacheManager.clearAllCaches).toHaveBeenCalled();
-            expect(mockVisibilityState.markAllTokensChangedThrottled).toHaveBeenCalled();
+            expect(mockVisibilityState.markAllTokensChangedImmediate).toHaveBeenCalled();
         });
     });
 });

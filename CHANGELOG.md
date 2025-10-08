@@ -1,5 +1,13 @@
 # Changelog
 
+## [4.2.1] - 2025-10-08
+
+### 🐛 Bug Fixes
+
+- **Immediate Door Visibility Updates**: Fixed issue where token visibility wasn't updating until a door was opened/closed
+  - Wall changes (door open/close, wall create/update/delete) now trigger immediate visibility recalculation instead of using 100ms throttle
+  - Resolves delay where players had to interact with a door before visibility states updated correctly
+
 ## [4.2.0] - 2025-10-08
 
 ### ✨ Features
