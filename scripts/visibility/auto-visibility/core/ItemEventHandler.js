@@ -111,8 +111,7 @@ export class ItemEventHandler {
         ];
 
         const isVisibilityFeat = itemType === 'feat' && visibilityAffectingFeatSlugs.some(slug => 
-            itemSlug.includes(slug) || itemName.includes(slug.replace(/-/g, ' '))
-        );
+            itemSlug === slug || itemName === slug.replace(/-/g, ' '));
 
         const isVisibilityRelated =
             itemName.includes('invisible') ||
