@@ -27,6 +27,13 @@
 
 ## [4.1.0] - 2025-10-08
 
+### ✨ Features
+
+- Support for petal step feat (tremorsense logic)
+
+
+## [4.1.0] - 2025-10-08
+
 ### 🐛 Bug Fixes
 
 - movmentType fly now shows as undetected again for tokens senseing with Tremorsense
