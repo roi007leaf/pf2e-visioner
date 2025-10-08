@@ -348,7 +348,7 @@ export class OverrideValidationSystem {
                 await AvsOverrideManager.removeOverride(observerId, targetId);
               }
             }
-            ui.notifications.info(`Accepted ${invalidOverrides.length} AVS change${invalidOverrides.length > 1 ? 's' : ''}`);
+            ui.notifications.info(game.i18n.format('PF2E_VISIONER.NOTIFICATIONS.AVS_ACCEPTED_PLURAL', { count: invalidOverrides.length, plural: invalidOverrides.length > 1 ? 's' : '' }));
             break;
 
           case 'clear-manual': {
@@ -364,14 +364,14 @@ export class OverrideValidationSystem {
               }
             }
             if (clearedCount > 0) {
-              ui.notifications.info(`Accepted ${clearedCount} AVS change${clearedCount > 1 ? 's' : ''}`);
+              ui.notifications.info(game.i18n.format('PF2E_VISIONER.NOTIFICATIONS.AVS_CLEARED_PLURAL', { count: clearedCount, plural: clearedCount > 1 ? 's' : '' }));
             }
             break;
           }
 
           case 'keep':
             // Do nothing - keep all overrides
-            ui.notifications.info('Rejected AVS changes');
+            ui.notifications.info(game.i18n.localize('PF2E_VISIONER.NOTIFICATIONS.AVS_REJECTED'));
             break;
 
           default:
@@ -387,7 +387,7 @@ export class OverrideValidationSystem {
 
       if (observer && target) {
         const result = await Dialog.confirm({
-          title: "Override Validation",
+          title: game.i18n.localize('PF2E_VISIONER.DIALOG_TITLES.OVERRIDE_VALIDATION'),
           content: `<p>The visibility override <strong>${observer.document.name} → ${target.document.name}</strong> may no longer be valid.</p><p><strong>Reason:</strong> ${first.reason}</p><p>Would you like to remove this override?</p>`,
           yes: () => true,
           no: () => false,

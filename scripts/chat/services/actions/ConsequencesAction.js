@@ -87,7 +87,7 @@ export class ConsequencesActionHandler extends ActionHandlerBase {
     // If no valid targets found after RAW filtering, notify the user
     if (potential.length === 0) {
       notify.warn(
-        'No valid targets found for Attack Consequences. According to RAW, you can only see consequences from targets that you are Hidden or Undetected from.',
+        game.i18n.localize('PF2E_VISIONER.NOTIFICATIONS.NO_VALID_CONSEQUENCES'),
       );
     }
 

@@ -21,7 +21,7 @@ export class HidePreviewDialog extends BaseActionDialog {
     tag: 'div',
     classes: ['pf2e-visioner', 'hide-preview-dialog'],
     window: {
-      title: 'Hide Results',
+      title: game.i18n.localize('PF2E_VISIONER.DIALOG_TITLES.HIDE_RESULTS'),
       icon: 'fas fa-mask',
       resizable: true,
     },
@@ -54,7 +54,7 @@ export class HidePreviewDialog extends BaseActionDialog {
     // Set window title and icon for hide dialog
     options.window = {
       ...options.window,
-      title: `Hide Results`,
+      title: game.i18n.localize('PF2E_VISIONER.DIALOG_TITLES.HIDE_RESULTS'),
       icon: 'fas fa-eye-slash',
     };
 

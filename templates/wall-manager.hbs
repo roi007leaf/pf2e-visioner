@@ -7,55 +7,55 @@
   <div class="search-filter-container">
     <div class="inline-flex">
       <i class="fas fa-search"></i>
-      <input type="text" id="wall-search" placeholder="Search by identifier or wall ID..." />
+      <input type="text" id="wall-search" placeholder="{{localize 'PF2E_VISIONER.UI.SEARCH_WALL_PLACEHOLDER'}}" />
     </div>
     <div class="inline-flex">
       <label for="wall-type-filter">Type:</label>
       <select id="wall-type-filter">
-        <option value="">All Types</option>
-        <option value="0">Walls</option>
-        <option value="1">Doors</option>
-        <option value="2">Secret Doors</option>
+        <option value="">{{localize "PF2E_VISIONER.UI.ALL_TYPES"}}</option>
+        <option value="0">{{localize "PF2E_VISIONER.UI.WALLS"}}</option>
+        <option value="1">{{localize "PF2E_VISIONER.UI.DOORS"}}</option>
+        <option value="2">{{localize "PF2E_VISIONER.UI.SECRET_DOORS"}}</option>
       </select>
     </div>
     <div class="inline-flex">
       <label for="hidden-filter">Hidden:</label>
       <select id="hidden-filter">
-        <option value="">All</option>
-        <option value="true">Hidden Only</option>
-        <option value="false">Non-Hidden Only</option>
+        <option value="">{{localize "PF2E_VISIONER.UI.ALL"}}</option>
+        <option value="true">{{localize "PF2E_VISIONER.UI.HIDDEN_ONLY"}}</option>
+        <option value="false">{{localize "PF2E_VISIONER.UI.NON_HIDDEN_ONLY"}}</option>
       </select>
     </div>
     <div class="inline-flex">
       <label for="cover-filter">Cover:</label>
       <select id="cover-filter">
-        <option value="">All Cover Types</option>
-        <option value="auto">Auto Detection</option>
-        <option value="none">No Cover</option>
-        <option value="standard">Standard Max</option>
-        <option value="greater">Greater Max</option>
+        <option value="">{{localize "PF2E_VISIONER.UI.ALL_COVER_TYPES"}}</option>
+        <option value="auto">{{localize "PF2E_VISIONER.UI.AUTO_DETECTION"}}</option>
+        <option value="none">{{localize "PF2E_VISIONER.UI.NO_COVER_OPTION"}}</option>
+        <option value="standard">{{localize "PF2E_VISIONER.UI.STANDARD_MAX"}}</option>
+        <option value="greater">{{localize "PF2E_VISIONER.UI.GREATER_MAX"}}</option>
       </select>
     </div>
     <button type="button" id="clear-filters" class="visioner-btn"><i class="fas fa-times"></i> Clear</button>
     <div class="bulk-hidden-buttons">
-      <button type="button" class="visioner-icon-btn" data-action="bulkHiddenOn" data-tooltip="Set all walls to Hidden">
+      <button type="button" class="visioner-icon-btn" data-action="bulkHiddenOn" data-tooltip="{{localize 'PF2E_VISIONER.UI.SET_ALL_WALLS_HIDDEN_BULK'}}">
         <i class="fas fa-eye-slash icon-color-text-primary"></i>
       </button>
-      <button type="button" class="visioner-icon-btn" data-action="bulkHiddenOff" data-tooltip="Set all walls to Non-Hidden">
+      <button type="button" class="visioner-icon-btn" data-action="bulkHiddenOff" data-tooltip="{{localize 'PF2E_VISIONER.UI.SET_ALL_WALLS_NON_HIDDEN_BULK'}}">
         <i class="fas fa-eye icon-color-text-primary"></i>
       </button>
     </div>
     <div class="bulk-cover-buttons">
-      <button type="button" class="visioner-icon-btn" data-action="bulkCoverAuto" data-tooltip="Set all walls to Auto Cover">
+      <button type="button" class="visioner-icon-btn" data-action="bulkCoverAuto" data-tooltip="{{localize 'PF2E_VISIONER.UI.SET_ALL_WALLS_AUTO_COVER'}}">
         <i class="fas fa-bolt-auto icon-color-gray"></i>
       </button>
-      <button type="button" class="visioner-icon-btn" data-action="bulkCoverNone" data-tooltip="Set all walls to No Cover">
+      <button type="button" class="visioner-icon-btn" data-action="bulkCoverNone" data-tooltip="{{localize 'PF2E_VISIONER.UI.SET_ALL_WALLS_NO_COVER'}}">
         <i class="fas fa-shield-slash icon-color-cover-none"></i>
       </button>
-      <button type="button" class="visioner-icon-btn" data-action="bulkCoverStandard" data-tooltip="Set all walls to Standard Cover">
+      <button type="button" class="visioner-icon-btn" data-action="bulkCoverStandard" data-tooltip="{{localize 'PF2E_VISIONER.UI.SET_ALL_WALLS_STANDARD_COVER'}}">
         <i class="fas fa-shield-alt icon-color-cover-standard"></i>
       </button>
-      <button type="button" class="visioner-icon-btn" data-action="bulkCoverGreater" data-tooltip="Set all walls to Greater Cover">
+      <button type="button" class="visioner-icon-btn" data-action="bulkCoverGreater" data-tooltip="{{localize 'PF2E_VISIONER.UI.SET_ALL_WALLS_GREATER_COVER'}}">
         <i class="fas fa-shield icon-color-cover-greater"></i>
       </button>
     </div>
@@ -66,13 +66,13 @@
     <table class="visibility-table sticky-header-table">
     <thead class="sticky-header">
       <tr class="sticky-row">
-        <th>Type</th>
-        <th class="col-w-16">Identifier</th>
-        <th class="col-w-10">Hidden</th>
-        <th class="col-w-30">Cover</th>
-        <th class="col-w-10">Stealth DC</th>
-        <th class="col-w-8">Select</th>
-        <th class="col-w-26">Wall Id</th>
+        <th>{{localize "PF2E_VISIONER.UI.TYPE"}}</th>
+        <th class="col-w-16">{{localize "PF2E_VISIONER.UI.IDENTIFIER"}}</th>
+        <th class="col-w-10">{{localize "PF2E_VISIONER.UI.HIDDEN_HEADER"}}</th>
+        <th class="col-w-30">{{localize "PF2E_VISIONER.UI.COVER"}}</th>
+        <th class="col-w-10">{{localize "PF2E_VISIONER.UI.STEALTH_DC"}}</th>
+        <th class="col-w-8">{{localize "PF2E_VISIONER.UI.SELECT"}}</th>
+        <th class="col-w-26">{{localize "PF2E_VISIONER.UI.WALL_ID"}}</th>
       </tr>
     </thead>
     <tbody>
@@ -80,47 +80,47 @@
         <tr data-wall-id="{{w.id}}">
           <td class="text-center">
             <div class="wall-type-container">
-              <button type="button" class="wall-type-button" data-wall-id="{{w.id}}" data-current-type="{{w.doorType}}" data-tooltip="Left-click: next type | Right-click: previous type">
+              <button type="button" class="wall-type-button" data-wall-id="{{w.id}}" data-current-type="{{w.doorType}}" data-tooltip="{{localize 'PF2E_VISIONER.UI.WALL_TYPE_CYCLE_TOOLTIP'}}">
                 <img src="{{w.img}}" width="24" height="24" alt="{{#if (eq w.doorType 2)}}Secret Door{{else if (eq w.doorType 1)}}Door{{else}}Wall{{/if}}" />
               </button>
               <input type="hidden" name="wall.{{w.id}}.doorType" value="{{w.doorType}}" />
             </div>
           </td>
           <td>
-            <input type="text" name="wall.{{w.id}}.identifier" value="{{w.identifier}}" placeholder="Hidden Wall" />
+            <input type="text" name="wall.{{w.id}}.identifier" value="{{w.identifier}}" placeholder="{{localize 'PF2E_VISIONER.UI.WALL_IDENTIFIER_PLACEHOLDER'}}" />
           </td>
           <td class="text-center">
-            <input type="checkbox" name="wall.{{w.id}}.hiddenWall" {{#if w.hiddenWall}}checked{{/if}} data-tooltip="Mark this wall as hidden from players" />
+            <input type="checkbox" name="wall.{{w.id}}.hiddenWall" {{#if w.hiddenWall}}checked{{/if}} data-tooltip="{{localize 'PF2E_VISIONER.UI.WALL_HIDDEN_TOOLTIP'}}" />
           </td>
           <td class="text-center">
             <div class="cover-override-buttons">
               <button type="button" class="visioner-icon-btn {{#unless w.coverOverride}}active{{/unless}}" 
                       data-action="setCoverOverride" data-wall-id="{{w.id}}" data-cover-override="auto" 
-                      data-tooltip="Automatic Detection - Wall provides cover based on coverage thresholds" data-tooltip="Automatic Detection">
+                      data-tooltip="{{localize 'PF2E_VISIONER.UI.WALL_COVER_AUTO_SHORT'}}">
                 <i class="fas fa-bolt-auto icon-color-gray"></i>
               </button>
               <button type="button" class="visioner-icon-btn {{#if (eq w.coverOverride 'none')}}active{{/if}}" 
                       data-action="setCoverOverride" data-wall-id="{{w.id}}" data-cover-override="none" 
-                      data-tooltip="No Cover - Wall never provides cover regardless of thresholds" data-tooltip="No Cover">
+                      data-tooltip="{{localize 'PF2E_VISIONER.UI.WALL_COVER_NONE_SHORT'}}">
                 <i class="fas fa-shield-slash icon-color-cover-none"></i>
               </button>
               <button type="button" class="visioner-icon-btn {{#if (eq w.coverOverride 'standard')}}active{{/if}}" 
                       data-action="setCoverOverride" data-wall-id="{{w.id}}" data-cover-override="standard" 
-                      data-tooltip="Standard Cover Maximum - Wall provides up to standard cover based on thresholds" data-tooltip="Standard Cover">
+                      data-tooltip="{{localize 'PF2E_VISIONER.UI.WALL_COVER_STANDARD_SHORT'}}">
                 <i class="fas fa-shield-alt icon-color-cover-standard"></i>
               </button>
               <button type="button" class="visioner-icon-btn {{#if (eq w.coverOverride 'greater')}}active{{/if}}" 
                       data-action="setCoverOverride" data-wall-id="{{w.id}}" data-cover-override="greater" 
-                      data-tooltip="Greater Cover Maximum - Wall provides up to greater cover based on thresholds" data-tooltip="Greater Cover">
+                      data-tooltip="{{localize 'PF2E_VISIONER.UI.WALL_COVER_GREATER_SHORT'}}">
                 <i class="fas fa-shield icon-color-cover-greater"></i>
               </button>
             </div>
           </td>
           <td class="text-center">
-            <input type="number" min="0" step="1" name="wall.{{w.id}}.dc" value="{{w.dc}}" class="wall-dc-input" placeholder="DC" />
+            <input type="number" min="0" step="1" name="wall.{{w.id}}.dc" value="{{w.dc}}" class="wall-dc-input" placeholder="{{localize 'PF2E_VISIONER.UI.WALL_DC_PLACEHOLDER'}}" />
           </td>
           <td class="text-center">
-            <button type="button" class="visioner-icon-btn" data-action="selectWall" data-wall-id="{{w.id}}" data-tooltip="Select wall and pan to it">
+            <button type="button" class="visioner-icon-btn" data-action="selectWall" data-wall-id="{{w.id}}" data-tooltip="{{localize 'PF2E_VISIONER.UI.SELECT_WALL_AND_PAN'}}">
               <i class="fas fa-crosshairs icon-color-text-primary"></i>
             </button>
           </td>

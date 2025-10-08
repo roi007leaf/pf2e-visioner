@@ -130,7 +130,7 @@ Hooks.once('init', async () => {
 
     // Try to show a user notification if possible
     if (typeof ui !== 'undefined' && ui.notifications) {
-      ui.notifications.error(`PF2E Visioner failed to initialize: ${error.message}`);
+      ui.notifications.error(game.i18n.format('PF2E_VISIONER.NOTIFICATIONS.INIT_FAILED', { error: error.message }));
     }
   }
 });

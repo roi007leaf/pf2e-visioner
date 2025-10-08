@@ -25,7 +25,7 @@ export class SneakPreviewDialog extends BaseActionDialog {
     // Check if this is an end-of-turn dialog
     const isEndOfTurnDialog = options?.isEndOfTurnDialog || false;
     const dialogTitle =
-      options?.title || (isEndOfTurnDialog ? 'End-of-Turn Stealth Validation' : 'Sneak Results');
+      options?.title || (isEndOfTurnDialog ? game.i18n.localize('PF2E_VISIONER.DIALOG_TITLES.END_OF_TURN_SNEAK') : game.i18n.localize('PF2E_VISIONER.DIALOG_TITLES.SNEAK_RESULTS'));
 
     super({
       id: `sneak-preview-${sneakingToken.id}${isEndOfTurnDialog ? '-end-of-turn' : ''}`,
@@ -1308,7 +1308,7 @@ export class SneakPreviewDialog extends BaseActionDialog {
       }
     } else {
       if (typeof ui !== 'undefined' && ui.notifications) {
-        ui.notifications.warn('No deferred tokens found to undefer.');
+        ui.notifications.warn(game.i18n.localize('PF2E_VISIONER.NOTIFICATIONS.NO_DEFERRED_TOKENS'));
       }
     }
   }
@@ -1385,12 +1385,12 @@ export class SneakPreviewDialog extends BaseActionDialog {
 
       if (typeof ui !== 'undefined' && ui.notifications) {
         ui.notifications.info(
-          `Restored ${restoredCount} token${restoredCount === 1 ? '' : 's'} to original deferred state with all position data`,
+          game.i18n.format('PF2E_VISIONER.NOTIFICATIONS.SNEAK_DEFERRED_RESTORED', { count: restoredCount }),
         );
       }
     } else {
       if (typeof ui !== 'undefined' && ui.notifications) {
-        ui.notifications.warn('No undeferred tokens found to restore to deferred state.');
+        ui.notifications.warn(game.i18n.localize('PF2E_VISIONER.NOTIFICATIONS.NO_UNDEFERRED_TOKENS'));
       }
     }
   }
@@ -2110,26 +2110,26 @@ export class SneakPreviewDialog extends BaseActionDialog {
   _getDisplayProperty(type, value, property) {
     const configs = {
       visibility: {
-        observed: { label: 'Observed', icon: 'fas fa-eye', class: 'visibility-observed' },
-        concealed: { label: 'Concealed', icon: 'fas fa-eye-slash', class: 'visibility-concealed' },
-        hidden: { label: 'Hidden', icon: 'fas fa-user-secret', class: 'visibility-hidden' },
-        undetected: { label: 'Undetected', icon: 'fas fa-ghost', class: 'visibility-undetected' },
+        observed: { label: game.i18n.localize('PF2E_VISIONER.BUTTONS.OBSERVED'), icon: 'fas fa-eye', class: 'visibility-observed' },
+        concealed: { label: game.i18n.localize('PF2E_VISIONER.BUTTONS.CONCEALED'), icon: 'fas fa-eye-slash', class: 'visibility-concealed' },
+        hidden: { label: game.i18n.localize('PF2E_VISIONER.BUTTONS.HIDDEN'), icon: 'fas fa-user-secret', class: 'visibility-hidden' },
+        undetected: { label: game.i18n.localize('PF2E_VISIONER.BUTTONS.UNDETECTED'), icon: 'fas fa-ghost', class: 'visibility-undetected' },
       },
       cover: {
-        none: { label: 'No Cover', icon: 'fas fa-shield-slash', class: 'cover-none' },
-        lesser: { label: 'Lesser Cover', icon: 'fas fa-shield-alt', class: 'cover-lesser' },
-        standard: { label: 'Standard Cover', icon: 'fas fa-shield-alt', class: 'cover-standard' },
-        greater: { label: 'Greater Cover', icon: 'fas fa-shield', class: 'cover-greater' },
+        none: { label: game.i18n.localize('PF2E_VISIONER.BUTTONS.NO_COVER'), icon: 'fas fa-shield-slash', class: 'cover-none' },
+        lesser: { label: game.i18n.localize('PF2E_VISIONER.BUTTONS.LESSER_COVER'), icon: 'fas fa-shield-alt', class: 'cover-lesser' },
+        standard: { label: game.i18n.localize('PF2E_VISIONER.BUTTONS.STANDARD_COVER'), icon: 'fas fa-shield-alt', class: 'cover-standard' },
+        greater: { label: game.i18n.localize('PF2E_VISIONER.BUTTONS.GREATER_COVER'), icon: 'fas fa-shield', class: 'cover-greater' },
       },
       lighting: {
-        bright: { label: 'Bright Light', icon: 'fas fa-sun', class: 'lighting-bright' },
-        dim: { label: 'Dim Light', icon: 'fas fa-adjust', class: 'lighting-dim' },
-        darkness: { label: 'Darkness', icon: 'fas fa-moon', class: 'lighting-darkness' },
+        bright: { label: game.i18n.localize('PF2E_VISIONER.BUTTONS.BRIGHT_LIGHT'), icon: 'fas fa-sun', class: 'lighting-bright' },
+        dim: { label: game.i18n.localize('PF2E_VISIONER.BUTTONS.DIM_LIGHT'), icon: 'fas fa-adjust', class: 'lighting-dim' },
+        darkness: { label: game.i18n.localize('PF2E_VISIONER.BUTTONS.DARKNESS'), icon: 'fas fa-moon', class: 'lighting-darkness' },
       },
       transition: {
-        improved: { label: 'Improved', icon: 'fas fa-arrow-up', class: 'position-improved' },
-        worsened: { label: 'Worsened', icon: 'fas fa-arrow-down', class: 'position-worsened' },
-        unchanged: { label: 'Unchanged', icon: 'fas fa-equals', class: 'position-unchanged' },
+        improved: { label: game.i18n.localize('PF2E_VISIONER.BUTTONS.IMPROVED'), icon: 'fas fa-arrow-up', class: 'position-improved' },
+        worsened: { label: game.i18n.localize('PF2E_VISIONER.BUTTONS.WORSENED'), icon: 'fas fa-arrow-down', class: 'position-worsened' },
+        unchanged: { label: game.i18n.localize('PF2E_VISIONER.BUTTONS.UNCHANGED'), icon: 'fas fa-equals', class: 'position-unchanged' },
       },
     };
 
@@ -2791,7 +2791,7 @@ export class SneakPreviewDialog extends BaseActionDialog {
       if (actionsCell && !actionsCell.querySelector('.no-action')) {
         const noActionSpan = document.createElement('span');
         noActionSpan.className = 'no-action';
-        noActionSpan.textContent = 'No Change';
+        noActionSpan.textContent = game.i18n.localize('PF2E_VISIONER.UI.NO_CHANGE_LABEL');
         actionsCell.appendChild(noActionSpan);
       }
     }
@@ -2892,14 +2892,14 @@ export class SneakPreviewDialog extends BaseActionDialog {
     const app = currentSneakDialog;
     if (!app) {
       // No current sneak dialog found
-      ui.notifications.error('No active sneak dialog found');
+      ui.notifications.error(game.i18n.localize('PF2E_VISIONER.NOTIFICATIONS.NO_SNEAK_DIALOG'));
       return;
     }
 
     const tokenId = target.dataset.tokenId;
     if (!tokenId) {
       // No token ID found on undefer button
-      ui.notifications.error('No token ID found on button');
+      ui.notifications.error(game.i18n.localize('PF2E_VISIONER.NOTIFICATIONS.NO_TOKEN_ID'));
       return;
     }
 
@@ -3140,17 +3140,18 @@ export class SneakPreviewDialog extends BaseActionDialog {
   _resetBulkUndeferButton() {
     const bulkUndeferButton = this.element.querySelector('[data-action="bulkUndefer"]');
     if (bulkUndeferButton) {
+      const localize = game.i18n.localize.bind(game.i18n);
       // Apply the correct state based on our tracked state
       if (this._bulkUndeferButtonState === 'restore') {
         bulkUndeferButton.classList.add('ready-to-restore');
-        bulkUndeferButton.innerHTML = '<i class="fas fa-undo"></i> Restore Defers';
+        bulkUndeferButton.innerHTML = `<i class="fas fa-undo"></i> ${localize('PF2E_VISIONER.UI.RESTORE_DEFERS_BUTTON')}`;
         bulkUndeferButton.setAttribute(
           'data-tooltip',
           'Restore all previously deferred tokens to deferred state',
         );
       } else {
         bulkUndeferButton.classList.remove('ready-to-restore');
-        bulkUndeferButton.innerHTML = '<i class="fas fa-clock"></i> Undefer All';
+        bulkUndeferButton.innerHTML = `<i class="fas fa-clock"></i> ${localize('PF2E_VISIONER.UI.UNDEFER_ALL_BUTTON')}`;
         bulkUndeferButton.setAttribute(
           'data-tooltip',
           'Undefer all currently deferred tokens and restore their original state',
@@ -3171,8 +3172,9 @@ export class SneakPreviewDialog extends BaseActionDialog {
     this._bulkUndeferButtonState = 'restore';
     const bulkUndeferButton = this.element.querySelector('[data-action="bulkUndefer"]');
     if (bulkUndeferButton) {
+      const localize = game.i18n.localize.bind(game.i18n);
       bulkUndeferButton.classList.add('ready-to-restore');
-      bulkUndeferButton.innerHTML = '<i class="fas fa-undo"></i> Restore Defers';
+      bulkUndeferButton.innerHTML = `<i class="fas fa-undo"></i> ${localize('PF2E_VISIONER.UI.RESTORE_DEFERS_BUTTON')}`;
       bulkUndeferButton.setAttribute(
         'data-tooltip',
         'Restore all previously deferred tokens to deferred state',
@@ -3189,8 +3191,9 @@ export class SneakPreviewDialog extends BaseActionDialog {
     this._bulkUndeferredOutcomes.clear(); // Clear tracked outcomes when resetting
     const bulkUndeferButton = this.element.querySelector('[data-action="bulkUndefer"]');
     if (bulkUndeferButton) {
+      const localize = game.i18n.localize.bind(game.i18n);
       bulkUndeferButton.classList.remove('ready-to-restore');
-      bulkUndeferButton.innerHTML = '<i class="fas fa-clock"></i> Undefer All';
+      bulkUndeferButton.innerHTML = `<i class="fas fa-clock"></i> ${localize('PF2E_VISIONER.UI.UNDEFER_ALL_BUTTON')}`;
       bulkUndeferButton.setAttribute(
         'data-tooltip',
         'Undefer all currently deferred tokens and restore their original state',
@@ -3368,7 +3371,7 @@ export class SneakPreviewDialog extends BaseActionDialog {
     } catch (error) {
       // Error applying end-of-turn results
       if (typeof ui !== 'undefined' && ui.notifications) {
-        ui.notifications.error('Failed to apply end-of-turn visibility changes.');
+        ui.notifications.error(game.i18n.localize('PF2E_VISIONER.NOTIFICATIONS.END_TURN_FAILED'));
       }
     }
   }
@@ -3385,7 +3388,7 @@ export class SneakPreviewDialog extends BaseActionDialog {
     // Check if there are deferred outcomes to process
     if (!app._deferredChecks || app._deferredChecks.size === 0) {
       if (typeof ui !== 'undefined' && ui.notifications) {
-        ui.notifications.warn('No deferred position checks to validate.');
+        ui.notifications.warn(game.i18n.localize('PF2E_VISIONER.NOTIFICATIONS.NO_DEFERRED_POSITIONS'));
       }
       return;
     }
@@ -3401,7 +3404,7 @@ export class SneakPreviewDialog extends BaseActionDialog {
 
       if (deferredOutcomes.length === 0) {
         if (typeof ui !== 'undefined' && ui.notifications) {
-          ui.notifications.warn('No deferred outcomes found to validate.');
+          ui.notifications.warn(game.i18n.localize('PF2E_VISIONER.NOTIFICATIONS.NO_DEFERRED_OUTCOMES'));
         }
         return;
       }
@@ -3414,7 +3417,7 @@ export class SneakPreviewDialog extends BaseActionDialog {
         app.sneakData,
         {
           isEndOfTurnDialog: true,
-          title: `End-of-Turn Position Validation - ${app.sneakingToken.name}`,
+          title: game.i18n.format('PF2E_VISIONER.DIALOG_TITLES.END_TURN_POSITION', { name: app.sneakingToken.name }),
           deferredFromDialog: app, // Reference to the original dialog
         },
       );
@@ -3431,7 +3434,7 @@ export class SneakPreviewDialog extends BaseActionDialog {
     } catch (error) {
       // Error processing end-of-turn validation
       if (typeof ui !== 'undefined' && ui.notifications) {
-        ui.notifications.error('Failed to process end-of-turn validation.');
+        ui.notifications.error(game.i18n.localize('PF2E_VISIONER.NOTIFICATIONS.VALIDATION_FAILED'));
       }
     }
   }

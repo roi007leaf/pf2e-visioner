@@ -12,7 +12,7 @@ export class CoverQuickOverrideDialog extends foundry.applications.api.Applicati
     id: 'pv-cover-quick-override',
     tag: 'div',
     window: {
-      title: 'Cover Override',
+      title: game.i18n.localize('PF2E_VISIONER.DIALOG_TITLES.COVER_OVERRIDE'),
       icon: 'fas fa-shield-alt',
       resizable: false,
     },

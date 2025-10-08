@@ -368,7 +368,7 @@ class OverrideValidationIndicator {
       return `<i class="${cfg.icon} state-indicator ${cls}" data-kind="visibility" data-state="${key}" data-tooltip="${label}"></i>`;
     };
     const mkCover = (key) => {
-      const cfg = COVER_STATES?.[key] || { icon: 'fas fa-shield', label: 'Cover', cssClass: 'cover-none' };
+      const cfg = COVER_STATES?.[key] || { icon: 'fas fa-shield', label: game.i18n.localize('PF2E_VISIONER.TOKEN_MANAGER.COVER_STATE'), cssClass: 'cover-none' };
       const label = game?.i18n?.localize?.(cfg.label) || cfg.label || '';
       const cls = cfg.cssClass || `cover-${key}`;
       return `<i class="${cfg.icon} state-indicator ${cls}" data-kind="cover" data-state="${key}" data-tooltip="${label}"></i>`;

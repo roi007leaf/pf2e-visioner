@@ -7,21 +7,21 @@
   </div>
   <div class="observer-content">
     <div class="observer-main">
-      <button type="button" class="mode-toggle {{#if isObserverMode}}observer-active{{else}}target-active{{/if}}" data-action="toggleMode" data-tooltip="Click to switch between Observer and Target modes" {{#if (or lootObserver hazardObserver)}}disabled{{/if}}>
+      <button type="button" class="mode-toggle {{#if isObserverMode}}observer-active{{else}}target-active{{/if}}" data-action="toggleMode" data-tooltip="{{localize 'PF2E_VISIONER.UI.TOGGLE_MODE_TOOLTIP'}}" {{#if (or lootObserver hazardObserver)}}disabled{{/if}}>
         {{#if (or lootObserver hazardObserver)}}
           <div class="toggle-option active">
             <i class="fas fa-user-secret"></i>
-            <span>Target</span>
+            <span>{{localize "PF2E_VISIONER.UI.TARGET_HEADER"}}</span>
           </div>
         {{else}}
           <div class="toggle-option {{#if isObserverMode}}active{{/if}}">
             <i class="fas fa-eye"></i>
-            <span>Observer</span>
+            <span>{{localize "PF2E_VISIONER.UI.OBSERVER_HEADER"}}</span>
           </div>
           <div class="toggle-divider">|</div>
           <div class="toggle-option {{#if isTargetMode}}active{{/if}}">
             <i class="fas fa-user-secret"></i>
-            <span>Target</span>
+            <span>{{localize "PF2E_VISIONER.UI.TARGET_HEADER"}}</span>
           </div>
         {{/if}}
       </button>
@@ -44,23 +44,23 @@
   <div class="encounter-filter-section">
         {{#if showEncounterFilter}}
   <label class="encounter-filter-checkbox">
-          <input type="checkbox" {{#if encounterOnly}}checked{{/if}} data-action="toggleEncounterFilter" data-tooltip="Only show tokens in the current encounter" />
+          <input type="checkbox" {{#if encounterOnly}}checked{{/if}} data-action="toggleEncounterFilter" data-tooltip="{{localize 'PF2E_VISIONER.UI.ENCOUNTER_FILTER_TOOLTIP'}}" />
           <span class="encounter-filter-label">{{localize "PF2E_VISIONER.UI.ENCOUNTER_FILTER_TEXT"}}</span>
         </label>
         {{/if}}
   <label class="ignore-allies-filter-checkbox">
-          <input type="checkbox" {{#if ignoreAllies}}checked{{/if}} data-action="toggleIgnoreAllies" data-tooltip="Hide allies from the results list" />
-          <span class="encounter-filter-label">Ignore allies</span>
+          <input type="checkbox" {{#if ignoreAllies}}checked{{/if}} data-action="toggleIgnoreAllies" data-tooltip="{{localize 'PF2E_VISIONER.UI.IGNORE_ALLIES_TOOLTIP'}}" />
+          <span class="encounter-filter-label">{{localize "PF2E_VISIONER.UI.IGNORE_ALLIES"}}</span>
         </label>
   <label class="hide-foundry-hidden-filter-checkbox">
-          <input type="checkbox" {{#if hideFoundryHidden}}checked{{/if}} data-action="toggleHideFoundryHidden" data-tooltip="Visually hide tokens that are Foundry-hidden (document.hidden)" />
-          <span class="encounter-filter-label">Hide Foundry-hidden tokens</span>
+          <input type="checkbox" {{#if hideFoundryHidden}}checked{{/if}} data-action="toggleHideFoundryHidden" data-tooltip="{{localize 'PF2E_VISIONER.UI.HIDE_FOUNDRY_HIDDEN_TOOLTIP'}}" />
+          <span class="encounter-filter-label">{{localize "PF2E_VISIONER.UI.HIDE_FOUNDRY_HIDDEN"}}</span>
         </label>
         {{#if isObserverMode}}
           {{#if isVisibilityTab}}
             <label class="ignore-walls-filter-checkbox">
-              <input type="checkbox" {{#if ignoreWalls}}checked{{/if}} data-action="toggleIgnoreWalls" data-tooltip="Hide walls from the results list" />
-              <span class="encounter-filter-label">Ignore walls</span>
+              <input type="checkbox" {{#if ignoreWalls}}checked{{/if}} data-action="toggleIgnoreWalls" data-tooltip="{{localize 'PF2E_VISIONER.UI.IGNORE_WALLS'}}" />
+              <span class="encounter-filter-label">{{localize "PF2E_VISIONER.UI.IGNORE_WALLS"}}</span>
             </label>
           {{/if}}
         {{/if}}

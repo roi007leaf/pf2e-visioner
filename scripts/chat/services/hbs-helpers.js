@@ -15,7 +15,7 @@ try {
   // Usage: {{{positionTransitionIcon transition}}}
   Handlebars.registerHelper('positionTransitionIcon', function (transition) {
     if (!transition || !transition.hasChanged) {
-      return new Handlebars.SafeString('<i class="fas fa-equals position-unchanged" data-tooltip="No position change"></i>');
+      return new Handlebars.SafeString(`<i class="fas fa-equals position-unchanged" data-tooltip="${game.i18n.localize('PF2E_VISIONER.UI.NO_POSITION_CHANGE')}"></i>`);
     }
 
     let icon, cssClass, tooltip;

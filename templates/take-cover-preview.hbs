@@ -4,15 +4,16 @@
       <img src="{{actorTokenImage}}" alt="{{actorToken.name}}" />
     </div>
     <div class="hider-details">
-      <h3 class="hider-name">{{actorToken.name}}</h3>
-      <p class="hint">Taking cover against observers</p>
+            <h3 class="taker-name">{{taker.name}}</h3>
+      <p class="hint">{{localize "PF2E_VISIONER.UI.TAKING_COVER_HINT"}}</p>
+    </div>
     </div>
   </div>
 
   <div class="encounter-filter-section">
     {{#if showEncounterFilter}}
   <label class="encounter-filter-checkbox">
-      <input type="checkbox" {{#if encounterOnly}}checked{{/if}} data-action="toggleEncounterFilter" data-tooltip="Only show tokens in the current encounter" />
+      <input type="checkbox" {{#if encounterOnly}}checked{{/if}} data-action="toggleEncounterFilter" data-tooltip="{{localize 'PF2E_VISIONER.UI.ENCOUNTER_FILTER_TOOLTIP'}}" />
       <span class="encounter-filter-label">{{localize "PF2E_VISIONER.UI.ENCOUNTER_FILTER_TEXT"}}</span>
     </label>
     {{/if}}
@@ -22,16 +23,16 @@
       <span class="encounter-filter-label">{{localize 'PF2E_VISIONER.UI.FILTER_BY_DETECTION_LABEL'}}</span>
     </label>
   <label class="ignore-allies-filter-checkbox">
-      <input type="checkbox" {{#if ignoreAllies}}checked{{/if}} data-action="toggleIgnoreAllies" data-tooltip="Hide allies from the results list" />
-      <span class="encounter-filter-label">Ignore allies</span>
+      <input type="checkbox" {{#if ignoreAllies}}checked{{/if}} data-action="toggleIgnoreAllies" data-tooltip="{{localize 'PF2E_VISIONER.UI.IGNORE_ALLIES_TOOLTIP'}}" />
+      <span class="encounter-filter-label">{{localize "PF2E_VISIONER.UI.IGNORE_ALLIES"}}</span>
     </label>
   <label class="hide-foundry-hidden-filter-checkbox">
-      <input type="checkbox" {{#if hideFoundryHidden}}checked{{/if}} data-action="toggleHideFoundryHidden" data-tooltip="Visually hide tokens that are Foundry-hidden (document.hidden)" />
-      <span class="encounter-filter-label">Hide Foundry-hidden tokens</span>
+      <input type="checkbox" {{#if hideFoundryHidden}}checked{{/if}} data-action="toggleHideFoundryHidden" data-tooltip="{{localize 'PF2E_VISIONER.UI.HIDE_FOUNDRY_HIDDEN_TOOLTIP'}}" />
+      <span class="encounter-filter-label">{{localize "PF2E_VISIONER.UI.HIDE_FOUNDRY_HIDDEN"}}</span>
     </label>
   <label class="show-only-changes-filter-checkbox">
-      <input type="checkbox" {{#if showOnlyChanges}}checked{{/if}} data-action="toggleShowOnlyChanges" data-tooltip="Show only rows with cover/visibility changes" />
-      <span class="encounter-filter-label">Show only changes</span>
+      <input type="checkbox" {{#if showOnlyChanges}}checked{{/if}} data-action="toggleShowOnlyChanges" data-tooltip="{{localize 'PF2E_VISIONER.UI.SHOW_ONLY_COVER_CHANGES_TOOLTIP'}}" />
+      <span class="encounter-filter-label">{{localize "PF2E_VISIONER.UI.SHOW_ONLY_CHANGES"}}</span>
     </label>
   </div>
 
@@ -40,10 +41,10 @@
     <table class="visibility-table take-cover-results-table">
       <thead>
         <tr>
-          <th class="token-image">Token</th>
-          <th class="token-name">Name</th>
-          <th class="visibility-change">Cover Change</th>
-          <th class="actions">Actions</th>
+          <th class="token-image">{{localize "PF2E_VISIONER.UI.TOKEN"}}</th>
+          <th class="token-name">{{localize "PF2E_VISIONER.UI.NAME"}}</th>
+          <th class="visibility-change">{{localize "PF2E_VISIONER.UI.COVER_CHANGE"}}</th>
+          <th class="actions">{{localize "PF2E_VISIONER.UI.ACTIONS"}}</th>
         </tr>
       </thead>
       <tbody>
@@ -53,7 +54,7 @@
             <span class="token-img-wrapper">
               <img src="{{o.tokenImage}}" alt="{{o.target.name}}" width="28" height="28" />
               {{#if o.target.document.hidden}}
-                <span class="foundry-hidden-indicator" data-tooltip="Foundry Hidden"><i class="fas fa-eye-slash"></i></span>
+                <span class="foundry-hidden-indicator" data-tooltip="{{localize 'PF2E_VISIONER.UI.FOUNDRY_HIDDEN'}}"><i class="fas fa-eye-slash"></i></span>
               {{/if}}
             </span>
           </td>
@@ -73,14 +74,14 @@
           </td>
           <td class="actions">
             {{#if o.hasActionableChange}}
-              <button type="button" class="row-action-btn apply-change" data-action="applyChange" data-token-id="{{o.target.id}}" data-tooltip="Apply this cover change">
+              <button type="button" class="row-action-btn apply-change" data-action="applyChange" data-token-id="{{o.target.id}}" data-tooltip="{{localize 'PF2E_VISIONER.UI.APPLY_COVER_CHANGE'}}">
                 <i class="fas fa-check"></i>
               </button>
-              <button type="button" class="row-action-btn revert-change" data-action="revertChange" data-token-id="{{o.target.id}}" data-tooltip="Revert to original cover">
+              <button type="button" class="row-action-btn revert-change" data-action="revertChange" data-token-id="{{o.target.id}}" data-tooltip="{{localize 'PF2E_VISIONER.UI.REVERT_TO_ORIGINAL_COVER'}}">
                 <i class="fas fa-undo"></i>
               </button>
             {{else}}
-              <span class="no-action">No Change</span>
+              <span class="no-action">{{localize "PF2E_VISIONER.UI.NO_CHANGE_LABEL"}}</span>
             {{/if}}
           </td>
         </tr>
@@ -94,11 +95,11 @@
       <span class="take-cover-preview-dialog-changes-count">{{changesCount}}</span> of <span class="take-cover-preview-dialog-total-count">{{totalCount}}</span> observers will receive cover updates.
     </div>
     <div class="take-cover-preview-dialog-bulk-actions-buttons">
-      <button type="button" class="bulk-action-btn apply-all" data-action="applyAll" data-tooltip="Apply all cover changes">
-        <i class="fas fa-check-circle"></i> Apply All
+      <button type="button" class="bulk-action-btn apply-all" data-action="applyAll" data-tooltip="{{localize 'PF2E_VISIONER.UI.APPLY_ALL_COVER_CHANGES'}}">
+        <i class="fas fa-check-circle"></i> {{localize "PF2E_VISIONER.UI.APPLY_ALL"}}
       </button>
-      <button type="button" class="bulk-action-btn revert-all" data-action="revertAll" data-tooltip="Revert all changes" disabled>
-        <i class="fas fa-undo"></i> Revert All
+      <button type="button" class="bulk-action-btn revert-all" data-action="revertAll" data-tooltip="{{localize 'PF2E_VISIONER.UI.REVERT_ALL_COVER_CHANGES'}}" disabled>
+        <i class="fas fa-undo"></i> {{localize "PF2E_VISIONER.UI.REVERT_ALL"}}
       </button>
     </div>
   </div>

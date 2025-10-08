@@ -25,7 +25,9 @@ describe('api.clearAllSneakFlags', () => {
     const result = await Pf2eVisionerApi.clearAllSneakFlags();
 
     expect(result).toBe(false);
-    expect(ui.notifications.warn).toHaveBeenCalledWith('Only GMs can clear sneak flags');
+    expect(ui.notifications.warn).toHaveBeenCalledWith(
+      game.i18n.localize('PF2E_VISIONER.NOTIFICATIONS.SNEAK_CLEAR_GM_ONLY')
+    );
     expect(canvas.scene.updateEmbeddedDocuments).not.toHaveBeenCalled();
   });
 
@@ -39,7 +41,9 @@ describe('api.clearAllSneakFlags', () => {
     const result = await Pf2eVisionerApi.clearAllSneakFlags();
 
     expect(result).toBe(false);
-    expect(ui.notifications.warn).toHaveBeenCalledWith('No active scene.');
+    expect(ui.notifications.warn).toHaveBeenCalledWith(
+      game.i18n.localize('PF2E_VISIONER.NOTIFICATIONS.NO_ACTIVE_SCENE')
+    );
 
     // restore
     canvas.scene = origScene;

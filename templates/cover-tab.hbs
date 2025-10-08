@@ -11,7 +11,7 @@
           <div class="table-section-header">
             <div class="header-left">
               <i class="fas fa-users"></i>
-              <span>Player Characters</span>
+              <span>{{localize "PF2E_VISIONER.UI.PLAYER_CHARACTERS"}}</span>
             </div>
             <div class="bulk-actions-header">
               {{#each coverStates as |state|}}
@@ -21,7 +21,7 @@
                   data-action="bulkPC{{#if (eq state.key "none")}}No{{else}}{{capitalize state.key}}{{/if}}Cover"
                   data-state="{{state.value}}"
                   data-target-type="pc"
-                  data-tooltip="Set all PCs as {{state.label}}">
+                  data-tooltip="{{localize 'PF2E_VISIONER.UI.SET_ALL_AS' type='PCs' state=state.label}}">
                   <i class="{{state.icon}}"></i>
                 </button>
               {{/each}}
@@ -37,7 +37,7 @@
           <div class="table-section-header">
             <div class="header-left">
               <i class="fas fa-dragon"></i>
-              <span>NPCs</span>
+              <span>{{localize "PF2E_VISIONER.UI.NPCS_LABEL"}}</span>
             </div>
             <div class="bulk-actions-header">
               {{#each coverStates as |state|}}
@@ -47,7 +47,7 @@
                   data-action="bulkNPC{{#if (eq state.key "none")}}No{{else}}{{capitalize state.key}}{{/if}}Cover"
                   data-state="{{state.value}}"
                   data-target-type="npc"
-                  data-tooltip="Set all NPCs as {{state.label}}">
+                  data-tooltip="{{localize 'PF2E_VISIONER.UI.SET_ALL_AS' type='NPCs' state=state.label}}">
                   <i class="{{state.icon}}"></i>
                 </button>
               {{/each}}

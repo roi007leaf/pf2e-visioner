@@ -507,11 +507,11 @@ export class PositionAwareStateTransitions {
    */
   _getConfirmationOptions(stateTransition) {
     return [
-      { id: 'confirm', label: 'Apply Change', primary: true },
-      { id: 'cancel', label: 'Cancel', secondary: true },
+      { id: 'confirm', label: game.i18n.localize('PF2E_VISIONER.BUTTONS.APPLY_CHANGE'), primary: true },
+      { id: 'cancel', label: game.i18n.localize('PF2E_VISIONER.BUTTONS.CANCEL'), secondary: true },
       { 
         id: 'modify', 
-        label: 'Choose Different State', 
+        label: game.i18n.localize('PF2E_VISIONER.BUTTONS.CHOOSE_DIFFERENT'), 
         options: Object.keys(VISIBILITY_STATES).filter(state => 
           state !== stateTransition.fromState
         )

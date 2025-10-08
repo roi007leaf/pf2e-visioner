@@ -6,7 +6,14 @@
 <div class="seek-preview-content">
   {{!-- Seeker Information Panel --}}
   <div class="seeker-info">
-    <div class="seeker-image">
+    <div cla    <div class="hide-preview-dialog-bulk-actions-buttons">
+      <button type="button" class="bulk-action-btn apply-all" data-action="applyAll" data-tooltip="{{localize 'PF2E_VISIONER.UI.APPLY_ALL_CHANGES'}}">
+        <i class="fas fa-check-circle"></i> {{localize "PF2E_VISIONER.UI.APPLY_ALL"}}
+      </button>
+      <button type="button" class="bulk-action-btn revert-all" data-action="revertAll" data-tooltip="{{localize 'PF2E_VISIONER.UI.REVERT_ALL_CHANGES'}}" disabled>
+        <i class="fas fa-undo"></i> {{localize "PF2E_VISIONER.UI.REVERT_ALL"}}
+      </button>
+    </div>er-image">
       <img src="{{seeker.image}}" data-tooltip="{{seeker.name}}" />
     </div>
     <div class="seeker-details">
@@ -16,7 +23,7 @@
         <div class="senses-buttons-container-clean">
           <button class="senses-button available-senses" data-tooltip-html="senses-tooltip-content">
             <i class="fas fa-eye"></i>
-            <span class="button-text">Available Senses</span>
+            <span class="button-text">{{localize "PF2E_VISIONER.UI.AVAILABLE_SENSES"}}</span>
             <span class="count-badge" aria-label="{{allSenses.length}} senses">{{allSenses.length}}</span>
             <i class="fas fa-chevron-down chevron" aria-hidden="true"></i>
           </button>
@@ -96,25 +103,25 @@
   <div class="encounter-filter-section">
     {{#if showEncounterFilter}}
   <label class="encounter-filter-checkbox">
-      <input type="checkbox" {{#if encounterOnly}}checked{{/if}} data-action="toggleEncounterFilter" data-tooltip="Only show tokens in the current encounter" />
+      <input type="checkbox" {{#if encounterOnly}}checked{{/if}} data-action="toggleEncounterFilter" data-tooltip="{{localize 'PF2E_VISIONER.UI.ENCOUNTER_FILTER_TOOLTIP'}}" />
       <span class="encounter-filter-label">{{localize "PF2E_VISIONER.UI.ENCOUNTER_FILTER_TEXT"}}</span>
     </label>
     {{/if}}
   <label class="ignore-allies-filter-checkbox">
-      <input type="checkbox" {{#if ignoreAllies}}checked{{/if}} data-action="toggleIgnoreAllies" data-tooltip="Hide allies from the results list" />
-      <span class="encounter-filter-label">Ignore allies</span>
+      <input type="checkbox" {{#if ignoreAllies}}checked{{/if}} data-action="toggleIgnoreAllies" data-tooltip="{{localize 'PF2E_VISIONER.UI.IGNORE_ALLIES_TOOLTIP'}}" />
+      <span class="encounter-filter-label">{{localize "PF2E_VISIONER.UI.IGNORE_ALLIES"}}</span>
     </label>
   <label class="hide-foundry-hidden-filter-checkbox">
-      <input type="checkbox" {{#if hideFoundryHidden}}checked{{/if}} data-action="toggleHideFoundryHidden" data-tooltip="Visually hide tokens that are Foundry-hidden (document.hidden)" />
-      <span class="encounter-filter-label">Hide Foundry-hidden tokens</span>
+      <input type="checkbox" {{#if hideFoundryHidden}}checked{{/if}} data-action="toggleHideFoundryHidden" data-tooltip="{{localize 'PF2E_VISIONER.UI.HIDE_FOUNDRY_HIDDEN_TOOLTIP'}}" />
+      <span class="encounter-filter-label">{{localize "PF2E_VISIONER.UI.HIDE_FOUNDRY_HIDDEN"}}</span>
     </label>
   <label class="show-only-changes-filter-checkbox">
-      <input type="checkbox" {{#if showOnlyChanges}}checked{{/if}} data-action="toggleShowOnlyChanges" data-tooltip="Show only rows with visibility changes" />
-      <span class="encounter-filter-label">Show only changes</span>
+      <input type="checkbox" {{#if showOnlyChanges}}checked{{/if}} data-action="toggleShowOnlyChanges" data-tooltip="{{localize 'PF2E_VISIONER.UI.SHOW_ONLY_CHANGES_TOOLTIP'}}" />
+      <span class="encounter-filter-label">{{localize "PF2E_VISIONER.UI.SHOW_ONLY_CHANGES"}}</span>
     </label>
   <label class="ignore-walls-filter-checkbox">
-      <input type="checkbox" {{#if ignoreWalls}}checked{{/if}} data-action="toggleIgnoreWalls" data-tooltip="Hide walls from the results list" />
-      <span class="encounter-filter-label">Ignore walls</span>
+      <input type="checkbox" {{#if ignoreWalls}}checked{{/if}} data-action="toggleIgnoreWalls" data-tooltip="{{localize 'PF2E_VISIONER.UI.IGNORE_WALLS'}}" />
+      <span class="encounter-filter-label">{{localize "PF2E_VISIONER.UI.IGNORE_WALLS"}}</span>
     </label>
   {{#unless detectionFilterDisabled}}
   <label class="filter-by-los-checkbox">
@@ -134,12 +141,12 @@
     <table class="visibility-table seek-results-table">
       <thead>
         <tr>
-          <th class="token-image">Token</th>
-          <th class="token-name">Name</th>
+          <th class="token-image">{{localize "PF2E_VISIONER.UI.TOKEN"}}</th>
+          <th class="token-name">{{localize "PF2E_VISIONER.UI.NAME"}}</th>
           <th class="roll-result">{{localize "PF2E_VISIONER.SEEK_AUTOMATION.ROLL_VS_DC"}}</th>
           <th class="outcome">{{localize "PF2E_VISIONER.SEEK_AUTOMATION.OUTCOME"}}</th>
           <th class="visibility-change">{{localize "PF2E_VISIONER.SEEK_AUTOMATION.VISIBILITY_CHANGE"}}</th>
-          <th class="actions">Actions</th>
+          <th class="actions">{{localize "PF2E_VISIONER.UI.ACTIONS"}}</th>
         </tr>
       </thead>
       <tbody>
@@ -152,7 +159,7 @@
                 <span class="token-img-wrapper">
                   <img src="{{outcome.tokenImage}}" data-tooltip="{{outcome.target.name}}" width="28" height="28" />
                   {{#if outcome.target.document.hidden}}
-                    <span class="foundry-hidden-indicator" data-tooltip="Foundry Hidden"><i class="fas fa-eye-slash"></i></span>
+                    <span class="foundry-hidden-indicator" data-tooltip="{{localize 'PF2E_VISIONER.UI.FOUNDRY_HIDDEN'}}"><i class="fas fa-eye-slash"></i></span>
                   {{/if}}
                 </span>
               {{/if}}
@@ -168,13 +175,13 @@
             </td>
             <td class="roll-result">
               {{#if outcome.isPointOut}}
-                <span class="point-out-indicator">Point Out</span>
-                <br><small class="stealth-dc">Target DC {{outcome.dc}}</small>
+                <span class="point-out-indicator">{{localize "PF2E_VISIONER.UI.POINT_OUT_INDICATOR"}}</span>
+                <br><small class="stealth-dc">{{localize "PF2E_VISIONER.UI.TARGET_DC"}} {{outcome.dc}}</small>
               {{else}}
                 <div class="roll-vs-dc">
                   <div class="roll-dc-line">
                     <span class="roll-total">{{outcome.rollTotal}}</span>
-                    <span class="vs-text">vs DC</span>
+                    <span class="vs-text">{{localize "PF2E_VISIONER.UI.VS_DC"}}</span>
                     <span class="dc-value">{{outcome.dc}}</span>
                   </div>
                   <div class="margin-display">({{outcome.marginText}})</div>
@@ -195,7 +202,7 @@
                 <span class="old-visibility-state {{#if outcome.isOldStateAvsControlled}}avs-controlled{{/if}}">
                   {{{visibilityIcon outcome.oldVisibility}}}
                   {{#if outcome.isOldStateAvsControlled}}
-                    <span class="avs-tag-small" data-tooltip="Controlled by Auto-Visibility System">
+                    <span class="avs-tag-small" data-tooltip="{{localize 'PF2E_VISIONER.UI.AVS_CONTROLLED'}}">
                       <i class="fas fa-bolt-auto"></i>
                     </span>
                   {{/if}}
@@ -205,7 +212,7 @@
                   {{#each outcome.availableStates as |state|}}
                     <button type="button" class="state-icon {{#if state.selected}}selected{{/if}} {{#if state.calculatedOutcome}}calculated-outcome{{/if}} {{state.cssClass}}" 
                             data-state="{{state.value}}" data-target="{{outcome.target.id}}" 
-                            data-tooltip="Override to {{state.label}}">
+                            data-tooltip="{{localize 'PF2E_VISIONER.UI.OVERRIDE_TO_STATE' label=state.label}}">
                       <i class="{{state.icon}}"></i>
                     </button>
                   {{/each}}
@@ -213,17 +220,15 @@
                 </div>
               </div>
             </td>
-            <td class="actions">
-              {{#if outcome.hasActionableChange}}
-                <button type="button" class="row-action-btn apply-change" data-action="applyChange" {{#if outcome._isWall}}data-wall-id="{{outcome.wallId}}"{{else}}data-token-id="{{outcome.target.id}}"{{/if}} data-tooltip="Apply this visibility change">
+                        <td class="actions">
+              {{#unless outcome._isWall}}
+                <button type="button" class="row-action-btn apply-change" data-action="applyChange" {{#if outcome._isWall}}data-wall-id="{{outcome.wallId}}"{{else}}data-token-id="{{outcome.target.id}}"{{/if}} data-tooltip="{{localize 'PF2E_VISIONER.UI.APPLY_VISIBILITY_CHANGE'}}">
                   <i class="fas fa-check"></i>
                 </button>
-                <button type="button" class="row-action-btn revert-change" data-action="revertChange" {{#if outcome._isWall}}data-wall-id="{{outcome.wallId}}"{{else}}data-token-id="{{outcome.target.id}}"{{/if}} data-tooltip="Revert to original visibility">
+                <button type="button" class="row-action-btn revert-change" data-action="revertChange" {{#if outcome._isWall}}data-wall-id="{{outcome.wallId}}"{{else}}data-token-id="{{outcome.target.id}}"{{/if}} data-tooltip="{{localize 'PF2E_VISIONER.UI.REVERT_TO_ORIGINAL'}}">
                   <i class="fas fa-undo"></i>
                 </button>
-              {{else}}
-                <span class="no-action">No Change</span>
-              {{/if}}
+              {{/unless}}
             </td>
           </tr>
         {{/each}}
@@ -237,11 +242,11 @@
       <span class="seek-preview-dialog-changes-count">{{changesCount}}</span> of <span class="seek-preview-dialog-total-count">{{totalCount}}</span> targets will have visibility changes.
     </div>
     <div class="seek-preview-dialog-bulk-actions-buttons">
-      <button type="button" class="bulk-action-btn apply-all" data-action="applyAll" data-tooltip="Apply all visibility changes">
-        <i class="fas fa-check-circle"></i> Apply All
+      <button type="button" class="bulk-action-btn apply-all" data-action="applyAll" data-tooltip="{{localize 'PF2E_VISIONER.UI.APPLY_ALL_CHANGES'}}">
+        <i class="fas fa-check-circle"></i> {{localize "PF2E_VISIONER.UI.APPLY_ALL"}}
       </button>
-      <button type="button" class="bulk-action-btn revert-all" data-action="revertAll" data-tooltip="Revert all changes to original state" disabled>
-        <i class="fas fa-undo"></i> Revert All
+      <button type="button" class="bulk-action-btn revert-all" data-action="revertAll" data-tooltip="{{localize 'PF2E_VISIONER.UI.REVERT_ALL_CHANGES'}}" disabled>
+        <i class="fas fa-undo"></i> {{localize "PF2E_VISIONER.UI.REVERT_ALL"}}
       </button>
     </div>
   </div>
