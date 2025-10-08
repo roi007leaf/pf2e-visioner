@@ -113,7 +113,7 @@ export class WallEventHandler {
             if (this.visionAnalyzer?.clearCache) {
                 this.visionAnalyzer.clearCache();
             }
-            this.visibilityState.markAllTokensChangedThrottled();
+            this.visibilityState.markAllTokensChangedImmediate();
         }
 
         // Update wall visuals if visual properties changed
@@ -136,7 +136,7 @@ export class WallEventHandler {
         if (this.visionAnalyzer?.clearCache) {
             this.visionAnalyzer.clearCache();
         }
-        this.visibilityState.markAllTokensChangedThrottled();
+        this.visibilityState.markAllTokensChangedImmediate();
 
         // New walls might be hidden walls, so update visuals
         this.#scheduleWallVisualUpdate();
@@ -156,7 +156,7 @@ export class WallEventHandler {
         if (this.visionAnalyzer?.clearCache) {
             this.visionAnalyzer.clearCache();
         }
-        this.visibilityState.markAllTokensChangedThrottled();
+        this.visibilityState.markAllTokensChangedImmediate();
 
         // Clean up any hidden wall graphics for the deleted wall
         this.#cleanupDeletedWallVisuals(document);

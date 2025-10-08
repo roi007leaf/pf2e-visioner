@@ -18,7 +18,7 @@ describe('WallEventHandler - VisionAnalyzer Cache Clearing', () => {
         };
 
         mockVisibilityState = {
-            markAllTokensChangedThrottled: jest.fn()
+            markAllTokensChangedImmediate: jest.fn()
         };
 
         mockCacheManager = {
@@ -50,7 +50,7 @@ describe('WallEventHandler - VisionAnalyzer Cache Clearing', () => {
 
             expect(visionAnalyzer.clearCache).toHaveBeenCalled();
             expect(mockCacheManager.clearAllCaches).toHaveBeenCalled();
-            expect(mockVisibilityState.markAllTokensChangedThrottled).toHaveBeenCalled();
+            expect(mockVisibilityState.markAllTokensChangedImmediate).toHaveBeenCalled();
         });
 
         test('should NOT clear VisionAnalyzer cache when wall changes do not affect LOS', () => {
@@ -63,7 +63,7 @@ describe('WallEventHandler - VisionAnalyzer Cache Clearing', () => {
 
             expect(visionAnalyzer.clearCache).not.toHaveBeenCalled();
             expect(mockCacheManager.clearAllCaches).not.toHaveBeenCalled();
-            expect(mockVisibilityState.markAllTokensChangedThrottled).not.toHaveBeenCalled();
+            expect(mockVisibilityState.markAllTokensChangedImmediate).not.toHaveBeenCalled();
         });
 
         test('should clear VisionAnalyzer cache when wall direction changes', () => {
@@ -76,7 +76,7 @@ describe('WallEventHandler - VisionAnalyzer Cache Clearing', () => {
 
             expect(visionAnalyzer.clearCache).toHaveBeenCalled();
             expect(mockCacheManager.clearAllCaches).toHaveBeenCalled();
-            expect(mockVisibilityState.markAllTokensChangedThrottled).toHaveBeenCalled();
+            expect(mockVisibilityState.markAllTokensChangedImmediate).toHaveBeenCalled();
         });
 
         test('should clear VisionAnalyzer cache when wall sound blocking changes', () => {
@@ -89,7 +89,7 @@ describe('WallEventHandler - VisionAnalyzer Cache Clearing', () => {
 
             expect(visionAnalyzer.clearCache).toHaveBeenCalled();
             expect(mockCacheManager.clearAllCaches).toHaveBeenCalled();
-            expect(mockVisibilityState.markAllTokensChangedThrottled).toHaveBeenCalled();
+            expect(mockVisibilityState.markAllTokensChangedImmediate).toHaveBeenCalled();
         });
     });
 
@@ -99,7 +99,7 @@ describe('WallEventHandler - VisionAnalyzer Cache Clearing', () => {
 
             expect(visionAnalyzer.clearCache).toHaveBeenCalled();
             expect(mockCacheManager.clearAllCaches).toHaveBeenCalled();
-            expect(mockVisibilityState.markAllTokensChangedThrottled).toHaveBeenCalled();
+            expect(mockVisibilityState.markAllTokensChangedImmediate).toHaveBeenCalled();
         });
     });
 
@@ -111,7 +111,7 @@ describe('WallEventHandler - VisionAnalyzer Cache Clearing', () => {
 
             expect(visionAnalyzer.clearCache).toHaveBeenCalled();
             expect(mockCacheManager.clearAllCaches).toHaveBeenCalled();
-            expect(mockVisibilityState.markAllTokensChangedThrottled).toHaveBeenCalled();
+            expect(mockVisibilityState.markAllTokensChangedImmediate).toHaveBeenCalled();
         });
     });
 
