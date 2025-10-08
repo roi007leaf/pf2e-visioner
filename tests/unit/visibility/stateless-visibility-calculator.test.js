@@ -2038,6 +2038,56 @@ describe('StatelessVisibilityCalculator', () => {
             });
         });
 
+        test('tremorsense fails against target with Petal Step feat', () => {
+            const input = {
+                target: {
+                    lightingLevel: 'darkness',
+                    coverLevel: 'none',
+                    concealment: false,
+                    auxiliary: ['petal-step'],
+                    movementAction: 'stride'
+                },
+                observer: {
+                    precise: {},
+                    imprecise: {
+                        tremorsense: { range: 30 }
+                    },
+                    conditions: {}
+                }
+            };
+
+            const result = calculateVisibility(input);
+            expect(result.state).toBe('undetected');
+            expect(result.detection).toBe(null);
+        });
+
+        test('tremorsense fails but hearing works against Petal Step target', () => {
+            const input = {
+                target: {
+                    lightingLevel: 'darkness',
+                    coverLevel: 'none',
+                    concealment: false,
+                    auxiliary: ['petal-step'],
+                    movementAction: 'stride'
+                },
+                observer: {
+                    precise: {},
+                    imprecise: {
+                        tremorsense: { range: 30 },
+                        hearing: { range: 60 }
+                    },
+                    conditions: {}
+                }
+            };
+
+            const result = calculateVisibility(input);
+            expect(result.state).toBe('hidden');
+            expect(result.detection).toEqual({
+                isPrecise: false,
+                sense: 'hearing'
+            });
+        });
+
         test('tremorsense cannot detect elevated target (target above observer)', () => {
             const input = {
                 target: {
