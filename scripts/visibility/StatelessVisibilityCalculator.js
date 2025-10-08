@@ -601,8 +601,11 @@ function checkImpreciseSenses(observer, target, soundBlocked = false, visualDete
         // Check if target is elevated (not on the ground at observer's level)
         const isTargetElevated = targetMovementAction === 'fly' || observerMovementAction === 'fly';
 
-        if (!isTargetElevated) {
-            // Target is at same elevation - tremorsense detects them
+        // Check if target has Petal Step feat (immune to tremorsense)
+        const hasPetalStep = target.auxiliary.includes('petal-step');
+
+        if (!isTargetElevated && !hasPetalStep) {
+            // Target is at same elevation and doesn't have Petal Step - tremorsense detects them
             return {
                 state: 'hidden',
                 detection: {
@@ -611,7 +614,7 @@ function checkImpreciseSenses(observer, target, soundBlocked = false, visualDete
                 }
             };
         }
-        // If elevated, tremorsense fails - continue to check other senses
+        // If elevated or has Petal Step, tremorsense fails - continue to check other senses
     }
 
     // Lifesense: detects living or undead creatures, BYPASSES invisibility
