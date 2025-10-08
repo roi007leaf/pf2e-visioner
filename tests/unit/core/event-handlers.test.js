@@ -426,6 +426,81 @@ describe('Event Handler Tests', () => {
                 jest.useRealTimers();
             });
         });
+
+        test('should handle visibility-affecting feat changes (Petal Step)', () => {
+            jest.useFakeTimers();
+
+            const mockFeat = {
+                name: 'Petal Step',
+                type: 'feat',
+                system: { slug: 'petal-step' },
+                slug: 'petal-step',
+                parent: {
+                    documentName: 'Actor',
+                    id: 'actor1',
+                },
+            };
+
+            mockCanvas.tokens.placeables = [
+                { actor: { id: 'actor1' }, document: { id: 'token1' } },
+            ];
+
+            itemHandler.initialize();
+            const createHandler = mockHooks.on.mock.calls.find(call => call[0] === 'createItem')[1];
+
+            createHandler(mockFeat);
+
+            // Visibility-affecting feats have a 300ms delay
+            expect(mockVisibilityState.markTokenChangedImmediate).not.toHaveBeenCalled();
+
+            jest.advanceTimersByTime(300);
+
+            expect(mockVisibilityState.markTokenChangedImmediate).toHaveBeenCalledWith('token1');
+
+            jest.useRealTimers();
+        });
+
+        test('should handle visibility-affecting feat changes (Ceaseless Shadows, Legendary Sneak)', () => {
+            const visibilityFeats = [
+                { name: 'Ceaseless Shadows', slug: 'ceaseless-shadows' },
+                { name: 'Legendary Sneak', slug: 'legendary-sneak' },
+                { name: 'Terrain Stalker', slug: 'terrain-stalker' },
+            ];
+
+            visibilityFeats.forEach(({ name, slug }) => {
+                jest.useFakeTimers();
+                jest.clearAllMocks();
+
+                const mockFeat = {
+                    name,
+                    type: 'feat',
+                    system: { slug },
+                    slug,
+                    parent: {
+                        documentName: 'Actor',
+                        id: 'actor1',
+                    },
+                };
+
+                mockCanvas.tokens.placeables = [
+                    { actor: { id: 'actor1' }, document: { id: 'token1' } },
+                ];
+
+                itemHandler.initialize();
+                const createHandler = mockHooks.on.mock.calls.find(call => call[0] === 'createItem')[1];
+
+                createHandler(mockFeat);
+
+                // Visibility-affecting feats have a 300ms delay
+                expect(mockVisibilityState.markTokenChangedImmediate).not.toHaveBeenCalled();
+
+                jest.advanceTimersByTime(300);
+
+                expect(mockVisibilityState.markTokenChangedImmediate).toHaveBeenCalledWith('token1');
+
+                jest.useRealTimers();
+            });
+        });
     });
 
     describe('LightingEventHandler', () => {

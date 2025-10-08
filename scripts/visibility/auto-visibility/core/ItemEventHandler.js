@@ -83,6 +83,7 @@ export class ItemEventHandler {
         // In PF2e, conditions might be items, but also spells and effects
         const itemName = item.name?.toLowerCase() || '';
         const itemType = item.type?.toLowerCase() || '';
+        const itemSlug = item.system?.slug || item.slug || '';
 
         // Expand the types that might affect visibility
         const isRelevantType =
@@ -91,6 +92,27 @@ export class ItemEventHandler {
             itemType === 'spell' ||
             itemType === 'feat' ||
             itemType === 'action';
+
+        // Feats that affect visibility/detection
+        const visibilityAffectingFeatSlugs = [
+            'petal-step',          // Immune to tremorsense
+            'ceaseless-shadows',   // Cover upgrade, removes Sneak/Hide end position prerequisites
+            'legendary-sneak',     // Removes cover/concealment requirement
+            'terrain-stalker',     // Sneak/Hide in specific terrain
+            'swift-sneak',         // Full speed Sneak
+            'very-very-sneaky',    // No end cover required
+            'camouflage',          // Hide/Sneak in natural terrain
+            'vanish-into-the-land', // Hide/Sneak in difficult terrain
+            'distracting-shadows', // Use large creatures as cover
+            'very-sneaky',         // Distance bonus
+            'sneaky',              // Distance bonus
+            'keen-eyes',           // Detection bonus
+            'thats-odd'            // Detection bonus for anomalies
+        ];
+
+        const isVisibilityFeat = itemType === 'feat' && visibilityAffectingFeatSlugs.some(slug => 
+            itemSlug.includes(slug) || itemName.includes(slug.replace(/-/g, ' '))
+        );
 
         const isVisibilityRelated =
             itemName.includes('invisible') ||
@@ -128,7 +150,7 @@ export class ItemEventHandler {
 
         if (
             isRelevantType &&
-            (isVisibilityRelated || lightEmitterHint) &&
+            (isVisibilityRelated || isVisibilityFeat || lightEmitterHint) &&
             item.parent?.documentName === 'Actor'
         ) {
             const actor = item.parent;
@@ -141,10 +163,12 @@ export class ItemEventHandler {
                 this.#systemStateProvider.debug('ItemEventHandler: visibility-affecting item change', {
                     itemName: item.name,
                     itemType: item.type,
+                    itemSlug,
                     action,
                     actorId: actor.id,
                     tokensAffected: tokens.length,
-                    lightEmitter: lightEmitterHint
+                    lightEmitter: lightEmitterHint,
+                    visibilityFeat: isVisibilityFeat
                 });
 
                 // Clear VisionAnalyzer cache for affected tokens
@@ -162,8 +186,8 @@ export class ItemEventHandler {
                 if (lightEmitterHint) {
                     // Emitting light changed: recalc ALL because others are affected by the emitter's aura
                     this.#visibilityStateManager.markAllTokensChangedImmediate();
-                } else if (isVisibilityRelated) {
-                    // Visibility-affecting condition changed - delay batch and clear cache
+                } else if (isVisibilityRelated || isVisibilityFeat) {
+                    // Visibility-affecting condition/feat changed - delay batch and clear cache
                     // Wait for PF2e to update flags and conditions asynchronously (~250-300ms)
                     setTimeout(() => {
                         this.#cacheManager?.getGlobalVisibilityCache()?.clear();
