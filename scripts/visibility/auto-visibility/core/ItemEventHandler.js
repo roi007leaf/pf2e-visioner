@@ -97,15 +97,15 @@ export class ItemEventHandler {
         const visibilityAffectingFeatSlugs = [
             'petal-step',          // Immune to tremorsense
             'ceaseless-shadows',   // Cover upgrade, removes Sneak/Hide end position prerequisites
-            'legendary-sneak',     // Removes cover/concealment requirement
-            'terrain-stalker',     // Sneak/Hide in specific terrain
+            'legendary-sneak',     // removes Sneak end position prerequisites
+            'terrain-stalker',     // removes Sneak end position prerequisites in specific terrain
             'swift-sneak',         // Full speed Sneak
-            'very-very-sneaky',    // No end cover required
-            'camouflage',          // Hide/Sneak in natural terrain
-            'vanish-into-the-land', // Hide/Sneak in difficult terrain
+            'very-very-sneaky',    // removes Sneak/Hide end position prerequisites + distance bonus
+            'camouflage',          // removes Sneak/Hide end position prerequisites in natural terrain
+            'vanish-into-the-land', // removes Sneak/Hide end position prerequisites in difficult terrain
             'distracting-shadows', // Use large creatures as cover
-            'very-sneaky',         // Distance bonus
-            'sneaky',              // Distance bonus
+            'very-sneaky',         // Distance bonus + defer end position
+            'sneaky',              // Distance bonus + defer end position
             'keen-eyes',           // Detection bonus
             'thats-odd'            // Detection bonus for anomalies
         ];
