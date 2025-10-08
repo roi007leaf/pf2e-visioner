@@ -6,6 +6,7 @@ import { COVER_STATES, MODULE_ID, VISIBILITY_STATES } from '../constants.js';
 import autoCoverSystem from '../cover/auto-cover/AutoCoverSystem.js';
 import { canShowTooltips, computeSizesFromSetting } from '../helpers/tooltip-utils.js';
 import { getCoverMap, getVisibilityMap } from '../utils.js';
+import { getDetectionBetween } from '../stores/detection-map.js';
 
 /**
  * Lightweight service wrapper for lifecycle control.
@@ -568,7 +569,19 @@ function showVisibilityIndicators(hoveredToken) {
       // Never show 'avs' in tooltips - it's a control mechanism, not a visibility state
       if (visibilityState === 'avs') visibilityState = 'observed';
 
-      if (visibilityState !== 'observed') {
+      // Check if there's detection info (sense used)
+      // Don't check for sense if target is undetected
+      let hasSense = false;
+      if (visibilityState !== 'undetected') {
+        try {
+          const detectionInfo = getDetectionBetween(hoveredToken, targetToken);
+          hasSense = !!(detectionInfo && detectionInfo.sense);
+        } catch { }
+      }
+
+      // Show badge if visibility is not observed OR if there's a sense (even for observed)
+      // Never show just a sense badge for undetected (already filtered above)
+      if (visibilityState !== 'observed' || hasSense) {
         // Pass relation token (targetToken) to compute cover vs hoveredToken
         addVisibilityIndicator(targetToken, hoveredToken, visibilityState, 'observer', targetToken);
       }
@@ -591,7 +604,19 @@ function showVisibilityIndicators(hoveredToken) {
           // Never show 'avs' in tooltips - it's a control mechanism, not a visibility state
           if (visibilityState === 'avs') visibilityState = 'observed';
 
-          if (visibilityState !== 'observed') {
+          // Check if there's detection info (sense used)
+          // Don't check for sense if target is undetected
+          let hasSense = false;
+          if (visibilityState !== 'undetected') {
+            try {
+              const detectionInfo = getDetectionBetween(otherToken, hoveredToken);
+              hasSense = !!(detectionInfo && detectionInfo.sense);
+            } catch { }
+          }
+
+          // Show badge if visibility is not observed OR if there's a sense (even for observed)
+          // Never show just a sense badge for undetected (already filtered above)
+          if (visibilityState !== 'observed' || hasSense) {
             // Show indicator on the OTHER token to show how it sees the player's token
             addVisibilityIndicator(otherToken, otherToken, visibilityState, 'target', hoveredToken);
           }
@@ -606,7 +631,19 @@ function showVisibilityIndicators(hoveredToken) {
         // Never show 'avs' in tooltips - it's a control mechanism, not a visibility state
         if (visibilityState === 'avs') visibilityState = 'observed';
 
-        if (visibilityState !== 'observed') {
+        // Check if there's detection info (sense used)
+        // Don't check for sense if target is undetected
+        let hasSense = false;
+        if (visibilityState !== 'undetected') {
+          try {
+            const detectionInfo = getDetectionBetween(observerToken, hoveredToken);
+            hasSense = !!(detectionInfo && detectionInfo.sense);
+          } catch { }
+        }
+
+        // Show badge if visibility is not observed OR if there's a sense (even for observed)
+        // Never show just a sense badge for undetected (already filtered above)
+        if (visibilityState !== 'observed' || hasSense) {
           // Show indicator on the observer token
           addVisibilityIndicator(
             observerToken,
@@ -726,7 +763,19 @@ function showVisibilityIndicatorsForToken(observerToken, forceMode = null) {
       // Never show 'avs' in tooltips - it's a control mechanism, not a visibility state
       if (visibilityState === 'avs') visibilityState = 'observed';
 
-      if (visibilityState !== 'observed') {
+      // Check if there's detection info (sense used)
+      // Don't check for sense if target is undetected
+      let hasSense = false;
+      if (visibilityState !== 'undetected') {
+        try {
+          const detectionInfo = getDetectionBetween(observerToken, targetToken);
+          hasSense = !!(detectionInfo && detectionInfo.sense);
+        } catch { }
+      }
+
+      // Show badge if visibility is not observed OR if there's a sense (even for observed)
+      // Never show just a sense badge for undetected (already filtered above)
+      if (visibilityState !== 'observed' || hasSense) {
         addVisibilityIndicator(
           targetToken,
           observerToken,
@@ -751,7 +800,19 @@ function showVisibilityIndicatorsForToken(observerToken, forceMode = null) {
         // Never show 'avs' in tooltips - it's a control mechanism, not a visibility state
         if (visibilityState === 'avs') visibilityState = 'observed';
 
-        if (visibilityState !== 'observed') {
+        // Check if there's detection info (sense used)
+        // Don't check for sense if target is undetected
+        let hasSense = false;
+        if (visibilityState !== 'undetected') {
+          try {
+            const detectionInfo = getDetectionBetween(otherToken, observerToken);
+            hasSense = !!(detectionInfo && detectionInfo.sense);
+          } catch { }
+        }
+
+        // Show badge if visibility is not observed OR if there's a sense (even for observed)
+        // Never show just a sense badge for undetected (already filtered above)
+        if (visibilityState !== 'observed' || hasSense) {
           // Show indicator on the OTHER token
           addVisibilityIndicator(otherToken, otherToken, visibilityState, 'target', observerToken);
         }
@@ -764,7 +825,19 @@ function showVisibilityIndicatorsForToken(observerToken, forceMode = null) {
         // Never show 'avs' in tooltips - it's a control mechanism, not a visibility state
         if (visibilityState === 'avs') visibilityState = 'observed';
 
-        if (visibilityState !== 'observed') {
+        // Check if there's detection info (sense used)
+        // Don't check for sense if target is undetected
+        let hasSense = false;
+        if (visibilityState !== 'undetected') {
+          try {
+            const detectionInfo = getDetectionBetween(otherToken, observerToken);
+            hasSense = !!(detectionInfo && detectionInfo.sense);
+          } catch { }
+        }
+
+        // Show badge if visibility is not observed OR if there's a sense (even for observed)
+        // Never show just a sense badge for undetected (already filtered above)
+        if (visibilityState !== 'observed' || hasSense) {
           // Show indicator on the OTHER token
           addVisibilityIndicator(otherToken, otherToken, visibilityState, 'target', observerToken);
         }
@@ -905,6 +978,32 @@ function addVisibilityIndicator(
   const config = VISIBILITY_STATES[visibilityState];
   if (!config) return;
 
+  // Check if AVS is enabled - only show sense badges if AVS is on
+  const avsEnabled = game.settings?.get?.(MODULE_ID, 'autoVisibilityEnabled') ?? false;
+
+  // Get detection info (which sense was used) from detection map
+  // Don't show sense badges for undetected targets (observer doesn't know about them)
+  // In target mode: observerToken (where badge shows) sees relationToken (hovered token)
+  // In observer mode: observerToken (hovered) sees targetToken (where badge shows)
+  let detectionInfo = null;
+  let senseUsed = null;
+  if (avsEnabled && visibilityState !== 'undetected') {
+    try {
+      if (mode === 'target') {
+        // Show how observerToken detects the hovered token (relationToken)
+        detectionInfo = getDetectionBetween(observerToken, relationToken);
+      } else {
+        // Show how observerToken (hovered) detects targetToken
+        detectionInfo = getDetectionBetween(observerToken, targetToken);
+      }
+      if (detectionInfo && detectionInfo.sense) {
+        senseUsed = detectionInfo.sense;
+      }
+    } catch {
+      // Failed to get detection info, not critical
+    }
+  }
+
   // Create an anchor container at the token center-top to compute transformed bounds
   const indicator = new PIXI.Container();
   const tokenWidth = targetToken.document.width * canvas.grid.size;
@@ -959,6 +1058,7 @@ function addVisibilityIndicator(
     el.style.top = '0';
     el.style.transform = `translate(${Math.round(leftPx)}px, ${Math.round(topPx)}px)`;
     el.style.willChange = 'transform'; // Hint to browser for GPU layer
+    
     el.innerHTML = `<span class="pf2e-visioner-tooltip-badge ${kind === 'cover' ? `cover-${stateClass}` : `visibility-${stateClass}`}" style="--pf2e-visioner-tooltip-badge-width: ${badgeWidth}px; --pf2e-visioner-tooltip-badge-height: ${badgeHeight}px; --pf2e-visioner-tooltip-badge-radius: ${borderRadius}px;">
       <i class="${iconClass}"></i>
     </span>`;
@@ -966,18 +1066,66 @@ function addVisibilityIndicator(
     return el;
   };
 
+  const placeSenseBadge = (leftPx, topPx, sense) => {
+    const getSenseIcon = (sense) => {
+      const iconMap = {
+        'tremorsense': 'fa-solid fa-tower-broadcast',
+        'lifesense': 'fa-solid fa-heartbeat',
+        'scent': 'fa-solid fa-wind',
+        'hearing': 'fa-solid fa-ear-listen',
+        'greater-darkvision': 'fa-solid fa-moon',
+        'greaterDarkvision': 'fa-solid fa-moon',
+        'darkvision': 'fa-regular fa-moon',
+        'low-light-vision': 'fa-solid fa-moon-over-sun',
+        'lowLightVision': 'fa-solid fa-moon-over-sun',
+        'see-invisibility': 'fa-solid fa-user-dashed',
+        'light-perception': 'fa-solid fa-eye',
+        'vision': 'fa-solid fa-eye',
+        'echolocation': 'fa-solid fa-wave-pulse'
+      };
+      return iconMap[sense] || 'fa-solid fa-eye';
+    };
+
+    const el = document.createElement('div');
+    el.style.position = 'fixed';
+    el.style.pointerEvents = 'none';
+    el.style.zIndex = '60';
+    el.style.left = '0';
+    el.style.top = '0';
+    el.style.transform = `translate(${Math.round(leftPx)}px, ${Math.round(topPx)}px)`;
+    el.style.willChange = 'transform';
+    
+    el.innerHTML = `<span class="pf2e-visioner-sense-badge" style="display: inline-flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.85); border: 2px solid #888; border-radius: ${borderRadius}px; width: ${badgeWidth}px; height: ${badgeHeight}px; color: #aaa;">
+      <i class="${getSenseIcon(sense)}" style="font-size: ${sizeConfig.iconPx}px;"></i>
+    </span>`;
+    document.body.appendChild(el);
+    return el;
+  };
+
   if (coverConfig) {
-    // Two badges: visibility on left, cover on right
-    const visLeft = centerX - spacing / 2 - badgeWidth;
-    const coverLeft = centerX + spacing / 2;
+    // Three badges: sense (if present), visibility, cover
+    const totalWidth = (senseUsed ? badgeWidth + spacing : 0) + badgeWidth + spacing + badgeWidth;
+    const startX = centerX - totalWidth / 2;
+    
+    let currentX = startX;
+    
+    // Place sense badge if present
+    if (senseUsed) {
+      indicator._senseBadgeEl = placeSenseBadge(currentX, centerY, senseUsed);
+      currentX += badgeWidth + spacing;
+    }
+    
+    // Place visibility badge
     indicator._visBadgeEl = placeBadge(
-      visLeft,
+      currentX,
       centerY,
       visibilityState,
       config.icon,
-      'visibility',
+      'visibility'
     );
-    // Recompute cover state name for class
+    currentX += badgeWidth + spacing;
+    
+    // Place cover badge
     let coverStateName = 'none';
     try {
       if (relationToken) {
@@ -987,21 +1135,38 @@ function addVisibilityIndicator(
       }
     } catch (_) { }
     indicator._coverBadgeEl = placeBadge(
-      coverLeft,
+      currentX,
       centerY,
       coverStateName,
       coverConfig.icon,
-      'cover',
+      'cover'
     );
+  } else if (visibilityState === 'observed') {
+    // Observed state: only show sense badge (no visibility badge)
+    if (senseUsed) {
+      const left = centerX - badgeWidth / 2;
+      indicator._senseBadgeEl = placeSenseBadge(left, centerY, senseUsed);
+    }
   } else {
-    // Only visibility badge, centered
-    const visLeft = centerX - badgeWidth / 2;
+    // Visibility badge with optional sense badge to the left
+    const totalWidth = (senseUsed ? badgeWidth + spacing : 0) + badgeWidth;
+    const startX = centerX - totalWidth / 2;
+    
+    let currentX = startX;
+    
+    // Place sense badge if present
+    if (senseUsed) {
+      indicator._senseBadgeEl = placeSenseBadge(currentX, centerY, senseUsed);
+      currentX += badgeWidth + spacing;
+    }
+    
+    // Place visibility badge
     indicator._visBadgeEl = placeBadge(
-      visLeft,
+      currentX,
       centerY,
       visibilityState,
       config.icon,
-      'visibility',
+      'visibility'
     );
   }
 
@@ -1095,14 +1260,34 @@ function updateBadgePositions() {
     const centerY = canvasRect.top + globalPoint.y - badgeHeight / 2 + verticalOffset;
 
     if (indicator._visBadgeEl && indicator._coverBadgeEl) {
-      const visLeft = centerX - spacing / 2 - badgeWidth;
-      const coverLeft = centerX + spacing / 2;
-      // Use transform for GPU acceleration instead of left/top
-      indicator._visBadgeEl.style.transform = `translate(${Math.round(visLeft)}px, ${Math.round(centerY)}px)`;
-      indicator._coverBadgeEl.style.transform = `translate(${Math.round(coverLeft)}px, ${Math.round(centerY)}px)`;
+      // Three badges layout: sense (optional), visibility, cover
+      const totalWidth = (indicator._senseBadgeEl ? badgeWidth + spacing : 0) + badgeWidth + spacing + badgeWidth;
+      const startX = centerX - totalWidth / 2;
+      
+      let currentX = startX;
+      
+      if (indicator._senseBadgeEl) {
+        indicator._senseBadgeEl.style.transform = `translate(${Math.round(currentX)}px, ${Math.round(centerY)}px)`;
+        currentX += badgeWidth + spacing;
+      }
+      
+      indicator._visBadgeEl.style.transform = `translate(${Math.round(currentX)}px, ${Math.round(centerY)}px)`;
+      currentX += badgeWidth + spacing;
+      
+      indicator._coverBadgeEl.style.transform = `translate(${Math.round(currentX)}px, ${Math.round(centerY)}px)`;
     } else if (indicator._visBadgeEl) {
-      const visLeft = centerX - badgeWidth / 2;
-      indicator._visBadgeEl.style.transform = `translate(${Math.round(visLeft)}px, ${Math.round(centerY)}px)`;
+      // Visibility badge with optional sense badge
+      const totalWidth = (indicator._senseBadgeEl ? badgeWidth + spacing : 0) + badgeWidth;
+      const startX = centerX - totalWidth / 2;
+      
+      let currentX = startX;
+      
+      if (indicator._senseBadgeEl) {
+        indicator._senseBadgeEl.style.transform = `translate(${Math.round(currentX)}px, ${Math.round(centerY)}px)`;
+        currentX += badgeWidth + spacing;
+      }
+      
+      indicator._visBadgeEl.style.transform = `translate(${Math.round(currentX)}px, ${Math.round(centerY)}px)`;
     }
   });
 
@@ -1219,12 +1404,16 @@ function hideAllVisibilityIndicators() {
   HoverTooltips.visibilityIndicators.forEach((indicator) => {
     try {
       // Remove DOM badges if present
+      if (indicator._senseBadgeEl && indicator._senseBadgeEl.parentNode) {
+        indicator._senseBadgeEl.parentNode.removeChild(indicator._senseBadgeEl);
+      }
       if (indicator._visBadgeEl && indicator._visBadgeEl.parentNode) {
         indicator._visBadgeEl.parentNode.removeChild(indicator._visBadgeEl);
       }
       if (indicator._coverBadgeEl && indicator._coverBadgeEl.parentNode) {
         indicator._coverBadgeEl.parentNode.removeChild(indicator._coverBadgeEl);
       }
+      delete indicator._senseBadgeEl;
       delete indicator._visBadgeEl;
       delete indicator._coverBadgeEl;
 

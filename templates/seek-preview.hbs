@@ -6,44 +6,12 @@
 <div class="seek-preview-content">
   {{!-- Seeker Information Panel --}}
   <div class="seeker-info">
-    <div cla    <div class="hide-preview-dialog-bulk-actions-buttons">
-      <button type="button" class="bulk-action-btn apply-all" data-action="applyAll" data-tooltip="{{localize 'PF2E_VISIONER.UI.APPLY_ALL_CHANGES'}}">
-        <i class="fas fa-check-circle"></i> {{localize "PF2E_VISIONER.UI.APPLY_ALL"}}
-      </button>
-      <button type="button" class="bulk-action-btn revert-all" data-action="revertAll" data-tooltip="{{localize 'PF2E_VISIONER.UI.REVERT_ALL_CHANGES'}}" disabled>
-        <i class="fas fa-undo"></i> {{localize "PF2E_VISIONER.UI.REVERT_ALL"}}
-      </button>
-    </div>er-image">
+    <div class="seeker-image">
       <img src="{{seeker.image}}" data-tooltip="{{seeker.name}}" />
     </div>
     <div class="seeker-details">
       <h3 class="seeker-name">{{seeker.name}}</h3>
       <p class="hint">{{seeker.actionLabel}}</p>
-      {{#if allSenses}}
-        <div class="senses-buttons-container-clean">
-          <button class="senses-button available-senses" data-tooltip-html="senses-tooltip-content">
-            <i class="fas fa-eye"></i>
-            <span class="button-text">{{localize "PF2E_VISIONER.UI.AVAILABLE_SENSES"}}</span>
-            <span class="count-badge" aria-label="{{allSenses.length}} senses">{{allSenses.length}}</span>
-            <i class="fas fa-chevron-down chevron" aria-hidden="true"></i>
-          </button>
-          {{!-- Hidden tooltip content for available senses --}}
-          <div id="senses-tooltip-content" class="senses-tooltip-content" style="display: none;">
-            <div class="tooltip-senses-grid">
-              {{#each allSenses as |sense|}}
-                <div class="tooltip-sense-item {{#if sense.isPrecise}}precise{{else}}imprecise{{/if}} {{#if sense.wasUsed}}used{{/if}}">
-                  <i class="{{sense.config.icon}}"></i>
-                  <span class="sense-name">{{localize sense.config.label}}</span>
-                  <span class="sense-precision {{#if sense.isPrecise}}precise{{else}}imprecise{{/if}}">
-                    {{#if sense.isPrecise}}{{localize 'PF2E_VISIONER.SENSE_PRECISION.PRECISE'}}{{else}}{{localize 'PF2E_VISIONER.SENSE_PRECISION.IMPRECISE'}}{{/if}}
-                  </span>
-                  <span class="sense-range">{{sense.displayRange}}&nbsp;ft</span>
-                </div>
-              {{/each}}
-            </div>
-          </div>
-        </div>
-      {{/if}}
       {{#if seekFeatBadges}}
         <div class="action-context-badges">
       {{#each seekFeatBadges as |b|}}
@@ -143,6 +111,9 @@
         <tr>
           <th class="token-image">{{localize "PF2E_VISIONER.UI.TOKEN"}}</th>
           <th class="token-name">{{localize "PF2E_VISIONER.UI.NAME"}}</th>
+          {{#if avsEnabled}}
+            <th class="detected-by">{{localize "PF2E_VISIONER.SEEK_AUTOMATION.DETECTED_BY"}}</th>
+          {{/if}}
           <th class="roll-result">{{localize "PF2E_VISIONER.SEEK_AUTOMATION.ROLL_VS_DC"}}</th>
           <th class="outcome">{{localize "PF2E_VISIONER.SEEK_AUTOMATION.OUTCOME"}}</th>
           <th class="visibility-change">{{localize "PF2E_VISIONER.SEEK_AUTOMATION.VISIBILITY_CHANGE"}}</th>
@@ -173,6 +144,15 @@
                 </div>
               {{/if}}
             </td>
+            {{#if ../avsEnabled}}
+              <td class="detected-by">
+                {{#if outcome.detectedBySense}}
+                  {{{senseIcon outcome.detectedBySense}}}
+                {{else}}
+                  <span class="no-detection">—</span>
+                {{/if}}
+              </td>
+            {{/if}}
             <td class="roll-result">
               {{#if outcome.isPointOut}}
                 <span class="point-out-indicator">{{localize "PF2E_VISIONER.UI.POINT_OUT_INDICATOR"}}</span>

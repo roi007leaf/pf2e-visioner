@@ -169,6 +169,16 @@ export class VisibilityCalculator {
       options
     );
 
+    // Store detection info alongside visibility (for tooltips and UI)
+    // Import detection map functions dynamically to avoid circular dependencies
+    try {
+      const { setDetectionBetween } = await import('../../stores/detection-map.js');
+      await setDetectionBetween(observer, target, result.detection || null);
+    } catch (err) {
+      // Non-critical: detection storage failure shouldn't break visibility calculation
+      console.warn('PF2E Visioner: Failed to store detection info:', err);
+    }
+
     return result.state;
   }
 

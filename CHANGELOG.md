@@ -1,5 +1,17 @@
 # Changelog
 
+## [4.2.0] - 2025-10-08
+
+### ✨ Features
+
+- **Detection Badges System**: Added sense detection badges to visibility tooltips and dialogs
+  - Hover tooltips now display which sense detected each token (vision, darkvision, tremorsense, lifesense, scent, hearing, etc.)
+  - Sense badges appear alongside visibility and cover badges for comprehensive at-a-glance information
+  - Seek dialog includes new "Detected By" column showing which sense was used to detect each target
+  - All sense detection features respect AVS (Auto-Visibility System) setting - only shown when AVS is enabled
+  - Supports: vision, light-perception, darkvision, greater-darkvision, low-light-vision, see-invisibility, echolocation, tremorsense, lifesense, scent, and hearing
+  - Detection badges show even for "observed" targets to provide complete sensory information
+
 ## [4.1.1] - 2025-10-08
 
 ### ✨ Features
