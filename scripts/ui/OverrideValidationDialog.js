@@ -8,6 +8,9 @@ import { COVER_STATES, VISIBILITY_STATES } from '../constants.js';
 export class OverrideValidationDialog extends foundry.applications.api.HandlebarsApplicationMixin(foundry.applications.api.ApplicationV2) {
 
   constructor(options = {}) {
+    options.window = options.window || {};
+    options.window.title = game?.i18n?.localize('PF2E_VISIONER.DIALOG_TITLES.AVS_VALIDATION') || 'AVS Changes Validation';
+    
     super(options);
     this.invalidOverrides = options.invalidOverrides || [];
     this.tokenName = options.tokenName || 'Unknown Token';
@@ -19,7 +22,6 @@ export class OverrideValidationDialog extends foundry.applications.api.Handlebar
     id: "override-validation-dialog",
     tag: "div",
     window: {
-      title: "AVS Changes Validation",
       icon: "fas fa-bolt-auto",
       // Include module root class so shared styles apply consistently
       contentClasses: ["pf2e-visioner", "override-validation-dialog"],
@@ -103,7 +105,7 @@ export class OverrideValidationDialog extends foundry.applications.api.Handlebar
       const visCfg = (VISIBILITY_STATES && VISIBILITY_STATES[visibilityKey]) || { icon: 'fas fa-eye', color: '#4caf50', label: 'Observed' };
       const coverCfg = (COVER_STATES && COVER_STATES[coverKey]) || { icon: 'fas fa-shield-slash', color: '#4caf50', label: 'No Cover' };
       const prevVisCfg = (VISIBILITY_STATES && VISIBILITY_STATES[prevVisibilityKey]) || { icon: 'fas fa-eye', color: '#9e9e9e', label: 'Observed' };
-      const prevCoverCfg = (COVER_STATES && COVER_STATES[prevCoverKey]) || { icon: 'fas fa-shield', color: '#9e9e9e', label: 'Cover' };
+      const prevCoverCfg = (COVER_STATES && COVER_STATES[prevCoverKey]) || { icon: 'fas fa-shield', color: '#9e9e9e', label: game.i18n.localize('PF2E_VISIONER.TOKEN_MANAGER.COVER_STATE') };
 
       return {
         id: `${override.observerId}-${override.targetId}`,
@@ -291,14 +293,14 @@ export class OverrideValidationDialog extends foundry.applications.api.Handlebar
       this.invalidOverrides = this.invalidOverrides.filter(o => !(group === 'observer' ? o.observerId === moved : o.targetId === moved));
       await this.render(true);
 
-      ui.notifications.info(`Accepted ${toRemove.length} change(s) in ${group} table`);
+      ui.notifications.info(game.i18n.format('PF2E_VISIONER.NOTIFICATIONS.AVS_ACCEPTED_IN_TABLE', { count: toRemove.length, group }));
       if (!this.invalidOverrides.length) {
         setTimeout(() => this.close(), 300);
         try { const { default: indicator } = await import('./OverrideValidationIndicator.js'); indicator.hide(); } catch { }
       }
     } catch (e) {
       console.error('PF2E Visioner | Error during group clear:', e);
-      ui.notifications.error('Failed to clear overrides for this table');
+      ui.notifications.error(game.i18n.localize('PF2E_VISIONER.NOTIFICATIONS.OVERRIDE_CLEAR_FAILED'));
     }
   }
 
@@ -322,7 +324,7 @@ export class OverrideValidationDialog extends foundry.applications.api.Handlebar
         overrideElement.style.opacity = '0.6';
         overrideElement.style.pointerEvents = 'none';
         const statusSpan = overrideElement.querySelector('.status-description span');
-        if (statusSpan) statusSpan.textContent = 'Rejected';
+        if (statusSpan) statusSpan.textContent = game.i18n.localize('PF2E_VISIONER.UI.REJECTED_LABEL');
         const statusIcon = overrideElement.querySelector('.status-description i');
         if (statusIcon) {
           statusIcon.classList.remove('fa-check-circle');
@@ -344,10 +346,10 @@ export class OverrideValidationDialog extends foundry.applications.api.Handlebar
         } catch { }
       }
 
-      ui.notifications.info(`Rejected AVS change: ${override.observerName} → ${override.targetName}`);
+      ui.notifications.info(game.i18n.format('PF2E_VISIONER.NOTIFICATIONS.AVS_REJECTED_SINGLE', { observerName: override.observerName, targetName: override.targetName }));
     } catch (error) {
       console.error('PF2E Visioner | Error keeping individual override:', error);
-      ui.notifications.error('Failed to keep override');
+      ui.notifications.error(game.i18n.localize('PF2E_VISIONER.NOTIFICATIONS.OVERRIDE_KEEP_FAILED'));
     }
   }
 
@@ -378,7 +380,7 @@ export class OverrideValidationDialog extends foundry.applications.api.Handlebar
           overrideElement.style.opacity = '0.6';
           overrideElement.style.pointerEvents = 'none';
           const statusSpan = overrideElement.querySelector('.status-description span');
-          if (statusSpan) statusSpan.textContent = 'Accepted';
+          if (statusSpan) statusSpan.textContent = game.i18n.localize('PF2E_VISIONER.UI.ACCEPTED_LABEL');
           const statusIcon = overrideElement.querySelector('.status-description i');
           if (statusIcon) {
             statusIcon.classList.remove('fa-info-circle');
@@ -400,11 +402,11 @@ export class OverrideValidationDialog extends foundry.applications.api.Handlebar
           } catch { }
         }
 
-        ui.notifications.info(`Accepted AVS change: ${override.observerName} → ${override.targetName}`);
+        ui.notifications.info(game.i18n.format('PF2E_VISIONER.NOTIFICATIONS.AVS_ACCEPTED_SINGLE', { observerName: override.observerName, targetName: override.targetName }));
       }
     } catch (error) {
       console.error('PF2E Visioner | Error removing individual override:', error);
-      ui.notifications.error('Failed to accept AVS change');
+      ui.notifications.error(game.i18n.localize('PF2E_VISIONER.NOTIFICATIONS.AVS_ACCEPT_FAILED'));
     }
   }
 
@@ -423,7 +425,7 @@ export class OverrideValidationDialog extends foundry.applications.api.Handlebar
       }
     }
 
-    ui.notifications.info(`Accepted ${this.invalidOverrides.length} change(s)`);
+    ui.notifications.info(game.i18n.format('PF2E_VISIONER.NOTIFICATIONS.AVS_ACCEPTED_COUNT', { count: this.invalidOverrides.length }));
     try {
       const { default: indicator } = await import('./OverrideValidationIndicator.js');
       indicator.hide();
@@ -433,7 +435,7 @@ export class OverrideValidationDialog extends foundry.applications.api.Handlebar
   async _onRejectAll() {
 
     await this.close();
-    ui.notifications.info('Rejected all AVS changes');
+    ui.notifications.info(game.i18n.localize('PF2E_VISIONER.NOTIFICATIONS.AVS_REJECTED_ALL'));
     try {
       const { default: indicator } = await import('./OverrideValidationIndicator.js');
       indicator.hide();

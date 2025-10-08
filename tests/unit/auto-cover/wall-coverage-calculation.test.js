@@ -364,6 +364,7 @@ describe('Wall Coverage Percentage Calculation', () => {
       expect(coverDetector._estimateWallCoveragePercent).toHaveBeenCalledWith(
         attackerPos,
         mockTarget,
+        null,
       );
 
       // Restore original method

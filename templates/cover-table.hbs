@@ -11,11 +11,11 @@
   </colgroup>
   <thead>
     <tr>
-      <th class="token-image">Token</th>
-      <th class="token-name">Name</th>
+      <th class="token-image">{{localize "PF2E_VISIONER.UI.TOKEN"}}</th>
+      <th class="token-name">{{localize "PF2E_VISIONER.UI.NAME"}}</th>
       <th class="cover-state">{{localize "PF2E_VISIONER.TOKEN_MANAGER.COVER_STATE"}}</th>
-      <th class="current-state">Current State</th>
-      <th class="mechanical-effects">Effects</th>
+      <th class="current-state">{{localize "PF2E_VISIONER.UI.CURRENT_STATE"}}</th>
+      <th class="mechanical-effects">{{localize "PF2E_VISIONER.UI.EFFECTS"}}</th>
     </tr>
   </thead>
   <tbody>
@@ -26,7 +26,7 @@
             <div class="token-img-wrapper">
               <img src="{{target.img}}" width="28" height="28" />
               {{#if target.isFoundryHidden}}
-                <span class="foundry-hidden-indicator" data-tooltip="Foundry Hidden">
+                <span class="foundry-hidden-indicator" data-tooltip="{{localize 'PF2E_VISIONER.UI.FOUNDRY_HIDDEN'}}">
                   <i class="fas fa-eye-slash"></i>
                 </span>
               {{/if}}

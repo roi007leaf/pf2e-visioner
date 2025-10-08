@@ -2,22 +2,22 @@
   <fieldset>
     <legend>PF2E Visioner</legend>
     <div class="form-group">
-      <label>Cover</label>
+      <label>{{localize "PF2E_VISIONER.UI.COVER_LABEL"}}</label>
   <div class="cover-override-buttons pv-u-flex pv-u-gap-4" style="margin-top:4px;">
         <button type="button" class="visioner-icon-btn {{#unless coverOverride}}active{{/unless}}" 
-                data-cover-override="auto" data-tooltip="Automatic Detection - Wall provides cover based on coverage thresholds">
+                data-cover-override="auto" data-tooltip="{{localize 'PF2E_VISIONER.UI.WALL_COVER_AUTO_TOOLTIP'}}">
           <i class="fas fa-bolt-auto icon-color-gray"></i>
         </button>
         <button type="button" class="visioner-icon-btn {{#if (eq coverOverride 'none')}}active{{/if}}" 
-                data-cover-override="none" data-tooltip="No Cover - Wall never provides cover regardless of thresholds">
+                data-cover-override="none" data-tooltip="{{localize 'PF2E_VISIONER.UI.WALL_COVER_NONE_TOOLTIP'}}">
           <i class="fas fa-shield-slash cover-none"></i>
         </button>
         <button type="button" class="visioner-icon-btn {{#if (eq coverOverride 'standard')}}active{{/if}}" 
-                data-cover-override="standard" data-tooltip="Standard Cover Maximum - Wall provides up to standard cover based on thresholds">
+                data-cover-override="standard" data-tooltip="{{localize 'PF2E_VISIONER.UI.WALL_COVER_STANDARD_TOOLTIP'}}">
           <i class="fas fa-shield-alt cover-standard"></i>
         </button>
         <button type="button" class="visioner-icon-btn {{#if (eq coverOverride 'greater')}}active{{/if}}" 
-                data-cover-override="greater" data-tooltip="Greater Cover Maximum - Wall provides up to greater cover based on thresholds">
+                data-cover-override="greater" data-tooltip="{{localize 'PF2E_VISIONER.UI.WALL_COVER_GREATER_TOOLTIP'}}">
           <i class="fas fa-shield cover-greater"></i>
         </button>
       </div>
@@ -26,24 +26,24 @@
     </div>
     {{#if hiddenWallsEnabled}}
     <div class="form-group">
-      <label>Hidden Wall</label>
-      <input type="checkbox" name="hiddenWall" {{#if hiddenWall}}checked{{/if}} data-tooltip="Mark this wall as hidden from players"
+      <label>{{localize "PF2E_VISIONER.UI.HIDDEN_WALL_LABEL"}}</label>
+      <input type="checkbox" name="hiddenWall" {{#if hiddenWall}}checked{{/if}} data-tooltip="{{localize 'PF2E_VISIONER.UI.WALL_HIDDEN_TOOLTIP'}}"
         data-trigger-change="hidden-wall-sections" />
       <p class="notes">Adds a visible indicator for players;</p>
     </div>
   <div class="form-group hidden-wall-section {{#unless hiddenWall}}is-hidden{{/unless}}">
-      <label>Wall Identifier</label>
+      <label>{{localize "PF2E_VISIONER.UI.WALL_IDENTIFIER_LABEL"}}</label>
       <input type="text" name="identifier" value="{{identifier}}" />
       <p class="notes">Shown in the Token Manager for observers.</p>
     </div>
   <div class="form-group hidden-wall-section {{#unless hiddenWall}}is-hidden{{/unless}}">
-      <label>Wall Stealth DC</label>
+      <label>{{localize "PF2E_VISIONER.UI.WALL_STEALTH_DC_LABEL"}}</label>
       <input type="number" name="dc" min="0" step="1" value="{{dc}}" />
       <p class="notes">Optional per-wall DC for Seek; blank uses default setting.</p>
     </div>
   <div class="form-group hidden-wall-section {{#unless hiddenWall}}is-hidden{{/unless}}">
       <label>Connected Walls (Identifiers)</label>
-      <input type="text" name="connected" value="{{connectedCsv}}" placeholder="comma-separated identifiers" />
+      <input type="text" name="connected" value="{{connectedCsv}}" placeholder="{{localize 'PF2E_VISIONER.UI.CONNECTED_IDENTIFIERS_PLACEHOLDER'}}" />
       <p class="notes">List identifiers of other walls linked to this one. Actions that affect this wall will also apply
         to those walls.</p>
     </div>

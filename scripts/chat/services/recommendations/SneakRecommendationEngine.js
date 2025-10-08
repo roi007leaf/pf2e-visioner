@@ -72,7 +72,7 @@ export class SneakRecommendationEngine {
     if (firstError.includes('unconscious') || firstError.includes('dead')) {
       return {
         action: 'heal',
-        title: 'Heal Character',
+        title: game.i18n.localize('PF2E_VISIONER.DIALOG_TITLES.RECOMMENDATIONS.HEAL_CHARACTER'),
         description: 'Character must be conscious to perform stealth actions',
         icon: 'fas fa-heart',
         urgency: 'critical'
@@ -82,7 +82,7 @@ export class SneakRecommendationEngine {
     if (firstError.includes('preventing conditions')) {
       return {
         action: 'remove-conditions',
-        title: 'Remove Conditions',
+        title: game.i18n.localize('PF2E_VISIONER.DIALOG_TITLES.RECOMMENDATIONS.REMOVE_CONDITIONS'),
         description: 'Remove conditions that prevent stealth before attempting',
         icon: 'fas fa-times-circle',
         urgency: 'high'
@@ -92,7 +92,7 @@ export class SneakRecommendationEngine {
     if (firstError.includes('RAW enforcement')) {
       return {
         action: 'hide-first',
-        title: 'Use Hide Action First',
+        title: game.i18n.localize('PF2E_VISIONER.DIALOG_TITLES.RECOMMENDATIONS.USE_HIDE_FIRST'),
         description: 'RAW requires being hidden or undetected before sneaking',
         icon: 'fas fa-eye-slash',
         urgency: 'high'
@@ -101,7 +101,7 @@ export class SneakRecommendationEngine {
     
     return {
       action: 'check-setup',
-      title: 'Check Scene Setup',
+      title: game.i18n.localize('PF2E_VISIONER.DIALOG_TITLES.RECOMMENDATIONS.CHECK_SCENE_SETUP'),
       description: 'Verify token and scene configuration before attempting stealth',
       icon: 'fas fa-cog',
       urgency: 'high'
@@ -119,7 +119,7 @@ export class SneakRecommendationEngine {
     if (!positionAnalysis) {
       return {
         action: 'proceed-carefully',
-        title: 'Proceed with Caution',
+        title: game.i18n.localize('PF2E_VISIONER.DIALOG_TITLES.RECOMMENDATIONS.PROCEED_CAUTION'),
         description: 'Position analysis unavailable - results may be unpredictable',
         icon: 'fas fa-exclamation-triangle',
         urgency: 'medium'
@@ -130,7 +130,7 @@ export class SneakRecommendationEngine {
       case 'terrible':
         return {
           action: 'reposition',
-          title: 'Reposition Before Sneaking',
+          title: game.i18n.localize('PF2E_VISIONER.DIALOG_TITLES.RECOMMENDATIONS.REPOSITION_BEFORE_SNEAK'),
           description: 'Current position is very poor for stealth - move to better cover first',
           icon: 'fas fa-arrows-alt',
           urgency: 'high'
@@ -139,7 +139,7 @@ export class SneakRecommendationEngine {
       case 'poor':
         return {
           action: 'improve-position',
-          title: 'Improve Position',
+          title: game.i18n.localize('PF2E_VISIONER.DIALOG_TITLES.RECOMMENDATIONS.IMPROVE_POSITION'),
           description: 'Consider taking cover or hiding to improve stealth chances',
           icon: 'fas fa-shield-alt',
           urgency: 'medium'
@@ -148,7 +148,7 @@ export class SneakRecommendationEngine {
       default:
         return {
           action: 'proceed-with-awareness',
-          title: 'Proceed with Awareness',
+          title: game.i18n.localize('PF2E_VISIONER.DIALOG_TITLES.RECOMMENDATIONS.PROCEED_AWARENESS'),
           description: 'Be aware of the warnings but position is acceptable',
           icon: 'fas fa-eye',
           urgency: 'low'
@@ -166,7 +166,7 @@ export class SneakRecommendationEngine {
     if (!positionAnalysis) {
       return {
         action: 'proceed',
-        title: 'Proceed with Sneak',
+        title: game.i18n.localize('PF2E_VISIONER.DIALOG_TITLES.RECOMMENDATIONS.PROCEED_SNEAK'),
         description: 'Prerequisites met - ready to attempt stealth',
         icon: 'fas fa-check-circle',
         urgency: 'low'
@@ -177,7 +177,7 @@ export class SneakRecommendationEngine {
       case 'excellent':
         return {
           action: 'proceed-confidently',
-          title: 'Excellent Position',
+          title: game.i18n.localize('PF2E_VISIONER.DIALOG_TITLES.RECOMMENDATIONS.EXCELLENT_POSITION'),
           description: 'Outstanding stealth position - proceed with confidence',
           icon: 'fas fa-star',
           urgency: 'low'
@@ -186,7 +186,7 @@ export class SneakRecommendationEngine {
       case 'good':
         return {
           action: 'proceed',
-          title: 'Good Position',
+          title: game.i18n.localize('PF2E_VISIONER.DIALOG_TITLES.RECOMMENDATIONS.GOOD_POSITION'),
           description: 'Solid stealth position - reasonable chance of success',
           icon: 'fas fa-thumbs-up',
           urgency: 'low'
@@ -195,7 +195,7 @@ export class SneakRecommendationEngine {
       default:
         return {
           action: 'proceed',
-          title: 'Proceed with Sneak',
+          title: game.i18n.localize('PF2E_VISIONER.DIALOG_TITLES.RECOMMENDATIONS.PROCEED_SNEAK'),
           description: 'Prerequisites met - ready to attempt stealth',
           icon: 'fas fa-check-circle',
           urgency: 'low'
@@ -217,7 +217,7 @@ export class SneakRecommendationEngine {
     // Always suggest Hide as an alternative
     alternatives.push({
       action: 'hide',
-      title: 'Hide Action',
+      title: game.i18n.localize('PF2E_VISIONER.DIALOG_TITLES.RECOMMENDATIONS.HIDE_ACTION'),
       description: 'Break line of sight and become hidden before sneaking',
       icon: 'fas fa-eye-slash',
       priority: 'high',
@@ -228,7 +228,7 @@ export class SneakRecommendationEngine {
     if (positionAnalysis && positionAnalysis.noCoverCount > positionAnalysis.goodCoverCount) {
       alternatives.push({
         action: 'take-cover',
-        title: 'Take Cover',
+        title: game.i18n.localize('PF2E_VISIONER.DIALOG_TITLES.RECOMMENDATIONS.TAKE_COVER'),
         description: 'Gain cover bonuses and improve defensive position',
         icon: 'fas fa-shield-alt',
         priority: 'high',
@@ -240,7 +240,7 @@ export class SneakRecommendationEngine {
     if (positionAnalysis && (positionAnalysis.overallQuality === 'poor' || positionAnalysis.overallQuality === 'terrible')) {
       alternatives.push({
         action: 'move',
-        title: 'Reposition',
+        title: game.i18n.localize('PF2E_VISIONER.DIALOG_TITLES.RECOMMENDATIONS.REPOSITION'),
         description: 'Move to a better tactical position before attempting stealth',
         icon: 'fas fa-arrows-alt',
         priority: 'medium',
@@ -252,7 +252,7 @@ export class SneakRecommendationEngine {
     if (positionAnalysis && positionAnalysis.observedByCount > positionAnalysis.hiddenFromCount) {
       alternatives.push({
         action: 'create-diversion',
-        title: 'Create a Diversion',
+        title: game.i18n.localize('PF2E_VISIONER.DIALOG_TITLES.RECOMMENDATIONS.CREATE_DIVERSION'),
         description: 'Distract observers to improve stealth chances',
         icon: 'fas fa-magic',
         priority: 'medium',
@@ -264,7 +264,7 @@ export class SneakRecommendationEngine {
     if (actionData.actor && positionAnalysis && positionAnalysis.hiddenFromCount > 0) {
       alternatives.push({
         action: 'point-out',
-        title: 'Point Out',
+        title: game.i18n.localize('PF2E_VISIONER.DIALOG_TITLES.RECOMMENDATIONS.POINT_OUT'),
         description: 'Help allies locate hidden enemies instead',
         icon: 'fas fa-hand-point-right',
         priority: 'low',
@@ -275,7 +275,7 @@ export class SneakRecommendationEngine {
     // Suggest Seek if looking for hidden enemies
     alternatives.push({
       action: 'seek',
-      title: 'Seek Action',
+      title: game.i18n.localize('PF2E_VISIONER.DIALOG_TITLES.RECOMMENDATIONS.SEEK_ACTION'),
       description: 'Search for hidden enemies in the area',
       icon: 'fas fa-search',
       priority: 'low',
@@ -301,7 +301,7 @@ export class SneakRecommendationEngine {
     if (positionAnalysis.averageDistance < 15) {
       tactical.push({
         category: 'distance',
-        title: 'Increase Distance',
+        title: game.i18n.localize('PF2E_VISIONER.DIALOG_TITLES.RECOMMENDATIONS.INCREASE_DISTANCE'),
         description: 'Move farther from observers to reduce detection chance',
         icon: 'fas fa-expand-arrows-alt',
         priority: 'high'
@@ -309,7 +309,7 @@ export class SneakRecommendationEngine {
     } else if (positionAnalysis.averageDistance > 60) {
       tactical.push({
         category: 'distance',
-        title: 'Good Distance',
+        title: game.i18n.localize('PF2E_VISIONER.DIALOG_TITLES.RECOMMENDATIONS.GOOD_DISTANCE'),
         description: 'Excellent distance from observers - maintain or improve',
         icon: 'fas fa-check-circle',
         priority: 'low'
@@ -320,7 +320,7 @@ export class SneakRecommendationEngine {
     if (positionAnalysis.brightLightCount > positionAnalysis.dimLightCount + positionAnalysis.darknessCount) {
       tactical.push({
         category: 'lighting',
-        title: 'Seek Darkness',
+        title: game.i18n.localize('PF2E_VISIONER.DIALOG_TITLES.RECOMMENDATIONS.SEEK_DARKNESS'),
         description: 'Move to areas with dim light or darkness for better concealment',
         icon: 'fas fa-moon',
         priority: 'medium'
@@ -328,7 +328,7 @@ export class SneakRecommendationEngine {
     } else if (positionAnalysis.darknessCount > 0) {
       tactical.push({
         category: 'lighting',
-        title: 'Excellent Lighting',
+        title: game.i18n.localize('PF2E_VISIONER.DIALOG_TITLES.RECOMMENDATIONS.EXCELLENT_LIGHTING'),
         description: 'Darkness provides excellent concealment - exploit this advantage',
         icon: 'fas fa-star',
         priority: 'low'
@@ -339,7 +339,7 @@ export class SneakRecommendationEngine {
     if (positionAnalysis.noCoverCount === positionAnalysis.validPositions) {
       tactical.push({
         category: 'cover',
-        title: 'Find Cover',
+        title: game.i18n.localize('PF2E_VISIONER.DIALOG_TITLES.RECOMMENDATIONS.FIND_COVER'),
         description: 'No cover detected - seek walls, obstacles, or terrain features',
         icon: 'fas fa-shield-alt',
         priority: 'high'
@@ -347,7 +347,7 @@ export class SneakRecommendationEngine {
     } else if (positionAnalysis.goodCoverCount > positionAnalysis.noCoverCount) {
       tactical.push({
         category: 'cover',
-        title: 'Maintain Cover',
+        title: game.i18n.localize('PF2E_VISIONER.DIALOG_TITLES.RECOMMENDATIONS.MAINTAIN_COVER'),
         description: 'Good cover position - maintain or improve current advantage',
         icon: 'fas fa-thumbs-up',
         priority: 'low'
@@ -358,7 +358,7 @@ export class SneakRecommendationEngine {
     if (positionAnalysis.observedByCount > positionAnalysis.hiddenFromCount + positionAnalysis.concealedFromCount) {
       tactical.push({
         category: 'visibility',
-        title: 'Break Line of Sight',
+        title: game.i18n.localize('PF2E_VISIONER.DIALOG_TITLES.RECOMMENDATIONS.BREAK_LINE_SIGHT'),
         description: 'Too many observers can see you - use Hide action or move to concealment',
         icon: 'fas fa-eye-slash',
         priority: 'high'
@@ -383,7 +383,7 @@ export class SneakRecommendationEngine {
     if (positionAnalysis.bestCoverDirection) {
       positioning.push({
         type: 'direction',
-        title: 'Best Cover Direction',
+        title: game.i18n.localize('PF2E_VISIONER.DIALOG_TITLES.RECOMMENDATIONS.BEST_COVER_DIRECTION'),
         description: `Move toward ${positionAnalysis.bestCoverDirection}`,
         icon: 'fas fa-compass',
         priority: 'medium'
@@ -393,7 +393,7 @@ export class SneakRecommendationEngine {
     if (positionAnalysis.worstExposureDirection) {
       positioning.push({
         type: 'avoidance',
-        title: 'Avoid Exposure',
+        title: game.i18n.localize('PF2E_VISIONER.DIALOG_TITLES.RECOMMENDATIONS.AVOID_EXPOSURE'),
         description: `Avoid ${positionAnalysis.worstExposureDirection}`,
         icon: 'fas fa-exclamation-triangle',
         priority: 'high'
@@ -403,7 +403,7 @@ export class SneakRecommendationEngine {
     if (positionAnalysis.suggestedMovement) {
       positioning.push({
         type: 'movement',
-        title: 'Suggested Movement',
+        title: game.i18n.localize('PF2E_VISIONER.DIALOG_TITLES.RECOMMENDATIONS.SUGGESTED_MOVEMENT'),
         description: `Move ${positionAnalysis.suggestedMovement}`,
         icon: 'fas fa-arrows-alt',
         priority: 'medium'
@@ -415,7 +415,7 @@ export class SneakRecommendationEngine {
       case 'excellent':
         positioning.push({
           type: 'maintain',
-          title: 'Maintain Position',
+          title: game.i18n.localize('PF2E_VISIONER.DIALOG_TITLES.RECOMMENDATIONS.MAINTAIN_POSITION'),
           description: 'Excellent position - stay put or make minimal adjustments',
           icon: 'fas fa-anchor',
           priority: 'low'
@@ -425,7 +425,7 @@ export class SneakRecommendationEngine {
       case 'terrible':
         positioning.push({
           type: 'relocate',
-          title: 'Relocate Immediately',
+          title: game.i18n.localize('PF2E_VISIONER.DIALOG_TITLES.RECOMMENDATIONS.RELOCATE_IMMEDIATELY'),
           description: 'Current position is terrible - major repositioning required',
           icon: 'fas fa-running',
           priority: 'critical'
@@ -455,7 +455,7 @@ export class SneakRecommendationEngine {
     if (beneficialConditions.length > 0) {
       conditions.push({
         type: 'maintain',
-        title: 'Maintain Beneficial Conditions',
+        title: game.i18n.localize('PF2E_VISIONER.DIALOG_TITLES.RECOMMENDATIONS.MAINTAIN_BENEFICIAL'),
         description: `Keep these conditions: ${beneficialConditions.join(', ')}`,
         icon: 'fas fa-star',
         priority: 'medium'
@@ -467,7 +467,7 @@ export class SneakRecommendationEngine {
     if (harmfulConditions.length > 0) {
       conditions.push({
         type: 'remove',
-        title: 'Remove Harmful Conditions',
+        title: game.i18n.localize('PF2E_VISIONER.DIALOG_TITLES.RECOMMENDATIONS.REMOVE_HARMFUL'),
         description: `Remove these conditions: ${harmfulConditions.join(', ')}`,
         icon: 'fas fa-times-circle',
         priority: 'high'
@@ -479,7 +479,7 @@ export class SneakRecommendationEngine {
     if (suggestedConditions.length > 0) {
       conditions.push({
         type: 'acquire',
-        title: 'Acquire Beneficial Conditions',
+        title: game.i18n.localize('PF2E_VISIONER.DIALOG_TITLES.RECOMMENDATIONS.ACQUIRE_BENEFICIAL'),
         description: `Consider gaining: ${suggestedConditions.join(', ')}`,
         icon: 'fas fa-plus-circle',
         priority: 'low'
@@ -566,22 +566,22 @@ export class SneakRecommendationEngine {
       primary: recommendations.primary,
       sections: [
         {
-          title: 'Alternative Actions',
+          title: game.i18n.localize('PF2E_VISIONER.DIALOG_TITLES.RECOMMENDATIONS.ALTERNATIVE_ACTIONS'),
           items: recommendations.alternatives,
           icon: 'fas fa-list-alt'
         },
         {
-          title: 'Tactical Advice',
+          title: game.i18n.localize('PF2E_VISIONER.DIALOG_TITLES.RECOMMENDATIONS.TACTICAL_ADVICE'),
           items: recommendations.tactical,
           icon: 'fas fa-chess'
         },
         {
-          title: 'Positioning',
+          title: game.i18n.localize('PF2E_VISIONER.DIALOG_TITLES.RECOMMENDATIONS.POSITIONING'),
           items: recommendations.positioning,
           icon: 'fas fa-map-marker-alt'
         },
         {
-          title: 'Conditions',
+          title: game.i18n.localize('PF2E_VISIONER.DIALOG_TITLES.RECOMMENDATIONS.CONDITIONS'),
           items: recommendations.conditions,
           icon: 'fas fa-magic'
         }

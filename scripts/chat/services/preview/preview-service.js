@@ -291,7 +291,7 @@ export async function previewActionResults(actionData) {
           if (!canShowConsequences) {
             const { notify } = await import('../infra/notifications.js');
             notify.warn(
-              'No valid targets found for Attack Consequences. you can only see consequences if you are Hidden or Undetected from at least one observer.',
+              game.i18n.localize('PF2E_VISIONER.NOTIFICATIONS.NO_VALID_CONSEQUENCES'),
             );
             return;
           }

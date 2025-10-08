@@ -344,6 +344,7 @@ export const REACTIONS = {
   senseTheUnseen: {
     id: 'sense-the-unseen',
     name: 'PF2E_VISIONER.REACTIONS.SENSE_THE_UNSEEN.name',
+    applied: 'PF2E_VISIONER.REACTIONS.SENSE_THE_UNSEEN.applied',
     description: 'PF2E_VISIONER.REACTIONS.SENSE_THE_UNSEEN.description',
     icon: 'fas fa-eye',
     type: 'reaction',

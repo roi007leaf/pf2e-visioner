@@ -468,15 +468,15 @@ export class BaseActionDialog extends BasePreviewDialog {
 
       if (hasActionableChange) {
         container.innerHTML = `
-          <button type="button" class="row-action-btn apply-change" data-action="applyChange" ${opts.wallId ? `data-wall-id="${opts.wallId}"` : `data-token-id="${tokenId}"`} data-tooltip="Apply this visibility change">
+          <button type="button" class="row-action-btn apply-change" data-action="applyChange" ${opts.wallId ? `data-wall-id="${opts.wallId}"` : `data-token-id="${tokenId}"`} data-tooltip="${game.i18n.localize('PF2E_VISIONER.UI.APPLY_VISIBILITY_CHANGE')}">
             <i class="fas fa-check"></i>
           </button>
-          <button type="button" class="row-action-btn revert-change" data-action="revertChange" ${opts.wallId ? `data-wall-id="${opts.wallId}"` : `data-token-id="${tokenId}"`} data-tooltip="Revert to original visibility">
+          <button type="button" class="row-action-btn revert-change" data-action="revertChange" ${opts.wallId ? `data-wall-id="${opts.wallId}"` : `data-token-id="${tokenId}"`} data-tooltip="${game.i18n.localize('PF2E_VISIONER.UI.REVERT_TO_ORIGINAL')}">
             <i class="fas fa-undo"></i>
           </button>
         `;
       } else {
-        container.innerHTML = '<span class="no-action">No Change</span>';
+        container.innerHTML = `<span class="no-action">${game.i18n.localize('PF2E_VISIONER.UI.NO_CHANGE_LABEL')}</span>`;
       }
     } catch { }
   }
@@ -542,15 +542,15 @@ export class BaseActionDialog extends BasePreviewDialog {
                       ? `data-token-id="${targetId}"`
                       : '';
                   container.innerHTML = `
-                    <button type="button" class="row-action-btn apply-change" data-action="applyChange" ${idAttr} data-tooltip="Apply this visibility change">
+                    <button type="button" class="row-action-btn apply-change" data-action="applyChange" ${idAttr} data-tooltip="${game.i18n.localize('PF2E_VISIONER.UI.APPLY_VISIBILITY_CHANGE')}">
                       <i class="fas fa-check"></i>
                     </button>
-                    <button type="button" class="row-action-btn revert-change" data-action="revertChange" ${idAttr} data-tooltip="Revert to original visibility">
+                    <button type="button" class="row-action-btn revert-change" data-action="revertChange" ${idAttr} data-tooltip="${game.i18n.localize('PF2E_VISIONER.UI.REVERT_TO_ORIGINAL')}">
                       <i class="fas fa-undo"></i>
                     </button>
                   `;
                 } else {
-                  container.innerHTML = '<span class="no-action">No Change</span>';
+                  container.innerHTML = `<span class="no-action">${game.i18n.localize('PF2E_VISIONER.UI.NO_CHANGE_LABEL')}</span>`;
                 }
               }
             }

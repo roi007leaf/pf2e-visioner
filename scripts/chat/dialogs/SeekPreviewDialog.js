@@ -27,7 +27,7 @@ export class SeekPreviewDialog extends BaseActionDialog {
     tag: 'div',
     classes: ['pf2e-visioner', 'seek-preview-dialog'], // Keep same class for CSS compatibility
     window: {
-      title: 'Seek Results',
+      title: game.i18n.localize('PF2E_VISIONER.DIALOG_TITLES.SEEK_RESULTS'),
       icon: 'fas fa-search',
       resizable: true,
     },
@@ -61,7 +61,7 @@ export class SeekPreviewDialog extends BaseActionDialog {
     // Set window title and icon for seek dialog
     options.window = {
       ...options.window,
-      title: 'Action Results',
+      title: game.i18n.localize('PF2E_VISIONER.DIALOG_TITLES.ACTION_RESULTS'),
       icon: 'fas fa-search',
     };
 
@@ -609,8 +609,8 @@ export class SeekPreviewDialog extends BaseActionDialog {
         badges.push({
           key: 'keen-eyes',
           icon: 'fas fa-eye',
-          label: 'Keen Eyes',
-          tooltip: 'You gain a +2 circumstance bonus when using Seek (System application). Undetected creatures treated as Hidden, Hidden creatures treated as Observed when you Seek.',
+          label: game.i18n.localize('PF2E_VISIONER.BUTTONS.KEEN_EYES'),
+          tooltip: game.i18n.localize('PF2E_VISIONER.TOOLTIPS.KEEN_EYES'),
         });
       }
 
@@ -620,7 +620,7 @@ export class SeekPreviewDialog extends BaseActionDialog {
           key: 'thats-odd',
           icon: 'fas fa-exclamation-triangle',
           label: "That's Odd",
-          tooltip: 'You spot hidden doors, traps, and hazards more easily (failure will become a success).',
+          tooltip: game.i18n.localize('PF2E_VISIONER.TOOLTIPS.THAT_FEATURE'),
         });
       }
 
@@ -1412,7 +1412,7 @@ export class SeekPreviewDialog extends BaseActionDialog {
       button.disabled = true;
 
       const reaction = REACTIONS[reactionKey];
-      const appliedText = `${game.i18n.localize(reaction.name)} Applied`;
+      const appliedText = game.i18n.localize(reaction.applied || reaction.name);
       button.innerHTML = `<i class="fas fa-check-circle"></i><span class="button-label">${appliedText}</span>`;
 
       // Apply green styling
@@ -1454,14 +1454,14 @@ export class SeekPreviewDialog extends BaseActionDialog {
           // Update the visibility cell
           const visibilityCell = row.querySelector('.visibility-change');
           if (visibilityCell) {
-            visibilityCell.textContent = 'Hidden';
+            visibilityCell.textContent = game.i18n.localize('PF2E_VISIONER.VISIBILITY_STATES.hidden');
             visibilityCell.className = 'visibility-change hidden';
           }
 
           // Update the outcome cell
           const outcomeCell = row.querySelector('.outcome');
           if (outcomeCell) {
-            outcomeCell.textContent = 'Hidden (Reaction)';
+            outcomeCell.textContent = game.i18n.localize('PF2E_VISIONER.UI.HIDDEN_REACTION_LABEL');
             outcomeCell.className = 'outcome hidden';
           }
         }
@@ -1581,14 +1581,14 @@ export class SeekPreviewDialog extends BaseActionDialog {
             // Update the visibility cell
             const visibilityCell = row.querySelector('.visibility-change');
             if (visibilityCell) {
-              visibilityCell.textContent = 'Hidden';
+              visibilityCell.textContent = game.i18n.localize('PF2E_VISIONER.VISIBILITY_STATES.hidden');
               visibilityCell.className = 'visibility-change hidden';
             }
 
             // Update the outcome cell
             const outcomeCell = row.querySelector('.outcome');
             if (outcomeCell) {
-              outcomeCell.textContent = 'Hidden (Sense the Unseen)';
+              outcomeCell.textContent = game.i18n.localize('PF2E_VISIONER.UI.HIDDEN_SENSE_UNSEEN_LABEL');
               outcomeCell.className = 'outcome hidden';
             }
           }

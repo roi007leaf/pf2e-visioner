@@ -18,7 +18,7 @@ export class PointOutPreviewDialog extends BaseActionDialog {
     tag: 'div',
     classes: ['pf2e-visioner', 'point-out-preview-dialog'],
     window: {
-      title: 'Point Out Results',
+      title: game.i18n.localize('PF2E_VISIONER.DIALOG_TITLES.POINT_OUT_RESULTS'),
       icon: 'fas fa-hand-point-right',
       resizable: true,
     },

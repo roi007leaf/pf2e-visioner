@@ -13,6 +13,10 @@ let currentDiversionDialog = null;
 
 export class CreateADiversionPreviewDialog extends BaseActionDialog {
   constructor(divertingToken, outcomes, changes, diversionData, options = {}) {
+    // Set localized title before calling super
+    if (!options.window) options.window = {};
+    options.window.title = game?.i18n?.localize('PF2E_VISIONER.DIALOG_TITLES.CREATE_DIVERSION_RESULTS') || 'Create a Diversion Results';
+    
     super(options);
 
     this.divertingToken = divertingToken;
@@ -43,7 +47,7 @@ export class CreateADiversionPreviewDialog extends BaseActionDialog {
     tag: 'div',
     classes: ['pf2e-visioner', 'create-a-diversion-preview-dialog'],
     window: {
-      title: `Create a Diversion Results`,
+      title: game.i18n.localize('PF2E_VISIONER.DIALOG_TITLES.CREATE_DIVERSION_RESULTS'),
       icon: 'fas fa-theater-masks',
       resizable: true,
     },
@@ -367,7 +371,7 @@ export class CreateADiversionPreviewDialog extends BaseActionDialog {
       );
       if (revertAllButton) {
         revertAllButton.disabled = false;
-        revertAllButton.innerHTML = '<i class="fas fa-undo"></i> Revert All';
+        revertAllButton.innerHTML = `<i class="fas fa-undo"></i> ${game.i18n.localize('PF2E_VISIONER.UI.REVERT_ALL_BUTTON')}`;
       }
     } catch { }
     app.updateChangesCount();

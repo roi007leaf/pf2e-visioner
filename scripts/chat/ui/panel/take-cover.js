@@ -19,7 +19,7 @@ export function buildTakeCoverPanel() {
       <button type="button"
               class="visioner-btn ${buttonClass} apply-now"
               data-action="apply-now-take-cover"
-              data-tooltip="Apply all calculated cover changes without opening the dialog">
+              data-tooltip="${game.i18n.localize('PF2E_VISIONER.UI.APPLY_COVER_CHANGES_WITHOUT_DIALOG')}">
         <i class="fas fa-check-double"></i> Apply Changes
       </button>`;
   }

@@ -5,7 +5,7 @@ export class DarknessModeDialog extends foundry.applications.api.HandlebarsAppli
     constructor() {
         super({
             window: {
-                title: 'PF2E Visioner: Set Darkness Mode',
+                title: game.i18n.localize('PF2E_VISIONER.DIALOG_TITLES.DARKNESS_MODE'),
                 icon: 'fas fa-moon',
                 contentClasses: ['pf2e-visioner', 'pvv-darkness-dialog']
             },

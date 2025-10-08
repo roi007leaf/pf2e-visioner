@@ -11,16 +11,16 @@
     <div class="header-left">
       {{#if (eq sectionType 'pc')}}
         <i class="fas fa-users"></i>
-        <span>Player Characters</span>
+        <span>{{localize "PF2E_VISIONER.UI.PLAYER_CHARACTERS"}}</span>
       {{else if (eq sectionType 'npc')}}
         <i class="fas fa-dragon"></i>
-        <span>NPCs</span>
+        <span>{{localize "PF2E_VISIONER.UI.NPCS_LABEL"}}</span>
       {{else if (eq sectionType 'loot')}}
         <i class="fas fa-box"></i>
-        <span>Loot</span>
+        <span>{{localize "PF2E_VISIONER.UI.LOOT_LABEL"}}</span>
       {{else if (eq sectionType 'walls')}}
         <i class="fas fa-grip-lines-vertical"></i>
-        <span>Hidden Walls</span>
+        <span>{{localize "PF2E_VISIONER.UI.HIDDEN_WALLS_LABEL"}}</span>
       {{/if}}
     </div>
     {{#if bulkActions}}

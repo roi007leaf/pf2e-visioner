@@ -5,7 +5,7 @@ export class PointOutWarningDialog extends foundry.applications.api.ApplicationV
     id: 'pv-point-out-warning',
     tag: 'div',
     window: {
-      title: 'PF2E Visioner - Point Out Action',
+      title: game.i18n.localize('PF2E_VISIONER.DIALOG_TITLES.POINT_OUT_ACTION'),
       icon: 'fas fa-hand-point-right',
       resizable: false,
     },

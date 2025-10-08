@@ -66,7 +66,7 @@ export class Pf2eVisionerApi {
    */
   static async openTokenManager(observer = null, options = { mode: 'observer' }) {
     if (!game.user.isGM) {
-      ui.notifications.warn('Only GMs can manage token visibility and cover');
+      ui.notifications.warn(game.i18n.localize('PF2E_VISIONER.NOTIFICATIONS.PERMISSION_DENIED'));
       return;
     }
 
@@ -127,7 +127,7 @@ export class Pf2eVisionerApi {
    */
   static async openTokenManagerWithMode(observer, mode = 'observer') {
     if (!game.user.isGM) {
-      ui.notifications.warn('Only GMs can manage token visibility and cover');
+      ui.notifications.warn(game.i18n.localize('PF2E_VISIONER.NOTIFICATIONS.PERMISSION_DENIED'));
       return;
     }
 
@@ -340,8 +340,11 @@ export class Pf2eVisionerApi {
 
       const hasTremorsense = visionCaps.sensingSummary?.tremorsense?.range > 0;
       if (hasTremorsense) {
+        const observerMovementAction = observerToken.document.movementAction;
+        const targetMovementAction = targetToken.document.movementAction;
+        const isElevated = observerMovementAction === 'fly' || targetMovementAction === 'fly';
         const bothOnGround = (observerToken.document.elevation || 0) === 0 && (targetToken.document.elevation || 0) === 0;
-        detection.tremorsense = bothOnGround && distance <= (visionCaps.sensingSummary.tremorsense.range || 0);
+        detection.tremorsense = !isElevated && bothOnGround && distance <= (visionCaps.sensingSummary.tremorsense.range || 0);
       }
 
       // Build comprehensive senses object from sensingSummary
@@ -918,8 +921,11 @@ export class Pf2eVisionerApi {
       const canDetectWithLifesense = hasLifesense && visionAnalyzer.canDetectWithLifesenseInRange(observerToken, targetToken);
 
       const hasTremorsense = visionCaps.sensingSummary?.tremorsense?.range > 0;
+      const observerMovementAction = observerToken.document.movementAction;
+      const targetMovementAction = targetToken.document.movementAction;
+      const isElevated = observerMovementAction === 'fly' || targetMovementAction === 'fly';
       const bothOnGround = (observerToken.document.elevation || 0) === 0 && (targetToken.document.elevation || 0) === 0;
-      const canDetectWithTremorsense = hasTremorsense && bothOnGround && distance <= (visionCaps.sensingSummary.tremorsense.range || 0);
+      const canDetectWithTremorsense = hasTremorsense && !isElevated && bothOnGround && distance <= (visionCaps.sensingSummary.tremorsense.range || 0);
 
       // Build explanation
       const explanation = {
@@ -1074,13 +1080,13 @@ export class Pf2eVisionerApi {
   static async clearAllSneakFlags() {
     try {
       if (!game.user.isGM) {
-        ui.notifications.warn('Only GMs can clear sneak flags');
+        ui.notifications.warn(game.i18n.localize('PF2E_VISIONER.NOTIFICATIONS.SNEAK_CLEAR_GM_ONLY'));
         return false;
       }
 
       const scene = canvas?.scene;
       if (!scene) {
-        ui.notifications.warn('No active scene.');
+        ui.notifications.warn(game.i18n.localize('PF2E_VISIONER.NOTIFICATIONS.NO_ACTIVE_SCENE'));
         return false;
       }
 
@@ -1100,7 +1106,7 @@ export class Pf2eVisionerApi {
       return true;
     } catch (error) {
       console.error('PF2E Visioner: Error clearing sneak flags:', error);
-      ui.notifications.error('PF2E Visioner: Failed to clear sneak flags. See console.');
+      ui.notifications.error(game.i18n.localize('PF2E_VISIONER.NOTIFICATIONS.SNEAK_CLEAR_FAILED'));
       return false;
     }
   }
@@ -1115,13 +1121,13 @@ export class Pf2eVisionerApi {
   static async clearAllSceneData() {
     try {
       if (!game.user.isGM) {
-        ui.notifications.warn('Only GMs can clear Visioner scene data');
+        ui.notifications.warn(game.i18n.localize('PF2E_VISIONER.NOTIFICATIONS.SCENE_CLEAR_GM_ONLY'));
         return false;
       }
 
       const scene = canvas?.scene;
       if (!scene) {
-        ui.notifications.warn('No active scene.');
+        ui.notifications.warn(game.i18n.localize('PF2E_VISIONER.NOTIFICATIONS.NO_ACTIVE_SCENE'));
         return false;
       }
 
@@ -1329,11 +1335,11 @@ export class Pf2eVisionerApi {
         canvas.perception.update({ refreshVision: true });
       } catch { }
 
-      ui.notifications.info('PF2E Visioner: Cleared all scene data.');
+      ui.notifications.info(game.i18n.localize('PF2E_VISIONER.NOTIFICATIONS.SCENE_DATA_CLEARED'));
       return true;
     } catch (error) {
       console.error('PF2E Visioner: Error clearing scene data:', error);
-      ui.notifications.error('PF2E Visioner: Failed to clear scene data. See console.');
+      ui.notifications.error(game.i18n.localize('PF2E_VISIONER.NOTIFICATIONS.SCENE_CLEAR_FAILED'));
       return false;
     }
   }
@@ -1422,18 +1428,18 @@ export class Pf2eVisionerApi {
   static async clearAllDataForSelectedTokens(tokens = []) {
     try {
       if (!game.user.isGM) {
-        ui.notifications.warn('Only GMs can clear Visioner data');
+        ui.notifications.warn(game.i18n.localize('PF2E_VISIONER.NOTIFICATIONS.DATA_CLEAR_GM_ONLY'));
         return false;
       }
 
       if (!tokens || tokens.length === 0) {
-        ui.notifications.warn('No tokens provided for cleanup');
+        ui.notifications.warn(game.i18n.localize('PF2E_VISIONER.NOTIFICATIONS.NO_TOKENS_PROVIDED'));
         return false;
       }
 
       const scene = canvas?.scene;
       if (!scene) {
-        ui.notifications.warn('No active scene.');
+        ui.notifications.warn(game.i18n.localize('PF2E_VISIONER.NOTIFICATIONS.NO_ACTIVE_SCENE'));
         return false;
       }
 
@@ -1696,7 +1702,7 @@ export class Pf2eVisionerApi {
       return true;
     } catch (error) {
       console.error('PF2E Visioner: Error clearing data for selected tokens:', error);
-      ui.notifications.error('PF2E Visioner: Failed to clear token data. See console.');
+      ui.notifications.error(game.i18n.localize('PF2E_VISIONER.NOTIFICATIONS.TOKEN_CLEAR_FAILED'));
       return false;
     }
   }
@@ -1738,9 +1744,9 @@ export const autoVisibility = {
   clearLightCache: () => {
     if (autoVisibilitySystem.clearLightCache) {
       autoVisibilitySystem.clearLightCache();
-      ui.notifications.info('Light-emitting tokens cache cleared');
+      ui.notifications.info(game.i18n.localize('PF2E_VISIONER.NOTIFICATIONS.CACHE_CLEARED'));
     } else {
-      ui.notifications.warn('Cache clearing not available');
+      ui.notifications.warn(game.i18n.localize('PF2E_VISIONER.NOTIFICATIONS.CACHE_UNAVAILABLE'));
     }
   },
 
@@ -1753,7 +1759,7 @@ export const autoVisibility = {
         : 'Vision capabilities cache cleared';
       ui.notifications.info(message);
     } else {
-      ui.notifications.warn('Vision cache clearing not available');
+      ui.notifications.warn(game.i18n.localize('PF2E_VISIONER.NOTIFICATIONS.VISION_CACHE_UNAVAILABLE'));
     }
   },
 
@@ -1766,14 +1772,14 @@ export const autoVisibility = {
       autoVisibilitySystem.clearVisionCache();
     }
     autoVisibilitySystem.recalculateAllVisibility();
-    ui.notifications.info('All caches cleared and visibility recalculated');
+    ui.notifications.info(game.i18n.localize('PF2E_VISIONER.NOTIFICATIONS.ALL_CACHES_CLEARED'));
   },
 
   // Test invisibility detection for selected tokens
   testInvisibility: () => {
     const controlled = canvas.tokens.controlled;
     if (controlled.length !== 2) {
-      ui.notifications.warn('Select exactly 2 tokens: observer and target');
+      ui.notifications.warn(game.i18n.localize('PF2E_VISIONER.NOTIFICATIONS.SELECT_TWO_TOKENS'));
       return;
     }
 
@@ -1789,7 +1795,7 @@ export const autoVisibility = {
   resetSceneConfigFlag: () => {
     if (autoVisibilitySystem.resetSceneConfigFlag) {
       autoVisibilitySystem.resetSceneConfigFlag();
-      ui.notifications.info('Scene Config flag reset - updates should resume');
+      ui.notifications.info(game.i18n.localize('PF2E_VISIONER.NOTIFICATIONS.SCENE_CONFIG_RESET'));
     }
   },
 
@@ -1804,7 +1810,7 @@ export const autoVisibility = {
         'PF2E Visioner | All AVS overrides cleared (memory and persistent flags)',
       );
     } else {
-      ui.notifications.error('PF2E Visioner | Auto-visibility system not available');
+      ui.notifications.error(game.i18n.localize('PF2E_VISIONER.NOTIFICATIONS.AVS_UNAVAILABLE'));
     }
   },
 
@@ -1879,7 +1885,7 @@ export const autoVisibility = {
   debugTokenLighting: async (observer = null, target = null) => {
     const controlled = canvas.tokens.controlled;
     if (!observer && !target && controlled.length !== 2) {
-      ui.notifications.warn('Select exactly 2 tokens or provide observer and target parameters');
+      ui.notifications.warn(game.i18n.localize('PF2E_VISIONER.NOTIFICATIONS.SELECT_TWO_TOKENS_OR_PARAMS'));
       return;
     }
 
@@ -1887,7 +1893,7 @@ export const autoVisibility = {
     const tgt = target || controlled[1];
 
     if (!obs || !tgt) {
-      ui.notifications.warn('Need both observer and target tokens');
+      ui.notifications.warn(game.i18n.localize('PF2E_VISIONER.NOTIFICATIONS.NEED_BOTH_TOKENS'));
       return;
     }
 

@@ -11,7 +11,7 @@ export class VisionerWallManager extends foundry.applications.api.ApplicationV2 
     tag: 'div',
     classes: ['pf2e-visioner'],
     window: {
-      title: 'PF2E Visioner: Wall Settings',
+      title: game.i18n.localize('PF2E_VISIONER.DIALOG_TITLES.WALL_SETTINGS'),
       icon: 'fas fa-grip-lines-vertical',
       resizable: true,
     },

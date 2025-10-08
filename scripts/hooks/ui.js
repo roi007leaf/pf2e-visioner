@@ -148,7 +148,7 @@ export function registerUIHooks() {
         return {
           icon: 'fas fa-bolt-auto',
           color: 0x888888,
-          tooltip: 'Automatic Cover Detection'
+          tooltip: game.i18n.localize('PF2E_VISIONER.TOOLTIPS.AUTO_COVER_DETECTION')
         };
       }
 
@@ -610,7 +610,7 @@ export function registerUIHooks() {
         // Wall Manager
         addTool(walls.tools, {
           name: 'pf2e-visioner-wall-manager',
-          title: 'PF2E Visioner: Wall Settings',
+          title: game.i18n.localize('PF2E_VISIONER.DIALOG_TITLES.WALL_SETTINGS'),
           icon: 'fas fa-grip-lines-vertical',
           button: true,
           onChange: async () => {
@@ -704,7 +704,7 @@ export function registerUIHooks() {
           selectedWalls.every((w) => !!w?.document?.getFlag?.(MODULE_ID, 'hiddenWall'));
         addTool(walls.tools, {
           name: 'pf2e-visioner-toggle-hidden-wall',
-          title: 'Toggle Hidden Wall (Selected Walls)',
+          title: game.i18n.localize('PF2E_VISIONER.DIALOG_TITLES.TOGGLE_HIDDEN_WALL'),
           icon: currentHiddenState ? 'fa-solid fa-eye-slash' : 'fa-solid fa-eye',
           toggle: true,
           active: currentHiddenState,
@@ -741,7 +741,7 @@ export function registerUIHooks() {
         if (game.settings.get(MODULE_ID, 'showQuickEditTool')) {
           addTool(tokens.tools, {
             name: 'pf2e-visioner-quick-edit',
-            title: 'PF2E Visioner: Quick Edit (Selected ↔ Targeted)',
+            title: game.i18n.localize('PF2E_VISIONER.DIALOG_TITLES.QUICK_EDIT'),
             icon: 'fa-solid fa-bolt',
             button: true,
             onChange: async () => {
@@ -829,7 +829,7 @@ export function registerUIHooks() {
         // Purge: clear all Visioner scene data or selected token data
         addTool(tokens.tools, {
           name: 'pf2e-visioner-purge-scene',
-          title: 'PF2E Visioner: Purge Data (Scene/Selected Tokens)',
+          title: game.i18n.localize('PF2E_VISIONER.DIALOG_TITLES.PURGE_DATA'),
           icon: 'fa-solid fa-trash',
           button: true,
           onChange: async () => {
@@ -841,7 +841,7 @@ export function registerUIHooks() {
                 const tokenNames = selectedTokens.map((t) => t.name).join(', ');
                 const { VisionerConfirmDialog } = await import('../ui/dialogs/ConfirmDialog.js');
                 const confirmed = await VisionerConfirmDialog.confirm({
-                  title: 'PF2E Visioner',
+                  title: game.i18n.localize('PF2E_VISIONER.MODULE_TITLE'),
                   content: `<p>Clear all PF2E Visioner data for <strong>${selectedTokens.length === 1 ? tokenNames : `${selectedTokens.length} selected tokens`}</strong>? This will reset all visibility and cover relationships for ${selectedTokens.length === 1 ? 'this token' : 'all selected tokens'}.</p>`,
                   yes: 'Clear',
                   no: 'Cancel',
@@ -855,7 +855,7 @@ export function registerUIHooks() {
                 // No tokens or multiple tokens selected - offer to clear entire scene
                 const { VisionerConfirmDialog } = await import('../ui/dialogs/ConfirmDialog.js');
                 const confirmed = await VisionerConfirmDialog.confirm({
-                  title: 'PF2E Visioner',
+                  title: game.i18n.localize('PF2E_VISIONER.MODULE_TITLE'),
                   content: `<p>Clear all PF2E Visioner data for this scene? This cannot be undone.</p>`,
                   yes: 'Clear Scene',
                   no: 'Cancel',
@@ -1109,23 +1109,23 @@ function injectPF2eVisionerBox(app, root) {
       <label>Cover</label>
       <div class="cover-override-buttons" style="display: flex; gap: 4px; margin-top: 4px;">
         <button type="button" class="visioner-icon-btn ${!coverOverride ? 'active' : ''}" 
-                data-cover-override="auto" data-tooltip="Automatic Detection - Token provides cover based on coverage thresholds">
+                data-cover-override="auto" data-tooltip="${game.i18n.localize('PF2E_VISIONER.UI.TOKEN_COVER_AUTO_TOOLTIP')}">
           <i class="fas fa-bolt-auto" style="color:#888"></i>
         </button>
         <button type="button" class="visioner-icon-btn ${coverOverride === 'none' ? 'active' : ''}" 
-                data-cover-override="none" data-tooltip="No Cover - Token never provides cover regardless of thresholds">
+                data-cover-override="none" data-tooltip="${game.i18n.localize('PF2E_VISIONER.UI.TOKEN_COVER_NONE_TOOLTIP')}">
           <i class="fas fa-shield-slash" style="color:var(--cover-none)"></i>
         </button>
         <button type="button" class="visioner-icon-btn ${coverOverride === 'lesser' ? 'active' : ''}" 
-                data-cover-override="lesser" data-tooltip="Lesser Cover - Token always provides lesser cover">
+                data-cover-override="lesser" data-tooltip="${game.i18n.localize('PF2E_VISIONER.UI.TOKEN_COVER_LESSER_TOOLTIP')}">
           <i class="fa-regular fa-shield" style="color:var(--cover-lesser)"></i>
         </button>
         <button type="button" class="visioner-icon-btn ${coverOverride === 'standard' ? 'active' : ''}" 
-                data-cover-override="standard" data-tooltip="Standard Cover - Token always provides standard cover">
+                data-cover-override="standard" data-tooltip="${game.i18n.localize('PF2E_VISIONER.UI.TOKEN_COVER_STANDARD_TOOLTIP')}">
           <i class="fas fa-shield-alt" style="color:var(--cover-standard)"></i>
         </button>
         <button type="button" class="visioner-icon-btn ${coverOverride === 'greater' ? 'active' : ''}" 
-                data-cover-override="greater" data-tooltip="Greater Cover - Token always provides greater cover">
+                data-cover-override="greater" data-tooltip="${game.i18n.localize('PF2E_VISIONER.UI.TOKEN_COVER_GREATER_TOOLTIP')}">
           <i class="fas fa-shield" style="color:var(--cover-greater)"></i>
         </button>
       </div>
@@ -1259,7 +1259,7 @@ function onRenderLightConfig(app, html) {
               <span class="pvv-subtle">In this area: darkvision sees Concealed; greater darkvision sees normally.</span>
             </div>
           </label>
-          ${linkedTemplateId ? `<div class="pvv-chip-row"><span class="pvv-chip" data-tooltip="From linked Darkness template"><i class="fas fa-moon"></i> Derived rank: <strong>${derivedRank || '—'}</strong></span></div>` : ''}
+          ${linkedTemplateId ? `<div class="pvv-chip-row"><span class="pvv-chip" data-tooltip="${game.i18n.localize('PF2E_VISIONER.UI.FROM_LINKED_DARKNESS')}"><i class="fas fa-moon"></i> Derived rank: <strong>${derivedRank || '—'}</strong></span></div>` : ''}
           <div class="pvv-help">Applies the rank 4 Darkness visibility rule.</div>
         </div>
     `;

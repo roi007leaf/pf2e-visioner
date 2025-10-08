@@ -169,7 +169,7 @@ export async function toggleEncounterFilter(event, button) {
   app.encounterOnly = !app.encounterOnly;
   const newTargets = getSceneTargets(app.observer, app.encounterOnly);
   if (newTargets.length === 0 && app.encounterOnly) {
-    ui.notifications.info(`${MODULE_ID}: No encounter tokens found. Filter disabled.`);
+    ui.notifications.info(game.i18n.format('PF2E_VISIONER.NOTIFICATIONS.NO_ENCOUNTER_TOKENS', { moduleId: MODULE_ID }));
     app.encounterOnly = false;
     return;
   }
@@ -209,7 +209,7 @@ export async function bulkSetVisibilityState(event, button) {
     button.classList.add('loading');
     button.disabled = true;
     const originalText = button.innerHTML;
-    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+    button.innerHTML = `<i class="fas fa-spinner fa-spin"></i> ${game.i18n.localize('PF2E_VISIONER.UI.PROCESSING')}`;
 
     const targetEl = button || event?.currentTarget || event?.target || null;
     const form =
@@ -315,7 +315,7 @@ export async function bulkSetCoverState(event, button) {
     button.classList.add('loading');
     button.disabled = true;
     const originalText = button.innerHTML;
-    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+    button.innerHTML = `<i class="fas fa-spinner fa-spin"></i> ${game.i18n.localize('PF2E_VISIONER.UI.PROCESSING')}`;
 
     const targetEl = button || event?.currentTarget || event?.target || null;
     const form =
@@ -422,7 +422,7 @@ export async function bulkSetWallState(event, button) {
     button.classList.add('loading');
     button.disabled = true;
     const originalText = button.innerHTML;
-    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+    button.innerHTML = `<i class="fas fa-spinner fa-spin"></i> ${game.i18n.localize('PF2E_VISIONER.UI.PROCESSING')}`;
 
     const targetEl = button || event?.currentTarget || event?.target || null;
     const form =

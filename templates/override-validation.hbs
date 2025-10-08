@@ -5,7 +5,7 @@
     <div class="header-content">
       <p class="subtitle">
         Token <strong><em>{{tokenName}}</em></strong> has moved. AVS wants to make <strong>{{overrideCount}}</strong> change{{#unless (eq overrideCount 1)}}s{{/unless}}.
-        <i class="fas fa-info-circle" data-tooltip="Movement or lighting changes can invalidate previously set visibility overrides. Review each AVS change below to decide whether to accept or reject it."></i>
+        <i class="fas fa-info-circle" data-tooltip="{{localize 'PF2E_VISIONER.UI.AVS_CHANGE_INFO_TOOLTIP'}}"></i>
       </p>
     </div>
   </div>
@@ -17,9 +17,9 @@
   {{#if observerOrientedOverrides.length}}
   <div class="results-table-container observer-table">
     <div class="table-header">
-      <h4>Changes as Observer</h4>
+      <h4>{{localize "PF2E_VISIONER.UI.CHANGES_AS_OBSERVER"}}</h4>
       <div class="table-actions">
-        <button type="button" class="bulk-action-btn btn-clear-observer" data-tooltip="Accept all changes in this table">
+        <button type="button" class="bulk-action-btn btn-clear-observer" data-tooltip="{{localize 'PF2E_VISIONER.UI.ACCEPT_ALL_CHANGES_IN_TABLE'}}">
           <i class="fas fa-check"></i> Accept
         </button>
       </div>
@@ -27,10 +27,10 @@
     <table class="visibility-table override-validation-table">
       <thead>
         <tr>
-          <th class="target">Target</th>
-          <th class="source">Source</th>
-          <th class="status">Status</th>
-          <th class="actions">Actions</th>
+          <th class="target">{{localize "PF2E_VISIONER.UI.TARGET_HEADER"}}</th>
+          <th class="source">{{localize "PF2E_VISIONER.UI.SOURCE"}}</th>
+          <th class="status">{{localize "PF2E_VISIONER.UI.STATUS"}}</th>
+          <th class="actions">{{localize "PF2E_VISIONER.UI.ACTIONS"}}</th>
         </tr>
       </thead>
       <tbody>
@@ -80,10 +80,10 @@
             </td>
             <td class="actions">
               <div class="actions-section pv-u-flex pv-u-align-center pv-u-gap-8 pv-u-justify-end">
-                <button type="button" class="row-action-btn apply-change btn btn-clear" data-override-id="{{id}}" data-tooltip="Accept this change">
+                <button type="button" class="row-action-btn apply-change btn btn-clear" data-override-id="{{id}}" data-tooltip="{{localize 'PF2E_VISIONER.UI.ACCEPT_THIS_CHANGE'}}">
                   <i class="fas fa-check"></i>
                 </button>
-                <button type="button" class="row-action-btn revert-change btn btn-keep" data-override-id="{{id}}" data-tooltip="Reject this change">
+                <button type="button" class="row-action-btn revert-change btn btn-keep" data-override-id="{{id}}" data-tooltip="{{localize 'PF2E_VISIONER.UI.REJECT_THIS_CHANGE'}}">
                   <i class="fas fa-times"></i>
                 </button>
               </div>
@@ -99,9 +99,9 @@
   {{#if targetOrientedOverrides.length}}
   <div class="results-table-container target-table">
     <div class="table-header">
-      <h4>Changes as Target</h4>
+      <h4>{{localize "PF2E_VISIONER.UI.CHANGES_AS_TARGET"}}</h4>
       <div class="table-actions">
-        <button type="button" class="bulk-action-btn btn-clear-target" data-tooltip="Accept all changes in this table">
+        <button type="button" class="bulk-action-btn btn-clear-target" data-tooltip="{{localize 'PF2E_VISIONER.UI.ACCEPT_ALL_CHANGES_IN_TABLE'}}">
           <i class="fas fa-check"></i> Accept
         </button>
       </div>
@@ -109,10 +109,10 @@
     <table class="visibility-table override-validation-table">
       <thead>
         <tr>
-          <th class="observer">Observer</th>
-          <th class="source">Source</th>
-          <th class="status">Status</th>
-          <th class="actions">Actions</th>
+          <th class="observer">{{localize "PF2E_VISIONER.UI.OBSERVER_HEADER"}}</th>
+          <th class="source">{{localize "PF2E_VISIONER.UI.SOURCE"}}</th>
+          <th class="status">{{localize "PF2E_VISIONER.UI.STATUS"}}</th>
+          <th class="actions">{{localize "PF2E_VISIONER.UI.ACTIONS"}}</th>
         </tr>
       </thead>
       <tbody>
@@ -162,10 +162,10 @@
             </td>
             <td class="actions">
               <div class="actions-section pv-u-flex pv-u-align-center pv-u-gap-8 pv-u-justify-end">
-                <button type="button" class="row-action-btn apply-change btn btn-clear" data-override-id="{{id}}" data-tooltip="Accept this change">
+                <button type="button" class="row-action-btn apply-change btn btn-clear" data-override-id="{{id}}" data-tooltip="{{localize 'PF2E_VISIONER.UI.ACCEPT_THIS_CHANGE'}}">
                   <i class="fas fa-check"></i>
                 </button>
-                <button type="button" class="row-action-btn revert-change btn btn-keep" data-override-id="{{id}}" data-tooltip="Reject this change">
+                <button type="button" class="row-action-btn revert-change btn btn-keep" data-override-id="{{id}}" data-tooltip="{{localize 'PF2E_VISIONER.UI.REJECT_THIS_CHANGE'}}">
                   <i class="fas fa-times"></i>
                 </button>
               </div>
@@ -181,12 +181,12 @@
 
   <!-- Bulk Actions -->
   <div class="override-validation-bulk-actions-header">
-    <div class="override-validation-bulk-actions-info">Apply action to all changes at once</div>
+    <div class="override-validation-bulk-actions-info">{{localize "PF2E_VISIONER.UI.BULK_ACTION_INFO"}}</div>
     <div class="override-validation-bulk-actions-buttons">
-      <button type="button" class="bulk-action-btn apply-all btn-clear-all" data-tooltip="Accept all changes">
+      <button type="button" class="bulk-action-btn apply-all btn-clear-all" data-tooltip="{{localize 'PF2E_VISIONER.UI.ACCEPT_ALL_CHANGES'}}">
         <i class="fas fa-check-circle"></i> Accept All
       </button>
-      <button type="button" class="bulk-action-btn revert-all btn-keep-all" data-tooltip="Reject all changes">
+      <button type="button" class="bulk-action-btn revert-all btn-keep-all" data-tooltip="{{localize 'PF2E_VISIONER.UI.REJECT_ALL_CHANGES'}}">
         <i class="fas fa-times-circle"></i> Reject All
       </button>
     </div>
