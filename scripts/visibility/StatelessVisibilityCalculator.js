@@ -51,7 +51,7 @@ export function calculateVisibility(input) {
     const observer = normalizeObserverState(input.observer);
     const rayDarkness = input.rayDarkness || null;
     const soundBlocked = input.soundBlocked ?? false;
-    const hasLineOfSight = input.hasLineOfSight ?? true; // Default to true (fail open)
+    const hasLineOfSight = input.hasLineOfSight ?? undefined; // Default to undefined (ie unknown)
     const isInvisible = target.auxiliary.includes('invisible');
 
     // Decision tree: follow PF2e visibility rules in priority order
@@ -392,7 +392,7 @@ function checkPreciseNonVisualSenses(observer, target, soundBlocked = false) {
 /**
  * Determine if observer can detect target visually based on lighting and vision capabilities
  */
-function determineVisualDetection(observer, target, rayDarkness = null, hasLineOfSight = true) {
+function determineVisualDetection(observer, target, rayDarkness = null, hasLineOfSight = undefined) {
     // CRITICAL: Blinded observers cannot use any visual senses
     if (observer.conditions.blinded) {
         return {
@@ -404,7 +404,7 @@ function determineVisualDetection(observer, target, rayDarkness = null, hasLineO
     }
 
     // CRITICAL: If there's no line of sight (sight-blocking wall), visual detection fails
-    if (!hasLineOfSight) {
+    if (hasLineOfSight === false) {
         return {
             canDetect: false,
             sense: null,

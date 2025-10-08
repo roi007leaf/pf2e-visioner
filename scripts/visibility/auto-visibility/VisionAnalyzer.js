@@ -184,10 +184,21 @@ export class VisionAnalyzer {
    */
   hasLineOfSight(observer, target) {
     try {
+      // If the observer has an los shape, use that for line of sight against the target's circle
+      // Darkness sources may affect true LOS, so only return true/false if we can be sure
+      const los = observer.vision?.los;
+      if (los?.points) {
+        const radius = target.externalRadius;
+        const circle = new PIXI.Circle(target.center.x, target.center.y, radius);
+        const intersection = los.intersectCircle(circle, {density: 8, scalingFactor: 1.0});
+        const visible = intersection?.points?.length > 0;
+        if (visible || !canvas.effects?.darknessSources?.length) return visible;
+      }
+
       // Check if LOS calculation is disabled
       const losDisabled = game.settings.get(MODULE_ID, 'disableLineOfSightCalculation');
       if (losDisabled) {
-        return true; // Always allow LOS when disabled
+        return undefined; // return undefined if LOS calculation is disabled
       }
 
       const ray = new foundry.canvas.geometry.Ray(observer.center, target.center);
