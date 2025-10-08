@@ -97,6 +97,7 @@ describe('Wall Coverage Scenarios Integration', () => {
       expect(coverDetector._estimateWallCoveragePercent).toHaveBeenCalledWith(
         attacker.center,
         target,
+        { bottom: 0, top: 5 },
       );
     });
 

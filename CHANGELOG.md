@@ -1,5 +1,15 @@
 # Changelog
 
+## [4.1.0] - 2025-10-08
+
+### ✨ Features
+
+- **Wall Height Integration**: Added automatic support for the Wall Height module
+  - Cover detection now respects wall elevation ranges, allowing tokens above walls to see over them
+  - Visibility and line of sight calculations factor in wall heights when determining obstruction
+  - Elevation-aware filtering prevents low walls from blocking sight between elevated tokens
+  - No configuration required - automatically activates when Wall Height module is present
+
 ## [4.0.4] - 2025-10-07
 
 ### 🐛 Bug Fixes

@@ -22,6 +22,8 @@ import { MODULE_ID } from '../../constants.js';
 import { calculateDistanceInFeet } from '../../helpers/geometry-utils.js';
 import { getLogger } from '../../utils/logger.js';
 import { SensingCapabilitiesBuilder } from './SensingCapabilitiesBuilder.js';
+import { getTokenVerticalSpanFt } from '../../helpers/size-elevation-utils.js';
+import { doesWallBlockAtElevation } from '../../helpers/wall-height-utils.js';
 
 const log = getLogger('VisionAnalyzer');
 
@@ -201,6 +203,18 @@ export class VisionAnalyzer {
         return undefined; // return undefined if LOS calculation is disabled
       }
 
+      // Calculate elevation range for wall height checks
+      let elevationRange = null;
+      try {
+        const observerSpan = getTokenVerticalSpanFt(observer);
+        const targetSpan = getTokenVerticalSpanFt(target);
+        elevationRange = {
+          bottom: Math.min(observerSpan.bottom, targetSpan.bottom),
+          top: Math.max(observerSpan.top, targetSpan.top),
+        };
+      } catch (error) {
+      }
+
       const ray = new foundry.canvas.geometry.Ray(observer.center, target.center);
       let limitedWallCrossings = 0;
 
@@ -228,6 +242,11 @@ export class VisionAnalyzer {
         const blocksSound = wall.document.sound !== CONST.WALL_SENSE_TYPES.NONE;
 
         if (!blocksSight && !blocksSound) {
+          continue;
+        }
+
+        // Check wall elevation if Wall Height module is active and elevation range is available
+        if (elevationRange && !doesWallBlockAtElevation(wall.document, elevationRange)) {
           continue;
         }
 
