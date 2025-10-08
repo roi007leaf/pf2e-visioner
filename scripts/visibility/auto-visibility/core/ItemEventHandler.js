@@ -149,7 +149,7 @@ export class ItemEventHandler {
 
         if (
             isRelevantType &&
-            (isVisibilityRelated || lightEmitterHint || ) &&
+            (isVisibilityRelated || lightEmitterHint || isVisibilityFeat) &&
             item.parent?.documentName === 'Actor'
         ) {
             const actor = item.parent;
