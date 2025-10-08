@@ -9,7 +9,7 @@ export class VisionerWallQuickSettings extends foundry.applications.api.Applicat
     id: 'pf2e-visioner-wall-quick',
     tag: 'div',
     window: {
-      title: 'PF2E Visioner: Wall Settings',
+      title: game.i18n.localize('PF2E_VISIONER.DIALOG_TITLES.WALL_QUICK'),
       icon: 'fas fa-grip-lines-vertical',
       resizable: true,
     },

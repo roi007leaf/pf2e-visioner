@@ -11,7 +11,7 @@
     </div>
     <div class="hider-details">
       <h3 class="hider-name">{{actorToken.name}}</h3>
-      <p class="hint">Attempting to hide from observers</p>
+      <p class="hint">{{localize "PF2E_VISIONER.UI.ATTEMPTING_TO_HIDE"}}</p>
       {{#if prereqBadges}}
         <div class="action-context-badges">
           {{#each prereqBadges as |b|}}
@@ -29,21 +29,21 @@
   <div class="encounter-filter-section">
     {{#if showEncounterFilter}}
     <label class="encounter-filter-checkbox">
-      <input type="checkbox" {{#if encounterOnly}}checked{{/if}} data-action="toggleEncounterFilter" data-tooltip="Only show tokens in the current encounter" />
+      <input type="checkbox" {{#if encounterOnly}}checked{{/if}} data-action="toggleEncounterFilter" data-tooltip="{{localize 'PF2E_VISIONER.UI.ENCOUNTER_FILTER_TOOLTIP'}}" />
       <span class="encounter-filter-label">{{localize "PF2E_VISIONER.UI.ENCOUNTER_FILTER_TEXT"}}</span>
     </label>
     {{/if}}
     <label class="ignore-allies-filter-checkbox">
-      <input type="checkbox" {{#if ignoreAllies}}checked{{/if}} data-action="toggleIgnoreAllies" data-tooltip="Hide allies from the results list" />
-      <span class="encounter-filter-label">Ignore allies</span>
+      <input type="checkbox" {{#if ignoreAllies}}checked{{/if}} data-action="toggleIgnoreAllies" data-tooltip="{{localize 'PF2E_VISIONER.UI.IGNORE_ALLIES_TOOLTIP'}}" />
+      <span class="encounter-filter-label">{{localize "PF2E_VISIONER.UI.IGNORE_ALLIES"}}</span>
     </label>
     <label class="hide-foundry-hidden-filter-checkbox">
-      <input type="checkbox" {{#if hideFoundryHidden}}checked{{/if}} data-action="toggleHideFoundryHidden" data-tooltip="Visually hide tokens that are Foundry-hidden (document.hidden)" />
-      <span class="encounter-filter-label">Hide Foundry-hidden tokens</span>
+      <input type="checkbox" {{#if hideFoundryHidden}}checked{{/if}} data-action="toggleHideFoundryHidden" data-tooltip="{{localize 'PF2E_VISIONER.UI.HIDE_FOUNDRY_HIDDEN_TOOLTIP'}}" />
+      <span class="encounter-filter-label">{{localize "PF2E_VISIONER.UI.HIDE_FOUNDRY_HIDDEN"}}</span>
     </label>
     <label class="show-only-changes-filter-checkbox">
-      <input type="checkbox" {{#if showOnlyChanges}}checked{{/if}} data-action="toggleShowOnlyChanges" data-tooltip="Show only rows with visibility changes" />
-      <span class="encounter-filter-label">Show only changes</span>
+      <input type="checkbox" {{#if showOnlyChanges}}checked{{/if}} data-action="toggleShowOnlyChanges" data-tooltip="{{localize 'PF2E_VISIONER.UI.SHOW_ONLY_CHANGES_TOOLTIP'}}" />
+      <span class="encounter-filter-label">{{localize "PF2E_VISIONER.UI.SHOW_ONLY_CHANGES"}}</span>
     </label>
     <label class="filter-by-los-checkbox">
       <input type="checkbox" {{#if filterByDetection}}checked{{/if}} data-action="toggleFilterByDetection" data-tooltip="{{localize 'PF2E_VISIONER.UI.FILTER_BY_DETECTION_TOOLTIP'}}" />
@@ -61,20 +61,20 @@
     <table class="visibility-table hide-results-table">
       <thead>
         <tr>
-          <th class="token-image">Token</th>
-          <th class="token-name">Name</th>
-          <th class="auto-cover">Cover</th>
-          <th class="end-position">Prequisite<br>
-            <span class="legend-icon state-indicator visibility-concealed" data-state="concealed" data-tooltip="Concealed">
+          <th class="token-image">{{localize "PF2E_VISIONER.UI.TOKEN"}}</th>
+          <th class="token-name">{{localize "PF2E_VISIONER.UI.NAME"}}</th>
+          <th class="auto-cover">{{localize "PF2E_VISIONER.UI.COVER"}}</th>
+          <th class="end-position">{{localize "PF2E_VISIONER.UI.PREREQUISITE"}}<br>
+            <span class="legend-icon state-indicator visibility-concealed" data-state="concealed" data-tooltip="{{localize 'PF2E_VISIONER.UI.CONCEALED_TOOLTIP_SHORT'}}">
               <i class="fas fa-cloud" aria-hidden="true"></i>
-            </span>/<span class="legend-icon state-indicator cover-standard" data-state="standard-cover" data-tooltip="Standard or Greater">
+            </span>/<span class="legend-icon state-indicator cover-standard" data-state="standard-cover" data-tooltip="{{localize 'PF2E_VISIONER.UI.STANDARD_OR_GREATER_TOOLTIP'}}">
               <i class="fas fa-shield-alt" aria-hidden="true"></i><span class="legend-plus">+</span>
             </span>
           </th>
-          <th class="roll-result">Roll vs Perception DC</th>
-          <th class="outcome">Outcome</th>
-          <th class="visibility-change">Visibility Change</th>
-          <th class="actions">Actions</th>
+          <th class="roll-result">{{localize "PF2E_VISIONER.UI.ROLL_VS_PERCEPTION_DC"}}</th>
+          <th class="outcome">{{localize "PF2E_VISIONER.UI.OUTCOME"}}</th>
+          <th class="visibility-change">{{localize "PF2E_VISIONER.UI.VISIBILITY_CHANGE"}}</th>
+          <th class="actions">{{localize "PF2E_VISIONER.UI.ACTIONS"}}</th>
         </tr>
       </thead>
       <tbody>
@@ -84,7 +84,7 @@
               <span class="token-img-wrapper">
                 <img src="{{outcome.tokenImage}}" alt="{{outcome.target.name}}" width="28" height="28" />
                 {{#if outcome.target.document.hidden}}
-                  <span class="foundry-hidden-indicator" data-tooltip="Foundry Hidden"><i class="fas fa-eye-slash"></i></span>
+                  <span class="foundry-hidden-indicator" data-tooltip="{{localize 'PF2E_VISIONER.UI.FOUNDRY_HIDDEN'}}"><i class="fas fa-eye-slash"></i></span>
                 {{/if}}
               </span>
             </td>
@@ -98,7 +98,7 @@
                     {{#if outcome.autoCover.overrideDetails}}
                       <!-- Show detailed override indicator with original → final transition -->
                       <span class="auto-cover-override-detailed" 
-                            data-tooltip="Cover overridden {{#if (eq outcome.autoCover.source 'popup')}}via keybind popup{{else if (eq outcome.autoCover.source 'dialog')}}in roll dialog{{else}}manually{{/if}}: {{outcome.autoCover.overrideDetails.originalLabel}} → {{outcome.autoCover.overrideDetails.finalLabel}}">
+                            data-tooltip="{{#if (eq outcome.autoCover.source 'popup')}}{{localize 'PF2E_VISIONER.UI.COVER_OVERRIDDEN_POPUP'}}{{else if (eq outcome.autoCover.source 'dialog')}}{{localize 'PF2E_VISIONER.UI.COVER_OVERRIDDEN_DIALOG'}}{{else}}{{localize 'PF2E_VISIONER.UI.COVER_OVERRIDDEN_MANUALLY'}}{{/if}}: {{outcome.autoCover.overrideDetails.originalLabel}} → {{outcome.autoCover.overrideDetails.finalLabel}}">
                         <!-- Original state (no crossing out) -->
                         <span class="original-cover" style="color: {{outcome.autoCover.overrideDetails.originalColor}};">
                           <i class="{{outcome.autoCover.overrideDetails.originalIcon}}"></i>
@@ -122,7 +122,7 @@
                   {{/if}}
                 </div>
               {{else}}
-                <span class="auto-cover-icon no-cover" data-tooltip="No Cover (+0 Stealth)">
+                <span class="auto-cover-icon no-cover" data-tooltip="{{localize 'PF2E_VISIONER.UI.NO_COVER_STEALTH'}}">
                   <i class="fas fa-shield-slash cover-none"></i>
                 </span>
               {{/if}}
@@ -143,7 +143,7 @@
                   </button>
                 </div>
               {{else}}
-                <div class="no-position-data" data-tooltip="End position data not available">
+                <div class="no-position-data" data-tooltip="{{localize 'PF2E_VISIONER.UI.END_POSITION_NOT_AVAILABLE'}}">
                   <i class="fas fa-question-circle"></i>
                 </div>
               {{/if}}
@@ -157,7 +157,7 @@
                       ({{outcome.originalRollTotal}})
                     </span>
                   {{/if}}
-                  <span class="vs-text">vs DC</span>
+                  <span class="vs-text">{{localize "PF2E_VISIONER.UI.VS_DC"}}</span>
                   <span class="dc-value">{{outcome.dc}}</span>
                 </div>
                 <div class="margin-display">({{#if (gt outcome.margin 0)}}+{{/if}}{{outcome.margin}})
@@ -184,7 +184,7 @@
                     {{{visibilityIcon outcome.oldVisibility}}}
                   </span>
                   {{#if outcome.isOldStateAvsControlled}}
-                    <span class="avs-tag-small" data-tooltip="Controlled by Auto-Visibility System">
+                    <span class="avs-tag-small" data-tooltip="{{localize 'PF2E_VISIONER.UI.AVS_CONTROLLED'}}">
                       <i class="fas fa-bolt-auto"></i>
                     </span>
                   {{/if}}
@@ -201,8 +201,8 @@
               </div>
               {{#if (and outcome.shouldShowOverride outcome.originalNewVisibility)}}
                 <div class="original-visibility-change">
-                  <span>Original Change:</span>
-                  <span class="state-icon" data-state="{{outcome.originalNewVisibility}}" data-tooltip="Original Cover: {{outcome.originalNewVisibility}}">
+                  <span>{{localize "PF2E_VISIONER.UI.ORIGINAL_CHANGE"}}</span>
+                  <span class="state-icon" data-state="{{outcome.originalNewVisibility}}" data-tooltip="{{localize 'PF2E_VISIONER.UI.ORIGINAL_COVER' state=outcome.originalNewVisibility}}">
                     {{{visibilityIcon outcome.originalNewVisibility}}}
                   </span>
                 </div>
@@ -210,14 +210,14 @@
             </td>
             <td class="actions">
               {{#if outcome.hasActionableChange}}
-                <button type="button" class="row-action-btn apply-change" data-action="applyChange" data-token-id="{{outcome.target.id}}" data-tooltip="Apply this visibility change">
+                <button type="button" class="row-action-btn apply-change" data-action="applyChange" data-token-id="{{outcome.target.id}}" data-tooltip="{{localize 'PF2E_VISIONER.UI.APPLY_VISIBILITY_CHANGE'}}">
                   <i class="fas fa-check"></i>
                 </button>
-                <button type="button" class="row-action-btn revert-change" data-action="revertChange" data-token-id="{{outcome.target.id}}" data-tooltip="Revert to original visibility">
+                <button type="button" class="row-action-btn revert-change" data-action="revertChange" data-token-id="{{outcome.target.id}}" data-tooltip="{{localize 'PF2E_VISIONER.UI.REVERT_TO_ORIGINAL'}}">
                   <i class="fas fa-undo"></i>
                 </button>
               {{else}}
-                <span class="no-action">No Change</span>
+                <span class="no-action">{{localize "PF2E_VISIONER.UI.NO_CHANGE_LABEL"}}</span>
               {{/if}}
             </td>
           </tr>
@@ -232,11 +232,11 @@
       <span class="hide-preview-dialog-changes-count">{{changesCount}}</span> of <span class="hide-preview-dialog-total-count">{{totalCount}}</span> observers will have visibility changes.
     </div>
     <div class="hide-preview-dialog-bulk-actions-buttons">
-      <button type="button" class="bulk-action-btn apply-all" data-action="applyAll" data-tooltip="Apply all visibility changes">
-        <i class="fas fa-check-circle"></i> Apply All
+      <button type="button" class="bulk-action-btn apply-all" data-action="applyAll" data-tooltip="{{localize 'PF2E_VISIONER.UI.APPLY_ALL_CHANGES'}}">
+        <i class="fas fa-check-circle"></i> {{localize "PF2E_VISIONER.UI.APPLY_ALL"}}
       </button>
-      <button type="button" class="bulk-action-btn revert-all" data-action="revertAll" data-tooltip="Revert all changes to original state" disabled>
-        <i class="fas fa-undo"></i> Revert All
+      <button type="button" class="bulk-action-btn revert-all" data-action="revertAll" data-tooltip="{{localize 'PF2E_VISIONER.UI.REVERT_ALL_CHANGES'}}" disabled>
+        <i class="fas fa-undo"></i> {{localize "PF2E_VISIONER.UI.REVERT_ALL"}}
       </button>
     </div>
   </div>

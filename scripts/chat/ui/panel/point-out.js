@@ -23,7 +23,7 @@ export function buildPointOutPanel() {
       <button type="button"
               class="visioner-btn ${buttonClass} apply-now"
               data-action="apply-now-point-out"
-              data-tooltip="Apply all calculated changes without opening the dialog">
+              data-tooltip="${game.i18n.localize('PF2E_VISIONER.UI.APPLY_WITHOUT_DIALOG')}">
         <i class="fas fa-check-double"></i> Apply Changes
       </button>`;
   }

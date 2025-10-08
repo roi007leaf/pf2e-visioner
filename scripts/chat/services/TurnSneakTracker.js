@@ -507,7 +507,7 @@ class TurnSneakTracker {
                 {}, // Empty changes object for end-of-turn dialog
                 actionData,
                 {
-                    title: `End-of-Turn Stealth Validation - ${sneakingToken.name}`,
+                    title: game.i18n.format('PF2E_VISIONER.DIALOG_TITLES.END_TURN_STEALTH', { name: sneakingToken.name }),
                     isEndOfTurnDialog: true
                 }
             );

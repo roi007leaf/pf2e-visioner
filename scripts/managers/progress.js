@@ -6,7 +6,7 @@ export class VisionerProgress extends foundry.applications.api.ApplicationV2 {
   static DEFAULT_OPTIONS = {
     tag: 'div',
     window: {
-      title: 'Applying Changes',
+      title: game.i18n.localize('PF2E_VISIONER.DIALOG_TITLES.APPLYING_CHANGES'),
       icon: 'fas fa-spinner',
       resizable: false,
     },

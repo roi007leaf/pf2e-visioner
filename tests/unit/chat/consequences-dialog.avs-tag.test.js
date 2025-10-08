@@ -15,6 +15,9 @@ describe('ConsequencesPreviewDialog - AVS Tag Display', () => {
                     return false;
                 }),
             },
+            i18n: {
+                localize: (key) => key,
+            },
         };
         global.game = mockGame;
 

@@ -86,7 +86,7 @@ export function buildSneakPanel(actionData = {}, message = null) {
         <button type="button"
                 class="visioner-btn ${buttonClass} apply-now"
                 data-action="apply-now-sneak"
-                data-tooltip="Apply all calculated changes without opening the dialog">
+                data-tooltip="${game.i18n.localize('PF2E_VISIONER.UI.APPLY_WITHOUT_DIALOG')}">
           <i class="fas fa-check-double"></i> Apply Changes
         </button>`;
     } else {
@@ -99,7 +99,7 @@ export function buildSneakPanel(actionData = {}, message = null) {
           <button type="button" 
                   class="visioner-btn ${buttonClass}" 
                   data-action="start-sneak"
-                  data-tooltip="Start sneaking: capture current visibility and cover states"
+                  data-tooltip="${game.i18n.localize('PF2E_VISIONER.UI.START_SNEAK_TOOLTIP')}"
                   style="flex:1 1 auto; white-space: normal;">
             <i class="fas fa-mask"></i> Start Sneak
           </button>

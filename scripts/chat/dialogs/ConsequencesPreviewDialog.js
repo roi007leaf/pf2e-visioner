@@ -15,6 +15,10 @@ let currentConsequencesDialog = null;
 
 export class ConsequencesPreviewDialog extends BaseActionDialog {
   constructor(attackingToken, outcomes, changes, attackData, options = {}) {
+    // Set localized title before calling super
+    if (!options.window) options.window = {};
+    options.window.title = game?.i18n?.localize('PF2E_VISIONER.DIALOG_TITLES.ATTACK_CONSEQUENCES') || 'Attack Consequences Results';
+    
     super(options);
 
     this.attackingToken = attackingToken;
@@ -51,7 +55,7 @@ export class ConsequencesPreviewDialog extends BaseActionDialog {
     tag: 'div',
     classes: ['pf2e-visioner', 'consequences-preview-dialog'],
     window: {
-      title: `Attack Consequences Results`,
+      title: game.i18n.localize('PF2E_VISIONER.DIALOG_TITLES.ATTACK_CONSEQUENCES'),
       icon: 'fas fa-crosshairs',
       resizable: true,
     },

@@ -306,10 +306,10 @@ export async function manuallyRestoreAllPartyTokens() {
       }
     }
 
-    ui.notifications.info(`PF2E Visioner: Restored state for ${restoredCount} party tokens`);
+    ui.notifications.info(game.i18n.format('PF2E_VISIONER.NOTIFICATIONS.PARTY_RESTORE_SUCCESS', { count: restoredCount }));
   } catch (error) {
     console.error('PF2E Visioner: Error in manual restoration:', error);
-    ui.notifications.error('PF2E Visioner: Failed to restore party tokens');
+    ui.notifications.error(game.i18n.localize('PF2E_VISIONER.NOTIFICATIONS.PARTY_RESTORE_FAILED'));
   }
 }
 

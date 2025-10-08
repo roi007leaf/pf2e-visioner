@@ -2,6 +2,7 @@ import { MODULE_ID } from '../constants.js';
 import { HoverTooltips } from '../services/HoverTooltips.js';
 import { getVisibilityBetween } from '../utils.js';
 import autoCoverSystem from './auto-cover/AutoCoverSystem.js';
+import { doesWallBlockAtElevation } from '../helpers/wall-height-utils.js';
 /**
  * Cover field visualization system
  * Shows cover levels from cursor position to hovered token when hotkey is held
@@ -404,121 +405,6 @@ class CoverVisualization {
     // Remove hooks
     Hooks.off('hoverToken', this.boundOnTokenHover);
     Hooks.off('renderCanvas', this.boundOnCanvasRender);
-  }
-
-  /**
-   * Check if a line of sight between two points is blocked by walls
-   * @param {Object} p1 - First point {x, y}
-   * @param {Object} p2 - Second point {x, y}
-   * @param {Canvas} canvas - The canvas instance
-   * @returns {boolean} True if line of sight is blocked by walls
-   */
-  isLineOfSightBlockedByWalls(p1, p2, canvas) {
-    try {
-      const walls = canvas?.walls?.placeables || [];
-      if (!walls.length) {
-        return false;
-      }
-
-      for (const wall of walls) {
-        try {
-          const d = wall.document;
-          if (!d) continue;
-
-          // Skip open doors; treat closed/locked doors and normal walls as blockers
-          const isDoor = Number(d.door) > 0; // 0 none, 1 door, 2 secret (treat as door-like)
-          const doorState = Number(d.ds ?? d.doorState ?? 0); // 0 closed/secret, 1 open, 2 locked
-          if (isDoor && doorState === 1) continue; // open door → no blocking
-
-          // Get wall endpoints
-          const x1 = d.x;
-          const y1 = d.y;
-          const x2 = d.x2;
-          const y2 = d.y2;
-
-          // Handle different wall coordinate formats
-          let wallX1, wallY1, wallX2, wallY2;
-
-          if (
-            typeof x1 === 'number' &&
-            typeof y1 === 'number' &&
-            typeof x2 === 'number' &&
-            typeof y2 === 'number'
-          ) {
-            // Standard format: x, y, x2, y2
-            wallX1 = x1;
-            wallY1 = y1;
-            wallX2 = x2;
-            wallY2 = y2;
-          } else if (Array.isArray(d.c) && d.c.length >= 4) {
-            // Alternative format: c array [x1, y1, x2, y2, ...]
-            wallX1 = d.c[0];
-            wallY1 = d.c[1];
-            wallX2 = d.c[2];
-            wallY2 = d.c[3];
-          } else {
-            continue;
-          }
-
-          // Validate coordinates
-          if (
-            [wallX1, wallY1, wallX2, wallY2].some(
-              (coord) => typeof coord !== 'number' || !isFinite(coord),
-            )
-          ) {
-            continue;
-          }
-
-          // Check if the line of sight intersects with this wall
-          if (this.segmentsIntersect(p1, p2, { x: wallX1, y: wallY1 }, { x: wallX2, y: wallY2 })) {
-            return true;
-          }
-        } catch (error) {
-          console.warn('PF2E Visioner: Error checking wall for LOS:', error);
-          continue;
-        }
-      }
-
-      return false;
-    } catch (error) {
-      console.warn('PF2E Visioner: Error in isLineOfSightBlockedByWalls:', error);
-      return false;
-    }
-  }
-
-  /**
-   * Determine if a grid square should be blocked - aggressive approach.
-   * If the center OR any corner ray is blocked, consider the whole square blocked.
-   * This ensures areas behind walls show as black rather than green.
-   * @param {{x:number,y:number}} squareCenter
-   * @param {{x:number,y:number}} targetCenter
-   * @param {number} gridSize
-   * @param {Canvas} canvas
-   * @returns {boolean}
-   */
-  isAggressivelyBlockedByWalls(squareCenter, targetCenter, gridSize, canvas) {
-    try {
-      const half = gridSize / 2;
-      const inset = half * 0.8; // sample points inside the square
-      const samplePoints = [
-        { x: squareCenter.x, y: squareCenter.y }, // center
-        { x: squareCenter.x - inset, y: squareCenter.y - inset }, // top-left
-        { x: squareCenter.x + inset, y: squareCenter.y - inset }, // top-right
-        { x: squareCenter.x - inset, y: squareCenter.y + inset }, // bottom-left
-        { x: squareCenter.x + inset, y: squareCenter.y + inset }, // bottom-right
-      ];
-
-      // If ANY sample ray is blocked, consider the square blocked
-      for (const sample of samplePoints) {
-        if (this.isLineOfSightBlockedByWalls(sample, targetCenter, canvas)) {
-          return true; // at least one ray is blocked → square is blocked
-        }
-      }
-      return false; // all rays are clear
-    } catch (error) {
-      console.warn('PF2E Visioner: Error in isAggressivelyBlockedByWalls:', error);
-      return false;
-    }
   }
 
   /**

@@ -11,11 +11,11 @@
           <div class="table-section-header">
             <div class="header-left">
               <i class="fas fa-users"></i>
-              <span>Player Characters</span>
+              <span>{{localize "PF2E_VISIONER.UI.PLAYER_CHARACTERS"}}</span>
             </div>
             <div class="bulk-actions-header">
               {{#each visibilityStates as |state|}}
-                <button type="button" class="bulk-state-header {{state.cssClass}}" data-action="bulkPC{{capitalize state.key}}" data-state="{{state.value}}" data-target-type="pc" data-tooltip="Set all PCs as {{state.label}}">
+                <button type="button" class="bulk-state-header {{state.cssClass}}" data-action="bulkPC{{capitalize state.key}}" data-state="{{state.value}}" data-target-type="pc" data-tooltip="{{localize 'PF2E_VISIONER.UI.SET_ALL_AS' type='PCs' state=state.label}}">
                   <i class="{{state.icon}}"></i>
                 </button>
               {{/each}}
@@ -31,11 +31,11 @@
           <div class="table-section-header">
             <div class="header-left">
               <i class="fas fa-dragon"></i>
-              <span>NPCs</span>
+              <span>{{localize "PF2E_VISIONER.UI.NPCS_LABEL"}}</span>
             </div>
             <div class="bulk-actions-header">
               {{#each visibilityStates as |state|}}
-                <button type="button" class="bulk-state-header {{state.cssClass}}" data-action="bulkNPC{{capitalize state.key}}" data-state="{{state.value}}" data-target-type="npc" data-tooltip="Set all NPCs as {{state.label}}">
+                <button type="button" class="bulk-state-header {{state.cssClass}}" data-action="bulkNPC{{capitalize state.key}}" data-state="{{state.value}}" data-target-type="npc" data-tooltip="{{localize 'PF2E_VISIONER.UI.SET_ALL_AS' type='NPCs' state=state.label}}">
                   <i class="{{state.icon}}"></i>
                 </button>
               {{/each}}
@@ -51,13 +51,13 @@
           <div class="table-section-header">
             <div class="header-left">
               <i class="fas fa-exclamation-triangle"></i>
-              <span>Hazards</span>
+              <span>{{localize "PF2E_VISIONER.UI.HAZARDS_LABEL"}}</span>
             </div>
             <div class="bulk-actions-header">
-              <button type="button" class="bulk-state-header visibility-observed" data-action="bulkHazardsObserved" data-state="observed" data-target-type="hazards" data-tooltip="Set all Hazards as Observed">
+              <button type="button" class="bulk-state-header visibility-observed" data-action="bulkHazardsObserved" data-state="observed" data-target-type="hazards" data-tooltip="{{localize 'PF2E_VISIONER.UI.SET_ALL_AS' type='Hazards' state='Observed'}}">
                 <i class="fas fa-eye"></i>
               </button>
-              <button type="button" class="bulk-state-header visibility-hidden" data-action="bulkHazardsHidden" data-state="hidden" data-target-type="hazards" data-tooltip="Set all Hazards as Hidden">
+              <button type="button" class="bulk-state-header visibility-hidden" data-action="bulkHazardsHidden" data-state="hidden" data-target-type="hazards" data-tooltip="{{localize 'PF2E_VISIONER.UI.SET_ALL_AS' type='Hazards' state='Hidden'}}">
                 <i class="fas fa-eye-slash"></i>
               </button>
             </div>
@@ -72,13 +72,13 @@
           <div class="table-section-header">
             <div class="header-left">
               <i class="fas fa-box"></i>
-              <span>Loot</span>
+              <span>{{localize "PF2E_VISIONER.UI.LOOT_LABEL"}}</span>
             </div>
             <div class="bulk-actions-header">
-              <button type="button" class="bulk-state-header visibility-observed" data-action="bulkLootObserved" data-state="observed" data-target-type="loot" data-tooltip="Set all Loot as Observed">
+              <button type="button" class="bulk-state-header visibility-observed" data-action="bulkLootObserved" data-state="observed" data-target-type="loot" data-tooltip="{{localize 'PF2E_VISIONER.UI.SET_ALL_AS' type='Loot' state='Observed'}}">
                 <i class="fas fa-eye"></i>
               </button>
-              <button type="button" class="bulk-state-header visibility-hidden" data-action="bulkLootHidden" data-state="hidden" data-target-type="loot" data-tooltip="Set all Loot as Hidden">
+              <button type="button" class="bulk-state-header visibility-hidden" data-action="bulkLootHidden" data-state="hidden" data-target-type="loot" data-tooltip="{{localize 'PF2E_VISIONER.UI.SET_ALL_AS' type='Loot' state='Hidden'}}">
                 <i class="fas fa-eye-slash"></i>
               </button>
             </div>
@@ -105,13 +105,13 @@
               {{/if}}
               <thead>
                 <tr>
-                  <th class="token-image">Token</th>
-                  <th class="token-name">Name</th>
+                  <th class="token-image">{{localize "PF2E_VISIONER.UI.TOKEN"}}</th>
+                  <th class="token-name">{{localize "PF2E_VISIONER.UI.NAME"}}</th>
                   <th class="visibility-state">{{localize "PF2E_VISIONER.TOKEN_MANAGER.VISIBILITY_STATE"}}</th>
-                  <th class="current-state">Current State</th>
+                  <th class="current-state">{{localize "PF2E_VISIONER.UI.CURRENT_STATE"}}</th>
                   <th class="dc-column">{{#if isTargetMode}}Perception DC{{else}}Stealth DC{{/if}}</th>
                   {{#if showOutcomeColumn}}
-                    <th class="outcome-column">Outcome</th>
+                    <th class="outcome-column">{{localize "PF2E_VISIONER.UI.OUTCOME"}}</th>
                   {{/if}}
                 </tr>
               </thead>
@@ -122,7 +122,7 @@
                       <div class="token-img-wrapper">
                         <img src="{{target.img}}" width="28" height="28" />
                         {{#if target.isFoundryHidden}}
-                          <span class="foundry-hidden-indicator" data-tooltip="Foundry Hidden">
+                          <span class="foundry-hidden-indicator" data-tooltip="{{localize 'PF2E_VISIONER.UI.FOUNDRY_HIDDEN'}}">
                             <i class="fas fa-eye-slash"></i>
                           </span>
                         {{/if}}
@@ -181,13 +181,13 @@
           <div class="table-section-header">
             <div class="header-left">
               <i class="fas fa-grip-lines-vertical"></i>
-              <span>Hidden Walls</span>
+              <span>{{localize "PF2E_VISIONER.UI.HIDDEN_WALLS_LABEL"}}</span>
             </div>
             <div class="bulk-actions-header">
-              <button type="button" class="bulk-state-header visibility-observed" data-action="bulkWallsObserved" data-state="observed" data-target-type="walls" data-tooltip="Set all listed walls as Observed">
+              <button type="button" class="bulk-state-header visibility-observed" data-action="bulkWallsObserved" data-state="observed" data-target-type="walls" data-tooltip="{{localize 'PF2E_VISIONER.UI.SET_ALL_WALLS_AS' state='Observed'}}">
                 <i class="fas fa-eye"></i>
               </button>
-              <button type="button" class="bulk-state-header visibility-hidden" data-action="bulkWallsHidden" data-state="hidden" data-target-type="walls" data-tooltip="Set all listed walls as Hidden">
+              <button type="button" class="bulk-state-header visibility-hidden" data-action="bulkWallsHidden" data-state="hidden" data-target-type="walls" data-tooltip="{{localize 'PF2E_VISIONER.UI.SET_ALL_WALLS_AS' state='Hidden'}}">
                 <i class="fas fa-eye-slash"></i>
               </button>
             </div>
@@ -202,10 +202,10 @@
               </colgroup>
               <thead>
                 <tr>
-                  <th class="token-image">Wall</th>
-                  <th class="token-name">Identifier</th>
+                  <th class="token-image">{{localize "PF2E_VISIONER.UI.WALL_HEADER"}}</th>
+                  <th class="token-name">{{localize "PF2E_VISIONER.UI.IDENTIFIER"}}</th>
                   <th class="visibility-state">{{localize "PF2E_VISIONER.TOKEN_MANAGER.VISIBILITY_STATE"}}</th>
-                  <th class="dc-column">DC</th>
+                  <th class="dc-column">{{localize "PF2E_VISIONER.UI.DC"}}</th>
                 </tr>
               </thead>
               <tbody>

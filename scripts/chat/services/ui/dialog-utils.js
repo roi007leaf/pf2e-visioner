@@ -101,24 +101,26 @@ export function updateBulkActionButtons(rootElement, bulkActionState) {
   const revertAllButton = rootElement.querySelector('.bulk-action-btn[data-action="revertAll"]');
   if (!applyAllButton || !revertAllButton) return;
 
+  const localize = game.i18n.localize.bind(game.i18n);
+
   switch (bulkActionState) {
     case 'initial':
       applyAllButton.disabled = false;
       revertAllButton.disabled = true;
-      applyAllButton.innerHTML = '<i class="fas fa-check-circle"></i> Apply All';
-      revertAllButton.innerHTML = '<i class="fas fa-undo"></i> Revert All';
+      applyAllButton.innerHTML = `<i class="fas fa-check-circle"></i> ${localize('PF2E_VISIONER.UI.APPLY_ALL_BUTTON')}`;
+      revertAllButton.innerHTML = `<i class="fas fa-undo"></i> ${localize('PF2E_VISIONER.UI.REVERT_ALL_BUTTON')}`;
       break;
     case 'applied':
       applyAllButton.disabled = true;
       revertAllButton.disabled = false;
-      applyAllButton.innerHTML = '<i class="fas fa-check-circle"></i> Applied';
-      revertAllButton.innerHTML = '<i class="fas fa-undo"></i> Revert All';
+      applyAllButton.innerHTML = `<i class="fas fa-check-circle"></i> ${localize('PF2E_VISIONER.UI.APPLIED_BUTTON')}`;
+      revertAllButton.innerHTML = `<i class="fas fa-undo"></i> ${localize('PF2E_VISIONER.UI.REVERT_ALL_BUTTON')}`;
       break;
     case 'reverted':
       applyAllButton.disabled = false;
       revertAllButton.disabled = true;
-      applyAllButton.innerHTML = '<i class="fas fa-check-circle"></i> Apply All';
-      revertAllButton.innerHTML = '<i class="fas fa-undo"></i> Reverted';
+      applyAllButton.innerHTML = `<i class="fas fa-check-circle"></i> ${localize('PF2E_VISIONER.UI.APPLY_ALL_BUTTON')}`;
+      revertAllButton.innerHTML = `<i class="fas fa-undo"></i> ${localize('PF2E_VISIONER.UI.REVERTED_BUTTON')}`;
       break;
   }
 }

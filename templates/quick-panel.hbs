@@ -2,7 +2,7 @@
   <!-- Main controls: Visibility and Cover side-by-side -->
   <div class="quick-panel-main-controls">
     <fieldset class="quick-panel-fieldset">
-      <legend>Visibility</legend>
+      <legend>{{localize "PF2E_VISIONER.UI.VISIBILITY_LEGEND"}}</legend>
       <div class="quick-panel-button-group">
         {{#each visibilityStates as |s|}}
           <button type="button" class="state-icon {{s.cssClass}}" data-action="setVisibility" data-state="{{s.key}}" data-tooltip="{{s.label}}">
@@ -13,7 +13,7 @@
     </fieldset>
 
     <fieldset class="quick-panel-fieldset">
-      <legend>Cover</legend>
+      <legend>{{localize "PF2E_VISIONER.UI.COVER_LEGEND"}}</legend>
       <div class="quick-panel-button-group">
         {{#each coverStates as |s|}}
           <button type="button" class="state-icon {{s.cssClass}}" data-action="setCover" data-state="{{s.key}}" data-tooltip="{{s.label}}">
@@ -32,10 +32,10 @@
         <i class="fas fa-user-check"></i> {{selCount}}
       </div>
       <div class="quick-panel-button-group">
-        <button type="button" class="state-icon party-select" data-action="selectParty" data-tooltip="Select all party tokens">
+        <button type="button" class="state-icon party-select" data-action="selectParty" data-tooltip="{{localize 'PF2E_VISIONER.UI.SELECT_ALL_PARTY'}}">
           <i class="fas fa-face-smile-halo"></i>
         </button>
-        <button type="button" class="state-icon enemy-select" data-action="selectEnemies" data-tooltip="Select all enemy tokens">
+        <button type="button" class="state-icon enemy-select" data-action="selectEnemies" data-tooltip="{{localize 'PF2E_VISIONER.UI.SELECT_ALL_ENEMIES'}}">
           <i class="fas fa-face-angry-horns"></i>
         </button>
       </div>
@@ -48,7 +48,7 @@
       </div>
       <div class="quick-panel-button-group">
         <div class="mode-label" data-tooltip="{{#if modeIsObserver}}Observer Mode: How selected tokens treat the targets{{else}}Target Mode: How the targets treat selected tokens{{/if}}">{{#if modeIsObserver}}Observer{{else}}Target{{/if}}</div>
-        <button type="button" class="state-icon" data-action="toggleMode" data-tooltip="Swap Observer/Target mode">
+        <button type="button" class="state-icon" data-action="toggleMode" data-tooltip="{{localize 'PF2E_VISIONER.UI.SWAP_MODE'}}">
           <i class="fas fa-arrows-rotate"></i>
         </button>
       </div>
@@ -60,10 +60,10 @@
         <i class="fas fa-bullseye"></i> {{tgtCount}}
       </div>
       <div class="quick-panel-button-group">
-        <button type="button" class="state-icon party-select" data-action="targetParty" data-tooltip="Target all party tokens">
+        <button type="button" class="state-icon party-select" data-action="targetParty" data-tooltip="{{localize 'PF2E_VISIONER.UI.TARGET_ALL_PARTY'}}">
           <i class="fas fa-face-smile-halo"></i>
         </button>
-        <button type="button" class="state-icon enemy-select" data-action="targetEnemies" data-tooltip="Target all enemy tokens">
+        <button type="button" class="state-icon enemy-select" data-action="targetEnemies" data-tooltip="{{localize 'PF2E_VISIONER.UI.TARGET_ALL_ENEMIES'}}">
           <i class="fas fa-face-angry-horns"></i>
         </button>
       </div>
@@ -75,7 +75,7 @@
         Clear
       </div>
       <div class="quick-panel-button-group">
-        <button type="button" class="state-icon" data-action="clearAll" data-tooltip="Clear all selections and targets">
+        <button type="button" class="state-icon" data-action="clearAll" data-tooltip="{{localize 'PF2E_VISIONER.UI.CLEAR_ALL_SELECTIONS'}}">
           <i class="fas fa-trash"></i>
         </button>
       </div>

@@ -64,7 +64,11 @@ export function getTokenHeightFt(token) {
     const flagH = token?.document?.getFlag?.(MODULE_ID, 'heightFt');
     const fromFlag = parseFeet(flagH);
     if (fromFlag != null) return fromFlag;
-    // Size-only mode: use actor size category to determine height
+    // 2) Wall Height module integration - check for tokenHeight flag
+    const wallHeightFlag = token?.document?.flags?.['wall-height']?.tokenHeight;
+    const fromWallHeight = parseFeet(wallHeightFlag);
+    if (fromWallHeight != null) return fromWallHeight;
+    // 3) Size-only mode: use actor size category to determine height
     const size = token?.actor?.system?.traits?.size?.value ?? 'med';
     return SIZE_TO_HEIGHT_FT[size] ?? 5;
   } catch (_) {

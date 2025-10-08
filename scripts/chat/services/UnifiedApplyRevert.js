@@ -398,7 +398,7 @@ export class UnifiedApplyRevert {
    */
   _updateButtonToRevert(button) {
     if (button) {
-      button.textContent = 'Revert';
+      button.textContent = game.i18n.localize('PF2E_VISIONER.UI.REVERT_BUTTON_LABEL');
       button.classList.remove('apply');
       button.classList.add('revert');
       button.disabled = false;
@@ -411,7 +411,7 @@ export class UnifiedApplyRevert {
    */
   _updateButtonToApply(button) {
     if (button) {
-      button.textContent = 'Apply';
+      button.textContent = game.i18n.localize('PF2E_VISIONER.UI.APPLY_BUTTON_LABEL');
       button.classList.remove('revert');
       button.classList.add('apply');
       button.disabled = false;

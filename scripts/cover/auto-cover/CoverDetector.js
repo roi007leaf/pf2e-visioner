@@ -16,6 +16,7 @@ import {
   getTokenRect,
   getTokenVerticalSpanFt,
 } from '../../helpers/size-elevation-utils.js';
+import { doesWallBlockAtElevation } from '../../helpers/wall-height-utils.js';
 
 import { getVisibilityBetween } from '../../utils.js';
 
@@ -74,8 +75,21 @@ export class CoverDetector {
       const p1 = attacker.center ?? attacker.getCenterPoint();
       const p2 = target.center ?? target.getCenterPoint();
 
+      // Calculate elevation range for wall height checks
+      let elevationRange = null;
+      try {
+        const attSpan = getTokenVerticalSpanFt(attacker);
+        const tgtSpan = getTokenVerticalSpanFt(target);
+        elevationRange = {
+          bottom: Math.min(attSpan.bottom, tgtSpan.bottom),
+          top: Math.max(attSpan.top, tgtSpan.top),
+        };
+      } catch (error) {
+        // If we can't get elevation, don't filter by it
+      }
+
       // Check if there's any blocking terrain (walls) in the way
-      const segmentAnalysis = this._analyzeSegmentObstructions(p1, p2);
+      const segmentAnalysis = this._analyzeSegmentObstructions(p1, p2, elevationRange);
       const hasWallsInTheWay = segmentAnalysis.hasBlockingTerrain;
 
       // NEW LOGIC: Priority based on wall presence
@@ -91,7 +105,7 @@ export class CoverDetector {
         // Determine token cover based on intersection mode
         let tokenCover;
         if (intersectionMode === 'tactical') {
-          tokenCover = this._evaluateCoverByTactical(attacker, target, blockers);
+          tokenCover = this._evaluateCoverByTactical(attacker, target, blockers, elevationRange);
         } else if (intersectionMode === 'coverage') {
           tokenCover = this._evaluateCoverByCoverage(attacker, target, blockers);
         } else {
@@ -104,7 +118,7 @@ export class CoverDetector {
         return tokenCover;
       } else {
         // Case 2: There IS a wall in the way - use new wall cover rules
-        const wallCover = this._evaluateWallsCover(p1, p2);
+        const wallCover = this._evaluateWallsCover(p1, p2, elevationRange);
         return wallCover;
       }
     } catch (error) {
@@ -233,20 +247,21 @@ export class CoverDetector {
    * Evaluate walls cover using center-to-center segment analysis
    * @param {Object} p1 - Attacker center point
    * @param {Object} p2 - Target center point
+   * @param {Object} elevationRange - Optional elevation range {bottom, top} for wall height filtering
    * @returns {string} Cover category ('none', 'lesser', 'standard', 'greater')
    * @private
    */
-  _evaluateWallsCover(p1, p2) {
+  _evaluateWallsCover(p1, p2, elevationRange = null) {
     if (!canvas?.walls) return 'none';
 
     // First check for manual wall cover overrides - if present, use it directly and skip all other checks
-    const wallOverride = this._checkWallCoverOverrides(p1, p2);
+    const wallOverride = this._checkWallCoverOverrides(p1, p2, elevationRange);
     if (wallOverride !== null) {
       return wallOverride;
     }
 
     // Analyze the center-to-center segment
-    const segmentAnalysis = this._analyzeSegmentObstructions(p1, p2);
+    const segmentAnalysis = this._analyzeSegmentObstructions(p1, p2, elevationRange);
 
     // Determine cover category based on new rules
     let coverCategory = 'none';
@@ -266,7 +281,7 @@ export class CoverDetector {
       let wallCoveragePercent = 0;
 
       if (target) {
-        wallCoveragePercent = this._estimateWallCoveragePercent(p1, target);
+        wallCoveragePercent = this._estimateWallCoveragePercent(p1, target, elevationRange);
       }
 
       // Get threshold settings
@@ -298,10 +313,11 @@ export class CoverDetector {
    * Analyze what obstructions the center-to-center segment passes through
    * @param {Object} p1 - Start point (attacker center)
    * @param {Object} p2 - End point (target center)
+   * @param {Object} elevationRange - Optional elevation range {bottom, top} for wall height filtering
    * @returns {Object} Analysis object with obstruction details
    * @private
    */
-  _analyzeSegmentObstructions(p1, p2) {
+  _analyzeSegmentObstructions(p1, p2, elevationRange = null) {
     const segmentLength = Math.sqrt((p2.x - p1.x) ** 2 + (p2.y - p1.y) ** 2);
 
     const analysis = {
@@ -320,6 +336,11 @@ export class CoverDetector {
 
       // Skip walls that don't block from the attacker's direction
       if (!this._doesWallBlockFromDirection(wallDoc, p1)) continue;
+
+      // Check wall elevation if Wall Height module is active and elevation range is provided
+      if (elevationRange && !doesWallBlockAtElevation(wallDoc, elevationRange)) {
+        continue;
+      }
 
       const coords = wall?.coords;
       if (!coords) continue;
@@ -404,10 +425,11 @@ export class CoverDetector {
    * Overrides only apply if the wall would naturally block from the attacker's direction
    * @param {Object} p1 - Start point
    * @param {Object} p2 - End point
+   * @param {Object} elevationRange - Optional elevation range {bottom, top} for wall height filtering
    * @returns {string|null} Cover override ('none', 'lesser', 'standard', 'greater') or null if no override
    * @private
    */
-  _checkWallCoverOverrides(p1, p2) {
+  _checkWallCoverOverrides(p1, p2, elevationRange = null) {
     try {
       const ray = this._createRay(p1, p2);
       const walls = canvas.walls.objects?.children || [];
@@ -423,6 +445,11 @@ export class CoverDetector {
 
         // Check if wall would naturally block from this direction (respects door state and directionality)
         if (!this._wouldWallNaturallyBlock(wallDoc, p1)) continue;
+
+        // Check wall elevation if Wall Height module is active and elevation range is provided
+        if (elevationRange && !doesWallBlockAtElevation(wallDoc, elevationRange)) {
+          continue;
+        }
 
         const coords = wall?.coords;
         if (!coords) continue;
@@ -487,8 +514,13 @@ export class CoverDetector {
    * Estimate percent of the target token's edge directions that are blocked by walls from origin p1.
    * Samples multiple points along the target perimeter and casts rays to each, counting wall collisions.
    * Uses a more accurate D&D/PF2e style approach based on corner-to-corner line blocking.
+   * @param {Object} p1 - Start point
+   * @param {Object} target - Target token
+   * @param {Object} elevationRange - Optional elevation range {bottom, top} for wall height filtering
+   * @returns {number} Percentage of blocked sight lines (0-100)
+   * @private
    */
-  _estimateWallCoveragePercent(p1, target) {
+  _estimateWallCoveragePercent(p1, target, elevationRange = null) {
     try {
       const rect = getTokenRect(target);
 
@@ -523,7 +555,7 @@ export class CoverDetector {
       // Count blocked sight lines
       let blocked = 0;
       for (const pt of points) {
-        if (this._isRayBlockedByWalls(p1, pt)) blocked++;
+        if (this._isRayBlockedByWalls(p1, pt, elevationRange)) blocked++;
       }
 
       // Calculate raw percentage
@@ -542,10 +574,11 @@ export class CoverDetector {
    * Only counts walls that are actually between the points, not beyond point B
    * @param {Object} a - Start point {x, y}
    * @param {Object} b - End point {x, y}
+   * @param {Object} elevationRange - Optional elevation range {bottom, top} to check against Wall Height module
    * @returns {boolean} True if ray is blocked by walls
    * @private
    */
-  _isRayBlockedByWalls(a, b) {
+  _isRayBlockedByWalls(a, b, elevationRange = null) {
     const ray = this._createRay(a, b);
     const rayLength = Math.sqrt((b.x - a.x) ** 2 + (b.y - a.y) ** 2);
 
@@ -566,6 +599,11 @@ export class CoverDetector {
 
       // Skip walls that don't block sight from this direction
       if (!this._doesWallBlockFromDirection(wallDoc, a)) continue;
+
+      // Check wall elevation if Wall Height module is active and elevation range is provided
+      if (elevationRange && !doesWallBlockAtElevation(wallDoc, elevationRange)) {
+        continue;
+      }
 
       // Check if the ray intersects this wall
       const intersection = this._lineIntersectionPoint(
@@ -1275,10 +1313,11 @@ export class CoverDetector {
    * @param {Object} attacker
    * @param {Object} target
    * @param {Array} blockers
+   * @param {Object} elevationRange - Optional elevation range {bottom, top} for wall height filtering
    * @returns {string}
    * @private
    */
-  _evaluateCoverByTactical(attacker, target, blockers) {
+  _evaluateCoverByTactical(attacker, target, blockers, elevationRange = null) {
     // Tactical mode: corner-to-corner calculations
     // Choose the best corner of the attacker and check lines from all target corners to that corner
     // This matches the "choose a corner" tactical rule
@@ -1306,7 +1345,7 @@ export class CoverDetector {
         let lineBlocked = false;
 
         // Check if this line is blocked by walls
-        if (this._isRayBlockedByWalls(targetCorner, attackerCorner)) {
+        if (this._isRayBlockedByWalls(targetCorner, attackerCorner, elevationRange)) {
           lineBlocked = true;
         }
 

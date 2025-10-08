@@ -8,7 +8,7 @@ export class VisionerQuickPanel extends foundry.applications.api.ApplicationV2 {
     id: 'pf2e-visioner-quick-panel',
     tag: 'div',
     window: {
-      title: 'Visioner Quick Edit',
+      title: game.i18n.localize('PF2E_VISIONER.DIALOG_TITLES.VISIONER_QUICK_PANEL'),
       icon: 'fas fa-bolt',
       resizable: true,
     },

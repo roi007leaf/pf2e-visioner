@@ -56,7 +56,7 @@
   <div class="enhanced-controls-section">
     {{#if showEncounterFilter}}
     <label class="encounter-filter-checkbox">
-      <input type="checkbox" {{#if encounterOnly}}checked{{/if}} data-action="toggleEncounterFilter" data-tooltip="Only show tokens in the current encounter" />
+      <input type="checkbox" {{#if encounterOnly}}checked{{/if}} data-action="toggleEncounterFilter" data-tooltip="{{localize 'PF2E_VISIONER.UI.ENCOUNTER_FILTER_TOOLTIP'}}" />
       <span class="encounter-filter-label">{{localize "PF2E_VISIONER.UI.ENCOUNTER_FILTER_TEXT"}}</span>
     </label>
     {{/if}}
@@ -65,16 +65,16 @@
       <span class="encounter-filter-label">{{localize 'PF2E_VISIONER.UI.FILTER_BY_DETECTION_LABEL'}}</span>
     </label>
     <label class="ignore-allies-filter-checkbox">
-      <input type="checkbox" {{#if ignoreAllies}}checked{{/if}} data-action="toggleIgnoreAllies" data-tooltip="Hide allies from the results list" />
-      <span class="encounter-filter-label">Ignore allies</span>
+      <input type="checkbox" {{#if ignoreAllies}}checked{{/if}} data-action="toggleIgnoreAllies" data-tooltip="{{localize 'PF2E_VISIONER.UI.IGNORE_ALLIES_TOOLTIP'}}" />
+      <span class="encounter-filter-label">{{localize "PF2E_VISIONER.UI.IGNORE_ALLIES"}}</span>
     </label>
     <label class="hide-foundry-hidden-filter-checkbox">
-      <input type="checkbox" {{#if hideFoundryHidden}}checked{{/if}} data-action="toggleHideFoundryHidden" data-tooltip="Visually hide tokens that are Foundry-hidden (document.hidden)" />
-      <span class="encounter-filter-label">Hide Foundry-hidden tokens</span>
+      <input type="checkbox" {{#if hideFoundryHidden}}checked{{/if}} data-action="toggleHideFoundryHidden" data-tooltip="{{localize 'PF2E_VISIONER.UI.HIDE_FOUNDRY_HIDDEN_TOOLTIP'}}" />
+      <span class="encounter-filter-label">{{localize "PF2E_VISIONER.UI.HIDE_FOUNDRY_HIDDEN"}}</span>
     </label>
     <label class="show-only-changes-filter-checkbox">
-      <input type="checkbox" {{#if showChangesOnly}}checked{{/if}} data-action="toggleShowOnlyChanges" data-tooltip="Show only rows with visibility changes" />
-      <span class="encounter-filter-label">Show only changes</span>
+      <input type="checkbox" {{#if showChangesOnly}}checked{{/if}} data-action="toggleShowOnlyChanges" data-tooltip="{{localize 'PF2E_VISIONER.UI.SHOW_ONLY_CHANGES_TOOLTIP'}}" />
+      <span class="encounter-filter-label">{{localize "PF2E_VISIONER.UI.SHOW_ONLY_CHANGES"}}</span>
     </label>
 
   </div>
@@ -86,9 +86,9 @@
     <div class="bulk-action-group">
       <button type="button" class="bulk-defer-btn {{#if hasDeferableTokens}}available{{/if}}" 
               data-action="bulkDefer" 
-              data-tooltip="Defer all eligible position checks to end of turn">
+              data-tooltip="{{localize 'PF2E_VISIONER.UI.DEFER_ALL_ELIGIBLE'}}">
         <i class="fas fa-hourglass-half"></i>
-        <span>Defer All Eligible</span>
+        <span>{{localize "PF2E_VISIONER.UI.DEFER_ALL_ELIGIBLE_LABEL"}}</span>
       </button>
     </div>
     {{/if}}
@@ -100,24 +100,24 @@
     <div class="bulk-action-group">
       <button type="button" class="end-turn-validation-btn {{#if canProcessEndTurn}}available{{/if}}" 
               data-action="processEndTurnValidation" 
-              data-tooltip="Process {{deferredChecksCount}} deferred position check{{#unless (eq deferredChecksCount 1)}}s{{/unless}} for end-of-turn validation">
+              data-tooltip="{{localize 'PF2E_VISIONER.UI.PROCESS_DEFERRED_CHECKS' count=deferredChecksCount s=(unless (eq deferredChecksCount 1) 's' '')}}">
         <i class="fas fa-clock"></i>
-        <span>End Turn Validation ({{deferredChecksCount}})</span>
+        <span>{{localize "PF2E_VISIONER.UI.END_TURN_VALIDATION"}} ({{deferredChecksCount}})</span>
       </button>
     </div>
     {{/if}}
 
     {{!-- Apply All Cover Group --}}
     <div class="bulk-action-group">
-      <span class="bulk-action-label">Apply All Cover:</span>
+      <span class="bulk-action-label">{{localize "PF2E_VISIONER.UI.APPLY_ALL_COVER_LABEL"}}</span>
       <div class="apply-all-cover-buttons">
-        <button type="button" class="apply-all-cover-btn module-style" data-action="applyAllCover" data-bonus="0" data-tooltip="Apply no cover bonus to all observers">
+        <button type="button" class="apply-all-cover-btn module-style" data-action="applyAllCover" data-bonus="0" data-tooltip="{{localize 'PF2E_VISIONER.UI.APPLY_NO_COVER_ALL'}}">
           <i class="fas fa-shield-slash"></i> +0
         </button>
-        <button type="button" class="apply-all-cover-btn module-style" data-action="applyAllCover" data-bonus="2" data-tooltip="Apply standard cover bonus to all observers">
+        <button type="button" class="apply-all-cover-btn module-style" data-action="applyAllCover" data-bonus="2" data-tooltip="{{localize 'PF2E_VISIONER.UI.APPLY_STANDARD_COVER_ALL'}}">
           <i class="fas fa-shield-alt"></i> +2
         </button>
-        <button type="button" class="apply-all-cover-btn module-style" data-action="applyAllCover" data-bonus="4" data-tooltip="Apply greater cover bonus to all observers">
+        <button type="button" class="apply-all-cover-btn module-style" data-action="applyAllCover" data-bonus="4" data-tooltip="{{localize 'PF2E_VISIONER.UI.APPLY_GREATER_COVER_ALL'}}">
           <i class="fas fa-shield"></i> +4
         </button>
       </div>
@@ -136,25 +136,25 @@
     <table class="visibility-table sneak-results-table">
       <thead>
         <tr>
-          <th class="token-image">Token</th>
-          <th class="token-name">Name</th>
-          <th class="start-position">Start Pos<br>
-            <span class="legend-icon state-indicator visibility-hidden" data-state="hidden" data-tooltip="Hidden or Undetected">
+          <th class="token-image">{{localize "PF2E_VISIONER.UI.TOKEN"}}</th>
+          <th class="token-name">{{localize "PF2E_VISIONER.UI.NAME"}}</th>
+          <th class="start-position">{{localize "PF2E_VISIONER.UI.START_POS"}}<br>
+            <span class="legend-icon state-indicator visibility-hidden" data-state="hidden" data-tooltip="{{localize 'PF2E_VISIONER.UI.HIDDEN_OR_UNDETECTED'}}">
               <i class="fas fa-eye-slash" aria-hidden="true"></i><span class="legend-plus">+</span>
             </span>
           </th>
-          <th class="end-position">End Pos<br>
-            <span class="legend-icon state-indicator visibility-concealed" data-state="concealed" data-tooltip="Concealed">
+          <th class="end-position">{{localize "PF2E_VISIONER.UI.END_POS"}}<br>
+            <span class="legend-icon state-indicator visibility-concealed" data-state="concealed" data-tooltip="{{localize 'PF2E_VISIONER.BUTTONS.CONCEALED'}}">
               <i class="fas fa-cloud" aria-hidden="true"></i>
-            </span>/<span class="legend-icon state-indicator cover-standard" data-state="standard-cover" data-tooltip="Standard or Greater">
+            </span>/<span class="legend-icon state-indicator cover-standard" data-state="standard-cover" data-tooltip="{{localize 'PF2E_VISIONER.UI.STANDARD_OR_GREATER_TOOLTIP'}}">
               <i class="fas fa-shield-alt" aria-hidden="true"></i><span class="legend-plus">+</span>
             </span>
           </th>
-          <th class="cover-bonus">Cover Bonus</th>
-          <th class="roll-result">Stealth vs<br>Perception</th>
-          <th class="outcome">Roll Outcome</th>
-          <th class="visibility-change">Visibility Change</th>
-          <th class="actions">Actions</th>
+          <th class="cover-bonus">{{localize "PF2E_VISIONER.UI.COVER_BONUS"}}</th>
+          <th class="roll-result">{{localize "PF2E_VISIONER.UI.STEALTH_VS_PERCEPTION"}}</th>
+          <th class="outcome">{{localize "PF2E_VISIONER.UI.ROLL_OUTCOME"}}</th>
+          <th class="visibility-change">{{localize "PF2E_VISIONER.UI.VISIBILITY_CHANGE"}}</th>
+          <th class="actions">{{localize "PF2E_VISIONER.UI.ACTIONS"}}</th>
         </tr>
       </thead>
       <tbody>
@@ -168,7 +168,7 @@
               <span class="token-img-wrapper">
                 <img src="{{outcome.tokenImage}}" width="28" height="28" />
                 {{#if outcome.token.document.hidden}}
-                  <span class="foundry-hidden-indicator" data-tooltip="Foundry Hidden"><i class="fas fa-eye-slash"></i></span>
+                  <span class="foundry-hidden-indicator" data-tooltip="{{localize 'PF2E_VISIONER.UI.FOUNDRY_HIDDEN'}}"><i class="fas fa-eye-slash"></i></span>
                 {{/if}}
               </span>
             </td>
@@ -185,7 +185,7 @@
                           data-token-id="{{outcome.token.id}}" 
                           data-requirement="start"
                           {{#if outcome.isDeferred}}disabled{{/if}}
-                          data-tooltip="{{#if (and consecutiveSneaks (gt consecutiveSneaks 1))}}Start position qualification from previous sneak action{{else}}{{#if outcome.positionDisplay.startPosition.qualifies}}Start position qualifies for sneak{{else}}Start position does not qualify for sneak{{/if}}{{/if}}">
+                          data-tooltip="{{#if (and consecutiveSneaks (gt consecutiveSneaks 1))}}{{localize 'PF2E_VISIONER.UI.START_POS_PREVIOUS_SNEAK'}}{{else}}{{#if outcome.positionDisplay.startPosition.qualifies}}{{localize 'PF2E_VISIONER.UI.START_POS_QUALIFIES'}}{{else}}{{localize 'PF2E_VISIONER.UI.START_POS_NOT_QUALIFIES'}}{{/if}}{{/if}}">
                     {{#if (and consecutiveSneaks (gt consecutiveSneaks 1))}}
                       <i class="fas fa-clock"></i>
                     {{else}}
@@ -198,7 +198,7 @@
                   </button>
                 </div>
               {{else}}
-                <div class="no-position-data" data-tooltip="Start position data not available">
+                <div class="no-position-data" data-tooltip="{{localize 'PF2E_VISIONER.UI.START_POSITION_NOT_AVAILABLE'}}">
                   <i class="fas fa-question-circle"></i>
                 </div>
               {{/if}}
@@ -211,7 +211,7 @@
                           data-action="toggleEndPosition" 
                           data-token-id="{{outcome.token.id}}" 
                           data-requirement="end"
-                          data-tooltip="{{#if (and consecutiveSneaks (gt consecutiveSneaks 1))}}End position will be checked at end of turn (consecutive sneak){{else}}{{#if outcome.positionDisplay.endPosition.qualifies}}End position qualifies for sneak{{else}}End position does not qualify for sneak{{/if}}{{/if}}">
+                          data-tooltip="{{#if (and consecutiveSneaks (gt consecutiveSneaks 1))}}{{localize 'PF2E_VISIONER.UI.END_POS_CHECK_END_TURN'}}{{else}}{{#if outcome.positionDisplay.endPosition.qualifies}}{{localize 'PF2E_VISIONER.UI.END_POS_QUALIFIES'}}{{else}}{{localize 'PF2E_VISIONER.UI.END_POS_NOT_QUALIFIES'}}{{/if}}{{/if}}">
                     {{#if (and consecutiveSneaks (gt consecutiveSneaks 1))}}
                       <i class="fas fa-clock"></i>
                     {{else}}
@@ -230,7 +230,7 @@
                       <button type="button" class="defer-btn" 
                               data-action="toggleDefer" 
                               data-token-id="{{outcome.token.id}}"
-                              data-tooltip="Defer end position check to end of turn (Sneaky feat)">
+                              data-tooltip="{{localize 'PF2E_VISIONER.UI.DEFER_TO_END_OF_TURN'}}">
                         <i class="fas fa-hourglass"></i>
                       </button>
                     {{else}}
@@ -238,7 +238,7 @@
                       <button type="button" class="defer-btn deferred active" 
                               data-action="toggleDefer" 
                               data-token-id="{{outcome.token.id}}"
-                              data-tooltip="Currently deferred to end of turn (Sneaky feat)" disabled>
+                              data-tooltip="{{localize 'PF2E_VISIONER.UI.CURRENTLY_DEFERRED'}}" disabled>
                         <i class="fas fa-clock"></i>
                       </button>
                     {{/if}}
@@ -247,13 +247,13 @@
                     <button type="button" class="defer-btn {{#unless outcome.canDefer}}hidden{{/unless}}" 
                             data-action="toggleDefer" 
                             data-token-id="{{outcome.token.id}}"
-                            data-tooltip="Defer end position check to end of turn (Sneaky feat)">
+                            data-tooltip="{{localize 'PF2E_VISIONER.UI.DEFER_TO_END_OF_TURN'}}">
                       <i class="fas fa-hourglass"></i>
                     </button>
                   {{/if}}
                 </div>
               {{else}}
-                <div class="no-position-data" data-tooltip="End position data not available">
+                <div class="no-position-data" data-tooltip="{{localize 'PF2E_VISIONER.UI.END_POSITION_NOT_AVAILABLE'}}">
                   <i class="fas fa-question-circle"></i>
                 </div>
               {{/if}}
@@ -265,21 +265,21 @@
                         data-action="setCoverBonus" 
                         data-token-id="{{outcome.token.id}}" 
                         data-bonus="0"
-                        data-tooltip="No cover bonus (+0)">
+                        data-tooltip="{{localize 'PF2E_VISIONER.UI.NO_COVER_BONUS'}}">
                   <i class="fas fa-shield-slash"></i>
                 </button>
                 <button type="button" class="cover-bonus-btn module-style {{#if (eq outcome.appliedCoverBonus 2)}}active{{/if}}" 
                         data-action="setCoverBonus" 
                         data-token-id="{{outcome.token.id}}" 
                         data-bonus="2"
-                        data-tooltip="Standard cover bonus (+2)">
+                        data-tooltip="{{localize 'PF2E_VISIONER.UI.STANDARD_COVER_BONUS'}}">
                   <i class="fas fa-shield-alt"></i>
                 </button>
                 <button type="button" class="cover-bonus-btn module-style {{#if (eq outcome.appliedCoverBonus 4)}}active{{/if}}" 
                         data-action="setCoverBonus" 
                         data-token-id="{{outcome.token.id}}" 
                         data-bonus="4"
-                        data-tooltip="Greater cover bonus (+4)">
+                        data-tooltip="{{localize 'PF2E_VISIONER.UI.GREATER_COVER_BONUS'}}">
                   <i class="fas fa-shield"></i>
                 </button>
               </div>
@@ -288,7 +288,7 @@
               <div class="roll-vs-dc">
                 <div class="roll-dc-line">
                   <span class="roll-total" data-base-total="{{outcome.baseRollTotal}}">{{outcome.rollTotal}}</span>
-                  <span class="vs-text">vs DC</span>
+                  <span class="vs-text">{{localize "PF2E_VISIONER.UI.VS_DC"}}</span>
                   <span class="dc-value">{{outcome.dc}}</span>
                 </div>
               </div>
@@ -297,8 +297,8 @@
               <div class="final-result-display">
                 <div class="outcome-primary sneak-result-{{outcome.outcome}}">
                   {{#if outcome.sneakAdeptApplied}}
-                    <span class="outcome-text-crossed" >Failure</span>
-                    <span class="outcome-text">Success</span>
+                    <span class="outcome-text-crossed" >{{localize "PF2E_VISIONER.UI.FAILURE_LABEL"}}</span>
+                    <span class="outcome-text">{{localize "PF2E_VISIONER.UI.SUCCESS_LABEL"}}</span>
                   {{else}}
                     <span class="outcome-text">{{outcome.outcomeLabel}}</span>
                   {{/if}}
@@ -310,7 +310,7 @@
                 <span class="old-visibility-state {{#if outcome.isOldStateAvsControlled}}avs-controlled{{/if}}">
                   {{{visibilityIcon outcome.oldVisibility}}}
                   {{#if outcome.isOldStateAvsControlled}}
-                    <span class="avs-tag-small" data-tooltip="Controlled by Auto-Visibility System">
+                    <span class="avs-tag-small" data-tooltip="{{localize 'PF2E_VISIONER.UI.AVS_CONTROLLED'}}">
                       <i class="fas fa-bolt-auto"></i>
                     </span>
                   {{/if}}
@@ -322,7 +322,7 @@
                             data-action="overrideState"
                             data-state="{{state.value}}" data-token-id="{{outcome.token.id}}" 
                             {{#if outcome.isDeferred}}disabled{{/if}}
-                            data-tooltip="{{#if outcome.isDeferred}}Disabled - deferred to end of turn{{else if state.calculatedOutcome}}AVS Recommended: {{state.label}}{{else}}{{state.label}}{{/if}}">
+                            data-tooltip="{{#if outcome.isDeferred}}{{localize 'PF2E_VISIONER.UI.DEFERRED_ACTIONS_DISABLED'}}{{else if state.calculatedOutcome}}{{localize 'PF2E_VISIONER.UI.AVS_RECOMMENDED' label=state.label}}{{else}}{{state.label}}{{/if}}">
                       <i class="{{state.icon}}"></i>
                     </button>
                   {{/each}}
@@ -331,8 +331,8 @@
               </div>
               {{#if (and outcome.shouldShowOverride outcome.originalNewVisibility)}}
                 <div class="original-visibility-change">
-                  <span>Original Change:</span>
-                  <span class="state-icon" data-state="{{outcome.originalNewVisibility}}" data-tooltip="Original Cover: {{outcome.originalNewVisibility}}">
+                  <span>{{localize "PF2E_VISIONER.UI.ORIGINAL_CHANGE"}}</span>
+                  <span class="state-icon" data-state="{{outcome.originalNewVisibility}}" data-tooltip="{{localize 'PF2E_VISIONER.UI.ORIGINAL_COVER' state=outcome.originalNewVisibility}}">
                     {{{visibilityIcon outcome.originalNewVisibility}}}
                   </span>
                 </div>
@@ -341,13 +341,13 @@
             <td class="actions">
               {{#if outcome.isDeferred}}
                 <div class="deferred-actions-container" data-debug="deferred-container-{{outcome.token.id}}">
-                  <span class="deferred-action" data-tooltip="Actions disabled - deferred to end of turn">
+                  <span class="deferred-action" data-tooltip="{{localize 'PF2E_VISIONER.UI.DEFERRED_ACTIONS_DISABLED'}}">
                     <i class="fas fa-clock"></i> Deferred
                   </span>
                   <button type="button" class="undefer-btn" 
                           data-action="undeferCheck" 
                           data-token-id="{{outcome.token.id}}"
-                          data-tooltip="Remove defer and process this check now"
+                          data-tooltip="{{localize 'PF2E_VISIONER.UI.REMOVE_DEFER_PROCESS_NOW'}}"
                           data-debug="undefer-btn-{{outcome.token.id}}"
                           style="pointer-events: auto !important; z-index: 999; position: relative;">
                     <i class="fas fa-times"></i>
@@ -357,16 +357,16 @@
               {{else if outcome.hasActionableChange}}
                 <button type="button" class="row-action-btn apply-change" 
                 {{#if outcome.isDeferred}}disabled{{/if}}
-                data-action="applyChange" data-token-id="{{outcome.token.id}}" data-tooltip="Apply this visibility change">
+                data-action="applyChange" data-token-id="{{outcome.token.id}}" data-tooltip="{{localize 'PF2E_VISIONER.UI.APPLY_VISIBILITY_CHANGE'}}">
                   <i class="fas fa-check"></i>
                 </button>
                 <button type="button" class="row-action-btn revert-change" 
                 {{#if outcome.isDeferred}}disabled{{/if}}
-                data-action="revertChange" data-token-id="{{outcome.token.id}}" data-tooltip="Revert to original visibility">
+                data-action="revertChange" data-token-id="{{outcome.token.id}}" data-tooltip="{{localize 'PF2E_VISIONER.UI.REVERT_TO_ORIGINAL'}}">
                   <i class="fas fa-undo"></i>
                 </button>
               {{else}}
-                <span class="no-action">No Change</span>
+                <span class="no-action">{{localize "PF2E_VISIONER.UI.NO_CHANGE_LABEL"}}</span>
               {{/if}}
             </td>
           </tr>
@@ -383,23 +383,23 @@
     
     <div class="sneak-preview-dialog-bulk-actions-buttons">
       {{#if isEndOfTurnDialog}}
-        <button type="button" class="bulk-action-btn apply-all" data-action="applyAll" data-tooltip="Acknowledge end-of-turn position validation results">
+        <button type="button" class="bulk-action-btn apply-all" data-action="applyAll" data-tooltip="{{localize 'PF2E_VISIONER.UI.ACKNOWLEDGE_END_TURN'}}">
           <i class="fas fa-check-circle"></i> Acknowledge Results
         </button>
-        <button type="button" class="bulk-action-btn close-dialog" data-action="close" data-tooltip="Close dialog (results are automatically applied)">
+        <button type="button" class="bulk-action-btn close-dialog" data-action="close" data-tooltip="{{localize 'PF2E_VISIONER.UI.CLOSE_DIALOG'}}">
           <i class="fas fa-times"></i> Close
         </button>
       {{else}}
-        <button type="button" class="bulk-action-btn apply-all" data-action="applyAll" data-tooltip="Apply all visibility changes">
-          <i class="fas fa-check-circle"></i> Apply All
+        <button type="button" class="bulk-action-btn apply-all" data-action="applyAll" data-tooltip="{{localize 'PF2E_VISIONER.UI.APPLY_ALL_CHANGES'}}">
+          <i class="fas fa-check-circle"></i> {{localize "PF2E_VISIONER.UI.APPLY_ALL"}}
         </button>
-        <button type="button" class="bulk-action-btn revert-all" data-action="revertAll" data-tooltip="Revert all changes to original state">
-          <i class="fas fa-undo"></i> Revert All
+        <button type="button" class="bulk-action-btn revert-all" data-action="revertAll" data-tooltip="{{localize 'PF2E_VISIONER.UI.REVERT_ALL_CHANGES'}}">
+          <i class="fas fa-undo"></i> {{localize "PF2E_VISIONER.UI.REVERT_ALL"}}
         </button>
         {{#if canBulkUndefer}}
         <button type="button" class="bulk-action-btn undefer-all {{#if hasDeferredTokens}}available{{/if}}" 
                 data-action="bulkUndefer" 
-                data-tooltip="Undefer all currently deferred tokens and restore their original state">
+                data-tooltip="{{localize 'PF2E_VISIONER.UI.UNDEFER_ALL'}}">
           <i class="fas fa-clock"></i> Undefer All
         </button>
         {{/if}}

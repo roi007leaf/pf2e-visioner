@@ -92,21 +92,21 @@ function createVisibilityRuleElement(baseRuleElementClass, fields) {
         required: true,
         choices: ['self'],
         initial: 'self',
-        label: 'Subject',
+        label: game.i18n.localize('PF2E_VISIONER.RULE_ELEMENTS.LABELS.SUBJECT'),
       });
 
       schema.observers = new fields.StringField({
         required: true,
         choices: ['all', 'allies', 'enemies', 'selected', 'targeted'],
         initial: 'all',
-        label: 'Observers',
+        label: game.i18n.localize('PF2E_VISIONER.RULE_ELEMENTS.LABELS.OBSERVERS'),
       });
 
       schema.direction = new fields.StringField({
         required: false,
         choices: ['from', 'to'],
         initial: 'from',
-        label: 'Direction',
+        label: game.i18n.localize('PF2E_VISIONER.RULE_ELEMENTS.LABELS.DIRECTION'),
         hint: "'from': observers see subject as hidden, 'to': subject sees observers as hidden. Effects always on subject.",
       });
 
@@ -114,7 +114,7 @@ function createVisibilityRuleElement(baseRuleElementClass, fields) {
         required: true,
         choices: ['set', 'increase', 'decrease', 'remove'],
         initial: 'set',
-        label: 'Mode',
+        label: game.i18n.localize('PF2E_VISIONER.RULE_ELEMENTS.LABELS.MODE'),
         hint: "'set': directly set visibility state, 'increase'/'decrease': adjust visibility by steps, 'remove': reset to observed and remove effects",
       });
 
@@ -122,33 +122,33 @@ function createVisibilityRuleElement(baseRuleElementClass, fields) {
         required: true,
         choices: ['observed', 'concealed', 'hidden', 'undetected'],
         initial: 'hidden',
-        label: 'Status',
+        label: game.i18n.localize('PF2E_VISIONER.RULE_ELEMENTS.LABELS.STATUS'),
       });
 
       schema.steps = new fields.NumberField({
         required: false,
         initial: 1,
-        label: 'Steps',
+        label: game.i18n.localize('PF2E_VISIONER.RULE_ELEMENTS.LABELS.STEPS'),
       });
 
       schema.durationRounds = new fields.NumberField({
         required: false,
         nullable: true,
         initial: null,
-        label: 'Duration (Rounds)',
+        label: game.i18n.localize('PF2E_VISIONER.RULE_ELEMENTS.LABELS.DURATION'),
       });
 
       schema.requiresInitiative = new fields.BooleanField({
         required: false,
         initial: false,
-        label: 'Requires Initiative',
+        label: game.i18n.localize('PF2E_VISIONER.RULE_ELEMENTS.LABELS.REQUIRES_INITIATIVE'),
       });
 
       schema.range = new fields.NumberField({
         required: false,
         nullable: true,
         initial: null,
-        label: 'Range (feet)',
+        label: game.i18n.localize('PF2E_VISIONER.RULE_ELEMENTS.LABELS.RANGE'),
       });
 
       return schema;

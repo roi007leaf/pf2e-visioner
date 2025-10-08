@@ -8,7 +8,7 @@ export class TakeCoverPreviewDialog extends BaseActionDialog {
     tag: 'div',
     classes: ['pf2e-visioner', 'take-cover-preview-dialog'],
     window: {
-      title: 'Take Cover Results',
+      title: game.i18n.localize('PF2E_VISIONER.DIALOG_TITLES.TAKE_COVER_RESULTS'),
       icon: 'fas fa-shield-alt',
       resizable: true,
     },
