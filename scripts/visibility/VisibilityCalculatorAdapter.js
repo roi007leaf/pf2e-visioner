@@ -11,6 +11,7 @@ import { MODULE_ID } from '../constants.js';
 import { calculateDistanceInFeet } from '../helpers/geometry-utils.js';
 import { ConcealmentRegionBehavior } from '../regions/ConcealmentRegionBehavior.js';
 import { calculateVisibility } from './StatelessVisibilityCalculator.js';
+import { FeatsHandler } from '../chat/services/FeatsHandler.js';
 
 /**
  * Convert token and game state to standardized visibility input
@@ -409,6 +410,11 @@ function extractAuxiliaryConditions(target, options) {
         if (!auxiliary.includes('invisible')) {
             auxiliary.push('invisible');
         }
+    }
+
+    // Check for Petal Step feat (immune to tremorsense)
+    if (FeatsHandler.hasFeat(target, 'petal-step')) {
+        auxiliary.push('petal-step');
     }
 
     return auxiliary;
