@@ -1034,14 +1034,20 @@ function injectPF2eVisionerBox(app, root) {
         const fs = document.createElement('fieldset');
         fs.className = 'pf2e-visioner-scene-settings';
         const scene = app?.object || app?.document || canvas?.scene;
-        const current = Number(scene?.getFlag?.(MODULE_ID, 'hiddenIndicatorHalf')) || 10;
+        const currentWidth = Number(scene?.getFlag?.(MODULE_ID, 'hiddenIndicatorHalf')) || 10;
+        const currentDim = Number(scene?.getFlag?.(MODULE_ID, 'dimThreshold')) || 0.25;
         fs.innerHTML = `
           <legend>PF2E Visioner</legend>
           <div class="form-group" style="display:flex; flex-direction:column; gap:6px;">
             <label>Hidden Wall Indicator Width (half, px)</label>
             <div style="display:flex; align-items:center; gap:8px; width:100%;">
-              <input type="range" min="1" max="30" step="1" name="flags.${MODULE_ID}.hiddenIndicatorHalf" value="${current}" oninput="this.nextElementSibling.value=this.value" style="flex:1 1 auto; width:100%;">
-              <output style="min-width:2ch; text-align:right;">${current}</output>
+              <input type="range" min="1" max="30" step="1" name="flags.${MODULE_ID}.hiddenIndicatorHalf" value="${currentWidth}" oninput="this.nextElementSibling.value=this.value" style="flex:1 1 auto; width:100%;">
+              <output style="min-width:2ch; text-align:right;">${currentWidth}</output>
+            </div>
+            <label>Dim Lighting Threshold</label>
+            <div style="display:flex; align-items:center; gap:8px; width:100%;">
+              <input type="range" min="0" max="1" step="0.05" name="flags.${MODULE_ID}.dimThreshold" value="${currentDim}" oninput="this.nextElementSibling.value=this.value" style="flex:1 1 auto; width:100%;">
+              <output style="min-width:2ch; text-align:right;">${currentDim}</output>
             </div>
           </div>
         `;
