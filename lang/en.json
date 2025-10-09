@@ -507,7 +507,7 @@
       },
       "DISABLE_LINE_OF_SIGHT": {
         "name": "Disable Line of Sight Calculations",
-        "hint": "Disable line-of-sight calculations for visibility. When enabled, visibility will be determined solely by distance and senses, ignoring walls and obstacles. Useful for performance optimization or specific game styles."
+        "hint": "Disable line-of-sight calculations for visibility. When enabled, visibility will only be calculated for selected tokens using their vision shapes. Visibility results within the visibility shape will be more accurate, but darkvision results will only use distance and senses, ignoring walls and obstacles."
       },
       "COLORBLIND_MODE": {
         "name": "Colorblind Mode",
