@@ -664,13 +664,12 @@ export class VisionAnalyzer {
       delete enhanced.imprecise.echolocation;
     }
 
-    // Detect echolocation and upgrade hearing to precise if not deafened
+    // Detect echolocation and add as precise sense if not deafened
     if (!isDeafened) {
       const echolocation = this.#detectEcholocation(actor);
       if (echolocation.active) {
-        // Remove hearing from imprecise and add to precise with echolocation range
-        delete enhanced.imprecise.hearing;
-        enhanced.precise.hearing = echolocation.range;
+        // Add echolocation as a precise sense (keeping hearing as imprecise if it exists)
+        enhanced.precise.echolocation = echolocation.range;
       }
     }
 

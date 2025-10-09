@@ -21,6 +21,7 @@ class HoverTooltipsImpl {
     this.tokenEventHandlers = new Map();
     this.tooltipMode = 'target';
     this.isShowingKeyTooltips = false;
+    this.isShowingCoverOverlay = false;
     this.keyTooltipTokens = new Set();
     this.tooltipFontSize = 16;
     this.tooltipIconSize = 14;
@@ -353,9 +354,6 @@ export function initializeHoverTooltips() {
           hideAllCoverIndicators();
           setTimeout(() => {
             showVisibilityIndicators(tok);
-            try {
-              showCoverIndicators(tok);
-            } catch (_) { }
           }, 0);
         }
       }, 150); // 150ms debounce - batch multiple rapid updates
@@ -387,9 +385,6 @@ export function initializeHoverTooltips() {
           hideAllCoverIndicators();
           setTimeout(() => {
             showVisibilityIndicators(tok);
-            try {
-              showCoverIndicators(tok);
-            } catch (_) { }
           }, 0);
         } else if (HoverTooltips.isShowingKeyTooltips) {
           hideAllVisibilityIndicators();
@@ -419,8 +414,8 @@ function onTokenHover(hoveredToken) {
   if (HoverTooltips._isPanning || HoverTooltips._isTokenMoving || HoverTooltips._isDragging) return;
 
   // Only show hover tooltips if allowed for this user with current mode AND token
-  // Suppress hover overlays entirely while Alt overlay is active
-  if (HoverTooltips.isShowingKeyTooltips) return;
+  // Suppress hover overlays entirely while any keybind overlay is active
+  if (HoverTooltips.isShowingKeyTooltips || HoverTooltips.isShowingCoverOverlay) return;
   if (!canShowTooltips(HoverTooltips.tooltipMode, hoveredToken)) {
     return;
   }
@@ -514,9 +509,6 @@ export function onHighlightObjects(highlight) {
     if (HoverTooltips.currentHoveredToken) {
       setTimeout(() => {
         showVisibilityIndicators(HoverTooltips.currentHoveredToken);
-        try {
-          showCoverIndicators(HoverTooltips.currentHoveredToken);
-        } catch (_) { }
       }, 50);
     }
   }
@@ -528,8 +520,8 @@ export function onHighlightObjects(highlight) {
  */
 function showVisibilityIndicators(hoveredToken) {
   // Check if tooltips are allowed for the current mode and token
-  // Suppress hover overlays entirely while Alt overlay is active, UNLESS this is a keyboard context
-  if (HoverTooltips.isShowingKeyTooltips && !HoverTooltips._keyboardContext) return;
+  // Suppress hover overlays entirely while any keybind overlay is active, UNLESS this is a keyboard context
+  if ((HoverTooltips.isShowingKeyTooltips || HoverTooltips.isShowingCoverOverlay) && !HoverTooltips._keyboardContext) return;
 
   // Check if this is a keyboard-triggered call
   const isKeyboardTooltip = !!HoverTooltips._keyboardContext;
@@ -543,8 +535,8 @@ function showVisibilityIndicators(hoveredToken) {
     return;
   }
 
-  // Clear any existing indicators, unless Alt overlay is active (handled separately)
-  if (!HoverTooltips.isShowingKeyTooltips) {
+  // Clear any existing indicators, unless a keybind overlay is active (handled separately)
+  if (!HoverTooltips.isShowingKeyTooltips && !HoverTooltips.isShowingCoverOverlay) {
     hideAllVisibilityIndicators();
     hideAllCoverIndicators();
   }
@@ -583,7 +575,7 @@ function showVisibilityIndicators(hoveredToken) {
       // Never show just a sense badge for undetected (already filtered above)
       if (visibilityState !== 'observed' || hasSense) {
         // Pass relation token (targetToken) to compute cover vs hoveredToken
-        addVisibilityIndicator(targetToken, hoveredToken, visibilityState, 'observer', targetToken);
+        addVisibilityIndicator(targetToken, hoveredToken, visibilityState, 'observer');
       }
     });
   } else {
@@ -657,77 +649,7 @@ function showVisibilityIndicators(hoveredToken) {
     }
   }
 
-  // Additionally render cover-only indicators when there is cover but no visibility change
-  // Already suppressed above if Alt overlay is active
-  try {
-    showCoverIndicators(hoveredToken);
-  } catch (_) { }
-}
 
-/**
- * Show cover indicators on other tokens
- * @param {Token} hoveredToken - The token being hovered
- */
-function showCoverIndicators(hoveredToken) {
-  // Suppress hover overlays entirely while Alt overlay is active, UNLESS this is a keyboard context
-  if (HoverTooltips.isShowingKeyTooltips && !HoverTooltips._keyboardContext) return;
-
-  // Check if this is a keyboard-triggered call
-  const isKeyboardTooltip = !!HoverTooltips._keyboardContext;
-  const tooltipsAllowed = canShowTooltips(
-    HoverTooltips.tooltipMode,
-    hoveredToken,
-    isKeyboardTooltip,
-  );
-  if (!tooltipsAllowed) return;
-
-  hideAllCoverIndicators();
-
-  const otherTokens = canvas.tokens.placeables.filter((t) => t !== hoveredToken && t.isVisible);
-  if (otherTokens.length === 0) return;
-
-  if (HoverTooltips.tooltipMode === 'observer') {
-    // How hoveredToken sees others (cover from hoveredToken's perspective)
-    if (!game.user.isGM && !hoveredToken.isOwner) return;
-    otherTokens.forEach((targetToken) => {
-      // Skip duplicate if visibility badge already carries cover
-      const visInd = HoverTooltips.visibilityIndicators.get(targetToken.id);
-      if (visInd && visInd._coverBadgeEl) return;
-      const coverMap = getCoverMap(hoveredToken);
-      const coverState = coverMap[targetToken.document.id] || 'none';
-      if (coverState !== 'none') {
-        addCoverIndicator(targetToken, hoveredToken, coverState, 'observer');
-      }
-    });
-  } else {
-    // Target mode: How others see the hovered token (cover others have against hovered)
-    if (!game.user.isGM) {
-      if (hoveredToken.isOwner) {
-        const nonPlayerTokens = canvas.tokens.placeables.filter(
-          (t) => t !== hoveredToken && t.isVisible,
-        );
-        nonPlayerTokens.forEach((otherToken) => {
-          const visInd = HoverTooltips.visibilityIndicators.get(otherToken.id);
-          if (visInd && visInd._coverBadgeEl) return;
-          const coverMap = getCoverMap(otherToken);
-          const coverState = coverMap[hoveredToken.document.id] || 'none';
-          if (coverState !== 'none') {
-            addCoverIndicator(otherToken, otherToken, coverState, 'target');
-          }
-        });
-      }
-    } else {
-      otherTokens.forEach((observerToken) => {
-        const visInd = HoverTooltips.visibilityIndicators.get(observerToken.id);
-        if (visInd && visInd._coverBadgeEl) return;
-        const coverMap = getCoverMap(observerToken);
-        const coverState = coverMap[hoveredToken.document.id] || 'none';
-        if (coverState !== 'none') {
-          addCoverIndicator(observerToken, observerToken, coverState, 'target');
-        }
-      });
-    }
-  }
 }
 
 /**
@@ -781,7 +703,6 @@ function showVisibilityIndicatorsForToken(observerToken, forceMode = null) {
           observerToken,
           visibilityState,
           'observer',
-          targetToken,
         );
       }
     });
@@ -847,33 +768,69 @@ function showVisibilityIndicatorsForToken(observerToken, forceMode = null) {
 }
 
 /**
- * Compute auto-cover fresh (ignoring stored maps) and render cover-only badges above targets.
- * Does not affect any visibility states.
+ * Show both manual cover and auto-computed cover as badges above targets.
+ * Manual cover badges have a cog overlay to indicate manual override.
+ * Manual cover takes precedence over auto cover when both exist.
  * @param {Token} sourceToken - The token acting as the attacker/source
  */
 export function showAutoCoverComputedOverlay(sourceToken) {
   try {
     if (!sourceToken) return;
+    
+    // Set flag to suppress hover tooltips
+    HoverTooltips.isShowingCoverOverlay = true;
+    
+    // Clear any existing hover tooltips
+    hideAllVisibilityIndicators();
     hideAllCoverIndicators();
+    
     const others = (canvas.tokens?.placeables || []).filter(
       (t) => t && t !== sourceToken && t.isVisible,
     );
+    
+    // Get manual cover map for this source
+    const manualCoverMap = getCoverMap(sourceToken) || {};
+    
     for (const target of others) {
-      let state = 'none';
-      try {
-        state = autoCoverSystem.detectCoverBetweenTokens(sourceToken, target) || 'none';
-      } catch (_) {
-        state = 'none';
+      const targetId = target.document.id;
+      
+      // Check manual cover first - it takes precedence
+      const manualCover = manualCoverMap[targetId];
+      if (manualCover && manualCover !== 'none') {
+        // Show manual cover badge with cog overlay
+        addCoverIndicator(target, sourceToken, manualCover, true);
+        continue;
       }
-      if (state && state !== 'none') {
-        addCoverIndicator(target, sourceToken, state, 'target');
+      
+      // If no manual cover, check auto cover
+      let autoCover = 'none';
+      try {
+        autoCover = autoCoverSystem.detectCoverBetweenTokens(sourceToken, target) || 'none';
+      } catch (_) {
+        autoCover = 'none';
+      }
+      
+      if (autoCover && autoCover !== 'none') {
+        // Show auto cover badge (no overlay)
+        addCoverIndicator(target, sourceToken, autoCover, false);
       }
     }
   } catch (_) { }
 }
 
 export function hideAutoCoverComputedOverlay() {
+  // Clear flag to allow hover tooltips again
+  HoverTooltips.isShowingCoverOverlay = false;
   hideAllCoverIndicators();
+  
+  // If still hovering over a token, restore hover tooltips
+  if (HoverTooltips.currentHoveredToken) {
+    setTimeout(() => {
+      if (HoverTooltips.currentHoveredToken) {
+        showVisibilityIndicators(HoverTooltips.currentHoveredToken);
+      }
+    }, 50);
+  }
 }
 
 /**
@@ -967,13 +924,14 @@ export function showControlledTokenVisibilityObserver() {
  * @param {Token} observerToken - The token that has the visibility perspective
  * @param {string} visibilityState - The visibility state
  * @param {string} mode - 'observer' or 'target' mode
+ * @param {Token} detectionTarget - In target mode, this is the token being detected (hoveredToken); in observer mode, it's the same as targetToken
  */
 function addVisibilityIndicator(
   targetToken,
   observerToken,
   visibilityState,
   mode = 'observer',
-  relationToken = null,
+  detectionTarget = null,
 ) {
   const config = VISIBILITY_STATES[visibilityState];
   if (!config) return;
@@ -983,19 +941,14 @@ function addVisibilityIndicator(
 
   // Get detection info (which sense was used) from detection map
   // Don't show sense badges for undetected targets (observer doesn't know about them)
-  // In target mode: observerToken (where badge shows) sees relationToken (hovered token)
-  // In observer mode: observerToken (hovered) sees targetToken (where badge shows)
   let detectionInfo = null;
   let senseUsed = null;
   if (avsEnabled && visibilityState !== 'undetected') {
     try {
-      if (mode === 'target') {
-        // Show how observerToken detects the hovered token (relationToken)
-        detectionInfo = getDetectionBetween(observerToken, relationToken);
-      } else {
-        // Show how observerToken (hovered) detects targetToken
-        detectionInfo = getDetectionBetween(observerToken, targetToken);
-      }
+      // In target mode, detectionTarget is the hoveredToken (what observer is detecting)
+      // In observer mode, detectionTarget is the targetToken (same as where badge appears)
+      const actualTarget = detectionTarget || targetToken;
+      detectionInfo = getDetectionBetween(observerToken, actualTarget);
       if (detectionInfo && detectionInfo.sense) {
         senseUsed = detectionInfo.sense;
       }
@@ -1029,17 +982,6 @@ function addVisibilityIndicator(
   const spacing = Math.max(6, Math.round(sizeConfig.iconPx / 2));
   const borderRadius = Math.round(badgeHeight / 3);
 
-  // Determine if cover applies
-  let coverConfig = null;
-  try {
-    if (relationToken) {
-      const coverMapSource = mode === 'observer' ? observerToken : targetToken;
-      const coverMap = getCoverMap(coverMapSource);
-      const coverState = coverMap[relationToken.document.id] || 'none';
-      if (coverState !== 'none') coverConfig = COVER_STATES[coverState];
-    }
-  } catch (_) { }
-
   // Compute aligned positions using world->screen transform
   const globalPoint = canvas.tokens.toGlobal(new PIXI.Point(indicator.x, indicator.y));
   const centerX = canvasRect.left + globalPoint.x;
@@ -1071,14 +1013,14 @@ function addVisibilityIndicator(
       const iconMap = {
         'tremorsense': 'fa-solid fa-tower-broadcast',
         'lifesense': 'fa-solid fa-heartbeat',
-        'scent': 'fa-solid fa-wind',
+        'scent': 'fa-solid fa-nose',
         'hearing': 'fa-solid fa-ear-listen',
         'greater-darkvision': 'fa-solid fa-moon',
         'greaterDarkvision': 'fa-solid fa-moon',
         'darkvision': 'fa-regular fa-moon',
         'low-light-vision': 'fa-solid fa-moon-over-sun',
         'lowLightVision': 'fa-solid fa-moon-over-sun',
-        'see-invisibility': 'fa-solid fa-user-dashed',
+        'see-invisibility': 'fa-solid fa-person-rays',
         'light-perception': 'fa-solid fa-eye',
         'vision': 'fa-solid fa-eye',
         'echolocation': 'fa-solid fa-wave-pulse'
@@ -1102,46 +1044,7 @@ function addVisibilityIndicator(
     return el;
   };
 
-  if (coverConfig) {
-    // Three badges: sense (if present), visibility, cover
-    const totalWidth = (senseUsed ? badgeWidth + spacing : 0) + badgeWidth + spacing + badgeWidth;
-    const startX = centerX - totalWidth / 2;
-    
-    let currentX = startX;
-    
-    // Place sense badge if present
-    if (senseUsed) {
-      indicator._senseBadgeEl = placeSenseBadge(currentX, centerY, senseUsed);
-      currentX += badgeWidth + spacing;
-    }
-    
-    // Place visibility badge
-    indicator._visBadgeEl = placeBadge(
-      currentX,
-      centerY,
-      visibilityState,
-      config.icon,
-      'visibility'
-    );
-    currentX += badgeWidth + spacing;
-    
-    // Place cover badge
-    let coverStateName = 'none';
-    try {
-      if (relationToken) {
-        const coverMapSource = mode === 'observer' ? observerToken : targetToken;
-        const coverMap = getCoverMap(coverMapSource);
-        coverStateName = coverMap[relationToken.document.id] || 'none';
-      }
-    } catch (_) { }
-    indicator._coverBadgeEl = placeBadge(
-      currentX,
-      centerY,
-      coverStateName,
-      coverConfig.icon,
-      'cover'
-    );
-  } else if (visibilityState === 'observed') {
+  if (visibilityState === 'observed') {
     // Observed state: only show sense badge (no visibility badge)
     if (senseUsed) {
       const left = centerX - badgeWidth / 2;
@@ -1307,8 +1210,9 @@ function updateBadgePositions() {
  * @param {Token} targetToken
  * @param {Token} observerToken
  * @param {string} coverState
+ * @param {boolean} isManualCover - If true, adds a cog overlay to indicate manual cover
  */
-function addCoverIndicator(targetToken, observerToken, coverState) {
+function addCoverIndicator(targetToken, observerToken, coverState, isManualCover = false) {
   const config = COVER_STATES[coverState];
   if (!config) return;
 
@@ -1377,8 +1281,16 @@ function addCoverIndicator(targetToken, observerToken, coverState) {
   };
   const color =
     colorblindMode !== 'none' ? colorblindmodeMap[colorblindMode][coverState] : config.color;
-  el.innerHTML = `<span style="display:inline-flex; align-items:center; justify-content:center; background: rgba(0,0,0,0.9); border: var(--pf2e-visioner-tooltip-badge-border, 2px) solid ${color}; border-radius: ${borderRadius}px; width: ${badgeWidth}px; height: ${badgeHeight}px; color: ${color};">
-    <i class="${config.icon}" style="font-size: var(--pf2e-visioner-tooltip-icon-size, 14px); line-height: 1;"></i>
+  
+  // Build the badge HTML with optional cog overlay for manual cover
+  const coverIconHTML = `<i class="${config.icon}" style="font-size: var(--pf2e-visioner-tooltip-icon-size, 14px); line-height: 1;"></i>`;
+  const cogOverlay = isManualCover 
+    ? `<i class="fa-solid fa-cog" style="position: absolute; bottom: -2px; right: -2px; font-size: calc(var(--pf2e-visioner-tooltip-icon-size, 16px) * 0.5); color: #888; text-shadow: 0 0 3px black;"></i>` 
+    : '';
+  
+  el.innerHTML = `<span style="display:inline-flex; align-items:center; justify-content:center; position: relative; background: rgba(0,0,0,0.9); border: var(--pf2e-visioner-tooltip-badge-border, 2px) solid ${color}; border-radius: ${borderRadius}px; width: ${badgeWidth}px; height: ${badgeHeight}px; color: ${color};">
+    ${coverIconHTML}
+    ${cogOverlay}
   </span>`;
   document.body.appendChild(el);
   indicator._coverBadgeEl = el;
