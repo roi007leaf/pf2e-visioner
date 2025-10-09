@@ -21,6 +21,17 @@
   - Keybind overlays now suppress hover tooltips while active for clearer viewing
   - Hover tooltips automatically restore after releasing keybind while still hovering
 
+- **Global Scene Settings**: Added default settings for scene-specific visual indicators
+  - New "Hidden Wall Indicator Width" setting in General UI (default: 10px, range: 1-30px)
+    - Automatically updates wall visuals when changed
+  - New "Dim Lighting Threshold" setting in General UI (default: 0.25, range: 0.0-1.0)
+    - Controls what light level is considered "dim" for visibility and concealment calculations
+    - Values below this threshold are treated as dim light (provides concealment in PF2E)
+    - Affects how the module interprets lighting levels for automatic visibility states
+    - **Automatically triggers AVS recalculation** when changed (global or per-scene) to immediately update visibility states
+  - Scene Configuration now uses these global defaults when scene-specific values aren't set
+  - Provides consistent defaults across all scenes while allowing per-scene customization
+
 ### Changes
 
 - Changed scent and see invisibility sense badges icons to better match their meanings

@@ -1034,8 +1034,13 @@ function injectPF2eVisionerBox(app, root) {
         const fs = document.createElement('fieldset');
         fs.className = 'pf2e-visioner-scene-settings';
         const scene = app?.object || app?.document || canvas?.scene;
-        const currentWidth = Number(scene?.getFlag?.(MODULE_ID, 'hiddenIndicatorHalf')) || 10;
-        const currentDim = Number(scene?.getFlag?.(MODULE_ID, 'dimThreshold')) || 0.25;
+        
+        // Use scene-specific flags if set, otherwise fall back to global settings
+        const defaultWidth = game.settings?.get?.(MODULE_ID, 'hiddenWallIndicatorWidth') ?? 10;
+        const defaultDim = game.settings?.get?.(MODULE_ID, 'dimLightingThreshold') ?? 0.25;
+        const currentWidth = Number(scene?.getFlag?.(MODULE_ID, 'hiddenIndicatorHalf')) || defaultWidth;
+        const currentDim = Number(scene?.getFlag?.(MODULE_ID, 'dimThreshold')) || defaultDim;
+        
         fs.innerHTML = `
           <legend>PF2E Visioner</legend>
           <div class="form-group" style="display:flex; flex-direction:column; gap:6px;">

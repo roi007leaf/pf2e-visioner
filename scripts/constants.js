@@ -704,6 +704,38 @@ export const DEFAULT_SETTINGS = {
     default: true,
   },
 
+  // Hidden Wall Indicator Width (half width in pixels)
+  hiddenWallIndicatorWidth: {
+    name: 'PF2E_VISIONER.SETTINGS.HIDDEN_WALL_INDICATOR_WIDTH.name',
+    hint: 'PF2E_VISIONER.SETTINGS.HIDDEN_WALL_INDICATOR_WIDTH.hint',
+    scope: 'world',
+    config: true,
+    restricted: true,
+    type: Number,
+    range: {
+      min: 1,
+      max: 30,
+      step: 1,
+    },
+    default: 10,
+  },
+
+  // Dim Lighting Threshold
+  dimLightingThreshold: {
+    name: 'PF2E_VISIONER.SETTINGS.DIM_LIGHTING_THRESHOLD.name',
+    hint: 'PF2E_VISIONER.SETTINGS.DIM_LIGHTING_THRESHOLD.hint',
+    scope: 'world',
+    config: true,
+    restricted: true,
+    type: Number,
+    range: {
+      min: 0,
+      max: 1,
+      step: 0.05,
+    },
+    default: 0.25,
+  },
+
   // Token Manager
   integrateRollOutcome: {
     name: 'PF2E_VISIONER.SETTINGS.MANAGER_ROLL_COMPARISON.name',

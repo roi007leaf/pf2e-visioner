@@ -305,7 +305,7 @@
       "HINT": "Grouped settings by category",
       "SECTIONS": {
         "GENERAL_UI": "General UI",
-        "MANAGER_SETTINGS": "Visioner Manager Settings",
+        "MANAGER_SETTINGS": "Visioner Dialogs Settings",
         "VISION": "Vision",
         "HIDDEN_LOOT": "Hidden Loot Actors",
         "HIDDEN_WALLS": "Hidden Walls",
@@ -647,6 +647,14 @@
       "VISIONER_SCENE_CONTROLS": {
         "name": "Visioner Scene Controls",
         "hint": "Adds specific Visioner features as buttons to Token Controls and Wall Controls on the left sidebar. If disabled, features can still be accessed via individual token/wall settings or keybinds"
+      },
+      "HIDDEN_WALL_INDICATOR_WIDTH": {
+        "name": "Hidden Wall Indicator Width",
+        "hint": "Default width (in pixels) for hidden wall visual indicators. This can be overridden per-scene in Scene Configuration. Larger values make hidden walls more visible on the canvas."
+      },
+      "DIM_LIGHTING_THRESHOLD": {
+        "name": "Dim Lighting Threshold",
+        "hint": "Default threshold for determining dim lighting (0.0 to 1.0). Values below this threshold are considered dim light. This can be overridden per-scene in Scene Configuration."
       },
       "AVS_CHANGES_INDICATOR_SIZE": {
         "name": "AVS Changes Indicator Size",
