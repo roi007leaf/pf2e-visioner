@@ -62,7 +62,8 @@ export class SceneEventHandler {
             'grid.distance',                 // Grid changes that affect distance calculations
             'grid.size',                     // Grid size changes
             'walls',                         // Wall changes
-            'lights'                         // Light changes
+            'lights',                        // Light changes
+            'flags.pf2e-visioner.dimThreshold' // Dim lighting threshold changes
         ];
 
         return visibilityFields.some(field => foundry.utils.hasProperty(changes, field));

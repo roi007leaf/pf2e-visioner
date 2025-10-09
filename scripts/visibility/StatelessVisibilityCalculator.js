@@ -52,7 +52,6 @@ export function calculateVisibility(input) {
     const rayDarkness = input.rayDarkness || null;
     const soundBlocked = input.soundBlocked ?? false;
     const hasLineOfSight = input.hasLineOfSight ?? undefined; // Default to undefined (ie unknown)
-    const isInvisible = target.auxiliary.includes('invisible');
 
     // Decision tree: follow PF2e visibility rules in priority order
 

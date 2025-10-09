@@ -10,9 +10,9 @@ import { DEFAULT_SETTINGS, KEYBINDINGS, MODULE_ID } from './constants.js';
 // Outside-of-dialog groups (Target Hover Tooltips, Debug Mode etc.) remain native.
 const SETTINGS_GROUPS = {
   General: [
-    { title: 'General UI', keys: ['useHudButton', 'showVisionerSceneTools', 'showQuickEditTool'] },
+    { title: 'General UI', keys: ['useHudButton', 'showVisionerSceneTools', 'showQuickEditTool', 'hiddenWallIndicatorWidth', 'dimLightingThreshold'] },
     {
-      title: 'Visioner Manager Settings',
+      title: 'Visioner Dialogs Settings',
       keys: [
         'integrateRollOutcome',
         'defaultEncounterFilter',
@@ -637,6 +637,28 @@ export function registerSettings() {
             }
           } catch (error) {
             console.error('PF2E Visioner: Error toggling auto-visibility system:', error);
+          }
+        };
+      } else if (key === 'dimLightingThreshold') {
+        // Recalculate AVS when dim lighting threshold changes
+        settingConfig.onChange = async () => {
+          try {
+            const { autoVisibility } = await import('./api.js');
+            if (game.settings.get(MODULE_ID, 'autoVisibilityEnabled')) {
+              autoVisibility.recalculateAll(true); // Force recalculation
+            }
+          } catch (error) {
+            console.warn('PF2E Visioner: Failed to trigger AVS recalculation on dim threshold change:', error);
+          }
+        };
+      } else if (key === 'hiddenWallIndicatorWidth') {
+        // Refresh wall visuals when indicator width changes
+        settingConfig.onChange = async () => {
+          try {
+            const { updateWallVisuals } = await import('./services/visual-effects.js');
+            await updateWallVisuals();
+          } catch (error) {
+            console.warn('PF2E Visioner: Failed to update wall visuals on indicator width change:', error);
           }
         };
       }

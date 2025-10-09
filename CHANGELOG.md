@@ -1,5 +1,43 @@
 # Changelog
 
+## [4.2.2] - 2025-10-09
+
+### 🐛 Bug Fixes
+
+- **Echolocation Sense Detection**: Fixed incorrect sense labeling when echolocation is active
+  - Echolocation was being stored as "precise hearing" instead of "echolocation", causing incorrect badge icons
+  - Detection map now correctly stores `sense: 'echolocation'` with `isPrecise: true`
+  - Tooltips now properly show echolocation icon instead of hearing icon when echolocation is detecting targets
+  - Sound-blocking walls now correctly prevent echolocation detection
+  - Regular hearing remains as an imprecise sense even when echolocation is active
+
+### ✨ Features
+
+- **Cover Display Consolidation**: Moved cover badges from hover tooltips to keybind overlay (G key)
+  - Hover tooltips now only show visibility and sense badges for cleaner display
+  - Cover information (both manual and auto-cover) consolidated under G-key overlay
+  - Manual cover badges show cog icon (⚙️) to distinguish from auto-calculated cover
+  - Auto-cover badges show plain cover icon without additional markers
+  - Keybind overlays now suppress hover tooltips while active for clearer viewing
+  - Hover tooltips automatically restore after releasing keybind while still hovering
+
+- **Global Scene Settings**: Added default settings for scene-specific visual indicators
+  - New "Hidden Wall Indicator Width" setting in General UI (default: 10px, range: 1-30px)
+    - Automatically updates wall visuals when changed
+  - New "Dim Lighting Threshold" setting in General UI (default: 0.25, range: 0.0-1.0)
+    - Controls what light level is considered "dim" for visibility and concealment calculations
+    - Values below this threshold are treated as dim light (provides concealment in PF2E)
+    - Affects how the module interprets lighting levels for automatic visibility states
+    - **Automatically triggers AVS recalculation** when changed (global or per-scene) to immediately update visibility states
+  - Scene Configuration now uses these global defaults when scene-specific values aren't set
+  - Provides consistent defaults across all scenes while allowing per-scene customization
+
+### Changes
+
+- Changed scent and see invisibility sense badges icons to better match their meanings
+  - Scent: changed to nose icon
+  - See Invisibility: changed from dashed user icon to person with rays icon
+
 ## [4.2.1] - 2025-10-08
 
 ### 🐛 Bug Fixes
