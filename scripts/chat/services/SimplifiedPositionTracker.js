@@ -6,6 +6,7 @@
 
 import unifiedSystemIntegration from './UnifiedSystemIntegration.js';
 import errorHandlingService, { SYSTEM_TYPES } from './infra/ErrorHandlingService.js';
+import { levelsIntegration } from '../../services/LevelsIntegration.js';
 
 /**
  * Simplified position state
@@ -161,6 +162,13 @@ export class SimplifiedPositionTracker {
    */
   _calculateDistance(token1, token2) {
     if (!token1?.center || !token2?.center) return 0;
+    
+    if (levelsIntegration.isActive) {
+      const distance3D = levelsIntegration.getTotalDistance(token1, token2);
+      if (distance3D !== null) {
+        return distance3D;
+      }
+    }
     
     const dx = token1.center.x - token2.center.x;
     const dy = token1.center.y - token2.center.y;

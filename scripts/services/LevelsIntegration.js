@@ -68,22 +68,37 @@ class LevelsIntegration {
 
     const elevation1 = this.getTokenLosHeight(token1);
     const elevation2 = this.getTokenLosHeight(token2);
+    const verticalDist = Math.abs(elevation2 - elevation1);
 
-    return Math.abs(elevation2 - elevation1);
+    console.log('[LevelsIntegration] getVerticalDistance - Token 1 elevation:', elevation1);
+    console.log('[LevelsIntegration] getVerticalDistance - Token 2 elevation:', elevation2);
+    console.log('[LevelsIntegration] getVerticalDistance - Vertical distance:', verticalDist);
+
+    return verticalDist;
   }
 
   getTotalDistance(token1, token2) {
     if (!token1 || !token2) return Infinity;
 
     const horizontalDistance = this._getHorizontalDistance(token1, token2);
+    console.log('[LevelsIntegration] getTotalDistance - Token 1:', token1.name, 'Token 2:', token2.name);
+    console.log('[LevelsIntegration] getTotalDistance - Horizontal distance (grid):', horizontalDistance);
 
     if (!this._isLevelsActive) {
+      console.log('[LevelsIntegration] getTotalDistance - Levels inactive, returning 2D distance');
       return horizontalDistance;
     }
 
-    const verticalDistance = this.getVerticalDistance(token1, token2);
+    const verticalDistanceFeet = this.getVerticalDistance(token1, token2);
+    const feetPerGrid = canvas.scene?.grid?.distance || 5;
+    const verticalDistance = verticalDistanceFeet / feetPerGrid;
+    const totalDistance = Math.sqrt(horizontalDistance ** 2 + verticalDistance ** 2);
+    
+    console.log('[LevelsIntegration] getTotalDistance - Vertical distance (feet):', verticalDistanceFeet);
+    console.log('[LevelsIntegration] getTotalDistance - Vertical distance (grid):', verticalDistance);
+    console.log('[LevelsIntegration] getTotalDistance - Total 3D distance (grid):', totalDistance);
 
-    return Math.sqrt(horizontalDistance ** 2 + verticalDistance ** 2);
+    return totalDistance;
   }
 
   _getHorizontalDistance(token1, token2) {
@@ -115,11 +130,24 @@ class LevelsIntegration {
 
   test3DPointCollision(p0, p1, type = 'sight') {
     if (!this._isLevelsActive || !this.api) {
+      console.log('[LevelsIntegration] test3DPointCollision - Levels inactive or no API');
+      return false;
+    }
+
+    if (!p0 || !p1) {
+      console.log('[LevelsIntegration] test3DPointCollision - Invalid points');
       return false;
     }
 
     try {
+      console.log('[LevelsIntegration] test3DPointCollision - Checking collision type:', type);
+      console.log('[LevelsIntegration] test3DPointCollision - From:', p0, 'To:', p1);
+      
       const collision = this.api.testCollision(p0, p1, type);
+      
+      console.log('[LevelsIntegration] test3DPointCollision - Raw collision result:', collision);
+      console.log('[LevelsIntegration] test3DPointCollision - Boolean result:', !!collision);
+      
       return !!collision;
     } catch (error) {
       console.warn('[PF2E Visioner] Error testing 3D point collision:', error);
@@ -171,15 +199,26 @@ class LevelsIntegration {
   }
 
   hasFloorCeilingBetween(observer, target) {
-    if (!this._isLevelsActive) return false;
+    if (!this._isLevelsActive) {
+      console.log('[LevelsIntegration] hasFloorCeilingBetween - Levels inactive');
+      return false;
+    }
 
     try {
       const p0 = this.get3DPoint(observer);
       const p1 = this.get3DPoint(target);
 
-      if (!p0 || !p1) return false;
+      console.log('[LevelsIntegration] hasFloorCeilingBetween - Observer:', observer.name, 'at', p0);
+      console.log('[LevelsIntegration] hasFloorCeilingBetween - Target:', target.name, 'at', p1);
+
+      if (!p0 || !p1) {
+        console.log('[LevelsIntegration] hasFloorCeilingBetween - Invalid points');
+        return false;
+      }
 
       const collision = this.test3DPointCollision(p0, p1, 'sight');
+      
+      console.log('[LevelsIntegration] hasFloorCeilingBetween - Collision result:', collision);
       
       return collision;
     } catch (error) {

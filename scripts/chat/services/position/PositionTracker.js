@@ -11,6 +11,7 @@ import errorHandlingService, { SYSTEM_TYPES } from '../infra/ErrorHandlingServic
 import dualSystemIntegration from './DualSystemIntegration.js';
 import performanceOptimizer from './PerformanceOptimizer.js';
 import positionCacheManager from './PositionCacheManager.js';
+import { levelsIntegration } from '../../../services/LevelsIntegration.js';
 
 /**
  * Position state data structure combining AVS and Auto-Cover information
@@ -269,21 +270,24 @@ export class PositionTracker {
    */
   _calculateDistance(token1, token2) {
     try {
-      // Use the updated v13+ API for distance calculation
+      if (levelsIntegration.isActive) {
+        const distance3D = levelsIntegration.getTotalDistance(token1, token2);
+        if (distance3D !== null) {
+          return distance3D;
+        }
+      }
+
       if (canvas.grid.measurePath) {
         const path = canvas.grid.measurePath([token1.center, token2.center]);
         return path.distance;
       } else if (canvas.grid.measureDistance) {
-        // Fallback for older versions
         return canvas.grid.measureDistance(token1.center, token2.center);
       } else {
-        // Ultimate fallback to simple Euclidean distance
         const dx = token1.center.x - token2.center.x;
         const dy = token1.center.y - token2.center.y;
         return Math.sqrt(dx * dx + dy * dy);
       }
     } catch {
-      // Fallback to simple Euclidean distance
       const dx = token1.center.x - token2.center.x;
       const dy = token1.center.y - token2.center.y;
       const distance = Math.sqrt(dx * dx + dy * dy);
@@ -303,21 +307,31 @@ export class PositionTracker {
     try {
       const storedCenter = { x: storedPosition.x, y: storedPosition.y };
 
-      // Use the updated v13+ API for distance calculation
+      if (levelsIntegration.isActive() && storedPosition.elevation !== undefined) {
+        const dx = storedCenter.x - observerToken.center.x;
+        const dy = storedCenter.y - observerToken.center.y;
+        const distance2D = Math.sqrt(dx * dx + dy * dy);
+        
+        const observerElevation = levelsIntegration.getTokenElevation(observerToken);
+        const dz = storedPosition.elevation - observerElevation;
+        const distance3D = Math.sqrt(distance2D * distance2D + dz * dz);
+        
+        const gridSize = canvas?.grid?.size || 100;
+        const unitDist = canvas?.scene?.grid?.distance || 5;
+        return (distance3D / gridSize) * unitDist;
+      }
+
       if (canvas.grid.measurePath) {
         const path = canvas.grid.measurePath([storedCenter, observerToken.center]);
         return path.distance;
       } else if (canvas.grid.measureDistance) {
-        // Fallback for older versions
         return canvas.grid.measureDistance(storedCenter, observerToken.center);
       } else {
-        // Ultimate fallback to simple Euclidean distance
         const dx = storedCenter.x - observerToken.center.x;
         const dy = storedCenter.y - observerToken.center.y;
         return Math.sqrt(dx * dx + dy * dy);
       }
     } catch {
-      // Fallback to simple Euclidean distance
       const dx = storedPosition.x - observerToken.center.x;
       const dy = storedPosition.y - observerToken.center.y;
       const distance = Math.sqrt(dx * dx + dy * dy);

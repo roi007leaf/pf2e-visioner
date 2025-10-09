@@ -196,7 +196,7 @@ describe('LevelsIntegration', () => {
       mockToken2.losHeight = 15;
 
       const distance = levelsIntegration.getTotalDistance(mockToken1, mockToken2);
-      expect(distance).toBeCloseTo(32.02, 1);
+      expect(distance).toBeCloseTo(28.44, 1);
     });
 
     test('returns Infinity for null tokens', () => {

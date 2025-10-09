@@ -62,8 +62,8 @@ export async function tokenStateToInput(
     if (levelsIntegration.isActive) {
         const distance3D = levelsIntegration.getTotalDistance(observer, target);
         if (distance3D !== Infinity) {
-            const gridSize = canvas.dimensions.distance;
-            distanceInFeet = distance3D * gridSize;
+            const feetPerGrid = canvas.scene?.grid?.distance || 5;
+            distanceInFeet = distance3D * feetPerGrid;
         }
     }
 
