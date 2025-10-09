@@ -2,8 +2,24 @@
   "PF2E_VISIONER": {
     "ENVIRONMENT": {},
     "MODULE_TITLE": "PF2E Visioner",
+    "MECHANICAL_EFFECTS": {
+      "HIDDEN_FLAT_CHECK": "Wymagany płaski test ST 11 do ustalenia celu",
+      "CONCEALED_FLAT_CHECK": "Wymagany płaski test ST 5 do ustalenia celu",
+      "UNDETECTED_CONDITION": "Niewykryty stan z pełnymi skutkami mechanicznymi",
+      "VISIBLE_NO_EFFECTS": "Brak kar podczas celowania; brak dodatkowych efektów",
+      "HIDDEN_TOOLTIP": "Ukryty: Jesteś odsłonięty wobec celu i musisz wykonać test o ST 11, aby trafić atakiem, zaklęciem lub innym efektem.",
+      "CONCEALED_TOOLTIP": "Przysłonięty: Musisz wykonać test ST 5, aby trafić cel atakiem, zaklęcia lub innego efektu.",
+      "UNDETECTED_TOOLTIP": "Niewykryty: Nie znasz położenia celu. Jesteś odsłonięty przed celem i nie możesz go łatwo namierzyć. Akcja Szukanie może pomóc w znalezieniu niewykrytej istoty.",
+      "VISIBLE_TOOLTIP": "Widoczny: Brak kar lub efektów",
+      "BLINDED_OVERRIDE": "Wszystkie stworzenia są Ukryte z powodu stanu Oślepienie.",
+      "DAZZLED_OVERRIDE": "Wszystkie stworzenia są Przysłonięte z powodu stanu Zamroczony.",
+      "NO_COVER_TOOLTIP": "Bez osłony: brak premii i kar",
+      "LESSER_COVER_TOOLTIP": "Mniejsza osłona: +1 premii okolicznościowej do KP",
+      "STANDARD_COVER_TOOLTIP": "Standardowa osłona: +2 premii okolicznościowej do KP, rzutów obronnych na Refleks i testów Ukrycia. Możliwość Ukrywania się za osłoną.",
+      "GREATER_COVER_TOOLTIP": "Większa osłona: +4 premii okolicznościowej do KP, rzutów obronnych na Refleks i testów Ukrycia. Możliwość Ukrywania się za tą osłoną."
+    },
     "TOKEN_MANAGER": {
-      "TITLE": "Menedżer widoczności tokenów",
+      "TITLE": "Menedżer widoczności",
       "OBSERVER": "Token obserwowany",
       "TARGET": "Token docelowy",
       "VISIBILITY_STATE": "Stan widoczności",
@@ -20,9 +36,9 @@
     "VISIBILITY_STATES": {
       "avs": "AVS",
       "observed": "Obserwowany",
+      "concealed": "Przysłonięty",
       "hidden": "Ukryty",
-      "undetected": "Niewykryty",
-      "concealed": "Przysłonięty"
+      "undetected": "Niewykryty"
     },
     "COVER_STATES": {
       "none": "Brak osłony",
@@ -31,142 +47,288 @@
       "greater": "Większa osłona"
     },
     "SENSES": {
-      "LIGHT-PERCEPTION": "(PL TODO) Light Perception",
-      "LIGHT-PERCEPTION_DESC": "(PL TODO) You can perceive light and darkness. This sense allows you to see in natural darkness but is affected by magical darkness.",
-      "VISION": "(PL TODO) Vision",
-      "VISION_DESC": "(PL TODO) Your standard visual sense used to perceive your surroundings.",
-      "DARKVISION": "(PL TODO) Darkvision",
-      "DARKVISION_DESC": "(PL TODO) You can see in darkness and dim light just as well as in bright light, though you can't distinguish color in darkness.",
-      "GREATER-DARKVISION": "(PL TODO) Greater Darkvision",
-      "GREATER-DARKVISION_DESC": "(PL TODO) You can see in darkness and dim light as if it were bright light—colors included.",
-      "HEARING": "(PL TODO) Hearing",
-      "HEARING_DESC": "(PL TODO) You can detect creatures and events via sound within range (imprecise).",
-      "TREMORSENSE": "(PL TODO) Tremorsense",
-      "TREMORSENSE_DESC": "(PL TODO) You can sense vibrations through the ground within range (imprecise).",
-      "SCENT": "(PL TODO) Scent",
-      "SCENT_DESC": "(PL TODO) You have an enhanced sense of smell, allowing you to detect living creatures within range (imprecise).",
-      "ECHOLOCATION": "(PL TODO) Echolocation",
-      "ECHOLOCATION_DESC": "(PL TODO) You can use sound to navigate and detect objects within range (precise).",
-      "LIFESENSE": "(PL TODO) Lifesense",
-      "LIFESENSE_DESC": "(PL TODO) You can sense the life force of living and undead creatures within range (imprecise)."
+      "LIGHT-PERCEPTION": "Postrzeganie światła",
+      "LIGHT-PERCEPTION_DESC": "Możesz postrzegać światło i ciemność. Ten zmysł pozwala ci widzieć w naturalnej ciemności, ale ma na niego wpływ magiczna ciemność.",
+      "VISION": "Wizja",
+      "VISION_DESC": "Twój standardowy zmysł wzroku służący do postrzegania otoczenia.",
+      "DARKVISION": "Widzenie w ciemności",
+      "DARKVISION_DESC": "Widzisz w ciemności i przy słabym oświetleniu równie dobrze jak w jasnym świetle, chociaż w ciemności nie rozróżniasz kolorów.",
+      "GREATER-DARKVISION": "Większe widzenie w ciemności",
+      "GREATER-DARKVISION_DESC": "W ciemności i przy słabym oświetleniu widzisz tak, jakby było jasno — włącznie z kolorami.",
+      "HEARING": "Słyszenie",
+      "HEARING_DESC": "Możesz wykrywać stworzenia i wydarzenia za pomocą dźwięku w określonym zasięgu (nieprecyzyjne).",
+      "TREMORSENSE": "Wyczucie Drgań",
+      "TREMORSENSE_DESC": "Można wyczuć wibracje przenoszone przez ziemię w określonym zasięgu (nieprecyzyjnie).",
+      "SCENT": "Zmysł węchu",
+      "SCENT_DESC": "Masz wyostrzony zmysł węchu, który pozwala ci wykrywać żywe stworzenia w określonym zasięgu (nieprecyzyjne).",
+      "ECHOLOCATION": "Echolokacja",
+      "ECHOLOCATION_DESC": "Możesz używać dźwięku do nawigacji i wykrywania obiektów w określonym zasięgu (precyzyjne).",
+      "LIFESENSE": "Wyczucie Życia",
+      "LIFESENSE_DESC": "Możesz wyczuć moc życiową żywych i nieumarłych stworzeń w określonym zasięgu (nieprecyzyjne)."
+    },
+    "SPECIAL_SENSES": {
+      "vision": "Wizja",
+      "vision_description": "Twój standardowy zmysł wzroku służący do postrzegania otoczenia.",
+      "lifesense": "Wyczucie Życia",
+      "lifesense_description": "Masz ograniczoną zdolność wyczuwania mocy życiowej. Zyskujesz zmysł wyczuwania życia jako nieprecyzyjny zmysł. Pozwala ci to wyczuwać moc życiową żywych i nieumarłych stworzeń w podanym zasięgu. Zmysł ten potrafi odróżnić energię witalną ożywiającą żywe stworzenia od energii pustki ożywiającej nieumarłe stworzenia.",
+      "echolocation": "Echolokacja",
+      "echolocation_description": "Możesz używać dźwięku do nawigacji i wykrywania obiektów. Zyskujesz echolokację jako precyzyjny zmysł. Pozwala ci to wykrywać wszystkie stworzenia i obiekty w zasięgu poprzez odbicie dźwięku.",
+      "tremorsense": "Wyczucie Drgań",
+      "tremorsense_description": "Możesz wyczuwać wibracje przenoszone przez ziemię. Zyskujesz zmysł wibracji jako zmysł nieprecyzyjny. Pozwala ci to wykrywać stworzenia i przedmioty mające kontakt z ziemią w zasięgu.",
+      "scent": "Zmysł węchu",
+      "scent_description": "Masz wyostrzony zmysł węchu. Zyskujesz zmysł węchu jako zmysł nieprecyzyjny. Pozwala ci to wykrywać żywe stworzenia po zapachu w zasięgu.",
+      "darkvision": "Widzenie w ciemności",
+      "darkvision_description": "Widzisz w ciemności i przy słabym oświetleniu równie dobrze jak w jasnym świetle, chociaż w ciemności nie rozróżniasz kolorów.",
+      "greater_darkvision": "Większe widzenie w ciemności",
+      "greater_darkvision_description": "W ciemności i przy słabym oświetleniu widzisz tak, jakby było jasno — włącznie z kolorami.",
+      "hearing": "Słyszenie",
+      "hearing_description": "Możesz wykrywać stworzenia i wydarzenia za pomocą dźwięku w określonym zasięgu (nieprecyzyjne).",
+      "low_light_vision": "Widzenie w słabym świetle",
+      "low_light_vision_description": "W słabym świetle widzisz tak, jakby było jasno.",
+      "infrared_vision": "Wizja w podczerwieni",
+      "infrared_vision_description": "Możesz wyczuwać ślady ciepła w swoim otoczeniu.",
+      "truesight": "Prawdziwe widzenie",
+      "truesight_description": "Możesz widzieć rzeczy takimi, jakimi są naprawdę, ignorując iluzje i niewidzialność w zasięgu wzroku.",
+      "see_the_unseen": "Widzenie Niewidzialnego",
+      "see_the_unseen_description": "Możesz dostrzegać niewidoczne zjawiska znajdujące się w zasięgu wzroku.",
+      "bloodsense": "Wyczucie Krwi",
+      "bloodsense_description": "Możesz wykrywać obecność i lokalizację stworzeń, wyczuwając krew w zasięgu.",
+      "magicsense": "Wyczucie Magii",
+      "magicsense_description": "Możesz wyczuwać magiczne aury lub efekty w zasięgu.",
+      "motion_sense": "Wyczucie Ruchu",
+      "motion_sense_description": "Możesz wykrywać ruch w swoim otoczeniu w swoim zasięgu.",
+      "spiritsense": "Wyczucie Duchów",
+      "spiritsense_description": "Możesz wyczuć obecność duchów i nieumarłych w zasięgu wzroku.",
+      "thoughtsense": "Wyczucie Myśli",
+      "thoughtsense_description": "Możesz wykrywać pobliskie istoty myślące znajdujące się w zasięgu.",
+      "wavesense": "Wyczucie Fal",
+      "wavesense_description": "Wykrywasz wibracje lub fale za pośrednictwem medium znajdującego się w zasięgu."
     },
     "COVER_OVERRIDE": {
       "POPUP_OVERRIDE": "Osłona zastąpiona za pomocą wyskakującego okienka skrótów klawiszowych: {original} → {final}"
     },
+    "FEAT": {
+      "CEASELESS_SHADOWS": "Nieustające Cienie"
+    },
+    "AVS_OVERRIDE_DIALOG": {
+      "NO_OVERRIDES": "Obecnie nie ma żadnych aktywnych zastąpień AVS dla tego tokenu.",
+      "CLOSE": "Zamknij",
+      "CLEAR_ALL": "Wyczyść wszystkie zastąpienia",
+      "CLEAR_ALL_CONFIRM_TITLE": "Wyczyść wszystkie zastąpienia AVS",
+      "OVERRIDE_REMOVED": "Usunięto zastąpienie AVS: {observer} → {target}",
+      "ALL_OVERRIDES_CLEARED": "Wszystkie zastąpienia AVS zostały usunięte dla {token}",
+      "ERROR_REMOVING_OVERRIDE": "Błąd podczas usuwania zastąpienia AVS",
+      "ERROR_CLEARING_OVERRIDES": "Błąd podczas kasowania zastąpień AVS"
+    },
     "VISUAL_EFFECTS": {
       "CONCEALED_OVERLAY": "Ten token jest przysłonięty dla ciebie",
-      "CONCEALED_FLAT_CHECK": "(PL TODO) DC 5 flat check required for targeting",
-      "UNDETECTED_CONDITION": "(PL TODO) Undetected condition applied with full mechanical effects",
-      "CONCEALED_TOOLTIP": "(PL TODO) Concealed: You must succeed at a DC 5 flat check when targeting with an attack, spell, or other effect",
-      "UNDETECTED_TOOLTIP": "(PL TODO) Undetected: You don't know the target's location. You are off-guard to the target and you can't easily target it. Using the Seek action can help find an undetected creature",
-      "DAZZLED_OVERRIDE": "(PL TODO) All creatures appear Concealed due to Dazzled condition",
-      "NO_COVER_TOOLTIP": "(PL TODO) No Cover: No bonuses or penalties",
-      "GREATER_COVER_TOOLTIP": "(PL TODO) Greater Cover: +4 circumstance bonus to AC, Reflex saves, and Stealth checks. Can Hide behind this cover."
-    },
-    "SPECIAL_SENSES": {
-      "vision": "(PL TODO) Vision",
-      "vision_description": "(PL TODO) Standard visual sense.",
-      "low_light_vision": "(PL TODO) Low-Light Vision",
-      "low_light_vision_description": "(PL TODO) See in dim light as bright.",
-      "infrared_vision": "(PL TODO) Infrared Vision",
-      "infrared_vision_description": "(PL TODO) Perceive heat signatures.",
-      "truesight": "(PL TODO) Truesight",
-      "truesight_description": "(PL TODO) See things as they truly are.",
-      "see_the_unseen": "(PL TODO) See the Unseen",
-      "see_the_unseen_description": "(PL TODO) Perceive otherwise unseen phenomena.",
-      "bloodsense": "(PL TODO) Bloodsense",
-      "bloodsense_description": "(PL TODO) Detect nearby blood.",
-      "magicsense": "(PL TODO) Magicsense",
-      "magicsense_description": "(PL TODO) Sense magical auras.",
-      "motion_sense": "(PL TODO) Motion Sense",
-      "motion_sense_description": "(PL TODO) Detect motion nearby.",
-      "spiritsense": "(PL TODO) Spiritsense",
-      "spiritsense_description": "(PL TODO) Sense spirits and undead.",
-      "thoughtsense": "(PL TODO) Thoughtsense",
-      "thoughtsense_description": "(PL TODO) Detect thinking creatures.",
-      "wavesense": "(PL TODO) Wavesense",
-      "wavesense_description": "(PL TODO) Perceive vibrations/waves through a medium.",
-      "lifesense": "(PL TODO) Lifesense",
-      "lifesense_description": "(PL TODO) You have a limited ability to sense life force. You gain lifesense as an imprecise sense. This allows you to sense the life force of living and undead creatures within the listed range. The sense can distinguish between the vitality energy animating living creatures and the void energy animating undead creatures.",
-      "echolocation": "(PL TODO) Echolocation",
-      "echolocation_description": "(PL TODO) You can use sound to navigate and detect objects. You gain echolocation as a precise sense. This allows you to detect all creatures and objects within range through sound reflection.",
-      "tremorsense": "(PL TODO) Tremorsense",
-      "tremorsense_description": "(PL TODO) You can sense vibrations through the ground. You gain tremorsense as an imprecise sense. This allows you to detect creatures and objects in contact with the ground within range.",
-      "scent": "(PL TODO) Scent",
-      "scent_description": "(PL TODO) You have an enhanced sense of smell. You gain scent as an imprecise sense. This allows you to detect living creatures by their scent within range.",
-      "darkvision": "(PL TODO) Darkvision",
-      "darkvision_description": "(PL TODO) You can see in darkness and dim light just as well as in bright light, though you can’t distinguish color in darkness.",
-      "greater_darkvision": "(PL TODO) Greater Darkvision",
-      "greater_darkvision_description": "(PL TODO) You can see in darkness and dim light as if it were bright light—colors included.",
-      "hearing": "(PL TODO) Hearing",
-      "hearing_description": "(PL TODO) You can detect creatures and events via sound within range (imprecise)."
-    },
-    "MECHANICAL_EFFECTS": {
-      "HIDDEN_FLAT_CHECK": "Wymagany płaski test ST 11 do ustalenia celu",
       "CONCEALED_FLAT_CHECK": "Wymagany płaski test ST 5 do ustalenia celu",
       "UNDETECTED_CONDITION": "Niewykryty stan z pełnymi skutkami mechanicznymi",
-      "VISIBLE_NO_EFFECTS": "Brak kar ani efektów za celowanie",
-      "HIDDEN_TOOLTIP": "Ukryty: Jesteś odsłonięty przed celem i musisz wykonać test ST 11, aby trafić go atakiem, zaklęciem lub innym efektem.",
       "CONCEALED_TOOLTIP": "Przysłonięty: Musisz wykonać test ST 5, aby trafić cel atakiem, zaklęcia lub innego efektu.",
       "UNDETECTED_TOOLTIP": "Niewykryty: Nie znasz położenia celu. Jesteś odsłonięty przed celem i nie możesz go łatwo namierzyć. Akcja Szukanie może pomóc w znalezieniu niewykrytej istoty.",
-      "VISIBLE_TOOLTIP": "Widoczny: Brak kar lub efektów",
-      "BLINDED_OVERRIDE": "Wszystkie stworzenia są Ukryte z powodu stanu Oślepienie.",
       "DAZZLED_OVERRIDE": "Wszystkie stworzenia są Przysłonięte z powodu stanu Zamroczony.",
       "NO_COVER_TOOLTIP": "Bez osłony: brak premii i kar",
-      "LESSER_COVER_TOOLTIP": "Mniejsza osłona: +1 premii okolicznościowej do KP",
-      "STANDARD_COVER_TOOLTIP": "Standardowa osłona: +2 premii okolicznościowej do KP, rzutów obronnych na Refleks i testów Ukrycia. Możliwość Ukrywania się za osłoną.",
       "GREATER_COVER_TOOLTIP": "Większa osłona: +4 premii okolicznościowej do KP, rzutów obronnych na Refleks i testów Ukrycia. Możliwość Ukrywania się za tą osłoną."
+    },
+    "UI_ACTIONS": {
+      "MANAGE_VISIBILITY": "Zarządzaj widocznością tokenu",
+      "MANAGE_COVER": "Zarządzaj osłoną tokenu",
+      "QUICK_CONCEALED": "Ustaw jako Przysłonięty",
+      "QUICK_OBSERVED": "Ustaw jako Obserwowany",
+      "QUICK_NO_COVER": "Ustaw bez Osłony",
+      "QUICK_LESSER_COVER": "Ustaw Mniejszą Osłonę",
+      "QUICK_STANDARD_COVER": "Ustaw Standardową Osłonę",
+      "QUICK_GREATER_COVER": "Ustaw Większą Osłonę"
+    },
+    "MOVEMENT": {
+      "walk": "Spacer",
+      "stride": "Bieg",
+      "leap": "Skok",
+      "climb": "Wspinaczka",
+      "fly": "Latanie",
+      "swim": "Pływanie",
+      "burrow": "Przekopywanie",
+      "teleport": "Teleportacja",
+      "deploy": "Rozmieszczenie",
+      "travel": "Podróż"
     },
     "NOTIFICATIONS": {
       "NO_OBSERVER_SELECTED": "Najpierw wybierz token obserwowany.",
       "MULTIPLE_OBSERVERS": "Wybrano wiele tokenów obserwatora — wybierz tylko jeden",
       "NO_SOCKETLIB_INSTALLED": "PF2E Visioner wymaga, aby moduł socketlib był aktywny, aby automatycznie odświeżać ekrany klientów. Proszę go aktywować.",
-      "PERMISSION_DENIED": "Only GMs can manage token visibility and cover (PL TODO)",
-      "SNEAK_CLEAR_GM_ONLY": "Only GMs can clear sneak flags (PL TODO)",
-      "SCENE_CLEAR_GM_ONLY": "Only GMs can clear Visioner scene data (PL TODO)",
-      "DATA_CLEAR_GM_ONLY": "Only GMs can clear Visioner data (PL TODO)",
-      "NO_ACTIVE_SCENE": "No active scene. (PL TODO)",
-      "NO_TOKENS_PROVIDED": "No tokens provided for cleanup (PL TODO)",
-      "SNEAK_CLEARED": "PF2E Visioner: Cleared all sneak flags. (PL TODO)",
-      "SNEAK_CLEAR_FAILED": "PF2E Visioner: Failed to clear sneak flags. See console. (PL TODO)",
-      "SCENE_DATA_CLEARED": "PF2E Visioner: Cleared all scene data. (PL TODO)",
-      "SCENE_CLEAR_FAILED": "PF2E Visioner: Failed to clear scene data. See console. (PL TODO)",
-      "TOKEN_DATA_CLEARED": "PF2E Visioner: Cleared all token data. (PL TODO)",
-      "TOKEN_CLEAR_FAILED": "PF2E Visioner: Failed to clear token data. See console. (PL TODO)",
-      "CACHE_CLEARED": "Light-emitting tokens cache cleared (PL TODO)",
-      "CACHE_UNAVAILABLE": "Cache clearing not available (PL TODO)",
-      "VISION_CACHE_UNAVAILABLE": "Vision cache clearing not available (PL TODO)",
-      "ALL_CACHES_CLEARED": "All caches cleared and visibility recalculated (PL TODO)",
-      "SELECT_TWO_TOKENS": "Select exactly 2 tokens: observer and target (PL TODO)",
-      "SCENE_CONFIG_RESET": "Scene Config flag reset - updates should resume (PL TODO)",
-      "AVS_UNAVAILABLE": "PF2E Visioner | Auto-visibility system not available (PL TODO)",
-      "NEED_BOTH_TOKENS": "Need both observer and target tokens (PL TODO)",
-      "SELECT_TWO_TOKENS_OR_PARAMS": "Select exactly 2 tokens or provide observer and target parameters (PL TODO)",
-      "NO_DEFERRED_TOKENS": "No deferred tokens found to undefer. (PL TODO)",
-      "NO_UNDEFERRED_TOKENS": "No undeferred tokens found to restore to deferred state. (PL TODO)",
-      "NO_SNEAK_DIALOG": "No active sneak dialog found (PL TODO)",
-      "NO_TOKEN_ID": "No token ID found on button (PL TODO)",
-      "END_TURN_FAILED": "Failed to apply end-of-turn visibility changes. (PL TODO)",
-      "NO_DEFERRED_POSITIONS": "No deferred position checks to validate. (PL TODO)",
-      "NO_DEFERRED_OUTCOMES": "No deferred outcomes found to validate. (PL TODO)",
-      "VALIDATION_FAILED": "Failed to process end-of-turn validation. (PL TODO)",
-      "PARTY_RESTORE_FAILED": "PF2E Visioner: Failed to restore party tokens (PL TODO)",
-      "OVERRIDE_CLEAR_FAILED": "Failed to clear overrides for this table (PL TODO)",
-      "OVERRIDE_KEEP_FAILED": "Failed to keep override (PL TODO)",
-      "AVS_ACCEPT_FAILED": "Failed to accept AVS change (PL TODO)",
-      "AVS_REJECTED_ALL": "Rejected all AVS changes (PL TODO)",
-      "AVS_REJECTED": "Rejected AVS changes (PL TODO)",
-      "PARTY_RESTORE_SUCCESS": "PF2E Visioner: Restored state for {count} party tokens (PL TODO)",
-      "AVS_REJECTED_SINGLE": "Rejected AVS change: {observerName} → {targetName} (PL TODO)",
-      "AVS_ACCEPTED_SINGLE": "Accepted AVS change: {observerName} → {targetName} (PL TODO)",
-      "AVS_ACCEPTED_COUNT": "Accepted {count} change(s) (PL TODO)",
-      "AVS_ACCEPTED_IN_TABLE": "Accepted {count} change(s) in {group} table (PL TODO)",
-      "AVS_ACCEPTED_PLURAL": "Accepted {count} AVS change{plural} (PL TODO)",
-      "AVS_CLEARED_PLURAL": "Accepted {count} AVS change{plural} (PL TODO)",
-      "SNEAK_APPLY_FAILED": "Failed to apply sneak changes: {errors} (PL TODO)",
-      "INIT_FAILED": "PF2E Visioner failed to initialize: {error} (PL TODO)",
-      "NO_ENCOUNTER_TOKENS": "{moduleId}: No encounter tokens found. Filter disabled. (PL TODO)",
-      "NO_VALID_CONSEQUENCES": "No valid targets found for Attack Consequences. you can only see consequences if you are Hidden or Undetected from at least one observer. (PL TODO)"
+      "PERMISSION_DENIED": "Tylko MG mogą zarządzać widocznością i osłoną tokenów",
+      "SNEAK_CLEAR_GM_ONLY": "Tylko MG mogą usuwać flagi skradania się",
+      "SCENE_CLEAR_GM_ONLY": "Tylko MG mogą usuwać dane sceny Visioner",
+      "DATA_CLEAR_GM_ONLY": "Tylko MG mogą usuwać dane Visioner'a",
+      "NO_ACTIVE_SCENE": "Brak aktywnej sceny.",
+      "NO_TOKENS_PROVIDED": "Brak tokenów do wyczyszczenia",
+      "SNEAK_CLEARED": "PF2E Visioner: Wyczyszczono wszystkie flagi skradania się.",
+      "SNEAK_CLEAR_FAILED": "PF2E Visioner: Nie udało się wyczyścić flag skradania się. Zobacz konsolę.",
+      "SCENE_DATA_CLEARED": "PF2E Visioner: Wyczyszczono wszystkie dane sceny.",
+      "SCENE_CLEAR_FAILED": "PF2E Visioner: Nie udało się wyczyścić danych sceny. Zobacz konsolę.",
+      "TOKEN_DATA_CLEARED": "PF2E Visioner: Wyczyszczono wszystkie dane tokenu.",
+      "TOKEN_CLEAR_FAILED": "PF2E Visioner: Nie udało się wyczyścić danych tokenu. Zobacz konsolę.",
+      "CACHE_CLEARED": "Pamięć podręczna tokenów emitujących światło została wyczyszczona.",
+      "CACHE_UNAVAILABLE": "Nie można wyczyścić pamięci podręcznej",
+      "VISION_CACHE_UNAVAILABLE": "Nie można wyczyścić pamięci podręcznej wizji",
+      "ALL_CACHES_CLEARED": "Wszystkie pamięci podręczne zostały wyczyszczone, a widoczność ponownie obliczona.",
+      "SELECT_TWO_TOKENS": "Wybierz dokładnie 2 tokeny: obserwator i cel.",
+      "SCENE_CONFIG_RESET": "Resetowanie flagi Konfiguracji Sceny — aktualizacje powinny zostać wznowione",
+      "AVS_UNAVAILABLE": "PF2E Visioner | System automatycznej widoczności niedostępny",
+      "NEED_BOTH_TOKENS": "Potrzebne są zarówno token obserwatora, jak i token celu.",
+      "SELECT_TWO_TOKENS_OR_PARAMS": "Wybierz dokładnie 2 tokeny lub podaj parametry obserwatora i celu.",
+      "NO_DEFERRED_TOKENS": "Nie znaleziono żadnych tokenów do cofnięcia.",
+      "NO_UNDEFERRED_TOKENS": "Nie znaleziono żadnych tokenów bez opóźnienia, które można przywrócić do stanu opóźnionego.",
+      "NO_SNEAK_DIALOG": "Nie znaleziono aktywnego okna skradania się",
+      "NO_TOKEN_ID": "Nie znaleziono identyfikatora tokenu na przycisku",
+      "END_TURN_FAILED": "Nie udało się zastosować zmian widoczności na koniec tury.",
+      "NO_DEFERRED_POSITIONS": "Brak odroczonych weryfikacji pozycji do zatwierdzenia.",
+      "NO_DEFERRED_OUTCOMES": "Nie znaleziono żadnych odroczonych wyników do zatwierdzenia.",
+      "VALIDATION_FAILED": "Nie udało się przetworzyć walidacji końca tury.",
+      "PARTY_RESTORE_FAILED": "PF2E Visioner: Nie udało się przywrócić tokenów drużyny",
+      "PARTY_RESTORE_SUCCESS": "PF2E Visioner: Przywrócony stan dla {count} tokenów drużyny",
+      "OVERRIDE_CLEAR_FAILED": "Nie udało się usunąć zastąpień dla tej tabeli",
+      "OVERRIDE_KEEP_FAILED": "Nie udało się zachować zastąpienia",
+      "AVS_ACCEPT_FAILED": "Nie udało się zaakceptować zmiany AVS",
+      "AVS_REJECTED_ALL": "Odrzucono wszystkie zmiany AVS",
+      "AVS_REJECTED": "Odrzucono zmiany AVS",
+      "AVS_REJECTED_SINGLE": "Odrzucona zmiana AVS: {observerName} → {targetName}",
+      "AVS_ACCEPTED_SINGLE": "Zatwierdzona zmiana AVS: {observerName} → {targetName}",
+      "AVS_ACCEPTED_COUNT": "Zaakceptowano {count} zmian",
+      "AVS_ACCEPTED_IN_TABLE": "Zaakceptowano {count} zmian w tabeli {group}",
+      "AVS_ACCEPTED_PLURAL": "Zaakceptowano {count} zmian AVS{plural}",
+      "AVS_CLEARED_PLURAL": "Zaakceptowano {count} zmian AVS{plural}",
+      "SNEAK_APPLY_FAILED": "Nie udało się zastosować zmian skradania się: {errors}",
+      "INIT_FAILED": "Nie powiodła się inicjalizacja PF2E Visioner: {error}",
+      "NO_ENCOUNTER_TOKENS": "{moduleId}: Nie znaleziono tokenów spotkań. Filtr wyłączony.",
+      "NO_VALID_CONSEQUENCES": "Nie znaleziono żadnych ważnych celów dla konsekwencji ataku. Konsekwencje można zobaczyć tylko wtedy, gdy jesteś Ukryty lub Niewykrywalny dla co najmniej jednego obserwatora.",
+      "SNEAK_DEFERRED_RESTORED": "Przywrócono {count} tokenów do pierwotnego stanu odroczonego wraz ze wszystkimi danymi dotyczącymi pozycji."
+    },
+    "DIALOG_TITLES": {
+      "HIDE_RESULTS": "Wyniki Ukrywania",
+      "POINT_OUT_RESULTS": "Wyniki Wskazania Palcem",
+      "POINT_OUT_ACTION": "PF2E Visioner - Akcja Wskaż Palcem",
+      "SEEK_RESULTS": "Wyniki Szukania",
+      "ACTION_RESULTS": "Wyniki akcji",
+      "TAKE_COVER_RESULTS": "Wyniki Znalezienia Osłony",
+      "COVER_OVERRIDE": "Pomijanie Osłony",
+      "WALL_SETTINGS": "PF2E Visioner: Ustawienia ścian",
+      "TOGGLE_HIDDEN_WALL": "Przełącz ukrytą ścianę (wybrane ściany)",
+      "QUICK_EDIT": "PF2E Visioner: Szybka edycja (wybrane ↔ docelowe)",
+      "PURGE_DATA": "PF2E Visioner: Wyczyść dane (scena / wybrane tokeny)",
+      "VISIONER_QUICK_PANEL": "Visioner Szybka edycja",
+      "APPLYING_CHANGES": "Stosowanie zmian",
+      "WALL_QUICK": "PF2E Visioner: Ustawienia ścian",
+      "AVS_VALIDATION": "Zmiany walidacji AVS",
+      "DARKNESS_MODE": "PF2E Visioner: Ustaw tryb ciemny",
+      "OVERRIDE_VALIDATION": "Zastąpienie walidacji",
+      "ATTACK_CONSEQUENCES": "Wyniki konsekwencji ataku",
+      "CREATE_DIVERSION_RESULTS": "Wyniki Dywersji",
+      "END_TURN_POSITION": "Weryfikacja pozycji na koniec tury – {name}",
+      "END_OF_TURN_SNEAK": "Weryfikacja Ukrycia na koniec tury",
+      "SNEAK_RESULTS": "Wyniki Skradania",
+      "RECOMMENDATIONS": {
+        "HEAL_CHARACTER": "Leczenie postaci",
+        "REMOVE_CONDITIONS": "Usuń stany",
+        "USE_HIDE_FIRST": "Użyj najpierw akcji Ukrywanie",
+        "CHECK_SCENE_SETUP": "Ustawienia sprawdzania sceny",
+        "PROCEED_CAUTION": "Postępuj ostrożnie",
+        "REPOSITION_BEFORE_SNEAK": "Przemieszczenie przed Skradaniem się",
+        "IMPROVE_POSITION": "Popraw pozycję",
+        "PROCEED_AWARENESS": "Postępuj świadomie",
+        "PROCEED_SNEAK": "Kontynuuj Skradanie się",
+        "EXCELLENT_POSITION": "Doskonała pozycja",
+        "GOOD_POSITION": "Dobra pozycja",
+        "HIDE_ACTION": "Akcja Ukrywanie",
+        "TAKE_COVER": "Znalezienie Osłony",
+        "REPOSITION": "Przemieszczenie",
+        "CREATE_DIVERSION": "Dywersja",
+        "POINT_OUT": "Wskaż Palcem",
+        "SEEK_ACTION": "Akcja Szukanie",
+        "INCREASE_DISTANCE": "Zwiększ odległość",
+        "GOOD_DISTANCE": "Dobra odległość",
+        "SEEK_DARKNESS": "Szukanie w ciemności",
+        "EXCELLENT_LIGHTING": "Doskonałe oświetlenie",
+        "FIND_COVER": "Znajdź osłonę",
+        "MAINTAIN_COVER": "Zachowaj osłonę",
+        "BREAK_LINE_SIGHT": "Przerwanie linii wzroku",
+        "BEST_COVER_DIRECTION": "Najlepszy kierunek osłony",
+        "AVOID_EXPOSURE": "Unikaj narażania się",
+        "SUGGESTED_MOVEMENT": "Sugerowany ruch",
+        "MAINTAIN_POSITION": "Utrzymaj pozycję",
+        "RELOCATE_IMMEDIATELY": "Przenieś się natychmiast",
+        "MAINTAIN_BENEFICIAL": "Utrzymanie korzystnych stanów",
+        "REMOVE_HARMFUL": "Usuń szkodliwe stany",
+        "ACQUIRE_BENEFICIAL": "Zdobądź korzystne stany",
+        "ALTERNATIVE_ACTIONS": "Akcje alternatywne",
+        "TACTICAL_ADVICE": "Porady taktyczne",
+        "POSITIONING": "Pozycjonowanie",
+        "CONDITIONS": "Stany"
+      }
+    },
+    "BUTTONS": {
+      "KEEN_EYES": "Bystre oczy",
+      "THAT": "To",
+      "OBSERVED": "Obserwowany",
+      "CONCEALED": "Przysłonięty",
+      "HIDDEN": "Ukryty",
+      "UNDETECTED": "Niewykryty",
+      "NO_COVER": "Brak osłony",
+      "LESSER_COVER": "Mniejsza osłona",
+      "STANDARD_COVER": "Standardowa osłona",
+      "GREATER_COVER": "Większa osłona",
+      "BRIGHT_LIGHT": "Jasne światło",
+      "DIM_LIGHT": "Słabe światło",
+      "DARKNESS": "Ciemność",
+      "IMPROVED": "Ulepszone",
+      "WORSENED": "Pogorszone",
+      "UNCHANGED": "Bez zmian",
+      "APPLY_CHANGE": "Zastosuj zmianę",
+      "CANCEL": "Anuluj",
+      "CHOOSE_DIFFERENT": "Wybierz inny stan",
+      "POSITION_DATA": {
+        "EXCELLENT": "Dane dotyczące doskonałej pozycji",
+        "GOOD": "Dane dotyczące dobrej pozycji",
+        "FAIR": "Dane dotyczące korzystnej pozycji",
+        "POOR": "Dane dotyczące złej pozycji",
+        "UNRELIABLE": "Dane dotyczące nieprawidłowej pozycji"
+      }
+    },
+    "TOOLTIPS": {
+      "AUTO_COVER_DETECTION": "Automatyczne wykrywanie osłony",
+      "KEEN_EYES": "Otrzymujesz premię okolicznościową +2 podczas korzystania z Szukania (aplikacja systemowa). Niewykryte stworzenia traktowane są jako Ukryte, a Ukryte stworzenia traktowane są jako Obserwowane podczas Szukania.",
+      "THAT_FEATURE": "Łatwiej dostrzegasz ukryte drzwi, pułapki i zagrożenia (porażka zamieni się w sukces)."
+    },
+    "SETTINGS_MENU": {
+      "TITLE": "Ustawienia PF2E Visioner",
+      "OPEN_BUTTON": "Otwórz",
+      "HINT": "Ustawienia pogrupowane według kategorii",
+      "SECTIONS": {
+        "GENERAL_UI": "Ogólny interfejs użytkownika",
+        "MANAGER_SETTINGS": "Ustawienia menedżera widoczności",
+        "VISION": "Wizja",
+        "HIDDEN_LOOT": "Ukryci aktorzy do złupienia",
+        "HIDDEN_WALLS": "Ukryte ściany",
+        "ADVANCED_SEEK": "Zaawansowane opcje Szukania",
+        "COVER": "Osłona",
+        "TOKEN_AUTO_COVER": "Ustawienia automatycznej osłony tokenu",
+        "WALL_AUTO_COVER": "Ustawienia automatycznej osłony ściany",
+        "AVS_SETTINGS": "Ustawienia A.V.S.",
+        "ADVANCED": "Zaawansowane"
+      }
+    },
+    "RULE_ELEMENTS": {
+      "LABELS": {
+        "SUBJECT": "Temat",
+        "OBSERVERS": "Obserwatorzy",
+        "DIRECTION": "Kierunek",
+        "MODE": "Tryb",
+        "STATUS": "Status",
+        "STEPS": "Etapy",
+        "DURATION": "Czas trwania (rundy)",
+        "REQUIRES_INITIATIVE": "Wymaga inicjatywy",
+        "RANGE": "Zasięg (stopy)"
+      }
     },
     "SEEK_AUTOMATION": {
       "BUTTON_APPLY": "Zastosuj wyniki Szukania",
@@ -180,6 +342,8 @@
       "PROCESSING": "Przetwarzanie wyników Szukania...",
       "PREVIEW_TITLE": "Przeglądaj wyniki Szukania",
       "PREVIEW_HINT": "Analiza wyników podjętych działań Szukania",
+      "PREVIEW_AVAILABLE_SENSES": "Dostępne zmysły",
+      "DETECTED_BY": "Wykryto przez",
       "ROLL_VS_DC": "Rzut przeciwko ST Ukrycia",
       "OUTCOME": "Wynik",
       "VISIBILITY_CHANGE": "Zmiana widoczności",
@@ -197,18 +361,30 @@
       "NO_TARGETS_IN_RANGE": "Brak ważnych celów w zasięgu 30 stóp.",
       "NO_TARGETS_IN_RANGE_CUSTOM": "Brak ważnych celów w zasięgu {distance} stóp.",
       "ECHOLOCATION_LABEL": "Echolokacja",
-      "ECHOLOCATION_TOOLTIP": "Dokładny słuch aktywny do początku twojej następnej tury",
-      "PREVIEW_AVAILABLE_SENSES": "(PL TODO) Available Senses",
-      "LIFESENSE_LABEL": "(PL TODO) Lifesense",
-      "LIFESENSE_TOOLTIP": "(PL TODO) Can sense living and undead creatures within range (imprecise sense)",
-      "UNMET_CONDITIONS": "(PL TODO) Unmet Conditions",
-      "SENSE_UNSEEN_BUTTON": "(PL TODO) Sense the Unseen (Reaction)",
-      "SENSE_UNSEEN_TOOLTIP": "(PL TODO) Use your Sense the Unseen feat to make undetected creatures hidden",
-      "SENSE_UNSEEN_APPLIED": "(PL TODO) Sense the Unseen Applied"
+      "ECHOLOCATION_TOOLTIP": "Precyzyjne słyszenie aktywne do momentu rozpoczęcia kolejnej tury",
+      "LIFESENSE_LABEL": "Wyczucie Życia",
+      "LIFESENSE_TOOLTIP": "Potrafi wyczuwać żywe i nieumarłe stworzenia w zasięgu (nieprecyzyjny zmysł)",
+      "UNMET_CONDITIONS": "Nieosiągnięte stany",
+      "SENSE_UNSEEN_BUTTON": "Wyczuwanie Niewidzialnego (reakcja)",
+      "SENSE_UNSEEN_TOOLTIP": "Użyj atut Widzenie Niewidzialnego, aby Niewykryte stworzenia stały się Ukryte",
+      "SENSE_UNSEEN_APPLIED": "Zastosowanie Wyczuwania Niewidzialnego"
     },
     "SENSE_PRECISION": {
-      "PRECISE": "(PL TODO) Precise",
-      "IMPRECISE": "(PL TODO) Imprecise"
+      "PRECISE": "Precyzyjny",
+      "IMPRECISE": "Nieprecyzyjny"
+    },
+    "REACTIONS": {
+      "BUTTON_LABEL": "Reakcje",
+      "BUTTON_TOOLTIP": "Dostępne reakcje dla tej akcji",
+      "NO_REACTIONS": "Brak dostępnych reakcji",
+      "DROPDOWN_TITLE": "Dostępne reakcje",
+      "SENSE_THE_UNSEEN": {
+        "name": "Wyczuwanie Niewidzialnego",
+        "applied": "Zastosowanie Wyczuwania Niewidzialnego",
+        "description": "Mimo że nie udało ci się wykonać testu wyzwalającego, automatycznie wyczuwasz wszystkie Niewykryte stworzenia w obszarze, w którym Szukasz, co sprawia, że stają się one dla ciebie jedynie Ukryci.",
+        "trigger": "Nie udaje ci się znaleźć Niewykrytej istoty.",
+        "effect": "Spraw, aby Niewykryte stworzenia były dla ciebie Ukryte"
+      }
     },
     "HIDE_AUTOMATION": {
       "BUTTON_APPLY": "Zastosuj wyniki Ukrywania",
@@ -231,20 +407,20 @@
       "SETTING_NAME": "Włącz automatyzację Ukrywania",
       "SETTING_HINT": "Automatycznie dodawaj przyciski do wiadomości czatu Ukrywania w celu zastosowania zmian widoczności.",
       "BADGES": {
-        "TERRAIN_STALKER_LABEL": "(PL TODO) Terrain Stalker",
-        "TERRAIN_STALKER_TOOLTIP": "(PL TODO) Chosen terrains active: {selection} (Region: {environments})",
-        "VANISH_INTO_THE_LAND_LABEL": "(PL TODO) Vanish into the Land",
-        "VANISH_INTO_THE_LAND_TOOLTIP": "(PL TODO) You can Hide and Sneak even without cover or concealment in your chosen difficult terrain",
-        "VERY_VERY_SNEAKY_LABEL": "(PL TODO) Very, Very Sneaky",
-        "VERY_VERY_SNEAKY_TOOLTIP": "(PL TODO) Cover/concealment requirement is bypassed",
-        "LEGENDARY_SNEAK_LABEL": "(PL TODO) Legendary Sneak",
-        "LEGENDARY_SNEAK_TOOLTIP": "(PL TODO) Cover/concealment requirement is bypassed",
-        "CEASELESS_SHADOWS_LABEL": "(PL TODO) Ceaseless Shadows",
-        "CEASELESS_SHADOWS_TOOLTIP": "(PL TODO) Cover/concealment prerequisites are removed",
-        "CAMOUFLAGE_LABEL": "(PL TODO) Camouflage",
-        "CAMOUFLAGE_TOOLTIP": "(PL TODO) Cover/concealment requirement is bypassed in natural terrain",
-        "DISTRACTING_SHADOWS_LABEL": "(PL TODO) Distracting Shadows",
-        "DISTRACTING_SHADOWS_TOOLTIP": "(PL TODO) You may use larger creatures as cover for Hide/Sneak prerequisites"
+        "TERRAIN_STALKER_LABEL": "Podstępny Tropiciel",
+        "TERRAIN_STALKER_TOOLTIP": "Wybrane aktywne tereny: {selection} (Region: {environments})",
+        "VANISH_INTO_THE_LAND_LABEL": "Zniknięcie na Lądzie",
+        "VANISH_INTO_THE_LAND_TOOLTIP": "Możesz się Ukrywać i Skradać nawet bez osłony lub kryjówki w wybranym trudnym terenie.",
+        "VERY_VERY_SNEAKY_LABEL": "Bardzo, Bardzo Przebiegły",
+        "VERY_VERY_SNEAKY_TOOLTIP": "Wymóg posiadania osłony / przysłonięcia zostaje pominięty",
+        "LEGENDARY_SNEAK_LABEL": "Legendarne Skradanie",
+        "LEGENDARY_SNEAK_TOOLTIP": "Wymóg posiadania osłony / przysłonięcia zostaje pominięty",
+        "CEASELESS_SHADOWS_LABEL": "Nieustające Cienie",
+        "CEASELESS_SHADOWS_TOOLTIP": "Usunięto warunki wstępne dotyczące osłony / przysłonięcia",
+        "CAMOUFLAGE_LABEL": "Kamuflaż",
+        "CAMOUFLAGE_TOOLTIP": "Wymóg posiadania osłony / przysłonięcia zostaje pominięty w naturalnym terenie",
+        "DISTRACTING_SHADOWS_LABEL": "Rozpraszające Cienie",
+        "DISTRACTING_SHADOWS_TOOLTIP": "Możesz wykorzystać większe stworzenia jako osłonę, aby spełnić wymagania dotyczące Ukrywania się / Skradania się."
       }
     },
     "SNEAK_AUTOMATION": {
@@ -267,20 +443,20 @@
       "SETTING_NAME": "Włącz automatyzację Skradania",
       "SETTING_HINT": "Automatycznie dodawaj przyciski do wiadomości czatu Skradania w celu zastosowania zmian widoczności.",
       "BADGES": {
-        "TERRAIN_STALKER_LABEL": "(PL TODO) Terrain Stalker",
-        "TERRAIN_STALKER_TOOLTIP": "(PL TODO) Chosen terrains active: {selection} (Region: {environments})",
-        "VANISH_INTO_THE_LAND_LABEL": "(PL TODO) Vanish into the Land",
-        "VANISH_INTO_THE_LAND_TOOLTIP": "(PL TODO) You can Sneak even without cover or concealment in your chosen difficult terrain",
-        "VERY_VERY_SNEAKY_LABEL": "(PL TODO) Very, Very Sneaky",
-        "VERY_VERY_SNEAKY_TOOLTIP": "(PL TODO) Cover/concealment requirement is bypassed",
-        "LEGENDARY_SNEAK_LABEL": "(PL TODO) Legendary Sneak",
-        "LEGENDARY_SNEAK_TOOLTIP": "(PL TODO) Cover/concealment requirement is bypassed",
-        "CEASELESS_SHADOWS_LABEL": "(PL TODO) Ceaseless Shadows",
-        "CEASELESS_SHADOWS_TOOLTIP": "(PL TODO) Cover/concealment prerequisites are removed",
-        "CAMOUFLAGE_LABEL": "(PL TODO) Camouflage",
-        "CAMOUFLAGE_TOOLTIP": "(PL TODO) Cover/concealment requirement is bypassed in natural terrain",
-        "DISTRACTING_SHADOWS_LABEL": "(PL TODO) Distracting Shadows",
-        "DISTRACTING_SHADOWS_TOOLTIP": "(PL TODO) You may use larger creatures as cover for Hide/Sneak prerequisites"
+        "TERRAIN_STALKER_LABEL": "Podstępny Tropiciel",
+        "TERRAIN_STALKER_TOOLTIP": "Wybrane aktywne tereny: {selection} (Region: {environments})",
+        "VANISH_INTO_THE_LAND_LABEL": "Zniknięcie na Lądzie",
+        "VANISH_INTO_THE_LAND_TOOLTIP": "Możesz się Skradać nawet bez osłony lub kryjówki w wybranym trudnym terenie.",
+        "VERY_VERY_SNEAKY_LABEL": "Bardzo, Bardzo Przebiegły",
+        "VERY_VERY_SNEAKY_TOOLTIP": "Wymóg posiadania osłony / przysłonięcia zostaje pominięty",
+        "LEGENDARY_SNEAK_LABEL": "Legendarne Skradanie",
+        "LEGENDARY_SNEAK_TOOLTIP": "Wymóg posiadania osłony / przysłonięcia zostaje pominięty",
+        "CEASELESS_SHADOWS_LABEL": "Nieustające Cienie",
+        "CEASELESS_SHADOWS_TOOLTIP": "Usunięto warunki wstępne dotyczące osłony / przysłonięcia",
+        "CAMOUFLAGE_LABEL": "Kamuflaż",
+        "CAMOUFLAGE_TOOLTIP": "Wymóg posiadania osłony / przysłonięcia zostaje pominięty w naturalnym terenie",
+        "DISTRACTING_SHADOWS_LABEL": "Rozpraszające Cienie",
+        "DISTRACTING_SHADOWS_TOOLTIP": "Możesz wykorzystać większe stworzenia jako osłonę, aby spełnić wymagania dotyczące Ukrywania się / Skradania się."
       }
     },
     "CREATE_A_DIVERSION_AUTOMATION": {
@@ -306,86 +482,6 @@
         "name": "Włącz podpowiedzi po najechaniu kursorem",
         "hint": "Pokaż podpowiedzi dotyczące statusu widoczności po najechaniu kursorem na tokeny"
       },
-      "TOKEN_HUD_BUTTON": {
-        "name": "(PL) Przycisk HUD tokenu",
-        "hint": "(PL) Pokaż przycisk Visioner w HUD tokenu"
-      },
-      "VISIONER_SCENE_CONTROLS": {
-        "name": "(PL) Kontrolki sceny Visioner",
-        "hint": "(PL) Pokaż przyciski Visioner na paskach narzędzi"
-      },
-      "AVS_CHANGES_INDICATOR_SIZE": {
-        "name": "(PL) Rozmiar wskaźnika zmian AVS",
-        "hint": "(PL) Kontroluje rozmiar pływającego przycisku wskaźnika zmian AVS i jego podpowiedzi.",
-        "CHOICES": {
-          "small": "(PL) Mały",
-          "medium": "(PL) Średni",
-          "large": "(PL) Duży",
-          "xlarge": "(PL) Bardzo duży"
-        }
-      },
-      "REMOVE_PLAYER_TARGET_TOOLTIPS": {
-        "name": "(PL) Usuń podpowiedzi celu dla graczy",
-        "hint": "(PL) Gracze nie widzą podpowiedzi celu"
-      },
-      "MANAGER_ROLL_COMPARISON": {
-        "name": "(PL) Porównanie rzutów w menedżerze",
-        "hint": "(PL) Pokaż ostatni wynik rzutu vs ST"
-      },
-      "TOKEN_INTERSECTION_MODE": {
-        "name": "(PL) Tryb przecięcia tokenów",
-        "hint": "(PL) Sposób oceny blokujących tokenów",
-        "CHOICES": {
-          "any": "(PL) Dowolny",
-          "length10": "(PL) 10%",
-          "coverage": "(PL) Pokrycie boku",
-          "tactical": "(PL) Taktyczny"
-        }
-      },
-      "AUTO_COVER_IGNORE_UNDETECTED": {
-        "name": "(PL) Ignoruj niewykryte tokeny",
-        "hint": "(PL) Niewykryte tokeny nie blokują osłony"
-      },
-      "AUTO_COVER_VISUALIZATION_COMBAT_ONLY": {
-        "name": "(PL) Wizualizacja osłony tylko w walce",
-        "hint": "(PL) Pokazuj auto-osłonę tylko podczas walki"
-      },
-      "AUTO_COVER_GM_RESPECT_FOG": {
-        "name": "(PL) MG respektuje mgłę dla osłony",
-        "hint": "(PL) MG widzi osłonę jak gracze (mgła)"
-      },
-      "AUTO_COVER_IGNORE_DEAD": {
-        "name": "(PL) Ignoruj martwe tokeny",
-        "hint": "(PL) Tokeny z 0 HP nie blokują osłony"
-      },
-      "AUTO_COVER_IGNORE_ALLIES": {
-        "name": "(PL) Ignoruj sojuszników dla osłony",
-        "hint": "(PL) Sojusznicy nie blokują osłony"
-      },
-      "WALL_STANDARD_THRESHOLD": {
-        "name": "(PL) Próg standardowej osłony przez ścianę (%)",
-        "hint": "(PL) Procent zasłonięcia dla standardowej osłony"
-      },
-      "WALL_GREATER_THRESHOLD": {
-        "name": "(PL) Próg większej osłony przez ścianę (%)",
-        "hint": "(PL) Procent zasłonięcia dla większej osłony"
-      },
-      "WALLS_ALLOW_GREATER": {
-        "name": "(PL) Ściany mogą zapewniać większą osłonę",
-        "hint": "(PL) Gdy wyłączone, ściany nie dają większej osłony"
-      },
-      "IGNORE_PRONE_TOKENS": {
-        "name": "(PL) Ignoruj leżące tokeny",
-        "hint": "(PL) Leżące tokeny nie blokują osłony"
-      },
-      "KEYBIND_OPEN_MANAGER_TARGET_MODE": {
-        "name": "(PL) Skrót otwiera menedżera w trybie Celu",
-        "hint": "(PL) Domyślnie otwiera w trybie Celu"
-      },
-      "VISIONER_QUICK_EDIT_TOOL": {
-        "name": "(PL) Narzędzie szybkiej edycji Visioner",
-        "hint": "(PL) Pokaż narzędzie szybkiej edycji na pasku"
-      },
       "ALLOW_PLAYER_TOOLTIPS": {
         "name": "Zezwól na podpowiedzi dla gracza",
         "hint": "Po włączeniu tej opcji gracze mogą zobaczyć podpowiedzi dotyczące widoczności z własnej perspektywy po najechaniu kursorem na tokeny."
@@ -401,6 +497,18 @@
           "xlarge": "Bardzo duży"
         }
       },
+      "AUTO_VISIBILITY_ENABLED": {
+        "name": "Włącz system automatycznej widoczności",
+        "hint": "Automatycznie ustaw flagi widoczności w oparciu o warunki oświetleniowe i zmysły stworzeń. System ten analizuje oświetlenie sceny, pozycje tokenów i zdolności stworzeń, aby określić odpowiednie stany widoczności (obserwowane, przysłonięte, niewidoczne, niewykryte)."
+      },
+      "AUTO_VISIBILITY_DEBUG_MODE": {
+        "name": "Tryb debugowania automatycznej widoczności",
+        "hint": "Włącz szczegółowe logowanie konsoli dla systemu automatycznej widoczności. Przydatne do rozwiązywania problemów związanych z obliczeniami widoczności."
+      },
+      "DISABLE_LINE_OF_SIGHT": {
+        "name": "Wyłącz obliczenia linii wzroku",
+        "hint": "Wyłącz obliczenia linii wzroku dla widoczności. Po włączeniu tej opcji widoczność będzie określana wyłącznie na podstawie odległości i zmysłów, z pominięciem ścian i przeszkód. Przydatne do optymalizacji wydajności lub określonych stylów gry."
+      },
       "COLORBLIND_MODE": {
         "name": "Tryb dla osób z dysfunkcją widzenia barw",
         "hint": "Wybierz tryb dla osób z dysfunkcją widzenia barw, aby dostosować kolory dla lepszej widoczności (ustawienie po stronie klienta)",
@@ -413,40 +521,52 @@
         }
       },
       "IGNORE_ALLIES_DEFAULT": {
-        "name": "Ignoruj sojuszników (domyślnie)",
-        "hint": "Ustawia domyślny stan pola 'Ignoruj sojuszników' w oknach Visioner i Menedżerze Tokenów. Można zmienić na bieżąco w każdym dialogu."
+        "name": "Ustaw domyślny stan „Ignoruj sojuszników”",
+        "hint": "Określa, czy pole wyboru Ignoruj sojuszników w oknach dialogowych Menedżera wizji / Akcji jest domyślnie włączone czy wyłączone, ale nadal można je ręcznie przełączać."
       },
       "HIDE_FOUNDRY_HIDDEN_TOKENS": {
-        "name": "Ukryj ukryte w Foundry tokeny w UI",
-        "hint": "Gdy włączone, tokeny oznaczone jako ukryte (core Foundry) są filtrowane z okien/dialogów Visioner (poza przypadkami specjalnymi). Tylko filtr wizualny po stronie klienta."
+        "name": "Ustaw domyślny stan „Ukryj Foundry”",
+        "hint": "Określa, czy pole wyboru Ukryj Foundry w oknach dialogowych Menedżera Wizji / Akcji jest domyślnie włączone czy wyłączone, ale nadal można je ręcznie przełączać."
       },
       "ENABLE_ALL_TOKENS_VISION": {
-        "name": "Włącz wizję dla wszystkich tokenów",
-        "hint": "Po włączeniu wszystkie tokeny będą miały domyślnie włączoną widoczność."
+        "name": "Wizja dla bohaterów niezależnych",
+        "hint": "Umożliwia wszystkim tokenom BN łatwiejsze obserwowanie punktu widzenia."
+      },
+      "GDV_VISUAL_OVERRIDE_ENABLED": {
+        "name": "Nadpisanie Większego widzenia w ciemności",
+        "hint": "Tylko dla klienta: Gdy wybrany token ma zdolność Większe widzenie w ciemności, rozjaśnij obszary ciemności, aby obraz był zgodny z zasadami Visioner."
+      },
+      "GDV_OVERLAY_ALPHA": {
+        "name": "Intensywność nakładki GDV",
+        "hint": "Tylko dla klienta: Jak silnie przeciwdziałać ciemności dla Większego widzenia w ciemności (0–1)."
+      },
+      "GDV_TOKEN_GRAYSCALE": {
+        "name": "GDV: Czarne i białe tokeny",
+        "hint": "Tylko dla klienta: podczas widzenia za pomocą (większego) widzenia w ciemności, renderuj tokeny w skali szarości, aby dopasować je do treści zasad (widzenie czarno-białe)."
       },
       "DEFAULT_ENCOUNTER_FILTER": {
-        "name": "Domyślny stan filtru spotkań",
-        "hint": "Po włączeniu opcji, pole wyboru filtru spotkań w oknach dialogowych będzie domyślnie zaznaczone, gdy aktywne jest spotkanie."
+        "name": "Ustaw domyślny stan „Tylko spotkanie”",
+        "hint": "Określa, czy pole wyboru „Tylko spotkanie” w oknach dialogowych Menedżera wizji / Akcji jest domyślnie włączone lub wyłączone, ale nadal można je ręcznie przełączać (to pole wyboru pojawia się tylko w oknach dialogowych podczas spotkań)"
       },
       "LIMIT_SEEK_RANGE": {
-        "name": "Ogranicz zakres poszukiwań w walce",
-        "hint": "Po włączeniu opcji, akcja Szukanie w walce będzie wykrywać tylko cele znajdujące się w określonej odległości."
+        "name": "Ogranicz zasięg Szukania w walce",
+        "hint": "Cel zostanie wybrany na podstawie określonej odległości od tokenu przy użyciu Szukania podczas walki."
       },
       "SEEK_USE_TEMPLATE": {
-        "name": "Użyj szablonu Szukania (15 stóp - wybuch)",
-        "hint": "Po włączeniu tej opcji będzie można skonfigurować szablon wybuchu o zasięgu 15 stóp i uwzględniać tylko cele znajdujące się w obrębie tego szablonu."
+        "name": "Korzystanie z szablonu Szukania",
+        "hint": "Podczas Szukania cele zostaną wybrane przy użyciu szablonu o zasięgu 15 stóp. Przycisk szablonu zastępuje standardowe przyciski Visionera w karcie czatu Szukania."
       },
       "LIMIT_SEEK_RANGE_OUT_OF_COMBAT": {
-        "name": "Ogranicz zasięg Szukania poza walką",
-        "hint": "Po włączeniu opcji, akcja Szukanie poza walką będzie wykrywać tylko cele znajdujące się w określonej odległości."
+        "name": "Ogranicz zasięg Szukania podczas eksploracji",
+        "hint": "Cel zostanie wybrany na podstawie określonej odległości od tokenu przy użyciu Szukania poza walką."
       },
       "CUSTOM_SEEK_DISTANCE": {
-        "name": "Wartość zakresu Szukania",
-        "hint": "Ustaw maksymalną odległość (w stopach) dla akcji Szukania, gdy włączone jest ograniczenie zasięgu."
+        "name": "Zasięg Szukania w walce:",
+        "hint": "Maksymalna odległość Szukania w walce"
       },
       "CUSTOM_SEEK_DISTANCE_OOC": {
-        "name": "Wartość zasięgu Szukania (poza walką)",
-        "hint": "Ustaw maksymalną odległość (w stopach) dla akcji Szukania, gdy włączone jest ograniczenie zasięgu poza walką."
+        "name": "Zasięg Szukania podczas eksploracji",
+        "hint": "Maksymalna odległość Szukania poza walką"
       },
       "USE_HUD_BUTTON": {
         "name": "Użyj przycisku HUD token",
@@ -455,6 +575,14 @@
       "BLOCK_PLAYER_TARGET_TOOLTIPS": {
         "name": "Blokuj podpowiedzi dotyczące celów dla graczy",
         "hint": "Po włączeniu tej opcji gracze nie będą widzieć podpowiedzi po najechaniu kursorem na tokeny w trybie celowania (tak jak widzą je inni gracze). Podpowiedzi będą nadal widoczne po przytrzymaniu klawisza O lub naciśnięciu klawisza Alt."
+      },
+      "REMOVE_PLAYER_TARGET_TOOLTIPS": {
+        "name": "Usuń podpowiedzi dotyczące celowania z graczy",
+        "hint": "Uniemożliwia graczom wyświetlanie podpowiedzi z perspektywy celu dla posiadanych tokenów."
+      },
+      "REMOVE_PLAYER_OBSERVER_TOOLTIPS": {
+        "name": "Usuń podpowiedzi obserwatora z graczy",
+        "hint": "Uniemożliwia graczom wyświetlanie podpowiedzi z perspektywy obserwatora (klawisz O / tryb obserwatora)."
       },
       "INTEGRATE_COVER_VISIBILITY": {
         "name": "Zintegruj Osłonę z regułami widoczności",
@@ -477,32 +605,32 @@
         "hint": "Używane, gdy token łupu wymaga ST Percepcji i nie ma statystyki systemowej."
       },
       "LOOT_STEALTH_DC": {
-        "name": "Domyślne ST Ukrycia dla aktorów łupów",
-        "hint": "ST używane podczas traktowania tokenów łupów jako celów Szukania."
+        "name": "ST Ukrycia aktora do złupienia",
+        "hint": "Domyślna wartość ST używana podczas wyszukiwania ukrytych aktorów do złupienia za pomocą Szukania. Wartość ST Ukrycia można zmienić w ustawieniach tokena aktora do złupienia."
       },
       "WALL_STEALTH_DC": {
-        "name": "Domyślne ST Ukrycia dla ścian",
-        "hint": "ST używane przy traktowaniu ukrytych ścian jako celów wyszukiwania (gdy ściana nie ma wyraźnie ustawionego ST)."
+        "name": "ST Ukrycia ściany",
+        "hint": "Domyślna wartość ST używana podczas wyszukiwania ukrytych ścian za pomocą Szukania. Wartość ST Ukrycia można zmienić w ustawieniach ściany."
       },
       "HIDE_QUICK_EDIT_TOOL": {
         "name": "Ukryj narzędzie szybkiej edycji",
         "hint": "Jeśli opcja jest włączona, narzędzie Szybka edycja zostanie ukryte na pasku narzędzi elementów sterujących tokenów."
       },
       "INCLUDE_LOOT_ACTORS": {
-        "name": "Dodaj aktorów łupów do menedżera widoczności",
-        "hint": "Umożliwia konfigurację stanów widoczności przedmiotów łupów (skrzyń, pojemników) dla poszczególnych obserwatorów. Tylko wizualnie; nie są stosowane żadne stany PF2E."
+        "name": "Ukryci aktorzy do złupienia",
+        "hint": "Umożliwia konfigurację stanów widoczności aktorów do złupienia w menedżerze Visioner\n(tylko wizualnie – bez warunków)"
       },
       "INCLUDE_WALLS": {
-        "name": "Dodaj ściany jako obiekty, które można ukryć (funkcja eksperymentalna)",
-        "hint": "Pokaż ściany w menedżerze, aby oznaczyć je jako widoczne/ukryte dla obserwatora. Obecna implementacja jest wyłącznie wizualna i nie zmienia zasłaniania ani kolizji."
+        "name": "Ukryte ściany",
+        "hint": "Umożliwia konfigurację stanów widoczności ścian w menedżerze Visioner. Wizualny wskaźnik powodzenia Szukania."
       },
       "HIDDEN_WALLS": {
-        "name": "Włącz ukryte ściany",
-        "hint": "Włącz opcję ukrywania poszczególnych ścian i wskaźników graczy. Jeśli ukryta ściana jest drzwiami, nie będzie zasłaniać widoku."
+        "name": "Ukryte ściany",
+        "hint": "Umożliwia konfigurację stanów widoczności ścian w menedżerze Visioner. Wizualny wskaźnik powodzenia Szukania."
       },
       "AUTO_COVER": {
-        "name": "Automatyczna osłona",
-        "hint": "Po włączeniu moduł automatycznie zastosuje osłonę do tokenów na podstawie ścieżki blokującej token."
+        "name": "Włącz automatyczną osłonę",
+        "hint": "Umożliwia automatyczne stosowanie osłony w oparciu o zasięg tokenu w stosunku do ścian i innych tokenów."
       },
       "EXPERIMENTAL_SEE_THROUGH_WALLS": {
         "name": "Eksperymentalna funkcja: Przezroczyste ściany dla tokenów (tylko dla klienta)",
@@ -512,253 +640,301 @@
         "name": "Surowe egzekwowanie Skradania",
         "hint": "Po włączeniu funkcja Skradanie będzie działać zgodnie z zasadami RAW. Po wyłączeniu funkcja Skradania będzie bardziej wyrozumiała."
       },
-      "AUTO_VISIBILITY_ENABLED": {
-        "name": "(PL TODO) Enable Auto-Visibility System",
-        "hint": "(PL TODO) Automatically set visibility flags based on lighting conditions and creature senses. This system will analyze scene lighting, token positions, and creature abilities to determine appropriate visibility states (observed, concealed, hidden, undetected)."
+      "TOKEN_HUD_BUTTON": {
+        "name": "Przycisk HUD tokenu",
+        "hint": "Dodaje przycisk do interfejsu HUD tokenów Foundry, służący do otwierania menedżera Visioner. Po wyłączeniu tej funkcji, po wybraniu tokenu pojawi się ruchomy, pływający przycisk."
       },
-      "AUTO_VISIBILITY_DEBUG_MODE": {
-        "name": "(PL TODO) Auto-Visibility Debug Mode",
-        "hint": "(PL TODO) Enable detailed console logging for the auto-visibility system. Useful for troubleshooting visibility calculations."
+      "VISIONER_SCENE_CONTROLS": {
+        "name": "Sterowanie sceną Visioner",
+        "hint": "Dodaje określone funkcje Visioner jako przyciski do elementów sterujących tokenami i elementami sterującymi ścianą na lewym pasku bocznym. Jeśli funkcja jest wyłączona, nadal można uzyskać do niej dostęp za pośrednictwem indywidualnych ustawień tokenów / ściany lub skrótów klawiszowych."
       },
-      "DISABLE_LINE_OF_SIGHT": {
-        "name": "(PL TODO) Disable Line of Sight Calculations",
-        "hint": "(PL TODO) Disable line-of-sight calculations for visibility. When enabled, visibility will be determined solely by distance and senses, ignoring walls and obstacles. Useful for performance optimization or specific game styles."
+      "AVS_CHANGES_INDICATOR_SIZE": {
+        "name": "AVS Zmiana rozmiaru wskaźnika",
+        "hint": "Kontroluje rozmiar przycisku wskaźnika zmian AVS oraz jego podpowiedzi.",
+        "CHOICES": {
+          "small": "Mały",
+          "medium": "Średni",
+          "large": "Duży",
+          "xlarge": "Bardzo duży"
+        }
       },
-      "GDV_VISUAL_OVERRIDE_ENABLED": {
-        "name": "(PL TODO) Greater Darkvision Visual Override",
-        "hint": "(PL TODO) Client-only: When your selected token has Greater Darkvision, lighten darkness areas so visuals match Visioner rules."
+      "MANAGER_ROLL_COMPARISON": {
+        "name": "Porównanie rzutów menedżera Visioner",
+        "hint": "Dodaje kolumnę porównania rzutów do Menedżera Visioner, porównującą ostatni odpowiedni rzut z odpowiednim ST."
       },
-      "GDV_OVERLAY_ALPHA": {
-        "name": "(PL TODO) GDV Overlay Intensity",
-        "hint": "(PL TODO) Client-only: How strongly to counteract darkness tint for Greater Darkvision (0–1)."
+      "TOKEN_INTERSECTION_MODE": {
+        "name": "Tryb przecięcia promienia tokenowego",
+        "hint": "Jak oceniana jest osłona na podstawie tokenów jako blokujących",
+        "CHOICES": {
+          "any": "Dowolny – dowolny punkt przecięcia. Mniejsza osłona; Standardowa osłona, jeśli dwa rozmiary lub większe niż atakujący i cel",
+          "length10": "10% – przecięcie 10% lub więcej strony blokującej",
+          "coverage": "Pokrycie boczne — progi oparte na procentowym pokryciu bocznym. 50% standardowe / 70% większe",
+          "tactical": "Taktyczne - Obliczenia od rogu do rogu dla większej precyzji obliczeń"
+        }
       },
-      "GDV_TOKEN_GRAYSCALE": {
-        "name": "(PL TODO) GDV: Black & White Tokens",
-        "hint": "(PL TODO) Client-only: When seeing via (greater) darkvision, render tokens in grayscale to match rules text (black and white vision)."
+      "AUTO_COVER_IGNORE_UNDETECTED": {
+        "name": "Ignoruj Niewykryte tokeny",
+        "hint": "Niewykryte tokeny, zgodnie z efektem Visionera, nie zapewniają automatycznej osłony."
       },
-      "REMOVE_PLAYER_OBSERVER_TOOLTIPS": {
-        "name": "(PL TODO) Remove Observer Hover Tooltips from Players",
-        "hint": "(PL TODO) Stops players from seeing observer-perspective hover tooltips (O key / observer mode)"
+      "AUTO_COVER_VISUALIZATION_COMBAT_ONLY": {
+        "name": "Ogranicz wizualizację automatycznej osłony w walce",
+        "hint": "Ogranicza użycie skrótu klawiszowego „Automatyczna wizualizacja osłony” wyłącznie do sytuacji, gdy trwa walka."
+      },
+      "AUTO_COVER_GM_RESPECT_FOG": {
+        "name": "Wizualizacja automatycznej osłony tokenu dla MG",
+        "hint": "MG będzie widział ograniczenia wizualizacji Automatycznej Osłony w oparciu o wizję tokenu."
+      },
+      "AUTO_COVER_IGNORE_DEAD": {
+        "name": "Ignoruj martwe tokeny",
+        "hint": "Martwe tokeny nie zapewniają automatycznej osłony."
+      },
+      "AUTO_COVER_IGNORE_ALLIES": {
+        "name": "Ignoruj tokeny sojuszników",
+        "hint": "Tokeny sojusznicze nie zapewniają automatycznej osłony."
+      },
+      "WALL_STANDARD_THRESHOLD": {
+        "name": "Standardowy próg ściany:",
+        "hint": "Procent docelowego tokenu, który musi zostać zablokowany, aby zapewnić Standardową Osłonę"
+      },
+      "WALL_GREATER_THRESHOLD": {
+        "name": "Większy próg ściany:",
+        "hint": "Procent docelowego tokenu, który musi zostać zablokowany, aby zapewnić Większą Osłonę"
+      },
+      "WALLS_ALLOW_GREATER": {
+        "name": "Ściany zapewniają Większą Osłonę",
+        "hint": "Pozwala ścianom zapewnić Większą Osłonę w oparciu o konfigurowalny próg"
+      },
+      "IGNORE_PRONE_TOKENS": {
+        "name": "Ignoruj tokeny Przewrócone",
+        "hint": "Tokeny w pozycji leżącej nie zapewniają automatycznej osłony."
+      },
+      "KEYBIND_OPEN_MANAGER_TARGET_MODE": {
+        "name": "Skrót klawiszowy otwiera menedżera trybu celowania",
+        "hint": "Otwórz menedżera Visioner w trybie celowania zamiast obserwacji za pomocą skrótu klawiszowego."
+      },
+      "VISIONER_QUICK_EDIT_TOOL": {
+        "name": "Narzędzie szybkiej edycji Visioner",
+        "hint": "Dodaje przycisk do paska bocznego narzędzi tokenów, aby otworzyć narzędzie Szybkiej Edycji Visioner. Jeśli jest wyłączone, dostęp do narzędzia można uzyskać za pomocą skrótu klawiszowego."
       }
     },
     "UI": {
       "ENCOUNTER_FILTER_TEXT": "Pokaż tylko tokeny spotkań",
+      "CEASELESS_SHADOWS_UPGRADE_TOOLTIP": "{FEAT}: {FROM} → {TO} (ulepszenie atutu)",
       "COVER_OVERRIDE": "Pomijanie osłony",
       "ROLL": "Rzut",
-      "APPLY_ALL": "Apply All",
-      "REVERT_ALL": "Revert All",
-      "REMOVE_OVERRIDES": "Remove Overrides",
-      "BULK_SET_VISIBILITY": "Bulk Set Visibility",
-      "CLEAR_BULK_OVERRIDES": "Clear Bulk Overrides",
-      "FILTER_BY_DETECTION_LABEL": "(PL TODO) Filter By Viewport",
-      "FILTER_BY_DETECTION_TOOLTIP": "(PL TODO) Only show tokens that are within the current viewport",
-      "CEASELESS_SHADOWS_UPGRADE_TOOLTIP": "(PL TODO) {FEAT}: {FROM} → {TO} (feat upgrade)",
-      "ATTEMPTING_TO_HIDE": "(PL TODO) Attempting to hide from observers",
-      "IGNORE_ALLIES": "(PL TODO) Ignore allies",
-      "IGNORE_ALLIES_TOOLTIP": "(PL TODO) Hide allies from the results list",
-      "HIDE_FOUNDRY_HIDDEN": "(PL TODO) Hide Foundry-hidden tokens",
-      "HIDE_FOUNDRY_HIDDEN_TOOLTIP": "(PL TODO) Visually hide tokens that are Foundry-hidden (document.hidden)",
-      "SHOW_ONLY_CHANGES": "(PL TODO) Show only changes",
-      "SHOW_ONLY_CHANGES_TOOLTIP": "(PL TODO) Show only rows with visibility changes",
-      "ENCOUNTER_FILTER_TOOLTIP": "(PL TODO) Only show tokens in the current encounter",
-      "CONCEALED_TOOLTIP_SHORT": "(PL TODO) Concealed",
-      "STANDARD_OR_GREATER_TOOLTIP": "(PL TODO) Standard or Greater",
-      "FOUNDRY_HIDDEN": "(PL TODO) Foundry Hidden",
-      "COVER_OVERRIDDEN_POPUP": "(PL TODO) Cover overridden via keybind popup",
-      "COVER_OVERRIDDEN_DIALOG": "(PL TODO) in roll dialog",
-      "COVER_OVERRIDDEN_MANUALLY": "(PL TODO) manually",
-      "NO_COVER_STEALTH": "(PL TODO) No Cover (+0 Stealth)",
-      "END_POSITION_NOT_AVAILABLE": "(PL TODO) End position data not available",
-      "START_POSITION_NOT_AVAILABLE": "(PL TODO) Start position data not available",
-      "AVS_CONTROLLED": "(PL TODO) Controlled by Auto-Visibility System",
-      "ORIGINAL_COVER": "(PL TODO) Original Cover: {state}",
-      "APPLY_VISIBILITY_CHANGE": "(PL TODO) Apply this visibility change",
-      "REVERT_TO_ORIGINAL": "(PL TODO) Revert to original visibility",
-      "APPLY_ALL_CHANGES": "(PL TODO) Apply all visibility changes",
-      "REVERT_ALL_CHANGES": "(PL TODO) Revert all changes to original state",
-      "ATTACK_CONSEQUENCES": "(PL TODO) Attack consequences for hidden/undetected attacker",
-      "TOKEN": "(PL TODO) Token",
-      "NAME": "(PL TODO) Name",
-      "VISIBILITY_CHANGE": "(PL TODO) Visibility Change",
-      "ACTIONS": "(PL TODO) Actions",
-      "HIDE_WALLS": "(PL TODO) Hide walls from the results list",
-      "IGNORE_WALLS": "(PL TODO) Hide walls from the results list",
-      "OVERRIDE_TO_STATE": "(PL TODO) Override to {label}",
-      "HIDDEN_OR_UNDETECTED": "(PL TODO) Hidden or Undetected",
-      "NO_COVER_BONUS": "(PL TODO) No cover bonus (+0)",
-      "STANDARD_COVER_BONUS": "(PL TODO) Standard cover bonus (+2)",
-      "GREATER_COVER_BONUS": "(PL TODO) Greater cover bonus (+4)",
-      "DEFER_TO_END_OF_TURN": "(PL TODO) Defer end position check to end of turn (Sneaky feat)",
-      "CURRENTLY_DEFERRED": "(PL TODO) Currently deferred to end of turn (Sneaky feat)",
-      "DEFERRED_ACTIONS_DISABLED": "(PL TODO) Actions disabled - deferred to end of turn",
-      "REMOVE_DEFER_PROCESS_NOW": "(PL TODO) Remove defer and process this check now",
-      "ACKNOWLEDGE_END_TURN": "(PL TODO) Acknowledge end-of-turn position validation results",
-      "CLOSE_DIALOG": "(PL TODO) Close dialog (results are automatically applied)",
-      "UNDEFER_ALL": "(PL TODO) Undefer all currently deferred tokens and restore their original state",
-      "DEFER_ALL_ELIGIBLE": "(PL TODO) Defer all eligible position checks to end of turn",
-      "PROCESS_DEFERRED_CHECKS": "(PL TODO) Process {count} deferred position check{s} for end-of-turn validation",
-      "APPLY_NO_COVER_ALL": "(PL TODO) Apply no cover bonus to all observers",
-      "APPLY_STANDARD_COVER_ALL": "(PL TODO) Apply standard cover bonus to all observers",
-      "APPLY_GREATER_COVER_ALL": "(PL TODO) Apply greater cover bonus to all observers",
-      "AVS_CHANGE_INFO": "(PL TODO) Movement or lighting changes can invalidate previously set visibility overrides. Review each AVS change below to decide whether to accept or reject it.",
-      "ACCEPT_ALL_CHANGES": "(PL TODO) Accept all changes",
-      "REJECT_ALL_CHANGES": "(PL TODO) Reject all changes",
-      "ACCEPT_THIS_CHANGE": "(PL TODO) Accept this change",
-      "REJECT_THIS_CHANGE": "(PL TODO) Reject this change",
-      "ACCEPT_ALL_IN_TABLE": "(PL TODO) Accept all changes in this table",
-      "CLICK_TO_SWITCH_MODE": "(PL TODO) Click to switch between Observer and Target modes",
-      "WALL_COVER_AUTO": "(PL TODO) Automatic Detection - Wall provides cover based on coverage thresholds",
-      "WALL_COVER_NONE": "(PL TODO) No Cover - Wall never provides cover regardless of thresholds",
-      "WALL_COVER_STANDARD_MAX": "(PL TODO) Standard Cover Maximum - Wall provides up to standard cover based on thresholds",
-      "WALL_COVER_GREATER_MAX": "(PL TODO) Greater Cover Maximum - Wall provides up to greater cover based on thresholds",
-      "MARK_WALL_HIDDEN": "(PL TODO) Mark this wall as hidden from players",
-      "SET_ALL_PCS_AS": "(PL TODO) Set all PCs as {state}",
-      "SET_ALL_NPCS_AS": "(PL TODO) Set all NPCs as {state}",
-      "SET_ALL_HAZARDS_OBSERVED": "(PL TODO) Set all Hazards as Observed",
-      "SET_ALL_HAZARDS_HIDDEN": "(PL TODO) Set all Hazards as Hidden",
-      "SET_ALL_LOOT_OBSERVED": "(PL TODO) Set all Loot as Observed",
-      "SET_ALL_LOOT_HIDDEN": "(PL TODO) Set all Loot as Hidden",
-      "SET_ALL_WALLS_OBSERVED": "(PL TODO) Set all listed walls as Observed",
-      "SET_ALL_WALLS_HIDDEN": "(PL TODO) Set all listed walls as Hidden",
-      "SELECT_ALL_PARTY": "(PL TODO) Select all party tokens",
-      "SELECT_ALL_ENEMIES": "(PL TODO) Select all enemy tokens",
-      "SWAP_OBSERVER_TARGET": "(PL TODO) Swap Observer/Target mode",
-      "TARGET_ALL_PARTY": "(PL TODO) Target all party tokens",
-      "TARGET_ALL_ENEMIES": "(PL TODO) Target all enemy tokens",
-      "CLEAR_ALL_SELECTIONS": "(PL TODO) Clear all selections and targets",
-      "PF2E_VISIONER": "(PL TODO) PF2E Visioner",
-      "CONFIGURE_SETTINGS_BELOW": "(PL TODO) Configure settings below.",
-      "APPLY_COVER_CHANGE": "(PL TODO) Apply this cover change",
-      "REVERT_TO_ORIGINAL_COVER": "(PL TODO) Revert to original cover",
-      "APPLY_ALL_COVER_CHANGES": "(PL TODO) Apply all cover changes",
-      "REVERT_ALL_COVER_CHANGES": "(PL TODO) Revert all changes",
-      "SHOW_ONLY_COVER_CHANGES_TOOLTIP": "(PL TODO) Show only rows with cover/visibility changes",
-      "SET_ALL_WALLS_HIDDEN_BULK": "(PL TODO) Set all walls to Hidden",
-      "SET_ALL_WALLS_NON_HIDDEN_BULK": "(PL TODO) Set all walls to Non-Hidden",
-      "SET_ALL_WALLS_AUTO_COVER": "(PL TODO) Set all walls to Auto Cover",
-      "SET_ALL_WALLS_NO_COVER": "(PL TODO) Set all walls to No Cover",
-      "SET_ALL_WALLS_STANDARD_COVER": "(PL TODO) Set all walls to Standard Cover",
-      "SET_ALL_WALLS_GREATER_COVER": "(PL TODO) Set all walls to Greater Cover",
-      "WALL_TYPE_CYCLE_TOOLTIP": "(PL TODO) Left-click: next type | Right-click: previous type",
-      "SELECT_WALL_AND_PAN": "(PL TODO) Select wall and pan to it",
-      "WALL_COVER_AUTO_SHORT": "(PL TODO) Automatic Detection",
-      "WALL_COVER_NONE_SHORT": "(PL TODO) No Cover",
-      "WALL_COVER_STANDARD_SHORT": "(PL TODO) Standard Cover",
-      "WALL_COVER_GREATER_SHORT": "(PL TODO) Greater Cover",
-      "COVER_OVERRIDDEN_VIA": "(PL TODO) Cover overridden {source}: {originalLabel} → {finalLabel}",
-      "START_POS_PREVIOUS_SNEAK": "(PL TODO) Start position qualification from previous sneak action",
-      "START_POS_QUALIFIES": "(PL TODO) Start position qualifies for sneak",
-      "START_POS_NOT_QUALIFIES": "(PL TODO) Start position does not qualify for sneak",
-      "END_POS_CHECK_END_TURN": "(PL TODO) End position will be checked at end of turn (consecutive sneak)",
-      "END_POS_QUALIFIES": "(PL TODO) End position qualifies for sneak",
-      "END_POS_NOT_QUALIFIES": "(PL TODO) End position does not qualify for sneak",
-      "AVS_RECOMMENDED": "(PL TODO) AVS Recommended: {label}",
-      "TOGGLE_MODE_TOOLTIP": "(PL TODO) Click to switch between Observer and Target modes",
-      "ONLY_SHOW_ENCOUNTER_TOOLTIP": "(PL TODO) Only show tokens in the current encounter",
-      "HIDE_FOUNDRY_HIDDEN_DOCUMENT_TOOLTIP": "(PL TODO) Visually hide tokens that are Foundry-hidden (document.hidden)",
-      "SHOW_ONLY_VISIBILITY_CHANGES": "(PL TODO) Show only rows with visibility changes",
-      "SET_ALL_AS": "(PL TODO) Set all {type} as {state}",
-      "SET_ALL_WALLS_AS": "(PL TODO) Set all listed walls as {state}",
-      "WALL_COVER_AUTO_TOOLTIP": "(PL TODO) Automatic Detection - Wall provides cover based on coverage thresholds",
-      "WALL_COVER_NONE_TOOLTIP": "(PL TODO) No Cover - Wall never provides cover regardless of thresholds",
-      "WALL_COVER_STANDARD_TOOLTIP": "(PL TODO) Standard Cover Maximum - Wall provides up to standard cover based on thresholds",
-      "WALL_COVER_GREATER_TOOLTIP": "(PL TODO) Greater Cover Maximum - Wall provides up to greater cover based on thresholds",
-      "WALL_HIDDEN_TOOLTIP": "(PL TODO) Mark this wall as hidden from players",
-      "SWAP_MODE": "(PL TODO) Swap Observer/Target mode",
-      "AVS_CHANGE_INFO_TOOLTIP": "(PL TODO) Movement or lighting changes can invalidate previously set visibility overrides. Review each AVS change below to decide whether to accept or reject it.",
-      "ACCEPT_ALL_CHANGES_IN_TABLE": "(PL TODO) Accept all changes in this table",
-      "PREVIEW_POINT_OUT_CHANGES": "(PL TODO) Preview and apply Point Out visibility changes",
-      "APPLY_WITHOUT_DIALOG": "(PL TODO) Apply all calculated changes without opening the dialog",
-      "TOKEN_COVER_AUTO_TOOLTIP": "(PL TODO) Automatic Detection - Token provides cover based on coverage thresholds",
-      "TOKEN_COVER_NONE_TOOLTIP": "(PL TODO) No Cover - Token never provides cover regardless of thresholds",
-      "TOKEN_COVER_LESSER_TOOLTIP": "(PL TODO) Lesser Cover - Token always provides lesser cover",
-      "TOKEN_COVER_STANDARD_TOOLTIP": "(PL TODO) Standard Cover - Token always provides standard cover",
-      "TOKEN_COVER_GREATER_TOOLTIP": "(PL TODO) Greater Cover - Token always provides greater cover",
-      "FROM_LINKED_DARKNESS": "(PL TODO) From linked Darkness template",
-      "NO_POSITION_CHANGE": "(PL TODO) No position change",
-      "SEARCH_WALL_PLACEHOLDER": "(PL TODO) Search by identifier or wall ID...",
-      "WALL_IDENTIFIER_PLACEHOLDER": "(PL TODO) Hidden Wall",
-      "WALL_DC_PLACEHOLDER": "(PL TODO) DC",
-      "CONNECTED_IDENTIFIERS_PLACEHOLDER": "(PL TODO) comma-separated identifiers",
-      "START_SNEAK_TOOLTIP": "(PL TODO) Start sneaking: capture current visibility and cover states",
-      "APPLY_COVER_CHANGES_WITHOUT_DIALOG": "(PL TODO) Apply all calculated cover changes without opening the dialog",
-      "NO_CHANGE_LABEL": "(PL TODO) No Change",
-      "APPLY_ALL_COVER_LABEL": "(PL TODO) Apply All Cover:",
-      "COVER": "(PL TODO) Cover",
-      "OUTCOME": "(PL TODO) Outcome",
-      "ROLL_VS_PERCEPTION_DC": "(PL TODO) Roll vs Perception DC",
-      "STEALTH_VS_PERCEPTION": "(PL TODO) Stealth vs Perception",
-      "COVER_BONUS": "(PL TODO) Cover Bonus",
-      "ROLL_OUTCOME": "(PL TODO) Roll Outcome",
-      "ALLY": "(PL TODO) Ally",
-      "OBSERVER_HEADER": "(PL TODO) Observer",
-      "TARGET_HEADER": "(PL TODO) Target",
-      "CURRENT_STATE": "(PL TODO) Current State",
-      "EFFECTS": "(PL TODO) Effects",
-      "STATUS": "(PL TODO) Status",
-      "SOURCE": "(PL TODO) Source",
-      "DC": "(PL TODO) DC",
-      "WALL_HEADER": "(PL TODO) Wall",
-      "IDENTIFIER": "(PL TODO) Identifier",
-      "TYPE": "(PL TODO) Type",
-      "HIDDEN_HEADER": "(PL TODO) Hidden",
-      "STEALTH_DC": "(PL TODO) Stealth DC",
-      "SELECT": "(PL TODO) Select",
-      "WALL_ID": "(PL TODO) Wall Id",
-      "VS_DC": "(PL TODO) vs DC",
-      "AVAILABLE_SENSES": "(PL TODO) Available Senses",
-      "POINT_OUT_INDICATOR": "(PL TODO) Point Out",
-      "DEFER_ALL_ELIGIBLE_LABEL": "(PL TODO) Defer All Eligible",
-      "FAILURE_LABEL": "(PL TODO) Failure",
-      "SUCCESS_LABEL": "(PL TODO) Success",
-      "PLAYER_CHARACTERS": "(PL TODO) Player Characters",
-      "NPCS_LABEL": "(PL TODO) NPCs",
-      "HAZARDS_LABEL": "(PL TODO) Hazards",
-      "LOOT_LABEL": "(PL TODO) Loot",
-      "HIDDEN_WALLS_LABEL": "(PL TODO) Hidden Walls",
-      "TAKING_COVER_HINT": "(PL TODO) Taking cover against observers",
-      "SHOW_ONLY_CHANGES_LABEL": "(PL TODO) Show only changes",
-      "CHANGES_AS_OBSERVER": "(PL TODO) Changes as Observer",
-      "CHANGES_AS_TARGET": "(PL TODO) Changes as Target",
-      "BULK_ACTION_INFO": "(PL TODO) Apply action to all changes at once",
-      "PREREQUISITE": "(PL TODO) Prerequisite",
-      "COVER_CHANGE": "(PL TODO) Cover Change",
-      "COVER_LABEL": "(PL TODO) Cover",
-      "HIDDEN_WALL_LABEL": "(PL TODO) Hidden Wall",
-      "WALL_IDENTIFIER_LABEL": "(PL TODO) Wall Identifier",
-      "WALL_STEALTH_DC_LABEL": "(PL TODO) Wall Stealth DC",
-      "ALL_TYPES": "(PL TODO) All Types",
-      "WALLS": "(PL TODO) Walls",
-      "DOORS": "(PL TODO) Doors",
-      "SECRET_DOORS": "(PL TODO) Secret Doors",
-      "ALL": "(PL TODO) All",
-      "HIDDEN_ONLY": "(PL TODO) Hidden Only",
-      "ALL_COVER_TYPES": "(PL TODO) All Cover Types",
-      "AUTO_DETECTION": "(PL TODO) Auto Detection",
-      "NO_COVER_OPTION": "(PL TODO) No Cover",
-      "STANDARD_MAX": "(PL TODO) Standard Max",
-      "GREATER_MAX": "(PL TODO) Greater Max",
-      "VISIBILITY_LEGEND": "(PL TODO) Visibility",
-      "COVER_LEGEND": "(PL TODO) Cover",
-      "TARGET_DC": "(PL TODO) Target DC",
-      "START_POS": "(PL TODO) Start Pos",
-      "END_POS": "(PL TODO) End Pos",
-      "END_TURN_VALIDATION": "(PL TODO) End Turn Validation",
-      "ORIGINAL_CHANGE": "(PL TODO) Original Change:",
-      "NON_HIDDEN_ONLY": "(PL TODO) Non-Hidden Only",
-      "APPLY_ALL_BUTTON": "(PL TODO) Apply All",
-      "REVERT_ALL_BUTTON": "(PL TODO) Revert All",
-      "APPLIED_BUTTON": "(PL TODO) Applied",
-      "REVERTED_BUTTON": "(PL TODO) Reverted",
-      "PROCESSING": "(PL TODO) Processing...",
-      "UNDEFER_ALL_BUTTON": "(PL TODO) Undefer All",
-      "RESTORE_DEFERS_BUTTON": "(PL TODO) Restore Defers",
-      "REJECTED_LABEL": "(PL TODO) Rejected",
-      "ACCEPTED_LABEL": "(PL TODO) Accepted",
-      "APPLY_BUTTON_LABEL": "(PL TODO) Apply",
-      "REVERT_BUTTON_LABEL": "(PL TODO) Revert",
-      "HIDDEN_REACTION_LABEL": "(PL TODO) Hidden (Reaction)",
-      "HIDDEN_SENSE_UNSEEN_LABEL": "(PL TODO) Hidden (Sense the Unseen)"
+      "APPLY_ALL": "Zastosuj wszystko",
+      "REVERT_ALL": "Cofnij wszystko",
+      "REMOVE_OVERRIDES": "Usuń zastąpienia",
+      "BULK_SET_VISIBILITY": "Widoczność zestawu zbiorczego",
+      "CLEAR_BULK_OVERRIDES": "Wyraźne zastąpienia zbiorcze",
+      "FILTER_BY_DETECTION_LABEL": "Filtruj według okna wyświetlania",
+      "FILTER_BY_DETECTION_TOOLTIP": "Pokaż tylko tokeny znajdujące się w bieżącym oknie podglądu",
+      "ATTEMPTING_TO_HIDE": "Próba ukrycia się przed obserwatorami",
+      "IGNORE_ALLIES": "Ignoruj sojuszników",
+      "IGNORE_ALLIES_TOOLTIP": "Ukryj sojuszników z listy wyników",
+      "HIDE_FOUNDRY_HIDDEN": "Ukryj tokeny ukryte przez Foundry",
+      "HIDE_FOUNDRY_HIDDEN_TOOLTIP": "Ukryj wizualnie tokeny ukryte przez Foundry (document.hidden)",
+      "SHOW_ONLY_CHANGES": "Pokaż tylko zmiany",
+      "SHOW_ONLY_CHANGES_TOOLTIP": "Pokaż tylko wiersze z zmianami widoczności",
+      "ENCOUNTER_FILTER_TOOLTIP": "Pokaż tylko tokeny w bieżącym starciu",
+      "CONCEALED_TOOLTIP_SHORT": "Przysłonięty",
+      "STANDARD_OR_GREATER_TOOLTIP": "Standardowy lub Większy",
+      "FOUNDRY_HIDDEN": "Ukryty przez Foundry ",
+      "COVER_OVERRIDDEN_POPUP": "Osłona zastąpiona za pomocą wyskakującego okienka skrótów klawiszowych",
+      "COVER_OVERRIDDEN_DIALOG": "w oknie dialogowym rzutu",
+      "COVER_OVERRIDDEN_MANUALLY": "ręcznie",
+      "NO_COVER_STEALTH": "Brak osłony (+0 do Ukrycia się)",
+      "END_POSITION_NOT_AVAILABLE": "Dane dotyczące pozycji końcowej niedostępne",
+      "START_POSITION_NOT_AVAILABLE": "Dane dotyczące pozycji początkowej niedostępne",
+      "AVS_CONTROLLED": "Sterowany przez system automatycznej widoczności",
+      "ORIGINAL_COVER": "Pierwotna osłona: {state}",
+      "APPLY_VISIBILITY_CHANGE": "Zastosuj tę zmianę widoczności",
+      "REVERT_TO_ORIGINAL": "Przywróć pierwotną widoczność",
+      "APPLY_ALL_CHANGES": "Zastosuj wszystkie zmiany widoczności",
+      "REVERT_ALL_CHANGES": "Przywróć wszystkie zmiany do stanu pierwotnego",
+      "ATTACK_CONSEQUENCES": "Konsekwencje ataku dla ukrytego / niewykrytego napastnika",
+      "TOKEN": "Token",
+      "NAME": "Nazwa",
+      "VISIBILITY_CHANGE": "Zmiana widoczności",
+      "ACTIONS": "Akcje",
+      "HIDE_WALLS": "Ukryj ściany z listy wyników",
+      "IGNORE_WALLS": "Ukryj ściany z listy wyników",
+      "OVERRIDE_TO_STATE": "Zastąpienie dla {label}",
+      "HIDDEN_OR_UNDETECTED": "Ukryty lub Niewykryty",
+      "NO_COVER_BONUS": "Brak premii za osłonę (+0)",
+      "STANDARD_COVER_BONUS": "Standardowa premia za osłonę (+2)",
+      "GREATER_COVER_BONUS": "Większa premia za osłonę (+4)",
+      "DEFER_TO_END_OF_TURN": "Odłóż sprawdzenie pozycji końcowej do końca tury (atut Podstępny).",
+      "CURRENTLY_DEFERRED": "Obecnie odroczone do końca tury (atut Podstępny)",
+      "DEFERRED_ACTIONS_DISABLED": "Akcje wyłączone – odroczone do końca tury",
+      "REMOVE_DEFER_PROCESS_NOW": "Usuń odroczenie i przetwórz test teraz",
+      "ACKNOWLEDGE_END_TURN": "Potwierdź wyniki sprawdzania pozycji na koniec tury.",
+      "CLOSE_DIALOG": "Zamknij okno dialogowe (wyniki zostaną automatycznie zastosowane)",
+      "UNDEFER_ALL": "Cofnij wszystkie obecnie odroczone tokeny i przywróć ich pierwotny stan.",
+      "DEFER_ALL_ELIGIBLE": "Odłóż wszystkie kwalifikujące się sprawdzenia pozycji do końca tury.",
+      "PROCESS_DEFERRED_CHECKS": "Przeprowadź {count} odroczonych kontroli pozycji w celu sprawdzenia poprawności na koniec tury.",
+      "APPLY_NO_COVER_ALL": "Zastosuj brak premii za osłonę dla wszystkich obserwatorów",
+      "APPLY_STANDARD_COVER_ALL": "Zastosuj standardową premię za osłonę do wszystkich obserwatorów",
+      "APPLY_GREATER_COVER_ALL": "Zastosuj większą premię za osłonę do wszystkich obserwatorów",
+      "AVS_CHANGE_INFO": "Ruchy lub zmiany oświetlenia mogą unieważnić wcześniej ustawione nadpisania widoczności. Przejrzyj każdą zmianę AVS poniżej, aby zdecydować, czy ją zaakceptować, czy odrzucić.",
+      "ACCEPT_ALL_CHANGES": "Akceptuj wszystkie zmiany",
+      "REJECT_ALL_CHANGES": "Odrzuć wszystkie zmiany",
+      "ACCEPT_THIS_CHANGE": "Akceptuj tę zmianę",
+      "REJECT_THIS_CHANGE": "Odrzuć tę zmianę",
+      "ACCEPT_ALL_IN_TABLE": "Zaakceptuj wszystkie zmiany w tej tabeli",
+      "CLICK_TO_SWITCH_MODE": "Kliknij, aby przełączać się między trybem obserwatora a trybem celu.",
+      "WALL_COVER_AUTO": "Automatyczne wykrywanie — ściana zapewnia osłonę w oparciu o progi pokrycia.",
+      "WALL_COVER_NONE": "Brak osłony – ściana nigdy nie zapewnia osłony, niezależnie od progów.",
+      "WALL_COVER_STANDARD_MAX": "Maksymalna Standardowa osłona– Ściana zapewnia standardową osłonę w oparciu o progi",
+      "WALL_COVER_GREATER_MAX": "Maksymalna Większa Osłona - Ściana zapewnia większą osłonę w oparciu o progi",
+      "MARK_WALL_HIDDEN": "Oznacz tę ścianę jako ukrytą dla graczy",
+      "SET_ALL_PCS_AS": "Ustaw wszystkie stany graczy jako {state}",
+      "SET_ALL_NPCS_AS": "Ustaw wszystkie stany BN'ów jako {state}",
+      "SET_ALL_HAZARDS_OBSERVED": "Ustaw wszystkie Zagrożenia jako Obserwowane",
+      "SET_ALL_HAZARDS_HIDDEN": "Ustaw wszystkie Zagrożenia jako Ukryte",
+      "SET_ALL_LOOT_OBSERVED": "Ustaw wszystkie Łupy jako Obserwowane",
+      "SET_ALL_LOOT_HIDDEN": "Ustaw wszystkie Łupy jako Ukryte",
+      "SET_ALL_WALLS_OBSERVED": "Ustaw wszystkie wymienione ściany jako Obserwowane",
+      "SET_ALL_WALLS_HIDDEN": "Ustaw wszystkie wymienione ściany jako Ukryte",
+      "SELECT_ALL_PARTY": "Wybierz wszystkie tokeny drużyny",
+      "SELECT_ALL_ENEMIES": "Wybierz wszystkie tokeny przeciwników",
+      "SWAP_OBSERVER_TARGET": "Przełącz tryb obserwatora / celowania",
+      "TARGET_ALL_PARTY": "Wyceluj wszystkie tokeny drużyny",
+      "TARGET_ALL_ENEMIES": "Wyceluj we wszystkie tokeny przeciwników",
+      "CLEAR_ALL_SELECTIONS": "Wyczyść wszystkie zaznaczenia i cele",
+      "PF2E_VISIONER": "PF2E Visioner",
+      "CONFIGURE_SETTINGS_BELOW": "Skonfiguruj poniższe ustawienia.",
+      "APPLY_COVER_CHANGE": "Zastosuj tę zmianę osłony",
+      "REVERT_TO_ORIGINAL_COVER": "Przywróć pierwotną osłonę",
+      "APPLY_ALL_COVER_CHANGES": "Zastosuj wszystkie zmiany osłony",
+      "REVERT_ALL_COVER_CHANGES": "Cofnij wszystkie zmiany",
+      "SHOW_ONLY_COVER_CHANGES_TOOLTIP": "Pokaż tylko wiersze z zmianami osłony / widoczności",
+      "SET_ALL_WALLS_HIDDEN_BULK": "Ustaw wszystkie ściany jako Ukryte",
+      "SET_ALL_WALLS_NON_HIDDEN_BULK": "Ustaw wszystkie ściany jako nieukryte",
+      "SET_ALL_WALLS_AUTO_COVER": "Ustaw wszystkie ściany na Automatyczną Osłonę",
+      "SET_ALL_WALLS_NO_COVER": "Ustaw wszystkie ściany na Brak Osłony",
+      "SET_ALL_WALLS_STANDARD_COVER": "Ustaw wszystkie ściany na Standardową Osłonę",
+      "SET_ALL_WALLS_GREATER_COVER": "Ustaw wszystkie ściany na Większą Osłonę",
+      "WALL_TYPE_CYCLE_TOOLTIP": "Kliknięcie lewym przyciskiem myszy: następny typ | Kliknięcie prawym przyciskiem myszy: poprzedni typ",
+      "SELECT_WALL_AND_PAN": "Wybierz ścianę i przesuń do niej",
+      "WALL_COVER_AUTO_SHORT": "Automatyczne wykrywanie",
+      "WALL_COVER_NONE_SHORT": "Brak osłony",
+      "WALL_COVER_STANDARD_SHORT": "Standardowa osłona",
+      "WALL_COVER_GREATER_SHORT": "Większa osłona",
+      "COVER_OVERRIDDEN_VIA": "Zastąpiono osłonę {source}: {originalLabel} → {finalLabel}",
+      "START_POS_PREVIOUS_SNEAK": "Kwalifikacja pozycji startowej z poprzedniej akcji skradania się",
+      "START_POS_QUALIFIES": "Pozycja startowa kwalifikuje się do skradania się",
+      "START_POS_NOT_QUALIFIES": "Pozycja startowa nie kwalifikuje się do skradania się",
+      "END_POS_CHECK_END_TURN": "Pozycja końcowa zostanie sprawdzona na koniec tury (kolejne skradanie się)",
+      "END_POS_QUALIFIES": "Pozycja końcowa kwalifikuje się do skradania się",
+      "END_POS_NOT_QUALIFIES": "cPozycja końcowa nie kwalifikuje się do skradania się",
+      "AVS_RECOMMENDED": "Zalecane przez AVS: {label}",
+      "TOGGLE_MODE_TOOLTIP": "Kliknij, aby przełączać się między trybem obserwatora a trybem celu.",
+      "ONLY_SHOW_ENCOUNTER_TOOLTIP": "Pokaż tylko tokeny w bieżącym starciu",
+      "HIDE_FOUNDRY_HIDDEN_DOCUMENT_TOOLTIP": "Ukryj wizualnie tokeny ukryte przez Foundry (document.hidden)",
+      "SHOW_ONLY_VISIBILITY_CHANGES": "Pokaż tylko wiersze z zmianami widoczności",
+      "SET_ALL_AS": "Ustaw wszystkie {type} jako {state}",
+      "SET_ALL_WALLS_AS": "Ustaw wszystkie wymienione ściany jako {state}",
+      "WALL_COVER_AUTO_TOOLTIP": "Automatyczne wykrywanie — ściana zapewnia osłonę w oparciu o progi pokrycia.",
+      "WALL_COVER_NONE_TOOLTIP": "Brak osłony – ściana nigdy nie zapewnia osłony, niezależnie od progów.",
+      "WALL_COVER_STANDARD_TOOLTIP": "Maksymalna Standardowa osłona– Ściana zapewnia standardową osłonę w oparciu o progi",
+      "WALL_COVER_GREATER_TOOLTIP": "Maksymalna Większa Osłona - Ściana zapewnia większą osłonę w oparciu o progi",
+      "WALL_HIDDEN_TOOLTIP": "Oznacz tę ścianę jako ukrytą dla graczy",
+      "SWAP_MODE": "Przełącz tryb obserwatora / celowania",
+      "AVS_CHANGE_INFO_TOOLTIP": "Ruchy lub zmiany oświetlenia mogą unieważnić wcześniej ustawione nadpisania widoczności. Przejrzyj każdą zmianę AVS poniżej, aby zdecydować, czy ją zaakceptować, czy odrzucić.",
+      "ACCEPT_ALL_CHANGES_IN_TABLE": "Zaakceptuj wszystkie zmiany w tej tabeli",
+      "PREVIEW_POINT_OUT_CHANGES": "Podgląd i zastosowanie zmian widoczności Wskazania Palcem",
+      "APPLY_WITHOUT_DIALOG": "Zastosuj wszystkie obliczone zmiany bez otwierania okna dialogowego.",
+      "TOKEN_COVER_AUTO_TOOLTIP": "Automatyczne wykrywanie — token zapewnia osłonę w oparciu o progi pokrycia.",
+      "TOKEN_COVER_NONE_TOOLTIP": "Brak osłony – token nigdy nie zapewnia osłony, niezależnie od progów.",
+      "TOKEN_COVER_LESSER_TOOLTIP": "Mniejsza Osłona - token zawsze zapewnia mniejszą osłonę",
+      "TOKEN_COVER_STANDARD_TOOLTIP": "Standardowa Osłona — token zawsze zapewnia standardową osłonę",
+      "TOKEN_COVER_GREATER_TOOLTIP": "Większa Osłona - token zawsze zapewnia większą osłonę",
+      "FROM_LINKED_DARKNESS": "Z powiązanego szablonu Ciemności",
+      "NO_POSITION_CHANGE": "Brak zmiany pozycji",
+      "SEARCH_WALL_PLACEHOLDER": "Wyszukaj według identyfikatora lub ID ściany...",
+      "WALL_IDENTIFIER_PLACEHOLDER": "Ukryta ściana",
+      "WALL_DC_PLACEHOLDER": "ST",
+      "CONNECTED_IDENTIFIERS_PLACEHOLDER": "identyfikatory rozdzielone przecinkami",
+      "START_SNEAK_TOOLTIP": "Rozpocznij skradanie się: uchwyć aktualną widoczność i stan osłony",
+      "APPLY_COVER_CHANGES_WITHOUT_DIALOG": "Zastosuj wszystkie obliczone zmiany osłony bez otwierania okna dialogowego",
+      "NO_CHANGE_LABEL": "Bez zmian",
+      "APPLY_ALL_COVER_LABEL": "Zastosuj wszystkie osłony:",
+      "COVER": "Osłona",
+      "OUTCOME": "Wynik",
+      "ROLL_VS_PERCEPTION_DC": "Rzut przeciwko ST Percepcji",
+      "STEALTH_VS_PERCEPTION": "Ukrycie przeciw Percepcji",
+      "COVER_BONUS": "Bonus za osłonę",
+      "ROLL_OUTCOME": "Rezultaty rzutu",
+      "ALLY": "Sojusznik",
+      "OBSERVER_HEADER": "Obserwator",
+      "TARGET_HEADER": "Cel",
+      "CURRENT_STATE": "Obecny stan",
+      "EFFECTS": "Efekty",
+      "STATUS": "Status",
+      "SOURCE": "Źródło",
+      "DC": "ST",
+      "WALL_HEADER": "Ściana",
+      "IDENTIFIER": "Identyfikator",
+      "TYPE": "Typ",
+      "HIDDEN_HEADER": "Ukryty",
+      "STEALTH_DC": "ST Ukrycia",
+      "SELECT": "Wybierz",
+      "WALL_ID": "ID ściany",
+      "VS_DC": "przeciwko ST",
+      "AVAILABLE_SENSES": "Dostępne zmysły",
+      "POINT_OUT_INDICATOR": "Wskaż Palcem",
+      "DEFER_ALL_ELIGIBLE_LABEL": "Odroczyć wszystkie kwalifikujące się",
+      "FAILURE_LABEL": "Porażka",
+      "SUCCESS_LABEL": "Sukces",
+      "PLAYER_CHARACTERS": "Postacie graczy",
+      "NPCS_LABEL": "Bohaterowie Niezależni",
+      "HAZARDS_LABEL": "Zagrożenia",
+      "LOOT_LABEL": "Łupy",
+      "HIDDEN_WALLS_LABEL": "Ukryte ściany",
+      "TAKING_COVER_HINT": "Znalezienie osłony przed obserwatorami",
+      "SHOW_ONLY_CHANGES_LABEL": "Pokaż tylko zmiany",
+      "CHANGES_AS_OBSERVER": "Zmiany jako obserwator",
+      "CHANGES_AS_TARGET": "Zmiany jako cel",
+      "BULK_ACTION_INFO": "Zastosuj akcję do wszystkich zmian jednocześnie",
+      "PREREQUISITE": "Wymagania wstępne",
+      "COVER_CHANGE": "Zmiana osłony",
+      "COVER_LABEL": "Osłona",
+      "HIDDEN_WALL_LABEL": "Ukryta ściana",
+      "WALL_IDENTIFIER_LABEL": "Identyfikator ściany",
+      "WALL_STEALTH_DC_LABEL": "ST Ukrycia ściany",
+      "ALL_TYPES": "Wszystkie typy",
+      "WALLS": "Ściany",
+      "DOORS": "Drzwi",
+      "SECRET_DOORS": "Sekretne drzwi",
+      "ALL": "Wszystkie",
+      "HIDDEN_ONLY": "Tylko Ukryte",
+      "ALL_COVER_TYPES": "Wszystkie rodzaje osłon",
+      "AUTO_DETECTION": "Automatyczne wykrywanie",
+      "NO_COVER_OPTION": "Brak osłony",
+      "STANDARD_MAX": "Maksymalna wartość Standardowej",
+      "GREATER_MAX": "Maksymalna wartość Większej",
+      "VISIBILITY_LEGEND": "Widoczność",
+      "COVER_LEGEND": "Osłona",
+      "TARGET_DC": "ST celu",
+      "START_POS": "Pozycja startowa",
+      "END_POS": "Pozycja końcowa",
+      "END_TURN_VALIDATION": "Walidacja końca tury",
+      "ORIGINAL_CHANGE": "Pierwotna zmiana:",
+      "NON_HIDDEN_ONLY": "Tylko nieukryte",
+      "APPLY_ALL_BUTTON": "Zastosuj wszystko",
+      "REVERT_ALL_BUTTON": "Cofnij wszystko",
+      "APPLIED_BUTTON": "Zastosowano",
+      "REVERTED_BUTTON": "Przywrócono",
+      "PROCESSING": "Przetwarzanie...",
+      "UNDEFER_ALL_BUTTON": "Odwołaj wszystko",
+      "RESTORE_DEFERS_BUTTON": "Przywróć odroczenia",
+      "REJECTED_LABEL": "Odrzucono",
+      "ACCEPTED_LABEL": "Zaakceptowano",
+      "APPLY_BUTTON_LABEL": "Zastosuj",
+      "REVERT_BUTTON_LABEL": "Przywróć",
+      "HIDDEN_REACTION_LABEL": "Ukryty (Reakcja)",
+      "HIDDEN_SENSE_UNSEEN_LABEL": "Ukryty (Wyczuwanie Niewidzialnego)"
     },
     "WALL": {
       "VISIBLE_TO_YOU": "Ukryta ściana",
@@ -767,12 +943,8 @@
     },
     "KEYBINDINGS": {
       "OPEN_TOKEN_MANAGER": {
-        "name": "Otwórz menedżera widoczności tokenów",
+        "name": "Otwórz Menedżera Widoczności",
         "hint": "Otwórz menedżera tokenów dla wybranych tokenów"
-      },
-      "OPEN_QUICK_PANEL": {
-        "name": "(PL) Otwórz Panel Szybkiego Dostępu Visioner",
-        "hint": "(PL) Otwiera kompaktowy panel szybkiej edycji Visioner"
       },
       "OPEN_VISIBILITY_MANAGER": {
         "name": "Otwórz menedżera widoczności tokenów",
@@ -786,228 +958,59 @@
         "name": "Włącz/wyłącz tryb obserwatora dla podpowiedzi po najechaniu kursorem",
         "hint": "Przytrzymaj ten klawisz, aby przełączyć podpowiedzi po najechaniu kursorem do trybu obserwatora (jak token po najechaniu kursorem widzi inne)."
       },
+      "OPEN_QUICK_PANEL": {
+        "name": "Otwórz szybki panel Widoczności",
+        "hint": "Otwórz kompaktowy panel Szybkiej edycji Visioner."
+      },
       "SHOW_AUTO_COVER_OVERLAY": {
-        "name": "(PL) Pokaż nakładkę auto-osłony",
-        "hint": "(PL) Przytrzymaj aby pokazać znaczniki auto-osłony"
+        "name": "Pokaż nakładkę automatycznej osłony",
+        "hint": "Naciśnij, aby wyświetlić automatyczne osłony dla tokenu, nad którym znajduje się kursor (lub tokenu kontrolowanego, jeśli nie ma żadnego)."
       },
       "HOLD_COVER_VISUALIZATION": {
-        "name": "(PL) Przytrzymaj aby wizualizować osłonę",
-        "hint": "(PL) Przytrzymaj aby zobaczyć pola osłony"
+        "name": "Przytrzymaj, aby wyświetlić wizualizację osłony",
+        "hint": "Przytrzymaj ten klawisz, najeżdżając kursorem na tokeny, aby wyświetlić pola osłony. Pokazuje optymalne pozycjonowanie do ataków."
       },
       "OPEN_WALL_MANAGER": {
-        "name": "(PL) Otwórz Menedżera Ścian",
-        "hint": "(PL) Otwiera okno Menedżera Ścian Visioner"
+        "name": "Otwórz Menedżera ścian",
+        "hint": "Otwórz okno dialogowe Menedżera ścian Visioner, aby zbiorczo edytować ustawienia ścian."
       }
     },
-    "AVS_OVERRIDE_DIALOG": {
-      "NO_OVERRIDES": "(PL TODO) No AVS overrides are currently active for this token.",
-      "CLOSE": "(PL TODO) Close",
-      "CLEAR_ALL": "(PL TODO) Clear All Overrides",
-      "CLEAR_ALL_CONFIRM_TITLE": "(PL TODO) Clear All AVS Overrides",
-      "OVERRIDE_REMOVED": "(PL TODO) AVS override removed: {observer} → {target}",
-      "ALL_OVERRIDES_CLEARED": "(PL TODO) All AVS overrides cleared for {token}",
-      "ERROR_REMOVING_OVERRIDE": "(PL TODO) Error removing AVS override",
-      "ERROR_CLEARING_OVERRIDES": "(PL TODO) Error clearing AVS overrides"
-    },
     "REGION_BEHAVIOR": {
-      "TYPE_LABEL": "(PL TODO) PF2e Visioner Visibility",
+      "TYPE_LABEL": "Widoczność PF2e Visioner",
       "TYPES": {
         "CONCEALMENT": {
-          "label": "(PL TODO) Visioner Concealment"
+          "label": "Ukrywanie AVS"
         },
         "VISIBILITY": {
-          "label": "(PL TODO) Visioner Visibility"
+          "label": "Widoczność Visioner'a"
         }
       },
       "VISIBILITY_STATE": {
-        "label": "(PL TODO) Visibility State",
-        "hint": "(PL TODO) The visibility state to apply between tokens inside and outside the region"
+        "label": "Stan widoczności",
+        "hint": "Stan widoczności, który ma być stosowany między tokenami wewnątrz i na zewnątrz regionu"
       },
       "APPLY_TO_INSIDE_TOKENS": {
-        "label": "(PL TODO) Apply to Inside Tokens",
-        "hint": "(PL TODO) If enabled, tokens inside the region will have the visibility state applied to other tokens inside the region as well"
+        "label": "Zastosuj do tokenów wewnątrz",
+        "hint": "Jeśli opcja jest włączona, tokeny w regionie będą miały stan widoczności zastosowany również do innych tokenów w regionie."
       },
       "TWO_WAY_REGION": {
-        "label": "(PL TODO) Two-Way Region",
-        "hint": "(PL TODO) If enabled, tokens outside the region will also have the visibility state applied to tokens inside the region"
+        "label": "Region dwukierunkowy",
+        "hint": "Jeśli opcja jest włączona, tokeny spoza regionu również będą miały stan widoczności zastosowany do tokenów w regionie."
       },
-      "VISIBILITY_UPDATED": "(PL TODO) Region visibility updated for {count} token relationships",
-      "UPDATE_ERROR": "(PL TODO) Failed to update region visibility relationships",
       "CONCEALMENT_ENABLED": {
-        "label": "(PL TODO) Enable Concealment",
-        "hint": "(PL TODO) If enabled, rays that cross this region's boundaries will grant concealment to the target"
-      }
-    },
-    "FEAT": {
-      "CEASELESS_SHADOWS": "(PL TODO) Ceaseless Shadows"
-    },
-    "UI_ACTIONS": {
-      "MANAGE_VISIBILITY": "(PL TODO) Manage Token Visibility",
-      "MANAGE_COVER": "(PL TODO) Manage Token Cover",
-      "QUICK_CONCEALED": "(PL TODO) Set as Concealed",
-      "QUICK_OBSERVED": "(PL TODO) Set as Observed",
-      "QUICK_NO_COVER": "(PL TODO) Set No Cover",
-      "QUICK_LESSER_COVER": "(PL TODO) Set Lesser Cover",
-      "QUICK_STANDARD_COVER": "(PL TODO) Set Standard Cover",
-      "QUICK_GREATER_COVER": "(PL TODO) Set Greater Cover"
-    },
-    "MOVEMENT": {
-      "walk": "(PL TODO) Walk",
-      "stride": "(PL TODO) Stride",
-      "leap": "(PL TODO) Leap",
-      "climb": "(PL TODO) Climb",
-      "fly": "(PL TODO) Fly",
-      "swim": "(PL TODO) Swim",
-      "burrow": "(PL TODO) Burrow",
-      "teleport": "(PL TODO) Teleport",
-      "deploy": "(PL TODO) Deploy",
-      "travel": "(PL TODO) Travel"
-    },
-    "REACTIONS": {
-      "BUTTON_LABEL": "(PL TODO) Reactions",
-      "BUTTON_TOOLTIP": "(PL TODO) Available reactions for this action",
-      "NO_REACTIONS": "(PL TODO) No reactions available",
-      "DROPDOWN_TITLE": "(PL TODO) Available Reactions",
-      "SENSE_THE_UNSEEN": {
-        "name": "(PL TODO) Sense the Unseen",
-        "applied": "(PL TODO) Sense the Unseen Applied",
-        "description": "(PL TODO) Even though you failed at the triggering check, you automatically sense any Undetected creatures in the area where you're Seeking, making them merely Hidden to you.",
-        "trigger": "(PL TODO) You fail a Seek to find an undetected creature",
-        "effect": "(PL TODO) Make undetected creatures hidden to you"
-      }
+        "label": "Włącz przysłanianie",
+        "hint": "Jeśli opcja jest włączona, promienie przekraczające granice tego obszaru zapewnią przysłonięcie celowi."
+      },
+      "VISIBILITY_UPDATED": "Widoczność regionu zaktualizowana dla {count} relacji tokenów",
+      "UPDATE_ERROR": "Nie udało się zaktualizować relacji widoczności regionu."
     },
     "SNEAKY_FEAT": {
-      "VISIBILITY_CAPPED": "(PL TODO) Sneaky Feat",
-      "TOOLTIP": "(PL TODO) Visibility capped at Hidden due to Sneaky feat effect. This creature successfully sneaked against you."
+      "VISIBILITY_CAPPED": "Atut Podstępny",
+      "TOOLTIP": "Widoczność ograniczona do Ukrycia z powodu efektu atutu Podstępny. Ta istota skutecznie podkradła się do ciebie."
     },
     "SNEAK_ADEPT_FEAT": {
-      "OUTCOME_UPGRADED": "(PL TODO) Sneak Adept",
-      "TOOLTIP": "(PL TODO) Failure upgraded to Success due to Sneak Adept feat. It's almost impossible to spot this creature."
-    },
-    "DIALOG_TITLES": {
-      "HIDE_RESULTS": "Hide Results (PL TODO)",
-      "POINT_OUT_RESULTS": "Point Out Results (PL TODO)",
-      "POINT_OUT_ACTION": "PF2E Visioner - Point Out Action (PL TODO)",
-      "SEEK_RESULTS": "Seek Results (PL TODO)",
-      "ACTION_RESULTS": "Action Results (PL TODO)",
-      "TAKE_COVER_RESULTS": "Take Cover Results (PL TODO)",
-      "COVER_OVERRIDE": "Cover Override (PL TODO)",
-      "WALL_SETTINGS": "PF2E Visioner: Wall Settings (PL TODO)",
-      "TOGGLE_HIDDEN_WALL": "Toggle Hidden Wall (Selected Walls) (PL TODO)",
-      "QUICK_EDIT": "PF2E Visioner: Quick Edit (Selected ↔ Targeted) (PL TODO)",
-      "PURGE_DATA": "PF2E Visioner: Purge Data (Scene/Selected Tokens) (PL TODO)",
-      "VISIONER_QUICK_PANEL": "Visioner Quick Edit (PL TODO)",
-      "APPLYING_CHANGES": "Applying Changes (PL TODO)",
-      "WALL_QUICK": "PF2E Visioner: Wall Settings (PL TODO)",
-      "AVS_VALIDATION": "AVS Changes Validation (PL TODO)",
-      "DARKNESS_MODE": "PF2E Visioner: Set Darkness Mode (PL TODO)",
-      "OVERRIDE_VALIDATION": "Override Validation (PL TODO)",
-      "ATTACK_CONSEQUENCES": "Attack Consequences Results (PL TODO)",
-      "CREATE_DIVERSION_RESULTS": "Create a Diversion Results (PL TODO)",
-      "END_TURN_POSITION": "End-of-Turn Position Validation - {name} (PL TODO)",
-      "END_TURN_STEALTH": "End-of-Turn Stealth Validation - {name} (PL TODO)",
-      "RECOMMENDATIONS": {
-        "HEAL_CHARACTER": "Heal Character (PL TODO)",
-        "REMOVE_CONDITIONS": "Remove Conditions (PL TODO)",
-        "USE_HIDE_FIRST": "Use Hide Action First (PL TODO)",
-        "CHECK_SCENE_SETUP": "Check Scene Setup (PL TODO)",
-        "PROCEED_CAUTION": "Proceed with Caution (PL TODO)",
-        "REPOSITION_BEFORE_SNEAK": "Reposition Before Sneaking (PL TODO)",
-        "IMPROVE_POSITION": "Improve Position (PL TODO)",
-        "PROCEED_AWARENESS": "Proceed with Awareness (PL TODO)",
-        "PROCEED_SNEAK": "Proceed with Sneak (PL TODO)",
-        "EXCELLENT_POSITION": "Excellent Position (PL TODO)",
-        "GOOD_POSITION": "Good Position (PL TODO)",
-        "HIDE_ACTION": "Hide Action (PL TODO)",
-        "TAKE_COVER": "Take Cover (PL TODO)",
-        "REPOSITION": "Reposition (PL TODO)",
-        "CREATE_DIVERSION": "Create a Diversion (PL TODO)",
-        "POINT_OUT": "Point Out (PL TODO)",
-        "SEEK_ACTION": "Seek Action (PL TODO)",
-        "INCREASE_DISTANCE": "Increase Distance (PL TODO)",
-        "GOOD_DISTANCE": "Good Distance (PL TODO)",
-        "SEEK_DARKNESS": "Seek Darkness (PL TODO)",
-        "EXCELLENT_LIGHTING": "Excellent Lighting (PL TODO)",
-        "FIND_COVER": "Find Cover (PL TODO)",
-        "MAINTAIN_COVER": "Maintain Cover (PL TODO)",
-        "BREAK_LINE_SIGHT": "Break Line of Sight (PL TODO)",
-        "BEST_COVER_DIRECTION": "Best Cover Direction (PL TODO)",
-        "AVOID_EXPOSURE": "Avoid Exposure (PL TODO)",
-        "SUGGESTED_MOVEMENT": "Suggested Movement (PL TODO)",
-        "MAINTAIN_POSITION": "Maintain Position (PL TODO)",
-        "RELOCATE_IMMEDIATELY": "Relocate Immediately (PL TODO)",
-        "MAINTAIN_BENEFICIAL": "Maintain Beneficial Conditions (PL TODO)",
-        "REMOVE_HARMFUL": "Remove Harmful Conditions (PL TODO)",
-        "ACQUIRE_BENEFICIAL": "Acquire Beneficial Conditions (PL TODO)",
-        "ALTERNATIVE_ACTIONS": "Alternative Actions (PL TODO)",
-        "TACTICAL_ADVICE": "Tactical Advice (PL TODO)",
-        "POSITIONING": "Positioning (PL TODO)",
-        "CONDITIONS": "Conditions (PL TODO)"
-      }
-    },
-    "BUTTONS": {
-      "KEEN_EYES": "Keen Eyes (PL TODO)",
-      "THAT": "That (PL TODO)",
-      "OBSERVED": "Observed (PL TODO)",
-      "CONCEALED": "Concealed (PL TODO)",
-      "HIDDEN": "Hidden (PL TODO)",
-      "UNDETECTED": "Undetected (PL TODO)",
-      "NO_COVER": "No Cover (PL TODO)",
-      "LESSER_COVER": "Lesser Cover (PL TODO)",
-      "STANDARD_COVER": "Standard Cover (PL TODO)",
-      "GREATER_COVER": "Greater Cover (PL TODO)",
-      "BRIGHT_LIGHT": "Bright Light (PL TODO)",
-      "DIM_LIGHT": "Dim Light (PL TODO)",
-      "DARKNESS": "Darkness (PL TODO)",
-      "IMPROVED": "Improved (PL TODO)",
-      "WORSENED": "Worsened (PL TODO)",
-      "UNCHANGED": "Unchanged (PL TODO)",
-      "APPLY_CHANGE": "Apply Change (PL TODO)",
-      "CANCEL": "Cancel (PL TODO)",
-      "CHOOSE_DIFFERENT": "Choose Different State (PL TODO)",
-      "POSITION_DATA": {
-        "EXCELLENT": "Excellent position data (PL TODO)",
-        "GOOD": "Good position data (PL TODO)",
-        "FAIR": "Fair position data (PL TODO)",
-        "POOR": "Poor position data (PL TODO)",
-        "UNRELIABLE": "Unreliable position data (PL TODO)"
-      }
-    },
-    "TOOLTIPS": {
-      "AUTO_COVER_DETECTION": "Automatic Cover Detection (PL TODO)",
-      "KEEN_EYES": "You gain a +2 circumstance bonus when using Seek (System application). Undetected creatures treated as Hidden, Hidden creatures treated as Observed when you Seek. (PL TODO)",
-      "THAT_FEATURE": "You spot hidden doors, traps, and hazards more easily (failure will become a success). (PL TODO)"
-    },
-    "SETTINGS_MENU": {
-      "TITLE": "PF2E Visioner Settings (PL TODO)",
-      "OPEN_BUTTON": "Open (PL TODO)",
-      "HINT": "Grouped settings by category (PL TODO)",
-      "SECTIONS": {
-        "GENERAL_UI": "General UI (PL TODO)",
-        "MANAGER_SETTINGS": "Visioner Manager Settings (PL TODO)",
-        "VISION": "Vision (PL TODO)",
-        "HIDDEN_LOOT": "Hidden Loot Actors (PL TODO)",
-        "HIDDEN_WALLS": "Hidden Walls (PL TODO)",
-        "ADVANCED_SEEK": "Advanced Seek Options (PL TODO)",
-        "COVER": "Cover (PL TODO)",
-        "TOKEN_AUTO_COVER": "Token Auto Cover Settings (PL TODO)",
-        "WALL_AUTO_COVER": "Wall Auto Cover Settings (PL TODO)",
-        "AVS_SETTINGS": "A.V.S. Settings (PL TODO)",
-        "ADVANCED": "Advanced (PL TODO)"
-      }
-    },
-    "RULE_ELEMENTS": {
-      "LABELS": {
-        "SUBJECT": "Subject (PL TODO)",
-        "OBSERVERS": "Observers (PL TODO)",
-        "DIRECTION": "Direction (PL TODO)",
-        "MODE": "Mode (PL TODO)",
-        "STATUS": "Status (PL TODO)",
-        "STEPS": "Steps (PL TODO)",
-        "DURATION": "Duration (Rounds) (PL TODO)",
-        "REQUIRES_INITIATIVE": "Requires Initiative (PL TODO)",
-        "RANGE": "Range (feet) (PL TODO)"
-      }
+      "OUTCOME_UPGRADED": "Adept Podstępu",
+      "TOOLTIP": "Porażka zamieniona w sukces dzięki atutowi Adept Podstępu. Niemal niemożliwe jest dostrzeżenie tej istoty."
     }
   }
 }
