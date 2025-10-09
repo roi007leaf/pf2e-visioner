@@ -919,6 +919,51 @@ export function showControlledTokenVisibilityObserver() {
 }
 
 /**
+ * Add click handler to a badge element to open token manager
+ * @param {HTMLElement} badgeElement - The badge element to make clickable
+ * @param {Token} observerToken - The observer token
+ * @param {Token} targetToken - The target token
+ * @param {string} mode - The mode ('observer' or 'target')
+ */
+function addBadgeClickHandler(badgeElement, observerToken, targetToken, mode) {
+  if (!badgeElement) return;
+  
+  badgeElement.addEventListener('click', async (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    
+    try {
+      const { openTokenManagerWithMode } = await import('../api.js');
+      
+      if (mode === 'observer') {
+        await openTokenManagerWithMode(observerToken, 'observer');
+      } else {
+        await openTokenManagerWithMode(targetToken, 'target');
+      }
+      
+      setTimeout(async () => {
+        try {
+          const manager = await import('../managers/token-manager/TokenManager.js');
+          const app = manager.VisionerTokenManager.currentInstance;
+          if (app && app.element) {
+            const rowToHighlight = mode === 'observer' ? targetToken.id : observerToken.id;
+            const rows = app.element.querySelectorAll(`tr[data-token-id="${rowToHighlight}"]`);
+            if (rows && rows.length > 0) {
+              rows.forEach((r) => r.classList.add('row-hover'));
+              rows[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+          }
+        } catch (err) {
+          console.warn('PF2E Visioner | Could not highlight row:', err);
+        }
+      }, 100);
+    } catch (error) {
+      console.error('PF2E Visioner | Error opening token manager from tooltip:', error);
+    }
+  });
+}
+
+/**
  * Add a visibility indicator to a token
  * @param {Token} targetToken - The token to show the indicator on
  * @param {Token} observerToken - The token that has the visibility perspective
@@ -993,13 +1038,13 @@ function addVisibilityIndicator(
   const placeBadge = (leftPx, topPx, stateClass, iconClass, kind) => {
     const el = document.createElement('div');
     el.style.position = 'fixed';
-    el.style.pointerEvents = 'none';
+    el.style.pointerEvents = 'auto';
+    el.style.cursor = 'pointer';
     el.style.zIndex = '60';
-    // Use transform for GPU acceleration - set left/top to 0 and use translate
     el.style.left = '0';
     el.style.top = '0';
     el.style.transform = `translate(${Math.round(leftPx)}px, ${Math.round(topPx)}px)`;
-    el.style.willChange = 'transform'; // Hint to browser for GPU layer
+    el.style.willChange = 'transform';
     
     el.innerHTML = `<span class="pf2e-visioner-tooltip-badge ${kind === 'cover' ? `cover-${stateClass}` : `visibility-${stateClass}`}" style="--pf2e-visioner-tooltip-badge-width: ${badgeWidth}px; --pf2e-visioner-tooltip-badge-height: ${badgeHeight}px; --pf2e-visioner-tooltip-badge-radius: ${borderRadius}px;">
       <i class="${iconClass}"></i>
@@ -1030,7 +1075,8 @@ function addVisibilityIndicator(
 
     const el = document.createElement('div');
     el.style.position = 'fixed';
-    el.style.pointerEvents = 'none';
+    el.style.pointerEvents = 'auto';
+    el.style.cursor = 'pointer';
     el.style.zIndex = '60';
     el.style.left = '0';
     el.style.top = '0';
@@ -1045,25 +1091,23 @@ function addVisibilityIndicator(
   };
 
   if (visibilityState === 'observed') {
-    // Observed state: only show sense badge (no visibility badge)
     if (senseUsed) {
       const left = centerX - badgeWidth / 2;
       indicator._senseBadgeEl = placeSenseBadge(left, centerY, senseUsed);
+      addBadgeClickHandler(indicator._senseBadgeEl, observerToken, targetToken, mode);
     }
   } else {
-    // Visibility badge with optional sense badge to the left
     const totalWidth = (senseUsed ? badgeWidth + spacing : 0) + badgeWidth;
     const startX = centerX - totalWidth / 2;
     
     let currentX = startX;
     
-    // Place sense badge if present
     if (senseUsed) {
       indicator._senseBadgeEl = placeSenseBadge(currentX, centerY, senseUsed);
+      addBadgeClickHandler(indicator._senseBadgeEl, observerToken, targetToken, mode);
       currentX += badgeWidth + spacing;
     }
     
-    // Place visibility badge
     indicator._visBadgeEl = placeBadge(
       currentX,
       centerY,
@@ -1071,11 +1115,11 @@ function addVisibilityIndicator(
       config.icon,
       'visibility'
     );
+    addBadgeClickHandler(indicator._visBadgeEl, observerToken, targetToken, mode);
   }
 
   HoverTooltips.visibilityIndicators.set(targetToken.id, indicator);
 
-  // Ensure ticker updates DOM badge positions during pan/zoom
   ensureBadgeTicker();
 } function ensureBadgeTicker() {
   if (HoverTooltips.badgeTicker) return;
@@ -1246,7 +1290,8 @@ function addCoverIndicator(targetToken, observerToken, coverState, isManualCover
 
   const el = document.createElement('div');
   el.style.position = 'fixed';
-  el.style.pointerEvents = 'none';
+  el.style.pointerEvents = 'auto';
+  el.style.cursor = 'pointer';
   el.style.zIndex = '60';
   el.style.left = '0';
   el.style.top = '0';
@@ -1295,7 +1340,7 @@ function addCoverIndicator(targetToken, observerToken, coverState, isManualCover
   document.body.appendChild(el);
   indicator._coverBadgeEl = el;
 
-  // Do not attach a Foundry tooltip on hover; the badge itself is the tooltip.
+  addBadgeClickHandler(el, observerToken, targetToken, 'target');
 
   HoverTooltips.coverIndicators.set(targetToken.id + '|cover', indicator);
   ensureBadgeTicker();
