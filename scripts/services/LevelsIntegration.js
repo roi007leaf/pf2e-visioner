@@ -174,14 +174,6 @@ class LevelsIntegration {
     if (!this._isLevelsActive) return false;
 
     try {
-      const observerElevation = this.getTokenElevation(observer);
-      const targetElevation = this.getTokenElevation(target);
-      
-      const elevationDiff = Math.abs(observerElevation - targetElevation);
-      if (elevationDiff < 0.1) {
-        return false;
-      }
-
       const p0 = this.get3DPoint(observer);
       const p1 = this.get3DPoint(target);
 
