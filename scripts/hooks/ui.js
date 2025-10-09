@@ -1036,10 +1036,10 @@ function injectPF2eVisionerBox(app, root) {
         const scene = app?.object || app?.document || canvas?.scene;
         
         // Use scene-specific flags if set, otherwise fall back to global settings
-        const defaultWidth = game.settings?.get?.(MODULE_ID, 'hiddenWallIndicatorWidth') ?? 10;
+        const defaultWidth = game.settings?.get?.(MODULE_ID, 'hiddenWallIndicatorWidth') || 10;
         const defaultDim = game.settings?.get?.(MODULE_ID, 'dimLightingThreshold') ?? 0.25;
         const currentWidth = Number(scene?.getFlag?.(MODULE_ID, 'hiddenIndicatorHalf')) || defaultWidth;
-        const currentDim = Number(scene?.getFlag?.(MODULE_ID, 'dimThreshold')) || defaultDim;
+        const currentDim = Number(scene?.getFlag?.(MODULE_ID, 'dimThreshold')) ?? defaultDim;
         
         fs.innerHTML = `
           <legend>PF2E Visioner</legend>
@@ -1051,7 +1051,7 @@ function injectPF2eVisionerBox(app, root) {
             </div>
             <label>Dim Lighting Threshold</label>
             <div style="display:flex; align-items:center; gap:8px; width:100%;">
-              <input type="range" min="0" max="1" step="0.05" name="flags.${MODULE_ID}.dimThreshold" value="${currentDim}" oninput="this.nextElementSibling.value=this.value" style="flex:1 1 auto; width:100%;">
+              <input type="range" min="0" max="1" step="0.01" name="flags.${MODULE_ID}.dimThreshold" value="${currentDim}" oninput="this.nextElementSibling.value=this.value" style="flex:1 1 auto; width:100%;">
               <output style="min-width:2ch; text-align:right;">${currentDim}</output>
             </div>
           </div>
