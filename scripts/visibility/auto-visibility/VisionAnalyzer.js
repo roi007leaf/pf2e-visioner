@@ -24,6 +24,7 @@ import { getLogger } from '../../utils/logger.js';
 import { SensingCapabilitiesBuilder } from './SensingCapabilitiesBuilder.js';
 import { getTokenVerticalSpanFt } from '../../helpers/size-elevation-utils.js';
 import { doesWallBlockAtElevation } from '../../helpers/wall-height-utils.js';
+import { LevelsIntegration } from '../../services/LevelsIntegration.js';
 
 const log = getLogger('VisionAnalyzer');
 
@@ -180,12 +181,22 @@ export class VisionAnalyzer {
   /**
    * Check if observer has line of sight to target
    * Uses shape-based collision detection like LightingCalculator
+   * Integrates with Levels module for 3D collision detection
    * @param {Token} observer
    * @param {Token} target
    * @returns {boolean}
    */
   hasLineOfSight(observer, target) {
     try {
+      // Check for 3D collision using Levels if available
+      const levelsIntegration = LevelsIntegration.getInstance();
+      if (levelsIntegration.isActive) {
+        const has3DCollision = levelsIntegration.hasFloorCeilingBetween(observer, target);
+        if (has3DCollision) {
+          return false;
+        }
+      }
+
       // If the observer has an los shape, use that for line of sight against the target's circle
       // Darkness sources may affect true LOS, so only return true/false if we can be sure
       const los = observer.vision?.los;
@@ -325,10 +336,11 @@ export class VisionAnalyzer {
   }
 
   /**
-   * Check if sound is blocked between observer and target
+   * Check if sound is blocked between two tokens
+   * Integrates with Levels module for 3D collision detection
    * @param {Token} observer
    * @param {Token} target
-   * @returns {boolean} True if sound is blocked by walls or Silence effect
+   * @returns {boolean} True if sound is blocked by walls, floors/ceilings, or Silence effect
    */
   isSoundBlocked(observer, target) {
     try {
@@ -338,6 +350,15 @@ export class VisionAnalyzer {
 
       if (observerHasSilence || targetHasSilence) {
         return true;
+      }
+
+      // Check for 3D collision using Levels if available
+      const levelsIntegration = LevelsIntegration.getInstance();
+      if (levelsIntegration.isActive) {
+        const has3DCollision = levelsIntegration.test3DCollision(observer, target, 'sound');
+        if (has3DCollision) {
+          return true;
+        }
       }
 
       // Check if polygon backend for sound is available
@@ -361,9 +382,7 @@ export class VisionAnalyzer {
       // On error, assume sound is NOT blocked (fail open for better UX)
       return false;
     }
-  }
-
-  /**
+  }  /**
    * Check if actor has Silence effect active
    * @private
    * @param {Actor} actor
@@ -385,12 +404,21 @@ export class VisionAnalyzer {
 
   /**
    * Calculate distance between tokens in feet
+   * Uses Levels integration for 3D distance when available
    * @param {Token} a
    * @param {Token} b
    * @returns {number} Distance in feet
    */
   distanceFeet(a, b) {
     try {
+      const levelsIntegration = LevelsIntegration.getInstance();
+      if (levelsIntegration.isActive) {
+        const distance3D = levelsIntegration.getTotalDistance(a, b);
+        if (distance3D !== Infinity) {
+          const gridSize = canvas.dimensions.distance;
+          return distance3D * gridSize;
+        }
+      }
       return calculateDistanceInFeet(a, b);
     } catch (error) {
       log.debug('Error calculating distance', error);

@@ -12,6 +12,7 @@ import { calculateDistanceInFeet } from '../helpers/geometry-utils.js';
 import { ConcealmentRegionBehavior } from '../regions/ConcealmentRegionBehavior.js';
 import { calculateVisibility } from './StatelessVisibilityCalculator.js';
 import { FeatsHandler } from '../chat/services/FeatsHandler.js';
+import { LevelsIntegration } from '../services/LevelsIntegration.js';
 
 /**
  * Convert token and game state to standardized visibility input
@@ -55,7 +56,16 @@ export async function tokenStateToInput(
     const targetState = extractTargetState(target, lightingCalculator, options, observerPosition, targetPosition);
 
     // Calculate distance for sense range filtering using PF2e rules (5-10-5 diagonal pattern)
-    const distanceInFeet = calculateDistanceInFeet(observer, target);
+    // Use Levels integration for 3D distance if available
+    let distanceInFeet = calculateDistanceInFeet(observer, target);
+    const levelsIntegration = LevelsIntegration.getInstance();
+    if (levelsIntegration.isActive) {
+        const distance3D = levelsIntegration.getTotalDistance(observer, target);
+        if (distance3D !== Infinity) {
+            const gridSize = canvas.dimensions.distance;
+            distanceInFeet = distance3D * gridSize;
+        }
+    }
 
     const observerState = extractObserverState(observer, visionAnalyzer, conditionManager, lightingCalculator, options, distanceInFeet);
 
