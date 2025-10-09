@@ -924,8 +924,9 @@ export function showControlledTokenVisibilityObserver() {
  * @param {Token} observerToken - The observer token
  * @param {Token} targetToken - The target token
  * @param {string} mode - The mode ('observer' or 'target')
+ * @param {Token} [actualTarget] - In target mode, the actual target being observed (the hovered token)
  */
-function addBadgeClickHandler(badgeElement, observerToken, targetToken, mode) {
+function addBadgeClickHandler(badgeElement, observerToken, targetToken, mode, actualTarget = null) {
   if (!badgeElement) return;
   
   badgeElement.addEventListener('click', async (event) => {
@@ -934,29 +935,96 @@ function addBadgeClickHandler(badgeElement, observerToken, targetToken, mode) {
     
     try {
       const { openTokenManagerWithMode } = await import('../api.js');
+      const manager = await import('../managers/token-manager/TokenManager.js');
       
-      if (mode === 'observer') {
-        await openTokenManagerWithMode(observerToken, 'observer');
-      } else {
-        await openTokenManagerWithMode(targetToken, 'target');
+      // Determine which token to open the manager for
+      // In target mode with actualTarget, open for the actualTarget (the hovered token)
+      // Otherwise use the standard logic
+      const tokenToOpen = (mode === 'target' && actualTarget) ? actualTarget : 
+                          (mode === 'observer' ? observerToken : targetToken);
+      const modeToUse = (mode === 'target' && actualTarget) ? 'target' : mode;
+      
+      // Open the manager and wait for it to render
+      await openTokenManagerWithMode(tokenToOpen, modeToUse);
+      
+      // Get the app instance
+      const app = manager.VisionerTokenManager.currentInstance;
+      if (!app) {
+        console.warn('PF2E Visioner | No TokenManager instance found');
+        return;
       }
       
-      setTimeout(async () => {
+      // Wait for manager to be rendered, then highlight the row if it exists
+      const highlightRow = async (retries = 0) => {
+        const maxRetries = 30;
         try {
-          const manager = await import('../managers/token-manager/TokenManager.js');
-          const app = manager.VisionerTokenManager.currentInstance;
-          if (app && app.element) {
-            const rowToHighlight = mode === 'observer' ? targetToken.id : observerToken.id;
-            const rows = app.element.querySelectorAll(`tr[data-token-id="${rowToHighlight}"]`);
-            if (rows && rows.length > 0) {
-              rows.forEach((r) => r.classList.add('row-hover'));
-              rows[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+          
+          if (!app.element) {
+            if (retries < maxRetries) {
+              setTimeout(() => highlightRow(retries + 1), 50);
+            }
+            return;
+          }
+          
+          // In target mode with actualTarget, we want to highlight the observer's row
+          // (showing who can see the actualTarget)
+          // In observer mode, highlight the target's row (what the observer can see)
+          const rowToHighlight = (mode === 'target' && actualTarget) ? observerToken.id :
+                                (mode === 'observer' ? targetToken.id : observerToken.id);
+          const rows = app.element.querySelectorAll(`tr[data-token-id="${rowToHighlight}"]`);
+          
+          const allRows = app.element.querySelectorAll('tr[data-token-id]');
+          const allTokenIds = Array.from(allRows).map(r => r.getAttribute('data-token-id'));
+          
+          // Check if we have any rows rendered yet (table populated)
+          const tablePopulated = allRows.length > 0;
+          
+          if (!rows || rows.length === 0) {
+            if (!tablePopulated && retries < maxRetries) {
+              // Table not yet populated, keep waiting
+              setTimeout(() => highlightRow(retries + 1), 50);
+            }
+            // Either table is populated but row doesn't exist (token has "observed" state),
+            // or we've exceeded retries. Either way, just return - manager is open.
+            return;
+          }
+          
+          // Clear any existing highlights
+          app.element.querySelectorAll('tr.token-row.row-hover')
+            ?.forEach((el) => el.classList.remove('row-hover'));
+          
+          // Add highlight to target rows
+          rows.forEach((r) => r.classList.add('row-hover'));
+          
+          // Scroll to first visible row (check if in active tab)
+          const activeTab = app.activeTab || 'visibility';
+          const sectionSelector = activeTab === 'cover' ? '.cover-section' : '.visibility-section';
+          
+          let firstVisibleRow = null;
+          for (const r of rows) {
+            const section = r.closest(sectionSelector);
+            const visible = section && getComputedStyle(section).display !== 'none';
+            if (section && visible) {
+              firstVisibleRow = r;
+              break;
             }
           }
+          
+          if (!firstVisibleRow && rows.length > 0) {
+            firstVisibleRow = rows[0];
+          }
+          
+          if (firstVisibleRow) {
+            requestAnimationFrame(() => {
+              firstVisibleRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            });
+          }
         } catch (err) {
-          console.warn('PF2E Visioner | Could not highlight row:', err);
+          // Silently fail - manager is open, just couldn't highlight
         }
-      }, 100);
+      };
+      
+      highlightRow();
     } catch (error) {
       console.error('PF2E Visioner | Error opening token manager from tooltip:', error);
     }
@@ -1094,7 +1162,7 @@ function addVisibilityIndicator(
     if (senseUsed) {
       const left = centerX - badgeWidth / 2;
       indicator._senseBadgeEl = placeSenseBadge(left, centerY, senseUsed);
-      addBadgeClickHandler(indicator._senseBadgeEl, observerToken, targetToken, mode);
+      addBadgeClickHandler(indicator._senseBadgeEl, observerToken, targetToken, mode, detectionTarget);
     }
   } else {
     const totalWidth = (senseUsed ? badgeWidth + spacing : 0) + badgeWidth;
@@ -1104,7 +1172,7 @@ function addVisibilityIndicator(
     
     if (senseUsed) {
       indicator._senseBadgeEl = placeSenseBadge(currentX, centerY, senseUsed);
-      addBadgeClickHandler(indicator._senseBadgeEl, observerToken, targetToken, mode);
+      addBadgeClickHandler(indicator._senseBadgeEl, observerToken, targetToken, mode, detectionTarget);
       currentX += badgeWidth + spacing;
     }
     
@@ -1115,7 +1183,7 @@ function addVisibilityIndicator(
       config.icon,
       'visibility'
     );
-    addBadgeClickHandler(indicator._visBadgeEl, observerToken, targetToken, mode);
+    addBadgeClickHandler(indicator._visBadgeEl, observerToken, targetToken, mode, detectionTarget);
   }
 
   HoverTooltips.visibilityIndicators.set(targetToken.id, indicator);
