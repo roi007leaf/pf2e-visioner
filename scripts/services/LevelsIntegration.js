@@ -182,14 +182,6 @@ class LevelsIntegration {
         return false;
       }
 
-      const minElevation = Math.min(observerElevation, targetElevation);
-      const maxElevation = Math.max(observerElevation, targetElevation);
-      
-      const floorRange = maxElevation - minElevation;
-      if (floorRange <= 10) {
-        return false;
-      }
-
       const p0 = this.get3DPoint(observer);
       const p1 = this.get3DPoint(target);
 
