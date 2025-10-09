@@ -174,12 +174,30 @@ class LevelsIntegration {
     if (!this._isLevelsActive) return false;
 
     try {
+      const observerElevation = this.getTokenElevation(observer);
+      const targetElevation = this.getTokenElevation(target);
+      
+      const elevationDiff = Math.abs(observerElevation - targetElevation);
+      if (elevationDiff < 0.1) {
+        return false;
+      }
+
+      const minElevation = Math.min(observerElevation, targetElevation);
+      const maxElevation = Math.max(observerElevation, targetElevation);
+      
+      const floorRange = maxElevation - minElevation;
+      if (floorRange <= 10) {
+        return false;
+      }
+
       const p0 = this.get3DPoint(observer);
       const p1 = this.get3DPoint(target);
 
       if (!p0 || !p1) return false;
 
-      return this.test3DPointCollision(p0, p1, 'sight');
+      const collision = this.test3DPointCollision(p0, p1, 'sight');
+      
+      return collision;
     } catch (error) {
       console.warn('[PF2E Visioner] Error checking floor/ceiling:', error);
       return false;
