@@ -34,7 +34,47 @@ export class TokenEventHandler {
     // Token events
     Hooks.on('updateToken', this.handleTokenUpdate.bind(this));
     Hooks.on('createToken', this.handleTokenCreate.bind(this));
-    Hooks.on('deleteToken', this.handleTokenDelete.bind(this));
+    Hooks.on('moveToken', this.handleMoveToken.bind(this));
+  }
+
+  handleMoveToken(tokenDoc, updateData, options, userId) {
+    // This fires for EVERY grid square during animation
+    // We only want to process the FINAL destination
+    if (!this.systemState.shouldProcessEvents()) {
+      return;
+    }
+
+    // Check if this is the final move segment
+    // The updateData has a 'chain' array - if it's empty, this is the final move
+    const isFinalMove = !updateData.chain || updateData.chain.length === 0;
+
+    if (!isFinalMove) {
+      // This is an intermediate waypoint, skip processing
+      return;
+    }
+
+    // This is the final destination, process visibility
+
+    // Use destination from updateData - this is the final position after animation
+    const finalX = updateData.destination?.x ?? tokenDoc.x;
+    const finalY = updateData.destination?.y ?? tokenDoc.y;
+
+    try {
+      if (this.overrideValidationManager) {
+        this.overrideValidationManager.queueOverrideValidation(tokenDoc.id);
+        this.overrideValidationManager.processQueuedValidations().catch(() => { });
+      }
+
+      const movementChanges = {
+        x: finalX,
+        y: finalY,
+      };
+
+      this.visibilityState.markTokenChangedWithSpatialOptimization(tokenDoc, movementChanges);
+
+    } catch (e) {
+      console.warn('PF2E Visioner | Error processing move token:', e);
+    }
   }
 
   /**
@@ -88,6 +128,19 @@ export class TokenEventHandler {
             }
           }).catch(() => { /* ignore animation errors */ });
         }
+        return;
+      }
+
+      // Check if token was dragged to the same position (no actual movement)
+      const oldX = tokenDoc.x;
+      const oldY = tokenDoc.y;
+      const newX = changes.x ?? oldX;
+      const newY = changes.y ?? oldY;
+
+      if (oldX === newX && oldY === newY) {
+        // Token dragged but released at same position - clear cached data
+        this.positionManager.clearTokenPositionData(tokenDoc.id);
+        this.systemState.debug('token-drag-same-position', tokenDoc.id, 'cleared cached positions');
         return;
       }
     }

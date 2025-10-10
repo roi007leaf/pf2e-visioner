@@ -29,6 +29,10 @@ describe('Sight and Sound Blocking', () => {
             name: 'Observer',
             center: { x: 100, y: 100 },
             document: {
+                x: 50,  // Token position for sample point calculation
+                y: 50,
+                width: 1,  // Grid squares
+                height: 1,
                 detectionModes: [
                     { id: 'hearing', enabled: true, range: 60 }
                 ]
@@ -51,6 +55,12 @@ describe('Sight and Sound Blocking', () => {
             id: 'target-1',
             name: 'Target',
             center: { x: 300, y: 300 },
+            document: {
+                x: 250,  // Token position for sample point calculation
+                y: 250,
+                width: 1,  // Grid squares
+                height: 1
+            },
             actor: {
                 system: {
                     perception: {
@@ -65,6 +75,9 @@ describe('Sight and Sound Blocking', () => {
         global.canvas = {
             walls: {
                 placeables: [] // Default: no walls
+            },
+            grid: {
+                size: 100  // 100 pixels per grid square
             }
         };
 
@@ -240,29 +253,36 @@ describe('Sight and Sound Blocking', () => {
 
     describe('VisionAnalyzer - isSoundBlocked', () => {
         it('should return false when no sound-blocking wall', () => {
-            CONFIG.Canvas.polygonBackends.sound.testCollision.mockReturnValue(false);
+            global.canvas.walls.placeables = []; // No walls
 
             const result = visionAnalyzer.isSoundBlocked(mockObserver, mockTarget);
 
             expect(result).toBe(false);
-            expect(CONFIG.Canvas.polygonBackends.sound.testCollision).toHaveBeenCalledWith(
-                mockObserver.center,
-                mockTarget.center,
-                { type: 'sound', mode: 'any' }
-            );
         });
 
         it('should return true when sound-blocking wall present', () => {
-            CONFIG.Canvas.polygonBackends.sound.testCollision.mockReturnValue(true);
+            // Mock a wall that blocks sound
+            global.canvas.walls.placeables = [
+                {
+                    document: {
+                        move: CONST.WALL_SENSE_TYPES.NORMAL,
+                        sight: CONST.WALL_SENSE_TYPES.NONE,
+                        sound: CONST.WALL_SENSE_TYPES.NORMAL, // Blocks sound
+                        c: [200, 50, 200, 250] // Wall between observer and target
+                    }
+                }
+            ];
+
+            // Mock intersection
+            global.foundry.utils.lineLineIntersection.mockReturnValue({
+                x: 200,
+                y: 200,
+                t0: 0.5 // Midpoint
+            });
 
             const result = visionAnalyzer.isSoundBlocked(mockObserver, mockTarget);
 
             expect(result).toBe(true);
-            expect(CONFIG.Canvas.polygonBackends.sound.testCollision).toHaveBeenCalledWith(
-                mockObserver.center,
-                mockTarget.center,
-                { type: 'sound', mode: 'any' }
-            );
         });
 
         it('should return false when polygon backend not available', () => {

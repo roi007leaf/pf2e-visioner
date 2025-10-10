@@ -65,12 +65,13 @@ describe('Wall Sight Blocking Fix', () => {
             },
           },
         },
-        document: { id: 'test-observer-1' },
+        document: { id: 'test-observer-1', x: -50, y: -50, width: 1, height: 1 },
       };
 
       const target = {
         center: { x: 100, y: 0 },
         shape: null,
+        document: { x: 50, y: -50, width: 1, height: 1 },
       };
 
       // Mock a wall that blocks sight but not sound
@@ -107,12 +108,13 @@ describe('Wall Sight Blocking Fix', () => {
             },
           },
         },
-        document: { id: 'test-observer-2' },
+        document: { id: 'test-observer-2', x: -50, y: -50, width: 1, height: 1 },
       };
 
       const target = {
         center: { x: 100, y: 0 },
         shape: null,
+        document: { x: 50, y: -50, width: 1, height: 1 },
       };
 
       // Mock a wall that blocks ONLY movement (darkness wall - should be skipped)
@@ -149,12 +151,13 @@ describe('Wall Sight Blocking Fix', () => {
             },
           },
         },
-        document: { id: 'test-observer-3' },
+        document: { id: 'test-observer-3', x: -50, y: -50, width: 1, height: 1 },
       };
 
       const target = {
         center: { x: 100, y: 0 },
         shape: null,
+        document: { x: 50, y: -50, width: 1, height: 1 },
       };
 
       // Mock a physical wall that blocks sight
@@ -190,12 +193,13 @@ describe('Wall Sight Blocking Fix', () => {
             },
           },
         },
-        document: { id: 'test-observer-4' },
+        document: { id: 'test-observer-4', x: -50, y: -50, width: 1, height: 1 },
       };
 
       const target = {
         center: { x: 100, y: 0 },
         shape: null,
+        document: { x: 50, y: -50, width: 1, height: 1 },
       };
 
       // Simulate missing walls
@@ -218,12 +222,13 @@ describe('Wall Sight Blocking Fix', () => {
             },
           },
         },
-        document: { id: 'test-no-vision-observer' },
+        document: { id: 'test-no-vision-observer', x: -50, y: -50, width: 1, height: 1 },
       };
 
       const target = {
         center: { x: 100, y: 0 },
         shape: null,
+        document: { x: 50, y: -50, width: 1, height: 1 },
       };
 
       // No walls blocking

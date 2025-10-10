@@ -1,6 +1,6 @@
-import { describe, test, expect, beforeEach, jest } from '@jest/globals';
-import '../../setup.js';
+import { beforeEach, describe, expect, jest, test } from '@jest/globals';
 import { VisionAnalyzer } from '../../../scripts/visibility/auto-visibility/VisionAnalyzer.js';
+import '../../setup.js';
 
 describe('VisionAnalyzer with Wall Height Integration', () => {
   let visionAnalyzer;
@@ -24,6 +24,9 @@ describe('VisionAnalyzer with Wall Height Integration', () => {
       },
       effects: {
         darknessSources: [],
+      },
+      grid: {
+        size: 100,  // 100 pixels per grid square
       },
     };
 
@@ -59,7 +62,7 @@ describe('VisionAnalyzer with Wall Height Integration', () => {
       const observer = {
         center: { x: 0, y: 0 },
         vision: null,
-        document: { id: 'observer-1', elevation: 0 },
+        document: { id: 'observer-1', elevation: 0, x: -50, y: -50, width: 1, height: 1 },
         actor: {
           system: {
             perception: { vision: true },
@@ -71,7 +74,7 @@ describe('VisionAnalyzer with Wall Height Integration', () => {
       const target = {
         center: { x: 100, y: 0 },
         shape: null,
-        document: { elevation: 0 },
+        document: { elevation: 0, x: 50, y: -50, width: 1, height: 1 },
         actor: {
           system: {
             traits: { size: { value: 'med' } },
@@ -118,7 +121,7 @@ describe('VisionAnalyzer with Wall Height Integration', () => {
       const observer = {
         center: { x: 0, y: 0 },
         vision: null,
-        document: { id: 'observer-1', elevation: 0 },
+        document: { id: 'observer-1', elevation: 0, x: -50, y: -50, width: 1, height: 1 },
         actor: {
           system: {
             perception: { vision: true },
@@ -130,7 +133,7 @@ describe('VisionAnalyzer with Wall Height Integration', () => {
       const target = {
         center: { x: 100, y: 0 },
         shape: null,
-        document: { elevation: 5 },
+        document: { elevation: 5, x: 50, y: -50, width: 1, height: 1 },
         actor: {
           system: {
             traits: { size: { value: 'med' } },
@@ -168,7 +171,7 @@ describe('VisionAnalyzer with Wall Height Integration', () => {
       const observer = {
         center: { x: 0, y: 0 },
         vision: null,
-        document: { id: 'observer-1', elevation: 15 },
+        document: { id: 'observer-1', elevation: 15, x: -50, y: -50, width: 1, height: 1 },
         actor: {
           system: {
             perception: { vision: true },
@@ -180,7 +183,7 @@ describe('VisionAnalyzer with Wall Height Integration', () => {
       const target = {
         center: { x: 100, y: 0 },
         shape: null,
-        document: { elevation: 20 },
+        document: { elevation: 20, x: 50, y: -50, width: 1, height: 1 },
         actor: {
           system: {
             traits: { size: { value: 'med' } },
@@ -220,7 +223,7 @@ describe('VisionAnalyzer with Wall Height Integration', () => {
       const observer = {
         center: { x: 0, y: 0 },
         vision: null,
-        document: { id: 'observer-1', elevation: 0 },
+        document: { id: 'observer-1', elevation: 0, x: -50, y: -50, width: 1, height: 1 },
         actor: {
           system: {
             perception: { vision: true },
@@ -232,7 +235,7 @@ describe('VisionAnalyzer with Wall Height Integration', () => {
       const target = {
         center: { x: 100, y: 0 },
         shape: null,
-        document: { elevation: 10 },
+        document: { elevation: 10, x: 50, y: -50, width: 1, height: 1 },
         actor: {
           system: {
             traits: { size: { value: 'med' } },
@@ -269,7 +272,7 @@ describe('VisionAnalyzer with Wall Height Integration', () => {
       const observer = {
         center: { x: 0, y: 0 },
         vision: null,
-        document: { id: 'observer-1', elevation: 0 },
+        document: { id: 'observer-1', elevation: 0, x: -50, y: -50, width: 1, height: 1 },
         actor: {
           system: {
             perception: { vision: true },
@@ -281,7 +284,7 @@ describe('VisionAnalyzer with Wall Height Integration', () => {
       const target = {
         center: { x: 100, y: 0 },
         shape: null,
-        document: { elevation: 20 },
+        document: { elevation: 20, x: 50, y: -50, width: 1, height: 1 },
         actor: {
           system: {
             traits: { size: { value: 'med' } },
@@ -318,7 +321,7 @@ describe('VisionAnalyzer with Wall Height Integration', () => {
       const observer = {
         center: { x: 0, y: 0 },
         vision: null,
-        document: { id: 'observer-1', elevation: 50 },
+        document: { id: 'observer-1', elevation: 50, x: -50, y: -50, width: 1, height: 1 },
         actor: {
           system: {
             perception: { vision: true },
@@ -330,7 +333,7 @@ describe('VisionAnalyzer with Wall Height Integration', () => {
       const target = {
         center: { x: 100, y: 0 },
         shape: null,
-        document: { elevation: 100 },
+        document: { elevation: 100, x: 50, y: -50, width: 1, height: 1 },
         actor: {
           system: {
             traits: { size: { value: 'med' } },
@@ -367,7 +370,7 @@ describe('VisionAnalyzer with Wall Height Integration', () => {
       const observer = {
         center: { x: 0, y: 0 },
         vision: null,
-        document: { id: 'observer-1', elevation: 10 },
+        document: { id: 'observer-1', elevation: 10, x: -50, y: -50, width: 1, height: 1 },
         actor: {
           system: {
             perception: { vision: true },
@@ -379,7 +382,7 @@ describe('VisionAnalyzer with Wall Height Integration', () => {
       const target = {
         center: { x: 100, y: 0 },
         shape: null,
-        document: { elevation: 15 },
+        document: { elevation: 15, x: 50, y: -50, width: 1, height: 1 },
         actor: {
           system: {
             traits: { size: { value: 'med' } },

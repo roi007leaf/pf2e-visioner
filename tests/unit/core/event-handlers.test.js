@@ -780,7 +780,7 @@ describe('Event Handler Tests', () => {
 
             expect(mockHooks.on).toHaveBeenCalledWith('updateToken', expect.any(Function));
             expect(mockHooks.on).toHaveBeenCalledWith('createToken', expect.any(Function));
-            expect(mockHooks.on).toHaveBeenCalledWith('deleteToken', expect.any(Function));
+            expect(mockHooks.on).toHaveBeenCalledWith('moveToken', expect.any(Function));
         });
 
         test('should handle light changes with global recalculation', () => {

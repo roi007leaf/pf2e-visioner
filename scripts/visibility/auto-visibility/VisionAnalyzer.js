@@ -20,10 +20,10 @@
 
 import { MODULE_ID } from '../../constants.js';
 import { calculateDistanceInFeet } from '../../helpers/geometry-utils.js';
-import { getLogger } from '../../utils/logger.js';
-import { SensingCapabilitiesBuilder } from './SensingCapabilitiesBuilder.js';
 import { getTokenVerticalSpanFt } from '../../helpers/size-elevation-utils.js';
 import { doesWallBlockAtElevation } from '../../helpers/wall-height-utils.js';
+import { getLogger } from '../../utils/logger.js';
+import { SensingCapabilitiesBuilder } from './SensingCapabilitiesBuilder.js';
 
 const log = getLogger('VisionAnalyzer');
 
@@ -192,7 +192,7 @@ export class VisionAnalyzer {
       if (los?.points) {
         const radius = target.externalRadius;
         const circle = new PIXI.Circle(target.center.x, target.center.y, radius);
-        const intersection = los.intersectCircle(circle, {density: 8, scalingFactor: 1.0});
+        const intersection = los.intersectCircle(circle, { density: 8, scalingFactor: 1.0 });
         const visible = intersection?.points?.length > 0;
         if (visible || !canvas.effects?.darknessSources?.length) return visible;
       }
@@ -200,10 +200,12 @@ export class VisionAnalyzer {
       // Check if LOS calculation is disabled
       const losDisabled = game.settings.get(MODULE_ID, 'disableLineOfSightCalculation');
       if (losDisabled) {
-        return undefined; // return undefined if LOS calculation is disabled
+        return undefined;
       }
 
-      // Calculate elevation range for wall height checks
+      // Use multi-point geometric sampling with proper limited wall handling
+      // Foundry's polygon backend doesn't correctly handle our custom limited wall rules
+      // (where 2+ limited walls block vision), so we use ray-casting instead
       let elevationRange = null;
       try {
         const observerSpan = getTokenVerticalSpanFt(observer);
@@ -215,113 +217,154 @@ export class VisionAnalyzer {
       } catch (error) {
       }
 
-      const ray = new foundry.canvas.geometry.Ray(observer.center, target.center);
-      let limitedWallCrossings = 0;
+      const observerPoints = this.#getTokenSamplePoints(observer);
+      const targetPoints = this.#getTokenSamplePoints(target);
 
-      // Check for walls that block BOTH movement AND (sight OR sound)
-      // Darkness walls typically block ONLY movement, not sight/sound
-      // Physical walls block movement + sight/sound
-      for (const wall of canvas.walls.placeables) {
-        // Skip walls that don't block movement (not physical barriers)
-        if (wall.document.move === CONST.WALL_SENSE_TYPES.NONE) {
-          continue;
-        }
-
-        // Skip open doors - they don't block line of sight
-        // door: 0 = not a door, 1 = door, 2 = secret door
-        // ds: 0 = closed, 1 = open, 2 = locked
-        const isDoor = wall.document.door > 0;
-        const isOpen = wall.document.ds === 1;
-        if (isDoor && isOpen) {
-          continue;
-        }
-
-        // Skip walls that block ONLY movement (darkness walls)
-        // Physical walls must also block sight or sound
-        const blocksSight = wall.document.sight !== CONST.WALL_SENSE_TYPES.NONE;
-        const blocksSound = wall.document.sound !== CONST.WALL_SENSE_TYPES.NONE;
-
-        if (!blocksSight && !blocksSound) {
-          continue;
-        }
-
-        // Check wall elevation if Wall Height module is active and elevation range is available
-        if (elevationRange && !doesWallBlockAtElevation(wall.document, elevationRange)) {
-          continue;
-        }
-
-        // Check if the ray intersects this physical wall
-        const intersection = foundry.utils.lineLineIntersection(
-          { x: ray.A.x, y: ray.A.y },
-          { x: ray.B.x, y: ray.B.y },
-          { x: wall.document.c[0], y: wall.document.c[1] },
-          { x: wall.document.c[2], y: wall.document.c[3] }
-        );
-
-        // Check if intersection is within the ray segment (0 <= t0 <= 1)
-        if (intersection && typeof intersection.t0 === 'number' && intersection.t0 >= 0 && intersection.t0 <= 1) {
-          // Compute t1 for the wall segment
-          const wallDx = wall.document.c[2] - wall.document.c[0];
-          const wallDy = wall.document.c[3] - wall.document.c[1];
-          let t1;
-
-          // Use the larger component to avoid division by near-zero
-          if (Math.abs(wallDx) > Math.abs(wallDy)) {
-            t1 = (intersection.x - wall.document.c[0]) / wallDx;
-          } else {
-            t1 = (intersection.y - wall.document.c[1]) / wallDy;
-          }
-
-          // Check if t1 is also within [0, 1] (intersection within wall segment)
-          if (t1 >= 0 && t1 <= 1) {
-            // Ray intersects this wall
-
-            // Check for directional walls (one-way walls)
-            // dir: 0 = both directions, 1 = left side blocks, 2 = right side blocks
-            if (wall.document.dir && wall.document.dir !== 0) {
-              const observerDx = observer.center.x - wall.document.c[0];
-              const observerDy = observer.center.y - wall.document.c[1];
-
-              // Cross product determines which side the observer is on
-              const crossProduct = wallDx * observerDy - wallDy * observerDx;
-
-              // dir=1: blocks from left (negative cross product)
-              // dir=2: blocks from right (positive cross product)
-              const blocksFromObserverSide =
-                (wall.document.dir === 1 && crossProduct < 0) ||
-                (wall.document.dir === 2 && crossProduct > 0);
-
-              if (!blocksFromObserverSide) {
-                continue; // One-way wall doesn't block from this direction
-              }
-            }
-
-            // Check if this is a Limited wall (sight/light/sound = LIMITED)
-            const isLimitedSight = wall.document.sight === CONST.WALL_SENSE_TYPES.LIMITED;
-            const isLimitedLight = wall.document.light === CONST.WALL_SENSE_TYPES.LIMITED;
-            const isLimitedSound = wall.document.sound === CONST.WALL_SENSE_TYPES.LIMITED;
-            const isLimited = isLimitedSight || isLimitedLight || isLimitedSound;
-
-            if (isLimited) {
-              // Limited walls: count crossings, block only if > 1
-              limitedWallCrossings++;
-              if (limitedWallCrossings > 1) {
-                return false; // More than one Limited wall crossed
-              }
-            } else {
-              // Normal wall: blocks immediately
-              return false;
-            }
+      for (const obsPoint of observerPoints) {
+        for (const targetPoint of targetPoints) {
+          if (this.#checkSingleRayLOS(obsPoint, targetPoint, elevationRange)) {
+            return true;
           }
         }
       }
 
-      return true; // No walls block line of sight
+      return false;
     } catch (error) {
       console.error('[LineOfSight] Error:', error);
       log.debug('Error checking line of sight', error);
       return false;
     }
+  }
+
+  /**
+   * Get sample points around a token's perimeter for multi-point LOS checks
+   * Returns center + 4 corner points for consistent symmetric sampling
+   * @private
+   */
+  #getTokenSamplePoints(token) {
+    const center = { x: token.center.x, y: token.center.y };
+    const w = token.document.width * canvas.grid.size;
+    const h = token.document.height * canvas.grid.size;
+    const x = token.document.x;
+    const y = token.document.y;
+
+    // Sample center + 4 corners for reasonable coverage
+    return [
+      center,                              // Center
+      { x: x + w * 0.25, y: y + h * 0.25 }, // Top-left quadrant
+      { x: x + w * 0.75, y: y + h * 0.25 }, // Top-right quadrant
+      { x: x + w * 0.25, y: y + h * 0.75 }, // Bottom-left quadrant
+      { x: x + w * 0.75, y: y + h * 0.75 }  // Bottom-right quadrant
+    ];
+  }
+
+  /**
+   * Check if a single ray has clear line of sight (internal helper)
+   * @private
+   */
+  #checkSingleRayLOS(fromPoint, toPoint, elevationRange) {
+    const ray = new foundry.canvas.geometry.Ray(fromPoint, toPoint);
+    let limitedWallCrossings = 0;
+
+    // Check for walls that block BOTH movement AND (sight OR sound)
+    // Darkness walls typically block ONLY movement, not sight/sound
+    // Physical walls block movement + sight/sound
+    for (const wall of canvas.walls.placeables) {
+      // Skip walls that don't block movement (not physical barriers)
+      if (wall.document.move === CONST.WALL_SENSE_TYPES.NONE) {
+        continue;
+      }
+
+      // Skip open doors - they don't block line of sight
+      // door: 0 = not a door, 1 = door, 2 = secret door
+      // ds: 0 = closed, 1 = open, 2 = locked
+      const isDoor = wall.document.door > 0;
+      const isOpen = wall.document.ds === 1;
+      if (isDoor && isOpen) {
+        continue;
+      }
+
+      // Skip walls that block ONLY movement (darkness walls)
+      // Physical walls must also block sight or sound
+      const blocksSight = wall.document.sight !== CONST.WALL_SENSE_TYPES.NONE;
+      const blocksSound = wall.document.sound !== CONST.WALL_SENSE_TYPES.NONE;
+
+      if (!blocksSight && !blocksSound) {
+        continue;
+      }
+
+      // Check wall elevation if Wall Height module is active and elevation range is available
+      if (elevationRange && !doesWallBlockAtElevation(wall.document, elevationRange)) {
+        continue;
+      }
+
+      // Check if the ray intersects this physical wall
+      const intersection = foundry.utils.lineLineIntersection(
+        { x: ray.A.x, y: ray.A.y },
+        { x: ray.B.x, y: ray.B.y },
+        { x: wall.document.c[0], y: wall.document.c[1] },
+        { x: wall.document.c[2], y: wall.document.c[3] }
+      );
+
+      // Check if intersection is within the ray segment (0 <= t0 <= 1)
+      if (intersection && typeof intersection.t0 === 'number' && intersection.t0 >= 0 && intersection.t0 <= 1) {
+        // Compute t1 for the wall segment
+        const wallDx = wall.document.c[2] - wall.document.c[0];
+        const wallDy = wall.document.c[3] - wall.document.c[1];
+        let t1;
+
+        // Use the larger component to avoid division by near-zero
+        if (Math.abs(wallDx) > Math.abs(wallDy)) {
+          t1 = (intersection.x - wall.document.c[0]) / wallDx;
+        } else {
+          t1 = (intersection.y - wall.document.c[1]) / wallDy;
+        }
+
+        // Check if t1 is also within [0, 1] (intersection within wall segment)
+        if (t1 >= 0 && t1 <= 1) {
+          // Ray intersects this wall
+
+          // Check for directional walls (one-way walls)
+          // dir: 0 = both directions, 1 = left side blocks, 2 = right side blocks
+          if (wall.document.dir && wall.document.dir !== 0) {
+            const observerDx = fromPoint.x - wall.document.c[0];
+            const observerDy = fromPoint.y - wall.document.c[1];
+
+            // Cross product determines which side the observer is on
+            const crossProduct = wallDx * observerDy - wallDy * observerDx;
+
+            // dir=1: blocks from left (negative cross product)
+            // dir=2: blocks from right (positive cross product)
+            const blocksFromObserverSide =
+              (wall.document.dir === 1 && crossProduct < 0) ||
+              (wall.document.dir === 2 && crossProduct > 0);
+
+            if (!blocksFromObserverSide) {
+              continue; // One-way wall doesn't block from this direction
+            }
+          }
+
+          // Check if this is a Limited wall (sight/light/sound = LIMITED)
+          const isLimitedSight = wall.document.sight === CONST.WALL_SENSE_TYPES.LIMITED;
+          const isLimitedLight = wall.document.light === CONST.WALL_SENSE_TYPES.LIMITED;
+          const isLimitedSound = wall.document.sound === CONST.WALL_SENSE_TYPES.LIMITED;
+          const isLimited = isLimitedSight || isLimitedLight || isLimitedSound;
+
+          if (isLimited) {
+            // Limited walls: count crossings, block only if > 1
+            limitedWallCrossings++;
+            if (limitedWallCrossings > 1) {
+              return false; // More than one Limited wall crossed
+            }
+          } else {
+            // Normal wall: blocks immediately
+            return false;
+          }
+        }
+      }
+    }
+
+    return true; // No walls block line of sight
   }
 
   /**
@@ -340,21 +383,55 @@ export class VisionAnalyzer {
         return true;
       }
 
-      // Check if polygon backend for sound is available
-      const soundBackend = CONFIG.Canvas.polygonBackends?.sound;
-      if (!soundBackend?.testCollision) {
-        return false;
+      // Check for sound-blocking walls manually, ignoring LIMITED walls
+      // Limited walls (terrain walls) should NOT block sound - they represent fog/mist
+      const ray = new foundry.canvas.geometry.Ray(observer.center, target.center);
+
+      for (const wall of canvas.walls.placeables) {
+        // Skip walls that don't block sound
+        if (wall.document.sound === CONST.WALL_SENSE_TYPES.NONE) {
+          continue;
+        }
+
+        // Skip LIMITED walls - they don't block sound (fog, mist, etc.)
+        if (wall.document.sound === CONST.WALL_SENSE_TYPES.LIMITED) {
+          continue;
+        }
+
+        // Skip open doors
+        const isDoor = wall.document.door > 0;
+        const isOpen = wall.document.ds === 1;
+        if (isDoor && isOpen) {
+          continue;
+        }
+
+        // Check if the ray intersects this sound-blocking wall
+        const intersection = foundry.utils.lineLineIntersection(
+          { x: ray.A.x, y: ray.A.y },
+          { x: ray.B.x, y: ray.B.y },
+          { x: wall.document.c[0], y: wall.document.c[1] },
+          { x: wall.document.c[2], y: wall.document.c[3] }
+        );
+
+        if (intersection && typeof intersection.t0 === 'number' && intersection.t0 >= 0 && intersection.t0 <= 1) {
+          const wallDx = wall.document.c[2] - wall.document.c[0];
+          const wallDy = wall.document.c[3] - wall.document.c[1];
+          let t1;
+
+          if (Math.abs(wallDx) > Math.abs(wallDy)) {
+            t1 = (intersection.x - wall.document.c[0]) / wallDx;
+          } else {
+            t1 = (intersection.y - wall.document.c[1]) / wallDy;
+          }
+
+          if (t1 >= 0 && t1 <= 1) {
+            // Found a normal (non-limited) sound-blocking wall
+            return true;
+          }
+        }
       }
 
-      // Check for sound-blocking walls using polygon backend
-      const hasSoundWall = soundBackend.testCollision(
-        observer.center,
-        target.center,
-        { type: 'sound', mode: 'any' }
-      );
-
-
-      return hasSoundWall;
+      return false;
     } catch (error) {
       console.error('[Sound-Blocking] Error checking sound blocking:', error);
       log.debug('Error checking sound blocking', error);
