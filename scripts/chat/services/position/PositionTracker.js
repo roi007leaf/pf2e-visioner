@@ -5,13 +5,13 @@
  */
 
 // import { getVisibilityBetween } from '../../../utils.js';
+import { LevelsIntegration } from '../../../services/LevelsIntegration.js';
 import { LightingCalculator } from '../../../visibility/auto-visibility/LightingCalculator.js';
 import { visibilityCalculator } from '../../../visibility/auto-visibility/VisibilityCalculator.js';
 import errorHandlingService, { SYSTEM_TYPES } from '../infra/ErrorHandlingService.js';
 import dualSystemIntegration from './DualSystemIntegration.js';
 import performanceOptimizer from './PerformanceOptimizer.js';
 import positionCacheManager from './PositionCacheManager.js';
-import { levelsIntegration } from '../../../services/LevelsIntegration.js';
 
 /**
  * Position state data structure combining AVS and Auto-Cover information
@@ -270,6 +270,7 @@ export class PositionTracker {
    */
   _calculateDistance(token1, token2) {
     try {
+      const levelsIntegration = LevelsIntegration.getInstance();
       if (levelsIntegration.isActive) {
         const distance3D = levelsIntegration.getTotalDistance(token1, token2);
         if (distance3D !== null) {
@@ -307,15 +308,16 @@ export class PositionTracker {
     try {
       const storedCenter = { x: storedPosition.x, y: storedPosition.y };
 
-      if (levelsIntegration.isActive() && storedPosition.elevation !== undefined) {
+      const levelsIntegration = LevelsIntegration.getInstance();
+      if (levelsIntegration.isActive && storedPosition.elevation !== undefined) {
         const dx = storedCenter.x - observerToken.center.x;
         const dy = storedCenter.y - observerToken.center.y;
         const distance2D = Math.sqrt(dx * dx + dy * dy);
-        
+
         const observerElevation = levelsIntegration.getTokenElevation(observerToken);
         const dz = storedPosition.elevation - observerElevation;
         const distance3D = Math.sqrt(distance2D * distance2D + dz * dz);
-        
+
         const gridSize = canvas?.grid?.size || 100;
         const unitDist = canvas?.scene?.grid?.distance || 5;
         return (distance3D / gridSize) * unitDist;

@@ -4,9 +4,9 @@
  * Uses unified system integration as the single source of truth
  */
 
+import { LevelsIntegration } from '../../services/LevelsIntegration.js';
 import unifiedSystemIntegration from './UnifiedSystemIntegration.js';
 import errorHandlingService, { SYSTEM_TYPES } from './infra/ErrorHandlingService.js';
-import { levelsIntegration } from '../../services/LevelsIntegration.js';
 
 /**
  * Simplified position state
@@ -126,7 +126,7 @@ export class SimplifiedPositionTracker {
       // Improved if visibility got better OR stealth bonus increased
       const visibilityImproved = this._isVisibilityImproved(startPos.visibility, endPos.visibility);
       const bonusImproved = stealthBonusChange > 0;
-      
+
       if (visibilityImproved || bonusImproved) {
         transitionType = 'improved';
       } else {
@@ -162,14 +162,15 @@ export class SimplifiedPositionTracker {
    */
   _calculateDistance(token1, token2) {
     if (!token1?.center || !token2?.center) return 0;
-    
+
+    const levelsIntegration = LevelsIntegration.getInstance();
     if (levelsIntegration.isActive) {
       const distance3D = levelsIntegration.getTotalDistance(token1, token2);
       if (distance3D !== null) {
         return distance3D;
       }
     }
-    
+
     const dx = token1.center.x - token2.center.x;
     const dy = token1.center.y - token2.center.y;
     return Math.sqrt(dx * dx + dy * dy);
@@ -213,23 +214,23 @@ export class SimplifiedPositionTracker {
     if (observers.length > 20) {
       const chunkSize = 10;
       const chunks = [];
-      
+
       for (let i = 0; i < observers.length; i += chunkSize) {
         chunks.push(observers.slice(i, i + chunkSize));
       }
-      
+
       const allResults = new Map();
-      
+
       for (const chunk of chunks) {
         const chunkResults = await this.capturePositions(sneakingToken, chunk, options);
         for (const [id, state] of chunkResults) {
           allResults.set(id, state);
         }
       }
-      
+
       return allResults;
     }
-    
+
     // Standard processing for smaller groups
     return this.capturePositions(sneakingToken, observers, options);
   }

@@ -1,8 +1,8 @@
 import { MODULE_ID, VISIBILITY_STATES } from '../../../constants.js';
+import { LevelsIntegration } from '../../../services/LevelsIntegration.js';
 import { SeekDialogAdapter } from '../../../visibility/auto-visibility/SeekDialogAdapter.js';
 import { appliedSeekChangesByMessage } from '../data/message-cache.js';
 import { ActionHandlerBase } from './BaseAction.js';
-import { levelsIntegration } from '../../../services/LevelsIntegration.js';
 
 export class SeekActionHandler extends ActionHandlerBase {
   constructor() {
@@ -680,11 +680,12 @@ export class SeekActionHandler extends ActionHandlerBase {
       const dy = token.center.y - wall.center.y;
       let distance = Math.hypot(dx, dy);
 
+      const levelsIntegration = LevelsIntegration.getInstance();
       if (levelsIntegration.isActive) {
         const tokenElevation = levelsIntegration.getTokenElevation(token);
         const wallTop = wall.document?.flags?.['wall-height']?.top ?? tokenElevation;
         const wallBottom = wall.document?.flags?.['wall-height']?.bottom ?? tokenElevation;
-        
+
         const wallMidElevation = (wallTop + wallBottom) / 2;
         const dz = tokenElevation - wallMidElevation;
         distance = Math.sqrt(distance * distance + dz * dz);
