@@ -47,6 +47,7 @@ describe('Wall Sight Blocking Fix', () => {
     };
 
     visionAnalyzer = new VisionAnalyzer();
+    visionAnalyzer.clearCache();
   });
 
   afterEach(() => {

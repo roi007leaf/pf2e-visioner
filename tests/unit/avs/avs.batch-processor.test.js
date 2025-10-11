@@ -44,7 +44,8 @@ describe('BatchProcessor', () => {
 
         // Mock the VisionAnalyzer dependency
         const mockVisionAnalyzer = {
-            getVisionCapabilities: jest.fn(() => ({ sensingSummary: { imprecise: [], precise: [], hearing: null } }))
+            getVisionCapabilities: jest.fn(() => ({ sensingSummary: { imprecise: [], precise: [], hearing: null } })),
+            hasLineOfSight: jest.fn(() => true)
         };
 
         processor = new BatchProcessor({

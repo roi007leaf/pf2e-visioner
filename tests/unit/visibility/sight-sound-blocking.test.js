@@ -13,6 +13,16 @@
 import { VisionAnalyzer } from '../../../scripts/visibility/auto-visibility/VisionAnalyzer.js';
 import { calculateVisibility } from '../../../scripts/visibility/StatelessVisibilityCalculator.js';
 
+global.PIXI = {
+    Circle: class Circle {
+        constructor(x, y, radius) {
+            this.x = x;
+            this.y = y;
+            this.radius = radius;
+        }
+    },
+};
+
 describe('Sight and Sound Blocking', () => {
     let visionAnalyzer;
     let mockObserver;

@@ -122,14 +122,7 @@ export class SystemStateProvider {
         }
     }
 
-    /**
-     * Log debug messages if debug mode is enabled
-     * @param {...any} args - Arguments to log
-     */
     debug(...args) {
-        if (this.isDebugMode()) {
-            console.debug('PF2E Visioner | AVS', ...args);
-        }
     }
 
     /**

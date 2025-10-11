@@ -19,6 +19,16 @@ describe('Asymmetric Visibility with LIMITED Walls', () => {
             effects: { darknessSources: [] },
         };
 
+        global.PIXI = {
+            Circle: class Circle {
+                constructor(x, y, radius) {
+                    this.x = x;
+                    this.y = y;
+                    this.radius = radius;
+                }
+            },
+        };
+
         global.game = {
             settings: {
                 get: jest.fn(() => false),

@@ -106,8 +106,8 @@ export class WallEventHandler {
 
         // Only clear caches if the change actually affects line of sight
         if (affectsLOS) {
-            if (this.cacheManager?.clearAllCaches) {
-                this.cacheManager.clearAllCaches();
+            if (this.cacheManager?.clearLosCache) {
+                this.cacheManager.clearLosCache();
             }
             // Clear VisionAnalyzer cache for all tokens since wall changes affect everyone
             if (this.visionAnalyzer?.clearCache) {
@@ -129,8 +129,8 @@ export class WallEventHandler {
         if (!this.systemState.shouldProcessEvents()) return;
 
         // New walls always affect LOS, so clear caches
-        if (this.cacheManager?.clearAllCaches) {
-            this.cacheManager.clearAllCaches();
+        if (this.cacheManager?.clearLosCache) {
+            this.cacheManager.clearLosCache();
         }
         // Clear VisionAnalyzer cache for all tokens since wall changes affect everyone
         if (this.visionAnalyzer?.clearCache) {
@@ -149,8 +149,8 @@ export class WallEventHandler {
         if (!this.systemState.shouldProcessEvents()) return;
 
         // Deleted walls always affect LOS, so clear caches
-        if (this.cacheManager?.clearAllCaches) {
-            this.cacheManager.clearAllCaches();
+        if (this.cacheManager?.clearLosCache) {
+            this.cacheManager.clearLosCache();
         }
         // Clear VisionAnalyzer cache for all tokens since wall changes affect everyone
         if (this.visionAnalyzer?.clearCache) {

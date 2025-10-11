@@ -34,6 +34,10 @@ export class VisionAnalyzer {
   #cacheTimestamp = new Map();
   #cacheTimeout = 5000; // 5 seconds
 
+  #wallCache = new Map();
+  #wallCacheTimestamp = new Map();
+  #wallCacheTimeout = 5000;
+
   constructor() {
     if (VisionAnalyzer.#instance) {
       return VisionAnalyzer.#instance;
@@ -185,27 +189,40 @@ export class VisionAnalyzer {
    * @returns {boolean}
    */
   hasLineOfSight(observer, target) {
+    // Early exit: token always has LOS to itself
+    if (observer?.document?.id === target?.document?.id) {
+      return true;
+    }
+
+    let stage = 'init';
     try {
       // If the observer has an los shape, use that for line of sight against the target's circle
       // Darkness sources may affect true LOS, so only return true/false if we can be sure
+      stage = 'vision-polygon';
       const los = observer.vision?.los;
       if (los?.points) {
-        const radius = target.externalRadius;
-        const circle = new PIXI.Circle(target.center.x, target.center.y, radius);
-        const intersection = los.intersectCircle(circle, { density: 8, scalingFactor: 1.0 });
-        const visible = intersection?.points?.length > 0;
-        if (visible || !canvas.effects?.darknessSources?.length) return visible;
+        try {
+          const radius = target.externalRadius;
+          const circle = new PIXI.Circle(target.center.x, target.center.y, radius);
+          const intersection = los.intersectCircle(circle, { density: 8, scalingFactor: 1.0 });
+          const visible = intersection?.points?.length > 0;
+          if (visible || !canvas.effects?.darknessSources?.length) {
+            return visible;
+          }
+        } catch (e) {
+          // PIXI not available or polygon check failed, fall through to geometric check
+        }
       }
 
       // Check if LOS calculation is disabled
+      stage = 'settings-check';
       const losDisabled = game.settings.get(MODULE_ID, 'disableLineOfSightCalculation');
       if (losDisabled) {
         return undefined;
       }
 
-      // Use multi-point geometric sampling with proper limited wall handling
-      // Foundry's polygon backend doesn't correctly handle our custom limited wall rules
-      // (where 2+ limited walls block vision), so we use ray-casting instead
+      // Use multi-point geometric sampling with cached wall filtering
+      stage = 'elevation-calc';
       let elevationRange = null;
       try {
         const observerSpan = getTokenVerticalSpanFt(observer);
@@ -217,12 +234,31 @@ export class VisionAnalyzer {
       } catch (error) {
       }
 
+      stage = 'get-walls';
+      const cachedWalls = this.#getCachedWalls(elevationRange);
+
+      // Early exit: if no walls, always have LOS
+      stage = 'wall-check';
+      if (cachedWalls.length === 0) {
+        return true;
+      }
+
+      stage = 'sample-points';
       const observerPoints = this.#getTokenSamplePoints(observer);
       const targetPoints = this.#getTokenSamplePoints(target);
 
-      for (const obsPoint of observerPoints) {
-        for (const targetPoint of targetPoints) {
-          if (this.#checkSingleRayLOS(obsPoint, targetPoint, elevationRange)) {
+      // Check center-to-center first (most common case)
+      stage = 'center-check';
+      if (this.#checkSingleRayLOSWithWalls(observerPoints[0], targetPoints[0], cachedWalls)) {
+        return true;
+      }
+
+      // Only check additional points if center-to-center failed
+      stage = 'additional-points';
+      for (let i = 0; i < observerPoints.length; i++) {
+        for (let j = 0; j < targetPoints.length; j++) {
+          if (i === 0 && j === 0) continue; // Already checked center-to-center
+          if (this.#checkSingleRayLOSWithWalls(observerPoints[i], targetPoints[j], cachedWalls)) {
             return true;
           }
         }
@@ -230,10 +266,70 @@ export class VisionAnalyzer {
 
       return false;
     } catch (error) {
-      console.error('[LineOfSight] Error:', error);
-      log.debug('Error checking line of sight', error);
+      console.error(`[LineOfSight] Error in stage '${stage}':`, error);
+      log.debug(`Error checking line of sight in stage '${stage}'`, error);
       return false;
     }
+  }
+
+  /**
+   * Get cached filtered walls for elevation range
+   * Caches the expensive wall filtering operation
+   * @private
+   * @param {Object} elevationRange
+   * @returns {Array<Wall>}
+   */
+  #getCachedWalls(elevationRange) {
+    const cacheKey = `${elevationRange?.bottom ?? 'none'}_${elevationRange?.top ?? 'none'}`;
+
+    const timestamp = this.#wallCacheTimestamp.get(cacheKey);
+    if (timestamp && (Date.now() - timestamp) < this.#wallCacheTimeout) {
+      const cached = this.#wallCache.get(cacheKey);
+      if (cached) return cached;
+    }
+
+    const walls = this.#filterBlockingWalls(elevationRange);
+    this.#wallCache.set(cacheKey, walls);
+    this.#wallCacheTimestamp.set(cacheKey, Date.now());
+
+    return walls;
+  }
+
+  /**
+   * Filter walls that block sight, respecting elevation and custom rules
+   * @private
+   * @param {Object} elevationRange
+   * @returns {Array<Wall>}
+   */
+  #filterBlockingWalls(elevationRange) {
+    const blockingWalls = [];
+
+    for (const wall of canvas.walls.placeables) {
+      if (wall.document.move === CONST.WALL_SENSE_TYPES.NONE) {
+        continue;
+      }
+
+      const isDoor = wall.document.door > 0;
+      const isOpen = wall.document.ds === 1;
+      if (isDoor && isOpen) {
+        continue;
+      }
+
+      const blocksSight = wall.document.sight !== CONST.WALL_SENSE_TYPES.NONE;
+      const blocksSound = wall.document.sound !== CONST.WALL_SENSE_TYPES.NONE;
+
+      if (!blocksSight && !blocksSound) {
+        continue;
+      }
+
+      if (elevationRange && !doesWallBlockAtElevation(wall.document, elevationRange)) {
+        continue;
+      }
+
+      blockingWalls.push(wall);
+    }
+
+    return blockingWalls;
   }
 
   /**
@@ -248,57 +344,36 @@ export class VisionAnalyzer {
     const x = token.document.x;
     const y = token.document.y;
 
-    // Sample center + 4 corners for reasonable coverage
+    // Sample center + 2 diagonal corners for performance (sufficient for most cases)
     return [
       center,                              // Center
-      { x: x + w * 0.25, y: y + h * 0.25 }, // Top-left quadrant
-      { x: x + w * 0.75, y: y + h * 0.25 }, // Top-right quadrant
-      { x: x + w * 0.25, y: y + h * 0.75 }, // Bottom-left quadrant
-      { x: x + w * 0.75, y: y + h * 0.75 }  // Bottom-right quadrant
+      { x: x + w * 0.25, y: y + h * 0.25 }, // Top-left
+      { x: x + w * 0.75, y: y + h * 0.75 }  // Bottom-right
     ];
   }
 
   /**
-   * Check if a single ray has clear line of sight (internal helper)
+   * Check if a single ray has clear line of sight using cached walls
    * @private
    */
-  #checkSingleRayLOS(fromPoint, toPoint, elevationRange) {
+  #checkSingleRayLOSWithWalls(fromPoint, toPoint, walls) {
     const ray = new foundry.canvas.geometry.Ray(fromPoint, toPoint);
-    let limitedWallCrossings = 0;
+    const rayLength = Math.sqrt((toPoint.x - fromPoint.x) ** 2 + (toPoint.y - fromPoint.y) ** 2);
+    const limitedWallIntersections = [];
 
-    // Check for walls that block BOTH movement AND (sight OR sound)
-    // Darkness walls typically block ONLY movement, not sight/sound
-    // Physical walls block movement + sight/sound
-    for (const wall of canvas.walls.placeables) {
-      // Skip walls that don't block movement (not physical barriers)
-      if (wall.document.move === CONST.WALL_SENSE_TYPES.NONE) {
+    for (const wall of walls) {
+      const wallMidX = (wall.document.c[0] + wall.document.c[2]) / 2;
+      const wallMidY = (wall.document.c[1] + wall.document.c[3]) / 2;
+      const distToRayMid = Math.sqrt(
+        (wallMidX - (fromPoint.x + toPoint.x) / 2) ** 2 +
+        (wallMidY - (fromPoint.y + toPoint.y) / 2) ** 2
+      );
+
+      if (distToRayMid > rayLength * 1.5) {
         continue;
       }
 
-      // Skip open doors - they don't block line of sight
-      // door: 0 = not a door, 1 = door, 2 = secret door
-      // ds: 0 = closed, 1 = open, 2 = locked
-      const isDoor = wall.document.door > 0;
-      const isOpen = wall.document.ds === 1;
-      if (isDoor && isOpen) {
-        continue;
-      }
-
-      // Skip walls that block ONLY movement (darkness walls)
-      // Physical walls must also block sight or sound
-      const blocksSight = wall.document.sight !== CONST.WALL_SENSE_TYPES.NONE;
-      const blocksSound = wall.document.sound !== CONST.WALL_SENSE_TYPES.NONE;
-
-      if (!blocksSight && !blocksSound) {
-        continue;
-      }
-
-      // Check wall elevation if Wall Height module is active and elevation range is available
-      if (elevationRange && !doesWallBlockAtElevation(wall.document, elevationRange)) {
-        continue;
-      }
-
-      // Check if the ray intersects this physical wall
+      // Walls are pre-filtered, check intersection
       const intersection = foundry.utils.lineLineIntersection(
         { x: ray.A.x, y: ray.A.y },
         { x: ray.B.x, y: ray.B.y },
@@ -351,20 +426,30 @@ export class VisionAnalyzer {
           const isLimited = isLimitedSight || isLimitedLight || isLimitedSound;
 
           if (isLimited) {
-            // Limited walls: count crossings, block only if > 1
-            limitedWallCrossings++;
-            if (limitedWallCrossings > 1) {
-              return false; // More than one Limited wall crossed
-            }
+            limitedWallIntersections.push({ x: intersection.x, y: intersection.y, t0: intersection.t0 });
           } else {
-            // Normal wall: blocks immediately
             return false;
           }
         }
       }
     }
 
-    return true; // No walls block line of sight
+    // Check if we hit 2+ Limited walls at different locations
+    if (limitedWallIntersections.length >= 2) {
+      // Check if all intersections are at approximately the same point (corner hit)
+      const epsilon = 0.1; // Small tolerance for floating point comparison
+      const first = limitedWallIntersections[0];
+      const allSamePoint = limitedWallIntersections.every(point =>
+        Math.abs(point.x - first.x) < epsilon &&
+        Math.abs(point.y - first.y) < epsilon
+      );
+
+      if (!allSamePoint) {
+        return false;
+      }
+    }
+
+    return true;
   }
 
   /**
@@ -566,6 +651,8 @@ export class VisionAnalyzer {
     } else {
       this.#capabilitiesCache.clear();
       this.#cacheTimestamp.clear();
+      this.#wallCache.clear();
+      this.#wallCacheTimestamp.clear();
     }
   }
 

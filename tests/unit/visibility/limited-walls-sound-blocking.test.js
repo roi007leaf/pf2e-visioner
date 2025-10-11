@@ -5,6 +5,17 @@
 
 import { VisionAnalyzer } from '../../../scripts/visibility/auto-visibility/VisionAnalyzer.js';
 import { calculateVisibility } from '../../../scripts/visibility/StatelessVisibilityCalculator.js';
+import '../../../tests/setup.js';
+
+global.PIXI = {
+    Circle: class Circle {
+        constructor(x, y, radius) {
+            this.x = x;
+            this.y = y;
+            this.radius = radius;
+        }
+    },
+};
 
 describe('LIMITED Walls - Sound and Sight Blocking', () => {
     let visionAnalyzer;

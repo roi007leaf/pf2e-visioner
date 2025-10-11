@@ -4,6 +4,17 @@
 
 import { WallEventHandler } from '../../../scripts/visibility/auto-visibility/core/WallEventHandler.js';
 import { VisionAnalyzer } from '../../../scripts/visibility/auto-visibility/VisionAnalyzer.js';
+import '../../setup.js';
+
+global.PIXI = {
+    Circle: class Circle {
+        constructor(x, y, radius) {
+            this.x = x;
+            this.y = y;
+            this.radius = radius;
+        }
+    },
+};
 
 describe('WallEventHandler - VisionAnalyzer Cache Clearing', () => {
     let wallEventHandler;
