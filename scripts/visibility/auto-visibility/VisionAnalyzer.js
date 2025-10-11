@@ -20,11 +20,11 @@
 
 import { MODULE_ID } from '../../constants.js';
 import { calculateDistanceInFeet } from '../../helpers/geometry-utils.js';
-import { getLogger } from '../../utils/logger.js';
-import { SensingCapabilitiesBuilder } from './SensingCapabilitiesBuilder.js';
 import { getTokenVerticalSpanFt } from '../../helpers/size-elevation-utils.js';
 import { doesWallBlockAtElevation } from '../../helpers/wall-height-utils.js';
 import { LevelsIntegration } from '../../services/LevelsIntegration.js';
+import { getLogger } from '../../utils/logger.js';
+import { SensingCapabilitiesBuilder } from './SensingCapabilitiesBuilder.js';
 
 const log = getLogger('VisionAnalyzer');
 
@@ -146,25 +146,15 @@ export class VisionAnalyzer {
     const capabilities = this.getSensingCapabilities(observer);
     const distance = this.distanceFeet(observer, target);
 
-    console.log('[VisionAnalyzer] canSenseImprecisely - Observer:', observer.name);
-    console.log('[VisionAnalyzer] canSenseImprecisely - Target:', target.name);
-    console.log('[VisionAnalyzer] canSenseImprecisely - Distance:', distance, 'ft');
-    console.log('[VisionAnalyzer] canSenseImprecisely - Imprecise senses:', capabilities.imprecise);
-    console.log('[VisionAnalyzer] canSenseImprecisely - Precise senses:', capabilities.precise);
-
     // Check specific sense type if requested
     if (senseType) {
       const range = capabilities.imprecise[senseType] || capabilities.precise[senseType];
-      const result = range ? distance <= range : false;
-      console.log('[VisionAnalyzer] canSenseImprecisely - Checking', senseType, '- Range:', range, 'Result:', result);
-      return result;
+      return range ? distance <= range : false;
     }
 
     // Check any imprecise or precise sense (precise can also sense imprecisely)
     const allSenses = { ...capabilities.imprecise, ...capabilities.precise };
-    const result = Object.values(allSenses).some(range => distance <= range);
-    console.log('[VisionAnalyzer] canSenseImprecisely - Any sense result:', result);
-    return result;
+    return Object.values(allSenses).some(range => distance <= range);
   }
 
   /**
@@ -186,15 +176,11 @@ export class VisionAnalyzer {
     // Check specific sense type if requested
     if (senseType) {
       const range = capabilities.precise[senseType];
-      const result = range ? distance <= range : false;
-      console.log('[VisionAnalyzer] canSensePrecisely - Checking', senseType, '- Range:', range, 'Result:', result);
-      return result;
+      return range ? distance <= range : false;
     }
 
     // Check any precise sense
-    const result = Object.values(capabilities.precise).some(range => distance <= range);
-    console.log('[VisionAnalyzer] canSensePrecisely - Any sense result:', result);
-    return result;
+    return Object.values(capabilities.precise).some(range => distance <= range);
   }
 
   /**
@@ -208,12 +194,11 @@ export class VisionAnalyzer {
   hasLineOfSight(observer, target) {
     try {
       // Check for 3D collision using Levels if available
+      // When Levels is active, rely entirely on 3D collision detection
       const levelsIntegration = LevelsIntegration.getInstance();
       if (levelsIntegration.isActive) {
         const has3DCollision = levelsIntegration.hasFloorCeilingBetween(observer, target);
-        if (has3DCollision) {
-          return false;
-        }
+        return !has3DCollision;
       }
 
       // If the observer has an los shape, use that for line of sight against the target's circle
@@ -222,7 +207,7 @@ export class VisionAnalyzer {
       if (los?.points) {
         const radius = target.externalRadius;
         const circle = new PIXI.Circle(target.center.x, target.center.y, radius);
-        const intersection = los.intersectCircle(circle, {density: 8, scalingFactor: 1.0});
+        const intersection = los.intersectCircle(circle, { density: 8, scalingFactor: 1.0 });
         const visible = intersection?.points?.length > 0;
         if (visible || !canvas.effects?.darknessSources?.length) return visible;
       }
@@ -432,25 +417,16 @@ export class VisionAnalyzer {
     try {
       const levelsIntegration = LevelsIntegration.getInstance();
       console.log('[VisionAnalyzer] distanceFeet - Levels active:', levelsIntegration.isActive);
-      
+
       if (levelsIntegration.isActive) {
         const distance3D = levelsIntegration.getTotalDistance(a, b);
-        console.log('[VisionAnalyzer] distanceFeet - 3D distance (grid squares):', distance3D);
-        
         if (distance3D !== Infinity) {
           const feetPerGrid = canvas.scene?.grid?.distance || 5;
           const distanceInFeet = distance3D * feetPerGrid;
-          console.log('[VisionAnalyzer] distanceFeet - Feet per grid:', feetPerGrid);
-          console.log('[VisionAnalyzer] distanceFeet - Final distance (feet):', distanceInFeet);
-          console.log('[VisionAnalyzer] distanceFeet - Token A losHeight:', levelsIntegration.getTokenLosHeight(a));
-          console.log('[VisionAnalyzer] distanceFeet - Token B losHeight:', levelsIntegration.getTokenLosHeight(b));
-          console.log('[VisionAnalyzer] distanceFeet - Token A document.elevation:', a.document.elevation);
-          console.log('[VisionAnalyzer] distanceFeet - Token B document.elevation:', b.document.elevation);
           return distanceInFeet;
         }
       }
       const distance2D = calculateDistanceInFeet(a, b);
-      console.log('[VisionAnalyzer] distanceFeet - Using 2D distance:', distance2D);
       return distance2D;
     } catch (error) {
       console.error('[VisionAnalyzer] distanceFeet - Error:', error);

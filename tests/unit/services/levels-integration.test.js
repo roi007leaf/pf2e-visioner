@@ -82,14 +82,18 @@ describe('LevelsIntegration', () => {
     });
 
     test('only initializes once', () => {
-      const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
       game.modules.get('levels').active = true;
 
       levelsIntegration.initialize();
+      const firstInitState = levelsIntegration.isActive;
+      
+      // Change the module state
+      game.modules.get('levels').active = false;
+      
+      // Initialize again - should not change state since already initialized
       levelsIntegration.initialize();
 
-      expect(consoleSpy).toHaveBeenCalledTimes(1);
-      consoleSpy.mockRestore();
+      expect(levelsIntegration.isActive).toBe(firstInitState);
     });
   });
 

@@ -28,9 +28,7 @@ class LevelsIntegration {
     this._isLevelsActive = game.modules.get('levels')?.active ?? false;
     this._isWallHeightActive = game.modules.get('wall-height')?.active ?? false;
 
-    if (this._isLevelsActive) {
-      console.log('[PF2E Visioner] Levels module detected - enabling 3D integration');
-    }
+
 
     this._initialized = true;
   }
@@ -93,7 +91,7 @@ class LevelsIntegration {
     const feetPerGrid = canvas.scene?.grid?.distance || 5;
     const verticalDistance = verticalDistanceFeet / feetPerGrid;
     const totalDistance = Math.sqrt(horizontalDistance ** 2 + verticalDistance ** 2);
-    
+
     console.log('[LevelsIntegration] getTotalDistance - Vertical distance (feet):', verticalDistanceFeet);
     console.log('[LevelsIntegration] getTotalDistance - Vertical distance (grid):', verticalDistance);
     console.log('[LevelsIntegration] getTotalDistance - Total 3D distance (grid):', totalDistance);
@@ -142,12 +140,12 @@ class LevelsIntegration {
     try {
       console.log('[LevelsIntegration] test3DPointCollision - Checking collision type:', type);
       console.log('[LevelsIntegration] test3DPointCollision - From:', p0, 'To:', p1);
-      
+
       const collision = this.api.testCollision(p0, p1, type);
-      
+
       console.log('[LevelsIntegration] test3DPointCollision - Raw collision result:', collision);
       console.log('[LevelsIntegration] test3DPointCollision - Boolean result:', !!collision);
-      
+
       return !!collision;
     } catch (error) {
       console.warn('[PF2E Visioner] Error testing 3D point collision:', error);
@@ -217,9 +215,9 @@ class LevelsIntegration {
       }
 
       const collision = this.test3DPointCollision(p0, p1, 'sight');
-      
+
       console.log('[LevelsIntegration] hasFloorCeilingBetween - Collision result:', collision);
-      
+
       return collision;
     } catch (error) {
       console.warn('[PF2E Visioner] Error checking floor/ceiling:', error);
@@ -290,3 +288,4 @@ class LevelsIntegration {
 }
 
 export { LevelsIntegration };
+
