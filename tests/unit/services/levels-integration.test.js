@@ -86,10 +86,10 @@ describe('LevelsIntegration', () => {
 
       levelsIntegration.initialize();
       const firstInitState = levelsIntegration.isActive;
-      
+
       // Change the module state
       game.modules.get('levels').active = false;
-      
+
       // Initialize again - should not change state since already initialized
       levelsIntegration.initialize();
 
