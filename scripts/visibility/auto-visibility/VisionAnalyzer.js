@@ -419,6 +419,14 @@ export class VisionAnalyzer {
             }
           }
 
+          // Check if this wall blocks sight
+          const blocksSight = wall.document.sight !== CONST.WALL_SENSE_TYPES.NONE;
+
+          // If wall doesn't block sight, skip it for LOS check
+          if (!blocksSight) {
+            continue;
+          }
+
           // Check if this is a Limited wall (sight/light/sound = LIMITED)
           const isLimitedSight = wall.document.sight === CONST.WALL_SENSE_TYPES.LIMITED;
           const isLimitedLight = wall.document.light === CONST.WALL_SENSE_TYPES.LIMITED;
