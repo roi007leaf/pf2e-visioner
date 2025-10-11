@@ -31,6 +31,7 @@ export class LightingPrecomputer {
             // This avoids computing the lighting environment hash entirely for micro-batches where nothing moved.
             // Skip this optimization if we've been told to force fresh computation (e.g., lighting changed)
             const shouldBypassBurstOptimization = LightingPrecomputer.#forceFreshComputation;
+
             if (prevMap && prevPosKeyMap && previousTs && (nowTs - previousTs) < BURST_TTL_MS && !shouldBypassBurstOptimization) {
                 const gs = canvas.grid?.size || 1;
                 const quant = Math.max(1, Math.floor(gs / 2)); // half-grid quantization
@@ -201,7 +202,6 @@ export class LightingPrecomputer {
             return LightingPrecomputer.#lightingHashMemo.hash;
         }
 
-        const hashStart = performance.now();
         try {
             const scene = canvas.scene;
             if (!scene) return 'no-scene';
@@ -297,7 +297,6 @@ export class LightingPrecomputer {
             LightingPrecomputer.#lightingHashMemo = { hash, ts: now };
             return hash;
         } catch {
-            const hashEnd = performance.now();
             // Fallback hash that will force recalculation
             const fallbackHash = `fallback:${Date.now()}`;
             LightingPrecomputer.#lightingHashMemo = { hash: fallbackHash, ts: now };
@@ -306,13 +305,26 @@ export class LightingPrecomputer {
     }
 
     /**
+     * Check if fresh lighting computation is being forced
+     * @returns {boolean} True if visibility calculations should skip global cache
+     */
+    static isForcingFreshComputation() {
+        return LightingPrecomputer.#forceFreshComputation;
+    }
+
+    /**
      * Clear all static caches to force fresh lighting calculations
      * Called when ambient lights change to ensure lighting environment hash is recalculated
+     * @param {GlobalVisibilityCache} [globalVisibilityCache] - Optional global cache to clear
      */
-    static clearLightingCaches() {
+    static clearLightingCaches(globalVisibilityCache = null) {
         LightingPrecomputer.#lightingHashMemo = { hash: null, ts: 0 };
         LightingPrecomputer.#cachedTokenData = { tokens: null, timestamp: 0 };
         LightingPrecomputer.#forceFreshComputation = true; // Force bypass of burst optimization
+
+        if (globalVisibilityCache) {
+            globalVisibilityCache.clear();
+        }
 
         // Clear any existing timeout
         if (LightingPrecomputer.#forceResetTimeout) {
@@ -320,10 +332,11 @@ export class LightingPrecomputer {
         }
 
         // Reset the force flag after a brief delay to allow multiple rapid batches to complete
+        // Extended to 3000ms to match global visibility cache TTL and prevent stale entries
         LightingPrecomputer.#forceResetTimeout = setTimeout(() => {
             LightingPrecomputer.#forceFreshComputation = false;
             LightingPrecomputer.#forceResetTimeout = null;
-        }, 500); // 500ms should be enough for all rapid batches to complete
+        }, 3000); // Match global visibility cache TTL to prevent stale cache entries
     }
 
     static #getPos(tok) {

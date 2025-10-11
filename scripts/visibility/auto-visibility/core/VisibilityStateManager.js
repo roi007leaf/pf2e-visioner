@@ -109,10 +109,8 @@ export class VisibilityStateManager {
                     y: (changes.y !== undefined ? changes.y : tokenDoc.y) + (tokenDoc.height * canvas.grid.size) / 2,
                 };
 
-                // Get affected tokens from spatial analyzer
                 const affectedTokens = this.#spatialAnalyzer(oldPos, newPos, tokenId);
 
-                // Add affected tokens to the changed set
                 affectedTokens.forEach((token) => {
                     this.#changedTokens.add(token.document.id);
                 });

@@ -14,6 +14,7 @@ export class GlobalVisibilityCache {
         this._ttl.set(key, value);
     }
     clear() {
+        const sizeBefore = this._ttl.size || 0;
         this._ttl._map.clear();
     }
     pruneIfDue(minIntervalMs = 1000) {

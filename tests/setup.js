@@ -207,6 +207,39 @@ global.foundry = {
       }
       return merged;
     }),
+    lineLineIntersection: jest.fn().mockImplementation((p1, p2, p3, p4) => {
+      const dx1 = p2.x - p1.x;
+      const dy1 = p2.y - p1.y;
+      const dx2 = p4.x - p3.x;
+      const dy2 = p4.y - p3.y;
+
+      const denom = dx1 * dy2 - dy1 * dx2;
+      if (Math.abs(denom) < 1e-10) return null;
+
+      const dx3 = p3.x - p1.x;
+      const dy3 = p3.y - p1.y;
+      const t0 = (dx3 * dy2 - dy3 * dx2) / denom;
+      const t1 = (dx3 * dy1 - dy3 * dx1) / denom;
+
+      if (t0 < 0 || t0 > 1 || t1 < 0 || t1 > 1) return null;
+
+      return {
+        x: p1.x + t0 * dx1,
+        y: p1.y + t0 * dy1,
+        t0,
+        t1
+      };
+    }),
+  },
+  canvas: {
+    geometry: {
+      Ray: class MockRay {
+        constructor(A, B) {
+          this.A = A;
+          this.B = B;
+        }
+      }
+    }
   },
   data: {
     models: {

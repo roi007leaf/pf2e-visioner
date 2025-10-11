@@ -15,16 +15,10 @@ export async function runWithCoverEffectLock(actor, taskFn) {
   });
   locks.set(
     actor,
-    next.catch(() => {}),
+    next.catch(() => { }),
   );
   return next;
 }
 
 export function coverDebug(...args) {
-  try {
-    if (game?.settings?.get?.(MODULE_ID, 'debug')) {
-      // Use console.debug with a consistent prefix
-      console.debug(LOG_PREFIX, ...args);
-    }
-  } catch (_) {}
 }

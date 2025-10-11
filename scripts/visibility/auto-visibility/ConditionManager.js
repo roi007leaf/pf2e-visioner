@@ -5,10 +5,12 @@
  */
 
 import { VisionAnalyzer } from './VisionAnalyzer.js';
+import { ExclusionManager } from './core/ExclusionManager.js';
 
 export class ConditionManager {
   /** @type {ConditionManager} */
   static #instance = null;
+  #exclusionManager = null;
 
   constructor() {
     if (ConditionManager.#instance) {
@@ -17,6 +19,7 @@ export class ConditionManager {
 
     // No initialization needed for now
     ConditionManager.#instance = this;
+    this.#exclusionManager = new ExclusionManager();
   }
 
   /**
@@ -238,7 +241,9 @@ export class ConditionManager {
    */
   async handleInvisibilityChange(actor) {
     // Find the actor's token(s) on the current scene
-    const tokens = canvas.tokens.placeables.filter((token) => token.actor?.id === actor.id);
+    const tokens = canvas.tokens.placeables.filter((token) =>
+      token.actor?.id === actor.id && !this.#exclusionManager.isExcludedToken(token)
+    );
 
     for (const token of tokens) {
       // Check if invisibility was added (try multiple methods)
@@ -289,7 +294,7 @@ export class ConditionManager {
         const { getVisibilityBetween } = await import('../../stores/visibility-map.js');
         // Build visibility map manually
         for (const otherToken of canvas.tokens.placeables) {
-          if (otherToken === token || !otherToken.actor) continue;
+          if (otherToken === token || !otherToken.actor || this.#exclusionManager.isExcludedToken(otherToken)) continue;
           const observerId = otherToken.document.id;
           visibilityMap[observerId] = getVisibilityBetween(otherToken, token);
         }
@@ -303,7 +308,7 @@ export class ConditionManager {
 
     // Check visibility from all other tokens to this token
     for (const otherToken of canvas.tokens.placeables) {
-      if (otherToken === token || !otherToken.actor) continue;
+      if (otherToken === token || !otherToken.actor || this.#exclusionManager.isExcludedToken(otherToken)) continue;
 
       const observerId = otherToken.document.id;
       const currentVisibility = visibilityMap[observerId] || 'observed';
@@ -386,7 +391,7 @@ export class ConditionManager {
 
       // Check visibility from all other tokens to this token
       for (const otherToken of canvas.tokens.placeables) {
-        if (otherToken === token || !otherToken.actor) continue;
+        if (otherToken === token || !otherToken.actor || this.#exclusionManager.isExcludedToken(otherToken)) continue;
 
         const observerId = otherToken.document.id;
 

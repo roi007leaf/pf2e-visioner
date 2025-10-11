@@ -3,6 +3,7 @@
  * Base styles and variables for PF2E Visioner
  * Core styling foundation used across all components
  */
+@import url('./enhanced-multi-target-processing.css');
 
 /* CSS Custom Properties - Foundry VTT Integration (Global) */
 :root {
@@ -889,6 +890,3 @@
 .hidden {
   display: none !important;
 }
-
-/* Import enhanced multi-target processing styles */
-@import url('./enhanced-multi-target-processing.css');

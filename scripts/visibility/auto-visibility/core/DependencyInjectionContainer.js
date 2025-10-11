@@ -113,7 +113,6 @@ export class DependencyInjectionContainer {
         this.#factories.set('batchProcessor', async (dependencies) => {
             const { BatchProcessor } = await import('./BatchProcessor.js');
             return new BatchProcessor({
-                spatialAnalyzer: dependencies.spatialAnalyzer,
                 viewportFilterService: dependencies.viewportFilterService,
                 optimizedVisibilityCalculator: dependencies.optimizedVisibilityCalculator,
                 globalLosCache: dependencies.globalLosCache,

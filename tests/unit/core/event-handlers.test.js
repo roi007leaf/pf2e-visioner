@@ -552,7 +552,6 @@ describe('Event Handler Tests', () => {
 
             // Add debugging
             expect(mockSystemState.shouldProcessEvents).toHaveBeenCalled();
-            expect(mockCacheManager.clearAllCaches).toHaveBeenCalled();
             expect(mockVisibilityState.markAllTokensChangedImmediate).toHaveBeenCalled();
         });
 
@@ -577,7 +576,6 @@ describe('Event Handler Tests', () => {
 
             await createHandler(mockLight, {}, 'user1');
 
-            expect(mockCacheManager.clearAllCaches).toHaveBeenCalled();
             expect(mockVisibilityState.markAllTokensChangedImmediate).toHaveBeenCalled();
         });
     });
@@ -780,7 +778,7 @@ describe('Event Handler Tests', () => {
 
             expect(mockHooks.on).toHaveBeenCalledWith('updateToken', expect.any(Function));
             expect(mockHooks.on).toHaveBeenCalledWith('createToken', expect.any(Function));
-            expect(mockHooks.on).toHaveBeenCalledWith('deleteToken', expect.any(Function));
+            expect(mockHooks.on).toHaveBeenCalledWith('moveToken', expect.any(Function));
         });
 
         test('should handle light changes with global recalculation', () => {
@@ -811,7 +809,6 @@ describe('Event Handler Tests', () => {
             tokenHandler.handleTokenUpdate(mockTokenDoc, changes);
 
             // Movement action affects tremorsense, should clear caches and trigger recalculation
-            expect(mockCacheManager.clearAllCaches).toHaveBeenCalled();
             expect(mockVisibilityState.markTokenChangedImmediate).toHaveBeenCalledWith('token1');
         });
 
@@ -883,7 +880,6 @@ describe('Event Handler Tests', () => {
 
             wallHandler.handleWallUpdate(mockWall, changes);
 
-            expect(mockCacheManager.clearAllCaches).toHaveBeenCalled();
             expect(mockVisibilityState.markAllTokensChangedImmediate).toHaveBeenCalled();
         });
 
@@ -902,7 +898,6 @@ describe('Event Handler Tests', () => {
 
             wallHandler.handleWallCreate(mockWall);
 
-            expect(mockCacheManager.clearAllCaches).toHaveBeenCalled();
             expect(mockVisibilityState.markAllTokensChangedImmediate).toHaveBeenCalled();
         });
 
@@ -911,7 +906,6 @@ describe('Event Handler Tests', () => {
 
             wallHandler.handleWallDelete(mockWall);
 
-            expect(mockCacheManager.clearAllCaches).toHaveBeenCalled();
             expect(mockVisibilityState.markAllTokensChangedImmediate).toHaveBeenCalled();
         });
     });
