@@ -1,4 +1,5 @@
 import { MODULE_ID, VISIBILITY_STATES } from '../../../constants.js';
+import { LevelsIntegration } from '../../../services/LevelsIntegration.js';
 import { SeekDialogAdapter } from '../../../visibility/auto-visibility/SeekDialogAdapter.js';
 import { appliedSeekChangesByMessage } from '../data/message-cache.js';
 import { ActionHandlerBase } from './BaseAction.js';
@@ -677,10 +678,22 @@ export class SeekActionHandler extends ActionHandlerBase {
 
       const dx = token.center.x - wall.center.x;
       const dy = token.center.y - wall.center.y;
-      const px = Math.hypot(dx, dy);
+      let distance = Math.hypot(dx, dy);
+
+      const levelsIntegration = LevelsIntegration.getInstance();
+      if (levelsIntegration.isActive) {
+        const tokenElevation = levelsIntegration.getTokenElevation(token);
+        const wallTop = wall.document?.flags?.['wall-height']?.top ?? tokenElevation;
+        const wallBottom = wall.document?.flags?.['wall-height']?.bottom ?? tokenElevation;
+
+        const wallMidElevation = (wallTop + wallBottom) / 2;
+        const dz = tokenElevation - wallMidElevation;
+        distance = Math.sqrt(distance * distance + dz * dz);
+      }
+
       const gridSize = canvas?.grid?.size || 100;
       const unitDist = canvas?.scene?.grid?.distance || 5;
-      return (px / gridSize) * unitDist;
+      return (distance / gridSize) * unitDist;
     } catch {
       return Infinity;
     }

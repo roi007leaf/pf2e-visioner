@@ -15,6 +15,8 @@ import { initializeRuleElements } from './rule-elements/index.js';
 import { initCoverVisualization } from './cover/CoverVisualization.js';
 // Import region behavior registration (executes immediately)
 import './regions/register.js';
+// Import Levels integration
+import { LevelsIntegration } from './services/LevelsIntegration.js';
 
 // Function to update colorblind mode
 function updateColorblindMode() {
@@ -120,6 +122,10 @@ Hooks.once('init', async () => {
     // Initialize Auto-Visibility System (OPTIMIZED - Zero Delays)
     const { autoVisibilitySystem } = await import('./visibility/auto-visibility/index.js');
     await autoVisibilitySystem.initialize();
+
+    // Initialize Levels integration
+    const levelsIntegration = LevelsIntegration.getInstance();
+    levelsIntegration.initialize();
 
     // Apply colorblind mode after settings are registered
     updateColorblindMode();

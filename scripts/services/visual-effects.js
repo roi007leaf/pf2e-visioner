@@ -1244,14 +1244,20 @@ export async function updateSystemHiddenTokenHighlights(observerId = null, posit
 
       const lifesenseRange = lifesenseSense?.range ?? 0;
 
-      // Use modern Foundry API for distance measurement
-      const path = canvas.grid.measurePath([
-        { x: observerCenterX, y: observerCenterY },
-        { x: targetCenterX, y: targetCenterY }
-      ]);
-      const distance = path.distance; // This is in grid spaces by default
+      // Calculate distance in feet
+      let distanceInFeet;
+      if (observer.distanceTo && typeof observer.distanceTo === 'function') {
+        distanceInFeet = observer.distanceTo(token);
+      } else {
+        const path = canvas.grid.measurePath([
+          { x: observerCenterX, y: observerCenterY },
+          { x: targetCenterX, y: targetCenterY }
+        ]);
+        const feetPerGrid = canvas.grid?.distance || 5;
+        distanceInFeet = path.distance * feetPerGrid;
+      }
 
-      const isWithinLifesenseRange = lifesenseRange === Infinity || distance <= lifesenseRange;
+      const isWithinLifesenseRange = lifesenseRange === Infinity || distanceInFeet <= lifesenseRange;
 
       if (isSystemHidden && canBeDetectedByLifesense && isWithinLifesenseRange) {
         try {
@@ -1325,6 +1331,44 @@ export async function updateSystemHiddenTokenHighlights(observerId = null, posit
           g.on('pointerover', async () => {
             g.alpha = 1.0;
 
+            // Show distance text on hover
+            if (!g._distanceText && observer) {
+              try {
+                let distanceInFeet;
+                if (observer.distanceTo && typeof observer.distanceTo === 'function') {
+                  distanceInFeet = observer.distanceTo(token);
+                } else {
+                  const { calculateDistanceInFeet } = await import('../helpers/geometry-utils.js');
+                  distanceInFeet = calculateDistanceInFeet(observer, token);
+                }
+
+                const distance = Math.round(distanceInFeet / 5) * 5;
+
+                const distanceTextStyle = new PIXI.TextStyle({
+                  fontFamily: 'Signika, sans-serif',
+                  fontSize: Math.max(20, size / 4),
+                  fill: 0xffffff,
+                  stroke: 0x000000,
+                  strokeThickness: 4,
+                  dropShadow: true,
+                  dropShadowColor: 0x000000,
+                  dropShadowBlur: 4,
+                  dropShadowAngle: Math.PI / 4,
+                  dropShadowDistance: 2,
+                  align: 'center',
+                });
+
+                const distanceText = new PIXI.Text(`${distance} ft`, distanceTextStyle);
+                distanceText.anchor.set(0.5, 1);
+                distanceText.position.set(0, -size * 0.55);
+                distanceText.zIndex = 1000;
+                g.addChild(distanceText);
+                g._distanceText = distanceText;
+              } catch (err) {
+                console.warn('PF2E Visioner | Error showing distance for lifesense indicator:', err);
+              }
+            }
+
             // Show hover tooltips if enabled
             try {
               const tooltipsEnabled = game.settings?.get?.(MODULE_ID, 'enableHoverTooltips');
@@ -1349,6 +1393,13 @@ export async function updateSystemHiddenTokenHighlights(observerId = null, posit
 
           g.on('pointerout', async () => {
             g.alpha = 0.8;
+
+            // Remove distance text
+            if (g._distanceText) {
+              g.removeChild(g._distanceText);
+              g._distanceText.destroy();
+              g._distanceText = null;
+            }
 
             // Hide hover tooltips
             try {

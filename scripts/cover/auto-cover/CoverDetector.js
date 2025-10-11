@@ -17,6 +17,7 @@ import {
   getTokenVerticalSpanFt,
 } from '../../helpers/size-elevation-utils.js';
 import { doesWallBlockAtElevation } from '../../helpers/wall-height-utils.js';
+import { LevelsIntegration } from '../../services/LevelsIntegration.js';
 
 import { getVisibilityBetween } from '../../utils.js';
 
@@ -115,10 +116,17 @@ export class CoverDetector {
         // Apply token cover overrides
         tokenCover = this._applyTokenCoverOverrides(attacker, target, blockers, tokenCover);
 
+        // Apply Levels integration for elevation-based cover adjustment
+        tokenCover = this._applyLevelsCoverAdjustment(attacker, target, tokenCover);
+
         return tokenCover;
       } else {
         // Case 2: There IS a wall in the way - use new wall cover rules
-        const wallCover = this._evaluateWallsCover(p1, p2, elevationRange);
+        let wallCover = this._evaluateWallsCover(p1, p2, elevationRange);
+
+        // Apply Levels integration for elevation-based cover adjustment
+        wallCover = this._applyLevelsCoverAdjustment(attacker, target, wallCover);
+
         return wallCover;
       }
     } catch (error) {
@@ -240,6 +248,28 @@ export class CoverDetector {
     } catch (error) {
       console.warn('PF2E Visioner | Error checking wall direction:', error);
       return true;
+    }
+  }
+
+  /**
+   * Apply Levels module elevation-based cover adjustment
+   * @param {Object} attacker - Attacker token
+   * @param {Object} target - Target token
+   * @param {string} baseCover - Base cover level before elevation adjustment
+   * @returns {string} Adjusted cover level
+   * @private
+   */
+  _applyLevelsCoverAdjustment(attacker, target, baseCover) {
+    try {
+      const levelsIntegration = LevelsIntegration.getInstance();
+      if (!levelsIntegration.isActive) {
+        return baseCover;
+      }
+
+      return levelsIntegration.adjustCoverForElevation(attacker, target, baseCover);
+    } catch (error) {
+      console.warn('PF2E Visioner | Error applying Levels cover adjustment:', error);
+      return baseCover;
     }
   }
 
