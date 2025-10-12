@@ -69,6 +69,12 @@ export class TokenEventHandler {
       this.cacheManager?.clearLosCache?.();
       this.cacheManager?.clearVisibilityCache?.();
 
+      // CRITICAL: Clear VisionAnalyzer's internal caches for this specific token
+      // The wall cache and capabilities cache can become stale when token moves
+      if (this.visionAnalyzer?.clearCache) {
+        this.visionAnalyzer.clearCache(tokenDoc);
+      }
+
       if (this.overrideValidationManager) {
         this.overrideValidationManager.queueOverrideValidation(tokenDoc.id);
         this.overrideValidationManager.processQueuedValidations().catch(() => { });
@@ -138,8 +144,13 @@ export class TokenEventHandler {
               this.cacheManager?.clearLosCache?.();
               this.cacheManager?.clearVisibilityCache?.();
 
-              // Trigger visibility recalculation with spatial optimization
+              // CRITICAL: Clear VisionAnalyzer's internal caches for this specific token
               const tokenDocObj = canvas.tokens?.get(tokenId)?.document;
+              if (tokenDocObj && this.visionAnalyzer?.clearCache) {
+                this.visionAnalyzer.clearCache(tokenDocObj);
+              }
+
+              // Trigger visibility recalculation with spatial optimization
               if (tokenDocObj) {
                 this.visibilityState.markTokenChangedWithSpatialOptimization(tokenDocObj, movementChanges);
               }
@@ -183,17 +194,32 @@ export class TokenEventHandler {
       // Defer recalculation until after Foundry refreshes lighting, so we read updated sources
       let scheduled = false;
       try {
+        globalThis.game = globalThis.game || {};
+        game.pf2eVisioner = game.pf2eVisioner || {};
+        game.pf2eVisioner.suppressLightingRefresh = true;
+
         Hooks.once('lightingRefresh', () => {
-          this.visibilityState.markAllTokensChangedImmediate();
+          try {
+            this._handleLightChangeWithSpatialOptimization(tokenDoc, changes);
+          } finally {
+            delete game.pf2eVisioner.suppressLightingRefresh;
+          }
         });
         scheduled = true;
       } catch {
         /* ignore */
+        delete game.pf2eVisioner?.suppressLightingRefresh;
       }
 
       // Fallback: if the hook didn't schedule, use a short timeout
       if (!scheduled) {
-        setTimeout(() => this.visibilityState.markAllTokensChangedImmediate(), 50);
+        setTimeout(() => {
+          try {
+            this._handleLightChangeWithSpatialOptimization(tokenDoc, changes);
+          } finally {
+            delete game.pf2eVisioner?.suppressLightingRefresh;
+          }
+        }, 50);
       }
       // Continue processing other changes (e.g., movement) for position pinning
     }
@@ -344,6 +370,37 @@ export class TokenEventHandler {
       return lightConfig.enabled === true && (lightConfig.bright > 0 || lightConfig.dim > 0);
     } catch {
       return false;
+    }
+  }
+
+  _handleLightChangeWithSpatialOptimization(tokenDoc, changes) {
+    try {
+      const gridSize = canvas.grid?.size || 1;
+      const tokenPos = {
+        x: tokenDoc.x + (tokenDoc.width * gridSize) / 2,
+        y: tokenDoc.y + (tokenDoc.height * gridSize) / 2,
+      };
+
+      const affectedTokens = this.spatialAnalyzer.getAffectedTokens(tokenPos, tokenPos, tokenDoc.id);
+
+      this.visibilityState.markTokenChangedImmediate(tokenDoc.id);
+      affectedTokens.forEach((token) => {
+        this.visibilityState.markTokenChangedImmediate(token.document.id);
+      });
+
+      const lightConfig = changes.light !== undefined ? changes.light : tokenDoc.light;
+      const lightRadius = lightConfig?.enabled
+        ? Math.max(lightConfig.bright || 0, lightConfig.dim || 0)
+        : 0;
+
+      this.systemState.debug('light-change-spatial-opt', tokenDoc.id, {
+        lightRadius,
+        enabled: lightConfig?.enabled ?? false,
+        affectedCount: affectedTokens.length,
+      });
+    } catch (error) {
+      this.systemState.debug('light-change-spatial-fallback', tokenDoc.id, error);
+      this.visibilityState.markAllTokensChangedImmediate();
     }
   }
 

@@ -600,7 +600,17 @@ describe('Event Handler Tests', () => {
 
         test('should handle darkness level changes', () => {
             const mockScene = { id: 'scene1', name: 'Test Scene' };
-            const changes = { darkness: 0.5 };
+            const changes = { environment: { darknessLevel: 0.5 } };
+
+            // Mock hasProperty to return true for environment.darknessLevel
+            global.foundry.utils.hasProperty.mockImplementation((obj, path) => {
+                if (path === 'environment.darknessLevel' && obj.environment && obj.environment.darknessLevel !== undefined) {
+                    return true;
+                }
+                return false;
+            });
+
+            mockSystemState.shouldProcessEvents.mockReturnValue(true);
 
             sceneHandler.initialize();
             const updateHandler = mockHooks.on.mock.calls.find(call => call[0] === 'updateScene')[1];

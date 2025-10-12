@@ -5,8 +5,8 @@
 import { COVER_STATES, MODULE_ID, VISIBILITY_STATES } from '../constants.js';
 import autoCoverSystem from '../cover/auto-cover/AutoCoverSystem.js';
 import { canShowTooltips, computeSizesFromSetting } from '../helpers/tooltip-utils.js';
-import { getCoverMap, getVisibilityMap } from '../utils.js';
 import { getDetectionBetween } from '../stores/detection-map.js';
+import { getCoverMap, getVisibilityMap } from '../utils.js';
 
 /**
  * Lightweight service wrapper for lifecycle control.
@@ -151,14 +151,34 @@ export function setTooltipMode(mode) {
 }
 
 /**
- * Add event listeners to all current tokens
+ * Add event listener to a specific token (for drag detection only)
+ * @param {Token} token - The token to add listeners to
+ * @returns {boolean} True if listeners were added, false if skipped
  */
-function addTokenEventListeners() {
-  if (!canvas?.tokens?.placeables) return;
+export function addTokenEventListener(token) {
+  if (!token || !token.id) return false;
 
-  canvas.tokens.placeables.forEach((token) => {
-    addTokenEventListener(token);
+  // If we already have handlers for this token ID, remove them first
+  if (HoverTooltips.tokenEventHandlers.has(token.id)) {
+    removeTokenEventListener(token.id);
+  }
+
+  const pointerDownHandler = () => onTokenPointerDown(token);
+  const pointerUpHandler = () => onTokenPointerUp(token);
+
+  // Store handlers for later cleanup
+  HoverTooltips.tokenEventHandlers.set(token.id, {
+    pointerDownHandler,
+    pointerUpHandler
   });
+
+  // Only listen for pointer down/up to detect drag operations
+  // Hover is handled by Foundry's hoverToken hook
+  token.on('pointerdown', pointerDownHandler);
+  token.on('pointerup', pointerUpHandler);
+  token.on('pointerupoutside', pointerUpHandler);
+
+  return true;
 }
 
 /**
@@ -172,8 +192,6 @@ function removeTokenEventListener(tokenId) {
   const token = canvas?.tokens?.placeables?.find(t => t.id === tokenId);
   if (token) {
     try {
-      token.off('pointerover', handlers.overHandler);
-      token.off('pointerout', handlers.outHandler);
       if (handlers.pointerDownHandler) {
         token.off('pointerdown', handlers.pointerDownHandler);
       }
@@ -190,41 +208,14 @@ function removeTokenEventListener(tokenId) {
 }
 
 /**
- * Add event listener to a specific token
- * @param {Token} token - The token to add listeners to
- * @returns {boolean} True if listeners were added, false if skipped
+ * Add event listeners to all current tokens (for drag detection)
  */
-export function addTokenEventListener(token) {
-  if (!token || !token.id) return false;
+function addTokenEventListeners() {
+  if (!canvas?.tokens?.placeables) return;
 
-  // If we already have handlers for this token ID, remove them first
-  // This handles cases where the token PIXI object was recreated by Foundry
-  if (HoverTooltips.tokenEventHandlers.has(token.id)) {
-    removeTokenEventListener(token.id);
-  }
-
-  const overHandler = () => onTokenHover(token);
-  const outHandler = () => onTokenHoverEnd(token);
-  const pointerDownHandler = () => onTokenPointerDown(token);
-  const pointerUpHandler = () => onTokenPointerUp(token);
-
-  // Store handlers for later cleanup
-  HoverTooltips.tokenEventHandlers.set(token.id, {
-    overHandler,
-    outHandler,
-    pointerDownHandler,
-    pointerUpHandler
+  canvas.tokens.placeables.forEach((token) => {
+    addTokenEventListener(token);
   });
-
-  token.on('pointerover', overHandler);
-  token.on('pointerout', outHandler);
-
-  // Listen for pointer down/up to detect drag operations
-  token.on('pointerdown', pointerDownHandler);
-  token.on('pointerup', pointerUpHandler);
-  token.on('pointerupoutside', pointerUpHandler); // In case pointer is released outside token
-
-  return true;
 }
 
 /**
@@ -276,8 +267,18 @@ export function initializeHoverTooltips() {
     document.documentElement.style.setProperty('--pf2e-visioner-tooltip-badge-border', '2px');
   }
 
-  // Add event listeners to canvas for token hover
+  // Add event listeners to tokens (for drag detection only)
   addTokenEventListeners();
+
+  // Register hoverToken hook to handle token hover events
+  // This is cleaner than PIXI events and automatically excludes UI hover
+  Hooks.on('hoverToken', (token, hovered) => {
+    if (hovered) {
+      onTokenHover(token);
+    } else {
+      onTokenHoverEnd(token);
+    }
+  });
 
   // Handle canvas pan: hide tooltips during pan, show after
   let panTimeout = null;
@@ -368,6 +369,10 @@ export function initializeHoverTooltips() {
       // Mark movement as active
       HoverTooltips._isTokenMoving = true;
 
+      // Hide all tooltips immediately when ANY token starts moving
+      hideAllVisibilityIndicators();
+      hideAllCoverIndicators();
+
       // Clear any existing debounce timer
       if (HoverTooltips._movementDebounceTimer) {
         clearTimeout(HoverTooltips._movementDebounceTimer);
@@ -381,19 +386,15 @@ export function initializeHoverTooltips() {
         // Refresh tooltips after movement completes
         if (HoverTooltips.currentHoveredToken) {
           const tok = HoverTooltips.currentHoveredToken;
-          hideAllVisibilityIndicators();
-          hideAllCoverIndicators();
           setTimeout(() => {
             showVisibilityIndicators(tok);
           }, 0);
         } else if (HoverTooltips.isShowingKeyTooltips) {
-          hideAllVisibilityIndicators();
-          hideAllCoverIndicators();
           setTimeout(() => {
             showControlledTokenVisibility();
           }, 0);
         }
-      }, 200); // Wait 200ms after last movement update before refreshing
+      }, 300); // Wait 300ms after last movement update before refreshing (increased from 200ms)
     }
   });
 
@@ -407,6 +408,7 @@ export function initializeHoverTooltips() {
 
 /**
  * Handle token hover start
+ * Called by the hoverToken hook, which only fires for actual token hovers (not UI elements)
  * @param {Token} hoveredToken - The token being hovered
  */
 function onTokenHover(hoveredToken) {
@@ -776,24 +778,24 @@ function showVisibilityIndicatorsForToken(observerToken, forceMode = null) {
 export function showAutoCoverComputedOverlay(sourceToken) {
   try {
     if (!sourceToken) return;
-    
+
     // Set flag to suppress hover tooltips
     HoverTooltips.isShowingCoverOverlay = true;
-    
+
     // Clear any existing hover tooltips
     hideAllVisibilityIndicators();
     hideAllCoverIndicators();
-    
+
     const others = (canvas.tokens?.placeables || []).filter(
       (t) => t && t !== sourceToken && t.isVisible,
     );
-    
+
     // Get manual cover map for this source
     const manualCoverMap = getCoverMap(sourceToken) || {};
-    
+
     for (const target of others) {
       const targetId = target.document.id;
-      
+
       // Check manual cover first - it takes precedence
       const manualCover = manualCoverMap[targetId];
       if (manualCover && manualCover !== 'none') {
@@ -801,7 +803,7 @@ export function showAutoCoverComputedOverlay(sourceToken) {
         addCoverIndicator(target, sourceToken, manualCover, true);
         continue;
       }
-      
+
       // If no manual cover, check auto cover
       let autoCover = 'none';
       try {
@@ -809,7 +811,7 @@ export function showAutoCoverComputedOverlay(sourceToken) {
       } catch (_) {
         autoCover = 'none';
       }
-      
+
       if (autoCover && autoCover !== 'none') {
         // Show auto cover badge (no overlay)
         addCoverIndicator(target, sourceToken, autoCover, false);
@@ -822,7 +824,7 @@ export function hideAutoCoverComputedOverlay() {
   // Clear flag to allow hover tooltips again
   HoverTooltips.isShowingCoverOverlay = false;
   hideAllCoverIndicators();
-  
+
   // If still hovering over a token, restore hover tooltips
   if (HoverTooltips.currentHoveredToken) {
     setTimeout(() => {
@@ -928,57 +930,57 @@ export function showControlledTokenVisibilityObserver() {
  */
 function addBadgeClickHandler(badgeElement, observerToken, targetToken, mode, actualTarget = null) {
   if (!badgeElement) return;
-  
+
   badgeElement.addEventListener('click', async (event) => {
     event.preventDefault();
     event.stopPropagation();
-    
+
     try {
       const { openTokenManagerWithMode } = await import('../api.js');
       const manager = await import('../managers/token-manager/TokenManager.js');
-      
+
       // Determine which token to open the manager for
       // In target mode with actualTarget, open for the actualTarget (the hovered token)
       // Otherwise use the standard logic
-      const tokenToOpen = (mode === 'target' && actualTarget) ? actualTarget : 
-                          (mode === 'observer' ? observerToken : targetToken);
+      const tokenToOpen = (mode === 'target' && actualTarget) ? actualTarget :
+        (mode === 'observer' ? observerToken : targetToken);
       const modeToUse = (mode === 'target' && actualTarget) ? 'target' : mode;
-      
+
       // Open the manager and wait for it to render
       await openTokenManagerWithMode(tokenToOpen, modeToUse);
-      
+
       // Get the app instance
       const app = manager.VisionerTokenManager.currentInstance;
       if (!app) {
         console.warn('PF2E Visioner | No TokenManager instance found');
         return;
       }
-      
+
       // Wait for manager to be rendered, then highlight the row if it exists
       const highlightRow = async (retries = 0) => {
         const maxRetries = 30;
         try {
-          
+
           if (!app.element) {
             if (retries < maxRetries) {
               setTimeout(() => highlightRow(retries + 1), 50);
             }
             return;
           }
-          
+
           // In target mode with actualTarget, we want to highlight the observer's row
           // (showing who can see the actualTarget)
           // In observer mode, highlight the target's row (what the observer can see)
           const rowToHighlight = (mode === 'target' && actualTarget) ? observerToken.id :
-                                (mode === 'observer' ? targetToken.id : observerToken.id);
+            (mode === 'observer' ? targetToken.id : observerToken.id);
           const rows = app.element.querySelectorAll(`tr[data-token-id="${rowToHighlight}"]`);
-          
+
           const allRows = app.element.querySelectorAll('tr[data-token-id]');
           const allTokenIds = Array.from(allRows).map(r => r.getAttribute('data-token-id'));
-          
+
           // Check if we have any rows rendered yet (table populated)
           const tablePopulated = allRows.length > 0;
-          
+
           if (!rows || rows.length === 0) {
             if (!tablePopulated && retries < maxRetries) {
               // Table not yet populated, keep waiting
@@ -988,18 +990,18 @@ function addBadgeClickHandler(badgeElement, observerToken, targetToken, mode, ac
             // or we've exceeded retries. Either way, just return - manager is open.
             return;
           }
-          
+
           // Clear any existing highlights
           app.element.querySelectorAll('tr.token-row.row-hover')
             ?.forEach((el) => el.classList.remove('row-hover'));
-          
+
           // Add highlight to target rows
           rows.forEach((r) => r.classList.add('row-hover'));
-          
+
           // Scroll to first visible row (check if in active tab)
           const activeTab = app.activeTab || 'visibility';
           const sectionSelector = activeTab === 'cover' ? '.cover-section' : '.visibility-section';
-          
+
           let firstVisibleRow = null;
           for (const r of rows) {
             const section = r.closest(sectionSelector);
@@ -1009,11 +1011,11 @@ function addBadgeClickHandler(badgeElement, observerToken, targetToken, mode, ac
               break;
             }
           }
-          
+
           if (!firstVisibleRow && rows.length > 0) {
             firstVisibleRow = rows[0];
           }
-          
+
           if (firstVisibleRow) {
             requestAnimationFrame(() => {
               firstVisibleRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -1023,7 +1025,7 @@ function addBadgeClickHandler(badgeElement, observerToken, targetToken, mode, ac
           // Silently fail - manager is open, just couldn't highlight
         }
       };
-      
+
       highlightRow();
     } catch (error) {
       console.error('PF2E Visioner | Error opening token manager from tooltip:', error);
@@ -1108,12 +1110,12 @@ function addVisibilityIndicator(
     el.style.position = 'fixed';
     el.style.pointerEvents = 'auto';
     el.style.cursor = 'pointer';
-    el.style.zIndex = '60';
+    el.style.zIndex = '15';
     el.style.left = '0';
     el.style.top = '0';
     el.style.transform = `translate(${Math.round(leftPx)}px, ${Math.round(topPx)}px)`;
     el.style.willChange = 'transform';
-    
+
     el.innerHTML = `<span class="pf2e-visioner-tooltip-badge ${kind === 'cover' ? `cover-${stateClass}` : `visibility-${stateClass}`}" style="--pf2e-visioner-tooltip-badge-width: ${badgeWidth}px; --pf2e-visioner-tooltip-badge-height: ${badgeHeight}px; --pf2e-visioner-tooltip-badge-radius: ${borderRadius}px;">
       <i class="${iconClass}"></i>
     </span>`;
@@ -1145,12 +1147,12 @@ function addVisibilityIndicator(
     el.style.position = 'fixed';
     el.style.pointerEvents = 'auto';
     el.style.cursor = 'pointer';
-    el.style.zIndex = '60';
+    el.style.zIndex = '15';
     el.style.left = '0';
     el.style.top = '0';
     el.style.transform = `translate(${Math.round(leftPx)}px, ${Math.round(topPx)}px)`;
     el.style.willChange = 'transform';
-    
+
     el.innerHTML = `<span class="pf2e-visioner-sense-badge" style="display: inline-flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.85); border: 2px solid #888; border-radius: ${borderRadius}px; width: ${badgeWidth}px; height: ${badgeHeight}px; color: #aaa;">
       <i class="${getSenseIcon(sense)}" style="font-size: ${sizeConfig.iconPx}px;"></i>
     </span>`;
@@ -1167,15 +1169,15 @@ function addVisibilityIndicator(
   } else {
     const totalWidth = (senseUsed ? badgeWidth + spacing : 0) + badgeWidth;
     const startX = centerX - totalWidth / 2;
-    
+
     let currentX = startX;
-    
+
     if (senseUsed) {
       indicator._senseBadgeEl = placeSenseBadge(currentX, centerY, senseUsed);
       addBadgeClickHandler(indicator._senseBadgeEl, observerToken, targetToken, mode, detectionTarget);
       currentX += badgeWidth + spacing;
     }
-    
+
     indicator._visBadgeEl = placeBadge(
       currentX,
       centerY,
@@ -1278,30 +1280,30 @@ function updateBadgePositions() {
       // Three badges layout: sense (optional), visibility, cover
       const totalWidth = (indicator._senseBadgeEl ? badgeWidth + spacing : 0) + badgeWidth + spacing + badgeWidth;
       const startX = centerX - totalWidth / 2;
-      
+
       let currentX = startX;
-      
+
       if (indicator._senseBadgeEl) {
         indicator._senseBadgeEl.style.transform = `translate(${Math.round(currentX)}px, ${Math.round(centerY)}px)`;
         currentX += badgeWidth + spacing;
       }
-      
+
       indicator._visBadgeEl.style.transform = `translate(${Math.round(currentX)}px, ${Math.round(centerY)}px)`;
       currentX += badgeWidth + spacing;
-      
+
       indicator._coverBadgeEl.style.transform = `translate(${Math.round(currentX)}px, ${Math.round(centerY)}px)`;
     } else if (indicator._visBadgeEl) {
       // Visibility badge with optional sense badge
       const totalWidth = (indicator._senseBadgeEl ? badgeWidth + spacing : 0) + badgeWidth;
       const startX = centerX - totalWidth / 2;
-      
+
       let currentX = startX;
-      
+
       if (indicator._senseBadgeEl) {
         indicator._senseBadgeEl.style.transform = `translate(${Math.round(currentX)}px, ${Math.round(centerY)}px)`;
         currentX += badgeWidth + spacing;
       }
-      
+
       indicator._visBadgeEl.style.transform = `translate(${Math.round(currentX)}px, ${Math.round(centerY)}px)`;
     }
   });
@@ -1360,7 +1362,7 @@ function addCoverIndicator(targetToken, observerToken, coverState, isManualCover
   el.style.position = 'fixed';
   el.style.pointerEvents = 'auto';
   el.style.cursor = 'pointer';
-  el.style.zIndex = '60';
+  el.style.zIndex = '15';
   el.style.left = '0';
   el.style.top = '0';
   el.style.transform = `translate(${Math.round(centerX - badgeWidth / 2)}px, ${Math.round(centerY)}px)`;
@@ -1394,13 +1396,13 @@ function addCoverIndicator(targetToken, observerToken, coverState, isManualCover
   };
   const color =
     colorblindMode !== 'none' ? colorblindmodeMap[colorblindMode][coverState] : config.color;
-  
+
   // Build the badge HTML with optional cog overlay for manual cover
   const coverIconHTML = `<i class="${config.icon}" style="font-size: var(--pf2e-visioner-tooltip-icon-size, 14px); line-height: 1;"></i>`;
-  const cogOverlay = isManualCover 
-    ? `<i class="fa-solid fa-cog" style="position: absolute; bottom: -2px; right: -2px; font-size: calc(var(--pf2e-visioner-tooltip-icon-size, 16px) * 0.5); color: #888; text-shadow: 0 0 3px black;"></i>` 
+  const cogOverlay = isManualCover
+    ? `<i class="fa-solid fa-cog" style="position: absolute; bottom: -2px; right: -2px; font-size: calc(var(--pf2e-visioner-tooltip-icon-size, 16px) * 0.5); color: #888; text-shadow: 0 0 3px black;"></i>`
     : '';
-  
+
   el.innerHTML = `<span style="display:inline-flex; align-items:center; justify-content:center; position: relative; background: rgba(0,0,0,0.9); border: var(--pf2e-visioner-tooltip-badge-border, 2px) solid ${color}; border-radius: ${borderRadius}px; width: ${badgeWidth}px; height: ${badgeHeight}px; color: ${color};">
     ${coverIconHTML}
     ${cogOverlay}
