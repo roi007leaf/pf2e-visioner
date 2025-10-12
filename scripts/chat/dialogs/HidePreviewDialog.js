@@ -691,11 +691,16 @@ export class HidePreviewDialog extends BaseActionDialog {
   markInitialSelections() {
     this.outcomes.forEach((outcome) => {
       // Mark the effective state (override if present, otherwise calculated) as selected in the UI
-      const effectiveState = outcome.overrideState ?? outcome.newVisibility;
+      let effectiveState = outcome.overrideState ?? outcome.newVisibility;
+
+      const isOldStateAvsControlled = this.isOldStateAvsControlled(outcome);
+      if (effectiveState === 'avs' && isOldStateAvsControlled && outcome._calculatedNewVisibility) {
+        effectiveState = outcome._calculatedNewVisibility;
+      }
+
       // Recompute actionable flag for UI buttons using the SAME logic as _prepareContext
       try {
         const oldState = outcome.oldVisibility ?? outcome.currentVisibility ?? null;
-        const isOldStateAvsControlled = this.isOldStateAvsControlled(outcome);
 
         // Use the SAME logic as _prepareContext and addIconClickHandlers
         let hasActionableChange = false;
@@ -721,10 +726,13 @@ export class HidePreviewDialog extends BaseActionDialog {
         const container = row.querySelector('.override-icons');
         if (container) {
           container.querySelectorAll('.state-icon').forEach((i) => i.classList.remove('selected'));
-          // Prefer the icon for the effective state; fall back to observed if not found
-          const iconEl =
-            container.querySelector(`.state-icon[data-state="${effectiveState}"]`) ||
-            container.querySelector('.state-icon[data-state="observed"]');
+          let iconEl = container.querySelector(`.state-icon[data-state="${effectiveState}"]`);
+          if (!iconEl && effectiveState === 'undetected') {
+            iconEl = container.querySelector('.state-icon[data-state="hidden"]');
+          }
+          if (!iconEl) {
+            iconEl = container.querySelector('.state-icon[data-state="observed"]');
+          }
           if (iconEl) iconEl.classList.add('selected');
         }
       }

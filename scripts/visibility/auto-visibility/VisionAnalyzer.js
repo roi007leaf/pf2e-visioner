@@ -20,10 +20,11 @@
 
 import { MODULE_ID } from '../../constants.js';
 import { calculateDistanceInFeet } from '../../helpers/geometry-utils.js';
-import { getLogger } from '../../utils/logger.js';
-import { SensingCapabilitiesBuilder } from './SensingCapabilitiesBuilder.js';
 import { getTokenVerticalSpanFt } from '../../helpers/size-elevation-utils.js';
 import { doesWallBlockAtElevation } from '../../helpers/wall-height-utils.js';
+import { LevelsIntegration } from '../../services/LevelsIntegration.js';
+import { getLogger } from '../../utils/logger.js';
+import { SensingCapabilitiesBuilder } from './SensingCapabilitiesBuilder.js';
 
 const log = getLogger('VisionAnalyzer');
 
@@ -180,19 +181,28 @@ export class VisionAnalyzer {
   /**
    * Check if observer has line of sight to target
    * Uses shape-based collision detection like LightingCalculator
+   * Integrates with Levels module for 3D collision detection
    * @param {Token} observer
    * @param {Token} target
    * @returns {boolean}
    */
   hasLineOfSight(observer, target) {
     try {
+      // Check for 3D collision using Levels if available
+      // When Levels is active, rely entirely on 3D collision detection
+      const levelsIntegration = LevelsIntegration.getInstance();
+      if (levelsIntegration.isActive) {
+        const has3DCollision = levelsIntegration.hasFloorCeilingBetween(observer, target);
+        return !has3DCollision;
+      }
+
       // If the observer has an los shape, use that for line of sight against the target's circle
       // Darkness sources may affect true LOS, so only return true/false if we can be sure
       const los = observer.vision?.los;
       if (los?.points) {
         const radius = target.externalRadius;
         const circle = new PIXI.Circle(target.center.x, target.center.y, radius);
-        const intersection = los.intersectCircle(circle, {density: 8, scalingFactor: 1.0});
+        const intersection = los.intersectCircle(circle, { density: 8, scalingFactor: 1.0 });
         const visible = intersection?.points?.length > 0;
         if (visible || !canvas.effects?.darknessSources?.length) return visible;
       }
@@ -325,10 +335,11 @@ export class VisionAnalyzer {
   }
 
   /**
-   * Check if sound is blocked between observer and target
+   * Check if sound is blocked between two tokens
+   * Integrates with Levels module for 3D collision detection
    * @param {Token} observer
    * @param {Token} target
-   * @returns {boolean} True if sound is blocked by walls or Silence effect
+   * @returns {boolean} True if sound is blocked by walls, floors/ceilings, or Silence effect
    */
   isSoundBlocked(observer, target) {
     try {
@@ -338,6 +349,15 @@ export class VisionAnalyzer {
 
       if (observerHasSilence || targetHasSilence) {
         return true;
+      }
+
+      // Check for 3D collision using Levels if available
+      const levelsIntegration = LevelsIntegration.getInstance();
+      if (levelsIntegration.isActive) {
+        const has3DCollision = levelsIntegration.test3DCollision(observer, target, 'sound');
+        if (has3DCollision) {
+          return true;
+        }
       }
 
       // Check if polygon backend for sound is available
@@ -361,9 +381,7 @@ export class VisionAnalyzer {
       // On error, assume sound is NOT blocked (fail open for better UX)
       return false;
     }
-  }
-
-  /**
+  }  /**
    * Check if actor has Silence effect active
    * @private
    * @param {Actor} actor
@@ -385,14 +403,27 @@ export class VisionAnalyzer {
 
   /**
    * Calculate distance between tokens in feet
+   * Uses Levels integration for 3D distance when available
    * @param {Token} a
    * @param {Token} b
    * @returns {number} Distance in feet
    */
   distanceFeet(a, b) {
     try {
-      return calculateDistanceInFeet(a, b);
+      const levelsIntegration = LevelsIntegration.getInstance();
+
+      if (levelsIntegration.isActive) {
+        const distance3D = levelsIntegration.getTotalDistance(a, b);
+        if (distance3D !== Infinity) {
+          const feetPerGrid = canvas.scene?.grid?.distance || 5;
+          const distanceInFeet = distance3D * feetPerGrid;
+          return distanceInFeet;
+        }
+      }
+      const distance2D = calculateDistanceInFeet(a, b);
+      return distance2D;
     } catch (error) {
+      console.error('[VisionAnalyzer] distanceFeet - Error:', error);
       log.debug('Error calculating distance', error);
       return Infinity;
     }
