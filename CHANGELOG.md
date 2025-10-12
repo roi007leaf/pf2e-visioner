@@ -12,6 +12,12 @@
   - When Levels module is present, AVS calculations will consider levels
   - Automatically detects Levels module and integrates without additional configuration
 
+### 🐛 Bug Fixes
+
+- Fixed tooltip showing above ui elements
+- Fixed tooltip not hiding when panning the canvas
+- Fixed tooltips now showing for newly added tokens without requiring a refresh
+
 ## [4.2.2] - 2025-10-09
 
 ### 🐛 Bug Fixes
