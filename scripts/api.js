@@ -13,6 +13,7 @@ import {
   removeObserverContributions,
   unsetMapsForTokens,
 } from './services/api-internal.js';
+import { LevelsIntegration } from './services/LevelsIntegration.js';
 import { manuallyRestoreAllPartyTokens } from './services/party-token-state.js';
 import { refreshEveryonesPerception } from './services/socket.js';
 import { updateTokenVisuals } from './services/visual-effects.js';
@@ -1954,3 +1955,6 @@ export const api = Pf2eVisionerApi;
 
 // Attach the autoVisibility object to the main API
 api.autoVisibility = autoVisibility;
+
+// Attach the Levels integration service to the main API
+api.levels = LevelsIntegration.getInstance();
