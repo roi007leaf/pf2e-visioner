@@ -285,7 +285,9 @@ export class VisionAnalyzer {
     const timestamp = this.#wallCacheTimestamp.get(cacheKey);
     if (timestamp && (Date.now() - timestamp) < this.#wallCacheTimeout) {
       const cached = this.#wallCache.get(cacheKey);
-      if (cached) return cached;
+      if (cached) {
+        return cached;
+      }
     }
 
     const walls = this.#filterBlockingWalls(elevationRange);
@@ -371,15 +373,75 @@ export class VisionAnalyzer {
     const limitedWallIntersections = [];
 
     for (const wall of walls) {
-      const wallMidX = (wall.document.c[0] + wall.document.c[2]) / 2;
-      const wallMidY = (wall.document.c[1] + wall.document.c[3]) / 2;
-      const distToRayMid = Math.sqrt(
-        (wallMidX - (fromPoint.x + toPoint.x) / 2) ** 2 +
-        (wallMidY - (fromPoint.y + toPoint.y) / 2) ** 2
-      );
+      // For doors, skip the distance optimization since they need special proximity handling
+      // Doors can block vision even when the ray midpoint is far from the door midpoint
+      const isDoor = wall.document.door > 0;
 
-      if (distToRayMid > rayLength * 1.5) {
-        continue;
+      if (!isDoor) {
+        const wallMidX = (wall.document.c[0] + wall.document.c[2]) / 2;
+        const wallMidY = (wall.document.c[1] + wall.document.c[3]) / 2;
+        const distToRayMid = Math.sqrt(
+          (wallMidX - (fromPoint.x + toPoint.x) / 2) ** 2 +
+          (wallMidY - (fromPoint.y + toPoint.y) / 2) ** 2
+        );
+
+        if (distToRayMid > rayLength * 1.5) {
+          continue;
+        }
+      }
+
+      // For doors, check if ray crosses through the door's area with threshold
+      // This catches near-misses where ray passes within a few pixels of door
+      if (isDoor) {
+        const doorThreshold = 3; // pixels
+
+        // Check if ray endpoints are on opposite sides of the door
+        // and if the ray passes close enough to the door span
+        const wallX1 = wall.document.c[0];
+        const wallY1 = wall.document.c[1];
+        const wallX2 = wall.document.c[2];
+        const wallY2 = wall.document.c[3];
+
+        // Determine if door is more horizontal or vertical
+        const doorDx = Math.abs(wallX2 - wallX1);
+        const doorDy = Math.abs(wallY2 - wallY1);
+        const isHorizontalDoor = doorDx > doorDy;
+
+        if (isHorizontalDoor) {
+          // Horizontal door: check if ray crosses the Y plane
+          const doorY = wallY1;
+          const doorMinX = Math.min(wallX1, wallX2);
+          const doorMaxX = Math.max(wallX1, wallX2);
+
+          // Check if ray crosses the door's Y coordinate
+          const rayMinY = Math.min(fromPoint.y, toPoint.y);
+          const rayMaxY = Math.max(fromPoint.y, toPoint.y);
+
+          if (rayMinY <= doorY + doorThreshold && rayMaxY >= doorY - doorThreshold) {
+            // Ray crosses door's Y plane, check if it's within door's X span (with threshold)
+            const rayX = fromPoint.x; // For vertical rays, X is constant
+            if (rayX >= doorMinX - doorThreshold && rayX <= doorMaxX + doorThreshold) {
+              return false;
+            }
+          }
+        } else {
+          // Vertical door: check if ray crosses the X plane
+          const doorX = wallX1;
+          const doorMinY = Math.min(wallY1, wallY2);
+          const doorMaxY = Math.max(wallY1, wallY2);
+
+          // Check if ray crosses the door's X coordinate
+          const rayMinX = Math.min(fromPoint.x, toPoint.x);
+          const rayMaxX = Math.max(fromPoint.x, toPoint.x);
+
+          if (rayMinX <= doorX + doorThreshold && rayMaxX >= doorX - doorThreshold) {
+            // Ray crosses door's X plane, check if it's within door's Y span (with threshold)
+            const rayY = fromPoint.y; // For horizontal rays, Y is constant
+            if (rayY >= doorMinY - doorThreshold && rayY <= doorMaxY + doorThreshold) {
+              return false;
+            }
+          }
+        }
       }
 
       // Walls are pre-filtered, check intersection

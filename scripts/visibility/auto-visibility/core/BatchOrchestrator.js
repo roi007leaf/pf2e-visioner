@@ -661,4 +661,12 @@ export class BatchOrchestrator {
       // Best effort cache clearing
     }
   }
+
+  /**
+   * Clear the burst LOS memo
+   * Called when walls/lighting changes to invalidate recent LOS calculations
+   */
+  clearBurstLosMemo() {
+    this._lastLosMemo = { map: null, ts: 0 };
+  }
 }

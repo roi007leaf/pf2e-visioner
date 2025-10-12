@@ -96,12 +96,14 @@ export class CacheManagementService {
         }
     }
 
-    clearVisibilityCache() {
+    clearGlobalVisibilityCache() {
         if (this.#globalVisibilityCache?.clear) {
-            const sizeBefore = this.#globalVisibilityCache.size || 0;
             this.#globalVisibilityCache.clear();
         }
+    }
 
+    clearVisibilityCache() {
+        this.clearGlobalVisibilityCache();
         // Clear sense precomputation cache when visibility cache is cleared
         this.#clearSenseCache();
     }

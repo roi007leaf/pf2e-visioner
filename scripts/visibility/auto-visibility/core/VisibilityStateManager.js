@@ -170,7 +170,6 @@ export class VisibilityStateManager {
      * @private
      */
     async #processBatch() {
-
         if (this.#processingBatch || this.#changedTokens.size === 0 || !this.#batchProcessor) {
             return;
         }
