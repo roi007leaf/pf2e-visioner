@@ -168,11 +168,6 @@ export class VisionAnalyzer {
     const capabilities = this.getSensingCapabilities(observer);
     const distance = this.distanceFeet(observer, target);
 
-    console.log('[VisionAnalyzer] canSensePrecisely - Observer:', observer.name);
-    console.log('[VisionAnalyzer] canSensePrecisely - Target:', target.name);
-    console.log('[VisionAnalyzer] canSensePrecisely - Distance:', distance, 'ft');
-    console.log('[VisionAnalyzer] canSensePrecisely - Precise senses:', capabilities.precise);
-
     // Check specific sense type if requested
     if (senseType) {
       const range = capabilities.precise[senseType];
@@ -416,7 +411,6 @@ export class VisionAnalyzer {
   distanceFeet(a, b) {
     try {
       const levelsIntegration = LevelsIntegration.getInstance();
-      console.log('[VisionAnalyzer] distanceFeet - Levels active:', levelsIntegration.isActive);
 
       if (levelsIntegration.isActive) {
         const distance3D = levelsIntegration.getTotalDistance(a, b);
