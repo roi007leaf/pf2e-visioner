@@ -1,5 +1,17 @@
 # Changelog
 
+## [4.3.0] - 2025-10-12
+
+### ✨ Features
+
+- Added clickable badges to token hover tooltips for quick access to Token Manager
+  - Click on observer badge to open Token Manager in observer mode for that token
+  - Click on target badge to open Token Manager in target mode for that token
+  - Highlights and scrolls to relevant row in Token Manager after opening
+- Levels module integration for AVS calculations
+  - When Levels module is present, AVS calculations will consider levels
+  - Automatically detects Levels module and integrates without additional configuration
+
 ## [4.2.2] - 2025-10-09
 
 ### 🐛 Bug Fixes
