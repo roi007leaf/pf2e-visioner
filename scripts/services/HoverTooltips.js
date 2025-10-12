@@ -398,6 +398,33 @@ export function initializeHoverTooltips() {
     }
   });
 
+  // Clean up tooltips when changing scenes
+  Hooks.on('canvasReady', () => {
+    // Clean up all tooltips and reset state
+    hideAllVisibilityIndicators();
+    hideAllCoverIndicators();
+    HoverTooltips.currentHoveredToken = null;
+    HoverTooltips.isShowingKeyTooltips = false;
+    HoverTooltips.isShowingCoverOverlay = false;
+    HoverTooltips._isPanning = false;
+    HoverTooltips._isTokenMoving = false;
+    HoverTooltips._isDragging = false;
+    HoverTooltips._pointerIsDown = false;
+
+    // Clear any pending timers
+    if (HoverTooltips._dragClearTimer) {
+      clearTimeout(HoverTooltips._dragClearTimer);
+      HoverTooltips._dragClearTimer = null;
+    }
+    if (HoverTooltips._movementDebounceTimer) {
+      clearTimeout(HoverTooltips._movementDebounceTimer);
+      HoverTooltips._movementDebounceTimer = null;
+    }
+
+    // Re-add event listeners to new tokens
+    addTokenEventListeners();
+  });
+
   // Note: Alt key handled via highlightObjects hook registered in main hooks
   // O key event listeners added globally in registerHooks
 
