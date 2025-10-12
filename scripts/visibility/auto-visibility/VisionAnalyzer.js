@@ -334,7 +334,7 @@ export class VisionAnalyzer {
 
   /**
    * Get sample points around a token's perimeter for multi-point LOS checks
-   * Returns center + 4 corner points for consistent symmetric sampling
+   * Returns center + 8 edge/corner points for comprehensive coverage
    * @private
    */
   #getTokenSamplePoints(token) {
@@ -344,11 +344,20 @@ export class VisionAnalyzer {
     const x = token.document.x;
     const y = token.document.y;
 
-    // Sample center + 2 diagonal corners for performance (sufficient for most cases)
+    // Small inset to ensure points are inside token bounds
+    const inset = 2;
+
+    // Sample center + 4 corners + 4 edge midpoints for maximum coverage
     return [
-      center,                              // Center
-      { x: x + w * 0.25, y: y + h * 0.25 }, // Top-left
-      { x: x + w * 0.75, y: y + h * 0.75 }  // Bottom-right
+      center,                                        // Center
+      { x: x + inset, y: y + inset },               // Top-left corner
+      { x: x + w - inset, y: y + inset },           // Top-right corner
+      { x: x + inset, y: y + h - inset },           // Bottom-left corner
+      { x: x + w - inset, y: y + h - inset },       // Bottom-right corner
+      { x: x + w * 0.5, y: y + inset },             // Top edge center
+      { x: x + w * 0.5, y: y + h - inset },         // Bottom edge center
+      { x: x + inset, y: y + h * 0.5 },             // Left edge center
+      { x: x + w - inset, y: y + h * 0.5 }          // Right edge center
     ];
   }
 

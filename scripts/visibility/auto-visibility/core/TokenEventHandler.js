@@ -103,6 +103,13 @@ export class TokenEventHandler {
       return;
     }
 
+    // Early exit: if ONLY _id or non-visibility flags changed, skip processing
+    const keys = Object.keys(changes);
+    const relevantKeys = keys.filter(k => k !== '_id' && !k.startsWith('flags.') && k !== 'flags');
+    if (relevantKeys.length === 0 && !changes.flags?.[MODULE_ID]) {
+      return;
+    }
+
     try {
       this.systemState.debug('onTokenUpdate', tokenDoc.id, tokenDoc.name, Object.keys(changes));
     } catch { }
@@ -184,6 +191,14 @@ export class TokenEventHandler {
 
     // Early light change detection (handles nested dotted paths like "light.bright")
     if (changeFlags.lightChanged) {
+      const lightConfig = changes.light !== undefined ? changes.light : tokenDoc.light;
+      console.log(`[PF2E Visioner] Light change detected on token ${tokenDoc.id} (${tokenDoc.name})`, {
+        enabled: lightConfig?.enabled,
+        bright: lightConfig?.bright,
+        dim: lightConfig?.dim,
+        totalTokens: canvas.tokens?.placeables?.length || 0
+      });
+
       // Token light changes affect visibility but not LOS; clear only visibility cache
       try {
         this.cacheManager?.clearVisibilityCache?.();
@@ -193,27 +208,34 @@ export class TokenEventHandler {
 
       // Defer recalculation until after Foundry refreshes lighting, so we read updated sources
       let scheduled = false;
+      const startTime = performance.now();
       try {
         globalThis.game = globalThis.game || {};
         game.pf2eVisioner = game.pf2eVisioner || {};
         game.pf2eVisioner.suppressLightingRefresh = true;
 
         Hooks.once('lightingRefresh', () => {
+          const hookTime = performance.now();
+          console.log(`[PF2E Visioner] lightingRefresh hook fired after ${(hookTime - startTime).toFixed(2)}ms`);
           try {
             this._handleLightChangeWithSpatialOptimization(tokenDoc, changes);
           } finally {
             delete game.pf2eVisioner.suppressLightingRefresh;
+            const endTime = performance.now();
+            console.log(`[PF2E Visioner] Light change processing completed in ${(endTime - startTime).toFixed(2)}ms`);
           }
         });
         scheduled = true;
-      } catch {
+      } catch (error) {
         /* ignore */
+        console.warn('[PF2E Visioner] Failed to schedule lightingRefresh hook:', error);
         delete game.pf2eVisioner?.suppressLightingRefresh;
       }
 
       // Fallback: if the hook didn't schedule, use a short timeout
       if (!scheduled) {
         setTimeout(() => {
+          console.log('[PF2E Visioner] Using fallback timeout for light change');
           try {
             this._handleLightChangeWithSpatialOptimization(tokenDoc, changes);
           } finally {
@@ -374,6 +396,7 @@ export class TokenEventHandler {
   }
 
   _handleLightChangeWithSpatialOptimization(tokenDoc, changes) {
+    const startTime = performance.now();
     try {
       const gridSize = canvas.grid?.size || 1;
       const tokenPos = {
@@ -381,24 +404,41 @@ export class TokenEventHandler {
         y: tokenDoc.y + (tokenDoc.height * gridSize) / 2,
       };
 
+      console.log(`[PF2E Visioner] Computing affected tokens for light change at (${tokenPos.x}, ${tokenPos.y})`);
+      const spatialStartTime = performance.now();
       const affectedTokens = this.spatialAnalyzer.getAffectedTokens(tokenPos, tokenPos, tokenDoc.id);
+      const spatialEndTime = performance.now();
+      console.log(`[PF2E Visioner] Spatial analysis found ${affectedTokens.length} affected tokens in ${(spatialEndTime - spatialStartTime).toFixed(2)}ms`);
 
+      const markStartTime = performance.now();
       this.visibilityState.markTokenChangedImmediate(tokenDoc.id);
       affectedTokens.forEach((token) => {
         this.visibilityState.markTokenChangedImmediate(token.document.id);
       });
+      const markEndTime = performance.now();
+      console.log(`[PF2E Visioner] Marked ${affectedTokens.length + 1} tokens for recalculation in ${(markEndTime - markStartTime).toFixed(2)}ms`);
 
       const lightConfig = changes.light !== undefined ? changes.light : tokenDoc.light;
       const lightRadius = lightConfig?.enabled
         ? Math.max(lightConfig.bright || 0, lightConfig.dim || 0)
         : 0;
 
+      const totalTime = performance.now() - startTime;
+      console.log(`[PF2E Visioner] Light change spatial optimization completed in ${totalTime.toFixed(2)}ms`, {
+        lightRadius,
+        enabled: lightConfig?.enabled ?? false,
+        affectedCount: affectedTokens.length,
+        totalTokensInScene: canvas.tokens?.placeables?.length || 0
+      });
+
       this.systemState.debug('light-change-spatial-opt', tokenDoc.id, {
         lightRadius,
         enabled: lightConfig?.enabled ?? false,
         affectedCount: affectedTokens.length,
+        durationMs: totalTime
       });
     } catch (error) {
+      console.error('[PF2E Visioner] Spatial optimization failed, falling back to full recalculation:', error);
       this.systemState.debug('light-change-spatial-fallback', tokenDoc.id, error);
       this.visibilityState.markAllTokensChangedImmediate();
     }

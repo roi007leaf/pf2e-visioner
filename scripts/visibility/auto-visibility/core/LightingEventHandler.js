@@ -117,23 +117,20 @@ export class LightingEventHandler {
      * We use a throttled recalculation to avoid over-processing during continuous refreshes.
      */
     handleLightingRefresh() {
-        if (!this.systemState.shouldProcessEvents()) return;
+        if (!this.systemState.shouldProcessEvents()) {
+            return;
+        }
 
-        // CRITICAL: Check if we're currently in a token control operation
-        // If so, ignore this refresh to prevent unnecessary AVS processing
         if (globalThis.game?.pf2eVisioner?.suppressLightingRefresh) {
             this.systemState.debug?.('LightingEventHandler: suppressing lightingRefresh during token operation');
             return;
         }
 
-        // CRITICAL: Check if this lighting refresh was triggered by token selection
-        // If so, ignore it to prevent unnecessary AVS processing
         if (this.#isLightingRefreshFromTokenSelection()) {
             this.systemState.debug?.('LightingEventHandler: ignoring lightingRefresh from token selection');
             return;
         }
 
-        // If Scene Config is open, these refreshes are likely live previews; defer until close
         if (this.systemState.isSceneConfigOpen?.()) {
             this.systemState.markPendingLightingChange?.();
             this.systemState.debug?.('LightingEventHandler: deferring lightingRefresh during open SceneConfig');
