@@ -46,7 +46,7 @@ export async function onTokenCreated(scene, tokenDoc) {
     // Add hover tooltip listeners to the new token
     if (game.settings.get('pf2e-visioner', 'enableHoverTooltips')) {
       const token = canvas.tokens.get(tokenDoc.id);
-      if (token) {
+      if (token && !token.destroyed && token.sprite && token.mesh) {
         addTokenEventListener(token);
       }
     }
@@ -182,7 +182,7 @@ export function registerTokenHooks() {
   Hooks.on('renderToken', (token, html, data) => {
     // Add hover tooltip listeners when token is rendered (most reliable timing)
     if (game.settings.get('pf2e-visioner', 'enableHoverTooltips')) {
-      if (token?.id) {
+      if (token?.id && !token.destroyed && token.sprite && token.mesh) {
         addTokenEventListener(token);
       }
     }

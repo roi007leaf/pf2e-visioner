@@ -11,6 +11,7 @@ import { FeatsHandler } from '../chat/services/FeatsHandler.js';
 import { MODULE_ID } from '../constants.js';
 import { calculateDistanceInFeet } from '../helpers/geometry-utils.js';
 import { ConcealmentRegionBehavior } from '../regions/ConcealmentRegionBehavior.js';
+import { LevelsIntegration } from '../services/LevelsIntegration.js';
 import { calculateVisibility } from './StatelessVisibilityCalculator.js';
 
 /**
@@ -55,7 +56,16 @@ export async function tokenStateToInput(
     const targetState = extractTargetState(target, lightingCalculator, options, observerPosition, targetPosition);
 
     // Calculate distance for sense range filtering using PF2e rules (5-10-5 diagonal pattern)
-    const distanceInFeet = calculateDistanceInFeet(observer, target);
+    // Use Levels integration for 3D distance if available
+    let distanceInFeet = calculateDistanceInFeet(observer, target);
+    const levelsIntegration = LevelsIntegration.getInstance();
+    if (levelsIntegration.isActive) {
+        const distance3D = levelsIntegration.getTotalDistance(observer, target);
+        if (distance3D !== Infinity) {
+            const feetPerGrid = canvas.scene?.grid?.distance || 5;
+            distanceInFeet = distance3D * feetPerGrid;
+        }
+    }
 
     const observerState = extractObserverState(observer, visionAnalyzer, conditionManager, lightingCalculator, options, distanceInFeet);
 

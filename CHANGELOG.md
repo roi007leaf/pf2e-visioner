@@ -1,6 +1,6 @@
 # Changelog
 
-## [4.3.0] - 2025-10-12
+## [4.4.0] - 2025-10-14
 
 ### 🐛 Bug Fixes
 
@@ -17,6 +17,30 @@
   - Prevents delay in tooltip appearance when tokens are added during gameplay
   - Ensures consistent user experience with instant feedback on token hover
   - Make sure tooltips doesnt render above ui elements
+
+## [4.3.1] - 2025-10-13
+
+### 🐛 Bug Fixes
+
+- Fixed an issue with the mesh and turn marker
+
+## [4.3.0] - 2025-10-12
+
+### ✨ Features
+
+- Added clickable badges to token hover tooltips for quick access to Token Manager
+  - Click on observer badge to open Token Manager in observer mode for that token
+  - Click on target badge to open Token Manager in target mode for that token
+  - Highlights and scrolls to relevant row in Token Manager after opening
+- Levels module integration for AVS calculations
+  - When Levels module is present, AVS calculations will consider levels
+  - Automatically detects Levels module and integrates without additional configuration
+
+### 🐛 Bug Fixes
+
+- Fixed tooltip showing above ui elements
+- Fixed tooltip not hiding when panning the canvas
+- Fixed tooltips now showing for newly added tokens without requiring a refresh
 
 ## [4.2.2] - 2025-10-09
 
