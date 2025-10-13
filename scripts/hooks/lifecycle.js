@@ -29,7 +29,9 @@ export function onReady() {
 }
 
 export async function onCanvasReady() {
-  await updateTokenVisuals();
+  if (canvas.ready && canvas.tokens?.placeables) {
+    await updateTokenVisuals();
+  }
   try {
     // After canvas refresh, restore indicators for currently controlled tokens that have wall flags
     const controlledTokens = canvas.tokens.controlled || [];

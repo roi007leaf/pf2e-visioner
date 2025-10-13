@@ -15,7 +15,11 @@ export async function updateTokenVisuals() {
   // No dice animation check - immediate processing
   for (const token of canvas.tokens.placeables) {
     try {
-      if (token?.visible) token.refresh();
+      if (token?.visible && !token.destroyed && token.sprite && token.mesh) {
+        if (!token.turnMarker || token.turnMarker.mesh) {
+          token.refresh();
+        }
+      }
     } catch (_) { }
   }
 }
@@ -461,7 +465,13 @@ export async function updateWallVisuals(observerId = null) {
 
         // Force token refresh
         try {
-          for (const t of canvas.tokens.placeables) t.refresh?.();
+          for (const t of canvas.tokens.placeables) {
+            if (!t.destroyed && t.sprite && t.mesh) {
+              if (!t.turnMarker || t.turnMarker.mesh) {
+                t.refresh?.();
+              }
+            }
+          }
         } catch (_) { }
       } catch (e) {
         console.warn(`[${MODULE_ID}] Failed to update hidden door sight overrides`, e);
@@ -487,10 +497,18 @@ export async function updateSpecificTokenPairs(pairs) {
     if (!observer || !target) continue;
 
     try {
-      observer.refresh();
+      if (!observer.destroyed && observer.sprite && observer.mesh) {
+        if (!observer.turnMarker || observer.turnMarker.mesh) {
+          observer.refresh();
+        }
+      }
     } catch (_) { }
     try {
-      target.refresh();
+      if (!target.destroyed && target.sprite && target.mesh) {
+        if (!target.turnMarker || target.turnMarker.mesh) {
+          target.refresh();
+        }
+      }
     } catch (_) { }
   }
 }
