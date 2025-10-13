@@ -1,5 +1,11 @@
 # Changelog
 
+## [4.3.1] - 2025-10-13
+
+### 🐛 Bug Fixes
+
+- Fixed an issue with the mesh and turn marker
+
 ## [4.3.0] - 2025-10-12
 
 ### ✨ Features
