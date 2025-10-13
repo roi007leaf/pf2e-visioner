@@ -202,8 +202,7 @@ export class VisionAnalyzer {
       // When Levels is active, rely entirely on 3D collision detection
       const levelsIntegration = LevelsIntegration.getInstance();
       if (levelsIntegration.isActive) {
-        const has3DCollision = levelsIntegration.hasFloorCeilingBetween(observer, target);
-        return !has3DCollision;
+        return !levelsIntegration.hasFloorCeilingBetween(observer, target);
       }
 
       // If the observer has an los shape, use that for line of sight against the target's circle
@@ -602,10 +601,7 @@ export class VisionAnalyzer {
       // Check for 3D collision using Levels if available
       const levelsIntegration = LevelsIntegration.getInstance();
       if (levelsIntegration.isActive) {
-        const has3DCollision = levelsIntegration.test3DCollision(observer, target, 'sound');
-        if (has3DCollision) {
-          return true;
-        }
+        return levelsIntegration.test3DCollision(observer, target, 'sound');
       }
 
       // Check if polygon backend for sound is available
