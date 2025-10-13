@@ -2,6 +2,7 @@ import { describe, test, expect, beforeEach, jest } from '@jest/globals';
 import {
   getTokenHeightFt,
   getTokenVerticalSpanFt,
+  getTokenRect,
   parseFeet,
 } from '../../../scripts/helpers/size-elevation-utils.js';
 
@@ -9,6 +10,9 @@ describe('Size and Elevation Utils', () => {
   beforeEach(() => {
     global.game = {
       modules: new Map(),
+    };
+    global.canvas = {
+      grid: { size: 100 },
     };
   });
 
@@ -371,6 +375,86 @@ describe('Size and Elevation Utils', () => {
 
       const span = getTokenVerticalSpanFt(token);
       expect(span).toEqual({ bottom: 0, top: 5 });
+    });
+  });
+
+  describe('getTokenRect', () => {
+    test('calculates rect based on creature size, not document dimensions (top-down token fix)', () => {
+      const mediumTokenWithWrongDimensions = {
+        document: {
+          x: 100,
+          y: 100,
+          width: 2,
+          height: 2,
+        },
+        actor: {
+          system: {
+            traits: {
+              size: { value: 'med' },
+            },
+          },
+        },
+      };
+
+      const rect = getTokenRect(mediumTokenWithWrongDimensions);
+      expect(rect).toEqual({ x1: 100, y1: 100, x2: 200, y2: 200 });
+    });
+
+    test('handles large creatures correctly', () => {
+      const largeToken = {
+        document: {
+          x: 0,
+          y: 0,
+          width: 1,
+          height: 1,
+        },
+        actor: {
+          system: {
+            traits: {
+              size: { value: 'lg' },
+            },
+          },
+        },
+      };
+
+      const rect = getTokenRect(largeToken);
+      expect(rect).toEqual({ x1: 0, y1: 0, x2: 200, y2: 200 });
+    });
+
+    test('handles tiny creatures correctly', () => {
+      const tinyToken = {
+        document: {
+          x: 50,
+          y: 50,
+          width: 1,
+          height: 1,
+        },
+        actor: {
+          system: {
+            traits: {
+              size: { value: 'tiny' },
+            },
+          },
+        },
+      };
+
+      const rect = getTokenRect(tinyToken);
+      expect(rect).toEqual({ x1: 50, y1: 50, x2: 100, y2: 100 });
+    });
+
+    test('defaults to medium size when actor missing', () => {
+      const tokenNoActor = {
+        document: {
+          x: 0,
+          y: 0,
+          width: 3,
+          height: 3,
+        },
+        actor: null,
+      };
+
+      const rect = getTokenRect(tokenNoActor);
+      expect(rect).toEqual({ x1: 0, y1: 0, x2: 100, y2: 100 });
     });
   });
 });

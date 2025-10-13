@@ -116,8 +116,24 @@ export function getSizeRank(token) {
 export function getTokenRect(token) {
   const x1 = token.document.x;
   const y1 = token.document.y;
-  const width = token.document.width * canvas.grid.size;
-  const height = token.document.height * canvas.grid.size;
+  
+  const creatureSize = token?.actor?.system?.traits?.size?.value ?? 'med';
+  const sizeToSquares = {
+    tiny: 0.5,
+    sm: 1,
+    small: 1,
+    med: 1,
+    medium: 1,
+    lg: 2,
+    large: 2,
+    huge: 3,
+    grg: 4,
+    gargantuan: 4,
+  };
+  const squares = sizeToSquares[creatureSize] ?? 1;
+  
+  const width = squares * canvas.grid.size;
+  const height = squares * canvas.grid.size;
   return { x1, y1, x2: x1 + width, y2: y1 + height };
 }
 
