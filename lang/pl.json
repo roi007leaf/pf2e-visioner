@@ -506,8 +506,8 @@
         "hint": "Włącz szczegółowe logowanie konsoli dla systemu automatycznej widoczności. Przydatne do rozwiązywania problemów związanych z obliczeniami widoczności."
       },
       "DISABLE_LINE_OF_SIGHT": {
-        "name": "Wyłącz obliczenia linii wzroku",
-        "hint": "Wyłącz obliczenia linii wzroku dla widoczności. Po włączeniu tej opcji widoczność będzie określana wyłącznie na podstawie odległości i zmysłów, z pominięciem ścian i przeszkód. Przydatne do optymalizacji wydajności lub określonych stylów gry."
+        "name": "Wyłącz rzucanie promieni w linii wzroku",
+        "hint": "Wyłącz rzutowanie promieni w linii wzroku dla widoczności. Po włączeniu widoczność będzie obliczana tylko dla wybranych tokenów przy użyciu ich kształtów widzenia. Wyniki widoczności w obrębie kształtu widoczności będą dokładniejsze, ale wyniki widzenia w ciemności i niewybranych tokenów będą oparte wyłącznie na odległości i zmysłach, z pominięciem ścian i przeszkód."
       },
       "COLORBLIND_MODE": {
         "name": "Tryb dla osób z dysfunkcją widzenia barw",
