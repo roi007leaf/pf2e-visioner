@@ -39,7 +39,7 @@ export class SneakPreviewDialog extends BaseActionDialog {
         minimizable: false,
       },
       position: {
-        width: 900, // Increased width for position display components
+        width: 950, // Increased width for position display components
         height: 'auto',
       },
       form: {
@@ -881,6 +881,9 @@ export class SneakPreviewDialog extends BaseActionDialog {
     }
 
     Object.assign(context, this.buildCommonContext(processedOutcomes));
+
+    // Pass the sneak extended states setting to template for UI indicators
+    context.sneakAllowExtendedEndStates = game.settings.get('pf2e-visioner', 'sneakAllowHiddenUndetectedEndPosition');
 
     return context;
   }
@@ -2350,11 +2353,18 @@ export class SneakPreviewDialog extends BaseActionDialog {
 
           // Qualify if concealed at end (not hidden/undetected)
           const endVisibility = endPosition.avsVisibility;
+          const allowExtendedEndStates = game.settings.get('pf2e-visioner', 'sneakAllowHiddenUndetectedEndPosition');
           if (endVisibility === 'concealed') {
+            return true;
+          }
+          if (allowExtendedEndStates && (endVisibility === 'hidden' || endVisibility === 'undetected')) {
             return true;
           }
           // Additionally, if we calculated a live end visibility and it's concealed, qualify
           if (outcome?.liveEndVisibility === 'concealed') {
+            return true;
+          }
+          if (allowExtendedEndStates && (outcome?.liveEndVisibility === 'hidden' || outcome?.liveEndVisibility === 'undetected')) {
             return true;
           }
           // Otherwise, fall through to live visibility check below
@@ -2384,8 +2394,9 @@ export class SneakPreviewDialog extends BaseActionDialog {
       // Live check last: qualify if currently concealed from this observer
       // (dim light and similar lighting effects are captured here)
       const visibility = getVisibilityBetween(observerToken, this.sneakingToken);
+      const allowExtendedEndStates = game.settings.get('pf2e-visioner', 'sneakAllowHiddenUndetectedEndPosition');
 
-      const qualifies = visibility === 'concealed';
+      const qualifies = visibility === 'concealed' || (allowExtendedEndStates && (visibility === 'hidden' || visibility === 'undetected'));
       return qualifies;
     } catch (error) {
       // Error checking end position qualification

@@ -144,8 +144,8 @@
             </span>
           </th>
           <th class="end-position">{{localize "PF2E_VISIONER.UI.END_POS"}}<br>
-            <span class="legend-icon state-indicator visibility-concealed" data-state="concealed" data-tooltip="{{localize 'PF2E_VISIONER.BUTTONS.CONCEALED'}}">
-              <i class="fas fa-cloud" aria-hidden="true"></i>
+            <span class="legend-icon state-indicator visibility-concealed" data-state="concealed" data-tooltip="{{#if sneakAllowExtendedEndStates}}{{localize 'PF2E_VISIONER.UI.CONCEALED_HIDDEN_UNDETECTED'}}{{else}}{{localize 'PF2E_VISIONER.BUTTONS.CONCEALED'}}{{/if}}">
+              <i class="fas fa-cloud" aria-hidden="true"></i>{{#if sneakAllowExtendedEndStates}}<span class="legend-plus">+</span>{{/if}}
             </span>/<span class="legend-icon state-indicator cover-standard" data-state="standard-cover" data-tooltip="{{localize 'PF2E_VISIONER.UI.STANDARD_OR_GREATER_TOOLTIP'}}">
               <i class="fas fa-shield-alt" aria-hidden="true"></i><span class="legend-plus">+</span>
             </span>
@@ -211,12 +211,15 @@
                           data-action="toggleEndPosition" 
                           data-token-id="{{outcome.token.id}}" 
                           data-requirement="end"
-                          data-tooltip="{{#if (and consecutiveSneaks (gt consecutiveSneaks 1))}}{{localize 'PF2E_VISIONER.UI.END_POS_CHECK_END_TURN'}}{{else}}{{#if outcome.positionDisplay.endPosition.qualifies}}{{localize 'PF2E_VISIONER.UI.END_POS_QUALIFIES'}}{{else}}{{localize 'PF2E_VISIONER.UI.END_POS_NOT_QUALIFIES'}}{{/if}}{{/if}}">
+                          data-tooltip="{{#if (and consecutiveSneaks (gt consecutiveSneaks 1))}}{{localize 'PF2E_VISIONER.UI.END_POS_CHECK_END_TURN'}}{{else}}{{#if outcome.positionDisplay.endPosition.qualifies}}{{#if (and sneakAllowExtendedEndStates (or (eq outcome.positionDisplay.endPosition.visibility 'hidden') (eq outcome.positionDisplay.endPosition.visibility 'undetected')))}}{{localize 'PF2E_VISIONER.UI.END_POS_QUALIFIES_EXTENDED'}}{{else}}{{localize 'PF2E_VISIONER.UI.END_POS_QUALIFIES'}}{{/if}}{{else}}{{localize 'PF2E_VISIONER.UI.END_POS_NOT_QUALIFIES'}}{{/if}}{{/if}}">
                     {{#if (and consecutiveSneaks (gt consecutiveSneaks 1))}}
                       <i class="fas fa-clock"></i>
                     {{else}}
                       {{#if outcome.positionDisplay.endPosition.qualifies}}
                         <i class="fas fa-check"></i>
+                        {{#if (and sneakAllowExtendedEndStates (or (eq outcome.positionDisplay.endPosition.visibility 'hidden') (eq outcome.positionDisplay.endPosition.visibility 'undetected')))}}
+                          <i class="fas fa-plus" style="font-size: 0.6em; vertical-align: super; margin-left: 2px;" data-tooltip="{{localize 'PF2E_VISIONER.UI.END_POS_QUALIFIES_EXTENDED'}}"></i>
+                        {{/if}}
                       {{else}}
                         <i class="fas fa-times"></i>
                       {{/if}}
