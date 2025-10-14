@@ -61,7 +61,6 @@ export class BatchOrchestrator {
     // Start a new movement session if not already moving
     if (!this._isTokenMoving) {
       this._movementSession = {
-        startTime: performance.now(),
         positionUpdates: 0,
         tokensAccumulated: new Set(),
         sessionId: `movement-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
@@ -88,10 +87,8 @@ export class BatchOrchestrator {
         return;
       }
 
-      const sessionDurationMs = performance.now() - this._movementSession.startTime;
       const sessionData = {
         sessionId: this._movementSession.sessionId,
-        sessionDurationMs: Number(sessionDurationMs.toFixed(2)),
         positionUpdates: this._movementSession.positionUpdates,
         tokensAccumulated: this._movementSession.tokensAccumulated.size,
         pendingTokensCount: this._pendingTokens.size,
@@ -175,25 +172,11 @@ export class BatchOrchestrator {
     }
 
     this.processingBatch = true;
-    const batchStartTime = performance.now();
     const batchId = `batch-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     const movementSession = options.movementSession || null;
 
-    // Timing measurements
-    const timings = {
-      batchStart: batchStartTime,
-      tokenPrep: 0,
-      lightingPrecompute: 0,
-      calcOptionsPrep: 0,
-      batchProcessing: 0,
-      resultApplication: 0,
-      batchEnd: 0,
-    };
-
     // Prepare tokens and calculation options (moved before telemetry start to report viewport-filtered changed count)
-    const tokenPrepStart = performance.now();
     const allTokens = this._getAllTokens().filter((t) => !this.exclusionManager.isExcludedToken(t));
-    timings.tokenPrep = performance.now() - tokenPrepStart;
 
     // Filter the changed set to tokens present in the current viewport set
     const visibleIdSet = new Set();
@@ -216,17 +199,20 @@ export class BatchOrchestrator {
 
     let telemetryStopped = false;
     try {
+      // Start detection batch mode to defer writes
+      const { startDetectionBatch } = await import('../../../stores/detection-map.js');
+      startDetectionBatch();
+
       // Precompute lighting for performance optimization
-      const lightingStart = performance.now();
       const { precomputedLights, precomputeStats } = await this._precomputeLighting(allTokens);
-      timings.lightingPrecompute = performance.now() - lightingStart;
 
       // Prepare calculation options
-      const calcOptionsStart = performance.now();
       // Reuse short-lived LOS memo for bursty batches (e.g., animation frames)
+      // Increased from 150ms to 500ms to better handle multiple batches per lighting change
       const now = Date.now();
-      const BURST_TTL_MS = 150;
-      if (!this._lastLosMemo.map || now - this._lastLosMemo.ts >= BURST_TTL_MS) {
+      const BURST_TTL_MS = 500;
+      const timeSinceLastBatch = this._lastLosMemo.ts ? now - this._lastLosMemo.ts : 999999;
+      if (!this._lastLosMemo.map || timeSinceLastBatch >= BURST_TTL_MS) {
         this._lastLosMemo.map = new Map();
       }
       this._lastLosMemo.ts = now;
@@ -238,19 +224,13 @@ export class BatchOrchestrator {
         // Enable fast mode during active token movement to reduce LOS precision
         fastMode: this._isTokenMoving,
       };
-      timings.calcOptionsPrep = performance.now() - calcOptionsStart;
 
       // Execute batch processing
-      const batchProcessingStart = performance.now();
       const batchResult = await this.batchProcessor.process(
         allTokens,
         visibleChangedTokens,
         calcOptions,
       );
-      timings.batchProcessing = performance.now() - batchProcessingStart;
-
-      // Capture detailed timings from BatchProcessor
-      timings.detailedBatchTimings = batchResult.detailedTimings || {};
 
       // Queue and process override validation BEFORE applying results
       // This allows validation to compare override state against OLD map values
@@ -267,30 +247,25 @@ export class BatchOrchestrator {
       }
 
       // Apply results - this writes NEW values to maps
-      const resultApplicationStart = performance.now();
       const uniqueUpdateCount = this._applyBatchResults(batchResult);
+
+      // Flush batched detection writes (turns 110+ writes into one batched operation)
+      const { flushDetectionBatch } = await import('../../../stores/detection-map.js');
+      await flushDetectionBatch();
 
       // Always refresh perception after batch processing to ensure condition changes are reflected
       // Even if no visibility map updates occurred, conditions like invisibility, blindness, etc.
       // may still affect what tokens can perceive, so we need to refresh perception consistently
       this._refreshPerceptionAfterBatch();
 
-      timings.resultApplication = performance.now() - resultApplicationStart;
-
-      const batchEndTime = performance.now();
-      timings.batchEnd = batchEndTime;
-
       // Stop telemetry with detailed metrics
       this._reportTelemetry({
         batchId,
-        batchStartTime,
-        batchEndTime,
         changedTokens: visibleChangedTokens,
         allTokens,
         batchResult,
         precomputeStats,
         uniqueUpdateCount,
-        timings,
         movementSession,
       });
       telemetryStopped = true;
@@ -305,8 +280,7 @@ export class BatchOrchestrator {
         batchId,
         changedTokens: Array.from(visibleChangedTokens),
         allTokens,
-        uniqueUpdateCount,
-        timings
+        uniqueUpdateCount
       });
     } catch (error) {
       try {
@@ -316,13 +290,10 @@ export class BatchOrchestrator {
       // Defensive: ensure we stop telemetry even if an error occurred before normal stop
       if (!telemetryStopped) {
         try {
-          const errorEndTime = performance.now();
           this.telemetryReporter.stop({
             batchId,
             clientId: game.user.id,
             clientName: game.user.name,
-            batchStartTime,
-            batchEndTime: errorEndTime,
             changedAtStartCount: visibleChangedTokens.size || changedTokens.size,
             allTokensCount: canvas.tokens?.placeables?.length || 0,
             viewportFilteringEnabled: this._getViewportFilteringEnabled(),
@@ -439,14 +410,16 @@ export class BatchOrchestrator {
       const wasReused = !!previous;
       const result = await LightingPrecomputer.precompute(allTokens, undefined, previous);
 
-      // Check if lighting environment changed and clear BatchProcessor caches if needed
+      // Check if lighting environment changed
+      // Note: We don't clear caches here because:
+      // 1. Visibility calculations use precomputedLights, so they naturally handle lighting changes
+      // 2. LOS is not affected by lighting
+      // 3. Event handlers (LightingEventHandler, TokenEventHandler) already clear appropriate caches
       const lightingChanged =
         result.lightingHash &&
         this._lastPrecompute.lightingHash &&
         result.lightingHash !== this._lastPrecompute.lightingHash;
-      if (lightingChanged) {
-        this.clearPersistentCaches();
-      }
+      // Lighting changes are handled by event handlers clearing appropriate caches
       precomputedLights = result.map;
       precomputeStats = result.stats || precomputeStats;
       // Add cache reuse stats to precompute stats
@@ -687,5 +660,13 @@ export class BatchOrchestrator {
     } catch {
       // Best effort cache clearing
     }
+  }
+
+  /**
+   * Clear the burst LOS memo
+   * Called when walls/lighting changes to invalidate recent LOS calculations
+   */
+  clearBurstLosMemo() {
+    this._lastLosMemo = { map: null, ts: 0 };
   }
 }

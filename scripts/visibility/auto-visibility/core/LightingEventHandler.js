@@ -52,8 +52,8 @@ export class LightingEventHandler {
 
         // Only clear caches if the change actually affects visibility
         if (this.#affectsVisibility(changeData)) {
-            if (this.cacheManager?.clearAllCaches) {
-                this.cacheManager.clearAllCaches();
+            if (this.cacheManager?.clearVisibilityCache) {
+                this.cacheManager.clearVisibilityCache();
             }
             // CRITICAL: Clear LightingPrecomputer caches when ambient lights change
             // This ensures the lighting environment hash will be recalculated
@@ -76,8 +76,8 @@ export class LightingEventHandler {
     async handleLightCreate() {
         if (!this.systemState.shouldProcessEvents()) return;
         // New lights always affect visibility, so clear caches
-        if (this.cacheManager?.clearAllCaches) {
-            this.cacheManager.clearAllCaches();
+        if (this.cacheManager?.clearVisibilityCache) {
+            this.cacheManager.clearVisibilityCache();
         }
         // CRITICAL: Clear LightingPrecomputer caches when ambient lights are created
         try {
@@ -97,8 +97,8 @@ export class LightingEventHandler {
     async handleLightDelete() {
         if (!this.systemState.shouldProcessEvents()) return;
         // Deleted lights always affect visibility, so clear caches
-        if (this.cacheManager?.clearAllCaches) {
-            this.cacheManager.clearAllCaches();
+        if (this.cacheManager?.clearVisibilityCache) {
+            this.cacheManager.clearVisibilityCache();
         }
         // CRITICAL: Clear LightingPrecomputer caches when ambient lights are deleted
         try {
@@ -117,23 +117,20 @@ export class LightingEventHandler {
      * We use a throttled recalculation to avoid over-processing during continuous refreshes.
      */
     handleLightingRefresh() {
-        if (!this.systemState.shouldProcessEvents()) return;
+        if (!this.systemState.shouldProcessEvents()) {
+            return;
+        }
 
-        // CRITICAL: Check if we're currently in a token control operation
-        // If so, ignore this refresh to prevent unnecessary AVS processing
         if (globalThis.game?.pf2eVisioner?.suppressLightingRefresh) {
             this.systemState.debug?.('LightingEventHandler: suppressing lightingRefresh during token operation');
             return;
         }
 
-        // CRITICAL: Check if this lighting refresh was triggered by token selection
-        // If so, ignore it to prevent unnecessary AVS processing
         if (this.#isLightingRefreshFromTokenSelection()) {
             this.systemState.debug?.('LightingEventHandler: ignoring lightingRefresh from token selection');
             return;
         }
 
-        // If Scene Config is open, these refreshes are likely live previews; defer until close
         if (this.systemState.isSceneConfigOpen?.()) {
             this.systemState.markPendingLightingChange?.();
             this.systemState.debug?.('LightingEventHandler: deferring lightingRefresh during open SceneConfig');

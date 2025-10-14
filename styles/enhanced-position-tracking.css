@@ -575,24 +575,6 @@
   gap: 4px;
 }
 
-/* Exclude window header icons from visibility indicator styling */
-.window-header .window-icon,
-.window-header i,
-.header-control i,
-.header-control .fa,
-.close,
-.close i,
-button[data-action='close'] i {
-  position: static !important;
-  display: inline !important;
-  min-width: auto !important;
-  min-height: auto !important;
-  border: none !important;
-  background: none !important;
-  border-radius: 0 !important;
-  color: inherit !important;
-}
-
 /* Visibility indicators specifically within position tracking tables */
 /* SNEAK DIALOG SPECIFIC: New class to avoid conflicts with canvas visibility indicators */
 .sneak-preview-dialog .sneak-visibility-indicator,

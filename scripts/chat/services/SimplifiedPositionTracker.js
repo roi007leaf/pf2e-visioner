@@ -252,7 +252,7 @@ export class SimplifiedPositionTracker {
    */
   clearCache() {
     // No-op in simplified version - no complex caching to clear
-    console.debug('PF2E Visioner | SimplifiedPositionTracker cache cleared');
+
   }
 }
 

@@ -8,10 +8,11 @@
 import { VisionAnalyzer } from '../VisionAnalyzer.js';
 
 export class WallEventHandler {
-    constructor(systemStateProvider, visibilityStateManager, cacheManager = null) {
+    constructor(systemStateProvider, visibilityStateManager, cacheManager = null, batchOrchestrator = null) {
         this.systemState = systemStateProvider;
         this.visibilityState = visibilityStateManager;
         this.cacheManager = cacheManager;
+        this.batchOrchestrator = batchOrchestrator;
         this.visualUpdateTimeout = null;
         this.visionAnalyzer = VisionAnalyzer.getInstance();
     }
@@ -106,12 +107,20 @@ export class WallEventHandler {
 
         // Only clear caches if the change actually affects line of sight
         if (affectsLOS) {
-            if (this.cacheManager?.clearAllCaches) {
-                this.cacheManager.clearAllCaches();
+            if (this.cacheManager?.clearLosCache) {
+                this.cacheManager.clearLosCache();
             }
             // Clear VisionAnalyzer cache for all tokens since wall changes affect everyone
             if (this.visionAnalyzer?.clearCache) {
                 this.visionAnalyzer.clearCache();
+            }
+            // Clear global visibility cache to invalidate stale visibility states
+            if (this.cacheManager?.clearGlobalVisibilityCache) {
+                this.cacheManager.clearGlobalVisibilityCache();
+            }
+            // Clear burst LOS memo to force fresh calculations
+            if (this.batchOrchestrator?.clearBurstLosMemo) {
+                this.batchOrchestrator.clearBurstLosMemo();
             }
             this.visibilityState.markAllTokensChangedImmediate();
         }
@@ -129,12 +138,20 @@ export class WallEventHandler {
         if (!this.systemState.shouldProcessEvents()) return;
 
         // New walls always affect LOS, so clear caches
-        if (this.cacheManager?.clearAllCaches) {
-            this.cacheManager.clearAllCaches();
+        if (this.cacheManager?.clearLosCache) {
+            this.cacheManager.clearLosCache();
         }
         // Clear VisionAnalyzer cache for all tokens since wall changes affect everyone
         if (this.visionAnalyzer?.clearCache) {
             this.visionAnalyzer.clearCache();
+        }
+        // Clear global visibility cache to invalidate stale visibility states
+        if (this.cacheManager?.clearGlobalVisibilityCache) {
+            this.cacheManager.clearGlobalVisibilityCache();
+        }
+        // Clear burst LOS memo to force fresh calculations
+        if (this.batchOrchestrator?.clearBurstLosMemo) {
+            this.batchOrchestrator.clearBurstLosMemo();
         }
         this.visibilityState.markAllTokensChangedImmediate();
 
@@ -149,12 +166,20 @@ export class WallEventHandler {
         if (!this.systemState.shouldProcessEvents()) return;
 
         // Deleted walls always affect LOS, so clear caches
-        if (this.cacheManager?.clearAllCaches) {
-            this.cacheManager.clearAllCaches();
+        if (this.cacheManager?.clearLosCache) {
+            this.cacheManager.clearLosCache();
         }
         // Clear VisionAnalyzer cache for all tokens since wall changes affect everyone
         if (this.visionAnalyzer?.clearCache) {
             this.visionAnalyzer.clearCache();
+        }
+        // Clear global visibility cache to invalidate stale visibility states
+        if (this.cacheManager?.clearGlobalVisibilityCache) {
+            this.cacheManager.clearGlobalVisibilityCache();
+        }
+        // Clear burst LOS memo to force fresh calculations
+        if (this.batchOrchestrator?.clearBurstLosMemo) {
+            this.batchOrchestrator.clearBurstLosMemo();
         }
         this.visibilityState.markAllTokensChangedImmediate();
 

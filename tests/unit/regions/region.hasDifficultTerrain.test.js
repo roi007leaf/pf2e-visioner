@@ -1,4 +1,4 @@
-import RegionHelper from '../../scripts/utils/region.js';
+import RegionHelper from '../../../scripts/utils/region.js';
 
 describe('RegionHelper.hasDifficultTerrain', () => {
     const makeRegion = (behaviors) => ({

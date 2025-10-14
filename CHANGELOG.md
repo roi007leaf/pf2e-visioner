@@ -1,5 +1,31 @@
 # Changelog
 
+## [4.4.0] - 2025-10-14
+
+### ✨ Features
+
+- **Sneak End Position Extended States**: Added optional setting to allow Hidden/Undetected states for sneak end positions
+  - New setting: "Allow Hidden/Undetected for Sneak End Position" (disabled by default)
+  - When enabled, sneak end positions qualify with Hidden or Undetected states (in addition to Concealed)
+  - Visual indicator: Plus icon (+) appears in column header legend when setting is active
+  - Setting located in General > Visioner Dialogs Settings
+
+### 🐛 Bug Fixes
+
+- **Line of Sight Accuracy**: Fixed visibility issue by implementing comprehensive 9-point sampling
+  - LOS now samples 9 points on each token: center + 4 corners (with 2px inset) + 4 edge midpoints
+  - Creates 81 possible sight lines (9×9) to accurately detect visibility around partial obstacles
+  - Previously used only 3 points per token, which could miss valid sight lines around corners
+  - Fixes cases where tall creatures couldn't see smaller creatures behind low partial walls
+  - More accurately represents physical reality where creatures can lean or look around obstacles
+  - Updated unit tests to reflect the improved geometric accuracy of multi-point sampling
+
+- **Hover Tooltip Performance**: Make sure tooltips appear for newly created tokens
+  - Added event listener for `createToken` to attach hover listeners immediately
+  - Prevents delay in tooltip appearance when tokens are added during gameplay
+  - Ensures consistent user experience with instant feedback on token hover
+  - Make sure tooltips doesnt render above ui elements
+
 ## [4.3.1] - 2025-10-13
 
 ### 🐛 Bug Fixes

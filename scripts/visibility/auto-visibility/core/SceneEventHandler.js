@@ -55,8 +55,7 @@ export class SceneEventHandler {
 
         // Check for lighting-related changes that affect visibility
         const visibilityFields = [
-            'darkness',                      // Global darkness level
-            'environment.darknessLevel',     // Environment darkness
+            'environment.darknessLevel',     // Environment darkness (v12+)
             'environment.globalLight',       // Global illumination
             'environment.globalLightThreshold', // Light threshold changes
             'grid.distance',                 // Grid changes that affect distance calculations
@@ -93,9 +92,8 @@ export class SceneEventHandler {
             return;
         }
 
-        // Check if darkness level or other lighting changed (FoundryVTT v13+ compatibility)
-        const darknessChanged =
-            changes.environment?.darknessLevel !== undefined || changes.darkness !== undefined;
+        // Check if darkness level or other lighting changed (FoundryVTT v12+ compatibility)
+        const darknessChanged = changes.environment?.darknessLevel !== undefined;
 
         const environmentChanged = changes.environment !== undefined;
         const lightingChanged = darknessChanged || environmentChanged;
@@ -114,7 +112,7 @@ export class SceneEventHandler {
                 darknessChanged,
                 environmentChanged,
                 changes: {
-                    darkness: changes.darkness,
+                    darknessLevel: changes.environment?.darknessLevel,
                     environment: changes.environment
                 }
             });

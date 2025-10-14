@@ -9,6 +9,7 @@ import {
   initializeHoverTooltips,
 } from '../services/HoverTooltips.js';
 import { updateTokenVisuals } from '../services/visual-effects.js';
+import { autoVisibilitySystem } from '../visibility/auto-visibility/index.js';
 
 export async function onTokenCreated(scene, tokenDoc) {
   try {
@@ -163,7 +164,18 @@ export function registerTokenHooks() {
     // Small delay to ensure actor data is fully loaded
     setTimeout(async () => {
       await checkAndRestorePartyTokenState(tokenDoc);
-    }, 100);
+
+      // Trigger AVS calculation for the new token to ensure tooltips and keybinds work
+      // The TokenEventHandler.handleTokenCreate already marks the token as changed,
+      // but we explicitly trigger a recalculation here to ensure immediate processing
+      if (autoVisibilitySystem?.recalculateAll) {
+        try {
+          autoVisibilitySystem.recalculateAll();
+        } catch (err) {
+          console.warn('PF2E Visioner | Error triggering AVS for new token:', err);
+        }
+      }
+    }, 150); // Slightly longer delay to ensure token is fully initialized
   });
 
   // Additional hook: when tokens are rendered on canvas (more reliable timing)

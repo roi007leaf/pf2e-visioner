@@ -89,9 +89,35 @@ export class CacheManagementService {
         this.#pairwiseValidationCache.clear();
     }
 
+    clearLosCache() {
+        if (this.#globalLosCache?.clear) {
+            const sizeBefore = this.#globalLosCache.size || 0;
+            this.#globalLosCache.clear();
+        }
+    }
+
+    clearGlobalVisibilityCache() {
+        if (this.#globalVisibilityCache?.clear) {
+            this.#globalVisibilityCache.clear();
+        }
+    }
+
+    clearVisibilityCache() {
+        this.clearGlobalVisibilityCache();
+        // Clear sense precomputation cache when visibility cache is cleared
+        this.#clearSenseCache();
+    }
+
+    #clearSenseCache() {
+        import('../../../services/SensePrecomputer.js').then(({ SensePrecomputer }) => {
+            SensePrecomputer.clear();
+        }).catch(() => { });
+    }
+
     clearAllCaches() {
-        if (this.#globalLosCache?.clear) this.#globalLosCache.clear();
-        if (this.#globalVisibilityCache?.clear) this.#globalVisibilityCache.clear();
+        this.clearLosCache();
+        this.clearGlobalVisibilityCache();
+        this.clearVisibilityCache();
         this.clearValidationCache();
     }
 

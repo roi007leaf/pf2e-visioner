@@ -18,6 +18,7 @@ const SETTINGS_GROUPS = {
         'defaultEncounterFilter',
         'ignoreAllies',
         'hideFoundryHiddenTokens',
+        'sneakAllowHiddenUndetectedEndPosition',
       ],
     },
   ],

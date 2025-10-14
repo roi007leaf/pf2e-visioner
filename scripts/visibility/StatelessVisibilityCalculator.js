@@ -51,17 +51,18 @@ export function calculateVisibility(input) {
     const observer = normalizeObserverState(input.observer);
     const rayDarkness = input.rayDarkness || null;
     const soundBlocked = input.soundBlocked ?? false;
-    const hasLineOfSight = input.hasLineOfSight ?? undefined; // Default to undefined (ie unknown)
+    const hasLineOfSight = input.hasLineOfSight ?? undefined;
 
     // Decision tree: follow PF2e visibility rules in priority order
 
     // 1. Check if observer is completely incapacitated (blinded)
     if (observer.conditions.blinded) {
-        return handleBlindedObserver(observer, target, soundBlocked);
+        const result = handleBlindedObserver(observer, target, soundBlocked);
+
+        return result;
     }
 
     // 2. Check all available senses and return the best detection result
-    // This ensures non-visual senses (like lifesense) work through walls even without blinded/deafened
     const allDetectionResults = [];
 
     // 2a. Check precise non-visual senses (bypass invisibility, lighting, and walls)
@@ -84,8 +85,8 @@ export function calculateVisibility(input) {
     }
 
     // 3. Return the best detection result based on priority
-    // Priority: observed (precise) > concealed > hidden (imprecise) > undetected
     const bestResult = selectBestDetection(allDetectionResults);
+
     if (bestResult) {
         return bestResult;
     }
