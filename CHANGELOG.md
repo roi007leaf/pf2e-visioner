@@ -2,6 +2,14 @@
 
 ## [4.4.0] - 2025-10-14
 
+### ✨ Features
+
+- **Sneak End Position Extended States**: Added optional setting to allow Hidden/Undetected states for sneak end positions
+  - New setting: "Allow Hidden/Undetected for Sneak End Position" (disabled by default)
+  - When enabled, sneak end positions qualify with Hidden or Undetected states (in addition to Concealed)
+  - Visual indicator: Plus icon (+) appears in column header legend when setting is active
+  - Setting located in General > Visioner Dialogs Settings
+
 ### 🐛 Bug Fixes
 
 - **Line of Sight Accuracy**: Fixed visibility issue by implementing comprehensive 9-point sampling

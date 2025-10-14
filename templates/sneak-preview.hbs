@@ -217,9 +217,6 @@
                     {{else}}
                       {{#if outcome.positionDisplay.endPosition.qualifies}}
                         <i class="fas fa-check"></i>
-                        {{#if (and sneakAllowExtendedEndStates (or (eq outcome.positionDisplay.endPosition.visibility 'hidden') (eq outcome.positionDisplay.endPosition.visibility 'undetected')))}}
-                          <i class="fas fa-plus" style="font-size: 0.6em; vertical-align: super; margin-left: 2px;" data-tooltip="{{localize 'PF2E_VISIONER.UI.END_POS_QUALIFIES_EXTENDED'}}"></i>
-                        {{/if}}
                       {{else}}
                         <i class="fas fa-times"></i>
                       {{/if}}
