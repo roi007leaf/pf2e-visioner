@@ -26,11 +26,22 @@ export class ItemEventHandler {
     /** @type {CacheManagementService} */
     #cacheManager = null;
 
+    /** @type {boolean} */
+    #batchInProgress = false;
+
     constructor(systemStateProvider, visibilityStateManager, exclusionManager, cacheManager) {
         this.#systemStateProvider = systemStateProvider;
         this.#visibilityStateManager = visibilityStateManager;
         this.#exclusionManager = exclusionManager;
         this.#cacheManager = cacheManager;
+
+        Hooks.on('pf2e-visioner.batchStart', () => {
+            this.#batchInProgress = true;
+        });
+
+        Hooks.on('pf2e-visioner.batchComplete', () => {
+            this.#batchInProgress = false;
+        });
     }
 
     /**
@@ -48,7 +59,9 @@ export class ItemEventHandler {
      * @param {Item} item - The created item
      */
     #onItemCreate(item) {
-        if (!this.#systemStateProvider.shouldProcessEvents()) return;
+        if (!this.#systemStateProvider.shouldProcessEvents()) {
+            return;
+        }
         this.#handleItemChange(item, 'created');
     }
 
@@ -58,9 +71,36 @@ export class ItemEventHandler {
      * @param {Object} changes - The changes made to the item
      */
     #onItemUpdate(item, changes) {
-        if (!this.#systemStateProvider.shouldProcessEvents()) return;
+        if (this.#batchInProgress) {
+            return;
+        }
 
-        // Handle both general item changes and equipment-specific changes
+        if (!this.#systemStateProvider.shouldProcessEvents()) {
+            return;
+        }
+
+        const changeKeys = Object.keys(changes);
+        const nonMetadataChanges = changeKeys.filter(key => key !== '_stats' && key !== '_id');
+
+        if (nonMetadataChanges.length === 0) {
+            return;
+        }
+
+        if (item.type === 'effect' && nonMetadataChanges.length === 1 && nonMetadataChanges[0] === 'system') {
+            const systemChanges = changes.system || {};
+            const systemKeys = Object.keys(systemChanges);
+            const hasSubstantiveChange = systemKeys.some(key =>
+                key !== 'start' &&
+                key !== 'duration' &&
+                key !== '_stats' &&
+                key !== 'rules'
+            );
+
+            if (!hasSubstantiveChange) {
+                return;
+            }
+        }
+
         this.#handleItemChange(item, 'updated');
         this.#handleEquipmentChange(item, changes);
     }
@@ -70,7 +110,9 @@ export class ItemEventHandler {
      * @param {Item} item - The deleted item
      */
     #onItemDelete(item) {
-        if (!this.#systemStateProvider.shouldProcessEvents()) return;
+        if (!this.#systemStateProvider.shouldProcessEvents()) {
+            return;
+        }
         this.#handleItemChange(item, 'deleted');
     }
 
@@ -110,7 +152,7 @@ export class ItemEventHandler {
             'thats-odd'            // Detection bonus for anomalies
         ];
 
-        const isVisibilityFeat = itemType === 'feat' && visibilityAffectingFeatSlugs.some(slug => 
+        const isVisibilityFeat = itemType === 'feat' && visibilityAffectingFeatSlugs.some(slug =>
             itemSlug === slug || itemName === slug.replace(/-/g, ' '));
 
         const isVisibilityRelated =
@@ -136,16 +178,15 @@ export class ItemEventHandler {
             itemName.includes('lifesense') ||
             itemName.includes('deaf');
 
-        // Strong hint that this item toggles an emitting LIGHT/DARKNESS on the token
-        const lightEmitterHint =
-            itemName.includes('light') ||
-            itemName.includes('darkness') ||
-            itemName.includes('torch') ||
-            itemName.includes('lantern') ||
-            itemName.includes('sunrod') ||
-            itemName.includes('everburning') ||
-            itemName.includes('glow') ||
-            itemName.includes('luminous');
+        // DISABLED: Light-emitting items should be handled by LightingEventHandler via lightingRefresh
+        // ItemEventHandler should NOT process physical light sources as they're handled elsewhere
+        // This prevents double-processing and cascading updates
+        const lightEmitterHint = false;
+        // Original logic (now disabled to prevent duplicate processing):
+        // itemName.includes('light') || itemName.includes('darkness') ||
+        // itemName.includes('torch') || itemName.includes('lantern') ||
+        // itemName.includes('sunrod') || itemName.includes('everburning') ||
+        // itemName.includes('glow') || itemName.includes('luminous')
 
         if (
             isRelevantType &&
@@ -159,15 +200,6 @@ export class ItemEventHandler {
                 ) || [];
 
             if (tokens.length > 0) {
-                this.#systemStateProvider.debug('ItemEventHandler: visibility-affecting item change', {
-                    itemName: item.name,
-                    itemType: item.type,
-                    action,
-                    actorId: actor.id,
-                    tokensAffected: tokens.length,
-                    lightEmitter: lightEmitterHint
-                });
-
                 // Clear VisionAnalyzer cache for affected tokens
                 // This ensures vision/sensing capabilities are recalculated with new conditions
                 const visionAnalyzer = VisionAnalyzer.getInstance();

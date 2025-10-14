@@ -7,12 +7,12 @@
  * @module VisibilityCalculatorAdapter
  */
 
+import { FeatsHandler } from '../chat/services/FeatsHandler.js';
 import { MODULE_ID } from '../constants.js';
 import { calculateDistanceInFeet } from '../helpers/geometry-utils.js';
 import { ConcealmentRegionBehavior } from '../regions/ConcealmentRegionBehavior.js';
-import { calculateVisibility } from './StatelessVisibilityCalculator.js';
-import { FeatsHandler } from '../chat/services/FeatsHandler.js';
 import { LevelsIntegration } from '../services/LevelsIntegration.js';
+import { calculateVisibility } from './StatelessVisibilityCalculator.js';
 
 /**
  * Convert token and game state to standardized visibility input
@@ -78,20 +78,47 @@ export async function tokenStateToInput(
     // Get ray darkness information if lightingRasterService is available
     let rayDarkness = null;
 
-    // Check if ray passes through darkness
-    const { linePassesThroughDarkness, rayDarknessRank } =
-        await checkDarknessRayIntersection(
+    // Use precomputed lighting if available to avoid expensive ray checks
+    let linePassesThroughDarkness = false;
+    let rayDarknessRank = 0;
+
+    if (options?.precomputedLights) {
+        // Use precomputed data - much faster than ray intersection
+        const observerLight = options.precomputedLights.get(observer.document.id);
+        const targetLight = options.precomputedLights.get(target.document.id);
+
+        if (observerLight?.darknessRank > 0 || targetLight?.darknessRank > 0) {
+            linePassesThroughDarkness = true;
+            rayDarknessRank = Math.max(observerLight?.darknessRank || 0, targetLight?.darknessRank || 0);
+        }
+    } else {
+        // Fallback to expensive ray check only if no precomputed data
+        const result = await checkDarknessRayIntersection(
             lightingRasterService,
             observer,
             target,
             observerPosition,
             targetPosition
         );
+        linePassesThroughDarkness = result.linePassesThroughDarkness;
+        rayDarknessRank = result.rayDarknessRank;
+    }
 
     // Allow skipping LOS check via options (useful for diagnostic APIs)
-    const hasLineOfSight = options?.skipLOS ? undefined : visionAnalyzer.hasLineOfSight(observer, target);
+    let hasLineOfSight;
+    if (options?.skipLOS) {
+        hasLineOfSight = undefined;
+    } else if (options?.precomputedLOS) {
+        // Use precomputed LOS if available (much faster than recalculating)
+        const losKey = `${observer.document.id}-${target.document.id}`;
+        hasLineOfSight = options.precomputedLOS.get(losKey);
+        if (hasLineOfSight === undefined) {
+            hasLineOfSight = visionAnalyzer.hasLineOfSight(observer, target);
+        }
+    } else {
+        hasLineOfSight = visionAnalyzer.hasLineOfSight(observer, target);
+    }
     const soundBlocked = visionAnalyzer.isSoundBlocked(observer, target);
-
 
     if (linePassesThroughDarkness && rayDarknessRank > 0) {
         // Map darkness rank to lighting level for the ray
@@ -108,7 +135,6 @@ export async function tokenStateToInput(
             lightingLevel: rayLightingLevel
         };
     }
-
 
     return {
         target: targetState,
@@ -132,7 +158,18 @@ function extractTargetState(target, lightingCalculator, options, observerPositio
         };
     }
 
-    const lightLevel = lightingCalculator.getLightLevelAt(targetPosition, target);
+    // Use precomputed lighting if available (much faster)
+    let lightLevel;
+    if (options?.precomputedLights) {
+        const precomputed = options.precomputedLights.get(target.document.id);
+        if (precomputed) {
+            lightLevel = precomputed;
+        } else {
+            lightLevel = lightingCalculator.getLightLevelAt(targetPosition, target);
+        }
+    } else {
+        lightLevel = lightingCalculator.getLightLevelAt(targetPosition, target);
+    }
 
     // Map lighting calculator output to standard format
     let lightingLevel = 'bright';
@@ -158,7 +195,6 @@ function extractTargetState(target, lightingCalculator, options, observerPositio
 
     }
 
-
     // Check for concealment (from terrain, effects, etc.)
     let concealment = extractConcealment(target, options);
 
@@ -168,7 +204,6 @@ function extractTargetState(target, lightingCalculator, options, observerPositio
         concealment = regionConcealment;
     } else if (!observerPosition || !targetPosition) {
     }
-
 
     // Extract auxiliary conditions (invisible, etc.)
     const auxiliary = extractAuxiliaryConditions(target, options);
@@ -201,7 +236,16 @@ function extractTargetState(target, lightingCalculator, options, observerPositio
  * @returns {Object} Observer state for StatelessVisibilityCalculator
  */
 function extractObserverState(observer, visionAnalyzer, conditionManager, lightingCalculator, options, distanceInFeet) {
-    const visionCapabilities = visionAnalyzer.getVisionCapabilities(observer);
+    // Use precomputed senses if available (much faster)
+    let visionCapabilities;
+    if (options?.precomputedSenses) {
+        visionCapabilities = options.precomputedSenses.get(observer.document.id);
+        if (!visionCapabilities) {
+            visionCapabilities = visionAnalyzer.getVisionCapabilities(observer);
+        }
+    } else {
+        visionCapabilities = visionAnalyzer.getVisionCapabilities(observer);
+    }
 
     // Extract precise and imprecise senses from sensingSummary (single source of truth)
     // Filter by range - only include senses that can reach the target
@@ -222,7 +266,18 @@ function extractObserverState(observer, visionAnalyzer, conditionManager, lighti
         elevation: observer.document.elevation || 0
     };
 
-    const observerLightLevel = lightingCalculator.getLightLevelAt(observerPosition, observer);
+    // Use precomputed lighting if available (much faster)
+    let observerLightLevel;
+    if (options?.precomputedLights) {
+        const precomputed = options.precomputedLights.get(observer.document.id);
+        if (precomputed) {
+            observerLightLevel = precomputed;
+        } else {
+            observerLightLevel = lightingCalculator.getLightLevelAt(observerPosition, observer);
+        }
+    } else {
+        observerLightLevel = lightingCalculator.getLightLevelAt(observerPosition, observer);
+    }
     let observerLightingLevel = 'bright';
 
     if (observerLightLevel) {
@@ -376,7 +431,9 @@ function extractConcealment(target, options) {
     // Check PF2e actor conditions
     if (target.actor?.conditions) {
         const concealed = target.actor.conditions.find(c => c.slug === 'concealed');
-        if (concealed) return true;
+        if (concealed) {
+            return true;
+        }
     }
 
     return false;
@@ -483,7 +540,9 @@ export async function calculateVisibilityFromTokens(
     };
 
     // Calculate using stateless calculator
-    return calculateVisibility(input);
+    const result = calculateVisibility(input);
+
+    return result;
 }
 
 

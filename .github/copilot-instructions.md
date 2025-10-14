@@ -24,6 +24,8 @@ Purpose: Give coding AIs crisp, actionable guardrails for this repo. Follow thes
 - If you don't know — say you don't know
 - If an old unit test fails, do not modify the test to make it pass
 - Don't add hardcoded strings for UI, use i18n keys
+- Don't use time based solution, use event or hook based solutions instead
+
 ## Architecture you must respect
 - Stores (single-responsibility): `scripts/stores/*` – visibility/cover maps, simple get/set.
 - Services (cross-cutting): `scripts/services/*` – orchestration, perception refresh, visuals, sockets.
@@ -33,7 +35,7 @@ Purpose: Give coding AIs crisp, actionable guardrails for this repo. Follow thes
 - Chat automation: `scripts/chat/*` – actions, dialogs, results.
 - Public API: `scripts/api.js` – stable surface. Internal helpers in `services/api-internal.js`.
 
-Contract for state
+## Contract for state
 - Visibility states: observed | concealed | hidden | undetected.
 - Cover states: none | lesser | standard | greater.
 - Flags shape per token:
@@ -73,6 +75,7 @@ Don’t
 - Call `canvas.perception.update({ refreshLighting: true })`.
 - Add long-lived timers or polling for visibility/cover.
 - Introduce UI inline styles or hardcoded colors.
+- Use Time based solutions if possible
 
 ## Common pitfalls (and the correct approach)
 - Token vs TokenDocument: when in doubt, operate on TokenDocument for persistence; use `token.document`.

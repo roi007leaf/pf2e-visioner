@@ -124,23 +124,5 @@ export class TelemetryReporter {
     }
 
     debugBreakdown(breakdown) {
-        try {
-            console.debug('PF2E Visioner | AVS batch breakdown:', {
-                pairsConsidered: breakdown.pairsConsidered,
-                pairsComputed: breakdown.pairsComputed,
-                pairsCached: breakdown.pairsCached,
-                pairsSkippedSpatial: breakdown.pairsSkippedSpatial,
-                pairsSkippedLOS: breakdown.pairsSkippedLOS,
-                pairsSkippedDedup: breakdown.pairsSkippedDedup,
-                losCacheHits: breakdown.losCacheHits,
-                losCacheMisses: breakdown.losCacheMisses,
-                losGlobalHits: breakdown.losGlobalHits,
-                losGlobalMisses: breakdown.losGlobalMisses,
-                losGlobalExpired: breakdown.losGlobalExpired,
-                visGlobalHits: breakdown.visGlobalHits,
-                visGlobalMisses: breakdown.visGlobalMisses,
-                visGlobalExpired: breakdown.visGlobalExpired,
-            });
-        } catch { /* noop */ }
     }
 }

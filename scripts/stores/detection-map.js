@@ -13,6 +13,45 @@
 
 import { MODULE_ID } from '../constants.js';
 
+let batchMode = false;
+const batchedUpdates = new Map();
+
+export function startDetectionBatch() {
+  batchMode = true;
+  batchedUpdates.clear();
+}
+
+export async function flushDetectionBatch() {
+  if (!batchMode) return;
+
+  const updates = [];
+  let skipped = 0;
+  let written = 0;
+
+  for (const [tokenId, detectionMap] of batchedUpdates.entries()) {
+    const token = canvas.tokens.get(tokenId);
+    if (token?.document && game.user.isGM) {
+      const currentMap = token.document.getFlag(MODULE_ID, 'detection') ?? {};
+      const hasChanged = JSON.stringify(currentMap) !== JSON.stringify(detectionMap);
+
+      if (hasChanged) {
+        const path = `flags.${MODULE_ID}.detection`;
+        updates.push(token.document.update({ [path]: detectionMap }, { diff: false }));
+        written++;
+      } else {
+        skipped++;
+      }
+    }
+  }
+
+  if (updates.length > 0) {
+    await Promise.all(updates);
+  }
+
+  batchMode = false;
+  batchedUpdates.clear();
+}
+
 /**
  * Get the detection map for a token
  * @param {Token} token
@@ -30,8 +69,12 @@ export function getDetectionMap(token) {
  */
 export async function setDetectionMap(token, detectionMap) {
   if (!token?.document) return;
-  // Only GMs can update token documents
   if (!game.user.isGM) return;
+
+  if (batchMode) {
+    batchedUpdates.set(token.document.id, detectionMap);
+    return;
+  }
 
   const path = `flags.${MODULE_ID}.detection`;
   const result = await token.document.update({ [path]: detectionMap }, { diff: false });
@@ -58,19 +101,28 @@ export function getDetectionBetween(observer, target) {
 export async function setDetectionBetween(observer, target, detection) {
   if (!observer?.document?.id || !target?.document?.id) return;
 
-  const detectionMap = getDetectionMap(observer);
-  const currentDetection = detectionMap[target.document.id];
+  let detectionMap;
+  let currentDetection;
 
-  // Compare current detection with new detection (deep comparison)
+  if (batchMode) {
+    detectionMap = batchedUpdates.get(observer.document.id);
+    if (!detectionMap) {
+      detectionMap = { ...getDetectionMap(observer) };
+    } else {
+      detectionMap = { ...detectionMap };
+    }
+    currentDetection = detectionMap[target.document.id];
+  } else {
+    detectionMap = getDetectionMap(observer);
+    currentDetection = detectionMap[target.document.id];
+  }
+
   const hasChanged = JSON.stringify(currentDetection) !== JSON.stringify(detection);
 
-  // Only update if detection has changed
   if (hasChanged) {
     if (detection === null) {
-      // Remove detection entry if null (undetected)
       delete detectionMap[target.document.id];
     } else {
-      // Store detection info
       detectionMap[target.document.id] = detection;
     }
     await setDetectionMap(observer, detectionMap);

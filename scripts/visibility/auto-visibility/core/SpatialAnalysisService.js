@@ -1,5 +1,5 @@
-import { HashGridIndex } from './HashGridIndex.js';
 import { VisionAnalyzer } from '../VisionAnalyzer.js';
+import { HashGridIndex } from './HashGridIndex.js';
 
 /**
  * SpatialAnalysisService provides spatial analysis functionality.
@@ -34,14 +34,16 @@ export class SpatialAnalysisService {
             if (excludeTokenId && t.document.id === excludeTokenId) return false;
 
             // Create a temporary token-like object for the position to use with distanceFeet
-            const positionToken = { center: position, distanceTo: (other) => {
-                const otherCenter = other.center || { x: other.x, y: other.y };
-                const dx = position.x - otherCenter.x;
-                const dy = position.y - otherCenter.y;
-                const pixelDistance = Math.hypot(dx, dy);
-                return pixelDistance / (canvas.grid?.size || 1); // Return in grid squares
-            }};
-            
+            const positionToken = {
+                center: position, distanceTo: (other) => {
+                    const otherCenter = other.center || { x: other.x, y: other.y };
+                    const dx = position.x - otherCenter.x;
+                    const dy = position.y - otherCenter.y;
+                    const pixelDistance = Math.hypot(dx, dy);
+                    return pixelDistance / (canvas.grid?.size || 1); // Return in grid squares
+                }
+            };
+
             // Use standardized distance calculation
             const distanceFeet = this.#visionAnalyzer.distanceFeet(positionToken, t);
             return distanceFeet <= maxDistance;
@@ -53,118 +55,27 @@ export class SpatialAnalysisService {
 
     /**
      * Check if two tokens can see each other (bidirectional line of sight or special senses)
+     * Uses VisionAnalyzer's optimized LOS calculation with wall caching, sample point reduction,
+     * and distance culling instead of duplicating logic.
      * @param {Token} token1 - First token
      * @param {Token} token2 - Second token
      * @returns {boolean} True if either token can detect the other through sight or special senses
      */
     canTokensSeeEachOther(token1, token2) {
         try {
-            // Use standardized distance calculation in feet
-            const distanceFeet = this.#visionAnalyzer.distanceFeet(token1, token2);
-
-            if (distanceFeet > this.#maxVisibilityDistance) {
-                // Still need to check if special senses have longer ranges
-                if (!this._hasSpecialSenseInRange(token1, token2, distanceFeet) &&
-                    !this._hasSpecialSenseInRange(token2, token1, distanceFeet)) {
-                    return false;
-                }
-            }
-
-            // Check for walls blocking line of sight in both directions
-            const walls = canvas.walls?.objects?.children || [];
-            let wallsBlockSight = false;
-
-            if (walls.length > 0) {
-                try {
-                    // Get token positions for wall collision check
-                    const pos1 = this.#positionManager.getTokenPosition(token1);
-                    const pos2 = this.#positionManager.getTokenPosition(token2);
-                    
-                    // Create Ray using the correct FoundryVTT API
-                    const ray = new foundry.canvas.geometry.Ray(pos1, pos2);
-                    const wallsInBounds = canvas.walls.quadtree.getObjects(ray.bounds);
-
-                    // Check if any walls actually block the line
-                    for (const wall of wallsInBounds) {
-                        // A wall is solid if it blocks movement (move > 0) and is not a door (door === 0 or door === null)
-                        const isSolidWall =
-                            wall.document.move > 0 && (wall.document.door === 0 || wall.document.door === null);
-
-                        if (isSolidWall) {
-                            // This is a solid wall, check if it intersects our ray
-                            if (ray.intersectSegment(wall.coords)) {
-                                wallsBlockSight = true;
-                                break;
-                            }
-                        }
-                    }
-                } catch {
-                    // If we can't check walls properly, assume they can see (conservative approach)
-                    return true;
-                }
-            }
-
-            // If walls don't block sight, they can see each other normally
-            if (!wallsBlockSight) {
-                return true;
-            }
-
-            // Walls block normal sight - check if either token has special senses that work through walls
-            return this._hasSpecialSenseInRange(token1, token2, distanceFeet) ||
-                this._hasSpecialSenseInRange(token2, token1, distanceFeet);
+            // Use VisionAnalyzer's optimized hasLineOfSight which includes:
+            // - Wall caching (5s TTL)
+            // - Sample point reduction (3 points)
+            // - Distance culling (1.5x ray length)
+            // - Self-check early exit
+            // This is bidirectional - checks both directions
+            return this.#visionAnalyzer.hasLineOfSight(token1, token2, 'sight');
         } catch {
             // If we can't determine, assume they can see (conservative approach)
             return true;
         }
     }
 
-    /**
-     * Check if observer has special senses that can detect target at given distance
-     * @param {Token} observer - Observing token
-     * @param {Token} target - Target token
-     * @param {number} distanceFeet - Distance between tokens in feet
-     * @returns {boolean} True if observer has special sense that can detect target
-     * @private
-     */
-    _hasSpecialSenseInRange(observer, target, distanceFeet) {
-        try {
-            // Check for tremorsense (works through walls, ground contact required)
-            const tremorsense = this._getSenseRange(observer, 'tremorsense');
-            if (tremorsense > 0 && distanceFeet <= tremorsense) {
-                // Tremorsense works if both tokens are on the ground
-                const observerElevation = observer.document?.elevation || 0;
-                const targetElevation = target.document?.elevation || 0;
-                if (observerElevation === 0 && targetElevation === 0) {
-                    return true;
-                }
-            }
-
-            // Check for echolocation (works through some obstacles)
-            const echolocation = this._getSenseRange(observer, 'echolocation');
-            if (echolocation > 0 && distanceFeet <= echolocation) {
-                return true;
-            }
-
-            // Check for lifesense (detects living creatures through walls)
-            const lifesense = this._getSenseRange(observer, 'lifesense');
-            if (lifesense > 0 && distanceFeet <= lifesense) {
-                // Only works on living creatures
-                if (this._isLivingCreature(target)) {
-                    return true;
-                }
-            }
-
-            // Check for other precise non-visual senses
-            const senseAcuity = this._getSenseRange(observer, 'senseAcuity');
-            if (senseAcuity > 0 && distanceFeet <= senseAcuity) {
-                return true;
-            }
-
-            return false;
-        } catch {
-            return false;
-        }
-    }
 
     /**
      * Get the range of a specific sense for a token
@@ -204,33 +115,6 @@ export class SpatialAnalysisService {
             return 0;
         } catch {
             return 0;
-        }
-    }
-
-    /**
-     * Check if a token represents a living creature
-     * @param {Token} token - Token to check
-     * @returns {boolean} True if token is a living creature
-     * @private
-     */
-    _isLivingCreature(token) {
-        try {
-            const actor = token.actor;
-            if (!actor) return false;
-
-            // Check actor type - living types
-            const livingTypes = ['character', 'npc', 'familiar'];
-            if (livingTypes.includes(actor.type)) {
-                // Check for undead, construct, or other non-living traits
-                const traits = actor.system?.traits?.value || [];
-                const nonLivingTraits = ['undead', 'construct', 'fiend', 'celestial'];
-
-                return !nonLivingTraits.some(trait => traits.includes(trait));
-            }
-
-            return false;
-        } catch {
-            return false;
         }
     }
 
@@ -343,7 +227,6 @@ export class SpatialAnalysisService {
      * @returns {Set} Set of affected tokens
      */
     getAffectedTokensByMovement(oldPos, newPos, movingTokenId) {
-        const startTime = performance.now();
         const metrics = {
             movementDistance: 0,
             midpointSkipped: false,
@@ -352,7 +235,6 @@ export class SpatialAnalysisService {
             losChecks: 0,
             wallChecks: 0,
             raysCreated: 0,
-            totalTime: 0,
             optimizationSavings: 0,
         };
 
@@ -406,28 +288,32 @@ export class SpatialAnalysisService {
         // Now filter by actual line of sight with optimized checks
         for (const token of allNearbyTokens) {
             metrics.tokensChecked++;
-            const tokenPos = this.#positionManager.getTokenPosition(token);
 
             // Quick distance check using standardized feet calculation
             // Create temporary token-like objects for distance calculation
-            const oldPosToken = { center: oldPos, distanceTo: (other) => {
-                const otherCenter = other.center || { x: other.x, y: other.y };
-                const dx = oldPos.x - otherCenter.x;
-                const dy = oldPos.y - otherCenter.y;
-                const pixelDistance = Math.hypot(dx, dy);
-                return pixelDistance / (canvas.grid?.size || 1); // Return in grid squares
-            }};
-            const newPosToken = { center: newPos, distanceTo: (other) => {
-                const otherCenter = other.center || { x: other.x, y: other.y };
-                const dx = newPos.x - otherCenter.x;
-                const dy = newPos.y - otherCenter.y;
-                const pixelDistance = Math.hypot(dx, dy);
-                return pixelDistance / (canvas.grid?.size || 1); // Return in grid squares
-            }};
-            
-            const oldDistanceFeet = this.#visionAnalyzer.distanceFeet(token, oldPosToken);
-            const newDistanceFeet = this.#visionAnalyzer.distanceFeet(token, newPosToken);
+            const oldPosToken = {
+                center: oldPos, distanceTo: (other) => {
+                    const otherCenter = other.center || { x: other.x, y: other.y };
+                    const dx = oldPos.x - otherCenter.x;
+                    const dy = oldPos.y - otherCenter.y;
+                    const pixelDistance = Math.hypot(dx, dy);
+                    return pixelDistance / (canvas.grid?.size || 1); // Return in grid squares
+                }
+            };
+            const newPosToken = {
+                center: newPos, distanceTo: (other) => {
+                    const otherCenter = other.center || { x: other.x, y: other.y };
+                    const dx = newPos.x - otherCenter.x;
+                    const dy = newPos.y - otherCenter.y;
+                    const pixelDistance = Math.hypot(dx, dy);
+                    return pixelDistance / (canvas.grid?.size || 1); // Return in grid squares
+                }
+            };
+
+            const oldDistanceFeet = this.#visionAnalyzer.distanceFeet(oldPosToken, token);
+            const newDistanceFeet = this.#visionAnalyzer.distanceFeet(newPosToken, token);
             metrics.distanceChecks += 2;
+
 
             const canSeeOld =
                 oldDistanceFeet <= this.#maxVisibilityDistance &&
@@ -437,14 +323,12 @@ export class SpatialAnalysisService {
                 this.canTokenSeePositionOptimized(token, newPos, metrics);
             metrics.losChecks += 2;
 
+
             // If the token can see either position, it's affected
             if (canSeeOld || canSeeNew) {
                 affectedTokens.add(token);
             }
         }
-
-        const endTime = performance.now();
-        metrics.totalTime = endTime - startTime;
 
         // Calculate optimization savings
         const theoreticalChecks = allNearbyTokens.size * 2; // Old + New position checks
@@ -529,38 +413,38 @@ export class SpatialAnalysisService {
      */
     #calculateDynamicMaxDistance() {
         const now = Date.now();
-        
+
         // Cache the calculation for 5 seconds to avoid recalculating every frame
         if (this.#dynamicMaxDistance !== null && (now - this.#lastDistanceCalcTime) < 5000) {
             return this.#dynamicMaxDistance;
         }
 
         let maxDistance = this.#maxVisibilityDistance; // Start with base distance
-        
+
         try {
             const tokens = canvas.tokens?.placeables || [];
-            
+
             for (const token of tokens) {
                 if (!token.actor) continue;
-                
+
                 // Check for tremorsense
                 const tremorsenseRange = this._getSenseRange(token, 'tremorsense');
                 if (tremorsenseRange > 0) {
                     maxDistance = Math.max(maxDistance, tremorsenseRange);
                 }
-                
+
                 // Check for echolocation
                 const echolocationRange = this._getSenseRange(token, 'echolocation');
                 if (echolocationRange > 0) {
                     maxDistance = Math.max(maxDistance, echolocationRange);
                 }
-                
+
                 // Check for lifesense
                 const lifesenseRange = this._getSenseRange(token, 'lifesense');
                 if (lifesenseRange > 0) {
                     maxDistance = Math.max(maxDistance, lifesenseRange);
                 }
-                
+
                 // Check for blindsense/blindsight
                 const blindsenseRange = this._getSenseRange(token, 'blindsense') || this._getSenseRange(token, 'blindsight');
                 if (blindsenseRange > 0) {
@@ -570,10 +454,10 @@ export class SpatialAnalysisService {
         } catch (error) {
             console.warn('PF2E Visioner | Error calculating dynamic max distance:', error);
         }
-        
+
         this.#dynamicMaxDistance = maxDistance;
         this.#lastDistanceCalcTime = now;
-        
+
         return maxDistance;
     }
 

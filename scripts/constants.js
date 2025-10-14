@@ -576,6 +576,16 @@ export const DEFAULT_SETTINGS = {
     type: Boolean,
     default: true,
   },
+  // Sneak End Position Qualification
+  sneakAllowHiddenUndetectedEndPosition: {
+    name: 'PF2E_VISIONER.SETTINGS.SNEAK_ALLOW_HIDDEN_UNDETECTED_END_POSITION.name',
+    hint: 'PF2E_VISIONER.SETTINGS.SNEAK_ALLOW_HIDDEN_UNDETECTED_END_POSITION.hint',
+    scope: 'world',
+    config: true,
+    restricted: true,
+    type: Boolean,
+    default: false,
+  },
   // Token Filtering
   enableAllTokensVision: {
     name: 'PF2E_VISIONER.SETTINGS.ENABLE_ALL_TOKENS_VISION.name',

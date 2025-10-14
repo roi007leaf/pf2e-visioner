@@ -109,10 +109,8 @@ export class VisibilityStateManager {
                     y: (changes.y !== undefined ? changes.y : tokenDoc.y) + (tokenDoc.height * canvas.grid.size) / 2,
                 };
 
-                // Get affected tokens from spatial analyzer
                 const affectedTokens = this.#spatialAnalyzer(oldPos, newPos, tokenId);
 
-                // Add affected tokens to the changed set
                 affectedTokens.forEach((token) => {
                     this.#changedTokens.add(token.document.id);
                 });
@@ -172,7 +170,6 @@ export class VisibilityStateManager {
      * @private
      */
     async #processBatch() {
-
         if (this.#processingBatch || this.#changedTokens.size === 0 || !this.#batchProcessor) {
             return;
         }
@@ -187,16 +184,18 @@ export class VisibilityStateManager {
         }
 
         this.#processingBatch = true;
-        try {
-            // Call the injected batch processor with the current changed tokens
-            await this.#batchProcessor(this.#changedTokens);
+        const tokenCount = this.#changedTokens.size;
 
-            // Clear processed changes
+        Hooks.callAll('pf2e-visioner.batchStart', { tokenCount });
+
+        try {
+            await this.#batchProcessor(this.#changedTokens);
             this.#changedTokens.clear();
         } catch (error) {
             console.error('PF2E Visioner | Batch processing failed:', error);
         } finally {
             this.#processingBatch = false;
+            Hooks.callAll('pf2e-visioner.batchComplete', { tokenCount });
         }
     }
 

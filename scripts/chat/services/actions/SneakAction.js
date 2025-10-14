@@ -1147,10 +1147,12 @@ export class SneakActionHandler extends ActionHandlerBase {
     let startQualifies =
       startPos.avsVisibility === 'hidden' || startPos.avsVisibility === 'undetected';
     // Only Standard or Greater cover qualifies (lesser is insufficient per PF2E rules)
+    const allowExtendedEndStates = game.settings.get('pf2e-visioner', 'sneakAllowHiddenUndetectedEndPosition');
     let endQualifies =
       endPos.coverState === 'standard' ||
       endPos.coverState === 'greater' ||
-      endPos.avsVisibility === 'concealed';
+      endPos.avsVisibility === 'concealed' ||
+      (allowExtendedEndStates && (endPos.avsVisibility === 'hidden' || endPos.avsVisibility === 'undetected'));
 
     // Check for Sneaky/Very Sneaky feat mechanics
     if (sneakingToken && observerToken && turnSneakTracker.hasSneakyFeat(sneakingToken)) {

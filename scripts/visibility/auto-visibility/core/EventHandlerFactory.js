@@ -61,7 +61,7 @@ export class EventHandlerFactory {
             {
                 name: 'wallEventHandler',
                 Handler: WallEventHandler,
-                deps: [systemStateProvider, visibilityStateManager, cacheManager]
+                deps: [systemStateProvider, visibilityStateManager, cacheManager, batchOrchestrator]
             },
             {
                 name: 'actorEventHandler',
