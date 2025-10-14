@@ -200,16 +200,6 @@ export class ItemEventHandler {
                 ) || [];
 
             if (tokens.length > 0) {
-                console.log(`[PF2E Visioner] ItemEventHandler: Processing visibility-affecting item ${item.name}`);
-                this.#systemStateProvider.debug('ItemEventHandler: visibility-affecting item change', {
-                    itemName: item.name,
-                    itemType: item.type,
-                    action,
-                    actorId: actor.id,
-                    tokensAffected: tokens.length,
-                    lightEmitter: lightEmitterHint
-                });
-
                 // Clear VisionAnalyzer cache for affected tokens
                 // This ensures vision/sensing capabilities are recalculated with new conditions
                 const visionAnalyzer = VisionAnalyzer.getInstance();
@@ -219,7 +209,6 @@ export class ItemEventHandler {
 
                 if (lightEmitterHint) {
                     // Emitting light changed: recalc ALL because others are affected by the emitter's aura
-                    console.log('[PF2E Visioner] ItemEventHandler: Light-emitting item changed - marking ALL tokens');
                     this.#visibilityStateManager.markAllTokensChangedImmediate();
                 } else if (isVisibilityRelated || isVisibilityFeat) {
                     // Visibility-affecting condition changed - delay batch and clear cache
