@@ -2,15 +2,18 @@ import { PredicateHelper } from '../PredicateHelper.js';
 import { SourceTracker } from '../SourceTracker.js';
 
 export class CoverOverride {
-  static async applyCoverOverride(operation, subjectToken, options = {}) {
+  static async applyCoverOverride(operation, subjectToken, ruleElement = null) {
     if (!subjectToken) return;
 
     const {
-      targets,
-      direction,
+      priority = 100,
+      targets = 'all',
+      direction = 'from',
       state,
       source,
-      priority = 100,
+      range,
+      observers,
+      condition,
       blockedEdges,
       requiresTakeCover,
       autoCoverBehavior = 'replace',
@@ -21,32 +24,27 @@ export class CoverOverride {
 
     const targetTokens = this.getTargetTokens(subjectToken, targets, operation.range, tokenIds);
 
+    // Generate a unique source ID based on the item applying this rule element
+    // This ensures that updating the item will replace the old source rather than creating duplicates
+    const itemSlug = ruleElement.item?.slug || ruleElement.item?.name?.slugify() || 'unknown';
+    const sourceId = source || `rule-element-${itemSlug}`;
+    
     const sourceData = {
-      id: source || `cover-${Date.now()}`,
-      type: source,
-      priority,
-      state,
-      direction,
-      blockedEdges,
-      requiresTakeCover,
-      autoCoverBehavior,
-      preventAutoCover,
-      qualifications: operation.qualifications || {}
+      id: sourceId,
+      type: 'rule-element',
+      priority: priority,
+      state: state,
+      direction: direction,
+      preventAutoCover: preventAutoCover || false,
+      predicate: predicate,
     };
 
     for (const targetToken of targetTokens) {
       if (targetToken.id === subjectToken.id) continue;
 
-      // Check operation-level predicate per target
-      if (predicate && predicate.length > 0) {
-        const subjectOptions = PredicateHelper.getTokenRollOptions(subjectToken);
-        const targetOptions = PredicateHelper.getTargetRollOptions(targetToken, subjectToken);
-        const combinedOptions = PredicateHelper.combineRollOptions(subjectOptions, targetOptions);
-        
-        if (!PredicateHelper.evaluate(predicate, combinedOptions)) {
-          continue;
-        }
-      }
+      // Note: We store the predicate in the source but don't evaluate it here
+      // Predicates are evaluated at attack time in RuleElementCoverService
+      // when we have the actual attack context (item, rollOptions, etc.)
 
       if (direction === 'to') {
         await this.setCoverState(subjectToken, targetToken, state, sourceData);
@@ -58,7 +56,7 @@ export class CoverOverride {
 
   static async setCoverState(attackerToken, defenderToken, state, sourceData) {
     try {
-      const { setCoverBetween } = await import('../../cover/utils.js');
+      const { setCoverBetween } = await import('../../utils.js');
       await setCoverBetween(attackerToken, defenderToken, state);
 
       await SourceTracker.addSourceToState(defenderToken, 'cover', sourceData, attackerToken.id);
@@ -67,14 +65,61 @@ export class CoverOverride {
     }
   }
 
-  static async removeCoverOverride(operation, subjectToken) {
+  static async removeCoverOverride(operation, subjectToken, ruleElement = null) {
     if (!subjectToken) return;
 
-    const { source } = operation;
-    await SourceTracker.removeSource(subjectToken, source, 'cover');
+    const { source, targets = 'all', range, tokenIds, direction = 'from' } = operation;
+    // Generate the same source ID that was used during creation
+    const itemSlug = ruleElement?.item?.slug || ruleElement?.item?.name?.slugify() || 'unknown';
+    const sourceId = source || `rule-element-${itemSlug}`;
+    
+    // Get the same target tokens that were affected during creation
+    const targetTokens = this.getTargetTokens(subjectToken, targets, range, tokenIds);
+    
+    // Remove the source from each target token
+    for (const targetToken of targetTokens) {
+      if (targetToken.id === subjectToken.id) continue;
+      
+      if (direction === 'to') {
+        // Source was stored on targets with subjectToken as observerId
+        await SourceTracker.removeSource(targetToken, sourceId, 'cover', subjectToken.id);
+        
+        // Also clean up any old sources from the same item (for backward compatibility)
+        // This handles cases where the source ID changed between versions
+        await this.cleanupOldSourcesFromItem(targetToken, ruleElement, subjectToken.id);
+      } else {
+        // Source was stored on subjectToken with targetToken as observerId
+        await SourceTracker.removeSource(subjectToken, sourceId, 'cover', targetToken.id);
+        
+        // Clean up old sources
+        await this.cleanupOldSourcesFromItem(subjectToken, ruleElement, targetToken.id);
+      }
+    }
   }
 
-  static async applyProvideCover(operation, subjectToken) {
+  static async cleanupOldSourcesFromItem(token, ruleElement, observerId) {
+    if (!token?.document || !ruleElement?.item) return;
+    
+    const stateSource = token.document.getFlag('pf2e-visioner', 'stateSource') || {};
+    const coverSources = stateSource.coverByObserver?.[observerId]?.sources || [];
+    
+    // Find and remove sources that match old naming patterns from this item
+    const itemName = ruleElement.item.name;
+    const itemSlug = ruleElement.item.slug || itemName?.slugify();
+    const oldSourceIds = [
+      'cover-override',  // Old generic name
+      'aim-aiding-rune', // Old hardcoded name
+      `rule-element-${itemSlug}`, // Current pattern
+    ];
+    
+    for (const oldId of oldSourceIds) {
+      if (coverSources.some(s => s.id === oldId && s.type === 'rule-element')) {
+        await SourceTracker.removeSource(token, oldId, 'cover', observerId);
+      }
+    }
+  }
+
+  static async applyProvideCover(operation, subjectToken, ruleElement = null) {
     if (!subjectToken) return;
 
     const {

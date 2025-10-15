@@ -18,12 +18,14 @@ import {
 } from '../../helpers/size-elevation-utils.js';
 import { doesWallBlockAtElevation } from '../../helpers/wall-height-utils.js';
 import { LevelsIntegration } from '../../services/LevelsIntegration.js';
+import { RuleElementCoverService } from '../../rule-elements/RuleElementCoverService.js';
 
 import { getVisibilityBetween } from '../../utils.js';
 
 export class CoverDetector {
   constructor() {
     this._featUpgradeRecords = new Map();
+    this._ruleElementBlocks = new Map();
   }
   // Define token disposition constants for use within this class
   static TOKEN_DISPOSITIONS = {
@@ -63,11 +65,13 @@ export class CoverDetector {
    * Detect cover state for an attack between two tokens
    * @param {Object} attacker - Attacker token
    * @param {Object} target - Target token
-   * @param {Object} options - Additional options
+   * @param {Object} options - Additional options (attackContext for rule element checks)
    * @returns {string} Cover state ('none', 'lesser', 'standard', 'greater')
    */
-  detectBetweenTokens(attacker, target) {
+  detectBetweenTokens(attacker, target, options = {}) {
     try {
+      console.log(`\n=== PF2E Visioner | Cover Detection: ${attacker.name} → ${target.name} ===`);
+      
       if (!attacker || !target) return 'none';
 
       // Exclude same token (attacker and target are the same)
@@ -75,7 +79,9 @@ export class CoverDetector {
 
       try {
         const ruleElementCover = this._checkRuleElementCover(attacker, target);
+        console.log(`PF2E Visioner | Rule element cover check result:`, ruleElementCover);
         if (ruleElementCover) {
+          console.log(`PF2E Visioner | Returning early with rule element cover: ${ruleElementCover}`);
           return ruleElementCover;
         }
       } catch (error) {
@@ -106,7 +112,7 @@ export class CoverDetector {
       if (!hasWallsInTheWay) {
         // Case 1: No walls in the way - use token cover
         const intersectionMode = this._getIntersectionMode();
-        const filters = { ...this._getAutoCoverFilterSettings(attacker) };
+        const filters = { ...this._getAutoCoverFilterSettings(attacker), attackContext: options.attackContext };
         let blockers = this._getEligibleBlockingTokens(attacker, target, filters);
 
         // Apply elevation filtering (mode-aware)
@@ -1105,9 +1111,29 @@ export class CoverDetector {
 
       // Check size-based cover rules
       if (!this._canTokenProvideCover(attacker, target, blocker)) {
+        console.log(`PF2E Visioner | ${blocker.name} filtered out by size rules`);
         continue;
       }
 
+      // Check rule elements: if blocker has a rule element preventing it from providing cover to target
+      const attackContext = filters.attackContext || null;
+      const ruleElementCheck = RuleElementCoverService.canTokenProvideCoverToTarget(blocker, target, attackContext);
+      if (!ruleElementCheck.allowed) {
+        console.log(`PF2E Visioner | ${blocker.name} filtered out by rule elements`);
+        // Track this for chat indicators (avoid duplicates)
+        const key = `${attacker.id}:${target.id}`;
+        if (!this._ruleElementBlocks.has(key)) {
+          this._ruleElementBlocks.set(key, []);
+        }
+        const blocks = this._ruleElementBlocks.get(key);
+        // Only add if we haven't already tracked this blocker
+        if (!blocks.some(re => re.tokenId === blocker.id)) {
+          this._ruleElementBlocks.get(key).push(ruleElementCheck.ruleElement);
+        }
+        continue;
+      }
+
+      console.log(`PF2E Visioner | ${blocker.name} added as eligible blocker`);
       out.push(blocker);
     }
 
@@ -1342,6 +1368,16 @@ export class CoverDetector {
       this._featUpgradeRecords.delete(key);
       if (Date.now() - rec.ts > 15000) return null;
       return rec;
+    } catch { return null; }
+  }
+
+  consumeRuleElementBlocks(attackerId, targetId) {
+    try {
+      const key = `${attackerId}:${targetId}`;
+      if (!this._ruleElementBlocks.has(key)) return null;
+      const blocks = this._ruleElementBlocks.get(key);
+      this._ruleElementBlocks.delete(key);
+      return blocks.length > 0 ? blocks : null;
     } catch { return null; }
   }
 
@@ -1611,46 +1647,7 @@ export class CoverDetector {
   }
 
   _checkRuleElementCover(attacker, target) {
-    try {
-      const coverSources = target.document.getFlag('pf2e-visioner', 'stateSource')?.coverByObserver?.[attacker.id];
-      if (!coverSources || !coverSources.sources || coverSources.sources.length === 0) {
-        return null;
-      }
-
-      const highestPriority = coverSources.sources.reduce((highest, current) => {
-        const highestPriority = highest?.priority || 0;
-        const currentPriority = current?.priority || 0;
-        return currentPriority > highestPriority ? current : highest;
-      }, coverSources.sources[0]);
-
-      if (highestPriority && highestPriority.preventAutoCover) {
-        return highestPriority.state || 'none';
-      }
-
-      if (highestPriority && highestPriority.state) {
-        return highestPriority.state;
-      }
-
-      const providedCoverData = target.document.getFlag('pf2e-visioner', 'providesCover');
-      if (providedCoverData) {
-        const distance = canvas.grid.measureDistance(attacker, target);
-        if (!providedCoverData.range || distance <= providedCoverData.range) {
-          if (providedCoverData.requiresTakeCover) {
-            const hasTakenCover = target.document.getFlag('pf2e-visioner', 'hasTakenCover');
-            if (hasTakenCover) {
-              return providedCoverData.state;
-            }
-          } else {
-            return providedCoverData.state;
-          }
-        }
-      }
-
-      return null;
-    } catch (error) {
-      console.warn('PF2E Visioner | Error in _checkRuleElementCover:', error);
-      return null;
-    }
+    return RuleElementCoverService.getCoverFromRuleElements(attacker, target);
   }
 }
 

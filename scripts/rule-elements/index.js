@@ -5,6 +5,7 @@
 
 import { api } from '../api.js';
 import { createPF2eVisionerEffectRuleElement } from './PF2eVisionerEffect.js';
+export { RuleElementCoverService } from './RuleElementCoverService.js';
 
 // Map to store recent changes to prevent loops
 const recentChanges = new Map();

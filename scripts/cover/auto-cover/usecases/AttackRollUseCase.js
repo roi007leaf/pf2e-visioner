@@ -40,7 +40,7 @@ class AttackRollUseCase extends BaseAutoCoverUseCase {
     // Fallback to auto-detection if no manual cover
     const manualCover = getCoverBetween(attacker, target);
     if (!state && manualCover === 'none') {
-      state = this._detectCover(attacker, target);
+      state = this._detectCover(attacker, target, data?.flags?.pf2e?.context);
     }
 
     // Preserve original detected state for override comparison
@@ -107,6 +107,25 @@ class AttackRollUseCase extends BaseAutoCoverUseCase {
         }
       }
     } catch (_) { }
+
+    try {
+      const ruleElementBlocks = coverDetector.consumeRuleElementBlocks(speakerTokenId, targetTokenId);
+      console.log('PF2E Visioner | Consumed rule element blocks:', ruleElementBlocks);
+      if (ruleElementBlocks) {
+        console.log('PF2E Visioner | Storing rule element blocks in message flags:', ruleElementBlocks);
+        if (!data.flags) data.flags = {};
+        if (!data.flags['pf2e-visioner']) data.flags['pf2e-visioner'] = {};
+        data.flags['pf2e-visioner'].ruleElementBlocks = ruleElementBlocks;
+        console.log('PF2E Visioner | Message flags after setting:', data.flags['pf2e-visioner']);
+        if (doc && doc.updateSource) {
+          try {
+            doc.updateSource({ 'flags.pf2e-visioner.ruleElementBlocks': ruleElementBlocks });
+          } catch (_) { }
+        }
+      }
+    } catch (e) {
+      console.warn('PF2E Visioner | Error storing rule element blocks:', e);
+    }
   }
 
   /**
@@ -122,7 +141,7 @@ class AttackRollUseCase extends BaseAutoCoverUseCase {
     let target = this._resolveTargetFromCtx(ctx);
     if (!attacker || !target) return;
     const manualCover = getCoverBetween(attacker, target);
-    let state = this._detectCover(attacker, target);
+    let state = this._detectCover(attacker, target, ctx);
 
     // Delegate dialog UI injection to CoverUIManager
     try {
@@ -269,7 +288,7 @@ class AttackRollUseCase extends BaseAutoCoverUseCase {
         } catch (_) { }
 
         const manualCover = getCoverBetween(attacker, target);
-        const detected = this._detectCover(attacker, target);
+        const detected = this._detectCover(attacker, target, context);
         let chosen = null;
         try {
           // Only show popup if keybind is held

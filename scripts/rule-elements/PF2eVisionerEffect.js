@@ -140,10 +140,12 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
     }
 
     async onCreate(actorUpdates) {
+      console.log(`PF2E Visioner | Rule element onCreate called for item: ${this.item?.name}`);
       await this.applyOperations();
     }
 
     async onDelete(actorUpdates) {
+      console.log(`PF2E Visioner | Rule element onDelete called for item: ${this.item?.name}`);
       await this.removeOperations();
     }
 
@@ -155,18 +157,33 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
 
     async applyOperations() {
       const token = this.getSubjectToken();
-      if (!token) return;
+      console.log(`PF2E Visioner | applyOperations called for token:`, token?.name, `item:`, this.item?.name);
+      console.log(`PF2E Visioner | Rule element data:`, this);
+      console.log(`PF2E Visioner | Operations array:`, this.operations);
+      
+      if (!token) {
+        console.log(`PF2E Visioner | No token found for rule element`);
+        return;
+      }
 
       // Check rule element level predicate using PF2e's built-in method
       if (this.predicate && this.predicate.length > 0) {
         const rollOptions = token.actor.getRollOptions(['all']);
         if (!this.test(rollOptions)) {
+          console.log(`PF2E Visioner | Rule element predicate failed for ${token.name}`);
           return;
         }
       }
 
+      if (!this.operations || this.operations.length === 0) {
+        console.warn(`PF2E Visioner | No operations defined for rule element`);
+        return;
+      }
+
+      console.log(`PF2E Visioner | Applying ${this.operations.length} operations for ${token.name}`);
       for (const operation of this.operations) {
         try {
+          console.log(`PF2E Visioner | Applying operation type: ${operation.type}`, operation);
           await this.applyOperation(operation, token);
         } catch (error) {
           console.error(`PF2E Visioner | Error applying operation ${operation.type}:`, error);
@@ -185,11 +202,11 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
           break;
 
         case 'overrideCover':
-          await CoverOverride.applyCoverOverride(operation, token);
+          await CoverOverride.applyCoverOverride(operation, token, this);
           break;
 
         case 'provideCover':
-          await CoverOverride.applyProvideCover(operation, token);
+          await CoverOverride.applyProvideCover(operation, token, this);
           break;
 
         case 'modifyActionQualification':
@@ -229,7 +246,7 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
           break;
 
         case 'overrideCover':
-          await CoverOverride.removeCoverOverride(operation, token);
+          await CoverOverride.removeCoverOverride(operation, token, this);
           break;
 
         case 'provideCover':
@@ -247,6 +264,7 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
 
     getSubjectToken() {
       const tokens = this.actor.getActiveTokens();
+      console.log(`PF2E Visioner | getSubjectToken for actor ${this.actor?.name}: found ${tokens.length} active tokens`, tokens.map(t => t.name));
       return tokens[0] || null;
     }
   };
