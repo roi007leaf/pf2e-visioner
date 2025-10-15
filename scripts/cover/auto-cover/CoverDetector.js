@@ -73,6 +73,15 @@ export class CoverDetector {
       // Exclude same token (attacker and target are the same)
       if (attacker.id === target.id) return 'none';
 
+      try {
+        const ruleElementCover = this._checkRuleElementCover(attacker, target);
+        if (ruleElementCover) {
+          return ruleElementCover;
+        }
+      } catch (error) {
+        console.warn('PF2E Visioner | Error checking rule element cover:', error);
+      }
+
       const p1 = attacker.center ?? attacker.getCenterPoint();
       const p2 = target.center ?? target.getCenterPoint();
 
@@ -1598,6 +1607,49 @@ export class CoverDetector {
     } catch (e) {
       console.warn('PF2E Visioner | CoverDetector.hasLargeCreatureCover failed:', e);
       return false;
+    }
+  }
+
+  _checkRuleElementCover(attacker, target) {
+    try {
+      const coverSources = target.document.getFlag('pf2e-visioner', 'stateSource')?.coverByObserver?.[attacker.id];
+      if (!coverSources || !coverSources.sources || coverSources.sources.length === 0) {
+        return null;
+      }
+
+      const highestPriority = coverSources.sources.reduce((highest, current) => {
+        const highestPriority = highest?.priority || 0;
+        const currentPriority = current?.priority || 0;
+        return currentPriority > highestPriority ? current : highest;
+      }, coverSources.sources[0]);
+
+      if (highestPriority && highestPriority.preventAutoCover) {
+        return highestPriority.state || 'none';
+      }
+
+      if (highestPriority && highestPriority.state) {
+        return highestPriority.state;
+      }
+
+      const providedCoverData = target.document.getFlag('pf2e-visioner', 'providesCover');
+      if (providedCoverData) {
+        const distance = canvas.grid.measureDistance(attacker, target);
+        if (!providedCoverData.range || distance <= providedCoverData.range) {
+          if (providedCoverData.requiresTakeCover) {
+            const hasTakenCover = target.document.getFlag('pf2e-visioner', 'hasTakenCover');
+            if (hasTakenCover) {
+              return providedCoverData.state;
+            }
+          } else {
+            return providedCoverData.state;
+          }
+        }
+      }
+
+      return null;
+    } catch (error) {
+      console.warn('PF2E Visioner | Error in _checkRuleElementCover:', error);
+      return null;
     }
   }
 }

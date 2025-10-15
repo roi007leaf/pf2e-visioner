@@ -233,6 +233,11 @@ export class BatchProcessor {
             if (!changedToken) {
                 continue;
             }
+            
+            if (this._hasRuleElementOverride(changedToken)) {
+                continue;
+            }
+            
             processedTokens++;
 
             // Use precomputed position if available (with early exit optimization)
@@ -575,5 +580,14 @@ export class BatchProcessor {
 
         // Could add other non-visual senses here (scent, etc.)
         return false;
+    }
+
+    _hasRuleElementOverride(token) {
+        try {
+            const override = token?.document?.getFlag('pf2e-visioner', 'ruleElementOverride');
+            return override?.active === true;
+        } catch (error) {
+            return false;
+        }
     }
 }

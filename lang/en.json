@@ -328,6 +328,122 @@
         "DURATION": "Duration (Rounds)",
         "REQUIRES_INITIATIVE": "Requires Initiative",
         "RANGE": "Range (feet)"
+      },
+      "EFFECT": {
+        "NAME": "PF2eVisionerEffect",
+        "DESCRIPTION": "Advanced visibility, cover, and sense modifications for spells, items and feats",
+        "OPERATION_TYPES": {
+          "MODIFY_SENSES": "Modify Senses",
+          "OVERRIDE_VISIBILITY": "Override Visibility",
+          "OVERRIDE_COVER": "Override Cover",
+          "PROVIDE_COVER": "Provide Cover",
+          "MODIFY_ACTION_QUALIFICATION": "Modify Action Qualification",
+          "CONDITIONAL_STATE": "Conditional State"
+        },
+        "MESSAGES": {
+          "NO_QUALIFYING_CONCEALMENT": "Your concealment doesn't qualify for this action",
+          "NO_QUALIFYING_COVER": "Your cover doesn't qualify for this action",
+          "BLUR_HIDE_BLOCKED": "Blur's concealment doesn't hide your location",
+          "BLUR_SNEAK_BLOCKED": "Blur doesn't obscure your location enough for Sneak",
+          "FAERIE_FIRE_ACTIVE": "Faerie fire reveals your location",
+          "REVEALING_LIGHT_ACTIVE": "Revealing light prevents concealment",
+          "THOUSAND_VISIONS_ACTIVE": "Thousand visions ignores concealment within 30 feet",
+          "CLOUDED_FOCUS_ACTIVE": "Clouded focus limits your perception range to 20 feet",
+          "DEPLOYABLE_COVER_ACTIVE": "Deployable cover provides standard cover when you Take Cover",
+          "TOWER_SHIELD_ALLY": "Ally benefits from your tower shield",
+          "END_POSITION_DISQUALIFIED": "Your end position doesn't qualify for this action",
+          "START_POSITION_DISQUALIFIED": "Your start position doesn't qualify for this action",
+          "BLIND_FIGHT_ACTIVE": "Blind-Fight allows you to react to barely-detected foes",
+          "CONCEALMENT_QUALIFICATION_FAILED": "Your concealment or cover does not qualify for Hide"
+        },
+        "DESCRIPTIONS": {
+          "MODIFY_SENSES": "Modify sense ranges and precision",
+          "OVERRIDE_VISIBILITY": "Override visibility states",
+          "OVERRIDE_COVER": "Override cover states",
+          "PROVIDE_COVER": "Provide cover to other tokens",
+          "MODIFY_ACTION_QUALIFICATION": "Control what qualifies for action prerequisites",
+          "CONDITIONAL_STATE": "Apply states based on conditions"
+        },
+        "EXAMPLES": {
+          "BLUR": {
+            "NAME": "Blur",
+            "DESCRIPTION": "The target's form appears blurry. It becomes Concealed. As the nature of this effect still leaves the target's location obvious, the target can't use this concealment to Hide or Sneak."
+          },
+          "FAERIE_FIRE": {
+            "NAME": "Faerie Fire",
+            "DESCRIPTION": "All creatures in the area when you cast the spell are limned in colorful, heatless fire of a color of your choice for the duration. Visible creatures can't be Concealed while affected by faerie fire. If the creatures are Invisible, they are Concealed while affected by faerie fire, rather than being Undetected."
+          },
+          "REVEALING_LIGHT": {
+            "NAME": "Revealing Light",
+            "DESCRIPTION": "A wave of magical light washes over the area. You choose the appearance of the light, such as colorful, heatless flames or sparkling motes. A creature affected by revealing light is Dazzled. If the creature was Invisible, it becomes Concealed instead. If the creature was already concealed for any other reason, it is no longer concealed."
+          },
+          "CLOUDED_FOCUS": {
+            "NAME": "Clouded Focus",
+            "DESCRIPTION": "You sharpen a creature's senses, though more distant objects become hazy, indistinct, or muted to it. The target gains a +1 status bonus to Perception checks attempted with any of its precise senses. Furthermore, any imprecise senses the target has are sharpened to precise senses (though they don't receive the status bonus). However, the target can't perceive anything beyond a range of 20 feet with any of its senses."
+          },
+          "THOUSAND_VISIONS": {
+            "NAME": "Thousand Visions",
+            "DESCRIPTION": "You open your senses to numerous visions of the immediate future. The visions grant you subtle details of your immediate surroundings within 30 feet. Within this range, you don't need to succeed at a flat check to target a Concealed creature. Beyond 30 feet, the visions become overwhelmed with too many possible futures, making all of your senses imprecise beyond this range."
+          },
+          "TOWER_SHIELD": {
+            "NAME": "Tower Shield (Take Cover)",
+            "DESCRIPTION": "When you Take Cover with a raised tower shield, you can provide standard cover to allies adjacent to you."
+          },
+          "DEPLOYABLE_COVER": {
+            "NAME": "Deployable Cover",
+            "DESCRIPTION": "This thick mat of canvas, foliage, and wood is mounted on a tripod of flexible metal struts. Deployable cover completely blocks one edge of the chosen square, allowing you (and others) to gain standard cover when you use the Take Cover action."
+          },
+          "BALLISTIC_COVER": {
+            "NAME": "Ballistic Cover",
+            "DESCRIPTION": "Specially crafted to protect against bullet fire, a ballistic cover also works against other physical projectiles. While a creature has cover from Taking Cover behind a ballistic cover, it gains resistance 2 to piercing damage from ranged weapons and ranged unarmed attacks."
+          },
+          "SEE_INVISIBILITY": {
+            "NAME": "See Invisibility",
+            "DESCRIPTION": "You can see invisible creatures and objects. They appear translucent and are concealed to you."
+          },
+          "BLIND_FIGHT": {
+            "NAME": "Blind-Fight",
+            "DESCRIPTION": "Your battle insight lets you react to foes you can barely detect. You ignore the concealed condition from creatures who are hidden or undetected."
+          },
+          "CONSECRATE": {
+            "NAME": "Consecrate (vs Undead)",
+            "DESCRIPTION": "The consecrated area makes undead uneasy. Undead creatures in the area are concealed to everyone."
+          },
+          "DARKVISION_CONDITIONAL": {
+            "NAME": "Darkvision (Conditional)",
+            "DESCRIPTION": "Darkvision only works in darkness or dim light."
+          }
+        }
+      },
+      "VISIBILITY": {
+        "NAME": "PF2eVisionerVisibility",
+        "DESCRIPTION": "Change visibility statuses and apply ephemeral effects programmatically",
+        "EXAMPLES": {
+          "HIDE": {
+            "NAME": "Hide",
+            "DESCRIPTION": "<p>You become hidden to all creatures.</p><p>Use this when you successfully Hide.</p>"
+          },
+          "CONCEAL_TARGET": {
+            "NAME": "Conceal Target",
+            "DESCRIPTION": "<p>You magically conceal the target from all observers.</p>"
+          },
+          "OBSCURING_MIST": {
+            "NAME": "Obscuring Mist",
+            "DESCRIPTION": "<p>You surround yourself with a mist that makes you harder to see.</p>"
+          },
+          "REVEAL": {
+            "NAME": "Reveal",
+            "DESCRIPTION": "<p>You reveal the target, making them easier to see.</p>"
+          },
+          "ENHANCED_VISION": {
+            "NAME": "Enhanced Vision",
+            "DESCRIPTION": "<p>You can see hidden creatures better.</p>"
+          },
+          "BLUR_VISION": {
+            "NAME": "Blur Vision",
+            "DESCRIPTION": "<p>You blur the target's vision, making it harder for them to see others.</p>"
+          }
+        }
       }
     },
     "SEEK_AUTOMATION": {
