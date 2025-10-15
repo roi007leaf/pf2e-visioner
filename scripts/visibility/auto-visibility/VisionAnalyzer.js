@@ -196,6 +196,12 @@ export class VisionAnalyzer {
       return true;
     }
 
+    // Check if LOS calculation is disabled
+    const losDisabled = game.settings.get(MODULE_ID, 'disableLineOfSightCalculation');
+    if (losDisabled) {
+      return undefined;
+    }
+
     let stage = 'init';
     try {
       // Check for 3D collision using Levels if available
@@ -215,13 +221,6 @@ export class VisionAnalyzer {
         const intersection = los.intersectCircle(circle, { density: 8, scalingFactor: 1.0 });
         const visible = intersection?.points?.length > 0;
         if (visible || !canvas.effects?.darknessSources?.length) return visible;
-      }
-
-      // Check if LOS calculation is disabled
-      stage = 'settings-check';
-      const losDisabled = game.settings.get(MODULE_ID, 'disableLineOfSightCalculation');
-      if (losDisabled) {
-        return undefined;
       }
 
       // Use multi-point geometric sampling with cached wall filtering
