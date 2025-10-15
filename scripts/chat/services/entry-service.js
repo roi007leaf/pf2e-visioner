@@ -253,7 +253,9 @@ export async function handleRenderChatMessage(message, html) {
       const actor = actorToken?.actor || actorToken?.document?.actor || null;
       // Only the message author client should create the effect to prevent duplicates across connected players
       const isMessageAuthorClient = message.author?.id === game.user.id;
-      if (actor && !hasStartedSneak && isMessageAuthorClient) {
+      // Only apply movement prevention if AVS is enabled
+      const avsEnabled = game.settings?.get?.('pf2e-visioner', 'autoVisibilityEnabled') ?? false;
+      if (actor && !hasStartedSneak && isMessageAuthorClient && avsEnabled) {
         // Check for existing waiting effect by slug
         const existing = actor.itemTypes?.effect?.find?.(e => e?.system?.slug === 'waiting-for-sneak-start');
         if (!existing) {

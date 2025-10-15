@@ -193,7 +193,9 @@ export async function registerHooks() {
 
       // Prevent movement while awaiting Start Sneak confirmation (MUST BE SYNCHRONOUS)
       // Allow GMs to always move
-      if (!game.users?.get(userId)?.isGM) {
+      // Only block movement if AVS is enabled
+      const avsEnabled = game.settings?.get?.('pf2e-visioner', 'autoVisibilityEnabled') ?? false;
+      if (!game.users?.get(userId)?.isGM && avsEnabled) {
         const actor = tokenDoc?.actor;
         if (actor) {
           // Determine waiting state either via our custom token flag or effect slug.
@@ -302,8 +304,11 @@ export async function registerHooks() {
       // Find any active tokens for this actor on the current scene
       const tokens = canvas.tokens?.placeables?.filter((t) => t.actor?.id === actor.id) || [];
 
+      // Only handle sneak-related cleanup if AVS is enabled
+      const avsEnabled = game.settings?.get?.('pf2e-visioner', 'autoVisibilityEnabled') ?? false;
+
       // Handle waiting-for-sneak-start effect removal
-      if (item?.system?.slug === 'waiting-for-sneak-start') {
+      if (item?.system?.slug === 'waiting-for-sneak-start' && avsEnabled) {
         for (const t of tokens) {
           if (t.document.getFlag('pf2e-visioner', 'waitingSneak')) {
             try {
@@ -318,7 +323,7 @@ export async function registerHooks() {
 
       // Handle Sneaking effect removal - clear sneak-active flag as failsafe
       const isSneakingEffect = item?.flags?.['pf2e-visioner']?.sneakingEffect;
-      if (isSneakingEffect) {
+      if (isSneakingEffect && avsEnabled) {
         for (const t of tokens) {
           const hasSneakActive = t.document.getFlag('pf2e-visioner', 'sneak-active');
           if (hasSneakActive) {

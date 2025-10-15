@@ -66,30 +66,33 @@ export class SneakDialogService {
       const startStates = {};
 
       // Remove waiting-for-sneak-start effect (if present) and unlock token before proceeding
-      try {
-        const actor = token?.actor;
-        if (actor) {
-          const waiting = actor.itemTypes?.effect?.find?.(
-            (e) => e?.system?.slug === 'waiting-for-sneak-start',
-          );
-          if (waiting) {
-            try {
-              await actor.deleteEmbeddedDocuments('Item', [waiting.id]);
-            } catch (e) {
-              console.warn('PF2E Visioner | Failed to remove waiting-for-sneak-start effect:', e);
+      // Only if AVS is enabled
+      if (avsEnabled) {
+        try {
+          const actor = token?.actor;
+          if (actor) {
+            const waiting = actor.itemTypes?.effect?.find?.(
+              (e) => e?.system?.slug === 'waiting-for-sneak-start',
+            );
+            if (waiting) {
+              try {
+                await actor.deleteEmbeddedDocuments('Item', [waiting.id]);
+              } catch (e) {
+                console.warn('PF2E Visioner | Failed to remove waiting-for-sneak-start effect:', e);
+              }
             }
           }
+          try {
+            const tokenObj = canvas.tokens.get(token.id);
+            if (tokenObj) tokenObj.locked = false;
+          } catch { }
+          // Clear waiting flag so movement is allowed
+          try {
+            await token.document.unsetFlag('pf2e-visioner', 'waitingSneak');
+          } catch { }
+        } catch (cleanupErr) {
+          console.warn('PF2E Visioner | Cleanup waiting effect failed:', cleanupErr);
         }
-        try {
-          const tokenObj = canvas.tokens.get(token.id);
-          if (tokenObj) tokenObj.locked = false;
-        } catch { }
-        // Clear waiting flag so movement is allowed
-        try {
-          await token.document.unsetFlag('pf2e-visioner', 'waitingSneak');
-        } catch { }
-      } catch (cleanupErr) {
-        console.warn('PF2E Visioner | Cleanup waiting effect failed:', cleanupErr);
       }
 
       // Get all potential observer tokens (non-allied tokens). Include Foundry-hidden; UI handles visual filtering.
@@ -196,8 +199,10 @@ export class SneakDialogService {
         console.warn('PF2E Visioner | Failed to store sneak start position:', posErr);
       }
 
-      // Set sneak flag on the token to indicate it's currently sneaking
-      await token.document.setFlag('pf2e-visioner', SNEAK_FLAGS.SNEAK_ACTIVE, true);
+      // Set sneak flag on the token to indicate it's currently sneaking (only if AVS enabled)
+      if (avsEnabled) {
+        await token.document.setFlag('pf2e-visioner', SNEAK_FLAGS.SNEAK_ACTIVE, true);
+      }
 
       // Apply speed halving while sneaking
       try {
