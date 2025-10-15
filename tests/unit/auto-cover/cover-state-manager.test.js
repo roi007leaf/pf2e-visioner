@@ -5,6 +5,14 @@
 
 import '../../setup.js';
 
+// Mock rule element service to return input unchanged
+jest.mock('../../../scripts/services/RuleElementService.js', () => ({
+  ruleElementService: {
+    applyCoverModifiers: jest.fn((observer, target, baseCover) => baseCover),
+    applyVisibilityModifiers: jest.fn((observer, target, baseState) => baseState),
+  },
+}));
+
 describe('CoverStateManager', () => {
   let coverStateManager;
   let sourceToken, targetToken;

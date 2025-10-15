@@ -71,9 +71,9 @@ export class HideActionHandler extends ActionHandlerBase {
     return base;
   }
   async analyzeOutcome(actionData, subject) {
-    const { getVisibilityBetween } = await import('../../../utils.js');
+    const { getVisibilityBetweenWithRuleElements, getCoverBetweenWithRuleElements } = await import('../../../services/rule-element-aware-utils.js');
     const { extractPerceptionDC, determineOutcome } = await import('../infra/shared-utils.js');
-    const current = getVisibilityBetween(subject, actionData.actor);
+    const current = getVisibilityBetweenWithRuleElements(subject, actionData.actor);
 
     // Calculate auto-cover from observer's perspective looking at the hiding actor
     let adjustedDC = extractPerceptionDC(subject);
@@ -91,8 +91,8 @@ export class HideActionHandler extends ActionHandlerBase {
 
       // Compute base cover (manual first, then auto-cover fallback)
       try {
-        // First check for manual cover
-        const manualDetected = getCoverBetween(subject, hidingToken);
+        // First check for manual cover (with rule element modifiers)
+        const manualDetected = getCoverBetweenWithRuleElements(subject, hidingToken);
         if (manualDetected && manualDetected !== 'none') {
           coverState = manualDetected;
           coverSource = 'manual';
@@ -283,7 +283,7 @@ export class HideActionHandler extends ActionHandlerBase {
         { forceFresh: true, useCurrentPositionForCover: true }
       );
       const startVisibility = current;
-      const endVisibility = endSnapshot?.avsVisibility || current;
+      const endVisibility = endSnapshot?.effectiveVisibility || endSnapshot?.avsVisibility || current;
       const endCoverState = endSnapshot?.coverState || 'none';
       // Hide: you must have cover or concealment now to attempt (observed without either disqualifies unless feats)
       const startQualifies = (startVisibility === 'hidden' || startVisibility === 'undetected' || startVisibility === 'concealed') || (endCoverState === 'standard' || endCoverState === 'greater');

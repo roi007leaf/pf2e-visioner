@@ -124,7 +124,7 @@ export class SeekActionHandler extends ActionHandlerBase {
 
   async analyzeOutcome(actionData, subject) {
     const { MODULE_ID } = await import('../../../constants.js');
-    const { getVisibilityBetween } = await import('../../../utils.js');
+    const { getVisibilityBetweenWithRuleElements } = await import('../../../services/rule-element-aware-utils.js');
     const { extractStealthDC, determineOutcome } = await import('../infra/shared-utils.js');
 
     let current = 'hidden';
@@ -177,7 +177,7 @@ export class SeekActionHandler extends ActionHandlerBase {
       // Get the observer token from the actor
       const observerToken =
         actionData.actorToken || actionData.actor?.token?.object || actionData.actor;
-      current = getVisibilityBetween(observerToken, subject);
+      current = getVisibilityBetweenWithRuleElements(observerToken, subject);
 
       // Proficiency gating for hazards/loot (skip if That's Odd guarantees detection)
       try {

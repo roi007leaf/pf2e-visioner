@@ -388,8 +388,11 @@ export class SneakActionHandler extends ActionHandlerBase {
       });
     }
 
-    const { getVisibilityBetween } = await import('../../../utils.js');
+    const { getVisibilityBetweenWithRuleElements } = await import('../../../services/rule-element-aware-utils.js');
     const { extractPerceptionDC, determineOutcome } = await import('../infra/shared-utils.js');
+    
+    // Cache the rule-element-aware function for use in IIFE below
+    const getVisWithRE = getVisibilityBetweenWithRuleElements;
 
     // Use fresh visibility calculation that accounts for darkvision instead of stored state
     let current;
@@ -403,7 +406,7 @@ export class SneakActionHandler extends ActionHandlerBase {
         'PF2E Visioner | Failed to calculate fresh visibility, using stored state:',
         error,
       );
-      current = getVisibilityBetween(subject, actionData.actor);
+      current = getVisibilityBetweenWithRuleElements(subject, actionData.actor);
     }
 
     // Terrain Stalker free Sneak: if criteria met, skip Stealth check and keep visibility
@@ -894,10 +897,10 @@ export class SneakActionHandler extends ActionHandlerBase {
           }
         }
         if (avsOverride) return avsOverride;
-        // 2. Manual state (getVisibilityBetween)
+        // 2. Manual state (getVisibilityBetweenWithRuleElements - cached at top of function)
         let manualState = null;
         try {
-          manualState = getVisibilityBetween(subject, actionData.actor);
+          manualState = getVisWithRE(subject, actionData.actor);
         } catch { }
         if (manualState) return manualState;
         // 3. AVS calculation (position tracker)

@@ -123,6 +123,26 @@ class AttackRollUseCase extends BaseAutoCoverUseCase {
     if (!attacker || !target) return;
     const manualCover = getCoverBetween(attacker, target);
     let state = this._detectCover(attacker, target);
+    console.log('PF2E Visioner | Dialog - Before rule elements:', {
+      attacker: attacker.name,
+      target: target.name,
+      detectedCover: state,
+      manualCover,
+    });
+
+    // Apply rule element modifiers to the detected cover state
+    try {
+      const { ruleElementService } = await import('../../../services/RuleElementService.js');
+      const modifiedState = ruleElementService.applyCoverModifiers(state, attacker, target);
+      console.log('PF2E Visioner | Dialog - After rule elements:', {
+        originalState: state,
+        modifiedState,
+        changed: state !== modifiedState,
+      });
+      state = modifiedState;
+    } catch (e) {
+      console.warn('PF2E Visioner | Failed to apply cover rule elements in dialog:', e);
+    }
 
     // Delegate dialog UI injection to CoverUIManager
     try {
@@ -137,11 +157,6 @@ class AttackRollUseCase extends BaseAutoCoverUseCase {
             if (attacker && target && manualCover === 'none' && chosen !== state) {
               // Use the correctly resolved token objects from outer scope
               this.autoCoverSystem.setDialogOverride(attacker, target, chosen, state);
-            } else {
-              console.warn('PF2E Visioner | Could not resolve token objects for dialog override', {
-                hasAttacker: !!attacker,
-                hasTarget: !!target,
-              });
             }
           } catch (e) {
             console.warn('PF2E Visioner | Failed to set dialog override:', e);
@@ -270,6 +285,12 @@ class AttackRollUseCase extends BaseAutoCoverUseCase {
 
         const manualCover = getCoverBetween(attacker, target);
         const detected = this._detectCover(attacker, target);
+        console.log('PF2E Visioner | Check Roll - Before rule elements:', {
+          attacker: attacker.name,
+          target: target.name,
+          detectedCover: detected,
+          manualCover,
+        });
         let chosen = null;
         try {
           // Only show popup if keybind is held
@@ -280,8 +301,26 @@ class AttackRollUseCase extends BaseAutoCoverUseCase {
         }
 
         // If popup was used and a choice was made, use it; otherwise, use detected state
-        const finalState =
+        let finalState =
           chosen !== null ? chosen : manualCover !== 'none' ? manualCover : detected;
+        console.log('PF2E Visioner | Check Roll - Before applying rule elements:', {
+          chosen,
+          finalStateBeforeRules: finalState,
+        });
+
+        // Apply rule element modifiers to the final cover state
+        try {
+          const { ruleElementService } = await import('../../../services/RuleElementService.js');
+          const modifiedState = ruleElementService.applyCoverModifiers(finalState, attacker, target);
+          console.log('PF2E Visioner | Check Roll - After rule elements:', {
+            originalState: finalState,
+            modifiedState,
+            changed: finalState !== modifiedState,
+          });
+          finalState = modifiedState;
+        } catch (e) {
+          console.warn('PF2E Visioner | Failed to apply cover rule elements:', e);
+        }
 
         // Store the override for onPreCreateChatMessage if popup was used
         if (chosen && manualCover === 'none' && chosen !== detected) {

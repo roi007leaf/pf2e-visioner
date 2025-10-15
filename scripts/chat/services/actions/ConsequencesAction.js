@@ -67,13 +67,13 @@ export class ConsequencesActionHandler extends ActionHandlerBase {
     });
 
     // Apply RAW enforcement if enabled
-    const { getVisibilityBetween } = await import('../../../utils.js');
+    const { getVisibilityBetweenWithRuleElements } = await import('../../../services/rule-element-aware-utils.js');
 
     // Filter to only include targets that the attacker is Hidden or Undetected from
     potential = potential.filter((subject) => {
       try {
         // Check visibility state from the subject's perspective toward the attacker
-        const visibility = getVisibilityBetween(subject, attacker);
+        const visibility = getVisibilityBetweenWithRuleElements(subject, attacker);
         const isValidTarget = visibility === 'undetected' || visibility === 'hidden';
 
         return isValidTarget;
@@ -94,8 +94,8 @@ export class ConsequencesActionHandler extends ActionHandlerBase {
     return potential;
   }
   async analyzeOutcome(actionData, subject) {
-    const { getVisibilityBetween } = await import('../../../utils.js');
-    const currentVisibility = getVisibilityBetween(subject, actionData.actor);
+    const { getVisibilityBetweenWithRuleElements } = await import('../../../services/rule-element-aware-utils.js');
+    const currentVisibility = getVisibilityBetweenWithRuleElements(subject, actionData.actor);
     return {
       target: subject,
       currentVisibility,

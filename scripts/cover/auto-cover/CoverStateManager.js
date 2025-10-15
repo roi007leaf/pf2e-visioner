@@ -5,6 +5,7 @@
 
 import { MODULE_ID } from '../../constants.js';
 import { getCoverBonusByState } from '../../helpers/cover-helpers.js';
+import { ruleElementService } from '../../services/RuleElementService.js';
 
 export class CoverStateManager {
   /**
@@ -58,6 +59,8 @@ export class CoverStateManager {
   async setCoverBetween(source, target, state, options = {}) {
     if (!source?.document || !target?.document) return;
 
+    let modifiedState = ruleElementService.applyCoverModifiers(source, target, state);
+
     // Get current cover map for source
     const coverMap =
       source.document.getFlag(CoverStateManager.FLAG_SCOPE, CoverStateManager.FLAG_KEY) || {};
@@ -66,7 +69,9 @@ export class CoverStateManager {
     const currentState = coverMap[target.document.id] || 'none';
 
     // If no change needed, skip the update
-    if (currentState === state) return;
+    if (currentState === modifiedState) return;
+    
+    state = modifiedState;
 
     // Create updated map
     const updatedMap = { ...coverMap };

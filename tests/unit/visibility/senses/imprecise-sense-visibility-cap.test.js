@@ -5,6 +5,13 @@
 import { SeekActionHandler } from '../../../../scripts/chat/services/actions/SeekAction.js';
 import { VisionAnalyzer } from '../../../../scripts/visibility/auto-visibility/VisionAnalyzer.js';
 
+jest.mock('../../../../scripts/services/rule-element-aware-utils.js', () => ({
+  getVisibilityBetweenWithRuleElements: jest.fn((observer, target) => {
+    return 'undetected';
+  }),
+  getCoverBetweenWithRuleElements: jest.fn(() => 'none'),
+}));
+
 // Mock canvas and game globals
 global.canvas = {
   grid: { size: 100 },

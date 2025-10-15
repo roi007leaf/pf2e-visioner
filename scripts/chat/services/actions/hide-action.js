@@ -289,7 +289,7 @@ export class HideActionHandler extends ActionHandlerBase {
         { forceFresh: true, useCurrentPositionForCover: true }
       );
       const startVisibility = current;
-      const endVisibility = endSnapshot?.avsVisibility || current;
+      const endVisibility = endSnapshot?.effectiveVisibility || endSnapshot?.avsVisibility || current;
       const endCoverState = endSnapshot?.coverState || 'none';
       // Hide: you must have cover or concealment now to attempt (observed without either disqualifies unless feats)
       const startQualifies = (startVisibility === 'hidden' || startVisibility === 'undetected' || startVisibility === 'concealed') || (endCoverState === 'standard' || endCoverState === 'greater');

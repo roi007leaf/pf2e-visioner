@@ -6,6 +6,7 @@
 
 import { COVER_STATES, MODULE_ID } from '../../../constants.js';
 import errorHandlingService, { SYSTEM_TYPES } from '../infra/ErrorHandlingService.js';
+import { ruleElementService } from '../../../services/RuleElementService.js';
 
 /**
  * Options for system integration calls
@@ -246,7 +247,7 @@ export class DualSystemIntegration {
       }
 
       // Calculate combined effective visibility and stealth bonus
-      const effectiveVisibility = this._combineSystemStates(avsResult.data, coverResult.data.state);
+      const effectiveVisibility = this._combineSystemStates(avsResult.data, coverResult.data.state, targetToken);
       const stealthBonus = coverResult.data.bonus || 0;
 
       return {
@@ -686,7 +687,7 @@ export class DualSystemIntegration {
    * @returns {string} Combined effective visibility
    * @private
    */
-  _combineSystemStates(avsVisibility, coverState) {
+  _combineSystemStates(avsVisibility, coverState, token = null) {
     // If already hidden or undetected, cover doesn't change that
     if (['hidden', 'undetected'].includes(avsVisibility)) {
       return avsVisibility;
@@ -695,6 +696,32 @@ export class DualSystemIntegration {
     // If observed but has cover that allows hiding, consider it concealed
     if (avsVisibility === 'observed' && coverState && COVER_STATES[coverState]?.canHide) {
       return 'concealed';
+    }
+
+    // Check for visibility rule element modifiers
+    if (token) {
+      try {
+        const visibilityRules = ruleElementService.getVisibilityRuleElements(token);
+        
+        // If observed but has qualifyConcealment=true, treat as concealed for action prerequisites
+        if (avsVisibility === 'observed') {
+          const hasQualifyConcealment = visibilityRules.some(re => re.rule?.qualifyConcealment === true);
+          if (hasQualifyConcealment) {
+            return 'concealed';
+          }
+        }
+        
+        // If concealed but has qualifyConcealment=false, treat as observed for action prerequisites
+        // (like Blur: concealed for attacks, but can't Hide/Sneak)
+        if (avsVisibility === 'concealed') {
+          const hasDisqualifyConcealment = visibilityRules.some(re => re.rule?.qualifyConcealment === false);
+          if (hasDisqualifyConcealment) {
+            return 'observed';
+          }
+        }
+      } catch (e) {
+        // Silently fail if rule element check fails
+      }
     }
 
     // Otherwise, return the AVS visibility state

@@ -5,6 +5,22 @@
 
 import { SeekActionHandler } from '../../../scripts/chat/services/actions/SeekAction.js';
 
+// Mock rule-element-aware utils - delegates to getVisibilityBetween if it's mocked
+const mockGetVisibilityBetweenWithRE = jest.fn((observer, target) => {
+  try {
+    const { getVisibilityBetween } = require('../../../scripts/utils.js');
+    if (getVisibilityBetween && typeof getVisibilityBetween.mock === 'object') {
+      return getVisibilityBetween(observer, target);
+    }
+  } catch {}
+  return target?._testVisibility || 'undetected';
+});
+
+jest.mock('../../../scripts/services/rule-element-aware-utils.js', () => ({
+  getVisibilityBetweenWithRuleElements: mockGetVisibilityBetweenWithRE,
+  getCoverBetweenWithRuleElements: jest.fn(() => 'none'),
+}));
+
 // Mock VisionAnalyzer
 jest.mock('../../../scripts/visibility/auto-visibility/VisionAnalyzer.js', () => ({
     VisionAnalyzer: {

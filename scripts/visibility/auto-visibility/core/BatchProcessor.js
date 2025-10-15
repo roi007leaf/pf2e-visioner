@@ -11,6 +11,7 @@ import { SensesCapabilitiesCache } from "./SensesCapabilitiesCache.js";
 import { ViewportFilterService } from "./ViewportFilterService.js";
 import { VisibilityMapBatchCache } from "./VisibilityMapBatchCache.js";
 import { VisibilityMapService } from "./VisibilityMapService.js";
+import { ruleElementService } from "../../../services/RuleElementService.js";
 
 /**
  * BatchProcessor centralizes the heavy per-batch computation:
@@ -463,6 +464,12 @@ export class BatchProcessor {
                         breakdown.pairsCached++;
                     }
                     effectiveVisibility1 = visibility1;
+
+                    effectiveVisibility1 = ruleElementService.applyVisibilityModifiers(
+                        effectiveVisibility1,
+                        changedToken,
+                        otherToken
+                    );
                 }
                 // Direction 2: otherToken -> changedToken (only calculate if no override)
                 if (!hasOverride2) {
@@ -509,6 +516,12 @@ export class BatchProcessor {
                         breakdown.pairsCached++;
                     }
                     effectiveVisibility2 = visibility2;
+
+                    effectiveVisibility2 = ruleElementService.applyVisibilityModifiers(
+                        effectiveVisibility2,
+                        otherToken,
+                        changedToken
+                    );
                 }
 
                 // Queue updates if changed from ORIGINAL map state (before any calculations)

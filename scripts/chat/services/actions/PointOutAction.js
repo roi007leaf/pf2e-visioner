@@ -80,9 +80,9 @@ export class PointOutActionHandler extends ActionHandlerBase {
     return cannotSee.map((ally) => ({ ally, target }));
   }
 
-  async analyzeOutcome(_actionData, subject) {
-    const { getVisibilityBetween } = await import('../../../utils.js');
-    const current = getVisibilityBetween(subject.ally, subject.target);
+  async analyzeOutcome(actionData, subject) {
+    const { getVisibilityBetweenWithRuleElements } = await import('../../../services/rule-element-aware-utils.js');
+    const current = getVisibilityBetweenWithRuleElements(subject.ally, subject.target);
     // Point Out reveals target to allies as hidden if they currently cannot see it
     const newVisibility = current === 'hidden' || current === 'undetected' ? 'hidden' : current;
     return {

@@ -57,9 +57,9 @@ export class DiversionActionHandler extends ActionHandlerBase {
     );
   }
   async analyzeOutcome(actionData, subject) {
-    const { getVisibilityBetween } = await import('../../../utils.js');
+    const { getVisibilityBetweenWithRuleElements } = await import('../../../services/rule-element-aware-utils.js');
     const { extractPerceptionDC, determineOutcome } = await import('../infra/shared-utils.js');
-    const current = getVisibilityBetween(subject, actionData.actor);
+    const current = getVisibilityBetweenWithRuleElements(subject, actionData.actor);
 
     // Diversion roll vs observer Perception DC
     const dc = extractPerceptionDC(subject);

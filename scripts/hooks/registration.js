@@ -10,6 +10,7 @@ import { registerCombatHooks } from './combat.js';
 import { onCanvasReady, onReady } from './lifecycle.js';
 import { registerTokenHooks } from './token-events.js';
 import { registerUIHooks } from './ui.js';
+import { registerRuleElementHooks } from './rule-element-hooks.js';
 
 export async function registerHooks() {
   Hooks.on('ready', onReady);
@@ -49,6 +50,9 @@ export async function registerHooks() {
   registerUIHooks();
   registerCombatHooks();
   AutoCoverHooks.registerHooks();
+  
+  // Rule element lifecycle
+  registerRuleElementHooks();
 
   // Register effect perception hooks for automatic perception refresh
   // These work independently of the Auto-Visibility System
