@@ -1221,7 +1221,8 @@ export class SneakActionHandler extends ActionHandlerBase {
    */
   async _clearSneakFlag(actionData) {
     try {
-      if (actionData?.sneakingToken) {
+      const avsEnabled = game.settings?.get?.('pf2e-visioner', 'autoVisibilityEnabled') ?? false;
+      if (actionData?.sneakingToken && avsEnabled) {
         await actionData.sneakingToken.document.unsetFlag('pf2e-visioner', 'sneak-active');
         // Restore walk speed after sneak ends
         try {

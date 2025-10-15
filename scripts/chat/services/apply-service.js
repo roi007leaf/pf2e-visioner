@@ -81,7 +81,9 @@ export async function applyNowSneak(actionData, button) {
       handler.updateButtonToRevert(button);
 
       // Only clear sneak-active flag and restore speed if applying to all tokens (no overrides)
-      if (!actionData.overrides || Object.keys(actionData.overrides).length === 0) {
+      // Only if AVS is enabled
+      const avsEnabled = game.settings?.get?.('pf2e-visioner', 'autoVisibilityEnabled') ?? false;
+      if ((!actionData.overrides || Object.keys(actionData.overrides).length === 0) && avsEnabled) {
         const sneakingToken = handler._getSneakingToken(actionData);
         if (sneakingToken) {
           await sneakingToken.document.unsetFlag('pf2e-visioner', 'sneak-active');

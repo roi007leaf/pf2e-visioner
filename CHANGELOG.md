@@ -1,5 +1,11 @@
 # Changelog
 
+## [4.4.1] - 2025-10-15
+
+### Changes
+
+- Disable sneak fancy functions like blocking movement until start sneak and hide sneaking token if avs is turned off
+
 ## [4.4.0] - 2025-10-14
 
 ### ✨ Features

@@ -528,6 +528,10 @@
         "name": "Ustaw domyślny stan „Ukryj Foundry”",
         "hint": "Określa, czy pole wyboru Ukryj Foundry w oknach dialogowych Menedżera Wizji / Akcji jest domyślnie włączone czy wyłączone, ale nadal można je ręcznie przełączać."
       },
+      "SNEAK_ALLOW_HIDDEN_UNDETECTED_END_POSITION": {
+        "name": "Zezwól na stan Ukryty/ Niewykryty dla pozycji końcowej Skradania się",
+        "hint": "Po włączeniu tej opcji pozycje końcowe Skradania będą również kwalifikować się, jeśli cel jest Ukryty lub Niewykryty (oprócz domyślnego stanu przysłonięty). W oknie dialogowym pojawi się ikona plusa, aby wskazać te rozszerzone kwalifikowanie."
+      },
       "ENABLE_ALL_TOKENS_VISION": {
         "name": "Wizja dla bohaterów niezależnych",
         "hint": "Umożliwia wszystkim tokenom BN łatwiejsze obserwowanie punktu widzenia."
@@ -836,6 +840,8 @@
       "END_POS_CHECK_END_TURN": "Pozycja końcowa zostanie sprawdzona na koniec tury (kolejne skradanie się)",
       "END_POS_QUALIFIES": "Pozycja końcowa kwalifikuje się do skradania się",
       "END_POS_NOT_QUALIFIES": "cPozycja końcowa nie kwalifikuje się do skradania się",
+      "END_POS_QUALIFIES_EXTENDED": "Pozycja końcowa kwalifikuje się do skradania się (dozwolone jest również stan Ukryty / Niewykryty).",
+      "CONCEALED_HIDDEN_UNDETECTED": "Przysłonięty, Ukryty, lub Niewykryty (aktywna reguła rozszerzona)",
       "AVS_RECOMMENDED": "Zalecane przez AVS: {label}",
       "TOGGLE_MODE_TOOLTIP": "Kliknij, aby przełączać się między trybem obserwatora a trybem celu.",
       "ONLY_SHOW_ENCOUNTER_TOOLTIP": "Pokaż tylko tokeny w bieżącym starciu",
