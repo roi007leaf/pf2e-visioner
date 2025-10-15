@@ -390,7 +390,7 @@ export class SneakActionHandler extends ActionHandlerBase {
 
     const { getVisibilityBetweenWithRuleElements } = await import('../../../services/rule-element-aware-utils.js');
     const { extractPerceptionDC, determineOutcome } = await import('../infra/shared-utils.js');
-    
+
     // Cache the rule-element-aware function for use in IIFE below
     const getVisWithRE = getVisibilityBetweenWithRuleElements;
 

@@ -11,6 +11,7 @@ Visioner rule elements are now fully integrated into the module's core systems. 
 **Purpose:** Central service that manages rule element querying, caching, and application.
 
 **Key Responsibilities:**
+
 - Extract rule elements from actor items
 - Cache rule elements per token (1-second TTL)
 - Test predicates with roll options
@@ -18,26 +19,27 @@ Visioner rule elements are now fully integrated into the module's core systems. 
 - Manage sense modifications
 
 **Public Methods:**
+
 ```javascript
 // Get all rule elements for a token
-getRuleElementsForToken(token)
+getRuleElementsForToken(token);
 
 // Get specific types
-getVisibilityRuleElements(token)
-getCoverRuleElements(token)
-getDetectionRuleElements(token)
+getVisibilityRuleElements(token);
+getCoverRuleElements(token);
+getDetectionRuleElements(token);
 
 // Test if a rule element should apply
-shouldApplyRuleElement(ruleElement, context)
+shouldApplyRuleElement(ruleElement, context);
 
 // Apply modifiers
-applyVisibilityModifiers(baseVisibility, observer, target)
-applyCoverModifiers(baseCover, observer, target)
-getModifiedSenses(token)
+applyVisibilityModifiers(baseVisibility, observer, target);
+applyCoverModifiers(baseCover, observer, target);
+getModifiedSenses(token);
 
 // Cache management
-clearCache(tokenId)
-invalidateCacheForActor(actorUuid)
+clearCache(tokenId);
+invalidateCacheForActor(actorUuid);
 ```
 
 ### 2. AVS Integration (`BatchProcessor.js`)
@@ -45,22 +47,24 @@ invalidateCacheForActor(actorUuid)
 **Location:** `scripts/visibility/auto-visibility/core/BatchProcessor.js`
 
 **Integration Points:**
+
 ```javascript
 // After calculating visibility, apply rule element modifiers
 effectiveVisibility1 = ruleElementService.applyVisibilityModifiers(
-    effectiveVisibility1,
-    changedToken,
-    otherToken
+  effectiveVisibility1,
+  changedToken,
+  otherToken,
 );
 
 effectiveVisibility2 = ruleElementService.applyVisibilityModifiers(
-    effectiveVisibility2,
-    otherToken,
-    changedToken
+  effectiveVisibility2,
+  otherToken,
+  changedToken,
 );
 ```
 
 **How It Works:**
+
 1. AVS calculates base visibility between tokens
 2. Rule element service checks both observer and target for visibility rule elements
 3. For each applicable rule element (passing predicates), modifiers are applied:
@@ -70,6 +74,7 @@ effectiveVisibility2 = ruleElementService.applyVisibilityModifiers(
 4. Modified visibility is used for updates
 
 **Performance:**
+
 - Rule elements cached per token (1s TTL)
 - Only checked when visibility is actually calculated
 - No overhead when tokens have no rule elements
@@ -79,16 +84,18 @@ effectiveVisibility2 = ruleElementService.applyVisibilityModifiers(
 **Location:** `scripts/cover/auto-cover/CoverStateManager.js`
 
 **Integration Point:**
+
 ```javascript
 async setCoverBetween(source, target, state, options = {}) {
     // Apply rule element modifiers immediately
     let modifiedState = ruleElementService.applyCoverModifiers(state, source, target);
-    
+
     // ... rest of cover setting logic
 }
 ```
 
 **How It Works:**
+
 1. Cover is calculated or set manually
 2. Rule element service checks both source and target for cover rule elements
 3. For each applicable rule element (passing predicates), modifiers are applied:
@@ -99,6 +106,7 @@ async setCoverBetween(source, target, state, options = {}) {
 4. Modified cover is persisted to flags
 
 **Use Cases:**
+
 - Feat grants "always has standard cover"
 - Ability negates cover against specific enemies
 - Condition increases cover effectiveness
@@ -108,6 +116,7 @@ async setCoverBetween(source, target, state, options = {}) {
 **Location:** `scripts/hooks/rule-element-hooks.js`
 
 **Registered Hooks:**
+
 - `createItem` - Invalidate when items added
 - `updateItem` - Invalidate when items modified
 - `deleteItem` - Invalidate when items removed
@@ -119,6 +128,7 @@ async setCoverBetween(source, target, state, options = {}) {
 
 **Why It Matters:**
 Ensures rule element cache stays fresh when:
+
 - Effects expire or are removed
 - Items are equipped/unequipped
 - Token actors change
@@ -186,15 +196,16 @@ When testing predicates, the service builds a context with roll options:
 const context = {
   token: observerToken,
   target: targetToken,
-  visibility: currentVisibility,  // e.g., "hidden"
-  cover: currentCover,            // e.g., "standard"
-  lighting: lightingLevel,        // e.g., "partial"
-  avs: isAVSEnabled,              // true/false
-  customOptions: []               // Additional options
+  visibility: currentVisibility, // e.g., "hidden"
+  cover: currentCover, // e.g., "standard"
+  lighting: lightingLevel, // e.g., "partial"
+  avs: isAVSEnabled, // true/false
+  customOptions: [], // Additional options
 };
 ```
 
 These are converted to roll options:
+
 - `self:token`
 - `self:actor:character`
 - `target:token`
@@ -211,11 +222,13 @@ Plus all custom Visioner roll options from BaseVisionerRuleElement.
 ### Caching Strategy
 
 **Token-level cache (1s TTL):**
+
 - Extracts rule elements from actor items once
 - Reuses for all calculations within 1 second
 - Invalidated on item/effect changes
 
 **Why 1 second?**
+
 - Long enough for batch processing (multiple token pairs)
 - Short enough to respond to quick changes
 - Balances freshness with performance
@@ -243,15 +256,18 @@ Plus all custom Visioner roll options from BaseVisionerRuleElement.
 ### Performance Impact
 
 **Baseline (no rule elements):**
+
 - Negligible overhead (~0.1ms per token pair)
 - Cache check is fast Set lookup
 
 **With rule elements:**
+
 - First access: ~2-5ms (extract from items)
 - Cached access: ~0.2-0.5ms (predicate test + modifier)
 - Amortized across batch: minimal impact
 
 **Worst case (many rule elements):**
+
 - 10 rule elements per token: ~1-2ms overhead
 - Still acceptable within batch processing budget
 - AVS already handles hundreds of token pairs efficiently
@@ -270,6 +286,7 @@ try {
 ```
 
 **Philosophy:**
+
 - Rule elements enhance behavior, don't break it
 - If rule element fails, system continues normally
 - Errors logged for debugging but don't block gameplay
@@ -277,6 +294,7 @@ try {
 ### Predicate Fallback
 
 If PF2e Predicate system unavailable:
+
 ```javascript
 #testPredicateFallback(predicate, rollOptions) {
   // Simple AND logic
@@ -290,38 +308,38 @@ If PF2e Predicate system unavailable:
 ### Unit Tests
 
 Test the service in isolation:
+
 ```javascript
 // Mock tokens with rule elements
 const token = createMockToken({
   actor: {
     items: [
-      createMockItem({ 
-        rules: [{ 
-          key: 'PF2eVisionerVisibility',
-          mode: 'increase',
-          steps: 1
-        }]
-      })
-    ]
-  }
+      createMockItem({
+        rules: [
+          {
+            key: 'PF2eVisionerVisibility',
+            mode: 'increase',
+            steps: 1,
+          },
+        ],
+      }),
+    ],
+  },
 });
 
 // Test modifier application
-const result = ruleElementService.applyVisibilityModifiers(
-  'observed', 
-  token, 
-  targetToken
-);
+const result = ruleElementService.applyVisibilityModifiers('observed', token, targetToken);
 expect(result).toBe('concealed'); // observed + 1 step = concealed
 ```
 
 ### Integration Tests
 
 Test with actual Visioner systems:
+
 ```javascript
 // Create tokens with rule elements
 const observer = await createTestToken({
-  actor: actorWithVisibilityRuleElement
+  actor: actorWithVisibilityRuleElement,
 });
 
 // Trigger AVS
@@ -377,12 +395,13 @@ ruleElementService.clearCache();
 ### Trace Execution
 
 Add temporary debug logs:
+
 ```javascript
 // In RuleElementService.applyVisibilityModifiers()
 console.log('Applying visibility modifiers:', {
   baseVisibility,
   observerRules: observerRules.length,
-  targetRules: targetRules.length
+  targetRules: targetRules.length,
 });
 ```
 
@@ -418,6 +437,7 @@ console.log('Applying visibility modifiers:', {
 ### Extension Points
 
 Create custom services that hook into rule elements:
+
 ```javascript
 class CustomRuleElementHandler {
   async onRuleElementApplied(ruleElement, context, result) {
@@ -435,6 +455,6 @@ Visioner rule elements are now a **first-class feature** of the module, seamless
 ✅ **Detection** - Sense modifications (via PF2e lifecycle)  
 ✅ **Caching** - Smart invalidation on changes  
 ✅ **Performance** - Optimized for batch processing  
-✅ **Debugging** - Tools and logging for troubleshooting  
+✅ **Debugging** - Tools and logging for troubleshooting
 
 The integration is **transparent, efficient, and robust**. Players and GMs can now use rule elements to create complex, conditional visibility and cover effects that respond dynamically to game state. 🎉

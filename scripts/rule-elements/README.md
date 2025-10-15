@@ -13,12 +13,14 @@ Rule elements allow you to automatically apply Visioner effects when items, feat
 Controls visibility states between tokens (observed, concealed, hidden, undetected).
 
 **Common Use Cases:**
+
 - Hide action effects
 - Invisibility spells
 - Concealment from environmental effects
 - See Invisibility and similar detection magic
 
 **Key Properties:**
+
 - `status`: The visibility state to apply
 - `direction`: Who sees whom (`from`, `to`, `bidirectional`)
 - `mode`: How to apply (`set`, `increase`, `decrease`, `remove`, `toggle`)
@@ -29,12 +31,14 @@ Controls visibility states between tokens (observed, concealed, hidden, undetect
 Controls cover states between tokens (none, lesser, standard, greater).
 
 **Common Use Cases:**
+
 - Take Cover action
 - Wall spells providing cover
 - Magical barriers
 - Environmental cover effects
 
 **Key Properties:**
+
 - `coverLevel`: The level of cover to apply
 - `applyBonuses`: Whether to apply AC/Reflex bonuses
 - `allowHide`: Whether this cover allows the Hide action
@@ -45,6 +49,7 @@ Controls cover states between tokens (none, lesser, standard, greater).
 Grants or modifies detection senses (darkvision, tremorsense, etc.).
 
 **Common Use Cases:**
+
 - Darkvision spell
 - Tremorsense effects
 - Scent tracking
@@ -52,6 +57,7 @@ Grants or modifies detection senses (darkvision, tremorsense, etc.).
 - Lifesense
 
 **Key Properties:**
+
 - `sense`: The type of sense to grant
 - `senseRange`: Maximum range of the sense
 - `acuity`: Precision level (`precise`, `imprecise`, `vague`)
@@ -66,13 +72,15 @@ All rule elements share these properties:
 **`predicate`**: Array of conditional statements that must be true for the rule element to apply.
 
 Uses PF2e's predicate syntax. Examples:
+
 - `["self:condition:prone"]` - Only when prone
-- `["target:enemy", "not:target:condition:blinded"]` - Enemy targets that aren't blinded  
+- `["target:enemy", "not:target:condition:blinded"]` - Enemy targets that aren't blinded
 - `[{"or": ["lighting:dim", "lighting:darkness"]}]` - In dim light or darkness
 
 See `PREDICATE_GUIDE.md` for comprehensive documentation.
 
 ### Target Selection
+
 - **`subject`**: Who is affected (`self`, `target`, `controlled`, `all`)
 - **`observers`**: Who observes/interacts (`all`, `allies`, `enemies`, `selected`, `targeted`, `none`)
 - **`targetFilter`**: Additional filtering
@@ -82,6 +90,7 @@ See `PREDICATE_GUIDE.md` for comprehensive documentation.
   - `actorType`: Filter by actor type
 
 ### Operation Control
+
 - **`mode`**: How to apply the effect
   - `set`: Directly set to a value
   - `increase`: Worsen the state (e.g., observed → concealed → hidden)
@@ -91,12 +100,14 @@ See `PREDICATE_GUIDE.md` for comprehensive documentation.
 - **`steps`**: Number of steps for increase/decrease (default: 1)
 
 ### Lifecycle Management
+
 - **`trigger`**: When to apply (implicit based on lifecycle hooks)
 - **`duration`**: How long the effect lasts
   - `durationRounds`: Number of combat rounds (null = permanent)
 - **`requiresInitiative`**: Only apply when in active combat
 
 ### Spatial Filtering
+
 - **`range`**: Maximum distance in feet (null = unlimited)
 - **`direction`**: Directional relationships
   - `from`: Observers see subject with the effect
@@ -359,7 +370,7 @@ Each application switches between observed and concealed.
 Use the global function to create test items:
 
 ```javascript
-window.PF2EVisioner.createRuleElementExamples()
+window.PF2EVisioner.createRuleElementExamples();
 ```
 
 This creates several example items demonstrating various rule elements.
@@ -369,6 +380,7 @@ This creates several example items demonstrating various rule elements.
 ### Base Class
 
 All rule elements extend `BaseVisionerRuleElement`, which provides:
+
 - Token selection and filtering logic
 - Range checking
 - Directional relationship handling
@@ -378,6 +390,7 @@ All rule elements extend `BaseVisionerRuleElement`, which provides:
 ### Specialized Classes
 
 Each rule element type adds specific functionality:
+
 - **VisibilityRuleElement**: Visibility state calculations
 - **CoverRuleElement**: Cover level management
 - **DetectionRuleElement**: Sense granting/modification
@@ -385,6 +398,7 @@ Each rule element type adds specific functionality:
 ### Integration
 
 Rule elements integrate with:
+
 - **Visioner API**: Uses public API for state changes
 - **Batch Operations**: Optimizes multiple token updates
 - **AVS System**: Triggers visibility recalculations
@@ -407,31 +421,37 @@ Visioner automatically injects custom roll options that expose module state for 
 ### Quick Reference
 
 #### Visibility Options
+
 - `visioner:visibility:as-target:{state}` - How observers see this token
 - `visioner:visibility:hidden-to-any` - Hidden from at least one observer
 - `visioner:visibility:concealed-to-any` - Concealed or worse to anyone
 
 #### Cover Options
+
 - `visioner:cover:as-target:{level}` - Cover level (lesser/standard/greater)
 - `visioner:cover:has-any` - Has cover from at least one observer
 - `visioner:cover:standard-or-better` - Standard+ cover from anyone
 
 #### Sense Options
+
 - `visioner:sense:{type}` - Has specific sense (darkvision, tremorsense, etc.)
 - `visioner:sense:{type}:{acuity}` - Sense with acuity (precise/imprecise/vague)
 - `visioner:sense:darkvision-any` - Has any darkvision variant
 
 #### AVS Options
+
 - `visioner:avs:enabled` - AVS is currently enabled
 - `visioner:avs:mode:{mode}` - Current AVS mode
 
 #### Lighting Options
+
 - `visioner:lighting:darkness:{level}` - Darkness level (none/partial/complete)
 - `visioner:lighting:token:has-light` - Token emits light
 
 ### Quick Examples
 
 **+2 Stealth when hidden:**
+
 ```json
 {
   "key": "FlatModifier",
@@ -442,19 +462,18 @@ Visioner automatically injects custom roll options that expose module state for 
 ```
 
 **Grant darkvision in darkness:**
+
 ```json
 {
   "key": "PF2eVisionerDetection",
   "sense": "darkvision",
   "senseRange": 60,
-  "predicate": [
-    "visioner:lighting:darkness:complete",
-    "not:visioner:sense:darkvision-any"
-  ]
+  "predicate": ["visioner:lighting:darkness:complete", "not:visioner:sense:darkvision-any"]
 }
 ```
 
 **AC bonus with cover:**
+
 ```json
 {
   "key": "FlatModifier",
@@ -471,23 +490,27 @@ For complete documentation on all custom roll options, see [CUSTOM_ROLL_OPTIONS.
 Rule elements are **fully integrated** with Visioner's core systems and automatically apply during gameplay:
 
 ### Auto-Visibility System (AVS)
+
 - Rule elements checked during visibility calculations
 - Modifiers applied to base visibility results
 - Works with batch processing for optimal performance
 - Example: Item grants concealment in dim light via predicate
 
 ### Cover System
+
 - Rule elements checked when setting/calculating cover
 - Modifiers applied to cover levels
 - Works with both auto-cover and manual cover
 - Example: Feat grants permanent standard cover via rule element
 
 ### Detection/Senses
+
 - Rule elements modify senses via PF2e's lifecycle
 - Conditional sense grants based on predicates
 - Example: Grant darkvision only in darkness
 
 ### Performance
+
 - Rule elements cached per token (1-second TTL)
 - Invalidated automatically when effects/items change
 - Negligible overhead when tokens have no rule elements
@@ -530,6 +553,7 @@ For detailed integration documentation, see [INTEGRATION.md](./INTEGRATION.md).
 ## Future Rule Elements
 
 Planned rule elements include:
+
 - **PF2eVisionerLight**: Modify light perception
 - **PF2eVisionerAVS**: Configure AVS behavior
 - **PF2eVisionerWall**: Modify wall interactions
@@ -537,6 +561,7 @@ Planned rule elements include:
 ## Contributing
 
 When adding new rule elements:
+
 1. Extend `BaseVisionerRuleElement`
 2. Add specialized schema properties
 3. Implement lifecycle hooks

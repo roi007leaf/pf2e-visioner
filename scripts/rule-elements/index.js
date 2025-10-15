@@ -3,9 +3,9 @@
  * This file handles the registration of custom rule elements
  */
 
-import { createVisibilityRuleElement } from './VisibilityRuleElement.js';
 import { createCoverRuleElement } from './CoverRuleElement.js';
 import { createDetectionRuleElement } from './DetectionRuleElement.js';
+import { createVisibilityRuleElement } from './VisibilityRuleElement.js';
 
 /**
  * Initialize and register custom rule elements

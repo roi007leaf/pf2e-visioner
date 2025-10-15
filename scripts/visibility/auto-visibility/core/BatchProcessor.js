@@ -1,3 +1,4 @@
+import { ruleElementService } from "../../../services/RuleElementService.js";
 import { GlobalLosCache } from "../utils/GlobalLosCache.js";
 import { GlobalVisibilityCache } from "../utils/GlobalVisibilityCache.js";
 import { VisionAnalyzer } from '../VisionAnalyzer.js';
@@ -11,7 +12,6 @@ import { SensesCapabilitiesCache } from "./SensesCapabilitiesCache.js";
 import { ViewportFilterService } from "./ViewportFilterService.js";
 import { VisibilityMapBatchCache } from "./VisibilityMapBatchCache.js";
 import { VisibilityMapService } from "./VisibilityMapService.js";
-import { ruleElementService } from "../../../services/RuleElementService.js";
 
 /**
  * BatchProcessor centralizes the heavy per-batch computation:

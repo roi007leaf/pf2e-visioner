@@ -22,7 +22,7 @@ Foundry VTT's rule element editor requires compact JSON without line breaks:
 **✅ Correct (copy this into Foundry):**
 
 ```json
-{"key":"PF2eVisionerCover","mode":"set","coverLevel":"lesser"}
+{ "key": "PF2eVisionerCover", "mode": "set", "coverLevel": "lesser" }
 ```
 
 **❌ Incorrect (will error):**
@@ -65,7 +65,12 @@ Rule elements automatically apply during:
 **Example**: Blur spell makes the TARGET concealed, so the rule element goes **on the target's effect**:
 
 ```json
-{"key":"PF2eVisionerVisibility","mode":"set","status":"concealed","qualifyConcealment":false}
+{
+  "key": "PF2eVisionerVisibility",
+  "mode": "set",
+  "status": "concealed",
+  "qualifyConcealment": false
+}
 ```
 
 When Observer attacks Target:
@@ -102,7 +107,7 @@ When Observer attacks Target:
 **For Foundry VTT (copy this):**
 
 ```json
-{"key":"PF2eVisionerVisibility","mode":"set","status":"hidden"}
+{ "key": "PF2eVisionerVisibility", "mode": "set", "status": "hidden" }
 ```
 
 **Readable format:**
@@ -133,7 +138,7 @@ When Observer attacks Target:
 **For Foundry VTT (copy this):**
 
 ```json
-{"key":"PF2eVisionerVisibility","mode":"increase","steps":1}
+{ "key": "PF2eVisionerVisibility", "mode": "increase", "steps": 1 }
 ```
 
 **Readable format:**
@@ -163,7 +168,7 @@ When Observer attacks Target:
 **For Foundry VTT (copy this):**
 
 ```json
-{"key":"PF2eVisionerVisibility","mode":"set","status":"observed","qualifyConcealment":true}
+{ "key": "PF2eVisionerVisibility", "mode": "set", "status": "observed", "qualifyConcealment": true }
 ```
 
 **Readable format:**
@@ -211,7 +216,12 @@ The system checks for `qualifyConcealment` when you attempt Sneak/Hide actions. 
 **For Foundry VTT (copy this):**
 
 ```json
-{"key":"PF2eVisionerVisibility","mode":"set","status":"concealed","qualifyConcealment":false}
+{
+  "key": "PF2eVisionerVisibility",
+  "mode": "set",
+  "status": "concealed",
+  "qualifyConcealment": false
+}
 ```
 
 **Readable format:**
@@ -298,7 +308,7 @@ The system checks for `qualifyConcealment` when you attempt Sneak/Hide actions. 
 **For Foundry VTT (copy this):**
 
 ```json
-{"key":"PF2eVisionerCover","mode":"set","coverLevel":"lesser"}
+{ "key": "PF2eVisionerCover", "mode": "set", "coverLevel": "lesser" }
 ```
 
 **Readable format:**
@@ -320,7 +330,7 @@ The system checks for `qualifyConcealment` when you attempt Sneak/Hide actions. 
 **Alternative (increase by 1 step):**
 
 ```json
-{"key":"PF2eVisionerCover","mode":"increase","steps":1}
+{ "key": "PF2eVisionerCover", "mode": "increase", "steps": 1 }
 ```
 
 **Where to add it:** On an effect, stance feat, or defensive buff.

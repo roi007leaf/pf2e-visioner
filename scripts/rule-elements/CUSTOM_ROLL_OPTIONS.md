@@ -9,30 +9,36 @@ PF2E Visioner automatically injects custom roll options that expose the module's
 ### Per-Token Visibility
 
 **`visioner:visibility:as-target:{state}`**
+
 - How observers see this token
 - States: `observed`, `concealed`, `hidden`, `undetected`
 - Example: `visioner:visibility:as-target:hidden`
 
 **`visioner:visibility:as-observer:{state}`**
+
 - How this token sees others
 - States: `observed`, `concealed`, `hidden`, `undetected`
 - Example: `visioner:visibility:as-observer:concealed`
 
 **`visioner:visibility:target:{tokenId}:{state}`**
+
 - Specific token relationship (as target)
 - Example: `visioner:visibility:target:abc123:hidden`
 
 **`visioner:visibility:observer:{tokenId}:{state}`**
+
 - Specific token relationship (as observer)
 - Example: `visioner:visibility:observer:def456:observed`
 
 ### Aggregate Visibility
 
 **`visioner:visibility:hidden-to-any`**
+
 - Token is hidden or undetected to at least one observer
 - Useful for: "Apply when I'm hidden from anyone"
 
 **`visioner:visibility:concealed-to-any`**
+
 - Token has concealment or worse to at least one observer
 - Includes: concealed, hidden, undetected
 - Useful for: "Apply when I have any concealment"
@@ -42,30 +48,36 @@ PF2E Visioner automatically injects custom roll options that expose the module's
 ### Per-Token Cover
 
 **`visioner:cover:as-target:{level}`**
+
 - Cover level between observer and this token (as target)
 - Levels: `lesser`, `standard`, `greater`
 - Example: `visioner:cover:as-target:standard`
 
 **`visioner:cover:as-observer:{level}`**
+
 - Cover level between this token (as observer) and target
 - Levels: `lesser`, `standard`, `greater`
 - Example: `visioner:cover:as-observer:greater`
 
 **`visioner:cover:target:{tokenId}:{level}`**
+
 - Specific token relationship (as target)
 - Example: `visioner:cover:target:abc123:standard`
 
 **`visioner:cover:observer:{tokenId}:{level}`**
+
 - Specific token relationship (as observer)
 - Example: `visioner:cover:observer:def456:lesser`
 
 ### Aggregate Cover
 
 **`visioner:cover:has-any`**
+
 - Token has any cover from at least one observer
 - Useful for: "Apply when I have cover from someone"
 
 **`visioner:cover:standard-or-better`**
+
 - Token has standard or greater cover from at least one observer
 - Useful for: "Only apply with significant cover"
 
@@ -74,27 +86,32 @@ PF2E Visioner automatically injects custom roll options that expose the module's
 ### Specific Senses
 
 **`visioner:sense:{type}`**
+
 - Actor has this sense
 - Types: `darkvision`, `low-light-vision`, `tremorsense`, `scent`, etc.
 - Example: `visioner:sense:darkvision`
 
 **`visioner:sense:{type}:{acuity}`**
+
 - Sense with specific acuity
 - Acuity: `precise`, `imprecise`, `vague`
 - Example: `visioner:sense:tremorsense:imprecise`
 
 **`visioner:sense:{type}:range:{feet}`**
+
 - Sense with specific range
 - Example: `visioner:sense:darkvision:range:60`
 
 ### Aggregate Senses
 
 **`visioner:sense:darkvision-any`**
+
 - Has any darkvision variant
 - Includes: darkvision, greater darkvision
 - Useful for: "Doesn't need darkvision spell"
 
 **`visioner:sense:low-light`**
+
 - Has low-light vision
 - Useful for: "Can see in dim light"
 
@@ -103,14 +120,17 @@ PF2E Visioner automatically injects custom roll options that expose the module's
 ### AVS State
 
 **`visioner:avs:enabled`**
+
 - AVS is currently enabled
 - Useful for: "Only when AVS is active"
 
 **`visioner:avs:disabled`**
+
 - AVS is currently disabled
 - Useful for: "Only in manual mode"
 
 **`visioner:avs:mode:{mode}`**
+
 - Current AVS mode
 - Modes vary by settings
 - Example: `visioner:avs:mode:full`
@@ -120,34 +140,41 @@ PF2E Visioner automatically injects custom roll options that expose the module's
 ### Global Lighting
 
 **`visioner:lighting:global:bright`**
+
 - Scene has global bright light
 - Useful for: "Only in bright scenes"
 
 **`visioner:lighting:global:varies`**
+
 - Scene lighting varies (default)
 - Most scenes use this
 
 ### Token Light
 
 **`visioner:lighting:token:has-light`**
+
 - This token emits light
 - Useful for: "When carrying a torch"
 
 **`visioner:lighting:token:range:{feet}`**
+
 - Token's light range
 - Example: `visioner:lighting:token:range:20`
 
 ### Darkness Level
 
 **`visioner:lighting:darkness:none`**
+
 - Darkness level < 0.25
 - Mostly bright/daylight
 
 **`visioner:lighting:darkness:partial`**
+
 - Darkness level 0.25-0.75
 - Dim light / twilight
 
 **`visioner:lighting:darkness:complete`**
+
 - Darkness level >= 0.75
 - Full darkness
 
@@ -174,10 +201,7 @@ Grants +2 circumstance to Stealth when hidden from anyone.
   "key": "PF2eVisionerDetection",
   "sense": "darkvision",
   "senseRange": 60,
-  "predicate": [
-    "visioner:lighting:darkness:partial",
-    "not:visioner:sense:darkvision-any"
-  ]
+  "predicate": ["visioner:lighting:darkness:partial", "not:visioner:sense:darkvision-any"]
 }
 ```
 
@@ -204,10 +228,7 @@ Grants darkvision only in partial darkness and if you don't already have it.
   "key": "PF2eVisionerVisibility",
   "mode": "set",
   "status": "hidden",
-  "predicate": [
-    "visioner:visibility:concealed-to-any",
-    "visioner:lighting:darkness:partial"
-  ]
+  "predicate": ["visioner:visibility:concealed-to-any", "visioner:lighting:darkness:partial"]
 }
 ```
 
@@ -234,10 +255,7 @@ Better detection when you have tremorsense.
   "key": "PF2eVisionerVisibility",
   "mode": "increase",
   "steps": 1,
-  "predicate": [
-    "visioner:avs:enabled",
-    "visioner:lighting:darkness:complete"
-  ]
+  "predicate": ["visioner:avs:enabled", "visioner:lighting:darkness:complete"]
 }
 ```
 
@@ -279,10 +297,7 @@ Become hidden when prone, with cover, in dim light, and not already hidden.
 {
   "key": "PF2eVisionerCover",
   "mode": "remove",
-  "predicate": [
-    "visioner:sense:tremorsense:precise",
-    "target:condition:on-ground"
-  ]
+  "predicate": ["visioner:sense:tremorsense:precise", "target:condition:on-ground"]
 }
 ```
 
@@ -329,10 +344,7 @@ All conditions must be true (AND logic).
 {
   "predicate": [
     {
-      "or": [
-        "visioner:visibility:hidden-to-any",
-        "visioner:cover:standard-or-better"
-      ]
+      "or": ["visioner:visibility:hidden-to-any", "visioner:cover:standard-or-better"]
     }
   ]
 }
@@ -344,10 +356,7 @@ Either hidden OR has good cover.
 
 ```json
 {
-  "predicate": [
-    "not:visioner:visibility:hidden-to-any",
-    "not:visioner:cover:has-any"
-  ]
+  "predicate": ["not:visioner:visibility:hidden-to-any", "not:visioner:cover:has-any"]
 }
 ```
 
@@ -360,10 +369,7 @@ Not hidden and no cover (vulnerable).
   "predicate": [
     "visioner:visibility:concealed-to-any",
     {
-      "or": [
-        "visioner:lighting:darkness:partial",
-        "visioner:lighting:darkness:complete"
-      ]
+      "or": ["visioner:lighting:darkness:partial", "visioner:lighting:darkness:complete"]
     },
     "not:visioner:sense:darkvision-any"
   ]
@@ -378,16 +384,12 @@ Visioner options work alongside PF2e's native options:
 
 ```json
 {
-  "predicate": [
-    "self:condition:prone",
-    "visioner:cover:has-any",
-    "target:enemy",
-    "attack:ranged"
-  ]
+  "predicate": ["self:condition:prone", "visioner:cover:has-any", "target:enemy", "attack:ranged"]
 }
 ```
 
 Combines:
+
 - PF2e condition (`self:condition:prone`)
 - Visioner state (`visioner:cover:has-any`)
 - PF2e targeting (`target:enemy`)
@@ -400,7 +402,7 @@ Visioner roll options are **dynamically generated** each time roll options are r
 ✅ Always reflects current state  
 ✅ Updates when visibility/cover changes  
 ✅ Responds to AVS recalculations  
-✅ Tracks sense modifications  
+✅ Tracks sense modifications
 
 No caching issues or stale data!
 
@@ -431,9 +433,7 @@ console.log(Array.from(options));
 
 ```javascript
 const options = ruleElement.getRollOptions();
-const visionerOptions = Array.from(options).filter(opt => 
-  opt.startsWith('visioner:')
-);
+const visionerOptions = Array.from(options).filter((opt) => opt.startsWith('visioner:'));
 console.log(visionerOptions);
 ```
 
@@ -450,11 +450,26 @@ console.log('Has option:', hasOption);
 ```javascript
 const options = Array.from(ruleElement.getRollOptions());
 
-console.log('Visibility:', options.filter(o => o.startsWith('visioner:visibility:')));
-console.log('Cover:', options.filter(o => o.startsWith('visioner:cover:')));
-console.log('Senses:', options.filter(o => o.startsWith('visioner:sense:')));
-console.log('AVS:', options.filter(o => o.startsWith('visioner:avs:')));
-console.log('Lighting:', options.filter(o => o.startsWith('visioner:lighting:')));
+console.log(
+  'Visibility:',
+  options.filter((o) => o.startsWith('visioner:visibility:')),
+);
+console.log(
+  'Cover:',
+  options.filter((o) => o.startsWith('visioner:cover:')),
+);
+console.log(
+  'Senses:',
+  options.filter((o) => o.startsWith('visioner:sense:')),
+);
+console.log(
+  'AVS:',
+  options.filter((o) => o.startsWith('visioner:avs:')),
+);
+console.log(
+  'Lighting:',
+  options.filter((o) => o.startsWith('visioner:lighting:')),
+);
 ```
 
 ## Common Pitfalls
@@ -529,10 +544,10 @@ Use targetFilter for static conditions, predicates for dynamic:
 ```json
 {
   "targetFilter": {
-    "actorType": "character"  // Static
+    "actorType": "character" // Static
   },
   "predicate": [
-    "visioner:visibility:hidden-to-any"  // Dynamic
+    "visioner:visibility:hidden-to-any" // Dynamic
   ]
 }
 ```
@@ -588,8 +603,9 @@ Planned additions:
 Custom Visioner roll options make predicates **incredibly powerful**. They expose all of Visioner's state in a clean, predictable format that integrates seamlessly with PF2e's predicate system.
 
 You can now create rule elements that respond to:
+
 - ✅ Visibility relationships
-- ✅ Cover situations  
+- ✅ Cover situations
 - ✅ Active senses
 - ✅ AVS state
 - ✅ Lighting conditions

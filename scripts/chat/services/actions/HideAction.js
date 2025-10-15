@@ -1,7 +1,6 @@
 import { COVER_STATES, MODULE_ID, VISIBILITY_STATES } from '../../../constants.js';
 import autoCoverSystem from '../../../cover/auto-cover/AutoCoverSystem.js';
 import stealthCheckUseCase from '../../../cover/auto-cover/usecases/StealthCheckUseCase.js';
-import { getCoverBetween } from '../../../utils.js';
 import { appliedHideChangesByMessage } from '../data/message-cache.js';
 import { calculateStealthRollTotals, shouldFilterAlly } from '../infra/shared-utils.js';
 import { ActionHandlerBase } from './BaseAction.js';

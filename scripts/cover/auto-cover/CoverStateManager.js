@@ -70,7 +70,7 @@ export class CoverStateManager {
 
     // If no change needed, skip the update
     if (currentState === modifiedState) return;
-    
+
     state = modifiedState;
 
     // Create updated map

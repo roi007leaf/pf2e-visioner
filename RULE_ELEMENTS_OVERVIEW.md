@@ -64,14 +64,16 @@ A high-level overview of how Visioner's rule element system works.
 **Key**: `visioner-visibility`
 
 **Examples**:
+
 - Invisibility effects
 - Camouflage abilities
 - Stealth feats
 - Environmental concealment
 
 **States** (in order of worse → better for you):
+
 1. `observed` - Normal visibility
-2. `concealed` - +5 DC, 20% miss chance  
+2. `concealed` - +5 DC, 20% miss chance
 3. `hidden` - +10 DC, 50% miss chance
 4. `undetected` - +15 DC, cannot be targeted
 
@@ -84,12 +86,14 @@ A high-level overview of how Visioner's rule element system works.
 **Key**: `visioner-cover`
 
 **Examples**:
+
 - Shield abilities
 - Defensive stances
 - Environmental cover
 - Anti-cover feats
 
 **States** (in order of none → best):
+
 1. `none` - No cover
 2. `lesser` - +1 AC
 3. `standard` - +2 AC, +4 Stealth
@@ -104,6 +108,7 @@ A high-level overview of how Visioner's rule element system works.
 **Key**: `visioner-detection`
 
 **Examples**:
+
 - Darkvision
 - Tremorsense
 - Lifesense
@@ -111,6 +116,7 @@ A high-level overview of how Visioner's rule element system works.
 - Scent
 
 **Acuity**:
+
 - `precise` - Can pinpoint exact location
 - `imprecise` - Can detect presence but not exact location
 - `vague` - General awareness only
@@ -314,12 +320,12 @@ Let's trace a rule element through the system:
 // RuleElementService.getRuleElementsForToken(cloakedToken)
 const rules = [
   {
-    key: "visioner-visibility",
-    selector: "all",
-    state: "concealed",
+    key: 'visioner-visibility',
+    selector: 'all',
+    state: 'concealed',
     range: 60,
-    predicate: ["enemy"]
-  }
+    predicate: ['enemy'],
+  },
 ];
 ```
 
@@ -497,7 +503,7 @@ try {
   return modified.state;
 } catch (error) {
   console.warn('Rule elements failed:', error);
-  return baseState;  // Use original state if rule elements fail
+  return baseState; // Use original state if rule elements fail
 }
 ```
 
@@ -517,6 +523,7 @@ try {
 ### Unit Tests (60+ tests)
 
 Test `RuleElementService` in isolation:
+
 - Rule extraction
 - Predicate testing
 - Modifier application
@@ -525,6 +532,7 @@ Test `RuleElementService` in isolation:
 ### Integration Tests (40+ tests)
 
 Test rule elements with systems:
+
 - AVS integration scenarios
 - Cover integration scenarios
 - Multiple rule elements
@@ -533,6 +541,7 @@ Test rule elements with systems:
 ### System Tests (23+ tests)
 
 Test that systems call the service:
+
 - BatchProcessor calls service
 - CoverStateManager calls service
 - Action handlers use wrappers

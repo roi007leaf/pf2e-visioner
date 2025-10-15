@@ -5,8 +5,8 @@
  */
 
 import { COVER_STATES, MODULE_ID } from '../../../constants.js';
-import errorHandlingService, { SYSTEM_TYPES } from '../infra/ErrorHandlingService.js';
 import { ruleElementService } from '../../../services/RuleElementService.js';
+import errorHandlingService, { SYSTEM_TYPES } from '../infra/ErrorHandlingService.js';
 
 /**
  * Options for system integration calls
@@ -702,7 +702,7 @@ export class DualSystemIntegration {
     if (token) {
       try {
         const visibilityRules = ruleElementService.getVisibilityRuleElements(token);
-        
+
         // If observed but has qualifyConcealment=true, treat as concealed for action prerequisites
         if (avsVisibility === 'observed') {
           const hasQualifyConcealment = visibilityRules.some(re => re.rule?.qualifyConcealment === true);
@@ -710,7 +710,7 @@ export class DualSystemIntegration {
             return 'concealed';
           }
         }
-        
+
         // If concealed but has qualifyConcealment=false, treat as observed for action prerequisites
         // (like Blur: concealed for attacks, but can't Hide/Sneak)
         if (avsVisibility === 'concealed') {

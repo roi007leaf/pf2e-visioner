@@ -8,11 +8,11 @@ Rule elements let you create custom visibility, cover, and detection abilities o
 
 ## Three Types
 
-| Type | Key | What It Does |
-|------|-----|--------------|
+| Type           | Key                   | What It Does                                         |
+| -------------- | --------------------- | ---------------------------------------------------- |
 | **Visibility** | `visioner-visibility` | Control how others see you (concealed, hidden, etc.) |
-| **Cover** | `visioner-cover` | Control cover bonuses (lesser, standard, greater) |
-| **Detection** | `visioner-detection` | Grant special senses (darkvision, tremorsense, etc.) |
+| **Cover**      | `visioner-cover`      | Control cover bonuses (lesser, standard, greater)    |
+| **Detection**  | `visioner-detection`  | Grant special senses (darkvision, tremorsense, etc.) |
 
 ## Your First Rule Element
 
@@ -218,8 +218,8 @@ Hidden from enemies beyond 60 feet if you have cover:
   "state": "hidden",
   "predicate": [
     "enemy",
-    {"gte": ["visioner:distance", 60]},
-    {"or": ["visioner:cover:lesser", "visioner:cover:standard", "visioner:cover:greater"]}
+    { "gte": ["visioner:distance", 60] },
+    { "or": ["visioner:cover:lesser", "visioner:cover:standard", "visioner:cover:greater"] }
   ]
 }
 ```
@@ -275,19 +275,19 @@ Upgrades your cover by one step:
 
 ### Required Properties
 
-| Property | Description | Example |
-|----------|-------------|---------|
-| `key` | Type of rule element | `"visioner-visibility"` |
-| `selector` | Who it affects | `"all"` |
+| Property   | Description          | Example                 |
+| ---------- | -------------------- | ----------------------- |
+| `key`      | Type of rule element | `"visioner-visibility"` |
+| `selector` | Who it affects       | `"all"`                 |
 
 ### Optional Properties
 
-| Property | Description | Example |
-|----------|-------------|---------|
-| `state` | Force a specific state | `"hidden"` |
-| `modifier` | Upgrade/downgrade state | `{"action": "upgrade"}` |
-| `range` | Distance limit (feet) | `60` |
-| `predicate` | Conditions to match | `["enemy"]` |
+| Property    | Description             | Example                 |
+| ----------- | ----------------------- | ----------------------- |
+| `state`     | Force a specific state  | `"hidden"`              |
+| `modifier`  | Upgrade/downgrade state | `{"action": "upgrade"}` |
+| `range`     | Distance limit (feet)   | `60`                    |
+| `predicate` | Conditions to match     | `["enemy"]`             |
 
 ### Visibility States
 
@@ -309,12 +309,12 @@ From none to best:
 
 ### Modifier Actions
 
-| Action | What It Does |
-|--------|--------------|
-| `"set"` | Force a specific state (overrides everything) |
-| `"upgrade"` | Improve state from one level to another |
-| `"downgrade"` | Worsen state from one level to another |
-| `{"penalty": -2}` | Flat bonus/penalty to calculations |
+| Action            | What It Does                                  |
+| ----------------- | --------------------------------------------- |
+| `"set"`           | Force a specific state (overrides everything) |
+| `"upgrade"`       | Improve state from one level to another       |
+| `"downgrade"`     | Worsen state from one level to another        |
+| `{"penalty": -2}` | Flat bonus/penalty to calculations            |
 
 ## Troubleshooting
 
