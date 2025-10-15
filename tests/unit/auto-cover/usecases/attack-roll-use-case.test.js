@@ -119,7 +119,7 @@ describe('AttackRollUseCase', () => {
       await attackRollUseCase.handlePreCreateChatMessage(mockData);
 
       expect(getCoverBetween).toHaveBeenCalledWith(speakerToken, targetToken);
-      expect(attackRollUseCase._detectCover).toHaveBeenCalledWith(speakerToken, targetToken);
+      expect(attackRollUseCase._detectCover).toHaveBeenCalledWith(speakerToken, targetToken, expect.any(Object));
     });
 
     test('should not auto-detect cover when manual cover exists', async () => {
@@ -215,7 +215,7 @@ describe('AttackRollUseCase', () => {
       await attackRollUseCase.handleCheckDialog(mockDialog, mockHtml);
 
       expect(getCoverBetween).toHaveBeenCalledWith(attackerToken, targetToken);
-      expect(attackRollUseCase._detectCover).toHaveBeenCalledWith(attackerToken, targetToken);
+      expect(attackRollUseCase._detectCover).toHaveBeenCalledWith(attackerToken, targetToken, {});
       expect(mockCoverUIManager.injectDialogCoverUI).toHaveBeenCalledWith(
         mockDialog,
         mockHtml,
@@ -235,7 +235,7 @@ describe('AttackRollUseCase', () => {
       await attackRollUseCase.handleCheckDialog(mockDialog, mockHtml);
 
       expect(getCoverBetween).toHaveBeenCalledWith(attackerToken, targetToken);
-      expect(attackRollUseCase._detectCover).toHaveBeenCalledWith(attackerToken, targetToken);
+      expect(attackRollUseCase._detectCover).toHaveBeenCalledWith(attackerToken, targetToken, {});
       expect(mockCoverUIManager.injectDialogCoverUI).toHaveBeenCalledWith(
         mockDialog,
         mockHtml,
