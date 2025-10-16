@@ -7,7 +7,7 @@ export class LightingModifier {
   /**
    * Apply lighting modification to a token
    * @param {Object} operation - The operation configuration
-   * @param {Token} subjectToken - The token to apply lighting modification to
+   * @param {Token} subjectToken - The token with the effect
    */
   static async applyLightingModification(operation, subjectToken) {
     if (!subjectToken) return;
@@ -31,22 +31,43 @@ export class LightingModifier {
       `lightingModification.${lightingData.id}`,
       lightingData
     );
+
+    // Trigger AVS recalculation for the subject token
+    if (window.pf2eVisioner?.services?.autoVisibilitySystem?.recalculateForTokens) {
+      await window.pf2eVisioner.services.autoVisibilitySystem.recalculateForTokens([subjectToken.id]);
+    } else if (window.pf2eVisioner?.services?.autoVisibilitySystem?.recalculateAll) {
+      await window.pf2eVisioner.services.autoVisibilitySystem.recalculateAll();
+    } else if (canvas?.perception) {
+      canvas.perception.update({ refreshVision: true, refreshOcclusion: true });
+    }
   }
 
   /**
    * Remove lighting modification from a token
    * @param {Object} operation - The operation configuration
-   * @param {Token} subjectToken - The token to remove lighting modification from
+   * @param {Token} subjectToken - The token with the effect
    */
   static async removeLightingModification(operation, subjectToken) {
     if (!subjectToken) return;
 
     const { source } = operation;
+    
     const modifications = subjectToken.document.getFlag('pf2e-visioner', 'lightingModification') || {};
 
     if (modifications[source]) {
-      delete modifications[source];
-      await subjectToken.document.setFlag('pf2e-visioner', 'lightingModification', modifications);
+      await subjectToken.document.unsetFlag('pf2e-visioner', `lightingModification.${source}`);
+
+      // Small delay to ensure flag update is processed
+      await new Promise(resolve => setTimeout(resolve, 50));
+
+      // Trigger AVS recalculation for the subject token
+      if (window.pf2eVisioner?.services?.autoVisibilitySystem?.recalculateForTokens) {
+        await window.pf2eVisioner.services.autoVisibilitySystem.recalculateForTokens([subjectToken.id]);
+      } else if (window.pf2eVisioner?.services?.autoVisibilitySystem?.recalculateAll) {
+        await window.pf2eVisioner.services.autoVisibilitySystem.recalculateAll();
+      } else if (canvas?.perception) {
+        canvas.perception.update({ refreshVision: true, refreshOcclusion: true });
+      }
     }
   }
 

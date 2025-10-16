@@ -73,8 +73,14 @@ export class LightingCalculator {
         // Add magical darkness flags if applicable
         if (modifiedLighting === 'magicalDarkness') {
           extras.magicalDarkness = true;
+          extras.isDarknessSource = true;
+          extras.darknessRank = 2;
+          extras.isHeightenedDarkness = false;
         } else if (modifiedLighting === 'greaterMagicalDarkness') {
           extras.greaterMagicalDarkness = true;
+          extras.isDarknessSource = true;
+          extras.darknessRank = 4;
+          extras.isHeightenedDarkness = true;
         }
         
         return makeIlluminationResult(illumination, extras);

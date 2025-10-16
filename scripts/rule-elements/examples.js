@@ -161,19 +161,19 @@ export const RULE_ELEMENT_EXAMPLES = {
 
   deepDarkness: {
     name: 'Deep Darkness',
-    description: 'The creature is surrounded by supernatural darkness. The lighting level at its position is always treated as darkness, regardless of ambient light.',
+    description: 'The creature is surrounded by supernatural darkness. The lighting level at its position is always treated as magical darkness (rank 4), blocking darkvision.',
     rules: [
       {
-        key: 'PF2eVisionerEffect',
-        operations: [
+        "key": "PF2eVisionerEffect",
+        "operations": [
           {
-            type: 'modifyLighting',
-            lightingLevel: 'darkness',
-            source: 'deep-darkness',
-            priority: 200
+            "type": "modifyLighting",
+            "lightingLevel": "greaterMagicalDarkness",
+            "source": "deep-darkness",
+            "priority": 200
           }
         ],
-        priority: 100
+        "priority": 100
       }
     ]
   },
