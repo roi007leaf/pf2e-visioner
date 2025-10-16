@@ -1154,6 +1154,27 @@ export class SneakActionHandler extends ActionHandlerBase {
       endPos.avsVisibility === 'concealed' ||
       (allowExtendedEndStates && (endPos.avsVisibility === 'hidden' || endPos.avsVisibility === 'undetected'));
 
+    try {
+      const { ActionQualificationIntegration } = await import('../../../rule-elements/ActionQualificationIntegration.js');
+      
+      const startCheck = await ActionQualificationIntegration.checkSneakWithRuleElements(
+        sneakingToken,
+        { startQualifies, endQualifies, bothQualify: startQualifies && endQualifies },
+        'start'
+      );
+      
+      const endCheck = await ActionQualificationIntegration.checkSneakWithRuleElements(
+        sneakingToken,
+        startCheck,
+        'end'
+      );
+      
+      startQualifies = endCheck.startQualifies;
+      endQualifies = endCheck.endQualifies;
+    } catch (err) {
+      console.warn('PF2E Visioner | Error checking rule element qualifications:', err);
+    }
+
     // Check for Sneaky/Very Sneaky feat mechanics
     if (sneakingToken && observerToken && turnSneakTracker.hasSneakyFeat(sneakingToken)) {
       const shouldDefer = turnSneakTracker.shouldDeferEndPositionCheck(

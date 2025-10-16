@@ -187,10 +187,11 @@ export class BaseAutoCoverUseCase {
    * Detect cover state between tokens
    * @param {Object} attacker - Attacker token
    * @param {Object} target - Target token
+   * @param {Object} context - Optional attack context for rule element checks
    * @returns {string} Cover state
    * @protected
    */
-  _detectCover(attacker, target) {
+  _detectCover(attacker, target, context = null) {
     if (!attacker || !target) {
       this._log(
         '_detectCover',
@@ -213,6 +214,7 @@ export class BaseAutoCoverUseCase {
 
     // Check template origin first
     const originRec = this.templateManager.getTemplateOrigin(attacker.id);
+    const attackContext = context ? { item: context.item, options: context.options } : null;
 
     let coverState;
     if (originRec) {
@@ -220,10 +222,10 @@ export class BaseAutoCoverUseCase {
         originPoint: originRec.point,
         templateTimestamp: originRec.ts,
       });
-      coverState = this.autoCoverSystem.detectCoverFromPoint(originRec.point, target);
+      coverState = this.autoCoverSystem.detectCoverFromPoint(originRec.point, target, { attackContext });
     } else {
       // Default: detect from attacker to target directly
-      coverState = this.autoCoverSystem.detectCoverBetweenTokens(attacker, target);
+      coverState = this.autoCoverSystem.detectCoverBetweenTokens(attacker, target, { attackContext });
     }
 
     this._log('_detectCover', 'Cover detection result', {
