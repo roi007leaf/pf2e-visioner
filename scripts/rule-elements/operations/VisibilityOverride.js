@@ -3,15 +3,28 @@ import { SourceTracker } from '../SourceTracker.js';
 
 export class VisibilityOverride {
   static async applyVisibilityOverride(operation, subjectToken, options = {}) {
-    
     if (!subjectToken) {
       console.warn('PF2E Visioner | No subject token provided to applyVisibilityOverride');
       return;
     }
 
-    const { observers, direction, state, source, preventConcealment, priority = 100, tokenIds, predicate } = operation;
-    
-    const observerTokens = this.getObserverTokens(subjectToken, observers, operation.range, tokenIds);
+    const {
+      observers,
+      direction,
+      state,
+      source,
+      preventConcealment,
+      priority = 100,
+      tokenIds,
+      predicate,
+    } = operation;
+
+    const observerTokens = this.getObserverTokens(
+      subjectToken,
+      observers,
+      operation.range,
+      tokenIds,
+    );
 
     const sourceData = {
       id: source || `visibility-${Date.now()}`,
@@ -19,7 +32,7 @@ export class VisibilityOverride {
       priority,
       state,
       preventConcealment,
-      qualifications: operation.qualifications || {}
+      qualifications: operation.qualifications || {},
     };
 
     for (const observerToken of observerTokens) {
@@ -27,17 +40,15 @@ export class VisibilityOverride {
         continue;
       }
 
-      const [targetToken, observingToken] = direction === 'from'
-        ? [subjectToken, observerToken]
-        : [observerToken, subjectToken];
-      
+      const [targetToken, observingToken] =
+        direction === 'from' ? [subjectToken, observerToken] : [observerToken, subjectToken];
 
       // Check operation-level predicate per target
       if (predicate && predicate.length > 0) {
         const subjectOptions = PredicateHelper.getTokenRollOptions(subjectToken);
         const targetOptions = PredicateHelper.getTargetRollOptions(observerToken, subjectToken);
         const combinedOptions = PredicateHelper.combineRollOptions(subjectOptions, targetOptions);
-        
+
         if (!PredicateHelper.evaluate(predicate, combinedOptions)) {
           continue;
         }
@@ -49,17 +60,17 @@ export class VisibilityOverride {
     await subjectToken.document.setFlag('pf2e-visioner', 'ruleElementOverride', {
       active: true,
       source: sourceData.id,
-      state
+      state,
     });
   }
 
   static async setVisibilityState(observerToken, targetToken, state, sourceData) {
     try {
       const { setVisibilityBetween } = await import('../../stores/visibility-map.js');
-      
-      await setVisibilityBetween(observerToken, targetToken, state, { 
+
+      await setVisibilityBetween(observerToken, targetToken, state, {
         skipEphemeralUpdate: false,
-        isAutomatic: false
+        isAutomatic: false,
       });
       await SourceTracker.addSourceToState(targetToken, 'visibility', sourceData, observerToken.id);
     } catch (error) {
@@ -76,7 +87,9 @@ export class VisibilityOverride {
 
     // Trigger AVS recalculation after effect removal
     if (window.pf2eVisioner?.services?.autoVisibilitySystem?.recalculateForTokens) {
-      await window.pf2eVisioner.services.autoVisibilitySystem.recalculateForTokens([subjectToken.id]);
+      await window.pf2eVisioner.services.autoVisibilitySystem.recalculateForTokens([
+        subjectToken.id,
+      ]);
     } else if (window.pf2eVisioner?.services?.autoVisibilitySystem?.recalculateAll) {
       await window.pf2eVisioner.services.autoVisibilitySystem.recalculateAll();
     } else if (canvas?.perception) {
@@ -85,7 +98,8 @@ export class VisibilityOverride {
   }
 
   static getObserverTokens(subjectToken, observers, range, tokenIds = null) {
-    const allTokens = canvas.tokens?.placeables.filter(t => t.actor && t.id !== subjectToken.id) || [];
+    const allTokens =
+      canvas.tokens?.placeables.filter((t) => t.actor && t.id !== subjectToken.id) || [];
 
     let filteredTokens = [];
 
@@ -94,20 +108,20 @@ export class VisibilityOverride {
         filteredTokens = allTokens;
         break;
       case 'allies':
-        filteredTokens = allTokens.filter(t => this.areAllies(subjectToken.actor, t.actor));
+        filteredTokens = allTokens.filter((t) => this.areAllies(subjectToken.actor, t.actor));
         break;
       case 'enemies':
-        filteredTokens = allTokens.filter(t => !this.areAllies(subjectToken.actor, t.actor));
+        filteredTokens = allTokens.filter((t) => !this.areAllies(subjectToken.actor, t.actor));
         break;
       case 'selected':
-        filteredTokens = canvas.tokens?.controlled.filter(t => t.id !== subjectToken.id) || [];
+        filteredTokens = canvas.tokens?.controlled.filter((t) => t.id !== subjectToken.id) || [];
         break;
       case 'targeted':
-        filteredTokens = Array.from(game.user.targets).filter(t => t.id !== subjectToken.id);
+        filteredTokens = Array.from(game.user.targets).filter((t) => t.id !== subjectToken.id);
         break;
       case 'specific':
         if (tokenIds && tokenIds.length > 0) {
-          filteredTokens = allTokens.filter(t => tokenIds.includes(t.document.id));
+          filteredTokens = allTokens.filter((t) => tokenIds.includes(t.document.id));
         }
         break;
       default:
@@ -115,7 +129,7 @@ export class VisibilityOverride {
     }
 
     if (range) {
-      filteredTokens = filteredTokens.filter(token => {
+      filteredTokens = filteredTokens.filter((token) => {
         const distance = canvas.grid.measureDistance(subjectToken, token);
         return distance <= range;
       });
@@ -138,17 +152,20 @@ export class VisibilityOverride {
     if (!subjectToken?.actor) return;
 
     const { condition, thenState, elseState, stateType = 'visibility' } = operation;
-    
+
     const conditionMet = this.evaluateCondition(subjectToken.actor, condition);
     const targetState = conditionMet ? thenState : elseState;
 
     if (!targetState) return;
 
     if (stateType === 'visibility') {
-      await this.applyVisibilityOverride({
-        ...operation,
-        state: targetState
-      }, subjectToken);
+      await this.applyVisibilityOverride(
+        {
+          ...operation,
+          state: targetState,
+        },
+        subjectToken,
+      );
     }
   }
 
@@ -156,19 +173,18 @@ export class VisibilityOverride {
     if (!actor) return false;
 
     const conditions = actor.itemTypes?.condition || [];
-    
+
     switch (condition) {
       case 'invisible':
-        return conditions.some(c => c.slug === 'invisible');
+        return conditions.some((c) => c.slug === 'invisible');
       case 'concealed':
-        return conditions.some(c => c.slug === 'concealed');
+        return conditions.some((c) => c.slug === 'concealed');
       case 'hidden':
-        return conditions.some(c => c.slug === 'hidden');
+        return conditions.some((c) => c.slug === 'hidden');
       case 'undetected':
-        return conditions.some(c => c.slug === 'undetected');
+        return conditions.some((c) => c.slug === 'undetected');
       default:
         return false;
     }
   }
 }
-

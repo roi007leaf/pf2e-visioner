@@ -4,6 +4,7 @@ import { DistanceBasedVisibility } from './operations/DistanceBasedVisibility.js
 import { LightingModifier } from './operations/LightingModifier.js';
 import { SenseModifier } from './operations/SenseModifier.js';
 import { VisibilityOverride } from './operations/VisibilityOverride.js';
+import { SourceTracker } from './SourceTracker.js';
 
 export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields) {
   if (!baseRuleElementClass || !fields) {
@@ -160,17 +161,24 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
       return `${this.item?.uuid || 'unknown'}-${this.slug || 'effect'}`;
     }
 
+    get ruleElementRegistryKey() {
+      if (this.item?.id) {
+        return `item-${this.item.id}`;
+      }
+      return this.ruleElementId;
+    }
+
     async onCreate(actorUpdates) {
       await this.applyOperations();
     }
 
     async onUpdate(actorUpdates) {
-      await this.removeOperations();
+      await this.removeAllFlagsForRuleElement();
       await this.applyOperations();
     }
 
     async onDelete(actorUpdates) {
-      await this.removeOperations();
+      await this.removeAllFlagsForRuleElement();
     }
 
     async onUpdateEncounter({ event }) {
@@ -199,12 +207,192 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
         return;
       }
 
-      for (const operation of this.operations) {
+      // Check for operation compatibility issues
+      this.checkOperationCompatibility();
+
+      // Smart merge operations before applying
+      const mergedOperations = this.smartMergeOperations();
+
+      for (const operation of mergedOperations) {
         try {
           await this.applyOperation(operation, token);
         } catch (error) {
           console.error(`PF2E Visioner | Error applying operation ${operation.type}:`, error);
         }
+      }
+    }
+
+    smartMergeOperations() {
+      const operations = [...this.operations];
+      const merged = [];
+      const processed = new Set();
+
+      console.log(
+        `PF2E Visioner | Smart merging ${operations.length} operations for ${this.item?.name || 'effect'}`,
+      );
+
+      for (let i = 0; i < operations.length; i++) {
+        if (processed.has(i)) continue;
+
+        const currentOp = operations[i];
+        let mergedOp = { ...currentOp };
+        let mergeCount = 1;
+
+        // Try to merge with subsequent operations
+        for (let j = i + 1; j < operations.length; j++) {
+          if (processed.has(j)) continue;
+
+          const nextOp = operations[j];
+          const mergeResult = this.tryMergeOperations(mergedOp, nextOp);
+
+          if (mergeResult.success) {
+            mergedOp = mergeResult.operation;
+            processed.add(j);
+            mergeCount++;
+            console.log(`PF2E Visioner | Merged ${currentOp.type} with ${nextOp.type}`);
+          }
+        }
+
+        merged.push(mergedOp);
+        processed.add(i);
+
+        if (mergeCount > 1) {
+          console.log(
+            `PF2E Visioner | Created merged operation combining ${mergeCount} operations`,
+          );
+        }
+      }
+
+      console.log(
+        `PF2E Visioner | Reduced ${operations.length} operations to ${merged.length} merged operations`,
+      );
+      return merged;
+    }
+
+    tryMergeOperations(op1, op2) {
+      // Merge sense modifications
+      if (op1.type === 'modifySenses' && op2.type === 'modifySenses') {
+        return {
+          success: true,
+          operation: {
+            ...op1,
+            senseModifications: {
+              ...op1.senseModifications,
+              ...op2.senseModifications,
+            },
+          },
+        };
+      }
+
+      // Merge action qualifications
+      if (op1.type === 'modifyActionQualification' && op2.type === 'modifyActionQualification') {
+        return {
+          success: true,
+          operation: {
+            ...op1,
+            qualifications: {
+              ...op1.qualifications,
+              ...op2.qualifications,
+            },
+          },
+        };
+      }
+
+      // Merge visibility overrides with priority
+      if (op1.type === 'overrideVisibility' && op2.type === 'overrideVisibility') {
+        const priority1 = op1.priority || 100;
+        const priority2 = op2.priority || 100;
+
+        return {
+          success: true,
+          operation: priority1 >= priority2 ? op1 : op2,
+        };
+      }
+
+      // Merge distance-based visibility with conditional state
+      if (op1.type === 'distanceBasedVisibility' && op2.type === 'conditionalState') {
+        return {
+          success: true,
+          operation: {
+            ...op1,
+            conditionalState: op2,
+            // Distance-based takes precedence, but we store the conditional for reference
+          },
+        };
+      }
+
+      // Merge lighting modifications
+      if (op1.type === 'modifyLighting' && op2.type === 'modifyLighting') {
+        const priority1 = op1.priority || 100;
+        const priority2 = op2.priority || 100;
+
+        return {
+          success: true,
+          operation: priority1 >= priority2 ? op1 : op2,
+        };
+      }
+
+      // Merge cover operations with priority
+      if (op1.type === 'overrideCover' && op2.type === 'overrideCover') {
+        const priority1 = op1.priority || 100;
+        const priority2 = op2.priority || 100;
+
+        return {
+          success: true,
+          operation: priority1 >= priority2 ? op1 : op2,
+        };
+      }
+
+      // No merge possible
+      return { success: false };
+    }
+
+    checkOperationCompatibility() {
+      const operationTypes = this.operations.map((op) => op.type);
+      const warnings = [];
+
+      // Check for visibility override conflicts
+      const visibilityOps = operationTypes.filter((type) =>
+        ['overrideVisibility', 'conditionalState', 'distanceBasedVisibility'].includes(type),
+      );
+      if (visibilityOps.length > 1) {
+        warnings.push(
+          `Multiple visibility operations detected: ${visibilityOps.join(', ')}. Smart merging will attempt to resolve conflicts.`,
+        );
+      }
+
+      // Check for cover conflicts
+      const coverOps = operationTypes.filter((type) =>
+        ['overrideCover', 'provideCover'].includes(type),
+      );
+      if (coverOps.length > 1) {
+        warnings.push(
+          `Multiple cover operations detected: ${coverOps.join(', ')}. Smart merging will attempt to resolve conflicts.`,
+        );
+      }
+
+      // Check for sense modification conflicts
+      const senseOps = operationTypes.filter((type) => type === 'modifySenses');
+      if (senseOps.length > 1) {
+        warnings.push(
+          `Multiple sense modification operations detected. Smart merging will combine them.`,
+        );
+      }
+
+      // Check for action qualification conflicts
+      const actionOps = operationTypes.filter((type) => type === 'modifyActionQualification');
+      if (actionOps.length > 1) {
+        warnings.push(
+          `Multiple action qualification operations detected. Smart merging will combine them.`,
+        );
+      }
+
+      // Log warnings
+      if (warnings.length > 0) {
+        console.warn(
+          `PF2E Visioner | Operation compatibility warnings for ${this.item?.name || 'effect'}:`,
+        );
+        warnings.forEach((warning) => console.warn(`  - ${warning}`));
       }
     }
 
@@ -217,10 +405,12 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
             this.ruleElementId,
             operation.predicate,
           );
+          await this.registerFlag(token, 'originalSenses');
           break;
 
         case 'overrideVisibility':
           await VisibilityOverride.applyVisibilityOverride(operation, token);
+          await this.registerFlag(token, 'ruleElementOverride');
           break;
 
         case 'overrideCover':
@@ -229,14 +419,17 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
 
         case 'provideCover':
           await CoverOverride.applyProvideCover(operation, token, this);
+          await this.registerFlag(token, 'providesCover');
           break;
 
         case 'modifyActionQualification':
           await ActionQualifier.applyActionQualifications(operation, token);
+          await this.registerFlag(token, 'actionQualifications');
           break;
 
         case 'modifyLighting':
           await LightingModifier.applyLightingModification(operation, token);
+          await this.registerFlag(token, `lightingModification.${operation.source || 'lighting'}`);
           break;
 
         case 'conditionalState':
@@ -245,10 +438,80 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
 
         case 'distanceBasedVisibility':
           await DistanceBasedVisibility.applyDistanceBasedVisibility(operation, token);
+          await this.registerFlag(token, 'distanceBasedVisibility');
           break;
 
         default:
           console.warn(`PF2E Visioner | Unknown operation type: ${operation.type}`);
+      }
+    }
+
+    async registerFlag(token, flagPath) {
+      const registryKey = this.ruleElementRegistryKey;
+      const registry = token.document.getFlag('pf2e-visioner', 'ruleElementRegistry') || {};
+      if (!registry[registryKey]) {
+        registry[registryKey] = [];
+      }
+      if (!registry[registryKey].includes(flagPath)) {
+        registry[registryKey].push(flagPath);
+        await token.document.setFlag('pf2e-visioner', 'ruleElementRegistry', registry);
+      }
+    }
+
+    async removeAllFlagsForRuleElement() {
+      const token = this.getSubjectToken();
+      if (!token) return;
+
+      const registryKey = this.ruleElementRegistryKey;
+      const flagRegistry = token.document.getFlag('pf2e-visioner', 'ruleElementRegistry') || {};
+      const flagsToRemove = flagRegistry[registryKey] || [];
+
+      const updates = {};
+
+      if (flagsToRemove.length > 0) {
+        for (const flagPath of flagsToRemove) {
+          updates[`flags.pf2e-visioner.${flagPath}`] = null;
+        }
+      } else {
+        const allPf2eVisionerFlags = token.document.getFlag('pf2e-visioner') || {};
+        const simpleFlags = [
+          'distanceBasedVisibility',
+          'ruleElementOverride',
+          'actionQualifications',
+          'providesCover',
+          'originalSenses',
+        ];
+
+        for (const flagName of simpleFlags) {
+          if (allPf2eVisionerFlags[flagName]) {
+            updates[`flags.pf2e-visioner.${flagName}`] = null;
+          }
+        }
+
+        const lightingModifications = allPf2eVisionerFlags.lightingModification || {};
+        for (const modId of Object.keys(lightingModifications)) {
+          updates[`flags.pf2e-visioner.lightingModification.${modId}`] = null;
+        }
+      }
+
+      if (flagRegistry[registryKey]) {
+        const newRegistry = { ...flagRegistry };
+        delete newRegistry[registryKey];
+        updates['flags.pf2e-visioner.ruleElementRegistry'] = newRegistry;
+      }
+
+      await SourceTracker.removeSource(this.ruleElementId);
+
+      if (Object.keys(updates).length > 0) {
+        await token.document.update(updates);
+      }
+
+      if (window.pf2eVisioner?.services?.autoVisibilitySystem?.recalculateForTokens) {
+        await window.pf2eVisioner.services.autoVisibilitySystem.recalculateForTokens([token.id]);
+      } else if (window.pf2eVisioner?.services?.autoVisibilitySystem?.recalculateAll) {
+        await window.pf2eVisioner.services.autoVisibilitySystem.recalculateAll();
+      } else if (canvas?.perception) {
+        canvas.perception.update({ refreshVision: true, refreshOcclusion: true });
       }
     }
 

@@ -1,3 +1,4 @@
+import { RuleElementChecker } from '../../../rule-elements/RuleElementChecker.js';
 import { GlobalLosCache } from '../utils/GlobalLosCache.js';
 import { GlobalVisibilityCache } from '../utils/GlobalVisibilityCache.js';
 import { VisionAnalyzer } from '../VisionAnalyzer.js';
@@ -517,12 +518,9 @@ export class BatchProcessor {
           }
           effectiveVisibility1 = visibility1;
 
-          const distanceBasedResult1 = await this._checkDistanceBasedVisibility(
-            changedToken,
-            otherToken,
-          );
-          if (distanceBasedResult1) {
-            effectiveVisibility1 = distanceBasedResult1.state;
+          const ruleElementResult1 = RuleElementChecker.checkRuleElements(changedToken, otherToken);
+          if (ruleElementResult1) {
+            effectiveVisibility1 = ruleElementResult1.state;
           }
         }
         // Direction 2: otherToken -> changedToken (only calculate if no override)
@@ -572,12 +570,9 @@ export class BatchProcessor {
           }
           effectiveVisibility2 = visibility2;
 
-          const distanceBasedResult2 = await this._checkDistanceBasedVisibility(
-            otherToken,
-            changedToken,
-          );
-          if (distanceBasedResult2) {
-            effectiveVisibility2 = distanceBasedResult2.state;
+          const ruleElementResult2 = RuleElementChecker.checkRuleElements(otherToken, changedToken);
+          if (ruleElementResult2) {
+            effectiveVisibility2 = ruleElementResult2.state;
           }
         }
 
@@ -661,17 +656,6 @@ export class BatchProcessor {
       return override?.active === true;
     } catch (error) {
       return false;
-    }
-  }
-
-  async _checkDistanceBasedVisibility(observerToken, targetToken) {
-    try {
-      const { DistanceBasedVisibility } = await import(
-        '../../../rule-elements/operations/DistanceBasedVisibility.js'
-      );
-      return DistanceBasedVisibility.checkDistanceBasedVisibility(observerToken, targetToken);
-    } catch (error) {
-      return null;
     }
   }
 }

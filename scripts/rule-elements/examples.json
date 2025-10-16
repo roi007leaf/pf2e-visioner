@@ -1,0 +1,387 @@
+{
+  "blur": {
+    "name": "PF2E_VISIONER.RULE_ELEMENTS.EFFECT.EXAMPLES.BLUR.NAME",
+    "description": "PF2E_VISIONER.RULE_ELEMENTS.EFFECT.EXAMPLES.BLUR.DESCRIPTION",
+    "rules": [
+      {
+        "key": "PF2eVisionerEffect",
+        "operations": [
+          {
+            "type": "overrideVisibility",
+            "state": "concealed",
+            "direction": "from",
+            "observers": "all",
+            "source": "blur-spell"
+          },
+          {
+            "type": "modifyActionQualification",
+            "qualifications": {
+              "hide": {
+                "canUseThisConcealment": false,
+                "customMessage": "PF2E_VISIONER.RULE_ELEMENTS.EFFECT.MESSAGES.BLUR_HIDE_BLOCKED"
+              },
+              "sneak": {
+                "endPositionQualifies": false,
+                "customMessage": "PF2E_VISIONER.RULE_ELEMENTS.EFFECT.MESSAGES.BLUR_SNEAK_BLOCKED"
+              }
+            },
+            "source": "blur-spell"
+          }
+        ],
+        "priority": 100
+      }
+    ]
+  },
+  "faerieFire": {
+    "name": "PF2E_VISIONER.RULE_ELEMENTS.EFFECT.EXAMPLES.FAERIE_FIRE.NAME",
+    "description": "PF2E_VISIONER.RULE_ELEMENTS.EFFECT.EXAMPLES.FAERIE_FIRE.DESCRIPTION",
+    "rules": [
+      {
+        "key": "PF2eVisionerEffect",
+        "operations": [
+          {
+            "type": "conditionalState",
+            "condition": "invisible",
+            "thenState": "concealed",
+            "elseState": "observed",
+            "stateType": "visibility",
+            "direction": "from",
+            "observers": "all",
+            "source": "faerie-fire"
+          },
+          {
+            "type": "overrideVisibility",
+            "preventConcealment": true,
+            "direction": "from",
+            "observers": "all",
+            "source": "faerie-fire"
+          }
+        ],
+        "priority": 110
+      }
+    ]
+  },
+  "revealingLight": {
+    "name": "PF2E_VISIONER.RULE_ELEMENTS.EFFECT.EXAMPLES.REVEALING_LIGHT.NAME",
+    "description": "PF2E_VISIONER.RULE_ELEMENTS.EFFECT.EXAMPLES.REVEALING_LIGHT.DESCRIPTION",
+    "rules": [
+      {
+        "key": "PF2eVisionerEffect",
+        "operations": [
+          {
+            "type": "conditionalState",
+            "condition": "invisible",
+            "thenState": "concealed",
+            "stateType": "visibility",
+            "direction": "from",
+            "observers": "all",
+            "source": "revealing-light"
+          },
+          {
+            "type": "overrideVisibility",
+            "preventConcealment": true,
+            "direction": "from",
+            "observers": "all",
+            "source": "revealing-light"
+          }
+        ],
+        "priority": 110
+      }
+    ]
+  },
+  "cloudedFocus": {
+    "name": "PF2E_VISIONER.RULE_ELEMENTS.EFFECT.EXAMPLES.CLOUDED_FOCUS.NAME",
+    "description": "PF2E_VISIONER.RULE_ELEMENTS.EFFECT.EXAMPLES.CLOUDED_FOCUS.DESCRIPTION",
+    "rules": [
+      {
+        "key": "PF2eVisionerEffect",
+        "operations": [
+          {
+            "type": "modifySenses",
+            "senseModifications": {
+              "hearing": {
+                "precision": "precise",
+                "range": 20
+              },
+              "tremorsense": {
+                "precision": "precise",
+                "range": 20
+              },
+              "scent": {
+                "precision": "precise",
+                "range": 20
+              },
+              "all": {
+                "maxRange": 20
+              }
+            },
+            "source": "clouded-focus"
+          }
+        ],
+        "priority": 100
+      }
+    ]
+  },
+  "thousandVisions": {
+    "name": "PF2E_VISIONER.RULE_ELEMENTS.EFFECT.EXAMPLES.THOUSAND_VISIONS.NAME",
+    "description": "PF2E_VISIONER.RULE_ELEMENTS.EFFECT.EXAMPLES.THOUSAND_VISIONS.DESCRIPTION",
+    "rules": [
+      {
+        "key": "PF2eVisionerEffect",
+        "operations": [
+          {
+            "type": "modifyActionQualification",
+            "qualifications": {
+              "seek": {
+                "ignoreConcealment": true
+              }
+            },
+            "range": 30,
+            "source": "thousand-visions"
+          },
+          {
+            "type": "modifySenses",
+            "senseModifications": {
+              "all": {
+                "maxRange": 30,
+                "beyondIsImprecise": true
+              }
+            },
+            "source": "thousand-visions"
+          }
+        ],
+        "priority": 100
+      }
+    ]
+  },
+  "deepDarkness": {
+    "name": "Deep Darkness",
+    "description": "The creature is surrounded by supernatural darkness. The lighting level at its position is always treated as magical darkness (rank 4), blocking darkvision.",
+    "rules": [
+      {
+        "key": "PF2eVisionerEffect",
+        "operations": [
+          {
+            "type": "modifyLighting",
+            "lightingLevel": "greaterMagicalDarkness",
+            "source": "deep-darkness",
+            "priority": 200
+          }
+        ],
+        "priority": 100
+      }
+    ]
+  },
+  "towerShield": {
+    "name": "PF2E_VISIONER.RULE_ELEMENTS.EFFECT.EXAMPLES.TOWER_SHIELD.NAME",
+    "description": "PF2E_VISIONER.RULE_ELEMENTS.EFFECT.EXAMPLES.TOWER_SHIELD.DESCRIPTION",
+    "rules": [
+      {
+        "key": "PF2eVisionerEffect",
+        "operations": [
+          {
+            "type": "overrideCover",
+            "state": "standard",
+            "direction": "to",
+            "targets": "allies",
+            "range": 5,
+            "source": "tower-shield",
+            "requiresTakeCover": true
+          }
+        ],
+        "priority": 100
+      }
+    ]
+  },
+  "deployableCover": {
+    "name": "PF2E_VISIONER.RULE_ELEMENTS.EFFECT.EXAMPLES.DEPLOYABLE_COVER.NAME",
+    "description": "PF2E_VISIONER.RULE_ELEMENTS.EFFECT.EXAMPLES.DEPLOYABLE_COVER.DESCRIPTION",
+    "rules": [
+      {
+        "key": "PF2eVisionerEffect",
+        "operations": [
+          {
+            "type": "provideCover",
+            "state": "standard",
+            "blockedEdges": ["north"],
+            "requiresTakeCover": true,
+            "autoCoverBehavior": "replace",
+            "source": "deployable-cover"
+          }
+        ],
+        "priority": 100
+      }
+    ]
+  },
+  "ballisticCover": {
+    "name": "PF2E_VISIONER.RULE_ELEMENTS.EFFECT.EXAMPLES.BALLISTIC_COVER.NAME",
+    "description": "PF2E_VISIONER.RULE_ELEMENTS.EFFECT.EXAMPLES.BALLISTIC_COVER.DESCRIPTION",
+    "rules": [
+      {
+        "key": "PF2eVisionerEffect",
+        "operations": [
+          {
+            "type": "provideCover",
+            "state": "standard",
+            "blockedEdges": ["north"],
+            "requiresTakeCover": true,
+            "autoCoverBehavior": "replace",
+            "source": "ballistic-cover"
+          }
+        ],
+        "priority": 100
+      }
+    ]
+  },
+  "seeInvisibility": {
+    "name": "PF2E_VISIONER.RULE_ELEMENTS.EFFECT.EXAMPLES.SEE_INVISIBILITY.NAME",
+    "description": "PF2E_VISIONER.RULE_ELEMENTS.EFFECT.EXAMPLES.SEE_INVISIBILITY.DESCRIPTION",
+    "rules": [
+      {
+        "key": "PF2eVisionerEffect",
+        "operations": [
+          {
+            "type": "overrideVisibility",
+            "state": "concealed",
+            "direction": "to",
+            "observers": "all",
+            "predicate": ["target:condition:invisible"],
+            "source": "see-invisibility"
+          }
+        ],
+        "priority": 100
+      }
+    ]
+  },
+  "blindFight": {
+    "name": "PF2E_VISIONER.RULE_ELEMENTS.EFFECT.EXAMPLES.BLIND_FIGHT.NAME",
+    "description": "PF2E_VISIONER.RULE_ELEMENTS.EFFECT.EXAMPLES.BLIND_FIGHT.DESCRIPTION",
+    "rules": [
+      {
+        "key": "PF2eVisionerEffect",
+        "operations": [
+          {
+            "type": "modifyActionQualification",
+            "qualifications": {
+              "seek": {
+                "ignoreThisConcealment": true,
+                "customMessage": "PF2E_VISIONER.RULE_ELEMENTS.EFFECT.MESSAGES.BLIND_FIGHT_ACTIVE"
+              }
+            },
+            "predicate": ["target:condition:hidden", "target:condition:concealed"],
+            "source": "blind-fight"
+          }
+        ],
+        "priority": 100
+      }
+    ]
+  },
+  "consecrate": {
+    "name": "PF2E_VISIONER.RULE_ELEMENTS.EFFECT.EXAMPLES.CONSECRATE.NAME",
+    "description": "PF2E_VISIONER.RULE_ELEMENTS.EFFECT.EXAMPLES.CONSECRATE.DESCRIPTION",
+    "rules": [
+      {
+        "key": "PF2eVisionerEffect",
+        "operations": [
+          {
+            "type": "overrideVisibility",
+            "state": "concealed",
+            "direction": "from",
+            "observers": "all",
+            "predicate": ["self:trait:undead"],
+            "source": "consecrate"
+          }
+        ],
+        "priority": 100
+      }
+    ]
+  },
+  "darkvisionConditional": {
+    "name": "PF2E_VISIONER.RULE_ELEMENTS.EFFECT.EXAMPLES.DARKVISION_CONDITIONAL.NAME",
+    "description": "PF2E_VISIONER.RULE_ELEMENTS.EFFECT.EXAMPLES.DARKVISION_CONDITIONAL.DESCRIPTION",
+    "rules": [
+      {
+        "key": "PF2eVisionerEffect",
+        "predicate": ["lighting:dim", "lighting:darkness"],
+        "operations": [
+          {
+            "type": "modifySenses",
+            "senseModifications": {
+              "darkvision": {
+                "range": 60,
+                "precision": "precise"
+              }
+            },
+            "source": "darkvision-conditional"
+          }
+        ],
+        "priority": 100
+      }
+    ]
+  },
+  "heavyPrecipitation": {
+    "name": "PF2E_VISIONER.RULE_ELEMENTS.EFFECT.EXAMPLES.HEAVY_PRECIPITATION.NAME",
+    "description": "PF2E_VISIONER.RULE_ELEMENTS.EFFECT.EXAMPLES.HEAVY_PRECIPITATION.DESCRIPTION",
+    "rules": [
+      {
+        "key": "PF2eVisionerEffect",
+        "operations": [
+          {
+            "type": "distanceBasedVisibility",
+            "direction": "to",
+            "observers": "all",
+            "distanceBands": [
+              {
+                "minDistance": 0,
+                "maxDistance": 30,
+                "state": "observed"
+              },
+              {
+                "minDistance": 30,
+                "maxDistance": null,
+                "state": "concealed"
+              }
+            ],
+            "source": "heavy-precipitation"
+          }
+        ],
+        "priority": 100
+      }
+    ]
+  },
+  "thickFog": {
+    "name": "PF2E_VISIONER.RULE_ELEMENTS.EFFECT.EXAMPLES.THICK_FOG.NAME",
+    "description": "PF2E_VISIONER.RULE_ELEMENTS.EFFECT.EXAMPLES.THICK_FOG.DESCRIPTION",
+    "rules": [
+      {
+        "key": "PF2eVisionerEffect",
+        "operations": [
+          {
+            "type": "distanceBasedVisibility",
+            "direction": "to",
+            "observers": "all",
+            "distanceBands": [
+              {
+                "minDistance": 0,
+                "maxDistance": 10,
+                "state": "observed"
+              },
+              {
+                "minDistance": 10,
+                "maxDistance": 20,
+                "state": "concealed"
+              },
+              {
+                "minDistance": 20,
+                "maxDistance": null,
+                "state": "hidden"
+              }
+            ],
+            "source": "thick-fog"
+          }
+        ],
+        "priority": 100
+      }
+    ]
+  }
+}

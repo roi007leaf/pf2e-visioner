@@ -1,4 +1,5 @@
 import { DistanceBasedVisibility } from '../../../../scripts/rule-elements/operations/DistanceBasedVisibility.js';
+import { RuleElementChecker } from '../../../../scripts/rule-elements/RuleElementChecker.js';
 
 describe('DistanceBasedVisibility', () => {
   let mockToken1, mockToken2, mockToken3;
@@ -162,7 +163,7 @@ describe('DistanceBasedVisibility', () => {
 
   describe('checkDistanceBasedVisibility', () => {
     it('should return null when neither token has distance-based config', () => {
-      const result = DistanceBasedVisibility.checkDistanceBasedVisibility(mockToken1, mockToken2);
+      const result = RuleElementChecker.checkDistanceBasedVisibility(mockToken1, mockToken2);
 
       expect(result).toBeNull();
     });
@@ -189,7 +190,7 @@ describe('DistanceBasedVisibility', () => {
       mockToken2.x = 200;
       mockToken2.y = 0;
 
-      const result = DistanceBasedVisibility.checkDistanceBasedVisibility(mockToken1, mockToken2);
+      const result = RuleElementChecker.checkDistanceBasedVisibility(mockToken1, mockToken2);
 
       expect(result).not.toBeNull();
       expect(result.state).toBe('concealed');
@@ -219,7 +220,7 @@ describe('DistanceBasedVisibility', () => {
       mockToken2.x = 500;
       mockToken2.y = 0;
 
-      const result = DistanceBasedVisibility.checkDistanceBasedVisibility(mockToken1, mockToken2);
+      const result = RuleElementChecker.checkDistanceBasedVisibility(mockToken1, mockToken2);
 
       expect(result).not.toBeNull();
       expect(result.state).toBe('hidden');
