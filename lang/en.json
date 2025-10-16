@@ -415,6 +415,14 @@
           "DARKVISION_CONDITIONAL": {
             "NAME": "Darkvision (Conditional)",
             "DESCRIPTION": "Darkvision only works in darkness or dim light."
+          },
+          "HEAVY_PRECIPITATION": {
+            "NAME": "Heavy Precipitation",
+            "DESCRIPTION": "Heavy rain, snow, or sleet reduces visibility. Creatures 30 feet or more away are concealed."
+          },
+          "THICK_FOG": {
+            "NAME": "Thick Fog",
+            "DESCRIPTION": "Dense fog severely limits visibility. Creatures within 10 feet are concealed, and creatures beyond 20 feet are hidden."
           }
         }
       },

@@ -1,5 +1,6 @@
 import { ActionQualifier } from './operations/ActionQualifier.js';
 import { CoverOverride } from './operations/CoverOverride.js';
+import { DistanceBasedVisibility } from './operations/DistanceBasedVisibility.js';
 import { LightingModifier } from './operations/LightingModifier.js';
 import { SenseModifier } from './operations/SenseModifier.js';
 import { VisibilityOverride } from './operations/VisibilityOverride.js';
@@ -31,10 +32,7 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
       const schema = super.defineSchema();
 
       // Add predicate support at rule element level
-      schema.predicate = new fields.ArrayField(
-        new fields.StringField(),
-        { required: false }
-      );
+      schema.predicate = new fields.ArrayField(new fields.StringField(), { required: false });
 
       schema.operations = new fields.ArrayField(
         new fields.SchemaField({
@@ -47,96 +45,112 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
               'provideCover',
               'modifyActionQualification',
               'modifyLighting',
-              'conditionalState'
+              'conditionalState',
+              'distanceBasedVisibility',
             ],
-            initial: 'overrideVisibility'
+            initial: 'overrideVisibility',
           }),
-          
+
           // Predicate at operation level (more granular)
-          predicate: new fields.ArrayField(
-            new fields.StringField(),
-            { required: false }
-          ),
-          
+          predicate: new fields.ArrayField(new fields.StringField(), { required: false }),
+
           senseModifications: new fields.ObjectField({ required: false }),
-          
+
           state: new fields.StringField({
             required: false,
-            choices: ['observed', 'concealed', 'hidden', 'undetected', 'none', 'lesser', 'standard', 'greater']
+            choices: [
+              'observed',
+              'concealed',
+              'hidden',
+              'undetected',
+              'none',
+              'lesser',
+              'standard',
+              'greater',
+            ],
           }),
-          
+
           direction: new fields.StringField({
             required: false,
             choices: ['from', 'to'],
-            initial: 'from'
+            initial: 'from',
           }),
-          
+
           observers: new fields.StringField({
             required: false,
             choices: ['all', 'allies', 'enemies', 'selected', 'targeted', 'specific'],
-            initial: 'all'
+            initial: 'all',
           }),
-          
+
           targets: new fields.StringField({
             required: false,
             choices: ['all', 'allies', 'enemies', 'selected', 'targeted', 'specific'],
-            initial: 'all'
+            initial: 'all',
           }),
-          
-          tokenIds: new fields.ArrayField(
-            new fields.StringField(),
-            { required: false }
-          ),
-          
+
+          tokenIds: new fields.ArrayField(new fields.StringField(), { required: false }),
+
           source: new fields.StringField({ required: false }),
-          
+
           preventConcealment: new fields.BooleanField({ required: false, initial: false }),
-          
+
           blockedEdges: new fields.ArrayField(
             new fields.StringField({ choices: ['north', 'south', 'east', 'west'] }),
-            { required: false }
+            { required: false },
           ),
-          
+
           requiresTakeCover: new fields.BooleanField({ required: false, initial: false }),
-          
+
           autoCoverBehavior: new fields.StringField({
             required: false,
             choices: ['add', 'replace', 'minimum'],
-            initial: 'replace'
+            initial: 'replace',
           }),
-          
+
           preventAutoCover: new fields.BooleanField({ required: false, initial: false }),
-          
+
           qualifications: new fields.ObjectField({ required: false }),
-          
+
           condition: new fields.StringField({
             required: false,
-            choices: ['invisible', 'concealed', 'hidden', 'undetected']
+            choices: ['invisible', 'concealed', 'hidden', 'undetected'],
           }),
-          
+
           thenState: new fields.StringField({ required: false }),
-          
+
           elseState: new fields.StringField({ required: false }),
-          
+
           stateType: new fields.StringField({
             required: false,
             choices: ['visibility', 'cover'],
-            initial: 'visibility'
+            initial: 'visibility',
           }),
-          
+
           lightingLevel: new fields.StringField({
             required: false,
-            choices: ['darkness', 'dim', 'bright', 'magicalDarkness', 'greaterMagicalDarkness']
+            choices: ['darkness', 'dim', 'bright', 'magicalDarkness', 'greaterMagicalDarkness'],
           }),
-          
-          range: new fields.NumberField({ required: false, nullable: true })
+
+          range: new fields.NumberField({ required: false, nullable: true }),
+
+          distanceBands: new fields.ArrayField(
+            new fields.SchemaField({
+              minDistance: new fields.NumberField({ required: false, nullable: true }),
+              maxDistance: new fields.NumberField({ required: false, nullable: true }),
+              state: new fields.StringField({
+                required: true,
+                choices: ['observed', 'concealed', 'hidden', 'undetected'],
+              }),
+            }),
+            { required: false },
+          ),
         }),
-        { required: true }
+        { required: true },
       );
 
       schema.priority = new fields.NumberField({
         required: false,
-        initial: 100
+        initial: 100,
       });
 
       return schema;
@@ -147,6 +161,11 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
     }
 
     async onCreate(actorUpdates) {
+      await this.applyOperations();
+    }
+
+    async onUpdate(actorUpdates) {
+      await this.removeOperations();
       await this.applyOperations();
     }
 
@@ -162,7 +181,7 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
 
     async applyOperations() {
       const token = this.getSubjectToken();
-      
+
       if (!token) {
         return;
       }
@@ -192,7 +211,12 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
     async applyOperation(operation, token) {
       switch (operation.type) {
         case 'modifySenses':
-          SenseModifier.applySenseModifications(token, operation.senseModifications, this.ruleElementId, operation.predicate);
+          SenseModifier.applySenseModifications(
+            token,
+            operation.senseModifications,
+            this.ruleElementId,
+            operation.predicate,
+          );
           break;
 
         case 'overrideVisibility':
@@ -217,6 +241,10 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
 
         case 'conditionalState':
           await VisibilityOverride.applyConditionalState(operation, token);
+          break;
+
+        case 'distanceBasedVisibility':
+          await DistanceBasedVisibility.applyDistanceBasedVisibility(operation, token);
           break;
 
         default:
@@ -263,6 +291,10 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
           await LightingModifier.removeLightingModification(operation, token);
           break;
 
+        case 'distanceBasedVisibility':
+          await DistanceBasedVisibility.removeDistanceBasedVisibility(operation, token);
+          break;
+
         default:
           break;
       }
@@ -274,4 +306,3 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
     }
   };
 }
-

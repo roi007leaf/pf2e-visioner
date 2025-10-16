@@ -81,23 +81,27 @@ Applied to individual operations. More granular control - each operation can hav
 Predicates use PF2e roll options. Common patterns include:
 
 **Self options** (the token with the effect):
+
 - `self:condition:{condition}` - Has a specific condition (e.g., `self:condition:invisible`)
 - `self:trait:{trait}` - Has a specific trait (e.g., `self:trait:undead`)
 - `self:disposition:friendly|hostile|neutral` - Token disposition
 - `self:hidden` - Token is hidden to GM
 
 **Target options** (the affected token):
+
 - `target:condition:{condition}` - Target has a condition
 - `target:trait:{trait}` - Target has a trait
 - `target:ally` - Target is an ally
 - `target:enemy` - Target is an enemy
 
 **Environmental options**:
+
 - `lighting:dim` - Dim light
 - `lighting:darkness` - Darkness
 - `lighting:bright` - Bright light
 
 **Logical operators**:
+
 - Array elements are AND by default: `["self:condition:invisible", "target:enemy"]` means both must be true
 - Use `not:` prefix for negation: `["not:target:condition:invisible"]`
 - Complex logic uses objects: `{"or": ["condition1", "condition2"]}`
@@ -105,6 +109,7 @@ Predicates use PF2e roll options. Common patterns include:
 #### Predicate Examples
 
 **See Invisibility** (only reveals invisible creatures):
+
 ```json
 {
   "key": "PF2eVisionerEffect",
@@ -120,6 +125,7 @@ Predicates use PF2e roll options. Common patterns include:
 ```
 
 **Darkvision** (only works in dim/dark conditions):
+
 ```json
 {
   "key": "PF2eVisionerEffect",
@@ -136,6 +142,7 @@ Predicates use PF2e roll options. Common patterns include:
 ```
 
 **Consecrate** (only affects undead):
+
 ```json
 {
   "key": "PF2eVisionerEffect",
@@ -157,11 +164,13 @@ Predicates use PF2e roll options. Common patterns include:
 Modify sense ranges and precision for the token.
 
 **Use cases:**
+
 - Spells that limit perception range (Clouded Focus)
 - Effects that sharpen imprecise senses to precise
 - Temporary sense enhancements
 
 **Properties:**
+
 - `senseModifications` (object): Sense-specific modifications
   - Keys: Sense names or `"all"` for all senses
   - Values: `{ range: number, precision: "precise"|"imprecise", maxRange: number, beyondIsImprecise: boolean }`
@@ -188,11 +197,13 @@ Modify sense ranges and precision for the token.
 Override the visibility state between tokens, bypassing AVS calculations.
 
 **Use cases:**
+
 - Spells that force concealment (Blur)
 - Effects that reveal invisible creatures (Faerie Fire, Revealing Light)
 - Temporary visibility changes
 
 **Properties:**
+
 - `state` (string): Visibility state - `"observed"`, `"concealed"`, `"hidden"`, `"undetected"`
 - `direction` (string): Relationship direction
   - `"from"` - Observers see subject differently (e.g., Blur makes you concealed to others)
@@ -215,15 +226,101 @@ Override the visibility state between tokens, bypassing AVS calculations.
 }
 ```
 
-### 3. overrideCover
+### 3. distanceBasedVisibility
+
+Apply different visibility states based on distance between tokens. Perfect for environmental effects like fog, precipitation, or darkness that affect visibility at different ranges.
+
+**Use cases:**
+
+- Heavy precipitation (creatures 30+ feet away are concealed)
+- Thick fog (creatures 10-20 feet away are concealed, 20+ feet are hidden)
+- Magical darkness effects with varying intensity by distance
+- Environmental hazards that limit vision
+
+**Properties:**
+
+- `direction` (string): Relationship direction
+  - `"from"` - Observers see subject differently based on distance
+  - `"to"` - Subject sees observers differently based on distance
+- `observers` (string): Who is affected - `"all"`, `"allies"`, `"enemies"`, `"selected"`, `"targeted"`, `"specific"`
+- `tokenIds` (array): Array of token document IDs (required when `observers` is `"specific"`)
+- `distanceBands` (array): Array of distance band objects, each with:
+  - `minDistance` (number): Minimum distance in feet (null or 0 for no minimum)
+  - `maxDistance` (number): Maximum distance in feet (null for no maximum/infinity)
+  - `state` (string): Visibility state - `"observed"`, `"concealed"`, `"hidden"`, `"undetected"`
+- `source` (string): Identifier for source tracking
+- `predicate` (array): Optional PF2e predicate for conditional application
+
+**Example - Heavy Precipitation:**
+
+```json
+{
+  "type": "distanceBasedVisibility",
+  "direction": "to",
+  "observers": "all",
+  "distanceBands": [
+    {
+      "minDistance": 0,
+      "maxDistance": 30,
+      "state": "observed"
+    },
+    {
+      "minDistance": 30,
+      "maxDistance": null,
+      "state": "concealed"
+    }
+  ],
+  "source": "heavy-precipitation"
+}
+```
+
+**Example - Thick Fog (Multiple Bands):**
+
+```json
+{
+  "type": "distanceBasedVisibility",
+  "direction": "to",
+  "observers": "all",
+  "distanceBands": [
+    {
+      "minDistance": 0,
+      "maxDistance": 10,
+      "state": "observed"
+    },
+    {
+      "minDistance": 10,
+      "maxDistance": 20,
+      "state": "concealed"
+    },
+    {
+      "minDistance": 20,
+      "maxDistance": null,
+      "state": "hidden"
+    }
+  ],
+  "source": "thick-fog"
+}
+```
+
+**How Distance Bands Work:**
+
+- Bands are evaluated in order from smallest to largest `minDistance`
+- The first band where `distance >= minDistance AND distance < maxDistance` is applied
+- Use `null` for `maxDistance` to mean "infinity" (no upper limit)
+- Use `null` or `0` for `minDistance` to mean "from 0 feet"
+- Make sure bands don't overlap - each distance should fall into exactly one band
+
+### 4. overrideCover
 
 Override cover states between tokens.
 
 **Use cases:**
+
 - Tower shield providing cover to allies
 - Effects that grant or block cover
 
 **Properties:**
+
 - `state` (string): Cover state - `"none"`, `"lesser"`, `"standard"`, `"greater"`
 - `direction` (string): Relationship direction
   - `"to"` - Token provides cover TO others (e.g., tower shield)
@@ -247,22 +344,24 @@ Override cover states between tokens.
 }
 ```
 
-### 4. provideCover
+### 5. provideCover
 
 Placed objects (like deployable cover) that provide cover to tokens.
 
 **Use cases:**
+
 - Deployable Cover
 - Ballistic Cover
 - Barriers and shields
 
 **Properties:**
+
 - `state` (string): Cover state provided
 - `blockedEdges` (array): Directional cover - `["north"]`, `["south"]`, `["east"]`, `["west"]`
 - `requiresTakeCover` (boolean): Only works with Take Cover action
 - `autoCoverBehavior` (string): How to interact with auto-cover
   - `"add"` - Add to auto-cover calculation
-  - `"replace"` - Replace auto-cover entirely  
+  - `"replace"` - Replace auto-cover entirely
   - `"minimum"` - Use whichever is higher
 - `source` (string): Identifier
 
@@ -279,32 +378,37 @@ Placed objects (like deployable cover) that provide cover to tokens.
 }
 ```
 
-### 5. modifyActionQualification
+### 6. modifyActionQualification
 
 Control what qualifies for action prerequisites (Hide, Sneak, Seek).
 
 **Use cases:**
+
 - Blur granting concealment that can't be used for Hide/Sneak
 - Thousand Visions ignoring concealment within range
 - Effects that modify action capabilities
 
 **Properties:**
+
 - `qualifications` (object): Action-specific rules
   - Keys: `"hide"`, `"sneak"`, `"seek"`
   - Values: Action-specific qualification objects
 
 **Hide qualifications:**
+
 - `canUseThisConcealment` (boolean): Can use this concealment for Hide
 - `canUseThisCover` (boolean): Can use this cover for Hide
 - `requiresLineOfSightBreak` (boolean): Requires breaking line of sight
 - `customMessage` (string): Message explaining why it doesn't qualify
 
 **Sneak qualifications:**
+
 - `endPositionQualifies` (boolean): End position qualifies for Sneak
 - `startPositionQualifies` (boolean): Start position qualifies
 - `canMaintain` (boolean): Can maintain sneak state
 
 **Seek qualifications:**
+
 - `ignoreThisConcealment` (boolean): Ignore this concealment source
 - `ignoreThisCover` (boolean): Ignore this cover source
 - `ignoreConcealment` (boolean): Ignore all concealment (alternative syntax)
@@ -327,16 +431,18 @@ Control what qualifies for action prerequisites (Hide, Sneak, Seek).
 }
 ```
 
-### 6. conditionalState
+### 7. conditionalState
 
 Apply visibility or cover states based on conditions.
 
 **Use cases:**
+
 - Faerie Fire (if invisible → concealed, else observed)
 - Revealing Light (if invisible → concealed)
 - Conditional visibility changes
 
 **Properties:**
+
 - `condition` (string): Condition to check - `"invisible"`, `"concealed"`, `"hidden"`, `"undetected"`
 - `thenState` (string): State if condition is true
 - `elseState` (string|null): State if condition is false
@@ -361,26 +467,26 @@ Apply visibility or cover states based on conditions.
 
 ### Rule Element Properties
 
-| Property | Type | Values | Description |
-|----------|------|--------|-------------|
-| `key` | string | `"PF2eVisionerEffect"` | Rule element type |
-| `predicate` | array | Array of roll option strings | Rule element level predicate (optional) |
-| `operations` | array | Array of operation objects | Operations to apply |
-| `priority` | number | Default: 100 | Rule element priority |
+| Property     | Type   | Values                       | Description                             |
+| ------------ | ------ | ---------------------------- | --------------------------------------- |
+| `key`        | string | `"PF2eVisionerEffect"`       | Rule element type                       |
+| `predicate`  | array  | Array of roll option strings | Rule element level predicate (optional) |
+| `operations` | array  | Array of operation objects   | Operations to apply                     |
+| `priority`   | number | Default: 100                 | Rule element priority                   |
 
 ### Common Operation Properties
 
-| Property | Type | Values | Description |
-|----------|------|--------|-------------|
-| `type` | string | See [Operation Types](#operation-types) | Operation type |
-| `predicate` | array | Array of roll option strings | Operation level predicate (optional) |
-| `direction` | string | `"from"`, `"to"` | Relationship direction |
-| `observers` / `targets` | string | `"all"`, `"allies"`, `"enemies"`, `"selected"`, `"targeted"`, `"specific"` | Who is affected |
-| `tokenIds` | array | Array of token document IDs | Required when using `"specific"` for observers/targets |
-| `state` | string | Visibility: `"observed"`, `"concealed"`, `"hidden"`, `"undetected"`<br>Cover: `"none"`, `"lesser"`, `"standard"`, `"greater"` | State to apply |
-| `source` | string | Any unique string | Identifier for source tracking |
-| `range` | number | Distance in feet | Optional distance limit |
-| `priority` | number | Default: 100 | Conflict resolution priority (higher wins) |
+| Property                | Type   | Values                                                                                                                        | Description                                            |
+| ----------------------- | ------ | ----------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
+| `type`                  | string | See [Operation Types](#operation-types)                                                                                       | Operation type                                         |
+| `predicate`             | array  | Array of roll option strings                                                                                                  | Operation level predicate (optional)                   |
+| `direction`             | string | `"from"`, `"to"`                                                                                                              | Relationship direction                                 |
+| `observers` / `targets` | string | `"all"`, `"allies"`, `"enemies"`, `"selected"`, `"targeted"`, `"specific"`                                                    | Who is affected                                        |
+| `tokenIds`              | array  | Array of token document IDs                                                                                                   | Required when using `"specific"` for observers/targets |
+| `state`                 | string | Visibility: `"observed"`, `"concealed"`, `"hidden"`, `"undetected"`<br>Cover: `"none"`, `"lesser"`, `"standard"`, `"greater"` | State to apply                                         |
+| `source`                | string | Any unique string                                                                                                             | Identifier for source tracking                         |
+| `range`                 | number | Distance in feet                                                                                                              | Optional distance limit                                |
+| `priority`              | number | Default: 100                                                                                                                  | Conflict resolution priority (higher wins)             |
 
 ## Examples
 
@@ -594,6 +700,7 @@ You can target specific tokens by their IDs for precise control:
 ```
 
 This is useful for:
+
 - Spells that affect specific designated targets
 - Conditional effects based on token selection
 - Custom scenarios requiring fine-grained control
@@ -674,6 +781,6 @@ await PF2EVisioner.createAllRuleElementExamples();
 ## Support
 
 For issues, questions, or feature requests:
+
 - GitHub Issues: https://github.com/roileaf/pf2e-visioner/issues
 - Discord: https://discord.gg/pf2e
-
