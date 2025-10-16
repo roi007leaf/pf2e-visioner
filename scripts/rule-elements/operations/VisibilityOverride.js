@@ -3,9 +3,14 @@ import { SourceTracker } from '../SourceTracker.js';
 
 export class VisibilityOverride {
   static async applyVisibilityOverride(operation, subjectToken, options = {}) {
-    if (!subjectToken) return;
+    
+    if (!subjectToken) {
+      console.warn('PF2E Visioner | No subject token provided to applyVisibilityOverride');
+      return;
+    }
 
     const { observers, direction, state, source, preventConcealment, priority = 100, tokenIds, predicate } = operation;
+    
     const observerTokens = this.getObserverTokens(subjectToken, observers, operation.range, tokenIds);
 
     const sourceData = {
@@ -18,11 +23,14 @@ export class VisibilityOverride {
     };
 
     for (const observerToken of observerTokens) {
-      if (observerToken.id === subjectToken.id) continue;
+      if (observerToken.id === subjectToken.id) {
+        continue;
+      }
 
       const [targetToken, observingToken] = direction === 'from'
         ? [subjectToken, observerToken]
         : [observerToken, subjectToken];
+      
 
       // Check operation-level predicate per target
       if (predicate && predicate.length > 0) {
@@ -47,12 +55,12 @@ export class VisibilityOverride {
 
   static async setVisibilityState(observerToken, targetToken, state, sourceData) {
     try {
-      const { setVisibilityBetween } = await import('../../visibility/visibility-helpers.js');
+      const { setVisibilityBetween } = await import('../../stores/visibility-map.js');
+      
       await setVisibilityBetween(observerToken, targetToken, state, { 
         skipEphemeralUpdate: false,
         isAutomatic: false
       });
-
       await SourceTracker.addSourceToState(targetToken, 'visibility', sourceData, observerToken.id);
     } catch (error) {
       console.warn('PF2E Visioner | Failed to set visibility state:', error);
@@ -65,6 +73,15 @@ export class VisibilityOverride {
     const { source } = operation;
     await SourceTracker.removeSource(subjectToken, source, 'visibility');
     await subjectToken.document.unsetFlag('pf2e-visioner', 'ruleElementOverride');
+
+    // Trigger AVS recalculation after effect removal
+    if (window.pf2eVisioner?.services?.autoVisibilitySystem?.recalculateForTokens) {
+      await window.pf2eVisioner.services.autoVisibilitySystem.recalculateForTokens([subjectToken.id]);
+    } else if (window.pf2eVisioner?.services?.autoVisibilitySystem?.recalculateAll) {
+      await window.pf2eVisioner.services.autoVisibilitySystem.recalculateAll();
+    } else if (canvas?.perception) {
+      canvas.perception.update({ refreshVision: true, refreshOcclusion: true });
+    }
   }
 
   static getObserverTokens(subjectToken, observers, range, tokenIds = null) {

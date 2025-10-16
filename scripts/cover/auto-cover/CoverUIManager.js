@@ -211,12 +211,6 @@ export class CoverUIManager {
       let overrideInfo = message?.flags?.['pf2e-visioner']?.coverOverride;
       let featUpgradeInfo = message?.flags?.['pf2e-visioner']?.coverFeatUpgrade;
       let ruleElementBlocks = message?.flags?.['pf2e-visioner']?.ruleElementBlocks;
-      console.log('PF2E Visioner | Checking message for indicators:', {
-        hasOverride: !!overrideInfo,
-        hasFeatUpgrade: !!featUpgradeInfo,
-        hasRuleElementBlocks: !!ruleElementBlocks,
-        ruleElementBlocks
-      });
 
       // Also check for manual cover by examining the message for token references
       let manualCoverInfo = null;
@@ -433,11 +427,9 @@ export class CoverUIManager {
       // Handle rule element blocks indicator
       if (ruleElementBlocks && ruleElementBlocks.length > 0) {
         try {
-          console.log('PF2E Visioner | Generating rule element indicator for blocks:', ruleElementBlocks);
           const blockerNameSet = new Set(ruleElementBlocks.map(b => b.blockerName));
           const blockerNames = Array.from(blockerNameSet).join(', ');
           const tooltip = `Rule element prevented cover from: ${blockerNames}`;
-          console.log('PF2E Visioner | Rule element indicator tooltip:', tooltip);
           indicatorHtml += `
                  <span class="pf2e-visioner-cover-rule-element-indicator" style="
                    margin-left: 4px;

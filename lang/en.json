@@ -318,6 +318,9 @@
       }
     },
     "RULE_ELEMENTS": {
+      "BADGE": {
+        "LABEL": "Rule Effect"
+      },
       "LABELS": {
         "SUBJECT": "Subject",
         "OBSERVERS": "Observers",

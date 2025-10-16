@@ -69,9 +69,7 @@ export class CoverDetector {
    * @returns {string} Cover state ('none', 'lesser', 'standard', 'greater')
    */
   detectBetweenTokens(attacker, target, options = {}) {
-    try {
-      console.log(`\n=== PF2E Visioner | Cover Detection: ${attacker.name} → ${target.name} ===`);
-      
+    try {      
       if (!attacker || !target) return 'none';
 
       // Exclude same token (attacker and target are the same)
@@ -79,9 +77,7 @@ export class CoverDetector {
 
       try {
         const ruleElementCover = this._checkRuleElementCover(attacker, target);
-        console.log(`PF2E Visioner | Rule element cover check result:`, ruleElementCover);
         if (ruleElementCover) {
-          console.log(`PF2E Visioner | Returning early with rule element cover: ${ruleElementCover}`);
           return ruleElementCover;
         }
       } catch (error) {
@@ -1111,7 +1107,6 @@ export class CoverDetector {
 
       // Check size-based cover rules
       if (!this._canTokenProvideCover(attacker, target, blocker)) {
-        console.log(`PF2E Visioner | ${blocker.name} filtered out by size rules`);
         continue;
       }
 
@@ -1119,7 +1114,6 @@ export class CoverDetector {
       const attackContext = filters.attackContext || null;
       const ruleElementCheck = RuleElementCoverService.canTokenProvideCoverToTarget(blocker, target, attackContext);
       if (!ruleElementCheck.allowed) {
-        console.log(`PF2E Visioner | ${blocker.name} filtered out by rule elements`);
         // Track this for chat indicators (avoid duplicates)
         const key = `${attacker.id}:${target.id}`;
         if (!this._ruleElementBlocks.has(key)) {
@@ -1133,7 +1127,6 @@ export class CoverDetector {
         continue;
       }
 
-      console.log(`PF2E Visioner | ${blocker.name} added as eligible blocker`);
       out.push(blocker);
     }
 

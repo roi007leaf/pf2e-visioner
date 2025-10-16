@@ -110,13 +110,10 @@ class AttackRollUseCase extends BaseAutoCoverUseCase {
 
     try {
       const ruleElementBlocks = coverDetector.consumeRuleElementBlocks(speakerTokenId, targetTokenId);
-      console.log('PF2E Visioner | Consumed rule element blocks:', ruleElementBlocks);
       if (ruleElementBlocks) {
-        console.log('PF2E Visioner | Storing rule element blocks in message flags:', ruleElementBlocks);
         if (!data.flags) data.flags = {};
         if (!data.flags['pf2e-visioner']) data.flags['pf2e-visioner'] = {};
         data.flags['pf2e-visioner'].ruleElementBlocks = ruleElementBlocks;
-        console.log('PF2E Visioner | Message flags after setting:', data.flags['pf2e-visioner']);
         if (doc && doc.updateSource) {
           try {
             doc.updateSource({ 'flags.pf2e-visioner.ruleElementBlocks': ruleElementBlocks });

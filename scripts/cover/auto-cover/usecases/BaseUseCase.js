@@ -44,13 +44,10 @@ export class BaseAutoCoverUseCase {
 
   async handleRenderChatMessage(message, html, shouldShow = true) {
     try {
-      console.log('PF2E Visioner | handleRenderChatMessage called for message:', message.id);
       // Always check for cover override indicators first, regardless of action data
       shouldShow = await this.coverUIManager.shouldShowCoverOverrideIndicator(message);
-      console.log('PF2E Visioner | shouldShowCoverOverrideIndicator returned:', shouldShow);
 
       if (shouldShow) {
-        console.log('PF2E Visioner | Injecting cover override indicator');
         await this.coverUIManager.injectCoverOverrideIndicator(message, html, shouldShow);
       }
     } catch (error) {
