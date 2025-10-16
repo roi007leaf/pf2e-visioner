@@ -1,5 +1,6 @@
 import { ActionQualifier } from './operations/ActionQualifier.js';
 import { CoverOverride } from './operations/CoverOverride.js';
+import { LightingModifier } from './operations/LightingModifier.js';
 import { SenseModifier } from './operations/SenseModifier.js';
 import { VisibilityOverride } from './operations/VisibilityOverride.js';
 
@@ -45,6 +46,7 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
               'overrideCover',
               'provideCover',
               'modifyActionQualification',
+              'modifyLighting',
               'conditionalState'
             ],
             initial: 'overrideVisibility'
@@ -120,6 +122,11 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
             required: false,
             choices: ['visibility', 'cover'],
             initial: 'visibility'
+          }),
+          
+          lightingLevel: new fields.StringField({
+            required: false,
+            choices: ['darkness', 'dim', 'bright', 'magicalDarkness', 'greaterMagicalDarkness']
           }),
           
           range: new fields.NumberField({ required: false, nullable: true })
@@ -204,6 +211,10 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
           await ActionQualifier.applyActionQualifications(operation, token);
           break;
 
+        case 'modifyLighting':
+          await LightingModifier.applyLightingModification(operation, token);
+          break;
+
         case 'conditionalState':
           await VisibilityOverride.applyConditionalState(operation, token);
           break;
@@ -246,6 +257,10 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
 
         case 'modifyActionQualification':
           await ActionQualifier.removeActionQualifications(operation, token);
+          break;
+
+        case 'modifyLighting':
+          await LightingModifier.removeLightingModification(operation, token);
           break;
 
         default:

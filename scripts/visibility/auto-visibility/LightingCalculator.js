@@ -6,6 +6,7 @@
 
 import { MODULE_ID } from '../../constants.js';
 import { getLogger } from '../../utils/logger.js';
+import { LightingModifier } from '../../rule-elements/operations/LightingModifier.js';
 const log = getLogger('LightingCalculator');
 
 export class LightingCalculator {
@@ -53,6 +54,31 @@ export class LightingCalculator {
       };
       //console.trace(`getLightLevelAt(${token.name || token?.id || 'unknown'}, ${position ? `${position.x},${position.y}` : 'token center'}) => ${result.level}`);
       return result;
+    }
+
+    // Check if token has a lighting modification from a rule element
+    if (token && LightingModifier.hasLightingModification(token)) {
+      const modifiedLighting = LightingModifier.getEffectiveLighting(token);
+      if (modifiedLighting) {
+        const illuminationMap = {
+          'darkness': DARK,
+          'dim': DIM,
+          'bright': BRIGHT,
+          'magicalDarkness': DARK,
+          'greaterMagicalDarkness': DARK
+        };
+        const illumination = illuminationMap[modifiedLighting] ?? DIM;
+        const extras = { modified: true, source: 'rule-element' };
+        
+        // Add magical darkness flags if applicable
+        if (modifiedLighting === 'magicalDarkness') {
+          extras.magicalDarkness = true;
+        } else if (modifiedLighting === 'greaterMagicalDarkness') {
+          extras.greaterMagicalDarkness = true;
+        }
+        
+        return makeIlluminationResult(illumination, extras);
+      }
     }
 
     // Convert light radii from scene units (feet) to pixels for distance comparison

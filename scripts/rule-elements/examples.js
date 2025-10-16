@@ -159,6 +159,25 @@ export const RULE_ELEMENT_EXAMPLES = {
     ]
   },
 
+  deepDarkness: {
+    name: 'Deep Darkness',
+    description: 'The creature is surrounded by supernatural darkness. The lighting level at its position is always treated as darkness, regardless of ambient light.',
+    rules: [
+      {
+        key: 'PF2eVisionerEffect',
+        operations: [
+          {
+            type: 'modifyLighting',
+            lightingLevel: 'darkness',
+            source: 'deep-darkness',
+            priority: 200
+          }
+        ],
+        priority: 100
+      }
+    ]
+  },
+
   towerShield: {
     name: game.i18n.localize('PF2E_VISIONER.RULE_ELEMENTS.EFFECT.EXAMPLES.TOWER_SHIELD.NAME'),
     description: game.i18n.localize('PF2E_VISIONER.RULE_ELEMENTS.EFFECT.EXAMPLES.TOWER_SHIELD.DESCRIPTION'),
