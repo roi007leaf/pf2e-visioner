@@ -1,5 +1,11 @@
 # Changelog
 
+## [4.4.2] - 2025-10-17
+
+### 🐛 Bug Fixes
+
+- **_AVS_**: Fix player side not triggering AVS calculations
+
 ## [4.4.1] - 2025-10-15
 
 ### Changes
