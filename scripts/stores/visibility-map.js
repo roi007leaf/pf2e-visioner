@@ -24,7 +24,10 @@ export function getVisibilityMap(token) {
 export async function setVisibilityMap(token, visibilityMap) {
   if (!token?.document) return;
   // Only GMs can update token documents
-  if (!game.user.isGM) return;
+  if (!game.user.isGM) {
+    console.warn('PF2E Visioner | setVisibilityMap: Not GM, skipping visibility map update');
+    return;
+  }
 
   const path = `flags.${MODULE_ID}.visibility`;
   const result = await token.document.update({ [path]: visibilityMap }, { diff: false });
@@ -72,10 +75,15 @@ export async function setVisibilityBetween(
         state,
         direction: options.direction || 'observer_to_target',
       });
-    } catch (_) { }
+    } catch (_) {}
   }
 
-  if (options.skipEphemeralUpdate) return;
+  // Skip ephemeral effects for socket-triggered processing to avoid permission errors
+  // or if explicitly requested
+  if (options.skipEphemeralUpdate || options.fromSocket) {
+    return;
+  }
+
   try {
     // Set flag to prevent auto-visibility system from reacting to its own effect changes
     if (autoVisibilitySystem) {

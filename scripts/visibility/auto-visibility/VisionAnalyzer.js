@@ -1,20 +1,20 @@
 /**
  * VisionAnalyzer - Query Interface for Vision and Sensing Capabilities
- * 
+ *
  * Clean query interface that answers questions about what tokens can sense.
  * Uses SensingCapabilitiesBuilder internally to get capabilities data.
- * 
+ *
  * Responsibilities:
  * - Answer queries: "Can this token sense that token?"
  * - Provide vision/sensing capabilities for a token
  * - Calculate distances and line of sight
  * - Cache capabilities for performance
- * 
+ *
  * Does NOT:
  * - Build sensing data (delegates to SensingCapabilitiesBuilder)
  * - Make visibility state decisions (that's StatelessVisibilityCalculator)
  * - Handle UI/dialog concerns (that's SeekDialogAdapter)
- * 
+ *
  * SINGLETON PATTERN
  */
 
@@ -39,20 +39,24 @@ export class VisionAnalyzer {
   #wallCacheTimestamp = new Map();
   #wallCacheTimeout = 5000;
 
-  constructor() {
+  #positionManager = null;
+
+  constructor(positionManager = null) {
     if (VisionAnalyzer.#instance) {
       return VisionAnalyzer.#instance;
     }
+    this.#positionManager = positionManager;
     VisionAnalyzer.#instance = this;
   }
 
   /**
    * Get singleton instance
+   * @param {PositionManager} [positionManager] - Optional PositionManager to inject
    * @returns {VisionAnalyzer}
    */
-  static getInstance() {
+  static getInstance(positionManager = null) {
     if (!VisionAnalyzer.#instance) {
-      VisionAnalyzer.#instance = new VisionAnalyzer();
+      VisionAnalyzer.#instance = new VisionAnalyzer(positionManager);
     }
     return VisionAnalyzer.#instance;
   }
@@ -120,7 +124,7 @@ export class VisionAnalyzer {
       return Object.keys(capabilities.precise).length > 0;
     }
 
-    return Object.values(capabilities.precise).some(range => range >= maxRange);
+    return Object.values(capabilities.precise).some((range) => range >= maxRange);
   }
 
   /**
@@ -136,7 +140,7 @@ export class VisionAnalyzer {
       return Object.keys(capabilities.imprecise).length > 0;
     }
 
-    return Object.values(capabilities.imprecise).some(range => range >= maxRange);
+    return Object.values(capabilities.imprecise).some((range) => range >= maxRange);
   }
 
   /**
@@ -158,7 +162,7 @@ export class VisionAnalyzer {
 
     // Check any imprecise or precise sense (precise can also sense imprecisely)
     const allSenses = { ...capabilities.imprecise, ...capabilities.precise };
-    return Object.values(allSenses).some(range => distance <= range);
+    return Object.values(allSenses).some((range) => distance <= range);
   }
 
   /**
@@ -179,7 +183,7 @@ export class VisionAnalyzer {
     }
 
     // Check any precise sense
-    return Object.values(capabilities.precise).some(range => distance <= range);
+    return Object.values(capabilities.precise).some((range) => distance <= range);
   }
 
   /**
@@ -196,6 +200,12 @@ export class VisionAnalyzer {
       return true;
     }
 
+    // Check if LOS calculation is disabled
+    const losDisabled = game.settings.get(MODULE_ID, 'disableLineOfSightCalculation');
+    if (losDisabled) {
+      return undefined;
+    }
+
     let stage = 'init';
     try {
       // Check for 3D collision using Levels if available
@@ -209,19 +219,41 @@ export class VisionAnalyzer {
       // Darkness sources may affect true LOS, so only return true/false if we can be sure
       stage = 'vision-polygon';
       const los = observer.vision?.los;
-      if (los?.points) {
-        const radius = target.externalRadius;
-        const circle = new PIXI.Circle(target.center.x, target.center.y, radius);
-        const intersection = los.intersectCircle(circle, { density: 8, scalingFactor: 1.0 });
-        const visible = intersection?.points?.length > 0;
-        if (visible || !canvas.effects?.darknessSources?.length) return visible;
+      // CRITICAL: Use PositionManager if available to get correct positions
+      // This fixes the issue where token.center is stale during player movements
+      let observerPos = { x: observer.center.x, y: observer.center.y };
+      let targetPos = { x: target.center.x, y: target.center.y };
+      let usingPositionManager = false;
+
+      // Try to get more accurate positions from injected PositionManager
+      if (this.#positionManager) {
+        try {
+          const pmObserverPos = this.#positionManager.getTokenPosition(observer);
+          const pmTargetPos = this.#positionManager.getTokenPosition(target);
+
+          if (pmObserverPos) {
+            observerPos = { x: pmObserverPos.x, y: pmObserverPos.y };
+            usingPositionManager = true;
+          }
+          if (pmTargetPos) {
+            targetPos = { x: pmTargetPos.x, y: pmTargetPos.y };
+            usingPositionManager = true;
+          }
+        } catch (e) {
+          // Fall back to token.center if PositionManager access fails
+        }
       }
 
-      // Check if LOS calculation is disabled
-      stage = 'settings-check';
-      const losDisabled = game.settings.get(MODULE_ID, 'disableLineOfSightCalculation');
-      if (losDisabled) {
-        return undefined;
+      // Only use vision polygon if NOT using PositionManager
+      // When using PositionManager, the vision polygon may be stale (based on old canvas position)
+      // so we skip it and fall through to geometric LOS calculation
+      if (los?.points && !usingPositionManager) {
+        const radius = target.externalRadius;
+        const circle = new PIXI.Circle(targetPos.x, targetPos.y, radius);
+        const intersection = los.intersectCircle(circle, { density: 8, scalingFactor: 1.0 });
+        const visible = intersection?.points?.length > 0;
+
+        if (visible || !canvas.effects?.darknessSources?.length) return visible;
       }
 
       // Use multi-point geometric sampling with cached wall filtering
@@ -234,8 +266,7 @@ export class VisionAnalyzer {
           bottom: Math.min(observerSpan.bottom, targetSpan.bottom),
           top: Math.max(observerSpan.top, targetSpan.top),
         };
-      } catch (error) {
-      }
+      } catch (error) {}
 
       stage = 'get-walls';
       const cachedWalls = this.#getCachedWalls(elevationRange);
@@ -247,8 +278,8 @@ export class VisionAnalyzer {
       }
 
       stage = 'sample-points';
-      const observerPoints = this.#getTokenSamplePoints(observer);
-      const targetPoints = this.#getTokenSamplePoints(target);
+      const observerPoints = this.#getTokenSamplePoints(observer, observerPos);
+      const targetPoints = this.#getTokenSamplePoints(target, targetPos);
 
       // Check center-to-center first (most common case)
       stage = 'center-check';
@@ -286,7 +317,7 @@ export class VisionAnalyzer {
     const cacheKey = `${elevationRange?.bottom ?? 'none'}_${elevationRange?.top ?? 'none'}`;
 
     const timestamp = this.#wallCacheTimestamp.get(cacheKey);
-    if (timestamp && (Date.now() - timestamp) < this.#wallCacheTimeout) {
+    if (timestamp && Date.now() - timestamp < this.#wallCacheTimeout) {
       const cached = this.#wallCache.get(cacheKey);
       if (cached) {
         return cached;
@@ -342,27 +373,32 @@ export class VisionAnalyzer {
    * Returns center + 8 edge/corner points for comprehensive coverage
    * @private
    */
-  #getTokenSamplePoints(token) {
-    const center = { x: token.center.x, y: token.center.y };
+  #getTokenSamplePoints(token, centerPos = null) {
+    // Use provided center position or fall back to token.center
+    const center = centerPos
+      ? { x: centerPos.x, y: centerPos.y }
+      : { x: token.center.x, y: token.center.y };
     const w = token.document.width * canvas.grid.size;
     const h = token.document.height * canvas.grid.size;
-    const x = token.document.x;
-    const y = token.document.y;
+
+    // Calculate x,y based on center position if provided
+    const x = centerPos ? centerPos.x - w / 2 : token.document.x;
+    const y = centerPos ? centerPos.y - h / 2 : token.document.y;
 
     // Small inset to ensure points are inside token bounds
     const inset = 2;
 
     // Sample center + 4 corners + 4 edge midpoints for maximum coverage
     return [
-      center,                                        // Center
-      { x: x + inset, y: y + inset },               // Top-left corner
-      { x: x + w - inset, y: y + inset },           // Top-right corner
-      { x: x + inset, y: y + h - inset },           // Bottom-left corner
-      { x: x + w - inset, y: y + h - inset },       // Bottom-right corner
-      { x: x + w * 0.5, y: y + inset },             // Top edge center
-      { x: x + w * 0.5, y: y + h - inset },         // Bottom edge center
-      { x: x + inset, y: y + h * 0.5 },             // Left edge center
-      { x: x + w - inset, y: y + h * 0.5 }          // Right edge center
+      center, // Center
+      { x: x + inset, y: y + inset }, // Top-left corner
+      { x: x + w - inset, y: y + inset }, // Top-right corner
+      { x: x + inset, y: y + h - inset }, // Bottom-left corner
+      { x: x + w - inset, y: y + h - inset }, // Bottom-right corner
+      { x: x + w * 0.5, y: y + inset }, // Top edge center
+      { x: x + w * 0.5, y: y + h - inset }, // Bottom edge center
+      { x: x + inset, y: y + h * 0.5 }, // Left edge center
+      { x: x + w - inset, y: y + h * 0.5 }, // Right edge center
     ];
   }
 
@@ -385,7 +421,7 @@ export class VisionAnalyzer {
         const wallMidY = (wall.document.c[1] + wall.document.c[3]) / 2;
         const distToRayMid = Math.sqrt(
           (wallMidX - (fromPoint.x + toPoint.x) / 2) ** 2 +
-          (wallMidY - (fromPoint.y + toPoint.y) / 2) ** 2
+            (wallMidY - (fromPoint.y + toPoint.y) / 2) ** 2,
         );
 
         if (distToRayMid > rayLength * 1.5) {
@@ -452,11 +488,16 @@ export class VisionAnalyzer {
         { x: ray.A.x, y: ray.A.y },
         { x: ray.B.x, y: ray.B.y },
         { x: wall.document.c[0], y: wall.document.c[1] },
-        { x: wall.document.c[2], y: wall.document.c[3] }
+        { x: wall.document.c[2], y: wall.document.c[3] },
       );
 
       // Check if intersection is within the ray segment (0 <= t0 <= 1)
-      if (intersection && typeof intersection.t0 === 'number' && intersection.t0 >= 0 && intersection.t0 <= 1) {
+      if (
+        intersection &&
+        typeof intersection.t0 === 'number' &&
+        intersection.t0 >= 0 &&
+        intersection.t0 <= 1
+      ) {
         // Compute t1 for the wall segment
         const wallDx = wall.document.c[2] - wall.document.c[0];
         const wallDy = wall.document.c[3] - wall.document.c[1];
@@ -508,7 +549,11 @@ export class VisionAnalyzer {
           const isLimited = isLimitedSight || isLimitedLight || isLimitedSound;
 
           if (isLimited) {
-            limitedWallIntersections.push({ x: intersection.x, y: intersection.y, t0: intersection.t0 });
+            limitedWallIntersections.push({
+              x: intersection.x,
+              y: intersection.y,
+              t0: intersection.t0,
+            });
           } else {
             return false;
           }
@@ -521,9 +566,8 @@ export class VisionAnalyzer {
       // Check if all intersections are at approximately the same point (corner hit)
       const epsilon = 0.1; // Small tolerance for floating point comparison
       const first = limitedWallIntersections[0];
-      const allSamePoint = limitedWallIntersections.every(point =>
-        Math.abs(point.x - first.x) < epsilon &&
-        Math.abs(point.y - first.y) < epsilon
+      const allSamePoint = limitedWallIntersections.every(
+        (point) => Math.abs(point.x - first.x) < epsilon && Math.abs(point.y - first.y) < epsilon,
       );
 
       if (!allSamePoint) {
@@ -578,10 +622,15 @@ export class VisionAnalyzer {
           { x: ray.A.x, y: ray.A.y },
           { x: ray.B.x, y: ray.B.y },
           { x: wall.document.c[0], y: wall.document.c[1] },
-          { x: wall.document.c[2], y: wall.document.c[3] }
+          { x: wall.document.c[2], y: wall.document.c[3] },
         );
 
-        if (intersection && typeof intersection.t0 === 'number' && intersection.t0 >= 0 && intersection.t0 <= 1) {
+        if (
+          intersection &&
+          typeof intersection.t0 === 'number' &&
+          intersection.t0 >= 0 &&
+          intersection.t0 <= 1
+        ) {
           const wallDx = wall.document.c[2] - wall.document.c[0];
           const wallDy = wall.document.c[3] - wall.document.c[1];
           let t1;
@@ -617,7 +666,7 @@ export class VisionAnalyzer {
       // On error, assume sound is NOT blocked (fail open for better UX)
       return false;
     }
-  }  /**
+  } /**
    * Check if actor has Silence effect active
    * @private
    * @param {Actor} actor
@@ -625,12 +674,12 @@ export class VisionAnalyzer {
    */
   #hasSilenceEffect(actor) {
     try {
-      const effects = actor.itemTypes?.effect ?? actor.items?.filter?.(i => i?.type === 'effect') ?? [];
-      return effects?.some?.(effect => {
+      const effects =
+        actor.itemTypes?.effect ?? actor.items?.filter?.((i) => i?.type === 'effect') ?? [];
+      return effects?.some?.((effect) => {
         const slug = effect?.slug || effect?.system?.slug || '';
         const name = effect?.name?.toLowerCase() || '';
-        return slug.toLowerCase() === 'spell-effect-silence' ||
-          name.includes('silence');
+        return slug.toLowerCase() === 'spell-effect-silence' || name.includes('silence');
       });
     } catch {
       return false;
@@ -689,10 +738,9 @@ export class VisionAnalyzer {
     const distance = this.distanceFeet(observer, target);
 
     // Check for precise non-visual senses within range
-    const nonVisualSenses = Object.entries(capabilities.precise).filter(([senseType]) =>
-      senseType !== 'vision' &&
-      senseType !== 'sight' &&
-      !senseType.includes('vision')
+    const nonVisualSenses = Object.entries(capabilities.precise).filter(
+      ([senseType]) =>
+        senseType !== 'vision' && senseType !== 'sight' && !senseType.includes('vision'),
     );
 
     return nonVisualSenses.some(([_, range]) => distance <= range);
@@ -723,8 +771,10 @@ export class VisionAnalyzer {
     const sensingCaps = this.getSensingCapabilities(observer);
 
     // Visual senses can detect elevated targets only if there's line of sight
-    if ((capabilities.hasDarkvision || capabilities.hasLowLightVision || capabilities.hasVision) &&
-      this.hasLineOfSight(observer, target)) {
+    if (
+      (capabilities.hasDarkvision || capabilities.hasLowLightVision || capabilities.hasVision) &&
+      this.hasLineOfSight(observer, target)
+    ) {
       return true;
     }
 
@@ -879,7 +929,6 @@ export class VisionAnalyzer {
     // Extract vision data and conditions
     const visionData = this.#extractVisionData(token, actor);
 
-
     // Build sensing capabilities using SensingCapabilitiesBuilder
     const rawSensing = SensingCapabilitiesBuilder.build({
       senses: visionData.senses,
@@ -890,10 +939,8 @@ export class VisionAnalyzer {
       },
     });
 
-
     // Enhance with special sense interpretation and echolocation detection
     const sensing = this.#enhanceSensingCapabilities(rawSensing, actor);
-
 
     // Build legacy format for backward compatibility
     const legacy = this.#buildLegacyFormat(visionData, sensing);
@@ -917,8 +964,15 @@ export class VisionAnalyzer {
 
     // Filter out visual senses if blinded
     if (isBlinded) {
-      const visualSenseTypes = ['vision', 'sight', 'darkvision', 'greater-darkvision', 'low-light-vision',
-        'see-invisibility', 'see-all'];
+      const visualSenseTypes = [
+        'vision',
+        'sight',
+        'darkvision',
+        'greater-darkvision',
+        'low-light-vision',
+        'see-invisibility',
+        'see-all',
+      ];
       for (const senseType of visualSenseTypes) {
         delete enhanced.precise[senseType];
         delete enhanced.imprecise[senseType];
@@ -954,9 +1008,12 @@ export class VisionAnalyzer {
 
     try {
       // Check for echolocation effect
-      const effects = actor.itemTypes?.effect ?? actor.items?.filter?.(i => i?.type === 'effect') ?? [];
-      const hasEffect = effects?.some?.(effect =>
-        (effect?.slug || effect?.system?.slug || effect?.name)?.toLowerCase?.() === 'effect-echolocation'
+      const effects =
+        actor.itemTypes?.effect ?? actor.items?.filter?.((i) => i?.type === 'effect') ?? [];
+      const hasEffect = effects?.some?.(
+        (effect) =>
+          (effect?.slug || effect?.system?.slug || effect?.name)?.toLowerCase?.() ===
+          'effect-echolocation',
       );
 
       if (hasEffect) {
@@ -1027,7 +1084,6 @@ export class VisionAnalyzer {
 
       // Build detection modes object
       this.#buildDetectionModes(token, result);
-
     } catch (error) {
       log.debug('Error extracting vision data', error);
     }
@@ -1163,7 +1219,10 @@ export class VisionAnalyzer {
   #buildLegacyFormat(visionData, sensing) {
     // Build legacy array-based format from object-based sensing
     const preciseArray = Object.entries(sensing.precise).map(([type, range]) => ({ type, range }));
-    const impreciseArray = Object.entries(sensing.imprecise).map(([type, range]) => ({ type, range }));
+    const impreciseArray = Object.entries(sensing.imprecise).map(([type, range]) => ({
+      type,
+      range,
+    }));
 
     // Build individual sense properties for legacy access
     const hearingPrecise = sensing.precise.hearing;
@@ -1233,7 +1292,7 @@ export class VisionAnalyzer {
       precise: sensing.precise,
       imprecise: sensing.imprecise,
 
-      // Top-level: legacy special properties  
+      // Top-level: legacy special properties
       hearing,
       lifesense,
       echolocationActive,
@@ -1271,7 +1330,7 @@ export class VisionAnalyzer {
       if (actor.conditions) {
         try {
           return Array.from(actor.conditions).some(
-            condition => condition.slug === conditionSlug || condition.key === conditionSlug
+            (condition) => condition.slug === conditionSlug || condition.key === conditionSlug,
           );
         } catch {
           // Ignore iteration errors
@@ -1281,7 +1340,8 @@ export class VisionAnalyzer {
       // Method 5: Check itemTypes
       if (actor.itemTypes?.condition) {
         return actor.itemTypes.condition.some(
-          condition => condition.slug === conditionSlug || condition.system?.slug === conditionSlug
+          (condition) =>
+            condition.slug === conditionSlug || condition.system?.slug === conditionSlug,
         );
       }
 

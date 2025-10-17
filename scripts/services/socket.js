@@ -92,10 +92,10 @@ export function refreshEveryonesPerception() {
 
       // Removed redundant updateWallVisuals call - wall visual updates are properly handled
       // by TokenEventHandler._handleWallFlagChanges when wall flags actually change
-    } catch { }
+    } catch {}
 
     _perceptionRefreshTimeout = null;
-  }, 100); // 100ms debounce to prevent spam
+  }, 10); // 10ms debounce to prevent spam
 }
 
 /*
@@ -217,7 +217,7 @@ async function pointOutRequestHandler({ pointerTokenId, targetTokenId, messageId
       });
       try {
         await msg.render(true);
-      } catch { }
+      } catch {}
     }
 
     // Update GM panel actions if already rendered
@@ -364,11 +364,11 @@ async function seekTemplateHandler({
         if (playerUser && _socketService.socket?.executeForUser) {
           _socketService.socket.executeForUser(userId, REFRESH_CHANNEL);
         }
-      } catch { }
+      } catch {}
       // Re-render the chat message so the injected panel can be updated/removed appropriately
       try {
         await msg.render(true);
-      } catch { }
+      } catch {}
     }
 
     // If the automation panel is already injected for this message on the GM, swap its action to "Open Seek Results"
