@@ -95,7 +95,7 @@ export function refreshEveryonesPerception() {
     } catch {}
 
     _perceptionRefreshTimeout = null;
-  }, 10); // 100ms debounce to prevent spam
+  }, 10); // 10ms debounce to prevent spam
 }
 
 /*
