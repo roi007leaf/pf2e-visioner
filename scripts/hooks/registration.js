@@ -14,6 +14,8 @@ import { registerUIHooks } from './ui.js';
 /**
  * Clean up AVS overrides for a defeated actor
  * @param {Actor} actor - The defeated actor
+ * @async
+ * @throws {Error} If an error occurs during AVS override cleanup
  */
 async function cleanupAvsOverridesForDefeatedActor(actor) {
   try {
