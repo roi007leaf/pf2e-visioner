@@ -11,6 +11,33 @@ import { onCanvasReady, onReady } from './lifecycle.js';
 import { registerTokenHooks } from './token-events.js';
 import { registerUIHooks } from './ui.js';
 
+/**
+ * Clean up AVS overrides for a defeated actor
+ * @param {Actor} actor - The defeated actor
+ */
+async function cleanupAvsOverridesForDefeatedActor(actor) {
+  try {
+    // Find all tokens for this actor on the current scene
+    const tokens = canvas.tokens?.placeables?.filter((t) => t.actor?.id === actor.id) || [];
+
+    if (tokens.length === 0) {
+      return;
+    }
+
+    // Import the AVS override manager
+    const { default: AvsOverrideManager } = await import(
+      '../chat/services/infra/AvsOverrideManager.js'
+    );
+
+    // Clean up overrides for each token of this actor
+    for (const token of tokens) {
+      await AvsOverrideManager.removeAllOverridesInvolving(token.document.id);
+    }
+  } catch (error) {
+    console.error('PF2E Visioner | Failed to clean up AVS overrides for defeated actor:', error);
+  }
+}
+
 export async function registerHooks() {
   Hooks.on('ready', onReady);
   Hooks.on('canvasReady', onCanvasReady);
@@ -65,7 +92,7 @@ export async function registerHooks() {
       const { updateWallVisuals } = await import('../services/visual-effects.js');
       const id = canvas.tokens.controlled?.[0]?.id || null;
       await updateWallVisuals(id);
-    } catch { }
+    } catch {}
   });
   Hooks.on('updateWall', async (doc, changes) => {
     try {
@@ -103,12 +130,12 @@ export async function registerHooks() {
                 await canvas.scene?.updateEmbeddedDocuments?.('Token', updates, { diff: false });
               }
             }
-          } catch (_) { }
+          } catch (_) {}
           // Mirror hidden flag to connected walls
           try {
             const { mirrorHiddenFlagToConnected } = await import('../services/connected-walls.js');
             await mirrorHiddenFlagToConnected(doc, true);
-          } catch (_) { }
+          } catch (_) {}
         } else {
           // If unhidden, remove entries for that wall from tokens
           try {
@@ -141,20 +168,20 @@ export async function registerHooks() {
                 await canvas.scene?.updateEmbeddedDocuments?.('Token', updates, { diff: false });
               }
             }
-          } catch (_) { }
+          } catch (_) {}
           // Mirror hidden flag to connected walls (set hidden=false)
           try {
             const { mirrorHiddenFlagToConnected } = await import('../services/connected-walls.js');
             await mirrorHiddenFlagToConnected(doc, false);
-          } catch (_) { }
+          } catch (_) {}
         }
       }
-    } catch (_) { }
+    } catch (_) {}
     try {
       const { updateWallVisuals } = await import('../services/visual-effects.js');
       const id = canvas.tokens.controlled?.[0]?.id || null;
       await updateWallVisuals(id);
-    } catch { }
+    } catch {}
   });
   Hooks.on('deleteWall', async (wallDocument) => {
     try {
@@ -174,7 +201,7 @@ export async function registerHooks() {
       const { updateWallVisuals } = await import('../services/visual-effects.js');
       const id = canvas.tokens.controlled?.[0]?.id || null;
       await updateWallVisuals(id);
-    } catch { }
+    } catch {}
   });
 
   // Removed controlToken hook - was causing excessive updateWallVisuals calls on token selection.
@@ -228,7 +255,7 @@ export async function registerHooks() {
           // Get the condition manager and clear established states
           const conditionManager = game.modules.get('pf2e-visioner')?.api?.getConditionManager?.();
           if (conditionManager?.clearEstablishedInvisibleStates) {
-            conditionManager.clearEstablishedInvisibleStates(token).catch(() => { });
+            conditionManager.clearEstablishedInvisibleStates(token).catch(() => {});
           }
         }
       }
@@ -247,15 +274,14 @@ export async function registerHooks() {
       const movedTokenId = tokenDoc.id;
       const targetPosition = {
         x: changes.x ?? tokenDoc.x,
-        y: changes.y ?? tokenDoc.y
+        y: changes.y ?? tokenDoc.y,
       };
 
       const { updateSystemHiddenTokenHighlights } = await import('../services/visual-effects.js');
 
       for (const controlledToken of controlledTokens) {
-        const positionOverride = controlledToken.document.id === movedTokenId
-          ? targetPosition
-          : null;
+        const positionOverride =
+          controlledToken.document.id === movedTokenId ? targetPosition : null;
 
         await updateSystemHiddenTokenHighlights(controlledToken.document.id, positionOverride);
       }
@@ -293,6 +319,41 @@ export async function registerHooks() {
   // This was triggered by animation frames during movement, causing hundreds of calls. Wall visual updates are now
   // properly handled by TokenEventHandler._handleWallFlagChanges only when wall flags actually change.
 
+  // Handle actor updates to detect death/defeat and clean up AVS overrides
+
+  // Handle ActiveEffect creation to detect death conditions
+  Hooks.on('createActiveEffect', async (effect, options, userId) => {
+    try {
+      if (!game.user?.isGM) return;
+
+      const avsEnabled = game.settings?.get?.('pf2e-visioner', 'autoVisibilityEnabled') ?? false;
+      if (!avsEnabled) {
+        return;
+      }
+
+      const actor = effect?.parent;
+      if (!actor) {
+        return;
+      }
+
+      // Check if this is a death-related effect
+      const effectName = effect?.name?.toLowerCase() || '';
+      const effectSlug = effect?.system?.slug || effect?.slug || '';
+      const deathConditions = ['unconscious', 'dead', 'dying'];
+      const deathNames = ['dead', 'unconscious', 'dying'];
+
+      if (
+        deathConditions.includes(effectSlug) ||
+        deathNames.some((name) => effectName.includes(name))
+      ) {
+        // Actor got a death effect - clean up AVS overrides
+        await cleanupAvsOverridesForDefeatedActor(actor);
+      }
+    } catch (error) {
+      console.warn('PF2E Visioner | Error handling ActiveEffect creation:', error);
+    }
+  });
+
   // If effects are manually removed, clear corresponding token flags
   Hooks.on('deleteItem', async (item) => {
     try {
@@ -313,10 +374,10 @@ export async function registerHooks() {
           if (t.document.getFlag('pf2e-visioner', 'waitingSneak')) {
             try {
               await t.document.unsetFlag('pf2e-visioner', 'waitingSneak');
-            } catch { }
+            } catch {}
             try {
               if (t.locked) t.locked = false;
-            } catch { }
+            } catch {}
           }
         }
       }
