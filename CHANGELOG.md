@@ -1,5 +1,12 @@
 # Changelog
 
+## [4.4.3] - 2025-10-18
+
+### 🐛 Bug Fixes
+
+- **AVS**: When a token gets dead or defeated, clear avs overrides and hide indicator
+- **Visioner manager**: Filter out dead and defeated tokens
+
 ## [4.4.2] - 2025-10-17
 
 ### 🐛 Bug Fixes
