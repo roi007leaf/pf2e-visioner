@@ -63,7 +63,7 @@ export async function buildContext(app, options) {
   try {
     app.visibilityData = getVisibilityMap(app.observer) || {};
     app.coverData = getCoverMap(app.observer) || {};
-  } catch { }
+  } catch {}
 
   const isLootObserver = app.observer?.actor?.type === 'loot';
   const isHazardObserver = app.observer?.actor?.type === 'hazard';
@@ -95,9 +95,26 @@ export async function buildContext(app, options) {
   const sceneTokens = getSceneTargets(app.observer, app.encounterOnly, app.ignoreAllies);
 
   // In target mode, filter out hazards (they can't observe other tokens)
-  const filteredTokens = app.mode === 'target'
-    ? sceneTokens.filter(token => token.actor?.type !== 'hazard')
-    : sceneTokens;
+  let filteredTokens =
+    app.mode === 'target'
+      ? sceneTokens.filter((token) => token.actor?.type !== 'hazard')
+      : sceneTokens;
+
+  // Filter out defeated/dead tokens from both observer and target modes
+  try {
+    const { isTokenDefeated } = await import('../../chat/services/infra/shared-utils.js');
+    filteredTokens = filteredTokens.filter((token) => {
+      // Always keep hazards and loot regardless of HP/defeated status
+      if (token?.actor?.type === 'hazard' || token?.actor?.type === 'loot') {
+        return true;
+      }
+      // Filter out defeated tokens (for characters/NPCs only)
+      return !isTokenDefeated(token);
+    });
+  } catch (error) {
+    console.warn('PF2E Visioner | Failed to filter defeated tokens:', error);
+    // Continue without filtering if import fails
+  }
 
   context.observer = {
     id: app.observer.document.id,
@@ -153,18 +170,17 @@ export async function buildContext(app, options) {
         // Check if AVS is enabled to determine if 'avs' button should be available
         const avsEnabled = game.settings.get(MODULE_ID, 'autoVisibilityEnabled');
 
-        let allowedVisKeys =
-          isNonAvsToken
-            ? ['observed', 'hidden']
-            : Object.keys(VISIBILITY_STATES);
+        let allowedVisKeys = isNonAvsToken
+          ? ['observed', 'hidden']
+          : Object.keys(VISIBILITY_STATES);
 
         // Remove 'avs' from allowed keys if AVS is disabled
         if (!avsEnabled) {
-          allowedVisKeys = allowedVisKeys.filter(key => key !== 'avs');
+          allowedVisKeys = allowedVisKeys.filter((key) => key !== 'avs');
         }
 
         const visibilityStates = allowedVisKeys
-          .filter(key => !isNonAvsToken || key !== 'avs') // Extra safety: never include 'avs' for loot/hazard
+          .filter((key) => !isNonAvsToken || key !== 'avs') // Extra safety: never include 'avs' for loot/hazard
           .map((key) => {
             // Determine if this state should be selected
             let selected = false;
@@ -351,12 +367,12 @@ export async function buildContext(app, options) {
 
         // Remove 'avs' from allowed keys if AVS is disabled
         if (!avsEnabledForTarget) {
-          allowedVisKeys = allowedVisKeys.filter(key => key !== 'avs');
+          allowedVisKeys = allowedVisKeys.filter((key) => key !== 'avs');
         }
 
         // Debug: console.log(`[AVS Debug] Target mode allowedVisKeys for ${observerToken.document.name}:`, { isRowLoot, isLootObserver, allowedVisKeys });
         const visibilityStates = allowedVisKeys
-          .filter(key => !isNonAvsToken || key !== 'avs') // Extra safety: never include 'avs' for loot/hazard
+          .filter((key) => !isNonAvsToken || key !== 'avs') // Extra safety: never include 'avs' for loot/hazard
           .map((key) => {
             // Determine if this state should be selected
             let selected = false;
@@ -508,9 +524,14 @@ export async function buildContext(app, options) {
     return sortByStatusAndName(a, b);
   };
 
-  context.pcTargets = allTargets.filter((t) => t.isPC && !t.isLoot && !t.isHazard).sort(sortWithOverridesFirst);
-  context.npcTargets = allTargets.filter((t) => !t.isPC && !t.isLoot && !t.isHazard).sort(sortWithOverridesFirst);
-  context.hazardTargets = app.mode === 'observer' ? allTargets.filter((t) => t.isHazard).sort(sortByStatusAndName) : [];
+  context.pcTargets = allTargets
+    .filter((t) => t.isPC && !t.isLoot && !t.isHazard)
+    .sort(sortWithOverridesFirst);
+  context.npcTargets = allTargets
+    .filter((t) => !t.isPC && !t.isLoot && !t.isHazard)
+    .sort(sortWithOverridesFirst);
+  context.hazardTargets =
+    app.mode === 'observer' ? allTargets.filter((t) => t.isHazard).sort(sortByStatusAndName) : [];
   context.lootTargets =
     app.mode === 'observer' ? allTargets.filter((t) => t.isLoot).sort(sortByStatusAndName) : [];
   context.targets = allTargets;
@@ -572,7 +593,7 @@ export async function buildContext(app, options) {
               showOutcome = true;
             }
           }
-        } catch { }
+        } catch {}
         return {
           id: d.id,
           identifier: idf && String(idf).trim() ? String(idf) : fallback,
@@ -588,15 +609,14 @@ export async function buildContext(app, options) {
       });
       context.includeWalls = context.wallTargets.length > 0;
     }
-  } catch { }
+  } catch {}
 
   // Check if AVS is enabled to filter out 'avs' state from bulk actions
   const avsEnabled = game.settings.get(MODULE_ID, 'autoVisibilityEnabled');
 
   // For loot/hazard observers, only show Observed and Hidden in legend and bulk actions
-  const allowedLegendKeys = (isLootObserver || context.hazardObserver)
-    ? ['observed', 'hidden']
-    : null;
+  const allowedLegendKeys =
+    isLootObserver || context.hazardObserver ? ['observed', 'hidden'] : null;
 
   context.visibilityStates = Object.entries(VISIBILITY_STATES)
     .filter(([key]) => {
