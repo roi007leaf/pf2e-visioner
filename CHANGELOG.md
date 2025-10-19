@@ -1,5 +1,25 @@
 # Changelog
 
+## [4.4.8] - 2025-10-19
+
+### ✨ Features
+
+- **Visibility Factors Keybind**: Added customizable keybind to display detailed visibility factors for controlled tokens
+  - Hold the keybind to show factor badges (info icon) above all other tokens from controlled token's perspective
+  - Hover over badges to see comprehensive tooltip explaining visibility state:
+    - Current visibility state (Observed, Hidden, Undetected, Concealed)
+    - Lighting conditions (Bright Light, Dim Light, Darkness, Magical Darkness with ranks)
+    - Detailed reasons including observer/target conditions, sense detection, and lighting interactions
+  - No default keybind assigned - configure in Controls settings
+  - Works alongside existing Alt/O keybind overlays
+  - Badge positions update in real-time as tokens move
+  - Includes support for all visibility factors:
+    - Observer conditions (blinded, dazzled, deafened)
+    - Target conditions (invisible, hidden, concealed, undetected)
+    - Lighting factors (bright, dim, darkness, magical darkness ranks 1-5, greater magical darkness)
+    - Sense detection (darkvision, low-light vision, greater darkvision, lifesense, tremorsense, scent, hearing, echolocation, and more)
+    - Precise and imprecise sense acuity
+
 ## [4.4.7] - 2025-10-19
 
 ### 🐛 Bug Fixes
