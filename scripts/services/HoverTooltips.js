@@ -288,7 +288,6 @@ export function initializeHoverTooltips() {
   Hooks.on('canvasPan', () => {
     // Hide tooltips immediately when pan starts
     if (!HoverTooltips._isPanning) {
-      console.log('[PF2E Visioner] Canvas pan detected, hiding badges');
       HoverTooltips._isPanning = true;
       HoverTooltips._savedHoveredToken = HoverTooltips.currentHoveredToken;
       HoverTooltips._savedKeyTooltipsActive = HoverTooltips.isShowingKeyTooltips;
@@ -1742,26 +1741,10 @@ export function hideVisibilityFactorsOverlay() {
  * Temporarily hide factor badges during panning/zooming (without removing them)
  */
 function hideFactorBadges() {
-  console.log('[PF2E Visioner] Hiding factor badges, count:', HoverTooltips.visibilityBadges.size);
   HoverTooltips.visibilityBadges.forEach((badge, key) => {
     if (badge.isFactor) {
-      console.log('[PF2E Visioner] Hiding factor badge:', key);
       if (badge.badgeEl) badge.badgeEl.style.display = 'none';
       if (badge.tooltipEl) badge.tooltipEl.style.display = 'none';
-    }
-  });
-}
-
-/**
- * Show factor badges after panning/zooming
- */
-function showFactorBadges() {
-  console.log('[PF2E Visioner] Showing factor badges, count:', HoverTooltips.visibilityBadges.size);
-  HoverTooltips.visibilityBadges.forEach((badge, key) => {
-    if (badge.isFactor) {
-      console.log('[PF2E Visioner] Showing factor badge:', key);
-      if (badge.badgeEl) badge.badgeEl.style.display = '';
-      // Don't auto-show tooltips, only badges
     }
   });
 }
@@ -1955,7 +1938,6 @@ function addFactorIndicator(targetToken, observerToken, factorText, state) {
     tooltipEl.style.transformOrigin = 'left center';
   };
 
-  console.log('[PF2E Visioner] Adding factor badge to map:', badgeKey);
   HoverTooltips.visibilityBadges.set(badgeKey, {
     badgeEl,
     tooltipEl,
@@ -1963,7 +1945,6 @@ function addFactorIndicator(targetToken, observerToken, factorText, state) {
     observerId: observerToken.id,
     isFactor: true,
   });
-  console.log('[PF2E Visioner] Total badges in map:', HoverTooltips.visibilityBadges.size);
 }
 
 // Export internal functions for use by lifesense indicators
