@@ -134,8 +134,8 @@ describe('Wall Sight Blocking Fix', () => {
       ];
 
       const result = visionAnalyzer.hasLineOfSight(observer, target);
-      // 9-point sampling: wall at y=-100 to 100 doesn't fully cover token bounds, some rays have LOS
-      expect(result).toBe(true);
+      // Conservative LOS: wall blocks sight, requiring ALL rays to be clear
+      expect(result).toBe(false);
     });
 
     test('should detect line of sight when neither sight nor sound is blocked', () => {
@@ -222,8 +222,8 @@ describe('Wall Sight Blocking Fix', () => {
       ];
 
       const result = visionAnalyzer.hasLineOfSight(observer, target);
-      // 9-point sampling: wall doesn't fully cover token bounds, some rays have LOS
-      expect(result).toBe(true);
+      // Conservative LOS: wall blocks sight, requiring ALL rays to be clear
+      expect(result).toBe(false);
     });
 
     test('should handle missing canvas walls gracefully', () => {
