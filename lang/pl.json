@@ -993,6 +993,19 @@
         "hint": "(PL TODO) Press to show detailed reasons for visibility states from controlled tokens to all other tokens."
       }
     },
+    "VISIBILITY_FACTORS": {
+      "NO_TOKEN_SELECTED": "(PL TODO) Select at least one token to show visibility factors",
+      "STATE_LABEL": "(PL TODO) State",
+      "LIGHTING_LABEL": "(PL TODO) Lighting",
+      "UNKNOWN_STATE": "(PL TODO) Unknown State",
+      "LIGHTING": {
+        "bright": "(PL TODO) Bright Light",
+        "dim": "(PL TODO) Dim Light",
+        "darkness": "(PL TODO) Darkness",
+        "magicalDarkness": "(PL TODO) Magical Darkness",
+        "greaterMagicalDarkness": "(PL TODO) Greater Magical Darkness"
+      }
+    },
     "REGION_BEHAVIOR": {
       "TYPE_LABEL": "Widoczność PF2e Visioner",
       "TYPES": {

@@ -1692,7 +1692,8 @@ export function showVisibilityFactorsOverlay() {
 
   const controlledTokens = canvas.tokens.controlled;
   if (controlledTokens.length === 0) {
-    ui.notifications?.info?.('Select at least one token to show visibility factors');
+    const message = game.i18n.localize('PF2E_VISIONER.VISIBILITY_FACTORS.NO_TOKEN_SELECTED');
+    ui.notifications?.info?.(message);
     return;
   }
 
@@ -1779,31 +1780,23 @@ async function showFactorIndicatorsForToken(observerToken) {
 function formatVisibilityFactors(factors) {
   const lines = [];
 
-  // State
   if (factors.state) {
     const stateLabel = VISIBILITY_STATES[factors.state]?.label || factors.state;
     const localizedState = game.i18n?.localize?.(stateLabel) || stateLabel;
-    lines.push(`State: ${localizedState}`);
+    const stateLabelKey = game.i18n.localize('PF2E_VISIONER.VISIBILITY_FACTORS.STATE_LABEL');
+    lines.push(`${stateLabelKey}: ${localizedState}`);
   }
 
-  // Lighting
   if (factors.lighting) {
-    const lightMap = {
-      bright: 'Bright Light',
-      dim: 'Dim Light',
-      darkness: 'Darkness',
-      magicalDarkness: 'Magical Darkness',
-      greaterMagicalDarkness: 'Greater Magical Darkness',
-    };
-    const lightText = lightMap[factors.lighting] || factors.lighting;
-    lines.push(`Lighting: ${lightText}`);
+    const lightingKey = `PF2E_VISIONER.VISIBILITY_FACTORS.LIGHTING.${factors.lighting}`;
+    const lightText = game.i18n.localize(lightingKey);
+    const lightingLabel = game.i18n.localize('PF2E_VISIONER.VISIBILITY_FACTORS.LIGHTING_LABEL');
+    lines.push(`${lightingLabel}: ${lightText}`);
   }
 
-  // Reasons - emphasize detection-related reasons
   if (factors.reasons && factors.reasons.length > 0) {
-    lines.push(''); // Empty line for separator
+    lines.push('');
 
-    // Keywords that indicate detection/sense usage
     const detectionKeywords = [
       'Detected by', 'detected by',
       'vision', 'Vision',
@@ -1818,7 +1811,6 @@ function formatVisibilityFactors(factors) {
 
     factors.reasons.forEach(reason => {
       if (typeof reason === 'string') {
-        // Check if this reason is about detection/senses
         const isDetection = detectionKeywords.some(keyword => reason.includes(keyword));
 
         if (isDetection) {
@@ -1830,9 +1822,9 @@ function formatVisibilityFactors(factors) {
     });
   }
 
-  // Fallback
   if (lines.length === 0) {
-    lines.push(factors.state || 'Unknown State');
+    const unknownState = game.i18n.localize('PF2E_VISIONER.VISIBILITY_FACTORS.UNKNOWN_STATE');
+    lines.push(factors.state || unknownState);
   }
 
   return lines.join('\n');

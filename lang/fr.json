@@ -800,6 +800,19 @@
         "hint": "(FR TODO) Press to show detailed reasons for visibility states from controlled tokens to all other tokens."
       }
     },
+    "VISIBILITY_FACTORS": {
+      "NO_TOKEN_SELECTED": "(FR TODO) Select at least one token to show visibility factors",
+      "STATE_LABEL": "(FR TODO) State",
+      "LIGHTING_LABEL": "(FR TODO) Lighting",
+      "UNKNOWN_STATE": "(FR TODO) Unknown State",
+      "LIGHTING": {
+        "bright": "(FR TODO) Bright Light",
+        "dim": "(FR TODO) Dim Light",
+        "darkness": "(FR TODO) Darkness",
+        "magicalDarkness": "(FR TODO) Magical Darkness",
+        "greaterMagicalDarkness": "(FR TODO) Greater Magical Darkness"
+      }
+    },
     "AVS_OVERRIDE_DIALOG": {
       "NO_OVERRIDES": "(FR TODO) No AVS overrides are currently active for this token.",
       "CLOSE": "(FR TODO) Close",
