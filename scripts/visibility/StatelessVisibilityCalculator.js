@@ -435,34 +435,16 @@ function determineVisualDetection(
   }
 
   // CRITICAL: If there's no line of sight (sight-blocking wall), visual detection fails
-  // EXCEPTION: In darkness scenarios, darkvision might still work if the wall doesn't completely block vision
-  // This handles cases where tokens are in magical darkness on opposite sides of a wall
+  // CONSERVATIVE APPROACH: Walls always block vision, regardless of darkness
+  // Darkness effects only matter when there are no sight-blocking walls
   if (hasLineOfSight === false) {
-    const { lightingLevel } = target;
-    const { precise, lightingLevel: observerLighting } = observer;
-
-    // Check if we're in a darkness scenario where darkvision might still apply
-    const isDarknessScenario =
-      lightingLevel === 'greaterMagicalDarkness' ||
-      lightingLevel === 'magicalDarkness' ||
-      lightingLevel === 'darkness' ||
-      observerLighting === 'greaterMagicalDarkness' ||
-      observerLighting === 'magicalDarkness' ||
-      observerLighting === 'darkness';
-
-    // If observer has darkvision and we're in darkness, allow darkvision processing
-    // This handles the case where darkvision can "see through" some obstacles in magical darkness
-    if (isDarknessScenario && precise.darkvision) {
-      // Continue to darkvision processing below
-    } else {
-      // No darkvision or not in darkness - wall completely blocks vision
-      return {
-        canDetect: false,
-        sense: null,
-        isPrecise: false,
-        baseState: null,
-      };
-    }
+    // Wall completely blocks vision - no exceptions for darkness
+    return {
+      canDetect: false,
+      sense: null,
+      isPrecise: false,
+      baseState: null,
+    };
   }
 
   // Check if observer has see-invisibility sense BEFORE checking invisibility

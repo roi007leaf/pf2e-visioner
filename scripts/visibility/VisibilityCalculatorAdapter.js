@@ -102,9 +102,24 @@ export async function tokenStateToInput(
     const observerLight = options.precomputedLights.get(observer.document.id);
     const targetLight = options.precomputedLights.get(target.document.id);
 
+    // Check if tokens themselves are in darkness
     if (observerLight?.darknessRank > 0 || targetLight?.darknessRank > 0) {
       linePassesThroughDarkness = true;
       rayDarknessRank = Math.max(observerLight?.darknessRank || 0, targetLight?.darknessRank || 0);
+    }
+
+    // CRITICAL: Also check for darkness BETWEEN tokens, even with precomputed data
+    // Precomputed lighting only tells us about token positions, not the ray between them
+    if (!linePassesThroughDarkness) {
+      const result = await checkDarknessRayIntersection(
+        lightingRasterService,
+        observer,
+        target,
+        observerPosition,
+        targetPosition,
+      );
+      linePassesThroughDarkness = result.linePassesThroughDarkness;
+      rayDarknessRank = Math.max(rayDarknessRank, result.rayDarknessRank);
     }
   } else {
     // Fallback to expensive ray check only if no precomputed data
@@ -713,14 +728,102 @@ const doesLinePassThroughDarkness = (
   targetPosOverride = null,
 ) => {
   try {
-    const observerPos = observerPosOverride || this._getTokenPosition(observer);
-    const targetPos = targetPosOverride || this._getTokenPosition(target);
+    const observerPos = observerPosOverride || { x: observer.center.x, y: observer.center.y };
+    const targetPos = targetPosOverride || { x: target.center.x, y: target.center.y };
 
-    // Precise darkness detection using shape-based intersection
+    // CONSERVATIVE DARKNESS DETECTION: Use 9-point sampling like wall LOS
+    // This ensures that darkness between tokens is detected even if it doesn't
+    // intersect the exact center-to-center line
 
-    // Cast a ray between the tokens to check for darkness effects
-    const ray = new foundry.canvas.geometry.Ray(observerPos, targetPos);
+    // Get sample points for both tokens (9 points each: center + corners + edges)
+    const observerPoints = getTokenSamplePoints(observer, observerPos);
+    const targetPoints = getTokenSamplePoints(target, targetPos);
 
+    // Check multiple rays between sample points for darkness intersection
+    let darknessDetected = false;
+    let maxDarknessRank = 0;
+    const darknessEffects = [];
+
+    // Check center-to-center ray first (most important)
+    const centerRay = new foundry.canvas.geometry.Ray(observerPos, targetPos);
+    const centerResult = checkSingleRayForDarkness(centerRay);
+    if (centerResult.passesThroughDarkness) {
+      darknessDetected = true;
+      maxDarknessRank = Math.max(maxDarknessRank, centerResult.maxDarknessRank);
+      darknessEffects.push(...centerResult.darknessEffects);
+    }
+
+    // CONSERVATIVE APPROACH: Check additional rays for comprehensive coverage
+    // If center ray found darkness, we already know there's darkness
+    // If center ray didn't find darkness, check corner rays to be thorough
+    if (!darknessDetected) {
+      // Check rays from observer center to target corners
+      for (let i = 1; i < targetPoints.length; i++) {
+        const ray = new foundry.canvas.geometry.Ray(observerPos, targetPoints[i]);
+        const result = checkSingleRayForDarkness(ray);
+        if (result.passesThroughDarkness) {
+          darknessDetected = true;
+          maxDarknessRank = Math.max(maxDarknessRank, result.maxDarknessRank);
+          darknessEffects.push(...result.darknessEffects);
+          break; // Found darkness, no need to check more rays
+        }
+      }
+    }
+
+    if (darknessDetected) {
+      return {
+        passesThroughDarkness: true,
+        maxDarknessRank,
+        darknessEffects,
+      };
+    }
+
+    return { passesThroughDarkness: false, maxDarknessRank: 0 };
+  } catch (error) {
+    console.error('PF2E Visioner | Error in doesLinePassThroughDarkness:', error);
+    return { passesThroughDarkness: false, maxDarknessRank: 0 };
+  }
+};
+
+/**
+ * Helper function to get token sample points (9-point sampling)
+ * Replicates the logic from VisionAnalyzer.js
+ */
+const getTokenSamplePoints = (token, centerPos = null) => {
+  // Use provided center position or fall back to token.center
+  const center = centerPos
+    ? { x: centerPos.x, y: centerPos.y }
+    : { x: token.center.x, y: token.center.y };
+  const w = token.document.width * canvas.grid.size;
+  const h = token.document.height * canvas.grid.size;
+
+  // Calculate x,y based on center position if provided
+  const x = centerPos ? centerPos.x - w / 2 : token.document.x;
+  const y = centerPos ? centerPos.y - h / 2 : token.document.y;
+
+  // Small inset to ensure points are inside token bounds
+  const inset = 2;
+
+  // Sample center + 4 corners + 4 edge midpoints for maximum coverage
+  return [
+    center, // Center
+    { x: x + inset, y: y + inset }, // Top-left corner
+    { x: x + w - inset, y: y + inset }, // Top-right corner
+    { x: x + inset, y: y + h - inset }, // Bottom-left corner
+    { x: x + w - inset, y: y + h - inset }, // Bottom-right corner
+    { x: x + w * 0.5, y: y + inset }, // Top edge center
+    { x: x + w * 0.5, y: y + h - inset }, // Bottom edge center
+    { x: x + inset, y: y + h * 0.5 }, // Left edge center
+    { x: x + w - inset, y: y + h * 0.5 }, // Right edge center
+  ];
+};
+
+/**
+ * Check a single ray for darkness intersection
+ * Extracted from the original logic for reuse
+ */
+const checkSingleRayForDarkness = (ray) => {
+  try {
     // Get all darkness sources that the ray passes through
     let lightSources = [];
     try {
@@ -881,15 +984,11 @@ const doesLinePassThroughDarkness = (
     return {
       passesThroughDarkness,
       maxDarknessRank,
+      darknessEffects,
     };
   } catch (error) {
-    console.error('PF2E Visioner | Error checking darkness line of sight:', {
-      observer: observer.name,
-      target: target.name,
-      error: error.message,
-      stack: error.stack,
-    });
-    return { passesThroughDarkness: false, maxDarknessRank: 0 };
+    console.error('PF2E Visioner | Error checking single ray darkness:', error);
+    return { passesThroughDarkness: false, maxDarknessRank: 0, darknessEffects: [] };
   }
 };
 

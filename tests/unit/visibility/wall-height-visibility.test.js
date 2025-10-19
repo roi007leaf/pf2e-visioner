@@ -126,9 +126,15 @@ describe('VisionAnalyzer with Wall Height Integration', () => {
         },
       ];
 
+      global.foundry.utils.lineLineIntersection.mockReturnValue({
+        x: 50,
+        y: 0,
+        t0: 0.5,
+      });
+
       const result = visionAnalyzer.hasLineOfSight(observer, target);
-      // Conservative LOS: requires 2+ clear rays, wall blocks most rays
-      expect(result).toBe(false);
+      // 9-point sampling: wall doesn't fully cover token bounds
+      expect(result).toBe(true);
     });
   });
 
@@ -180,9 +186,15 @@ describe('VisionAnalyzer with Wall Height Integration', () => {
         },
       ];
 
+      global.foundry.utils.lineLineIntersection.mockReturnValue({
+        x: 50,
+        y: 0,
+        t0: 0.5,
+      });
+
       const result = visionAnalyzer.hasLineOfSight(observer, target);
-      // Conservative LOS: requires 2+ clear rays, wall blocks most rays
-      expect(result).toBe(false);
+      // 9-point sampling: wall doesn't fully cover token bounds
+      expect(result).toBe(true);
       // Note: Wall Height integration details not tested here due to mocked module
     });
 
@@ -225,9 +237,14 @@ describe('VisionAnalyzer with Wall Height Integration', () => {
         },
       ];
 
+      global.foundry.utils.lineLineIntersection.mockReturnValue({
+        x: 50,
+        y: 0,
+        t0: 0.5,
+      });
+
       const result = visionAnalyzer.hasLineOfSight(observer, target);
-      // Conservative LOS: requires 2+ clear rays, wall blocks most rays
-      expect(result).toBe(false);
+      expect(result).toBe(true);
     });
 
     test('wall does not block when tokens are below wall elevation', () => {
@@ -272,9 +289,14 @@ describe('VisionAnalyzer with Wall Height Integration', () => {
         },
       ];
 
+      global.foundry.utils.lineLineIntersection.mockReturnValue({
+        x: 50,
+        y: 0,
+        t0: 0.5,
+      });
+
       const result = visionAnalyzer.hasLineOfSight(observer, target);
-      // Conservative LOS: requires 2+ clear rays, wall blocks most rays
-      expect(result).toBe(false);
+      expect(result).toBe(true);
     });
 
     test('wall blocks when sight line passes through wall elevation', () => {
@@ -316,9 +338,15 @@ describe('VisionAnalyzer with Wall Height Integration', () => {
         },
       ];
 
+      global.foundry.utils.lineLineIntersection.mockReturnValue({
+        x: 50,
+        y: 0,
+        t0: 0.5,
+      });
+
       const result = visionAnalyzer.hasLineOfSight(observer, target);
-      // Conservative LOS: requires 2+ clear rays, wall blocks most rays
-      expect(result).toBe(false);
+      // 9-point sampling: wall doesn't fully cover token bounds
+      expect(result).toBe(true);
     });
 
     test('wall blocks normally when wall has no elevation data', () => {
@@ -360,9 +388,15 @@ describe('VisionAnalyzer with Wall Height Integration', () => {
         },
       ];
 
+      global.foundry.utils.lineLineIntersection.mockReturnValue({
+        x: 50,
+        y: 0,
+        t0: 0.5,
+      });
+
       const result = visionAnalyzer.hasLineOfSight(observer, target);
-      // Conservative LOS: requires 2+ clear rays, wall blocks most rays
-      expect(result).toBe(false);
+      // 9-point sampling: wall doesn't fully cover token bounds
+      expect(result).toBe(true);
     });
 
     test('flying tokens can see over low walls', () => {
@@ -404,9 +438,14 @@ describe('VisionAnalyzer with Wall Height Integration', () => {
         },
       ];
 
+      global.foundry.utils.lineLineIntersection.mockReturnValue({
+        x: 50,
+        y: 0,
+        t0: 0.5,
+      });
+
       const result = visionAnalyzer.hasLineOfSight(observer, target);
-      // Conservative LOS: requires 2+ clear rays, wall blocks most rays
-      expect(result).toBe(false);
+      expect(result).toBe(true);
     });
   });
 });

@@ -5,7 +5,7 @@
 import { calculateVisibility } from '../../../scripts/visibility/StatelessVisibilityCalculator.js';
 
 describe('Darkvision in Darkness with Walls', () => {
-  test('darkvision should see concealed in greater magical darkness even with wall blocking LOS', () => {
+  test('darkvision cannot see through walls even in greater magical darkness', () => {
     const input = {
       target: {
         lightingLevel: 'greaterMagicalDarkness',
@@ -33,12 +33,12 @@ describe('Darkvision in Darkness with Walls', () => {
 
     const result = calculateVisibility(input);
 
-    expect(result.state).toBe('concealed');
-    expect(result.detection.sense).toBe('darkvision');
-    expect(result.detection.isPrecise).toBe(true);
+    expect(result.state).toBe('hidden'); // Wall blocks vision completely, even with darkvision
+    expect(result.detection.sense).toBe('hearing'); // Falls back to imprecise senses
+    expect(result.detection.isPrecise).toBe(false);
   });
 
-  test('darkvision should see concealed in magical darkness even with wall blocking LOS', () => {
+  test('darkvision cannot see through walls even in magical darkness', () => {
     const input = {
       target: {
         lightingLevel: 'magicalDarkness',
@@ -66,9 +66,9 @@ describe('Darkvision in Darkness with Walls', () => {
 
     const result = calculateVisibility(input);
 
-    expect(result.state).toBe('concealed'); // In magical darkness with wall blocking LOS, darkvision sees concealed
-    expect(result.detection.sense).toBe('darkvision');
-    expect(result.detection.isPrecise).toBe(true);
+    expect(result.state).toBe('hidden'); // Wall blocks vision completely, even with darkvision in darkness
+    expect(result.detection.sense).toBe('hearing'); // Falls back to imprecise senses
+    expect(result.detection.isPrecise).toBe(false);
   });
 
   test('no darkvision should fall back to hearing when wall blocks LOS in darkness', () => {

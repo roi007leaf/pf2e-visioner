@@ -1,5 +1,15 @@
 # Changelog
 
+## [4.4.7] - 2025-10-19
+
+### 🐛 Bug Fixes
+
+- **Wall Priority**: Walls now always block vision regardless of darkness presence - no more "darkvision through walls" edge cases
+- **Precomputed Lighting**: Fixed precomputed lighting to also check for darkness between tokens, not just at token locations
+- Ensures consistent "undetected" states when walls properly block line of sight
+- Prevents false positives where tokens appeared "observed" when they should be "hidden" behind walls
+- More accurate darkness detection catches magical darkness areas that single-ray sampling missed
+
 ## [4.4.6] - 2025-10-19
 
 ### 🐛 Bug Fixes
