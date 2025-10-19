@@ -536,6 +536,10 @@
         "name": "Vision for NPCs",
         "hint": "Enables token vision for all NPC tokens to more easily see point of view"
       },
+      "ENABLE_CAMERA_VISION_AGGREGATION": {
+        "name": "Camera Vision Aggregation",
+        "hint": "When enabled, camera accounts with observer permissions on multiple party tokens will display the best (most permissive) visibility state across all controlled tokens, instead of just the first token. Useful for streaming where camera needs to see what any party member can see."
+      },
       "GDV_VISUAL_OVERRIDE_ENABLED": {
         "name": "Greater Darkvision Visual Override",
         "hint": "Client-only: When your selected token has Greater Darkvision, lighten darkness areas so visuals match Visioner rules."

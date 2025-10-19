@@ -3,6 +3,7 @@
  */
 
 import { MODULE_ID } from '../constants.js';
+import { getBestVisibilityState } from '../utils.js';
 import { autoVisibilitySystem } from '../visibility/auto-visibility/index.js';
 import { updateEphemeralEffectsForVisibility } from '../visibility/ephemeral.js';
 
@@ -75,7 +76,7 @@ export async function setVisibilityBetween(
         state,
         direction: options.direction || 'observer_to_target',
       });
-    } catch (_) {}
+    } catch (_) { }
   }
 
   // Skip ephemeral effects for socket-triggered processing to avoid permission errors
@@ -133,13 +134,69 @@ export function getVisibility(observer, target, direction = 'observer_to_target'
     // Handle direction (for bidirectional visibility systems)
     if (direction === 'target_to_observer') {
       // Swap observer and target for reverse direction lookup
-      return getVisibilityBetween(targetToken, observerToken);
+      return getVisibilityBetweenWithAggregation(targetToken, observerToken);
     }
 
     // Default: observer_to_target
-    return getVisibilityBetween(observerToken, targetToken);
+    return getVisibilityBetweenWithAggregation(observerToken, targetToken);
   } catch (error) {
     console.error('PF2E Visioner: Error in getVisibility function:', error);
     return 'observed'; // Default fallback value
   }
+}
+
+/**
+ * Get visibility between tokens with optional aggregation for camera vision.
+ * If camera vision aggregation is enabled and observer has multiple controlled tokens,
+ * returns the best (most permissive) visibility state across all observers.
+ * @param {Token} observer - Observer token
+ * @param {Token} target - Target token
+ * @returns {string} Visibility state
+ */
+function getVisibilityBetweenWithAggregation(observer, target) {
+  if (!observer || !target) {
+    return getVisibilityBetween(observer, target);
+  }
+
+  // Check if camera vision aggregation is enabled
+  try {
+    const aggregationEnabled = game.settings.get(MODULE_ID, 'enableCameraVisionAggregation');
+    if (!aggregationEnabled) {
+      return getVisibilityBetween(observer, target);
+    }
+  } catch (e) {
+    return getVisibilityBetween(observer, target);
+  }
+
+  // Only apply aggregation if observer is one of the controlled tokens
+  // This ensures aggregation only applies to player-controlled camera viewing
+  const controlled = canvas.tokens.controlled;
+  if (controlled.length === 0) {
+    return getVisibilityBetween(observer, target);
+  }
+
+  // Check if the observer token is in the controlled list
+  const isObserverControlled = controlled.some(t => t.id === observer.id);
+  if (!isObserverControlled) {
+    // Not a controlled token, use normal logic
+    return getVisibilityBetween(observer, target);
+  }
+
+  // If only one controlled token, no aggregation needed
+  if (controlled.length === 1) {
+    return getVisibilityBetween(observer, target);
+  }
+
+  // Multiple controlled tokens - aggregate visibility from all of them
+  // Get the best visibility state from all controlled observers
+  const visibilityStates = controlled
+    .map(controlledObserver => getVisibilityBetween(controlledObserver, target))
+    .filter(state => state !== undefined && state !== null);
+
+  if (visibilityStates.length === 0) {
+    return 'observed';
+  }
+
+  // Use the helper function to get the best (most permissive) state
+  return getBestVisibilityState(visibilityStates);
 }

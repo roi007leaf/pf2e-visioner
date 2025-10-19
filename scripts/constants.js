@@ -556,6 +556,17 @@ export const DEFAULT_SETTINGS = {
     default: 'none',
   },
 
+  // Camera Vision Aggregation
+  enableCameraVisionAggregation: {
+    name: 'PF2E_VISIONER.SETTINGS.ENABLE_CAMERA_VISION_AGGREGATION.name',
+    hint: 'PF2E_VISIONER.SETTINGS.ENABLE_CAMERA_VISION_AGGREGATION.hint',
+    scope: 'world',
+    config: true,
+    restricted: true,
+    type: Boolean,
+    default: false,
+  },
+
   // Token Filtering
   ignoreAllies: {
     name: 'PF2E_VISIONER.SETTINGS.IGNORE_ALLIES_DEFAULT.name',

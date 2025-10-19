@@ -12,6 +12,8 @@
  */
 
 import { MODULE_ID } from '../constants.js';
+import { getBestVisibilityState } from '../utils.js';
+import { getVisibilityBetween } from './visibility-map.js';
 
 let batchMode = false;
 const batchedUpdates = new Map();
@@ -161,17 +163,83 @@ export function getDetection(observer, target, direction = 'observer_to_target')
     // Handle direction (for bidirectional detection systems)
     if (direction === 'target_to_observer') {
       // Swap observer and target for reverse direction lookup
-      return getDetectionBetween(targetToken, observerToken);
+      return getDetectionBetweenWithAggregation(targetToken, observerToken);
     }
 
     // Default: observer_to_target
-    return getDetectionBetween(observerToken, targetToken);
+    return getDetectionBetweenWithAggregation(observerToken, targetToken);
   } catch (error) {
     console.error('PF2E Visioner: Error in getDetection function:', error);
     return null;
   }
 }
 
+/**
+ * Get detection info between tokens with optional aggregation for camera vision.
+ * If camera vision aggregation is enabled and observer has multiple controlled tokens,
+ * returns the detection from the observer with the best visibility state.
+ * @param {Token} observer - Observer token
+ * @param {Token} target - Target token
+ * @returns {Object|null} Detection info or null
+ */
+function getDetectionBetweenWithAggregation(observer, target) {
+  if (!observer || !target) {
+    return getDetectionBetween(observer, target);
+  }
+
+  // Check if camera vision aggregation is enabled
+  try {
+    const aggregationEnabled = game.settings.get(MODULE_ID, 'enableCameraVisionAggregation');
+    if (!aggregationEnabled) {
+      return getDetectionBetween(observer, target);
+    }
+  } catch (e) {
+    return getDetectionBetween(observer, target);
+  }
+
+  // Only apply aggregation if observer is one of the controlled tokens
+  const controlled = canvas.tokens.controlled;
+  if (controlled.length === 0) {
+    return getDetectionBetween(observer, target);
+  }
+
+  // Check if the observer token is in the controlled list
+  const isObserverControlled = controlled.some(t => t.id === observer.id);
+  if (!isObserverControlled) {
+    return getDetectionBetween(observer, target);
+  }
+
+  // If only one controlled token, no aggregation needed
+  if (controlled.length === 1) {
+    return getDetectionBetween(observer, target);
+  }
+
+  // Multiple controlled tokens - get detection from the observer with best visibility
+  // First, get all visibility states from all controlled observers
+  const visibilityStates = controlled
+    .map(controlledObserver => ({
+      token: controlledObserver,
+      visibility: getVisibilityBetween(controlledObserver, target),
+    }))
+    .filter(item => item.visibility !== undefined && item.visibility !== null);
+
+  if (visibilityStates.length === 0) {
+    return null;
+  }
+
+  // Find which observer has the best visibility
+  const visibilities = visibilityStates.map(item => item.visibility);
+  const bestVisibility = getBestVisibilityState(visibilities);
+
+  // Find the first observer with that best visibility and return their detection
+  for (const item of visibilityStates) {
+    if (item.visibility === bestVisibility) {
+      return getDetectionBetween(item.token, target);
+    }
+  }
+
+  return null;
+}
 /**
  * Clear detection info for a specific target
  * @param {Token} observer
