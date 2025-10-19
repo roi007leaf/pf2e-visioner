@@ -155,6 +155,17 @@ export class ItemEventHandler {
    * @param {string} action - The action performed ('created', 'updated', 'deleted')
    */
   #handleItemChange(item, action) {
+    // CRITICAL: Skip our own ephemeral effects to prevent feedback loops
+    // Our ephemeral effects are marked with aggregateOffGuard flag
+    // Check for the flag directly without needing to import MODULE_ID
+    if (item.flags?.['pf2e-visioner']?.aggregateOffGuard === true) {
+      this.#systemStateProvider?.debug?.('ItemEventHandler: skipping own ephemeral effect', {
+        itemName: item.name,
+        action,
+      });
+      return;
+    }
+
     // In PF2e, conditions might be items, but also spells and effects
     const itemName = item.name?.toLowerCase() || '';
     const itemType = item.type?.toLowerCase() || '';

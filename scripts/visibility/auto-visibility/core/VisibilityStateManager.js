@@ -71,6 +71,13 @@ export class VisibilityStateManager {
    * @param {string} tokenId - ID of the token to mark as changed
    */
   markTokenChangedImmediate(tokenId) {
+    const stack = new Error().stack;
+    const caller = stack?.split('\n')?.[2]?.trim() || 'unknown';
+    this.#systemStateProvider?.debug?.('VSM:markTokenChangedImmediate', {
+      tokenId,
+      caller,
+      stack: stack?.split('\n').slice(1, 4).join('\n'),
+    });
     this.#changedTokens.add(tokenId);
 
     // Trigger immediate processing
@@ -87,6 +94,15 @@ export class VisibilityStateManager {
    * @param {Object} [changes] - Changes being made to the token (optional)
    */
   markTokenChangedWithSpatialOptimization(tokenDoc, changes) {
+    const stack = new Error().stack;
+    const caller = stack?.split('\n')?.[2]?.trim() || 'unknown';
+    this.#systemStateProvider?.debug?.('VSM:markTokenChangedWithSpatialOptimization', {
+      tokenId: tokenDoc?.id,
+      tokenName: tokenDoc?.name,
+      changes,
+      caller,
+      stack: stack?.split('\n').slice(1, 4).join('\n'),
+    });
     // Handle the case where no parameters are provided (just trigger optimization)
     if (!tokenDoc) {
       this.markAllTokensChangedImmediate();
@@ -120,10 +136,9 @@ export class VisibilityStateManager {
           this.#changedTokens.add(token.document.id);
         });
       } catch (error) {
-        console.warn(
-          'PF2E Visioner | Spatial optimization failed, falling back to simple marking:',
-          error,
-        );
+        try {
+          this.#systemStateProvider?.debug?.('VSM:spatialOptimizationFailed', error);
+        } catch {}
       }
     }
 
@@ -139,6 +154,14 @@ export class VisibilityStateManager {
    * Mark all eligible tokens as needing recalculation (immediate processing)
    */
   markAllTokensChangedImmediate() {
+    const stack = new Error().stack;
+    const caller = stack?.split('\n')?.[2]?.trim() || 'unknown';
+    const tokenCount = canvas.tokens?.placeables?.length || 0;
+    this.#systemStateProvider?.debug?.('VSM:markAllTokensChangedImmediate', {
+      tokenCount,
+      caller,
+      stack: stack?.split('\n').slice(1, 4).join('\n'),
+    });
     const tokens = canvas.tokens?.placeables || [];
     const exclusionManager = this.#exclusionManager?.();
 
@@ -161,6 +184,12 @@ export class VisibilityStateManager {
    * Debounces rapid-fire events that would cause constant full recalculations
    */
   markAllTokensChangedThrottled() {
+    const stack = new Error().stack;
+    const caller = stack?.split('\n')?.[2]?.trim() || 'unknown';
+    this.#systemStateProvider?.debug?.('VSM:markAllTokensChangedThrottled', {
+      caller,
+      stack: stack?.split('\n').slice(1, 4).join('\n'),
+    });
     // If already pending, just extend the timeout
     if (this.#pendingFullRecalc) {
       if (this.#fullRecalcTimeout) {
@@ -182,6 +211,9 @@ export class VisibilityStateManager {
    * @private
    */
   async #processBatch() {
+    this.#systemStateProvider?.debug?.('VSM:processBatch:start', {
+      changedCount: this.#changedTokens.size,
+    });
     if (this.#processingBatch || this.#changedTokens.size === 0 || !this.#batchProcessor) {
       return;
     }
@@ -209,6 +241,7 @@ export class VisibilityStateManager {
       console.error('PF2E Visioner | Batch processing failed:', error);
     } finally {
       this.#processingBatch = false;
+      this.#systemStateProvider?.debug?.('VSM:processBatch:complete');
       Hooks.callAll('pf2e-visioner.batchComplete', { tokenCount });
     }
   }
@@ -273,6 +306,14 @@ export class VisibilityStateManager {
    * @param {string[]} tokenIds - Array of token IDs to recalculate
    */
   recalculateForTokens(tokenIds) {
+    const stack = new Error().stack;
+    const caller = stack?.split('\n')?.[2]?.trim() || 'unknown';
+    this.#systemStateProvider?.debug?.('VSM:recalculateForTokens', {
+      tokenIds: Array.from(tokenIds),
+      count: tokenIds?.length,
+      caller,
+      stack: stack?.split('\n').slice(1, 4).join('\n'),
+    });
     // Add all specified tokens to the changed set
     tokenIds.forEach((id) => this.#changedTokens.add(id));
 

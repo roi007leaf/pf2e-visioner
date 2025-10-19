@@ -5,6 +5,7 @@
 import { MODULE_ID } from '../constants.js';
 import { AutoCoverHooks } from '../cover/auto-cover/AutoCoverHooks.js';
 import { onHighlightObjects } from '../services/HoverTooltips.js';
+import { getLogger } from '../utils/logger.js';
 import { registerChatHooks } from './chat.js';
 import { registerCombatHooks } from './combat.js';
 import { onCanvasReady, onReady } from './lifecycle.js';
@@ -267,6 +268,14 @@ export async function registerHooks() {
   });
 
   Hooks.on('updateToken', async (tokenDoc, changes, options, userId) => {
+    const log = getLogger('AVS/Hooks');
+    log.debug(() => ({
+      msg: 'updateToken (registration.js) fired',
+      tokenName: tokenDoc?.name,
+      tokenId: tokenDoc?.id,
+      changes,
+      stack: new Error().stack,
+    }));
     try {
       if (!('x' in changes || 'y' in changes)) return;
 
@@ -293,6 +302,21 @@ export async function registerHooks() {
   });
 
   Hooks.on('refreshToken', async (token) => {
+    const log = getLogger('AVS/Hooks');
+    log.debug(() => ({
+      msg: 'refreshToken fired',
+      tokenName: token?.name,
+      tokenId: token?.id,
+      stack: new Error().stack,
+    }));
+
+    // Skip processing if we're in the middle of ephemeral effect sync
+    // This prevents feedback loops where effect updates trigger refreshToken → lightingRefresh → new batch
+    if (globalThis.game?.pf2eVisioner?.suppressRefreshTokenProcessing) {
+      log.debug?.('refreshToken: skipping processing during ephemeral effect sync');
+      return;
+    }
+
     try {
       const controlledTokens = canvas?.tokens?.controlled || [];
       if (controlledTokens.length === 0) return;

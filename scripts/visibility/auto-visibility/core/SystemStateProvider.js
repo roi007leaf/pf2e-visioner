@@ -1,5 +1,6 @@
 
 import { MODULE_ID } from "../../../constants.js";
+import { getLogger } from "../../../utils/logger.js";
 /**
  * SystemStateProvider - Provides access to system state information
  * 
@@ -123,6 +124,11 @@ export class SystemStateProvider {
     }
 
     debug(...args) {
+        try {
+            if (!this.isDebugMode()) return;
+            const log = getLogger('AVS');
+            log.debug(...args);
+        } catch { }
     }
 
     /**

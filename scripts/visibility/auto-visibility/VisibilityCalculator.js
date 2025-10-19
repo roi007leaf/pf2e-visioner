@@ -156,6 +156,16 @@ export class VisibilityCalculator {
     targetPositionOverride = null,
     options = undefined,
   ) {
+    const log = await import('../../utils/logger.js').then(m => m.getLogger('AVS/VisibilityCalculator'));
+    log.debug(() => ({
+      msg: 'calculateVisibilityBetweenTokens:start',
+      observerName: observer?.name,
+      observerId: observer?.id,
+      targetName: target?.name,
+      targetId: target?.id,
+      hasOptions: !!options
+    }));
+
     // Use stateless calculator via adapter
     const result = await calculateVisibilityFromTokens(
       observer,
@@ -168,6 +178,14 @@ export class VisibilityCalculator {
       },
       options
     );
+
+    log.debug(() => ({
+      msg: 'calculateVisibilityBetweenTokens:complete',
+      observerName: observer?.name,
+      targetName: target?.name,
+      state: result.state,
+      detection: result.detection
+    }));
 
     // Store detection info alongside visibility (for tooltips and UI)
     // Import detection map functions dynamically to avoid circular dependencies

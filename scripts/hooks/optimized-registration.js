@@ -4,6 +4,7 @@
  */
 
 import { MODULE_ID } from '../constants.js';
+import { getLogger } from '../utils/logger.js';
 
 /**
  * Register optimized hooks with no artificial delays
@@ -39,6 +40,13 @@ export function registerHooks() {
 
   // Optimized renderTokenConfig hook - IMMEDIATE
   Hooks.on('renderTokenConfig', async (config) => {
+    const log = getLogger('AVS/Hooks');
+    log.debug(() => ({
+      msg: 'renderTokenConfig fired',
+      tokenName: config.token?.name,
+      tokenId: config.token?.id,
+      stack: new Error().stack,
+    }));
     try {
       const { updateWallVisuals } = await import('../services/optimized-visual-effects.js');
       const id = config.token?.id || canvas.tokens.controlled?.[0]?.id || null;
