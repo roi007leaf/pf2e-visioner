@@ -1793,11 +1793,6 @@ function formatVisibilityFactors(factors) {
       dim: 'Dim Light',
       darkness: 'Darkness',
       magicalDarkness: 'Magical Darkness',
-      magicalDarkness1: 'Magical Darkness (rank 1)',
-      magicalDarkness2: 'Magical Darkness (rank 2)',
-      magicalDarkness3: 'Magical Darkness (rank 3)',
-      magicalDarkness4: 'Magical Darkness (rank 4)',
-      magicalDarkness5: 'Magical Darkness (rank 5)',
       greaterMagicalDarkness: 'Greater Magical Darkness',
     };
     const lightText = lightMap[factors.lighting] || factors.lighting;
