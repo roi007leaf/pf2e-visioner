@@ -61,7 +61,7 @@ export class BatchOrchestrator {
   notifyTokenMovementStart() {
     try {
       getLogger('AVS/Batch').debug('movement:start');
-    } catch { }
+    } catch {}
     // Start a new movement session if not already moving
     if (!this._isTokenMoving) {
       this._movementSession = {
@@ -132,7 +132,7 @@ export class BatchOrchestrator {
         caller,
         isMoving: this._isTokenMoving,
         pendingCount: this._pendingTokens.size,
-        stack: stack?.split('\n').slice(1, 4).join('\n')
+        stack: stack?.split('\n').slice(1, 4).join('\n'),
       }));
       for (const id of changedTokens) {
         this._pendingTokens.add(id);
@@ -196,9 +196,9 @@ export class BatchOrchestrator {
         tokens: Array.from(changedTokens),
         caller,
         movementSession: options.movementSession,
-        stack: stack?.split('\n').slice(1, 4).join('\n')
+        stack: stack?.split('\n').slice(1, 4).join('\n'),
       }));
-    } catch { }
+    } catch {}
     const movementSession = options.movementSession || null;
 
     // Invalidate global caches to ensure fresh calculations
@@ -319,14 +319,25 @@ export class BatchOrchestrator {
       const { flushDetectionBatch } = await import('../../../stores/detection-map.js');
       await flushDetectionBatch();
 
-      // Always refresh perception after batch processing to ensure condition changes are reflected
-      // Even if no visibility map updates occurred, conditions like invisibility, blindness, etc.
-      // may still affect what tokens can perceive, so we need to refresh perception consistently
-      this._refreshPerceptionAfterBatch();
+      // Only refresh perception if there were actual updates to avoid triggering feedback loops
+      // When uniqueUpdateCount is 0, nothing changed so perception refresh would just waste cycles
+      // and potentially trigger more lightingRefresh events
+      if (uniqueUpdateCount > 0) {
+        // Refresh perception after batch processing to ensure condition changes are reflected
+        this._refreshPerceptionAfterBatch();
 
-      // Force ephemeral effect sync for all tokens even if no map updates occurred
-      // This ensures visual effects are always in sync with visibility maps
-      await this._syncEphemeralEffects(allTokens);
+        // Sync ephemeral effects ONLY for observer-target pairs that had visibility changes
+        // This prevents unnecessary refreshToken events for unchanged tokens
+        await this._syncEphemeralEffectsForUpdates(batchResult.updates);
+      } else {
+        // No updates - skip perception refresh to prevent feedback loops
+        this.systemState?.debug?.('BatchOrchestrator: skipping perception refresh (no updates)');
+      }
+
+      // Track batch completion time to prevent feedback loops in LightingEventHandler
+      if (!globalThis.game) globalThis.game = {};
+      if (!globalThis.game.pf2eVisioner) globalThis.game.pf2eVisioner = {};
+      globalThis.game.pf2eVisioner._lastBatchCompleteTime = Date.now();
 
       // Stop telemetry with detailed metrics
       this._reportTelemetry({
@@ -345,7 +356,7 @@ export class BatchOrchestrator {
           changed: visibleChangedTokens.size,
           updates: uniqueUpdateCount,
         }));
-      } catch { }
+      } catch {}
       telemetryStopped = true;
 
       // Clear movement session after successful batch
@@ -363,7 +374,7 @@ export class BatchOrchestrator {
     } catch (error) {
       try {
         console.error('PF2E Visioner | processBatch error:', error);
-      } catch { }
+      } catch {}
     } finally {
       // Defensive: ensure we stop telemetry even if an error occurred before normal stop
       if (!telemetryStopped) {
@@ -477,11 +488,11 @@ export class BatchOrchestrator {
       const previous =
         this._lastPrecompute.map && now - this._lastPrecompute.ts < TTL_MS
           ? {
-            map: this._lastPrecompute.map,
-            posKeyMap: this._lastPrecompute.posKeyMap,
-            lightingHash: this._lastPrecompute.lightingHash,
-            ts: this._lastPrecompute.ts,
-          }
+              map: this._lastPrecompute.map,
+              posKeyMap: this._lastPrecompute.posKeyMap,
+              lightingHash: this._lastPrecompute.lightingHash,
+              ts: this._lastPrecompute.ts,
+            }
           : undefined;
 
       // Track cache hit/miss for better telemetry
@@ -515,7 +526,7 @@ export class BatchOrchestrator {
       // Best effort - continue without precomputation
       try {
         console.warn('PF2E Visioner | Failed to precompute lighting:', error);
-      } catch { }
+      } catch {}
     }
 
     return { precomputedLights, precomputeStats };
@@ -550,16 +561,31 @@ export class BatchOrchestrator {
    */
   _refreshPerceptionAfterBatch() {
     try {
-      // Update canvas perception to reflect visibility changes immediately
-      if (canvas?.perception?.update) {
-        canvas.perception.update({
-          refreshVision: true,
-          refreshOcclusion: true,
-        });
-      }
+      // Set flag to suppress lighting refresh events during perception update
+      // This prevents feedback loops where perception.update triggers lightingRefresh
+      if (!globalThis.game) globalThis.game = {};
+      if (!globalThis.game.pf2eVisioner) globalThis.game.pf2eVisioner = {};
+      globalThis.game.pf2eVisioner.suppressLightingRefresh = true;
 
-      // Also refresh everyone's perception via socket to ensure all clients see changes
-      this._refreshEveryonesPerception();
+      try {
+        // Update canvas perception to reflect visibility changes immediately
+        if (canvas?.perception?.update) {
+          canvas.perception.update({
+            refreshVision: true,
+            refreshOcclusion: true,
+          });
+        }
+
+        // Also refresh everyone's perception via socket to ensure all clients see changes
+        this._refreshEveryonesPerception();
+      } finally {
+        // Always clear the suppression flag after a short delay
+        setTimeout(() => {
+          if (globalThis.game?.pf2eVisioner) {
+            globalThis.game.pf2eVisioner.suppressLightingRefresh = false;
+          }
+        }, 50);
+      }
     } catch (error) {
       // Fail silently to avoid disrupting batch processing
       try {
@@ -584,37 +610,71 @@ export class BatchOrchestrator {
   }
 
   /**
-   * Sync ephemeral effects for all tokens based on current visibility maps.
-   * This ensures visual effects match the visibility state even when maps didn't change.
-   * @param {Token[]} allTokens - All tokens in the scene
+   * Check if a token is a hazard or loot token that doesn't need visibility effects.
+   * @param {Token} token - Token to check
+   * @returns {boolean} True if token is hazard or loot
    * @private
    */
-  async _syncEphemeralEffects(allTokens) {
+  _isHazardOrLoot(token) {
+    try {
+      const actorType = token?.actor?.type || token?.document?.actor?.type;
+      return actorType === 'hazard' || actorType === 'loot';
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Sync ephemeral effects ONLY for the specific observer-target pairs that had visibility changes.
+   * This is much more efficient than syncing all tokens, preventing unnecessary refreshToken events.
+   * Skips hazards and loot tokens as they don't need visibility effects.
+   * @param {Array<{observer: Token, target: Token, visibility: string}>} updates - Array of visibility updates
+   * @private
+   */
+  async _syncEphemeralEffectsForUpdates(updates) {
+    if (!updates || updates.length === 0) {
+      return;
+    }
+
     try {
       const { updateEphemeralEffectsForVisibility } = await import(
         '../../../visibility/ephemeral.js'
       );
 
+      // Deduplicate updates to avoid syncing the same pair multiple times
+      const syncedPairs = new Set();
       let syncCount = 0;
+      let skippedCount = 0;
 
-      for (const observerToken of allTokens) {
-        const observerId = observerToken?.document?.id;
-        if (!observerId) continue;
+      for (const update of updates) {
+        const observerId = update.observer?.document?.id;
+        const targetId = update.target?.document?.id;
 
-        const visibilityMap = this.visibilityMapService.getVisibilityMap(observerToken);
+        if (!observerId || !targetId) continue;
 
-        if (!visibilityMap) continue;
-
-        for (const targetId in visibilityMap) {
-          const targetToken = canvas.tokens?.get(targetId);
-          if (!targetToken) continue;
-
-          const visibility = visibilityMap[targetId];
-
-          // Update ephemeral effects to match the visibility map
-          await updateEphemeralEffectsForVisibility(observerToken, targetToken, visibility);
-          syncCount++;
+        // Skip hazards and loot tokens - they don't need visibility effects
+        if (this._isHazardOrLoot(update.target)) {
+          skippedCount++;
+          continue;
         }
+
+        const pairKey = `${observerId}-${targetId}`;
+        if (syncedPairs.has(pairKey)) continue;
+        syncedPairs.add(pairKey);
+
+        // Update ephemeral effects for this specific observer-target pair
+        await updateEphemeralEffectsForVisibility(
+          update.observer,
+          update.target,
+          update.visibility,
+        );
+        syncCount++;
+      }
+
+      if (syncCount > 0 || skippedCount > 0) {
+        this.systemState?.debug?.(
+          `BatchOrchestrator: synced ${syncCount} ephemeral effects, skipped ${skippedCount} hazards/loot`,
+        );
       }
     } catch (error) {
       console.warn('PF2E Visioner | Failed to sync ephemeral effects:', error);

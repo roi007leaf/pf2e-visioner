@@ -1,5 +1,22 @@
 # Changelog
 
+## [4.4.5] - 2025-10-19
+
+### ⚡ Performance Improvements
+
+- **AVS Feedback Loop Prevention**: Eliminated multiple feedback loops causing excessive visibility recalculations
+  - Added temporal guard in `LightingEventHandler` to prevent rapid re-triggering within 100ms of batch completion
+  - Skip perception refresh when no actual visibility changes occurred (`uniqueUpdateCount === 0`)
+  - Suppress `lightingRefresh` events during `canvas.perception.update()` to prevent cascading updates
+  - Skip processing module's own ephemeral effects in `ItemEventHandler` (identified by `aggregateOffGuard` flag)
+  
+- **Optimized Ephemeral Effect Sync**: Dramatically reduced unnecessary `refreshToken` events
+  - Changed from syncing ALL tokens in scene to only syncing specific observer-target pairs that changed
+  - Reduced complexity from O(allTokens × changedTokens) to O(updates)
+  - Skip hazards and loot tokens entirely - they don't need visibility effects
+  - Typical scenes now trigger 2-4 `refreshToken` events instead of 28+ after each batch
+
+
 ## [4.4.4] - 2025-10-18
 
 ### 🐛 Bug Fixes
