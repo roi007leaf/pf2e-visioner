@@ -987,6 +987,10 @@
       "OPEN_WALL_MANAGER": {
         "name": "Open Wall Manager",
         "hint": "Open the Visioner Wall Manager dialog to bulk edit wall settings."
+      },
+      "SHOW_VISIBILITY_FACTORS": {
+        "name": "Show Visibility Factors",
+        "hint": "Press to show detailed reasons for visibility states from controlled tokens to all other tokens."
       }
     },
     "REGION_BEHAVIOR": {

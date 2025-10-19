@@ -987,6 +987,10 @@
       "OPEN_WALL_MANAGER": {
         "name": "Otwórz Menedżera ścian",
         "hint": "Otwórz okno dialogowe Menedżera ścian Visioner, aby zbiorczo edytować ustawienia ścian."
+      },
+      "SHOW_VISIBILITY_FACTORS": {
+        "name": "(PL TODO) Show Visibility Factors",
+        "hint": "(PL TODO) Press to show detailed reasons for visibility states from controlled tokens to all other tokens."
       }
     },
     "REGION_BEHAVIOR": {

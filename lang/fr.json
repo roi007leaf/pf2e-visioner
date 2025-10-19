@@ -794,6 +794,10 @@
       "OPEN_WALL_MANAGER": {
         "name": "(FR) Ouvrir le gestionnaire de murs",
         "hint": "(FR) Ouvre la boîte de gestion des murs Visioner"
+      },
+      "SHOW_VISIBILITY_FACTORS": {
+        "name": "(FR TODO) Show Visibility Factors",
+        "hint": "(FR TODO) Press to show detailed reasons for visibility states from controlled tokens to all other tokens."
       }
     },
     "AVS_OVERRIDE_DIALOG": {

@@ -953,4 +953,10 @@ export const KEYBINDINGS = {
     editable: [],
     restricted: true,
   },
+  showVisibilityFactors: {
+    name: 'PF2E_VISIONER.KEYBINDINGS.SHOW_VISIBILITY_FACTORS.name',
+    hint: 'PF2E_VISIONER.KEYBINDINGS.SHOW_VISIBILITY_FACTORS.hint',
+    editable: [],
+    restricted: true,
+  },
 };
