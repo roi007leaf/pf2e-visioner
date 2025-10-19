@@ -12,7 +12,10 @@ import { MODULE_ID } from '../constants.js';
 import { calculateDistanceInFeet } from '../helpers/geometry-utils.js';
 import { ConcealmentRegionBehavior } from '../regions/ConcealmentRegionBehavior.js';
 import { LevelsIntegration } from '../services/LevelsIntegration.js';
+import { getLogger } from '../utils/logger.js';
 import { calculateVisibility } from './StatelessVisibilityCalculator.js';
+
+const log = getLogger('AVS/VisibilityAdapter');
 
 /**
  * Convert token and game state to standardized visibility input
@@ -511,6 +514,12 @@ export async function calculateVisibilityFromTokens(
 ) {
     const { lightingCalculator, visionAnalyzer, conditionManager, lightingRasterService } = dependencies;
 
+    log.debug(() => ({
+        msg: 'calculateVisibilityFromTokens:start',
+        observerName: observer?.name,
+        targetName: target?.name
+    }));
+
     // Convert tokens to standardized input (now async due to ray darkness check)
     const input = await tokenStateToInput(
         observer,
@@ -524,6 +533,11 @@ export async function calculateVisibilityFromTokens(
 
     // Handle null input (invalid tokens)
     if (!input) {
+        log.debug(() => ({
+            msg: 'calculateVisibilityFromTokens:null-input',
+            observerName: observer?.name,
+            targetName: target?.name
+        }));
         return {
             state: 'undetected',
             detectionType: 'none',
@@ -541,6 +555,14 @@ export async function calculateVisibilityFromTokens(
 
     // Calculate using stateless calculator
     const result = calculateVisibility(input);
+
+    log.debug(() => ({
+        msg: 'calculateVisibilityFromTokens:complete',
+        observerName: observer?.name,
+        targetName: target?.name,
+        state: result.state,
+        detectionType: result.detectionType
+    }));
 
     return result;
 }

@@ -1,5 +1,11 @@
 # Changelog
 
+## [4.4.4] - 2025-10-18
+
+### 🐛 Bug Fixes
+
+- Add some more AVS debug logs to help track down an issue
+
 ## [4.4.3] - 2025-10-18
 
 ### 🐛 Bug Fixes

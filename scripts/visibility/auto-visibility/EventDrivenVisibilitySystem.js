@@ -5,6 +5,7 @@
  */
 
 import { MODULE_ID } from '../../constants.js';
+import { getLogger } from '../../utils/logger.js';
 import { BatchOrchestrator } from './core/BatchOrchestrator.js';
 import { BatchProcessor } from './core/BatchProcessor.js';
 import { DependencyInjectionContainer } from './core/DependencyInjectionContainer.js';
@@ -102,6 +103,8 @@ export class EventDrivenVisibilitySystem {
    * Initialize the system using dependency injection - cleaner architecture
    */
   async initialize() {
+    const log = getLogger('AVS/Init');
+    log.debug('initialize:start');
 
     try {
       // Initialize dependency injection container
@@ -202,7 +205,14 @@ export class EventDrivenVisibilitySystem {
    * Enable the system
    */
   enable() {
-
+    const log = getLogger('AVS/System');
+    const stack = new Error().stack;
+    const caller = stack?.split('\n')?.[2]?.trim() || 'unknown';
+    log.debug(() => ({
+      msg: 'enable',
+      caller,
+      stack: stack?.split('\n').slice(1, 4).join('\n')
+    }));
     this.#systemStateProvider.setEnabled(true);
 
     // Initial full calculation - immediate
@@ -213,8 +223,8 @@ export class EventDrivenVisibilitySystem {
    * Disable the system
    */
   disable() {
-    // Removed debug log
-
+    const log = getLogger('AVS/System');
+    log.debug('disable');
     this.#systemStateProvider.setDisabled(true);
 
     // Clear all pending changes through VisibilityStateManager
@@ -226,9 +236,14 @@ export class EventDrivenVisibilitySystem {
    */
   recalculateAll() {
     if (!this.#systemStateProvider.shouldProcessEvents()) return;
-
-    // Removed debug log
-
+    const log = getLogger('AVS/API');
+    const stack = new Error().stack;
+    const caller = stack?.split('\n')?.[2]?.trim() || 'unknown';
+    log.debug(() => ({
+      msg: 'recalculateAll',
+      caller,
+      stack: stack?.split('\n').slice(1, 4).join('\n')
+    }));
     this.#visibilityStateManager.markAllTokensChangedImmediate();
   }
 
@@ -253,6 +268,15 @@ export class EventDrivenVisibilitySystem {
     if (!this.#systemStateProvider.shouldProcessEvents()) return;
     const ids = Array.from(new Set((tokenIds || []).filter(Boolean)));
     if (ids.length === 0) return;
+    const log = getLogger('AVS/API');
+    const stack = new Error().stack;
+    const caller = stack?.split('\n')?.[2]?.trim() || 'unknown';
+    log.debug(() => ({
+      msg: 'recalculateForTokens',
+      ids,
+      caller,
+      stack: stack?.split('\n').slice(1, 4).join('\n')
+    }));
 
     // Filter to only valid, non-excluded tokens and delegate to VisibilityStateManager
     const validIds = ids.filter(id => {
@@ -270,6 +294,7 @@ export class EventDrivenVisibilitySystem {
    * @returns {Promise<string>} Visibility state
    */
   async calculateVisibility(observer, target, options = undefined) {
+    const log = getLogger('AVS/API');
     try {
       // Short-circuit: AVS does not calculate for excluded participants (hidden, fails testVisibility, sneak-active)
       if (observer && this.#exclusionManager.isExcludedToken(observer)) {
@@ -287,7 +312,9 @@ export class EventDrivenVisibilitySystem {
     } catch {
       // Best effort only
     }
-    return await this.#optimizedVisibilityCalculator.calculateVisibility(observer, target, options);
+    const result = await this.#optimizedVisibilityCalculator.calculateVisibility(observer, target, options);
+    log.debug(() => ({ msg: 'calculateVisibility', observer: observer?.document?.name, target: target?.document?.name, result }));
+    return result;
   }
 
   /**
@@ -301,6 +328,7 @@ export class EventDrivenVisibilitySystem {
    * @returns {Promise<string>} Visibility state
    */
   async calculateVisibilityWithOverrides(observer, target) {
+    const log = getLogger('AVS/API');
     try {
       if (!observer?.document?.id || !target?.document?.id) return 'observed';
 
@@ -320,7 +348,9 @@ export class EventDrivenVisibilitySystem {
       }
 
       // 3) Fallback to regular AVS calculation (no overrides)
-      return await this.calculateVisibility(observer, target);
+      const res = await this.calculateVisibility(observer, target);
+      log.debug(() => ({ msg: 'calculateVisibilityWithOverrides', observer: observer?.document?.name, target: target?.document?.name, result: res }));
+      return res;
     } catch {
       return 'observed';
     }

@@ -1,3 +1,4 @@
+import { getLogger } from '../../../utils/logger.js';
 import { GlobalLosCache } from '../utils/GlobalLosCache.js';
 import { GlobalVisibilityCache } from '../utils/GlobalVisibilityCache.js';
 import { VisionAnalyzer } from '../VisionAnalyzer.js';
@@ -11,6 +12,8 @@ import { SensesCapabilitiesCache } from './SensesCapabilitiesCache.js';
 import { ViewportFilterService } from './ViewportFilterService.js';
 import { VisibilityMapBatchCache } from './VisibilityMapBatchCache.js';
 import { VisibilityMapService } from './VisibilityMapService.js';
+
+const log = getLogger('AVS/BatchProcessor');
 
 /**
  * BatchProcessor centralizes the heavy per-batch computation:
@@ -67,6 +70,13 @@ export class BatchProcessor {
    * @returns {Promise<{updates:Array<{observer:Token,target:Token,visibility:string}>, breakdown:any, processedTokens:number, precomputeStats:any, detailedTimings:Object}>}
    */
   async process(allTokens, changedTokenIds, calcOptions) {
+    log.debug(() => ({
+      msg: 'BatchProcessor:process:start',
+      allTokenCount: allTokens.length,
+      changedTokenCount: changedTokenIds.size,
+      changedTokens: Array.from(changedTokenIds)
+    }));
+
     // Detailed timing collection for performance analysis
     const detailedTimings = {
       cacheBuilding: 0,
@@ -435,7 +445,7 @@ export class BatchProcessor {
             // Populate burst memo for immediate subsequent batches
             try {
               if (calcOptions?.burstLosMemo) calcOptions.burstLosMemo.set(pairKey, los);
-            } catch {}
+            } catch { }
           }
 
           batchLosCache.set(pairKey, los);
@@ -590,6 +600,13 @@ export class BatchProcessor {
     // Multiple batches are triggered per lighting change, causing redundant LOS calculations.
     // Low cache hit rates indicate calculations are repeated across batches.
     // Burst memo (150ms TTL) helps but may need longer TTL or better batch deduplication.
+
+    log.debug(() => ({
+      msg: 'BatchProcessor:process:complete',
+      updatesCount: updates.length,
+      processedTokens,
+      breakdown
+    }));
 
     return { updates, breakdown, processedTokens, precomputeStats, detailedTimings };
   }

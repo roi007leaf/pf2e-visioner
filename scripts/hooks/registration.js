@@ -5,6 +5,7 @@
 import { MODULE_ID } from '../constants.js';
 import { AutoCoverHooks } from '../cover/auto-cover/AutoCoverHooks.js';
 import { onHighlightObjects } from '../services/HoverTooltips.js';
+import { getLogger } from '../utils/logger.js';
 import { registerChatHooks } from './chat.js';
 import { registerCombatHooks } from './combat.js';
 import { onCanvasReady, onReady } from './lifecycle.js';
@@ -94,7 +95,7 @@ export async function registerHooks() {
       const { updateWallVisuals } = await import('../services/visual-effects.js');
       const id = canvas.tokens.controlled?.[0]?.id || null;
       await updateWallVisuals(id);
-    } catch {}
+    } catch { }
   });
   Hooks.on('updateWall', async (doc, changes) => {
     try {
@@ -132,12 +133,12 @@ export async function registerHooks() {
                 await canvas.scene?.updateEmbeddedDocuments?.('Token', updates, { diff: false });
               }
             }
-          } catch (_) {}
+          } catch (_) { }
           // Mirror hidden flag to connected walls
           try {
             const { mirrorHiddenFlagToConnected } = await import('../services/connected-walls.js');
             await mirrorHiddenFlagToConnected(doc, true);
-          } catch (_) {}
+          } catch (_) { }
         } else {
           // If unhidden, remove entries for that wall from tokens
           try {
@@ -170,20 +171,20 @@ export async function registerHooks() {
                 await canvas.scene?.updateEmbeddedDocuments?.('Token', updates, { diff: false });
               }
             }
-          } catch (_) {}
+          } catch (_) { }
           // Mirror hidden flag to connected walls (set hidden=false)
           try {
             const { mirrorHiddenFlagToConnected } = await import('../services/connected-walls.js');
             await mirrorHiddenFlagToConnected(doc, false);
-          } catch (_) {}
+          } catch (_) { }
         }
       }
-    } catch (_) {}
+    } catch (_) { }
     try {
       const { updateWallVisuals } = await import('../services/visual-effects.js');
       const id = canvas.tokens.controlled?.[0]?.id || null;
       await updateWallVisuals(id);
-    } catch {}
+    } catch { }
   });
   Hooks.on('deleteWall', async (wallDocument) => {
     try {
@@ -203,7 +204,7 @@ export async function registerHooks() {
       const { updateWallVisuals } = await import('../services/visual-effects.js');
       const id = canvas.tokens.controlled?.[0]?.id || null;
       await updateWallVisuals(id);
-    } catch {}
+    } catch { }
   });
 
   // Removed controlToken hook - was causing excessive updateWallVisuals calls on token selection.
@@ -257,7 +258,7 @@ export async function registerHooks() {
           // Get the condition manager and clear established states
           const conditionManager = game.modules.get('pf2e-visioner')?.api?.getConditionManager?.();
           if (conditionManager?.clearEstablishedInvisibleStates) {
-            conditionManager.clearEstablishedInvisibleStates(token).catch(() => {});
+            conditionManager.clearEstablishedInvisibleStates(token).catch(() => { });
           }
         }
       }
@@ -267,6 +268,14 @@ export async function registerHooks() {
   });
 
   Hooks.on('updateToken', async (tokenDoc, changes, options, userId) => {
+    const log = getLogger('AVS/Hooks');
+    log.debug(() => ({
+      msg: 'updateToken (registration.js) fired',
+      tokenName: tokenDoc?.name,
+      tokenId: tokenDoc?.id,
+      changes,
+      stack: new Error().stack,
+    }));
     try {
       if (!('x' in changes || 'y' in changes)) return;
 
@@ -293,6 +302,13 @@ export async function registerHooks() {
   });
 
   Hooks.on('refreshToken', async (token) => {
+    const log = getLogger('AVS/Hooks');
+    log.debug(() => ({
+      msg: 'refreshToken fired',
+      tokenName: token?.name,
+      tokenId: token?.id,
+      stack: new Error().stack,
+    }));
     try {
       const controlledTokens = canvas?.tokens?.controlled || [];
       if (controlledTokens.length === 0) return;
@@ -376,10 +392,10 @@ export async function registerHooks() {
           if (t.document.getFlag('pf2e-visioner', 'waitingSneak')) {
             try {
               await t.document.unsetFlag('pf2e-visioner', 'waitingSneak');
-            } catch {}
+            } catch { }
             try {
               if (t.locked) t.locked = false;
-            } catch {}
+            } catch { }
           }
         }
       }

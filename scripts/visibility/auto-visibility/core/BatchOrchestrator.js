@@ -1,4 +1,5 @@
 import { MODULE_ID } from '../../../constants.js';
+import { getLogger } from '../../../utils/logger.js';
 import { BatchProcessor } from './BatchProcessor.js';
 import { ExclusionManager } from './ExclusionManager.js';
 import { LightingPrecomputer } from './LightingPrecomputer.js';
@@ -58,6 +59,9 @@ export class BatchOrchestrator {
    * This will delay batch processing until movement stops.
    */
   notifyTokenMovementStart() {
+    try {
+      getLogger('AVS/Batch').debug('movement:start');
+    } catch { }
     // Start a new movement session if not already moving
     if (!this._isTokenMoving) {
       this._movementSession = {
@@ -119,6 +123,17 @@ export class BatchOrchestrator {
    */
   enqueueTokens(changedTokens) {
     try {
+      const stack = new Error().stack;
+      const caller = stack?.split('\n')?.[2]?.trim() || 'unknown';
+      getLogger('AVS/Batch').debug(() => ({
+        msg: 'enqueueTokens',
+        count: changedTokens?.size,
+        tokens: Array.from(changedTokens || []),
+        caller,
+        isMoving: this._isTokenMoving,
+        pendingCount: this._pendingTokens.size,
+        stack: stack?.split('\n').slice(1, 4).join('\n')
+      }));
       for (const id of changedTokens) {
         this._pendingTokens.add(id);
         // Track accumulated tokens in movement session
@@ -171,6 +186,19 @@ export class BatchOrchestrator {
 
     this.processingBatch = true;
     const batchId = `batch-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    try {
+      const stack = new Error().stack;
+      const caller = stack?.split('\n')?.[2]?.trim() || 'unknown';
+      getLogger('AVS/Batch').debug(() => ({
+        msg: 'processBatch:start',
+        batchId,
+        size: changedTokens.size,
+        tokens: Array.from(changedTokens),
+        caller,
+        movementSession: options.movementSession,
+        stack: stack?.split('\n').slice(1, 4).join('\n')
+      }));
+    } catch { }
     const movementSession = options.movementSession || null;
 
     // Invalidate global caches to ensure fresh calculations
@@ -310,6 +338,14 @@ export class BatchOrchestrator {
         uniqueUpdateCount,
         movementSession,
       });
+      try {
+        getLogger('AVS/Batch').debug(() => ({
+          msg: 'processBatch:complete',
+          batchId,
+          changed: visibleChangedTokens.size,
+          updates: uniqueUpdateCount,
+        }));
+      } catch { }
       telemetryStopped = true;
 
       // Clear movement session after successful batch
@@ -327,7 +363,7 @@ export class BatchOrchestrator {
     } catch (error) {
       try {
         console.error('PF2E Visioner | processBatch error:', error);
-      } catch {}
+      } catch { }
     } finally {
       // Defensive: ensure we stop telemetry even if an error occurred before normal stop
       if (!telemetryStopped) {
@@ -441,11 +477,11 @@ export class BatchOrchestrator {
       const previous =
         this._lastPrecompute.map && now - this._lastPrecompute.ts < TTL_MS
           ? {
-              map: this._lastPrecompute.map,
-              posKeyMap: this._lastPrecompute.posKeyMap,
-              lightingHash: this._lastPrecompute.lightingHash,
-              ts: this._lastPrecompute.ts,
-            }
+            map: this._lastPrecompute.map,
+            posKeyMap: this._lastPrecompute.posKeyMap,
+            lightingHash: this._lastPrecompute.lightingHash,
+            ts: this._lastPrecompute.ts,
+          }
           : undefined;
 
       // Track cache hit/miss for better telemetry
@@ -479,7 +515,7 @@ export class BatchOrchestrator {
       // Best effort - continue without precomputation
       try {
         console.warn('PF2E Visioner | Failed to precompute lighting:', error);
-      } catch {}
+      } catch { }
     }
 
     return { precomputedLights, precomputeStats };

@@ -7,6 +7,9 @@
  * @module StatelessVisibilityCalculator
  */
 
+import { getLogger } from '../utils/logger.js';
+const log = getLogger('AVS/StatelessCalculator');
+
 /**
  * Calculate visibility state from standardized input
  * 
@@ -46,6 +49,14 @@
  * @returns {string} result.detection.sense - Which sense detected: "vision" | "darkvision" | "lowLightVision" | "greaterDarkvision" | "hearing" | "tremorsense" | "lifesense" | "scent"
  */
 export function calculateVisibility(input) {
+    log.debug(() => ({
+        msg: 'calculateVisibility:start',
+        observerName: input._debug?.observerName,
+        targetName: input._debug?.targetName,
+        targetLighting: input.target?.lightingLevel,
+        isInvisible: input.target?.auxiliary?.includes('invisible')
+    }));
+
     // Normalize input
     const target = normalizeTargetState(input.target);
     const observer = normalizeObserverState(input.observer);
@@ -57,6 +68,11 @@ export function calculateVisibility(input) {
 
     // 1. Check if observer is completely incapacitated (blinded)
     if (observer.conditions.blinded) {
+        log.debug(() => ({
+            msg: 'calculateVisibility:blinded',
+            observerName: input._debug?.observerName,
+            targetName: input._debug?.targetName
+        }));
         const result = handleBlindedObserver(observer, target, soundBlocked);
 
         return result;
@@ -88,6 +104,14 @@ export function calculateVisibility(input) {
     const bestResult = selectBestDetection(allDetectionResults);
 
     if (bestResult) {
+        log.debug(() => ({
+            msg: 'calculateVisibility:complete',
+            observerName: input._debug?.observerName,
+            targetName: input._debug?.targetName,
+            state: bestResult.state,
+            sense: bestResult.detection?.sense,
+            isPrecise: bestResult.detection?.isPrecise
+        }));
         return bestResult;
     }
 

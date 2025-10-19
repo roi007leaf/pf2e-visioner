@@ -40,6 +40,12 @@ describe('BatchProcessor - Observer Movement Override Fix', () => {
         const overrideService = { getActiveOverrideForTokens: getActiveOverride };
         const visibilityMapService = { getVisibilityMap };
 
+        // Mock the SystemStateProvider dependency
+        const mockSystemState = {
+            debug: jest.fn(),
+            isDebugMode: jest.fn(() => false)
+        };
+
         processor = new BatchProcessor({
             spatialAnalyzer,
             viewportFilterService,
@@ -49,6 +55,7 @@ describe('BatchProcessor - Observer Movement Override Fix', () => {
             positionManager,
             overrideService,
             visibilityMapService,
+            systemState: mockSystemState,
             maxVisibilityDistance: 20
         });
 
