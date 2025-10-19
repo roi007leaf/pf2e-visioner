@@ -792,6 +792,16 @@ export function registerKeybindings() {
           }
         };
         break;
+      case 'showVisibilityFactors':
+        keybindingConfig.onDown = async () => {
+          const { showVisibilityFactorsOverlay } = await import('./services/HoverTooltips.js');
+          showVisibilityFactorsOverlay();
+        };
+        keybindingConfig.onUp = async () => {
+          const { hideVisibilityFactorsOverlay } = await import('./services/HoverTooltips.js');
+          hideVisibilityFactorsOverlay();
+        };
+        break;
       // Add other keybindings as needed
     }
 

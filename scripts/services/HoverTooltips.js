@@ -22,10 +22,13 @@ class HoverTooltipsImpl {
     this.tooltipMode = 'target';
     this.isShowingKeyTooltips = false;
     this.isShowingCoverOverlay = false;
+    this.isShowingFactorsOverlay = false;
     this.keyTooltipTokens = new Set();
+    this.factorsOverlayTokens = new Set();
     this.tooltipFontSize = 16;
     this.tooltipIconSize = 14;
     this.badgeTicker = null;
+    this.visibilityBadges = new Map();
     this._isTokenMoving = false;
     this._movementDebounceTimer = null;
     this._isDragging = false;
@@ -288,8 +291,12 @@ export function initializeHoverTooltips() {
       HoverTooltips._isPanning = true;
       HoverTooltips._savedHoveredToken = HoverTooltips.currentHoveredToken;
       HoverTooltips._savedKeyTooltipsActive = HoverTooltips.isShowingKeyTooltips;
+      HoverTooltips._savedFactorsOverlayActive = HoverTooltips.isShowingFactorsOverlay;
       hideAllVisibilityIndicators();
       hideAllCoverIndicators();
+
+      // Hide factor badges during panning
+      hideFactorBadges();
     }
 
     // Clear any existing timeout
@@ -300,6 +307,7 @@ export function initializeHoverTooltips() {
       HoverTooltips._isPanning = false;
 
       // Restore tooltips based on what was showing before
+      // NOTE: We don't restore factor badges - user must press keybind again
       if (HoverTooltips._savedKeyTooltipsActive) {
         // Restore Alt/O overlay
         if (HoverTooltips.tooltipMode === 'observer') {
@@ -317,9 +325,66 @@ export function initializeHoverTooltips() {
       // Clean up saved state
       delete HoverTooltips._savedHoveredToken;
       delete HoverTooltips._savedKeyTooltipsActive;
+      delete HoverTooltips._savedFactorsOverlayActive;
       panTimeout = null;
     }, 150); // 150ms after pan stops
   });
+
+  // Handle canvas zoom: hide tooltips during zoom, show after (similar to pan)
+  let zoomTimeout = null;
+  const originalAnimate = canvas.animatePan;
+  canvas.animatePan = function (...args) {
+    // Detect if this is a zoom operation
+    const options = args[0] || {};
+    if (options.scale !== undefined && options.scale !== canvas.stage.scale.x) {
+      // Hide tooltips immediately when zoom starts
+      if (!HoverTooltips._isZooming) {
+        HoverTooltips._isZooming = true;
+        if (!HoverTooltips._isPanning) {
+          HoverTooltips._savedHoveredToken = HoverTooltips.currentHoveredToken;
+          HoverTooltips._savedKeyTooltipsActive = HoverTooltips.isShowingKeyTooltips;
+          HoverTooltips._savedFactorsOverlayActive = HoverTooltips.isShowingFactorsOverlay;
+          hideAllVisibilityIndicators();
+          hideAllCoverIndicators();
+
+          // Hide factor badges during zooming
+          hideFactorBadges();
+        }
+      }
+
+      // Clear any existing timeout
+      if (zoomTimeout) clearTimeout(zoomTimeout);
+
+      // Set timeout to restore tooltips after zoom stops
+      zoomTimeout = setTimeout(() => {
+        HoverTooltips._isZooming = false;
+
+        // Only restore if not panning
+        if (!HoverTooltips._isPanning) {
+          // Restore tooltips based on what was showing before
+          // NOTE: We don't restore factor badges - user must press keybind again
+          if (HoverTooltips._savedKeyTooltipsActive) {
+            if (HoverTooltips.tooltipMode === 'observer') {
+              showControlledTokenVisibilityObserver();
+            } else {
+              showControlledTokenVisibility();
+            }
+          } else if (HoverTooltips._savedHoveredToken) {
+            const token = HoverTooltips._savedHoveredToken;
+            HoverTooltips.currentHoveredToken = token;
+            showVisibilityIndicators(token);
+          }
+
+          // Clean up saved state
+          delete HoverTooltips._savedHoveredToken;
+          delete HoverTooltips._savedKeyTooltipsActive;
+          delete HoverTooltips._savedFactorsOverlayActive;
+        }
+        zoomTimeout = null;
+      }, 150);
+    }
+    return originalAnimate.apply(this, args);
+  };
 
   // Refresh badges when visibility map changes (debounced to avoid performance issues during rapid updates)
   try {
@@ -439,12 +504,12 @@ export function initializeHoverTooltips() {
  * @param {Token} hoveredToken - The token being hovered
  */
 function onTokenHover(hoveredToken) {
-  // Skip if currently panning, during active token movement, or during drag
-  if (HoverTooltips._isPanning || HoverTooltips._isTokenMoving || HoverTooltips._isDragging) return;
+  // Skip if currently panning, zooming, during active token movement, or during drag
+  if (HoverTooltips._isPanning || HoverTooltips._isZooming || HoverTooltips._isTokenMoving || HoverTooltips._isDragging) return;
 
   // Only show hover tooltips if allowed for this user with current mode AND token
   // Suppress hover overlays entirely while any keybind overlay is active
-  if (HoverTooltips.isShowingKeyTooltips || HoverTooltips.isShowingCoverOverlay) return;
+  if (HoverTooltips.isShowingKeyTooltips || HoverTooltips.isShowingCoverOverlay || HoverTooltips.isShowingFactorsOverlay) return;
   if (!canShowTooltips(HoverTooltips.tooltipMode, hoveredToken)) {
     return;
   }
@@ -550,7 +615,7 @@ export function onHighlightObjects(highlight) {
 function showVisibilityIndicators(hoveredToken) {
   // Check if tooltips are allowed for the current mode and token
   // Suppress hover overlays entirely while any keybind overlay is active, UNLESS this is a keyboard context
-  if ((HoverTooltips.isShowingKeyTooltips || HoverTooltips.isShowingCoverOverlay) && !HoverTooltips._keyboardContext) return;
+  if ((HoverTooltips.isShowingKeyTooltips || HoverTooltips.isShowingCoverOverlay || HoverTooltips.isShowingFactorsOverlay) && !HoverTooltips._keyboardContext) return;
 
   // Check if this is a keyboard-triggered call
   const isKeyboardTooltip = !!HoverTooltips._keyboardContext;
@@ -565,7 +630,7 @@ function showVisibilityIndicators(hoveredToken) {
   }
 
   // Clear any existing indicators, unless a keybind overlay is active (handled separately)
-  if (!HoverTooltips.isShowingKeyTooltips && !HoverTooltips.isShowingCoverOverlay) {
+  if (!HoverTooltips.isShowingKeyTooltips && !HoverTooltips.isShowingCoverOverlay && !HoverTooltips.isShowingFactorsOverlay) {
     hideAllVisibilityIndicators();
     hideAllCoverIndicators();
   }
@@ -1344,6 +1409,32 @@ function updateBadgePositions() {
     const left = centerX - badgeWidth / 2;
     indicator._coverBadgeEl.style.transform = `translate(${Math.round(left)}px, ${Math.round(centerY)}px)`;
   });
+
+  // Update factor badge positions (DOM-based)
+  HoverTooltips.visibilityBadges.forEach((badge) => {
+    if (!badge || !badge.badgeEl || !badge.isFactor) return;
+
+    const token = canvas.tokens.get(badge.tokenId);
+    if (!token) {
+      // Clean up removed tokens
+      if (badge.badgeEl) badge.badgeEl.remove();
+      if (badge.tooltipEl) badge.tooltipEl.remove();
+      HoverTooltips.visibilityBadges.delete(`factor-${badge.tokenId}-${badge.observerId}`);
+      return;
+    }
+
+    const bgSize = 40;
+    const tokenBounds = token.bounds;
+    const tokenCenterX = token.x + (tokenBounds.width / 2);
+    const tokenTopY = token.y - bgSize - 5;
+
+    // Convert world coordinates to screen coordinates
+    const globalPoint = canvas.tokens.toGlobal(new PIXI.Point(tokenCenterX, tokenTopY));
+    const screenX = canvasRect.left + globalPoint.x;
+    const screenY = canvasRect.top + globalPoint.y;
+
+    badge.badgeEl.style.transform = `translate(${Math.round(screenX - bgSize / 2)}px, ${Math.round(screenY - bgSize / 2)}px)`;
+  });
 }
 
 /**
@@ -1495,6 +1586,32 @@ function hideAllVisibilityIndicators() {
   // Clear the map
   HoverTooltips.visibilityIndicators.clear();
 
+  // Clean up factor badges
+  HoverTooltips.visibilityBadges.forEach((badge, key) => {
+    // Skip factor badges - they're managed separately
+    if (badge.isFactor) return;
+
+    try {
+      if (badge.container && badge.container.parent) {
+        badge.container.parent.removeChild(badge.container);
+      }
+      badge.container?.destroy?.({ children: true });
+    } catch (e) {
+    }
+  });
+
+  // Clear non-factor badges from the map
+  const factorBadgesToKeep = new Map();
+  HoverTooltips.visibilityBadges.forEach((badge, key) => {
+    if (badge.isFactor) {
+      factorBadgesToKeep.set(key, badge);
+    }
+  });
+  HoverTooltips.visibilityBadges.clear();
+  factorBadgesToKeep.forEach((badge, key) => {
+    HoverTooltips.visibilityBadges.set(key, badge);
+  });
+
   // Reset tracking variables to ensure clean state
   keyTooltipTokens.clear();  // Stop ticker when no indicators remain
   try {
@@ -1564,6 +1681,264 @@ export function cleanupHoverTooltips() {
   cleanupTokenEventListeners();
 
   _initialized = false;
+}
+
+/**
+ * Show visibility factors overlay for controlled tokens
+ * Similar to Alt/O keys but shows detailed reasons for visibility states
+ */
+export function showVisibilityFactorsOverlay() {
+  if (HoverTooltips.isShowingFactorsOverlay) return;
+
+  const controlledTokens = canvas.tokens.controlled;
+  if (controlledTokens.length === 0) {
+    const message = game.i18n.localize('PF2E_VISIONER.VISIBILITY_FACTORS.NO_TOKEN_SELECTED');
+    ui.notifications?.info?.(message);
+    return;
+  }
+
+  HoverTooltips.isShowingFactorsOverlay = true;
+  HoverTooltips.factorsOverlayTokens = new Set();
+
+  hideAllVisibilityIndicators();
+  hideAllCoverIndicators();
+
+  controlledTokens.forEach((observer) => {
+    HoverTooltips.factorsOverlayTokens.add(observer.id);
+    showFactorIndicatorsForToken(observer);
+  });
+}
+
+/**
+ * Hide visibility factors overlay
+ */
+export function hideVisibilityFactorsOverlay() {
+  if (!HoverTooltips.isShowingFactorsOverlay) return;
+
+  HoverTooltips.isShowingFactorsOverlay = false;
+  HoverTooltips.factorsOverlayTokens.clear();
+
+  // Clean up factor badges (DOM elements)
+  HoverTooltips.visibilityBadges.forEach((badge, key) => {
+    if (badge.isFactor) {
+      if (badge.badgeEl) badge.badgeEl.remove();
+      if (badge.tooltipEl) badge.tooltipEl.remove();
+      HoverTooltips.visibilityBadges.delete(key);
+    }
+  });
+
+  hideAllVisibilityIndicators();
+  hideAllCoverIndicators();
+
+  if (HoverTooltips.currentHoveredToken) {
+    const tooltipsAllowed = canShowTooltips(HoverTooltips.tooltipMode, HoverTooltips.currentHoveredToken);
+    if (tooltipsAllowed) {
+      showVisibilityIndicators(HoverTooltips.currentHoveredToken);
+    }
+  }
+}
+
+/**
+ * Temporarily hide factor badges during panning/zooming (without removing them)
+ */
+function hideFactorBadges() {
+  HoverTooltips.visibilityBadges.forEach((badge, key) => {
+    if (badge.isFactor) {
+      if (badge.badgeEl) badge.badgeEl.style.display = 'none';
+      if (badge.tooltipEl) badge.tooltipEl.style.display = 'none';
+    }
+  });
+}
+
+/**
+ * Show factor indicators for a specific token
+ * @param {Token} observerToken - The observer token
+ */
+async function showFactorIndicatorsForToken(observerToken) {
+  const otherTokens = canvas.tokens.placeables.filter((t) => t !== observerToken && t.isVisible);
+  if (otherTokens.length === 0) return;
+
+  const { Pf2eVisionerApi } = await import('../api.js');
+
+  for (const target of otherTokens) {
+    try {
+      const factors = await Pf2eVisionerApi.getVisibilityFactors(observerToken.id, target.id);
+      if (!factors) continue;
+
+      const factorText = formatVisibilityFactors(factors);
+      addFactorIndicator(target, observerToken, factorText, factors.state);
+    } catch (e) {
+      console.error('[Visibility Factors Error]', e);
+    }
+  }
+}
+
+/**
+ * Format visibility factors into user-friendly text
+ * @param {Object} factors - The factors object from getVisibilityFactors
+ * @returns {string} Formatted text
+ */
+function formatVisibilityFactors(factors) {
+  const lines = [];
+
+  if (factors.state) {
+    const stateLabel = VISIBILITY_STATES[factors.state]?.label || factors.state;
+    const localizedState = game.i18n?.localize?.(stateLabel) || stateLabel;
+    const stateLabelKey = game.i18n.localize('PF2E_VISIONER.VISIBILITY_FACTORS.STATE_LABEL');
+    lines.push(`${stateLabelKey}: ${localizedState}`);
+  }
+
+  if (factors.lighting) {
+    let lightingKey = factors.lighting;
+
+    if (lightingKey.startsWith('magicalDarkness') && lightingKey !== 'magicalDarkness' && lightingKey !== 'greaterMagicalDarkness') {
+      lightingKey = 'magicalDarkness';
+    }
+
+    const i18nKey = `PF2E_VISIONER.VISIBILITY_FACTORS.LIGHTING.${lightingKey}`;
+    const lightText = game.i18n.localize(i18nKey);
+    const lightingLabel = game.i18n.localize('PF2E_VISIONER.VISIBILITY_FACTORS.LIGHTING_LABEL');
+    lines.push(`${lightingLabel}: ${lightText}`);
+  }
+
+  if (factors.reasons && factors.reasons.length > 0) {
+    lines.push('');
+
+    const detectionKeywords = [
+      'Detected by', 'detected by',
+      'vision', 'Vision',
+      'Darkvision', 'darkvision',
+      'Low-light', 'low-light',
+      'lifesense', 'Lifesense',
+      'tremorsense', 'Tremorsense',
+      'scent', 'Scent',
+      'hearing', 'Hearing', 'Heard',
+      'sees', 'see',
+    ];
+
+    factors.reasons.forEach(reason => {
+      if (typeof reason === 'string') {
+        const isDetection = detectionKeywords.some(keyword => reason.includes(keyword));
+
+        if (isDetection) {
+          lines.push(`• <strong>${reason}</strong>`);
+        } else {
+          lines.push(`• ${reason}`);
+        }
+      }
+    });
+  }
+
+  if (lines.length === 0) {
+    const unknownState = game.i18n.localize('PF2E_VISIONER.VISIBILITY_FACTORS.UNKNOWN_STATE');
+    lines.push(factors.state || unknownState);
+  }
+
+  return lines.join('\n');
+}
+
+/**
+ * Add a factor indicator badge to a token
+ * @param {Token} targetToken - The token to show the indicator on
+ * @param {Token} observerToken - The observer token
+ * @param {string} factorText - The text to display
+ * @param {string} state - The visibility state
+ */
+function addFactorIndicator(targetToken, observerToken, factorText, state) {
+  if (!targetToken?.mesh) return;
+
+  ensureBadgeTicker();
+
+  const stateConfig = VISIBILITY_STATES[state] || VISIBILITY_STATES.observed;
+  const badgeKey = `factor-${targetToken.id}-${observerToken.id}`;
+
+  if (HoverTooltips.visibilityBadges.has(badgeKey)) return;
+
+  // Resolve CSS variable to actual color value
+  const resolveColor = (cssColor) => {
+    if (!cssColor) return '#ffffff';
+
+    if (cssColor.includes('var(')) {
+      const tempEl = document.createElement('div');
+      tempEl.style.color = cssColor;
+      document.body.appendChild(tempEl);
+      const computed = getComputedStyle(tempEl).color;
+      document.body.removeChild(tempEl);
+      return computed;
+    }
+
+    return cssColor;
+  };
+
+  const iconSize = tooltipIconSize || 16;
+  const bgSize = 40;
+  const iconColor = resolveColor(stateConfig.color);
+
+  // Create DOM-based badge like other tooltips
+  const badgeEl = document.createElement('div');
+  badgeEl.style.position = 'fixed';
+  badgeEl.style.pointerEvents = 'auto';
+  badgeEl.style.cursor = 'pointer';
+  badgeEl.style.zIndex = '1000';
+  badgeEl.style.left = '0';
+  badgeEl.style.top = '0';
+  badgeEl.style.willChange = 'transform';
+
+  badgeEl.innerHTML = `<span class="pf2e-visioner-factor-badge" style="display: inline-flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.8); border-radius: 6px; width: ${bgSize}px; height: ${bgSize}px;">
+    <i class="fa-solid fa-circle-info" style="font-size: ${iconSize}px; color: ${iconColor};"></i>
+  </span>`;
+
+  document.body.appendChild(badgeEl);
+
+  // Create tooltip element (hidden by default)
+  const tooltipEl = document.createElement('div');
+  tooltipEl.style.position = 'fixed';
+  tooltipEl.style.pointerEvents = 'none';
+  tooltipEl.style.zIndex = '2000';
+  tooltipEl.style.display = 'none';
+  tooltipEl.style.left = '0';
+  tooltipEl.style.top = '0';
+  tooltipEl.style.willChange = 'transform';
+
+  const lines = factorText.split('\n');
+  const linesHtml = lines.map(line => `<div style="margin: 2px 0;">${line}</div>`).join('');
+
+  tooltipEl.innerHTML = `<div style="background: rgba(0,0,0,0.9); border-radius: 4px; padding: 8px; color: #ffffff; font-family: Arial; font-size: 12px; white-space: nowrap; box-shadow: 0 2px 8px rgba(0,0,0,0.3);">
+    ${linesHtml}
+  </div>`;
+
+  document.body.appendChild(tooltipEl);
+
+  // Show/hide tooltip on hover
+  badgeEl.addEventListener('mouseenter', () => {
+    tooltipEl.style.display = 'block';
+    updateTooltipPosition();
+  });
+
+  badgeEl.addEventListener('mouseleave', () => {
+    tooltipEl.style.display = 'none';
+  });
+
+  const updateTooltipPosition = () => {
+    const badgeRect = badgeEl.getBoundingClientRect();
+    const tooltipRect = tooltipEl.getBoundingClientRect();
+
+    // Position tooltip to the right of badge
+    const left = badgeRect.right + 5;
+    const top = badgeRect.top + (badgeRect.height / 2) - (tooltipRect.height / 2);
+
+    // No scaling - keep tooltip at normal size
+    tooltipEl.style.transform = `translate(${left}px, ${top}px)`;
+    tooltipEl.style.transformOrigin = 'left center';
+  };
+
+  HoverTooltips.visibilityBadges.set(badgeKey, {
+    badgeEl,
+    tooltipEl,
+    tokenId: targetToken.id,
+    observerId: observerToken.id,
+    isFactor: true,
+  });
 }
 
 // Export internal functions for use by lifesense indicators
