@@ -1768,6 +1768,7 @@ async function showFactorIndicatorsForToken(observerToken) {
       const factorText = formatVisibilityFactors(factors);
       addFactorIndicator(target, observerToken, factorText, factors.state);
     } catch (e) {
+      console.error('[Visibility Factors Error]', e);
     }
   }
 }
@@ -1788,8 +1789,14 @@ function formatVisibilityFactors(factors) {
   }
 
   if (factors.lighting) {
-    const lightingKey = `PF2E_VISIONER.VISIBILITY_FACTORS.LIGHTING.${factors.lighting}`;
-    const lightText = game.i18n.localize(lightingKey);
+    let lightingKey = factors.lighting;
+
+    if (lightingKey.startsWith('magicalDarkness') && lightingKey !== 'magicalDarkness' && lightingKey !== 'greaterMagicalDarkness') {
+      lightingKey = 'magicalDarkness';
+    }
+
+    const i18nKey = `PF2E_VISIONER.VISIBILITY_FACTORS.LIGHTING.${lightingKey}`;
+    const lightText = game.i18n.localize(i18nKey);
     const lightingLabel = game.i18n.localize('PF2E_VISIONER.VISIBILITY_FACTORS.LIGHTING_LABEL');
     lines.push(`${lightingLabel}: ${lightText}`);
   }

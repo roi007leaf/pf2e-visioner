@@ -279,6 +279,10 @@ export class Pf2eVisionerApi {
         { skipLOS: true }
       );
 
+      // Check for manual overrides
+      const visibilityMap = observerToken.document.getFlag('pf2e-visioner', 'visibility') || {};
+      const manualState = visibilityMap[targetToken.id];
+
       // Get lighting at target
       const lightingCalc = optimizedVisibilityCalculator.getComponents().lightingCalculator;
       const targetPos = {
@@ -287,6 +291,99 @@ export class Pf2eVisionerApi {
         elevation: targetToken.document.elevation || 0,
       };
       const targetLight = lightingCalc.getLightLevelAt(targetPos, targetToken);
+
+      // Also get lighting at observer
+      const observerPos = {
+        x: observerToken.document.x + (observerToken.document.width * canvas.grid.size) / 2,
+        y: observerToken.document.y + (observerToken.document.height * canvas.grid.size) / 2,
+        elevation: observerToken.document.elevation || 0,
+      };
+      const observerLight = lightingCalc.getLightLevelAt(observerPos, observerToken);
+
+      // Check for region-based concealment (now that we have targetPos)      
+      let regionConcealment = false;
+      try {
+        const { ConcealmentRegionBehavior } = await import('./regions/ConcealmentRegionBehavior.js');
+        regionConcealment = ConcealmentRegionBehavior.doesRayHaveConcealment(observerPos, targetPos);
+      } catch (e) {
+        console.error('[Visibility Factors API Debug] Region concealment check failed:', e);
+      }
+
+      // Check for darkness along the ray (magical darkness templates)
+      let rayDarkness = false;
+      let rayDarknessRank = 0;
+      let darknessTemplates = [];
+      try {
+        const lightingRasterService = optimizedVisibilityCalculator.getComponents().lightingRasterService;
+        if (lightingRasterService) {
+          const result = await lightingRasterService.checkDarknessRayIntersection(
+            observerPos,
+            targetPos,
+            observerLight,
+            targetLight
+          );
+          rayDarkness = result?.linePassesThroughDarkness || false;
+          rayDarknessRank = result?.rayDarknessRank || 0;
+        }
+
+        // Also check if target is inside a darkness template
+        const templates = canvas.templates?.placeables || [];
+        for (const template of templates) {
+          const templateName = template.document?.flags?.pf2e?.origin?.name || template.document?.name || '';
+          const isDarknessSpell = /darkness/i.test(templateName) || template.document?.getFlag?.('pf2e-visioner', 'isDarknessTemplate');
+
+          if (isDarknessSpell) {
+            // Check if target is within the template
+            const templateShape = template.shape;
+            if (templateShape && templateShape.contains(targetPos.x - template.x, targetPos.y - template.y)) {
+              darknessTemplates.push({
+                name: templateName,
+                template,
+                affectsTarget: true,
+                affectsObserver: false
+              });
+            }
+            // Also check if observer is within the template
+            else if (templateShape && templateShape.contains(observerPos.x - template.x, observerPos.y - template.y)) {
+              darknessTemplates.push({
+                name: templateName,
+                template,
+                affectsTarget: false,
+                affectsObserver: true
+              });
+            }
+            // Check if the ray passes through the template (both tokens on opposite sides)
+            else {
+              // Simple check: if template is between the two tokens
+              const templateCenter = { x: template.x, y: template.y };
+              const distObserverToTemplate = Math.hypot(observerPos.x - templateCenter.x, observerPos.y - templateCenter.y);
+              const distTargetToTemplate = Math.hypot(targetPos.x - templateCenter.x, targetPos.y - templateCenter.y);
+              const distObserverToTarget = Math.hypot(observerPos.x - targetPos.x, observerPos.y - targetPos.y);
+
+              // If template is roughly between them (within template radius)
+              const templateRadius = template.document?.distance || 20;
+              const gridSize = canvas.grid?.size || 100;
+              const radiusPixels = (templateRadius / canvas.dimensions?.distance) * gridSize;
+
+              if (distObserverToTemplate < distObserverToTarget && distTargetToTemplate < distObserverToTarget) {
+                // Template is between them, check if ray likely passes through it
+                if (distObserverToTemplate < radiusPixels + distObserverToTarget * 0.5) {
+                  darknessTemplates.push({
+                    name: templateName,
+                    template,
+                    affectsTarget: false,
+                    affectsObserver: false,
+                    betweenTokens: true
+                  });
+                }
+              }
+            }
+          }
+        }
+
+      } catch (e) {
+        console.error('[Visibility Factors API Debug] Ray darkness check failed:', e);
+      }
 
       // Determine lighting factor
       let lightingFactor = 'bright';
@@ -426,13 +523,13 @@ export class Pf2eVisionerApi {
 
       // 1. OBSERVER CONDITIONS (highest priority - completely override senses)
       if (observerConditions.includes('blinded')) {
-        reasons.push('Observer is blinded (cannot use visual senses)');
+        reasons.push(game.i18n.localize('PF2E_VISIONER.VISIBILITY_FACTORS.REASONS.OBSERVER_BLINDED'));
         slugs.push('blinded');
       }
 
       const isDeafened = observerConditions.includes('deafened');
       if (isDeafened && targetConditions.includes('invisible')) {
-        reasons.push('Observer is deafened (cannot hear invisible target)');
+        reasons.push(game.i18n.localize('PF2E_VISIONER.VISIBILITY_FACTORS.REASONS.OBSERVER_DEAFENED_INVISIBLE'));
         slugs.push('invisible');
       }
 
@@ -445,58 +542,172 @@ export class Pf2eVisionerApi {
             !['vision', 'darkvision', 'low-light-vision', 'greater-darkvision'].includes(type)
           );
         if (!hasNonVisualPreciseSense && lightingFactor === 'bright') {
-          reasons.push('Observer is dazzled in bright light');
+          reasons.push(game.i18n.localize('PF2E_VISIONER.VISIBILITY_FACTORS.REASONS.OBSERVER_DAZZLED'));
           slugs.push('dazzled');
         }
       }
 
       // 2. TARGET CONDITIONS (override most other factors)
       if (targetConditions.includes('invisible')) {
-        reasons.push('Target is invisible');
+        reasons.push(game.i18n.localize('PF2E_VISIONER.VISIBILITY_FACTORS.REASONS.TARGET_INVISIBLE'));
         slugs.push('invisible');
       }
       if (targetConditions.includes('undetected')) {
-        reasons.push('Target has undetected condition');
+        reasons.push(game.i18n.localize('PF2E_VISIONER.VISIBILITY_FACTORS.REASONS.TARGET_UNDETECTED_CONDITION'));
         slugs.push('undetected');
       }
       if (targetConditions.includes('hidden')) {
-        reasons.push('Target has hidden condition');
+        reasons.push(game.i18n.localize('PF2E_VISIONER.VISIBILITY_FACTORS.REASONS.TARGET_HIDDEN_CONDITION'));
         slugs.push('hidden');
       }
       if (targetConditions.includes('concealed')) {
-        reasons.push('Target has concealed condition');
+        reasons.push(game.i18n.localize('PF2E_VISIONER.VISIBILITY_FACTORS.REASONS.TARGET_CONCEALED_CONDITION'));
         slugs.push('concealed');
       }
 
       // 3. LIGHTING CONDITIONS (main cause of concealment/hidden for most cases)
       if (visibility === 'concealed' || visibility === 'hidden') {
-        if (lightingFactor == "greaterMagicalDarkness" || lightingFactor.startsWith('magicalDarkness')) {
+        // Check for darkness templates first (most common cause)
+        if (darknessTemplates.length > 0) {
+          const affectsTarget = darknessTemplates.some(t => t.affectsTarget);
+          const affectsObserver = darknessTemplates.some(t => t.affectsObserver);
+          const betweenTokens = darknessTemplates.some(t => t.betweenTokens);
+          const templateNames = darknessTemplates.map(t => t.name).join(', ');
+
+          // Determine darkness rank
+          const darknessRank = Math.max(
+            targetLight.darknessRank || 0,
+            observerLight.darknessRank || 0
+          );
+
+          // Build appropriate message based on darkvision and darkness rank
+          if (affectsTarget) {
+            if (darknessRank >= 4) {
+              // Greater Magical Darkness (rank 4+)
+              if (visionCaps.hasGreaterDarkvision) {
+                reasons.push(game.i18n.format('PF2E_VISIONER.VISIBILITY_FACTORS.REASONS.TARGET_IN_GREATER_DARKNESS_WITH_GREATER_DARKVISION', { templates: templateNames }));
+              } else if (visionCaps.hasDarkvision) {
+                reasons.push(game.i18n.format('PF2E_VISIONER.VISIBILITY_FACTORS.REASONS.TARGET_IN_GREATER_DARKNESS_WITH_DARKVISION', { templates: templateNames }));
+              } else {
+                reasons.push(game.i18n.format('PF2E_VISIONER.VISIBILITY_FACTORS.REASONS.TARGET_IN_GREATER_DARKNESS_NO_DARKVISION', { templates: templateNames }));
+              }
+            } else if (darknessRank >= 1) {
+              // Regular Magical Darkness (rank 1-3)
+              if (visionCaps.hasDarkvision) {
+                reasons.push(game.i18n.format('PF2E_VISIONER.VISIBILITY_FACTORS.REASONS.TARGET_IN_MAGICAL_DARKNESS_WITH_DARKVISION', { templates: templateNames }));
+              } else {
+                reasons.push(game.i18n.format('PF2E_VISIONER.VISIBILITY_FACTORS.REASONS.TARGET_IN_MAGICAL_DARKNESS_NO_DARKVISION', { templates: templateNames }));
+              }
+            } else {
+              // Regular darkness
+              if (visionCaps.hasDarkvision) {
+                reasons.push(game.i18n.format('PF2E_VISIONER.VISIBILITY_FACTORS.REASONS.TARGET_IN_DARKNESS_WITH_DARKVISION', { templates: templateNames }));
+              } else {
+                reasons.push(game.i18n.format('PF2E_VISIONER.VISIBILITY_FACTORS.REASONS.TARGET_IN_DARKNESS_NO_DARKVISION', { templates: templateNames }));
+              }
+            }
+          } else if (affectsObserver) {
+            if (darknessRank >= 4) {
+              // Greater Magical Darkness (rank 4+)
+              if (visionCaps.hasGreaterDarkvision) {
+                reasons.push(game.i18n.format('PF2E_VISIONER.VISIBILITY_FACTORS.REASONS.OBSERVER_IN_GREATER_DARKNESS_WITH_GREATER_DARKVISION', { templates: templateNames }));
+              } else if (visionCaps.hasDarkvision) {
+                reasons.push(game.i18n.format('PF2E_VISIONER.VISIBILITY_FACTORS.REASONS.OBSERVER_IN_GREATER_DARKNESS_WITH_DARKVISION', { templates: templateNames }));
+              } else {
+                reasons.push(game.i18n.format('PF2E_VISIONER.VISIBILITY_FACTORS.REASONS.OBSERVER_IN_GREATER_DARKNESS_NO_DARKVISION', { templates: templateNames }));
+              }
+            } else if (darknessRank >= 1) {
+              // Regular Magical Darkness (rank 1-3)
+              if (visionCaps.hasDarkvision) {
+                reasons.push(game.i18n.format('PF2E_VISIONER.VISIBILITY_FACTORS.REASONS.OBSERVER_IN_MAGICAL_DARKNESS_WITH_DARKVISION', { templates: templateNames }));
+              } else {
+                reasons.push(game.i18n.format('PF2E_VISIONER.VISIBILITY_FACTORS.REASONS.OBSERVER_IN_MAGICAL_DARKNESS_NO_DARKVISION', { templates: templateNames }));
+              }
+            } else {
+              // Regular darkness
+              if (visionCaps.hasDarkvision) {
+                reasons.push(game.i18n.format('PF2E_VISIONER.VISIBILITY_FACTORS.REASONS.OBSERVER_IN_DARKNESS_WITH_DARKVISION', { templates: templateNames }));
+              } else {
+                reasons.push(game.i18n.format('PF2E_VISIONER.VISIBILITY_FACTORS.REASONS.OBSERVER_IN_DARKNESS_NO_DARKVISION', { templates: templateNames }));
+              }
+            }
+          } else if (betweenTokens) {
+            if (darknessRank >= 4) {
+              if (visionCaps.hasGreaterDarkvision) {
+                reasons.push(game.i18n.format('PF2E_VISIONER.VISIBILITY_FACTORS.REASONS.DARKNESS_BETWEEN_WITH_GREATER_DARKVISION', { templates: templateNames }));
+              } else if (visionCaps.hasDarkvision) {
+                reasons.push(game.i18n.format('PF2E_VISIONER.VISIBILITY_FACTORS.REASONS.DARKNESS_BETWEEN_WITH_DARKVISION', { templates: templateNames }));
+              } else {
+                reasons.push(game.i18n.format('PF2E_VISIONER.VISIBILITY_FACTORS.REASONS.DARKNESS_BETWEEN_NO_DARKVISION', { templates: templateNames }));
+              }
+            } else if (darknessRank >= 1) {
+              if (visionCaps.hasDarkvision) {
+                reasons.push(game.i18n.format('PF2E_VISIONER.VISIBILITY_FACTORS.REASONS.MAGICAL_DARKNESS_BETWEEN_WITH_DARKVISION', { templates: templateNames }));
+              } else {
+                reasons.push(game.i18n.format('PF2E_VISIONER.VISIBILITY_FACTORS.REASONS.MAGICAL_DARKNESS_BETWEEN_NO_DARKVISION', { templates: templateNames }));
+              }
+            } else {
+              if (visionCaps.hasDarkvision) {
+                reasons.push(game.i18n.format('PF2E_VISIONER.VISIBILITY_FACTORS.REASONS.REGULAR_DARKNESS_BETWEEN_WITH_DARKVISION', { templates: templateNames }));
+              } else {
+                reasons.push(game.i18n.format('PF2E_VISIONER.VISIBILITY_FACTORS.REASONS.REGULAR_DARKNESS_BETWEEN_NO_DARKVISION', { templates: templateNames }));
+              }
+            }
+          } else {
+            reasons.push(game.i18n.format('PF2E_VISIONER.VISIBILITY_FACTORS.REASONS.AFFECTED_BY_DARKNESS', { templates: templateNames }));
+          }
+          slugs.push('darkness-template');
+        }
+        // Check for region-based concealment
+        else if (regionConcealment) {
+          reasons.push(game.i18n.localize('PF2E_VISIONER.VISIBILITY_FACTORS.REASONS.REGION_CONCEALMENT'));
+          slugs.push('region-concealment');
+        }
+        // Check for darkness along the ray (magical darkness templates/areas)
+        else if (rayDarkness && rayDarknessRank > 0) {
+          if (rayDarknessRank >= 4) {
+            if (visionCaps.hasDarkvision && !visionCaps.hasGreaterDarkvision) {
+              reasons.push(game.i18n.format('PF2E_VISIONER.VISIBILITY_FACTORS.REASONS.RAY_GREATER_DARKNESS_WITH_DARKVISION', { rank: rayDarknessRank }));
+              slugs.push('magical-darkness');
+            } else if (!visionCaps.hasDarkvision) {
+              reasons.push(game.i18n.format('PF2E_VISIONER.VISIBILITY_FACTORS.REASONS.RAY_GREATER_DARKNESS_NO_DARKVISION', { rank: rayDarknessRank }));
+              slugs.push('magical-darkness');
+            }
+          } else {
+            if (!visionCaps.hasDarkvision) {
+              reasons.push(game.i18n.format('PF2E_VISIONER.VISIBILITY_FACTORS.REASONS.RAY_MAGICAL_DARKNESS_NO_DARKVISION', { rank: rayDarknessRank }));
+              slugs.push('magical-darkness');
+            }
+          }
+        }
+        // Check magical darkness from lighting
+        else if (lightingFactor == "greaterMagicalDarkness" || lightingFactor.startsWith('magicalDarkness')) {
           const rank = targetLight.darknessRank || 0;
           if (rank >= 4) {
             if (visionCaps.hasDarkvision && !visionCaps.hasGreaterDarkvision) {
-              reasons.push(`Greater magical darkness (rank ${rank}) conceals even with darkvision`);
+              reasons.push(game.i18n.format('PF2E_VISIONER.VISIBILITY_FACTORS.REASONS.GREATER_MAGICAL_DARKNESS_WITH_DARKVISION', { rank: rank }));
               slugs.push('magical-darkness');
             } else if (!visionCaps.hasDarkvision) {
-              reasons.push(`Target is in magical darkness (rank ${rank}) without darkvision`);
+              reasons.push(game.i18n.format('PF2E_VISIONER.VISIBILITY_FACTORS.REASONS.TARGET_MAGICAL_DARKNESS_NO_DARKVISION', { rank: rank }));
               slugs.push('magical-darkness');
             }
             // Note: Greater darkvision can see through rank 4 darkness
           } else if (rank >= 1) {
             // Regular magical darkness (rank 1-3) - works like normal darkness
             if (!visionCaps.hasDarkvision) {
-              reasons.push(`Target is in magical darkness (rank ${rank}) without darkvision`);
+              reasons.push(game.i18n.format('PF2E_VISIONER.VISIBILITY_FACTORS.REASONS.TARGET_MAGICAL_DARKNESS_NO_DARKVISION', { rank: rank }));
               slugs.push('magical-darkness');
             }
           }
         }
         // Regular darkness without darkvision
         else if (lightingFactor === 'darkness' && !visionCaps.hasDarkvision) {
-          reasons.push('Target is in darkness without darkvision');
+          reasons.push(game.i18n.localize('PF2E_VISIONER.VISIBILITY_FACTORS.REASONS.TARGET_IN_DARKNESS_NO_DARKVISION_SIMPLE'));
           slugs.push('darkness');
         }
         // Dim light without low-light vision (causes concealment)
         else if (lightingFactor === 'dim' && !visionCaps.hasLowLightVision) {
-          reasons.push('Target is in dim light without low-light vision');
+          reasons.push(game.i18n.localize('PF2E_VISIONER.VISIBILITY_FACTORS.REASONS.TARGET_IN_DIM_NO_LOW_LIGHT'));
           slugs.push('dim-light');
         }
       }
@@ -519,14 +730,14 @@ export class Pf2eVisionerApi {
       // Lifesense detection
       if (detection.lifesense) {
         const acuity = getSenseAcuity('lifesense');
-        reasons.push(`Detected by lifesense (${acuity})`);
+        reasons.push(game.i18n.format('PF2E_VISIONER.VISIBILITY_FACTORS.REASONS.DETECTED_BY_LIFESENSE', { acuity: acuity }));
         slugs.push('lifesense');
       }
 
       // Tremorsense detection
       if (detection.tremorsense) {
         const acuity = getSenseAcuity('tremorsense');
-        reasons.push(`Detected by tremorsense (${acuity})`);
+        reasons.push(game.i18n.format('PF2E_VISIONER.VISIBILITY_FACTORS.REASONS.DETECTED_BY_TREMORSENSE', { acuity: acuity }));
         slugs.push('tremorsense');
       }
 
@@ -539,7 +750,7 @@ export class Pf2eVisionerApi {
           if (!['vision', 'darkvision', 'low-light-vision', 'greater-darkvision', 'lifesense', 'tremorsense'].includes(senseType)) {
             if (sense.range > 0 && distance <= sense.range) {
               const senseName = senseType.replace(/-/g, ' ');
-              reasons.push(`Detected by ${senseName} (precise)`);
+              reasons.push(game.i18n.format('PF2E_VISIONER.VISIBILITY_FACTORS.REASONS.DETECTED_BY_SENSE', { sense: senseName }));
               slugs.push(senseType);
             }
           }
@@ -553,10 +764,10 @@ export class Pf2eVisionerApi {
         const hasScent = sensingSummary.scent && distance <= (sensingSummary.scent?.range || 0);
 
         if (hasHearing && targetConditions.includes('invisible')) {
-          reasons.push('Heard with hearing (imprecise) - invisible creature is hidden');
+          reasons.push(game.i18n.localize('PF2E_VISIONER.VISIBILITY_FACTORS.REASONS.HEARD_INVISIBLE_HIDDEN'));
           slugs.push('hearing');
         } else if (hasScent) {
-          reasons.push('Detected by scent (imprecise)');
+          reasons.push(game.i18n.localize('PF2E_VISIONER.VISIBILITY_FACTORS.REASONS.DETECTED_BY_SCENT'));
           slugs.push('scent');
         }
       }
@@ -565,23 +776,23 @@ export class Pf2eVisionerApi {
       if (visibility === 'observed' && reasons.length === 0) {
         // Explain why they can see the target
         if (lightingFactor === 'bright') {
-          reasons.push('Target is in bright light with normal vision');
+          reasons.push(game.i18n.localize('PF2E_VISIONER.VISIBILITY_FACTORS.REASONS.BRIGHT_LIGHT_NORMAL_VISION'));
           slugs.push('bright-light');
         } else if (lightingFactor === 'dim' && visionCaps.hasLowLightVision) {
-          reasons.push('Low-light vision sees clearly in dim light');
+          reasons.push(game.i18n.localize('PF2E_VISIONER.VISIBILITY_FACTORS.REASONS.LOW_LIGHT_VISION_DIM'));
           slugs.push('low-light-vision');
         } else if ((lightingFactor === 'darkness' || lightingFactor.includes('magicalDarkness')) && visionCaps.hasDarkvision) {
           if (lightingFactor.includes('magicalDarkness')) {
             const rank = targetLight.darknessRank || 0;
             if (rank < 4) {
-              reasons.push(`Darkvision sees through magical darkness (rank ${rank})`);
+              reasons.push(game.i18n.format('PF2E_VISIONER.VISIBILITY_FACTORS.REASONS.DARKVISION_THROUGH_MAGICAL_DARKNESS', { rank: rank }));
               slugs.push('darkvision');
             } else if (visionCaps.hasGreaterDarkvision) {
-              reasons.push(`Greater darkvision sees through magical darkness (rank ${rank})`);
+              reasons.push(game.i18n.format('PF2E_VISIONER.VISIBILITY_FACTORS.REASONS.GREATER_DARKVISION_THROUGH_MAGICAL_DARKNESS', { rank: rank }));
               slugs.push('greater-darkvision');
             }
           } else {
-            reasons.push('Darkvision sees clearly in darkness');
+            reasons.push(game.i18n.localize('PF2E_VISIONER.VISIBILITY_FACTORS.REASONS.DARKVISION_IN_DARKNESS'));
             slugs.push('darkvision');
           }
         }
@@ -591,16 +802,24 @@ export class Pf2eVisionerApi {
       if (visibility === 'undetected' && reasons.length === 0) {
         if (targetConditions.includes('invisible')) {
           if (isDeafened) {
-            reasons.push('Target is invisible and observer is deafened');
+            reasons.push(game.i18n.localize('PF2E_VISIONER.VISIBILITY_FACTORS.REASONS.TARGET_INVISIBLE_OBSERVER_DEAFENED'));
             slugs.push('invisible');
           } else {
-            reasons.push('Target is invisible and cannot be detected by available senses');
+            reasons.push(game.i18n.localize('PF2E_VISIONER.VISIBILITY_FACTORS.REASONS.TARGET_INVISIBLE_NO_SENSES'));
             slugs.push('invisible');
           }
         } else {
-          reasons.push('Target cannot be detected by any available senses');
+          reasons.push(game.i18n.localize('PF2E_VISIONER.VISIBILITY_FACTORS.REASONS.TARGET_NO_SENSES'));
           slugs.push('undetected');
         }
+      }
+
+      // 7. FALLBACK - if we still have no reasons but visibility is not observed, add generic explanation
+      if (reasons.length === 0 && visibility !== 'observed') {
+        // Check if there's a stored visibility state (could be from AVS or manual override)
+        // But we can't tell if it's manual or automatic, so use generic wording
+        reasons.push(game.i18n.format('PF2E_VISIONER.VISIBILITY_FACTORS.REASONS.STORED_STATE', { state: visibility }));
+        slugs.push('stored-state');
       }
 
       return {
