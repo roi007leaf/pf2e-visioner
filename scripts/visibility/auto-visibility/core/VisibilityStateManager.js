@@ -76,7 +76,7 @@ export class VisibilityStateManager {
     this.#systemStateProvider?.debug?.('VSM:markTokenChangedImmediate', {
       tokenId,
       caller,
-      stack: stack?.split('\n').slice(1, 4).join('\n')
+      stack: stack?.split('\n').slice(1, 4).join('\n'),
     });
     this.#changedTokens.add(tokenId);
 
@@ -101,7 +101,7 @@ export class VisibilityStateManager {
       tokenName: tokenDoc?.name,
       changes,
       caller,
-      stack: stack?.split('\n').slice(1, 4).join('\n')
+      stack: stack?.split('\n').slice(1, 4).join('\n'),
     });
     // Handle the case where no parameters are provided (just trigger optimization)
     if (!tokenDoc) {
@@ -138,7 +138,7 @@ export class VisibilityStateManager {
       } catch (error) {
         try {
           this.#systemStateProvider?.debug?.('VSM:spatialOptimizationFailed', error);
-        } catch { }
+        } catch {}
       }
     }
 
@@ -160,7 +160,7 @@ export class VisibilityStateManager {
     this.#systemStateProvider?.debug?.('VSM:markAllTokensChangedImmediate', {
       tokenCount,
       caller,
-      stack: stack?.split('\n').slice(1, 4).join('\n')
+      stack: stack?.split('\n').slice(1, 4).join('\n'),
     });
     const tokens = canvas.tokens?.placeables || [];
     const exclusionManager = this.#exclusionManager?.();
@@ -188,7 +188,7 @@ export class VisibilityStateManager {
     const caller = stack?.split('\n')?.[2]?.trim() || 'unknown';
     this.#systemStateProvider?.debug?.('VSM:markAllTokensChangedThrottled', {
       caller,
-      stack: stack?.split('\n').slice(1, 4).join('\n')
+      stack: stack?.split('\n').slice(1, 4).join('\n'),
     });
     // If already pending, just extend the timeout
     if (this.#pendingFullRecalc) {
@@ -312,7 +312,7 @@ export class VisibilityStateManager {
       tokenIds: Array.from(tokenIds),
       count: tokenIds?.length,
       caller,
-      stack: stack?.split('\n').slice(1, 4).join('\n')
+      stack: stack?.split('\n').slice(1, 4).join('\n'),
     });
     // Add all specified tokens to the changed set
     tokenIds.forEach((id) => this.#changedTokens.add(id));

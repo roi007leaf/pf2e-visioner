@@ -149,11 +149,10 @@ export class LightingEventHandler {
     }
 
     // Check if we're in a feedback loop - if a batch just completed, don't immediately trigger another
-    const now = Date.now();
-    const lastBatchComplete = globalThis.game?.pf2eVisioner?._lastBatchCompleteTime || 0;
-    if (now - lastBatchComplete < 100) {
+    // This flag is set by BatchOrchestrator and cleared after the next render frame
+    if (globalThis.game?.pf2eVisioner?.suppressLightingRefreshAfterBatch) {
       this.systemState.debug?.(
-        'LightingEventHandler: ignoring lightingRefresh within 100ms of batch completion (feedback loop prevention)',
+        'LightingEventHandler: ignoring lightingRefresh after batch completion (feedback loop prevention)',
       );
       return;
     }

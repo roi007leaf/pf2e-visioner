@@ -48,7 +48,7 @@ export class BatchOrchestrator {
     // Movement detection to delay batch processing until movement stops
     this._isTokenMoving = false;
     this._movementStopTimer = null;
-    this._movementStopDelayMs = 100; // Reduced from 300ms for faster response
+    this._movementStopDelayMs = 200; // Increased to allow canvas position to update after animation
 
     // Movement session telemetry tracking
     this._movementSession = null;
@@ -60,7 +60,12 @@ export class BatchOrchestrator {
    */
   notifyTokenMovementStart() {
     try {
-      getLogger('AVS/Batch').debug('movement:start');
+      getLogger('AVS/Batch').debug(() => ({
+        msg: 'movement:start',
+        wasMoving: this._isTokenMoving,
+        pendingTokens: this._pendingTokens.size,
+        stack: new Error().stack?.split('\n').slice(1, 4).join('\n'),
+      }));
     } catch {}
     // Start a new movement session if not already moving
     if (!this._isTokenMoving) {
@@ -69,6 +74,18 @@ export class BatchOrchestrator {
         tokensAccumulated: new Set(),
         sessionId: `movement-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       };
+
+      // CRITICAL: Clear LOS cache when movement starts to prevent stale precomputed LOS
+      // This ensures fresh LOS calculations when the batch processes after movement completes
+      try {
+        this.cacheManager?.clearLosCache?.();
+        getLogger('AVS/Batch').debug(() => ({
+          msg: 'movement:cleared-los-cache',
+          reason: 'movement-started',
+        }));
+      } catch (error) {
+        console.warn('PF2E Visioner | Failed to clear LOS cache on movement start:', error);
+      }
     }
 
     this._isTokenMoving = true;
@@ -83,6 +100,14 @@ export class BatchOrchestrator {
 
     // Set timer to detect when movement stops
     this._movementStopTimer = setTimeout(() => {
+      try {
+        getLogger('AVS/Batch').debug(() => ({
+          msg: 'movement:stop-timer-fired',
+          hasSession: !!this._movementSession,
+          pendingTokens: this._pendingTokens.size,
+        }));
+      } catch {}
+
       if (!this._movementSession) {
         console.warn('PF2E Visioner | Movement stop timer fired but no session exists');
         this._isTokenMoving = false;
@@ -99,6 +124,14 @@ export class BatchOrchestrator {
 
       this._isTokenMoving = false;
       this._movementStopTimer = null;
+
+      try {
+        getLogger('AVS/Batch').debug(() => ({
+          msg: 'movement:stopped',
+          sessionData,
+          willProcessBatch: this._pendingTokens.size > 0,
+        }));
+      } catch {}
 
       // If there are pending tokens, process them immediately now that movement stopped
       if (this._pendingTokens.size > 0) {
@@ -181,6 +214,18 @@ export class BatchOrchestrator {
    */
   async processBatch(changedTokens, options = {}) {
     if (this.processingBatch || changedTokens.size === 0) {
+      return;
+    }
+
+    // CRITICAL: Don't process batch if tokens are still moving/animating
+    // Wait for movement to complete to ensure accurate LOS calculations with final positions
+    if (this._isTokenMoving) {
+      getLogger('AVS/Batch').debug(() => ({
+        msg: 'processBatch:deferred',
+        reason: 'tokens-still-moving',
+        changedCount: changedTokens.size,
+      }));
+      // Tokens will be processed when movement completes via movement stop timer
       return;
     }
 
@@ -278,6 +323,9 @@ export class BatchOrchestrator {
         burstLosMemo: this._lastLosMemo.map,
         // Enable fast mode during active token movement to reduce LOS precision
         fastMode: this._isTokenMoving,
+        // CRITICAL: Skip precomputed LOS if this batch is processing after movement
+        // The precomputed LOS would be stale because tokens have moved
+        skipPrecomputedLOS: !!options.movementSession,
       };
 
       // Execute batch processing
@@ -334,10 +382,18 @@ export class BatchOrchestrator {
         this.systemState?.debug?.('BatchOrchestrator: skipping perception refresh (no updates)');
       }
 
-      // Track batch completion time to prevent feedback loops in LightingEventHandler
+      // Set flag to suppress lightingRefresh immediately after batch completion
+      // This prevents feedback loops where batch completion triggers immediate re-processing
       if (!globalThis.game) globalThis.game = {};
       if (!globalThis.game.pf2eVisioner) globalThis.game.pf2eVisioner = {};
-      globalThis.game.pf2eVisioner._lastBatchCompleteTime = Date.now();
+      globalThis.game.pf2eVisioner.suppressLightingRefreshAfterBatch = true;
+
+      // Clear the flag after the next render frame to allow normal processing to resume
+      requestAnimationFrame(() => {
+        if (globalThis.game?.pf2eVisioner) {
+          globalThis.game.pf2eVisioner.suppressLightingRefreshAfterBatch = false;
+        }
+      });
 
       // Stop telemetry with detailed metrics
       this._reportTelemetry({
@@ -579,12 +635,13 @@ export class BatchOrchestrator {
         // Also refresh everyone's perception via socket to ensure all clients see changes
         this._refreshEveryonesPerception();
       } finally {
-        // Always clear the suppression flag after a short delay
-        setTimeout(() => {
+        // Clear the suppression flag after the current render frame
+        // This ensures any queued lightingRefresh events from perception.update are suppressed
+        requestAnimationFrame(() => {
           if (globalThis.game?.pf2eVisioner) {
             globalThis.game.pf2eVisioner.suppressLightingRefresh = false;
           }
-        }, 50);
+        });
       }
     } catch (error) {
       // Fail silently to avoid disrupting batch processing
@@ -641,40 +698,59 @@ export class BatchOrchestrator {
         '../../../visibility/ephemeral.js'
       );
 
-      // Deduplicate updates to avoid syncing the same pair multiple times
-      const syncedPairs = new Set();
-      let syncCount = 0;
-      let skippedCount = 0;
+      // Set flags to suppress both refreshToken processing AND lightingRefresh during ephemeral effect updates
+      // This prevents feedback loops where effect updates trigger refreshToken → lightingRefresh → new batch
+      if (!globalThis.game) globalThis.game = {};
+      if (!globalThis.game.pf2eVisioner) globalThis.game.pf2eVisioner = {};
+      globalThis.game.pf2eVisioner.suppressRefreshTokenProcessing = true;
+      globalThis.game.pf2eVisioner.suppressLightingRefresh = true;
 
-      for (const update of updates) {
-        const observerId = update.observer?.document?.id;
-        const targetId = update.target?.document?.id;
+      try {
+        // Deduplicate updates to avoid syncing the same pair multiple times
+        const syncedPairs = new Set();
+        let syncCount = 0;
+        let skippedCount = 0;
 
-        if (!observerId || !targetId) continue;
+        for (const update of updates) {
+          const observerId = update.observer?.document?.id;
+          const targetId = update.target?.document?.id;
 
-        // Skip hazards and loot tokens - they don't need visibility effects
-        if (this._isHazardOrLoot(update.target)) {
-          skippedCount++;
-          continue;
+          if (!observerId || !targetId) continue;
+
+          // Skip hazards and loot tokens - they don't need visibility effects
+          if (this._isHazardOrLoot(update.target)) {
+            skippedCount++;
+            continue;
+          }
+
+          const pairKey = `${observerId}-${targetId}`;
+          if (syncedPairs.has(pairKey)) continue;
+          syncedPairs.add(pairKey);
+
+          // Update ephemeral effects for this specific observer-target pair
+          await updateEphemeralEffectsForVisibility(
+            update.observer,
+            update.target,
+            update.visibility,
+          );
+          syncCount++;
         }
 
-        const pairKey = `${observerId}-${targetId}`;
-        if (syncedPairs.has(pairKey)) continue;
-        syncedPairs.add(pairKey);
-
-        // Update ephemeral effects for this specific observer-target pair
-        await updateEphemeralEffectsForVisibility(
-          update.observer,
-          update.target,
-          update.visibility,
-        );
-        syncCount++;
-      }
-
-      if (syncCount > 0 || skippedCount > 0) {
-        this.systemState?.debug?.(
-          `BatchOrchestrator: synced ${syncCount} ephemeral effects, skipped ${skippedCount} hazards/loot`,
-        );
+        if (syncCount > 0 || skippedCount > 0) {
+          this.systemState?.debug?.(
+            `BatchOrchestrator: synced ${syncCount} ephemeral effects, skipped ${skippedCount} hazards/loot`,
+          );
+        }
+      } finally {
+        // Clear the suppression flags after the current event loop cycle completes
+        // This ensures any queued refreshToken/lightingRefresh events are processed while suppressed
+        // Using requestAnimationFrame ensures we wait for the next render frame
+        requestAnimationFrame(() => {
+          if (globalThis.game?.pf2eVisioner) {
+            globalThis.game.pf2eVisioner.suppressRefreshTokenProcessing = false;
+            globalThis.game.pf2eVisioner.suppressLightingRefresh = false;
+          }
+        });
       }
     } catch (error) {
       console.warn('PF2E Visioner | Failed to sync ephemeral effects:', error);

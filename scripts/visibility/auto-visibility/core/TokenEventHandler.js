@@ -82,7 +82,7 @@ export class TokenEventHandler {
 
       if (this.overrideValidationManager) {
         this.overrideValidationManager.queueOverrideValidation(tokenDoc.id);
-        this.overrideValidationManager.processQueuedValidations().catch(() => { });
+        this.overrideValidationManager.processQueuedValidations().catch(() => {});
       }
 
       const movementChanges = {
@@ -118,7 +118,10 @@ export class TokenEventHandler {
       : this.systemState.shouldProcessEvents();
 
     if (!shouldProcess) {
-      this.systemState.debug(() => ({ msg: 'handleTokenUpdate skipped - shouldProcess=false', tokenId: tokenDoc?.id }));
+      this.systemState.debug(() => ({
+        msg: 'handleTokenUpdate skipped - shouldProcess=false',
+        tokenId: tokenDoc?.id,
+      }));
       return;
     }
 
@@ -128,20 +131,24 @@ export class TokenEventHandler {
       (k) => k !== '_id' && !k.startsWith('flags.') && k !== 'flags',
     );
     if (relevantKeys.length === 0 && !changes.flags?.[MODULE_ID]) {
-      this.systemState.debug(() => ({ msg: 'handleTokenUpdate skipped - no relevant changes', tokenId: tokenDoc?.id, keys }));
+      this.systemState.debug(() => ({
+        msg: 'handleTokenUpdate skipped - no relevant changes',
+        tokenId: tokenDoc?.id,
+        keys,
+      }));
       return;
     }
 
     try {
       this.systemState.debug('onTokenUpdate', tokenDoc.id, tokenDoc.name, Object.keys(changes));
-    } catch { }
+    } catch {}
 
     // Analyze changes once to derive flags used throughout handling
     const changeFlags = this._analyzeChanges(changes);
     this.systemState.debug(() => ({
       msg: 'handleTokenUpdate changeFlags',
       tokenId: tokenDoc?.id,
-      changeFlags
+      changeFlags,
     }));
 
     // Skip position updates during animation/dragging - only process completed movements
@@ -152,7 +159,7 @@ export class TokenEventHandler {
         globalThis.game = globalThis.game || {};
         game.pf2eVisioner = game.pf2eVisioner || {};
         game.pf2eVisioner.lastMovedTokenId = tokenDoc.id;
-      } catch { }
+      } catch {}
 
       const token = tokenDoc.object;
 
@@ -165,8 +172,15 @@ export class TokenEventHandler {
           msg: 'handleTokenUpdate skipped - animating or dragging',
           tokenId: tokenDoc?.id,
           isAnimating,
-          isDragging
+          isDragging,
         }));
+
+        // CRITICAL: Notify batch orchestrator that token is moving BEFORE we skip
+        // This ensures the orchestrator knows to defer batch processing until movement completes
+        if (changeFlags.positionChanged && this.batchOrchestrator?.notifyTokenMovementStart) {
+          this.batchOrchestrator.notifyTokenMovementStart();
+        }
+
         // CRITICAL: Store the updated document position BEFORE returning early
         // This ensures the PositionManager has the correct destination position
         // when the batch eventually processes (either from moveToken or later updateToken)
@@ -217,7 +231,7 @@ export class TokenEventHandler {
                 // Queue override validation
                 if (this.overrideValidationManager) {
                   this.overrideValidationManager.queueOverrideValidation(tokenId);
-                  this.overrideValidationManager.processQueuedValidations().catch(() => { });
+                  this.overrideValidationManager.processQueuedValidations().catch(() => {});
                 }
               } catch (e) {
                 console.warn('PF2E Visioner | Error processing validation after animation:', e);
@@ -253,7 +267,7 @@ export class TokenEventHandler {
       this.systemState.debug(() => ({
         msg: 'handleTokenUpdate light change detected',
         tokenId: tokenDoc?.id,
-        lightChanges: changes.light
+        lightChanges: changes.light,
       }));
       // Token light changes affect visibility but not LOS; clear only visibility cache
       try {
@@ -312,7 +326,7 @@ export class TokenEventHandler {
       this.systemState.debug(() => ({
         msg: 'handleTokenUpdate hidden toggle',
         tokenId: tokenDoc?.id,
-        hidden: changes.hidden
+        hidden: changes.hidden,
       }));
       this._handleHiddenToggle(tokenDoc, changes);
       return;
@@ -330,7 +344,7 @@ export class TokenEventHandler {
     if (emitterMoved) {
       this.systemState.debug(() => ({
         msg: 'handleTokenUpdate light emitter moved - global recalc',
-        tokenId: tokenDoc?.id
+        tokenId: tokenDoc?.id,
       }));
       this.systemState.debug(
         'emitter-moved: global recalculation for token light move',
@@ -342,14 +356,20 @@ export class TokenEventHandler {
 
     // Handle hidden tokens (with sneak special case)
     if (isHidden && !changeFlags.lightChanged && !emitterMoved) {
-      this.systemState.debug(() => ({ msg: 'handleTokenUpdate hidden token', tokenId: tokenDoc?.id }));
+      this.systemState.debug(() => ({
+        msg: 'handleTokenUpdate hidden token',
+        tokenId: tokenDoc?.id,
+      }));
       this._handleHiddenToken(tokenDoc, changes);
       return;
     }
 
     // Handle excluded tokens (with sneak special case)
     if (this._handleExcludedToken(tokenDoc, changes)) {
-      this.systemState.debug(() => ({ msg: 'handleTokenUpdate excluded token', tokenId: tokenDoc?.id }));
+      this.systemState.debug(() => ({
+        msg: 'handleTokenUpdate excluded token',
+        tokenId: tokenDoc?.id,
+      }));
       return;
     }
 
@@ -358,13 +378,13 @@ export class TokenEventHandler {
       this.systemState.debug(() => ({
         msg: 'handleTokenUpdate processing relevant changes',
         tokenId: tokenDoc?.id,
-        changeFlags
+        changeFlags,
       }));
       this._processRelevantChanges(tokenDoc, changes, changeFlags);
     } else {
       this.systemState.debug(() => ({
         msg: 'handleTokenUpdate no relevant changes',
-        tokenId: tokenDoc?.id
+        tokenId: tokenDoc?.id,
       }));
     }
   }
@@ -515,7 +535,7 @@ export class TokenEventHandler {
           globalThis.game = globalThis.game || {};
           game.pf2eVisioner = game.pf2eVisioner || {};
           game.pf2eVisioner.lastMovedTokenId = tokenDoc.id;
-        } catch { }
+        } catch {}
         this.overrideValidationManager.queueOverrideValidation(tokenDoc.id);
       }
     } catch {
@@ -536,7 +556,7 @@ export class TokenEventHandler {
             globalThis.game = globalThis.game || {};
             game.pf2eVisioner = game.pf2eVisioner || {};
             game.pf2eVisioner.lastMovedTokenId = tokenDoc.id;
-          } catch { }
+          } catch {}
           this.overrideValidationManager.queueOverrideValidation(tokenDoc.id);
         }
         return true; // Token was excluded
@@ -632,13 +652,13 @@ export class TokenEventHandler {
     if (changeFlags.lightChanged) {
       this.systemState.debug(() => ({
         msg: '_handleVisibilityRecalculation light changed - mark all',
-        tokenId: tokenDoc?.id
+        tokenId: tokenDoc?.id,
       }));
       this.visibilityState.markAllTokensChangedImmediate();
     } else if (changeFlags.movementActionChanged) {
       this.systemState.debug(() => ({
         msg: '_handleVisibilityRecalculation movement action changed',
-        tokenId: tokenDoc?.id
+        tokenId: tokenDoc?.id,
       }));
       // Movement action affects tremorsense detection (flying vs grounded)
       // Need to recalculate for tokens that might detect this one via tremorsense
@@ -648,7 +668,7 @@ export class TokenEventHandler {
         msg: '_handleVisibilityRecalculation position changed - spatial optimization',
         tokenId: tokenDoc?.id,
         x: changes.x,
-        y: changes.y
+        y: changes.y,
       }));
       try {
         const globalVisCache = this.cacheManager?.getGlobalVisibilityCache();
@@ -667,7 +687,7 @@ export class TokenEventHandler {
     } else {
       this.systemState.debug(() => ({
         msg: '_handleVisibilityRecalculation other change - mark token',
-        tokenId: tokenDoc?.id
+        tokenId: tokenDoc?.id,
       }));
       this.visibilityState.markTokenChangedImmediate(tokenDoc.id);
     }
@@ -680,7 +700,7 @@ export class TokenEventHandler {
       game.pf2eVisioner = game.pf2eVisioner || {};
       game.pf2eVisioner.lastMovedTokenId = tokenDoc.id;
       this.systemState.debug('set lastMovedTokenId', tokenDoc.id);
-    } catch { }
+    } catch {}
 
     // Queue override validation for the moved token
     this.overrideValidationManager.queueOverrideValidation(tokenDoc.id);
