@@ -48,6 +48,12 @@ describe('BatchProcessor', () => {
             hasLineOfSight: jest.fn(() => true)
         };
 
+        // Mock the SystemStateProvider dependency
+        const mockSystemState = {
+            debug: jest.fn(),
+            isDebugMode: jest.fn(() => false)
+        };
+
         processor = new BatchProcessor({
             spatialAnalyzer,
             viewportFilterService,
@@ -59,6 +65,7 @@ describe('BatchProcessor', () => {
             getActiveOverride,
             getVisibilityMap,
             visionAnalyzer: mockVisionAnalyzer,
+            systemState: mockSystemState,
             maxVisibilityDistance: 10,
         });
 

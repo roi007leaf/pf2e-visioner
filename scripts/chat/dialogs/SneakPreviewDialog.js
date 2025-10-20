@@ -3256,7 +3256,8 @@ export class SneakPreviewDialog extends BaseActionDialog {
    */
   async _clearSneakActiveFlag() {
     try {
-      if (this.sneakingToken) {
+      const avsEnabled = game.settings?.get?.('pf2e-visioner', 'autoVisibilityEnabled') ?? false;
+      if (this.sneakingToken && avsEnabled) {
         await this.sneakingToken.document.unsetFlag('pf2e-visioner', 'sneak-active');
         try {
           const { SneakSpeedService } = await import('../services/SneakSpeedService.js');

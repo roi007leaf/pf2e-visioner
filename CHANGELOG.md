@@ -1,5 +1,102 @@
 # Changelog
 
+## [4.4.8] - 2025-10-19
+
+### ✨ Features
+
+- **Visibility Factors Keybind**: Added customizable keybind to display detailed visibility factors for controlled tokens
+  - Hold the keybind to show factor badges (info icon) above all other tokens from controlled token's perspective
+  - Hover over badges to see comprehensive tooltip explaining visibility state:
+    - Current visibility state (Observed, Hidden, Undetected, Concealed)
+    - Lighting conditions (Bright Light, Dim Light, Darkness, Magical Darkness with ranks)
+    - Detailed reasons including observer/target conditions, sense detection, and lighting interactions
+  - No default keybind assigned - configure in Controls settings
+  - Works alongside existing Alt/O keybind overlays
+  - Badge positions update in real-time as tokens move
+  - Includes support for all visibility factors:
+    - Observer conditions (blinded, dazzled, deafened)
+    - Target conditions (invisible, hidden, concealed, undetected)
+    - Lighting factors (bright, dim, darkness, magical darkness ranks 1-5, greater magical darkness)
+    - Sense detection (darkvision, low-light vision, greater darkvision, lifesense, tremorsense, scent, hearing, echolocation, and more)
+    - Precise and imprecise sense acuity
+
+## [4.4.7] - 2025-10-19
+
+### 🐛 Bug Fixes
+
+- **Wall Priority**: Walls now always block vision regardless of darkness presence - no more "darkvision through walls" edge cases
+- **Precomputed Lighting**: Fixed precomputed lighting to also check for darkness between tokens, not just at token locations
+- Ensures consistent "undetected" states when walls properly block line of sight
+- Prevents false positives where tokens appeared "observed" when they should be "hidden" behind walls
+- More accurate darkness detection catches magical darkness areas that single-ray sampling missed
+
+## [4.4.6] - 2025-10-19
+
+### 🐛 Bug Fixes
+
+- **AVS Line of Sight**: Fixed incorrect visibility calculations during token movement/animation
+  - **Primary Fix**: Batch processing now defers entirely when tokens are moving, waiting for movement to complete
+  - **Secondary Fix**: Precomputed LOS cache is skipped for animating/dragging tokens as a safety net
+  - Prevents stale LOS data from causing tokens to see through walls during movement
+  - Ensures visibility calculations always use final token positions after movement completes
+  - Fixes issue where dragging a token would incorrectly show visibility through walls
+  - Implements defense-in-depth approach for maximum accuracy during token movement
+- **Hybrid Vision Consensus**: Improved LOS algorithm using consensus between Foundry's vision polygon and full geometric validation
+  - **Previous Approach**: Shot rays between all combinations of 9 observer points and 9 target points (81 rays total)
+  - **New Approach**: Compare Foundry's vision polygon with complete geometric LOS algorithm, use consensus logic for final result
+  - **Consensus Logic**: When both systems agree, trust the result; when they disagree, use geometric as tiebreaker
+  - **Geometric Algorithm**: Center-to-target ray sampling requiring 2+ clear rays when center is blocked (same logic for validation and fallback)
+  - **Fallback Logic**: If vision polygon unavailable, use the same conservative geometric sampling algorithm
+  - More realistic vision model - you look from your eyes (center) toward different parts of the target
+  - Handles edge cases where vision polygon and geometric LOS disagree by using more predictable geometric result
+  - Significantly more efficient (90% fewer rays) while maintaining accuracy and flexibility through dual validation
+  - Best of both worlds: Foundry's precision when it agrees, geometric predictability and flexibility when it doesn't
+
+## [4.4.5] - 2025-10-19
+
+### ⚡ Performance Improvements
+
+- **AVS Feedback Loop Prevention**: Eliminated multiple feedback loops causing excessive visibility recalculations
+  - Added flag-based guard in `LightingEventHandler` to prevent rapid re-triggering after batch completion
+  - Skip perception refresh when no actual visibility changes occurred (`uniqueUpdateCount === 0`)
+  - Suppress `lightingRefresh` events during `canvas.perception.update()` to prevent cascading updates
+  - Skip processing module's own ephemeral effects in `ItemEventHandler` (identified by `aggregateOffGuard` flag)
+  - Suppress both `refreshToken` hook processing AND `lightingRefresh` events during ephemeral effect sync
+  - Uses `requestAnimationFrame` for precise, deterministic flag control instead of arbitrary timeouts
+  - All suppression flags are cleared after the next render frame for optimal timing
+  - Prevents cascading `refreshToken` → `lightingRefresh` → batch cycles during effect updates
+- **Optimized Ephemeral Effect Sync**: Dramatically reduced unnecessary `refreshToken` events
+  - Changed from syncing ALL tokens in scene to only syncing specific observer-target pairs that changed
+  - Reduced complexity from O(allTokens × changedTokens) to O(updates)
+  - Skip hazards and loot tokens entirely - they don't need visibility effects
+  - Typical scenes now trigger 2-4 `refreshToken` events instead of 28+ after each batch
+  - Ephemeral effect updates no longer trigger cascading `refreshToken` → `lightingRefresh` → batch cycles
+
+## [4.4.4] - 2025-10-18
+
+### 🐛 Bug Fixes
+
+- Add some more AVS debug logs to help track down an issue
+
+## [4.4.3] - 2025-10-18
+
+### 🐛 Bug Fixes
+
+- **AVS**: When a token gets dead or defeated, clear avs overrides and hide indicator
+- **Visioner manager**: Filter out dead and defeated tokens
+
+## [4.4.2] - 2025-10-17
+
+### 🐛 Bug Fixes
+
+- **_AVS_**: Fix player side not triggering AVS calculations
+
+## [4.4.1] - 2025-10-15
+
+### Changes
+
+- Disable sneak fancy functions like blocking movement until start sneak and hide sneaking token if avs is turned off
+
 ## [4.4.0] - 2025-10-14
 
 ### ✨ Features

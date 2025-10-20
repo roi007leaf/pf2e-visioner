@@ -58,10 +58,14 @@ export class SneakSpeedService {
    * Back-compat shim: legacy API expected to halve speed unless a feat grants full speed.
    * New behavior: we don't change base speed; we apply a label-only effect to indicate Sneaking.
    * We now always create the Sneaking effect for visual indication, regardless of speed multiplier.
+   * Only applies if AVS is enabled.
    * @param {Token|Actor} tokenOrActor
    */
   static async applySneakWalkSpeed(tokenOrActor) {
     try {
+      const avsEnabled = game.settings?.get?.('pf2e-visioner', 'autoVisibilityEnabled') ?? false;
+      if (!avsEnabled) return;
+
       const actor = SneakSpeedService.resolveActor(tokenOrActor);
       if (!actor) {
         console.warn(
@@ -96,9 +100,13 @@ export class SneakSpeedService {
    * Prefers adding a PF2e effect (ActiveEffectLike multiply 0.5) so the sheet/UI updates properly.
    * Falls back to directly updating system.attributes.speed.value when effects aren't available.
    * Safe to call multiple times; will not stack.
+   * Only operates if AVS is enabled.
    * @param {Token|Actor} tokenOrActor
    */
   static async applySneakStartEffect(tokenOrActor) {
+    const avsEnabled = game.settings?.get?.('pf2e-visioner', 'autoVisibilityEnabled') ?? false;
+    if (!avsEnabled) return;
+
     const actor = SneakSpeedService.resolveActor(tokenOrActor);
     if (!actor) {
       console.warn(
@@ -188,10 +196,14 @@ export class SneakSpeedService {
   /**
    * Restore the original walking speed if it was halved by applySneakWalkSpeed.
    * Safe to call even if not applied.
+   * Only operates if AVS is enabled.
    * @param {Token|Actor} tokenOrActor
    */
   static async restoreSneakWalkSpeed(tokenOrActor) {
     try {
+      const avsEnabled = game.settings?.get?.('pf2e-visioner', 'autoVisibilityEnabled') ?? false;
+      if (!avsEnabled) return;
+
       const actor = SneakSpeedService.resolveActor(tokenOrActor);
       if (!actor) return;
 

@@ -228,6 +228,9 @@ export class SneakCore {
 
   async _setSneakFlag(token, active) {
     try {
+      const avsEnabled = game.settings?.get?.('pf2e-visioner', 'autoVisibilityEnabled') ?? false;
+      if (!avsEnabled) return;
+      
       if (active) {
         await token.document.setFlag('pf2e-visioner', 'sneak-active', true);
       } else {

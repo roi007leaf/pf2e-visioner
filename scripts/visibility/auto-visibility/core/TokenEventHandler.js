@@ -41,7 +41,12 @@ export class TokenEventHandler {
   handleMoveToken(tokenDoc, updateData, options, userId) {
     // This fires for EVERY grid square during animation
     // We only want to process the FINAL destination
-    if (!this.systemState.shouldProcessEvents()) {
+    // Use token-specific check if available, otherwise fall back to general check
+    const shouldProcess = this.systemState.shouldProcessEventsForToken
+      ? this.systemState.shouldProcessEventsForToken(tokenDoc)
+      : this.systemState.shouldProcessEvents();
+
+    if (!shouldProcess) {
       return;
     }
 
@@ -77,7 +82,7 @@ export class TokenEventHandler {
 
       if (this.overrideValidationManager) {
         this.overrideValidationManager.queueOverrideValidation(tokenDoc.id);
-        this.overrideValidationManager.processQueuedValidations().catch(() => { });
+        this.overrideValidationManager.processQueuedValidations().catch(() => {});
       }
 
       const movementChanges = {
@@ -86,7 +91,6 @@ export class TokenEventHandler {
       };
 
       this.visibilityState.markTokenChangedWithSpatialOptimization(tokenDoc, movementChanges);
-
     } catch (e) {
       console.warn('PF2E Visioner | Error processing move token:', e);
     }
@@ -99,34 +103,63 @@ export class TokenEventHandler {
    * @param {Object} options - Update options (includes animation flag)
    */
   handleTokenUpdate(tokenDoc, changes, options = {}) {
-    if (!this.systemState.shouldProcessEvents()) {
+    this.systemState.debug(() => ({
+      msg: 'handleTokenUpdate fired',
+      tokenName: tokenDoc?.name,
+      tokenId: tokenDoc?.id,
+      changes,
+      options,
+      stack: new Error().stack,
+    }));
+
+    // Use token-specific check if available, otherwise fall back to general check
+    const shouldProcess = this.systemState.shouldProcessEventsForToken
+      ? this.systemState.shouldProcessEventsForToken(tokenDoc)
+      : this.systemState.shouldProcessEvents();
+
+    if (!shouldProcess) {
+      this.systemState.debug(() => ({
+        msg: 'handleTokenUpdate skipped - shouldProcess=false',
+        tokenId: tokenDoc?.id,
+      }));
       return;
     }
 
     // Early exit: if ONLY _id or non-visibility flags changed, skip processing
     const keys = Object.keys(changes);
-    const relevantKeys = keys.filter(k => k !== '_id' && !k.startsWith('flags.') && k !== 'flags');
+    const relevantKeys = keys.filter(
+      (k) => k !== '_id' && !k.startsWith('flags.') && k !== 'flags',
+    );
     if (relevantKeys.length === 0 && !changes.flags?.[MODULE_ID]) {
+      this.systemState.debug(() => ({
+        msg: 'handleTokenUpdate skipped - no relevant changes',
+        tokenId: tokenDoc?.id,
+        keys,
+      }));
       return;
     }
 
     try {
       this.systemState.debug('onTokenUpdate', tokenDoc.id, tokenDoc.name, Object.keys(changes));
-    } catch { }
+    } catch {}
 
     // Analyze changes once to derive flags used throughout handling
     const changeFlags = this._analyzeChanges(changes);
+    this.systemState.debug(() => ({
+      msg: 'handleTokenUpdate changeFlags',
+      tokenId: tokenDoc?.id,
+      changeFlags,
+    }));
 
     // Skip position updates during animation/dragging - only process completed movements
     const hasPositionChange = changes.x !== undefined || changes.y !== undefined;
     if (hasPositionChange) {
-
       // Set lastMovedTokenId BEFORE returning early so the hook can pick it up
       try {
         globalThis.game = globalThis.game || {};
         game.pf2eVisioner = game.pf2eVisioner || {};
         game.pf2eVisioner.lastMovedTokenId = tokenDoc.id;
-      } catch { }
+      } catch {}
 
       const token = tokenDoc.object;
 
@@ -135,43 +168,83 @@ export class TokenEventHandler {
       const isDragging = token?._dragHandle !== undefined && token?._dragHandle !== null;
 
       if (isAnimating || isDragging) {
+        this.systemState.debug(() => ({
+          msg: 'handleTokenUpdate skipped - animating or dragging',
+          tokenId: tokenDoc?.id,
+          isAnimating,
+          isDragging,
+        }));
+
+        // CRITICAL: Notify batch orchestrator that token is moving BEFORE we skip
+        // This ensures the orchestrator knows to defer batch processing until movement completes
+        if (changeFlags.positionChanged && this.batchOrchestrator?.notifyTokenMovementStart) {
+          this.batchOrchestrator.notifyTokenMovementStart();
+        }
+
+        // CRITICAL: Store the updated document position BEFORE returning early
+        // This ensures the PositionManager has the correct destination position
+        // when the batch eventually processes (either from moveToken or later updateToken)
+        this.positionManager.storeUpdatedTokenDoc(tokenDoc.id, {
+          id: tokenDoc.id,
+          x: changes.x !== undefined ? changes.x : tokenDoc.x,
+          y: changes.y !== undefined ? changes.y : tokenDoc.y,
+          width: tokenDoc.width,
+          height: tokenDoc.height,
+          name: tokenDoc.name,
+          elevation: tokenDoc.elevation,
+        });
+
+        // Also pin the destination position
+        this.positionManager.pinTokenDestination(tokenDoc, changes);
+
         // If animating (e.g., remote player movement), wait for animation to complete
         if (isAnimating && token?._animation?.promise) {
           const tokenId = tokenDoc.id;
           const movementChanges = {
             x: changes.x ?? tokenDoc.x,
-            y: changes.y ?? tokenDoc.y
+            y: changes.y ?? tokenDoc.y,
           };
 
-          token._animation.promise.then(() => {
-            // After animation completes, clear position-dependent caches and trigger visibility recalculation
-            try {
-              const globalVisCache = this.cacheManager?.getGlobalVisibilityCache();
-              LightingPrecomputer.clearLightingCaches(globalVisCache);
-              this.cacheManager?.clearLosCache?.();
-              this.cacheManager?.clearVisibilityCache?.();
+          token._animation.promise
+            .then(() => {
+              // After animation completes, clear position-dependent caches and trigger visibility recalculation
+              try {
+                const globalVisCache = this.cacheManager?.getGlobalVisibilityCache();
+                LightingPrecomputer.clearLightingCaches(globalVisCache);
+                this.cacheManager?.clearLosCache?.();
+                this.cacheManager?.clearVisibilityCache?.();
 
-              // CRITICAL: Clear VisionAnalyzer's internal caches for this specific token
-              const tokenDocObj = canvas.tokens?.get(tokenId)?.document;
-              if (tokenDocObj && this.visionAnalyzer?.clearCache) {
-                this.visionAnalyzer.clearCache(tokenDocObj);
-              }
+                // CRITICAL: Clear VisionAnalyzer's internal caches for this specific token
+                const tokenDocObj = canvas.tokens?.get(tokenId)?.document;
+                if (tokenDocObj && this.visionAnalyzer?.clearCache) {
+                  this.visionAnalyzer.clearCache(tokenDocObj);
+                }
 
-              // Trigger visibility recalculation with spatial optimization
-              if (tokenDocObj) {
-                this.visibilityState.markTokenChangedWithSpatialOptimization(tokenDocObj, movementChanges);
-              }
+                // Trigger visibility recalculation with spatial optimization
+                if (tokenDocObj) {
+                  this.visibilityState.markTokenChangedWithSpatialOptimization(
+                    tokenDocObj,
+                    movementChanges,
+                  );
+                }
 
-              // Queue override validation
-              if (this.overrideValidationManager) {
-                this.overrideValidationManager.queueOverrideValidation(tokenId);
-                this.overrideValidationManager.processQueuedValidations().catch(() => { });
+                // Queue override validation
+                if (this.overrideValidationManager) {
+                  this.overrideValidationManager.queueOverrideValidation(tokenId);
+                  this.overrideValidationManager.processQueuedValidations().catch(() => {});
+                }
+              } catch (e) {
+                console.warn('PF2E Visioner | Error processing validation after animation:', e);
               }
-            } catch (e) {
-              console.warn('PF2E Visioner | Error processing validation after animation:', e);
-            }
-          }).catch(() => { /* ignore animation errors */ });
+            })
+            .catch(() => {
+              /* ignore animation errors */
+            });
+          return; // Early return only when we have a promise to wait for
         }
+
+        // If animating but no promise, or if dragging, skip this update
+        // The moveToken hook or a later updateToken will handle it when animation completes
         return;
       }
 
@@ -191,6 +264,11 @@ export class TokenEventHandler {
 
     // Early light change detection (handles nested dotted paths like "light.bright")
     if (changeFlags.lightChanged) {
+      this.systemState.debug(() => ({
+        msg: 'handleTokenUpdate light change detected',
+        tokenId: tokenDoc?.id,
+        lightChanges: changes.light,
+      }));
       // Token light changes affect visibility but not LOS; clear only visibility cache
       try {
         this.cacheManager?.clearVisibilityCache?.();
@@ -245,6 +323,11 @@ export class TokenEventHandler {
 
     // Hidden flag toggle - recalculate everyone
     if (Object.prototype.hasOwnProperty.call(changes, 'hidden')) {
+      this.systemState.debug(() => ({
+        msg: 'handleTokenUpdate hidden toggle',
+        tokenId: tokenDoc?.id,
+        hidden: changes.hidden,
+      }));
       this._handleHiddenToggle(tokenDoc, changes);
       return;
     }
@@ -259,6 +342,10 @@ export class TokenEventHandler {
     // Handle light emitter movement (global recalculation)
     const emitterMoved = changeFlags.positionChanged && this._tokenEmitsLight(tokenDoc, changes);
     if (emitterMoved) {
+      this.systemState.debug(() => ({
+        msg: 'handleTokenUpdate light emitter moved - global recalc',
+        tokenId: tokenDoc?.id,
+      }));
       this.systemState.debug(
         'emitter-moved: global recalculation for token light move',
         tokenDoc.id,
@@ -269,26 +356,51 @@ export class TokenEventHandler {
 
     // Handle hidden tokens (with sneak special case)
     if (isHidden && !changeFlags.lightChanged && !emitterMoved) {
+      this.systemState.debug(() => ({
+        msg: 'handleTokenUpdate hidden token',
+        tokenId: tokenDoc?.id,
+      }));
       this._handleHiddenToken(tokenDoc, changes);
       return;
     }
 
     // Handle excluded tokens (with sneak special case)
     if (this._handleExcludedToken(tokenDoc, changes)) {
+      this.systemState.debug(() => ({
+        msg: 'handleTokenUpdate excluded token',
+        tokenId: tokenDoc?.id,
+      }));
       return;
     }
 
     // Process relevant changes
     if (this._hasRelevantChanges(changeFlags)) {
+      this.systemState.debug(() => ({
+        msg: 'handleTokenUpdate processing relevant changes',
+        tokenId: tokenDoc?.id,
+        changeFlags,
+      }));
       this._processRelevantChanges(tokenDoc, changes, changeFlags);
+    } else {
+      this.systemState.debug(() => ({
+        msg: 'handleTokenUpdate no relevant changes',
+        tokenId: tokenDoc?.id,
+      }));
     }
   }
 
   /**
-   * Handles new token creation
-   * @param {Object} tokenDoc - The token document
+   * Handle token creation
+   * @param {TokenDocument} tokenDoc
    */
   handleTokenCreate(tokenDoc) {
+    this.systemState.debug(() => ({
+      msg: 'handleTokenCreate fired',
+      tokenName: tokenDoc?.name,
+      tokenId: tokenDoc?.id,
+      stack: new Error().stack,
+    }));
+
     if (!this.systemState.shouldProcessEvents()) return;
 
     try {
@@ -391,15 +503,21 @@ export class TokenEventHandler {
         y: tokenDoc.y + (tokenDoc.height * gridSize) / 2,
       };
 
-      const affectedTokens = this.spatialAnalyzer.getAffectedTokens(tokenPos, tokenPos, tokenDoc.id);
+      const affectedTokens = this.spatialAnalyzer.getAffectedTokens(
+        tokenPos,
+        tokenPos,
+        tokenDoc.id,
+      );
 
       this.visibilityState.markTokenChangedImmediate(tokenDoc.id);
       affectedTokens.forEach((token) => {
         this.visibilityState.markTokenChangedImmediate(token.document.id);
       });
-
     } catch (error) {
-      console.error('[PF2E Visioner] Spatial optimization failed, falling back to full recalculation:', error);
+      console.error(
+        '[PF2E Visioner] Spatial optimization failed, falling back to full recalculation:',
+        error,
+      );
       this.systemState.debug('light-change-spatial-fallback', tokenDoc.id, error);
       this.visibilityState.markAllTokensChangedImmediate();
     }
@@ -417,7 +535,7 @@ export class TokenEventHandler {
           globalThis.game = globalThis.game || {};
           game.pf2eVisioner = game.pf2eVisioner || {};
           game.pf2eVisioner.lastMovedTokenId = tokenDoc.id;
-        } catch { }
+        } catch {}
         this.overrideValidationManager.queueOverrideValidation(tokenDoc.id);
       }
     } catch {
@@ -438,7 +556,7 @@ export class TokenEventHandler {
             globalThis.game = globalThis.game || {};
             game.pf2eVisioner = game.pf2eVisioner || {};
             game.pf2eVisioner.lastMovedTokenId = tokenDoc.id;
-          } catch { }
+          } catch {}
           this.overrideValidationManager.queueOverrideValidation(tokenDoc.id);
         }
         return true; // Token was excluded
@@ -532,12 +650,26 @@ export class TokenEventHandler {
 
   _handleVisibilityRecalculation(tokenDoc, changes, changeFlags) {
     if (changeFlags.lightChanged) {
+      this.systemState.debug(() => ({
+        msg: '_handleVisibilityRecalculation light changed - mark all',
+        tokenId: tokenDoc?.id,
+      }));
       this.visibilityState.markAllTokensChangedImmediate();
     } else if (changeFlags.movementActionChanged) {
+      this.systemState.debug(() => ({
+        msg: '_handleVisibilityRecalculation movement action changed',
+        tokenId: tokenDoc?.id,
+      }));
       // Movement action affects tremorsense detection (flying vs grounded)
       // Need to recalculate for tokens that might detect this one via tremorsense
       this.visibilityState.markTokenChangedImmediate(tokenDoc.id);
     } else if (changeFlags.positionChanged) {
+      this.systemState.debug(() => ({
+        msg: '_handleVisibilityRecalculation position changed - spatial optimization',
+        tokenId: tokenDoc?.id,
+        x: changes.x,
+        y: changes.y,
+      }));
       try {
         const globalVisCache = this.cacheManager?.getGlobalVisibilityCache();
         LightingPrecomputer.clearLightingCaches(globalVisCache);
@@ -553,6 +685,10 @@ export class TokenEventHandler {
       }
       this.visibilityState.markTokenChangedWithSpatialOptimization(tokenDoc, changes);
     } else {
+      this.systemState.debug(() => ({
+        msg: '_handleVisibilityRecalculation other change - mark token',
+        tokenId: tokenDoc?.id,
+      }));
       this.visibilityState.markTokenChangedImmediate(tokenDoc.id);
     }
   }
@@ -564,7 +700,7 @@ export class TokenEventHandler {
       game.pf2eVisioner = game.pf2eVisioner || {};
       game.pf2eVisioner.lastMovedTokenId = tokenDoc.id;
       this.systemState.debug('set lastMovedTokenId', tokenDoc.id);
-    } catch { }
+    } catch {}
 
     // Queue override validation for the moved token
     this.overrideValidationManager.queueOverrideValidation(tokenDoc.id);

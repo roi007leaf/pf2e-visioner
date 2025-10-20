@@ -1,4 +1,5 @@
 import { RuleElementChecker } from '../../../rule-elements/RuleElementChecker.js';
+import { getLogger } from '../../../utils/logger.js';
 import { GlobalLosCache } from '../utils/GlobalLosCache.js';
 import { GlobalVisibilityCache } from '../utils/GlobalVisibilityCache.js';
 import { VisionAnalyzer } from '../VisionAnalyzer.js';
@@ -12,6 +13,8 @@ import { SensesCapabilitiesCache } from './SensesCapabilitiesCache.js';
 import { ViewportFilterService } from './ViewportFilterService.js';
 import { VisibilityMapBatchCache } from './VisibilityMapBatchCache.js';
 import { VisibilityMapService } from './VisibilityMapService.js';
+
+const log = getLogger('AVS/BatchProcessor');
 
 /**
  * BatchProcessor centralizes the heavy per-batch computation:
@@ -68,6 +71,13 @@ export class BatchProcessor {
    * @returns {Promise<{updates:Array<{observer:Token,target:Token,visibility:string}>, breakdown:any, processedTokens:number, precomputeStats:any, detailedTimings:Object}>}
    */
   async process(allTokens, changedTokenIds, calcOptions) {
+    log.debug(() => ({
+      msg: 'BatchProcessor:process:start',
+      allTokenCount: allTokens.length,
+      changedTokenCount: changedTokenIds.size,
+      changedTokens: Array.from(changedTokenIds),
+    }));
+
     // Detailed timing collection for performance analysis
     const detailedTimings = {
       cacheBuilding: 0,
@@ -211,14 +221,67 @@ export class BatchProcessor {
     }
 
     // Precompute LOS for all token pairs to avoid redundant checks
+    // CRITICAL: Skip ALL precomputed LOS if this batch is after movement (skipPrecomputedLOS flag)
+    // because token positions have changed and any precomputed LOS would be stale
     const precomputedLOS = new Map();
-    for (let i = 0; i < allTokens.length; i++) {
-      for (let j = i + 1; j < allTokens.length; j++) {
-        const tokenA = allTokens[i];
-        const tokenB = allTokens[j];
-        const losAB = this.visionAnalyzer.hasLineOfSight(tokenA, tokenB);
-        precomputedLOS.set(`${tokenA.document.id}-${tokenB.document.id}`, losAB);
-        precomputedLOS.set(`${tokenB.document.id}-${tokenA.document.id}`, losAB);
+
+    if (calcOptions?.skipPrecomputedLOS) {
+      try {
+        getLogger('AVS/BatchProcessor').debug(() => ({
+          msg: 'skipping-all-precomputed-los',
+          reason: 'batch-after-movement',
+        }));
+      } catch { }
+    } else {
+      // Only precompute LOS if not skipping
+      const animatingTokenIds = new Set();
+
+      // Detect which tokens are currently animating or being dragged
+      for (const token of allTokens) {
+        const isAnimating = token._animation?.promise || token._animation?.active;
+        const isDragging = token._dragPassthrough || token.document?.flags?.core?.isDragging;
+        if (isAnimating || isDragging) {
+          animatingTokenIds.add(token.document.id);
+          try {
+            getLogger('AVS/BatchProcessor').debug(() => ({
+              msg: 'detected-animating-token',
+              tokenName: token.name,
+              tokenId: token.document.id,
+              isAnimating,
+              isDragging,
+            }));
+          } catch { }
+        }
+      }
+
+      if (animatingTokenIds.size > 0) {
+        try {
+          getLogger('AVS/BatchProcessor').debug(() => ({
+            msg: 'skipping-precomputed-los-for-animating-tokens',
+            animatingCount: animatingTokenIds.size,
+            animatingTokens: Array.from(animatingTokenIds),
+          }));
+        } catch { }
+      }
+
+      for (let i = 0; i < allTokens.length; i++) {
+        for (let j = i + 1; j < allTokens.length; j++) {
+          const tokenA = allTokens[i];
+          const tokenB = allTokens[j];
+
+          // Skip precomputing LOS if either token is animating/dragging
+          // The LOS will be calculated fresh during visibility calculation instead
+          if (
+            animatingTokenIds.has(tokenA.document.id) ||
+            animatingTokenIds.has(tokenB.document.id)
+          ) {
+            continue;
+          }
+
+          const losAB = this.visionAnalyzer.hasLineOfSight(tokenA, tokenB);
+          precomputedLOS.set(`${tokenA.document.id}-${tokenB.document.id}`, losAB);
+          precomputedLOS.set(`${tokenB.document.id}-${tokenA.document.id}`, losAB);
+        }
       }
     }
 
@@ -245,11 +308,6 @@ export class BatchProcessor {
       if (!changedToken) {
         continue;
       }
-
-      if (this._hasRuleElementOverride(changedToken)) {
-        continue;
-      }
-
       processedTokens++;
 
       // Use precomputed position if available (with early exit optimization)
@@ -441,7 +499,7 @@ export class BatchProcessor {
             // Populate burst memo for immediate subsequent batches
             try {
               if (calcOptions?.burstLosMemo) calcOptions.burstLosMemo.set(pairKey, los);
-            } catch {}
+            } catch { }
           }
 
           batchLosCache.set(pairKey, los);
@@ -517,11 +575,6 @@ export class BatchProcessor {
             breakdown.pairsCached++;
           }
           effectiveVisibility1 = visibility1;
-
-          const ruleElementResult1 = RuleElementChecker.checkRuleElements(changedToken, otherToken);
-          if (ruleElementResult1) {
-            effectiveVisibility1 = ruleElementResult1.state;
-          }
         }
         // Direction 2: otherToken -> changedToken (only calculate if no override)
         if (!hasOverride2) {
@@ -606,6 +659,13 @@ export class BatchProcessor {
     // Multiple batches are triggered per lighting change, causing redundant LOS calculations.
     // Low cache hit rates indicate calculations are repeated across batches.
     // Burst memo (150ms TTL) helps but may need longer TTL or better batch deduplication.
+
+    log.debug(() => ({
+      msg: 'BatchProcessor:process:complete',
+      updatesCount: updates.length,
+      processedTokens,
+      breakdown,
+    }));
 
     return { updates, breakdown, processedTokens, precomputeStats, detailedTimings };
   }

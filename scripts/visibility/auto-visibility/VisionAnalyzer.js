@@ -1,20 +1,20 @@
 /**
  * VisionAnalyzer - Query Interface for Vision and Sensing Capabilities
- * 
+ *
  * Clean query interface that answers questions about what tokens can sense.
  * Uses SensingCapabilitiesBuilder internally to get capabilities data.
- * 
+ *
  * Responsibilities:
  * - Answer queries: "Can this token sense that token?"
  * - Provide vision/sensing capabilities for a token
  * - Calculate distances and line of sight
  * - Cache capabilities for performance
- * 
+ *
  * Does NOT:
  * - Build sensing data (delegates to SensingCapabilitiesBuilder)
  * - Make visibility state decisions (that's StatelessVisibilityCalculator)
  * - Handle UI/dialog concerns (that's SeekDialogAdapter)
- * 
+ *
  * SINGLETON PATTERN
  */
 
@@ -39,20 +39,24 @@ export class VisionAnalyzer {
   #wallCacheTimestamp = new Map();
   #wallCacheTimeout = 5000;
 
-  constructor() {
+  #positionManager = null;
+
+  constructor(positionManager = null) {
     if (VisionAnalyzer.#instance) {
       return VisionAnalyzer.#instance;
     }
+    this.#positionManager = positionManager;
     VisionAnalyzer.#instance = this;
   }
 
   /**
    * Get singleton instance
+   * @param {PositionManager} [positionManager] - Optional PositionManager to inject
    * @returns {VisionAnalyzer}
    */
-  static getInstance() {
+  static getInstance(positionManager = null) {
     if (!VisionAnalyzer.#instance) {
-      VisionAnalyzer.#instance = new VisionAnalyzer();
+      VisionAnalyzer.#instance = new VisionAnalyzer(positionManager);
     }
     return VisionAnalyzer.#instance;
   }
@@ -120,7 +124,7 @@ export class VisionAnalyzer {
       return Object.keys(capabilities.precise).length > 0;
     }
 
-    return Object.values(capabilities.precise).some(range => range >= maxRange);
+    return Object.values(capabilities.precise).some((range) => range >= maxRange);
   }
 
   /**
@@ -136,7 +140,7 @@ export class VisionAnalyzer {
       return Object.keys(capabilities.imprecise).length > 0;
     }
 
-    return Object.values(capabilities.imprecise).some(range => range >= maxRange);
+    return Object.values(capabilities.imprecise).some((range) => range >= maxRange);
   }
 
   /**
@@ -158,7 +162,7 @@ export class VisionAnalyzer {
 
     // Check any imprecise or precise sense (precise can also sense imprecisely)
     const allSenses = { ...capabilities.imprecise, ...capabilities.precise };
-    return Object.values(allSenses).some(range => distance <= range);
+    return Object.values(allSenses).some((range) => distance <= range);
   }
 
   /**
@@ -179,7 +183,7 @@ export class VisionAnalyzer {
     }
 
     // Check any precise sense
-    return Object.values(capabilities.precise).some(range => distance <= range);
+    return Object.values(capabilities.precise).some((range) => distance <= range);
   }
 
   /**
@@ -196,6 +200,12 @@ export class VisionAnalyzer {
       return true;
     }
 
+    // Check if LOS calculation is disabled
+    const losDisabled = game.settings.get(MODULE_ID, 'disableLineOfSightCalculation');
+    if (losDisabled) {
+      return undefined;
+    }
+
     let stage = 'init';
     try {
       // Check for 3D collision using Levels if available
@@ -209,19 +219,168 @@ export class VisionAnalyzer {
       // Darkness sources may affect true LOS, so only return true/false if we can be sure
       stage = 'vision-polygon';
       const los = observer.vision?.los;
-      if (los?.points) {
-        const radius = target.externalRadius;
-        const circle = new PIXI.Circle(target.center.x, target.center.y, radius);
-        const intersection = los.intersectCircle(circle, { density: 8, scalingFactor: 1.0 });
-        const visible = intersection?.points?.length > 0;
-        if (visible || !canvas.effects?.darknessSources?.length) return visible;
+      // CRITICAL: Use PositionManager if available to get correct positions
+      // This fixes the issue where token.center is stale during player movements
+      let observerPos = { x: observer.center.x, y: observer.center.y };
+      let targetPos = { x: target.center.x, y: target.center.y };
+      let usingPositionManager = false;
+
+      // Try to get more accurate positions from injected PositionManager
+      if (this.#positionManager) {
+        try {
+          const pmObserverPos = this.#positionManager.getTokenPosition(observer);
+          const pmTargetPos = this.#positionManager.getTokenPosition(target);
+
+          if (pmObserverPos) {
+            observerPos = { x: pmObserverPos.x, y: pmObserverPos.y };
+            usingPositionManager = true;
+          }
+          if (pmTargetPos) {
+            targetPos = { x: pmTargetPos.x, y: pmTargetPos.y };
+            usingPositionManager = true;
+          }
+
+          // Debug log to verify PositionManager is being used
+          if (usingPositionManager) {
+            const log = getLogger('AVS/VisionAnalyzer');
+            log.debug(
+              () =>
+                `using-position-manager-for-los: ${observer.name} -> ${target.name}, PM_obs=(${Math.round(observerPos.x)},${Math.round(observerPos.y)}), PM_tgt=(${Math.round(targetPos.x)},${Math.round(targetPos.y)}), Canvas_obs=(${Math.round(observer.center.x)},${Math.round(observer.center.y)}), Canvas_tgt=(${Math.round(target.center.x)},${Math.round(target.center.y)})`,
+            );
+          }
+        } catch (e) {
+          // Fall back to token.center if PositionManager access fails
+        }
       }
 
-      // Check if LOS calculation is disabled
-      stage = 'settings-check';
-      const losDisabled = game.settings.get(MODULE_ID, 'disableLineOfSightCalculation');
-      if (losDisabled) {
-        return undefined;
+      // Use vision polygon for LOS check - this is Foundry's accurate pre-computed vision
+      // The vision polygon is based on the observer's position and respects all walls
+      // HOWEVER: During token movement, the vision polygon may be stale (based on old position)
+      // So we check if the observer position has changed significantly
+      const visionPolygonStale =
+        usingPositionManager &&
+        los?.points &&
+        (Math.abs(observerPos.x - observer.center.x) > 5 ||
+          Math.abs(observerPos.y - observer.center.y) > 5);
+
+      if (los?.points && !visionPolygonStale) {
+        const radius = target.externalRadius;
+        // Use targetPos from PositionManager for accurate target position
+        const circle = new PIXI.Circle(targetPos.x, targetPos.y, radius);
+        const intersection = los.intersectCircle(circle, { density: 8, scalingFactor: 1.0 });
+        const visible = intersection?.points?.length > 0;
+
+        const log = getLogger('AVS/VisionAnalyzer');
+        log.debug(
+          () =>
+            `vision-polygon-check: ${observer.name} -> ${target.name}, hasIntersection=${visible}, polygonPoints=${los.points.length}`,
+        );
+
+        // HYBRID VALIDATION: Compare vision polygon with full geometric LOS
+        // When they agree, trust the result. When they disagree, use geometric as tiebreaker.
+        const cachedWalls = this.#getCachedWalls(null); // Get all walls for validation
+
+        // Run full geometric LOS check (same logic as the fallback below)
+        const observerCenter = { x: observerPos.x, y: observerPos.y };
+        const targetPoints = this.#getTokenSamplePoints(target, targetPos);
+
+        // Check center-to-center first
+        const centerHasLOS = this.#checkSingleRayLOSWithWalls(
+          observerCenter,
+          targetPoints[0], // Target center
+          cachedWalls,
+        );
+
+        let geometricResult = centerHasLOS;
+
+        // If center is blocked, check for 2+ corner rays (same as fallback logic)
+        if (!centerHasLOS) {
+          let clearRays = 0;
+          const requiredRays = 2;
+
+          for (let i = 1; i < targetPoints.length; i++) {
+            const hasLOS = this.#checkSingleRayLOSWithWalls(
+              observerCenter,
+              targetPoints[i],
+              cachedWalls,
+            );
+            if (hasLOS) {
+              clearRays++;
+              if (clearRays >= requiredRays) {
+                geometricResult = true;
+                break;
+              }
+            }
+          }
+        }
+
+        if (visible === geometricResult) {
+          // Both systems agree - high confidence result
+          log.debug(
+            () =>
+              `vision-polygon-AGREEMENT: ${observer.name} -> ${target.name}, both polygon and geometric agree: ${visible}`,
+          );
+          return visible;
+        } else {
+          // Systems disagree - use geometric as tiebreaker (more predictable)
+          log.debug(
+            () =>
+              `vision-polygon-DISAGREEMENT: ${observer.name} -> ${target.name}, polygon=${visible}, geometric=${geometricResult}, using geometric result`,
+          );
+          return geometricResult;
+        }
+      } else if (visionPolygonStale) {
+        const log = getLogger('AVS/VisionAnalyzer');
+        log.debug(
+          () => `vision-polygon-STALE: ${observer.name} moved, falling back to geometric LOS`,
+        );
+      } else if (!los?.points) {
+        const log = getLogger('AVS/VisionAnalyzer');
+        log.debug(
+          () =>
+            `vision-polygon-UNAVAILABLE: ${observer.name} -> ${target.name}, attempting testVisibility`,
+        );
+
+        // CRITICAL: When vision polygon is unavailable, use Foundry's testVisibility
+        // This computes the vision polygon on-demand and is more accurate than geometric sampling
+        try {
+          // testVisibility requires a point to test - use target's center
+          const testPoint = { x: targetPos.x, y: targetPos.y };
+          // Use the observer's vision source to test visibility
+          const visionSource = observer.vision;
+
+          log.debug(
+            () =>
+              `testVisibility-check: visionSource=${!!visionSource}, canvas.visibility=${!!canvas.visibility}`,
+          );
+
+          if (visionSource && canvas.visibility) {
+            const isVisible = canvas.visibility.testVisibility(testPoint, {
+              object: target,
+              source: visionSource,
+            });
+            log.debug(
+              () =>
+                `testVisibility-result: ${observer.name} -> ${target.name}, isVisible=${isVisible}`,
+            );
+            return isVisible;
+          } else {
+            log.debug(
+              () =>
+                `testVisibility-unavailable: ${observer.name} -> ${target.name}, visionSource=${!!visionSource}, canvas.visibility=${!!canvas.visibility}, falling back to geometric LOS`,
+            );
+            // CRITICAL: When vision source is unavailable (token not controlled),
+            // we can't compute accurate vision polygons. Fall back to geometric sampling
+            // with the 2-ray requirement for better accuracy.
+            // This is less accurate than vision polygons but better than center-only.
+          }
+        } catch (error) {
+          log.debug(
+            () =>
+              `testVisibility-failed: ${observer.name} -> ${target.name}, error=${error.message}`,
+          );
+          // Fall through to geometric sampling if testVisibility fails
+        }
       }
 
       // Use multi-point geometric sampling with cached wall filtering
@@ -234,8 +393,7 @@ export class VisionAnalyzer {
           bottom: Math.min(observerSpan.bottom, targetSpan.bottom),
           top: Math.max(observerSpan.top, targetSpan.top),
         };
-      } catch (error) {
-      }
+      } catch (error) {}
 
       stage = 'get-walls';
       const cachedWalls = this.#getCachedWalls(elevationRange);
@@ -243,30 +401,76 @@ export class VisionAnalyzer {
       // Early exit: if no walls, always have LOS
       stage = 'wall-check';
       if (cachedWalls.length === 0) {
+        const log = getLogger('AVS/VisionAnalyzer');
+        log.debug(
+          () => `LOS-no-walls: ${observer.name} -> ${target.name}, returning true (no walls found)`,
+        );
         return true;
       }
 
       stage = 'sample-points';
-      const observerPoints = this.#getTokenSamplePoints(observer);
-      const targetPoints = this.#getTokenSamplePoints(target);
+      // Get observer and target sample points
+      const observerPoints = this.#getTokenSamplePoints(observer, observerPos);
+      const targetPoints = this.#getTokenSamplePoints(target, targetPos);
+      const observerCenter = observerPoints[0]; // Center is first point
+      const targetCenter = targetPoints[0]; // Center is first point
 
       // Check center-to-center first (most common case)
       stage = 'center-check';
-      if (this.#checkSingleRayLOSWithWalls(observerPoints[0], targetPoints[0], cachedWalls)) {
+      const centerHasLOS = this.#checkSingleRayLOSWithWalls(
+        observerCenter,
+        targetCenter,
+        cachedWalls,
+      );
+
+      // Debug log for center-to-center check
+      const log = getLogger('AVS/VisionAnalyzer');
+      log.debug(
+        () =>
+          `LOS-center-check: ${observer.name} -> ${target.name}, from=(${Math.round(observerCenter.x)},${Math.round(observerCenter.y)}), to=(${Math.round(targetCenter.x)},${Math.round(targetCenter.y)}), walls=${cachedWalls.length}, result=${centerHasLOS}`,
+      );
+
+      if (centerHasLOS) {
         return true;
       }
 
-      // Only check additional points if center-to-center failed
-      stage = 'additional-points';
-      for (let i = 0; i < observerPoints.length; i++) {
-        for (let j = 0; j < targetPoints.length; j++) {
-          if (i === 0 && j === 0) continue; // Already checked center-to-center
-          if (this.#checkSingleRayLOSWithWalls(observerPoints[i], targetPoints[j], cachedWalls)) {
+      // CONSERVATIVE RAY SAMPLING: When vision polygon is unavailable, be very conservative
+      // Since Foundry's vision polygon is authoritative and accounts for complex geometry,
+      // our geometric fallback should err on the side of "no LOS" to avoid false positives.
+      // Only return true if we find multiple clear rays, indicating significant visibility.
+      stage = 'target-sampling';
+      let clearRays = 0;
+      const requiredRays = 2; // Require at least 2 clear rays for conservative LOS
+
+      for (let i = 1; i < targetPoints.length; i++) {
+        // Skip index 0 (center), already checked
+        const hasLOS = this.#checkSingleRayLOSWithWalls(
+          observerCenter,
+          targetPoints[i],
+          cachedWalls,
+        );
+        if (hasLOS) {
+          clearRays++;
+          log.debug(
+            () =>
+              `LOS-center-to-target: ${observer.name} -> ${target.name}, from=(${Math.round(observerCenter.x)},${Math.round(observerCenter.y)}), to=(${Math.round(targetPoints[i].x)},${Math.round(targetPoints[i].y)}), pointIdx=${i}, clearRays=${clearRays}`,
+          );
+
+          // Conservative approach: require multiple clear rays to confirm LOS
+          if (clearRays >= requiredRays) {
+            log.debug(
+              () =>
+                `LOS-confirmed-conservative: ${observer.name} -> ${target.name}, found ${clearRays} clear rays (required ${requiredRays})`,
+            );
             return true;
           }
         }
       }
 
+      log.debug(
+        () =>
+          `LOS-all-blocked-conservative: ${observer.name} -> ${target.name}, found only ${clearRays} clear rays (required ${requiredRays})`,
+      );
       return false;
     } catch (error) {
       console.error(`[LineOfSight] Error in stage '${stage}':`, error);
@@ -274,7 +478,6 @@ export class VisionAnalyzer {
       return false;
     }
   }
-
   /**
    * Get cached filtered walls for elevation range
    * Caches the expensive wall filtering operation
@@ -286,7 +489,7 @@ export class VisionAnalyzer {
     const cacheKey = `${elevationRange?.bottom ?? 'none'}_${elevationRange?.top ?? 'none'}`;
 
     const timestamp = this.#wallCacheTimestamp.get(cacheKey);
-    if (timestamp && (Date.now() - timestamp) < this.#wallCacheTimeout) {
+    if (timestamp && Date.now() - timestamp < this.#wallCacheTimeout) {
       const cached = this.#wallCache.get(cacheKey);
       if (cached) {
         return cached;
@@ -342,27 +545,32 @@ export class VisionAnalyzer {
    * Returns center + 8 edge/corner points for comprehensive coverage
    * @private
    */
-  #getTokenSamplePoints(token) {
-    const center = { x: token.center.x, y: token.center.y };
+  #getTokenSamplePoints(token, centerPos = null) {
+    // Use provided center position or fall back to token.center
+    const center = centerPos
+      ? { x: centerPos.x, y: centerPos.y }
+      : { x: token.center.x, y: token.center.y };
     const w = token.document.width * canvas.grid.size;
     const h = token.document.height * canvas.grid.size;
-    const x = token.document.x;
-    const y = token.document.y;
+
+    // Calculate x,y based on center position if provided
+    const x = centerPos ? centerPos.x - w / 2 : token.document.x;
+    const y = centerPos ? centerPos.y - h / 2 : token.document.y;
 
     // Small inset to ensure points are inside token bounds
     const inset = 2;
 
     // Sample center + 4 corners + 4 edge midpoints for maximum coverage
     return [
-      center,                                        // Center
-      { x: x + inset, y: y + inset },               // Top-left corner
-      { x: x + w - inset, y: y + inset },           // Top-right corner
-      { x: x + inset, y: y + h - inset },           // Bottom-left corner
-      { x: x + w - inset, y: y + h - inset },       // Bottom-right corner
-      { x: x + w * 0.5, y: y + inset },             // Top edge center
-      { x: x + w * 0.5, y: y + h - inset },         // Bottom edge center
-      { x: x + inset, y: y + h * 0.5 },             // Left edge center
-      { x: x + w - inset, y: y + h * 0.5 }          // Right edge center
+      center, // Center
+      { x: x + inset, y: y + inset }, // Top-left corner
+      { x: x + w - inset, y: y + inset }, // Top-right corner
+      { x: x + inset, y: y + h - inset }, // Bottom-left corner
+      { x: x + w - inset, y: y + h - inset }, // Bottom-right corner
+      { x: x + w * 0.5, y: y + inset }, // Top edge center
+      { x: x + w * 0.5, y: y + h - inset }, // Bottom edge center
+      { x: x + inset, y: y + h * 0.5 }, // Left edge center
+      { x: x + w - inset, y: y + h * 0.5 }, // Right edge center
     ];
   }
 
@@ -375,6 +583,9 @@ export class VisionAnalyzer {
     const rayLength = Math.sqrt((toPoint.x - fromPoint.x) ** 2 + (toPoint.y - fromPoint.y) ** 2);
     const limitedWallIntersections = [];
 
+    // Debug: log ray details for problematic case
+    const isProblematicRay = Math.abs(fromPoint.x - 1702) < 5 && Math.abs(fromPoint.y - 1102) < 5;
+
     for (const wall of walls) {
       // For doors, skip the distance optimization since they need special proximity handling
       // Doors can block vision even when the ray midpoint is far from the door midpoint
@@ -385,7 +596,7 @@ export class VisionAnalyzer {
         const wallMidY = (wall.document.c[1] + wall.document.c[3]) / 2;
         const distToRayMid = Math.sqrt(
           (wallMidX - (fromPoint.x + toPoint.x) / 2) ** 2 +
-          (wallMidY - (fromPoint.y + toPoint.y) / 2) ** 2
+            (wallMidY - (fromPoint.y + toPoint.y) / 2) ** 2,
         );
 
         if (distToRayMid > rayLength * 1.5) {
@@ -452,11 +663,24 @@ export class VisionAnalyzer {
         { x: ray.A.x, y: ray.A.y },
         { x: ray.B.x, y: ray.B.y },
         { x: wall.document.c[0], y: wall.document.c[1] },
-        { x: wall.document.c[2], y: wall.document.c[3] }
+        { x: wall.document.c[2], y: wall.document.c[3] },
       );
 
+      if (isProblematicRay) {
+        const log = getLogger('AVS/VisionAnalyzer');
+        log.debug(
+          () =>
+            `wall-check: from=(${Math.round(fromPoint.x)},${Math.round(fromPoint.y)}), to=(${Math.round(toPoint.x)},${Math.round(toPoint.y)}), wall=(${wall.document.c[0]},${wall.document.c[1]})->(${wall.document.c[2]},${wall.document.c[3]}), hasIntersection=${!!intersection}, t0=${intersection?.t0?.toFixed(3)}`,
+        );
+      }
+
       // Check if intersection is within the ray segment (0 <= t0 <= 1)
-      if (intersection && typeof intersection.t0 === 'number' && intersection.t0 >= 0 && intersection.t0 <= 1) {
+      if (
+        intersection &&
+        typeof intersection.t0 === 'number' &&
+        intersection.t0 >= 0 &&
+        intersection.t0 <= 1
+      ) {
         // Compute t1 for the wall segment
         const wallDx = wall.document.c[2] - wall.document.c[0];
         const wallDy = wall.document.c[3] - wall.document.c[1];
@@ -472,6 +696,14 @@ export class VisionAnalyzer {
         // Check if t1 is also within [0, 1] (intersection within wall segment)
         if (t1 >= 0 && t1 <= 1) {
           // Ray intersects this wall
+
+          if (isProblematicRay) {
+            const log = getLogger('AVS/VisionAnalyzer');
+            log.debug(
+              () =>
+                `wall-intersection-found: t1=${t1.toFixed(3)}, wallDir=${wall.document.dir}, checking directional...`,
+            );
+          }
 
           // Check for directional walls (one-way walls)
           // dir: 0 = both directions, 1 = left side blocks, 2 = right side blocks
@@ -498,6 +730,10 @@ export class VisionAnalyzer {
 
           // If wall doesn't block sight, skip it for LOS check
           if (!blocksSight) {
+            if (isProblematicRay) {
+              const log = getLogger('AVS/VisionAnalyzer');
+              log.debug(() => `wall-doesnt-block-sight: sight=${wall.document.sight}, skipping`);
+            }
             continue;
           }
 
@@ -508,12 +744,38 @@ export class VisionAnalyzer {
           const isLimited = isLimitedSight || isLimitedLight || isLimitedSound;
 
           if (isLimited) {
-            limitedWallIntersections.push({ x: intersection.x, y: intersection.y, t0: intersection.t0 });
+            if (isProblematicRay) {
+              const log = getLogger('AVS/VisionAnalyzer');
+              log.debug(() => `wall-limited: adding to limitedWallIntersections`);
+            }
+            limitedWallIntersections.push({
+              x: intersection.x,
+              y: intersection.y,
+              t0: intersection.t0,
+            });
           } else {
+            if (isProblematicRay) {
+              const log = getLogger('AVS/VisionAnalyzer');
+              log.debug(() => `wall-BLOCKS-completely: returning false immediately`);
+            }
             return false;
           }
+        } else if (isProblematicRay) {
+          const log = getLogger('AVS/VisionAnalyzer');
+          log.debug(() => `wall-t1-out-of-range: t1=${t1?.toFixed(3)} not in [0,1]`);
         }
+      } else if (isProblematicRay && intersection) {
+        const log = getLogger('AVS/VisionAnalyzer');
+        log.debug(() => `wall-t0-out-of-range: t0=${intersection.t0?.toFixed(3)} not in [0,1]`);
       }
+    }
+
+    if (isProblematicRay) {
+      const log = getLogger('AVS/VisionAnalyzer');
+      log.debug(
+        () =>
+          `ray-final-result: limitedWalls=${limitedWallIntersections.length}, returning=${limitedWallIntersections.length < 2}`,
+      );
     }
 
     // Check if we hit 2+ Limited walls at different locations
@@ -521,9 +783,8 @@ export class VisionAnalyzer {
       // Check if all intersections are at approximately the same point (corner hit)
       const epsilon = 0.1; // Small tolerance for floating point comparison
       const first = limitedWallIntersections[0];
-      const allSamePoint = limitedWallIntersections.every(point =>
-        Math.abs(point.x - first.x) < epsilon &&
-        Math.abs(point.y - first.y) < epsilon
+      const allSamePoint = limitedWallIntersections.every(
+        (point) => Math.abs(point.x - first.x) < epsilon && Math.abs(point.y - first.y) < epsilon,
       );
 
       if (!allSamePoint) {
@@ -578,10 +839,15 @@ export class VisionAnalyzer {
           { x: ray.A.x, y: ray.A.y },
           { x: ray.B.x, y: ray.B.y },
           { x: wall.document.c[0], y: wall.document.c[1] },
-          { x: wall.document.c[2], y: wall.document.c[3] }
+          { x: wall.document.c[2], y: wall.document.c[3] },
         );
 
-        if (intersection && typeof intersection.t0 === 'number' && intersection.t0 >= 0 && intersection.t0 <= 1) {
+        if (
+          intersection &&
+          typeof intersection.t0 === 'number' &&
+          intersection.t0 >= 0 &&
+          intersection.t0 <= 1
+        ) {
           const wallDx = wall.document.c[2] - wall.document.c[0];
           const wallDy = wall.document.c[3] - wall.document.c[1];
           let t1;
@@ -617,7 +883,7 @@ export class VisionAnalyzer {
       // On error, assume sound is NOT blocked (fail open for better UX)
       return false;
     }
-  }  /**
+  } /**
    * Check if actor has Silence effect active
    * @private
    * @param {Actor} actor
@@ -625,12 +891,12 @@ export class VisionAnalyzer {
    */
   #hasSilenceEffect(actor) {
     try {
-      const effects = actor.itemTypes?.effect ?? actor.items?.filter?.(i => i?.type === 'effect') ?? [];
-      return effects?.some?.(effect => {
+      const effects =
+        actor.itemTypes?.effect ?? actor.items?.filter?.((i) => i?.type === 'effect') ?? [];
+      return effects?.some?.((effect) => {
         const slug = effect?.slug || effect?.system?.slug || '';
         const name = effect?.name?.toLowerCase() || '';
-        return slug.toLowerCase() === 'spell-effect-silence' ||
-          name.includes('silence');
+        return slug.toLowerCase() === 'spell-effect-silence' || name.includes('silence');
       });
     } catch {
       return false;
@@ -689,10 +955,9 @@ export class VisionAnalyzer {
     const distance = this.distanceFeet(observer, target);
 
     // Check for precise non-visual senses within range
-    const nonVisualSenses = Object.entries(capabilities.precise).filter(([senseType]) =>
-      senseType !== 'vision' &&
-      senseType !== 'sight' &&
-      !senseType.includes('vision')
+    const nonVisualSenses = Object.entries(capabilities.precise).filter(
+      ([senseType]) =>
+        senseType !== 'vision' && senseType !== 'sight' && !senseType.includes('vision'),
     );
 
     return nonVisualSenses.some(([_, range]) => distance <= range);
@@ -723,8 +988,10 @@ export class VisionAnalyzer {
     const sensingCaps = this.getSensingCapabilities(observer);
 
     // Visual senses can detect elevated targets only if there's line of sight
-    if ((capabilities.hasDarkvision || capabilities.hasLowLightVision || capabilities.hasVision) &&
-      this.hasLineOfSight(observer, target)) {
+    if (
+      (capabilities.hasDarkvision || capabilities.hasLowLightVision || capabilities.hasVision) &&
+      this.hasLineOfSight(observer, target)
+    ) {
       return true;
     }
 
@@ -879,7 +1146,6 @@ export class VisionAnalyzer {
     // Extract vision data and conditions
     const visionData = this.#extractVisionData(token, actor);
 
-
     // Build sensing capabilities using SensingCapabilitiesBuilder
     const rawSensing = SensingCapabilitiesBuilder.build({
       senses: visionData.senses,
@@ -890,10 +1156,8 @@ export class VisionAnalyzer {
       },
     });
 
-
     // Enhance with special sense interpretation and echolocation detection
     const sensing = this.#enhanceSensingCapabilities(rawSensing, actor);
-
 
     // Build legacy format for backward compatibility
     const legacy = this.#buildLegacyFormat(visionData, sensing);
@@ -917,8 +1181,15 @@ export class VisionAnalyzer {
 
     // Filter out visual senses if blinded
     if (isBlinded) {
-      const visualSenseTypes = ['vision', 'sight', 'darkvision', 'greater-darkvision', 'low-light-vision',
-        'see-invisibility', 'see-all'];
+      const visualSenseTypes = [
+        'vision',
+        'sight',
+        'darkvision',
+        'greater-darkvision',
+        'low-light-vision',
+        'see-invisibility',
+        'see-all',
+      ];
       for (const senseType of visualSenseTypes) {
         delete enhanced.precise[senseType];
         delete enhanced.imprecise[senseType];
@@ -954,9 +1225,12 @@ export class VisionAnalyzer {
 
     try {
       // Check for echolocation effect
-      const effects = actor.itemTypes?.effect ?? actor.items?.filter?.(i => i?.type === 'effect') ?? [];
-      const hasEffect = effects?.some?.(effect =>
-        (effect?.slug || effect?.system?.slug || effect?.name)?.toLowerCase?.() === 'effect-echolocation'
+      const effects =
+        actor.itemTypes?.effect ?? actor.items?.filter?.((i) => i?.type === 'effect') ?? [];
+      const hasEffect = effects?.some?.(
+        (effect) =>
+          (effect?.slug || effect?.system?.slug || effect?.name)?.toLowerCase?.() ===
+          'effect-echolocation',
       );
 
       if (hasEffect) {
@@ -1027,7 +1301,6 @@ export class VisionAnalyzer {
 
       // Build detection modes object
       this.#buildDetectionModes(token, result);
-
     } catch (error) {
       log.debug('Error extracting vision data', error);
     }
@@ -1163,7 +1436,10 @@ export class VisionAnalyzer {
   #buildLegacyFormat(visionData, sensing) {
     // Build legacy array-based format from object-based sensing
     const preciseArray = Object.entries(sensing.precise).map(([type, range]) => ({ type, range }));
-    const impreciseArray = Object.entries(sensing.imprecise).map(([type, range]) => ({ type, range }));
+    const impreciseArray = Object.entries(sensing.imprecise).map(([type, range]) => ({
+      type,
+      range,
+    }));
 
     // Build individual sense properties for legacy access
     const hearingPrecise = sensing.precise.hearing;
@@ -1233,7 +1509,7 @@ export class VisionAnalyzer {
       precise: sensing.precise,
       imprecise: sensing.imprecise,
 
-      // Top-level: legacy special properties  
+      // Top-level: legacy special properties
       hearing,
       lifesense,
       echolocationActive,
@@ -1271,7 +1547,7 @@ export class VisionAnalyzer {
       if (actor.conditions) {
         try {
           return Array.from(actor.conditions).some(
-            condition => condition.slug === conditionSlug || condition.key === conditionSlug
+            (condition) => condition.slug === conditionSlug || condition.key === conditionSlug,
           );
         } catch {
           // Ignore iteration errors
@@ -1281,7 +1557,8 @@ export class VisionAnalyzer {
       // Method 5: Check itemTypes
       if (actor.itemTypes?.condition) {
         return actor.itemTypes.condition.some(
-          condition => condition.slug === conditionSlug || condition.system?.slug === conditionSlug
+          (condition) =>
+            condition.slug === conditionSlug || condition.system?.slug === conditionSlug,
         );
       }
 
