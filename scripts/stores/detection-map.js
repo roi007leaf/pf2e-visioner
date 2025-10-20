@@ -12,7 +12,7 @@
  */
 
 import { MODULE_ID } from '../constants.js';
-import { getBestVisibilityState } from '../utils.js';
+import { getBestVisibilityState, getControlledObserverTokens } from '../utils.js';
 import { getVisibilityBetween } from './visibility-map.js';
 
 let batchMode = false;
@@ -197,29 +197,18 @@ function getDetectionBetweenWithAggregation(observer, target) {
     return getDetectionBetween(observer, target);
   }
 
-  // Only apply aggregation if observer is one of the controlled tokens
-  const controlled = canvas.tokens.controlled;
-  if (controlled.length === 0) {
+  // Get tokens with observer permissions
+  const observerTokens = getControlledObserverTokens();
+  if (observerTokens.length <= 1) {
     return getDetectionBetween(observer, target);
   }
 
-  // Check if the observer token is in the controlled list
-  const isObserverControlled = controlled.some(t => t.id === observer.id);
-  if (!isObserverControlled) {
-    return getDetectionBetween(observer, target);
-  }
-
-  // If only one controlled token, no aggregation needed
-  if (controlled.length === 1) {
-    return getDetectionBetween(observer, target);
-  }
-
-  // Multiple controlled tokens - get detection from the observer with best visibility
-  // First, get all visibility states from all controlled observers
-  const visibilityStates = controlled
-    .map(controlledObserver => ({
-      token: controlledObserver,
-      visibility: getVisibilityBetween(controlledObserver, target),
+  // Multiple observer tokens - get detection from the observer with best visibility
+  // First, get all visibility states from all observer tokens
+  const visibilityStates = observerTokens
+    .map(observerToken => ({
+      token: observerToken,
+      visibility: getVisibilityBetween(observerToken, target),
     }))
     .filter(item => item.visibility !== undefined && item.visibility !== null);
 
@@ -257,3 +246,4 @@ export async function clearAllDetections(observer) {
   if (!observer?.document) return;
   await setDetectionMap(observer, {});
 }
+

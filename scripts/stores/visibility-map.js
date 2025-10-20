@@ -3,7 +3,7 @@
  */
 
 import { MODULE_ID } from '../constants.js';
-import { getBestVisibilityState } from '../utils.js';
+import { getBestVisibilityState, getControlledObserverTokens } from '../utils.js';
 import { autoVisibilitySystem } from '../visibility/auto-visibility/index.js';
 import { updateEphemeralEffectsForVisibility } from '../visibility/ephemeral.js';
 
@@ -147,7 +147,7 @@ export function getVisibility(observer, target, direction = 'observer_to_target'
 
 /**
  * Get visibility between tokens with optional aggregation for camera vision.
- * If camera vision aggregation is enabled and observer has multiple controlled tokens,
+ * If camera vision aggregation is enabled and observer has multiple permission tokens,
  * returns the best (most permissive) visibility state across all observers.
  * @param {Token} observer - Observer token
  * @param {Token} target - Target token
@@ -168,29 +168,17 @@ function getVisibilityBetweenWithAggregation(observer, target) {
     return getVisibilityBetween(observer, target);
   }
 
-  // Only apply aggregation if observer is one of the controlled tokens
-  // This ensures aggregation only applies to player-controlled camera viewing
-  const controlled = canvas.tokens.controlled;
-  if (controlled.length === 0) {
+  // Get all tokens with observer permissions (or selected tokens for GM)
+  const observerTokens = getControlledObserverTokens();
+  if (observerTokens.length <= 1) {
+    // Only one or no observer tokens, no aggregation needed
     return getVisibilityBetween(observer, target);
   }
 
-  // Check if the observer token is in the controlled list
-  const isObserverControlled = controlled.some(t => t.id === observer.id);
-  if (!isObserverControlled) {
-    // Not a controlled token, use normal logic
-    return getVisibilityBetween(observer, target);
-  }
-
-  // If only one controlled token, no aggregation needed
-  if (controlled.length === 1) {
-    return getVisibilityBetween(observer, target);
-  }
-
-  // Multiple controlled tokens - aggregate visibility from all of them
-  // Get the best visibility state from all controlled observers
-  const visibilityStates = controlled
-    .map(controlledObserver => getVisibilityBetween(controlledObserver, target))
+  // Multiple observer tokens - aggregate visibility from all of them
+  // Get the best visibility state from all observer tokens
+  const visibilityStates = observerTokens
+    .map(observerToken => getVisibilityBetween(observerToken, target))
     .filter(state => state !== undefined && state !== null);
 
   if (visibilityStates.length === 0) {

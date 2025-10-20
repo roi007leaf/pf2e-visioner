@@ -452,16 +452,30 @@ export function getBestVisibilityState(states) {
 }
 
 /**
- * Get all tokens that the current user can control (has observer permissions on).
- * Primarily used for camera vision aggregation feature.
- * @returns {Token[]} Array of tokens the user controls
+ * Get all tokens that the current user has observer permissions on.
+ * For camera/spectator accounts: returns party tokens they can view but don't own
+ * For GMs: returns selected tokens (controlled), or all tokens if none selected
+ * For players: returns tokens they have observer perms on (usually their party)
+ * 
+ * Note: "observer permissions" != "selected tokens" in PF2E
+ * This function aggregates vision for camera accounts in streaming scenarios.
+ * 
+ * @returns {Token[]} Array of tokens the user can observe/control for visibility
  */
 export function getControlledObserverTokens() {
   if (!canvas?.tokens?.placeables) return [];
 
-  const controlled = canvas.tokens.controlled;
-  if (controlled.length === 0) return [];
+  // For GMs: prefer selected/controlled tokens, fallback to all tokens
+  if (game.user.isGM) {
+    const controlled = canvas.tokens.controlled;
+    if (controlled.length > 0) {
+      return controlled;
+    }
+    return canvas.tokens.placeables;
+  }
 
-  return controlled;
+  // For non-GMs: get tokens with observer permissions that aren't owned by the user
+  // This is the camera account case: they have observer perms on party tokens but don't own them
+  return canvas.tokens.placeables.filter(token => token.observer && !token.isOwner);
 }
 

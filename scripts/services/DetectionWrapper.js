@@ -3,7 +3,7 @@
  */
 
 import { MODULE_ID } from '../constants.js';
-import { getBestVisibilityState, getVisibilityMap } from '../utils.js';
+import { getBestVisibilityState, getControlledObserverTokens, getVisibilityMap } from '../utils.js';
 
 /**
  * Class wrapper for PF2E detection integration to support init/teardown.
@@ -169,26 +169,18 @@ function getVisibilityBetweenTokens(observer, target) {
     return visibilityMap[target.document.id] || 'observed';
   }
 
-  // Camera vision aggregation enabled - check if observer is one of multiple controlled tokens
-  const controlled = canvas.tokens.controlled;
-  if (controlled.length <= 1) {
-    // Only one or no controlled tokens, no aggregation needed
+  // Camera vision aggregation enabled - get tokens with observer permissions
+  const observerTokens = getControlledObserverTokens();
+  if (observerTokens.length <= 1) {
+    // Only one or no observer tokens, no aggregation needed
     const visibilityMap = getVisibilityMap(observer);
     return visibilityMap[target.document.id] || 'observed';
   }
 
-  // Check if the observer token is in the controlled list
-  const isObserverControlled = controlled.some(t => t.id === observer.id);
-  if (!isObserverControlled) {
-    // Not a controlled token, use standard behavior
-    const visibilityMap = getVisibilityMap(observer);
-    return visibilityMap[target.document.id] || 'observed';
-  }
-
-  // Multiple controlled tokens - aggregate visibility from all of them
-  const visibilityStates = controlled
-    .map(controlledObserver => {
-      const map = getVisibilityMap(controlledObserver);
+  // Multiple observer tokens - aggregate visibility from all of them
+  const visibilityStates = observerTokens
+    .map(observerToken => {
+      const map = getVisibilityMap(observerToken);
       return map[target.document.id] || 'observed';
     })
     .filter(state => state !== undefined && state !== null);
