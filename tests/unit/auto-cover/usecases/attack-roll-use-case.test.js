@@ -408,6 +408,7 @@ describe('AttackRollUseCase', () => {
       attackRollUseCase._resolveAttackerFromCtx = jest.fn().mockReturnValue(attackerToken);
       attackRollUseCase._resolveTargetFromCtx = jest.fn().mockReturnValue(targetToken);
       attackRollUseCase._detectCover = jest.fn().mockReturnValue('standard');
+      jest.spyOn(attackRollUseCase, '_applyCoverEphemeralEffect').mockResolvedValue(undefined);
 
       // Mock UI manager
       attackRollUseCase.coverUIManager = {

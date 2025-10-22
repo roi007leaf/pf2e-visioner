@@ -7,11 +7,11 @@ export class ActionQualificationIntegration {
 
     try {
       const result = ActionQualifier.checkHidePrerequisites(token);
-      
+
       if (!result.canHide) {
         qualification.endQualifies = false;
         qualification.bothQualify = false;
-        qualification.reason = result.messages.length > 0 
+        qualification.reason = result.messages.length > 0
           ? result.messages.join(', ')
           : game.i18n.localize('PF2E_VISIONER.RULE_ELEMENTS.EFFECT.MESSAGES.CONCEALMENT_QUALIFICATION_FAILED');
       }
@@ -30,8 +30,8 @@ export class ActionQualificationIntegration {
     if (!token || !qualification) return qualification;
 
     try {
-      const result = ActionQualifier.checkSneakPrerequisites(token, position);
-      
+      const result = ActionQualifier.checkSneakPrerequisites(token, null, position);
+
       if (!result.qualifies) {
         if (position === 'start') {
           qualification.startQualifies = false;
@@ -39,7 +39,7 @@ export class ActionQualificationIntegration {
           qualification.endQualifies = false;
         }
         qualification.bothQualify = qualification.startQualifies && qualification.endQualifies;
-        
+
         if (result.messages.length > 0) {
           qualification.reason = result.messages.join(', ');
         }
@@ -85,7 +85,7 @@ export class ActionQualificationIntegration {
     if (qualification.ruleElementMessages && qualification.ruleElementMessages.length > 0) {
       const originalReason = qualification.reason || '';
       const messageText = qualification.ruleElementMessages.join('. ');
-      qualification.reason = originalReason 
+      qualification.reason = originalReason
         ? `${originalReason}. ${messageText}`
         : messageText;
     }
@@ -105,7 +105,7 @@ export class ActionQualificationIntegration {
     if (!hasQualifyingConcealment && !hasQualifyingCover) {
       currentQualification.endQualifies = false;
       currentQualification.bothQualify = false;
-      
+
       const messages = [...concealmentCheck.messages, ...coverCheck.messages];
       if (messages.length > 0) {
         currentQualification.reason = messages.join('. ');
@@ -118,7 +118,7 @@ export class ActionQualificationIntegration {
   static async checkSneakWithRuleElements(token, currentQualification, position = 'start') {
     if (!token) return currentQualification;
 
-    const result = ActionQualifier.checkSneakPrerequisites(token, position);
+    const result = ActionQualifier.checkSneakPrerequisites(token, null, position);
 
     if (!result.qualifies) {
       if (position === 'start') {
@@ -127,7 +127,7 @@ export class ActionQualificationIntegration {
         currentQualification.endQualifies = false;
       }
       currentQualification.bothQualify = currentQualification.startQualifies && currentQualification.endQualifies;
-      
+
       if (result.messages.length > 0) {
         currentQualification.reason = result.messages.join('. ');
       }

@@ -82,7 +82,7 @@ export class TokenEventHandler {
 
       if (this.overrideValidationManager) {
         this.overrideValidationManager.queueOverrideValidation(tokenDoc.id);
-        this.overrideValidationManager.processQueuedValidations().catch(() => {});
+        this.overrideValidationManager.processQueuedValidations().catch(() => { });
       }
 
       const movementChanges = {
@@ -141,7 +141,7 @@ export class TokenEventHandler {
 
     try {
       this.systemState.debug('onTokenUpdate', tokenDoc.id, tokenDoc.name, Object.keys(changes));
-    } catch {}
+    } catch { }
 
     // Analyze changes once to derive flags used throughout handling
     const changeFlags = this._analyzeChanges(changes);
@@ -159,7 +159,7 @@ export class TokenEventHandler {
         globalThis.game = globalThis.game || {};
         game.pf2eVisioner = game.pf2eVisioner || {};
         game.pf2eVisioner.lastMovedTokenId = tokenDoc.id;
-      } catch {}
+      } catch { }
 
       const token = tokenDoc.object;
 
@@ -231,7 +231,7 @@ export class TokenEventHandler {
                 // Queue override validation
                 if (this.overrideValidationManager) {
                   this.overrideValidationManager.queueOverrideValidation(tokenId);
-                  this.overrideValidationManager.processQueuedValidations().catch(() => {});
+                  this.overrideValidationManager.processQueuedValidations().catch(() => { });
                 }
               } catch (e) {
                 console.warn('PF2E Visioner | Error processing validation after animation:', e);
@@ -256,7 +256,7 @@ export class TokenEventHandler {
 
       if (oldX === newX && oldY === newY) {
         // Token dragged but released at same position - clear cached data
-        this.positionManager.clearTokenPositionData(tokenDoc.id);
+        this.positionManager.clearUpdatedTokenDocsCache(tokenDoc.id);
         this.systemState.debug('token-drag-same-position', tokenDoc.id, 'cleared cached positions');
         return;
       }
@@ -535,7 +535,7 @@ export class TokenEventHandler {
           globalThis.game = globalThis.game || {};
           game.pf2eVisioner = game.pf2eVisioner || {};
           game.pf2eVisioner.lastMovedTokenId = tokenDoc.id;
-        } catch {}
+        } catch { }
         this.overrideValidationManager.queueOverrideValidation(tokenDoc.id);
       }
     } catch {
@@ -556,7 +556,7 @@ export class TokenEventHandler {
             globalThis.game = globalThis.game || {};
             game.pf2eVisioner = game.pf2eVisioner || {};
             game.pf2eVisioner.lastMovedTokenId = tokenDoc.id;
-          } catch {}
+          } catch { }
           this.overrideValidationManager.queueOverrideValidation(tokenDoc.id);
         }
         return true; // Token was excluded
@@ -700,7 +700,7 @@ export class TokenEventHandler {
       game.pf2eVisioner = game.pf2eVisioner || {};
       game.pf2eVisioner.lastMovedTokenId = tokenDoc.id;
       this.systemState.debug('set lastMovedTokenId', tokenDoc.id);
-    } catch {}
+    } catch { }
 
     // Queue override validation for the moved token
     this.overrideValidationManager.queueOverrideValidation(tokenDoc.id);

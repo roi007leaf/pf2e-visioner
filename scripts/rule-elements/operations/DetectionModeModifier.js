@@ -1,10 +1,17 @@
 import { PredicateHelper } from '../PredicateHelper.js';
 
 export class DetectionModeModifier {
+    static _clone(obj) {
+        if (typeof structuredClone !== 'undefined') {
+            return structuredClone(obj);
+        }
+        return JSON.parse(JSON.stringify(obj));
+    }
+
     static sanitizeDetectionModes(detectionModes) {
         if (!Array.isArray(detectionModes)) return [];
         return detectionModes.map(mode => {
-            const sanitized = structuredClone(mode);
+            const sanitized = this._clone(mode);
             if (sanitized.range !== null && !Number.isFinite(sanitized.range)) {
                 sanitized.range = null;
             }

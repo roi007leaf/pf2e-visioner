@@ -1,6 +1,13 @@
 import { PredicateHelper } from '../PredicateHelper.js';
 
 export class SenseModifier {
+  static _clone(obj) {
+    if (typeof structuredClone !== 'undefined') {
+      return structuredClone(obj);
+    }
+    return JSON.parse(JSON.stringify(obj));
+  }
+
   static async applySenseModifications(token, senseModifications, ruleElementId, predicate = null) {
     if (!token?.actor || !senseModifications) return;
 
@@ -24,10 +31,10 @@ export class SenseModifier {
     }
 
     if (!originalPerception[escapedRuleElementId].senses) {
-      originalPerception[escapedRuleElementId].senses = structuredClone(token.actor.system?.perception?.senses || []);
+      originalPerception[escapedRuleElementId].senses = this._clone(token.actor.system?.perception?.senses || []);
     }
 
-    const senses = structuredClone(originalPerception[escapedRuleElementId].senses);
+    const senses = this._clone(originalPerception[escapedRuleElementId].senses);
 
     Object.entries(senseModifications).forEach(([senseName, modifications]) => {
 
