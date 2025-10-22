@@ -3,7 +3,7 @@
  * Handles token/wall visual updates and refresh operations for both visibility and cover
  */
 
-import { MODULE_ID } from '../constants.js';
+import { MODULE_ID, VISIBILITY_STATES } from '../constants.js';
 import { getVisibilityBetween } from '../utils.js';
 import { _internal as visibilityCalculatorInternal } from '../visibility/StatelessVisibilityCalculator.js';
 
@@ -24,7 +24,7 @@ import { _internal as visibilityCalculatorInternal } from '../visibility/Statele
 export async function updateTokenVisuals() {
   if (!canvas?.tokens) return;
   if (isDiceSoNiceAnimating()) {
-    setTimeout(() => updateTokenVisuals(), 500);
+    updateTokenVisuals()
     return;
   }
   // Minimal per-token refresh; token.visibility managed by PF2e detection wrapper
@@ -1178,11 +1178,26 @@ export async function updateSystemHiddenTokenHighlights(observerId = null, posit
       for (const token of tokens) {
         try {
           if (token._pvSystemHiddenIndicator) {
-            if (token._pvSystemHiddenIndicator._pvTargetHookId !== undefined) {
-              Hooks.off('targetToken', token._pvSystemHiddenIndicator._pvTargetHookId);
+            const gi = token._pvSystemHiddenIndicator;
+            if (gi._pvTargetHookId !== undefined) {
+              Hooks.off('targetToken', gi._pvTargetHookId);
             }
-            token._pvSystemHiddenIndicator.parent?.removeChild(token._pvSystemHiddenIndicator);
-            token._pvSystemHiddenIndicator.destroy?.();
+            if (gi._pvFactorsOverlayHook !== undefined) {
+              Hooks.off('pf2e-visioner:visibilityFactorsOverlay', gi._pvFactorsOverlayHook);
+            }
+            if (gi._pvCanvasPanHook !== undefined) {
+              Hooks.off('canvasPan', gi._pvCanvasPanHook);
+            }
+            if (gi._pvCanvasReadyHook !== undefined) {
+              Hooks.off('canvasReady', gi._pvCanvasReadyHook);
+            }
+            if (gi._pvCanvasTearDownHook !== undefined) {
+              Hooks.off('canvasTearDown', gi._pvCanvasTearDownHook);
+            }
+            if (gi._pvFactorsBadgeEl) { gi._pvFactorsBadgeEl.remove(); }
+            if (gi._pvFactorsTooltipEl) { gi._pvFactorsTooltipEl.remove(); }
+            gi.parent?.removeChild(gi);
+            gi.destroy?.({ children: false, texture: false, baseTexture: false });
             token._pvSystemHiddenIndicator = null;
           }
         } catch (_) { }
@@ -1211,11 +1226,26 @@ export async function updateSystemHiddenTokenHighlights(observerId = null, posit
       for (const token of tokens) {
         try {
           if (token._pvSystemHiddenIndicator) {
-            if (token._pvSystemHiddenIndicator._pvTargetHookId !== undefined) {
-              Hooks.off('targetToken', token._pvSystemHiddenIndicator._pvTargetHookId);
+            const gi = token._pvSystemHiddenIndicator;
+            if (gi._pvTargetHookId !== undefined) {
+              Hooks.off('targetToken', gi._pvTargetHookId);
             }
-            token._pvSystemHiddenIndicator.parent?.removeChild(token._pvSystemHiddenIndicator);
-            token._pvSystemHiddenIndicator.destroy?.();
+            if (gi._pvFactorsOverlayHook !== undefined) {
+              Hooks.off('pf2e-visioner:visibilityFactorsOverlay', gi._pvFactorsOverlayHook);
+            }
+            if (gi._pvCanvasPanHook !== undefined) {
+              Hooks.off('canvasPan', gi._pvCanvasPanHook);
+            }
+            if (gi._pvCanvasReadyHook !== undefined) {
+              Hooks.off('canvasReady', gi._pvCanvasReadyHook);
+            }
+            if (gi._pvCanvasTearDownHook !== undefined) {
+              Hooks.off('canvasTearDown', gi._pvCanvasTearDownHook);
+            }
+            if (gi._pvFactorsBadgeEl) { gi._pvFactorsBadgeEl.remove(); }
+            if (gi._pvFactorsTooltipEl) { gi._pvFactorsTooltipEl.remove(); }
+            gi.parent?.removeChild(gi);
+            gi.destroy?.({ children: false, texture: false, baseTexture: false });
             token._pvSystemHiddenIndicator = null;
           }
         } catch (_) { }
@@ -1226,11 +1256,26 @@ export async function updateSystemHiddenTokenHighlights(observerId = null, posit
     for (const token of tokens) {
       try {
         if (token._pvSystemHiddenIndicator) {
-          if (token._pvSystemHiddenIndicator._pvTargetHookId !== undefined) {
-            Hooks.off('targetToken', token._pvSystemHiddenIndicator._pvTargetHookId);
+          const gi = token._pvSystemHiddenIndicator;
+          if (gi._pvTargetHookId !== undefined) {
+            Hooks.off('targetToken', gi._pvTargetHookId);
           }
-          token._pvSystemHiddenIndicator.parent?.removeChild(token._pvSystemHiddenIndicator);
-          token._pvSystemHiddenIndicator.destroy?.();
+          if (gi._pvFactorsOverlayHook !== undefined) {
+            Hooks.off('pf2e-visioner:visibilityFactorsOverlay', gi._pvFactorsOverlayHook);
+          }
+          if (gi._pvCanvasPanHook !== undefined) {
+            Hooks.off('canvasPan', gi._pvCanvasPanHook);
+          }
+          if (gi._pvCanvasReadyHook !== undefined) {
+            Hooks.off('canvasReady', gi._pvCanvasReadyHook);
+          }
+          if (gi._pvCanvasTearDownHook !== undefined) {
+            Hooks.off('canvasTearDown', gi._pvCanvasTearDownHook);
+          }
+          if (gi._pvFactorsBadgeEl) { gi._pvFactorsBadgeEl.remove(); }
+          if (gi._pvFactorsTooltipEl) { gi._pvFactorsTooltipEl.remove(); }
+          gi.parent?.removeChild(gi);
+          gi.destroy?.({ children: false, texture: false, baseTexture: false });
           token._pvSystemHiddenIndicator = null;
         }
       } catch (_) { }
@@ -1276,8 +1321,41 @@ export async function updateSystemHiddenTokenHighlights(observerId = null, posit
       }
 
       const isWithinLifesenseRange = lifesenseRange === Infinity || distanceInFeet <= lifesenseRange;
+      const shouldShowIndicator = isSystemHidden && canBeDetectedByLifesense && isWithinLifesenseRange;
 
-      if (isSystemHidden && canBeDetectedByLifesense && isWithinLifesenseRange) {
+      // If indicator exists but shouldn't, remove it
+      if (token._pvSystemHiddenIndicator && !shouldShowIndicator) {
+        const gi = token._pvSystemHiddenIndicator;
+        if (gi._pvTargetHookId !== undefined) {
+          Hooks.off('targetToken', gi._pvTargetHookId);
+        }
+        if (gi._pvFactorsOverlayHook !== undefined) {
+          Hooks.off('pf2e-visioner:visibilityFactorsOverlay', gi._pvFactorsOverlayHook);
+        }
+        if (gi._pvCanvasPanHook !== undefined) {
+          Hooks.off('canvasPan', gi._pvCanvasPanHook);
+        }
+        if (gi._pvCanvasReadyHook !== undefined) {
+          Hooks.off('canvasReady', gi._pvCanvasReadyHook);
+        }
+        if (gi._pvCanvasTearDownHook !== undefined) {
+          Hooks.off('canvasTearDown', gi._pvCanvasTearDownHook);
+        }
+        if (gi._pvFactorsBadgeEl) { gi._pvFactorsBadgeEl.remove(); }
+        if (gi._pvFactorsTooltipEl) { gi._pvFactorsTooltipEl.remove(); }
+        gi.parent?.removeChild(gi);
+        gi.destroy?.({ children: false, texture: false, baseTexture: false });
+        token._pvSystemHiddenIndicator = null;
+        continue;
+      }
+
+      // If indicator exists and should exist, skip recreation (just position updates are handled by token animation)
+      if (token._pvSystemHiddenIndicator && shouldShowIndicator) {
+        continue;
+      }
+
+      // Only create if should show and doesn't exist yet
+      if (shouldShowIndicator) {
         try {
           const size = token.document.width * canvas.grid.size;
           const centerX = token.center?.x ?? (token.document.x + size / 2);
@@ -1331,7 +1409,96 @@ export async function updateSystemHiddenTokenHighlights(observerId = null, posit
 
           updateIndicatorColor();
 
-          g.hitArea = new PIXI.Rectangle(-size / 2, -size / 2, size, size);
+          const buildPairFactorsBadgeOutside = async () => {
+            try {
+              if (g._pvFactorsActive) return;
+              const { Pf2eVisionerApi } = await import('../api.js');
+              const factors = await Pf2eVisionerApi.getVisibilityFactors(observer.id, token.id);
+              if (!factors) return;
+
+              g._pvFactorsActive = true;
+              const stateCfg = VISIBILITY_STATES[factors.state] || VISIBILITY_STATES.observed || { icon: 'fa-solid fa-eye', color: '#ffffff' };
+              const canvasRect = canvas.app.view.getBoundingClientRect();
+              const bgSize = 40;
+              const tokenBounds = token.bounds;
+              const tokenCenterX = token.x + (tokenBounds.width / 2);
+              const tokenTopY = token.y - bgSize - 5;
+              const globalPoint = canvas.tokens.toGlobal(new PIXI.Point(tokenCenterX, tokenTopY));
+              const screenX = canvasRect.left + globalPoint.x;
+              const screenY = canvasRect.top + globalPoint.y;
+
+              const badgeEl = document.createElement('div');
+              badgeEl.style.position = 'fixed';
+              badgeEl.style.pointerEvents = 'auto';
+              badgeEl.style.cursor = 'pointer';
+              badgeEl.style.zIndex = '6000';
+              badgeEl.style.left = '0';
+              badgeEl.style.top = '0';
+              badgeEl.style.willChange = 'transform';
+              badgeEl.style.transform = `translate(${Math.round(screenX - bgSize / 2)}px, ${Math.round(screenY - bgSize / 2)}px)`;
+              badgeEl.innerHTML = `<span class="pf2e-visioner-factor-badge" style="display: inline-flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.8); border-radius: 6px; width: ${bgSize}px; height: ${bgSize}px;">
+    <i class="${stateCfg.icon}" style="font-size: 16px; color: ${stateCfg.color};"></i>
+  </span>`;
+              document.body.appendChild(badgeEl);
+
+              const tooltipEl = document.createElement('div');
+              tooltipEl.style.position = 'fixed';
+              tooltipEl.style.pointerEvents = 'none';
+              tooltipEl.style.zIndex = '2000';
+              tooltipEl.style.display = 'none';
+              tooltipEl.style.left = '0';
+              tooltipEl.style.top = '0';
+              tooltipEl.style.willChange = 'transform';
+
+              const lines = [];
+              try {
+                if (factors.state) {
+                  const stateLabelKey = (VISIBILITY_STATES[factors.state]?.label) || factors.state;
+                  const localizedState = game.i18n?.localize?.(stateLabelKey) || stateLabelKey;
+                  const stateHdr = game.i18n?.localize?.('PF2E_VISIONER.VISIBILITY_FACTORS.STATE_LABEL') || 'State';
+                  lines.push(`${stateHdr}: ${localizedState}`);
+                }
+                if (factors.lighting) {
+                  let lightingKey = factors.lighting;
+                  if (lightingKey.startsWith?.('magicalDarkness') && lightingKey !== 'magicalDarkness' && lightingKey !== 'greaterMagicalDarkness') {
+                    lightingKey = 'magicalDarkness';
+                  }
+                  const litHdr = game.i18n?.localize?.('PF2E_VISIONER.VISIBILITY_FACTORS.LIGHTING_LABEL') || 'Lighting';
+                  const litText = game.i18n?.localize?.(`PF2E_VISIONER.VISIBILITY_FACTORS.LIGHTING.${lightingKey}`) || lightingKey;
+                  lines.push(`${litHdr}: ${litText}`);
+                }
+                if (Array.isArray(factors.reasons) && factors.reasons.length) {
+                  lines.push('');
+                  factors.reasons.forEach((r) => {
+                    if (typeof r === 'string') lines.push(`• ${r}`);
+                  });
+                }
+              } catch (_) { }
+
+              const linesHtml = lines.map(line => `<div style="margin: 2px 0;">${line}</div>`).join('');
+              tooltipEl.innerHTML = `<div style="background: rgba(0,0,0,0.9); border-radius: 4px; padding: 8px; color: #ffffff; font-family: Arial; font-size: 12px; white-space: nowrap; box-shadow: 0 2px 8px rgba(0,0,0,0.3);">
+    ${linesHtml || (factors.state || '')}
+  </div>`;
+              document.body.appendChild(tooltipEl);
+
+              const updateTooltipPos = () => {
+                const left = screenX + bgSize / 2 + 5;
+                const top = screenY - bgSize / 2;
+                tooltipEl.style.transform = `translate(${Math.round(left)}px, ${Math.round(top)}px)`;
+              };
+
+              badgeEl.addEventListener('mouseenter', () => {
+                tooltipEl.style.display = 'block';
+                updateTooltipPos();
+              });
+              badgeEl.addEventListener('mouseleave', () => {
+                tooltipEl.style.display = 'none';
+              });
+
+              g._pvFactorsBadgeEl = badgeEl;
+              g._pvFactorsTooltipEl = tooltipEl;
+            } catch (_) { }
+          };
 
           g.on('rightdown', (event) => {
             try {
@@ -1387,26 +1554,41 @@ export async function updateSystemHiddenTokenHighlights(observerId = null, posit
               }
             }
 
-            // Show hover tooltips if enabled
+            // Show hover tooltips using observer-mode context so hidden targets display badges
             try {
               const tooltipsEnabled = game.settings?.get?.(MODULE_ID, 'enableHoverTooltips');
               if (tooltipsEnabled) {
-                const { HoverTooltips } = await import('./HoverTooltips.js');
+                const hoverModule = await import('./HoverTooltips.js');
+                const { HoverTooltips, showVisibilityIndicators } = hoverModule;
                 if (!HoverTooltips.isShowingKeyTooltips && !HoverTooltips._isPanning) {
-                  // Store the token so tooltip system knows what to show
-                  HoverTooltips.currentHoveredToken = token;
+                  // Save previous tooltip context to restore on pointerout
+                  g._pvPrevTooltipState = {
+                    mode: HoverTooltips.tooltipMode,
+                    hovered: HoverTooltips.currentHoveredToken,
+                    keyboard: HoverTooltips._keyboardContext,
+                  };
 
-                  // Import the visibility indicator function
-                  const hoverModule = await import('./HoverTooltips.js');
-                  // Call the internal visibility indicator function
-                  if (typeof hoverModule.showVisibilityIndicators === 'function') {
-                    hoverModule.showVisibilityIndicators(token);
+                  // Emulate keyboard context to bypass owner/hover constraints and use observer perspective
+                  HoverTooltips.tooltipMode = 'observer';
+                  HoverTooltips._keyboardContext = true;
+                  HoverTooltips.currentHoveredToken = observer; // the lifesense owner
+
+                  if (typeof showVisibilityIndicators === 'function') {
+                    showVisibilityIndicators(observer);
                   }
                 }
               }
             } catch (err) {
               console.warn('PF2E Visioner | Error showing hover tooltips for lifesense indicator:', err);
             }
+
+            try {
+              const hoverModule = await import('./HoverTooltips.js');
+              const { HoverTooltips } = hoverModule;
+              if (HoverTooltips.isShowingFactorsOverlay) {
+                await buildPairFactorsBadgeOutside();
+              }
+            } catch (_) { }
           });
 
           g.on('pointerout', async () => {
@@ -1419,23 +1601,38 @@ export async function updateSystemHiddenTokenHighlights(observerId = null, posit
               g._distanceText = null;
             }
 
-            // Hide hover tooltips
+            // Hide hover tooltips and restore previous tooltip context
             try {
-              const { HoverTooltips } = await import('./HoverTooltips.js');
-              if (HoverTooltips.currentHoveredToken === token) {
-                HoverTooltips.currentHoveredToken = null;
+              const hoverModule = await import('./HoverTooltips.js');
+              const { HoverTooltips, hideAllVisibilityIndicators, hideAllCoverIndicators } = hoverModule;
 
-                const hoverModule = await import('./HoverTooltips.js');
-                if (typeof hoverModule.hideAllVisibilityIndicators === 'function') {
-                  hoverModule.hideAllVisibilityIndicators();
-                }
-                if (typeof hoverModule.hideAllCoverIndicators === 'function') {
-                  hoverModule.hideAllCoverIndicators();
+              if (typeof hideAllVisibilityIndicators === 'function') hideAllVisibilityIndicators();
+              if (typeof hideAllCoverIndicators === 'function') hideAllCoverIndicators();
+
+              if (g._pvPrevTooltipState) {
+                HoverTooltips.tooltipMode = g._pvPrevTooltipState.mode;
+                HoverTooltips._keyboardContext = g._pvPrevTooltipState.keyboard;
+                HoverTooltips.currentHoveredToken = g._pvPrevTooltipState.hovered || null;
+                delete g._pvPrevTooltipState;
+              } else {
+                // Fallback: clear any hover reference set by this indicator
+                if (HoverTooltips.currentHoveredToken === observer) {
+                  HoverTooltips.currentHoveredToken = null;
                 }
               }
             } catch (err) {
               console.warn('PF2E Visioner | Error hiding hover tooltips for lifesense indicator:', err);
             }
+
+            try {
+              const mod = await import('./HoverTooltips.js');
+              const overlayActive = !!mod.HoverTooltips?.isShowingFactorsOverlay;
+              if (!overlayActive) {
+                if (g._pvFactorsBadgeEl) { g._pvFactorsBadgeEl.remove(); g._pvFactorsBadgeEl = null; }
+                if (g._pvFactorsTooltipEl) { g._pvFactorsTooltipEl.remove(); g._pvFactorsTooltipEl = null; }
+                delete g._pvFactorsActive;
+              }
+            } catch (_) { }
           });
 
           const hookId = Hooks.on('targetToken', (user, targetToken, targeted) => {
@@ -1532,11 +1729,72 @@ export async function updateSystemHiddenTokenHighlights(observerId = null, posit
             }
           }; requestAnimationFrame(animate);
 
-          // Use controls layer for lifesense indicators - it bypasses fog of war
+          // Prefer interface layer so DOM hover tooltips render above this PIXI overlay
           // We create these for all users (not just GM) to show lifesense detection
-          const parent = canvas.controls || canvas.interface || canvas.tokens;
+          const parent = canvas.interface || canvas.controls || canvas.tokens;
           parent.addChild(g);
           token._pvSystemHiddenIndicator = g;
+
+          if (!g._pvFactorsOverlayHook) {
+            g._pvFactorsOverlayHook = Hooks.on('pf2e-visioner:visibilityFactorsOverlay', async ({ active } = {}) => {
+              try {
+                if (active) {
+                  await buildPairFactorsBadgeOutside();
+                } else if (g._pvFactorsActive) {
+                  g._pvFactorsActive = false;
+                  if (g._pvFactorsBadgeEl) { g._pvFactorsBadgeEl.remove(); g._pvFactorsBadgeEl = null; }
+                  if (g._pvFactorsTooltipEl) { g._pvFactorsTooltipEl.remove(); g._pvFactorsTooltipEl = null; }
+                }
+              } catch (_) { }
+            });
+          }
+
+          if (!g._pvCanvasPanHook) {
+            g._pvCanvasPanHook = Hooks.on('canvasPan', async () => {
+              try {
+                if (g._pvFactorsActive) {
+                  g._pvFactorsActive = false;
+                  if (g._pvFactorsBadgeEl) { g._pvFactorsBadgeEl.remove(); g._pvFactorsBadgeEl = null; }
+                  if (g._pvFactorsTooltipEl) { g._pvFactorsTooltipEl.remove(); g._pvFactorsTooltipEl = null; }
+                }
+                const mod = await import('./HoverTooltips.js');
+                mod.hideAllVisibilityIndicators?.();
+                mod.hideAllCoverIndicators?.();
+              } catch (_) { }
+            });
+          }
+
+          if (!g._pvCanvasReadyHook) {
+            g._pvCanvasReadyHook = Hooks.on('canvasReady', async () => {
+              try {
+                if (g._pvFactorsActive) {
+                  g._pvFactorsActive = false;
+                  if (g._pvFactorsBadgeEl) { g._pvFactorsBadgeEl.remove(); g._pvFactorsBadgeEl = null; }
+                  if (g._pvFactorsTooltipEl) { g._pvFactorsTooltipEl.remove(); g._pvFactorsTooltipEl = null; }
+                }
+                const mod = await import('./HoverTooltips.js');
+                mod.hideAllVisibilityIndicators?.();
+                mod.hideAllCoverIndicators?.();
+              } catch (_) { }
+            });
+          }
+
+          if (!g._pvCanvasTearDownHook) {
+            g._pvCanvasTearDownHook = Hooks.on('canvasTearDown', () => {
+              try {
+                if (g._pvFactorsBadgeEl) { g._pvFactorsBadgeEl.remove(); g._pvFactorsBadgeEl = null; }
+                if (g._pvFactorsTooltipEl) { g._pvFactorsTooltipEl.remove(); g._pvFactorsTooltipEl = null; }
+                delete g._pvFactorsActive;
+              } catch (_) { }
+            });
+          }
+
+          try {
+            const hoverModule = await import('./HoverTooltips.js');
+            if (hoverModule.HoverTooltips?.isShowingFactorsOverlay) {
+              await buildPairFactorsBadgeOutside();
+            }
+          } catch (_) { }
         } catch (error) {
           console.warn(`PF2E Visioner | Error creating system-hidden indicator for token ${token.document.id}:`, error);
         }
