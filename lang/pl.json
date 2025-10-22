@@ -1047,6 +1047,7 @@
         "DETECTED_BY_LIFESENSE": "(PL TODO) Detected by lifesense ({acuity})",
         "DETECTED_BY_TREMORSENSE": "(PL TODO) Detected by tremorsense ({acuity})",
         "DETECTED_BY_SENSE": "(PL TODO) Detected by {sense} (precise)",
+        "DETECTED_BY_SENSE_IMPRECISE": "(PL TODO) Detected by {sense} (imprecise)",
         "HEARD_INVISIBLE_HIDDEN": "(PL TODO) Heard with hearing (imprecise) - invisible creature is hidden",
         "DETECTED_BY_SCENT": "(PL TODO) Detected by scent (imprecise)",
         "BRIGHT_LIGHT_NORMAL_VISION": "(PL TODO) Target is in bright light with normal vision",
