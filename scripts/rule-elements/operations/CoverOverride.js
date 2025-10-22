@@ -1,4 +1,3 @@
-import { PredicateHelper } from '../PredicateHelper.js';
 import { SourceTracker } from '../SourceTracker.js';
 
 export class CoverOverride {
@@ -11,12 +10,6 @@ export class CoverOverride {
       direction = 'from',
       state,
       source,
-      range,
-      observers,
-      condition,
-      blockedEdges,
-      requiresTakeCover,
-      autoCoverBehavior = 'replace',
       preventAutoCover,
       tokenIds,
       predicate
@@ -28,7 +21,7 @@ export class CoverOverride {
     // This ensures that updating the item will replace the old source rather than creating duplicates
     const itemSlug = ruleElement.item?.slug || ruleElement.item?.name?.slugify() || 'unknown';
     const sourceId = source || `rule-element-${itemSlug}`;
-    
+
     const sourceData = {
       id: sourceId,
       type: 'rule-element',
@@ -72,25 +65,25 @@ export class CoverOverride {
     // Generate the same source ID that was used during creation
     const itemSlug = ruleElement?.item?.slug || ruleElement?.item?.name?.slugify() || 'unknown';
     const sourceId = source || `rule-element-${itemSlug}`;
-    
+
     // Get the same target tokens that were affected during creation
     const targetTokens = this.getTargetTokens(subjectToken, targets, range, tokenIds);
-    
+
     // Remove the source from each target token
     for (const targetToken of targetTokens) {
       if (targetToken.id === subjectToken.id) continue;
-      
+
       if (direction === 'to') {
         // Source was stored on targets with subjectToken as observerId
         await SourceTracker.removeSource(targetToken, sourceId, 'cover', subjectToken.id);
-        
+
         // Also clean up any old sources from the same item (for backward compatibility)
         // This handles cases where the source ID changed between versions
         await this.cleanupOldSourcesFromItem(targetToken, ruleElement, subjectToken.id);
       } else {
         // Source was stored on subjectToken with targetToken as observerId
         await SourceTracker.removeSource(subjectToken, sourceId, 'cover', targetToken.id);
-        
+
         // Clean up old sources
         await this.cleanupOldSourcesFromItem(subjectToken, ruleElement, targetToken.id);
       }
@@ -99,10 +92,10 @@ export class CoverOverride {
 
   static async cleanupOldSourcesFromItem(token, ruleElement, observerId) {
     if (!token?.document || !ruleElement?.item) return;
-    
+
     const stateSource = token.document.getFlag('pf2e-visioner', 'stateSource') || {};
     const coverSources = stateSource.coverByObserver?.[observerId]?.sources || [];
-    
+
     // Find and remove sources that match old naming patterns from this item
     const itemName = ruleElement.item.name;
     const itemSlug = ruleElement.item.slug || itemName?.slugify();
@@ -111,7 +104,7 @@ export class CoverOverride {
       'aim-aiding-rune', // Old hardcoded name
       `rule-element-${itemSlug}`, // Current pattern
     ];
-    
+
     for (const oldId of oldSourceIds) {
       if (coverSources.some(s => s.id === oldId && s.type === 'rule-element')) {
         await SourceTracker.removeSource(token, oldId, 'cover', observerId);
@@ -183,10 +176,10 @@ export class CoverOverride {
   static checkDirectionalCover(providerToken, receiverToken, attackerToken, blockedEdges) {
     const providerPos = { x: providerToken.x, y: providerToken.y };
     const attackerPos = { x: attackerToken.x, y: attackerToken.y };
-    
+
     const dx = attackerPos.x - providerPos.x;
     const dy = attackerPos.y - providerPos.y;
-    
+
     let attackDirection;
     if (Math.abs(dx) > Math.abs(dy)) {
       attackDirection = dx > 0 ? 'east' : 'west';

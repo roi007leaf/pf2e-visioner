@@ -14,6 +14,9 @@ export class VisibilityOverride {
       state,
       source,
       preventConcealment,
+      applyOffGuard = true,
+      fromStates,
+      toState,
       priority = 100,
       tokenIds,
       predicate,
@@ -25,6 +28,39 @@ export class VisibilityOverride {
       operation.range,
       tokenIds,
     );
+
+    // If this is a visibility replacement (fromStates → toState), handle it separately
+    if (fromStates && fromStates.length > 0 && toState) {
+
+      const sourceData = {
+        id: source || `visibility-replacement-${Date.now()}`,
+        type: source,
+        priority,
+        fromStates,
+        toState,
+        direction,
+      };
+
+      await subjectToken.document.setFlag('pf2e-visioner', 'visibilityReplacement', {
+        active: true,
+        ...sourceData,
+      });
+
+
+      // Trigger AVS recalculation after setting replacement flag
+      if (window.pf2eVisioner?.services?.autoVisibilitySystem?.recalculateForTokens) {
+        await window.pf2eVisioner.services.autoVisibilitySystem.recalculateForTokens([
+          subjectToken.id,
+        ]);
+      } else if (window.pf2eVisioner?.services?.autoVisibilitySystem?.recalculateAll) {
+        await window.pf2eVisioner.services.autoVisibilitySystem.recalculateAll();
+      } else if (canvas?.perception) {
+        canvas.perception.update({ refreshVision: true, refreshOcclusion: true });
+      }
+      return;
+    }
+
+    // Otherwise, it's a direct state override
 
     const sourceData = {
       id: source || `visibility-${Date.now()}`,
@@ -54,22 +90,23 @@ export class VisibilityOverride {
         }
       }
 
-      await this.setVisibilityState(observingToken, targetToken, state, sourceData);
+      await this.setVisibilityState(observingToken, targetToken, state, sourceData, applyOffGuard);
     }
 
     await subjectToken.document.setFlag('pf2e-visioner', 'ruleElementOverride', {
       active: true,
       source: sourceData.id,
       state,
+      direction,
     });
   }
 
-  static async setVisibilityState(observerToken, targetToken, state, sourceData) {
+  static async setVisibilityState(observerToken, targetToken, state, sourceData, applyOffGuard = true) {
     try {
       const { setVisibilityBetween } = await import('../../stores/visibility-map.js');
 
       await setVisibilityBetween(observerToken, targetToken, state, {
-        skipEphemeralUpdate: false,
+        skipEphemeralUpdate: !applyOffGuard,
         isAutomatic: false,
       });
       await SourceTracker.addSourceToState(targetToken, 'visibility', sourceData, observerToken.id);
@@ -151,7 +188,7 @@ export class VisibilityOverride {
   static async applyConditionalState(operation, subjectToken) {
     if (!subjectToken?.actor) return;
 
-    const { condition, thenState, elseState, stateType = 'visibility' } = operation;
+    const { condition, thenState, elseState, stateType = 'visibility', source, direction, observers, priority } = operation;
 
     const conditionMet = this.evaluateCondition(subjectToken.actor, condition);
     const targetState = conditionMet ? thenState : elseState;
@@ -161,8 +198,11 @@ export class VisibilityOverride {
     if (stateType === 'visibility') {
       await this.applyVisibilityOverride(
         {
-          ...operation,
           state: targetState,
+          source,
+          direction,
+          observers,
+          priority,
         },
         subjectToken,
       );

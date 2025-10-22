@@ -221,17 +221,19 @@ describe('Event Handler Tests', () => {
 
   describe('EffectEventHandler', () => {
     let effectHandler;
-    let mockSystemState, mockVisibilityState, mockExclusionManager;
+    let mockSystemState, mockVisibilityState, mockExclusionManager, mockCacheManager;
 
     beforeEach(() => {
       mockSystemState = createMockSystemStateProvider();
       mockVisibilityState = createMockVisibilityStateManager();
       mockExclusionManager = createMockExclusionManager();
+      mockCacheManager = createMockCacheManager();
 
       effectHandler = new EffectEventHandler(
         mockSystemState,
         mockVisibilityState,
         mockExclusionManager,
+        mockCacheManager,
       );
     });
 

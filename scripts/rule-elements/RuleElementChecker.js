@@ -7,9 +7,10 @@ export class RuleElementChecker {
    * Check all rule element effects for a token pair
    * @param {Token} observerToken - The observing token
    * @param {Token} targetToken - The target token
+   * @param {string} currentVisibility - The current visibility state (optional, for replacements)
    * @returns {Object|null} Combined result with highest priority effect
    */
-  static checkRuleElements(observerToken, targetToken) {
+  static checkRuleElements(observerToken, targetToken, currentVisibility = null) {
     if (!observerToken || !targetToken) return null;
 
     const results = [];
@@ -21,9 +22,21 @@ export class RuleElementChecker {
     }
 
     // Check rule element overrides
-    const overrideResult = this.checkRuleElementOverride(observerToken, targetToken);
+    const overrideResult = this.checkRuleElementOverride(observerToken, targetToken, currentVisibility);
     if (overrideResult) {
       results.push(overrideResult);
+    }
+
+    // Check visibility replacements (fromStates → toState)
+    if (currentVisibility) {
+      const replacementResult = this.checkVisibilityReplacement(
+        observerToken,
+        targetToken,
+        currentVisibility,
+      );
+      if (replacementResult) {
+        results.push(replacementResult);
+      }
     }
 
     // Check conditional states
@@ -35,10 +48,27 @@ export class RuleElementChecker {
     // Return the highest priority result
     if (results.length === 0) return null;
 
-    // Priority resolution: higher priority wins
-    const winner = results.reduce((highest, current) =>
-      (current.priority || 100) > (highest.priority || 100) ? current : highest,
-    );
+    // Priority resolution with type-based precedence
+    // visibilityReplacement > ruleElementOverride > conditionalState > distanceBasedVisibility
+    const typePriority = {
+      visibilityReplacement: 1000,
+      ruleElementOverride: 500,
+      conditionalState: 250,
+      distanceBasedVisibility: 100,
+    };
+
+
+    const winner = results.reduce((highest, current) => {
+      const currentTypePri = typePriority[current.type] || 0;
+      const highestTypePri = typePriority[highest.type] || 0;
+
+      if (currentTypePri !== highestTypePri) {
+        return currentTypePri > highestTypePri ? current : highest;
+      }
+
+      // If same type priority, use numeric priority
+      return (current.priority || 100) > (highest.priority || 100) ? current : highest;
+    });
 
     return winner;
   }
@@ -129,7 +159,7 @@ export class RuleElementChecker {
   /**
    * Check rule element override effects
    */
-  static checkRuleElementOverride(observerToken, targetToken) {
+  static checkRuleElementOverride(observerToken, targetToken, currentVisibility = null) {
     try {
       const observerConfig = observerToken.document?.getFlag(
         'pf2e-visioner',
@@ -141,29 +171,89 @@ export class RuleElementChecker {
         return null;
       }
 
-      // Check observer's override (direction: 'to')
       if (observerConfig?.active) {
-        return {
-          state: observerConfig.state,
-          source: observerConfig.source,
-          priority: observerConfig.priority || 100,
-          type: 'ruleElementOverride',
-        };
+        const direction = observerConfig.direction || 'to';
+        if (direction === 'to') {
+          return {
+            state: observerConfig.state,
+            source: observerConfig.source,
+            priority: observerConfig.priority || 100,
+            type: 'ruleElementOverride',
+          };
+        }
       }
 
-      // Check target's override (direction: 'from')
       if (targetConfig?.active) {
-        return {
-          state: targetConfig.state,
-          source: targetConfig.source,
-          priority: targetConfig.priority || 100,
-          type: 'ruleElementOverride',
-        };
+        const direction = targetConfig.direction || 'from';
+        if (direction === 'from') {
+          return {
+            state: targetConfig.state,
+            source: targetConfig.source,
+            priority: targetConfig.priority || 100,
+            type: 'ruleElementOverride',
+          };
+        }
       }
 
       return null;
     } catch (error) {
       console.warn('PF2E Visioner | Error checking rule element override:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Check visibility state replacements (fromStates → toState)
+   * @param {Token} observerToken - The observing token
+   * @param {Token} targetToken - The target token
+   * @param {string} currentVisibility - The current visibility state to check
+   * @returns {Object|null} Replacement result if condition matches
+   */
+  static checkVisibilityReplacement(observerToken, targetToken, currentVisibility) {
+    try {
+      const observerConfig = observerToken.document?.getFlag(
+        'pf2e-visioner',
+        'visibilityReplacement',
+      );
+      const targetConfig = targetToken.document?.getFlag('pf2e-visioner', 'visibilityReplacement');
+
+
+      if (!observerConfig?.active && !targetConfig?.active) {
+        return null;
+      }
+
+      // Check observer's visibility replacement (direction: 'to')
+      // The observer with direction='to' affects how they see the target
+      if (observerConfig?.active) {
+        const direction = observerConfig.direction || 'from';
+        if (direction === 'to' && observerConfig.fromStates?.includes(currentVisibility)) {
+          return {
+            state: observerConfig.toState,
+            source: observerConfig.source,
+            priority: observerConfig.priority || 100,
+            type: 'visibilityReplacement',
+          };
+        }
+      }
+
+      // Check target's visibility replacement (direction: 'from')
+      // The target with direction='from' affects how others see them
+      if (targetConfig?.active) {
+        const direction = targetConfig.direction || 'from';
+        if (direction === 'from' && targetConfig.fromStates?.includes(currentVisibility)) {
+
+          return {
+            state: targetConfig.toState,
+            source: targetConfig.source,
+            priority: targetConfig.priority || 100,
+            type: 'visibilityReplacement',
+          };
+        }
+      }
+
+      return null;
+    } catch (error) {
+      console.warn('PF2E Visioner | Error checking visibility replacement:', error);
       return null;
     }
   }

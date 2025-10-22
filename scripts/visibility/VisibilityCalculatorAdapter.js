@@ -385,7 +385,13 @@ function extractPreciseSenses(capabilities, distanceInFeet) {
 
   // Extract ALL precise senses from sensingSummary.precise array
   // This includes vision, darkvision, greater-darkvision, low-light-vision, echolocation, etc.
-  const preciseSenses = sensingSummary.precise || [];
+  let preciseSenses = sensingSummary.precise || [];
+
+  // Ensure preciseSenses is an array
+  if (!Array.isArray(preciseSenses)) {
+    preciseSenses = [];
+  }
+
   for (const sense of preciseSenses) {
     if (sense.type && sense.range !== undefined) {
       // Only include senses that are within range
@@ -450,7 +456,13 @@ function extractImpreciseSenses(capabilities, distanceInFeet) {
   const sensingSummary = capabilities.sensingSummary || {};
 
   // Process all imprecise senses from sensingSummary
-  const impreciseSenses = sensingSummary.imprecise || [];
+  let impreciseSenses = sensingSummary.imprecise || [];
+
+  // Ensure impreciseSenses is an array
+  if (!Array.isArray(impreciseSenses)) {
+    impreciseSenses = [];
+  }
+
   for (const sense of impreciseSenses) {
     if (sense.type && sense.range !== undefined) {
       // Only include senses that are within range

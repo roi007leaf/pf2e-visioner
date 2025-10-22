@@ -580,6 +580,8 @@
         "LEGENDARY_SNEAK_TOOLTIP": "Cover/concealment requirement is bypassed",
         "CEASELESS_SHADOWS_LABEL": "Ceaseless Shadows",
         "CEASELESS_SHADOWS_TOOLTIP": "Cover/concealment prerequisites are removed",
+        "OFF_GUARD_PREVENTED_LABEL": "Off-Guard Prevented",
+        "OFF_GUARD_PREVENTED_TOOLTIP": "{EFFECT} prevents off-guard penalty",
         "CAMOUFLAGE_LABEL": "Camouflage",
         "CAMOUFLAGE_TOOLTIP": "Cover/concealment requirement is bypassed in natural terrain",
         "DISTRACTING_SHADOWS_LABEL": "Distracting Shadows",

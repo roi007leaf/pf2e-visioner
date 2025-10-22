@@ -66,7 +66,7 @@ export class BatchOrchestrator {
         pendingTokens: this._pendingTokens.size,
         stack: new Error().stack?.split('\n').slice(1, 4).join('\n'),
       }));
-    } catch {}
+    } catch { }
     // Start a new movement session if not already moving
     if (!this._isTokenMoving) {
       this._movementSession = {
@@ -106,7 +106,7 @@ export class BatchOrchestrator {
           hasSession: !!this._movementSession,
           pendingTokens: this._pendingTokens.size,
         }));
-      } catch {}
+      } catch { }
 
       if (!this._movementSession) {
         console.warn('PF2E Visioner | Movement stop timer fired but no session exists');
@@ -131,7 +131,7 @@ export class BatchOrchestrator {
           sessionData,
           willProcessBatch: this._pendingTokens.size > 0,
         }));
-      } catch {}
+      } catch { }
 
       // If there are pending tokens, process them immediately now that movement stopped
       if (this._pendingTokens.size > 0) {
@@ -243,7 +243,7 @@ export class BatchOrchestrator {
         movementSession: options.movementSession,
         stack: stack?.split('\n').slice(1, 4).join('\n'),
       }));
-    } catch {}
+    } catch { }
     const movementSession = options.movementSession || null;
 
     // Invalidate global caches to ensure fresh calculations
@@ -412,7 +412,7 @@ export class BatchOrchestrator {
           changed: visibleChangedTokens.size,
           updates: uniqueUpdateCount,
         }));
-      } catch {}
+      } catch { }
       telemetryStopped = true;
 
       // Clear movement session after successful batch
@@ -430,7 +430,7 @@ export class BatchOrchestrator {
     } catch (error) {
       try {
         console.error('PF2E Visioner | processBatch error:', error);
-      } catch {}
+      } catch { }
     } finally {
       // Defensive: ensure we stop telemetry even if an error occurred before normal stop
       if (!telemetryStopped) {
@@ -544,11 +544,11 @@ export class BatchOrchestrator {
       const previous =
         this._lastPrecompute.map && now - this._lastPrecompute.ts < TTL_MS
           ? {
-              map: this._lastPrecompute.map,
-              posKeyMap: this._lastPrecompute.posKeyMap,
-              lightingHash: this._lastPrecompute.lightingHash,
-              ts: this._lastPrecompute.ts,
-            }
+            map: this._lastPrecompute.map,
+            posKeyMap: this._lastPrecompute.posKeyMap,
+            lightingHash: this._lastPrecompute.lightingHash,
+            ts: this._lastPrecompute.ts,
+          }
           : undefined;
 
       // Track cache hit/miss for better telemetry
@@ -582,7 +582,7 @@ export class BatchOrchestrator {
       // Best effort - continue without precomputation
       try {
         console.warn('PF2E Visioner | Failed to precompute lighting:', error);
-      } catch {}
+      } catch { }
     }
 
     return { precomputedLights, precomputeStats };
@@ -768,6 +768,7 @@ export class BatchOrchestrator {
     let uniqueUpdateCount = 0;
 
     if (batchResult.updates && batchResult.updates.length > 0) {
+
       // Deduplicate updates before applying them
       const uniqueUpdates = [];
       const updateKeys = new Set();

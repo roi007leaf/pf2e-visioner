@@ -1,5 +1,6 @@
 import { ActionQualifier } from './operations/ActionQualifier.js';
 import { CoverOverride } from './operations/CoverOverride.js';
+import { DetectionModeModifier } from './operations/DetectionModeModifier.js';
 import { DistanceBasedVisibility } from './operations/DistanceBasedVisibility.js';
 import { LightingModifier } from './operations/LightingModifier.js';
 import { SenseModifier } from './operations/SenseModifier.js';
@@ -41,6 +42,7 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
             required: true,
             choices: [
               'modifySenses',
+              'modifyDetectionModes',
               'overrideVisibility',
               'overrideCover',
               'provideCover',
@@ -56,6 +58,8 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
           predicate: new fields.ArrayField(new fields.StringField(), { required: false }),
 
           senseModifications: new fields.ObjectField({ required: false }),
+
+          modeModifications: new fields.ObjectField({ required: false }),
 
           state: new fields.StringField({
             required: false,
@@ -94,6 +98,18 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
           source: new fields.StringField({ required: false }),
 
           preventConcealment: new fields.BooleanField({ required: false, initial: false }),
+
+          fromStates: new fields.ArrayField(
+            new fields.StringField({
+              choices: ['observed', 'concealed', 'hidden', 'undetected'],
+            }),
+            { required: false },
+          ),
+
+          toState: new fields.StringField({
+            required: false,
+            choices: ['observed', 'concealed', 'hidden', 'undetected'],
+          }),
 
           blockedEdges: new fields.ArrayField(
             new fields.StringField({ choices: ['north', 'south', 'east', 'west'] }),
@@ -154,11 +170,24 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
         initial: 100,
       });
 
+      schema.cancelOffGuardFromVisibility = new fields.SchemaField(
+        {
+          states: new fields.ArrayField(
+            new fields.StringField({
+              choices: ['hidden', 'undetected'],
+            }),
+            { required: true },
+          ),
+          label: new fields.StringField({ required: false }),
+        },
+        { required: false },
+      );
+
       return schema;
     }
 
     get ruleElementId() {
-      return `${this.item?.uuid || 'unknown'}-${this.slug || 'effect'}`;
+      return `${this.item?.id || 'unknown'}-${this.slug || 'effect'}`;
     }
 
     get ruleElementRegistryKey() {
@@ -178,6 +207,7 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
     }
 
     async onDelete(actorUpdates) {
+      await this.removeOperations();
       await this.removeAllFlagsForRuleElement();
     }
 
@@ -227,10 +257,6 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
       const merged = [];
       const processed = new Set();
 
-      console.log(
-        `PF2E Visioner | Smart merging ${operations.length} operations for ${this.item?.name || 'effect'}`,
-      );
-
       for (let i = 0; i < operations.length; i++) {
         if (processed.has(i)) continue;
 
@@ -249,23 +275,12 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
             mergedOp = mergeResult.operation;
             processed.add(j);
             mergeCount++;
-            console.log(`PF2E Visioner | Merged ${currentOp.type} with ${nextOp.type}`);
           }
         }
 
         merged.push(mergedOp);
         processed.add(i);
-
-        if (mergeCount > 1) {
-          console.log(
-            `PF2E Visioner | Created merged operation combining ${mergeCount} operations`,
-          );
-        }
       }
-
-      console.log(
-        `PF2E Visioner | Reduced ${operations.length} operations to ${merged.length} merged operations`,
-      );
       return merged;
     }
 
@@ -399,7 +414,7 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
     async applyOperation(operation, token) {
       switch (operation.type) {
         case 'modifySenses':
-          SenseModifier.applySenseModifications(
+          await SenseModifier.applySenseModifications(
             token,
             operation.senseModifications,
             this.ruleElementId,
@@ -408,9 +423,20 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
           await this.registerFlag(token, 'originalSenses');
           break;
 
+        case 'modifyDetectionModes':
+          await DetectionModeModifier.applyDetectionModeModifications(
+            token,
+            operation.modeModifications,
+            this.ruleElementId,
+            operation.predicate,
+          );
+          await this.registerFlag(token, 'originalDetectionModes');
+          break;
+
         case 'overrideVisibility':
           await VisibilityOverride.applyVisibilityOverride(operation, token);
           await this.registerFlag(token, 'ruleElementOverride');
+          await this.registerFlag(token, 'visibilityReplacement');
           break;
 
         case 'overrideCover':
@@ -434,6 +460,7 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
 
         case 'conditionalState':
           await VisibilityOverride.applyConditionalState(operation, token);
+          await this.registerFlag(token, 'conditionalState');
           break;
 
         case 'distanceBasedVisibility':
@@ -519,6 +546,7 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
       const token = this.getSubjectToken();
       if (!token) return;
 
+
       for (const operation of this.operations) {
         try {
           await this.removeOperation(operation, token);
@@ -532,6 +560,10 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
       switch (operation.type) {
         case 'modifySenses':
           await SenseModifier.restoreSenses(token, this.ruleElementId);
+          break;
+
+        case 'modifyDetectionModes':
+          await DetectionModeModifier.restoreDetectionModes(token, this.ruleElementId);
           break;
 
         case 'overrideVisibility':

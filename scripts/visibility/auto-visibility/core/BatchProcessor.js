@@ -575,6 +575,11 @@ export class BatchProcessor {
             breakdown.pairsCached++;
           }
           effectiveVisibility1 = visibility1;
+
+          const ruleElementResult1 = RuleElementChecker.checkRuleElements(changedToken, otherToken, visibility1);
+          if (ruleElementResult1) {
+            effectiveVisibility1 = ruleElementResult1.state;
+          }
         }
         // Direction 2: otherToken -> changedToken (only calculate if no override)
         if (!hasOverride2) {
@@ -623,7 +628,7 @@ export class BatchProcessor {
           }
           effectiveVisibility2 = visibility2;
 
-          const ruleElementResult2 = RuleElementChecker.checkRuleElements(otherToken, changedToken);
+          const ruleElementResult2 = RuleElementChecker.checkRuleElements(otherToken, changedToken, visibility2);
           if (ruleElementResult2) {
             effectiveVisibility2 = ruleElementResult2.state;
           }

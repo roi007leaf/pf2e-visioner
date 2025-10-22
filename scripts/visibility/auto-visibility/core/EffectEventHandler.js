@@ -20,10 +20,14 @@ export class EffectEventHandler {
   /** @type {ExclusionManager} */
   #exclusionManager = null;
 
-  constructor(systemStateProvider, visibilityStateManager, exclusionManager) {
+  /** @type {CacheManager|null} */
+  #cacheManager = null;
+
+  constructor(systemStateProvider, visibilityStateManager, exclusionManager, cacheManager = null) {
     this.#systemStateProvider = systemStateProvider;
     this.#visibilityStateManager = visibilityStateManager;
     this.#exclusionManager = exclusionManager;
+    this.#cacheManager = cacheManager;
   }
 
   /**
@@ -126,6 +130,10 @@ export class EffectEventHandler {
           lightEmitter: lightEmitterHint,
         });
 
+        // Clear position-dependent caches when visibility-affecting effects change
+        // This ensures visibility recalculation uses fresh position data, not stale cached positions
+        this.#clearPositionCaches();
+
         if (lightEmitterHint) {
           // Emitting light changed: recalc ALL because others are affected by the emitter's aura
           this.#visibilityStateManager.markAllTokensChangedImmediate();
@@ -140,6 +148,24 @@ export class EffectEventHandler {
         // This guarantees that condition changes are reflected immediately in the UI
         await this.#refreshPerceptionAfterEffectChange();
       }
+    }
+  }
+
+  /**
+   * Clear position-dependent caches to ensure fresh visibility calculations
+   * This is critical when effects change that affect visibility calculations,
+   * to avoid stale position cache being reused
+   * @private
+   */
+  #clearPositionCaches() {
+    try {
+      if (this.#cacheManager) {
+        this.#cacheManager.clearVisibilityCache?.();
+        this.#cacheManager.clearLosCache?.();
+      }
+    } catch (error) {
+      // Fail gracefully if cache manager not available
+      console.warn('PF2E Visioner | Failed to clear position caches:', error);
     }
   }
 

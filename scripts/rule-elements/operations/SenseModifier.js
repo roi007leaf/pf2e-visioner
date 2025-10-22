@@ -1,117 +1,171 @@
 import { PredicateHelper } from '../PredicateHelper.js';
 
 export class SenseModifier {
-  static applySenseModifications(token, senseModifications, ruleElementId, predicate = null) {
+  static async applySenseModifications(token, senseModifications, ruleElementId, predicate = null) {
     if (!token?.actor || !senseModifications) return;
 
-    // Check predicate if provided
+
+
+
+
     if (predicate && predicate.length > 0) {
       const rollOptions = PredicateHelper.getTokenRollOptions(token);
       if (!PredicateHelper.evaluate(predicate, rollOptions)) {
+
         return;
       }
     }
 
-    const originalSenses = token.document.getFlag('pf2e-visioner', 'originalSenses') || {};
-    
-    if (!originalSenses[ruleElementId]) {
-      originalSenses[ruleElementId] = this.captureOriginalSenses(token.actor);
+    const escapedRuleElementId = ruleElementId.replace(/\./g, '___');
+    const originalPerception = token.document.getFlag('pf2e-visioner', 'originalPerception') || {};
+
+    if (!originalPerception[escapedRuleElementId]) {
+      originalPerception[escapedRuleElementId] = {};
     }
 
-    const senses = token.actor.system?.perception?.senses || [];
-    
+    if (!originalPerception[escapedRuleElementId].senses) {
+      originalPerception[escapedRuleElementId].senses = structuredClone(token.actor.system?.perception?.senses || []);
+    }
+
+    const senses = structuredClone(originalPerception[escapedRuleElementId].senses);
+
     Object.entries(senseModifications).forEach(([senseName, modifications]) => {
+
       if (senseName === 'all') {
-        this.modifyAllSenses(token, modifications);
+        this.modifyAllSensesArray(senses, modifications);
       } else {
-        this.modifySense(token, senseName, modifications);
+        this.modifySenseInArray(senses, senseName, modifications);
       }
     });
 
-    token.document.setFlag('pf2e-visioner', 'originalSenses', originalSenses);
+    await token.document.update({
+      [`flags.pf2e-visioner.originalPerception.${ruleElementId.replace(/\./g, '___')}`]: originalPerception[ruleElementId]
+    });
+
+    const flagCheckAfterSet = token.document.getFlag('pf2e-visioner', 'originalPerception') || {};
+
+
+    try {
+      await token.actor.update({ 'system.perception.senses': senses });
+
+    } catch (error) {
+      console.warn('PF2E Visioner | Failed to update actor senses:', error);
+    }
   }
 
-  static captureOriginalSenses(actor) {
-    const senses = actor.system?.perception?.senses || [];
-    return senses.map(sense => ({
-      type: sense.type,
-      acuity: sense.acuity,
-      range: sense.range,
-      source: sense.source
-    }));
-  }
-
-  static modifySense(token, senseName, modifications) {
-    if (!token?.actor?.system?.perception?.senses) return;
-
-    const senses = token.actor.system.perception.senses;
-    const senseIndex = senses.findIndex(s => 
+  static modifySenseInArray(senses, senseName, modifications) {
+    const senseIndex = senses.findIndex(s =>
       s.type?.toLowerCase() === senseName.toLowerCase()
     );
 
+
+
     if (senseIndex === -1) {
-      if (modifications.precision) {
-        senses.push({
-          type: senseName,
-          acuity: modifications.precision,
-          range: modifications.range || Infinity,
-          source: 'PF2e Visioner Rule Element'
-        });
-      }
+
       return;
     }
 
     const sense = senses[senseIndex];
 
+
     if (modifications.range !== undefined) {
       sense.range = modifications.range;
+
     }
 
     if (modifications.precision !== undefined) {
       sense.acuity = modifications.precision;
+
     }
 
     if (modifications.maxRange !== undefined) {
       sense.range = Math.min(sense.range, modifications.maxRange);
+
     }
+
+
   }
 
-  static modifyAllSenses(token, modifications) {
-    if (!token?.actor?.system?.perception?.senses) return;
+  static modifyAllSensesArray(senses, modifications) {
 
-    const senses = token.actor.system.perception.senses;
 
-    senses.forEach(sense => {
+
+    senses.forEach((sense, index) => {
+
+
       if (modifications.maxRange !== undefined) {
+        const oldRange = sense.range;
         sense.range = Math.min(sense.range, modifications.maxRange);
+
+      }
+
+      if (modifications.range !== undefined) {
+        const oldRange = sense.range;
+        sense.range = modifications.range;
+
       }
 
       if (modifications.beyondIsImprecise && sense.range > modifications.maxRange) {
         sense.acuity = 'imprecise';
+
       }
+
+      if (modifications.precision !== undefined) {
+        const oldAcuity = sense.acuity;
+        sense.acuity = modifications.precision;
+
+      }
+
+
     });
+
+
   }
 
   static async restoreSenses(token, ruleElementId) {
     if (!token?.actor) return;
 
-    const originalSenses = token.document.getFlag('pf2e-visioner', 'originalSenses') || {};
-    
-    if (!originalSenses[ruleElementId]) return;
 
-    const stored = originalSenses[ruleElementId];
-    if (token.actor.system?.perception?.senses) {
-      token.actor.system.perception.senses = stored;
+
+    const escapedRuleElementId = ruleElementId.replace(/\./g, '___');
+    const originalPerception = token.document.getFlag('pf2e-visioner', 'originalPerception') || {};
+
+
+
+    if (!originalPerception[escapedRuleElementId]?.senses) {
+
+      return;
     }
 
-    delete originalSenses[ruleElementId];
-    await token.document.setFlag('pf2e-visioner', 'originalSenses', originalSenses);
+    const senses = originalPerception[escapedRuleElementId].senses;
+
+
+    try {
+      await token.actor.update({ 'system.perception.senses': senses });
+
+    } catch (error) {
+      console.warn('PF2E Visioner | Failed to restore actor senses:', error);
+    }
+
+    const currentPerception = token.document.getFlag('pf2e-visioner', 'originalPerception') || {};
+
+    if (currentPerception[escapedRuleElementId]?.detectionModes === undefined) {
+      await token.document.update({
+        [`flags.pf2e-visioner.originalPerception.-=${escapedRuleElementId}`]: null
+      });
+    } else {
+      delete currentPerception[escapedRuleElementId].senses;
+      await token.document.update({
+        [`flags.pf2e-visioner.originalPerception.${escapedRuleElementId}`]: currentPerception[escapedRuleElementId]
+      });
+    }
   }
 
   static getSenseCapabilities(token) {
-    if (!token?.actor?.system?.perception?.senses) return {};
+    if (!token?.actor?.system?.perception) return {};
 
-    const senses = token.actor.system.perception.senses;
+    const senses = token.actor.system.perception.senses || [];
+
     const capabilities = {
       precise: {},
       imprecise: {}
@@ -128,4 +182,3 @@ export class SenseModifier {
     return capabilities;
   }
 }
-

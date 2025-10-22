@@ -3,12 +3,12 @@ export class SourceTracker {
     if (!token?.document) return [];
 
     const stateSource = token.document.getFlag('pf2e-visioner', 'stateSource') || {};
-    
+
     if (observerId) {
       const observerVisibility = stateSource.visibilityByObserver?.[observerId];
       return observerVisibility?.sources || [];
     }
-    
+
     return stateSource.visibility?.sources || [];
   }
 
@@ -16,17 +16,17 @@ export class SourceTracker {
     if (!token?.document) return [];
 
     const stateSource = token.document.getFlag('pf2e-visioner', 'stateSource') || {};
-    
+
     if (observerId) {
       const observerCover = stateSource.coverByObserver?.[observerId];
       return observerCover?.sources || [];
     }
-    
+
     return stateSource.cover?.sources || [];
   }
 
   static getQualifyingSources(token, action, stateType, observerId = null) {
-    const sources = stateType === 'visibility' 
+    const sources = stateType === 'visibility'
       ? this.getVisibilityStateSources(token, observerId)
       : this.getCoverStateSources(token, observerId);
 
@@ -46,7 +46,7 @@ export class SourceTracker {
     if (!token?.document) return;
 
     const currentStateSource = token.document.getFlag('pf2e-visioner', 'stateSource') || {};
-    
+
     if (observerId) {
       const observerKey = stateType === 'visibility' ? 'visibilityByObserver' : 'coverByObserver';
       if (!currentStateSource[observerKey]) {
@@ -55,17 +55,17 @@ export class SourceTracker {
       if (!currentStateSource[observerKey][observerId]) {
         currentStateSource[observerKey][observerId] = { sources: [] };
       }
-      
+
       const existingIndex = currentStateSource[observerKey][observerId].sources.findIndex(
         s => s.id === source.id
       );
-      
+
       if (existingIndex >= 0) {
         currentStateSource[observerKey][observerId].sources[existingIndex] = source;
       } else {
         currentStateSource[observerKey][observerId].sources.push(source);
       }
-      
+
       if (source.state) {
         currentStateSource[observerKey][observerId].state = source.state;
       }
@@ -77,7 +77,7 @@ export class SourceTracker {
       const existingIndex = currentStateSource[stateType].sources.findIndex(
         s => s.id === source.id
       );
-      
+
       if (existingIndex >= 0) {
         currentStateSource[stateType].sources[existingIndex] = source;
       } else {
@@ -111,7 +111,7 @@ export class SourceTracker {
       });
     } else {
       const types = stateType ? [stateType] : ['visibility', 'cover'];
-      
+
       types.forEach(type => {
         if (currentStateSource[type]?.sources) {
           const sources = currentStateSource[type].sources;
@@ -136,7 +136,7 @@ export class SourceTracker {
 
   static getHighestPrioritySource(sources) {
     if (!sources || sources.length === 0) return null;
-    
+
     return sources.reduce((highest, current) => {
       const highestPriority = highest?.priority || 0;
       const currentPriority = current?.priority || 0;
@@ -158,8 +158,8 @@ export class SourceTracker {
       const qualifications = source.qualifications?.[action];
       if (!qualifications) return false;
 
-      return qualifications.canUseThisConcealment === false || 
-             qualifications.canUseThisCover === false;
+      return qualifications.canUseThisConcealment === false ||
+        qualifications.canUseThisCover === false;
     });
   }
 

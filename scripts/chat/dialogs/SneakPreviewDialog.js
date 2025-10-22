@@ -1,5 +1,6 @@
 import { MODULE_ID } from '../../constants.js';
 import autoCoverSystem from '../../cover/auto-cover/AutoCoverSystem.js';
+import { ActionQualifier } from '../../rule-elements/operations/ActionQualifier.js';
 import { getCoverBetween, getVisibilityBetween } from '../../utils.js';
 import { optimizedVisibilityCalculator } from '../../visibility/auto-visibility/index.js';
 import { getDesiredOverrideStatesForAction } from '../services/data/action-state-config.js';
@@ -9,7 +10,6 @@ import { hasActiveEncounter } from '../services/infra/shared-utils.js';
 import sneakPositionTracker from '../services/position/PositionTracker.js';
 import turnSneakTracker from '../services/TurnSneakTracker.js';
 import { BaseActionDialog } from './base-action-dialog.js';
-import { ActionQualifier } from '../../rule-elements/operations/ActionQualifier.js';
 
 // Store reference to current sneak dialog
 let currentSneakDialog = null;
@@ -2301,7 +2301,7 @@ export class SneakPreviewDialog extends BaseActionDialog {
     if (!observerToken || !this.sneakingToken) return false;
 
     // Priority -3: Check action qualifications from rule elements (e.g., blur spell)
-    const actionCheck = ActionQualifier.checkSneakPrerequisites(this.sneakingToken, 'end');
+    const actionCheck = ActionQualifier.checkSneakPrerequisites(this.sneakingToken, observerToken.id);
     if (!actionCheck.qualifies) {
       return false;
     }
