@@ -23,7 +23,7 @@ const SETTINGS_GROUPS = {
     },
   ],
   Vision: [
-    { title: 'Vision', keys: ['enableAllTokensVision'] },
+    { title: 'Vision', keys: ['enableAllTokensVision', 'enableCameraVisionAggregation'] },
     { title: 'Hidden Loot Actors', keys: ['includeLootActors', 'lootStealthDC'] },
     { title: 'Hidden Walls', keys: ['hiddenWallsEnabled', 'wallStealthDC'] },
     {
