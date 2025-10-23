@@ -447,7 +447,7 @@ export const DEFAULT_SETTINGS = {
   enableHoverTooltips: {
     name: 'PF2E_VISIONER.SETTINGS.ENABLE_HOVER_TOOLTIPS.name',
     hint: 'PF2E_VISIONER.SETTINGS.ENABLE_HOVER_TOOLTIPS.hint',
-    scope: 'client',
+    scope: 'world',
     config: true,
     restricted: true,
     type: Boolean,

@@ -1,6 +1,6 @@
 # Changelog
 
-## [4.4.9] - 2025-10-19
+## [4.4.10] - 2025-10-19
 
 ### ✨ Features
 
@@ -11,6 +11,14 @@
   - Solves the issue where camera accounts would lose sight of enemies when their primary observer token went behind a wall
   - Enables proper streaming without leaking GM information or requiring invisible dummy actors
   - Perfect for broadcast/spectator setups where camera needs to see what any party member can see
+
+## [4.4.9] - 2025-10-22
+
+### Changes
+
+- **Factors tooltip**: Changed (i) icon to use actual state icons
+- **Hover Tooltips**: made ALT respect the Remove Target Hover Tooltips From Players setting
+- **Lifesense Indicator**: Added Factors tooltip when lifsense is indicated on the canvas
 
 ## [4.4.8] - 2025-10-19
 

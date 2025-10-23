@@ -766,9 +766,28 @@ export class Pf2eVisionerApi {
         if (hasHearing && targetConditions.includes('invisible')) {
           reasons.push(game.i18n.localize('PF2E_VISIONER.VISIBILITY_FACTORS.REASONS.HEARD_INVISIBLE_HIDDEN'));
           slugs.push('hearing');
-        } else if (hasScent) {
-          reasons.push(game.i18n.localize('PF2E_VISIONER.VISIBILITY_FACTORS.REASONS.DETECTED_BY_SCENT'));
+        } else if (hasHearing && (lightingFactor === 'darkness' || (typeof lightingFactor === 'string' && lightingFactor.includes('magicalDarkness')))) {
+          // Target is hidden in darkness but can be heard
+          reasons.push(game.i18n.format('PF2E_VISIONER.VISIBILITY_FACTORS.REASONS.DETECTED_BY_SENSE_IMPRECISE', { sense: 'hearing' }));
+          slugs.push('hearing');
+        }
+
+        if (hasScent) {
+          reasons.push(game.i18n.format('PF2E_VISIONER.VISIBILITY_FACTORS.REASONS.DETECTED_BY_SENSE_IMPRECISE', { sense: 'scent' }));
           slugs.push('scent');
+        }
+
+        if (sensingSummary.imprecise && Array.isArray(sensingSummary.imprecise)) {
+          for (const sense of sensingSummary.imprecise) {
+            const senseType = sense?.type;
+            if (!senseType || senseType === 'hearing' || senseType === 'scent') continue;
+            const range = Number(sense?.range) || 0;
+            if (range > 0 && distance <= range) {
+              const senseName = senseType.replace(/-/g, ' ');
+              reasons.push(game.i18n.format('PF2E_VISIONER.VISIBILITY_FACTORS.REASONS.DETECTED_BY_SENSE_IMPRECISE', { sense: senseName }));
+              slugs.push(senseType);
+            }
+          }
         }
       }
 
@@ -822,11 +841,29 @@ export class Pf2eVisionerApi {
         slugs.push('stored-state');
       }
 
+      const dedupedReasons = [];
+      const seenReasons = new Set();
+      for (const r of reasons) {
+        const t = (r ?? '').trim();
+        if (!t || seenReasons.has(t)) continue;
+        seenReasons.add(t);
+        dedupedReasons.push(t);
+      }
+
+      const dedupedSlugs = [];
+      const seenSlugs = new Set();
+      for (const s of slugs) {
+        const k = (s ?? '').trim();
+        if (!k || seenSlugs.has(k)) continue;
+        seenSlugs.add(k);
+        dedupedSlugs.push(k);
+      }
+
       return {
         state: visibility,
         lighting: lightingFactor,
-        reasons,
-        slugs,
+        reasons: dedupedReasons,
+        slugs: dedupedSlugs,
       };
     } catch (error) {
       console.error('Error getting visibility factors:', error);
