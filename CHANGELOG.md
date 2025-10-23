@@ -1,5 +1,11 @@
 # Changelog
 
+## [4.4.11] - 2025-10-23
+
+### 🐛 Bug Fixes
+
+- Fix recursion issue with dice so nice
+
 ## [4.4.10] - 2025-10-23
 
 ### ✨ Features
