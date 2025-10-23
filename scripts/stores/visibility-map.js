@@ -172,7 +172,11 @@ function getVisibilityBetweenWithAggregation(observer, target) {
   const observerTokens = getControlledObserverTokens();
   if (observerTokens.length <= 1) {
     // Only one or no observer tokens, no aggregation needed
-    return getVisibilityBetween(observer, target);
+    if (observerTokens.length === 1) {
+      return getVisibilityBetween(observerTokens[0], target);
+    } else {
+      return getVisibilityBetween(observer, target);
+    }
   }
 
   // Multiple observer tokens - aggregate visibility from all of them
