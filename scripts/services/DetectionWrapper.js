@@ -3,7 +3,7 @@
  */
 
 import { MODULE_ID } from '../constants.js';
-import { getVisibilityMap } from '../utils.js';
+import { getBestVisibilityState, getControlledObserverTokens, getVisibilityMap } from '../utils.js';
 
 /**
  * Class wrapper for PF2E detection integration to support init/teardown.
@@ -64,7 +64,7 @@ export class DetectionWrapper {
 export function initializeDetectionWrapper() {
   try {
     (DetectionWrapper._instance ||= new DetectionWrapper()).register();
-  } catch (_) {}
+  } catch (_) { }
 }
 
 /**
@@ -123,7 +123,7 @@ function canDetectWrapper(threshold) {
           return false;
         }
       }
-    } catch (_) {}
+    } catch (_) { }
 
     // Check our module's visibility settings
     const origin = visionSource.object;
@@ -150,13 +150,45 @@ function reachesVisibilityThreshold(origin, target, threshold, config = {}) {
 /**
  * Get visibility state between two tokens using our module's flags
  * This is the key function that makes the detection wrapper work
+ * Supports camera vision aggregation when enabled
  */
 function getVisibilityBetweenTokens(observer, target) {
   if (!observer || !target) return 'observed';
 
-  // Get the observer's visibility map
-  const visibilityMap = getVisibilityMap(observer);
+  // Check if camera vision aggregation is enabled
+  let aggregationEnabled = false;
+  try {
+    aggregationEnabled = game.settings.get(MODULE_ID, 'enableCameraVisionAggregation');
+  } catch (e) {
+    aggregationEnabled = false;
+  }
 
-  // Return the visibility state for this target
-  return visibilityMap[target.document.id] || 'observed';
+  if (!aggregationEnabled) {
+    // Standard behavior: get visibility from the single observer
+    const visibilityMap = getVisibilityMap(observer);
+    return visibilityMap[target.document.id] || 'observed';
+  }
+
+  // Camera vision aggregation enabled - get tokens with observer permissions
+  const observerTokens = getControlledObserverTokens();
+  if (observerTokens.length <= 1) {
+    // Only one or no observer tokens, no aggregation needed
+    const visibilityMap = getVisibilityMap(observer);
+    return visibilityMap[target.document.id] || 'observed';
+  }
+
+  // Multiple observer tokens - aggregate visibility from all of them
+  const visibilityStates = observerTokens
+    .map(observerToken => {
+      const map = getVisibilityMap(observerToken);
+      return map[target.document.id] || 'observed';
+    })
+    .filter(state => state !== undefined && state !== null);
+
+  if (visibilityStates.length === 0) {
+    return 'observed';
+  }
+
+  // Return the best (most permissive) visibility state
+  return getBestVisibilityState(visibilityStates);
 }

@@ -447,7 +447,7 @@ export const DEFAULT_SETTINGS = {
   enableHoverTooltips: {
     name: 'PF2E_VISIONER.SETTINGS.ENABLE_HOVER_TOOLTIPS.name',
     hint: 'PF2E_VISIONER.SETTINGS.ENABLE_HOVER_TOOLTIPS.hint',
-    scope: 'client',
+    scope: 'world',
     config: true,
     restricted: true,
     type: Boolean,
@@ -554,6 +554,17 @@ export const DEFAULT_SETTINGS = {
       achromatopsia: 'PF2E_VISIONER.SETTINGS.COLORBLIND_MODE.CHOICES.achromatopsia',
     },
     default: 'none',
+  },
+
+  // Camera Vision Aggregation
+  enableCameraVisionAggregation: {
+    name: 'PF2E_VISIONER.SETTINGS.ENABLE_CAMERA_VISION_AGGREGATION.name',
+    hint: 'PF2E_VISIONER.SETTINGS.ENABLE_CAMERA_VISION_AGGREGATION.hint',
+    scope: 'world',
+    config: true,
+    restricted: true,
+    type: Boolean,
+    default: false,
   },
 
   // Token Filtering
