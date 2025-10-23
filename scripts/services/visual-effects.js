@@ -21,10 +21,19 @@ import { _internal as visibilityCalculatorInternal } from '../visibility/Statele
  * Visual-only walls toggle per observer
  * Hides walls for this client if the active observer has them set as hidden
  */
+let updateTokenVisualsPending = false;
+
 export async function updateTokenVisuals() {
   if (!canvas?.tokens) return;
   if (isDiceSoNiceAnimating()) {
-    updateTokenVisuals()
+    // Defer refresh until dice animations complete, but avoid multiple pending calls
+    if (!updateTokenVisualsPending) {
+      updateTokenVisualsPending = true;
+      // Wait a short time and retry
+      await new Promise(resolve => setTimeout(resolve, 100));
+      updateTokenVisualsPending = false;
+      updateTokenVisuals();
+    }
     return;
   }
   // Minimal per-token refresh; token.visibility managed by PF2e detection wrapper
