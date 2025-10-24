@@ -1,5 +1,51 @@
 # Changelog
 
+## [5.0.0] - 2025-10-24
+
+### 🎉 Major Release - Rule Elements System
+
+#### ✨ New Features
+
+**PF2eVisionerEffect Rule Element System:**
+
+- Complete rule element framework for advanced visibility and cover control
+- Eight operation types for comprehensive customization:
+  - `modifySenses`: Modify sense ranges and precision (darkvision, hearing, etc.)
+  - `overrideVisibility`: Force specific visibility states with direction control
+  - `distanceBasedVisibility`: Apply visibility states based on distance bands
+  - `overrideCover`: Provide or block cover to specific targets
+  - `provideCover`: Placed objects providing directional cover
+  - `modifyActionQualification`: Control action prerequisites (Hide, Sneak, Seek)
+  - `conditionalState`: Apply states based on conditions
+  - `offGuardSuppression`: Suppress off-guard penalty from hidden/undetected attackers (Blind-Fight)
+- Predicate support at both rule and operation levels for conditional application
+- Priority system for conflict resolution between multiple effects
+- Source tracking for qualification checks and effect management
+- Range limitations and directional control (to/from)
+- Full PF2e roll options integration
+
+**Off-Guard Suppression:**
+
+- Suppress off-guard penalty when attacked by hidden/undetected creatures
+- Removes ephemeral off-guard effects when suppression is active
+- Works with attack roll pipeline and AVS ephemeral effect system
+- Compatible with other off-guard sources (flanking, prone, etc.)
+
+#### 📚 Documentation
+
+- Comprehensive `RULE_ELEMENTS.md` with examples for all operations
+- Operation-specific property references and use cases
+- Homebrew guide with best practices
+- Example JSON configurations for common feats and spells
+- API documentation for rule element system
+
+#### 🔧 Technical
+
+- Extensive test coverage for all rule element operations
+- Integration with existing visibility and cover systems
+- Clean separation between rule element logic and effect application
+- Support for both PC and NPC actors
+
 ## [4.4.11] - 2025-10-23
 
 ### 🐛 Bug Fixes
