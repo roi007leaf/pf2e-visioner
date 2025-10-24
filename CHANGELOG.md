@@ -1,5 +1,19 @@
 # Changelog
 
+## [4.4.12] - 2025-10-24
+
+### 🐛 Bug Fixes
+
+- **Chat Action Detection**: Improved action detection logic to prevent false positives
+  - Action type detection now relies strictly on PF2e system context flags rather than flavor text
+  - Removed flavor text parsing for Sneak, Hide, Create a Diversion, Avoid Notice, and Take Cover actions
+  - Prevents incorrect action detection when action names appear in unrelated messages (e.g., "Hide Shield", "Sneak Attack")
+  - More reliable action identification through PF2e's `context.options` and `context.slug` fields
+- **Wall Height Integration**: Fixed token height calculation to reject invalid Wall Height module flags
+  - Wall Height token height flags with value 0 or null are now ignored
+  - Falls back to size-based height calculation when Wall Height flag is invalid
+  - Prevents tokens from being treated as having zero height when Wall Height module provides incomplete data
+
 ## [4.4.11] - 2025-10-23
 
 ### 🐛 Bug Fixes
