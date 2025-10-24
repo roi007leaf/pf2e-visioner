@@ -219,8 +219,30 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
     }
 
     async onDelete(actorUpdates) {
+      console.log('PF2E Visioner | onDelete called for rule element:', this.item?.name, 'with operations:', this.operations.map(op => op.type));
+
+      const tokens = this.actor?.getActiveTokens?.() || [];
+      const tokenIds = tokens.map(t => t.id);
+
       await this.removeOperations();
       await this.removeAllFlagsForRuleElement();
+
+      // Trigger AVS recalculation once at the end after all cleanup is complete
+      console.log('PF2E Visioner | Triggering final AVS recalculation for tokens:', tokenIds);
+      if (tokenIds.length) {
+        if (window.pf2eVisioner?.services?.autoVisibilitySystem?.recalculateForTokens) {
+          await window.pf2eVisioner.services.autoVisibilitySystem.recalculateForTokens(tokenIds);
+          console.log('PF2E Visioner | Final AVS recalculation completed');
+        } else if (window.pf2eVisioner?.services?.autoVisibilitySystem?.recalculateAll) {
+          await window.pf2eVisioner.services.autoVisibilitySystem.recalculateAll();
+          console.log('PF2E Visioner | Final AVS recalculation (all) completed');
+        } else if (canvas?.perception) {
+          canvas.perception.update({ refreshVision: true, refreshOcclusion: true });
+          console.log('PF2E Visioner | Final perception update completed');
+        }
+      }
+
+      console.log('PF2E Visioner | onDelete completed for rule element:', this.item?.name);
     }
 
     async onUpdateEncounter({ event }) {
@@ -504,15 +526,22 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
     }
 
     async removeAllFlagsForRuleElement() {
+      console.log('PF2E Visioner | removeAllFlagsForRuleElement called');
       const tokens = this.actor?.getActiveTokens?.() || [];
-      if (!tokens.length) return;
+      if (!tokens.length) {
+        console.log('PF2E Visioner | No active tokens found');
+        return;
+      }
 
       const registryKey = this.ruleElementRegistryKey;
+      console.log('PF2E Visioner | Registry key:', registryKey);
 
       const tokensNeedingAVS = [];
       for (const token of tokens) {
+        console.log('PF2E Visioner | Checking flags for token:', token.name);
         const flagRegistry = token.document.getFlag('pf2e-visioner', 'ruleElementRegistry') || {};
         const flagsToRemove = flagRegistry[registryKey] || [];
+        console.log('PF2E Visioner | Flags to remove:', flagsToRemove);
 
         const updates = {};
 
@@ -550,50 +579,36 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
           updates['flags.pf2e-visioner.ruleElementRegistry'] = newRegistry;
         }
 
+        console.log('PF2E Visioner | Removing source from SourceTracker:', this.ruleElementId);
         await SourceTracker.removeSource(token, this.ruleElementId);
 
+        console.log('PF2E Visioner | Updates to apply:', updates);
         if (Object.keys(updates).length > 0) {
           await token.document.update(updates);
-          tokensNeedingAVS.push(token.id);
+          console.log('PF2E Visioner | Updates applied for token:', token.name);
         }
       }
-
-      if (tokensNeedingAVS.length) {
-        if (window.pf2eVisioner?.services?.autoVisibilitySystem?.recalculateForTokens) {
-          await window.pf2eVisioner.services.autoVisibilitySystem.recalculateForTokens(tokensNeedingAVS);
-        } else if (window.pf2eVisioner?.services?.autoVisibilitySystem?.recalculateAll) {
-          await window.pf2eVisioner.services.autoVisibilitySystem.recalculateAll();
-        } else if (canvas?.perception) {
-          canvas.perception.update({ refreshVision: true, refreshOcclusion: true });
-        }
-      }
+      console.log('PF2E Visioner | All flags removed (AVS recalc will happen after all cleanup)');
     }
 
     async removeOperations() {
+      console.log('PF2E Visioner | removeOperations called');
       const tokens = this.actor?.getActiveTokens?.() || [];
+      console.log('PF2E Visioner | Active tokens:', tokens.length, tokens.map(t => t.name));
       if (!tokens.length) return;
 
-      const tokenIds = [];
       for (const token of tokens) {
+        console.log('PF2E Visioner | Removing operations for token:', token.name);
         for (const operation of this.operations) {
           try {
+            console.log('PF2E Visioner | Removing operation:', operation.type);
             await this.removeOperation(operation, token);
           } catch (error) {
             console.error(`PF2E Visioner | Error removing operation ${operation.type}:`, error);
           }
         }
-        tokenIds.push(token.id);
       }
-
-      if (tokenIds.length) {
-        if (window.pf2eVisioner?.services?.autoVisibilitySystem?.recalculateForTokens) {
-          await window.pf2eVisioner.services.autoVisibilitySystem.recalculateForTokens(tokenIds);
-        } else if (window.pf2eVisioner?.services?.autoVisibilitySystem?.recalculateAll) {
-          await window.pf2eVisioner.services.autoVisibilitySystem.recalculateAll();
-        } else if (canvas?.perception) {
-          canvas.perception.update({ refreshVision: true, refreshOcclusion: true });
-        }
-      }
+      console.log('PF2E Visioner | All operations removed (AVS recalc will happen after all cleanup)');
     }
 
     async removeOperation(operation, token) {
