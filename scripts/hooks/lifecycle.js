@@ -54,13 +54,12 @@ async function reapplyRuleElementsOnLoad() {
           for (const rule of rules) {
             if (rule.key === 'PF2eVisionerEffect' || rule.key === 'PF2eVisionerVisibility') {
               try {
-                const ruleElement = effect.rules?.find(r =>
-                  r.key === rule.key &&
-                  (r.slug === rule.slug || !rule.slug)
-                );
+                const instance = Array.isArray(effect.ruleElements)
+                  ? effect.ruleElements.find(r => r?.key === rule.key && (r?.slug === rule.slug || !rule.slug))
+                  : null;
 
-                if (ruleElement && typeof ruleElement.applyOperations === 'function') {
-                  await ruleElement.applyOperations();
+                if (instance && typeof instance.applyOperations === 'function') {
+                  await instance.applyOperations();
                   hasAppliedRules = true;
                   log.debug(() => ({
                     msg: 'Successfully reapplied rule element operations',
@@ -161,11 +160,53 @@ async function cleanupStaleRuleElementFlags(token, actor, log) {
     delete newRegistry[staleKey];
 
     try {
-      const { SourceTracker } = await import('../rule-elements/SourceTracker.js');
-      await SourceTracker.removeSource(staleKey);
+      const currentStateSource = token.document.getFlag('pf2e-visioner', 'stateSource') || {};
+      const itemId = staleKey.startsWith('item-') ? staleKey.substring(5) : staleKey;
+      let modified = false;
+
+      const prune = (arr) => Array.isArray(arr) ? arr.filter(s => !(typeof s?.id === 'string' && s.id.startsWith(`${itemId}-`))) : arr;
+
+      if (currentStateSource.visibility?.sources) {
+        const next = prune(currentStateSource.visibility.sources);
+        if (next.length !== currentStateSource.visibility.sources.length) {
+          currentStateSource.visibility.sources = next;
+          modified = true;
+        }
+      }
+      if (currentStateSource.cover?.sources) {
+        const next = prune(currentStateSource.cover.sources);
+        if (next.length !== currentStateSource.cover.sources.length) {
+          currentStateSource.cover.sources = next;
+          modified = true;
+        }
+      }
+      for (const key of ['visibilityByObserver', 'coverByObserver']) {
+        const byObserver = currentStateSource[key];
+        if (!byObserver) continue;
+        for (const [obsId, data] of Object.entries(byObserver)) {
+          const srcs = Array.isArray(data?.sources) ? data.sources : [];
+          const filtered = prune(srcs);
+          if (filtered.length !== srcs.length) {
+            byObserver[obsId].sources = filtered;
+            modified = true;
+          }
+          if (Array.isArray(byObserver[obsId].sources) && byObserver[obsId].sources.length === 0) {
+            delete byObserver[obsId];
+            modified = true;
+          }
+        }
+        if (Object.keys(byObserver).length === 0) {
+          delete currentStateSource[key];
+          modified = true;
+        }
+      }
+
+      if (modified) {
+        updates['flags.pf2e-visioner.stateSource'] = currentStateSource;
+      }
     } catch (error) {
       log.warn(() => ({
-        msg: 'Failed to remove source from SourceTracker',
+        msg: 'Failed to prune stale sources for item',
         staleKey,
         error: error.message
       }));

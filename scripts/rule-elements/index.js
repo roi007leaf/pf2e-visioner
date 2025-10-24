@@ -14,13 +14,16 @@ const recentChanges = new Map();
  * Initialize and register custom rule elements
  */
 export function initializeRuleElements() {
+  Hooks.once('setup', registerRuleElements);
   Hooks.once('ready', registerRuleElements);
 }
 
 /**
  * Register rule elements with PF2e system
  */
+let _reRegistered = false;
 function registerRuleElements() {
+  if (_reRegistered) return;
   if (!game.pf2e?.RuleElement) {
     console.error('PF2E Visioner | PF2e system not ready, rule elements not registered');
     return;
@@ -80,6 +83,8 @@ function registerRuleElements() {
     if (window.PF2EVisioner) {
       window.PF2EVisioner.createVisibilityRuleElementExample = createVisibilityRuleElementExample;
     }
+
+    _reRegistered = true;
   } catch (error) {
     console.error('PF2E Visioner | Error registering rule elements:', error);
   }

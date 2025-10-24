@@ -131,8 +131,6 @@ export class VisibilityOverride {
   static async removeVisibilityOverride(operation, subjectToken) {
     if (!subjectToken) return;
 
-    console.log('PF2E Visioner | removeVisibilityOverride called for token:', subjectToken.name);
-
     let sourceId = operation?.source;
     try {
       const existingOverride = subjectToken.document.getFlag('pf2e-visioner', 'ruleElementOverride');
@@ -145,17 +143,11 @@ export class VisibilityOverride {
       }
     } catch (_) { }
 
-    console.log('PF2E Visioner | Derived sourceId:', sourceId);
-
     if (sourceId) {
-      console.log('PF2E Visioner | Removing source from SourceTracker:', sourceId);
       await SourceTracker.removeSource(subjectToken, sourceId);
     }
-    console.log('PF2E Visioner | Unsetting ruleElementOverride flag');
     await subjectToken.document.unsetFlag('pf2e-visioner', 'ruleElementOverride');
-    console.log('PF2E Visioner | Unsetting visibilityReplacement flag');
     await subjectToken.document.unsetFlag('pf2e-visioner', 'visibilityReplacement');
-    console.log('PF2E Visioner | removeVisibilityOverride completed');
   }
 
   static getObserverTokens(subjectToken, observers, range, tokenIds = null) {
