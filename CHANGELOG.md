@@ -14,10 +14,9 @@
   - `overrideVisibility`: Force specific visibility states with direction control
   - `distanceBasedVisibility`: Apply visibility states based on distance bands
   - `overrideCover`: Provide or block cover to specific targets
-  - `provideCover`: Placed objects providing directional cover
-  - `modifyActionQualification`: Control action prerequisites (Hide, Sneak, Seek)
+  - `modifyActionQualification`: Control action prerequisites
   - `conditionalState`: Apply states based on conditions
-  - `offGuardSuppression`: Suppress off-guard penalty from hidden/undetected attackers (Blind-Fight)
+  - `offGuardSuppression`: Suppress off-guard penalty from hidden/undetected attackers
 - Predicate support at both rule and operation levels for conditional application
 - Priority system for conflict resolution between multiple effects
 - Source tracking for qualification checks and effect management
