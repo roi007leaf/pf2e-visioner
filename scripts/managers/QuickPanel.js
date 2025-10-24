@@ -603,7 +603,7 @@ export class VisionerQuickPanel extends foundry.applications.api.ApplicationV2 {
     try {
       return Array.from(canvas?.tokens?.placeables ?? [])
         .filter(
-          (token) => token?.actor && token.actor.type === 'character' && token.actor.hasPlayerOwner,
+          (token) => token?.actor && (token.actor.type === 'character' || token.actor.type === 'familiar') && token.actor.hasPlayerOwner,
         )
         .filter((token) => token.actor.alliance === 'party' || token.actor.alliance === 'self');
     } catch (_) {
