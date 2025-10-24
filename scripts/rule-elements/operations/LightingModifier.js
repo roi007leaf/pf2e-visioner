@@ -54,18 +54,6 @@ export class LightingModifier {
 
     if (modifications[source]) {
       await subjectToken.document.unsetFlag('pf2e-visioner', `lightingModification.${source}`);
-
-      // Small delay to ensure flag update is processed
-      await new Promise(resolve => setTimeout(resolve, 50));
-
-      // Trigger AVS recalculation for the subject token
-      if (window.pf2eVisioner?.services?.autoVisibilitySystem?.recalculateForTokens) {
-        await window.pf2eVisioner.services.autoVisibilitySystem.recalculateForTokens([subjectToken.id]);
-      } else if (window.pf2eVisioner?.services?.autoVisibilitySystem?.recalculateAll) {
-        await window.pf2eVisioner.services.autoVisibilitySystem.recalculateAll();
-      } else if (canvas?.perception) {
-        canvas.perception.update({ refreshVision: true, refreshOcclusion: true });
-      }
     }
   }
 

@@ -565,6 +565,17 @@ export class Pf2eVisionerApi {
         slugs.push('concealed');
       }
 
+      // 2.5 RULE ELEMENT OVERRIDES (can override automatic visibility calculations)
+      const hasRuleElementOverride = observerToken.document.getFlag('pf2e-visioner', 'ruleElementOverride') ||
+        targetToken.document.getFlag('pf2e-visioner', 'ruleElementOverride') ||
+        observerToken.document.getFlag('pf2e-visioner', 'visibilityReplacement') ||
+        targetToken.document.getFlag('pf2e-visioner', 'visibilityReplacement');
+
+      if (hasRuleElementOverride) {
+        reasons.push(game.i18n.localize('PF2E_VISIONER.VISIBILITY_FACTORS.REASONS.RULE_ELEMENT_OVERRIDE'));
+        slugs.push('rule-element-override');
+      }
+
       // 3. LIGHTING CONDITIONS (main cause of concealment/hidden for most cases)
       if (visibility === 'concealed' || visibility === 'hidden') {
         // Check for darkness templates first (most common cause)
@@ -860,7 +871,7 @@ export class Pf2eVisionerApi {
       }
 
       return {
-        state: visibility,
+        state: manualState || visibility,
         lighting: lightingFactor,
         reasons: dedupedReasons,
         slugs: dedupedSlugs,

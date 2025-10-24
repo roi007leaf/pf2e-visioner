@@ -1151,6 +1151,7 @@
         "TARGET_UNDETECTED_CONDITION": "Target has undetected condition",
         "TARGET_HIDDEN_CONDITION": "Target has hidden condition",
         "TARGET_CONCEALED_CONDITION": "Target has concealed condition",
+        "RULE_ELEMENT_OVERRIDE": "Rule element overrides state",
         "TARGET_IN_GREATER_DARKNESS_WITH_GREATER_DARKVISION": "Target is in greater magical darkness ({templates}), but observer has greater darkvision",
         "TARGET_IN_GREATER_DARKNESS_WITH_DARKVISION": "Target is in greater magical darkness ({templates}) - concealed even with darkvision",
         "TARGET_IN_GREATER_DARKNESS_NO_DARKVISION": "Target is in greater magical darkness ({templates}), observer lacks darkvision",

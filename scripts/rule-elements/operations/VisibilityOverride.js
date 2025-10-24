@@ -131,7 +131,6 @@ export class VisibilityOverride {
   static async removeVisibilityOverride(operation, subjectToken) {
     if (!subjectToken) return;
 
-    // Derive the actual source id from the stored flag if not provided on operation
     let sourceId = operation?.source;
     try {
       const existingOverride = subjectToken.document.getFlag('pf2e-visioner', 'ruleElementOverride');
@@ -149,17 +148,6 @@ export class VisibilityOverride {
     }
     await subjectToken.document.unsetFlag('pf2e-visioner', 'ruleElementOverride');
     await subjectToken.document.unsetFlag('pf2e-visioner', 'visibilityReplacement');
-
-    // Trigger AVS recalculation after effect removal
-    if (window.pf2eVisioner?.services?.autoVisibilitySystem?.recalculateForTokens) {
-      await window.pf2eVisioner.services.autoVisibilitySystem.recalculateForTokens([
-        subjectToken.id,
-      ]);
-    } else if (window.pf2eVisioner?.services?.autoVisibilitySystem?.recalculateAll) {
-      await window.pf2eVisioner.services.autoVisibilitySystem.recalculateAll();
-    } else if (canvas?.perception) {
-      canvas.perception.update({ refreshVision: true, refreshOcclusion: true });
-    }
   }
 
   static getObserverTokens(subjectToken, observers, range, tokenIds = null) {

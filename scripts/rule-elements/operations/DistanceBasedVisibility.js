@@ -71,15 +71,5 @@ export class DistanceBasedVisibility {
       const { SourceTracker } = await import('../SourceTracker.js');
       await SourceTracker.removeSource(subjectToken, sourceId);
     }
-
-    if (window.pf2eVisioner?.services?.autoVisibilitySystem?.recalculateForTokens) {
-      await window.pf2eVisioner.services.autoVisibilitySystem.recalculateForTokens([
-        subjectToken.id,
-      ]);
-    } else if (window.pf2eVisioner?.services?.autoVisibilitySystem?.recalculateAll) {
-      await window.pf2eVisioner.services.autoVisibilitySystem.recalculateAll();
-    } else if (canvas?.perception) {
-      canvas.perception.update({ refreshVision: true, refreshOcclusion: true });
-    }
   }
 }

@@ -573,6 +573,7 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
       const tokens = this.actor?.getActiveTokens?.() || [];
       if (!tokens.length) return;
 
+      const tokenIds = [];
       for (const token of tokens) {
         for (const operation of this.operations) {
           try {
@@ -580,6 +581,17 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
           } catch (error) {
             console.error(`PF2E Visioner | Error removing operation ${operation.type}:`, error);
           }
+        }
+        tokenIds.push(token.id);
+      }
+
+      if (tokenIds.length) {
+        if (window.pf2eVisioner?.services?.autoVisibilitySystem?.recalculateForTokens) {
+          await window.pf2eVisioner.services.autoVisibilitySystem.recalculateForTokens(tokenIds);
+        } else if (window.pf2eVisioner?.services?.autoVisibilitySystem?.recalculateAll) {
+          await window.pf2eVisioner.services.autoVisibilitySystem.recalculateAll();
+        } else if (canvas?.perception) {
+          canvas.perception.update({ refreshVision: true, refreshOcclusion: true });
         }
       }
     }
