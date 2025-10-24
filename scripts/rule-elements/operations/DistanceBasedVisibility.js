@@ -63,7 +63,14 @@ export class DistanceBasedVisibility {
   static async removeDistanceBasedVisibility(operation, subjectToken) {
     if (!subjectToken) return;
 
+    const sourceId = operation?.source || subjectToken.document.getFlag('pf2e-visioner', 'distanceBasedVisibility')?.source;
+
     await subjectToken.document.unsetFlag('pf2e-visioner', 'distanceBasedVisibility');
+
+    if (sourceId) {
+      const { SourceTracker } = await import('../SourceTracker.js');
+      await SourceTracker.removeSource(subjectToken, sourceId);
+    }
 
     if (window.pf2eVisioner?.services?.autoVisibilitySystem?.recalculateForTokens) {
       await window.pf2eVisioner.services.autoVisibilitySystem.recalculateForTokens([

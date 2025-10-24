@@ -527,8 +527,9 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
             'ruleElementOverride',
             'visibilityReplacement',
             'actionQualifications',
-            'providesCover',
+            'overrideCover',
             'originalSenses',
+            'conditionalState',
           ];
 
           for (const flagName of simpleFlags) {
@@ -594,6 +595,7 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
           break;
 
         case 'overrideVisibility':
+        case 'conditionalState':
           await VisibilityOverride.removeVisibilityOverride(operation, token);
           break;
 

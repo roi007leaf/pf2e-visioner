@@ -145,7 +145,7 @@ export class VisibilityOverride {
     } catch (_) { }
 
     if (sourceId) {
-      await SourceTracker.removeSource(subjectToken, sourceId, 'visibility');
+      await SourceTracker.removeSource(subjectToken, sourceId);
     }
     await subjectToken.document.unsetFlag('pf2e-visioner', 'ruleElementOverride');
     await subjectToken.document.unsetFlag('pf2e-visioner', 'visibilityReplacement');
