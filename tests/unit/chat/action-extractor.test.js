@@ -218,21 +218,6 @@ describe('Action Extractor Tests', () => {
         actionType: 'create-a-diversion',
       });
     });
-
-    test('detects create a diversion from flavor text', async () => {
-      const message = {
-        id: 'msg1',
-        flavor: 'Create a Diversion',
-        flags: {},
-      };
-
-      const result = await extractActionData(message);
-
-      expect(result).toMatchObject({
-        messageId: 'msg1',
-        actionType: 'create-a-diversion',
-      });
-    });
   });
 
   describe('Take Cover Action Detection', () => {
@@ -427,25 +412,6 @@ describe('Action Extractor Tests', () => {
       });
     });
 
-    test('detects sneak from flavor text', async () => {
-      const message = {
-        id: 'msg1',
-        flavor: 'Sneak past the guards',
-        flags: {
-          pf2e: {
-            context: { type: 'skill-check' },
-          },
-        },
-      };
-
-      const result = await extractActionData(message);
-
-      expect(result).toMatchObject({
-        messageId: 'msg1',
-        actionType: 'sneak',
-      });
-    });
-
     test('does not detect sneak from sneak attack flavor', async () => {
       const message = {
         id: 'msg1',
@@ -525,25 +491,6 @@ describe('Action Extractor Tests', () => {
               type: 'skill-check',
               slug: 'hide',
             },
-          },
-        },
-      };
-
-      const result = await extractActionData(message);
-
-      expect(result).toMatchObject({
-        messageId: 'msg1',
-        actionType: 'hide',
-      });
-    });
-
-    test('detects hide from flavor text', async () => {
-      const message = {
-        id: 'msg1',
-        flavor: 'Hide behind the tree',
-        flags: {
-          pf2e: {
-            context: { type: 'skill-check' },
           },
         },
       };
@@ -909,25 +856,6 @@ describe('Action Extractor Tests', () => {
       expect(result).toMatchObject({
         messageId: 'msg1',
         actionType: 'point-out',
-      });
-    });
-
-    test('handles case-insensitive flavor text matching', async () => {
-      const message = {
-        id: 'msg1',
-        flavor: 'HIDE BEHIND COVER',
-        flags: {
-          pf2e: {
-            context: { type: 'skill-check' },
-          },
-        },
-      };
-
-      const result = await extractActionData(message);
-
-      expect(result).toMatchObject({
-        messageId: 'msg1',
-        actionType: 'hide',
       });
     });
 

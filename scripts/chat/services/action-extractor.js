@@ -18,12 +18,14 @@ export async function extractActionData(message) {
     context?.type === 'perception-check' &&
     (context.options?.includes('action:seek') || context.slug === 'seek');
 
+  // Only detect Create a Diversion if explicit context present
   const isCreateADiversionAction =
-    (context?.type === 'skill-check' &&
-      (context.options?.some((opt) => opt.startsWith('action:create-a-diversion')) ||
-        context.slug === 'create-a-diversion')) ||
-    message.flavor?.toLowerCase?.().includes?.('create a diversion');
+    context?.type === 'skill-check' &&
+    (context.options?.some((opt) => opt.startsWith('action:create-a-diversion')) ||
+      context.slug === 'create-a-diversion');
 
+  // Take Cover: PF2e doesn't provide structured data for this action
+  // Only detect via context/origin flags if they exist, or our module's flag (if we add one)
   const isTakeCoverAction =
     // Only treat as Take Cover when structured context or origin flags indicate the action.
     // Avoid matching generic messages that merely mention "Take Cover" (e.g., condition summaries).
@@ -34,38 +36,28 @@ export async function extractActionData(message) {
     message.flavor?.toLowerCase?.().includes?.('take cover') ||
     message.flavor?.includes?.("Mise à l'abri");
 
+  // Only detect Avoid Notice if explicit context or origin flags present
   const isAvoidNoticeAction =
     origin?.rollOptions?.includes('origin:item:avoid-notice') ||
     origin?.rollOptions?.includes('origin:item:slug:avoid-notice') ||
-    context?.options?.includes('action:avoid-notice') ||
-    message.content?.includes('Avoid Notice') ||
-    message.flavor?.toLowerCase?.().includes?.('avoid notice');
+    context?.options?.includes('action:avoid-notice');
 
-  // Check for explicit sneak action first (more specific)
+  // Only detect Sneak if explicit context present
   const isSneakAction =
-    context && // Require context to exist as it should on an actual roll.
+    context &&
     !isCreateADiversionAction &&
     !isAvoidNoticeAction &&
-    ((context?.type === 'skill-check' &&
-      (context.options?.includes('action:sneak') || context.slug === 'sneak')) ||
-      (message.flavor?.toLowerCase?.().includes?.('sneak') &&
-        !message.flavor?.toLowerCase?.().includes?.('sneak attack') &&
-        !message.flavor?.toLowerCase?.().includes?.('create a diversion') &&
-        !message.flavor?.toLowerCase?.().includes?.('avoid notice') &&
-        !message.flavor?.toLowerCase?.().includes?.('hide')));
+    context.type === 'skill-check' &&
+    (context.options?.includes('action:sneak') || context.slug === 'sneak');
 
   // Check for hide action after sneak (less specific, can overlap)
+  // Only rely on explicit context, not flavor text, to avoid false positives (e.g., "Hide Shield")
   const isHideAction =
-    context && // Require context to exist, as it always does on the actual roll.
+    context &&
     !isCreateADiversionAction &&
-    !isSneakAction && // Don't classify as hide if already identified as sneak
-    ((context?.type === 'skill-check' &&
-      (context.options?.includes('action:hide') || context.slug === 'hide')) ||
-      (message.flavor?.toLowerCase?.().includes?.('hide') &&
-        !message.flavor?.toLowerCase?.().includes?.('create a diversion') &&
-        !message.flavor?.toLowerCase?.().includes?.('sneak attack') &&
-        !message.flavor?.toLowerCase?.().includes?.('saving throw'))) &&
-    !message.flavor?.toLowerCase?.().includes?.('sneak');
+    !isSneakAction &&
+    context.type === 'skill-check' &&
+    (context.options?.includes('action:hide') || context.slug === 'hide');
 
   const isAttackRoll =
     (context?.type === 'attack-roll' ||
@@ -92,7 +84,7 @@ export async function extractActionData(message) {
       const speakerActor = game.actors?.get?.(message.speaker.actor);
       const activeTokens = speakerActor?.getActiveTokens?.(true, true) || [];
       actorToken = activeTokens[0] || null;
-    } catch (_) {}
+    } catch (_) { }
   }
   if (!actorToken && origin?.uuid && typeof fromUuidSync === 'function') {
     try {
@@ -100,7 +92,7 @@ export async function extractActionData(message) {
       const originActor = originDoc?.actor ?? originDoc?.parent?.actor ?? null;
       const activeTokens = originActor?.getActiveTokens?.(true, true) || [];
       actorToken = activeTokens[0] || null;
-    } catch (_) {}
+    } catch (_) { }
   }
 
   // Debug logging for action type detection
@@ -115,7 +107,7 @@ export async function extractActionData(message) {
   else if (isTakeCoverAction) actionType = 'take-cover';
   else if (isAttackRoll && !isDamageTakenMessage) {
     const flags = actorToken?.document?.flags?.['pf2e-visioner'] || {};
-    const hasHiddenOverride = Object.entries(flags).some(([k,v]) =>
+    const hasHiddenOverride = Object.entries(flags).some(([k, v]) =>
       k.startsWith('avs-override-from-') && ['hidden', 'undetected'].includes(v?.state));
     if (hasHiddenOverride) actionType = 'consequences';
   }
@@ -144,7 +136,7 @@ export async function extractActionData(message) {
       if (Number.isFinite(total)) {
         data.roll = { total, dice: [{ total: die }] };
       }
-    } catch (_) {}
+    } catch (_) { }
   }
 
   // For Point Out, include target reference if present
@@ -153,7 +145,7 @@ export async function extractActionData(message) {
       data.context = data.context || {};
       data.context.target = { ...message.flags.pf2e.target };
     }
-  } catch (_) {}
+  } catch (_) { }
 
   return data;
 }
