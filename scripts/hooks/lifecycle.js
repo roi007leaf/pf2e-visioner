@@ -30,6 +30,8 @@ async function reapplyRuleElementsOnLoad() {
 
       tokensProcessed.add(actor.id);
 
+      await cleanupStaleRuleElementFlags(token, actor, log);
+
       const effects = actor.items?.filter(i => i.type === 'effect') || [];
 
       for (const effect of effects) {
@@ -86,7 +88,72 @@ async function reapplyRuleElementsOnLoad() {
   log.debug('Finished reapplying rule elements');
 }
 
-export function onReady() {
+async function cleanupStaleRuleElementFlags(token, actor, log) {
+  const flagRegistry = token.document.getFlag('pf2e-visioner', 'ruleElementRegistry') || {};
+  const registeredKeys = Object.keys(flagRegistry);
+
+  if (registeredKeys.length === 0) {
+    return;
+  }
+
+  const activeEffectIds = new Set(
+    (actor.items?.filter(i => i.type === 'effect') || []).map(e => e.id)
+  );
+
+  const staleKeys = registeredKeys.filter(key => {
+    if (key.startsWith('item-')) {
+      const itemId = key.substring(5);
+      return !activeEffectIds.has(itemId);
+    }
+    return false;
+  });
+
+  if (staleKeys.length === 0) {
+    return;
+  }
+
+  log.debug(() => ({
+    msg: 'Found stale rule element flags, cleaning up',
+    tokenName: token.name,
+    staleKeys
+  }));
+
+  const updates = {};
+  const newRegistry = { ...flagRegistry };
+
+  for (const staleKey of staleKeys) {
+    const flagsToRemove = flagRegistry[staleKey] || [];
+
+    for (const flagPath of flagsToRemove) {
+      updates[`flags.pf2e-visioner.${flagPath}`] = null;
+    }
+
+    delete newRegistry[staleKey];
+
+    try {
+      const { SourceTracker } = await import('../rule-elements/SourceTracker.js');
+      await SourceTracker.removeSource(staleKey);
+    } catch (error) {
+      log.warn(() => ({
+        msg: 'Failed to remove source from SourceTracker',
+        staleKey,
+        error: error.message
+      }));
+    }
+  }
+
+  updates['flags.pf2e-visioner.ruleElementRegistry'] = newRegistry;
+
+  if (Object.keys(updates).length > 0) {
+    await token.document.update(updates);
+
+    log.debug(() => ({
+      msg: 'Cleaned up stale flags',
+      tokenName: token.name,
+      flagsRemoved: Object.keys(updates).length
+    }));
+  }
+} export function onReady() {
   // Add CSS styles for chat automation
   injectChatAutomationStyles();
 
