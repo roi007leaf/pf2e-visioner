@@ -1699,6 +1699,7 @@ export function showVisibilityFactorsOverlay() {
 
   HoverTooltips.isShowingFactorsOverlay = true;
   HoverTooltips.factorsOverlayTokens = new Set();
+  try { Hooks.call('pf2e-visioner:visibilityFactorsOverlay', { active: true }); } catch (_) { }
 
   hideAllVisibilityIndicators();
   hideAllCoverIndicators();
@@ -1717,6 +1718,7 @@ export function hideVisibilityFactorsOverlay() {
 
   HoverTooltips.isShowingFactorsOverlay = false;
   HoverTooltips.factorsOverlayTokens.clear();
+  try { Hooks.call('pf2e-visioner:visibilityFactorsOverlay', { active: false }); } catch (_) { }
 
   // Clean up factor badges (DOM elements)
   HoverTooltips.visibilityBadges.forEach((badge, key) => {
@@ -1810,10 +1812,17 @@ function formatVisibilityFactors(factors) {
       'Darkvision', 'darkvision',
       'Low-light', 'low-light',
       'lifesense', 'Lifesense',
-      'tremorsense', 'Tremorsense',
-      'scent', 'Scent',
-      'hearing', 'Hearing', 'Heard',
+      'tremorsense', 'Tremorsense', 'tremor', 'vibration', 'Vibration', 'vibrationsense', 'Vibrationsense',
+      'scent', 'Scent', 'smell', 'Smell', 'odor', 'Odor', 'stench', 'Stench',
+      'hearing', 'Hearing', 'Heard', 'hear', 'Hear',
+      'echolocation', 'Echolocation',
+      'wavesense', 'Wavesense',
+      'blindsight', 'Blindsight',
+      'lifesense', 'Lifesense', 'bloodsense', 'Bloodsense',
+      'touch', 'Touch', 'tactile', 'Tactile', 'pressure', 'Pressure',
+      'taste', 'Taste', 'gustation', 'Gustation',
       'sees', 'see',
+      'sense', 'Sense',
     ];
 
     factors.reasons.forEach(reason => {
@@ -1885,7 +1894,7 @@ function addFactorIndicator(targetToken, observerToken, factorText, state) {
   badgeEl.style.willChange = 'transform';
 
   badgeEl.innerHTML = `<span class="pf2e-visioner-factor-badge" style="display: inline-flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.8); border-radius: 6px; width: ${bgSize}px; height: ${bgSize}px;">
-    <i class="fa-solid fa-circle-info" style="font-size: ${iconSize}px; color: ${iconColor};"></i>
+    <i class="${stateConfig.icon}" style="font-size: ${iconSize}px; color: ${iconColor};"></i>
   </span>`;
 
   document.body.appendChild(badgeEl);

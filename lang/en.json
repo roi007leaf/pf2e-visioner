@@ -665,6 +665,10 @@
         "name": "Vision for NPCs",
         "hint": "Enables token vision for all NPC tokens to more easily see point of view"
       },
+      "ENABLE_CAMERA_VISION_AGGREGATION": {
+        "name": "Camera Vision Aggregation",
+        "hint": "When enabled, camera accounts with observer permissions on multiple party tokens will display the best (most permissive) visibility state across all controlled tokens, instead of just the first token. Useful for streaming where camera needs to see what any party member can see."
+      },
       "GDV_VISUAL_OVERRIDE_ENABLED": {
         "name": "Greater Darkvision Visual Override",
         "hint": "Client-only: When your selected token has Greater Darkvision, lighten darkness areas so visuals match Visioner rules."
@@ -1176,8 +1180,8 @@
         "DETECTED_BY_LIFESENSE": "Detected by lifesense ({acuity})",
         "DETECTED_BY_TREMORSENSE": "Detected by tremorsense ({acuity})",
         "DETECTED_BY_SENSE": "Detected by {sense} (precise)",
+        "DETECTED_BY_SENSE_IMPRECISE": "Detected by {sense} (imprecise)",
         "HEARD_INVISIBLE_HIDDEN": "Heard with hearing (imprecise) - invisible creature is hidden",
-        "DETECTED_BY_SCENT": "Detected by scent (imprecise)",
         "BRIGHT_LIGHT_NORMAL_VISION": "Target is in bright light with normal vision",
         "LOW_LIGHT_VISION_DIM": "Low-light vision sees clearly in dim light",
         "DARKVISION_THROUGH_MAGICAL_DARKNESS": "Darkvision sees through magical darkness (rank {rank})",

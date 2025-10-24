@@ -854,6 +854,7 @@
         "DETECTED_BY_LIFESENSE": "(FR TODO) Detected by lifesense ({acuity})",
         "DETECTED_BY_TREMORSENSE": "(FR TODO) Detected by tremorsense ({acuity})",
         "DETECTED_BY_SENSE": "(FR TODO) Detected by {sense} (precise)",
+        "DETECTED_BY_SENSE_IMPRECISE": "(FR TODO) Detected by {sense} (imprecise)",
         "HEARD_INVISIBLE_HIDDEN": "(FR TODO) Heard with hearing (imprecise) - invisible creature is hidden",
         "DETECTED_BY_SCENT": "(FR TODO) Detected by scent (imprecise)",
         "BRIGHT_LIGHT_NORMAL_VISION": "(FR TODO) Target is in bright light with normal vision",

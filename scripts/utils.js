@@ -427,3 +427,55 @@ export function getLastRollTotalForActor(actor, requiredSlug = null) {
   } catch (_) { }
   return null;
 }
+
+/**
+ * Returns the best (most permissive) visibility state from a list of states.
+ * Order of visibility (best to worst): observed > concealed > hidden > undetected
+ * @param {string[]} states - Array of visibility states
+ * @returns {string} The best visibility state, defaults to 'observed' if empty
+ */
+export function getBestVisibilityState(states) {
+  if (!Array.isArray(states) || states.length === 0) return 'observed';
+
+  const stateOrder = ['observed', 'concealed', 'hidden', 'undetected'];
+
+  let bestIndex = stateOrder.length - 1;
+
+  for (const state of states) {
+    const index = stateOrder.indexOf(state);
+    if (index !== -1 && index < bestIndex) {
+      bestIndex = index;
+    }
+  }
+
+  return stateOrder[bestIndex];
+}
+
+/**
+ * Get all tokens that the current user has observer permissions on.
+ * For camera/spectator accounts: returns party tokens they can view but don't own
+ * For GMs: returns selected tokens (controlled), or all tokens if none selected
+ * For players: returns tokens they have observer perms on (usually their party)
+ * 
+ * Note: "observer permissions" != "selected tokens" in PF2E
+ * This function aggregates vision for camera accounts in streaming scenarios.
+ * 
+ * @returns {Token[]} Array of tokens the user can observe/control for visibility
+ */
+export function getControlledObserverTokens() {
+  if (!canvas?.tokens?.placeables) return [];
+
+  // For GMs: prefer selected/controlled tokens, fallback to all tokens
+  if (game.user.isGM) {
+    const controlled = canvas.tokens.controlled;
+    if (controlled.length > 0) {
+      return controlled;
+    }
+    return canvas.tokens.placeables;
+  }
+
+  // For non-GMs: get tokens with observer permissions that aren't owned by the user
+  // This is the camera account case: they have observer perms on party tokens but don't own them
+  return canvas.tokens.placeables.filter(token => token.observer && !token.isOwner);
+}
+

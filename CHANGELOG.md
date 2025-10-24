@@ -1,5 +1,31 @@
 # Changelog
 
+## [4.4.11] - 2025-10-23
+
+### 🐛 Bug Fixes
+
+- Fix recursion issue with dice so nice
+
+## [4.4.10] - 2025-10-23
+
+### ✨ Features
+
+- **Camera Vision Aggregation**: Added option to aggregate visibility across multiple party tokens for camera/spectator accounts
+  - New setting: "Camera Vision Aggregation" in Vision settings (disabled by default)
+  - When enabled, accounts with observer permissions on multiple tokens will display the best (most permissive) visibility state
+  - Visibility order: Observed > Concealed > Hidden > Undetected
+  - Solves the issue where camera accounts would lose sight of enemies when their primary observer token went behind a wall
+  - Enables proper streaming without leaking GM information or requiring invisible dummy actors
+  - Perfect for broadcast/spectator setups where camera needs to see what any party member can see
+
+## [4.4.9] - 2025-10-22
+
+### Changes
+
+- **Factors tooltip**: Changed (i) icon to use actual state icons
+- **Hover Tooltips**: made ALT respect the Remove Target Hover Tooltips From Players setting
+- **Lifesense Indicator**: Added Factors tooltip when lifsense is indicated on the canvas
+
 ## [4.4.8] - 2025-10-19
 
 ### ✨ Features

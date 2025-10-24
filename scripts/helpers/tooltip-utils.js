@@ -31,7 +31,7 @@ export function computeSizesFromSetting(rawValue) {
       const borderPx = Math.max(2, Math.round(numeric / 8));
       return { fontPx, iconPx, borderPx };
     }
-  } catch (_) {}
+  } catch (_) { }
   return { fontPx: 16, iconPx: 16, borderPx: 3 };
 }
 
@@ -51,6 +51,15 @@ export function canShowTooltips(mode = 'target', hoveredToken = null, isKeyboard
     const result =
       game.settings.get(MODULE_ID, 'enableHoverTooltips') &&
       game.settings.get(MODULE_ID, 'allowPlayerTooltips');
+
+    // For target mode keyboard tooltips (Alt key), also check blockPlayerTargetTooltips setting
+    if (mode === 'target' && hoveredToken) {
+      if (game.settings.get(MODULE_ID, 'blockPlayerTargetTooltips')) {
+        return false;
+      }
+      return hoveredToken.isOwner;
+    }
+
     return result;
   }
 
