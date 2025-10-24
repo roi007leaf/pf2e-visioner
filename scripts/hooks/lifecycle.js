@@ -7,6 +7,84 @@ import { MODULE_ID } from '../constants.js';
 import { initializeHoverTooltips } from '../services/HoverTooltips.js';
 import { registerSocket } from '../services/socket.js';
 import { updateTokenVisuals, updateWallVisuals } from '../services/visual-effects.js';
+import { getLogger } from '../utils/logger.js';
+
+async function reapplyRuleElementsOnLoad() {
+  const log = getLogger('RuleElements/Lifecycle');
+
+  if (!canvas?.tokens?.placeables) {
+    log.debug('No tokens on canvas, skipping rule element reapplication');
+    return;
+  }
+
+  log.debug('Reapplying rule elements on canvas ready');
+
+  const tokensProcessed = new Set();
+
+  for (const token of canvas.tokens.placeables) {
+    try {
+      const actor = token.actor;
+      if (!actor || tokensProcessed.has(actor.id)) {
+        continue;
+      }
+
+      tokensProcessed.add(actor.id);
+
+      const effects = actor.items?.filter(i => i.type === 'effect') || [];
+
+      for (const effect of effects) {
+        const rules = effect.system?.rules || [];
+        const hasVisionerRules = rules.some(rule =>
+          rule.key === 'PF2eVisionerEffect' || rule.key === 'PF2eVisionerVisibility'
+        );
+
+        if (hasVisionerRules) {
+          log.debug(() => ({
+            msg: 'Found PF2eVisionerEffect on existing effect, reapplying',
+            effectName: effect.name,
+            actorName: actor.name,
+            tokenId: token.id
+          }));
+
+          for (const rule of rules) {
+            if (rule.key === 'PF2eVisionerEffect' || rule.key === 'PF2eVisionerVisibility') {
+              try {
+                const ruleElement = effect.rules?.find(r =>
+                  r.key === rule.key &&
+                  (r.slug === rule.slug || !rule.slug)
+                );
+
+                if (ruleElement && typeof ruleElement.applyOperations === 'function') {
+                  await ruleElement.applyOperations();
+                  log.debug(() => ({
+                    msg: 'Successfully reapplied rule element operations',
+                    ruleKey: rule.key,
+                    effectName: effect.name
+                  }));
+                }
+              } catch (error) {
+                log.warn(() => ({
+                  msg: 'Failed to reapply individual rule',
+                  ruleKey: rule.key,
+                  effectName: effect.name,
+                  error: error.message
+                }));
+              }
+            }
+          }
+        }
+      }
+    } catch (error) {
+      log.warn(() => ({
+        msg: 'Failed to process token for rule element reapplication',
+        tokenName: token.name,
+        error: error.message
+      }));
+    }
+  }
+
+  log.debug('Finished reapplying rule elements');
+}
 
 export function onReady() {
   // Add CSS styles for chat automation
@@ -32,6 +110,13 @@ export async function onCanvasReady() {
   if (canvas.ready && canvas.tokens?.placeables) {
     await updateTokenVisuals();
   }
+
+  try {
+    await reapplyRuleElementsOnLoad();
+  } catch (error) {
+    console.warn('PF2E Visioner | Failed to reapply rule elements on load:', error);
+  }
+
   try {
     // After canvas refresh, restore indicators for currently controlled tokens that have wall flags
     const controlledTokens = canvas.tokens.controlled || [];
