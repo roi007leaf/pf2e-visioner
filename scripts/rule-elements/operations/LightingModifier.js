@@ -1,22 +1,21 @@
-/**
- * LightingModifier - Handles modifyLighting operation
- * Allows rule elements to override the lighting level at a token's position
- */
+import { PredicateHelper } from '../PredicateHelper.js';
 
 export class LightingModifier {
-  /**
-   * Apply lighting modification to a token
-   * @param {Object} operation - The operation configuration
-   * @param {Token} subjectToken - The token with the effect
-   */
   static async applyLightingModification(operation, subjectToken) {
     if (!subjectToken) return;
 
-    const { lightingLevel, source, priority = 100 } = operation;
+    const { lightingLevel, source, priority = 100, predicate } = operation;
 
     if (!lightingLevel) {
       console.warn('PF2E Visioner | modifyLighting operation requires lightingLevel');
       return;
+    }
+
+    if (predicate && predicate.length > 0) {
+      const rollOptions = PredicateHelper.getTokenRollOptions(subjectToken);
+      if (!PredicateHelper.evaluate(predicate, rollOptions)) {
+        return;
+      }
     }
 
     const lightingData = {
@@ -32,7 +31,6 @@ export class LightingModifier {
       lightingData
     );
 
-    // Trigger AVS recalculation for the subject token
     if (window.pf2eVisioner?.services?.autoVisibilitySystem?.recalculateForTokens) {
       await window.pf2eVisioner.services.autoVisibilitySystem.recalculateForTokens([subjectToken.id]);
     } else if (window.pf2eVisioner?.services?.autoVisibilitySystem?.recalculateAll) {
@@ -51,7 +49,7 @@ export class LightingModifier {
     if (!subjectToken) return;
 
     const { source } = operation;
-    
+
     const modifications = subjectToken.document.getFlag('pf2e-visioner', 'lightingModification') || {};
 
     if (modifications[source]) {

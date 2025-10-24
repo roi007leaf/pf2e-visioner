@@ -1,3 +1,4 @@
+import { PredicateHelper } from '../PredicateHelper.js';
 import { SourceTracker } from '../SourceTracker.js';
 
 export class CoverOverride {
@@ -17,8 +18,6 @@ export class CoverOverride {
 
     const targetTokens = this.getTargetTokens(subjectToken, targets, operation.range, tokenIds);
 
-    // Generate a unique source ID based on the item applying this rule element
-    // This ensures that updating the item will replace the old source rather than creating duplicates
     const itemSlug = ruleElement.item?.slug || ruleElement.item?.name?.slugify() || 'unknown';
     const sourceId = source || `rule-element-${itemSlug}`;
 
@@ -35,9 +34,15 @@ export class CoverOverride {
     for (const targetToken of targetTokens) {
       if (targetToken.id === subjectToken.id) continue;
 
-      // Note: We store the predicate in the source but don't evaluate it here
-      // Predicates are evaluated at attack time in RuleElementCoverService
-      // when we have the actual attack context (item, rollOptions, etc.)
+      if (predicate && predicate.length > 0) {
+        const subjectOptions = PredicateHelper.getTokenRollOptions(subjectToken);
+        const targetOptions = PredicateHelper.getTargetRollOptions(targetToken, subjectToken);
+        const combinedOptions = PredicateHelper.combineRollOptions(subjectOptions, targetOptions);
+
+        if (!PredicateHelper.evaluate(predicate, combinedOptions)) {
+          continue;
+        }
+      }
 
       if (direction === 'to') {
         await this.setCoverState(subjectToken, targetToken, state, sourceData);

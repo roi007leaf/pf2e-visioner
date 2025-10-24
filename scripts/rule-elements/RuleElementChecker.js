@@ -1,7 +1,5 @@
-/**
- * Centralized rule element checker for AVS integration
- * Handles all rule element operations that need dynamic updates
- */
+import { PredicateHelper } from './PredicateHelper.js';
+
 export class RuleElementChecker {
   /**
    * Check all rule element effects for a token pair
@@ -120,6 +118,16 @@ export class RuleElementChecker {
       if (observerConfig?.active) {
         const config = observerConfig;
         if (config.direction === 'to') {
+          if (config.predicate && config.predicate.length > 0) {
+            const observerOptions = PredicateHelper.getTokenRollOptions(observerToken);
+            const targetOptions = PredicateHelper.getTargetRollOptions(targetToken, observerToken);
+            const combinedOptions = PredicateHelper.combineRollOptions(observerOptions, targetOptions);
+
+            if (!PredicateHelper.evaluate(config.predicate, combinedOptions)) {
+              return null;
+            }
+          }
+
           const applicableBand = this.getApplicableDistanceBand(distance, config.distanceBands);
           if (applicableBand) {
             return {
@@ -136,6 +144,16 @@ export class RuleElementChecker {
       if (targetConfig?.active) {
         const config = targetConfig;
         if (config.direction === 'from') {
+          if (config.predicate && config.predicate.length > 0) {
+            const targetOptions = PredicateHelper.getTokenRollOptions(targetToken);
+            const observerOptions = PredicateHelper.getTargetRollOptions(observerToken, targetToken);
+            const combinedOptions = PredicateHelper.combineRollOptions(targetOptions, observerOptions);
+
+            if (!PredicateHelper.evaluate(config.predicate, combinedOptions)) {
+              return null;
+            }
+          }
+
           const applicableBand = this.getApplicableDistanceBand(distance, config.distanceBands);
           if (applicableBand) {
             return {
