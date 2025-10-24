@@ -165,36 +165,30 @@
           {
             "type": "modifyActionQualification",
             "qualifications": {
-              "seek": {
+              "attack": {
                 "ignoreThisConcealment": true,
                 "customMessage": "PF2E_VISIONER.RULE_ELEMENTS.EFFECT.MESSAGES.BLIND_FIGHT_ACTIVE"
               }
             },
-            "predicate": ["target:condition:hidden", "target:condition:concealed"],
-            "source": "blind-fight"
-          }
-        ],
-        "priority": 100
-      }
-    ]
-  },
-  "consecrate": {
-    "name": "PF2E_VISIONER.RULE_ELEMENTS.EFFECT.EXAMPLES.CONSECRATE.NAME",
-    "description": "PF2E_VISIONER.RULE_ELEMENTS.EFFECT.EXAMPLES.CONSECRATE.DESCRIPTION",
-    "rules": [
-      {
-        "key": "PF2eVisionerEffect",
-        "operations": [
+            "source": "blind-fight-concealment"
+          },
+          {
+            "type": "offGuardSuppression",
+            "suppressedStates": ["hidden"],
+            "source": "blind-fight-offguard"
+          },
           {
             "type": "overrideVisibility",
-            "state": "concealed",
-            "direction": "from",
-            "observers": "all",
-            "predicate": ["self:trait:undead"],
-            "source": "consecrate"
+            "fromStates": ["undetected"],
+            "toState": "hidden",
+            "direction": "to",
+            "observers": "enemies",
+            "range": 5,
+            "levelComparison": "lte",
+            "source": "blind-fight-adjacent"
           }
         ],
-        "priority": 100
+        "priority": 120
       }
     ]
   },
@@ -280,6 +274,23 @@
               }
             ],
             "source": "thick-fog"
+          }
+        ],
+        "priority": 100
+      }
+    ]
+  },
+  "mirrorImage": {
+    "name": "PF2E_VISIONER.RULE_ELEMENTS.EFFECT.EXAMPLES.MIRROR_IMAGE.NAME",
+    "description": "PF2E_VISIONER.RULE_ELEMENTS.EFFECT.EXAMPLES.MIRROR_IMAGE.DESCRIPTION",
+    "rules": [
+      {
+        "key": "PF2eVisionerEffect",
+        "operations": [
+          {
+            "type": "offGuardSuppression",
+            "suppressedStates": ["concealed", "hidden", "undetected"],
+            "source": "mirror-image"
           }
         ],
         "priority": 100

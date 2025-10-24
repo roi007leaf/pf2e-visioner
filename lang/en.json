@@ -406,7 +406,7 @@
           },
           "BLIND_FIGHT": {
             "NAME": "Blind-Fight",
-            "DESCRIPTION": "Your battle insight lets you react to foes you can barely detect. You ignore the concealed condition from creatures who are hidden or undetected."
+            "DESCRIPTION": "You're not off-guard to creatures that are hidden from you (unless you're off-guard to them for reasons other than the hidden condition). While you're adjacent to an undetected creature of your level or lower, it is instead only hidden from you."
           },
           "CONSECRATE": {
             "NAME": "Consecrate (vs Undead)",
@@ -423,6 +423,10 @@
           "THICK_FOG": {
             "NAME": "Thick Fog",
             "DESCRIPTION": "Dense fog severely limits visibility. Creatures within 10 feet are concealed, and creatures beyond 20 feet are hidden."
+          },
+          "MIRROR_IMAGE": {
+            "NAME": "Mirror Image",
+            "DESCRIPTION": "Illusory duplicates prevent attackers from gaining tactical advantages. Off-guard effects from concealment, hidden, or undetected states are suppressed."
           }
         }
       },

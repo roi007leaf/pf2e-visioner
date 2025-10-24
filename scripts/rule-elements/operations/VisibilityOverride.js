@@ -13,7 +13,6 @@ export class VisibilityOverride {
       direction,
       state,
       source,
-      preventConcealment,
       applyOffGuard = true,
       fromStates,
       toState,
@@ -39,13 +38,15 @@ export class VisibilityOverride {
         fromStates,
         toState,
         direction,
+        predicate,
+        range: operation.range,
+        levelComparison: operation.levelComparison,
       };
 
       await subjectToken.document.setFlag('pf2e-visioner', 'visibilityReplacement', {
         active: true,
         ...sourceData,
       });
-
 
       // Trigger AVS recalculation after setting replacement flag
       if (window.pf2eVisioner?.services?.autoVisibilitySystem?.recalculateForTokens) {
@@ -67,7 +68,6 @@ export class VisibilityOverride {
       type: source,
       priority,
       state,
-      preventConcealment,
       qualifications: operation.qualifications || {},
     };
 
@@ -121,6 +121,7 @@ export class VisibilityOverride {
     const { source } = operation;
     await SourceTracker.removeSource(subjectToken, source, 'visibility');
     await subjectToken.document.unsetFlag('pf2e-visioner', 'ruleElementOverride');
+    await subjectToken.document.unsetFlag('pf2e-visioner', 'visibilityReplacement');
 
     // Trigger AVS recalculation after effect removal
     if (window.pf2eVisioner?.services?.autoVisibilitySystem?.recalculateForTokens) {

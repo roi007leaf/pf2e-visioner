@@ -76,87 +76,6 @@ Applied to individual operations. More granular control - each operation can hav
 }
 ```
 
-#### Common Roll Options
-
-Predicates use PF2e roll options. Common patterns include:
-
-**Self options** (the token with the effect):
-
-- `self:condition:{condition}` - Has a specific condition (e.g., `self:condition:invisible`)
-- `self:trait:{trait}` - Has a specific trait (e.g., `self:trait:undead`)
-- `self:disposition:friendly|hostile|neutral` - Token disposition
-- `self:hidden` - Token is hidden to GM
-
-**Target options** (the affected token):
-
-- `target:condition:{condition}` - Target has a condition
-- `target:trait:{trait}` - Target has a trait
-- `target:ally` - Target is an ally
-- `target:enemy` - Target is an enemy
-
-**Environmental options**:
-
-- `lighting:dim` - Dim light
-- `lighting:darkness` - Darkness
-- `lighting:bright` - Bright light
-
-**Logical operators**:
-
-- Array elements are AND by default: `["self:condition:invisible", "target:enemy"]` means both must be true
-- Use `not:` prefix for negation: `["not:target:condition:invisible"]`
-- Complex logic uses objects: `{"or": ["condition1", "condition2"]}`
-
-#### Predicate Examples
-
-**See Invisibility** (only reveals invisible creatures):
-
-```json
-{
-  "key": "PF2eVisionerEffect",
-  "operations": [
-    {
-      "type": "overrideVisibility",
-      "state": "concealed",
-      "predicate": ["target:condition:invisible"],
-      "observers": "all"
-    }
-  ]
-}
-```
-
-**Darkvision** (only works in dim/dark conditions):
-
-```json
-{
-  "key": "PF2eVisionerEffect",
-  "predicate": ["lighting:dim", "lighting:darkness"],
-  "operations": [
-    {
-      "type": "modifySenses",
-      "senseModifications": {
-        "darkvision": { "range": 60 }
-      }
-    }
-  ]
-}
-```
-
-**Consecrate** (only affects undead):
-
-```json
-{
-  "key": "PF2eVisionerEffect",
-  "operations": [
-    {
-      "type": "overrideVisibility",
-      "state": "concealed",
-      "predicate": ["self:trait:undead"],
-      "observers": "all"
-    }
-  ]
-}
-```
-
 ## Operation Types
 
 ### 1. modifySenses
@@ -208,10 +127,9 @@ Override the visibility state between tokens, bypassing AVS calculations.
 - `direction` (string): Relationship direction
   - `"from"` - Observers see subject differently (e.g., Blur makes you concealed to others)
   - `"to"` - Subject sees observers differently (e.g., you see others as hidden)
-- `observers` (string): Who is affected - `"all"`, `"allies"`, `"enemies"`, `"selected"`, `"targeted"`, `"specific"`
+- `observers` (string): Who is affected - `"all"`, `"allies"`, `"enemies"`, `"specific"`
 - `tokenIds` (array): Array of token document IDs (required when `observers` is `"specific"`)
 - `source` (string): Identifier for source tracking (used for qualifications)
-- `preventConcealment` (boolean): Remove all concealment sources
 - `range` (number): Optional distance limit in feet
 
 **Example:**
@@ -344,41 +262,7 @@ Override cover states between tokens.
 }
 ```
 
-### 5. provideCover
-
-Placed objects (like deployable cover) that provide cover to tokens.
-
-**Use cases:**
-
-- Deployable Cover
-- Ballistic Cover
-- Barriers and shields
-
-**Properties:**
-
-- `state` (string): Cover state provided
-- `blockedEdges` (array): Directional cover - `["north"]`, `["south"]`, `["east"]`, `["west"]`
-- `requiresTakeCover` (boolean): Only works with Take Cover action
-- `autoCoverBehavior` (string): How to interact with auto-cover
-  - `"add"` - Add to auto-cover calculation
-  - `"replace"` - Replace auto-cover entirely
-  - `"minimum"` - Use whichever is higher
-- `source` (string): Identifier
-
-**Example:**
-
-```json
-{
-  "type": "provideCover",
-  "state": "standard",
-  "blockedEdges": ["north"],
-  "requiresTakeCover": true,
-  "autoCoverBehavior": "replace",
-  "source": "deployable-cover"
-}
-```
-
-### 6. modifyActionQualification
+### 5. modifyActionQualification
 
 Control what qualifies for action prerequisites (Hide, Sneak, Seek).
 
@@ -431,7 +315,7 @@ Control what qualifies for action prerequisites (Hide, Sneak, Seek).
 }
 ```
 
-### 7. conditionalState
+### 6. conditionalState
 
 Apply visibility or cover states based on conditions.
 
@@ -463,30 +347,61 @@ Apply visibility or cover states based on conditions.
 }
 ```
 
-## Property Reference
+### 7. offGuardSuppression
 
-### Rule Element Properties
+Suppress the off-guard penalty for attacks from hidden or undetected creatures. This operation implements abilities like Blind-Fight that allow combatants to defend effectively against unseen attackers.
 
-| Property     | Type   | Values                       | Description                             |
-| ------------ | ------ | ---------------------------- | --------------------------------------- |
-| `key`        | string | `"PF2eVisionerEffect"`       | Rule element type                       |
-| `predicate`  | array  | Array of roll option strings | Rule element level predicate (optional) |
-| `operations` | array  | Array of operation objects   | Operations to apply                     |
-| `priority`   | number | Default: 100                 | Rule element priority                   |
+**Use cases:**
 
-### Common Operation Properties
+- Blind-Fight feat (suppress off-guard from hidden/undetected)
+- Abilities that allow fighting unseen opponents without penalty
+- Homebrew features that negate off-guard from concealment
 
-| Property                | Type   | Values                                                                                                                        | Description                                            |
-| ----------------------- | ------ | ----------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
-| `type`                  | string | See [Operation Types](#operation-types)                                                                                       | Operation type                                         |
-| `predicate`             | array  | Array of roll option strings                                                                                                  | Operation level predicate (optional)                   |
-| `direction`             | string | `"from"`, `"to"`                                                                                                              | Relationship direction                                 |
-| `observers` / `targets` | string | `"all"`, `"allies"`, `"enemies"`, `"selected"`, `"targeted"`, `"specific"`                                                    | Who is affected                                        |
-| `tokenIds`              | array  | Array of token document IDs                                                                                                   | Required when using `"specific"` for observers/targets |
-| `state`                 | string | Visibility: `"observed"`, `"concealed"`, `"hidden"`, `"undetected"`<br>Cover: `"none"`, `"lesser"`, `"standard"`, `"greater"` | State to apply                                         |
-| `source`                | string | Any unique string                                                                                                             | Identifier for source tracking                         |
-| `range`                 | number | Distance in feet                                                                                                              | Optional distance limit                                |
-| `priority`              | number | Default: 100                                                                                                                  | Conflict resolution priority (higher wins)             |
+**Properties:**
+
+- `suppressedStates` (array): Array of visibility states that won't cause off-guard - `"hidden"`, `"undetected"`
+- `source` (string): Identifier for source tracking (optional but recommended)
+
+**How it works:**
+
+When an attacker who is hidden or undetected to the defender makes an attack, the defender is normally off-guard (flat-footed) and takes a -2 AC penalty. This operation suppresses that penalty for the specified visibility states.
+
+The suppression:
+
+- Prevents the -2 AC penalty during attack rolls
+- Removes ephemeral off-guard effects that would normally be applied
+- Only affects off-guard from the specified visibility states
+- Does not affect off-guard from other sources (flanking, prone, etc.)
+
+**Example - Blind-Fight:**
+
+```json
+{
+  "key": "PF2eVisionerEffect",
+  "operations": [
+    {
+      "type": "offGuardSuppression",
+      "suppressedStates": ["hidden", "undetected"],
+      "source": "blind-fight"
+    }
+  ]
+}
+```
+
+**Example - Custom Homebrew (only hidden):**
+
+```json
+{
+  "key": "PF2eVisionerEffect",
+  "operations": [
+    {
+      "type": "offGuardSuppression",
+      "suppressedStates": ["hidden"],
+      "source": "custom-awareness"
+    }
+  ]
+}
+```
 
 ## Examples
 
@@ -537,7 +452,6 @@ Reveals invisible creatures as concealed, prevents concealment for visible creat
     },
     {
       "type": "overrideVisibility",
-      "preventConcealment": true,
       "direction": "from",
       "observers": "all",
       "source": "faerie-fire"
@@ -592,42 +506,18 @@ Ignores concealment within 30 feet, imprecise senses beyond:
 }
 ```
 
-### Tower Shield
+### Blind-Fight
 
-Provides standard cover to allies within 5 feet when you Take Cover:
-
-```json
-{
-  "key": "PF2eVisionerEffect",
-  "operations": [
-    {
-      "type": "overrideCover",
-      "state": "standard",
-      "direction": "to",
-      "targets": "allies",
-      "range": 5,
-      "source": "tower-shield",
-      "requiresTakeCover": true
-    }
-  ]
-}
-```
-
-### Deployable Cover
-
-Placed object providing directional cover:
+Suppresses off-guard penalty from hidden and undetected attackers:
 
 ```json
 {
   "key": "PF2eVisionerEffect",
   "operations": [
     {
-      "type": "provideCover",
-      "state": "standard",
-      "blockedEdges": ["north"],
-      "requiresTakeCover": true,
-      "autoCoverBehavior": "replace",
-      "source": "deployable-cover"
+      "type": "offGuardSuppression",
+      "suppressedStates": ["hidden", "undetected"],
+      "source": "blind-fight"
     }
   ]
 }
@@ -649,10 +539,6 @@ Placed object providing directional cover:
 3. **Use source tracking**
    - Provide a unique `source` identifier
    - This enables qualification checks
-
-4. **Test with action dialogs**
-   - Verify Hide and Sneak dialogs respect qualifications
-   - Check that custom messages appear
 
 ### Combining Operations
 
@@ -764,23 +650,3 @@ Use `conditionalState` for effects that depend on existing conditions:
 3. **Test effect removal**
    - Ensure effects clean up properly
    - Check flags are removed on delete
-
-## API Access
-
-You can test rule elements programmatically:
-
-```javascript
-// Create example effects
-await PF2EVisioner.createRuleElementExample('blur');
-await PF2EVisioner.createRuleElementExample('faerieFire');
-
-// Create all examples
-await PF2EVisioner.createAllRuleElementExamples();
-```
-
-## Support
-
-For issues, questions, or feature requests:
-
-- GitHub Issues: https://github.com/roileaf/pf2e-visioner/issues
-- Discord: https://discord.gg/pf2e

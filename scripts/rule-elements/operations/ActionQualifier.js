@@ -10,7 +10,8 @@ export class ActionQualifier {
     // Check predicate if provided
     if (predicate && predicate.length > 0) {
       const rollOptions = PredicateHelper.getTokenRollOptions(subjectToken);
-      if (!PredicateHelper.evaluate(predicate, rollOptions)) {
+      const predicateResult = PredicateHelper.evaluate(predicate, rollOptions);
+      if (!predicateResult) {
         return;
       }
     }
@@ -109,15 +110,19 @@ export class ActionQualifier {
 
     if (targetToken) {
       const distance = canvas.grid.measureDistance(token, targetToken);
-      return qualifications.some(q => {
-        if (q.range && distance > q.range) return false;
-        return q.ignoreThisConcealment === true || q.ignoreConcealment === true;
+      const result = qualifications.some(q => {
+        const rangeCheck = !q.range || distance <= q.range;
+        const ignores = q.ignoreThisConcealment === true || q.ignoreConcealment === true;
+
+        return rangeCheck && ignores;
       });
+      return result;
     }
 
-    return qualifications.some(q =>
+    const result = qualifications.some(q =>
       q.ignoreThisConcealment === true || q.ignoreConcealment === true
     );
+    return result;
   }
 
   static ignoreCover(token, action, targetToken = null) {

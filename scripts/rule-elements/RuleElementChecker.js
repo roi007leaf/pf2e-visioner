@@ -235,7 +235,6 @@ export class RuleElementChecker {
       );
       const targetConfig = targetToken.document?.getFlag('pf2e-visioner', 'visibilityReplacement');
 
-
       if (!observerConfig?.active && !targetConfig?.active) {
         return null;
       }
@@ -245,6 +244,54 @@ export class RuleElementChecker {
       if (observerConfig?.active) {
         const direction = observerConfig.direction || 'from';
         if (direction === 'to' && observerConfig.fromStates?.includes(currentVisibility)) {
+          // Check range if specified
+          if (observerConfig.range) {
+            const distance = observerToken.distanceTo(targetToken);
+            if (distance > observerConfig.range) {
+              return null;
+            }
+          }
+
+          // Check level comparison if specified
+          if (observerConfig.levelComparison) {
+            const observerLevel = observerToken.actor?.level ?? 0;
+            const targetLevel = targetToken.actor?.level ?? 0;
+            const comparison = observerConfig.levelComparison;
+
+            let levelCheckPassed = false;
+            switch (comparison) {
+              case 'lte': // target level <= observer level
+                levelCheckPassed = targetLevel <= observerLevel;
+                break;
+              case 'gte': // target level >= observer level
+                levelCheckPassed = targetLevel >= observerLevel;
+                break;
+              case 'lt': // target level < observer level
+                levelCheckPassed = targetLevel < observerLevel;
+                break;
+              case 'gt': // target level > observer level
+                levelCheckPassed = targetLevel > observerLevel;
+                break;
+              case 'eq': // target level == observer level
+                levelCheckPassed = targetLevel === observerLevel;
+                break;
+            }
+
+            if (!levelCheckPassed) {
+              return null;
+            }
+          }
+
+          // Evaluate predicate, if present, with observer as subject and target as target
+          if (observerConfig.predicate && observerConfig.predicate.length > 0) {
+            const subjectOptions = PredicateHelper.getTokenRollOptions(observerToken);
+            const targetOptions = PredicateHelper.getTargetRollOptions(targetToken, observerToken);
+            const combined = PredicateHelper.combineRollOptions(subjectOptions, targetOptions);
+            const predicateResult = PredicateHelper.evaluate(observerConfig.predicate, combined);
+            if (!predicateResult) {
+              return null;
+            }
+          }
           return {
             state: observerConfig.toState,
             source: observerConfig.source,
@@ -259,6 +306,53 @@ export class RuleElementChecker {
       if (targetConfig?.active) {
         const direction = targetConfig.direction || 'from';
         if (direction === 'from' && targetConfig.fromStates?.includes(currentVisibility)) {
+          // Check range if specified
+          if (targetConfig.range) {
+            const distance = observerToken.distanceTo(targetToken);
+            if (distance > targetConfig.range) {
+              return null;
+            }
+          }
+
+          // Check level comparison if specified
+          if (targetConfig.levelComparison) {
+            const observerLevel = observerToken.actor?.level ?? 0;
+            const targetLevel = targetToken.actor?.level ?? 0;
+            const comparison = targetConfig.levelComparison;
+
+            let levelCheckPassed = false;
+            switch (comparison) {
+              case 'lte': // target level <= observer level
+                levelCheckPassed = targetLevel <= observerLevel;
+                break;
+              case 'gte': // target level >= observer level
+                levelCheckPassed = targetLevel >= observerLevel;
+                break;
+              case 'lt': // target level < observer level
+                levelCheckPassed = targetLevel < observerLevel;
+                break;
+              case 'gt': // target level > observer level
+                levelCheckPassed = targetLevel > observerLevel;
+                break;
+              case 'eq': // target level == observer level
+                levelCheckPassed = targetLevel === observerLevel;
+                break;
+            }
+
+            if (!levelCheckPassed) {
+              return null;
+            }
+          }
+
+          // Evaluate predicate, if present, with target as subject and observer as target
+          if (targetConfig.predicate && targetConfig.predicate.length > 0) {
+            const subjectOptions = PredicateHelper.getTokenRollOptions(targetToken);
+            const targetOptions = PredicateHelper.getTargetRollOptions(observerToken, targetToken);
+            const combined = PredicateHelper.combineRollOptions(subjectOptions, targetOptions);
+            if (!PredicateHelper.evaluate(targetConfig.predicate, combined)) {
+              return null;
+            }
+          }
 
           return {
             state: targetConfig.toState,

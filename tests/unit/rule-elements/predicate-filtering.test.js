@@ -4,6 +4,7 @@ import { CoverOverride } from '../../../scripts/rule-elements/operations/CoverOv
 import { DetectionModeModifier } from '../../../scripts/rule-elements/operations/DetectionModeModifier.js';
 import { DistanceBasedVisibility } from '../../../scripts/rule-elements/operations/DistanceBasedVisibility.js';
 import { LightingModifier } from '../../../scripts/rule-elements/operations/LightingModifier.js';
+import { OffGuardSuppression } from '../../../scripts/rule-elements/operations/OffGuardSuppression.js';
 import { SenseModifier } from '../../../scripts/rule-elements/operations/SenseModifier.js';
 import { VisibilityOverride } from '../../../scripts/rule-elements/operations/VisibilityOverride.js';
 import { PredicateHelper } from '../../../scripts/rule-elements/PredicateHelper.js';
@@ -292,6 +293,31 @@ describe('Rule Element Predicate Filtering', () => {
             await VisibilityOverride.applyVisibilityOverride(operation, mockSubjectToken);
 
             expect(mockSubjectToken.document.setFlag).toHaveBeenCalled();
+        });
+
+        it('should store predicate in visibility replacement flag', async () => {
+            const operation = {
+                fromStates: ['undetected'],
+                toState: 'hidden',
+                direction: 'to',
+                observers: 'all',
+                range: 5,
+                predicate: ['target:level:lte:self'],
+                source: 'blind-fight-adjacent',
+                priority: 120,
+            };
+
+            await VisibilityOverride.applyVisibilityOverride(operation, mockSubjectToken);
+
+            expect(mockSubjectToken.document.setFlag).toHaveBeenCalledWith(
+                'pf2e-visioner',
+                'visibilityReplacement',
+                expect.objectContaining({
+                    predicate: ['target:level:lte:self'],
+                    fromStates: ['undetected'],
+                    toState: 'hidden',
+                }),
+            );
         });
     });
 
@@ -670,6 +696,55 @@ describe('Rule Element Predicate Filtering', () => {
                 'distanceBasedVisibility',
                 expect.objectContaining({
                     predicate: undefined,
+                }),
+            );
+        });
+    });
+
+    describe('OffGuardSuppression - Token-Level Predicate Filtering', () => {
+        it('should apply off-guard suppression when predicate matches', async () => {
+            const operation = {
+                suppressedStates: ['concealed', 'hidden'],
+                predicate: ['self:trait:human'],
+                source: 'mirror-image',
+            };
+
+            await OffGuardSuppression.applyOffGuardSuppression(operation, mockSubjectToken);
+
+            expect(mockSubjectToken.document.setFlag).toHaveBeenCalledWith(
+                'pf2e-visioner',
+                'offGuardSuppression.mirror-image',
+                expect.objectContaining({
+                    suppressedStates: ['concealed', 'hidden'],
+                }),
+            );
+        });
+
+        it('should not apply off-guard suppression when predicate fails', async () => {
+            const operation = {
+                suppressedStates: ['concealed'],
+                predicate: ['self:trait:elf'],
+                source: 'test-source',
+            };
+
+            await OffGuardSuppression.applyOffGuardSuppression(operation, mockSubjectToken);
+
+            expect(mockSubjectToken.document.setFlag).not.toHaveBeenCalled();
+        });
+
+        it('should apply off-guard suppression when no predicate provided', async () => {
+            const operation = {
+                suppressedStates: ['undetected'],
+                source: 'test-source',
+            };
+
+            await OffGuardSuppression.applyOffGuardSuppression(operation, mockSubjectToken);
+
+            expect(mockSubjectToken.document.setFlag).toHaveBeenCalledWith(
+                'pf2e-visioner',
+                'offGuardSuppression.test-source',
+                expect.objectContaining({
+                    suppressedStates: ['undetected'],
                 }),
             );
         });

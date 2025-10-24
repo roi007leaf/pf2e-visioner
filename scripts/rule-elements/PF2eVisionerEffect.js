@@ -3,6 +3,7 @@ import { CoverOverride } from './operations/CoverOverride.js';
 import { DetectionModeModifier } from './operations/DetectionModeModifier.js';
 import { DistanceBasedVisibility } from './operations/DistanceBasedVisibility.js';
 import { LightingModifier } from './operations/LightingModifier.js';
+import { OffGuardSuppression } from './operations/OffGuardSuppression.js';
 import { SenseModifier } from './operations/SenseModifier.js';
 import { VisibilityOverride } from './operations/VisibilityOverride.js';
 import { SourceTracker } from './SourceTracker.js';
@@ -50,6 +51,7 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
               'modifyLighting',
               'conditionalState',
               'distanceBasedVisibility',
+              'offGuardSuppression',
             ],
             initial: 'overrideVisibility',
           }),
@@ -97,8 +99,6 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
 
           source: new fields.StringField({ required: false }),
 
-          preventConcealment: new fields.BooleanField({ required: false, initial: false }),
-
           fromStates: new fields.ArrayField(
             new fields.StringField({
               choices: ['observed', 'concealed', 'hidden', 'undetected'],
@@ -109,6 +109,11 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
           toState: new fields.StringField({
             required: false,
             choices: ['observed', 'concealed', 'hidden', 'undetected'],
+          }),
+
+          levelComparison: new fields.StringField({
+            required: false,
+            choices: ['lte', 'gte', 'lt', 'gt', 'eq'],
           }),
 
           blockedEdges: new fields.ArrayField(
@@ -158,6 +163,13 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
                 required: true,
                 choices: ['observed', 'concealed', 'hidden', 'undetected'],
               }),
+            }),
+            { required: false },
+          ),
+
+          suppressedStates: new fields.ArrayField(
+            new fields.StringField({
+              choices: ['observed', 'concealed', 'hidden', 'undetected'],
             }),
             { required: false },
           ),
@@ -227,7 +239,8 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
       // Check rule element level predicate using PF2e's built-in method
       if (this.predicate && this.predicate.length > 0) {
         const rollOptions = token.actor.getRollOptions(['all']);
-        if (!this.test(rollOptions)) {
+        const predicateResult = this.test(rollOptions);
+        if (!predicateResult) {
           return;
         }
       }
@@ -468,6 +481,11 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
           await this.registerFlag(token, 'distanceBasedVisibility');
           break;
 
+        case 'offGuardSuppression':
+          await OffGuardSuppression.applyOffGuardSuppression(operation, token);
+          await this.registerFlag(token, 'offGuardSuppression');
+          break;
+
         default:
           console.warn(`PF2E Visioner | Unknown operation type: ${operation.type}`);
       }
@@ -504,6 +522,7 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
         const simpleFlags = [
           'distanceBasedVisibility',
           'ruleElementOverride',
+          'visibilityReplacement',
           'actionQualifications',
           'providesCover',
           'originalSenses',
@@ -588,6 +607,10 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
 
         case 'distanceBasedVisibility':
           await DistanceBasedVisibility.removeDistanceBasedVisibility(operation, token);
+          break;
+
+        case 'offGuardSuppression':
+          await OffGuardSuppression.removeOffGuardSuppression(operation, token);
           break;
 
         default:

@@ -685,7 +685,11 @@ export class BatchOrchestrator {
    * Sync ephemeral effects ONLY for the specific observer-target pairs that had visibility changes.
    * This is much more efficient than syncing all tokens, preventing unnecessary refreshToken events.
    * Skips hazards and loot tokens as they don't need visibility effects.
-   * @param {Array<{observer: Token, target: Token, visibility: string}>} updates - Array of visibility updates
+   * 
+   * NOTE: This also processes forceEphemeralOnly updates, which occur when visibility state hasn't changed
+   * but ephemeral effects need to be re-evaluated (e.g., when Blind-Fight is added/removed).
+   * 
+   * @param {Array<{observer: Token, target: Token, visibility: string, forceEphemeralOnly?: boolean}>} updates - Array of visibility updates
    * @private
    */
   async _syncEphemeralEffectsForUpdates(updates) {
@@ -799,6 +803,13 @@ export class BatchOrchestrator {
         } catch {
           // If guard fails, fall through to applying the update
         }
+
+        // If forceEphemeralOnly is true, skip the visibility map update
+        // and only sync ephemeral effects (handled in _syncEphemeralEffectsForUpdates)
+        if (update.forceEphemeralOnly) {
+          continue;
+        }
+
         this.visibilityMapService.setVisibilityBetween(
           update.observer,
           update.target,

@@ -67,7 +67,7 @@ export function getTokenHeightFt(token) {
     // 2) Wall Height module integration - check for tokenHeight flag
     const wallHeightFlag = token?.document?.flags?.['wall-height']?.tokenHeight;
     const fromWallHeight = parseFeet(wallHeightFlag);
-    if (fromWallHeight != null) return fromWallHeight;
+    if (fromWallHeight != null && fromWallHeight > 0) return fromWallHeight;
     // 3) Size-only mode: use actor size category to determine height
     const size = token?.actor?.system?.traits?.size?.value ?? 'med';
     return SIZE_TO_HEIGHT_FT[size] ?? 5;
