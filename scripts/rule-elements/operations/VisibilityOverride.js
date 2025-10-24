@@ -8,6 +8,8 @@ export class VisibilityOverride {
       return;
     }
 
+
+
     const {
       observers,
       direction,
@@ -28,8 +30,11 @@ export class VisibilityOverride {
       tokenIds,
     );
 
+
+
     // If this is a visibility replacement (fromStates → toState), handle it separately
     if (fromStates && fromStates.length > 0 && toState) {
+
 
       const sourceData = {
         id: source || `visibility-replacement-${Date.now()}`,
@@ -63,6 +68,8 @@ export class VisibilityOverride {
 
     // Otherwise, it's a direct state override
 
+
+
     const sourceData = {
       id: source || `visibility-${Date.now()}`,
       type: source,
@@ -79,6 +86,8 @@ export class VisibilityOverride {
       const [targetToken, observingToken] =
         direction === 'from' ? [subjectToken, observerToken] : [observerToken, subjectToken];
 
+
+
       // Check operation-level predicate per target
       if (predicate && predicate.length > 0) {
         const subjectOptions = PredicateHelper.getTokenRollOptions(subjectToken);
@@ -93,12 +102,16 @@ export class VisibilityOverride {
       await this.setVisibilityState(observingToken, targetToken, state, sourceData, applyOffGuard);
     }
 
+
+
     await subjectToken.document.setFlag('pf2e-visioner', 'ruleElementOverride', {
       active: true,
       source: sourceData.id,
       state,
       direction,
     });
+
+
   }
 
   static async setVisibilityState(observerToken, targetToken, state, sourceData, applyOffGuard = true) {
@@ -118,8 +131,22 @@ export class VisibilityOverride {
   static async removeVisibilityOverride(operation, subjectToken) {
     if (!subjectToken) return;
 
-    const { source } = operation;
-    await SourceTracker.removeSource(subjectToken, source, 'visibility');
+    // Derive the actual source id from the stored flag if not provided on operation
+    let sourceId = operation?.source;
+    try {
+      const existingOverride = subjectToken.document.getFlag('pf2e-visioner', 'ruleElementOverride');
+      if (!sourceId && existingOverride?.source) {
+        sourceId = existingOverride.source;
+      }
+      const existingReplacement = subjectToken.document.getFlag('pf2e-visioner', 'visibilityReplacement');
+      if (!sourceId && existingReplacement?.id) {
+        sourceId = existingReplacement.id;
+      }
+    } catch (_) { }
+
+    if (sourceId) {
+      await SourceTracker.removeSource(subjectToken, sourceId, 'visibility');
+    }
     await subjectToken.document.unsetFlag('pf2e-visioner', 'ruleElementOverride');
     await subjectToken.document.unsetFlag('pf2e-visioner', 'visibilityReplacement');
 

@@ -122,6 +122,28 @@ export class SourceTracker {
           }
         }
       });
+
+      // Also remove from all observer-scoped entries when no specific observer is provided
+      ['visibilityByObserver', 'coverByObserver'].forEach(observerKey => {
+        const byObserver = currentStateSource[observerKey];
+        if (!byObserver) return;
+        for (const [obsId, data] of Object.entries(byObserver)) {
+          const srcs = Array.isArray(data?.sources) ? data.sources : [];
+          const filtered = srcs.filter(s => s.id !== sourceId);
+          if (filtered.length !== srcs.length) {
+            byObserver[obsId].sources = filtered;
+            modified = true;
+          }
+          if (Array.isArray(byObserver[obsId].sources) && byObserver[obsId].sources.length === 0) {
+            delete byObserver[obsId];
+            modified = true;
+          }
+        }
+        if (Object.keys(byObserver).length === 0) {
+          delete currentStateSource[observerKey];
+          modified = true;
+        }
+      });
     }
 
     if (modified) {

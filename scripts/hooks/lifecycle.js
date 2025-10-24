@@ -20,6 +20,7 @@ async function reapplyRuleElementsOnLoad() {
   log.debug('Reapplying rule elements on canvas ready');
 
   const tokensProcessed = new Set();
+  const tokensWithRuleElements = [];
 
   for (const token of canvas.tokens.placeables) {
     try {
@@ -48,6 +49,8 @@ async function reapplyRuleElementsOnLoad() {
             tokenId: token.id
           }));
 
+          let hasAppliedRules = false;
+
           for (const rule of rules) {
             if (rule.key === 'PF2eVisionerEffect' || rule.key === 'PF2eVisionerVisibility') {
               try {
@@ -58,6 +61,7 @@ async function reapplyRuleElementsOnLoad() {
 
                 if (ruleElement && typeof ruleElement.applyOperations === 'function') {
                   await ruleElement.applyOperations();
+                  hasAppliedRules = true;
                   log.debug(() => ({
                     msg: 'Successfully reapplied rule element operations',
                     ruleKey: rule.key,
@@ -74,12 +78,38 @@ async function reapplyRuleElementsOnLoad() {
               }
             }
           }
+
+          if (hasAppliedRules) {
+            tokensWithRuleElements.push(token.id);
+          }
         }
       }
     } catch (error) {
       log.warn(() => ({
         msg: 'Failed to process token for rule element reapplication',
         tokenName: token.name,
+        error: error.message
+      }));
+    }
+  }
+
+  if (tokensWithRuleElements.length > 0) {
+    log.debug(() => ({
+      msg: 'Triggering AVS recalculation for tokens with rule elements',
+      tokenCount: tokensWithRuleElements.length
+    }));
+
+    try {
+      if (window.pf2eVisioner?.services?.autoVisibilitySystem?.recalculateForTokens) {
+        await window.pf2eVisioner.services.autoVisibilitySystem.recalculateForTokens(tokensWithRuleElements);
+      } else if (window.pf2eVisioner?.services?.autoVisibilitySystem?.recalculateAll) {
+        await window.pf2eVisioner.services.autoVisibilitySystem.recalculateAll();
+      } else if (canvas?.perception) {
+        canvas.perception.update({ refreshVision: true, refreshOcclusion: true });
+      }
+    } catch (error) {
+      log.warn(() => ({
+        msg: 'Failed to trigger AVS recalculation',
         error: error.message
       }));
     }

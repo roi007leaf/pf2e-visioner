@@ -504,73 +504,81 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
     }
 
     async removeAllFlagsForRuleElement() {
-      const token = this.getSubjectToken();
-      if (!token) return;
+      const tokens = this.actor?.getActiveTokens?.() || [];
+      if (!tokens.length) return;
 
       const registryKey = this.ruleElementRegistryKey;
-      const flagRegistry = token.document.getFlag('pf2e-visioner', 'ruleElementRegistry') || {};
-      const flagsToRemove = flagRegistry[registryKey] || [];
 
-      const updates = {};
+      const tokensNeedingAVS = [];
+      for (const token of tokens) {
+        const flagRegistry = token.document.getFlag('pf2e-visioner', 'ruleElementRegistry') || {};
+        const flagsToRemove = flagRegistry[registryKey] || [];
 
-      if (flagsToRemove.length > 0) {
-        for (const flagPath of flagsToRemove) {
-          updates[`flags.pf2e-visioner.${flagPath}`] = null;
-        }
-      } else {
-        const allPf2eVisionerFlags = token.document.getFlag('pf2e-visioner') || {};
-        const simpleFlags = [
-          'distanceBasedVisibility',
-          'ruleElementOverride',
-          'visibilityReplacement',
-          'actionQualifications',
-          'providesCover',
-          'originalSenses',
-        ];
+        const updates = {};
 
-        for (const flagName of simpleFlags) {
-          if (allPf2eVisionerFlags[flagName]) {
-            updates[`flags.pf2e-visioner.${flagName}`] = null;
+        if (flagsToRemove.length > 0) {
+          for (const flagPath of flagsToRemove) {
+            updates[`flags.pf2e-visioner.${flagPath}`] = null;
+          }
+        } else {
+          const allPf2eVisionerFlags = token.document.getFlag('pf2e-visioner') || {};
+          const simpleFlags = [
+            'distanceBasedVisibility',
+            'ruleElementOverride',
+            'visibilityReplacement',
+            'actionQualifications',
+            'providesCover',
+            'originalSenses',
+          ];
+
+          for (const flagName of simpleFlags) {
+            if (allPf2eVisionerFlags[flagName]) {
+              updates[`flags.pf2e-visioner.${flagName}`] = null;
+            }
+          }
+
+          const lightingModifications = allPf2eVisionerFlags.lightingModification || {};
+          for (const modId of Object.keys(lightingModifications)) {
+            updates[`flags.pf2e-visioner.lightingModification.${modId}`] = null;
           }
         }
 
-        const lightingModifications = allPf2eVisionerFlags.lightingModification || {};
-        for (const modId of Object.keys(lightingModifications)) {
-          updates[`flags.pf2e-visioner.lightingModification.${modId}`] = null;
+        if (flagRegistry[registryKey]) {
+          const newRegistry = { ...flagRegistry };
+          delete newRegistry[registryKey];
+          updates['flags.pf2e-visioner.ruleElementRegistry'] = newRegistry;
+        }
+
+        await SourceTracker.removeSource(token, this.ruleElementId);
+
+        if (Object.keys(updates).length > 0) {
+          await token.document.update(updates);
+          tokensNeedingAVS.push(token.id);
         }
       }
 
-      if (flagRegistry[registryKey]) {
-        const newRegistry = { ...flagRegistry };
-        delete newRegistry[registryKey];
-        updates['flags.pf2e-visioner.ruleElementRegistry'] = newRegistry;
-      }
-
-      await SourceTracker.removeSource(this.ruleElementId);
-
-      if (Object.keys(updates).length > 0) {
-        await token.document.update(updates);
-      }
-
-      if (window.pf2eVisioner?.services?.autoVisibilitySystem?.recalculateForTokens) {
-        await window.pf2eVisioner.services.autoVisibilitySystem.recalculateForTokens([token.id]);
-      } else if (window.pf2eVisioner?.services?.autoVisibilitySystem?.recalculateAll) {
-        await window.pf2eVisioner.services.autoVisibilitySystem.recalculateAll();
-      } else if (canvas?.perception) {
-        canvas.perception.update({ refreshVision: true, refreshOcclusion: true });
+      if (tokensNeedingAVS.length) {
+        if (window.pf2eVisioner?.services?.autoVisibilitySystem?.recalculateForTokens) {
+          await window.pf2eVisioner.services.autoVisibilitySystem.recalculateForTokens(tokensNeedingAVS);
+        } else if (window.pf2eVisioner?.services?.autoVisibilitySystem?.recalculateAll) {
+          await window.pf2eVisioner.services.autoVisibilitySystem.recalculateAll();
+        } else if (canvas?.perception) {
+          canvas.perception.update({ refreshVision: true, refreshOcclusion: true });
+        }
       }
     }
 
     async removeOperations() {
-      const token = this.getSubjectToken();
-      if (!token) return;
+      const tokens = this.actor?.getActiveTokens?.() || [];
+      if (!tokens.length) return;
 
-
-      for (const operation of this.operations) {
-        try {
-          await this.removeOperation(operation, token);
-        } catch (error) {
-          console.error(`PF2E Visioner | Error removing operation ${operation.type}:`, error);
+      for (const token of tokens) {
+        for (const operation of this.operations) {
+          try {
+            await this.removeOperation(operation, token);
+          } catch (error) {
+            console.error(`PF2E Visioner | Error removing operation ${operation.type}:`, error);
+          }
         }
       }
     }
