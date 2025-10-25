@@ -22,6 +22,7 @@ Purpose: Give coding AIs crisp, actionable guardrails for this repo. Follow thes
 - Do not refactor code unprompted
 - Maintain clean and readable code
 - If you don't know — say you don't know
+- Break large functions into smaller functions
 - If an old unit test fails, do not modify the test to make it pass
 - Don't add hardcoded strings for UI, use i18n keys
 - Don't use time based solution, use event or hook based solutions instead

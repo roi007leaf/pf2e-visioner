@@ -4,6 +4,7 @@
  */
 
 import { api } from '../api.js';
+import { getLogger } from '../utils/logger.js';
 import { createPF2eVisionerEffectRuleElement } from './PF2eVisionerEffect.js';
 export { RuleElementCoverService } from './RuleElementCoverService.js';
 
@@ -14,8 +15,10 @@ const recentChanges = new Map();
  * Initialize and register custom rule elements
  */
 export function initializeRuleElements() {
+  try {
+    registerRuleElements();
+  } catch (_) { }
   Hooks.once('setup', registerRuleElements);
-  Hooks.once('ready', registerRuleElements);
 }
 
 /**
@@ -23,16 +26,23 @@ export function initializeRuleElements() {
  */
 let _reRegistered = false;
 function registerRuleElements() {
-  if (_reRegistered) return;
-  if (!game.pf2e?.RuleElement) {
+  const log = getLogger('RuleElements/Registration');
+  if (_reRegistered) {
+    log.debug('registerRuleElements: already registered, skipping');
+    return;
+  }
+  const BaseRuleElement = game.pf2e?.RuleElement ?? game.pf2e?.RuleElementPF2e;
+  if (!BaseRuleElement) {
     console.error('PF2E Visioner | PF2e system not ready, rule elements not registered');
+    log.debug(() => ({ msg: 'PF2e RuleElement missing', hasPF2e: !!game.pf2e, keys: Object.keys(game.pf2e || {}) }));
     return;
   }
 
   try {
     // Create the rule element class
+    log.debug('Creating VisibilityRuleElement');
     const VisibilityRuleElement = createVisibilityRuleElement(
-      game.pf2e.RuleElement,
+      BaseRuleElement,
       foundry.data.fields,
     );
 
@@ -40,6 +50,7 @@ function registerRuleElements() {
 
     // Register with PF2e
     game.pf2e.RuleElements.custom.PF2eVisionerVisibility = VisibilityRuleElement;
+    log.debug('Registered PF2eVisionerVisibility');
 
     // Add to UI dropdown
     if (CONFIG.PF2E?.ruleElementTypes) {
@@ -57,13 +68,15 @@ function registerRuleElements() {
     }
 
     // Create the new PF2eVisionerEffect rule element
+    log.debug('Creating PF2eVisionerEffect');
     const EffectRuleElement = createPF2eVisionerEffectRuleElement(
-      game.pf2e.RuleElement,
+      BaseRuleElement,
       foundry.data.fields,
     );
 
     if (EffectRuleElement) {
       game.pf2e.RuleElements.custom.PF2eVisionerEffect = EffectRuleElement;
+      log.debug('Registered PF2eVisionerEffect');
 
       if (CONFIG.PF2E?.ruleElementTypes) {
         CONFIG.PF2E.ruleElementTypes.PF2eVisionerEffect = 'PF2eVisionerEffect';
@@ -85,6 +98,7 @@ function registerRuleElements() {
     }
 
     _reRegistered = true;
+    log.debug('registerRuleElements: completed');
   } catch (error) {
     console.error('PF2E Visioner | Error registering rule elements:', error);
   }

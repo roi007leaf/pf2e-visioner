@@ -2,6 +2,8 @@
  * OverrideService
  * Facade for interacting with overrides (active manual overrides between tokens).
  */
+import { getLogger } from '../../../utils/logger.js';
+
 export class OverrideService {
     constructor() { }
 
@@ -66,11 +68,20 @@ export class OverrideService {
      * @returns {{ state?: string } | null}
      */
     _checkRuleElementOverride(observer, target) {
+        const log = getLogger('AVS/OverrideService');
         try {
 
 
             // Check if target has a direct rule element override
             const targetOverride = target?.document?.getFlag('pf2e-visioner', 'ruleElementOverride');
+            log.debug?.(() => ({
+                msg: 'checkRuleElementOverride:target',
+                targetId: target?.document?.id,
+                has: !!targetOverride,
+                active: !!targetOverride?.active,
+                dir: targetOverride?.direction,
+                state: targetOverride?.state
+            }));
 
 
             if (targetOverride?.active && targetOverride?.state) {
@@ -83,6 +94,14 @@ export class OverrideService {
 
             // Check if observer has a rule element override
             const observerOverride = observer?.document?.getFlag('pf2e-visioner', 'ruleElementOverride');
+            log.debug?.(() => ({
+                msg: 'checkRuleElementOverride:observer',
+                observerId: observer?.document?.id,
+                has: !!observerOverride,
+                active: !!observerOverride?.active,
+                dir: observerOverride?.direction,
+                state: observerOverride?.state
+            }));
 
 
             if (observerOverride?.active && observerOverride?.state) {
@@ -96,6 +115,12 @@ export class OverrideService {
             // Check for visibility replacement (these don't provide a direct state)
             // Just signal that rule elements are active so AVS respects the current visibility map
             const targetReplacement = target?.document?.getFlag('pf2e-visioner', 'visibilityReplacement');
+            log.debug?.(() => ({
+                msg: 'checkRuleElementReplacement:target',
+                targetId: target?.document?.id,
+                has: !!targetReplacement,
+                active: !!targetReplacement?.active
+            }));
 
 
             if (targetReplacement?.active) {
@@ -108,6 +133,12 @@ export class OverrideService {
             }
 
             const observerReplacement = observer?.document?.getFlag('pf2e-visioner', 'visibilityReplacement');
+            log.debug?.(() => ({
+                msg: 'checkRuleElementReplacement:observer',
+                observerId: observer?.document?.id,
+                has: !!observerReplacement,
+                active: !!observerReplacement?.active
+            }));
 
 
             if (observerReplacement?.active) {

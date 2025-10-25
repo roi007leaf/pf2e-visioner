@@ -38,7 +38,7 @@ export class TokenEventHandler {
     Hooks.on('moveToken', this.handleMoveToken.bind(this));
   }
 
-  handleMoveToken(tokenDoc, updateData, options, userId) {
+  async handleMoveToken(tokenDoc, updateData, options, userId) {
     // This fires for EVERY grid square during animation
     // We only want to process the FINAL destination
     // Use token-specific check if available, otherwise fall back to general check
@@ -66,6 +66,9 @@ export class TokenEventHandler {
     const finalY = updateData.destination?.y ?? tokenDoc.y;
 
     try {
+      // Reapply rule element operations after movement to restore overrides
+      await this._reapplyRuleElementsAfterMovement(tokenDoc);
+
       // Clear position-dependent caches since token has moved
       // CRITICAL: Clear lighting caches FIRST to set forceFreshComputation flag
       // This ensures subsequent batches bypass burst optimization and use fresh lighting
@@ -93,6 +96,32 @@ export class TokenEventHandler {
       this.visibilityState.markTokenChangedWithSpatialOptimization(tokenDoc, movementChanges);
     } catch (e) {
       console.warn('PF2E Visioner | Error processing move token:', e);
+    }
+  }
+
+  async _reapplyRuleElementsAfterMovement(tokenDoc) {
+    try {
+      const token = tokenDoc.object;
+      if (!token?.actor) return;
+
+      const effects = token.actor.items?.filter(i => i.type === 'effect') || [];
+      for (const effect of effects) {
+        const rules = effect.system?.rules || [];
+        const hasVisionerRules = rules.some(rule =>
+          rule.key === 'PF2eVisionerEffect' || rule.key === 'PF2eVisionerVisibility'
+        );
+
+        if (hasVisionerRules && Array.isArray(effect.ruleElements)) {
+          for (const ruleElement of effect.ruleElements) {
+            if ((ruleElement.key === 'PF2eVisionerEffect' || ruleElement.key === 'PF2eVisionerVisibility') &&
+                typeof ruleElement.applyOperations === 'function') {
+              await ruleElement.applyOperations();
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.warn('PF2E Visioner | Failed to reapply rule elements after movement:', error);
     }
   }
 

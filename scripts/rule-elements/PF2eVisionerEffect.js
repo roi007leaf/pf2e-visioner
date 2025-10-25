@@ -1,3 +1,4 @@
+import { getLogger } from '../utils/logger.js';
 import { ActionQualifier } from './operations/ActionQualifier.js';
 import { CoverOverride } from './operations/CoverOverride.js';
 import { DetectionModeModifier } from './operations/DetectionModeModifier.js';
@@ -209,20 +210,62 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
     }
 
     async onCreate(actorUpdates) {
-      await this.applyOperations();
+      const log = getLogger('RuleElements/Effect');
+      log.debug(() => ({ msg: 'onCreate', item: this.item?.name, actor: this.actor?.name }));
+      await this.applyOperations({ triggerRecalculation: true });
     }
 
     async onUpdate(actorUpdates) {
+      const log = getLogger('RuleElements/Effect');
+      log.debug(() => ({ msg: 'onUpdate', item: this.item?.name, actor: this.actor?.name }));
       await this.removeAllFlagsForRuleElement();
-      await this.applyOperations();
+      await this.applyOperations({ triggerRecalculation: false });
     }
 
     async onDelete(actorUpdates) {
+      const log = getLogger('RuleElements/Effect');
       const tokens = this.actor?.getActiveTokens?.() || [];
       const tokenIds = tokens.map(t => t.id);
+      log.debug(() => ({ msg: 'onDelete', item: this.item?.name, actor: this.actor?.name, tokenCount: tokenIds.length }));
 
-      await this.removeOperations();
-      await this.removeAllFlagsForRuleElement();
+      const registryKey = this.ruleElementRegistryKey;
+
+      for (const token of tokens) {
+        const updates = {};
+
+        for (const operation of this.operations) {
+          try {
+            this.collectRemovalUpdates(operation, token, updates);
+          } catch (error) {
+            console.error(`PF2E Visioner | Error collecting removal updates for ${operation.type}:`, error);
+          }
+        }
+
+        this.collectStateSourceCleanup(token, updates);
+
+        const flagRegistry = token.document.getFlag('pf2e-visioner', 'ruleElementRegistry') || {};
+        if (flagRegistry[registryKey]) {
+          updates[`flags.pf2e-visioner.ruleElementRegistry.-=${registryKey}`] = null;
+          log.debug(() => ({
+            msg: 'onDelete: adding registry removal',
+            tokenId: token.id,
+            registryKey
+          }));
+        }
+
+        await SourceTracker.removeSource(token, this.ruleElementId);
+
+        if (Object.keys(updates).length > 0) {
+          log.debug(() => ({
+            msg: 'onDelete: applying updates',
+            tokenId: token.id,
+            updateCount: Object.keys(updates).length,
+            updateKeys: Object.keys(updates)
+          }));
+          await token.document.update(updates);
+          log.debug(() => ({ msg: 'onDelete: cleanup complete', tokenId: token.id }));
+        }
+      }
 
       if (tokenIds.length) {
         if (window.pf2eVisioner?.services?.autoVisibilitySystem?.recalculateForTokens) {
@@ -235,16 +278,177 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
       }
     }
 
-    async onUpdateEncounter({ event }) {
-      if (event === 'turn-start' || event === 'turn-end') {
-        await this.applyOperations();
+    collectStateSourceCleanup(token, updates) {
+      const log = getLogger('RuleElements/Effect');
+      const stateSource = token.document.getFlag('pf2e-visioner', 'stateSource') || {};
+      let stateSourceModified = false;
+
+      log.debug(() => ({
+        msg: 'collectStateSourceCleanup: starting',
+        tokenId: token.id,
+        ruleElementId: this.ruleElementId,
+        itemId: this.item?.id,
+        hasVisibilityByObserver: !!stateSource.visibilityByObserver,
+        hasCoverByObserver: !!stateSource.coverByObserver
+      }));
+
+      const cleanupSourcesInCategory = (category) => {
+        if (!stateSource[category]) return;
+
+        for (const [key, data] of Object.entries(stateSource[category])) {
+          if (Array.isArray(data?.sources)) {
+            log.debug(() => ({
+              msg: `collectStateSourceCleanup: checking ${category}`,
+              observerId: key,
+              sources: data.sources,
+              ruleElementId: this.ruleElementId
+            }));
+
+            const filteredSources = data.sources.filter(s => {
+              const sourceId = typeof s === 'string' ? s : s?.id;
+              const shouldKeep = sourceId && !sourceId.startsWith(this.ruleElementId);
+
+              if (!shouldKeep) {
+                log.debug(() => ({
+                  msg: 'collectStateSourceCleanup: removing source',
+                  sourceId,
+                  ruleElementId: this.ruleElementId,
+                  category,
+                  observerId: key
+                }));
+              }
+
+              return shouldKeep;
+            });
+
+            if (filteredSources.length !== data.sources.length) {
+              if (filteredSources.length === 0) {
+                updates[`flags.pf2e-visioner.stateSource.${category}.-=${key}`] = null;
+                log.debug(() => ({
+                  msg: 'collectStateSourceCleanup: removing entire observer entry',
+                  category,
+                  observerId: key
+                }));
+              } else {
+                updates[`flags.pf2e-visioner.stateSource.${category}.${key}.sources`] = filteredSources;
+                log.debug(() => ({
+                  msg: 'collectStateSourceCleanup: updating sources',
+                  category,
+                  observerId: key,
+                  oldCount: data.sources.length,
+                  newCount: filteredSources.length
+                }));
+              }
+              stateSourceModified = true;
+            }
+          }
+        }
+      };
+
+      cleanupSourcesInCategory('visibilityByObserver');
+      cleanupSourcesInCategory('coverByObserver');
+
+      if (stateSourceModified) {
+        log.debug(() => ({
+          msg: 'collectStateSourceCleanup: modifications made',
+          tokenId: token.id,
+          updateCount: Object.keys(updates).length
+        }));
+      } else {
+        log.debug(() => ({
+          msg: 'collectStateSourceCleanup: no modifications needed',
+          tokenId: token.id
+        }));
       }
     }
 
-    async applyOperations() {
+    collectRemovalUpdates(operation, token, updates) {
+      const registryKey = this.ruleElementRegistryKey;
+      const flagRegistry = token.document.getFlag('pf2e-visioner', 'ruleElementRegistry') || {};
+      const registeredFlags = flagRegistry[registryKey] || [];
+
+      switch (operation.type) {
+        case 'modifySenses':
+          if (registeredFlags.includes('originalSenses')) {
+            updates['flags.pf2e-visioner.originalSenses'] = null;
+          }
+          break;
+
+        case 'modifyDetectionModes':
+          if (registeredFlags.includes('originalDetectionModes')) {
+            updates['flags.pf2e-visioner.originalDetectionModes'] = null;
+          }
+          break;
+
+        case 'overrideVisibility':
+        case 'conditionalState':
+          if (registeredFlags.includes('ruleElementOverride')) {
+            updates['flags.pf2e-visioner.ruleElementOverride'] = null;
+          }
+          if (registeredFlags.includes('visibilityReplacement')) {
+            updates['flags.pf2e-visioner.visibilityReplacement'] = null;
+          }
+          if (registeredFlags.includes('conditionalState')) {
+            updates['flags.pf2e-visioner.conditionalState'] = null;
+          }
+          break;
+
+        case 'overrideCover':
+          if (registeredFlags.includes('overrideCover')) {
+            updates['flags.pf2e-visioner.overrideCover'] = null;
+          }
+          break;
+
+        case 'provideCover':
+          if (registeredFlags.includes('providesCover')) {
+            updates['flags.pf2e-visioner.providesCover'] = null;
+          }
+          break;
+
+        case 'modifyActionQualification':
+          if (registeredFlags.includes('actionQualifications')) {
+            updates['flags.pf2e-visioner.actionQualifications'] = null;
+          }
+          break;
+
+        case 'modifyLighting': {
+          const lightingFlag = registeredFlags.find(f => f.startsWith('lightingModification.'));
+          if (lightingFlag) {
+            updates[`flags.pf2e-visioner.${lightingFlag}`] = null;
+          }
+          break;
+        }
+
+        case 'distanceBasedVisibility':
+          if (registeredFlags.includes('distanceBasedVisibility')) {
+            updates['flags.pf2e-visioner.distanceBasedVisibility'] = null;
+          }
+          break;
+
+        case 'offGuardSuppression':
+          if (registeredFlags.includes('offGuardSuppression')) {
+            updates['flags.pf2e-visioner.offGuardSuppression'] = null;
+          }
+          break;
+
+        default:
+          break;
+      }
+    }
+
+    async onUpdateEncounter({ event }) {
+      if (event === 'turn-start' || event === 'turn-end') {
+        await this.applyOperations({ triggerRecalculation: true });
+      }
+    }
+
+    async applyOperations(options = {}) {
+      const { triggerRecalculation = false } = options;
+      const log = getLogger('RuleElements/Effect');
       const token = this.getSubjectToken();
 
       if (!token) {
+        log.debug(() => ({ msg: 'applyOperations: no subject token', item: this.item?.name, actor: this.actor?.name }));
         return;
       }
 
@@ -253,6 +457,7 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
         const rollOptions = token.actor.getRollOptions(['all']);
         const predicateResult = this.test(rollOptions);
         if (!predicateResult) {
+          log.debug(() => ({ msg: 'applyOperations: predicate failed', item: this.item?.name, actor: this.actor?.name }));
           return;
         }
       }
@@ -267,10 +472,12 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
 
       // Smart merge operations before applying
       const mergedOperations = this.smartMergeOperations();
+      log.debug(() => ({ msg: 'applyOperations: applying merged operations', count: mergedOperations.length, item: this.item?.name, actor: this.actor?.name }));
 
       for (const operation of mergedOperations) {
         try {
-          await this.applyOperation(operation, token);
+          await this.applyOperation(operation, token, { triggerRecalculation });
+          log.debug(() => ({ msg: 'applyOperations: applied op', type: operation.type, item: this.item?.name }));
         } catch (error) {
           console.error(`PF2E Visioner | Error applying operation ${operation.type}:`, error);
         }
@@ -436,7 +643,8 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
       }
     }
 
-    async applyOperation(operation, token) {
+    async applyOperation(operation, token, options = {}) {
+      const { triggerRecalculation = false } = options;
       switch (operation.type) {
         case 'modifySenses':
           await SenseModifier.applySenseModifications(
@@ -459,7 +667,11 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
           break;
 
         case 'overrideVisibility':
-          await VisibilityOverride.applyVisibilityOverride(operation, token);
+          await VisibilityOverride.applyVisibilityOverride({
+            ...operation,
+            source: operation.source || this.ruleElementId,
+            triggerRecalculation
+          }, token);
           await this.registerFlag(token, 'ruleElementOverride');
           await this.registerFlag(token, 'visibilityReplacement');
           break;
@@ -516,6 +728,7 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
     }
 
     async removeAllFlagsForRuleElement() {
+      const log = getLogger('RuleElements/Effect');
       const tokens = this.actor?.getActiveTokens?.() || [];
       if (!tokens.length) return;
 
@@ -555,21 +768,17 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
           }
         }
 
-        if (flagRegistry[registryKey]) {
-          const newRegistry = { ...flagRegistry };
-          delete newRegistry[registryKey];
-          updates['flags.pf2e-visioner.ruleElementRegistry'] = newRegistry;
-        }
-
         await SourceTracker.removeSource(token, this.ruleElementId);
 
         if (Object.keys(updates).length > 0) {
           await token.document.update(updates);
+          log.debug(() => ({ msg: 'removeAllFlagsForRuleElement: updated token flags', tokenId: token.id }));
         }
       }
     }
 
     async removeOperations() {
+      const log = getLogger('RuleElements/Effect');
       const tokens = this.actor?.getActiveTokens?.() || [];
       if (!tokens.length) return;
 
@@ -588,6 +797,7 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
           const newRegistry = { ...flagRegistry };
           delete newRegistry[registryKey];
           await token.document.setFlag('pf2e-visioner', 'ruleElementRegistry', newRegistry);
+          log.debug(() => ({ msg: 'removeOperations: removed registry key', tokenId: token.id, registryKey }));
         }
       }
     }

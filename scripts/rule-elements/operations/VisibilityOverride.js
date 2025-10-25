@@ -21,6 +21,7 @@ export class VisibilityOverride {
       priority = 100,
       tokenIds,
       predicate,
+      triggerRecalculation = false,
     } = operation;
 
     const observerTokens = this.getObserverTokens(
@@ -53,15 +54,16 @@ export class VisibilityOverride {
         ...sourceData,
       });
 
-      // Trigger AVS recalculation after setting replacement flag
-      if (window.pf2eVisioner?.services?.autoVisibilitySystem?.recalculateForTokens) {
-        await window.pf2eVisioner.services.autoVisibilitySystem.recalculateForTokens([
-          subjectToken.id,
-        ]);
-      } else if (window.pf2eVisioner?.services?.autoVisibilitySystem?.recalculateAll) {
-        await window.pf2eVisioner.services.autoVisibilitySystem.recalculateAll();
-      } else if (canvas?.perception) {
-        canvas.perception.update({ refreshVision: true, refreshOcclusion: true });
+      if (triggerRecalculation) {
+        if (window.pf2eVisioner?.services?.autoVisibilitySystem?.recalculateForTokens) {
+          await window.pf2eVisioner.services.autoVisibilitySystem.recalculateForTokens([
+            subjectToken.id,
+          ]);
+        } else if (window.pf2eVisioner?.services?.autoVisibilitySystem?.recalculateAll) {
+          await window.pf2eVisioner.services.autoVisibilitySystem.recalculateAll();
+        } else if (canvas?.perception) {
+          canvas.perception.update({ refreshVision: true, refreshOcclusion: true });
+        }
       }
       return;
     }
@@ -111,7 +113,17 @@ export class VisibilityOverride {
       direction,
     });
 
-
+    if (triggerRecalculation) {
+      if (window.pf2eVisioner?.services?.autoVisibilitySystem?.recalculateForTokens) {
+        await window.pf2eVisioner.services.autoVisibilitySystem.recalculateForTokens([
+          subjectToken.id,
+        ]);
+      } else if (window.pf2eVisioner?.services?.autoVisibilitySystem?.recalculateAll) {
+        await window.pf2eVisioner.services.autoVisibilitySystem.recalculateAll();
+      } else if (canvas?.perception) {
+        canvas.perception.update({ refreshVision: true, refreshOcclusion: true });
+      }
+    }
   }
 
   static async setVisibilityState(observerToken, targetToken, state, sourceData, applyOffGuard = true) {

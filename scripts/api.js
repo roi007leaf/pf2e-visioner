@@ -1399,28 +1399,65 @@ export class Pf2eVisionerApi {
         return false;
       }
 
-      // 1) Bulk-reset flags on all scene tokens (remove ALL visioner flags)
+      // 1) Bulk-reset flags on all scene tokens (remove manual overrides, preserve rule element flags)
       const tokens = canvas.tokens?.placeables ?? [];
 
-      // Count AVS override flags before removal for logging
-      // (Optional logging of existing AVS override flags removed to reduce noise)
+      // Separate tokens into two groups: those with rule elements and those without
+      const tokensWithRuleElements = [];
+      const tokensWithoutRuleElements = [];
 
-      // First, try to remove the entire flag namespace
-      const updates = tokens.map((t) => ({
+      for (const t of tokens) {
+        const registry = t.document.getFlag(MODULE_ID, 'ruleElementRegistry') || {};
+        if (Object.keys(registry).length > 0) {
+          tokensWithRuleElements.push(t);
+        } else {
+          tokensWithoutRuleElements.push(t);
+        }
+      }
+
+      // For tokens WITHOUT rule elements, remove all flags completely
+      const updates = tokensWithoutRuleElements.map((t) => ({
         _id: t.id,
-        // Remove ALL visioner flags completely - using multiple approaches for safety
         [`flags.${MODULE_ID}`]: null,
         [`flags.-=${MODULE_ID}`]: null,
       }));
 
-      if (updates.length && scene.updateEmbeddedDocuments) {
+      // For tokens WITH rule elements, only remove manual override flags, keep rule element flags
+      const selectiveUpdates = tokensWithRuleElements.map((t) => {
+        const update = { _id: t.id };
+
+        // Remove only manual override flags, NOT rule element managed flags
+        update[`flags.${MODULE_ID}.-=coverOverride`] = null;
+        update[`flags.${MODULE_ID}.-=waitingSneak`] = null;
+        update[`flags.${MODULE_ID}.-=sneak-speed-effect-id`] = null;
+        update[`flags.${MODULE_ID}.-=invisibility`] = null;
+
+        // Clear visibility/cover maps (these get recalculated by AVS)
+        update[`flags.${MODULE_ID}.visibility`] = {};
+        update[`flags.${MODULE_ID}.cover`] = {};
+
+        return update;
+      });
+
+      const allUpdates = [...updates, ...selectiveUpdates];
+
+      if (allUpdates.length && scene.updateEmbeddedDocuments) {
         try {
+          await scene.updateEmbeddedDocuments('Token', allUpdates, { diff: false });
+
+          if (tokensWithRuleElements.length > 0) {
+            console.log(
+              `PF2E Visioner | Preserved rule element flags on ${tokensWithRuleElements.length} token(s):`,
+              tokensWithRuleElements.map(t => t.name)
+            );
+          }
+
           // Additional verification and cleanup: check if flags are actually gone
           setTimeout(async () => {
             const remainingFlags = [];
             const explicitUpdates = [];
 
-            tokens.forEach((t) => {
+            tokensWithoutRuleElements.forEach((t) => {
               const flags = t.document.flags?.[MODULE_ID] || {};
               if (Object.keys(flags).length > 0) {
                 remainingFlags.push({
@@ -1458,22 +1495,9 @@ export class Pf2eVisionerApi {
         }
       }
 
-      // 1.5) Additional safety: explicitly clear all types of flags
+      // 1.5) Clear sneak flags
       try {
         await this.clearAllSneakFlags();
-
-        // Also clear other flag types that might be missed
-        const explicitFlagUpdates = tokens.map((t) => ({
-          _id: t.id,
-          [`flags.${MODULE_ID}.-=waitingSneak`]: null,
-          [`flags.${MODULE_ID}.-=invisibility`]: null,
-          [`flags.${MODULE_ID}.-=coverOverride`]: null,
-          [`flags.${MODULE_ID}.-=sneak-speed-effect-id`]: null,
-        }));
-
-        if (explicitFlagUpdates.length && scene.updateEmbeddedDocuments) {
-          await scene.updateEmbeddedDocuments('Token', explicitFlagUpdates, { diff: false });
-        }
       } catch { }
 
       // 2) Clear ALL scene-level flags used by the module

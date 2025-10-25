@@ -17,7 +17,7 @@ async function reapplyRuleElementsOnLoad() {
     return;
   }
 
-  log.debug('Reapplying rule elements on canvas ready');
+  log.debug(() => ({ msg: 'Reapplying rule elements on canvas ready', tokenCount: canvas.tokens.placeables.length }));
 
   const tokensProcessed = new Set();
   const tokensWithRuleElements = [];
@@ -34,6 +34,7 @@ async function reapplyRuleElementsOnLoad() {
       await cleanupStaleRuleElementFlags(token, actor, log);
 
       const effects = actor.items?.filter(i => i.type === 'effect') || [];
+      log.debug(() => ({ msg: 'Actor effects scanned', actor: actor.name, effects: effects.length }));
 
       for (const effect of effects) {
         const rules = effect.system?.rules || [];
@@ -58,6 +59,8 @@ async function reapplyRuleElementsOnLoad() {
                   ? effect.ruleElements.find(r => r?.key === rule.key && (r?.slug === rule.slug || !rule.slug))
                   : null;
 
+                log.debug(() => ({ msg: 'Rule instance lookup', effect: effect.name, ruleKey: rule.key, hasInstance: !!instance, hasApply: !!(instance && typeof instance.applyOperations === 'function') }));
+
                 if (instance && typeof instance.applyOperations === 'function') {
                   await instance.applyOperations();
                   hasAppliedRules = true;
@@ -66,6 +69,8 @@ async function reapplyRuleElementsOnLoad() {
                     ruleKey: rule.key,
                     effectName: effect.name
                   }));
+                } else {
+                  log.debug(() => ({ msg: 'No applicable instance to apply', effect: effect.name, ruleKey: rule.key }));
                 }
               } catch (error) {
                 log.warn(() => ({
