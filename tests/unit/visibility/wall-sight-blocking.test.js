@@ -42,41 +42,37 @@ describe('Wall Sight Blocking Fix', () => {
       },
     };
 
-    // Mock foundry utilities with proper geometric line-line intersection
-    global.foundry = {
-      canvas: {
-        geometry: {
-          Ray: jest.fn().mockImplementation((a, b) => ({ A: a, B: b })),
-        },
-      },
-      utils: {
-        lineLineIntersection: jest.fn((a, b, c, d) => {
-          // Compute actual line-line intersection
-          const x1 = a.x,
-            y1 = a.y,
-            x2 = b.x,
-            y2 = b.y;
-          const x3 = c.x,
-            y3 = c.y,
-            x4 = d.x,
-            y4 = d.y;
+    // Extend the global foundry mock with geometry utilities
+    if (!global.foundry.canvas.geometry.ClockwiseSweepPolygon) {
+      global.foundry.canvas.geometry.ClockwiseSweepPolygon = global.ClockwiseSweepPolygon;
+    }
 
-          const denom = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
-          if (Math.abs(denom) < 1e-10) return null; // Parallel lines
+    // Mock foundry utilities with proper geometric line-line intersection  
+    global.foundry.utils.lineLineIntersection = jest.fn((a, b, c, d) => {
+      // Compute actual line-line intersection
+      const x1 = a.x,
+        y1 = a.y,
+        x2 = b.x,
+        y2 = b.y;
+      const x3 = c.x,
+        y3 = c.y,
+        x4 = d.x,
+        y4 = d.y;
 
-          const t0 = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / denom;
-          const t1 = ((x1 - x3) * (y1 - y2) - (y1 - y3) * (x1 - x2)) / denom;
+      const denom = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
+      if (Math.abs(denom) < 1e-10) return null; // Parallel lines
 
-          if (t0 < 0 || t0 > 1 || t1 < 0 || t1 > 1) return null; // No intersection within segments
+      const t0 = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / denom;
+      const t1 = ((x1 - x3) * (y1 - y2) - (y1 - y3) * (x1 - x2)) / denom;
 
-          return {
-            x: x1 + t0 * (x2 - x1),
-            y: y1 + t0 * (y2 - y1),
-            t0: t0,
-          };
-        }),
-      },
-    };
+      if (t0 < 0 || t0 > 1 || t1 < 0 || t1 > 1) return null; // No intersection within segments
+
+      return {
+        x: x1 + t0 * (x2 - x1),
+        y: y1 + t0 * (y2 - y1),
+        t0: t0,
+      };
+    });
 
     visionAnalyzer = new VisionAnalyzer();
     visionAnalyzer.clearCache();

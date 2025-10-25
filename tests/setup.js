@@ -76,6 +76,84 @@ global.game = {
   },
 };
 
+global.CONST = {
+  WALL_SENSE_TYPES: {
+    NONE: 0,
+    LIMITED: 10,
+    NORMAL: 20,
+    PROXIMITY: 30,
+    DISTANCE: 40,
+  },
+};
+
+// Mock ClockwiseSweepPolygon for collision detection
+global.ClockwiseSweepPolygon = {
+  testCollision: jest.fn((origin, destination, options = {}) => {
+    // Mock collision detection that checks walls
+    const walls = global.canvas?.walls?.placeables || [];
+
+    console.log(`[Mock testCollision] origin:`, origin, `dest:`, destination, `walls:`, walls.length);
+
+    for (const wall of walls) {
+      const d = wall.document;
+      if (!d) continue;
+
+      console.log(`[Mock testCollision] checking wall:`, d.c, `sight:`, d.sight);
+
+      // Check if wall blocks the requested sense type (default to 'sight')
+      const senseType = options.type || 'sight';
+      if (senseType === 'sight' && d.sight === 0) {
+        console.log(`[Mock testCollision] wall doesn't block sight, skipping`);
+        continue;
+      }
+      if (senseType === 'sound' && d.sound === 0) continue;
+      if (senseType === 'move' && d.move === 0) continue;
+
+      // Skip open doors
+      const isDoor = Number(d.door) > 0;
+      const doorState = Number(d.ds ?? 0);
+      if (isDoor && doorState === 1) continue;
+
+      const [x1, y1, x2, y2] = Array.isArray(d.c) ? d.c : [d.x, d.y, d.x2, d.y2];
+      if ([x1, y1, x2, y2].some((n) => typeof n !== 'number')) continue;
+
+      // Check if ray intersects wall segment
+      const denom = (x2 - x1) * (destination.y - origin.y) - (y2 - y1) * (destination.x - origin.x);
+      if (Math.abs(denom) < 1e-10) continue;
+
+      const t = ((origin.x - x1) * (destination.y - origin.y) - (origin.y - y1) * (destination.x - origin.x)) / denom;
+      const u = -((x1 - origin.x) * (y2 - y1) - (y1 - origin.y) * (x2 - x1)) / denom;
+
+      console.log(`[Mock testCollision] t:`, t, `u:`, u);
+
+      if (t >= 0 && t <= 1 && u >= 0 && u <= 1) {
+        // Collision detected
+        const collision = {
+          x: origin.x + u * (destination.x - origin.x),
+          y: origin.y + u * (destination.y - origin.y),
+          t0: u,
+          t1: t,
+        };
+        console.log(`[Mock testCollision] COLLISION DETECTED:`, collision);
+        return collision;
+      }
+    }
+
+    console.log(`[Mock testCollision] NO COLLISION`);
+    return null; // No collision
+  }),
+};
+
+global.CONFIG = {
+  Canvas: {
+    polygonBackends: {
+      sight: {
+        testCollision: global.ClockwiseSweepPolygon.testCollision,
+      },
+    },
+  },
+};
+
 global.canvas = {
   scene: {
     id: 'test-scene',
@@ -238,7 +316,8 @@ global.foundry = {
           this.A = A;
           this.B = B;
         }
-      }
+      },
+      ClockwiseSweepPolygon: global.ClockwiseSweepPolygon,
     }
   },
   data: {
@@ -869,6 +948,8 @@ global.createMockToken = (data = {}) => {
       x: x * gridSize + (width * gridSize) / 2,
       y: y * gridSize + (height * gridSize) / 2,
     },
+    w: data.w || width * gridSize,
+    h: data.h || height * gridSize,
     getCenterPoint: jest.fn(
       () =>
         data.center || {

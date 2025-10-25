@@ -84,6 +84,12 @@ export function getCorrectTokenHeight(token) {
  * @returns {Object} - {x: number, y: number} center point
  */
 export function getCorrectTokenCenter(token) {
+  // Use native Foundry method for center point calculation with fallback
+  if (token.getCenterPoint && typeof token.getCenterPoint === 'function') {
+    return token.getCenterPoint();
+  }
+  
+  // Fallback to manual calculation when native method isn't available
   const rect = getCorrectTokenRect(token);
   return {
     x: (rect.x1 + rect.x2) / 2,

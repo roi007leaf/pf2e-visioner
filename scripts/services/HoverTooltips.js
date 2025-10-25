@@ -1166,7 +1166,7 @@ function addVisibilityIndicator(
 
   // Create an anchor container at the token center-top to compute transformed bounds
   const indicator = new PIXI.Container();
-  const tokenWidth = targetToken.document.width * canvas.grid.size;
+  const tokenWidth = targetToken.w;
   indicator.x = targetToken.x + tokenWidth / 2;
   indicator.y = targetToken.y - 8; // slight padding above the token
   canvas.tokens.addChild(indicator);
@@ -1450,7 +1450,7 @@ function addCoverIndicator(targetToken, observerToken, coverState, isManualCover
 
   // Use DOM badge with icon only (no large text), consistent with visibility badges
   const indicator = new PIXI.Container();
-  const tokenWidth = targetToken.document.width * canvas.grid.size;
+  const tokenWidth = targetToken.w;
   indicator.x = targetToken.x + tokenWidth / 2;
   indicator.y = targetToken.y - 8; // align above token
   canvas.tokens.addChild(indicator);

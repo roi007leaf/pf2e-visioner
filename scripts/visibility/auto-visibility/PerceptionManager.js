@@ -5,6 +5,7 @@
 
 import { MODULE_ID } from '../../constants.js';
 import { refreshEveryonesPerception } from '../../services/socket.js';
+import { performanceMonitor } from '../../utils/performance-monitor.js';
 
 export class OptimizedPerceptionManager {
   /** @type {OptimizedPerceptionManager} */
@@ -12,6 +13,21 @@ export class OptimizedPerceptionManager {
 
   /** @type {boolean} */
   #refreshScheduled = false;
+
+  /** @type {number} */
+  #lastRefreshTime = 0;
+
+  /** @type {number} */
+  #minRefreshInterval = 16; // ~60fps minimum interval (16ms)
+
+  /** @type {number} */
+  #animationRefreshInterval = 33; // ~30fps during animations (33ms)
+
+  /** @type {boolean} */
+  #isTokenAnimating = false;
+
+  /** @type {Set<string>} */
+  #animatingTokens = new Set();
 
   constructor() {
     if (OptimizedPerceptionManager.#instance) {
@@ -33,11 +49,38 @@ export class OptimizedPerceptionManager {
 
   /**
    * Refresh perception immediately or schedule for next frame
-   * No artificial delays - relies on event-driven batching to prevent spam
+   * Includes moderate throttling during animations to prevent FPS drops
+   * without breaking LOS functionality
    */
   refreshPerception() {
+    const now = performance.now();
+    
     // If already scheduled, don't duplicate
     if (this.#refreshScheduled) return;
+    
+    const timeSinceLastRefresh = now - this.#lastRefreshTime;
+    
+    // During animations, use moderate throttling (50ms = 20fps max)
+    if (this.#isTokenAnimating) {
+      if (timeSinceLastRefresh < 50) {
+        this.#refreshScheduled = true;
+        requestAnimationFrame(() => {
+          this.#doRefreshPerception();
+          this.#refreshScheduled = false;
+        });
+        return;
+      }
+    } else {
+      // Normal throttling when not animating
+      if (timeSinceLastRefresh < this.#minRefreshInterval) {
+        this.#refreshScheduled = true;
+        requestAnimationFrame(() => {
+          this.#doRefreshPerception();
+          this.#refreshScheduled = false;
+        });
+        return;
+      }
+    }
 
     this.#refreshScheduled = true;
 
@@ -62,23 +105,27 @@ export class OptimizedPerceptionManager {
    * @private
    */
   #doRefreshPerception() {
-    try {
-      // Refresh everyone's perception via socket
-      refreshEveryonesPerception();
-    } catch (error) {
-      console.warn(`${MODULE_ID} | Error refreshing everyone's perception:`, error);
-    }
+    performanceMonitor.timeOperation('perceptionRefresh', () => {
+      this.#lastRefreshTime = performance.now();
+      
+      try {
+        // Refresh everyone's perception via socket
+        refreshEveryonesPerception();
+      } catch (error) {
+        console.warn(`${MODULE_ID} | Error refreshing everyone's perception:`, error);
+      }
 
-    try {
-      // Also refresh local canvas perception
-      canvas.perception.update({
-        refreshVision: true,
-        refreshLighting: false,
-        refreshOcclusion: true,
-      });
-    } catch (error) {
-      console.warn(`${MODULE_ID} | Error refreshing canvas perception:`, error);
-    }
+      try {
+        // Also refresh local canvas perception
+        canvas.perception.update({
+          refreshVision: true,
+          refreshLighting: false,
+          refreshOcclusion: true,
+        });
+      } catch (error) {
+        console.warn(`${MODULE_ID} | Error refreshing canvas perception:`, error);
+      }
+    });
   }
 
   /**
@@ -97,6 +144,32 @@ export class OptimizedPerceptionManager {
   }
 
   /**
+   * Mark a token as animating to reduce perception update frequency
+   * @param {string} tokenId - The token ID
+   */
+  markTokenAnimating(tokenId) {
+    this.#animatingTokens.add(tokenId);
+    this.#isTokenAnimating = this.#animatingTokens.size > 0;
+  }
+
+  /**
+   * Mark a token as finished animating
+   * @param {string} tokenId - The token ID
+   */
+  markTokenAnimationComplete(tokenId) {
+    this.#animatingTokens.delete(tokenId);
+    this.#isTokenAnimating = this.#animatingTokens.size > 0;
+  }
+
+  /**
+   * Check if any tokens are currently animating
+   * @returns {boolean}
+   */
+  isAnyTokenAnimating() {
+    return this.#isTokenAnimating;
+  }
+
+  /**
    * Clean up resources
    */
   cleanup() {
@@ -110,6 +183,9 @@ export class OptimizedPerceptionManager {
   getStatus() {
     return {
       refreshScheduled: this.#refreshScheduled,
+      isTokenAnimating: this.#isTokenAnimating,
+      animatingTokens: Array.from(this.#animatingTokens),
+      currentRefreshInterval: this.#isTokenAnimating ? this.#animationRefreshInterval : this.#minRefreshInterval
     };
   }
 }

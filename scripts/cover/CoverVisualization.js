@@ -2,7 +2,6 @@ import { MODULE_ID } from '../constants.js';
 import { HoverTooltips } from '../services/HoverTooltips.js';
 import { getVisibilityBetween } from '../utils.js';
 import autoCoverSystem from './auto-cover/AutoCoverSystem.js';
-import { doesWallBlockAtElevation } from '../helpers/wall-height-utils.js';
 /**
  * Cover field visualization system
  * Shows cover levels from cursor position to hovered token when hotkey is held
@@ -574,8 +573,9 @@ class CoverVisualization {
 
       // Check if the token is hidden or undetected from the selected token's perspective
       try {
-        // Check if the token is foundry hidden first (simple check)
-        if (token.document.hidden) {
+        // Check if the token is hidden using native Foundry method
+        const token = canvas.tokens?.get(token.id);
+        if (token?.isVisible === false || token.document.hidden) {
           continue;
         }
 
@@ -594,12 +594,13 @@ class CoverVisualization {
         );
       }
 
-      // Get token's bounds
+      // Get token's bounds using native Foundry method
+      const tokenBounds = token.bounds;
       const tokenRect = {
-        x1: token.document.x,
-        y1: token.document.y,
-        x2: token.document.x + token.document.width * gridSize,
-        y2: token.document.y + token.document.height * gridSize,
+        x1: tokenBounds.x,
+        y1: tokenBounds.y,
+        x2: tokenBounds.x + tokenBounds.width,
+        y2: tokenBounds.y + tokenBounds.height,
       };
 
       // Check if the world position overlaps with this token's area
@@ -754,9 +755,11 @@ class CoverVisualization {
           id: selectedToken.id + '-temp-pos',
           document: {
             ...selectedToken.document,
-            x: worldX - (selectedToken.document.width * canvas.grid.size) / 2,
-            y: worldY - (selectedToken.document.height * canvas.grid.size) / 2,
+            x: worldX - selectedToken.w / 2,
+            y: worldY - selectedToken.h / 2,
           },
+          w: selectedToken.w,
+          h: selectedToken.h,
         };
 
         // Calculate what cover the hovered token would have when attacked from this grid position

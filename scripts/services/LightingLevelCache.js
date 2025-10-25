@@ -41,9 +41,10 @@ export class LightingLevelCache {
         const results = new Map();
 
         for (const token of tokens) {
+            const adjustedPos = token.getMovementAdjustedPoint?.(token.center) ?? token.center;
             const position = {
-                x: token.document.x + (token.document.width * canvas.grid.size) / 2,
-                y: token.document.y + (token.document.height * canvas.grid.size) / 2,
+                x: adjustedPos.x,
+                y: adjustedPos.y,
                 elevation: token.document.elevation || 0
             };
 

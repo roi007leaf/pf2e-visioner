@@ -217,6 +217,7 @@ export class LightingPrecomputer {
                 let lightHash = '';
                 for (const light of lights) {
                     if (light.hidden === true) continue;
+                    // Use native Foundry light config
                     const config = light.config || {};
                     // Only include properties that significantly affect lighting calculations
                     // Include native darkness toggle and module flags that affect visibility logic
@@ -227,7 +228,7 @@ export class LightingPrecomputer {
                         heightened = light.getFlag?.(MODULE_ID, 'heightenedDarkness') ? 1 : 0;
                         rank = Number(light.getFlag?.(MODULE_ID, 'darknessRank') ?? 0) || 0;
                     } catch { /* ignore flag access issues */ }
-                    lightHash += `${light.id}:${light.x}:${light.y}:${light.disabled ? 0 : 1}:${config.bright || 0}:${config.dim || 0}:${negative}:${heightened}:${rank}|`;
+                    lightHash += `${light.id}:${light.center?.x || light.x || 0}:${light.center?.y || light.y || 0}:${light.disabled ? 0 : 1}:${light.brightRadius || light.config?.bright || 0}:${light.dimRadius || light.config?.dim || 0}:${negative}:${heightened}:${rank}|`;
                 }
                 parts.push(`lights:${lightHash}`);
             } else {
@@ -255,7 +256,8 @@ export class LightingPrecomputer {
                     let tokenLightHash = '';
                     for (const token of tokens) {
                         const lightConfig = token.document?.light;
-                        if (!lightConfig || (lightConfig.bright <= 0 && lightConfig.dim <= 0) || token.document.hidden) continue;
+                        // Use native Foundry visibility check
+                        if (!lightConfig || (lightConfig.bright <= 0 && lightConfig.dim <= 0) || token.isVisible === false || token.document.hidden) continue;
                         // Include ALL properties that affect lighting calculations, especially for directional lights
                         const angle = lightConfig.angle || 360;
                         const lightRotation = lightConfig.rotation || 0;
@@ -340,10 +342,10 @@ export class LightingPrecomputer {
     }
 
     static #getPos(tok) {
-        const gs = canvas.grid?.size || 1;
+        // Use native Foundry properties for position calculation
         return {
-            x: tok.document.x + (tok.document.width * gs) / 2,
-            y: tok.document.y + (tok.document.height * gs) / 2,
+            x: tok.document.x + tok.w / 2,
+            y: tok.document.y + tok.h / 2,
             elevation: tok.document.elevation || 0,
         };
     }

@@ -527,8 +527,8 @@ export class DualSystemIntegration {
 
       const observerCenter = observer.center;
       const storedSneakingCenter = {
-        x: storedPosition.x + (target.document.width * canvas.grid.size) / 2,
-        y: storedPosition.y + (target.document.height * canvas.grid.size) / 2,
+        x: storedPosition.x + target.w / 2,
+        y: storedPosition.y + target.h / 2,
       };
 
       // Check line of sight using wall collision
@@ -631,8 +631,8 @@ export class DualSystemIntegration {
       // Create a ray from observer center to stored sneaking token position
       const observerCenter = observer.center;
       const storedSneakingCenter = {
-        x: storedPosition.x + (target.document.width * canvas.grid.size) / 2,
-        y: storedPosition.y + (target.document.height * canvas.grid.size) / 2,
+        x: storedPosition.x + target.w / 2,
+        y: storedPosition.y + target.h / 2,
       };
 
       const ray = new foundry.canvas.geometry.Ray(observerCenter, storedSneakingCenter);

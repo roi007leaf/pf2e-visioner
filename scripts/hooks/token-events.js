@@ -10,6 +10,7 @@ import {
 } from '../services/HoverTooltips.js';
 import { updateTokenVisuals } from '../services/visual-effects.js';
 import { autoVisibilitySystem } from '../visibility/auto-visibility/index.js';
+import { optimizedPerceptionManager } from '../visibility/auto-visibility/PerceptionManager.js';
 
 export async function onTokenCreated(scene, tokenDoc) {
   try {
@@ -220,5 +221,60 @@ export function registerTokenHooks() {
         }
       }
     }, 1000);
+  });
+
+  // Track token animation state for FPS optimization
+  Hooks.on('canvas.tokens.update', (tokens) => {
+    for (const token of tokens) {
+      if (token.movementAnimationPromise) {
+        optimizedPerceptionManager.markTokenAnimating(token.id);
+        
+        // Mark animation complete when promise resolves
+        token.movementAnimationPromise.finally(() => {
+          optimizedPerceptionManager.markTokenAnimationComplete(token.id);
+        });
+      }
+      
+      if (token.animationContexts && token.animationContexts.size > 0) {
+        optimizedPerceptionManager.markTokenAnimating(token.id);
+      } else {
+        // Only mark complete if we don't have a movement promise
+        if (!token.movementAnimationPromise) {
+          optimizedPerceptionManager.markTokenAnimationComplete(token.id);
+        }
+      }
+    }
+  });
+
+  // Note: We removed the canvas.perception.update interception as it was breaking LOS
+  // The PerceptionManager throttling is sufficient for performance optimization
+
+  // Alternative hook: Track token movement via TokenDocument updates
+  Hooks.on('updateToken', (tokenDoc, changes) => {
+    if (changes.x !== undefined || changes.y !== undefined) {
+      console.log(`Token ${tokenDoc.id} position changed:`, changes);
+      const token = canvas.tokens.get(tokenDoc.id);
+      if (token) {
+        optimizedPerceptionManager.markTokenAnimating(token.id);
+        
+        // Use a timeout to mark animation complete (since we don't have a promise)
+        setTimeout(() => {
+          optimizedPerceptionManager.markTokenAnimationComplete(token.id);
+        }, 1000); // 1 second should be enough for most movements
+      }
+    }
+  });
+
+  // Alternative hook: Track canvas token movement
+  Hooks.on('canvas.tokens.move', (tokens) => {
+    console.log('Canvas tokens move event:', tokens.map(t => t.id));
+    for (const token of tokens) {
+      optimizedPerceptionManager.markTokenAnimating(token.id);
+      
+      // Use a timeout to mark animation complete
+      setTimeout(() => {
+        optimizedPerceptionManager.markTokenAnimationComplete(token.id);
+      }, 1000);
+    }
   });
 }

@@ -371,12 +371,13 @@ export class BatchOrchestrator {
       // When uniqueUpdateCount is 0, nothing changed so perception refresh would just waste cycles
       // and potentially trigger more lightingRefresh events
       if (uniqueUpdateCount > 0) {
-        // Refresh perception after batch processing to ensure condition changes are reflected
-        this._refreshPerceptionAfterBatch();
-
-        // Sync ephemeral effects ONLY for observer-target pairs that had visibility changes
+        // Sync ephemeral effects FIRST (before perception refresh) to minimize rendering
         // This prevents unnecessary refreshToken events for unchanged tokens
         await this._syncEphemeralEffectsForUpdates(batchResult.updates);
+
+        // Refresh perception AFTER all effect operations are complete
+        // This ensures all changes are reflected in a single perception update
+        this._refreshPerceptionAfterBatch();
       } else {
         // No updates - skip perception refresh to prevent feedback loops
         this.systemState?.debug?.('BatchOrchestrator: skipping perception refresh (no updates)');
@@ -706,7 +707,8 @@ export class BatchOrchestrator {
       globalThis.game.pf2eVisioner.suppressLightingRefresh = true;
 
       try {
-        // Deduplicate updates to avoid syncing the same pair multiple times
+        // Group updates by observer for batch processing
+        const updatesByObserver = new Map();
         const syncedPairs = new Set();
         let syncCount = 0;
         let skippedCount = 0;
@@ -727,19 +729,45 @@ export class BatchOrchestrator {
           if (syncedPairs.has(pairKey)) continue;
           syncedPairs.add(pairKey);
 
-          // Update ephemeral effects for this specific observer-target pair
-          await updateEphemeralEffectsForVisibility(
-            update.observer,
-            update.target,
-            update.visibility,
-          );
+          // Group by observer for batch processing
+          if (!updatesByObserver.has(observerId)) {
+            updatesByObserver.set(observerId, {
+              observer: update.observer,
+              targets: []
+            });
+          }
+          updatesByObserver.get(observerId).targets.push({
+            target: update.target,
+            state: update.visibility
+          });
           syncCount++;
+        }
+
+        // Process each observer's targets in parallel for maximum performance
+        const { batchUpdateVisibilityEffects } = await import('../../../visibility/batch.js');
+        const observerPromises = Array.from(updatesByObserver.values())
+          .filter(({ targets }) => targets.length > 0)
+          .map(({ observer, targets }) => 
+            batchUpdateVisibilityEffects(observer, targets, {
+              skipVisualUpdates: true
+            })
+          );
+        
+        // Wait for all observer processing to complete in parallel
+        if (observerPromises.length > 0) {
+          await Promise.all(observerPromises);
         }
 
         if (syncCount > 0 || skippedCount > 0) {
           this.systemState?.debug?.(
             `BatchOrchestrator: synced ${syncCount} ephemeral effects, skipped ${skippedCount} hazards/loot`,
           );
+          
+          // Final canvas refresh after all effect operations are complete
+          // This ensures all visual changes are properly rendered
+          if (canvas?.perception?.update) {
+            canvas.perception.update({ refreshLighting: false });
+          }
         }
       } finally {
         // Clear the suppression flags after the current event loop cycle completes

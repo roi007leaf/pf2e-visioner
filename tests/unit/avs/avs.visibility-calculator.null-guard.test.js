@@ -22,8 +22,13 @@ describe('VisibilityCalculator null guards', () => {
 
         const token = {
             name: 't',
+            x: 0,
+            y: 0,
+            w: 100,
+            h: 100,
             document: { id: '1', x: 0, y: 0, width: 1, height: 1, elevation: 0 },
             actor: {},
+            center: { x: 50, y: 50 },
         };
 
         await expect(vc.calculateVisibility(token, token)).resolves.toBeDefined();

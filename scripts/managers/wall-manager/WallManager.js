@@ -340,12 +340,10 @@ export class VisionerWallManager extends foundry.applications.api.ApplicationV2 
       }
 
       try {
-        // Calculate wall center and pan to it
-        const d = wall.document;
-        const coords = Array.isArray(d?.c) ? d.c : [d?.x, d?.y, d?.x2, d?.y2];
-        const [x1, y1, x2, y2] = coords.map((n) => Number(n) || 0);
-        const centerX = (x1 + x2) / 2;
-        const centerY = (y1 + y2) / 2;
+        // Use native Foundry wall center
+        const wallCenter = wall.center || { x: 0, y: 0 };
+        const centerX = wallCenter.x;
+        const centerY = wallCenter.y;
 
         // Animate pan to wall center
         canvas?.animatePan?.({ x: centerX, y: centerY, duration: 350 });

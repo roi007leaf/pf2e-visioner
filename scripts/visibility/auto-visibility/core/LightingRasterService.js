@@ -42,6 +42,7 @@ export class LightingRasterService {
     const gridSize = canvas.grid?.size || 100;
     const tokenWidth = (target?.document?.width ?? target?.width ?? 1) * gridSize;
     const tokenHeight = (target?.document?.height ?? target?.height ?? 1) * gridSize;
+    // Use native Foundry external radius property with fallback
     const targetRadius = target?.externalRadius ?? Math.max(tokenWidth, tokenHeight) / 2;
 
     // If the two tokens are overlapping, we can't possibly pass through darkness
@@ -65,18 +66,25 @@ export class LightingRasterService {
     // Process all non-hidden darkness sources
     let maxDarknessResult = null;
     for (const light of darknessSources) {
-      if (!light.active) continue;
+      // Use native Foundry light visibility check with fallback for tests
+      if (!(light.isVisible !== false || light.active !== false)) continue;
 
       // Make sure the ray intersects the light's radius before doing more complex math
       //
       // Get the vector from observer to light source and its squared length. This will be the hypotenuse
       // of our right triangle, which we'll name 'h'
-      const hX = light.x - observerPos.x;
-      const hY = light.y - observerPos.y;
+      // Use native Foundry light center position with fallback for tests
+      const lightCenter = light.center || { x: light.x || 0, y: light.y || 0 };
+      const hX = lightCenter.x - observerPos.x;
+      const hY = lightCenter.y - observerPos.y;
       const hDot = hX * hX + hY * hY;
 
       // Get the squared radius of the darkness area
-      const radius = Math.max(light.data.bright, light.data.dim);
+      // Use native Foundry light radius properties with fallback for tests
+      const radius = Math.max(
+        light.brightRadius || light.data?.bright || 0,
+        light.dimRadius || light.data?.dim || 0
+      );
       const radiusDot = radius * radius;
 
       // Now project h onto a to get the length of the adjacent side of our triangle, which tells us
@@ -93,8 +101,10 @@ export class LightingRasterService {
       // If p is greater than |a|^2, the perpendicular falls "beyond" the target, so the target is the point
       // we need to check against radius
       else if (p >= aDot) {
-        const tX = light.x - targetPos.x;
-        const tY = light.y - targetPos.y;
+        // Use native Foundry light center position with fallback for tests
+        const lightCenter = light.center || { x: light.x || 0, y: light.y || 0 };
+        const tX = lightCenter.x - targetPos.x;
+        const tY = lightCenter.y - targetPos.y;
         const tDot = tX * tX + tY * tY;
         if (tDot > radiusDot) continue;
       }

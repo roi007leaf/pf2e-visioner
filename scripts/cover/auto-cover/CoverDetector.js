@@ -46,7 +46,11 @@ export class CoverDetector {
       const pseudoAttacker = {
         id: 'template-origin',
         center: { x: Number(origin.x) || 0, y: Number(origin.y) || 0 },
-        getCenterPoint: () => ({ x: Number(origin.x) || 0, y: Number(origin.y) || 0, elevation: 0 }),
+        getCenterPoint: () => ({
+          x: Number(origin.x) || 0,
+          y: Number(origin.y) || 0,
+          elevation: 0,
+        }),
         actor: null,
         document: { x: origin.x, y: origin.y, width: 0, height: 0 },
       };
@@ -348,7 +352,20 @@ export class CoverDetector {
    * @private
    */
   _analyzeSegmentObstructions(p1, p2, elevationRange = null) {
-    const segmentLength = Math.sqrt((p2.x - p1.x) ** 2 + (p2.y - p1.y) ** 2);
+    // Use native Foundry Ray distance calculation when available
+    let segmentLength;
+    try {
+      if (foundry?.canvas?.geometry?.Ray) {
+        const ray = new foundry.canvas.geometry.Ray(p1, p2);
+        segmentLength = ray.distance;
+      } else {
+        // Fallback to manual calculation
+        segmentLength = Math.sqrt((p2.x - p1.x) ** 2 + (p2.y - p1.y) ** 2);
+      }
+    } catch (error) {
+      // Fallback to manual calculation if native method fails
+      segmentLength = Math.sqrt((p2.x - p1.x) ** 2 + (p2.y - p1.y) ** 2);
+    }
 
     const analysis = {
       hasBlockingTerrain: false,
@@ -609,8 +626,60 @@ export class CoverDetector {
    * @private
    */
   _isRayBlockedByWalls(a, b, elevationRange = null) {
+    try {
+      // Use native Foundry ray casting if available
+      if (canvas.walls?.testCollision && typeof canvas.walls.testCollision === 'function') {
+        // Use native collision detection for movement blocking walls
+        const hasCollision = canvas.walls.testCollision(a, b, { type: 'move' });
+
+        // If Wall Height module is active, we need to do additional elevation checks
+        if (elevationRange && hasCollision) {
+          // Check if any walls actually block at the specified elevation
+          const walls = canvas.walls.objects?.children || [];
+          for (const wall of walls) {
+            const wallDoc = wall.document || wall;
+            if (doesWallBlockAtElevation(wallDoc, elevationRange)) {
+              // Use native Foundry wall ray intersection method
+              const ray = new foundry.canvas.geometry.Ray(a, b);
+              if (wall.canRayIntersect && typeof wall.canRayIntersect === 'function') {
+                // Use native Foundry method for ray intersection
+                if (wall.canRayIntersect(ray)) {
+                  return true;
+                }
+              } else {
+                // Fallback to manual intersection check
+                if (ray.intersectSegment(wall.coords)) {
+                  return true;
+                }
+              }
+            }
+          }
+          return false; // No walls block at this elevation
+        }
+
+        return hasCollision;
+      }
+
+      // Fallback to manual ray casting for older Foundry versions
+      return this._isRayBlockedByWallsManual(a, b, elevationRange);
+    } catch (error) {
+      console.warn('PF2E Visioner | Ray casting failed, falling back to manual method:', error);
+      return this._isRayBlockedByWallsManual(a, b, elevationRange);
+    }
+  }
+
+  /**
+   * Manual ray casting fallback for older Foundry versions
+   * @param {Object} a - Start point {x, y}
+   * @param {Object} b - End point {x, y}
+   * @param {Object} elevationRange - Optional elevation range
+   * @returns {boolean} True if ray is blocked by walls
+   * @private
+   */
+  _isRayBlockedByWallsManual(a, b, elevationRange = null) {
     const ray = this._createRay(a, b);
-    const rayLength = Math.sqrt((b.x - a.x) ** 2 + (b.y - a.y) ** 2);
+    // Use native Ray distance if available, otherwise manual calculation
+    const rayLength = ray.distance || Math.sqrt((b.x - a.x) ** 2 + (b.y - a.y) ** 2);
 
     // Check if there are any walls at all
     const totalWalls = canvas?.walls?.objects?.children?.length || 0;
@@ -1058,8 +1127,9 @@ export class CoverDetector {
       if (type === 'loot' || type === 'hazard') continue;
       // Token cover overrides are handled later in _applyTokenCoverOverrides
       // Don't filter out tokens here based on cover override
-      // Always ignore Foundry hidden tokens
-      if (blocker.document.hidden) {
+      // Always ignore hidden tokens using native Foundry method
+      const blockerToken = canvas.tokens?.get(blocker.id);
+      if (blockerToken?.isVisible === false || blocker.document.hidden) {
         continue;
       }
 
@@ -1072,23 +1142,31 @@ export class CoverDetector {
           if (vis === 'undetected') {
             continue;
           }
-        } catch { }
+        } catch {}
       }
       if (filters.ignoreDead && blocker.actor?.hitPoints?.value === 0) {
         continue;
       }
       if (!filters.allowProneBlockers) {
         try {
-          const itemConditions = blocker.actor?.itemTypes?.condition || [];
-          const legacyConditions =
-            blocker.actor?.conditions?.conditions || blocker.actor?.conditions || [];
-          const isProne =
-            itemConditions.some((c) => c?.slug === 'prone') ||
-            legacyConditions.some((c) => c?.slug === 'prone');
-          if (isProne) {
-            continue;
+          // Use native PF2E condition checking (fastest and most reliable)
+          if (blocker.actor?.hasCondition && typeof blocker.actor.hasCondition === 'function') {
+            if (blocker.actor.hasCondition('prone')) {
+              continue;
+            }
+          } else {
+            // Fallback to manual condition checking for test compatibility
+            const itemConditions = blocker.actor?.itemTypes?.condition || [];
+            const legacyConditions =
+              blocker.actor?.conditions?.conditions || blocker.actor?.conditions || [];
+            const isProne =
+              itemConditions.some((c) => c?.slug === 'prone') ||
+              legacyConditions.some((c) => c?.slug === 'prone');
+            if (isProne) {
+              continue;
+            }
           }
-        } catch { }
+        } catch {}
       }
       if (filters.ignoreAllies && blocker.actor?.alliance === filters.attackerAlliance) {
         continue;
@@ -1161,10 +1239,11 @@ export class CoverDetector {
       const token2GridY = Math.floor(token2.document.y / gridSize);
 
       // For tokens larger than 1x1, check if their grid areas overlap
-      const token1Width = token1.document.width || 1;
-      const token1Height = token1.document.height || 1;
-      const token2Width = token2.document.width || 1;
-      const token2Height = token2.document.height || 1;
+      // Use native Foundry properties for token dimensions
+      const token1Width = token1.w / gridSize;
+      const token1Height = token1.h / gridSize;
+      const token2Width = token2.w / gridSize;
+      const token2Height = token2.h / gridSize;
 
       // Check for overlap in both X and Y dimensions
       const xOverlap =
@@ -1293,7 +1372,7 @@ export class CoverDetector {
       const result = any ? (standard ? 'standard' : 'lesser') : 'none';
       let finalState = result;
 
-      const hasBlockerWithOverride = blockers.some(blocker => {
+      const hasBlockerWithOverride = blockers.some((blocker) => {
         const override = blocker.document?.getFlag?.(MODULE_ID, 'coverOverride');
         return override && override !== 'auto';
       });
@@ -1314,10 +1393,10 @@ export class CoverDetector {
                 hasBlockerWithOverride,
               });
             }
-          } catch { }
+          } catch {}
         }
         finalState = upgraded;
-      } catch { }
+      } catch {}
       return finalState;
     } catch (error) {
       console.error('PF2E Visioner | Error in evaluateCreatureSizeCover:', error);
@@ -1333,7 +1412,9 @@ export class CoverDetector {
       this._featUpgradeRecords.delete(key);
       if (Date.now() - rec.ts > 15000) return null;
       return rec;
-    } catch { return null; }
+    } catch {
+      return null;
+    }
   }
 
   // Using segmentIntersectsRect from geometry-utils.js instead of _rayIntersectRect
@@ -1464,7 +1545,51 @@ export class CoverDetector {
    * @param {number} x3, y3, x4, y4 - Second line segment coordinates
    * @returns {Object|null} Intersection point {x, y} or null if no intersection
    */
+  /**
+   * Find intersection point between two line segments using native Foundry methods when possible
+   * @param {number} x1 - First line start x
+   * @param {number} y1 - First line start y
+   * @param {number} x2 - First line end x
+   * @param {number} y2 - First line end y
+   * @param {number} x3 - Second line start x
+   * @param {number} y3 - Second line start y
+   * @param {number} x4 - Second line end x
+   * @param {number} y4 - Second line end y
+   * @returns {Object|null} Intersection point {x, y} or null if no intersection
+   * @private
+   */
   _lineIntersectionPoint(x1, y1, x2, y2, x3, y3, x4, y4) {
+    try {
+      // Use native Foundry Ray intersection if available
+      if (foundry?.canvas?.geometry?.Ray) {
+        const ray1 = new foundry.canvas.geometry.Ray({ x: x1, y: y1 }, { x: x2, y: y2 });
+        const segment = [x3, y3, x4, y4];
+        const intersection = ray1.intersectSegment(segment);
+        return intersection;
+      }
+
+      // Fallback to manual calculation for older Foundry versions
+      return this._lineIntersectionPointManual(x1, y1, x2, y2, x3, y3, x4, y4);
+    } catch (error) {
+      console.warn('PF2E Visioner | Line intersection failed, using manual calculation:', error);
+      return this._lineIntersectionPointManual(x1, y1, x2, y2, x3, y3, x4, y4);
+    }
+  }
+
+  /**
+   * Manual line intersection calculation fallback
+   * @param {number} x1 - First line start x
+   * @param {number} y1 - First line start y
+   * @param {number} x2 - First line end x
+   * @param {number} y2 - First line end y
+   * @param {number} x3 - Second line start x
+   * @param {number} y3 - Second line start y
+   * @param {number} x4 - Second line end x
+   * @param {number} y4 - Second line end y
+   * @returns {Object|null} Intersection point {x, y} or null if no intersection
+   * @private
+   */
+  _lineIntersectionPointManual(x1, y1, x2, y2, x3, y3, x4, y4) {
     const d = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
     if (d === 0) return null; // Lines are parallel
 
@@ -1555,7 +1680,7 @@ export class CoverDetector {
    * Check if target has cover from creatures larger than it between observer and target point.
    * Used by Distracting Shadows feat: creatures at least one size larger can provide cover
    * for Hide/Sneak prerequisite checks.
-   * 
+   *
    * @param {Token} observer - The observing token
    * @param {Token} target - The target token (actor using feat)
    * @param {Object} targetPoint - Optional specific point instead of target center {x, y}

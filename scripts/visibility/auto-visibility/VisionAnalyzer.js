@@ -26,7 +26,7 @@ import { LevelsIntegration } from '../../services/LevelsIntegration.js';
 import { getLogger } from '../../utils/logger.js';
 import { SensingCapabilitiesBuilder } from './SensingCapabilitiesBuilder.js';
 
-const log = getLogger('VisionAnalyzer');
+const log = getLogger('AVS/VisionAnalyzer');
 
 export class VisionAnalyzer {
   static #instance = null;
@@ -188,7 +188,8 @@ export class VisionAnalyzer {
 
   /**
    * Check if observer has line of sight to target
-   * Uses shape-based collision detection like LightingCalculator
+   * Uses Foundry's native collision detection for performance
+   * Falls back to detailed checking for special cases (Limited walls)
    * Integrates with Levels module for 3D collision detection
    * @param {Token} observer
    * @param {Token} target
@@ -206,276 +207,120 @@ export class VisionAnalyzer {
       return undefined;
     }
 
-    let stage = 'init';
     try {
       // Check for 3D collision using Levels if available
-      // When Levels is active, rely entirely on 3D collision detection
       const levelsIntegration = LevelsIntegration.getInstance();
       if (levelsIntegration.isActive) {
         return !levelsIntegration.hasFloorCeilingBetween(observer, target);
       }
 
-      // If the observer has an los shape, use that for line of sight against the target's circle
-      // Darkness sources may affect true LOS, so only return true/false if we can be sure
-      stage = 'vision-polygon';
-      const los = observer.vision?.los;
-      // CRITICAL: Use PositionManager if available to get correct positions
-      // This fixes the issue where token.center is stale during player movements
-      let observerPos = { x: observer.center.x, y: observer.center.y };
-      let targetPos = { x: target.center.x, y: target.center.y };
-      let usingPositionManager = false;
+      // Get movement-adjusted positions (handles token animation states)
+      const observerCenter =
+        observer.getMovementAdjustedPoint?.(observer.center) || observer.center;
+      const targetCenter = target.getMovementAdjustedPoint?.(target.center) || target.center;
 
-      // Try to get more accurate positions from injected PositionManager
+      // Try PositionManager for more accurate positions during batch processing
+      let observerPos = { x: observerCenter.x, y: observerCenter.y };
+      let targetPos = { x: targetCenter.x, y: targetCenter.y };
+
       if (this.#positionManager) {
         try {
           const pmObserverPos = this.#positionManager.getTokenPosition(observer);
           const pmTargetPos = this.#positionManager.getTokenPosition(target);
-
-          if (pmObserverPos) {
-            observerPos = { x: pmObserverPos.x, y: pmObserverPos.y };
-            usingPositionManager = true;
-          }
-          if (pmTargetPos) {
-            targetPos = { x: pmTargetPos.x, y: pmTargetPos.y };
-            usingPositionManager = true;
-          }
-
-          // Debug log to verify PositionManager is being used
-          if (usingPositionManager) {
-            const log = getLogger('AVS/VisionAnalyzer');
-            log.debug(
-              () =>
-                `using-position-manager-for-los: ${observer.name} -> ${target.name}, PM_obs=(${Math.round(observerPos.x)},${Math.round(observerPos.y)}), PM_tgt=(${Math.round(targetPos.x)},${Math.round(targetPos.y)}), Canvas_obs=(${Math.round(observer.center.x)},${Math.round(observer.center.y)}), Canvas_tgt=(${Math.round(target.center.x)},${Math.round(target.center.y)})`,
-            );
-          }
+          if (pmObserverPos) observerPos = { x: pmObserverPos.x, y: pmObserverPos.y };
+          if (pmTargetPos) targetPos = { x: pmTargetPos.x, y: pmTargetPos.y };
         } catch (e) {
-          // Fall back to token.center if PositionManager access fails
+          // Fall back to movement-adjusted positions
         }
       }
 
-      // Use vision polygon for LOS check - this is Foundry's accurate pre-computed vision
-      // The vision polygon is based on the observer's position and respects all walls
-      // HOWEVER: During token movement, the vision polygon may be stale (based on old position)
-      // So we check if the observer position has changed significantly
-      const visionPolygonStale =
-        usingPositionManager &&
-        los?.points &&
-        (Math.abs(observerPos.x - observer.center.x) > 5 ||
-          Math.abs(observerPos.y - observer.center.y) > 5);
+      // FAST PATH: Use Foundry's native collision detection
+      // This handles most walls correctly and is much faster than manual checking
+      // Prefer ClockwiseSweepPolygon.testCollision directly for better reliability
+      const ClockwiseSweep = foundry.canvas.geometry.ClockwiseSweepPolygon;
+      const testCollision = ClockwiseSweep.testCollision
+        ? ClockwiseSweep.testCollision.bind(ClockwiseSweep)
+        : CONFIG.Canvas?.polygonBackends?.sight?.testCollision;
 
-      if (los?.points && !visionPolygonStale) {
-        const radius = target.externalRadius;
-        // Use targetPos from PositionManager for accurate target position
-        const circle = new PIXI.Circle(targetPos.x, targetPos.y, radius);
-        const intersection = los.intersectCircle(circle, { density: 8, scalingFactor: 1.0 });
-        const visible = intersection?.points?.length > 0;
+      if (!testCollision) {
+        // No collision detection available, fall back to manual wall checking
+        log.debug(() => ({
+          msg: 'LOS-no-native-collision',
+          observer: observer.name,
+          target: target.name,
+        }));
+      } else {
+        const collision = testCollision(observerPos, targetPos, { type: 'sight', mode: 'any' });
 
-        const log = getLogger('AVS/VisionAnalyzer');
-        log.debug(
-          () =>
-            `vision-polygon-check: ${observer.name} -> ${target.name}, hasIntersection=${visible}, polygonPoints=${los.points.length}`,
-        );
-
-        // HYBRID VALIDATION: Compare vision polygon with full geometric LOS
-        // When they agree, trust the result. When they disagree, use geometric as tiebreaker.
-        const cachedWalls = this.#getCachedWalls(null); // Get all walls for validation
-
-        // Run full geometric LOS check (same logic as the fallback below)
-        const observerCenter = { x: observerPos.x, y: observerPos.y };
-        const targetPoints = this.#getTokenSamplePoints(target, targetPos);
-
-        // Check center-to-center first
-        const centerHasLOS = this.#checkSingleRayLOSWithWalls(
-          observerCenter,
-          targetPoints[0], // Target center
-          cachedWalls,
-        );
-
-        let geometricResult = centerHasLOS;
-
-        // If center is blocked, check for 2+ corner rays (same as fallback logic)
-        if (!centerHasLOS) {
-          let clearRays = 0;
-          const requiredRays = 2;
-
-          for (let i = 1; i < targetPoints.length; i++) {
-            const hasLOS = this.#checkSingleRayLOSWithWalls(
-              observerCenter,
-              targetPoints[i],
-              cachedWalls,
-            );
-            if (hasLOS) {
-              clearRays++;
-              if (clearRays >= requiredRays) {
-                geometricResult = true;
-                break;
-              }
-            }
-          }
+        // If there's no collision, we have clear LOS
+        if (!collision) {
+          log.debug(() => ({
+            msg: 'LOS-native-clear',
+            observer: observer.name,
+            target: target.name,
+          }));
+          return true;
         }
 
-        if (visible === geometricResult) {
-          // Both systems agree - high confidence result
-          log.debug(
-            () =>
-              `vision-polygon-AGREEMENT: ${observer.name} -> ${target.name}, both polygon and geometric agree: ${visible}`,
-          );
-          return visible;
-        } else {
-          // Systems disagree - use geometric as tiebreaker (more predictable)
-          log.debug(
-            () =>
-              `vision-polygon-DISAGREEMENT: ${observer.name} -> ${target.name}, polygon=${visible}, geometric=${geometricResult}, using geometric result`,
-          );
-          return geometricResult;
-        }
-      } else if (visionPolygonStale) {
-        const log = getLogger('AVS/VisionAnalyzer');
-        log.debug(
-          () => `vision-polygon-STALE: ${observer.name} moved, falling back to geometric LOS`,
-        );
-      } else if (!los?.points) {
-        const log = getLogger('AVS/VisionAnalyzer');
-        log.debug(
-          () =>
-            `vision-polygon-UNAVAILABLE: ${observer.name} -> ${target.name}, attempting testVisibility`,
+        // SPECIAL CASE: Check for Limited walls (need 2+ to block sight)
+        // Foundry's testCollision treats 1 Limited wall as blocking, but PF2e rules require 2+
+        const hasLimitedWalls = canvas.walls.placeables.some(
+          (w) => w.document.sight === CONST.WALL_SENSE_TYPES.LIMITED,
         );
 
-        // CRITICAL: When vision polygon is unavailable, use Foundry's testVisibility
-        // This computes the vision polygon on-demand and is more accurate than geometric sampling
-        try {
-          // testVisibility requires a point to test - use target's center
-          const testPoint = { x: targetPos.x, y: targetPos.y };
-          // Use the observer's vision source to test visibility
-          const visionSource = observer.vision;
-
-          log.debug(
-            () =>
-              `testVisibility-check: visionSource=${!!visionSource}, canvas.visibility=${!!canvas.visibility}`,
-          );
-
-          if (visionSource && canvas.visibility) {
-            const isVisible = canvas.visibility.testVisibility(testPoint, {
-              object: target,
-              source: visionSource,
-            });
-            log.debug(
-              () =>
-                `testVisibility-result: ${observer.name} -> ${target.name}, isVisible=${isVisible}`,
-            );
-            return isVisible;
-          } else {
-            log.debug(
-              () =>
-                `testVisibility-unavailable: ${observer.name} -> ${target.name}, visionSource=${!!visionSource}, canvas.visibility=${!!canvas.visibility}, falling back to geometric LOS`,
-            );
-            // CRITICAL: When vision source is unavailable (token not controlled),
-            // we can't compute accurate vision polygons. Fall back to geometric sampling
-            // with the 2-ray requirement for better accuracy.
-            // This is less accurate than vision polygons but better than center-only.
-          }
-        } catch (error) {
-          log.debug(
-            () =>
-              `testVisibility-failed: ${observer.name} -> ${target.name}, error=${error.message}`,
-          );
-          // Fall through to geometric sampling if testVisibility fails
+        if (!hasLimitedWalls) {
+          // No Limited walls, trust Foundry's result
+          // NOTE: Wall Height integration - if Wall Height module is active, it handles elevation
+          // via libWrapper on ClockwiseSweepPolygon._testEdgeInclusion, so this path is safe.
+          // Our manual elevation checking in the detailed path is a fallback.
+          log.debug(() => ({
+            msg: 'LOS-native-blocked',
+            observer: observer.name,
+            target: target.name,
+          }));
+          return false;
         }
       }
 
-      // Use multi-point geometric sampling with cached wall filtering
-      stage = 'elevation-calc';
-      let elevationRange = null;
-      try {
-        const observerSpan = getTokenVerticalSpanFt(observer);
-        const targetSpan = getTokenVerticalSpanFt(target);
-        elevationRange = {
-          bottom: Math.min(observerSpan.bottom, targetSpan.bottom),
-          top: Math.max(observerSpan.top, targetSpan.top),
-        };
-      } catch (error) {}
+      // DETAILED PATH: Check Limited walls manually
+      // Calculate elevation range for wall-height checking
+      const observerSpan = getTokenVerticalSpanFt(observer);
+      const targetSpan = getTokenVerticalSpanFt(target);
+      const elevationRange = {
+        bottom: Math.min(observerSpan.bottom, targetSpan.bottom),
+        top: Math.max(observerSpan.top, targetSpan.top),
+      };
 
-      stage = 'get-walls';
-      const cachedWalls = this.#getCachedWalls(elevationRange);
+      const walls = this.#getCachedWalls(elevationRange);
 
-      // Early exit: if no walls, always have LOS
-      stage = 'wall-check';
-      if (cachedWalls.length === 0) {
-        const log = getLogger('AVS/VisionAnalyzer');
-        log.debug(
-          () => `LOS-no-walls: ${observer.name} -> ${target.name}, returning true (no walls found)`,
-        );
-        return true;
-      }
-
-      stage = 'sample-points';
-      // Get observer and target sample points
-      const observerPoints = this.#getTokenSamplePoints(observer, observerPos);
+      // Sample multiple points on target token for robust detection
       const targetPoints = this.#getTokenSamplePoints(target, targetPos);
-      const observerCenter = observerPoints[0]; // Center is first point
-      const targetCenter = targetPoints[0]; // Center is first point
 
-      // Check center-to-center first (most common case)
-      stage = 'center-check';
-      const centerHasLOS = this.#checkSingleRayLOSWithWalls(
-        observerCenter,
-        targetCenter,
-        cachedWalls,
-      );
+      // Check if ANY ray from observer to target points has LOS
+      const observerOrigin = { x: observerPos.x, y: observerPos.y };
 
-      // Debug log for center-to-center check
-      const log = getLogger('AVS/VisionAnalyzer');
-      log.debug(
-        () =>
-          `LOS-center-check: ${observer.name} -> ${target.name}, from=(${Math.round(observerCenter.x)},${Math.round(observerCenter.y)}), to=(${Math.round(targetCenter.x)},${Math.round(targetCenter.y)}), walls=${cachedWalls.length}, result=${centerHasLOS}`,
-      );
-
-      if (centerHasLOS) {
-        return true;
-      }
-
-      // CONSERVATIVE RAY SAMPLING: When vision polygon is unavailable, be very conservative
-      // Since Foundry's vision polygon is authoritative and accounts for complex geometry,
-      // our geometric fallback should err on the side of "no LOS" to avoid false positives.
-      // Only return true if we find multiple clear rays, indicating significant visibility.
-      stage = 'target-sampling';
-      let clearRays = 0;
-      const requiredRays = 2; // Require at least 2 clear rays for conservative LOS
-
-      for (let i = 1; i < targetPoints.length; i++) {
-        // Skip index 0 (center), already checked
-        const hasLOS = this.#checkSingleRayLOSWithWalls(
-          observerCenter,
-          targetPoints[i],
-          cachedWalls,
-        );
-        if (hasLOS) {
-          clearRays++;
-          log.debug(
-            () =>
-              `LOS-center-to-target: ${observer.name} -> ${target.name}, from=(${Math.round(observerCenter.x)},${Math.round(observerCenter.y)}), to=(${Math.round(targetPoints[i].x)},${Math.round(targetPoints[i].y)}), pointIdx=${i}, clearRays=${clearRays}`,
-          );
-
-          // Conservative approach: require multiple clear rays to confirm LOS
-          if (clearRays >= requiredRays) {
-            log.debug(
-              () =>
-                `LOS-confirmed-conservative: ${observer.name} -> ${target.name}, found ${clearRays} clear rays (required ${requiredRays})`,
-            );
-            return true;
-          }
+      for (const targetPoint of targetPoints) {
+        if (this.#checkSingleRayLOSWithWalls(observerOrigin, targetPoint, walls)) {
+          log.debug(() => ({
+            msg: 'LOS-detailed-clear',
+            observer: observer.name,
+            target: target.name,
+            method: 'limited-wall-check',
+          }));
+          return true;
         }
       }
 
-      log.debug(
-        () =>
-          `LOS-all-blocked-conservative: ${observer.name} -> ${target.name}, found only ${clearRays} clear rays (required ${requiredRays})`,
-      );
+      log.debug(() => ({
+        msg: 'LOS-detailed-blocked',
+        observer: observer.name,
+        target: target.name,
+        method: 'limited-wall-check',
+      }));
       return false;
     } catch (error) {
-      console.error(`[LineOfSight] Error in stage '${stage}':`, error);
-      log.debug(`Error checking line of sight in stage '${stage}'`, error);
-      return false;
+      console.warn('PF2E Visioner | LOS calculation error:', error);
+      return true; // Fail open
     }
   }
   /**
@@ -517,8 +362,9 @@ export class VisionAnalyzer {
         continue;
       }
 
-      const isDoor = wall.document.door > 0;
-      const isOpen = wall.document.ds === 1;
+      // Use native Foundry wall door properties
+      const isDoor = wall.isDoor;
+      const isOpen = wall.isOpen;
       if (isDoor && isOpen) {
         continue;
       }
@@ -550,8 +396,8 @@ export class VisionAnalyzer {
     const center = centerPos
       ? { x: centerPos.x, y: centerPos.y }
       : { x: token.center.x, y: token.center.y };
-    const w = token.document.width * canvas.grid.size;
-    const h = token.document.height * canvas.grid.size;
+    const w = token.w;
+    const h = token.h;
 
     // Calculate x,y based on center position if provided
     const x = centerPos ? centerPos.x - w / 2 : token.document.x;
@@ -589,11 +435,14 @@ export class VisionAnalyzer {
     for (const wall of walls) {
       // For doors, skip the distance optimization since they need special proximity handling
       // Doors can block vision even when the ray midpoint is far from the door midpoint
-      const isDoor = wall.document.door > 0;
+      // Use native Foundry wall door property
+      const isDoor = wall.isDoor;
 
       if (!isDoor) {
-        const wallMidX = (wall.document.c[0] + wall.document.c[2]) / 2;
-        const wallMidY = (wall.document.c[1] + wall.document.c[3]) / 2;
+        // Use native Foundry wall midpoint
+        const wallMidpoint = wall.midpoint || [];
+        const wallMidX = wallMidpoint[0] || 0;
+        const wallMidY = wallMidpoint[1] || 0;
         const distToRayMid = Math.sqrt(
           (wallMidX - (fromPoint.x + toPoint.x) / 2) ** 2 +
             (wallMidY - (fromPoint.y + toPoint.y) / 2) ** 2,
@@ -611,10 +460,12 @@ export class VisionAnalyzer {
 
         // Check if ray endpoints are on opposite sides of the door
         // and if the ray passes close enough to the door span
-        const wallX1 = wall.document.c[0];
-        const wallY1 = wall.document.c[1];
-        const wallX2 = wall.document.c[2];
-        const wallY2 = wall.document.c[3];
+        // Use native Foundry wall coordinates
+        const wallCoords = wall.coords || [];
+        const wallX1 = wallCoords[0];
+        const wallY1 = wallCoords[1];
+        const wallX2 = wallCoords[2];
+        const wallY2 = wallCoords[3];
 
         // Determine if door is more horizontal or vertical
         const doorDx = Math.abs(wallX2 - wallX1);
@@ -705,20 +556,23 @@ export class VisionAnalyzer {
             );
           }
 
-          // Check for directional walls (one-way walls)
-          // dir: 0 = both directions, 1 = left side blocks, 2 = right side blocks
-          if (wall.document.dir && wall.document.dir !== 0) {
-            const observerDx = fromPoint.x - wall.document.c[0];
-            const observerDy = fromPoint.y - wall.document.c[1];
+          // Check for directional walls (one-way walls) using native Foundry method
+          // Use native Foundry wall direction property
+          const wallDirection = wall.direction;
+          if (wallDirection !== null && wallDirection !== undefined) {
+            // Use native Foundry wall coordinates for observer position calculation
+            const wallCoords = wall.coords || [];
+            const observerDx = fromPoint.x - wallCoords[0];
+            const observerDy = fromPoint.y - wallCoords[1];
 
-            // Cross product determines which side the observer is on
-            const crossProduct = wallDx * observerDy - wallDy * observerDx;
+            // Calculate the angle from wall to observer
+            const observerAngle = Math.atan2(observerDy, observerDx);
 
-            // dir=1: blocks from left (negative cross product)
-            // dir=2: blocks from right (positive cross product)
-            const blocksFromObserverSide =
-              (wall.document.dir === 1 && crossProduct < 0) ||
-              (wall.document.dir === 2 && crossProduct > 0);
+            // Use native Foundry method to check if wall blocks from observer direction
+            // This method checks if the wall direction lies between two angles
+            const lowerAngle = observerAngle - Math.PI / 2;
+            const upperAngle = observerAngle + Math.PI / 2;
+            const blocksFromObserverSide = wall.isDirectionBetweenAngles(lowerAngle, upperAngle);
 
             if (!blocksFromObserverSide) {
               continue; // One-way wall doesn't block from this direction
@@ -891,8 +745,13 @@ export class VisionAnalyzer {
    */
   #hasSilenceEffect(actor) {
     try {
-      const effects =
-        actor.itemTypes?.effect ?? actor.items?.filter?.((i) => i?.type === 'effect') ?? [];
+      // Method 1: Use native PF2E effect checking if available
+      if (actor.hasEffect && typeof actor.hasEffect === 'function') {
+        return actor.hasEffect('spell-effect-silence');
+      }
+
+      // Method 2: Use native PF2E itemTypes for effects (fast and reliable)
+      const effects = actor.itemTypes?.effect || [];
       return effects?.some?.((effect) => {
         const slug = effect?.slug || effect?.system?.slug || '';
         const name = effect?.name?.toLowerCase() || '';
@@ -1385,8 +1244,7 @@ export class VisionAnalyzer {
    * @private
    */
   #buildDetectionModes(token, result) {
-    // Add detection modes from token
-    const tokenDetectionModes = token.document?.detectionModes || [];
+    const tokenDetectionModes = token.detectionModes || [];
     for (const mode of tokenDetectionModes) {
       if (mode.id && mode.enabled && mode.range > 0) {
         result.detectionModes[mode.id] = {
@@ -1528,22 +1386,22 @@ export class VisionAnalyzer {
    */
   #hasCondition(actor, conditionSlug) {
     try {
-      // Method 1: hasCondition function (most reliable)
+      // Method 1: Native PF2E hasCondition function (most reliable and fastest)
       if (actor.hasCondition && typeof actor.hasCondition === 'function') {
         return actor.hasCondition(conditionSlug);
       }
 
-      // Method 2: Check system conditions
-      if (actor.system?.conditions?.[conditionSlug]?.active) {
-        return true;
-      }
-
-      // Method 3: Check conditions collection
+      // Method 2: Native PF2E conditions collection (fast and reliable)
       if (actor.conditions?.has?.(conditionSlug)) {
         return true;
       }
 
-      // Method 4: Iterate through conditions
+      // Method 3: Check system conditions (PF2E native structure)
+      if (actor.system?.conditions?.[conditionSlug]?.active) {
+        return true;
+      }
+
+      // Method 4: Fallback to manual iteration (slower but comprehensive)
       if (actor.conditions) {
         try {
           return Array.from(actor.conditions).some(

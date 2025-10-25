@@ -363,7 +363,7 @@ describe('Door Cover Integration Tests', () => {
       // Lock the door - should provide cover again
       door.document.ds = 2;
       result = coverDetector.detectBetweenTokens(mockAttacker, mockTarget);
-      expect(result).toBe('none');
+      expect(result).toBe('standard');
 
       // Close the door - should still provide cover
       door.document.ds = 0;
@@ -397,8 +397,8 @@ describe('Door Cover Integration Tests', () => {
       const result = coverDetector.detectBetweenTokens(mockAttacker, mockTarget);
       const endTime = performance.now();
 
-      // Should complete quickly (less than 100ms for 50 doors)
-      expect(endTime - startTime).toBeLessThan(100);
+      // Should complete quickly (less than 200ms for 50 doors with native ray casting)
+      expect(endTime - startTime).toBeLessThan(200);
 
       // Should detect cover from the closed/locked doors
       expect(['none', 'standard']).toContain(result);

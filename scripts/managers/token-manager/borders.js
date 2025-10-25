@@ -10,8 +10,8 @@ export function addTokenBorder(token, strong = false) {
   const borderColor = strong ? 0xffd700 : 0xffa500;
   const borderWidth = strong ? 3 : 2;
   const alpha = strong ? 0.9 : 0.7;
-  const tokenWidth = token.document.width * canvas.grid.size;
-  const tokenHeight = token.document.height * canvas.grid.size;
+  const tokenWidth = token.w;
+  const tokenHeight = token.h;
   border.lineStyle(borderWidth, borderColor, alpha);
   border.drawRoundedRect(
     -tokenWidth / 2 - padding,
@@ -32,10 +32,10 @@ export function removeTokenBorder(token) {
       if (token._highlightBorder.parent) {
         token._highlightBorder.parent.removeChild(token._highlightBorder);
       }
-    } catch (_) {}
+    } catch (_) { }
     try {
       token._highlightBorder.destroy();
-    } catch (_) {}
+    } catch (_) { }
     delete token._highlightBorder;
   }
 }

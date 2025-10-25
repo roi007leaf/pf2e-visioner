@@ -9,6 +9,11 @@ export class LightingEventHandler {
     this.systemState = systemStateProvider;
     this.visibilityState = visibilityStateManager;
     this.cacheManager = cacheManager;
+    
+    // Light-specific throttling to reduce lag when turning on/off lights
+    this._lastLightRefreshTime = 0;
+    this._lightRefreshThrottleMs = 100; // 100ms throttle for light changes
+    this._pendingLightRefresh = false;
   }
 
   /**
@@ -119,7 +124,7 @@ export class LightingEventHandler {
 
   /**
    * Handle Foundry lighting refreshes. This fires for ambient and token-emitted light changes.
-   * We use a throttled recalculation to avoid over-processing during continuous refreshes.
+   * We use light-specific throttling to reduce lag when turning on/off lights.
    */
   handleLightingRefresh() {
     if (!this.systemState.shouldProcessEvents()) {
@@ -157,6 +162,32 @@ export class LightingEventHandler {
       return;
     }
 
+    // Light-specific throttling to reduce lag when turning on/off lights
+    const now = performance.now();
+    const timeSinceLastRefresh = now - this._lastLightRefreshTime;
+    
+    if (timeSinceLastRefresh < this._lightRefreshThrottleMs) {
+      // Too soon, schedule for later
+      if (!this._pendingLightRefresh) {
+        this._pendingLightRefresh = true;
+        setTimeout(() => {
+          this._pendingLightRefresh = false;
+          this._lastLightRefreshTime = performance.now();
+          this._performLightingRefresh();
+        }, this._lightRefreshThrottleMs - timeSinceLastRefresh);
+      }
+      return;
+    }
+
+    // Perform the refresh immediately
+    this._lastLightRefreshTime = now;
+    this._performLightingRefresh();
+  }
+
+  /**
+   * Perform the actual lighting refresh with cache clearing and token updates
+   */
+  _performLightingRefresh() {
     try {
       this.cacheManager?.clearAllCaches?.();
     } catch {

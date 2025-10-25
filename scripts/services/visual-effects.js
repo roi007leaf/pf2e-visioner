@@ -257,6 +257,38 @@ export async function cleanupDeletedWallVisuals(wallDocument) {
 }
 
 /**
+ * Optimized bulk visual update that skips individual perception refreshes
+ * Use this for bulk operations to prevent FPS drops
+ * @param {Function} operation - The operation to perform
+ * @param {Object} options - Options for the operation
+ * @param {boolean} options.skipVisualUpdates - Skip visual updates during operation
+ */
+export async function performBulkVisualOperation(operation, options = {}) {
+  const { skipVisualUpdates = false } = options;
+  
+  try {
+    // Perform the operation
+    await operation();
+    
+    // Only refresh perception once at the end if not skipping visual updates
+    if (!skipVisualUpdates) {
+      try {
+        canvas.perception?.update?.({
+          refreshLighting: false,
+          refreshVision: true,
+          refreshOcclusion: true,
+          refreshEffects: true,
+        });
+      } catch (error) {
+        console.warn(`[${MODULE_ID}] Error refreshing perception after bulk operation:`, error);
+      }
+    }
+  } catch (error) {
+    console.warn(`[${MODULE_ID}] Error in bulk visual operation:`, error);
+  }
+}
+
+/**
  * Clean up all wall indicators globally - useful for mass deletions
  * This function removes all wall indicators from the canvas layers without
  * needing to iterate over specific wall documents
@@ -1303,27 +1335,18 @@ export async function updateSystemHiddenTokenHighlights(observerId = null, posit
       const targetTraits = token.actor?.system?.traits?.value || [];
       const canBeDetectedByLifesense = visibilityCalculatorInternal.canLifesenseDetect({ traits: targetTraits });
 
-      // Check if token is within lifesense range
-      // Use document positions to ensure we have the latest coordinates
-      // If positionOverride is provided, use it instead of querying the document
-      const observerDocX = positionOverride?.x ?? observer.document.x;
-      const observerDocY = positionOverride?.y ?? observer.document.y;
-
-      const observerCenterX = observerDocX + (observer.document.width * canvas.grid.size) / 2;
-      const observerCenterY = observerDocY + (observer.document.height * canvas.grid.size) / 2;
-      const targetCenterX = token.document.x + (token.document.width * canvas.grid.size) / 2;
-      const targetCenterY = token.document.y + (token.document.height * canvas.grid.size) / 2;
+      const observerAdjusted = observer.getMovementAdjustedPoint?.(observer.center) ?? observer.center;
+      const targetAdjusted = token.getMovementAdjustedPoint?.(token.center) ?? token.center;
 
       const lifesenseRange = lifesenseSense?.range ?? 0;
 
-      // Calculate distance in feet
       let distanceInFeet;
       if (observer.distanceTo && typeof observer.distanceTo === 'function') {
         distanceInFeet = observer.distanceTo(token);
       } else {
         const path = canvas.grid.measurePath([
-          { x: observerCenterX, y: observerCenterY },
-          { x: targetCenterX, y: targetCenterY }
+          { x: observerAdjusted.x, y: observerAdjusted.y },
+          { x: targetAdjusted.x, y: targetAdjusted.y }
         ]);
         const feetPerGrid = canvas.grid?.distance || 5;
         distanceInFeet = path.distance * feetPerGrid;
@@ -1366,7 +1389,7 @@ export async function updateSystemHiddenTokenHighlights(observerId = null, posit
       // Only create if should show and doesn't exist yet
       if (shouldShowIndicator) {
         try {
-          const size = token.document.width * canvas.grid.size;
+          const size = token.w;
           const centerX = token.center?.x ?? (token.document.x + size / 2);
           const centerY = token.center?.y ?? (token.document.y + size / 2);
 

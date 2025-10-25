@@ -230,15 +230,15 @@ export class BatchProcessor {
           msg: 'skipping-all-precomputed-los',
           reason: 'batch-after-movement',
         }));
-      } catch {}
+      } catch { }
     } else {
       // Only precompute LOS if not skipping
       const animatingTokenIds = new Set();
 
-      // Detect which tokens are currently animating or being dragged
+      // Detect which tokens are currently animating or being dragged using native Foundry methods
       for (const token of allTokens) {
-        const isAnimating = token._animation?.promise || token._animation?.active;
-        const isDragging = token._dragPassthrough || token.document?.flags?.core?.isDragging;
+        const isAnimating = token?.movementAnimationPromise || token?.animationContexts?.size > 0;
+        const isDragging = token?.isDragged || token.document?.flags?.core?.isDragging;
         if (isAnimating || isDragging) {
           animatingTokenIds.add(token.document.id);
           try {
@@ -249,7 +249,7 @@ export class BatchProcessor {
               isAnimating,
               isDragging,
             }));
-          } catch {}
+          } catch { }
         }
       }
 
@@ -260,7 +260,7 @@ export class BatchProcessor {
             animatingCount: animatingTokenIds.size,
             animatingTokens: Array.from(animatingTokenIds),
           }));
-        } catch {}
+        } catch { }
       }
 
       for (let i = 0; i < allTokens.length; i++) {
@@ -498,7 +498,7 @@ export class BatchProcessor {
             // Populate burst memo for immediate subsequent batches
             try {
               if (calcOptions?.burstLosMemo) calcOptions.burstLosMemo.set(pairKey, los);
-            } catch {}
+            } catch { }
           }
 
           batchLosCache.set(pairKey, los);
@@ -509,10 +509,19 @@ export class BatchProcessor {
 
         if (!los) {
           // Check if observer has non-visual senses that could work without LoS
-          // Calculate distance using the existing position data
-          const distance =
-            Math.sqrt(Math.pow(posA.x - posB.x, 2) + Math.pow(posA.y - posB.y, 2)) /
-            canvas.grid.size;
+          // Calculate distance using native method if available, otherwise manual calculation
+          let distance;
+          if (changedToken?.distanceTo && typeof changedToken.distanceTo === 'function') {
+            try {
+              distance = changedToken.distanceTo(otherToken) / canvas.grid.size;
+            } catch (e) {
+              // Fall back to manual calculation
+              distance = Math.sqrt(Math.pow(posA.x - posB.x, 2) + Math.pow(posA.y - posB.y, 2)) / canvas.grid.size;
+            }
+          } else {
+            distance = Math.sqrt(Math.pow(posA.x - posB.x, 2) + Math.pow(posA.y - posB.y, 2)) / canvas.grid.size;
+          }
+          
           const hasNonVisualSenses = this.#canUseNonVisualSenses(
             changedToken,
             otherToken,
@@ -679,7 +688,14 @@ export class BatchProcessor {
     }
 
     // Check for tremorsense in precise or imprecise senses - works through walls if both tokens on ground
-    const allSenses = [...(sensingSummary.precise || []), ...(sensingSummary.imprecise || [])];
+    // Handle both array-based (legacy) and object-based formats
+    const preciseArray = Array.isArray(sensingSummary.precise)
+      ? sensingSummary.precise
+      : Object.entries(sensingSummary.precise || {}).map(([type, range]) => ({ type, range }));
+    const impreciseArray = Array.isArray(sensingSummary.imprecise)
+      ? sensingSummary.imprecise
+      : Object.entries(sensingSummary.imprecise || {}).map(([type, range]) => ({ type, range }));
+    const allSenses = [...preciseArray, ...impreciseArray];
     const tremorsenseSense = allSenses.find((sense) => sense.type === 'tremorsense');
     if (tremorsenseSense) {
       const tremorsenseRange = tremorsenseSense.range || 30;

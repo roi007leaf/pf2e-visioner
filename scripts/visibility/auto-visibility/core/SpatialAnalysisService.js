@@ -144,12 +144,20 @@ export class SpatialAnalysisService {
 
                     // Check if any walls actually block the line
                     for (const wall of wallsInBounds) {
-                        // A wall is solid if it blocks movement (move > 0) and is not a door (door === 0 or door === null)
-                        const isSolidWall =
-                            wall.document.move > 0 && (wall.document.door === 0 || wall.document.door === null);
-
-                        if (isSolidWall) {
-                            // This is a solid wall, check if it intersects our ray
+                        // Check if wall blocks sight - terrain walls (move=0) can still block sight
+                        // Only skip walls that explicitly don't block sight
+                        const blocksSight = wall.document.sight !== CONST.WALL_SENSE_TYPES.NONE;
+                        
+                        if (blocksSight) {
+                            // Skip open doors
+                            const isDoor = wall.document.door > 0;
+                            const isOpen = wall.document.ds === 1;
+                            if (isDoor && isOpen) {
+                                continue;
+                            }
+                            
+                            // This wall blocks sight, check if it intersects our ray
+                            // Use native Foundry wall coordinates
                             if (ray.intersectSegment(wall.coords)) {
                                 return false; // Wall blocks line of sight
                             }
@@ -390,11 +398,16 @@ export class SpatialAnalysisService {
      */
     tokenEmitsLight(tokenDoc, changes = {}) {
         try {
-            // Check if the token has light configuration
+            // Use native Foundry method if available
+            const token = canvas.tokens?.get(tokenDoc.id);
+            if (token?.emitsLight && typeof token.emitsLight === 'function') {
+                return token.emitsLight;
+            }
+            
+            // Fallback to manual check
             const lightConfig = changes.light !== undefined ? changes.light : tokenDoc.light;
-
             if (!lightConfig) return false;
-
+            
             // Token emits light if:
             // 1. Light is enabled AND
             // 2. Has a bright radius > 0 OR dim radius > 0

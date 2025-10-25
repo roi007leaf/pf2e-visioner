@@ -55,19 +55,12 @@ global.CONST = {
 };
 
 // Mock Foundry utilities
-global.foundry = {
-  utils: {
-    lineLineIntersection: jest.fn(),
-  },
-  canvas: {
-    geometry: {
-      Ray: jest.fn().mockImplementation((from, to) => ({
-        A: from,
-        B: to,
-      })),
-    },
-  },
-};
+global.foundry.utils.lineLineIntersection = jest.fn();
+global.foundry.canvas.geometry.Ray = jest.fn().mockImplementation((from, to) => ({
+  A: from,
+  B: to,
+}));
+global.foundry.canvas.geometry.ClockwiseSweepPolygon = global.ClockwiseSweepPolygon;
 
 // Mock PIXI
 global.PIXI = {
@@ -343,20 +336,8 @@ describe('VisionAnalyzer - Hybrid Consensus Validation', () => {
       expect(typeof result).toBe('boolean');
     });
 
-    test('should validate consensus logic exists', () => {
-      // Add vision polygon to trigger consensus logic
-      mockObserver.vision = {
-        los: {
-          points: [0, 0, 100, 0, 100, 100, 0, 100],
-          intersectCircle: jest.fn().mockReturnValue({ points: [] }),
-        },
-      };
-
-      // Should execute consensus logic without errors
-      const result = visionAnalyzer.hasLineOfSight(mockObserver, mockTarget);
-
-      expect(typeof result).toBe('boolean');
-      expect(mockObserver.vision.los.intersectCircle).toHaveBeenCalled();
-    });
+    // NOTE: Removed obsolete "should validate consensus logic exists" test
+    // The test was checking for intersectCircle() which is no longer used.
+    // Current implementation uses ClockwiseSweepPolygon.testCollision for collision detection.
   });
 });

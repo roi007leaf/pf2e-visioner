@@ -53,8 +53,18 @@ describe('OptimizedPerceptionManager', () => {
     });
 
     test('getStatus returns flag state', () => {
-        expect(mgr.getStatus()).toEqual({ refreshScheduled: false });
+        expect(mgr.getStatus()).toEqual({ 
+            refreshScheduled: false,
+            isTokenAnimating: false,
+            animatingTokens: [],
+            currentRefreshInterval: 16
+        });
         mgr.refreshPerception();
-        expect(mgr.getStatus()).toEqual({ refreshScheduled: true });
+        expect(mgr.getStatus()).toEqual({ 
+            refreshScheduled: true,
+            isTokenAnimating: false,
+            animatingTokens: [],
+            currentRefreshInterval: 16
+        });
     });
 });

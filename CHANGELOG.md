@@ -13,6 +13,24 @@
   - NPCs with abilities like "Swift Sneak" will now have proper sneak distance calculations displayed
   - Sneak distance chip in chat panels now works correctly for both PCs and NPCs
 
+### ⚡ Performance
+
+- **Line of Sight Optimization**: Improved LOS calculations using Foundry's native collision detection
+  - Uses `ClockwiseSweepPolygon.testCollision()` for fast, accurate wall checking (inspired by Token Lean module)
+  - Applied across VisionAnalyzer and public API methods
+  - Falls back to detailed checking only when Limited walls are present (PF2e-specific rule: 2+ Limited walls block sight)
+  - Significantly faster LOS calculations for most scenarios (no Limited walls)
+- **Movement-Adjusted Positions**: All vision and lighting calculations now use movement-adjusted token positions
+  - Uses `token.getMovementAdjustedPoint()` to account for token animation states during movement
+  - Applied across all position-dependent systems: VisionAnalyzer, VisibilityCalculatorAdapter, PositionManager, LightingLevelCache, API methods, and visual effects
+  - Fixes issues where lighting levels and LOS were calculated using stale positions during token animation
+  - Ensures accurate visibility calculations even while tokens are in motion
+- **PositionManager Simplification**: Removed redundant position tracking system
+  - Eliminated `updatedTokenDocs` and `pinnedPositions` Maps that duplicated Foundry's native position handling
+  - Removed complex 4-priority position resolution system in favor of direct `getMovementAdjustedPoint()` delegation
+  - Reduced memory usage and eliminated potential memory leaks from stale position caches
+  - Simplified codebase by ~100 lines while improving accuracy and performance
+
 ## [4.4.12] - 2025-10-24
 
 ### 🐛 Bug Fixes

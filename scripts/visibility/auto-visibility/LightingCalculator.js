@@ -95,6 +95,7 @@ export class LightingCalculator {
 
     // Convert the shape to clipper points
     const tokenClipperPoints = shapeInWorld.toClipperPoints({ scalingFactor: 1.0 });
+    // Use native Foundry external radius property with fallback
     const tokenRadius = token?.externalRadius ?? Math.max(tokenWidth, tokenHeight) / 2;
 
     // First process all non-hidden darkness sources since they override illumination
@@ -102,11 +103,18 @@ export class LightingCalculator {
     const darknessSources = canvas.effects?.darknessSources || [];
 
     for (const light of darknessSources) {
-      if (!light.active) continue;
+      // Use native Foundry light visibility check with fallback for tests
+      if (!(light.isVisible !== false || light.active !== false)) continue;
 
-      const dx = center.x - light.x;
-      const dy = center.y - light.y;
-      const radius = Math.max(light.data.bright, light.data.dim);
+      // Use native Foundry light center position with fallback for tests
+      const lightCenter = light.center || { x: light.x || 0, y: light.y || 0 };
+      const dx = center.x - lightCenter.x;
+      const dy = center.y - lightCenter.y;
+      // Use native Foundry light radius properties with fallback for tests
+      const radius = Math.max(
+        light.brightRadius || light.data?.bright || 0,
+        light.dimRadius || light.data?.dim || 0
+      );
       if (dx * dx + dy * dy > radius * radius) continue;
 
       // If our token clipper points don't intersect the darkness light shape, skip it
@@ -163,7 +171,7 @@ export class LightingCalculator {
     let sceneDarkness = globalLight?.enabled ? scene.environment.darknessLevel : 1.0;
 
     // Find all the darkness regions that apply to our position
-    const adlRegions = scene.regions.filter(
+    const adlRegions = (scene.regions || []).filter(
       (r) =>
         elevation >= r.elevation.bottom &&
         elevation <= r.elevation.top &&
@@ -199,21 +207,30 @@ export class LightingCalculator {
     }
 
     // If the token isn't fully in darkness by GI, then it is in bright light and we can skip the rest
-    // Addendum: dimThreshhold is a scene-level setting that allows a token to be considered in dim light
-    // rather than as bright
-    const dimThreshold = Math.min(scene.flags?.[MODULE_ID]?.dimThreshold || 0.25, maxDarknessInBright);
+    // Addendum: dimThreshold is a module setting that allows a token to be considered in dim light
+    // rather than as bright. Check scene-specific override first, then fall back to module setting.
+    const sceneDimThreshold = scene.flags?.[MODULE_ID]?.dimThreshold;
+    const moduleDimThreshold = game.settings?.get?.(MODULE_ID, 'dimLightingThreshold') ?? 0.25;
+    const dimThreshold = Math.min(sceneDimThreshold ?? moduleDimThreshold, maxDarknessInBright);
     if (sceneDarkness <= dimThreshold) return makeIlluminationResult(BRIGHT);
     let illumination = (sceneDarkness <= maxDarknessInBright) ? DIM : DARK;
 
     // iterate the lights, skipping hidden or inactive lights as well as global lights
     for (const light of canvas.effects.lightSources) {
-      if (!light.active || light instanceof foundry.canvas.sources.GlobalLightSource) continue;
+      // Use native Foundry light visibility check with fallback for tests
+      if (!(light.isVisible !== false || light.active !== false) || light instanceof foundry.canvas.sources.GlobalLightSource) continue;
 
       // Do a cheap distance check to skip obviously out-of-range sources
       // We nudge out the radius a bit to not reject partially illuminated tokens
+      // Use native Foundry light center position for distance calculation with fallback for tests
+      const lightCenter = light.center || { x: light.x || 0, y: light.y || 0 };
       const distanceSquared =
-        (center.x - light.x) * (center.x - light.x) + (center.y - light.y) * (center.y - light.y);
-      const bumpedRadius = Math.max(light.data.dim, light.data.bright) + tokenRadius;
+        (center.x - lightCenter.x) * (center.x - lightCenter.x) + (center.y - lightCenter.y) * (center.y - lightCenter.y);
+      // Use native Foundry light radius properties with fallback for tests
+      const bumpedRadius = Math.max(
+        light.dimRadius || light.data?.dim || 0,
+        light.brightRadius || light.data?.bright || 0
+      ) + tokenRadius;
       if (distanceSquared > bumpedRadius * bumpedRadius) continue;
 
       // Do the complete polygon intersection check, and if there is any intersection, the token
@@ -222,7 +239,8 @@ export class LightingCalculator {
       if (!solution.length) continue;
 
       // See if we are in the bright area of the light
-      const brightRadiusSquared = light.data.bright * light.data.bright;
+      // Use native Foundry light bright radius with fallback for tests
+      const brightRadiusSquared = (light.brightRadius || light.data?.bright || 0) * (light.brightRadius || light.data?.bright || 0);
 
       if (distanceSquared < brightRadiusSquared) return makeIlluminationResult(BRIGHT);
       illumination = Math.max(illumination, DIM);

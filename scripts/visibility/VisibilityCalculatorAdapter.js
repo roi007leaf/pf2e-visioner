@@ -43,16 +43,20 @@ export async function tokenStateToInput(
     return null;
   }
 
-  // Calculate positions first (needed by multiple functions)
+  // Calculate positions using movement-adjusted points for accuracy during animation
+  // Use native Foundry methods for center point calculations with fallbacks
+  const observerCenter = observer.getMovementAdjustedPoint?.(observer.getCenterPoint?.() || observer.center) || observer.getCenterPoint?.() || observer.center;
+  const targetCenter = target.getMovementAdjustedPoint?.(target.getCenterPoint?.() || target.center) || target.getCenterPoint?.() || target.center;
+
   const observerPosition = {
-    x: observer.document.x + (observer.document.width * canvas.grid.size) / 2,
-    y: observer.document.y + (observer.document.height * canvas.grid.size) / 2,
+    x: observerCenter.x,
+    y: observerCenter.y,
     elevation: observer.document.elevation || 0,
   };
 
   const targetPosition = {
-    x: target.document.x + (target.document.width * canvas.grid.size) / 2,
-    y: target.document.y + (target.document.height * canvas.grid.size) / 2,
+    x: targetCenter.x,
+    y: targetCenter.y,
     elevation: target.document.elevation || 0,
   };
 
@@ -83,6 +87,7 @@ export async function tokenStateToInput(
     lightingCalculator,
     options,
     distanceInFeet,
+    observerPosition,
   );
 
   // Check if there's line of sight (no sight-blocking walls)
@@ -209,8 +214,8 @@ function extractTargetState(
   // Get lighting level at target position
   if (!targetPosition) {
     targetPosition = {
-      x: target.document.x + (target.document.width * canvas.grid.size) / 2,
-      y: target.document.y + (target.document.height * canvas.grid.size) / 2,
+      x: target.center.x,
+      y: target.center.y,
       elevation: target.document.elevation || 0,
     };
   }
@@ -288,6 +293,7 @@ function extractTargetState(
  * @param {Object} lightingCalculator - Lighting calculator instance
  * @param {Object} options - Additional options
  * @param {number} distanceInFeet - Distance to target in feet (for range filtering)
+ * @param {Object} observerPosition - Pre-calculated observer position (movement-adjusted)
  * @returns {Object} Observer state for StatelessVisibilityCalculator
  */
 function extractObserverState(
@@ -297,6 +303,7 @@ function extractObserverState(
   lightingCalculator,
   options,
   distanceInFeet,
+  observerPosition,
 ) {
   // Use precomputed senses if available (much faster)
   let visionCapabilities;
@@ -322,11 +329,7 @@ function extractObserverState(
   };
 
   // Extract observer's lighting level (needed for magical darkness rules)
-  const observerPosition = {
-    x: observer.document.x + (observer.document.width * canvas.grid.size) / 2,
-    y: observer.document.y + (observer.document.height * canvas.grid.size) / 2,
-    elevation: observer.document.elevation || 0,
-  };
+  // Use the pre-calculated observerPosition (already movement-adjusted)
 
   // Use precomputed lighting if available (much faster)
   let observerLightLevel;
@@ -728,8 +731,12 @@ const doesLinePassThroughDarkness = (
   targetPosOverride = null,
 ) => {
   try {
-    const observerPos = observerPosOverride || { x: observer.center.x, y: observer.center.y };
-    const targetPos = targetPosOverride || { x: target.center.x, y: target.center.y };
+    const observerPos = observerPosOverride || (observer.center
+      ? { x: observer.center.x, y: observer.center.y }
+      : { x: observer.x + observer.w / 2, y: observer.y + observer.h / 2 });
+    const targetPos = targetPosOverride || (target.center
+      ? { x: target.center.x, y: target.center.y }
+      : { x: target.x + target.w / 2, y: target.y + target.h / 2 });
 
     // CONSERVATIVE DARKNESS DETECTION: Use 9-point sampling like wall LOS
     // This ensures that darkness between tokens is detected even if it doesn't
@@ -793,9 +800,11 @@ const getTokenSamplePoints = (token, centerPos = null) => {
   // Use provided center position or fall back to token.center
   const center = centerPos
     ? { x: centerPos.x, y: centerPos.y }
-    : { x: token.center.x, y: token.center.y };
-  const w = token.document.width * canvas.grid.size;
-  const h = token.document.height * canvas.grid.size;
+    : token.center
+      ? { x: token.center.x, y: token.center.y }
+      : { x: token.x + token.w / 2, y: token.y + token.h / 2 };
+  const w = token.w;
+  const h = token.h;
 
   // Calculate x,y based on center position if provided
   const x = centerPos ? centerPos.x - w / 2 : token.document.x;
@@ -837,11 +846,12 @@ const checkSingleRayForDarkness = (ray) => {
 
       lightSources = allSources.filter((light) => {
         // Check for darkness sources - either isDarknessSource property or negative config
-        const isDarkness = light.isDarknessSource || light.document?.config?.negative || false;
+        // Use native Foundry light properties for darkness detection
+        const isDarkness = light.isDarknessSource || light.config?.negative || false;
 
-        // Treat undefined active as true (some darkness sources may not have explicit active property)
-        const isActive = light.active !== false;
-        const isVisible = light.visible !== false;
+        // Use native Foundry light visibility check with fallback for tests
+        const isActive = (light.isVisible !== false) || (light.active !== false);
+        const isVisible = (light.isVisible !== false) || (light.visible !== false);
 
         if (!isDarkness || !isActive || !isVisible) {
           return false;
@@ -854,8 +864,9 @@ const checkSingleRayForDarkness = (ray) => {
           // Get the radius for circular intersection test
           // For darkness sources, use total effective area (bright + dim) to match visual rendering
           // PointDarknessSource has calculated values in data property
-          const brightValue = light.data?.bright || light.config?.bright || light.bright || 0;
-          const dimValue = light.data?.dim || light.config?.dim || light.dim || 0;
+          // Use native Foundry light radius properties with fallback for tests
+          const brightValue = light.brightRadius || light.data?.bright || light.config?.bright || 0;
+          const dimValue = light.dimRadius || light.data?.dim || light.config?.dim || 0;
           const totalRadius = brightValue + dimValue;
 
           // For darkness sources with visual coverage but no bright/dim values,
@@ -1126,9 +1137,10 @@ const getAllDarknessSources = () => {
  */
 const filterIntersectedDarknessSources = (ray, allSources) => {
   return allSources.filter((light) => {
-    const isDarkness = light.isDarknessSource || light.document?.config?.negative || false;
-    const isActive = light.active !== false;
-    const isVisible = light.visible !== false;
+    const isDarkness = light.isDarknessSource || light.config?.negative || false;
+    // Use native Foundry light visibility check with fallback for tests
+    const isActive = (light.isVisible !== false) || (light.active !== false);
+    const isVisible = (light.isVisible !== false) || (light.visible !== false);
 
     if (!isDarkness || !isActive || !isVisible) {
       return false;
