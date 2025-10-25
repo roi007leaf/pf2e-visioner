@@ -3,6 +3,7 @@ import { FeatsHandler } from '../../services/FeatsHandler.js';
 function buildSneakDistanceChipHTML(tokenOrActor) {
   try {
     const actor = tokenOrActor?.actor || tokenOrActor?.document?.actor || tokenOrActor;
+    const isNPC = actor?.type === 'npc';
     const baseFromFlag = actor?.getFlag?.('pf2e-visioner', 'sneak-original-walk-speed');
     const baseSpeed = Number(baseFromFlag ?? actor?.system?.movement?.speeds?.land?.value ?? 0) || 0;
     if (!actor || baseSpeed <= 0) return '';
@@ -31,13 +32,13 @@ function buildSneakDistanceChipHTML(tokenOrActor) {
     ];
     if (Number.isFinite(multiplier)) {
       if (multiplier === 1) {
-        tooltipLines.push(`Sneak multiplier: ×1.0${fullSpeedFeats.length ? ` (feats: ${fullSpeedFeats.join(', ')})` : ''}`);
+        tooltipLines.push(`Sneak multiplier: ×1.0${fullSpeedFeats.length ? ` (${isNPC ? 'passives' : 'feats'}: ${fullSpeedFeats.join(', ')})` : ''}`);
       } else {
         tooltipLines.push(`Sneak multiplier: ×${multiplier}`);
       }
     }
     if (bonusFeet > 0) {
-      tooltipLines.push(`Feat bonus: +${bonusFeet} ft${hasVerySneaky ? ' (Very Sneaky)' : ''}${hasSneaky ? ' (Sneaky)' : ''}`);
+      tooltipLines.push(`${isNPC ? 'Passive' : 'Feat'} bonus: +${bonusFeet} ft${hasVerySneaky ? ' (Very Sneaky)' : ''}${hasSneaky ? ' (Sneaky)' : ''}`);
     }
     if (raw > baseSpeed) {
       tooltipLines.push(`Capped at base Speed (${baseSpeed} ft)`);
