@@ -56,6 +56,7 @@ class FeatsHandlerInternal {
 /**
  * Extract feat slugs present on the actor.
  * Supports PF2e system item structure: item.type === 'feat' and item.system.slug
+ * Also checks passive actions (type === 'action') for NPCs that have abilities like "Swift Sneak"
  * @param {Actor} actor
  * @returns {Set<string>}
  */
@@ -64,10 +65,15 @@ function getActorFeatSlugs(actor) {
     const items = actor?.items ?? [];
     const slugs = new Set();
     for (const item of items) {
-      if (item?.type !== 'feat') continue;
-      const raw = item.system?.slug ?? item.slug ?? item.name?.toLowerCase()?.replace(/\s+/g, '-');
-      const slug = normalizeSlug(raw);
-      if (slug) slugs.add(slug);
+      if (item?.type === 'feat') {
+        const raw = item.system?.slug ?? item.slug ?? item.name?.toLowerCase()?.replace(/\s+/g, '-');
+        const slug = normalizeSlug(raw);
+        if (slug) slugs.add(slug);
+      } else if (item?.system?.actionType?.value === 'passive') {
+        const raw = item.system?.slug ?? item.slug ?? item.name?.toLowerCase()?.replace(/\s+/g, '-');
+        const slug = normalizeSlug(raw);
+        if (slug) slugs.add(slug);
+      }
     }
     return slugs;
   } catch (e) {

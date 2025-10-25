@@ -1,5 +1,18 @@
 # Changelog
 
+## [4.4.13] - 2025-10-25
+
+### 🐛 Bug Fixes
+
+- **Rule Element Performance**: Fixed performance issue where tokens with rule elements triggered full AVS recalculation on movement
+  - Rule elements now only trigger AVS recalculation when initially created (`onCreate`) or during encounter events (`onUpdateEncounter`)
+  - Token movement with active rule elements no longer causes unnecessary recalculation of all tokens
+  - AVS naturally picks up rule element flag changes through its normal event-driven batch processing
+- **NPC Sneak Detection**: Fixed sneak speed calculations for NPCs with passive abilities
+  - `FeatsHandler` now correctly detects passive actions (type: "action") in addition to feats
+  - NPCs with abilities like "Swift Sneak" will now have proper sneak distance calculations displayed
+  - Sneak distance chip in chat panels now works correctly for both PCs and NPCs
+
 ## [4.4.12] - 2025-10-24
 
 ### 🐛 Bug Fixes

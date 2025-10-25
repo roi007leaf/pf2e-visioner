@@ -536,6 +536,10 @@
         "name": "Wizja dla bohaterów niezależnych",
         "hint": "Umożliwia wszystkim tokenom BN łatwiejsze obserwowanie punktu widzenia."
       },
+      "ENABLE_CAMERA_VISION_AGGREGATION": {
+        "name": "Agregacja obrazów z kamer",
+        "hint": "Po włączeniu tej opcji konta kamer z uprawnieniami obserwatora dla wielu tokenów uczestników będą wyświetlać najlepszy (najbardziej liberalny) stan widoczności dla wszystkich kontrolowanych tokenów, a nie tylko dla pierwszego tokenu. Jest to przydatne w przypadku transmisji strumieniowej, gdzie kamera musi widzieć to, co widzi każdy uczestnik."
+      },
       "GDV_VISUAL_OVERRIDE_ENABLED": {
         "name": "Nadpisanie Większego widzenia w ciemności",
         "hint": "Tylko dla klienta: Gdy wybrany token ma zdolność Większe widzenie w ciemności, rozjaśnij obszary ciemności, aby obraz był zgodny z zasadami Visioner."
