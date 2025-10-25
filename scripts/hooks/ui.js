@@ -24,7 +24,6 @@ export function registerUIHooks() {
     } catch {
       return null;
     }
-
   };
 
   const addTool = (toolsContainer, tool) => {
@@ -32,12 +31,13 @@ export function registerUIHooks() {
       if (!toolsContainer || !tool?.name) return;
       if (Array.isArray(toolsContainer)) toolsContainer.push(tool);
       else if (typeof toolsContainer === 'object') toolsContainer[tool.name] = tool;
-    } catch { }
+    } catch {}
   };
   // Keep Darkness tool icon/title in sync with current selection (Lighting tool)
   const refreshDarknessTool = () => {
     try {
-      const lightingTools = ui.controls.controls?.lighting?.tools || ui.controls.controls?.lights?.tools;
+      const lightingTools =
+        ui.controls.controls?.lighting?.tools || ui.controls.controls?.lights?.tools;
       const tool = getNamedTool(lightingTools, 'pf2e-visioner-darkness-mode');
       if (!tool) return;
 
@@ -83,7 +83,7 @@ export function registerUIHooks() {
       tool.icon = iconClass;
       tool.title = titleText;
       if (changed) ui.controls.render();
-    } catch { }
+    } catch {}
   };
   // Update tool icon on light selection and CRUD changes
   // Update on light selection changes (AmbientLight/Light placeables)
@@ -136,7 +136,7 @@ export function registerUIHooks() {
       }
 
       ui.controls.render();
-    } catch { }
+    } catch {}
   };
   // Helper: get cover status info for a wall
   const getWallCoverInfo = (wallDocument) => {
@@ -148,7 +148,7 @@ export function registerUIHooks() {
         return {
           icon: 'fas fa-bolt-auto',
           color: 0x888888,
-          tooltip: game.i18n.localize('PF2E_VISIONER.TOOLTIPS.AUTO_COVER_DETECTION')
+          tooltip: game.i18n.localize('PF2E_VISIONER.TOOLTIPS.AUTO_COVER_DETECTION'),
         };
       }
 
@@ -156,15 +156,18 @@ export function registerUIHooks() {
       if (coverState) {
         // Convert CSS color to hex number for PIXI
         let color = 0x888888; // default gray
-        if (coverOverride === 'none') color = 0x4caf50; // green
-        else if (coverOverride === 'lesser') color = 0xffc107; // yellow
-        else if (coverOverride === 'standard') color = 0xff6600; // orange
+        if (coverOverride === 'none')
+          color = 0x4caf50; // green
+        else if (coverOverride === 'lesser')
+          color = 0xffc107; // yellow
+        else if (coverOverride === 'standard')
+          color = 0xff6600; // orange
         else if (coverOverride === 'greater') color = 0xf44336; // red
 
         return {
           icon: coverState.icon,
           color: color,
-          tooltip: `Cover: ${coverOverride.charAt(0).toUpperCase() + coverOverride.slice(1)}`
+          tooltip: `Cover: ${coverOverride.charAt(0).toUpperCase() + coverOverride.slice(1)}`,
         };
       }
 
@@ -179,244 +182,239 @@ export function registerUIHooks() {
 
   // Utility: label identifiers and cover status for walls when Alt is held
   const refreshWallIdentifierLabels = () => {
-    return Promise.resolve().then(() => {
-      const walls = canvas?.walls?.placeables || [];
-      const layer = canvas?.controls || canvas?.hud || canvas?.stage;
+    return Promise.resolve()
+      .then(() => {
+        const walls = canvas?.walls?.placeables || [];
+        const layer = canvas?.controls || canvas?.hud || canvas?.stage;
 
-      // Check if walls tool is active
-      const isWallTool = ui.controls?.control?.name === 'walls';
+        // Check if walls tool is active
+        const isWallTool = ui.controls?.control?.name === 'walls';
 
-      // Clean up labels that shouldn't exist anymore
-      for (const w of walls) {
-        const idf = w?.document?.getFlag?.(MODULE_ID, 'wallIdentifier');
-        const coverOverride = w?.document?.getFlag?.(MODULE_ID, 'coverOverride');
+        // Clean up labels that shouldn't exist anymore
+        for (const w of walls) {
+          const idf = w?.document?.getFlag?.(MODULE_ID, 'wallIdentifier');
+          const coverOverride = w?.document?.getFlag?.(MODULE_ID, 'coverOverride');
 
-        // Show identifier if wall is controlled AND walls tool is active AND has identifier
-        const shouldShowIdentifier = !!w?.controlled && isWallTool && !!idf;
+          // Show identifier if wall is controlled AND walls tool is active AND has identifier
+          const shouldShowIdentifier = !!w?.controlled && isWallTool && !!idf;
 
-        // Show cover status if Alt is pressed AND walls tool is active AND has cover override
-        const shouldShowCover = isAltPressed && isWallTool && coverOverride !== undefined;
+          // Show cover status if Alt is pressed AND walls tool is active AND has cover override
+          const shouldShowCover = isAltPressed && isWallTool && coverOverride !== undefined;
 
-        // Clean up identifier label if it shouldn't show
-        if (!shouldShowIdentifier && w._pvIdLabel) {
-          try {
-            w._pvIdLabel.parent?.removeChild?.(w._pvIdLabel);
-          } catch { }
-          try {
-            w._pvIdLabel.destroy?.();
-          } catch { }
-          delete w._pvIdLabel;
-        }
-
-        // Clean up cover icon if it shouldn't show
-        if (!shouldShowCover && w._pvCoverIcon) {
-          try {
-            w._pvCoverIcon.parent?.removeChild?.(w._pvCoverIcon);
-          } catch { }
-          try {
-            w._pvCoverIcon.destroy?.();
-          } catch { }
-          delete w._pvCoverIcon;
-        }
-      }
-
-      // Create/update labels for walls
-      for (const w of walls) {
-        const idf = w?.document?.getFlag?.(MODULE_ID, 'wallIdentifier');
-        const coverInfo = getWallCoverInfo(w.document);
-
-        // Check conditions for showing each type of label
-        const shouldShowIdentifier = !!w?.controlled && isWallTool && !!idf;
-        const shouldShowCover = isAltPressed && isWallTool && coverInfo;
-
-        // Skip if nothing to show
-        if (!shouldShowIdentifier && !shouldShowCover) continue;
-
-        try {
-          const [x1, y1, x2, y2] = Array.isArray(w.document?.c)
-            ? w.document.c
-            : [w.document?.x, w.document?.y, w.document?.x2, w.document?.y2];
-          const mx = (Number(x1) + Number(x2)) / 2;
-          const my = (Number(y1) + Number(y2)) / 2;
-
-          // Handle identifier text
-          if (shouldShowIdentifier) {
-            if (!w._pvIdLabel) {
-              const style = new PIXI.TextStyle({
-                fill: 0xffffff,
-                fontSize: 12,
-                stroke: 0x000000,
-                strokeThickness: 3,
-              });
-              const text = new PIXI.Text(String(idf), style);
-              text.anchor.set(0.5, 1);
-              text.zIndex = 10000;
-              text.position.set(mx, my - 6);
-              // Prefer controls layer; fallback to wall container
-              if (layer?.addChild) layer.addChild(text);
-              else w.addChild?.(text);
-              w._pvIdLabel = text;
-            } else {
-              w._pvIdLabel.text = String(idf);
-              w._pvIdLabel.position.set(mx, my - 6);
-            }
-          } else if (w._pvIdLabel) {
-            // Remove identifier label if no longer needed
+          // Clean up identifier label if it shouldn't show
+          if (!shouldShowIdentifier && w._pvIdLabel) {
             try {
               w._pvIdLabel.parent?.removeChild?.(w._pvIdLabel);
-            } catch { }
+            } catch {}
             try {
               w._pvIdLabel.destroy?.();
-            } catch { }
+            } catch {}
             delete w._pvIdLabel;
           }
 
-          // Handle cover status text
-          if (shouldShowCover) {
-            const textOffsetX = 0; // Keep text centered
-            const textY = shouldShowIdentifier ? my - 24 : my - 18; // Position text above identifier or wall center
-
-            // Get cover text
-            let coverText = '';
-            if (coverInfo.tooltip.includes('Automatic')) {
-              coverText = 'AUTO';
-            } else if (coverInfo.tooltip.includes('None')) {
-              coverText = 'NONE';
-            } else if (coverInfo.tooltip.includes('Lesser')) {
-              coverText = 'LESSER';
-            } else if (coverInfo.tooltip.includes('Standard')) {
-              coverText = 'STANDARD';
-            } else if (coverInfo.tooltip.includes('Greater')) {
-              coverText = 'GREATER';
-            } else {
-              coverText = 'AUTO';
-            }
-
-            if (!w._pvCoverIcon) {
-              // Create a container for the text
-              const container = new PIXI.Container();
-              container.zIndex = 10001; // Above identifier text
-
-              // Calculate scale based on camera zoom
-              const cameraScale = canvas?.stage?.scale?.x || 1;
-              const baseScale = Math.max(0.8, Math.min(2.0, 1 / cameraScale)); // Scale inversely with zoom, clamped
-
-              // Create background rectangle for better visibility
-              const bg = new PIXI.Graphics();
-              bg.beginFill(0x000000, 0.8);
-              bg.lineStyle(1, coverInfo.color, 1);
-
-              // Calculate text dimensions for background sizing
-              const tempStyle = new PIXI.TextStyle({
-                fontFamily: 'Arial, sans-serif',
-                fontSize: Math.round(10 * baseScale),
-                fill: coverInfo.color,
-                fontWeight: 'bold',
-              });
-              const tempText = new PIXI.Text(coverText, tempStyle);
-              const textWidth = tempText.width;
-              const textHeight = tempText.height;
-              tempText.destroy();
-
-              // Draw rounded rectangle background
-              const padding = 3 * baseScale;
-              bg.drawRoundedRect(
-                -textWidth / 2 - padding,
-                -textHeight / 2 - padding,
-                textWidth + padding * 2,
-                textHeight + padding * 2,
-                3 * baseScale
-              );
-              bg.endFill();
-              container.addChild(bg);
-
-              // Create text label
-              const textStyle = new PIXI.TextStyle({
-                fontFamily: 'Arial, sans-serif',
-                fontSize: Math.round(10 * baseScale),
-                fill: coverInfo.color,
-                stroke: 0x000000,
-                strokeThickness: Math.max(1, Math.round(1 * baseScale)),
-                fontWeight: 'bold',
-              });
-
-              const text = new PIXI.Text(coverText, textStyle);
-              text.anchor.set(0.5, 0.5);
-              container.addChild(text);
-
-              container.position.set(mx + textOffsetX, textY);
-              container.scale.set(baseScale);
-
-
-
-              // Store tooltip and scale info
-              container._tooltip = coverInfo.tooltip;
-              container._baseScale = baseScale;
-              container._coverText = coverText;
-
-              // Prefer controls layer; fallback to wall container
-              if (layer?.addChild) layer.addChild(container);
-              else w.addChild?.(container);
-              w._pvCoverIcon = container;
-            } else {
-              // Update existing text position, scale, and content
-              const cameraScale = canvas?.stage?.scale?.x || 1;
-              const baseScale = Math.max(0.8, Math.min(2.0, 1 / cameraScale));
-
-              w._pvCoverIcon.position.set(mx + textOffsetX, textY);
-              w._pvCoverIcon.scale.set(baseScale);
-
-
-
-              // Update text content and color if changed
-              const text = w._pvCoverIcon.children[1]; // Text is second child after background
-              if (text && (text.text !== coverText || w._pvCoverIcon._coverText !== coverText)) {
-                text.text = coverText;
-                text.style.fill = coverInfo.color;
-                w._pvCoverIcon._coverText = coverText;
-
-                // Update background size and color
-                const bg = w._pvCoverIcon.children[0];
-                if (bg) {
-                  bg.clear();
-                  bg.beginFill(0x000000, 0.8);
-                  bg.lineStyle(1, coverInfo.color, 1);
-
-                  const textWidth = text.width;
-                  const textHeight = text.height;
-                  const padding = 3;
-                  bg.drawRoundedRect(
-                    -textWidth / 2 - padding,
-                    -textHeight / 2 - padding,
-                    textWidth + padding * 2,
-                    textHeight + padding * 2,
-                    3
-                  );
-                  bg.endFill();
-                }
-              }
-
-
-
-              w._pvCoverIcon._tooltip = coverInfo.tooltip;
-              w._pvCoverIcon._baseScale = baseScale;
-            }
-          } else if (w._pvCoverIcon) {
-            // Remove cover text if no longer needed
+          // Clean up cover icon if it shouldn't show
+          if (!shouldShowCover && w._pvCoverIcon) {
             try {
               w._pvCoverIcon.parent?.removeChild?.(w._pvCoverIcon);
-            } catch { }
+            } catch {}
             try {
               w._pvCoverIcon.destroy?.();
-            } catch { }
+            } catch {}
             delete w._pvCoverIcon;
           }
-
-        } catch {
-          /* ignore label errors */
         }
-      }
-    }).catch(() => { });
+
+        // Create/update labels for walls
+        for (const w of walls) {
+          const idf = w?.document?.getFlag?.(MODULE_ID, 'wallIdentifier');
+          const coverInfo = getWallCoverInfo(w.document);
+
+          // Check conditions for showing each type of label
+          const shouldShowIdentifier = !!w?.controlled && isWallTool && !!idf;
+          const shouldShowCover = isAltPressed && isWallTool && coverInfo;
+
+          // Skip if nothing to show
+          if (!shouldShowIdentifier && !shouldShowCover) continue;
+
+          try {
+            const [x1, y1, x2, y2] = Array.isArray(w.document?.c)
+              ? w.document.c
+              : [w.document?.x, w.document?.y, w.document?.x2, w.document?.y2];
+            const mx = (Number(x1) + Number(x2)) / 2;
+            const my = (Number(y1) + Number(y2)) / 2;
+
+            // Handle identifier text
+            if (shouldShowIdentifier) {
+              if (!w._pvIdLabel) {
+                const style = new PIXI.TextStyle({
+                  fill: 0xffffff,
+                  fontSize: 12,
+                  stroke: 0x000000,
+                  strokeThickness: 3,
+                });
+                const text = new PIXI.Text(String(idf), style);
+                text.anchor.set(0.5, 1);
+                text.zIndex = 10000;
+                text.position.set(mx, my - 6);
+                // Prefer controls layer; fallback to wall container
+                if (layer?.addChild) layer.addChild(text);
+                else w.addChild?.(text);
+                w._pvIdLabel = text;
+              } else {
+                w._pvIdLabel.text = String(idf);
+                w._pvIdLabel.position.set(mx, my - 6);
+              }
+            } else if (w._pvIdLabel) {
+              // Remove identifier label if no longer needed
+              try {
+                w._pvIdLabel.parent?.removeChild?.(w._pvIdLabel);
+              } catch {}
+              try {
+                w._pvIdLabel.destroy?.();
+              } catch {}
+              delete w._pvIdLabel;
+            }
+
+            // Handle cover status text
+            if (shouldShowCover) {
+              const textOffsetX = 0; // Keep text centered
+              const textY = shouldShowIdentifier ? my - 24 : my - 18; // Position text above identifier or wall center
+
+              // Get cover text
+              let coverText = '';
+              if (coverInfo.tooltip.includes('Automatic')) {
+                coverText = 'AUTO';
+              } else if (coverInfo.tooltip.includes('None')) {
+                coverText = 'NONE';
+              } else if (coverInfo.tooltip.includes('Lesser')) {
+                coverText = 'LESSER';
+              } else if (coverInfo.tooltip.includes('Standard')) {
+                coverText = 'STANDARD';
+              } else if (coverInfo.tooltip.includes('Greater')) {
+                coverText = 'GREATER';
+              } else {
+                coverText = 'AUTO';
+              }
+
+              if (!w._pvCoverIcon) {
+                // Create a container for the text
+                const container = new PIXI.Container();
+                container.zIndex = 10001; // Above identifier text
+
+                // Calculate scale based on camera zoom
+                const cameraScale = canvas?.stage?.scale?.x || 1;
+                const baseScale = Math.max(0.8, Math.min(2.0, 1 / cameraScale)); // Scale inversely with zoom, clamped
+
+                // Create background rectangle for better visibility
+                const bg = new PIXI.Graphics();
+                bg.beginFill(0x000000, 0.8);
+                bg.lineStyle(1, coverInfo.color, 1);
+
+                // Calculate text dimensions for background sizing
+                const tempStyle = new PIXI.TextStyle({
+                  fontFamily: 'Arial, sans-serif',
+                  fontSize: Math.round(10 * baseScale),
+                  fill: coverInfo.color,
+                  fontWeight: 'bold',
+                });
+                const tempText = new PIXI.Text(coverText, tempStyle);
+                const textWidth = tempText.width;
+                const textHeight = tempText.height;
+                tempText.destroy();
+
+                // Draw rounded rectangle background
+                const padding = 3 * baseScale;
+                bg.drawRoundedRect(
+                  -textWidth / 2 - padding,
+                  -textHeight / 2 - padding,
+                  textWidth + padding * 2,
+                  textHeight + padding * 2,
+                  3 * baseScale,
+                );
+                bg.endFill();
+                container.addChild(bg);
+
+                // Create text label
+                const textStyle = new PIXI.TextStyle({
+                  fontFamily: 'Arial, sans-serif',
+                  fontSize: Math.round(10 * baseScale),
+                  fill: coverInfo.color,
+                  stroke: 0x000000,
+                  strokeThickness: Math.max(1, Math.round(1 * baseScale)),
+                  fontWeight: 'bold',
+                });
+
+                const text = new PIXI.Text(coverText, textStyle);
+                text.anchor.set(0.5, 0.5);
+                container.addChild(text);
+
+                container.position.set(mx + textOffsetX, textY);
+                container.scale.set(baseScale);
+
+                // Store tooltip and scale info
+                container._tooltip = coverInfo.tooltip;
+                container._baseScale = baseScale;
+                container._coverText = coverText;
+
+                // Prefer controls layer; fallback to wall container
+                if (layer?.addChild) layer.addChild(container);
+                else w.addChild?.(container);
+                w._pvCoverIcon = container;
+              } else {
+                // Update existing text position, scale, and content
+                const cameraScale = canvas?.stage?.scale?.x || 1;
+                const baseScale = Math.max(0.8, Math.min(2.0, 1 / cameraScale));
+
+                w._pvCoverIcon.position.set(mx + textOffsetX, textY);
+                w._pvCoverIcon.scale.set(baseScale);
+
+                // Update text content and color if changed
+                const text = w._pvCoverIcon.children[1]; // Text is second child after background
+                if (text && (text.text !== coverText || w._pvCoverIcon._coverText !== coverText)) {
+                  text.text = coverText;
+                  text.style.fill = coverInfo.color;
+                  w._pvCoverIcon._coverText = coverText;
+
+                  // Update background size and color
+                  const bg = w._pvCoverIcon.children[0];
+                  if (bg) {
+                    bg.clear();
+                    bg.beginFill(0x000000, 0.8);
+                    bg.lineStyle(1, coverInfo.color, 1);
+
+                    const textWidth = text.width;
+                    const textHeight = text.height;
+                    const padding = 3;
+                    bg.drawRoundedRect(
+                      -textWidth / 2 - padding,
+                      -textHeight / 2 - padding,
+                      textWidth + padding * 2,
+                      textHeight + padding * 2,
+                      3,
+                    );
+                    bg.endFill();
+                  }
+                }
+
+                w._pvCoverIcon._tooltip = coverInfo.tooltip;
+                w._pvCoverIcon._baseScale = baseScale;
+              }
+            } else if (w._pvCoverIcon) {
+              // Remove cover text if no longer needed
+              try {
+                w._pvCoverIcon.parent?.removeChild?.(w._pvCoverIcon);
+              } catch {}
+              try {
+                w._pvCoverIcon.destroy?.();
+              } catch {}
+              delete w._pvCoverIcon;
+            }
+          } catch {
+            /* ignore label errors */
+          }
+        }
+      })
+      .catch(() => {});
   };
 
   const refreshWallTool = () => {
@@ -471,9 +469,9 @@ export function registerUIHooks() {
       }
 
       // Also refresh identifier labels on the canvas when selection changes
-      refreshWallIdentifierLabels().catch(() => { });
+      refreshWallIdentifierLabels().catch(() => {});
       ui.controls.render();
-    } catch { }
+    } catch {}
   };
   Hooks.on('controlToken', (token, controlled) => {
     // CRITICAL: Set global flag to suppress lighting refreshes during token control operations
@@ -483,9 +481,11 @@ export function registerUIHooks() {
       globalThis.game.pf2eVisioner.suppressLightingRefresh = true;
 
       // Track this controlToken event to prevent AVS from responding to related lighting refreshes
-      import('../visibility/auto-visibility/core/LightingEventHandler.js').then(({ LightingEventHandler }) => {
-        LightingEventHandler.trackControlTokenEvent();
-      });
+      import('../visibility/auto-visibility/core/LightingEventHandler.js').then(
+        ({ LightingEventHandler }) => {
+          LightingEventHandler.trackControlTokenEvent();
+        },
+      );
 
       // Clear the suppression flag after a short delay
       setTimeout(() => {
@@ -526,7 +526,9 @@ export function registerUIHooks() {
         return;
       }
 
-      const statuses = selected.map((l) => !!(l?.document?.getFlag?.(MODULE_ID, 'heightenedDarkness')));
+      const statuses = selected.map(
+        (l) => !!l?.document?.getFlag?.(MODULE_ID, 'heightenedDarkness'),
+      );
       const all = statuses.every(Boolean);
       const none = statuses.every((s) => !s);
 
@@ -545,7 +547,7 @@ export function registerUIHooks() {
       }
 
       ui.controls.render();
-    } catch { }
+    } catch {}
   };
   Hooks.on('controlAmbientLight', refreshLightingTool);
   Hooks.on('deleteAmbientLight', refreshLightingTool);
@@ -555,26 +557,26 @@ export function registerUIHooks() {
   // Refresh wall labels when camera zoom changes
   let hasPendingCanvasPanUpdate = false;
   Hooks.on('canvasPan', () => {
-    refreshWallIdentifierLabels().catch(() => { });
+    refreshWallIdentifierLabels().catch(() => {});
   });
 
   // Refresh wall labels when active tool changes
   Hooks.on('renderSceneControls', () => {
-    refreshWallIdentifierLabels().catch(() => { });
+    refreshWallIdentifierLabels().catch(() => {});
   });
 
   // Add keyboard event listeners for Alt key
   document.addEventListener('keydown', (event) => {
     if (event.altKey && !isAltPressed) {
       isAltPressed = true;
-      refreshWallIdentifierLabels().catch(() => { });
+      refreshWallIdentifierLabels().catch(() => {});
     }
   });
 
   document.addEventListener('keyup', (event) => {
     if (!event.altKey && isAltPressed) {
       isAltPressed = false;
-      refreshWallIdentifierLabels().catch(() => { });
+      refreshWallIdentifierLabels().catch(() => {});
     }
   });
   for (const hook of [
@@ -614,9 +616,7 @@ export function registerUIHooks() {
           icon: 'fas fa-grip-lines-vertical',
           button: true,
           onChange: async () => {
-            const { VisionerWallManager } = await import(
-              '../managers/wall-manager/WallManager.js'
-            );
+            const { VisionerWallManager } = await import('../managers/wall-manager/WallManager.js');
             new VisionerWallManager().render(true);
           },
         });
@@ -631,7 +631,10 @@ export function registerUIHooks() {
 
         if (selectedWalls.length > 0) {
           // Get the cover override of the first selected wall to determine icon
-          const firstWallOverride = selectedWalls[0]?.document?.getFlag?.(MODULE_ID, 'coverOverride');
+          const firstWallOverride = selectedWalls[0]?.document?.getFlag?.(
+            MODULE_ID,
+            'coverOverride',
+          );
           currentCoverState = firstWallOverride || 'auto';
 
           switch (currentCoverState) {
@@ -652,7 +655,7 @@ export function registerUIHooks() {
               titleText = 'Cycle Wall Cover: Standard → Greater Cover';
               break;
             case 'greater':
-              iconClass = 'fa-solid fa-shield'
+              iconClass = 'fa-solid fa-shield';
               titleText = 'Cycle Wall Cover: Greater → Auto';
               break;
           }
@@ -684,10 +687,10 @@ export function registerUIHooks() {
                 selected.map((w) => {
                   const promises = [
                     w?.document?.setFlag?.(MODULE_ID, 'coverOverride', nextCoverOverride),
-                    w?.document?.setFlag?.(MODULE_ID, 'provideCover', nextCoverOverride !== 'none')
+                    w?.document?.setFlag?.(MODULE_ID, 'provideCover', nextCoverOverride !== 'none'),
                   ];
                   return Promise.all(promises.filter(Boolean));
-                })
+                }),
               );
 
               // Force controls to re-render to update icon
@@ -724,12 +727,12 @@ export function registerUIHooks() {
                   } catch {
                     try {
                       await w?.document?.setFlag?.(MODULE_ID, 'hiddenWall', false);
-                    } catch { }
+                    } catch {}
                   }
                 }
               }
               ui.controls.render();
-            } catch { }
+            } catch {}
           },
         });
       }
@@ -749,7 +752,7 @@ export function registerUIHooks() {
                 const { VisionerQuickPanel } = await import('../managers/QuickPanel.js');
                 if (!game.user?.isGM) return;
                 new VisionerQuickPanel({}).render(true);
-              } catch { }
+              } catch {}
             },
           });
         }
@@ -763,7 +766,10 @@ export function registerUIHooks() {
 
         if (selectedTokens.length > 0) {
           // Get the cover override of the first selected token to determine icon
-          const firstTokenOverride = selectedTokens[0]?.document?.getFlag?.(MODULE_ID, 'coverOverride');
+          const firstTokenOverride = selectedTokens[0]?.document?.getFlag?.(
+            MODULE_ID,
+            'coverOverride',
+          );
           currentCoverState = firstTokenOverride || 'auto';
 
           switch (currentCoverState) {
@@ -930,23 +936,31 @@ export function registerUIHooks() {
               if (!selected.length) return;
               const refreshAfterChange = async () => {
                 try {
-                  const { LightingCalculator } = await import('../visibility/auto-visibility/LightingCalculator.js');
+                  const { LightingCalculator } = await import(
+                    '../visibility/auto-visibility/LightingCalculator.js'
+                  );
                   LightingCalculator.getInstance().invalidateLightCache();
-                } catch { }
+                } catch {}
 
                 // Clear LightingPrecomputer caches for ambient light changes
                 try {
-                  const { LightingPrecomputer } = await import('../visibility/auto-visibility/core/LightingPrecomputer.js');
+                  const { LightingPrecomputer } = await import(
+                    '../visibility/auto-visibility/core/LightingPrecomputer.js'
+                  );
                   LightingPrecomputer.clearLightingCaches();
-                } catch { }
+                } catch {}
 
-                canvas.perception.update({ refreshVision: true, initializeVision: true, refreshLighting: true });
+                canvas.perception.update({
+                  refreshVision: true,
+                  initializeVision: true,
+                  refreshLighting: true,
+                });
 
                 // Trigger AVS recalculation for lighting environment changes
                 try {
                   const { autoVisibility } = await import('../api.js');
                   autoVisibility.recalculateAll(true); // Force recalculation
-                } catch { }
+                } catch {}
 
                 // Update tool icon/title immediately
                 refreshDarknessTool();
@@ -957,23 +971,56 @@ export function registerUIHooks() {
               if (!choice) return;
 
               const applyPlainDarkness = async () => {
-                await Promise.all(selected.map(async (l) => {
-                  try { await l?.document?.update?.({ 'config.negative': true, 'config.darkness.negative': true }); } catch { }
-                  try { await l?.document?.unsetFlag?.(MODULE_ID, 'heightenedDarkness'); } catch { await l?.document?.setFlag?.(MODULE_ID, 'heightenedDarkness', false); }
-                }));
+                await Promise.all(
+                  selected.map(async (l) => {
+                    try {
+                      await l?.document?.update?.({
+                        'config.negative': true,
+                        'config.darkness.negative': true,
+                      });
+                    } catch {}
+                    try {
+                      await l?.document?.unsetFlag?.(MODULE_ID, 'heightenedDarkness');
+                    } catch {
+                      await l?.document?.setFlag?.(MODULE_ID, 'heightenedDarkness', false);
+                    }
+                  }),
+                );
               };
               const applyHeightened = async () => {
-                await Promise.all(selected.map(async (l) => {
-                  try { await l?.document?.update?.({ 'config.negative': true, 'config.darkness.negative': true }); } catch { }
-                  try { await l?.document?.setFlag?.(MODULE_ID, 'heightenedDarkness', true); } catch { }
-                  try { await l?.document?.setFlag?.(MODULE_ID, 'darknessRank', 4); } catch { }
-                }));
+                await Promise.all(
+                  selected.map(async (l) => {
+                    try {
+                      await l?.document?.update?.({
+                        'config.negative': true,
+                        'config.darkness.negative': true,
+                      });
+                    } catch {}
+                    try {
+                      await l?.document?.setFlag?.(MODULE_ID, 'heightenedDarkness', true);
+                    } catch {}
+                    try {
+                      await l?.document?.setFlag?.(MODULE_ID, 'darknessRank', 4);
+                    } catch {}
+                  }),
+                );
               };
               const clearDarkness = async () => {
-                await Promise.all(selected.map(async (l) => {
-                  try { await l?.document?.update?.({ 'config.negative': false, 'config.darkness.negative': false }); } catch { }
-                  try { await l?.document?.unsetFlag?.(MODULE_ID, 'heightenedDarkness'); } catch { await l?.document?.setFlag?.(MODULE_ID, 'heightenedDarkness', false); }
-                }));
+                await Promise.all(
+                  selected.map(async (l) => {
+                    try {
+                      await l?.document?.update?.({
+                        'config.negative': false,
+                        'config.darkness.negative': false,
+                      });
+                    } catch {}
+                    try {
+                      await l?.document?.unsetFlag?.(MODULE_ID, 'heightenedDarkness');
+                    } catch {
+                      await l?.document?.setFlag?.(MODULE_ID, 'heightenedDarkness', false);
+                    }
+                  }),
+                );
               };
 
               if (choice === 'plain') await applyPlainDarkness();
@@ -997,9 +1044,9 @@ export function registerUIHooks() {
             try {
               const idf = w?.document?.getFlag?.(MODULE_ID, 'wallIdentifier');
               if (idf && w?.controlIcon) w.controlIcon.tooltip = String(idf);
-            } catch { }
+            } catch {}
           });
-        } catch { }
+        } catch {}
       };
       Hooks.on('controlWall', showWallIdentifierTooltip);
     } catch (_) {
@@ -1034,13 +1081,14 @@ function injectPF2eVisionerBox(app, root) {
         const fs = document.createElement('fieldset');
         fs.className = 'pf2e-visioner-scene-settings';
         const scene = app?.object || app?.document || canvas?.scene;
-        
+
         // Use scene-specific flags if set, otherwise fall back to global settings
         const defaultWidth = game.settings?.get?.(MODULE_ID, 'hiddenWallIndicatorWidth') || 10;
         const defaultDim = game.settings?.get?.(MODULE_ID, 'dimLightingThreshold') ?? 0.25;
-        const currentWidth = Number(scene?.getFlag?.(MODULE_ID, 'hiddenIndicatorHalf')) || defaultWidth;
-        const currentDim = Number(scene?.getFlag?.(MODULE_ID, 'dimThreshold')) ?? defaultDim;
-        
+        const currentWidth =
+          Number(scene?.getFlag?.(MODULE_ID, 'hiddenIndicatorHalf')) || defaultWidth;
+        const currentDim = Number(scene?.getFlag?.(MODULE_ID, 'dimThreshold')) || defaultDim;
+
         fs.innerHTML = `
           <legend>PF2E Visioner</legend>
           <div class="form-group" style="display:flex; flex-direction:column; gap:6px;">
@@ -1066,7 +1114,7 @@ function injectPF2eVisionerBox(app, root) {
         }
       }
     }
-  } catch { }
+  } catch {}
 
   // The incoming "app" can represent several shapes depending on which sheet
   // is being rendered: a TokenConfig, PrototypeTokenConfig, or the PF2e
@@ -1078,10 +1126,16 @@ function injectPF2eVisionerBox(app, root) {
   // explicit actor references on token documents, fall back to parent,
   // then to app.object when the sheet is an actor-based prototype form.
   let actor = null;
-  if (tokenDoc?.actor) actor = tokenDoc.actor; // Token document
-  else if (tokenDoc?.parent) actor = tokenDoc.parent; // Some token-like documents
-  else if (app?.object?.actor) actor = app.object.actor; // sheets that expose object.actor
-  else if (app?.object && (app.object.documentName === 'Actor' || tokenDoc?.documentName === 'Actor'))
+  if (tokenDoc?.actor)
+    actor = tokenDoc.actor; // Token document
+  else if (tokenDoc?.parent)
+    actor = tokenDoc.parent; // Some token-like documents
+  else if (app?.object?.actor)
+    actor = app.object.actor; // sheets that expose object.actor
+  else if (
+    app?.object &&
+    (app.object.documentName === 'Actor' || tokenDoc?.documentName === 'Actor')
+  )
     actor = app.object || tokenDoc; // actor sheet or prototype where document is the actor
 
   if (!actor) {
@@ -1092,9 +1146,10 @@ function injectPF2eVisionerBox(app, root) {
   if (!panel || panel.querySelector('.pf2e-visioner-box')) return;
 
   // Find the detection fieldset (used as an anchor) if present
-  const detectionFS = [...panel.querySelectorAll('fieldset')].find((fs) =>
-    fs.querySelector('header.detection-mode') ||
-    (fs.querySelector('legend')?.textContent || '').trim().toLowerCase().startsWith('detection'),
+  const detectionFS = [...panel.querySelectorAll('fieldset')].find(
+    (fs) =>
+      fs.querySelector('header.detection-mode') ||
+      (fs.querySelector('legend')?.textContent || '').trim().toLowerCase().startsWith('detection'),
   );
   const box = document.createElement('fieldset');
   box.className = 'pf2e-visioner-box';
@@ -1173,7 +1228,7 @@ function injectPF2eVisionerBox(app, root) {
     const coverButtons = box.querySelectorAll('.cover-override-buttons .visioner-icon-btn');
     const hiddenInput = box.querySelector('input[name$=".coverOverride"]');
 
-    coverButtons.forEach(button => {
+    coverButtons.forEach((button) => {
       button.addEventListener('click', (event) => {
         event.preventDefault();
         event.stopPropagation();
@@ -1181,7 +1236,7 @@ function injectPF2eVisionerBox(app, root) {
         const coverType = button.getAttribute('data-cover-override');
 
         // Remove active class from all cover override buttons
-        coverButtons.forEach(btn => btn.classList.remove('active'));
+        coverButtons.forEach((btn) => btn.classList.remove('active'));
 
         // Always make the clicked button active (no toggle behavior - one must always be selected)
         button.classList.add('active');
@@ -1193,7 +1248,7 @@ function injectPF2eVisionerBox(app, root) {
         }
       });
     });
-  } catch { }
+  } catch {}
 
   if (detectionFS) detectionFS.insertAdjacentElement('afterend', box);
   else panel.appendChild(box);
@@ -1240,10 +1295,8 @@ function onRenderWallConfig(app, html) {
           new VisionerWallQuickSettings(app.document).render(true);
         });
       }
-
-
-    } catch { }
-  } catch { }
+    } catch {}
+  } catch {}
 }
 
 function onRenderLightConfig(app, html) {
@@ -1256,7 +1309,7 @@ function onRenderLightConfig(app, html) {
     const fs = document.createElement('fieldset');
     fs.className = 'pf2e-visioner-light-settings';
     const lightDoc = app?.document || app?.object || null;
-    const checked = !!(lightDoc?.getFlag?.(MODULE_ID, 'heightenedDarkness'));
+    const checked = !!lightDoc?.getFlag?.(MODULE_ID, 'heightenedDarkness');
     const derivedRank = Number(lightDoc?.getFlag?.(MODULE_ID, 'darknessRank') ?? 0) || 0;
     const linkedTemplateId = lightDoc?.getFlag?.(MODULE_ID, 'linkedTemplateId') || '';
     fs.innerHTML = `
@@ -1281,14 +1334,16 @@ function onRenderLightConfig(app, html) {
     try {
       // Locate the native darkness checkbox and its form-group container
       negCheckbox = form.querySelector(
-        'input[name="config.negative"], input[name$=".negative"], input[name*="darkness"][name*="negative"]'
+        'input[name="config.negative"], input[name$=".negative"], input[name*="darkness"][name*="negative"]',
       );
       const negGroup = negCheckbox?.closest?.('.form-group');
       if (negGroup && negGroup.parentElement) {
         negGroup.insertAdjacentElement('afterend', fs);
         inserted = true;
       }
-    } catch { /* fall through to other placements */ }
+    } catch {
+      /* fall through to other placements */
+    }
 
     // Fallbacks: first (leftmost) tab, then common tab names, then Advanced, then end of form
     if (!inserted) {
@@ -1298,36 +1353,50 @@ function onRenderLightConfig(app, html) {
         const firstTabName = firstBtn?.getAttribute?.('data-tab');
         if (firstTabName) {
           const firstTabPanel = form.querySelector(
-            `div.tab[data-tab="${firstTabName}"], section.tab[data-tab="${firstTabName}"], [data-tab="${firstTabName}"]`
+            `div.tab[data-tab="${firstTabName}"], section.tab[data-tab="${firstTabName}"], [data-tab="${firstTabName}"]`,
           );
           if (firstTabPanel) {
             firstTabPanel.insertBefore(fs, firstTabPanel.firstChild);
             inserted = true;
           }
         }
-      } catch { /* ignore and fallback */ }
-    }
-    if (!inserted) {
-      const basicTab = form.querySelector(
-        'div.tab[data-tab="basic"], div.tab[data-tab="basics"], div.tab[data-tab="configuration"], section.tab[data-tab="basic"], section.tab[data-tab="basics"], section.tab[data-tab="configuration"]'
-      );
-      if (basicTab) {
-        try { basicTab.insertBefore(fs, basicTab.firstChild); inserted = true; } catch { }
+      } catch {
+        /* ignore and fallback */
       }
     }
     if (!inserted) {
-      const advTab = form.querySelector('div.tab[data-tab="advanced"], section.tab[data-tab="advanced"], [data-tab="advanced"]');
+      const basicTab = form.querySelector(
+        'div.tab[data-tab="basic"], div.tab[data-tab="basics"], div.tab[data-tab="configuration"], section.tab[data-tab="basic"], section.tab[data-tab="basics"], section.tab[data-tab="configuration"]',
+      );
+      if (basicTab) {
+        try {
+          basicTab.insertBefore(fs, basicTab.firstChild);
+          inserted = true;
+        } catch {}
+      }
+    }
+    if (!inserted) {
+      const advTab = form.querySelector(
+        'div.tab[data-tab="advanced"], section.tab[data-tab="advanced"], [data-tab="advanced"]',
+      );
       if (advTab) {
         try {
           const headings = Array.from(advTab.querySelectorAll('legend,h2,h3,header,label'));
-          const lightPlacementHeader = headings.find((h) => /light\s*placement/i.test(h.textContent || ''));
+          const lightPlacementHeader = headings.find((h) =>
+            /light\s*placement/i.test(h.textContent || ''),
+          );
           if (lightPlacementHeader && lightPlacementHeader.parentElement) {
             lightPlacementHeader.parentElement.insertAdjacentElement('beforebegin', fs);
             inserted = true;
           }
-        } catch { /* ignore */ }
+        } catch {
+          /* ignore */
+        }
         if (!inserted) {
-          try { advTab.insertBefore(fs, advTab.firstChild); inserted = true; } catch { }
+          try {
+            advTab.insertBefore(fs, advTab.firstChild);
+            inserted = true;
+          } catch {}
         }
       }
     }
@@ -1342,7 +1411,7 @@ function onRenderLightConfig(app, html) {
 
       const nativeNeg = () =>
         form.querySelector(
-          'input[name="config.negative"], input[name$=".negative"], input[name*="darkness"][name*="negative"]'
+          'input[name="config.negative"], input[name$=".negative"], input[name*="darkness"][name*="negative"]',
         );
       if (magCb && darknessRankInput) {
         magCb.addEventListener('change', async (event) => {
@@ -1351,7 +1420,10 @@ function onRenderLightConfig(app, html) {
           if (magCb.checked) {
             const neg = nativeNeg();
             if (neg && !neg.checked) {
-              try { neg.checked = true; neg.dispatchEvent(new Event('change', { bubbles: true })); } catch { }
+              try {
+                neg.checked = true;
+                neg.dispatchEvent(new Event('change', { bubbles: true }));
+              } catch {}
             }
           }
 
@@ -1379,7 +1451,9 @@ function onRenderLightConfig(app, html) {
           // Trigger AVS recalculation when heightened darkness checkbox changes
           try {
             // Clear LightingPrecomputer caches for ambient light changes
-            const { LightingPrecomputer } = await import('../visibility/auto-visibility/core/LightingPrecomputer.js');
+            const { LightingPrecomputer } = await import(
+              '../visibility/auto-visibility/core/LightingPrecomputer.js'
+            );
             LightingPrecomputer.clearLightingCaches();
 
             // Trigger AVS recalculation for lighting environment changes
@@ -1388,14 +1462,19 @@ function onRenderLightConfig(app, html) {
 
             // Debug logs removed
           } catch (e) {
-            console.warn('PF2E Visioner | Failed to trigger AVS recalculation on heightened darkness change:', e);
+            console.warn(
+              'PF2E Visioner | Failed to trigger AVS recalculation on heightened darkness change:',
+              e,
+            );
           }
         });
       }
       // Hide our fieldset unless the native darkness checkbox is checked
       const neg = negCheckbox || nativeNeg();
       const syncVisibility = () => {
-        try { fs.style.display = neg?.checked ? '' : 'none'; } catch { }
+        try {
+          fs.style.display = neg?.checked ? '' : 'none';
+        } catch {}
       };
       const handleNativeDarknessChange = async () => {
         syncVisibility();
@@ -1403,20 +1482,25 @@ function onRenderLightConfig(app, html) {
         // Trigger AVS recalculation when native darkness checkbox changes
         try {
           // Clear LightingPrecomputer caches for ambient light changes
-          const { LightingPrecomputer } = await import('../visibility/auto-visibility/core/LightingPrecomputer.js');
+          const { LightingPrecomputer } = await import(
+            '../visibility/auto-visibility/core/LightingPrecomputer.js'
+          );
           LightingPrecomputer.clearLightingCaches();
 
           // Trigger AVS recalculation for lighting environment changes
           const { autoVisibility } = await import('../api.js');
           autoVisibility.recalculateAll(true); // Force recalculation
         } catch (e) {
-          console.warn('PF2E Visioner | Failed to trigger AVS recalculation on native darkness change:', e);
+          console.warn(
+            'PF2E Visioner | Failed to trigger AVS recalculation on native darkness change:',
+            e,
+          );
         }
       };
       syncVisibility();
       if (neg) neg.addEventListener('change', handleNativeDarknessChange);
-    } catch { }
-  } catch { }
+    } catch {}
+  } catch {}
 }
 
 // Removed: onGetSceneControlButtons for a separate 'visioner' control group
