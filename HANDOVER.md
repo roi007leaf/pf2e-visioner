@@ -12,6 +12,58 @@ This document provides a comprehensive overview of the PF2E Visioner module's cu
 
 ## 🔄 Recent Changes (October 2025)
 
+### ✅ Position Cache Invalidation on Effect Addition (October 20, 2025)
+
+**Bug Fixed**: When adding an effect with a rule element to a token that hasn't moved yet, visibility calculations would use stale position cache. Moving the token would update visibility correctly, but moving back to the original position would incorrectly use the old cached position instead of calculating with the new effect applied.
+
+**Root Cause**: `EffectEventHandler` was marking tokens for visibility recalculation when effects changed, but it wasn't clearing the position-dependent caches. This caused the `PositionBatchCache` created during the initial batch to be reused, resulting in stale position data being used for visibility calculations.
+
+**Scenario That Triggered Bug**:
+
+1. Token at position A (initial batch, position cache built with A)
+2. Add visibility-affecting effect (visibility recalculated using old position A cache)
+3. Move token to position B (new batch, new cache built with B - effect now works)
+4. Move back to position A (new batch attempted to be created, but old cache from step 2 was partially reused, causing incorrect results)
+
+**The Fix**:
+
+- **EffectEventHandler** now clears position-dependent caches when visibility-affecting effects change:
+  - Added `#cacheManager` dependency injection to constructor
+  - Added `#clearPositionCaches()` private method to clear both visibility and LOS caches
+  - Calls `#clearPositionCaches()` before marking tokens changed for visibility-affecting and light-emitting effects
+- Applied to all effect state changes:
+  - `#onEffectCreate()` - When effects are created
+  - `#onEffectUpdate()` - When effects are updated
+  - `#onEffectDelete()` - When effects are deleted
+- Updated `EventHandlerFactory` to inject cacheManager into EffectEventHandler
+
+**Behavior Now**:
+
+- Adding visibility-affecting effects immediately clears all position caches
+- Moving tokens after adding effects uses fresh position cache
+- Returning to original position after adding effects correctly uses new position cache
+- Light-emitting effects properly trigger global cache clearing and recalculation
+- Position cache is never reused across effect-related visibility updates
+
+**Testing**:
+
+- Added `tests/unit/effect-cache-invalidation.test.js` with comprehensive cache clearing tests
+- Added `tests/unit/effect-position-cache-bug.test.js` with detailed scenario reproduction and verification
+- Tested all visibility-affecting effect types (invisible, blinded, darkvision, etc.)
+- Tested light-emitting effects (torch, continual flame, etc.)
+- Verified graceful handling when cache manager not available
+
+**Files Modified**:
+
+- `scripts/visibility/auto-visibility/core/EffectEventHandler.js` - Added cache clearing logic
+- `scripts/visibility/auto-visibility/core/EventHandlerFactory.js` - Added cacheManager parameter
+- `tests/unit/effect-cache-invalidation.test.js` - New test coverage
+- `tests/unit/effect-position-cache-bug.test.js` - Comprehensive scenario tests
+- `tests/unit/core/event-handlers.test.js` - Updated EffectEventHandler tests
+- `tests/unit/core/perception-refresh-improvements.test.js` - Updated EffectEventHandler tests
+
+**Pattern Consistency**: This matches the pattern already used in `TokenEventHandler` for movement and light changes, and `WallEventHandler` for wall property changes.
+
 ### Wall Changes Now Trigger Proper Cache Clearing (October 2, 2025)
 
 **Bug Fixed**: Wall property changes (direction, sight/sound blocking) weren't updating visibility states when observers had conditions like deafened.

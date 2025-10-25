@@ -4,6 +4,9 @@
  */
 
 import { api } from '../api.js';
+import { getLogger } from '../utils/logger.js';
+import { createPF2eVisionerEffectRuleElement } from './PF2eVisionerEffect.js';
+export { RuleElementCoverService } from './RuleElementCoverService.js';
 
 // Map to store recent changes to prevent loops
 const recentChanges = new Map();
@@ -12,22 +15,34 @@ const recentChanges = new Map();
  * Initialize and register custom rule elements
  */
 export function initializeRuleElements() {
-  Hooks.once('ready', registerRuleElements);
+  try {
+    registerRuleElements();
+  } catch (_) { }
+  Hooks.once('setup', registerRuleElements);
 }
 
 /**
  * Register rule elements with PF2e system
  */
+let _reRegistered = false;
 function registerRuleElements() {
-  if (!game.pf2e?.RuleElement) {
+  const log = getLogger('RuleElements/Registration');
+  if (_reRegistered) {
+    log.debug('registerRuleElements: already registered, skipping');
+    return;
+  }
+  const BaseRuleElement = game.pf2e?.RuleElement ?? game.pf2e?.RuleElementPF2e;
+  if (!BaseRuleElement) {
     console.error('PF2E Visioner | PF2e system not ready, rule elements not registered');
+    log.debug(() => ({ msg: 'PF2e RuleElement missing', hasPF2e: !!game.pf2e, keys: Object.keys(game.pf2e || {}) }));
     return;
   }
 
   try {
     // Create the rule element class
+    log.debug('Creating VisibilityRuleElement');
     const VisibilityRuleElement = createVisibilityRuleElement(
-      game.pf2e.RuleElement,
+      BaseRuleElement,
       foundry.data.fields,
     );
 
@@ -35,6 +50,7 @@ function registerRuleElements() {
 
     // Register with PF2e
     game.pf2e.RuleElements.custom.PF2eVisionerVisibility = VisibilityRuleElement;
+    log.debug('Registered PF2eVisionerVisibility');
 
     // Add to UI dropdown
     if (CONFIG.PF2E?.ruleElementTypes) {
@@ -51,10 +67,38 @@ function registerRuleElements() {
       }
     }
 
+    // Create the new PF2eVisionerEffect rule element
+    log.debug('Creating PF2eVisionerEffect');
+    const EffectRuleElement = createPF2eVisionerEffectRuleElement(
+      BaseRuleElement,
+      foundry.data.fields,
+    );
+
+    if (EffectRuleElement) {
+      game.pf2e.RuleElements.custom.PF2eVisionerEffect = EffectRuleElement;
+      log.debug('Registered PF2eVisionerEffect');
+
+      if (CONFIG.PF2E?.ruleElementTypes) {
+        CONFIG.PF2E.ruleElementTypes.PF2eVisionerEffect = 'PF2eVisionerEffect';
+      }
+
+      if (game.i18n) {
+        const effectKey = 'PF2E.RuleElement.PF2eVisionerEffect';
+        if (!game.i18n.has(effectKey)) {
+          game.i18n.translations.PF2E = game.i18n.translations.PF2E || {};
+          game.i18n.translations.PF2E.RuleElement = game.i18n.translations.PF2E.RuleElement || {};
+          game.i18n.translations.PF2E.RuleElement.PF2eVisionerEffect = 'PF2e Visioner Effect';
+        }
+      }
+    }
+
     // Add global test function
     if (window.PF2EVisioner) {
       window.PF2EVisioner.createVisibilityRuleElementExample = createVisibilityRuleElementExample;
     }
+
+    _reRegistered = true;
+    log.debug('registerRuleElements: completed');
   } catch (error) {
     console.error('PF2E Visioner | Error registering rule elements:', error);
   }
@@ -78,7 +122,7 @@ function createVisibilityRuleElement(baseRuleElementClass, fields) {
       return 'https://github.com/roileaf/pf2e-visioner/blob/main/RULE_ELEMENTS.md#pf2evisioner-visibility-rule-element';
     }
     static get description() {
-      return 'Change visibility statuses and apply ephemeral effects programmatically';
+      return game.i18n.localize('PF2E_VISIONER.RULE_ELEMENTS.VISIBILITY.DESCRIPTION');
     }
     static get defaultKey() {
       return 'PF2eVisionerVisibility';
@@ -427,10 +471,9 @@ async function createVisibilityRuleElementExample() {
   // Example item data
   const examples = [
     {
-      name: 'Hide',
+      name: game.i18n.localize('PF2E_VISIONER.RULE_ELEMENTS.VISIBILITY.EXAMPLES.HIDE.NAME'),
       img: 'systems/pf2e/icons/spells/cloak-of-shadow.webp',
-      description:
-        '<p>You become hidden to all creatures.</p><p>Use this when you successfully Hide.</p>',
+      description: game.i18n.localize('PF2E_VISIONER.RULE_ELEMENTS.VISIBILITY.EXAMPLES.HIDE.DESCRIPTION'),
       rules: [
         {
           key: 'PF2eVisionerVisibility',
@@ -445,9 +488,9 @@ async function createVisibilityRuleElementExample() {
       traits: ['visual'],
     },
     {
-      name: 'Conceal Target',
+      name: game.i18n.localize('PF2E_VISIONER.RULE_ELEMENTS.VISIBILITY.EXAMPLES.CONCEAL_TARGET.NAME'),
       img: 'systems/pf2e/icons/spells/obscuring-mist.webp',
-      description: '<p>You magically conceal the target from all observers.</p>',
+      description: game.i18n.localize('PF2E_VISIONER.RULE_ELEMENTS.VISIBILITY.EXAMPLES.CONCEAL_TARGET.DESCRIPTION'),
       rules: [
         {
           key: 'PF2eVisionerVisibility',
@@ -462,9 +505,9 @@ async function createVisibilityRuleElementExample() {
       traits: ['illusion', 'magical'],
     },
     {
-      name: 'Obscuring Mist',
+      name: game.i18n.localize('PF2E_VISIONER.RULE_ELEMENTS.VISIBILITY.EXAMPLES.OBSCURING_MIST.NAME'),
       img: 'systems/pf2e/icons/spells/obscuring-mist.webp',
-      description: '<p>You surround yourself with a mist that makes you harder to see.</p>',
+      description: game.i18n.localize('PF2E_VISIONER.RULE_ELEMENTS.VISIBILITY.EXAMPLES.OBSCURING_MIST.DESCRIPTION'),
       rules: [
         {
           key: 'PF2eVisionerVisibility',
@@ -479,9 +522,9 @@ async function createVisibilityRuleElementExample() {
       traits: ['conjuration', 'water'],
     },
     {
-      name: 'Reveal',
+      name: game.i18n.localize('PF2E_VISIONER.RULE_ELEMENTS.VISIBILITY.EXAMPLES.REVEAL.NAME'),
       img: 'systems/pf2e/icons/spells/true-seeing.webp',
-      description: '<p>You reveal the target, making them easier to see.</p>',
+      description: game.i18n.localize('PF2E_VISIONER.RULE_ELEMENTS.VISIBILITY.EXAMPLES.REVEAL.DESCRIPTION'),
       rules: [
         {
           key: 'PF2eVisionerVisibility',
@@ -496,9 +539,9 @@ async function createVisibilityRuleElementExample() {
       traits: ['divination', 'revelation'],
     },
     {
-      name: 'Enhanced Vision',
+      name: game.i18n.localize('PF2E_VISIONER.RULE_ELEMENTS.VISIBILITY.EXAMPLES.ENHANCED_VISION.NAME'),
       img: 'systems/pf2e/icons/spells/see-invisibility.webp',
-      description: '<p>You can see hidden creatures better.</p>',
+      description: game.i18n.localize('PF2E_VISIONER.RULE_ELEMENTS.VISIBILITY.EXAMPLES.ENHANCED_VISION.DESCRIPTION'),
       rules: [
         {
           key: 'PF2eVisionerVisibility',
@@ -513,9 +556,9 @@ async function createVisibilityRuleElementExample() {
       traits: ['divination', 'detection'],
     },
     {
-      name: 'Blur Vision',
+      name: game.i18n.localize('PF2E_VISIONER.RULE_ELEMENTS.VISIBILITY.EXAMPLES.BLUR_VISION.NAME'),
       img: 'systems/pf2e/icons/spells/blur.webp',
-      description: "<p>You blur the target's vision, making it harder for them to see others.</p>",
+      description: game.i18n.localize('PF2E_VISIONER.RULE_ELEMENTS.VISIBILITY.EXAMPLES.BLUR_VISION.DESCRIPTION'),
       rules: [
         {
           key: 'PF2eVisionerVisibility',

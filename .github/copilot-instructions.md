@@ -22,10 +22,13 @@ Purpose: Give coding AIs crisp, actionable guardrails for this repo. Follow thes
 - Do not refactor code unprompted
 - Maintain clean and readable code
 - If you don't know — say you don't know
+- Break large functions into smaller functions
 - If an old unit test fails, do not modify the test to make it pass
 - Don't add hardcoded strings for UI, use i18n keys
 - Don't use time based solution, use event or hook based solutions instead
-
+- Always consult https://foundryvtt.com/api/ and https://github.com/foundryvtt/pf2e for any system or Foundry related questions or API references
+- Use https://2e.aonprd.com/ for any PF2e rules references
+ 
 ## Architecture you must respect
 - Stores (single-responsibility): `scripts/stores/*` – visibility/cover maps, simple get/set.
 - Services (cross-cutting): `scripts/services/*` – orchestration, perception refresh, visuals, sockets.

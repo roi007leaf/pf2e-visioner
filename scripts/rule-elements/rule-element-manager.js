@@ -44,7 +44,7 @@ function setupRuleElements() {
          * Set the description for this rule element
          */
         static get description() {
-          return 'Change visibility statuses and apply ephemeral effects programmatically';
+          return game.i18n.localize('PF2E_VISIONER.RULE_ELEMENTS.VISIBILITY.DESCRIPTION');
         }
 
         /**

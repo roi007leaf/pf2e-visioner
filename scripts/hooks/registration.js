@@ -95,7 +95,7 @@ export async function registerHooks() {
       const { updateWallVisuals } = await import('../services/visual-effects.js');
       const id = canvas.tokens.controlled?.[0]?.id || null;
       await updateWallVisuals(id);
-    } catch {}
+    } catch { }
   });
   Hooks.on('updateWall', async (doc, changes) => {
     try {
@@ -133,12 +133,12 @@ export async function registerHooks() {
                 await canvas.scene?.updateEmbeddedDocuments?.('Token', updates, { diff: false });
               }
             }
-          } catch (_) {}
+          } catch (_) { }
           // Mirror hidden flag to connected walls
           try {
             const { mirrorHiddenFlagToConnected } = await import('../services/connected-walls.js');
             await mirrorHiddenFlagToConnected(doc, true);
-          } catch (_) {}
+          } catch (_) { }
         } else {
           // If unhidden, remove entries for that wall from tokens
           try {
@@ -171,20 +171,20 @@ export async function registerHooks() {
                 await canvas.scene?.updateEmbeddedDocuments?.('Token', updates, { diff: false });
               }
             }
-          } catch (_) {}
+          } catch (_) { }
           // Mirror hidden flag to connected walls (set hidden=false)
           try {
             const { mirrorHiddenFlagToConnected } = await import('../services/connected-walls.js');
             await mirrorHiddenFlagToConnected(doc, false);
-          } catch (_) {}
+          } catch (_) { }
         }
       }
-    } catch (_) {}
+    } catch (_) { }
     try {
       const { updateWallVisuals } = await import('../services/visual-effects.js');
       const id = canvas.tokens.controlled?.[0]?.id || null;
       await updateWallVisuals(id);
-    } catch {}
+    } catch { }
   });
   Hooks.on('deleteWall', async (wallDocument) => {
     try {
@@ -204,7 +204,7 @@ export async function registerHooks() {
       const { updateWallVisuals } = await import('../services/visual-effects.js');
       const id = canvas.tokens.controlled?.[0]?.id || null;
       await updateWallVisuals(id);
-    } catch {}
+    } catch { }
   });
 
   // Removed controlToken hook - was causing excessive updateWallVisuals calls on token selection.
@@ -258,7 +258,7 @@ export async function registerHooks() {
           // Get the condition manager and clear established states
           const conditionManager = game.modules.get('pf2e-visioner')?.api?.getConditionManager?.();
           if (conditionManager?.clearEstablishedInvisibleStates) {
-            conditionManager.clearEstablishedInvisibleStates(token).catch(() => {});
+            conditionManager.clearEstablishedInvisibleStates(token).catch(() => { });
           }
         }
       }
@@ -400,10 +400,10 @@ export async function registerHooks() {
           if (t.document.getFlag('pf2e-visioner', 'waitingSneak')) {
             try {
               await t.document.unsetFlag('pf2e-visioner', 'waitingSneak');
-            } catch {}
+            } catch { }
             try {
               if (t.locked) t.locked = false;
-            } catch {}
+            } catch { }
           }
         }
       }
@@ -418,6 +418,69 @@ export async function registerHooks() {
               await t.document.unsetFlag('pf2e-visioner', 'sneak-active');
             } catch {
               console.error(`PF2E Visioner | Failed to clear sneak-active flag for ${t.name}`);
+            }
+          }
+        }
+      }
+
+      const rules = item.system?.rules || [];
+      const hasVisionerRules = rules.some(rule =>
+        rule.key === 'PF2eVisionerEffect' || rule.key === 'PF2eVisionerVisibility'
+      );
+
+      if (hasVisionerRules && Array.isArray(item.ruleElements)) {
+        const { getLogger } = await import('../utils/logger.js');
+        const log = getLogger('RuleElements/Cleanup');
+
+        log.debug(() => ({
+          msg: 'Cleaning up rule elements for deleted effect',
+          itemName: item.name,
+          itemId: item.id,
+          tokenCount: tokens.length,
+          ruleElementCount: item.ruleElements.length
+        }));
+
+        for (const token of tokens) {
+          const registryKey = `item-${item.id}`;
+          const flagRegistry = token.document.getFlag('pf2e-visioner', 'ruleElementRegistry') || {};
+
+          if (!flagRegistry[registryKey]) {
+            log.debug(() => ({
+              msg: 'No registry entry found for effect',
+              tokenName: token.name,
+              registryKey
+            }));
+            continue;
+          }
+
+          for (const ruleElement of item.ruleElements) {
+            if (ruleElement?.key !== 'PF2eVisionerEffect' && ruleElement?.key !== 'PF2eVisionerVisibility') {
+              continue;
+            }
+
+            try {
+              log.debug(() => ({
+                msg: 'Removing rule element flags',
+                tokenName: token.name,
+                ruleKey: ruleElement.key,
+                ruleSlug: ruleElement.slug
+              }));
+
+              if (typeof ruleElement.removeAllFlagsForRuleElement === 'function') {
+                await ruleElement.removeAllFlagsForRuleElement();
+                log.debug(() => ({
+                  msg: 'Successfully removed rule element flags',
+                  tokenName: token.name,
+                  ruleKey: ruleElement.key
+                }));
+              }
+            } catch (error) {
+              log.warn(() => ({
+                msg: 'Failed to remove flags for rule element on effect deletion',
+                tokenName: token.name,
+                ruleKey: ruleElement?.key,
+                error: error.message
+              }));
             }
           }
         }

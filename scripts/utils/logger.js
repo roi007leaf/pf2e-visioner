@@ -5,12 +5,29 @@
 
 import { MODULE_ID } from '../constants.js';
 
-function isEnabled() {
+function isEnabled(scope) {
     try {
-        // Prefer AVS specific debug, fallback to global debug
         const avs = !!game.settings.get(MODULE_ID, 'autoVisibilityDebugMode');
         const global = !!game.settings.get(MODULE_ID, 'debug');
-        return avs || global;
+
+        const isAvsScope = scope && (
+            scope.includes('AVS') ||
+            scope.includes('AutoVisibility') ||
+            scope.includes('Batch') ||
+            scope.includes('LightingEvent') ||
+            scope.includes('TokenEvent') ||
+            scope.includes('ActorEvent') ||
+            scope.includes('EffectEvent') ||
+            scope.includes('ItemEvent') ||
+            scope.includes('VisibilityProcessor') ||
+            scope.includes('CoverProcessor')
+        );
+
+        if (isAvsScope) {
+            return avs;
+        }
+
+        return global;
     } catch {
         return false;
     }
@@ -29,7 +46,7 @@ function fmtScope(scope) {
 }
 
 function baseLog(level, scope, args) {
-    if (!isEnabled()) return;
+    if (!isEnabled(scope)) return;
     const prefix = `PF2E Visioner ${fmtScope(scope)}`;
     const stamp = nowTs();
     try {
@@ -43,29 +60,29 @@ function baseLog(level, scope, args) {
 
 export function getLogger(scope = '') {
     return {
-        enabled: () => isEnabled(),
+        enabled: () => isEnabled(scope),
         debug: (...args) => baseLog('debug', scope, args),
         info: (...args) => baseLog('info', scope, args),
         warn: (...args) => baseLog('warn', scope, args),
         error: (...args) => baseLog('error', scope, args),
         group: (label) => {
-            if (!isEnabled()) return;
+            if (!isEnabled(scope)) return;
             console.group(`PF2E Visioner ${fmtScope(scope)} ${nowTs()}: ${label}`);
         },
         groupCollapsed: (label) => {
-            if (!isEnabled()) return;
+            if (!isEnabled(scope)) return;
             console.groupCollapsed(`PF2E Visioner ${fmtScope(scope)} ${nowTs()}: ${label}`);
         },
         groupEnd: () => {
-            if (!isEnabled()) return;
+            if (!isEnabled(scope)) return;
             console.groupEnd();
         },
         time: (label) => {
-            if (!isEnabled()) return;
+            if (!isEnabled(scope)) return;
             console.time(`PF2E Visioner ${fmtScope(scope)} ${label}`);
         },
         timeEnd: (label) => {
-            if (!isEnabled()) return;
+            if (!isEnabled(scope)) return;
             console.timeEnd(`PF2E Visioner ${fmtScope(scope)} ${label}`);
         },
     };
