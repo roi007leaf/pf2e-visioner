@@ -2,6 +2,8 @@
  * Combat-related hooks: reset encounter filter for open dialogs
  */
 
+import { MODULE_ID } from '../constants.js';
+
 export function registerCombatHooks() {
   Hooks.on('combatStart', onCombatStart);
   Hooks.on('combatEnd', onCombatEnd);
@@ -38,11 +40,11 @@ function onDeleteCombat(combat) {
 
 async function handleCombatStart() {
   try {
-    const avsOnlyInCombat = game.settings.get('pf2e-visioner', 'avsOnlyInCombat');
+    const avsOnlyInCombat = game.settings.get(MODULE_ID, 'avsOnlyInCombat');
     if (!avsOnlyInCombat) return;
     if (!game.user.isGM) return;
 
-    const autoVisibilityEnabled = game.settings.get('pf2e-visioner', 'autoVisibilityEnabled');
+    const autoVisibilityEnabled = game.settings.get(MODULE_ID, 'autoVisibilityEnabled');
     if (!autoVisibilityEnabled) return;
 
       try {
@@ -58,7 +60,7 @@ async function handleCombatStart() {
 
 async function handleCombatEnd(combat = null) {
   try {
-    const avsOnlyInCombat = game.settings.get('pf2e-visioner', 'avsOnlyInCombat');
+    const avsOnlyInCombat = game.settings.get(MODULE_ID, 'avsOnlyInCombat');
     if (!avsOnlyInCombat) return;
     if (!game.user.isGM) return;
 
@@ -79,23 +81,23 @@ async function handleCombatEnd(combat = null) {
       if (!token?.actor) continue;
 
       try {
-        const currentFlags = token.document.flags?.['pf2e-visioner'];
+        const currentFlags = token.document.flags?.[MODULE_ID];
         if (!currentFlags) continue;
 
         if (currentFlags.visibility) {
-          await token.document.unsetFlag('pf2e-visioner', 'visibility');
+          await token.document.unsetFlag(MODULE_ID, 'visibility');
         }
 
         if (currentFlags.detection) {
-          await token.document.unsetFlag('pf2e-visioner', 'detection');
+          await token.document.unsetFlag(MODULE_ID, 'detection');
         }
 
         try {
           const effects = token.actor.itemTypes.effect;
           const visibilityEffects = effects.filter(
             (e) =>
-              e.flags?.['pf2e-visioner']?.isEphemeralOffGuard ||
-              e.flags?.['pf2e-visioner']?.aggregateOffGuard,
+              e.flags?.[MODULE_ID]?.isEphemeralOffGuard ||
+              e.flags?.[MODULE_ID]?.aggregateOffGuard,
           );
 
           if (visibilityEffects.length > 0) {
