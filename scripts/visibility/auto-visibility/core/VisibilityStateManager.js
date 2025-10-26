@@ -229,6 +229,14 @@ export class VisibilityStateManager {
       return;
     }
 
+    // Critical check: Don't process batches when AVS is combat-only and not in combat
+    if (this.#systemStateProvider && typeof this.#systemStateProvider.shouldProcessEvents === 'function') {
+      if (!this.#systemStateProvider.shouldProcessEvents()) {
+        this.#changedTokens.clear();
+        return;
+      }
+    }
+
     this.#processingBatch = true;
     const tokenCount = this.#changedTokens.size;
 

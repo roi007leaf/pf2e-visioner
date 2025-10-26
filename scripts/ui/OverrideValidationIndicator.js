@@ -92,6 +92,15 @@ class OverrideValidationIndicator {
   }
 
   show(overrideData, tokenName, movedTokenId = null, options = {}) {
+      const avsOnlyInCombat = game.settings.get('pf2e-visioner', 'avsOnlyInCombat');
+      if (avsOnlyInCombat) {
+        const inCombat = !!(game.combat?.started && game.combat?.combatants?.size > 0);
+        if (!inCombat) {
+          this.hide(true);
+          return;
+        }
+    } 
+
     // Keep a raw copy for clearAll regardless of display filters
     const all = Array.isArray(overrideData) ? overrideData : [];
     this._rawOverrides = all;
