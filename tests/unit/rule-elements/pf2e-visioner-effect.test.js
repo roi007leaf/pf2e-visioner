@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { SourceTracker } from '../../../scripts/rule-elements/SourceTracker.js';
 import { ActionQualifier } from '../../../scripts/rule-elements/operations/ActionQualifier.js';
-import { SenseModifier } from '../../../scripts/rule-elements/operations/SenseModifier.js';
 
 describe('SourceTracker', () => {
   let mockToken;
@@ -23,11 +22,9 @@ describe('SourceTracker', () => {
     });
 
     it('should return sources when they exist', () => {
-      const mockSources = [
-        { id: 'blur-spell', priority: 100, state: 'concealed' }
-      ];
+      const mockSources = [{ id: 'blur-spell', priority: 100, state: 'concealed' }];
       mockToken.document.getFlag.mockReturnValue({
-        visibility: { sources: mockSources }
+        visibility: { sources: mockSources },
       });
 
       const sources = SourceTracker.getVisibilityStateSources(mockToken);
@@ -35,13 +32,11 @@ describe('SourceTracker', () => {
     });
 
     it('should return observer-specific sources when observerId provided', () => {
-      const mockSources = [
-        { id: 'blur-spell', priority: 100, state: 'concealed' }
-      ];
+      const mockSources = [{ id: 'blur-spell', priority: 100, state: 'concealed' }];
       mockToken.document.getFlag.mockReturnValue({
         visibilityByObserver: {
-          'observer-1': { sources: mockSources }
-        }
+          'observer-1': { sources: mockSources },
+        },
       });
 
       const sources = SourceTracker.getVisibilityStateSources(mockToken, 'observer-1');
@@ -53,10 +48,10 @@ describe('SourceTracker', () => {
     it('should return all sources when no qualifications exist', () => {
       const mockSources = [
         { id: 'source-1', priority: 100 },
-        { id: 'source-2', priority: 50 }
+        { id: 'source-2', priority: 50 },
       ];
       mockToken.document.getFlag.mockReturnValue({
-        visibility: { sources: mockSources }
+        visibility: { sources: mockSources },
       });
 
       const qualifying = SourceTracker.getQualifyingSources(mockToken, 'hide', 'visibility');
@@ -69,19 +64,19 @@ describe('SourceTracker', () => {
           id: 'blur-spell',
           priority: 100,
           qualifications: {
-            hide: { canUseThisConcealment: false }
-          }
+            hide: { canUseThisConcealment: false },
+          },
         },
         {
           id: 'darkness',
           priority: 50,
           qualifications: {
-            hide: { canUseThisConcealment: true }
-          }
-        }
+            hide: { canUseThisConcealment: true },
+          },
+        },
       ];
       mockToken.document.getFlag.mockReturnValue({
-        visibility: { sources: mockSources }
+        visibility: { sources: mockSources },
       });
 
       const qualifying = SourceTracker.getQualifyingSources(mockToken, 'hide', 'visibility');
@@ -95,7 +90,7 @@ describe('SourceTracker', () => {
       const newSource = {
         id: 'blur-spell',
         priority: 100,
-        state: 'concealed'
+        state: 'concealed',
       };
 
       await SourceTracker.addSourceToState(mockToken, 'visibility', newSource);
@@ -106,16 +101,16 @@ describe('SourceTracker', () => {
         expect.objectContaining({
           visibility: expect.objectContaining({
             sources: expect.arrayContaining([newSource]),
-            state: 'concealed'
-          })
-        })
+            state: 'concealed',
+          }),
+        }),
       );
     });
 
     it('should update existing source', async () => {
       const existingSource = { id: 'blur-spell', priority: 100, state: 'concealed' };
       mockToken.document.getFlag.mockReturnValue({
-        visibility: { sources: [existingSource] }
+        visibility: { sources: [existingSource] },
       });
 
       const updatedSource = { id: 'blur-spell', priority: 150, state: 'hidden' };
@@ -133,9 +128,9 @@ describe('SourceTracker', () => {
         visibility: {
           sources: [
             { id: 'blur-spell', priority: 100 },
-            { id: 'darkness', priority: 50 }
-          ]
-        }
+            { id: 'darkness', priority: 50 },
+          ],
+        },
       });
 
       await SourceTracker.removeSource(mockToken, 'blur-spell', 'visibility');
@@ -152,7 +147,7 @@ describe('SourceTracker', () => {
       const sources = [
         { id: 'source-1', priority: 50 },
         { id: 'source-2', priority: 100 },
-        { id: 'source-3', priority: 75 }
+        { id: 'source-3', priority: 75 },
       ];
 
       const highest = SourceTracker.getHighestPrioritySource(sources);
@@ -172,9 +167,9 @@ describe('SourceTracker', () => {
         {
           id: 'blur-spell',
           qualifications: {
-            hide: { canUseThisConcealment: false }
-          }
-        }
+            hide: { canUseThisConcealment: false },
+          },
+        },
       ];
 
       const hasDisqualifying = SourceTracker.hasDisqualifyingSource(sources, 'hide');
@@ -186,9 +181,9 @@ describe('SourceTracker', () => {
         {
           id: 'darkness',
           qualifications: {
-            hide: { canUseThisConcealment: true }
-          }
-        }
+            hide: { canUseThisConcealment: true },
+          },
+        },
       ];
 
       const hasDisqualifying = SourceTracker.hasDisqualifyingSource(sources, 'hide');
@@ -202,20 +197,265 @@ describe('SourceTracker', () => {
         {
           id: 'blur-spell',
           qualifications: {
-            hide: { customMessage: "Blur's concealment doesn't hide your location" }
-          }
+            hide: { customMessage: "Blur's concealment doesn't hide your location" },
+          },
         },
         {
           id: 'darkness',
           qualifications: {
-            hide: { canUseThisConcealment: true }
-          }
-        }
+            hide: { canUseThisConcealment: true },
+          },
+        },
       ];
 
       const messages = SourceTracker.getCustomMessages(sources, 'hide');
       expect(messages).toHaveLength(1);
       expect(messages[0]).toBe("Blur's concealment doesn't hide your location");
+    });
+  });
+});
+
+describe('DetectionModeModifier', () => {
+  let mockToken, mockDetectionsModes;
+
+  beforeEach(() => {
+    mockDetectionsModes = [
+      { id: 'visual', enabled: true },
+      { id: 'imprecise-hearing', enabled: true },
+    ];
+    mockToken = {
+      id: 'test-token',
+      document: {
+        id: 'test-token',
+        detectionModes: mockDetectionsModes,
+        getFlag: jest.fn(() => ({})),
+        setFlag: jest.fn(() => Promise.resolve()),
+        update: jest.fn(() => Promise.resolve()),
+      },
+    };
+  });
+
+  describe('applyDetectionModeModifications', () => {
+    it('should save original detection modes before modifying', async () => {
+      const { DetectionModeModifier } = await import(
+        '../../../scripts/rule-elements/operations/DetectionModeModifier.js'
+      );
+
+      await DetectionModeModifier.applyDetectionModeModifications(
+        mockToken,
+        { visual: { enabled: false } },
+        'test-rule-element',
+        null,
+      );
+
+      expect(mockToken.document.getFlag).toHaveBeenCalled();
+      expect(mockToken.document.update).toHaveBeenCalled();
+    });
+  });
+});
+
+describe('DistanceBasedVisibility', () => {
+  let mockToken;
+
+  beforeEach(() => {
+    mockToken = {
+      id: 'test-token',
+      document: {
+        id: 'test-token',
+        getFlag: jest.fn(() => null),
+        setFlag: jest.fn(() => Promise.resolve()),
+        unsetFlag: jest.fn(() => Promise.resolve()),
+      },
+    };
+  });
+
+  describe('applyDistanceBasedVisibility', () => {
+    it('should set distance-based visibility flag', async () => {
+      const { DistanceBasedVisibility } = await import(
+        '../../../scripts/rule-elements/operations/DistanceBasedVisibility.js'
+      );
+
+      const operation = {
+        distanceBands: [
+          { minDistance: 0, maxDistance: 20, state: 'observed' },
+          { minDistance: 20, maxDistance: null, state: 'concealed' },
+        ],
+        direction: 'to',
+        observers: 'all',
+        source: 'test-source',
+      };
+
+      await DistanceBasedVisibility.applyDistanceBasedVisibility(operation, mockToken);
+
+      expect(mockToken.document.setFlag).toHaveBeenCalledWith(
+        'pf2e-visioner',
+        'distanceBasedVisibility',
+        expect.objectContaining({
+          active: true,
+          source: 'test-source',
+          distanceBands: operation.distanceBands,
+        }),
+      );
+    });
+
+    it('should return correct distance band for distance', () => {
+      const {
+        DistanceBasedVisibility,
+      } = require('../../../scripts/rule-elements/operations/DistanceBasedVisibility.js');
+
+      const distanceBands = [
+        { minDistance: 0, maxDistance: 20, state: 'observed' },
+        { minDistance: 20, maxDistance: 40, state: 'concealed' },
+        { minDistance: 40, maxDistance: null, state: 'hidden' },
+      ];
+
+      expect(DistanceBasedVisibility.getApplicableDistanceBand(10, distanceBands).state).toBe(
+        'observed',
+      );
+      expect(DistanceBasedVisibility.getApplicableDistanceBand(30, distanceBands).state).toBe(
+        'concealed',
+      );
+      expect(DistanceBasedVisibility.getApplicableDistanceBand(50, distanceBands).state).toBe(
+        'hidden',
+      );
+    });
+
+    it('should remove distance-based visibility on removal', async () => {
+      const { DistanceBasedVisibility } = await import(
+        '../../../scripts/rule-elements/operations/DistanceBasedVisibility.js'
+      );
+
+      const operation = { source: 'test-source' };
+
+      await DistanceBasedVisibility.removeDistanceBasedVisibility(operation, mockToken);
+
+      expect(mockToken.document.unsetFlag).toHaveBeenCalledWith(
+        'pf2e-visioner',
+        'distanceBasedVisibility',
+      );
+    });
+  });
+});
+
+describe('LightingModifier', () => {
+  let mockToken;
+
+  beforeEach(() => {
+    mockToken = {
+      id: 'test-token',
+      document: {
+        id: 'test-token',
+        setFlag: jest.fn(() => Promise.resolve()),
+      },
+    };
+  });
+
+  describe('applyLightingModification', () => {
+    it('should set lighting modification flag', async () => {
+      const { LightingModifier } = await import(
+        '../../../scripts/rule-elements/operations/LightingModifier.js'
+      );
+
+      const operation = {
+        lightingLevel: 'bright',
+        source: 'test-light',
+        priority: 100,
+      };
+
+      await LightingModifier.applyLightingModification(operation, mockToken);
+
+      expect(mockToken.document.setFlag).toHaveBeenCalledWith(
+        'pf2e-visioner',
+        'lightingModification.test-light',
+        expect.objectContaining({
+          lightingLevel: 'bright',
+          type: 'test-light',
+          priority: 100,
+        }),
+      );
+    });
+  });
+});
+
+describe('OffGuardSuppression', () => {
+  let mockToken;
+
+  beforeEach(() => {
+    mockToken = {
+      id: 'test-token',
+      document: {
+        id: 'test-token',
+        getFlag: jest.fn(() => null),
+        setFlag: jest.fn(() => Promise.resolve()),
+        unsetFlag: jest.fn(() => Promise.resolve()),
+      },
+    };
+  });
+
+  describe('applyOffGuardSuppression', () => {
+    it('should set off guard suppression flag', async () => {
+      const { OffGuardSuppression } = await import(
+        '../../../scripts/rule-elements/operations/OffGuardSuppression.js'
+      );
+
+      const operation = {
+        suppressedStates: ['hidden', 'undetected'],
+        source: 'test-suppression',
+      };
+
+      await OffGuardSuppression.applyOffGuardSuppression(operation, mockToken);
+
+      expect(mockToken.document.setFlag).toHaveBeenCalledWith(
+        'pf2e-visioner',
+        expect.stringContaining('offGuardSuppression.'),
+        expect.objectContaining({
+          suppressedStates: ['hidden', 'undetected'],
+        }),
+      );
+    });
+
+    it('should check if state should suppress off guard', async () => {
+      const { OffGuardSuppression } = await import(
+        '../../../scripts/rule-elements/operations/OffGuardSuppression.js'
+      );
+
+      mockToken.document.getFlag.mockReturnValue({
+        'test-suppression': {
+          suppressedStates: ['hidden', 'undetected'],
+        },
+      });
+
+      const shouldSuppress = OffGuardSuppression.shouldSuppressOffGuardForState(
+        mockToken,
+        'hidden',
+      );
+      expect(shouldSuppress).toBe(true);
+
+      const shouldNotSuppress = OffGuardSuppression.shouldSuppressOffGuardForState(
+        mockToken,
+        'concealed',
+      );
+      expect(shouldNotSuppress).toBe(false);
+    });
+
+    it('should remove off guard suppression on removal', async () => {
+      const { OffGuardSuppression } = await import(
+        '../../../scripts/rule-elements/operations/OffGuardSuppression.js'
+      );
+
+      const operation = { source: 'test-suppression' };
+      mockToken.document.getFlag.mockReturnValue({
+        'test-suppression': {
+          suppressedStates: ['hidden', 'undetected'],
+        },
+      });
+
+      await OffGuardSuppression.removeOffGuardSuppression(operation, mockToken);
+
+      expect(mockToken.document.unsetFlag).toHaveBeenCalledWith(
+        'pf2e-visioner',
+        'offGuardSuppression.test-suppression',
+      );
     });
   });
 });
@@ -230,10 +470,10 @@ describe('SenseModifier', () => {
         perception: {
           senses: [
             { type: 'vision', acuity: 'precise', range: Infinity },
-            { type: 'hearing', acuity: 'imprecise', range: Infinity }
-          ]
-        }
-      }
+            { type: 'hearing', acuity: 'imprecise', range: Infinity },
+          ],
+        },
+      },
     };
 
     mockToken = {
@@ -249,63 +489,20 @@ describe('SenseModifier', () => {
     };
   });
 
-  describe.skip('applySenseModifications', () => {
-    it('should modify sense range', () => {
-      const modifications = {
-        vision: { range: 20 }
-      };
+  it('should save original senses before modifying', async () => {
+    const { SenseModifier } = await import(
+      '../../../scripts/rule-elements/operations/SenseModifier.js'
+    );
 
-      SenseModifier.applySenseModifications(mockToken, modifications, 'test-re');
+    await SenseModifier.applySenseModifications(
+      mockToken,
+      { vision: { enabled: false } },
+      'test-rule-element',
+      null,
+    );
 
-      const visionSense = mockToken.actor.system.perception.senses.find(s => s.type === 'vision');
-      expect(visionSense.range).toBe(20);
-    });
-
-    it('should modify sense precision', () => {
-      const modifications = {
-        hearing: { precision: 'precise' }
-      };
-
-      SenseModifier.applySenseModifications(mockToken, modifications, 'test-re');
-
-      const hearingSense = mockToken.actor.system.perception.senses.find(s => s.type === 'hearing');
-      expect(hearingSense.acuity).toBe('precise');
-    });
-
-    it('should add new sense if it does not exist', () => {
-      const modifications = {
-        tremorsense: { precision: 'imprecise', range: 30 }
-      };
-
-      SenseModifier.applySenseModifications(mockToken, modifications, 'test-re');
-
-      const tremorsenseSense = mockToken.actor.system.perception.senses.find(s => s.type === 'tremorsense');
-      expect(tremorsenseSense).toBeDefined();
-      expect(tremorsenseSense.acuity).toBe('imprecise');
-      expect(tremorsenseSense.range).toBe(30);
-    });
-
-    it('should apply maxRange to all senses when using "all"', () => {
-      const modifications = {
-        all: { maxRange: 20 }
-      };
-
-      SenseModifier.applySenseModifications(mockToken, modifications, 'test-re');
-
-      mockToken.actor.system.perception.senses.forEach(sense => {
-        expect(sense.range).toBeLessThanOrEqual(20);
-      });
-    });
-  });
-
-  describe.skip('captureOriginalSenses', () => {
-    it('should create a copy of original senses', () => {
-      const original = SenseModifier.captureOriginalSenses(mockActor);
-
-      expect(original).toHaveLength(2);
-      expect(original[0].type).toBe('vision');
-      expect(original[1].type).toBe('hearing');
-    });
+    expect(mockToken.document.getFlag).toHaveBeenCalled();
+    expect(mockToken.actor.update).toHaveBeenCalled();
   });
 });
 
@@ -327,8 +524,8 @@ describe('ActionQualifier', () => {
         source: 'blur-spell',
         qualifications: {
           hide: { canUseThisConcealment: false },
-          sneak: { endPositionQualifies: false }
-        }
+          sneak: { endPositionQualifies: false },
+        },
       };
 
       await ActionQualifier.applyActionQualifications(operation, mockToken);
@@ -338,8 +535,8 @@ describe('ActionQualifier', () => {
         'actionQualifications.blur-spell',
         expect.objectContaining({
           id: 'blur-spell',
-          qualifications: operation.qualifications
-        })
+          qualifications: operation.qualifications,
+        }),
       );
     });
   });
@@ -352,9 +549,9 @@ describe('ActionQualifier', () => {
           priority: 100,
           qualifications: {
             hide: { canUseThisConcealment: false },
-            sneak: { endPositionQualifies: false }
-          }
-        }
+            sneak: { endPositionQualifies: false },
+          },
+        },
       });
 
       const qualifications = ActionQualifier.getActionQualifications(mockToken, 'hide');
@@ -371,9 +568,9 @@ describe('ActionQualifier', () => {
           id: 'blur-spell',
           priority: 100,
           qualifications: {
-            hide: { qualifiesOnConcealment: false }
-          }
-        }
+            hide: { qualifiesOnConcealment: false },
+          },
+        },
       });
 
       const canUse = ActionQualifier.canUseConcealment(mockToken, 'hide');
@@ -393,9 +590,9 @@ describe('ActionQualifier', () => {
           id: 'blur-spell',
           priority: 100,
           qualifications: {
-            sneak: { endPositionQualifies: false }
-          }
-        }
+            sneak: { endPositionQualifies: false },
+          },
+        },
       });
 
       const qualifies = ActionQualifier.endPositionQualifies(mockToken, 'sneak');
@@ -414,9 +611,9 @@ describe('ActionQualifier', () => {
         'blur-spell': {
           id: 'blur-spell',
           qualifications: {
-            hide: { canUseThisConcealment: false }
-          }
-        }
+            hide: { canUseThisConcealment: false },
+          },
+        },
       });
 
       const result = ActionQualifier.checkHidePrerequisites(mockToken);
@@ -432,9 +629,9 @@ describe('ActionQualifier', () => {
         'blur-spell': {
           id: 'blur-spell',
           qualifications: {
-            sneak: { endPositionQualifies: false }
-          }
-        }
+            sneak: { endPositionQualifies: false },
+          },
+        },
       });
 
       const result = ActionQualifier.checkSneakPrerequisites(mockToken, 'end');
@@ -448,35 +645,39 @@ describe('Rule Element Integration', () => {
   it('should have all required operation types', () => {
     const expectedOperations = [
       'modifySenses',
+      'modifyDetectionModes',
       'overrideVisibility',
       'overrideCover',
       'provideCover',
       'modifyActionQualification',
-      'conditionalState'
+      'modifyLighting',
+      'conditionalState',
+      'distanceBasedVisibility',
+      'offGuardSuppression',
     ];
 
-    expectedOperations.forEach(op => {
+    expectedOperations.forEach((op) => {
       expect(op).toBeTruthy();
     });
   });
 
   it('should support all visibility states', () => {
     const expectedStates = ['observed', 'concealed', 'hidden', 'undetected'];
-    expectedStates.forEach(state => {
+    expectedStates.forEach((state) => {
       expect(state).toBeTruthy();
     });
   });
 
   it('should support all cover states', () => {
     const expectedStates = ['none', 'lesser', 'standard', 'greater'];
-    expectedStates.forEach(state => {
+    expectedStates.forEach((state) => {
       expect(state).toBeTruthy();
     });
   });
 
   it('should support all target/observer options', () => {
     const expectedOptions = ['all', 'allies', 'enemies', 'selected', 'targeted', 'specific'];
-    expectedOptions.forEach(option => {
+    expectedOptions.forEach((option) => {
       expect(option).toBeTruthy();
     });
   });
@@ -494,7 +695,9 @@ describe('VisibilityOverride', () => {
   let mockObserverTokens;
 
   beforeEach(async () => {
-    const { VisibilityOverride } = await import('../../../scripts/rule-elements/operations/VisibilityOverride.js');
+    const { VisibilityOverride } = await import(
+      '../../../scripts/rule-elements/operations/VisibilityOverride.js'
+    );
 
     mockSubjectToken = {
       id: 'subject-token',
@@ -502,44 +705,48 @@ describe('VisibilityOverride', () => {
       document: {
         id: 'subject-token',
         setFlag: jest.fn(() => Promise.resolve()),
-        unsetFlag: jest.fn(() => Promise.resolve())
-      }
+        unsetFlag: jest.fn(() => Promise.resolve()),
+      },
     };
 
     mockObserverTokens = [
       {
         id: 'observer-1',
         actor: { hasPlayerOwner: true },
-        document: { id: 'observer-1' }
+        document: { id: 'observer-1' },
       },
       {
         id: 'observer-2',
         actor: { hasPlayerOwner: false, token: { disposition: -1 } },
-        document: { id: 'observer-2' }
-      }
+        document: { id: 'observer-2' },
+      },
     ];
 
     global.canvas = {
       tokens: {
-        placeables: [mockSubjectToken, ...mockObserverTokens]
+        placeables: [mockSubjectToken, ...mockObserverTokens],
       },
       grid: {
-        measureDistance: jest.fn(() => 10)
-      }
+        measureDistance: jest.fn(() => 10),
+      },
     };
   });
 
   describe('getObserverTokens', () => {
     it('should return all tokens when observers is "all"', async () => {
-      const { VisibilityOverride } = await import('../../../scripts/rule-elements/operations/VisibilityOverride.js');
+      const { VisibilityOverride } = await import(
+        '../../../scripts/rule-elements/operations/VisibilityOverride.js'
+      );
       const tokens = VisibilityOverride.getObserverTokens(mockSubjectToken, 'all');
 
       expect(tokens.length).toBe(2);
-      expect(tokens.map(t => t.id)).toEqual(['observer-1', 'observer-2']);
+      expect(tokens.map((t) => t.id)).toEqual(['observer-1', 'observer-2']);
     });
 
     it('should filter allies when observers is "allies"', async () => {
-      const { VisibilityOverride } = await import('../../../scripts/rule-elements/operations/VisibilityOverride.js');
+      const { VisibilityOverride } = await import(
+        '../../../scripts/rule-elements/operations/VisibilityOverride.js'
+      );
       const tokens = VisibilityOverride.getObserverTokens(mockSubjectToken, 'allies');
 
       expect(tokens.length).toBe(1);
@@ -547,7 +754,9 @@ describe('VisibilityOverride', () => {
     });
 
     it('should filter enemies when observers is "enemies"', async () => {
-      const { VisibilityOverride } = await import('../../../scripts/rule-elements/operations/VisibilityOverride.js');
+      const { VisibilityOverride } = await import(
+        '../../../scripts/rule-elements/operations/VisibilityOverride.js'
+      );
       const tokens = VisibilityOverride.getObserverTokens(mockSubjectToken, 'enemies');
 
       expect(tokens.length).toBe(1);
@@ -555,19 +764,26 @@ describe('VisibilityOverride', () => {
     });
 
     it('should filter specific tokens when observers is "specific"', async () => {
-      const { VisibilityOverride } = await import('../../../scripts/rule-elements/operations/VisibilityOverride.js');
+      const { VisibilityOverride } = await import(
+        '../../../scripts/rule-elements/operations/VisibilityOverride.js'
+      );
       const tokenIds = ['observer-2'];
-      const tokens = VisibilityOverride.getObserverTokens(mockSubjectToken, 'specific', null, tokenIds);
+      const tokens = VisibilityOverride.getObserverTokens(
+        mockSubjectToken,
+        'specific',
+        null,
+        tokenIds,
+      );
 
       expect(tokens.length).toBe(1);
       expect(tokens[0].id).toBe('observer-2');
     });
 
     it('should apply range filter when range is specified', async () => {
-      const { VisibilityOverride } = await import('../../../scripts/rule-elements/operations/VisibilityOverride.js');
-      global.canvas.grid.measureDistance = jest.fn()
-        .mockReturnValueOnce(5)
-        .mockReturnValueOnce(25);
+      const { VisibilityOverride } = await import(
+        '../../../scripts/rule-elements/operations/VisibilityOverride.js'
+      );
+      global.canvas.grid.measureDistance = jest.fn().mockReturnValueOnce(5).mockReturnValueOnce(25);
 
       const tokens = VisibilityOverride.getObserverTokens(mockSubjectToken, 'all', 20);
 
@@ -578,7 +794,9 @@ describe('VisibilityOverride', () => {
 
   describe('areAllies', () => {
     it('should return true for PC vs PC', async () => {
-      const { VisibilityOverride } = await import('../../../scripts/rule-elements/operations/VisibilityOverride.js');
+      const { VisibilityOverride } = await import(
+        '../../../scripts/rule-elements/operations/VisibilityOverride.js'
+      );
       const actor1 = { hasPlayerOwner: true };
       const actor2 = { hasPlayerOwner: true };
 
@@ -586,7 +804,9 @@ describe('VisibilityOverride', () => {
     });
 
     it('should return false for PC vs NPC', async () => {
-      const { VisibilityOverride } = await import('../../../scripts/rule-elements/operations/VisibilityOverride.js');
+      const { VisibilityOverride } = await import(
+        '../../../scripts/rule-elements/operations/VisibilityOverride.js'
+      );
       const actor1 = { hasPlayerOwner: true };
       const actor2 = { hasPlayerOwner: false, token: { disposition: -1 } };
 
@@ -594,7 +814,9 @@ describe('VisibilityOverride', () => {
     });
 
     it('should return true for NPCs with same disposition', async () => {
-      const { VisibilityOverride } = await import('../../../scripts/rule-elements/operations/VisibilityOverride.js');
+      const { VisibilityOverride } = await import(
+        '../../../scripts/rule-elements/operations/VisibilityOverride.js'
+      );
       const actor1 = { hasPlayerOwner: false, token: { disposition: 1 } };
       const actor2 = { hasPlayerOwner: false, token: { disposition: 1 } };
 
@@ -614,43 +836,47 @@ describe('CoverOverride', () => {
       document: {
         id: 'subject-token',
         setFlag: jest.fn(() => Promise.resolve()),
-        getFlag: jest.fn(() => null)
-      }
+        getFlag: jest.fn(() => null),
+      },
     };
 
     mockTargetTokens = [
       {
         id: 'target-1',
         actor: { hasPlayerOwner: true },
-        document: { id: 'target-1' }
+        document: { id: 'target-1' },
       },
       {
         id: 'target-2',
         actor: { hasPlayerOwner: false, token: { disposition: -1 } },
-        document: { id: 'target-2' }
-      }
+        document: { id: 'target-2' },
+      },
     ];
 
     global.canvas = {
       tokens: {
-        placeables: [mockSubjectToken, ...mockTargetTokens]
+        placeables: [mockSubjectToken, ...mockTargetTokens],
       },
       grid: {
-        measureDistance: jest.fn(() => 10)
-      }
+        measureDistance: jest.fn(() => 10),
+      },
     };
   });
 
   describe('getTargetTokens', () => {
     it('should return all tokens when targets is "all"', async () => {
-      const { CoverOverride } = await import('../../../scripts/rule-elements/operations/CoverOverride.js');
+      const { CoverOverride } = await import(
+        '../../../scripts/rule-elements/operations/CoverOverride.js'
+      );
       const tokens = CoverOverride.getTargetTokens(mockSubjectToken, 'all');
 
       expect(tokens.length).toBe(2);
     });
 
     it('should filter specific tokens when targets is "specific"', async () => {
-      const { CoverOverride } = await import('../../../scripts/rule-elements/operations/CoverOverride.js');
+      const { CoverOverride } = await import(
+        '../../../scripts/rule-elements/operations/CoverOverride.js'
+      );
       const tokenIds = ['target-1'];
       const tokens = CoverOverride.getTargetTokens(mockSubjectToken, 'specific', null, tokenIds);
 
@@ -659,10 +885,10 @@ describe('CoverOverride', () => {
     });
 
     it('should apply range filter', async () => {
-      const { CoverOverride } = await import('../../../scripts/rule-elements/operations/CoverOverride.js');
-      global.canvas.grid.measureDistance = jest.fn()
-        .mockReturnValueOnce(5)
-        .mockReturnValueOnce(25);
+      const { CoverOverride } = await import(
+        '../../../scripts/rule-elements/operations/CoverOverride.js'
+      );
+      global.canvas.grid.measureDistance = jest.fn().mockReturnValueOnce(5).mockReturnValueOnce(25);
 
       const tokens = CoverOverride.getTargetTokens(mockSubjectToken, 'all', 20);
 
@@ -672,7 +898,9 @@ describe('CoverOverride', () => {
 
   describe('checkDirectionalCover', () => {
     it('should return true when attack is from blocked edge', async () => {
-      const { CoverOverride } = await import('../../../scripts/rule-elements/operations/CoverOverride.js');
+      const { CoverOverride } = await import(
+        '../../../scripts/rule-elements/operations/CoverOverride.js'
+      );
       const providerToken = { x: 100, y: 100 };
       const receiverToken = { x: 100, y: 100 };
       const attackerToken = { x: 100, y: 50 };
@@ -681,14 +909,16 @@ describe('CoverOverride', () => {
         providerToken,
         receiverToken,
         attackerToken,
-        ['north']
+        ['north'],
       );
 
       expect(isProtected).toBe(true);
     });
 
     it('should return false when attack is from unblocked edge', async () => {
-      const { CoverOverride } = await import('../../../scripts/rule-elements/operations/CoverOverride.js');
+      const { CoverOverride } = await import(
+        '../../../scripts/rule-elements/operations/CoverOverride.js'
+      );
       const providerToken = { x: 100, y: 100 };
       const receiverToken = { x: 100, y: 100 };
       const attackerToken = { x: 100, y: 150 };
@@ -697,7 +927,7 @@ describe('CoverOverride', () => {
         providerToken,
         receiverToken,
         attackerToken,
-        ['north']
+        ['north'],
       );
 
       expect(isProtected).toBe(false);
@@ -717,14 +947,16 @@ describe('Integration Tests', () => {
               id: 'blur-spell',
               priority: 100,
               qualifications: {
-                hide: { canUseThisConcealment: false }
-              }
-            }
-          }))
-        }
+                hide: { canUseThisConcealment: false },
+              },
+            },
+          })),
+        },
       };
 
-      const { ActionQualifier } = await import('../../../scripts/rule-elements/operations/ActionQualifier.js');
+      const { ActionQualifier } = await import(
+        '../../../scripts/rule-elements/operations/ActionQualifier.js'
+      );
       const result = ActionQualifier.checkHidePrerequisites(mockToken);
 
       expect(result.canHide).toBe(false);
@@ -736,18 +968,20 @@ describe('Integration Tests', () => {
         document: {
           id: 'test-token',
           getFlag: jest.fn(() => ({
-            'darkness': {
+            darkness: {
               id: 'darkness',
               priority: 100,
               qualifications: {
-                hide: { canUseThisConcealment: true }
-              }
-            }
-          }))
-        }
+                hide: { canUseThisConcealment: true },
+              },
+            },
+          })),
+        },
       };
 
-      const { ActionQualifier } = await import('../../../scripts/rule-elements/operations/ActionQualifier.js');
+      const { ActionQualifier } = await import(
+        '../../../scripts/rule-elements/operations/ActionQualifier.js'
+      );
       const qualifications = ActionQualifier.getActionQualifications(mockToken, 'hide');
 
       expect(qualifications.length).toBe(1);
@@ -766,14 +1000,16 @@ describe('Integration Tests', () => {
               id: 'blur-spell',
               priority: 100,
               qualifications: {
-                sneak: { endPositionQualifies: false }
-              }
-            }
-          }))
-        }
+                sneak: { endPositionQualifies: false },
+              },
+            },
+          })),
+        },
       };
 
-      const { ActionQualifier } = await import('../../../scripts/rule-elements/operations/ActionQualifier.js');
+      const { ActionQualifier } = await import(
+        '../../../scripts/rule-elements/operations/ActionQualifier.js'
+      );
       const result = ActionQualifier.checkSneakPrerequisites(mockToken, 'end');
 
       expect(result.qualifies).toBe(false);
@@ -790,17 +1026,15 @@ describe('Integration Tests', () => {
             if (key === 'stateSource') {
               return {
                 coverByObserver: {
-                  'attacker': {
-                    sources: [
-                      { id: 'tower-shield', priority: 100, state: 'standard' }
-                    ]
-                  }
-                }
+                  attacker: {
+                    sources: [{ id: 'tower-shield', priority: 100, state: 'standard' }],
+                  },
+                },
               };
             }
             return null;
-          })
-        }
+          }),
+        },
       };
 
       const coverSources = mockTarget.document.getFlag('pf2e-visioner', 'stateSource')
@@ -819,15 +1053,15 @@ describe('Integration Tests', () => {
               return {
                 state: 'standard',
                 blockedEdges: ['north'],
-                requiresTakeCover: true
+                requiresTakeCover: true,
               };
             }
             if (key === 'hasTakenCover') {
               return true;
             }
             return null;
-          })
-        }
+          }),
+        },
       };
 
       const coverData = mockTarget.document.getFlag('pf2e-visioner', 'providesCover');
@@ -848,8 +1082,8 @@ describe('Integration Tests', () => {
               return { active: true, source: 'blur-spell', state: 'concealed' };
             }
             return null;
-          })
-        }
+          }),
+        },
       };
 
       const override = mockToken.document.getFlag('pf2e-visioner', 'ruleElementOverride');
@@ -868,15 +1102,16 @@ describe('Integration Tests', () => {
             visibility: {
               sources: [
                 { id: 'darkness', priority: 10, state: 'concealed' },
-                { id: 'blur-spell', priority: 100, state: 'concealed' }
-              ]
-            }
+                { id: 'blur-spell', priority: 100, state: 'concealed' },
+              ],
+            },
           })),
-          setFlag: jest.fn(() => Promise.resolve())
-        }
+          setFlag: jest.fn(() => Promise.resolve()),
+        },
       };
 
-      const sources = mockToken.document.getFlag('pf2e-visioner', 'stateSource')?.visibility?.sources;
+      const sources = mockToken.document.getFlag('pf2e-visioner', 'stateSource')?.visibility
+        ?.sources;
 
       expect(sources).toBeDefined();
       expect(sources.length).toBe(2);
@@ -892,20 +1127,22 @@ describe('Integration Tests', () => {
             'source-1': {
               id: 'source-1',
               qualifications: {
-                hide: { qualifiesOnConcealment: true }
-              }
+                hide: { qualifiesOnConcealment: true },
+              },
             },
             'source-2': {
               id: 'source-2',
               qualifications: {
-                hide: { qualifiesOnConcealment: false }
-              }
-            }
-          }))
-        }
+                hide: { qualifiesOnConcealment: false },
+              },
+            },
+          })),
+        },
       };
 
-      const { ActionQualifier } = await import('../../../scripts/rule-elements/operations/ActionQualifier.js');
+      const { ActionQualifier } = await import(
+        '../../../scripts/rule-elements/operations/ActionQualifier.js'
+      );
       const canUse = ActionQualifier.canUseConcealment(mockToken, 'hide');
 
       expect(canUse).toBe(false);
@@ -916,13 +1153,13 @@ describe('Integration Tests', () => {
     it('should evaluate invisible condition correctly', async () => {
       const mockActor = {
         itemTypes: {
-          condition: [
-            { slug: 'invisible' }
-          ]
-        }
+          condition: [{ slug: 'invisible' }],
+        },
       };
 
-      const { VisibilityOverride } = await import('../../../scripts/rule-elements/operations/VisibilityOverride.js');
+      const { VisibilityOverride } = await import(
+        '../../../scripts/rule-elements/operations/VisibilityOverride.js'
+      );
       const result = VisibilityOverride.evaluateCondition(mockActor, 'invisible');
 
       expect(result).toBe(true);
@@ -931,21 +1168,23 @@ describe('Integration Tests', () => {
     it('should return false when condition not present', async () => {
       const mockActor = {
         itemTypes: {
-          condition: []
-        }
+          condition: [],
+        },
       };
 
-      const { VisibilityOverride } = await import('../../../scripts/rule-elements/operations/VisibilityOverride.js');
+      const { VisibilityOverride } = await import(
+        '../../../scripts/rule-elements/operations/VisibilityOverride.js'
+      );
       const result = VisibilityOverride.evaluateCondition(mockActor, 'invisible');
 
       expect(result).toBe(false);
     });
   });
 
-  describe.skip('Spell Examples Integration', () => {
+  describe('Spell Examples Integration', () => {
     it('should have valid configuration for Blur spell', async () => {
-      const { RULE_ELEMENT_EXAMPLES } = await import('../../../scripts/rule-elements/examples.js');
-      const blur = RULE_ELEMENT_EXAMPLES.blur;
+      const { default: examples } = await import('../../../scripts/rule-elements/examples.json');
+      const blur = examples.blur;
 
       expect(blur).toBeDefined();
       expect(blur.rules).toBeDefined();
@@ -953,48 +1192,28 @@ describe('Integration Tests', () => {
       expect(blur.rules[0].operations).toBeDefined();
       expect(blur.rules[0].operations.length).toBeGreaterThan(0);
 
-      const visibilityOp = blur.rules[0].operations.find(op => op.type === 'overrideVisibility');
+      const visibilityOp = blur.rules[0].operations.find((op) => op.type === 'overrideVisibility');
       expect(visibilityOp).toBeDefined();
       expect(visibilityOp.state).toBe('concealed');
 
-      const qualificationOp = blur.rules[0].operations.find(op => op.type === 'modifyActionQualification');
+      const qualificationOp = blur.rules[0].operations.find(
+        (op) => op.type === 'modifyActionQualification',
+      );
       expect(qualificationOp).toBeDefined();
-      expect(qualificationOp.qualifications.hide.canUseThisConcealment).toBe(false);
+      expect(qualificationOp.qualifications.hide.qualifiesOnConcealment).toBe(false);
     });
 
     it('should have valid configuration for Faerie Fire spell', async () => {
-      const { RULE_ELEMENT_EXAMPLES } = await import('../../../scripts/rule-elements/examples.js');
-      const faerieFire = RULE_ELEMENT_EXAMPLES.faerieFire;
+      const { default: examples } = await import('../../../scripts/rule-elements/examples.json');
+      const faerieFire = examples.faerieFire;
 
       expect(faerieFire).toBeDefined();
-      const conditionalOp = faerieFire.rules[0].operations.find(op => op.type === 'conditionalState');
+      const conditionalOp = faerieFire.rules[0].operations.find(
+        (op) => op.type === 'conditionalState',
+      );
       expect(conditionalOp).toBeDefined();
       expect(conditionalOp.condition).toBe('invisible');
       expect(conditionalOp.thenState).toBe('concealed');
-    });
-
-    it('should have valid configuration for Tower Shield', async () => {
-      const { RULE_ELEMENT_EXAMPLES } = await import('../../../scripts/rule-elements/examples.js');
-      const towerShield = RULE_ELEMENT_EXAMPLES.towerShield;
-
-      expect(towerShield).toBeDefined();
-      const coverOp = towerShield.rules[0].operations.find(op => op.type === 'overrideCover');
-      expect(coverOp).toBeDefined();
-      expect(coverOp.state).toBe('standard');
-      expect(coverOp.direction).toBe('to');
-      expect(coverOp.targets).toBe('allies');
-    });
-
-    it('should have valid configuration for Deployable Cover', async () => {
-      const { RULE_ELEMENT_EXAMPLES } = await import('../../../scripts/rule-elements/examples.js');
-      const deployableCover = RULE_ELEMENT_EXAMPLES.deployableCover;
-
-      expect(deployableCover).toBeDefined();
-      const provideOp = deployableCover.rules[0].operations.find(op => op.type === 'provideCover');
-      expect(provideOp).toBeDefined();
-      expect(provideOp.state).toBe('standard');
-      expect(provideOp.blockedEdges).toContain('north');
-      expect(provideOp.requiresTakeCover).toBe(true);
     });
   });
 
@@ -1007,15 +1226,15 @@ describe('Integration Tests', () => {
         id: 'test-token',
         document: {
           id: 'test-token',
-          getFlag: jest.fn()
-        }
+          getFlag: jest.fn(),
+        },
       };
 
       mockQualification = {
         startQualifies: true,
         endQualifies: true,
         bothQualify: true,
-        reason: ''
+        reason: '',
       };
     });
 
@@ -1024,28 +1243,31 @@ describe('Integration Tests', () => {
         mockToken.document.getFlag = jest.fn((scope, key) => {
           if (key === 'actionQualifications') {
             return {
-              'darkness': {
+              darkness: {
                 id: 'darkness',
                 qualifications: {
-                  hide: { canUseThisConcealment: true }
-                }
-              }
+                  hide: { canUseThisConcealment: true },
+                },
+              },
             };
           }
           if (key === 'stateSource') {
             return {
               visibility: {
-                sources: [
-                  { id: 'darkness', priority: 100 }
-                ]
-              }
+                sources: [{ id: 'darkness', priority: 100 }],
+              },
             };
           }
           return null;
         });
 
-        const { ActionQualificationIntegration } = await import('../../../scripts/rule-elements/ActionQualificationIntegration.js');
-        const result = await ActionQualificationIntegration.checkHideWithRuleElements(mockToken, mockQualification);
+        const { ActionQualificationIntegration } = await import(
+          '../../../scripts/rule-elements/ActionQualificationIntegration.js'
+        );
+        const result = await ActionQualificationIntegration.checkHideWithRuleElements(
+          mockToken,
+          mockQualification,
+        );
 
         expect(result.endQualifies).toBe(true);
         expect(result.bothQualify).toBe(true);
@@ -1063,19 +1285,24 @@ describe('Integration Tests', () => {
                     qualifications: {
                       hide: {
                         canUseThisConcealment: false,
-                        customMessage: "Blur's concealment doesn't hide your location"
-                      }
-                    }
-                  }
-                ]
-              }
+                        customMessage: "Blur's concealment doesn't hide your location",
+                      },
+                    },
+                  },
+                ],
+              },
             };
           }
           return null;
         });
 
-        const { ActionQualificationIntegration } = await import('../../../scripts/rule-elements/ActionQualificationIntegration.js');
-        const result = await ActionQualificationIntegration.checkHideWithRuleElements(mockToken, mockQualification);
+        const { ActionQualificationIntegration } = await import(
+          '../../../scripts/rule-elements/ActionQualificationIntegration.js'
+        );
+        const result = await ActionQualificationIntegration.checkHideWithRuleElements(
+          mockToken,
+          mockQualification,
+        );
 
         expect(result.endQualifies).toBe(false);
         expect(result.bothQualify).toBe(false);
@@ -1089,25 +1316,28 @@ describe('Integration Tests', () => {
               'standard-cover': {
                 id: 'standard-cover',
                 qualifications: {
-                  hide: { canUseThisCover: true }
-                }
-              }
+                  hide: { canUseThisCover: true },
+                },
+              },
             };
           }
           if (key === 'stateSource') {
             return {
               cover: {
-                sources: [
-                  { id: 'standard-cover', priority: 100 }
-                ]
-              }
+                sources: [{ id: 'standard-cover', priority: 100 }],
+              },
             };
           }
           return null;
         });
 
-        const { ActionQualificationIntegration } = await import('../../../scripts/rule-elements/ActionQualificationIntegration.js');
-        const result = await ActionQualificationIntegration.checkHideWithRuleElements(mockToken, mockQualification);
+        const { ActionQualificationIntegration } = await import(
+          '../../../scripts/rule-elements/ActionQualificationIntegration.js'
+        );
+        const result = await ActionQualificationIntegration.checkHideWithRuleElements(
+          mockToken,
+          mockQualification,
+        );
 
         expect(result.endQualifies).toBe(true);
       });
@@ -1115,8 +1345,13 @@ describe('Integration Tests', () => {
       it('should fail when no qualifying concealment or cover', async () => {
         mockToken.document.getFlag = jest.fn(() => null);
 
-        const { ActionQualificationIntegration } = await import('../../../scripts/rule-elements/ActionQualificationIntegration.js');
-        const result = await ActionQualificationIntegration.checkHideWithRuleElements(mockToken, mockQualification);
+        const { ActionQualificationIntegration } = await import(
+          '../../../scripts/rule-elements/ActionQualificationIntegration.js'
+        );
+        const result = await ActionQualificationIntegration.checkHideWithRuleElements(
+          mockToken,
+          mockQualification,
+        );
 
         expect(result.endQualifies).toBe(false);
         expect(result.bothQualify).toBe(false);
@@ -1134,9 +1369,9 @@ describe('Integration Tests', () => {
                     qualifications: {
                       hide: {
                         canUseThisConcealment: false,
-                        customMessage: "Blur doesn't hide your location"
-                      }
-                    }
+                        customMessage: "Blur doesn't hide your location",
+                      },
+                    },
                   },
                   {
                     id: 'revealing-light',
@@ -1144,23 +1379,28 @@ describe('Integration Tests', () => {
                     qualifications: {
                       hide: {
                         canUseThisConcealment: false,
-                        customMessage: "You are illuminated by revealing light"
-                      }
-                    }
-                  }
-                ]
-              }
+                        customMessage: 'You are illuminated by revealing light',
+                      },
+                    },
+                  },
+                ],
+              },
             };
           }
           return null;
         });
 
-        const { ActionQualificationIntegration } = await import('../../../scripts/rule-elements/ActionQualificationIntegration.js');
-        const result = await ActionQualificationIntegration.checkHideWithRuleElements(mockToken, mockQualification);
+        const { ActionQualificationIntegration } = await import(
+          '../../../scripts/rule-elements/ActionQualificationIntegration.js'
+        );
+        const result = await ActionQualificationIntegration.checkHideWithRuleElements(
+          mockToken,
+          mockQualification,
+        );
 
         expect(result.endQualifies).toBe(false);
         expect(result.reason).toContain("Blur doesn't hide your location");
-        expect(result.reason).toContain("You are illuminated by revealing light");
+        expect(result.reason).toContain('You are illuminated by revealing light');
       });
     });
 
@@ -1169,31 +1409,31 @@ describe('Integration Tests', () => {
         mockToken.document.getFlag = jest.fn((scope, key) => {
           if (key === 'actionQualifications') {
             return {
-              'darkness': {
+              darkness: {
                 id: 'darkness',
                 qualifications: {
-                  sneak: { qualifiesOnConcealment: true }
-                }
-              }
+                  sneak: { qualifiesOnConcealment: true },
+                },
+              },
             };
           }
           if (key === 'stateSource') {
             return {
               visibility: {
-                sources: [
-                  { id: 'darkness', priority: 100 }
-                ]
-              }
+                sources: [{ id: 'darkness', priority: 100 }],
+              },
             };
           }
           return null;
         });
 
-        const { ActionQualificationIntegration } = await import('../../../scripts/rule-elements/ActionQualificationIntegration.js');
+        const { ActionQualificationIntegration } = await import(
+          '../../../scripts/rule-elements/ActionQualificationIntegration.js'
+        );
         const result = await ActionQualificationIntegration.checkSneakWithRuleElements(
           mockToken,
           mockQualification,
-          'end'
+          'end',
         );
 
         expect(result.endQualifies).toBe(true);
@@ -1208,29 +1448,29 @@ describe('Integration Tests', () => {
                 qualifications: {
                   sneak: {
                     qualifiesOnConcealment: false,
-                    customMessage: "Blur doesn't hide your location for sneaking"
-                  }
-                }
-              }
+                    customMessage: "Blur doesn't hide your location for sneaking",
+                  },
+                },
+              },
             };
           }
           if (key === 'stateSource') {
             return {
               visibility: {
-                sources: [
-                  { id: 'blur-spell', priority: 100 }
-                ]
-              }
+                sources: [{ id: 'blur-spell', priority: 100 }],
+              },
             };
           }
           return null;
         });
 
-        const { ActionQualificationIntegration } = await import('../../../scripts/rule-elements/ActionQualificationIntegration.js');
+        const { ActionQualificationIntegration } = await import(
+          '../../../scripts/rule-elements/ActionQualificationIntegration.js'
+        );
         const result = await ActionQualificationIntegration.checkSneakWithRuleElements(
           mockToken,
           mockQualification,
-          'end'
+          'end',
         );
 
         expect(result.endQualifies).toBe(false);
@@ -1242,41 +1482,41 @@ describe('Integration Tests', () => {
         mockToken.document.getFlag = jest.fn((scope, key) => {
           if (key === 'actionQualifications') {
             return {
-              'darkness': {
+              darkness: {
                 id: 'darkness',
                 qualifications: {
                   sneak: {
-                    qualifiesOnConcealment: true
-                  }
-                }
-              }
+                    qualifiesOnConcealment: true,
+                  },
+                },
+              },
             };
           }
           if (key === 'stateSource') {
             return {
               visibility: {
-                sources: [
-                  { id: 'darkness', priority: 100 }
-                ]
-              }
+                sources: [{ id: 'darkness', priority: 100 }],
+              },
             };
           }
           return null;
         });
 
-        const { ActionQualificationIntegration } = await import('../../../scripts/rule-elements/ActionQualificationIntegration.js');
+        const { ActionQualificationIntegration } = await import(
+          '../../../scripts/rule-elements/ActionQualificationIntegration.js'
+        );
 
         const startResult = await ActionQualificationIntegration.checkSneakWithRuleElements(
           mockToken,
           { ...mockQualification },
-          'start'
+          'start',
         );
         expect(startResult.startQualifies).toBe(true);
 
         const endResult = await ActionQualificationIntegration.checkSneakWithRuleElements(
           mockToken,
           { ...mockQualification },
-          'end'
+          'end',
         );
         expect(endResult.endQualifies).toBe(true);
       });
@@ -1288,30 +1528,30 @@ describe('Integration Tests', () => {
           if (key === 'stateSource') {
             return {
               visibility: {
-                sources: [
-                  { id: 'darkness', priority: 100 }
-                ]
-              }
+                sources: [{ id: 'darkness', priority: 100 }],
+              },
             };
           }
           if (key === 'actionQualifications') {
             return {
-              'darkness': {
+              darkness: {
                 id: 'darkness',
                 qualifications: {
-                  hide: { canUseThisConcealment: true }
-                }
-              }
+                  hide: { canUseThisConcealment: true },
+                },
+              },
             };
           }
           return null;
         });
 
-        const { ActionQualificationIntegration } = await import('../../../scripts/rule-elements/ActionQualificationIntegration.js');
+        const { ActionQualificationIntegration } = await import(
+          '../../../scripts/rule-elements/ActionQualificationIntegration.js'
+        );
         const result = ActionQualificationIntegration.checkSourceQualifications(
           mockToken,
           'hide',
-          'visibility'
+          'visibility',
         );
 
         expect(result.qualifies).toBe(true);
@@ -1331,22 +1571,24 @@ describe('Integration Tests', () => {
                     qualifications: {
                       hide: {
                         canUseThisConcealment: false,
-                        customMessage: "Blur doesn't hide your location"
-                      }
-                    }
-                  }
-                ]
-              }
+                        customMessage: "Blur doesn't hide your location",
+                      },
+                    },
+                  },
+                ],
+              },
             };
           }
           return null;
         });
 
-        const { ActionQualificationIntegration } = await import('../../../scripts/rule-elements/ActionQualificationIntegration.js');
+        const { ActionQualificationIntegration } = await import(
+          '../../../scripts/rule-elements/ActionQualificationIntegration.js'
+        );
         const result = ActionQualificationIntegration.checkSourceQualifications(
           mockToken,
           'hide',
-          'visibility'
+          'visibility',
         );
 
         expect(result.qualifies).toBe(false);
@@ -1358,10 +1600,8 @@ describe('Integration Tests', () => {
           if (key === 'stateSource') {
             return {
               cover: {
-                sources: [
-                  { id: 'tower-shield', priority: 100 }
-                ]
-              }
+                sources: [{ id: 'tower-shield', priority: 100 }],
+              },
             };
           }
           if (key === 'actionQualifications') {
@@ -1369,19 +1609,21 @@ describe('Integration Tests', () => {
               'tower-shield': {
                 id: 'tower-shield',
                 qualifications: {
-                  hide: { canUseThisCover: true }
-                }
-              }
+                  hide: { canUseThisCover: true },
+                },
+              },
             };
           }
           return null;
         });
 
-        const { ActionQualificationIntegration } = await import('../../../scripts/rule-elements/ActionQualificationIntegration.js');
+        const { ActionQualificationIntegration } = await import(
+          '../../../scripts/rule-elements/ActionQualificationIntegration.js'
+        );
         const result = ActionQualificationIntegration.checkSourceQualifications(
           mockToken,
           'hide',
-          'cover'
+          'cover',
         );
 
         expect(result.qualifies).toBe(true);
@@ -1394,11 +1636,14 @@ describe('Integration Tests', () => {
         const qualification = {
           endQualifies: false,
           reason: 'You lack concealment',
-          ruleElementMessages: ["Blur doesn't hide your location"]
+          ruleElementMessages: ["Blur doesn't hide your location"],
         };
 
-        const { ActionQualificationIntegration } = await import('../../../scripts/rule-elements/ActionQualificationIntegration.js');
-        const result = ActionQualificationIntegration.enhanceQualificationWithMessages(qualification);
+        const { ActionQualificationIntegration } = await import(
+          '../../../scripts/rule-elements/ActionQualificationIntegration.js'
+        );
+        const result =
+          ActionQualificationIntegration.enhanceQualificationWithMessages(qualification);
 
         expect(result.reason).toBe("You lack concealment. Blur doesn't hide your location");
       });
@@ -1406,29 +1651,32 @@ describe('Integration Tests', () => {
       it('should set reason when none exists', async () => {
         const qualification = {
           endQualifies: false,
-          ruleElementMessages: ["Custom message from rule element"]
+          ruleElementMessages: ['Custom message from rule element'],
         };
 
-        const { ActionQualificationIntegration } = await import('../../../scripts/rule-elements/ActionQualificationIntegration.js');
-        const result = ActionQualificationIntegration.enhanceQualificationWithMessages(qualification);
+        const { ActionQualificationIntegration } = await import(
+          '../../../scripts/rule-elements/ActionQualificationIntegration.js'
+        );
+        const result =
+          ActionQualificationIntegration.enhanceQualificationWithMessages(qualification);
 
-        expect(result.reason).toBe("Custom message from rule element");
+        expect(result.reason).toBe('Custom message from rule element');
       });
 
       it('should handle multiple messages', async () => {
         const qualification = {
           endQualifies: false,
-          ruleElementMessages: [
-            "Message one",
-            "Message two"
-          ]
+          ruleElementMessages: ['Message one', 'Message two'],
         };
 
-        const { ActionQualificationIntegration } = await import('../../../scripts/rule-elements/ActionQualificationIntegration.js');
-        const result = ActionQualificationIntegration.enhanceQualificationWithMessages(qualification);
+        const { ActionQualificationIntegration } = await import(
+          '../../../scripts/rule-elements/ActionQualificationIntegration.js'
+        );
+        const result =
+          ActionQualificationIntegration.enhanceQualificationWithMessages(qualification);
 
-        expect(result.reason).toContain("Message one");
-        expect(result.reason).toContain("Message two");
+        expect(result.reason).toContain('Message one');
+        expect(result.reason).toContain('Message two');
       });
     });
   });
@@ -1450,27 +1698,32 @@ describe('Integration Tests', () => {
                       qualifications: {
                         hide: {
                           canUseThisConcealment: false,
-                          customMessage: "Blur's concealment doesn't hide your location"
-                        }
-                      }
-                    }
-                  ]
-                }
+                          customMessage: "Blur's concealment doesn't hide your location",
+                        },
+                      },
+                    },
+                  ],
+                },
               };
             }
             return null;
-          })
-        }
+          }),
+        },
       };
 
       const qualification = {
         startQualifies: true,
         endQualifies: true,
-        bothQualify: true
+        bothQualify: true,
       };
 
-      const { ActionQualificationIntegration } = await import('../../../scripts/rule-elements/ActionQualificationIntegration.js');
-      const result = await ActionQualificationIntegration.checkHideWithRuleElements(mockToken, qualification);
+      const { ActionQualificationIntegration } = await import(
+        '../../../scripts/rule-elements/ActionQualificationIntegration.js'
+      );
+      const result = await ActionQualificationIntegration.checkHideWithRuleElements(
+        mockToken,
+        qualification,
+      );
 
       expect(result.endQualifies).toBe(false);
       expect(result.bothQualify).toBe(false);
@@ -1491,10 +1744,10 @@ describe('Integration Tests', () => {
                       id: 'blur-spell',
                       priority: 100,
                       qualifications: {
-                        hide: { canUseThisConcealment: false }
-                      }
-                    }
-                  ]
+                        hide: { canUseThisConcealment: false },
+                      },
+                    },
+                  ],
                 },
                 cover: {
                   sources: [
@@ -1502,26 +1755,31 @@ describe('Integration Tests', () => {
                       id: 'wall-cover',
                       priority: 50,
                       qualifications: {
-                        hide: { canUseThisCover: true }
-                      }
-                    }
-                  ]
-                }
+                        hide: { canUseThisCover: true },
+                      },
+                    },
+                  ],
+                },
               };
             }
             return null;
-          })
-        }
+          }),
+        },
       };
 
       const qualification = {
         startQualifies: true,
         endQualifies: true,
-        bothQualify: true
+        bothQualify: true,
       };
 
-      const { ActionQualificationIntegration } = await import('../../../scripts/rule-elements/ActionQualificationIntegration.js');
-      const result = await ActionQualificationIntegration.checkHideWithRuleElements(mockToken, qualification);
+      const { ActionQualificationIntegration } = await import(
+        '../../../scripts/rule-elements/ActionQualificationIntegration.js'
+      );
+      const result = await ActionQualificationIntegration.checkHideWithRuleElements(
+        mockToken,
+        qualification,
+      );
 
       expect(result.endQualifies).toBe(true);
     });
@@ -1539,18 +1797,20 @@ describe('Integration Tests', () => {
                   qualifications: {
                     seek: {
                       ignoreThisConcealment: true,
-                      customMessage: "Thousand Visions reveals hidden creatures within 30ft"
-                    }
-                  }
-                }
+                      customMessage: 'Thousand Visions reveals hidden creatures within 30ft',
+                    },
+                  },
+                },
               };
             }
             return null;
-          })
-        }
+          }),
+        },
       };
 
-      const { ActionQualifier } = await import('../../../scripts/rule-elements/operations/ActionQualifier.js');
+      const { ActionQualifier } = await import(
+        '../../../scripts/rule-elements/operations/ActionQualifier.js'
+      );
       const qualifications = ActionQualifier.getActionQualifications(mockToken, 'seek');
 
       expect(qualifications.length).toBe(1);
@@ -1566,24 +1826,23 @@ describe('Integration Tests', () => {
         id: 'test-token',
         actor: {
           hasPlayerOwner: true,
-          getRollOptions: jest.fn(() => [
-            'self:condition:invisible',
-            'self:trait:elf'
-          ])
+          getRollOptions: jest.fn(() => ['self:condition:invisible', 'self:trait:elf']),
         },
         document: {
           id: 'test-token',
           hidden: false,
           disposition: 1,
           setFlag: jest.fn(() => Promise.resolve()),
-          getFlag: jest.fn(() => null)
-        }
+          getFlag: jest.fn(() => null),
+        },
       };
     });
 
     describe('PredicateHelper', () => {
       it('should evaluate simple predicate with single condition', async () => {
-        const { PredicateHelper } = await import('../../../scripts/rule-elements/PredicateHelper.js');
+        const { PredicateHelper } = await import(
+          '../../../scripts/rule-elements/PredicateHelper.js'
+        );
         const predicate = ['self:condition:invisible'];
         const rollOptions = new Set(['self:condition:invisible', 'self:trait:elf']);
 
@@ -1592,7 +1851,9 @@ describe('Integration Tests', () => {
       });
 
       it('should return false when predicate condition not met', async () => {
-        const { PredicateHelper } = await import('../../../scripts/rule-elements/PredicateHelper.js');
+        const { PredicateHelper } = await import(
+          '../../../scripts/rule-elements/PredicateHelper.js'
+        );
         const predicate = ['self:condition:blinded'];
         const rollOptions = new Set(['self:condition:invisible']);
 
@@ -1601,7 +1862,9 @@ describe('Integration Tests', () => {
       });
 
       it('should evaluate AND logic (array)', async () => {
-        const { PredicateHelper } = await import('../../../scripts/rule-elements/PredicateHelper.js');
+        const { PredicateHelper } = await import(
+          '../../../scripts/rule-elements/PredicateHelper.js'
+        );
         const predicate = ['self:condition:invisible', 'self:trait:elf'];
         const rollOptions = new Set(['self:condition:invisible', 'self:trait:elf']);
 
@@ -1610,7 +1873,9 @@ describe('Integration Tests', () => {
       });
 
       it('should fail AND logic if one condition missing', async () => {
-        const { PredicateHelper } = await import('../../../scripts/rule-elements/PredicateHelper.js');
+        const { PredicateHelper } = await import(
+          '../../../scripts/rule-elements/PredicateHelper.js'
+        );
         const predicate = ['self:condition:invisible', 'self:trait:dwarf'];
         const rollOptions = new Set(['self:condition:invisible', 'self:trait:elf']);
 
@@ -1619,7 +1884,9 @@ describe('Integration Tests', () => {
       });
 
       it('should handle negation with not: prefix', async () => {
-        const { PredicateHelper } = await import('../../../scripts/rule-elements/PredicateHelper.js');
+        const { PredicateHelper } = await import(
+          '../../../scripts/rule-elements/PredicateHelper.js'
+        );
         const predicate = ['not:self:condition:blinded'];
         const rollOptions = new Set(['self:condition:invisible']);
 
@@ -1628,7 +1895,9 @@ describe('Integration Tests', () => {
       });
 
       it('should return true for empty predicate', async () => {
-        const { PredicateHelper } = await import('../../../scripts/rule-elements/PredicateHelper.js');
+        const { PredicateHelper } = await import(
+          '../../../scripts/rule-elements/PredicateHelper.js'
+        );
         const predicate = [];
         const rollOptions = new Set(['self:condition:invisible']);
 
@@ -1637,7 +1906,9 @@ describe('Integration Tests', () => {
       });
 
       it('should get token roll options', async () => {
-        const { PredicateHelper } = await import('../../../scripts/rule-elements/PredicateHelper.js');
+        const { PredicateHelper } = await import(
+          '../../../scripts/rule-elements/PredicateHelper.js'
+        );
         const options = PredicateHelper.getTokenRollOptions(mockToken);
 
         expect(Array.isArray(options)).toBe(true);
@@ -1646,14 +1917,16 @@ describe('Integration Tests', () => {
       });
 
       it('should get target roll options', async () => {
-        const { PredicateHelper } = await import('../../../scripts/rule-elements/PredicateHelper.js');
+        const { PredicateHelper } = await import(
+          '../../../scripts/rule-elements/PredicateHelper.js'
+        );
         const targetToken = {
           actor: {
-            getRollOptions: jest.fn(() => ['trait:undead', 'condition:concealed'])
+            getRollOptions: jest.fn(() => ['trait:undead', 'condition:concealed']),
           },
           document: {
-            hidden: false
-          }
+            hidden: false,
+          },
         };
 
         const options = PredicateHelper.getTargetRollOptions(targetToken, mockToken);
@@ -1664,7 +1937,9 @@ describe('Integration Tests', () => {
       });
 
       it('should combine roll options from multiple sources', async () => {
-        const { PredicateHelper } = await import('../../../scripts/rule-elements/PredicateHelper.js');
+        const { PredicateHelper } = await import(
+          '../../../scripts/rule-elements/PredicateHelper.js'
+        );
         const set1 = new Set(['option1', 'option2']);
         const set2 = new Set(['option3', 'option4']);
 
@@ -1679,7 +1954,9 @@ describe('Integration Tests', () => {
 
     describe('Rule Element Level Predicate', () => {
       it('should skip all operations when rule element predicate fails', async () => {
-        const { PredicateHelper } = await import('../../../scripts/rule-elements/PredicateHelper.js');
+        const { PredicateHelper } = await import(
+          '../../../scripts/rule-elements/PredicateHelper.js'
+        );
 
         mockToken.actor.getRollOptions = jest.fn(() => ['self:trait:elf']);
 
@@ -1691,7 +1968,9 @@ describe('Integration Tests', () => {
       });
 
       it('should apply all operations when rule element predicate passes', async () => {
-        const { PredicateHelper } = await import('../../../scripts/rule-elements/PredicateHelper.js');
+        const { PredicateHelper } = await import(
+          '../../../scripts/rule-elements/PredicateHelper.js'
+        );
 
         const predicate = ['self:condition:invisible'];
         const rollOptions = PredicateHelper.getTokenRollOptions(mockToken);
@@ -1712,24 +1991,26 @@ describe('Integration Tests', () => {
                 actor: {
                   hasPlayerOwner: false,
                   getRollOptions: jest.fn(() => ['trait:humanoid']),
-                  token: { disposition: -1 }
+                  token: { disposition: -1 },
                 },
-                document: { id: 'target-1' }
-              }
-            ]
+                document: { id: 'target-1' },
+              },
+            ],
           },
           grid: {
-            measureDistance: jest.fn(() => 10)
-          }
+            measureDistance: jest.fn(() => 10),
+          },
         };
 
-        const { VisibilityOverride } = await import('../../../scripts/rule-elements/operations/VisibilityOverride.js');
+        const { VisibilityOverride } = await import(
+          '../../../scripts/rule-elements/operations/VisibilityOverride.js'
+        );
         const operation = {
           state: 'concealed',
           direction: 'to',
           observers: 'all',
           predicate: ['target:trait:undead'],
-          source: 'test-predicate'
+          source: 'test-predicate',
         };
 
         await VisibilityOverride.applyVisibilityOverride(operation, mockToken);
@@ -1747,24 +2028,26 @@ describe('Integration Tests', () => {
                 actor: {
                   hasPlayerOwner: false,
                   getRollOptions: jest.fn(() => ['trait:undead']),
-                  token: { disposition: -1 }
+                  token: { disposition: -1 },
                 },
-                document: { id: 'target-1' }
-              }
-            ]
+                document: { id: 'target-1' },
+              },
+            ],
           },
           grid: {
-            measureDistance: jest.fn(() => 10)
-          }
+            measureDistance: jest.fn(() => 10),
+          },
         };
 
-        const { VisibilityOverride } = await import('../../../scripts/rule-elements/operations/VisibilityOverride.js');
+        const { VisibilityOverride } = await import(
+          '../../../scripts/rule-elements/operations/VisibilityOverride.js'
+        );
         const operation = {
           state: 'concealed',
           direction: 'to',
           observers: 'all',
           predicate: ['target:trait:undead'],
-          source: 'test-predicate'
+          source: 'test-predicate',
         };
 
         await VisibilityOverride.applyVisibilityOverride(operation, mockToken);
@@ -1775,7 +2058,9 @@ describe('Integration Tests', () => {
 
     describe('Predicate Examples from Documentation', () => {
       it('should support See Invisibility pattern', async () => {
-        const { PredicateHelper } = await import('../../../scripts/rule-elements/PredicateHelper.js');
+        const { PredicateHelper } = await import(
+          '../../../scripts/rule-elements/PredicateHelper.js'
+        );
 
         const predicate = ['target:condition:invisible'];
         const rollOptionsWithInvisible = new Set(['target:condition:invisible']);
@@ -1786,7 +2071,9 @@ describe('Integration Tests', () => {
       });
 
       it('should support Consecrate vs Undead pattern', async () => {
-        const { PredicateHelper } = await import('../../../scripts/rule-elements/PredicateHelper.js');
+        const { PredicateHelper } = await import(
+          '../../../scripts/rule-elements/PredicateHelper.js'
+        );
 
         const predicate = ['self:trait:undead'];
         const undeadOptions = new Set(['self:trait:undead', 'self:trait:mindless']);
@@ -1797,10 +2084,15 @@ describe('Integration Tests', () => {
       });
 
       it('should support Blind-Fight pattern', async () => {
-        const { PredicateHelper } = await import('../../../scripts/rule-elements/PredicateHelper.js');
+        const { PredicateHelper } = await import(
+          '../../../scripts/rule-elements/PredicateHelper.js'
+        );
 
         const predicate = ['target:condition:hidden', 'target:condition:concealed'];
-        const hiddenAndConcealed = new Set(['target:condition:hidden', 'target:condition:concealed']);
+        const hiddenAndConcealed = new Set([
+          'target:condition:hidden',
+          'target:condition:concealed',
+        ]);
         const onlyHidden = new Set(['target:condition:hidden']);
 
         expect(PredicateHelper.evaluate(predicate, hiddenAndConcealed)).toBe(true);
@@ -1809,4 +2101,3 @@ describe('Integration Tests', () => {
     });
   });
 });
-
