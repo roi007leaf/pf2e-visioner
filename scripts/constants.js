@@ -529,6 +529,16 @@ export const DEFAULT_SETTINGS = {
     default: false,
   },
 
+  avsOnlyInCombat: {
+    name: 'PF2E_VISIONER.SETTINGS.AVS_ONLY_IN_COMBAT.name',
+    hint: 'PF2E_VISIONER.SETTINGS.AVS_ONLY_IN_COMBAT.hint',
+    scope: 'world',
+    config: true,
+    restricted: true,
+    type: Boolean,
+    default: false,
+  },
+
   disableLineOfSightCalculation: {
     name: 'PF2E_VISIONER.SETTINGS.DISABLE_LINE_OF_SIGHT.name',
     hint: 'PF2E_VISIONER.SETTINGS.DISABLE_LINE_OF_SIGHT.hint',

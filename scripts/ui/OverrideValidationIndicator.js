@@ -8,7 +8,7 @@
  */
 
 
-import { COVER_STATES, VISIBILITY_STATES } from '../constants.js';
+import { COVER_STATES, MODULE_ID, VISIBILITY_STATES } from '../constants.js';
 
 class OverrideValidationIndicator {
   static #instance = null;
@@ -92,6 +92,19 @@ class OverrideValidationIndicator {
   }
 
   show(overrideData, tokenName, movedTokenId = null, options = {}) {
+    try {
+      const avsOnlyInCombat = game.settings.get(MODULE_ID, 'avsOnlyInCombat');
+      if (avsOnlyInCombat) {
+        const inCombat = !!(game.combat?.started && game.combat?.combatants?.size > 0);
+        if (!inCombat) {
+          this.hide(true);
+          return;
+        }
+      }
+    } catch {
+      /* ignore */
+    }
+
     // Keep a raw copy for clearAll regardless of display filters
     const all = Array.isArray(overrideData) ? overrideData : [];
     this._rawOverrides = all;

@@ -252,6 +252,16 @@ export class EventDrivenVisibilitySystem {
    * @param {boolean} force - Force recalculation even if recently done
    */
   async recalculateAllVisibility(force = false) {
+    const avsOnlyInCombat = this.#systemStateProvider.getSetting('avsOnlyInCombat', false);
+    if (avsOnlyInCombat) {
+      try {
+        const inCombat = !!(game.combat?.started && game.combat?.combatants?.size > 0);
+        if (!inCombat) return;
+      } catch {
+        return;
+      }
+    }
+
     if (!this.#systemStateProvider.shouldProcessEvents() && !force) return;
 
     // Delegate to VisibilityStateManager for proper abstraction
@@ -265,6 +275,16 @@ export class EventDrivenVisibilitySystem {
    * @param {string[]|Set<string>} tokenIds
    */
   async recalculateForTokens(tokenIds) {
+    const avsOnlyInCombat = this.#systemStateProvider.getSetting('avsOnlyInCombat', false);
+    if (avsOnlyInCombat) {
+      try {
+        const inCombat = !!(game.combat?.started && game.combat?.combatants?.size > 0);
+        if (!inCombat) return;
+      } catch {
+        return;
+      }
+    }
+
     if (!this.#systemStateProvider.shouldProcessEvents()) return;
     const ids = Array.from(new Set((tokenIds || []).filter(Boolean)));
     if (ids.length === 0) return;

@@ -505,6 +505,10 @@
         "name": "Auto-Visibility Debug Mode",
         "hint": "Enable detailed console logging for the auto-visibility system. Useful for troubleshooting visibility calculations."
       },
+      "AVS_ONLY_IN_COMBAT": {
+        "name": "AVS Only Active in Combat",
+        "hint": "When enabled, the Auto-Visibility System will only be active during encounters and will only track visibility for tokens in the encounter. Visibility will be reset when combat ends."
+      },
       "DISABLE_LINE_OF_SIGHT": {
         "name": "Disable Line of Sight Raycasting",
         "hint": "Disable line-of-sight raycasting for visibility. When enabled, visibility will only be calculated for selected tokens using their vision shapes. Visibility results within the visibility shape will be more accurate, but darkvision and unselected token results will only use distance and senses, ignoring walls and obstacles."

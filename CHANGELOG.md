@@ -1,5 +1,18 @@
 # Changelog
 
+## [4.5.0] - 2025-01-XX
+
+### ✨ Features
+
+- **AVS Combat-Only Mode**: Added new setting to restrict Auto-Visibility System to active encounters only
+  - New setting: "AVS Only Active in Combat" in A.V.S. Settings (disabled by default)
+  - When enabled, AVS only processes visibility calculations during active combat
+  - Automatically calculates visibility for all encounter participants when combat starts
+  - Clears all visibility and detection flags for combatants when combat ends
+  - Excludes tokens not in the encounter from AVS processing during combat
+  - Perfect for tables that want to use AVS only during tactical encounters
+
+
 ## [4.4.13] - 2025-10-25
 
 ### 🐛 Bug Fixes

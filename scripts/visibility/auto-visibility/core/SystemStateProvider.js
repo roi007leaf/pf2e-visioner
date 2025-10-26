@@ -95,11 +95,24 @@ export class SystemStateProvider {
     }
 
     /**
-     * Check if the system should process events (enabled + GM)
+     * Check if the system should process events (enabled + GM + combat check if applicable)
      * @returns {boolean} True if events should be processed
      */
     shouldProcessEvents() {
-        return this.isEnabled() && this.isGM();
+        if (!this.isEnabled() || !this.isGM()) {
+            return false;
+        }
+
+        const avsOnlyInCombat = this.getSetting('avsOnlyInCombat', false);
+        if (!avsOnlyInCombat) {
+            return true;
+        }
+
+        try {
+            return !!(game.combat?.started && game.combat?.combatants?.size > 0);
+        } catch {
+            return false;
+        }
     }
 
 
