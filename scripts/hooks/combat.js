@@ -90,6 +90,24 @@ async function handleCombatEnd(combat = null) {
           await token.document.unsetFlag('pf2e-visioner', 'detection');
         }
 
+        try {
+          const effects = token.actor.itemTypes.effect;
+          const visibilityEffects = effects.filter(
+            (e) =>
+              e.flags?.['pf2e-visioner']?.isEphemeralOffGuard ||
+              e.flags?.['pf2e-visioner']?.aggregateOffGuard,
+          );
+
+          if (visibilityEffects.length > 0) {
+            const ids = visibilityEffects.map((e) => e.id).filter((id) => !!id);
+            if (ids.length > 0) {
+              await token.actor.deleteEmbeddedDocuments('Item', ids);
+            }
+          }
+        } catch {
+          /* ignore individual effect clearing errors */
+        }
+
         clearedCount++;
       } catch (error) {
         console.error(`PF2E Visioner: Error clearing flags for token ${token.document.name}:`, error);
