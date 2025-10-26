@@ -218,8 +218,9 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
     async onUpdate(actorUpdates) {
       const log = getLogger('RuleElements/Effect');
       log.debug(() => ({ msg: 'onUpdate', item: this.item?.name, actor: this.actor?.name }));
+      
       await this.removeAllFlagsForRuleElement();
-      await this.applyOperations({ triggerRecalculation: false });
+      await this.applyOperations({ triggerRecalculation: true });
     }
 
     async onDelete(actorUpdates) {

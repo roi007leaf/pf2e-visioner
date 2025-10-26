@@ -52,12 +52,32 @@ async function reapplyRuleElementsOnLoad() {
 
           let hasAppliedRules = false;
 
+          // Wait for rule elements to be initialized
+          await new Promise(resolve => setTimeout(resolve, 100));
+
           for (const rule of rules) {
             if (rule.key === 'PF2eVisionerEffect' || rule.key === 'PF2eVisionerVisibility') {
               try {
-                const instance = Array.isArray(effect.ruleElements)
-                  ? effect.ruleElements.find(r => r?.key === rule.key && (r?.slug === rule.slug || !rule.slug))
-                  : null;
+                // Try to get the rule element instance from the effect
+                let instance = null;
+                
+                // First try to get from effect.ruleElements
+                if (Array.isArray(effect.ruleElements)) {
+                  instance = effect.ruleElements.find(r => r?.key === rule.key && (r?.slug === rule.slug || !rule.slug));
+                }
+                
+                // If not found, try to create a temporary instance for reapplication
+                if (!instance && game.pf2e?.RuleElements?.custom?.[rule.key]) {
+                  try {
+                    // Deep clone the rule data to make it extensible
+                    const clonedRule = JSON.parse(JSON.stringify(rule));
+                    const RuleElementClass = game.pf2e.RuleElements.custom[rule.key];
+                    instance = new RuleElementClass(clonedRule, effect);
+                    log.debug(() => ({ msg: 'Created temporary rule element instance', ruleKey: rule.key }));
+                  } catch (error) {
+                    log.debug(() => ({ msg: 'Failed to create temporary instance', ruleKey: rule.key, error: error.message }));
+                  }
+                }
 
                 log.debug(() => ({ msg: 'Rule instance lookup', effect: effect.name, ruleKey: rule.key, hasInstance: !!instance, hasApply: !!(instance && typeof instance.applyOperations === 'function') }));
 
