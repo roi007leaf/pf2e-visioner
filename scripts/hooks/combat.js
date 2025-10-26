@@ -11,9 +11,9 @@ export function registerCombatHooks() {
   Hooks.on('deleteCombat', onDeleteCombat);
 }
 
-function onCombatStart() {
+async function onCombatStart(combat) {
   resetEncounterFiltersInDialogs();
-  handleCombatStart();
+  await handleCombatStart();
 }
 
 function onCombatEnd(combat) {
@@ -47,25 +47,52 @@ async function handleCombatStart() {
     const autoVisibilityEnabled = game.settings.get(MODULE_ID, 'autoVisibilityEnabled');
     if (!autoVisibilityEnabled) return;
 
-      try {
-        const { autoVisibilitySystem } = await import('../visibility/auto-visibility/index.js');
-        await autoVisibilitySystem.recalculateAllVisibility(true);
-      } catch (error) {
-        console.error('PF2E Visioner: Error recalculating visibility on combat start:', error);
+    try {
+      const { autoVisibilitySystem } = await import('../visibility/auto-visibility/index.js');
+      
+      let retries = 5;
+      while (retries > 0) {
+        const inCombat = !!(game.combat?.started && game.combat?.combatants?.size > 0);
+        if (inCombat) {
+          await autoVisibilitySystem.recalculateAllVisibility(true);
+          break;
+        }
+        await new Promise(resolve => setTimeout(resolve, 100));
+        retries--;
       }
+    } catch (error) {
+      console.error('PF2E Visioner: Error recalculating visibility on combat start:', error);
+    }
   } catch (error) {
     console.error('PF2E Visioner: Error setting up visibility recalculation on combat start:', error);
   }
 }
 
+let combatEndCleanupInProgress = false;
+
 async function handleCombatEnd(combat = null) {
+  if (combatEndCleanupInProgress) {
+    return;
+  }
+  
+  combatEndCleanupInProgress = true;
+  
   try {
     const avsOnlyInCombat = game.settings.get(MODULE_ID, 'avsOnlyInCombat');
-    if (!avsOnlyInCombat) return;
-    if (!game.user.isGM) return;
+    if (!avsOnlyInCombat) {
+      combatEndCleanupInProgress = false;
+      return;
+    }
+    if (!game.user.isGM) {
+      combatEndCleanupInProgress = false;
+      return;
+    }
 
     const combatTracker = combat || game.combat;
-    if (!combatTracker) return;
+    if (!combatTracker) {
+      combatEndCleanupInProgress = false;
+      return;
+    }
 
     const combatantTokens = new Set();
     for (const combatant of combatTracker.combatants) {
@@ -83,14 +110,6 @@ async function handleCombatEnd(combat = null) {
       try {
         const currentFlags = token.document.flags?.[MODULE_ID];
         if (!currentFlags) continue;
-
-        if (currentFlags.visibility) {
-          await token.document.unsetFlag(MODULE_ID, 'visibility');
-        }
-
-        if (currentFlags.detection) {
-          await token.document.unsetFlag(MODULE_ID, 'detection');
-        }
 
         try {
           const effects = token.actor.itemTypes.effect;
@@ -110,15 +129,27 @@ async function handleCombatEnd(combat = null) {
           /* ignore individual effect clearing errors */
         }
 
+        if (currentFlags.visibility) {
+          await token.document.unsetFlag(MODULE_ID, 'visibility');
+        }
+
+        if (currentFlags.detection) {
+          await token.document.unsetFlag(MODULE_ID, 'detection');
+        }
+
         clearedCount++;
       } catch (error) {
         console.error(`PF2E Visioner: Error clearing flags for token ${token.document.name}:`, error);
       }
     }
 
-    ui.notifications.info(`PF2E Visioner: Cleared flags on ${clearedCount} combatant tokens after combat.`);
+    if (clearedCount > 0) {
+      ui.notifications.info(`PF2E Visioner: Cleared flags on ${clearedCount} combatant tokens after combat.`);
+    }
   } catch (error) {
     console.error('PF2E Visioner: Error resetting flags after combat:', error);
+  } finally {
+    combatEndCleanupInProgress = false;
   }
 }
 
