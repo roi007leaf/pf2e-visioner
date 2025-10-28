@@ -29,6 +29,19 @@ export class ExclusionManager {
                 return true;
             }
 
+            // When AVS is combat-only, exclude tokens not in the encounter
+            try {
+                const avsOnlyInCombat = game.settings.get(MODULE_ID, 'avsOnlyInCombat');
+                if (avsOnlyInCombat) {
+                    const inCombat = !!(game.combat?.started && game.combat?.combatants?.size > 0);
+                    if (inCombat && !this._isTokenInEncounter(token)) {
+                        return true;
+                    }
+                }
+            } catch {
+                /* ignore */
+            }
+
             // Note: Do not exclude based on sneak-active or viewport visibility; 
             // AVS must still process them for awareness and override validation
 
@@ -205,6 +218,63 @@ export class ExclusionManager {
             }
 
             return false;
+        } catch {
+            return false;
+        }
+    }
+
+    /**
+     * Check if a token is in the current encounter
+     * @param {Object} token - Token to check
+     * @returns {boolean} True if token is in the encounter
+     */
+    _isTokenInEncounter(token) {
+        try {
+            if (!game.combat || !token) return false;
+
+            const tokenId = token.id ?? token.document?.id;
+            if (!tokenId) return false;
+
+            const direct = game.combat.combatants.find((c) => c.tokenId === tokenId);
+            if (direct) return true;
+
+            const actor = token.actor;
+            if (!actor) return false;
+
+            const actorId = actor.id;
+            const isFamiliar = actor.type === 'familiar';
+            const isEidolon = actor.type === 'eidolon' || actor.isOfType?.('eidolon');
+
+            if (isFamiliar) {
+                const masterId = actor.system?.master?.id;
+                if (masterId && game.combat.combatants.some((c) => c.actorId === masterId)) {
+                    return true;
+                }
+            }
+
+            const master = isEidolon ? actor.system?.eidolon?.master : null;
+            const masterTokenId = master?.getActiveTokens?.(true, true)?.[0]?.id;
+            if (masterTokenId && game.combat.combatants.some((c) => c.tokenId === masterTokenId)) {
+                return true;
+            }
+
+            if (actorId && game.combat.combatants.some((c) => c.actorId === actorId)) {
+                return true;
+            }
+
+            return game.combat.combatants.some((c) => {
+                try {
+                    const cActor = c.actor;
+                    if (!cActor) return false;
+
+                    const ownerIds = new Set(
+                        [cActor.id, cActor.master?.id, cActor.system?.eidolon?.master?.id].filter(Boolean)
+                    );
+                    return ownerIds.has(actorId);
+                } catch {
+                    return false;
+                }
+            });
         } catch {
             return false;
         }

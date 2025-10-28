@@ -69,6 +69,7 @@ const SETTINGS_GROUPS = {
         'autoVisibilityEnabled',
         'avsChangesIndicatorSize',
         'autoVisibilityDebugMode',
+        'avsOnlyInCombat',
         'disableLineOfSightCalculation',
       ],
     },
@@ -156,7 +157,7 @@ class VisionerSettingsForm extends foundry.applications.api.ApplicationV2 {
       ['wallCoverAllowGreater', ['wallCoverGreaterThreshold']],
       [
         'autoVisibilityEnabled',
-        ['avsChangesIndicatorSize', 'autoVisibilityDebugMode'],
+        ['avsChangesIndicatorSize', 'autoVisibilityDebugMode', 'avsOnlyInCombat'],
       ],
       [
         'autoCover',
@@ -312,6 +313,7 @@ class VisionerSettingsForm extends foundry.applications.api.ApplicationV2 {
         autoVisibilityEnabled: [
           'avsChangesIndicatorSize',
           'autoVisibilityDebugMode',
+          'avsOnlyInCombat',
         ],
       };
 
