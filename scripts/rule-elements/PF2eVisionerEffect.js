@@ -218,7 +218,7 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
     async onUpdate(actorUpdates) {
       const log = getLogger('RuleElements/Effect');
       log.debug(() => ({ msg: 'onUpdate', item: this.item?.name, actor: this.actor?.name }));
-      
+
       await this.removeAllFlagsForRuleElement();
       await this.applyOperations({ triggerRecalculation: true });
     }
@@ -733,9 +733,28 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
       const tokens = this.actor?.getActiveTokens?.() || [];
       if (!tokens.length) return;
 
+      console.log(`PF2E Visioner | removeAllFlagsForRuleElement called for ${this.item?.name}`, {
+        operationCount: this.operations.length,
+        tokenCount: tokens.length,
+        operations: this.operations.map(op => ({ type: op.type, direction: op.direction })),
+      });
+
       const registryKey = this.ruleElementRegistryKey;
 
       for (const token of tokens) {
+        console.log(`PF2E Visioner | Processing token: ${token.name} (${token.id})`);
+
+        // Use removeOperation for each operation to ensure direction-aware cleanup
+        for (const operation of this.operations) {
+          try {
+            console.log(`PF2E Visioner | Calling removeOperation for operation type: ${operation.type}, direction: ${operation.direction}`);
+            await this.removeOperation(operation, token);
+          } catch (error) {
+            console.error(`PF2E Visioner | Error removing operation ${operation.type} in removeAllFlagsForRuleElement:`, error);
+          }
+        }
+
+        // Clean up any remaining flags that weren't handled by removeOperation
         const flagRegistry = token.document.getFlag('pf2e-visioner', 'ruleElementRegistry') || {};
         const flagsToRemove = flagRegistry[registryKey] || [];
 

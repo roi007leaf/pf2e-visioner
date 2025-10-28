@@ -106,7 +106,19 @@ export class SourceTracker {
           if (newSources.length !== sources.length) {
             currentStateSource[observerKey][observerId].sources = newSources;
             modified = true;
+
+            // Clean up empty observer entries
+            if (newSources.length === 0) {
+              delete currentStateSource[observerKey][observerId];
+            }
           }
+        }
+      });
+
+      // Clean up empty observer containers
+      ['visibilityByObserver', 'coverByObserver'].forEach(observerKey => {
+        if (currentStateSource[observerKey] && Object.keys(currentStateSource[observerKey]).length === 0) {
+          delete currentStateSource[observerKey];
         }
       });
     } else {
@@ -115,8 +127,10 @@ export class SourceTracker {
       types.forEach(type => {
         if (currentStateSource[type]?.sources) {
           const sources = currentStateSource[type].sources;
+          console.log(`PF2E Visioner | Found ${sources.length} sources in ${type}`);
           const newSources = sources.filter(s => s.id !== sourceId);
           if (newSources.length !== sources.length) {
+            console.log(`PF2E Visioner | Removed source from ${type}: ${sources.length} -> ${newSources.length}`);
             currentStateSource[type].sources = newSources;
             modified = true;
           }
@@ -124,6 +138,7 @@ export class SourceTracker {
       });
 
       // Also remove from all observer-scoped entries when no specific observer is provided
+      console.log(`PF2E Visioner | Also cleaning up all observer-scoped entries`);
       ['visibilityByObserver', 'coverByObserver'].forEach(observerKey => {
         const byObserver = currentStateSource[observerKey];
         if (!byObserver) return;
@@ -131,15 +146,18 @@ export class SourceTracker {
           const srcs = Array.isArray(data?.sources) ? data.sources : [];
           const filtered = srcs.filter(s => s.id !== sourceId);
           if (filtered.length !== srcs.length) {
+            console.log(`PF2E Visioner | Removed source from ${observerKey}[${obsId}]: ${srcs.length} -> ${filtered.length}`);
             byObserver[obsId].sources = filtered;
             modified = true;
           }
           if (Array.isArray(byObserver[obsId].sources) && byObserver[obsId].sources.length === 0) {
+            console.log(`PF2E Visioner | Removing empty observer entry: ${observerKey}[${obsId}]`);
             delete byObserver[obsId];
             modified = true;
           }
         }
         if (Object.keys(byObserver).length === 0) {
+          console.log(`PF2E Visioner | Removing empty ${observerKey} object`);
           delete currentStateSource[observerKey];
           modified = true;
         }

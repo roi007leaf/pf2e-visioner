@@ -111,7 +111,7 @@ export async function registerHooks() {
 
       // Check if the changes affect rule elements
       const systemChanges = changes.system || {};
-      const hasRuleChanges = Object.keys(systemChanges).some(key => 
+      const hasRuleChanges = Object.keys(systemChanges).some(key =>
         key === 'rules' || key.startsWith('rules.')
       );
 
@@ -129,17 +129,82 @@ export async function registerHooks() {
       setTimeout(async () => {
         try {
           const rules = item.system?.rules || [];
-          const visionerRule = rules.find(rule => 
+          const visionerRule = rules.find(rule =>
             rule.key === 'PF2eVisionerEffect' || rule.key === 'PF2eVisionerVisibility'
           );
 
           if (!visionerRule) return;
 
-          // Manually apply the operations without needing an instance
-          const registryKey = `item-${item.id}`;
-          
+          const operations = visionerRule.operations || [];
+          const ruleElementId = `${item.id}-${visionerRule.slug || 'effect'}`;
+
           for (const token of tokens) {
-            // First, remove old flags
+            // First, remove old operations using direction-aware cleanup
+            // Use the ruleElementId as the source for proper matching
+            // IMPORTANT: Since we only have the NEW item data, we need to try removing from BOTH directions
+            // to ensure cleanup when the user changes the direction property
+            for (const operation of operations) {
+              const operationWithSource = {
+                ...operation,
+                source: operation.source || ruleElementId
+              };
+              try {
+                let OperationClass = null;
+                switch (operationWithSource.type) {
+                  case 'overrideVisibility':
+                  case 'conditionalState':
+                    OperationClass = (await import('../rule-elements/operations/VisibilityOverride.js')).VisibilityOverride;
+                    // Try removing from both directions to handle direction changes
+                    if (operationWithSource.direction === 'from') {
+                      // Also try removing from 'to' in case user changed from 'to' to 'from'
+                      await OperationClass.removeVisibilityOverride({ ...operationWithSource, direction: 'to' }, token);
+                    } else if (operationWithSource.direction === 'to') {
+                      // Also try removing from 'from' in case user changed from 'from' to 'to'
+                      await OperationClass.removeVisibilityOverride({ ...operationWithSource, direction: 'from' }, token);
+                    }
+                    // Now remove from the current direction (this handles the case where direction didn't change)
+                    await OperationClass.removeVisibilityOverride(operationWithSource, token);
+                    break;
+                  case 'distanceBasedVisibility':
+                    OperationClass = (await import('../rule-elements/operations/DistanceBasedVisibility.js')).DistanceBasedVisibility;
+                    await OperationClass.removeDistanceBasedVisibility(operationWithSource, token);
+                    break;
+                  case 'overrideCover':
+                    OperationClass = (await import('../rule-elements/operations/CoverOverride.js')).CoverOverride;
+                    await OperationClass.removeCoverOverride(operationWithSource, token, null);
+                    break;
+                  case 'provideCover':
+                    OperationClass = (await import('../rule-elements/operations/CoverOverride.js')).CoverOverride;
+                    await OperationClass.removeProvideCover(token);
+                    break;
+                  case 'modifySenses':
+                    OperationClass = (await import('../rule-elements/operations/SenseModifier.js')).SenseModifier;
+                    await OperationClass.restoreSenses(token, ruleElementId);
+                    break;
+                  case 'modifyDetectionModes':
+                    OperationClass = (await import('../rule-elements/operations/DetectionModeModifier.js')).DetectionModeModifier;
+                    await OperationClass.restoreDetectionModes(token, ruleElementId);
+                    break;
+                  case 'modifyActionQualification':
+                    OperationClass = (await import('../rule-elements/operations/ActionQualifier.js')).ActionQualifier;
+                    await OperationClass.removeActionQualifications(operationWithSource, token);
+                    break;
+                  case 'modifyLighting':
+                    OperationClass = (await import('../rule-elements/operations/LightingModifier.js')).LightingModifier;
+                    await OperationClass.removeLightingModification(operationWithSource, token);
+                    break;
+                  case 'offGuardSuppression':
+                    OperationClass = (await import('../rule-elements/operations/OffGuardSuppression.js')).OffGuardSuppression;
+                    await OperationClass.removeOffGuardSuppression(operationWithSource, token);
+                    break;
+                }
+              } catch (error) {
+                console.warn(`PF2E Visioner | updateItem: Failed to remove operation ${operationWithSource.type}:`, error);
+              }
+            }
+
+            // Clean up any remaining registry flags
+            const registryKey = `item-${item.id}`;
             const flagRegistry = token.document.getFlag('pf2e-visioner', 'ruleElementRegistry') || {};
             const flagsToRemove = flagRegistry[registryKey] || [];
             const updates = {};
@@ -155,33 +220,36 @@ export async function registerHooks() {
             }
 
             // Now manually apply each operation
-            const operations = visionerRule.operations || [];
-            const ruleElementId = `${item.id}-${visionerRule.slug || 'effect'}`;
 
             for (const operation of operations) {
+              // Ensure operation has a source ID for proper tracking
+              const operationWithSource = {
+                ...operation,
+                source: operation.source || ruleElementId
+              };
               try {
                 // Import the operation class
                 let OperationClass = null;
-                switch (operation.type) {
+                switch (operationWithSource.type) {
                   case 'distanceBasedVisibility':
                     OperationClass = (await import('../rule-elements/operations/DistanceBasedVisibility.js')).DistanceBasedVisibility;
-                    await OperationClass.applyDistanceBasedVisibility(operation, token);
+                    await OperationClass.applyDistanceBasedVisibility(operationWithSource, token);
                     break;
                   case 'overrideVisibility':
                     OperationClass = (await import('../rule-elements/operations/VisibilityOverride.js')).VisibilityOverride;
-                    await OperationClass.applyVisibilityOverride(operation, token);
+                    await OperationClass.applyVisibilityOverride(operationWithSource, token);
                     break;
                   case 'modifySenses':
                     OperationClass = (await import('../rule-elements/operations/SenseModifier.js')).SenseModifier;
-                    await OperationClass.applySenseModifications(token, operation.senseModifications, ruleElementId, operation.predicate);
+                    await OperationClass.applySenseModifications(token, operationWithSource.senseModifications, ruleElementId, operationWithSource.predicate);
                     break;
                   case 'modifyLighting':
                     OperationClass = (await import('../rule-elements/operations/LightingModifier.js')).LightingModifier;
-                    await OperationClass.applyLightingModification(operation, token);
+                    await OperationClass.applyLightingModification(operationWithSource, token);
                     break;
                   case 'offGuardSuppression':
                     OperationClass = (await import('../rule-elements/operations/OffGuardSuppression.js')).OffGuardSuppression;
-                    await OperationClass.applyOffGuardSuppression(operation, token);
+                    await OperationClass.applyOffGuardSuppression(operationWithSource, token);
                     break;
                 }
               } catch (error) {
@@ -558,7 +626,7 @@ export async function registerHooks() {
         rule.key === 'PF2eVisionerEffect' || rule.key === 'PF2eVisionerVisibility'
       );
 
-      if (hasVisionerRules && Array.isArray(item.ruleElements)) {
+      if (hasVisionerRules && Array.isArray(item.rules)) {
         const { getLogger } = await import('../utils/logger.js');
         const log = getLogger('RuleElements/Cleanup');
 
@@ -567,7 +635,7 @@ export async function registerHooks() {
           itemName: item.name,
           itemId: item.id,
           tokenCount: tokens.length,
-          ruleElementCount: item.ruleElements.length
+          ruleElementCount: item.rules.length
         }));
 
         for (const token of tokens) {
@@ -583,7 +651,7 @@ export async function registerHooks() {
             continue;
           }
 
-          for (const ruleElement of item.ruleElements) {
+          for (const ruleElement of item.rules) {
             if (ruleElement?.key !== 'PF2eVisionerEffect' && ruleElement?.key !== 'PF2eVisionerVisibility') {
               continue;
             }

@@ -8,8 +8,6 @@ export class VisibilityOverride {
       return;
     }
 
-
-
     const {
       observers,
       direction,
@@ -32,11 +30,8 @@ export class VisibilityOverride {
     );
 
 
-
     // If this is a visibility replacement (fromStates → toState), handle it separately
     if (fromStates && fromStates.length > 0 && toState) {
-
-
       const sourceData = {
         id: source || `visibility-replacement-${Date.now()}`,
         type: source,
@@ -69,9 +64,6 @@ export class VisibilityOverride {
     }
 
     // Otherwise, it's a direct state override
-
-
-
     const sourceData = {
       id: source || `visibility-${Date.now()}`,
       type: source,
@@ -89,7 +81,6 @@ export class VisibilityOverride {
         direction === 'from' ? [subjectToken, observerToken] : [observerToken, subjectToken];
 
 
-
       // Check operation-level predicate per target
       if (predicate && predicate.length > 0) {
         const subjectOptions = PredicateHelper.getTokenRollOptions(subjectToken);
@@ -104,8 +95,6 @@ export class VisibilityOverride {
       await this.setVisibilityState(observingToken, targetToken, state, sourceData, applyOffGuard);
     }
 
-
-
     await subjectToken.document.setFlag('pf2e-visioner', 'ruleElementOverride', {
       active: true,
       source: sourceData.id,
@@ -113,11 +102,19 @@ export class VisibilityOverride {
       direction,
     });
 
+    // Trigger visibility recalculation to update visibility maps from sources
     if (triggerRecalculation) {
+      // Collect all affected token IDs for recalculation
+      const affectedTokenIds = [subjectToken.id];
+      for (const observerToken of observerTokens) {
+        if (observerToken.id !== subjectToken.id && !affectedTokenIds.includes(observerToken.id)) {
+          affectedTokenIds.push(observerToken.id);
+        }
+      }
+
+      // Trigger full recalculation to update visibility maps from sources
       if (window.pf2eVisioner?.services?.autoVisibilitySystem?.recalculateForTokens) {
-        await window.pf2eVisioner.services.autoVisibilitySystem.recalculateForTokens([
-          subjectToken.id,
-        ]);
+        await window.pf2eVisioner.services.autoVisibilitySystem.recalculateForTokens(affectedTokenIds);
       } else if (window.pf2eVisioner?.services?.autoVisibilitySystem?.recalculateAll) {
         await window.pf2eVisioner.services.autoVisibilitySystem.recalculateAll();
       } else if (canvas?.perception) {
@@ -128,13 +125,17 @@ export class VisibilityOverride {
 
   static async setVisibilityState(observerToken, targetToken, state, sourceData, applyOffGuard = true) {
     try {
-      const { setVisibilityBetween } = await import('../../stores/visibility-map.js');
+      // Add the source to the state tracker
+      await SourceTracker.addSourceToState(targetToken, 'visibility', sourceData, observerToken.id);
 
+      // Update the visibility map for this specific observer->target pair
+      // This is unidirectional: only sets visibility from observer's perspective of target
+      const { setVisibilityBetween } = await import('../../stores/visibility-map.js');
       await setVisibilityBetween(observerToken, targetToken, state, {
         skipEphemeralUpdate: !applyOffGuard,
         isAutomatic: false,
+        direction: 'observer_to_target', // Explicitly unidirectional
       });
-      await SourceTracker.addSourceToState(targetToken, 'visibility', sourceData, observerToken.id);
     } catch (error) {
       console.warn('PF2E Visioner | Failed to set visibility state:', error);
     }
@@ -144,20 +145,72 @@ export class VisibilityOverride {
     if (!subjectToken) return;
 
     let sourceId = operation?.source;
+    let direction = operation?.direction;
+    let observers = operation?.observers;
+    let range = operation?.range;
+    let tokenIds = operation?.tokenIds;
+
     try {
       const existingOverride = subjectToken.document.getFlag('pf2e-visioner', 'ruleElementOverride');
       if (!sourceId && existingOverride?.source) {
         sourceId = existingOverride.source;
       }
+      if (!direction && existingOverride?.direction) {
+        direction = existingOverride.direction;
+      }
       const existingReplacement = subjectToken.document.getFlag('pf2e-visioner', 'visibilityReplacement');
       if (!sourceId && existingReplacement?.id) {
         sourceId = existingReplacement.id;
       }
+      if (!direction && existingReplacement?.direction) {
+        direction = existingReplacement.direction;
+      }
     } catch (_) { }
 
-    if (sourceId) {
+    // Remove sources from the affected tokens based on direction
+    if (sourceId && direction) {
+      const observerTokens = this.getObserverTokens(
+        subjectToken,
+        observers || 'all',
+        range,
+        tokenIds,
+      );
+
+      // Import visibility map functions
+      const { setVisibilityBetween } = await import('../../stores/visibility-map.js');
+
+      for (const observerToken of observerTokens) {
+        if (observerToken.id === subjectToken.id) continue;
+
+        // Clean up ONLY the current direction's storage location
+        // The updateItem hook calls remove with the OLD direction, then apply with the NEW direction
+        // So we should only clean where the OLD direction stored data, not both locations
+
+        if (direction === 'from') {
+          // Clean up what 'from' creates: sources on subject token with observer IDs
+          await SourceTracker.removeSource(subjectToken, sourceId, 'visibility', observerToken.id);
+          // Clear visibility map: observer->target (set to 'observed' to remove override)
+          await setVisibilityBetween(observerToken, subjectToken, 'observed', {
+            skipEphemeralUpdate: true,
+            isAutomatic: false,
+            direction: 'observer_to_target',
+          });
+        } else if (direction === 'to') {
+          // Clean up what 'to' creates: sources on observer tokens with subject ID
+          await SourceTracker.removeSource(observerToken, sourceId, 'visibility', subjectToken.id);
+          // Clear visibility map: subject->observer (set to 'observed' to remove override)
+          await setVisibilityBetween(subjectToken, observerToken, 'observed', {
+            skipEphemeralUpdate: true,
+            isAutomatic: false,
+            direction: 'observer_to_target',
+          });
+        }
+      }
+    } else if (sourceId) {
+      // Fallback: if no direction, do a general cleanup (less precise)
       await SourceTracker.removeSource(subjectToken, sourceId);
     }
+
     await subjectToken.document.unsetFlag('pf2e-visioner', 'ruleElementOverride');
     await subjectToken.document.unsetFlag('pf2e-visioner', 'visibilityReplacement');
   }

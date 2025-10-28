@@ -70,11 +70,29 @@ Applied to individual operations. More granular control - each operation can hav
       "type": "overrideVisibility",
       "state": "concealed",
       "predicate": ["target:trait:undead"],
+      "direction": "to",
       "observers": "all"
     }
   ]
 }
 ```
+
+**How predicates work with direction:**
+
+- The `predicate` checks the **target** of the visibility relationship
+- **`direction: "to"`** - You see others differently
+  - Target = the observers (what you're looking at)
+  - Example: `["target:trait:undead"]` makes you see undead as concealed
+- **`direction: "from"`** - Others see you differently
+  - Target = you (the subject token)
+  - Example: `["target:condition:invisible"]` only applies if YOU are invisible
+
+**Common predicates:**
+
+- `["target:trait:undead"]` - Checks if target has undead trait
+- `["target:condition:invisible"]` - Checks if target is invisible
+- `["target:ally"]` - Checks if target is an ally
+- `["target:enemy"]` - Checks if target is an enemy
 
 ## Operation Types
 

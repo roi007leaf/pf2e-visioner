@@ -1,150 +1,277 @@
 # PF2E Visioner – Copilot Instructions
 
-Purpose: Give coding AIs crisp, actionable guardrails for this repo. Follow these rules unless a maintainer explicitly asks otherwise.
+**Purpose**: Give coding AIs crisp, actionable guardrails for this repo. Follow these rules unless a maintainer explicitly asks otherwise.
 
-## Golden rules
-- Never introduce time-based loops (no setInterval/setTimeout) for core flows. Use hooks, debounced events, or batch cycles.
-- Persist state only via token/scene flags under `flags["pf2e-visioner"]`. Merge, don’t overwrite.
-- Favor batch ops over per-document updates. Use Scene updates for many tokens.
-- UI uses ApplicationV2; avoid legacy Application patterns.
-- No hidden global side effects. Prefer services and stores with explicit wiring.
-- Keep hot paths synchronous where feasible. Async only when necessary and outside render-critical loops.
-- Check HANDOVER.md first.
-- Always run tests in terminal rather than internal tool.
-- Every bugfix requires a test if there isn't any.
-- Dont write long functions, break to several functions to keep readable.
-- Never mix test code and production code.
-- Use i18n keys for all user-facing text. Update lang/*.json as needed.
-- Dont delete debug logs until the user confirms bug is fixed.
-- Do not add comments
-- Do not modify code you haven't specifically been instructed to modify
-- Do not rename functions unless you have been instructed to
-- Do not refactor code unprompted
-- Maintain clean and readable code
-- If you don't know — say you don't know
-- Break large functions into smaller functions
-- If an old unit test fails, do not modify the test to make it pass
-- Don't add hardcoded strings for UI, use i18n keys
-- Don't use time based solution, use event or hook based solutions instead
-- Always consult https://foundryvtt.com/api/ and https://github.com/foundryvtt/pf2e for any system or Foundry related questions or API references
-- Use https://2e.aonprd.com/ for any PF2e rules references
+## Quick Start - Most Critical Rules
+
+1. **Check HANDOVER.md first** - Contains current architecture, recent changes, and critical gotchas
+2. **Never use timers** - No setInterval/setTimeout for core flows; use hooks and events
+3. **Always batch operations** - Never loop over tokens with individual updates
+4. **Deep-merge flags** - Never overwrite `flags["pf2e-visioner"]` objects; always merge
+5. **Every bug needs a test** - Add regression tests for all bugfixes
+6. **Use i18n for all UI text** - No hardcoded strings; update lang/*.json
+
+## Code Quality & Style
+
+- **Keep functions focused**: Break long functions into smaller, single-purpose functions
+- **Self-documenting code**: Use clear names; add comments only for complex algorithms or non-obvious behavior
+- **Maintain readability**: Clean, idiomatic code is preferred over clever code
+- **Don't modify unprompted**: Only change code you're specifically instructed to modify
+- **Don't rename without instruction**: Preserve existing function/variable names unless explicitly asked
+- **Don't refactor unprompted**: Focus on the requested task, not code reorganization
+- **If uncertain, say so**: Don't guess or make assumptions; ask for clarification
+
+## Communication & Output Style
+
+- **Be concise**: Keep answers short and to the point
+- **No verbose explanations**: Don't explain what you're about to do before doing it
+- **Use tools, not codeblocks**: Never print code changes in chat; use edit tools instead
+- **Use terminal, not suggestions**: Run commands directly; don't tell user to run them
+- **Action over words**: Prefer taking action over describing planned actions
+- **Direct responses**: Answer questions directly without preamble
+
+## Architecture Principles
+
+- **Event-driven architecture**: Use Foundry hooks, debounced events, or batch cycles instead of timers
+- **Flag-based persistence**: All state persists via token/scene flags under `flags["pf2e-visioner"]`
+- **Deep-merge only**: Use service methods to merge flags; never overwrite entire flag objects
+- **Batch operations**: Favor Scene.updateEmbeddedDocuments over individual token updates
+- **ApplicationV2 only**: All UI uses Foundry v13's ApplicationV2 framework
+- **No hidden side effects**: Prefer services and stores with explicit dependency injection
+- **Synchronous hot paths**: Keep render-critical paths synchronous; async only when necessary
+- **Service-based architecture**: Use stores for state, services for orchestration
+
+## Testing Requirements
+
+- **Run tests in terminal**: Use VS Code task "Run unit tests", not internal tool
+- **Test coverage for bugs**: Every bugfix requires a regression test if none exists
+- **Don't modify failing tests**: If an old unit test fails, fix the code, not the test
+- **Keep tests separate**: Never mix test code and production code
+- **Preserve debug logs**: Don't delete debug logs until user confirms bug is fixed
+- **Use Jest**: Testing framework is Jest, not Vitest
+
+## Localization & Accessibility
+
+- **i18n keys only**: All user-facing text uses localization keys from lang/*.json
+- **Update all locales**: Add English translations, mark other locales with TODO
+- **CSS custom properties**: All colors use CSS custom properties; no hardcoded hex values
+- **Colorblind support**: Respect colorblind modes; test with all accessibility settings
+
+## External References
+
+- **Foundry API**: https://foundryvtt.com/api/ for Foundry-related questions
+- **PF2e System**: https://github.com/foundryvtt/pf2e for system API and patterns
+- **PF2e Rules**: https://2e.aonprd.com/ for game rules references
  
-## Architecture you must respect
-- Stores (single-responsibility): `scripts/stores/*` – visibility/cover maps, simple get/set.
-- Services (cross-cutting): `scripts/services/*` – orchestration, perception refresh, visuals, sockets.
-- UI controllers: `scripts/managers/*` – thin ApplicationV2 controllers.
-- Hooks: `scripts/hooks/*` – registration split by concern; `hooks/registration.js` composes.
-- Cover/Visibility engines: `scripts/cover/*`, `scripts/visibility/*` – effect aggregation, batch processing.
-- Chat automation: `scripts/chat/*` – actions, dialogs, results.
-- Public API: `scripts/api.js` – stable surface. Internal helpers in `services/api-internal.js`.
+## Architecture You Must Respect
 
-## Contract for state
-- Visibility states: observed | concealed | hidden | undetected.
-- Cover states: none | lesser | standard | greater.
-- Flags shape per token:
-  - `flags["pf2e-visioner"].visibility[observerId] = state`
-  - `flags["pf2e-visioner"].cover[attackerId] = state`
-- Never wipe the object; deep-merge when writing.
+- **Stores** (single-responsibility): `scripts/stores/*` – visibility/cover maps, simple get/set
+- **Services** (cross-cutting): `scripts/services/*` – orchestration, perception refresh, visuals, sockets
+- **UI controllers**: `scripts/managers/*` – thin ApplicationV2 controllers
+- **Hooks**: `scripts/hooks/*` – registration split by concern; `hooks/registration.js` composes
+- **Cover/Visibility engines**: `scripts/cover/*`, `scripts/visibility/*` – effect aggregation, batch processing
+- **Chat automation**: `scripts/chat/*` – actions, dialogs, results
+- **Public API**: `scripts/api.js` – stable surface. Internal helpers in `services/api-internal.js`
+- **Rule Elements**: `scripts/rule-elements/*` – PF2e rule element integrations for visibility/cover effects
 
-## Performance patterns
-- Batch writes and effect rebuilds; avoid per-target loops with immediate awaits.
-- Defer heavy work to GM or token owners to avoid duplicate computation.
-- Avoid triggering `refreshLighting`; refresh vision/occlusion only when needed.
-- Debounce/react to Foundry hooks (move/animate/lighting) and avoid feedback loops.
+## State Contracts
 
-## UI/UX conventions
-- Color and styling come from CSS custom properties in `styles/*.css`; don’t hardcode hex values. Respect colorblind modes.
-- Token Manager and dialogs are responsive; keep templates clean and class-driven (no inline styles).
-- Bulk actions must support Apply/Revert per-row and bulk Apply All/Revert All.
+### Visibility States (PF2e)
+- **observed**: Full visibility, no penalties
+- **concealed**: DC 5 flat check to target
+- **hidden**: Requires Seek, DC 11 flat check
+- **undetected**: Unknown location, cannot target
 
-## Testing + quality gates
-- Jest test suite must pass. Use the provided npm scripts.
-- Maintain coverage; add unit tests for helpers and integration tests for flows.
-- Run linting and keep ESModule imports tidy.
-- Prefer deterministic tests; use provided Foundry/PF2e mocks.
-- Never change production code to accommodate tests. fix the test instead.
-- Never run a test with debug logs, if debug is needed set debugger expressions and tell me to run in debug and ill tell you waht you need to know
-- Use Jest not Vitest
+### Cover States (PF2e)
+- **none**: No AC bonus
+- **lesser**: +1 AC
+- **standard**: +2 AC
+- **greater**: +4 AC
 
-## Do/Don’t examples
-Do
-- Add a service and register it via hooks/registration or API init.
-- Read/merge token flags with defensive null checks.
-- Batch update token flags and then trigger a single visuals refresh.
-- Use i18n keys; update `lang/*.json` when introducing user-facing text.
+### Flag Structure
+```javascript
+// Visibility: per-observer state
+token.flags["pf2e-visioner"].visibility = {
+  [observerId]: "observed" | "concealed" | "hidden" | "undetected"
+}
 
-Don’t
-- Write directly to `token.document.flags.pf2e-visioner = {...}` (overwrites!).
-- Call `canvas.perception.update({ refreshLighting: true })`.
-- Add long-lived timers or polling for visibility/cover.
-- Introduce UI inline styles or hardcoded colors.
-- Use Time based solutions if possible
+// Cover: per-attacker state
+token.flags["pf2e-visioner"].cover = {
+  [attackerId]: "none" | "lesser" | "standard" | "greater"
+}
 
-## Common pitfalls (and the correct approach)
-- Token vs TokenDocument: when in doubt, operate on TokenDocument for persistence; use `token.document`.
-- Cross-client updates: prefer socket-based perception refresh via services; avoid duplicating work across clients.
-- Effect lifecycle: aggregate effects are intentional; clean up after roll-time effects; don’t duplicate.
-- Party tokens: respect preservation/restoration services and caches; avoid deleting/restoring flags manually.
+// Overrides: manual GM overrides
+token.flags["pf2e-visioner"]["avs-override-from-${observerId}"] = true
 
-## How to add a feature safely
-1) Identify the layer(s): store vs service vs UI.
-2) Add minimal store getters/setters (pure data), then a service for orchestration.
-3) Wire hooks/UI to call the service. Keep UI thin.
-4) Write unit tests (helpers/service) and an integration test if flow touches canvas/chat.
-5) Update docs if you change behavior (README/DEVELOPMENT/ARCHITECTURE).
+// Scene: party token cache
+scene.flags["pf2e-visioner"].partyTokenStateCache = {
+  [tokenId]: { visibility, cover, effects }
+}
+```
 
-## Commands you can run
-- Run unit tests: use the VS Code task “Run unit tests” (npm test).
-- Re-run subset: use the "Re-run unit tests (subset)" task where provided.
+**CRITICAL**: Always deep-merge flags, NEVER overwrite:
+```javascript
+// ❌ WRONG - wipes all data
+await token.update({"flags.pf2e-visioner": newData});
 
-## File map for common tasks
-- Visibility map read/write: `scripts/stores/visibility-map.js`
-- Cover map read/write: `scripts/stores/cover-map.js`
-- Visual refresh: `scripts/services/visual-effects.js`
-- Hook wiring: `scripts/hooks/registration.js`, `scripts/hooks/*.js`
-- Chat automation: `scripts/chat/**` (dialogs, processors, services)
-- Public API: `scripts/api.js`
+// ✅ CORRECT - use service
+await VisibilityMapService.setVisibilityState(token, observer, state);
+```
 
-## Localization and accessibility
-- Add English strings to `lang/en.json` and mirror to other locales with TODO comments.
-- Keep ARIA/tooltips consistent; reuse existing tooltip helpers where possible.
+## Performance Patterns
 
-## Security/permissions
-- Assume players have limited permissions. Guard actions by role; GM-first for destructive ops.
+- **Batch writes and effect rebuilds**: Avoid per-target loops with immediate awaits
+- **Defer heavy work**: GM or token owners to avoid duplicate computation
+- **Avoid refreshLighting**: Refresh vision/occlusion only when needed
+- **Debounce/react to hooks**: Avoid feedback loops from move/animate/lighting
 
-## When in doubt
-- Check HANDOVER.md first. Align with patterns there.
-- Prefer small, reversible changes. Add TODO comments with clear follow-ups.
-- If performance is impacted, add a benchmark test or a quick micro-benchmark under tests.
+## UI/UX Conventions
 
-## Auto‑Visibility System (AVS) structuring
-- Core orchestration lives in services; keep hot-path math/data pure and synchronous where possible.
-- Dependency Injection (DI): Register services once and pass them explicitly; don’t reach for globals in core logic.
+- **CSS custom properties**: All colors from `styles/*.css`; never hardcode hex values
+- **Colorblind modes**: Support Protanopia, Deuteranopia, Tritanopia, Achromatopsia
+- **Responsive design**: Token Manager and dialogs work on all screen sizes
+- **Bulk actions**: Support Apply/Revert per-row and bulk Apply All/Revert All
 
-Key components
-- Event‑Driven Visibility System (EDS): reacts to hooks and delegates to services; avoid long async operations inside event handlers.
-- BatchProcessor: entry to batch recompute; never mutate flags directly here—go through services.
-- Spatial index & filters: use viewport/range filtering before heavy processing.
+## Testing + Quality Gates
 
-Caches (use, don’t reinvent)
-- PositionBatchCache: snapshot token positions for the batch.
-- VisibilityMapBatchCache: snapshot original per‑observer maps to compare/reconcile.
-- OverrideBatchCache: memoize per‑pair manual overrides; read via OverrideService; fall back to target flags if needed.
-- Global caches: GlobalLos/GlobalVisibility caches with TTL; prefer them for repeated queries within the same frame/tick.
+- **Jest test suite must pass**: Use provided npm scripts
+- **Maintain coverage**: Add unit tests for helpers, integration tests for flows
+- **Run linting**: Keep ESModule imports tidy
+- **Deterministic tests**: Use provided Foundry/PF2e mocks
+- **Never change production for tests**: Fix tests instead
+- **No debug logs in tests**: Use debugger expressions, tell user to run in debug
 
-Services contract
-- VisibilityMapService: single source of truth for reading/writing visibility maps; deep‑merge writes only.
-- OverrideService: best‑effort sync lookup `getActiveOverrideForTokens(observer, target)`; only read in hot paths.
-- Visual effects service: trigger one consolidated refresh after batch writes; do not call `refreshLighting`.
+## Do/Don't Examples
 
-Do
-- Wire EDS → BatchProcessor with services injected via DI.
-- Filter candidates by viewport and max range before per‑pair work.
-- Batch flag updates and perform a single visuals/perception refresh via services.
-- Keep batch steps side‑effect free until the final commit phase.
+### Do ✅
+- Add a service and register it via hooks/registration or API init
+- Read/merge token flags with defensive null checks
+- Batch update token flags and then trigger a single visuals refresh
+- Use i18n keys; update `lang/*.json` when introducing user-facing text
 
-Don’t
-- Don’t access `visibilityMapFunctions` or other legacy function deps—use services.
-- Don’t await per‑target writes in a loop; collect and batch.
-- Don’t compute the same pair twice—check caches first.
-- Don’t introduce timers/polling to drive AVS; rely on hooks and debounced signals.
+### Don't ❌
+- Write directly to `token.document.flags.pf2e-visioner = {...}` (overwrites!)
+- Call `canvas.perception.update({ refreshLighting: true })`
+- Add long-lived timers or polling for visibility/cover
+- Introduce UI inline styles or hardcoded colors
+- Use time-based solutions when event/hook-based alternatives exist
+
+## Common Pitfalls (and Correct Approach)
+
+- **Token vs TokenDocument**: When in doubt, operate on TokenDocument for persistence; use `token.document`
+- **Cross-client updates**: Prefer socket-based perception refresh via services; avoid duplicating work
+- **Effect lifecycle**: Aggregate effects are intentional; clean up after roll-time effects
+- **Party tokens**: Respect preservation/restoration services and caches; avoid manual flag operations
+
+## How to Add a Feature Safely
+
+1. **Identify the layer(s)**: Store vs service vs UI
+2. **Add minimal store getters/setters**: Pure data, then a service for orchestration
+3. **Wire hooks/UI to call the service**: Keep UI thin
+4. **Write unit tests**: Helpers/service tests and integration tests if flow touches canvas/chat
+5. **Update docs**: README/DEVELOPMENT/ARCHITECTURE if behavior changes
+
+## File Map for Common Tasks
+
+- **Visibility map read/write**: `scripts/stores/visibility-map.js`
+- **Cover map read/write**: `scripts/stores/cover-map.js`
+- **Visual refresh**: `scripts/services/visual-effects.js`
+- **Hook wiring**: `scripts/hooks/registration.js`, `scripts/hooks/*.js`
+- **Chat automation**: `scripts/chat/**` (dialogs, processors, services)
+- **Public API**: `scripts/api.js`
+- **Rule elements**: `scripts/rule-elements/pf2e-visioner-effect.js`
+
+## Localization and Accessibility
+
+- **Add English strings** to `lang/en.json` and mirror to other locales with TODO comments
+- **Keep ARIA/tooltips consistent**: Reuse existing tooltip helpers
+- **Colorblind modes**: Test all four modes (Protanopia, Deuteranopia, Tritanopia, Achromatopsia)
+
+## Security/Permissions
+
+- **Assume limited permissions**: Guard actions by role; GM-first for destructive ops
+- **Token ownership**: Check token.isOwner before allowing state changes
+
+## When in Doubt
+
+- **Check HANDOVER.md first**: Align with patterns there
+- **Prefer small, reversible changes**: Add TODO comments with clear follow-ups
+- **Performance impact**: Add benchmark test or micro-benchmark under tests
+
+## Auto-Visibility System (AVS) Structuring
+
+- **Core orchestration**: Lives in services; keep hot-path math/data pure and synchronous
+- **Dependency Injection (DI)**: Register services once and pass them explicitly; don't reach for globals
+
+### Key Components
+- **Event-Driven Visibility System (EDS)**: Reacts to hooks and delegates to services; avoid long async ops
+- **BatchProcessor**: Entry to batch recompute; never mutate flags directly—go through services
+- **Spatial index & filters**: Use viewport/range filtering before heavy processing
+
+### Caches (Use, Don't Reinvent)
+- **PositionBatchCache**: Snapshot token positions for the batch
+- **VisibilityMapBatchCache**: Snapshot original per-observer maps to compare/reconcile
+- **OverrideBatchCache**: Memoize per-pair manual overrides; read via OverrideService
+- **Global caches**: GlobalLos/GlobalVisibility caches with TTL; prefer for repeated queries
+
+### Services Contract
+- **VisibilityMapService**: Single source of truth for reading/writing visibility maps; deep-merge writes only
+- **OverrideService**: Best-effort sync lookup `getActiveOverrideForTokens(observer, target)`; only read in hot paths
+- **Visual effects service**: Trigger one consolidated refresh after batch writes; do not call `refreshLighting`
+
+### AVS Do/Don't
+
+#### Do ✅
+- Wire EDS → BatchProcessor with services injected via DI
+- Filter candidates by viewport and max range before per-pair work
+- Batch flag updates and perform a single visuals/perception refresh via services
+- Keep batch steps side-effect free until the final commit phase
+
+#### Don't ❌
+- Don't access `visibilityMapFunctions` or other legacy function deps—use services
+- Don't await per-target writes in a loop; collect and batch
+- Don't compute the same pair twice—check caches first
+- Don't introduce timers/polling to drive AVS; rely on hooks and debounced signals
+
+## Rule Elements System
+
+The module supports PF2e rule elements for advanced visibility and cover modifications:
+
+### PF2eVisionerEffect Rule Element
+- **Purpose**: Apply visibility/cover modifications through PF2e's rule element system
+- **Location**: `scripts/rule-elements/pf2e-visioner-effect.js`
+- **Integration**: Registered with PF2e system during module initialization
+- **Usage**: Can be added to items to modify visibility states or cover levels
+
+### Rule Element Patterns
+- **Validation**: Always validate rule element data before applying effects
+- **Compatibility**: Ensure rule elements work with PF2e system version
+- **Documentation**: Update RULE_ELEMENTS.md when adding new rule element types
+- **Testing**: Add unit tests for rule element logic and integration tests for PF2e interaction
+
+## Recent Feature Updates
+
+### Sound-Blocking Walls
+- **Detection**: Uses `CONFIG.Canvas.polygonBackends.sound.testCollision()` for sound-blocking walls
+- **Rules**: When sight AND sound blocked, targets become "undetected" (not just "hidden")
+- **Senses**: Tremorsense, scent, and lifesense bypass sound-blocking walls
+- **Files**: `VisionAnalyzer.js`, `StatelessVisibilityCalculator.js`
+
+### Movement Action Support
+- **Tremorsense**: Now uses `movementAction` property instead of elevation
+- **Flying detection**: `movementAction === 'fly'` means tremorsense fails
+- **Cache invalidation**: Movement action changes clear all caches
+- **Files**: `StatelessVisibilityCalculator.js`, `TokenEventHandler.js`
+
+### Lighting Cache Management
+- **Multi-layer caches**: Position, LOS, visibility, and lighting caches
+- **Invalidation**: Event handlers MUST clear caches when state changes
+- **TTL-based**: Caches have time-to-live to prevent stale data
+- **Coordination**: BatchOrchestrator coordinates cache clearing across all layers
+
+## Commands You Can Run
+
+- **Run unit tests**: VS Code task "Run unit tests" (npm test)
+- **Re-run subset**: "Re-run unit tests (subset)" task where provided
+- **Coverage report**: npm run test:coverage
+- **Linting**: npm run lint

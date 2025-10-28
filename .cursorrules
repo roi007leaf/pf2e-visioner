@@ -3,6 +3,10 @@
 Purpose: Give coding AIs crisp, actionable guardrails for this repo. Follow these rules unless a maintainer explicitly asks otherwise.
 
 ## Golden rules
+
+- In all interactions and commit messages, be extremely concise and sacrifice grammar for the sake of concision.
+- Your primary method for interacting with GitHub should be the GitHub cli
+- At the end of every plan, give me a list of unresolved questions to answer, if any. Make the questions extremely concise. Sacrifice grammar for the sake of concision.
 - Never introduce time-based loops (no setInterval/setTimeout) for core flows. Use hooks, debounced events, or batch cycles.
 - Persist state only via token/scene flags under `flags["pf2e-visioner"]`. Merge, don’t overwrite.
 - Favor batch ops over per-document updates. Use Scene updates for many tokens.
@@ -14,7 +18,7 @@ Purpose: Give coding AIs crisp, actionable guardrails for this repo. Follow thes
 - Every bugfix requires a test if there isn't any.
 - Dont write long functions, break to several functions to keep readable.
 - Never mix test code and production code.
-- Use i18n keys for all user-facing text. Update lang/*.json as needed.
+- Use i18n keys for all user-facing text. Update lang/\*.json as needed.
 - Dont delete debug logs until the user confirms bug is fixed.
 - Do not add comments
 - Do not modify code you haven't specifically been instructed to modify
@@ -22,11 +26,15 @@ Purpose: Give coding AIs crisp, actionable guardrails for this repo. Follow thes
 - Do not refactor code unprompted
 - Maintain clean and readable code
 - If you don't know — say you don't know
+- Break large functions into smaller functions
 - If an old unit test fails, do not modify the test to make it pass
 - Don't add hardcoded strings for UI, use i18n keys
 - Don't use time based solution, use event or hook based solutions instead
+- Always consult https://foundryvtt.com/api/ and https://github.com/foundryvtt/pf2e for any system or Foundry related questions or API references
+- Use https://2e.aonprd.com/ for any PF2e rules references
 
 ## Architecture you must respect
+
 - Stores (single-responsibility): `scripts/stores/*` – visibility/cover maps, simple get/set.
 - Services (cross-cutting): `scripts/services/*` – orchestration, perception refresh, visuals, sockets.
 - UI controllers: `scripts/managers/*` – thin ApplicationV2 controllers.
@@ -36,6 +44,7 @@ Purpose: Give coding AIs crisp, actionable guardrails for this repo. Follow thes
 - Public API: `scripts/api.js` – stable surface. Internal helpers in `services/api-internal.js`.
 
 ## Contract for state
+
 - Visibility states: observed | concealed | hidden | undetected.
 - Cover states: none | lesser | standard | greater.
 - Flags shape per token:
@@ -44,17 +53,20 @@ Purpose: Give coding AIs crisp, actionable guardrails for this repo. Follow thes
 - Never wipe the object; deep-merge when writing.
 
 ## Performance patterns
+
 - Batch writes and effect rebuilds; avoid per-target loops with immediate awaits.
 - Defer heavy work to GM or token owners to avoid duplicate computation.
 - Avoid triggering `refreshLighting`; refresh vision/occlusion only when needed.
 - Debounce/react to Foundry hooks (move/animate/lighting) and avoid feedback loops.
 
 ## UI/UX conventions
+
 - Color and styling come from CSS custom properties in `styles/*.css`; don’t hardcode hex values. Respect colorblind modes.
 - Token Manager and dialogs are responsive; keep templates clean and class-driven (no inline styles).
 - Bulk actions must support Apply/Revert per-row and bulk Apply All/Revert All.
 
 ## Testing + quality gates
+
 - Jest test suite must pass. Use the provided npm scripts.
 - Maintain coverage; add unit tests for helpers and integration tests for flows.
 - Run linting and keep ESModule imports tidy.
@@ -64,13 +76,16 @@ Purpose: Give coding AIs crisp, actionable guardrails for this repo. Follow thes
 - Use Jest not Vitest
 
 ## Do/Don’t examples
+
 Do
+
 - Add a service and register it via hooks/registration or API init.
 - Read/merge token flags with defensive null checks.
 - Batch update token flags and then trigger a single visuals refresh.
 - Use i18n keys; update `lang/*.json` when introducing user-facing text.
 
 Don’t
+
 - Write directly to `token.document.flags.pf2e-visioner = {...}` (overwrites!).
 - Call `canvas.perception.update({ refreshLighting: true })`.
 - Add long-lived timers or polling for visibility/cover.
@@ -78,23 +93,27 @@ Don’t
 - Use Time based solutions if possible
 
 ## Common pitfalls (and the correct approach)
+
 - Token vs TokenDocument: when in doubt, operate on TokenDocument for persistence; use `token.document`.
 - Cross-client updates: prefer socket-based perception refresh via services; avoid duplicating work across clients.
 - Effect lifecycle: aggregate effects are intentional; clean up after roll-time effects; don’t duplicate.
 - Party tokens: respect preservation/restoration services and caches; avoid deleting/restoring flags manually.
 
 ## How to add a feature safely
-1) Identify the layer(s): store vs service vs UI.
-2) Add minimal store getters/setters (pure data), then a service for orchestration.
-3) Wire hooks/UI to call the service. Keep UI thin.
-4) Write unit tests (helpers/service) and an integration test if flow touches canvas/chat.
-5) Update docs if you change behavior (README/DEVELOPMENT/ARCHITECTURE).
+
+1. Identify the layer(s): store vs service vs UI.
+2. Add minimal store getters/setters (pure data), then a service for orchestration.
+3. Wire hooks/UI to call the service. Keep UI thin.
+4. Write unit tests (helpers/service) and an integration test if flow touches canvas/chat.
+5. Update docs if you change behavior (README/DEVELOPMENT/ARCHITECTURE).
 
 ## Commands you can run
+
 - Run unit tests: use the VS Code task “Run unit tests” (npm test).
 - Re-run subset: use the "Re-run unit tests (subset)" task where provided.
 
 ## File map for common tasks
+
 - Visibility map read/write: `scripts/stores/visibility-map.js`
 - Cover map read/write: `scripts/stores/cover-map.js`
 - Visual refresh: `scripts/services/visual-effects.js`
@@ -103,44 +122,53 @@ Don’t
 - Public API: `scripts/api.js`
 
 ## Localization and accessibility
+
 - Add English strings to `lang/en.json` and mirror to other locales with TODO comments.
 - Keep ARIA/tooltips consistent; reuse existing tooltip helpers where possible.
 
 ## Security/permissions
+
 - Assume players have limited permissions. Guard actions by role; GM-first for destructive ops.
 
 ## When in doubt
+
 - Check HANDOVER.md first. Align with patterns there.
 - Prefer small, reversible changes. Add TODO comments with clear follow-ups.
 - If performance is impacted, add a benchmark test or a quick micro-benchmark under tests.
 
 ## Auto‑Visibility System (AVS) structuring
+
 - Core orchestration lives in services; keep hot-path math/data pure and synchronous where possible.
 - Dependency Injection (DI): Register services once and pass them explicitly; don’t reach for globals in core logic.
 
 Key components
+
 - Event‑Driven Visibility System (EDS): reacts to hooks and delegates to services; avoid long async operations inside event handlers.
 - BatchProcessor: entry to batch recompute; never mutate flags directly here—go through services.
 - Spatial index & filters: use viewport/range filtering before heavy processing.
 
 Caches (use, don’t reinvent)
+
 - PositionBatchCache: snapshot token positions for the batch.
 - VisibilityMapBatchCache: snapshot original per‑observer maps to compare/reconcile.
 - OverrideBatchCache: memoize per‑pair manual overrides; read via OverrideService; fall back to target flags if needed.
 - Global caches: GlobalLos/GlobalVisibility caches with TTL; prefer them for repeated queries within the same frame/tick.
 
 Services contract
+
 - VisibilityMapService: single source of truth for reading/writing visibility maps; deep‑merge writes only.
 - OverrideService: best‑effort sync lookup `getActiveOverrideForTokens(observer, target)`; only read in hot paths.
 - Visual effects service: trigger one consolidated refresh after batch writes; do not call `refreshLighting`.
 
 Do
+
 - Wire EDS → BatchProcessor with services injected via DI.
 - Filter candidates by viewport and max range before per‑pair work.
 - Batch flag updates and perform a single visuals/perception refresh via services.
 - Keep batch steps side‑effect free until the final commit phase.
 
 Don’t
+
 - Don’t access `visibilityMapFunctions` or other legacy function deps—use services.
 - Don’t await per‑target writes in a loop; collect and batch.
 - Don’t compute the same pair twice—check caches first.
