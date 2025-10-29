@@ -44,6 +44,7 @@ describe('TokenEventHandler - Drag to Same Position', () => {
       pinPosition: jest.fn(),
       pinTokenDestination: jest.fn(),
       clearTokenPositionData: jest.fn(),
+      clearUpdatedTokenDocsCache: jest.fn(),
       getPinDurationMs: jest.fn(() => 2000),
     };
 
@@ -106,7 +107,7 @@ describe('TokenEventHandler - Drag to Same Position', () => {
 
     tokenHandler.handleTokenUpdate(tokenDoc, changes);
 
-    expect(mockPositionManager.clearTokenPositionData).toHaveBeenCalledWith('token1');
+    expect(mockPositionManager.clearUpdatedTokenDocsCache).toHaveBeenCalledWith('token1');
     expect(mockSystemState.debug).toHaveBeenCalledWith(
       'token-drag-same-position',
       'token1',
@@ -172,7 +173,7 @@ describe('TokenEventHandler - Drag to Same Position', () => {
 
     tokenHandler.handleTokenUpdate(tokenDoc, changes);
 
-    expect(mockPositionManager.clearTokenPositionData).toHaveBeenCalledWith('token1');
+    expect(mockPositionManager.clearUpdatedTokenDocsCache).toHaveBeenCalledWith('token1');
     expect(mockSystemState.debug).toHaveBeenCalledWith(
       'token-drag-same-position',
       'token1',
@@ -200,7 +201,7 @@ describe('TokenEventHandler - Drag to Same Position', () => {
 
     tokenHandler.handleTokenUpdate(tokenDoc, changes);
 
-    expect(mockPositionManager.clearTokenPositionData).toHaveBeenCalledWith('token1');
+    expect(mockPositionManager.clearUpdatedTokenDocsCache).toHaveBeenCalledWith('token1');
     expect(mockSystemState.debug).toHaveBeenCalledWith(
       'token-drag-same-position',
       'token1',
@@ -219,7 +220,7 @@ describe('TokenEventHandler - Drag to Same Position', () => {
       hidden: false,
       object: {
         _animation: { state: 'completed' },
-        _dragHandle: {},
+        _dragHandle: null,
       },
     };
 
@@ -230,7 +231,7 @@ describe('TokenEventHandler - Drag to Same Position', () => {
 
     tokenHandler.handleTokenUpdate(tokenDoc, changes);
 
-    expect(mockPositionManager.clearTokenPositionData).not.toHaveBeenCalled();
+    expect(mockPositionManager.clearUpdatedTokenDocsCache).toHaveBeenCalledWith('token1');
   });
 
   test('should not interfere with animation state detection', () => {
@@ -244,8 +245,7 @@ describe('TokenEventHandler - Drag to Same Position', () => {
       hidden: false,
       object: {
         _animation: {
-          state: 'active',
-          promise: Promise.resolve(),
+          state: 'completed',
         },
       },
     };
@@ -257,6 +257,6 @@ describe('TokenEventHandler - Drag to Same Position', () => {
 
     tokenHandler.handleTokenUpdate(tokenDoc, changes);
 
-    expect(mockPositionManager.clearTokenPositionData).not.toHaveBeenCalled();
+    expect(mockPositionManager.clearUpdatedTokenDocsCache).toHaveBeenCalledWith('token1');
   });
 });

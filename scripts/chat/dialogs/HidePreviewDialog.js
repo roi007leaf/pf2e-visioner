@@ -12,6 +12,7 @@ import { getVisibilityStateConfig } from '../services/data/visibility-states.js'
 import { notify } from '../services/infra/notifications.js';
 import { hasActiveEncounter } from '../services/infra/shared-utils.js';
 import { BaseActionDialog } from './base-action-dialog.js';
+import { ActionQualifier } from '../../rule-elements/operations/ActionQualifier.js';
 
 // Store reference to current hide dialog
 let currentHideDialog = null;
@@ -504,6 +505,22 @@ export class HidePreviewDialog extends BaseActionDialog {
           ),
         });
       }
+
+      // Rule Element Qualifications: show badges for active rule elements affecting hide
+      try {
+        const ruleMessages = ActionQualifier.getCustomMessages(this.hidingToken, 'hide');
+        if (ruleMessages && ruleMessages.length > 0) {
+          ruleMessages.forEach(message => {
+            badges.push({
+              key: 'rule-element-hide',
+              icon: 'fas fa-scroll',
+              label: game.i18n.localize('PF2E_VISIONER.RULE_ELEMENTS.BADGE.LABEL'),
+              tooltip: message,
+            });
+          });
+        }
+      } catch { }
+
       context.prereqBadges = badges;
     } catch { }
 
@@ -1179,6 +1196,12 @@ export class HidePreviewDialog extends BaseActionDialog {
    */
   _endPositionQualifiesForHide(endPos) {
     try {
+      // Priority -1: Check action qualifications from rule elements (e.g., blur spell canUseThisConcealment)
+      const actionCheck = ActionQualifier.canUseConcealment(this.hidingToken, 'hide');
+      if (!actionCheck) {
+        return false;
+      }
+
       if (!endPos) return false;
       if (
         endPos.coverState &&

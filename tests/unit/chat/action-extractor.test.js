@@ -885,6 +885,650 @@ describe('Action Extractor Tests', () => {
       const result = await extractActionData(message);
       expect(result).toBeNull();
     });
+  });
+
+  test('detects take cover from action context with slug', async () => {
+    const message = {
+      id: 'msg1',
+      flags: {
+        pf2e: {
+          context: {
+            type: 'action',
+            slug: 'take-cover',
+          },
+        },
+      },
+    };
+
+    const result = await extractActionData(message);
+
+    expect(result).toMatchObject({
+      messageId: 'msg1',
+      actionType: 'take-cover',
+    });
+  });
+
+  test('detects take cover from origin roll options', async () => {
+    const message = {
+      id: 'msg1',
+      flags: {
+        pf2e: {
+          origin: {
+            rollOptions: ['origin:item:take-cover'],
+          },
+        },
+      },
+    };
+
+    const result = await extractActionData(message);
+
+    expect(result).toMatchObject({
+      messageId: 'msg1',
+      actionType: 'take-cover',
+    });
+  });
+
+  test('detects take cover from flavor text', async () => {
+    const message = {
+      id: 'msg1',
+      flavor: 'Take Cover',
+      flags: {},
+    };
+
+    const result = await extractActionData(message);
+
+    expect(result).toMatchObject({
+      messageId: 'msg1',
+      actionType: 'take-cover',
+    });
+  });
+
+  test('detects take cover from french flavor text', async () => {
+    const message = {
+      id: 'msg1',
+      flavor: "Mise à l'abri",
+      flags: {},
+    };
+
+    const result = await extractActionData(message);
+
+    expect(result).toMatchObject({
+      messageId: 'msg1',
+      actionType: 'take-cover',
+    });
+  });
+
+  describe('Avoid Notice Action Detection', () => {
+    test('avoid notice is detected but not processed as action type', async () => {
+      const message = {
+        id: 'msg1',
+        flags: {
+          pf2e: {
+            context: { type: 'skill-check' }, // Required context
+            origin: {
+              rollOptions: ['origin:item:avoid-notice'],
+            },
+          },
+        },
+      };
+
+      const result = await extractActionData(message);
+
+      // Avoid notice is detected but excluded from sneak processing and has no dedicated action type
+      expect(result).toBeNull();
+    });
+
+    test('avoid notice from context options returns null', async () => {
+      const message = {
+        id: 'msg1',
+        flags: {
+          pf2e: {
+            context: {
+              type: 'skill-check',
+              options: ['action:avoid-notice'],
+            },
+          },
+        },
+      };
+
+      const result = await extractActionData(message);
+
+      expect(result).toBeNull();
+    });
+
+    test('avoid notice from content returns null', async () => {
+      const message = {
+        id: 'msg1',
+        content: 'Avoid Notice check',
+        flags: {
+          pf2e: {
+            context: { type: 'skill-check' },
+          },
+        },
+      };
+
+      const result = await extractActionData(message);
+
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('Sneak Action Detection', () => {
+    test('detects sneak from skill check with action option', async () => {
+      const message = {
+        id: 'msg1',
+        flags: {
+          pf2e: {
+            context: {
+              type: 'skill-check',
+              options: ['action:sneak'],
+            },
+          },
+        },
+      };
+
+      const result = await extractActionData(message);
+
+      expect(result).toMatchObject({
+        messageId: 'msg1',
+        actionType: 'sneak',
+      });
+    });
+
+    test('detects sneak from skill check with slug', async () => {
+      const message = {
+        id: 'msg1',
+        flags: {
+          pf2e: {
+            context: {
+              type: 'skill-check',
+              slug: 'sneak',
+            },
+          },
+        },
+      };
+
+      const result = await extractActionData(message);
+
+      expect(result).toMatchObject({
+        messageId: 'msg1',
+        actionType: 'sneak',
+      });
+    });
+
+    test('does not detect sneak from sneak attack flavor', async () => {
+      const message = {
+        id: 'msg1',
+        flavor: 'Sneak Attack',
+        flags: {
+          pf2e: {
+            context: { type: 'skill-check' },
+          },
+        },
+      };
+
+      const result = await extractActionData(message);
+
+      expect(result).toBeNull();
+    });
+
+    test('does not detect sneak when create a diversion is detected first', async () => {
+      const message = {
+        id: 'msg1',
+        flavor: 'Create a Diversion with sneaky movements',
+        flags: {
+          pf2e: {
+            context: {
+              type: 'skill-check',
+              slug: 'create-a-diversion',
+            },
+          },
+        },
+      };
+
+      const result = await extractActionData(message);
+
+      expect(result.actionType).toBe('create-a-diversion');
+    });
+
+    test('requires context to exist for sneak detection', async () => {
+      const message = {
+        id: 'msg1',
+        flavor: 'Sneak',
+        flags: {},
+      };
+
+      const result = await extractActionData(message);
+
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('Hide Action Detection', () => {
+    test('detects hide from skill check with action option', async () => {
+      const message = {
+        id: 'msg1',
+        flags: {
+          pf2e: {
+            context: {
+              type: 'skill-check',
+              options: ['action:hide'],
+            },
+          },
+        },
+      };
+
+      const result = await extractActionData(message);
+
+      expect(result).toMatchObject({
+        messageId: 'msg1',
+        actionType: 'hide',
+      });
+    });
+
+    test('detects hide from skill check with slug', async () => {
+      const message = {
+        id: 'msg1',
+        flags: {
+          pf2e: {
+            context: {
+              type: 'skill-check',
+              slug: 'hide',
+            },
+          },
+        },
+      };
+
+      const result = await extractActionData(message);
+
+      expect(result).toMatchObject({
+        messageId: 'msg1',
+        actionType: 'hide',
+      });
+    });
+
+    test('does not detect hide when sneak is already detected', async () => {
+      const message = {
+        id: 'msg1',
+        flags: {
+          pf2e: {
+            context: {
+              type: 'skill-check',
+              options: ['action:sneak'],
+            },
+          },
+        },
+      };
+
+      const result = await extractActionData(message);
+
+      expect(result.actionType).toBe('sneak');
+    });
+
+    test('does not detect hide from sneak attack flavor', async () => {
+      const message = {
+        id: 'msg1',
+        flavor: 'Sneak Attack',
+        flags: {
+          pf2e: {
+            context: { type: 'skill-check' },
+          },
+        },
+      };
+
+      const result = await extractActionData(message);
+
+      expect(result).toBeNull();
+    });
+
+    test('does not detect hide when create a diversion is detected first', async () => {
+      const message = {
+        id: 'msg1',
+        flavor: 'Create a Diversion by hiding',
+        flags: {
+          pf2e: {
+            context: {
+              type: 'skill-check',
+              slug: 'create-a-diversion',
+            },
+          },
+        },
+      };
+
+      const result = await extractActionData(message);
+
+      expect(result.actionType).toBe('create-a-diversion');
+    });
+
+    test('requires context to exist for hide detection', async () => {
+      const message = {
+        id: 'msg1',
+        flavor: 'Hide',
+        flags: {},
+      };
+
+      const result = await extractActionData(message);
+
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('Attack Roll and Consequences Detection', () => {
+    test('detects attack roll from context type', async () => {
+      const mockToken = {
+        actor: {
+          itemTypes: { condition: [] },
+        },
+      };
+
+      const message = {
+        id: 'msg1',
+        flags: {
+          pf2e: {
+            context: {
+              type: 'attack-roll',
+            },
+          },
+        },
+        token: { object: mockToken },
+      };
+
+      const result = await extractActionData(message);
+
+      expect(result).toBeNull(); // Should be null since token is not hidden/undetected
+    });
+
+    test('skips attack consequences for damage-taken messages', async () => {
+      const mockToken = {
+        actor: {
+          itemTypes: {
+            condition: [{ slug: 'hidden' }],
+          },
+        },
+      };
+
+      const message = {
+        id: 'msg1',
+        flags: {
+          pf2e: {
+            context: {
+              type: 'damage-taken',
+            },
+            appliedDamage: { total: 10 },
+          },
+        },
+        token: { object: mockToken },
+      };
+
+      const result = await extractActionData(message);
+
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('Actor Token Resolution', () => {
+    test('resolves actor token from message.token.object', async () => {
+      const mockToken = { id: 'token1', actor: { id: 'actor1' } };
+      const message = {
+        id: 'msg1',
+        flavor: 'Point Out',
+        token: { object: mockToken },
+      };
+
+      const result = await extractActionData(message);
+
+      expect(result.actor).toBe(mockToken);
+    });
+
+    test('resolves actor token from canvas tokens by speaker token ID', async () => {
+      const mockToken = { id: 'token1', actor: { id: 'actor1' } };
+      global.canvas.tokens.get.mockReturnValue(mockToken);
+
+      const message = {
+        id: 'msg1',
+        flavor: 'Point Out',
+        speaker: { token: 'token1' },
+      };
+
+      const result = await extractActionData(message);
+
+      expect(result.actor).toBe(mockToken);
+      expect(global.canvas.tokens.get).toHaveBeenCalledWith('token1');
+    });
+
+    test('resolves actor token from speaker actor active tokens', async () => {
+      const mockToken = { id: 'token1', actor: { id: 'actor1' } };
+      const mockActor = {
+        getActiveTokens: jest.fn().mockReturnValue([mockToken]),
+      };
+
+      // Ensure the mock exists before setting it
+      if (!global.game.actors) {
+        global.game.actors = { get: jest.fn() };
+      }
+      global.game.actors.get.mockReturnValue(mockActor);
+
+      const message = {
+        id: 'msg1',
+        flavor: 'Point Out',
+        speaker: { actor: 'actor1' },
+      };
+
+      const result = await extractActionData(message);
+
+      expect(result.actor).toBe(mockToken);
+      expect(global.game.actors.get).toHaveBeenCalledWith('actor1');
+      expect(mockActor.getActiveTokens).toHaveBeenCalledWith(true, true);
+    });
+
+    test('resolves actor token from origin UUID', async () => {
+      const mockToken = { id: 'token1', actor: { id: 'actor1' } };
+      const mockOriginDoc = {
+        actor: {
+          getActiveTokens: jest.fn().mockReturnValue([mockToken]),
+        },
+      };
+
+      // Ensure the mock exists before setting it
+      if (!global.fromUuidSync) {
+        global.fromUuidSync = jest.fn();
+      }
+      global.fromUuidSync.mockReturnValue(mockOriginDoc);
+
+      const message = {
+        id: 'msg1',
+        flavor: 'Point Out',
+        flags: {
+          pf2e: {
+            origin: { uuid: 'origin-uuid' },
+          },
+        },
+      };
+
+      const result = await extractActionData(message);
+
+      expect(result.actor).toBe(mockToken);
+      expect(global.fromUuidSync).toHaveBeenCalledWith('origin-uuid');
+    });
+
+    test('handles graceful fallback when actor resolution fails', async () => {
+      // Ensure the mock exists before setting it
+      if (!global.game.actors) {
+        global.game.actors = { get: jest.fn() };
+      }
+      global.game.actors.get.mockImplementation(() => {
+        throw new Error('Actor not found');
+      });
+
+      const message = {
+        id: 'msg1',
+        flavor: 'Point Out',
+        speaker: { actor: 'invalid-actor' },
+      };
+
+      const result = await extractActionData(message);
+
+      expect(result.actor).toBeNull();
+    });
+  });
+
+  describe('Roll Data Processing', () => {
+    test('processes roll data from skill checks', async () => {
+      const mockRoll = {
+        total: 15,
+        dice: [{ total: 12 }],
+      };
+
+      const message = {
+        id: 'msg1',
+        flags: {
+          pf2e: {
+            context: {
+              type: 'skill-check',
+              options: ['action:hide'],
+            },
+          },
+        },
+        rolls: [mockRoll],
+      };
+
+      const result = await extractActionData(message);
+
+      expect(result.roll).toEqual({
+        total: 15,
+        dice: [{ total: 12 }],
+      });
+    });
+
+    test('handles legacy roll format with _total', async () => {
+      const mockRoll = {
+        _total: 18,
+        terms: [{ total: 14 }],
+      };
+
+      const message = {
+        id: 'msg1',
+        flags: {
+          pf2e: {
+            context: {
+              type: 'skill-check',
+              options: ['action:sneak'],
+            },
+          },
+        },
+        rolls: [mockRoll],
+      };
+
+      const result = await extractActionData(message);
+
+      expect(result.roll).toEqual({
+        total: 18,
+        dice: [{ total: 14 }],
+      });
+    });
+
+    test('handles malformed roll data gracefully', async () => {
+      const message = {
+        id: 'msg1',
+        flags: {
+          pf2e: {
+            context: {
+              type: 'skill-check',
+              options: ['action:hide'],
+            },
+          },
+        },
+        rolls: [{ invalid: 'data' }],
+      };
+
+      const result = await extractActionData(message);
+
+      // The code creates a roll object with total: 0 and dice: [{ total: undefined }]
+      expect(result.roll).toEqual({
+        total: 0,
+        dice: [{ total: undefined }],
+      });
+    });
+  });
+
+  describe('Edge Cases and Error Handling', () => {
+    test('returns null for null message', async () => {
+      const result = await extractActionData(null);
+      expect(result).toBeNull();
+    });
+
+    test('returns null for undefined message', async () => {
+      const result = await extractActionData(undefined);
+      expect(result).toBeNull();
+    });
+
+    test('returns null when no action type is detected', async () => {
+      const message = {
+        id: 'msg1',
+        flavor: 'Some random message',
+        flags: {},
+      };
+
+      const result = await extractActionData(message);
+      expect(result).toBeNull();
+    });
+
+    test('handles missing context gracefully', async () => {
+      const message = {
+        id: 'msg1',
+        flavor: 'Take Cover',
+        flags: { pf2e: {} },
+      };
+
+      const result = await extractActionData(message);
+
+      expect(result).toMatchObject({
+        messageId: 'msg1',
+        actionType: 'take-cover',
+        context: undefined,
+      });
+    });
+
+    test('handles missing flags gracefully', async () => {
+      const message = {
+        id: 'msg1',
+        flavor: 'Point Out',
+      };
+
+      const result = await extractActionData(message);
+
+      expect(result).toMatchObject({
+        messageId: 'msg1',
+        actionType: 'point-out',
+      });
+    });
+
+    test('handles recall knowledge with hide in the flavor name', async () => {
+      const message = {
+        id: 'msg1',
+        flavor: 'hide lore:',
+      };
+
+      const result = await extractActionData(message);
+      expect(result).toBeNull();
+    });
+
+    test('handles Devise a Stratagem and other self checks', async () => {
+      const message = {
+        id: 'msg1',
+        flags: {
+          pf2e: {
+            context: {
+              type: 'self-effect',
+              item: 'abcdef123',
+            },
+          },
+        },
+      };
+
+      const result = await extractActionData(message);
+      expect(result).toBeNull();
+    });
 
     test('handles skill checks that should not be processed', async () => {
       const message = {

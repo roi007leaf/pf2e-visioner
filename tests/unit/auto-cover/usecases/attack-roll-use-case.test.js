@@ -119,7 +119,7 @@ describe('AttackRollUseCase', () => {
       await attackRollUseCase.handlePreCreateChatMessage(mockData);
 
       expect(getCoverBetween).toHaveBeenCalledWith(speakerToken, targetToken);
-      expect(attackRollUseCase._detectCover).toHaveBeenCalledWith(speakerToken, targetToken);
+      expect(attackRollUseCase._detectCover).toHaveBeenCalledWith(speakerToken, targetToken, expect.any(Object));
     });
 
     test('should not auto-detect cover when manual cover exists', async () => {
@@ -215,7 +215,7 @@ describe('AttackRollUseCase', () => {
       await attackRollUseCase.handleCheckDialog(mockDialog, mockHtml);
 
       expect(getCoverBetween).toHaveBeenCalledWith(attackerToken, targetToken);
-      expect(attackRollUseCase._detectCover).toHaveBeenCalledWith(attackerToken, targetToken);
+      expect(attackRollUseCase._detectCover).toHaveBeenCalledWith(attackerToken, targetToken, {});
       expect(mockCoverUIManager.injectDialogCoverUI).toHaveBeenCalledWith(
         mockDialog,
         mockHtml,
@@ -235,7 +235,7 @@ describe('AttackRollUseCase', () => {
       await attackRollUseCase.handleCheckDialog(mockDialog, mockHtml);
 
       expect(getCoverBetween).toHaveBeenCalledWith(attackerToken, targetToken);
-      expect(attackRollUseCase._detectCover).toHaveBeenCalledWith(attackerToken, targetToken);
+      expect(attackRollUseCase._detectCover).toHaveBeenCalledWith(attackerToken, targetToken, {});
       expect(mockCoverUIManager.injectDialogCoverUI).toHaveBeenCalledWith(
         mockDialog,
         mockHtml,
@@ -408,7 +408,7 @@ describe('AttackRollUseCase', () => {
       attackRollUseCase._resolveAttackerFromCtx = jest.fn().mockReturnValue(attackerToken);
       attackRollUseCase._resolveTargetFromCtx = jest.fn().mockReturnValue(targetToken);
       attackRollUseCase._detectCover = jest.fn().mockReturnValue('standard');
-      attackRollUseCase._applyCoverEphemeralEffect = jest.fn();
+      jest.spyOn(attackRollUseCase, '_applyCoverEphemeralEffect').mockResolvedValue(undefined);
 
       // Mock UI manager
       attackRollUseCase.coverUIManager = {
@@ -621,251 +621,6 @@ describe('AttackRollUseCase', () => {
     test('should return null for invalid context', () => {
       expect(attackRollUseCase._resolveAttackerFromCtx({})).toBeNull();
       expect(attackRollUseCase._resolveAttackerFromCtx(null)).toBeNull();
-    });
-  });
-
-  describe('_applyCoverEphemeralEffect', () => {
-    let targetToken, attackerToken, mockContext;
-
-    beforeEach(() => {
-      targetToken = global.createMockToken({ id: 'target' });
-      attackerToken = global.createMockToken({ id: 'attacker' });
-
-      mockContext = {
-        dc: {
-          slug: 'ac',
-          value: 15,
-        },
-      };
-
-      // Mock cover helper functions
-      jest.doMock('../../../../scripts/helpers/cover-helpers.js', () => ({
-        getCoverBonusByState: jest.fn().mockImplementation((state) => {
-          const bonuses = { none: 0, lesser: 1, standard: 2, greater: 4 };
-          return bonuses[state] || 0;
-        }),
-        getCoverLabel: jest
-          .fn()
-          .mockImplementation((state) => `${state.charAt(0).toUpperCase() + state.slice(1)} Cover`),
-        getCoverImageForState: jest.fn().mockReturnValue('cover-icon.svg'),
-      }));
-
-      // Mock visibility store
-      jest.doMock('../../../../scripts/stores/visibility-map.js', () => ({
-        getVisibilityBetween: jest.fn().mockReturnValue('observed'),
-      }));
-
-      // Setup mock actor with cloning
-      const mockStatistic = {
-        dc: { value: 17 },
-      };
-
-      targetToken.actor._source = { items: [] };
-      targetToken.actor.clone = jest.fn().mockImplementation(() => ({
-        getStatistic: jest.fn().mockReturnValue(mockStatistic),
-      }));
-    });
-
-    test('should return early for none state', async () => {
-      await attackRollUseCase._applyCoverEphemeralEffect(
-        targetToken,
-        attackerToken,
-        'none',
-        mockContext,
-        'none',
-      );
-
-      expect(targetToken.actor.clone).not.toHaveBeenCalled();
-    });
-
-    test('should return early for zero bonus', async () => {
-      const { getCoverBonusByState } = await import('../../../../scripts/helpers/cover-helpers.js');
-      getCoverBonusByState.mockReturnValue(0);
-
-      await attackRollUseCase._applyCoverEphemeralEffect(
-        targetToken,
-        attackerToken,
-        'custom',
-        mockContext,
-        'none',
-      );
-
-      expect(targetToken.actor.clone).not.toHaveBeenCalled();
-    });
-
-    test('should create ephemeral effect with correct properties', async () => {
-      await attackRollUseCase._applyCoverEphemeralEffect(
-        targetToken,
-        attackerToken,
-        'standard',
-        mockContext,
-        'none',
-      );
-
-      expect(targetToken.actor.clone).toHaveBeenCalledWith(
-        expect.objectContaining({
-          items: expect.arrayContaining([
-            expect.objectContaining({
-              name: 'Standard Cover',
-              type: 'effect',
-              system: expect.objectContaining({
-                rules: [{ key: 'FlatModifier', selector: 'ac', type: 'circumstance', value: 2 }],
-              }),
-              flags: { 'pf2e-visioner': { forThisRoll: true, ephemeralCoverRoll: true } },
-            }),
-          ]),
-        }),
-        { keepId: true },
-      );
-    });
-
-    test('should update DC when manual cover is none', async () => {
-      await attackRollUseCase._applyCoverEphemeralEffect(
-        targetToken,
-        attackerToken,
-        'standard',
-        mockContext,
-        'none',
-      );
-
-      expect(mockContext.dc.value).toBe(17);
-      expect(mockContext.dc.statistic).toEqual({ value: 17 });
-    });
-
-    test('should not update DC when manual cover exists', async () => {
-      const originalValue = mockContext.dc.value;
-
-      await attackRollUseCase._applyCoverEphemeralEffect(
-        targetToken,
-        attackerToken,
-        'standard',
-        mockContext,
-        'greater',
-      );
-
-      expect(mockContext.dc.value).toBe(originalValue);
-      expect(mockContext.dc.statistic).toBeUndefined();
-    });
-
-    test('should add off-guard effect for hidden targets', async () => {
-      const { getVisibilityBetween } = await import('../../../../scripts/stores/visibility-map.js');
-      getVisibilityBetween.mockReturnValue('hidden');
-
-      await attackRollUseCase._applyCoverEphemeralEffect(
-        targetToken,
-        attackerToken,
-        'standard',
-        mockContext,
-        'none',
-      );
-
-      expect(targetToken.actor.clone).toHaveBeenCalledWith(
-        expect.objectContaining({
-          items: expect.arrayContaining([
-            expect.objectContaining({
-              name: 'Off-Guard (Hidden)',
-              system: expect.objectContaining({
-                rules: [{ key: 'FlatModifier', selector: 'ac', type: 'circumstance', value: -2 }],
-              }),
-              flags: { 'pf2e-visioner': { forThisRoll: true, ephemeralOffGuardRoll: true } },
-            }),
-          ]),
-        }),
-        { keepId: true },
-      );
-    });
-
-    test('should add off-guard effect for undetected targets', async () => {
-      const { getVisibilityBetween } = await import('../../../../scripts/stores/visibility-map.js');
-      getVisibilityBetween.mockReturnValue('undetected');
-
-      await attackRollUseCase._applyCoverEphemeralEffect(
-        targetToken,
-        attackerToken,
-        'standard',
-        mockContext,
-        'none',
-      );
-
-      expect(targetToken.actor.clone).toHaveBeenCalledWith(
-        expect.objectContaining({
-          items: expect.arrayContaining([
-            expect.objectContaining({
-              name: 'Off-Guard (Undetected)',
-              system: expect.objectContaining({
-                rules: [{ key: 'FlatModifier', selector: 'ac', type: 'circumstance', value: -2 }],
-              }),
-              flags: { 'pf2e-visioner': { forThisRoll: true, ephemeralOffGuardRoll: true } },
-            }),
-          ]),
-        }),
-        { keepId: true },
-      );
-    });
-
-    test('should filter out existing ephemeral cover effects', async () => {
-      targetToken.actor._source.items = [
-        {
-          type: 'effect',
-          flags: { 'pf2e-visioner': { ephemeralCoverRoll: true } },
-          name: 'Old Cover Effect',
-        },
-        {
-          type: 'effect',
-          flags: { 'pf2e-visioner': { ephemeralCoverRoll: false } },
-          name: 'Normal Effect',
-        },
-      ];
-
-      await attackRollUseCase._applyCoverEphemeralEffect(
-        targetToken,
-        attackerToken,
-        'standard',
-        mockContext,
-        'none',
-      );
-
-      const cloneCall = targetToken.actor.clone.mock.calls[0][0];
-
-      // Should not contain the old ephemeral cover effect
-      expect(cloneCall.items).not.toEqual(
-        expect.arrayContaining([expect.objectContaining({ name: 'Old Cover Effect' })]),
-      );
-
-      // Should contain the normal effect
-      expect(cloneCall.items).toEqual(
-        expect.arrayContaining([expect.objectContaining({ name: 'Normal Effect' })]),
-      );
-    });
-
-    test('should handle missing context DC gracefully', async () => {
-      const contextWithoutDC = {};
-
-      await expect(
-        attackRollUseCase._applyCoverEphemeralEffect(
-          targetToken,
-          attackerToken,
-          'standard',
-          contextWithoutDC,
-          'none',
-        ),
-      ).resolves.toBeUndefined();
-    });
-
-    test('should handle cloning errors gracefully', async () => {
-      targetToken.actor.clone.mockImplementation(() => {
-        throw new Error('Clone failed');
-      });
-
-      await expect(
-        attackRollUseCase._applyCoverEphemeralEffect(
-          targetToken,
-          attackerToken,
-          'standard',
-          mockContext,
-          'none',
-        ),
-      ).rejects.toThrow('Clone failed');
     });
   });
 

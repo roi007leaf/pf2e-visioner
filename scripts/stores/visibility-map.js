@@ -63,8 +63,11 @@ export async function setVisibilityBetween(
   const visibilityMap = getVisibilityMap(observer);
   const currentState = visibilityMap[target.document.id];
 
-  // Only update if state has changed
-  if (currentState !== state) {
+  // Track if state changed for hook notification
+  const stateChanged = currentState !== state;
+
+  // Update map if state has changed
+  if (stateChanged) {
     visibilityMap[target.document.id] = state;
     await setVisibilityMap(observer, visibilityMap);
 
@@ -85,6 +88,30 @@ export async function setVisibilityBetween(
     return;
   }
 
+  // Always evaluate ephemeral effects, even if state hasn't changed
+  // This is important when suppression flags change (e.g., Blind-Fight added/removed)
+  // Check if off-guard effects should be suppressed for this visibility state
+  // The suppression is on the OBSERVER (the one with Blind-Fight feat)
+  const { OffGuardSuppression } = await import('../rule-elements/operations/OffGuardSuppression.js');
+  if (OffGuardSuppression.shouldSuppressOffGuardForState(observer, state)) {
+    // Remove any existing off-guard effects
+    try {
+      if (autoVisibilitySystem) {
+        autoVisibilitySystem.setUpdatingEffects(true);
+      }
+      // Force removal of all ephemeral effects for this pair when suppression is active
+      await updateEphemeralEffectsForVisibility(observer, target, state, { ...options, removeAllEffects: true });
+    } catch (error) {
+      console.error('PF2E Visioner: Error removing off-guard effects:', error);
+    } finally {
+      if (autoVisibilitySystem) {
+        autoVisibilitySystem.setUpdatingEffects(false);
+      }
+    }
+    return;
+  }
+
+  // Apply ephemeral effects if not suppressed
   try {
     // Set flag to prevent auto-visibility system from reacting to its own effect changes
     if (autoVisibilitySystem) {

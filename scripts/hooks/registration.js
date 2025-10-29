@@ -89,13 +89,204 @@ export async function registerHooks() {
   Hooks.on('updateActiveEffect', onUpdateActiveEffect);
   Hooks.on('deleteActiveEffect', onDeleteActiveEffect);
 
+  // Register item update hooks for rule element updates
+  Hooks.on('updateItem', async (item, changes, options, userId) => {
+    try {
+      const { getLogger } = await import('../utils/logger.js');
+      const log = getLogger('RuleElements/ItemUpdate');
+
+      // Only process on GM client to avoid duplicate processing
+      if (!game.user?.isGM) return;
+
+      // Only process effect items
+      if (item.type !== 'effect') return;
+
+      // Check if the item has PF2eVisioner rule elements
+      const rules = item.system?.rules || [];
+      const hasVisionerRules = rules.some(rule =>
+        rule.key === 'PF2eVisionerEffect' || rule.key === 'PF2eVisionerVisibility'
+      );
+
+      if (!hasVisionerRules) return;
+
+      // Check if the changes affect rule elements
+      const systemChanges = changes.system || {};
+      const hasRuleChanges = Object.keys(systemChanges).some(key =>
+        key === 'rules' || key.startsWith('rules.')
+      );
+
+      if (!hasRuleChanges) return;
+
+
+      // Find tokens for this actor
+      const actor = item.parent;
+      if (!actor) return;
+
+      const tokens = canvas?.tokens?.placeables?.filter(t => t.actor?.id === actor.id) || [];
+      if (tokens.length === 0) return;
+
+      // Wait a bit for PF2e to process the item update
+      setTimeout(async () => {
+        try {
+          const rules = item.system?.rules || [];
+          const visionerRule = rules.find(rule =>
+            rule.key === 'PF2eVisionerEffect' || rule.key === 'PF2eVisionerVisibility'
+          );
+
+          if (!visionerRule) return;
+
+          const operations = visionerRule.operations || [];
+          const ruleElementId = `${item.id}-${visionerRule.slug || 'effect'}`;
+
+          for (const token of tokens) {
+            // First, remove old operations using direction-aware cleanup
+            // Use the ruleElementId as the source for proper matching
+            // IMPORTANT: removeVisibilityOverride is now direction-agnostic - it removes ALL sources for the rule element ID
+            // So we only need to call it once, not once per direction
+            for (const operation of operations) {
+              const operationWithSource = {
+                ...operation,
+                source: operation.source || ruleElementId
+              };
+              try {
+                let OperationClass = null;
+                switch (operationWithSource.type) {
+                  case 'overrideVisibility':
+                  case 'conditionalState':
+                    OperationClass = (await import('../rule-elements/operations/VisibilityOverride.js')).VisibilityOverride;
+                    // Cleanup is direction-agnostic - removes all sources for the rule element ID regardless of direction
+                    // Pass ruleElementId to ensure proper cleanup
+                    await OperationClass.removeVisibilityOverride(operationWithSource, token, ruleElementId);
+                    break;
+                  case 'distanceBasedVisibility':
+                    OperationClass = (await import('../rule-elements/operations/DistanceBasedVisibility.js')).DistanceBasedVisibility;
+                    await OperationClass.removeDistanceBasedVisibility(operationWithSource, token);
+                    break;
+                  case 'overrideCover':
+                    OperationClass = (await import('../rule-elements/operations/CoverOverride.js')).CoverOverride;
+                    await OperationClass.removeCoverOverride(operationWithSource, token, null);
+                    break;
+                  case 'provideCover':
+                    OperationClass = (await import('../rule-elements/operations/CoverOverride.js')).CoverOverride;
+                    await OperationClass.removeProvideCover(token);
+                    break;
+                  case 'modifySenses':
+                    OperationClass = (await import('../rule-elements/operations/SenseModifier.js')).SenseModifier;
+                    await OperationClass.restoreSenses(token, ruleElementId);
+                    break;
+                  case 'modifyDetectionModes':
+                    OperationClass = (await import('../rule-elements/operations/DetectionModeModifier.js')).DetectionModeModifier;
+                    await OperationClass.restoreDetectionModes(token, ruleElementId);
+                    break;
+                  case 'modifyActionQualification':
+                    OperationClass = (await import('../rule-elements/operations/ActionQualifier.js')).ActionQualifier;
+                    await OperationClass.removeActionQualifications(operationWithSource, token);
+                    break;
+                  case 'modifyLighting':
+                    OperationClass = (await import('../rule-elements/operations/LightingModifier.js')).LightingModifier;
+                    await OperationClass.removeLightingModification(operationWithSource, token);
+                    break;
+                  case 'offGuardSuppression':
+                    OperationClass = (await import('../rule-elements/operations/OffGuardSuppression.js')).OffGuardSuppression;
+                    await OperationClass.removeOffGuardSuppression(operationWithSource, token);
+                    break;
+                }
+              } catch (error) {
+                console.warn(`PF2E Visioner | updateItem: Failed to remove operation ${operationWithSource.type}:`, error);
+              }
+            }
+
+            // Clean up any remaining registry flags
+            const registryKey = `item-${item.id}`;
+            const flagRegistry = token.document.getFlag('pf2e-visioner', 'ruleElementRegistry') || {};
+            const flagsToRemove = flagRegistry[registryKey] || [];
+            const updates = {};
+
+            if (flagsToRemove.length > 0) {
+              for (const flagPath of flagsToRemove) {
+                updates[`flags.pf2e-visioner.${flagPath}`] = null;
+              }
+            }
+
+            if (Object.keys(updates).length > 0) {
+              await token.document.update(updates);
+            }
+
+            // Now manually apply each operation
+
+            for (const operation of operations) {
+              // Ensure operation has a source ID for proper tracking
+              const operationWithSource = {
+                ...operation,
+                source: operation.source || ruleElementId
+              };
+              try {
+                // Import the operation class
+                let OperationClass = null;
+                switch (operationWithSource.type) {
+                  case 'distanceBasedVisibility':
+                    OperationClass = (await import('../rule-elements/operations/DistanceBasedVisibility.js')).DistanceBasedVisibility;
+                    await OperationClass.applyDistanceBasedVisibility(operationWithSource, token);
+                    break;
+                  case 'overrideVisibility':
+                    OperationClass = (await import('../rule-elements/operations/VisibilityOverride.js')).VisibilityOverride;
+                    await OperationClass.applyVisibilityOverride(operationWithSource, token);
+                    break;
+                  case 'modifySenses':
+                    OperationClass = (await import('../rule-elements/operations/SenseModifier.js')).SenseModifier;
+                    await OperationClass.applySenseModifications(token, operationWithSource.senseModifications, ruleElementId, operationWithSource.predicate);
+                    break;
+                  case 'modifyLighting':
+                    OperationClass = (await import('../rule-elements/operations/LightingModifier.js')).LightingModifier;
+                    await OperationClass.applyLightingModification(operationWithSource, token);
+                    break;
+                  case 'offGuardSuppression':
+                    OperationClass = (await import('../rule-elements/operations/OffGuardSuppression.js')).OffGuardSuppression;
+                    await OperationClass.applyOffGuardSuppression(operationWithSource, token);
+                    break;
+                }
+              } catch (error) {
+                console.warn(`PF2E Visioner | Failed to apply operation ${operation.type}:`, error);
+              }
+            }
+
+            // Register the new flags
+            const newRegistry = token.document.getFlag('pf2e-visioner', 'ruleElementRegistry') || {};
+            newRegistry[registryKey] = operations.map(op => {
+              switch (op.type) {
+                case 'distanceBasedVisibility': return 'distanceBasedVisibility';
+                case 'overrideVisibility': return 'visibilityReplacement';
+                case 'modifySenses': return 'originalSenses';
+                case 'modifyLighting': return `lightingModification.${op.source || 'lighting'}`;
+                case 'offGuardSuppression': return 'offGuardSuppression';
+                default: return null;
+              }
+            }).filter(Boolean);
+            await token.document.setFlag('pf2e-visioner', 'ruleElementRegistry', newRegistry);
+          }
+
+          if (window.pf2eVisioner?.services?.autoVisibilitySystem?.recalculateForTokens) {
+            const tokenIds = tokens.map(t => t.id);
+            await window.pf2eVisioner.services.autoVisibilitySystem.recalculateForTokens(tokenIds);
+          } else if (canvas?.perception) {
+            canvas.perception.update({ refreshVision: true, refreshOcclusion: true });
+          }
+        } catch (error) {
+          console.warn('PF2E Visioner | Failed to process rule element update:', error);
+        }
+      }, 500);
+    } catch (error) {
+      console.warn('PF2E Visioner | Failed to handle item update for rule elements:', error);
+    }
+  });
+
   // Wall lifecycle: refresh indicators and see-through state when walls change
   Hooks.on('createWall', async () => {
     try {
       const { updateWallVisuals } = await import('../services/visual-effects.js');
       const id = canvas.tokens.controlled?.[0]?.id || null;
       await updateWallVisuals(id);
-    } catch {}
+    } catch { }
   });
   Hooks.on('updateWall', async (doc, changes) => {
     try {
@@ -133,12 +324,12 @@ export async function registerHooks() {
                 await canvas.scene?.updateEmbeddedDocuments?.('Token', updates, { diff: false });
               }
             }
-          } catch (_) {}
+          } catch (_) { }
           // Mirror hidden flag to connected walls
           try {
             const { mirrorHiddenFlagToConnected } = await import('../services/connected-walls.js');
             await mirrorHiddenFlagToConnected(doc, true);
-          } catch (_) {}
+          } catch (_) { }
         } else {
           // If unhidden, remove entries for that wall from tokens
           try {
@@ -171,20 +362,20 @@ export async function registerHooks() {
                 await canvas.scene?.updateEmbeddedDocuments?.('Token', updates, { diff: false });
               }
             }
-          } catch (_) {}
+          } catch (_) { }
           // Mirror hidden flag to connected walls (set hidden=false)
           try {
             const { mirrorHiddenFlagToConnected } = await import('../services/connected-walls.js');
             await mirrorHiddenFlagToConnected(doc, false);
-          } catch (_) {}
+          } catch (_) { }
         }
       }
-    } catch (_) {}
+    } catch (_) { }
     try {
       const { updateWallVisuals } = await import('../services/visual-effects.js');
       const id = canvas.tokens.controlled?.[0]?.id || null;
       await updateWallVisuals(id);
-    } catch {}
+    } catch { }
   });
   Hooks.on('deleteWall', async (wallDocument) => {
     try {
@@ -204,7 +395,7 @@ export async function registerHooks() {
       const { updateWallVisuals } = await import('../services/visual-effects.js');
       const id = canvas.tokens.controlled?.[0]?.id || null;
       await updateWallVisuals(id);
-    } catch {}
+    } catch { }
   });
 
   // Removed controlToken hook - was causing excessive updateWallVisuals calls on token selection.
@@ -258,7 +449,7 @@ export async function registerHooks() {
           // Get the condition manager and clear established states
           const conditionManager = game.modules.get('pf2e-visioner')?.api?.getConditionManager?.();
           if (conditionManager?.clearEstablishedInvisibleStates) {
-            conditionManager.clearEstablishedInvisibleStates(token).catch(() => {});
+            conditionManager.clearEstablishedInvisibleStates(token).catch(() => { });
           }
         }
       }
@@ -400,10 +591,10 @@ export async function registerHooks() {
           if (t.document.getFlag('pf2e-visioner', 'waitingSneak')) {
             try {
               await t.document.unsetFlag('pf2e-visioner', 'waitingSneak');
-            } catch {}
+            } catch { }
             try {
               if (t.locked) t.locked = false;
-            } catch {}
+            } catch { }
           }
         }
       }
@@ -418,6 +609,69 @@ export async function registerHooks() {
               await t.document.unsetFlag('pf2e-visioner', 'sneak-active');
             } catch {
               console.error(`PF2E Visioner | Failed to clear sneak-active flag for ${t.name}`);
+            }
+          }
+        }
+      }
+
+      const rules = item.system?.rules || [];
+      const hasVisionerRules = rules.some(rule =>
+        rule.key === 'PF2eVisionerEffect' || rule.key === 'PF2eVisionerVisibility'
+      );
+
+      if (hasVisionerRules && Array.isArray(item.rules)) {
+        const { getLogger } = await import('../utils/logger.js');
+        const log = getLogger('RuleElements/Cleanup');
+
+        log.debug(() => ({
+          msg: 'Cleaning up rule elements for deleted effect',
+          itemName: item.name,
+          itemId: item.id,
+          tokenCount: tokens.length,
+          ruleElementCount: item.rules.length
+        }));
+
+        for (const token of tokens) {
+          const registryKey = `item-${item.id}`;
+          const flagRegistry = token.document.getFlag('pf2e-visioner', 'ruleElementRegistry') || {};
+
+          if (!flagRegistry[registryKey]) {
+            log.debug(() => ({
+              msg: 'No registry entry found for effect',
+              tokenName: token.name,
+              registryKey
+            }));
+            continue;
+          }
+
+          for (const ruleElement of item.rules) {
+            if (ruleElement?.key !== 'PF2eVisionerEffect' && ruleElement?.key !== 'PF2eVisionerVisibility') {
+              continue;
+            }
+
+            try {
+              log.debug(() => ({
+                msg: 'Removing rule element flags',
+                tokenName: token.name,
+                ruleKey: ruleElement.key,
+                ruleSlug: ruleElement.slug
+              }));
+
+              if (typeof ruleElement.removeAllFlagsForRuleElement === 'function') {
+                await ruleElement.removeAllFlagsForRuleElement();
+                log.debug(() => ({
+                  msg: 'Successfully removed rule element flags',
+                  tokenName: token.name,
+                  ruleKey: ruleElement.key
+                }));
+              }
+            } catch (error) {
+              log.warn(() => ({
+                msg: 'Failed to remove flags for rule element on effect deletion',
+                tokenName: token.name,
+                ruleKey: ruleElement?.key,
+                error: error.message
+              }));
             }
           }
         }

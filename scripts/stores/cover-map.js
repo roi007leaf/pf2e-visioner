@@ -29,6 +29,25 @@ export async function setCoverMap(token, coverMap) {
     { [path]: coverMap },
     { diff: false, render: false, animate: false },
   );
+
+  // Track sources for each cover entry
+  try {
+    const { SourceTracker } = await import('../rule-elements/SourceTracker.js');
+    for (const [targetId, state] of Object.entries(coverMap)) {
+      if (state && state !== 'none') {
+        const targetToken = canvas.tokens.get(targetId);
+        if (targetToken) {
+          await SourceTracker.addSourceToState(targetToken, 'cover', {
+            id: token.id,
+            type: 'manual-cover'
+          }, token.id);
+        }
+      }
+    }
+  } catch (error) {
+    console.warn('Error tracking cover sources in setCoverMap:', error);
+  }
+
   return result;
 }
 
@@ -52,6 +71,7 @@ export async function setCoverBetween(observer, target, state, options = {}) {
   const coverMap = getCoverMap(observer);
   const targetId = target?.document?.id;
   if (!targetId) return;
+
   // Skip if no change
   if (coverMap[targetId] === state) {
     if (!options.skipEphemeralUpdate) {
@@ -64,8 +84,22 @@ export async function setCoverBetween(observer, target, state, options = {}) {
     }
     return;
   }
+
   coverMap[targetId] = state;
   await setCoverMap(observer, coverMap);
+
+  // Track the source for sneak/action qualification checks
+  if (state && state !== 'none' && !options.skipSourceTracking) {
+    try {
+      const { SourceTracker } = await import('../rule-elements/SourceTracker.js');
+      await SourceTracker.addSourceToState(target, 'cover', {
+        id: observer.id,
+        type: 'manual-cover'
+      }, observer.id);
+    } catch (error) {
+      console.warn('Error tracking cover source:', error);
+    }
+  }
 
   if (options.skipEphemeralUpdate) return;
   try {
