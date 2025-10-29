@@ -1982,20 +1982,23 @@ describe('Integration Tests', () => {
 
     describe('Operation Level Predicate', () => {
       it('should skip visibility override when predicate fails', async () => {
+        const targetToken = {
+          id: 'target-1',
+          actor: {
+            hasPlayerOwner: false,
+            getRollOptions: jest.fn(() => ['trait:humanoid']),
+            token: { disposition: -1 },
+          },
+          document: {
+            id: 'target-1',
+            setFlag: jest.fn().mockResolvedValue(undefined),
+            getFlag: jest.fn(() => ({})),
+          },
+        };
+
         global.canvas = {
           tokens: {
-            placeables: [
-              mockToken,
-              {
-                id: 'target-1',
-                actor: {
-                  hasPlayerOwner: false,
-                  getRollOptions: jest.fn(() => ['trait:humanoid']),
-                  token: { disposition: -1 },
-                },
-                document: { id: 'target-1' },
-              },
-            ],
+            placeables: [mockToken, targetToken],
           },
           grid: {
             measureDistance: jest.fn(() => 10),
@@ -2015,24 +2018,27 @@ describe('Integration Tests', () => {
 
         await VisibilityOverride.applyVisibilityOverride(operation, mockToken);
 
-        expect(mockToken.document.setFlag).toHaveBeenCalled();
+        expect(targetToken.document.setFlag).not.toHaveBeenCalled();
       });
 
       it('should apply visibility override when predicate passes', async () => {
+        const targetToken = {
+          id: 'target-1',
+          actor: {
+            hasPlayerOwner: false,
+            getRollOptions: jest.fn(() => ['trait:undead']),
+            token: { disposition: -1 },
+          },
+          document: {
+            id: 'target-1',
+            setFlag: jest.fn().mockResolvedValue(undefined),
+            getFlag: jest.fn(() => ({})),
+          },
+        };
+
         global.canvas = {
           tokens: {
-            placeables: [
-              mockToken,
-              {
-                id: 'target-1',
-                actor: {
-                  hasPlayerOwner: false,
-                  getRollOptions: jest.fn(() => ['trait:undead']),
-                  token: { disposition: -1 },
-                },
-                document: { id: 'target-1' },
-              },
-            ],
+            placeables: [mockToken, targetToken],
           },
           grid: {
             measureDistance: jest.fn(() => 10),
@@ -2052,7 +2058,7 @@ describe('Integration Tests', () => {
 
         await VisibilityOverride.applyVisibilityOverride(operation, mockToken);
 
-        expect(mockToken.document.setFlag).toHaveBeenCalled();
+        expect(targetToken.document.setFlag).toHaveBeenCalled();
       });
     });
 

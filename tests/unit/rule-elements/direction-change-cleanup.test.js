@@ -129,8 +129,45 @@ describe('Rule Elements - Direction Change Cleanup', () => {
 
     describe('removeVisibilityOverride with direction="from"', () => {
         it('should remove sources from subject token with observer-specific tracking', async () => {
+            // Use call counter to return null for early extraction, but return ruleElementOverride for fallback extraction
+            let getFlagCallCount = 0;
+            mockSubjectToken.document.getFlag = jest.fn((scope, key) => {
+                getFlagCallCount++;
+                // Early extraction (first few calls) should return null so idToMatch stays undefined
+                // Fallback extraction (later calls) should return ruleElementOverride so sourceId gets set
+                if (scope === 'pf2e-visioner') {
+                    if (key === 'ruleElementOverride') {
+                        // Return null for first call (early extraction), return value for later calls (fallback)
+                        if (getFlagCallCount <= 2) {
+                            return null;
+                        }
+                        return {
+                            active: true,
+                            source: 'test-source-id',
+                            state: 'hidden',
+                            direction: 'from',
+                        };
+                    }
+                    if (key === 'stateSource') {
+                        return {
+                            visibilityByObserver: {
+                                'observer-1': {
+                                    sources: [{ id: 'test-source-id', type: 'test-source', priority: 100, state: 'hidden' }],
+                                    state: 'hidden',
+                                },
+                                'observer-2': {
+                                    sources: [{ id: 'test-source-id', type: 'test-source', priority: 100, state: 'hidden' }],
+                                    state: 'hidden',
+                                },
+                            },
+                        };
+                    }
+                }
+                return null;
+            });
+
             const operation = {
-                source: 'test-source-id',
+                // Don't provide source - will use fallback path that calls SourceTracker.removeSource
                 direction: 'from',
                 observers: 'all',
             };
@@ -140,7 +177,7 @@ describe('Rule Elements - Direction Change Cleanup', () => {
 
             await VisibilityOverride.removeVisibilityOverride(operation, mockSubjectToken);
 
-            // Should remove from subject token with each observer ID (no general call anymore)
+            // Should remove from subject token with each observer ID (fallback path uses SourceTracker.removeSource)
             expect(removeSourceSpy).toHaveBeenCalledWith(
                 mockSubjectToken,
                 'test-source-id',
@@ -159,6 +196,7 @@ describe('Rule Elements - Direction Change Cleanup', () => {
 
         it('should unset ruleElementOverride and visibilityReplacement flags', async () => {
             const operation = {
+                // source provided to test comprehensive cleanup path
                 source: 'test-source-id',
                 direction: 'from',
                 observers: 'all',
@@ -179,24 +217,33 @@ describe('Rule Elements - Direction Change Cleanup', () => {
 
     describe('removeVisibilityOverride with direction="to"', () => {
         it('should remove sources from observer tokens with subject as observer ID', async () => {
-            const operation = {
-                source: 'test-source-id',
-                direction: 'to',
-                observers: 'all',
-            };
-
-            // Update mock to reflect 'to' direction
+            let getFlagCallCount = 0;
             mockSubjectToken.document.getFlag = jest.fn((scope, key) => {
-                if (scope === 'pf2e-visioner' && key === 'ruleElementOverride') {
-                    return {
-                        active: true,
-                        source: 'test-source-id',
-                        state: 'hidden',
-                        direction: 'to',
-                    };
+                getFlagCallCount++;
+                if (scope === 'pf2e-visioner') {
+                    if (key === 'ruleElementOverride') {
+                        if (getFlagCallCount <= 2) {
+                            return null;
+                        }
+                        return {
+                            active: true,
+                            source: 'test-source-id',
+                            state: 'hidden',
+                            direction: 'to',
+                        };
+                    }
+                    if (key === 'stateSource') {
+                        return {};
+                    }
                 }
                 return null;
             });
+
+            const operation = {
+                // Don't provide source - will use fallback path that calls SourceTracker.removeSource
+                direction: 'to',
+                observers: 'all',
+            };
 
             // Spy on SourceTracker
             const removeSourceSpy = jest.spyOn(SourceTracker, 'removeSource');
@@ -223,9 +270,41 @@ describe('Rule Elements - Direction Change Cleanup', () => {
 
     describe('removeVisibilityOverride extracts direction from flags', () => {
         it('should extract direction from ruleElementOverride flag when not provided in operation', async () => {
+            let getFlagCallCount = 0;
+            mockSubjectToken.document.getFlag = jest.fn((scope, key) => {
+                getFlagCallCount++;
+                if (scope === 'pf2e-visioner') {
+                    if (key === 'ruleElementOverride') {
+                        if (getFlagCallCount <= 2) {
+                            return null;
+                        }
+                        return {
+                            active: true,
+                            source: 'test-source-id',
+                            state: 'hidden',
+                            direction: 'from',
+                        };
+                    }
+                    if (key === 'stateSource') {
+                        return {
+                            visibilityByObserver: {
+                                'observer-1': {
+                                    sources: [{ id: 'test-source-id', type: 'test-source', priority: 100, state: 'hidden' }],
+                                    state: 'hidden',
+                                },
+                                'observer-2': {
+                                    sources: [{ id: 'test-source-id', type: 'test-source', priority: 100, state: 'hidden' }],
+                                    state: 'hidden',
+                                },
+                            },
+                        };
+                    }
+                }
+                return null;
+            });
+
             const operation = {
-                source: 'test-source-id',
-                // direction not provided
+                // Don't provide source or direction - fallback path will extract both from flags
             };
 
             const removeSourceSpy = jest.spyOn(SourceTracker, 'removeSource');
@@ -250,25 +329,32 @@ describe('Rule Elements - Direction Change Cleanup', () => {
         });
 
         it('should extract direction from visibilityReplacement flag as fallback', async () => {
-            // Update mock to have direction in visibilityReplacement instead
+            let getFlagCallCount = 0;
             mockSubjectToken.document.getFlag = jest.fn((scope, key) => {
+                getFlagCallCount++;
                 if (scope === 'pf2e-visioner') {
                     if (key === 'ruleElementOverride') {
                         return null;
                     }
                     if (key === 'visibilityReplacement') {
+                        if (getFlagCallCount <= 2) {
+                            return null;
+                        }
                         return {
                             active: true,
                             id: 'test-source-id',
                             direction: 'to',
                         };
                     }
+                    if (key === 'stateSource') {
+                        return {};
+                    }
                 }
                 return null;
             });
 
             const operation = {
-                // source and direction not provided
+                // Don't provide source or direction - fallback path will extract both from flags
             };
 
             const removeSourceSpy = jest.spyOn(SourceTracker, 'removeSource');
@@ -295,8 +381,41 @@ describe('Rule Elements - Direction Change Cleanup', () => {
 
     describe('removeVisibilityOverride with filtered observers', () => {
         it('should only remove from enemy tokens when observers="enemies"', async () => {
+            let getFlagCallCount = 0;
+            mockSubjectToken.document.getFlag = jest.fn((scope, key) => {
+                getFlagCallCount++;
+                if (scope === 'pf2e-visioner') {
+                    if (key === 'ruleElementOverride') {
+                        if (getFlagCallCount <= 2) {
+                            return null;
+                        }
+                        return {
+                            active: true,
+                            source: 'test-source-id',
+                            state: 'hidden',
+                            direction: 'from',
+                        };
+                    }
+                    if (key === 'stateSource') {
+                        return {
+                            visibilityByObserver: {
+                                'observer-1': {
+                                    sources: [{ id: 'test-source-id', type: 'test-source', priority: 100, state: 'hidden' }],
+                                    state: 'hidden',
+                                },
+                                'observer-2': {
+                                    sources: [{ id: 'test-source-id', type: 'test-source', priority: 100, state: 'hidden' }],
+                                    state: 'hidden',
+                                },
+                            },
+                        };
+                    }
+                }
+                return null;
+            });
+
             const operation = {
-                source: 'test-source-id',
+                // Don't provide source - will use fallback path that calls SourceTracker.removeSource
                 direction: 'from',
                 observers: 'enemies',
             };
@@ -325,24 +444,33 @@ describe('Rule Elements - Direction Change Cleanup', () => {
 
     describe('Regression: Direction change scenario', () => {
         it('should properly clean up when direction changes from "to" to "from"', async () => {
-            // Initial state: direction is 'to' (subject sees observers as hidden)
+            let getFlagCallCount = 0;
             mockSubjectToken.document.getFlag = jest.fn((scope, key) => {
-                if (scope === 'pf2e-visioner' && key === 'ruleElementOverride') {
-                    return {
-                        active: true,
-                        source: 'test-source-id',
-                        state: 'hidden',
-                        direction: 'to', // OLD direction
-                    };
+                getFlagCallCount++;
+                if (scope === 'pf2e-visioner') {
+                    if (key === 'ruleElementOverride') {
+                        if (getFlagCallCount <= 2) {
+                            return null;
+                        }
+                        return {
+                            active: true,
+                            source: 'test-source-id',
+                            state: 'hidden',
+                            direction: 'to', // OLD direction
+                        };
+                    }
+                    if (key === 'stateSource') {
+                        return {};
+                    }
                 }
                 return null;
             });
 
             const removeSourceSpy = jest.spyOn(SourceTracker, 'removeSource');
 
-            // Remove with old direction
+            // Remove with old direction (source will be extracted from flag in fallback path)
             await VisibilityOverride.removeVisibilityOverride(
-                { source: 'test-source-id' },
+                {},
                 mockSubjectToken,
             );
 
@@ -364,24 +492,44 @@ describe('Rule Elements - Direction Change Cleanup', () => {
         });
 
         it('should properly clean up when direction changes from "from" to "to"', async () => {
-            // Initial state: direction is 'from' (observers see subject as hidden)
+            let getFlagCallCount = 0;
             mockSubjectToken.document.getFlag = jest.fn((scope, key) => {
-                if (scope === 'pf2e-visioner' && key === 'ruleElementOverride') {
-                    return {
-                        active: true,
-                        source: 'test-source-id',
-                        state: 'hidden',
-                        direction: 'from', // OLD direction
-                    };
+                getFlagCallCount++;
+                if (scope === 'pf2e-visioner') {
+                    if (key === 'ruleElementOverride') {
+                        if (getFlagCallCount <= 2) {
+                            return null;
+                        }
+                        return {
+                            active: true,
+                            source: 'test-source-id',
+                            state: 'hidden',
+                            direction: 'from', // OLD direction
+                        };
+                    }
+                    if (key === 'stateSource') {
+                        return {
+                            visibilityByObserver: {
+                                'observer-1': {
+                                    sources: [{ id: 'test-source-id', type: 'test-source', priority: 100, state: 'hidden' }],
+                                    state: 'hidden',
+                                },
+                                'observer-2': {
+                                    sources: [{ id: 'test-source-id', type: 'test-source', priority: 100, state: 'hidden' }],
+                                    state: 'hidden',
+                                },
+                            },
+                        };
+                    }
                 }
                 return null;
             });
 
             const removeSourceSpy = jest.spyOn(SourceTracker, 'removeSource');
 
-            // Remove with old direction
+            // Remove with old direction (source will be extracted from flag in fallback path)
             await VisibilityOverride.removeVisibilityOverride(
-                { source: 'test-source-id' },
+                {},
                 mockSubjectToken,
             );
 
