@@ -19,7 +19,28 @@ export class PredicateHelper {
       // Use PF2e's built-in predicate system
       const predicateInstance = new game.pf2e.Predicate(predicate);
       const optionsArray = Array.isArray(rollOptions) ? rollOptions : Array.from(rollOptions);
-      return predicateInstance.test(optionsArray);
+      const result = predicateInstance.test(optionsArray);
+      
+      // Debug logging for complex predicates
+      if (predicate.some(p => typeof p === 'object' && (p.or || p.and || p.not))) {
+        const allTraitOptions = optionsArray.filter(o => o.includes('trait'));
+        const targetTraitOptions = optionsArray.filter(o => o.includes('target:trait'));
+        const undeadOptions = optionsArray.filter(o => o.includes('undead'));
+        const giantOptions = optionsArray.filter(o => o.includes('giant'));
+        
+        console.log('PF2E Visioner | Evaluating complex predicate:', {
+          predicate,
+          predicateString: JSON.stringify(predicate),
+          optionsCount: optionsArray.length,
+          allTraitOptions: allTraitOptions.slice(0, 15),
+          targetTraitOptions: targetTraitOptions.slice(0, 15),
+          undeadOptions: undeadOptions,
+          giantOptions: giantOptions,
+          result,
+        });
+      }
+      
+      return result;
     } catch (error) {
       console.warn('PF2E Visioner | PF2e predicate system unavailable, using fallback:', error);
       // Fallback to simple implementation if PF2e system unavailable (e.g., during tests)
@@ -55,21 +76,42 @@ export class PredicateHelper {
     if (!targetToken?.actor) return [];
 
     try {
-      // Get PF2e roll options and add target: prefix
+      // Get PF2e roll options - these come in various formats:
+      // - 'trait:undead' (base trait)
+      // - 'self:trait:undead' (self-domain with trait)
+      // - 'item:trait:undead' (item-domain with trait)
+      // We need to create target: domain options that match predicate expectations
       const actorOptions = targetToken.actor.getRollOptions(['all']);
-      const targetOptions = actorOptions.map(opt => `target:${opt}`);
+      const targetOptions = new Set();
+
+      // First, prefix all options with target:
+      for (const opt of actorOptions) {
+        targetOptions.add(`target:${opt}`);
+      }
+
+      // Extract and add direct trait options (most important for predicates like "target:trait:undead")
+      // Look for patterns like 'self:trait:X', 'item:trait:X', 'trait:X', etc.
+      for (const opt of actorOptions) {
+        // Match trait: followed by trait name (may be at start, or after a domain like self:, item:, etc.)
+        const traitMatch = opt.match(/trait:([^:]+)/);
+        if (traitMatch) {
+          const traitName = traitMatch[1];
+          const directTraitOption = `target:trait:${traitName}`;
+          targetOptions.add(directTraitOption);
+        }
+      }
 
       // Add disposition relative to observer using PF2e's alliance system
       if (observerToken?.actor) {
         const isAlly = observerToken.actor.isAllyOf?.(targetToken.actor) ?? false;
         if (isAlly) {
-          targetOptions.push('target:ally');
+          targetOptions.add('target:ally');
         } else {
-          targetOptions.push('target:enemy');
+          targetOptions.add('target:enemy');
         }
       }
 
-      return targetOptions;
+      return Array.from(targetOptions);
     } catch (error) {
       console.warn('PF2E Visioner | Error getting target roll options:', error);
       return [];

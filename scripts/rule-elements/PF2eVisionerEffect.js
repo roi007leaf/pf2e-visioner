@@ -35,8 +35,19 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
     static defineSchema() {
       const schema = super.defineSchema();
 
+      // Use PF2e's PredicateField for proper predicate support (handles strings and objects like {"or": [...]})
+      let PredicateFieldToUse;
+      try {
+        const rollOptionSchema = game.pf2e.RuleElements.builtin.RollOption.defineSchema();
+        const PredicateField = rollOptionSchema.predicate.constructor;
+        PredicateFieldToUse = PredicateField;
+      } catch (error) {
+        // Fallback if PF2e schema not available (e.g., during tests)
+        PredicateFieldToUse = new fields.ArrayField(new fields.AnyField());
+      }
+
       // Add predicate support at rule element level
-      schema.predicate = new fields.ArrayField(new fields.StringField(), { required: false });
+      schema.predicate = new PredicateFieldToUse({ required: false });
 
       schema.operations = new fields.ArrayField(
         new fields.SchemaField({
@@ -57,7 +68,8 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
           }),
 
           // Predicate at operation level (more granular)
-          predicate: new fields.ArrayField(new fields.StringField(), { required: false }),
+          // Use PF2e's PredicateField for proper predicate support
+          predicate: new PredicateFieldToUse({ required: false }),
 
           senseModifications: new fields.ObjectField({ required: false }),
 
@@ -744,11 +756,29 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
       for (const token of tokens) {
         console.log(`PF2E Visioner | Processing token: ${token.name} (${token.id})`);
 
-        // Use removeOperation for each operation to ensure direction-aware cleanup
+        // Derive ruleElementId once for all operations
+        const ruleElementId = this.ruleElementId;
+        console.log(`PF2E Visioner | removeAllFlagsForRuleElement: ruleElementId=${ruleElementId}, item=${this.item?.id}, slug=${this.slug}`);
+        
+        // Track visibility override cleanup to avoid duplicate cleanup
+        // Visibility override cleanup is direction-agnostic and removes all sources for the rule element ID
+        // Both 'overrideVisibility' and 'conditionalState' use the same cleanup function
+        let hasCleanedUpVisibilityOverride = false;
+        
         for (const operation of this.operations) {
           try {
-            console.log(`PF2E Visioner | Calling removeOperation for operation type: ${operation.type}, direction: ${operation.direction}`);
-            await this.removeOperation(operation, token);
+            // For visibility overrides, only clean up once per rule element (not per operation)
+            // The cleanup removes all sources for the rule element ID regardless of direction
+            if ((operation.type === 'overrideVisibility' || operation.type === 'conditionalState') 
+                && !hasCleanedUpVisibilityOverride) {
+              hasCleanedUpVisibilityOverride = true;
+              console.log(`PF2E Visioner | Calling removeOperation for operation type: ${operation.type} (once per rule element for direction-agnostic cleanup)`);
+              await this.removeOperation(operation, token);
+            } else if (operation.type !== 'overrideVisibility' && operation.type !== 'conditionalState') {
+              // For other operation types, clean up normally
+              console.log(`PF2E Visioner | Calling removeOperation for operation type: ${operation.type}, direction: ${operation.direction}`);
+              await this.removeOperation(operation, token);
+            }
           } catch (error) {
             console.error(`PF2E Visioner | Error removing operation ${operation.type} in removeAllFlagsForRuleElement:`, error);
           }
@@ -823,18 +853,32 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
     }
 
     async removeOperation(operation, token) {
+      // Try to get ruleElementId from various sources
+      let ruleElementId = this.ruleElementId;
+      
+      // If ruleElementId is still invalid, try to extract from operation source
+      if (!ruleElementId || ruleElementId.includes('unknown')) {
+        if (operation?.source) {
+          // Source format is usually "itemId-effect" or just "itemId"
+          ruleElementId = operation.source;
+        } else if (this.item?.id) {
+          ruleElementId = `${this.item.id}-${this.slug || 'effect'}`;
+        }
+      }
+      
+      console.log(`PF2E Visioner | removeOperation: ruleElementId=${ruleElementId}, item=${this.item?.id}, slug=${this.slug}, operationSource=${operation?.source}`);
       switch (operation.type) {
         case 'modifySenses':
-          await SenseModifier.restoreSenses(token, this.ruleElementId);
+          await SenseModifier.restoreSenses(token, ruleElementId);
           break;
 
         case 'modifyDetectionModes':
-          await DetectionModeModifier.restoreDetectionModes(token, this.ruleElementId);
+          await DetectionModeModifier.restoreDetectionModes(token, ruleElementId);
           break;
 
         case 'overrideVisibility':
         case 'conditionalState':
-          await VisibilityOverride.removeVisibilityOverride(operation, token);
+          await VisibilityOverride.removeVisibilityOverride(operation, token, ruleElementId);
           break;
 
         case 'overrideCover':

@@ -141,8 +141,8 @@ export async function registerHooks() {
           for (const token of tokens) {
             // First, remove old operations using direction-aware cleanup
             // Use the ruleElementId as the source for proper matching
-            // IMPORTANT: Since we only have the NEW item data, we need to try removing from BOTH directions
-            // to ensure cleanup when the user changes the direction property
+            // IMPORTANT: removeVisibilityOverride is now direction-agnostic - it removes ALL sources for the rule element ID
+            // So we only need to call it once, not once per direction
             for (const operation of operations) {
               const operationWithSource = {
                 ...operation,
@@ -154,16 +154,9 @@ export async function registerHooks() {
                   case 'overrideVisibility':
                   case 'conditionalState':
                     OperationClass = (await import('../rule-elements/operations/VisibilityOverride.js')).VisibilityOverride;
-                    // Try removing from both directions to handle direction changes
-                    if (operationWithSource.direction === 'from') {
-                      // Also try removing from 'to' in case user changed from 'to' to 'from'
-                      await OperationClass.removeVisibilityOverride({ ...operationWithSource, direction: 'to' }, token);
-                    } else if (operationWithSource.direction === 'to') {
-                      // Also try removing from 'from' in case user changed from 'from' to 'to'
-                      await OperationClass.removeVisibilityOverride({ ...operationWithSource, direction: 'from' }, token);
-                    }
-                    // Now remove from the current direction (this handles the case where direction didn't change)
-                    await OperationClass.removeVisibilityOverride(operationWithSource, token);
+                    // Cleanup is direction-agnostic - removes all sources for the rule element ID regardless of direction
+                    // Pass ruleElementId to ensure proper cleanup
+                    await OperationClass.removeVisibilityOverride(operationWithSource, token, ruleElementId);
                     break;
                   case 'distanceBasedVisibility':
                     OperationClass = (await import('../rule-elements/operations/DistanceBasedVisibility.js')).DistanceBasedVisibility;
