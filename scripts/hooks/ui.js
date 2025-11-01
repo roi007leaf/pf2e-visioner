@@ -182,79 +182,17 @@ export function registerUIHooks() {
 
   // Utility: label identifiers and cover status for walls when Alt is held
   const refreshWallIdentifierLabels = () => {
-    return Promise.resolve()
-      .then(async () => {
-        let allWalls = canvas?.walls?.placeables || [];
-        const layer = canvas?.controls || canvas?.hud || canvas?.stage;
+    return Promise.resolve().then(() => {
+      const walls = canvas?.walls?.placeables || [];
+      const layer = canvas?.controls || canvas?.hud || canvas?.stage;
 
-        // Filter walls to viewport for performance
-        try {
-          const { ViewportFilterService } = await import(
-            '../visibility/auto-visibility/core/ViewportFilterService.js'
-          );
-          const viewportService = new ViewportFilterService();
-          const viewportBounds = viewportService.getViewportBounds(128);
+      // Check if walls tool is active
+      const isWallTool = ui.controls?.control?.name === 'walls';
 
-          if (viewportBounds) {
-            allWalls = allWalls.filter((w) => {
-              try {
-                const [x1, y1, x2, y2] = Array.isArray(w.document?.c)
-                  ? w.document.c
-                  : [w.document?.x, w.document?.y, w.document?.x2, w.document?.y2];
-
-                // Check if wall intersects viewport bounds
-                return !(
-                  Math.max(x1, x2) < viewportBounds.minX ||
-                  Math.min(x1, x2) > viewportBounds.maxX ||
-                  Math.max(y1, y2) < viewportBounds.minY ||
-                  Math.min(y1, y2) > viewportBounds.maxY
-                );
-              } catch {
-                return true; // Keep wall if we can't check viewport
-              }
-            });
-          }
-        } catch {
-          // If viewport filtering fails, use all walls as fallback
-        }
-
-        const walls = allWalls;
-        // Check if walls tool is active
-        const isWallTool = ui.controls?.control?.name === 'walls';
-
-        // Early exit if nothing needs to be shown
-        if (!isWallTool && !isAltPressed) {
-          // Clean up all labels if tool is inactive and ALT isn't pressed
-          const allWallsForCleanup = canvas?.walls?.placeables || [];
-          for (const w of allWallsForCleanup) {
-            if (w._pvIdLabel) {
-              try {
-                w._pvIdLabel.parent?.removeChild?.(w._pvIdLabel);
-                w._pvIdLabel.destroy?.();
-              } catch {}
-              delete w._pvIdLabel;
-            }
-            if (w._pvCoverIcon) {
-              try {
-                w._pvCoverIcon.parent?.removeChild?.(w._pvCoverIcon);
-                w._pvCoverIcon.destroy?.();
-              } catch {}
-              delete w._pvCoverIcon;
-            }
-          }
-          return;
-        }
-
-        // Calculate camera scale once (used for all walls)
-        const cameraScale = canvas?.stage?.scale?.x || 1;
-        const baseScale = Math.max(0.8, Math.min(2.0, 1 / cameraScale));
-
-        // Clean up labels that shouldn't exist anymore
-        // Need to check all walls (including those outside viewport) for cleanup
-        const allWallsForCleanup = canvas?.walls?.placeables || [];
-        for (const w of allWallsForCleanup) {
-          const idf = w?.document?.getFlag?.(MODULE_ID, 'wallIdentifier');
-          const coverOverride = w?.document?.getFlag?.(MODULE_ID, 'coverOverride');
+      // Clean up labels that shouldn't exist anymore
+      for (const w of walls) {
+        const idf = w?.document?.getFlag?.(MODULE_ID, 'wallIdentifier');
+        const coverOverride = w?.document?.getFlag?.(MODULE_ID, 'coverOverride');
 
           // Show identifier if wall is controlled AND walls tool is active AND has identifier
           const shouldShowIdentifier = !!w?.controlled && isWallTool && !!idf;
@@ -357,33 +295,43 @@ export function registerUIHooks() {
                 coverText = 'AUTO';
               }
 
-              if (!w._pvCoverIcon) {
-                // Create a container for the text
-                const container = new PIXI.Container();
-                container.zIndex = 10001; // Above identifier text
+            if (!w._pvCoverIcon) {
+              // Create a container for the text
+              const container = new PIXI.Container();
+              container.zIndex = 10001; // Above identifier text
+
+              // Calculate scale based on camera zoom
+              const cameraScale = canvas?.stage?.scale?.x || 1;
+              const baseScale = Math.max(0.8, Math.min(2.0, 1 / cameraScale)); // Scale inversely with zoom, clamped
 
                 // Create background rectangle for better visibility
                 const bg = new PIXI.Graphics();
                 bg.beginFill(0x000000, 0.8);
                 bg.lineStyle(1, coverInfo.color, 1);
 
-                // Estimate text dimensions without creating temporary text object
-                // Approximate: "GREATER" is longest at ~7 chars, 10px font ≈ 50-60px width
-                const estimatedCharWidth = Math.round(10 * baseScale * 0.6); // Approximate char width
-                const estimatedTextWidth = coverText.length * estimatedCharWidth;
-                const estimatedTextHeight = Math.round(10 * baseScale * 1.2);
+              // Calculate text dimensions for background sizing
+              const tempStyle = new PIXI.TextStyle({
+                fontFamily: 'Arial, sans-serif',
+                fontSize: Math.round(10 * baseScale),
+                fill: coverInfo.color,
+                fontWeight: 'bold',
+              });
+              const tempText = new PIXI.Text(coverText, tempStyle);
+              const textWidth = tempText.width;
+              const textHeight = tempText.height;
+              tempText.destroy();
 
-                // Draw rounded rectangle background
-                const padding = 3 * baseScale;
-                bg.drawRoundedRect(
-                  -estimatedTextWidth / 2 - padding,
-                  -estimatedTextHeight / 2 - padding,
-                  estimatedTextWidth + padding * 2,
-                  estimatedTextHeight + padding * 2,
-                  3 * baseScale,
-                );
-                bg.endFill();
-                container.addChild(bg);
+              // Draw rounded rectangle background
+              const padding = 3 * baseScale;
+              bg.drawRoundedRect(
+                -textWidth / 2 - padding,
+                -textHeight / 2 - padding,
+                textWidth + padding * 2,
+                textHeight + padding * 2,
+                3 * baseScale
+              );
+              bg.endFill();
+              container.addChild(bg);
 
                 // Create text label
                 const textStyle = new PIXI.TextStyle({
@@ -395,61 +343,33 @@ export function registerUIHooks() {
                   fontWeight: 'bold',
                 });
 
-                const text = new PIXI.Text(coverText, textStyle);
-                text.anchor.set(0.5, 0.5);
-                container.addChild(text);
+              const text = new PIXI.Text(coverText, textStyle);
+              text.anchor.set(0.5, 0.5);
+              container.addChild(text);
 
-                // Adjust background size based on actual text dimensions after creation
-                const actualTextWidth = text.width;
-                const actualTextHeight = text.height;
-                if (
-                  Math.abs(actualTextWidth - estimatedTextWidth) > 5 ||
-                  Math.abs(actualTextHeight - estimatedTextHeight) > 5
-                ) {
-                  bg.clear();
-                  bg.beginFill(0x000000, 0.8);
-                  bg.lineStyle(1, coverInfo.color, 1);
-                  bg.drawRoundedRect(
-                    -actualTextWidth / 2 - padding,
-                    -actualTextHeight / 2 - padding,
-                    actualTextWidth + padding * 2,
-                    actualTextHeight + padding * 2,
-                    3 * baseScale,
-                  );
-                  bg.endFill();
-                }
+              container.position.set(mx + textOffsetX, textY);
+              container.scale.set(baseScale);
 
-                container.position.set(mx + textOffsetX, textY);
-                container.scale.set(baseScale);
 
-                // Store tooltip, scale info, and last position
-                container._tooltip = coverInfo.tooltip;
-                container._baseScale = baseScale;
-                container._coverText = coverText;
-                container._lastX = mx + textOffsetX;
-                container._lastY = textY;
 
-                // Prefer controls layer; fallback to wall container
-                if (layer?.addChild) layer.addChild(container);
-                else w.addChild?.(container);
-                w._pvCoverIcon = container;
-              } else {
-                // Update existing text position, scale, and content
-                // Only update if position actually changed (avoid unnecessary updates)
-                const newX = mx + textOffsetX;
-                const newY = textY;
-                const needsPositionUpdate =
-                  Math.abs(w._pvCoverIcon._lastX - newX) > 0.1 ||
-                  Math.abs(w._pvCoverIcon._lastY - newY) > 0.1 ||
-                  Math.abs(w._pvCoverIcon._baseScale - baseScale) > 0.01;
+              // Store tooltip and scale info
+              container._tooltip = coverInfo.tooltip;
+              container._baseScale = baseScale;
+              container._coverText = coverText;
 
-                if (needsPositionUpdate) {
-                  w._pvCoverIcon.position.set(newX, newY);
-                  w._pvCoverIcon.scale.set(baseScale);
-                  w._pvCoverIcon._lastX = newX;
-                  w._pvCoverIcon._lastY = newY;
-                  w._pvCoverIcon._baseScale = baseScale;
-                }
+              // Prefer controls layer; fallback to wall container
+              if (layer?.addChild) layer.addChild(container);
+              else w.addChild?.(container);
+              w._pvCoverIcon = container;
+            } else {
+              // Update existing text position, scale, and content
+              const cameraScale = canvas?.stage?.scale?.x || 1;
+              const baseScale = Math.max(0.8, Math.min(2.0, 1 / cameraScale));
+
+              w._pvCoverIcon.position.set(mx + textOffsetX, textY);
+              w._pvCoverIcon.scale.set(baseScale);
+
+
 
                 // Update text content and color if changed
                 const text = w._pvCoverIcon.children[1]; // Text is second child after background
@@ -640,11 +560,7 @@ export function registerUIHooks() {
   // Refresh wall labels when camera zoom changes (debounced)
   let canvasPanTimeout = null;
   Hooks.on('canvasPan', () => {
-    if (canvasPanTimeout) clearTimeout(canvasPanTimeout);
-    canvasPanTimeout = setTimeout(() => {
-      refreshWallIdentifierLabels().catch(() => {});
-      canvasPanTimeout = null;
-    }, 100); // Debounce to 100ms
+    refreshWallIdentifierLabels().catch(() => { });
   });
 
   // Refresh wall labels when active tool changes

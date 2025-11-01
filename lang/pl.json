@@ -507,7 +507,7 @@
       },
       "AVS_ONLY_IN_COMBAT": {
         "name": "AVS aktywny tylko w walce",
-        "hint": "Po włączeniu system automatycznej widoczności będzie aktywny tylko podczas spotkań i będzie śledził widoczność tylko dla tokenów biorących udział w spotkaniu. Widoczność zostanie zresetowana po zakończeniu walki."
+        "hint": "Po włączeniu, system automatycznej widoczności będzie aktywny tylko podczas spotkań bojowych i będzie śledzić widoczność tylko dla tokenów w spotkaniu. Widoczność zostanie zresetowana po zakończeniu walki."
       },
       "DISABLE_LINE_OF_SIGHT": {
         "name": "Wyłącz rzucanie promieni w linii wzroku",
