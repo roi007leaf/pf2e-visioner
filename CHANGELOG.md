@@ -1,5 +1,12 @@
 # Changelog
 
+## [4.5.1] - 2025-11-01
+
+### 🐛 Bug Fixes
+
+- Made wall cover labels performance better
+- Remove tooltips from the screen when changing scenes
+
 ## [4.5.0] - 2025-01-XX
 
 ### ✨ Features
