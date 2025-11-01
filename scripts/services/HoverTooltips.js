@@ -463,6 +463,129 @@ export function initializeHoverTooltips() {
     }
   });
 
+  // Clean up tooltips when tearing down canvas (leaving a scene)
+  Hooks.on('canvasTearDown', () => {
+    // Aggressively destroy all PIXI containers and DOM elements
+    
+    // Destroy all visibility indicators with full cleanup
+    HoverTooltips.visibilityIndicators.forEach((indicator) => {
+      try {
+        // Remove DOM badges
+        if (indicator._senseBadgeEl?.parentNode) {
+          indicator._senseBadgeEl.parentNode.removeChild(indicator._senseBadgeEl);
+        }
+        if (indicator._visBadgeEl?.parentNode) {
+          indicator._visBadgeEl.parentNode.removeChild(indicator._visBadgeEl);
+        }
+        if (indicator._coverBadgeEl?.parentNode) {
+          indicator._coverBadgeEl.parentNode.removeChild(indicator._coverBadgeEl);
+        }
+        if (indicator._tooltipAnchor?.parentNode) {
+          indicator._tooltipAnchor.parentNode.removeChild(indicator._tooltipAnchor);
+        }
+        // Remove from parent before destroying
+        if (indicator.parent) {
+          indicator.parent.removeChild(indicator);
+        }
+        // Destroy with children to ensure nested containers are cleaned up
+        indicator.destroy({ children: true, texture: true, baseTexture: true });
+      } catch (e) {
+        console.warn('PF2E Visioner: Error destroying visibility indicator', e);
+      }
+    });
+    HoverTooltips.visibilityIndicators.clear();
+
+    // Destroy all cover indicators with full cleanup
+    HoverTooltips.coverIndicators.forEach((indicator) => {
+      try {
+        if (indicator._coverBadgeEl?.parentNode) {
+          indicator._coverBadgeEl.parentNode.removeChild(indicator._coverBadgeEl);
+        }
+        if (indicator._tooltipAnchor?.parentNode) {
+          indicator._tooltipAnchor.parentNode.removeChild(indicator._tooltipAnchor);
+        }
+        if (indicator.parent) {
+          indicator.parent.removeChild(indicator);
+        }
+        // Destroy with children to ensure nested containers are cleaned up
+        indicator.destroy({ children: true, texture: true, baseTexture: true });
+      } catch (e) {
+        console.warn('PF2E Visioner: Error destroying cover indicator', e);
+      }
+    });
+    HoverTooltips.coverIndicators.clear();
+
+    // Destroy all visibility badges (including factor badges)
+    HoverTooltips.visibilityBadges.forEach((badge, key) => {
+      try {
+        // Remove DOM elements
+        if (badge.badgeEl?.parentNode) {
+          badge.badgeEl.parentNode.removeChild(badge.badgeEl);
+        }
+        if (badge.tooltipEl?.parentNode) {
+          badge.tooltipEl.parentNode.removeChild(badge.tooltipEl);
+        }
+        // Destroy PIXI container if present
+        if (badge.container) {
+          if (badge.container.parent) {
+            badge.container.parent.removeChild(badge.container);
+          }
+          badge.container.destroy({ children: true, texture: true, baseTexture: true });
+        }
+      } catch (e) {
+        console.warn('PF2E Visioner: Error destroying visibility badge', e);
+      }
+    });
+    HoverTooltips.visibilityBadges.clear();
+
+    // Deactivate tooltips
+    try {
+      game.tooltip.deactivate();
+    } catch (e) {}
+
+    // Hide factors overlay
+    hideVisibilityFactorsOverlay();
+
+    // Reset all state
+    HoverTooltips.currentHoveredToken = null;
+    HoverTooltips.isShowingKeyTooltips = false;
+    HoverTooltips.isShowingCoverOverlay = false;
+    HoverTooltips.isShowingFactorsOverlay = false;
+    HoverTooltips._isPanning = false;
+    HoverTooltips._isTokenMoving = false;
+    HoverTooltips._isDragging = false;
+    HoverTooltips._pointerIsDown = false;
+    HoverTooltips._isZooming = false;
+
+    // Clear any pending timers
+    if (HoverTooltips._dragClearTimer) {
+      clearTimeout(HoverTooltips._dragClearTimer);
+      HoverTooltips._dragClearTimer = null;
+    }
+    if (HoverTooltips._movementDebounceTimer) {
+      clearTimeout(HoverTooltips._movementDebounceTimer);
+      HoverTooltips._movementDebounceTimer = null;
+    }
+
+    // Stop badge ticker
+    if (HoverTooltips.badgeTicker) {
+      try {
+        canvas.app?.ticker?.remove?.(HoverTooltips.badgeTicker);
+      } catch (e) {}
+      HoverTooltips.badgeTicker = null;
+      delete HoverTooltips._canvasRectCache;
+      HoverTooltips._canvasRectInvalidated = true;
+    }
+
+    // Clear saved state
+    delete HoverTooltips._savedHoveredToken;
+    delete HoverTooltips._savedKeyTooltipsActive;
+    delete HoverTooltips._savedFactorsOverlayActive;
+
+    // Clear key tooltip tokens
+    keyTooltipTokens.clear();
+  });
+
   // Clean up tooltips when changing scenes
   Hooks.on('canvasReady', () => {
     // Clean up all tooltips and reset state
