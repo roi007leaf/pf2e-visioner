@@ -1167,8 +1167,8 @@ let currentlyHoveredIndicator = null;
 function lifesenseTargetKeyHandler(event) {
   if (!currentlyHoveredIndicator) return;
 
-  // Check for T key (keyCode 84 or key 't'/'T')
-  const isTargetKey = event.key === 't' || event.key === 'T' || event.keyCode === 84;
+  // Check for T key using event.code for keyboard layout consistency
+  const isTargetKey = event.code === 'KeyT';
   if (!isTargetKey) return;
 
   try {
