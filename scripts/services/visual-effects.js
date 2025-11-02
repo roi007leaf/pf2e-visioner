@@ -1192,6 +1192,20 @@ function ensureKeyHandlerInstalled() {
   if (!keyHandlerInstalled) {
     window.addEventListener('keydown', lifesenseTargetKeyHandler, true);
     keyHandlerInstalled = true;
+
+    // Register cleanup on canvas teardown
+    Hooks.once('canvasTearDown', () => {
+      cleanupLifesenseKeyHandler();
+    });
+  }
+}
+
+// Cleanup function for the global keyboard handler
+function cleanupLifesenseKeyHandler() {
+  if (keyHandlerInstalled) {
+    window.removeEventListener('keydown', lifesenseTargetKeyHandler, true);
+    keyHandlerInstalled = false;
+    currentlyHoveredIndicator = null;
   }
 }
 
