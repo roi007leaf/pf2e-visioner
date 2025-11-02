@@ -1,5 +1,13 @@
 # Changelog
 
+## [4.5.2] - 2025-11-02
+
+### Changed
+
+- **Lifesense Targeting**: Changed targeting from right-click/shift+right-click to T/Shift+T keys
+  - Hover over lifesense indicators and press T to target token (releases others)
+  - Shift+T adds/removes token from selection
+
 ## [4.5.1] - 2025-11-01
 
 ### 🐛 Bug Fixes
@@ -18,7 +26,6 @@
   - Clears all visibility and detection flags for combatants when combat ends
   - Excludes tokens not in the encounter from AVS processing during combat
   - Perfect for tables that want to use AVS only during tactical encounters
-
 
 ## [4.4.13] - 2025-10-25
 
