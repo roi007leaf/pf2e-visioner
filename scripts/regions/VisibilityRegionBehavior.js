@@ -14,11 +14,11 @@ import RegionHelper from '../utils/region.js';
 
 const RegionBehaviorBase =
   typeof foundry !== 'undefined' &&
-    foundry.data &&
-    foundry.data.regionBehaviors &&
-    foundry.data.regionBehaviors.RegionBehaviorType
+  foundry.data &&
+  foundry.data.regionBehaviors &&
+  foundry.data.regionBehaviors.RegionBehaviorType
     ? foundry.data.regionBehaviors.RegionBehaviorType
-    : class { };
+    : class {};
 
 const DEFAULT_DEBOUNCE_MS = 50;
 
@@ -39,15 +39,10 @@ export class VisibilityRegionBehavior extends RegionBehaviorBase {
           CONST.REGION_EVENTS.BEHAVIOR_DEACTIVATED,
           CONST.REGION_EVENTS.TOKEN_ENTER,
           CONST.REGION_EVENTS.TOKEN_EXIT,
-          CONST.REGION_EVENTS.TOKEN_ANIMATE_IN,
-          CONST.REGION_EVENTS.TOKEN_ANIMATE_OUT,
-          CONST.REGION_EVENTS.TOKEN_MOVE_IN,
-          CONST.REGION_EVENTS.TOKEN_MOVE_OUT,
           CONST.REGION_EVENTS.TOKEN_TURN_START,
           CONST.REGION_EVENTS.TOKEN_TURN_END,
           CONST.REGION_EVENTS.TOKEN_ROUND_START,
           CONST.REGION_EVENTS.TOKEN_ROUND_END,
-          'regionClicked',
         ],
       }),
 
@@ -105,7 +100,7 @@ export class VisibilityRegionBehavior extends RegionBehaviorBase {
           const parts = event.tokenUuid.split('.');
           const last = parts[parts.length - 1];
           if (last) token = canvas.tokens.get(last);
-        } catch { }
+        } catch {}
       }
     } catch (err) {
       console.error('PF2e Visioner | Error resolving token from event:', err, event);
@@ -215,7 +210,7 @@ export class VisibilityRegionBehavior extends RegionBehaviorBase {
     try {
       const thisType = getTokenActorType(token);
       if (thisType && ignoredActorTypes.has(thisType)) return [];
-    } catch { }
+    } catch {}
 
     const visibilityState = this.visibilityState;
     const applyToInsideTokens = this.applyToInsideTokens;
@@ -302,7 +297,7 @@ export class VisibilityRegionBehavior extends RegionBehaviorBase {
               skipResetDueToCombat = true;
           }
         }
-      } catch { }
+      } catch {}
 
       if (!skipResetDueToCombat) {
         const tokensToReset = [
@@ -419,7 +414,11 @@ export class VisibilityRegionBehavior extends RegionBehaviorBase {
     if (!region) return [];
 
     const pointInRegion = (x, y) => {
-      try { return RegionHelper.isPointInside(region, { x, y }); } catch { return false; }
+      try {
+        return RegionHelper.isPointInside(region, { x, y });
+      } catch {
+        return false;
+      }
     };
 
     // Compute a bounding box for the region (if available) to prefilter tokens
@@ -484,7 +483,7 @@ export class VisibilityRegionBehavior extends RegionBehaviorBase {
             if (current === state) {
               continue;
             }
-          } catch { }
+          } catch {}
 
           if (state && state !== 'observed') {
             const observerId = sourceToken.document.id;
@@ -526,7 +525,9 @@ export class VisibilityRegionBehavior extends RegionBehaviorBase {
 
       // Update override validation indicator after all changes
       try {
-        const { OverrideValidationIndicator } = await import('../ui/OverrideValidationIndicator.js');
+        const { OverrideValidationIndicator } = await import(
+          '../ui/OverrideValidationIndicator.js'
+        );
         const indicator = OverrideValidationIndicator.getInstance();
         // If we removed overrides (AVS mode), hide the indicator
         if (removalsToProcess.length > 0 && updatesByObserver.size === 0) {
