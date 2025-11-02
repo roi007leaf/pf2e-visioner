@@ -1160,6 +1160,55 @@ export async function updateWallIndicatorsOnly(observerId = null) {
   }
 }
 
+// Shared state for keyboard targeting
+let currentlyHoveredIndicator = null;
+
+// Global keyboard handler for lifesense targeting
+function lifesenseTargetKeyHandler(event) {
+  if (!currentlyHoveredIndicator) return;
+
+  // Check for T key using event.code for keyboard layout consistency
+  const isTargetKey = event.code === 'KeyT';
+  if (!isTargetKey) return;
+
+  try {
+    const tokenId = currentlyHoveredIndicator._pvTokenId;
+    const targetToken = canvas.tokens.get(tokenId);
+    if (targetToken) {
+      const shiftKey = event.shiftKey ?? false;
+      targetToken.setTarget(!targetToken.isTargeted, { releaseOthers: !shiftKey });
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+    }
+  } catch (err) {
+    console.warn('PF2E Visioner | Error keyboard targeting system-hidden token:', err);
+  }
+}
+
+// Install global keyboard handler once
+let keyHandlerInstalled = false;
+function ensureKeyHandlerInstalled() {
+  if (!keyHandlerInstalled) {
+    window.addEventListener('keydown', lifesenseTargetKeyHandler, true);
+    keyHandlerInstalled = true;
+
+    // Register cleanup on canvas teardown
+    Hooks.once('canvasTearDown', () => {
+      cleanupLifesenseKeyHandler();
+    });
+  }
+}
+
+// Cleanup function for the global keyboard handler
+function cleanupLifesenseKeyHandler() {
+  if (keyHandlerInstalled) {
+    window.removeEventListener('keydown', lifesenseTargetKeyHandler, true);
+    keyHandlerInstalled = false;
+    currentlyHoveredIndicator = null;
+  }
+}
+
 export async function updateSystemHiddenTokenHighlights(observerId = null, positionOverride = null) {
   try {
     if (!game.settings?.get?.(MODULE_ID, 'autoVisibilityEnabled')) {
@@ -1170,6 +1219,9 @@ export async function updateSystemHiddenTokenHighlights(observerId = null, posit
     if (!tokens.length) {
       return;
     }
+
+    // Ensure keyboard handler is installed
+    ensureKeyHandlerInstalled();
 
     let observer = null;
     try {
@@ -1202,6 +1254,9 @@ export async function updateSystemHiddenTokenHighlights(observerId = null, posit
             }
             if (gi._pvCanvasTearDownHook !== undefined) {
               Hooks.off('canvasTearDown', gi._pvCanvasTearDownHook);
+            }
+            if (currentlyHoveredIndicator === gi) {
+              currentlyHoveredIndicator = null;
             }
             if (gi._pvFactorsBadgeEl) { gi._pvFactorsBadgeEl.remove(); }
             if (gi._pvFactorsTooltipEl) { gi._pvFactorsTooltipEl.remove(); }
@@ -1250,6 +1305,9 @@ export async function updateSystemHiddenTokenHighlights(observerId = null, posit
             }
             if (gi._pvCanvasTearDownHook !== undefined) {
               Hooks.off('canvasTearDown', gi._pvCanvasTearDownHook);
+            }
+            if (currentlyHoveredIndicator === gi) {
+              currentlyHoveredIndicator = null;
             }
             if (gi._pvFactorsBadgeEl) { gi._pvFactorsBadgeEl.remove(); }
             if (gi._pvFactorsTooltipEl) { gi._pvFactorsTooltipEl.remove(); }
@@ -1509,16 +1567,14 @@ export async function updateSystemHiddenTokenHighlights(observerId = null, posit
             } catch (_) { }
           };
 
-          g.on('rightdown', (event) => {
-            try {
-              const targetToken = canvas.tokens.get(token.document.id);
-              if (targetToken) {
-                const shiftKey = event.data?.originalEvent?.shiftKey ?? false;
-                targetToken.setTarget(!targetToken.isTargeted, { releaseOthers: !shiftKey });
-                event.stopPropagation();
-              }
-            } catch (err) {
-              console.warn('PF2E Visioner | Error right-click targeting system-hidden token:', err);
+          // Track hovered indicator for keyboard targeting
+          g.on('pointerenter', () => {
+            currentlyHoveredIndicator = g;
+          });
+
+          g.on('pointerleave', () => {
+            if (currentlyHoveredIndicator === g) {
+              currentlyHoveredIndicator = null;
             }
           });
 

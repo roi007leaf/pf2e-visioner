@@ -1,12 +1,12 @@
-2025/10/24-20:04:38.797 1694 Log #25: 0 ops saved to Table #37 OK
-2025/10/24-20:04:38.799 1694 Archiving C:\Users\roi00\AppData\Local\FoundryVTT\Data\modules\pf2e-visioner\packs\pf2e-visioner-macros/000025.log: OK
-2025/10/24-20:04:38.799 1694 Log #30: 0 ops saved to Table #38 OK
-2025/10/24-20:04:38.802 1694 Archiving C:\Users\roi00\AppData\Local\FoundryVTT\Data\modules\pf2e-visioner\packs\pf2e-visioner-macros/000030.log: OK
-2025/10/24-20:04:38.802 1694 Log #36: 0 ops saved to Table #39 OK
-2025/10/24-20:04:38.804 1694 Archiving C:\Users\roi00\AppData\Local\FoundryVTT\Data\modules\pf2e-visioner\packs\pf2e-visioner-macros/000036.log: OK
-2025/10/24-20:04:38.804 1694 Table #23: 2 entries OK
-2025/10/24-20:04:38.804 1694 Table #33: 2 entries OK
-2025/10/24-20:04:38.808 1694 Archiving C:\Users\roi00\AppData\Local\FoundryVTT\Data\modules\pf2e-visioner\packs\pf2e-visioner-macros/MANIFEST-000024: OK
-2025/10/24-20:04:38.810 1694 Archiving C:\Users\roi00\AppData\Local\FoundryVTT\Data\modules\pf2e-visioner\packs\pf2e-visioner-macros/MANIFEST-000029: OK
-2025/10/24-20:04:38.812 1694 Archiving C:\Users\roi00\AppData\Local\FoundryVTT\Data\modules\pf2e-visioner\packs\pf2e-visioner-macros/MANIFEST-000035: OK
-2025/10/24-20:04:38.818 1694 **** Repaired leveldb C:\Users\roi00\AppData\Local\FoundryVTT\Data\modules\pf2e-visioner\packs\pf2e-visioner-macros; recovered 2 files; 2018 bytes. Some data may have been lost. ****
+2025/11/01-18:15:21.044 6ba0 Delete type=3 #1
+2025/11/01-20:46:44.125 6304 Level-0 table #46: started
+2025/11/01-20:46:44.125 6304 Level-0 table #46: 0 bytes OK
+2025/11/01-20:46:44.126 6304 Delete type=0 #44
+2025/11/01-20:46:44.136 6304 Manual compaction at level-0 from '!macros!DYzIWNerMDEE4VmQ' @ 72057594037927935 : 1 .. '!macros!fqzpWphOkC3UtOx8' @ 0 : 0; will stop at '!macros!fqzpWphOkC3UtOx8' @ 6 : 1
+2025/11/01-20:46:44.136 6304 Compacting 2@0 + 0@1 files
+2025/11/01-20:46:44.137 6304 Generated table #47@0: 2 keys, 1009 bytes
+2025/11/01-20:46:44.137 6304 Compacted 2@0 + 0@1 files => 1009 bytes
+2025/11/01-20:46:44.139 6304 compacted to: files[ 0 1 0 0 0 0 0 ]
+2025/11/01-20:46:44.139 6304 Delete type=2 #23
+2025/11/01-20:46:44.140 6304 Delete type=2 #33
+2025/11/01-20:46:44.141 6304 Manual compaction at level-0 from '!macros!fqzpWphOkC3UtOx8' @ 6 : 1 .. '!macros!fqzpWphOkC3UtOx8' @ 0 : 0; will stop at (end)
