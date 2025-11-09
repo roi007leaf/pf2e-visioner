@@ -753,12 +753,7 @@ function applyVisualModifiers(visualDetection, observer, target) {
     // In PF2e, invisible creatures are undetected
     // (they can still be detected by imprecise senses like hearing, tremorsense, etc.,
     // but those are handled separately in the imprecise sense detection logic)
-    if (finalState === VisibilityState.OBSERVED) {
-      return {
-        state: VisibilityState.HIDDEN,
-        detection: null,
-      };
-    }
+
     return {
       state: VisibilityState.UNDETECTED,
       detection: null,
