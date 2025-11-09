@@ -7,6 +7,7 @@
  * @module StatelessVisibilityCalculator
  */
 
+import { LightingLevel, SenseType, VisibilityState } from '../constants.js';
 import { getLogger } from '../utils/logger.js';
 const log = getLogger('AVS/StatelessCalculator');
 
@@ -15,7 +16,7 @@ const log = getLogger('AVS/StatelessCalculator');
  *
  * @param {Object} input - Standardized visibility calculation input
  * @param {Object} input.target - Target state
- * @param {string} input.target.lightingLevel - "bright" | "dim" | "darkness" | "magicalDarkness" | "greaterMagicalDarkness"
+ * @param {string} input.target.lightingLevel - One of LightingLevel enum values (BRIGHT, DIM, DARKNESS, MAGICAL_DARKNESS, GREATER_MAGICAL_DARKNESS)
  * @param {boolean} input.target.concealment - Whether target has concealment
  * @param {string[]} input.target.auxiliary - Additional conditions like ["invisible"]
  * @param {string[]} input.target.traits - Target traits like ["undead", "construct"]
@@ -39,14 +40,14 @@ const log = getLogger('AVS/StatelessCalculator');
  * @param {Object|null} input.rayDarkness - Ray darkness information (if ray passes through darkness)
  * @param {boolean} input.rayDarkness.passesThroughDarkness - Whether ray passes through darkness
  * @param {number} input.rayDarkness.rank - Darkness rank along the ray (1-3 = magical, 4+ = greater magical)
- * @param {string} input.rayDarkness.lightingLevel - Lighting level of darkness along ray
+ * @param {string} input.rayDarkness.lightingLevel - Lighting level of darkness along ray (one of LightingLevel enum values)
  * @param {boolean} input.soundBlocked - Whether sound is blocked between observer and target (walls with sound restriction)
  *
  * @returns {Object} Visibility result
- * @returns {string} result.state - "observed" | "concealed" | "hidden" | "undetected"
+ * @returns {string} result.state - One of VisibilityState enum values (OBSERVED, CONCEALED, HIDDEN, UNDETECTED)
  * @returns {Object|null} result.detection - Detection info or null if undetected
  * @returns {boolean} result.detection.isPrecise - Whether detection is precise
- * @returns {string} result.detection.sense - Which sense detected: "vision" | "darkvision" | "lowLightVision" | "greaterDarkvision" | "hearing" | "tremorsense" | "lifesense" | "scent"
+ * @returns {string} result.detection.sense - Which sense detected: one of SenseType enum values (VISION, DARKVISION, LOW_LIGHT_VISION, GREATER_DARKVISION, HEARING, TREMORSENSE, LIFESENSE, SCENT, ECHOLOCATION, SEE_INVISIBILITY, LIGHT_PERCEPTION)
  */
 export function calculateVisibility(input) {
   log.debug(() => ({
@@ -117,7 +118,7 @@ export function calculateVisibility(input) {
 
   // 4. Default: undetected (no senses can detect)
   return {
-    state: 'undetected',
+    state: VisibilityState.UNDETECTED,
     detection: null,
   };
 }
@@ -127,7 +128,7 @@ export function calculateVisibility(input) {
  */
 function normalizeTargetState(target) {
   return {
-    lightingLevel: target.lightingLevel || 'bright',
+    lightingLevel: target.lightingLevel || LightingLevel.BRIGHT,
     concealment: target.concealment ?? false,
     auxiliary: Array.isArray(target.auxiliary) ? target.auxiliary : [],
     traits: Array.isArray(target.traits) ? target.traits : [],
@@ -151,7 +152,7 @@ function normalizeObserverState(observer) {
       deafened: conditions.deafened ?? false,
       dazzled: conditions.dazzled ?? false,
     },
-    lightingLevel: observer.lightingLevel || 'bright', // Observer's own lighting level
+    lightingLevel: observer.lightingLevel || LightingLevel.BRIGHT, // Observer's own lighting level
     movementAction: observer.movementAction ?? 0, // Observer's movement action for tremorsense checks
   };
 }
@@ -176,7 +177,7 @@ function handleBlindedObserver(observer, target, soundBlocked) {
   // Blinded with no working non-visual senses = undetected
   // (This means they have no precise non-visual senses AND no imprecise non-visual senses that work)
   return {
-    state: 'undetected',
+    state: VisibilityState.UNDETECTED,
     detection: null,
   };
 }
@@ -197,10 +198,10 @@ function checkNonAuditorySenses(observer, target) {
     const isTargetElevated = targetMovementAction === 'fly' || observerMovementAction === 'fly';
     if (!isTargetElevated) {
       return {
-        state: 'hidden',
+        state: VisibilityState.HIDDEN,
         detection: {
           isPrecise: false,
-          sense: 'tremorsense',
+          sense: SenseType.TREMORSENSE,
         },
       };
     }
@@ -209,10 +210,10 @@ function checkNonAuditorySenses(observer, target) {
   // Scent: detects by smell, BYPASSES invisibility
   if (imprecise.scent) {
     return {
-      state: 'hidden',
+      state: VisibilityState.HIDDEN,
       detection: {
         isPrecise: false,
-        sense: 'scent',
+        sense: SenseType.SCENT,
       },
     };
   }
@@ -220,10 +221,10 @@ function checkNonAuditorySenses(observer, target) {
   // Lifesense: detects living or undead creatures, BYPASSES invisibility
   if (imprecise.lifesense && canLifesenseDetect(target)) {
     return {
-      state: 'hidden',
+      state: VisibilityState.HIDDEN,
       detection: {
         isPrecise: false,
-        sense: 'lifesense',
+        sense: SenseType.LIFESENSE,
       },
     };
   }
@@ -259,21 +260,21 @@ function selectBestDetection(results) {
 
   // State priority ranking (lower number = better detection)
   const statePriority = {
-    observed: 1,
-    concealed: 2,
-    hidden: 3,
-    undetected: 4,
+    [VisibilityState.OBSERVED]: 1,
+    [VisibilityState.CONCEALED]: 2,
+    [VisibilityState.HIDDEN]: 3,
+    [VisibilityState.UNDETECTED]: 4,
   };
 
   // Visual senses (preferred when state is equal)
   const visualSenses = new Set([
-    'vision',
-    'darkvision',
+    SenseType.VISION,
+    SenseType.DARKVISION,
     'greater-darkvision',
-    'greaterDarkvision',
+    SenseType.GREATER_DARKVISION,
     'low-light-vision',
-    'lowLightVision',
-    'light-perception',
+    SenseType.LOW_LIGHT_VISION,
+    SenseType.LIGHT_PERCEPTION,
   ]);
 
   // Sort by state priority (best first), then by visual preference
@@ -311,13 +312,13 @@ function checkHasPreciseNonVisualSense(observer) {
 
   // Visual senses that should be excluded
   const visualSenses = new Set([
-    'vision',
-    'darkvision',
+    SenseType.VISION,
+    SenseType.DARKVISION,
     'greater-darkvision',
-    'greaterDarkvision',
+    SenseType.GREATER_DARKVISION,
     'low-light-vision',
-    'lowLightVision',
-    'light-perception',
+    SenseType.LOW_LIGHT_VISION,
+    SenseType.LIGHT_PERCEPTION,
   ]);
 
   // Check if there are any precise non-visual senses with range > 0
@@ -345,14 +346,14 @@ function checkPreciseNonVisualSenses(observer, target, soundBlocked = false) {
   // Visual senses that should be excluded from non-visual checks
   // These are affected by lighting conditions and should go through determineVisualDetection
   const visualSenses = new Set([
-    'vision',
-    'darkvision',
+    SenseType.VISION,
+    SenseType.DARKVISION,
     'greater-darkvision',
-    'greaterDarkvision',
+    SenseType.GREATER_DARKVISION,
     'low-light-vision',
-    'lowLightVision',
-    'light-perception',
-    'see-invisibility', // Visual sense that counters invisibility
+    SenseType.LOW_LIGHT_VISION,
+    SenseType.LIGHT_PERCEPTION,
+    SenseType.SEE_INVISIBILITY, // Visual sense that counters invisibility
     'seeInvisibility',
   ]);
 
@@ -370,16 +371,16 @@ function checkPreciseNonVisualSenses(observer, target, soundBlocked = false) {
     }
 
     // Special handling for echolocation: requires hearing (blocked if deafened or sound blocked)
-    if (senseType === 'echolocation') {
+    if (senseType === SenseType.ECHOLOCATION) {
       if (conditions.deafened || soundBlocked) {
         continue; // Cannot use echolocation when deafened or sound is blocked
       }
       if (senseData && senseData.range > 0) {
         return {
-          state: 'observed',
+          state: VisibilityState.OBSERVED,
           detection: {
             isPrecise: true,
-            sense: 'echolocation',
+            sense: SenseType.ECHOLOCATION,
           },
         };
       }
@@ -387,13 +388,13 @@ function checkPreciseNonVisualSenses(observer, target, soundBlocked = false) {
     }
 
     // Special handling for lifesense: check creature traits
-    if (senseType === 'lifesense') {
+    if (senseType === SenseType.LIFESENSE) {
       if (senseData && senseData.range > 0 && canLifesenseDetect(target)) {
         return {
-          state: 'observed',
+          state: VisibilityState.OBSERVED,
           detection: {
             isPrecise: true,
-            sense: 'lifesense',
+            sense: SenseType.LIFESENSE,
           },
         };
       }
@@ -403,7 +404,7 @@ function checkPreciseNonVisualSenses(observer, target, soundBlocked = false) {
     // Any other non-visual precise sense allows observation
     if (senseData && senseData.range > 0) {
       return {
-        state: 'observed',
+        state: VisibilityState.OBSERVED,
         detection: {
           isPrecise: true,
           sense: senseType,
@@ -449,7 +450,7 @@ function determineVisualDetection(
 
   // Check if observer has see-invisibility sense BEFORE checking invisibility
   const hasSeeInvisibility =
-    observer.precise['see-invisibility'] || observer.precise.seeInvisibility;
+    observer.precise[SenseType.SEE_INVISIBILITY] || observer.precise.seeInvisibility;
 
   // CRITICAL: Invisible targets cannot be detected by visual senses UNLESS observer has see-invisibility
   const isInvisible = target.auxiliary.includes('invisible');
@@ -480,13 +481,13 @@ function determineVisualDetection(
   let effectiveLightingLevel = lightingLevel;
 
   // If observer is in magical darkness, that affects their vision even if target is in light
-  if (observerLighting === 'greaterMagicalDarkness') {
-    effectiveLightingLevel = 'greaterMagicalDarkness';
+  if (observerLighting === LightingLevel.GREATER_MAGICAL_DARKNESS) {
+    effectiveLightingLevel = LightingLevel.GREATER_MAGICAL_DARKNESS;
   } else if (
-    observerLighting === 'magicalDarkness' &&
-    effectiveLightingLevel !== 'greaterMagicalDarkness'
+    observerLighting === LightingLevel.MAGICAL_DARKNESS &&
+    effectiveLightingLevel !== LightingLevel.GREATER_MAGICAL_DARKNESS
   ) {
-    effectiveLightingLevel = 'magicalDarkness';
+    effectiveLightingLevel = LightingLevel.MAGICAL_DARKNESS;
   }
 
   // CRITICAL FIX: Observer in regular darkness can still see targets in bright/dim light!
@@ -498,13 +499,13 @@ function determineVisualDetection(
     const rayLevel = rayDarkness.lightingLevel;
 
     // Ray darkness becomes the effective level if it's more restrictive
-    if (rayLevel === 'greaterMagicalDarkness') {
-      effectiveLightingLevel = 'greaterMagicalDarkness';
+    if (rayLevel === LightingLevel.GREATER_MAGICAL_DARKNESS) {
+      effectiveLightingLevel = LightingLevel.GREATER_MAGICAL_DARKNESS;
     } else if (
-      rayLevel === 'magicalDarkness' &&
-      effectiveLightingLevel !== 'greaterMagicalDarkness'
+      rayLevel === LightingLevel.MAGICAL_DARKNESS &&
+      effectiveLightingLevel !== LightingLevel.GREATER_MAGICAL_DARKNESS
     ) {
-      effectiveLightingLevel = 'magicalDarkness';
+      effectiveLightingLevel = LightingLevel.MAGICAL_DARKNESS;
     }
   }
 
@@ -515,9 +516,9 @@ function determineVisualDetection(
   if (hasSeeInvisibility && isInvisible) {
     return {
       canDetect: true,
-      sense: 'see-invisibility',
+      sense: SenseType.SEE_INVISIBILITY,
       isPrecise: true,
-      baseState: 'concealed', // Invisible creatures seen with see-invisibility are concealed
+      baseState: VisibilityState.CONCEALED, // Invisible creatures seen with see-invisibility are concealed
     };
   }
 
@@ -525,9 +526,9 @@ function determineVisualDetection(
   if (precise.greaterDarkvision || precise['greater-darkvision']) {
     return {
       canDetect: true,
-      sense: 'greaterDarkvision',
+      sense: SenseType.GREATER_DARKVISION,
       isPrecise: true,
-      baseState: dazzledApplies ? 'concealed' : 'observed',
+      baseState: dazzledApplies ? VisibilityState.CONCEALED : VisibilityState.OBSERVED,
     };
   }
 
@@ -536,50 +537,56 @@ function determineVisualDetection(
   // In magical darkness (rank 1-3) or natural darkness, sees observed
   if (precise.darkvision) {
     // If effective lighting is rank 4+ magical darkness (from observer, target, or ray), darkvision sees concealed
-    if (effectiveLightingLevel === 'greaterMagicalDarkness') {
+    if (effectiveLightingLevel === LightingLevel.GREATER_MAGICAL_DARKNESS) {
       return {
         canDetect: true,
-        sense: 'darkvision',
+        sense: SenseType.DARKVISION,
         isPrecise: true,
-        baseState: 'concealed', // Impaired by greater magical darkness
+        baseState: VisibilityState.CONCEALED, // Impaired by greater magical darkness
       };
     }
 
     // In magical darkness (rank 1-3) or natural darkness: darkvision sees clearly
-    if (effectiveLightingLevel === 'magicalDarkness' || effectiveLightingLevel === 'darkness') {
+    if (
+      effectiveLightingLevel === LightingLevel.MAGICAL_DARKNESS ||
+      effectiveLightingLevel === LightingLevel.DARKNESS
+    ) {
       return {
         canDetect: true,
-        sense: 'darkvision',
+        sense: SenseType.DARKVISION,
         isPrecise: true,
-        baseState: dazzledApplies ? 'concealed' : 'observed',
+        baseState: dazzledApplies ? VisibilityState.CONCEALED : VisibilityState.OBSERVED,
       };
-    } else if (effectiveLightingLevel === 'dim') {
+    } else if (effectiveLightingLevel === LightingLevel.DIM) {
       // In dim light, darkvision sees clearly
       return {
         canDetect: true,
-        sense: 'darkvision',
+        sense: SenseType.DARKVISION,
         isPrecise: true,
-        baseState: dazzledApplies ? 'concealed' : 'observed',
+        baseState: dazzledApplies ? VisibilityState.CONCEALED : VisibilityState.OBSERVED,
       };
-    } else if (effectiveLightingLevel === 'bright') {
+    } else if (effectiveLightingLevel === LightingLevel.BRIGHT) {
       // In bright light, darkvision works like normal vision
       return {
         canDetect: true,
-        sense: 'darkvision',
+        sense: SenseType.DARKVISION,
         isPrecise: true,
-        baseState: dazzledApplies ? 'concealed' : 'observed',
+        baseState: dazzledApplies ? VisibilityState.CONCEALED : VisibilityState.OBSERVED,
       };
     }
   }
 
   // Low-light vision: treats dim light as bright light, but doesn't help in any darkness
   if (precise.lowLightVision || precise['low-light-vision']) {
-    if (effectiveLightingLevel === 'bright' || effectiveLightingLevel === 'dim') {
+    if (
+      effectiveLightingLevel === LightingLevel.BRIGHT ||
+      effectiveLightingLevel === LightingLevel.DIM
+    ) {
       return {
         canDetect: true,
-        sense: 'lowLightVision',
+        sense: SenseType.LOW_LIGHT_VISION,
         isPrecise: true,
-        baseState: dazzledApplies ? 'concealed' : 'observed',
+        baseState: dazzledApplies ? VisibilityState.CONCEALED : VisibilityState.OBSERVED,
       };
     } else {
       // Low-light vision doesn't work in any type of darkness
@@ -590,22 +597,22 @@ function determineVisualDetection(
   // Light-perception and normal vision: work the same way
   // Both work in bright light, concealed in dim light, fail in any darkness
   if (precise['light-perception'] || precise.vision) {
-    const senseUsed = precise['light-perception'] ? 'light-perception' : 'vision';
+    const senseUsed = precise['light-perception'] ? SenseType.LIGHT_PERCEPTION : SenseType.VISION;
 
-    if (effectiveLightingLevel === 'bright') {
+    if (effectiveLightingLevel === LightingLevel.BRIGHT) {
       return {
         canDetect: true,
         sense: senseUsed,
         isPrecise: true,
-        baseState: dazzledApplies ? 'concealed' : 'observed',
+        baseState: dazzledApplies ? VisibilityState.CONCEALED : VisibilityState.OBSERVED,
       };
-    } else if (effectiveLightingLevel === 'dim') {
+    } else if (effectiveLightingLevel === LightingLevel.DIM) {
       // Dim light causes concealment for normal vision
       return {
         canDetect: true,
         sense: senseUsed,
         isPrecise: true,
-        baseState: 'concealed', // Always concealed in dim light
+        baseState: VisibilityState.CONCEALED, // Always concealed in dim light
       };
     } else {
       // Any type of darkness: cannot detect
@@ -630,9 +637,8 @@ function determineVisualDetection(
  * @param {Object} observer - Observer state
  * @param {Object} target - Target state
  * @param {boolean} soundBlocked - Whether sound is blocked between observer and target
- * @param {Object} visualDetection - Visual detection result (unused but kept for backward compatibility)
  */
-function checkImpreciseSenses(observer, target, soundBlocked = false, visualDetection) {
+function checkImpreciseSenses(observer, target, soundBlocked = false) {
   const { imprecise, conditions, movementAction: observerMovementAction } = observer;
   const { auxiliary, movementAction: targetMovementAction } = target;
   const isInvisible = auxiliary.includes('invisible');
@@ -654,10 +660,10 @@ function checkImpreciseSenses(observer, target, soundBlocked = false, visualDete
       // Target is at same elevation and doesn't have Petal Step - tremorsense detects them
       workingSenses.push({
         priority: 1,
-        state: 'hidden',
+        state: VisibilityState.HIDDEN,
         detection: {
           isPrecise: false,
-          sense: 'tremorsense',
+          sense: SenseType.TREMORSENSE,
         },
       });
     }
@@ -671,10 +677,10 @@ function checkImpreciseSenses(observer, target, soundBlocked = false, visualDete
   if (imprecise.lifesense && canLifesenseDetect(target)) {
     workingSenses.push({
       priority: 2,
-      state: 'hidden',
+      state: VisibilityState.HIDDEN,
       detection: {
         isPrecise: false,
-        sense: 'lifesense',
+        sense: SenseType.LIFESENSE,
       },
     });
   }
@@ -685,10 +691,10 @@ function checkImpreciseSenses(observer, target, soundBlocked = false, visualDete
   if (imprecise.scent) {
     workingSenses.push({
       priority: 3,
-      state: 'hidden',
+      state: VisibilityState.HIDDEN,
       detection: {
         isPrecise: false,
-        sense: 'scent',
+        sense: SenseType.SCENT,
       },
     });
   }
@@ -704,16 +710,16 @@ function checkImpreciseSenses(observer, target, soundBlocked = false, visualDete
     if (isInvisible) {
       workingSenses.push({
         priority: 4,
-        state: 'undetected',
+        state: VisibilityState.UNDETECTED,
         detection: null, // Invisible makes target undetected to visual-based detection
       });
     } else {
       workingSenses.push({
         priority: 4,
-        state: 'hidden',
+        state: VisibilityState.HIDDEN,
         detection: {
           isPrecise: false,
-          sense: 'hearing',
+          sense: SenseType.HEARING,
         },
       });
     }
@@ -743,19 +749,20 @@ function applyVisualModifiers(visualDetection, observer, target) {
 
   // 1. Apply invisibility (most significant modifier)
   // EXCEPTION: see-invisibility sense already handled invisibility in determineVisualDetection
-  if (auxiliary.includes('invisible') && visualDetection.sense !== 'see-invisibility') {
+  if (auxiliary.includes('invisible') && visualDetection.sense !== SenseType.SEE_INVISIBILITY) {
     // In PF2e, invisible creatures are undetected
     // (they can still be detected by imprecise senses like hearing, tremorsense, etc.,
     // but those are handled separately in the imprecise sense detection logic)
+
     return {
-      state: 'undetected',
+      state: VisibilityState.UNDETECTED,
       detection: null,
     };
   }
 
   // 2. Apply concealment (from target's concealment property)
-  if (concealment && finalState === 'observed') {
-    finalState = 'concealed';
+  if (concealment && finalState === VisibilityState.OBSERVED) {
+    finalState = VisibilityState.CONCEALED;
   }
 
   // 3. Apply cover (affects targeting but not detection state in PF2e)
