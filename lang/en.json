@@ -992,6 +992,10 @@
         "name": "Hold for Cover Visualization",
         "hint": "Hold this key while hovering over tokens to visualize cover fields. Shows optimal positioning for attacks."
       },
+      "SHOW_WALL_COVER_LABELS": {
+        "name": "Show Wall Cover Labels",
+        "hint": "Hold this key while the walls tool is active to show cover status labels on walls (AUTO, NONE, LESSER, STANDARD, GREATER)."
+      },
       "OPEN_WALL_MANAGER": {
         "name": "Open Wall Manager",
         "hint": "Open the Visioner Wall Manager dialog to bulk edit wall settings."

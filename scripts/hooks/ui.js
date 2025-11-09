@@ -177,28 +177,154 @@ export function registerUIHooks() {
     }
   };
 
-  // Track Alt key state
-  let isAltPressed = false;
+  // Track keybinding state for showing wall cover labels
+  let isShowWallLabelsKeyPressed = false;
+
+  // Debounce timer for refreshWallIdentifierLabels
+  let refreshWallLabelsDebounceTimer = null;
+
+  // Flag to prevent concurrent refreshes
+  let isRefreshingWallLabels = false;
+
+  // Bound methods for event listeners
+  let boundOnKeyDown = null;
+  let boundOnKeyUp = null;
+
+  // Debounced wrapper for refreshWallIdentifierLabels (for canvasPan)
+  const refreshWallIdentifierLabelsDebounced = () => {
+    if (refreshWallLabelsDebounceTimer) {
+      clearTimeout(refreshWallLabelsDebounceTimer);
+    }
+    refreshWallLabelsDebounceTimer = setTimeout(() => {
+      refreshWallIdentifierLabels().catch(() => {});
+      refreshWallLabelsDebounceTimer = null;
+    }, 150);
+  };
 
   // Utility: label identifiers and cover status for walls when Alt is held
   const refreshWallIdentifierLabels = () => {
-    return Promise.resolve().then(() => {
-      const walls = canvas?.walls?.placeables || [];
-      const layer = canvas?.controls || canvas?.hud || canvas?.stage;
+    // Prevent concurrent refreshes
+    if (isRefreshingWallLabels) {
+      return Promise.resolve();
+    }
+    isRefreshingWallLabels = true;
 
-      // Check if walls tool is active
-      const isWallTool = ui.controls?.control?.name === 'walls';
+    return Promise.resolve()
+      .then(() => {
+        const walls = canvas?.walls?.placeables || [];
+        // Try multiple layer options - controls layer is where we add the icons
+        const layer = canvas?.controls || canvas?.hud || canvas?.stage;
+        const isWallTool = ui.controls?.control?.name === 'walls';
 
-      // Clean up labels that shouldn't exist anymore
-      for (const w of walls) {
-        const idf = w?.document?.getFlag?.(MODULE_ID, 'wallIdentifier');
-        const coverOverride = w?.document?.getFlag?.(MODULE_ID, 'coverOverride');
+        // Check if walls tool is active - early exit if not
+        if (!isWallTool) {
+          // Clean up all labels if walls tool is not active
+          for (const w of walls) {
+            if (w._pvIdLabel) {
+              try {
+                w._pvIdLabel.parent?.removeChild?.(w._pvIdLabel);
+              } catch {}
+              try {
+                w._pvIdLabel.destroy?.();
+              } catch {}
+              delete w._pvIdLabel;
+            }
+            if (w._pvCoverIcon) {
+              try {
+                w._pvCoverIcon.parent?.removeChild?.(w._pvCoverIcon);
+              } catch {}
+              try {
+                w._pvCoverIcon.destroy?.();
+              } catch {}
+              delete w._pvCoverIcon;
+            }
+          }
+          return;
+        }
+
+        // Early exit if key not pressed and no controlled walls with identifiers
+        // If key IS pressed, we should show cover labels for ALL walls (including AUTO mode)
+        const hasControlledWallsWithIds = walls.some(
+          (w) => w?.controlled && w?.document?.getFlag?.(MODULE_ID, 'wallIdentifier'),
+        );
+
+        // If key is pressed, always show labels (including AUTO), so don't early exit
+        // Only early exit if key not pressed AND no identifiers
+        // BUT: we still need to clean up cover icons even if we early exit
+        if (!isShowWallLabelsKeyPressed && !hasControlledWallsWithIds) {
+          // Clean up all cover icons before early exit
+          const layerChildren = layer?.children || [];
+          for (const child of layerChildren) {
+            if (child._coverText && child._tooltip) {
+              try {
+                child.parent?.removeChild?.(child);
+              } catch (e) {
+                console.warn('[PF2E Visioner] Error removing cover icon:', e);
+              }
+              try {
+                child.destroy?.();
+              } catch (e) {
+                console.warn('[PF2E Visioner] Error destroying cover icon:', e);
+              }
+            }
+          }
+          // Clean up wall references
+          for (const w of walls) {
+            if (w._pvCoverIcon) {
+              delete w._pvCoverIcon;
+            }
+          }
+          return;
+        }
+
+        // Clean up labels that shouldn't exist anymore
+        // Also search layer for orphaned cover icons that might not have references
+        const layerChildren = layer?.children || [];
+        const orphanedCoverIcons = [];
+
+        for (const child of layerChildren) {
+          if (child._coverText && child._tooltip) {
+            // This looks like a cover icon - try to find which wall it belongs to
+            const foundWall = walls.find((w) => {
+              if (w._pvCoverIcon === child) {
+                return true;
+              }
+              const wallCenter = w.center || {
+                x: (w.document.x + w.document.x2) / 2,
+                y: (w.document.y + w.document.y2) / 2,
+              };
+              if (child.position) {
+                const dist = Math.sqrt(
+                  Math.pow(child.position.x - wallCenter.x, 2) +
+                    Math.pow(child.position.y - wallCenter.y, 2),
+                );
+                if (dist < 50) {
+                  return true;
+                }
+              }
+              return false;
+            });
+            if (foundWall) {
+              // Link it to the wall if not already linked
+              if (!foundWall._pvCoverIcon) {
+                foundWall._pvCoverIcon = child;
+              }
+            } else {
+              orphanedCoverIcons.push(child);
+            }
+          }
+        }
+
+        for (const w of walls) {
+          const idf = w?.document?.getFlag?.(MODULE_ID, 'wallIdentifier');
+          const coverOverride = w?.document?.getFlag?.(MODULE_ID, 'coverOverride');
 
           // Show identifier if wall is controlled AND walls tool is active AND has identifier
           const shouldShowIdentifier = !!w?.controlled && isWallTool && !!idf;
 
-          // Show cover status if Alt is pressed AND walls tool is active AND has cover override
-          const shouldShowCover = isAltPressed && isWallTool && coverOverride !== undefined;
+          // Show cover status if key is pressed AND walls tool is active AND has cover override
+          const shouldShowCover =
+            isShowWallLabelsKeyPressed && isWallTool && coverOverride !== undefined;
 
           // Clean up identifier label if it shouldn't show
           if (!shouldShowIdentifier && w._pvIdLabel) {
@@ -215,22 +341,94 @@ export function registerUIHooks() {
           if (!shouldShowCover && w._pvCoverIcon) {
             try {
               w._pvCoverIcon.parent?.removeChild?.(w._pvCoverIcon);
-            } catch {}
+            } catch (e) {
+              console.warn('[PF2E Visioner] Error removing cover icon:', e);
+            }
             try {
               w._pvCoverIcon.destroy?.();
-            } catch {}
+            } catch (e) {
+              console.warn('[PF2E Visioner] Error destroying cover icon:', e);
+            }
             delete w._pvCoverIcon;
+          }
+        }
+
+        // Clean up any orphaned cover icons that don't belong to any wall
+        // Also clean up ALL cover icons if key is not pressed (regardless of whether they're linked)
+        const shouldKeepCoverIcons = isShowWallLabelsKeyPressed && isWallTool;
+
+        if (!shouldKeepCoverIcons) {
+          // Clean up all cover icons in the layer
+          // Re-fetch layer children in case they've changed since we captured layerChildren
+          const currentLayerChildren = layer?.children || [];
+
+          for (const child of currentLayerChildren) {
+            if (child._coverText && child._tooltip) {
+              try {
+                if (child.parent) {
+                  child.parent.removeChild(child);
+                }
+              } catch (e) {
+                console.warn('[PF2E Visioner] Error removing cover icon:', e);
+              }
+              try {
+                child.destroy();
+              } catch (e) {
+                console.warn('[PF2E Visioner] Error destroying cover icon:', e);
+              }
+            }
+          }
+
+          // Also clean up any wall references
+          for (const w of walls) {
+            if (w._pvCoverIcon) {
+              delete w._pvCoverIcon;
+            }
+          }
+        }
+
+        // Clean up orphaned icons that don't belong to any wall (even if key is pressed)
+        for (const orphanedIcon of orphanedCoverIcons) {
+          if (!shouldKeepCoverIcons) {
+            try {
+              orphanedIcon.parent?.removeChild?.(orphanedIcon);
+            } catch (e) {
+              console.warn('[PF2E Visioner] Error removing orphaned icon:', e);
+            }
+            try {
+              orphanedIcon.destroy?.();
+            } catch (e) {
+              console.warn('[PF2E Visioner] Error destroying orphaned icon:', e);
+            }
           }
         }
 
         // Create/update labels for walls
         for (const w of walls) {
           const idf = w?.document?.getFlag?.(MODULE_ID, 'wallIdentifier');
+          const coverOverride = w?.document?.getFlag?.(MODULE_ID, 'coverOverride');
           const coverInfo = getWallCoverInfo(w.document);
 
           // Check conditions for showing each type of label
           const shouldShowIdentifier = !!w?.controlled && isWallTool && !!idf;
-          const shouldShowCover = isAltPressed && isWallTool && coverInfo;
+          // Show cover label if key pressed, walls tool active, AND wall has a cover override set (no AUTO labels)
+          const shouldShowCover =
+            isShowWallLabelsKeyPressed && isWallTool && coverOverride !== undefined;
+
+          // Clean up cover icon if it shouldn't show (do this BEFORE continue to ensure cleanup)
+          if (!shouldShowCover && w._pvCoverIcon) {
+            try {
+              w._pvCoverIcon.parent?.removeChild?.(w._pvCoverIcon);
+            } catch (e) {
+              console.warn('[PF2E Visioner] Error removing cover icon:', e);
+            }
+            try {
+              w._pvCoverIcon.destroy?.();
+            } catch (e) {
+              console.warn('[PF2E Visioner] Error destroying cover icon:', e);
+            }
+            delete w._pvCoverIcon;
+          }
 
           // Skip if nothing to show
           if (!shouldShowIdentifier && !shouldShowCover) continue;
@@ -255,6 +453,8 @@ export function registerUIHooks() {
                 text.anchor.set(0.5, 1);
                 text.zIndex = 10000;
                 text.position.set(mx, my - 6);
+                text.interactive = false;
+                text.interactiveChildren = false;
                 // Prefer controls layer; fallback to wall container
                 if (layer?.addChild) layer.addChild(text);
                 else w.addChild?.(text);
@@ -295,43 +495,47 @@ export function registerUIHooks() {
                 coverText = 'AUTO';
               }
 
-            if (!w._pvCoverIcon) {
-              // Create a container for the text
-              const container = new PIXI.Container();
-              container.zIndex = 10001; // Above identifier text
+              if (!w._pvCoverIcon) {
+                // Create a container for the text
+                const container = new PIXI.Container();
+                container.zIndex = 10001; // Above identifier text
+                container.interactive = false;
+                container.interactiveChildren = false;
 
-              // Calculate scale based on camera zoom
-              const cameraScale = canvas?.stage?.scale?.x || 1;
-              const baseScale = Math.max(0.8, Math.min(2.0, 1 / cameraScale)); // Scale inversely with zoom, clamped
+                // Calculate scale based on camera zoom
+                const cameraScale = canvas?.stage?.scale?.x || 1;
+                const baseScale = Math.max(0.8, Math.min(2.0, 1 / cameraScale)); // Scale inversely with zoom, clamped
 
                 // Create background rectangle for better visibility
                 const bg = new PIXI.Graphics();
+                bg.interactive = false;
+                bg.interactiveChildren = false;
                 bg.beginFill(0x000000, 0.8);
                 bg.lineStyle(1, coverInfo.color, 1);
 
-              // Calculate text dimensions for background sizing
-              const tempStyle = new PIXI.TextStyle({
-                fontFamily: 'Arial, sans-serif',
-                fontSize: Math.round(10 * baseScale),
-                fill: coverInfo.color,
-                fontWeight: 'bold',
-              });
-              const tempText = new PIXI.Text(coverText, tempStyle);
-              const textWidth = tempText.width;
-              const textHeight = tempText.height;
-              tempText.destroy();
+                // Calculate text dimensions for background sizing
+                const tempStyle = new PIXI.TextStyle({
+                  fontFamily: 'Arial, sans-serif',
+                  fontSize: Math.round(10 * baseScale),
+                  fill: coverInfo.color,
+                  fontWeight: 'bold',
+                });
+                const tempText = new PIXI.Text(coverText, tempStyle);
+                const textWidth = tempText.width;
+                const textHeight = tempText.height;
+                tempText.destroy();
 
-              // Draw rounded rectangle background
-              const padding = 3 * baseScale;
-              bg.drawRoundedRect(
-                -textWidth / 2 - padding,
-                -textHeight / 2 - padding,
-                textWidth + padding * 2,
-                textHeight + padding * 2,
-                3 * baseScale
-              );
-              bg.endFill();
-              container.addChild(bg);
+                // Draw rounded rectangle background
+                const padding = 3 * baseScale;
+                bg.drawRoundedRect(
+                  -textWidth / 2 - padding,
+                  -textHeight / 2 - padding,
+                  textWidth + padding * 2,
+                  textHeight + padding * 2,
+                  3 * baseScale,
+                );
+                bg.endFill();
+                container.addChild(bg);
 
                 // Create text label
                 const textStyle = new PIXI.TextStyle({
@@ -343,33 +547,34 @@ export function registerUIHooks() {
                   fontWeight: 'bold',
                 });
 
-              const text = new PIXI.Text(coverText, textStyle);
-              text.anchor.set(0.5, 0.5);
-              container.addChild(text);
+                const text = new PIXI.Text(coverText, textStyle);
+                text.anchor.set(0.5, 0.5);
+                text.interactive = false;
+                text.interactiveChildren = false;
+                container.addChild(text);
 
-              container.position.set(mx + textOffsetX, textY);
-              container.scale.set(baseScale);
+                container.position.set(mx + textOffsetX, textY);
+                container.scale.set(baseScale);
 
+                // Store tooltip and scale info
+                container._tooltip = coverInfo.tooltip;
+                container._baseScale = baseScale;
+                container._coverText = coverText;
 
+                // Prefer controls layer; fallback to wall container
+                if (layer?.addChild) {
+                  layer.addChild(container);
+                } else if (w.addChild) {
+                  w.addChild(container);
+                }
+                w._pvCoverIcon = container;
+              } else {
+                // Update existing text position, scale, and content
+                const cameraScale = canvas?.stage?.scale?.x || 1;
+                const baseScale = Math.max(0.8, Math.min(2.0, 1 / cameraScale));
 
-              // Store tooltip and scale info
-              container._tooltip = coverInfo.tooltip;
-              container._baseScale = baseScale;
-              container._coverText = coverText;
-
-              // Prefer controls layer; fallback to wall container
-              if (layer?.addChild) layer.addChild(container);
-              else w.addChild?.(container);
-              w._pvCoverIcon = container;
-            } else {
-              // Update existing text position, scale, and content
-              const cameraScale = canvas?.stage?.scale?.x || 1;
-              const baseScale = Math.max(0.8, Math.min(2.0, 1 / cameraScale));
-
-              w._pvCoverIcon.position.set(mx + textOffsetX, textY);
-              w._pvCoverIcon.scale.set(baseScale);
-
-
+                w._pvCoverIcon.position.set(mx + textOffsetX, textY);
+                w._pvCoverIcon.scale.set(baseScale);
 
                 // Update text content and color if changed
                 const text = w._pvCoverIcon.children[1]; // Text is second child after background
@@ -402,22 +607,19 @@ export function registerUIHooks() {
                 w._pvCoverIcon._tooltip = coverInfo.tooltip;
                 w._pvCoverIcon._baseScale = baseScale;
               }
-            } else if (w._pvCoverIcon) {
-              // Remove cover text if no longer needed
-              try {
-                w._pvCoverIcon.parent?.removeChild?.(w._pvCoverIcon);
-              } catch {}
-              try {
-                w._pvCoverIcon.destroy?.();
-              } catch {}
-              delete w._pvCoverIcon;
             }
+            // Note: Cover icon cleanup is handled at the start of the loop to ensure it happens even when skipping
           } catch {
             /* ignore label errors */
           }
         }
       })
-      .catch(() => {});
+      .catch((err) => {
+        console.error('[PF2E Visioner] Error in refreshWallIdentifierLabels:', err);
+      })
+      .finally(() => {
+        isRefreshingWallLabels = false;
+      });
   };
 
   const refreshWallTool = () => {
@@ -558,9 +760,8 @@ export function registerUIHooks() {
   Hooks.on('updateAmbientLight', refreshLightingTool);
 
   // Refresh wall labels when camera zoom changes (debounced)
-  let canvasPanTimeout = null;
   Hooks.on('canvasPan', () => {
-    refreshWallIdentifierLabels().catch(() => { });
+    refreshWallIdentifierLabelsDebounced();
   });
 
   // Refresh wall labels when active tool changes
@@ -568,19 +769,144 @@ export function registerUIHooks() {
     refreshWallIdentifierLabels().catch(() => {});
   });
 
-  // Add keyboard event listeners for Alt key
-  document.addEventListener('keydown', (event) => {
-    if (event.altKey && !isAltPressed) {
-      isAltPressed = true;
+  // Handle configurable keybinding for wall cover labels (doesn't interfere with Alt-click)
+  // Use document-level listeners similar to CoverVisualization pattern
+  const checkKeybindingMatch = (event, keybinding) => {
+    if (!keybinding) return false;
+
+    // Check if the key matches (using both code and key for better compatibility)
+    // This helps with different keyboard layouts like AZERTY
+    const keyMatches =
+      event.code === keybinding.key ||
+      event.key === keybinding.key ||
+      // Additional fallback for physical key position matching
+      (keybinding.key.startsWith('Key') && event.code === keybinding.key) ||
+      (keybinding.key.startsWith('Digit') && event.code === keybinding.key) ||
+      // Handle left/right modifier keys
+      (keybinding.key === 'ShiftLeft' && (event.code === 'ShiftLeft' || event.key === 'Shift')) ||
+      (keybinding.key === 'ShiftRight' && (event.code === 'ShiftRight' || event.key === 'Shift')) ||
+      (keybinding.key === 'AltLeft' && (event.code === 'AltLeft' || event.key === 'Alt')) ||
+      (keybinding.key === 'AltRight' && (event.code === 'AltRight' || event.key === 'Alt')) ||
+      (keybinding.key === 'ControlLeft' &&
+        (event.code === 'ControlLeft' || event.key === 'Control')) ||
+      (keybinding.key === 'ControlRight' &&
+        (event.code === 'ControlRight' || event.key === 'Control')) ||
+      (keybinding.key === 'MetaLeft' && (event.code === 'MetaLeft' || event.key === 'Meta')) ||
+      (keybinding.key === 'MetaRight' && (event.code === 'MetaRight' || event.key === 'Meta'));
+
+    // Check modifiers - a modifier should be pressed if it's in the keybinding
+    const requiredModifiers = keybinding.modifiers || [];
+    const ctrlMatches = requiredModifiers.includes('Control') ? event.ctrlKey : !event.ctrlKey;
+    const shiftMatches = requiredModifiers.includes('Shift') ? event.shiftKey : !event.shiftKey;
+    const altMatches = requiredModifiers.includes('Alt') ? event.altKey : !event.altKey;
+    const metaMatches = requiredModifiers.includes('Meta') ? event.metaKey : !event.metaKey;
+
+    return keyMatches && ctrlMatches && shiftMatches && altMatches && metaMatches;
+  };
+
+  boundOnKeyDown = (event) => {
+    // Check if this key matches the configured keybinding
+    const keybindings = game.keybindings?.get?.(MODULE_ID, 'showWallCoverLabels') || [];
+
+    if (keybindings.length === 0) return;
+
+    const keybinding = keybindings[0];
+    const matches = checkKeybindingMatch(event, keybinding);
+
+    if (matches && !isShowWallLabelsKeyPressed) {
+      isShowWallLabelsKeyPressed = true;
+      // Only refresh if walls tool is active
+      if (ui.controls?.control?.name === 'walls') {
+        refreshWallIdentifierLabels().catch(() => {});
+      }
+    }
+  };
+
+  boundOnKeyUp = (event) => {
+    // Check if this key matches the configured keybinding
+    const keybindings = game.keybindings?.get?.(MODULE_ID, 'showWallCoverLabels') || [];
+
+    if (keybindings.length === 0) {
+      // If no keybinding configured but key was pressed, reset anyway
+      if (isShowWallLabelsKeyPressed) {
+        isShowWallLabelsKeyPressed = false;
+        refreshWallIdentifierLabels().catch(() => {});
+      }
+      return;
+    }
+
+    const keybinding = keybindings[0];
+    const matches = checkKeybindingMatch(event, keybinding);
+
+    // Also check if this is the same key by code (more reliable)
+    const codeMatches = event.code === keybinding.key;
+
+    if (matches || codeMatches) {
+      // Always reset state and refresh to clean up labels
+      const wasPressed = isShowWallLabelsKeyPressed;
+      isShowWallLabelsKeyPressed = false;
+      // Always refresh to clean up labels when key is released
+      if (wasPressed) {
+        refreshWallIdentifierLabels().catch(() => {});
+      }
+    }
+  };
+
+  // Track if listeners are registered to avoid duplicates
+  let keyListenersRegistered = false;
+
+  // Safety net: clean up labels if window loses focus (user might release key outside window)
+  const boundOnWindowBlur = () => {
+    if (isShowWallLabelsKeyPressed) {
+      isShowWallLabelsKeyPressed = false;
       refreshWallIdentifierLabels().catch(() => {});
     }
+  };
+
+  // Register event listeners - use regular hook to handle multiple canvas loads
+  const registerKeyListeners = () => {
+    // Remove old listeners first to avoid duplicates
+    if (keyListenersRegistered) {
+      if (boundOnKeyDown) {
+        document.removeEventListener('keydown', boundOnKeyDown, true);
+      }
+      if (boundOnKeyUp) {
+        document.removeEventListener('keyup', boundOnKeyUp, true);
+      }
+      window.removeEventListener('blur', boundOnWindowBlur);
+    }
+
+    if (boundOnKeyDown && boundOnKeyUp) {
+      document.addEventListener('keydown', boundOnKeyDown, true);
+      document.addEventListener('keyup', boundOnKeyUp, true);
+      window.addEventListener('blur', boundOnWindowBlur);
+      keyListenersRegistered = true;
+    }
+  };
+
+  // Register immediately if canvas is already ready, otherwise wait for canvasReady
+  if (canvas?.ready) {
+    registerKeyListeners();
+  }
+
+  Hooks.on('canvasReady', () => {
+    registerKeyListeners();
   });
 
-  document.addEventListener('keyup', (event) => {
-    if (!event.altKey && isAltPressed) {
-      isAltPressed = false;
-      refreshWallIdentifierLabels().catch(() => {});
+  // Clean up on canvas teardown
+  Hooks.on('canvasTearDown', () => {
+    if (boundOnKeyDown) {
+      document.removeEventListener('keydown', boundOnKeyDown, true);
     }
+    if (boundOnKeyUp) {
+      document.removeEventListener('keyup', boundOnKeyUp, true);
+    }
+    window.removeEventListener('blur', boundOnWindowBlur);
+    keyListenersRegistered = false;
+    // Reset state
+    isShowWallLabelsKeyPressed = false;
+    // Clean up any lingering labels
+    refreshWallIdentifierLabels().catch(() => {});
   });
   for (const hook of [
     'renderTokenConfig',

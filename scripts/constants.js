@@ -1006,6 +1006,12 @@ export const KEYBINDINGS = {
     editable: [{ key: 'KeyY', modifiers: [] }],
     restricted: false,
   },
+  showWallCoverLabels: {
+    name: 'PF2E_VISIONER.KEYBINDINGS.SHOW_WALL_COVER_LABELS.name',
+    hint: 'PF2E_VISIONER.KEYBINDINGS.SHOW_WALL_COVER_LABELS.hint',
+    editable: [],
+    restricted: true,
+  },
   openWallManager: {
     name: 'PF2E_VISIONER.KEYBINDINGS.OPEN_WALL_MANAGER.name',
     hint: 'PF2E_VISIONER.KEYBINDINGS.OPEN_WALL_MANAGER.hint',

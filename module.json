@@ -9,7 +9,7 @@
       "flags": {}
     }
   ],
-  "version": "4.5.2",
+  "version": "4.5.3",
   "compatibility": {
     "minimum": "13.341",
     "verified": "13.350"
@@ -97,7 +97,7 @@
         "type": "system",
         "compatibility": {
           "minimum": "7.0.0",
-          "verified": "7.6.2"
+          "verified": "7.7.1"
         }
       }
     ],

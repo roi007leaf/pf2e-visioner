@@ -1,5 +1,16 @@
 # Changelog
 
+## [4.5.3] - 2025-01-XX
+
+### ✨ Features
+
+- **Customizable Wall Cover Labels Keybind**: Replaced Alt key handling with a configurable keybinding for showing wall cover labels
+  - New keybinding: "Show Wall Cover Labels" (default: H key) in Controls settings
+  - Hold the configured key while the walls tool is active to display cover status labels (NONE, LESSER, STANDARD, GREATER) on walls
+  - Labels automatically hide when the key is released or when switching away from the walls tool
+  - Prevents interference with Foundry's native Alt-click functionality for wall selection
+  - Only shows labels for walls with explicit cover overrides (AUTO labels are not displayed)
+
 ## [4.5.2] - 2025-11-02
 
 ### Changed
