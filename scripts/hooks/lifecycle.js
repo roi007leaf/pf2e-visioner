@@ -5,12 +5,16 @@
 import { injectChatAutomationStyles } from '../chat/chat-automation-styles.js';
 import { MODULE_ID } from '../constants.js';
 import { initializeHoverTooltips } from '../services/HoverTooltips.js';
+import { initializeGpuKeepAlive } from '../services/gpu-keepalive.js';
 import { registerSocket } from '../services/socket.js';
 import { updateTokenVisuals, updateWallVisuals } from '../services/visual-effects.js';
 
 export function onReady() {
   // Add CSS styles for chat automation
   injectChatAutomationStyles();
+
+  // Initialize GPU keep-alive to prevent throttling during canvas panning
+  initializeGpuKeepAlive();
 
   // Add a fallback approach - add a floating button when tokens are selected (only if HUD button is disabled)
   if (!game.settings.get(MODULE_ID, 'useHudButton')) {
