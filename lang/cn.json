@@ -1,0 +1,1126 @@
+{
+    "PF2E_VISIONER": {
+        "MODULE_TITLE": "PF2E Visioner",
+        "TOKEN_MANAGER": {
+            "TARGET": "目标指示物",
+            "OBSERVER": "观察者指示物",
+            "CANCEL": "取消",
+            "COVER_TAB": "掩蔽",
+            "TITLE": "视野管理器",
+            "COVER_STATE": "掩蔽状态",
+            "NO_TOKENS": "该场景中无可用指示物",
+            "VISIBILITY_STATE": "能见度状态",
+            "VISIBILITY_TAB": "能见度",
+            "APPLY": "应用于该指示物",
+            "APPLY_BOTH": "应用于双方",
+            "RESET": "恢复初始状态",
+            "BULK_ACTIONS": "批量操作"
+        },
+        "VISIBILITY_STATES": {
+            "observed": "可见",
+            "hidden": "隐藏",
+            "undetected": "无踪",
+            "concealed": "隐蔽",
+            "avs": "自动能见度"
+        },
+        "COVER_STATES": {
+            "none": "无掩蔽",
+            "lesser": "次等掩蔽",
+            "standard": "标准掩蔽",
+            "greater": "高等掩蔽"
+        },
+        "VISUAL_EFFECTS": {
+            "HIDDEN_OVERLAY": "该指示物在你的视线中藏匿",
+            "UNDETECTED_OVERLAY": "该指示物对你处于无踪",
+            "CONCEALED_OVERLAY": "该指示物对你隐匿",
+            "UNDETECTED_TOOLTIP": "无踪：你不知道目标所在的位置。你对目标为措手不及且你难以轻易瞄准目标。使用搜索动作有助于找到无踪生物",
+            "DAZZLED_OVERRIDE": "因为目眩状态，所有生物对你处于隐蔽",
+            "CONCEALED_FLAT_CHECK": "瞄准该生物必须进行DC 5纯骰检定",
+            "UNDETECTED_CONDITION": "全自动应用无踪状态",
+            "CONCEALED_TOOLTIP": "隐蔽：你的攻击，法术或其他效果瞄准目标时，必须通过DC 5的纯骰检定",
+            "NO_COVER_TOOLTIP": "无掩蔽：无加值或减值",
+            "GREATER_COVER_TOOLTIP": "高等掩蔽：为AC，反射豁免与隐秘检定提供+4环境加值。可以在该掩蔽后进行躲藏。"
+        },
+        "MECHANICAL_EFFECTS": {
+            "HIDDEN_FLAT_CHECK": "需通过DC 11的纯骰检定以瞄准目标",
+            "CONCEALED_FLAT_CHECK": "需通过DC 5的纯骰检定以瞄准目标",
+            "HIDDEN_TOOLTIP": "藏匿：你对目标为措手不及，且你的攻击、法术或其它效果瞄准目标时，必须通过DC 11的纯骰检定",
+            "CONCEALED_TOOLTIP": "隐蔽：你的攻击，法术或其他效果瞄准目标时，必须通过DC 5的纯骰检定",
+            "UNDETECTED_TOOLTIP": "无踪：你不知道目标所在的位置。你对目标为措手不及且你难以轻易瞄准目标。使用搜索动作有助于找到无踪生物",
+            "VISIBLE_TOOLTIP": "可见：无减值或效果",
+            "BLINDED_OVERRIDE": "所有生物因目盲状态对其自动藏匿",
+            "DAZZLED_OVERRIDE": "所有生物因目眩状态对其自动隐蔽",
+            "NO_COVER_TOOLTIP": "无掩蔽：无加值或减值",
+            "LESSER_COVER_TOOLTIP": "次等掩蔽：为AC提供+1环境加值",
+            "STANDARD_COVER_TOOLTIP": "标准掩蔽：为AC，反射豁免与隐秘检定提供+2物品加值。可以在该掩蔽后进行躲藏。",
+            "GREATER_COVER_TOOLTIP": "高等掩蔽：为AC，反射豁免与隐秘检定提供+4环境加值。可以在该掩蔽后进行躲藏。",
+            "UNDETECTED_CONDITION": "全自动应用无踪状态",
+            "VISIBLE_NO_EFFECTS": "瞄准目标时无减值，也无额外效果"
+        },
+        "CONTEXT_MENU": {
+            "MANAGE_TOKEN": "管理指示物",
+            "MANAGE_VISIBILITY": "管理指示物能见度",
+            "MANAGE_COVER": "管理指示物掩蔽",
+            "QUICK_HIDDEN": "设置为藏匿",
+            "QUICK_UNDETECTED": "设为无踪",
+            "QUICK_CONCEALED": "设为隐蔽",
+            "QUICK_OBSERVED": "设为可见",
+            "QUICK_NO_COVER": "设为无掩蔽",
+            "QUICK_LESSER_COVER": "设置次等掩蔽",
+            "QUICK_STANDARD_COVER": "设置标准掩蔽",
+            "QUICK_GREATER_COVER": "设置高等掩蔽"
+        },
+        "NOTIFICATIONS": {
+            "NO_OBSERVER_SELECTED": "请首先选择观察者指示物",
+            "MULTIPLE_OBSERVERS": "已选择多个观察者指示物—请仅选择一个",
+            "NO_SOCKETLIB_INSTALLED": "PF2E Visioner需要启用socketlib模组以便自动刷新客户端屏幕。请启用它。",
+            "SNEAK_CLEAR_GM_ONLY": "只有GM才能清除潜行标记",
+            "SCENE_CLEAR_GM_ONLY": "只有GM才能清除模组场景数据",
+            "DATA_CLEAR_GM_ONLY": "只有GM才能清除模组数据",
+            "NO_ACTIVE_SCENE": "未激活场景。",
+            "PERMISSION_DENIED": "只有GM才能管理指示物可见度与掩蔽",
+            "SNEAK_CLEARED": "PF2E Visioner：所有潜行标记已清除。",
+            "SCENE_DATA_CLEARED": "PF2E Visioner：已清除全部场景数据。",
+            "SCENE_CLEAR_FAILED": "PF2E Visioner：未能清除场景数据。请查看控制台。",
+            "TOKEN_DATA_CLEARED": "PF2E Visioner：已清除所有指示物数据。",
+            "TOKEN_CLEAR_FAILED": "PF2E Visioner：未能清除指示物数据。请查看控制台。",
+            "CACHE_CLEARED": "已清除散发光照的指示物缓存",
+            "CACHE_UNAVAILABLE": "无法清除缓存",
+            "ALL_CACHES_CLEARED": "所有缓存已清除，且能见度已重新计算",
+            "SCENE_CONFIG_RESET": "场景配置标志重置 - 重载将恢复",
+            "SELECT_TWO_TOKENS": "请按顺序选择两个指示物：观察者与目标",
+            "AVS_UNAVAILABLE": "PF2E Visioner：自动化能见度系统不可用",
+            "NEED_BOTH_TOKENS": "同时需要观察者与目标指示物",
+            "SELECT_TWO_TOKENS_OR_PARAMS": "按顺序选择两个指示物或提供观察者与目标的参数",
+            "NO_DEFERRED_TOKENS": "未找到可取消推迟的指示物。",
+            "NO_SNEAK_DIALOG": "未找到激活中的潜行会话",
+            "NO_TOKEN_ID": "未在按钮上找到指示物ID",
+            "END_TURN_FAILED": "未能成功应用回合结束时的能见度变更。",
+            "NO_DEFERRED_POSITIONS": "无需进行推迟位置检查以验证。",
+            "PARTY_RESTORE_SUCCESS": "PF2E Visioner：恢复{count}个团队指示物状态",
+            "OVERRIDE_KEEP_FAILED": "无法保持设置覆盖",
+            "AVS_ACCEPTED_IN_TABLE": "在{group}表中已接受{count}次变更",
+            "SNEAK_APPLY_FAILED": "未能应用潜行变更：{errors}",
+            "INIT_FAILED": "PF2E Visioner无法初始化：{error}",
+            "NO_VALID_CONSEQUENCES": "未找到有效的攻击后果目标。只有当你对至少一名观察者处于藏匿或无踪状态时，才能看到后果。",
+            "NO_TOKENS_PROVIDED": "无指示物可供清理",
+            "VISION_CACHE_UNAVAILABLE": "无法清除视觉缓存",
+            "NO_DEFERRED_OUTCOMES": "未找到可验证的推迟结果。",
+            "PARTY_RESTORE_FAILED": "PF2E Visioner：无法恢复团队指示物",
+            "SNEAK_CLEAR_FAILED": "PF2E Visioner：未能清除潜行标记。请查看控制台。",
+            "NO_UNDEFERRED_TOKENS": "未找到可恢复至推迟状态的指示物。",
+            "VALIDATION_FAILED": "未能处理回合结束时的验证。",
+            "OVERRIDE_CLEAR_FAILED": "无法清除此表的覆盖设置",
+            "AVS_ACCEPTED_COUNT": "已接受{count}次变更",
+            "NO_ENCOUNTER_TOKENS": "{moduleId}：未找到遭遇中指示物。过滤功能已禁用。",
+            "SNEAK_DEFERRED_RESTORED": "已将{count}个指示物恢复至原始的推迟状态，并带有全部的位置数据",
+            "AVS_REJECTED_ALL": "已拒绝所有自动能见度变更",
+            "AVS_REJECTED": "已拒绝自动能见度变更",
+            "AVS_REJECTED_SINGLE": "已拒绝自动能见度变更：{observerName} → {targetName}",
+            "AVS_ACCEPTED_SINGLE": "接受自动能见度变更：{observerName} → {targetName}",
+            "AVS_ACCEPTED_PLURAL": "接受{count}次自动能见度变更",
+            "AVS_CLEARED_PLURAL": "接受{count}次自动能见度变更",
+            "AVS_ACCEPT_FAILED": "未能接受自动能见度变更"
+        },
+        "SEEK_AUTOMATION": {
+            "BUTTON_APPLY": "应用搜索结果",
+            "BUTTON_PREVIEW": "预览结果",
+            "BUTTON_TOOLTIP": "基于搜索结果应用能见度变化",
+            "RANGE_LIMIT_ACTIVE": "激活射程限制：仅显示30尺内的目标",
+            "SETUP_TEMPLATE": "放置搜索测量板",
+            "REMOVE_TEMPLATE": "移除搜索测量板",
+            "SETUP_TEMPLATE_TOOLTIP": "点击任意位置放置15尺爆发范围，对范围内的指示物使用搜索动作",
+            "ENCOUNTER_ONLY": "仅显示遭遇中指示物",
+            "SETTING_NAME": "启用搜索自动化",
+            "SETTING_HINT": "自动为<b>搜索</b>聊天信息添加按钮以便应用能见度变更",
+            "OUT_OF_RANGE": "超出射程",
+            "RANGE_LIMIT_ACTIVE_CUSTOM": "激活射程限制：仅显示{distance}尺内的目标",
+            "NO_TARGETS_IN_RANGE": "30尺射程内无有效目标存在",
+            "NO_TARGETS_IN_RANGE_CUSTOM": "{distance}尺射程内无有效目标",
+            "BUTTON_PROCESSED": "结果已应用",
+            "NO_UNDETECTED_TOKENS": "{name}的搜索行动未发现藏匿或无踪指示物",
+            "NO_CHANGES": "{name}的搜索行动未发生能见度变化",
+            "RESULTS_APPLIED": "搜索自动化已应用变更：{changes}",
+            "ERROR_PROCESSING": "应用搜索结果时出现错误。请查看控制台了解详情。",
+            "PROCESSING": "正在处理搜索结果……",
+            "PREVIEW_TITLE": "搜索结果预览",
+            "PREVIEW_HINT": "对搜索行动结果进行分析",
+            "ROLL_VS_DC": "掷骰对抗隐秘DC",
+            "OUTCOME": "结果",
+            "VISIBILITY_CHANGE": "能见度变更",
+            "OPEN_RESULTS": "公开搜索结果",
+            "OPEN_RESULTS_TOOLTIP": "打开搜索结果对话框，以进行单独或批量能见度变更",
+            "PREVIEW_AVAILABLE_SENSES": "可用感官",
+            "DETECTED_BY": "被…侦测到",
+            "ECHOLOCATION_TOOLTIP": "直到下个回合开始前，你能使用听觉作为精确感官",
+            "LIFESENSE_LABEL": "生命感知",
+            "UNMET_CONDITIONS": "未满足状态",
+            "ECHOLOCATION_LABEL": "回声定位（化形生物）",
+            "SENSE_UNSEEN_BUTTON": "察觉未见（反应）",
+            "SENSE_UNSEEN_TOOLTIP": "以你的察觉未见专长感知到无踪生物，使其对你视为藏匿",
+            "SENSE_UNSEEN_APPLIED": "已应用察觉未见",
+            "LIFESENSE_TOOLTIP": "你能感知到范围内的活物与不死生物（模糊感官）"
+        },
+        "HIDE_AUTOMATION": {
+            "BUTTON_APPLY": "应用躲藏结果",
+            "BUTTON_PREVIEW": "预览结果",
+            "BUTTON_PROCESSED": "结果已应用",
+            "BUTTON_TOOLTIP": "基于躲藏结果应用能见度变更",
+            "NO_CHANGES": "{name}的躲藏动作未发生任何能见度变更",
+            "RESULTS_APPLIED": "躲藏自动化已应用变更：{changes}",
+            "ERROR_PROCESSING": "应用躲藏结果时出现错误。请查看控制台了解详情。",
+            "PROCESSING": "正在处理躲藏结果……",
+            "PREVIEW_TITLE": "躲藏结果预览",
+            "NO_OBSERVERS": "未发现任何允许{name}进行躲藏动作的观察者",
+            "PREVIEW_HINT": "对躲藏动作结果进行分析",
+            "ROLL_VS_DC": "掷骰对抗察觉DC",
+            "OUTCOME": "结果",
+            "VISIBILITY_CHANGE": "能见度变更",
+            "OPEN_RESULTS": "公开躲藏结果",
+            "ENCOUNTER_ONLY": "仅显示遭遇中指示物",
+            "SETTING_NAME": "启用躲藏自动化",
+            "SETTING_HINT": "自动为<b>躲藏</b>聊天信息添加按钮以便应用能见度变更",
+            "OPEN_RESULTS_TOOLTIP": "打开躲藏结果对话框，以进行单独或批量能见度变更",
+            "BADGES": {
+                "TERRAIN_STALKER_LABEL": "地形潜伏",
+                "VANISH_INTO_THE_LAND_LABEL": "隐于山林",
+                "VERY_VERY_SNEAKY_LABEL": "特别鬼祟",
+                "LEGENDARY_SNEAK_LABEL": "传奇潜行者",
+                "VERY_VERY_SNEAKY_TOOLTIP": "忽略躲藏与潜行的掩蔽/隐蔽需求",
+                "LEGENDARY_SNEAK_TOOLTIP": "忽略躲藏与潜行的掩蔽/隐蔽需求",
+                "CEASELESS_SHADOWS_TOOLTIP": "忽略躲藏与潜行的掩蔽/隐蔽需求",
+                "CAMOUFLAGE_LABEL": "伪装",
+                "DISTRACTING_SHADOWS_LABEL": "潜于阴影",
+                "DISTRACTING_SHADOWS_TOOLTIP": "你可以将更大体型的生物作为掩蔽满足躲藏/潜行的先决条件",
+                "TERRAIN_STALKER_TOOLTIP": "已选择困难地形：{selection}（区域：{environments}）",
+                "VANISH_INTO_THE_LAND_TOOLTIP": "当你处于为地形潜伏专长选择的困难地形中，即使没有掩蔽或未处于隐蔽状态，也可以使用躲藏与潜行",
+                "CEASELESS_SHADOWS_LABEL": "阴影不绝",
+                "CAMOUFLAGE_TOOLTIP": "在自然地形中，忽略躲藏与潜行的掩蔽/隐匿需求"
+            }
+        },
+        "COVER_OVERRIDE": {
+            "POPUP_OVERRIDE": "快捷键弹窗已完成掩蔽状态覆盖：{original} → {final}",
+            "DIALOG_OVERRIDE": "掷骰对话框中的掩蔽状态已覆盖：{original} → {final}",
+            "GENERIC_OVERRIDE": "掩蔽状态已覆盖：{original} → {final}"
+        },
+        "SNEAK_AUTOMATION": {
+            "BUTTON_APPLY": "应用潜行结果",
+            "BUTTON_PREVIEW": "预览结果",
+            "BUTTON_PROCESSED": "结果已应用",
+            "BUTTON_TOOLTIP": "基于潜行结果应用能见度变更",
+            "NO_OBSERVERS": "{actor}对所有指示物不可见 - 无需潜行",
+            "NO_CHANGES": "本次潜行动作未发生任何能见度变更",
+            "ERROR_PROCESSING": "应用潜行结果时出现错误",
+            "PROCESSING": "正在处理潜行结果……",
+            "PREVIEW_TITLE": "潜行结果预览",
+            "PREVIEW_HINT": "对潜行动作结果进行分析",
+            "ROLL_VS_DC": "掷骰对抗察觉DC",
+            "OUTCOME": "结果",
+            "VISIBILITY_CHANGE": "能见度变化",
+            "OPEN_RESULTS": "公开潜行结果",
+            "ENCOUNTER_ONLY": "仅显示遭遇中指示物",
+            "SETTING_NAME": "启用潜行自动化",
+            "SETTING_HINT": "自动为<b>潜行</b>聊天信息添加按钮以便应用能见度变更",
+            "OPEN_RESULTS_TOOLTIP": "打开潜行结果对话框，以进行单独或批量能见度变更",
+            "BADGES": {
+                "TERRAIN_STALKER_TOOLTIP": "已选择困难地形：{selection}（区域：{environments}）",
+                "VANISH_INTO_THE_LAND_LABEL": "隐于山林",
+                "VERY_VERY_SNEAKY_LABEL": "特别鬼祟",
+                "VERY_VERY_SNEAKY_TOOLTIP": "忽略潜行的掩蔽/隐蔽需求",
+                "LEGENDARY_SNEAK_LABEL": "传奇潜行者",
+                "LEGENDARY_SNEAK_TOOLTIP": "忽略潜行的掩蔽/隐蔽需求",
+                "CEASELESS_SHADOWS_LABEL": "阴影不绝",
+                "CEASELESS_SHADOWS_TOOLTIP": "忽略潜行的掩蔽/隐蔽需求",
+                "CAMOUFLAGE_LABEL": "伪装",
+                "CAMOUFLAGE_TOOLTIP": "在自然地形中，忽略潜行的掩蔽/隐匿需求",
+                "DISTRACTING_SHADOWS_LABEL": "潜于阴影",
+                "TERRAIN_STALKER_LABEL": "地形潜伏",
+                "DISTRACTING_SHADOWS_TOOLTIP": "你可以将更大体型的生物作为掩蔽满足躲藏/潜行的先决条件",
+                "VANISH_INTO_THE_LAND_TOOLTIP": "当你处于为地形潜伏专长选择的困难地形中，即使没有掩蔽或未处于隐蔽状态，也可以使用潜行"
+            }
+        },
+        "CREATE_A_DIVERSION_AUTOMATION": {
+            "BUTTON_APPLY": "应用分神结果",
+            "BUTTON_TOOLTIP": "应用来自分神动作的能见度变更",
+            "NO_OBSERVERS": "{actor}对所有指示物均不可见 - 无需分神",
+            "NO_CHANGES": "本次分神动作未发生任何能见度变更",
+            "ERROR_PROCESSING": "应用分神结果时出现错误",
+            "PROCESSING": "正在处理分神结果……",
+            "PREVIEW_TITLE": "分神结果预览",
+            "PREVIEW_HINT": "对分神动作结果进行分析",
+            "ROLL_VS_DC": "掷骰对抗察觉DC",
+            "OUTCOME": "结果",
+            "VISIBILITY_CHANGE": "能见度变更",
+            "OPEN_RESULTS": "公开分神结果",
+            "ENCOUNTER_ONLY": "仅显示遭遇中指示物",
+            "SETTING_NAME": "启用分神自动化",
+            "SETTING_HINT": "自动为<b>分神</b>聊天信息添加按钮以便应用能见度变更",
+            "OPEN_RESULTS_TOOLTIP": "打开分神结果对话框，以进行单独或批量能见度变更"
+        },
+        "SETTINGS": {
+            "ENABLE_HOVER_TOOLTIPS": {
+                "name": "启用悬停提示框",
+                "hint": "悬停于指示物时显示能见度状态提示信息"
+            },
+            "ALLOW_PLAYER_TOOLTIPS": {
+                "hint": "若启用，玩家可以在悬停指示物时看见基于自身视角的能见度标志提示框",
+                "name": "玩家视角提示框"
+            },
+            "TOOLTIP_FONT_SIZE": {
+                "name": "提示框大小",
+                "hint": "选择提示框大小（影响图标与边框尺寸；文本则会进行相应调整）",
+                "CHOICES": {
+                    "tiny": "超小",
+                    "small": "小",
+                    "medium": "中",
+                    "large": "大",
+                    "xlarge": "超大"
+                }
+            },
+            "COLORBLIND_MODE": {
+                "name": "色盲模式",
+                "CHOICES": {
+                    "protanopia": "红色色盲",
+                    "deuteranopia": "绿色色盲",
+                    "tritanopia": "蓝色色盲",
+                    "achromatopsia": "全色盲",
+                    "none": "非色盲模式"
+                },
+                "hint": "选择一项色盲模式调整提示框颜色以提升可视性（客户端设置）"
+            },
+            "IGNORE_ALLIES_DEFAULT": {
+                "name": "“忽略盟友”状态默认设置",
+                "hint": "决定“忽略盟友”复选框在视野管理器/操作对话框中初始是处于启用还是禁用状态，但你仍然可以手动切换"
+            },
+            "ENABLE_ALL_TOKENS_VISION": {
+                "name": "NPC视觉",
+                "hint": "为所有NPC指示物启用指示物视觉功能，以便更轻松地了解其视角的所见"
+            },
+            "DEFAULT_ENCOUNTER_FILTER": {
+                "name": "“仅限遭遇中”状态默认设置",
+                "hint": "决定“仅限遭遇中”复选框在视野管理器/操作对话框中初始是处于启用还是禁用状态，但你仍然可以手动切换。\n（该复选框仅在遭遇中的对话框内出现）"
+            },
+            "SEEK_USE_TEMPLATE": {
+                "name": "使用搜索测量板",
+                "hint": "在搜索时，将使用15尺爆发的测量板选择目标。测量板按钮取代了搜索聊天卡片中的常规按钮"
+            },
+            "LIMIT_SEEK_RANGE": {
+                "name": "限制战斗搜索射程",
+                "hint": "在战斗中，搜索目标将基于指示物使用搜索动作时的指定距离决定"
+            },
+            "LIMIT_SEEK_RANGE_DISABLED_BY_TEMPLATE": "禁用范围限制：使用标准测量板",
+            "LIMIT_SEEK_RANGE_OUT_OF_COMBAT": {
+                "name": "限制探索期搜索射程",
+                "hint": "在战斗外，搜索目标将基于指示物使用搜索动作时的指定距离决定"
+            },
+            "CUSTOM_SEEK_DISTANCE": {
+                "name": "战斗搜索射程：",
+                "hint": "战斗中搜索动作的距离最大值"
+            },
+            "CUSTOM_SEEK_DISTANCE_OOC": {
+                "name": "探索期搜索射程：",
+                "hint": "战斗外搜索动作的距离最大值"
+            },
+            "USE_HUD_BUTTON": {
+                "name": "使用指示物HUD按钮",
+                "hint": "若启用，为指示物HUD添加能见度按钮。若禁用，在指示物被选择时显示悬浮按钮。"
+            },
+            "BLOCK_PLAYER_TARGET_TOOLTIPS": {
+                "name": "对玩家屏蔽目标能见度提示框",
+                "hint": "若启用，在目标模式下（即其他玩家看悬停指示物时）玩家悬停于指示物上时将不会看到提示框。但当玩家长按O键或Alt键时，仍能看到提示框。"
+            },
+            "INTEGRATE_COVER_VISIBILITY": {
+                "hint": "若启用，某些动作需要满足掩蔽先决条件。例如，躲藏动作仅在执行动作的指示物至少对一名观察者具备标准掩蔽时才能使用。",
+                "name": "将掩蔽状态整合至能见度规则中"
+            },
+            "INTEGRATE_ROLL_OUTCOME": {
+                "name": "将掷骰结果整合至指示物管理器中",
+                "hint": "在指示物管理器中添加一栏，用于显示与当前DC相关的最新掷骰结果及成功度。"
+            },
+            "ENFORCE_RAW": {
+                "name": "强制RAW",
+                "hint": "若启用，某些动作需要满足先决条件。例如，躲藏动作仅能在执行动作的指示物至少对一名观察者隐蔽或具备标准掩蔽时才能使用。"
+            },
+            "DEBUG": {
+                "name": "调试模式",
+                "hint": "启用详细控制台日志记录，以进行故障排查"
+            },
+            "LOOT_PERCEPTION_DC": {
+                "hint": "当一个战利品指示物需要设置察觉DC，但不具备对应系统属性时使用该功能。",
+                "name": "战利品角色默认察觉DC"
+            },
+            "LOOT_STEALTH_DC": {
+                "hint": "使用搜索动作寻找隐藏的战利品角色时所对抗的默认DC。隐秘DC可以在战利品角色的指示物设置中进行更改",
+                "name": "战利品角色隐秘DC"
+            },
+            "WALL_STEALTH_DC": {
+                "name": "墙体隐秘DC",
+                "hint": "使用搜索动作寻找隐藏墙体时所对抗的默认DC。隐秘DC可以在墙体设置中进行更改"
+            },
+            "HIDE_QUICK_EDIT_TOOL": {
+                "hint": "若启用，快捷编辑工具将不会出现在指示物控件栏中。",
+                "name": "隐藏快捷编辑工具"
+            },
+            "INCLUDE_LOOT_ACTORS": {
+                "name": "隐藏战利品角色",
+                "hint": "允许在视野管理器中配置战利品角色的条件性能见度状态。\n（仅限视觉效果 - 无状态应用）"
+            },
+            "INCLUDE_WALLS": {
+                "name": "隐藏墙体",
+                "hint": "可在视野管理器中配置墙体的条件性能见度状态。以及成功搜索出目标时的视觉标识"
+            },
+            "HIDDEN_WALLS": {
+                "name": "隐藏墙体",
+                "hint": "可在视野管理器中配置墙体的条件性能见度状态。以及成功搜索出目标时的视觉标识"
+            },
+            "AUTO_COVER": {
+                "name": "启用自动掩蔽",
+                "hint": "允许基于相对于墙体与其他指示物间的掩蔽关系对指示物自动应用掩蔽"
+            },
+            "EXPERIMENTAL_SEE_THROUGH_WALLS": {
+                "name": "实验性：独立指示物透视墙体（仅限客户端）",
+                "hint": "若在你的客户端启用，所选指示物视线将略过你在隐藏墙体列表中标注为“可见”的墙体。本功能仅为视觉显示且处于初步实验阶段。"
+            },
+            "SNEAK_RAW_ENFORCEMENT": {
+                "name": "潜行强制RAW",
+                "hint": "若启用，潜行将遵循RAW规则。若禁用，潜行条件则会更加放宽。"
+            },
+            "AUTO_VISIBILITY_ENABLED": {
+                "name": "启用自动能见度系统",
+                "hint": "根据光照条件和生物感知自动设置能见度标志。该系统会分析场景光照、指示物位置以及生物能力，以确定合适的能见度状态（可见、隐蔽、藏匿、无踪）。"
+            },
+            "AUTO_VISIBILITY_DEBUG_MODE": {
+                "name": "自动能见度调试模式",
+                "hint": "为自动能见度系统启用详细控制台日志记录。这对于排查能见度计算问题非常有用。"
+            },
+            "DISABLE_LINE_OF_SIGHT": {
+                "name": "禁用视觉线光线投射",
+                "hint": "禁用视觉线光线投射以实现能见度显示。若启用，只根据选定指示物的视觉形状来计算能见度。能见度形状内的能见度结果会更加准确，但黑暗视觉与未选定指示物的结果将仅使用距离和感知能力，忽略墙壁和障碍物。"
+            },
+            "HIDE_FOUNDRY_HIDDEN_TOKENS": {
+                "hint": "决定视野管理器/操作对话框中的“隐藏Foundry不可见”复选框是启用还是禁用状态，但同样能进行手动切换",
+                "name": "“隐藏Foundry不可见”状态默认设置"
+            },
+            "SNEAK_ALLOW_HIDDEN_UNDETECTED_END_POSITION": {
+                "name": "允许潜行结束的位置为藏匿/无踪",
+                "hint": "若启用，在目标处于藏匿或无踪（除了默认的“隐蔽”）时，潜行结束时的位置仍旧有效。对话框中会出现一个加号图标显示这一扩展的要求。"
+            },
+            "GDV_VISUAL_OVERRIDE_ENABLED": {
+                "hint": "仅限客户端：当你所选的指示物具备高等黑暗视觉时，将黑暗区域的亮度调高以使视觉效果符合视野规则。",
+                "name": "高等黑暗视觉视效覆盖"
+            },
+            "GDV_OVERLAY_ALPHA": {
+                "name": "高等黑视覆盖强度",
+                "hint": "仅限客户端：高等黑暗视觉抵消黑暗区域视效的强度（0-1）。"
+            },
+            "GDV_TOKEN_GRAYSCALE": {
+                "name": "高等黑视：黑&白指示物",
+                "hint": "仅限客户端：当通过（高等）黑暗视觉观察时，应将指示物渲染为灰度图像，以符合规则文本描述（黑白视觉效果）。"
+            },
+            "REMOVE_PLAYER_TARGET_TOOLTIPS": {
+                "name": "移除玩家的目标悬停提示框",
+                "hint": "阻止玩家从目标视角看到所拥有指示物的悬停提示框"
+            },
+            "REMOVE_PLAYER_OBSERVER_TOOLTIPS": {
+                "name": "移除玩家的观察者悬停提示框",
+                "hint": "阻止玩家看到观察者视角的悬停提示框（O键/观察者模式）"
+            },
+            "HIDDEN_WALL_INDICATOR_WIDTH": {
+                "name": "隐藏墙体标识宽度",
+                "hint": "隐藏墙体视觉标识的默认宽度（像素）。该项设置可以在每个场景配置中进行单独设置。该配置值更大则隐藏墙体在画布上更加明显。"
+            },
+            "DIM_LIGHTING_THRESHOLD": {
+                "name": "昏暗光照阈值",
+                "hint": "确定昏暗光照的默认阈值（0.0-1.0）。低于该值的光亮被视为昏暗光照。该项设置可以在每个场景配置中进行单独设置。"
+            },
+            "AVS_CHANGES_INDICATOR_SIZE": {
+                "CHOICES": {
+                    "small": "小",
+                    "medium": "中",
+                    "large": "大",
+                    "xlarge": "超大"
+                },
+                "name": "自动能见度变更标识大小",
+                "hint": "控制自动能见度变更浮动标识按钮，及其提示信息的大小。"
+            },
+            "MANAGER_ROLL_COMPARISON": {
+                "name": "视野管理器掷骰比较",
+                "hint": "在视野管理器中添加一掷骰比较栏，以比较最新相关掷骰与相关DC"
+            },
+            "AUTO_COVER_GM_RESPECT_FOG": {
+                "name": "GM指示物自动掩蔽可视化",
+                "hint": "GM能够基于指示物的视角看到自动掩蔽可视化的限制"
+            },
+            "AUTO_COVER_IGNORE_DEAD": {
+                "name": "忽略死亡指示物",
+                "hint": "死亡指示物将不提供自动掩蔽"
+            },
+            "TOKEN_INTERSECTION_MODE": {
+                "hint": "如何基于指示物遮挡计算掩蔽",
+                "name": "指示物连线相交模式",
+                "CHOICES": {
+                    "length10": "10% - 相交10%或遮挡更多部分",
+                    "any": "任意 - 若有任意相交，为次等掩蔽；若遮挡指示物体型大于攻击者与目标两级，为标准掩蔽",
+                    "coverage": "侧边遮挡 - 基于侧边遮挡的百分比阈值。50%标准掩蔽/70%高等掩蔽",
+                    "tactical": "策略 - 从指示物边缘出发连线，更加精确的掩蔽计算"
+                }
+            },
+            "AUTO_COVER_VISUALIZATION_COMBAT_ONLY": {
+                "hint": "限制自动掩蔽可视化快捷键只能在战斗中使用",
+                "name": "仅限战斗中自动掩蔽可视化"
+            },
+            "AUTO_COVER_IGNORE_ALLIES": {
+                "name": "忽略盟友指示物",
+                "hint": "盟友指示物将不提供自动掩蔽"
+            },
+            "WALL_STANDARD_THRESHOLD": {
+                "name": "墙体标准掩蔽阈值：",
+                "hint": "目标指示物获得标准掩蔽时，必须被墙体遮蔽部分的百分比"
+            },
+            "WALL_GREATER_THRESHOLD": {
+                "name": "墙体高等掩蔽阈值：",
+                "hint": "目标指示物获得高等掩蔽时，必须被墙体遮蔽部分的百分比"
+            },
+            "WALLS_ALLOW_GREATER": {
+                "name": "允许墙体提供高等掩蔽",
+                "hint": "允许墙体基于配置阈值提供高等掩蔽"
+            },
+            "IGNORE_PRONE_TOKENS": {
+                "name": "忽略倒地指示物",
+                "hint": "倒地指示物将不提供自动掩蔽"
+            },
+            "KEYBIND_OPEN_MANAGER_TARGET_MODE": {
+                "name": "以目标模式打开管理器的快捷键",
+                "hint": "通过快捷键以目标模式而非观察者模式打开视野管理器。"
+            },
+            "VISIONER_QUICK_EDIT_TOOL": {
+                "name": "视野快捷编辑工具",
+                "hint": "在指示物控件侧边栏添加按钮，用于打开视野快捷编辑工具。若禁用，该工具仍可以通过快捷键访问"
+            },
+            "TOKEN_HUD_BUTTON": {
+                "name": "指示物HUD按钮",
+                "hint": "在Foundry的指示物HUD中添加一个按钮，用于打开视野管理器。若禁用，在选择指示物时会出现一个可移动的浮动按钮"
+            },
+            "VISIONER_SCENE_CONTROLS": {
+                "name": "视野场景控制",
+                "hint": "在左侧边栏的指示物控件和墙体控件添加特定的视野功能按钮。若禁用，这些功能仍可以通过单独的指示物/墙体设置或快捷键访问"
+            },
+            "AUTO_COVER_IGNORE_UNDETECTED": {
+                "name": "忽略无踪指示物",
+                "hint": "根据视野效果，处于无踪状态的指示物将不提供自动掩蔽"
+            },
+            "AVS_ONLY_IN_COMBAT": {
+                "name": "仅在战斗中启用自动能见度",
+                "hint": "若启用，自动能见度系统将只在遭遇期间激活，并且只会跟踪处于遭遇中指示物的能见度。战斗结束后能见度将被重置。"
+            },
+            "ENABLE_CAMERA_VISION_AGGREGATION": {
+                "name": "摄像视野整合",
+                "hint": "若启用，具有旁观权限的摄像账号在多个团队指示物运行时，将显示所有受控指示物的最佳（最宽松）能见度状态，而非仅显示首个指示物的情况。这对于需要摄像能够看到全部团队成员所看见场景的流媒体情景非常有用。"
+            }
+        },
+        "UI": {
+            "ENCOUNTER_FILTER_TEXT": "仅显示遭遇中指示物",
+            "COVER_OVERRIDE": "覆盖掩蔽状态",
+            "ROLL": "掷骰",
+            "APPLY_ALL": "全部应用",
+            "REVERT_ALL": "全部撤销",
+            "REMOVE_OVERRIDES": "移除覆盖设置",
+            "CLEAR_BULK_OVERRIDES": "清除批量覆盖",
+            "FILTER_BY_DETECTION_LABEL": "按视窗过滤",
+            "ATTEMPTING_TO_HIDE": "尝试对观察者进行躲藏",
+            "IGNORE_ALLIES": "忽略盟友",
+            "IGNORE_ALLIES_TOOLTIP": "在结果列表中隐藏盟友",
+            "HIDE_FOUNDRY_HIDDEN": "隐藏Foundry不可见指示物",
+            "CONCEALED_TOOLTIP_SHORT": "隐蔽",
+            "SHOW_ONLY_CHANGES_TOOLTIP": "仅显示有能见度变更的行",
+            "ENCOUNTER_FILTER_TOOLTIP": "仅显示当前遭遇中的指示物",
+            "FOUNDRY_HIDDEN": "Foundry不可见",
+            "NO_COVER_STEALTH": "无掩蔽（隐秘+0）",
+            "APPLY_VISIBILITY_CHANGE": "应用该能见度变更",
+            "REVERT_TO_ORIGINAL": "恢复为原能见度",
+            "TOKEN": "指示物",
+            "NAME": "名称",
+            "VISIBILITY_CHANGE": "能见度变更",
+            "ACTIONS": "动作",
+            "APPLY_ALL_CHANGES": "应用全部能见度变更",
+            "REVERT_ALL_CHANGES": "撤销所有变更至原状态",
+            "OVERRIDE_TO_STATE": "覆盖为{label}",
+            "HIDDEN_OR_UNDETECTED": "藏匿或无踪",
+            "NO_COVER_BONUS": "无掩蔽加值（+0）",
+            "STANDARD_COVER_BONUS": "标准掩蔽加值（+2）",
+            "GREATER_COVER_BONUS": "高等掩蔽加值（+4）",
+            "CLOSE_DIALOG": "关闭对话框（结果已自动应用）",
+            "APPLY_NO_COVER_ALL": "对所有观察者应用无掩蔽加值",
+            "APPLY_STANDARD_COVER_ALL": "对所有观察者应用标准掩蔽加值",
+            "APPLY_GREATER_COVER_ALL": "对所有观察者应用高等掩蔽加值",
+            "SET_ALL_PCS_AS": "设置所有PC为{state}",
+            "SET_ALL_NPCS_AS": "设置所有NPC为{state}",
+            "SET_ALL_HAZARDS_OBSERVED": "设置所有危害为可见",
+            "SET_ALL_HAZARDS_HIDDEN": "设置所有危害为藏匿",
+            "SET_ALL_LOOT_OBSERVED": "设置所有战利品为可见",
+            "SET_ALL_LOOT_HIDDEN": "设置所有战利品为藏匿",
+            "SELECT_ALL_ENEMIES": "选择全部敌人指示物",
+            "SWAP_OBSERVER_TARGET": "切换观察者/目标模式",
+            "PF2E_VISIONER": "PF2E Visioner",
+            "WALL_COVER_NONE_SHORT": "无掩蔽",
+            "WALL_COVER_STANDARD_SHORT": "标准掩蔽",
+            "CEASELESS_SHADOWS_UPGRADE_TOOLTIP": "{FEAT}：{FROM} → {TO}（专长升级）",
+            "BULK_SET_VISIBILITY": "批量能见度设置",
+            "FILTER_BY_DETECTION_TOOLTIP": "仅显示处于当前视窗内的指示物",
+            "SELECT_ALL_PARTY": "选择团队内全部指示物",
+            "STANDARD_OR_GREATER_TOOLTIP": "标准或高等掩蔽",
+            "ACKNOWLEDGE_END_TURN": "确认回合结束位置的验证结果",
+            "HIDE_FOUNDRY_HIDDEN_TOOLTIP": "视觉上隐藏处于Foundry不可见状态的指示物（document.hidden）",
+            "SET_ALL_AS": "设置全部{type}为{state}",
+            "SHOW_ONLY_CHANGES": "仅显示变更",
+            "WALL_COVER_GREATER_SHORT": "高等掩蔽",
+            "COVER_OVERRIDDEN_POPUP": "通过快捷键弹窗覆盖掩蔽",
+            "COVER_OVERRIDDEN_DIALOG": "在掷骰对话框",
+            "COVER_OVERRIDDEN_MANUALLY": "手动",
+            "END_POSITION_NOT_AVAILABLE": "无法获取结束位置数据",
+            "AVS_CONTROLLED": "由自动能见度系统控制",
+            "ORIGINAL_COVER": "原掩蔽状态：{state}",
+            "START_POSITION_NOT_AVAILABLE": "无法获取起始位置数据",
+            "ATTACK_CONSEQUENCES": "对藏匿/无踪攻击者的攻击后果",
+            "HIDE_WALLS": "将隐藏墙体从结果列表隐藏",
+            "IGNORE_WALLS": "将隐藏墙体从结果列表隐藏",
+            "AVS_CHANGE_INFO": "移动或光照变化可能导致之前设置的能见度覆盖失效。请仔细查看以下每一项自动能见度变更后，再决定是否接受或拒绝。",
+            "REJECT_ALL_CHANGES": "拒绝所有变更",
+            "ACCEPT_ALL_CHANGES": "接受所有变更",
+            "ACCEPT_THIS_CHANGE": "接受该变更",
+            "REJECT_THIS_CHANGE": "拒绝该变更",
+            "ACCEPT_ALL_IN_TABLE": "接受此表中的所有变更",
+            "CLICK_TO_SWITCH_MODE": "点击切换观察者或目标模式",
+            "WALL_COVER_NONE": "无掩蔽 - 墙体不提供掩蔽",
+            "WALL_COVER_STANDARD_MAX": "至多标准掩蔽 - 墙体基于遮挡阈值至多提供标准掩蔽",
+            "WALL_COVER_AUTO": "自动监测 - 墙体基于遮挡阈值提供掩蔽",
+            "WALL_COVER_GREATER_MAX": "至多高等掩蔽 - 墙体基于遮挡阈值至多提供高等掩蔽",
+            "MARK_WALL_HIDDEN": "将该墙体标记为对玩家隐藏",
+            "SET_ALL_WALLS_OBSERVED": "设置列表内所有墙体为可见",
+            "SET_ALL_WALLS_HIDDEN": "设置列表内所有墙体为隐藏",
+            "TARGET_ALL_PARTY": "将团队内全部指示物设为目标",
+            "TARGET_ALL_ENEMIES": "将全部敌人指示物设为目标",
+            "CLEAR_ALL_SELECTIONS": "清除所有选择与目标",
+            "APPLY_COVER_CHANGE": "应用该掩蔽变更",
+            "CONFIGURE_SETTINGS_BELOW": "请在下方配置相关设置。",
+            "APPLY_ALL_COVER_CHANGES": "应用所有掩蔽变更",
+            "REVERT_ALL_COVER_CHANGES": "撤销所有变更",
+            "SHOW_ONLY_COVER_CHANGES_TOOLTIP": "仅显示有掩蔽/能见度变更的行",
+            "SET_ALL_WALLS_HIDDEN_BULK": "设置所有墙体为隐藏",
+            "SET_ALL_WALLS_NON_HIDDEN_BULK": "设置所有墙体为非隐藏",
+            "SET_ALL_WALLS_AUTO_COVER": "设置所有墙体为自动掩蔽",
+            "SET_ALL_WALLS_NO_COVER": "设置所有墙体为无掩蔽",
+            "SET_ALL_WALLS_STANDARD_COVER": "设置所有墙体为标准掩蔽",
+            "SET_ALL_WALLS_GREATER_COVER": "设置所有墙体为高等掩蔽",
+            "WALL_TYPE_CYCLE_TOOLTIP": "左键点击：下一项丨右键点击：上一项",
+            "SELECT_WALL_AND_PAN": "选择墙体并将镜头移至它",
+            "WALL_COVER_AUTO_SHORT": "自动监测",
+            "COVER_OVERRIDDEN_VIA": "掩蔽覆盖{source}：{originalLabel} → {finalLabel}",
+            "START_POS_PREVIOUS_SNEAK": "根据先前的潜行动作确定起始位置",
+            "START_POS_QUALIFIES": "起始位置符合潜行条件",
+            "START_POS_NOT_QUALIFIES": "起始位置不符合潜行条件",
+            "END_POS_QUALIFIES": "结束位置符合潜行条件",
+            "END_POS_NOT_QUALIFIES": "结束位置不符合潜行条件",
+            "END_POS_QUALIFIES_EXTENDED": "结束位置符合潜行条件（处于藏匿/无踪状态也符合）",
+            "CONCEALED_HIDDEN_UNDETECTED": "隐蔽，藏匿或无踪（扩展规则生效）",
+            "TOGGLE_MODE_TOOLTIP": "点击切换观察者或目标模式",
+            "ONLY_SHOW_ENCOUNTER_TOOLTIP": "仅显示当前遭遇中的指示物",
+            "HIDE_FOUNDRY_HIDDEN_DOCUMENT_TOOLTIP": "视觉上隐藏处于Foundry不可见状态的指示物（document.hidden）",
+            "SHOW_ONLY_VISIBILITY_CHANGES": "仅显示有能见度变更的行",
+            "SET_ALL_WALLS_AS": "设置列表内所有墙体为{state}",
+            "WALL_COVER_NONE_TOOLTIP": "无掩蔽 - 墙体不提供掩蔽",
+            "WALL_COVER_STANDARD_TOOLTIP": "至多标准掩蔽 - 墙体基于遮挡阈值至多提供标准掩蔽",
+            "WALL_COVER_GREATER_TOOLTIP": "至多高等掩蔽 - 墙体基于遮挡阈值至多提供高等掩蔽",
+            "WALL_HIDDEN_TOOLTIP": "将该墙体标记为对玩家隐藏",
+            "SWAP_MODE": "切换观察者/目标模式",
+            "PREVIEW_POINT_OUT_CHANGES": "预览并应用指出位置的能见度变更",
+            "WALL_DC_PLACEHOLDER": "DC",
+            "WALL_IDENTIFIER_PLACEHOLDER": "隐藏墙体",
+            "TOKEN_COVER_NONE_TOOLTIP": "无掩蔽 - 指示物不提供掩蔽",
+            "TOKEN_COVER_LESSER_TOOLTIP": "次等掩蔽 - 指示物总是提供次等掩蔽",
+            "TOKEN_COVER_STANDARD_TOOLTIP": "标准掩蔽 - 指示物总是提供标准掩蔽",
+            "TOKEN_COVER_GREATER_TOOLTIP": "高等掩蔽 - 指示物总是提供高等掩蔽",
+            "FROM_LINKED_DARKNESS": "来自链接的黑暗区域测量板",
+            "NO_POSITION_CHANGE": "无位置变化",
+            "CONNECTED_IDENTIFIERS_PLACEHOLDER": "以半角逗号分隔的标识符",
+            "START_SNEAK_TOOLTIP": "开始潜行：获取当前能见度与掩蔽状态",
+            "APPLY_ALL_COVER_LABEL": "应用所有掩蔽：",
+            "COVER": "掩蔽",
+            "OUTCOME": "结果",
+            "ROLL_VS_PERCEPTION_DC": "掷骰对抗察觉DC",
+            "COVER_BONUS": "掩蔽加值",
+            "ROLL_OUTCOME": "掷骰结果",
+            "ALLY": "盟友",
+            "OBSERVER_HEADER": "观察者",
+            "TARGET_HEADER": "目标",
+            "CURRENT_STATE": "当前状态",
+            "EFFECTS": "效果",
+            "STATUS": "状态",
+            "SOURCE": "来源",
+            "DC": "DC",
+            "WALL_HEADER": "墙体",
+            "IDENTIFIER": "标识符",
+            "TYPE": "类型",
+            "STEALTH_DC": "隐秘DC",
+            "SELECT": "选择",
+            "WALL_ID": "墙体Id",
+            "VS_DC": "对抗DC",
+            "AVAILABLE_SENSES": "可用感官",
+            "POINT_OUT_INDICATOR": "指出位置",
+            "HIDDEN_HEADER": "隐藏",
+            "FAILURE_LABEL": "失败",
+            "SUCCESS_LABEL": "成功",
+            "PLAYER_CHARACTERS": "玩家角色",
+            "NPCS_LABEL": "NPC",
+            "HAZARDS_LABEL": "危害",
+            "LOOT_LABEL": "战利品",
+            "HIDDEN_WALLS_LABEL": "隐藏墙体",
+            "TAKING_COVER_HINT": "对观察者寻找掩蔽",
+            "SHOW_ONLY_CHANGES_LABEL": "仅显示变更",
+            "CHANGES_AS_OBSERVER": "作为观察者的变更",
+            "CHANGES_AS_TARGET": "作为目标的变更",
+            "PREREQUISITE": "先决条件",
+            "COVER_CHANGE": "掩蔽变更",
+            "COVER_LABEL": "掩蔽",
+            "HIDDEN_WALL_LABEL": "隐藏墙体",
+            "WALL_IDENTIFIER_LABEL": "墙体标识符",
+            "WALL_STEALTH_DC_LABEL": "墙体隐秘DC",
+            "ALL_TYPES": "所有类型",
+            "WALLS": "墙体",
+            "DOORS": "门",
+            "SECRET_DOORS": "密门",
+            "ALL": "全部",
+            "HIDDEN_ONLY": "仅隐藏",
+            "ALL_COVER_TYPES": "全部掩蔽类型",
+            "AUTO_DETECTION": "自动监测",
+            "STANDARD_MAX": "至多标准",
+            "GREATER_MAX": "至多高等",
+            "VISIBILITY_LEGEND": "能见度",
+            "COVER_LEGEND": "掩蔽",
+            "TARGET_DC": "目标DC",
+            "END_POS": "结束位置",
+            "APPLIED_BUTTON": "应用",
+            "REVERTED_BUTTON": "撤销",
+            "PROCESSING": "处理中…",
+            "REJECTED_LABEL": "拒绝",
+            "ACCEPTED_LABEL": "接受",
+            "APPLY_BUTTON_LABEL": "应用",
+            "REVERT_BUTTON_LABEL": "撤销",
+            "HIDDEN_SENSE_UNSEEN_LABEL": "藏匿（察觉未见）",
+            "HIDDEN_REACTION_LABEL": "藏匿（反应）",
+            "ORIGINAL_CHANGE": "原变更：",
+            "NON_HIDDEN_ONLY": "仅限非隐藏",
+            "APPLY_ALL_BUTTON": "全部应用",
+            "REVERT_ALL_BUTTON": "全部撤销",
+            "REVERT_TO_ORIGINAL_COVER": "恢复为原掩蔽状态",
+            "APPLY_WITHOUT_DIALOG": "不打开对话框并应用所有经计算的能见度变更",
+            "STEALTH_VS_PERCEPTION": "隐秘 vs 察觉",
+            "APPLY_COVER_CHANGES_WITHOUT_DIALOG": "不打开对话框并应用所有经计算的掩蔽变更",
+            "NO_COVER_OPTION": "无掩蔽",
+            "WALL_COVER_AUTO_TOOLTIP": "自动监测 - 墙体基于遮挡阈值提供掩蔽",
+            "NO_CHANGE_LABEL": "无变更",
+            "TOKEN_COVER_AUTO_TOOLTIP": "自动监测 - 指示物基于遮挡阈值提供掩蔽",
+            "SEARCH_WALL_PLACEHOLDER": "按标识符或墙体ID搜索…",
+            "START_POS": "起始位置",
+            "BULK_ACTION_INFO": "一次性对所有变更应用操作",
+            "END_POS_CHECK_END_TURN": "回合结束时将对结束位置进行检查（连续潜行）",
+            "END_TURN_VALIDATION": "回合结束验证",
+            "ACCEPT_ALL_CHANGES_IN_TABLE": "接受此表中的所有变更",
+            "CURRENTLY_DEFERRED": "现已推迟至回合结束（鬼祟专长）",
+            "DEFER_TO_END_OF_TURN": "将结束位置检查推迟至回合结束（鬼祟专长）",
+            "DEFERRED_ACTIONS_DISABLED": "动作已禁用 - 推迟至回合结束",
+            "REMOVE_DEFER_PROCESS_NOW": "取消推迟并立即处理位置检查",
+            "DEFER_ALL_ELIGIBLE": "将所有符合条件的位置检查推迟至回合结束",
+            "PROCESS_DEFERRED_CHECKS": "对回合结束时的验证进行{count}次推迟位置检查",
+            "AVS_RECOMMENDED": "自动能见度推荐：{label}",
+            "AVS_CHANGE_INFO_TOOLTIP": "移动或光照变化可能导致之前设置的能见度覆盖失效。请仔细查看以下每一项自动能见度变更后，再决定是否接受或拒绝。",
+            "DEFER_ALL_ELIGIBLE_LABEL": "推迟全部符合条件项",
+            "UNDEFER_ALL_BUTTON": "全部取消推迟",
+            "RESTORE_DEFERS_BUTTON": "恢复推迟",
+            "UNDEFER_ALL": "取消所有指示物当前的推迟状态并恢复其原状态"
+        },
+        "WALL": {
+            "VISIBLE_TO_YOU": "隐藏墙体",
+            "observed": "可见",
+            "hidden": "隐藏"
+        },
+        "KEYBINDINGS": {
+            "OPEN_TOKEN_MANAGER": {
+                "hint": "打开所选指示物的指示物管理器",
+                "name": "打开视野管理器"
+            },
+            "OPEN_VISIBILITY_MANAGER": {
+                "name": "打开指示物能见度管理器",
+                "hint": "打开所选指示物的能见度管理器"
+            },
+            "HOLD_COVER_OVERRIDE": {
+                "name": "长按在快速掷骰中覆盖掩蔽",
+                "hint": "当点击打击/攻击动作时长按此键（无对话框），使用模组覆盖掩蔽替代掩蔽自动计算。无默认设置；请自行配置按键。"
+            },
+            "TOGGLE_OBSERVER_MODE": {
+                "name": "悬停提示框切换为观察者模式",
+                "hint": "长按此键切换悬停提示框为观察者模式（即显示悬停指示物看其他指示物的能见度）"
+            },
+            "OPEN_QUICK_PANEL": {
+                "name": "打开视野快捷面板",
+                "hint": "打开简洁视野快捷编辑面板。"
+            },
+            "SHOW_AUTO_COVER_OVERLAY": {
+                "name": "显示自动掩蔽覆盖层",
+                "hint": "按下显示悬停指示物（若无悬停则为所控制指示物）的自动掩蔽状态徽记。"
+            },
+            "HOLD_COVER_VISUALIZATION": {
+                "name": "长按掩蔽可视化",
+                "hint": "悬停指示物时长按此键，使掩蔽区域可视化。并显示攻击的最佳位置。"
+            },
+            "OPEN_WALL_MANAGER": {
+                "name": "打开墙体管理器",
+                "hint": "打开视野墙体管理器对话框，以便批量编辑墙体设置。"
+            },
+            "SHOW_VISIBILITY_FACTORS": {
+                "name": "显示能见度因素",
+                "hint": "按下显示受控指示物对其他指示物能见度状态的详细原因。"
+            }
+        },
+        "REGION_BEHAVIOR": {
+            "TYPE_LABEL": "PF2e Visioner 能见度",
+            "VISIBILITY_STATE": {
+                "label": "能见度状态",
+                "hint": "应用于区域内与区域外之间的指示物的能见度状态"
+            },
+            "APPLY_TO_INSIDE_TOKENS": {
+                "label": "应用于区域内指示物",
+                "hint": "若启用，区域内的指示物将对区域内的其他指示物同步其能见度状态"
+            },
+            "TWO_WAY_REGION": {
+                "label": "双向区域",
+                "hint": "若启用，区域外的指示物将对区域内指示物同步其能见度状态"
+            },
+            "VISIBILITY_UPDATED": "区域能见度已更新{count}个指示物能见度关系",
+            "UPDATE_ERROR": "未能更新区域能见度关系",
+            "TYPES": {
+                "VISIBILITY": {
+                    "label": "视野能见度"
+                },
+                "CONCEALMENT": {
+                    "label": "自动能见度隐蔽区域"
+                }
+            },
+            "CONCEALMENT_ENABLED": {
+                "hint": "若启用，穿过该区域边界的光线将使目标获得隐蔽",
+                "label": "启用隐蔽区域"
+            }
+        },
+        "SENSES": {
+            "LIFESENSE": "生命感知",
+            "LIGHT-PERCEPTION": "光亮感知",
+            "VISION": "视觉",
+            "VISION_DESC": "你用于感知周围环境的标准视觉感官。",
+            "DARKVISION": "黑暗视觉",
+            "SCENT": "灵敏嗅觉",
+            "ECHOLOCATION": "回声定位",
+            "GREATER-DARKVISION": "高等黑暗视觉",
+            "HEARING": "听觉",
+            "TREMORSENSE": "震颤感知",
+            "DARKVISION_DESC": "你可以在黑暗和昏暗光照中视物，如同在明亮光照中，但你在黑暗中只能分辨黑白两色。",
+            "SCENT_DESC": "你的嗅觉感官得到增强，允许你侦测范围内的活物（模糊感官）。",
+            "TREMORSENSE_DESC": "你可以感知范围内地面中的振动（模糊感官）。",
+            "LIFESENSE_DESC": "你可以感知范围内活物与不死生物体内活跃的生命能量（模糊感官）。",
+            "GREATER-DARKVISION_DESC": "你可以在黑暗和昏暗光照中视物，如同在明亮光照中——包括颜色。",
+            "LIGHT-PERCEPTION_DESC": "你可以感知光亮和黑暗。这一感官允许你在自然黑暗中视物，但也会受到魔法黑暗的影响。",
+            "ECHOLOCATION_DESC": "你可以利用声音来导航以及侦测范围内的物体（精确感官）。",
+            "HEARING_DESC": "你可以通过声音侦测到范围内的生物和事件（模糊感官）。"
+        },
+        "SPECIAL_SENSES": {
+            "vision": "视觉",
+            "lifesense": "生命感知",
+            "vision_description": "你用于感知周围环境的标准视觉感官。",
+            "echolocation": "回声定位",
+            "tremorsense": "震颤感知",
+            "scent": "灵敏嗅觉",
+            "tremorsense_description": "你可以感知周遭地面中的振动。你获得震颤感知作为模糊感官。这允许你侦测范围内与地面接触的生物和物体。",
+            "greater_darkvision": "高等黑暗视觉",
+            "hearing": "听觉",
+            "low_light_vision": "昏暗视觉",
+            "infrared_vision": "红外视觉",
+            "truesight": "真景术",
+            "see_the_unseen": "识破无形",
+            "darkvision_description": "你可以在黑暗和昏暗光照中视物，如同在明亮光照中，但你在黑暗中只能分辨黑白两色。",
+            "greater_darkvision_description": "你可以在黑暗和昏暗光照中视物，如同在明亮光照中——包括颜色。",
+            "hearing_description": "你可以通过声音侦测到范围内的生物和事件（模糊感官）。",
+            "low_light_vision_description": "你可以在昏暗光照中视物，如同在明亮光照中。",
+            "truesight_description": "你可以看见事物的本来面貌，忽略范围内的幻术和隐形效果。",
+            "bloodsense": "血液感知",
+            "see_the_unseen_description": "你可以感知到范围内原本无形无迹的现象。",
+            "spiritsense": "精魂感知",
+            "magicsense_description": "你能够感知范围内的魔法区域或效应。",
+            "wavesense": "水波感知",
+            "thoughtsense_description": "你能够侦测到范围内具备思想的生物。",
+            "wavesense_description": "你能够通过范围内的液体介质感知到振波。",
+            "darkvision": "黑暗视觉",
+            "magicsense": "魔法感知",
+            "thoughtsense": "思维感知",
+            "lifesense_description": "你能有限地感知到生命力的存在。你获得生命感知作为10尺范围的模糊感官。你能借此感知到所列范围内活物与不死生物体内活跃的生命能量。你能用生命感知区分属于活物的命能以及属于不死生物的虚能。",
+            "scent_description": "你的嗅觉感官得到增强。你获得灵敏嗅觉作为模糊感官。这允许你通过气味侦测到范围内的活物。",
+            "motion_sense": "运动感知",
+            "echolocation_description": "你可以利用声音来导航和侦测物体。你获得回声定位作为模糊感官。这允许你通过声音反射来侦测范围内的所有生物和物体。",
+            "spiritsense_description": "你能够感知到范围内精魂与不死生物的存在。",
+            "infrared_vision_description": "你能够感知到周遭环境的热能特征。",
+            "bloodsense_description": "你可以通过感知范围内存在的血液来侦测生物的存在及其位置。",
+            "motion_sense_description": "你能够侦测范围内你周围的运动。"
+        },
+        "FEAT": {
+            "CEASELESS_SHADOWS": "阴影不绝"
+        },
+        "AVS_OVERRIDE_DIALOG": {
+            "CLEAR_ALL": "清除所有覆盖设置",
+            "CLOSE": "关闭",
+            "NO_OVERRIDES": "该指示物当前未启用自动能见度覆盖。",
+            "CLEAR_ALL_CONFIRM_TITLE": "清除所有自动能见度覆盖设置",
+            "OVERRIDE_REMOVED": "自动能见度覆盖已移除：{observer} → {target}",
+            "ERROR_REMOVING_OVERRIDE": "移除自动能见度覆盖设置时出错",
+            "ERROR_CLEARING_OVERRIDES": "清除自动能见度覆盖时出错",
+            "ALL_OVERRIDES_CLEARED": "已清除{token}的所有AVS覆盖设置"
+        },
+        "VISIBILITY_FACTORS": {
+            "REASONS": {
+                "DETECTED_BY_SENSE": "被{sense}（精确感官）侦测到",
+                "DETECTED_BY_SCENT": "被灵敏嗅觉（模糊感官）侦测到",
+                "DETECTED_BY_TREMORSENSE": "被震颤感知侦测到（{acuity}）",
+                "OBSERVER_BLINDED": "观察者陷入目盲（无法使用视觉）",
+                "OBSERVER_DEAFENED_INVISIBLE": "观察者陷入耳聋（无法侦测隐形目标）",
+                "OBSERVER_DAZZLED": "观察者在明亮光照下陷入目眩",
+                "TARGET_INVISIBLE": "目标处于隐形",
+                "TARGET_HIDDEN_CONDITION": "目标处于藏匿状态",
+                "TARGET_CONCEALED_CONDITION": "目标处于隐蔽状态",
+                "TARGET_IN_GREATER_DARKNESS_WITH_DARKVISION": "目标处于高等魔法黑暗区域中（{templates}）- 即便具备黑暗视觉，也视其为隐蔽",
+                "TARGET_IN_DARKNESS_NO_DARKVISION": "目标处于黑暗区域中（{templates}），且观察者缺乏黑暗视觉",
+                "OBSERVER_IN_GREATER_DARKNESS_WITH_DARKVISION": "观察者处于高等魔法黑暗区域中（{templates}），即便具备黑暗视觉，也视觉受限",
+                "OBSERVER_IN_GREATER_DARKNESS_NO_DARKVISION": "观察者处于高等魔法黑暗区域中（{templates}），且缺乏黑暗视觉",
+                "OBSERVER_IN_MAGICAL_DARKNESS_WITH_DARKVISION": "观察者处于魔法黑暗区域中（{templates}），但具备黑暗视觉",
+                "OBSERVER_IN_MAGICAL_DARKNESS_NO_DARKVISION": "观察者处于魔法黑暗区域中（{templates}），且缺乏黑暗视觉",
+                "DARKNESS_BETWEEN_NO_DARKVISION": "观察者与目标间存在高等魔法黑暗区域（{templates}），且观察者缺乏黑暗视觉",
+                "MAGICAL_DARKNESS_BETWEEN_WITH_DARKVISION": "观察者与目标间存在魔法黑暗区域（{templates}），但观察者具备黑暗视觉",
+                "REGULAR_DARKNESS_BETWEEN_WITH_DARKVISION": "观察者与目标间存在黑暗区域（{templates}），但观察者具备黑暗视觉",
+                "REGULAR_DARKNESS_BETWEEN_NO_DARKVISION": "观察者与目标间存在黑暗区域（{templates}），且观察者缺乏黑暗视觉",
+                "AFFECTED_BY_DARKNESS": "受黑暗术法术影响（{templates}）",
+                "RAY_GREATER_DARKNESS_NO_DARKVISION": "光束穿过高等魔法黑暗区域（{rank}环级），且观察者缺乏黑暗视觉",
+                "RAY_MAGICAL_DARKNESS_NO_DARKVISION": "光束穿过魔法黑暗区域（{rank}环级），且观察者缺乏黑暗视觉",
+                "TARGET_MAGICAL_DARKNESS_NO_DARKVISION": "目标处于魔法黑暗区域中（{rank}环级），且观察者缺乏黑暗视觉",
+                "TARGET_IN_DARKNESS_NO_DARKVISION_SIMPLE": "目标处于黑暗中，且观察者缺乏黑暗视觉",
+                "TARGET_IN_DIM_NO_LOW_LIGHT": "目标处于昏暗光照中，且观察者缺乏昏暗视觉",
+                "DETECTED_BY_LIFESENSE": "被生命感知侦测到（{acuity}）",
+                "LOW_LIGHT_VISION_DIM": "昏暗视觉能在昏暗光照中如常视物",
+                "GREATER_DARKVISION_THROUGH_MAGICAL_DARKNESS": "高等黑暗视觉能正常看穿魔法黑暗（{rank}环级）",
+                "TARGET_INVISIBLE_NO_SENSES": "目标处于隐形，且无法被可用感官侦测到",
+                "TARGET_NO_SENSES": "目标无法被任何可用感官侦测到",
+                "DARKNESS_BETWEEN_WITH_GREATER_DARKVISION": "观察者与目标间存在高等魔法黑暗区域（{templates}），但观察者具备高等黑暗视觉",
+                "TARGET_IN_DARKNESS_WITH_DARKVISION": "目标处于黑暗区域中（{templates}），但观察者具备黑暗视觉",
+                "DARKNESS_BETWEEN_WITH_DARKVISION": "观察者与目标间存在高等魔法黑暗区域（{templates}）- 即便有黑暗视觉，视野仍被遮蔽",
+                "TARGET_IN_MAGICAL_DARKNESS_WITH_DARKVISION": "目标处于魔法黑暗区域中（{templates}），但观察者具备黑暗视觉",
+                "TARGET_IN_MAGICAL_DARKNESS_NO_DARKVISION": "目标处于魔法黑暗区域中（{templates}），且观察者缺乏黑暗视觉",
+                "TARGET_IN_GREATER_DARKNESS_WITH_GREATER_DARKVISION": "目标处于高等魔法黑暗区域中（{templates}），但观察者具有高等黑暗视觉",
+                "TARGET_IN_GREATER_DARKNESS_NO_DARKVISION": "目标处于高等魔法黑暗区域中（{templates}），且观察者缺乏黑暗视觉",
+                "OBSERVER_IN_DARKNESS_WITH_DARKVISION": "观察者处于黑暗区域中（{templates}），但具备黑暗视觉",
+                "MAGICAL_DARKNESS_BETWEEN_NO_DARKVISION": "观察者与目标间存在魔法黑暗区域（{templates}），且观察者缺乏黑暗视觉",
+                "BRIGHT_LIGHT_NORMAL_VISION": "目标处于明亮光照中，且观察者视力正常",
+                "DARKVISION_THROUGH_MAGICAL_DARKNESS": "黑暗视觉能勉强看透魔法黑暗（{rank}环级）",
+                "OBSERVER_IN_GREATER_DARKNESS_WITH_GREATER_DARKVISION": "观察者处于高等魔法黑暗区域中（{templates}），但具备高等黑暗视觉",
+                "OBSERVER_IN_DARKNESS_NO_DARKVISION": "观察者处于黑暗区域中（{templates}），且缺乏黑暗视觉",
+                "REGION_CONCEALMENT": "光束穿过隐蔽区域边界（例如：魔法黑暗测量板）",
+                "RAY_GREATER_DARKNESS_WITH_DARKVISION": "光束穿过高等魔法黑暗区域（{rank}环级）- 即便具备黑暗视觉，也视其为隐蔽",
+                "GREATER_MAGICAL_DARKNESS_WITH_DARKVISION": "即便具备黑暗视觉，高等魔法黑暗区域（{rank}环级）内的一切对你视为隐蔽",
+                "TARGET_UNDETECTED_CONDITION": "目标处于无踪状态",
+                "HEARD_INVISIBLE_HIDDEN": "被听觉（模糊感官）侦测到 - 隐形生物视为藏匿",
+                "DARKVISION_IN_DARKNESS": "黑暗视觉能在黑暗中如常视物",
+                "TARGET_INVISIBLE_OBSERVER_DEAFENED": "目标处于隐形，且观察者陷入耳聋",
+                "DETECTED_BY_SENSE_IMPRECISE": "被{sense}（模糊感官）侦测到"
+            },
+            "NO_TOKEN_SELECTED": "选择至少一个指示物显示能见度因素",
+            "STATE_LABEL": "状态",
+            "LIGHTING_LABEL": "光照",
+            "UNKNOWN_STATE": "未知状态",
+            "LIGHTING": {
+                "bright": "明亮光照",
+                "dim": "昏暗光照",
+                "darkness": "黑暗",
+                "magicalDarkness": "魔法黑暗",
+                "greaterMagicalDarkness": "高等魔法黑暗"
+            },
+            "STORED_STATE": "能见度状态为{state}（已存储状态 - 未获取原因）"
+        },
+        "SNEAKY_FEAT": {
+            "VISIBILITY_CAPPED": "鬼祟专长",
+            "TOOLTIP": "由于鬼祟专长的效果，能见度被限制为藏匿状态。该生物成功对你进行潜行。"
+        },
+        "UI_ACTIONS": {
+            "MANAGE_VISIBILITY": "管理指示物能见度",
+            "MANAGE_COVER": "管理指示物掩蔽",
+            "QUICK_CONCEALED": "设置为隐蔽",
+            "QUICK_OBSERVED": "设置为可见",
+            "QUICK_NO_COVER": "设置为无掩蔽",
+            "QUICK_LESSER_COVER": "设置为次等掩蔽",
+            "QUICK_STANDARD_COVER": "设置为标准掩蔽",
+            "QUICK_GREATER_COVER": "设置为高等掩蔽"
+        },
+        "MOVEMENT": {
+            "walk": "步行",
+            "stride": "行走",
+            "leap": "跳跃",
+            "climb": "攀爬",
+            "fly": "飞行",
+            "swim": "游泳",
+            "burrow": "掘地",
+            "deploy": "展开",
+            "travel": "旅行",
+            "teleport": "传送"
+        },
+        "DIALOG_TITLES": {
+            "HIDE_RESULTS": "躲藏结果",
+            "POINT_OUT_RESULTS": "指出位置结果",
+            "SEEK_RESULTS": "搜索结果",
+            "ACTION_RESULTS": "动作结果",
+            "TAKE_COVER_RESULTS": "寻找掩蔽结果",
+            "COVER_OVERRIDE": "掩蔽设置覆盖",
+            "WALL_SETTINGS": "PF2E Visioner：墙体设置",
+            "TOGGLE_HIDDEN_WALL": "切换墙体隐藏（所选墙体）",
+            "QUICK_EDIT": "PF2E Visioner：快捷编辑（所选 ↔ 目标）",
+            "PURGE_DATA": "PF2E Visioner：清除数据（场景/所选指示物）",
+            "VISIONER_QUICK_PANEL": "视野快捷编辑",
+            "APPLYING_CHANGES": "应用变更",
+            "WALL_QUICK": "PF2E Visioner：墙体设置",
+            "DARKNESS_MODE": "PF2E Visioner：设置黑暗模式",
+            "ATTACK_CONSEQUENCES": "攻击后果结果",
+            "CREATE_DIVERSION_RESULTS": "分神结果",
+            "SNEAK_RESULTS": "潜行结果",
+            "RECOMMENDATIONS": {
+                "HEAL_CHARACTER": "治疗角色",
+                "REMOVE_CONDITIONS": "移除状态",
+                "USE_HIDE_FIRST": "首先使用躲藏动作",
+                "PROCEED_CAUTION": "谨慎行动",
+                "REPOSITION_BEFORE_SNEAK": "潜行前移位",
+                "TAKE_COVER": "寻找掩蔽",
+                "REPOSITION": "移位",
+                "POINT_OUT": "指出位置",
+                "SEEK_ACTION": "搜索动作",
+                "INCREASE_DISTANCE": "增加距离",
+                "AVOID_EXPOSURE": "避免暴露",
+                "TACTICAL_ADVICE": "战术建议",
+                "CONDITIONS": "状态",
+                "HIDE_ACTION": "躲藏动作",
+                "ALTERNATIVE_ACTIONS": "其他动作",
+                "CREATE_DIVERSION": "分神",
+                "CHECK_SCENE_SETUP": "检查场景设置",
+                "IMPROVE_POSITION": "改善位置",
+                "PROCEED_AWARENESS": "保持警觉地继续",
+                "PROCEED_SNEAK": "继续潜行",
+                "EXCELLENT_POSITION": "绝佳位置",
+                "GOOD_POSITION": "优秀位置",
+                "GOOD_DISTANCE": "优秀距离",
+                "SEEK_DARKNESS": "搜索黑暗区域",
+                "EXCELLENT_LIGHTING": "绝佳光照",
+                "FIND_COVER": "寻找掩蔽",
+                "MAINTAIN_COVER": "保持掩蔽",
+                "BREAK_LINE_SIGHT": "遮挡视觉线",
+                "BEST_COVER_DIRECTION": "最佳掩蔽方向",
+                "SUGGESTED_MOVEMENT": "推荐移动",
+                "MAINTAIN_POSITION": "保持位置",
+                "RELOCATE_IMMEDIATELY": "立即迁移",
+                "MAINTAIN_BENEFICIAL": "保持有利状态",
+                "REMOVE_HARMFUL": "移除有害状态",
+                "ACQUIRE_BENEFICIAL": "获得有利状态",
+                "POSITIONING": "定位"
+            },
+            "POINT_OUT_ACTION": "PF2E Visioner - 指出位置动作",
+            "OVERRIDE_VALIDATION": "覆盖设置验证",
+            "END_OF_TURN_SNEAK": "回合结束时的隐秘验证",
+            "END_TURN_POSITION": "回合结束时的位置验证 - {name}",
+            "AVS_VALIDATION": "自动能见度变更验证"
+        },
+        "BUTTONS": {
+            "KEEN_EYES": "敏锐视觉",
+            "OBSERVED": "可见",
+            "CONCEALED": "隐蔽",
+            "HIDDEN": "藏匿",
+            "UNDETECTED": "无踪",
+            "NO_COVER": "无掩蔽",
+            "LESSER_COVER": "次等掩蔽",
+            "STANDARD_COVER": "标准掩蔽",
+            "GREATER_COVER": "高等掩蔽",
+            "BRIGHT_LIGHT": "明亮光照",
+            "DIM_LIGHT": "昏暗光照",
+            "DARKNESS": "黑暗",
+            "CANCEL": "取消",
+            "THAT": "那个",
+            "IMPROVED": "改善",
+            "WORSENED": "恶化",
+            "UNCHANGED": "不变更",
+            "APPLY_CHANGE": "应用变更",
+            "CHOOSE_DIFFERENT": "选择不同状态",
+            "POSITION_DATA": {
+                "EXCELLENT": "绝佳位置数据",
+                "GOOD": "优秀位置数据",
+                "FAIR": "合理位置数据",
+                "POOR": "糟糕位置数据",
+                "UNRELIABLE": "恶劣位置数据"
+            }
+        },
+        "TOOLTIPS": {
+            "AUTO_COVER_DETECTION": "自动掩蔽监测",
+            "THAT_FEATURE": "你更容易发现密门，陷阱与危害（失败将改为获得成功）。",
+            "KEEN_EYES": "当你使用搜索动作时，获得+2环境加值（系统应用）。且将无踪生物视为隐匿，隐匿生物视为可见。"
+        },
+        "SETTINGS_MENU": {
+            "TITLE": "PF2E Visioner设置",
+            "OPEN_BUTTON": "打开",
+            "HINT": "按类别分组设置",
+            "SECTIONS": {
+                "GENERAL_UI": "通用UI",
+                "MANAGER_SETTINGS": "视野对话框设置",
+                "VISION": "视觉",
+                "HIDDEN_LOOT": "隐藏战利品角色",
+                "HIDDEN_WALLS": "隐藏墙",
+                "ADVANCED_SEEK": "进阶搜索选项",
+                "COVER": "掩蔽",
+                "TOKEN_AUTO_COVER": "指示物自动掩蔽设置",
+                "WALL_AUTO_COVER": "墙壁自动掩蔽设置",
+                "AVS_SETTINGS": "自动能见度系统设置",
+                "ADVANCED": "进阶"
+            }
+        },
+        "RULE_ELEMENTS": {
+            "LABELS": {
+                "SUBJECT": "主题",
+                "OBSERVERS": "观察者",
+                "MODE": "模式",
+                "STATUS": "状态",
+                "STEPS": "快步",
+                "DURATION": "持续时间（轮）",
+                "REQUIRES_INITIATIVE": "需要先攻",
+                "RANGE": "射程（尺）",
+                "DIRECTION": "方向"
+            }
+        },
+        "SENSE_PRECISION": {
+            "PRECISE": "精确感官",
+            "IMPRECISE": "模糊感官"
+        },
+        "REACTIONS": {
+            "BUTTON_LABEL": "反应",
+            "BUTTON_TOOLTIP": "反应可用于该动作",
+            "NO_REACTIONS": "无反应可用",
+            "DROPDOWN_TITLE": "可用反应",
+            "SENSE_THE_UNSEEN": {
+                "name": "察觉未见",
+                "applied": "察觉未见已应用",
+                "trigger": "你在搜索无踪生物的检定上失败",
+                "effect": "使无踪生物对你视为隐匿",
+                "description": "即使你在触发的检定中失败，你也可以自动感知到你的搜索区域内的任何无踪生物，使他们仅对你藏匿。"
+            }
+        },
+        "SNEAK_ADEPT_FEAT": {
+            "OUTCOME_UPGRADED": "精巧潜行",
+            "TOOLTIP": "由于具备精巧潜行专长，潜行失败改为成功。该生物几乎不可能被发现。"
+        }
+    }
+}
