@@ -273,9 +273,11 @@ export async function bulkSetVisibilityState(event, button) {
       }
     }
 
-    // Batch all DOM updates in a single animation frame
+    // Batch all DOM updates in a single tick
+    // Use setTimeout(0) because requestAnimationFrame doesn't fire reliably
+    // when the browser tab/window is not focused
     if (updates.length > 0) {
-      requestAnimationFrame(() => {
+      setTimeout(() => {
         updates.forEach((update) => {
           if (update.currentSelected) {
             update.currentSelected.classList.remove('selected');
@@ -379,9 +381,11 @@ export async function bulkSetCoverState(event, button) {
       }
     }
 
-    // Batch all DOM updates in a single animation frame
+    // Batch all DOM updates in a single tick
+    // Use setTimeout(0) because requestAnimationFrame doesn't fire reliably
+    // when the browser tab/window is not focused
     if (updates.length > 0) {
-      requestAnimationFrame(() => {
+      setTimeout(() => {
         updates.forEach((update) => {
           if (update.currentSelected) {
             update.currentSelected.classList.remove('selected');
@@ -478,7 +482,7 @@ export async function bulkSetWallState(event, button) {
     }
 
     if (updates.length > 0) {
-      requestAnimationFrame(() => {
+      setTimeout(() => {
         updates.forEach((update) => {
           if (update.currentSelected) {
             update.currentSelected.classList.remove('selected');

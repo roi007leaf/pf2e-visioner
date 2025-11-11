@@ -61,7 +61,9 @@ export function applySelectionHighlight(TokenManagerClass) {
       };
       const scroller =
         findScrollParent(firstRow) || app.element.querySelector('.tables-content') || app.element;
-      requestAnimationFrame(() => {
+      // Use setTimeout(0) because requestAnimationFrame doesn't fire reliably
+      // when the browser tab/window is not focused
+      setTimeout(() => {
         try {
           const rowRect = firstRow.getBoundingClientRect();
           const scrRect = scroller.getBoundingClientRect();
@@ -84,7 +86,7 @@ export function applySelectionHighlight(TokenManagerClass) {
             scroller.scrollTo({ top: target, behavior: 'smooth' });
           else scroller.scrollTop = target;
         } catch (_) {}
-      });
+      }, 0);
     }
   } catch (_) {}
 }

@@ -9,8 +9,10 @@ import { MODULE_ID } from '../constants.js';
 let _refreshScheduled = false;
 
 /**
- * Optimized perception refresh - uses requestAnimationFrame instead of setTimeout
+ * Optimized perception refresh - uses setTimeout instead of requestAnimationFrame
  * No artificial delays since event-driven batching prevents spam naturally
+ * setTimeout(0) is used because requestAnimationFrame doesn't fire reliably
+ * when the browser tab/window is not focused
  */
 export function refreshEveryonesPerceptionOptimized() {
   // If already scheduled, don't duplicate
@@ -18,8 +20,8 @@ export function refreshEveryonesPerceptionOptimized() {
 
   _refreshScheduled = true;
 
-  // Use requestAnimationFrame for optimal timing with rendering
-  requestAnimationFrame(async () => {
+  // Use setTimeout(0) because it fires even when window is not focused
+  setTimeout(async () => {
     try {
       // Import the original socket service
       const { _socketService, REFRESH_CHANNEL } = await import('./socket.js');
@@ -37,7 +39,7 @@ export function refreshEveryonesPerceptionOptimized() {
     }
 
     _refreshScheduled = false;
-  });
+  }, 0);
 }
 
 /**

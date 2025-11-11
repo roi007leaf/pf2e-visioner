@@ -5,7 +5,8 @@
  * Features:
  * - Event-driven architecture (no polling)
  * - Zero artificial delays (no setTimeout/setInterval throttling)
- * - Immediate processing using requestAnimationFrame
+ * - Immediate processing using setTimeout(0) instead of requestAnimationFrame
+ * - setTimeout(0) fires even when browser tab/window is not focused
  * - Batch processing to handle multiple changes efficiently
  * - Fresh coordinate tracking for accurate distance calculations
  */

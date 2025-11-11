@@ -1,7 +1,8 @@
 /**
  * EventDrivenVisibilitySystem - Zero-delay event-driven visibility management
  * Uses zero-delay components with no artificial throttling
- * Relies purely on event batching and requestAnimationFrame for performance
+ * Relies purely on event batching and setTimeout(0) for performance
+ * setTimeout(0) fires even when browser tab/window is not focused
  */
 
 import { MODULE_ID } from '../../constants.js';

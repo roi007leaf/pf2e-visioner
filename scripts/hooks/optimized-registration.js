@@ -124,20 +124,24 @@ export function registerHooks() {
   Hooks.on('canvasReady', async () => {
     try {
       // Small delay only for canvas readiness, not for throttling
-      requestAnimationFrame(async () => {
+      // Use setTimeout(0) because requestAnimationFrame doesn't fire reliably
+      // when the browser tab/window is not focused
+      setTimeout(async () => {
         try {
           const { updateWallVisuals } = await import('../services/optimized-visual-effects.js');
           const id = canvas.tokens.controlled?.[0]?.id || null;
           await updateWallVisuals(id);
         } catch { }
-      });
+      }, 0);
     } catch { }
   });
 
   // UI hooks for token tool updates - IMMEDIATE
   const refreshTokenTool = () => {
     try {
-      requestAnimationFrame(() => {
+      // Use setTimeout(0) because requestAnimationFrame doesn't fire reliably
+      // when the browser tab/window is not focused
+      setTimeout(() => {
         try {
           const tokenTools = ui.controls.controls?.tokens?.tools;
           if (!tokenTools) return;
@@ -153,7 +157,7 @@ export function registerHooks() {
 
           ui.controls.render();
         } catch { }
-      });
+      }, 0);
     } catch { }
   };
 

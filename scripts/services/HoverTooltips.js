@@ -1232,9 +1232,11 @@ function addBadgeClickHandler(badgeElement, observerToken, targetToken, mode, ac
           }
 
           if (firstVisibleRow) {
-            requestAnimationFrame(() => {
+            // Use setTimeout(0) because requestAnimationFrame doesn't fire reliably
+            // when the browser tab/window is not focused
+            setTimeout(() => {
               firstVisibleRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            });
+            }, 0);
           }
         } catch (err) {
           // Silently fail - manager is open, just couldn't highlight

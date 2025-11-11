@@ -388,12 +388,14 @@ export class BatchOrchestrator {
       if (!globalThis.game.pf2eVisioner) globalThis.game.pf2eVisioner = {};
       globalThis.game.pf2eVisioner.suppressLightingRefreshAfterBatch = true;
 
-      // Clear the flag after the next render frame to allow normal processing to resume
-      requestAnimationFrame(() => {
+      // Clear the flag after a short delay to allow normal processing to resume
+      // Use setTimeout(0) because requestAnimationFrame doesn't fire reliably
+      // when the browser tab/window is not focused
+      setTimeout(() => {
         if (globalThis.game?.pf2eVisioner) {
           globalThis.game.pf2eVisioner.suppressLightingRefreshAfterBatch = false;
         }
-      });
+      }, 0);
 
       // Stop telemetry with detailed metrics
       this._reportTelemetry({
@@ -635,13 +637,15 @@ export class BatchOrchestrator {
         // Also refresh everyone's perception via socket to ensure all clients see changes
         this._refreshEveryonesPerception();
       } finally {
-        // Clear the suppression flag after the current render frame
+        // Clear the suppression flag after a short delay
         // This ensures any queued lightingRefresh events from perception.update are suppressed
-        requestAnimationFrame(() => {
+        // Use setTimeout(0) because requestAnimationFrame doesn't fire reliably
+        // when the browser tab/window is not focused
+        setTimeout(() => {
           if (globalThis.game?.pf2eVisioner) {
             globalThis.game.pf2eVisioner.suppressLightingRefresh = false;
           }
-        });
+        }, 0);
       }
     } catch (error) {
       // Fail silently to avoid disrupting batch processing
@@ -744,13 +748,14 @@ export class BatchOrchestrator {
       } finally {
         // Clear the suppression flags after the current event loop cycle completes
         // This ensures any queued refreshToken/lightingRefresh events are processed while suppressed
-        // Using requestAnimationFrame ensures we wait for the next render frame
-        requestAnimationFrame(() => {
+        // Use setTimeout(0) because requestAnimationFrame doesn't fire reliably
+        // when the browser tab/window is not focused
+        setTimeout(() => {
           if (globalThis.game?.pf2eVisioner) {
             globalThis.game.pf2eVisioner.suppressRefreshTokenProcessing = false;
             globalThis.game.pf2eVisioner.suppressLightingRefresh = false;
           }
-        });
+        }, 0);
       }
     } catch (error) {
       console.warn('PF2E Visioner | Failed to sync ephemeral effects:', error);

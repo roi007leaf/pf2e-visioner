@@ -264,7 +264,9 @@ export class VisionerQuickPanel extends foundry.applications.api.ApplicationV2 {
       canvas.tokens.releaseAll();
 
       // Wait for the next frame to ensure releaseAll completes
-      await new Promise((resolve) => requestAnimationFrame(resolve));
+      // Use setTimeout(0) because requestAnimationFrame doesn't fire reliably
+      // when the browser tab/window is not focused
+      await new Promise((resolve) => setTimeout(resolve, 0));
 
       // Simulate multi-select behavior like Shift+click
       let selectedCount = 0;
@@ -306,7 +308,9 @@ export class VisionerQuickPanel extends foundry.applications.api.ApplicationV2 {
       canvas.tokens.releaseAll();
 
       // Wait for the next frame to ensure releaseAll completes
-      await new Promise((resolve) => requestAnimationFrame(resolve));
+      // Use setTimeout(0) because requestAnimationFrame doesn't fire reliably
+      // when the browser tab/window is not focused
+      await new Promise((resolve) => setTimeout(resolve, 0));
 
       // Simulate multi-select behavior like Shift+click
       let selectedCount = 0;

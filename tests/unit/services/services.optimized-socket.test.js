@@ -10,12 +10,12 @@ describe('services/optimized-socket', () => {
     jest.clearAllMocks();
   });
 
-  test('schedules exactly one refresh via requestAnimationFrame', async () => {
-    // Fake rAF
-    const rAFQueue = [];
-    const origRAF = global.requestAnimationFrame;
-    global.requestAnimationFrame = (cb) => {
-      rAFQueue.push(cb);
+  test('schedules exactly one refresh via setTimeout', async () => {
+    // Fake setTimeout
+    const timeoutQueue = [];
+    const origSetTimeout = global.setTimeout;
+    global.setTimeout = (cb, delay) => {
+      timeoutQueue.push(cb);
       return 1;
     };
 
@@ -35,15 +35,15 @@ describe('services/optimized-socket', () => {
     mod.refreshEveryonesPerceptionOptimized();
     mod.refreshEveryonesPerceptionOptimized();
 
-    // Flush rAF
-    expect(rAFQueue.length).toBe(1);
-    await rAFQueue.shift()();
+    // Flush setTimeout
+    expect(timeoutQueue.length).toBe(1);
+    await timeoutQueue.shift()();
 
     const { _socketService } = await import('../../../scripts/services/socket.js');
     expect(_socketService.executeForEveryone).toHaveBeenCalledWith('refresh');
 
     // Clean up
-    global.requestAnimationFrame = origRAF;
+    global.setTimeout = origSetTimeout;
   });
 
   test('force refresh bypasses scheduling and calls executeForEveryone', async () => {

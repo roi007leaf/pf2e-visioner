@@ -34,6 +34,8 @@ export class OptimizedPerceptionManager {
   /**
    * Refresh perception immediately or schedule for next frame
    * No artificial delays - relies on event-driven batching to prevent spam
+   * Uses setTimeout(0) because requestAnimationFrame doesn't fire reliably
+   * when the browser tab/window is not focused
    */
   refreshPerception() {
     // If already scheduled, don't duplicate
@@ -41,11 +43,11 @@ export class OptimizedPerceptionManager {
 
     this.#refreshScheduled = true;
 
-    // Use requestAnimationFrame for optimal timing with rendering
-    requestAnimationFrame(() => {
+    // Use setTimeout(0) because it fires even when window is not focused
+    setTimeout(() => {
       this.#doRefreshPerception();
       this.#refreshScheduled = false;
-    });
+    }, 0);
   }
 
   /**

@@ -59,7 +59,7 @@ export class OverrideValidationManager {
             return;
         }
         // Best-effort settle to allow canvas updates to apply before validations
-        try { await new Promise((resolve) => requestAnimationFrame(resolve)); } catch { }
+        try { await new Promise((resolve) => setTimeout(resolve, 0)); } catch { }
 
         const tokenIds = Array.from(this._tokensQueuedForValidation);
         this._tokensQueuedForValidation.clear();

@@ -1859,9 +1859,11 @@ export class SeekPreviewDialog extends BaseActionDialog {
     tooltip.style.top = `${top}px`;
 
     // Show tooltip
-    requestAnimationFrame(() => {
+    // Use setTimeout(0) because requestAnimationFrame doesn't fire reliably
+    // when the browser tab/window is not focused
+    setTimeout(() => {
       tooltip.style.opacity = '1';
-    });
+    }, 0);
 
     this._currentTooltip = tooltip;
   }
