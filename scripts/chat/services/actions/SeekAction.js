@@ -458,27 +458,22 @@ export class SeekActionHandler extends ActionHandlerBase {
 
         let inside = false;
         if (subject?._isWall) {
-          // For walls, check if the wall's center point is within the template
-          try {
-            const wallCenter = subject.wall?.center;
-            if (wallCenter) {
-              const distance = Math.sqrt(
-                Math.pow(wallCenter.x - actionData.seekTemplateCenter.x, 2) +
-                Math.pow(wallCenter.y - actionData.seekTemplateCenter.y, 2),
-              );
-              const radiusPixels = (actionData.seekTemplateRadiusFeet * canvas.scene.grid.size) / 5;
-              inside = distance <= radiusPixels;
-            }
-          } catch {
-            // If wall center calculation fails, assume it's not in template
-            inside = false;
-          }
+          inside = isTokenWithinTemplate(
+            actionData.seekTemplateCenter,
+            actionData.seekTemplateRadiusFeet,
+            subject.wall,
+            actionData.seekTemplateType || 'circle',
+            actionData.messageId,
+            actionData.actorToken?.id || actionData.actor?.id,
+          );
         } else {
-          // For tokens, use the existing function
           inside = isTokenWithinTemplate(
             actionData.seekTemplateCenter,
             actionData.seekTemplateRadiusFeet,
             subject,
+            actionData.seekTemplateType || 'circle',
+            actionData.messageId,
+            actionData.actorToken?.id || actionData.actor?.id,
           );
         }
 

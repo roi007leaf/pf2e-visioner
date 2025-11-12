@@ -1,5 +1,30 @@
 # Changelog
 
+## [4.5.4] - 2025-11-12
+
+### ✨ Features
+
+- **Customizable Seek Template Dialog**: Added dialog to configure Seek template type and radius
+  - Choose from burst (circle), cone (90 degrees), or line (ray) template types
+  - Configurable radius in feet (defaults to 15 feet burst)
+  - Works for both GM and player template creation
+
+### 🐛 Bug Fixes
+
+- **Seek Results Template Filtering**: Fixed Seek results dialog showing tokens outside template when reopened
+  - Improved template lookup to check both `canvas.scene.templates` and `canvas.templates.placeables`
+  - Fixed token ID consistency by using `actorToken.id` instead of `actor.id` for template matching
+  - Filter out outcomes marked as `changed: false` when template is present
+- **Template Type Resolution**: Fixed undefined `fallbackTemplate` variable error in event-binder
+
+- **Window Minimization Support**: Fixed AVS visibility calculations not working when GM window is minimized
+  - Replaced `requestAnimationFrame` with synchronous batch processing to bypass browser throttling
+  - Added automatic perception refresh when window is restored from minimized state
+  - Implemented Levels module compatibility: bypasses 3D collision detection when minimized, uses 2D geometric LOS
+  - Window state listener detects minimize/restore and triggers full perception refresh on restore
+  - Ensures all visibility state changes apply correctly even when Foundry window is in background
+  - Perfect for GMs running multiple applications or streaming while game window is minimized
+
 ## [4.5.3] - 2025-11-09
 
 ### ✨ Features

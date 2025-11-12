@@ -127,6 +127,7 @@ export function bindAutomationEvents(panel, message, actionData) {
           if (center && radiusFeet) {
             actionData.seekTemplateCenter = center;
             actionData.seekTemplateRadiusFeet = radiusFeet;
+            actionData.seekTemplateType = pending?.templateType || fallbackTemplate?.t || 'circle';
           }
           if (pending && typeof pending.rollTotal === 'number') {
             actionData.roll = {
@@ -257,6 +258,7 @@ export function bindAutomationEvents(panel, message, actionData) {
             const pending = msg?.flags?.['pf2e-visioner']?.seekTemplate;
             let tplCenter = pending?.center;
             let tplRadius = pending?.radiusFeet;
+            let fallbackTemplate = null;
             if (
               (!tplCenter || !tplRadius) &&
               game.user.isGM &&
@@ -264,7 +266,7 @@ export function bindAutomationEvents(panel, message, actionData) {
               msg.author.isGM === false
             ) {
               try {
-                const t = canvas.scene?.templates?.find?.((t) => {
+                fallbackTemplate = canvas.scene?.templates?.find?.((t) => {
                   const f = t?.flags?.['pf2e-visioner'];
                   return (
                     f?.seekPreviewManual === true &&
@@ -273,14 +275,15 @@ export function bindAutomationEvents(panel, message, actionData) {
                     t?.user?.id === msg.author.id
                   );
                 });
-                if (t) {
-                  tplCenter = { x: t.x, y: t.y };
-                  tplRadius = Number(t.distance) || 0;
+                if (fallbackTemplate) {
+                  tplCenter = { x: fallbackTemplate.x, y: fallbackTemplate.y };
+                  tplRadius = Number(fallbackTemplate.distance) || 0;
                 }
               } catch { }
             }
             if (tplCenter && tplRadius) {
-              actionable = filterOutcomesByTemplate(actionable, tplCenter, tplRadius, 'target');
+              const tplType = pending?.templateType || fallbackTemplate?.t || 'circle';
+              actionable = filterOutcomesByTemplate(actionable, tplCenter, tplRadius, 'target', tplType, actionData.messageId, actionData.actor?.id);
             }
             if (actionable.length === 0) {
               notify.info('No changes to apply');

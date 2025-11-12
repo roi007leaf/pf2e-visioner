@@ -1,6 +1,23 @@
 /**
  * Visual Effects Handler
  * Handles token/wall visual updates and refresh operations for both visibility and cover
+ * 
+ * NOTE: This file contains requestAnimationFrame calls for PIXI.js animation loops.
+ * These CANNOT be converted to web workers or setTimeout because:
+ * 
+ * 1. Web workers cannot access DOM, Canvas, or PIXI graphics objects
+ * 2. Animation loops need to update PIXI graphics (sparkles, pulses, shimmer effects)
+ * 3. These are purely visual effects that only need to run when the window is focused
+ * 4. When the window is unfocused, animations pausing is actually desired behavior
+ *    (saves CPU/GPU resources since no one is watching)
+ * 
+ * The requestAnimationFrame usage here is INTENTIONAL and CORRECT for visual animations.
+ * Do NOT convert these to setTimeout or web workers.
+ * 
+ * For non-visual calculations that need to run when unfocused, see:
+ * - scripts/utils/scheduler.js (scheduleTask utility)
+ * - scripts/visibility/auto-visibility/core/BatchOrchestrator.js (uses setTimeout)
+ * - scripts/visibility/auto-visibility/core/VisibilityStateManager.js (uses setTimeout)
  */
 
 import { MODULE_ID, VISIBILITY_STATES } from '../constants.js';
