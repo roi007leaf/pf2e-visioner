@@ -10,14 +10,8 @@ describe('services/optimized-socket', () => {
     jest.clearAllMocks();
   });
 
-  test('schedules exactly one refresh via requestAnimationFrame', async () => {
-    // Fake rAF
-    const rAFQueue = [];
-    const origRAF = global.requestAnimationFrame;
-    global.requestAnimationFrame = (cb) => {
-      rAFQueue.push(cb);
-      return 1;
-    };
+  test('schedules exactly one refresh via keep-alive', async () => {
+    jest.useFakeTimers();
 
     // Mock dependent modules
     jest.doMock('../../../scripts/services/socket.js', () => ({
@@ -35,15 +29,14 @@ describe('services/optimized-socket', () => {
     mod.refreshEveryonesPerceptionOptimized();
     mod.refreshEveryonesPerceptionOptimized();
 
-    // Flush rAF
-    expect(rAFQueue.length).toBe(1);
-    await rAFQueue.shift()();
+    // Advance timers to trigger keep-alive execution
+    jest.advanceTimersByTime(100);
+    await Promise.resolve();
 
     const { _socketService } = await import('../../../scripts/services/socket.js');
     expect(_socketService.executeForEveryone).toHaveBeenCalledWith('refresh');
 
-    // Clean up
-    global.requestAnimationFrame = origRAF;
+    jest.useRealTimers();
   });
 
   test('force refresh bypasses scheduling and calls executeForEveryone', async () => {

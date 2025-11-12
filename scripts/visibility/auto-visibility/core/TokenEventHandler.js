@@ -60,7 +60,6 @@ export class TokenEventHandler {
     }
 
     // This is the final destination, process visibility
-
     // Use destination from updateData - this is the final position after animation
     const finalX = updateData.destination?.x ?? tokenDoc.x;
     const finalY = updateData.destination?.y ?? tokenDoc.y;

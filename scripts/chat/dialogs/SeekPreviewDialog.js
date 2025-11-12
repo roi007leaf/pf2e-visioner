@@ -1858,7 +1858,9 @@ export class SeekPreviewDialog extends BaseActionDialog {
     tooltip.style.left = `${left}px`;
     tooltip.style.top = `${top}px`;
 
-    // Show tooltip
+    // Show tooltip with fade-in effect
+    // NOTE: requestAnimationFrame is kept here for smooth CSS transitions
+    // This is a visual effect that only needs to work when the window is focused
     requestAnimationFrame(() => {
       tooltip.style.opacity = '1';
     });

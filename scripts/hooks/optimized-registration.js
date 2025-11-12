@@ -5,6 +5,7 @@
 
 import { MODULE_ID } from '../constants.js';
 import { getLogger } from '../utils/logger.js';
+import { scheduleTask } from '../utils/scheduler.js';
 
 /**
  * Register optimized hooks with no artificial delays
@@ -124,7 +125,8 @@ export function registerHooks() {
   Hooks.on('canvasReady', async () => {
     try {
       // Small delay only for canvas readiness, not for throttling
-      requestAnimationFrame(async () => {
+      // Use setTimeout instead of requestAnimationFrame to work when window is unfocused
+      scheduleTask(async () => {
         try {
           const { updateWallVisuals } = await import('../services/optimized-visual-effects.js');
           const id = canvas.tokens.controlled?.[0]?.id || null;
@@ -137,7 +139,8 @@ export function registerHooks() {
   // UI hooks for token tool updates - IMMEDIATE
   const refreshTokenTool = () => {
     try {
-      requestAnimationFrame(() => {
+      // Use setTimeout instead of requestAnimationFrame for UI updates that should work when unfocused
+      scheduleTask(() => {
         try {
           const tokenTools = ui.controls.controls?.tokens?.tools;
           if (!tokenTools) return;
