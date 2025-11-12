@@ -1,0 +1,64 @@
+<div class="seek-template-config">
+  <p class="notes" style="margin:0 0 12px 0; color: var(--color-text-secondary);">
+    {{localize "PF2E_VISIONER.SEEK_TEMPLATE_CONFIG.DESCRIPTION"}}
+  </p>
+  
+  <div class="template-type-selector">
+    <label class="template-selector-label">{{localize "PF2E_VISIONER.SEEK_TEMPLATE_CONFIG.TEMPLATE_TYPE"}}</label>
+    <div class="template-options">
+      <div class="template-option" data-template-type="circle">
+        <div class="template-option-icon">
+          <i class="fas fa-circle" aria-hidden="true"></i>
+        </div>
+        <div class="template-option-content">
+          <div class="template-option-title">{{localize "PF2E_VISIONER.SEEK_TEMPLATE_CONFIG.BURST"}}</div>
+          <div class="template-option-sub">{{localize "PF2E_VISIONER.SEEK_TEMPLATE_CONFIG.BURST_DESC"}}</div>
+        </div>
+        <input type="radio" name="templateType" value="circle" checked style="display:none;">
+      </div>
+
+      <div class="template-option" data-template-type="cone">
+        <div class="template-option-icon">
+          <i class="fas fa-triangle" aria-hidden="true"></i>
+        </div>
+        <div class="template-option-content">
+          <div class="template-option-title">{{localize "PF2E_VISIONER.SEEK_TEMPLATE_CONFIG.CONE"}}</div>
+          <div class="template-option-sub">{{localize "PF2E_VISIONER.SEEK_TEMPLATE_CONFIG.CONE_DESC"}}</div>
+        </div>
+        <input type="radio" name="templateType" value="cone" style="display:none;">
+      </div>
+
+      <div class="template-option" data-template-type="ray">
+        <div class="template-option-icon">
+          <i class="fas fa-grip-lines" aria-hidden="true"></i>
+        </div>
+        <div class="template-option-content">
+          <div class="template-option-title">{{localize "PF2E_VISIONER.SEEK_TEMPLATE_CONFIG.LINE"}}</div>
+          <div class="template-option-sub">{{localize "PF2E_VISIONER.SEEK_TEMPLATE_CONFIG.LINE_DESC"}}</div>
+        </div>
+        <input type="radio" name="templateType" value="ray" style="display:none;">
+      </div>
+    </div>
+  </div>
+
+  <div class="radius-input-group">
+    <label for="template-radius" class="radius-label">
+      <i class="fas fa-ruler" style="margin-right: 6px;"></i>
+      {{localize "PF2E_VISIONER.SEEK_TEMPLATE_CONFIG.RADIUS"}}
+    </label>
+    <div class="radius-input-wrapper">
+      <input type="number" name="radius" id="template-radius" value="15" min="1" max="1000" step="1" class="radius-input">
+      <span class="radius-units">{{localize "PF2E_VISIONER.SEEK_TEMPLATE_CONFIG.FEET"}}</span>
+    </div>
+  </div>
+
+  <footer class="form-footer seek-template-footer">
+    <button type="button" class="dialog-button seek-template-cancel" data-action="cancel">
+      <i class="fas fa-times"></i> {{localize "Cancel"}}
+    </button>
+    <button type="submit" class="dialog-button seek-template-submit">
+      <i class="fas fa-bullseye"></i> {{localize "PF2E_VISIONER.SEEK_TEMPLATE_CONFIG.CREATE"}}
+    </button>
+  </footer>
+</div>
+
