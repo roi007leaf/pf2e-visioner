@@ -1,4 +1,3 @@
-import { scheduleTask, scheduleTaskWithKeepAlive } from '../../../utils/scheduler.js';
 
 /**
  * VisibilityStateManager - Manages token visibility state changes and batch processing
@@ -82,8 +81,7 @@ export class VisibilityStateManager {
     });
     this.#changedTokens.add(tokenId);
 
-    // Process SYNCHRONOUSLY to avoid browser throttling when window is minimized
-    // Foundry hooks fire even when minimized, so we can process immediately
+    // Execute immediately (not scheduled) to avoid browser throttling when window is minimized
     if (!this.#processingBatch) {
       this.#processBatch();
     }

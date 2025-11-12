@@ -51,8 +51,8 @@ export function cancelTask(taskId) {
  */
 export function scheduleAnimationFrame(callback) {
   // Check if window is focused and rAF is available
-  if (typeof requestAnimationFrame !== 'undefined' && document.hasFocus()) {
-    return { type: 'raf', id: requestAnimationFrame(callback) };
+  if (typeof window.requestAnimationFrame !== 'undefined' && document.hasFocus()) {
+    return { type: 'raf', id: window.requestAnimationFrame(callback) };
   } else {
     // Fallback to setTimeout with ~60fps timing
     return { type: 'timeout', id: setTimeout(callback, 16) };
@@ -66,8 +66,8 @@ export function scheduleAnimationFrame(callback) {
  */
 export function cancelAnimationFrame(frameId) {
   if (typeof frameId === 'object') {
-    if (frameId.type === 'raf' && typeof cancelAnimationFrame !== 'undefined') {
-      cancelAnimationFrame(frameId.id);
+    if (frameId.type === 'raf' && typeof window.cancelAnimationFrame !== 'undefined') {
+      window.cancelAnimationFrame(frameId.id);
     } else if (frameId.type === 'timeout') {
       clearTimeout(frameId.id);
     }
@@ -77,8 +77,8 @@ export function cancelAnimationFrame(frameId) {
       clearTimeout(frameId);
     } catch {}
     try {
-      if (typeof cancelAnimationFrame !== 'undefined') {
-        cancelAnimationFrame(frameId);
+      if (typeof window.cancelAnimationFrame !== 'undefined') {
+        window.cancelAnimationFrame(frameId);
       }
     } catch {}
   }
