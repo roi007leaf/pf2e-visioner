@@ -277,6 +277,7 @@ export function requestGMOpenSeekWithTemplate(
   messageId,
   rollTotal,
   dieResult,
+  templateType = 'circle',
 ) {
   if (!_socketService.socket) return;
   _socketService.executeAsGM(SEEK_TEMPLATE_CHANNEL, {
@@ -286,6 +287,7 @@ export function requestGMOpenSeekWithTemplate(
     messageId,
     rollTotal,
     dieResult,
+    templateType,
     userId: game.userId,
   });
 }
@@ -297,6 +299,7 @@ async function seekTemplateHandler({
   messageId,
   rollTotal,
   dieResult,
+  templateType = 'circle',
   userId,
 }) {
   try {
@@ -329,11 +332,13 @@ async function seekTemplateHandler({
 
       const { isTokenWithinTemplate } = await import('../chat/services/infra/shared-utils.js');
 
-      // Check if any tokens are in the template
-      const tokensInTemplate = targets.some((t) => isTokenWithinTemplate(center, radiusFeet, t));
+      const tokensInTemplate = targets.some((t) =>
+        isTokenWithinTemplate(center, radiusFeet, t, templateType, messageId, actorTokenId),
+      );
 
-      // Check if any walls are in the template
-      const wallsInTemplate = walls.some((wall) => isTokenWithinTemplate(center, radiusFeet, wall));
+      const wallsInTemplate = walls.some((wall) =>
+        isTokenWithinTemplate(center, radiusFeet, wall, templateType, messageId, actorTokenId),
+      );
 
       // Has targets if either tokens or walls are in the template
       hasTargets = tokensInTemplate || wallsInTemplate;
@@ -351,6 +356,7 @@ async function seekTemplateHandler({
         [`flags.${MODULE_ID}.seekTemplate`]: {
           center,
           radiusFeet,
+          templateType,
           actorTokenId,
           rollTotal: typeof rollTotal === 'number' ? rollTotal : null,
           dieResult: typeof dieResult === 'number' ? dieResult : null,

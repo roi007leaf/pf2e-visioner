@@ -2,6 +2,8 @@
  * Selection and hover highlighting helpers for the Token Manager
  */
 
+import { scheduleTask } from '../../utils/scheduler.js';
+
 export function attachSelectionHandlers(TokenManagerClass) {
   if (TokenManagerClass._selectionHookId) return;
   TokenManagerClass._selectionHookId = Hooks.on('controlToken', () => {
@@ -61,7 +63,8 @@ export function applySelectionHighlight(TokenManagerClass) {
       };
       const scroller =
         findScrollParent(firstRow) || app.element.querySelector('.tables-content') || app.element;
-      requestAnimationFrame(() => {
+      // Use setTimeout instead of requestAnimationFrame for UI updates that should work when unfocused
+      scheduleTask(() => {
         try {
           const rowRect = firstRow.getBoundingClientRect();
           const scrRect = scroller.getBoundingClientRect();

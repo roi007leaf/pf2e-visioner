@@ -3,6 +3,7 @@
  */
 
 import { MODULE_ID } from '../../../constants.js';
+import { scheduleTask } from '../../../utils/scheduler.js';
 import {
   addTokenImageClickHandlers,
   panToAndSelectToken,
@@ -273,9 +274,10 @@ export async function bulkSetVisibilityState(event, button) {
       }
     }
 
-    // Batch all DOM updates in a single animation frame
+    // Batch all DOM updates in a single task
+    // Using setTimeout instead of requestAnimationFrame so updates apply when window is unfocused
     if (updates.length > 0) {
-      requestAnimationFrame(() => {
+      scheduleTask(() => {
         updates.forEach((update) => {
           if (update.currentSelected) {
             update.currentSelected.classList.remove('selected');
@@ -379,9 +381,10 @@ export async function bulkSetCoverState(event, button) {
       }
     }
 
-    // Batch all DOM updates in a single animation frame
+    // Batch all DOM updates in a single task
+    // Using setTimeout instead of requestAnimationFrame so updates apply when window is unfocused
     if (updates.length > 0) {
-      requestAnimationFrame(() => {
+      scheduleTask(() => {
         updates.forEach((update) => {
           if (update.currentSelected) {
             update.currentSelected.classList.remove('selected');
@@ -477,8 +480,10 @@ export async function bulkSetWallState(event, button) {
       }
     }
 
+    // Batch all DOM updates in a single task
+    // Using setTimeout instead of requestAnimationFrame so updates apply when window is unfocused
     if (updates.length > 0) {
-      requestAnimationFrame(() => {
+      scheduleTask(() => {
         updates.forEach((update) => {
           if (update.currentSelected) {
             update.currentSelected.classList.remove('selected');

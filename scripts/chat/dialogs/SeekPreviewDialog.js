@@ -9,8 +9,8 @@ import { SeekDialogAdapter } from '../../visibility/auto-visibility/SeekDialogAd
 import { getDesiredOverrideStatesForAction } from '../services/data/action-state-config.js';
 import { notify } from '../services/infra/notifications.js';
 import {
-  filterOutcomesBySeekDistance,
-  filterOutcomesByTemplate,
+    filterOutcomesBySeekDistance,
+    filterOutcomesByTemplate,
 } from '../services/infra/shared-utils.js';
 import { BaseActionDialog } from './base-action-dialog.js';
 
@@ -189,6 +189,9 @@ export class SeekPreviewDialog extends BaseActionDialog {
         this.actionData.seekTemplateCenter,
         this.actionData.seekTemplateRadiusFeet,
         'target',
+        this.actionData.seekTemplateType || 'circle',
+        this.actionData.messageId,
+        this.actorToken?.id || this.actionData.actor?.id,
       );
     }
 
@@ -839,6 +842,9 @@ export class SeekPreviewDialog extends BaseActionDialog {
             this.actionData.seekTemplateCenter,
             this.actionData.seekTemplateRadiusFeet,
             'target',
+            this.actionData.seekTemplateType || 'circle',
+            this.actionData.messageId,
+            this.actorToken?.id || this.actionData.actor?.id,
           );
         } catch { }
       }
@@ -1858,7 +1864,9 @@ export class SeekPreviewDialog extends BaseActionDialog {
     tooltip.style.left = `${left}px`;
     tooltip.style.top = `${top}px`;
 
-    // Show tooltip
+    // Show tooltip with fade-in effect
+    // NOTE: requestAnimationFrame is kept here for smooth CSS transitions
+    // This is a visual effect that only needs to work when the window is focused
     requestAnimationFrame(() => {
       tooltip.style.opacity = '1';
     });

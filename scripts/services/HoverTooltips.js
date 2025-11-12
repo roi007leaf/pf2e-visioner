@@ -1232,6 +1232,8 @@ function addBadgeClickHandler(badgeElement, observerToken, targetToken, mode, ac
           }
 
           if (firstVisibleRow) {
+            // NOTE: requestAnimationFrame is kept here for smooth scrolling animations
+            // This is a visual effect that only needs to work when the window is focused
             requestAnimationFrame(() => {
               firstVisibleRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
             });

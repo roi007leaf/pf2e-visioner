@@ -1,7 +1,7 @@
 import { MODULE_ID } from '../../../constants.js';
 import { getVisibilityBetween } from '../../../utils.js';
 // Debug logger removed
-import { shouldFilterAlly } from './shared-utils.js';
+import { isTokenWithinTemplate, shouldFilterAlly } from './shared-utils.js';
 
 export function checkForValidTargets(actionData) {
   // Guard: canvas or tokens not ready yet in early hook timings
@@ -21,20 +21,23 @@ export function checkForValidTargets(actionData) {
     return true;
   });
 
-  if (potentialTargets.length === 0) return false;
-
   switch (actionData.actionType) {
     case 'consequences':
+      if (potentialTargets.length === 0) return false;
       return checkConsequencesTargets(actionData, potentialTargets);
     case 'seek':
       return checkSeekTargets(actionData, potentialTargets);
     case 'point-out':
+      if (potentialTargets.length === 0) return false;
       return checkPointOutTargets(actionData, potentialTargets);
     case 'hide':
+      if (potentialTargets.length === 0) return false;
       return checkHideTargets(actionData, potentialTargets);
     case 'sneak':
+      if (potentialTargets.length === 0) return false;
       return checkSneakTargets(actionData, potentialTargets);
     case 'create-a-diversion':
+      if (potentialTargets.length === 0) return false;
       return checkDiversionTargets(actionData, potentialTargets);
     default:
       return true;
@@ -73,18 +76,38 @@ function checkConsequencesTargets(actionData, potentialTargets) {
 }
 
 function checkSeekTargets(actionData, potentialTargets) {
-  // First check if there are any walls in the scene that could be seek targets
   try {
     const scene = canvas?.scene;
     if (scene) {
-      // Check for walls in the walls collection
-      const walls = canvas?.walls?.placeables || [];
-      if (walls.length > 0) {
-        // Found walls - these are always valid seek targets
-        return true;
+      const hasTemplate = actionData.seekTemplateCenter && actionData.seekTemplateRadiusFeet;
+
+      const allWalls = canvas?.walls?.placeables || [];
+      const hiddenWalls = allWalls.filter((w) => !!w?.document?.getFlag?.(MODULE_ID, 'hiddenWall'));
+
+      if (hiddenWalls.length > 0) {
+        if (hasTemplate) {
+          const wallsInTemplate = hiddenWalls.some((wall) => {
+            try {
+              const wallCenter = wall.center;
+              if (wallCenter && canvas.scene?.grid?.size) {
+                const distance = Math.sqrt(
+                  Math.pow(wallCenter.x - actionData.seekTemplateCenter.x, 2) +
+                  Math.pow(wallCenter.y - actionData.seekTemplateCenter.y, 2),
+                );
+                const radiusPixels = (actionData.seekTemplateRadiusFeet * canvas.scene.grid.size) / 5;
+                return distance <= radiusPixels;
+              }
+              return false;
+            } catch {
+              return false;
+            }
+          });
+          if (wallsInTemplate) return true;
+        } else {
+          return true;
+        }
       }
 
-      // Check for loot tokens (tokens without actors that might be loot)
       const allSceneTokens = canvas.tokens?.placeables || [];
       const lootTokens = allSceneTokens.filter(
         (token) =>
@@ -95,20 +118,26 @@ function checkSeekTargets(actionData, potentialTargets) {
       );
 
       if (lootTokens.length > 0) {
-        // Found loot - check if any meet perception requirements
-        for (const lootToken of lootTokens) {
-          const minRank = Number(
-            lootToken.document?.getFlag?.(MODULE_ID, 'minPerceptionRank') ?? 0,
-          );
-          if (Number.isFinite(minRank) && minRank > 0) {
-            const stat = actionData.actor?.actor?.getStatistic?.('perception');
-            const seekerRank = Number(stat?.proficiency?.rank ?? stat?.rank ?? 0);
-            if (Number.isFinite(seekerRank) && seekerRank >= minRank) {
-              return true; // Valid loot target found
+        const validLootTokens = hasTemplate
+          ? lootTokens.filter((token) =>
+              isTokenWithinTemplate(actionData.seekTemplateCenter, actionData.seekTemplateRadiusFeet, token),
+            )
+          : lootTokens;
+
+        if (validLootTokens.length > 0) {
+          for (const lootToken of validLootTokens) {
+            const minRank = Number(
+              lootToken.document?.getFlag?.(MODULE_ID, 'minPerceptionRank') ?? 0,
+            );
+            if (Number.isFinite(minRank) && minRank > 0) {
+              const stat = actionData.actor?.actor?.getStatistic?.('perception');
+              const seekerRank = Number(stat?.proficiency?.rank ?? stat?.rank ?? 0);
+              if (Number.isFinite(seekerRank) && seekerRank >= minRank) {
+                return true;
+              }
+            } else {
+              return true;
             }
-          } else {
-            // No rank requirement, so this is a valid seek target
-            return true;
           }
         }
       }

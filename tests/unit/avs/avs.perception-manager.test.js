@@ -9,9 +9,6 @@ describe('OptimizedPerceptionManager', () => {
         // spy on socket and canvas
         jest.spyOn(socketSvc, 'refreshEveryonesPerception');
         global.canvas.perception = { update: jest.fn() };
-        // rAF immediate, but keep original to restore later
-        global._origRAF = global.requestAnimationFrame;
-        global.requestAnimationFrame = (cb) => setTimeout(cb, 0);
         jest.useFakeTimers();
         mgr = OptimizedPerceptionManager.getInstance();
         mgr.cleanup();
@@ -20,20 +17,15 @@ describe('OptimizedPerceptionManager', () => {
     afterEach(() => {
         jest.useRealTimers();
         jest.restoreAllMocks();
-        if (global._origRAF) {
-            global.requestAnimationFrame = global._origRAF;
-            delete global._origRAF;
-        }
     });
 
     test('refreshPerception schedules once and executes', async () => {
         mgr.refreshPerception();
         mgr.refreshPerception(); // dedup
-        expect(mgr.isRefreshScheduled()).toBe(true);
-        // flush rAF then debounce inside refreshEveryonesPerception (100ms)
-        jest.advanceTimersByTime(0);
+        // The keep-alive system executes immediately, so advance timers and check
+        jest.advanceTimersByTime(100); // Keep-alive poll interval
         await Promise.resolve();
-        jest.advanceTimersByTime(100);
+        jest.advanceTimersByTime(100); // Debounce inside refreshEveryonesPerception
         await Promise.resolve();
         expect(socketSvc.refreshEveryonesPerception).toHaveBeenCalled();
         expect(global.canvas.perception.update).toHaveBeenCalledWith({
@@ -55,6 +47,8 @@ describe('OptimizedPerceptionManager', () => {
     test('getStatus returns flag state', () => {
         expect(mgr.getStatus()).toEqual({ refreshScheduled: false });
         mgr.refreshPerception();
-        expect(mgr.getStatus()).toEqual({ refreshScheduled: true });
+        // After refresh executes immediately via keep-alive, the flag is cleared
+        jest.advanceTimersByTime(100);
+        expect(mgr.getStatus()).toEqual({ refreshScheduled: false });
     });
 });
