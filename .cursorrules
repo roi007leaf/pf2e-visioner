@@ -3,11 +3,11 @@
 - Dont write long functions, break to several functions to keep readable.
 - Never mix test code and production code.
 - Use i18n keys for all user-facing text. Update lang files as needed.
-- Dont delete debug logs until the user confirms bug has been fixed.
+- Do not delete debug logs until the user confirms bug has been fixed.
 - Do not add comments
-- Do not modify code you havent specifically been instructed to modify
+- Do not modify code you have not specifically been instructed to modify
 - Do not rename functions unless you have been instructed to
 - Do not refactor code unprompted
 - Maintain clean and readable code
-- If you dont know — say you dont know
+- If you do not know — say you do not know
 - If an old unit test fails, dont modify the test to make it pass
