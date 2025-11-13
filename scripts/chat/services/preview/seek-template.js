@@ -1,16 +1,20 @@
 // Facade around seek template helpers to keep UI layer clean
 
-export async function setupSeekTemplate(actionData) {
+export async function setupSeekTemplate(actionData, skipDialog = false) {
   const { notify } = await import('../infra/notifications.js');
+  const { MODULE_ID } = await import('../../../constants.js');
 
-  const { SeekTemplateConfigDialog } = await import('../../dialogs/SeekTemplateConfigDialog.js');
-  const config = await SeekTemplateConfigDialog.choose();
-
-  if (!config) {
-    return;
+  let config = null;
+  if (!skipDialog && !game.settings.get(MODULE_ID, 'seekTemplateSkipDialog')) {
+    const { SeekTemplateConfigDialog } = await import('../../dialogs/SeekTemplateConfigDialog.js');
+    config = await SeekTemplateConfigDialog.choose();
+    if (!config) {
+      return;
+    }
   }
 
-  const { templateType, radius } = config;
+  const templateType = config?.templateType || 'circle';
+  const radius = config?.radius || 15;
   const distance = radius;
 
   notify.info(game.i18n.localize('PF2E_VISIONER.SEEK_AUTOMATION.SETUP_TEMPLATE_TOOLTIP'));
@@ -47,11 +51,12 @@ export async function setupSeekTemplate(actionData) {
         try {
           Hooks.off('createMeasuredTemplate', createHookId);
           try {
-            await doc.update({
+            const updateData = {
               [`flags.pf2e-visioner.seekPreviewManual`]: true,
               [`flags.pf2e-visioner.messageId`]: actionData.messageId,
               [`flags.pf2e-visioner.actorTokenId`]: actionData.actor.id,
-            });
+            };
+            await doc.update(updateData);
           } catch (_) { }
           actionData.seekTemplateCenter = { x: doc.x, y: doc.y };
           actionData.seekTemplateRadiusFeet = Number(doc.distance) || distance;
@@ -87,14 +92,13 @@ export async function setupSeekTemplate(actionData) {
             ]);
             if (created) {
               try {
-                await canvas.scene.updateEmbeddedDocuments('MeasuredTemplate', [
-                  {
-                    _id: created.id,
-                    [`flags.pf2e-visioner.seekPreviewManual`]: true,
-                    [`flags.pf2e-visioner.messageId`]: actionData.messageId,
-                    [`flags.pf2e-visioner.actorTokenId`]: actionData.actor.id,
-                  },
-                ]);
+                const updateData = {
+                  _id: created.id,
+                  [`flags.pf2e-visioner.seekPreviewManual`]: true,
+                  [`flags.pf2e-visioner.messageId`]: actionData.messageId,
+                  [`flags.pf2e-visioner.actorTokenId`]: actionData.actor.id,
+                };
+                await canvas.scene.updateEmbeddedDocuments('MeasuredTemplate', [updateData]);
               } catch (_) { }
               actionData.seekTemplateCenter = { x: created.x, y: created.y };
               actionData.seekTemplateRadiusFeet = Number(created.distance) || distance;
@@ -129,9 +133,6 @@ export async function setupSeekTemplate(actionData) {
   if (templateType === 'cone') {
     tplData.angle = 90;
     tplData.direction = 0;
-  } else if (templateType === 'rect') {
-    tplData.width = distance;
-    tplData.distance = distance;
   } else if (templateType === 'ray') {
     tplData.width = 5;
   }
@@ -147,7 +148,6 @@ export async function setupSeekTemplate(actionData) {
         actionData.seekTemplateCenter = center;
         actionData.seekTemplateRadiusFeet = radius;
         actionData.seekTemplateType = templateType;
-        // Keep the player's template on the scene so the GM can reuse it
         try {
           await doc.update({
             ['flags.pf2e-visioner.seekPreviewManual']: true,

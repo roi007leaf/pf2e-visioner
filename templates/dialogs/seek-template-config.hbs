@@ -42,9 +42,9 @@
   </div>
 
   <div class="radius-input-group">
-    <label for="template-radius" class="radius-label">
+    <label for="template-radius" class="radius-label" id="template-size-label">
       <i class="fas fa-ruler" style="margin-right: 6px;"></i>
-      {{localize "PF2E_VISIONER.SEEK_TEMPLATE_CONFIG.RADIUS"}}
+      <span id="template-size-label-text">{{localize "PF2E_VISIONER.SEEK_TEMPLATE_CONFIG.RADIUS"}}</span>
     </label>
     <div class="radius-input-wrapper">
       <input type="number" name="radius" id="template-radius" value="15" min="1" max="1000" step="1" class="radius-input">

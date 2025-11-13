@@ -369,11 +369,13 @@
       "BURST_DESC": "Circular area effect",
       "CONE": "Cone",
       "CONE_DESC": "90-degree cone area",
-      "SQUARE": "Square",
-      "SQUARE_DESC": "Square area effect",
+      "RECTANGLE": "Rectangle",
+      "RECTANGLE_DESC": "Square/rectangular area effect",
       "LINE": "Line (Ray)",
       "LINE_DESC": "Straight line area",
       "RADIUS": "Radius",
+      "LENGTH": "Length",
+      "SIZE": "Size",
       "FEET": "feet",
       "CREATE": "Create Template",
       "INVALID_RADIUS": "Radius must be between 1 and 1000 feet",
@@ -580,6 +582,10 @@
       "LIMIT_SEEK_RANGE": {
         "name": "Limit Combat Seek Range",
         "hint": "Target will be decided based on the specified distance from token using Seek while in combat"
+      },
+      "SEEK_TEMPLATE_SKIP_DIALOG": {
+        "name": "Always Skip Seek Template Dialog",
+        "hint": "When enabled, the Seek template configuration dialog will be skipped and default values (15ft burst) will be used."
       },
       "SEEK_USE_TEMPLATE": {
         "name": "Use Seek Template",
