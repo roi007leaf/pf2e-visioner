@@ -1,5 +1,20 @@
 # Changelog
 
+## [4.5.5] - 2025-01-XX
+
+### ✨ Features
+
+- **Seek Template Dialog Enhancements**:
+  - Added Shift+Click on "Setup Seek Template" button to skip dialog and use defaults burst 15ft.
+  - Added "Always Skip Seek Template Dialog" setting to always use default values (15ft burst)
+  - Changed label from "Radius" to "Length" when selecting line (ray) template type
+
+### 🐛 Bug Fixes
+
+- **Seek Template Dialog Close Button**: Fixed dialog not reopening after closing with X button
+  - Dialog now properly resolves promise when closed via X button or Cancel
+  - Ensures template setup can be used again after closing dialog
+
 ## [4.5.4] - 2025-11-12
 
 ### ✨ Features

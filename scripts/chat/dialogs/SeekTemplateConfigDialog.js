@@ -22,6 +22,17 @@ export class SeekTemplateConfigDialog extends foundry.applications.api.Handlebar
     const root = this.element;
     if (!root) return;
 
+    const updateLabel = (templateType) => {
+      const labelText = root.querySelector('#template-size-label-text');
+      if (labelText) {
+        let labelKey = 'PF2E_VISIONER.SEEK_TEMPLATE_CONFIG.RADIUS';
+        if (templateType === 'ray') {
+          labelKey = 'PF2E_VISIONER.SEEK_TEMPLATE_CONFIG.LENGTH';
+        }
+        labelText.textContent = game.i18n.localize(labelKey);
+      }
+    };
+
     const templateOptions = root.querySelectorAll('.template-option');
     templateOptions.forEach((option) => {
       option.addEventListener('click', () => {
@@ -30,6 +41,7 @@ export class SeekTemplateConfigDialog extends foundry.applications.api.Handlebar
         option.classList.add('selected');
         const radio = option.querySelector('input[type="radio"]');
         if (radio) radio.checked = true;
+        updateLabel(type);
       });
     });
 
@@ -63,13 +75,26 @@ export class SeekTemplateConfigDialog extends foundry.applications.api.Handlebar
     if (defaultOption) {
       defaultOption.classList.add('selected');
     }
+    updateLabel('circle');
   }
 
   _resolve(value) {
-    try {
-      this.close();
-    } catch {}
-    if (this._resolver) this._resolver(value);
+    if (this._resolver) {
+      const resolver = this._resolver;
+      this._resolver = null;
+      resolver(value);
+      try {
+        super.close();
+      } catch {}
+    }
+  }
+
+  async close(options) {
+    if (this._resolver) {
+      this._resolve(null);
+      return;
+    }
+    return super.close(options);
   }
 
   static async choose() {

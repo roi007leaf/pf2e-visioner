@@ -68,7 +68,8 @@ export function bindAutomationEvents(panel, message, actionData) {
       };
 
       if (action === 'setup-seek-template' && actionData.actionType === 'seek') {
-        await setupSeekTemplate(actionData);
+        const skipDialog = event.shiftKey || false;
+        await setupSeekTemplate(actionData, skipDialog);
       } else if (action === 'remove-seek-template' && actionData.actionType === 'seek') {
         await removeSeekTemplate(actionData);
         try {

@@ -709,6 +709,16 @@ export const DEFAULT_SETTINGS = {
     default: false,
   },
 
+  seekTemplateSkipDialog: {
+    name: 'PF2E_VISIONER.SETTINGS.SEEK_TEMPLATE_SKIP_DIALOG.name',
+    hint: 'PF2E_VISIONER.SETTINGS.SEEK_TEMPLATE_SKIP_DIALOG.hint',
+    scope: 'world',
+    config: true,
+    restricted: true,
+    type: Boolean,
+    default: false,
+  },
+
   limitSeekRangeInCombat: {
     name: 'PF2E_VISIONER.SETTINGS.LIMIT_SEEK_RANGE.name',
     hint: 'PF2E_VISIONER.SETTINGS.LIMIT_SEEK_RANGE.hint',
