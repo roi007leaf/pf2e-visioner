@@ -874,6 +874,10 @@
   color: var(--cover-none);
 }
 
+.pv-wall-quick .cover-override-buttons .cover-lesser {
+  color: var(--cover-lesser);
+}
+
 .pv-wall-quick .cover-override-buttons .cover-standard {
   color: var(--cover-standard);
 }

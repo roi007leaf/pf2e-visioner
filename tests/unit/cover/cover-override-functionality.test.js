@@ -64,7 +64,7 @@ describe('Cover Override Functionality', () => {
     });
 
     test('should handle all wall cover override types', () => {
-      const coverTypes = ['none', 'standard', 'greater'];
+      const coverTypes = ['none', 'lesser', 'standard', 'greater'];
 
       coverTypes.forEach((type) => {
         mockWall.document.getFlag.mockReturnValue(type);
@@ -122,6 +122,7 @@ describe('Cover Override Functionality', () => {
       const wallButtonStates = {
         auto: wallOverride === null,
         none: wallOverride === 'none',
+        lesser: wallOverride === 'lesser',
         standard: wallOverride === 'standard',
         greater: wallOverride === 'greater',
       };
@@ -129,6 +130,7 @@ describe('Cover Override Functionality', () => {
       expect(wallButtonStates.standard).toBe(true);
       expect(wallButtonStates.auto).toBe(false);
       expect(wallButtonStates.none).toBe(false);
+      expect(wallButtonStates.lesser).toBe(false);
       expect(wallButtonStates.greater).toBe(false);
     });
 
@@ -150,7 +152,7 @@ describe('Cover Override Functionality', () => {
     });
 
     test('should validate cover override values', () => {
-      const validWallOverrides = [null, 'none', 'standard', 'greater'];
+      const validWallOverrides = [null, 'none', 'lesser', 'standard', 'greater'];
       const validTokenOverrides = [null, 'none', 'lesser', 'standard', 'greater'];
 
       validWallOverrides.forEach((override) => {
@@ -169,7 +171,7 @@ describe('Cover Override Functionality', () => {
 
   describe('Cover Override Button Behavior', () => {
     test('should simulate wall cover override button clicks', () => {
-      const coverTypes = ['auto', 'none', 'standard', 'greater'];
+      const coverTypes = ['auto', 'none', 'lesser', 'standard', 'greater'];
 
       coverTypes.forEach((type) => {
         // Simulate button click setting the override
@@ -256,7 +258,7 @@ describe('Cover Override Functionality', () => {
       expect(result).toBe('invalid-override');
 
       // In real implementation, this would be validated and fall back to auto
-      const validOverrides = [null, 'none', 'standard', 'greater'];
+      const validOverrides = [null, 'none', 'lesser', 'standard', 'greater'];
       const isValid = validOverrides.includes(result);
       expect(isValid).toBe(false);
     });

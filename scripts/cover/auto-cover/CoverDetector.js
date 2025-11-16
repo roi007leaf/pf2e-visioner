@@ -46,7 +46,11 @@ export class CoverDetector {
       const pseudoAttacker = {
         id: 'template-origin',
         center: { x: Number(origin.x) || 0, y: Number(origin.y) || 0 },
-        getCenterPoint: () => ({ x: Number(origin.x) || 0, y: Number(origin.y) || 0, elevation: 0 }),
+        getCenterPoint: () => ({
+          x: Number(origin.x) || 0,
+          y: Number(origin.y) || 0,
+          elevation: 0,
+        }),
         actor: null,
         document: { x: origin.x, y: origin.y, width: 0, height: 0 },
       };
@@ -87,6 +91,13 @@ export class CoverDetector {
         };
       } catch (error) {
         // If we can't get elevation, don't filter by it
+      }
+
+      // FIRST: Check for wall cover overrides - these take precedence regardless of natural blocking
+      const wallOverride = this._checkWallCoverOverrides(p1, p2, elevationRange);
+      if (wallOverride !== null) {
+        const adjusted = this._applyLevelsCoverAdjustment(attacker, target, wallOverride);
+        return adjusted;
       }
 
       // Check if there's any blocking terrain (walls) in the way
@@ -452,7 +463,8 @@ export class CoverDetector {
 
   /**
    * Check for manual wall cover overrides along the line of sight
-   * Overrides only apply if the wall would naturally block from the attacker's direction
+   * Overrides that grant cover (lesser/standard/greater) apply if wall intersects line, regardless of natural blocking
+   * Override 'none' only applies if wall would naturally block (to remove natural cover)
    * @param {Object} p1 - Start point
    * @param {Object} p2 - End point
    * @param {Object} elevationRange - Optional elevation range {bottom, top} for wall height filtering
@@ -471,10 +483,9 @@ export class CoverDetector {
         const wallDoc = wall.document || wall;
         const coverOverride = wallDoc.getFlag?.(MODULE_ID, 'coverOverride');
 
-        if (!coverOverride || coverOverride === 'auto') continue;
-
-        // Check if wall would naturally block from this direction (respects door state and directionality)
-        if (!this._wouldWallNaturallyBlock(wallDoc, p1)) continue;
+        if (!coverOverride || coverOverride === 'auto') {
+          continue;
+        }
 
         // Check wall elevation if Wall Height module is active and elevation range is provided
         if (elevationRange && !doesWallBlockAtElevation(wallDoc, elevationRange)) {
@@ -482,7 +493,9 @@ export class CoverDetector {
         }
 
         const coords = wall?.coords;
-        if (!coords) continue;
+        if (!coords) {
+          continue;
+        }
 
         const intersection = this._lineIntersectionPoint(
           ray.A.x,
@@ -495,22 +508,36 @@ export class CoverDetector {
           coords[3],
         );
 
-        if (intersection) {
-          if (highestCover === null) {
-            highestCover = coverOverride;
-          } else {
-            const coverIndex = coverOrder.indexOf(coverOverride);
-            const currentIndex = coverOrder.indexOf(highestCover);
+        if (!intersection) {
+          continue;
+        }
 
-            if (coverIndex > currentIndex) {
-              highestCover = coverOverride;
-            }
+        const wouldNaturallyBlock = this._wouldWallNaturallyBlock(wallDoc, p1);
+
+        // For 'none' override, only apply if wall would naturally block (to remove natural cover)
+        if (coverOverride === 'none') {
+          if (!wouldNaturallyBlock) {
+            continue;
+          }
+        }
+        // For cover-granting overrides (lesser/standard/greater), apply if wall intersects line
+        // regardless of whether it would naturally block
+
+        if (highestCover === null) {
+          highestCover = coverOverride;
+        } else {
+          const coverIndex = coverOrder.indexOf(coverOverride);
+          const currentIndex = coverOrder.indexOf(highestCover);
+
+          if (coverIndex > currentIndex) {
+            highestCover = coverOverride;
           }
         }
       }
 
       return highestCover;
-    } catch {
+    } catch (error) {
+      console.error('PF2E Visioner | _checkWallCoverOverrides error', error);
       return null;
     }
   }
@@ -1072,7 +1099,7 @@ export class CoverDetector {
           if (vis === 'undetected') {
             continue;
           }
-        } catch { }
+        } catch {}
       }
       if (filters.ignoreDead && blocker.actor?.hitPoints?.value === 0) {
         continue;
@@ -1088,7 +1115,7 @@ export class CoverDetector {
           if (isProne) {
             continue;
           }
-        } catch { }
+        } catch {}
       }
       if (filters.ignoreAllies && blocker.actor?.alliance === filters.attackerAlliance) {
         continue;
@@ -1293,7 +1320,7 @@ export class CoverDetector {
       const result = any ? (standard ? 'standard' : 'lesser') : 'none';
       let finalState = result;
 
-      const hasBlockerWithOverride = blockers.some(blocker => {
+      const hasBlockerWithOverride = blockers.some((blocker) => {
         const override = blocker.document?.getFlag?.(MODULE_ID, 'coverOverride');
         return override && override !== 'auto';
       });
@@ -1314,10 +1341,10 @@ export class CoverDetector {
                 hasBlockerWithOverride,
               });
             }
-          } catch { }
+          } catch {}
         }
         finalState = upgraded;
-      } catch { }
+      } catch {}
       return finalState;
     } catch (error) {
       console.error('PF2E Visioner | Error in evaluateCreatureSizeCover:', error);
@@ -1333,7 +1360,9 @@ export class CoverDetector {
       this._featUpgradeRecords.delete(key);
       if (Date.now() - rec.ts > 15000) return null;
       return rec;
-    } catch { return null; }
+    } catch {
+      return null;
+    }
   }
 
   // Using segmentIntersectsRect from geometry-utils.js instead of _rayIntersectRect
@@ -1555,7 +1584,7 @@ export class CoverDetector {
    * Check if target has cover from creatures larger than it between observer and target point.
    * Used by Distracting Shadows feat: creatures at least one size larger can provide cover
    * for Hide/Sneak prerequisite checks.
-   * 
+   *
    * @param {Token} observer - The observing token
    * @param {Token} target - The target token (actor using feat)
    * @param {Object} targetPoint - Optional specific point instead of target center {x, y}
