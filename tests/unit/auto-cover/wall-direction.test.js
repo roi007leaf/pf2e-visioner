@@ -368,7 +368,8 @@ describe('Wall Direction Checking', () => {
       const result_blocking = coverDetector._checkWallCoverOverrides(p1_blocking, p2_blocking);
       expect(result_blocking).toBe('standard'); // Override should be applied
 
-      // Test 2: Attack from left side (positive cross product) - should not block
+      // Test 2: Attack from left side (positive cross product) - should not naturally block
+      // But cover-granting overrides now apply regardless of natural blocking
       const p1_nonblocking = { x: 50, y: 50 }; // attacker below wall (positive cross product)
       const p2_nonblocking = { x: 50, y: -50 }; // target above wall
 
@@ -376,7 +377,7 @@ describe('Wall Direction Checking', () => {
         p1_nonblocking,
         p2_nonblocking,
       );
-      expect(result_nonblocking).toBe(null); // No override should be applied
+      expect(result_nonblocking).toBe('standard'); // Override applies even when wall wouldn't naturally block
     });
 
     test('should respect RIGHT directional wall blocking in cover override checks', () => {
@@ -407,7 +408,8 @@ describe('Wall Direction Checking', () => {
       const result_blocking = coverDetector._checkWallCoverOverrides(p1_blocking, p2_blocking);
       expect(result_blocking).toBe('greater'); // Override should be applied
 
-      // Test 2: Attack from right side (negative cross product) - should not block
+      // Test 2: Attack from right side (negative cross product) - should not naturally block
+      // But cover-granting overrides now apply regardless of natural blocking
       const p1_nonblocking = { x: 50, y: -50 }; // attacker above wall (negative cross product)
       const p2_nonblocking = { x: 50, y: 50 }; // target below wall
 
@@ -415,7 +417,7 @@ describe('Wall Direction Checking', () => {
         p1_nonblocking,
         p2_nonblocking,
       );
-      expect(result_nonblocking).toBe(null); // No override should be applied
+      expect(result_nonblocking).toBe('greater'); // Override applies even when wall wouldn't naturally block
     });
   });
 
@@ -620,12 +622,12 @@ describe('Wall Direction Checking', () => {
       expect(result_blocking).toBe('greater'); // Override applies directly
 
       // Test 2: Attack from non-blocking side (positive cross product for LEFT)
-      // Wall would not naturally block from this direction, so override is ignored
+      // Wall would not naturally block from this direction, but cover-granting overrides now apply regardless
       const p1_nonblocking = { x: 50, y: 50 };
       const p2_nonblocking = { x: 50, y: -50 };
 
       const result_nonblocking = coverDetector._evaluateWallsCover(p1_nonblocking, p2_nonblocking);
-      expect(result_nonblocking).toBe('none'); // Override ignored, no natural blocking = no cover
+      expect(result_nonblocking).toBe('greater'); // Override applies even when wall wouldn't naturally block
     });
 
     test('should handle wall override ceiling behavior correctly', () => {
