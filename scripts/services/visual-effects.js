@@ -23,6 +23,7 @@
 import { MODULE_ID, VISIBILITY_STATES } from '../constants.js';
 import { getVisibilityBetween } from '../utils.js';
 import { _internal as visibilityCalculatorInternal } from '../visibility/StatelessVisibilityCalculator.js';
+import { HoverTooltips } from './HoverTooltips.js';
 
 /**
  * Update token visuals - now mostly handled by detection wrapper
@@ -631,6 +632,13 @@ export async function updateWallVisuals(observerId = null) {
                 if (!g.parent || !wall._pvAnimationActive) {
                   return;
                 }
+                
+                // Skip animation work during panning - don't schedule next frame to reduce RAF overhead
+                if (HoverTooltips?._isPanning) {
+                  // Don't schedule next frame - animation will resume when pan stops via pan-stop callback
+                  g._pvAnimationFrameId = null;
+                  return;
+                }
 
                 const elapsed = (Date.now() - startTime) / 1000; // seconds
 
@@ -720,14 +728,17 @@ export async function updateWallVisuals(observerId = null) {
                   sparkle.scale.set(sizeVariation);
                 });
 
-                requestAnimationFrame(animate);
+                // Continue animation loop (will check panning flag next frame)
+                g._pvAnimationFrameId = requestAnimationFrame(animate);
               } catch (error) {
                 console.error(`[PF2E-Visioner] Animation error:`, error);
               }
             };
 
+            // Store animate function for resume after pan
+            g._pvAnimateFunction = animate;
             // Start animation immediately
-            requestAnimationFrame(animate);
+            g._pvAnimationFrameId = requestAnimationFrame(animate);
 
             const parent = canvas.effects?.foreground || canvas.effects || canvas.walls || wall;
             parent.addChild(g);
@@ -1805,11 +1816,21 @@ export async function updateSystemHiddenTokenHighlights(observerId = null, posit
                 size + expansion * 2
               );
 
-              requestAnimationFrame(animate);
+              // Skip animation work during panning - don't schedule next frame to reduce RAF overhead
+              if (HoverTooltips?._isPanning) {
+                // Don't schedule next frame - animation will resume when pan stops via pan-stop callback
+                g._pvAnimationFrameId = null;
+                return;
+              }
+              // Continue animation loop (will check panning flag next frame)
+              g._pvAnimationFrameId = requestAnimationFrame(animate);
             } catch (error) {
               console.error(`[PF2E-Visioner] System-hidden token animation error:`, error);
             }
-          }; requestAnimationFrame(animate);
+          };
+          // Store animate function for resume after pan
+          g._pvAnimateFunction = animate;
+          g._pvAnimationFrameId = requestAnimationFrame(animate);
 
           // Prefer interface layer so DOM hover tooltips render above this PIXI overlay
           // We create these for all users (not just GM) to show lifesense detection
@@ -1832,17 +1853,22 @@ export async function updateSystemHiddenTokenHighlights(observerId = null, posit
           }
 
           if (!g._pvCanvasPanHook) {
-            g._pvCanvasPanHook = Hooks.on('canvasPan', async () => {
-              try {
-                if (g._pvFactorsActive) {
-                  g._pvFactorsActive = false;
-                  if (g._pvFactorsBadgeEl) { g._pvFactorsBadgeEl.remove(); g._pvFactorsBadgeEl = null; }
-                  if (g._pvFactorsTooltipEl) { g._pvFactorsTooltipEl.remove(); g._pvFactorsTooltipEl = null; }
-                }
-                const mod = await import('./HoverTooltips.js');
-                mod.hideAllVisibilityIndicators?.();
-                mod.hideAllCoverIndicators?.();
-              } catch (_) { }
+            g._pvCanvasPanHook = Hooks.on('canvasPan', () => {
+              // Exit immediately without async work if already panning
+              // This prevents redundant calls from multiple token hooks
+              if (HoverTooltips?._isPanning) {
+                return;
+              }
+              
+              // Synchronous work only - no async imports during pan
+              if (g._pvFactorsActive) {
+                g._pvFactorsActive = false;
+                if (g._pvFactorsBadgeEl) { g._pvFactorsBadgeEl.remove(); g._pvFactorsBadgeEl = null; }
+                if (g._pvFactorsTooltipEl) { g._pvFactorsTooltipEl.remove(); g._pvFactorsTooltipEl = null; }
+              }
+              
+              // Skip - these functions are called from main canvasPan hook
+              // Per-token hooks should not call them to avoid redundant work
             });
           }
 

@@ -1,5 +1,35 @@
 # Changelog
 
+## [4.5.6] - 2025-11-16
+
+### ✨ Features
+
+- **Lesser Cover Wall Override**: Added lesser cover as a wall cover override option
+  - New "Lesser Cover Maximum" option in Wall Manager and wall quick config
+  - Walls can now be set to provide up to lesser cover based on coverage thresholds
+  - Added bulk action to set all walls to lesser cover
+  - Cover cycling now includes lesser: auto → none → lesser → standard → greater → auto
+
+### 🐛 Bug Fixes
+
+- **Wall Cover Override Logic**: Fixed wall cover override behavior
+  - Cover-granting overrides (lesser/standard/greater) now apply if wall intersects line, regardless of natural blocking
+  - Override 'none' only applies if wall would naturally block (to remove natural cover)
+  - Ensures overrides work correctly even when walls wouldn't naturally provide cover
+
+### ⚡ Performance Improvements
+
+- **UI Hook Optimization**: Reduced unnecessary UI re-renders
+  - Token and wall cover cycling tools only re-render when icon/title actually changes
+  - Update token tool only refreshes on visioner-related flag changes
+  - Prevents redundant control panel updates during token/wall updates
+- **Canvas Panning Performance**: Optimized operations during canvas panning
+  - Skip wall identifier label refresh during active panning
+  - Skip hover tooltip badge position updates during panning
+  - Skip animation frame scheduling during panning to reduce RAF overhead
+  - Cache canvas rect to avoid forced reflows during panning
+  - Batch DOM transform updates to minimize layout thrashing
+
 ## [4.5.5] - 2025-01-XX
 
 ### ✨ Features

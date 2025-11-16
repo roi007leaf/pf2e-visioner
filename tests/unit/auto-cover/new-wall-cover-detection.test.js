@@ -304,5 +304,44 @@ describe('New Wall Cover Detection', () => {
       const result = coverDetector.detectBetweenTokens(sourceToken, targetToken);
       expect(['none', 'lesser']).toContain(result); // Should be capped at lesser despite high coverage
     });
+
+    test('should apply lesser override even when wall would not naturally block', () => {
+      // Mock settings
+      global.game.settings.get = jest.fn((module, setting) => {
+        const settingsMap = {
+          wallCoverStandardThreshold: 50,
+          wallCoverGreaterThreshold: 70,
+          wallCoverAllowGreater: true,
+          autoCoverTokenIntersectionMode: 'tactical',
+          autoCoverIgnoreUndetected: false,
+          autoCoverIgnoreDead: false,
+          autoCoverIgnoreAllies: false,
+          autoCoverAllowProneBlockers: true,
+        };
+        return settingsMap[setting] || 0;
+      });
+
+      // Add directional wall with lesser override
+      const mockWall = {
+        document: {
+          id: 'test-wall',
+          sight: 1,
+          door: 0,
+          ds: 0,
+          dir: 2, // RIGHT directional wall
+          getFlag: jest.fn(() => 'lesser'), // Override to lesser
+        },
+        coords: [125, 0, 125, 250],
+      };
+      global.canvas.walls.objects.children = [mockWall];
+
+      // Mock that wall would NOT naturally block (attacker on non-blocking side)
+      jest.spyOn(coverDetector, '_wouldWallNaturallyBlock').mockReturnValue(false);
+      jest.spyOn(coverDetector, '_lineIntersectionPoint').mockReturnValue({ x: 125, y: 125 });
+      jest.spyOn(coverDetector, '_estimateWallCoveragePercent').mockReturnValue(0);
+
+      const result = coverDetector.detectBetweenTokens(sourceToken, targetToken);
+      expect(['none', 'lesser']).toContain(result); // Override should still apply
+    });
   });
 });

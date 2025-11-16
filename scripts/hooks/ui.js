@@ -101,41 +101,44 @@ export function registerUIHooks() {
       if (!tool) return;
       const selected = canvas?.tokens?.controlled ?? [];
 
+      let newIcon, newTitle;
       if (!selected.length) {
-        tool.icon = 'fa-solid fa-bolt-auto';
-        tool.title = 'Cycle Token Cover (Selected Tokens)';
+        newIcon = 'fa-solid fa-bolt-auto';
+        newTitle = 'Cycle Token Cover (Selected Tokens)';
+      } else {
+        const firstTokenOverride = selected[0]?.document?.getFlag?.(MODULE_ID, 'coverOverride');
+        const currentCoverState = firstTokenOverride || 'auto';
+
+        switch (currentCoverState) {
+          case 'auto':
+            newIcon = 'fa-solid fa-bolt-auto';
+            newTitle = 'Cycle Token Cover: Auto → No Cover';
+            break;
+          case 'none':
+            newIcon = 'fa-solid fa-shield-slash';
+            newTitle = 'Cycle Token Cover: No Cover → Lesser Cover';
+            break;
+          case 'lesser':
+            newIcon = 'fa-regular fa-shield';
+            newTitle = 'Cycle Token Cover: Lesser → Standard Cover';
+            break;
+          case 'standard':
+            newIcon = 'fa-solid fa-shield-alt';
+            newTitle = 'Cycle Token Cover: Standard → Greater Cover';
+            break;
+          case 'greater':
+            newIcon = 'fa-solid fa-shield';
+            newTitle = 'Cycle Token Cover: Greater → Auto';
+            break;
+        }
+      }
+
+      const changed = tool.icon !== newIcon || tool.title !== newTitle;
+      if (changed) {
+        tool.icon = newIcon;
+        tool.title = newTitle;
         ui.controls.render();
-        return;
       }
-
-      // Update icon and title based on first selected token's cover override
-      const firstTokenOverride = selected[0]?.document?.getFlag?.(MODULE_ID, 'coverOverride');
-      const currentCoverState = firstTokenOverride || 'auto';
-
-      switch (currentCoverState) {
-        case 'auto':
-          tool.icon = 'fa-solid fa-bolt-auto';
-          tool.title = 'Cycle Token Cover: Auto → No Cover';
-          break;
-        case 'none':
-          tool.icon = 'fa-solid fa-shield-slash';
-          tool.title = 'Cycle Token Cover: No Cover → Lesser Cover';
-          break;
-        case 'lesser':
-          tool.icon = 'fa-regular fa-shield';
-          tool.title = 'Cycle Token Cover: Lesser → Standard Cover';
-          break;
-        case 'standard':
-          tool.icon = 'fa-solid fa-shield-alt';
-          tool.title = 'Cycle Token Cover: Standard → Greater Cover';
-          break;
-        case 'greater':
-          tool.icon = 'fa-solid fa-shield';
-          tool.title = 'Cycle Token Cover: Greater → Auto';
-          break;
-      }
-
-      ui.controls.render();
     } catch {}
   };
   // Helper: get cover status info for a wall
@@ -627,12 +630,16 @@ export function registerUIHooks() {
       const wallTools = ui.controls.controls?.walls?.tools;
       const selected = canvas?.walls?.controlled ?? [];
 
+      let coverToolChanged = false;
+      let hiddenToolChanged = false;
+
       // Cover cycling tool
       const coverTool = getNamedTool(wallTools, 'pf2e-visioner-cycle-wall-cover');
       if (coverTool) {
+        let newIcon, newTitle;
         if (!selected.length) {
-          coverTool.icon = 'fa-solid fa-bolt-auto';
-          coverTool.title = 'Cycle Wall Cover (Selected Walls)';
+          newIcon = 'fa-solid fa-bolt-auto';
+          newTitle = 'Cycle Wall Cover (Selected Walls)';
         } else {
           // Update icon and title based on first selected wall's cover override
           const firstWallOverride = selected[0]?.document?.getFlag?.(MODULE_ID, 'coverOverride');
@@ -640,26 +647,31 @@ export function registerUIHooks() {
 
           switch (currentCoverState) {
             case 'auto':
-              coverTool.icon = 'fa-solid fa-bolt-auto';
-              coverTool.title = 'Cycle Wall Cover: Auto → No Cover';
+              newIcon = 'fa-solid fa-bolt-auto';
+              newTitle = 'Cycle Wall Cover: Auto → No Cover';
               break;
             case 'none':
-              coverTool.icon = 'fa-solid fa-shield-slash';
-              coverTool.title = 'Cycle Wall Cover: No Cover → Standard Cover';
+              newIcon = 'fa-solid fa-shield-slash';
+              newTitle = 'Cycle Wall Cover: No Cover → Standard Cover';
               break;
             case 'lesser':
-              coverTool.icon = 'fa-regular fa-shield';
-              coverTool.title = 'Cycle Wall Cover: Lesser → Standard Cover';
+              newIcon = 'fa-regular fa-shield';
+              newTitle = 'Cycle Wall Cover: Lesser → Standard Cover';
               break;
             case 'standard':
-              coverTool.icon = 'fa-solid fa-shield-alt';
-              coverTool.title = 'Cycle Wall Cover: Standard → Greater Cover';
+              newIcon = 'fa-solid fa-shield-alt';
+              newTitle = 'Cycle Wall Cover: Standard → Greater Cover';
               break;
             case 'greater':
-              coverTool.icon = 'fa-solid fa-shield';
-              coverTool.title = 'Cycle Wall Cover: Greater → Auto';
+              newIcon = 'fa-solid fa-shield';
+              newTitle = 'Cycle Wall Cover: Greater → Auto';
               break;
           }
+        }
+        coverToolChanged = coverTool.icon !== newIcon || coverTool.title !== newTitle;
+        if (coverToolChanged) {
+          coverTool.icon = newIcon;
+          coverTool.title = newTitle;
         }
       }
 
@@ -669,13 +681,20 @@ export function registerUIHooks() {
         const hiddenActive =
           selected.length > 0 &&
           selected.every((w) => !!w?.document?.getFlag?.(MODULE_ID, 'hiddenWall'));
-        hiddenTool.active = hiddenActive;
-        hiddenTool.icon = hiddenActive ? 'fa-solid fa-eye-slash' : 'fa-solid fa-eye';
+        const newIcon = hiddenActive ? 'fa-solid fa-eye-slash' : 'fa-solid fa-eye';
+        hiddenToolChanged = hiddenTool.active !== hiddenActive || hiddenTool.icon !== newIcon;
+        if (hiddenToolChanged) {
+          hiddenTool.active = hiddenActive;
+          hiddenTool.icon = newIcon;
+        }
       }
 
       // Also refresh identifier labels on the canvas when selection changes
       refreshWallIdentifierLabels().catch(() => {});
-      ui.controls.render();
+
+      if (coverToolChanged || hiddenToolChanged) {
+        ui.controls.render();
+      }
     } catch {}
   };
   Hooks.on('controlToken', (token, controlled) => {
@@ -709,7 +728,16 @@ export function registerUIHooks() {
   });
   Hooks.on('deleteToken', refreshTokenTool);
   Hooks.on('createToken', refreshTokenTool);
-  Hooks.on('updateToken', refreshTokenTool);
+  Hooks.on('updateToken', (tokenDoc, changes) => {
+    const changeKeys = Object.keys(changes);
+    const hasVisionerChanges =
+      changeKeys.some((k) => k.startsWith(`flags.${MODULE_ID}`)) ||
+      changes.flags?.[MODULE_ID]?.coverOverride !== undefined;
+
+    if (hasVisionerChanges) {
+      refreshTokenTool();
+    }
+  });
   Hooks.on('controlWall', refreshWallTool);
   Hooks.on('deleteWall', refreshWallTool);
   Hooks.on('createWall', refreshWallTool);
@@ -760,7 +788,27 @@ export function registerUIHooks() {
   Hooks.on('updateAmbientLight', refreshLightingTool);
 
   // Refresh wall labels when camera zoom changes (debounced)
-  Hooks.on('canvasPan', () => {
+  // Skip during active panning to prevent performance issues
+  let hoverTooltipsModuleCache = null;
+  Hooks.on('canvasPan', async () => {
+    // Early exit if panning - check cached module first to avoid async import
+    if (hoverTooltipsModuleCache?.HoverTooltips?._isPanning) {
+      return;
+    }
+
+    // Cache the module import (only once)
+    if (!hoverTooltipsModuleCache) {
+      try {
+        hoverTooltipsModuleCache = await import('../services/HoverTooltips.js');
+      } catch (_) {
+        return;
+      }
+    }
+    // Check again after import
+    if (hoverTooltipsModuleCache?.HoverTooltips?._isPanning) {
+      return;
+    }
+
     refreshWallIdentifierLabelsDebounced();
   });
 
@@ -1003,8 +1051,8 @@ export function registerUIHooks() {
                 return;
               }
 
-              // Cycle through cover states: auto → none → standard → greater → auto
-              const coverCycle = ['auto', 'none', 'standard', 'greater'];
+              // Cycle through cover states: auto → none → lesser → standard → greater → auto
+              const coverCycle = ['auto', 'none', 'lesser', 'standard', 'greater'];
 
               // Get current state of first wall to determine next state
               const currentOverride = selected[0]?.document?.getFlag?.(MODULE_ID, 'coverOverride');
