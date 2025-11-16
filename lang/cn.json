@@ -516,6 +516,10 @@
             "ENABLE_CAMERA_VISION_AGGREGATION": {
                 "name": "摄像视野整合",
                 "hint": "若启用，具有旁观权限的摄像账号在多个团队指示物运行时，将显示所有受控指示物的最佳（最宽松）能见度状态，而非仅显示首个指示物的情况。这对于需要摄像能够看到全部团队成员所看见场景的流媒体情景非常有用。"
+            },
+            "SEEK_TEMPLATE_SKIP_DIALOG": {
+                "name": "始终跳过“搜索测量板”对话框",
+                "hint": "若启用，搜索测量板配置对话框将被跳过，并使用默认测量板配置（15尺爆发）。"
             }
         },
         "UI": {
@@ -780,6 +784,10 @@
             "SHOW_VISIBILITY_FACTORS": {
                 "name": "显示能见度因素",
                 "hint": "按下显示受控指示物对其他指示物能见度状态的详细原因。"
+            },
+            "SHOW_WALL_COVER_LABELS": {
+                "name": "显示墙体掩蔽标签",
+                "hint": "在墙体工具激活时，长按此键显示墙体的掩蔽状态标签（自动，无，次等，标准，高等）。"
             }
         },
         "REGION_BEHAVIOR": {
@@ -1121,6 +1129,33 @@
         "SNEAK_ADEPT_FEAT": {
             "OUTCOME_UPGRADED": "精巧潜行",
             "TOOLTIP": "由于具备精巧潜行专长，潜行失败改为成功。该生物几乎不可能被发现。"
+        },
+        "SEEK_TEMPLATE_CONFIG": {
+            "BURST": "爆发（圆形）",
+            "CONE": "锥形",
+            "CONE_DESC": "90度锥形区域",
+            "RECTANGLE": "矩形",
+            "LINE": "线形（射线）",
+            "LINE_DESC": "笔直线形区域",
+            "RADIUS": "半径",
+            "LENGTH": "长度",
+            "RECTANGLE_DESC": "方格/矩形区域效果",
+            "BURST_DESC": "圆形区域效果",
+            "CREATE": "创建测量板",
+            "FEET": "尺",
+            "ECHOLOCATION_LABEL": "回声定位",
+            "LIFESENSE_LABEL": "生命感知",
+            "SENSE_UNSEEN_BUTTON": "察觉未见（反应）",
+            "SENSE_UNSEEN_TOOLTIP": "使用察觉未见专长，使无踪生物变为对你藏匿",
+            "SIZE": "大小",
+            "INVALID_RADIUS": "半径必须为1尺-1000尺之间",
+            "TEMPLATE_TYPE": "测量板类型",
+            "ECHOLOCATION_TOOLTIP": "听力精确感官将持续至你下一回合开始",
+            "UNMET_CONDITIONS": "未满足条件",
+            "TITLE": "搜索测量板配置",
+            "DESCRIPTION": "选择搜索动作的测量板形状和大小。",
+            "LIFESENSE_TOOLTIP": "可以感知到范围内的活物与不死生物（模糊感官）",
+            "SENSE_UNSEEN_APPLIED": "察觉未见已应用"
         }
     }
 }
