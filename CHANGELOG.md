@@ -30,7 +30,7 @@
   - Cache canvas rect to avoid forced reflows during panning
   - Batch DOM transform updates to minimize layout thrashing
 
-## [4.5.5] - 2025-01-XX
+## [4.5.5] - 2025-11-14
 
 ### ✨ Features
 

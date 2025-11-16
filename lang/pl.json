@@ -369,11 +369,13 @@
       "BURST_DESC": "Efekt okrągłego obszaru",
       "CONE": "Stożek",
       "CONE_DESC": "Obszar stożka o kącie 90 stopni",
-      "SQUARE": "Kwadrat",
-      "SQUARE_DESC": "Efekt kwadratowego obszaru",
+      "RECTANGLE": "Prostokąt",
+      "RECTANGLE_DESC": "Efekt obszaru kwadratowego / prostokątnego",
       "LINE": "Linia (promień)",
       "LINE_DESC": "Obszar prostej linii",
       "RADIUS": "Promień",
+      "LENGTH": "Długość",
+      "SIZE": "Rozmiar",
       "FEET": "stopy",
       "CREATE": "Utwórz szablon",
       "INVALID_RADIUS": "Promień musi wynosić od 1 do 1000 stóp",
@@ -580,6 +582,10 @@
       "LIMIT_SEEK_RANGE": {
         "name": "Ogranicz zasięg Szukania w walce",
         "hint": "Cel zostanie wybrany na podstawie określonej odległości od tokenu przy użyciu Szukania podczas walki."
+      },
+      "SEEK_TEMPLATE_SKIP_DIALOG": {
+        "name": "Zawsze pomijaj okno dialogowe szablonu Szukania",
+        "hint": "Po włączeniu tej opcji okno dialogowe konfiguracji szablonu Szukania zostanie pominięte i zostaną użyte wartości domyślne (wybuch 15 stóp)."
       },
       "SEEK_USE_TEMPLATE": {
         "name": "Korzystanie z szablonu Szukania",
