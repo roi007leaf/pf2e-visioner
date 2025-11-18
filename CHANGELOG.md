@@ -1,5 +1,21 @@
 # Changelog
 
+## [4.5.7] - 2025-11-18
+
+### ⚡ Performance Improvements
+
+- Token border highlights now reuse a single `PIXI.Graphics` per token instead of recreating on every hover, eliminating runaway `canvas.tokens` children; covered by new `token-manager-borders` unit test
+- Introduced a centralized, pan-aware RAF scheduler so HoverTooltips, visual-effects pulses, and other animations throttle or pause while the canvas is panning/zooming; scheduler has dedicated unit coverage
+- Hover tooltips, cover overlays, and HUD badges now suspend DOM/PIXI work during pan/zoom and resume cleanly afterward, avoiding compounded FPS drops
+- Cover visualization and wall label overlays respect viewport culling and use a dedicated render layer so showing all labels at once no longer tanks performance
+
+### 🐛 Bug Fixes
+
+- Hover tooltips no longer misinterpret keybind releases during pan/zoom
+  - `onHighlightObjects(false)` clears `_savedKeyTooltipsActive`, preventing Alt/O overlays from relaunching immediately after keyup
+  - Regression test (`hover-tooltips-keybind-state.test.js`) reproduces the pan-lock scenario to guard future changes
+- Wall cover labels respect the keybinding lifecycle: holding the key shows all manual overrides simultaneously, releasing it clears every label and destroys the dedicated layer to avoid lingering sprites
+
 ## [4.5.6] - 2025-11-16
 
 ### ✨ Features

@@ -369,7 +369,7 @@ describe('Door Cover Integration Tests', () => {
       door.document.ds = 0;
       result = coverDetector.detectBetweenTokens(mockAttacker, mockTarget);
       expect(['none', 'standard', 'greater']).toContain(result);
-    });
+    }); 
   });
 
   describe('Performance with multiple doors', () => {

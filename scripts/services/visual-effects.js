@@ -1,19 +1,19 @@
 /**
  * Visual Effects Handler
  * Handles token/wall visual updates and refresh operations for both visibility and cover
- * 
+ *
  * NOTE: This file contains requestAnimationFrame calls for PIXI.js animation loops.
  * These CANNOT be converted to web workers or setTimeout because:
- * 
+ *
  * 1. Web workers cannot access DOM, Canvas, or PIXI graphics objects
  * 2. Animation loops need to update PIXI graphics (sparkles, pulses, shimmer effects)
  * 3. These are purely visual effects that only need to run when the window is focused
  * 4. When the window is unfocused, animations pausing is actually desired behavior
  *    (saves CPU/GPU resources since no one is watching)
- * 
+ *
  * The requestAnimationFrame usage here is INTENTIONAL and CORRECT for visual animations.
  * Do NOT convert these to setTimeout or web workers.
- * 
+ *
  * For non-visual calculations that need to run when unfocused, see:
  * - scripts/utils/scheduler.js (scheduleTask utility)
  * - scripts/visibility/auto-visibility/core/BatchOrchestrator.js (uses setTimeout)
@@ -22,6 +22,7 @@
 
 import { MODULE_ID, VISIBILITY_STATES } from '../constants.js';
 import { getVisibilityBetween } from '../utils.js';
+import { scheduleRAF } from '../utils/scheduler.js';
 import { _internal as visibilityCalculatorInternal } from '../visibility/StatelessVisibilityCalculator.js';
 import { HoverTooltips } from './HoverTooltips.js';
 
@@ -48,7 +49,7 @@ export async function updateTokenVisuals() {
     if (!updateTokenVisualsPending) {
       updateTokenVisualsPending = true;
       // Wait a short time and retry
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
       updateTokenVisualsPending = false;
       updateTokenVisuals();
     }
@@ -62,7 +63,7 @@ export async function updateTokenVisuals() {
           token.refresh();
         }
       }
-    } catch (_) { }
+    } catch (_) {}
   }
 }
 
@@ -87,14 +88,14 @@ export async function updateSpecificTokenPairs(pairs) {
           observer.refresh();
         }
       }
-    } catch (_) { }
+    } catch (_) {}
     try {
       if (!target.destroyed && target.sprite && target.mesh) {
         if (!target.turnMarker || target.turnMarker.mesh) {
           target.refresh();
         }
       }
-    } catch (_) { }
+    } catch (_) {}
   }
 }
 
@@ -172,7 +173,7 @@ export async function cleanupDeletedWallVisuals(wallDocument) {
           if (child.children && child.children.length > 0) {
             searchAndRemoveIndicators(child);
           }
-        } catch (_) { }
+        } catch (_) {}
       }
 
       // Remove found indicators
@@ -182,7 +183,7 @@ export async function cleanupDeletedWallVisuals(wallDocument) {
             indicator.parent.removeChild(indicator);
           }
           indicator.destroy?.({ children: true, texture: true, baseTexture: true });
-        } catch (_) { }
+        } catch (_) {}
       }
     }
 
@@ -207,7 +208,7 @@ export async function cleanupDeletedWallVisuals(wallDocument) {
                 wall._pvHiddenIndicator.parent.removeChild(wall._pvHiddenIndicator);
               }
               wall._pvHiddenIndicator.destroy?.();
-            } catch (_) { }
+            } catch (_) {}
             wall._pvHiddenIndicator = null;
           }
         }
@@ -219,7 +220,7 @@ export async function cleanupDeletedWallVisuals(wallDocument) {
               try {
                 if (mask.parent) mask.parent.removeChild(mask);
                 mask.destroy?.();
-              } catch (_) { }
+              } catch (_) {}
               return false;
             }
             return true;
@@ -231,7 +232,7 @@ export async function cleanupDeletedWallVisuals(wallDocument) {
         if (wall._pvAnimationActive && (wall.id === wallId || wall.document?.id === wallId)) {
           wall._pvAnimationActive = false;
         }
-      } catch (_) { }
+      } catch (_) {}
     }
 
     // Clean up any token wall flags that reference the deleted wall
@@ -250,7 +251,7 @@ export async function cleanupDeletedWallVisuals(wallDocument) {
               [`flags.${MODULE_ID}.walls`]: newWallMap,
             });
           }
-        } catch (_) { }
+        } catch (_) {}
       }
 
       if (tokenUpdates.length > 0 && game.user?.isGM) {
@@ -268,7 +269,7 @@ export async function cleanupDeletedWallVisuals(wallDocument) {
         refreshOcclusion: false,
         refreshEffects: true,
       });
-    } catch (_) { }
+    } catch (_) {}
   } catch (error) {
     console.warn(`[${MODULE_ID}] Error cleaning up deleted wall visuals:`, error);
   }
@@ -285,10 +286,12 @@ export async function cleanupAllWallIndicators() {
     // NOTE: We only cleanup indicators, not the entire hover tooltip system
     // because we don't want to remove event listeners from tokens
     try {
-      const { hideAllVisibilityIndicators, hideAllCoverIndicators } = await import('./HoverTooltips.js');
+      const { hideAllVisibilityIndicators, hideAllCoverIndicators } = await import(
+        './HoverTooltips.js'
+      );
       hideAllVisibilityIndicators();
       hideAllCoverIndicators();
-    } catch (_) { }
+    } catch (_) {}
 
     // Search through all potential canvas layers where wall indicators might exist
     const layers = [
@@ -307,16 +310,17 @@ export async function cleanupAllWallIndicators() {
       for (const child of container.children) {
         try {
           // Check if this looks like a wall indicator based on properties that wall indicators have
-          const isWallIndicator = (
+          const isWallIndicator =
             child._pvWallId ||
             child._wallDocumentId ||
             child._associatedWallId ||
             (child.name && child.name.includes('wall-indicator')) ||
-            (child._pvIndicatorType === 'wall') ||
+            child._pvIndicatorType === 'wall' ||
             // Add checks for UI-generated wall labels (created by refreshWallIdentifierLabels)
             (child._tooltip && child._coverText) || // Cover status labels from Alt key
-            (child instanceof PIXI.Text && (child.style?.stroke === 0x000000 && child.style?.strokeThickness >= 3)) // Identifier labels
-          );
+            (child instanceof PIXI.Text &&
+              child.style?.stroke === 0x000000 &&
+              child.style?.strokeThickness >= 3); // Identifier labels
 
           if (isWallIndicator) {
             toRemove.push(child);
@@ -326,7 +330,7 @@ export async function cleanupAllWallIndicators() {
           if (child.children && child.children.length > 0) {
             searchAndRemoveAllIndicators(child);
           }
-        } catch (_) { }
+        } catch (_) {}
       }
 
       // Remove found indicators
@@ -336,7 +340,7 @@ export async function cleanupAllWallIndicators() {
             indicator.parent.removeChild(indicator);
           }
           indicator.destroy?.({ children: true, texture: true, baseTexture: true });
-        } catch (_) { }
+        } catch (_) {}
       }
     }
 
@@ -356,7 +360,7 @@ export async function cleanupAllWallIndicators() {
               wall._pvHiddenIndicator.parent.removeChild(wall._pvHiddenIndicator);
             }
             wall._pvHiddenIndicator.destroy?.();
-          } catch (_) { }
+          } catch (_) {}
           wall._pvHiddenIndicator = null;
         }
 
@@ -366,7 +370,7 @@ export async function cleanupAllWallIndicators() {
             try {
               if (mask.parent) mask.parent.removeChild(mask);
               mask.destroy?.();
-            } catch (_) { }
+            } catch (_) {}
           }
           wall._pvSeeThroughMasks = [];
         }
@@ -378,18 +382,18 @@ export async function cleanupAllWallIndicators() {
               wall._pvCoverIcon.parent.removeChild(wall._pvCoverIcon);
             }
             wall._pvCoverIcon.destroy?.();
-          } catch (_) { }
+          } catch (_) {}
           delete wall._pvCoverIcon;
         }
 
-        // Clean up UI wall identifier labels 
+        // Clean up UI wall identifier labels
         if (wall._pvIdLabel) {
           try {
             if (wall._pvIdLabel.parent) {
               wall._pvIdLabel.parent.removeChild(wall._pvIdLabel);
             }
             wall._pvIdLabel.destroy?.();
-          } catch (_) { }
+          } catch (_) {}
           delete wall._pvIdLabel;
         }
 
@@ -397,10 +401,8 @@ export async function cleanupAllWallIndicators() {
         if (wall._pvAnimationActive) {
           wall._pvAnimationActive = false;
         }
-      } catch (_) { }
+      } catch (_) {}
     }
-
-
 
     // Force a canvas refresh to ensure visual updates are applied
     try {
@@ -410,7 +412,7 @@ export async function cleanupAllWallIndicators() {
         refreshOcclusion: false,
         refreshEffects: true,
       });
-    } catch (_) { }
+    } catch (_) {}
   } catch (error) {
     console.warn(`[${MODULE_ID}] Error cleaning up all wall indicators:`, error);
   }
@@ -424,6 +426,10 @@ export async function cleanupAllWallIndicators() {
 let lastObserverId = null;
 export async function updateWallVisuals(observerId = null) {
   try {
+    if (HoverTooltips?._isPanning) {
+      return;
+    }
+
     // Respect setting toggle
     if (!game.settings?.get?.(MODULE_ID, 'hiddenWallsEnabled')) {
       return;
@@ -479,7 +485,7 @@ export async function updateWallVisuals(observerId = null) {
         const connectedDocs = getConnectedWallDocsBySourceId(id) || [];
         for (const d of connectedDocs) expandedObserved.add(d.id);
       }
-    } catch (_) { }
+    } catch (_) {}
 
     // Collect token flag updates for player-owned tokens that can see hidden walls
     const tokenWallFlagUpdates = [];
@@ -490,7 +496,7 @@ export async function updateWallVisuals(observerId = null) {
       let flagHidden = false;
       try {
         flagHidden = !!d.getFlag?.(MODULE_ID, 'hiddenWall');
-      } catch (_) { }
+      } catch (_) {}
 
       // Remove previous indicator/masks if any (always clean before evaluating)
       try {
@@ -503,11 +509,11 @@ export async function updateWallVisuals(observerId = null) {
             try {
               m.parent?.removeChild(m);
               m.destroy?.();
-            } catch (_) { }
+            } catch (_) {}
           }
           wall._pvSeeThroughMasks = [];
         }
-      } catch (_) { }
+      } catch (_) {}
 
       const isExpandedObserved = expandedObserved.has(d.id);
 
@@ -523,7 +529,7 @@ export async function updateWallVisuals(observerId = null) {
                 [`flags.${MODULE_ID}.originalSight`]: null,
               });
             }
-          } catch (_) { }
+          } catch (_) {}
         }
         continue;
       }
@@ -544,7 +550,7 @@ export async function updateWallVisuals(observerId = null) {
                 wall._pvHiddenIndicator.parent?.removeChild(wall._pvHiddenIndicator);
                 wall._pvHiddenIndicator.destroy?.();
               }
-            } catch (_) { }
+            } catch (_) {}
 
             const isDoor = Number(d.door) > 0; // 0 none, 1 door, 2 secret
             const color = isDoor ? 0xffd166 : 0x9b59b6; // Yellow for doors, purple for walls
@@ -558,7 +564,7 @@ export async function updateWallVisuals(observerId = null) {
             try {
               const flagVal = Number(canvas?.scene?.getFlag?.(MODULE_ID, 'hiddenIndicatorHalf'));
               if (Number.isFinite(flagVal) && flagVal > 0) half = flagVal;
-            } catch (_) { }
+            } catch (_) {}
             const g = new PIXI.Graphics();
             g.lineStyle(2, color, 0.9);
             g.beginFill(color, 0.3);
@@ -630,13 +636,6 @@ export async function updateWallVisuals(observerId = null) {
               try {
                 // Check if still attached to scene
                 if (!g.parent || !wall._pvAnimationActive) {
-                  return;
-                }
-                
-                // Skip animation work during panning - don't schedule next frame to reduce RAF overhead
-                if (HoverTooltips?._isPanning) {
-                  // Don't schedule next frame - animation will resume when pan stops via pan-stop callback
-                  g._pvAnimationFrameId = null;
                   return;
                 }
 
@@ -728,8 +727,13 @@ export async function updateWallVisuals(observerId = null) {
                   sparkle.scale.set(sizeVariation);
                 });
 
-                // Continue animation loop (will check panning flag next frame)
-                g._pvAnimationFrameId = requestAnimationFrame(animate);
+                // Continue animation loop via centralized scheduler (throttles during pan)
+                const cancelFn = scheduleRAF(animate, true);
+                if (cancelFn) {
+                  g._pvAnimationFrameId = cancelFn;
+                } else {
+                  g._pvAnimationFrameId = null;
+                }
               } catch (error) {
                 console.error(`[PF2E-Visioner] Animation error:`, error);
               }
@@ -737,8 +741,11 @@ export async function updateWallVisuals(observerId = null) {
 
             // Store animate function for resume after pan
             g._pvAnimateFunction = animate;
-            // Start animation immediately
-            g._pvAnimationFrameId = requestAnimationFrame(animate);
+            // Start animation via centralized scheduler
+            const cancelFn = scheduleRAF(animate, true);
+            if (cancelFn) {
+              g._pvAnimationFrameId = cancelFn;
+            }
 
             const parent = canvas.effects?.foreground || canvas.effects || canvas.walls || wall;
             parent.addChild(g);
@@ -781,11 +788,11 @@ export async function updateWallVisuals(observerId = null) {
               (canvas.walls || wall).addChild(mask);
               if (!wall._pvSeeThroughMasks) wall._pvSeeThroughMasks = [];
               wall._pvSeeThroughMasks.push(mask);
-            } catch (_) { }
+            } catch (_) {}
           } else if (wall._pvSeeThroughMasks) {
             try {
               wall._pvSeeThroughMasks.forEach((m) => m.parent?.removeChild(m));
-            } catch (_) { }
+            } catch (_) {}
             wall._pvSeeThroughMasks = [];
           }
 
@@ -816,7 +823,7 @@ export async function updateWallVisuals(observerId = null) {
                       break;
                     }
                   }
-                } catch (_) { }
+                } catch (_) {}
 
                 if (anyObserved) {
                   const currentSight = Number(d.sight ?? 1);
@@ -840,12 +847,12 @@ export async function updateWallVisuals(observerId = null) {
                   }
                 }
               }
-            } catch (_) { }
+            } catch (_) {}
           }
 
           // Note: Auto-discovery disabled. Observed/Hidden should be controlled via the Token Manager.
         }
-      } catch (_) { }
+      } catch (_) {}
 
       // Door-specific unconditional relaxation removed; handled above under unified GM logic.
     }
@@ -876,7 +883,7 @@ export async function updateWallVisuals(observerId = null) {
               }
             }
           }
-        } catch (_) { }
+        } catch (_) {}
       } catch (e) {
         console.warn(`[${MODULE_ID}] Failed to update hidden door sight overrides`, e);
       }
@@ -885,8 +892,8 @@ export async function updateWallVisuals(observerId = null) {
     // Draw hidden-echo overlays for tokens relative to current observer (client-only visual)
     try {
       await updateHiddenTokenEchoes(observer);
-    } catch (_) { }
-  } catch (_) { }
+    } catch (_) {}
+  } catch (_) {}
 }
 
 /**
@@ -919,7 +926,7 @@ async function updateHiddenTokenEchoes(observer) {
         const connectedDocs = getConnectedWallDocsBySourceId(id) || [];
         for (const d of connectedDocs) expandedObserved.add(d.id);
       }
-    } catch (_) { }
+    } catch (_) {}
     const hiddenObservedWalls = walls.filter((w) => {
       try {
         return expandedObserved.has(w?.document?.id);
@@ -950,7 +957,7 @@ async function updateHiddenTokenEchoes(observer) {
       let vis = 'observed';
       try {
         vis = getVisibilityBetween(observer, t);
-      } catch (_) { }
+      } catch (_) {}
       if (vis !== 'hidden') {
         removeEcho(t);
         continue;
@@ -974,13 +981,17 @@ async function updateHiddenTokenEchoes(observer) {
       }
       drawEcho(t);
     }
-  } catch (_) { }
+  } catch (_) {}
 }
 
 function drawEcho(token) {
   try {
     const center = token.center ||
-      token.getCenterPoint?.() || { x: token.x + token.w / 2, y: token.y + token.h / 2, elevation: token.elevation };
+      token.getCenterPoint?.() || {
+        x: token.x + token.w / 2,
+        y: token.y + token.h / 2,
+        elevation: token.elevation,
+      };
     const g = token._pvHiddenEcho || new PIXI.Graphics();
     g.clear();
     const color = 0xffa500; // orange
@@ -993,7 +1004,7 @@ function drawEcho(token) {
       (canvas.tokens || token.parent)?.addChild(g);
       token._pvHiddenEcho = g;
     }
-  } catch (_) { }
+  } catch (_) {}
 }
 
 function removeEcho(token) {
@@ -1002,7 +1013,7 @@ function removeEcho(token) {
       token._pvHiddenEcho.parent?.removeChild(token._pvHiddenEcho);
       token._pvHiddenEcho.destroy?.();
     }
-  } catch (_) { }
+  } catch (_) {}
   token._pvHiddenEcho = null;
 }
 
@@ -1047,6 +1058,10 @@ function segmentsIntersect(p1, p2, q1, q2) {
  */
 export async function updateWallIndicatorsOnly(observerId = null) {
   try {
+    if (HoverTooltips?._isPanning) {
+      return;
+    }
+
     // Respect setting toggle
     if (!game.settings?.get?.(MODULE_ID, 'hiddenWallsEnabled')) {
       return;
@@ -1094,7 +1109,7 @@ export async function updateWallIndicatorsOnly(observerId = null) {
         const connectedDocs = getConnectedWallDocsBySourceId(id) || [];
         for (const d of connectedDocs) expandedObserved.add(d.id);
       }
-    } catch (_) { }
+    } catch (_) {}
 
     // OPTIMIZED: Only handle visual indicators, no document updates or lighting changes
     for (const wall of walls) {
@@ -1104,7 +1119,7 @@ export async function updateWallIndicatorsOnly(observerId = null) {
       let flagHidden = false;
       try {
         flagHidden = !!d.getFlag?.(MODULE_ID, 'hiddenWall');
-      } catch (_) { }
+      } catch (_) {}
 
       // Remove previous indicator/masks if any (always clean before evaluating)
       try {
@@ -1117,11 +1132,11 @@ export async function updateWallIndicatorsOnly(observerId = null) {
             try {
               m.parent?.removeChild(m);
               m.destroy?.();
-            } catch (_) { }
+            } catch (_) {}
           }
           wall._pvSeeThroughMasks = [];
         }
-      } catch (_) { }
+      } catch (_) {}
 
       const isExpandedObserved = expandedObserved.has(d.id);
 
@@ -1152,7 +1167,7 @@ export async function updateWallIndicatorsOnly(observerId = null) {
             try {
               const flagVal = Number(canvas?.scene?.getFlag?.(MODULE_ID, 'hiddenIndicatorHalf'));
               if (Number.isFinite(flagVal) && flagVal > 0) half = flagVal;
-            } catch (_) { }
+            } catch (_) {}
 
             const g = new PIXI.Graphics();
             g.lineStyle(2, color, 0.9);
@@ -1237,7 +1252,10 @@ function cleanupLifesenseKeyHandler() {
   }
 }
 
-export async function updateSystemHiddenTokenHighlights(observerId = null, positionOverride = null) {
+export async function updateSystemHiddenTokenHighlights(
+  observerId = null,
+  positionOverride = null,
+) {
   try {
     if (!game.settings?.get?.(MODULE_ID, 'autoVisibilityEnabled')) {
       return;
@@ -1286,20 +1304,24 @@ export async function updateSystemHiddenTokenHighlights(observerId = null, posit
             if (currentlyHoveredIndicator === gi) {
               currentlyHoveredIndicator = null;
             }
-            if (gi._pvFactorsBadgeEl) { gi._pvFactorsBadgeEl.remove(); }
-            if (gi._pvFactorsTooltipEl) { gi._pvFactorsTooltipEl.remove(); }
+            if (gi._pvFactorsBadgeEl) {
+              gi._pvFactorsBadgeEl.remove();
+            }
+            if (gi._pvFactorsTooltipEl) {
+              gi._pvFactorsTooltipEl.remove();
+            }
             gi.parent?.removeChild(gi);
             gi.destroy?.({ children: false, texture: false, baseTexture: false });
             token._pvSystemHiddenIndicator = null;
           }
-        } catch (_) { }
+        } catch (_) {}
       }
       return;
     }
 
     const observerSenses = observer.actor?.system?.perception?.senses || [];
 
-    const lifesenseSense = observerSenses.find?.(sense => sense.type === 'lifesense');
+    const lifesenseSense = observerSenses.find?.((sense) => sense.type === 'lifesense');
 
     const observerHasLifesense = !!lifesenseSense;
     const lifesenseIsPrecise = lifesenseSense?.acuity === 'precise';
@@ -1309,7 +1331,7 @@ export async function updateSystemHiddenTokenHighlights(observerId = null, posit
     // 1. Are within lifesense range
     // 2. Can be detected by lifesense (living/undead creatures)
     // 3. Are system-hidden (not visible to the client)
-    // 
+    //
     // This allows lifesense to work through walls, in darkness, and with invisible creatures
     // without requiring specific conditions like blinded/deafened
     const isUsingLifesense = observerHasLifesense;
@@ -1337,13 +1359,17 @@ export async function updateSystemHiddenTokenHighlights(observerId = null, posit
             if (currentlyHoveredIndicator === gi) {
               currentlyHoveredIndicator = null;
             }
-            if (gi._pvFactorsBadgeEl) { gi._pvFactorsBadgeEl.remove(); }
-            if (gi._pvFactorsTooltipEl) { gi._pvFactorsTooltipEl.remove(); }
+            if (gi._pvFactorsBadgeEl) {
+              gi._pvFactorsBadgeEl.remove();
+            }
+            if (gi._pvFactorsTooltipEl) {
+              gi._pvFactorsTooltipEl.remove();
+            }
             gi.parent?.removeChild(gi);
             gi.destroy?.({ children: false, texture: false, baseTexture: false });
             token._pvSystemHiddenIndicator = null;
           }
-        } catch (_) { }
+        } catch (_) {}
       }
       return;
     }
@@ -1367,13 +1393,17 @@ export async function updateSystemHiddenTokenHighlights(observerId = null, posit
           if (gi._pvCanvasTearDownHook !== undefined) {
             Hooks.off('canvasTearDown', gi._pvCanvasTearDownHook);
           }
-          if (gi._pvFactorsBadgeEl) { gi._pvFactorsBadgeEl.remove(); }
-          if (gi._pvFactorsTooltipEl) { gi._pvFactorsTooltipEl.remove(); }
+          if (gi._pvFactorsBadgeEl) {
+            gi._pvFactorsBadgeEl.remove();
+          }
+          if (gi._pvFactorsTooltipEl) {
+            gi._pvFactorsTooltipEl.remove();
+          }
           gi.parent?.removeChild(gi);
           gi.destroy?.({ children: false, texture: false, baseTexture: false });
           token._pvSystemHiddenIndicator = null;
         }
-      } catch (_) { }
+      } catch (_) {}
     }
 
     for (const token of tokens) {
@@ -1387,7 +1417,9 @@ export async function updateSystemHiddenTokenHighlights(observerId = null, posit
       const isSystemHidden = !token.visible || token.renderable === false;
 
       const targetTraits = token.actor?.system?.traits?.value || [];
-      const canBeDetectedByLifesense = visibilityCalculatorInternal.canLifesenseDetect({ traits: targetTraits });
+      const canBeDetectedByLifesense = visibilityCalculatorInternal.canLifesenseDetect({
+        traits: targetTraits,
+      });
 
       // Check if token is within lifesense range
       // Use document positions to ensure we have the latest coordinates
@@ -1409,14 +1441,16 @@ export async function updateSystemHiddenTokenHighlights(observerId = null, posit
       } else {
         const path = canvas.grid.measurePath([
           { x: observerCenterX, y: observerCenterY },
-          { x: targetCenterX, y: targetCenterY }
+          { x: targetCenterX, y: targetCenterY },
         ]);
         const feetPerGrid = canvas.grid?.distance || 5;
         distanceInFeet = path.distance * feetPerGrid;
       }
 
-      const isWithinLifesenseRange = lifesenseRange === Infinity || distanceInFeet <= lifesenseRange;
-      const shouldShowIndicator = isSystemHidden && canBeDetectedByLifesense && isWithinLifesenseRange;
+      const isWithinLifesenseRange =
+        lifesenseRange === Infinity || distanceInFeet <= lifesenseRange;
+      const shouldShowIndicator =
+        isSystemHidden && canBeDetectedByLifesense && isWithinLifesenseRange;
 
       // If indicator exists but shouldn't, remove it
       if (token._pvSystemHiddenIndicator && !shouldShowIndicator) {
@@ -1436,8 +1470,12 @@ export async function updateSystemHiddenTokenHighlights(observerId = null, posit
         if (gi._pvCanvasTearDownHook !== undefined) {
           Hooks.off('canvasTearDown', gi._pvCanvasTearDownHook);
         }
-        if (gi._pvFactorsBadgeEl) { gi._pvFactorsBadgeEl.remove(); }
-        if (gi._pvFactorsTooltipEl) { gi._pvFactorsTooltipEl.remove(); }
+        if (gi._pvFactorsBadgeEl) {
+          gi._pvFactorsBadgeEl.remove();
+        }
+        if (gi._pvFactorsTooltipEl) {
+          gi._pvFactorsTooltipEl.remove();
+        }
         gi.parent?.removeChild(gi);
         gi.destroy?.({ children: false, texture: false, baseTexture: false });
         token._pvSystemHiddenIndicator = null;
@@ -1453,8 +1491,8 @@ export async function updateSystemHiddenTokenHighlights(observerId = null, posit
       if (shouldShowIndicator) {
         try {
           const size = token.document.width * canvas.grid.size;
-          const centerX = token.center?.x ?? (token.document.x + size / 2);
-          const centerY = token.center?.y ?? (token.document.y + size / 2);
+          const centerX = token.center?.x ?? token.document.x + size / 2;
+          const centerY = token.center?.y ?? token.document.y + size / 2;
 
           const g = new PIXI.Graphics();
           g.position.set(centerX, centerY);
@@ -1512,11 +1550,12 @@ export async function updateSystemHiddenTokenHighlights(observerId = null, posit
               if (!factors) return;
 
               g._pvFactorsActive = true;
-              const stateCfg = VISIBILITY_STATES[factors.state] || VISIBILITY_STATES.observed || { icon: 'fa-solid fa-eye', color: '#ffffff' };
+              const stateCfg = VISIBILITY_STATES[factors.state] ||
+                VISIBILITY_STATES.observed || { icon: 'fa-solid fa-eye', color: '#ffffff' };
               const canvasRect = canvas.app.view.getBoundingClientRect();
               const bgSize = 40;
               const tokenBounds = token.bounds;
-              const tokenCenterX = token.x + (tokenBounds.width / 2);
+              const tokenCenterX = token.x + tokenBounds.width / 2;
               const tokenTopY = token.y - bgSize - 5;
               const globalPoint = canvas.tokens.toGlobal(new PIXI.Point(tokenCenterX, tokenTopY));
               const screenX = canvasRect.left + globalPoint.x;
@@ -1548,18 +1587,29 @@ export async function updateSystemHiddenTokenHighlights(observerId = null, posit
               const lines = [];
               try {
                 if (factors.state) {
-                  const stateLabelKey = (VISIBILITY_STATES[factors.state]?.label) || factors.state;
+                  const stateLabelKey = VISIBILITY_STATES[factors.state]?.label || factors.state;
                   const localizedState = game.i18n?.localize?.(stateLabelKey) || stateLabelKey;
-                  const stateHdr = game.i18n?.localize?.('PF2E_VISIONER.VISIBILITY_FACTORS.STATE_LABEL') || 'State';
+                  const stateHdr =
+                    game.i18n?.localize?.('PF2E_VISIONER.VISIBILITY_FACTORS.STATE_LABEL') ||
+                    'State';
                   lines.push(`${stateHdr}: ${localizedState}`);
                 }
                 if (factors.lighting) {
                   let lightingKey = factors.lighting;
-                  if (lightingKey.startsWith?.('magicalDarkness') && lightingKey !== 'magicalDarkness' && lightingKey !== 'greaterMagicalDarkness') {
+                  if (
+                    lightingKey.startsWith?.('magicalDarkness') &&
+                    lightingKey !== 'magicalDarkness' &&
+                    lightingKey !== 'greaterMagicalDarkness'
+                  ) {
                     lightingKey = 'magicalDarkness';
                   }
-                  const litHdr = game.i18n?.localize?.('PF2E_VISIONER.VISIBILITY_FACTORS.LIGHTING_LABEL') || 'Lighting';
-                  const litText = game.i18n?.localize?.(`PF2E_VISIONER.VISIBILITY_FACTORS.LIGHTING.${lightingKey}`) || lightingKey;
+                  const litHdr =
+                    game.i18n?.localize?.('PF2E_VISIONER.VISIBILITY_FACTORS.LIGHTING_LABEL') ||
+                    'Lighting';
+                  const litText =
+                    game.i18n?.localize?.(
+                      `PF2E_VISIONER.VISIBILITY_FACTORS.LIGHTING.${lightingKey}`,
+                    ) || lightingKey;
                   lines.push(`${litHdr}: ${litText}`);
                 }
                 if (Array.isArray(factors.reasons) && factors.reasons.length) {
@@ -1568,11 +1618,13 @@ export async function updateSystemHiddenTokenHighlights(observerId = null, posit
                     if (typeof r === 'string') lines.push(`• ${r}`);
                   });
                 }
-              } catch (_) { }
+              } catch (_) {}
 
-              const linesHtml = lines.map(line => `<div style="margin: 2px 0;">${line}</div>`).join('');
+              const linesHtml = lines
+                .map((line) => `<div style="margin: 2px 0;">${line}</div>`)
+                .join('');
               tooltipEl.innerHTML = `<div style="background: rgba(0,0,0,0.9); border-radius: 4px; padding: 8px; color: #ffffff; font-family: Arial; font-size: 12px; white-space: nowrap; box-shadow: 0 2px 8px rgba(0,0,0,0.3);">
-    ${linesHtml || (factors.state || '')}
+    ${linesHtml || factors.state || ''}
   </div>`;
               document.body.appendChild(tooltipEl);
 
@@ -1592,7 +1644,7 @@ export async function updateSystemHiddenTokenHighlights(observerId = null, posit
 
               g._pvFactorsBadgeEl = badgeEl;
               g._pvFactorsTooltipEl = tooltipEl;
-            } catch (_) { }
+            } catch (_) {}
           };
 
           // Track hovered indicator for keyboard targeting
@@ -1643,7 +1695,10 @@ export async function updateSystemHiddenTokenHighlights(observerId = null, posit
                 g.addChild(distanceText);
                 g._distanceText = distanceText;
               } catch (err) {
-                console.warn('PF2E Visioner | Error showing distance for lifesense indicator:', err);
+                console.warn(
+                  'PF2E Visioner | Error showing distance for lifesense indicator:',
+                  err,
+                );
               }
             }
 
@@ -1672,7 +1727,10 @@ export async function updateSystemHiddenTokenHighlights(observerId = null, posit
                 }
               }
             } catch (err) {
-              console.warn('PF2E Visioner | Error showing hover tooltips for lifesense indicator:', err);
+              console.warn(
+                'PF2E Visioner | Error showing hover tooltips for lifesense indicator:',
+                err,
+              );
             }
 
             try {
@@ -1681,7 +1739,7 @@ export async function updateSystemHiddenTokenHighlights(observerId = null, posit
               if (HoverTooltips.isShowingFactorsOverlay) {
                 await buildPairFactorsBadgeOutside();
               }
-            } catch (_) { }
+            } catch (_) {}
           });
 
           g.on('pointerout', async () => {
@@ -1697,7 +1755,8 @@ export async function updateSystemHiddenTokenHighlights(observerId = null, posit
             // Hide hover tooltips and restore previous tooltip context
             try {
               const hoverModule = await import('./HoverTooltips.js');
-              const { HoverTooltips, hideAllVisibilityIndicators, hideAllCoverIndicators } = hoverModule;
+              const { HoverTooltips, hideAllVisibilityIndicators, hideAllCoverIndicators } =
+                hoverModule;
 
               if (typeof hideAllVisibilityIndicators === 'function') hideAllVisibilityIndicators();
               if (typeof hideAllCoverIndicators === 'function') hideAllCoverIndicators();
@@ -1714,18 +1773,27 @@ export async function updateSystemHiddenTokenHighlights(observerId = null, posit
                 }
               }
             } catch (err) {
-              console.warn('PF2E Visioner | Error hiding hover tooltips for lifesense indicator:', err);
+              console.warn(
+                'PF2E Visioner | Error hiding hover tooltips for lifesense indicator:',
+                err,
+              );
             }
 
             try {
               const mod = await import('./HoverTooltips.js');
               const overlayActive = !!mod.HoverTooltips?.isShowingFactorsOverlay;
               if (!overlayActive) {
-                if (g._pvFactorsBadgeEl) { g._pvFactorsBadgeEl.remove(); g._pvFactorsBadgeEl = null; }
-                if (g._pvFactorsTooltipEl) { g._pvFactorsTooltipEl.remove(); g._pvFactorsTooltipEl = null; }
+                if (g._pvFactorsBadgeEl) {
+                  g._pvFactorsBadgeEl.remove();
+                  g._pvFactorsBadgeEl = null;
+                }
+                if (g._pvFactorsTooltipEl) {
+                  g._pvFactorsTooltipEl.remove();
+                  g._pvFactorsTooltipEl = null;
+                }
                 delete g._pvFactorsActive;
               }
-            } catch (_) { }
+            } catch (_) {}
           });
 
           const hookId = Hooks.on('targetToken', (user, targetToken, targeted) => {
@@ -1813,24 +1881,27 @@ export async function updateSystemHiddenTokenHighlights(observerId = null, posit
                 -size / 2 - expansion,
                 -size / 2 - expansion,
                 size + expansion * 2,
-                size + expansion * 2
+                size + expansion * 2,
               );
 
-              // Skip animation work during panning - don't schedule next frame to reduce RAF overhead
-              if (HoverTooltips?._isPanning) {
-                // Don't schedule next frame - animation will resume when pan stops via pan-stop callback
+              // Continue animation loop via centralized scheduler (throttles during pan)
+              const cancelFn = scheduleRAF(animate, true);
+              if (cancelFn) {
+                g._pvAnimationFrameId = cancelFn;
+              } else {
                 g._pvAnimationFrameId = null;
-                return;
               }
-              // Continue animation loop (will check panning flag next frame)
-              g._pvAnimationFrameId = requestAnimationFrame(animate);
             } catch (error) {
               console.error(`[PF2E-Visioner] System-hidden token animation error:`, error);
             }
           };
           // Store animate function for resume after pan
           g._pvAnimateFunction = animate;
-          g._pvAnimationFrameId = requestAnimationFrame(animate);
+          // Start animation via centralized scheduler
+          const cancelFn = scheduleRAF(animate, true);
+          if (cancelFn) {
+            g._pvAnimationFrameId = cancelFn;
+          }
 
           // Prefer interface layer so DOM hover tooltips render above this PIXI overlay
           // We create these for all users (not just GM) to show lifesense detection
@@ -1839,17 +1910,26 @@ export async function updateSystemHiddenTokenHighlights(observerId = null, posit
           token._pvSystemHiddenIndicator = g;
 
           if (!g._pvFactorsOverlayHook) {
-            g._pvFactorsOverlayHook = Hooks.on('pf2e-visioner:visibilityFactorsOverlay', async ({ active } = {}) => {
-              try {
-                if (active) {
-                  await buildPairFactorsBadgeOutside();
-                } else if (g._pvFactorsActive) {
-                  g._pvFactorsActive = false;
-                  if (g._pvFactorsBadgeEl) { g._pvFactorsBadgeEl.remove(); g._pvFactorsBadgeEl = null; }
-                  if (g._pvFactorsTooltipEl) { g._pvFactorsTooltipEl.remove(); g._pvFactorsTooltipEl = null; }
-                }
-              } catch (_) { }
-            });
+            g._pvFactorsOverlayHook = Hooks.on(
+              'pf2e-visioner:visibilityFactorsOverlay',
+              async ({ active } = {}) => {
+                try {
+                  if (active) {
+                    await buildPairFactorsBadgeOutside();
+                  } else if (g._pvFactorsActive) {
+                    g._pvFactorsActive = false;
+                    if (g._pvFactorsBadgeEl) {
+                      g._pvFactorsBadgeEl.remove();
+                      g._pvFactorsBadgeEl = null;
+                    }
+                    if (g._pvFactorsTooltipEl) {
+                      g._pvFactorsTooltipEl.remove();
+                      g._pvFactorsTooltipEl = null;
+                    }
+                  }
+                } catch (_) {}
+              },
+            );
           }
 
           if (!g._pvCanvasPanHook) {
@@ -1859,14 +1939,20 @@ export async function updateSystemHiddenTokenHighlights(observerId = null, posit
               if (HoverTooltips?._isPanning) {
                 return;
               }
-              
+
               // Synchronous work only - no async imports during pan
               if (g._pvFactorsActive) {
                 g._pvFactorsActive = false;
-                if (g._pvFactorsBadgeEl) { g._pvFactorsBadgeEl.remove(); g._pvFactorsBadgeEl = null; }
-                if (g._pvFactorsTooltipEl) { g._pvFactorsTooltipEl.remove(); g._pvFactorsTooltipEl = null; }
+                if (g._pvFactorsBadgeEl) {
+                  g._pvFactorsBadgeEl.remove();
+                  g._pvFactorsBadgeEl = null;
+                }
+                if (g._pvFactorsTooltipEl) {
+                  g._pvFactorsTooltipEl.remove();
+                  g._pvFactorsTooltipEl = null;
+                }
               }
-              
+
               // Skip - these functions are called from main canvasPan hook
               // Per-token hooks should not call them to avoid redundant work
             });
@@ -1877,23 +1963,35 @@ export async function updateSystemHiddenTokenHighlights(observerId = null, posit
               try {
                 if (g._pvFactorsActive) {
                   g._pvFactorsActive = false;
-                  if (g._pvFactorsBadgeEl) { g._pvFactorsBadgeEl.remove(); g._pvFactorsBadgeEl = null; }
-                  if (g._pvFactorsTooltipEl) { g._pvFactorsTooltipEl.remove(); g._pvFactorsTooltipEl = null; }
+                  if (g._pvFactorsBadgeEl) {
+                    g._pvFactorsBadgeEl.remove();
+                    g._pvFactorsBadgeEl = null;
+                  }
+                  if (g._pvFactorsTooltipEl) {
+                    g._pvFactorsTooltipEl.remove();
+                    g._pvFactorsTooltipEl = null;
+                  }
                 }
                 const mod = await import('./HoverTooltips.js');
                 mod.hideAllVisibilityIndicators?.();
                 mod.hideAllCoverIndicators?.();
-              } catch (_) { }
+              } catch (_) {}
             });
           }
 
           if (!g._pvCanvasTearDownHook) {
             g._pvCanvasTearDownHook = Hooks.on('canvasTearDown', () => {
               try {
-                if (g._pvFactorsBadgeEl) { g._pvFactorsBadgeEl.remove(); g._pvFactorsBadgeEl = null; }
-                if (g._pvFactorsTooltipEl) { g._pvFactorsTooltipEl.remove(); g._pvFactorsTooltipEl = null; }
+                if (g._pvFactorsBadgeEl) {
+                  g._pvFactorsBadgeEl.remove();
+                  g._pvFactorsBadgeEl = null;
+                }
+                if (g._pvFactorsTooltipEl) {
+                  g._pvFactorsTooltipEl.remove();
+                  g._pvFactorsTooltipEl = null;
+                }
                 delete g._pvFactorsActive;
-              } catch (_) { }
+              } catch (_) {}
             });
           }
 
@@ -1902,9 +2000,12 @@ export async function updateSystemHiddenTokenHighlights(observerId = null, posit
             if (hoverModule.HoverTooltips?.isShowingFactorsOverlay) {
               await buildPairFactorsBadgeOutside();
             }
-          } catch (_) { }
+          } catch (_) {}
         } catch (error) {
-          console.warn(`PF2E Visioner | Error creating system-hidden indicator for token ${token.document.id}:`, error);
+          console.warn(
+            `PF2E Visioner | Error creating system-hidden indicator for token ${token.document.id}:`,
+            error,
+          );
         }
       }
     }
