@@ -174,9 +174,17 @@ export function registerUIHooks() {
         };
       }
 
-      return 'auto';
+      return {
+        icon: 'fas fa-bolt-auto',
+        color: 0x888888,
+        tooltip: game.i18n.localize('PF2E_VISIONER.TOOLTIPS.AUTO_COVER_DETECTION'),
+      };
     } catch {
-      return 'auto';
+      return {
+        icon: 'fas fa-bolt-auto',
+        color: 0x888888,
+        tooltip: game.i18n.localize('PF2E_VISIONER.TOOLTIPS.AUTO_COVER_DETECTION'),
+      };
     }
   };
 
@@ -188,6 +196,8 @@ export function registerUIHooks() {
 
   // Flag to prevent concurrent refreshes
   let isRefreshingWallLabels = false;
+  let refreshWallLabelsPending = false;
+  let wallCoverLabelLayer = null;
 
   // Bound methods for event listeners
   let boundOnKeyDown = null;
@@ -195,10 +205,17 @@ export function registerUIHooks() {
 
   // Debounced wrapper for refreshWallIdentifierLabels (for canvasPan)
   const refreshWallIdentifierLabelsDebounced = () => {
+    if (hoverTooltipsModuleCache?.HoverTooltips?._isPanning) {
+      return;
+    }
     if (refreshWallLabelsDebounceTimer) {
       clearTimeout(refreshWallLabelsDebounceTimer);
     }
     refreshWallLabelsDebounceTimer = setTimeout(() => {
+      if (hoverTooltipsModuleCache?.HoverTooltips?._isPanning) {
+        refreshWallLabelsDebounceTimer = null;
+        return;
+      }
       refreshWallIdentifierLabels().catch(() => {});
       refreshWallLabelsDebounceTimer = null;
     }, 150);
@@ -206,17 +223,32 @@ export function registerUIHooks() {
 
   // Utility: label identifiers and cover status for walls when Alt is held
   const refreshWallIdentifierLabels = () => {
+    if (hoverTooltipsModuleCache?.HoverTooltips?._isPanning) {
+      return Promise.resolve();
+    }
     // Prevent concurrent refreshes
     if (isRefreshingWallLabels) {
+      refreshWallLabelsPending = true;
       return Promise.resolve();
     }
     isRefreshingWallLabels = true;
+    refreshWallLabelsPending = false;
 
     return Promise.resolve()
       .then(() => {
         const walls = canvas?.walls?.placeables || [];
         // Try multiple layer options - controls layer is where we add the icons
         const layer = canvas?.controls || canvas?.hud || canvas?.stage;
+        const getCoverLayer = () => {
+          if (!wallCoverLabelLayer) {
+            wallCoverLabelLayer = new PIXI.Container();
+            wallCoverLabelLayer.zIndex = 10000;
+            try {
+              canvas.interface?.addChild(wallCoverLabelLayer);
+            } catch (_) {}
+          }
+          return wallCoverLabelLayer;
+        };
         const isWallTool = ui.controls?.control?.name === 'walls';
 
         // Check if walls tool is active - early exit if not
@@ -241,6 +273,14 @@ export function registerUIHooks() {
               } catch {}
               delete w._pvCoverIcon;
             }
+          }
+          if (wallCoverLabelLayer) {
+            try {
+              wallCoverLabelLayer.removeChildren();
+              wallCoverLabelLayer.parent?.removeChild(wallCoverLabelLayer);
+              wallCoverLabelLayer.destroy({ children: true });
+            } catch (_) {}
+            wallCoverLabelLayer = null;
           }
           return;
         }
@@ -276,6 +316,14 @@ export function registerUIHooks() {
             if (w._pvCoverIcon) {
               delete w._pvCoverIcon;
             }
+          }
+          if (wallCoverLabelLayer) {
+            try {
+              wallCoverLabelLayer.removeChildren();
+              wallCoverLabelLayer.parent?.removeChild(wallCoverLabelLayer);
+              wallCoverLabelLayer.destroy({ children: true });
+            } catch (_) {}
+            wallCoverLabelLayer = null;
           }
           return;
         }
@@ -322,10 +370,10 @@ export function registerUIHooks() {
           const idf = w?.document?.getFlag?.(MODULE_ID, 'wallIdentifier');
           const coverOverride = w?.document?.getFlag?.(MODULE_ID, 'coverOverride');
 
-          // Show identifier if wall is controlled AND walls tool is active AND has identifier
-          const shouldShowIdentifier = !!w?.controlled && isWallTool && !!idf;
+          // Show identifier when walls tool is active and the wall has an identifier flag
+          const shouldShowIdentifier = isWallTool && !!idf;
 
-          // Show cover status if key is pressed AND walls tool is active AND has cover override
+          // Show cover status only when a cover override exists
           const shouldShowCover =
             isShowWallLabelsKeyPressed && isWallTool && coverOverride !== undefined;
 
@@ -361,28 +409,16 @@ export function registerUIHooks() {
         const shouldKeepCoverIcons = isShowWallLabelsKeyPressed && isWallTool;
 
         if (!shouldKeepCoverIcons) {
-          // Clean up all cover icons in the layer
-          // Re-fetch layer children in case they've changed since we captured layerChildren
-          const currentLayerChildren = layer?.children || [];
-
-          for (const child of currentLayerChildren) {
-            if (child._coverText && child._tooltip) {
-              try {
-                if (child.parent) {
-                  child.parent.removeChild(child);
-                }
-              } catch (e) {
-                console.warn('[PF2E Visioner] Error removing cover icon:', e);
-              }
-              try {
-                child.destroy();
-              } catch (e) {
-                console.warn('[PF2E Visioner] Error destroying cover icon:', e);
-              }
-            }
+          const coverLayer = wallCoverLabelLayer;
+          if (coverLayer) {
+            try {
+              coverLayer.removeChildren();
+              coverLayer.parent?.removeChild(coverLayer);
+              coverLayer.destroy({ children: true });
+            } catch (_) {}
+            wallCoverLabelLayer = null;
           }
 
-          // Also clean up any wall references
           for (const w of walls) {
             if (w._pvCoverIcon) {
               delete w._pvCoverIcon;
@@ -413,8 +449,8 @@ export function registerUIHooks() {
           const coverInfo = getWallCoverInfo(w.document);
 
           // Check conditions for showing each type of label
-          const shouldShowIdentifier = !!w?.controlled && isWallTool && !!idf;
-          // Show cover label if key pressed, walls tool active, AND wall has a cover override set (no AUTO labels)
+          const shouldShowIdentifier = isWallTool && !!idf;
+          // Show cover label only when a cover override exists
           const shouldShowCover =
             isShowWallLabelsKeyPressed && isWallTool && coverOverride !== undefined;
 
@@ -565,8 +601,9 @@ export function registerUIHooks() {
                 container._coverText = coverText;
 
                 // Prefer controls layer; fallback to wall container
-                if (layer?.addChild) {
-                  layer.addChild(container);
+                const coverLayer = getCoverLayer();
+                if (coverLayer) {
+                  coverLayer.addChild(container);
                 } else if (w.addChild) {
                   w.addChild(container);
                 }
@@ -622,6 +659,10 @@ export function registerUIHooks() {
       })
       .finally(() => {
         isRefreshingWallLabels = false;
+        if (refreshWallLabelsPending) {
+          refreshWallLabelsPending = false;
+          refreshWallIdentifierLabels();
+        }
       });
   };
 
@@ -791,6 +832,12 @@ export function registerUIHooks() {
   // Skip during active panning to prevent performance issues
   let hoverTooltipsModuleCache = null;
   Hooks.on('canvasPan', async () => {
+    // Clear any pending refresh during pan
+    if (refreshWallLabelsDebounceTimer) {
+      clearTimeout(refreshWallLabelsDebounceTimer);
+      refreshWallLabelsDebounceTimer = null;
+    }
+
     // Early exit if panning - check cached module first to avoid async import
     if (hoverTooltipsModuleCache?.HoverTooltips?._isPanning) {
       return;
@@ -809,7 +856,13 @@ export function registerUIHooks() {
       return;
     }
 
-    refreshWallIdentifierLabelsDebounced();
+    // Only schedule refresh after pan stops
+    refreshWallLabelsDebounceTimer = setTimeout(() => {
+      refreshWallLabelsDebounceTimer = null;
+      if (!hoverTooltipsModuleCache?.HoverTooltips?._isPanning) {
+        refreshWallIdentifierLabelsDebounced();
+      }
+    }, 200);
   });
 
   // Refresh wall labels when active tool changes
@@ -953,6 +1006,14 @@ export function registerUIHooks() {
     keyListenersRegistered = false;
     // Reset state
     isShowWallLabelsKeyPressed = false;
+    if (wallCoverLabelLayer) {
+      try {
+        wallCoverLabelLayer.removeChildren();
+        wallCoverLabelLayer.parent?.removeChild(wallCoverLabelLayer);
+        wallCoverLabelLayer.destroy({ children: true });
+      } catch (_) {}
+      wallCoverLabelLayer = null;
+    }
     // Clean up any lingering labels
     refreshWallIdentifierLabels().catch(() => {});
   });

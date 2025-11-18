@@ -7,6 +7,7 @@ import autoCoverSystem from '../cover/auto-cover/AutoCoverSystem.js';
 import { canShowTooltips, computeSizesFromSetting } from '../helpers/tooltip-utils.js';
 import { getDetectionBetween } from '../stores/detection-map.js';
 import { getCoverMap, getVisibilityMap } from '../utils.js';
+import { setPanningState } from '../utils/scheduler.js';
 
 /**
  * Lightweight service wrapper for lifecycle control.
@@ -131,9 +132,7 @@ export function setTooltipMode(mode) {
     // Small defer then re-render clean target-mode indicators if still hovering
     if (HoverTooltips.currentHoveredToken) {
       setTimeout(() => {
-        if (!HoverTooltips._isPanning) {
-          showVisibilityIndicators(HoverTooltips.currentHoveredToken);
-        }
+        showVisibilityIndicators(HoverTooltips.currentHoveredToken);
       }, 50);
     }
     return;
@@ -278,10 +277,6 @@ export function initializeHoverTooltips() {
   // Register hoverToken hook to handle token hover events
   // This is cleaner than PIXI events and automatically excludes UI hover
   Hooks.on('hoverToken', (token, hovered) => {
-    // Skip hover handling during pan to prevent forced reflows
-    if (HoverTooltips._isPanning) {
-      return;
-    }
     if (hovered) {
       onTokenHover(token);
     } else {
@@ -292,77 +287,26 @@ export function initializeHoverTooltips() {
   // Handle canvas pan: hide tooltips during pan, show after
   let panTimeout = null;
   Hooks.on('canvasPan', () => {
-    // Early exit if already panning - avoid all overhead
-    if (HoverTooltips._isPanning) {
-      // Only update timeout, no other work
-      if (panTimeout) {
-        clearTimeout(panTimeout);
-      }
-      panTimeout = setTimeout(() => {
-        HoverTooltips._isPanning = false;
-        hideAllVisibilityIndicators();
-        hideAllCoverIndicators();
-        const walls = canvas?.walls?.placeables || [];
-        for (const wall of walls) {
-          if (
-            wall._pvHiddenIndicator &&
-            !wall._pvHiddenIndicator._pvAnimationFrameId &&
-            wall._pvAnimationActive
-          ) {
-            const animate = wall._pvHiddenIndicator._pvAnimateFunction;
-            if (animate) {
-              wall._pvHiddenIndicator._pvAnimationFrameId = requestAnimationFrame(animate);
-            }
-          }
-        }
-        const tokens = canvas?.tokens?.placeables || [];
-        for (const token of tokens) {
-          if (
-            token._pvSystemHiddenIndicator &&
-            !token._pvSystemHiddenIndicator._pvAnimationFrameId
-          ) {
-            const animate = token._pvSystemHiddenIndicator._pvAnimateFunction;
-            if (animate) {
-              token._pvSystemHiddenIndicator._pvAnimationFrameId = requestAnimationFrame(animate);
-            }
-          }
-        }
-        if (
-          (HoverTooltips.visibilityIndicators.size > 0 || HoverTooltips.coverIndicators.size > 0) &&
-          !HoverTooltips.badgeTicker
-        ) {
-          ensureBadgeTicker();
-        }
-        if (HoverTooltips._savedKeyTooltipsActive) {
-          if (HoverTooltips.tooltipMode === 'observer') {
-            showControlledTokenVisibilityObserver();
-          } else {
-            showControlledTokenVisibility();
-          }
-        } else if (HoverTooltips._savedHoveredToken) {
-          const token = HoverTooltips._savedHoveredToken;
-          HoverTooltips.currentHoveredToken = token;
-          showVisibilityIndicators(token);
-        }
-        delete HoverTooltips._savedHoveredToken;
-        delete HoverTooltips._savedKeyTooltipsActive;
-        delete HoverTooltips._savedFactorsOverlayActive;
-        panTimeout = null;
-      }, 200);
-      return;
+    // Hide tooltips immediately when pan starts
+    if (!HoverTooltips._isPanning) {
+      HoverTooltips._isPanning = true;
+      setPanningState(true);
+      HoverTooltips._savedHoveredToken = HoverTooltips.currentHoveredToken;
+      HoverTooltips._savedKeyTooltipsActive = HoverTooltips.isShowingKeyTooltips;
+      HoverTooltips._savedFactorsOverlayActive = HoverTooltips.isShowingFactorsOverlay;
     }
 
-    // Pan start - only do work if we have indicators or ticker
-    if (
-      HoverTooltips.visibilityIndicators.size === 0 &&
-      HoverTooltips.coverIndicators.size === 0 &&
-      !HoverTooltips.badgeTicker
-    ) {
-      // No indicators, no ticker - nothing to do, skip entirely
-      return;
+    // Always hide tooltips during pan (even if already panning, in case O key was pressed during pan)
+    // Clear key tooltips flag to prevent recreation during pan
+    if (HoverTooltips.isShowingKeyTooltips) {
+      HoverTooltips.isShowingKeyTooltips = false;
+      HoverTooltips.keyTooltipTokens.clear();
     }
+    hideAllVisibilityIndicators();
+    hideAllCoverIndicators();
+    hideFactorBadges();
 
-    // Stop ticker and set panning flag
+    // Stop badge ticker during pan to prevent FPS drops
     if (HoverTooltips.badgeTicker) {
       try {
         canvas.app?.ticker?.remove?.(HoverTooltips.badgeTicker);
@@ -370,72 +314,41 @@ export function initializeHoverTooltips() {
       } catch (_) {}
     }
 
-    HoverTooltips._isPanning = true;
-    HoverTooltips._savedHoveredToken = HoverTooltips.currentHoveredToken;
-    HoverTooltips._savedKeyTooltipsActive = HoverTooltips.isShowingKeyTooltips;
-    HoverTooltips._savedFactorsOverlayActive = HoverTooltips.isShowingFactorsOverlay;
+    // Clear any existing timeout
+    if (panTimeout) clearTimeout(panTimeout);
 
-    // Set timeout to restore after pan stops
-    if (panTimeout) {
-      clearTimeout(panTimeout);
-    }
+    // Set timeout to restore tooltips after pan stops
     panTimeout = setTimeout(() => {
-      HoverTooltips.visibilityIndicators.forEach((indicator) => {
-        if (indicator._senseBadgeEl) indicator._senseBadgeEl.style.visibility = 'hidden';
-        if (indicator._visBadgeEl) indicator._visBadgeEl.style.visibility = 'hidden';
-        if (indicator._coverBadgeEl) indicator._coverBadgeEl.style.visibility = 'hidden';
-      });
-      HoverTooltips.coverIndicators.forEach((indicator) => {
-        if (indicator._coverBadgeEl) indicator._coverBadgeEl.style.visibility = 'hidden';
-      });
-      hideFactorBadges();
       HoverTooltips._isPanning = false;
-      hideAllVisibilityIndicators();
-      hideAllCoverIndicators();
-      const walls = canvas?.walls?.placeables || [];
-      for (const wall of walls) {
-        if (
-          wall._pvHiddenIndicator &&
-          !wall._pvHiddenIndicator._pvAnimationFrameId &&
-          wall._pvAnimationActive
-        ) {
-          const animate = wall._pvHiddenIndicator._pvAnimateFunction;
-          if (animate) {
-            wall._pvHiddenIndicator._pvAnimationFrameId = requestAnimationFrame(animate);
-          }
-        }
-      }
-      const tokens = canvas?.tokens?.placeables || [];
-      for (const token of tokens) {
-        if (token._pvSystemHiddenIndicator && !token._pvSystemHiddenIndicator._pvAnimationFrameId) {
-          const animate = token._pvSystemHiddenIndicator._pvAnimateFunction;
-          if (animate) {
-            token._pvSystemHiddenIndicator._pvAnimationFrameId = requestAnimationFrame(animate);
-          }
-        }
-      }
-      if (
-        (HoverTooltips.visibilityIndicators.size > 0 || HoverTooltips.coverIndicators.size > 0) &&
-        !HoverTooltips.badgeTicker
-      ) {
+      setPanningState(false);
+
+      // Restart badge ticker if badges exist
+      if (HoverTooltips.visibilityBadges.size > 0 || HoverTooltips.coverIndicators.size > 0) {
         ensureBadgeTicker();
       }
+
+      // Restore tooltips based on what was showing before
+      // NOTE: We don't restore factor badges - user must press keybind again
       if (HoverTooltips._savedKeyTooltipsActive) {
+        // Restore Alt/O overlay
         if (HoverTooltips.tooltipMode === 'observer') {
           showControlledTokenVisibilityObserver();
         } else {
           showControlledTokenVisibility();
         }
       } else if (HoverTooltips._savedHoveredToken) {
+        // Restore hover tooltips
         const token = HoverTooltips._savedHoveredToken;
         HoverTooltips.currentHoveredToken = token;
         showVisibilityIndicators(token);
       }
+
+      // Clean up saved state
       delete HoverTooltips._savedHoveredToken;
       delete HoverTooltips._savedKeyTooltipsActive;
       delete HoverTooltips._savedFactorsOverlayActive;
       panTimeout = null;
-    }, 200);
+    }, 150); // 150ms after pan stops
   });
 
   // Handle canvas zoom: hide tooltips during zoom, show after (similar to pan)
@@ -513,20 +426,13 @@ export function initializeHoverTooltips() {
       visibilityUpdateDebounce = setTimeout(() => {
         visibilityUpdateDebounce = null;
 
-        // Skip if panning - avoid forced reflows
-        if (HoverTooltips._isPanning) {
-          return;
-        }
-
         // If Alt overlay is active, re-render it; otherwise refresh current hover
         if (HoverTooltips.isShowingKeyTooltips) {
           // Rebuild Alt overlay for controlled tokens
           hideAllVisibilityIndicators();
           hideAllCoverIndicators();
           setTimeout(() => {
-            if (!HoverTooltips._isPanning) {
-              showControlledTokenVisibility();
-            }
+            showControlledTokenVisibility();
           }, 0);
         } else if (HoverTooltips.currentHoveredToken) {
           // Re-render indicators for the currently hovered token
@@ -534,9 +440,7 @@ export function initializeHoverTooltips() {
           hideAllVisibilityIndicators();
           hideAllCoverIndicators();
           setTimeout(() => {
-            if (!HoverTooltips._isPanning) {
-              showVisibilityIndicators(tok);
-            }
+            showVisibilityIndicators(tok);
           }, 0);
         }
       }, 150); // 150ms debounce - batch multiple rapid updates
@@ -565,24 +469,15 @@ export function initializeHoverTooltips() {
         HoverTooltips._isTokenMoving = false;
         HoverTooltips._movementDebounceTimer = null;
 
-        // Skip if panning - avoid forced reflows
-        if (HoverTooltips._isPanning) {
-          return;
-        }
-
         // Refresh tooltips after movement completes
         if (HoverTooltips.currentHoveredToken) {
           const tok = HoverTooltips.currentHoveredToken;
           setTimeout(() => {
-            if (!HoverTooltips._isPanning) {
-              showVisibilityIndicators(tok);
-            }
+            showVisibilityIndicators(tok);
           }, 0);
         } else if (HoverTooltips.isShowingKeyTooltips) {
           setTimeout(() => {
-            if (!HoverTooltips._isPanning) {
-              showControlledTokenVisibility();
-            }
+            showControlledTokenVisibility();
           }, 0);
         }
       }, 300); // Wait 300ms after last movement update before refreshing (increased from 200ms)
@@ -678,6 +573,7 @@ export function initializeHoverTooltips() {
     HoverTooltips.isShowingCoverOverlay = false;
     HoverTooltips.isShowingFactorsOverlay = false;
     HoverTooltips._isPanning = false;
+    setPanningState(false);
     HoverTooltips._isTokenMoving = false;
     HoverTooltips._isDragging = false;
     HoverTooltips._pointerIsDown = false;
@@ -721,6 +617,7 @@ export function initializeHoverTooltips() {
     HoverTooltips.isShowingKeyTooltips = false;
     HoverTooltips.isShowingCoverOverlay = false;
     HoverTooltips._isPanning = false;
+    setPanningState(false);
     HoverTooltips._isTokenMoving = false;
     HoverTooltips._isDragging = false;
     HoverTooltips._pointerIsDown = false;
@@ -784,11 +681,6 @@ function onTokenHover(hoveredToken) {
   }
 
   HoverTooltips._hoverDebounceTimer = setTimeout(() => {
-    // Skip if panning started during debounce
-    if (HoverTooltips._isPanning) {
-      delete HoverTooltips._hoverDebounceTimer;
-      return;
-    }
     HoverTooltips.currentHoveredToken = hoveredToken;
     showVisibilityIndicators(hoveredToken);
     delete HoverTooltips._hoverDebounceTimer;
@@ -862,14 +754,13 @@ export function onHighlightObjects(highlight) {
     // Alt released: fully reset Alt state and clean badges
     HoverTooltips.isShowingKeyTooltips = false;
     HoverTooltips.keyTooltipTokens.clear();
+    delete HoverTooltips._savedKeyTooltipsActive;
     hideAllVisibilityIndicators();
     hideAllCoverIndicators();
     // Restore clean hover indicators if still hovering
     if (HoverTooltips.currentHoveredToken) {
       setTimeout(() => {
-        if (!HoverTooltips._isPanning) {
-          showVisibilityIndicators(HoverTooltips.currentHoveredToken);
-        }
+        showVisibilityIndicators(HoverTooltips.currentHoveredToken);
       }, 50);
     }
   }
@@ -880,9 +771,6 @@ export function onHighlightObjects(highlight) {
  * @param {Token} hoveredToken - The token being hovered
  */
 function showVisibilityIndicators(hoveredToken) {
-  if (HoverTooltips._isPanning) {
-    return;
-  }
   // Check if tooltips are allowed for the current mode and token
   // Suppress hover overlays entirely while any keybind overlay is active, UNLESS this is a keyboard context
   if (
@@ -1193,7 +1081,7 @@ export function hideAutoCoverComputedOverlay() {
   // If still hovering over a token, restore hover tooltips
   if (HoverTooltips.currentHoveredToken) {
     setTimeout(() => {
-      if (!HoverTooltips._isPanning && HoverTooltips.currentHoveredToken) {
+      if (HoverTooltips.currentHoveredToken) {
         showVisibilityIndicators(HoverTooltips.currentHoveredToken);
       }
     }, 50);
@@ -1208,6 +1096,8 @@ export function showControlledTokenVisibility() {
   if (HoverTooltips.isShowingKeyTooltips) {
     return;
   }
+  if (HoverTooltips._isPanning) return;
+
   const controlledTokens = canvas.tokens.controlled;
   HoverTooltips.isShowingKeyTooltips = true;
   HoverTooltips.keyTooltipTokens.clear();
@@ -1246,6 +1136,7 @@ export function showControlledTokenVisibility() {
  */
 export function showControlledTokenVisibilityObserver() {
   if (HoverTooltips.isShowingKeyTooltips) return;
+  if (HoverTooltips._isPanning) return;
 
   const controlledTokens = canvas.tokens.controlled;
   // Fallback: if no controlled token, use the currently hovered token as the observer
@@ -1454,14 +1345,7 @@ function addVisibilityIndicator(
   indicator.y = targetToken.y - 8; // slight padding above the token
   canvas.tokens.addChild(indicator);
 
-  // Use cached rect or skip if panning to avoid forced reflows
-  if (HoverTooltips._isPanning && !HoverTooltips._canvasRectCache) {
-    return;
-  }
-  const canvasRect = HoverTooltips._canvasRectCache || canvas.app.view.getBoundingClientRect();
-  if (!HoverTooltips._canvasRectCache) {
-    HoverTooltips._canvasRectCache = canvasRect;
-  }
+  const canvasRect = canvas.app.view.getBoundingClientRect();
   // Compute dynamic badge dimensions based on configured sizes
   let sizeConfig;
   try {
@@ -1587,8 +1471,6 @@ function addVisibilityIndicator(
   ensureBadgeTicker();
 }
 function ensureBadgeTicker() {
-  // Don't start ticker during panning
-  if (HoverTooltips._isPanning) return;
   if (HoverTooltips.badgeTicker) return;
 
   // Invalidate canvas rect cache when ticker starts (viewport may have changed)
@@ -1604,8 +1486,6 @@ function ensureBadgeTicker() {
   const UPDATE_THROTTLE_MS = 16; // ~60fps max (one frame at 60fps = 16.67ms)
 
   HoverTooltips.badgeTicker = () => {
-    // CRITICAL: Check panning flag FIRST, before any operations
-    // This prevents any work if panning flag was set between ticker queue and execution
     if (HoverTooltips._isPanning) {
       return;
     }
@@ -1653,18 +1533,12 @@ function ensureBadgeTicker() {
 }
 
 function updateBadgePositions() {
-  // Skip during panning to prevent forced reflows
   if (HoverTooltips._isPanning) {
     return;
   }
 
   // Cache getBoundingClientRect to avoid layout thrashing (expensive DOM query)
-  // Never call getBoundingClientRect during panning - use cached value or skip
-  if (!HoverTooltips._canvasRectCache) {
-    if (HoverTooltips._isPanning) return;
-    HoverTooltips._canvasRectCache = canvas.app.view.getBoundingClientRect();
-  }
-  if (HoverTooltips._canvasRectInvalidated && !HoverTooltips._isPanning) {
+  if (!HoverTooltips._canvasRectCache || HoverTooltips._canvasRectInvalidated) {
     HoverTooltips._canvasRectCache = canvas.app.view.getBoundingClientRect();
     HoverTooltips._canvasRectInvalidated = false;
   }
@@ -1683,9 +1557,6 @@ function updateBadgePositions() {
   }
   const verticalOffset = HoverTooltips._hudActiveCache ? 26 : -6;
 
-  // Batch all DOM updates to minimize forced reflows
-  const updates = [];
-
   HoverTooltips.visibilityIndicators.forEach((indicator) => {
     if (!indicator || (!indicator._visBadgeEl && !indicator._coverBadgeEl)) return;
     const globalPoint = canvas.tokens.toGlobal(new PIXI.Point(indicator.x, indicator.y));
@@ -1701,13 +1572,14 @@ function updateBadgePositions() {
       let currentX = startX;
 
       if (indicator._senseBadgeEl) {
-        updates.push({ el: indicator._senseBadgeEl, x: currentX, y: centerY });
+        indicator._senseBadgeEl.style.transform = `translate(${Math.round(currentX)}px, ${Math.round(centerY)}px)`;
         currentX += badgeWidth + spacing;
       }
 
-      updates.push({ el: indicator._visBadgeEl, x: currentX, y: centerY });
+      indicator._visBadgeEl.style.transform = `translate(${Math.round(currentX)}px, ${Math.round(centerY)}px)`;
       currentX += badgeWidth + spacing;
-      updates.push({ el: indicator._coverBadgeEl, x: currentX, y: centerY });
+
+      indicator._coverBadgeEl.style.transform = `translate(${Math.round(currentX)}px, ${Math.round(centerY)}px)`;
     } else if (indicator._visBadgeEl) {
       // Visibility badge with optional sense badge
       const totalWidth = (indicator._senseBadgeEl ? badgeWidth + spacing : 0) + badgeWidth;
@@ -1716,11 +1588,11 @@ function updateBadgePositions() {
       let currentX = startX;
 
       if (indicator._senseBadgeEl) {
-        updates.push({ el: indicator._senseBadgeEl, x: currentX, y: centerY });
+        indicator._senseBadgeEl.style.transform = `translate(${Math.round(currentX)}px, ${Math.round(centerY)}px)`;
         currentX += badgeWidth + spacing;
       }
 
-      updates.push({ el: indicator._visBadgeEl, x: currentX, y: centerY });
+      indicator._visBadgeEl.style.transform = `translate(${Math.round(currentX)}px, ${Math.round(centerY)}px)`;
     }
   });
 
@@ -1731,7 +1603,7 @@ function updateBadgePositions() {
     const centerX = canvasRect.left + globalPoint.x;
     const centerY = canvasRect.top + globalPoint.y - badgeHeight / 2 + verticalOffset;
     const left = centerX - badgeWidth / 2;
-    updates.push({ el: indicator._coverBadgeEl, x: left, y: centerY });
+    indicator._coverBadgeEl.style.transform = `translate(${Math.round(left)}px, ${Math.round(centerY)}px)`;
   });
 
   // Update factor badge positions (DOM-based)
@@ -1757,13 +1629,8 @@ function updateBadgePositions() {
     const screenX = canvasRect.left + globalPoint.x;
     const screenY = canvasRect.top + globalPoint.y;
 
-    updates.push({ el: badge.badgeEl, x: screenX - bgSize / 2, y: screenY - bgSize / 2 });
+    badge.badgeEl.style.transform = `translate(${Math.round(screenX - bgSize / 2)}px, ${Math.round(screenY - bgSize / 2)}px)`;
   });
-
-  // Apply all updates in a single batch to minimize reflows
-  for (const update of updates) {
-    update.el.style.transform = `translate(${Math.round(update.x)}px, ${Math.round(update.y)}px)`;
-  }
 }
 
 /**
@@ -1784,12 +1651,7 @@ function addCoverIndicator(targetToken, observerToken, coverState, isManualCover
   indicator.y = targetToken.y - 8; // align above token
   canvas.tokens.addChild(indicator);
 
-  // Use cached rect or skip if panning to avoid forced reflows
-  if (HoverTooltips._isPanning && !HoverTooltips._canvasRectCache) return;
-  const canvasRect = HoverTooltips._canvasRectCache || canvas.app.view.getBoundingClientRect();
-  if (!HoverTooltips._canvasRectCache) {
-    HoverTooltips._canvasRectCache = canvasRect;
-  }
+  const canvasRect = canvas.app.view.getBoundingClientRect();
   let sizeConfig;
   try {
     const raw = game.settings?.get?.(MODULE_ID, 'tooltipFontSize');
@@ -1872,11 +1734,6 @@ function addCoverIndicator(targetToken, observerToken, coverState, isManualCover
  * Hide all visibility indicators
  */
 function hideAllVisibilityIndicators() {
-  // Skip if already panning and no indicators (prevents redundant work from multiple hooks)
-  if (HoverTooltips._isPanning && HoverTooltips.visibilityIndicators.size === 0) {
-    return;
-  }
-
   // Deactivate any active tooltips
   try {
     game.tooltip.deactivate();
@@ -1914,9 +1771,8 @@ function hideAllVisibilityIndicators() {
         indicator.parent.removeChild(indicator);
       }
 
-      // Destroy the indicator - simplified flags to reduce overhead
-      // Don't need to destroy textures/baseTextures for containers without graphics
-      indicator.destroy({ children: false });
+      // Destroy the indicator with all children to ensure PIXI graphics are fully destroyed
+      indicator.destroy({ children: true, texture: true, baseTexture: true });
     } catch (e) {
       console.warn('PF2E Visioner: Error cleaning up indicator', e);
     }
@@ -1967,11 +1823,6 @@ function hideAllVisibilityIndicators() {
  * Hide all cover indicators
  */
 function hideAllCoverIndicators() {
-  // Skip if already panning and no indicators (prevents redundant work from multiple hooks)
-  if (HoverTooltips._isPanning && HoverTooltips.coverIndicators.size === 0) {
-    return;
-  }
-
   try {
     game.tooltip.deactivate();
   } catch (_) {}
@@ -1988,8 +1839,8 @@ function hideAllCoverIndicators() {
         delete indicator._tooltipAnchor;
       }
       if (indicator.parent) indicator.parent.removeChild(indicator);
-      // Simplified destroy - no textures to clean up
-      indicator.destroy({ children: false });
+      // Destroy with all children to ensure PIXI graphics are fully destroyed
+      indicator.destroy({ children: true, texture: true, baseTexture: true });
     } catch (_) {}
   });
   HoverTooltips.coverIndicators.clear();
