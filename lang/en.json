@@ -490,7 +490,26 @@
       "RANGE_LIMIT_ACTIVE": "Range limit active: Only showing targets within 30 feet",
       "RANGE_LIMIT_ACTIVE_CUSTOM": "Range limit active: Only showing targets within {distance} feet",
       "NO_TARGETS_IN_RANGE": "No valid targets within 30 feet range",
-      "NO_TARGETS_IN_RANGE_CUSTOM": "No valid targets within {distance} feet range",
+      "NO_TARGETS_IN_RANGE_CUSTOM": "No valid targets within {distance} feet range"
+    },
+    "SEEK_TEMPLATE_CONFIG": {
+      "TITLE": "Seek Template Configuration",
+      "DESCRIPTION": "Choose the template shape and size for your Seek action.",
+      "TEMPLATE_TYPE": "Template Type",
+      "BURST": "Burst (Circle)",
+      "BURST_DESC": "Circular area effect",
+      "CONE": "Cone",
+      "CONE_DESC": "90-degree cone area",
+      "RECTANGLE": "Rectangle",
+      "RECTANGLE_DESC": "Square/rectangular area effect",
+      "LINE": "Line (Ray)",
+      "LINE_DESC": "Straight line area",
+      "RADIUS": "Radius",
+      "LENGTH": "Length",
+      "SIZE": "Size",
+      "FEET": "feet",
+      "CREATE": "Create Template",
+      "INVALID_RADIUS": "Radius must be between 1 and 1000 feet",
       "ECHOLOCATION_LABEL": "Echolocation",
       "ECHOLOCATION_TOOLTIP": "Precise hearing active until the start of your next turn",
       "LIFESENSE_LABEL": "Lifesense",
@@ -696,6 +715,10 @@
       "LIMIT_SEEK_RANGE": {
         "name": "Limit Combat Seek Range",
         "hint": "Target will be decided based on the specified distance from token using Seek while in combat"
+      },
+      "SEEK_TEMPLATE_SKIP_DIALOG": {
+        "name": "Always Skip Seek Template Dialog",
+        "hint": "When enabled, the Seek template configuration dialog will be skipped and default values (15ft burst) will be used."
       },
       "SEEK_USE_TEMPLATE": {
         "name": "Use Seek Template",
@@ -966,12 +989,14 @@
       "SET_ALL_WALLS_NON_HIDDEN_BULK": "Set all walls to Non-Hidden",
       "SET_ALL_WALLS_AUTO_COVER": "Set all walls to Auto Cover",
       "SET_ALL_WALLS_NO_COVER": "Set all walls to No Cover",
+      "SET_ALL_WALLS_LESSER_COVER": "Set all walls to Lesser Cover",
       "SET_ALL_WALLS_STANDARD_COVER": "Set all walls to Standard Cover",
       "SET_ALL_WALLS_GREATER_COVER": "Set all walls to Greater Cover",
       "WALL_TYPE_CYCLE_TOOLTIP": "Left-click: next type | Right-click: previous type",
       "SELECT_WALL_AND_PAN": "Select wall and pan to it",
       "WALL_COVER_AUTO_SHORT": "Automatic Detection",
       "WALL_COVER_NONE_SHORT": "No Cover",
+      "WALL_COVER_LESSER_SHORT": "Lesser Cover",
       "WALL_COVER_STANDARD_SHORT": "Standard Cover",
       "WALL_COVER_GREATER_SHORT": "Greater Cover",
       "COVER_OVERRIDDEN_VIA": "Cover overridden {source}: {originalLabel} → {finalLabel}",
@@ -992,6 +1017,7 @@
       "SET_ALL_WALLS_AS": "Set all listed walls as {state}",
       "WALL_COVER_AUTO_TOOLTIP": "Automatic Detection - Wall provides cover based on coverage thresholds",
       "WALL_COVER_NONE_TOOLTIP": "No Cover - Wall never provides cover regardless of thresholds",
+      "WALL_COVER_LESSER_TOOLTIP": "Lesser Cover Maximum - Wall provides up to lesser cover based on thresholds",
       "WALL_COVER_STANDARD_TOOLTIP": "Standard Cover Maximum - Wall provides up to standard cover based on thresholds",
       "WALL_COVER_GREATER_TOOLTIP": "Greater Cover Maximum - Wall provides up to greater cover based on thresholds",
       "WALL_HIDDEN_TOOLTIP": "Mark this wall as hidden from players",
@@ -1067,6 +1093,7 @@
       "ALL_COVER_TYPES": "All Cover Types",
       "AUTO_DETECTION": "Auto Detection",
       "NO_COVER_OPTION": "No Cover",
+      "LESSER_MAX": "Lesser Max",
       "STANDARD_MAX": "Standard Max",
       "GREATER_MAX": "Greater Max",
       "VISIBILITY_LEGEND": "Visibility",
@@ -1124,6 +1151,10 @@
       "HOLD_COVER_VISUALIZATION": {
         "name": "Hold for Cover Visualization",
         "hint": "Hold this key while hovering over tokens to visualize cover fields. Shows optimal positioning for attacks."
+      },
+      "SHOW_WALL_COVER_LABELS": {
+        "name": "Show Wall Cover Labels",
+        "hint": "Hold this key while the walls tool is active to show cover status labels on walls (AUTO, NONE, LESSER, STANDARD, GREATER)."
       },
       "OPEN_WALL_MANAGER": {
         "name": "Open Wall Manager",

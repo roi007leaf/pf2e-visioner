@@ -1,5 +1,6 @@
 import { MODULE_ID } from '../../../constants.js';
 import { getLogger } from '../../../utils/logger.js';
+import { scheduleTask } from '../../../utils/scheduler.js';
 import { BatchProcessor } from './BatchProcessor.js';
 import { ExclusionManager } from './ExclusionManager.js';
 import { LightingPrecomputer } from './LightingPrecomputer.js';
@@ -35,6 +36,29 @@ export class BatchOrchestrator {
     this.moduleId = dependencies.moduleId;
 
     this.processingBatch = false;
+    this._wasMinimized = false;
+    this._pendingPerceptionRefresh = false;
+    
+    // Listen for visibility changes to handle window being restored from minimized state
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', () => {
+        if (!document.hidden && this._wasMinimized) {
+          // Window just became visible after being minimized
+          this._wasMinimized = false;
+          this._pendingPerceptionRefresh = true;
+          
+          // Force immediate perception refresh
+          setTimeout(() => {
+            if (this._pendingPerceptionRefresh) {
+              this._forcePerceptionRefresh();
+              this._pendingPerceptionRefresh = false;
+            }
+          }, 100);
+        } else if (document.hidden) {
+          this._wasMinimized = true;
+        }
+      });
+    }
 
     // Coalescing and precompute cache
     this._pendingTokens = new Set();
@@ -388,8 +412,9 @@ export class BatchOrchestrator {
       if (!globalThis.game.pf2eVisioner) globalThis.game.pf2eVisioner = {};
       globalThis.game.pf2eVisioner.suppressLightingRefreshAfterBatch = true;
 
-      // Clear the flag after the next render frame to allow normal processing to resume
-      requestAnimationFrame(() => {
+      // Clear the flag after a short delay to allow normal processing to resume
+      // Using setTimeout instead of requestAnimationFrame so it works when window is unfocused
+      scheduleTask(() => {
         if (globalThis.game?.pf2eVisioner) {
           globalThis.game.pf2eVisioner.suppressLightingRefreshAfterBatch = false;
         }
@@ -635,9 +660,10 @@ export class BatchOrchestrator {
         // Also refresh everyone's perception via socket to ensure all clients see changes
         this._refreshEveryonesPerception();
       } finally {
-        // Clear the suppression flag after the current render frame
+        // Clear the suppression flag after a short delay
         // This ensures any queued lightingRefresh events from perception.update are suppressed
-        requestAnimationFrame(() => {
+        // Using setTimeout instead of requestAnimationFrame so it works when window is unfocused
+        scheduleTask(() => {
           if (globalThis.game?.pf2eVisioner) {
             globalThis.game.pf2eVisioner.suppressLightingRefresh = false;
           }
@@ -663,6 +689,30 @@ export class BatchOrchestrator {
       refreshEveryonesPerception();
     } catch {
       // Best effort - continue if socket service unavailable
+    }
+  }
+
+  /**
+   * Force full perception refresh (used when window is restored from minimized state)
+   * @private
+   */
+  async _forcePerceptionRefresh() {
+    try {
+      // Update canvas perception
+      if (canvas?.perception?.update) {
+        await canvas.perception.update({
+          refreshVision: true,
+          refreshLighting: true,
+          refreshOcclusion: true,
+          refreshSounds: false,
+          initializeVision: false,
+        });
+      }
+      
+      // Also refresh via socket
+      await this._refreshEveryonesPerception();
+    } catch (error) {
+      console.warn('[PF2E-Visioner] Error forcing perception refresh:', error);
     }
   }
 
@@ -746,10 +796,10 @@ export class BatchOrchestrator {
           );
         }
       } finally {
-        // Clear the suppression flags after the current event loop cycle completes
+        // Clear the suppression flags after a short delay
         // This ensures any queued refreshToken/lightingRefresh events are processed while suppressed
-        // Using requestAnimationFrame ensures we wait for the next render frame
-        requestAnimationFrame(() => {
+        // Using setTimeout instead of requestAnimationFrame so it works when window is unfocused
+        scheduleTask(() => {
           if (globalThis.game?.pf2eVisioner) {
             globalThis.game.pf2eVisioner.suppressRefreshTokenProcessing = false;
             globalThis.game.pf2eVisioner.suppressLightingRefresh = false;

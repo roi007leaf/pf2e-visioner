@@ -359,7 +359,26 @@
       "RANGE_LIMIT_ACTIVE": "Aktywne ograniczenie zasięgu: Wyświetlane są tylko cele znajdujące się w odległości do 30 stóp.",
       "RANGE_LIMIT_ACTIVE_CUSTOM": "Aktywne ograniczenie zasięgu: Wyświetlane są tylko cele znajdujące się w odległości {distance} stóp.",
       "NO_TARGETS_IN_RANGE": "Brak ważnych celów w zasięgu 30 stóp.",
-      "NO_TARGETS_IN_RANGE_CUSTOM": "Brak ważnych celów w zasięgu {distance} stóp.",
+      "NO_TARGETS_IN_RANGE_CUSTOM": "Brak ważnych celów w zasięgu {distance} stóp."
+    },
+    "SEEK_TEMPLATE_CONFIG": {
+      "TITLE": "Konfiguracja szablonu Szukania",
+      "DESCRIPTION": "Wybierz kształt i rozmiar szablonu dla akcji Szukanie.",
+      "TEMPLATE_TYPE": "Typ szablonu",
+      "BURST": "Wybuch (okrąg)",
+      "BURST_DESC": "Efekt okrągłego obszaru",
+      "CONE": "Stożek",
+      "CONE_DESC": "Obszar stożka o kącie 90 stopni",
+      "RECTANGLE": "Prostokąt",
+      "RECTANGLE_DESC": "Efekt obszaru kwadratowego / prostokątnego",
+      "LINE": "Linia (promień)",
+      "LINE_DESC": "Obszar prostej linii",
+      "RADIUS": "Promień",
+      "LENGTH": "Długość",
+      "SIZE": "Rozmiar",
+      "FEET": "stopy",
+      "CREATE": "Utwórz szablon",
+      "INVALID_RADIUS": "Promień musi wynosić od 1 do 1000 stóp",
       "ECHOLOCATION_LABEL": "Echolokacja",
       "ECHOLOCATION_TOOLTIP": "Precyzyjne słyszenie aktywne do momentu rozpoczęcia kolejnej tury",
       "LIFESENSE_LABEL": "Wyczucie Życia",
@@ -507,7 +526,7 @@
       },
       "AVS_ONLY_IN_COMBAT": {
         "name": "AVS aktywny tylko w walce",
-        "hint": "Po włączeniu, system automatycznej widoczności będzie aktywny tylko podczas spotkań bojowych i będzie śledzić widoczność tylko dla tokenów w spotkaniu. Widoczność zostanie zresetowana po zakończeniu walki."
+        "hint": "Po włączeniu system automatycznej widoczności będzie aktywny tylko podczas spotkań i będzie śledził widoczność tylko dla tokenów biorących udział w spotkaniu. Widoczność zostanie zresetowana po zakończeniu walki."
       },
       "DISABLE_LINE_OF_SIGHT": {
         "name": "Wyłącz rzucanie promieni w linii wzroku",
@@ -563,6 +582,10 @@
       "LIMIT_SEEK_RANGE": {
         "name": "Ogranicz zasięg Szukania w walce",
         "hint": "Cel zostanie wybrany na podstawie określonej odległości od tokenu przy użyciu Szukania podczas walki."
+      },
+      "SEEK_TEMPLATE_SKIP_DIALOG": {
+        "name": "Zawsze pomijaj okno dialogowe szablonu Szukania",
+        "hint": "Po włączeniu tej opcji okno dialogowe konfiguracji szablonu Szukania zostanie pominięte i zostaną użyte wartości domyślne (wybuch 15 stóp)."
       },
       "SEEK_USE_TEMPLATE": {
         "name": "Korzystanie z szablonu Szukania",
@@ -833,12 +856,14 @@
       "SET_ALL_WALLS_NON_HIDDEN_BULK": "Ustaw wszystkie ściany jako nieukryte",
       "SET_ALL_WALLS_AUTO_COVER": "Ustaw wszystkie ściany na Automatyczną Osłonę",
       "SET_ALL_WALLS_NO_COVER": "Ustaw wszystkie ściany na Brak Osłony",
+      "SET_ALL_WALLS_LESSER_COVER": "Ustaw wszystkie ściany na Mniejszą Osłonę",
       "SET_ALL_WALLS_STANDARD_COVER": "Ustaw wszystkie ściany na Standardową Osłonę",
       "SET_ALL_WALLS_GREATER_COVER": "Ustaw wszystkie ściany na Większą Osłonę",
       "WALL_TYPE_CYCLE_TOOLTIP": "Kliknięcie lewym przyciskiem myszy: następny typ | Kliknięcie prawym przyciskiem myszy: poprzedni typ",
       "SELECT_WALL_AND_PAN": "Wybierz ścianę i przesuń do niej",
       "WALL_COVER_AUTO_SHORT": "Automatyczne wykrywanie",
       "WALL_COVER_NONE_SHORT": "Brak osłony",
+      "WALL_COVER_LESSER_SHORT": "Mniejsza osłona",
       "WALL_COVER_STANDARD_SHORT": "Standardowa osłona",
       "WALL_COVER_GREATER_SHORT": "Większa osłona",
       "COVER_OVERRIDDEN_VIA": "Zastąpiono osłonę {source}: {originalLabel} → {finalLabel}",
@@ -859,6 +884,7 @@
       "SET_ALL_WALLS_AS": "Ustaw wszystkie wymienione ściany jako {state}",
       "WALL_COVER_AUTO_TOOLTIP": "Automatyczne wykrywanie — ściana zapewnia osłonę w oparciu o progi pokrycia.",
       "WALL_COVER_NONE_TOOLTIP": "Brak osłony – ściana nigdy nie zapewnia osłony, niezależnie od progów.",
+      "WALL_COVER_LESSER_TOOLTIP": "Maksymalna Mniejsza Osłona - Ściana zapewnia mniejszą osłonę w oparciu o progi",
       "WALL_COVER_STANDARD_TOOLTIP": "Maksymalna Standardowa osłona– Ściana zapewnia standardową osłonę w oparciu o progi",
       "WALL_COVER_GREATER_TOOLTIP": "Maksymalna Większa Osłona - Ściana zapewnia większą osłonę w oparciu o progi",
       "WALL_HIDDEN_TOOLTIP": "Oznacz tę ścianę jako ukrytą dla graczy",
@@ -934,6 +960,7 @@
       "ALL_COVER_TYPES": "Wszystkie rodzaje osłon",
       "AUTO_DETECTION": "Automatyczne wykrywanie",
       "NO_COVER_OPTION": "Brak osłony",
+      "LESSER_MAX": "Maksymalna wartość Mniejszej",
       "STANDARD_MAX": "Maksymalna wartość Standardowej",
       "GREATER_MAX": "Maksymalna wartość Większej",
       "VISIBILITY_LEGEND": "Widoczność",
@@ -991,6 +1018,10 @@
       "HOLD_COVER_VISUALIZATION": {
         "name": "Przytrzymaj, aby wyświetlić wizualizację osłony",
         "hint": "Przytrzymaj ten klawisz, najeżdżając kursorem na tokeny, aby wyświetlić pola osłony. Pokazuje optymalne pozycjonowanie do ataków."
+      },
+      "SHOW_WALL_COVER_LABELS": {
+        "name": "Pokaż etykiety osłon ścian",
+        "hint": "Przytrzymaj ten klawisz, gdy narzędzie ścian jest aktywne, aby wyświetlić etykiety stanu osłon ścian (AUTO, BRAK, MNIEJSZA, STANDARDOWA, WIĘKSZA)."
       },
       "OPEN_WALL_MANAGER": {
         "name": "Otwórz Menedżera ścian",

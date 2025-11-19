@@ -12,6 +12,10 @@
                 data-cover-override="none" data-tooltip="{{localize 'PF2E_VISIONER.UI.WALL_COVER_NONE_TOOLTIP'}}">
           <i class="fas fa-shield-slash cover-none"></i>
         </button>
+        <button type="button" class="visioner-icon-btn {{#if (eq coverOverride 'lesser')}}active{{/if}}" 
+                data-cover-override="lesser" data-tooltip="{{localize 'PF2E_VISIONER.UI.WALL_COVER_LESSER_TOOLTIP'}}">
+          <i class="fa-regular fa-shield cover-lesser"></i>
+        </button>
         <button type="button" class="visioner-icon-btn {{#if (eq coverOverride 'standard')}}active{{/if}}" 
                 data-cover-override="standard" data-tooltip="{{localize 'PF2E_VISIONER.UI.WALL_COVER_STANDARD_TOOLTIP'}}">
           <i class="fas fa-shield-alt cover-standard"></i>

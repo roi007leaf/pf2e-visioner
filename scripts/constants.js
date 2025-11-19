@@ -6,6 +6,44 @@ export const MODULE_ID = 'pf2e-visioner';
 export const MODULE_TITLE = 'PF2E Visioner';
 
 /**
+ * Visibility state enum values - string constants for visibility states
+ */
+export const VisibilityState = {
+  OBSERVED: 'observed',
+  CONCEALED: 'concealed',
+  HIDDEN: 'hidden',
+  UNDETECTED: 'undetected',
+};
+
+/**
+ * Lighting level enum values - string constants for lighting conditions
+ */
+export const LightingLevel = {
+  BRIGHT: 'bright',
+  DIM: 'dim',
+  DARKNESS: 'darkness',
+  MAGICAL_DARKNESS: 'magicalDarkness',
+  GREATER_MAGICAL_DARKNESS: 'greaterMagicalDarkness',
+};
+
+/**
+ * Sense type enum values - string constants for sense types used in detection
+ */
+export const SenseType = {
+  VISION: 'vision',
+  DARKVISION: 'darkvision',
+  GREATER_DARKVISION: 'greaterDarkvision',
+  LOW_LIGHT_VISION: 'lowLightVision',
+  HEARING: 'hearing',
+  TREMORSENSE: 'tremorsense',
+  LIFESENSE: 'lifesense',
+  SCENT: 'scent',
+  ECHOLOCATION: 'echolocation',
+  SEE_INVISIBILITY: 'see-invisibility',
+  LIGHT_PERCEPTION: 'light-perception',
+};
+
+/**
  * Visibility states supported by the module - aligned with PF2E detection conditions
  */
 export const VISIBILITY_STATES = {
@@ -154,7 +192,7 @@ export const SPECIAL_SENSES = {
     icon: 'fas fa-moon-over-sun',
     hasRangeLimit: true,
   },
-  'lowlightvision': {
+  lowlightvision: {
     label: 'PF2E_VISIONER.SPECIAL_SENSES.low_light_vision',
     description: 'PF2E_VISIONER.SPECIAL_SENSES.low_light_vision_description',
     type: 'precise',
@@ -671,6 +709,16 @@ export const DEFAULT_SETTINGS = {
     default: false,
   },
 
+  seekTemplateSkipDialog: {
+    name: 'PF2E_VISIONER.SETTINGS.SEEK_TEMPLATE_SKIP_DIALOG.name',
+    hint: 'PF2E_VISIONER.SETTINGS.SEEK_TEMPLATE_SKIP_DIALOG.hint',
+    scope: 'world',
+    config: true,
+    restricted: true,
+    type: Boolean,
+    default: false,
+  },
+
   limitSeekRangeInCombat: {
     name: 'PF2E_VISIONER.SETTINGS.LIMIT_SEEK_RANGE.name',
     hint: 'PF2E_VISIONER.SETTINGS.LIMIT_SEEK_RANGE.hint',
@@ -967,6 +1015,12 @@ export const KEYBINDINGS = {
     hint: 'PF2E_VISIONER.KEYBINDINGS.HOLD_COVER_VISUALIZATION.hint',
     editable: [{ key: 'KeyY', modifiers: [] }],
     restricted: false,
+  },
+  showWallCoverLabels: {
+    name: 'PF2E_VISIONER.KEYBINDINGS.SHOW_WALL_COVER_LABELS.name',
+    hint: 'PF2E_VISIONER.KEYBINDINGS.SHOW_WALL_COVER_LABELS.hint',
+    editable: [],
+    restricted: true,
   },
   openWallManager: {
     name: 'PF2E_VISIONER.KEYBINDINGS.OPEN_WALL_MANAGER.name',

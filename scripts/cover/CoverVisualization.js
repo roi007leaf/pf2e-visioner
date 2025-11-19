@@ -3,6 +3,7 @@ import { HoverTooltips } from '../services/HoverTooltips.js';
 import { getVisibilityBetween } from '../utils.js';
 import autoCoverSystem from './auto-cover/AutoCoverSystem.js';
 import { doesWallBlockAtElevation } from '../helpers/wall-height-utils.js';
+import { setPanningState } from '../utils/scheduler.js';
 /**
  * Cover field visualization system
  * Shows cover levels from cursor position to hovered token when hotkey is held
@@ -297,6 +298,10 @@ class CoverVisualization {
 
   tryActivateVisualization() {
     if (!this.keyPressed || !this.currentTarget) {
+      return;
+    }
+
+    if (HoverTooltips?._isPanning) {
       return;
     }
 

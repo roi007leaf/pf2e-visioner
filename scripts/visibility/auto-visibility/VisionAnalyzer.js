@@ -210,9 +210,14 @@ export class VisionAnalyzer {
     try {
       // Check for 3D collision using Levels if available
       // When Levels is active, rely entirely on 3D collision detection
+      // CRITICAL: Skip Levels 3D checks when window is minimized - they require rendered vision data
+      const isMinimized = typeof document !== 'undefined' && document.hidden;
       const levelsIntegration = LevelsIntegration.getInstance();
-      if (levelsIntegration.isActive) {
-        return !levelsIntegration.hasFloorCeilingBetween(observer, target);
+      if (levelsIntegration.isActive && !isMinimized) {
+        const has3DCollision = !levelsIntegration.hasFloorCeilingBetween(observer, target);
+        return has3DCollision;
+      } else if (levelsIntegration.isActive && isMinimized) {
+        // Fall through to 2D geometric LOS calculation below
       }
 
       // If the observer has an los shape, use that for line of sight against the target's circle
@@ -469,7 +474,7 @@ export class VisionAnalyzer {
 
       log.debug(
         () =>
-          `LOS-all-blocked-conservative: ${observer.name} -> ${target.name}, found only ${clearRays} clear rays (required ${requiredRays})`,
+          `LOS-no-clear-rays-conservative: ${observer.name} -> ${target.name}, found ${clearRays} clear rays (required ${requiredRays}), returning false`,
       );
       return false;
     } catch (error) {

@@ -1,3 +1,4 @@
+
 /**
  * VisibilityStateManager - Manages token visibility state changes and batch processing
  *
@@ -80,11 +81,9 @@ export class VisibilityStateManager {
     });
     this.#changedTokens.add(tokenId);
 
-    // Trigger immediate processing
-    // Use setTimeout(0) instead of requestAnimationFrame because rAF doesn't fire
-    // reliably when the browser tab/window is not focused
+    // Execute immediately (not scheduled) to avoid browser throttling when window is minimized
     if (!this.#processingBatch) {
-      setTimeout(() => this.#processBatch(), 0);
+      this.#processBatch();
     }
   }
 
@@ -142,11 +141,10 @@ export class VisibilityStateManager {
       }
     }
 
-    // Trigger immediate processing
-    // Use setTimeout(0) instead of requestAnimationFrame because rAF doesn't fire
-    // reliably when the browser tab/window is not focused
+    // Process SYNCHRONOUSLY to avoid browser throttling when window is minimized
+    // Foundry hooks fire even when minimized, so we can process immediately
     if (!this.#processingBatch) {
-      setTimeout(() => this.#processBatch(), 0);
+      this.#processBatch();
     }
   }
 
@@ -171,11 +169,10 @@ export class VisibilityStateManager {
       }
     });
 
-    // Trigger immediate processing
-    // Use setTimeout(0) instead of requestAnimationFrame because rAF doesn't fire
-    // reliably when the browser tab/window is not focused
+    // Process SYNCHRONOUSLY to avoid browser throttling when window is minimized
+    // Foundry hooks fire even when minimized, so we can process immediately
     if (!this.#processingBatch) {
-      setTimeout(() => this.#processBatch(), 0);
+      this.#processBatch();
     }
   }
 
@@ -325,11 +322,10 @@ export class VisibilityStateManager {
     // Add all specified tokens to the changed set
     tokenIds.forEach((id) => this.#changedTokens.add(id));
 
-    // Trigger immediate processing
-    // Use setTimeout(0) instead of requestAnimationFrame because rAF doesn't fire
-    // reliably when the browser tab/window is not focused
+    // Process SYNCHRONOUSLY to avoid browser throttling when window is minimized
+    // Foundry hooks fire even when minimized, so we can process immediately
     if (!this.#processingBatch) {
-      setTimeout(() => this.#processBatch(), 0);
+      this.#processBatch();
     }
   }
 

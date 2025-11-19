@@ -223,13 +223,16 @@ export class BatchProcessor {
     // Precompute LOS for all token pairs to avoid redundant checks
     // CRITICAL: Skip ALL precomputed LOS if this batch is after movement (skipPrecomputedLOS flag)
     // because token positions have changed and any precomputed LOS would be stale
+    // ALSO: Skip when window is minimized because vision polygons aren't computed
     const precomputedLOS = new Map();
+    
+    const isWindowMinimized = typeof document !== 'undefined' && document.hidden;
 
-    if (calcOptions?.skipPrecomputedLOS) {
+    if (calcOptions?.skipPrecomputedLOS || isWindowMinimized) {
       try {
         getLogger('AVS/BatchProcessor').debug(() => ({
           msg: 'skipping-all-precomputed-los',
-          reason: 'batch-after-movement',
+          reason: isWindowMinimized ? 'window-minimized' : 'batch-after-movement',
         }));
       } catch { }
     } else {
@@ -336,7 +339,7 @@ export class BatchProcessor {
       const potentialOthers = Math.max(0, allTokens.length - 1);
       const spatiallySkipped = Math.max(0, potentialOthers - relevantTokens.length);
       breakdown.pairsSkippedSpatial += spatiallySkipped * 2;
-
+      
       for (const otherToken of relevantTokens) {
         if (otherToken.document.id === changedTokenId) continue;
 

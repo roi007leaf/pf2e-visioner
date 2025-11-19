@@ -2,10 +2,6 @@
 
 ## [5.0.0] - 2025-10-24
 
-### 🎉 Major Release - Rule Elements System
-
-#### ✨ New Features
-
 **PF2eVisionerEffect Rule Element System:**
 
 - Complete rule element framework for advanced visibility and cover control
@@ -44,6 +40,124 @@
 - Integration with existing visibility and cover systems
 - Clean separation between rule element logic and effect application
 - Support for both PC and NPC actors
+
+## [4.5.7] - 2025-11-18
+
+### ⚡ Performance Improvements
+
+- Token border highlights now reuse a single `PIXI.Graphics` per token instead of recreating on every hover, eliminating runaway `canvas.tokens` children; covered by new `token-manager-borders` unit test
+- Introduced a centralized, pan-aware RAF scheduler so HoverTooltips, visual-effects pulses, and other animations throttle or pause while the canvas is panning/zooming; scheduler has dedicated unit coverage
+- Hover tooltips, cover overlays, and HUD badges now suspend DOM/PIXI work during pan/zoom and resume cleanly afterward, avoiding compounded FPS drops
+- Cover visualization and wall label overlays respect viewport culling and use a dedicated render layer so showing all labels at once no longer tanks performance
+
+### 🐛 Bug Fixes
+
+- Hover tooltips no longer misinterpret keybind releases during pan/zoom
+  - `onHighlightObjects(false)` clears `_savedKeyTooltipsActive`, preventing Alt/O overlays from relaunching immediately after keyup
+  - Regression test (`hover-tooltips-keybind-state.test.js`) reproduces the pan-lock scenario to guard future changes
+- Wall cover labels respect the keybinding lifecycle: holding the key shows all manual overrides simultaneously, releasing it clears every label and destroys the dedicated layer to avoid lingering sprites
+
+## [4.5.6] - 2025-11-16
+
+### ✨ Features
+
+- **Lesser Cover Wall Override**: Added lesser cover as a wall cover override option
+  - New "Lesser Cover Maximum" option in Wall Manager and wall quick config
+  - Walls can now be set to provide up to lesser cover based on coverage thresholds
+  - Added bulk action to set all walls to lesser cover
+  - Cover cycling now includes lesser: auto → none → lesser → standard → greater → auto
+
+### 🐛 Bug Fixes
+
+- **Wall Cover Override Logic**: Fixed wall cover override behavior
+  - Cover-granting overrides (lesser/standard/greater) now apply if wall intersects line, regardless of natural blocking
+  - Override 'none' only applies if wall would naturally block (to remove natural cover)
+  - Ensures overrides work correctly even when walls wouldn't naturally provide cover
+
+### ⚡ Performance Improvements
+
+- **UI Hook Optimization**: Reduced unnecessary UI re-renders
+  - Token and wall cover cycling tools only re-render when icon/title actually changes
+  - Update token tool only refreshes on visioner-related flag changes
+  - Prevents redundant control panel updates during token/wall updates
+- **Canvas Panning Performance**: Optimized operations during canvas panning
+  - Skip wall identifier label refresh during active panning
+  - Skip hover tooltip badge position updates during panning
+  - Skip animation frame scheduling during panning to reduce RAF overhead
+  - Cache canvas rect to avoid forced reflows during panning
+  - Batch DOM transform updates to minimize layout thrashing
+
+## [4.5.5] - 2025-11-14
+
+### ✨ Features
+
+- **Seek Template Dialog Enhancements**:
+  - Added Shift+Click on "Setup Seek Template" button to skip dialog and use defaults burst 15ft.
+  - Added "Always Skip Seek Template Dialog" setting to always use default values (15ft burst)
+  - Changed label from "Radius" to "Length" when selecting line (ray) template type
+
+### 🐛 Bug Fixes
+
+- **Seek Template Dialog Close Button**: Fixed dialog not reopening after closing with X button
+  - Dialog now properly resolves promise when closed via X button or Cancel
+  - Ensures template setup can be used again after closing dialog
+
+## [4.5.4] - 2025-11-12
+
+### ✨ Features
+
+- **Customizable Seek Template Dialog**: Added dialog to configure Seek template type and radius
+  - Choose from burst (circle), cone (90 degrees), or line (ray) template types
+  - Configurable radius in feet (defaults to 15 feet burst)
+  - Works for both GM and player template creation
+
+### 🐛 Bug Fixes
+
+- **Seek Results Template Filtering**: Fixed Seek results dialog showing tokens outside template when reopened
+  - Improved template lookup to check both `canvas.scene.templates` and `canvas.templates.placeables`
+  - Fixed token ID consistency by using `actorToken.id` instead of `actor.id` for template matching
+  - Filter out outcomes marked as `changed: false` when template is present
+- **Template Type Resolution**: Fixed undefined `fallbackTemplate` variable error in event-binder
+
+- **Window Minimization Support**: Fixed AVS visibility calculations not working when GM window is minimized
+  - Replaced `requestAnimationFrame` with synchronous batch processing to bypass browser throttling
+  - Added automatic perception refresh when window is restored from minimized state
+  - Implemented Levels module compatibility: bypasses 3D collision detection when minimized, uses 2D geometric LOS
+  - Window state listener detects minimize/restore and triggers full perception refresh on restore
+  - Ensures all visibility state changes apply correctly even when Foundry window is in background
+  - Perfect for GMs running multiple applications or streaming while game window is minimized
+
+## [4.5.3] - 2025-11-09
+
+### ✨ Features
+
+- **Customizable Wall Cover Labels Keybind**: Replaced Alt key handling with a configurable keybinding for showing wall cover labels
+  - New keybinding: "Show Wall Cover Labels" in Controls settings
+  - Hold the configured key while the walls tool is active to display cover status labels (NONE, LESSER, STANDARD, GREATER) on walls
+  - Labels automatically hide when the key is released or when switching away from the walls tool
+  - Prevents interference with Foundry's native Alt-click functionality for wall selection
+  - Only shows labels for walls with explicit cover overrides (AUTO labels are not displayed)
+
+## [4.5.2] - 2025-11-02
+
+### Changed
+
+- **Lifesense Targeting**: Changed targeting from right-click/shift+right-click to T/Shift+T keys
+  - Hover over lifesense indicators and press T to target token (releases others)
+  - Shift+T adds/removes token from selection
+
+## [4.5.1] - 2025-11-01
+
+### 🐛 Bug Fixes
+
+- Made wall cover labels performance better
+- Remove tooltips from the screen when changing scenes
+
+## [4.5.0] - 2025-01-XX
+
+### 🎉 Major Release - Rule Elements System
+
+#### ✨ New Features
 
 ## [4.4.13] - 2025-10-25
 

@@ -1,17 +1,28 @@
 // Facade around seek template helpers to keep UI layer clean
 
-export async function setupSeekTemplate(actionData) {
+export async function setupSeekTemplate(actionData, skipDialog = false) {
   const { notify } = await import('../infra/notifications.js');
+  const { MODULE_ID } = await import('../../../constants.js');
+
+  let config = null;
+  if (!skipDialog && !game.settings.get(MODULE_ID, 'seekTemplateSkipDialog')) {
+    const { SeekTemplateConfigDialog } = await import('../../dialogs/SeekTemplateConfigDialog.js');
+    config = await SeekTemplateConfigDialog.choose();
+    if (!config) {
+      return;
+    }
+  }
+
+  const templateType = config?.templateType || 'circle';
+  const radius = config?.radius || 15;
+  const distance = radius;
 
   notify.info(game.i18n.localize('PF2E_VISIONER.SEEK_AUTOMATION.SETUP_TEMPLATE_TOOLTIP'));
 
-  // Clean up any existing seek templates for this actor before creating a new one
   await cleanupOrphanedSeekTemplates(actionData.actor?.id, game.userId);
-
-  const distance = 15;
   if (game.user.isGM) {
     const tplData = {
-      t: 'circle',
+      t: templateType,
       user: game.userId,
       distance,
       fillColor: game.user?.color || '#ff9800',
@@ -26,6 +37,13 @@ export async function setupSeekTemplate(actionData) {
         'pf2e-toolbelt': { betterTemplate: { skip: true } },
       },
     };
+
+    if (templateType === 'cone') {
+      tplData.angle = 90;
+      tplData.direction = 0;
+    } else if (templateType === 'ray') {
+      tplData.width = 5;
+    }
     let dispatched = false;
     await new Promise((resolve) => {
       const createHookId = Hooks.on('createMeasuredTemplate', async (doc) => {
@@ -33,14 +51,16 @@ export async function setupSeekTemplate(actionData) {
         try {
           Hooks.off('createMeasuredTemplate', createHookId);
           try {
-            await doc.update({
+            const updateData = {
               [`flags.pf2e-visioner.seekPreviewManual`]: true,
               [`flags.pf2e-visioner.messageId`]: actionData.messageId,
               [`flags.pf2e-visioner.actorTokenId`]: actionData.actor.id,
-            });
+            };
+            await doc.update(updateData);
           } catch (_) { }
           actionData.seekTemplateCenter = { x: doc.x, y: doc.y };
           actionData.seekTemplateRadiusFeet = Number(doc.distance) || distance;
+          actionData.seekTemplateType = templateType;
           // Determine presence of potential targets within template by proximity
           const tokens = canvas?.tokens?.placeables || [];
           const targets = tokens.filter((t) => t && t !== actionData.actor && t.actor);
@@ -72,17 +92,17 @@ export async function setupSeekTemplate(actionData) {
             ]);
             if (created) {
               try {
-                await canvas.scene.updateEmbeddedDocuments('MeasuredTemplate', [
-                  {
-                    _id: created.id,
-                    [`flags.pf2e-visioner.seekPreviewManual`]: true,
-                    [`flags.pf2e-visioner.messageId`]: actionData.messageId,
-                    [`flags.pf2e-visioner.actorTokenId`]: actionData.actor.id,
-                  },
-                ]);
+                const updateData = {
+                  _id: created.id,
+                  [`flags.pf2e-visioner.seekPreviewManual`]: true,
+                  [`flags.pf2e-visioner.messageId`]: actionData.messageId,
+                  [`flags.pf2e-visioner.actorTokenId`]: actionData.actor.id,
+                };
+                await canvas.scene.updateEmbeddedDocuments('MeasuredTemplate', [updateData]);
               } catch (_) { }
               actionData.seekTemplateCenter = { x: created.x, y: created.y };
               actionData.seekTemplateRadiusFeet = Number(created.distance) || distance;
+              actionData.seekTemplateType = templateType;
               const tokens = canvas?.tokens?.placeables || [];
               const targets = tokens.filter((t) => t && t !== actionData.actor && t.actor);
               if (targets.length > 0) {
@@ -100,9 +120,8 @@ export async function setupSeekTemplate(actionData) {
     });
     return;
   }
-  // Player path
   const tplData = {
-    t: 'circle',
+    t: templateType,
     user: game.userId,
     distance,
     fillColor: game.user?.color || '#ff9800',
@@ -110,6 +129,13 @@ export async function setupSeekTemplate(actionData) {
     texture: null,
     flags: { 'pf2e-toolbelt': { betterTemplate: { skip: true } } },
   };
+
+  if (templateType === 'cone') {
+    tplData.angle = 90;
+    tplData.direction = 0;
+  } else if (templateType === 'ray') {
+    tplData.width = 5;
+  }
   let usedPreview = false;
   await new Promise((resolve) => {
     const createHookId = Hooks.on('createMeasuredTemplate', async (doc) => {
@@ -121,7 +147,7 @@ export async function setupSeekTemplate(actionData) {
         const radius = Number(doc.distance) || distance;
         actionData.seekTemplateCenter = center;
         actionData.seekTemplateRadiusFeet = radius;
-        // Keep the player's template on the scene so the GM can reuse it
+        actionData.seekTemplateType = templateType;
         try {
           await doc.update({
             ['flags.pf2e-visioner.seekPreviewManual']: true,
@@ -139,18 +165,19 @@ export async function setupSeekTemplate(actionData) {
             const targets = all.filter((t) => t && t !== actionData.actor && t.actor);
             const { isTokenWithinTemplate } = await import('../infra/shared-utils.js');
             const hasTargets = targets.some((t) => isTokenWithinTemplate(center, radius, t));
-            await msg.update({
-              ['flags.pf2e-visioner.seekTemplate']: {
-                center,
-                radiusFeet: radius,
-                actorTokenId: actionData.actor.id,
-                rollTotal: actionData.roll?.total ?? null,
-                dieResult:
-                  actionData.roll?.dice?.[0]?.total ?? actionData.roll?.terms?.[0]?.total ?? null,
-                fromUserId: game.userId,
-                hasTargets,
-              },
-            });
+              await msg.update({
+                ['flags.pf2e-visioner.seekTemplate']: {
+                  center,
+                  radiusFeet: radius,
+                  templateType,
+                  actorTokenId: actionData.actor.id,
+                  rollTotal: actionData.roll?.total ?? null,
+                  dieResult:
+                    actionData.roll?.dice?.[0]?.total ?? actionData.roll?.terms?.[0]?.total ?? null,
+                  fromUserId: game.userId,
+                  hasTargets,
+                },
+              });
           }
         } catch (_) { }
         const roll = actionData.roll || game.messages.get(actionData.messageId)?.rolls?.[0] || null;
@@ -163,6 +190,7 @@ export async function setupSeekTemplate(actionData) {
           actionData.messageId,
           rollTotal,
           dieResult,
+          templateType,
         );
       } finally {
         resolve();
@@ -188,6 +216,7 @@ export async function setupSeekTemplate(actionData) {
           };
           actionData.seekTemplateCenter = { x: snapped.x, y: snapped.y };
           actionData.seekTemplateRadiusFeet = distance;
+          actionData.seekTemplateType = templateType;
           const { requestGMOpenSeekWithTemplate } = await import('../../socket.js');
           try {
             // Best-effort: annotate chat message flags immediately
@@ -203,6 +232,7 @@ export async function setupSeekTemplate(actionData) {
                 ['flags.pf2e-visioner.seekTemplate']: {
                   center: actionData.seekTemplateCenter,
                   radiusFeet: distance,
+                  templateType,
                   actorTokenId: actionData.actor.id,
                   rollTotal: actionData.roll?.total ?? null,
                   dieResult:
@@ -224,6 +254,7 @@ export async function setupSeekTemplate(actionData) {
             actionData.messageId,
             rollTotal,
             dieResult,
+            templateType,
           );
           const tokens = canvas?.tokens?.placeables || [];
           const targets = tokens.filter((t) => t && t !== actionData.actor && t.actor);

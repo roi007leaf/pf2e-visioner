@@ -32,6 +32,7 @@
         <option value="">{{localize "PF2E_VISIONER.UI.ALL_COVER_TYPES"}}</option>
         <option value="auto">{{localize "PF2E_VISIONER.UI.AUTO_DETECTION"}}</option>
         <option value="none">{{localize "PF2E_VISIONER.UI.NO_COVER_OPTION"}}</option>
+        <option value="lesser">{{localize "PF2E_VISIONER.UI.LESSER_MAX"}}</option>
         <option value="standard">{{localize "PF2E_VISIONER.UI.STANDARD_MAX"}}</option>
         <option value="greater">{{localize "PF2E_VISIONER.UI.GREATER_MAX"}}</option>
       </select>
@@ -51,6 +52,9 @@
       </button>
       <button type="button" class="visioner-icon-btn" data-action="bulkCoverNone" data-tooltip="{{localize 'PF2E_VISIONER.UI.SET_ALL_WALLS_NO_COVER'}}">
         <i class="fas fa-shield-slash icon-color-cover-none"></i>
+      </button>
+      <button type="button" class="visioner-icon-btn" data-action="bulkCoverLesser" data-tooltip="{{localize 'PF2E_VISIONER.UI.SET_ALL_WALLS_LESSER_COVER'}}">
+        <i class="fa-regular fa-shield icon-color-cover-lesser"></i>
       </button>
       <button type="button" class="visioner-icon-btn" data-action="bulkCoverStandard" data-tooltip="{{localize 'PF2E_VISIONER.UI.SET_ALL_WALLS_STANDARD_COVER'}}">
         <i class="fas fa-shield-alt icon-color-cover-standard"></i>
@@ -103,6 +107,11 @@
                       data-action="setCoverOverride" data-wall-id="{{w.id}}" data-cover-override="none" 
                       data-tooltip="{{localize 'PF2E_VISIONER.UI.WALL_COVER_NONE_SHORT'}}">
                 <i class="fas fa-shield-slash icon-color-cover-none"></i>
+              </button>
+              <button type="button" class="visioner-icon-btn {{#if (eq w.coverOverride 'lesser')}}active{{/if}}" 
+                      data-action="setCoverOverride" data-wall-id="{{w.id}}" data-cover-override="lesser" 
+                      data-tooltip="{{localize 'PF2E_VISIONER.UI.WALL_COVER_LESSER_SHORT'}}">
+                <i class="fa-regular fa-shield icon-color-cover-lesser"></i>
               </button>
               <button type="button" class="visioner-icon-btn {{#if (eq w.coverOverride 'standard')}}active{{/if}}" 
                       data-action="setCoverOverride" data-wall-id="{{w.id}}" data-cover-override="standard" 

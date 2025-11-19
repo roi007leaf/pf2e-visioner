@@ -4,13 +4,15 @@
  */
 
 import { MODULE_ID } from '../constants.js';
+import { scheduleTaskWithKeepAlive } from '../utils/scheduler.js';
 
 // Track if a refresh is already scheduled
 let _refreshScheduled = false;
 
 /**
- * Optimized perception refresh - uses requestAnimationFrame instead of setTimeout
+ * Optimized perception refresh - uses keep-alive scheduler
  * No artificial delays since event-driven batching prevents spam naturally
+ * Uses keep-alive to work even when window is minimized (critical for GM)
  */
 export function refreshEveryonesPerceptionOptimized() {
   // If already scheduled, don't duplicate
@@ -18,8 +20,9 @@ export function refreshEveryonesPerceptionOptimized() {
 
   _refreshScheduled = true;
 
-  // Use requestAnimationFrame for optimal timing with rendering
-  requestAnimationFrame(async () => {
+  // Use keep-alive scheduler so it works even when window is minimized
+  // Critical for GM windows processing player movements in the background
+  scheduleTaskWithKeepAlive(async () => {
     try {
       // Import the original socket service
       const { _socketService, REFRESH_CHANNEL } = await import('./socket.js');

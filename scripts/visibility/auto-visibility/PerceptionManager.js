@@ -5,6 +5,7 @@
 
 import { MODULE_ID } from '../../constants.js';
 import { refreshEveryonesPerception } from '../../services/socket.js';
+import { scheduleTaskWithKeepAlive } from '../../utils/scheduler.js';
 
 export class OptimizedPerceptionManager {
   /** @type {OptimizedPerceptionManager} */
@@ -32,8 +33,9 @@ export class OptimizedPerceptionManager {
   }
 
   /**
-   * Refresh perception immediately or schedule for next frame
+   * Refresh perception immediately or schedule for next task
    * No artificial delays - relies on event-driven batching to prevent spam
+   * Uses keep-alive scheduler to work even when window is minimized (critical for GM)
    */
   refreshPerception() {
     // If already scheduled, don't duplicate
@@ -41,8 +43,9 @@ export class OptimizedPerceptionManager {
 
     this.#refreshScheduled = true;
 
-    // Use requestAnimationFrame for optimal timing with rendering
-    requestAnimationFrame(() => {
+    // Use keep-alive scheduler so it works even when window is minimized
+    // Critical for GM windows processing player movements in the background
+    scheduleTaskWithKeepAlive(() => {
       this.#doRefreshPerception();
       this.#refreshScheduled = false;
     });

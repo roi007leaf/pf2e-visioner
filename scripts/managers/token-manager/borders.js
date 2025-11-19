@@ -4,8 +4,16 @@
 
 export function addTokenBorder(token, strong = false) {
   if (!token) return;
-  removeTokenBorder(token);
-  const border = new PIXI.Graphics();
+  
+  let border = token._highlightBorder;
+  if (!border) {
+    border = new PIXI.Graphics();
+    token._highlightBorder = border;
+    canvas.tokens.addChild(border);
+  } else {
+    border.clear();
+  }
+  
   const padding = 4;
   const borderColor = strong ? 0xffd700 : 0xffa500;
   const borderWidth = strong ? 3 : 2;
@@ -22,8 +30,6 @@ export function addTokenBorder(token, strong = false) {
   );
   border.x = token.document.x + tokenWidth / 2;
   border.y = token.document.y + tokenHeight / 2;
-  canvas.tokens.addChild(border);
-  token._highlightBorder = border;
 }
 
 export function removeTokenBorder(token) {

@@ -571,68 +571,157 @@ export function filterOutcomesBySeekDistance(outcomes, seeker, tokenProperty = '
 }
 
 /**
- * Check whether a token's center lies within a circular template (in feet)
- * @param {{x:number,y:number}} center - Circle center in canvas coordinates (pixels)
- * @param {number} radiusFeet - Radius of the circle in feet
- * @param {Token} token - Token to test for inclusion
+ * Check whether a token's center lies within a template
+ * @param {{x:number,y:number}} center - Template center/start in canvas coordinates (pixels)
+ * @param {number} radiusFeet - Template size in feet (radius for circle, distance for others)
+ * @param {Token|Wall} token - Token or wall to test for inclusion
+ * @param {string} templateType - Template type: 'circle', 'cone', 'rect', 'ray'
+ * @param {string} messageId - Optional message ID to find the actual template object
+ * @param {string} actorTokenId - Optional actor token ID to find the actual template object
  * @returns {boolean}
  */
-export function isTokenWithinTemplate(center, radiusFeet, token) {
+export function isTokenWithinTemplate(center, radiusFeet, token, templateType = 'circle', messageId = null, actorTokenId = null) {
   try {
     if (!center || !token) return false;
-    const tokenCenter = token.center || {
-      x: token.x + (token.w ?? token.width * canvas.grid.size) / 2,
-      y: token.y + (token.h ?? token.height * canvas.grid.size) / 2,
-    };
-    const dx = tokenCenter.x - center.x;
-    const dy = tokenCenter.y - center.y;
-    const distancePixels = Math.hypot(dx, dy);
-    const gridSize = canvas.grid?.size || 1;
-    const gridDistance = canvas.grid?.distance || 5; // Foundry scene distance per grid space (PF2e defaults to 5 ft)
-    const feetPerPixel = gridDistance / gridSize;
-    const distanceFeet = distancePixels * feetPerPixel;
-    return distanceFeet <= radiusFeet;
+
+    if (messageId && actorTokenId) {
+      let template = canvas.scene?.templates?.find?.((t) => {
+        const f = t?.flags?.['pf2e-visioner'];
+        return (
+          (f?.seekPreviewManual || f?.seekTemplate) &&
+          f?.messageId === messageId &&
+          f?.actorTokenId === actorTokenId
+        );
+      });
+      if (!template) {
+        template = canvas.templates?.placeables?.find?.((t) => {
+          const f = t?.flags?.['pf2e-visioner'];
+          return (
+            (f?.seekPreviewManual || f?.seekTemplate) &&
+            f?.messageId === messageId &&
+            f?.actorTokenId === actorTokenId
+          );
+        });
+      }
+
+      if (template && template.shape) {
+        const tokenCenter = token.center || {
+          x: token.x + (token.w ?? token.width * canvas.grid.size) / 2,
+          y: token.y + (token.h ?? token.height * canvas.grid.size) / 2,
+        };
+        const localX = tokenCenter.x - template.x;
+        const localY = tokenCenter.y - template.y;
+        return template.shape.contains(localX, localY);
+      }
+    }
+
+    if (templateType === 'circle') {
+      const tokenCenter = token.center || {
+        x: token.x + (token.w ?? token.width * canvas.grid.size) / 2,
+        y: token.y + (token.h ?? token.height * canvas.grid.size) / 2,
+      };
+      const dx = tokenCenter.x - center.x;
+      const dy = tokenCenter.y - center.y;
+      const distancePixels = Math.hypot(dx, dy);
+      const gridSize = canvas.grid?.size || 1;
+      const gridDistance = canvas.grid?.distance || 5;
+      const feetPerPixel = gridDistance / gridSize;
+      const distanceFeet = distancePixels * feetPerPixel;
+      return distanceFeet <= radiusFeet;
+    }
+
+    return false;
   } catch (_) {
     return false;
   }
 }
 
 /**
- * Filter outcomes to only those whose token lies within a circular template
+ * Filter outcomes to only those whose token lies within a template
  * @param {Array} outcomes
  * @param {{x:number,y:number}} center
  * @param {number} radiusFeet
  * @param {string} tokenProperty
+ * @param {string} templateType - Template type: 'circle', 'cone', 'rect', 'ray'
+ * @param {string} messageId - Optional message ID to find the actual template object
+ * @param {string} actorTokenId - Optional actor token ID to find the actual template object
  * @returns {Array}
  */
-export function filterOutcomesByTemplate(outcomes, center, radiusFeet, tokenProperty = 'target') {
+export function filterOutcomesByTemplate(outcomes, center, radiusFeet, tokenProperty = 'target', templateType = 'circle', messageId = null, actorTokenId = null) {
   try {
     if (!Array.isArray(outcomes) || !center || !Number.isFinite(radiusFeet) || radiusFeet <= 0)
       return outcomes;
 
+    let template = null;
+    if (messageId && actorTokenId) {
+      template = canvas.scene?.templates?.find?.((t) => {
+        const f = t?.flags?.['pf2e-visioner'];
+        return (
+          (f?.seekPreviewManual || f?.seekTemplate) &&
+          f?.messageId === messageId &&
+          f?.actorTokenId === actorTokenId
+        );
+      });
+      if (!template) {
+        template = canvas.templates?.placeables?.find?.((t) => {
+          const f = t?.flags?.['pf2e-visioner'];
+          return (
+            (f?.seekPreviewManual || f?.seekTemplate) &&
+            f?.messageId === messageId &&
+            f?.actorTokenId === actorTokenId
+          );
+        });
+      }
+    }
+
     return outcomes.filter((outcome) => {
-      // Special handling for walls - use wall center instead of target token
-      if (outcome?._isWall && outcome?.wall) {
-        const wallCenter = outcome.wall.center;
-        if (wallCenter) {
-          const dx = wallCenter.x - center.x;
-          const dy = wallCenter.y - center.y;
-          const distanceFeet = Math.sqrt(dx * dx + dy * dy) / (canvas.scene.grid.size / 5);
-          return distanceFeet <= radiusFeet;
-        }
-        // If wall center is not accessible, exclude the wall
+      if (outcome?.changed === false && messageId) {
         return false;
       }
 
-      // Standard token handling - only for non-wall outcomes
-      const token = outcome?.[tokenProperty];
-      if (!token) return false;
+      if (template && template.shape) {
+        if (outcome?._isWall && outcome?.wall) {
+          const wallCenter = outcome.wall.center;
+          if (wallCenter) {
+            const localX = wallCenter.x - template.x;
+            const localY = wallCenter.y - template.y;
+            return template.shape.contains(localX, localY);
+          }
+          return false;
+        }
 
-      // Calculate distance manually for tokens
-      const dx = token.center.x - center.x;
-      const dy = token.center.y - center.y;
-      const distanceFeet = Math.sqrt(dx * dx + dy * dy) / (canvas.scene.grid.size / 5);
-      return distanceFeet <= radiusFeet;
+        const token = outcome?.[tokenProperty];
+        if (!token) return false;
+        const tokenCenter = token.center || {
+          x: token.x + (token.w ?? token.width * canvas.grid.size) / 2,
+          y: token.y + (token.h ?? token.height * canvas.grid.size) / 2,
+        };
+        const localX = tokenCenter.x - template.x;
+        const localY = tokenCenter.y - template.y;
+        return template.shape.contains(localX, localY);
+      }
+
+      if (templateType === 'circle') {
+        if (outcome?._isWall && outcome?.wall) {
+          const wallCenter = outcome.wall.center;
+          if (wallCenter) {
+            const dx = wallCenter.x - center.x;
+            const dy = wallCenter.y - center.y;
+            const distanceFeet = Math.sqrt(dx * dx + dy * dy) / (canvas.scene.grid.size / 5);
+            return distanceFeet <= radiusFeet;
+          }
+          return false;
+        }
+
+        const token = outcome?.[tokenProperty];
+        if (!token) return false;
+        const dx = token.center.x - center.x;
+        const dy = token.center.y - center.y;
+        const distanceFeet = Math.sqrt(dx * dx + dy * dy) / (canvas.scene.grid.size / 5);
+        return distanceFeet <= radiusFeet;
+      }
+
+      return false;
     });
   } catch (error) {
     console.error('Error in filterOutcomesByTemplate:', error);
