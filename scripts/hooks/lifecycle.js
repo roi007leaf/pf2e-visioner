@@ -35,17 +35,13 @@ async function reapplyRuleElementsOnLoad() {
 
       const itemsWithRules = actor.items?.filter(i => {
         const rules = i.system?.rules || [];
-        return rules.some(rule => rule.key === 'PF2eVisionerEffect' || rule.key === 'PF2eVisionerVisibility');
+        return rules.some(rule => rule.key === 'PF2eVisionerEffect');
       }) || [];
       log.debug(() => ({ msg: 'Actor items with Visioner rules scanned', actor: actor.name, items: itemsWithRules.length }));
 
       for (const item of itemsWithRules) {
         const rules = item.system?.rules || [];
-        const hasVisionerRules = rules.some(rule =>
-          rule.key === 'PF2eVisionerEffect' || rule.key === 'PF2eVisionerVisibility'
-        );
 
-        if (hasVisionerRules) {
           log.debug(() => ({
             msg: 'Found PF2eVisionerEffect on existing item, reapplying',
             itemName: item.name,
@@ -60,7 +56,7 @@ async function reapplyRuleElementsOnLoad() {
           await new Promise(resolve => setTimeout(resolve, 100));
 
           for (const rule of rules) {
-            if (rule.key === 'PF2eVisionerEffect' || rule.key === 'PF2eVisionerVisibility') {
+            if (rule.key === 'PF2eVisionerEffect') {
               try {
                 // Try to get the rule element instance from the effect
                 let instance = null;
@@ -110,7 +106,7 @@ async function reapplyRuleElementsOnLoad() {
           if (hasAppliedRules) {
             tokensWithRuleElements.push(token.id);
           }
-        }
+        
       }
     } catch (error) {
       log.warn(() => ({
