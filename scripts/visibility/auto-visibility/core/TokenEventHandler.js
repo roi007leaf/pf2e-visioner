@@ -103,15 +103,18 @@ export class TokenEventHandler {
       const token = tokenDoc.object;
       if (!token?.actor) return;
 
-      const effects = token.actor.items?.filter(i => i.type === 'effect') || [];
-      for (const effect of effects) {
-        const rules = effect.system?.rules || [];
+      const itemsWithRules = token.actor.items?.filter(i => {
+        const rules = i.system?.rules || [];
+        return rules.some(rule => rule.key === 'PF2eVisionerEffect' || rule.key === 'PF2eVisionerVisibility');
+      }) || [];
+      for (const item of itemsWithRules) {
+        const rules = item.system?.rules || [];
         const hasVisionerRules = rules.some(rule =>
           rule.key === 'PF2eVisionerEffect' || rule.key === 'PF2eVisionerVisibility'
         );
 
-        if (hasVisionerRules && Array.isArray(effect.ruleElements)) {
-          for (const ruleElement of effect.ruleElements) {
+        if (hasVisionerRules && Array.isArray(item.ruleElements)) {
+          for (const ruleElement of item.ruleElements) {
             if ((ruleElement.key === 'PF2eVisionerEffect' || ruleElement.key === 'PF2eVisionerVisibility') &&
                 typeof ruleElement.applyOperations === 'function') {
               await ruleElement.applyOperations();

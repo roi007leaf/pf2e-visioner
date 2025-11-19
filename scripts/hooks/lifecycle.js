@@ -33,19 +33,23 @@ async function reapplyRuleElementsOnLoad() {
 
       await cleanupStaleRuleElementFlags(token, actor, log);
 
-      const effects = actor.items?.filter(i => i.type === 'effect') || [];
-      log.debug(() => ({ msg: 'Actor effects scanned', actor: actor.name, effects: effects.length }));
+      const itemsWithRules = actor.items?.filter(i => {
+        const rules = i.system?.rules || [];
+        return rules.some(rule => rule.key === 'PF2eVisionerEffect' || rule.key === 'PF2eVisionerVisibility');
+      }) || [];
+      log.debug(() => ({ msg: 'Actor items with Visioner rules scanned', actor: actor.name, items: itemsWithRules.length }));
 
-      for (const effect of effects) {
-        const rules = effect.system?.rules || [];
+      for (const item of itemsWithRules) {
+        const rules = item.system?.rules || [];
         const hasVisionerRules = rules.some(rule =>
           rule.key === 'PF2eVisionerEffect' || rule.key === 'PF2eVisionerVisibility'
         );
 
         if (hasVisionerRules) {
           log.debug(() => ({
-            msg: 'Found PF2eVisionerEffect on existing effect, reapplying',
-            effectName: effect.name,
+            msg: 'Found PF2eVisionerEffect on existing item, reapplying',
+            itemName: item.name,
+            itemType: item.type,
             actorName: actor.name,
             tokenId: token.id
           }));
@@ -61,9 +65,9 @@ async function reapplyRuleElementsOnLoad() {
                 // Try to get the rule element instance from the effect
                 let instance = null;
                 
-                // First try to get from effect.ruleElements
-                if (Array.isArray(effect.ruleElements)) {
-                  instance = effect.ruleElements.find(r => r?.key === rule.key && (r?.slug === rule.slug || !rule.slug));
+                // First try to get from item.ruleElements
+                if (Array.isArray(item.ruleElements)) {
+                  instance = item.ruleElements.find(r => r?.key === rule.key && (r?.slug === rule.slug || !rule.slug));
                 }
                 
                 // If not found, try to create a temporary instance for reapplication
@@ -72,14 +76,14 @@ async function reapplyRuleElementsOnLoad() {
                     // Deep clone the rule data to make it extensible
                     const clonedRule = JSON.parse(JSON.stringify(rule));
                     const RuleElementClass = game.pf2e.RuleElements.custom[rule.key];
-                    instance = new RuleElementClass(clonedRule, effect);
+                    instance = new RuleElementClass(clonedRule, item);
                     log.debug(() => ({ msg: 'Created temporary rule element instance', ruleKey: rule.key }));
                   } catch (error) {
                     log.debug(() => ({ msg: 'Failed to create temporary instance', ruleKey: rule.key, error: error.message }));
                   }
                 }
 
-                log.debug(() => ({ msg: 'Rule instance lookup', effect: effect.name, ruleKey: rule.key, hasInstance: !!instance, hasApply: !!(instance && typeof instance.applyOperations === 'function') }));
+                log.debug(() => ({ msg: 'Rule instance lookup', itemName: item.name, ruleKey: rule.key, hasInstance: !!instance, hasApply: !!(instance && typeof instance.applyOperations === 'function') }));
 
                 if (instance && typeof instance.applyOperations === 'function') {
                   await instance.applyOperations();
@@ -87,16 +91,16 @@ async function reapplyRuleElementsOnLoad() {
                   log.debug(() => ({
                     msg: 'Successfully reapplied rule element operations',
                     ruleKey: rule.key,
-                    effectName: effect.name
+                    itemName: item.name
                   }));
                 } else {
-                  log.debug(() => ({ msg: 'No applicable instance to apply', effect: effect.name, ruleKey: rule.key }));
+                  log.debug(() => ({ msg: 'No applicable instance to apply', itemName: item.name, ruleKey: rule.key }));
                 }
               } catch (error) {
                 log.warn(() => ({
                   msg: 'Failed to reapply individual rule',
                   ruleKey: rule.key,
-                  effectName: effect.name,
+                  itemName: item.name,
                   error: error.message
                 }));
               }
