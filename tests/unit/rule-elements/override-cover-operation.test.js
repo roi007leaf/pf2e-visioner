@@ -478,3 +478,95 @@ describe('overrideCover Operation - Rule Element', () => {
         });
     });
 });
+
+describe('CoverOverride Helpers', () => {
+    let mockSubjectToken;
+    let mockTargetTokens;
+
+    beforeEach(() => {
+        mockSubjectToken = {
+            id: 'subject-token',
+            actor: { hasPlayerOwner: true },
+            document: {
+                id: 'subject-token',
+                setFlag: jest.fn(() => Promise.resolve()),
+                getFlag: jest.fn(() => null),
+            },
+        };
+
+        mockTargetTokens = [
+            {
+                id: 'target-1',
+                actor: { hasPlayerOwner: true },
+                document: { id: 'target-1' },
+            },
+            {
+                id: 'target-2',
+                actor: { hasPlayerOwner: false, token: { disposition: -1 } },
+                document: { id: 'target-2' },
+            },
+        ];
+
+        global.canvas = {
+            tokens: {
+                placeables: [mockSubjectToken, ...mockTargetTokens],
+            },
+            grid: {
+                measureDistance: jest.fn(() => 10),
+            },
+        };
+    });
+
+    describe('getTargetTokens', () => {
+        it('should return all tokens when targets is "all"', async () => {
+            const tokens = CoverOverride.getTargetTokens(mockSubjectToken, 'all');
+            expect(tokens.length).toBe(2);
+        });
+
+        it('should filter specific tokens when targets is "specific"', async () => {
+            const tokenIds = ['target-1'];
+            const tokens = CoverOverride.getTargetTokens(mockSubjectToken, 'specific', null, tokenIds);
+
+            expect(tokens.length).toBe(1);
+            expect(tokens[0].id).toBe('target-1');
+        });
+
+        it('should apply range filter', async () => {
+            global.canvas.grid.measureDistance = jest.fn().mockReturnValueOnce(5).mockReturnValueOnce(25);
+            const tokens = CoverOverride.getTargetTokens(mockSubjectToken, 'all', 20);
+            expect(tokens.length).toBe(1);
+        });
+    });
+
+    describe('checkDirectionalCover', () => {
+        it('should return true when attack is from blocked edge', async () => {
+            const providerToken = { x: 100, y: 100 };
+            const receiverToken = { x: 100, y: 100 };
+            const attackerToken = { x: 100, y: 50 };
+
+            const isProtected = CoverOverride.checkDirectionalCover(
+                providerToken,
+                receiverToken,
+                attackerToken,
+                ['north'],
+            );
+
+            expect(isProtected).toBe(true);
+        });
+
+        it('should return false when attack is from unblocked edge', async () => {
+            const providerToken = { x: 100, y: 100 };
+            const receiverToken = { x: 100, y: 100 };
+            const attackerToken = { x: 100, y: 150 };
+
+            const isProtected = CoverOverride.checkDirectionalCover(
+                providerToken,
+                receiverToken,
+                attackerToken,
+                ['north'],
+            );
+
+            expect(isProtected).toBe(false);
+        });
+    });
+});
