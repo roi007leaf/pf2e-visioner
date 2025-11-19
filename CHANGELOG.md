@@ -1,5 +1,14 @@
 # Changelog
 
+## [5.0.2] - 2025-11-19
+
+### 🗑️ Removed
+
+- **Rule Elements**: Removed `PF2eVisionerVisibility` rule element
+  - This rule element has been deprecated in favor of `PF2eVisionerEffect` which provides more comprehensive functionality
+  - All references to `PF2eVisionerVisibility` have been removed from the codebase
+  - Users should migrate existing items to use `PF2eVisionerEffect` instead
+
 ## [5.0.1] - 2025-11-19
 
 ### 🐛 Bug Fixes

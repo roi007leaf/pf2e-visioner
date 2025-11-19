@@ -429,36 +429,6 @@
             "DESCRIPTION": "Illusory duplicates prevent attackers from gaining tactical advantages. Off-guard effects from concealment, hidden, or undetected states are suppressed."
           }
         }
-      },
-      "VISIBILITY": {
-        "NAME": "PF2eVisionerVisibility",
-        "DESCRIPTION": "Change visibility statuses and apply ephemeral effects programmatically",
-        "EXAMPLES": {
-          "HIDE": {
-            "NAME": "Hide",
-            "DESCRIPTION": "<p>You become hidden to all creatures.</p><p>Use this when you successfully Hide.</p>"
-          },
-          "CONCEAL_TARGET": {
-            "NAME": "Conceal Target",
-            "DESCRIPTION": "<p>You magically conceal the target from all observers.</p>"
-          },
-          "OBSCURING_MIST": {
-            "NAME": "Obscuring Mist",
-            "DESCRIPTION": "<p>You surround yourself with a mist that makes you harder to see.</p>"
-          },
-          "REVEAL": {
-            "NAME": "Reveal",
-            "DESCRIPTION": "<p>You reveal the target, making them easier to see.</p>"
-          },
-          "ENHANCED_VISION": {
-            "NAME": "Enhanced Vision",
-            "DESCRIPTION": "<p>You can see hidden creatures better.</p>"
-          },
-          "BLUR_VISION": {
-            "NAME": "Blur Vision",
-            "DESCRIPTION": "<p>You blur the target's vision, making it harder for them to see others.</p>"
-          }
-        }
       }
     },
     "SEEK_AUTOMATION": {

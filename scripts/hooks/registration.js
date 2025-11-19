@@ -101,7 +101,7 @@ export async function registerHooks() {
       // Check if the item has PF2eVisioner rule elements
       const rules = item.system?.rules || [];
       const hasVisionerRules = rules.some(rule =>
-        rule.key === 'PF2eVisionerEffect' || rule.key === 'PF2eVisionerVisibility'
+        rule.key === 'PF2eVisionerEffect'
       );
 
       if (!hasVisionerRules) return;
@@ -127,7 +127,7 @@ export async function registerHooks() {
         try {
           const rules = item.system?.rules || [];
           const visionerRule = rules.find(rule =>
-            rule.key === 'PF2eVisionerEffect' || rule.key === 'PF2eVisionerVisibility'
+            rule.key === 'PF2eVisionerEffect'
           );
 
           if (!visionerRule) return;
@@ -613,7 +613,7 @@ export async function registerHooks() {
 
       const rules = item.system?.rules || [];
       const hasVisionerRules = rules.some(rule =>
-        rule.key === 'PF2eVisionerEffect' || rule.key === 'PF2eVisionerVisibility'
+        rule.key === 'PF2eVisionerEffect'
       );
 
       if (hasVisionerRules && Array.isArray(item.rules)) {
@@ -642,7 +642,7 @@ export async function registerHooks() {
           }
 
           for (const ruleElement of item.rules) {
-            if (ruleElement?.key !== 'PF2eVisionerEffect' && ruleElement?.key !== 'PF2eVisionerVisibility') {
+            if (ruleElement?.key !== 'PF2eVisionerEffect') {
               continue;
             }
 
