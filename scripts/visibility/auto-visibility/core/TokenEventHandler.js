@@ -68,6 +68,9 @@ export class TokenEventHandler {
       // Reapply rule element operations after movement to restore overrides
       await this._reapplyRuleElementsAfterMovement(tokenDoc);
 
+      // Reapply rule element operations after movement to restore overrides
+      await this._reapplyRuleElementsAfterMovement(tokenDoc);
+
       // Clear position-dependent caches since token has moved
       // CRITICAL: Clear lighting caches FIRST to set forceFreshComputation flag
       // This ensures subsequent batches bypass burst optimization and use fresh lighting
@@ -84,6 +87,7 @@ export class TokenEventHandler {
 
       if (this.overrideValidationManager) {
         this.overrideValidationManager.queueOverrideValidation(tokenDoc.id);
+        this.overrideValidationManager.processQueuedValidations().catch(() => { });
         this.overrideValidationManager.processQueuedValidations().catch(() => { });
       }
 
