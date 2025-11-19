@@ -210,6 +210,7 @@ export class CoverUIManager {
       // Check if this message has cover override information
       let overrideInfo = message?.flags?.['pf2e-visioner']?.coverOverride;
       let featUpgradeInfo = message?.flags?.['pf2e-visioner']?.coverFeatUpgrade;
+      let ruleElementBlocks = message?.flags?.['pf2e-visioner']?.ruleElementBlocks;
 
       // Also check for manual cover by examining the message for token references
       let manualCoverInfo = null;
@@ -247,7 +248,7 @@ export class CoverUIManager {
       }
 
       // If no override info and no manual cover, nothing to show
-      if (!overrideInfo && !manualCoverInfo && !featUpgradeInfo) {
+      if (!overrideInfo && !manualCoverInfo && !featUpgradeInfo && !ruleElementBlocks) {
         return;
       }
 
@@ -257,7 +258,7 @@ export class CoverUIManager {
 
       // Check if indicator already exists to avoid duplicates
       if (
-        $html.find('.pf2e-visioner-cover-override-indicator, .pf2e-visioner-cover-manual-indicator, .pf2e-visioner-cover-feat-indicator')
+        $html.find('.pf2e-visioner-cover-override-indicator, .pf2e-visioner-cover-manual-indicator, .pf2e-visioner-cover-feat-indicator, .pf2e-visioner-cover-rule-element-indicator')
           .length > 0
       ) {
         return;
@@ -423,6 +424,48 @@ export class CoverUIManager {
         } catch (e) { }
       }
 
+      // Handle rule element blocks indicator
+      if (ruleElementBlocks && ruleElementBlocks.length > 0) {
+        try {
+          const blockerNameSet = new Set(ruleElementBlocks.map(b => b.blockerName));
+          const blockerNames = Array.from(blockerNameSet).join(', ');
+          const tooltip = `Rule element prevented cover from: ${blockerNames}`;
+          indicatorHtml += `
+                 <span class="pf2e-visioner-cover-rule-element-indicator" style="
+                   margin-left: 4px;
+                   padding: 2px 4px;
+                   background: rgba(138, 43, 226, 0.15);
+                   border-radius: 3px;
+                   font-size: 1em;
+                   display: inline-flex;
+                   align-items: center;
+                   gap: 3px;
+                   vertical-align: middle;
+                   border: 1px solid rgba(138, 43, 226, 0.3);
+                 ">
+                   <i class="fas fa-magic" style="
+                     color: rgb(138, 43, 226);
+                     font-size: 0.7em;
+                     opacity: 0.8;
+                   "></i>
+                   <span 
+                     data-tooltip="${tooltip}"
+                     data-tooltip-direction="UP"
+                     style="
+                       color: rgb(138, 43, 226);
+                       cursor: help;
+                       display: inline-flex;
+                       align-items: center;
+                       filter: brightness(0.9);
+                       font-size: 0.8em;
+                     "
+                   >
+                     <i class="fas fa-ban" style="font-size: 0.9em;"></i>
+                   </span>
+                 </span>`;
+        } catch (e) { }
+      }
+
       if (!indicatorHtml) return;
 
       // Find the specific AC span element (the adjusted AC value)
@@ -502,6 +545,7 @@ export class CoverUIManager {
 
       const hasOverride = !!message?.flags?.['pf2e-visioner']?.coverOverride;
       const hasFeatUpgrade = !!message?.flags?.['pf2e-visioner']?.coverFeatUpgrade;
+      const hasRuleElementBlocks = !!message?.flags?.['pf2e-visioner']?.ruleElementBlocks;
 
       // Also check for manual cover
       let hasManualCover = false;
@@ -528,7 +572,7 @@ export class CoverUIManager {
         );
       }
 
-      return hasOverride || hasManualCover || hasFeatUpgrade;
+      return hasOverride || hasManualCover || hasFeatUpgrade || hasRuleElementBlocks;
     } catch (e) {
       console.warn('PF2E Visioner | Error in shouldShowCoverOverrideIndicator:', e);
       return false;

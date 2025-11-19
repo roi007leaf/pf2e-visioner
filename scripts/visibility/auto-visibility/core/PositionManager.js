@@ -249,6 +249,15 @@ export class PositionManager {
   }
 
   /**
+   * Clear only the updated token docs cache for a specific token.
+   * Used during movement to prevent stale position data from being reused,
+   * while preserving pinned positions needed by active batches.
+   */
+  clearUpdatedTokenDocsCache(tokenId) {
+    this.updatedTokenDocs.delete(tokenId);
+  }
+
+  /**
    * Clean up expired position data
    */
   cleanup() {

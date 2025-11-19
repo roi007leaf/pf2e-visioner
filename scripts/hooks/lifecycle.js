@@ -7,8 +7,249 @@ import { MODULE_ID } from '../constants.js';
 import { initializeHoverTooltips } from '../services/HoverTooltips.js';
 import { registerSocket } from '../services/socket.js';
 import { updateTokenVisuals, updateWallVisuals } from '../services/visual-effects.js';
+import { getLogger } from '../utils/logger.js';
 
-export function onReady() {
+async function reapplyRuleElementsOnLoad() {
+  const log = getLogger('RuleElements/Lifecycle');
+
+  if (!canvas?.tokens?.placeables) {
+    log.debug('No tokens on canvas, skipping rule element reapplication');
+    return;
+  }
+
+  log.debug(() => ({ msg: 'Reapplying rule elements on canvas ready', tokenCount: canvas.tokens.placeables.length }));
+
+  const tokensProcessed = new Set();
+  const tokensWithRuleElements = [];
+
+  for (const token of canvas.tokens.placeables) {
+    try {
+      const actor = token.actor;
+      if (!actor || tokensProcessed.has(actor.id)) {
+        continue;
+      }
+
+      tokensProcessed.add(actor.id);
+
+      await cleanupStaleRuleElementFlags(token, actor, log);
+
+      const effects = actor.items?.filter(i => i.type === 'effect') || [];
+      log.debug(() => ({ msg: 'Actor effects scanned', actor: actor.name, effects: effects.length }));
+
+      for (const effect of effects) {
+        const rules = effect.system?.rules || [];
+        const hasVisionerRules = rules.some(rule =>
+          rule.key === 'PF2eVisionerEffect' || rule.key === 'PF2eVisionerVisibility'
+        );
+
+        if (hasVisionerRules) {
+          log.debug(() => ({
+            msg: 'Found PF2eVisionerEffect on existing effect, reapplying',
+            effectName: effect.name,
+            actorName: actor.name,
+            tokenId: token.id
+          }));
+
+          let hasAppliedRules = false;
+
+          // Wait for rule elements to be initialized
+          await new Promise(resolve => setTimeout(resolve, 100));
+
+          for (const rule of rules) {
+            if (rule.key === 'PF2eVisionerEffect' || rule.key === 'PF2eVisionerVisibility') {
+              try {
+                // Try to get the rule element instance from the effect
+                let instance = null;
+                
+                // First try to get from effect.ruleElements
+                if (Array.isArray(effect.ruleElements)) {
+                  instance = effect.ruleElements.find(r => r?.key === rule.key && (r?.slug === rule.slug || !rule.slug));
+                }
+                
+                // If not found, try to create a temporary instance for reapplication
+                if (!instance && game.pf2e?.RuleElements?.custom?.[rule.key]) {
+                  try {
+                    // Deep clone the rule data to make it extensible
+                    const clonedRule = JSON.parse(JSON.stringify(rule));
+                    const RuleElementClass = game.pf2e.RuleElements.custom[rule.key];
+                    instance = new RuleElementClass(clonedRule, effect);
+                    log.debug(() => ({ msg: 'Created temporary rule element instance', ruleKey: rule.key }));
+                  } catch (error) {
+                    log.debug(() => ({ msg: 'Failed to create temporary instance', ruleKey: rule.key, error: error.message }));
+                  }
+                }
+
+                log.debug(() => ({ msg: 'Rule instance lookup', effect: effect.name, ruleKey: rule.key, hasInstance: !!instance, hasApply: !!(instance && typeof instance.applyOperations === 'function') }));
+
+                if (instance && typeof instance.applyOperations === 'function') {
+                  await instance.applyOperations();
+                  hasAppliedRules = true;
+                  log.debug(() => ({
+                    msg: 'Successfully reapplied rule element operations',
+                    ruleKey: rule.key,
+                    effectName: effect.name
+                  }));
+                } else {
+                  log.debug(() => ({ msg: 'No applicable instance to apply', effect: effect.name, ruleKey: rule.key }));
+                }
+              } catch (error) {
+                log.warn(() => ({
+                  msg: 'Failed to reapply individual rule',
+                  ruleKey: rule.key,
+                  effectName: effect.name,
+                  error: error.message
+                }));
+              }
+            }
+          }
+
+          if (hasAppliedRules) {
+            tokensWithRuleElements.push(token.id);
+          }
+        }
+      }
+    } catch (error) {
+      log.warn(() => ({
+        msg: 'Failed to process token for rule element reapplication',
+        tokenName: token.name,
+        error: error.message
+      }));
+    }
+  }
+
+  if (tokensWithRuleElements.length > 0) {
+    log.debug(() => ({
+      msg: 'Triggering AVS recalculation for tokens with rule elements',
+      tokenCount: tokensWithRuleElements.length
+    }));
+
+    try {
+      if (window.pf2eVisioner?.services?.autoVisibilitySystem?.recalculateForTokens) {
+        await window.pf2eVisioner.services.autoVisibilitySystem.recalculateForTokens(tokensWithRuleElements);
+      } else if (window.pf2eVisioner?.services?.autoVisibilitySystem?.recalculateAll) {
+        await window.pf2eVisioner.services.autoVisibilitySystem.recalculateAll();
+      } else if (canvas?.perception) {
+        canvas.perception.update({ refreshVision: true, refreshOcclusion: true });
+      }
+    } catch (error) {
+      log.warn(() => ({
+        msg: 'Failed to trigger AVS recalculation',
+        error: error.message
+      }));
+    }
+  }
+
+  log.debug('Finished reapplying rule elements');
+}
+
+async function cleanupStaleRuleElementFlags(token, actor, log) {
+  const flagRegistry = token.document.getFlag('pf2e-visioner', 'ruleElementRegistry') || {};
+  const registeredKeys = Object.keys(flagRegistry);
+
+  if (registeredKeys.length === 0) {
+    return;
+  }
+
+  const activeEffectIds = new Set(
+    (actor.items?.filter(i => i.type === 'effect') || []).map(e => e.id)
+  );
+
+  const staleKeys = registeredKeys.filter(key => {
+    if (key.startsWith('item-')) {
+      const itemId = key.substring(5);
+      return !activeEffectIds.has(itemId);
+    }
+    return false;
+  });
+
+  if (staleKeys.length === 0) {
+    return;
+  }
+
+  log.debug(() => ({
+    msg: 'Found stale rule element flags, cleaning up',
+    tokenName: token.name,
+    staleKeys
+  }));
+
+  const updates = {};
+  const newRegistry = { ...flagRegistry };
+
+  for (const staleKey of staleKeys) {
+    const flagsToRemove = flagRegistry[staleKey] || [];
+
+    for (const flagPath of flagsToRemove) {
+      updates[`flags.pf2e-visioner.${flagPath}`] = null;
+    }
+
+    delete newRegistry[staleKey];
+
+    try {
+      const currentStateSource = token.document.getFlag('pf2e-visioner', 'stateSource') || {};
+      const itemId = staleKey.startsWith('item-') ? staleKey.substring(5) : staleKey;
+      let modified = false;
+
+      const prune = (arr) => Array.isArray(arr) ? arr.filter(s => !(typeof s?.id === 'string' && s.id.startsWith(`${itemId}-`))) : arr;
+
+      if (currentStateSource.visibility?.sources) {
+        const next = prune(currentStateSource.visibility.sources);
+        if (next.length !== currentStateSource.visibility.sources.length) {
+          currentStateSource.visibility.sources = next;
+          modified = true;
+        }
+      }
+      if (currentStateSource.cover?.sources) {
+        const next = prune(currentStateSource.cover.sources);
+        if (next.length !== currentStateSource.cover.sources.length) {
+          currentStateSource.cover.sources = next;
+          modified = true;
+        }
+      }
+      for (const key of ['visibilityByObserver', 'coverByObserver']) {
+        const byObserver = currentStateSource[key];
+        if (!byObserver) continue;
+        for (const [obsId, data] of Object.entries(byObserver)) {
+          const srcs = Array.isArray(data?.sources) ? data.sources : [];
+          const filtered = prune(srcs);
+          if (filtered.length !== srcs.length) {
+            byObserver[obsId].sources = filtered;
+            modified = true;
+          }
+          if (Array.isArray(byObserver[obsId].sources) && byObserver[obsId].sources.length === 0) {
+            delete byObserver[obsId];
+            modified = true;
+          }
+        }
+        if (Object.keys(byObserver).length === 0) {
+          delete currentStateSource[key];
+          modified = true;
+        }
+      }
+
+      if (modified) {
+        updates['flags.pf2e-visioner.stateSource'] = currentStateSource;
+      }
+    } catch (error) {
+      log.warn(() => ({
+        msg: 'Failed to prune stale sources for item',
+        staleKey,
+        error: error.message
+      }));
+    }
+  }
+
+  updates['flags.pf2e-visioner.ruleElementRegistry'] = newRegistry;
+
+  if (Object.keys(updates).length > 0) {
+    await token.document.update(updates);
+
+    log.debug(() => ({
+      msg: 'Cleaned up stale flags',
+      tokenName: token.name,
+      flagsRemoved: Object.keys(updates).length
+    }));
+  }
+} export function onReady() {
   // Add CSS styles for chat automation
   injectChatAutomationStyles();
 
@@ -32,6 +273,13 @@ export async function onCanvasReady() {
   if (canvas.ready && canvas.tokens?.placeables) {
     await updateTokenVisuals();
   }
+
+  try {
+    await reapplyRuleElementsOnLoad();
+  } catch (error) {
+    console.warn('PF2E Visioner | Failed to reapply rule elements on load:', error);
+  }
+
   try {
     // After canvas refresh, restore indicators for currently controlled tokens that have wall flags
     const controlledTokens = canvas.tokens.controlled || [];

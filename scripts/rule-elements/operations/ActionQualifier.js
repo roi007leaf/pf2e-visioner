@@ -1,0 +1,242 @@
+import { PredicateHelper } from '../PredicateHelper.js';
+import { SourceTracker } from '../SourceTracker.js';
+
+export class ActionQualifier {
+  static async applyActionQualifications(operation, subjectToken) {
+    if (!subjectToken) return;
+
+    const { qualifications, source, priority = 100, range, predicate } = operation;
+
+    // Check predicate if provided
+    if (predicate && predicate.length > 0) {
+      const rollOptions = PredicateHelper.getTokenRollOptions(subjectToken);
+      const predicateResult = PredicateHelper.evaluate(predicate, rollOptions);
+      if (!predicateResult) {
+        return;
+      }
+    }
+
+    const qualificationData = {
+      id: source || `qualification-${Date.now()}`,
+      type: source,
+      priority,
+      qualifications,
+      range
+    };
+
+    await subjectToken.document.setFlag(
+      'pf2e-visioner',
+      `actionQualifications.${qualificationData.id}`,
+      qualificationData
+    );
+  }
+
+  static async removeActionQualifications(operation, subjectToken) {
+    if (!subjectToken) return;
+
+    const { source } = operation;
+    const qualifications = subjectToken.document.getFlag('pf2e-visioner', 'actionQualifications') || {};
+
+    if (qualifications[source]) {
+      delete qualifications[source];
+      await subjectToken.document.setFlag('pf2e-visioner', 'actionQualifications', qualifications);
+    }
+  }
+
+  static getActionQualifications(token, action) {
+    if (!token?.document) return [];
+
+    const qualifications = token.document.getFlag('pf2e-visioner', 'actionQualifications') || {};
+
+    return Object.values(qualifications)
+      .filter(q => q.qualifications?.[action])
+      .map(q => ({
+        id: q.id,
+        priority: q.priority,
+        ...q.qualifications[action]
+      }));
+  }
+
+  static canUseConcealment(token, action, source = null) {
+    const qualifications = this.getActionQualifications(token, action);
+
+    if (qualifications.length === 0) return true;
+
+    if (source) {
+      const sourceQual = qualifications.find(q => q.id === source);
+      if (sourceQual) {
+        return sourceQual.qualifiesOnConcealment !== false;
+      }
+    }
+
+    return !qualifications.some(q => q.qualifiesOnConcealment === false);
+  }
+
+  static canUseCover(token, action, source = null) {
+    const qualifications = this.getActionQualifications(token, action);
+
+    if (qualifications.length === 0) return true;
+
+    if (source) {
+      const sourceQual = qualifications.find(q => q.id === source);
+      if (sourceQual) {
+        return sourceQual.qualifiesOnCover !== false;
+      }
+    }
+
+    return !qualifications.some(q => q.qualifiesOnCover === false);
+  }
+
+  static endPositionQualifies(token, action) {
+    const qualifications = this.getActionQualifications(token, action);
+
+    if (qualifications.length === 0) return true;
+
+    return !qualifications.some(q => q.endPositionQualifies === false);
+  }
+
+  static startPositionQualifies(token, action) {
+    const qualifications = this.getActionQualifications(token, action);
+
+    if (qualifications.length === 0) return true;
+
+    return !qualifications.some(q => q.startPositionQualifies === false);
+  }
+
+  static ignoreConcealment(token, action, targetToken = null) {
+    const qualifications = this.getActionQualifications(token, action);
+
+    if (qualifications.length === 0) return false;
+
+    if (targetToken) {
+      const distance = canvas.grid.measureDistance(token, targetToken);
+      const result = qualifications.some(q => {
+        const rangeCheck = !q.range || distance <= q.range;
+        const ignores = q.ignoreThisConcealment === true || q.ignoreConcealment === true;
+
+        return rangeCheck && ignores;
+      });
+      return result;
+    }
+
+    const result = qualifications.some(q =>
+      q.ignoreThisConcealment === true || q.ignoreConcealment === true
+    );
+    return result;
+  }
+
+  static ignoreCover(token, action, targetToken = null) {
+    const qualifications = this.getActionQualifications(token, action);
+
+    if (qualifications.length === 0) return false;
+
+    if (targetToken) {
+      const distance = canvas.grid.measureDistance(token, targetToken);
+      return qualifications.some(q => {
+        if (q.range && distance > q.range) return false;
+        return q.ignoreThisCover === true;
+      });
+    }
+
+    return qualifications.some(q => q.ignoreThisCover === true);
+  }
+
+  static getCustomMessages(token, action) {
+    const qualifications = this.getActionQualifications(token, action);
+
+    return qualifications
+      .filter(q => q.customMessage)
+      .map(q => q.customMessage);
+  }
+
+  static checkHidePrerequisites(token) {
+    const visibilitySources = SourceTracker.getVisibilityStateSources(token);
+    const coverSources = SourceTracker.getCoverStateSources(token);
+
+    const qualifyingConcealment = visibilitySources.filter(source => {
+      return this.canUseConcealment(token, 'hide', source.id);
+    });
+
+    const qualifyingCover = coverSources.filter(source => {
+      return this.canUseCover(token, 'hide', source.id);
+    });
+
+    const hasQualifying = qualifyingConcealment.length > 0 || qualifyingCover.length > 0;
+    const messages = this.getCustomMessages(token, 'hide');
+
+    return {
+      canHide: hasQualifying,
+      qualifyingConcealment: qualifyingConcealment.length,
+      qualifyingCover: qualifyingCover.length,
+      messages
+    };
+  }
+
+  static checkSneakPrerequisites(token, observerId = null, position = 'end') {
+    const visibilitySources = SourceTracker.getVisibilityStateSources(token, observerId);
+    const coverSources = SourceTracker.getCoverStateSources(token, observerId);
+
+    const qualifyingConcealment = visibilitySources.filter(source => {
+      return this.canUseSneakFromConcealment(token, 'sneak', source.id, position);
+    });
+
+    const qualifyingCover = coverSources.filter(source => {
+      return this.canUseCoverForSneak(token, 'sneak', source.id, position);
+    });
+
+    const hasQualifying = qualifyingConcealment.length > 0 || qualifyingCover.length > 0;
+    const messages = this.getCustomMessages(token, 'sneak');
+
+    return {
+      qualifies: hasQualifying,
+      qualifyingConcealment: qualifyingConcealment.length,
+      qualifyingCover: qualifyingCover.length,
+      messages
+    };
+  }
+
+  static canUseSneakFromConcealment(token, action, source = null, position = 'end') {
+    const qualifications = this.getActionQualifications(token, action);
+
+    if (qualifications.length === 0) {
+      return true;
+    }
+
+    if (source) {
+      const sourceQual = qualifications.find(q => q.id === source);
+      if (sourceQual) {
+        const positionQual = sourceQual[position];
+        if (positionQual && positionQual.qualifiesOnConcealment !== undefined) {
+          return positionQual.qualifiesOnConcealment !== false;
+        }
+        return sourceQual.qualifiesOnConcealment !== false;
+      }
+    }
+
+    const result = !qualifications.some(q => q.qualifiesOnConcealment === false);
+    return result;
+  }
+
+  static canUseCoverForSneak(token, action, source = null, position = 'end') {
+    const qualifications = this.getActionQualifications(token, action);
+
+    if (qualifications.length === 0) {
+      return true;
+    }
+
+    if (source) {
+      const sourceQual = qualifications.find(q => q.id === source);
+      if (sourceQual) {
+        const positionQual = sourceQual[position];
+        if (positionQual && positionQual.qualifiesOnCover !== undefined) {
+          return positionQual.qualifiesOnCover !== false;
+        }
+        return sourceQual.qualifiesOnCover !== false;
+      }
+    }
+
+    const result = !qualifications.some(q => q.qualifiesOnCover === false);
+    return result;
+  }
+}
+

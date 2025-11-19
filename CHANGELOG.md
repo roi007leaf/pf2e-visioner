@@ -1,5 +1,46 @@
 # Changelog
 
+## [5.0.0] - 2025-10-24
+
+**PF2eVisionerEffect Rule Element System:**
+
+- Complete rule element framework for advanced visibility and cover control
+- Eight operation types for comprehensive customization:
+  - `modifySenses`: Modify sense ranges and precision (darkvision, hearing, etc.)
+  - `overrideVisibility`: Force specific visibility states with direction control
+  - `distanceBasedVisibility`: Apply visibility states based on distance bands
+  - `overrideCover`: Provide or block cover to specific targets
+  - `modifyActionQualification`: Control action prerequisites
+  - `conditionalState`: Apply states based on conditions
+  - `offGuardSuppression`: Suppress off-guard penalty from hidden/undetected attackers
+- Predicate support at both rule and operation levels for conditional application
+- Priority system for conflict resolution between multiple effects
+- Source tracking for qualification checks and effect management
+- Range limitations and directional control (to/from)
+- Full PF2e roll options integration
+
+**Off-Guard Suppression:**
+
+- Suppress off-guard penalty when attacked by hidden/undetected creatures
+- Removes ephemeral off-guard effects when suppression is active
+- Works with attack roll pipeline and AVS ephemeral effect system
+- Compatible with other off-guard sources (flanking, prone, etc.)
+
+#### 📚 Documentation
+
+- Comprehensive `RULE_ELEMENTS.md` with examples for all operations
+- Operation-specific property references and use cases
+- Homebrew guide with best practices
+- Example JSON configurations for common feats and spells
+- API documentation for rule element system
+
+#### 🔧 Technical
+
+- Extensive test coverage for all rule element operations
+- Integration with existing visibility and cover systems
+- Clean separation between rule element logic and effect application
+- Support for both PC and NPC actors
+
 ## [4.5.7] - 2025-11-18
 
 ### ⚡ Performance Improvements
@@ -114,15 +155,9 @@
 
 ## [4.5.0] - 2025-01-XX
 
-### ✨ Features
+### 🎉 Major Release - Rule Elements System
 
-- **AVS Combat-Only Mode**: Added new setting to restrict Auto-Visibility System to active encounters only
-  - New setting: "AVS Only Active in Combat" in A.V.S. Settings (disabled by default)
-  - When enabled, AVS only processes visibility calculations during active combat
-  - Automatically calculates visibility for all encounter participants when combat starts
-  - Clears all visibility and detection flags for combatants when combat ends
-  - Excludes tokens not in the encounter from AVS processing during combat
-  - Perfect for tables that want to use AVS only during tactical encounters
+#### ✨ New Features
 
 ## [4.4.13] - 2025-10-25
 

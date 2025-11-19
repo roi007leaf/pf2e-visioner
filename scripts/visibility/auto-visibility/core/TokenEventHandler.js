@@ -38,7 +38,7 @@ export class TokenEventHandler {
     Hooks.on('moveToken', this.handleMoveToken.bind(this));
   }
 
-  handleMoveToken(tokenDoc, updateData, options, userId) {
+  async handleMoveToken(tokenDoc, updateData, options, userId) {
     // This fires for EVERY grid square during animation
     // We only want to process the FINAL destination
     // Use token-specific check if available, otherwise fall back to general check
@@ -65,6 +65,9 @@ export class TokenEventHandler {
     const finalY = updateData.destination?.y ?? tokenDoc.y;
 
     try {
+      // Reapply rule element operations after movement to restore overrides
+      await this._reapplyRuleElementsAfterMovement(tokenDoc);
+
       // Clear position-dependent caches since token has moved
       // CRITICAL: Clear lighting caches FIRST to set forceFreshComputation flag
       // This ensures subsequent batches bypass burst optimization and use fresh lighting
@@ -81,7 +84,7 @@ export class TokenEventHandler {
 
       if (this.overrideValidationManager) {
         this.overrideValidationManager.queueOverrideValidation(tokenDoc.id);
-        this.overrideValidationManager.processQueuedValidations().catch(() => {});
+        this.overrideValidationManager.processQueuedValidations().catch(() => { });
       }
 
       const movementChanges = {
@@ -92,6 +95,32 @@ export class TokenEventHandler {
       this.visibilityState.markTokenChangedWithSpatialOptimization(tokenDoc, movementChanges);
     } catch (e) {
       console.warn('PF2E Visioner | Error processing move token:', e);
+    }
+  }
+
+  async _reapplyRuleElementsAfterMovement(tokenDoc) {
+    try {
+      const token = tokenDoc.object;
+      if (!token?.actor) return;
+
+      const effects = token.actor.items?.filter(i => i.type === 'effect') || [];
+      for (const effect of effects) {
+        const rules = effect.system?.rules || [];
+        const hasVisionerRules = rules.some(rule =>
+          rule.key === 'PF2eVisionerEffect' || rule.key === 'PF2eVisionerVisibility'
+        );
+
+        if (hasVisionerRules && Array.isArray(effect.ruleElements)) {
+          for (const ruleElement of effect.ruleElements) {
+            if ((ruleElement.key === 'PF2eVisionerEffect' || ruleElement.key === 'PF2eVisionerVisibility') &&
+                typeof ruleElement.applyOperations === 'function') {
+              await ruleElement.applyOperations();
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.warn('PF2E Visioner | Failed to reapply rule elements after movement:', error);
     }
   }
 
@@ -140,7 +169,7 @@ export class TokenEventHandler {
 
     try {
       this.systemState.debug('onTokenUpdate', tokenDoc.id, tokenDoc.name, Object.keys(changes));
-    } catch {}
+    } catch { }
 
     // Analyze changes once to derive flags used throughout handling
     const changeFlags = this._analyzeChanges(changes);
@@ -158,7 +187,7 @@ export class TokenEventHandler {
         globalThis.game = globalThis.game || {};
         game.pf2eVisioner = game.pf2eVisioner || {};
         game.pf2eVisioner.lastMovedTokenId = tokenDoc.id;
-      } catch {}
+      } catch { }
 
       const token = tokenDoc.object;
 
@@ -230,7 +259,7 @@ export class TokenEventHandler {
                 // Queue override validation
                 if (this.overrideValidationManager) {
                   this.overrideValidationManager.queueOverrideValidation(tokenId);
-                  this.overrideValidationManager.processQueuedValidations().catch(() => {});
+                  this.overrideValidationManager.processQueuedValidations().catch(() => { });
                 }
               } catch (e) {
                 console.warn('PF2E Visioner | Error processing validation after animation:', e);
@@ -255,7 +284,7 @@ export class TokenEventHandler {
 
       if (oldX === newX && oldY === newY) {
         // Token dragged but released at same position - clear cached data
-        this.positionManager.clearTokenPositionData(tokenDoc.id);
+        this.positionManager.clearUpdatedTokenDocsCache(tokenDoc.id);
         this.systemState.debug('token-drag-same-position', tokenDoc.id, 'cleared cached positions');
         return;
       }
@@ -534,7 +563,7 @@ export class TokenEventHandler {
           globalThis.game = globalThis.game || {};
           game.pf2eVisioner = game.pf2eVisioner || {};
           game.pf2eVisioner.lastMovedTokenId = tokenDoc.id;
-        } catch {}
+        } catch { }
         this.overrideValidationManager.queueOverrideValidation(tokenDoc.id);
       }
     } catch {
@@ -555,7 +584,7 @@ export class TokenEventHandler {
             globalThis.game = globalThis.game || {};
             game.pf2eVisioner = game.pf2eVisioner || {};
             game.pf2eVisioner.lastMovedTokenId = tokenDoc.id;
-          } catch {}
+          } catch { }
           this.overrideValidationManager.queueOverrideValidation(tokenDoc.id);
         }
         return true; // Token was excluded
@@ -699,7 +728,7 @@ export class TokenEventHandler {
       game.pf2eVisioner = game.pf2eVisioner || {};
       game.pf2eVisioner.lastMovedTokenId = tokenDoc.id;
       this.systemState.debug('set lastMovedTokenId', tokenDoc.id);
-    } catch {}
+    } catch { }
 
     // Queue override validation for the moved token
     this.overrideValidationManager.queueOverrideValidation(tokenDoc.id);

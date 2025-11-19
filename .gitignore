@@ -4,3 +4,6 @@ pf2e/
 .claude/
 .vscode/settings.json
 .vscode/tasks.json
+.bmad-core
+web-bundles/
+.github/

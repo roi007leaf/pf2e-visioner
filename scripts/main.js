@@ -123,6 +123,11 @@ Hooks.once('init', async () => {
     const { autoVisibilitySystem } = await import('./visibility/auto-visibility/index.js');
     await autoVisibilitySystem.initialize();
 
+    // Expose AVS and other services globally for rule element system
+    window.pf2eVisioner = window.pf2eVisioner || {};
+    window.pf2eVisioner.services = window.pf2eVisioner.services || {};
+    window.pf2eVisioner.services.autoVisibilitySystem = autoVisibilitySystem;
+
     // Initialize Levels integration
     const levelsIntegration = LevelsIntegration.getInstance();
     levelsIntegration.initialize();

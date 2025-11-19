@@ -76,7 +76,7 @@ export class EventHandlerFactory {
             {
                 name: 'effectEventHandler',
                 Handler: EffectEventHandler,
-                deps: [systemStateProvider, visibilityStateManager, exclusionManager]
+                deps: [systemStateProvider, visibilityStateManager, exclusionManager, cacheManager]
             },
             {
                 name: 'sceneEventHandler',

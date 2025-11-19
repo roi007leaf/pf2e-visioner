@@ -81,10 +81,16 @@ describe('Perception Refresh Improvements', () => {
 
   describe('EffectEventHandler', () => {
     test('should refresh perception after visibility-affecting effect changes', async () => {
+      const mockCacheManager = {
+        clearVisibilityCache: jest.fn(),
+        clearLosCache: jest.fn(),
+      };
+
       const handler = new EffectEventHandler(
         mockSystemStateProvider,
         mockVisibilityStateManager,
         mockExclusionManager,
+        mockCacheManager,
       );
 
       // Initialize the handler to register hooks
@@ -132,10 +138,16 @@ describe('Perception Refresh Improvements', () => {
     });
 
     test('should handle light-emitting effects and refresh all tokens', async () => {
+      const mockCacheManager = {
+        clearVisibilityCache: jest.fn(),
+        clearLosCache: jest.fn(),
+      };
+
       const handler = new EffectEventHandler(
         mockSystemStateProvider,
         mockVisibilityStateManager,
         mockExclusionManager,
+        mockCacheManager,
       );
 
       handler.initialize();
