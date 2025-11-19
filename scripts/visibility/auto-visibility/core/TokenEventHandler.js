@@ -85,6 +85,7 @@ export class TokenEventHandler {
       if (this.overrideValidationManager) {
         this.overrideValidationManager.queueOverrideValidation(tokenDoc.id);
         this.overrideValidationManager.processQueuedValidations().catch(() => { });
+        this.overrideValidationManager.processQueuedValidations().catch(() => { });
       }
 
       const movementChanges = {
