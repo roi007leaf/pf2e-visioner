@@ -1,5 +1,14 @@
 # Changelog
 
+## [5.0.1] - 2025-11-19
+
+### 🐛 Bug Fixes
+
+- **Rule Elements**: Fixed `PF2eVisionerEffect` rule elements not working on feats, equipment, and other non-effect items
+  - Previously only processed rule elements on items with `type: "effect"`
+  - Now correctly processes rule elements on all item types (feats, equipment, effects, etc.)
+  - Affects lifecycle reapplication, movement reapplication, and item update hooks
+
 ## [5.0.0] - 2025-10-24
 
 **PF2eVisionerEffect Rule Element System:**

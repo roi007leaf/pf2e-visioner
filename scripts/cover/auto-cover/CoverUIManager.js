@@ -429,7 +429,7 @@ export class CoverUIManager {
         try {
           const blockerNameSet = new Set(ruleElementBlocks.map(b => b.blockerName));
           const blockerNames = Array.from(blockerNameSet).join(', ');
-          const tooltip = `Rule element prevented cover from: ${blockerNames}`;
+          const tooltip = `Rule element prevented ${blockerNames} from granting cover`;
           indicatorHtml += `
                  <span class="pf2e-visioner-cover-rule-element-indicator" style="
                    margin-left: 4px;

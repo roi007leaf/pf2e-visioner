@@ -98,9 +98,6 @@ export async function registerHooks() {
       // Only process on GM client to avoid duplicate processing
       if (!game.user?.isGM) return;
 
-      // Only process effect items
-      if (item.type !== 'effect') return;
-
       // Check if the item has PF2eVisioner rule elements
       const rules = item.system?.rules || [];
       const hasVisionerRules = rules.some(rule =>
