@@ -1,5 +1,6 @@
 import { MODULE_ID } from '../../constants.js';
 import autoCoverSystem from '../../cover/auto-cover/AutoCoverSystem.js';
+import { ActionQualifier } from '../../rule-elements/operations/ActionQualifier.js';
 import { getCoverBetween, getVisibilityBetween } from '../../utils.js';
 import { optimizedVisibilityCalculator } from '../../visibility/auto-visibility/index.js';
 import { getDesiredOverrideStatesForAction } from '../services/data/action-state-config.js';
@@ -855,6 +856,21 @@ export class SneakPreviewDialog extends BaseActionDialog {
             icon: 'fas fa-arrow-up',
             label: game.i18n.localize('PF2E_VISIONER.SNEAK_ADEPT_FEAT.OUTCOME_UPGRADED'),
             tooltip: game.i18n.localize('PF2E_VISIONER.SNEAK_ADEPT_FEAT.TOOLTIP'),
+          });
+        }
+      } catch { }
+
+      // Rule Element Qualifications: show badges for active rule elements affecting sneak
+      try {
+        const ruleMessages = ActionQualifier.getCustomMessages(this.sneakingToken, 'sneak');
+        if (ruleMessages && ruleMessages.length > 0) {
+          ruleMessages.forEach(message => {
+            badges.push({
+              key: 'rule-element-sneak',
+              icon: 'fas fa-scroll',
+              label: game.i18n.localize('PF2E_VISIONER.RULE_ELEMENTS.BADGE.LABEL'),
+              tooltip: message,
+            });
           });
         }
       } catch { }
@@ -2283,6 +2299,12 @@ export class SneakPreviewDialog extends BaseActionDialog {
    */
   _endPositionQualifiesForSneak(observerToken, outcome) {
     if (!observerToken || !this.sneakingToken) return false;
+
+    // Priority -3: Check action qualifications from rule elements (e.g., blur spell)
+    const actionCheck = ActionQualifier.checkSneakPrerequisites(this.sneakingToken, observerToken.id);
+    if (!actionCheck.qualifies) {
+      return false;
+    }
 
     try {
       // Check if this specific observer's end position check has been deferred for Sneaky feats

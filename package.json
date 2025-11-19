@@ -1,13 +1,13 @@
 {
   "name": "pf2e-visioner",
-  "version": "4.5.7",
+  "version": "5.0.0",
   "description": "Advanced per-token visibility and cover management for Pathfinder 2E",
   "main": "scripts/main.js",
   "scripts": {
-    "test": "jest",
-    "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage",
-    "test:ci": "jest --ci --coverage --watchAll=false",
+    "test": "jest --maxWorkers=50%",
+    "test:watch": "jest --maxWorkers=50% --watch",
+    "test:coverage": "jest --coverage --maxWorkers=50%",
+    "test:ci": "jest --ci --coverage --watchAll=false --maxWorkers=50%",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",

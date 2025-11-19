@@ -2,6 +2,8 @@
  * OverrideService
  * Facade for interacting with overrides (active manual overrides between tokens).
  */
+import { getLogger } from '../../../utils/logger.js';
+
 export class OverrideService {
     constructor() { }
 
@@ -30,6 +32,12 @@ export class OverrideService {
      */
     getActiveOverrideForTokens(observer, target) {
         try {
+            // Check for rule element overrides first
+            const ruleElementOverride = this._checkRuleElementOverride(observer, target);
+            if (ruleElementOverride) {
+                return ruleElementOverride;
+            }
+
             // Use dynamic require to avoid ESM async import in hot paths; tests can mock this module.
             const mod = (0, eval)('require')('../../chat/services/infra/AvsOverrideManager.js');
             const AvsOverrideManager = mod?.default;
@@ -47,6 +55,106 @@ export class OverrideService {
             );
             if (peek?.state) return peek;
         } catch { /* ignore */ }
+        return null;
+    }
+
+    /**
+     * Check if there's an active rule element override that should be respected.
+     * Rule elements can set overrides in two ways:
+     * 1. ruleElementOverride flag - direct visibility override
+     * 2. visibilityReplacement flag - conditional state replacement
+     * @param {Token} observer
+     * @param {Token} target
+     * @returns {{ state?: string } | null}
+     */
+    _checkRuleElementOverride(observer, target) {
+        const log = getLogger('AVS/OverrideService');
+        try {
+
+
+            // Check if target has a direct rule element override
+            const targetOverride = target?.document?.getFlag('pf2e-visioner', 'ruleElementOverride');
+            log.debug?.(() => ({
+                msg: 'checkRuleElementOverride:target',
+                targetId: target?.document?.id,
+                has: !!targetOverride,
+                active: !!targetOverride?.active,
+                dir: targetOverride?.direction,
+                state: targetOverride?.state
+            }));
+
+
+            if (targetOverride?.active && targetOverride?.state) {
+                // This is a "from" direction override - target is seen as the override state by all observers
+                if (targetOverride.direction === 'from') {
+
+                    return { state: targetOverride.state };
+                }
+            }
+
+            // Check if observer has a rule element override
+            const observerOverride = observer?.document?.getFlag('pf2e-visioner', 'ruleElementOverride');
+            log.debug?.(() => ({
+                msg: 'checkRuleElementOverride:observer',
+                observerId: observer?.document?.id,
+                has: !!observerOverride,
+                active: !!observerOverride?.active,
+                dir: observerOverride?.direction,
+                state: observerOverride?.state
+            }));
+
+
+            if (observerOverride?.active && observerOverride?.state) {
+                // This is a "to" direction override - observer sees all targets as the override state
+                if (observerOverride.direction === 'to') {
+
+                    return { state: observerOverride.state };
+                }
+            }
+
+            // Check for visibility replacement (these don't provide a direct state)
+            // Just signal that rule elements are active so AVS respects the current visibility map
+            const targetReplacement = target?.document?.getFlag('pf2e-visioner', 'visibilityReplacement');
+            log.debug?.(() => ({
+                msg: 'checkRuleElementReplacement:target',
+                targetId: target?.document?.id,
+                has: !!targetReplacement,
+                active: !!targetReplacement?.active
+            }));
+
+
+            if (targetReplacement?.active) {
+                // Get the current visibility from the visibility map to preserve rule element state
+                const currentVisibility = observer?.document?.getFlag('pf2e-visioner', 'visibility')?.[target?.document?.id];
+
+                if (currentVisibility) {
+                    return { state: currentVisibility };
+                }
+            }
+
+            const observerReplacement = observer?.document?.getFlag('pf2e-visioner', 'visibilityReplacement');
+            log.debug?.(() => ({
+                msg: 'checkRuleElementReplacement:observer',
+                observerId: observer?.document?.id,
+                has: !!observerReplacement,
+                active: !!observerReplacement?.active
+            }));
+
+
+            if (observerReplacement?.active) {
+                // Get the current visibility from the visibility map to preserve rule element state
+                const currentVisibility = observer?.document?.getFlag('pf2e-visioner', 'visibility')?.[target?.document?.id];
+
+                if (currentVisibility) {
+                    return { state: currentVisibility };
+                }
+            }
+
+
+        } catch (error) {
+            // Fail silently to avoid breaking hot path
+
+        }
         return null;
     }
 }

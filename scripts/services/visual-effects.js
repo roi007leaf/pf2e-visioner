@@ -1326,6 +1326,11 @@ export async function updateSystemHiddenTokenHighlights(
     const observerHasLifesense = !!lifesenseSense;
     const lifesenseIsPrecise = lifesenseSense?.acuity === 'precise';
 
+    // Check if observer has both blinded and deafened conditions
+    const observerIsBlinded = observer.actor?.hasCondition?.('blinded') ?? false;
+    const observerIsDeafened = observer.actor?.hasCondition?.('deafened') ?? false;
+    const observerIsBlindAndDeaf = observerIsBlinded && observerIsDeafened;
+
     // Lifesense indicator should show when the observer has lifesense
     // The indicator will then be shown on targets that:
     // 1. Are within lifesense range
@@ -1334,9 +1339,14 @@ export async function updateSystemHiddenTokenHighlights(
     //
     // This allows lifesense to work through walls, in darkness, and with invisible creatures
     // without requiring specific conditions like blinded/deafened
+    //
+    // OR when the observer is both blinded AND deafened:
+    // All other tokens should show an indicator because they are effectively undetectable
+    // (no precise or imprecise senses can work)
     const isUsingLifesense = observerHasLifesense;
+    const showingBlindDeafIndicators = observerIsBlindAndDeaf;
 
-    if (!isUsingLifesense) {
+    if (!isUsingLifesense && !showingBlindDeafIndicators) {
       for (const token of tokens) {
         try {
           if (token._pvSystemHiddenIndicator) {
@@ -1447,10 +1457,23 @@ export async function updateSystemHiddenTokenHighlights(
         distanceInFeet = path.distance * feetPerGrid;
       }
 
-      const isWithinLifesenseRange =
-        lifesenseRange === Infinity || distanceInFeet <= lifesenseRange;
-      const shouldShowIndicator =
-        isSystemHidden && canBeDetectedByLifesense && isWithinLifesenseRange;
+      const isWithinLifesenseRange = lifesenseRange === Infinity || distanceInFeet <= lifesenseRange;
+
+      // Check the actual visibility state for blind+deaf logic
+      let isHiddenFromObserver = false;
+      if (showingBlindDeafIndicators) {
+        const { getVisibilityBetween } = await import('../stores/visibility-map.js');
+        const visibilityState = getVisibilityBetween(observer, token);
+        // Show indicator when token is hidden/concealed/undetected (not observed)
+        isHiddenFromObserver = visibilityState && visibilityState === 'hidden';
+      }
+
+      // Determine if indicator should show
+      // For lifesense: show if system-hidden, detectable by lifesense, and within range
+      // For blind+deaf: show when token is hidden/concealed/undetected from the blind+deaf observer
+      const shouldShowLifesenseIndicator = isSystemHidden && canBeDetectedByLifesense && isWithinLifesenseRange;
+      const shouldShowBlindDeafIndicator = showingBlindDeafIndicators && isHiddenFromObserver;
+      const shouldShowIndicator = shouldShowLifesenseIndicator || shouldShowBlindDeafIndicator;
 
       // If indicator exists but shouldn't, remove it
       if (token._pvSystemHiddenIndicator && !shouldShowIndicator) {
@@ -1509,7 +1532,9 @@ export async function updateSystemHiddenTokenHighlights(
             const targetToken = canvas.tokens.get(token.document.id);
             const isTargeted = targetToken?.isTargeted ?? false;
 
-            let color = 0x00d4ff;
+            // Different base color for blind+deaf indicators (gray/dark) vs lifesense (cyan)
+            let color = showingBlindDeafIndicators ? 0x555555 : 0x00d4ff;
+
             if (isTargeted) {
               const disposition = token.document.disposition ?? CONST.TOKEN_DISPOSITIONS.NEUTRAL;
 
@@ -1524,7 +1549,7 @@ export async function updateSystemHiddenTokenHighlights(
                   color = 0xffa500;
                   break;
                 default:
-                  color = 0x00d4ff;
+                  color = showingBlindDeafIndicators ? 0x555555 : 0x00d4ff;
               }
             }
 

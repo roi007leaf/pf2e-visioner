@@ -1,414 +1,911 @@
-# PF2E Visioner Development Handover
+# PF2E Visioner Development Handover# PF2E Visioner Development Handover
 
-This document provides a comprehensive overview of the PF2E Visioner module's current state, architecture, development patterns, and critical information for new AI assistants working on this project.
+**Last Updated**: October 28, 2025 This document provides a comprehensive overview of the PF2E Visioner module's current state, architecture, development patterns, and critical information for new AI assistants working on this project.
+
+**Version**: 5.0.0
 
 ## 📋 Quick Reference
 
+This document provides essential architecture, patterns, and gotchas for developers working on PF2E Visioner. For detailed change history, see CHANGELOG.md.
+
 - **Module ID**: `pf2e-visioner`
-- **Current Version**: 2.6.5
-- **FoundryVTT Compatibility**: v13.341+ (verified up to v13.346)
-- **PF2E System**: v6.0.0+
+
+## 📋 Quick Reference- **Current Version**: 5.0.0
+
+- **FoundryVTT Compatibility**: v13.341+ (verified up to v13.350)
+
+- **Module ID**: `pf2e-visioner`- **PF2E System**: v7.0.0+ (verified up to v7.6.2)
+
+- **Current Version**: 5.0.0- **License**: GPL-3.0
+
+- **FoundryVTT**: v13.341+ (verified up to v13.350)
+
+- **PF2E System**: v7.0.0+ (verified up to v7.6.2)## 🔄 Recent Changes (October 2025)
+
 - **License**: GPL-3.0
 
-## 🔄 Recent Changes (October 2025)
+- **Primary Language**: ESModule JavaScript (no TypeScript)### ✅ Position Cache Invalidation on Effect Addition (October 20, 2025)
 
-### Wall Changes Now Trigger Proper Cache Clearing (October 2, 2025)
+- **Testing**: Jest (1400+ tests, 80%+ coverage)
 
-**Bug Fixed**: Wall property changes (direction, sight/sound blocking) weren't updating visibility states when observers had conditions like deafened.
+**Bug Fixed**: When adding an effect with a rule element to a token that hasn't moved yet, visibility calculations would use stale position cache. Moving the token would update visibility correctly, but moving back to the original position would incorrectly use the old cached position instead of calculating with the new effect applied.
 
-**Root Causes**:
+## 🏗️ Architecture Overview
 
-1. **VisionAnalyzer Cache Stale**: `WallEventHandler` only cleared `CacheManager` caches but not the `VisionAnalyzer` cache containing observer sensing capabilities (conditions, senses)
-2. **Global Cache Preventing Updates**: Stale global visibility cache caused batch processor to skip recalculations, thinking nothing changed
-
-**The Fix**:
-
-- **WallEventHandler** now clears BOTH cache layers when walls change:
-  - `cacheManager.clearAllCaches()` - Clears LOS and global visibility caches
-  - `visionAnalyzer.clearCache()` - **NEW**: Clears observer capability cache
-- Applied to all wall event handlers:
-  - `handleWallUpdate()` - When wall properties change
-  - `handleWallCreate()` - When walls are created
-  - `handleWallDelete()` - When walls are deleted
-
-**Behavior Now**:
-
-- Changing wall direction (left → both) immediately recalculates visibility
-- Changing sight/sound blocking immediately updates detection states
-- Observer conditions (deafened, blinded) properly re-evaluated after wall changes
-- Global visibility cache correctly cleared and repopulated
-
-**Testing**:
-
-- Added `tests/unit/wall-change-cache-clear.test.js` with 7 comprehensive tests
-- Verified cache clearing for sight, sound, and direction changes
-- Integration test confirms deafened condition scenario works
-
-**Files Modified**:
-
-- `scripts/visibility/auto-visibility/core/WallEventHandler.js` - Added VisionAnalyzer cache clearing
-- `tests/unit/wall-change-cache-clear.test.js` - New test coverage
-
-**Pattern Consistency**: This matches the pattern already used in `ItemEventHandler` for condition changes.
-
-### Sight and Sound Blocking Wall Support � Recent Changes (October 2025)
-
-### Sight and Sound Blocking Wall Support
-
-**Feature**: Proper detection of sight-blocking and sound-blocking walls using FoundryVTT's polygon backend API.
-
-**Implementation Details**:
-
-- **VisionAnalyzer**: Added `hasLineOfSight()` and `isSoundBlocked()` methods
-  - Uses `CONFIG.Canvas.polygonBackends.sight.testCollision()` for sight-blocking detection
-  - Uses `CONFIG.Canvas.polygonBackends.sound.testCollision()` for sound-blocking detection
-  - Both methods fail-open (return false/true) if polygon backend unavailable
-- **StatelessVisibilityCalculator**: Added `hasLineOfSight` parameter to input
-  - Visual detection fails immediately if `hasLineOfSight === false`
-  - Combined with `soundBlocked` flag for comprehensive wall-based detection
-  - Results in "undetected" state when both sight and sound are blocked
-- **VisibilityCalculatorAdapter**: Integrated line-of-sight and sound-blocking checks
-  - Calls `visionAnalyzer.hasLineOfSight()` and `visionAnalyzer.isSoundBlocked()`
-  - Passes both flags to the calculator for proper state determination
-  - Clean architectural separation: no manipulation of `coverLevel` for wall-blocking
-
-**Cache Management**:
-
-- **ItemEventHandler**: Now clears VisionAnalyzer cache when conditions change
-  - Detects PF2e condition changes (conditions are items with type="condition")
-  - Clears cache for affected tokens to force recalculation of sensing capabilities
-  - Ensures deafened/blinded conditions are immediately reflected in visibility
-
-**Behavior**:
-
-- **Sight-only blocking**: Visual detection fails → falls back to hearing → "hidden" state
-- **Sound-only blocking**: Hearing fails → visual detection works → "observed" state
-- **Sight + sound blocking**: Both fail → "undetected" state
-- **Sight blocked + deafened observer**: Visual fails, hearing fails → "undetected" state
-- **Precise non-visual senses** (tremorsense, scent, lifesense): Still work through walls
-
-**Testing**: Comprehensive unit tests in `tests/unit/visibility/sight-sound-blocking.test.js`
-
-**Files Modified**:
-
-- `scripts/visibility/auto-visibility/VisionAnalyzer.js` - Added wall detection methods
-- `scripts/visibility/StatelessVisibilityCalculator.js` - Added hasLineOfSight check
-- `scripts/visibility/VisibilityCalculatorAdapter.js` - Integrated wall checks
-- `scripts/visibility/auto-visibility/core/ItemEventHandler.js` - Added cache clearing
-- `scripts/hooks/effect-perception.js` - Enhanced for condition changes (debug logging)
-
-## �🏗️ Architecture Overview
+**Root Cause**: `EffectEventHandler` was marking tokens for visibility recalculation when effects changed, but it wasn't clearing the position-dependent caches. This caused the `PositionBatchCache` created during the initial batch to be reused, resulting in stale position data being used for visibility calculations.
 
 ### Core Philosophy
 
-The module follows a **modular, single-responsibility architecture** with clear separation of concerns:
+**Scenario That Triggered Bug**:
+
+**Event-Driven, Performance-First Architecture**
+
+- ESModule-based with tree-shaking1. Token at position A (initial batch, position cache built with A)
+
+- ApplicationV2 UI (Foundry v13+ only)2. Add visibility-affecting effect (visibility recalculated using old position A cache)
+
+- Flag-based persistence (all state in token/scene flags)3. Move token to position B (new batch, new cache built with B - effect now works)
+
+- Batch operations (never per-token loops)4. Move back to position A (new batch attempted to be created, but old cache from step 2 was partially reused, causing incorrect results)
+
+- Hook-driven (no polling/timers)
+
+- Dependency injection for testability**The Fix**:
+
+### Key Patterns- **EffectEventHandler** now clears position-dependent caches when visibility-affecting effects change
+
+- Added `#cacheManager` dependency injection to constructor
+
+1. **Facade Pattern**: `utils.js` re-exports stores/services - Added `#clearPositionCaches()` private method to clear both visibility and LOS caches
+
+2. **Store Pattern**: Single-responsibility state management - Calls `#clearPositionCaches()` before marking tokens changed for visibility-affecting and light-emitting effects
+
+3. **Service Layer**: Cross-cutting orchestration- Applied to all effect state changes:
+
+4. **Adapter Pattern**: Foundry ↔ Core logic translation - `#onEffectCreate()` - When effects are created
+
+5. **Singleton Services**: Lifecycle managed, DI-based - `#onEffectUpdate()` - When effects are updated
+
+- `#onEffectDelete()` - When effects are deleted
+
+## 📁 File Structure (Essential)- Updated `EventHandlerFactory` to inject cacheManager into EffectEventHandler
+
+````**Behavior Now**:
+
+scripts/
+
+├── main.js                    # Entry point, module init- Adding visibility-affecting effects immediately clears all position caches
+
+├── constants.js               # All config, states, settings- Moving tokens after adding effects uses fresh position cache
+
+├── api.js                     # Public API surface- Returning to original position after adding effects correctly uses new position cache
+
+├── utils.js                   # Facade + UI helpers- Light-emitting effects properly trigger global cache clearing and recalculation
+
+├── settings.js                # Settings registration- Position cache is never reused across effect-related visibility updates
+
+│
+
+├── hooks/                     # Modular hook handlers**Testing**:
+
+│   ├── registration.js        # Central registrar
+
+│   ├── lifecycle.js           # ready/canvasReady, sockets- Added `tests/unit/effect-cache-invalidation.test.js` with comprehensive cache clearing tests
+
+│   ├── ui.js                  # Token HUD, context menus- Added `tests/unit/effect-position-cache-bug.test.js` with detailed scenario reproduction and verification
+
+│   ├── token-events.js        # Token create/delete- Tested all visibility-affecting effect types (invisible, blinded, darkvision, etc.)
+
+│   └── auto-cover.js          # Auto-cover libWrapper- Tested light-emitting effects (torch, continual flame, etc.)
+
+│- Verified graceful handling when cache manager not available
+
+├── managers/                  # UI controllers (ApplicationV2)
+
+│   ├── token-manager/         # Main UI (tabbed interface)**Files Modified**:
+
+│   ├── quick-panel.js         # Quick edit floating panel
+
+│   └── wall-manager/          # Wall config UI- `scripts/visibility/auto-visibility/core/EffectEventHandler.js` - Added cache clearing logic
+
+│- `scripts/visibility/auto-visibility/core/EventHandlerFactory.js` - Added cacheManager parameter
+
+├── stores/                    # State persistence- `tests/unit/effect-cache-invalidation.test.js` - New test coverage
+
+│   ├── visibility-map.js      # Visibility state (deep-merge only)- `tests/unit/effect-position-cache-bug.test.js` - Comprehensive scenario tests
+
+│   └── cover-map.js           # Cover state (deep-merge only)- `tests/unit/core/event-handlers.test.js` - Updated EffectEventHandler tests
+
+│- `tests/unit/core/perception-refresh-improvements.test.js` - Updated EffectEventHandler tests
+
+├── services/                  # Cross-cutting operations
+
+│   ├── visual-effects.js      # Token appearance**Pattern Consistency**: This matches the pattern already used in `TokenEventHandler` for movement and light changes, and `WallEventHandler` for wall property changes.
+
+│   ├── socket.js              # Cross-client sync
+
+│   ├── scene-cleanup.js       # Deletion cleanup### Wall Changes Now Trigger Proper Cache Clearing (October 2, 2025)
+
+│   ├── party-token-state.js   # Party consolidation
+
+│   ├── CoverModifierService.js# Cover calculations**Bug Fixed**: Wall property changes (direction, sight/sound blocking) weren't updating visibility states when observers had conditions like deafened.
+
+│   ├── DetectionWrapper.js    # Detection mode wrapping
+
+│   └── SensePrecomputer.js    # Sense capability cache**Root Causes**:
+
+│
+
+├── visibility/                # Visibility system1. **VisionAnalyzer Cache Stale**: `WallEventHandler` only cleared `CacheManager` caches but not the `VisionAnalyzer` cache containing observer sensing capabilities (conditions, senses)
+
+│   └── auto-visibility/       # AVS subsystem2. **Global Cache Preventing Updates**: Stale global visibility cache caused batch processor to skip recalculations, thinking nothing changed
+
+│       ├── EventDrivenVisibilitySystem.js  # Main orchestrator
+
+│       ├── VisionAnalyzer.js              # Sense detection, LOS**The Fix**:
+
+│       ├── VisibilityCalculator.js        # Core rules logic
+
+│       ├── SeekDialogAdapter.js           # Sense UI adapter- **WallEventHandler** now clears BOTH cache layers when walls change:
+
+│       └── core/                          # Batch processing  - `cacheManager.clearAllCaches()` - Clears LOS and global visibility caches
+
+│           ├── BatchProcessor.js          # Entry point, filtering  - `visionAnalyzer.clearCache()` - **NEW**: Clears observer capability cache
+
+│           ├── BatchOrchestrator.js       # Phase coordination- Applied to all wall event handlers:
+
+│           ├── TokenEventHandler.js       # Movement events  - `handleWallUpdate()` - When wall properties change
+
+│           ├── EffectEventHandler.js      # Effect changes  - `handleWallCreate()` - When walls are created
+
+│           └── WallEventHandler.js        # Wall changes  - `handleWallDelete()` - When walls are deleted
+
+│
+
+├── cover/                     # Cover system**Behavior Now**:
+
+│   ├── auto-cover.js          # Auto-detection, keybinds
+
+│   ├── cover-visualization.js # Interactive grid overlay- Changing wall direction (left → both) immediately recalculates visibility
+
+│   ├── CoverDetector.js       # Intersection algorithms- Changing sight/sound blocking immediately updates detection states
+
+│   └── aggregates.js          # Effect management- Observer conditions (deafened, blinded) properly re-evaluated after wall changes
+
+│- Global visibility cache correctly cleared and repopulated
+
+└── chat/                      # PF2E action automation
+
+    ├── automation-service.js  # Main controller**Testing**:
+
+    ├── chat-processor.js      # Message processing
+
+    ├── dialogs/               # Action dialogs (Seek, Hide, etc)- Added `tests/unit/wall-change-cache-clear.test.js` with 7 comprehensive tests
+
+    └── services/              # Action handlers- Verified cache clearing for sight, sound, and direction changes
+
+```- Integration test confirms deafened condition scenario works
+
+
+
+## 🎯 State Management**Files Modified**:
+
+
+
+### Visibility States (PF2e Rules)- `scripts/visibility/auto-visibility/core/WallEventHandler.js` - Added VisionAnalyzer cache clearing
+
+- **observed**: Full visibility, no penalties- `tests/unit/wall-change-cache-clear.test.js` - New test coverage
+
+- **concealed**: DC 5 flat check to target
+
+- **hidden**: Requires Seek, DC 11 flat check**Pattern Consistency**: This matches the pattern already used in `ItemEventHandler` for condition changes.
+
+- **undetected**: Unknown location, cannot target
+
+### Sight and Sound Blocking Wall Support � Recent Changes (October 2025)
+
+### Cover States (PF2e Rules)
+
+- **none**: No AC bonus### Sight and Sound Blocking Wall Support
+
+- **lesser**: +1 AC
+
+- **standard**: +2 AC**Feature**: Proper detection of sight-blocking and sound-blocking walls using FoundryVTT's polygon backend API.
+
+- **greater**: +4 AC
+
+**Implementation Details**:
+
+### Flag Structure
+
+```javascript- **VisionAnalyzer**: Added `hasLineOfSight()` and `isSoundBlocked()` methods
+
+// Visibility: per-observer state  - Uses `CONFIG.Canvas.polygonBackends.sight.testCollision()` for sight-blocking detection
+
+token.flags["pf2e-visioner"].visibility = {  - Uses `CONFIG.Canvas.polygonBackends.sound.testCollision()` for sound-blocking detection
+
+  [observerId]: "observed" | "concealed" | "hidden" | "undetected"  - Both methods fail-open (return false/true) if polygon backend unavailable
+
+}- **StatelessVisibilityCalculator**: Added `hasLineOfSight` parameter to input
+
+  - Visual detection fails immediately if `hasLineOfSight === false`
+
+// Cover: per-attacker state  - Combined with `soundBlocked` flag for comprehensive wall-based detection
+
+token.flags["pf2e-visioner"].cover = {  - Results in "undetected" state when both sight and sound are blocked
+
+  [attackerId]: "none" | "lesser" | "standard" | "greater"- **VisibilityCalculatorAdapter**: Integrated line-of-sight and sound-blocking checks
+
+}  - Calls `visionAnalyzer.hasLineOfSight()` and `visionAnalyzer.isSoundBlocked()`
+
+  - Passes both flags to the calculator for proper state determination
+
+// Overrides: manual GM overrides  - Clean architectural separation: no manipulation of `coverLevel` for wall-blocking
+
+token.flags["pf2e-visioner"]["avs-override-from-${observerId}"] = true
+
+**Cache Management**:
+
+// Scene: party token cache
+
+scene.flags["pf2e-visioner"].partyTokenStateCache = {- **ItemEventHandler**: Now clears VisionAnalyzer cache when conditions change
+
+  [tokenId]: { visibility, cover, effects }  - Detects PF2e condition changes (conditions are items with type="condition")
+
+}  - Clears cache for affected tokens to force recalculation of sensing capabilities
+
+```  - Ensures deafened/blinded conditions are immediately reflected in visibility
+
+
+
+**CRITICAL**: Always deep-merge flags, NEVER overwrite:**Behavior**:
+
+```javascript
+
+// ❌ WRONG - wipes all data- **Sight-only blocking**: Visual detection fails → falls back to hearing → "hidden" state
+
+await token.update({"flags.pf2e-visioner": newData});- **Sound-only blocking**: Hearing fails → visual detection works → "observed" state
+
+- **Sight + sound blocking**: Both fail → "undetected" state
+
+// ✅ CORRECT - use service- **Sight blocked + deafened observer**: Visual fails, hearing fails → "undetected" state
+
+await VisibilityMapService.setVisibilityState(token, observer, state);- **Precise non-visual senses** (tremorsense, scent, lifesense): Still work through walls
+
+````
+
+**Testing**: Comprehensive unit tests in `tests/unit/visibility/sight-sound-blocking.test.js`
+
+## 🔧 Auto-Visibility System (AVS)
+
+**Files Modified**:
+
+### Architecture
+
+**EventDrivenVisibilitySystem** = Main orchestrator (singleton, GM-only)- `scripts/visibility/auto-visibility/VisionAnalyzer.js` - Added wall detection methods
+
+- Listens to Foundry hooks (movement, lighting, walls, effects)- `scripts/visibility/StatelessVisibilityCalculator.js` - Added hasLineOfSight check
+
+- Delegates to **BatchOrchestrator** for processing- `scripts/visibility/VisibilityCalculatorAdapter.js` - Integrated wall checks
+
+- Manages lifecycle and circuit breakers- `scripts/visibility/auto-visibility/core/ItemEventHandler.js` - Added cache clearing
+
+- `scripts/hooks/effect-perception.js` - Enhanced for condition changes (debug logging)
+
+**Batch Processing Pipeline**:
+
+1. **Filter**: Viewport + range filtering## �🏗️ Architecture Overview
+
+2. **Cache**: Position snapshots, spatial index
+
+3. **Calculate**: VisionAnalyzer → VisibilityCalculator### Core Philosophy
+
+4. **Reconcile**: Compare old vs new states
+
+5. **Update**: Batch flag writesThe module follows a **modular, single-responsibility architecture** with clear separation of concerns:
+
+6. **Refresh**: Single perception update (no `refreshLighting`!)
 
 - **ESModule## 🏁 CHECKPOINT: Working State (January 2025) - Performance Optimization Complete# 🏁 CHECKPOINT: Working State (January 2025) - Performance Optimization Completebased**: Modern JavaScript module system with tree-shaking
-- **ApplicationV2**: Uses FoundryVTT v13's modern UI framework
-- **Flag-based persistence**: All data stored in token/scene flags for robustness
-- **Event-driven**: Heavy use of FoundryVTT's hook system
-- **Performance-focused**: Batch operations, lazy loading, and optimized updates
 
-### Key Architectural Patterns
+### Sense Priority (Visual)- **ApplicationV2**: Uses FoundryVTT v13's modern UI framework
 
-1. **Facade Pattern**: `utils.js` re-exports from stores/services for single source of truth
-2. **Store Pattern**: Separate stores for visibility and cover state management
-3. **Service Layer**: Cross-cutting concerns handled by dedicated services
-4. **Hook Registration**: Centralized in `hooks/registration.js` with modular handlers
-5. **API Layer**: Clean public API in `api.js` with internal helpers in `services/api-internal.js`
+1. greater-darkvision (sees through all darkness)- **Flag-based persistence**: All data stored in token/scene flags for robustness
+
+2. darkvision (rank 1-3 → observed, rank 4+ → concealed)- **Event-driven**: Heavy use of FoundryVTT's hook system
+
+3. light-perception (fails in ANY magical darkness)- **Performance-focused**: Batch operations, lazy loading, and optimized updates
+
+4. low-light-vision
+
+5. vision### Key Architectural Patterns
+
+### Sense Priority (Imprecise)1. **Facade Pattern**: `utils.js` re-exports from stores/services for single source of truth
+
+- hearing (blocked by sound-blocking walls)2. **Store Pattern**: Separate stores for visibility and cover state management
+
+- scent (bypasses walls)3. **Service Layer**: Cross-cutting concerns handled by dedicated services
+
+- tremorsense (fails if `movementAction === 'fly'`)4. **Hook Registration**: Centralized in `hooks/registration.js` with modular handlers
+
+- echolocation5. **API Layer**: Clean public API in `api.js` with internal helpers in `services/api-internal.js`
+
+- lifesense
 
 ## 📁 File Structure & Responsibilities
 
-```
-scripts/
-├── main.js                    # Entry point - module initialization
-├── constants.js               # All configuration, states, settings definitions
-├── api.js                     # Public API surface
-├── utils.js                   # Facade re-exporting stores/services + UI helpers
-├── settings.js                # Settings registration with grouped UI
-├── hooks.js                   # Thin shim → delegates to hooks/
-├── hooks/                     # Modular hook handlers by concern
-│   ├── registration.js        # Central registrar
-│   ├── lifecycle.js           # ready/canvasReady + socket + tooltips
-│   ├── ui.js                  # Token HUD, directory context, config injection
-│   ├── token-events.js        # create/delete token handlers
-│   ├── party-token-hooks.js   # Party token consolidation detection
-│   ├── combat.js              # encounter filter reset
-│   └── chat.js                # chat styles + processing
-├── managers/                  # UI controllers
-│   ├── token-manager/         # Main visibility/cover UI (ApplicationV2)
-│   ├── progress.js            # Progress indicator
-│   ├── quick-panel.js         # Quick edit panel
-│   └── wall-manager/          # Wall management UI
-├── stores/                    # State management (single responsibility)
-│   ├── visibility-map.js      # Visibility state persistence
-│   └── cover-map.js           # Cover state persistence
+### Cache Management
+
+**Multi-layer caches** with TTL-based invalidation:```
+
+- **PositionBatchCache**: Token positions (5s TTL)scripts/
+
+- **GlobalLosCache**: Line-of-sight results (5s TTL)├── main.js # Entry point - module initialization
+
+- **GlobalVisibilityCache**: Visibility results (5s TTL)├── constants.js # All configuration, states, settings definitions
+
+- **LightingPrecomputer**: Lighting hash (2s TTL)├── api.js # Public API surface
+
+├── utils.js # Facade re-exporting stores/services + UI helpers
+
+**Critical**: Event handlers MUST clear caches:├── settings.js # Settings registration with grouped UI
+
+- `EffectEventHandler`: Clears on effect add/remove/update├── hooks.js # Thin shim → delegates to hooks/
+
+- `TokenEventHandler`: Clears on movement/light changes├── hooks/ # Modular hook handlers by concern
+
+- `WallEventHandler`: Clears on wall property changes│ ├── registration.js # Central registrar
+
+- `LightingPrecomputer`: Clears on ambient light changes│ ├── lifecycle.js # ready/canvasReady + socket + tooltips
+
+│ ├── ui.js # Token HUD, directory context, config injection
+
+### Performance Targets│ ├── token-events.js # create/delete token handlers
+
+- **Batch processing**: 75-80% faster with caching│ ├── party-token-hooks.js # Party token consolidation detection
+
+- **Cache building**: 99% improvement (46.7ms → 0.1ms)│ ├── combat.js # encounter filter reset
+
+- **Large scenes**: Handles 50+ tokens efficiently│ └── chat.js # chat styles + processing
+
+├── managers/ # UI controllers
+
+## ⚠️ Critical Gotchas│ ├── token-manager/ # Main visibility/cover UI (ApplicationV2)
+
+│ ├── progress.js # Progress indicator
+
+### 1. Token vs TokenDocument│ ├── quick-panel.js # Quick edit panel
+
+````javascript│ └── wall-manager/          # Wall management UI
+
+// APIs are inconsistent - always check!├── stores/                    # State management (single responsibility)
+
+const tokenDoc = token.document;  // For persistence│   ├── visibility-map.js      # Visibility state persistence
+
+const token = canvas.tokens.get(id);  // For canvas ops│   └── cover-map.js           # Cover state persistence
+
 ├── services/                  # Cross-cutting operations
-│   ├── api-internal.js        # Internal API helpers
-│   ├── auto-visibility-system.js # Automatic visibility detection system
-│   ├── scene-cleanup.js       # Token deletion cleanup
-│   ├── party-token-state.js   # Party token state preservation
+
+// During deletion, token may not be in canvas.tokens│   ├── api-internal.js        # Internal API helpers
+
+const doc = scene.tokens.get(tokenId);  // Use scene instead│   ├── scene-cleanup.js       # Token deletion cleanup
+
+```│   ├── party-token-state.js   # Party token state preservation
+
 │   ├── socket.js              # Cross-client communication
-│   ├── visual-effects.js      # Token appearance management
+
+### 2. Perception Refresh (NEVER refreshLighting)│   ├── visual-effects.js      # Token appearance management
+
+```javascript│   ├── CoverModifierService.js # Cover modifier calculations
+
+// ❌ WRONG - Creates infinite loop!│   ├── DetectionWrapper.js    # Detection mode wrapping
+
+canvas.perception.update({ refreshLighting: true });│   ├── SensePrecomputer.js    # Sense capability precomputation
+
 │   └── [other services]
-├── cover/                     # Cover system modules
-│   ├── auto-cover.js          # Automatic cover detection
-│   ├── cover-visualization.js # Interactive cover grid overlay
-│   ├── aggregates.js          # Effect aggregation
-│   ├── batch.js               # Batch operations
-│   └── [other cover modules]
+
+// ✅ CORRECT - Vision and occlusion only├── cover/                     # Cover system modules
+
+canvas.perception.update({│   ├── auto-cover.js          # Automatic cover detection
+
+  refreshVision: true,│   ├── cover-visualization.js # Interactive cover grid overlay
+
+  refreshOcclusion: true│   ├── aggregates.js          # Effect aggregation
+
+});│   ├── batch.js               # Batch operations
+
+```│   └── [other cover modules]
+
 ├── visibility/                # Visibility system modules
-├── chat/                      # PF2E action automation
-│   ├── automation-service.js  # Main automation controller
-│   ├── chat-processor.js      # Chat message processing
-│   ├── dialogs/               # Action-specific dialogs
-│   └── services/              # Action handlers and utilities
+
+### 3. Effect Lifecycle├── chat/                      # PF2E action automation
+
+- **Aggregate effects**: Multi-observer efficiency (by design)│   ├── automation-service.js  # Main automation controller
+
+- **Roll-time effects**: Clean up immediately after roll│   ├── chat-processor.js      # Chat message processing
+
+- **Never delete manually**: Use service methods│   ├── dialogs/               # Action-specific dialogs
+
+- **Icon resolution**: Use `getPF2eConditionIcon()` for PF2e icons│   └── services/              # Action handlers and utilities
+
 └── helpers/                   # Pure utility functions
-```
 
-## 🔧 Development Patterns & Conventions
+### 4. Party Token Integration```
 
-### Code Style & Standards
+- **Consolidation**: State saved to scene flags automatically
 
-- **ESModule imports/exports**: Always use modern module syntax
-- **ApplicationV2**: All UI components use FoundryVTT v13's modern framework
-- **Async/await**: Prefer over Promise chains
-- **Error handling**: Comprehensive try-catch with user notifications
-- **JSDoc**: Document all public methods and complex functions
-- **No time-based operations**: User preference - avoid setTimeout/setInterval [[memory:4992324]]
+- **Restoration**: State restored when tokens brought back## 🔧 Development Patterns & Conventions
 
-### Data Management Patterns
+- **Edge cases**: Race conditions handled, deferred updates for allies
 
-1. **Flag-based persistence**: All state stored in `token.flags["pf2e-visioner"]`
-2. **Batch operations**: Always prefer bulk document updates over individual operations
-3. **State reconciliation**: Updates merge with existing data, never overwrite completely
-4. **Cleanup on deletion**: Automatic cleanup when tokens/actors are removed
+- **Cache location**: `scene.flags["pf2e-visioner"].partyTokenStateCache`### Code Style & Standards
+
+
+
+### 5. Auto-Cover Architecture- **ESModule imports/exports**: Always use modern module syntax
+
+- **Keybind-only popups**: Override dialog only with keybind held- **ApplicationV2**: All UI components use FoundryVTT v13's modern framework
+
+- **Automatic detection**: Seamless when keybind not held- **Async/await**: Prefer over Promise chains
+
+- **Dual-phase**:- **Error handling**: Comprehensive try-catch with user notifications
+
+  1. libWrapper: DC modification (immediate)- **JSDoc**: Document all public methods and complex functions
+
+  2. Chat hook: Persistent state + visuals- **No time-based operations**: User preference - avoid setTimeout/setInterval [[memory:4992324]]
+
+- **Movement invalidation**: Token move clears pre-applied cover
+
+- **Elevation-aware**: All modes filter blockers by height### Data Management Patterns
+
+
+
+### 6. Colorblind Mode1. **Flag-based persistence**: All state stored in `token.flags["pf2e-visioner"]`
+
+- **CSS custom properties ONLY**: Never hardcoded colors2. **Batch operations**: Always prefer bulk document updates over individual operations
+
+- **4 modes**: Protanopia, Deuteranopia, Tritanopia, Achromatopsia3. **State reconciliation**: Updates merge with existing data, never overwrite completely
+
+- **Apply on load**: Multiple hooks ensure immediate application4. **Cleanup on deletion**: Automatic cleanup when tokens/actors are removed
+
+- **All UI elements**: Every component respects mode
 
 ### UI Patterns
 
-1. **Tabbed interfaces**: Visibility and Cover tabs in main manager
-2. **Bulk actions**: "Apply All", "Revert All" with per-row controls
-3. **Progress indicators**: Long operations show progress bars
-4. **Responsive design**: CSS breakpoints for different screen sizes
-5. **Colorblind support**: Multiple accessibility modes with pattern indicators
+## 🧪 Testing Strategy
 
-### Quick Panel (VisionerQuickPanel)
+1. **Tabbed interfaces**: Visibility and Cover tabs in main manager
+
+### Test Organization2. **Bulk actions**: "Apply All", "Revert All" with per-row controls
+
+```3. **Progress indicators**: Long operations show progress bars
+
+tests/4. **Responsive design**: CSS breakpoints for different screen sizes
+
+├── unit/                      # Individual functions/classes5. **Colorblind support**: Multiple accessibility modes with pattern indicators
+
+├── integration/               # Full workflows
+
+└── mocks/                     # Foundry API mocks### Quick Panel (VisionerQuickPanel)
+
+````
 
 1. **Purpose**: Rapid visibility and cover management without opening full manager
-2. **Layout**: Compact interface with visibility/cover buttons and quick selection tools
-3. **Quick Selection Buttons**:
-   - **Party Selection**: Selects all character tokens with player ownership
-   - **Enemy Selection**: Selects all NPC tokens without player ownership
-   - **Party Targeting**: Targets all party tokens for visibility/cover operations
-   - **Enemy Targeting**: Targets all enemy tokens for visibility/cover operations
-4. **Features**:
-   - Observer/Target mode switching
-   - Minimizable to floating button
-   - Auto-refresh on token selection/targeting changes
-   - Position memory for floating button
-5. **Token Detection Logic**:
+
+### Requirements2. **Layout**: Compact interface with visibility/cover buttons and quick selection tools
+
+- **Jest** (not Vitest)3. **Quick Selection Buttons**:
+
+- **Coverage**: 80%+ branches/functions/lines - **Party Selection**: Selects all character tokens with player ownership
+
+- **Canvas mocking**: Real HTML5 canvas for drawing tests - **Enemy Selection**: Selects all NPC tokens without player ownership
+
+- **Every bugfix**: Must include regression test - **Party Targeting**: Targets all party tokens for visibility/cover operations
+  - **Enemy Targeting**: Targets all enemy tokens for visibility/cover operations
+
+### Commands4. **Features**
+
+````bash - Observer/Target mode switching
+
+npm test              # Run all tests   - Minimizable to floating button
+
+npm run test:coverage # Generate coverage   - Auto-refresh on token selection/targeting changes
+
+npm run test:watch    # Watch mode   - Position memory for floating button
+
+```5. **Token Detection Logic**:
+
    - **Party tokens**: `actor.type === 'character' && actor.hasPlayerOwner && (actor.alliance === 'party' || actor.alliance === 'self')`
-   - **Enemy tokens**: `actor.type === 'npc' && !actor.hasPlayerOwner`
-6. **Usage**: Ideal for GMs managing large encounters or quick visibility adjustments
 
-### Performance Patterns
+### Critical Test Scenarios   - **Enemy tokens**: `actor.type === 'npc' && !actor.hasPlayerOwner`
 
-1. **Lazy loading**: Dynamic imports for heavy modules (dialogs, batch operations)
+1. Cache invalidation (movement, effects, walls, lighting)6. **Usage**: Ideal for GMs managing large encounters or quick visibility adjustments
+
+2. Feedback loop prevention (AVS doesn't trigger itself)
+
+3. Race conditions (party consolidation, parallel deletion)### Performance Patterns
+
+4. PF2e rules accuracy (all senses, wall types, lighting)
+
+5. Edge cases (missing observers, null caches)1. **Lazy loading**: Dynamic imports for heavy modules (dialogs, batch operations)
+
 2. **Debounced updates**: Visual effects batched to avoid excessive redraws
-3. **Efficient queries**: Canvas token filtering optimized for large scenes
+
+## 🎨 UI Development3. **Efficient queries**: Canvas token filtering optimized for large scenes
+
 4. **Memory management**: Cleanup of event listeners and temporary data
 
-## 🎯 Core Features & Systems
+### ApplicationV2 Pattern
 
-### 1. Visibility System
+```javascript## 🎯 Core Features & Systems
 
-- **States**: Observed, Concealed, Hidden, Undetected
-- **Per-observer tracking**: Each token has individual visibility map
-- **PF2E integration**: Automatic condition application with mechanical effects
-- **Visual feedback**: Token overlays, opacity changes, indicators
+export class YourUI extends foundry.applications.api.ApplicationV2 {
 
-### 2. Cover System
+  static DEFAULT_OPTIONS = {### 1. Visibility System
 
-- **States**: None, Lesser (+1 AC), Standard (+2 AC), Greater (+4 AC)
-- **Auto-cover detection**: Multiple intersection algorithms (Any, 10%, Center, Coverage, Tactical)
-- **Roll-time application**: Cover applied only during attacks, then cleaned up
-- **Override system**: GM can override auto-calculated cover in roll dialogs
+    id: "pf2e-visioner-your-ui",
 
-### 3. Chat Automation
+    classes: ["pf2e-visioner"],- **States**: Observed, Concealed, Hidden, Undetected
 
-- **PF2E Actions**: Seek, Hide, Sneak, Point Out, Create a Diversion, Take Cover
-- **Attack Consequences**: Post-damage visibility updates for hidden/undetected attackers
+    window: { title: "PF2E_VISIONER.UI.Title" },- **Per-observer tracking**: Each token has individual visibility map
+
+    actions: { yourAction: YourUI.#handleAction }- **PF2E integration**: Automatic condition application with mechanical effects
+
+  };- **Visual feedback**: Token overlays, opacity changes, indicators
+
+
+
+  static PARTS = {### 2. Cover System
+
+    form: { template: "modules/pf2e-visioner/templates/your-ui.hbs" }
+
+  };- **States**: None, Lesser (+1 AC), Standard (+2 AC), Greater (+4 AC)
+
+  - **Auto-cover detection**: Multiple intersection algorithms (Any, 10%, Center, Coverage, Tactical)
+
+  async _prepareContext(options) {- **Roll-time application**: Cover applied only during attacks, then cleaned up
+
+    return { ...await super._prepareContext(options), yourData };- **Override system**: GM can override auto-calculated cover in roll dialogs
+
+  }
+
+  ### 3. Chat Automation
+
+  static #handleAction(event, target) { /* ... */ }
+
+}- **PF2E Actions**: Seek, Hide, Sneak, Point Out, Create a Diversion, Take Cover
+
+```- **Attack Consequences**: Post-damage visibility updates for hidden/undetected attackers
+
 - **Template system**: Seek can use placed templates for area targeting
-- **Player/GM workflow**: Players trigger, GMs resolve with preview dialogs
 
-### 4. Cover Visualization
+### Localization- **Player/GM workflow**: Players trigger, GMs resolve with preview dialogs
+
+```javascript
+
+// Templates### 4. Cover Visualization
+
+{{localize "PF2E_VISIONER.UI.Title"}}
 
 - **Interactive grid**: Hold keybind while hovering to show cover levels
-- **Color-coded**: Green (none), Yellow (lesser), Orange (standard), Red (greater)
-- **Fog of war aware**: Only shows information in visible areas
-- **Performance optimized**: Client-side rendering with efficient algorithms
+
+// JavaScript- **Color-coded**: Green (none), Yellow (lesser), Orange (standard), Red (greater)
+
+game.i18n.localize("PF2E_VISIONER.UI.Title")- **Fog of war aware**: Only shows information in visible areas
+
+game.i18n.format("PF2E_VISIONER.Messages.StateChanged", {token, state})- **Performance optimized**: Client-side rendering with efficient algorithms
+
+````
 
 ### 5. Cover Override Indication ✅ **NEW FEATURE**
 
-- **Chat message indicators**: Visual indicators appear in chat when auto cover calculations are overridden
-- **Override sources tracked**: Distinguishes between popup overrides (keybind) and roll dialog overrides
-- **Clear messaging**: Shows original detected cover vs final applied cover (e.g., "Standard Cover → Lesser Cover")
+### Responsive Design
+
+- Breakpoints in `styles/responsive.css`- **Chat message indicators**: Visual indicators appear in chat when auto cover calculations are overridden
+
+- Test at: 1920x1080, 1366x768, mobile- **Override sources tracked**: Distinguishes between popup overrides (keybind) and roll dialog overrides
+
+- All dialogs must be mobile-friendly- **Clear messaging**: Shows original detected cover vs final applied cover (e.g., "Standard Cover → Lesser Cover")
+
 - **Localized**: Supports multiple languages with proper i18n formatting
-- **Non-intrusive**: Appears as a subtle warning-colored bar in chat messages
 
-### 6. Auto-Visibility System ✅ **NEW FEATURE**
+## 🔌 Public API- **Non-intrusive**: Appears as a subtle warning-colored bar in chat messages
 
-- **Automatic visibility detection**: Analyzes lighting conditions, creature senses, and environmental factors to automatically set appropriate visibility flags
+### Core Methods### 6. Auto-Visibility System ✅ **NEW FEATURE**
+
+```javascript
+
+const api = game.modules.get('pf2e-visioner').api;- **Automatic visibility detection**: Analyzes lighting conditions, creature senses, and environmental factors to automatically set appropriate visibility flags
+
 - **Lighting-based calculations**: Considers bright light, dim light, and darkness levels at token positions
-- **Creature senses integration**: Supports darkvision, low-light vision, tremorsense, echolocation, see-invisibility, and other PF2E senses
-- **Real-time updates**: Automatically recalculates visibility when tokens move, lighting changes, or walls are modified
-- **Scene Config Intelligence**: Detects when Scene Configuration dialog is open and defers updates until user saves changes
-- **Performance optimized**: Uses singleton pattern with efficient batching and prevents duplicate processing
+
+// Visibility- **Creature senses integration**: Supports darkvision, low-light vision, tremorsense, echolocation, see-invisibility, and other PF2E senses
+
+api.setVisibility(observer, target, state);- **Real-time updates**: Automatically recalculates visibility when tokens move, lighting changes, or walls are modified
+
+api.getVisibility(observer, target);- **Scene Config Intelligence**: Detects when Scene Configuration dialog is open and defers updates until user saves changes
+
+api.clearVisibility(token);- **Performance optimized**: Uses singleton pattern with efficient batching and prevents duplicate processing
+
 - **Comprehensive API**: Provides methods for manual calculation, debugging, and system control
-- **GM-only operation**: Only runs for GM users to prevent conflicts and ensure consistent state
-- **Configurable settings**: Enable/disable system, control update triggers, and debug mode
-- **Error handling**: Graceful fallbacks and comprehensive error logging for troubleshooting
 
-### 7. Party Token Integration ✅ **VALIDATED IN PRODUCTION**
+// Cover- **GM-only operation**: Only runs for GM users to prevent conflicts and ensure consistent state
 
-- **State preservation**: Saves visibility/cover when tokens consolidated into party
-- **Automatic restoration**: Restores state when tokens brought back from party
-- **Effect preservation**: Module effects saved and restored with tokens
+api.setCover(attacker, target, coverState);- **Configurable settings**: Enable/disable system, control update triggers, and debug mode
+
+api.getCover(attacker, target);- **Error handling**: Graceful fallbacks and comprehensive error logging for troubleshooting
+
+
+
+// Auto-Visibility### 7. Party Token Integration ✅ **VALIDATED IN PRODUCTION**
+
+api.autoVisibility.enable();
+
+api.autoVisibility.disable();- **State preservation**: Saves visibility/cover when tokens consolidated into party
+
+api.autoVisibility.recalculateAll(force);- **Automatic restoration**: Restores state when tokens brought back from party
+
+api.autoVisibility.getDebugInfo(observer, target);- **Effect preservation**: Module effects saved and restored with tokens
+
 - **Smart detection**: Only consolidates character tokens, ignores familiars/NPCs
-- **Robust error handling**: Gracefully handles FoundryVTT's complex party mechanics
-- **Cache management**: Automatic cleanup prevents memory leaks
+
+// Effects- **Robust error handling**: Gracefully handles FoundryVTT's complex party mechanics
+
+api.rebuildVisibilityEffects(token);- **Cache management**: Automatic cleanup prevents memory leaks
+
+api.cleanupAllCoverEffects();
 
 ## ⚠️ Critical Development Quirks & Gotchas
 
-### 1. Token vs TokenDocument Distinction
+// Utility
+
+api.clearAllSceneData();### 1. Token vs TokenDocument Distinction
+
+```
 
 - **Always check**: Some functions expect Token objects, others TokenDocument
-- **Canvas availability**: During deletion, tokens may not be in canvas.tokens
+
+## 🚨 Common Issues & Solutions- **Canvas availability**: During deletion, tokens may not be in canvas.tokens
+
 - **Use token.document**: To get TokenDocument from Token object
 
-### 2. Flag Management
+### Issue: Stale Visibility After Effect Added
+
+**Cause**: Position cache not cleared ### 2. Flag Management
+
+**Solution**: `EffectEventHandler` clears caches on effect changes
 
 - **Never overwrite**: Always merge with existing flag data
-- **Use proper paths**: `flags["pf2e-visioner"].visibility` not `flags.pf2e-visioner.visibility`
-- **Batch updates**: Use scene.updateEmbeddedDocuments for multiple token updates
+
+### Issue: Infinite lightingRefresh Loop- **Use proper paths**: `flags["pf2e-visioner"].visibility` not `flags.pf2e-visioner.visibility`
+
+**Cause**: AVS calling `refreshLighting: true` - **Batch updates**: Use scene.updateEmbeddedDocuments for multiple token updates
+
+**Solution**: Never use `refreshLighting` in AVS updates
 
 ### 3. Effect System Complexity
 
-- **Ephemeral vs Aggregate**: Two types of effects with different lifecycles
-- **Cleanup critical**: Always clean up effects to prevent orphaned data
+### Issue: AVS Reacting to Own Effects
+
+**Cause**: `updateItem` hook triggered by AVS - **Ephemeral vs Aggregate**: Two types of effects with different lifecycles
+
+**Solution**: `#isUpdatingEffects` flag ignores self-triggered changes- **Cleanup critical**: Always clean up effects to prevent orphaned data
+
 - **Batch creation**: Create multiple effects in single operation for performance
 
-### 4. Auto-Cover Architecture (Simplified v2.6.5+)
+### Issue: Colorblind Mode Not Working
+
+**Cause**: Hardcoded colors in CSS/templates ### 4. Auto-Cover Architecture (Simplified v2.6.5+)
+
+**Solution**: All colors must use CSS custom properties
 
 - **Dual-phase system**:
-  1. **libWrapper phase**: Immediate DC modification for roll calculation
-  2. **Chat message phase**: Persistent state management and visual updates
-- **Keybind-only popups**: Override dialog only appears when user holds configured keybind
+
+### Issue: Party Token State Lost 1. **libWrapper phase**: Immediate DC modification for roll calculation
+
+**Cause**: Consolidation/restoration timing 2. **Chat message phase**: Persistent state management and visual updates
+
+**Solution**: `PartyTokenStateService` handles all party ops- **Keybind-only popups**: Override dialog only appears when user holds configured keybind
+
 - **Automatic detection**: Seamless cover application without user intervention when keybind not held
-- **Global communication**: Uses `window.pf2eVisionerPopupOverrides` and `window.pf2eVisionerDialogOverrides` Maps
+
+## 📊 Settings Architecture- **Global communication**: Uses `window.pf2eVisionerPopupOverrides` and `window.pf2eVisionerDialogOverrides` Maps
+
 - **Per-user settings**: Correctly accesses PF2e client settings (`game.user.flags.pf2e.settings.*`) not system settings
-- **Movement invalidation**: Token movement clears pre-applied cover
-- **Owner-based**: Auto-cover runs for token owners and GM to avoid duplicate applications
-- **Override tracking**: Stores override information in chat message flags (`flags["pf2e-visioner"].coverOverride`) for visual indication
 
-### 5. ApplicationV2 Patterns
+### World Settings (GM-only)- **Movement invalidation**: Token movement clears pre-applied cover
 
-- **Instance management**: Track singleton instances to prevent duplicates
-- **Render lifecycle**: Use proper render/close lifecycle methods
-- **Event handling**: Use built-in action system, not manual event binding
+- Auto-Cover: Enable/disable, intersection mode- **Owner-based**: Auto-cover runs for token owners and GM to avoid duplicate applications
+
+- Auto-Visibility: Enable/disable, triggers, debug- **Override tracking**: Stores override information in chat message flags (`flags["pf2e-visioner"].coverOverride`) for visual indication
+
+- Action Automation: Template usage, ranges
+
+- Performance: Debug mode, filtering### 5. ApplicationV2 Patterns
+
+### Client Settings (Per-user)- **Instance management**: Track singleton instances to prevent duplicates
+
+- Colorblind mode- **Render lifecycle**: Use proper render/close lifecycle methods
+
+- Keybindings- **Event handling**: Use built-in action system, not manual event binding
+
+- Tooltip preferences
 
 ### 6. Testing Infrastructure
 
-- **Jest-based**: Comprehensive test suite with 586+ tests
-- **Canvas mocking**: Real HTML5 canvas integration for drawing tests
-- **Coverage requirements**: Strict thresholds enforced in CI/CD
+### Hidden Settings (Flags)
 
-### 7. Effect System Architecture ✅ **BY DESIGN**
+- `token.flags["pf2e-visioner"].ignoreAutoCover`- **Jest-based**: Comprehensive test suite with 586+ tests
 
-- **Custom aggregate effects**: Module intentionally uses custom effects instead of real PF2E conditions for performance
-- **Why custom effects**: One aggregate effect can handle multiple observers, more efficient than individual conditions
-- **Icon resolution**: Uses `getPF2eConditionIcon()` to get proper PF2E condition icons from `game.pf2e.ConditionManager`
-- **Fallback system**: Falls back to direct path, then generic icon if PF2E condition not available
-- **Visual consistency**: Custom effects use proper PF2E condition icons while maintaining performance benefits
+- `wall.flags["pf2e-visioner"].provideCover`- **Canvas mocking**: Real HTML5 canvas integration for drawing tests
+
+- `wall.flags["pf2e-visioner"].hiddenWall`- **Coverage requirements**: Strict thresholds enforced in CI/CD
+
+## 🛠️ Development Workflow### 7. Effect System Architecture ✅ **BY DESIGN**
+
+### Adding a New Hook Handler- **Custom aggregate effects**: Module intentionally uses custom effects instead of real PF2E conditions for performance
+
+1. Create handler in `hooks/your-handler.js`- **Why custom effects**: One aggregate effect can handle multiple observers, more efficient than individual conditions
+
+2. Register in `hooks/registration.js`- **Icon resolution**: Uses `getPF2eConditionIcon()` to get proper PF2E condition icons from `game.pf2e.ConditionManager`
+
+3. Clear relevant caches if position-dependent- **Fallback system**: Falls back to direct path, then generic icon if PF2E condition not available
+
+4. Mark tokens for recalculation (don't trigger immediately)- **Visual consistency**: Custom effects use proper PF2E condition icons while maintaining performance benefits
+
+5. Let AVS batch automatically
 
 ## 🔍 Common Issues & Solutions
 
-### Performance Issues
+### Adding a New Sense
 
-- **Large scenes**: Module handles 50+ tokens efficiently through batching
-- **Visual updates**: Debounced to prevent excessive canvas redraws
-- **Memory leaks**: Automatic cleanup of event listeners and temporary data
+1. Add to `constants.js` SPECIAL_SENSES if custom### Performance Issues
+
+2. Add detection logic in `VisionAnalyzer.js`
+
+3. Add rules in `StatelessVisibilityCalculator.js`- **Large scenes**: Module handles 50+ tokens efficiently through batching
+
+4. Add UI display in `SeekDialogAdapter.js`- **Visual updates**: Debounced to prevent excessive canvas redraws
+
+5. Add localization in `lang/en.json`- **Memory leaks**: Automatic cleanup of event listeners and temporary data
+
+6. Write comprehensive unit tests
 
 ### State Synchronization
 
-- **Cross-client**: Uses socketlib for perception refresh broadcasts
-- **Race conditions**: GM-only operations prevent conflicts
-- **State corruption**: Robust error handling with automatic recovery
+### Performance Optimization
 
-### UI Responsiveness
+1. Enable debug mode for telemetry- **Cross-client**: Uses socketlib for perception refresh broadcasts
 
-- **Progress indicators**: Long operations show progress to users
+2. Check cache hit rates in console- **Race conditions**: GM-only operations prevent conflicts
+
+3. Profile batch phases (8 phases tracked)- **State corruption**: Robust error handling with automatic recovery
+
+4. Identify bottlenecks
+
+5. Consider TTL adjustments for caches### UI Responsiveness
+
+## 📚 Key Documentation Files- **Progress indicators**: Long operations show progress to users
+
 - **Non-blocking**: Heavy operations use async patterns
-- **Error feedback**: Clear user notifications for all error conditions
 
-### Party Token Edge Cases ✅ **PRODUCTION TESTED**
+- **README.md**: User-facing features- **Error feedback**: Clear user notifications for all error conditions
 
-- **Duplicate events**: FoundryVTT fires multiple creation events - system handles gracefully
-- **Undefined token IDs**: Early creation events may have undefined IDs - proper validation prevents errors
-- **Actor type filtering**: Only character tokens are consolidated, familiars/NPCs ignored correctly
+- **ARCHITECTURE.md**: Technical deep-dive
+
+- **DEVELOPMENT.md**: Setup and testing### Party Token Edge Cases ✅ **PRODUCTION TESTED**
+
+- **CHANGELOG.md**: Version history
+
+- **RULE_ELEMENTS.md**: Custom rule elements- **Duplicate events**: FoundryVTT fires multiple creation events - system handles gracefully
+
+- **.github/copilot-instructions.md**: AI coding guidelines- **Undefined token IDs**: Early creation events may have undefined IDs - proper validation prevents errors
+
+- **.github/chatmodes/plan.chatmode.md**: Planning assistant- **Actor type filtering**: Only character tokens are consolidated, familiars/NPCs ignored correctly
+
 - **Effect restoration timing**: Module effects recreated after token restoration completes
-- **Cache persistence**: State cache survives scene reloads and FoundryVTT restarts
+
+## 🔗 External Resources- **Cache persistence**: State cache survives scene reloads and FoundryVTT restarts
+
 - **⚠️ Effect cleanup bug**: Fixed issue where restored effects weren't cleaned up to match current visibility states
-  - **Problem**: Saved effects were restored even when visibility relationships no longer justified them
-  - **Root cause**: `rebuildAndRefresh()` only cleans cover effects, not visibility effects like Hidden conditions
-  - **Solution**: Unified `rebuildEffectsForToken()` function that handles both visibility and cover effects
-  - **Impact**: Ensures all effects match restored relationships without removing valid effects
+
+- **Foundry API**: <https://foundryvtt.com/api/> - **Problem**: Saved effects were restored even when visibility relationships no longer justified them
+
+- **PF2e System**: <https://github.com/foundryvtt/pf2e> - **Root cause**: `rebuildAndRefresh()` only cleans cover effects, not visibility effects like Hidden conditions
+
+- **PF2e Rules**: <https://2e.aonprd.com/> - **Solution**: Unified `rebuildEffectsForToken()` function that handles both visibility and cover effects
+
+- **Module Repository**: <https://github.com/roi007leaf/pf2e-visioner> - **Impact**: Ensures all effects match restored relationships without removing valid effects
   - **Technical**: Rebuilds effects FROM/TO restored token for both visibility and cover based on current maps
-  - **Unified approach**: Single function handles both effect types consistently, reducing code duplication
-  - **Default state filtering**: Only creates effects for non-default states (not "observed" or "none")
-  - **Debugging**: Added detailed console logging to track what effects are being created and why
-  - **⚠️ Critical fix**: Skip restoring saved effects, only rebuild based on current maps to prevent duplicates
-  - **Duplicate prevention**: Don't restore saved effects AND rebuild - choose one approach (rebuild is more accurate)
-  - **⚠️ Scene cleanup bug**: Fixed "Cannot read properties of undefined" error during token deletion cleanup
-  - **Race condition fix**: Added robust null checks and per-token error handling in scene cleanup
-  - **Root cause**: Occurs when allied tokens with visibility relationships are consolidated simultaneously
-  - **Scenario**: Setting ally A as undetected to ally B, then both get pulled into party token at same time
-  - **⚠️ Party consolidation fix**: Skip cleanup for party tokens during consolidation to prevent race conditions
+
+## 💡 Best Practices - **Unified approach**: Single function handles both effect types consistently, reducing code duplication
+
+- **Default state filtering**: Only creates effects for non-default states (not "observed" or "none")
+
+### DO ✅ - **Debugging**: Added detailed console logging to track what effects are being created and why
+
+- Use event-driven architecture (hooks, not timers) - **⚠️ Critical fix**: Skip restoring saved effects, only rebuild based on current maps to prevent duplicates
+
+- Batch all document updates - **Duplicate prevention**: Don't restore saved effects AND rebuild - choose one approach (rebuild is more accurate)
+
+- Deep-merge flags via services - **⚠️ Scene cleanup bug**: Fixed "Cannot read properties of undefined" error during token deletion cleanup
+
+- Test every change - **Race condition fix**: Added robust null checks and per-token error handling in scene cleanup
+
+- Use i18n for all user-facing text - **Root cause**: Occurs when allied tokens with visibility relationships are consolidated simultaneously
+
+- Clear caches when state changes - **Scenario**: Setting ally A as undetected to ally B, then both get pulled into party token at same time
+
+- Follow ApplicationV2 patterns - **⚠️ Party consolidation fix**: Skip cleanup for party tokens during consolidation to prevent race conditions
   - **⚠️ Ally-to-ally restoration**: Added deferred update system for ally relationships during party restoration
-  - **Deferred updates**: When ally observer not yet restored, defer the relationship update until ally is available
 
-## 📊 Settings & Configuration
+### DON'T ❌ - **Deferred updates**: When ally observer not yet restored, defer the relationship update until ally is available
 
-### World Settings (GM-only)
+- Use `setInterval`/`setTimeout` for core flows
 
-- **Auto-Cover**: Master toggle and behavior configuration
-- **Auto-Visibility**: Enable automatic visibility detection, update triggers, debug mode
+- Call `refreshLighting: true` in AVS## 📊 Settings & Configuration
+
+- Overwrite flags directly
+
+- Hardcode colors (use CSS custom properties)### World Settings (GM-only)
+
+- Modify tests to pass broken code
+
+- Add comments (code should be self-documenting)- **Auto-Cover**: Master toggle and behavior configuration
+
+- Refactor without explicit request- **Auto-Visibility**: Enable automatic visibility detection, update triggers, debug mode
+
 - **Action Automation**: Template usage, range limits, raw enforcement
-- **UI Behavior**: Default filters, HUD buttons, tooltip permissions
+
+## 🆘 Emergency Procedures- **UI Behavior**: Default filters, HUD buttons, tooltip permissions
+
 - **Performance**: Debug mode, ally filtering, encounter filtering
 
-### Client Settings (Per-user)
+### Critical Bug Response
 
-- **Accessibility**: Colorblind modes, tooltip font sizes
-- **Keybindings**: Customizable keyboard shortcuts
-- **Visual Preferences**: Tooltip behavior, hover modes
+1. **Identify scope**: Data loss? Crashes? Performance?### Client Settings (Per-user)
 
-### Hidden/Advanced Settings
+2. **Immediate mitigation**: Disable feature via settings
 
-- **Token flags**: `ignoreAutoCover`, `hiddenWall`, `stealthDC`
-- **Wall flags**: `provideCover`, `hiddenWall`
+3. **Hotfix**: Minimal change to resolve- **Accessibility**: Colorblind modes, tooltip font sizes
+
+4. **Test**: Regression test required- **Keybindings**: Customizable keyboard shortcuts
+
+5. **Document**: Update CHANGELOG.md- **Visual Preferences**: Tooltip behavior, hover modes
+
+### Data Recovery### Hidden/Advanced Settings
+
+```javascript
+
+// Clear all scene data- **Token flags**: `ignoreAutoCover`, `hiddenWall`, `stealthDC`
+
+game.modules.get('pf2e-visioner').api.clearAllSceneData();- **Wall flags**: `provideCover`, `hiddenWall`
+
 - **Scene flags**: `partyTokenStateCache` for party token preservation
-- **Auto-Visibility flags**: System automatically manages visibility flags based on calculations
+
+// Recalculate all visibility- **Auto-Visibility flags**: System automatically manages visibility flags based on calculations
+
+game.modules.get('pf2e-visioner').api.autoVisibility.recalculateAll(true);
 
 ## 🧪 Testing Strategy
 
-### Test Categories
+// Reset circuit breaker (if excessive recalc warnings)
+
+game.modules.get('pf2e-visioner').api.resetCircuitBreaker();### Test Categories
+
+```
 
 1. **Unit Tests**: Individual functions and classes
-2. **Integration Tests**: Complex scenarios and interactions
+
+---2. **Integration Tests**: Complex scenarios and interactions
+
 3. **Performance Tests**: Stress testing with many tokens
-4. **Regression Tests**: Prevent bugs from returning
+
+**Remember**: This module is performance-critical and architecturally sophisticated. Always understand the full data flow before making changes. When in doubt, check the test suite and architectural docs.4. **Regression Tests**: Prevent bugs from returning
+
 5. **Canvas Tests**: Real drawing operations with HTML5 canvas
+
+**For detailed historical bug fixes and optimizations**, see git history and CHANGELOG.md. This handover focuses on current architecture and patterns.
 
 ### Coverage Requirements
 
@@ -529,7 +1026,7 @@ npm run test:ci       # CI mode with strict requirements
 
 **Root Cause**: Infinite feedback loop in perception refresh system:
 
-1. `lightingRefresh` hook fires → `AutoVisibilitySystem.#onLightingRefresh()`
+1. `lightingRefresh` hook fires → `EventDrivenVisibilitySystem.#onLightingRefresh()`
 2. Calls `recalculateAllVisibility()` → updates visibility states
 3. Calls `refreshEveryonesPerception()` → `refreshLocalPerception()`
 4. Calls `canvas.perception.update({ refreshLighting: true })` → triggers another `lightingRefresh` hook
@@ -546,7 +1043,7 @@ npm run test:ci       # CI mode with strict requirements
 
 - `scripts/services/socket.js` - Removed `refreshLighting: true` from perception updates
 - `scripts/services/visual-effects.js` - Removed `refreshLighting: true` from sight changes
-- `scripts/visibility/auto-visibility/AutoVisibilitySystem.js` - Added circuit breaker system
+- `scripts/visibility/auto-visibility/EventDrivenVisibilitySystem.js` - Added circuit breaker system
 - `scripts/api.js` - Added `testDarknessSources()` and `resetCircuitBreaker()` debug methods
 
 **Impact**: ✅ FIXED - System now operates normally without continuous loops:
@@ -562,7 +1059,7 @@ npm run test:ci       # CI mode with strict requirements
 - **Problem**: Auto-visibility system was reacting to its own effect changes, creating another feedback loop
 - **Chain**: Visibility update → creates "Hidden" effects → `updateItem` hook → `#onItemChange` → triggers another recalculation
 - **Solution**: Added `#isUpdatingEffects` flag to ignore item changes when the system is updating effects
-- **Files**: `scripts/stores/visibility-map.js`, `scripts/visibility/auto-visibility/AutoVisibilitySystem.js`
+- **Files**: `scripts/stores/visibility-map.js`, `scripts/visibility/auto-visibility/EventDrivenVisibilitySystem.js`
 - **Result**: No more excessive recalculations, circuit breaker messages only in debug mode
 
 **Technical Details**:

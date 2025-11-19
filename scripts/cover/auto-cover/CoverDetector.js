@@ -18,12 +18,14 @@ import {
 } from '../../helpers/size-elevation-utils.js';
 import { doesWallBlockAtElevation } from '../../helpers/wall-height-utils.js';
 import { LevelsIntegration } from '../../services/LevelsIntegration.js';
+import { RuleElementCoverService } from '../../rule-elements/RuleElementCoverService.js';
 
 import { getVisibilityBetween } from '../../utils.js';
 
 export class CoverDetector {
   constructor() {
     this._featUpgradeRecords = new Map();
+    this._ruleElementBlocks = new Map();
   }
   // Define token disposition constants for use within this class
   static TOKEN_DISPOSITIONS = {
@@ -67,15 +69,24 @@ export class CoverDetector {
    * Detect cover state for an attack between two tokens
    * @param {Object} attacker - Attacker token
    * @param {Object} target - Target token
-   * @param {Object} options - Additional options
+   * @param {Object} options - Additional options (attackContext for rule element checks)
    * @returns {string} Cover state ('none', 'lesser', 'standard', 'greater')
    */
-  detectBetweenTokens(attacker, target) {
-    try {
+  detectBetweenTokens(attacker, target, options = {}) {
+    try {      
       if (!attacker || !target) return 'none';
 
       // Exclude same token (attacker and target are the same)
       if (attacker.id === target.id) return 'none';
+
+      try {
+        const ruleElementCover = this._checkRuleElementCover(attacker, target);
+        if (ruleElementCover) {
+          return ruleElementCover;
+        }
+      } catch (error) {
+        console.warn('PF2E Visioner | Error checking rule element cover:', error);
+      }
 
       const p1 = attacker.center ?? attacker.getCenterPoint();
       const p2 = target.center ?? target.getCenterPoint();
@@ -108,7 +119,7 @@ export class CoverDetector {
       if (!hasWallsInTheWay) {
         // Case 1: No walls in the way - use token cover
         const intersectionMode = this._getIntersectionMode();
-        const filters = { ...this._getAutoCoverFilterSettings(attacker) };
+        const filters = { ...this._getAutoCoverFilterSettings(attacker), attackContext: options.attackContext };
         let blockers = this._getEligibleBlockingTokens(attacker, target, filters);
 
         // Apply elevation filtering (mode-aware)
@@ -1126,6 +1137,23 @@ export class CoverDetector {
         continue;
       }
 
+      // Check rule elements: if blocker has a rule element preventing it from providing cover to target
+      const attackContext = filters.attackContext || null;
+      const ruleElementCheck = RuleElementCoverService.canTokenProvideCoverToTarget(blocker, target, attackContext);
+      if (!ruleElementCheck.allowed) {
+        // Track this for chat indicators (avoid duplicates)
+        const key = `${attacker.id}:${target.id}`;
+        if (!this._ruleElementBlocks.has(key)) {
+          this._ruleElementBlocks.set(key, []);
+        }
+        const blocks = this._ruleElementBlocks.get(key);
+        // Only add if we haven't already tracked this blocker
+        if (!blocks.some(re => re.tokenId === blocker.id)) {
+          this._ruleElementBlocks.get(key).push(ruleElementCheck.ruleElement);
+        }
+        continue;
+      }
+
       out.push(blocker);
     }
 
@@ -1363,6 +1391,16 @@ export class CoverDetector {
     } catch {
       return null;
     }
+  }
+
+  consumeRuleElementBlocks(attackerId, targetId) {
+    try {
+      const key = `${attackerId}:${targetId}`;
+      if (!this._ruleElementBlocks.has(key)) return null;
+      const blocks = this._ruleElementBlocks.get(key);
+      this._ruleElementBlocks.delete(key);
+      return blocks.length > 0 ? blocks : null;
+    } catch { return null; }
   }
 
   // Using segmentIntersectsRect from geometry-utils.js instead of _rayIntersectRect
@@ -1628,6 +1666,10 @@ export class CoverDetector {
       console.warn('PF2E Visioner | CoverDetector.hasLargeCreatureCover failed:', e);
       return false;
     }
+  }
+
+  _checkRuleElementCover(attacker, target) {
+    return RuleElementCoverService.getCoverFromRuleElements(attacker, target);
   }
 }
 
