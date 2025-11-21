@@ -38,7 +38,7 @@ export class BatchOrchestrator {
     this.processingBatch = false;
     this._wasMinimized = false;
     this._pendingPerceptionRefresh = false;
-    
+
     // Listen for visibility changes to handle window being restored from minimized state
     if (typeof document !== 'undefined') {
       document.addEventListener('visibilitychange', () => {
@@ -46,7 +46,7 @@ export class BatchOrchestrator {
           // Window just became visible after being minimized
           this._wasMinimized = false;
           this._pendingPerceptionRefresh = true;
-          
+
           // Force immediate perception refresh
           setTimeout(() => {
             if (this._pendingPerceptionRefresh) {
@@ -238,6 +238,19 @@ export class BatchOrchestrator {
    */
   async processBatch(changedTokens, options = {}) {
     if (this.processingBatch || changedTokens.size === 0) {
+      return;
+    }
+
+    // Check if AVS is disabled for the current scene
+    const disableAVS = canvas?.scene?.getFlag?.(this.moduleId, 'disableAVS');
+    if (disableAVS) {
+      getLogger('AVS/Batch').debug(() => ({
+        msg: 'processBatch:skipped',
+        reason: 'avs-disabled-for-scene',
+        changedCount: changedTokens.size,
+      }));
+      // Clear pending tokens since we're not processing
+      this._pendingTokens.clear();
       return;
     }
 
@@ -708,7 +721,7 @@ export class BatchOrchestrator {
           initializeVision: false,
         });
       }
-      
+
       // Also refresh via socket
       await this._refreshEveryonesPerception();
     } catch (error) {

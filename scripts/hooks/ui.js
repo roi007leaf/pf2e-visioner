@@ -31,7 +31,7 @@ export function registerUIHooks() {
       if (!toolsContainer || !tool?.name) return;
       if (Array.isArray(toolsContainer)) toolsContainer.push(tool);
       else if (typeof toolsContainer === 'object') toolsContainer[tool.name] = tool;
-    } catch {}
+    } catch { }
   };
   // Keep Darkness tool icon/title in sync with current selection (Lighting tool)
   const refreshDarknessTool = () => {
@@ -83,7 +83,7 @@ export function registerUIHooks() {
       tool.icon = iconClass;
       tool.title = titleText;
       if (changed) ui.controls.render();
-    } catch {}
+    } catch { }
   };
   // Update tool icon on light selection and CRUD changes
   // Update on light selection changes (AmbientLight/Light placeables)
@@ -139,7 +139,7 @@ export function registerUIHooks() {
         tool.title = newTitle;
         ui.controls.render();
       }
-    } catch {}
+    } catch { }
   };
   // Helper: get cover status info for a wall
   const getWallCoverInfo = (wallDocument) => {
@@ -216,7 +216,7 @@ export function registerUIHooks() {
         refreshWallLabelsDebounceTimer = null;
         return;
       }
-      refreshWallIdentifierLabels().catch(() => {});
+      refreshWallIdentifierLabels().catch(() => { });
       refreshWallLabelsDebounceTimer = null;
     }, 150);
   };
@@ -245,7 +245,7 @@ export function registerUIHooks() {
             wallCoverLabelLayer.zIndex = 10000;
             try {
               canvas.interface?.addChild(wallCoverLabelLayer);
-            } catch (_) {}
+            } catch (_) { }
           }
           return wallCoverLabelLayer;
         };
@@ -258,19 +258,19 @@ export function registerUIHooks() {
             if (w._pvIdLabel) {
               try {
                 w._pvIdLabel.parent?.removeChild?.(w._pvIdLabel);
-              } catch {}
+              } catch { }
               try {
                 w._pvIdLabel.destroy?.();
-              } catch {}
+              } catch { }
               delete w._pvIdLabel;
             }
             if (w._pvCoverIcon) {
               try {
                 w._pvCoverIcon.parent?.removeChild?.(w._pvCoverIcon);
-              } catch {}
+              } catch { }
               try {
                 w._pvCoverIcon.destroy?.();
-              } catch {}
+              } catch { }
               delete w._pvCoverIcon;
             }
           }
@@ -279,7 +279,7 @@ export function registerUIHooks() {
               wallCoverLabelLayer.removeChildren();
               wallCoverLabelLayer.parent?.removeChild(wallCoverLabelLayer);
               wallCoverLabelLayer.destroy({ children: true });
-            } catch (_) {}
+            } catch (_) { }
             wallCoverLabelLayer = null;
           }
           return;
@@ -322,7 +322,7 @@ export function registerUIHooks() {
               wallCoverLabelLayer.removeChildren();
               wallCoverLabelLayer.parent?.removeChild(wallCoverLabelLayer);
               wallCoverLabelLayer.destroy({ children: true });
-            } catch (_) {}
+            } catch (_) { }
             wallCoverLabelLayer = null;
           }
           return;
@@ -347,7 +347,7 @@ export function registerUIHooks() {
               if (child.position) {
                 const dist = Math.sqrt(
                   Math.pow(child.position.x - wallCenter.x, 2) +
-                    Math.pow(child.position.y - wallCenter.y, 2),
+                  Math.pow(child.position.y - wallCenter.y, 2),
                 );
                 if (dist < 50) {
                   return true;
@@ -381,10 +381,10 @@ export function registerUIHooks() {
           if (!shouldShowIdentifier && w._pvIdLabel) {
             try {
               w._pvIdLabel.parent?.removeChild?.(w._pvIdLabel);
-            } catch {}
+            } catch { }
             try {
               w._pvIdLabel.destroy?.();
-            } catch {}
+            } catch { }
             delete w._pvIdLabel;
           }
 
@@ -415,7 +415,7 @@ export function registerUIHooks() {
               coverLayer.removeChildren();
               coverLayer.parent?.removeChild(coverLayer);
               coverLayer.destroy({ children: true });
-            } catch (_) {}
+            } catch (_) { }
             wallCoverLabelLayer = null;
           }
 
@@ -506,10 +506,10 @@ export function registerUIHooks() {
               // Remove identifier label if no longer needed
               try {
                 w._pvIdLabel.parent?.removeChild?.(w._pvIdLabel);
-              } catch {}
+              } catch { }
               try {
                 w._pvIdLabel.destroy?.();
-              } catch {}
+              } catch { }
               delete w._pvIdLabel;
             }
 
@@ -731,12 +731,12 @@ export function registerUIHooks() {
       }
 
       // Also refresh identifier labels on the canvas when selection changes
-      refreshWallIdentifierLabels().catch(() => {});
+      refreshWallIdentifierLabels().catch(() => { });
 
       if (coverToolChanged || hiddenToolChanged) {
         ui.controls.render();
       }
-    } catch {}
+    } catch { }
   };
   Hooks.on('controlToken', (token, controlled) => {
     // CRITICAL: Set global flag to suppress lighting refreshes during token control operations
@@ -821,7 +821,7 @@ export function registerUIHooks() {
       }
 
       ui.controls.render();
-    } catch {}
+    } catch { }
   };
   Hooks.on('controlAmbientLight', refreshLightingTool);
   Hooks.on('deleteAmbientLight', refreshLightingTool);
@@ -867,7 +867,7 @@ export function registerUIHooks() {
 
   // Refresh wall labels when active tool changes
   Hooks.on('renderSceneControls', () => {
-    refreshWallIdentifierLabels().catch(() => {});
+    refreshWallIdentifierLabels().catch(() => { });
   });
 
   // Handle configurable keybinding for wall cover labels (doesn't interfere with Alt-click)
@@ -918,7 +918,7 @@ export function registerUIHooks() {
       isShowWallLabelsKeyPressed = true;
       // Only refresh if walls tool is active
       if (ui.controls?.control?.name === 'walls') {
-        refreshWallIdentifierLabels().catch(() => {});
+        refreshWallIdentifierLabels().catch(() => { });
       }
     }
   };
@@ -931,7 +931,7 @@ export function registerUIHooks() {
       // If no keybinding configured but key was pressed, reset anyway
       if (isShowWallLabelsKeyPressed) {
         isShowWallLabelsKeyPressed = false;
-        refreshWallIdentifierLabels().catch(() => {});
+        refreshWallIdentifierLabels().catch(() => { });
       }
       return;
     }
@@ -948,7 +948,7 @@ export function registerUIHooks() {
       isShowWallLabelsKeyPressed = false;
       // Always refresh to clean up labels when key is released
       if (wasPressed) {
-        refreshWallIdentifierLabels().catch(() => {});
+        refreshWallIdentifierLabels().catch(() => { });
       }
     }
   };
@@ -960,7 +960,7 @@ export function registerUIHooks() {
   const boundOnWindowBlur = () => {
     if (isShowWallLabelsKeyPressed) {
       isShowWallLabelsKeyPressed = false;
-      refreshWallIdentifierLabels().catch(() => {});
+      refreshWallIdentifierLabels().catch(() => { });
     }
   };
 
@@ -1011,11 +1011,11 @@ export function registerUIHooks() {
         wallCoverLabelLayer.removeChildren();
         wallCoverLabelLayer.parent?.removeChild(wallCoverLabelLayer);
         wallCoverLabelLayer.destroy({ children: true });
-      } catch (_) {}
+      } catch (_) { }
       wallCoverLabelLayer = null;
     }
     // Clean up any lingering labels
-    refreshWallIdentifierLabels().catch(() => {});
+    refreshWallIdentifierLabels().catch(() => { });
   });
   for (const hook of [
     'renderTokenConfig',
@@ -1165,12 +1165,12 @@ export function registerUIHooks() {
                   } catch {
                     try {
                       await w?.document?.setFlag?.(MODULE_ID, 'hiddenWall', false);
-                    } catch {}
+                    } catch { }
                   }
                 }
               }
               ui.controls.render();
-            } catch {}
+            } catch { }
           },
         });
       }
@@ -1190,7 +1190,7 @@ export function registerUIHooks() {
                 const { VisionerQuickPanel } = await import('../managers/QuickPanel.js');
                 if (!game.user?.isGM) return;
                 new VisionerQuickPanel({}).render(true);
-              } catch {}
+              } catch { }
             },
           });
         }
@@ -1378,7 +1378,7 @@ export function registerUIHooks() {
                     '../visibility/auto-visibility/LightingCalculator.js'
                   );
                   LightingCalculator.getInstance().invalidateLightCache();
-                } catch {}
+                } catch { }
 
                 // Clear LightingPrecomputer caches for ambient light changes
                 try {
@@ -1386,7 +1386,7 @@ export function registerUIHooks() {
                     '../visibility/auto-visibility/core/LightingPrecomputer.js'
                   );
                   LightingPrecomputer.clearLightingCaches();
-                } catch {}
+                } catch { }
 
                 canvas.perception.update({
                   refreshVision: true,
@@ -1398,7 +1398,7 @@ export function registerUIHooks() {
                 try {
                   const { autoVisibility } = await import('../api.js');
                   autoVisibility.recalculateAll(true); // Force recalculation
-                } catch {}
+                } catch { }
 
                 // Update tool icon/title immediately
                 refreshDarknessTool();
@@ -1416,7 +1416,7 @@ export function registerUIHooks() {
                         'config.negative': true,
                         'config.darkness.negative': true,
                       });
-                    } catch {}
+                    } catch { }
                     try {
                       await l?.document?.unsetFlag?.(MODULE_ID, 'heightenedDarkness');
                     } catch {
@@ -1433,13 +1433,13 @@ export function registerUIHooks() {
                         'config.negative': true,
                         'config.darkness.negative': true,
                       });
-                    } catch {}
+                    } catch { }
                     try {
                       await l?.document?.setFlag?.(MODULE_ID, 'heightenedDarkness', true);
-                    } catch {}
+                    } catch { }
                     try {
                       await l?.document?.setFlag?.(MODULE_ID, 'darknessRank', 4);
-                    } catch {}
+                    } catch { }
                   }),
                 );
               };
@@ -1451,7 +1451,7 @@ export function registerUIHooks() {
                         'config.negative': false,
                         'config.darkness.negative': false,
                       });
-                    } catch {}
+                    } catch { }
                     try {
                       await l?.document?.unsetFlag?.(MODULE_ID, 'heightenedDarkness');
                     } catch {
@@ -1482,9 +1482,9 @@ export function registerUIHooks() {
             try {
               const idf = w?.document?.getFlag?.(MODULE_ID, 'wallIdentifier');
               if (idf && w?.controlIcon) w.controlIcon.tooltip = String(idf);
-            } catch {}
+            } catch { }
           });
-        } catch {}
+        } catch { }
       };
       Hooks.on('controlWall', showWallIdentifierTooltip);
     } catch (_) {
@@ -1526,10 +1526,15 @@ function injectPF2eVisionerBox(app, root) {
         const currentWidth =
           Number(scene?.getFlag?.(MODULE_ID, 'hiddenIndicatorHalf')) || defaultWidth;
         const currentDim = Number(scene?.getFlag?.(MODULE_ID, 'dimThreshold')) || defaultDim;
+        const disableAVS = !!scene?.getFlag?.(MODULE_ID, 'disableAVS');
 
         fs.innerHTML = `
           <legend>PF2E Visioner</legend>
-          <div class="form-group" style="display:flex; flex-direction:column; gap:6px;">
+          <div class="form-group" style="display:flex; flex-direction:column; gap:6px; align-items:flex-start;">
+            <label data-tooltip="${game.i18n.localize('PF2E_VISIONER.SETTINGS.DISABLE_AVS_PER_SCENE.hint')}">
+              <input type="checkbox" name="flags.${MODULE_ID}.disableAVS" ${disableAVS ? 'checked' : ''}>
+              ${game.i18n.localize('PF2E_VISIONER.SETTINGS.DISABLE_AVS_PER_SCENE.name')}
+            </label>
             <label>Hidden Wall Indicator Width (half, px)</label>
             <div style="display:flex; align-items:center; gap:8px; width:100%;">
               <input type="range" min="1" max="30" step="1" name="flags.${MODULE_ID}.hiddenIndicatorHalf" value="${currentWidth}" oninput="this.nextElementSibling.value=this.value" style="flex:1 1 auto; width:100%;">
@@ -1552,7 +1557,7 @@ function injectPF2eVisionerBox(app, root) {
         }
       }
     }
-  } catch {}
+  } catch { }
 
   // The incoming "app" can represent several shapes depending on which sheet
   // is being rendered: a TokenConfig, PrototypeTokenConfig, or the PF2e
@@ -1686,7 +1691,7 @@ function injectPF2eVisionerBox(app, root) {
         }
       });
     });
-  } catch {}
+  } catch { }
 
   if (detectionFS) detectionFS.insertAdjacentElement('afterend', box);
   else panel.appendChild(box);
@@ -1733,8 +1738,8 @@ function onRenderWallConfig(app, html) {
           new VisionerWallQuickSettings(app.document).render(true);
         });
       }
-    } catch {}
-  } catch {}
+    } catch { }
+  } catch { }
 }
 
 function onRenderLightConfig(app, html) {
@@ -1810,7 +1815,7 @@ function onRenderLightConfig(app, html) {
         try {
           basicTab.insertBefore(fs, basicTab.firstChild);
           inserted = true;
-        } catch {}
+        } catch { }
       }
     }
     if (!inserted) {
@@ -1834,7 +1839,7 @@ function onRenderLightConfig(app, html) {
           try {
             advTab.insertBefore(fs, advTab.firstChild);
             inserted = true;
-          } catch {}
+          } catch { }
         }
       }
     }
@@ -1861,7 +1866,7 @@ function onRenderLightConfig(app, html) {
               try {
                 neg.checked = true;
                 neg.dispatchEvent(new Event('change', { bubbles: true }));
-              } catch {}
+              } catch { }
             }
           }
 
@@ -1912,7 +1917,7 @@ function onRenderLightConfig(app, html) {
       const syncVisibility = () => {
         try {
           fs.style.display = neg?.checked ? '' : 'none';
-        } catch {}
+        } catch { }
       };
       const handleNativeDarknessChange = async () => {
         syncVisibility();
@@ -1937,8 +1942,8 @@ function onRenderLightConfig(app, html) {
       };
       syncVisibility();
       if (neg) neg.addEventListener('change', handleNativeDarknessChange);
-    } catch {}
-  } catch {}
+    } catch { }
+  } catch { }
 }
 
 // Removed: onGetSceneControlButtons for a separate 'visioner' control group

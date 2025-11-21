@@ -262,6 +262,10 @@ export class EventDrivenVisibilitySystem {
       }
     }
 
+    // Check if AVS is disabled for this scene
+    const disableAVS = canvas?.scene?.getFlag?.(MODULE_ID, 'disableAVS');
+    if (disableAVS) return;
+
     if (!this.#systemStateProvider.shouldProcessEvents() && !force) return;
 
     // Delegate to VisibilityStateManager for proper abstraction
@@ -284,6 +288,10 @@ export class EventDrivenVisibilitySystem {
         return;
       }
     }
+
+    // Check if AVS is disabled for this scene
+    const disableAVS = canvas?.scene?.getFlag?.(MODULE_ID, 'disableAVS');
+    if (disableAVS) return;
 
     if (!this.#systemStateProvider.shouldProcessEvents()) return;
     const ids = Array.from(new Set((tokenIds || []).filter(Boolean)));

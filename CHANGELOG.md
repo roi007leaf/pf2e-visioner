@@ -1,5 +1,13 @@
 # Changelog
 
+## [5.1.0] - 2025-11-21
+
+### ✨ Added
+
+- Scene setting: per-scene "Disable AVS for this Scene" flag with a localized tooltip (checkbox title) to suppress Auto-Visibility System calculations for the current scene.
+- Ensure AVS honors the per-scene disable flag: added early-exit checks to the AVS batch pipeline and visibility recalculation entry points so no calculations are performed when the scene flag is enabled.
+- Recalculate AVS state when the per-scene flag is changed: register an `updateScene` hook to trigger a recalculation when the scene flag is toggled.
+
 ## [5.0.2] - 2025-11-19
 
 ### 🗑️ Removed

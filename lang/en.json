@@ -794,6 +794,10 @@
         "name": "Dim Lighting Threshold",
         "hint": "Default threshold for determining dim lighting (0.0 to 1.0). Values below this threshold are considered dim light. This can be overridden per-scene in Scene Configuration."
       },
+      "DISABLE_AVS_PER_SCENE": {
+        "name": "Disable AVS for this Scene",
+        "hint": "When enabled, the Auto-Visibility System will be disabled for this scene. Visibility states will not be automatically calculated or updated."
+      },
       "AVS_CHANGES_INDICATOR_SIZE": {
         "name": "AVS Changes Indicator Size",
         "hint": "Controls the size of the floating AVS changes indicator button and its tooltip.",
