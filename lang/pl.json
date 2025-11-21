@@ -758,6 +758,10 @@
       "VISIONER_QUICK_EDIT_TOOL": {
         "name": "Narzędzie szybkiej edycji Visioner",
         "hint": "Dodaje przycisk do paska bocznego narzędzi tokenów, aby otworzyć narzędzie Szybkiej Edycji Visioner. Jeśli jest wyłączone, dostęp do narzędzia można uzyskać za pomocą skrótu klawiszowego."
+      },
+      "DISABLE_AVS_PER_SCENE": {
+        "name": "Wyłącz AVS dla tej sceny",
+        "hint": "Po włączeniu tej opcji system automatycznej widoczności zostanie wyłączony dla tej sceny, nawet jeśli globalny AVS jest włączony."
       }
     },
     "UI": {

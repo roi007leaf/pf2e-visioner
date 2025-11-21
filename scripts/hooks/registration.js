@@ -677,4 +677,18 @@ export async function registerHooks() {
       console.warn('PF2E Visioner | deleteItem cleanup failed:', e);
     }
   });
+
+  // Handle scene updates to trigger AVS recalculation when disableAVS flag changes
+  Hooks.on('updateScene', async (scene, changes, options, userId) => {
+    try {
+      const disableAVSChanged = changes?.flags?.[MODULE_ID]?.disableAVS !== undefined;
+      if (disableAVSChanged) {
+        // Trigger AVS recalculation when the disable flag changes
+        const { autoVisibility } = await import('../api.js');
+        await autoVisibility.recalculateAll(true); // Force recalculation
+      }
+    } catch (error) {
+      console.warn('PF2E Visioner | Failed to handle scene update for disableAVS:', error);
+    }
+  });
 }
