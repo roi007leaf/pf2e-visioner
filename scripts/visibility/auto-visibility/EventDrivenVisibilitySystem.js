@@ -290,7 +290,7 @@ export class EventDrivenVisibilitySystem {
     }
 
     // Check if AVS is disabled for this scene
-    const disableAVS = canvas?.scene?.getFlag?.('pf2e-visioner', 'disableAVS');
+    const disableAVS = canvas?.scene?.getFlag?.(MODULE_ID, 'disableAVS');
     if (disableAVS) return;
 
     if (!this.#systemStateProvider.shouldProcessEvents()) return;
