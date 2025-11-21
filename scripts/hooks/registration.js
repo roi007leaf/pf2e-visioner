@@ -681,6 +681,7 @@ export async function registerHooks() {
   // Handle scene updates to trigger AVS recalculation when disableAVS flag changes
   Hooks.on('updateScene', async (scene, changes, options, userId) => {
     try {
+      if (scene.id !== canvas?.scene?.id) return;
       const disableAVSChanged = changes?.flags?.[MODULE_ID]?.disableAVS !== undefined;
       if (disableAVSChanged) {
         // Trigger AVS recalculation when the disable flag changes
