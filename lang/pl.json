@@ -318,6 +318,9 @@
       }
     },
     "RULE_ELEMENTS": {
+      "BADGE": {
+        "LABEL": "Efekt reguły"
+      },
       "LABELS": {
         "SUBJECT": "Temat",
         "OBSERVERS": "Obserwatorzy",
@@ -328,6 +331,104 @@
         "DURATION": "Czas trwania (rundy)",
         "REQUIRES_INITIATIVE": "Wymaga inicjatywy",
         "RANGE": "Zasięg (stopy)"
+      },
+      "EFFECT": {
+        "NAME": "PF2eVisionerEffect",
+        "DESCRIPTION": "Zaawansowane modyfikacje widoczności, osłony i zmysłów dla zaklęć, przedmiotów i zdolności",
+        "OPERATION_TYPES": {
+          "MODIFY_SENSES": "Modyfikacja zmysłów",
+          "OVERRIDE_VISIBILITY": "Nadpisanie widoczności",
+          "OVERRIDE_COVER": "Nadpisanie osłony",
+          "PROVIDE_COVER": "Zapewnienie osłony",
+          "MODIFY_ACTION_QUALIFICATION": "Zmiana kwalifikacji akcji",
+          "CONDITIONAL_STATE": "Stan warunkowy"
+        },
+        "MESSAGES": {
+          "NO_QUALIFYING_CONCEALMENT": "Twoje przysłanianie nie kwalifikuje się do tej akcji",
+          "NO_QUALIFYING_COVER": "Twoja osłona nie kwalifikuje się do tej akcji",
+          "BLUR_HIDE_BLOCKED": "Rozmycie nie ukrywa Twojej lokalizacji",
+          "BLUR_SNEAK_BLOCKED": "Rozmycie nie ukrywa wystarczająco dobrze Twojej lokalizacji, aby umożliwić skradanie się",
+          "FAERIE_FIRE_ACTIVE": "Ogień wróżek ujawnia twoją lokalizację",
+          "REVEALING_LIGHT_ACTIVE": "Światło objawienia uniemożliwia ukrywanie",
+          "THOUSAND_VISIONS_ACTIVE": "Tysiąc wizji ignoruje przysłonięcie w promieniu 30 stóp",
+          "CLOUDED_FOCUS_ACTIVE": "Zmącone skupienie ogranicza zasięg widzenia do 20 stóp",
+          "DEPLOYABLE_COVER_ACTIVE": "Rozkładana osłona zapewnia standardową osłonę podczas korzystania z akcji Znalezienie Osłony",
+          "TOWER_SHIELD_ALLY": "Sojusznik korzysta z twojej pawęży",
+          "END_POSITION_DISQUALIFIED": "Twoja pozycja końcowa nie kwalifikuje się do tej akcji",
+          "START_POSITION_DISQUALIFIED": "Twoja pozycja startowa nie kwalifikuje się do tej akcji",
+          "BLIND_FIGHT_ACTIVE": "Walka na oślep pozwala reagować na ledwo wykrywalnych przeciwników",
+          "CONCEALMENT_QUALIFICATION_FAILED": "Twoje przysłonięcie lub osłona nie kwalifikują się do Ukrywania"
+        },
+        "DESCRIPTIONS": {
+          "MODIFY_SENSES": "Modyfikacja zasięgu zmysłów i precyzji",
+          "OVERRIDE_VISIBILITY": "Zastąpienie stanów widoczności",
+          "OVERRIDE_COVER": "Zastąpienie stanów osłony",
+          "PROVIDE_COVER": "Zapewnij osłonę innym tokenom",
+          "MODIFY_ACTION_QUALIFICATION": "Kontroluj, co kwalifikuje się jako wymagania wstępne dla akcji",
+          "CONDITIONAL_STATE": "Zastosuj stany w oparciu o warunki"
+        },
+        "EXAMPLES": {
+          "BLUR": {
+            "NAME": "Rozmycie",
+            "DESCRIPTION": "Postać celu wydaje się rozmyta. Staje się ona przysłonięta. Ponieważ charakter tego efektu nadal pozostawia lokalizację celu oczywistą, cel nie może wykorzystać tego przysłonięcia do Ukrywania się lub Skradania."
+          },
+          "FAERIE_FIRE": {
+            "NAME": "Ogień Wróżek",
+            "DESCRIPTION": "Wszystkie stworzenia znajdujące się w obszarze działania zaklęcia zostają otoczone kolorowym, pozbawionym ciepła ogniem w wybranym przez ciebie kolorze na czas trwania zaklęcia. Widoczne stworzenia nie mogą być przysłonięte, gdy są pod wpływem ognia wróżek. Jeśli stworzenia są niewidzialne, są one przysłonięte, gdy są pod wpływem ognia wróżek, a nie niewykryte."
+          },
+          "REVEALING_LIGHT": {
+            "NAME": "Światło Objawienia",
+            "DESCRIPTION": "Fala magicznego światła zalewa obszar. Wybierasz wygląd światła, np. kolorowe, niepowodujące ciepła płomienie lub błyszczące drobinki. Stworzenie dotknięte światłem objawienia zostaje Zamroczone. Jeśli stworzenie było Niewidzialne, staje się Przysłonięte. Jeśli stworzenie było już przysłonięte z jakiegokolwiek innego powodu, przestaje być przysłonięte."
+          },
+          "CLOUDED_FOCUS": {
+            "NAME": "Zmącone Skupienie",
+            "DESCRIPTION": "Wyostrzasz zmysły stworzenia, ale bardziej odległe obiekty stają się dla niego zamglone, niewyraźne lub wyciszone. Cel otrzymuje premię +1 do rzutów na Percepcję wykonywanych przy użyciu dowolnego z jego precyzyjnych zmysłów. Ponadto wszelkie nieprecyzyjne zmysły celu zostają wyostrzone do poziomu precyzyjnych zmysłów (chociaż nie otrzymują one premii). Jednakże cel nie może dostrzec niczego poza zasięgiem 20 stóp żadnym ze swoich zmysłów."
+          },
+          "THOUSAND_VISIONS": {
+            "NAME": "Tysiąc Wizji",
+            "DESCRIPTION": "Otwierasz swoje zmysły na liczne wizje najbliższej przyszłości. Wizje te dostarczają ci subtelnych szczegółów dotyczących twojego najbliższego otoczenia w promieniu 30 stóp. W tym zakresie nie musisz wykonywać płaskiego testu, aby namierzyć przysłoniętą istotę. Poza zasięgiem 30 stóp wizje stają się przytłaczające z powodu zbyt wielu możliwych przyszłości, co sprawia, że wszystkie twoje zmysły stają się nieprecyzyjne poza tym zasięgiem."
+          },
+          "TOWER_SHIELD": {
+            "NAME": "Pawęż (Znalezienie Osłony)",
+            "DESCRIPTION": "Kiedy Znajdujesz Osłonę za podniesioną pawężą, możesz zapewnić standardową osłonę sojusznikom znajdującym się obok ciebie."
+          },
+          "DEPLOYABLE_COVER": {
+            "NAME": "Rozkładana Osłona",
+            "DESCRIPTION": "Ta gruba mata z płótna, liści i drewna jest zamontowana na trójnogu z elastycznych metalowych podpór. Rozkładana osłona całkowicie blokuje jedną krawędź wybranego kwadratu, umożliwiając Tobie (i innym) uzyskanie standardowej osłony podczas wykonywania akcji Znalezienia Osłony."
+          },
+          "BALLISTIC_COVER": {
+            "NAME": "Osłona Balistyczna",
+            "DESCRIPTION": "Specjalnie zaprojektowana, aby chronić przed ostrzałem, osłona balistyczna chroni również przed innymi fizycznymi pociskami. Gdy stworzenie korzysta z osłony, stojąc za osłoną balistyczną, zyskuje odporność 2 na obrażenia kłute zadawane bronią dystansową i atakami bez broni z dystansu."
+          },
+          "SEE_INVISIBILITY": {
+            "NAME": "Widzenie Niewidzialności",
+            "DESCRIPTION": "Widzisz niewidzialne stworzenia i przedmioty. Są one półprzezroczyste i przysłonięte przed tobą."
+          },
+          "BLIND_FIGHT": {
+            "NAME": "Walka na Oślep",
+            "DESCRIPTION": "Nie jesteś odsłonięty wobec stworzeń, które są przed tobą ukryte (chyba że jesteś odsłonięty wobec nich z powodów innych niż stan ukrycia). Gdy znajdujesz się w sąsiedztwie niewykrytego stworzenia na twoim poziomie lub niższym, jest ono jedynie ukryte przed tobą."
+          },
+          "CONSECRATE": {
+            "NAME": "Konsekracja (przeciwko nieumarłym)",
+            "DESCRIPTION": "Konsekrowany obszar sprawia, że nieumarli czują się nieswojo. Nieumarłe stworzenia w tym obszarze są przysłonięte dla wszystkich."
+          },
+          "DARKVISION_CONDITIONAL": {
+            "NAME": "Widzenie w Ciemności (warunkowo)",
+            "DESCRIPTION": "Widzenie w ciemności działa tylko w ciemności lub przy słabym oświetleniu."
+          },
+          "HEAVY_PRECIPITATION": {
+            "NAME": "Silne Opady",
+            "DESCRIPTION": "Ulewny deszcz, śnieg lub deszcz ze śniegiem ograniczają widoczność. Stworzenia znajdujące się w odległości 30 stóp lub większej są przysłonięte."
+          },
+          "THICK_FOG": {
+            "NAME": "Gęsta Mgła",
+            "DESCRIPTION": "Gęsta mgła znacznie ogranicza widoczność. Stworzenia znajdujące się w odległości do 10 stóp są przysłonięte, a stworzenia znajdujące się w odległości powyżej 20 stóp są niewidoczne."
+          },
+          "MIRROR_IMAGE": {
+            "NAME": "Lustrzane Odbicie",
+            "DESCRIPTION": "Iluzoryczne duplikaty uniemożliwiają atakującym uzyskanie przewagi taktycznej. Efekty Odsłonięcia wynikające ze stanu przysłonięcia, ukrycia lub niewykrywalności są tłumione."
+          }
+        }
       }
     },
     "SEEK_AUTOMATION": {
@@ -472,6 +573,8 @@
         "LEGENDARY_SNEAK_TOOLTIP": "Wymóg posiadania osłony / przysłonięcia zostaje pominięty",
         "CEASELESS_SHADOWS_LABEL": "Nieustające Cienie",
         "CEASELESS_SHADOWS_TOOLTIP": "Usunięto warunki wstępne dotyczące osłony / przysłonięcia",
+        "OFF_GUARD_PREVENTED_LABEL": "Zapobieganie odsłonięciu",
+        "OFF_GUARD_PREVENTED_TOOLTIP": "{EFFECT} zapobiega karze za stan Odsłonięty ",
         "CAMOUFLAGE_LABEL": "Kamuflaż",
         "CAMOUFLAGE_TOOLTIP": "Wymóg posiadania osłony / przysłonięcia zostaje pominięty w naturalnym terenie",
         "DISTRACTING_SHADOWS_LABEL": "Rozpraszające Cienie",
@@ -691,6 +794,10 @@
         "name": "Próg słabego światła",
         "hint": "Domyślny próg określający słabe oświetlenie (od 0,0 do 1,0). Wartości poniżej tego progu są traktowane jako słabe oświetlenie. Można to zmienić dla poszczególnych scen w konfiguracji sceny."
       },
+      "DISABLE_AVS_PER_SCENE": {
+        "name": "Wyłącz AVS dla tej sceny",
+        "hint": "Po włączeniu funkcja automatycznej widoczności zostanie wyłączona dla tej sceny. Stany widoczności nie będą automatycznie obliczane ani aktualizowane."
+      },
       "AVS_CHANGES_INDICATOR_SIZE": {
         "name": "AVS Zmiana rozmiaru wskaźnika",
         "hint": "Kontroluje rozmiar przycisku wskaźnika zmian AVS oraz jego podpowiedzi.",
@@ -758,10 +865,6 @@
       "VISIONER_QUICK_EDIT_TOOL": {
         "name": "Narzędzie szybkiej edycji Visioner",
         "hint": "Dodaje przycisk do paska bocznego narzędzi tokenów, aby otworzyć narzędzie Szybkiej Edycji Visioner. Jeśli jest wyłączone, dostęp do narzędzia można uzyskać za pomocą skrótu klawiszowego."
-      },
-      "DISABLE_AVS_PER_SCENE": {
-        "name": "Wyłącz AVS dla tej sceny",
-        "hint": "Po włączeniu tej opcji system automatycznej widoczności zostanie wyłączony dla tej sceny, nawet jeśli globalny AVS jest włączony."
       }
     },
     "UI": {
@@ -1057,6 +1160,7 @@
         "TARGET_UNDETECTED_CONDITION": "Cel ma stan niewykryty",
         "TARGET_HIDDEN_CONDITION": "Cel ma stan ukryty",
         "TARGET_CONCEALED_CONDITION": "Cel ma stan przysłonięty",
+        "RULE_ELEMENT_OVERRIDE": "Element reguły zastępuje stan",
         "TARGET_IN_GREATER_DARKNESS_WITH_GREATER_DARKVISION": "Cel znajduje się w większej magicznej ciemności ({templates}), ale obserwator ma większe widzenie w ciemności",
         "TARGET_IN_GREATER_DARKNESS_WITH_DARKVISION": "Cel znajduje się w większej magicznej ciemności ({templates}) – przysłonięty nawet dla postaci posiadających widzenie w ciemności",
         "TARGET_IN_GREATER_DARKNESS_NO_DARKVISION": "Cel znajduje się w większej magicznej ciemności ({templates}), obserwator nie posiada widzenia w ciemności",
