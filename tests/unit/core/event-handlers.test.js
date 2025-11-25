@@ -922,6 +922,16 @@ describe('Event Handler Tests', () => {
       expect(mockVisibilityState.markAllTokensChangedImmediate).not.toHaveBeenCalled();
     });
 
+    test('should ignore wall movement property changes', () => {
+      const mockWall = { id: 'wall1' };
+      const changes = { move: 1 };
+
+      wallHandler.handleWallUpdate(mockWall, changes);
+
+      expect(mockCacheManager.clearAllCaches).not.toHaveBeenCalled();
+      expect(mockVisibilityState.markAllTokensChangedImmediate).not.toHaveBeenCalled();
+    });
+
     test('should always handle wall creation', () => {
       const mockWall = { id: 'wall1' };
 

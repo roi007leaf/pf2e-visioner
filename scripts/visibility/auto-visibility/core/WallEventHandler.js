@@ -42,8 +42,7 @@ export class WallEventHandler {
             'sense',                         // Wall sense restrictions
             'dir',                           // Wall direction restrictions
             'sight',                         // Sight restriction
-            'sound',                         // Sound restriction (affects some LOS calculations)
-            'move'                           // Movement restriction (can affect visibility in some cases)
+            'sound'                          // Sound restriction (affects some LOS calculations)
         ];
 
         const affectedFields = geometryFields.filter(field =>
