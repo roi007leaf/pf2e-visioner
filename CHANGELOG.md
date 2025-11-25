@@ -1,5 +1,13 @@
 # Changelog
 
+## [5.1.1] - 2025-11-25
+
+### 🐛 Bug Fixes
+
+- **Wall Movement Property**: Fixed wall movement property changes incorrectly triggering AVS recalculation
+  - Wall movement restrictions (`move` property) should not affect line of sight calculations
+  - Removed incorrect check that excluded walls with `move=NONE` from sight blocking calculations
+
 ## [5.1.0] - 2025-11-21
 
 ### ✨ Added

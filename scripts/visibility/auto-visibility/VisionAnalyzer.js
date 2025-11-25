@@ -398,7 +398,7 @@ export class VisionAnalyzer {
           bottom: Math.min(observerSpan.bottom, targetSpan.bottom),
           top: Math.max(observerSpan.top, targetSpan.top),
         };
-      } catch (error) {}
+      } catch (error) { }
 
       stage = 'get-walls';
       const cachedWalls = this.#getCachedWalls(elevationRange);
@@ -518,10 +518,6 @@ export class VisionAnalyzer {
     const blockingWalls = [];
 
     for (const wall of canvas.walls.placeables) {
-      if (wall.document.move === CONST.WALL_SENSE_TYPES.NONE) {
-        continue;
-      }
-
       const isDoor = wall.document.door > 0;
       const isOpen = wall.document.ds === 1;
       if (isDoor && isOpen) {
@@ -601,7 +597,7 @@ export class VisionAnalyzer {
         const wallMidY = (wall.document.c[1] + wall.document.c[3]) / 2;
         const distToRayMid = Math.sqrt(
           (wallMidX - (fromPoint.x + toPoint.x) / 2) ** 2 +
-            (wallMidY - (fromPoint.y + toPoint.y) / 2) ** 2,
+          (wallMidY - (fromPoint.y + toPoint.y) / 2) ** 2,
         );
 
         if (distToRayMid > rayLength * 1.5) {

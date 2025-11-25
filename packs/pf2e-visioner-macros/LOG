@@ -1,3 +1,7 @@
-2025/11/21-08:03:01.693 6ae8 Recovering log #125
-2025/11/21-08:03:01.698 6ae8 Delete type=0 #125
-2025/11/21-08:03:01.699 6ae8 Delete type=3 #123
+2025/11/23-17:33:57.766 213c Recovering log #147
+2025/11/23-17:33:57.771 213c Delete type=0 #147
+2025/11/23-17:33:57.772 213c Delete type=3 #145
+2025/11/25-07:21:54.448 2aa4 Level-0 table #152: started
+2025/11/25-07:21:54.448 2aa4 Level-0 table #152: 0 bytes OK
+2025/11/25-07:21:54.449 2aa4 Delete type=0 #150
+2025/11/25-07:21:54.454 2aa4 Manual compaction at level-0 from '!macros!DYzIWNerMDEE4VmQ' @ 72057594037927935 : 1 .. '!macros!fqzpWphOkC3UtOx8' @ 0 : 0; will stop at (end)

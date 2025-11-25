@@ -255,6 +255,54 @@ describe('Wall Sight Blocking Fix', () => {
       }).not.toThrow();
     });
 
+    test('should block sight for walls with move=NONE but sight restriction', () => {
+      const observer = {
+        center: { x: 0, y: 0 },
+        vision: null,
+        actor: {
+          system: {
+            perception: {
+              vision: true,
+            },
+            traits: {
+              size: { value: 'med' },
+            },
+          },
+        },
+        document: { id: 'test-observer-move-none', x: -50, y: -50, width: 1, height: 1, elevation: 0 },
+      };
+
+      const target = {
+        center: { x: 100, y: 0 },
+        shape: null,
+        actor: {
+          system: {
+            traits: {
+              size: { value: 'med' },
+            },
+          },
+        },
+        document: { x: 50, y: -50, width: 1, height: 1, elevation: 0 },
+      };
+
+      global.canvas.walls.placeables = [
+        {
+          document: {
+            move: CONST.WALL_SENSE_TYPES.NONE,
+            sight: CONST.WALL_SENSE_TYPES.NORMAL,
+            sound: CONST.WALL_SENSE_TYPES.NONE,
+            light: CONST.WALL_SENSE_TYPES.NORMAL,
+            door: 0,
+            ds: 0,
+            c: [50, -100, 50, 100],
+          },
+        },
+      ];
+
+      const result = visionAnalyzer.hasLineOfSight(observer, target);
+      expect(result).toBe(false);
+    });
+
     test('should return false for observers with no vision capabilities', () => {
       const observerWithNoVision = {
         center: { x: 0, y: 0 },
