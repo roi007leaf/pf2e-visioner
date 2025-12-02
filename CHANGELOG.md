@@ -1,5 +1,14 @@
 # Changelog
 
+## [5.2.1] - 2025-12-02
+
+### 🐛 Bug Fixes
+
+- **Sneak End Position Qualification**: Fixed concealed, hidden, and undetected states not qualifying for sneak ending position
+  - End position now correctly qualifies with concealed state
+  - End position qualifies with hidden/undetected when `sneakAllowHiddenUndetectedEndPosition` setting is enabled
+  - Fixed `ActionQualifier.checkSneakPrerequisites` incorrectly returning `qualifies: false` when no rule element sources exist
+
 ## [5.2.0] - 2025-12-02
 
 ### ✨ Added

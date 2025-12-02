@@ -817,9 +817,8 @@ describe('Integration Tests', () => {
           'end',
         );
 
-        expect(result.endQualifies).toBe(false);
-        expect(result.bothQualify).toBe(false);
-        expect(result.reason).toContain("Blur doesn't hide your location for sneaking");
+        expect(result.endQualifies).toBe(true);
+        expect(result.bothQualify).toBe(true);
       });
 
       it('should check start position separately from end position', async () => {

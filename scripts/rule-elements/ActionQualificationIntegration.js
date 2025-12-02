@@ -120,7 +120,9 @@ export class ActionQualificationIntegration {
 
     const result = ActionQualifier.checkSneakPrerequisites(token, null, position);
 
-    if (!result.qualifies) {
+    const hasRuleElementSources = result.qualifyingConcealment > 0 || result.qualifyingCover > 0;
+    
+    if (!result.qualifies && hasRuleElementSources) {
       if (position === 'start') {
         currentQualification.startQualifies = false;
       } else {
