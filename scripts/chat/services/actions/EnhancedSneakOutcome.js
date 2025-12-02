@@ -21,14 +21,31 @@ export class EnhancedSneakOutcome {
    * @returns {boolean} Whether this position qualifies for sneak
    */
   static doesPositionQualifyForSneak(visibilityState, isStartPosition = false, coverState = 'none') {
+    
     if (isStartPosition) {
       // Start position must be Hidden or Undetected to attempt Sneak
-      return visibilityState === 'hidden' || visibilityState === 'undetected';
+      const result = visibilityState === 'hidden' || visibilityState === 'undetected';
+      return result;
     } else {
       // End position needs concealment OR cover to maintain stealth
+      if (!visibilityState) {
+        return false;
+      }
+      
       const hasConcealment = visibilityState === 'concealed';
       const hasCover = coverState && (coverState === 'standard' || coverState === 'greater');
-      return hasConcealment || hasCover;
+      let allowExtendedEndStates = false;
+      try {
+        allowExtendedEndStates = game.settings.get('pf2e-visioner', 'sneakAllowHiddenUndetectedEndPosition');
+      } catch (err) {
+        console.warn('[PF2E Visioner] Error getting sneakAllowHiddenUndetectedEndPosition setting:', err);
+        allowExtendedEndStates = false;
+      }
+      const hasExtendedStates = allowExtendedEndStates && (visibilityState === 'hidden' || visibilityState === 'undetected');
+      
+      const result = hasConcealment || hasCover || hasExtendedStates;
+      
+      return result;
     }
   }
 
@@ -63,6 +80,7 @@ export class EnhancedSneakOutcome {
     } = params;
 
     // Check position qualifications
+    
     const startQualifies = this.doesPositionQualifyForSneak(startVisibilityState, true);
     const endCoverState = positionTransition?.endPosition?.coverState;
     const endQualifies = this.doesPositionQualifyForSneak(endVisibilityState, false, endCoverState);

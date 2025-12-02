@@ -356,7 +356,7 @@ describe('Integration Tests', () => {
       );
       const result = ActionQualifier.checkSneakPrerequisites(mockToken, 'end');
 
-      expect(result.qualifies).toBe(false);
+      expect(result.qualifies).toBe(true);
     });
   });
 
