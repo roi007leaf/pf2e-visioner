@@ -1,5 +1,12 @@
 # Changelog
 
+## [5.2.0] - 2025-12-02
+
+### ✨ Added
+
+- **Blinded Condition Terrain**: Creatures with the Blinded condition now treat all movement as difficult terrain (cost x2), reflecting the difficulty of moving without sight.
+- **Darkness Spell Terrain**: Darkness spell templates now automatically create an attached Region that applies difficult terrain (cost x2) to all movement types (Climb, Swim, Fly, Stride) within the area.
+
 ## [5.1.1] - 2025-11-25
 
 ### 🐛 Bug Fixes
