@@ -79,7 +79,7 @@ describe('TemplateEventHandler', () => {
             expect.objectContaining({
               type: 'modifyMovementCost',
               system: expect.objectContaining({
-                difficulties: expect.objectContaining({ land: 2, stride: 2 })
+                difficulties: expect.objectContaining({ walk: 2 })
               })
             })
           ]),
