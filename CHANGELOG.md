@@ -1,5 +1,10 @@
 # Changelog
 
+## [5.2.2] - 2025-12-02
+
+### 🐛 Bug Fixes
+- Actually push the code
+
 ## [5.2.1] - 2025-12-02
 
 ### 🐛 Bug Fixes

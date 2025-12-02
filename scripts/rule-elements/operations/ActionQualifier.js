@@ -176,6 +176,18 @@ export class ActionQualifier {
     const visibilitySources = SourceTracker.getVisibilityStateSources(token, observerId);
     const coverSources = SourceTracker.getCoverStateSources(token, observerId);
 
+    const totalSources = visibilitySources.length + coverSources.length;
+    
+    if (totalSources === 0) {
+      return {
+        qualifies: true,
+        qualifyingConcealment: 0,
+        qualifyingCover: 0,
+        totalSources: 0,
+        messages: []
+      };
+    }
+
     const qualifyingConcealment = visibilitySources.filter(source => {
       return this.canUseSneakFromConcealment(token, 'sneak', source.id, position);
     });
@@ -191,6 +203,7 @@ export class ActionQualifier {
       qualifies: hasQualifying,
       qualifyingConcealment: qualifyingConcealment.length,
       qualifyingCover: qualifyingCover.length,
+      totalSources,
       messages
     };
   }
