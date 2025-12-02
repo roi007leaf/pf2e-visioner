@@ -9,6 +9,7 @@ import { getLogger } from '../utils/logger.js';
 import { registerChatHooks } from './chat.js';
 import { registerCombatHooks } from './combat.js';
 import { onCanvasReady, onReady } from './lifecycle.js';
+import { registerMovementCostHooks } from './movement-cost.js';
 import { registerTokenHooks } from './token-events.js';
 import { registerUIHooks } from './ui.js';
 
@@ -48,6 +49,7 @@ export async function registerHooks() {
   const { registerHooks: registerOptimized } = await import('../hooks/optimized-registration.js');
   registerOptimized();
   registerChatHooks();
+  registerMovementCostHooks();
 
   // Initialize turn-based sneak tracker for Sneaky/Very Sneaky feats
   try {
@@ -79,6 +81,14 @@ export async function registerHooks() {
   registerUIHooks();
   registerCombatHooks();
   AutoCoverHooks.registerHooks();
+
+  // Register movement cost hooks (Blinded difficult terrain)
+  try {
+    const { registerMovementCostHooks } = await import('./movement-cost.js');
+    registerMovementCostHooks();
+  } catch (error) {
+    console.error('PF2E Visioner | Failed to register movement cost hooks:', error);
+  }
 
   // Register effect perception hooks for automatic perception refresh
   // These work independently of the Auto-Visibility System

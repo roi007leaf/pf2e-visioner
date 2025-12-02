@@ -40,6 +40,7 @@ export class TemplateEventHandler {
         try {
             if (this.#isDarknessTemplate(template)) {
                 this.#ensureDarknessLightForTemplate(template);
+                this.#ensureDarknessRegionForTemplate(template);
             }
         } catch {
             /* best-effort */
@@ -70,6 +71,7 @@ export class TemplateEventHandler {
             try {
                 if (this.#isDarknessTemplate(template)) {
                     this.#syncDarknessLightForTemplate(template);
+                    this.#syncDarknessRegionForTemplate(template);
                 }
             } catch {
                 /* best-effort */
@@ -93,6 +95,7 @@ export class TemplateEventHandler {
         try {
             if (this.#isDarknessTemplate(template)) {
                 this.#removeDarknessLightForTemplate(template);
+                this.#removeDarknessRegionForTemplate(template);
             }
         } catch {
             /* best-effort */
@@ -300,6 +303,123 @@ export class TemplateEventHandler {
             }
         } catch (e) {
             console.warn('PF2E Visioner | Failed to remove Darkness light for template:', e);
+        }
+    }
+
+    /**
+     * Ensure a difficult terrain region exists for a Darkness template and link it via flags.
+     */
+    async #ensureDarknessRegionForTemplate(template) {
+        try {
+            const existingId = template.getFlag?.(MODULE_ID, 'darknessRegionId');
+            if (existingId && canvas.scene?.regions?.get?.(existingId)) {
+                await this.#syncDarknessRegionForTemplate(template);
+                return;
+            }
+
+            const radiusPixels = (template.distance / canvas.dimensions.distance) * canvas.grid.size;
+            const shape = {
+                type: 'ellipse',
+                x: template.x,
+                y: template.y,
+                radiusX: radiusPixels,
+                radiusY: radiusPixels,
+                rotation: 0
+            };
+
+            const regionData = {
+                name: `Darkness Terrain (${template.id})`,
+                color: '#000000',
+                shapes: [shape],
+                behaviors: [{
+                    type: 'modifyMovementCost',
+                    system: {
+                        difficulties: {
+                            "walk": 2,
+                            "fly": 2,
+                            "swim": 2,
+                            "burrow": 2,
+                            "deploy": 2,
+                            "travel": 2,
+                            "drive": 2,
+                            "jump": 2,
+                            "crawl": 2,
+                            "climb": 2,
+                            "blink": 2,
+                            "displace": 2
+                        }
+                    }
+                }],
+                flags: {
+                    [MODULE_ID]: {
+                        darknessTemplateId: template.id
+                    }
+                }
+            };
+
+            const created = await canvas.scene?.createEmbeddedDocuments?.('Region', [regionData]);
+            const createdDoc = Array.isArray(created) ? created[0] : null;
+            const regionId = createdDoc?.id || createdDoc?._id || null;
+
+            if (regionId) {
+                try {
+                    await template.setFlag?.(MODULE_ID, 'darknessRegionId', regionId);
+                } catch {
+                    /* ignore */
+                }
+            }
+        } catch (e) {
+            console.warn('PF2E Visioner | Failed to create Darkness region for template:', e);
+        }
+    }
+
+    /**
+     * Sync the linked Darkness region to the template's position and radius.
+     */
+    async #syncDarknessRegionForTemplate(template) {
+        try {
+            const regionId = template.getFlag?.(MODULE_ID, 'darknessRegionId');
+            if (!regionId) return;
+
+            const region = canvas.scene?.regions?.get?.(regionId);
+            if (!region) return;
+
+            const radiusPixels = (template.distance / canvas.dimensions.distance) * canvas.grid.size;
+            const newShape = {
+                type: 'ellipse',
+                x: template.x,
+                y: template.y,
+                radiusX: radiusPixels,
+                radiusY: radiusPixels,
+                rotation: 0
+            };
+
+            await region.update({ shapes: [newShape] });
+        } catch (e) {
+            console.warn('PF2E Visioner | Failed to sync Darkness region for template:', e);
+        }
+    }
+
+    /**
+     * Remove the linked Darkness region when the template is deleted.
+     */
+    async #removeDarknessRegionForTemplate(template) {
+        try {
+            const regionId = template.getFlag?.(MODULE_ID, 'darknessRegionId');
+            if (!regionId) return;
+
+            try {
+                await canvas.scene?.deleteEmbeddedDocuments?.('Region', [regionId]);
+            } catch {
+                /* ignore delete errors */
+            }
+            try {
+                await template.unsetFlag?.(MODULE_ID, 'darknessRegionId');
+            } catch {
+                /* ignore flag errors */
+            }
+        } catch (e) {
+            console.warn('PF2E Visioner | Failed to remove Darkness region for template:', e);
         }
     }
 }
