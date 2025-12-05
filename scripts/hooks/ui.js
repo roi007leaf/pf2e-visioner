@@ -1610,6 +1610,14 @@ function injectPF2eVisionerBox(app, root) {
   const stealthCurrent = readFlag('stealthDC') ?? '';
   const coverOverride = readFlag('coverOverride') || 'auto';
   const minPerceptionRank = Number(readFlag('minPerceptionRank') ?? 0);
+  const encounterMasterTokenId = readFlag('encounterMasterTokenId') ?? '';
+
+  const currentTokenId = tokenDoc?.id ?? tokenDoc?.uuid;
+  const masterToken = encounterMasterTokenId ? canvas?.tokens?.get(encounterMasterTokenId) : null;
+  const masterName = masterToken?.name || masterToken?.document?.name || '';
+  const masterDisplayText = encounterMasterTokenId && masterName
+    ? masterName
+    : game.i18n.localize('PF2E_VISIONER.UI.ENCOUNTER_MASTER_CHOOSE');
 
   // Build content
   let inner = `
@@ -1640,6 +1648,17 @@ function injectPF2eVisionerBox(app, root) {
       </div>
       <input type="hidden" name="flags.${MODULE_ID}.coverOverride" value="${coverOverride || ''}">
       <p class="notes">Set how this token provides cover in combat.</p>
+    </div>
+    <div class="form-group">
+      <label data-tooltip="${game.i18n.localize('PF2E_VISIONER.UI.ENCOUNTER_MASTER_TOOLTIP')}">${game.i18n.localize('PF2E_VISIONER.UI.ENCOUNTER_MASTER_LABEL')}</label>
+      <div style="display: flex; gap: 4px; align-items: center;">
+        <button type="button" class="pv-encounter-master-btn" style="flex: 1; text-align: left;">
+          <i class="fas fa-users" style="margin-right: 4px;"></i>
+          <span class="pv-encounter-master-label">${masterDisplayText}</span>
+        </button>
+        ${encounterMasterTokenId ? `<button type="button" class="pv-encounter-master-clear" data-tooltip="Clear"><i class="fas fa-times"></i></button>` : ''}
+      </div>
+      <input type="hidden" name="flags.${MODULE_ID}.encounterMasterTokenId" class="pv-encounter-master-input" value="${encounterMasterTokenId}">
     </div>
   `;
   if (actor.type === 'loot') {
@@ -1691,6 +1710,61 @@ function injectPF2eVisionerBox(app, root) {
         }
       });
     });
+  } catch { }
+
+  try {
+    const masterBtn = box.querySelector('.pv-encounter-master-btn');
+    const masterInput = box.querySelector('.pv-encounter-master-input');
+    const masterLabel = box.querySelector('.pv-encounter-master-label');
+    const clearBtn = box.querySelector('.pv-encounter-master-clear');
+
+    if (masterBtn && masterInput) {
+      masterBtn.addEventListener('click', async (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        const { EncounterMasterDialog } = await import('../ui/dialogs/EncounterMasterDialog.js');
+        const selectedId = await EncounterMasterDialog.selectMaster(masterInput.value, currentTokenId);
+        if (selectedId !== undefined) {
+          masterInput.value = selectedId;
+          if (masterLabel) {
+            if (selectedId) {
+              const selectedToken = canvas?.tokens?.get(selectedId);
+              masterLabel.textContent = selectedToken?.name || selectedToken?.document?.name || selectedId;
+            } else {
+              masterLabel.textContent = game.i18n.localize('PF2E_VISIONER.UI.ENCOUNTER_MASTER_CHOOSE');
+            }
+          }
+          const clearBtnExisting = box.querySelector('.pv-encounter-master-clear');
+          if (selectedId && !clearBtnExisting) {
+            const newClearBtn = document.createElement('button');
+            newClearBtn.type = 'button';
+            newClearBtn.className = 'pv-encounter-master-clear';
+            newClearBtn.dataset.tooltip = 'Clear';
+            newClearBtn.innerHTML = '<i class="fas fa-times"></i>';
+            newClearBtn.addEventListener('click', (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              masterInput.value = '';
+              if (masterLabel) masterLabel.textContent = game.i18n.localize('PF2E_VISIONER.UI.ENCOUNTER_MASTER_CHOOSE');
+              newClearBtn.remove();
+            });
+            masterBtn.parentElement.appendChild(newClearBtn);
+          } else if (!selectedId && clearBtnExisting) {
+            clearBtnExisting.remove();
+          }
+        }
+      });
+    }
+
+    if (clearBtn) {
+      clearBtn.addEventListener('click', (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        if (masterInput) masterInput.value = '';
+        if (masterLabel) masterLabel.textContent = game.i18n.localize('PF2E_VISIONER.UI.ENCOUNTER_MASTER_CHOOSE');
+        clearBtn.remove();
+      });
+    }
   } catch { }
 
   if (detectionFS) detectionFS.insertAdjacentElement('afterend', box);

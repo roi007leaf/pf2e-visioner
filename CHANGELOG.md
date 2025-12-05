@@ -1,8 +1,19 @@
 # Changelog
 
+## [5.3.0] - 2025-12-05
+
+### ✨ Added
+
+- **Encounter Master Token Setting**: Added ability to manually link tokens to a master token for encounter participation
+  - Tokens with an Encounter Master set will be considered part of the encounter when their master is in combat
+  - Useful for eidolons, companions, pets, or other minions not directly in the combat tracker
+  - Accessible via Token Config → Vision tab → PF2E Visioner section
+  - Visual dialog with token images and pan-to-token functionality for easy selection
+
 ## [5.2.2] - 2025-12-02
 
 ### 🐛 Bug Fixes
+
 - Actually push the code
 
 ## [5.2.1] - 2025-12-02
