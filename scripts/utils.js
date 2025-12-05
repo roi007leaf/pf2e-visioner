@@ -269,18 +269,21 @@ export function getSceneTargets(observer, encounterOnly = false, ignoreAllies = 
     if (!game.combat || !game.combat.combatants.size) return true;
 
     const actor = token?.actor;
-    // Always include familiars regardless of encounter filter
     if (actor?.type === 'familiar') return true;
 
-    // Check if this specific token (by ID) is directly in the encounter
     const tokenId = token?.id ?? token?.document?.id;
     if (!tokenId) return false;
 
-    // Direct token match (primary check)
     const directMatch = game.combat.combatants.some((c) => c.tokenId === tokenId);
     if (directMatch) return true;
 
-    // Eidolon master linkage - include eidolons whose masters are in combat
+    const encounterMasterTokenId = token?.document?.getFlag?.(MODULE_ID, 'encounterMasterTokenId');
+    if (encounterMasterTokenId) {
+      if (game.combat.combatants.some((c) => c.tokenId === encounterMasterTokenId)) {
+        return true;
+      }
+    }
+
     const master =
       actor?.type === 'eidolon' || actor?.isOfType?.('eidolon')
         ? actor?.system?.eidolon?.master
@@ -292,7 +295,6 @@ export function getSceneTargets(observer, encounterOnly = false, ignoreAllies = 
       }
     }
 
-    // No other fallbacks - prevents including random token copies
     return false;
   });
 }
@@ -313,7 +315,17 @@ export function hasActiveEncounter() {
 export function isTokenInEncounter(token) {
   if (!hasActiveEncounter()) return false;
 
-  return game.combat.combatants.some((combatant) => combatant.token?.id === token.document.id);
+  const tokenId = token?.document?.id ?? token?.id;
+  if (game.combat.combatants.some((combatant) => combatant.token?.id === tokenId)) {
+    return true;
+  }
+
+  const encounterMasterTokenId = token?.document?.getFlag?.(MODULE_ID, 'encounterMasterTokenId');
+  if (encounterMasterTokenId) {
+    return game.combat.combatants.some((combatant) => combatant.token?.id === encounterMasterTokenId);
+  }
+
+  return false;
 }
 
 /**
