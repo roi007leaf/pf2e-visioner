@@ -2,81 +2,96 @@ import { MODULE_ID } from '../../constants.js';
 import { panToAndSelectToken } from '../shared-ui-utils.js';
 
 export class EncounterMasterDialog extends foundry.applications.api.ApplicationV2 {
-    static DEFAULT_OPTIONS = {
-        id: 'pv-encounter-master-dialog',
-        tag: 'div',
-        window: {
-            title: game.i18n.localize('PF2E_VISIONER.UI.ENCOUNTER_MASTER_DIALOG_TITLE'),
-            icon: 'fas fa-users',
-            resizable: true,
-        },
-        position: { width: 400, height: 500 },
-        classes: [MODULE_ID, 'pv-encounter-master-dialog'],
-    };
+  static DEFAULT_OPTIONS = {
+    id: 'pv-encounter-master-dialog',
+    tag: 'div',
+    window: {
+      title: game.i18n.localize('PF2E_VISIONER.UI.ENCOUNTER_MASTER_DIALOG_TITLE'),
+      icon: 'fas fa-users',
+      resizable: true,
+    },
+    position: { width: 400, height: 500 },
+    classes: [MODULE_ID, 'pv-encounter-master-dialog'],
+  };
 
-    constructor(currentTokenId, excludeTokenId, options = {}) {
-        super(options);
-        this.currentTokenId = currentTokenId || '';
-        this.excludeTokenId = excludeTokenId;
-        this._resolver = null;
+  constructor(currentTokenId, excludeTokenId, options = {}) {
+    super(options);
+    this.currentTokenId = currentTokenId || '';
+    this.excludeTokenId = excludeTokenId;
+    this._resolver = null;
+  }
+
+  setResolver(fn) {
+    this._resolver = fn;
+  }
+
+  _getSceneTokens() {
+    const tokens = canvas?.tokens?.placeables || [];
+    const excludeToken = this.excludeTokenId ? canvas?.tokens?.get(this.excludeTokenId) : null;
+    const filtered = tokens.filter((t) => {
+      const tid = t?.document?.id ?? t?.id;
+      if (!tid || tid === this.excludeTokenId) return false;
+      const actorType = t?.actor?.type;
+      if (actorType === 'hazard' || actorType === 'loot') return false;
+      return true;
+    });
+    if (excludeToken) {
+      const ex = excludeToken.center || { x: excludeToken.x, y: excludeToken.y };
+      filtered.sort((a, b) => {
+        const ac = a.center || { x: a.x, y: a.y };
+        const bc = b.center || { x: b.x, y: b.y };
+        const distA = Math.hypot(ac.x - ex.x, ac.y - ex.y);
+        const distB = Math.hypot(bc.x - ex.x, bc.y - ex.y);
+        return distA - distB;
+      });
+    }
+    return filtered;
+  }
+
+  _resolveTokenImage(token) {
+    try {
+      return (
+        token?.document?.texture?.src ||
+        token?.texture?.src ||
+        token?.actor?.img ||
+        token?.actor?.prototypeToken?.texture?.src ||
+        'icons/svg/mystery-man.svg'
+      );
+    } catch {
+      return 'icons/svg/mystery-man.svg';
+    }
+  }
+
+  async _renderHTML(_context, _options) {
+    const tokens = this._getSceneTokens();
+    const noneLabel = game.i18n.localize('PF2E_VISIONER.UI.ENCOUNTER_MASTER_NONE');
+    const panLabel = game.i18n.localize('PF2E_VISIONER.UI.ENCOUNTER_MASTER_PAN');
+    const cancelLabel = game.i18n.localize('Cancel');
+
+    const tokensByActor = new Map();
+    for (const t of tokens) {
+      const actorId = t?.actor?.id || 'no-actor';
+      const name = t?.name || t?.document?.name || 'Unknown';
+      const key = `${actorId}-${name}`;
+      if (!tokensByActor.has(key)) {
+        tokensByActor.set(key, []);
+      }
+      tokensByActor.get(key).push(t);
     }
 
-    setResolver(fn) {
-        this._resolver = fn;
-    }
+    let tokenRows = '';
+    for (const t of tokens) {
+      const tid = t?.document?.id ?? t?.id;
+      const name = t?.name || t?.document?.name || 'Unknown';
+      const img = this._resolveTokenImage(t);
+      const isSelected = tid === this.currentTokenId;
 
-    _getSceneTokens() {
-        const tokens = canvas?.tokens?.placeables || [];
-        return tokens.filter((t) => {
-            const tid = t?.document?.id ?? t?.id;
-            return tid && tid !== this.excludeTokenId;
-        });
-    }
+      const actorId = t?.actor?.id || 'no-actor';
+      const key = `${actorId}-${name}`;
+      const sameActorTokens = tokensByActor.get(key) || [];
+      const showId = sameActorTokens.length > 1;
 
-    _resolveTokenImage(token) {
-        try {
-            return (
-                token?.document?.texture?.src ||
-                token?.texture?.src ||
-                token?.actor?.img ||
-                token?.actor?.prototypeToken?.texture?.src ||
-                'icons/svg/mystery-man.svg'
-            );
-        } catch {
-            return 'icons/svg/mystery-man.svg';
-        }
-    }
-
-    async _renderHTML(_context, _options) {
-        const tokens = this._getSceneTokens();
-        const noneLabel = game.i18n.localize('PF2E_VISIONER.UI.ENCOUNTER_MASTER_NONE');
-        const panLabel = game.i18n.localize('PF2E_VISIONER.UI.ENCOUNTER_MASTER_PAN');
-        const cancelLabel = game.i18n.localize('Cancel');
-
-        const tokensByActor = new Map();
-        for (const t of tokens) {
-            const actorId = t?.actor?.id || 'no-actor';
-            const name = t?.name || t?.document?.name || 'Unknown';
-            const key = `${actorId}-${name}`;
-            if (!tokensByActor.has(key)) {
-                tokensByActor.set(key, []);
-            }
-            tokensByActor.get(key).push(t);
-        }
-
-        let tokenRows = '';
-        for (const t of tokens) {
-            const tid = t?.document?.id ?? t?.id;
-            const name = t?.name || t?.document?.name || 'Unknown';
-            const img = this._resolveTokenImage(t);
-            const isSelected = tid === this.currentTokenId;
-
-            const actorId = t?.actor?.id || 'no-actor';
-            const key = `${actorId}-${name}`;
-            const sameActorTokens = tokensByActor.get(key) || [];
-            const showId = sameActorTokens.length > 1;
-
-            tokenRows += `
+      tokenRows += `
         <div class="pv-em-token-row ${isSelected ? 'selected' : ''}" data-token-id="${tid}">
           <img class="pv-em-token-img" src="${img}" alt="${name}">
           <div class="pv-em-token-info">
@@ -88,9 +103,9 @@ export class EncounterMasterDialog extends foundry.applications.api.ApplicationV
           </button>
         </div>
       `;
-        }
+    }
 
-        return `
+    return `
       <style>
         .pv-em-container { display: flex; flex-direction: column; height: 100%; gap: 8px; padding: 8px; }
         
@@ -178,56 +193,56 @@ export class EncounterMasterDialog extends foundry.applications.api.ApplicationV
         </div>
       </div>
     `;
-    }
+  }
 
-    _replaceHTML(result, content, _options) {
-        content.innerHTML = result;
-        return content;
-    }
+  _replaceHTML(result, content, _options) {
+    content.innerHTML = result;
+    return content;
+  }
 
-    _onRender(context, options) {
-        super._onRender?.(context, options);
-        const root = this.element;
+  _onRender(context, options) {
+    super._onRender?.(context, options);
+    const root = this.element;
 
-        root.querySelector('.pv-em-none-row')?.addEventListener('click', () => {
-            this._selectToken('');
-        });
+    root.querySelector('.pv-em-none-row')?.addEventListener('click', () => {
+      this._selectToken('');
+    });
 
-        root.querySelectorAll('.pv-em-pan-btn').forEach((btn) => {
-            btn.addEventListener('click', (ev) => {
-                ev.stopPropagation();
-                const tokenId = btn.dataset.tokenId;
-                const token = canvas?.tokens?.get(tokenId);
-                if (token) {
-                    panToAndSelectToken(token);
-                }
-            });
-        });
-
-        root.querySelectorAll('.pv-em-token-row').forEach((row) => {
-            row.addEventListener('click', () => {
-                const tokenId = row.dataset.tokenId;
-                this._selectToken(tokenId);
-            });
-        });
-
-        root.querySelector('.pv-em-cancel-btn')?.addEventListener('click', () => {
-            this.close();
-        });
-    }
-
-    _selectToken(tokenId) {
-        if (this._resolver) {
-            this._resolver(tokenId);
+    root.querySelectorAll('.pv-em-pan-btn').forEach((btn) => {
+      btn.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        const tokenId = btn.dataset.tokenId;
+        const token = canvas?.tokens?.get(tokenId);
+        if (token) {
+          panToAndSelectToken(token);
         }
-        this.close();
-    }
+      });
+    });
 
-    static async selectMaster(currentTokenId, excludeTokenId) {
-        return new Promise((resolve) => {
-            const dlg = new this(currentTokenId, excludeTokenId);
-            dlg.setResolver(resolve);
-            dlg.render(true);
-        });
+    root.querySelectorAll('.pv-em-token-row').forEach((row) => {
+      row.addEventListener('click', () => {
+        const tokenId = row.dataset.tokenId;
+        this._selectToken(tokenId);
+      });
+    });
+
+    root.querySelector('.pv-em-cancel-btn')?.addEventListener('click', () => {
+      this.close();
+    });
+  }
+
+  _selectToken(tokenId) {
+    if (this._resolver) {
+      this._resolver(tokenId);
     }
+    this.close();
+  }
+
+  static async selectMaster(currentTokenId, excludeTokenId) {
+    return new Promise((resolve) => {
+      const dlg = new this(currentTokenId, excludeTokenId);
+      dlg.setResolver(resolve);
+      dlg.render(true);
+    });
+  }
 }

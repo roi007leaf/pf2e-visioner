@@ -1,5 +1,13 @@
 # Changelog
 
+## [5.3.1] - 2025-12-06
+
+### 🛠️ Improved
+
+- **Encounter Master Dialog**: Improved token selection UX
+  - Filters out hazards and loot tokens from the selection list
+  - Sorts tokens by proximity to the token being configured
+
 ## [5.3.0] - 2025-12-05
 
 ### ✨ Added
