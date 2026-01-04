@@ -152,8 +152,22 @@ export class OverrideValidationManager {
 
         if (this.exclusionManager.isExcludedToken(movedToken)) {
             let isSneaking = false;
+            let hasExistingOverrides = false;
             try { isSneaking = !!movedToken.document.getFlag(MODULE_ID, 'sneak-active'); } catch { }
-            if (!isSneaking) return { overrides: [], __showAwareness: false };
+            try {
+                const moverFlags = movedToken.document.flags['pf2e-visioner'] || {};
+                hasExistingOverrides = Object.keys(moverFlags).some(k => k.startsWith('avs-override-from-'));
+                if (!hasExistingOverrides) {
+                    const allTokens = canvas.tokens?.placeables || [];
+                    for (const t of allTokens) {
+                        if (t?.document?.flags?.['pf2e-visioner']?.[`avs-override-from-${movedTokenId}`]) {
+                            hasExistingOverrides = true;
+                            break;
+                        }
+                    }
+                }
+            } catch { }
+            if (!isSneaking && !hasExistingOverrides) return { overrides: [], __showAwareness: false };
             const awareness = [];
             try {
                 const allTokens = canvas.tokens?.placeables || [];

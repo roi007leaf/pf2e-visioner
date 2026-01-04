@@ -108,7 +108,8 @@
       "POPUP_OVERRIDE": "Osłona zastąpiona za pomocą wyskakującego okienka skrótów klawiszowych: {original} → {final}"
     },
     "FEAT": {
-      "CEASELESS_SHADOWS": "Nieustające Cienie"
+      "CEASELESS_SHADOWS": "Nieustające Cienie",
+      "SNIPING_DUO_DEDICATION": "Sniping Duo Dedication"
     },
     "AVS_OVERRIDE_DIALOG": {
       "NO_OVERRIDES": "Obecnie nie ma żadnych aktywnych zastąpień AVS dla tego tokenu.",
@@ -119,6 +120,14 @@
       "ALL_OVERRIDES_CLEARED": "Wszystkie zastąpienia AVS zostały usunięte dla {token}",
       "ERROR_REMOVING_OVERRIDE": "Błąd podczas usuwania zastąpienia AVS",
       "ERROR_CLEARING_OVERRIDES": "Błąd podczas kasowania zastąpień AVS"
+    },
+    "OVERRIDE_INDICATOR": {
+      "TOOLTIP_HEADER": "zmian(y) do zatwierdzenia",
+      "TOOLTIP_NEXT": "Następny:",
+      "TOOLTIP_LEFT_CLICK": "Lewy klik: otwórz szczegóły",
+      "TOOLTIP_RIGHT_CLICK": "Prawy klik: zaakceptuj wszystko",
+      "TOOLTIP_SHIFT_RIGHT_CLICK": "Shift+Prawy klik: odrzuć wszystko",
+      "QUEUE_POSITION": "{current} z {total}"
     },
     "VISUAL_EFFECTS": {
       "CONCEALED_OVERLAY": "Ten token jest przysłonięty dla ciebie",
@@ -204,6 +213,7 @@
       "NO_VALID_CONSEQUENCES": "Nie znaleziono żadnych ważnych celów dla konsekwencji ataku. Konsekwencje można zobaczyć tylko wtedy, gdy jesteś Ukryty lub Niewykrywalny dla co najmniej jednego obserwatora.",
       "SNEAK_DEFERRED_RESTORED": "Przywrócono {count} tokenów do pierwotnego stanu odroczonego wraz ze wszystkimi danymi dotyczącymi pozycji."
     },
+    "MACROS": {},
     "DIALOG_TITLES": {
       "HIDE_RESULTS": "Wyniki Ukrywania",
       "POINT_OUT_RESULTS": "Wyniki Wskazania Palcem",
@@ -1012,6 +1022,15 @@
       "ENCOUNTER_MASTER_PAN": "Przypnij do tokenu",
       "ENCOUNTER_MASTER_SELECT": "Wybierz",
       "ENCOUNTER_MASTER_CHOOSE": "Wybierz Mistrza...",
+      "SNIPING_DUO_SPOTTER_LABEL": "Sniping Duo: obserwator",
+      "SNIPING_DUO_SPOTTER_TOOLTIP": "Wybierz obserwatora Sniping Duo (sojusznika, który nie powinien zapewniać osłony dla uderzeń między wami).",
+      "SNIPING_DUO_SPOTTER_CHOOSE": "Wybierz obserwatora...",
+      "SNIPING_DUO_DIALOG_TITLE": "Wybierz obserwatora Sniping Duo",
+      "SNIPING_DUO_NONE": "Brak",
+      "SNIPING_DUO_PAN": "Przypnij do tokenu",
+      "SNIPING_DUO_SPOTTER_NOT_FOUND": "Sniping Duo: nie znaleziono wybranego obserwatora.",
+      "SNIPING_DUO_COVER_IGNORE_TOOLTIP": "{FEAT}: {ALLY} nie zapewnia osłony dla tego uderzenia.",
+      "SNIPING_DUO_COVER_OVERRIDE_UNAVAILABLE": "{FEAT}: nadpisanie osłony niedostępne.",
       "FROM_LINKED_DARKNESS": "Z powiązanego szablonu Ciemności",
       "NO_POSITION_CHANGE": "Brak zmiany pozycji",
       "SEARCH_WALL_PLACEHOLDER": "Wyszukaj według identyfikatora lub ID ściany...",

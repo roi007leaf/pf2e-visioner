@@ -10,7 +10,7 @@ export class OverrideValidationDialog extends foundry.applications.api.Handlebar
   constructor(options = {}) {
     options.window = options.window || {};
     options.window.title = game?.i18n?.localize('PF2E_VISIONER.DIALOG_TITLES.AVS_VALIDATION') || 'AVS Changes Validation';
-    
+
     super(options);
     this.invalidOverrides = options.invalidOverrides || [];
     this.tokenName = options.tokenName || 'Unknown Token';
@@ -296,7 +296,7 @@ export class OverrideValidationDialog extends foundry.applications.api.Handlebar
       ui.notifications.info(game.i18n.format('PF2E_VISIONER.NOTIFICATIONS.AVS_ACCEPTED_IN_TABLE', { count: toRemove.length, group }));
       if (!this.invalidOverrides.length) {
         setTimeout(() => this.close(), 300);
-        try { const { default: indicator } = await import('./OverrideValidationIndicator.js'); indicator.hide(); } catch { }
+        try { const { default: indicator } = await import('./OverrideValidationIndicator.js'); indicator.hide(true); } catch { }
       }
     } catch (e) {
       console.error('PF2E Visioner | Error during group clear:', e);
@@ -342,7 +342,7 @@ export class OverrideValidationDialog extends foundry.applications.api.Handlebar
         setTimeout(() => this.close(), 1000);
         try {
           const { default: indicator } = await import('./OverrideValidationIndicator.js');
-          indicator.hide();
+          indicator.hide(true);
         } catch { }
       }
 
@@ -398,7 +398,7 @@ export class OverrideValidationDialog extends foundry.applications.api.Handlebar
           setTimeout(() => this.close(), 1000);
           try {
             const { default: indicator } = await import('./OverrideValidationIndicator.js');
-            indicator.hide();
+            indicator.hide(true);
           } catch { }
         }
 
@@ -428,7 +428,7 @@ export class OverrideValidationDialog extends foundry.applications.api.Handlebar
     ui.notifications.info(game.i18n.format('PF2E_VISIONER.NOTIFICATIONS.AVS_ACCEPTED_COUNT', { count: this.invalidOverrides.length }));
     try {
       const { default: indicator } = await import('./OverrideValidationIndicator.js');
-      indicator.hide();
+      indicator.hide(true);
     } catch { }
   }
 
@@ -438,7 +438,7 @@ export class OverrideValidationDialog extends foundry.applications.api.Handlebar
     ui.notifications.info(game.i18n.localize('PF2E_VISIONER.NOTIFICATIONS.AVS_REJECTED_ALL'));
     try {
       const { default: indicator } = await import('./OverrideValidationIndicator.js');
-      indicator.hide();
+      indicator.hide(true);
     } catch { }
   }
 

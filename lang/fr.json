@@ -165,6 +165,7 @@
       "NO_ENCOUNTER_TOKENS": "{moduleId}: No encounter tokens found. Filter disabled. (FR TODO)",
       "NO_VALID_CONSEQUENCES": "No valid targets found for Attack Consequences. you can only see consequences if you are Hidden or Undetected from at least one observer. (FR TODO)"
     },
+    "MACROS": {},
     "SEEK_AUTOMATION": {
       "BUTTON_APPLY": "Appliquer les résultats de Chercher",
       "BUTTON_PREVIEW": "Aperçu des résultats",
@@ -682,6 +683,15 @@
       "TOKEN_COVER_LESSER_TOOLTIP": "(FR TODO) Lesser Cover - Token always provides lesser cover",
       "TOKEN_COVER_STANDARD_TOOLTIP": "(FR TODO) Standard Cover - Token always provides standard cover",
       "TOKEN_COVER_GREATER_TOOLTIP": "(FR TODO) Greater Cover - Token always provides greater cover",
+      "SNIPING_DUO_SPOTTER_LABEL": "(FR TODO) Sniping Duo Spotter",
+      "SNIPING_DUO_SPOTTER_TOOLTIP": "(FR TODO) Choose your Sniping Duo spotter (the ally who should not provide cover for Strikes between you).",
+      "SNIPING_DUO_SPOTTER_CHOOSE": "(FR TODO) Choose Spotter...",
+      "SNIPING_DUO_DIALOG_TITLE": "(FR TODO) Select Sniping Duo Spotter",
+      "SNIPING_DUO_NONE": "(FR TODO) None",
+      "SNIPING_DUO_PAN": "(FR TODO) Pan to token",
+      "SNIPING_DUO_SPOTTER_NOT_FOUND": "(FR TODO) Sniping Duo: selected spotter not found.",
+      "SNIPING_DUO_COVER_IGNORE_TOOLTIP": "(FR TODO) {FEAT}: {ALLY} does not provide cover for this Strike.",
+      "SNIPING_DUO_COVER_OVERRIDE_UNAVAILABLE": "(FR TODO) {FEAT}: cover override unavailable.",
       "FROM_LINKED_DARKNESS": "(FR TODO) From linked Darkness template",
       "NO_POSITION_CHANGE": "(FR TODO) No position change",
       "SEARCH_WALL_PLACEHOLDER": "(FR TODO) Search by identifier or wall ID...",
@@ -889,6 +899,14 @@
       "ERROR_REMOVING_OVERRIDE": "(FR TODO) Error removing AVS override",
       "ERROR_CLEARING_OVERRIDES": "(FR TODO) Error clearing AVS overrides"
     },
+    "OVERRIDE_INDICATOR": {
+      "TOOLTIP_HEADER": "(FR TODO) change(s) to validate",
+      "TOOLTIP_NEXT": "(FR TODO) Next:",
+      "TOOLTIP_LEFT_CLICK": "(FR TODO) Left-click: open details",
+      "TOOLTIP_RIGHT_CLICK": "(FR TODO) Right-click: accept all",
+      "TOOLTIP_SHIFT_RIGHT_CLICK": "(FR TODO) Shift+Right-click: reject all",
+      "QUEUE_POSITION": "(FR TODO) {current} of {total}"
+    },
     "REGION_BEHAVIOR": {
       "TYPE_LABEL": "(FR TODO) PF2e Visioner Visibility",
       "TYPES": {
@@ -922,7 +940,8 @@
       "POPUP_OVERRIDE": "(FR TODO) Cover overridden via keybind popup: {original} → {final}"
     },
     "FEAT": {
-      "CEASELESS_SHADOWS": "(FR TODO) Ceaseless Shadows"
+      "CEASELESS_SHADOWS": "(FR TODO) Ceaseless Shadows",
+      "SNIPING_DUO_DEDICATION": "(FR TODO) Sniping Duo Dedication"
     },
     "UI_ACTIONS": {
       "MANAGE_VISIBILITY": "(FR TODO) Manage Token Visibility",

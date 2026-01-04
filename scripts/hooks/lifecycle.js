@@ -42,71 +42,71 @@ async function reapplyRuleElementsOnLoad() {
       for (const item of itemsWithRules) {
         const rules = item.system?.rules || [];
 
-          log.debug(() => ({
-            msg: 'Found PF2eVisionerEffect on existing item, reapplying',
-            itemName: item.name,
-            itemType: item.type,
-            actorName: actor.name,
-            tokenId: token.id
-          }));
+        log.debug(() => ({
+          msg: 'Found PF2eVisionerEffect on existing item, reapplying',
+          itemName: item.name,
+          itemType: item.type,
+          actorName: actor.name,
+          tokenId: token.id
+        }));
 
-          let hasAppliedRules = false;
+        let hasAppliedRules = false;
 
-          // Wait for rule elements to be initialized
-          await new Promise(resolve => setTimeout(resolve, 100));
+        // Wait for rule elements to be initialized
+        await new Promise(resolve => setTimeout(resolve, 100));
 
-          for (const rule of rules) {
-            if (rule.key === 'PF2eVisionerEffect') {
-              try {
-                // Try to get the rule element instance from the effect
-                let instance = null;
-                
-                // First try to get from item.ruleElements
-                if (Array.isArray(item.ruleElements)) {
-                  instance = item.ruleElements.find(r => r?.key === rule.key && (r?.slug === rule.slug || !rule.slug));
-                }
-                
-                // If not found, try to create a temporary instance for reapplication
-                if (!instance && game.pf2e?.RuleElements?.custom?.[rule.key]) {
-                  try {
-                    // Deep clone the rule data to make it extensible
-                    const clonedRule = JSON.parse(JSON.stringify(rule));
-                    const RuleElementClass = game.pf2e.RuleElements.custom[rule.key];
-                    instance = new RuleElementClass(clonedRule, item);
-                    log.debug(() => ({ msg: 'Created temporary rule element instance', ruleKey: rule.key }));
-                  } catch (error) {
-                    log.debug(() => ({ msg: 'Failed to create temporary instance', ruleKey: rule.key, error: error.message }));
-                  }
-                }
+        for (const rule of rules) {
+          if (rule.key === 'PF2eVisionerEffect') {
+            try {
+              // Try to get the rule element instance from the effect
+              let instance = null;
 
-                log.debug(() => ({ msg: 'Rule instance lookup', itemName: item.name, ruleKey: rule.key, hasInstance: !!instance, hasApply: !!(instance && typeof instance.applyOperations === 'function') }));
-
-                if (instance && typeof instance.applyOperations === 'function') {
-                  await instance.applyOperations();
-                  hasAppliedRules = true;
-                  log.debug(() => ({
-                    msg: 'Successfully reapplied rule element operations',
-                    ruleKey: rule.key,
-                    itemName: item.name
-                  }));
-                } else {
-                  log.debug(() => ({ msg: 'No applicable instance to apply', itemName: item.name, ruleKey: rule.key }));
-                }
-              } catch (error) {
-                log.warn(() => ({
-                  msg: 'Failed to reapply individual rule',
-                  ruleKey: rule.key,
-                  itemName: item.name,
-                  error: error.message
-                }));
+              // First try to get from item.ruleElements
+              if (Array.isArray(item.ruleElements)) {
+                instance = item.ruleElements.find(r => r?.key === rule.key && (r?.slug === rule.slug || !rule.slug));
               }
+
+              // If not found, try to create a temporary instance for reapplication
+              if (!instance && game.pf2e?.RuleElements?.custom?.[rule.key]) {
+                try {
+                  // Deep clone the rule data to make it extensible
+                  const clonedRule = JSON.parse(JSON.stringify(rule));
+                  const RuleElementClass = game.pf2e.RuleElements.custom[rule.key];
+                  instance = new RuleElementClass(clonedRule, item);
+                  log.debug(() => ({ msg: 'Created temporary rule element instance', ruleKey: rule.key }));
+                } catch (error) {
+                  log.debug(() => ({ msg: 'Failed to create temporary instance', ruleKey: rule.key, error: error.message }));
+                }
+              }
+
+              log.debug(() => ({ msg: 'Rule instance lookup', itemName: item.name, ruleKey: rule.key, hasInstance: !!instance, hasApply: !!(instance && typeof instance.applyOperations === 'function') }));
+
+              if (instance && typeof instance.applyOperations === 'function') {
+                await instance.applyOperations();
+                hasAppliedRules = true;
+                log.debug(() => ({
+                  msg: 'Successfully reapplied rule element operations',
+                  ruleKey: rule.key,
+                  itemName: item.name
+                }));
+              } else {
+                log.debug(() => ({ msg: 'No applicable instance to apply', itemName: item.name, ruleKey: rule.key }));
+              }
+            } catch (error) {
+              log.warn(() => ({
+                msg: 'Failed to reapply individual rule',
+                ruleKey: rule.key,
+                itemName: item.name,
+                error: error.message
+              }));
             }
           }
+        }
 
-          if (hasAppliedRules) {
-            tokensWithRuleElements.push(token.id);
-          }
-        
+        if (hasAppliedRules) {
+          tokensWithRuleElements.push(token.id);
+        }
+
       }
     } catch (error) {
       log.warn(() => ({
@@ -487,6 +487,39 @@ export async function onCanvasReady() {
       console.warn('PF2E Visioner | Failed to hide indicator on scene change:', error);
     }
   });
+
+  // Update override validation indicator when controlled token changes to show accumulated stack
+  Hooks.on('controlToken', async (token, controlled) => {
+    try {
+      const { default: indicator } = await import('../ui/OverrideValidationIndicator.js');
+      if (controlled && token) {
+        const hasOverrides = await checkTokenHasOverrides(token.id);
+        if (hasOverrides) {
+          indicator.addToStack(token.id);
+        }
+      }
+    } catch (error) {
+    }
+  });
+}
+
+async function checkTokenHasOverrides(tokenId) {
+  try {
+    const token = canvas.tokens?.get(tokenId);
+    if (!token) return false;
+    const flags = token.document?.flags?.['pf2e-visioner'] || {};
+    const hasAsTarget = Object.keys(flags).some(k => k.startsWith('avs-override-from-'));
+    if (hasAsTarget) return true;
+    const allTokens = canvas.tokens?.placeables || [];
+    for (const t of allTokens) {
+      if (t?.document?.flags?.['pf2e-visioner']?.[`avs-override-from-${tokenId}`]) {
+        return true;
+      }
+    }
+    return false;
+  } catch {
+    return false;
+  }
 }
 
 async function enableVisionForAllTokensAndPrototypes() {

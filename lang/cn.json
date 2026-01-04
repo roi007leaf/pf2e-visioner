@@ -122,6 +122,7 @@
       "AVS_CLEARED_PLURAL": "接受{count}次自动能见度变更",
       "AVS_ACCEPT_FAILED": "未能接受自动能见度变更"
     },
+    "MACROS": {},
     "SEEK_AUTOMATION": {
       "BUTTON_APPLY": "应用搜索结果",
       "BUTTON_PREVIEW": "预览结果",
@@ -650,6 +651,15 @@
       "TOKEN_COVER_LESSER_TOOLTIP": "次等掩蔽 - 指示物总是提供次等掩蔽",
       "TOKEN_COVER_STANDARD_TOOLTIP": "标准掩蔽 - 指示物总是提供标准掩蔽",
       "TOKEN_COVER_GREATER_TOOLTIP": "高等掩蔽 - 指示物总是提供高等掩蔽",
+      "SNIPING_DUO_SPOTTER_LABEL": "Sniping Duo 观察者",
+      "SNIPING_DUO_SPOTTER_TOOLTIP": "选择你的Sniping Duo观察者（在你们之间进行打击时不应提供掩蔽加值的盟友）。",
+      "SNIPING_DUO_SPOTTER_CHOOSE": "选择观察者…",
+      "SNIPING_DUO_DIALOG_TITLE": "选择Sniping Duo观察者",
+      "SNIPING_DUO_NONE": "无",
+      "SNIPING_DUO_PAN": "移动视角至指示物",
+      "SNIPING_DUO_SPOTTER_NOT_FOUND": "Sniping Duo：未找到所选观察者。",
+      "SNIPING_DUO_COVER_IGNORE_TOOLTIP": "{FEAT}: {ALLY} 不会在这次打击中提供掩护。",
+      "SNIPING_DUO_COVER_OVERRIDE_UNAVAILABLE": "{FEAT}: 无法覆盖掩护。",
       "FROM_LINKED_DARKNESS": "来自链接的黑暗区域测量板",
       "NO_POSITION_CHANGE": "无位置变化",
       "CONNECTED_IDENTIFIERS_PLACEHOLDER": "以半角逗号分隔的标识符",
@@ -885,7 +895,8 @@
       "motion_sense_description": "你能够侦测范围内你周围的运动。"
     },
     "FEAT": {
-      "CEASELESS_SHADOWS": "阴影不绝"
+      "CEASELESS_SHADOWS": "阴影不绝",
+      "SNIPING_DUO_DEDICATION": "Sniping Duo Dedication"
     },
     "AVS_OVERRIDE_DIALOG": {
       "CLEAR_ALL": "清除所有覆盖设置",
@@ -896,6 +907,14 @@
       "ERROR_REMOVING_OVERRIDE": "移除自动能见度覆盖设置时出错",
       "ERROR_CLEARING_OVERRIDES": "清除自动能见度覆盖时出错",
       "ALL_OVERRIDES_CLEARED": "已清除{token}的所有AVS覆盖设置"
+    },
+    "OVERRIDE_INDICATOR": {
+      "TOOLTIP_HEADER": "需验证的更改",
+      "TOOLTIP_NEXT": "下一个：",
+      "TOOLTIP_LEFT_CLICK": "左键单击：打开详情",
+      "TOOLTIP_RIGHT_CLICK": "右键单击：接受全部",
+      "TOOLTIP_SHIFT_RIGHT_CLICK": "Shift+右键单击：拒绝全部",
+      "QUEUE_POSITION": "{current}/{total}"
     },
     "VISIBILITY_FACTORS": {
       "REASONS": {

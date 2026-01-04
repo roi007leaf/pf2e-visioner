@@ -17,15 +17,17 @@ import {
   getTokenVerticalSpanFt,
 } from '../../helpers/size-elevation-utils.js';
 import { doesWallBlockAtElevation } from '../../helpers/wall-height-utils.js';
-import { LevelsIntegration } from '../../services/LevelsIntegration.js';
 import { RuleElementCoverService } from '../../rule-elements/RuleElementCoverService.js';
+import { LevelsIntegration } from '../../services/LevelsIntegration.js';
 
 import { getVisibilityBetween } from '../../utils.js';
+import { getLogger } from '../../utils/logger.js';
 
 export class CoverDetector {
   constructor() {
     this._featUpgradeRecords = new Map();
     this._ruleElementBlocks = new Map();
+    this._snipingDuoRecords = new Map();
   }
   // Define token disposition constants for use within this class
   static TOKEN_DISPOSITIONS = {
@@ -73,7 +75,7 @@ export class CoverDetector {
    * @returns {string} Cover state ('none', 'lesser', 'standard', 'greater')
    */
   detectBetweenTokens(attacker, target, options = {}) {
-    try {      
+    try {
       if (!attacker || !target) return 'none';
 
       // Exclude same token (attacker and target are the same)
@@ -128,11 +130,11 @@ export class CoverDetector {
         // Determine token cover based on intersection mode
         let tokenCover;
         if (intersectionMode === 'tactical') {
-          tokenCover = this._evaluateCoverByTactical(attacker, target, blockers, elevationRange);
+          tokenCover = this._evaluateCoverByTactical(attacker, target, blockers, elevationRange, options.attackContext);
         } else if (intersectionMode === 'coverage') {
-          tokenCover = this._evaluateCoverByCoverage(attacker, target, blockers);
+          tokenCover = this._evaluateCoverByCoverage(attacker, target, blockers, options.attackContext);
         } else {
-          tokenCover = this._evaluateCreatureSizeCover(attacker, target, blockers);
+          tokenCover = this._evaluateCreatureSizeCover(attacker, target, blockers, options.attackContext);
         }
 
         // Apply token cover overrides
@@ -1079,6 +1081,7 @@ export class CoverDetector {
    */
   _getEligibleBlockingTokens(attacker, target, filters) {
     const out = [];
+    const log = getLogger('AutoCover');
 
     for (const blocker of canvas.tokens.placeables) {
       if (!blocker?.actor) continue;
@@ -1110,7 +1113,7 @@ export class CoverDetector {
           if (vis === 'undetected') {
             continue;
           }
-        } catch {}
+        } catch { }
       }
       if (filters.ignoreDead && blocker.actor?.hitPoints?.value === 0) {
         continue;
@@ -1126,7 +1129,7 @@ export class CoverDetector {
           if (isProne) {
             continue;
           }
-        } catch {}
+        } catch { }
       }
       if (filters.ignoreAllies && blocker.actor?.alliance === filters.attackerAlliance) {
         continue;
@@ -1158,6 +1161,254 @@ export class CoverDetector {
     }
 
     return out;
+  }
+
+  _shouldIgnoreBlockerForSnipingDuo(attacker, blocker, attackContext = null) {
+    try {
+      if (!attacker?.actor || !blocker?.actor) return false;
+
+      // Only apply to Strikes
+      const strikeOk = !attackContext || this._isStrikeAttackContext(attackContext);
+      if (!strikeOk) {
+        const log = getLogger('AutoCover');
+        const attackerActor = attacker.actor;
+        const blockerActor = blocker.actor;
+        const attackerKey = this._getActorKey(attackerActor);
+        const blockerKey = this._getActorKey(blockerActor);
+        const spotterKey = FeatsHandler.hasFeat(attacker, 'sniping-duo-dedication')
+          ? this._readActorFlag(attackerActor, 'snipingDuoSpotterActorUuid')
+          : null;
+        const sniperKey = this._readActorFlag(attackerActor, 'snipingDuoSniperActorUuid');
+        const nBlocker = this._normalizeActorKey(blockerKey);
+        const nSpotter = this._normalizeActorKey(spotterKey);
+        const nSniper = this._normalizeActorKey(sniperKey);
+        const candidate = !!(
+          nBlocker?.id &&
+          (nBlocker.id === nSpotter?.id || nBlocker.id === nSniper?.id)
+        );
+
+        if (candidate) {
+          log.debug('Sniping Duo: strike context not detected; not ignoring blocker', () => ({
+            attackerName: attacker?.name,
+            attackerActorKey: attackerKey,
+            blockerName: blocker?.name,
+            blockerActorKey: blockerKey,
+            spotterKey,
+            sniperKey,
+            attackContextType: attackContext?.type ?? null,
+            attackContextOptions: this._formatRollOptionsForLog(attackContext?.options),
+            attackContextDomains: Array.isArray(attackContext?.domains)
+              ? attackContext.domains.slice(0, 20)
+              : null,
+            itemName: attackContext?.item?.name ?? null,
+          }));
+        }
+      }
+      if (attackContext && !strikeOk) return false;
+
+      const attackerActor = attacker.actor;
+      const blockerActor = blocker.actor;
+      const attackerKey = this._getActorKey(attackerActor);
+      const blockerKey = this._getActorKey(blockerActor);
+      if (!attackerKey || !blockerKey) return false;
+
+      // Case A: attacker is the sniper (has dedication) and blocker is the designated spotter
+      const attackerHasDedication = FeatsHandler.hasFeat(attacker, 'sniping-duo-dedication');
+      const spotterKey = attackerHasDedication
+        ? this._readActorFlag(attackerActor, 'snipingDuoSpotterActorUuid')
+        : null;
+      if (attackerHasDedication) {
+        if (spotterKey && this._actorKeysMatch(spotterKey, blockerKey)) return true;
+      }
+
+      // Case B: attacker is the spotter. Ignore cover from the sniper if there's a verified link.
+      const sniperKey = this._readActorFlag(attackerActor, 'snipingDuoSniperActorUuid');
+      if (!sniperKey || !this._actorKeysMatch(sniperKey, blockerKey)) return false;
+
+      const sniperToken = this._findTokenByActorKey(sniperKey);
+      if (!sniperToken?.actor) return false;
+      if (!FeatsHandler.hasFeat(sniperToken, 'sniping-duo-dedication')) return false;
+
+      const sniperSpotterKey = this._readActorFlag(sniperToken.actor, 'snipingDuoSpotterActorUuid');
+      return !!(sniperSpotterKey && this._actorKeysMatch(sniperSpotterKey, attackerKey));
+    } catch {
+      return false;
+    }
+  }
+
+  _recordSnipingDuoIgnoredBlocker(attacker, target, blocker) {
+    const log = getLogger('AutoCover');
+    try {
+      const aId = attacker?.id;
+      const tId = target?.id;
+      if (!aId || !tId) return;
+      const key = `${aId}:${tId}`;
+      if (!this._snipingDuoRecords.has(key)) {
+        this._snipingDuoRecords.set(key, {
+          feat: 'sniping-duo-dedication',
+          ignoredTokenId: blocker?.id ?? null,
+          ignoredTokenName: blocker?.name ?? null,
+          ts: Date.now(),
+        });
+      }
+    } catch { }
+
+    log.debug('Sniping Duo: ignored blocker', () => ({
+      attackerTokenId: attacker?.id,
+      attackerName: attacker?.name,
+      attackerActorKey: this._getActorKey(attacker?.actor),
+      blockerTokenId: blocker?.id,
+      blockerName: blocker?.name,
+      blockerActorKey: this._getActorKey(blocker?.actor),
+    }));
+  }
+
+  _formatRollOptionsForLog(rollOptions) {
+    try {
+      const arr = Array.isArray(rollOptions)
+        ? rollOptions
+        : rollOptions instanceof Set
+          ? Array.from(rollOptions)
+          : [];
+      return arr.slice(0, 50);
+    } catch {
+      return null;
+    }
+  }
+
+  _isStrikeAttackContext(attackContext) {
+    try {
+      if (!attackContext) return false;
+      if (attackContext.type === 'strike-attack-roll') return true;
+
+      const rollOptions = attackContext?.options;
+      const optionsArray = Array.isArray(rollOptions)
+        ? rollOptions
+        : rollOptions instanceof Set
+          ? Array.from(rollOptions)
+          : [];
+
+      if (optionsArray.includes('action:strike')) return true;
+
+      return false;
+    } catch {
+      return false;
+    }
+  }
+
+  _isRangedAttackContext(attackContext) {
+    try {
+      const rollOptions = attackContext?.options;
+      if (rollOptions) {
+        const optionsArray = Array.isArray(rollOptions)
+          ? rollOptions
+          : rollOptions instanceof Set
+            ? Array.from(rollOptions)
+            : [];
+
+        const hasAnyExact = (opts) => opts.some((o) => optionsArray.includes(o));
+        if (
+          hasAnyExact([
+            'attack:ranged',
+            'attack:trait:ranged',
+            'item:ranged',
+            'item:trait:ranged',
+            'ranged',
+          ])
+        ) {
+          return true;
+        }
+
+        // Best-effort: some contexts encode ranged-ness in a longer option string.
+        if (optionsArray.some((o) => typeof o === 'string' && (o.startsWith('attack:ranged') || o.endsWith(':ranged')))) {
+          return true;
+        }
+      }
+
+      const item = attackContext?.item;
+      if (item) {
+        if (item?.isRanged === true) return true;
+        if (item?.isMelee === true) return false;
+
+        const category = item.system?.category;
+        if (
+          category === 'simple-ranged' ||
+          category === 'martial-ranged' ||
+          category === 'advanced-ranged' ||
+          category === 'unarmed-ranged'
+        ) {
+          return true;
+        }
+
+        const traits = item.system?.traits?.value || [];
+        if (Array.isArray(traits) && traits.includes('ranged')) return true;
+
+        const rangeRaw = item.system?.range ?? null;
+        const range =
+          (rangeRaw && typeof rangeRaw === 'object' ? (rangeRaw.value ?? rangeRaw.increment ?? null) : rangeRaw) ??
+          item.system?.rangeIncrement ??
+          null;
+        if (range != null && Number(range) > 0) return true;
+      }
+    } catch {
+      return false;
+    }
+    return false;
+  }
+
+  _readActorFlag(actor, key) {
+    try {
+      return actor?.getFlag?.(MODULE_ID, key) ?? actor?.flags?.[MODULE_ID]?.[key] ?? null;
+    } catch {
+      return null;
+    }
+  }
+
+  _getActorKey(actor) {
+    try {
+      return actor?.uuid || actor?.id || null;
+    } catch {
+      return null;
+    }
+  }
+
+  _actorKeysMatch(a, b) {
+    try {
+      const na = this._normalizeActorKey(a);
+      const nb = this._normalizeActorKey(b);
+      return !!(na && nb && (na.raw === nb.raw || na.id === nb.id));
+    } catch {
+      return false;
+    }
+  }
+
+  _normalizeActorKey(key) {
+    try {
+      const raw = String(key || '').trim();
+      if (!raw) return null;
+      const parts = raw.split('.');
+      const id = parts[parts.length - 1] || raw;
+      return { raw, id };
+    } catch {
+      return null;
+    }
+  }
+
+  _findTokenByActorKey(actorKey) {
+    try {
+      const key = this._normalizeActorKey(actorKey);
+      if (!key) return null;
+      const tokens = canvas?.tokens?.placeables || [];
+      for (const t of tokens) {
+        const a = t?.actor;
+        if (!a) continue;
+        const tKey = this._getActorKey(a);
+        if (tKey && this._actorKeysMatch(key.raw, tKey)) return t;
+      }
+      return null;
+    } catch {
+      return null;
+    }
   }
 
   /**
@@ -1301,7 +1552,7 @@ export class CoverDetector {
    * @returns {string} Cover state ('none', 'lesser', 'standard', 'greater')
    * @private
    */
-  _evaluateCreatureSizeCover(attacker, target, blockers) {
+  _evaluateCreatureSizeCover(attacker, target, blockers, attackContext = null) {
     try {
       if (!attacker || !target) return 'none';
 
@@ -1336,6 +1587,11 @@ export class CoverDetector {
         )
           continue;
 
+        if (this._shouldIgnoreBlockerForSnipingDuo(attacker, blocker, attackContext)) {
+          this._recordSnipingDuoIgnoredBlocker(attacker, target, blocker);
+          continue;
+        }
+
         any = true;
         const blockerSize = getSizeRank(blocker);
         const sizeDiffAttacker = blockerSize - attackerSize;
@@ -1369,10 +1625,10 @@ export class CoverDetector {
                 hasBlockerWithOverride,
               });
             }
-          } catch {}
+          } catch { }
         }
         finalState = upgraded;
-      } catch {}
+      } catch { }
       return finalState;
     } catch (error) {
       console.error('PF2E Visioner | Error in evaluateCreatureSizeCover:', error);
@@ -1403,6 +1659,31 @@ export class CoverDetector {
     } catch { return null; }
   }
 
+  consumeSnipingDuoCoverIgnore(attackerId, targetId) {
+    try {
+      const key = `${attackerId}:${targetId}`;
+      if (!this._snipingDuoRecords.has(key)) return null;
+      const rec = this._snipingDuoRecords.get(key);
+      this._snipingDuoRecords.delete(key);
+      if (!rec?.ts || Date.now() - rec.ts > 15000) return null;
+      return rec;
+    } catch {
+      return null;
+    }
+  }
+
+  peekSnipingDuoCoverIgnore(attackerId, targetId) {
+    try {
+      const key = `${attackerId}:${targetId}`;
+      if (!this._snipingDuoRecords.has(key)) return null;
+      const rec = this._snipingDuoRecords.get(key);
+      if (!rec?.ts || Date.now() - rec.ts > 15000) return null;
+      return rec;
+    } catch {
+      return null;
+    }
+  }
+
   // Using segmentIntersectsRect from geometry-utils.js instead of _rayIntersectRect
 
   /**
@@ -1411,10 +1692,11 @@ export class CoverDetector {
    * @param {Object} target
    * @param {Array} blockers
    * @param {Object} elevationRange - Optional elevation range {bottom, top} for wall height filtering
+   * @param {Object|null} attackContext - Optional PF2e roll context
    * @returns {string}
    * @private
    */
-  _evaluateCoverByTactical(attacker, target, blockers, elevationRange = null) {
+  _evaluateCoverByTactical(attacker, target, blockers, elevationRange = null, attackContext = null) {
     // Tactical mode: corner-to-corner calculations
     // Choose the best corner of the attacker and check lines from all target corners to that corner
     // This matches the "choose a corner" tactical rule
@@ -1458,6 +1740,10 @@ export class CoverDetector {
               blockerRect,
             );
             if (intersectionLength > 0) {
+              if (this._shouldIgnoreBlockerForSnipingDuo(attacker, blocker, attackContext)) {
+                this._recordSnipingDuoIgnoredBlocker(attacker, target, blocker);
+                continue;
+              }
               lineBlocked = true;
               break;
             }
@@ -1485,15 +1771,7 @@ export class CoverDetector {
     return bestCover;
   }
 
-  /**
-   * Evaluate cover by coverage percentage
-   * @param {Object} attacker
-   * @param {Object} target
-   * @param {Array} blockers
-   * @returns {string}
-   * @private
-   */
-  _evaluateCoverByCoverage(attacker, target, blockers) {
+  _evaluateCoverByCoverage(attacker, target, blockers, attackContext = null) {
     try {
       // If no blockers, no cover
       if (!blockers.length) return 'none';
@@ -1502,23 +1780,24 @@ export class CoverDetector {
       const p1 = attacker.center ?? attacker.getCenterPoint();
       const p2 = target.center ?? target.getCenterPoint();
 
-      // Calculate total coverage by all blockers
-      let totalCoverage = 0;
+      const coverOrder = ['none', 'lesser', 'standard', 'greater'];
+      let bestCover = 'none';
 
       for (const blocker of blockers) {
-        // Calculate coverage contribution of this blocker
-        const coverage = this._calculateCoverageByBlocker(p1, p2, [blocker]);
-        totalCoverage += coverage;
+        const perBlocker = this._calculateCoverageByBlocker(p1, p2, [blocker]);
+        if (!perBlocker || perBlocker === 'none') continue;
+
+        if (this._shouldIgnoreBlockerForSnipingDuo(attacker, blocker, attackContext)) {
+          this._recordSnipingDuoIgnoredBlocker(attacker, target, blocker);
+          continue;
+        }
+
+        if (coverOrder.indexOf(perBlocker) > coverOrder.indexOf(bestCover)) {
+          bestCover = perBlocker;
+        }
       }
 
-      // Cap total coverage at 100%
-      totalCoverage = Math.min(totalCoverage, 100);
-
-      // Determine cover based on percentage
-      if (totalCoverage >= 75) return 'greater';
-      if (totalCoverage >= 50) return 'standard';
-      if (totalCoverage >= 20) return 'lesser';
-      return 'none';
+      return bestCover;
     } catch (error) {
       console.error('PF2E Visioner | Error in evaluateCoverByCoverage:', error);
       return 'none';

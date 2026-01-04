@@ -108,7 +108,8 @@
       "POPUP_OVERRIDE": "Cover overridden via keybind popup: {original} → {final}"
     },
     "FEAT": {
-      "CEASELESS_SHADOWS": "Ceaseless Shadows"
+      "CEASELESS_SHADOWS": "Ceaseless Shadows",
+      "SNIPING_DUO_DEDICATION": "Sniping Duo Dedication"
     },
     "AVS_OVERRIDE_DIALOG": {
       "NO_OVERRIDES": "No AVS overrides are currently active for this token.",
@@ -119,6 +120,14 @@
       "ALL_OVERRIDES_CLEARED": "All AVS overrides cleared for {token}",
       "ERROR_REMOVING_OVERRIDE": "Error removing AVS override",
       "ERROR_CLEARING_OVERRIDES": "Error clearing AVS overrides"
+    },
+    "OVERRIDE_INDICATOR": {
+      "TOOLTIP_HEADER": "change(s) to validate",
+      "TOOLTIP_NEXT": "Next:",
+      "TOOLTIP_LEFT_CLICK": "Left-click: open details",
+      "TOOLTIP_RIGHT_CLICK": "Right-click: accept all",
+      "TOOLTIP_SHIFT_RIGHT_CLICK": "Shift+Right-click: reject all",
+      "QUEUE_POSITION": "{current} of {total}"
     },
     "VISUAL_EFFECTS": {
       "CONCEALED_OVERLAY": "This token is concealed from you",
@@ -204,6 +213,7 @@
       "NO_VALID_CONSEQUENCES": "No valid targets found for Attack Consequences. you can only see consequences if you are Hidden or Undetected from at least one observer.",
       "SNEAK_DEFERRED_RESTORED": "Restored {count} token(s) to original deferred state with all position data"
     },
+    "MACROS": {},
     "DIALOG_TITLES": {
       "HIDE_RESULTS": "Hide Results",
       "POINT_OUT_RESULTS": "Point Out Results",
@@ -1012,6 +1022,15 @@
       "ENCOUNTER_MASTER_PAN": "Pan to token",
       "ENCOUNTER_MASTER_SELECT": "Select",
       "ENCOUNTER_MASTER_CHOOSE": "Choose Master...",
+      "SNIPING_DUO_SPOTTER_LABEL": "Sniping Duo Spotter",
+      "SNIPING_DUO_SPOTTER_TOOLTIP": "Choose your Sniping Duo spotter (the ally who should not provide cover for Strikes between you).",
+      "SNIPING_DUO_SPOTTER_CHOOSE": "Choose Spotter...",
+      "SNIPING_DUO_DIALOG_TITLE": "Select Sniping Duo Spotter",
+      "SNIPING_DUO_NONE": "None",
+      "SNIPING_DUO_PAN": "Pan to token",
+      "SNIPING_DUO_SPOTTER_NOT_FOUND": "Sniping Duo: selected spotter not found.",
+      "SNIPING_DUO_COVER_IGNORE_TOOLTIP": "{FEAT}: {ALLY} does not provide cover for this Strike.",
+      "SNIPING_DUO_COVER_OVERRIDE_UNAVAILABLE": "{FEAT}: cover override unavailable.",
       "FROM_LINKED_DARKNESS": "From linked Darkness template",
       "NO_POSITION_CHANGE": "No position change",
       "SEARCH_WALL_PLACEHOLDER": "Search by identifier or wall ID...",

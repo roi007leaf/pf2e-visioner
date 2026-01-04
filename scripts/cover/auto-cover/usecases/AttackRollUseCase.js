@@ -123,6 +123,25 @@ class AttackRollUseCase extends BaseAutoCoverUseCase {
     } catch (e) {
       console.warn('PF2E Visioner | Error storing rule element blocks:', e);
     }
+
+    try {
+      const snipingDuoCoverIgnore = coverDetector.consumeSnipingDuoCoverIgnore(
+        speakerTokenId,
+        targetTokenId,
+      );
+      if (snipingDuoCoverIgnore) {
+        if (!data.flags) data.flags = {};
+        if (!data.flags['pf2e-visioner']) data.flags['pf2e-visioner'] = {};
+        data.flags['pf2e-visioner'].snipingDuoCoverIgnore = snipingDuoCoverIgnore;
+        if (doc && doc.updateSource) {
+          try {
+            doc.updateSource({
+              'flags.pf2e-visioner.snipingDuoCoverIgnore': snipingDuoCoverIgnore,
+            });
+          } catch (_) { }
+        }
+      }
+    } catch (_) { }
   }
 
   /**
@@ -140,6 +159,8 @@ class AttackRollUseCase extends BaseAutoCoverUseCase {
     const manualCover = getCoverBetween(attacker, target);
     let state = this._detectCover(attacker, target, ctx);
 
+    const snipingDuoCoverIgnore = coverDetector.peekSnipingDuoCoverIgnore(attacker.id, target.id);
+
     // Delegate dialog UI injection to CoverUIManager
     try {
       await this.coverUIManager.injectDialogCoverUI(
@@ -148,6 +169,7 @@ class AttackRollUseCase extends BaseAutoCoverUseCase {
         state,
         target,
         manualCover,
+        snipingDuoCoverIgnore,
         ({ chosen, dctx, target: tgt, targetActor: tgtActor }) => {
           try {
             if (attacker && target && manualCover === 'none' && chosen !== state) {

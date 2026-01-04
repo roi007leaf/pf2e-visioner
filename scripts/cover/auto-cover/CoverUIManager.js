@@ -22,65 +22,94 @@ export class CoverUIManager {
    * @param {(args: { chosen: string, dialog: any, dctx: any, subject: Token|null, target: Token|null, targetActor: Actor|null, originalState: string }) => void} [onChosen]
    *        Optional callback to handle chosen state on roll. If omitted, a default AC effect + override store is applied.
    */
-  async injectDialogCoverUI(dialog, html, state, target, manualCover, onChosen) {
+  async injectDialogCoverUI(dialog, html, state, target, manualCover, snipingDuoCoverIgnoreOrOnChosen, maybeOnChosen) {
     try {
+      const snipingDuoCoverIgnore =
+        typeof snipingDuoCoverIgnoreOrOnChosen === 'function' ? null : snipingDuoCoverIgnoreOrOnChosen;
+      const onChosen =
+        typeof snipingDuoCoverIgnoreOrOnChosen === 'function'
+          ? snipingDuoCoverIgnoreOrOnChosen
+          : maybeOnChosen;
+
+      const allowOverride = manualCover === 'none' && !snipingDuoCoverIgnore;
+
       if (html?.find?.('.pv-cover-override').length === 0) {
         const current = dialog?._pvCoverOverride ?? state ?? 'none';
+        const snipingMsg = (() => {
+          try {
+            const featName =
+              game.i18n?.localize?.('PF2E_VISIONER.FEAT.SNIPING_DUO_DEDICATION') ||
+              'Sniping Duo Dedication';
+            const ally = snipingDuoCoverIgnore?.ignoredTokenName || '';
+            return (
+              game.i18n?.localize?.('PF2E_VISIONER.UI.SNIPING_DUO_COVER_OVERRIDE_UNAVAILABLE')
+                ?.replace?.('{FEAT}', featName)
+                ?.replace?.('{ALLY}', ally) ||
+              `${featName}: cover override unavailable`
+            );
+          } catch {
+            return 'Sniping Duo: cover override unavailable';
+          }
+        })();
         const container = $(`
                   <div class="pv-cover-override" style="margin: 6px 0 8px 0;">
                     <div class="pv-cover-row" style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
                       <div class="pv-cover-title" style="font-weight:600;">${game.i18n?.localize?.('PF2E_VISIONER.UI.COVER_OVERRIDE') ?? 'Cover'}</div>
-                      ${manualCover === 'none' ? '<div class="pv-cover-buttons" style="display:flex; gap:6px;"></div>' : '<div class="pv-cover-manual" style="display:flex;">Manual cover detected, override unavailable</div>'}
+                      ${allowOverride ? '<div class="pv-cover-buttons" style="display:flex; gap:6px;"></div>' : `<div class="pv-cover-manual" style="display:flex;">${manualCover !== 'none' ? 'Manual cover detected, override unavailable' : snipingMsg}</div>`}
                     </div>
                   </div>
                 `);
-        const btns = container.find('.pv-cover-buttons');
-        const states = ['none', 'lesser', 'standard', 'greater'];
-        for (const s of states) {
-          const label = getCoverLabel(s);
-          const bonus = getCoverBonusByState(s);
-          const isActive = s === current;
-          const cfg = COVER_STATES?.[s] || {};
-          const iconClass =
-            cfg.icon ||
-            (s === 'none'
-              ? 'fas fa-shield-slash'
-              : s === 'lesser'
-                ? 'fa-regular fa-shield'
-                : s === 'standard'
-                  ? 'fas fa-shield-alt'
-                  : 'fas fa-shield');
-          const color = cfg.color || 'inherit';
-          const tooltip = `${label}${bonus > 0 ? ` (+${bonus})` : ''}`;
-          const btn = $(`
+        if (allowOverride) {
+          const btns = container.find('.pv-cover-buttons');
+          const states = ['none', 'lesser', 'standard', 'greater'];
+          for (const s of states) {
+            const label = getCoverLabel(s);
+            const bonus = getCoverBonusByState(s);
+            const isActive = s === current;
+            const cfg = COVER_STATES?.[s] || {};
+            const iconClass =
+              cfg.icon ||
+              (s === 'none'
+                ? 'fas fa-shield-slash'
+                : s === 'lesser'
+                  ? 'fa-regular fa-shield'
+                  : s === 'standard'
+                    ? 'fas fa-shield-alt'
+                    : 'fas fa-shield');
+            const color = cfg.color || 'inherit';
+            const tooltip = `${label}${bonus > 0 ? ` (+${bonus})` : ''}`;
+            const btn = $(`
                         <button type="button" class="pv-cover-btn" data-state="${s}" data-tooltip="${tooltip}" data-tooltip-direction="UP" aria-label="${tooltip}" style="width:28px; height:28px; padding:0; line-height:0; border:1px solid rgba(255,255,255,0.2); border-radius:6px; background:${isActive ? 'var(--color-bg-tertiary, rgba(0,0,0,0.2))' : 'transparent'}; color:inherit; cursor:pointer; display:inline-flex; align-items:center; justify-content:center;">
                           <i class="${iconClass}" style="color:${color}; display:block; width:18px; height:18px; line-height:18px; text-align:center; font-size:16px; margin:0;"></i>
                         </button>
                     `);
-          if (isActive) btn.addClass('active');
-          btns.append(btn);
+            if (isActive) btn.addClass('active');
+            btns.append(btn);
+          }
         }
 
         const anchor = html.find('.roll-mode-panel');
         if (anchor.length > 0) anchor.before(container);
         else html.find('.dialog-buttons').before(container);
         dialog.setPosition();
-        container.on('click', '.pv-cover-btn', (ev) => {
-          try {
-            const btn = ev.currentTarget;
-            const sel = btn?.dataset?.state || 'none';
-            dialog._pvCoverOverride = sel;
-            container.find('.pv-cover-btn').each((_, el) => {
-              const active = el.dataset?.state === sel;
-              el.classList.toggle('active', active);
-              el.style.background = active
-                ? 'var(--color-bg-tertiary, rgba(0,0,0,0.2))'
-                : 'transparent';
-            });
-          } catch (e) {
-            console.error('PF2E Visioner | Error in cover override button click:', e);
-          }
-        });
+        if (allowOverride) {
+          container.on('click', '.pv-cover-btn', (ev) => {
+            try {
+              const btn = ev.currentTarget;
+              const sel = btn?.dataset?.state || 'none';
+              dialog._pvCoverOverride = sel;
+              container.find('.pv-cover-btn').each((_, el) => {
+                const active = el.dataset?.state === sel;
+                el.classList.toggle('active', active);
+                el.style.background = active
+                  ? 'var(--color-bg-tertiary, rgba(0,0,0,0.2))'
+                  : 'transparent';
+              });
+            } catch (e) {
+              console.error('PF2E Visioner | Error in cover override button click:', e);
+            }
+          });
+        }
       }
 
       // Ensure current roll uses selected (or auto) cover via dialog injection
@@ -99,7 +128,9 @@ export class CoverUIManager {
                 const chosen =
                   manualCover !== 'none'
                     ? manualCover
-                    : (dialog?._pvCoverOverride ?? state ?? 'none');
+                    : snipingDuoCoverIgnore
+                      ? (state ?? 'none')
+                      : (dialog?._pvCoverOverride ?? state ?? 'none');
                 const subjectToken = dctx?.actor?.token;
                 const subjectActor = dctx?.actor || null;
 
@@ -211,6 +242,7 @@ export class CoverUIManager {
       let overrideInfo = message?.flags?.['pf2e-visioner']?.coverOverride;
       let featUpgradeInfo = message?.flags?.['pf2e-visioner']?.coverFeatUpgrade;
       let ruleElementBlocks = message?.flags?.['pf2e-visioner']?.ruleElementBlocks;
+      let snipingDuoCoverIgnore = message?.flags?.['pf2e-visioner']?.snipingDuoCoverIgnore;
 
       // Also check for manual cover by examining the message for token references
       let manualCoverInfo = null;
@@ -248,7 +280,7 @@ export class CoverUIManager {
       }
 
       // If no override info and no manual cover, nothing to show
-      if (!overrideInfo && !manualCoverInfo && !featUpgradeInfo && !ruleElementBlocks) {
+      if (!overrideInfo && !manualCoverInfo && !featUpgradeInfo && !ruleElementBlocks && !snipingDuoCoverIgnore) {
         return;
       }
 
@@ -258,7 +290,7 @@ export class CoverUIManager {
 
       // Check if indicator already exists to avoid duplicates
       if (
-        $html.find('.pf2e-visioner-cover-override-indicator, .pf2e-visioner-cover-manual-indicator, .pf2e-visioner-cover-feat-indicator, .pf2e-visioner-cover-rule-element-indicator')
+        $html.find('.pf2e-visioner-cover-override-indicator, .pf2e-visioner-cover-manual-indicator, .pf2e-visioner-cover-feat-indicator, .pf2e-visioner-cover-rule-element-indicator, .pf2e-visioner-cover-sniping-duo-indicator')
           .length > 0
       ) {
         return;
@@ -466,6 +498,54 @@ export class CoverUIManager {
         } catch (e) { }
       }
 
+      if (snipingDuoCoverIgnore) {
+        try {
+          const featName =
+            game.i18n?.localize?.('PF2E_VISIONER.FEAT.SNIPING_DUO_DEDICATION') ||
+            'Sniping Duo Dedication';
+          const ally = snipingDuoCoverIgnore?.ignoredTokenName || '';
+          const tooltip =
+            game.i18n?.localize?.('PF2E_VISIONER.UI.SNIPING_DUO_COVER_IGNORE_TOOLTIP')
+              ?.replace?.('{FEAT}', featName)
+              ?.replace?.('{ALLY}', ally) ||
+            `${featName}: ${ally ? `${ally} ` : ''}ignored for cover`;
+
+          indicatorHtml += `
+                 <span class="pf2e-visioner-cover-sniping-duo-indicator" style="
+                   margin-left: 4px;
+                   padding: 2px 4px;
+                   background: rgba(46, 204, 113, 0.12);
+                   border-radius: 3px;
+                   font-size: 1em;
+                   display: inline-flex;
+                   align-items: center;
+                   gap: 3px;
+                   vertical-align: middle;
+                   border: 1px solid rgba(46, 204, 113, 0.25);
+                 ">
+                   <i class="fas fa-crosshairs" style="
+                     color: rgb(46, 204, 113);
+                     font-size: 0.7em;
+                     opacity: 0.85;
+                   "></i>
+                   <span 
+                     data-tooltip="${tooltip}"
+                     data-tooltip-direction="UP"
+                     style="
+                       color: rgb(46, 204, 113);
+                       cursor: help;
+                       display: inline-flex;
+                       align-items: center;
+                       filter: brightness(0.9);
+                       font-size: 0.8em;
+                     "
+                   >
+                     <i class="fas fa-shield-slash" style="font-size: 0.9em;"></i>
+                   </span>
+                 </span>`;
+        } catch (e) { }
+      }
+
       if (!indicatorHtml) return;
 
       // Find the specific AC span element (the adjusted AC value)
@@ -546,6 +626,7 @@ export class CoverUIManager {
       const hasOverride = !!message?.flags?.['pf2e-visioner']?.coverOverride;
       const hasFeatUpgrade = !!message?.flags?.['pf2e-visioner']?.coverFeatUpgrade;
       const hasRuleElementBlocks = !!message?.flags?.['pf2e-visioner']?.ruleElementBlocks;
+      const hasSnipingDuoCoverIgnore = !!message?.flags?.['pf2e-visioner']?.snipingDuoCoverIgnore;
 
       // Also check for manual cover
       let hasManualCover = false;
@@ -572,7 +653,7 @@ export class CoverUIManager {
         );
       }
 
-      return hasOverride || hasManualCover || hasFeatUpgrade || hasRuleElementBlocks;
+      return hasOverride || hasManualCover || hasFeatUpgrade || hasRuleElementBlocks || hasSnipingDuoCoverIgnore;
     } catch (e) {
       console.warn('PF2E Visioner | Error in shouldShowCoverOverrideIndicator:', e);
       return false;
