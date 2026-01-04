@@ -24,6 +24,8 @@ class OverrideValidationIndicator {
     this._data = null; // { overrides: [], tokenName }
     // Keep the raw list passed in (unfiltered) so clearAll can remove overrides even when display filters hide them
     this._rawOverrides = [];
+    this._overrideStack = new Map(); // tokenId -> { overrides, tokenName, timestamp }
+    this._currentTokenId = null;
     this._drag = { active: false, start: { x: 0, y: 0 }, offset: { x: 0, y: 0 }, moved: false };
     // Guard against rapid show->hide flicker when recomputations settle to 0
     this._lastShowAt = 0; // ms timestamp of last show() with non-empty items
@@ -92,6 +94,7 @@ class OverrideValidationIndicator {
   }
 
   show(overrideData, tokenName, movedTokenId = null, options = {}) {
+    console.log(`PF2E Visioner | Queue: show() called - tokenName: ${tokenName}, movedTokenId: ${movedTokenId}, overrides: ${Array.isArray(overrideData) ? overrideData.length : 0}`);
     try {
       const avsOnlyInCombat = game.settings.get(MODULE_ID, 'avsOnlyInCombat');
       if (avsOnlyInCombat) {
@@ -110,34 +113,216 @@ class OverrideValidationIndicator {
     this._rawOverrides = all;
     // Filter for display: show only entries that actually changed (visibility or cover) and handle sneak filtering
     const overrides = all.filter((o) => this.#hasDisplayChange(o) && this.#shouldShowOverride(o));
-    // Do not show indicator if there are no override details
-    if (!overrides.length) {
-      // If we just showed with items, avoid immediate hide flicker; let caller decide to force-hide
+    console.log(`PF2E Visioner | Queue: show() - all overrides: ${all.length}, filtered: ${overrides.length}`);
+
+    if (movedTokenId && overrides.length > 0) {
+      const alreadyInQueue = this._overrideStack.has(movedTokenId);
+      const isCurrentlyShown = this._currentTokenId === movedTokenId;
+      if (alreadyInQueue) {
+        console.log(`PF2E Visioner | Queue: Token ${movedTokenId} (${tokenName}) already in queue, updating data without re-ordering.`);
+      } else {
+        console.log(`PF2E Visioner | Queue: Adding new token ${movedTokenId} (${tokenName}) to end of queue.`);
+      }
+      this._overrideStack.set(movedTokenId, {
+        overrides: all,
+        tokenName,
+        timestamp: Date.now()
+      });
+      console.log(`PF2E Visioner | Queue: Queue size: ${this._overrideStack.size}`);
+      if (!alreadyInQueue || !isCurrentlyShown) {
+        console.log(`PF2E Visioner | Queue: Showing indicator for ${movedTokenId}`);
+        this.#showStackedIndicator();
+      } else {
+        console.log(`PF2E Visioner | Queue: Token ${movedTokenId} already displayed, skipping re-show.`);
+        this.#updateBadge();
+        this.#updateQueueBadge();
+      }
+    } else if (this._overrideStack.size > 0) {
+      console.log(`PF2E Visioner | Queue: show() called without movedTokenId, but queue has ${this._overrideStack.size} items. Showing from queue.`);
+      this.#showStackedIndicator();
+    } else {
+      console.log('PF2E Visioner | Queue: Empty queue, showing direct.');
+      this.#showDirect(overrides, all, tokenName);
+    }
+  }
+
+  #showDirect(overrides, rawOverrides, tokenName) {
+    if (overrides.length === 0) {
       if (Date.now() - this._lastShowAt < this._minVisibleMs) return;
       this.hide(true);
       return;
     }
-    // Ensure latest styles are injected or refreshed (hot-reload safe)
+
+    this._rawOverrides = rawOverrides;
     this.#ensureStyles();
-    const pulse = options?.pulse !== undefined ? !!options.pulse : true;
-    this._data = { overrides, tokenName, movedTokenId, pulse };
+    this._data = { overrides, tokenName, movedTokenId: null, pulse: false };
     if (!this._el) this.#createElement();
     this.#updateBadge();
     this._el.classList.add('pf2e-visioner-override-indicator--visible');
-    this._el.classList.toggle('pulse', !!pulse);
-    // Remember that we showed with N items now
+    this._el.classList.remove('pulse');
     this._lastShowAt = Date.now();
     this._lastCount = overrides.length;
   }
 
+  #showStackedIndicator() {
+    // First, clean up entries with no valid overrides
+    console.log(`PF2E Visioner | Queue: #showStackedIndicator() - Starting cleanup. Current queue:`, Array.from(this._overrideStack.keys()));
+    for (const [tokenId, data] of Array.from(this._overrideStack.entries())) {
+      const filtered = data.overrides.filter((o) => this.#hasDisplayChange(o) && this.#shouldShowOverride(o));
+      if (filtered.length === 0) {
+        console.log(`PF2E Visioner | Queue: Cleaning up ${tokenId} (${data.tokenName}) - no valid overrides`);
+        this._overrideStack.delete(tokenId);
+      }
+    }
+
+    const entries = Array.from(this._overrideStack.entries());
+    console.log(`PF2E Visioner | Queue: #showStackedIndicator() - Queue size: ${entries.length}, entries:`, entries.map(([id, d]) => `${id}:${d.tokenName}`));
+    if (entries.length === 0) {
+      console.log('PF2E Visioner | Queue: Empty, hiding.');
+      this.hide(true);
+      return;
+    }
+
+    const [currentTokenId, currentData] = entries[entries.length - 1];
+    console.log(`PF2E Visioner | Queue: Showing last entry (LIFO): ${currentTokenId} (${currentData.tokenName})`);
+    const filtered = currentData.overrides.filter((o) => this.#hasDisplayChange(o) && this.#shouldShowOverride(o));
+
+    if (filtered.length === 0) {
+      console.log(`PF2E Visioner | Queue: No valid overrides for ${currentTokenId}, removing and recursing.`);
+      this._overrideStack.delete(currentTokenId);
+      this.#showStackedIndicator();
+      return;
+    }
+
+    this._rawOverrides = currentData.overrides;
+    this._currentTokenId = currentTokenId;
+
+    this.#ensureStyles();
+    const currentIndex = entries.length;
+    const queuePosition = this._overrideStack.size > 1 
+      ? ` (${game.i18n.format('PF2E_VISIONER.OVERRIDE_INDICATOR.QUEUE_POSITION', { current: currentIndex, total: this._overrideStack.size })})`
+      : '';
+
+    // Get next token in queue (second to last) for tooltip display
+    const nextEntry = entries.length > 1 ? entries[entries.length - 2] : null;
+    const nextTokenName = nextEntry ? nextEntry[1].tokenName : null;
+
+    this._data = { overrides: filtered, tokenName: currentData.tokenName + queuePosition, movedTokenId: currentTokenId, pulse: false, nextTokenName };
+    if (!this._el) this.#createElement();
+    this.#updateBadge();
+    this.#updateQueueBadge();
+    this._el.classList.add('pf2e-visioner-override-indicator--visible');
+    this._el.classList.remove('pulse');
+    this._lastShowAt = Date.now();
+    this._lastCount = filtered.length;
+  }
+
+  #updateBadge() {
+    const badge = this._el?.querySelector('.indicator-badge');
+    if (!badge) return;
+    const count = this._data?.overrides?.length || 0;
+    badge.textContent = count > 0 ? String(count) : '';
+  }
+
+  #updateQueueBadge() {
+    const queueContainer = this._el?.querySelector('.indicator-queue');
+    if (!queueContainer) return;
+
+    const queueSize = this._overrideStack.size;
+    if (queueSize <= 1) {
+      queueContainer.innerHTML = '';
+      return;
+    }
+
+    queueContainer.innerHTML = `
+      <div class="queue-badge" title="${queueSize} tokens in queue">
+        <i class="fas fa-layer-group"></i>
+        <span class="queue-count">${queueSize}</span>
+      </div>
+    `;
+  }
+
+  addToStack(tokenId) {
+    const token = canvas.tokens?.get(tokenId);
+    if (!token) return;
+
+    if (!this._overrideStack.has(tokenId)) {
+      const overrides = this.#getOverridesForToken(tokenId);
+      if (overrides.length > 0) {
+        this._overrideStack.set(tokenId, {
+          overrides,
+          tokenName: token.name,
+          timestamp: Date.now()
+        });
+        this.#showStackedIndicator();
+      }
+    }
+  }
+
+  #getOverridesForToken(tokenId) {
+    const overrides = [];
+    try {
+      const token = canvas.tokens?.get(tokenId);
+      if (!token) return overrides;
+
+      const flags = token.document?.flags?.['pf2e-visioner'] || {};
+      for (const [flagKey, flagData] of Object.entries(flags)) {
+        if (!flagKey.startsWith('avs-override-from-')) continue;
+        const observerId = flagKey.replace('avs-override-from-', '');
+        const observerToken = canvas.tokens?.get(observerId);
+        overrides.push({
+          observerId,
+          targetId: tokenId,
+          observerName: flagData.observerName || observerToken?.name || 'Unknown',
+          targetName: token.name,
+          state: flagData.state,
+          hasCover: flagData.hasCover,
+          hasConcealment: flagData.hasConcealment,
+          expectedCover: flagData.expectedCover,
+          source: flagData.source,
+        });
+      }
+
+      const allTokens = canvas.tokens?.placeables || [];
+      for (const t of allTokens) {
+        const fk = `avs-override-from-${tokenId}`;
+        const fd = t.document?.flags?.['pf2e-visioner']?.[fk];
+        if (fd) {
+          overrides.push({
+            observerId: tokenId,
+            targetId: t.id,
+            observerName: token.name,
+            targetName: t.name,
+            state: fd.state,
+            hasCover: fd.hasCover,
+            hasConcealment: fd.hasConcealment,
+            expectedCover: fd.expectedCover,
+            source: fd.source,
+          });
+        }
+      }
+    } catch { }
+    return overrides;
+  }
+
   hide(force = false) {
     if (!this._el) return;
-    // Prevent hiding immediately after a show with items unless forced
     if (!force && this._lastCount > 0 && Date.now() - this._lastShowAt < this._minVisibleMs) return;
-    this._el.classList.remove('pf2e-visioner-override-indicator--visible');
-    this._el.classList.remove('pulse');
-    this.#hideTooltip();
-    this._lastCount = 0;
+
+    if (this._currentTokenId) {
+      this._overrideStack.delete(this._currentTokenId);
+      this._currentTokenId = null;
+    }
+
+    if (this._overrideStack.size > 0 && !force) {
+      this.#showStackedIndicator();
+    } else {
+      this._el.classList.remove('pf2e-visioner-override-indicator--visible');
+      this._el.classList.remove('pulse');
+      this.#hideTooltip();
+      this._lastCount = 0;
+      this._overrideStack.clear();
+    }
   }
 
   // Public: re-apply computed styles (e.g., after settings change)
@@ -162,12 +347,12 @@ class OverrideValidationIndicator {
   }
 
   async openDialog() {
-    if (!this._data?.overrides?.length) return;
+    if (!this._rawOverrides?.length) return;
     try {
       const { OverrideValidationDialog } = await import('./OverrideValidationDialog.js');
       // Expose moved token id for grouping via a global scratch, then show dialog
       try { game.pf2eVisioner = game.pf2eVisioner || {}; game.pf2eVisioner.lastMovedTokenId = this._data.movedTokenId || null; } catch { }
-      await OverrideValidationDialog.show(this._data.overrides, this._data.tokenName, this._data.movedTokenId || null);
+      await OverrideValidationDialog.show(this._rawOverrides, this._data.tokenName, this._data.movedTokenId || null);
       // Keep indicator visible; user can minimize dialog back
     } catch (e) {
       console.error('PF2E Visioner | Failed to open OverrideValidationDialog from indicator:', e);
@@ -175,7 +360,7 @@ class OverrideValidationIndicator {
   }
 
   async clearAll() {
-    // Prefer raw list for clearAll, so we remove all current overrides even if some are filtered out visually
+    // Accept only the current indicator's overrides, not the entire queue
     const raw = Array.isArray(this._rawOverrides) ? this._rawOverrides : [];
     if (!raw.length) return;
     try {
@@ -187,7 +372,18 @@ class OverrideValidationIndicator {
         if (observerId && targetId) affectedPairs.add(`${observerId}-${targetId}`);
       }
       ui.notifications?.info?.(`Accepted ${raw.length} AVS change(s)`);
-      this.hide();
+
+      // Remove current token from queue and show next
+      if (this._currentTokenId) {
+        this._overrideStack.delete(this._currentTokenId);
+        this._currentTokenId = null;
+      }
+
+      if (this._overrideStack.size > 0) {
+        this.#showStackedIndicator();
+      } else {
+        this.hide(true);
+      }
 
       // Immediately recalculate AVS and refresh visuals/perception
       try {
@@ -245,11 +441,11 @@ class OverrideValidationIndicator {
     this.#ensureStyles();
 
     const el = document.createElement('div');
-    // Use only component class; rely on body-level custom properties (colorblind modes set vars globally)
     el.className = 'pf2e-visioner-override-indicator';
     el.innerHTML = `
       <div class="indicator-icon"><i class="fas fa-bolt-auto"></i></div>
-      <div class="indicator-badge">0</div>
+      <div class="indicator-badge"></div>
+      <div class="indicator-queue"></div>
     `;
 
     // Restore position
@@ -270,6 +466,17 @@ class OverrideValidationIndicator {
     // Hover tooltip
     el.addEventListener('mouseenter', () => this.#showTooltip());
     el.addEventListener('mouseleave', () => this.#hideTooltip());
+
+    // Scroll tooltip content when hovering over indicator
+    el.addEventListener('wheel', (e) => {
+      if (this._tooltipEl?.isConnected) {
+        e.preventDefault();
+        const scrollable = this._tooltipEl.querySelector('.tip-content-scrollable');
+        if (scrollable) {
+          scrollable.scrollTop += e.deltaY;
+        }
+      }
+    }, { passive: false });
 
     // Clicks
     el.addEventListener('click', async (ev) => {
@@ -333,16 +540,6 @@ class OverrideValidationIndicator {
     } else {
       this._drag.moved = false;
     }
-  }
-
-  #updateBadge() {
-    const count = this._data?.overrides?.length || 0;
-    const badge = this._el?.querySelector('.indicator-badge');
-    if (badge) badge.textContent = String(count);
-    this._el?.classList.toggle('has-items', count > 0);
-    // Ensure pulse animation reflects desired mode
-    const pulse = !!this._data?.pulse && count > 0;
-    this._el?.classList.toggle('pulse', pulse);
   }
 
   #showTooltip() {
@@ -412,49 +609,44 @@ class OverrideValidationIndicator {
       `;
     };
 
-    // If we know the moved token, split into two groups; otherwise render flat up to 6
+    // If we know the moved token, split into two groups; otherwise render flat
     let contentHTML = '';
     if (movedId) {
       const asObserver = all.filter((o) => o.observerId === movedId);
       const asTarget = all.filter((o) => o.targetId === movedId);
-      // Cap total to 6 items, prefer showing at least some of each group
-      const cap = 6;
-      const half = Math.max(1, Math.floor(cap / 2));
-      const firstSlice = asObserver.slice(0, half);
-      const secondSlice = asTarget.slice(0, cap - firstSlice.length);
-      // If observer had fewer than half, top up from target up to cap
-      const obsExtra = asObserver.slice(firstSlice.length, cap - secondSlice.length);
-      const tgtExtra = asTarget.slice(secondSlice.length, cap - firstSlice.length - obsExtra.length);
 
+      const movedTokenName = this._overrideStack.get(movedId)?.tokenName || null;
       const section = (title, arr, groupKey) => arr.length
         ? `
           <div class="tip-group" data-group="${groupKey}">
             <div class="tip-group-header">
-              <div class="tip-subheader">${title}</div>
+              <div class="tip-subheader">${title}${movedTokenName ? ` <span class="moving-token-indicator"><i class="fas fa-person-walking"></i> ${movedTokenName}</span>` : ''}</div>
             </div>
             <div class="tip-group-body">${arr.map(buildRow).join('')}</div>
           </div>
         `
         : '';
 
-      const observerRows = [...firstSlice, ...obsExtra];
-      const targetRows = [...secondSlice, ...tgtExtra];
-
-      contentHTML = section('Changes as observer', observerRows, 'observer') + section('Changes as target', targetRows, 'target');
+      contentHTML = section('Changes as observer', asObserver, 'observer') + section('Changes as target', asTarget, 'target');
       if (!contentHTML) contentHTML = '<div class="tip-empty">No details available</div>';
     } else {
-      const items = all.slice(0, 6);
-      contentHTML = items.map(buildRow).join('') || '<div class="tip-empty">No details available</div>';
+      contentHTML = all.map(buildRow).join('') || '<div class="tip-empty">No details available</div>';
     }
 
     this._tooltipEl.innerHTML = `
-      <div class="tip-header"><i class="fas fa-bolt-auto"></i> ${this._data?.overrides?.length || 0} change(s) to validate</div>
-      ${contentHTML}
+      <div class="tip-header"><i class="fas fa-bolt-auto"></i> ${this._data?.overrides?.length || 0} ${game.i18n.localize('PF2E_VISIONER.OVERRIDE_INDICATOR.TOOLTIP_HEADER')}</div>
+      <div class="tip-content-scrollable">
+        ${contentHTML}
+      </div>
       <div class="tip-footer">
-        <div class="footer-bottom"><span>Left-click: open details</span></div>
-        <div class="footer-right">
-          <span>Right-click: accept all</span>
-          <span>Shift+Right-click: reject all</span>
+        ${this._data?.nextTokenName ? `<div class="footer-row"><div class="footer-left" style="color: #4a9eff; font-style: italic;"><i class="fas fa-arrow-right"></i> ${game.i18n.localize('PF2E_VISIONER.OVERRIDE_INDICATOR.TOOLTIP_NEXT')} ${this._data.nextTokenName}</div></div>` : ''}
+        <div class="footer-row">
+          <div class="footer-left">${game.i18n.localize('PF2E_VISIONER.OVERRIDE_INDICATOR.TOOLTIP_LEFT_CLICK')}</div>
+          <div class="footer-right">${game.i18n.localize('PF2E_VISIONER.OVERRIDE_INDICATOR.TOOLTIP_RIGHT_CLICK')}</div>
+        </div>
+        <div class="footer-row">
+          <div class="footer-left"></div>
+          <div class="footer-right">${game.i18n.localize('PF2E_VISIONER.OVERRIDE_INDICATOR.TOOLTIP_SHIFT_RIGHT_CLICK')}</div>
         </div>
       </div>
     `;
@@ -587,31 +779,30 @@ class OverrideValidationIndicator {
 
     const css = `
       .pf2e-visioner-override-indicator {
-        position: fixed; top: 60%; left: 10px; width: ${p.box}px; height: ${p.box}px; background: var(--color-bg-option, rgba(0,0,0,0.85)); border: ${p.border}px solid var(--pf2e-visioner-warning); border-radius: ${p.radius}px; color: var(--color-text-light-primary, #fff); display: none; align-items: center; justify-content: center; cursor: move; z-index: 1001; font-size: ${p.font}px; box-shadow: 0 2px 8px rgba(0,0,0,0.35); transition: transform .15s ease, box-shadow .15s ease; user-select: none; overflow: visible;
+        position: fixed; top: 60%; left: 10px; width: ${p.box}px; height: ${p.box}px; background: rgba(20,20,20,0.92); border: ${p.border}px solid var(--pf2e-visioner-warning); border-radius: ${p.radius}px; color: var(--color-text-light-primary, #fff); display: none; align-items: center; justify-content: center; cursor: move; z-index: 1001; box-shadow: 0 2px 12px rgba(0,0,0,0.4); transition: transform .15s ease, box-shadow .15s ease; user-select: none; overflow: visible;
       }
       .pf2e-visioner-override-indicator--visible { display: flex; }
       .pf2e-visioner-override-indicator.dragging { cursor: grabbing; transform: scale(1.06); box-shadow: 0 4px 18px rgba(0,0,0,0.5); }
-      .pf2e-visioner-override-indicator .indicator-icon { pointer-events: none; }
-  .pf2e-visioner-override-indicator .indicator-badge { position: absolute; top: -${p.badgeOffset}px; right: -${p.badgeOffset}px; background: var(--pf2e-visioner-danger); color: var(--color-text-light-primary, #fff); border-radius: 10px; padding: ${p.badgePadY}px ${p.badgePadX}px; font-size: ${p.badgeFont}px; border: 1px solid rgba(0,0,0,0.2); }
-      /* Transform-based pulse ring for broad compatibility (no color-mix needed) */
-      .pf2e-visioner-override-indicator.pulse::after {
-        content: '';
-        position: absolute;
-        inset: ${p.pulseInset}px;
-        border-radius: ${p.pulseRadius}px;
-  border: ${p.pulseBorder}px solid var(--pf2e-visioner-warning);
-        opacity: 0;
-        transform: scale(1);
-        pointer-events: none;
-        animation: pv-pulse-ring 1.2s ease-out infinite;
-      }
-      @keyframes pv-pulse-ring {
-        0% { opacity: 0.6; transform: scale(0.9); }
-        70% { opacity: 0; transform: scale(1.35); }
-        100% { opacity: 0; transform: scale(1.35); }
-      }
+      .pf2e-visioner-override-indicator .indicator-icon { font-size: ${p.font}px; color: #ffffff; }
+      .pf2e-visioner-override-indicator .indicator-badge { position: absolute; top: -8px; right: -6px; background: rgba(244,67,54,0.95); color: #fff; border: 1px solid rgba(244,67,54,1); border-radius: ${p.radius - 2}px; padding: ${p.badgePadY}px ${p.badgePadX}px; font-size: ${p.badgeFont}px; font-weight: 700; line-height: 1; min-width: 18px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.3); }
+      .pf2e-visioner-override-indicator .indicator-queue { position: absolute; bottom: -6px; right: -6px; }
+      .pf2e-visioner-override-indicator .queue-badge { display: flex; align-items: center; gap: 2px; background: rgba(33,150,243,0.95); border: 1px solid rgba(33,150,243,1); border-radius: 8px; padding: 1px 4px; font-size: 9px; font-weight: 700; color: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.4); }
+      .pf2e-visioner-override-indicator .queue-badge i { font-size: 8px; }
+      .pf2e-visioner-override-indicator .queue-count { line-height: 1; }
 
-  .pf2e-visioner-override-tooltip { position: fixed; min-width: 260px; max-width: 420px; background: rgba(30,30,30,0.98); color: var(--color-text-light-primary, #fff); border: 1px solid var(--color-border-light-primary, #555); border-radius: 8px; padding: ${p.tipPad}px; z-index: 1002; font-size: ${p.tipFont}px; box-shadow: 0 2px 16px rgba(0,0,0,0.45); backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
+  .pf2e-visioner-override-tooltip { position: fixed; min-width: 300px; max-width: 450px; background: rgba(30,30,30,0.98); color: var(--color-text-light-primary, #fff); border: 1px solid var(--color-border-light-primary, #555); border-radius: 8px; z-index: 1002; font-size: ${p.tipFont}px; box-shadow: 0 2px 16px rgba(0,0,0,0.45); backdrop-filter: none !important; -webkit-backdrop-filter: none !important; display: flex; flex-direction: column; max-height: min(80vh, 600px); }
+      .pf2e-visioner-override-tooltip .tip-header { padding: ${p.tipPad}px ${p.tipPad}px 6px ${p.tipPad}px; font-weight: 600; color: var(--pf2e-visioner-warning); flex-shrink: 0; }
+      .pf2e-visioner-override-tooltip .tip-content-scrollable { overflow-y: auto; overflow-x: hidden; max-height: 150px; min-height: 50px; padding: 0 ${p.tipPad}px; flex: 1 1 auto; }
+      .pf2e-visioner-override-tooltip .tip-content-scrollable::-webkit-scrollbar { width: 8px; }
+      .pf2e-visioner-override-tooltip .tip-content-scrollable::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); border-radius: 4px; }
+      .pf2e-visioner-override-tooltip .tip-content-scrollable::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 4px; }
+      .pf2e-visioner-override-tooltip .tip-content-scrollable::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.3); }
+      .pf2e-visioner-override-tooltip .tip-footer { padding: 6px ${p.tipPad}px ${p.tipPad}px ${p.tipPad}px; flex-shrink: 0; display: flex; flex-direction: column; gap: 4px; }
+      .pf2e-visioner-override-tooltip .footer-row { display: flex; justify-content: space-between; align-items: center; white-space: nowrap; }
+      .pf2e-visioner-override-tooltip .footer-left { flex: 0 0 auto; }
+      .pf2e-visioner-override-tooltip .footer-right { flex: 0 0 auto; text-align: right; }
+      .pf2e-visioner-override-tooltip .moving-token-indicator { color: var(--pf2e-visioner-success, #4caf50); font-weight: 600; font-size: 0.9em; margin-left: 8px; }
+      .pf2e-visioner-override-tooltip .moving-token-indicator i { margin-right: 4px; }
       /* Force per-state colors inside tooltip (override any external .state-indicator !important rules) */
       .pf2e-visioner-override-tooltip .state-indicator.visibility-observed { color: var(--visibility-observed, var(--visibility-observed-color, #4caf50)) !important; }
       .pf2e-visioner-override-tooltip .state-indicator.visibility-concealed { color: var(--visibility-concealed, var(--visibility-concealed-color, #ffc107)) !important; }
@@ -623,7 +814,6 @@ class OverrideValidationIndicator {
       .pf2e-visioner-override-tooltip .state-indicator.cover-greater { color: var(--cover-greater, var(--cover-greater-color, #f44336)) !important; }
       /* Normalize cover icon visual size vs visibility */
       .pf2e-visioner-override-tooltip .state-indicator[class*='cover-'] { font-size: 1.08em; }
-      .pf2e-visioner-override-tooltip .tip-header { font-weight: 600; margin-bottom: 6px; color: var(--pf2e-visioner-warning); }
       .pf2e-visioner-override-tooltip .tip-group { margin-top: 4px; }
       .pf2e-visioner-override-tooltip .tip-group-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-top: 4px; }
       .pf2e-visioner-override-tooltip .tip-subheader { font-weight: 600; color: var(--color-text-dark-secondary, #bbb); }
@@ -650,9 +840,6 @@ class OverrideValidationIndicator {
       }
       .pf2e-visioner-override-tooltip .reasons { display: inline-flex; align-items: center; gap: 4px; color: var(--pf2e-visioner-info, #90caf9); }
   .pf2e-visioner-override-tooltip .reasons i { font-size: ${Math.max(10, p.tipFont - 1)}px; }
-      .pf2e-visioner-override-tooltip .tip-footer { display: flex; flex-direction: row; align-items: flex-end; justify-content: space-between; margin-top: 6px; color: #bbb; gap: 12px; }
-      .pf2e-visioner-override-tooltip .tip-footer .footer-right { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
-      .pf2e-visioner-override-tooltip .tip-footer .footer-bottom { white-space: nowrap; }
       .pf2e-visioner-override-tooltip .tip-empty { color: var(--color-text-dark-secondary, #bbb); padding: 8px 0; }
     `;
     if (existing) {

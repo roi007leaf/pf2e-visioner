@@ -120,6 +120,14 @@
       "ERROR_REMOVING_OVERRIDE": "Błąd podczas usuwania zastąpienia AVS",
       "ERROR_CLEARING_OVERRIDES": "Błąd podczas kasowania zastąpień AVS"
     },
+    "OVERRIDE_INDICATOR": {
+      "TOOLTIP_HEADER": "zmian(y) do zatwierdzenia",
+      "TOOLTIP_NEXT": "Następny:",
+      "TOOLTIP_LEFT_CLICK": "Lewy klik: otwórz szczegóły",
+      "TOOLTIP_RIGHT_CLICK": "Prawy klik: zaakceptuj wszystko",
+      "TOOLTIP_SHIFT_RIGHT_CLICK": "Shift+Prawy klik: odrzuć wszystko",
+      "QUEUE_POSITION": "{current} z {total}"
+    },
     "VISUAL_EFFECTS": {
       "CONCEALED_OVERLAY": "Ten token jest przysłonięty dla ciebie",
       "CONCEALED_FLAT_CHECK": "Wymagany płaski test ST 5 do ustalenia celu",

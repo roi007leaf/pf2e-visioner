@@ -378,20 +378,8 @@ export class BatchOrchestrator {
       try {
         const lastMovedId = globalThis?.game?.pf2eVisioner?.lastMovedTokenId;
         if (lastMovedId && this.overrideValidationManager) {
-          // Create a timeout promise to prevent indefinite blocking
-          const timeoutPromise = new Promise((resolve) => {
-            setTimeout(() => {
-              resolve();
-            }, 50); // Reduced from 200ms for faster response
-          });
-
-          // Race between validation and timeout
-          const validationPromise = (async () => {
-            this.overrideValidationManager.queueOverrideValidation(lastMovedId);
-            await this.overrideValidationManager.processQueuedValidations();
-          })();
-
-          await Promise.race([validationPromise, timeoutPromise]);
+          this.overrideValidationManager.queueOverrideValidation(lastMovedId);
+          await this.overrideValidationManager.processQueuedValidations();
         }
       } catch (e) {
         console.warn('PF2E Visioner | Error processing override validation in batch:', e);

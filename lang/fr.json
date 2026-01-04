@@ -889,6 +889,14 @@
       "ERROR_REMOVING_OVERRIDE": "(FR TODO) Error removing AVS override",
       "ERROR_CLEARING_OVERRIDES": "(FR TODO) Error clearing AVS overrides"
     },
+    "OVERRIDE_INDICATOR": {
+      "TOOLTIP_HEADER": "(FR TODO) change(s) to validate",
+      "TOOLTIP_NEXT": "(FR TODO) Next:",
+      "TOOLTIP_LEFT_CLICK": "(FR TODO) Left-click: open details",
+      "TOOLTIP_RIGHT_CLICK": "(FR TODO) Right-click: accept all",
+      "TOOLTIP_SHIFT_RIGHT_CLICK": "(FR TODO) Shift+Right-click: reject all",
+      "QUEUE_POSITION": "(FR TODO) {current} of {total}"
+    },
     "REGION_BEHAVIOR": {
       "TYPE_LABEL": "(FR TODO) PF2e Visioner Visibility",
       "TYPES": {

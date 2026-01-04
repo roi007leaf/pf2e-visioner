@@ -1,5 +1,20 @@
 # Changelog
 
+## [5.4.0] - 2026-01-04
+
+### ✨ Added
+
+- **Override Validation Queue System**: Implemented LIFO queue for managing multiple token movement indicators
+  - Processes most recent token movement first
+  - Auto-advances to next indicator after accepting/rejecting current one
+  - Shows queue position in indicator title (e.g., "(3 of 3)")
+  - Visual queue badge displays total pending indicators
+  - Tooltip shows next token in queue
+  - Tokens moving multiple times update data without re-ordering in queue
+  - Scrollable tooltip with increased size (300-450px) for better readability
+  - Moving token highlighted in green with walking icon
+  - Right-click now accepts only current indicator's overrides and advances to next
+
 ## [5.3.1] - 2025-12-06
 
 ### 🛠️ Improved

@@ -120,6 +120,14 @@
       "ERROR_REMOVING_OVERRIDE": "Error removing AVS override",
       "ERROR_CLEARING_OVERRIDES": "Error clearing AVS overrides"
     },
+    "OVERRIDE_INDICATOR": {
+      "TOOLTIP_HEADER": "change(s) to validate",
+      "TOOLTIP_NEXT": "Next:",
+      "TOOLTIP_LEFT_CLICK": "Left-click: open details",
+      "TOOLTIP_RIGHT_CLICK": "Right-click: accept all",
+      "TOOLTIP_SHIFT_RIGHT_CLICK": "Shift+Right-click: reject all",
+      "QUEUE_POSITION": "{current} of {total}"
+    },
     "VISUAL_EFFECTS": {
       "CONCEALED_OVERLAY": "This token is concealed from you",
       "CONCEALED_FLAT_CHECK": "DC 5 flat check required for targeting",

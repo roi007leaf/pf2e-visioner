@@ -897,6 +897,14 @@
       "ERROR_CLEARING_OVERRIDES": "清除自动能见度覆盖时出错",
       "ALL_OVERRIDES_CLEARED": "已清除{token}的所有AVS覆盖设置"
     },
+    "OVERRIDE_INDICATOR": {
+      "TOOLTIP_HEADER": "需验证的更改",
+      "TOOLTIP_NEXT": "下一个：",
+      "TOOLTIP_LEFT_CLICK": "左键单击：打开详情",
+      "TOOLTIP_RIGHT_CLICK": "右键单击：接受全部",
+      "TOOLTIP_SHIFT_RIGHT_CLICK": "Shift+右键单击：拒绝全部",
+      "QUEUE_POSITION": "{current}/{total}"
+    },
     "VISIBILITY_FACTORS": {
       "REASONS": {
         "DETECTED_BY_SENSE": "被{sense}（精确感官）侦测到",
