@@ -1114,6 +1114,83 @@ export class Pf2eVisionerApi {
     return ['none', 'lesser', 'standard', 'greater'];
   }
 
+  static _resolveActorRef(tokenActorOrId) {
+    try {
+      if (!tokenActorOrId) return null;
+      if (tokenActorOrId?.actor) return tokenActorOrId.actor;
+      if (tokenActorOrId?.system?.attributes) return tokenActorOrId;
+      if (typeof tokenActorOrId === 'string') {
+        const token = canvas?.tokens?.get?.(tokenActorOrId);
+        if (token?.actor) return token.actor;
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
+  static _getActorKey(actor) {
+    return actor?.uuid || actor?.id || null;
+  }
+
+  static async setSnipingDuoSpotter(sniperTokenOrActor, spotterTokenOrActor) {
+    try {
+      const sniperActor = this._resolveActorRef(sniperTokenOrActor);
+      const spotterActor = this._resolveActorRef(spotterTokenOrActor);
+      if (!sniperActor || !spotterActor) return false;
+
+      const sniperKey = this._getActorKey(sniperActor);
+      const spotterKey = this._getActorKey(spotterActor);
+      if (!sniperKey || !spotterKey) return false;
+
+      await sniperActor.setFlag('pf2e-visioner', 'snipingDuoSpotterActorUuid', spotterKey);
+      await spotterActor.setFlag('pf2e-visioner', 'snipingDuoSniperActorUuid', sniperKey);
+      return true;
+    } catch (error) {
+      console.warn('PF2E Visioner API: setSnipingDuoSpotter failed', error);
+      return false;
+    }
+  }
+
+  static async clearSnipingDuoSpotter(sniperTokenOrActor) {
+    try {
+      const sniperActor = this._resolveActorRef(sniperTokenOrActor);
+      if (!sniperActor) return false;
+      const spotterKey = (await sniperActor.getFlag?.('pf2e-visioner', 'snipingDuoSpotterActorUuid')) ?? null;
+
+      await sniperActor.unsetFlag('pf2e-visioner', 'snipingDuoSpotterActorUuid');
+
+      // Best-effort: if the spotter actor is on-canvas, clear the reverse link too
+      if (spotterKey) {
+        const tokens = canvas?.tokens?.placeables ?? [];
+        for (const t of tokens) {
+          const a = t?.actor;
+          if (!a) continue;
+          const key = this._getActorKey(a);
+          if (key && String(key) === String(spotterKey)) {
+            await a.unsetFlag('pf2e-visioner', 'snipingDuoSniperActorUuid');
+            break;
+          }
+        }
+      }
+
+      return true;
+    } catch (error) {
+      console.warn('PF2E Visioner API: clearSnipingDuoSpotter failed', error);
+      return false;
+    }
+  }
+
+  static getSnipingDuoSpotter(sniperTokenOrActor) {
+    try {
+      const sniperActor = this._resolveActorRef(sniperTokenOrActor);
+      if (!sniperActor) return null;
+      return sniperActor.getFlag?.('pf2e-visioner', 'snipingDuoSpotterActorUuid') ?? null;
+    } catch {
+      return null;
+    }
+  }
+
   /**
    * Get the ConditionManager instance for managing invisible condition states
    * @returns {ConditionManager} The condition manager instance

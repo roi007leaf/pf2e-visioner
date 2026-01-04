@@ -4,6 +4,7 @@
 
 import { MODULE_ID } from '../constants.js';
 import { AutoCoverHooks } from '../cover/auto-cover/AutoCoverHooks.js';
+import { registerSnipingDuoDamageBonusHooks } from '../feats/sniping-duo-damage-bonus.js';
 import { onHighlightObjects } from '../services/HoverTooltips.js';
 import { getLogger } from '../utils/logger.js';
 import { registerChatHooks } from './chat.js';
@@ -81,6 +82,7 @@ export async function registerHooks() {
   registerUIHooks();
   registerCombatHooks();
   AutoCoverHooks.registerHooks();
+  registerSnipingDuoDamageBonusHooks();
 
   // Register movement cost hooks (Blinded difficult terrain)
   try {

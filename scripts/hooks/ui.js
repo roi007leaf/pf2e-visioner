@@ -2,6 +2,7 @@
  * UI-related hooks: Token HUD, Token Directory, TokenConfig injection
  */
 
+import { FeatsHandler } from '../chat/services/FeatsHandler.js';
 import { COVER_STATES, MODULE_ID } from '../constants.js';
 import { onRenderTokenHUD } from '../services/token-hud.js';
 
@@ -1612,12 +1613,39 @@ function injectPF2eVisionerBox(app, root) {
   const minPerceptionRank = Number(readFlag('minPerceptionRank') ?? 0);
   const encounterMasterTokenId = readFlag('encounterMasterTokenId') ?? '';
 
+  const hasSnipingDuo = FeatsHandler.hasFeat(actor, 'sniping-duo-dedication');
+  const snipingDuoSpotterActorKey =
+    actor?.getFlag?.(MODULE_ID, 'snipingDuoSpotterActorUuid') ??
+    actor?.flags?.[MODULE_ID]?.snipingDuoSpotterActorUuid ??
+    '';
+
   const currentTokenId = tokenDoc?.id ?? tokenDoc?.uuid;
   const masterToken = encounterMasterTokenId ? canvas?.tokens?.get(encounterMasterTokenId) : null;
   const masterName = masterToken?.name || masterToken?.document?.name || '';
   const masterDisplayText = encounterMasterTokenId && masterName
     ? masterName
     : game.i18n.localize('PF2E_VISIONER.UI.ENCOUNTER_MASTER_CHOOSE');
+
+  const resolveTokenByActorKey = (actorKey) => {
+    try {
+      if (!actorKey) return null;
+      const tokens = canvas?.tokens?.placeables ?? [];
+      for (const t of tokens) {
+        const a = t?.actor;
+        const key = a?.uuid || a?.id || '';
+        if (key && String(key) === String(actorKey)) return t;
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  };
+
+  const spotterToken = snipingDuoSpotterActorKey ? resolveTokenByActorKey(snipingDuoSpotterActorKey) : null;
+  const spotterName = spotterToken?.name || spotterToken?.document?.name || '';
+  const spotterDisplayText = snipingDuoSpotterActorKey && spotterName
+    ? spotterName
+    : game.i18n.localize('PF2E_VISIONER.UI.SNIPING_DUO_SPOTTER_CHOOSE');
 
   // Build content
   let inner = `
@@ -1661,6 +1689,21 @@ function injectPF2eVisionerBox(app, root) {
       <input type="hidden" name="flags.${MODULE_ID}.encounterMasterTokenId" class="pv-encounter-master-input" value="${encounterMasterTokenId}">
     </div>
   `;
+
+  if (hasSnipingDuo) {
+    inner += `
+      <div class="form-group">
+        <label data-tooltip="${game.i18n.localize('PF2E_VISIONER.UI.SNIPING_DUO_SPOTTER_TOOLTIP')}">${game.i18n.localize('PF2E_VISIONER.UI.SNIPING_DUO_SPOTTER_LABEL')}</label>
+        <div style="display: flex; gap: 4px; align-items: center;">
+          <button type="button" class="pv-sniping-duo-btn" style="flex: 1; text-align: left;" data-spotter-key="${String(snipingDuoSpotterActorKey || '')}">
+            <i class="fas fa-user-friends" style="margin-right: 4px;"></i>
+            <span class="pv-sniping-duo-label">${spotterDisplayText}</span>
+          </button>
+          ${snipingDuoSpotterActorKey ? `<button type="button" class="pv-sniping-duo-clear" data-tooltip="Clear"><i class="fas fa-times"></i></button>` : ''}
+        </div>
+      </div>
+    `;
+  }
   if (actor.type === 'loot') {
     inner += `
       <div class="form-group">
@@ -1763,6 +1806,113 @@ function injectPF2eVisionerBox(app, root) {
         if (masterInput) masterInput.value = '';
         if (masterLabel) masterLabel.textContent = game.i18n.localize('PF2E_VISIONER.UI.ENCOUNTER_MASTER_CHOOSE');
         clearBtn.remove();
+      });
+    }
+  } catch { }
+
+  try {
+    const duoBtn = box.querySelector('.pv-sniping-duo-btn');
+    const duoLabel = box.querySelector('.pv-sniping-duo-label');
+    const duoClear = box.querySelector('.pv-sniping-duo-clear');
+
+    const resolveActorFromKey = async (actorKey) => {
+      try {
+        if (!actorKey) return null;
+        const token = resolveTokenByActorKey(actorKey);
+        if (token?.actor) return token.actor;
+        if (String(actorKey).startsWith('Actor.')) {
+          const doc = await fromUuidSync(actorKey);
+          return doc || null;
+        }
+        return null;
+      } catch {
+        return null;
+      }
+    };
+
+    const ensureClearButton = () => {
+      try {
+        const existing = box.querySelector('.pv-sniping-duo-clear');
+        if (existing) return;
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'pv-sniping-duo-clear';
+        btn.dataset.tooltip = 'Clear';
+        btn.innerHTML = '<i class="fas fa-times"></i>';
+        btn.addEventListener('click', async (ev) => {
+          ev.preventDefault();
+          ev.stopPropagation();
+          try {
+            const { Pf2eVisionerApi } = await import('../api.js');
+            await Pf2eVisionerApi.clearSnipingDuoSpotter(actor);
+          } catch (e) {
+            console.warn('PF2E Visioner: clearSnipingDuoSpotter failed', e);
+          }
+          duoBtn?.dataset && (duoBtn.dataset.spotterKey = '');
+          if (duoLabel) duoLabel.textContent = game.i18n.localize('PF2E_VISIONER.UI.SNIPING_DUO_SPOTTER_CHOOSE');
+          btn.remove();
+        });
+        duoBtn?.parentElement?.appendChild?.(btn);
+      } catch { }
+    };
+
+    if (duoBtn) {
+      duoBtn.addEventListener('click', async (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+
+        const currentKey = duoBtn.dataset?.spotterKey || '';
+        const { SnipingDuoSpotterDialog } = await import('../ui/dialogs/SnipingDuoSpotterDialog.js');
+        const selectedKey = await SnipingDuoSpotterDialog.selectSpotter(currentKey, tokenDoc?.id);
+        if (selectedKey === undefined) return;
+
+        if (!selectedKey) {
+          try {
+            const { Pf2eVisionerApi } = await import('../api.js');
+            await Pf2eVisionerApi.clearSnipingDuoSpotter(actor);
+          } catch (e) {
+            console.warn('PF2E Visioner: clearSnipingDuoSpotter failed', e);
+          }
+          duoBtn.dataset.spotterKey = '';
+          if (duoLabel) duoLabel.textContent = game.i18n.localize('PF2E_VISIONER.UI.SNIPING_DUO_SPOTTER_CHOOSE');
+          box.querySelector('.pv-sniping-duo-clear')?.remove();
+          return;
+        }
+
+        const spotterActor = await resolveActorFromKey(selectedKey);
+        if (!spotterActor) {
+          ui.notifications.warn(game.i18n.localize('PF2E_VISIONER.UI.SNIPING_DUO_SPOTTER_NOT_FOUND'));
+          return;
+        }
+
+        try {
+          const { Pf2eVisionerApi } = await import('../api.js');
+          await Pf2eVisionerApi.setSnipingDuoSpotter(actor, spotterActor);
+        } catch (e) {
+          console.warn('PF2E Visioner: setSnipingDuoSpotter failed', e);
+        }
+
+        duoBtn.dataset.spotterKey = String(selectedKey);
+        const t = resolveTokenByActorKey(selectedKey);
+        const name = t?.name || t?.document?.name || spotterActor?.name || String(selectedKey);
+        if (duoLabel) duoLabel.textContent = name;
+        ensureClearButton();
+      });
+    }
+
+    if (duoClear && duoBtn) {
+      duoClear.addEventListener('click', async (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        try {
+          const { Pf2eVisionerApi } = await import('../api.js');
+          await Pf2eVisionerApi.clearSnipingDuoSpotter(actor);
+        } catch (e) {
+          console.warn('PF2E Visioner: clearSnipingDuoSpotter failed', e);
+        }
+        duoBtn.dataset.spotterKey = '';
+        if (duoLabel) duoLabel.textContent = game.i18n.localize('PF2E_VISIONER.UI.SNIPING_DUO_SPOTTER_CHOOSE');
+        duoClear.remove();
       });
     }
   } catch { }

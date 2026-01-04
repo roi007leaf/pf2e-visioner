@@ -222,6 +222,7 @@ describe('AttackRollUseCase', () => {
         'standard',
         targetToken,
         'none', // manualCover
+        null, // snipingDuoCoverIgnore
         expect.any(Function), // onChosen callback
       );
     });
@@ -242,6 +243,7 @@ describe('AttackRollUseCase', () => {
         'standard',
         targetToken,
         'greater', // manualCover
+        null, // snipingDuoCoverIgnore
         expect.any(Function), // onChosen callback
       );
     });
@@ -255,7 +257,7 @@ describe('AttackRollUseCase', () => {
 
       let callbackFunction;
       mockCoverUIManager.injectDialogCoverUI.mockImplementation(
-        (dialog, html, state, target, manualCover, callback) => {
+        (dialog, html, state, target, manualCover, snipingDuoCoverIgnore, callback) => {
           callbackFunction = callback;
         },
       );
@@ -287,7 +289,7 @@ describe('AttackRollUseCase', () => {
 
       let callbackFunction;
       mockCoverUIManager.injectDialogCoverUI.mockImplementation(
-        (dialog, html, state, target, manualCover, callback) => {
+        (dialog, html, state, target, manualCover, snipingDuoCoverIgnore, callback) => {
           callbackFunction = callback;
         },
       );
@@ -314,7 +316,7 @@ describe('AttackRollUseCase', () => {
 
       let callbackFunction;
       mockCoverUIManager.injectDialogCoverUI.mockImplementation(
-        (dialog, html, state, target, manualCover, callback) => {
+        (dialog, html, state, target, manualCover, snipingDuoCoverIgnore, callback) => {
           callbackFunction = callback;
         },
       );

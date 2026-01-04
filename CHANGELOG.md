@@ -15,6 +15,11 @@
   - Moving token highlighted in green with walking icon
   - Right-click now accepts only current indicator's overrides and advances to next
 
+- **Sniping Duo Dedication**: Added support for the "designated spotter" not granting lesser cover for Strikes between duo members
+  - Token Config UI to pick a Sniping Duo spotter
+  - Auto-cover ignores the spotter as a blocker for eligible Strikes
+  - Chat indicator added when Sniping Duo cover-ignore applies
+
 ## [5.3.1] - 2025-12-06
 
 ### 🛠️ Improved
@@ -134,7 +139,6 @@
 
 ### ⚡ Performance Improvements
 
-- Token border highlights now reuse a single `PIXI.Graphics` per token instead of recreating on every hover, eliminating runaway `canvas.tokens` children; covered by new `token-manager-borders` unit test
 - Introduced a centralized, pan-aware RAF scheduler so HoverTooltips, visual-effects pulses, and other animations throttle or pause while the canvas is panning/zooming; scheduler has dedicated unit coverage
 - Hover tooltips, cover overlays, and HUD badges now suspend DOM/PIXI work during pan/zoom and resume cleanly afterward, avoiding compounded FPS drops
 - Cover visualization and wall label overlays respect viewport culling and use a dedicated render layer so showing all labels at once no longer tanks performance
