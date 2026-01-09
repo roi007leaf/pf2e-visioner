@@ -94,6 +94,7 @@ class OverrideValidationIndicator {
   }
 
   show(overrideData, tokenName, movedTokenId = null, options = {}) {
+    if (!game.user?.isGM) return;
     console.log(`PF2E Visioner | Queue: show() called - tokenName: ${tokenName}, movedTokenId: ${movedTokenId}, overrides: ${Array.isArray(overrideData) ? overrideData.length : 0}`);
     try {
       const avsOnlyInCombat = game.settings.get(MODULE_ID, 'avsOnlyInCombat');
@@ -199,7 +200,7 @@ class OverrideValidationIndicator {
 
     this.#ensureStyles();
     const currentIndex = entries.length;
-    const queuePosition = this._overrideStack.size > 1 
+    const queuePosition = this._overrideStack.size > 1
       ? ` (${game.i18n.format('PF2E_VISIONER.OVERRIDE_INDICATOR.QUEUE_POSITION', { current: currentIndex, total: this._overrideStack.size })})`
       : '';
 
@@ -243,6 +244,7 @@ class OverrideValidationIndicator {
   }
 
   addToStack(tokenId) {
+    if (!game.user?.isGM) return;
     const token = canvas.tokens?.get(tokenId);
     if (!token) return;
 
@@ -335,6 +337,7 @@ class OverrideValidationIndicator {
   }
 
   update(overrideData, tokenName) {
+    if (!game.user?.isGM) return;
     // Ensure latest styles are applied (hot-reload safe)
     this.#ensureStyles();
     const all = Array.isArray(overrideData) ? overrideData : [];
@@ -347,6 +350,7 @@ class OverrideValidationIndicator {
   }
 
   async openDialog() {
+    if (!game.user?.isGM) return;
     if (!this._rawOverrides?.length) return;
     try {
       const { OverrideValidationDialog } = await import('./OverrideValidationDialog.js');
@@ -357,6 +361,10 @@ class OverrideValidationIndicator {
     } catch (e) {
       console.error('PF2E Visioner | Failed to open OverrideValidationDialog from indicator:', e);
     }
+  }
+
+  hasQueuedTokens() {
+    return this._overrideStack.size > 0;
   }
 
   async clearAll() {

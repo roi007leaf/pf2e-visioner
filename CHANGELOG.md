@@ -1,5 +1,10 @@
 # Changelog
 
+## [5.4.1] - 2026-01-09
+
+- **Override Validation Indicator**: Fixed indicator showing for players; now GM-only
+- **Override Validation Indicator**: Fixed indicator appearing on token control/selection; now only shows for actual movement/queued validations
+
 ## [5.4.0] - 2026-01-04
 
 ### ✨ Added

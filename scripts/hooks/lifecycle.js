@@ -491,35 +491,13 @@ export async function onCanvasReady() {
   // Update override validation indicator when controlled token changes to show accumulated stack
   Hooks.on('controlToken', async (token, controlled) => {
     try {
+      if (!game.user?.isGM) return;
       const { default: indicator } = await import('../ui/OverrideValidationIndicator.js');
-      if (controlled && token) {
-        const hasOverrides = await checkTokenHasOverrides(token.id);
-        if (hasOverrides) {
-          indicator.addToStack(token.id);
-        }
-      }
+      if (!controlled || !indicator?.hasQueuedTokens?.()) return;
+      indicator.show([], '', null);
     } catch (error) {
     }
   });
-}
-
-async function checkTokenHasOverrides(tokenId) {
-  try {
-    const token = canvas.tokens?.get(tokenId);
-    if (!token) return false;
-    const flags = token.document?.flags?.['pf2e-visioner'] || {};
-    const hasAsTarget = Object.keys(flags).some(k => k.startsWith('avs-override-from-'));
-    if (hasAsTarget) return true;
-    const allTokens = canvas.tokens?.placeables || [];
-    for (const t of allTokens) {
-      if (t?.document?.flags?.['pf2e-visioner']?.[`avs-override-from-${tokenId}`]) {
-        return true;
-      }
-    }
-    return false;
-  } catch {
-    return false;
-  }
 }
 
 async function enableVisionForAllTokensAndPrototypes() {
