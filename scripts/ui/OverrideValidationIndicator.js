@@ -26,6 +26,8 @@ class OverrideValidationIndicator {
     this._rawOverrides = [];
     this._overrideStack = new Map(); // tokenId -> { overrides, tokenName, timestamp }
     this._currentTokenId = null;
+    this._overrideStack = new Map(); // tokenId -> { overrides, tokenName, timestamp }
+    this._currentTokenId = null;
     this._drag = { active: false, start: { x: 0, y: 0 }, offset: { x: 0, y: 0 }, moved: false };
     // Guard against rapid show->hide flicker when recomputations settle to 0
     this._lastShowAt = 0; // ms timestamp of last show() with non-empty items
