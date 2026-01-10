@@ -557,6 +557,16 @@ export const DEFAULT_SETTINGS = {
     default: false,
   },
 
+  suppressAvsGmVisionWarning: {
+    name: 'PF2E_VISIONER.SETTINGS.AVS_GM_VISION_WARNING_SUPPRESS.name',
+    hint: 'PF2E_VISIONER.SETTINGS.AVS_GM_VISION_WARNING_SUPPRESS.hint',
+    scope: 'client',
+    config: true,
+    restricted: true,
+    type: Boolean,
+    default: false,
+  },
+
   autoVisibilityDebugMode: {
     name: 'PF2E_VISIONER.SETTINGS.AUTO_VISIBILITY_DEBUG_MODE.name',
     hint: 'PF2E_VISIONER.SETTINGS.AUTO_VISIBILITY_DEBUG_MODE.hint',

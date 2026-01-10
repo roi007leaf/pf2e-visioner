@@ -4,6 +4,7 @@
  */
 
 import { MODULE_ID, MODULE_TITLE } from '../../constants.js';
+import { ActionQualifier } from '../../rule-elements/operations/ActionQualifier.js';
 import {
   getDefaultNewStateFor,
   getDesiredOverrideStatesForAction,
@@ -12,7 +13,6 @@ import { getVisibilityStateConfig } from '../services/data/visibility-states.js'
 import { notify } from '../services/infra/notifications.js';
 import { hasActiveEncounter } from '../services/infra/shared-utils.js';
 import { BaseActionDialog } from './base-action-dialog.js';
-import { ActionQualifier } from '../../rule-elements/operations/ActionQualifier.js';
 
 // Store reference to current hide dialog
 let currentHideDialog = null;
@@ -210,6 +210,26 @@ export class HidePreviewDialog extends BaseActionDialog {
             outcome.positionQualification = overridden;
           } catch {
             /* feat override non-fatal */
+          }
+
+          // Apply rule element qualification overrides (e.g., camouflage dye force qualification)
+          try {
+            const { ActionQualificationIntegration } = await import('../../rule-elements/ActionQualificationIntegration.js');
+            const ruleQualification = {
+              startQualifies: true, // Hide doesn't gate on start in dialog
+              endQualifies: qualifies,
+              bothQualify: qualifies,
+              reason: 'Hide (dialog) prerequisites',
+            };
+            const ruleResult = await ActionQualificationIntegration.checkHideWithRuleElements(
+              hider,
+              ruleQualification
+            );
+            if (ruleResult.endQualifies && !qualifies) {
+              qualifies = true;
+            }
+          } catch {
+            /* rule element override non-fatal */
           }
 
           // Compute and store the base calculated new visibility (ignoring prereq gating)
@@ -1196,6 +1216,10 @@ export class HidePreviewDialog extends BaseActionDialog {
    */
   _endPositionQualifiesForHide(endPos) {
     try {
+      if (ActionQualifier.forceEndQualifies(this.hidingToken, 'hide')) {
+        return true;
+      }
+
       // Priority -1: Check action qualifications from rule elements (e.g., blur spell canUseThisConcealment)
       const actionCheck = ActionQualifier.canUseConcealment(this.hidingToken, 'hide');
       if (!actionCheck) {

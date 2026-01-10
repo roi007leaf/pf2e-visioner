@@ -2230,6 +2230,10 @@ export class SneakPreviewDialog extends BaseActionDialog {
     if (!observerToken || !this.sneakingToken) return false;
 
     try {
+      if (ActionQualifier.forceStartQualifies(this.sneakingToken, 'sneak')) {
+        return true;
+      }
+
       // Priority -2: For deferred checks, use the preserved original qualification (highest priority)
       if (outcome?._featPositionOverride) {
         return !!outcome._featPositionOverride.startQualifies;
@@ -2299,6 +2303,10 @@ export class SneakPreviewDialog extends BaseActionDialog {
    */
   _endPositionQualifiesForSneak(observerToken, outcome) {
     if (!observerToken || !this.sneakingToken) return false;
+
+    if (ActionQualifier.forceEndQualifies(this.sneakingToken, 'sneak')) {
+      return true;
+    }
 
     // Priority -3: Check action qualifications from rule elements (e.g., blur spell)
     const actionCheck = ActionQualifier.checkSneakPrerequisites(this.sneakingToken, observerToken.id);

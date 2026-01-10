@@ -510,6 +510,10 @@
         "name": "(FR TODO) Enable Auto-Visibility System",
         "hint": "(FR TODO) Automatically set visibility flags based on lighting conditions and creature senses. This system will analyze scene lighting, token positions, and creature abilities to determine appropriate visibility states (observed, concealed, hidden, undetected)."
       },
+      "AVS_GM_VISION_WARNING_SUPPRESS": {
+        "name": "(FR TODO) Suppress GM Vision warning",
+        "hint": "(FR TODO) Client-only: Don't show the 'GM Vision active' warning banner when GM Vision prevents AVS."
+      },
       "AUTO_VISIBILITY_DEBUG_MODE": {
         "name": "(FR TODO) Auto-Visibility Debug Mode",
         "hint": "(FR TODO) Enable detailed console logging for the auto-visibility system. Useful for troubleshooting visibility calculations."
@@ -898,6 +902,12 @@
       "ALL_OVERRIDES_CLEARED": "(FR TODO) All AVS overrides cleared for {token}",
       "ERROR_REMOVING_OVERRIDE": "(FR TODO) Error removing AVS override",
       "ERROR_CLEARING_OVERRIDES": "(FR TODO) Error clearing AVS overrides"
+    },
+    "AVS_GM_VISION_WARNING": {
+      "TITLE": "(FR TODO) GM Vision active",
+      "BODY": "(FR TODO) AVS needs a vision polygon; GM Vision does not generate one. Disable GM Vision to enable AVS.",
+      "CLOSE": "(FR TODO) Dismiss",
+      "DONT_SHOW_AGAIN": "(FR TODO) Don't show again"
     },
     "OVERRIDE_INDICATOR": {
       "TOOLTIP_HEADER": "(FR TODO) change(s) to validate",

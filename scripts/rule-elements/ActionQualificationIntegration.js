@@ -96,13 +96,16 @@ export class ActionQualificationIntegration {
   static async checkHideWithRuleElements(token, currentQualification) {
     if (!token) return currentQualification;
 
+    const forceStart = ActionQualifier.forceStartQualifies(token, 'hide');
+    const forceEnd = ActionQualifier.forceEndQualifies(token, 'hide');
+
     const concealmentCheck = this.checkSourceQualifications(token, 'hide', 'visibility');
     const coverCheck = this.checkSourceQualifications(token, 'hide', 'cover');
 
     const hasQualifyingConcealment = concealmentCheck.qualifies;
     const hasQualifyingCover = coverCheck.qualifies;
 
-    if (!hasQualifyingConcealment && !hasQualifyingCover) {
+    if (!hasQualifyingConcealment && !hasQualifyingCover && !forceEnd) {
       currentQualification.endQualifies = false;
       currentQualification.bothQualify = false;
 
@@ -112,16 +115,34 @@ export class ActionQualificationIntegration {
       }
     }
 
+    if (forceStart) {
+      currentQualification.startQualifies = true;
+    }
+
+    if (forceEnd) {
+      currentQualification.endQualifies = true;
+    }
+
+    currentQualification.bothQualify =
+      !!currentQualification.startQualifies && !!currentQualification.endQualifies;
+
+    if (currentQualification.bothQualify && currentQualification.reason) {
+      currentQualification.reason = '';
+    }
+
     return this.enhanceQualificationWithMessages(currentQualification);
   }
 
   static async checkSneakWithRuleElements(token, currentQualification, position = 'start') {
     if (!token) return currentQualification;
 
+    const forceStart = ActionQualifier.forceStartQualifies(token, 'sneak');
+    const forceEnd = ActionQualifier.forceEndQualifies(token, 'sneak');
+
     const result = ActionQualifier.checkSneakPrerequisites(token, null, position);
 
     const hasRuleElementSources = result.qualifyingConcealment > 0 || result.qualifyingCover > 0;
-    
+
     if (!result.qualifies && hasRuleElementSources) {
       if (position === 'start') {
         currentQualification.startQualifies = false;
@@ -133,6 +154,21 @@ export class ActionQualificationIntegration {
       if (result.messages.length > 0) {
         currentQualification.reason = result.messages.join('. ');
       }
+    }
+
+    if (position === 'start' && forceStart) {
+      currentQualification.startQualifies = true;
+    }
+
+    if (position === 'end' && forceEnd) {
+      currentQualification.endQualifies = true;
+    }
+
+    currentQualification.bothQualify =
+      !!currentQualification.startQualifies && !!currentQualification.endQualifies;
+
+    if (currentQualification.bothQualify && currentQualification.reason) {
+      currentQualification.reason = '';
     }
 
     return this.enhanceQualificationWithMessages(currentQualification);

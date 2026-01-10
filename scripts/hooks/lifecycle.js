@@ -355,6 +355,11 @@ export async function onCanvasReady() {
 
   initializeHoverTooltips();
 
+  try {
+    const { registerAvsGmVisionWarning } = await import('../ui/AvsGmVisionWarning.js');
+    registerAvsGmVisionWarning();
+  } catch (_) { }
+
   // Listen for condition changes to update lifesense highlights
   // Note: Trait changes are handled by ActorEventHandler for full AVS recalculation
 

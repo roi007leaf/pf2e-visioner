@@ -1589,6 +1589,7 @@ export class Pf2eVisionerApi {
           // Clear any other scene flags that might exist
           const sceneFlags = scene.flags?.[MODULE_ID] || {};
           for (const flagKey of Object.keys(sceneFlags)) {
+            if (flagKey === 'disableAVS') continue;
             try {
               await scene.unsetFlag(MODULE_ID, flagKey);
             } catch { }

@@ -40,7 +40,7 @@ describe('ActionQualifier', () => {
   describe('removeActionQualifications', () => {
     it('should remove action qualifications', async () => {
       const operation = { source: 'blur-spell' };
-      
+
       // Mock existing qualifications
       mockToken.document.getFlag.mockReturnValue({
         'blur-spell': { qualifications: {} }
@@ -116,6 +116,38 @@ describe('ActionQualifier', () => {
 
     it('should return true when no qualifications exist', () => {
       const qualifies = ActionQualifier.endPositionQualifies(mockToken, 'sneak');
+      expect(qualifies).toBe(true);
+    });
+  });
+
+  describe('forcePositionQualifies', () => {
+    it('should return true when forceEndQualifies is enabled for sneak', () => {
+      mockToken.document.getFlag.mockReturnValue({
+        camo: {
+          id: 'camo',
+          priority: 100,
+          qualifications: {
+            sneak: { forceEndQualifies: true },
+          },
+        },
+      });
+
+      const qualifies = ActionQualifier.forceEndQualifies(mockToken, 'sneak');
+      expect(qualifies).toBe(true);
+    });
+
+    it('should return true when forceQualifies is enabled for sneak end position', () => {
+      mockToken.document.getFlag.mockReturnValue({
+        camo: {
+          id: 'camo',
+          priority: 100,
+          qualifications: {
+            sneak: { end: { forceQualifies: true } },
+          },
+        },
+      });
+
+      const qualifies = ActionQualifier.forceEndQualifies(mockToken, 'sneak');
       expect(qualifies).toBe(true);
     });
   });

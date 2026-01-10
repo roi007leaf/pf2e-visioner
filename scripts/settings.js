@@ -68,6 +68,7 @@ const SETTINGS_GROUPS = {
       title: 'A.V.S. Settings',
       keys: [
         'autoVisibilityEnabled',
+        'suppressAvsGmVisionWarning',
         'avsChangesIndicatorSize',
         'autoVisibilityDebugMode',
         'avsOnlyInCombat',

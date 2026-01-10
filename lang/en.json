@@ -121,6 +121,12 @@
       "ERROR_REMOVING_OVERRIDE": "Error removing AVS override",
       "ERROR_CLEARING_OVERRIDES": "Error clearing AVS overrides"
     },
+    "AVS_GM_VISION_WARNING": {
+      "TITLE": "GM Vision active",
+      "BODY": "AVS needs a vision polygon; GM Vision does not generate one. Disable GM Vision to enable AVS.",
+      "CLOSE": "Dismiss",
+      "DONT_SHOW_AGAIN": "Don't show again"
+    },
     "OVERRIDE_INDICATOR": {
       "TOOLTIP_HEADER": "change(s) to validate",
       "TOOLTIP_NEXT": "Next:",
@@ -632,6 +638,10 @@
       "AUTO_VISIBILITY_ENABLED": {
         "name": "Enable Auto-Visibility System",
         "hint": "Automatically set visibility flags based on lighting conditions and creature senses. This system will analyze scene lighting, token positions, and creature abilities to determine appropriate visibility states (observed, concealed, hidden, undetected)."
+      },
+      "AVS_GM_VISION_WARNING_SUPPRESS": {
+        "name": "Suppress GM Vision warning",
+        "hint": "Client-only: Don't show the 'GM Vision active' warning banner when GM Vision prevents AVS."
       },
       "AUTO_VISIBILITY_DEBUG_MODE": {
         "name": "Auto-Visibility Debug Mode",

@@ -390,6 +390,10 @@
         "name": "启用自动能见度系统",
         "hint": "根据光照条件和生物感知自动设置能见度标志。该系统会分析场景光照、指示物位置以及生物能力，以确定合适的能见度状态（可见、隐蔽、藏匿、无踪）。"
       },
+      "AVS_GM_VISION_WARNING_SUPPRESS": {
+        "name": "Suppress GM Vision warning",
+        "hint": "Client-only: Don't show the 'GM Vision active' warning banner when GM Vision prevents AVS."
+      },
       "AUTO_VISIBILITY_DEBUG_MODE": {
         "name": "自动能见度调试模式",
         "hint": "为自动能见度系统启用详细控制台日志记录。这对于排查能见度计算问题非常有用。"
@@ -907,6 +911,12 @@
       "ERROR_REMOVING_OVERRIDE": "移除自动能见度覆盖设置时出错",
       "ERROR_CLEARING_OVERRIDES": "清除自动能见度覆盖时出错",
       "ALL_OVERRIDES_CLEARED": "已清除{token}的所有AVS覆盖设置"
+    },
+    "AVS_GM_VISION_WARNING": {
+      "TITLE": "GM Vision active",
+      "BODY": "AVS needs a vision polygon; GM Vision does not generate one. Disable GM Vision to enable AVS.",
+      "CLOSE": "Dismiss",
+      "DONT_SHOW_AGAIN": "Don't show again"
     },
     "OVERRIDE_INDICATOR": {
       "TOOLTIP_HEADER": "需验证的更改",

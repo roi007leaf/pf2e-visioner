@@ -20,7 +20,7 @@
                 "qualifiesOnConcealment": false
               },
               "sneak": {
-                "endPosition": {
+                "end": {
                   "qualifiesOnConcealment": false
                 }
               }
