@@ -103,6 +103,28 @@ export class ActionQualifier {
     return !qualifications.some(q => q.startPositionQualifies === false);
   }
 
+  static forcePositionQualifies(token, action, position) {
+    const qualifications = this.getActionQualifications(token, action);
+
+    if (qualifications.length === 0) return false;
+
+    const topKey = position === 'start' ? 'forceStartQualifies' : 'forceEndQualifies';
+
+    return qualifications.some(q => {
+      if (q?.[topKey] === true) return true;
+      const positionQual = q?.[position];
+      return positionQual?.forceQualifies === true;
+    });
+  }
+
+  static forceStartQualifies(token, action) {
+    return this.forcePositionQualifies(token, action, 'start');
+  }
+
+  static forceEndQualifies(token, action) {
+    return this.forcePositionQualifies(token, action, 'end');
+  }
+
   static ignoreConcealment(token, action, targetToken = null) {
     const qualifications = this.getActionQualifications(token, action);
 
@@ -177,7 +199,7 @@ export class ActionQualifier {
     const coverSources = SourceTracker.getCoverStateSources(token, observerId);
 
     const totalSources = visibilitySources.length + coverSources.length;
-    
+
     if (totalSources === 0) {
       return {
         qualifies: true,

@@ -31,6 +31,7 @@ describe('TurnSneakTracker', () => {
             },
             document: {
                 id: 'token1',
+                getFlag: jest.fn(() => null),
                 x: 100,
                 y: 100,
                 elevation: 0
@@ -249,6 +250,32 @@ describe('TurnSneakTracker', () => {
             const position = { x: 150, y: 150 };
             const qualifies = await tracker._checkEndPositionQualifies(mockToken, mockObserver, position);
             expect(qualifies).toBe(false);
+        });
+
+        test('position qualifies when forced by rule element even without cover or concealment', async () => {
+            const { getCoverBetween } = require('../../../scripts/utils.js');
+            const { optimizedVisibilityCalculator } = require('../../../scripts/visibility/auto-visibility/index.js');
+
+            getCoverBetween.mockReturnValue('none');
+            optimizedVisibilityCalculator.calculateVisibility.mockResolvedValue('observed');
+
+            mockToken.document.getFlag = jest.fn((scope, key) => {
+                if (key === 'actionQualifications') {
+                    return {
+                        camo: {
+                            id: 'camo',
+                            qualifications: {
+                                sneak: { forceEndQualifies: true }
+                            }
+                        }
+                    };
+                }
+                return null;
+            });
+
+            const position = { x: 150, y: 150 };
+            const qualifies = await tracker._checkEndPositionQualifies(mockToken, mockObserver, position);
+            expect(qualifies).toBe(true);
         });
     });
 

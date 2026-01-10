@@ -1,5 +1,15 @@
 # Changelog
 
+## [5.5.0] - 2026-01-10
+
+### ✨ Added
+
+- **Action Qualification Force Override**: Added `forceStartQualifies` and `forceEndQualifies` properties for `modifyActionQualification` rule elements
+  - Allows effects to force Hide/Sneak prerequisites to pass regardless of cover/concealment
+  - Useful for custom effects like "camouflage dye" that enable stealth without normal requirements
+  - Supports both top-level flags (`hide.forceEndQualifies`) and position-scoped flags (`sneak.end.forceQualifies`)
+  - Integrated into Hide/Sneak dialogs, action handlers, and turn-end validation
+
 ## [5.4.1] - 2026-01-09
 
 - **Override Validation Indicator**: Fixed indicator showing for players; now GM-only

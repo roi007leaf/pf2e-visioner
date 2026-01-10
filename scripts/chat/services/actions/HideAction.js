@@ -304,17 +304,28 @@ export class HideActionHandler extends ActionHandlerBase {
           endCenter: endSnapshot?.endPositionCenter || undefined,
         });
       } catch { }
-      
+
       try {
         const { ActionQualificationIntegration } = await import('../../../rule-elements/ActionQualificationIntegration.js');
-        qualification = await ActionQualificationIntegration.checkHideWithRuleElements(
-          actionData.actor.getActiveTokens()[0],
-          qualification
-        );
+        // Safely get token: actionData.actor might be a token or Actor
+        let hidingToken = actionData.actorToken || actionData.actor;
+        if (hidingToken?.actor) {
+          // If it's a token, use it directly
+        } else if (hidingToken?.getActiveTokens) {
+          // If it's an Actor, get first active token
+          hidingToken = hidingToken.getActiveTokens()[0];
+        }
+
+        if (hidingToken) {
+          qualification = await ActionQualificationIntegration.checkHideWithRuleElements(
+            hidingToken,
+            qualification
+          );
+        }
       } catch (err) {
         console.warn('PF2E Visioner | Error checking rule element qualifications:', err);
       }
-      
+
       positionQualification = qualification;
       if (!qualification.bothQualify) newVisibility = 'avs';
     } catch { /* non-fatal prereq */ }

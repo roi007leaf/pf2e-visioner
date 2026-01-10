@@ -746,6 +746,47 @@ describe('Integration Tests', () => {
         expect(result.reason).toContain("Blur doesn't hide your location");
         expect(result.reason).toContain('You are illuminated by revealing light');
       });
+
+      it('should allow Hide when forced by rule element even with no cover or concealment', async () => {
+        mockToken.document.getFlag = jest.fn((scope, key) => {
+          if (key === 'actionQualifications') {
+            return {
+              camo: {
+                id: 'camo',
+                qualifications: {
+                  hide: {
+                    forceStartQualifies: true,
+                    forceEndQualifies: true,
+                  },
+                },
+              },
+            };
+          }
+          if (key === 'stateSource') {
+            return null;
+          }
+          return null;
+        });
+
+        const { ActionQualificationIntegration } = await import(
+          '../../../scripts/rule-elements/ActionQualificationIntegration.js'
+        );
+
+        const result = await ActionQualificationIntegration.checkHideWithRuleElements(
+          mockToken,
+          {
+            startQualifies: false,
+            endQualifies: false,
+            bothQualify: false,
+            reason: 'original',
+          },
+        );
+
+        expect(result.startQualifies).toBe(true);
+        expect(result.endQualifies).toBe(true);
+        expect(result.bothQualify).toBe(true);
+        expect(result.reason).toBe('');
+      });
     });
 
     describe('checkSneakWithRuleElements', () => {
@@ -862,6 +903,46 @@ describe('Integration Tests', () => {
           'end',
         );
         expect(endResult.endQualifies).toBe(true);
+      });
+
+      it('should allow Sneak end position when forced by rule element', async () => {
+        mockToken.document.getFlag = jest.fn((scope, key) => {
+          if (key === 'actionQualifications') {
+            return {
+              camo: {
+                id: 'camo',
+                qualifications: {
+                  sneak: {
+                    forceEndQualifies: true,
+                  },
+                },
+              },
+            };
+          }
+          if (key === 'stateSource') {
+            return null;
+          }
+          return null;
+        });
+
+        const { ActionQualificationIntegration } = await import(
+          '../../../scripts/rule-elements/ActionQualificationIntegration.js'
+        );
+
+        const result = await ActionQualificationIntegration.checkSneakWithRuleElements(
+          mockToken,
+          {
+            startQualifies: true,
+            endQualifies: false,
+            bothQualify: false,
+            reason: 'original',
+          },
+          'end',
+        );
+
+        expect(result.endQualifies).toBe(true);
+        expect(result.bothQualify).toBe(true);
+        expect(result.reason).toBe('');
       });
     });
 

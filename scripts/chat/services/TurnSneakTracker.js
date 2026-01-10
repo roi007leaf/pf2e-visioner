@@ -530,6 +530,13 @@ class TurnSneakTracker {
      */
     async _checkEndPositionQualifies(sneakingToken, observerToken, position, originalOutcome = null) {
         try {
+            try {
+                const { ActionQualifier } = await import('../../rule-elements/operations/ActionQualifier.js');
+                if (ActionQualifier.forceEndQualifies(sneakingToken, 'sneak')) {
+                    return true;
+                }
+            } catch { }
+
             // Calculate current cover state
             let coverState = 'none';
             try {
