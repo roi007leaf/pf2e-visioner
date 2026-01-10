@@ -29,6 +29,26 @@ describe('API AVS cleanup integration', () => {
     expect(clearAllSpy).toHaveBeenCalled();
   });
 
+  test('clearAllSceneData does not unset disableAVS scene flag', async () => {
+    canvas.scene.unsetFlag = jest.fn().mockResolvedValue(true);
+    canvas.scene.flags = {
+      'pf2e-visioner': {
+        disableAVS: true,
+        deletedEntryCache: { x: 1 },
+        someOtherFlag: true,
+      },
+    };
+
+    const { Pf2eVisionerApi } = await import('../../../scripts/api.js');
+    const ok = await Pf2eVisionerApi.clearAllSceneData();
+
+    expect(ok).toBe(true);
+
+    const calls = canvas.scene.unsetFlag.mock.calls;
+    expect(calls.some((c) => c?.[0] === 'pf2e-visioner' && c?.[1] === 'disableAVS')).toBe(false);
+    expect(calls.some((c) => c?.[0] === 'pf2e-visioner' && c?.[1] === 'deletedEntryCache')).toBe(true);
+  });
+
   test('clearAllDataForSelectedTokens removes avs-override-* flags referencing purged tokens and calls removeOverride between them', async () => {
     const mkToken = (id, flags = {}) => ({
       id,

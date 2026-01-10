@@ -10,6 +10,13 @@
   - Supports both top-level flags (`hide.forceEndQualifies`) and position-scoped flags (`sneak.end.forceQualifies`)
   - Integrated into Hide/Sneak dialogs, action handlers, and turn-end validation
 
+- **GM Vision AVS Warning**: GM-only banner warns that AVS won't work while PF2e GM Vision is active (no vision polygon)
+  - Includes dismiss (×) and a persistent "Don't show again" option (client setting)
+
+### 🐛 Bug Fixes
+
+- **AVS Scene Disable**: Purging/cleanup no longer clears the per-scene "Disable AVS" flag
+
 ## [5.4.1] - 2026-01-09
 
 - **Override Validation Indicator**: Fixed indicator showing for players; now GM-only

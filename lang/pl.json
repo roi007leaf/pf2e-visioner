@@ -121,6 +121,12 @@
       "ERROR_REMOVING_OVERRIDE": "Błąd podczas usuwania zastąpienia AVS",
       "ERROR_CLEARING_OVERRIDES": "Błąd podczas kasowania zastąpień AVS"
     },
+    "AVS_GM_VISION_WARNING": {
+      "TITLE": "GM Vision active",
+      "BODY": "AVS needs a vision polygon; GM Vision does not generate one. Disable GM Vision to enable AVS.",
+      "CLOSE": "Dismiss",
+      "DONT_SHOW_AGAIN": "Don't show again"
+    },
     "OVERRIDE_INDICATOR": {
       "TOOLTIP_HEADER": "zmian(y) do zatwierdzenia",
       "TOOLTIP_NEXT": "Następny:",
@@ -632,6 +638,10 @@
       "AUTO_VISIBILITY_ENABLED": {
         "name": "Włącz system automatycznej widoczności",
         "hint": "Automatycznie ustaw flagi widoczności w oparciu o warunki oświetleniowe i zmysły stworzeń. System ten analizuje oświetlenie sceny, pozycje tokenów i zdolności stworzeń, aby określić odpowiednie stany widoczności (obserwowane, przysłonięte, niewidoczne, niewykryte)."
+      },
+      "AVS_GM_VISION_WARNING_SUPPRESS": {
+        "name": "Suppress GM Vision warning",
+        "hint": "Client-only: Don't show the 'GM Vision active' warning banner when GM Vision prevents AVS."
       },
       "AUTO_VISIBILITY_DEBUG_MODE": {
         "name": "Tryb debugowania automatycznej widoczności",
