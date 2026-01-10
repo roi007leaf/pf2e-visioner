@@ -875,6 +875,8 @@
   min-height: 0; /* allow children to shrink and scroll */
   /* Bound the content area so inner flex children can create a scroll region */
   overflow: hidden;
+  background: var(--color-bg);
+  color: var(--color-text-primary);
 }
 
 /* Inline template styles migrated from override-validation.hbs */
@@ -2560,22 +2562,25 @@
     position: sticky !important;
     top: 0 !important;
     z-index: 999 !important;
-    background: var(--color-bg-header, #2a2a2a) !important;
+    background: var(--color-bg-header, var(--color-bg, var(--color-bg-base))) !important;
+    color: var(--color-text-primary);
   }
 
   .sticky-row {
     position: sticky !important;
     top: 0 !important;
     z-index: 999 !important;
-    background: var(--color-bg-header, #2a2a2a) !important;
+    background: var(--color-bg-header, var(--color-bg, var(--color-bg-base))) !important;
+    color: var(--color-text-primary);
   }
 
   .sticky-header th {
     padding: 8px;
-    border-bottom: 2px solid var(--color-border-dark);
+    border-bottom: 2px solid var(--color-border-light-primary);
     font-weight: bold;
     text-align: center;
-    background: var(--color-bg-header, #2a2a2a) !important;
+    background: var(--color-bg-header, var(--color-bg, var(--color-bg-base))) !important;
+    color: var(--color-text-primary);
     position: sticky !important;
     top: 0 !important;
     z-index: 999 !important;
@@ -2936,7 +2941,7 @@
     padding: 0;
     min-width: 540px;
     max-width: 700px;
-    background: var(--color-bg-base);
+    background: var(--color-bg);
     color: var(--color-text-primary);
   }
 
