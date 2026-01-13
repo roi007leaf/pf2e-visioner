@@ -31,11 +31,12 @@ export async function onTokenCreated(scene, tokenDoc) {
   }
   // Ensure Vision is enabled on newly created token documents
   try {
-    if (game.settings.get(MODULE_ID, 'enableAllTokensVision')) {
-      const currentEnabled = tokenDoc?.vision ?? tokenDoc?.sight?.enabled ?? undefined;
-      if (currentEnabled !== true && tokenDoc?.actor?.type !== 'loot') {
+    const desired = !!game.settings.get(MODULE_ID, 'enableAllTokensVision');
+    if (tokenDoc?.actor?.type === 'npc') {
+      const currentEnabled = tokenDoc?.sight?.enabled ?? tokenDoc?.vision ?? undefined;
+      if (currentEnabled !== desired) {
         await tokenDoc.update?.(
-          { vision: true, sight: { enabled: true } },
+          { vision: desired, sight: { enabled: desired } },
           { diff: false, render: false, animate: false },
         );
       }

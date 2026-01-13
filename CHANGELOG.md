@@ -1,5 +1,14 @@
 # Changelog
 
+## [5.5.1] - 2026-01-13
+
+### 🐛 Bug Fixes
+
+- **Vision for NPCs**: Fixed setting not fully applying on toggle
+  - Now updates existing NPC tokens already on scenes
+  - New NPC tokens created on canvas now inherit the setting (on/off)
+  - NPC prototype tokens now sync so future drops inherit correctly
+
 ## [5.5.0] - 2026-01-10
 
 ### ✨ Added
