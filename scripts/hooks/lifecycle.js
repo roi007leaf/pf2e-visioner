@@ -507,43 +507,62 @@ export async function onCanvasReady() {
 
 async function enableVisionForAllTokensAndPrototypes() {
   try {
-    if (game.settings.get(MODULE_ID, 'enableAllTokensVision')) {
-      // Update all scene tokens
-      const scenes = Array.from(game.scenes?.contents ?? []);
-      for (const scene of scenes) {
-        try {
-          const tokens = Array.from(scene.tokens?.contents ?? []).filter(t => t.actor?.type !== "loot");
-          const updates = [];
-          for (const t of tokens) {
-            const hasVision = t?.vision === true || t?.sight?.enabled === true;
-            if (!hasVision) {
-              updates.push({ _id: t.id, vision: true, sight: { enabled: true } });
-            }
-          }
-          if (updates.length) {
-            await scene.updateEmbeddedDocuments('Token', updates, { diff: false, render: false });
-          }
-        } catch (_) { }
-      }
+    const enabled = !!game.settings.get(MODULE_ID, 'enableAllTokensVision');
+    await applyEnableAllTokensVisionSetting(enabled);
+  } catch (_) { }
+}
 
-      // Update all actor prototype tokens
-      const actors = Array.from(game.actors?.contents ?? []).filter(a => a?.type !== "loot");
-      for (const actor of actors) {
-        try {
-          const pt = actor?.prototypeToken;
-          const hasVision = pt?.vision === true || pt?.sight?.enabled === true;
-          if (!hasVision) {
-            // Only GMs can update actor prototype tokens
-            if (game.user.isGM) {
-              await actor.update(
-                { 'prototypeToken.vision': true, 'prototypeToken.sight.enabled': true },
-                { diff: false },
-              );
-            }
-          }
-        } catch (_) { }
+function getTokenVisionEnabled(doc) {
+  const sightEnabled = doc?.sight?.enabled;
+  if (typeof sightEnabled === 'boolean') return sightEnabled;
+  const legacy = doc?.vision;
+  if (typeof legacy === 'boolean') return legacy;
+  return false;
+}
+
+async function syncNpcVisionInScenes(enabled) {
+  const scenes = Array.from(game.scenes?.contents ?? []);
+  for (const scene of scenes) {
+    try {
+      const tokens = Array.from(scene.tokens?.contents ?? []).filter(
+        (t) => t?.actor?.type === 'npc',
+      );
+      const updates = [];
+      for (const t of tokens) {
+        const current = getTokenVisionEnabled(t);
+        if (current !== enabled) {
+          updates.push({ _id: t.id, vision: enabled, sight: { enabled } });
+        }
       }
-    }
+      if (updates.length) {
+        await scene.updateEmbeddedDocuments('Token', updates, { diff: false, render: false });
+      }
+    } catch (_) { }
+  }
+}
+
+async function syncNpcPrototypeVision(enabled) {
+  const actors = Array.from(game.actors?.contents ?? []).filter((a) => a?.type === 'npc');
+  for (const actor of actors) {
+    try {
+      const pt = actor?.prototypeToken;
+      const current = getTokenVisionEnabled(pt);
+      if (current !== enabled) {
+        await actor.update(
+          { 'prototypeToken.vision': enabled, 'prototypeToken.sight.enabled': enabled },
+          { diff: false },
+        );
+      }
+    } catch (_) { }
+  }
+}
+
+export async function applyEnableAllTokensVisionSetting(enabled) {
+  try {
+    if (!game.user?.isGM) return;
+    const desired = !!enabled;
+    await syncNpcVisionInScenes(desired);
+    await syncNpcPrototypeVision(desired);
   } catch (_) { }
 }
 

@@ -646,6 +646,15 @@ export function registerSettings() {
             console.error('PF2E Visioner: Error toggling auto-visibility system:', error);
           }
         };
+      } else if (key === 'enableAllTokensVision') {
+        settingConfig.onChange = async (value) => {
+          try {
+            const { applyEnableAllTokensVisionSetting } = await import('./hooks/lifecycle.js');
+            await applyEnableAllTokensVisionSetting(!!value);
+          } catch (error) {
+            console.warn('PF2E Visioner: Failed to apply Vision for NPCs setting:', error);
+          }
+        };
       } else if (key === 'dimLightingThreshold') {
         // Recalculate AVS when dim lighting threshold changes
         settingConfig.onChange = async () => {
