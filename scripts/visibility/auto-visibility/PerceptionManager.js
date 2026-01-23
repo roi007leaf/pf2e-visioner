@@ -78,6 +78,7 @@ export class OptimizedPerceptionManager {
         refreshVision: true,
         refreshLighting: false,
         refreshOcclusion: true,
+        refreshTiles: true,
       });
     } catch (error) {
       console.warn(`${MODULE_ID} | Error refreshing canvas perception:`, error);

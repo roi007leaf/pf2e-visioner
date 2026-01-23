@@ -162,7 +162,8 @@ async function refreshPerceptionForTokens(tokens) {
       initializeLighting: false,
       refreshVision: true,
       refreshLighting: false,
-      refreshOcclusion: true
+      refreshOcclusion: true,
+      refreshTiles: true
     });
 
     // Update lifesense indicators

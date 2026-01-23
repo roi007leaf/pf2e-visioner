@@ -460,7 +460,7 @@ export class ConditionManager {
         await canvas.perception.update({
           refreshVision: true,
           refreshLighting: false,
-          refreshTiles: false,
+          refreshTiles: true,
         });
         return;
       }
