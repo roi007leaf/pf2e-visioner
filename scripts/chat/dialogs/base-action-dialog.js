@@ -179,6 +179,14 @@ export class BaseActionDialog extends BasePreviewDialog {
       btn.dataset.timerBound = 'true';
       btn.addEventListener('click', (ev) => this._onToggleRowTimer(ev));
     });
+
+    try {
+      const all = this.element.querySelectorAll('.row-timer-toggle[data-token-id]');
+      all.forEach((btn) => {
+        const tokenId = btn.dataset.tokenId;
+        if (tokenId) this._updateRowTimerButton(tokenId);
+      });
+    } catch {}
   }
 
   _injectTimerButtonsIfMissing() {

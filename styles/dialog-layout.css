@@ -51,16 +51,17 @@ button.row-timer-toggle {
 .create-a-diversion-preview-dialog .row-timer-toggle.active,
 .point-out-preview-dialog .row-timer-toggle.active,
 .take-cover-preview-dialog .row-timer-toggle.active,
-.consequences-preview-dialog .row-timer-toggle.active {
+.consequences-preview-dialog .row-timer-toggle.active,
+button.row-timer-toggle.active {
   background: linear-gradient(
     135deg,
-    rgba(59, 130, 246, 0.4) 0%,
-    rgba(37, 99, 235, 0.5) 100%
+    rgba(76, 175, 80, 0.45) 0%,
+    rgba(69, 160, 73, 0.6) 100%
   ) !important;
-  border-color: rgba(96, 165, 250, 0.9) !important;
+  border-color: rgba(76, 175, 80, 0.95) !important;
   color: #fff !important;
   box-shadow:
-    0 0 10px rgba(59, 130, 246, 0.35),
+    0 0 10px rgba(76, 175, 80, 0.35),
     inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
 }
 .pf2e-visioner .row-timer-toggle.active:hover,
@@ -70,10 +71,32 @@ button.row-timer-toggle {
 .create-a-diversion-preview-dialog .row-timer-toggle.active:hover,
 .point-out-preview-dialog .row-timer-toggle.active:hover,
 .take-cover-preview-dialog .row-timer-toggle.active:hover,
-.consequences-preview-dialog .row-timer-toggle.active:hover {
+.consequences-preview-dialog .row-timer-toggle.active:hover,
+button.row-timer-toggle.active:hover {
   background: rgba(220, 38, 38, 0.15);
   border-color: rgba(220, 38, 38, 0.5);
   color: rgba(220, 38, 38, 0.9);
+}
+
+.pf2e-visioner .row-timer-toggle.active:not(:hover),
+.hide-preview-dialog .row-timer-toggle.active:not(:hover),
+.sneak-preview-dialog .row-timer-toggle.active:not(:hover),
+.seek-preview-dialog .row-timer-toggle.active:not(:hover),
+.create-a-diversion-preview-dialog .row-timer-toggle.active:not(:hover),
+.point-out-preview-dialog .row-timer-toggle.active:not(:hover),
+.take-cover-preview-dialog .row-timer-toggle.active:not(:hover),
+.consequences-preview-dialog .row-timer-toggle.active:not(:hover),
+button.row-timer-toggle.active:not(:hover) {
+  background: linear-gradient(
+    135deg,
+    rgba(76, 175, 80, 0.45) 0%,
+    rgba(69, 160, 73, 0.6) 100%
+  ) !important;
+  border-color: rgba(76, 175, 80, 0.95) !important;
+  color: #fff !important;
+  box-shadow:
+    0 0 10px rgba(76, 175, 80, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
 }
 .pf2e-visioner .row-timer-label,
 .hide-preview-dialog .row-timer-label,

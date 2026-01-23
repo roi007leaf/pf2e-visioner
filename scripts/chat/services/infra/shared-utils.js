@@ -670,6 +670,34 @@ export function filterOutcomesByTemplate(
     if (!Array.isArray(outcomes) || !center || !Number.isFinite(radiusFeet) || radiusFeet <= 0)
       return outcomes;
 
+    const gridSize = canvas?.grid?.size ?? canvas?.scene?.grid?.size ?? 100;
+    const gridDistance = canvas?.scene?.grid?.distance ?? canvas?.grid?.distance ?? 5;
+    const pixelsToFeet = (pixels) => (pixels / (gridSize || 1)) * (gridDistance || 5);
+    const getTokenCenter = (token) => {
+      if (!token) return null;
+      if (token.center) return token.center;
+      const w = token.w ?? (Number.isFinite(token.width) ? token.width * gridSize : 0);
+      const h = token.h ?? (Number.isFinite(token.height) ? token.height * gridSize : 0);
+      if (!Number.isFinite(token.x) || !Number.isFinite(token.y)) return null;
+      return { x: token.x + w / 2, y: token.y + h / 2 };
+    };
+    const getWallCenter = (wall) => {
+      if (!wall) return null;
+      if (wall.center) return wall.center;
+      const d = wall.document ?? wall;
+      const c = Array.isArray(d?.c) ? d.c : null;
+      if (c && c.length >= 4) return { x: (c[0] + c[2]) / 2, y: (c[1] + c[3]) / 2 };
+      if (
+        Number.isFinite(d?.x) &&
+        Number.isFinite(d?.y) &&
+        Number.isFinite(d?.x2) &&
+        Number.isFinite(d?.y2)
+      ) {
+        return { x: (d.x + d.x2) / 2, y: (d.y + d.y2) / 2 };
+      }
+      return null;
+    };
+
     let template = null;
     if (messageId && actorTokenId) {
       template = canvas.scene?.templates?.find?.((t) => {
@@ -693,13 +721,9 @@ export function filterOutcomesByTemplate(
     }
 
     return outcomes.filter((outcome) => {
-      if (outcome?.changed === false && messageId) {
-        return false;
-      }
-
       if (template && template.shape) {
         if (outcome?._isWall && outcome?.wall) {
-          const wallCenter = outcome.wall.center;
+          const wallCenter = getWallCenter(outcome.wall);
           if (wallCenter) {
             const localX = wallCenter.x - template.x;
             const localY = wallCenter.y - template.y;
@@ -710,10 +734,8 @@ export function filterOutcomesByTemplate(
 
         const token = outcome?.[tokenProperty];
         if (!token) return false;
-        const tokenCenter = token.center || {
-          x: token.x + (token.w ?? token.width * canvas.grid.size) / 2,
-          y: token.y + (token.h ?? token.height * canvas.grid.size) / 2,
-        };
+        const tokenCenter = getTokenCenter(token);
+        if (!tokenCenter) return false;
         const localX = tokenCenter.x - template.x;
         const localY = tokenCenter.y - template.y;
         return template.shape.contains(localX, localY);
@@ -721,11 +743,11 @@ export function filterOutcomesByTemplate(
 
       if (templateType === 'circle') {
         if (outcome?._isWall && outcome?.wall) {
-          const wallCenter = outcome.wall.center;
+          const wallCenter = getWallCenter(outcome.wall);
           if (wallCenter) {
             const dx = wallCenter.x - center.x;
             const dy = wallCenter.y - center.y;
-            const distanceFeet = Math.sqrt(dx * dx + dy * dy) / (canvas.scene.grid.size / 5);
+            const distanceFeet = pixelsToFeet(Math.sqrt(dx * dx + dy * dy));
             return distanceFeet <= radiusFeet;
           }
           return false;
@@ -733,9 +755,11 @@ export function filterOutcomesByTemplate(
 
         const token = outcome?.[tokenProperty];
         if (!token) return false;
-        const dx = token.center.x - center.x;
-        const dy = token.center.y - center.y;
-        const distanceFeet = Math.sqrt(dx * dx + dy * dy) / (canvas.scene.grid.size / 5);
+        const tokenCenter = getTokenCenter(token);
+        if (!tokenCenter) return false;
+        const dx = tokenCenter.x - center.x;
+        const dy = tokenCenter.y - center.y;
+        const distanceFeet = pixelsToFeet(Math.sqrt(dx * dx + dy * dy));
         return distanceFeet <= radiusFeet;
       }
 
