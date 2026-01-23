@@ -606,29 +606,8 @@ export class RuleElementChecker {
           if (!shouldApply) continue;
         }
 
-        console.log('PF2E Visioner | checkAuraVisibility:', {
-          auraSource: auraSource.name,
-          observer: observerToken.name,
-          target: targetToken.name,
-          distToObserver,
-          distToTarget,
-          radius,
-          observerInside,
-          targetInside,
-          observerIsSource,
-          targetIsSource,
-          includeSourceAsTarget: auraConfig.includeSourceAsTarget,
-          auraTargets: auraConfig.auraTargets,
-        });
-
         if (!observerInside && targetInside) {
-          console.log('PF2E Visioner | Inside→Outside check:', {
-            includeSourceAsTarget: auraConfig.includeSourceAsTarget,
-            targetIsSource,
-            shouldApply: auraConfig.includeSourceAsTarget || !targetIsSource,
-          });
           if (auraConfig.includeSourceAsTarget || !targetIsSource) {
-            console.log('PF2E Visioner | Aura applying inside→outside concealment');
             results.push({
               state: auraConfig.insideOutsideState,
               source: auraConfig.source,
@@ -641,7 +620,6 @@ export class RuleElementChecker {
 
         if (observerInside && !targetInside) {
           if (!auraConfig.sourceExempt || !observerIsSource) {
-            console.log('PF2E Visioner | Aura applying outside→inside concealment');
             results.push({
               state: auraConfig.outsideInsideState,
               source: auraConfig.source,
@@ -659,7 +637,6 @@ export class RuleElementChecker {
         (current.priority || 150) > (highest.priority || 150) ? current : highest,
       );
 
-      console.log('PF2E Visioner | checkAuraVisibility returning:', winner);
       return winner;
     } catch (error) {
       console.warn('PF2E Visioner | Error checking aura visibility:', error);

@@ -20,12 +20,6 @@ export class AuraVisibility {
 
     const sourceId = source || `aura-visibility-${Date.now()}`;
 
-    console.log('PF2E Visioner | applyAuraVisibility:', {
-      token: subjectToken.name,
-      radius: auraRadius,
-      sourceId,
-    });
-
     await subjectToken.document.setFlag('pf2e-visioner', 'auraVisibility', {
       active: true,
       source: sourceId,
@@ -38,14 +32,10 @@ export class AuraVisibility {
       priority,
     });
 
-    console.log('PF2E Visioner | auraVisibility flag set, triggering recalculation');
-
     if (window.pf2eVisioner?.services?.autoVisibilitySystem?.recalculateAll) {
       await window.pf2eVisioner.services.autoVisibilitySystem.recalculateAll();
-      console.log('PF2E Visioner | recalculateAll completed');
     } else if (canvas?.perception) {
       canvas.perception.update({ refreshVision: true, refreshOcclusion: true });
-      console.log('PF2E Visioner | canvas.perception.update triggered');
     }
   }
 

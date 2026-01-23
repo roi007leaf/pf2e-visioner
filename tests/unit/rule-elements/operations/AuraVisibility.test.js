@@ -3,6 +3,9 @@ import { RuleElementChecker } from '../../../../scripts/rule-elements/RuleElemen
 import { SourceTracker } from '../../../../scripts/rule-elements/SourceTracker.js';
 
 jest.mock('../../../../scripts/rule-elements/SourceTracker.js');
+jest.mock('../../../../scripts/stores/visibility-map.js', () => ({
+  setVisibilityMap: jest.fn().mockResolvedValue(undefined),
+}));
 
 describe('AuraVisibility', () => {
   let mockSourceToken, mockInsideToken1, mockInsideToken2, mockOutsideToken1, mockOutsideToken2;

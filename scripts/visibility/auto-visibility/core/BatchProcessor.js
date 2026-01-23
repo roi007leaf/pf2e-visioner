@@ -580,13 +580,6 @@ export class BatchProcessor {
           effectiveVisibility1 = visibility1;
 
           const ruleElementResult1 = RuleElementChecker.checkRuleElements(changedToken, otherToken, visibility1);
-          console.log('PF2E Visioner | BatchProcessor rule element check:', {
-            observer: changedToken.name,
-            target: otherToken.name,
-            baseVisibility: visibility1,
-            ruleElementResult: ruleElementResult1,
-            effectiveVisibility: ruleElementResult1 ? ruleElementResult1.state : visibility1
-          });
           if (ruleElementResult1) {
             effectiveVisibility1 = ruleElementResult1.state;
           }
@@ -639,13 +632,6 @@ export class BatchProcessor {
           effectiveVisibility2 = visibility2;
 
           const ruleElementResult2 = RuleElementChecker.checkRuleElements(otherToken, changedToken, visibility2);
-          console.log('PF2E Visioner | BatchProcessor rule element check:', {
-            observer: otherToken.name,
-            target: changedToken.name,
-            baseVisibility: visibility2,
-            ruleElementResult: ruleElementResult2,
-            effectiveVisibility: ruleElementResult2 ? ruleElementResult2.state : visibility2
-          });
           if (ruleElementResult2) {
             effectiveVisibility2 = ruleElementResult2.state;
           }
@@ -657,12 +643,6 @@ export class BatchProcessor {
         const needsEphemeralUpdate2 = effectiveVisibility2 !== originalVisibility2;
 
         if (needsEphemeralUpdate1) {
-          console.log('PF2E Visioner | BatchProcessor queuing update:', {
-            observer: changedToken.name,
-            target: otherToken.name,
-            visibility: effectiveVisibility1,
-            original: originalVisibility1
-          });
           updates.push({
             observer: changedToken,
             target: otherToken,
@@ -670,12 +650,6 @@ export class BatchProcessor {
           });
         }
         if (needsEphemeralUpdate2) {
-          console.log('PF2E Visioner | BatchProcessor queuing update:', {
-            observer: otherToken.name,
-            target: changedToken.name,
-            visibility: effectiveVisibility2,
-            original: originalVisibility2
-          });
           updates.push({
             observer: otherToken,
             target: changedToken,
