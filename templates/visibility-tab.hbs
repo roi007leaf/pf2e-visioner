@@ -3,6 +3,9 @@
 --}}
 <div class="tab-panel visibility-section {{#if isVisibilityTab}}active{{/if}}">
   <div class="tables-content">
+    {{!-- Active Timed Overrides Section --}}
+    {{> "pf2e-visioner.active-timers"}}
+
     {{#if hasTargets}}
       
       {{!-- Player Characters Table --}}

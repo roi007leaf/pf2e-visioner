@@ -1,0 +1,84 @@
+<div class="timer-duration-content">
+  {{#if targetToken}}
+  <div class="target-info">
+    <div class="target-image">
+      <img src="{{targetImg}}" alt="{{targetName}}" />
+    </div>
+    <div class="target-details">
+      <span class="target-name">{{targetName}}</span>
+      <span class="state-indicator {{stateCssClass}}">
+        <i class="{{stateIcon}}"></i>
+        {{stateLabel}}
+      </span>
+    </div>
+  </div>
+  {{/if}}
+
+  <div class="duration-section">
+    <h4>{{localize "PF2E_VISIONER.TIMED_OVERRIDE.DURATION"}}</h4>
+    
+    <div class="preset-buttons">
+      {{#each presets}}
+        <button type="button" 
+                class="preset-btn {{#if (eq ../selectedDuration key)}}selected{{/if}}" 
+                data-action="selectPreset" 
+                data-preset="{{key}}"
+                data-tooltip="{{label}}">
+          <i class="{{icon}}"></i>
+          <span>{{label}}</span>
+        </button>
+      {{/each}}
+    </div>
+
+    <div class="custom-duration-section {{#if (eq selectedDuration 'custom')}}active{{/if}}">
+      <label>{{localize "PF2E_VISIONER.TIMED_OVERRIDE.CUSTOM"}}</label>
+      <div class="custom-inputs">
+        <input type="number" name="customValue" value="{{customValue}}" min="1" max="999" />
+        <select name="customUnit">
+          <option value="rounds" {{#if (eq customUnit 'rounds')}}selected{{/if}} {{#unless hasCombat}}disabled{{/unless}}>
+            {{localize "PF2E_VISIONER.TIMED_OVERRIDE.ROUNDS"}}
+          </option>
+          <option value="minutes" {{#if (eq customUnit 'minutes')}}selected{{/if}}>
+            {{localize "PF2E_VISIONER.TIMED_OVERRIDE.MINUTES"}}
+          </option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  {{#if hasCombat}}
+  <div class="turn-timing-section">
+    <h4>{{localize "PF2E_VISIONER.TIMED_OVERRIDE.ROUND_TIMING"}}</h4>
+    <div class="turn-timing-inputs">
+      <span>{{localize "PF2E_VISIONER.TIMED_OVERRIDE.EXPIRES_AT"}}</span>
+      <select name="turnTiming">
+        <option value="start" {{#if (eq turnTiming 'start')}}selected{{/if}}>
+          {{localize "PF2E_VISIONER.TIMED_OVERRIDE.START_OF_TURN"}}
+        </option>
+        <option value="end" {{#if (eq turnTiming 'end')}}selected{{/if}}>
+          {{localize "PF2E_VISIONER.TIMED_OVERRIDE.END_OF_TURN"}}
+        </option>
+      </select>
+      <span>{{localize "PF2E_VISIONER.TIMED_OVERRIDE.OF"}}</span>
+      <select name="turnActorId">
+        {{#each combatants}}
+          <option value="{{actorId}}" {{#if selected}}selected{{/if}}>
+            {{name}}
+          </option>
+        {{/each}}
+      </select>
+    </div>
+  </div>
+  {{/if}}
+
+  <div class="dialog-buttons">
+    <button type="button" class="cancel-btn" data-action="cancelTimer">
+      <i class="fas fa-times"></i>
+      {{localize "PF2E_VISIONER.TIMED_OVERRIDE.CANCEL_BUTTON"}}
+    </button>
+    <button type="button" class="apply-btn" data-action="applyTimer">
+      <i class="fas fa-check"></i>
+      {{localize "PF2E_VISIONER.TIMED_OVERRIDE.APPLY_BUTTON"}}
+    </button>
+  </div>
+</div>

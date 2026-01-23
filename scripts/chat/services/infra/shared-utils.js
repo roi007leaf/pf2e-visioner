@@ -242,6 +242,7 @@ export async function applyVisibilityChanges(observer, changes, options = {}) {
         changesByTarget.set(targetToken.document.id, {
           target: targetToken,
           state: effectiveNewState,
+          timedOverride: change.timedOverride || null,
         });
       }
     }
@@ -344,8 +345,9 @@ export function markPanelComplete(panel, changes) {
     const completionMsg = `
             <div class="automation-completion">
                 <i class="fas fa-check-circle"></i>
-                <span>Applied ${changes.length} visibility change${changes.length !== 1 ? 's' : ''
-      }</span>
+                <span>Applied ${changes.length} visibility change${
+                  changes.length !== 1 ? 's' : ''
+                }</span>
             </div>
         `;
 
@@ -533,7 +535,6 @@ export function filterOutcomesBySeekDistance(outcomes, seeker, tokenProperty = '
     const applyOutOfCombat = !!game.settings.get(MODULE_ID, 'limitSeekRangeOutOfCombat');
     const shouldApply = (inCombat && applyInCombat) || (!inCombat && applyOutOfCombat);
 
-
     if (!shouldApply) {
       return outcomes;
     }
@@ -544,9 +545,10 @@ export function filterOutcomesBySeekDistance(outcomes, seeker, tokenProperty = '
         : game.settings.get(MODULE_ID, 'customSeekDistanceOutOfCombat'),
     );
 
-
     if (!Number.isFinite(maxDistance) || maxDistance <= 0) {
-      console.warn(`${MODULE_TITLE} | filterOutcomesBySeekDistance: Invalid max distance (${maxDistance}) - returning all outcomes`);
+      console.warn(
+        `${MODULE_TITLE} | filterOutcomesBySeekDistance: Invalid max distance (${maxDistance}) - returning all outcomes`,
+      );
       return outcomes;
     }
 
@@ -558,14 +560,15 @@ export function filterOutcomesBySeekDistance(outcomes, seeker, tokenProperty = '
       const dist = calculateTokenDistance(seeker, token);
       const isWithinRange = Number.isFinite(dist) ? dist <= maxDistance : true;
 
-
       return isWithinRange;
     });
 
-
     return filtered;
   } catch (error) {
-    console.error(`${MODULE_TITLE} | filterOutcomesBySeekDistance: Error filtering by distance:`, error);
+    console.error(
+      `${MODULE_TITLE} | filterOutcomesBySeekDistance: Error filtering by distance:`,
+      error,
+    );
     return outcomes;
   }
 }
@@ -580,7 +583,14 @@ export function filterOutcomesBySeekDistance(outcomes, seeker, tokenProperty = '
  * @param {string} actorTokenId - Optional actor token ID to find the actual template object
  * @returns {boolean}
  */
-export function isTokenWithinTemplate(center, radiusFeet, token, templateType = 'circle', messageId = null, actorTokenId = null) {
+export function isTokenWithinTemplate(
+  center,
+  radiusFeet,
+  token,
+  templateType = 'circle',
+  messageId = null,
+  actorTokenId = null,
+) {
   try {
     if (!center || !token) return false;
 
@@ -647,7 +657,15 @@ export function isTokenWithinTemplate(center, radiusFeet, token, templateType = 
  * @param {string} actorTokenId - Optional actor token ID to find the actual template object
  * @returns {Array}
  */
-export function filterOutcomesByTemplate(outcomes, center, radiusFeet, tokenProperty = 'target', templateType = 'circle', messageId = null, actorTokenId = null) {
+export function filterOutcomesByTemplate(
+  outcomes,
+  center,
+  radiusFeet,
+  tokenProperty = 'target',
+  templateType = 'circle',
+  messageId = null,
+  actorTokenId = null,
+) {
   try {
     if (!Array.isArray(outcomes) || !center || !Number.isFinite(radiusFeet) || radiusFeet <= 0)
       return outcomes;
@@ -749,7 +767,6 @@ export async function filterOutcomesByDetection(
   filterTokens = true,
 ) {
   try {
-
     if (!Array.isArray(outcomes)) {
       return outcomes;
     }
@@ -869,7 +886,7 @@ export async function filterOutcomesByDetection(
     const removedCount = outcomes.length - filtered.length;
 
     if (removedCount > 0) {
-      const removed = outcomes.filter(o => !filtered.includes(o));
+      const removed = outcomes.filter((o) => !filtered.includes(o));
     }
 
     return filtered;

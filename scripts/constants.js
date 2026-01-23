@@ -988,6 +988,19 @@ export const UI_CONSTANTS = {
 /**
  * Keybinding configurations
  */
+export const TIMED_OVERRIDE_TYPES = {
+  ROUNDS: 'rounds',
+  REALTIME: 'realtime',
+  PERMANENT: 'permanent',
+};
+
+export const TURN_TIMING = {
+  START: 'start',
+  END: 'end',
+};
+
+export const REALTIME_CHECK_INTERVAL_MS = 30000;
+
 export const KEYBINDINGS = {
   openTokenManager: {
     name: 'PF2E_VISIONER.KEYBINDINGS.OPEN_TOKEN_MANAGER.name',

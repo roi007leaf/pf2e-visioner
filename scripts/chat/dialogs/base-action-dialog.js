@@ -9,6 +9,7 @@ export class BaseActionDialog extends BasePreviewDialog {
   constructor(options = {}) {
     super(options);
     this.bulkActionState = this.bulkActionState ?? 'initial';
+    this.rowTimers = new Map();
     // Per-dialog visual filter: show only rows with actionable changes
     if (typeof this.showOnlyChanges === 'undefined') this.showOnlyChanges = false;
     // LOS filter: enabled out of combat by default, disabled in combat (UI disabled while in combat)
@@ -154,7 +155,157 @@ export class BaseActionDialog extends BasePreviewDialog {
     // Ensure bulk override buttons get listeners
     try {
       this._attachBulkOverrideHandlers();
-    } catch { }
+    } catch {}
+
+    // Attach dropdown toggle handlers
+    try {
+      this._attachDropdownHandlers();
+    } catch {}
+
+    // Attach row timer button handlers
+    try {
+      this._attachRowTimerHandlers();
+    } catch {}
+  }
+
+  _attachRowTimerHandlers() {
+    if (!this.element) return;
+
+    this._injectTimerButtonsIfMissing();
+
+    const timerButtons = this.element.querySelectorAll('.row-timer-toggle');
+    timerButtons.forEach((btn) => {
+      if (btn.dataset.timerBound) return;
+      btn.dataset.timerBound = 'true';
+      btn.addEventListener('click', (ev) => this._onToggleRowTimer(ev));
+    });
+  }
+
+  _injectTimerButtonsIfMissing() {
+    const actionsCells = this.element.querySelectorAll('td.actions');
+    actionsCells.forEach((cell) => {
+      if (cell.querySelector('.row-timer-toggle')) return;
+
+      const applyBtn = cell.querySelector('.row-action-btn.apply-change');
+      if (!applyBtn) return;
+
+      const tokenId = applyBtn.dataset.tokenId;
+      if (!tokenId) return;
+
+      const timerBtn = document.createElement('button');
+      timerBtn.type = 'button';
+      timerBtn.className = 'row-timer-toggle';
+      timerBtn.dataset.tokenId = tokenId;
+      timerBtn.dataset.tooltip = game.i18n.localize(
+        'PF2E_VISIONER.TIMED_OVERRIDE.SET_DURATION_FOR_ROW',
+      );
+      timerBtn.innerHTML = '<i class="fas fa-clock"></i>';
+
+      const timerConfig = this.rowTimers?.get(tokenId);
+      if (timerConfig) {
+        timerBtn.classList.add('active');
+      }
+
+      cell.insertBefore(timerBtn, applyBtn);
+    });
+  }
+
+  async _onToggleRowTimer(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    const btn = event.currentTarget;
+    const tokenId = btn.dataset.tokenId;
+    if (!tokenId) return;
+
+    if (this.rowTimers.has(tokenId)) {
+      this.rowTimers.delete(tokenId);
+      this._updateRowTimerButton(tokenId);
+      return;
+    }
+
+    try {
+      const { TimerDurationDialog } = await import('../../ui/TimerDurationDialog.js');
+      const app = this;
+      const defaultActorId = app.actorToken?.actor?.id || app.actor?.id || null;
+      await TimerDurationDialog.show({
+        defaultActorId,
+        onApply: (timerConfig) => {
+          if (timerConfig) {
+            app.rowTimers.set(tokenId, timerConfig);
+            app._updateRowTimerButton(tokenId);
+          }
+        },
+      });
+    } catch (error) {
+      console.error('PF2E Visioner | Error opening timer duration dialog:', error);
+    }
+  }
+
+  _updateRowTimerButton(tokenId) {
+    if (!this.element) return;
+    const btn = this.element.querySelector(`.row-timer-toggle[data-token-id="${tokenId}"]`);
+    if (!btn) return;
+
+    const timerConfig = this.rowTimers.get(tokenId);
+    if (timerConfig) {
+      btn.classList.add('active');
+      let label = '';
+      if (timerConfig.type === 'rounds') {
+        label = `${timerConfig.rounds}r`;
+      } else if (timerConfig.type === 'realtime') {
+        label = `${timerConfig.minutes}m`;
+      } else if (timerConfig.type === 'permanent') {
+        label = '\u221E';
+      }
+      let labelSpan = btn.querySelector('.row-timer-label');
+      if (!labelSpan) {
+        labelSpan = document.createElement('span');
+        labelSpan.className = 'row-timer-label';
+        btn.appendChild(labelSpan);
+      }
+      labelSpan.textContent = label;
+      btn.dataset.tooltip = `${label} - Click to clear`;
+    } else {
+      btn.classList.remove('active');
+      const labelSpan = btn.querySelector('.row-timer-label');
+      if (labelSpan) labelSpan.remove();
+      btn.dataset.tooltip = game.i18n.localize('PF2E_VISIONER.TIMED_OVERRIDE.SET_DURATION_FOR_ROW');
+    }
+  }
+
+  getRowTimer(tokenId) {
+    return this.rowTimers.get(tokenId) || null;
+  }
+
+  _attachDropdownHandlers() {
+    if (!this.element) return;
+    const dropdownToggles = this.element.querySelectorAll('.dropdown-toggle');
+    dropdownToggles.forEach((toggle) => {
+      if (toggle.dataset.dropdownBound) return;
+      toggle.dataset.dropdownBound = 'true';
+      toggle.addEventListener('click', (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        const dropdown = toggle.closest('.row-action-dropdown');
+        if (!dropdown) return;
+        const menu = dropdown.querySelector('.dropdown-menu');
+        if (!menu) return;
+        const wasOpen = menu.style.display !== 'none';
+        this._closeAllDropdowns();
+        if (!wasOpen) {
+          menu.style.display = 'block';
+        }
+      });
+    });
+
+    document.addEventListener('click', () => this._closeAllDropdowns(), { once: true });
+  }
+
+  _closeAllDropdowns() {
+    if (!this.element) return;
+    this.element.querySelectorAll('.dropdown-menu').forEach((menu) => {
+      menu.style.display = 'none';
+    });
   }
 
   buildCommonContext(outcomes) {
@@ -189,7 +340,7 @@ export class BaseActionDialog extends BasePreviewDialog {
 
       // Remove 'avs' if AVS is disabled
       if (!avsEnabled) {
-        states = states.filter(s => s !== 'avs');
+        states = states.filter((s) => s !== 'avs');
       }
 
       this._cachedBulkStates = states.map((s) => ({ value: s, ...this.visibilityConfig(s) }));
@@ -237,7 +388,7 @@ export class BaseActionDialog extends BasePreviewDialog {
       });
       const clearBtn = root.querySelector('button[data-action="bulkOverrideClear"]');
       if (clearBtn) clearBtn.addEventListener('click', (ev) => this._onBulkOverrideClear(ev));
-    } catch { }
+    } catch {}
   }
 
   _onBulkOverrideSet(event) {
@@ -322,7 +473,7 @@ export class BaseActionDialog extends BasePreviewDialog {
     import('../services/ui/dialog-utils.js').then(({ updateRowButtonsToApplied }) => {
       try {
         updateRowButtonsToApplied(this.element, normalized);
-      } catch { }
+      } catch {}
     });
   }
 
@@ -334,7 +485,7 @@ export class BaseActionDialog extends BasePreviewDialog {
     import('../services/ui/dialog-utils.js').then(({ updateRowButtonsToReverted }) => {
       try {
         updateRowButtonsToReverted(this.element, normalized);
-      } catch { }
+      } catch {}
       try {
         // After reverting, reset each row's selection to its initial calculated outcome
         if (!Array.isArray(outcomes)) return;
@@ -366,9 +517,9 @@ export class BaseActionDialog extends BasePreviewDialog {
               (x) => String(this.getOutcomeTokenId(x)) === String(tokenId),
             );
             if (outcome) outcome.overrideState = null;
-          } catch { }
+          } catch {}
         }
-      } catch { }
+      } catch {}
     });
   }
 
@@ -376,7 +527,7 @@ export class BaseActionDialog extends BasePreviewDialog {
     import('../services/ui/dialog-utils.js').then(({ updateBulkActionButtons }) => {
       try {
         updateBulkActionButtons(this.element, this.bulkActionState);
-      } catch { }
+      } catch {}
     });
   }
 
@@ -384,7 +535,7 @@ export class BaseActionDialog extends BasePreviewDialog {
     import('../services/ui/dialog-utils.js').then(({ updateChangesCount }) => {
       try {
         updateChangesCount(this.element, this.getChangesCounterClass());
-      } catch { }
+      } catch {}
     });
   }
 
@@ -409,7 +560,7 @@ export class BaseActionDialog extends BasePreviewDialog {
         const icon = container.querySelector(`.state-icon[data-state="${desiredState}"]`);
         if (icon) icon.classList.add('selected');
       }
-    } catch { }
+    } catch {}
   }
 
   // Outcome display helpers (string-based). Subclasses can override if needed
@@ -467,18 +618,36 @@ export class BaseActionDialog extends BasePreviewDialog {
       if (!container) return;
 
       if (hasActionableChange) {
-        container.innerHTML = `
-          <button type="button" class="row-action-btn apply-change" data-action="applyChange" ${opts.wallId ? `data-wall-id="${opts.wallId}"` : `data-token-id="${tokenId}"`} data-tooltip="${game.i18n.localize('PF2E_VISIONER.UI.APPLY_VISIBILITY_CHANGE')}">
+        const idAttr = opts.wallId ? `data-wall-id="${opts.wallId}"` : `data-token-id="${tokenId}"`;
+        const timerBtn =
+          opts.wallId || !tokenId
+            ? ''
+            : `
+          <button type="button" class="row-timer-toggle" data-token-id="${tokenId}" data-tooltip="${game.i18n.localize(
+            'PF2E_VISIONER.TIMED_OVERRIDE.SET_DURATION_FOR_ROW',
+          )}">
+            <i class="fas fa-clock"></i>
+          </button>
+        `;
+        container.innerHTML = `${timerBtn}
+          <button type="button" class="row-action-btn apply-change" data-action="applyChange" ${idAttr} data-tooltip="${game.i18n.localize('PF2E_VISIONER.UI.APPLY_VISIBILITY_CHANGE')}">
             <i class="fas fa-check"></i>
           </button>
-          <button type="button" class="row-action-btn revert-change" data-action="revertChange" ${opts.wallId ? `data-wall-id="${opts.wallId}"` : `data-token-id="${tokenId}"`} data-tooltip="${game.i18n.localize('PF2E_VISIONER.UI.REVERT_TO_ORIGINAL')}">
+          <button type="button" class="row-action-btn revert-change" data-action="revertChange" ${idAttr} data-tooltip="${game.i18n.localize('PF2E_VISIONER.UI.REVERT_TO_ORIGINAL')}">
             <i class="fas fa-undo"></i>
           </button>
         `;
+
+        if (!opts.wallId && tokenId) {
+          try {
+            this._attachRowTimerHandlers();
+            this._updateRowTimerButton(tokenId);
+          } catch {}
+        }
       } else {
         container.innerHTML = `<span class="no-action">${game.i18n.localize('PF2E_VISIONER.UI.NO_CHANGE_LABEL')}</span>`;
       }
-    } catch { }
+    } catch {}
   }
 
   addIconClickHandlers() {
@@ -528,7 +697,7 @@ export class BaseActionDialog extends BasePreviewDialog {
               wallId,
               row: event.currentTarget.closest('tr'),
             });
-          } catch { }
+          } catch {}
           // Direct DOM fallback to ensure row shows buttons immediately
           try {
             const rowEl = event.currentTarget.closest('tr');
@@ -541,7 +710,18 @@ export class BaseActionDialog extends BasePreviewDialog {
                     : targetId
                       ? `data-token-id="${targetId}"`
                       : '';
+                  const timerBtn =
+                    wallId || !targetId
+                      ? ''
+                      : `
+                    <button type="button" class="row-timer-toggle" data-token-id="${targetId}" data-tooltip="${game.i18n.localize(
+                      'PF2E_VISIONER.TIMED_OVERRIDE.SET_DURATION_FOR_ROW',
+                    )}">
+                      <i class="fas fa-clock"></i>
+                    </button>
+                  `;
                   container.innerHTML = `
+                    ${timerBtn}
                     <button type="button" class="row-action-btn apply-change" data-action="applyChange" ${idAttr} data-tooltip="${game.i18n.localize('PF2E_VISIONER.UI.APPLY_VISIBILITY_CHANGE')}">
                       <i class="fas fa-check"></i>
                     </button>
@@ -549,28 +729,34 @@ export class BaseActionDialog extends BasePreviewDialog {
                       <i class="fas fa-undo"></i>
                     </button>
                   `;
+                  if (!wallId && targetId) {
+                    try {
+                      this._attachRowTimerHandlers();
+                      this._updateRowTimerButton(targetId);
+                    } catch {}
+                  }
                 } else {
                   container.innerHTML = `<span class="no-action">${game.i18n.localize('PF2E_VISIONER.UI.NO_CHANGE_LABEL')}</span>`;
                 }
               }
             }
-          } catch { }
+          } catch {}
           try {
             // Maintain a lightweight list of changed outcomes for convenience
             this.changes = Array.isArray(this.outcomes)
               ? this.outcomes.filter((o) => {
-                const baseOld = o.oldVisibility ?? o.currentVisibility ?? null;
-                const baseNew = o.overrideState ?? o.newVisibility ?? null;
-                return baseOld != null && baseNew != null && baseOld !== baseNew;
-              })
+                  const baseOld = o.oldVisibility ?? o.currentVisibility ?? null;
+                  const baseNew = o.overrideState ?? o.newVisibility ?? null;
+                  return baseOld != null && baseNew != null && baseOld !== baseNew;
+                })
               : [];
-          } catch { }
+          } catch {}
         }
         this.updateChangesCount();
         // If "Show only changes" is active, re-render so filtering reflects override adjustments
         try {
           if (this.showOnlyChanges) this.render({ force: true });
-        } catch { }
+        } catch {}
       });
     });
   }
@@ -593,7 +779,7 @@ export class BaseActionDialog extends BasePreviewDialog {
         if (!row) continue;
         this.updateActionButtonsForToken(tokenId || null, !!o.hasActionableChange, { wallId, row });
       }
-    } catch { }
+    } catch {}
   }
 
   /**
@@ -645,9 +831,7 @@ export class BaseActionDialog extends BasePreviewDialog {
           const { updateTokenVisuals } = await import('../../services/visual-effects.js');
           await updateTokenVisuals();
           const targetName = outcome.target?.name || outcome.token?.name || 'token';
-          notify.info(
-            `${MODULE_TITLE}: Accepted AVS change for ${targetName}`,
-          );
+          notify.info(`${MODULE_TITLE}: Accepted AVS change for ${targetName}`);
         }
       } catch (e) {
         console.warn('Failed to remove AVS override:', e);
@@ -659,11 +843,13 @@ export class BaseActionDialog extends BasePreviewDialog {
     }
 
     // Use AVS-aware logic: allow manual override of AVS-controlled states even if same value
-    const isOldStateAvsControlled = (typeof app.isOldStateAvsControlled === 'function')
-      ? app.isOldStateAvsControlled(outcome)
-      : false;
+    const isOldStateAvsControlled =
+      typeof app.isOldStateAvsControlled === 'function'
+        ? app.isOldStateAvsControlled(outcome)
+        : false;
     const statesMatch = effectiveNewState === outcome.oldVisibility;
-    const hasChange = (effectiveNewState !== outcome.oldVisibility) || (statesMatch && isOldStateAvsControlled);
+    const hasChange =
+      effectiveNewState !== outcome.oldVisibility || (statesMatch && isOldStateAvsControlled);
 
     if (!hasChange) {
       notify.warn(`${MODULE_TITLE}: No changes to apply for this ${wallId ? 'wall' : 'token'}`);
@@ -685,9 +871,17 @@ export class BaseActionDialog extends BasePreviewDialog {
         await applyFunction({ ...actionData, overrides }, target);
         app.updateRowButtonsToApplied([{ wallId: outcome.wallId }]);
       } else {
+        // Check for row timer configuration
+        const rowTimerConfig = app.rowTimers?.get(tokenId);
+        let timedOverride = null;
+        if (rowTimerConfig) {
+          const { TimedOverrideManager } = await import('../../services/TimedOverrideManager.js');
+          timedOverride = TimedOverrideManager._buildTimedOverrideData(rowTimerConfig);
+        }
+
         // Apply visibility changes - this sets AVS pair overrides which will
         // prevent future AVS calculations for this token pair until reverted
-        const overrides = { [tokenId]: effectiveNewState };
+        const overrides = { [tokenId]: { state: effectiveNewState, timedOverride } };
         await applyFunction({ ...actionData, overrides }, target);
 
         // Update the outcome to reflect the applied state
@@ -695,6 +889,12 @@ export class BaseActionDialog extends BasePreviewDialog {
         outcome.overrideState = null;
         outcome.hasActionableChange = false;
         outcome.hasRevertableChange = false;
+
+        // Clear row timer after applying
+        if (rowTimerConfig) {
+          app.rowTimers.delete(tokenId);
+          app._updateRowTimerButton?.(tokenId);
+        }
 
         // Update the UI if method exists
         if (app._updateOutcomeDisplayForToken) {
@@ -713,10 +913,80 @@ export class BaseActionDialog extends BasePreviewDialog {
       if (app.updateChangesCount) {
         app.updateChangesCount();
       }
-
     } catch (error) {
       console.error(`[${actionType} Dialog] Error applying change:`, error);
       notify.error(`${MODULE_TITLE}: Failed to apply change - see console for details`);
+    }
+  }
+
+  static async onApplyChangeTimed(event, target, context) {
+    const { app, applyFunction, actionType } = context;
+    if (!app) {
+      console.error(`[${actionType} Dialog] Could not find application instance`);
+      return;
+    }
+
+    const tokenId = target.dataset.tokenId;
+    if (!tokenId) {
+      notify.warn(`${MODULE_TITLE}: No token found for timed apply`);
+      return;
+    }
+
+    const outcome = app.outcomes?.find?.(
+      (o) => o.token?.id === tokenId || o.target?.id === tokenId,
+    );
+    if (!outcome) {
+      notify.warn(`${MODULE_TITLE}: No outcome found for this token`);
+      return;
+    }
+
+    const effectiveNewState = outcome.overrideState || outcome.newVisibility;
+    if (!effectiveNewState || effectiveNewState === 'avs') {
+      notify.warn(`${MODULE_TITLE}: Cannot apply timed override for AVS state`);
+      return;
+    }
+
+    const observer = app.actionData?.actor;
+    const targetToken = outcome.target || outcome.token;
+    if (!observer || !targetToken) {
+      notify.warn(`${MODULE_TITLE}: Missing observer or target`);
+      return;
+    }
+
+    try {
+      const { TimerDurationDialog } = await import('../../ui/TimerDurationDialog.js');
+      const timerConfig = await TimerDurationDialog.prompt();
+      if (!timerConfig) return;
+
+      const { TimedOverrideManager } = await import('../../services/TimedOverrideManager.js');
+      const success = await TimedOverrideManager.createTimedOverride(
+        observer,
+        targetToken,
+        effectiveNewState,
+        timerConfig,
+        { source: `${actionType.toLowerCase()}_action` },
+      );
+
+      if (success) {
+        outcome.oldVisibility = effectiveNewState;
+        outcome.overrideState = null;
+        outcome.hasActionableChange = false;
+        outcome.hasRevertableChange = false;
+
+        if (app.updateRowButtonsToApplied) {
+          app.updateRowButtonsToApplied([{ target: { id: tokenId } }]);
+        }
+        if (app.updateChangesCount) {
+          app.updateChangesCount();
+        }
+
+        notify.info(
+          `${MODULE_TITLE}: Applied timed visibility override for ${targetToken.name || 'token'}`,
+        );
+      }
+    } catch (error) {
+      console.error(`[${actionType} Dialog] Error applying timed change:`, error);
+      notify.error(`${MODULE_TITLE}: Failed to apply timed change - see console for details`);
     }
   }
 
@@ -761,7 +1031,9 @@ export class BaseActionDialog extends BasePreviewDialog {
       // We check if an override exists rather than checking state differences
       if (!wallId) {
         try {
-          const { default: AvsOverrideManager } = await import('../../services/infra/AvsOverrideManager.js');
+          const { default: AvsOverrideManager } = await import(
+            '../../services/infra/AvsOverrideManager.js'
+          );
           const actorId = app.actionData?.actor?.document?.id || app.actionData?.actor?.id;
           const targetId = outcome.target?.id || outcome.token?.id || tokenId;
 
@@ -800,7 +1072,6 @@ export class BaseActionDialog extends BasePreviewDialog {
       if (app.updateChangesCount) {
         app.updateChangesCount();
       }
-
     } catch (error) {
       console.error(`[${actionType} Dialog] Error reverting change:`, error);
       notify.error(`${MODULE_TITLE}: Failed to revert change - see console for details`);
@@ -977,13 +1248,19 @@ export class BaseActionDialog extends BasePreviewDialog {
 
       if (actorId) {
         try {
-          const { default: AvsOverrideManager } = await import('../../services/infra/AvsOverrideManager.js');
+          const { default: AvsOverrideManager } = await import(
+            '../../services/infra/AvsOverrideManager.js'
+          );
           // Determine the correct direction based on the action semantics
           const direction = app.getApplyDirection?.() || 'observer_to_target';
 
           for (const outcome of appliedOutcomes) {
             const effectiveOldState = outcome.oldVisibility;
-            if (effectiveOldState && effectiveOldState !== 'avs' && effectiveOldState !== outcome.currentVisibility) {
+            if (
+              effectiveOldState &&
+              effectiveOldState !== 'avs' &&
+              effectiveOldState !== outcome.currentVisibility
+            ) {
               const targetId = outcome.target?.id || outcome.token?.id;
               if (targetId) {
                 try {
@@ -1029,7 +1306,6 @@ export class BaseActionDialog extends BasePreviewDialog {
       if (app.updateBulkActionButtons) {
         app.updateBulkActionButtons();
       }
-
     } catch (error) {
       console.error(`[${actionType} Dialog] Error reverting all changes:`, error);
       notify.error(`${MODULE_TITLE}: Failed to revert changes - see console for details`);

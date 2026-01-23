@@ -74,6 +74,9 @@
           </td>
           <td class="actions">
             {{#if o.hasActionableChange}}
+              <button type="button" class="row-timer-toggle" data-token-id="{{o.target.id}}" data-tooltip="{{localize 'PF2E_VISIONER.TIMED_OVERRIDE.SET_DURATION_FOR_ROW'}}">
+                <i class="fas fa-clock"></i>
+              </button>
               <button type="button" class="row-action-btn apply-change" data-action="applyChange" data-token-id="{{o.target.id}}" data-tooltip="{{localize 'PF2E_VISIONER.UI.APPLY_COVER_CHANGE'}}">
                 <i class="fas fa-check"></i>
               </button>

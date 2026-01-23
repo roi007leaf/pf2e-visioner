@@ -28,7 +28,7 @@ function computeAllowedTokenIds(app) {
       // off-table safety: ensure present on canvas
       try {
         if (!canvas.tokens.get(id)) continue;
-      } catch { }
+      } catch {}
       ids.add(id);
     }
     return ids;
@@ -85,8 +85,16 @@ export async function formHandler(event, form, formData, options = {}) {
       const avsRemovals = new Set();
       for (const [tokenId, newState] of Object.entries(visibilityChanges)) {
         if (newState === 'avs') {
-          // AVS state means remove override, don't set a manual state
-          avsRemovals.add(tokenId);
+          const targetToken = canvas.tokens.get(tokenId);
+          if (targetToken) {
+            const hasExistingOverride = targetToken.document.getFlag(
+              MODULE_ID,
+              `avs-override-from-${app.observer.document.id}`,
+            );
+            if (hasExistingOverride) {
+              avsRemovals.add(tokenId);
+            }
+          }
         } else {
           if (merged[tokenId] !== newState) merged[tokenId] = newState;
         }
@@ -116,11 +124,22 @@ export async function formHandler(event, form, formData, options = {}) {
           // Create override if state changed OR if forceOverride is true
           if (stateChanged || forceOverride) {
             const expectedCover = coverChanges?.[tokenId];
+            const rowTimerConfig = app.rowTimers?.get(tokenId);
+            let timedOverride = undefined;
+            const { TimedOverrideManager } = await import(
+              '../../../services/TimedOverrideManager.js'
+            );
+            if (rowTimerConfig) {
+              timedOverride = TimedOverrideManager._buildTimedOverrideData(rowTimerConfig);
+            } else {
+              timedOverride = TimedOverrideManager.getTimerData(app.observer.document.id, tokenId);
+            }
             overrideMap.set(tokenId, {
               target: targetToken,
               state: newState,
               hasCover: expectedCover ? expectedCover !== 'none' : undefined,
               expectedCover,
+              timedOverride,
             });
           }
         }
@@ -213,7 +232,7 @@ export async function formHandler(event, form, formData, options = {}) {
           const actorId = app.observer?.actor?.id;
           if (actorId) {
             const allTokensOfSameActor = canvas.tokens.placeables.filter(
-              t => t.actor?.id === actorId && t.document.id !== app.observer.document.id
+              (t) => t.actor?.id === actorId && t.document.id !== app.observer.document.id,
             );
 
             for (const token of allTokensOfSameActor) {
@@ -235,11 +254,16 @@ export async function formHandler(event, form, formData, options = {}) {
       if (!observerToken) continue;
       try {
         if (['loot', 'vehicle', 'party'].includes(observerToken?.actor?.type)) continue;
-      } catch { }
+      } catch {}
 
       if (newVisibilityState === 'avs') {
-        // AVS state means remove override, don't set a manual state
-        avsRemovals.add(observerTokenId);
+        const hasExistingOverride = app.observer.document.getFlag(
+          MODULE_ID,
+          `avs-override-from-${observerTokenId}`,
+        );
+        if (hasExistingOverride) {
+          avsRemovals.add(observerTokenId);
+        }
         continue;
       }
 
@@ -273,7 +297,7 @@ export async function formHandler(event, form, formData, options = {}) {
         if (!observerToken) continue;
         try {
           if (['loot', 'vehicle', 'party'].includes(observerToken?.actor?.type)) continue;
-        } catch { }
+        } catch {}
         // Only add visual updates for actual state changes
         if (hasChanged) {
           observerUpdates.push({
@@ -299,9 +323,24 @@ export async function formHandler(event, form, formData, options = {}) {
             const { default: AvsOverrideManager } = await import(
               '../../../chat/services/infra/AvsOverrideManager.js'
             );
-            await AvsOverrideManager.applyOverrides(observerToken, map, {
-              source: 'manual_action',
-            });
+            const { TimedOverrideManager } = await import(
+              '../../../services/TimedOverrideManager.js'
+            );
+            const overrideOptions = { source: 'manual_action' };
+            const rowTimerConfig = app.rowTimers?.get(observerTokenId);
+            if (rowTimerConfig) {
+              overrideOptions.timedOverride =
+                TimedOverrideManager._buildTimedOverrideData(rowTimerConfig);
+            } else {
+              const existingTimer = TimedOverrideManager.getTimerData(
+                observerTokenId,
+                app.observer.document.id,
+              );
+              if (existingTimer) {
+                overrideOptions.timedOverride = existingTimer;
+              }
+            }
+            await AvsOverrideManager.applyOverrides(observerToken, map, overrideOptions);
           }
         } catch (e) {
           console.warn('Token Manager: failed to create AVS overrides (target mode):', e);
@@ -365,7 +404,7 @@ export async function formHandler(event, form, formData, options = {}) {
           }
           continue;
         }
-      } catch { }
+      } catch {}
       if (currentState === newCoverState && newCoverState !== 'none') continue;
       if (!perObserverCover.has(observerTokenId))
         perObserverCover.set(observerTokenId, { token: observerToken, map: current });
@@ -382,7 +421,7 @@ export async function formHandler(event, form, formData, options = {}) {
         if (!observerToken) continue;
         try {
           if (['loot', 'vehicle', 'party'].includes(observerToken?.actor?.type)) continue;
-        } catch { }
+        } catch {}
         observerUpdates.push({
           target: app.observer,
           state: newCoverState,
@@ -412,19 +451,21 @@ export async function formHandler(event, form, formData, options = {}) {
   (async () => {
     try {
       try {
-        const { autoVisibilitySystem } = await import('../../../visibility/auto-visibility/index.js');
+        const { autoVisibilitySystem } = await import(
+          '../../../visibility/auto-visibility/index.js'
+        );
         if (autoVisibilitySystem?.orchestrator?.clearPersistentCaches) {
           autoVisibilitySystem.orchestrator.clearPersistentCaches();
         }
-      } catch { }
+      } catch {}
       refreshEveryonesPerception();
       const { updateSpecificTokenPairs } = await import('../../../services/visual-effects.js');
       try {
         await updateSpecificTokenPairs([]);
-      } catch { }
+      } catch {}
       // Removed redundant updateWallVisuals call - wall visual updates are properly handled
       // by TokenEventHandler._handleWallFlagChanges when wall flags actually change
-    } catch { }
+    } catch {}
   })();
   return app.render();
 }
@@ -541,6 +582,24 @@ export async function applyCurrent(event, button) {
             const { default: AvsOverrideManager } = await import(
               '../../../chat/services/infra/AvsOverrideManager.js'
             );
+            const { TimedOverrideManager } = await import(
+              '../../../services/TimedOverrideManager.js'
+            );
+            for (const [tokenId, changeData] of changes.entries()) {
+              const rowTimerConfig = app.rowTimers?.get(tokenId);
+              if (rowTimerConfig) {
+                changeData.timedOverride =
+                  TimedOverrideManager._buildTimedOverrideData(rowTimerConfig);
+              } else {
+                const existingTimer = TimedOverrideManager.getTimerData(
+                  app.observer.document.id,
+                  tokenId,
+                );
+                if (existingTimer) {
+                  changeData.timedOverride = existingTimer;
+                }
+              }
+            }
             await AvsOverrideManager.applyOverrides(app.observer, changes, {
               source: 'manual_action',
             });
@@ -588,7 +647,7 @@ export async function applyCurrent(event, button) {
           if (!observerToken) continue;
           try {
             if (['loot', 'vehicle', 'party'].includes(observerToken?.actor?.type)) continue;
-          } catch { }
+          } catch {}
           const observerVisibilityData = getVisibilityMap(observerToken) || {};
           // Skip if no actual change (treat undefined as 'observed')
           const prev = observerVisibilityData?.[app.observer.document.id] ?? 'observed';
@@ -607,14 +666,31 @@ export async function applyCurrent(event, button) {
             const { default: AvsOverrideManager } = await import(
               '../../../chat/services/infra/AvsOverrideManager.js'
             );
+            const { TimedOverrideManager } = await import(
+              '../../../services/TimedOverrideManager.js'
+            );
             const map = new Map();
             const expectedCover = app._savedModeData.target?.cover?.[observerTokenId];
-            map.set(app.observer.document.id, {
+            const changeData = {
               target: app.observer,
               state: newState,
               hasCover: expectedCover ? expectedCover !== 'none' : undefined,
               expectedCover,
-            });
+            };
+            const rowTimerConfig = app.rowTimers?.get(observerTokenId);
+            if (rowTimerConfig) {
+              changeData.timedOverride =
+                TimedOverrideManager._buildTimedOverrideData(rowTimerConfig);
+            } else {
+              const existingTimer = TimedOverrideManager.getTimerData(
+                observerTokenId,
+                app.observer.document.id,
+              );
+              if (existingTimer) {
+                changeData.timedOverride = existingTimer;
+              }
+            }
+            map.set(app.observer.document.id, changeData);
             await AvsOverrideManager.applyOverrides(observerToken, map, {
               source: 'manual_action',
             });
@@ -653,7 +729,7 @@ export async function applyCurrent(event, button) {
             });
           }
         }
-      } catch { }
+      } catch {}
     }
 
     if (isCover) {
@@ -702,7 +778,7 @@ export async function applyCurrent(event, button) {
           try {
             const t = observer.actor?.type;
             if (t === 'loot' || t === 'vehicle' || t === 'party') continue;
-          } catch { }
+          } catch {}
           allOperations.push(async () => {
             const { batchUpdateCoverEffects } = await import('../../../cover/ephemeral.js');
             await batchUpdateCoverEffects(observer, updates);
@@ -779,7 +855,8 @@ export async function applyBoth(_event, _button) {
     const coverInputs = app.element.querySelectorAll('input[name^="cover."]');
     const wallInputs = app.element.querySelectorAll('input[name^="walls."]');
     if (!app._savedModeData) app._savedModeData = {};
-    if (!app._savedModeData[app.mode]) app._savedModeData[app.mode] = { visibility: {}, cover: {}, walls: {} };
+    if (!app._savedModeData[app.mode])
+      app._savedModeData[app.mode] = { visibility: {}, cover: {}, walls: {} };
     visibilityInputs.forEach((input) => {
       const row = typeof input?.closest === 'function' ? input.closest('tr.token-row') : null;
       const tokenId = input.name.replace('visibility.', '');
@@ -833,8 +910,29 @@ export async function applyBoth(_event, _button) {
             expectedCover,
           });
         }
-        if (map.size > 0)
-          await AvsOverrideManager.applyOverrides(app.observer, map, { source: 'manual_action' });
+        if (map.size > 0) {
+          const { TimedOverrideManager } = await import(
+            '../../../services/TimedOverrideManager.js'
+          );
+          for (const [tokenId, changeData] of map.entries()) {
+            const rowTimerConfig = app.rowTimers?.get(tokenId);
+            if (rowTimerConfig) {
+              changeData.timedOverride =
+                TimedOverrideManager._buildTimedOverrideData(rowTimerConfig);
+            } else {
+              const existingTimer = TimedOverrideManager.getTimerData(
+                app.observer.document.id,
+                tokenId,
+              );
+              if (existingTimer) {
+                changeData.timedOverride = existingTimer;
+              }
+            }
+          }
+          await AvsOverrideManager.applyOverrides(app.observer, map, {
+            source: 'manual_action',
+          });
+        }
       } catch (e) {
         console.warn('Token Manager: failed to create AVS overrides (applyBoth observer):', e);
       }
@@ -907,15 +1005,33 @@ export async function applyBoth(_event, _button) {
           const { default: AvsOverrideManager } = await import(
             '../../../chat/services/infra/AvsOverrideManager.js'
           );
+          const { TimedOverrideManager } = await import(
+            '../../../services/TimedOverrideManager.js'
+          );
           const map = new Map();
           const expectedCover = app._savedModeData.target?.cover?.[observerTokenId];
-          map.set(app.observer.document.id, {
+          const changeData = {
             target: app.observer,
             state: newState,
             hasCover: expectedCover ? expectedCover !== 'none' : undefined,
             expectedCover,
+          };
+          const rowTimerConfig = app.rowTimers?.get(observerTokenId);
+          if (rowTimerConfig) {
+            changeData.timedOverride = TimedOverrideManager._buildTimedOverrideData(rowTimerConfig);
+          } else {
+            const existingTimer = TimedOverrideManager.getTimerData(
+              observerTokenId,
+              app.observer.document.id,
+            );
+            if (existingTimer) {
+              changeData.timedOverride = existingTimer;
+            }
+          }
+          map.set(app.observer.document.id, changeData);
+          await AvsOverrideManager.applyOverrides(observerToken, map, {
+            source: 'manual_action',
           });
-          await AvsOverrideManager.applyOverrides(observerToken, map, { source: 'manual_action' });
         } catch (e) {
           console.warn('Token Manager: failed to create AVS overrides (applyBoth target):', e);
         }
