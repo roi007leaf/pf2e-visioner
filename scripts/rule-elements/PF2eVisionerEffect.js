@@ -1,5 +1,6 @@
 import { getLogger } from '../utils/logger.js';
 import { ActionQualifier } from './operations/ActionQualifier.js';
+import { AuraVisibility } from './operations/AuraVisibility.js';
 import { CoverOverride } from './operations/CoverOverride.js';
 import { DetectionModeModifier } from './operations/DetectionModeModifier.js';
 import { DistanceBasedVisibility } from './operations/DistanceBasedVisibility.js';
@@ -63,6 +64,7 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
               'conditionalState',
               'distanceBasedVisibility',
               'offGuardSuppression',
+              'auraVisibility',
             ],
             initial: 'overrideVisibility',
           }),
@@ -185,6 +187,30 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
             }),
             { required: false },
           ),
+
+          auraRadius: new fields.NumberField({ required: false, initial: 10 }),
+
+          insideOutsideState: new fields.StringField({
+            required: false,
+            choices: ['observed', 'concealed', 'hidden', 'undetected'],
+            initial: 'concealed',
+          }),
+
+          outsideInsideState: new fields.StringField({
+            required: false,
+            choices: ['observed', 'concealed', 'hidden', 'undetected'],
+            initial: 'concealed',
+          }),
+
+          sourceExempt: new fields.BooleanField({ required: false, initial: true }),
+
+          includeSourceAsTarget: new fields.BooleanField({ required: false, initial: false }),
+
+          auraTargets: new fields.StringField({
+            required: false,
+            choices: ['all', 'enemies', 'allies'],
+            initial: 'all',
+          }),
         }),
         { required: true },
       );
@@ -441,6 +467,12 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
         case 'offGuardSuppression':
           if (registeredFlags.includes('offGuardSuppression')) {
             updates['flags.pf2e-visioner.offGuardSuppression'] = null;
+          }
+          break;
+
+        case 'auraVisibility':
+          if (registeredFlags.includes('auraVisibility')) {
+            updates['flags.pf2e-visioner.auraVisibility'] = null;
           }
           break;
 
@@ -721,6 +753,11 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
         case 'offGuardSuppression':
           await OffGuardSuppression.applyOffGuardSuppression(operation, token);
           await this.registerFlag(token, 'offGuardSuppression');
+          break;
+
+        case 'auraVisibility':
+          await AuraVisibility.applyAuraVisibility(operation, token);
+          await this.registerFlag(token, 'auraVisibility');
           break;
 
         default:

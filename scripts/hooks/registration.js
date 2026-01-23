@@ -199,6 +199,10 @@ export async function registerHooks() {
                     OperationClass = (await import('../rule-elements/operations/OffGuardSuppression.js')).OffGuardSuppression;
                     await OperationClass.removeOffGuardSuppression(operationWithSource, token);
                     break;
+                  case 'auraVisibility':
+                    OperationClass = (await import('../rule-elements/operations/AuraVisibility.js')).AuraVisibility;
+                    await OperationClass.removeAuraVisibility(operationWithSource, token);
+                    break;
                 }
               } catch (error) {
                 console.warn(`PF2E Visioner | updateItem: Failed to remove operation ${operationWithSource.type}:`, error);
@@ -253,6 +257,10 @@ export async function registerHooks() {
                     OperationClass = (await import('../rule-elements/operations/OffGuardSuppression.js')).OffGuardSuppression;
                     await OperationClass.applyOffGuardSuppression(operationWithSource, token);
                     break;
+                  case 'auraVisibility':
+                    OperationClass = (await import('../rule-elements/operations/AuraVisibility.js')).AuraVisibility;
+                    await OperationClass.applyAuraVisibility(operationWithSource, token);
+                    break;
                 }
               } catch (error) {
                 console.warn(`PF2E Visioner | Failed to apply operation ${operation.type}:`, error);
@@ -268,6 +276,7 @@ export async function registerHooks() {
                 case 'modifySenses': return 'originalSenses';
                 case 'modifyLighting': return `lightingModification.${op.source || 'lighting'}`;
                 case 'offGuardSuppression': return 'offGuardSuppression';
+                case 'auraVisibility': return 'auraVisibility';
                 default: return null;
               }
             }).filter(Boolean);

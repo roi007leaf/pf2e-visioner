@@ -45,15 +45,22 @@ export class RuleElementChecker {
       results.push(conditionalResult);
     }
 
+    // Check aura visibility
+    const auraResult = this.checkAuraVisibility(observerToken, targetToken);
+    if (auraResult) {
+      results.push(auraResult);
+    }
+
     // Return the highest priority result
     if (results.length === 0) return null;
 
     // Priority resolution with type-based precedence
-    // visibilityReplacement > ruleElementOverride > conditionalState > distanceBasedVisibility
+    // visibilityReplacement > ruleElementOverride > conditionalState > auraVisibility > distanceBasedVisibility
     const typePriority = {
       visibilityReplacement: 1000,
       ruleElementOverride: 500,
       conditionalState: 250,
+      auraVisibility: 150,
       distanceBasedVisibility: 100,
     };
 
@@ -564,6 +571,98 @@ export class RuleElementChecker {
       return null;
     } catch (error) {
       console.warn('PF2E Visioner | Error checking conditional state:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Check aura visibility effects
+   */
+  static checkAuraVisibility(observerToken, targetToken) {
+    try {
+      const allTokens = canvas.tokens?.placeables.filter((t) => t.actor) || [];
+      const results = [];
+
+      for (const token of allTokens) {
+        const auraConfig = token.document?.getFlag('pf2e-visioner', 'auraVisibility');
+        if (!auraConfig?.active) continue;
+
+        const auraSource = token;
+
+        const distToObserver = auraSource.distanceTo(observerToken);
+        const distToTarget = auraSource.distanceTo(targetToken);
+        const radius = auraConfig.auraRadius || 10;
+
+        const observerIsSource = observerToken.id === auraSource.id;
+        const targetIsSource = targetToken.id === auraSource.id;
+
+        const observerInside = distToObserver <= radius;
+        const targetInside = distToTarget <= radius;
+
+        const auraTargets = auraConfig.auraTargets || 'all';
+        if (auraTargets !== 'all') {
+          const targetIsAlly = auraSource.actor?.isAllyOf?.(targetToken.actor) ?? false;
+          const shouldApply = (auraTargets === 'enemies' && !targetIsAlly) || (auraTargets === 'allies' && targetIsAlly);
+          if (!shouldApply) continue;
+        }
+
+        console.log('PF2E Visioner | checkAuraVisibility:', {
+          auraSource: auraSource.name,
+          observer: observerToken.name,
+          target: targetToken.name,
+          distToObserver,
+          distToTarget,
+          radius,
+          observerInside,
+          targetInside,
+          observerIsSource,
+          targetIsSource,
+          includeSourceAsTarget: auraConfig.includeSourceAsTarget,
+          auraTargets: auraConfig.auraTargets,
+        });
+
+        if (!observerInside && targetInside) {
+          console.log('PF2E Visioner | Inside→Outside check:', {
+            includeSourceAsTarget: auraConfig.includeSourceAsTarget,
+            targetIsSource,
+            shouldApply: auraConfig.includeSourceAsTarget || !targetIsSource,
+          });
+          if (auraConfig.includeSourceAsTarget || !targetIsSource) {
+            console.log('PF2E Visioner | Aura applying inside→outside concealment');
+            results.push({
+              state: auraConfig.insideOutsideState,
+              source: auraConfig.source,
+              priority: auraConfig.priority || 150,
+              type: 'auraVisibility',
+              direction: 'inside-outside',
+            });
+          }
+        }
+
+        if (observerInside && !targetInside) {
+          if (!auraConfig.sourceExempt || !observerIsSource) {
+            console.log('PF2E Visioner | Aura applying outside→inside concealment');
+            results.push({
+              state: auraConfig.outsideInsideState,
+              source: auraConfig.source,
+              priority: auraConfig.priority || 150,
+              type: 'auraVisibility',
+              direction: 'outside-inside',
+            });
+          }
+        }
+      }
+
+      if (results.length === 0) return null;
+
+      const winner = results.reduce((highest, current) =>
+        (current.priority || 150) > (highest.priority || 150) ? current : highest,
+      );
+
+      console.log('PF2E Visioner | checkAuraVisibility returning:', winner);
+      return winner;
+    } catch (error) {
+      console.warn('PF2E Visioner | Error checking aura visibility:', error);
       return null;
     }
   }

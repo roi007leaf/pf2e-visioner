@@ -10,7 +10,7 @@ import { registerHooks } from './hooks.js';
 // Import dialog scroll fix
 import { initializeDialogScrollFix } from './services/dialog-scroll-fix.js';
 // Import rule elements
-import { initializeRuleElements } from './rule-elements/index.js';
+import { initializeRuleElements, AuraVisibility } from './rule-elements/index.js';
 // Import cover visualization
 import { initCoverVisualization } from './cover/CoverVisualization.js';
 // Import region behavior registration (executes immediately)
@@ -127,6 +127,8 @@ Hooks.once('init', async () => {
     window.pf2eVisioner = window.pf2eVisioner || {};
     window.pf2eVisioner.services = window.pf2eVisioner.services || {};
     window.pf2eVisioner.services.autoVisibilitySystem = autoVisibilitySystem;
+    window.pf2eVisioner.ruleElements = window.pf2eVisioner.ruleElements || {};
+    window.pf2eVisioner.ruleElements.AuraVisibility = AuraVisibility;
 
     // Initialize Levels integration
     const levelsIntegration = LevelsIntegration.getInstance();
