@@ -63,6 +63,7 @@
       "TIMER_EXPIRED_NOTIFICATION": "Timed override for {target} has expired",
       "TIMER_CANCELLED": "Timer cancelled",
       "NO_COMBAT_FOR_ROUNDS": "No active combat - cannot use round-based duration",
+      "NO_DURATION_SELECTED": "Select a duration first",
       "PRESET_1_ROUND": "1 Round",
       "PRESET_3_ROUNDS": "3 Rounds",
       "PRESET_5_ROUNDS": "5 Rounds",

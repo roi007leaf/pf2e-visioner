@@ -76,7 +76,7 @@
       <i class="fas fa-times"></i>
       {{localize "PF2E_VISIONER.TIMED_OVERRIDE.CANCEL_BUTTON"}}
     </button>
-    <button type="button" class="apply-btn" data-action="applyTimer">
+    <button type="button" class="apply-btn" data-action="applyTimer" {{#unless selectedDuration}}disabled{{/unless}}>
       <i class="fas fa-check"></i>
       {{localize "PF2E_VISIONER.TIMED_OVERRIDE.APPLY_BUTTON"}}
     </button>

@@ -1,4 +1,4 @@
-import { MODULE_ID, TIMED_OVERRIDE_TYPES, REALTIME_CHECK_INTERVAL_MS } from '../constants.js';
+import { MODULE_ID, REALTIME_CHECK_INTERVAL_MS, TIMED_OVERRIDE_TYPES } from '../constants.js';
 
 export class TimedOverrideManager {
   static _realtimeIntervalId = null;
@@ -140,9 +140,6 @@ export class TimedOverrideManager {
     };
 
     switch (config.type) {
-      case TIMED_OVERRIDE_TYPES.PERMANENT:
-        break;
-
       case TIMED_OVERRIDE_TYPES.ROUNDS: {
         if (!config.rounds || config.rounds < 1) return null;
         data.roundsRemaining = config.rounds;
@@ -344,13 +341,13 @@ export class TimedOverrideManager {
         try {
           const { refreshLocalPerception } = await import('./socket.js');
           refreshLocalPerception();
-        } catch {}
+        } catch { }
       }
 
       try {
         const { updateTokenVisuals } = await import('./visual-effects.js');
         await updateTokenVisuals();
-      } catch {}
+      } catch { }
 
       const targetName = expired.token?.name || 'Unknown';
       ui.notifications?.info(
@@ -398,13 +395,6 @@ export class TimedOverrideManager {
       try {
         const updatedData = {
           ...override.flagData,
-          timedOverride: {
-            type: TIMED_OVERRIDE_TYPES.PERMANENT,
-            roundsRemaining: null,
-            expiresOnTurn: null,
-            combatId: null,
-            expiresAt: null,
-          },
         };
         const cleanKey = override.flagKey.replace(`${MODULE_ID}.`, '');
         await override.token.document.setFlag(MODULE_ID, cleanKey, updatedData);
@@ -432,23 +422,23 @@ export class TimedOverrideManager {
           const currentMap = getVisibilityMap(observerToken) || {};
           delete currentMap[targetId];
           await setVisibilityMap(observerToken, currentMap);
-        } catch {}
+        } catch { }
 
         try {
           const { cleanupEphemeralEffectsForTarget } = await import('../visibility/cleanup.js');
           await cleanupEphemeralEffectsForTarget(observerToken, targetToken);
-        } catch {}
+        } catch { }
 
         try {
           const { refreshLocalPerception } = await import('./socket.js');
           refreshLocalPerception();
-        } catch {}
+        } catch { }
       }
 
       try {
         const { updateTokenVisuals } = await import('./visual-effects.js');
         await updateTokenVisuals();
-      } catch {}
+      } catch { }
 
       ui.notifications?.info(game.i18n.localize('PF2E_VISIONER.TIMED_OVERRIDE.TIMER_CANCELLED'));
       return true;
@@ -525,9 +515,6 @@ export class TimedOverrideManager {
     if (!timedOverride) return '';
 
     switch (timedOverride.type) {
-      case TIMED_OVERRIDE_TYPES.PERMANENT:
-        return game.i18n.localize('PF2E_VISIONER.TIMED_OVERRIDE.PERMANENT');
-
       case TIMED_OVERRIDE_TYPES.ROUNDS:
         return game.i18n.format('PF2E_VISIONER.TIMED_OVERRIDE.ROUNDS_REMAINING', {
           count: timedOverride.roundsRemaining || 0,
@@ -554,9 +541,6 @@ export class TimedOverrideManager {
     if (!timedOverride) return false;
 
     switch (timedOverride.type) {
-      case TIMED_OVERRIDE_TYPES.PERMANENT:
-        return true;
-
       case TIMED_OVERRIDE_TYPES.ROUNDS:
         return (timedOverride.roundsRemaining || 0) > 0;
 

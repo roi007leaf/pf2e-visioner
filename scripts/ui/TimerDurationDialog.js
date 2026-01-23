@@ -14,11 +14,13 @@ export class TimerDurationDialog extends foundry.applications.api.HandlebarsAppl
     this.defaultActorId = options.defaultActorId || null;
     this.newState = options.newState || 'hidden';
     this.onApplyCallback = options.onApply || null;
+    this.onCancelCallback = options.onCancel || null;
     this.selectedDuration = null;
     this.customValue = 1;
     this.customUnit = 'rounds';
     this.turnTiming = TURN_TIMING.START;
     this.turnActorId = null;
+    this._didApply = false;
   }
 
   static DEFAULT_OPTIONS = {
@@ -161,6 +163,15 @@ export class TimerDurationDialog extends foundry.applications.api.HandlebarsAppl
     this._attachInputListeners();
     this._updatePresetSelection();
     this._updateTurnTimingVisibility();
+    this._updateApplyButtonState();
+  }
+
+  _updateApplyButtonState() {
+    const el = this.element;
+    if (!el) return;
+    const applyBtn = el.querySelector('.apply-btn');
+    if (!applyBtn) return;
+    applyBtn.disabled = !this.selectedDuration;
   }
 
   _getSelectedTimerType() {
@@ -172,7 +183,7 @@ export class TimerDurationDialog extends foundry.applications.api.HandlebarsAppl
 
     const presets = this._getPresets(!!game.combat);
     const preset = presets.find((p) => p.key === this.selectedDuration);
-    return preset?.type || TIMED_OVERRIDE_TYPES.PERMANENT;
+    return preset?.type;
   }
 
   _updateTurnTimingVisibility() {
@@ -249,6 +260,7 @@ export class TimerDurationDialog extends foundry.applications.api.HandlebarsAppl
     }
 
     this._updateTurnTimingVisibility();
+    this._updateApplyButtonState();
   }
 
   static _onSelectPreset(event, target) {
@@ -261,6 +273,13 @@ export class TimerDurationDialog extends foundry.applications.api.HandlebarsAppl
   }
 
   static async _onApplyTimer(event, target) {
+    if (!this.selectedDuration) {
+      ui.notifications?.warn(
+        game.i18n.localize('PF2E_VISIONER.TIMED_OVERRIDE.NO_DURATION_SELECTED'),
+      );
+      return;
+    }
+
     const timerConfig = this._buildTimerConfig();
     if (!timerConfig) {
       ui.notifications?.warn(
@@ -273,14 +292,44 @@ export class TimerDurationDialog extends foundry.applications.api.HandlebarsAppl
       await this.onApplyCallback(timerConfig);
     }
 
+    this._didApply = true;
+
     this.close();
   }
 
   static _onCancelTimer(event, target) {
+    try {
+      if (typeof this.onCancelCallback === 'function') this.onCancelCallback();
+    } catch {}
     this.close();
   }
 
+  async close(options) {
+    try {
+      if (!this._didApply && typeof this.onCancelCallback === 'function') this.onCancelCallback();
+    } catch {}
+    return super.close(options);
+  }
+
+  static async prompt(options = {}) {
+    return new Promise((resolve) => {
+      let settled = false;
+      const settle = (value) => {
+        if (settled) return;
+        settled = true;
+        resolve(value);
+      };
+
+      TimerDurationDialog.show({
+        ...options,
+        onApply: (cfg) => settle(cfg),
+        onCancel: () => settle(null),
+      });
+    });
+  }
+
   _buildTimerConfig() {
+    if (!this.selectedDuration) return null;
     const presets = this._getPresets(!!game.combat);
 
     if (this.selectedDuration === 'custom') {
@@ -305,9 +354,6 @@ export class TimerDurationDialog extends foundry.applications.api.HandlebarsAppl
     }
 
     const preset = presets.find((p) => p.key === this.selectedDuration);
-    if (!preset) {
-      return { type: TIMED_OVERRIDE_TYPES.PERMANENT };
-    }
 
     if (preset.type === TIMED_OVERRIDE_TYPES.ROUNDS) {
       if (!game.combat) return null;
@@ -329,8 +375,6 @@ export class TimerDurationDialog extends foundry.applications.api.HandlebarsAppl
         minutes: preset.value,
       };
     }
-
-    return { type: TIMED_OVERRIDE_TYPES.PERMANENT };
   }
 
   static async show(options = {}) {

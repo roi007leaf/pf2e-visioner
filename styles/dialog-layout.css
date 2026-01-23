@@ -52,9 +52,16 @@ button.row-timer-toggle {
 .point-out-preview-dialog .row-timer-toggle.active,
 .take-cover-preview-dialog .row-timer-toggle.active,
 .consequences-preview-dialog .row-timer-toggle.active {
-  background: rgba(59, 130, 246, 0.2);
-  border-color: rgba(59, 130, 246, 0.7);
-  color: rgba(59, 130, 246, 1);
+  background: linear-gradient(
+    135deg,
+    rgba(59, 130, 246, 0.4) 0%,
+    rgba(37, 99, 235, 0.5) 100%
+  ) !important;
+  border-color: rgba(96, 165, 250, 0.9) !important;
+  color: #fff !important;
+  box-shadow:
+    0 0 10px rgba(59, 130, 246, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
 }
 .pf2e-visioner .row-timer-toggle.active:hover,
 .hide-preview-dialog .row-timer-toggle.active:hover,
@@ -4126,4 +4133,21 @@ button.row-timer-toggle {
   border-color: rgba(59, 130, 246, 1);
   box-shadow: 0 2px 8px rgba(59, 130, 246, 0.4);
   transform: translateY(-1px);
+}
+
+.pf2e-visioner .timer-duration-content .apply-btn:disabled {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.18);
+  color: rgba(255, 255, 255, 0.55);
+  box-shadow: none;
+  cursor: not-allowed;
+  opacity: 0.7;
+  transform: none;
+}
+
+.pf2e-visioner .timer-duration-content .apply-btn:disabled:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.18);
+  box-shadow: none;
+  transform: none;
 }

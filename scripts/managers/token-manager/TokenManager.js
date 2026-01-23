@@ -600,7 +600,7 @@ export class VisionerTokenManager extends foundry.applications.api.ApplicationV2
 
     if (this.rowTimers.has(tokenId)) {
       this.rowTimers.delete(tokenId);
-      this.render({ force: true });
+      await this._updateRowTimerButton(tokenId);
       return;
     }
 
@@ -613,13 +613,47 @@ export class VisionerTokenManager extends foundry.applications.api.ApplicationV2
         onApply: (timerConfig) => {
           if (timerConfig) {
             app.rowTimers.set(tokenId, timerConfig);
-            app.render({ force: true });
+            app._updateRowTimerButton(tokenId);
           }
         },
       });
     } catch (error) {
       console.error('PF2E Visioner | Error opening timer duration dialog:', error);
     }
+  }
+
+  async _updateRowTimerButton(tokenId) {
+    try {
+      const root = this._getTimerRefreshRoot();
+      if (!root) return;
+      const btn = root.querySelector(`.row-timer-toggle[data-target-id="${tokenId}"]`);
+      if (!btn) return;
+
+      const timerConfig = this.rowTimers.get(tokenId);
+      if (!timerConfig) {
+        btn.classList.remove('active');
+        const labelEl = btn.querySelector('.row-timer-label');
+        if (labelEl) labelEl.remove();
+        btn.dataset.tooltip = game.i18n.localize(
+          'PF2E_VISIONER.TIMED_OVERRIDE.SET_DURATION_FOR_ROW',
+        );
+        return;
+      }
+
+      const { TimedOverrideManager } = await import('../../services/TimedOverrideManager.js');
+      const timedOverride = TimedOverrideManager._buildTimedOverrideData(timerConfig);
+      const display = TimedOverrideManager.getRemainingTimeDisplay(timedOverride);
+
+      btn.classList.add('active');
+      let labelEl = btn.querySelector('.row-timer-label');
+      if (!labelEl) {
+        labelEl = document.createElement('span');
+        labelEl.className = 'row-timer-label';
+        btn.appendChild(labelEl);
+      }
+      labelEl.textContent = display;
+      btn.dataset.tooltip = `${display} - Click to clear`;
+    } catch {}
   }
 
   getRowTimer(tokenId) {
