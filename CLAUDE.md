@@ -2,7 +2,7 @@
 - Every bugfix requires a test if there isn't any.
 - Dont write long functions, break to several functions to keep readable.
 - Never mix test code and production code.
-- Use i18n keys for all user-facing text. Update lang/*.json as needed.
+- Use i18n keys for all user-facing text. Update lang/\*.json as needed.
 - Dont delete debug logs until the user confirms bug is fixed.
 - Do not add comments
 - Do not modify code you haven't specifically been instructed to modify

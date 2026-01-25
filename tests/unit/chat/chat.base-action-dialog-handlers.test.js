@@ -11,7 +11,9 @@ describe('BaseActionDialog generic handlers', () => {
   });
 
   test('onApplyChange warns when no change', async () => {
-    const { BaseActionDialog } = await import('../../../scripts/chat/dialogs/base-action-dialog.js');
+    const { BaseActionDialog } = await import(
+      '../../../scripts/chat/dialogs/base-action-dialog.js'
+    );
 
     const app = {
       outcomes: [
@@ -38,7 +40,9 @@ describe('BaseActionDialog generic handlers', () => {
   });
 
   test('onApplyChange applies token override via applyFunction', async () => {
-    const { BaseActionDialog } = await import('../../../scripts/chat/dialogs/base-action-dialog.js');
+    const { BaseActionDialog } = await import(
+      '../../../scripts/chat/dialogs/base-action-dialog.js'
+    );
 
     const applyFunction = jest.fn().mockResolvedValue(true);
 
@@ -63,14 +67,16 @@ describe('BaseActionDialog generic handlers', () => {
     });
 
     expect(applyFunction).toHaveBeenCalledWith(
-      expect.objectContaining({ overrides: { t1: 'hidden' } }),
+      expect.objectContaining({ overrides: { t1: { state: 'hidden', timedOverride: null } } }),
       target,
     );
     expect(app.updateRowButtonsToApplied).toHaveBeenCalled();
   });
 
   test('onRevertChange reverts token and updates UI', async () => {
-    const { BaseActionDialog } = await import('../../../scripts/chat/dialogs/base-action-dialog.js');
+    const { BaseActionDialog } = await import(
+      '../../../scripts/chat/dialogs/base-action-dialog.js'
+    );
 
     const app = {
       outcomes: [

@@ -1,5 +1,42 @@
 # Changelog
 
+## [6.0.0] - 2026-01-23
+
+### ✨ Added
+
+- **Token Manager Timers**: Active timed overrides now tick live in the UI
+  - Countdown updates without requiring a re-render
+  - Badge tooltip updates stay in sync with the displayed time
+
+- **Action Dialog Row Timers**: Row-level duration picker available via the clock button
+  - Selecting a duration applies that override as timed (rounds/realtime)
+  - Selected duration is reflected on the row (button state/label)
+
+- **Timer Duration Dialog UX**: Combat-only round timing fields are now context-aware
+  - Start/End of turn + combatant selector hidden for non-round timers (realtime/permanent)
+  - Round options still require an active combat
+
+### 🐛 Bug Fixes
+
+- **Action Dialogs**: Changing override state no longer removes the clock icon
+  - Actions column refresh preserves the row timer control
+
+- **Realtime Timers + Pause**: Game pause no longer consumes realtime timer duration
+  - While paused, remaining time is frozen
+  - On unpause, realtime expiry timestamps are shifted forward by the paused duration
+
+### 📝 Notes
+
+- **What timers are**: Timers attach to manual AVS pair overrides (observer → target) as a `timedOverride` payload
+  - While a manual override exists, AVS calculations for that pair are bypassed
+  - When a timer expires (or is cancelled), the manual override is removed and AVS resumes controlling that pair
+
+- **Timer types**
+  - Rounds: decrements on combat turn changes; can expire at start/end of a selected combatant’s turn; requires active combat
+  - Realtime: expires at a wall-clock timestamp; checked periodically by the GM client; does not expire while the game is paused
+
+- **Combat end behavior**: Round-based overrides convert to Permanent when combat ends
+
 ## [5.5.1] - 2026-01-13
 
 ### 🐛 Bug Fixes

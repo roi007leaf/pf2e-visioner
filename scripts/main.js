@@ -91,6 +91,7 @@ Hooks.once('init', async () => {
       'pf2e-visioner.cover-table': 'modules/pf2e-visioner/templates/cover-table.hbs',
       'pf2e-visioner.table-section': 'modules/pf2e-visioner/templates/table-section.hbs',
       'pf2e-visioner.bulk-override': 'modules/pf2e-visioner/templates/partials/bulk-override.hbs',
+      'pf2e-visioner.active-timers': 'modules/pf2e-visioner/templates/partials/active-timers.hbs',
     });
 
     // Register settings and keybindings
@@ -143,7 +144,9 @@ Hooks.once('init', async () => {
 
     // Try to show a user notification if possible
     if (typeof ui !== 'undefined' && ui.notifications) {
-      ui.notifications.error(game.i18n.format('PF2E_VISIONER.NOTIFICATIONS.INIT_FAILED', { error: error.message }));
+      ui.notifications.error(
+        game.i18n.format('PF2E_VISIONER.NOTIFICATIONS.INIT_FAILED', { error: error.message }),
+      );
     }
   }
 });

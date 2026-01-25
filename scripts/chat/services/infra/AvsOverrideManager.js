@@ -29,12 +29,12 @@ function asChangesByTarget(changesInput, defaultState = null) {
 
     // Prefer provided flags; otherwise infer conservatively
     const expectedCover = ch.expectedCover;
-    const hasCover = typeof ch.hasCover === 'boolean'
-      ? ch.hasCover
-      : (expectedCover === 'standard' || expectedCover === 'greater');
-    const hasConcealment = typeof ch.hasConcealment === 'boolean'
-      ? ch.hasConcealment
-      : ['concealed'].includes(state);
+    const hasCover =
+      typeof ch.hasCover === 'boolean'
+        ? ch.hasCover
+        : expectedCover === 'standard' || expectedCover === 'greater';
+    const hasConcealment =
+      typeof ch.hasConcealment === 'boolean' ? ch.hasConcealment : ['concealed'].includes(state);
 
     map.set(target.document.id, { target, state, hasCover, hasConcealment, expectedCover });
   }
@@ -46,7 +46,7 @@ export class AvsOverrideManager {
   static registerHooks() {
     try {
       Hooks.off('avsOverride', this.onAVSOverride); // ensure no dupes
-    } catch { }
+    } catch {}
     Hooks.on('avsOverride', this.onAVSOverride.bind(this));
   }
   /**
@@ -64,7 +64,7 @@ export class AvsOverrideManager {
       // Do not create overrides when the observer is Foundry-hidden
       try {
         if (observer?.document?.hidden === true) return false;
-      } catch { }
+      } catch {}
 
       // Skip creating overrides for hazard and loot tokens - they don't participate in visibility systems
       const isHazardOrLoot = (token) => {
@@ -110,10 +110,10 @@ export class AvsOverrideManager {
           target,
           state,
           source: options.source || (isSneakAction ? 'sneak_action' : 'manual_action'),
-          // Do not force a boolean default; allow inference in onAVSOverride
-          hasCover: (typeof changeData.hasCover === 'boolean') ? changeData.hasCover : undefined,
+          hasCover: typeof changeData.hasCover === 'boolean' ? changeData.hasCover : undefined,
           hasConcealment: changeData.hasConcealment || false,
           expectedCover: changeData.expectedCover,
+          timedOverride: changeData.timedOverride || options.timedOverride || null,
         };
 
         if (isOneWayBySource) {
@@ -125,7 +125,7 @@ export class AvsOverrideManager {
           // Skip reverse if the swapped observer (original target) is Foundry-hidden or is hazard/loot
           try {
             if (target?.document?.hidden === true || isHazardOrLoot(target)) continue;
-          } catch { }
+          } catch {}
           await this.onAVSOverride({ ...payload, observer: target, target: observer });
         }
       }
@@ -134,9 +134,8 @@ export class AvsOverrideManager {
     }
   }
 
-  // Core hook handler: persist override and apply immediately
   static async onAVSOverride(overrideData) {
-    const { observer, target, state, source } = overrideData || {};
+    const { observer, target, state, source, timedOverride } = overrideData || {};
     let { hasCover, hasConcealment, expectedCover } = overrideData || {};
     if (!observer?.document?.id || !target?.document?.id || !state) {
       console.warn('PF2E Visioner | Invalid AVS override data:', overrideData);
@@ -180,13 +179,13 @@ export class AvsOverrideManager {
       if (typeof hasCover !== 'boolean' && expectedCover) {
         hasCover = expectedCover !== 'none';
       }
-      // Persist exactly what we resolved (manual preserves provided fields)
       await this.storeOverrideFlag(observer, target, {
         state,
         source: source || 'unknown',
         hasCover: !!hasCover,
         hasConcealment: !!hasConcealment,
         expectedCover,
+        timedOverride: timedOverride || null,
       });
     } catch (e) {
       console.error('PF2E Visioner | Failed to store override flag:', e);
@@ -206,8 +205,7 @@ export class AvsOverrideManager {
       if (autoVisibilitySystem?.orchestrator?.clearPersistentCaches) {
         autoVisibilitySystem.orchestrator.clearPersistentCaches();
       }
-    } catch (e) {
-    }
+    } catch (e) {}
   }
 
   static async storeOverrideFlag(observer, target, data) {
@@ -223,6 +221,7 @@ export class AvsOverrideManager {
       targetId: targetDocId,
       observerName: observer.name,
       targetName: target.name,
+      timedOverride: data.timedOverride || null,
     };
     await target.document.setFlag(MODULE_ID, flagKey, flagData);
   }
@@ -230,8 +229,13 @@ export class AvsOverrideManager {
   static async applyOverrideFromFlag(observer, target, state) {
     await setVisibility(observer, target, state, { isAutomatic: true, source: 'avs_override' });
     try {
-      Hooks.call('pf2e-visioner.visibilityChanged', observer.document.id, target.document.id, state);
-    } catch { }
+      Hooks.call(
+        'pf2e-visioner.visibilityChanged',
+        observer.document.id,
+        target.document.id,
+        state,
+      );
+    } catch {}
   }
 
   // Remove a specific override (persistent flag-based)
@@ -245,10 +249,12 @@ export class AvsOverrideManager {
         await targetToken.document.unsetFlag(MODULE_ID, flagKey);
         await this.clearGlobalCaches();
         try {
-          const { eventDrivenVisibilitySystem } = await import('../../../visibility/auto-visibility/EventDrivenVisibilitySystem.js');
+          const { eventDrivenVisibilitySystem } = await import(
+            '../../../visibility/auto-visibility/EventDrivenVisibilitySystem.js'
+          );
           // Recalc both sides to be thorough
           await eventDrivenVisibilitySystem.recalculateForTokens([observerId, targetId]);
-        } catch { }
+        } catch {}
         return true;
       }
     } catch (error) {
@@ -276,20 +282,28 @@ export class AvsOverrideManager {
                 await token.document.unsetFlag(MODULE_ID, flagKey);
                 tokensToRecalculate.add(token.id);
               } catch (e) {
-                console.warn(`PF2E Visioner | Failed to remove override flag ${flagKey} from token ${token.name}:`, e);
+                console.warn(
+                  `PF2E Visioner | Failed to remove override flag ${flagKey} from token ${token.name}:`,
+                  e,
+                );
               }
             }
           }
         }
       } catch (e) {
-        console.warn(`PF2E Visioner | Error processing token ${token?.name || 'unknown'} during override cleanup:`, e);
+        console.warn(
+          `PF2E Visioner | Error processing token ${token?.name || 'unknown'} during override cleanup:`,
+          e,
+        );
       }
     }
 
     if (tokensToRecalculate.size > 1) {
       await this.clearGlobalCaches();
       try {
-        const { eventDrivenVisibilitySystem } = await import('../../../visibility/auto-visibility/EventDrivenVisibilitySystem.js');
+        const { eventDrivenVisibilitySystem } = await import(
+          '../../../visibility/auto-visibility/EventDrivenVisibilitySystem.js'
+        );
         await eventDrivenVisibilitySystem.recalculateForTokens(Array.from(tokensToRecalculate));
       } catch (e) {
         console.warn('PF2E Visioner | Failed to recalculate visibility after override cleanup:', e);
@@ -316,26 +330,30 @@ export class AvsOverrideManager {
           if (flagKey.startsWith('avs-override-from-')) {
             try {
               await token.document.unsetFlag(MODULE_ID, flagKey);
-            } catch { }
+            } catch {}
           }
         }
-      } catch { }
+      } catch {}
     }
     // Recalculate everyone once after bulk clear
     try {
-      const { eventDrivenVisibilitySystem } = await import('../../../visibility/auto-visibility/EventDrivenVisibilitySystem.js');
+      const { eventDrivenVisibilitySystem } = await import(
+        '../../../visibility/auto-visibility/EventDrivenVisibilitySystem.js'
+      );
       await eventDrivenVisibilitySystem.recalculateAllVisibility(true);
-    } catch { }
+    } catch {}
   }
-  // Generic writer with explicit source tag
-  static async applyOverrides(observer, changesInput, { source, ...options } = {}) {
-    // Do not create overrides when the observer is Foundry-hidden
+  static async applyOverrides(observer, changesInput, { source, timedOverride, ...options } = {}) {
     try {
       if (observer?.document?.hidden === true) return false;
-    } catch { }
+    } catch {}
     const map = asChangesByTarget(changesInput);
     if (map.size === 0 || !observer) return false;
-    await this.setPairOverrides(observer, map, { source: source || 'manual_action', ...options });
+    await this.setPairOverrides(observer, map, {
+      source: source || 'manual_action',
+      timedOverride,
+      ...options,
+    });
     return true;
   }
 
@@ -404,20 +422,22 @@ export class AvsOverrideManager {
     try {
       // 1. Perception refresh (optimized if available)
       try {
-        const { forceRefreshEveryonesPerception } = await import('../../../services/optimized-socket.js');
+        const { forceRefreshEveryonesPerception } = await import(
+          '../../../services/optimized-socket.js'
+        );
         await forceRefreshEveryonesPerception();
       } catch {
         try {
           const { refreshLocalPerception } = await import('../../../services/socket.js');
           refreshLocalPerception();
-        } catch { }
+        } catch {}
       }
 
       // 2. Token visuals (safe if no dice animation)
       try {
         const { updateTokenVisuals } = await import('../../../services/visual-effects.js');
         await updateTokenVisuals();
-      } catch { }
+      } catch {}
 
       // 3. Hover indicators: clear so they repopulate lazily
       try {
@@ -425,21 +445,21 @@ export class AvsOverrideManager {
         if (typeof mod.hideAllVisibilityIndicators === 'function') {
           mod.hideAllVisibilityIndicators();
         }
-      } catch { }
+      } catch {}
 
       try {
         const mod = await import('../../../ui/OverrideValidationIndicator.js');
         if (typeof mod.hide === 'function') {
           mod.hide(true);
         }
-      } catch { }
+      } catch {}
 
       // 4. Override validation indicator: update (empty) so badge count drops immediately after batch clears
       if (scope === 'batch') {
         try {
           const { default: indicator } = await import('../../../ui/OverrideValidationIndicator.js');
           indicator.update([], '');
-        } catch { }
+        } catch {}
       }
     } catch (err) {
       console.warn('PF2E Visioner | Post-override refresh issue:', err, reason, scope);
