@@ -32,7 +32,7 @@ export function registerUIHooks() {
       if (!toolsContainer || !tool?.name) return;
       if (Array.isArray(toolsContainer)) toolsContainer.push(tool);
       else if (typeof toolsContainer === 'object') toolsContainer[tool.name] = tool;
-    } catch { }
+    } catch {}
   };
   // Keep Darkness tool icon/title in sync with current selection (Lighting tool)
   const refreshDarknessTool = () => {
@@ -84,7 +84,7 @@ export function registerUIHooks() {
       tool.icon = iconClass;
       tool.title = titleText;
       if (changed) ui.controls.render();
-    } catch { }
+    } catch {}
   };
   // Update tool icon on light selection and CRUD changes
   // Update on light selection changes (AmbientLight/Light placeables)
@@ -140,7 +140,7 @@ export function registerUIHooks() {
         tool.title = newTitle;
         ui.controls.render();
       }
-    } catch { }
+    } catch {}
   };
   // Helper: get cover status info for a wall
   const getWallCoverInfo = (wallDocument) => {
@@ -217,7 +217,7 @@ export function registerUIHooks() {
         refreshWallLabelsDebounceTimer = null;
         return;
       }
-      refreshWallIdentifierLabels().catch(() => { });
+      refreshWallIdentifierLabels().catch(() => {});
       refreshWallLabelsDebounceTimer = null;
     }, 150);
   };
@@ -246,7 +246,7 @@ export function registerUIHooks() {
             wallCoverLabelLayer.zIndex = 10000;
             try {
               canvas.interface?.addChild(wallCoverLabelLayer);
-            } catch (_) { }
+            } catch (_) {}
           }
           return wallCoverLabelLayer;
         };
@@ -259,19 +259,19 @@ export function registerUIHooks() {
             if (w._pvIdLabel) {
               try {
                 w._pvIdLabel.parent?.removeChild?.(w._pvIdLabel);
-              } catch { }
+              } catch {}
               try {
                 w._pvIdLabel.destroy?.();
-              } catch { }
+              } catch {}
               delete w._pvIdLabel;
             }
             if (w._pvCoverIcon) {
               try {
                 w._pvCoverIcon.parent?.removeChild?.(w._pvCoverIcon);
-              } catch { }
+              } catch {}
               try {
                 w._pvCoverIcon.destroy?.();
-              } catch { }
+              } catch {}
               delete w._pvCoverIcon;
             }
           }
@@ -280,7 +280,7 @@ export function registerUIHooks() {
               wallCoverLabelLayer.removeChildren();
               wallCoverLabelLayer.parent?.removeChild(wallCoverLabelLayer);
               wallCoverLabelLayer.destroy({ children: true });
-            } catch (_) { }
+            } catch (_) {}
             wallCoverLabelLayer = null;
           }
           return;
@@ -323,7 +323,7 @@ export function registerUIHooks() {
               wallCoverLabelLayer.removeChildren();
               wallCoverLabelLayer.parent?.removeChild(wallCoverLabelLayer);
               wallCoverLabelLayer.destroy({ children: true });
-            } catch (_) { }
+            } catch (_) {}
             wallCoverLabelLayer = null;
           }
           return;
@@ -348,7 +348,7 @@ export function registerUIHooks() {
               if (child.position) {
                 const dist = Math.sqrt(
                   Math.pow(child.position.x - wallCenter.x, 2) +
-                  Math.pow(child.position.y - wallCenter.y, 2),
+                    Math.pow(child.position.y - wallCenter.y, 2),
                 );
                 if (dist < 50) {
                   return true;
@@ -382,10 +382,10 @@ export function registerUIHooks() {
           if (!shouldShowIdentifier && w._pvIdLabel) {
             try {
               w._pvIdLabel.parent?.removeChild?.(w._pvIdLabel);
-            } catch { }
+            } catch {}
             try {
               w._pvIdLabel.destroy?.();
-            } catch { }
+            } catch {}
             delete w._pvIdLabel;
           }
 
@@ -416,7 +416,7 @@ export function registerUIHooks() {
               coverLayer.removeChildren();
               coverLayer.parent?.removeChild(coverLayer);
               coverLayer.destroy({ children: true });
-            } catch (_) { }
+            } catch (_) {}
             wallCoverLabelLayer = null;
           }
 
@@ -507,10 +507,10 @@ export function registerUIHooks() {
               // Remove identifier label if no longer needed
               try {
                 w._pvIdLabel.parent?.removeChild?.(w._pvIdLabel);
-              } catch { }
+              } catch {}
               try {
                 w._pvIdLabel.destroy?.();
-              } catch { }
+              } catch {}
               delete w._pvIdLabel;
             }
 
@@ -732,12 +732,12 @@ export function registerUIHooks() {
       }
 
       // Also refresh identifier labels on the canvas when selection changes
-      refreshWallIdentifierLabels().catch(() => { });
+      refreshWallIdentifierLabels().catch(() => {});
 
       if (coverToolChanged || hiddenToolChanged) {
         ui.controls.render();
       }
-    } catch { }
+    } catch {}
   };
   Hooks.on('controlToken', (token, controlled) => {
     // CRITICAL: Set global flag to suppress lighting refreshes during token control operations
@@ -822,7 +822,7 @@ export function registerUIHooks() {
       }
 
       ui.controls.render();
-    } catch { }
+    } catch {}
   };
   Hooks.on('controlAmbientLight', refreshLightingTool);
   Hooks.on('deleteAmbientLight', refreshLightingTool);
@@ -868,7 +868,7 @@ export function registerUIHooks() {
 
   // Refresh wall labels when active tool changes
   Hooks.on('renderSceneControls', () => {
-    refreshWallIdentifierLabels().catch(() => { });
+    refreshWallIdentifierLabels().catch(() => {});
   });
 
   // Handle configurable keybinding for wall cover labels (doesn't interfere with Alt-click)
@@ -919,7 +919,7 @@ export function registerUIHooks() {
       isShowWallLabelsKeyPressed = true;
       // Only refresh if walls tool is active
       if (ui.controls?.control?.name === 'walls') {
-        refreshWallIdentifierLabels().catch(() => { });
+        refreshWallIdentifierLabels().catch(() => {});
       }
     }
   };
@@ -932,7 +932,7 @@ export function registerUIHooks() {
       // If no keybinding configured but key was pressed, reset anyway
       if (isShowWallLabelsKeyPressed) {
         isShowWallLabelsKeyPressed = false;
-        refreshWallIdentifierLabels().catch(() => { });
+        refreshWallIdentifierLabels().catch(() => {});
       }
       return;
     }
@@ -949,7 +949,7 @@ export function registerUIHooks() {
       isShowWallLabelsKeyPressed = false;
       // Always refresh to clean up labels when key is released
       if (wasPressed) {
-        refreshWallIdentifierLabels().catch(() => { });
+        refreshWallIdentifierLabels().catch(() => {});
       }
     }
   };
@@ -961,7 +961,7 @@ export function registerUIHooks() {
   const boundOnWindowBlur = () => {
     if (isShowWallLabelsKeyPressed) {
       isShowWallLabelsKeyPressed = false;
-      refreshWallIdentifierLabels().catch(() => { });
+      refreshWallIdentifierLabels().catch(() => {});
     }
   };
 
@@ -1012,11 +1012,11 @@ export function registerUIHooks() {
         wallCoverLabelLayer.removeChildren();
         wallCoverLabelLayer.parent?.removeChild(wallCoverLabelLayer);
         wallCoverLabelLayer.destroy({ children: true });
-      } catch (_) { }
+      } catch (_) {}
       wallCoverLabelLayer = null;
     }
     // Clean up any lingering labels
-    refreshWallIdentifierLabels().catch(() => { });
+    refreshWallIdentifierLabels().catch(() => {});
   });
   for (const hook of [
     'renderTokenConfig',
@@ -1166,12 +1166,12 @@ export function registerUIHooks() {
                   } catch {
                     try {
                       await w?.document?.setFlag?.(MODULE_ID, 'hiddenWall', false);
-                    } catch { }
+                    } catch {}
                   }
                 }
               }
               ui.controls.render();
-            } catch { }
+            } catch {}
           },
         });
       }
@@ -1191,7 +1191,7 @@ export function registerUIHooks() {
                 const { VisionerQuickPanel } = await import('../managers/QuickPanel.js');
                 if (!game.user?.isGM) return;
                 new VisionerQuickPanel({}).render(true);
-              } catch { }
+              } catch {}
             },
           });
         }
@@ -1375,19 +1375,17 @@ export function registerUIHooks() {
               if (!selected.length) return;
               const refreshAfterChange = async () => {
                 try {
-                  const { LightingCalculator } = await import(
-                    '../visibility/auto-visibility/LightingCalculator.js'
-                  );
+                  const { LightingCalculator } =
+                    await import('../visibility/auto-visibility/LightingCalculator.js');
                   LightingCalculator.getInstance().invalidateLightCache();
-                } catch { }
+                } catch {}
 
                 // Clear LightingPrecomputer caches for ambient light changes
                 try {
-                  const { LightingPrecomputer } = await import(
-                    '../visibility/auto-visibility/core/LightingPrecomputer.js'
-                  );
+                  const { LightingPrecomputer } =
+                    await import('../visibility/auto-visibility/core/LightingPrecomputer.js');
                   LightingPrecomputer.clearLightingCaches();
-                } catch { }
+                } catch {}
 
                 canvas.perception.update({
                   refreshVision: true,
@@ -1399,7 +1397,7 @@ export function registerUIHooks() {
                 try {
                   const { autoVisibility } = await import('../api.js');
                   autoVisibility.recalculateAll(true); // Force recalculation
-                } catch { }
+                } catch {}
 
                 // Update tool icon/title immediately
                 refreshDarknessTool();
@@ -1417,7 +1415,7 @@ export function registerUIHooks() {
                         'config.negative': true,
                         'config.darkness.negative': true,
                       });
-                    } catch { }
+                    } catch {}
                     try {
                       await l?.document?.unsetFlag?.(MODULE_ID, 'heightenedDarkness');
                     } catch {
@@ -1434,13 +1432,13 @@ export function registerUIHooks() {
                         'config.negative': true,
                         'config.darkness.negative': true,
                       });
-                    } catch { }
+                    } catch {}
                     try {
                       await l?.document?.setFlag?.(MODULE_ID, 'heightenedDarkness', true);
-                    } catch { }
+                    } catch {}
                     try {
                       await l?.document?.setFlag?.(MODULE_ID, 'darknessRank', 4);
-                    } catch { }
+                    } catch {}
                   }),
                 );
               };
@@ -1452,7 +1450,7 @@ export function registerUIHooks() {
                         'config.negative': false,
                         'config.darkness.negative': false,
                       });
-                    } catch { }
+                    } catch {}
                     try {
                       await l?.document?.unsetFlag?.(MODULE_ID, 'heightenedDarkness');
                     } catch {
@@ -1483,9 +1481,9 @@ export function registerUIHooks() {
             try {
               const idf = w?.document?.getFlag?.(MODULE_ID, 'wallIdentifier');
               if (idf && w?.controlIcon) w.controlIcon.tooltip = String(idf);
-            } catch { }
+            } catch {}
           });
-        } catch { }
+        } catch {}
       };
       Hooks.on('controlWall', showWallIdentifierTooltip);
     } catch (_) {
@@ -1558,7 +1556,7 @@ function injectPF2eVisionerBox(app, root) {
         }
       }
     }
-  } catch { }
+  } catch {}
 
   // The incoming "app" can represent several shapes depending on which sheet
   // is being rendered: a TokenConfig, PrototypeTokenConfig, or the PF2e
@@ -1612,6 +1610,7 @@ function injectPF2eVisionerBox(app, root) {
   const coverOverride = readFlag('coverOverride') || 'auto';
   const minPerceptionRank = Number(readFlag('minPerceptionRank') ?? 0);
   const encounterMasterTokenId = readFlag('encounterMasterTokenId') ?? '';
+  const visionMasterTokenId = readFlag('visionMasterTokenId') ?? '';
 
   const hasSnipingDuo = FeatsHandler.hasFeat(actor, 'sniping-duo-dedication');
   const snipingDuoSpotterActorKey =
@@ -1622,9 +1621,24 @@ function injectPF2eVisionerBox(app, root) {
   const currentTokenId = tokenDoc?.id ?? tokenDoc?.uuid;
   const masterToken = encounterMasterTokenId ? canvas?.tokens?.get(encounterMasterTokenId) : null;
   const masterName = masterToken?.name || masterToken?.document?.name || '';
-  const masterDisplayText = encounterMasterTokenId && masterName
-    ? masterName
-    : game.i18n.localize('PF2E_VISIONER.UI.ENCOUNTER_MASTER_CHOOSE');
+  const masterDisplayText =
+    encounterMasterTokenId && masterName
+      ? masterName
+      : game.i18n.localize('PF2E_VISIONER.UI.ENCOUNTER_MASTER_CHOOSE');
+
+  const visionMasterToken = visionMasterTokenId ? canvas?.tokens?.get(visionMasterTokenId) : null;
+  const visionMasterName = visionMasterToken?.name || visionMasterToken?.document?.name || '';
+  const visionSharingMode = tokenDoc?.getFlag?.(MODULE_ID, 'visionSharingMode') || 'one-way';
+  const modeLabels = {
+    'one-way': game.i18n.localize('PF2E_VISIONER.VISION_MASTER_DIALOG.MODE_ONE_WAY'),
+    'two-way': game.i18n.localize('PF2E_VISIONER.VISION_MASTER_DIALOG.MODE_TWO_WAY'),
+    replace: game.i18n.localize('PF2E_VISIONER.VISION_MASTER_DIALOG.MODE_REPLACE'),
+    reverse: game.i18n.localize('PF2E_VISIONER.VISION_MASTER_DIALOG.MODE_REVERSE'),
+  };
+  const visionMasterDisplayText =
+    visionMasterTokenId && visionMasterName
+      ? visionMasterName
+      : game.i18n.localize('PF2E_VISIONER.UI.VISION_MASTER_CHOOSE');
 
   const resolveTokenByActorKey = (actorKey) => {
     try {
@@ -1641,11 +1655,14 @@ function injectPF2eVisionerBox(app, root) {
     }
   };
 
-  const spotterToken = snipingDuoSpotterActorKey ? resolveTokenByActorKey(snipingDuoSpotterActorKey) : null;
+  const spotterToken = snipingDuoSpotterActorKey
+    ? resolveTokenByActorKey(snipingDuoSpotterActorKey)
+    : null;
   const spotterName = spotterToken?.name || spotterToken?.document?.name || '';
-  const spotterDisplayText = snipingDuoSpotterActorKey && spotterName
-    ? spotterName
-    : game.i18n.localize('PF2E_VISIONER.UI.SNIPING_DUO_SPOTTER_CHOOSE');
+  const spotterDisplayText =
+    snipingDuoSpotterActorKey && spotterName
+      ? spotterName
+      : game.i18n.localize('PF2E_VISIONER.UI.SNIPING_DUO_SPOTTER_CHOOSE');
 
   // Build content
   let inner = `
@@ -1687,6 +1704,19 @@ function injectPF2eVisionerBox(app, root) {
         ${encounterMasterTokenId ? `<button type="button" class="pv-encounter-master-clear" data-tooltip="Clear"><i class="fas fa-times"></i></button>` : ''}
       </div>
       <input type="hidden" name="flags.${MODULE_ID}.encounterMasterTokenId" class="pv-encounter-master-input" value="${encounterMasterTokenId}">
+    </div>
+    <div class="form-group">
+      <label data-tooltip="${game.i18n.localize('PF2E_VISIONER.UI.VISION_MASTER_TOOLTIP')}">${game.i18n.localize('PF2E_VISIONER.UI.VISION_MASTER_LABEL')}</label>
+      <div style="display: flex; gap: 4px; align-items: center;">
+        <button type="button" class="pv-vision-master-btn" style="flex: 1; text-align: left;">
+          <i class="fas fa-eye" style="margin-right: 4px;"></i>
+          <span class="pv-vision-master-label">${visionMasterDisplayText}</span>
+        </button>
+        ${visionMasterTokenId ? `<button type="button" class="pv-vision-master-clear" data-tooltip="Clear"><i class="fas fa-times"></i></button>` : ''}
+      </div>
+      ${visionMasterTokenId ? `<p class="notes" style="margin-top: 4px; font-size: 0.9em; color: var(--color-text-light-secondary);">Mode: ${modeLabels[visionSharingMode] || visionSharingMode}</p>` : ''}
+      <input type="hidden" name="flags.${MODULE_ID}.visionMasterTokenId" class="pv-vision-master-input" value="${visionMasterTokenId}">
+      <input type="hidden" name="flags.${MODULE_ID}.visionSharingMode" class="pv-vision-mode-input" value="${visionSharingMode}">
     </div>
   `;
 
@@ -1753,7 +1783,7 @@ function injectPF2eVisionerBox(app, root) {
         }
       });
     });
-  } catch { }
+  } catch {}
 
   try {
     const masterBtn = box.querySelector('.pv-encounter-master-btn');
@@ -1766,15 +1796,21 @@ function injectPF2eVisionerBox(app, root) {
         ev.preventDefault();
         ev.stopPropagation();
         const { EncounterMasterDialog } = await import('../ui/dialogs/EncounterMasterDialog.js');
-        const selectedId = await EncounterMasterDialog.selectMaster(masterInput.value, currentTokenId);
+        const selectedId = await EncounterMasterDialog.selectMaster(
+          masterInput.value,
+          currentTokenId,
+        );
         if (selectedId !== undefined) {
           masterInput.value = selectedId;
           if (masterLabel) {
             if (selectedId) {
               const selectedToken = canvas?.tokens?.get(selectedId);
-              masterLabel.textContent = selectedToken?.name || selectedToken?.document?.name || selectedId;
+              masterLabel.textContent =
+                selectedToken?.name || selectedToken?.document?.name || selectedId;
             } else {
-              masterLabel.textContent = game.i18n.localize('PF2E_VISIONER.UI.ENCOUNTER_MASTER_CHOOSE');
+              masterLabel.textContent = game.i18n.localize(
+                'PF2E_VISIONER.UI.ENCOUNTER_MASTER_CHOOSE',
+              );
             }
           }
           const clearBtnExisting = box.querySelector('.pv-encounter-master-clear');
@@ -1788,7 +1824,10 @@ function injectPF2eVisionerBox(app, root) {
               e.preventDefault();
               e.stopPropagation();
               masterInput.value = '';
-              if (masterLabel) masterLabel.textContent = game.i18n.localize('PF2E_VISIONER.UI.ENCOUNTER_MASTER_CHOOSE');
+              if (masterLabel)
+                masterLabel.textContent = game.i18n.localize(
+                  'PF2E_VISIONER.UI.ENCOUNTER_MASTER_CHOOSE',
+                );
               newClearBtn.remove();
             });
             masterBtn.parentElement.appendChild(newClearBtn);
@@ -1804,11 +1843,93 @@ function injectPF2eVisionerBox(app, root) {
         ev.preventDefault();
         ev.stopPropagation();
         if (masterInput) masterInput.value = '';
-        if (masterLabel) masterLabel.textContent = game.i18n.localize('PF2E_VISIONER.UI.ENCOUNTER_MASTER_CHOOSE');
+        if (masterLabel)
+          masterLabel.textContent = game.i18n.localize('PF2E_VISIONER.UI.ENCOUNTER_MASTER_CHOOSE');
         clearBtn.remove();
       });
     }
-  } catch { }
+  } catch {}
+
+  try {
+    const visionMasterBtn = box.querySelector('.pv-vision-master-btn');
+    const visionMasterInput = box.querySelector('.pv-vision-master-input');
+    const visionMasterLabel = box.querySelector('.pv-vision-master-label');
+    const visionClearBtn = box.querySelector('.pv-vision-master-clear');
+
+    if (visionMasterBtn && visionMasterInput) {
+      visionMasterBtn.addEventListener('click', async (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        const { VisionMasterDialog } = await import('../ui/dialogs/VisionMasterDialog.js');
+        const currentDoc = canvas?.tokens?.get(currentTokenId)?.document;
+        const currentMode = currentDoc?.getFlag(MODULE_ID, 'visionSharingMode') || 'one-way';
+        const result = await VisionMasterDialog.selectMaster(
+          visionMasterInput.value,
+          currentTokenId,
+          currentMode,
+        );
+        if (result !== undefined) {
+          visionMasterInput.value = result.tokenId;
+          if (visionMasterLabel) {
+            if (result.tokenId) {
+              const selectedToken = canvas?.tokens?.get(result.tokenId);
+              visionMasterLabel.textContent =
+                selectedToken?.name || selectedToken?.document?.name || result.tokenId;
+            } else {
+              visionMasterLabel.textContent = game.i18n.localize(
+                'PF2E_VISIONER.UI.VISION_MASTER_CHOOSE',
+              );
+            }
+          }
+          // Store mode in a hidden input for submission
+          let modeInput = box.querySelector('.pv-vision-mode-input');
+          if (!modeInput) {
+            modeInput = document.createElement('input');
+            modeInput.type = 'hidden';
+            modeInput.className = 'pv-vision-mode-input';
+            modeInput.name = 'flags.pf2e-visioner.visionSharingMode';
+            box.appendChild(modeInput);
+          }
+          modeInput.value = result.mode;
+
+          const visionClearBtnExisting = box.querySelector('.pv-vision-master-clear');
+          if (result.tokenId && !visionClearBtnExisting) {
+            const newClearBtn = document.createElement('button');
+            newClearBtn.type = 'button';
+            newClearBtn.className = 'pv-vision-master-clear';
+            newClearBtn.dataset.tooltip = 'Clear';
+            newClearBtn.innerHTML = '<i class="fas fa-times"></i>';
+            newClearBtn.addEventListener('click', (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              visionMasterInput.value = '';
+              if (visionMasterLabel)
+                visionMasterLabel.textContent = game.i18n.localize(
+                  'PF2E_VISIONER.UI.VISION_MASTER_CHOOSE',
+                );
+              newClearBtn.remove();
+            });
+            visionMasterBtn.parentElement.appendChild(newClearBtn);
+          } else if (!result.tokenId && visionClearBtnExisting) {
+            visionClearBtnExisting.remove();
+          }
+        }
+      });
+    }
+
+    if (visionClearBtn) {
+      visionClearBtn.addEventListener('click', (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        if (visionMasterInput) visionMasterInput.value = '';
+        if (visionMasterLabel)
+          visionMasterLabel.textContent = game.i18n.localize(
+            'PF2E_VISIONER.UI.VISION_MASTER_CHOOSE',
+          );
+        visionClearBtn.remove();
+      });
+    }
+  } catch {}
 
   try {
     const duoBtn = box.querySelector('.pv-sniping-duo-btn');
@@ -1849,11 +1970,14 @@ function injectPF2eVisionerBox(app, root) {
             console.warn('PF2E Visioner: clearSnipingDuoSpotter failed', e);
           }
           duoBtn?.dataset && (duoBtn.dataset.spotterKey = '');
-          if (duoLabel) duoLabel.textContent = game.i18n.localize('PF2E_VISIONER.UI.SNIPING_DUO_SPOTTER_CHOOSE');
+          if (duoLabel)
+            duoLabel.textContent = game.i18n.localize(
+              'PF2E_VISIONER.UI.SNIPING_DUO_SPOTTER_CHOOSE',
+            );
           btn.remove();
         });
         duoBtn?.parentElement?.appendChild?.(btn);
-      } catch { }
+      } catch {}
     };
 
     if (duoBtn) {
@@ -1862,7 +1986,8 @@ function injectPF2eVisionerBox(app, root) {
         ev.stopPropagation();
 
         const currentKey = duoBtn.dataset?.spotterKey || '';
-        const { SnipingDuoSpotterDialog } = await import('../ui/dialogs/SnipingDuoSpotterDialog.js');
+        const { SnipingDuoSpotterDialog } =
+          await import('../ui/dialogs/SnipingDuoSpotterDialog.js');
         const selectedKey = await SnipingDuoSpotterDialog.selectSpotter(currentKey, tokenDoc?.id);
         if (selectedKey === undefined) return;
 
@@ -1874,14 +1999,19 @@ function injectPF2eVisionerBox(app, root) {
             console.warn('PF2E Visioner: clearSnipingDuoSpotter failed', e);
           }
           duoBtn.dataset.spotterKey = '';
-          if (duoLabel) duoLabel.textContent = game.i18n.localize('PF2E_VISIONER.UI.SNIPING_DUO_SPOTTER_CHOOSE');
+          if (duoLabel)
+            duoLabel.textContent = game.i18n.localize(
+              'PF2E_VISIONER.UI.SNIPING_DUO_SPOTTER_CHOOSE',
+            );
           box.querySelector('.pv-sniping-duo-clear')?.remove();
           return;
         }
 
         const spotterActor = await resolveActorFromKey(selectedKey);
         if (!spotterActor) {
-          ui.notifications.warn(game.i18n.localize('PF2E_VISIONER.UI.SNIPING_DUO_SPOTTER_NOT_FOUND'));
+          ui.notifications.warn(
+            game.i18n.localize('PF2E_VISIONER.UI.SNIPING_DUO_SPOTTER_NOT_FOUND'),
+          );
           return;
         }
 
@@ -1911,11 +2041,12 @@ function injectPF2eVisionerBox(app, root) {
           console.warn('PF2E Visioner: clearSnipingDuoSpotter failed', e);
         }
         duoBtn.dataset.spotterKey = '';
-        if (duoLabel) duoLabel.textContent = game.i18n.localize('PF2E_VISIONER.UI.SNIPING_DUO_SPOTTER_CHOOSE');
+        if (duoLabel)
+          duoLabel.textContent = game.i18n.localize('PF2E_VISIONER.UI.SNIPING_DUO_SPOTTER_CHOOSE');
         duoClear.remove();
       });
     }
-  } catch { }
+  } catch {}
 
   if (detectionFS) detectionFS.insertAdjacentElement('afterend', box);
   else panel.appendChild(box);
@@ -1956,14 +2087,13 @@ function onRenderWallConfig(app, html) {
         btn.addEventListener('click', async (ev) => {
           ev.preventDefault();
           ev.stopPropagation();
-          const { VisionerWallQuickSettings } = await import(
-            '../managers/wall-manager/WallQuick.js'
-          );
+          const { VisionerWallQuickSettings } =
+            await import('../managers/wall-manager/WallQuick.js');
           new VisionerWallQuickSettings(app.document).render(true);
         });
       }
-    } catch { }
-  } catch { }
+    } catch {}
+  } catch {}
 }
 
 function onRenderLightConfig(app, html) {
@@ -2039,7 +2169,7 @@ function onRenderLightConfig(app, html) {
         try {
           basicTab.insertBefore(fs, basicTab.firstChild);
           inserted = true;
-        } catch { }
+        } catch {}
       }
     }
     if (!inserted) {
@@ -2063,7 +2193,7 @@ function onRenderLightConfig(app, html) {
           try {
             advTab.insertBefore(fs, advTab.firstChild);
             inserted = true;
-          } catch { }
+          } catch {}
         }
       }
     }
@@ -2090,7 +2220,7 @@ function onRenderLightConfig(app, html) {
               try {
                 neg.checked = true;
                 neg.dispatchEvent(new Event('change', { bubbles: true }));
-              } catch { }
+              } catch {}
             }
           }
 
@@ -2118,9 +2248,8 @@ function onRenderLightConfig(app, html) {
           // Trigger AVS recalculation when heightened darkness checkbox changes
           try {
             // Clear LightingPrecomputer caches for ambient light changes
-            const { LightingPrecomputer } = await import(
-              '../visibility/auto-visibility/core/LightingPrecomputer.js'
-            );
+            const { LightingPrecomputer } =
+              await import('../visibility/auto-visibility/core/LightingPrecomputer.js');
             LightingPrecomputer.clearLightingCaches();
 
             // Trigger AVS recalculation for lighting environment changes
@@ -2141,7 +2270,7 @@ function onRenderLightConfig(app, html) {
       const syncVisibility = () => {
         try {
           fs.style.display = neg?.checked ? '' : 'none';
-        } catch { }
+        } catch {}
       };
       const handleNativeDarknessChange = async () => {
         syncVisibility();
@@ -2149,9 +2278,8 @@ function onRenderLightConfig(app, html) {
         // Trigger AVS recalculation when native darkness checkbox changes
         try {
           // Clear LightingPrecomputer caches for ambient light changes
-          const { LightingPrecomputer } = await import(
-            '../visibility/auto-visibility/core/LightingPrecomputer.js'
-          );
+          const { LightingPrecomputer } =
+            await import('../visibility/auto-visibility/core/LightingPrecomputer.js');
           LightingPrecomputer.clearLightingCaches();
 
           // Trigger AVS recalculation for lighting environment changes
@@ -2166,8 +2294,8 @@ function onRenderLightConfig(app, html) {
       };
       syncVisibility();
       if (neg) neg.addEventListener('change', handleNativeDarknessChange);
-    } catch { }
-  } catch { }
+    } catch {}
+  } catch {}
 }
 
 // Removed: onGetSceneControlButtons for a separate 'visioner' control group

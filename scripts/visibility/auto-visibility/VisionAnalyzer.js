@@ -351,7 +351,6 @@ export class VisionAnalyzer {
         try {
           // testVisibility requires a point to test - use target's center
           const testPoint = { x: targetPos.x, y: targetPos.y };
-          // Use the observer's vision source to test visibility
           const visionSource = observer.vision;
 
           log.debug(
@@ -398,7 +397,7 @@ export class VisionAnalyzer {
           bottom: Math.min(observerSpan.bottom, targetSpan.bottom),
           top: Math.max(observerSpan.top, targetSpan.top),
         };
-      } catch (error) { }
+      } catch (error) {}
 
       stage = 'get-walls';
       const cachedWalls = this.#getCachedWalls(elevationRange);
@@ -597,7 +596,7 @@ export class VisionAnalyzer {
         const wallMidY = (wall.document.c[1] + wall.document.c[3]) / 2;
         const distToRayMid = Math.sqrt(
           (wallMidX - (fromPoint.x + toPoint.x) / 2) ** 2 +
-          (wallMidY - (fromPoint.y + toPoint.y) / 2) ** 2,
+            (wallMidY - (fromPoint.y + toPoint.y) / 2) ** 2,
         );
 
         if (distToRayMid > rayLength * 1.5) {
