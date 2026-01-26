@@ -34,7 +34,6 @@ export class VisionMasterDialog extends foundry.applications.api.ApplicationV2 {
       if (!tid || tid === this.excludeTokenId) return false;
       const actorType = t?.actor?.type;
       if (actorType === 'hazard' || actorType === 'loot') return false;
-      if (!t?.document?.sight?.enabled) return false;
       return true;
     });
     if (excludeToken) {
@@ -70,11 +69,6 @@ export class VisionMasterDialog extends foundry.applications.api.ApplicationV2 {
     const panLabel = game.i18n.localize('PF2E_VISIONER.VISION_MASTER_DIALOG.PAN');
     const cancelLabel = game.i18n.localize('Cancel');
     const noTokensLabel = game.i18n.localize('PF2E_VISIONER.VISION_MASTER_DIALOG.NO_TOKENS');
-    const modeLabelText = game.i18n.localize('PF2E_VISIONER.VISION_MASTER_DIALOG.MODE_LABEL');
-    const modeOneWay = game.i18n.localize('PF2E_VISIONER.VISION_MASTER_DIALOG.MODE_ONE_WAY');
-    const modeTwoWay = game.i18n.localize('PF2E_VISIONER.VISION_MASTER_DIALOG.MODE_TWO_WAY');
-    const modeReplace = game.i18n.localize('PF2E_VISIONER.VISION_MASTER_DIALOG.MODE_REPLACE');
-    const modeReverse = game.i18n.localize('PF2E_VISIONER.VISION_MASTER_DIALOG.MODE_REVERSE');
 
     const tokensByActor = new Map();
     for (const t of tokens) {
@@ -120,14 +114,6 @@ export class VisionMasterDialog extends foundry.applications.api.ApplicationV2 {
     return `
       <style>
         .pv-vm-container { display: flex; flex-direction: column; height: 100%; gap: 8px; padding: 8px; }
-        
-        .pv-vm-mode-section { padding: 10px 12px; border: 1px solid var(--color-border-light-tertiary); border-radius: 6px; background: var(--color-bg-option); }
-        .pv-vm-mode-label { font-weight: 600; margin-bottom: 8px; display: block; font-size: 0.9em; color: var(--color-text-light-primary); }
-        .pv-vm-mode-options { display: flex; flex-direction: column; gap: 6px; }
-        .pv-vm-mode-option { display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 6px; border-radius: 4px; transition: background 0.15s ease; }
-        .pv-vm-mode-option:hover { background: var(--color-hover-bg); }
-        .pv-vm-mode-option input[type="radio"] { margin: 0; cursor: pointer; }
-        .pv-vm-mode-option label { cursor: pointer; flex: 1; font-size: 0.95em; }
         
         .pv-vm-none-row { display: flex; align-items: center; padding: 10px 12px; border: 1px solid var(--color-border-light-tertiary); border-radius: 6px; cursor: pointer; transition: all 0.15s ease; }
         .pv-vm-none-row:hover { background: var(--color-hover-bg); border-color: var(--color-border-light-highlight); }
@@ -193,27 +179,6 @@ export class VisionMasterDialog extends foundry.applications.api.ApplicationV2 {
         }
       </style>
       <div class="pv-vm-container" style="container-type: inline-size;">
-        <div class="pv-vm-mode-section">
-          <span class="pv-vm-mode-label">${modeLabelText}</span>
-          <div class="pv-vm-mode-options">
-            <div class="pv-vm-mode-option">
-              <input type="radio" id="mode-one-way" name="vision-mode" value="one-way" ${this.currentMode === 'one-way' ? 'checked' : ''}>
-              <label for="mode-one-way">${modeOneWay}</label>
-            </div>
-            <div class="pv-vm-mode-option">
-              <input type="radio" id="mode-two-way" name="vision-mode" value="two-way" ${this.currentMode === 'two-way' ? 'checked' : ''}>
-              <label for="mode-two-way">${modeTwoWay}</label>
-            </div>
-            <div class="pv-vm-mode-option">
-              <input type="radio" id="mode-replace" name="vision-mode" value="replace" ${this.currentMode === 'replace' ? 'checked' : ''}>
-              <label for="mode-replace">${modeReplace}</label>
-            </div>
-            <div class="pv-vm-mode-option">
-              <input type="radio" id="mode-reverse" name="vision-mode" value="reverse" ${this.currentMode === 'reverse' ? 'checked' : ''}>
-              <label for="mode-reverse">${modeReverse}</label>
-            </div>
-          </div>
-        </div>
         <div class="pv-vm-none-row ${!this.currentTokenId ? 'selected' : ''}" data-token-id="">
           <div class="pv-vm-none-icon"><i class="fas fa-ban"></i></div>
           <div class="pv-vm-none-label">${noneLabel}</div>
@@ -266,9 +231,8 @@ export class VisionMasterDialog extends foundry.applications.api.ApplicationV2 {
 
   _selectToken(tokenId) {
     if (this._resolver) {
-      const mode =
-        this.element.querySelector('input[name="vision-mode"]:checked')?.value || 'one-way';
-      this._resolver({ tokenId, mode });
+      // Always return current mode - it will be changed via the dropdown in token config
+      this._resolver({ tokenId, mode: this.currentMode });
     }
     this.close();
   }

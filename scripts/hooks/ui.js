@@ -1714,9 +1714,22 @@ function injectPF2eVisionerBox(app, root) {
         </button>
         ${visionMasterTokenId ? `<button type="button" class="pv-vision-master-clear" data-tooltip="Clear"><i class="fas fa-times"></i></button>` : ''}
       </div>
-      ${visionMasterTokenId ? `<p class="notes" style="margin-top: 4px; font-size: 0.9em; color: var(--color-text-light-secondary);">Mode: ${modeLabels[visionSharingMode] || visionSharingMode}</p>` : ''}
+      ${
+        visionMasterTokenId
+          ? `
+        <div style="margin-top: 8px;">
+          <label style="font-size: 0.9em; margin-bottom: 4px; display: block;">${game.i18n.localize('PF2E_VISIONER.VISION_MASTER_DIALOG.MODE_LABEL')}</label>
+          <select name="flags.${MODULE_ID}.visionSharingMode" class="pv-vision-mode-select" style="width: 100%;">
+            <option value="one-way" ${visionSharingMode === 'one-way' ? 'selected' : ''}>${modeLabels['one-way']}</option>
+            <option value="two-way" ${visionSharingMode === 'two-way' ? 'selected' : ''}>${modeLabels['two-way']}</option>
+            <option value="replace" ${visionSharingMode === 'replace' ? 'selected' : ''}>${modeLabels['replace']}</option>
+            <option value="reverse" ${visionSharingMode === 'reverse' ? 'selected' : ''}>${modeLabels['reverse']}</option>
+          </select>
+        </div>
+      `
+          : ''
+      }
       <input type="hidden" name="flags.${MODULE_ID}.visionMasterTokenId" class="pv-vision-master-input" value="${visionMasterTokenId}">
-      <input type="hidden" name="flags.${MODULE_ID}.visionSharingMode" class="pv-vision-mode-input" value="${visionSharingMode}">
     </div>
   `;
 
@@ -1892,6 +1905,62 @@ function injectPF2eVisionerBox(app, root) {
           }
           modeInput.value = result.mode;
 
+          // Add or update mode dropdown
+          const modeLabels = {
+            'one-way': game.i18n.localize('PF2E_VISIONER.VISION_MASTER_DIALOG.MODE_ONE_WAY'),
+            'two-way': game.i18n.localize('PF2E_VISIONER.VISION_MASTER_DIALOG.MODE_TWO_WAY'),
+            replace: game.i18n.localize('PF2E_VISIONER.VISION_MASTER_DIALOG.MODE_REPLACE'),
+            reverse: game.i18n.localize('PF2E_VISIONER.VISION_MASTER_DIALOG.MODE_REVERSE'),
+          };
+
+          let modeDropdownContainer = box.querySelector('.pv-vision-mode-dropdown-container');
+
+          if (result.tokenId) {
+            // Create mode dropdown if it doesn't exist
+            if (!modeDropdownContainer) {
+              modeDropdownContainer = document.createElement('div');
+              modeDropdownContainer.className = 'pv-vision-mode-dropdown-container';
+              modeDropdownContainer.style.marginTop = '8px';
+
+              const label = document.createElement('label');
+              label.style.fontSize = '0.9em';
+              label.style.marginBottom = '4px';
+              label.style.display = 'block';
+              label.textContent = game.i18n.localize(
+                'PF2E_VISIONER.VISION_MASTER_DIALOG.MODE_LABEL',
+              );
+
+              const select = document.createElement('select');
+              select.name = `flags.${MODULE_ID}.visionSharingMode`;
+              select.className = 'pv-vision-mode-select';
+              select.style.width = '100%';
+
+              ['one-way', 'two-way', 'replace', 'reverse'].forEach((mode) => {
+                const option = document.createElement('option');
+                option.value = mode;
+                option.textContent = modeLabels[mode];
+                select.appendChild(option);
+              });
+
+              modeDropdownContainer.appendChild(label);
+              modeDropdownContainer.appendChild(select);
+
+              // Insert after the button row
+              visionMasterBtn.parentElement.parentElement.appendChild(modeDropdownContainer);
+            }
+
+            // Update selected mode
+            const modeSelect = modeDropdownContainer.querySelector('.pv-vision-mode-select');
+            if (modeSelect) {
+              modeSelect.value = result.mode;
+            }
+          } else {
+            // Remove mode dropdown if master is cleared
+            if (modeDropdownContainer) {
+              modeDropdownContainer.remove();
+            }
+          }
+
           const visionClearBtnExisting = box.querySelector('.pv-vision-master-clear');
           if (result.tokenId && !visionClearBtnExisting) {
             const newClearBtn = document.createElement('button');
@@ -1908,6 +1977,9 @@ function injectPF2eVisionerBox(app, root) {
                   'PF2E_VISIONER.UI.VISION_MASTER_CHOOSE',
                 );
               newClearBtn.remove();
+              // Also remove mode dropdown
+              const dropdown = box.querySelector('.pv-vision-mode-dropdown-container');
+              if (dropdown) dropdown.remove();
             });
             visionMasterBtn.parentElement.appendChild(newClearBtn);
           } else if (!result.tokenId && visionClearBtnExisting) {
