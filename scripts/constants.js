@@ -536,6 +536,23 @@ export const DEFAULT_SETTINGS = {
     default: 'medium',
   },
 
+  // Shared vision indicator floating button size
+  sharedVisionIndicatorSize: {
+    name: 'PF2E_VISIONER.SETTINGS.SHARED_VISION_INDICATOR_SIZE.name',
+    hint: 'PF2E_VISIONER.SETTINGS.SHARED_VISION_INDICATOR_SIZE.hint',
+    scope: 'client',
+    config: true,
+    restricted: false,
+    type: String,
+    choices: {
+      small: 'PF2E_VISIONER.SETTINGS.SHARED_VISION_INDICATOR_SIZE.CHOICES.small',
+      medium: 'PF2E_VISIONER.SETTINGS.SHARED_VISION_INDICATOR_SIZE.CHOICES.medium',
+      large: 'PF2E_VISIONER.SETTINGS.SHARED_VISION_INDICATOR_SIZE.CHOICES.large',
+      xlarge: 'PF2E_VISIONER.SETTINGS.SHARED_VISION_INDICATOR_SIZE.CHOICES.xlarge',
+    },
+    default: 'small',
+  },
+
   blockPlayerTargetTooltips: {
     name: 'PF2E_VISIONER.SETTINGS.REMOVE_PLAYER_TARGET_TOOLTIPS.name',
     hint: 'PF2E_VISIONER.SETTINGS.REMOVE_PLAYER_TARGET_TOOLTIPS.hint',

@@ -1,11 +1,13 @@
 import { getLogger } from '../utils/logger.js';
 import { ActionQualifier } from './operations/ActionQualifier.js';
+import { AuraVisibility } from './operations/AuraVisibility.js';
 import { CoverOverride } from './operations/CoverOverride.js';
 import { DetectionModeModifier } from './operations/DetectionModeModifier.js';
 import { DistanceBasedVisibility } from './operations/DistanceBasedVisibility.js';
 import { LightingModifier } from './operations/LightingModifier.js';
 import { OffGuardSuppression } from './operations/OffGuardSuppression.js';
 import { SenseModifier } from './operations/SenseModifier.js';
+import { ShareVision } from './operations/ShareVision.js';
 import { VisibilityOverride } from './operations/VisibilityOverride.js';
 import { SourceTracker } from './SourceTracker.js';
 
@@ -63,6 +65,8 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
               'conditionalState',
               'distanceBasedVisibility',
               'offGuardSuppression',
+              'auraVisibility',
+              'shareVision',
             ],
             initial: 'overrideVisibility',
           }),
@@ -185,6 +189,38 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
             }),
             { required: false },
           ),
+
+          auraRadius: new fields.NumberField({ required: false, initial: 10 }),
+
+          insideOutsideState: new fields.StringField({
+            required: false,
+            choices: ['observed', 'concealed', 'hidden', 'undetected'],
+            initial: 'concealed',
+          }),
+
+          outsideInsideState: new fields.StringField({
+            required: false,
+            choices: ['observed', 'concealed', 'hidden', 'undetected'],
+            initial: 'concealed',
+          }),
+
+          sourceExempt: new fields.BooleanField({ required: false, initial: true }),
+
+          includeSourceAsTarget: new fields.BooleanField({ required: false, initial: false }),
+
+          auraTargets: new fields.StringField({
+            required: false,
+            choices: ['all', 'enemies', 'allies'],
+            initial: 'all',
+          }),
+
+          mode: new fields.StringField({
+            required: false,
+            choices: ['one-way', 'two-way', 'replace', 'reverse'],
+            initial: 'one-way',
+          }),
+
+          masterActorUuid: new fields.StringField({ required: false }),
         }),
         { required: true },
       );
@@ -238,8 +274,13 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
     async onDelete(actorUpdates) {
       const log = getLogger('RuleElements/Effect');
       const tokens = this.actor?.getActiveTokens?.() || [];
-      const tokenIds = tokens.map(t => t.id);
-      log.debug(() => ({ msg: 'onDelete', item: this.item?.name, actor: this.actor?.name, tokenCount: tokenIds.length }));
+      const tokenIds = tokens.map((t) => t.id);
+      log.debug(() => ({
+        msg: 'onDelete',
+        item: this.item?.name,
+        actor: this.actor?.name,
+        tokenCount: tokenIds.length,
+      }));
 
       const registryKey = this.ruleElementRegistryKey;
 
@@ -250,7 +291,10 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
           try {
             this.collectRemovalUpdates(operation, token, updates);
           } catch (error) {
-            console.error(`PF2E Visioner | Error collecting removal updates for ${operation.type}:`, error);
+            console.error(
+              `PF2E Visioner | Error collecting removal updates for ${operation.type}:`,
+              error,
+            );
           }
         }
 
@@ -262,7 +306,7 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
           log.debug(() => ({
             msg: 'onDelete: adding registry removal',
             tokenId: token.id,
-            registryKey
+            registryKey,
           }));
         }
 
@@ -273,7 +317,7 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
             msg: 'onDelete: applying updates',
             tokenId: token.id,
             updateCount: Object.keys(updates).length,
-            updateKeys: Object.keys(updates)
+            updateKeys: Object.keys(updates),
           }));
           await token.document.update(updates);
           log.debug(() => ({ msg: 'onDelete: cleanup complete', tokenId: token.id }));
@@ -302,7 +346,7 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
         ruleElementId: this.ruleElementId,
         itemId: this.item?.id,
         hasVisibilityByObserver: !!stateSource.visibilityByObserver,
-        hasCoverByObserver: !!stateSource.coverByObserver
+        hasCoverByObserver: !!stateSource.coverByObserver,
       }));
 
       const cleanupSourcesInCategory = (category) => {
@@ -314,10 +358,10 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
               msg: `collectStateSourceCleanup: checking ${category}`,
               observerId: key,
               sources: data.sources,
-              ruleElementId: this.ruleElementId
+              ruleElementId: this.ruleElementId,
             }));
 
-            const filteredSources = data.sources.filter(s => {
+            const filteredSources = data.sources.filter((s) => {
               const sourceId = typeof s === 'string' ? s : s?.id;
               const shouldKeep = sourceId && !sourceId.startsWith(this.ruleElementId);
 
@@ -327,7 +371,7 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
                   sourceId,
                   ruleElementId: this.ruleElementId,
                   category,
-                  observerId: key
+                  observerId: key,
                 }));
               }
 
@@ -340,16 +384,17 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
                 log.debug(() => ({
                   msg: 'collectStateSourceCleanup: removing entire observer entry',
                   category,
-                  observerId: key
+                  observerId: key,
                 }));
               } else {
-                updates[`flags.pf2e-visioner.stateSource.${category}.${key}.sources`] = filteredSources;
+                updates[`flags.pf2e-visioner.stateSource.${category}.${key}.sources`] =
+                  filteredSources;
                 log.debug(() => ({
                   msg: 'collectStateSourceCleanup: updating sources',
                   category,
                   observerId: key,
                   oldCount: data.sources.length,
-                  newCount: filteredSources.length
+                  newCount: filteredSources.length,
                 }));
               }
               stateSourceModified = true;
@@ -365,12 +410,12 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
         log.debug(() => ({
           msg: 'collectStateSourceCleanup: modifications made',
           tokenId: token.id,
-          updateCount: Object.keys(updates).length
+          updateCount: Object.keys(updates).length,
         }));
       } else {
         log.debug(() => ({
           msg: 'collectStateSourceCleanup: no modifications needed',
-          tokenId: token.id
+          tokenId: token.id,
         }));
       }
     }
@@ -418,6 +463,15 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
           }
           break;
 
+        case 'shareVision':
+          if (registeredFlags.includes('visionSharing')) {
+            updates['flags.pf2e-visioner.visionMasterTokenId'] = null;
+            updates['flags.pf2e-visioner.visionMasterActorUuid'] = null;
+            updates['flags.pf2e-visioner.visionSharingMode'] = null;
+            updates['flags.pf2e-visioner.visionSharingSources'] = null;
+          }
+          break;
+
         case 'modifyActionQualification':
           if (registeredFlags.includes('actionQualifications')) {
             updates['flags.pf2e-visioner.actionQualifications'] = null;
@@ -425,7 +479,7 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
           break;
 
         case 'modifyLighting': {
-          const lightingFlag = registeredFlags.find(f => f.startsWith('lightingModification.'));
+          const lightingFlag = registeredFlags.find((f) => f.startsWith('lightingModification.'));
           if (lightingFlag) {
             updates[`flags.pf2e-visioner.${lightingFlag}`] = null;
           }
@@ -441,6 +495,12 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
         case 'offGuardSuppression':
           if (registeredFlags.includes('offGuardSuppression')) {
             updates['flags.pf2e-visioner.offGuardSuppression'] = null;
+          }
+          break;
+
+        case 'auraVisibility':
+          if (registeredFlags.includes('auraVisibility')) {
+            updates['flags.pf2e-visioner.auraVisibility'] = null;
           }
           break;
 
@@ -461,7 +521,11 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
       const token = this.getSubjectToken();
 
       if (!token) {
-        log.debug(() => ({ msg: 'applyOperations: no subject token', item: this.item?.name, actor: this.actor?.name }));
+        log.debug(() => ({
+          msg: 'applyOperations: no subject token',
+          item: this.item?.name,
+          actor: this.actor?.name,
+        }));
         return;
       }
 
@@ -470,7 +534,11 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
         const rollOptions = token.actor.getRollOptions(['all']);
         const predicateResult = this.test(rollOptions);
         if (!predicateResult) {
-          log.debug(() => ({ msg: 'applyOperations: predicate failed', item: this.item?.name, actor: this.actor?.name }));
+          log.debug(() => ({
+            msg: 'applyOperations: predicate failed',
+            item: this.item?.name,
+            actor: this.actor?.name,
+          }));
           return;
         }
       }
@@ -485,12 +553,21 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
 
       // Smart merge operations before applying
       const mergedOperations = this.smartMergeOperations();
-      log.debug(() => ({ msg: 'applyOperations: applying merged operations', count: mergedOperations.length, item: this.item?.name, actor: this.actor?.name }));
+      log.debug(() => ({
+        msg: 'applyOperations: applying merged operations',
+        count: mergedOperations.length,
+        item: this.item?.name,
+        actor: this.actor?.name,
+      }));
 
       for (const operation of mergedOperations) {
         try {
           await this.applyOperation(operation, token, { triggerRecalculation });
-          log.debug(() => ({ msg: 'applyOperations: applied op', type: operation.type, item: this.item?.name }));
+          log.debug(() => ({
+            msg: 'applyOperations: applied op',
+            type: operation.type,
+            item: this.item?.name,
+          }));
         } catch (error) {
           console.error(`PF2E Visioner | Error applying operation ${operation.type}:`, error);
         }
@@ -680,11 +757,14 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
           break;
 
         case 'overrideVisibility':
-          await VisibilityOverride.applyVisibilityOverride({
-            ...operation,
-            source: operation.source || this.ruleElementId,
-            triggerRecalculation
-          }, token);
+          await VisibilityOverride.applyVisibilityOverride(
+            {
+              ...operation,
+              source: operation.source || this.ruleElementId,
+              triggerRecalculation,
+            },
+            token,
+          );
           await this.registerFlag(token, 'ruleElementOverride');
           await this.registerFlag(token, 'visibilityReplacement');
           break;
@@ -701,6 +781,11 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
         case 'modifyActionQualification':
           await ActionQualifier.applyActionQualifications(operation, token);
           await this.registerFlag(token, 'actionQualifications');
+          break;
+
+        case 'shareVision':
+          await ShareVision.applyShareVision(operation, token);
+          await this.registerFlag(token, 'visionSharing');
           break;
 
         case 'modifyLighting':
@@ -721,6 +806,11 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
         case 'offGuardSuppression':
           await OffGuardSuppression.applyOffGuardSuppression(operation, token);
           await this.registerFlag(token, 'offGuardSuppression');
+          break;
+
+        case 'auraVisibility':
+          await AuraVisibility.applyAuraVisibility(operation, token);
+          await this.registerFlag(token, 'auraVisibility');
           break;
 
         default:
@@ -745,12 +835,6 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
       const tokens = this.actor?.getActiveTokens?.() || [];
       if (!tokens.length) return;
 
-      console.log(`PF2E Visioner | removeAllFlagsForRuleElement called for ${this.item?.name}`, {
-        operationCount: this.operations.length,
-        tokenCount: tokens.length,
-        operations: this.operations.map(op => ({ type: op.type, direction: op.direction })),
-      });
-
       const registryKey = this.ruleElementRegistryKey;
 
       for (const token of tokens) {
@@ -758,29 +842,43 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
 
         // Derive ruleElementId once for all operations
         const ruleElementId = this.ruleElementId;
-        console.log(`PF2E Visioner | removeAllFlagsForRuleElement: ruleElementId=${ruleElementId}, item=${this.item?.id}, slug=${this.slug}`);
-        
+        console.log(
+          `PF2E Visioner | removeAllFlagsForRuleElement: ruleElementId=${ruleElementId}, item=${this.item?.id}, slug=${this.slug}`,
+        );
+
         // Track visibility override cleanup to avoid duplicate cleanup
         // Visibility override cleanup is direction-agnostic and removes all sources for the rule element ID
         // Both 'overrideVisibility' and 'conditionalState' use the same cleanup function
         let hasCleanedUpVisibilityOverride = false;
-        
+
         for (const operation of this.operations) {
           try {
             // For visibility overrides, only clean up once per rule element (not per operation)
             // The cleanup removes all sources for the rule element ID regardless of direction
-            if ((operation.type === 'overrideVisibility' || operation.type === 'conditionalState') 
-                && !hasCleanedUpVisibilityOverride) {
+            if (
+              (operation.type === 'overrideVisibility' || operation.type === 'conditionalState') &&
+              !hasCleanedUpVisibilityOverride
+            ) {
               hasCleanedUpVisibilityOverride = true;
-              console.log(`PF2E Visioner | Calling removeOperation for operation type: ${operation.type} (once per rule element for direction-agnostic cleanup)`);
+              console.log(
+                `PF2E Visioner | Calling removeOperation for operation type: ${operation.type} (once per rule element for direction-agnostic cleanup)`,
+              );
               await this.removeOperation(operation, token);
-            } else if (operation.type !== 'overrideVisibility' && operation.type !== 'conditionalState') {
+            } else if (
+              operation.type !== 'overrideVisibility' &&
+              operation.type !== 'conditionalState'
+            ) {
               // For other operation types, clean up normally
-              console.log(`PF2E Visioner | Calling removeOperation for operation type: ${operation.type}, direction: ${operation.direction}`);
+              console.log(
+                `PF2E Visioner | Calling removeOperation for operation type: ${operation.type}, direction: ${operation.direction}`,
+              );
               await this.removeOperation(operation, token);
             }
           } catch (error) {
-            console.error(`PF2E Visioner | Error removing operation ${operation.type} in removeAllFlagsForRuleElement:`, error);
+            console.error(
+              `PF2E Visioner | Error removing operation ${operation.type} in removeAllFlagsForRuleElement:`,
+              error,
+            );
           }
         }
 
@@ -822,7 +920,10 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
 
         if (Object.keys(updates).length > 0) {
           await token.document.update(updates);
-          log.debug(() => ({ msg: 'removeAllFlagsForRuleElement: updated token flags', tokenId: token.id }));
+          log.debug(() => ({
+            msg: 'removeAllFlagsForRuleElement: updated token flags',
+            tokenId: token.id,
+          }));
         }
       }
     }
@@ -847,7 +948,11 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
           const newRegistry = { ...flagRegistry };
           delete newRegistry[registryKey];
           await token.document.setFlag('pf2e-visioner', 'ruleElementRegistry', newRegistry);
-          log.debug(() => ({ msg: 'removeOperations: removed registry key', tokenId: token.id, registryKey }));
+          log.debug(() => ({
+            msg: 'removeOperations: removed registry key',
+            tokenId: token.id,
+            registryKey,
+          }));
         }
       }
     }
@@ -855,7 +960,7 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
     async removeOperation(operation, token) {
       // Try to get ruleElementId from various sources
       let ruleElementId = this.ruleElementId;
-      
+
       // If ruleElementId is still invalid, try to extract from operation source
       if (!ruleElementId || ruleElementId.includes('unknown')) {
         if (operation?.source) {
@@ -865,8 +970,10 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
           ruleElementId = `${this.item.id}-${this.slug || 'effect'}`;
         }
       }
-      
-      console.log(`PF2E Visioner | removeOperation: ruleElementId=${ruleElementId}, item=${this.item?.id}, slug=${this.slug}, operationSource=${operation?.source}`);
+
+      console.log(
+        `PF2E Visioner | removeOperation: ruleElementId=${ruleElementId}, item=${this.item?.id}, slug=${this.slug}, operationSource=${operation?.source}`,
+      );
       switch (operation.type) {
         case 'modifySenses':
           await SenseModifier.restoreSenses(token, ruleElementId);
@@ -903,6 +1010,10 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
 
         case 'offGuardSuppression':
           await OffGuardSuppression.removeOffGuardSuppression(operation, token);
+          break;
+
+        case 'shareVision':
+          await ShareVision.removeShareVision(operation, token);
           break;
 
         default:

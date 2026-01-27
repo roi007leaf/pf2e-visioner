@@ -208,6 +208,9 @@
       "AVS_REJECTED_ALL": "Rejected all AVS changes",
       "AVS_REJECTED": "Rejected AVS changes",
       "AVS_REJECTED_SINGLE": "Rejected AVS change: {observerName} → {targetName}",
+      "VISION_SHARING_REMOVED": "Vision sharing removed",
+      "VISION_SHARING_REMOVED_FROM": "Vision sharing removed from {name}",
+      "VISION_SHARING_REMOVE_FAILED": "Failed to remove vision sharing",
       "AVS_ACCEPTED_SINGLE": "Accepted AVS change: {observerName} → {targetName}",
       "AVS_ACCEPTED_COUNT": "Accepted {count} change(s)",
       "AVS_ACCEPTED_IN_TABLE": "Accepted {count} change(s) in {group} table",
@@ -220,6 +223,17 @@
       "SNEAK_DEFERRED_RESTORED": "Restored {count} token(s) to original deferred state with all position data"
     },
     "MACROS": {},
+    "VISION_MASTER_DIALOG": {
+      "TITLE": "Select Vision Master",
+      "NO_TOKENS": "No valid tokens with vision available",
+      "NONE": "None (use own vision)",
+      "PAN": "Pan to token",
+      "MODE_LABEL": "Vision Sharing Mode",
+      "MODE_ONE_WAY": "One-way (minion sees own + master's vision)",
+      "MODE_TWO_WAY": "Two-way (both see each other's vision)",
+      "MODE_REPLACE": "Replace (minion sees only master's vision)",
+      "MODE_REVERSE": "Reverse (master sees only minion's vision)"
+    },
     "DIALOG_TITLES": {
       "HIDE_RESULTS": "Hide Results",
       "POINT_OUT_RESULTS": "Point Out Results",
@@ -828,6 +842,16 @@
           "xlarge": "Extra Large"
         }
       },
+      "SHARED_VISION_INDICATOR_SIZE": {
+        "name": "Shared Vision Indicator Size",
+        "hint": "Controls the size of the floating shared vision indicator button.",
+        "CHOICES": {
+          "small": "Small",
+          "medium": "Medium",
+          "large": "Large",
+          "xlarge": "Extra Large"
+        }
+      },
       "MANAGER_ROLL_COMPARISON": {
         "name": "Visioner Manager Roll Comparison",
         "hint": "Adds a roll comparison column to the Visioner Manager comparing the last relevant roll vs relevant DC"
@@ -1032,6 +1056,20 @@
       "ENCOUNTER_MASTER_PAN": "Pan to token",
       "ENCOUNTER_MASTER_SELECT": "Select",
       "ENCOUNTER_MASTER_CHOOSE": "Choose Master...",
+      "VISION_MASTER_LABEL": "Vision Master",
+      "VISION_MASTER_TOOLTIP": "Select a master token whose vision this token will share. The minion uses the master's field of view for visibility calculations. Useful for summoned creatures or familiars that should see from their creator's perspective.",
+      "VISION_MASTER_CHOOSE": "Choose Vision Master...",
+      "SHARED_VISION_TITLE": "Shared Vision",
+      "VISION_TOKEN": "Token",
+      "VISION_MASTER": "Master",
+      "VISION_SHARED_WITH": "Minion",
+      "VISION_ROLE_MASTER": "Master",
+      "VISION_ROLE_MASTER_MULTIPLE": "Master ({count} minions)",
+      "VISION_ROLE_MINION": "Minion",
+      "CLICK_TO_PAN": "Click to pan to master token",
+      "CLICK_TO_PAN_MINION": "Click to pan to minion token",
+      "MIDDLE_CLICK_TO_CYCLE": "Middle-click to cycle minions",
+      "RIGHT_CLICK_TO_REMOVE": "Right-click to remove vision sharing",
       "SNIPING_DUO_SPOTTER_LABEL": "Sniping Duo Spotter",
       "SNIPING_DUO_SPOTTER_TOOLTIP": "Choose your Sniping Duo spotter (the ally who should not provide cover for Strikes between you).",
       "SNIPING_DUO_SPOTTER_CHOOSE": "Choose Spotter...",

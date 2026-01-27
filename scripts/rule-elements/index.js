@@ -7,6 +7,7 @@ import { api } from '../api.js';
 import { getLogger } from '../utils/logger.js';
 import { createPF2eVisionerEffectRuleElement } from './PF2eVisionerEffect.js';
 export { RuleElementCoverService } from './RuleElementCoverService.js';
+export { AuraVisibility } from './operations/AuraVisibility.js';
 
 // Map to store recent changes to prevent loops
 const recentChanges = new Map();
