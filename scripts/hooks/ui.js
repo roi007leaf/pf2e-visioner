@@ -1894,17 +1894,6 @@ function injectPF2eVisionerBox(app, root) {
               );
             }
           }
-          // Store mode in a hidden input for submission
-          let modeInput = box.querySelector('.pv-vision-mode-input');
-          if (!modeInput) {
-            modeInput = document.createElement('input');
-            modeInput.type = 'hidden';
-            modeInput.className = 'pv-vision-mode-input';
-            modeInput.name = 'flags.pf2e-visioner.visionSharingMode';
-            box.appendChild(modeInput);
-          }
-          modeInput.value = result.mode;
-
           // Add or update mode dropdown
           const modeLabels = {
             'one-way': game.i18n.localize('PF2E_VISIONER.VISION_MASTER_DIALOG.MODE_ONE_WAY'),
