@@ -1,5 +1,42 @@
 # Changelog
 
+## [5.6.0] - 2026-01-27
+
+### ✨ Added
+
+- **ShareVision Rule Element Operation**: Implemented vision sharing between tokens
+  - **Four modes**: `one-way`, `two-way`, `replace`, `reverse` for flexible vision control
+  - **Actor UUID based**: Master identification persists across scenes using actor UUIDs
+  - **Predicate support**: Conditional vision sharing based on roll options
+  - **Immediate vision refresh**: Controlled tokens see changes instantly
+  - **Automatic cleanup**: Master token deletion/defeat removes all associated vision sharing
+  - **Scene transition handling**: Vision sharing properly maintained when moving between scenes
+  - **Reliable vision reinitialization**: `preUpdateToken`/`updateToken` hook pair ensures vision sources update after flag changes
+
+- **Shared Vision Indicator**: Floating indicator showing active vision sharing relationships
+  - **Master/Minion detection**: Automatically detects if controlled token is sharing vision or receiving it
+  - **Multi-minion support**: Cycle through multiple minions when master has several
+  - **Mode-specific icons**: Different icons for each vision sharing mode (arrows, exchange)
+  - **Quick actions**: Left-click to pan, right-click to remove, cycle arrow for multiple minions
+  - **Configurable size**: Client setting with small/medium/large/xlarge options (defaults to small)
+  - **Draggable**: Position saved per-client
+  - **Count badge**: Shows current minion index (1/3) when multiple minions exist
+  - **Token config integration**: Works with both rule element and manual token config methods
+
+### 🔧 Technical
+
+- **Helper function**: Added `getSceneTokenIdFromActorUuid` to resolve actor UUIDs to scene token IDs
+- **Flag system**: Uses `visionMasterActorUuid`, `visionMasterTokenId`, `visionSharingMode`, `visionSharingSources` flags
+- **Detection wrapper**: Updated to handle reverse mode correctly
+- **Cleanup hooks**: Master token deletion and scene changes trigger proper vision sharing removal
+- **SharedVisionIndicator class**: Singleton pattern with refresh support and live size updates
+- **Dual detection**: Checks both `visionMasterTokenId` (token config) and `visionMasterActorUuid` (rule elements)
+
+### 🐛 Fixed
+
+- **Token config vision mode dropdown**: Now works correctly on first try after selecting a master
+- **Vision master actor UUID**: Token config now properly saves both token ID and actor UUID for persistence
+
 ## [5.5.1] - 2026-01-13
 
 ### 🐛 Bug Fixes
