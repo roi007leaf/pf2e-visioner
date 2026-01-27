@@ -1883,12 +1883,29 @@ function injectPF2eVisionerBox(app, root) {
         );
         if (result !== undefined) {
           visionMasterInput.value = result.tokenId;
-          if (visionMasterLabel) {
-            if (result.tokenId) {
-              const selectedToken = canvas?.tokens?.get(result.tokenId);
+
+          // Also save the actor UUID
+          let actorUuidInput = box.querySelector('.pv-vision-master-actor-uuid-input');
+          if (!actorUuidInput) {
+            actorUuidInput = document.createElement('input');
+            actorUuidInput.type = 'hidden';
+            actorUuidInput.className = 'pv-vision-master-actor-uuid-input';
+            actorUuidInput.name = `flags.${MODULE_ID}.visionMasterActorUuid`;
+            box.appendChild(actorUuidInput);
+          }
+
+          if (result.tokenId) {
+            const selectedToken = canvas?.tokens?.get(result.tokenId);
+            const actorUuid = selectedToken?.actor?.uuid || selectedToken?.actor?.id || '';
+            actorUuidInput.value = actorUuid;
+
+            if (visionMasterLabel) {
               visionMasterLabel.textContent =
                 selectedToken?.name || selectedToken?.document?.name || result.tokenId;
-            } else {
+            }
+          } else {
+            actorUuidInput.value = '';
+            if (visionMasterLabel) {
               visionMasterLabel.textContent = game.i18n.localize(
                 'PF2E_VISIONER.UI.VISION_MASTER_CHOOSE',
               );
@@ -1961,6 +1978,8 @@ function injectPF2eVisionerBox(app, root) {
               e.preventDefault();
               e.stopPropagation();
               visionMasterInput.value = '';
+              const actorUuidInput = box.querySelector('.pv-vision-master-actor-uuid-input');
+              if (actorUuidInput) actorUuidInput.value = '';
               if (visionMasterLabel)
                 visionMasterLabel.textContent = game.i18n.localize(
                   'PF2E_VISIONER.UI.VISION_MASTER_CHOOSE',
@@ -1983,6 +2002,8 @@ function injectPF2eVisionerBox(app, root) {
         ev.preventDefault();
         ev.stopPropagation();
         if (visionMasterInput) visionMasterInput.value = '';
+        const actorUuidInput = box.querySelector('.pv-vision-master-actor-uuid-input');
+        if (actorUuidInput) actorUuidInput.value = '';
         if (visionMasterLabel)
           visionMasterLabel.textContent = game.i18n.localize(
             'PF2E_VISIONER.UI.VISION_MASTER_CHOOSE',

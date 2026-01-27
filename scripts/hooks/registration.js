@@ -84,7 +84,7 @@ export async function registerHooks() {
     }
   });
 
-  Hooks.on('updateToken', (tokenDoc, changes, options, userId) => {
+  Hooks.on('updateToken', async (tokenDoc, changes, options, userId) => {
     const visionMasterChanged = foundry.utils.hasProperty(
       changes,
       `flags.${MODULE_ID}.visionMasterTokenId`,
@@ -114,6 +114,17 @@ export async function registerHooks() {
         }
 
         canvas.perception.update({ initializeVision: true, refreshLighting: true });
+      }
+
+      // Update shared vision indicator if the updated token is controlled
+      if (token?.controlled && game.user?.isGM) {
+        try {
+          const { default: SharedVisionIndicator } = await import('../ui/SharedVisionIndicator.js');
+          const indicator = SharedVisionIndicator.getInstance();
+          indicator.update(token);
+        } catch (error) {
+          console.warn('PF2E Visioner | Failed to update shared vision indicator:', error);
+        }
       }
     }
   });

@@ -597,6 +597,20 @@ export async function onCanvasReady() {
     }
   });
 
+  // Hide shared vision indicator when scene changes
+  Hooks.on('canvasTearDown', async () => {
+    try {
+      const { default: SharedVisionIndicator } = await import('../ui/SharedVisionIndicator.js');
+      const indicator = SharedVisionIndicator.getInstance();
+      indicator.hide();
+    } catch (error) {
+      console.warn(
+        'PF2E Visioner | Failed to hide shared vision indicator on scene change:',
+        error,
+      );
+    }
+  });
+
   // Update override validation indicator when controlled token changes to show accumulated stack
   Hooks.on('controlToken', async (token, controlled) => {
     try {
@@ -605,6 +619,28 @@ export async function onCanvasReady() {
       if (!controlled || !indicator?.hasQueuedTokens?.()) return;
       indicator.show([], '', null);
     } catch (error) {}
+  });
+
+  // Update shared vision indicator when controlled token changes
+  Hooks.on('controlToken', async (token, controlled) => {
+    try {
+      if (!game.user?.isGM) return;
+      console.log('PF2E Visioner | SharedVisionIndicator hook triggered:', {
+        token: token?.name,
+        controlled,
+      });
+      const { default: SharedVisionIndicator } = await import('../ui/SharedVisionIndicator.js');
+      const indicator = SharedVisionIndicator.getInstance();
+      if (controlled) {
+        console.log('PF2E Visioner | Updating shared vision indicator for token:', token?.name);
+        indicator.update(token);
+      } else {
+        console.log('PF2E Visioner | Hiding shared vision indicator');
+        indicator.hide();
+      }
+    } catch (error) {
+      console.warn('PF2E Visioner | Failed to update shared vision indicator:', error);
+    }
   });
 }
 
