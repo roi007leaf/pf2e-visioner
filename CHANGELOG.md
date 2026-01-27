@@ -1,5 +1,25 @@
 # Changelog
 
+## [5.6.0] - 2026-01-27
+
+### ✨ Added
+
+- **ShareVision Rule Element Operation**: Implemented vision sharing between tokens
+  - **Four modes**: `one-way`, `two-way`, `replace`, `reverse` for flexible vision control
+  - **Actor UUID based**: Master identification persists across scenes using actor UUIDs
+  - **Predicate support**: Conditional vision sharing based on roll options
+  - **Immediate vision refresh**: Controlled tokens see changes instantly
+  - **Automatic cleanup**: Master token deletion/defeat removes all associated vision sharing
+  - **Scene transition handling**: Vision sharing properly maintained when moving between scenes
+  - **Reliable vision reinitialization**: `preUpdateToken`/`updateToken` hook pair ensures vision sources update after flag changes
+
+### 🔧 Technical
+
+- **Helper function**: Added `getSceneTokenIdFromActorUuid` to resolve actor UUIDs to scene token IDs
+- **Flag system**: Uses `visionMasterActorUuid`, `visionMasterTokenId`, `visionSharingMode`, `visionSharingSources` flags
+- **Detection wrapper**: Updated to handle reverse mode correctly
+- **Cleanup hooks**: Master token deletion and scene changes trigger proper vision sharing removal
+
 ## [5.5.1] - 2026-01-13
 
 ### 🐛 Bug Fixes

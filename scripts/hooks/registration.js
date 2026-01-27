@@ -22,21 +22,45 @@ import { registerUIHooks } from './ui.js';
  */
 async function cleanupAvsOverridesForDefeatedActor(actor) {
   try {
-    // Find all tokens for this actor on the current scene
     const tokens = canvas.tokens?.placeables?.filter((t) => t.actor?.id === actor.id) || [];
 
     if (tokens.length === 0) {
       return;
     }
 
-    // Import the AVS override manager
     const { default: AvsOverrideManager } =
       await import('../chat/services/infra/AvsOverrideManager.js');
 
-    // Clean up overrides for each token of this actor
     for (const token of tokens) {
       await AvsOverrideManager.removeAllOverridesInvolving(token.document.id);
     }
+
+    for (const defeatedToken of tokens) {
+      const allTokens = canvas.tokens?.placeables || [];
+      for (const token of allTokens) {
+        const visionMasterId = token.document.getFlag(MODULE_ID, 'visionMasterTokenId');
+
+        if (visionMasterId === defeatedToken.id) {
+          console.log(
+            `[PF2E Visioner] Cleaning up vision sharing for ${token.name} (master defeated)`,
+          );
+
+          try {
+            await token.document.unsetFlag(MODULE_ID, 'visionMasterTokenId');
+            await token.document.unsetFlag(MODULE_ID, 'visionMasterActorUuid');
+            await token.document.unsetFlag(MODULE_ID, 'visionSharingMode');
+            await token.document.unsetFlag(MODULE_ID, 'visionSharingSources');
+          } catch (error) {
+            console.warn(
+              `[PF2E Visioner] Failed to cleanup vision sharing for ${token.name}:`,
+              error,
+            );
+          }
+        }
+      }
+    }
+
+    canvas.perception.update({ initializeVision: true, refreshLighting: true });
   } catch (error) {
     console.error('PF2E Visioner | Failed to clean up AVS overrides for defeated actor:', error);
   }
@@ -46,7 +70,20 @@ export async function registerHooks() {
   Hooks.on('ready', onReady);
   Hooks.on('canvasReady', onCanvasReady);
 
-  // Refresh vision when vision master flag changes
+  // Store old master IDs before token updates
+  const oldMasterIds = new Map();
+
+  Hooks.on('preUpdateToken', (tokenDoc, changes, options, userId) => {
+    const visionMasterChanged = foundry.utils.hasProperty(
+      changes,
+      `flags.${MODULE_ID}.visionMasterTokenId`,
+    );
+    if (visionMasterChanged) {
+      const currentMasterId = tokenDoc.getFlag(MODULE_ID, 'visionMasterTokenId');
+      oldMasterIds.set(tokenDoc.id, currentMasterId);
+    }
+  });
+
   Hooks.on('updateToken', (tokenDoc, changes, options, userId) => {
     const visionMasterChanged = foundry.utils.hasProperty(
       changes,
@@ -55,8 +92,27 @@ export async function registerHooks() {
     if (visionMasterChanged) {
       const token = tokenDoc.object;
       if (token) {
-        console.log('[PF2E-Visioner] Vision master changed, refreshing vision for', token.name);
+        const oldMasterId = oldMasterIds.get(tokenDoc.id);
+        const newMasterId = changes.flags?.[MODULE_ID]?.visionMasterTokenId;
+
+        oldMasterIds.delete(tokenDoc.id);
+
         token.initializeVisionSource();
+
+        if (oldMasterId) {
+          const oldMasterToken = canvas.tokens.get(oldMasterId);
+          if (oldMasterToken) {
+            oldMasterToken.initializeVisionSource();
+          }
+        }
+
+        if (newMasterId && newMasterId !== null) {
+          const newMasterToken = canvas.tokens.get(newMasterId);
+          if (newMasterToken) {
+            newMasterToken.initializeVisionSource();
+          }
+        }
+
         canvas.perception.update({ initializeVision: true, refreshLighting: true });
       }
     }
@@ -231,6 +287,11 @@ export async function registerHooks() {
                       .AuraVisibility;
                     await OperationClass.removeAuraVisibility(operationWithSource, token);
                     break;
+                  case 'shareVision':
+                    OperationClass = (await import('../rule-elements/operations/ShareVision.js'))
+                      .ShareVision;
+                    await OperationClass.removeShareVision(operationWithSource, token);
+                    break;
                 }
               } catch (error) {
                 console.warn(
@@ -308,6 +369,11 @@ export async function registerHooks() {
                       .AuraVisibility;
                     await OperationClass.applyAuraVisibility(operationWithSource, token);
                     break;
+                  case 'shareVision':
+                    OperationClass = (await import('../rule-elements/operations/ShareVision.js'))
+                      .ShareVision;
+                    await OperationClass.applyShareVision(operationWithSource, token);
+                    break;
                 }
               } catch (error) {
                 console.warn(`PF2E Visioner | Failed to apply operation ${operation.type}:`, error);
@@ -332,6 +398,8 @@ export async function registerHooks() {
                     return 'offGuardSuppression';
                   case 'auraVisibility':
                     return 'auraVisibility';
+                  case 'shareVision':
+                    return 'visionSharing';
                   default:
                     return null;
                 }

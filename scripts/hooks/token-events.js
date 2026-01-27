@@ -11,6 +11,34 @@ import {
 import { updateTokenVisuals } from '../services/visual-effects.js';
 import { autoVisibilitySystem } from '../visibility/auto-visibility/index.js';
 
+async function cleanupVisionSharingForDeletedToken(deletedTokenDoc) {
+  if (!deletedTokenDoc?.id) return;
+
+  const deletedTokenId = deletedTokenDoc.id;
+  const allTokens = canvas.tokens?.placeables || [];
+
+  for (const token of allTokens) {
+    const visionMasterId = token.document.getFlag(MODULE_ID, 'visionMasterTokenId');
+
+    if (visionMasterId === deletedTokenId) {
+      console.log(
+        `[PF2E Visioner] Cleaning up vision sharing for ${token.name} (master token deleted)`,
+      );
+
+      try {
+        await token.document.unsetFlag(MODULE_ID, 'visionMasterTokenId');
+        await token.document.unsetFlag(MODULE_ID, 'visionMasterActorUuid');
+        await token.document.unsetFlag(MODULE_ID, 'visionSharingMode');
+        await token.document.unsetFlag(MODULE_ID, 'visionSharingSources');
+      } catch (error) {
+        console.warn(`[PF2E Visioner] Failed to cleanup vision sharing for ${token.name}:`, error);
+      }
+    }
+  }
+
+  canvas.perception.update({ initializeVision: true, refreshLighting: true });
+}
+
 export async function onTokenCreated(scene, tokenDoc) {
   try {
     // Schedule party restoration check for later when token is fully ready
@@ -41,7 +69,7 @@ export async function onTokenCreated(scene, tokenDoc) {
         );
       }
     }
-  } catch (_) { }
+  } catch (_) {}
   setTimeout(async () => {
     await updateTokenVisuals();
     // Add hover tooltip listeners to the new token
@@ -66,9 +94,8 @@ async function checkAndRestorePartyTokenState(tokenDoc) {
 
     // If not restored from deleted cache, check if this might be a party token restoration
     if (!wasRestored) {
-      const { isLikelyPartyTokenRestoration, restoreTokenStateFromParty } = await import(
-        '../services/party-token-state.js'
-      );
+      const { isLikelyPartyTokenRestoration, restoreTokenStateFromParty } =
+        await import('../services/party-token-state.js');
       if (isLikelyPartyTokenRestoration(tokenDoc)) {
         await restoreTokenStateFromParty(tokenDoc);
       }
@@ -126,10 +153,17 @@ export async function onTokenDeleted(...args) {
       ]);
 
       try {
-        const { default: AvsOverrideManager } = await import('../chat/services/infra/AvsOverrideManager.js');
+        const { default: AvsOverrideManager } =
+          await import('../chat/services/infra/AvsOverrideManager.js');
         await AvsOverrideManager.removeAllOverridesInvolving(tokenDoc.id);
       } catch (error) {
         console.error('PF2E Visioner: AVS override cleanup failed', error);
+      }
+
+      try {
+        await cleanupVisionSharingForDeletedToken(tokenDoc);
+      } catch (error) {
+        console.error('PF2E Visioner: Vision sharing cleanup failed', error);
       }
     }
     setTimeout(async () => {
@@ -212,9 +246,8 @@ export function registerTokenHooks() {
       // Check all current tokens to see if any need restoration
       for (const tokenDoc of scene.tokens) {
         if (tokenDoc?.actor?.signature && cacheKeys.includes(tokenDoc.actor.signature)) {
-          const { isLikelyPartyTokenRestoration, restoreTokenStateFromParty } = await import(
-            '../services/party-token-state.js'
-          );
+          const { isLikelyPartyTokenRestoration, restoreTokenStateFromParty } =
+            await import('../services/party-token-state.js');
           if (isLikelyPartyTokenRestoration(tokenDoc)) {
             await restoreTokenStateFromParty(tokenDoc);
           }

@@ -9,6 +9,67 @@ import { registerSocket } from '../services/socket.js';
 import { updateTokenVisuals, updateWallVisuals } from '../services/visual-effects.js';
 import { getLogger } from '../utils/logger.js';
 
+async function refreshVisionSharingTokenIds() {
+  const log = getLogger('VisionSharing/SceneChange');
+
+  if (!canvas?.tokens?.placeables) {
+    return;
+  }
+
+  log.debug(() => ({
+    msg: 'Refreshing vision sharing token IDs for new scene',
+    scene: canvas.scene?.name,
+  }));
+
+  for (const token of canvas.tokens.placeables) {
+    try {
+      const masterActorUuid = token.document.getFlag(MODULE_ID, 'visionMasterActorUuid');
+
+      if (!masterActorUuid) {
+        continue;
+      }
+
+      log.debug(() => ({
+        msg: 'Token has vision master, resolving to current scene',
+        tokenName: token.name,
+        masterActorUuid,
+      }));
+
+      const { ShareVision } = await import('../rule-elements/operations/ShareVision.js');
+      const newSceneTokenId = ShareVision.getSceneTokenIdFromActorUuid(masterActorUuid);
+
+      if (newSceneTokenId) {
+        const oldTokenId = token.document.getFlag(MODULE_ID, 'visionMasterTokenId');
+        if (oldTokenId !== newSceneTokenId) {
+          log.debug(() => ({
+            msg: 'Updating vision master token ID for new scene',
+            tokenName: token.name,
+            oldTokenId,
+            newSceneTokenId,
+          }));
+
+          await token.document.setFlag(MODULE_ID, 'visionMasterTokenId', newSceneTokenId);
+        }
+      } else {
+        log.warn(() => ({
+          msg: 'Could not find master actor token in current scene',
+          tokenName: token.name,
+          masterActorUuid,
+          scene: canvas.scene?.name,
+        }));
+      }
+    } catch (error) {
+      log.warn(() => ({
+        msg: 'Failed to refresh vision sharing for token',
+        tokenName: token.name,
+        error: error.message,
+      }));
+    }
+  }
+
+  canvas.perception.update({ initializeVision: true, refreshLighting: true });
+}
+
 async function reapplyRuleElementsOnLoad() {
   const log = getLogger('RuleElements/Lifecycle');
 
@@ -17,7 +78,10 @@ async function reapplyRuleElementsOnLoad() {
     return;
   }
 
-  log.debug(() => ({ msg: 'Reapplying rule elements on canvas ready', tokenCount: canvas.tokens.placeables.length }));
+  log.debug(() => ({
+    msg: 'Reapplying rule elements on canvas ready',
+    tokenCount: canvas.tokens.placeables.length,
+  }));
 
   const tokensProcessed = new Set();
   const tokensWithRuleElements = [];
@@ -33,11 +97,16 @@ async function reapplyRuleElementsOnLoad() {
 
       await cleanupStaleRuleElementFlags(token, actor, log);
 
-      const itemsWithRules = actor.items?.filter(i => {
-        const rules = i.system?.rules || [];
-        return rules.some(rule => rule.key === 'PF2eVisionerEffect');
-      }) || [];
-      log.debug(() => ({ msg: 'Actor items with Visioner rules scanned', actor: actor.name, items: itemsWithRules.length }));
+      const itemsWithRules =
+        actor.items?.filter((i) => {
+          const rules = i.system?.rules || [];
+          return rules.some((rule) => rule.key === 'PF2eVisionerEffect');
+        }) || [];
+      log.debug(() => ({
+        msg: 'Actor items with Visioner rules scanned',
+        actor: actor.name,
+        items: itemsWithRules.length,
+      }));
 
       for (const item of itemsWithRules) {
         const rules = item.system?.rules || [];
@@ -47,13 +116,13 @@ async function reapplyRuleElementsOnLoad() {
           itemName: item.name,
           itemType: item.type,
           actorName: actor.name,
-          tokenId: token.id
+          tokenId: token.id,
         }));
 
         let hasAppliedRules = false;
 
         // Wait for rule elements to be initialized
-        await new Promise(resolve => setTimeout(resolve, 100));
+        await new Promise((resolve) => setTimeout(resolve, 100));
 
         for (const rule of rules) {
           if (rule.key === 'PF2eVisionerEffect') {
@@ -63,7 +132,9 @@ async function reapplyRuleElementsOnLoad() {
 
               // First try to get from item.ruleElements
               if (Array.isArray(item.ruleElements)) {
-                instance = item.ruleElements.find(r => r?.key === rule.key && (r?.slug === rule.slug || !rule.slug));
+                instance = item.ruleElements.find(
+                  (r) => r?.key === rule.key && (r?.slug === rule.slug || !rule.slug),
+                );
               }
 
               // If not found, try to create a temporary instance for reapplication
@@ -73,13 +144,26 @@ async function reapplyRuleElementsOnLoad() {
                   const clonedRule = JSON.parse(JSON.stringify(rule));
                   const RuleElementClass = game.pf2e.RuleElements.custom[rule.key];
                   instance = new RuleElementClass(clonedRule, item);
-                  log.debug(() => ({ msg: 'Created temporary rule element instance', ruleKey: rule.key }));
+                  log.debug(() => ({
+                    msg: 'Created temporary rule element instance',
+                    ruleKey: rule.key,
+                  }));
                 } catch (error) {
-                  log.debug(() => ({ msg: 'Failed to create temporary instance', ruleKey: rule.key, error: error.message }));
+                  log.debug(() => ({
+                    msg: 'Failed to create temporary instance',
+                    ruleKey: rule.key,
+                    error: error.message,
+                  }));
                 }
               }
 
-              log.debug(() => ({ msg: 'Rule instance lookup', itemName: item.name, ruleKey: rule.key, hasInstance: !!instance, hasApply: !!(instance && typeof instance.applyOperations === 'function') }));
+              log.debug(() => ({
+                msg: 'Rule instance lookup',
+                itemName: item.name,
+                ruleKey: rule.key,
+                hasInstance: !!instance,
+                hasApply: !!(instance && typeof instance.applyOperations === 'function'),
+              }));
 
               if (instance && typeof instance.applyOperations === 'function') {
                 await instance.applyOperations();
@@ -87,17 +171,21 @@ async function reapplyRuleElementsOnLoad() {
                 log.debug(() => ({
                   msg: 'Successfully reapplied rule element operations',
                   ruleKey: rule.key,
-                  itemName: item.name
+                  itemName: item.name,
                 }));
               } else {
-                log.debug(() => ({ msg: 'No applicable instance to apply', itemName: item.name, ruleKey: rule.key }));
+                log.debug(() => ({
+                  msg: 'No applicable instance to apply',
+                  itemName: item.name,
+                  ruleKey: rule.key,
+                }));
               }
             } catch (error) {
               log.warn(() => ({
                 msg: 'Failed to reapply individual rule',
                 ruleKey: rule.key,
                 itemName: item.name,
-                error: error.message
+                error: error.message,
               }));
             }
           }
@@ -106,13 +194,12 @@ async function reapplyRuleElementsOnLoad() {
         if (hasAppliedRules) {
           tokensWithRuleElements.push(token.id);
         }
-
       }
     } catch (error) {
       log.warn(() => ({
         msg: 'Failed to process token for rule element reapplication',
         tokenName: token.name,
-        error: error.message
+        error: error.message,
       }));
     }
   }
@@ -120,12 +207,14 @@ async function reapplyRuleElementsOnLoad() {
   if (tokensWithRuleElements.length > 0) {
     log.debug(() => ({
       msg: 'Triggering AVS recalculation for tokens with rule elements',
-      tokenCount: tokensWithRuleElements.length
+      tokenCount: tokensWithRuleElements.length,
     }));
 
     try {
       if (window.pf2eVisioner?.services?.autoVisibilitySystem?.recalculateForTokens) {
-        await window.pf2eVisioner.services.autoVisibilitySystem.recalculateForTokens(tokensWithRuleElements);
+        await window.pf2eVisioner.services.autoVisibilitySystem.recalculateForTokens(
+          tokensWithRuleElements,
+        );
       } else if (window.pf2eVisioner?.services?.autoVisibilitySystem?.recalculateAll) {
         await window.pf2eVisioner.services.autoVisibilitySystem.recalculateAll();
       } else if (canvas?.perception) {
@@ -134,7 +223,7 @@ async function reapplyRuleElementsOnLoad() {
     } catch (error) {
       log.warn(() => ({
         msg: 'Failed to trigger AVS recalculation',
-        error: error.message
+        error: error.message,
       }));
     }
   }
@@ -151,10 +240,10 @@ async function cleanupStaleRuleElementFlags(token, actor, log) {
   }
 
   const activeEffectIds = new Set(
-    (actor.items?.filter(i => i.type === 'effect') || []).map(e => e.id)
+    (actor.items?.filter((i) => i.type === 'effect') || []).map((e) => e.id),
   );
 
-  const staleKeys = registeredKeys.filter(key => {
+  const staleKeys = registeredKeys.filter((key) => {
     if (key.startsWith('item-')) {
       const itemId = key.substring(5);
       return !activeEffectIds.has(itemId);
@@ -169,7 +258,7 @@ async function cleanupStaleRuleElementFlags(token, actor, log) {
   log.debug(() => ({
     msg: 'Found stale rule element flags, cleaning up',
     tokenName: token.name,
-    staleKeys
+    staleKeys,
   }));
 
   const updates = {};
@@ -189,7 +278,10 @@ async function cleanupStaleRuleElementFlags(token, actor, log) {
       const itemId = staleKey.startsWith('item-') ? staleKey.substring(5) : staleKey;
       let modified = false;
 
-      const prune = (arr) => Array.isArray(arr) ? arr.filter(s => !(typeof s?.id === 'string' && s.id.startsWith(`${itemId}-`))) : arr;
+      const prune = (arr) =>
+        Array.isArray(arr)
+          ? arr.filter((s) => !(typeof s?.id === 'string' && s.id.startsWith(`${itemId}-`)))
+          : arr;
 
       if (currentStateSource.visibility?.sources) {
         const next = prune(currentStateSource.visibility.sources);
@@ -233,7 +325,7 @@ async function cleanupStaleRuleElementFlags(token, actor, log) {
       log.warn(() => ({
         msg: 'Failed to prune stale sources for item',
         staleKey,
-        error: error.message
+        error: error.message,
       }));
     }
   }
@@ -246,10 +338,11 @@ async function cleanupStaleRuleElementFlags(token, actor, log) {
     log.debug(() => ({
       msg: 'Cleaned up stale flags',
       tokenName: token.name,
-      flagsRemoved: Object.keys(updates).length
+      flagsRemoved: Object.keys(updates).length,
     }));
   }
-} export function onReady() {
+}
+export function onReady() {
   // Add CSS styles for chat automation
   injectChatAutomationStyles();
 
@@ -264,7 +357,7 @@ async function cleanupStaleRuleElementFlags(token, actor, log) {
   if (game.user?.isGM) {
     // Run shortly after ready to avoid competing with other modules' migrations
     setTimeout(() => {
-      enableVisionForAllTokensAndPrototypes().catch(() => { });
+      enableVisionForAllTokensAndPrototypes().catch(() => {});
     }, 25);
   }
 }
@@ -272,6 +365,12 @@ async function cleanupStaleRuleElementFlags(token, actor, log) {
 export async function onCanvasReady() {
   if (canvas.ready && canvas.tokens?.placeables) {
     await updateTokenVisuals();
+  }
+
+  try {
+    await refreshVisionSharingTokenIds();
+  } catch (error) {
+    console.warn('PF2E Visioner | Failed to refresh vision sharing on scene change:', error);
   }
 
   try {
@@ -305,7 +404,8 @@ export async function onCanvasReady() {
         globalThis.game.pf2eVisioner.suppressLightingRefresh = true;
 
         // Track this controlToken event to prevent AVS from responding to related lighting refreshes
-        const { LightingEventHandler } = await import('../visibility/auto-visibility/core/LightingEventHandler.js');
+        const { LightingEventHandler } =
+          await import('../visibility/auto-visibility/core/LightingEventHandler.js');
         LightingEventHandler.trackControlTokenEvent();
       } catch {
         // Best effort - if the import fails, continue without tracking
@@ -321,19 +421,24 @@ export async function onCanvasReady() {
             await updateWallIndicatorsOnly(token.document.id);
           } catch (error) {
             // If the optimized method fails, do nothing rather than triggering AVS
-            console.warn('PF2E Visioner | Failed to use optimized wall indicator update, skipping:', error);
+            console.warn(
+              'PF2E Visioner | Failed to use optimized wall indicator update, skipping:',
+              error,
+            );
           }
         }
 
         try {
-          const { updateSystemHiddenTokenHighlights } = await import('../services/visual-effects.js');
+          const { updateSystemHiddenTokenHighlights } =
+            await import('../services/visual-effects.js');
           await updateSystemHiddenTokenHighlights(token.document.id);
         } catch (error) {
           console.warn('PF2E Visioner | Failed to update system-hidden token highlights:', error);
         }
       } else {
         try {
-          const { updateSystemHiddenTokenHighlights } = await import('../services/visual-effects.js');
+          const { updateSystemHiddenTokenHighlights } =
+            await import('../services/visual-effects.js');
           await updateSystemHiddenTokenHighlights(null);
         } catch (error) {
           console.warn('PF2E Visioner | Failed to clear system-hidden token highlights:', error);
@@ -351,14 +456,14 @@ export async function onCanvasReady() {
         }
       }, 50);
     });
-  } catch (_) { }
+  } catch (_) {}
 
   initializeHoverTooltips();
 
   try {
     const { registerAvsGmVisionWarning } = await import('../ui/AvsGmVisionWarning.js');
     registerAvsGmVisionWarning();
-  } catch (_) { }
+  } catch (_) {}
 
   // Listen for condition changes to update lifesense highlights
   // Note: Trait changes are handled by ActorEventHandler for full AVS recalculation
@@ -375,7 +480,7 @@ export async function onCanvasReady() {
       if (canvas?.perception) {
         canvas.perception.update({
           refreshVision: true,
-          refreshOcclusion: true
+          refreshOcclusion: true,
         });
       }
 
@@ -406,7 +511,7 @@ export async function onCanvasReady() {
       if (canvas?.perception) {
         canvas.perception.update({
           refreshVision: true,
-          refreshOcclusion: true
+          refreshOcclusion: true,
         });
       }
 
@@ -432,9 +537,8 @@ export async function onCanvasReady() {
     'keydown',
     async (ev) => {
       if (ev.key?.toLowerCase() !== 'o') return;
-      const { HoverTooltips, showControlledTokenVisibilityObserver } = await import(
-        '../services/HoverTooltips.js'
-      );
+      const { HoverTooltips, showControlledTokenVisibilityObserver } =
+        await import('../services/HoverTooltips.js');
       if (
         !HoverTooltips.isShowingKeyTooltips &&
         typeof showControlledTokenVisibilityObserver === 'function'
@@ -478,10 +582,10 @@ export async function onCanvasReady() {
             const wrapper = typeof window.$ === 'function' ? window.$(el) : el;
             await handleRenderChatMessage(msg, wrapper);
           }
-        } catch (_) { }
+        } catch (_) {}
       }, 50);
     }
-  } catch (_) { }
+  } catch (_) {}
 
   // Hide override validation indicator when scene changes
   Hooks.on('canvasTearDown', async () => {
@@ -500,8 +604,7 @@ export async function onCanvasReady() {
       const { default: indicator } = await import('../ui/OverrideValidationIndicator.js');
       if (!controlled || !indicator?.hasQueuedTokens?.()) return;
       indicator.show([], '', null);
-    } catch (error) {
-    }
+    } catch (error) {}
   });
 }
 
@@ -509,7 +612,7 @@ async function enableVisionForAllTokensAndPrototypes() {
   try {
     const enabled = !!game.settings.get(MODULE_ID, 'enableAllTokensVision');
     await applyEnableAllTokensVisionSetting(enabled);
-  } catch (_) { }
+  } catch (_) {}
 }
 
 function getTokenVisionEnabled(doc) {
@@ -537,7 +640,7 @@ async function syncNpcVisionInScenes(enabled) {
       if (updates.length) {
         await scene.updateEmbeddedDocuments('Token', updates, { diff: false, render: false });
       }
-    } catch (_) { }
+    } catch (_) {}
   }
 }
 
@@ -553,7 +656,7 @@ async function syncNpcPrototypeVision(enabled) {
           { diff: false },
         );
       }
-    } catch (_) { }
+    } catch (_) {}
   }
 }
 
@@ -563,7 +666,7 @@ export async function applyEnableAllTokensVisionSetting(enabled) {
     const desired = !!enabled;
     await syncNpcVisionInScenes(desired);
     await syncNpcPrototypeVision(desired);
-  } catch (_) { }
+  } catch (_) {}
 }
 
 function setupFallbackHUDButton() {
@@ -641,7 +744,7 @@ function setupFallbackHUDButton() {
           const pos = JSON.parse(savedPos);
           if (pos.left) button.style.left = pos.left;
           if (pos.top) button.style.top = pos.top;
-        } catch (_) { }
+        } catch (_) {}
       }
 
       button.addEventListener('click', async (event) => {
