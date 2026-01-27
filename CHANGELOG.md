@@ -1,5 +1,15 @@
 # Changelog
 
+## [5.6.1] - 2026-01-27
+
+### 🐛 Fixed
+
+- **Shared Vision Blindness Handling**: All vision sharing modes now properly respect blindness conditions
+  - **One-way**: Blinded master cannot share vision, minion falls back to own vision
+  - **Two-way**: Blinded master cannot share, but minion blindness doesn't prevent master from sharing
+  - **Replace**: Blinded master causes minion to fall back to own vision
+  - **Reverse**: Blinded minion causes master to fall back to own vision
+
 ## [5.6.0] - 2026-01-27
 
 ### ✨ Added
