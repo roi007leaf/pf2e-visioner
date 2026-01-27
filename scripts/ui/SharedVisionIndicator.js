@@ -274,7 +274,7 @@ class SharedVisionIndicator {
         if (pos?.left) el.style.left = pos.left;
         if (pos?.top) el.style.top = pos.top;
       }
-    } catch {}
+    } catch { }
 
     // Drag handlers
     el.addEventListener('mousedown', (ev) => this.#onMouseDown(ev));
@@ -348,7 +348,7 @@ class SharedVisionIndicator {
           'pf2e-visioner-shared-vision-indicator-pos',
           JSON.stringify({ left: this._el.style.left, top: this._el.style.top }),
         );
-      } catch {}
+      } catch { }
       setTimeout(() => (this._drag.moved = false), 50);
     } else {
       this._drag.moved = false;
@@ -389,18 +389,6 @@ class SharedVisionIndicator {
     this.#updateDisplay();
     this.#hideTooltip();
     this.#showTooltip();
-  }
-
-  #resolveActorUuid(actorUuid) {
-    try {
-      if (actorUuid.includes('.')) {
-        return fromUuidSync(actorUuid);
-      } else {
-        return game.actors.get(actorUuid);
-      }
-    } catch {
-      return null;
-    }
   }
 
   async #removeVisionSharing() {
@@ -521,7 +509,7 @@ class SharedVisionIndicator {
     let size = 'small';
     try {
       size = game.settings.get('pf2e-visioner', 'sharedVisionIndicatorSize') || 'small';
-    } catch {}
+    } catch { }
 
     const presets = {
       small: { size: 34, radius: 8, font: 15 },
