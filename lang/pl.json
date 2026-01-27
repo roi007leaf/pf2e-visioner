@@ -109,7 +109,7 @@
     },
     "FEAT": {
       "CEASELESS_SHADOWS": "Nieustające Cienie",
-      "SNIPING_DUO_DEDICATION": "Sniping Duo Dedication"
+      "SNIPING_DUO_DEDICATION": "Archetyp Snajperskiego Duo"
     },
     "AVS_OVERRIDE_DIALOG": {
       "NO_OVERRIDES": "Obecnie nie ma żadnych aktywnych zastąpień AVS dla tego tokenu.",
@@ -122,17 +122,17 @@
       "ERROR_CLEARING_OVERRIDES": "Błąd podczas kasowania zastąpień AVS"
     },
     "AVS_GM_VISION_WARNING": {
-      "TITLE": "GM Vision active",
-      "BODY": "AVS needs a vision polygon; GM Vision does not generate one. Disable GM Vision to enable AVS.",
-      "CLOSE": "Dismiss",
-      "DONT_SHOW_AGAIN": "Don't show again"
+      "TITLE": "Aktywna wizja MG",
+      "BODY": "System AVS wymaga wielokąta widzenia; system wizji MG nie generuje takiego wielokąta. Aby włączyć system AVS, należy wyłączyć system wizji MG.",
+      "CLOSE": "Odwołaj",
+      "DONT_SHOW_AGAIN": "Nie pokazuj ponownie"
     },
     "OVERRIDE_INDICATOR": {
-      "TOOLTIP_HEADER": "zmian(y) do zatwierdzenia",
+      "TOOLTIP_HEADER": "zmiana(y) do zatwierdzenia",
       "TOOLTIP_NEXT": "Następny:",
-      "TOOLTIP_LEFT_CLICK": "Lewy klik: otwórz szczegóły",
-      "TOOLTIP_RIGHT_CLICK": "Prawy klik: zaakceptuj wszystko",
-      "TOOLTIP_SHIFT_RIGHT_CLICK": "Shift+Prawy klik: odrzuć wszystko",
+      "TOOLTIP_LEFT_CLICK": "Kliknięcie lewym przyciskiem myszy: otwórz szczegóły",
+      "TOOLTIP_RIGHT_CLICK": "Kliknij prawym przyciskiem myszy: zaakceptuj wszystko",
+      "TOOLTIP_SHIFT_RIGHT_CLICK": "Shift+kliknięcie prawym przyciskiem myszy: odrzuć wszystko",
       "QUEUE_POSITION": "{current} z {total}"
     },
     "VISUAL_EFFECTS": {
@@ -640,8 +640,8 @@
         "hint": "Automatycznie ustaw flagi widoczności w oparciu o warunki oświetleniowe i zmysły stworzeń. System ten analizuje oświetlenie sceny, pozycje tokenów i zdolności stworzeń, aby określić odpowiednie stany widoczności (obserwowane, przysłonięte, niewidoczne, niewykryte)."
       },
       "AVS_GM_VISION_WARNING_SUPPRESS": {
-        "name": "Suppress GM Vision warning",
-        "hint": "Client-only: Don't show the 'GM Vision active' warning banner when GM Vision prevents AVS."
+        "name": "Wyłącz ostrzeżenie o wizji MG",
+        "hint": "Tylko klienci: Nie wyświetlaj banera ostrzegawczego „Wizja MG aktywna”, gdy wizja MG uniemożliwia działanie AVS."
       },
       "AUTO_VISIBILITY_DEBUG_MODE": {
         "name": "Tryb debugowania automatycznej widoczności",
@@ -1032,15 +1032,15 @@
       "ENCOUNTER_MASTER_PAN": "Przypnij do tokenu",
       "ENCOUNTER_MASTER_SELECT": "Wybierz",
       "ENCOUNTER_MASTER_CHOOSE": "Wybierz Mistrza...",
-      "SNIPING_DUO_SPOTTER_LABEL": "Sniping Duo: obserwator",
-      "SNIPING_DUO_SPOTTER_TOOLTIP": "Wybierz obserwatora Sniping Duo (sojusznika, który nie powinien zapewniać osłony dla uderzeń między wami).",
-      "SNIPING_DUO_SPOTTER_CHOOSE": "Wybierz obserwatora...",
-      "SNIPING_DUO_DIALOG_TITLE": "Wybierz obserwatora Sniping Duo",
+      "SNIPING_DUO_SPOTTER_LABEL": "Obserwator Snajperskiego Duo",
+      "SNIPING_DUO_SPOTTER_TOOLTIP": "Wybierz swojego obserwatora snajperskiego duo (sojusznika, który nie powinien zapewniać osłony dla ataków między wami).",
+      "SNIPING_DUO_SPOTTER_CHOOSE": "Wybierz Obserwatora...",
+      "SNIPING_DUO_DIALOG_TITLE": "Zaznacz obserwatora Snajperskiego Duo",
       "SNIPING_DUO_NONE": "Brak",
       "SNIPING_DUO_PAN": "Przypnij do tokenu",
-      "SNIPING_DUO_SPOTTER_NOT_FOUND": "Sniping Duo: nie znaleziono wybranego obserwatora.",
-      "SNIPING_DUO_COVER_IGNORE_TOOLTIP": "{FEAT}: {ALLY} nie zapewnia osłony dla tego uderzenia.",
-      "SNIPING_DUO_COVER_OVERRIDE_UNAVAILABLE": "{FEAT}: nadpisanie osłony niedostępne.",
+      "SNIPING_DUO_SPOTTER_NOT_FOUND": "Snajperskie Duo: wybrany obserwator nie został znaleziony.",
+      "SNIPING_DUO_COVER_IGNORE_TOOLTIP": "{FEAT}: {ALLY} nie zapewnia osłony dla tego Ataku.",
+      "SNIPING_DUO_COVER_OVERRIDE_UNAVAILABLE": "{FEAT}: nie można zmienić osłony.",
       "FROM_LINKED_DARKNESS": "Z powiązanego szablonu Ciemności",
       "NO_POSITION_CHANGE": "Brak zmiany pozycji",
       "SEARCH_WALL_PLACEHOLDER": "Wyszukaj według identyfikatora lub ID ściany...",
