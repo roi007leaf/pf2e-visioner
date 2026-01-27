@@ -27,50 +27,36 @@ class SharedVisionIndicator {
   update(token) {
     if (!game.user?.isGM) return;
 
-    console.log('PF2E Visioner | SharedVisionIndicator.update() called for token:', token?.name);
-
     this._currentToken = token;
     this._currentMinionIndex = 0; // Reset to first minion when token changes
 
     if (!token) {
-      console.log('PF2E Visioner | No token provided, hiding indicator');
       this.hide();
       return;
     }
 
     const visionData = this.#getVisionSharingData(token);
-    console.log('PF2E Visioner | Vision data retrieved:', visionData);
 
     if (!visionData) {
-      console.log('PF2E Visioner | No vision data, hiding indicator');
       this.hide();
       return;
     }
 
     this._sharedVisionData = visionData;
-    console.log('PF2E Visioner | Showing indicator');
     this.show();
   }
 
   #getVisionSharingData(token) {
     if (!token?.document) {
-      console.log('PF2E Visioner | No token document');
       return null;
     }
 
     const tokenActorUuid = token.actor?.uuid || token.actor?.id;
-    console.log('PF2E Visioner | Token actor UUID:', tokenActorUuid);
 
     // Check if this token is a minion (has a master) - look at the actual flags set by ShareVision operation
     const visionMasterTokenId = token.document.getFlag(MODULE_ID, 'visionMasterTokenId');
     const visionSharingMode = token.document.getFlag(MODULE_ID, 'visionSharingMode');
     const visionMasterActorUuid = token.document.getFlag(MODULE_ID, 'visionMasterActorUuid');
-
-    console.log('PF2E Visioner | Vision sharing flags:', {
-      visionMasterTokenId,
-      visionSharingMode,
-      visionMasterActorUuid,
-    });
 
     if (visionMasterTokenId || visionMasterActorUuid) {
       // Try to get master token from token ID first (most reliable)
@@ -96,7 +82,6 @@ class SharedVisionIndicator {
       }
 
       if (!masterToken) {
-        console.log('PF2E Visioner | Could not find master token');
         return null;
       }
 
@@ -118,7 +103,6 @@ class SharedVisionIndicator {
         // Check if this token references our token as master via token ID
         const minionMasterTokenId = t.document.getFlag(MODULE_ID, 'visionMasterTokenId');
         if (minionMasterTokenId === tokenId) {
-          console.log('PF2E Visioner | Found minion via tokenId:', t.name);
           return true;
         }
 
@@ -128,7 +112,6 @@ class SharedVisionIndicator {
 
         // Compare with token's actor UUID
         if (tokenActorUuid && minionMasterUuid === tokenActorUuid) {
-          console.log('PF2E Visioner | Found minion via direct actor UUID match:', t.name);
           return true;
         }
 
@@ -141,7 +124,6 @@ class SharedVisionIndicator {
             masterActor = game.actors.get(minionMasterUuid);
           }
           if (masterActor?.id === token.actor?.id) {
-            console.log('PF2E Visioner | Found minion via resolved actor UUID:', t.name);
             return true;
           }
         } catch {
@@ -151,7 +133,6 @@ class SharedVisionIndicator {
         return false;
       }) || [];
 
-    console.log('PF2E Visioner | Found minions:', minions.length);
     if (minions.length === 0) return null;
 
     // Return data for all minions
@@ -170,16 +151,12 @@ class SharedVisionIndicator {
   }
 
   show() {
-    console.log('PF2E Visioner | SharedVisionIndicator.show() called');
     if (!this._el) {
-      console.log('PF2E Visioner | Creating indicator element');
       this.#createElement();
     }
 
     this.#updateDisplay();
-    console.log('PF2E Visioner | Adding visible class to indicator');
     this._el?.classList.add('pf2e-visioner-shared-vision-indicator--visible');
-    console.log('PF2E Visioner | Indicator element:', this._el, 'classes:', this._el?.className);
   }
 
   hide() {
@@ -197,11 +174,8 @@ class SharedVisionIndicator {
 
   #updateDisplay() {
     if (!this._el || !this._sharedVisionData) {
-      console.log('PF2E Visioner | #updateDisplay - no element or data');
       return;
     }
-
-    console.log('PF2E Visioner | #updateDisplay called', this._sharedVisionData);
 
     // Determine the mode to display
     let mode = 'one-way';
@@ -213,11 +187,9 @@ class SharedVisionIndicator {
     }
 
     const modeIcon = this.#getModeIcon(mode);
-    console.log('PF2E Visioner | Using icon:', modeIcon);
     const iconEl = this._el.querySelector('.indicator-icon');
     if (iconEl) {
       iconEl.innerHTML = `<i class="${modeIcon}"></i>`;
-      console.log('PF2E Visioner | Updated icon element');
     } else {
       console.warn('PF2E Visioner | No icon element found!');
     }
@@ -274,7 +246,7 @@ class SharedVisionIndicator {
         if (pos?.left) el.style.left = pos.left;
         if (pos?.top) el.style.top = pos.top;
       }
-    } catch { }
+    } catch {}
 
     // Drag handlers
     el.addEventListener('mousedown', (ev) => this.#onMouseDown(ev));
@@ -348,7 +320,7 @@ class SharedVisionIndicator {
           'pf2e-visioner-shared-vision-indicator-pos',
           JSON.stringify({ left: this._el.style.left, top: this._el.style.top }),
         );
-      } catch { }
+      } catch {}
       setTimeout(() => (this._drag.moved = false), 50);
     } else {
       this._drag.moved = false;
@@ -509,7 +481,7 @@ class SharedVisionIndicator {
     let size = 'small';
     try {
       size = game.settings.get('pf2e-visioner', 'sharedVisionIndicatorSize') || 'small';
-    } catch { }
+    } catch {}
 
     const presets = {
       small: { size: 34, radius: 8, font: 15 },

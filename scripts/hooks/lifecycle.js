@@ -404,8 +404,9 @@ export async function onCanvasReady() {
         globalThis.game.pf2eVisioner.suppressLightingRefresh = true;
 
         // Track this controlToken event to prevent AVS from responding to related lighting refreshes
-        const { LightingEventHandler } =
-          await import('../visibility/auto-visibility/core/LightingEventHandler.js');
+        const { LightingEventHandler } = await import(
+          '../visibility/auto-visibility/core/LightingEventHandler.js'
+        );
         LightingEventHandler.trackControlTokenEvent();
       } catch {
         // Best effort - if the import fails, continue without tracking
@@ -429,16 +430,18 @@ export async function onCanvasReady() {
         }
 
         try {
-          const { updateSystemHiddenTokenHighlights } =
-            await import('../services/visual-effects.js');
+          const { updateSystemHiddenTokenHighlights } = await import(
+            '../services/visual-effects.js'
+          );
           await updateSystemHiddenTokenHighlights(token.document.id);
         } catch (error) {
           console.warn('PF2E Visioner | Failed to update system-hidden token highlights:', error);
         }
       } else {
         try {
-          const { updateSystemHiddenTokenHighlights } =
-            await import('../services/visual-effects.js');
+          const { updateSystemHiddenTokenHighlights } = await import(
+            '../services/visual-effects.js'
+          );
           await updateSystemHiddenTokenHighlights(null);
         } catch (error) {
           console.warn('PF2E Visioner | Failed to clear system-hidden token highlights:', error);
@@ -537,8 +540,9 @@ export async function onCanvasReady() {
     'keydown',
     async (ev) => {
       if (ev.key?.toLowerCase() !== 'o') return;
-      const { HoverTooltips, showControlledTokenVisibilityObserver } =
-        await import('../services/HoverTooltips.js');
+      const { HoverTooltips, showControlledTokenVisibilityObserver } = await import(
+        '../services/HoverTooltips.js'
+      );
       if (
         !HoverTooltips.isShowingKeyTooltips &&
         typeof showControlledTokenVisibilityObserver === 'function'
@@ -625,17 +629,11 @@ export async function onCanvasReady() {
   Hooks.on('controlToken', async (token, controlled) => {
     try {
       if (!game.user?.isGM) return;
-      console.log('PF2E Visioner | SharedVisionIndicator hook triggered:', {
-        token: token?.name,
-        controlled,
-      });
       const { default: SharedVisionIndicator } = await import('../ui/SharedVisionIndicator.js');
       const indicator = SharedVisionIndicator.getInstance();
       if (controlled) {
-        console.log('PF2E Visioner | Updating shared vision indicator for token:', token?.name);
         indicator.update(token);
       } else {
-        console.log('PF2E Visioner | Hiding shared vision indicator');
         indicator.hide();
       }
     } catch (error) {
