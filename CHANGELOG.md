@@ -1,5 +1,45 @@
 # Changelog
 
+## [5.7.0] - 2026-01-29
+
+### ✨ Added
+
+- **Round Change AVS Override Validation**: GM prompted to accept/reject AVS changes for manual overrides each round
+  - **Unified table view**: Shows all override relationships (Observer → Target) in round change mode
+  - **Automatic visibility calculation**: Displays current visibility AVS wants to apply vs manual override
+  - **Cover calculation**: Shows cover changes (none/lesser/standard/greater) AVS wants to apply
+  - **Deduplication**: Each observer-target pair shown once regardless of combatant order
+  - **Token navigation**: Click token images to pan to token
+  - **Bulk actions**: Accept All/Reject All for efficient management
+  - **Individual control**: Accept/reject per override relationship
+  - **Conflict prevention**: Skips prompt if dialog already open from token movement
+
+### 🔧 Technical
+
+- **API enhancements**: Added `clearAllAVSOverrides(tokens)`, `hasAVSOverrides(token)`, `getAVSOverrides(token)` methods
+  - `clearAllAVSOverrides`: Now accepts optional token/array to reset specific tokens
+  - `hasAVSOverrides`: Check if token has any AVS overrides (as observer or target)
+  - `getAVSOverrides`: Get all overrides involving token with names, images, states
+- **Combat hooks**: Added `checkAvsOverrides()` on round change
+  - Checks all combatants for AVS overrides
+  - Calculates current visibility using `calculateVisibilityWithoutOverrides()`
+  - Calculates current cover using `CoverDetector.detectFromPoint()`
+  - Deduplicates overrides using Map with observer-target key
+- **Dialog integration**: Reuses existing `OverrideValidationIndicator` and `OverrideValidationDialog`
+  - Added `isRoundChange` flag for different UI/messaging
+  - Unified table layout for round change mode
+  - Observer/Target columns with tooltips explaining relationships
+
+## [5.6.1] - 2026-01-27
+
+### 🐛 Fixed
+
+- **Shared Vision Blindness Handling**: All vision sharing modes now properly respect blindness conditions
+  - **One-way**: Blinded master cannot share vision, minion falls back to own vision
+  - **Two-way**: Blinded master cannot share, but minion blindness doesn't prevent master from sharing
+  - **Replace**: Blinded master causes minion to fall back to own vision
+  - **Reverse**: Blinded minion causes master to fall back to own vision
+
 ## [5.6.0] - 2026-01-27
 
 ### ✨ Added

@@ -1161,6 +1161,8 @@
   border: 1px solid rgba(255, 255, 255, 0.3) !important;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3) !important;
   transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease !important;
+  display: block !important;
+  flex-shrink: 0 !important;
 }
 
 .pf2e-visioner .override-validation-dialog .chip-avatar {
@@ -1170,7 +1172,10 @@
   object-fit: cover;
 }
 .pf2e-visioner .override-validation-dialog .chip .chip-label {
-  line-height: 1;
+  line-height: 1.2;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text-primary);
 }
 
 /* Status */
@@ -3416,6 +3421,95 @@
   color: var(--color-text-secondary);
   opacity: 0.9;
 }
+
+/* Unified table observer/target column styles */
+.pf2e-visioner .override-validation-dialog .unified-table td.observer,
+.pf2e-visioner .override-validation-dialog .unified-table td.target {
+  padding: 8px 12px !important;
+  min-width: 140px;
+}
+
+.pf2e-visioner .override-validation-dialog .unified-table th.observer,
+.pf2e-visioner .override-validation-dialog .unified-table th.target {
+  position: relative;
+}
+
+.pf2e-visioner .override-validation-dialog .unified-table th.observer .fa-info-circle,
+.pf2e-visioner .override-validation-dialog .unified-table th.target .fa-info-circle {
+  margin-left: 4px;
+  font-size: 11px;
+  opacity: 0.6;
+  cursor: help;
+}
+
+.pf2e-visioner .override-validation-dialog .unified-table .token-info {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 4px;
+  transition: background-color 0.15s ease;
+}
+
+.pf2e-visioner .override-validation-dialog .unified-table .token-info:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.pf2e-visioner .override-validation-dialog .unified-table .token-info img {
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+  object-fit: cover;
+  flex-shrink: 0;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  display: block;
+  cursor: pointer;
+}
+
+.pf2e-visioner .override-validation-dialog .unified-table .token-info img:hover {
+  border-color: rgba(255, 255, 255, 0.5);
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.3);
+}
+
+.pf2e-visioner .override-validation-dialog .unified-table .token-info i {
+  font-size: 22px;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.5;
+}
+
+.pf2e-visioner .override-validation-dialog .unified-table .token-info span {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text-primary);
+  line-height: 1.2;
+}
+
+.pf2e-visioner .override-validation-dialog .unified-table .table-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: rgba(0, 0, 0, 0.2);
+  border-bottom: 1px solid var(--color-border-light-primary);
+}
+
+.pf2e-visioner .override-validation-dialog .unified-table .table-header h4 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.pf2e-visioner .override-validation-dialog .unified-table .table-actions {
+  display: flex;
+  gap: 8px;
+}
 .pf2e-visioner .override-validation-dialog .status-description {
   display: inline-flex;
   align-items: center;
@@ -3656,5 +3750,58 @@
   margin: 0;
   font-size: 12px;
   color: var(--color-text-light-primary, #ccc);
+  line-height: 1.4;
+}
+
+/* Separate image column styles for normal mode tables */
+.pf2e-visioner .override-validation-modern .visibility-table td.target-img,
+.pf2e-visioner .override-validation-modern .visibility-table td.observer-img {
+  width: 60px !important;
+  min-width: 60px !important;
+  max-width: 60px !important;
+  padding: 8px !important;
+  text-align: center;
+  vertical-align: middle;
+  cursor: pointer;
+}
+
+.pf2e-visioner .override-validation-modern .visibility-table td.target-img img,
+.pf2e-visioner .override-validation-modern .visibility-table td.observer-img img {
+  width: 48px !important;
+  height: 48px !important;
+  border-radius: 4px;
+  object-fit: cover;
+  object-position: top;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  display: block;
+  margin: 0 auto;
+}
+
+.pf2e-visioner .override-validation-modern .visibility-table td.target-img img:hover,
+.pf2e-visioner .override-validation-modern .visibility-table td.observer-img img:hover {
+  border-color: rgba(255, 255, 255, 0.5);
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.3);
+}
+
+.pf2e-visioner .override-validation-modern .visibility-table td.target-img i,
+.pf2e-visioner .override-validation-modern .visibility-table td.observer-img i {
+  font-size: 36px;
+  opacity: 0.5;
+}
+
+.pf2e-visioner .override-validation-modern .visibility-table th.target-img,
+.pf2e-visioner .override-validation-modern .visibility-table th.observer-img {
+  width: 60px !important;
+  min-width: 60px !important;
+  max-width: 60px !important;
+}
+
+.pf2e-visioner .override-validation-dialog td.target span,
+.pf2e-visioner .override-validation-dialog td.observer span {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text-primary);
   line-height: 1.4;
 }

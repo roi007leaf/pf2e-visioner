@@ -16,6 +16,7 @@ export class OverrideValidationDialog extends foundry.applications.api.Handlebar
     this.tokenName = options.tokenName || 'Unknown Token';
     // Prefer explicit moved token id when provided by caller
     this.movedTokenId = options.movedTokenId || null;
+    this.isRoundChange = options.isRoundChange || false;
   }
 
   static DEFAULT_OPTIONS = {
@@ -28,7 +29,7 @@ export class OverrideValidationDialog extends foundry.applications.api.Handlebar
       resizable: true,
     },
     position: {
-      width: 500,
+      width: 600,
       height: 560,
       left: null,
       top: null
@@ -91,11 +92,28 @@ export class OverrideValidationDialog extends foundry.applications.api.Handlebar
       const observerImg = observerToken?.actor?.img ?? observerToken?.document?.texture?.src ?? observerToken?.texture?.src ?? observerToken?.document?.img ?? 'icons/svg/book.svg';
       const targetImg = targetToken?.actor?.img ?? targetToken?.document?.texture?.src ?? targetToken?.texture?.src ?? targetToken?.document?.img ?? 'icons/svg/book.svg';
 
+      console.log(`PF2E Visioner | Image resolution for ${override.observerName} → ${override.targetName}:`, {
+        observerImg,
+        targetImg,
+        hasObserverToken: !!observerToken,
+        hasTargetToken: !!targetToken
+      });
+
       // Pick analysis icons from actual current state when provided by validator
       // Prefer current states provided by the validator/caller; fall back to safe defaults
       const visibilityKey = override.currentVisibility || 'observed';
       const coverKey = override.currentCover || 'none';
       const prevVisibilityKey = override.state || (override.hasConcealment ? 'concealed' : 'observed');
+
+      // Debug logging
+      if (game.settings.get('pf2e-visioner', 'debug')) {
+        console.log(`Override for ${override.observerName} → ${override.targetName}:`, {
+          state: override.state,
+          currentVisibility: override.currentVisibility,
+          prevVisibilityKey,
+          visibilityKey
+        });
+      }
       // Previous/original cover must reflect what the override expected at apply-time,
       // not what the currentCover is now. If we don't have a specific level, assume 'standard'.
       const prevCoverKey = (override.expectedCover != null)
@@ -155,23 +173,37 @@ export class OverrideValidationDialog extends foundry.applications.api.Handlebar
     // Group into observer- and target-oriented lists for separate tables
     const observerOrientedOverrides = [];
     const targetOrientedOverrides = [];
-    // Group relative to the actual mover when available; fallback to global, then header-by-name
-    let refTokenId = this.movedTokenId || game?.pf2eVisioner?.lastMovedTokenId || null;
-    if (!refTokenId) {
-      try {
-        const headerTokenByName = canvas.tokens?.placeables?.find(t => t?.document?.name === this.tokenName);
-        refTokenId = headerTokenByName?.document?.id || headerTokenByName?.id || null;
-      } catch { }
-    }
+    let unifiedOverrides = [];
 
-    for (const o of overrides) {
-      if (refTokenId) {
-        if (o.observerId === refTokenId) observerOrientedOverrides.push(o);
-        else if (o.targetId === refTokenId) targetOrientedOverrides.push(o);
-        else targetOrientedOverrides.push(o); // if unrelated, keep in target table for review
-      } else {
-        // If we can’t resolve a reference token, default to target table
-        targetOrientedOverrides.push(o);
+    // In round change mode, deduplicate and use unified view
+    if (this.isRoundChange) {
+      const seen = new Set();
+      for (const o of overrides) {
+        const key = `${o.observerId}-${o.targetId}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          unifiedOverrides.push(o);
+        }
+      }
+    } else {
+      // Group relative to the actual mover when available; fallback to global, then header-by-name
+      let refTokenId = this.movedTokenId || game?.pf2eVisioner?.lastMovedTokenId || null;
+      if (!refTokenId) {
+        try {
+          const headerTokenByName = canvas.tokens?.placeables?.find(t => t?.document?.name === this.tokenName);
+          refTokenId = headerTokenByName?.document?.id || headerTokenByName?.id || null;
+        } catch { }
+      }
+
+      for (const o of overrides) {
+        if (refTokenId) {
+          if (o.observerId === refTokenId) observerOrientedOverrides.push(o);
+          else if (o.targetId === refTokenId) targetOrientedOverrides.push(o);
+          else targetOrientedOverrides.push(o); // if unrelated, keep in target table for review
+        } else {
+          // If we can't resolve a reference token, default to target table
+          targetOrientedOverrides.push(o);
+        }
       }
     }
 
@@ -189,11 +221,22 @@ export class OverrideValidationDialog extends foundry.applications.api.Handlebar
       overrides,
       observerOrientedOverrides,
       targetOrientedOverrides,
-      overrideCount: overrides.length,
+      unifiedOverrides,
+      overrideCount: this.isRoundChange ? unifiedOverrides.length : overrides.length,
       hasManualOverrides: overrides.some(o => /manual/i.test(o.source)),
-      targetHeader
+      targetHeader,
+      isRoundChange: this.isRoundChange
     };
 
+    console.log('PF2E Visioner | Dialog context prepared:', {
+      isRoundChange: this.isRoundChange,
+      observerOrientedCount: observerOrientedOverrides.length,
+      targetOrientedCount: targetOrientedOverrides.length,
+      unifiedCount: unifiedOverrides.length,
+      sampleObserverOverride: observerOrientedOverrides[0],
+      sampleTargetOverride: targetOrientedOverrides[0],
+      sampleUnifiedOverride: unifiedOverrides[0]
+    });
 
     return result;
   }
@@ -269,6 +312,57 @@ export class OverrideValidationDialog extends foundry.applications.api.Handlebar
           }
         } catch (err) {
           console.warn('PF2E Visioner | Failed to pan/select token from override dialog:', err);
+        }
+      });
+    });
+
+    // Click token image cells in normal mode tables to pan to token
+    const imageCells = this.element.querySelectorAll('td.target-img, td.observer-img');
+    imageCells.forEach(cell => {
+      cell.addEventListener('click', async (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        const tokenId = cell.dataset.tokenId;
+        if (!tokenId) return;
+        try {
+          const token = canvas.tokens?.get(tokenId);
+          if (!token) return;
+          const center = token.center ?? { x: token.x + (token.w ?? token.width ?? 0) / 2, y: token.y + (token.h ?? token.height ?? 0) / 2 };
+          await canvas.animatePan({ x: center.x, y: center.y, duration: 400 });
+          try { canvas?.tokens?.selectObjects?.([token], { releaseOthers: true, control: true }); } catch { }
+          const row = cell.closest('tr.token-row');
+          if (row) {
+            this.element.querySelectorAll('tr.token-row.row-hover').forEach(r => r.classList.remove('row-hover'));
+            row.classList.add('row-hover');
+          }
+        } catch (err) {
+          console.warn('PF2E Visioner | Failed to pan to token from image cell:', err);
+        }
+      });
+    });
+
+    // Click token images in unified table to pan to token
+    const tokenImages = this.element.querySelectorAll('.unified-table .token-info img');
+    tokenImages.forEach(img => {
+      img.addEventListener('click', async (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        const tokenInfo = img.closest('.token-info');
+        const tokenId = tokenInfo?.dataset?.tokenId;
+        if (!tokenId) return;
+        try {
+          const token = canvas.tokens?.get(tokenId);
+          if (!token) return;
+          const center = token.center ?? { x: token.x + (token.w ?? token.width ?? 0) / 2, y: token.y + (token.h ?? token.height ?? 0) / 2 };
+          await canvas.animatePan({ x: center.x, y: center.y, duration: 400 });
+          try { canvas?.tokens?.selectObjects?.([token], { releaseOthers: true, control: true }); } catch { }
+          const row = img.closest('tr.token-row');
+          if (row) {
+            this.element.querySelectorAll('tr.token-row.row-hover').forEach(r => r.classList.remove('row-hover'));
+            row.classList.add('row-hover');
+          }
+        } catch (err) {
+          console.warn('PF2E Visioner | Failed to pan to token from unified table:', err);
         }
       });
     });

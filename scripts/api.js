@@ -2403,6 +2403,160 @@ export class Pf2eVisionerApi {
       return false;
     }
   }
+
+  /**
+   * Clear all AVS overrides (memory and persistent flags)
+   * @param {Token|Combatant|Token[]|Combatant[]|string|string[]} [tokens] - Optional token(s)/combatant(s) to clear. If omitted, clears all.
+   */
+  static async clearAllAVSOverrides(tokens) {
+    try {
+      const { default: AvsOverrideManager } = await import('./chat/services/infra/AvsOverrideManager.js');
+
+      if (!tokens) {
+        await AvsOverrideManager.clearAllOverrides();
+        ui.notifications.info(
+          'PF2E Visioner | All AVS overrides cleared (memory and persistent flags)',
+        );
+        return;
+      }
+
+      const tokenArray = Array.isArray(tokens) ? tokens : [tokens];
+      const tokenIds = tokenArray.map(t => {
+        if (typeof t === 'string') return t;
+        if (t?.token?.id) return t.token.id;
+        if (t?.document?.id) return t.document.id;
+        if (t?.id) return t.id;
+        return null;
+      }).filter(Boolean);
+
+      for (const tokenId of tokenIds) {
+        await AvsOverrideManager.removeAllOverridesInvolving(tokenId);
+      }
+
+      const count = tokenIds.length;
+      ui.notifications.info(
+        `PF2E Visioner | AVS overrides cleared for ${count} token${count !== 1 ? 's' : ''}`,
+      );
+    } catch (err) {
+      console.error('PF2E Visioner | clearAllAVSOverrides failed:', err);
+      ui.notifications.error(game.i18n.localize('PF2E_VISIONER.NOTIFICATIONS.AVS_UNAVAILABLE'));
+    }
+  }
+
+  /**
+   * Check if a token has any AVS overrides (as observer or target)
+   * @param {Token|Combatant|string} token - Token, combatant, or token ID
+   * @returns {boolean} True if token has overrides
+   */
+  static hasAVSOverrides(token) {
+    try {
+      const tokenId = this._resolveTokenId(token);
+      if (!tokenId || !canvas?.tokens?.placeables) return false;
+
+      const targetToken = canvas.tokens.get(tokenId);
+      if (!targetToken) return false;
+
+      const flags = targetToken.document.flags?.['pf2e-visioner'] || {};
+      for (const flagKey of Object.keys(flags)) {
+        if (flagKey.startsWith('avs-override-from-')) {
+          return true;
+        }
+      }
+
+      for (const t of canvas.tokens.placeables) {
+        const otherFlags = t.document.flags?.['pf2e-visioner'] || {};
+        for (const flagKey of Object.keys(otherFlags)) {
+          if (flagKey === `avs-override-from-${tokenId}`) {
+            return true;
+          }
+        }
+      }
+
+      return false;
+    } catch (err) {
+      console.error('PF2E Visioner | hasAVSOverrides failed:', err);
+      return false;
+    }
+  }
+
+  /**
+   * Get all AVS overrides involving a token (as observer or target)
+   * @param {Token|Combatant|string} token - Token, combatant, or token ID
+   * @returns {Array<{observerId: string, targetId: string, state: string, source: string}>}
+   */
+  static getAVSOverrides(token) {
+    try {
+      const tokenId = this._resolveTokenId(token);
+      if (!tokenId || !canvas?.tokens?.placeables) return [];
+
+      const overrides = [];
+      const targetToken = canvas.tokens.get(tokenId);
+
+      if (targetToken) {
+        const flags = targetToken.document.flags?.['pf2e-visioner'] || {};
+        for (const [flagKey, flagData] of Object.entries(flags)) {
+          if (flagKey.startsWith('avs-override-from-') && flagData) {
+            const observerToken = canvas.tokens.get(flagData.observerId);
+            overrides.push({
+              observerId: flagData.observerId,
+              targetId: flagData.targetId,
+              observerName: flagData.observerName,
+              targetName: flagData.targetName,
+              observerImg: observerToken?.document?.texture?.src || null,
+              targetImg: targetToken?.document?.texture?.src || null,
+              state: flagData.state,
+              source: flagData.source,
+              hasCover: flagData.hasCover,
+              hasConcealment: flagData.hasConcealment,
+              expectedCover: flagData.expectedCover,
+              timestamp: flagData.timestamp,
+            });
+          }
+        }
+      }
+
+      for (const t of canvas.tokens.placeables) {
+        const otherFlags = t.document.flags?.['pf2e-visioner'] || {};
+        const flagKey = `avs-override-from-${tokenId}`;
+        const flagData = otherFlags[flagKey];
+        if (flagData && flagData.observerId === tokenId) {
+          const observerToken = canvas.tokens.get(flagData.observerId);
+          overrides.push({
+            observerId: flagData.observerId,
+            targetId: flagData.targetId,
+            observerName: flagData.observerName,
+            targetName: flagData.targetName,
+            observerImg: observerToken?.document?.texture?.src || null,
+            targetImg: t?.document?.texture?.src || null,
+            state: flagData.state,
+            source: flagData.source,
+            hasCover: flagData.hasCover,
+            hasConcealment: flagData.hasConcealment,
+            expectedCover: flagData.expectedCover,
+            timestamp: flagData.timestamp,
+          });
+        }
+      }
+
+      return overrides;
+    } catch (err) {
+      console.error('PF2E Visioner | getAVSOverrides failed:', err);
+      return [];
+    }
+  }
+
+  /**
+   * Helper to resolve token ID from various inputs
+   * @private
+   */
+  static _resolveTokenId(token) {
+    if (!token) return null;
+    if (typeof token === 'string') return token;
+    if (token.token?.id) return token.token.id;
+    if (token.document?.id) return token.document.id;
+    if (token.id) return token.id;
+    return null;
+  }
 }
 
 /**
@@ -2495,21 +2649,6 @@ export const autoVisibility = {
     if (autoVisibilitySystem.resetSceneConfigFlag) {
       autoVisibilitySystem.resetSceneConfigFlag();
       ui.notifications.info(game.i18n.localize('PF2E_VISIONER.NOTIFICATIONS.SCENE_CONFIG_RESET'));
-    }
-  },
-
-  /**
-   * Clear all AVS overrides (memory and persistent flags)
-   */
-  async clearAllAVSOverrides() {
-    const autoVis = autoVisibilitySystem;
-    if (autoVis && typeof autoVis.clearAllOverrides === 'function') {
-      await autoVis.clearAllOverrides();
-      ui.notifications.info(
-        'PF2E Visioner | All AVS overrides cleared (memory and persistent flags)',
-      );
-    } else {
-      ui.notifications.error(game.i18n.localize('PF2E_VISIONER.NOTIFICATIONS.AVS_UNAVAILABLE'));
     }
   },
 

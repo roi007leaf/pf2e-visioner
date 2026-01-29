@@ -246,7 +246,7 @@ class SharedVisionIndicator {
         if (pos?.left) el.style.left = pos.left;
         if (pos?.top) el.style.top = pos.top;
       }
-    } catch {}
+    } catch { }
 
     // Drag handlers
     el.addEventListener('mousedown', (ev) => this.#onMouseDown(ev));
@@ -320,7 +320,7 @@ class SharedVisionIndicator {
           'pf2e-visioner-shared-vision-indicator-pos',
           JSON.stringify({ left: this._el.style.left, top: this._el.style.top }),
         );
-      } catch {}
+      } catch { }
       setTimeout(() => (this._drag.moved = false), 50);
     } else {
       this._drag.moved = false;
@@ -459,6 +459,10 @@ class SharedVisionIndicator {
         <div>${sharedWithLabel}: <strong>${otherTokenName}</strong></div>
         <div>${modeLabel}</div>
       </div>
+      <div class="tip-footer">
+        <div class="footer-action">Left-click: Pan to ${isMaster ? 'minion' : 'master'}</div>
+        <div class="footer-action">Right-click: Remove sharing</div>
+      </div>
     `;
 
     document.body.appendChild(tip);
@@ -481,7 +485,7 @@ class SharedVisionIndicator {
     let size = 'small';
     try {
       size = game.settings.get('pf2e-visioner', 'sharedVisionIndicatorSize') || 'small';
-    } catch {}
+    } catch { }
 
     const presets = {
       small: { size: 34, radius: 8, font: 15 },
@@ -636,6 +640,18 @@ class SharedVisionIndicator {
         gap: 3px;
         font-size: 11px;
         color: rgba(255, 255, 255, 0.8);
+      }
+      .pf2e-visioner-shared-vision-tooltip .tip-footer {
+        margin-top: 6px;
+        padding-top: 6px;
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+      .pf2e-visioner-shared-vision-tooltip .footer-action {
+        font-size: 10px;
+        color: rgba(255, 255, 255, 0.6);
       }
     `;
 
