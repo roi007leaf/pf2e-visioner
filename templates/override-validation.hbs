@@ -4,7 +4,11 @@
   <div class="validation-header">
     <div class="header-content">
       <p class="subtitle">
-        Token <strong><em>{{tokenName}}</em></strong> has moved. AVS wants to make <strong>{{overrideCount}}</strong> change{{#unless (eq overrideCount 1)}}s{{/unless}}.
+        {{#if isRoundChange}}
+          Round change detected. AVS wants to make <strong>{{overrideCount}}</strong> change{{#unless (eq overrideCount 1)}}s{{/unless}} for combat tokens.
+        {{else}}
+          Token <strong><em>{{tokenName}}</em></strong> has moved. AVS wants to make <strong>{{overrideCount}}</strong> change{{#unless (eq overrideCount 1)}}s{{/unless}}.
+        {{/if}}
         <i class="fas fa-info-circle" data-tooltip="{{localize 'PF2E_VISIONER.UI.AVS_CHANGE_INFO_TOOLTIP'}}"></i>
       </p>
     </div>
@@ -12,6 +16,112 @@
 
   <!-- Tables Scroll Container -->
   <div class="tables-scroll-container">
+
+  {{#if isRoundChange}}
+  <!-- Unified Round Change View -->
+  {{#if unifiedOverrides.length}}
+  <div class="results-table-container unified-table">
+    <div class="table-header">
+      <h4>Override Relationships</h4>
+      <div class="table-actions">
+        <button type="button" class="bulk-action-btn apply-all btn-clear-all" data-tooltip="{{localize 'PF2E_VISIONER.UI.ACCEPT_ALL_CHANGES'}}">
+          <i class="fas fa-check-circle"></i> Accept All
+        </button>
+        <button type="button" class="bulk-action-btn revert-all btn-keep-all" data-tooltip="{{localize 'PF2E_VISIONER.UI.REJECT_ALL_CHANGES'}}">
+          <i class="fas fa-times-circle"></i> Reject All
+        </button>
+      </div>
+    </div>
+    <table class="visibility-table override-validation-table">
+      <thead>
+        <tr>
+          <th class="observer">
+            Observer
+            <i class="fas fa-info-circle" data-tooltip="The token doing the observing"></i>
+          </th>
+          <th class="target">
+            Target
+            <i class="fas fa-info-circle" data-tooltip="The token being observed"></i>
+          </th>
+          <th class="source">{{localize "PF2E_VISIONER.UI.SOURCE"}}</th>
+          <th class="status">{{localize "PF2E_VISIONER.UI.STATUS"}}</th>
+          <th class="actions">{{localize "PF2E_VISIONER.UI.ACTIONS"}}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{#each unifiedOverrides}}
+          <tr class="token-row" data-override-id="{{id}}" data-token-id="{{targetId}}">
+            <td class="observer">
+              <div class="token-info" data-token-id="{{observerId}}">
+                {{#if observerImg}}
+                  <img src="{{observerImg}}" alt="{{observerName}}"/>
+                {{else}}
+                  <i class="fas fa-user-circle"></i>
+                {{/if}}
+                <span>{{observerName}}</span>
+              </div>
+            </td>
+            <td class="target">
+              <div class="token-info" data-token-id="{{targetId}}">
+                {{#if targetImg}}
+                  <img src="{{targetImg}}" alt="{{targetName}}"/>
+                {{else}}
+                  <i class="fas fa-user-circle"></i>
+                {{/if}}
+                <span>{{targetName}}</span>
+              </div>
+            </td>
+            <td class="source">
+              <div class="override-badge {{badgeClass}}">
+                <i class="fas {{badgeIcon}}"></i>
+                <span>{{badgeLabel}}</span>
+              </div>
+            </td>
+            <td class="status">
+              <div class="status-icons column" role="group" aria-label="State change">
+                <div class="state-row">
+                  {{#unless (eq prevVisibility.key statusVisibility.key)}}
+                    <button type="button" class="visioner-icon-btn prev-visibility" aria-label="{{prevVisibility.label}}" data-tooltip="{{prevVisibility.label}}">
+                      <i class="{{prevVisibility.icon}} visibility-{{prevVisibility.key}}" data-state="{{prevVisibility.key}}"></i>
+                    </button>
+                    <i class="fas fa-arrow-right state-arrow" aria-hidden="true"></i>
+                    <button type="button" class="visioner-icon-btn status-visibility" aria-label="{{statusVisibility.label}}" data-tooltip="{{statusVisibility.label}}">
+                      <i class="{{statusVisibility.icon}} visibility-{{statusVisibility.key}}" data-state="{{statusVisibility.key}}"></i>
+                    </button>
+                  {{/unless}}
+                </div>
+                <div class="state-row">
+                  {{#unless (eq prevCover.key statusCover.key)}}
+                    <i class="prev-cover {{prevCover.icon}} cover-{{prevCover.key}}" data-state="{{prevCover.key}}" data-tooltip="{{prevCover.label}}"></i>
+                    <i class="fas fa-arrow-right state-arrow" aria-hidden="true"></i>
+                    <i class="status-cover {{statusCover.icon}} cover-{{statusCover.key}}" data-state="{{statusCover.key}}" aria-label="{{statusCover.label}}" data-tooltip="{{statusCover.label}}"></i>
+                  {{/unless}}
+                </div>
+              </div>
+              <div class="status-description" data-tooltip="{{reason}}">
+                <i class="fas fa-info-circle"></i>
+                <span>{{#if currentVisibilityDescription}}{{currentVisibilityDescription}}{{else}}{{reason}}{{/if}}</span>
+              </div>
+            </td>
+            <td class="actions">
+              <div class="actions-section pv-u-flex pv-u-align-center pv-u-gap-8 pv-u-justify-end">
+                <button type="button" class="row-action-btn apply-change btn btn-clear" data-override-id="{{id}}" data-tooltip="{{localize 'PF2E_VISIONER.UI.ACCEPT_THIS_CHANGE'}}">
+                  <i class="fas fa-check"></i>
+                </button>
+                <button type="button" class="row-action-btn revert-change btn btn-keep" data-override-id="{{id}}" data-tooltip="{{localize 'PF2E_VISIONER.UI.REJECT_THIS_CHANGE'}}">
+                  <i class="fas fa-times"></i>
+                </button>
+              </div>
+            </td>
+          </tr>
+        {{/each}}
+      </tbody>
+    </table>
+  </div>
+  {{/if}}
+
+  {{else}}
+  <!-- Normal Mode: Separate Tables -->
 
   <!-- Observer-Oriented Overrides Table -->
   {{#if observerOrientedOverrides.length}}
@@ -27,6 +137,7 @@
     <table class="visibility-table override-validation-table">
       <thead>
         <tr>
+          <th class="target-img">&nbsp;</th>
           <th class="target">{{localize "PF2E_VISIONER.UI.TARGET_HEADER"}}</th>
           <th class="source">{{localize "PF2E_VISIONER.UI.SOURCE"}}</th>
           <th class="status">{{localize "PF2E_VISIONER.UI.STATUS"}}</th>
@@ -36,15 +147,15 @@
       <tbody>
         {{#each observerOrientedOverrides}}
           <tr class="token-row" data-override-id="{{id}}" data-token-id="{{targetId}}">
+            <td class="target-img" data-token-id="{{targetId}}">
+              {{#if targetImg}}
+                <img src="{{targetImg}}" alt="{{targetName}}" width="48" height="48"/>
+              {{else}}
+                <i class="fas fa-user-circle"></i>
+              {{/if}}
+            </td>
             <td class="target">
-              <div class="chip chip--token target" data-token-id="{{targetId}}">
-                {{#if targetImg}}
-                  <img class="chip-avatar" src="{{targetImg}}" alt="{{targetName}}" width="28" height="28"/>
-                {{else}}
-                  <i class="fas fa-eye"></i>
-                {{/if}}
-                <span class="chip-label">{{targetName}}</span>
-              </div>
+              <span>{{targetName}}</span>
             </td>
             <td class="source">
               <div class="override-badge {{badgeClass}}">
@@ -109,6 +220,7 @@
     <table class="visibility-table override-validation-table">
       <thead>
         <tr>
+          <th class="observer-img">&nbsp;</th>
           <th class="observer">{{localize "PF2E_VISIONER.UI.OBSERVER_HEADER"}}</th>
           <th class="source">{{localize "PF2E_VISIONER.UI.SOURCE"}}</th>
           <th class="status">{{localize "PF2E_VISIONER.UI.STATUS"}}</th>
@@ -118,15 +230,15 @@
       <tbody>
         {{#each targetOrientedOverrides}}
           <tr class="token-row" data-override-id="{{id}}" data-token-id="{{observerId}}">
+            <td class="observer-img" data-token-id="{{observerId}}">
+              {{#if observerImg}}
+                <img src="{{observerImg}}" alt="{{observerName}}" width="48" height="48"/>
+              {{else}}
+                <i class="fas fa-user-circle"></i>
+              {{/if}}
+            </td>
             <td class="observer">
-              <div class="chip chip--token observer" data-token-id="{{observerId}}">
-                {{#if observerImg}}
-                  <img class="chip-avatar" src="{{observerImg}}" alt="{{observerName}}" width="28" height="28"/>
-                {{else}}
-                  <i class="fas fa-eye"></i>
-                {{/if}}
-                <span class="chip-label">{{observerName}}</span>
-              </div>
+              <span>{{observerName}}</span>
             </td>
             <td class="source">
               <div class="override-badge {{badgeClass}}">
@@ -177,9 +289,12 @@
   </div>
   {{/if}}
 
+  {{/if}} <!-- End normal mode tables -->
+
   </div> <!-- /.tables-scroll-container -->
 
-  <!-- Bulk Actions -->
+  <!-- Bulk Actions (only show in normal mode, unified table has its own) -->
+  {{#unless isRoundChange}}
   <div class="override-validation-bulk-actions-header">
     <div class="override-validation-bulk-actions-info">{{localize "PF2E_VISIONER.UI.BULK_ACTION_INFO"}}</div>
     <div class="override-validation-bulk-actions-buttons">
@@ -191,4 +306,5 @@
       </button>
     </div>
   </div>
+  {{/unless}}
 </div>

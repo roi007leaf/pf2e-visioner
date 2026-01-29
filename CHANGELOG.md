@@ -16,15 +16,6 @@
   - Start/End of turn + combatant selector hidden for non-round timers (realtime/permanent)
   - Round options still require an active combat
 
-### 🐛 Bug Fixes
-
-- **Action Dialogs**: Changing override state no longer removes the clock icon
-  - Actions column refresh preserves the row timer control
-
-- **Realtime Timers + Pause**: Game pause no longer consumes realtime timer duration
-  - While paused, remaining time is frozen
-  - On unpause, realtime expiry timestamps are shifted forward by the paused duration
-
 ### 📝 Notes
 
 - **What timers are**: Timers attach to manual AVS pair overrides (observer → target) as a `timedOverride` payload
@@ -36,6 +27,83 @@
   - Realtime: expires at a wall-clock timestamp; checked periodically by the GM client; does not expire while the game is paused
 
 - **Combat end behavior**: Round-based overrides convert to Permanent when combat ends
+
+## [5.7.0] - 2026-01-29
+
+### ✨ Added
+
+- **Round Change AVS Override Validation**: GM prompted to accept/reject AVS changes for manual overrides each round
+  - **Unified table view**: Shows all override relationships (Observer → Target) in round change mode
+  - **Automatic visibility calculation**: Displays current visibility AVS wants to apply vs manual override
+  - **Cover calculation**: Shows cover changes (none/lesser/standard/greater) AVS wants to apply
+  - **Deduplication**: Each observer-target pair shown once regardless of combatant order
+  - **Token navigation**: Click token images to pan to token
+  - **Bulk actions**: Accept All/Reject All for efficient management
+  - **Individual control**: Accept/reject per override relationship
+  - **Conflict prevention**: Skips prompt if dialog already open from token movement
+
+### 🔧 Technical
+
+- **API enhancements**: Added `clearAllAVSOverrides(tokens)`, `hasAVSOverrides(token)`, `getAVSOverrides(token)` methods
+  - `clearAllAVSOverrides`: Now accepts optional token/array to reset specific tokens
+  - `hasAVSOverrides`: Check if token has any AVS overrides (as observer or target)
+  - `getAVSOverrides`: Get all overrides involving token with names, images, states
+- **Combat hooks**: Added `checkAvsOverrides()` on round change
+  - Checks all combatants for AVS overrides
+  - Calculates current visibility using `calculateVisibilityWithoutOverrides()`
+  - Calculates current cover using `CoverDetector.detectFromPoint()`
+  - Deduplicates overrides using Map with observer-target key
+- **Dialog integration**: Reuses existing `OverrideValidationIndicator` and `OverrideValidationDialog`
+  - Added `isRoundChange` flag for different UI/messaging
+  - Unified table layout for round change mode
+  - Observer/Target columns with tooltips explaining relationships
+
+## [5.6.1] - 2026-01-27
+
+### 🐛 Fixed
+
+- **Shared Vision Blindness Handling**: All vision sharing modes now properly respect blindness conditions
+  - **One-way**: Blinded master cannot share vision, minion falls back to own vision
+  - **Two-way**: Blinded master cannot share, but minion blindness doesn't prevent master from sharing
+  - **Replace**: Blinded master causes minion to fall back to own vision
+  - **Reverse**: Blinded minion causes master to fall back to own vision
+
+## [5.6.0] - 2026-01-27
+
+### ✨ Added
+
+- **ShareVision Rule Element Operation**: Implemented vision sharing between tokens
+  - **Four modes**: `one-way`, `two-way`, `replace`, `reverse` for flexible vision control
+  - **Actor UUID based**: Master identification persists across scenes using actor UUIDs
+  - **Predicate support**: Conditional vision sharing based on roll options
+  - **Immediate vision refresh**: Controlled tokens see changes instantly
+  - **Automatic cleanup**: Master token deletion/defeat removes all associated vision sharing
+  - **Scene transition handling**: Vision sharing properly maintained when moving between scenes
+  - **Reliable vision reinitialization**: `preUpdateToken`/`updateToken` hook pair ensures vision sources update after flag changes
+
+- **Shared Vision Indicator**: Floating indicator showing active vision sharing relationships
+  - **Master/Minion detection**: Automatically detects if controlled token is sharing vision or receiving it
+  - **Multi-minion support**: Cycle through multiple minions when master has several
+  - **Mode-specific icons**: Different icons for each vision sharing mode (arrows, exchange)
+  - **Quick actions**: Left-click to pan, right-click to remove, cycle arrow for multiple minions
+  - **Configurable size**: Client setting with small/medium/large/xlarge options (defaults to small)
+  - **Draggable**: Position saved per-client
+  - **Count badge**: Shows current minion index (1/3) when multiple minions exist
+  - **Token config integration**: Works with both rule element and manual token config methods
+
+### 🔧 Technical
+
+- **Helper function**: Added `getSceneTokenIdFromActorUuid` to resolve actor UUIDs to scene token IDs
+- **Flag system**: Uses `visionMasterActorUuid`, `visionMasterTokenId`, `visionSharingMode`, `visionSharingSources` flags
+- **Detection wrapper**: Updated to handle reverse mode correctly
+- **Cleanup hooks**: Master token deletion and scene changes trigger proper vision sharing removal
+- **SharedVisionIndicator class**: Singleton pattern with refresh support and live size updates
+- **Dual detection**: Checks both `visionMasterTokenId` (token config) and `visionMasterActorUuid` (rule elements)
+
+### 🐛 Fixed
+
+- **Token config vision mode dropdown**: Now works correctly on first try after selecting a master
+- **Vision master actor UUID**: Token config now properly saves both token ID and actor UUID for persistence
 
 ## [5.5.1] - 2026-01-13
 

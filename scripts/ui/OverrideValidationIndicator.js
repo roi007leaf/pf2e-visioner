@@ -97,6 +97,16 @@ class OverrideValidationIndicator {
 
   show(overrideData, tokenName, movedTokenId = null, options = {}) {
     if (!game.user?.isGM) return;
+
+    this._showOptions = options || {};
+
+    // If dialog is already open, don't show another one (prevents conflicts)
+    const existingDialog = Object.values(ui.windows).find(w => w.constructor.name === 'OverrideValidationDialog');
+    if (existingDialog) {
+      console.log('PF2E Visioner | Queue: Dialog already open, skipping new show request');
+      this.#updateRoundChangeBadge();
+      return;
+    }
     console.log(`PF2E Visioner | Queue: show() called - tokenName: ${tokenName}, movedTokenId: ${movedTokenId}, overrides: ${Array.isArray(overrideData) ? overrideData.length : 0}`);
     try {
       const avsOnlyInCombat = game.settings.get(MODULE_ID, 'avsOnlyInCombat');
@@ -139,6 +149,7 @@ class OverrideValidationIndicator {
         console.log(`PF2E Visioner | Queue: Token ${movedTokenId} already displayed, skipping re-show.`);
         this.#updateBadge();
         this.#updateQueueBadge();
+        this.#updateRoundChangeBadge();
       }
     } else if (this._overrideStack.size > 0) {
       console.log(`PF2E Visioner | Queue: show() called without movedTokenId, but queue has ${this._overrideStack.size} items. Showing from queue.`);
@@ -161,6 +172,7 @@ class OverrideValidationIndicator {
     this._data = { overrides, tokenName, movedTokenId: null, pulse: false };
     if (!this._el) this.#createElement();
     this.#updateBadge();
+    this.#updateRoundChangeBadge();
     this._el.classList.add('pf2e-visioner-override-indicator--visible');
     this._el.classList.remove('pulse');
     this._lastShowAt = Date.now();
@@ -214,6 +226,7 @@ class OverrideValidationIndicator {
     if (!this._el) this.#createElement();
     this.#updateBadge();
     this.#updateQueueBadge();
+    this.#updateRoundChangeBadge();
     this._el.classList.add('pf2e-visioner-override-indicator--visible');
     this._el.classList.remove('pulse');
     this._lastShowAt = Date.now();
@@ -225,6 +238,13 @@ class OverrideValidationIndicator {
     if (!badge) return;
     const count = this._data?.overrides?.length || 0;
     badge.textContent = count > 0 ? String(count) : '';
+  }
+
+  #updateRoundChangeBadge() {
+    const roundChangeBadge = this._el?.querySelector('.indicator-round-change');
+    if (!roundChangeBadge) return;
+    const isRoundChange = this._showOptions?.isRoundChange || false;
+    roundChangeBadge.style.display = isRoundChange ? 'flex' : 'none';
   }
 
   #updateQueueBadge() {
@@ -358,7 +378,14 @@ class OverrideValidationIndicator {
       const { OverrideValidationDialog } = await import('./OverrideValidationDialog.js');
       // Expose moved token id for grouping via a global scratch, then show dialog
       try { game.pf2eVisioner = game.pf2eVisioner || {}; game.pf2eVisioner.lastMovedTokenId = this._data.movedTokenId || null; } catch { }
-      await OverrideValidationDialog.show(this._rawOverrides, this._data.tokenName, this._data.movedTokenId || null);
+
+      const dialog = new OverrideValidationDialog({
+        invalidOverrides: this._rawOverrides,
+        tokenName: this._data.tokenName,
+        movedTokenId: this._data.movedTokenId || null,
+        ...(this._showOptions || {})
+      });
+      await dialog.render(true);
       // Keep indicator visible; user can minimize dialog back
     } catch (e) {
       console.error('PF2E Visioner | Failed to open OverrideValidationDialog from indicator:', e);
@@ -456,6 +483,7 @@ class OverrideValidationIndicator {
       <div class="indicator-icon"><i class="fas fa-bolt-auto"></i></div>
       <div class="indicator-badge"></div>
       <div class="indicator-queue"></div>
+      <div class="indicator-round-change" title="Round Change"><i class="fas fa-clock"></i></div>
     `;
 
     // Restore position
@@ -799,6 +827,8 @@ class OverrideValidationIndicator {
       .pf2e-visioner-override-indicator .queue-badge { display: flex; align-items: center; gap: 2px; background: rgba(33,150,243,0.95); border: 1px solid rgba(33,150,243,1); border-radius: 8px; padding: 1px 4px; font-size: 9px; font-weight: 700; color: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.4); }
       .pf2e-visioner-override-indicator .queue-badge i { font-size: 8px; }
       .pf2e-visioner-override-indicator .queue-count { line-height: 1; }
+      .pf2e-visioner-override-indicator .indicator-round-change { position: absolute; bottom: -6px; left: -6px; display: none; align-items: center; justify-content: center; background: rgba(156,39,176,0.95); border: 1px solid rgba(156,39,176,1); border-radius: 50%; width: 20px; height: 20px; color: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.4); }
+      .pf2e-visioner-override-indicator .indicator-round-change i { font-size: 10px; }
 
   .pf2e-visioner-override-tooltip { position: fixed; min-width: 300px; max-width: 450px; background: rgba(30,30,30,0.98); color: var(--color-text-light-primary, #fff); border: 1px solid var(--color-border-light-primary, #555); border-radius: 8px; z-index: 1002; font-size: ${p.tipFont}px; box-shadow: 0 2px 16px rgba(0,0,0,0.45); backdrop-filter: none !important; -webkit-backdrop-filter: none !important; display: flex; flex-direction: column; max-height: min(80vh, 600px); }
       .pf2e-visioner-override-tooltip .tip-header { padding: ${p.tipPad}px ${p.tipPad}px 6px ${p.tipPad}px; font-weight: 600; color: var(--pf2e-visioner-warning); flex-shrink: 0; }

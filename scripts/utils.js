@@ -12,7 +12,7 @@ export {
   getVisibilityBetween,
   getVisibilityMap,
   setVisibilityBetween,
-  setVisibilityMap
+  setVisibilityMap,
 } from './stores/visibility-map.js';
 
 /**
@@ -322,10 +322,23 @@ export function isTokenInEncounter(token) {
 
   const encounterMasterTokenId = token?.document?.getFlag?.(MODULE_ID, 'encounterMasterTokenId');
   if (encounterMasterTokenId) {
-    return game.combat.combatants.some((combatant) => combatant.token?.id === encounterMasterTokenId);
+    return game.combat.combatants.some(
+      (combatant) => combatant.token?.id === encounterMasterTokenId,
+    );
   }
 
   return false;
+}
+
+/**
+ * Resolve the vision source for a token, checking for vision master delegation
+ * NOTE: This is now handled by VisionSource polygon merging in DetectionWrapper
+ * This function is kept for backwards compatibility but just returns the token's own vision
+ * @param {Token} token - The token to resolve vision for
+ * @returns {VisionSource|null} The vision source to use
+ */
+export function resolveVisionSource(token) {
+  return token?.vision || null;
 }
 
 /**
@@ -436,7 +449,7 @@ export function getLastRollTotalForActor(actor, requiredSlug = null) {
         /* ignore and continue */
       }
     }
-  } catch (_) { }
+  } catch (_) {}
   return null;
 }
 
@@ -468,10 +481,10 @@ export function getBestVisibilityState(states) {
  * For camera/spectator accounts: returns party tokens they can view but don't own
  * For GMs: returns selected tokens (controlled), or all tokens if none selected
  * For players: returns tokens they have observer perms on (usually their party)
- * 
+ *
  * Note: "observer permissions" != "selected tokens" in PF2E
  * This function aggregates vision for camera accounts in streaming scenarios.
- * 
+ *
  * @returns {Token[]} Array of tokens the user can observe/control for visibility
  */
 export function getControlledObserverTokens() {
@@ -488,6 +501,5 @@ export function getControlledObserverTokens() {
 
   // For non-GMs: get tokens with observer permissions that aren't owned by the user
   // This is the camera account case: they have observer perms on party tokens but don't own them
-  return canvas.tokens.placeables.filter(token => token.observer && !token.isOwner);
+  return canvas.tokens.placeables.filter((token) => token.observer && !token.isOwner);
 }
-

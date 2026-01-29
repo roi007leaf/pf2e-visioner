@@ -52,6 +52,25 @@ export class DetectionWrapper {
       canDetectWrapper(VISIBILITY_VALUES.undetected),
       'WRAPPER',
     );
+
+    // Wrap Token._isVisionSource to make master tokens contribute vision for minions
+    try {
+      libWrapper.register(
+        'pf2e-visioner',
+        'Token.prototype._isVisionSource',
+        tokenIsVisionSourceWrapper,
+        'WRAPPER',
+      );
+      libWrapper.register(
+        'pf2e-visioner',
+        'TokenDocument.prototype.prepareBaseData',
+        tokenDocumentPrepareBaseDataWrapper,
+        'WRAPPER',
+      );
+    } catch (e) {
+      console.warn('[PF2E-Visioner] Failed to register Token wrapper:', e);
+    }
+
     this._registered = true;
   }
 
@@ -64,7 +83,7 @@ export class DetectionWrapper {
 export function initializeDetectionWrapper() {
   try {
     (DetectionWrapper._instance ||= new DetectionWrapper()).register();
-  } catch (_) { }
+  } catch (_) {}
 }
 
 /**
@@ -100,13 +119,12 @@ function detectionModeTestVisibility(visionSource, mode, config = {}) {
  */
 function canDetectWrapper(threshold) {
   return function (wrapped, visionSource, target, config) {
-    // Call the original function first
     const canDetect = wrapped(visionSource, target);
     if (canDetect === false) return false;
 
-    // Enforce minimum perception proficiency for hazards/loot
+    const observerToken = visionSource?.object;
+
     try {
-      const observerToken = visionSource?.object;
       const targetToken = target;
       const targetActorType = targetToken?.actor?.type;
       if (
@@ -123,14 +141,170 @@ function canDetectWrapper(threshold) {
           return false;
         }
       }
-    } catch (_) { }
+    } catch (_) {}
 
-    // Check our module's visibility settings
-    const origin = visionSource.object;
+    const origin = observerToken;
     const reachedThreshold = reachesVisibilityThreshold(origin, target, threshold, config);
 
     return !reachedThreshold;
   };
+}
+
+/**
+ * Helper to check if a token/actor is blinded
+ */
+function isTokenBlinded(tokenOrDoc) {
+  try {
+    const doc = tokenOrDoc?.document || tokenOrDoc;
+    const actor = doc?.actor;
+    if (!actor) return false;
+
+    // Check PF2e blinded condition
+    return (
+      actor.hasCondition?.('blinded') ||
+      actor.conditions?.has?.('blinded') ||
+      actor.itemTypes?.condition?.some((c) => c.slug === 'blinded')
+    );
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Wrapper for TokenDocument.prototype.prepareBaseData
+ * Disables sight for tokens in replace/reverse modes
+ */
+function tokenDocumentPrepareBaseDataWrapper(wrapped) {
+  wrapped();
+
+  const visionMasterTokenId = this.getFlag?.(MODULE_ID, 'visionMasterTokenId');
+  const mode = this.getFlag?.(MODULE_ID, 'visionSharingMode') || 'one-way';
+
+  // REPLACE: Disable minion's sight completely
+  if (visionMasterTokenId && mode === 'replace' && this.sight) {
+    this.sight.enabled = false;
+  }
+
+  // REVERSE: Check if THIS token is a master for a minion with reverse mode
+  // If so, disable this master's sight
+  const tokens = canvas?.tokens?.placeables || [];
+  const hasReverseMinionPointingToMe = tokens.some((t) => {
+    const minionMasterId = t.document?.getFlag?.(MODULE_ID, 'visionMasterTokenId');
+    const minionMode = t.document?.getFlag?.(MODULE_ID, 'visionSharingMode') || 'one-way';
+    return minionMasterId === this.id && minionMode === 'reverse';
+  });
+
+  if (hasReverseMinionPointingToMe && this.sight) {
+    this.sight.enabled = false;
+  }
+}
+
+/**
+ * Wrapper for Token.prototype._isVisionSource
+ * Implements vision sharing modes: one-way, two-way, replace, and reverse
+ */
+function tokenIsVisionSourceWrapper(wrapped) {
+  const isNormalVisionSource = wrapped();
+
+  const thisTokenBlinded = isTokenBlinded(this);
+
+  // Check if any controlled token has this token as their vision master
+  const controlledTokens = canvas?.tokens?.controlled || [];
+  for (const controlledToken of controlledTokens) {
+    const visionMasterTokenId = controlledToken.document?.getFlag?.(
+      MODULE_ID,
+      'visionMasterTokenId',
+    );
+    const mode = controlledToken.document?.getFlag?.(MODULE_ID, 'visionSharingMode') || 'one-way';
+
+    // Check if this token is the master for a controlled minion
+    if (visionMasterTokenId === this.id) {
+      // If master is blinded, cannot share vision (minion falls back to own vision if any)
+      if (thisTokenBlinded) {
+        return false;
+      }
+
+      // ONE-WAY: minion sees master's vision (master becomes vision source)
+      // TWO-WAY: both see each other's vision (both become vision sources)
+      // REPLACE: minion sees ONLY master's vision (master becomes vision source)
+      if (mode === 'one-way' || mode === 'two-way' || mode === 'replace') {
+        return true;
+      }
+    }
+  }
+
+  // If this token is blinded and is not being used as a vision source for someone else,
+  // it cannot be a normal vision source
+  if (thisTokenBlinded) {
+    return false;
+  }
+
+  // Check if this token is a minion with a vision master
+  const visionMasterTokenId = this.document?.getFlag?.(MODULE_ID, 'visionMasterTokenId');
+  const mode = this.document?.getFlag?.(MODULE_ID, 'visionSharingMode') || 'one-way';
+
+  // REPLACE: minion uses ONLY master's vision (minion is NOT a vision source)
+  // UNLESS master is blinded, then minion falls back to own vision
+  if (visionMasterTokenId && mode === 'replace') {
+    const masterToken = canvas?.tokens?.get(visionMasterTokenId);
+    if (masterToken && isTokenBlinded(masterToken)) {
+      // Fall through to check if this token can be a normal vision source
+    } else {
+      return false;
+    }
+  }
+
+  // TWO-WAY: When master is controlled, minion also becomes vision source
+  // Check if THIS token is a minion and its master is controlled
+  if (visionMasterTokenId && mode === 'two-way') {
+    const isMasterControlled = controlledTokens.some((ct) => ct.id === visionMasterTokenId);
+    // Don't share vision if the minion (this token) is blinded
+    if (isMasterControlled && !isTokenBlinded(this)) {
+      return true;
+    }
+  }
+
+  // REVERSE: When master is controlled, minion becomes vision source, master does not
+  // Check if THIS token is a minion and its master is controlled
+  if (visionMasterTokenId && mode === 'reverse') {
+    const isMasterControlled = controlledTokens.some((ct) => ct.id === visionMasterTokenId);
+    // Don't share vision if the minion (this token) is blinded
+    if (isMasterControlled && !isTokenBlinded(this)) {
+      return true;
+    }
+  }
+
+  // TWO-WAY: When THIS token is the master and is controlled, it should be a vision source
+  // Check if this token has any two-way minions
+  const hasTwoWayMinion = canvas?.tokens?.placeables?.some((t) => {
+    const minionMasterId = t.document?.getFlag?.(MODULE_ID, 'visionMasterTokenId');
+    const minionMode = t.document?.getFlag?.(MODULE_ID, 'visionSharingMode') || 'one-way';
+    return minionMasterId === this.id && minionMode === 'two-way';
+  });
+
+  if (hasTwoWayMinion && controlledTokens.some((ct) => ct.id === this.id) && !thisTokenBlinded) {
+    return true;
+  }
+
+  // REVERSE: When THIS token is the master and is controlled, it should NOT be a vision source
+  // UNLESS the minion is blinded (then master uses their own vision)
+  // Find if there's a minion with reverse mode that has this token as master
+  const reverseMinion = canvas?.tokens?.placeables?.find((t) => {
+    const minionMasterId = t.document?.getFlag?.(MODULE_ID, 'visionMasterTokenId');
+    const minionMode = t.document?.getFlag?.(MODULE_ID, 'visionSharingMode') || 'one-way';
+    return minionMasterId === this.id && minionMode === 'reverse';
+  });
+
+  if (reverseMinion && controlledTokens.some((ct) => ct.id === this.id)) {
+    // If the minion is blinded, master should use their own vision (if they have any)
+    if (isTokenBlinded(reverseMinion)) {
+      return isNormalVisionSource;
+    }
+
+    return false;
+  }
+
+  return isNormalVisionSource;
 }
 
 /**
@@ -179,11 +353,11 @@ function getVisibilityBetweenTokens(observer, target) {
 
   // Multiple observer tokens - aggregate visibility from all of them
   const visibilityStates = observerTokens
-    .map(observerToken => {
+    .map((observerToken) => {
       const map = getVisibilityMap(observerToken);
       return map[target.document.id] || 'observed';
     })
-    .filter(state => state !== undefined && state !== null);
+    .filter((state) => state !== undefined && state !== null);
 
   if (visibilityStates.length === 0) {
     return 'observed';

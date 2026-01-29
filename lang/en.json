@@ -248,6 +248,9 @@
       "AVS_REJECTED_ALL": "Rejected all AVS changes",
       "AVS_REJECTED": "Rejected AVS changes",
       "AVS_REJECTED_SINGLE": "Rejected AVS change: {observerName} → {targetName}",
+      "VISION_SHARING_REMOVED": "Vision sharing removed",
+      "VISION_SHARING_REMOVED_FROM": "Vision sharing removed from {name}",
+      "VISION_SHARING_REMOVE_FAILED": "Failed to remove vision sharing",
       "AVS_ACCEPTED_SINGLE": "Accepted AVS change: {observerName} → {targetName}",
       "AVS_ACCEPTED_COUNT": "Accepted {count} change(s)",
       "AVS_ACCEPTED_IN_TABLE": "Accepted {count} change(s) in {group} table",
@@ -260,6 +263,17 @@
       "SNEAK_DEFERRED_RESTORED": "Restored {count} token(s) to original deferred state with all position data"
     },
     "MACROS": {},
+    "VISION_MASTER_DIALOG": {
+      "TITLE": "Select Vision Master",
+      "NO_TOKENS": "No valid tokens with vision available",
+      "NONE": "None (use own vision)",
+      "PAN": "Pan to token",
+      "MODE_LABEL": "Vision Sharing Mode",
+      "MODE_ONE_WAY": "One-way (minion sees own + master's vision)",
+      "MODE_TWO_WAY": "Two-way (both see each other's vision)",
+      "MODE_REPLACE": "Replace (minion sees only master's vision)",
+      "MODE_REVERSE": "Reverse (master sees only minion's vision)"
+    },
     "DIALOG_TITLES": {
       "HIDE_RESULTS": "Hide Results",
       "POINT_OUT_RESULTS": "Point Out Results",
@@ -695,6 +709,10 @@
         "name": "Disable Line of Sight Raycasting",
         "hint": "Disable line-of-sight raycasting for visibility. When enabled, visibility will only be calculated for selected tokens using their vision shapes. Visibility results within the visibility shape will be more accurate, but darkvision and unselected token results will only use distance and senses, ignoring walls and obstacles."
       },
+      "AVS_OVERRIDE_VALIDATION_ON_ROUND_CHANGE": {
+        "name": "Validate AVS Overrides on Round Change",
+        "hint": "When enabled, the system will check all AVS overrides at the start of each round and display a validation indicator if any overrides are active. This helps ensure overrides remain accurate as combat progresses."
+      },
       "COLORBLIND_MODE": {
         "name": "Colorblind Mode",
         "hint": "Select a colorblind mode to adjust colors for better visibility (client-side setting)",
@@ -861,6 +879,16 @@
       "AVS_CHANGES_INDICATOR_SIZE": {
         "name": "AVS Changes Indicator Size",
         "hint": "Controls the size of the floating AVS changes indicator button and its tooltip.",
+        "CHOICES": {
+          "small": "Small",
+          "medium": "Medium",
+          "large": "Large",
+          "xlarge": "Extra Large"
+        }
+      },
+      "SHARED_VISION_INDICATOR_SIZE": {
+        "name": "Shared Vision Indicator Size",
+        "hint": "Controls the size of the floating shared vision indicator button.",
         "CHOICES": {
           "small": "Small",
           "medium": "Medium",
@@ -1072,6 +1100,20 @@
       "ENCOUNTER_MASTER_PAN": "Pan to token",
       "ENCOUNTER_MASTER_SELECT": "Select",
       "ENCOUNTER_MASTER_CHOOSE": "Choose Master...",
+      "VISION_MASTER_LABEL": "Vision Master",
+      "VISION_MASTER_TOOLTIP": "Select a master token whose vision this token will share. The minion uses the master's field of view for visibility calculations. Useful for summoned creatures or familiars that should see from their creator's perspective.",
+      "VISION_MASTER_CHOOSE": "Choose Vision Master...",
+      "SHARED_VISION_TITLE": "Shared Vision",
+      "VISION_TOKEN": "Token",
+      "VISION_MASTER": "Master",
+      "VISION_SHARED_WITH": "Minion",
+      "VISION_ROLE_MASTER": "Master",
+      "VISION_ROLE_MASTER_MULTIPLE": "Master ({count} minions)",
+      "VISION_ROLE_MINION": "Minion",
+      "CLICK_TO_PAN": "Click to pan to master token",
+      "CLICK_TO_PAN_MINION": "Click to pan to minion token",
+      "MIDDLE_CLICK_TO_CYCLE": "Middle-click to cycle minions",
+      "RIGHT_CLICK_TO_REMOVE": "Right-click to remove vision sharing",
       "SNIPING_DUO_SPOTTER_LABEL": "Sniping Duo Spotter",
       "SNIPING_DUO_SPOTTER_TOOLTIP": "Choose your Sniping Duo spotter (the ally who should not provide cover for Strikes between you).",
       "SNIPING_DUO_SPOTTER_CHOOSE": "Choose Spotter...",

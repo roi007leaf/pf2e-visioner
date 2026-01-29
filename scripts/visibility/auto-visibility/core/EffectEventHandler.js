@@ -186,6 +186,7 @@ export class EffectEventHandler {
             refreshVision: true,
             refreshOcclusion: true,
             refreshLighting: false,
+            refreshTiles: true,
           });
         }
       }

@@ -31,6 +31,10 @@ function onUpdateCombat(combat, updateData) {
   if (turnChanged) {
     handleTurnAdvance(combat);
   }
+
+  if (Object.prototype.hasOwnProperty.call(updateData, 'round')) {
+    handleRoundChange(combat);
+  }
 }
 
 function onDeleteCombat(combat) {
@@ -49,7 +53,7 @@ async function handleCombatStart() {
 
     try {
       const { autoVisibilitySystem } = await import('../visibility/auto-visibility/index.js');
-      
+
       let retries = 5;
       while (retries > 0) {
         const inCombat = !!(game.combat?.started && game.combat?.combatants?.size > 0);
@@ -66,6 +70,8 @@ async function handleCombatStart() {
   } catch (error) {
     console.error('PF2E Visioner: Error setting up visibility recalculation on combat start:', error);
   }
+
+  await checkAvsOverrides();
 }
 
 let combatEndCleanupInProgress = false;
@@ -173,17 +179,94 @@ async function handleTurnAdvance(combat) {
   try {
     const current = combat?.combatant?.actor;
     if (!current) return;
-    
+
     const actor = current;
     const flag = actor?.getFlag?.('pf2e-visioner', 'echolocation');
     if (flag?.active) {
       const shouldExpire = !flag.expiresOnTurnOf || flag.expiresOnTurnOf === (actor.uuid || actor.id);
       if (shouldExpire) {
         await actor.unsetFlag('pf2e-visioner', 'echolocation');
-        try { 
-          (await import('../visibility/auto-visibility/PerceptionManager.js')).optimizedPerceptionManager.refreshPerception(); 
+        try {
+          (await import('../visibility/auto-visibility/PerceptionManager.js')).optimizedPerceptionManager.refreshPerception();
         } catch { }
       }
     }
   } catch { /* ignore */ }
+}
+
+async function handleRoundChange(combat) {
+  await checkAvsOverrides();
+}
+
+async function checkAvsOverrides() {
+  if (!game.user?.isGM) return;
+  if (!game.combat?.combatants?.size) return;
+
+  try {
+    const autoVisibilityEnabled = game.settings.get(MODULE_ID, 'autoVisibilityEnabled');
+    if (!autoVisibilityEnabled) return;
+
+    const avsOverrideValidationOnRoundChange = game.settings.get(MODULE_ID, 'avsOverrideValidationOnRoundChange');
+    if (!avsOverrideValidationOnRoundChange) return;
+  } catch {
+    return;
+  }
+
+  console.log('PF2E Visioner | Checking AVS overrides at round change...');
+
+  try {
+    const { optimizedVisibilityCalculator } = await import('../visibility/auto-visibility/VisibilityCalculator.js');
+    const { api } = await import('../api.js');
+    const overrideMap = new Map();
+    const tokensWithOverrides = [];
+
+    for (const combatant of game.combat.combatants) {
+      const token = canvas.tokens?.get?.(combatant.tokenId);
+      if (!token) continue;
+
+      if (api.hasAVSOverrides(token)) {
+        console.log(`PF2E Visioner | Token ${token.name} has AVS overrides`);
+        tokensWithOverrides.push(token);
+        const overrides = api.getAVSOverrides(token);
+
+        for (const override of overrides) {
+          const key = `${override.observerId}-${override.targetId}`;
+          if (overrideMap.has(key)) continue;
+
+          const observer = canvas.tokens?.get(override.observerId);
+          const target = canvas.tokens?.get(override.targetId);
+          if (observer && target) {
+            try {
+              const currentVis = await optimizedVisibilityCalculator.calculateVisibilityWithoutOverrides(observer, target);
+              override.currentVisibility = currentVis;
+
+              const { CoverDetector } = await import('../cover/auto-cover/CoverDetector.js');
+              const coverDetector = new CoverDetector();
+              const observerPos = {
+                x: observer.document.x + (observer.document.width * canvas.grid.size) / 2,
+                y: observer.document.y + (observer.document.height * canvas.grid.size) / 2,
+                elevation: observer.document.elevation || 0
+              };
+              const currentCover = coverDetector.detectFromPoint(observerPos, target);
+              override.currentCover = currentCover;
+            } catch (err) {
+              console.warn(`Failed to calculate visibility for ${override.observerName} → ${override.targetName}:`, err);
+            }
+          }
+
+          overrideMap.set(key, override);
+        }
+      }
+    }
+
+    const allOverrides = Array.from(overrideMap.values());
+    console.log(`PF2E Visioner | Found ${tokensWithOverrides.length} tokens with ${allOverrides.length} unique overrides`);
+
+    if (allOverrides.length > 0) {
+      const { default: indicator } = await import('../ui/OverrideValidationIndicator.js');
+      indicator.show(allOverrides, '', null, { isRoundChange: true });
+    }
+  } catch (e) {
+    console.error('PF2E Visioner | Error checking AVS overrides on round change:', e);
+  }
 }

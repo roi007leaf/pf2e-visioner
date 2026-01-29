@@ -60,9 +60,8 @@ export class OverrideService {
 
     /**
      * Check if there's an active rule element override that should be respected.
-     * Rule elements can set overrides in two ways:
-     * 1. ruleElementOverride flag - direct visibility override
-     * 2. visibilityReplacement flag - conditional state replacement
+     * Only handles direct visibility overrides (ruleElementOverride flag).
+     * Visibility replacements (visibilityReplacement flag) are handled by RuleElementChecker.
      * @param {Token} observer
      * @param {Token} target
      * @returns {{ state?: string } | null}
@@ -109,44 +108,6 @@ export class OverrideService {
                 if (observerOverride.direction === 'to') {
 
                     return { state: observerOverride.state };
-                }
-            }
-
-            // Check for visibility replacement (these don't provide a direct state)
-            // Just signal that rule elements are active so AVS respects the current visibility map
-            const targetReplacement = target?.document?.getFlag('pf2e-visioner', 'visibilityReplacement');
-            log.debug?.(() => ({
-                msg: 'checkRuleElementReplacement:target',
-                targetId: target?.document?.id,
-                has: !!targetReplacement,
-                active: !!targetReplacement?.active
-            }));
-
-
-            if (targetReplacement?.active) {
-                // Get the current visibility from the visibility map to preserve rule element state
-                const currentVisibility = observer?.document?.getFlag('pf2e-visioner', 'visibility')?.[target?.document?.id];
-
-                if (currentVisibility) {
-                    return { state: currentVisibility };
-                }
-            }
-
-            const observerReplacement = observer?.document?.getFlag('pf2e-visioner', 'visibilityReplacement');
-            log.debug?.(() => ({
-                msg: 'checkRuleElementReplacement:observer',
-                observerId: observer?.document?.id,
-                has: !!observerReplacement,
-                active: !!observerReplacement?.active
-            }));
-
-
-            if (observerReplacement?.active) {
-                // Get the current visibility from the visibility map to preserve rule element state
-                const currentVisibility = observer?.document?.getFlag('pf2e-visioner', 'visibility')?.[target?.document?.id];
-
-                if (currentVisibility) {
-                    return { state: currentVisibility };
                 }
             }
 

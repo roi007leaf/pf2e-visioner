@@ -10,7 +10,16 @@ import { DEFAULT_SETTINGS, KEYBINDINGS, MODULE_ID } from './constants.js';
 // Outside-of-dialog groups (Target Hover Tooltips, Debug Mode etc.) remain native.
 const SETTINGS_GROUPS = {
   General: [
-    { title: 'General UI', keys: ['useHudButton', 'showVisionerSceneTools', 'showQuickEditTool', 'hiddenWallIndicatorWidth', 'dimLightingThreshold'] },
+    {
+      title: 'General UI',
+      keys: [
+        'useHudButton',
+        'showVisionerSceneTools',
+        'showQuickEditTool',
+        'hiddenWallIndicatorWidth',
+        'dimLightingThreshold',
+      ],
+    },
     {
       title: 'Visioner Dialogs Settings',
       keys: [
@@ -73,6 +82,7 @@ const SETTINGS_GROUPS = {
         'autoVisibilityDebugMode',
         'avsOnlyInCombat',
         'disableLineOfSightCalculation',
+        'avsOverrideValidationOnRoundChange',
       ],
     },
   ],
@@ -273,7 +283,7 @@ class VisionerSettingsForm extends foundry.applications.api.ApplicationV2 {
         btn.addEventListener('click', () => {
           try {
             VisionerSettingsForm._onSwitchGroup(null, btn);
-          } catch { }
+          } catch {}
         });
       });
 
@@ -290,7 +300,7 @@ class VisionerSettingsForm extends foundry.applications.api.ApplicationV2 {
             group.dataset.pvDisplay = group.style.display || computed || '';
           }
           group.style.display = visible ? group.dataset.pvDisplay : 'none';
-        } catch { }
+        } catch {}
       };
 
       // Generic dependency system per redesign
@@ -367,7 +377,7 @@ class VisionerSettingsForm extends foundry.applications.api.ApplicationV2 {
         'autoCoverCoverageGreaterPct',
         'autoCoverRespectIgnoreFlag',
       ].forEach((k) => toggleSettingVisibility(k, false));
-    } catch { }
+    } catch {}
     return content;
   }
 
@@ -381,7 +391,7 @@ class VisionerSettingsForm extends foundry.applications.api.ApplicationV2 {
       // Capture any unsaved edits from the currently visible group before reading form data
       try {
         app._capturePendingChanges();
-      } catch { }
+      } catch {}
       const fd = new FormData(formEl);
       const rawMap = Object.fromEntries(fd.entries());
       // Merge previously edited values from other tabs
@@ -408,15 +418,15 @@ class VisionerSettingsForm extends foundry.applications.api.ApplicationV2 {
       // Reset pending after successful save
       try {
         app._pendingChanges = {};
-      } catch { }
+      } catch {}
       try {
         await app.close();
-      } catch { }
+      } catch {}
     } catch (e) {
       e;
       /* noop */ try {
         await app.close();
-      } catch { }
+      } catch {}
     }
   }
 
@@ -429,10 +439,10 @@ class VisionerSettingsForm extends foundry.applications.api.ApplicationV2 {
       // Preserve edits from the current group before switching
       try {
         app._capturePendingChanges();
-      } catch { }
+      } catch {}
       app.activeGroupKey = key;
       app.render({ force: true });
-    } catch { }
+    } catch {}
   }
 }
 
@@ -448,7 +458,7 @@ VisionerSettingsForm.prototype._capturePendingChanges = function _capturePending
       if (el.type === 'checkbox') this._pendingChanges[name] = !!el.checked;
       else this._pendingChanges[name] = el.value;
     });
-  } catch { }
+  } catch {}
 };
 
 /**
@@ -468,15 +478,14 @@ export function registerSettings() {
         // Live-apply without world reload
         settingConfig.onChange = async (value) => {
           try {
-            const { initializeHoverTooltips, cleanupHoverTooltips } = await import(
-              './services/HoverTooltips.js'
-            );
+            const { initializeHoverTooltips, cleanupHoverTooltips } =
+              await import('./services/HoverTooltips.js');
             if (value) initializeHoverTooltips();
             else cleanupHoverTooltips();
-          } catch { }
+          } catch {}
         };
       } else if (key === 'allowPlayerTooltips') {
-        settingConfig.onChange = () => { };
+        settingConfig.onChange = () => {};
       } else if (key === 'useHudButton' || key === 'enableHoverTooltips') {
         settingConfig.onChange = () => {
           SettingsConfig.reloadConfirm({
@@ -484,24 +493,24 @@ export function registerSettings() {
           });
         };
       } else if (key === 'ignoreAllies') {
-        settingConfig.onChange = () => { };
+        settingConfig.onChange = () => {};
       } else if (key === 'defaultEncounterFilter') {
-        settingConfig.onChange = () => { };
+        settingConfig.onChange = () => {};
       } else if (key === 'seekUseTemplate') {
         // No reload needed: panel logic reads this setting at runtime
-        settingConfig.onChange = () => { };
+        settingConfig.onChange = () => {};
       } else if (key === 'limitSeekRangeInCombat') {
         // No reload needed: seek distance is read at runtime
-        settingConfig.onChange = () => { };
+        settingConfig.onChange = () => {};
       } else if (key === 'limitSeekRangeOutOfCombat') {
         // No reload needed: seek distance is read at runtime
-        settingConfig.onChange = () => { };
+        settingConfig.onChange = () => {};
       } else if (key === 'customSeekDistance') {
         // No reload needed: seek distance is read at runtime
-        settingConfig.onChange = () => { };
+        settingConfig.onChange = () => {};
       } else if (key === 'customSeekDistanceOutOfCombat') {
         // No reload needed: seek distance is read at runtime
-        settingConfig.onChange = () => { };
+        settingConfig.onChange = () => {};
       } else if (
         key === 'autoCover' ||
         key === 'autoCoverTokenIntersectionMode' ||
@@ -514,7 +523,7 @@ export function registerSettings() {
         key === 'autoCoverAllowProneBlockers'
       ) {
         // No reload needed: auto-cover is read at runtime
-        settingConfig.onChange = () => { };
+        settingConfig.onChange = () => {};
       } else if (key === 'blockPlayerTargetTooltips') {
         // No reload: will take effect on next hover; ensure initialized when allowed
         settingConfig.onChange = async () => {
@@ -525,7 +534,7 @@ export function registerSettings() {
               game.settings.get(MODULE_ID, 'allowPlayerTooltips')
             )
               initializeHoverTooltips();
-          } catch { }
+          } catch {}
         };
       } else if (key === 'showVisionerSceneTools') {
         // Rebuild scene controls to add/remove Visioner tools immediately
@@ -535,7 +544,7 @@ export function registerSettings() {
             SettingsConfig.reloadConfirm({
               world: true,
             });
-          } catch { }
+          } catch {}
         };
       } else if (key === 'hiddenWallsEnabled') {
         // Refresh wall visuals when toggled
@@ -543,7 +552,7 @@ export function registerSettings() {
           try {
             const { updateWallVisuals } = await import('./services/visual-effects.js');
             await updateWallVisuals();
-          } catch { }
+          } catch {}
         };
       } else if (key === 'tooltipFontSize') {
         settingConfig.onChange = (value) => {
@@ -629,9 +638,21 @@ export function registerSettings() {
             /* noop */
           }
         };
+      } else if (key === 'sharedVisionIndicatorSize') {
+        // Live-apply by refreshing indicator styles
+        settingConfig.onChange = async () => {
+          try {
+            const { default: SharedVisionIndicator } =
+              await import('./ui/SharedVisionIndicator.js');
+            const indicator = SharedVisionIndicator.getInstance();
+            indicator.refreshStyles?.();
+          } catch {
+            /* noop */
+          }
+        };
       } else if (key === 'keybindingOpensTMInTargetMode') {
         // No reload needed: swap mode is read at runtime
-        settingConfig.onChange = () => { };
+        settingConfig.onChange = () => {};
       } else if (key === 'autoVisibilityEnabled') {
         // Handle auto-visibility system enable/disable
         settingConfig.onChange = async (value) => {
@@ -664,7 +685,10 @@ export function registerSettings() {
               autoVisibility.recalculateAll(true); // Force recalculation
             }
           } catch (error) {
-            console.warn('PF2E Visioner: Failed to trigger AVS recalculation on dim threshold change:', error);
+            console.warn(
+              'PF2E Visioner: Failed to trigger AVS recalculation on dim threshold change:',
+              error,
+            );
           }
         };
       } else if (key === 'hiddenWallIndicatorWidth') {
@@ -674,7 +698,10 @@ export function registerSettings() {
             const { updateWallVisuals } = await import('./services/visual-effects.js');
             await updateWallVisuals();
           } catch (error) {
-            console.warn('PF2E Visioner: Failed to update wall visuals on indicator width change:', error);
+            console.warn(
+              'PF2E Visioner: Failed to update wall visuals on indicator width change:',
+              error,
+            );
           }
         };
       }
@@ -696,7 +723,7 @@ export function registerSettings() {
         type: VisionerSettingsForm,
         restricted: true,
       });
-    } catch { }
+    } catch {}
   } catch (error) {
     throw error;
   }
@@ -732,7 +759,7 @@ export function registerKeybindings() {
             if (existing) {
               try {
                 await existing.close();
-              } catch { }
+              } catch {}
               return;
             }
 
@@ -746,14 +773,14 @@ export function registerKeybindings() {
               qp.render(true);
               try {
                 qp._removeFloatingButton();
-              } catch { }
+              } catch {}
               return;
             }
 
             // Otherwise open a new one
             const qp = new VisionerQuickPanel();
             qp.render(true);
-          } catch { }
+          } catch {}
         };
         break;
       case 'openVisibilityManager':
@@ -784,13 +811,13 @@ export function registerKeybindings() {
             // Render fresh auto-cover computation overlay (cover-only)
             hideAutoCoverComputedOverlay();
             showAutoCoverComputedOverlay(token);
-          } catch { }
+          } catch {}
         };
         keybindingConfig.onUp = async () => {
           try {
             const { hideAutoCoverComputedOverlay } = await import('./services/HoverTooltips.js');
             hideAutoCoverComputedOverlay();
-          } catch { }
+          } catch {}
         };
         break;
       case 'openWallManager':
