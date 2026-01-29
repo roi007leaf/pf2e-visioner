@@ -614,6 +614,16 @@ export const DEFAULT_SETTINGS = {
     default: false,
   },
 
+  avsOverrideValidationOnRoundChange: {
+    name: 'PF2E_VISIONER.SETTINGS.AVS_OVERRIDE_VALIDATION_ON_ROUND_CHANGE.name',
+    hint: 'PF2E_VISIONER.SETTINGS.AVS_OVERRIDE_VALIDATION_ON_ROUND_CHANGE.hint',
+    scope: 'world',
+    config: true,
+    restricted: true,
+    type: Boolean,
+    default: true,
+  },
+
   colorblindMode: {
     name: 'PF2E_VISIONER.SETTINGS.COLORBLIND_MODE.name',
     hint: 'PF2E_VISIONER.SETTINGS.COLORBLIND_MODE.hint',
