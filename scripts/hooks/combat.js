@@ -205,6 +205,9 @@ async function checkAvsOverrides() {
   try {
     const autoVisibilityEnabled = game.settings.get(MODULE_ID, 'autoVisibilityEnabled');
     if (!autoVisibilityEnabled) return;
+
+    const avsOverrideValidationOnRoundChange = game.settings.get(MODULE_ID, 'avsOverrideValidationOnRoundChange');
+    if (!avsOverrideValidationOnRoundChange) return;
   } catch {
     return;
   }
