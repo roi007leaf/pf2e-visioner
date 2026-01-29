@@ -79,7 +79,7 @@ export class ActionHandlerBase {
   }
 
   // Optional hooks for subclasses
-  async ensurePrerequisites() { }
+  async ensurePrerequisites() {}
   async discoverSubjects() {
     throw new Error('discoverSubjects must be implemented in subclass');
   }
@@ -102,15 +102,24 @@ export class ActionHandlerBase {
         const id = this.getOutcomeTokenId(outcome);
         if (!id) continue;
         if (!overridesMap.has(id)) continue;
-        const overrideState = overridesMap.get(id);
+        const overrideValue = overridesMap.get(id);
+        let overrideState;
+        let timedOverride = null;
+        if (typeof overrideValue === 'string') {
+          overrideState = overrideValue;
+        } else if (typeof overrideValue === 'object' && overrideValue) {
+          overrideState = overrideValue.state;
+          timedOverride = overrideValue.timedOverride || null;
+        }
         if (typeof overrideState !== 'string' || !overrideState) continue;
         outcome.newVisibility = overrideState;
+        outcome.timedOverride = timedOverride;
         const baseOld = outcome.oldVisibility ?? outcome.currentVisibility;
         if (baseOld) {
           // If old state matches new state, check if old state was AVS-controlled
           // If it was AVS-controlled, we should still apply the manual override
           const isOldStateAvsControlled = this.isOldStateAvsControlled(outcome, actionData);
-          outcome.changed = (overrideState !== baseOld) || isOldStateAvsControlled;
+          outcome.changed = overrideState !== baseOld || isOldStateAvsControlled;
         }
       }
       return outcomes;
@@ -213,7 +222,7 @@ export class ActionHandlerBase {
           const allowedIds = new Set(Object.keys(overrides));
           filtered = filtered.filter((o) => allowedIds.has(this.getOutcomeTokenId(o)));
         }
-      } catch { }
+      } catch {}
       if (filtered.length === 0) {
         notify.info('No changes to apply');
         return 0;
@@ -224,7 +233,7 @@ export class ActionHandlerBase {
         if (actionData?.overrides && typeof actionData.overrides === 'object') {
           overridesMap = new Map(Object.entries(actionData.overrides));
         }
-      } catch { }
+      } catch {}
       const changes = filtered
         .map((o) => {
           const ch = this.outcomeToChange(actionData, o);
@@ -281,7 +290,7 @@ export class ActionHandlerBase {
           const allowedIds = new Set(Object.keys(overrides));
           filtered = filtered.filter((o) => allowedIds.has(this.getOutcomeTokenId(o)));
         }
-      } catch { }
+      } catch {}
 
       if (filtered.length === 0) {
         notify.info('No changes to apply');
@@ -291,7 +300,9 @@ export class ActionHandlerBase {
       // Check if this action type supports dual system application
       if (this.supportsDualSystemApplication && this.supportsDualSystemApplication()) {
         // Use dual system application for enhanced actions like sneak
-        const { default: dualSystemApplication } = await import('../DualSystemResultApplication.js');
+        const { default: dualSystemApplication } = await import(
+          '../DualSystemResultApplication.js'
+        );
 
         // Convert outcomes to sneak results format for dual system application
         const sneakResults = this.convertOutcomesToSneakResults(filtered, actionData);
@@ -300,7 +311,7 @@ export class ActionHandlerBase {
         const applicationResult = await dualSystemApplication.applySneakResults(sneakResults, {
           direction: this.getApplyDirection(),
           skipEphemeralUpdate: actionData.skipEphemeralUpdate,
-          skipCleanup: actionData.skipCleanup
+          skipCleanup: actionData.skipCleanup,
         });
 
         if (applicationResult.success) {
@@ -314,7 +325,7 @@ export class ActionHandlerBase {
           notify.error(`Failed to apply changes: ${errorMessage}`);
 
           // Attempt fallback to standard application if dual system fails
-          if (applicationResult.errors.some(error => error.includes('fallback'))) {
+          if (applicationResult.errors.some((error) => error.includes('fallback'))) {
             console.warn('PF2E Visioner | Dual system failed, attempting standard application');
             return await this.applyChangesWithFallback(filtered, actionData, button);
           }
@@ -325,7 +336,6 @@ export class ActionHandlerBase {
         // Use standard application for actions that don't support dual system
         return await this.applyChangesWithFallback(filtered, actionData, button);
       }
-
     } catch (e) {
       log.error(e);
       return 0;
@@ -341,7 +351,7 @@ export class ActionHandlerBase {
         if (actionData?.overrides && typeof actionData.overrides === 'object') {
           overridesMap = new Map(Object.entries(actionData.overrides));
         }
-      } catch { }
+      } catch {}
 
       const changes = filtered
         .map((o) => {
@@ -374,14 +384,14 @@ export class ActionHandlerBase {
   // Method for subclasses to convert outcomes to sneak results format
   convertOutcomesToSneakResults(outcomes, actionData) {
     // Default implementation - subclasses should override for specific conversion logic
-    return outcomes.map(outcome => ({
+    return outcomes.map((outcome) => ({
       token: outcome.token,
       actor: actionData.actor,
       newVisibility: outcome.newVisibility,
       oldVisibility: outcome.oldVisibility || outcome.currentVisibility,
       positionTransition: outcome.positionTransition,
       autoCover: outcome.autoCover,
-      overrideState: outcome.overrideState
+      overrideState: outcome.overrideState,
     }));
   }
 
@@ -397,7 +407,7 @@ export class ActionHandlerBase {
         transactionId: applicationResult.transactionId,
         appliedChanges: applicationResult.appliedChanges,
         timestamp: Date.now(),
-        isDualSystem: true
+        isDualSystem: true,
       };
 
       cache.set(actionData.messageId, existing.concat([entry]));
@@ -415,7 +425,7 @@ export class ActionHandlerBase {
     for (const group of groups) {
       try {
         if (group?.observer?.document?.hidden === true) continue; // Skip if observer is Foundry hidden
-      } catch { }
+      } catch {}
       await applyVisibilityChanges(
         group.observer,
         group.items.map((i) => ({ target: i.target, newVisibility: i.newVisibility })),
@@ -431,7 +441,7 @@ export class ActionHandlerBase {
       const existing = cache.get(actionData.messageId) || [];
       const entries = changes.map((c) => this.buildCacheEntryFromChange(c)).filter(Boolean);
       cache.set(actionData.messageId, existing.concat(entries));
-    } catch { }
+    } catch {}
   }
 
   updateButtonToRevert(button) {
@@ -440,7 +450,7 @@ export class ActionHandlerBase {
       button
         .html('<i class="fas fa-undo"></i> Revert Changes')
         .attr('data-action', this.getRevertActionName());
-    } catch { }
+    } catch {}
   }
 
   updateButtonToApply(button) {
@@ -449,7 +459,7 @@ export class ActionHandlerBase {
       button
         .html('<i class="fas fa-check-double"></i> Apply Changes')
         .attr('data-action', this.getApplyActionName());
-    } catch { }
+    } catch {}
   }
 
   // Revert logic
@@ -517,7 +527,7 @@ export class ActionHandlerBase {
   clearCache(actionData) {
     try {
       this.getCacheMap()?.delete(actionData.messageId);
-    } catch { }
+    } catch {}
   }
 
   removeFromCache(actionData, targetTokenId) {
@@ -537,7 +547,7 @@ export class ActionHandlerBase {
       } else {
         cache.set(actionData.messageId, filteredEntries);
       }
-    } catch { }
+    } catch {}
   }
 
   // Helpers

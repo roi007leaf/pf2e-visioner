@@ -2496,6 +2496,7 @@ export class Pf2eVisionerApi {
         const flags = targetToken.document.flags?.['pf2e-visioner'] || {};
         for (const [flagKey, flagData] of Object.entries(flags)) {
           if (flagKey.startsWith('avs-override-from-') && flagData) {
+            if (this.#hasActiveTimer(flagData.timedOverride)) continue;
             const observerToken = canvas.tokens.get(flagData.observerId);
             overrides.push({
               observerId: flagData.observerId,
@@ -2520,6 +2521,7 @@ export class Pf2eVisionerApi {
         const flagKey = `avs-override-from-${tokenId}`;
         const flagData = otherFlags[flagKey];
         if (flagData && flagData.observerId === tokenId) {
+          if (this.#hasActiveTimer(flagData.timedOverride)) continue;
           const observerToken = canvas.tokens.get(flagData.observerId);
           overrides.push({
             observerId: flagData.observerId,
@@ -2543,6 +2545,20 @@ export class Pf2eVisionerApi {
       console.error('PF2E Visioner | getAVSOverrides failed:', err);
       return [];
     }
+  }
+
+  static #hasActiveTimer(timedOverride) {
+    try {
+      const skipTimedOverrides = game.settings.get(MODULE_ID, 'avsSkipTimedOverrideValidation');
+      if (!skipTimedOverrides) return false;
+    } catch {
+      return false;
+    }
+    if (!timedOverride) return false;
+    if (timedOverride.type === 'permanent') return true;
+    if (timedOverride.type === 'realtime' && timedOverride.expiresAt > Date.now()) return true;
+    if (timedOverride.type === 'rounds' && timedOverride.roundsRemaining > 0) return true;
+    return false;
   }
 
   /**

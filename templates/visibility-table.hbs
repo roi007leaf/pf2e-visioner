@@ -43,6 +43,11 @@
                 <i class="fas fa-eye-slash"></i>
               </span>
             {{/if}}
+            {{#if target.hasActiveTimer}}
+              <span class="timer-badge" data-tooltip="{{target.timerTooltip}}: {{target.timerDisplay}}" data-observer-id="{{../observer.id}}" data-target-id="{{target.id}}">
+                <i class="fas fa-clock"></i>
+              </span>
+            {{/if}}
           </div>
         </td>
         <td class="token-name">
@@ -57,6 +62,12 @@
                 <i class="{{state.icon}}"></i>
               </button>
             {{/each}}
+            <button type="button" class="row-timer-toggle {{#if target.hasRowTimer}}active{{/if}}" 
+                    data-action="toggleRowTimer" data-target-id="{{target.id}}"
+                    data-tooltip="{{#if target.hasRowTimer}}{{target.rowTimerDisplay}} - Click to clear{{else}}{{localize 'PF2E_VISIONER.TIMED_OVERRIDE.SET_DURATION_FOR_ROW'}}{{/if}}">
+              <i class="fas fa-clock"></i>
+              {{#if target.hasRowTimer}}<span class="row-timer-label">{{target.rowTimerDisplay}}</span>{{/if}}
+            </button>
             <input type="hidden" name="visibility.{{target.id}}" value="{{#if target.isAvsControlled}}avs{{else}}{{target.currentVisibilityState}}{{/if}}" />
           </div>
         </td>

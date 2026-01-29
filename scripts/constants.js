@@ -624,6 +624,16 @@ export const DEFAULT_SETTINGS = {
     default: true,
   },
 
+  avsSkipTimedOverrideValidation: {
+    name: 'PF2E_VISIONER.SETTINGS.AVS_SKIP_TIMED_OVERRIDE_VALIDATION.name',
+    hint: 'PF2E_VISIONER.SETTINGS.AVS_SKIP_TIMED_OVERRIDE_VALIDATION.hint',
+    scope: 'world',
+    config: true,
+    restricted: true,
+    type: Boolean,
+    default: true,
+  },
+
   colorblindMode: {
     name: 'PF2E_VISIONER.SETTINGS.COLORBLIND_MODE.name',
     hint: 'PF2E_VISIONER.SETTINGS.COLORBLIND_MODE.hint',
@@ -1015,6 +1025,18 @@ export const UI_CONSTANTS = {
 /**
  * Keybinding configurations
  */
+export const TIMED_OVERRIDE_TYPES = {
+  ROUNDS: 'rounds',
+  REALTIME: 'realtime',
+};
+
+export const TURN_TIMING = {
+  START: 'start',
+  END: 'end',
+};
+
+export const REALTIME_CHECK_INTERVAL_MS = 30000;
+
 export const KEYBINDINGS = {
   openTokenManager: {
     name: 'PF2E_VISIONER.KEYBINDINGS.OPEN_TOKEN_MANAGER.name',

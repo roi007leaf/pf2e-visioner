@@ -1,0 +1,50 @@
+{{!-- Active Timed Overrides Section --}}
+{{#if hasActiveTimers}}
+<div class="table-section active-timers-section collapsible" data-collapsed="false">
+  <div class="table-section-header clickable" data-action="toggleTimersSection">
+    <div class="header-left">
+      <i class="fas fa-clock"></i>
+      <span>{{localize "PF2E_VISIONER.TIMED_OVERRIDE.ACTIVE_TIMERS"}}</span>
+      <span class="timer-count">({{activeTimers.length}})</span>
+      <i class="fas fa-chevron-down collapse-indicator"></i>
+    </div>
+  </div>
+  <div class="active-timers-content">
+    <table class="active-timers-table">
+      <thead>
+        <tr>
+          <th class="timer-target">{{localize "PF2E_VISIONER.UI.NAME"}}</th>
+          <th class="timer-state">{{localize "PF2E_VISIONER.UI.CURRENT_STATE"}}</th>
+          <th class="timer-remaining">{{localize "PF2E_VISIONER.TIMED_OVERRIDE.REMAINING"}}</th>
+          <th class="timer-actions"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {{#each activeTimers as |timer|}}
+        <tr class="timer-row" data-observer-id="{{timer.observerId}}" data-target-id="{{timer.targetId}}">
+          <td class="timer-target">
+            <span class="timer-target-name">{{timer.pairName}}</span>
+          </td>
+          <td class="timer-state">
+            <span class="state-indicator visibility-{{timer.state}}">
+              {{timer.stateLabel}}
+            </span>
+          </td>
+          <td class="timer-remaining">
+            <span class="timer-display">{{timer.remainingDisplay}}</span>
+            {{#if timer.turnTimingDisplay}}
+            <span class="timer-turn-info">{{timer.turnTimingDisplay}}</span>
+            {{/if}}
+          </td>
+          <td class="timer-actions">
+            <button type="button" class="cancel-timer-btn" data-action="cancelTimer" data-observer-id="{{timer.observerId}}" data-target-id="{{timer.targetId}}" data-tooltip="{{localize 'PF2E_VISIONER.TIMED_OVERRIDE.CANCEL_TIMER'}}">
+              <i class="fas fa-times"></i>
+            </button>
+          </td>
+        </tr>
+        {{/each}}
+      </tbody>
+    </table>
+  </div>
+</div>
+{{/if}}

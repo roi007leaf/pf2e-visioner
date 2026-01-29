@@ -83,6 +83,7 @@ const SETTINGS_GROUPS = {
         'avsOnlyInCombat',
         'disableLineOfSightCalculation',
         'avsOverrideValidationOnRoundChange',
+        'avsSkipTimedOverrideValidation',
       ],
     },
   ],

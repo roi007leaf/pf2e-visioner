@@ -483,7 +483,7 @@ class OverrideValidationIndicator {
       <div class="indicator-icon"><i class="fas fa-bolt-auto"></i></div>
       <div class="indicator-badge"></div>
       <div class="indicator-queue"></div>
-      <div class="indicator-round-change" title="Round Change"><i class="fas fa-clock"></i></div>
+      <div class="indicator-round-change" title="Round Change"><i class="fas fa-flag-checkered"></i></div>
     `;
 
     // Restore position

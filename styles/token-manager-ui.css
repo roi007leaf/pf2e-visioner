@@ -91,6 +91,169 @@
     box-shadow: 0 0 3px rgba(0, 0, 0, 0.5);
     pointer-events: none;
   }
+  .visioner-token-manager .timer-badge {
+    position: absolute;
+    bottom: -4px;
+    right: -4px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: rgba(59, 130, 246, 0.9);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 9px;
+    border: 1px solid rgba(255, 255, 255, 0.8);
+    box-shadow: 0 0 4px rgba(59, 130, 246, 0.6);
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+  .visioner-token-manager .timer-badge:hover {
+    background: rgba(37, 99, 235, 1);
+    transform: scale(1.1);
+  }
+
+  /* Active Timers Section */
+  .visioner-token-manager .active-timers-section {
+    margin-bottom: 12px;
+    border: 1px solid rgba(59, 130, 246, 0.4);
+    border-radius: 6px;
+    background: rgba(59, 130, 246, 0.05);
+  }
+  .visioner-token-manager .active-timers-section .table-section-header {
+    background: rgba(59, 130, 246, 0.15);
+    padding: 8px 12px;
+    cursor: pointer;
+    user-select: none;
+  }
+  .visioner-token-manager .active-timers-section .table-section-header:hover {
+    background: rgba(59, 130, 246, 0.25);
+  }
+  .visioner-token-manager .active-timers-section .header-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .visioner-token-manager .active-timers-section .header-left i {
+    color: rgba(59, 130, 246, 0.9);
+  }
+  .visioner-token-manager .active-timers-section .timer-count {
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.6);
+  }
+  .visioner-token-manager .active-timers-section .collapse-indicator {
+    margin-left: auto;
+    transition: transform 0.2s ease;
+  }
+  .visioner-token-manager .active-timers-section[data-collapsed='true'] .collapse-indicator {
+    transform: rotate(-90deg);
+  }
+  .visioner-token-manager .active-timers-section[data-collapsed='true'] .active-timers-content {
+    display: none;
+  }
+  .visioner-token-manager .active-timers-content {
+    padding: 8px;
+  }
+  .visioner-token-manager .active-timers-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  .visioner-token-manager .active-timers-table th {
+    text-align: left;
+    padding: 4px 8px;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.7);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  }
+  .visioner-token-manager .active-timers-table td {
+    padding: 6px 8px;
+    vertical-align: middle;
+  }
+  .visioner-token-manager .timer-row {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  }
+  .visioner-token-manager .timer-row:hover {
+    background: rgba(59, 130, 246, 0.1);
+  }
+  .visioner-token-manager .timer-target-name {
+    font-weight: 500;
+  }
+  .visioner-token-manager .timer-display {
+    font-family: monospace;
+    font-size: 12px;
+    color: rgba(59, 130, 246, 0.9);
+  }
+  .visioner-token-manager .timer-turn-info {
+    display: block;
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.5);
+    margin-top: 2px;
+  }
+  .visioner-token-manager .timer-actions {
+    text-align: right;
+    width: 40px;
+  }
+  .visioner-token-manager .cancel-timer-btn {
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--pf2e-visioner-danger, #c92a2a);
+    cursor: pointer;
+    padding: 4px 6px;
+    border-radius: 4px;
+    font-size: 12px;
+    line-height: 1;
+    transition: all 0.2s ease;
+  }
+  .visioner-token-manager .cancel-timer-btn:hover {
+    background: rgba(255, 0, 0, 0.15);
+    border-color: rgba(255, 0, 0, 0.4);
+    color: #ff4d4f;
+  }
+
+  /* Row Timer Toggle Button */
+  .visioner-token-manager .row-timer-toggle {
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: rgba(255, 255, 255, 0.5);
+    cursor: pointer;
+    padding: 4px 6px;
+    border-radius: 4px;
+    font-size: 12px;
+    line-height: 1;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: 4px;
+  }
+  .visioner-token-manager .row-timer-toggle:hover {
+    background: rgba(59, 130, 246, 0.15);
+    border-color: rgba(59, 130, 246, 0.5);
+    color: rgba(59, 130, 246, 0.9);
+  }
+  .visioner-token-manager .row-timer-toggle.active {
+    background: linear-gradient(
+      135deg,
+      rgba(59, 130, 246, 0.4) 0%,
+      rgba(37, 99, 235, 0.5) 100%
+    ) !important;
+    border-color: rgba(96, 165, 250, 0.9) !important;
+    color: #fff !important;
+    box-shadow:
+      0 0 10px rgba(59, 130, 246, 0.35),
+      inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
+  }
+  .visioner-token-manager .row-timer-toggle.active:hover {
+    background: rgba(220, 38, 38, 0.15);
+    border-color: rgba(220, 38, 38, 0.5);
+    color: rgba(220, 38, 38, 0.9);
+  }
+  .visioner-token-manager .row-timer-label {
+    font-size: 10px;
+    font-family: monospace;
+  }
   /*
  * Token Manager UI Improvements
  * Modern, compact UI for the token manager
