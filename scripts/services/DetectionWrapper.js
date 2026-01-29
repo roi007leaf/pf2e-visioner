@@ -67,7 +67,6 @@ export class DetectionWrapper {
         tokenDocumentPrepareBaseDataWrapper,
         'WRAPPER',
       );
-      console.log('[PF2E-Visioner] Token wrappers registered');
     } catch (e) {
       console.warn('[PF2E-Visioner] Failed to register Token wrapper:', e);
     }
@@ -207,10 +206,7 @@ function tokenDocumentPrepareBaseDataWrapper(wrapped) {
 function tokenIsVisionSourceWrapper(wrapped) {
   const isNormalVisionSource = wrapped();
 
-  // If this token is blinded, it cannot be a vision source
-  if (isTokenBlinded(this)) {
-    return false;
-  }
+  const thisTokenBlinded = isTokenBlinded(this);
 
   // Check if any controlled token has this token as their vision master
   const controlledTokens = canvas?.tokens?.controlled || [];
@@ -221,24 +217,26 @@ function tokenIsVisionSourceWrapper(wrapped) {
     );
     const mode = controlledToken.document?.getFlag?.(MODULE_ID, 'visionSharingMode') || 'one-way';
 
-    // Don't share vision if the master is blinded
-    if (visionMasterTokenId === this.id && isTokenBlinded(this)) {
-      console.log(`[PF2E-Visioner] ${this.name} is blinded - cannot share vision`);
-      return false;
-    }
+    // Check if this token is the master for a controlled minion
+    if (visionMasterTokenId === this.id) {
+      // If master is blinded, cannot share vision (minion falls back to own vision if any)
+      if (thisTokenBlinded) {
+        return false;
+      }
 
-    // ONE-WAY: minion sees master's vision (master becomes vision source)
-    // TWO-WAY: both see each other's vision (both become vision sources)
-    // REPLACE: minion sees ONLY master's vision (master becomes vision source)
-    if (
-      visionMasterTokenId === this.id &&
-      (mode === 'one-way' || mode === 'two-way' || mode === 'replace')
-    ) {
-      console.log(
-        `[PF2E-Visioner] ${this.name} acting as vision source for controlled minion ${controlledToken.name} (${mode})`,
-      );
-      return true;
+      // ONE-WAY: minion sees master's vision (master becomes vision source)
+      // TWO-WAY: both see each other's vision (both become vision sources)
+      // REPLACE: minion sees ONLY master's vision (master becomes vision source)
+      if (mode === 'one-way' || mode === 'two-way' || mode === 'replace') {
+        return true;
+      }
     }
+  }
+
+  // If this token is blinded and is not being used as a vision source for someone else,
+  // it cannot be a normal vision source
+  if (thisTokenBlinded) {
+    return false;
   }
 
   // Check if this token is a minion with a vision master
@@ -246,11 +244,14 @@ function tokenIsVisionSourceWrapper(wrapped) {
   const mode = this.document?.getFlag?.(MODULE_ID, 'visionSharingMode') || 'one-way';
 
   // REPLACE: minion uses ONLY master's vision (minion is NOT a vision source)
+  // UNLESS master is blinded, then minion falls back to own vision
   if (visionMasterTokenId && mode === 'replace') {
-    console.log(
-      `[PF2E-Visioner] ${this.name} NOT a vision source (replace mode - using only master's vision)`,
-    );
-    return false;
+    const masterToken = canvas?.tokens?.get(visionMasterTokenId);
+    if (masterToken && isTokenBlinded(masterToken)) {
+      // Fall through to check if this token can be a normal vision source
+    } else {
+      return false;
+    }
   }
 
   // TWO-WAY: When master is controlled, minion also becomes vision source
@@ -259,9 +260,6 @@ function tokenIsVisionSourceWrapper(wrapped) {
     const isMasterControlled = controlledTokens.some((ct) => ct.id === visionMasterTokenId);
     // Don't share vision if the minion (this token) is blinded
     if (isMasterControlled && !isTokenBlinded(this)) {
-      console.log(
-        `[PF2E-Visioner] ${this.name} (minion) acting as vision source - master is controlled with two-way mode`,
-      );
       return true;
     }
   }
@@ -272,25 +270,37 @@ function tokenIsVisionSourceWrapper(wrapped) {
     const isMasterControlled = controlledTokens.some((ct) => ct.id === visionMasterTokenId);
     // Don't share vision if the minion (this token) is blinded
     if (isMasterControlled && !isTokenBlinded(this)) {
-      console.log(
-        `[PF2E-Visioner] ${this.name} (minion) acting as vision source - master is controlled with reverse mode`,
-      );
       return true;
     }
   }
 
+  // TWO-WAY: When THIS token is the master and is controlled, it should be a vision source
+  // Check if this token has any two-way minions
+  const hasTwoWayMinion = canvas?.tokens?.placeables?.some((t) => {
+    const minionMasterId = t.document?.getFlag?.(MODULE_ID, 'visionMasterTokenId');
+    const minionMode = t.document?.getFlag?.(MODULE_ID, 'visionSharingMode') || 'one-way';
+    return minionMasterId === this.id && minionMode === 'two-way';
+  });
+
+  if (hasTwoWayMinion && controlledTokens.some((ct) => ct.id === this.id) && !thisTokenBlinded) {
+    return true;
+  }
+
   // REVERSE: When THIS token is the master and is controlled, it should NOT be a vision source
+  // UNLESS the minion is blinded (then master uses their own vision)
   // Find if there's a minion with reverse mode that has this token as master
-  const hasReverseMinion = canvas?.tokens?.placeables?.some((t) => {
+  const reverseMinion = canvas?.tokens?.placeables?.find((t) => {
     const minionMasterId = t.document?.getFlag?.(MODULE_ID, 'visionMasterTokenId');
     const minionMode = t.document?.getFlag?.(MODULE_ID, 'visionSharingMode') || 'one-way';
     return minionMasterId === this.id && minionMode === 'reverse';
   });
 
-  if (hasReverseMinion && controlledTokens.some((ct) => ct.id === this.id)) {
-    console.log(
-      `[PF2E-Visioner] ${this.name} (master) NOT a vision source (reverse mode - seeing through minion)`,
-    );
+  if (reverseMinion && controlledTokens.some((ct) => ct.id === this.id)) {
+    // If the minion is blinded, master should use their own vision (if they have any)
+    if (isTokenBlinded(reverseMinion)) {
+      return isNormalVisionSource;
+    }
+
     return false;
   }
 
