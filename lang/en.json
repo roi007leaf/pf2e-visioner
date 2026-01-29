@@ -58,7 +58,6 @@
       "CANCEL_TIMER": "Cancel Timer",
       "ROUNDS_REMAINING": "{count} round(s)",
       "TIME_REMAINING": "{time}",
-      "PERMANENT": "Permanent",
       "TIMER_TOOLTIP": "Override expires: {remaining}",
       "TIMER_EXPIRED_NOTIFICATION": "Timed override for {target} has expired",
       "TIMER_CANCELLED": "Timer cancelled",
@@ -712,6 +711,10 @@
       "AVS_OVERRIDE_VALIDATION_ON_ROUND_CHANGE": {
         "name": "Validate AVS Overrides on Round Change",
         "hint": "When enabled, the system will check all AVS overrides at the start of each round and display a validation indicator if any overrides are active. This helps ensure overrides remain accurate as combat progresses."
+      },
+      "AVS_SKIP_TIMED_OVERRIDE_VALIDATION": {
+        "name": "Skip Timed Override Validation",
+        "hint": "When enabled, overrides with active timers are excluded from round-change validation checks. This prevents round-change prompts for temporary overrides that haven't expired yet. Note: Movement validation always skips timed overrides regardless of this setting."
       },
       "COLORBLIND_MODE": {
         "name": "Colorblind Mode",

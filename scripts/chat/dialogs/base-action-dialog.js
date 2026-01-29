@@ -155,17 +155,17 @@ export class BaseActionDialog extends BasePreviewDialog {
     // Ensure bulk override buttons get listeners
     try {
       this._attachBulkOverrideHandlers();
-    } catch {}
+    } catch { }
 
     // Attach dropdown toggle handlers
     try {
       this._attachDropdownHandlers();
-    } catch {}
+    } catch { }
 
     // Attach row timer button handlers
     try {
       this._attachRowTimerHandlers();
-    } catch {}
+    } catch { }
   }
 
   _attachRowTimerHandlers() {
@@ -186,7 +186,7 @@ export class BaseActionDialog extends BasePreviewDialog {
         const tokenId = btn.dataset.tokenId;
         if (tokenId) this._updateRowTimerButton(tokenId);
       });
-    } catch {}
+    } catch { }
   }
 
   _injectTimerButtonsIfMissing() {
@@ -262,8 +262,6 @@ export class BaseActionDialog extends BasePreviewDialog {
         label = `${timerConfig.rounds}r`;
       } else if (timerConfig.type === 'realtime') {
         label = `${timerConfig.minutes}m`;
-      } else if (timerConfig.type === 'permanent') {
-        label = '\u221E';
       }
       let labelSpan = btn.querySelector('.row-timer-label');
       if (!labelSpan) {
@@ -396,7 +394,7 @@ export class BaseActionDialog extends BasePreviewDialog {
       });
       const clearBtn = root.querySelector('button[data-action="bulkOverrideClear"]');
       if (clearBtn) clearBtn.addEventListener('click', (ev) => this._onBulkOverrideClear(ev));
-    } catch {}
+    } catch { }
   }
 
   _onBulkOverrideSet(event) {
@@ -481,7 +479,7 @@ export class BaseActionDialog extends BasePreviewDialog {
     import('../services/ui/dialog-utils.js').then(({ updateRowButtonsToApplied }) => {
       try {
         updateRowButtonsToApplied(this.element, normalized);
-      } catch {}
+      } catch { }
     });
   }
 
@@ -493,7 +491,7 @@ export class BaseActionDialog extends BasePreviewDialog {
     import('../services/ui/dialog-utils.js').then(({ updateRowButtonsToReverted }) => {
       try {
         updateRowButtonsToReverted(this.element, normalized);
-      } catch {}
+      } catch { }
       try {
         // After reverting, reset each row's selection to its initial calculated outcome
         if (!Array.isArray(outcomes)) return;
@@ -525,9 +523,9 @@ export class BaseActionDialog extends BasePreviewDialog {
               (x) => String(this.getOutcomeTokenId(x)) === String(tokenId),
             );
             if (outcome) outcome.overrideState = null;
-          } catch {}
+          } catch { }
         }
-      } catch {}
+      } catch { }
     });
   }
 
@@ -535,7 +533,7 @@ export class BaseActionDialog extends BasePreviewDialog {
     import('../services/ui/dialog-utils.js').then(({ updateBulkActionButtons }) => {
       try {
         updateBulkActionButtons(this.element, this.bulkActionState);
-      } catch {}
+      } catch { }
     });
   }
 
@@ -543,7 +541,7 @@ export class BaseActionDialog extends BasePreviewDialog {
     import('../services/ui/dialog-utils.js').then(({ updateChangesCount }) => {
       try {
         updateChangesCount(this.element, this.getChangesCounterClass());
-      } catch {}
+      } catch { }
     });
   }
 
@@ -568,7 +566,7 @@ export class BaseActionDialog extends BasePreviewDialog {
         const icon = container.querySelector(`.state-icon[data-state="${desiredState}"]`);
         if (icon) icon.classList.add('selected');
       }
-    } catch {}
+    } catch { }
   }
 
   // Outcome display helpers (string-based). Subclasses can override if needed
@@ -632,8 +630,8 @@ export class BaseActionDialog extends BasePreviewDialog {
             ? ''
             : `
           <button type="button" class="row-timer-toggle" data-token-id="${tokenId}" data-tooltip="${game.i18n.localize(
-            'PF2E_VISIONER.TIMED_OVERRIDE.SET_DURATION_FOR_ROW',
-          )}">
+              'PF2E_VISIONER.TIMED_OVERRIDE.SET_DURATION_FOR_ROW',
+            )}">
             <i class="fas fa-clock"></i>
           </button>
         `;
@@ -650,12 +648,12 @@ export class BaseActionDialog extends BasePreviewDialog {
           try {
             this._attachRowTimerHandlers();
             this._updateRowTimerButton(tokenId);
-          } catch {}
+          } catch { }
         }
       } else {
         container.innerHTML = `<span class="no-action">${game.i18n.localize('PF2E_VISIONER.UI.NO_CHANGE_LABEL')}</span>`;
       }
-    } catch {}
+    } catch { }
   }
 
   addIconClickHandlers() {
@@ -705,7 +703,7 @@ export class BaseActionDialog extends BasePreviewDialog {
               wallId,
               row: event.currentTarget.closest('tr'),
             });
-          } catch {}
+          } catch { }
           // Direct DOM fallback to ensure row shows buttons immediately
           try {
             const rowEl = event.currentTarget.closest('tr');
@@ -723,8 +721,8 @@ export class BaseActionDialog extends BasePreviewDialog {
                       ? ''
                       : `
                     <button type="button" class="row-timer-toggle" data-token-id="${targetId}" data-tooltip="${game.i18n.localize(
-                      'PF2E_VISIONER.TIMED_OVERRIDE.SET_DURATION_FOR_ROW',
-                    )}">
+                        'PF2E_VISIONER.TIMED_OVERRIDE.SET_DURATION_FOR_ROW',
+                      )}">
                       <i class="fas fa-clock"></i>
                     </button>
                   `;
@@ -741,30 +739,30 @@ export class BaseActionDialog extends BasePreviewDialog {
                     try {
                       this._attachRowTimerHandlers();
                       this._updateRowTimerButton(targetId);
-                    } catch {}
+                    } catch { }
                   }
                 } else {
                   container.innerHTML = `<span class="no-action">${game.i18n.localize('PF2E_VISIONER.UI.NO_CHANGE_LABEL')}</span>`;
                 }
               }
             }
-          } catch {}
+          } catch { }
           try {
             // Maintain a lightweight list of changed outcomes for convenience
             this.changes = Array.isArray(this.outcomes)
               ? this.outcomes.filter((o) => {
-                  const baseOld = o.oldVisibility ?? o.currentVisibility ?? null;
-                  const baseNew = o.overrideState ?? o.newVisibility ?? null;
-                  return baseOld != null && baseNew != null && baseOld !== baseNew;
-                })
+                const baseOld = o.oldVisibility ?? o.currentVisibility ?? null;
+                const baseNew = o.overrideState ?? o.newVisibility ?? null;
+                return baseOld != null && baseNew != null && baseOld !== baseNew;
+              })
               : [];
-          } catch {}
+          } catch { }
         }
         this.updateChangesCount();
         // If "Show only changes" is active, re-render so filtering reflects override adjustments
         try {
           if (this.showOnlyChanges) this.render({ force: true });
-        } catch {}
+        } catch { }
       });
     });
   }
@@ -787,7 +785,7 @@ export class BaseActionDialog extends BasePreviewDialog {
         if (!row) continue;
         this.updateActionButtonsForToken(tokenId || null, !!o.hasActionableChange, { wallId, row });
       }
-    } catch {}
+    } catch { }
   }
 
   /**

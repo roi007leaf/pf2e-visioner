@@ -449,7 +449,6 @@ export class OverrideValidationManager {
 
     if (override.timedOverride) {
       const timer = override.timedOverride;
-      if (timer.type === 'permanent') return null;
       if (timer.type === 'realtime' && timer.expiresAt && timer.expiresAt > Date.now()) return null;
       if (timer.type === 'rounds' && timer.roundsRemaining !== 0) return null;
     }
@@ -699,7 +698,6 @@ export class OverrideValidationManager {
 
   _hasActiveTimer(timedOverride) {
     if (!timedOverride) return false;
-    if (timedOverride.type === 'permanent') return true;
     if (timedOverride.type === 'realtime' && timedOverride.expiresAt > Date.now()) return true;
     if (timedOverride.type === 'rounds' && timedOverride.roundsRemaining > 0) return true;
     return false;
