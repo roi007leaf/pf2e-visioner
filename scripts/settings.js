@@ -82,7 +82,7 @@ const SETTINGS_GROUPS = {
         'autoVisibilityDebugMode',
         'avsOnlyInCombat',
         'disableLineOfSightCalculation',
-        'avsOverrideValidationOnRoundChange',
+        'avsOverrideValidationOnTurnChange',
       ],
     },
   ],

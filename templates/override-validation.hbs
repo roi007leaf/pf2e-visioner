@@ -4,8 +4,8 @@
   <div class="validation-header">
     <div class="header-content">
       <p class="subtitle">
-        {{#if isRoundChange}}
-          Round change detected. AVS wants to make <strong>{{overrideCount}}</strong> change{{#unless (eq overrideCount 1)}}s{{/unless}} for combat tokens.
+        {{#if isTurnChange}}
+          Turn change detected. AVS wants to make <strong>{{overrideCount}}</strong> change{{#unless (eq overrideCount 1)}}s{{/unless}} for combat tokens.
         {{else}}
           Token <strong><em>{{tokenName}}</em></strong> has moved. AVS wants to make <strong>{{overrideCount}}</strong> change{{#unless (eq overrideCount 1)}}s{{/unless}}.
         {{/if}}
@@ -17,8 +17,8 @@
   <!-- Tables Scroll Container -->
   <div class="tables-scroll-container">
 
-  {{#if isRoundChange}}
-  <!-- Unified Round Change View -->
+  {{#if isTurnChange}}
+  <!-- Unified Turn Change View -->
   {{#if unifiedOverrides.length}}
   <div class="results-table-container unified-table">
     <div class="table-header">
@@ -294,7 +294,7 @@
   </div> <!-- /.tables-scroll-container -->
 
   <!-- Bulk Actions (only show in normal mode, unified table has its own) -->
-  {{#unless isRoundChange}}
+  {{#unless isTurnChange}}
   <div class="override-validation-bulk-actions-header">
     <div class="override-validation-bulk-actions-info">{{localize "PF2E_VISIONER.UI.BULK_ACTION_INFO"}}</div>
     <div class="override-validation-bulk-actions-buttons">

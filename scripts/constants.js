@@ -614,9 +614,9 @@ export const DEFAULT_SETTINGS = {
     default: false,
   },
 
-  avsOverrideValidationOnRoundChange: {
-    name: 'PF2E_VISIONER.SETTINGS.AVS_OVERRIDE_VALIDATION_ON_ROUND_CHANGE.name',
-    hint: 'PF2E_VISIONER.SETTINGS.AVS_OVERRIDE_VALIDATION_ON_ROUND_CHANGE.hint',
+  avsOverrideValidationOnTurnChange: {
+    name: 'PF2E_VISIONER.SETTINGS.AVS_OVERRIDE_VALIDATION_ON_TURN_CHANGE.name',
+    hint: 'PF2E_VISIONER.SETTINGS.AVS_OVERRIDE_VALIDATION_ON_TURN_CHANGE.hint',
     scope: 'world',
     config: true,
     restricted: true,
