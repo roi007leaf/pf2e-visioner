@@ -16,7 +16,7 @@ export class OverrideValidationDialog extends foundry.applications.api.Handlebar
     this.tokenName = options.tokenName || 'Unknown Token';
     // Prefer explicit moved token id when provided by caller
     this.movedTokenId = options.movedTokenId || null;
-    this.isRoundChange = options.isRoundChange || false;
+    this.isTurnChange = options.isTurnChange || false;
   }
 
   static DEFAULT_OPTIONS = {
@@ -175,8 +175,8 @@ export class OverrideValidationDialog extends foundry.applications.api.Handlebar
     const targetOrientedOverrides = [];
     let unifiedOverrides = [];
 
-    // In round change mode, deduplicate and use unified view
-    if (this.isRoundChange) {
+    // In turn change mode, deduplicate and use unified view
+    if (this.isTurnChange) {
       const seen = new Set();
       for (const o of overrides) {
         const key = `${o.observerId}-${o.targetId}`;
@@ -222,14 +222,14 @@ export class OverrideValidationDialog extends foundry.applications.api.Handlebar
       observerOrientedOverrides,
       targetOrientedOverrides,
       unifiedOverrides,
-      overrideCount: this.isRoundChange ? unifiedOverrides.length : overrides.length,
+      overrideCount: this.isTurnChange ? unifiedOverrides.length : overrides.length,
       hasManualOverrides: overrides.some(o => /manual/i.test(o.source)),
       targetHeader,
-      isRoundChange: this.isRoundChange
+      isTurnChange: this.isTurnChange
     };
 
     console.log('PF2E Visioner | Dialog context prepared:', {
-      isRoundChange: this.isRoundChange,
+      isTurnChange: this.isTurnChange,
       observerOrientedCount: observerOrientedOverrides.length,
       targetOrientedCount: targetOrientedOverrides.length,
       unifiedCount: unifiedOverrides.length,
