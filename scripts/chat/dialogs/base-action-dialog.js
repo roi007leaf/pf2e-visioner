@@ -1131,7 +1131,19 @@ export class BaseActionDialog extends BasePreviewDialog {
       // for these token pairs until reverted
       const overrides = {};
       const avsRemovals = [];
-      outcomesWithChanges.forEach((outcome) => {
+
+      // Import TimedOverrideManager once if needed
+      let TimedOverrideManager = null;
+      if (app.rowTimers?.size > 0) {
+        try {
+          const module = await import('../../services/TimedOverrideManager.js');
+          TimedOverrideManager = module.TimedOverrideManager;
+        } catch (e) {
+          console.error('PF2E Visioner | Failed to import TimedOverrideManager:', e);
+        }
+      }
+
+      for (const outcome of outcomesWithChanges) {
         const effectiveNewState = outcome.overrideState || outcome.newVisibility;
         const tokenId = outcome.token?.id || outcome.target?.id;
         if (tokenId) {
@@ -1140,10 +1152,23 @@ export class BaseActionDialog extends BasePreviewDialog {
             const tokenName = outcome.token?.name || outcome.target?.name || 'token';
             avsRemovals.push({ id: tokenId, name: tokenName });
           } else {
-            overrides[tokenId] = effectiveNewState;
+            // Check for row timer configuration
+            const rowTimerConfig = app.rowTimers?.get(tokenId);
+            if (rowTimerConfig && TimedOverrideManager) {
+              // Build the timed override data from the config
+              try {
+                const timedOverride = TimedOverrideManager._buildTimedOverrideData(rowTimerConfig);
+                overrides[tokenId] = { state: effectiveNewState, timedOverride };
+              } catch (e) {
+                console.error('PF2E Visioner | Apply All: Failed to build timer:', e);
+                overrides[tokenId] = effectiveNewState;
+              }
+            } else {
+              overrides[tokenId] = effectiveNewState;
+            }
           }
         }
-      });
+      }
 
       // Remove AVS overrides if any
       if (avsRemovals.length > 0) {
@@ -1181,6 +1206,15 @@ export class BaseActionDialog extends BasePreviewDialog {
         };
 
         await applyFunction(actionData, target);
+
+        // Clear row timers after applying
+        outcomesWithChanges.forEach((outcome) => {
+          const tokenId = outcome.token?.id || outcome.target?.id;
+          if (tokenId && app.rowTimers?.has(tokenId)) {
+            app.rowTimers.delete(tokenId);
+            app._updateRowTimerButton?.(tokenId);
+          }
+        });
       }
 
       // Update all outcomes to reflect applied state

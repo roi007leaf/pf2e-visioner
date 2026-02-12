@@ -113,6 +113,7 @@ export class ConsequencesActionHandler extends ActionHandlerBase {
       target: actionData.actorToken || actionData.actor,
       newVisibility,
       oldVisibility: outcome.currentVisibility,
+      timedOverride: outcome.timedOverride,
     };
   }
   buildCacheEntryFromChange(change) {

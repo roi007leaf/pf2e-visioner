@@ -119,7 +119,8 @@ export class ActionHandlerBase {
           // If old state matches new state, check if old state was AVS-controlled
           // If it was AVS-controlled, we should still apply the manual override
           const isOldStateAvsControlled = this.isOldStateAvsControlled(outcome, actionData);
-          outcome.changed = overrideState !== baseOld || isOldStateAvsControlled;
+          // Also mark as changed if there's a timed override, even if the state is the same
+          outcome.changed = overrideState !== baseOld || isOldStateAvsControlled || !!timedOverride;
         }
       }
       return outcomes;
@@ -161,7 +162,7 @@ export class ActionHandlerBase {
     }
   }
 
-  // Map outcomes to change objects { observer, target, newVisibility, oldVisibility }
+  // Map outcomes to change objects { observer, target, newVisibility, oldVisibility, timedOverride }
   // Default: observer is actor, target is outcome.target
   outcomeToChange(actionData, outcome) {
     return {
@@ -169,6 +170,7 @@ export class ActionHandlerBase {
       target: outcome.target,
       newVisibility: outcome.newVisibility,
       oldVisibility: outcome.oldVisibility ?? outcome.currentVisibility,
+      timedOverride: outcome.timedOverride,
     };
   }
 
@@ -187,6 +189,7 @@ export class ActionHandlerBase {
         target: ch.target,
         newVisibility: ch.newVisibility,
         oldVisibility: ch.oldVisibility,
+        timedOverride: ch.timedOverride,
       });
     }
     return Array.from(map.values());
@@ -428,7 +431,7 @@ export class ActionHandlerBase {
       } catch {}
       await applyVisibilityChanges(
         group.observer,
-        group.items.map((i) => ({ target: i.target, newVisibility: i.newVisibility })),
+        group.items.map((i) => ({ target: i.target, newVisibility: i.newVisibility, timedOverride: i.timedOverride })),
         { direction, source: sourceTag },
       );
     }

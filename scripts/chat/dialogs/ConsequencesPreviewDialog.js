@@ -413,7 +413,22 @@ export class ConsequencesPreviewDialog extends BaseActionDialog {
 
     try {
       const { applyNowConsequences } = await import('../services/index.js');
-      const overrides = { [outcome.target.id]: effectiveNewState };
+
+      // Check for row timer configuration
+      const rowTimerConfig = app.rowTimers?.get(tokenId);
+      let overrideValue = effectiveNewState;
+
+      if (rowTimerConfig) {
+        try {
+          const { TimedOverrideManager } = await import('../../services/TimedOverrideManager.js');
+          const timedOverride = TimedOverrideManager._buildTimedOverrideData(rowTimerConfig);
+          overrideValue = { state: effectiveNewState, timedOverride };
+        } catch (e) {
+          console.error('PF2E Visioner | Consequences row apply: Failed to build timer:', e);
+        }
+      }
+
+      const overrides = { [outcome.target.id]: overrideValue };
       await applyNowConsequences(
         {
           ...app.actionData,
@@ -423,6 +438,12 @@ export class ConsequencesPreviewDialog extends BaseActionDialog {
         },
         { html: () => { }, attr: () => { } },
       );
+
+      // Clear row timer after applying
+      if (rowTimerConfig) {
+        app.rowTimers.delete(tokenId);
+        app._updateRowTimerButton?.(tokenId);
+      }
     } catch { }
 
     // Update button states

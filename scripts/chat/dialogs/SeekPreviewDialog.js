@@ -1144,8 +1144,29 @@ export class SeekPreviewDialog extends BaseActionDialog {
           }
           app.updateRowButtonsToApplied([{ target: { id: outcome.target.id } }]);
         } else {
-          const overrides = { [outcome.target.id]: effectiveNewState };
+          // Check for row timer configuration
+          const rowTimerConfig = app.rowTimers?.get(tokenId);
+          let overrideValue = effectiveNewState;
+
+          if (rowTimerConfig) {
+            try {
+              const { TimedOverrideManager } = await import('../../services/TimedOverrideManager.js');
+              const timedOverride = TimedOverrideManager._buildTimedOverrideData(rowTimerConfig);
+              overrideValue = { state: effectiveNewState, timedOverride };
+            } catch (e) {
+              console.error('PF2E Visioner | Seek row apply: Failed to build timer:', e);
+            }
+          }
+
+          const overrides = { [outcome.target.id]: overrideValue };
           await applyNowSeek({ ...actionData, overrides }, { html: () => {}, attr: () => {} });
+
+          // Clear row timer after applying
+          if (rowTimerConfig) {
+            app.rowTimers.delete(tokenId);
+            app._updateRowTimerButton?.(tokenId);
+          }
+
           // Disable the row's Apply button for this token
           app.updateRowButtonsToApplied([{ target: { id: outcome.target.id } }]);
         }

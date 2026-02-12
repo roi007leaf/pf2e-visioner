@@ -71,6 +71,7 @@ class DualSystemResultApplication {
           newVisibility: sneakResult.newVisibility,
           oldVisibility: sneakResult.oldVisibility || sneakResult.currentVisibility,
           overrideState: sneakResult.overrideState,
+          timedOverride: sneakResult.timedOverride,
         };
 
         changesByObserver.get(observer.document.id).changes.push(change);
@@ -124,6 +125,7 @@ class DualSystemResultApplication {
                 hasCover,
                 hasConcealment,
                 expectedCover,
+                timedOverride: change.timedOverride,
               });
             }
           }

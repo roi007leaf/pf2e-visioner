@@ -712,7 +712,19 @@ export async function buildContext(app, options) {
   context.targetedTokensCount = targetedTokens.length;
 
   const observerId = app.observer.document.id;
-  const activeTimers = TimedOverrideManager.getActiveTimersForToken(observerId);
+  const allTimers = TimedOverrideManager.getActiveTimersForToken(observerId);
+
+  // Filter timers by current mode
+  const activeTimers = allTimers.filter((timer) => {
+    if (app.mode === 'observer') {
+      // In observer mode, only show timers where selected token is the observer
+      return timer.observerId === observerId;
+    } else {
+      // In target mode, only show timers where selected token is the target
+      return timer.targetId === observerId;
+    }
+  });
+
   context.activeTimers = activeTimers.map((timer) => {
     const isObserver = timer.observerId === observerId;
     const pairName = isObserver ? timer.targetName : timer.observerName;

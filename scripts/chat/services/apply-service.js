@@ -66,7 +66,8 @@ export async function applyNowSneak(actionData, button) {
       actor: actionData.actor,
       newVisibility: outcome.overrideState || outcome.newVisibility,
       oldVisibility: outcome.oldVisibility || outcome.currentVisibility,
-      overrideState: outcome.overrideState
+      overrideState: outcome.overrideState,
+      timedOverride: outcome.timedOverride
     }));
 
     // Apply results with AVS overrides enabled
