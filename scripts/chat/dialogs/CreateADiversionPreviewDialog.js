@@ -358,8 +358,29 @@ export class CreateADiversionPreviewDialog extends BaseActionDialog {
     const effectiveNewState = outcome.overrideState || outcome.newVisibility;
     try {
       const { applyNowDiversion } = await import('../services/index.js');
-      const overrides = { [tokenId]: effectiveNewState };
+
+      // Check for row timer configuration
+      const rowTimerConfig = app.rowTimers?.get(tokenId);
+      let overrideValue = effectiveNewState;
+
+      if (rowTimerConfig) {
+        try {
+          const { TimedOverrideManager } = await import('../../services/TimedOverrideManager.js');
+          const timedOverride = TimedOverrideManager._buildTimedOverrideData(rowTimerConfig);
+          overrideValue = { state: effectiveNewState, timedOverride };
+        } catch (e) {
+          console.error('PF2E Visioner | Diversion row apply: Failed to build timer:', e);
+        }
+      }
+
+      const overrides = { [tokenId]: overrideValue };
       await applyNowDiversion({ ...app.actionData, overrides }, { html: () => { }, attr: () => { } });
+
+      // Clear row timer after applying
+      if (rowTimerConfig) {
+        app.rowTimers.delete(tokenId);
+        app._updateRowTimerButton?.(tokenId);
+      }
     } catch { }
 
     // Update button states

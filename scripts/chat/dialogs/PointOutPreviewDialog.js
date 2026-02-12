@@ -457,9 +457,30 @@ export class PointOutPreviewDialog extends BaseActionDialog {
     }
 
     try {
-      const overrides = { [outcome.target.id]: outcome.overrideState || outcome.newVisibility };
+      // Check for row timer configuration
+      const effectiveNewState = outcome.overrideState || outcome.newVisibility;
+      const rowTimerConfig = app.rowTimers?.get(tokenId);
+      let overrideValue = effectiveNewState;
+
+      if (rowTimerConfig) {
+        try {
+          const { TimedOverrideManager } = await import('../../services/TimedOverrideManager.js');
+          const timedOverride = TimedOverrideManager._buildTimedOverrideData(rowTimerConfig);
+          overrideValue = { state: effectiveNewState, timedOverride };
+        } catch (e) {
+          console.error('PF2E Visioner | PointOut row apply: Failed to build timer:', e);
+        }
+      }
+
+      const overrides = { [outcome.target.id]: overrideValue };
       const { applyNowPointOut } = await import('../services/index.js');
       await applyNowPointOut({ ...app.actionData, overrides }, { html: () => { }, attr: () => { } });
+
+      // Clear row timer after applying
+      if (rowTimerConfig) {
+        app.rowTimers.delete(tokenId);
+        app._updateRowTimerButton?.(tokenId);
+      }
 
       // Update row using base helper
       app.updateRowButtonsToApplied([

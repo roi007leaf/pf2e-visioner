@@ -11,6 +11,7 @@ import {
   getVisibilityMap,
   hasActiveEncounter,
 } from '../../utils.js';
+import { TimedOverrideManager } from '../../services/TimedOverrideManager.js';
 
 function getTokenImage(token) {
   if (token.actor?.img) return token.actor.img;
@@ -22,6 +23,27 @@ function svgDataUri(svg) {
     return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
   } catch {
     return '';
+  }
+}
+
+function getTimerBadgeData(observerId, targetId) {
+  try {
+    const timerData = TimedOverrideManager.getTimerData(observerId, targetId);
+    if (!timerData) {
+      return { hasActiveTimer: false, timerDisplay: '', timerTooltip: '' };
+    }
+
+    const display = TimedOverrideManager.getRemainingTimeDisplay(timerData);
+    const tooltip = game.i18n.localize('PF2E_VISIONER.TIMED_OVERRIDE.ACTIVE_TIMER');
+
+    return {
+      hasActiveTimer: true,
+      timerDisplay: display,
+      timerTooltip: tooltip,
+      timerType: timerData.type,
+    };
+  } catch {
+    return { hasActiveTimer: false, timerDisplay: '', timerTooltip: '' };
   }
 }
 
@@ -262,6 +284,17 @@ export async function buildContext(app, options) {
           }
         });
 
+        const timerBadge = getTimerBadgeData(app.observer.document.id, token.document.id);
+        const rowTimerConfig = app.rowTimers?.get(token.document.id);
+        const rowTimerData = rowTimerConfig
+          ? {
+              hasRowTimer: true,
+              rowTimerDisplay: TimedOverrideManager.getRemainingTimeDisplay(
+                TimedOverrideManager._buildTimedOverrideData(rowTimerConfig),
+              ),
+            }
+          : { hasRowTimer: false, rowTimerDisplay: '' };
+
         const result = {
           id: token.document.id,
           name: token.document.name,
@@ -299,6 +332,8 @@ export async function buildContext(app, options) {
           showOutcome,
           outcomeLabel,
           outcomeClass,
+          ...timerBadge,
+          ...rowTimerData,
         };
 
         return result;
@@ -454,6 +489,17 @@ export async function buildContext(app, options) {
           }
         });
 
+        const timerBadge = getTimerBadgeData(observerToken.document.id, app.observer.document.id);
+        const rowTimerConfig = app.rowTimers?.get(observerToken.document.id);
+        const rowTimerData = rowTimerConfig
+          ? {
+              hasRowTimer: true,
+              rowTimerDisplay: TimedOverrideManager.getRemainingTimeDisplay(
+                TimedOverrideManager._buildTimedOverrideData(rowTimerConfig),
+              ),
+            }
+          : { hasRowTimer: false, rowTimerDisplay: '' };
+
         const result = {
           id: observerToken.document.id,
           name: observerToken.document.name,
@@ -491,9 +537,9 @@ export async function buildContext(app, options) {
           showOutcome,
           outcomeLabel,
           outcomeClass,
+          ...timerBadge,
+          ...rowTimerData,
         };
-
-        // Debug: if (isAvsControlled) console.log(`[AVS Debug] ${observerToken.document.name}:`, { currentVisibilityState: result.currentVisibilityState, isAvsControlled: result.isAvsControlled });
 
         return result;
       }),
@@ -664,6 +710,44 @@ export async function buildContext(app, options) {
   );
   context.showingTargetedTokens = targetedTokens.length > 0;
   context.targetedTokensCount = targetedTokens.length;
+
+  const observerId = app.observer.document.id;
+  const allTimers = TimedOverrideManager.getActiveTimersForToken(observerId);
+
+  // Filter timers by current mode
+  const activeTimers = allTimers.filter((timer) => {
+    if (app.mode === 'observer') {
+      // In observer mode, only show timers where selected token is the observer
+      return timer.observerId === observerId;
+    } else {
+      // In target mode, only show timers where selected token is the target
+      return timer.targetId === observerId;
+    }
+  });
+
+  context.activeTimers = activeTimers.map((timer) => {
+    const isObserver = timer.observerId === observerId;
+    const pairName = isObserver ? timer.targetName : timer.observerName;
+    let turnTimingDisplay = '';
+    if (timer.timedOverride?.type === 'rounds' && timer.timedOverride?.expiresOnTurn) {
+      const turnInfo = timer.timedOverride.expiresOnTurn;
+      const actorName = game.actors?.get(turnInfo.actorId)?.name || 'Unknown';
+      const timingKey =
+        turnInfo.timing === 'end'
+          ? 'PF2E_VISIONER.TIMED_OVERRIDE.END_OF_TURN'
+          : 'PF2E_VISIONER.TIMED_OVERRIDE.START_OF_TURN';
+      const timingLabel = game.i18n.localize(timingKey);
+      turnTimingDisplay = `(${timingLabel} ${actorName})`;
+    }
+    return {
+      ...timer,
+      pairName,
+      stateLabel: game.i18n.localize(VISIBILITY_STATES[timer.state]?.label || timer.state),
+      remainingDisplay: TimedOverrideManager.getRemainingTimeDisplay(timer.timedOverride),
+      turnTimingDisplay,
+    };
+  });
+  context.hasActiveTimers = context.activeTimers.length > 0;
 
   return context;
 }

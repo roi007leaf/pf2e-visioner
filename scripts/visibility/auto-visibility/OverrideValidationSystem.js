@@ -120,6 +120,7 @@ export class OverrideValidationSystem {
       const flags = token.document.flags['pf2e-visioner'] || {};
       for (const [flagKey, flagData] of Object.entries(flags)) {
         if (!flagKey.startsWith('avs-override-from-')) continue;
+        if (this.#shouldSkipTimedOverride(flagData.timedOverride)) continue;
 
         const observerId = flagKey.replace('avs-override-from-', '');
         const targetId = token.document.id;
@@ -402,6 +403,14 @@ export class OverrideValidationSystem {
         }
       }
     }
+  }
+
+  #shouldSkipTimedOverride(timedOverride) {
+    if (!timedOverride) return false;
+    if (timedOverride.type === 'permanent') return true;
+    if (timedOverride.type === 'realtime' && timedOverride.expiresAt > Date.now()) return true;
+    if (timedOverride.type === 'rounds' && timedOverride.roundsRemaining > 0) return true;
+    return false;
   }
 
   /**

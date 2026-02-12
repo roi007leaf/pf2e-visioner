@@ -7,7 +7,12 @@ import { getCoverMap, getVisibilityMap } from '../../utils.js';
 
 import { MODULE_ID } from '../../constants.js';
 import { bindTokenManagerActions } from './actions/index.js';
-import { bulkSetWallState, toggleHideFoundryHidden, toggleIgnoreAllies, toggleIgnoreWalls } from './actions/ui.js';
+import {
+  bulkSetWallState,
+  toggleHideFoundryHidden,
+  toggleIgnoreAllies,
+  toggleIgnoreWalls,
+} from './actions/ui.js';
 import { attachApplyButtonAnimation } from './apply-button-animation.js';
 import {
   addTokenBorder as addBorderUtil,
@@ -69,6 +74,9 @@ export class VisionerTokenManager extends foundry.applications.api.ApplicationV2
       bulkHazardsGreaterCover: VisionerTokenManager.bulkSetCoverState,
       bulkWallsObserved: bulkSetWallState,
       bulkWallsHidden: bulkSetWallState,
+      cancelTimer: VisionerTokenManager.cancelTimer,
+      toggleTimersSection: VisionerTokenManager.toggleTimersSection,
+      toggleRowTimer: VisionerTokenManager.toggleRowTimer,
     };
     return cfg;
   })();
@@ -101,6 +109,9 @@ export class VisionerTokenManager extends foundry.applications.api.ApplicationV2
     // Visual filter for Foundry-hidden tokens (per-user setting)
     this.hideFoundryHidden = game.settings.get(MODULE_ID, 'hideFoundryHiddenTokens');
 
+    // Per-row timer durations: Map<tokenId, timerConfig>
+    this.rowTimers = new Map();
+
     // Initialize storage for saved mode data
     this._savedModeData = {
       observer: { visibility: {}, cover: {} },
@@ -118,7 +129,7 @@ export class VisionerTokenManager extends foundry.applications.api.ApplicationV2
   static {
     try {
       bindTokenManagerActions(VisionerTokenManager);
-    } catch (_) { }
+    } catch (_) {}
   }
 
   /**
@@ -191,6 +202,10 @@ export class VisionerTokenManager extends foundry.applications.api.ApplicationV2
     if (this._visibilityChangeHook) {
       Hooks.off('pf2e-visioner.visibilityChanged', this._visibilityChangeHook);
       this._visibilityChangeHook = null;
+    }
+    if (this._timerRefreshInterval) {
+      clearInterval(this._timerRefreshInterval);
+      this._timerRefreshInterval = null;
     }
   }
 
@@ -339,20 +354,20 @@ export class VisionerTokenManager extends foundry.applications.api.ApplicationV2
           this.setPosition({ width: minWidth });
         }
       }
-    } catch (_) { }
+    } catch (_) {}
     // No row→token hover anymore (to avoid conflict with canvas→row). Keep icon handlers.
     // Provided by managers/token-manager/actions.js via bindTokenManagerActions
     // Setup canvas selection → row highlighting and canvas hover → row
     try {
       // Bind per-row icon click handlers (visibility/cover selection)
       this.addIconClickHandlers?.();
-    } catch (_) { }
+    } catch (_) {}
     try {
       // Add token image click handlers for panning and selection
       this.addTokenImageClickHandlers?.();
-    } catch (_) { }
+    } catch (_) {}
     try {
-    } catch (_) { }
+    } catch (_) {}
     attachSelectionHandlers(this.constructor);
     attachCanvasHoverHandlers(this.constructor);
     applySelectionHighlight(this.constructor);
@@ -360,7 +375,7 @@ export class VisionerTokenManager extends foundry.applications.api.ApplicationV2
     // Setup apply button animation for form changes
     try {
       attachApplyButtonAnimation(this);
-    } catch (_) { }
+    } catch (_) {}
 
     // Apply visual filter for Foundry-hidden tokens based on toggle
     try {
@@ -371,7 +386,111 @@ export class VisionerTokenManager extends foundry.applications.api.ApplicationV2
       rows.forEach((r) => {
         r.style.display = hide ? 'none' : '';
       });
-    } catch (_) { }
+    } catch (_) {}
+
+    // Setup timer countdown refresh for realtime timers
+    this._setupTimerRefresh();
+  }
+
+  _setupTimerRefresh() {
+    if (this._timerRefreshInterval) {
+      clearInterval(this._timerRefreshInterval);
+    }
+    this._timerRefreshInterval = setInterval(() => {
+      this._updateTimerDisplays();
+    }, 1000);
+    this._updateTimerDisplays();
+  }
+
+  _getTimerRefreshRoot() {
+    const el = this.element?.querySelectorAll ? this.element : this.element?.[0];
+    const winEl = this.window?.element?.querySelectorAll
+      ? this.window.element
+      : this.window?.element?.[0];
+    const winContent = this.window?.content?.querySelectorAll
+      ? this.window.content
+      : this.window?.content?.[0];
+    return el || winEl || winContent || null;
+  }
+
+  _buildActiveTimerMap(activeTimers) {
+    const timerMap = new Map();
+    for (const timer of activeTimers) {
+      const key = `${timer.observerId}-${timer.targetId}`;
+      timerMap.set(key, timer);
+    }
+    return timerMap;
+  }
+
+  _getTimerFromMap(timerMap, observerId, targetId) {
+    if (!observerId || !targetId) return null;
+    return timerMap.get(`${observerId}-${targetId}`) || timerMap.get(`${targetId}-${observerId}`);
+  }
+
+  _updateActiveTimerRows(timerRows, timerMap, TimedOverrideManager) {
+    for (const row of timerRows) {
+      const obsId = row.dataset.observerId;
+      const tgtId = row.dataset.targetId;
+      const timer = this._getTimerFromMap(timerMap, obsId, tgtId);
+      const displayEl = row.querySelector('.timer-display');
+      if (displayEl && timer) {
+        displayEl.textContent = TimedOverrideManager.getRemainingTimeDisplay(timer.timedOverride);
+      }
+    }
+  }
+
+  _updateTimerBadges(timerBadges, timerMap, TimedOverrideManager) {
+    for (const badge of timerBadges) {
+      const obsId = badge.dataset.observerId;
+      const tgtId = badge.dataset.targetId;
+      const timer = this._getTimerFromMap(timerMap, obsId, tgtId);
+      if (!timer) continue;
+      const display = TimedOverrideManager.getRemainingTimeDisplay(timer.timedOverride);
+      const label = game.i18n.localize('PF2E_VISIONER.TIMED_OVERRIDE.ACTIVE_TIMER');
+      badge.dataset.tooltip = `${label}: ${display}`;
+    }
+  }
+
+  async _updateTimerDisplays() {
+    if (!this.rendered) return;
+    const root = this._getTimerRefreshRoot();
+    if (!root) return;
+    if (game.paused) return;
+    const timerRows = root.querySelectorAll('.timer-row');
+    const timerBadges = root.querySelectorAll('.timer-badge');
+    if (timerRows.length === 0 && timerBadges.length === 0) return;
+
+    try {
+      if (game.settings.get(MODULE_ID, 'debug')) {
+        const now = Date.now();
+        this._lastTimerRefreshDebugTs = this._lastTimerRefreshDebugTs || 0;
+        if (now - this._lastTimerRefreshDebugTs > 5000) {
+          this._lastTimerRefreshDebugTs = now;
+          console.debug('PF2E Visioner | TokenManager: timer refresh tick', {
+            timerRows: timerRows.length,
+            timerBadges: timerBadges.length,
+            hasRoot: !!root,
+            hasElement: !!this.element,
+            hasWindowElement: !!this.window?.element,
+            hasWindowContent: !!this.window?.content,
+          });
+        }
+      }
+    } catch (_) {}
+
+    try {
+      const { default: TimedOverrideManager } = await import(
+        '../../services/TimedOverrideManager.js'
+      );
+      const observerId = this.observer?.document?.id;
+      if (!observerId) return;
+
+      const activeTimers = TimedOverrideManager.getActiveTimersForToken(observerId);
+      const timerMap = this._buildActiveTimerMap(activeTimers);
+
+      if (timerRows.length) this._updateActiveTimerRows(timerRows, timerMap, TimedOverrideManager);
+      if (timerBadges.length) this._updateTimerBadges(timerBadges, timerMap, TimedOverrideManager);
+    } catch (_) {}
   }
 
   /**
@@ -392,7 +511,7 @@ export class VisionerTokenManager extends foundry.applications.api.ApplicationV2
           .querySelectorAll('tr.token-row.row-hover')
           ?.forEach((el) => el.classList.remove('row-hover'));
       }
-    } catch (_) { }
+    } catch (_) {}
 
     // Clear the current instance reference
     if (VisionerTokenManager.currentInstance === this) {
@@ -454,5 +573,90 @@ export class VisionerTokenManager extends foundry.applications.api.ApplicationV2
    */
   removeTokenBorder(token) {
     removeBorderUtil(token);
+  }
+
+  static async cancelTimer(event, target) {
+    const observerId = target.dataset.observerId;
+    const targetId = target.dataset.targetId;
+    if (!observerId || !targetId) return;
+
+    const { TimedOverrideManager } = await import('../../services/TimedOverrideManager.js');
+    await TimedOverrideManager.cancelTimer(observerId, targetId);
+
+    this.render({ force: true });
+  }
+
+  static toggleTimersSection(event, target) {
+    const section = target.closest('.active-timers-section');
+    if (!section) return;
+
+    const isCollapsed = section.dataset.collapsed === 'true';
+    section.dataset.collapsed = isCollapsed ? 'false' : 'true';
+  }
+
+  static async toggleRowTimer(event, target) {
+    const tokenId = target.dataset.targetId;
+    if (!tokenId) return;
+
+    if (this.rowTimers.has(tokenId)) {
+      this.rowTimers.delete(tokenId);
+      await this._updateRowTimerButton(tokenId);
+      return;
+    }
+
+    try {
+      const { TimerDurationDialog } = await import('../../ui/TimerDurationDialog.js');
+      const app = this;
+      const defaultActorId = app.observer?.actor?.id || null;
+      await TimerDurationDialog.show({
+        defaultActorId,
+        onApply: (timerConfig) => {
+          if (timerConfig) {
+            app.rowTimers.set(tokenId, timerConfig);
+            app._updateRowTimerButton(tokenId);
+          }
+        },
+      });
+    } catch (error) {
+      console.error('PF2E Visioner | Error opening timer duration dialog:', error);
+    }
+  }
+
+  async _updateRowTimerButton(tokenId) {
+    try {
+      const root = this._getTimerRefreshRoot();
+      if (!root) return;
+      const btn = root.querySelector(`.row-timer-toggle[data-target-id="${tokenId}"]`);
+      if (!btn) return;
+
+      const timerConfig = this.rowTimers.get(tokenId);
+      if (!timerConfig) {
+        btn.classList.remove('active');
+        const labelEl = btn.querySelector('.row-timer-label');
+        if (labelEl) labelEl.remove();
+        btn.dataset.tooltip = game.i18n.localize(
+          'PF2E_VISIONER.TIMED_OVERRIDE.SET_DURATION_FOR_ROW',
+        );
+        return;
+      }
+
+      const { TimedOverrideManager } = await import('../../services/TimedOverrideManager.js');
+      const timedOverride = TimedOverrideManager._buildTimedOverrideData(timerConfig);
+      const display = TimedOverrideManager.getRemainingTimeDisplay(timedOverride);
+
+      btn.classList.add('active');
+      let labelEl = btn.querySelector('.row-timer-label');
+      if (!labelEl) {
+        labelEl = document.createElement('span');
+        labelEl.className = 'row-timer-label';
+        btn.appendChild(labelEl);
+      }
+      labelEl.textContent = display;
+      btn.dataset.tooltip = `${display} - Click to clear`;
+    } catch {}
+  }
+
+  getRowTimer(tokenId) {
+    return this.rowTimers.get(tokenId) || null;
   }
 }

@@ -103,6 +103,7 @@ export class DiversionActionHandler extends ActionHandlerBase {
       target: actionData.actorToken || actionData.actor,
       newVisibility: outcome.newVisibility,
       oldVisibility: outcome.currentVisibility,
+      timedOverride: outcome.timedOverride,
     };
   }
   buildCacheEntryFromChange(change) {

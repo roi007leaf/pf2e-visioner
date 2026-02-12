@@ -165,6 +165,14 @@ export async function registerHooks() {
   AutoCoverHooks.registerHooks();
   registerSnipingDuoDamageBonusHooks();
 
+  // Register timed override hooks for timer expiration
+  try {
+    const { TimedOverrideManager } = await import('../services/TimedOverrideManager.js');
+    TimedOverrideManager.registerHooks();
+  } catch (error) {
+    console.error('PF2E Visioner | Failed to register timed override hooks:', error);
+  }
+
   // Register movement cost hooks (Blinded difficult terrain)
   try {
     const { registerMovementCostHooks } = await import('./movement-cost.js');

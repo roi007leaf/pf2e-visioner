@@ -386,6 +386,7 @@ export class HideActionHandler extends ActionHandlerBase {
       target: actionData.actorToken || actionData.actor,
       newVisibility: outcome.newVisibility,
       oldVisibility: outcome.oldVisibility,
+      timedOverride: outcome.timedOverride,
     };
   }
   buildCacheEntryFromChange(change) {

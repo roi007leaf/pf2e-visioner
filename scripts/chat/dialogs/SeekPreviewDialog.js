@@ -9,8 +9,8 @@ import { SeekDialogAdapter } from '../../visibility/auto-visibility/SeekDialogAd
 import { getDesiredOverrideStatesForAction } from '../services/data/action-state-config.js';
 import { notify } from '../services/infra/notifications.js';
 import {
-    filterOutcomesBySeekDistance,
-    filterOutcomesByTemplate,
+  filterOutcomesBySeekDistance,
+  filterOutcomesByTemplate,
 } from '../services/infra/shared-utils.js';
 import { BaseActionDialog } from './base-action-dialog.js';
 
@@ -40,6 +40,7 @@ export class SeekPreviewDialog extends BaseActionDialog {
       applyAll: SeekPreviewDialog._onApplyAll,
       revertAll: SeekPreviewDialog._onRevertAll,
       applyChange: SeekPreviewDialog._onApplyChange,
+      applyChangeTimed: SeekPreviewDialog._onApplyChangeTimed,
       revertChange: SeekPreviewDialog._onRevertChange,
       toggleEncounterFilter: SeekPreviewDialog._onToggleEncounterFilter,
       toggleFilterByDetection: SeekPreviewDialog._onToggleFilterByDetection,
@@ -110,7 +111,7 @@ export class SeekPreviewDialog extends BaseActionDialog {
 
     // Walls never use AVS
     if (outcome._isWall) {
-      return states.filter(s => s.value !== 'avs');
+      return states.filter((s) => s.value !== 'avs');
     }
 
     const token = outcome?.target || outcome?.token;
@@ -118,7 +119,7 @@ export class SeekPreviewDialog extends BaseActionDialog {
     const isHazard = token?.actor?.type === 'hazard';
 
     if (isLoot || isHazard) {
-      return states.filter(s => s.value !== 'avs');
+      return states.filter((s) => s.value !== 'avs');
     }
 
     return states;
@@ -156,14 +157,12 @@ export class SeekPreviewDialog extends BaseActionDialog {
       ? this._originalOutcomes
       : this.outcomes || [];
 
-
     // Filter outcomes with encounter helper, ally filtering, optional walls toggle, template (if provided), then distance limits if enabled
     let filteredOutcomes = this.applyEncounterFilter(
       baseList,
       'target',
       'No encounter targets found, showing all',
     );
-
 
     // Apply ally filtering for display purposes
     try {
@@ -176,7 +175,7 @@ export class SeekPreviewDialog extends BaseActionDialog {
           'target',
         );
       }
-    } catch { }
+    } catch {}
     // Optional walls exclusion for UI convenience
     if (this.ignoreWalls === true) {
       filteredOutcomes = Array.isArray(filteredOutcomes)
@@ -205,7 +204,7 @@ export class SeekPreviewDialog extends BaseActionDialog {
         const applyInCombat = !!game.settings.get(MODULE_ID, 'limitSeekRangeInCombat');
         const applyOutOfCombat = !!game.settings.get(MODULE_ID, 'limitSeekRangeOutOfCombat');
         isRangeLimited = (inCombat && applyInCombat) || (!inCombat && applyOutOfCombat);
-      } catch { }
+      } catch {}
 
       // Apply distance filter first
       filteredOutcomes = filterOutcomesBySeekDistance(filteredOutcomes, this.actorToken, 'target');
@@ -255,7 +254,7 @@ export class SeekPreviewDialog extends BaseActionDialog {
         const overrideState = existing?.overrideState ?? o?.overrideState ?? null;
         return { ...o, overrideState };
       });
-    } catch { }
+    } catch {}
 
     // Prepare outcomes for template
     let processedOutcomes = await Promise.all(
@@ -296,7 +295,7 @@ export class SeekPreviewDialog extends BaseActionDialog {
                       await setVisibilityBetween(pcToken, outcome.target, inferred, {
                         direction: 'observer_to_target',
                       });
-                    } catch { }
+                    } catch {}
                   }
                 }
 
@@ -305,7 +304,7 @@ export class SeekPreviewDialog extends BaseActionDialog {
                   await setVisibilityBetween(this.actorToken, outcome.target, inferred, {
                     direction: 'observer_to_target',
                   });
-                } catch { }
+                } catch {}
 
                 // Remove PF2e system condition to avoid double-state after Visioner owns it
                 try {
@@ -316,14 +315,14 @@ export class SeekPreviewDialog extends BaseActionDialog {
                   else if (actor?.toggleCondition)
                     await actor.toggleCondition(slug, { active: false });
                   else if (actor?.decreaseCondition) await actor.decreaseCondition(slug);
-                } catch { }
+                } catch {}
                 currentVisibility = inferred;
                 // Ensure in-memory outcomes reflect the actual new mapping right away
                 outcome.oldVisibility = currentVisibility;
                 outcome.newVisibility = currentVisibility;
               }
             }
-          } catch { }
+          } catch {}
         }
 
         // Prepare available states for override using per-action config
@@ -354,7 +353,8 @@ export class SeekPreviewDialog extends BaseActionDialog {
           // No override - check if there's a change OR if old state was AVS-controlled
           // (moving from AVS to manual state is always actionable)
           const statesMatch = baseOldState === effectiveNewState;
-          hasActionableChange = outcome.changed === true || (statesMatch && isOldStateAvsControlled);
+          hasActionableChange =
+            outcome.changed === true || (statesMatch && isOldStateAvsControlled);
         }
 
         // Get detection info from detection map (only if AVS is enabled)
@@ -404,14 +404,14 @@ export class SeekPreviewDialog extends BaseActionDialog {
           }
         });
       }
-    } catch { }
+    } catch {}
 
     // Show-only-changes visual filter
     try {
       if (this.showOnlyChanges) {
         processedOutcomes = processedOutcomes.filter((o) => !!o.hasActionableChange);
       }
-    } catch { }
+    } catch {}
 
     // Update original outcomes with hasActionableChange for Apply All button logic
     processedOutcomes.forEach((processedOutcome, index) => {
@@ -598,7 +598,7 @@ export class SeekPreviewDialog extends BaseActionDialog {
       if (chosenUsedType) {
         activeSenses = allSenses.filter((s) => !s.isPrecise && s.type === chosenUsedType);
       }
-    } catch { }
+    } catch {}
 
     context.seeker = {
       name: this.actorToken?.name || 'Unknown Actor',
@@ -635,7 +635,7 @@ export class SeekPreviewDialog extends BaseActionDialog {
       }
 
       // That's Odd: anomalies (hazards/loot/hidden walls) are easier to notice
-      if (has("thats-odd") || has("that's-odd")) {
+      if (has('thats-odd') || has("that's-odd")) {
         badges.push({
           key: 'thats-odd',
           icon: 'fas fa-exclamation-triangle',
@@ -682,7 +682,7 @@ export class SeekPreviewDialog extends BaseActionDialog {
       const applyInCombat = !!game.settings.get(MODULE_ID, 'limitSeekRangeInCombat');
       const applyOutOfCombat = !!game.settings.get(MODULE_ID, 'limitSeekRangeOutOfCombat');
       rangeLimited = (inCombat && applyInCombat) || (!inCombat && applyOutOfCombat);
-    } catch { }
+    } catch {}
 
     context.isTemplateMode = templateMode;
     context.isRangeLimited = rangeLimited;
@@ -721,7 +721,7 @@ export class SeekPreviewDialog extends BaseActionDialog {
     // Hook up senses button tooltips
     try {
       this.setupSensesButtonTooltips(content);
-    } catch { }
+    } catch {}
 
     // Hook up per-dialog Ignore Allies toggle
     try {
@@ -739,7 +739,7 @@ export class SeekPreviewDialog extends BaseActionDialog {
             .catch(() => this.render({ force: true }));
         });
       }
-    } catch { }
+    } catch {}
     // Hook up per-dialog Ignore Walls toggle
     try {
       const cbw = content.querySelector('input[data-action="toggleIgnoreWalls"]');
@@ -756,7 +756,7 @@ export class SeekPreviewDialog extends BaseActionDialog {
             .catch(() => this.render({ force: true }));
         });
       }
-    } catch { }
+    } catch {}
     // Hook up Hide Foundry-hidden visual filter
     try {
       const cbh = content.querySelector('input[data-action="toggleHideFoundryHidden"]');
@@ -765,11 +765,11 @@ export class SeekPreviewDialog extends BaseActionDialog {
           this.hideFoundryHidden = !!cbh.checked;
           try {
             await game.settings.set(MODULE_ID, 'hideFoundryHiddenTokens', this.hideFoundryHidden);
-          } catch { }
+          } catch {}
           this.render({ force: true });
         });
       }
-    } catch { }
+    } catch {}
 
     // Hook up reactions system
     try {
@@ -789,7 +789,7 @@ export class SeekPreviewDialog extends BaseActionDialog {
           await this.applyReaction(reactionKey);
         });
       });
-    } catch { }
+    } catch {}
 
     // Hook up Sense the Unseen button (deprecated - for backward compatibility)
     try {
@@ -799,7 +799,7 @@ export class SeekPreviewDialog extends BaseActionDialog {
           await this.applySenseUnseen();
         });
       }
-    } catch { }
+    } catch {}
     return content;
   }
 
@@ -824,7 +824,7 @@ export class SeekPreviewDialog extends BaseActionDialog {
           const { filterOutcomesByAllies } = await import('../services/infra/shared-utils.js');
           filtered = filterOutcomesByAllies(filtered, this.actorToken, this.ignoreAllies, 'target');
         }
-      } catch { }
+      } catch {}
 
       // Optional walls exclusion for UI convenience
       if (this.ignoreWalls === true) {
@@ -846,7 +846,7 @@ export class SeekPreviewDialog extends BaseActionDialog {
             this.actionData.messageId,
             this.actorToken?.id || this.actionData.actor?.id,
           );
-        } catch { }
+        } catch {}
       }
 
       // Apply distance filtering FIRST (cheaper operation)
@@ -857,7 +857,7 @@ export class SeekPreviewDialog extends BaseActionDialog {
           );
           filtered = filterOutcomesBySeekDistance(filtered, this.actorToken, 'target');
         }
-      } catch { }
+      } catch {}
 
       // Then apply viewport/LOS filtering if enabled
       if (this.actorToken && this.filterByDetection) {
@@ -872,7 +872,7 @@ export class SeekPreviewDialog extends BaseActionDialog {
             this.filterByDetection,
             'observer_to_target',
           );
-        } catch { }
+        } catch {}
       }
       // Compute actionability and carry over any existing overrides from the currently displayed outcomes
       if (!Array.isArray(filtered)) return [];
@@ -895,7 +895,7 @@ export class SeekPreviewDialog extends BaseActionDialog {
                 currentVisibility =
                   getVisibilityBetween(this.actorToken, o.target) || currentVisibility;
               }
-            } catch { }
+            } catch {}
           }
           const effectiveNewState = overrideState || o.newVisibility || currentVisibility;
           const baseOldState = o.oldVisibility || currentVisibility;
@@ -923,13 +923,13 @@ export class SeekPreviewDialog extends BaseActionDialog {
             }
           });
         }
-      } catch { }
+      } catch {}
       // Apply show-only-changes filter for both UI and Apply All
       try {
         if (this.showOnlyChanges) {
           visual = visual.filter((o) => !!o.hasActionableChange);
         }
-      } catch { }
+      } catch {}
       return visual;
     } catch {
       return Array.isArray(this.outcomes) ? this.outcomes : [];
@@ -1034,7 +1034,7 @@ export class SeekPreviewDialog extends BaseActionDialog {
         payload.overrides = overrides;
       }
       // Pass current live ignoreAllies so discovery in apply respects checkbox state
-      const appliedCount = await applyNowSeek(payload, { html: () => { }, attr: () => { } });
+      const appliedCount = await applyNowSeek(payload, { html: () => {}, attr: () => {} });
       notify.info(
         `${MODULE_TITLE}: Applied ${appliedCount ?? actionableOutcomes.length} visibility changes. Dialog remains open for additional actions.`,
       );
@@ -1071,7 +1071,7 @@ export class SeekPreviewDialog extends BaseActionDialog {
       const { revertNowSeek } = await import('../services/index.js');
       await revertNowSeek(
         { ...app.actionData, ignoreAllies: app.ignoreAllies },
-        { html: () => { }, attr: () => { } },
+        { html: () => {}, attr: () => {} },
       );
 
       app.updateRowButtonsToReverted(changedOutcomes);
@@ -1118,7 +1118,7 @@ export class SeekPreviewDialog extends BaseActionDialog {
         const overrides = {
           __wall__: { [outcome.wallId]: outcome.overrideState || outcome.newVisibility },
         };
-        await applyNowSeek({ ...actionData, overrides }, { html: () => { }, attr: () => { } });
+        await applyNowSeek({ ...actionData, overrides }, { html: () => {}, attr: () => {} });
         // Disable the row's Apply button for this wall
         app.updateRowButtonsToApplied([{ wallId: outcome.wallId }]);
       } else {
@@ -1136,9 +1136,7 @@ export class SeekPreviewDialog extends BaseActionDialog {
               // Refresh UI to update override indicators
               const { updateTokenVisuals } = await import('../../services/visual-effects.js');
               await updateTokenVisuals();
-              notify.info(
-                `${MODULE_TITLE}: Accepted AVS change for ${outcome.target.name}`,
-              );
+              notify.info(`${MODULE_TITLE}: Accepted AVS change for ${outcome.target.name}`);
             }
           } catch (e) {
             console.warn('Failed to remove AVS override:', e);
@@ -1146,8 +1144,29 @@ export class SeekPreviewDialog extends BaseActionDialog {
           }
           app.updateRowButtonsToApplied([{ target: { id: outcome.target.id } }]);
         } else {
-          const overrides = { [outcome.target.id]: effectiveNewState };
-          await applyNowSeek({ ...actionData, overrides }, { html: () => { }, attr: () => { } });
+          // Check for row timer configuration
+          const rowTimerConfig = app.rowTimers?.get(tokenId);
+          let overrideValue = effectiveNewState;
+
+          if (rowTimerConfig) {
+            try {
+              const { TimedOverrideManager } = await import('../../services/TimedOverrideManager.js');
+              const timedOverride = TimedOverrideManager._buildTimedOverrideData(rowTimerConfig);
+              overrideValue = { state: effectiveNewState, timedOverride };
+            } catch (e) {
+              console.error('PF2E Visioner | Seek row apply: Failed to build timer:', e);
+            }
+          }
+
+          const overrides = { [outcome.target.id]: overrideValue };
+          await applyNowSeek({ ...actionData, overrides }, { html: () => {}, attr: () => {} });
+
+          // Clear row timer after applying
+          if (rowTimerConfig) {
+            app.rowTimers.delete(tokenId);
+            app._updateRowTimerButton?.(tokenId);
+          }
+
           // Disable the row's Apply button for this token
           app.updateRowButtonsToApplied([{ target: { id: outcome.target.id } }]);
         }
@@ -1156,6 +1175,64 @@ export class SeekPreviewDialog extends BaseActionDialog {
       app.updateChangesCount();
     } catch {
       notify.error(`${MODULE_TITLE}: Error applying change.`);
+    }
+  }
+
+  static async _onApplyChangeTimed(event, button) {
+    const app = _currentSeekDialogInstance;
+    if (!app) return;
+
+    const tokenId = button.dataset.tokenId;
+    if (!tokenId) {
+      notify.warn(`${MODULE_TITLE}: No token found for timed apply`);
+      return;
+    }
+
+    const outcome = app.outcomes.find((o) => o.target?.id === tokenId);
+    if (!outcome) {
+      notify.warn(`${MODULE_TITLE}: No outcome found for this token`);
+      return;
+    }
+
+    const effectiveNewState = outcome.overrideState || outcome.newVisibility;
+    if (!effectiveNewState || effectiveNewState === 'avs') {
+      notify.warn(`${MODULE_TITLE}: Cannot apply timed override for AVS state`);
+      return;
+    }
+
+    const observer = app.actorToken;
+    const targetToken = outcome.target;
+    if (!observer || !targetToken) {
+      notify.warn(`${MODULE_TITLE}: Missing observer or target`);
+      return;
+    }
+
+    try {
+      const { TimerDurationDialog } = await import('../../ui/TimerDurationDialog.js');
+      const timerConfig = await TimerDurationDialog.prompt();
+      if (!timerConfig) return;
+
+      const { TimedOverrideManager } = await import('../../services/TimedOverrideManager.js');
+      const success = await TimedOverrideManager.createTimedOverride(
+        observer,
+        targetToken,
+        effectiveNewState,
+        timerConfig,
+        { source: 'seek_action' },
+      );
+
+      if (success) {
+        outcome.hasActionableChange = false;
+        outcome.hasRevertableChange = false;
+        app.updateRowButtonsToApplied([{ target: { id: tokenId } }]);
+        app.updateChangesCount();
+        notify.info(
+          `${MODULE_TITLE}: Applied timed visibility override for ${targetToken.name || 'token'}`,
+        );
+      }
+    } catch (error) {
+      console.error(`${MODULE_TITLE}: Error applying timed change:`, error);
+      notify.error(`${MODULE_TITLE}: Failed to apply timed change`);
     }
   }
 
@@ -1276,7 +1353,7 @@ export class SeekPreviewDialog extends BaseActionDialog {
     if (this._selectionHookId) {
       try {
         Hooks.off('controlToken', this._selectionHookId);
-      } catch { }
+      } catch {}
       this._selectionHookId = null;
     }
     _currentSeekDialogInstance = null;
@@ -1480,7 +1557,9 @@ export class SeekPreviewDialog extends BaseActionDialog {
           // Update the visibility cell
           const visibilityCell = row.querySelector('.visibility-change');
           if (visibilityCell) {
-            visibilityCell.textContent = game.i18n.localize('PF2E_VISIONER.VISIBILITY_STATES.hidden');
+            visibilityCell.textContent = game.i18n.localize(
+              'PF2E_VISIONER.VISIBILITY_STATES.hidden',
+            );
             visibilityCell.className = 'visibility-change hidden';
           }
 
@@ -1505,7 +1584,9 @@ export class SeekPreviewDialog extends BaseActionDialog {
 
       // Find all failed outcomes where the target is currently undetected
       const failedUndetectedOutcomes = this.outcomes.filter(
-        (outcome) => (outcome.outcome === 'failure' || outcome.outcome === 'critical-failure') && outcome.currentVisibility === 'undetected',
+        (outcome) =>
+          (outcome.outcome === 'failure' || outcome.outcome === 'critical-failure') &&
+          outcome.currentVisibility === 'undetected',
       );
 
       if (failedUndetectedOutcomes.length === 0) {
@@ -1607,14 +1688,18 @@ export class SeekPreviewDialog extends BaseActionDialog {
             // Update the visibility cell
             const visibilityCell = row.querySelector('.visibility-change');
             if (visibilityCell) {
-              visibilityCell.textContent = game.i18n.localize('PF2E_VISIONER.VISIBILITY_STATES.hidden');
+              visibilityCell.textContent = game.i18n.localize(
+                'PF2E_VISIONER.VISIBILITY_STATES.hidden',
+              );
               visibilityCell.className = 'visibility-change hidden';
             }
 
             // Update the outcome cell
             const outcomeCell = row.querySelector('.outcome');
             if (outcomeCell) {
-              outcomeCell.textContent = game.i18n.localize('PF2E_VISIONER.UI.HIDDEN_SENSE_UNSEEN_LABEL');
+              outcomeCell.textContent = game.i18n.localize(
+                'PF2E_VISIONER.UI.HIDDEN_SENSE_UNSEEN_LABEL',
+              );
               outcomeCell.className = 'outcome hidden';
             }
           }
@@ -1656,7 +1741,7 @@ export class SeekPreviewDialog extends BaseActionDialog {
     app.ignoreAllies = target.checked;
     try {
       await game.settings.set(MODULE_ID, 'ignoreAllies', target.checked);
-    } catch { }
+    } catch {}
     app.bulkActionState = 'initial';
     await app.render({ force: true });
   }
@@ -1667,7 +1752,7 @@ export class SeekPreviewDialog extends BaseActionDialog {
     app.hideFoundryHidden = target.checked;
     try {
       await game.settings.set(MODULE_ID, 'hideFoundryHiddenTokens', target.checked);
-    } catch { }
+    } catch {}
     app.bulkActionState = 'initial';
     await app.render({ force: true });
   }
@@ -1710,12 +1795,14 @@ export class SeekPreviewDialog extends BaseActionDialog {
     }
 
     const effectiveNewState = outcome.overrideState || outcome.newVisibility;
-    const baseOldState = outcome.oldVisibility != null ? outcome.oldVisibility : outcome.currentVisibility;
+    const baseOldState =
+      outcome.oldVisibility != null ? outcome.oldVisibility : outcome.currentVisibility;
 
     // If user has set an override, use AVS-aware logic
     if (outcome.overrideState) {
       const isOldStateAvsControlled = this.isOldStateAvsControlled(outcome);
-      const statesMatch = baseOldState != null && effectiveNewState != null && effectiveNewState === baseOldState;
+      const statesMatch =
+        baseOldState != null && effectiveNewState != null && effectiveNewState === baseOldState;
       return (
         (baseOldState != null && effectiveNewState != null && effectiveNewState !== baseOldState) ||
         (statesMatch && isOldStateAvsControlled)

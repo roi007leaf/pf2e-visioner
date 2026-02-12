@@ -1,6 +1,7 @@
 {{!--
-  ApplicationV2 template for Sneak Results Preview Dialog
-  Matches the visibility manager's design and styling
+  ApplicationV2 template for Sneak Action Preview Dialog
+  Updated to support new enhanced sneak features
+  Updated: row-timer-toggle button support
 --}}
 
 <div class="sneak-preview-content pf2e-visioner">
@@ -355,6 +356,9 @@
                   </button>
                 </div>
               {{else if outcome.hasActionableChange}}
+                <button type="button" class="row-timer-toggle" data-token-id="{{outcome.token.id}}" data-tooltip="{{localize 'PF2E_VISIONER.TIMED_OVERRIDE.SET_DURATION_FOR_ROW'}}">
+                  <i class="fas fa-clock"></i>
+                </button>
                 <button type="button" class="row-action-btn apply-change" 
                 {{#if outcome.isDeferred}}disabled{{/if}}
                 data-action="applyChange" data-token-id="{{outcome.token.id}}" data-tooltip="{{localize 'PF2E_VISIONER.UI.APPLY_VISIBILITY_CHANGE'}}">

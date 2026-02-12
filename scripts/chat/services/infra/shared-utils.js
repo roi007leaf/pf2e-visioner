@@ -242,6 +242,7 @@ export async function applyVisibilityChanges(observer, changes, options = {}) {
         changesByTarget.set(targetToken.document.id, {
           target: targetToken,
           state: effectiveNewState,
+          timedOverride: change.timedOverride || null,
         });
       }
     }
@@ -344,8 +345,9 @@ export function markPanelComplete(panel, changes) {
     const completionMsg = `
             <div class="automation-completion">
                 <i class="fas fa-check-circle"></i>
-                <span>Applied ${changes.length} visibility change${changes.length !== 1 ? 's' : ''
-      }</span>
+                <span>Applied ${changes.length} visibility change${
+                  changes.length !== 1 ? 's' : ''
+                }</span>
             </div>
         `;
 
@@ -533,7 +535,6 @@ export function filterOutcomesBySeekDistance(outcomes, seeker, tokenProperty = '
     const applyOutOfCombat = !!game.settings.get(MODULE_ID, 'limitSeekRangeOutOfCombat');
     const shouldApply = (inCombat && applyInCombat) || (!inCombat && applyOutOfCombat);
 
-
     if (!shouldApply) {
       return outcomes;
     }
@@ -544,9 +545,10 @@ export function filterOutcomesBySeekDistance(outcomes, seeker, tokenProperty = '
         : game.settings.get(MODULE_ID, 'customSeekDistanceOutOfCombat'),
     );
 
-
     if (!Number.isFinite(maxDistance) || maxDistance <= 0) {
-      console.warn(`${MODULE_TITLE} | filterOutcomesBySeekDistance: Invalid max distance (${maxDistance}) - returning all outcomes`);
+      console.warn(
+        `${MODULE_TITLE} | filterOutcomesBySeekDistance: Invalid max distance (${maxDistance}) - returning all outcomes`,
+      );
       return outcomes;
     }
 
@@ -558,14 +560,15 @@ export function filterOutcomesBySeekDistance(outcomes, seeker, tokenProperty = '
       const dist = calculateTokenDistance(seeker, token);
       const isWithinRange = Number.isFinite(dist) ? dist <= maxDistance : true;
 
-
       return isWithinRange;
     });
 
-
     return filtered;
   } catch (error) {
-    console.error(`${MODULE_TITLE} | filterOutcomesBySeekDistance: Error filtering by distance:`, error);
+    console.error(
+      `${MODULE_TITLE} | filterOutcomesBySeekDistance: Error filtering by distance:`,
+      error,
+    );
     return outcomes;
   }
 }
@@ -580,7 +583,14 @@ export function filterOutcomesBySeekDistance(outcomes, seeker, tokenProperty = '
  * @param {string} actorTokenId - Optional actor token ID to find the actual template object
  * @returns {boolean}
  */
-export function isTokenWithinTemplate(center, radiusFeet, token, templateType = 'circle', messageId = null, actorTokenId = null) {
+export function isTokenWithinTemplate(
+  center,
+  radiusFeet,
+  token,
+  templateType = 'circle',
+  messageId = null,
+  actorTokenId = null,
+) {
   try {
     if (!center || !token) return false;
 
@@ -647,10 +657,46 @@ export function isTokenWithinTemplate(center, radiusFeet, token, templateType = 
  * @param {string} actorTokenId - Optional actor token ID to find the actual template object
  * @returns {Array}
  */
-export function filterOutcomesByTemplate(outcomes, center, radiusFeet, tokenProperty = 'target', templateType = 'circle', messageId = null, actorTokenId = null) {
+export function filterOutcomesByTemplate(
+  outcomes,
+  center,
+  radiusFeet,
+  tokenProperty = 'target',
+  templateType = 'circle',
+  messageId = null,
+  actorTokenId = null,
+) {
   try {
     if (!Array.isArray(outcomes) || !center || !Number.isFinite(radiusFeet) || radiusFeet <= 0)
       return outcomes;
+
+    const gridSize = canvas?.grid?.size ?? canvas?.scene?.grid?.size ?? 100;
+    const gridDistance = canvas?.scene?.grid?.distance ?? canvas?.grid?.distance ?? 5;
+    const pixelsToFeet = (pixels) => (pixels / (gridSize || 1)) * (gridDistance || 5);
+    const getTokenCenter = (token) => {
+      if (!token) return null;
+      if (token.center) return token.center;
+      const w = token.w ?? (Number.isFinite(token.width) ? token.width * gridSize : 0);
+      const h = token.h ?? (Number.isFinite(token.height) ? token.height * gridSize : 0);
+      if (!Number.isFinite(token.x) || !Number.isFinite(token.y)) return null;
+      return { x: token.x + w / 2, y: token.y + h / 2 };
+    };
+    const getWallCenter = (wall) => {
+      if (!wall) return null;
+      if (wall.center) return wall.center;
+      const d = wall.document ?? wall;
+      const c = Array.isArray(d?.c) ? d.c : null;
+      if (c && c.length >= 4) return { x: (c[0] + c[2]) / 2, y: (c[1] + c[3]) / 2 };
+      if (
+        Number.isFinite(d?.x) &&
+        Number.isFinite(d?.y) &&
+        Number.isFinite(d?.x2) &&
+        Number.isFinite(d?.y2)
+      ) {
+        return { x: (d.x + d.x2) / 2, y: (d.y + d.y2) / 2 };
+      }
+      return null;
+    };
 
     let template = null;
     if (messageId && actorTokenId) {
@@ -675,13 +721,9 @@ export function filterOutcomesByTemplate(outcomes, center, radiusFeet, tokenProp
     }
 
     return outcomes.filter((outcome) => {
-      if (outcome?.changed === false && messageId) {
-        return false;
-      }
-
       if (template && template.shape) {
         if (outcome?._isWall && outcome?.wall) {
-          const wallCenter = outcome.wall.center;
+          const wallCenter = getWallCenter(outcome.wall);
           if (wallCenter) {
             const localX = wallCenter.x - template.x;
             const localY = wallCenter.y - template.y;
@@ -692,10 +734,8 @@ export function filterOutcomesByTemplate(outcomes, center, radiusFeet, tokenProp
 
         const token = outcome?.[tokenProperty];
         if (!token) return false;
-        const tokenCenter = token.center || {
-          x: token.x + (token.w ?? token.width * canvas.grid.size) / 2,
-          y: token.y + (token.h ?? token.height * canvas.grid.size) / 2,
-        };
+        const tokenCenter = getTokenCenter(token);
+        if (!tokenCenter) return false;
         const localX = tokenCenter.x - template.x;
         const localY = tokenCenter.y - template.y;
         return template.shape.contains(localX, localY);
@@ -703,11 +743,11 @@ export function filterOutcomesByTemplate(outcomes, center, radiusFeet, tokenProp
 
       if (templateType === 'circle') {
         if (outcome?._isWall && outcome?.wall) {
-          const wallCenter = outcome.wall.center;
+          const wallCenter = getWallCenter(outcome.wall);
           if (wallCenter) {
             const dx = wallCenter.x - center.x;
             const dy = wallCenter.y - center.y;
-            const distanceFeet = Math.sqrt(dx * dx + dy * dy) / (canvas.scene.grid.size / 5);
+            const distanceFeet = pixelsToFeet(Math.sqrt(dx * dx + dy * dy));
             return distanceFeet <= radiusFeet;
           }
           return false;
@@ -715,9 +755,11 @@ export function filterOutcomesByTemplate(outcomes, center, radiusFeet, tokenProp
 
         const token = outcome?.[tokenProperty];
         if (!token) return false;
-        const dx = token.center.x - center.x;
-        const dy = token.center.y - center.y;
-        const distanceFeet = Math.sqrt(dx * dx + dy * dy) / (canvas.scene.grid.size / 5);
+        const tokenCenter = getTokenCenter(token);
+        if (!tokenCenter) return false;
+        const dx = tokenCenter.x - center.x;
+        const dy = tokenCenter.y - center.y;
+        const distanceFeet = pixelsToFeet(Math.sqrt(dx * dx + dy * dy));
         return distanceFeet <= radiusFeet;
       }
 
@@ -749,7 +791,6 @@ export async function filterOutcomesByDetection(
   filterTokens = true,
 ) {
   try {
-
     if (!Array.isArray(outcomes)) {
       return outcomes;
     }
@@ -869,7 +910,7 @@ export async function filterOutcomesByDetection(
     const removedCount = outcomes.length - filtered.length;
 
     if (removedCount > 0) {
-      const removed = outcomes.filter(o => !filtered.includes(o));
+      const removed = outcomes.filter((o) => !filtered.includes(o));
     }
 
     return filtered;

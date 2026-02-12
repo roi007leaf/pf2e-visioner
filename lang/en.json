@@ -33,6 +33,45 @@
       "VISIBILITY_TAB": "Visibility",
       "COVER_TAB": "Cover"
     },
+    "TIMED_OVERRIDE": {
+      "DIALOG_TITLE": "Apply Timed Override",
+      "TOKEN_LABEL": "Token",
+      "NEW_STATE_LABEL": "New State",
+      "DURATION": "Duration",
+      "ROUNDS": "Rounds",
+      "ROUND": "Round",
+      "MINUTES": "Minutes",
+      "MINUTE": "Minute",
+      "FOREVER": "Forever",
+      "CUSTOM": "Custom",
+      "ROUND_TIMING": "Round Timing",
+      "EXPIRES_AT": "Expires at",
+      "START_OF_TURN": "Start",
+      "END_OF_TURN": "End",
+      "OF": "of",
+      "OF_TURN": "of {name}'s turn",
+      "APPLY_NOW": "Apply Now",
+      "APPLY_FOR_DURATION": "Apply for Duration...",
+      "ACTIVE_TIMER": "Active Timer",
+      "ACTIVE_TIMERS": "Active Timed Overrides",
+      "REMAINING": "Remaining",
+      "CANCEL_TIMER": "Cancel Timer",
+      "ROUNDS_REMAINING": "{count} round(s)",
+      "TIME_REMAINING": "{time}",
+      "TIMER_TOOLTIP": "Override expires: {remaining}",
+      "TIMER_EXPIRED_NOTIFICATION": "Timed override for {target} has expired",
+      "TIMER_CANCELLED": "Timer cancelled",
+      "NO_COMBAT_FOR_ROUNDS": "No active combat - cannot use round-based duration",
+      "NO_DURATION_SELECTED": "Select a duration first",
+      "PRESET_1_ROUND": "1 Round",
+      "PRESET_3_ROUNDS": "3 Rounds",
+      "PRESET_5_ROUNDS": "5 Rounds",
+      "PRESET_1_MIN": "1 Min",
+      "PRESET_5_MIN": "5 Min",
+      "APPLY_BUTTON": "Apply",
+      "CANCEL_BUTTON": "Cancel",
+      "SET_DURATION_FOR_ROW": "Set duration for this override"
+    },
     "VISIBILITY_STATES": {
       "avs": "AVS",
       "observed": "Observed",
@@ -672,6 +711,10 @@
       "AVS_OVERRIDE_VALIDATION_ON_TURN_CHANGE": {
         "name": "Validate AVS Overrides on Turn Change",
         "hint": "When enabled, the system will check all AVS overrides at the start of each turn and display a validation indicator if any overrides are active. This helps ensure overrides remain accurate as combat progresses."
+      },
+      "AVS_SKIP_TIMED_OVERRIDE_VALIDATION": {
+        "name": "Skip Timed Override Validation",
+        "hint": "When enabled, overrides with active timers are excluded from round-change validation checks. This prevents round-change prompts for temporary overrides that haven't expired yet. Note: Movement validation always skips timed overrides regardless of this setting."
       },
       "COLORBLIND_MODE": {
         "name": "Colorblind Mode",

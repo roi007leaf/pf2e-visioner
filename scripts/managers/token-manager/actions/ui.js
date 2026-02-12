@@ -53,6 +53,12 @@ export async function toggleMode(event, button) {
 
   const newMode = app.mode === 'observer' ? 'target' : 'observer';
   app.mode = newMode;
+
+  // Clear row timers when switching modes since rows represent different relationships
+  if (app.rowTimers) {
+    app.rowTimers.clear();
+  }
+
   await app.render({ force: true });
 
   try {
@@ -119,6 +125,11 @@ export async function toggleTab(event, button) {
       });
     } catch (error) {
       console.error('Token Manager: Error saving tab state:', error);
+    }
+
+    // Clear row timers when switching tabs since timers only apply to visibility
+    if (app.rowTimers) {
+      app.rowTimers.clear();
     }
     app.activeTab = newTab;
     await app.render({ force: true });

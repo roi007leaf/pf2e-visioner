@@ -102,6 +102,7 @@ export class PointOutActionHandler extends ActionHandlerBase {
       target: outcome.targetToken,
       newVisibility: outcome.newVisibility,
       oldVisibility: outcome.oldVisibility,
+      timedOverride: outcome.timedOverride,
     };
   }
 

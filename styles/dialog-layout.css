@@ -5,6 +5,111 @@
 
 @import url('shared-ui-components.css');
 
+/* Row Timer Toggle Button for Action Dialogs - explicit selectors for compatibility */
+.pf2e-visioner .row-timer-toggle,
+.pf2e-visioner td.actions .row-timer-toggle,
+.hide-preview-dialog .row-timer-toggle,
+.sneak-preview-dialog .row-timer-toggle,
+.seek-preview-dialog .row-timer-toggle,
+.create-a-diversion-preview-dialog .row-timer-toggle,
+.point-out-preview-dialog .row-timer-toggle,
+.take-cover-preview-dialog .row-timer-toggle,
+.consequences-preview-dialog .row-timer-toggle,
+button.row-timer-toggle {
+  background: transparent !important;
+  border: 1px solid rgba(255, 255, 255, 0.5) !important;
+  color: rgba(255, 255, 255, 0.8) !important;
+  cursor: pointer !important;
+  padding: 4px 6px !important;
+  border-radius: 4px !important;
+  font-size: 12px !important;
+  line-height: 1 !important;
+  transition: all 0.2s ease !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  margin-right: 4px !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+.pf2e-visioner .row-timer-toggle:hover,
+.hide-preview-dialog .row-timer-toggle:hover,
+.sneak-preview-dialog .row-timer-toggle:hover,
+.seek-preview-dialog .row-timer-toggle:hover,
+.create-a-diversion-preview-dialog .row-timer-toggle:hover,
+.point-out-preview-dialog .row-timer-toggle:hover,
+.take-cover-preview-dialog .row-timer-toggle:hover,
+.consequences-preview-dialog .row-timer-toggle:hover {
+  background: rgba(59, 130, 246, 0.15);
+  border-color: rgba(59, 130, 246, 0.5);
+  color: rgba(59, 130, 246, 0.9);
+}
+.pf2e-visioner .row-timer-toggle.active,
+.hide-preview-dialog .row-timer-toggle.active,
+.sneak-preview-dialog .row-timer-toggle.active,
+.seek-preview-dialog .row-timer-toggle.active,
+.create-a-diversion-preview-dialog .row-timer-toggle.active,
+.point-out-preview-dialog .row-timer-toggle.active,
+.take-cover-preview-dialog .row-timer-toggle.active,
+.consequences-preview-dialog .row-timer-toggle.active,
+button.row-timer-toggle.active {
+  background: linear-gradient(
+    135deg,
+    rgba(76, 175, 80, 0.45) 0%,
+    rgba(69, 160, 73, 0.6) 100%
+  ) !important;
+  border-color: rgba(76, 175, 80, 0.95) !important;
+  color: #fff !important;
+  box-shadow:
+    0 0 10px rgba(76, 175, 80, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
+}
+.pf2e-visioner .row-timer-toggle.active:hover,
+.hide-preview-dialog .row-timer-toggle.active:hover,
+.sneak-preview-dialog .row-timer-toggle.active:hover,
+.seek-preview-dialog .row-timer-toggle.active:hover,
+.create-a-diversion-preview-dialog .row-timer-toggle.active:hover,
+.point-out-preview-dialog .row-timer-toggle.active:hover,
+.take-cover-preview-dialog .row-timer-toggle.active:hover,
+.consequences-preview-dialog .row-timer-toggle.active:hover,
+button.row-timer-toggle.active:hover {
+  background: rgba(220, 38, 38, 0.15);
+  border-color: rgba(220, 38, 38, 0.5);
+  color: rgba(220, 38, 38, 0.9);
+}
+
+.pf2e-visioner .row-timer-toggle.active:not(:hover),
+.hide-preview-dialog .row-timer-toggle.active:not(:hover),
+.sneak-preview-dialog .row-timer-toggle.active:not(:hover),
+.seek-preview-dialog .row-timer-toggle.active:not(:hover),
+.create-a-diversion-preview-dialog .row-timer-toggle.active:not(:hover),
+.point-out-preview-dialog .row-timer-toggle.active:not(:hover),
+.take-cover-preview-dialog .row-timer-toggle.active:not(:hover),
+.consequences-preview-dialog .row-timer-toggle.active:not(:hover),
+button.row-timer-toggle.active:not(:hover) {
+  background: linear-gradient(
+    135deg,
+    rgba(76, 175, 80, 0.45) 0%,
+    rgba(69, 160, 73, 0.6) 100%
+  ) !important;
+  border-color: rgba(76, 175, 80, 0.95) !important;
+  color: #fff !important;
+  box-shadow:
+    0 0 10px rgba(76, 175, 80, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
+}
+.pf2e-visioner .row-timer-label,
+.hide-preview-dialog .row-timer-label,
+.sneak-preview-dialog .row-timer-label,
+.seek-preview-dialog .row-timer-label,
+.create-a-diversion-preview-dialog .row-timer-label,
+.point-out-preview-dialog .row-timer-label,
+.take-cover-preview-dialog .row-timer-label,
+.consequences-preview-dialog .row-timer-label {
+  font-size: 10px;
+  font-family: monospace;
+}
+
 .pf2e-visioner {
   /* Force dialog to have a fixed height */
   .point-out-preview-dialog,
@@ -902,7 +1007,10 @@
   flex-shrink: 0;
   border: 1px solid rgba(255, 255, 255, 0.3) !important;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3) !important;
-  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease !important;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    border-color 0.2s ease !important;
 }
 
 .pf2e-visioner.override-validation-dialog .override-validation-modern .tables-scroll-container,
@@ -1160,9 +1268,10 @@
   object-position: top !important;
   border: 1px solid rgba(255, 255, 255, 0.3) !important;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3) !important;
-  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease !important;
-  display: block !important;
-  flex-shrink: 0 !important;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    border-color 0.2s ease !important;
 }
 
 .pf2e-visioner .override-validation-dialog .chip-avatar {
@@ -1485,7 +1594,10 @@
   cursor: pointer;
   border: 1px solid rgba(255, 255, 255, 0.3) !important;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3) !important;
-  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease !important;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    border-color 0.2s ease !important;
 }
 
 /* Safety net in case class is missing */
@@ -3753,55 +3865,459 @@
   line-height: 1.4;
 }
 
-/* Separate image column styles for normal mode tables */
-.pf2e-visioner .override-validation-modern .visibility-table td.target-img,
-.pf2e-visioner .override-validation-modern .visibility-table td.observer-img {
-  width: 60px !important;
-  min-width: 60px !important;
-  max-width: 60px !important;
-  padding: 8px !important;
+/* Row Action Dropdown Styles */
+.pf2e-visioner .row-action-dropdown {
+  position: relative;
+  display: inline-block;
+}
+
+.pf2e-visioner .row-action-dropdown .dropdown-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.pf2e-visioner .row-action-dropdown .dropdown-caret {
+  font-size: 10px;
+  opacity: 0.7;
+}
+
+.pf2e-visioner .row-action-dropdown .dropdown-menu {
+  display: none;
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 100;
+  min-width: 160px;
+  background: var(--color-bg-option, #2a2a2a);
+  border: 1px solid var(--color-border-light-primary, #555);
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  padding: 4px 0;
+  margin-top: 2px;
+}
+
+.pf2e-visioner .row-action-dropdown .dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 12px;
+  background: transparent;
+  border: none;
+  color: var(--color-text-light-primary, #eee);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.pf2e-visioner .row-action-dropdown .dropdown-item:hover {
+  background: rgba(59, 130, 246, 0.2);
+}
+
+.pf2e-visioner .row-action-dropdown .dropdown-item i {
+  width: 16px;
   text-align: center;
-  vertical-align: middle;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.pf2e-visioner .row-action-dropdown .dropdown-item:hover i {
+  color: rgba(59, 130, 246, 0.9);
+}
+
+/* ==============================
+   Timer Duration Dialog
+   ============================== */
+.pf2e-visioner.timer-duration-dialog {
+  min-width: 340px;
+  max-width: 400px;
+}
+
+.pf2e-visioner.timer-duration-dialog .window-content {
+  padding: 16px;
+  background: var(--color-bg);
+}
+
+.pf2e-visioner .timer-duration-content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Target Info Header */
+.pf2e-visioner .timer-duration-content .target-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+  border: 1px solid var(--color-border-light-primary);
+}
+
+.pf2e-visioner .timer-duration-content .target-image {
+  flex-shrink: 0;
+}
+
+.pf2e-visioner .timer-duration-content .target-image img {
+  width: 48px;
+  height: 48px;
+  border-radius: 6px;
+  object-fit: cover;
+  object-position: top;
+  border: 2px solid var(--color-border-light-primary);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.pf2e-visioner .timer-duration-content .target-details {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.pf2e-visioner .timer-duration-content .target-name {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--color-text-light-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pf2e-visioner .timer-duration-content .target-details .state-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  width: fit-content;
+}
+
+/* Duration Section */
+.pf2e-visioner .timer-duration-content .duration-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.pf2e-visioner .timer-duration-content .duration-section h4 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-text-light-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--color-border-light-primary);
+}
+
+/* Preset Buttons Grid */
+.pf2e-visioner .timer-duration-content .preset-buttons {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.pf2e-visioner .timer-duration-content .preset-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 10px 8px;
+  min-height: 58px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  color: var(--color-text-light-primary);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.pf2e-visioner .timer-duration-content .preset-btn:hover {
+  background: rgba(59, 130, 246, 0.2);
+  border-color: rgba(59, 130, 246, 0.6);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.25);
+}
+
+.pf2e-visioner .timer-duration-content .preset-btn.selected {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(37, 99, 235, 0.5) 100%);
+  border-color: rgba(96, 165, 250, 0.9);
+  box-shadow:
+    0 0 12px rgba(59, 130, 246, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.pf2e-visioner .timer-duration-content .preset-btn.selected:hover {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.5) 0%, rgba(37, 99, 235, 0.6) 100%);
+  border-color: rgba(147, 197, 253, 1);
+  box-shadow:
+    0 0 16px rgba(59, 130, 246, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.15);
+}
+
+.pf2e-visioner .timer-duration-content .preset-btn i {
+  font-size: 18px;
+  color: rgba(147, 197, 253, 0.8);
+  transition: all 0.15s ease;
+}
+
+.pf2e-visioner .timer-duration-content .preset-btn:hover i {
+  color: rgba(147, 197, 253, 1);
+  transform: scale(1.1);
+}
+
+.pf2e-visioner .timer-duration-content .preset-btn.selected i {
+  color: #fff;
+  text-shadow: 0 0 8px rgba(59, 130, 246, 0.8);
+}
+
+.pf2e-visioner .timer-duration-content .preset-btn span {
+  text-align: center;
+  line-height: 1.2;
+}
+
+/* Custom Duration Section */
+.pf2e-visioner .timer-duration-content .custom-duration-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 6px;
+  border: 1px solid transparent;
+  transition: all 0.2s ease;
+}
+
+.pf2e-visioner .timer-duration-content .custom-duration-section.active {
+  border-color: rgba(59, 130, 246, 0.5);
+  background: rgba(59, 130, 246, 0.08);
+}
+
+.pf2e-visioner .timer-duration-content .custom-duration-section label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-light-primary);
+}
+
+.pf2e-visioner .timer-duration-content .custom-inputs {
+  display: flex;
+  gap: 8px;
+}
+
+.pf2e-visioner .timer-duration-content .custom-inputs input[type='number'] {
+  width: 70px;
+  padding: 6px 10px;
+  border: 1px solid var(--color-border-light-primary);
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.2);
+  color: var(--color-text-light-primary);
+  font-size: 14px;
+  text-align: center;
+}
+
+.pf2e-visioner .timer-duration-content .custom-inputs input[type='number']:focus {
+  outline: none;
+  border-color: rgba(59, 130, 246, 0.8);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+.pf2e-visioner .timer-duration-content .custom-inputs select {
+  flex: 1;
+  padding: 6px 10px;
+  border: 1px solid var(--color-border-light-primary);
+  border-radius: 4px;
+  background: #1a1a1a;
+  color: var(--color-text-light-primary);
+  font-size: 13px;
   cursor: pointer;
 }
 
-.pf2e-visioner .override-validation-modern .visibility-table td.target-img img,
-.pf2e-visioner .override-validation-modern .visibility-table td.observer-img img {
-  width: 48px !important;
-  height: 48px !important;
-  border-radius: 4px;
-  object-fit: cover;
-  object-position: top;
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
-  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
-  display: block;
-  margin: 0 auto;
+.pf2e-visioner .timer-duration-content .custom-inputs select:focus {
+  outline: none;
+  border-color: rgba(59, 130, 246, 0.8);
 }
 
-.pf2e-visioner .override-validation-modern .visibility-table td.target-img img:hover,
-.pf2e-visioner .override-validation-modern .visibility-table td.observer-img img:hover {
-  border-color: rgba(255, 255, 255, 0.5);
-  box-shadow: 0 0 8px rgba(255, 255, 255, 0.3);
+.pf2e-visioner .timer-duration-content .custom-inputs select option {
+  background: #1a1a1a;
+  color: var(--color-text-light-primary);
 }
 
-.pf2e-visioner .override-validation-modern .visibility-table td.target-img i,
-.pf2e-visioner .override-validation-modern .visibility-table td.observer-img i {
-  font-size: 36px;
-  opacity: 0.5;
+/* Turn Timing Section */
+.pf2e-visioner .timer-duration-content .turn-timing-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 6px;
+  border: 1px solid var(--color-border-light-primary);
 }
 
-.pf2e-visioner .override-validation-modern .visibility-table th.target-img,
-.pf2e-visioner .override-validation-modern .visibility-table th.observer-img {
-  width: 60px !important;
-  min-width: 60px !important;
-  max-width: 60px !important;
+.pf2e-visioner .timer-duration-content .turn-timing-section h4 {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-text-light-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
-.pf2e-visioner .override-validation-dialog td.target span,
-.pf2e-visioner .override-validation-dialog td.observer span {
+.pf2e-visioner .timer-duration-content .turn-timing-inputs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
   font-size: 13px;
-  font-weight: 500;
-  color: var(--color-text-primary);
-  line-height: 1.4;
+  color: var(--color-text-light-primary);
+}
+
+.pf2e-visioner .timer-duration-content .turn-timing-inputs select {
+  padding: 5px 8px;
+  border: 1px solid var(--color-border-light-primary);
+  border-radius: 4px;
+  background: #1a1a1a;
+  color: var(--color-text-light-primary);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.pf2e-visioner .timer-duration-content .turn-timing-inputs select:focus {
+  outline: none;
+  border-color: rgba(59, 130, 246, 0.8);
+}
+
+.pf2e-visioner .timer-duration-content .turn-timing-inputs select option {
+  background: #1a1a1a;
+  color: var(--color-text-light-primary);
+}
+
+.pf2e-visioner .timer-duration-content .turn-timing-inputs span {
+  color: var(--color-text-dark-secondary);
+}
+
+/* Dialog Buttons */
+.pf2e-visioner .timer-duration-content .dialog-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--color-border-light-primary);
+  margin-top: 4px;
+}
+
+.pf2e-visioner .timer-duration-content .cancel-btn,
+.pf2e-visioner .timer-duration-content .apply-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.pf2e-visioner .timer-duration-content .cancel-btn {
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--color-border-light-primary);
+  color: var(--color-text-light-primary);
+}
+
+.pf2e-visioner .timer-duration-content .cancel-btn:hover {
+  background: rgba(0, 0, 0, 0.3);
+  border-color: var(--color-border-highlight);
+}
+
+.pf2e-visioner .timer-duration-content .apply-btn {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.8) 0%, rgba(37, 99, 235, 0.9) 100%);
+  border: 1px solid rgba(59, 130, 246, 0.6);
+  color: #fff;
+}
+
+.pf2e-visioner .timer-duration-content .apply-btn:hover {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 1) 0%, rgba(37, 99, 235, 1) 100%);
+  border-color: rgba(59, 130, 246, 1);
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.4);
+  transform: translateY(-1px);
+}
+
+.pf2e-visioner .timer-duration-content .apply-btn:disabled {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.18);
+  color: rgba(255, 255, 255, 0.55);
+  box-shadow: none;
+  cursor: not-allowed;
+  opacity: 0.7;
+  transform: none;
+}
+
+.pf2e-visioner .timer-duration-content .apply-btn:disabled:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.18);
+  box-shadow: none;
+  transform: none;
+  /* Separate image column styles for normal mode tables */
+  .pf2e-visioner .override-validation-modern .visibility-table td.target-img,
+  .pf2e-visioner .override-validation-modern .visibility-table td.observer-img {
+    width: 60px !important;
+    min-width: 60px !important;
+    max-width: 60px !important;
+    padding: 8px !important;
+    text-align: center;
+    vertical-align: middle;
+    cursor: pointer;
+  }
+
+  .pf2e-visioner .override-validation-modern .visibility-table td.target-img img,
+  .pf2e-visioner .override-validation-modern .visibility-table td.observer-img img {
+    width: 48px !important;
+    height: 48px !important;
+    border-radius: 4px;
+    object-fit: cover;
+    object-position: top;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+    transition:
+      transform 0.2s ease,
+      box-shadow 0.2s ease,
+      border-color 0.2s ease;
+    display: block;
+    margin: 0 auto;
+  }
+
+  .pf2e-visioner .override-validation-modern .visibility-table td.target-img img:hover,
+  .pf2e-visioner .override-validation-modern .visibility-table td.observer-img img:hover {
+    border-color: rgba(255, 255, 255, 0.5);
+    box-shadow: 0 0 8px rgba(255, 255, 255, 0.3);
+  }
+
+  .pf2e-visioner .override-validation-modern .visibility-table td.target-img i,
+  .pf2e-visioner .override-validation-modern .visibility-table td.observer-img i {
+    font-size: 36px;
+    opacity: 0.5;
+  }
+
+  .pf2e-visioner .override-validation-modern .visibility-table th.target-img,
+  .pf2e-visioner .override-validation-modern .visibility-table th.observer-img {
+    width: 60px !important;
+    min-width: 60px !important;
+    max-width: 60px !important;
+  }
+
+  .pf2e-visioner .override-validation-dialog td.target span,
+  .pf2e-visioner .override-validation-dialog td.observer span {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--color-text-primary);
+    line-height: 1.4;
+  }
 }
