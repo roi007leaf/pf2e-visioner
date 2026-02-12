@@ -208,6 +208,9 @@
       "AVS_REJECTED_ALL": "Odrzucono wszystkie zmiany AVS",
       "AVS_REJECTED": "Odrzucono zmiany AVS",
       "AVS_REJECTED_SINGLE": "Odrzucona zmiana AVS: {observerName} → {targetName}",
+      "VISION_SHARING_REMOVED": "Usunięto udostępnianie wizji",
+      "VISION_SHARING_REMOVED_FROM": "Udostępnianie wizji usunięte z {name}",
+      "VISION_SHARING_REMOVE_FAILED": "Nie udało się usunąć udostępniania wizji",
       "AVS_ACCEPTED_SINGLE": "Zatwierdzona zmiana AVS: {observerName} → {targetName}",
       "AVS_ACCEPTED_COUNT": "Zaakceptowano {count} zmian",
       "AVS_ACCEPTED_IN_TABLE": "Zaakceptowano {count} zmian w tabeli {group}",
@@ -220,6 +223,17 @@
       "SNEAK_DEFERRED_RESTORED": "Przywrócono {count} tokenów do pierwotnego stanu odroczonego wraz ze wszystkimi danymi dotyczącymi pozycji."
     },
     "MACROS": {},
+    "VISION_MASTER_DIALOG": {
+      "TITLE": "Wybierz Mistrza wizji",
+      "NO_TOKENS": "Brak prawidłowych tokenów z dostępną wizją",
+      "NONE": "Brak (wykorzystaj własną wizję)",
+      "PAN": "Przypnij do tokenu",
+      "MODE_LABEL": "Tryb współdzielenia wizji",
+      "MODE_ONE_WAY": "Jednokierunkowy (sługus widzi własną wizję + wizję mistrza)",
+      "MODE_TWO_WAY": "Dwukierunkowy (oboje widzą wzajemnie swoje wizje)",
+      "MODE_REPLACE": "Zastąp (sługus widzi tylko wizję mistrza)",
+      "MODE_REVERSE": "Odwrócenie (mistrz widzi tylko wizję sługusa)"
+    },
     "DIALOG_TITLES": {
       "HIDE_RESULTS": "Wyniki Ukrywania",
       "POINT_OUT_RESULTS": "Wyniki Wskazania Palcem",
@@ -655,6 +669,10 @@
         "name": "Wyłącz rzucanie promieni w linii wzroku",
         "hint": "Wyłącz rzutowanie promieni w linii wzroku dla widoczności. Po włączeniu widoczność będzie obliczana tylko dla wybranych tokenów przy użyciu ich kształtów widzenia. Wyniki widoczności w obrębie kształtu widoczności będą dokładniejsze, ale wyniki widzenia w ciemności i niewybranych tokenów będą oparte wyłącznie na odległości i zmysłach, z pominięciem ścian i przeszkód."
       },
+      "AVS_OVERRIDE_VALIDATION_ON_TURN_CHANGE": {
+        "name": "Sprawdź poprawność nadpisania AVS przy zmianie tury",
+        "hint": "Po włączeniu tej opcji system będzie sprawdzał wszystkie nadpisania AVS na początku każdej tury i wyświetlał wskaźnik walidacji, jeśli jakiekolwiek nadpisania są aktywne. Pomaga to zapewnić dokładność nadpisów w miarę postępu walki."
+      },
       "COLORBLIND_MODE": {
         "name": "Tryb dla osób z dysfunkcją widzenia barw",
         "hint": "Wybierz tryb dla osób z dysfunkcją widzenia barw, aby dostosować kolory dla lepszej widoczności (ustawienie po stronie klienta)",
@@ -821,6 +839,16 @@
       "AVS_CHANGES_INDICATOR_SIZE": {
         "name": "AVS Zmiana rozmiaru wskaźnika",
         "hint": "Kontroluje rozmiar przycisku wskaźnika zmian AVS oraz jego podpowiedzi.",
+        "CHOICES": {
+          "small": "Mały",
+          "medium": "Średni",
+          "large": "Duży",
+          "xlarge": "Bardzo duży"
+        }
+      },
+      "SHARED_VISION_INDICATOR_SIZE": {
+        "name": "Rozmiar wskaźnika współdzielonej wizji",
+        "hint": "Kontroluje rozmiar przycisku wskaźnika współdzielonej wizji.",
         "CHOICES": {
           "small": "Mały",
           "medium": "Średni",
@@ -1032,6 +1060,20 @@
       "ENCOUNTER_MASTER_PAN": "Przypnij do tokenu",
       "ENCOUNTER_MASTER_SELECT": "Wybierz",
       "ENCOUNTER_MASTER_CHOOSE": "Wybierz Mistrza...",
+      "VISION_MASTER_LABEL": "Mistrz wizji",
+      "VISION_MASTER_TOOLTIP": "Wybierz token mistrza, którego pole widzenia będzie dzielił ten token. Sługus wykorzystuje pole widzenia mistrza do obliczeń widoczności. Przydatne w przypadku przywołanych stworzeń lub chowańców, które powinny widzieć z perspektywy swojego twórcy.",
+      "VISION_MASTER_CHOOSE": "Wybierz Mistrza wizji...",
+      "SHARED_VISION_TITLE": "Współdzielona wizja",
+      "VISION_TOKEN": "Token",
+      "VISION_MASTER": "Mistrz",
+      "VISION_SHARED_WITH": "Sługus",
+      "VISION_ROLE_MASTER": "Mistrz",
+      "VISION_ROLE_MASTER_MULTIPLE": "Mistrz ({count} sługusów)",
+      "VISION_ROLE_MINION": "Sługus",
+      "CLICK_TO_PAN": "Kliknij, aby przejść do tokenu mistrza",
+      "CLICK_TO_PAN_MINION": "Kliknij, aby przejść do tokenu sługusa",
+      "MIDDLE_CLICK_TO_CYCLE": "Kliknij środkowym przyciskiem myszy, aby przełączać się między sługusami",
+      "RIGHT_CLICK_TO_REMOVE": "Kliknij prawym przyciskiem myszy, aby usunąć współdzielenie wizji",
       "SNIPING_DUO_SPOTTER_LABEL": "Obserwator Snajperskiego Duo",
       "SNIPING_DUO_SPOTTER_TOOLTIP": "Wybierz swojego obserwatora snajperskiego duo (sojusznika, który nie powinien zapewniać osłony dla ataków między wami).",
       "SNIPING_DUO_SPOTTER_CHOOSE": "Wybierz Obserwatora...",
