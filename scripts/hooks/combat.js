@@ -31,10 +31,6 @@ function onUpdateCombat(combat, updateData) {
   if (turnChanged) {
     handleTurnAdvance(combat);
   }
-
-  if (Object.prototype.hasOwnProperty.call(updateData, 'round')) {
-    handleRoundChange(combat);
-  }
 }
 
 function onDeleteCombat(combat) {
@@ -192,9 +188,7 @@ async function handleTurnAdvance(combat) {
       }
     }
   } catch { /* ignore */ }
-}
 
-async function handleRoundChange(combat) {
   await checkAvsOverrides();
 }
 
@@ -206,13 +200,13 @@ async function checkAvsOverrides() {
     const autoVisibilityEnabled = game.settings.get(MODULE_ID, 'autoVisibilityEnabled');
     if (!autoVisibilityEnabled) return;
 
-    const avsOverrideValidationOnRoundChange = game.settings.get(MODULE_ID, 'avsOverrideValidationOnRoundChange');
-    if (!avsOverrideValidationOnRoundChange) return;
+    const avsOverrideValidationOnTurnChange = game.settings.get(MODULE_ID, 'avsOverrideValidationOnTurnChange');
+    if (!avsOverrideValidationOnTurnChange) return;
   } catch {
     return;
   }
 
-  console.log('PF2E Visioner | Checking AVS overrides at round change...');
+  console.log('PF2E Visioner | Checking AVS overrides at turn change...');
 
   try {
     const { optimizedVisibilityCalculator } = await import('../visibility/auto-visibility/VisibilityCalculator.js');
@@ -264,9 +258,9 @@ async function checkAvsOverrides() {
 
     if (allOverrides.length > 0) {
       const { default: indicator } = await import('../ui/OverrideValidationIndicator.js');
-      indicator.show(allOverrides, '', null, { isRoundChange: true });
+      indicator.show(allOverrides, '', null, { isTurnChange: true });
     }
   } catch (e) {
-    console.error('PF2E Visioner | Error checking AVS overrides on round change:', e);
+    console.error('PF2E Visioner | Error checking AVS overrides on turn change:', e);
   }
 }

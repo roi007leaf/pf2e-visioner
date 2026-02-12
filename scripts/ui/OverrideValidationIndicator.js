@@ -104,7 +104,7 @@ class OverrideValidationIndicator {
     const existingDialog = Object.values(ui.windows).find(w => w.constructor.name === 'OverrideValidationDialog');
     if (existingDialog) {
       console.log('PF2E Visioner | Queue: Dialog already open, skipping new show request');
-      this.#updateRoundChangeBadge();
+      this.#updateTurnChangeBadge();
       return;
     }
     console.log(`PF2E Visioner | Queue: show() called - tokenName: ${tokenName}, movedTokenId: ${movedTokenId}, overrides: ${Array.isArray(overrideData) ? overrideData.length : 0}`);
@@ -149,7 +149,7 @@ class OverrideValidationIndicator {
         console.log(`PF2E Visioner | Queue: Token ${movedTokenId} already displayed, skipping re-show.`);
         this.#updateBadge();
         this.#updateQueueBadge();
-        this.#updateRoundChangeBadge();
+        this.#updateTurnChangeBadge();
       }
     } else if (this._overrideStack.size > 0) {
       console.log(`PF2E Visioner | Queue: show() called without movedTokenId, but queue has ${this._overrideStack.size} items. Showing from queue.`);
@@ -172,7 +172,7 @@ class OverrideValidationIndicator {
     this._data = { overrides, tokenName, movedTokenId: null, pulse: false };
     if (!this._el) this.#createElement();
     this.#updateBadge();
-    this.#updateRoundChangeBadge();
+    this.#updateTurnChangeBadge();
     this._el.classList.add('pf2e-visioner-override-indicator--visible');
     this._el.classList.remove('pulse');
     this._lastShowAt = Date.now();
@@ -226,7 +226,7 @@ class OverrideValidationIndicator {
     if (!this._el) this.#createElement();
     this.#updateBadge();
     this.#updateQueueBadge();
-    this.#updateRoundChangeBadge();
+    this.#updateTurnChangeBadge();
     this._el.classList.add('pf2e-visioner-override-indicator--visible');
     this._el.classList.remove('pulse');
     this._lastShowAt = Date.now();
@@ -240,11 +240,11 @@ class OverrideValidationIndicator {
     badge.textContent = count > 0 ? String(count) : '';
   }
 
-  #updateRoundChangeBadge() {
-    const roundChangeBadge = this._el?.querySelector('.indicator-round-change');
-    if (!roundChangeBadge) return;
-    const isRoundChange = this._showOptions?.isRoundChange || false;
-    roundChangeBadge.style.display = isRoundChange ? 'flex' : 'none';
+  #updateTurnChangeBadge() {
+    const turnChangeBadge = this._el?.querySelector('.indicator-round-change');
+    if (!turnChangeBadge) return;
+    const isTurnChange = this._showOptions?.isTurnChange || false;
+    turnChangeBadge.style.display = isTurnChange ? 'flex' : 'none';
   }
 
   #updateQueueBadge() {
@@ -483,7 +483,7 @@ class OverrideValidationIndicator {
       <div class="indicator-icon"><i class="fas fa-bolt-auto"></i></div>
       <div class="indicator-badge"></div>
       <div class="indicator-queue"></div>
-      <div class="indicator-round-change" title="Round Change"><i class="fas fa-flag-checkered"></i></div>
+      <div class="indicator-round-change" title="Turn Change"><i class="fas fa-clock"></i></div>
     `;
 
     // Restore position

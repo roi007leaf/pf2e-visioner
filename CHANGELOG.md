@@ -32,8 +32,8 @@
 
 ### ✨ Added
 
-- **Round Change AVS Override Validation**: GM prompted to accept/reject AVS changes for manual overrides each round
-  - **Unified table view**: Shows all override relationships (Observer → Target) in round change mode
+- **Turn Change AVS Override Validation**: GM prompted to accept/reject AVS changes for manual overrides each turn
+  - **Unified table view**: Shows all override relationships (Observer → Target) in turn change mode
   - **Automatic visibility calculation**: Displays current visibility AVS wants to apply vs manual override
   - **Cover calculation**: Shows cover changes (none/lesser/standard/greater) AVS wants to apply
   - **Deduplication**: Each observer-target pair shown once regardless of combatant order
@@ -48,14 +48,14 @@
   - `clearAllAVSOverrides`: Now accepts optional token/array to reset specific tokens
   - `hasAVSOverrides`: Check if token has any AVS overrides (as observer or target)
   - `getAVSOverrides`: Get all overrides involving token with names, images, states
-- **Combat hooks**: Added `checkAvsOverrides()` on round change
+- **Combat hooks**: Added `checkAvsOverrides()` on turn change
   - Checks all combatants for AVS overrides
   - Calculates current visibility using `calculateVisibilityWithoutOverrides()`
   - Calculates current cover using `CoverDetector.detectFromPoint()`
   - Deduplicates overrides using Map with observer-target key
 - **Dialog integration**: Reuses existing `OverrideValidationIndicator` and `OverrideValidationDialog`
-  - Added `isRoundChange` flag for different UI/messaging
-  - Unified table layout for round change mode
+  - Added `isTurnChange` flag for different UI/messaging
+  - Unified table layout for turn change mode
   - Observer/Target columns with tooltips explaining relationships
 
 ## [5.6.1] - 2026-01-27
