@@ -33,6 +33,45 @@
       "VISIBILITY_TAB": "Widoczność",
       "COVER_TAB": "Osłona"
     },
+    "TIMED_OVERRIDE": {
+      "DIALOG_TITLE": "Zastosuj czasowe nadpisanie",
+      "TOKEN_LABEL": "Token",
+      "NEW_STATE_LABEL": "Nowy stan",
+      "DURATION": "Czas trwania",
+      "ROUNDS": "Rundy",
+      "ROUND": "Runda",
+      "MINUTES": "Minuty",
+      "MINUTE": "Minuta",
+      "FOREVER": "Na zawsze",
+      "CUSTOM": "Niestandardowe",
+      "ROUND_TIMING": "Czas trwania rundy",
+      "EXPIRES_AT": "Wygasa o",
+      "START_OF_TURN": "Start",
+      "END_OF_TURN": "Koniec",
+      "OF": "z",
+      "OF_TURN": "tury {name}",
+      "APPLY_NOW": "Zastosuj teraz",
+      "APPLY_FOR_DURATION": "Zastosuj na okres...",
+      "ACTIVE_TIMER": "Aktywny licznik czasu",
+      "ACTIVE_TIMERS": "Aktywne czasowe nadpisania",
+      "REMAINING": "Pozostało",
+      "CANCEL_TIMER": "Anuluj licznik czasu",
+      "ROUNDS_REMAINING": "{count} rund(a)",
+      "TIME_REMAINING": "{time}",
+      "TIMER_TOOLTIP": "Wygaśnięcie nadpisania: {remaining}",
+      "TIMER_EXPIRED_NOTIFICATION": "Czasowe nadpisanie dla {target} wygasło",
+      "TIMER_CANCELLED": "Licznik czasu anulowany",
+      "NO_COMBAT_FOR_ROUNDS": "Brak aktywnej walki – nie można używać czasu trwania opartego na rundach.",
+      "NO_DURATION_SELECTED": "Najpierw wybierz czas trwania",
+      "PRESET_1_ROUND": "1 runda",
+      "PRESET_3_ROUNDS": "3 rundy",
+      "PRESET_5_ROUNDS": "5 rund",
+      "PRESET_1_MIN": "1 Min",
+      "PRESET_5_MIN": "5 Min",
+      "APPLY_BUTTON": "Zastosuj",
+      "CANCEL_BUTTON": "Anuluj",
+      "SET_DURATION_FOR_ROW": "Ustaw czas trwania tego nadpisania"
+    },
     "VISIBILITY_STATES": {
       "avs": "AVS",
       "observed": "Obserwowany",
@@ -672,6 +711,10 @@
       "AVS_OVERRIDE_VALIDATION_ON_TURN_CHANGE": {
         "name": "Sprawdź poprawność nadpisania AVS przy zmianie tury",
         "hint": "Po włączeniu tej opcji system będzie sprawdzał wszystkie nadpisania AVS na początku każdej tury i wyświetlał wskaźnik walidacji, jeśli jakiekolwiek nadpisania są aktywne. Pomaga to zapewnić dokładność nadpisów w miarę postępu walki."
+      },
+      "AVS_SKIP_TIMED_OVERRIDE_VALIDATION": {
+        "name": "Pomiń sprawdzanie nadpisania czasowego",
+        "hint": "Po włączeniu tej opcji nadpisania z aktywnymi licznikami czasu są one wykluczane z kontroli poprawności zmiany rundy. Zapobiega to wyświetlaniu monitów o zmianie rundy w przypadku tymczasowych nadpisania, które jeszcze nie wygasły. Uwaga: Kontrola poprawności ruchu zawsze pomija nadpisania czasowe, niezależnie od tego ustawienia."
       },
       "COLORBLIND_MODE": {
         "name": "Tryb dla osób z dysfunkcją widzenia barw",
