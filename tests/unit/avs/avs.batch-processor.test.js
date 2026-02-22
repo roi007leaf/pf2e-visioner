@@ -121,6 +121,20 @@ describe('BatchProcessor', () => {
         expect(typeof res.breakdown.pairsSkippedLOS).toBe('number');
     });
 
+    test('emits undetected updates when LOS blocked and prior visibility was observed', async () => {
+        processor.visionAnalyzer.hasLineOfSight.mockReturnValue(false);
+
+        const allTokens = global.canvas.tokens.placeables;
+        const changed = new Set(['A']);
+        const res = await processor.process(allTokens, changed, {});
+
+        expect(res.breakdown.pairsSkippedLOS).toBeGreaterThan(0);
+        const undetected = res.updates.filter(u => u.visibility === 'undetected');
+        expect(undetected.length).toBeGreaterThan(0);
+        expect(undetected.some(u => u.observer.document.id === 'A')).toBe(true);
+        expect(undetected.some(u => u.target.document.id === 'A')).toBe(true);
+    });
+
     test('respects active overrides to avoid calculation', async () => {
         // set override for A->B only
         getActiveOverride.mockImplementation((obs, tgt) => (obs === 'A' && tgt === 'B' ? { state: 'hidden' } : null));

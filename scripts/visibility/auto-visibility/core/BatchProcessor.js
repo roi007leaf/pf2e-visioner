@@ -225,7 +225,7 @@ export class BatchProcessor {
     // because token positions have changed and any precomputed LOS would be stale
     // ALSO: Skip when window is minimized because vision polygons aren't computed
     const precomputedLOS = new Map();
-    
+
     const isWindowMinimized = typeof document !== 'undefined' && document.hidden;
 
     if (calcOptions?.skipPrecomputedLOS || isWindowMinimized) {
@@ -328,18 +328,21 @@ export class BatchProcessor {
         .map((pt) => pt.token)
         .filter((t) => t?.document?.id && t.document.id !== changedTokenId);
 
-      // Optional client-side viewport filtering for relevant tokens
-      // Prefer the per-batch cached positions and quadtree for fast viewport filtering
-      const inView =
-        this.viewportFilterService.getTokenIdSet?.(64, index, (t) => getPos(t)) || null;
-      if (inView && inView.size > 0) {
-        relevantTokens = relevantTokens.filter((t) => inView.has(t.document.id));
+      // Optional client-side viewport filtering for relevant tokens.
+      // Skipped for movement batches: the destination room may be off-screen from the GM's
+      // viewport, so creatures there must still be included for correct recalculation.
+      if (!calcOptions?.skipViewportFilter) {
+        const inView =
+          this.viewportFilterService.getTokenIdSet?.(64, index, (t) => getPos(t)) || null;
+        if (inView && inView.size > 0) {
+          relevantTokens = relevantTokens.filter((t) => inView.has(t.document.id));
+        }
       }
 
       const potentialOthers = Math.max(0, allTokens.length - 1);
       const spatiallySkipped = Math.max(0, potentialOthers - relevantTokens.length);
       breakdown.pairsSkippedSpatial += spatiallySkipped * 2;
-      
+
       for (const otherToken of relevantTokens) {
         if (otherToken.document.id === changedTokenId) continue;
 
@@ -524,9 +527,17 @@ export class BatchProcessor {
           );
 
           if (!hasNonVisualSenses) {
-            // No LoS and no non-visual senses available - skip this pair
+            // No LoS and no non-visual senses - both directions must be undetected.
+            // Still apply updates if the original visibility was something other than undetected
+            // (e.g. player moved behind a wall → creature must transition observed → undetected).
             breakdown.pairsSkippedLOS++;
-            continue; // Skip to next pair instead of computing visibility
+            if (!hasOverride1 && originalVisibility1 !== 'undetected') {
+              updates.push({ observer: changedToken, target: otherToken, visibility: 'undetected' });
+            }
+            if (!hasOverride2 && originalVisibility2 !== 'undetected') {
+              updates.push({ observer: otherToken, target: changedToken, visibility: 'undetected' });
+            }
+            continue;
           }
           // Either has non-visual senses OR blocked LoS (will be undetected) - proceed with visibility calculation
         }

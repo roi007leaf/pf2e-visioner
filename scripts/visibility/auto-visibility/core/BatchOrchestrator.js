@@ -313,9 +313,17 @@ export class BatchOrchestrator {
     }
 
     // Prepare tokens and calculation options (moved before telemetry start to report viewport-filtered changed count)
-    const allTokens = this._getAllTokens().filter((t) => !this.exclusionManager.isExcludedToken(t));
+    // For movement batches, bypass viewport filtering so that tokens in the destination room
+    // (which may be off-screen from the GM's perspective) are included in visibility calculations.
+    // Without this, creatures in a newly-entered room are excluded and stay "undetected".
+    // Detect movement batches via movementSession (stop-timer path) or lastMovedTokenId (direct path).
+    const isMovementBatch = !!options.movementSession ||
+      !!(globalThis?.game?.pf2eVisioner?.lastMovedTokenId);
+    const allTokens = isMovementBatch
+      ? (canvas.tokens?.placeables || []).filter((t) => !this.exclusionManager.isExcludedToken(t))
+      : this._getAllTokens().filter((t) => !this.exclusionManager.isExcludedToken(t));
 
-    // Filter the changed set to tokens present in the current viewport set
+    // Filter the changed set to tokens present in allTokens
     const visibleIdSet = new Set();
     for (const t of allTokens) {
       const id = t?.document?.id;
@@ -363,6 +371,9 @@ export class BatchOrchestrator {
         // CRITICAL: Skip precomputed LOS if this batch is processing after movement
         // The precomputed LOS would be stale because tokens have moved
         skipPrecomputedLOS: !!options.movementSession,
+        // Skip viewport filter in BatchProcessor so off-screen tokens near the new
+        // position are still paired and recalculated (e.g. creatures in the destination room)
+        skipViewportFilter: isMovementBatch,
       };
 
       // Execute batch processing

@@ -188,6 +188,9 @@ export class ExclusionManager {
             const actor = token.actor;
             if (!actor) return false;
 
+            // Only exclude player characters (PCs), not NPCs
+            if (actor.type === 'character') return false;
+
             // HP based check (covers 0 or negative)
             const hpValue = actor.hitPoints?.value ?? actor.system?.attributes?.hp?.value;
             if (typeof hpValue === 'number' && hpValue <= 0) {
