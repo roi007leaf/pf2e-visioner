@@ -65,6 +65,9 @@ const SETTINGS_GROUPS = {
         'autoCoverIgnoreDead',
         'autoCoverAllowProneBlockers',
         'autoCoverIgnoreAllies',
+        'autoCoverIgnoreSmallerTokens',
+        'autoCoverIgnoreSameSizeTokens',
+        'autoCoverIgnoreLargerTokens',
       ],
     },
     {
@@ -182,6 +185,9 @@ class VisionerSettingsForm extends foundry.applications.api.ApplicationV2 {
           'autoCoverIgnoreDead',
           'autoCoverAllowProneBlockers',
           'autoCoverIgnoreAllies',
+          'autoCoverIgnoreSmallerTokens',
+          'autoCoverIgnoreSameSizeTokens',
+          'autoCoverIgnoreLargerTokens',
           'wallCoverStandardThreshold',
           'wallCoverAllowGreater',
           'wallCoverGreaterThreshold',
@@ -314,6 +320,9 @@ class VisionerSettingsForm extends foundry.applications.api.ApplicationV2 {
           'autoCoverIgnoreDead',
           'autoCoverAllowProneBlockers',
           'autoCoverIgnoreAllies',
+          'autoCoverIgnoreSmallerTokens',
+          'autoCoverIgnoreSameSizeTokens',
+          'autoCoverIgnoreLargerTokens',
           'wallCoverStandardThreshold',
           'wallCoverAllowGreater',
           'wallCoverGreaterThreshold',
@@ -520,6 +529,9 @@ export function registerSettings() {
         key === 'autoCoverIgnoreUndetected' ||
         key === 'autoCoverIgnoreDead' ||
         key === 'autoCoverIgnoreAllies' ||
+        key === 'autoCoverIgnoreSmallerTokens' ||
+        key === 'autoCoverIgnoreSameSizeTokens' ||
+        key === 'autoCoverIgnoreLargerTokens' ||
         key === 'autoCoverRespectIgnoreFlag' ||
         key === 'autoCoverAllowProneBlockers'
       ) {

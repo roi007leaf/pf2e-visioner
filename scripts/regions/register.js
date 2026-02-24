@@ -3,12 +3,14 @@
  */
 
 import { ConcealmentRegionBehavior } from './ConcealmentRegionBehavior.js';
+import { CoverRegionBehavior } from './CoverRegionBehavior.js';
 import { VisibilityRegionBehavior } from './VisibilityRegionBehavior.js';
 
 import { MODULE_ID } from '../constants.js';
 
 const visibilityBehaviorKey = `${MODULE_ID}.Pf2eVisionerVisibility`;
 const concealmentBehaviorKey = `${MODULE_ID}.Pf2eVisionerConcealment`;
+const coverBehaviorKey = `${MODULE_ID}.Pf2eVisionerCover`;
 
 function registerBehavior() {
   if (typeof CONFIG !== 'undefined' && CONFIG.RegionBehavior) {
@@ -19,6 +21,10 @@ function registerBehavior() {
     CONFIG.RegionBehavior.dataModels[concealmentBehaviorKey] = ConcealmentRegionBehavior;
     CONFIG.RegionBehavior.typeLabels[concealmentBehaviorKey] = 'PF2E_VISIONER.REGION_BEHAVIOR.TYPES.CONCEALMENT.label';
     CONFIG.RegionBehavior.typeIcons[concealmentBehaviorKey] = 'fa-solid fa-cloud';
+
+    CONFIG.RegionBehavior.dataModels[coverBehaviorKey] = CoverRegionBehavior;
+    CONFIG.RegionBehavior.typeLabels[coverBehaviorKey] = 'PF2E_VISIONER.REGION_BEHAVIOR.TYPES.COVER.label';
+    CONFIG.RegionBehavior.typeIcons[coverBehaviorKey] = 'fa-solid fa-shield-halved';
   }
 }
 

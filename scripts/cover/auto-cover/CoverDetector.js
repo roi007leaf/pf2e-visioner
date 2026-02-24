@@ -10,6 +10,7 @@ import {
   intersectsBetweenTokens,
   segmentRectIntersectionLength,
 } from '../../helpers/line-intersection.js';
+import { CoverRegionBehavior } from '../../regions/CoverRegionBehavior.js';
 import {
   getSizeRank,
   getTokenCorners,
@@ -118,6 +119,7 @@ export class CoverDetector {
       const hasWallsInTheWay = segmentAnalysis.hasBlockingTerrain;
 
       // NEW LOGIC: Priority based on wall presence
+      let calculatedCover;
       if (!hasWallsInTheWay) {
         // Case 1: No walls in the way - use token cover
         const intersectionMode = this._getIntersectionMode();
@@ -143,7 +145,7 @@ export class CoverDetector {
         // Apply Levels integration for elevation-based cover adjustment
         tokenCover = this._applyLevelsCoverAdjustment(attacker, target, tokenCover);
 
-        return tokenCover;
+        calculatedCover = tokenCover;
       } else {
         // Case 2: There IS a wall in the way - use new wall cover rules
         let wallCover = this._evaluateWallsCover(p1, p2, elevationRange);
@@ -151,8 +153,10 @@ export class CoverDetector {
         // Apply Levels integration for elevation-based cover adjustment
         wallCover = this._applyLevelsCoverAdjustment(attacker, target, wallCover);
 
-        return wallCover;
+        calculatedCover = wallCover;
       }
+
+      return this._applyRegionCover(p1, p2, calculatedCover);
     } catch (error) {
       console.error('PF2E Visioner | CoverDetector.detectForAttack error:', error);
       return 'none';
@@ -188,13 +192,20 @@ export class CoverDetector {
     const ignoreDead = !!game.settings?.get?.(MODULE_ID, 'autoCoverIgnoreDead');
     const ignoreAllies = !!game.settings?.get?.(MODULE_ID, 'autoCoverIgnoreAllies');
     const allowProneBlockers = !!game.settings?.get?.(MODULE_ID, 'autoCoverAllowProneBlockers');
+    const ignoreSmallerTokens = !!game.settings?.get?.(MODULE_ID, 'autoCoverIgnoreSmallerTokens');
+    const ignoreSameSizeTokens = !!game.settings?.get?.(MODULE_ID, 'autoCoverIgnoreSameSizeTokens');
+    const ignoreLargerTokens = !!game.settings?.get?.(MODULE_ID, 'autoCoverIgnoreLargerTokens');
 
     return {
       ignoreUndetected,
       ignoreDead,
       ignoreAllies,
       allowProneBlockers,
+      ignoreSmallerTokens,
+      ignoreSameSizeTokens,
+      ignoreLargerTokens,
       attackerAlliance: attacker?.actor?.alliance,
+      attackerSizeRank: getSizeRank(attacker),
     };
   }
 
@@ -294,6 +305,22 @@ export class CoverDetector {
     } catch (error) {
       console.warn('PF2E Visioner | Error applying Levels cover adjustment:', error);
       return baseCover;
+    }
+  }
+
+  _applyRegionCover(observerPoint, targetPoint, calculatedCover) {
+    try {
+      const regionCover = CoverRegionBehavior.getCoverBetween(observerPoint, targetPoint);
+      if (regionCover) {
+        const coverOrder = ['none', 'lesser', 'standard', 'greater'];
+        if (coverOrder.indexOf(regionCover) > coverOrder.indexOf(calculatedCover)) {
+          return regionCover;
+        }
+      }
+      return calculatedCover;
+    } catch (error) {
+      console.warn('PF2E Visioner | Error checking region cover:', error);
+      return calculatedCover;
     }
   }
 
@@ -1133,6 +1160,17 @@ export class CoverDetector {
       }
       if (filters.ignoreAllies && blocker.actor?.alliance === filters.attackerAlliance) {
         continue;
+      }
+      if (filters.ignoreSmallerTokens || filters.ignoreSameSizeTokens || filters.ignoreLargerTokens) {
+        const blockerRank = getSizeRank(blocker);
+        const attackerRank = filters.attackerSizeRank;
+        if (
+          (blockerRank < attackerRank && filters.ignoreSmallerTokens) ||
+          (blockerRank === attackerRank && filters.ignoreSameSizeTokens) ||
+          (blockerRank > attackerRank && filters.ignoreLargerTokens)
+        ) {
+          continue;
+        }
       }
 
       // Check size-based cover rules

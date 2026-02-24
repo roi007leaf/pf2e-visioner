@@ -1,5 +1,22 @@
 # Changelog
 
+## [7.0.0] - 2026-02-24
+
+### Added
+
+- **Token Size Cover Filter**: New settings to ignore tokens from providing Auto-Cover based on their size relative to the attacker
+  - Ignore Smaller Tokens — tokens smaller than the attacker won't provide cover
+  - Ignore Same Size Tokens — tokens the same size as the attacker won't provide cover
+  - Ignore Larger Tokens — tokens larger than the attacker won't provide cover
+
+- **Region Cover Behavior**: New region behavior that grants cover to tokens based on region placement, similar to AVS Concealment regions but for cover
+  - **Override Mode**: Tokens inside the region always have the configured cover level from any observer
+  - **Line of Sight Mode**: Cover applies when the line between observer and target crosses the region boundary, or when both tokens are inside
+  - **One Way Mode**: Cover only applies to tokens inside the region when observed from outside; tokens inside looking out get no cover
+  - Configurable cover level (Lesser, Standard, Greater) per region
+  - Can be enabled/disabled per region behavior
+  - Integrates with the auto-cover detection pipeline — region cover is combined with existing cover calculations, taking the highest
+
 ## [6.0.1] - 2026-02-24
 
 ### Fixed

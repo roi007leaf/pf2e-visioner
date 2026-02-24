@@ -929,6 +929,18 @@
         "name": "Ignore Dead Tokens",
         "hint": "Dead tokens will not provide Auto-Cover"
       },
+      "AUTO_COVER_IGNORE_SMALLER_TOKENS": {
+        "name": "Ignore Smaller Tokens",
+        "hint": "Tokens smaller than the attacker will not provide Auto-Cover"
+      },
+      "AUTO_COVER_IGNORE_SAME_SIZE_TOKENS": {
+        "name": "Ignore Same Size Tokens",
+        "hint": "Tokens the same size as the attacker will not provide Auto-Cover"
+      },
+      "AUTO_COVER_IGNORE_LARGER_TOKENS": {
+        "name": "Ignore Larger Tokens",
+        "hint": "Tokens larger than the attacker will not provide Auto-Cover"
+      },
       "AUTO_COVER_IGNORE_ALLIES": {
         "name": "Ignore Ally Tokens",
         "hint": "Ally tokens will not provide Auto-Cover"
@@ -1333,6 +1345,9 @@
         "CONCEALMENT": {
           "label": "AVS Concealment"
         },
+        "COVER": {
+          "label": "Region Cover"
+        },
         "VISIBILITY": {
           "label": "Visioner Visibility"
         }
@@ -1352,6 +1367,21 @@
       "CONCEALMENT_ENABLED": {
         "label": "Enable Concealment",
         "hint": "If enabled, rays that cross this region's boundaries will grant concealment to the target"
+      },
+      "COVER_ENABLED": {
+        "label": "Enable Cover",
+        "hint": "If enabled, this region will grant cover based on the configured mode"
+      },
+      "COVER_LEVEL": {
+        "label": "Cover Level",
+        "hint": "The level of cover granted by this region"
+      },
+      "COVER_MODE": {
+        "label": "Cover Mode",
+        "hint": "How cover is determined for this region",
+        "override": "Override - Tokens inside always have cover",
+        "lineOfSight": "Line of Sight - Cover when ray crosses boundary or both inside",
+        "oneWay": "One Way - Cover only for tokens inside when viewed from outside"
       },
       "VISIBILITY_UPDATED": "Region visibility updated for {count} token relationships",
       "UPDATE_ERROR": "Failed to update region visibility relationships"

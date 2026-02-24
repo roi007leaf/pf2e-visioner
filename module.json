@@ -9,7 +9,7 @@
       "flags": {}
     }
   ],
-  "version": "6.0.1",
+  "version": "7.0.0",
   "compatibility": {
     "minimum": "13.341",
     "verified": "13.350"
@@ -92,7 +92,8 @@
   "documentTypes": {
     "RegionBehavior": {
       "Pf2eVisionerVisibility": {"label": "PF2E_VISIONER.REGION_BEHAVIOR.TYPES.VISIBILITY.label"},
-      "Pf2eVisionerConcealment": {"label": "PF2E_VISIONER.REGION_BEHAVIOR.TYPES.CONCEALMENT.label"}
+      "Pf2eVisionerConcealment": {"label": "PF2E_VISIONER.REGION_BEHAVIOR.TYPES.CONCEALMENT.label"},
+      "Pf2eVisionerCover": {"label": "PF2E_VISIONER.REGION_BEHAVIOR.TYPES.COVER.label"}
     }
   },
   "socket": true,
