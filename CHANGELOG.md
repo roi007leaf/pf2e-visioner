@@ -1,5 +1,11 @@
 # Changelog
 
+## [6.0.1] - 2026-02-24
+
+### Fixed
+
+- **Sneak "Apply Changes" ignoring start state and cover/concealment**: Clicking "Apply Changes" directly now correctly accounts for whether the token started hidden/undetected and whether they ended in cover or concealment, matching the behaviour of "Open Sneak Results" → "Apply All Changes".
+
 ## [6.0.0] - 2026-01-23
 
 ### ✨ Added

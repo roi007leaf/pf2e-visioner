@@ -60,10 +60,89 @@ export class SneakActionHandler extends ActionHandlerBase {
       for (const subject of subjects) {
         outcomes.push(await this.analyzeOutcome(actionData, subject));
       }
-      return outcomes.filter(Boolean);
+      const result = outcomes.filter(Boolean);
+
+      // Apply start-state qualifications from stored sneakStartStates flags.
+      // Without this, analyzeOutcome falls back to standard logic using the current
+      // (post-movement) visibility, ignoring whether the token started hidden/undetected
+      // or ended in cover — producing incorrect results for the direct "Apply Changes" path.
+      await this._enrichOutcomesWithStartStates(actionData, result);
+
+      return result;
     } catch (error) {
       console.error('PF2E Visioner | Error getting cached outcomes:', error);
       return [];
+    }
+  }
+
+  /**
+   * Applies start-state-based position qualification to outcomes that lack position data.
+   * Mirrors the logic in SneakPreviewDialog._captureCurrentEndPositionsForOutcomes /
+   * _prepareContext so that "Apply Changes" produces the same result as the dialog path.
+   * @param {Object} actionData
+   * @param {Array} outcomes
+   * @private
+   */
+  async _enrichOutcomesWithStartStates(actionData, outcomes) {
+    try {
+      const message = actionData?.message || game.messages.get(actionData?.messageId);
+      const sneakStartStates = message?.flags?.['pf2e-visioner']?.sneakStartStates;
+      if (!sneakStartStates || !Object.keys(sneakStartStates).length) return;
+
+      const sneakingToken = this._getSneakingToken(actionData);
+      if (!sneakingToken) return;
+
+      const allowExtendedEndStates =
+        game.settings?.get?.('pf2e-visioner', 'sneakAllowHiddenUndetectedEndPosition') ?? false;
+      const { getDefaultNewStateFor } = await import('../data/action-state-config.js');
+      const { getCoverBetween } = await import('../../../utils.js');
+
+      for (const outcome of outcomes) {
+        if (!outcome?.token) continue;
+        // Skip if analyzeOutcome already produced position-aware results
+        if (outcome.positionTransition) continue;
+
+        const observerId = outcome.token?.document?.id || outcome.token?.id;
+        const startState = sneakStartStates[observerId];
+        if (!startState) continue;
+
+        const startVisibility = startState.visibility || 'observed';
+
+        // Start prerequisite: must have been hidden or undetected when sneak began
+        const startQualifies = startVisibility === 'hidden' || startVisibility === 'undetected';
+
+        // End prerequisite: must be in cover or concealed at current position
+        let endCoverState = 'none';
+        let endVisibility = outcome.currentVisibility || 'observed';
+        try {
+          endCoverState = getCoverBetween(outcome.token, sneakingToken) || 'none';
+          if (endCoverState === 'none' && this.autoCoverSystem?.isEnabled?.()) {
+            endCoverState =
+              this.stealthCheckUseCase?._detectCover?.(outcome.token, sneakingToken) || 'none';
+          }
+        } catch { }
+
+        const endQualifies =
+          endCoverState === 'standard' ||
+          endCoverState === 'greater' ||
+          endVisibility === 'concealed' ||
+          (allowExtendedEndStates &&
+            (endVisibility === 'hidden' || endVisibility === 'undetected'));
+
+        // Correct oldVisibility to reflect the actual state at sneak start
+        outcome.oldVisibility = startVisibility;
+
+        if (!startQualifies || !endQualifies) {
+          outcome.newVisibility = 'avs';
+        } else {
+          const newVis = getDefaultNewStateFor('sneak', startVisibility, outcome.outcome);
+          if (newVis) outcome.newVisibility = newVis;
+        }
+
+        outcome.changed = outcome.newVisibility !== outcome.currentVisibility;
+      }
+    } catch (e) {
+      console.warn('PF2E Visioner | Error enriching outcomes with start states:', e);
     }
   }
 
