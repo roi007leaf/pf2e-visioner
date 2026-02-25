@@ -4,7 +4,7 @@
 
 ### Fixed
 
-- **Huge/Gargantuan tokens getting greater cover from walls with Levels module**: Tokens with different physical heights (e.g. huge vs medium) at the same floor elevation were triggering Levels elevation-based cover adjustments, bypassing the "Walls Allow Greater Cover" setting. Fixed by using floor elevation for the threshold check and removing Levels elevation adjustment from the wall cover path entirely.
+- **Huge/Gargantuan tokens getting greater cover from walls with Levels module**: Levels elevation adjustment in the wall cover path could upgrade cover to 'greater', bypassing the "Walls Allow Greater Cover" setting. Wall cover is now capped at 'standard' after Levels adjustment when the setting is disabled.
 
 ## [7.0.0] - 2026-02-24
 
