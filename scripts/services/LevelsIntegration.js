@@ -203,9 +203,11 @@ class LevelsIntegration {
     if (!this._isLevelsActive) return baseCoverLevel;
 
     try {
-      const elevationDiff = this.getElevationDifference(observer, target);
+      const observerFloorElev = this.getTokenElevation(observer);
+      const targetFloorElev = this.getTokenElevation(target);
+      const floorElevDiff = Math.abs(targetFloorElev - observerFloorElev);
 
-      if (Math.abs(elevationDiff) < 5) {
+      if (floorElevDiff < 5) {
         return baseCoverLevel;
       }
 

@@ -336,7 +336,9 @@ describe('LevelsIntegration', () => {
       };
       levelsIntegration.initialize();
 
+      mockToken1.document.elevation = 15;
       mockToken1.losHeight = 15;
+      mockToken2.document.elevation = 0;
       mockToken2.losHeight = 0;
 
       const result = levelsIntegration.adjustCoverForElevation(
@@ -354,12 +356,35 @@ describe('LevelsIntegration', () => {
       };
       levelsIntegration.initialize();
 
+      mockToken1.document.elevation = 15;
       mockToken1.losHeight = 15;
+      mockToken2.document.elevation = 0;
       mockToken2.losHeight = 0;
 
       const result = levelsIntegration.adjustCoverForElevation(mockToken1, mockToken2, 'none');
       expect(result).toBe('none');
     });
+
+    test('does not trigger elevation adjustment for huge/gargantuan tokens at same floor level', () => {
+      game.modules.get('levels').active = true;
+      CONFIG.Levels = {
+        API: { testCollision: jest.fn().mockReturnValue(true) },
+      };
+      levelsIntegration.initialize();
+
+      mockToken1.document.elevation = 0;
+      mockToken1.losHeight = 7.5;
+      mockToken2.document.elevation = 0;
+      mockToken2.losHeight = 2.5;
+
+      const result = levelsIntegration.adjustCoverForElevation(
+        mockToken1,
+        mockToken2,
+        'standard',
+      );
+      expect(result).toBe('standard');
+    });
+
   });
 
   describe('Debug Info', () => {
