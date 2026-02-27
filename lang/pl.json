@@ -929,6 +929,18 @@
         "name": "Ignoruj martwe tokeny",
         "hint": "Martwe tokeny nie zapewniają automatycznej osłony."
       },
+      "AUTO_COVER_IGNORE_SMALLER_TOKENS": {
+        "name": "Ignoruj mniejsze tokeny",
+        "hint": "Tokeny mniejsze od atakującego nie zapewniają automatycznej osłony"
+      },
+      "AUTO_COVER_IGNORE_SAME_SIZE_TOKENS": {
+        "name": "Ignoruj tokeny tego samego rozmiaru",
+        "hint": "Tokeny tej samej wielkości co atakujący nie zapewniają automatycznej osłony."
+      },
+      "AUTO_COVER_IGNORE_LARGER_TOKENS": {
+        "name": "Ignoruj większe tokeny",
+        "hint": "Tokeny większe od atakującego nie zapewniają automatycznej osłony"
+      },
       "AUTO_COVER_IGNORE_ALLIES": {
         "name": "Ignoruj tokeny sojuszników",
         "hint": "Tokeny sojusznicze nie zapewniają automatycznej osłony."
@@ -1333,6 +1345,9 @@
         "CONCEALMENT": {
           "label": "Ukrywanie AVS"
         },
+        "COVER": {
+          "label": "Osłona strefy"
+        },
         "VISIBILITY": {
           "label": "Widoczność Visioner'a"
         }
@@ -1352,6 +1367,21 @@
       "CONCEALMENT_ENABLED": {
         "label": "Włącz przysłanianie",
         "hint": "Jeśli opcja jest włączona, promienie przekraczające granice tego obszaru zapewnią przysłonięcie celowi."
+      },
+      "COVER_ENABLED": {
+        "label": "Włącz osłonę",
+        "hint": "Jeśli opcja jest włączona, strefa ta zapewni osłonę zgodnie z skonfigurowanym trybem."
+      },
+      "COVER_LEVEL": {
+        "label": "Poziom osłony",
+        "hint": "Poziom osłony zapewniany przez tą strefę"
+      },
+      "COVER_MODE": {
+        "label": "Tryb osłony",
+        "hint": "Jak ustalana jest osłona dla tej strefy",
+        "override": "Zastąpienie – tokeny wewnątrz zawsze mają osłonę",
+        "lineOfSight": "Linia wzroku – osłona, gdy promień przekracza granicę lub znajduje się wewnątrz",
+        "oneWay": "Jednokierunkowy – osłona tylko dla tokenów wewnątrz, patrząc od zewnątrz"
       },
       "VISIBILITY_UPDATED": "Widoczność regionu zaktualizowana dla {count} relacji tokenów",
       "UPDATE_ERROR": "Nie udało się zaktualizować relacji widoczności regionu."
