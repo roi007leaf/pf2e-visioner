@@ -551,6 +551,18 @@
             "AVS_SKIP_TIMED_OVERRIDE_VALIDATION": {
                 "name": "跳过定时状态覆写验证",
                 "hint": "若启用，具有激活定时器的状态覆写将不会纳入回合变换验证检测范围。这样可以避免在临时状态覆写尚未过期的情况下出现回合变换提示。注意：无论此设置如何，移动验证总是会跳过具有定时器的状态覆写。"
+            },
+            "AUTO_COVER_IGNORE_SMALLER_TOKENS": {
+                "name": "忽略更小体型的指示物",
+                "hint": "体型小于攻击者的指示物将不会提供自动掩蔽"
+            },
+            "AUTO_COVER_IGNORE_SAME_SIZE_TOKENS": {
+                "name": "忽略相同体型的指示物",
+                "hint": "体型与攻击者相同的指示物将不会提供自动掩蔽"
+            },
+            "AUTO_COVER_IGNORE_LARGER_TOKENS": {
+                "name": "忽略更大体型的指示物",
+                "hint": "体型大于攻击者的指示物将不会提供自动掩蔽"
             }
         },
         "UI": {
@@ -877,11 +889,29 @@
                 },
                 "CONCEALMENT": {
                     "label": "自动能见度隐蔽区域"
+                },
+                "COVER": {
+                    "label": "区域掩蔽"
                 }
             },
             "CONCEALMENT_ENABLED": {
                 "hint": "若启用，穿过该区域边界的光线将使目标获得隐蔽",
-                "label": "启用隐蔽区域"
+                "label": "启用区域隐蔽"
+            },
+            "COVER_ENABLED": {
+                "label": "启用区域掩蔽",
+                "hint": "若启用，该区域将基于所配置的模式提供掩蔽"
+            },
+            "COVER_LEVEL": {
+                "label": "掩蔽等级",
+                "hint": "该区域所提供的掩蔽等级"
+            },
+            "COVER_MODE": {
+                "label": "掩蔽模式",
+                "override": "覆写 - 区域内的指示物始终具备掩蔽",
+                "lineOfSight": "视觉线 - 视线穿过区域边界或二者均在内部时提供掩蔽",
+                "oneWay": "单向 - 从外部观察时则仅对区域内部指示物提供掩蔽",
+                "hint": "该区域的掩蔽是如何确定的"
             }
         },
         "SENSES": {
