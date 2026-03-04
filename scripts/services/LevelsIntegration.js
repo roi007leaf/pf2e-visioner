@@ -203,9 +203,9 @@ class LevelsIntegration {
     if (!this._isLevelsActive) return baseCoverLevel;
 
     try {
-      const elevationDiff = this.getElevationDifference(observer, target);
+      const elevationDiff = Math.abs(this.getElevationDifference(observer, target));
 
-      if (Math.abs(elevationDiff) < 5) {
+      if (elevationDiff < 5) {
         return baseCoverLevel;
       }
 

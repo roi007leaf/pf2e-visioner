@@ -6,6 +6,12 @@
 
 - **Thoughtsense**: New sense that detects creatures with minds as an imprecise sense. Has no effect on mindless creatures or objects (constructs). Undead without the mindless trait are detected; mindless undead are not. Shows a purple border indicator on system-hidden tokens, matching the lifesense indicator style.
 
+## [7.0.1] - 2026-02-25
+
+### Fixed
+
+- **Huge/Gargantuan tokens getting greater cover from walls with Levels module**: Levels elevation adjustment in the wall cover path could upgrade cover to 'greater', bypassing the "Walls Allow Greater Cover" setting. Wall cover is now capped at 'standard' after Levels adjustment when the setting is disabled.
+
 ## [7.0.0] - 2026-02-24
 
 ### Added

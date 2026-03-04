@@ -150,8 +150,12 @@ export class CoverDetector {
         // Case 2: There IS a wall in the way - use new wall cover rules
         let wallCover = this._evaluateWallsCover(p1, p2, elevationRange);
 
-        // Apply Levels integration for elevation-based cover adjustment
         wallCover = this._applyLevelsCoverAdjustment(attacker, target, wallCover);
+
+        const allowGreater = !!game.settings.get('pf2e-visioner', 'wallCoverAllowGreater');
+        if (!allowGreater && wallCover === 'greater') {
+          wallCover = 'standard';
+        }
 
         calculatedCover = wallCover;
       }
