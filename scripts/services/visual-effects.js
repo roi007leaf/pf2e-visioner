@@ -1322,9 +1322,11 @@ export async function updateSystemHiddenTokenHighlights(
     const observerSenses = observer.actor?.system?.perception?.senses || [];
 
     const lifesenseSense = observerSenses.find?.((sense) => sense.type === 'lifesense');
+    const thoughtsenseSense = observerSenses.find?.((sense) => sense.type === 'thoughtsense');
 
     const observerHasLifesense = !!lifesenseSense;
     const lifesenseIsPrecise = lifesenseSense?.acuity === 'precise';
+    const observerHasThoughtsense = !!thoughtsenseSense;
 
     // Check if observer has both blinded and deafened conditions
     const observerIsBlinded = observer.actor?.hasCondition?.('blinded') ?? false;
@@ -1344,9 +1346,10 @@ export async function updateSystemHiddenTokenHighlights(
     // All other tokens should show an indicator because they are effectively undetectable
     // (no precise or imprecise senses can work)
     const isUsingLifesense = observerHasLifesense;
+    const isUsingThoughtsense = observerHasThoughtsense;
     const showingBlindDeafIndicators = observerIsBlindAndDeaf;
 
-    if (!isUsingLifesense && !showingBlindDeafIndicators) {
+    if (!isUsingLifesense && !isUsingThoughtsense && !showingBlindDeafIndicators) {
       for (const token of tokens) {
         try {
           if (token._pvSystemHiddenIndicator) {
@@ -1430,6 +1433,9 @@ export async function updateSystemHiddenTokenHighlights(
       const canBeDetectedByLifesense = visibilityCalculatorInternal.canLifesenseDetect({
         traits: targetTraits,
       });
+      const canBeDetectedByThoughtsense = visibilityCalculatorInternal.canThoughtsenseDetect({
+        traits: targetTraits,
+      });
 
       // Check if token is within lifesense range
       // Use document positions to ensure we have the latest coordinates
@@ -1443,6 +1449,7 @@ export async function updateSystemHiddenTokenHighlights(
       const targetCenterY = token.document.y + (token.document.height * canvas.grid.size) / 2;
 
       const lifesenseRange = lifesenseSense?.range ?? 0;
+      const thoughtsenseRange = thoughtsenseSense?.range ?? 0;
 
       // Calculate distance in feet
       let distanceInFeet;
@@ -1458,6 +1465,7 @@ export async function updateSystemHiddenTokenHighlights(
       }
 
       const isWithinLifesenseRange = lifesenseRange === Infinity || distanceInFeet <= lifesenseRange;
+      const isWithinThoughtsenseRange = thoughtsenseRange === Infinity || distanceInFeet <= thoughtsenseRange;
 
       // Check the actual visibility state for blind+deaf logic
       let isHiddenFromObserver = false;
@@ -1470,10 +1478,12 @@ export async function updateSystemHiddenTokenHighlights(
 
       // Determine if indicator should show
       // For lifesense: show if system-hidden, detectable by lifesense, and within range
+      // For thoughtsense: show if system-hidden, detectable by thoughtsense, and within range
       // For blind+deaf: show when token is hidden/concealed/undetected from the blind+deaf observer
       const shouldShowLifesenseIndicator = isSystemHidden && canBeDetectedByLifesense && isWithinLifesenseRange;
+      const shouldShowThoughtsenseIndicator = isSystemHidden && canBeDetectedByThoughtsense && isWithinThoughtsenseRange;
       const shouldShowBlindDeafIndicator = showingBlindDeafIndicators && isHiddenFromObserver;
-      const shouldShowIndicator = shouldShowLifesenseIndicator || shouldShowBlindDeafIndicator;
+      const shouldShowIndicator = shouldShowLifesenseIndicator || shouldShowThoughtsenseIndicator || shouldShowBlindDeafIndicator;
 
       // If indicator exists but shouldn't, remove it
       if (token._pvSystemHiddenIndicator && !shouldShowIndicator) {
@@ -1532,8 +1542,8 @@ export async function updateSystemHiddenTokenHighlights(
             const targetToken = canvas.tokens.get(token.document.id);
             const isTargeted = targetToken?.isTargeted ?? false;
 
-            // Different base color for blind+deaf indicators (gray/dark) vs lifesense (cyan)
-            let color = showingBlindDeafIndicators ? 0x555555 : 0x00d4ff;
+            // Different base color per indicator type
+            let color = showingBlindDeafIndicators ? 0x555555 : shouldShowThoughtsenseIndicator ? 0x9400d3 : 0x00d4ff;
 
             if (isTargeted) {
               const disposition = token.document.disposition ?? CONST.TOKEN_DISPOSITIONS.NEUTRAL;
@@ -1549,7 +1559,7 @@ export async function updateSystemHiddenTokenHighlights(
                   color = 0xffa500;
                   break;
                 default:
-                  color = showingBlindDeafIndicators ? 0x555555 : 0x00d4ff;
+                  color = showingBlindDeafIndicators ? 0x555555 : shouldShowThoughtsenseIndicator ? 0x9400d3 : 0x00d4ff;
               }
             }
 
@@ -1877,7 +1887,8 @@ export async function updateSystemHiddenTokenHighlights(
               const targetToken = canvas.tokens.get(token.document.id);
               const isTargeted = targetToken?.isTargeted ?? false;
 
-              let animColor = 0x00d4ff;
+              const baseAnimColor = shouldShowThoughtsenseIndicator ? 0x9400d3 : 0x00d4ff;
+              let animColor = baseAnimColor;
               if (isTargeted) {
                 const disposition = token.document.disposition ?? CONST.TOKEN_DISPOSITIONS.NEUTRAL;
 
@@ -1892,7 +1903,7 @@ export async function updateSystemHiddenTokenHighlights(
                     animColor = 0xffa500;
                     break;
                   default:
-                    animColor = 0x00d4ff;
+                    animColor = baseAnimColor;
                 }
               }
 

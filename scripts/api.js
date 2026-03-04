@@ -965,6 +965,17 @@ export class Pf2eVisionerApi {
         slugs.push('lifesense');
       }
 
+      // Thoughtsense detection
+      if (detection.thoughtsense) {
+        const acuity = getSenseAcuity('thoughtsense');
+        reasons.push(
+          game.i18n.format('PF2E_VISIONER.VISIBILITY_FACTORS.REASONS.DETECTED_BY_THOUGHTSENSE', {
+            acuity: acuity,
+          }),
+        );
+        slugs.push('thoughtsense');
+      }
+
       // Tremorsense detection
       if (detection.tremorsense) {
         const acuity = getSenseAcuity('tremorsense');
@@ -990,6 +1001,7 @@ export class Pf2eVisionerApi {
               'greater-darkvision',
               'lifesense',
               'tremorsense',
+              'thoughtsense',
             ].includes(senseType)
           ) {
             if (sense.range > 0 && distance <= sense.range) {

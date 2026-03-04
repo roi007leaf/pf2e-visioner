@@ -47,6 +47,9 @@ const SENSE_TYPE_ALIASES = {
     'lifesense': 'lifesense',
     'life-sense': 'lifesense',
 
+    'thoughtsense': 'thoughtsense',
+    'thought-sense': 'thoughtsense',
+
     'hearing': 'hearing',
 
     'see-invisibility': 'see-invisibility',

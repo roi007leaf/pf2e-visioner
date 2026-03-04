@@ -247,6 +247,19 @@ function canLifesenseDetect(target) {
 }
 
 /**
+ * Check if thoughtsense can detect the target based on creature traits
+ * @param {Object} target - Target state
+ * @returns {boolean} Whether thoughtsense can detect this target
+ */
+function canThoughtsenseDetect(target) {
+  const { traits } = target;
+  const isMindless = traits.includes('mindless');
+  const isConstruct = traits.includes('construct');
+  const isOoze = traits.includes('ooze');
+  return !isMindless && !isConstruct && !isOoze;
+}
+
+/**
  * Select the best detection result from multiple sense detection results
  * Priority: observed (precise senses) > concealed > hidden (imprecise senses) > undetected
  * When states are equal, prefer visual senses over non-visual senses (vision is primary)
@@ -395,6 +408,19 @@ function checkPreciseNonVisualSenses(observer, target, soundBlocked = false) {
           detection: {
             isPrecise: true,
             sense: SenseType.LIFESENSE,
+          },
+        };
+      }
+      continue;
+    }
+
+    if (senseType === SenseType.THOUGHTSENSE) {
+      if (senseData && senseData.range > 0 && canThoughtsenseDetect(target)) {
+        return {
+          state: VisibilityState.OBSERVED,
+          detection: {
+            isPrecise: true,
+            sense: SenseType.THOUGHTSENSE,
           },
         };
       }
@@ -685,6 +711,17 @@ function checkImpreciseSenses(observer, target, soundBlocked = false) {
     });
   }
 
+  if (imprecise.thoughtsense && canThoughtsenseDetect(target)) {
+    workingSenses.push({
+      priority: 2,
+      state: VisibilityState.HIDDEN,
+      detection: {
+        isPrecise: false,
+        sense: SenseType.THOUGHTSENSE,
+      },
+    });
+  }
+
   // Scent: detects by smell, BYPASSES invisibility
   // No conditions or restrictions
   // Priority: 3
@@ -795,5 +832,6 @@ export const _internal = {
   checkImpreciseSenses,
   applyVisualModifiers,
   canLifesenseDetect,
+  canThoughtsenseDetect,
   selectBestDetection,
 };

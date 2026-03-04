@@ -1,5 +1,11 @@
 # Changelog
 
+## [7.1.0] - 2026-03-04
+
+### Added
+
+- **Thoughtsense**: New sense that detects creatures with minds as an imprecise sense. Has no effect on mindless creatures or objects (constructs). Undead without the mindless trait are detected; mindless undead are not. Shows a purple border indicator on system-hidden tokens, matching the lifesense indicator style.
+
 ## [7.0.0] - 2026-02-24
 
 ### Added
