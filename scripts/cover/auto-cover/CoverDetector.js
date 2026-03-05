@@ -110,7 +110,11 @@ export class CoverDetector {
       // FIRST: Check for wall cover overrides - these take precedence regardless of natural blocking
       const wallOverride = this._checkWallCoverOverrides(p1, p2, elevationRange);
       if (wallOverride !== null) {
-        const adjusted = this._applyLevelsCoverAdjustment(attacker, target, wallOverride);
+        let adjusted = this._applyLevelsCoverAdjustment(attacker, target, wallOverride);
+        const allowGreaterOverride = !!game.settings.get('pf2e-visioner', 'wallCoverAllowGreater');
+        if (!allowGreaterOverride && adjusted === 'greater') {
+          adjusted = 'standard';
+        }
         return adjusted;
       }
 
@@ -305,7 +309,14 @@ export class CoverDetector {
         return baseCover;
       }
 
-      return levelsIntegration.adjustCoverForElevation(attacker, target, baseCover);
+      const adjusted = levelsIntegration.adjustCoverForElevation(attacker, target, baseCover);
+      if (adjusted === 'greater' && baseCover !== 'greater') {
+        const allowGreater = !!game.settings.get('pf2e-visioner', 'wallCoverAllowGreater');
+        if (!allowGreater) {
+          return 'standard';
+        }
+      }
+      return adjusted;
     } catch (error) {
       console.warn('PF2E Visioner | Error applying Levels cover adjustment:', error);
       return baseCover;

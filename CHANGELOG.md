@@ -1,5 +1,14 @@
 # Changelog
 
+## [7.1.1] - 2026-03-05
+
+### Fixed
+
+- **AVS not updating on token movement**: Fixed a bug where AVS visibility recalculation was silently skipped when tokens moved. The animation detection check produced a false positive when `_animation` was null (no animation running), causing all position updates to be dropped without processing. This affected both player and GM token movements.
+- **Levels elevation cover bypassing "Walls Allow Greater Cover" setting**: Levels elevation adjustment could upgrade cover to 'greater' in both the wall override path and the general elevation adjustment path, bypassing the `wallCoverAllowGreater` setting. Both paths now cap at 'standard' when the setting is disabled.
+- **Levels distance calculation using wrong divisor**: The grid distance calculation in `LevelsIntegration` used `canvas.dimensions.distance` instead of `canvas.dimensions.size / canvas.dimensions.distance`, producing incorrect elevation-based cover results.
+- **Cover level roll options missing from ephemeral effects**: Auto-cover ephemeral effects and aggregated cover effects now include `self:cover-level:<state>` and `self:cover-bonus:<bonus>` roll options, enabling rule elements and predicates to check the active cover level.
+
 ## [7.1.0] - 2026-03-04
 
 ### Added

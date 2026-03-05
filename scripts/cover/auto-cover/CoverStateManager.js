@@ -5,6 +5,7 @@
 
 import { MODULE_ID } from '../../constants.js';
 import { getCoverBonusByState } from '../../helpers/cover-helpers.js';
+import { getCoverLevelRollOptions } from '../batch.js';
 
 export class CoverStateManager {
   /**
@@ -197,6 +198,7 @@ export class CoverStateManager {
               domain: 'all',
               option: `cover-against:${attacker.id}`,
             },
+            ...getCoverLevelRollOptions(state),
             {
               key: 'FlatModifier',
               selector: 'ac',

@@ -191,7 +191,7 @@ export class TokenEventHandler {
       const token = tokenDoc.object;
 
       // Check if token is currently animating or being dragged
-      const isAnimating = token?._animation?.state !== 'completed';
+      const isAnimating = token?._animation != null && token._animation.state !== 'completed';
       const isDragging = token?._dragHandle !== undefined && token?._dragHandle !== null;
 
       if (isAnimating || isDragging) {

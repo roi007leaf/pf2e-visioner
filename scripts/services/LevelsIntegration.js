@@ -97,7 +97,7 @@ class LevelsIntegration {
     const dy = p2.y - p1.y;
 
     const pixelDistance = Math.sqrt(dx ** 2 + dy ** 2);
-    const gridDistance = pixelDistance / canvas.dimensions.distance;
+    const gridDistance = pixelDistance / (canvas.dimensions.size / canvas.dimensions.distance);
 
     return gridDistance;
   }

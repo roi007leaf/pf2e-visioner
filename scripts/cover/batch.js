@@ -282,7 +282,7 @@ export async function batchUpdateCoverEffects(observerToken, targetUpdates, opti
               modified = true;
             }
             if (modified) {
-              const canonical = canonicalizeObserverRules(rules);
+              const canonical = ensureCoverLevelRules(canonicalizeObserverRules(rules), coverState);
               if (targetAggregate)
                 effectsToUpdate.push({ _id: targetAggregate.id, 'system.rules': canonical });
               else effectsToCreate.push(createAggregate(target, coverState, canonical, options));
@@ -420,15 +420,36 @@ function getBonus(state) {
 
 // Locking centralized in cover/utils.js via runWithCoverEffectLock
 
+export function getCoverLevelRollOptions(coverState) {
+  const bonus = getBonus(coverState);
+  if (bonus <= 0) return [];
+  return [
+    { key: 'RollOption', domain: 'all', option: `self:cover-level:${coverState}` },
+    { key: 'RollOption', domain: 'all', option: `self:cover-bonus:${bonus}` },
+  ];
+}
+
+export function ensureCoverLevelRules(rules, coverState) {
+  const levelOption = `self:cover-level:${coverState}`;
+  const bonusOption = `self:cover-bonus:${getBonus(coverState)}`;
+  const hasLevel = rules.some((r) => r?.key === 'RollOption' && r.option === levelOption);
+  const hasBonus = rules.some((r) => r?.key === 'RollOption' && r.option === bonusOption);
+  const result = [...rules];
+  if (!hasLevel) result.push({ key: 'RollOption', domain: 'all', option: levelOption });
+  if (!hasBonus) result.push({ key: 'RollOption', domain: 'all', option: bonusOption });
+  return result;
+}
+
 function createAggregate(target, coverState, rules, options) {
   const label = getCoverLabel(coverState);
   const img = getCoverImageForState(coverState);
+  const rulesWithCoverLevel = ensureCoverLevelRules(rules, coverState);
   return {
     name: label,
     type: 'effect',
     system: {
       description: { value: `<p>Aggregated ${label} vs multiple observers.</p>`, gm: '' },
-      rules,
+      rules: rulesWithCoverLevel,
       slug: null,
       traits: { otherTags: [], value: [] },
       level: { value: 1 },

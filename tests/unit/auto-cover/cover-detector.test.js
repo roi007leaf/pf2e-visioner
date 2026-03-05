@@ -163,4 +163,92 @@ describe('CoverDetector', () => {
       global.canvas.tokens = originalTokens;
     });
   });
+
+  describe('wallCoverAllowGreater caps Levels elevation cover', () => {
+    test('should cap Levels-upgraded greater cover to standard when wallCoverAllowGreater is false', () => {
+      const attacker = global.createMockToken({
+        id: 'attacker',
+        x: 0,
+        y: 0,
+        width: 1,
+        height: 1,
+        center: { x: 50, y: 50 },
+      });
+
+      const target = global.createMockToken({
+        id: 'target',
+        x: 200,
+        y: 200,
+        width: 1,
+        height: 1,
+        center: { x: 250, y: 250 },
+      });
+
+      global.canvas.walls.placeables = [];
+      global.canvas.tokens.placeables = [attacker, target];
+
+      const result = coverDetector._applyLevelsCoverAdjustment(attacker, target, 'standard');
+      expect(result).toBe('standard');
+    });
+
+    test('should cap to standard when Levels upgrades to greater and setting is false', () => {
+      const { LevelsIntegration } = require('../../../scripts/services/LevelsIntegration.js');
+      const instance = LevelsIntegration.getInstance();
+      jest.spyOn(instance, 'isActive', 'get').mockReturnValue(true);
+      jest.spyOn(instance, 'adjustCoverForElevation').mockReturnValue('greater');
+
+      const attacker = global.createMockToken({ id: 'attacker' });
+      const target = global.createMockToken({ id: 'target' });
+
+      global.game.settings.get = jest.fn((mod, setting) => {
+        if (setting === 'wallCoverAllowGreater') return false;
+        return false;
+      });
+
+      const result = coverDetector._applyLevelsCoverAdjustment(attacker, target, 'standard');
+      expect(result).toBe('standard');
+
+      LevelsIntegration._instance = null;
+    });
+
+    test('should allow Levels-upgraded greater cover when wallCoverAllowGreater is true', () => {
+      const { LevelsIntegration } = require('../../../scripts/services/LevelsIntegration.js');
+      const instance = LevelsIntegration.getInstance();
+      jest.spyOn(instance, 'isActive', 'get').mockReturnValue(true);
+      jest.spyOn(instance, 'adjustCoverForElevation').mockReturnValue('greater');
+
+      const attacker = global.createMockToken({ id: 'attacker' });
+      const target = global.createMockToken({ id: 'target' });
+
+      global.game.settings.get = jest.fn((mod, setting) => {
+        if (setting === 'wallCoverAllowGreater') return true;
+        return false;
+      });
+
+      const result = coverDetector._applyLevelsCoverAdjustment(attacker, target, 'standard');
+      expect(result).toBe('greater');
+
+      LevelsIntegration._instance = null;
+    });
+
+    test('should not cap when base cover was already greater', () => {
+      const { LevelsIntegration } = require('../../../scripts/services/LevelsIntegration.js');
+      const instance = LevelsIntegration.getInstance();
+      jest.spyOn(instance, 'isActive', 'get').mockReturnValue(true);
+      jest.spyOn(instance, 'adjustCoverForElevation').mockReturnValue('greater');
+
+      const attacker = global.createMockToken({ id: 'attacker' });
+      const target = global.createMockToken({ id: 'target' });
+
+      global.game.settings.get = jest.fn((mod, setting) => {
+        if (setting === 'wallCoverAllowGreater') return false;
+        return false;
+      });
+
+      const result = coverDetector._applyLevelsCoverAdjustment(attacker, target, 'greater');
+      expect(result).toBe('greater');
+
+      LevelsIntegration._instance = null;
+    });
+  });
 });
