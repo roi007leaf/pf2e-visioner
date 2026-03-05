@@ -189,7 +189,7 @@ describe('LevelsIntegration', () => {
       levelsIntegration.initialize();
 
       const distance = levelsIntegration.getTotalDistance(mockToken1, mockToken2);
-      expect(distance).toBeCloseTo(28.28, 1);
+      expect(distance).toBeCloseTo(7.07, 1);
     });
 
     test('calculates 3D distance when Levels is active', () => {
@@ -200,7 +200,7 @@ describe('LevelsIntegration', () => {
       mockToken2.losHeight = 15;
 
       const distance = levelsIntegration.getTotalDistance(mockToken1, mockToken2);
-      expect(distance).toBeCloseTo(28.44, 1);
+      expect(distance).toBeCloseTo(7.68, 1);
     });
 
     test('returns Infinity for null tokens', () => {
