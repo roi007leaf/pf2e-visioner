@@ -9,6 +9,7 @@ import {
   getCoverLabel,
 } from '../../../helpers/cover-helpers.js';
 import { getCoverBetween } from '../../../utils.js';
+import { getCoverLevelRollOptions } from '../../batch.js';
 import autoCoverSystem from '../AutoCoverSystem.js';
 import coverDetector from '../CoverDetector.js';
 import { BaseAutoCoverUseCase } from './BaseUseCase.js';
@@ -195,13 +196,15 @@ class AttackRollUseCase extends BaseAutoCoverUseCase {
             if (bonus > 0) {
               const label = getCoverLabel(chosen);
               const img = getCoverImageForState(chosen);
-              const effectRules = [];
-              effectRules.push({
-                key: 'FlatModifier',
-                selector: 'ac',
-                type: 'circumstance',
-                value: bonus,
-              });
+              const effectRules = [
+                ...getCoverLevelRollOptions(chosen),
+                {
+                  key: 'FlatModifier',
+                  selector: 'ac',
+                  type: 'circumstance',
+                  value: bonus,
+                },
+              ];
               const description = `<p>${label}: +${bonus} circumstance bonus to AC for this roll.</p>`;
               items.push({
                 name: label,
@@ -230,6 +233,7 @@ class AttackRollUseCase extends BaseAutoCoverUseCase {
                 dcObj.statistic = st;
               }
             }
+            this._injectCoverRollOptions(dctx, chosen, bonus);
           } catch (_) { }
         },
       );
@@ -363,7 +367,10 @@ class AttackRollUseCase extends BaseAutoCoverUseCase {
           value: `<p>${label}: +${bonus} circumstance bonus to AC for this roll.</p>`,
           gm: '',
         },
-        rules: [{ key: 'FlatModifier', selector: 'ac', type: 'circumstance', value: bonus }],
+        rules: [
+          ...getCoverLevelRollOptions(state),
+          { key: 'FlatModifier', selector: 'ac', type: 'circumstance', value: bonus },
+        ],
         traits: { otherTags: [], value: [] },
         level: { value: 1 },
         duration: { value: -1, unit: 'unlimited' },
@@ -416,14 +423,22 @@ class AttackRollUseCase extends BaseAutoCoverUseCase {
         dcObj.statistic = clonedStat;
       }
     }
+    this._injectCoverRollOptions(context, state, bonus);
   }
 
-  /**
-   * Resolve attacker from context
-   * @param {Object} ctx - Context object
-   * @returns {Object|null}
-   * @private
-   */
+  _injectCoverRollOptions(context, state, bonus) {
+    if (!context) return;
+    if (context.options instanceof Set) {
+      context.options.add(`target:cover-level:${state}`);
+      context.options.add(`target:cover-bonus:${bonus}`);
+    } else {
+      const optSet = new Set(Array.isArray(context.options) ? context.options : []);
+      optSet.add(`target:cover-level:${state}`);
+      optSet.add(`target:cover-bonus:${bonus}`);
+      context.options = Array.from(optSet);
+    }
+  }
+
   _resolveAttackerFromCtx(ctx) {
     try {
       // First try to get a token object directly

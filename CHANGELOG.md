@@ -1,5 +1,11 @@
 # Changelog
 
+## [7.1.2] - 2026-03-05
+
+### Fixed
+
+- **Cover roll options not appearing on attack rolls**: Cover roll options (`target:cover-level:<state>`, `target:cover-bonus:<bonus>`) were not injected into the attack roll's `context.options`, so they didn't appear in the Roll Inspector. Now injected via both the dialog callback and the ephemeral effect paths.
+
 ## [7.1.1] - 2026-03-05
 
 ### Fixed
