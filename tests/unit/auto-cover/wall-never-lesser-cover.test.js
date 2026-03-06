@@ -81,6 +81,40 @@ describe('Walls never grant lesser cover', () => {
     });
   });
 
+  describe('detectBetweenTokens wall path', () => {
+    test('should clamp lesser to standard when Levels downgrades wall cover', () => {
+      const attacker = global.createMockToken({
+        id: 'attacker',
+        x: 0, y: 0, width: 1, height: 1,
+        center: { x: 25, y: 25 },
+      });
+      const target = global.createMockToken({
+        id: 'target',
+        x: 4, y: 0, width: 1, height: 1,
+        center: { x: 225, y: 25 },
+      });
+
+      jest.spyOn(coverDetector, '_checkRuleElementCover').mockReturnValue(null);
+      jest.spyOn(coverDetector, '_checkWallCoverOverrides').mockReturnValue(null);
+      jest.spyOn(coverDetector, '_analyzeSegmentObstructions').mockReturnValue({
+        hasBlockingTerrain: true,
+        hasCreatures: false,
+        blockingWalls: [{ id: 'wall-1' }],
+        intersectingCreatures: [],
+        totalBlockedLength: 0,
+        segmentLength: 200,
+      });
+      jest.spyOn(coverDetector, '_evaluateWallsCover').mockReturnValue('standard');
+      jest.spyOn(coverDetector, '_applyLevelsCoverAdjustment').mockReturnValue('lesser');
+      jest.spyOn(coverDetector, '_applyRegionCover').mockImplementation((p1, p2, cover) => cover);
+
+      const result = coverDetector.detectBetweenTokens(attacker, target);
+
+      expect(result).not.toBe('lesser');
+      expect(result).toBe('standard');
+    });
+  });
+
   describe('_evaluateCoverByTactical', () => {
     test('should return standard (not lesser) when a wall blocks only 1 of 4 corner lines', () => {
       const attacker = global.createMockToken({

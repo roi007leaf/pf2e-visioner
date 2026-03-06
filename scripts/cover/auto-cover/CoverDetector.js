@@ -158,6 +158,10 @@ export class CoverDetector {
 
         wallCover = this._applyLevelsCoverAdjustment(attacker, target, wallCover);
 
+        if (wallCover === 'lesser') {
+          wallCover = 'standard';
+        }
+
         const allowGreater = !!game.settings.get('pf2e-visioner', 'wallCoverAllowGreater');
         if (!allowGreater && wallCover === 'greater') {
           wallCover = 'standard';
