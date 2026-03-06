@@ -1,5 +1,11 @@
 # Changelog
 
+## [7.1.3] - 2026-03-06
+
+### Fixed
+
+- **Walls with max height (Wall Height module) still providing cover when attacker is far above them**: When using Wall Height to set a max height on walls (e.g. 5ft), elevated attackers would still receive cover from those walls even when clearly shooting over them. The wall height check used a combined elevation envelope of both tokens instead of calculating the actual 3D line-of-sight elevation at the wall's intersection point. Now uses proper 3D interpolation — if the sight line passes above (or below) the wall at the point where it crosses, the wall is correctly ignored for cover and visibility.
+
 ## [7.1.2] - 2026-03-05
 
 ### Fixed

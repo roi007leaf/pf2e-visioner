@@ -98,6 +98,8 @@ describe('Wall Coverage Scenarios Integration', () => {
         attacker.center,
         target,
         { bottom: 0, top: 5 },
+        { bottom: 0, top: 5 },
+        { bottom: 0, top: 5 },
       );
     });
 

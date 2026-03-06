@@ -365,6 +365,8 @@ describe('Wall Coverage Percentage Calculation', () => {
         attackerPos,
         mockTarget,
         null,
+        null,
+        null,
       );
 
       // Restore original method

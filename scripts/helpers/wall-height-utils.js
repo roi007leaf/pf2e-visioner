@@ -54,10 +54,33 @@ export function doesWallBlockAtElevation(wallDocument, elevationRange) {
   if (rangeBottom >= wallTop) {
     return false;
   }
-  
+
   if (rangeTop <= wallBottom) {
     return false;
   }
-  
+
+  return true;
+}
+
+export function doesWallBlockLineOfSight(wallDocument, attackerSpan, targetSpan, t) {
+  const wallBounds = getWallElevationBounds(wallDocument);
+
+  if (!wallBounds) {
+    return true;
+  }
+
+  const sightBottom = attackerSpan.bottom + t * (targetSpan.bottom - attackerSpan.bottom);
+  const sightTop = attackerSpan.top + t * (targetSpan.top - attackerSpan.top);
+
+  const losBtm = Math.min(sightBottom, sightTop);
+  const losTop = Math.max(sightBottom, sightTop);
+
+  if (losBtm >= wallBounds.top) {
+    return false;
+  }
+  if (losTop <= wallBounds.bottom) {
+    return false;
+  }
+
   return true;
 }

@@ -280,4 +280,61 @@ describe('CoverDetector with Wall Height Integration', () => {
       expect(cover).toBe('none');
     });
   });
+
+  describe('3D line-of-sight wall height checks', () => {
+    beforeEach(() => {
+      global.game.modules.set('wall-height', { active: true });
+      if (!global.window) {
+        global.window = {};
+      }
+    });
+
+    test('high elevation attacker can shoot over low wall to ground target', () => {
+      global.window.WallHeight = {
+        getSourceElevationBounds: jest.fn(() => ({ bottom: 0, top: 5 })),
+      };
+
+      mockAttacker.document.elevation = 100;
+      mockAttacker.getCenterPoint = () => ({ x: 50, y: 25, elevation: 100 });
+
+      mockTarget.document.elevation = 0;
+      mockTarget.getCenterPoint = () => ({ x: 50, y: 75, elevation: 0 });
+
+      const cover = coverDetector.detectBetweenTokens(mockAttacker, mockTarget);
+
+      expect(cover).toBe('none');
+    });
+
+    test('moderately elevated attacker can see over short wall', () => {
+      global.window.WallHeight = {
+        getSourceElevationBounds: jest.fn(() => ({ bottom: 0, top: 5 })),
+      };
+
+      mockAttacker.document.elevation = 20;
+      mockAttacker.getCenterPoint = () => ({ x: 50, y: 25, elevation: 20 });
+
+      mockTarget.document.elevation = 0;
+      mockTarget.getCenterPoint = () => ({ x: 50, y: 75, elevation: 0 });
+
+      const cover = coverDetector.detectBetweenTokens(mockAttacker, mockTarget);
+
+      expect(cover).toBe('none');
+    });
+
+    test('ground-level attacker is still blocked by wall against ground target', () => {
+      global.window.WallHeight = {
+        getSourceElevationBounds: jest.fn(() => ({ bottom: 0, top: 10 })),
+      };
+
+      mockAttacker.document.elevation = 0;
+      mockAttacker.getCenterPoint = () => ({ x: 50, y: 25, elevation: 0 });
+
+      mockTarget.document.elevation = 0;
+      mockTarget.getCenterPoint = () => ({ x: 50, y: 75, elevation: 0 });
+
+      const cover = coverDetector.detectBetweenTokens(mockAttacker, mockTarget);
+
+      expect(cover).not.toBe('none');
+    });
+  });
 });

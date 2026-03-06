@@ -3,6 +3,7 @@ import {
   isWallHeightActive,
   getWallElevationBounds,
   doesWallBlockAtElevation,
+  doesWallBlockLineOfSight,
 } from '../../../scripts/helpers/wall-height-utils.js';
 
 describe('Wall Height Utils', () => {
@@ -212,6 +213,108 @@ describe('Wall Height Utils', () => {
       const elevationRange = { bottom: 10, top: 20 };
 
       expect(doesWallBlockAtElevation(wallDoc, elevationRange)).toBe(true);
+    });
+  });
+
+  describe('doesWallBlockLineOfSight', () => {
+    beforeEach(() => {
+      global.game.modules.set('wall-height', { active: true });
+    });
+
+    test('returns true when wall bounds are not available', () => {
+      global.window.WallHeight = {
+        getSourceElevationBounds: jest.fn(() => null),
+      };
+      const wallDoc = {};
+      expect(doesWallBlockLineOfSight(wallDoc, { bottom: 0, top: 5 }, { bottom: 0, top: 5 }, 0.5)).toBe(true);
+    });
+
+    test('shooter at elevation 100 can see over a 5ft wall to target at elevation 0', () => {
+      global.window.WallHeight = {
+        getSourceElevationBounds: jest.fn(() => ({ bottom: 0, top: 5 })),
+      };
+      const wallDoc = {};
+      const attackerSpan = { bottom: 100, top: 105 };
+      const targetSpan = { bottom: 0, top: 5 };
+      const t = 0.5;
+      expect(doesWallBlockLineOfSight(wallDoc, attackerSpan, targetSpan, t)).toBe(false);
+    });
+
+    test('shooter at elevation 10 looking over a 5ft wall halfway to target at elevation 0', () => {
+      global.window.WallHeight = {
+        getSourceElevationBounds: jest.fn(() => ({ bottom: 0, top: 5 })),
+      };
+      const wallDoc = {};
+      const attackerSpan = { bottom: 10, top: 15 };
+      const targetSpan = { bottom: 0, top: 5 };
+      const t = 0.5;
+      const sightBottom = 10 + 0.5 * (0 - 10);
+      const sightTop = 15 + 0.5 * (5 - 15);
+      expect(sightBottom).toBe(5);
+      expect(sightTop).toBe(10);
+      expect(doesWallBlockLineOfSight(wallDoc, attackerSpan, targetSpan, t)).toBe(false);
+    });
+
+    test('wall blocks when sight line passes through wall height at intersection point', () => {
+      global.window.WallHeight = {
+        getSourceElevationBounds: jest.fn(() => ({ bottom: 0, top: 10 })),
+      };
+      const wallDoc = {};
+      const attackerSpan = { bottom: 0, top: 5 };
+      const targetSpan = { bottom: 0, top: 5 };
+      const t = 0.5;
+      expect(doesWallBlockLineOfSight(wallDoc, attackerSpan, targetSpan, t)).toBe(true);
+    });
+
+    test('wall near attacker blocks even when attacker is high', () => {
+      global.window.WallHeight = {
+        getSourceElevationBounds: jest.fn(() => ({ bottom: 0, top: 100 })),
+      };
+      const wallDoc = {};
+      const attackerSpan = { bottom: 50, top: 55 };
+      const targetSpan = { bottom: 0, top: 5 };
+      const t = 0.1;
+      expect(doesWallBlockLineOfSight(wallDoc, attackerSpan, targetSpan, t)).toBe(true);
+    });
+
+    test('wall at t=0 (right at attacker) checks attacker elevation', () => {
+      global.window.WallHeight = {
+        getSourceElevationBounds: jest.fn(() => ({ bottom: 0, top: 5 })),
+      };
+      const wallDoc = {};
+      const attackerSpan = { bottom: 10, top: 15 };
+      const targetSpan = { bottom: 0, top: 5 };
+      expect(doesWallBlockLineOfSight(wallDoc, attackerSpan, targetSpan, 0)).toBe(false);
+    });
+
+    test('wall at t=1 (right at target) checks target elevation', () => {
+      global.window.WallHeight = {
+        getSourceElevationBounds: jest.fn(() => ({ bottom: 0, top: 10 })),
+      };
+      const wallDoc = {};
+      const attackerSpan = { bottom: 100, top: 105 };
+      const targetSpan = { bottom: 0, top: 5 };
+      expect(doesWallBlockLineOfSight(wallDoc, attackerSpan, targetSpan, 1)).toBe(true);
+    });
+
+    test('both tokens at same elevation, wall blocks normally', () => {
+      global.window.WallHeight = {
+        getSourceElevationBounds: jest.fn(() => ({ bottom: 0, top: 10 })),
+      };
+      const wallDoc = {};
+      const attackerSpan = { bottom: 0, top: 5 };
+      const targetSpan = { bottom: 0, top: 5 };
+      expect(doesWallBlockLineOfSight(wallDoc, attackerSpan, targetSpan, 0.5)).toBe(true);
+    });
+
+    test('both tokens above wall, wall does not block', () => {
+      global.window.WallHeight = {
+        getSourceElevationBounds: jest.fn(() => ({ bottom: 0, top: 5 })),
+      };
+      const wallDoc = {};
+      const attackerSpan = { bottom: 10, top: 15 };
+      const targetSpan = { bottom: 10, top: 15 };
+      expect(doesWallBlockLineOfSight(wallDoc, attackerSpan, targetSpan, 0.5)).toBe(false);
     });
   });
 });

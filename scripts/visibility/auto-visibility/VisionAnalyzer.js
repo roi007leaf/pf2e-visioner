@@ -21,7 +21,7 @@
 import { MODULE_ID } from '../../constants.js';
 import { calculateDistanceInFeet } from '../../helpers/geometry-utils.js';
 import { getTokenVerticalSpanFt } from '../../helpers/size-elevation-utils.js';
-import { doesWallBlockAtElevation } from '../../helpers/wall-height-utils.js';
+import { doesWallBlockAtElevation, doesWallBlockLineOfSight } from '../../helpers/wall-height-utils.js';
 import { LevelsIntegration } from '../../services/LevelsIntegration.js';
 import { getLogger } from '../../utils/logger.js';
 import { SensingCapabilitiesBuilder } from './SensingCapabilitiesBuilder.js';
@@ -289,11 +289,20 @@ export class VisionAnalyzer {
         const observerCenter = { x: observerPos.x, y: observerPos.y };
         const targetPoints = this.#getTokenSamplePoints(target, targetPos);
 
+        let hybridObserverSpan = null;
+        let hybridTargetSpan = null;
+        try {
+          hybridObserverSpan = getTokenVerticalSpanFt(observer);
+          hybridTargetSpan = getTokenVerticalSpanFt(target);
+        } catch (error) {}
+
         // Check center-to-center first
         const centerHasLOS = this.#checkSingleRayLOSWithWalls(
           observerCenter,
           targetPoints[0], // Target center
           cachedWalls,
+          hybridObserverSpan,
+          hybridTargetSpan,
         );
 
         let geometricResult = centerHasLOS;
@@ -308,6 +317,8 @@ export class VisionAnalyzer {
               observerCenter,
               targetPoints[i],
               cachedWalls,
+              hybridObserverSpan,
+              hybridTargetSpan,
             );
             if (hasLOS) {
               clearRays++;
@@ -390,9 +401,11 @@ export class VisionAnalyzer {
       // Use multi-point geometric sampling with cached wall filtering
       stage = 'elevation-calc';
       let elevationRange = null;
+      let observerSpan = null;
+      let targetSpan = null;
       try {
-        const observerSpan = getTokenVerticalSpanFt(observer);
-        const targetSpan = getTokenVerticalSpanFt(target);
+        observerSpan = getTokenVerticalSpanFt(observer);
+        targetSpan = getTokenVerticalSpanFt(target);
         elevationRange = {
           bottom: Math.min(observerSpan.bottom, targetSpan.bottom),
           top: Math.max(observerSpan.top, targetSpan.top),
@@ -425,6 +438,8 @@ export class VisionAnalyzer {
         observerCenter,
         targetCenter,
         cachedWalls,
+        observerSpan,
+        targetSpan,
       );
 
       // Debug log for center-to-center check
@@ -452,6 +467,8 @@ export class VisionAnalyzer {
           observerCenter,
           targetPoints[i],
           cachedWalls,
+          observerSpan,
+          targetSpan,
         );
         if (hasLOS) {
           clearRays++;
@@ -578,7 +595,7 @@ export class VisionAnalyzer {
    * Check if a single ray has clear line of sight using cached walls
    * @private
    */
-  #checkSingleRayLOSWithWalls(fromPoint, toPoint, walls) {
+  #checkSingleRayLOSWithWalls(fromPoint, toPoint, walls, observerSpan = null, targetSpan = null) {
     const ray = new foundry.canvas.geometry.Ray(fromPoint, toPoint);
     const rayLength = Math.sqrt((toPoint.x - fromPoint.x) ** 2 + (toPoint.y - fromPoint.y) ** 2);
     const limitedWallIntersections = [];
@@ -754,6 +771,11 @@ export class VisionAnalyzer {
               t0: intersection.t0,
             });
           } else {
+            if (observerSpan && targetSpan) {
+              if (!doesWallBlockLineOfSight(wall.document, observerSpan, targetSpan, intersection.t0)) {
+                continue;
+              }
+            }
             if (isProblematicRay) {
               const log = getLogger('AVS/VisionAnalyzer');
               log.debug(() => `wall-BLOCKS-completely: returning false immediately`);
