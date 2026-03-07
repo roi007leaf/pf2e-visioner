@@ -357,21 +357,7 @@ export class SeekPreviewDialog extends BaseActionDialog {
             outcome.changed === true || (statesMatch && isOldStateAvsControlled);
         }
 
-        // Get detection info from detection map (only if AVS is enabled)
-        let detectionInfo = null;
-        let detectedBySense = null;
-        const avsEnabled = game.settings?.get?.('pf2e-visioner', 'autoVisibilityEnabled') ?? false;
-        if (avsEnabled && !outcome._isWall && this.actorToken && outcome.target) {
-          try {
-            const { getDetectionBetween } = await import('../../stores/detection-map.js');
-            detectionInfo = getDetectionBetween(this.actorToken, outcome.target);
-            if (detectionInfo && detectionInfo.sense) {
-              detectedBySense = detectionInfo.sense;
-            }
-          } catch {
-            // Failed to get detection info, not critical
-          }
-        }
+        const detectedBySense = outcome.usedSenseType || null;
 
         return {
           ...outcome,
@@ -648,6 +634,29 @@ export class SeekPreviewDialog extends BaseActionDialog {
     } catch (error) {
       console.warn('PF2E Visioner | Failed to build seek feat badges:', error);
       context.seekFeatBadges = [];
+    }
+
+    try {
+      const { SenseSuppressionRegionBehavior } = await import('../../regions/SenseSuppressionRegionBehavior.js');
+      const { SPECIAL_SENSES } = await import('../../constants.js');
+      const seekerPos = {
+        x: this.actorToken.document.x + (this.actorToken.document.width * canvas.grid.size) / 2,
+        y: this.actorToken.document.y + (this.actorToken.document.height * canvas.grid.size) / 2,
+        elevation: this.actorToken.document.elevation || 0,
+      };
+      const suppressed = SenseSuppressionRegionBehavior.getSuppressedSensesForObserver(seekerPos);
+      if (suppressed.size > 0) {
+        const senseLabels = Array.from(suppressed).map(s => {
+          const label = SPECIAL_SENSES[s]?.label;
+          return label ? (game.i18n?.localize?.(label) || s) : s;
+        }).join(', ');
+        context.suppressedSensesBadge = {
+          icon: 'fas fa-ban',
+          label: game.i18n.localize('PF2E_VISIONER.BUTTONS.SENSES_SUPPRESSED'),
+          tooltip: game.i18n.format('PF2E_VISIONER.TOOLTIPS.SENSES_SUPPRESSED', { senses: senseLabels }),
+        };
+      }
+    } catch {
     }
 
     // Legacy support for existing template logic

@@ -1,5 +1,17 @@
 # Changelog
 
+## [7.2.0] - 2026-03-07
+
+### Added
+
+- **Sense Suppression Region Behavior**: New region behavior that allows GMs to suppress specific senses within a region. Useful for areas with overpowering stench (disabling scent), zones of silence (suppressing hearing), magical darkness fields, and more. Configurable per-region with multi-select sense checkboxes and separate "Affects Observer" / "Affects Target" options.
+- **Seek action respects sense suppression**: The Seek action now filters out suppressed senses before determining detection. If all senses are suppressed (e.g., blinded + hearing suppressed), the seek cannot detect any targets.
+- **Sense suppression indicators**: Suppressed senses are shown as a small ban icon overlay on hover tooltip badges, as a badge in the Seek dialog header, and as a reason in the visibility factors overlay.
+
+### Fixed
+
+- **Seek "Detected By" column showing stale data**: The Detected By column in seek results now uses the freshly-calculated sense from the seek adapter instead of falling back to a potentially stale detection map.
+
 ## [7.1.3] - 2026-03-06
 
 ### Fixed

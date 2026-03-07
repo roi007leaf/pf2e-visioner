@@ -22,6 +22,14 @@
       {{/each}}
         </div>
       {{/if}}
+      {{#if suppressedSensesBadge}}
+        <div class="action-context-badges">
+          <span class="badge badge-warning" data-tooltip="{{suppressedSensesBadge.tooltip}}">
+            <i class="{{suppressedSensesBadge.icon}}"></i>
+            <span class="badge-label">{{suppressedSensesBadge.label}}</span>
+          </span>
+        </div>
+      {{/if}}
     </div>
   </div>
 

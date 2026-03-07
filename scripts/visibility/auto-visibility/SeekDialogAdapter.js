@@ -1,20 +1,22 @@
 /**
  * SeekDialogAdapter
- * 
+ *
  * Adapter between VisionAnalyzer and Seek action/dialog.
  * Centralizes all sense detection logic for Seek action.
- * 
+ *
  * Responsibilities:
  * - Determine which sense is used for detection (visual vs non-visual, precise vs imprecise)
  * - Check sense limitations (lifesense vs constructs, range limits, etc.)
  * - Format sensing data for UI display (badges, tooltips)
  * - Validate creature type compatibility with special senses
- * 
+ *
  * Does NOT:
  * - Build raw sensing capabilities (delegates to VisionAnalyzer)
  * - Make DC comparisons or outcome determinations (that's ActionHandler's job)
  * - Apply visibility changes (that's the service layer's job)
  */
+
+import { SenseSuppressionRegionBehavior } from '../../regions/SenseSuppressionRegionBehavior.js';
 
 export class SeekDialogAdapter {
     #visionAnalyzer;
@@ -85,7 +87,7 @@ export class SeekDialogAdapter {
 
         // Get observer's vision capabilities
         const visCaps = this.#visionAnalyzer.getVisionCapabilities(observer);
-        const sensingSummary = visCaps.sensingSummary || {};
+        const sensingSummary = this.#applySenseSuppression(visCaps.sensingSummary || {}, observer, target);
 
         // Calculate distance for range checks
         const distance = this.#visionAnalyzer.distanceFeet(observer, target);
@@ -99,6 +101,37 @@ export class SeekDialogAdapter {
         // PRIORITY 2: Fall back to imprecise senses
         const impreciseResult = await this.#checkImpreciseSenses(observer, target, visCaps, sensingSummary, distance);
         return impreciseResult;
+    }
+
+    #applySenseSuppression(sensingSummary, observer, target) {
+        try {
+            const observerPos = observer.center;
+            const targetPos = target.center;
+            const obs = SenseSuppressionRegionBehavior.getSuppressedSensesForObserver(observerPos);
+            const tgt = SenseSuppressionRegionBehavior.getSuppressedSensesForTarget(targetPos);
+            const suppressed = new Set([...obs, ...tgt]);
+            if (suppressed.size === 0) return sensingSummary;
+
+            const isSuppressed = (senseType) => {
+                if (suppressed.has(senseType)) return true;
+                const variants = SenseSuppressionRegionBehavior.getKeyVariantsForSense(senseType);
+                return variants.some((v) => suppressed.has(v));
+            };
+
+            const filtered = { ...sensingSummary };
+            if (Array.isArray(filtered.precise)) {
+                filtered.precise = filtered.precise.filter((s) => !isSuppressed(s.type));
+            }
+            if (Array.isArray(filtered.imprecise)) {
+                filtered.imprecise = filtered.imprecise.filter((s) => !isSuppressed(s.type));
+            }
+            if (filtered.hearing && isSuppressed('hearing')) {
+                filtered.hearing = null;
+            }
+            return filtered;
+        } catch {
+            return sensingSummary;
+        }
     }
 
     /**

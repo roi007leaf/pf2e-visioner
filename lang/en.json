@@ -339,6 +339,7 @@
     },
     "BUTTONS": {
       "KEEN_EYES": "Keen Eyes",
+      "SENSES_SUPPRESSED": "Senses Suppressed",
       "THAT": "That",
       "OBSERVED": "Observed",
       "CONCEALED": "Concealed",
@@ -368,7 +369,8 @@
     "TOOLTIPS": {
       "AUTO_COVER_DETECTION": "Automatic Cover Detection",
       "KEEN_EYES": "You gain a +2 circumstance bonus when using Seek (System application). Undetected creatures treated as Hidden, Hidden creatures treated as Observed when you Seek.",
-      "THAT_FEATURE": "You spot hidden doors, traps, and hazards more easily (failure will become a success)."
+      "THAT_FEATURE": "You spot hidden doors, traps, and hazards more easily (failure will become a success).",
+      "SENSES_SUPPRESSED": "The following senses are suppressed by a region: {senses}"
     },
     "SETTINGS_MENU": {
       "TITLE": "PF2E Visioner Settings",
@@ -1339,7 +1341,8 @@
         "DARKVISION_IN_DARKNESS": "Darkvision sees clearly in darkness",
         "TARGET_INVISIBLE_OBSERVER_DEAFENED": "Target is invisible and observer is deafened",
         "TARGET_INVISIBLE_NO_SENSES": "Target is invisible and cannot be detected by available senses",
-        "TARGET_NO_SENSES": "Target cannot be detected by any available senses"
+        "TARGET_NO_SENSES": "Target cannot be detected by any available senses",
+        "SENSES_SUPPRESSED": "Senses suppressed by region: {senses}"
       }
     },
     "REGION_BEHAVIOR": {
@@ -1353,6 +1356,9 @@
         },
         "VISIBILITY": {
           "label": "Visioner Visibility"
+        },
+        "SENSE_SUPPRESSION": {
+          "label": "Sense Suppression"
         }
       },
       "VISIBILITY_STATE": {
@@ -1385,6 +1391,22 @@
         "override": "Override - Tokens inside always have cover",
         "lineOfSight": "Line of Sight - Cover when ray crosses boundary or both inside",
         "oneWay": "One Way - Cover only for tokens inside when viewed from outside"
+      },
+      "SENSE_SUPPRESSION_ENABLED": {
+        "label": "Enable Sense Suppression",
+        "hint": "If enabled, this region will suppress the selected senses for tokens"
+      },
+      "SENSE_SUPPRESSION_SENSES": {
+        "label": "Suppressed Senses",
+        "hint": "Select which senses are suppressed within this region"
+      },
+      "SENSE_SUPPRESSION_AFFECTS_OBSERVER": {
+        "label": "Affects Observer",
+        "hint": "When enabled, tokens inside this region lose the selected senses (e.g. overpowering stench overwhelms scent)"
+      },
+      "SENSE_SUPPRESSION_AFFECTS_TARGET": {
+        "label": "Affects Target",
+        "hint": "When enabled, tokens inside this region cannot be detected by the selected senses from outside observers"
       },
       "VISIBILITY_UPDATED": "Region visibility updated for {count} token relationships",
       "UPDATE_ERROR": "Failed to update region visibility relationships"

@@ -2,9 +2,10 @@
  * Hover tooltips for token visibility states
  */
 
-import { COVER_STATES, MODULE_ID, VISIBILITY_STATES } from '../constants.js';
+import { COVER_STATES, MODULE_ID, SPECIAL_SENSES, VISIBILITY_STATES } from '../constants.js';
 import autoCoverSystem from '../cover/auto-cover/AutoCoverSystem.js';
 import { canShowTooltips, computeSizesFromSetting } from '../helpers/tooltip-utils.js';
+import { SenseSuppressionRegionBehavior } from '../regions/SenseSuppressionRegionBehavior.js';
 import { getDetectionBetween } from '../stores/detection-map.js';
 import { getCoverMap, getVisibilityMap } from '../utils.js';
 import { setPanningState } from '../utils/scheduler.js';
@@ -1426,6 +1427,55 @@ function addVisibilityIndicator(
     return el;
   };
 
+  const addSuppressionOverlay = (parentBadgeEl, suppressedSenses) => {
+    const labels = [...suppressedSenses].map((s) => {
+      const cfg = SPECIAL_SENSES[s];
+      return cfg ? (game.i18n?.localize?.(cfg.label) || s) : s;
+    });
+    const tooltipText = game.i18n?.format?.('PF2E_VISIONER.TOOLTIPS.SENSES_SUPPRESSED', { senses: labels.join(', ') })
+      || `Senses suppressed: ${labels.join(', ')}`;
+
+    const overlaySize = Math.max(10, Math.round(sizeConfig.iconPx * 0.7));
+    const el = document.createElement('div');
+    el.style.position = 'absolute';
+    el.style.top = '-4px';
+    el.style.right = '-4px';
+    el.style.width = `${overlaySize}px`;
+    el.style.height = `${overlaySize}px`;
+    el.style.borderRadius = '50%';
+    el.style.background = 'rgba(180,30,30,0.95)';
+    el.style.display = 'flex';
+    el.style.alignItems = 'center';
+    el.style.justifyContent = 'center';
+    el.style.zIndex = '16';
+    el.style.pointerEvents = 'auto';
+    el.dataset.tooltip = tooltipText;
+    el.dataset.tooltipDirection = 'UP';
+    el.innerHTML = `<i class="fa-solid fa-ban" style="font-size: ${Math.round(overlaySize * 0.7)}px; color: #fff;"></i>`;
+
+    const badgeSpan = parentBadgeEl.querySelector('span');
+    if (badgeSpan) {
+      badgeSpan.style.position = 'relative';
+      badgeSpan.appendChild(el);
+    } else {
+      parentBadgeEl.style.position = 'relative';
+      parentBadgeEl.appendChild(el);
+    }
+    return el;
+  };
+
+  let suppressedSenses = null;
+  try {
+    const observerPos = observerToken.center;
+    const actualTarget = detectionTarget || targetToken;
+    const targetPos = actualTarget.center;
+    const obs = SenseSuppressionRegionBehavior.getSuppressedSensesForObserver(observerPos);
+    const tgt = SenseSuppressionRegionBehavior.getSuppressedSensesForTarget(targetPos);
+    const combined = new Set([...obs, ...tgt]);
+    if (combined.size > 0) suppressedSenses = combined;
+  } catch {
+  }
+
   if (visibilityState === 'observed') {
     if (senseUsed) {
       const left = centerX - badgeWidth / 2;
@@ -1437,6 +1487,9 @@ function addVisibilityIndicator(
         mode,
         detectionTarget,
       );
+      if (suppressedSenses) {
+        indicator._suppressionBadgeEl = addSuppressionOverlay(indicator._senseBadgeEl, suppressedSenses);
+      }
     }
   } else {
     const totalWidth = (senseUsed ? badgeWidth + spacing : 0) + badgeWidth;
@@ -1464,6 +1517,11 @@ function addVisibilityIndicator(
       'visibility',
     );
     addBadgeClickHandler(indicator._visBadgeEl, observerToken, targetToken, mode, detectionTarget);
+
+    if (suppressedSenses) {
+      const targetEl = indicator._senseBadgeEl || indicator._visBadgeEl;
+      indicator._suppressionBadgeEl = addSuppressionOverlay(targetEl, suppressedSenses);
+    }
   }
 
   HoverTooltips.visibilityIndicators.set(targetToken.id, indicator);
@@ -1558,41 +1616,29 @@ function updateBadgePositions() {
   const verticalOffset = HoverTooltips._hudActiveCache ? 26 : -6;
 
   HoverTooltips.visibilityIndicators.forEach((indicator) => {
-    if (!indicator || (!indicator._visBadgeEl && !indicator._coverBadgeEl)) return;
+    if (!indicator || (!indicator._visBadgeEl && !indicator._coverBadgeEl && !indicator._senseBadgeEl)) return;
     const globalPoint = canvas.tokens.toGlobal(new PIXI.Point(indicator.x, indicator.y));
     const centerX = canvasRect.left + globalPoint.x;
     const centerY = canvasRect.top + globalPoint.y - badgeHeight / 2 + verticalOffset;
 
-    if (indicator._visBadgeEl && indicator._coverBadgeEl) {
-      // Three badges layout: sense (optional), visibility, cover
-      const totalWidth =
-        (indicator._senseBadgeEl ? badgeWidth + spacing : 0) + badgeWidth + spacing + badgeWidth;
-      const startX = centerX - totalWidth / 2;
+    let badgeCount = 0;
+    if (indicator._senseBadgeEl) badgeCount++;
+    if (indicator._visBadgeEl) badgeCount++;
+    if (indicator._coverBadgeEl) badgeCount++;
 
-      let currentX = startX;
+    const totalWidth = badgeCount > 0 ? badgeCount * badgeWidth + (badgeCount - 1) * spacing : 0;
+    let currentX = centerX - totalWidth / 2;
 
-      if (indicator._senseBadgeEl) {
-        indicator._senseBadgeEl.style.transform = `translate(${Math.round(currentX)}px, ${Math.round(centerY)}px)`;
-        currentX += badgeWidth + spacing;
-      }
-
+    if (indicator._senseBadgeEl) {
+      indicator._senseBadgeEl.style.transform = `translate(${Math.round(currentX)}px, ${Math.round(centerY)}px)`;
+      currentX += badgeWidth + spacing;
+    }
+    if (indicator._visBadgeEl) {
       indicator._visBadgeEl.style.transform = `translate(${Math.round(currentX)}px, ${Math.round(centerY)}px)`;
       currentX += badgeWidth + spacing;
-
+    }
+    if (indicator._coverBadgeEl) {
       indicator._coverBadgeEl.style.transform = `translate(${Math.round(currentX)}px, ${Math.round(centerY)}px)`;
-    } else if (indicator._visBadgeEl) {
-      // Visibility badge with optional sense badge
-      const totalWidth = (indicator._senseBadgeEl ? badgeWidth + spacing : 0) + badgeWidth;
-      const startX = centerX - totalWidth / 2;
-
-      let currentX = startX;
-
-      if (indicator._senseBadgeEl) {
-        indicator._senseBadgeEl.style.transform = `translate(${Math.round(currentX)}px, ${Math.round(centerY)}px)`;
-        currentX += badgeWidth + spacing;
-      }
-
-      indicator._visBadgeEl.style.transform = `translate(${Math.round(currentX)}px, ${Math.round(centerY)}px)`;
     }
   });
 
@@ -1757,6 +1803,7 @@ function hideAllVisibilityIndicators() {
       delete indicator._senseBadgeEl;
       delete indicator._visBadgeEl;
       delete indicator._coverBadgeEl;
+      delete indicator._suppressionBadgeEl;
 
       // Clean up tooltip anchor if it exists
       if (indicator._tooltipAnchor) {

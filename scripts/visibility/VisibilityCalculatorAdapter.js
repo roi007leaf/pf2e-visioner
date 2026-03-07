@@ -11,6 +11,7 @@ import { FeatsHandler } from '../chat/services/FeatsHandler.js';
 import { MODULE_ID } from '../constants.js';
 import { calculateDistanceInFeet } from '../helpers/geometry-utils.js';
 import { ConcealmentRegionBehavior } from '../regions/ConcealmentRegionBehavior.js';
+import { SenseSuppressionRegionBehavior } from '../regions/SenseSuppressionRegionBehavior.js';
 import { LevelsIntegration } from '../services/LevelsIntegration.js';
 import { getLogger } from '../utils/logger.js';
 import { calculateVisibility } from './StatelessVisibilityCalculator.js';
@@ -84,6 +85,17 @@ export async function tokenStateToInput(
     options,
     distanceInFeet,
   );
+
+  try {
+    SenseSuppressionRegionBehavior.applySenseSuppression(
+      observerState.precise,
+      observerState.imprecise,
+      observerPosition,
+      targetPosition,
+    );
+  } catch (error) {
+    log.debug(() => ({ msg: 'sense-suppression-error', error: error.message }));
+  }
 
   // Check if there's line of sight (no sight-blocking walls)
   // However, if either observer or target is in magical darkness, the darkness polygon might be

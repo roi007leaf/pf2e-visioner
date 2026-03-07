@@ -341,6 +341,11 @@ export class SeekActionHandler extends ActionHandlerBase {
       }
     } catch { }
 
+    // If no senses are available at all, the seek cannot detect anything
+    if (!this._usedSenseType && !usedImprecise) {
+      newVisibility = current;
+    }
+
     // PF2e RAW correction: You CAN Seek with imprecise senses,
     // but the best you can do is make the target Hidden (never Observed).
     // Echolocation (precise hearing within 40 ft) and other precise senses can allow Observed.

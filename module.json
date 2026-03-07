@@ -9,7 +9,7 @@
       "flags": {}
     }
   ],
-  "version": "7.1.3-alpha.1",
+  "version": "7.2.0",
   "compatibility": {
     "minimum": "13.341",
     "verified": "13.350"
@@ -93,7 +93,8 @@
     "RegionBehavior": {
       "Pf2eVisionerVisibility": {"label": "PF2E_VISIONER.REGION_BEHAVIOR.TYPES.VISIBILITY.label"},
       "Pf2eVisionerConcealment": {"label": "PF2E_VISIONER.REGION_BEHAVIOR.TYPES.CONCEALMENT.label"},
-      "Pf2eVisionerCover": {"label": "PF2E_VISIONER.REGION_BEHAVIOR.TYPES.COVER.label"}
+      "Pf2eVisionerCover": {"label": "PF2E_VISIONER.REGION_BEHAVIOR.TYPES.COVER.label"},
+      "Pf2eVisionerSenseSuppression": {"label": "PF2E_VISIONER.REGION_BEHAVIOR.TYPES.SENSE_SUPPRESSION.label"}
     }
   },
   "socket": true,

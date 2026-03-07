@@ -4,6 +4,7 @@
 
 import { ConcealmentRegionBehavior } from './ConcealmentRegionBehavior.js';
 import { CoverRegionBehavior } from './CoverRegionBehavior.js';
+import { SenseSuppressionRegionBehavior } from './SenseSuppressionRegionBehavior.js';
 import { VisibilityRegionBehavior } from './VisibilityRegionBehavior.js';
 
 import { MODULE_ID } from '../constants.js';
@@ -11,6 +12,7 @@ import { MODULE_ID } from '../constants.js';
 const visibilityBehaviorKey = `${MODULE_ID}.Pf2eVisionerVisibility`;
 const concealmentBehaviorKey = `${MODULE_ID}.Pf2eVisionerConcealment`;
 const coverBehaviorKey = `${MODULE_ID}.Pf2eVisionerCover`;
+const senseSuppressionBehaviorKey = `${MODULE_ID}.Pf2eVisionerSenseSuppression`;
 
 function registerBehavior() {
   if (typeof CONFIG !== 'undefined' && CONFIG.RegionBehavior) {
@@ -25,6 +27,10 @@ function registerBehavior() {
     CONFIG.RegionBehavior.dataModels[coverBehaviorKey] = CoverRegionBehavior;
     CONFIG.RegionBehavior.typeLabels[coverBehaviorKey] = 'PF2E_VISIONER.REGION_BEHAVIOR.TYPES.COVER.label';
     CONFIG.RegionBehavior.typeIcons[coverBehaviorKey] = 'fa-solid fa-shield-halved';
+
+    CONFIG.RegionBehavior.dataModels[senseSuppressionBehaviorKey] = SenseSuppressionRegionBehavior;
+    CONFIG.RegionBehavior.typeLabels[senseSuppressionBehaviorKey] = 'PF2E_VISIONER.REGION_BEHAVIOR.TYPES.SENSE_SUPPRESSION.label';
+    CONFIG.RegionBehavior.typeIcons[senseSuppressionBehaviorKey] = 'fa-solid fa-ban';
   }
 }
 

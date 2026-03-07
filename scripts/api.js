@@ -640,6 +640,30 @@ export class Pf2eVisionerApi {
         slugs.push('rule-element-override');
       }
 
+      // 2.7 SENSE SUPPRESSION REGIONS
+      try {
+        const { SenseSuppressionRegionBehavior } =
+          await import('./regions/SenseSuppressionRegionBehavior.js');
+        const observerSuppressed = SenseSuppressionRegionBehavior.getSuppressedSensesForObserver(observerPos);
+        const targetSuppressed = SenseSuppressionRegionBehavior.getSuppressedSensesForTarget(targetPos);
+        const allSuppressed = new Set([...observerSuppressed, ...targetSuppressed]);
+        if (allSuppressed.size > 0) {
+          const { SPECIAL_SENSES } = await import('./constants.js');
+          const senseLabels = Array.from(allSuppressed).map(s => {
+            const label = SPECIAL_SENSES[s]?.label;
+            return label ? (game.i18n?.localize?.(label) || s) : s;
+          }).join(', ');
+          reasons.push(
+            game.i18n.format('PF2E_VISIONER.VISIBILITY_FACTORS.REASONS.SENSES_SUPPRESSED', {
+              senses: senseLabels,
+            }),
+          );
+          slugs.push('sense-suppression');
+        }
+      } catch (e) {
+        // Sense suppression check failed, not critical
+      }
+
       // 3. LIGHTING CONDITIONS (main cause of concealment/hidden for most cases)
       if (visibility === 'concealed' || visibility === 'hidden') {
         // Check for darkness templates first (most common cause)
