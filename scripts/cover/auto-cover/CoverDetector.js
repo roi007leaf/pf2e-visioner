@@ -432,44 +432,54 @@ export class CoverDetector {
     };
 
     // Check for blocking walls/terrain
-    const walls = canvas?.walls?.objects?.children || [];
-    for (const wall of walls) {
-      const wallDoc = wall.document || wall;
+    let skipWallCheck = false;
+    if (attackerSpan && targetSpan) {
+      const levelsIntegration = LevelsIntegration.getInstance();
+      if (levelsIntegration.isActive) {
+        const p0_3d = { x: p1.x, y: p1.y, z: (attackerSpan.bottom + attackerSpan.top) / 2 };
+        const p1_3d = { x: p2.x, y: p2.y, z: (targetSpan.bottom + targetSpan.top) / 2 };
+        skipWallCheck = !levelsIntegration.test3DPointCollision(p0_3d, p1_3d, 'sight');
+      }
+    }
 
-      // Skip walls that don't block from the attacker's direction
-      if (!this._doesWallBlockFromDirection(wallDoc, p1)) continue;
+    if (!skipWallCheck) {
+      const walls = canvas?.walls?.objects?.children || [];
+      for (const wall of walls) {
+        const wallDoc = wall.document || wall;
 
-      const coords = wall?.coords;
-      if (!coords) continue;
+        if (!this._doesWallBlockFromDirection(wallDoc, p1)) continue;
 
-      // Check if segment intersects this wall
-      const intersection = this._lineIntersectionPoint(
-        p1.x,
-        p1.y,
-        p2.x,
-        p2.y,
-        coords[0],
-        coords[1],
-        coords[2],
-        coords[3],
-      );
+        const coords = wall?.coords;
+        if (!coords) continue;
 
-      if (intersection) {
-        if (attackerSpan && targetSpan && segmentLength > 0) {
-          const t = Math.sqrt((intersection.x - p1.x) ** 2 + (intersection.y - p1.y) ** 2) / segmentLength;
-          if (!doesWallBlockLineOfSight(wallDoc, attackerSpan, targetSpan, t)) {
+        const intersection = this._lineIntersectionPoint(
+          p1.x,
+          p1.y,
+          p2.x,
+          p2.y,
+          coords[0],
+          coords[1],
+          coords[2],
+          coords[3],
+        );
+
+        if (intersection) {
+          if (attackerSpan && targetSpan && segmentLength > 0) {
+            const t = Math.sqrt((intersection.x - p1.x) ** 2 + (intersection.y - p1.y) ** 2) / segmentLength;
+            if (!doesWallBlockLineOfSight(wallDoc, attackerSpan, targetSpan, t)) {
+              continue;
+            }
+          } else if (elevationRange && !doesWallBlockAtElevation(wallDoc, elevationRange)) {
             continue;
           }
-        } else if (elevationRange && !doesWallBlockAtElevation(wallDoc, elevationRange)) {
-          continue;
-        }
 
-        analysis.hasBlockingTerrain = true;
-        analysis.blockingWalls.push({
-          wall: wallDoc,
-          intersection: intersection,
-          coords: coords,
-        });
+          analysis.hasBlockingTerrain = true;
+          analysis.blockingWalls.push({
+            wall: wallDoc,
+            intersection: intersection,
+            coords: coords,
+          });
+        }
       }
     }
 
@@ -715,7 +725,17 @@ export class CoverDetector {
       return false;
     }
 
-    // Use our custom directional wall logic for accurate results
+    if (attackerSpan && targetSpan) {
+      const levelsIntegration = LevelsIntegration.getInstance();
+      if (levelsIntegration.isActive) {
+        const a3d = { x: a.x, y: a.y, z: (attackerSpan.bottom + attackerSpan.top) / 2 };
+        const b3d = { x: b.x, y: b.y, z: (targetSpan.bottom + targetSpan.top) / 2 };
+        if (!levelsIntegration.test3DPointCollision(a3d, b3d, 'sight')) {
+          return false;
+        }
+      }
+    }
+
     const walls = canvas.walls.objects?.children || [];
     for (const wall of walls) {
       const c = wall?.coords;

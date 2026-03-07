@@ -1,5 +1,12 @@
 # Changelog
 
+## [7.2.1-alpha] - 2026-03-07
+
+### Fixed
+
+- **3D line-of-sight mismatch with Levels API at different elevations**: Cover detection disagreed with the Levels API when tokens were at different elevations (e.g., attacker at 100ft, target at 0ft). The wall height check used a full height beam (bottom-to-top of both tokens) instead of a single midpoint ray matching the Levels API behavior. Now uses midpoint-to-midpoint ray and defers to the Levels API `testCollision` as the authoritative 3D collision check.
+- **Walls auto-detection no longer grants lesser cover**: Auto-detected wall cover is clamped to standard minimum. Manual wall overrides can still grant lesser cover.
+
 ## [7.2.0] - 2026-03-07
 
 ### Added

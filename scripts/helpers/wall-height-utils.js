@@ -69,16 +69,14 @@ export function doesWallBlockLineOfSight(wallDocument, attackerSpan, targetSpan,
     return true;
   }
 
-  const sightBottom = attackerSpan.bottom + t * (targetSpan.bottom - attackerSpan.bottom);
-  const sightTop = attackerSpan.top + t * (targetSpan.top - attackerSpan.top);
+  const attackerMid = (attackerSpan.bottom + attackerSpan.top) / 2;
+  const targetMid = (targetSpan.bottom + targetSpan.top) / 2;
+  const sightZ = attackerMid + t * (targetMid - attackerMid);
 
-  const losBtm = Math.min(sightBottom, sightTop);
-  const losTop = Math.max(sightBottom, sightTop);
-
-  if (losBtm >= wallBounds.top) {
+  if (sightZ >= wallBounds.top) {
     return false;
   }
-  if (losTop <= wallBounds.bottom) {
+  if (sightZ <= wallBounds.bottom) {
     return false;
   }
 
