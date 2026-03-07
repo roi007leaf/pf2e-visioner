@@ -76,7 +76,7 @@ export function doesWallBlockLineOfSight(wallDocument, attackerSpan, targetSpan,
   if (sightZ >= wallBounds.top) {
     return false;
   }
-  if (sightZ <= wallBounds.bottom) {
+  if (sightZ < wallBounds.bottom) {
     return false;
   }
 
