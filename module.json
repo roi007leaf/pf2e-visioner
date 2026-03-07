@@ -9,7 +9,7 @@
       "flags": {}
     }
   ],
-  "version": "7.2.1-alpha.1",
+  "version": "7.2.1",
   "compatibility": {
     "minimum": "13.341",
     "verified": "13.350"
