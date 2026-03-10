@@ -18,6 +18,7 @@ import {
   addTokenBorder as addBorderUtil,
   removeTokenBorder as removeBorderUtil,
 } from './borders.js';
+import { loadTokenManagerCSS, loadSharedUICSS, loadDialogCSS } from '../../css-loader.js';
 import { TOKEN_MANAGER_DEFAULT_OPTIONS, TOKEN_MANAGER_PARTS } from './config.js';
 import {
   applySelectionHighlight,
@@ -84,6 +85,9 @@ export class VisionerTokenManager extends foundry.applications.api.ApplicationV2
   static PARTS = TOKEN_MANAGER_PARTS;
 
   constructor(observer, options = {}) {
+    loadTokenManagerCSS();
+    loadSharedUICSS();
+    loadDialogCSS();
     super(options);
     this.observer = observer;
     this.visibilityData = getVisibilityMap(observer);

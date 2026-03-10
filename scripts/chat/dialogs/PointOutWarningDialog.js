@@ -1,4 +1,5 @@
 import { MODULE_ID } from '../../constants.js';
+import { loadDialogCSS, loadSharedUICSS } from '../../css-loader.js';
 
 export class PointOutWarningDialog extends foundry.applications.api.ApplicationV2 {
   static DEFAULT_OPTIONS = {
@@ -14,6 +15,8 @@ export class PointOutWarningDialog extends foundry.applications.api.ApplicationV
   };
 
   constructor(options = {}) {
+    loadDialogCSS();
+    loadSharedUICSS();
     super(options);
     this._resolver = null;
     this.isGM = options.isGM || false;

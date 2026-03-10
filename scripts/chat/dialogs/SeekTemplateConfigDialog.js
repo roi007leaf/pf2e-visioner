@@ -1,7 +1,11 @@
+import { loadDialogCSS, loadSharedUICSS } from '../../css-loader.js';
+
 export class SeekTemplateConfigDialog extends foundry.applications.api.HandlebarsApplicationMixin(
   foundry.applications.api.ApplicationV2
 ) {
   constructor() {
+    loadDialogCSS();
+    loadSharedUICSS();
     super({
       window: {
         title: game.i18n.localize('PF2E_VISIONER.SEEK_TEMPLATE_CONFIG.TITLE'),

@@ -1,11 +1,15 @@
 /**
  * ApplicationV2 confirm dialog with appealing visuals and variants.
  */
+import { loadDialogCSS, loadSharedUICSS } from '../../css-loader.js';
+
 export class VisionerConfirmDialog extends foundry.applications.api.HandlebarsApplicationMixin(foundry.applications.api.ApplicationV2) {
     constructor({ title = 'Confirm', content = '', yes = 'Yes', no = 'Cancel', variant, icon } = {}) {
         // Infer variant if not provided (danger when destructive verbs are used)
         const inferredVariant = variant || (/\b(clear|delete|purge|remove|wipe)\b/i.test(String(yes)) ? 'danger' : 'warning');
         const variantIcon = icon || (inferredVariant === 'danger' ? 'fas fa-trash' : inferredVariant === 'warning' ? 'fas fa-exclamation-triangle' : 'fas fa-question-circle');
+        loadDialogCSS();
+        loadSharedUICSS();
         super({
             window: {
                 title,

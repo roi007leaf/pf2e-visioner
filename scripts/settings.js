@@ -4,6 +4,7 @@
 
 import { reinjectChatAutomationStyles } from './chat/chat-automation-styles.js';
 import { DEFAULT_SETTINGS, KEYBINDINGS, MODULE_ID } from './constants.js';
+import { loadSharedUICSS } from './css-loader.js';
 
 // Grouped layout per redesign spec.
 // Each category contains an ordered list of group objects with a title & keys.
@@ -123,6 +124,7 @@ class VisionerSettingsForm extends foundry.applications.api.ApplicationV2 {
   };
 
   constructor(options = {}) {
+    loadSharedUICSS();
     super(options);
     currentVisionerSettingsApp = this;
     // Track unsaved edits across tab switches so the Save button applies all changes

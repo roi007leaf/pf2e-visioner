@@ -3,6 +3,7 @@
  */
 
 import { MODULE_ID } from '../../constants.js';
+import { loadDialogCSS, loadSharedUICSS } from '../../css-loader.js';
 import { getWallImage } from '../../utils.js';
 
 export class VisionerWallManager extends foundry.applications.api.ApplicationV2 {
@@ -36,6 +37,8 @@ export class VisionerWallManager extends foundry.applications.api.ApplicationV2 
   };
 
   constructor(options = {}) {
+    loadDialogCSS();
+    loadSharedUICSS();
     super(options);
   }
 

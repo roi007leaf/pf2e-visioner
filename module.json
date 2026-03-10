@@ -9,7 +9,7 @@
       "flags": {}
     }
   ],
-  "version": "7.2.1",
+  "version": "7.3.0-alpha.1",
   "compatibility": {
     "minimum": "13.341",
     "verified": "13.350"
@@ -20,34 +20,10 @@
       "src": "styles/base.css"
     },
     {
-      "src": "styles/token-manager.css"
-    },
-    {
-      "src": "styles/token-effects.css"
-    },
-    {
-      "src": "styles/responsive.css"
-    },
-    {
-      "src": "styles/tooltips.css"
-    },
-    {
-      "src": "styles/dialog-layout.css"
-    },
-    {
       "src": "styles/colorblind.css"
     },
     {
       "src": "styles/colorblind-buttons.css"
-    },
-    {
-      "src": "styles/token-manager-ui.css"
-    },
-    {
-      "src": "styles/enhanced-position-tracking.css"
-    },
-    {
-      "src": "styles/templates-inline.css"
     }
   ],
   "languages": [

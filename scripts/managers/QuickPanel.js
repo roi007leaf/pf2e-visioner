@@ -1,4 +1,5 @@
 import AvsOverrideManager from '../chat/services/infra/AvsOverrideManager.js';
+import { loadTokenManagerCSS, loadSharedUICSS } from '../css-loader.js';
 import { COVER_STATES, VISIBILITY_STATES } from '../constants.js';
 import { setCoverBetween, setVisibilityBetween } from '../utils.js';
 
@@ -28,6 +29,8 @@ export class VisionerQuickPanel extends foundry.applications.api.ApplicationV2 {
   };
 
   constructor(options = {}) {
+    loadTokenManagerCSS();
+    loadSharedUICSS();
     super(options);
     this.mode = options.mode || 'target'; // 'observer' | 'target'
     this._floatingBtnEl = null;

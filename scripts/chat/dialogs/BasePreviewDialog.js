@@ -5,6 +5,7 @@
  * - Safe hook attachment/cleanup
  */
 
+import { loadDialogCSS, loadSharedUICSS } from '../../css-loader.js';
 import {
   addTokenImageClickHandlers,
   panToAndSelectToken,
@@ -15,6 +16,8 @@ export class BasePreviewDialog extends foundry.applications.api.HandlebarsApplic
   foundry.applications.api.ApplicationV2
 ) {
   constructor(options = {}) {
+    loadDialogCSS();
+    loadSharedUICSS();
     super(options);
     this._selectionHookId = null;
     this._targetHookId = null;

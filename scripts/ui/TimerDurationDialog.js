@@ -1,4 +1,5 @@
 import { TIMED_OVERRIDE_TYPES, TURN_TIMING, VISIBILITY_STATES } from '../constants.js';
+import { loadDialogCSS, loadSharedUICSS } from '../css-loader.js';
 
 export class TimerDurationDialog extends foundry.applications.api.HandlebarsApplicationMixin(
   foundry.applications.api.ApplicationV2,
@@ -8,6 +9,8 @@ export class TimerDurationDialog extends foundry.applications.api.HandlebarsAppl
     options.window.title =
       game?.i18n?.localize('PF2E_VISIONER.TIMED_OVERRIDE.DIALOG_TITLE') || 'Apply Timed Override';
 
+    loadDialogCSS();
+    loadSharedUICSS();
     super(options);
     this.targetToken = options.targetToken || null;
     this.observerToken = options.observerToken || null;
