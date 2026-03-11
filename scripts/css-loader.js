@@ -40,27 +40,39 @@ export function unloadCSS(...paths) {
   }
 }
 
-// Grouped loaders for related components
+// CSS path groups
+
+const TOKEN_MANAGER_CSS = [
+  'styles/token-manager.css',
+  'styles/token-manager-ui.css',
+  'styles/token-effects.css',
+];
+
+const SHARED_UI_CSS = [
+  'styles/responsive.css',
+  'styles/tooltips.css',
+  'styles/enhanced-position-tracking.css',
+  'styles/templates-inline.css',
+];
+
+const DIALOG_CSS = [
+  'styles/dialog-layout.css',
+];
+
+// Grouped loaders
 
 export function loadTokenManagerCSS() {
-  loadCSS(
-    'styles/token-manager.css',
-    'styles/token-manager-ui.css',
-    'styles/token-effects.css',
-  );
+  loadCSS(...TOKEN_MANAGER_CSS);
 }
 
 export function loadSharedUICSS() {
-  loadCSS(
-    'styles/responsive.css',
-    'styles/tooltips.css',
-    'styles/enhanced-position-tracking.css',
-    'styles/templates-inline.css',
-  );
+  loadCSS(...SHARED_UI_CSS);
 }
 
 export function loadDialogCSS() {
-  loadCSS(
-    'styles/dialog-layout.css',
-  );
+  loadCSS(...DIALOG_CSS);
+}
+
+export function unloadAllUICSS() {
+  unloadCSS(...TOKEN_MANAGER_CSS, ...SHARED_UI_CSS, ...DIALOG_CSS);
 }
