@@ -1,5 +1,11 @@
 # Changelog
 
+## [7.3.0] - 2026-03-11
+
+### Improved
+
+- **Lazy CSS loading for improved performance**: Module stylesheets are now loaded on-demand instead of all at init. Only base variables and colorblind CSS load at startup (~147KB); the remaining ~226KB (token manager, dialogs, responsive, tooltips, position tracking) loads when the corresponding UI is first opened and unloads when closed. Reduces style recalculation overhead during normal gameplay.
+
 ## [7.2.1] - 2026-03-07
 
 ### Fixed
