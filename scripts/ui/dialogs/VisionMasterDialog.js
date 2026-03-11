@@ -1,4 +1,5 @@
 import { MODULE_ID } from '../../constants.js';
+import { loadDialogCSS, loadSharedUICSS } from '../../css-loader.js';
 import { panToAndSelectToken } from '../shared-ui-utils.js';
 
 export class VisionMasterDialog extends foundry.applications.api.ApplicationV2 {
@@ -15,6 +16,8 @@ export class VisionMasterDialog extends foundry.applications.api.ApplicationV2 {
   };
 
   constructor(currentTokenId, excludeTokenId, currentMode = 'one-way', options = {}) {
+    loadDialogCSS();
+    loadSharedUICSS();
     super(options);
     this.currentTokenId = currentTokenId || '';
     this.excludeTokenId = excludeTokenId;

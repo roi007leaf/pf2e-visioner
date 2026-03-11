@@ -3,6 +3,7 @@
  */
 
 import { MODULE_ID } from '../../constants.js';
+import { loadDialogCSS, loadSharedUICSS } from '../../css-loader.js';
 
 export class VisionerWallQuickSettings extends foundry.applications.api.ApplicationV2 {
   static DEFAULT_OPTIONS = {
@@ -25,6 +26,8 @@ export class VisionerWallQuickSettings extends foundry.applications.api.Applicat
   };
 
   constructor(wallDocument, options = {}) {
+    loadDialogCSS();
+    loadSharedUICSS();
     super(options);
     this.wall = wallDocument; // WallDocument
   }

@@ -1,4 +1,5 @@
 import { MODULE_ID } from '../../constants.js';
+import { loadDialogCSS, loadSharedUICSS } from '../../css-loader.js';
 import { panToAndSelectToken } from '../shared-ui-utils.js';
 
 export class SnipingDuoSpotterDialog extends foundry.applications.api.ApplicationV2 {
@@ -15,6 +16,8 @@ export class SnipingDuoSpotterDialog extends foundry.applications.api.Applicatio
     };
 
     constructor(currentSpotterActorKey, excludeTokenId, options = {}) {
+        loadDialogCSS();
+        loadSharedUICSS();
         super(options);
         this.currentSpotterActorKey = String(currentSpotterActorKey || '');
         this.excludeTokenId = excludeTokenId;

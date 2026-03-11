@@ -1,8 +1,12 @@
 /**
  * Darkness Mode chooser - ApplicationV2 dialog returning 'plain' | 'heightened' | 'clear' | null
  */
+import { loadDialogCSS, loadSharedUICSS } from '../../css-loader.js';
+
 export class DarknessModeDialog extends foundry.applications.api.HandlebarsApplicationMixin(foundry.applications.api.ApplicationV2) {
     constructor() {
+        loadDialogCSS();
+        loadSharedUICSS();
         super({
             window: {
                 title: game.i18n.localize('PF2E_VISIONER.DIALOG_TITLES.DARKNESS_MODE'),

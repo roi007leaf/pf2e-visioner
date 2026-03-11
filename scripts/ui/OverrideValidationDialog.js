@@ -4,6 +4,7 @@
  */
 
 import { COVER_STATES, VISIBILITY_STATES } from '../constants.js';
+import { loadDialogCSS, loadSharedUICSS } from '../css-loader.js';
 
 export class OverrideValidationDialog extends foundry.applications.api.HandlebarsApplicationMixin(foundry.applications.api.ApplicationV2) {
 
@@ -11,6 +12,8 @@ export class OverrideValidationDialog extends foundry.applications.api.Handlebar
     options.window = options.window || {};
     options.window.title = game?.i18n?.localize('PF2E_VISIONER.DIALOG_TITLES.AVS_VALIDATION') || 'AVS Changes Validation';
 
+    loadDialogCSS();
+    loadSharedUICSS();
     super(options);
     this.invalidOverrides = options.invalidOverrides || [];
     this.tokenName = options.tokenName || 'Unknown Token';

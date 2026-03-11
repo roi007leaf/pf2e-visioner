@@ -1,4 +1,5 @@
 import { MODULE_ID } from '../../constants.js';
+import { loadDialogCSS, loadSharedUICSS } from '../../css-loader.js';
 import { panToAndSelectToken } from '../shared-ui-utils.js';
 
 export class EncounterMasterDialog extends foundry.applications.api.ApplicationV2 {
@@ -15,6 +16,8 @@ export class EncounterMasterDialog extends foundry.applications.api.ApplicationV
   };
 
   constructor(currentTokenId, excludeTokenId, options = {}) {
+    loadDialogCSS();
+    loadSharedUICSS();
     super(options);
     this.currentTokenId = currentTokenId || '';
     this.excludeTokenId = excludeTokenId;
