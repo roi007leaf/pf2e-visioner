@@ -7,6 +7,7 @@ import { COVER_STATES } from '../../../constants.js';
 import { getCoverLabel, getCoverStealthBonusByState } from '../../../helpers/cover-helpers.js';
 import { CoverModifierService } from '../../../services/CoverModifierService.js';
 import { getCoverBetween } from '../../../utils.js';
+import { VisionAnalyzer } from '../../../visibility/auto-visibility/VisionAnalyzer.js';
 import autoCoverSystem from '../AutoCoverSystem.js';
 import { BaseAutoCoverUseCase } from './BaseUseCase.js';
 
@@ -16,6 +17,24 @@ const coverPrecedence = {
   standard: 2,
   greater: 4,
 };
+
+function _isHostile(token, hider) {
+  const hiderAlliance = hider.actor?.alliance;
+  const tokenAlliance = token.actor?.alliance;
+  if (!hiderAlliance || !tokenAlliance) return false;
+  if (tokenAlliance === 'neutral') return false;
+  return tokenAlliance !== hiderAlliance;
+}
+
+function _hasLineOfSight(observer, hider) {
+  try {
+    const result = VisionAnalyzer.getInstance().hasLineOfSight(observer, hider);
+    if (result === undefined) return true;
+    return result;
+  } catch {
+    return true;
+  }
+}
 
 class StealthCheckUseCase extends BaseAutoCoverUseCase {
   constructor() {
@@ -138,15 +157,14 @@ class StealthCheckUseCase extends BaseAutoCoverUseCase {
       try {
         const originRec = window?.pf2eVisionerTemplateOrigins?.get?.(hider.id);
         if (originRec && !state) {
-          // Only use this if we haven't already determined state from template data
-          state = this._detectCover(originRec.point, target);
+          state = this._detectCover(originRec.point, hider);
         }
       } catch (_) { }
 
       if (!state) {
         // First check for manual cover between tokens
         try {
-          const manualCover = getCoverBetween(hider, target);
+          const manualCover = getCoverBetween(target, hider);
           if (manualCover && manualCover !== 'none') {
             state = manualCover;
           }
@@ -154,7 +172,7 @@ class StealthCheckUseCase extends BaseAutoCoverUseCase {
 
         // Fallback to auto-detection if no manual cover
         if (!state) {
-          state = this._detectCover(hider, target);
+          state = this._detectCover(target, hider);
         }
       }
 
@@ -250,7 +268,9 @@ class StealthCheckUseCase extends BaseAutoCoverUseCase {
       let highestFoundManualCover = 'none';
       try {
         const observers = (canvas?.tokens?.placeables || []).filter(
-          (t) => t && t.actor && t.id !== hider.id,
+          (t) => t && t.actor && t.id !== hider.id &&
+            _hasLineOfSight(t, hider) &&
+            _isHostile(t, hider),
         );
         for (const obs of observers) {
           // First check for manual cover between tokens
@@ -268,7 +288,7 @@ class StealthCheckUseCase extends BaseAutoCoverUseCase {
 
           // Fallback to auto-detection if no manual cover
           if (!s) {
-            s = this._detectCover(hider, obs);
+            s = this._detectCover(obs, hider);
           }
 
           if (s && s !== 'none') {
@@ -469,18 +489,20 @@ class StealthCheckUseCase extends BaseAutoCoverUseCase {
 
             // If not overridden, evaluate cover against all other tokens and pick the best (highest stealth bonus)
             const observers = (canvas?.tokens?.placeables || []).filter(
-              (t) => t && t.actor && t.id !== hider.id,
+              (t) => t && t.actor && t.id !== hider.id &&
+                _hasLineOfSight(t, hider) &&
+                (t.actor.alliance !== 'party' && t.actor?.alliance !== 'neutral'),
             );
             let highestFoundManualCover = 'none';
             if (!state) {
-              let detectedState;
+              let detectedState = 'none';
               try {
                 for (const obs of observers) {
                   try {
                     // First check for manual cover between tokens
                     let s = null;
                     try {
-                      const manualCover = getCoverBetween(hider, obs);
+                      const manualCover = getCoverBetween(obs, hider);
                       if (manualCover && manualCover !== 'none') {
                         s = manualCover;
                         highestFoundManualCover =
@@ -492,7 +514,7 @@ class StealthCheckUseCase extends BaseAutoCoverUseCase {
 
                     // Fallback to auto-detection if no manual cover
                     if (!s) {
-                      s = this._detectCover(hider, obs);
+                      s = this._detectCover(obs, hider);
                     }
 
                     if (s) {

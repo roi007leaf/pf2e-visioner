@@ -1,5 +1,13 @@
 # Changelog
 
+## [7.3.2] - 2026-03-17
+
+### Fixed
+
+- **Stealth cover bonus always showing Greater Cover**: Stealth checks evaluated cover against every token on the scene (including those behind walls with no line of sight, allies, and neutral tokens), causing the cover override to incorrectly default to Greater Cover. Now filters observers by line of sight (using VisionAnalyzer) and alliance, and only considers hostile tokens that can actually see the hider.
+- **Stealth cover detection direction reversed**: Cover was being detected from hider→observer instead of observer→hider, checking what cover the observer had rather than what cover the hider had.
+- **Stealth cover state uninitialized in roll path**: `detectedState` was not initialized to `'none'` in `handleCheckRoll`, causing the cover precedence comparison to silently fail.
+
 ## [7.3.1] - 2026-03-17
 
 ### Fixed
