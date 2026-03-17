@@ -33,7 +33,7 @@ export function createEphemeralEffectRule(signature) {
   return {
     key: 'EphemeralEffect',
     predicate: [`target:signature:${signature}`],
-    selectors: ['strike-attack-roll', 'spell-attack-roll', 'strike-damage', 'attack-spell-damage'],
+    selectors: ['strike-attack-roll', 'spell-attack-roll', 'strike-damage', 'attack-spell-damage', 'impulse-attack-roll'],
     uuid: 'Compendium.pf2e.conditionitems.AJh5ex99aV6VTggg',
   };
 }

@@ -63,6 +63,7 @@ export async function extractActionData(message) {
     (context?.type === 'attack-roll' ||
       context?.type === 'spell-attack-roll' ||
       context?.type === 'strike-attack-roll' ||
+      context?.type === 'impulse-attack-roll' ||
       message.content?.includes('Attack Roll') ||
       message.content?.includes('Strike') ||
       context?.options?.some((opt) => opt.includes('attack-roll'))) &&

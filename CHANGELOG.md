@@ -1,5 +1,11 @@
 # Changelog
 
+## [7.3.1] - 2026-03-17
+
+### Fixed
+
+- **Impulse attack rolls not applying cover flat check**: Kineticist impulse attack rolls (`impulse-attack-roll`) were not recognized as attacks, so cover conditions were not applied. Added impulse attack roll support to both the action extractor and ephemeral effect rule selectors.
+
 ## [7.3.0] - 2026-03-11
 
 ### Improved
