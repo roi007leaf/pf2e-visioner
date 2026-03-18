@@ -3,6 +3,7 @@
  */
 
 import { COVER_STATES } from '../constants.js';
+import { systemIconPath } from '../system-adapter.js';
 
 export function getCoverBonusByState(state) {
   const cfg = COVER_STATES[state];
@@ -27,12 +28,12 @@ export function getCoverLabel(state) {
 export function getCoverImageForState(state) {
   switch (state) {
     case 'lesser':
-      return 'systems/pf2e/icons/equipment/shields/buckler.webp';
+      return systemIconPath('equipment/shields/buckler.webp');
     case 'greater':
-      return 'systems/pf2e/icons/equipment/shields/tower-shield.webp';
+      return systemIconPath('equipment/shields/tower-shield.webp');
     case 'standard':
     default:
-      return 'systems/pf2e/icons/equipment/shields/steel-shield.webp';
+      return systemIconPath('equipment/shields/steel-shield.webp');
   }
 }
 

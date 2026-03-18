@@ -3,6 +3,7 @@
  */
 
 import { MODULE_ID, VISIBILITY_STATES } from '../constants.js';
+import { systemIconPath, systemCompendiumId } from '../system-adapter.js';
 
 /**
  * Get the correct PF2E condition icon for a visibility state
@@ -21,7 +22,7 @@ function getPF2eConditionIcon(visibilityState) {
     }
 
     // Fallback to direct path
-    return `systems/pf2e/icons/conditions/${visibilityState}.webp`;
+    return systemIconPath(`conditions/${visibilityState}.webp`);
   } catch (error) {
     console.error(`PF2E Visioner: Failed to get condition icon for ${visibilityState}:`, error);
     // Ultimate fallback to a generic effect icon
@@ -34,7 +35,7 @@ export function createEphemeralEffectRule(signature) {
     key: 'EphemeralEffect',
     predicate: [`target:signature:${signature}`],
     selectors: ['strike-attack-roll', 'spell-attack-roll', 'strike-damage', 'attack-spell-damage', 'impulse-attack-roll'],
-    uuid: 'Compendium.pf2e.conditionitems.AJh5ex99aV6VTggg',
+    uuid: `Compendium.${systemCompendiumId('conditionitems.AJh5ex99aV6VTggg')}`,
   };
 }
 

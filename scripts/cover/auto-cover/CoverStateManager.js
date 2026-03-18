@@ -6,6 +6,7 @@
 import { MODULE_ID } from '../../constants.js';
 import { getCoverBonusByState } from '../../helpers/cover-helpers.js';
 import { getCoverLevelRollOptions } from '../batch.js';
+import { systemIconPath } from '../../system-adapter.js';
 
 export class CoverStateManager {
   /**
@@ -175,13 +176,13 @@ export class CoverStateManager {
 
       // Pick a representative image per cover level
       const coverEffectImageByState = {
-        lesser: 'systems/pf2e/icons/equipment/shields/buckler.webp',
-        standard: 'systems/pf2e/icons/equipment/shields/steel-shield.webp',
-        greater: 'systems/pf2e/icons/equipment/shields/tower-shield.webp',
+        lesser: systemIconPath('equipment/shields/buckler.webp'),
+        standard: systemIconPath('equipment/shields/steel-shield.webp'),
+        greater: systemIconPath('equipment/shields/tower-shield.webp'),
       };
 
       const effectImg =
-        coverEffectImageByState[state] || 'systems/pf2e/icons/equipment/shields/steel-shield.webp';
+        coverEffectImageByState[state] || systemIconPath('equipment/shields/steel-shield.webp');
 
       // Create a new effect item
       const ephemeralEffect = {

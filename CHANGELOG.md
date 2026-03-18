@@ -1,5 +1,11 @@
 # Changelog
 
+## [7.4.0] - 2026-03-18
+
+### Added
+
+- **Starfinder 2e (sf2e) system support**: Module now works with both Pathfinder 2e and Starfinder 2e. System-dependent paths (icons, compendiums, settings) are resolved dynamically via a system adapter.
+
 ## [7.3.2] - 2026-03-17
 
 ### Fixed

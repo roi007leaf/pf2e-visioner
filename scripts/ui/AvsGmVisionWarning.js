@@ -1,4 +1,5 @@
 import { MODULE_ID } from '../constants.js';
+import { getSystemId } from '../system-adapter.js';
 
 const ELEMENT_ID = 'pf2e-visioner-avs-gm-vision-warning';
 const STYLE_ID = 'pf2e-visioner-avs-gm-vision-warning-styles';
@@ -205,7 +206,7 @@ function ensureElement() {
 
 function gmVisionEnabled() {
     try {
-        const setting = game.settings?.get?.('pf2e', 'gmVision');
+        const setting = game.settings?.get?.(getSystemId(), 'gmVision');
         if (typeof setting === 'boolean') return setting;
     } catch {
         /* ignore */
@@ -295,7 +296,7 @@ export function registerAvsGmVisionWarning() {
     Hooks.on('updateScene', () => updateAvsGmVisionWarning());
     Hooks.on('canvasReady', () => updateAvsGmVisionWarning());
     Hooks.on('updateSetting', (setting) => {
-        if (isSetting(setting, 'pf2e', 'gmVision')) return updateAvsGmVisionWarning();
+        if (isSetting(setting, getSystemId(), 'gmVision')) return updateAvsGmVisionWarning();
         if (isSetting(setting, MODULE_ID, 'autoVisibilityEnabled')) return updateAvsGmVisionWarning();
         if (isSetting(setting, MODULE_ID, 'suppressAvsGmVisionWarning')) return updateAvsGmVisionWarning();
     });
