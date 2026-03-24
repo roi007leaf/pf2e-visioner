@@ -304,6 +304,7 @@ export class BatchProcessor {
       idToToken,
       // Use stateless calculator for better performance and testability
       useStatelessCalculator: true,
+      visibilityMapCache: visCache,
     };
 
     for (const changedTokenId of changedTokenIds) {
@@ -668,25 +669,26 @@ export class BatchProcessor {
           });
         }
 
-        // For pairs involving the changed token, always sync ephemeral effects
-        // even if visibility state didn't change (e.g., when Blind-Fight is added/removed)
-        // This ensures off-guard effects are properly updated when suppression flags change
-        if (!needsEphemeralUpdate1 && effectiveVisibility1) {
-
-          updates.push({
-            observer: changedToken,
-            target: otherToken,
-            visibility: effectiveVisibility1,
-            forceEphemeralOnly: true, // Don't update the visibility map, just sync effects
-          });
-        }
-        if (!needsEphemeralUpdate2 && effectiveVisibility2) {
-          updates.push({
-            observer: otherToken,
-            target: changedToken,
-            visibility: effectiveVisibility2,
-            forceEphemeralOnly: true, // Don't update the visibility map, just sync effects
-          });
+        // Ephemeral-only resync for unchanged pairs is skipped here for performance.
+        // Off-guard suppression changes (e.g. Blind-Fight added/removed) are handled via
+        // calcOptions.forceEphemeralResync, which is set by ItemEventHandler when needed.
+        if (calcOptions?.forceEphemeralResync) {
+          if (!needsEphemeralUpdate1 && effectiveVisibility1) {
+            updates.push({
+              observer: changedToken,
+              target: otherToken,
+              visibility: effectiveVisibility1,
+              forceEphemeralOnly: true,
+            });
+          }
+          if (!needsEphemeralUpdate2 && effectiveVisibility2) {
+            updates.push({
+              observer: otherToken,
+              target: changedToken,
+              visibility: effectiveVisibility2,
+              forceEphemeralOnly: true,
+            });
+          }
         }
       }
     }

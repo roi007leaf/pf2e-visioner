@@ -35,6 +35,7 @@ export async function setVisibilityMap(token, visibilityMap) {
   return result;
 }
 
+
 /**
  * Read visibility state between two tokens
  * @param {Token} observer

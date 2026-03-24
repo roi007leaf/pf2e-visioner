@@ -27,7 +27,13 @@ describe('BatchOrchestrator', () => {
         telemetryReporter = { start: jest.fn(), stop: jest.fn() };
         exclusionManager = { isExcludedToken: jest.fn(() => false) };
         visibilityMapService = {
-            setVisibilityBetween: (o, t, v) => applied.push([o?.document?.id, t?.document?.id, v])
+            setVisibilityBetween: (o, t, v) => applied.push([o?.document?.id, t?.document?.id, v]),
+            getVisibilityMap: () => ({}),
+            setVisibilityMap: (token, visMap) => {
+                for (const [targetId, state] of Object.entries(visMap)) {
+                    applied.push([token?.document?.id, targetId, state]);
+                }
+            },
         };
         orchestrator = new BatchOrchestrator({
             batchProcessor,

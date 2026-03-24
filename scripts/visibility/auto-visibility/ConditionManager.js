@@ -240,6 +240,8 @@ export class ConditionManager {
    * @param {Actor} actor
    */
   async handleInvisibilityChange(actor) {
+    if (!game.user.isGM) return;
+
     // Find the actor's token(s) on the current scene
     const tokens = canvas.tokens.placeables.filter((token) =>
       token.actor?.id === actor.id && !this.#exclusionManager.isExcludedToken(token)

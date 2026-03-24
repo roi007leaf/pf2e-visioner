@@ -1,5 +1,22 @@
 # Changelog
 
+## [7.5.0] - 2026-03-24
+
+### Added
+
+- **Invisibility previous-state tracking**: When a creature becomes invisible, visibility now degrades based on PF2e rules. Previously observed/concealed targets become hidden (observer knew where they were); previously hidden targets become undetected. Targets with no prior visibility state default to undetected.
+
+### Improved
+
+- **600x batch processing speedup**: Eliminated dynamic imports and unnecessary `await` yield points in the per-pair visibility calculation loop. 56 visibility calculations dropped from ~6600ms to ~11ms for 8 tokens.
+- **Batched visibility map writes**: Grouped per-pair `token.document.update()` calls by observer, reducing O(N²) Foundry document writes to O(N) per batch.
+- **Skip darkness ray checks when no darkness sources**: Adapter skips async `checkDarknessRayIntersection` entirely when `hasDarknessSources` is false, eliminating unnecessary async overhead.
+- **Ephemeral effect sync optimization**: Switched from per-pair sequential `updateSingleVisibilityEffect` to batched `batchUpdateVisibilityEffects`, and stopped generating `forceEphemeralOnly` entries for every unchanged pair.
+
+### Fixed
+
+- **Player permission errors on condition changes**: Added GM guards to token document writes in `ConditionManager`, `BatchOrchestrator`, ephemeral effect handlers (`batch.js`, `update.js`), preventing "lacks permission to update Token" errors on player clients.
+
 ## [7.4.0] - 2026-03-18
 
 ### Added

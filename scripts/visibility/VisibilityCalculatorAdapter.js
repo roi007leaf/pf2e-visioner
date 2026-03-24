@@ -14,6 +14,7 @@ import { ConcealmentRegionBehavior } from '../regions/ConcealmentRegionBehavior.
 import { SenseSuppressionRegionBehavior } from '../regions/SenseSuppressionRegionBehavior.js';
 import { LevelsIntegration } from '../services/LevelsIntegration.js';
 import { getLogger } from '../utils/logger.js';
+import { getVisibilityMap } from '../stores/visibility-map.js';
 import { calculateVisibility } from './StatelessVisibilityCalculator.js';
 
 const log = getLogger('AVS/VisibilityAdapter');
@@ -109,7 +110,9 @@ export async function tokenStateToInput(
   let linePassesThroughDarkness = false;
   let rayDarknessRank = 0;
 
-  if (options?.precomputedLights) {
+  if (options?.hasDarknessSources === false) {
+    // No darkness sources on scene — skip all ray darkness checks
+  } else if (options?.precomputedLights) {
     // Use precomputed data - much faster than ray intersection
     const observerLight = options.precomputedLights.get(observer.document.id);
     const targetLight = options.precomputedLights.get(target.document.id);
@@ -269,7 +272,6 @@ function extractTargetState(
   if (!concealment && observerPosition && targetPosition) {
     const regionConcealment = checkRegionConcealment(observerPosition, targetPosition);
     concealment = regionConcealment;
-  } else if (!observerPosition || !targetPosition) {
   }
 
   // Extract auxiliary conditions (invisible, etc.)
@@ -621,6 +623,17 @@ export async function calculateVisibilityFromTokens(observer, target, dependenci
     observerId: observer?.id,
     targetId: target?.id,
   };
+
+  if (input.target.auxiliary?.includes('invisible')) {
+    try {
+      const visMap = options?.visibilityMapCache
+        ? options.visibilityMapCache.getMap(observer)
+        : getVisibilityMap(observer);
+      input.previousState = visMap[target?.document?.id] || null;
+    } catch {
+      input.previousState = null;
+    }
+  }
 
   // Calculate using stateless calculator
   const result = calculateVisibility(input);

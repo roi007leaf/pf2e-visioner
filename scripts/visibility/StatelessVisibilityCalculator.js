@@ -64,6 +64,7 @@ export function calculateVisibility(input) {
   const rayDarkness = input.rayDarkness || null;
   const soundBlocked = input.soundBlocked ?? false;
   const hasLineOfSight = input.hasLineOfSight ?? undefined;
+  const previousState = input.previousState ?? null;
 
   // Decision tree: follow PF2e visibility rules in priority order
 
@@ -93,6 +94,15 @@ export function calculateVisibility(input) {
   if (visualDetection.canDetect) {
     const visualResult = applyVisualModifiers(visualDetection, observer, target);
     allDetectionResults.push(visualResult);
+  }
+
+  // 2b-2. Invisibility with previous state: degrade based on what observer knew before
+  const isInvisible = target.auxiliary.includes('invisible');
+  if (!visualDetection.canDetect && isInvisible && previousState) {
+    const invisibilityResult = resolveInvisibilityFromPreviousState(previousState);
+    if (invisibilityResult) {
+      allDetectionResults.push(invisibilityResult);
+    }
   }
 
   // 2c. Check imprecise senses (work through walls but provide worse detection)
@@ -777,6 +787,22 @@ function checkImpreciseSenses(observer, target, soundBlocked = false) {
   };
 }
 
+function resolveInvisibilityFromPreviousState(previousState) {
+  if (
+    previousState === VisibilityState.OBSERVED ||
+    previousState === VisibilityState.CONCEALED
+  ) {
+    return {
+      state: VisibilityState.HIDDEN,
+      detection: {
+        isPrecise: false,
+        sense: SenseType.VISION,
+      },
+    };
+  }
+  return null;
+}
+
 /**
  * Apply visual modifiers (concealment, cover, invisibility) to base visual detection
  */
@@ -831,6 +857,7 @@ export const _internal = {
   determineVisualDetection,
   checkImpreciseSenses,
   applyVisualModifiers,
+  resolveInvisibilityFromPreviousState,
   canLifesenseDetect,
   canThoughtsenseDetect,
   selectBestDetection,

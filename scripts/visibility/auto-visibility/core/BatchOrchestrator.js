@@ -397,7 +397,7 @@ export class BatchOrchestrator {
       }
 
       // Apply results - this writes NEW values to maps
-      const uniqueUpdateCount = this._applyBatchResults(batchResult, options);
+      const uniqueUpdateCount = this._applyBatchResults(batchResult);
 
       // Flush batched detection writes (turns 110+ writes into one batched operation)
       const { flushDetectionBatch } = await import('../../../stores/detection-map.js');
@@ -760,52 +760,41 @@ export class BatchOrchestrator {
     }
 
     try {
-      const { updateEphemeralEffectsForVisibility } = await import(
+      const { batchUpdateVisibilityEffects } = await import(
         '../../../visibility/ephemeral.js'
       );
 
-      // Set flags to suppress both refreshToken processing AND lightingRefresh during ephemeral effect updates
-      // This prevents feedback loops where effect updates trigger refreshToken → lightingRefresh → new batch
       if (!globalThis.game) globalThis.game = {};
       if (!globalThis.game.pf2eVisioner) globalThis.game.pf2eVisioner = {};
       globalThis.game.pf2eVisioner.suppressRefreshTokenProcessing = true;
       globalThis.game.pf2eVisioner.suppressLightingRefresh = true;
 
       try {
-        // Deduplicate updates to avoid syncing the same pair multiple times
         const syncedPairs = new Set();
-        let syncCount = 0;
-        let skippedCount = 0;
+        const updatesByObserver = new Map();
 
         for (const update of updates) {
           const observerId = update.observer?.document?.id;
           const targetId = update.target?.document?.id;
 
           if (!observerId || !targetId) continue;
-
-          // Skip hazards and loot tokens - they don't need visibility effects
-          if (this._isHazardOrLoot(update.target)) {
-            skippedCount++;
-            continue;
-          }
+          if (this._isHazardOrLoot(update.target)) continue;
 
           const pairKey = `${observerId}-${targetId}`;
           if (syncedPairs.has(pairKey)) continue;
           syncedPairs.add(pairKey);
 
-          // Update ephemeral effects for this specific observer-target pair
-          await updateEphemeralEffectsForVisibility(
-            update.observer,
-            update.target,
-            update.visibility,
-          );
-          syncCount++;
+          if (!updatesByObserver.has(observerId)) {
+            updatesByObserver.set(observerId, { observer: update.observer, targets: [] });
+          }
+          updatesByObserver.get(observerId).targets.push({
+            target: update.target,
+            state: update.visibility,
+          });
         }
 
-        if (syncCount > 0 || skippedCount > 0) {
-          this.systemState?.debug?.(
-            `BatchOrchestrator: synced ${syncCount} ephemeral effects, skipped ${skippedCount} hazards/loot`,
-          );
+        for (const { observer, targets } of updatesByObserver.values()) {
+          await batchUpdateVisibilityEffects(observer, targets);
         }
       } finally {
         // Clear the suppression flags after a short delay
@@ -830,55 +819,62 @@ export class BatchOrchestrator {
    * @returns {number} Number of unique updates applied
    * @private
    */
-  _applyBatchResults(batchResult, options = {}) {
+  _applyBatchResults(batchResult) {
     let uniqueUpdateCount = 0;
 
-    if (batchResult.updates && batchResult.updates.length > 0) {
+    if (!batchResult.updates || batchResult.updates.length === 0) {
+      return uniqueUpdateCount;
+    }
 
-      // Deduplicate updates before applying them
-      const uniqueUpdates = [];
-      const updateKeys = new Set();
+    const uniqueUpdates = [];
+    const updateKeys = new Set();
 
-      for (const update of batchResult.updates) {
-        const key = `${update.observer?.document?.id}-${update.target?.document?.id}`;
-        if (!updateKeys.has(key)) {
-          updateKeys.add(key);
-          uniqueUpdates.push(update);
-        }
+    for (const update of batchResult.updates) {
+      const key = `${update.observer?.document?.id}-${update.target?.document?.id}`;
+      if (!updateKeys.has(key)) {
+        updateKeys.add(key);
+        uniqueUpdates.push(update);
       }
+    }
 
-      uniqueUpdateCount = uniqueUpdates.length;
+    const observerMaps = new Map();
+    const dirtyObservers = new Set();
 
-      // Apply unique updates with override safety guard
-      for (const update of uniqueUpdates) {
-        try {
-          const obsId = update.observer?.document?.id;
-          const tgtDoc = update.target?.document;
-          if (obsId && tgtDoc?.getFlag) {
-            const flagKey = `avs-override-from-${obsId}`;
-            const overrideData = tgtDoc.getFlag(MODULE_ID, flagKey);
-            if (overrideData?.state && overrideData.state !== update.visibility) {
-              // Skip applying AVS-calculated visibility that contradicts an active override
-              continue;
-            }
+    for (const update of uniqueUpdates) {
+      if (update.forceEphemeralOnly) continue;
+
+      try {
+        const obsId = update.observer?.document?.id;
+        const tgtDoc = update.target?.document;
+        if (obsId && tgtDoc?.getFlag) {
+          const flagKey = `avs-override-from-${obsId}`;
+          const overrideData = tgtDoc.getFlag(MODULE_ID, flagKey);
+          if (overrideData?.state && overrideData.state !== update.visibility) {
+            continue;
           }
-        } catch {
-          // If guard fails, fall through to applying the update
         }
-
-        // If forceEphemeralOnly is true, skip the visibility map update
-        // and only sync ephemeral effects (handled in _syncEphemeralEffectsForUpdates)
-        if (update.forceEphemeralOnly) {
-          continue;
-        }
-
-        this.visibilityMapService.setVisibilityBetween(
-          update.observer,
-          update.target,
-          update.visibility,
-          options,
-        );
+      } catch {
+        // fall through
       }
+
+      const observer = update.observer;
+      const targetId = update.target?.document?.id;
+      if (!observer?.document?.id || !targetId) continue;
+
+      if (!observerMaps.has(observer)) {
+        observerMaps.set(observer, { ...this.visibilityMapService.getVisibilityMap(observer) });
+      }
+
+      const visMap = observerMaps.get(observer);
+      if (visMap[targetId] !== update.visibility) {
+        visMap[targetId] = update.visibility;
+        dirtyObservers.add(observer);
+        uniqueUpdateCount++;
+      }
+    }
+
+    for (const observer of dirtyObservers) {
+      this.visibilityMapService.setVisibilityMap(observer, observerMaps.get(observer));
     }
 
     return uniqueUpdateCount;

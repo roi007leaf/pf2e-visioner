@@ -7,8 +7,12 @@
  * function-based calculation logic.
  */
 
+import { setDetectionBetween } from '../../stores/detection-map.js';
+import { getLogger } from '../../utils/logger.js';
 import { calculateVisibilityFromTokens } from '../VisibilityCalculatorAdapter.js';
 import { SpatialAnalysisService } from './core/SpatialAnalysisService.js';
+
+const log = getLogger('AVS/VisibilityCalculator');
 
 export class VisibilityCalculator {
   /** @type {VisibilityCalculator} */
@@ -156,7 +160,6 @@ export class VisibilityCalculator {
     targetPositionOverride = null,
     options = undefined,
   ) {
-    const log = await import('../../utils/logger.js').then(m => m.getLogger('AVS/VisibilityCalculator'));
     log.debug(() => ({
       msg: 'calculateVisibilityBetweenTokens:start',
       observerName: observer?.name,
@@ -187,14 +190,10 @@ export class VisibilityCalculator {
       detection: result.detection
     }));
 
-    // Store detection info alongside visibility (for tooltips and UI)
-    // Import detection map functions dynamically to avoid circular dependencies
     try {
-      const { setDetectionBetween } = await import('../../stores/detection-map.js');
-      await setDetectionBetween(observer, target, result.detection || null);
-    } catch (err) {
-      // Non-critical: detection storage failure shouldn't break visibility calculation
-      console.warn('PF2E Visioner: Failed to store detection info:', err);
+      setDetectionBetween(observer, target, result.detection || null)?.catch?.(() => {});
+    } catch {
+      // non-critical
     }
 
     return result.state;

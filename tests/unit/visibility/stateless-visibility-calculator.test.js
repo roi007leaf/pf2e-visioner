@@ -556,6 +556,125 @@ describe('StatelessVisibilityCalculator', () => {
                 sense: 'tremorsense'
             });
         });
+
+        test('invisible + previousState observed = hidden (vision remembers location)', () => {
+            const input = {
+                target: {
+                    lightingLevel: 'bright',
+                    concealment: false,
+                    auxiliary: ['invisible']
+                },
+                observer: {
+                    precise: {
+                        vision: { range: Infinity }
+                    },
+                    imprecise: {},
+                    conditions: {}
+                },
+                previousState: 'observed'
+            };
+
+            const result = calculateVisibility(input);
+            expect(result.state).toBe('hidden');
+            expect(result.detection).toEqual({
+                isPrecise: false,
+                sense: 'vision'
+            });
+        });
+
+        test('invisible + previousState concealed = hidden', () => {
+            const input = {
+                target: {
+                    lightingLevel: 'bright',
+                    concealment: false,
+                    auxiliary: ['invisible']
+                },
+                observer: {
+                    precise: {
+                        vision: { range: Infinity }
+                    },
+                    imprecise: {},
+                    conditions: {}
+                },
+                previousState: 'concealed'
+            };
+
+            const result = calculateVisibility(input);
+            expect(result.state).toBe('hidden');
+            expect(result.detection).toEqual({
+                isPrecise: false,
+                sense: 'vision'
+            });
+        });
+
+        test('invisible + previousState hidden = undetected', () => {
+            const input = {
+                target: {
+                    lightingLevel: 'bright',
+                    concealment: false,
+                    auxiliary: ['invisible']
+                },
+                observer: {
+                    precise: {
+                        vision: { range: Infinity }
+                    },
+                    imprecise: {},
+                    conditions: {}
+                },
+                previousState: 'hidden'
+            };
+
+            const result = calculateVisibility(input);
+            expect(result.state).toBe('undetected');
+            expect(result.detection).toBe(null);
+        });
+
+        test('invisible + no previousState = undetected (backwards compatible)', () => {
+            const input = {
+                target: {
+                    lightingLevel: 'bright',
+                    concealment: false,
+                    auxiliary: ['invisible']
+                },
+                observer: {
+                    precise: {
+                        vision: { range: Infinity }
+                    },
+                    imprecise: {},
+                    conditions: {}
+                }
+            };
+
+            const result = calculateVisibility(input);
+            expect(result.state).toBe('undetected');
+            expect(result.detection).toBe(null);
+        });
+
+        test('invisible + previousState observed + echolocation = observed (precise non-visual wins)', () => {
+            const input = {
+                target: {
+                    lightingLevel: 'bright',
+                    concealment: false,
+                    auxiliary: ['invisible']
+                },
+                observer: {
+                    precise: {
+                        vision: { range: Infinity },
+                        echolocation: { range: 60 }
+                    },
+                    imprecise: {},
+                    conditions: {}
+                },
+                previousState: 'observed'
+            };
+
+            const result = calculateVisibility(input);
+            expect(result.state).toBe('observed');
+            expect(result.detection).toEqual({
+                isPrecise: true,
+                sense: 'echolocation'
+            });
+        });
     });
 
     describe('Observer conditions', () => {

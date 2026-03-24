@@ -1,4 +1,4 @@
-import { getVisibilityMap as storeGetVisibilityMap, setVisibilityBetween as storeSetVisibilityBetween } from '../../../stores/visibility-map.js';
+import { getVisibilityMap as storeGetVisibilityMap, setVisibilityMap as storeSetVisibilityMap, setVisibilityBetween as storeSetVisibilityBetween } from '../../../stores/visibility-map.js';
 /**
  * VisibilityMapService
  * Thin wrapper service around the visibility map store utilities.
@@ -28,5 +28,9 @@ export class VisibilityMapService {
      */
     async setVisibilityBetween(observer, target, state, options = undefined) {
         return storeSetVisibilityBetween(observer, target, state, options);
+    }
+
+    async setVisibilityMap(token, visibilityMap) {
+        return storeSetVisibilityMap(token, visibilityMap);
     }
 }
