@@ -755,7 +755,7 @@ export class BatchOrchestrator {
    * @private
    */
   async _syncEphemeralEffectsForUpdates(updates) {
-    if (!updates || updates.length === 0) {
+    if (!game.user.isGM || !updates || updates.length === 0) {
       return;
     }
 
@@ -822,7 +822,7 @@ export class BatchOrchestrator {
   _applyBatchResults(batchResult) {
     let uniqueUpdateCount = 0;
 
-    if (!batchResult.updates || batchResult.updates.length === 0) {
+    if (!game.user.isGM || !batchResult.updates || batchResult.updates.length === 0) {
       return uniqueUpdateCount;
     }
 

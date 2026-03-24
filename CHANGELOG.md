@@ -1,5 +1,14 @@
 # Changelog
 
+## [7.5.1] - 2026-03-24
+
+### Fixed
+
+- **Invisible token movement no longer degrades to undetected**: Hidden state now persists across movement recalculations. Previously, moving an invisible token re-read `previousState` from the live visibility map (which already said `hidden`), causing it to degrade to undetected. Now `hidden` correctly resolves to `hidden` in `resolveInvisibilityFromPreviousState`.
+- **Invisible condition removal now updates visibility immediately**: `extractAuxiliaryConditions` was checking `flags.invisibility` (per-observer tracking data) as evidence of invisibility. These flags persist after the condition is removed, causing the target to remain invisible to the stateless calculator. Now only checks `flags.invisible` (explicit flag) and the actual PF2e condition.
+- **Invisibility previousState reads from ConditionManager flags first**: Adapter now reads `previousState` from the stable `flags['pf2e-visioner'].invisibility[observerId].previousState` set when invisibility is first applied, falling back to `visibilityMapCache` only if flags aren't available.
+- **GM guards re-applied to BatchOrchestrator**: Re-added `game.user.isGM` guards to `_applyBatchResults` and `_syncEphemeralEffectsForUpdates` after linter revert.
+
 ## [7.5.0] - 2026-03-24
 
 ### Added

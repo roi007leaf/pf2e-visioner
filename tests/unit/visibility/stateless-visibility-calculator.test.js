@@ -607,7 +607,7 @@ describe('StatelessVisibilityCalculator', () => {
             });
         });
 
-        test('invisible + previousState hidden = undetected', () => {
+        test('invisible + previousState hidden = hidden (persists across recalculations)', () => {
             const input = {
                 target: {
                     lightingLevel: 'bright',
@@ -625,8 +625,11 @@ describe('StatelessVisibilityCalculator', () => {
             };
 
             const result = calculateVisibility(input);
-            expect(result.state).toBe('undetected');
-            expect(result.detection).toBe(null);
+            expect(result.state).toBe('hidden');
+            expect(result.detection).toEqual({
+                isPrecise: false,
+                sense: 'vision'
+            });
         });
 
         test('invisible + no previousState = undetected (backwards compatible)', () => {
@@ -648,6 +651,31 @@ describe('StatelessVisibilityCalculator', () => {
             const result = calculateVisibility(input);
             expect(result.state).toBe('undetected');
             expect(result.detection).toBe(null);
+        });
+
+        test('not invisible + stale previousState = observed (invisibility removed)', () => {
+            const input = {
+                target: {
+                    lightingLevel: 'bright',
+                    concealment: false,
+                    auxiliary: []
+                },
+                observer: {
+                    precise: {
+                        vision: { range: Infinity }
+                    },
+                    imprecise: {},
+                    conditions: {}
+                },
+                previousState: 'hidden'
+            };
+
+            const result = calculateVisibility(input);
+            expect(result.state).toBe('observed');
+            expect(result.detection).toEqual({
+                isPrecise: true,
+                sense: 'vision'
+            });
         });
 
         test('invisible + previousState observed + echolocation = observed (precise non-visual wins)', () => {

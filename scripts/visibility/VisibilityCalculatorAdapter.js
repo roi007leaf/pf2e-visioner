@@ -14,7 +14,6 @@ import { ConcealmentRegionBehavior } from '../regions/ConcealmentRegionBehavior.
 import { SenseSuppressionRegionBehavior } from '../regions/SenseSuppressionRegionBehavior.js';
 import { LevelsIntegration } from '../services/LevelsIntegration.js';
 import { getLogger } from '../utils/logger.js';
-import { getVisibilityMap } from '../stores/visibility-map.js';
 import { calculateVisibility } from './StatelessVisibilityCalculator.js';
 
 const log = getLogger('AVS/VisibilityAdapter');
@@ -549,9 +548,9 @@ function extractAuxiliaryConditions(target, options) {
     }
   }
 
-  // Check flags for invisible
+  // Check flags for invisible (only the explicit invisible flag, not the invisibility tracking data)
   const flags = target?.document?.flags?.['pf2e-visioner'] || {};
-  if (flags.invisible || flags.invisibility) {
+  if (flags.invisible) {
     if (!auxiliary.includes('invisible')) {
       auxiliary.push('invisible');
     }
@@ -626,10 +625,13 @@ export async function calculateVisibilityFromTokens(observer, target, dependenci
 
   if (input.target.auxiliary?.includes('invisible')) {
     try {
-      const visMap = options?.visibilityMapCache
-        ? options.visibilityMapCache.getMap(observer)
-        : getVisibilityMap(observer);
-      input.previousState = visMap[target?.document?.id] || null;
+      const invisFlags = target?.document?.flags?.['pf2e-visioner']?.invisibility;
+      const fromFlags = invisFlags?.[observer?.document?.id]?.previousState;
+      if (fromFlags) {
+        input.previousState = fromFlags;
+      } else if (options?.visibilityMapCache) {
+        input.previousState = options.visibilityMapCache.getMap(observer)[target?.document?.id] || null;
+      }
     } catch {
       input.previousState = null;
     }
