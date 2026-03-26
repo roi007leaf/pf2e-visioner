@@ -4,6 +4,7 @@
 
 import { MODULE_ID } from './constants.js';
 import autoCoverSystem from './cover/auto-cover/AutoCoverSystem.js';
+import { getCoverMap } from './stores/cover-map.js';
 import { VisionerTokenManager } from './managers/token-manager/TokenManager.js';
 import {
   rebuildAndRefresh,
@@ -2136,7 +2137,7 @@ export class Pf2eVisionerApi {
         });
       } else {
         // Try to get cached cover first, then fall back to fresh calculation
-        coverState = (observerToken, targetToken);
+        coverState = getCoverMap(observerToken)?.[targetToken.id];
         if (!coverState || coverState === 'none') {
           coverState = autoCoverSystem.detectCoverBetweenTokens(observerToken, targetToken, {
             rawPrereq,
