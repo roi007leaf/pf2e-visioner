@@ -242,10 +242,16 @@ export class ConditionManager {
   async handleInvisibilityChange(actor) {
     if (!game.user.isGM) return;
 
-    // Find the actor's token(s) on the current scene
-    const tokens = canvas.tokens.placeables.filter((token) =>
-      token.actor?.id === actor.id && !this.#exclusionManager.isExcludedToken(token)
+    // Scope to the specific token that triggered the change:
+    // use the controlled token if it matches, otherwise fall back to actor lookup
+    const controlled = canvas.tokens.controlled.find(
+      (t) => t.actor?.id === actor.id
     );
+    const tokens = controlled
+      ? [controlled]
+      : canvas.tokens.placeables.filter((token) =>
+        token.actor?.id === actor.id && !this.#exclusionManager.isExcludedToken(token)
+      );
 
     for (const token of tokens) {
       // Check if invisibility was added (try multiple methods)
@@ -276,6 +282,17 @@ export class ConditionManager {
           error,
         );
       }
+
+      // Apply Foundry's OutlineOverlayFilter as detection filter for invisible tokens.
+      // Foundry's built-in pipeline only sets this when GM controls a token with vision;
+      // we apply it directly so it works regardless.
+      setTimeout(() => {
+        try {
+          if (token.destroyed) return;
+          canvas.perception?.update({ refreshVision: true, refreshLighting: true });
+          this.#applyInvisibleMeshEffect(token, hasInvisibility);
+        } catch { }
+      }, 100);
     }
   }
 
@@ -446,6 +463,16 @@ export class ConditionManager {
    * Trigger perception refresh to immediately apply visibility changes
    * @param {Token} token
    */
+  #applyInvisibleMeshEffect(token, isInvisible) {
+    try {
+      if (!game.user.isGM || !token || token.destroyed) return;
+      const statusId = CONFIG.specialStatusEffects.INVISIBLE;
+      if (token._configureFilterEffect) {
+        token._configureFilterEffect(statusId, isInvisible);
+      }
+    } catch { }
+  }
+
   async #triggerPerceptionRefresh(token) {
     try {
       // Try multiple approaches to trigger perception refresh

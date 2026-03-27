@@ -9,6 +9,24 @@ import { SeekActionHandler } from './actions/SeekAction.js';
 import { SneakActionHandler } from './actions/SneakAction.js';
 import { TakeCoverActionHandler } from './actions/TakeCoverAction.js';
 
+function resolveSneakingToken(handler, actionData) {
+  // Prioritize the token ID stored when "Start Sneak" was clicked — it's the most reliable
+  // source since actionData.actor can resolve to the wrong unlinked token
+  try {
+    const message = actionData?.message || game.messages?.get(actionData?.messageId);
+    const tokenId = message?.flags?.['pf2e-visioner']?.sneakStartPosition?.tokenId;
+    if (tokenId) {
+      const token = canvas?.tokens?.placeables?.find((t) => t.id === tokenId);
+      if (token) return token;
+    }
+  } catch { }
+  try {
+    const token = handler._getSneakingToken(actionData);
+    if (token) return token;
+  } catch { }
+  return null;
+}
+
 export async function applyNowSeek(actionData, button) {
   const handler = new SeekActionHandler();
   return handler.apply(actionData, button);
@@ -25,93 +43,82 @@ export async function applyNowHide(actionData, button) {
 }
 
 export async function applyNowSneak(actionData, button) {
+  let appliedCount = 0;
   try {
-    // For sneak actions, use the dual system application singleton instead of the old handler
-    // The module exports a default singleton instance
     const dualModule = await import('./DualSystemResultApplication.js');
     const dualSystemApplication = dualModule.default;
 
-    // Get the cached outcomes from the action handler
     const handler = new SneakActionHandler();
     let allOutcomes = await handler.getCachedOutcomes(actionData) || [];
-    // Honor UI overrides (from dialog icon selections) by applying them onto the freshly computed outcomes
     try {
       allOutcomes = handler.applyOverrides(actionData, allOutcomes) || allOutcomes;
     } catch { }
 
-    if (allOutcomes.length === 0) {
-      console.warn('PF2E Visioner | No cached outcomes found for sneak application');
-      // Fallback to original handler
-      return handler.apply(actionData, button);
-    }
-
-    // If overrides are specified, filter to only apply those specific tokens
-    let outcomesToApply = allOutcomes;
-    if (actionData.overrides && Object.keys(actionData.overrides).length > 0) {
-      const overrideTokenIds = Object.keys(actionData.overrides).filter(key => key !== '__wall__');
-      outcomesToApply = allOutcomes.filter(outcome =>
-        overrideTokenIds.includes(outcome.token?.id)
-      );
-    }
-
-    if (outcomesToApply.length === 0) {
-      console.warn('PF2E Visioner | No outcomes found for specified token overrides');
-      return 0;
-    }
-
-
-    // Convert outcomes to the format expected by dual system
-    const sneakResults = outcomesToApply.map(outcome => ({
-      token: outcome.token,
-      actor: actionData.actor,
-      newVisibility: outcome.overrideState || outcome.newVisibility,
-      oldVisibility: outcome.oldVisibility || outcome.currentVisibility,
-      overrideState: outcome.overrideState,
-      timedOverride: outcome.timedOverride
-    }));
-
-    // Apply results with AVS overrides enabled
-    const result = await dualSystemApplication.applySneakResults(sneakResults, {
-      direction: 'observer_to_target',
-      skipEphemeralUpdate: false,
-      skipCleanup: false,
-      setAVSOverrides: true
-    });
-
-    if (result.success) {
-      handler.updateButtonToRevert(button);
-
-      // Only clear sneak-active flag and restore speed if applying to all tokens (no overrides)
-      // Only if AVS is enabled
-      const avsEnabled = game.settings?.get?.('pf2e-visioner', 'autoVisibilityEnabled') ?? false;
-      if ((!actionData.overrides || Object.keys(actionData.overrides).length === 0) && avsEnabled) {
-        const sneakingToken = handler._getSneakingToken(actionData);
-        if (sneakingToken) {
-          await sneakingToken.document.unsetFlag('pf2e-visioner', 'sneak-active');
-          // Restore walk speed and remove sneaking effect
-          try {
-            const { SneakSpeedService } = await import('./SneakSpeedService.js');
-            await SneakSpeedService.restoreSneakWalkSpeed(sneakingToken);
-          } catch (speedErr) {
-            console.warn('PF2E Visioner | Failed to restore sneak walk speed:', speedErr);
-          }
-        }
+    if (allOutcomes.length > 0) {
+      let outcomesToApply = allOutcomes;
+      if (actionData.overrides && Object.keys(actionData.overrides).length > 0) {
+        const overrideTokenIds = Object.keys(actionData.overrides).filter(key => key !== '__wall__');
+        outcomesToApply = allOutcomes.filter(outcome =>
+          overrideTokenIds.includes(outcome.token?.id)
+        );
       }
 
-      const appliedCount = outcomesToApply.length;
+      if (outcomesToApply.length > 0) {
+        const sneakResults = outcomesToApply.map(outcome => ({
+          token: outcome.token,
+          actor: actionData.actor,
+          newVisibility: outcome.overrideState || outcome.newVisibility,
+          oldVisibility: outcome.oldVisibility || outcome.currentVisibility,
+          overrideState: outcome.overrideState,
+          timedOverride: outcome.timedOverride
+        }));
 
-      return appliedCount;
-    } else {
-      console.error('PF2E Visioner | Dual system application failed:', result.errors);
-      ui.notifications.error(`Failed to apply sneak changes: ${result.errors.join('; ')}`);
-      return 0;
+        const result = await dualSystemApplication.applySneakResults(sneakResults, {
+          direction: 'observer_to_target',
+          skipEphemeralUpdate: false,
+          skipCleanup: false,
+          setAVSOverrides: true
+        });
+
+        if (result.success) {
+          handler.updateButtonToRevert(button);
+          appliedCount = outcomesToApply.length;
+        }
+      }
     }
   } catch (error) {
-    console.error('PF2E Visioner | Error in applyNowSneak dual system application:', error);
-    // Fallback to original handler
-    const handler = new SneakActionHandler();
-    return handler.apply(actionData, button);
+    console.error('PF2E Visioner | Error in applyNowSneak:', error);
   }
+
+  await cleanupSneakState(actionData);
+  return appliedCount;
+}
+
+async function cleanupSneakState(actionData) {
+  try {
+    const handler = new SneakActionHandler();
+    const sneakingToken = resolveSneakingToken(handler, actionData);
+    if (!sneakingToken) return;
+
+    await sneakingToken.document.unsetFlag('pf2e-visioner', 'sneak-active');
+
+    try {
+      const actor = sneakingToken.actor;
+      if (actor) {
+        const sneakEffect = actor.itemTypes?.effect?.find(
+          (e) => e.flags?.['pf2e-visioner']?.sneakingEffect === true
+        ) ?? actor.itemTypes?.effect?.find(
+          (e) => e.name === 'Sneaking'
+        );
+        if (sneakEffect) {
+          await actor.deleteEmbeddedDocuments('Item', [sneakEffect.id]);
+        }
+      }
+    } catch { }
+
+    const { SneakSpeedService } = await import('./SneakSpeedService.js');
+    await SneakSpeedService.restoreSneakWalkSpeed(sneakingToken);
+  } catch { }
 }
 
 export async function applyNowDiversion(actionData, button) {

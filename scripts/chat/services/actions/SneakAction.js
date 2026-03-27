@@ -1133,26 +1133,18 @@ export class SneakActionHandler extends ActionHandlerBase {
    */
   async revert(actionData, button) {
     try {
-      if (!this._currentSessionId) {
-        console.warn('PF2E Visioner | No active sneak session for revert');
-        return;
+      if (this._currentSessionId) {
+        const success = await this.sneakCore.revertResults(this._currentSessionId);
+        if (success) {
+          this.clearCache(actionData);
+          this.updateButtonToApply(button);
+          notify.info('Sneak changes reverted successfully');
+          return;
+        }
       }
-
-      // Revert using SneakCore
-      const success = await this.sneakCore.revertResults(this._currentSessionId);
-
-      if (success) {
-        this.clearCache(actionData);
-        this.updateButtonToApply(button);
-        notify.info('Sneak changes reverted successfully');
-      } else {
-        // Fallback to standard revert
-        console.warn('PF2E Visioner | SneakCore revert failed, attempting standard revert');
-        await super.revert(actionData, button);
-      }
+      await super.revert(actionData, button);
     } catch (error) {
       console.error('PF2E Visioner | Enhanced revert failed:', error);
-      // Fallback to standard revert
       await super.revert(actionData, button);
     }
   }

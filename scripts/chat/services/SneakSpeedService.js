@@ -207,24 +207,42 @@ export class SneakSpeedService {
       const actor = SneakSpeedService.resolveActor(tokenOrActor);
       if (!actor) return;
 
+      // Also check the token's direct actor in case of synthetic/unlinked tokens
+      const tokenActor = tokenOrActor?.actor;
+      const actorToUse = (tokenActor && tokenActor !== actor && tokenActor.items?.size > 0)
+        ? tokenActor : actor;
+
       // Remove created effect if it exists
       try {
-        const effectId = actor.getFlag?.(MODULE_ID, EFFECT_ID_FLAG);
+        const effectId = actorToUse.getFlag?.(MODULE_ID, EFFECT_ID_FLAG);
+        // Use itemTypes.effect (PF2e) or fall back to items iteration
+        const effects = actorToUse.itemTypes?.effect
+          ?? [...(actorToUse.items?.values?.() ?? [])].filter(i => i.type === 'effect');
+
         if (effectId) {
-          const effectExists =
-            actor.items?.get?.(effectId) || actor.items?.find?.((i) => i.id === effectId);
-          if (effectExists && typeof actor.deleteEmbeddedDocuments === 'function') {
-            await actor.deleteEmbeddedDocuments('Item', [effectId]);
+          const effectExists = actorToUse.items?.get?.(effectId)
+            || effects.find((i) => i.id === effectId);
+          if (effectExists && typeof actorToUse.deleteEmbeddedDocuments === 'function') {
+            await actorToUse.deleteEmbeddedDocuments('Item', [effectId]);
           }
-          await actor.unsetFlag(MODULE_ID, EFFECT_ID_FLAG);
+          await actorToUse.unsetFlag(MODULE_ID, EFFECT_ID_FLAG);
+        } else {
+          const sneakEffect = effects.find(
+            (item) => item.flags?.[MODULE_ID]?.sneakingEffect === true
+          ) ?? effects.find(
+            (item) => item.name === 'Sneaking'
+          );
+          if (sneakEffect && typeof actorToUse.deleteEmbeddedDocuments === 'function') {
+            await actorToUse.deleteEmbeddedDocuments('Item', [sneakEffect.id]);
+          }
         }
       } catch (e) {
         console.error('PF2E Visioner | Failed removing sneak speed effect (continuing):', e);
       }
       // Clear legacy original speed flag if present (backward compatibility)
-      const original = actor.getFlag?.(MODULE_ID, ORIGINAL_SPEED_FLAG);
+      const original = actorToUse.getFlag?.(MODULE_ID, ORIGINAL_SPEED_FLAG);
       if (original !== undefined && original !== null) {
-        await actor.unsetFlag(MODULE_ID, ORIGINAL_SPEED_FLAG);
+        await actorToUse.unsetFlag(MODULE_ID, ORIGINAL_SPEED_FLAG);
       }
     } catch (error) {
       console.warn('PF2E Visioner | Failed to restore sneak walk speed:', error);

@@ -2,6 +2,14 @@
 
 ## [7.5.2] - 2026-03-27
 
+### Fixed
+
+- **Sneak "Apply Changes" now removes the Sneaking effect**: The chat Apply button was resolving the wrong unlinked token when multiple tokens shared the same actor name. Token resolution now prioritizes the token ID stored in message flags from "Start Sneak".
+- **Sneak "Revert" now works correctly**: Revert clears AVS pair overrides and triggers a fresh AVS recalculation instead of attempting to restore stale cached states. Button properly switches back to "Apply Changes" after reverting.
+- **Sneak revert no longer silently fails without a session**: `SneakActionHandler.revert()` was returning early when no active session existed (always the case from the chat button path). Now falls through to the base class revert.
+- **Sneaking effect removal uses PF2e `itemTypes.effect` accessor**: Effect lookup via `actor.items.filter()` returned empty on PF2e's Collection. Now uses `actor.itemTypes.effect` with a name-based fallback, fixing cases where the Sneaking effect persisted after apply/revert.
+- **Invisible condition now shows translucent token immediately**: Toggling the invisible condition applies Foundry's `InvisibilityFilter` via `_configureFilterEffect`, so the GM sees the visual effect without a page refresh. Scoped to the controlled token to avoid affecting other tokens of the same actor.
+
 ### Improved
 
 - **Cached debug setting reads for faster batch processing**: Logger `isEnabled()` now reads `autoVisibilityDebugMode` and `debug` settings once per session instead of on every call, eliminating ~0.6ms overhead per log check during combat batch updates. Changing debug settings prompts a world reload to apply.
