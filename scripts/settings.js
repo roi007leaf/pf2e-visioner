@@ -418,7 +418,6 @@ class VisionerSettingsForm extends foundry.applications.api.ApplicationV2 {
         if (!cfg) continue;
         const formKey = `settings.${key}`;
         const raw = rawMap[formKey];
-        // If the key wasn't present in the merged form+pending map, don't touch it
         if (raw === undefined) continue;
         const saved = game.settings.get(MODULE_ID, key);
         let value;
@@ -499,6 +498,12 @@ export function registerSettings() {
       } else if (key === 'allowPlayerTooltips') {
         settingConfig.onChange = () => { };
       } else if (key === 'useHudButton' || key === 'enableHoverTooltips') {
+        settingConfig.onChange = () => {
+          SettingsConfig.reloadConfirm({
+            world: true,
+          });
+        };
+      } else if (key === 'debug' || key === 'autoVisibilityDebugMode') {
         settingConfig.onChange = () => {
           SettingsConfig.reloadConfirm({
             world: true,

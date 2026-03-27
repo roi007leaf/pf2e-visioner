@@ -1,5 +1,11 @@
 # Changelog
 
+## [7.5.2] - 2026-03-27
+
+### Improved
+
+- **Cached debug setting reads for faster batch processing**: Logger `isEnabled()` now reads `autoVisibilityDebugMode` and `debug` settings once per session instead of on every call, eliminating ~0.6ms overhead per log check during combat batch updates. Changing debug settings prompts a world reload to apply.
+
 ## [7.5.1] - 2026-03-24
 
 ### Fixed

@@ -5,32 +5,41 @@
 
 import { MODULE_ID } from '../constants.js';
 
-function isEnabled(scope) {
+let _cachedAvs = null;
+let _cachedGlobal = null;
+
+function _refreshCache() {
     try {
-        const avs = !!game.settings.get(MODULE_ID, 'autoVisibilityDebugMode');
-        const global = !!game.settings.get(MODULE_ID, 'debug');
-
-        const isAvsScope = scope && (
-            scope.includes('AVS') ||
-            scope.includes('AutoVisibility') ||
-            scope.includes('Batch') ||
-            scope.includes('LightingEvent') ||
-            scope.includes('TokenEvent') ||
-            scope.includes('ActorEvent') ||
-            scope.includes('EffectEvent') ||
-            scope.includes('ItemEvent') ||
-            scope.includes('VisibilityProcessor') ||
-            scope.includes('CoverProcessor')
-        );
-
-        if (isAvsScope) {
-            return avs;
-        }
-
-        return global;
+        _cachedAvs = !!game.settings.get(MODULE_ID, 'autoVisibilityDebugMode');
+        _cachedGlobal = !!game.settings.get(MODULE_ID, 'debug');
     } catch {
-        return false;
+        _cachedAvs = false;
+        _cachedGlobal = false;
     }
+}
+
+
+function isEnabled(scope) {
+    if (_cachedAvs === null) _refreshCache();
+
+    const isAvsScope = scope && (
+        scope.includes('AVS') ||
+        scope.includes('AutoVisibility') ||
+        scope.includes('Batch') ||
+        scope.includes('LightingEvent') ||
+        scope.includes('TokenEvent') ||
+        scope.includes('ActorEvent') ||
+        scope.includes('EffectEvent') ||
+        scope.includes('ItemEvent') ||
+        scope.includes('VisibilityProcessor') ||
+        scope.includes('CoverProcessor')
+    );
+
+    if (isAvsScope) {
+        return _cachedAvs;
+    }
+
+    return _cachedGlobal;
 }
 
 function nowTs() {
