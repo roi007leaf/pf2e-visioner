@@ -224,16 +224,14 @@ export function bindAutomationEvents(panel, message, actionData) {
             let changed = outcomes.filter((o) => o && o.changed);
             changed = filterOutcomesByEncounter(changed, encounterOnly, 'target');
             if (changed.length === 0) {
-              try {
-                notify.info('No changes to apply');
-              } catch {
-                try {
-                  notify.info('No changes to apply');
-                } catch { }
-              }
+              notify.info('No changes to apply');
               return;
             }
-          } catch { }
+          } catch (hideValidationErr) {
+            console.warn('PF2E Visioner | Hide validation failed, blocking apply:', hideValidationErr);
+            notify.warn('Unable to validate Hide targets');
+            return;
+          }
         }
         // For Seek: respect distance and template limits when applying directly from panel
         if (action === 'apply-now-seek') {

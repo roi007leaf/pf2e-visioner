@@ -4,7 +4,7 @@
 
 ### Fixed
 
-- **Seek "Apply Changes" no longer bypasses validation**: The seek apply button silently swallowed validation errors, allowing visibility changes on already-observed tokens. Now blocks the apply and warns if validation fails.
+- **Seek/Hide "Apply Changes" no longer bypass validation**: Both action apply buttons silently swallowed validation errors via empty `catch {}`, allowing incorrect visibility changes (e.g., setting already-observed tokens to hidden on Seek critical success). Now blocks the apply and warns if validation fails.
 
 ## [7.5.2] - 2026-03-27
 
