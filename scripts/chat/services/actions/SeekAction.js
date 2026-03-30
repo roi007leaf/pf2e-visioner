@@ -632,6 +632,28 @@ export class SeekActionHandler extends ActionHandlerBase {
       // Keep only changed outcomes, but always include walls for display
       let filtered = outcomes.filter((o) => o && (o.changed || o._isWall));
 
+      // Filter out allies if ignoreAllies setting is enabled
+      try {
+        const ignoreAllies = actionData?.ignoreAllies ?? game.settings.get('pf2e-visioner', 'ignoreAllies');
+        if (ignoreAllies) {
+          const { shouldFilterAlly } = await import('../infra/shared-utils.js');
+          filtered = filtered.filter((o) => {
+            if (o._isWall) return true;
+            return !shouldFilterAlly(actionData.actor, o.target, 'enemies', true);
+          });
+        }
+      } catch { }
+
+      // Filter out loot tokens with no GM-configured stealth DC — they should not get seek overrides
+      filtered = filtered.filter((o) => {
+        if (o._isWall) return true;
+        if (o.target?.actor?.type === 'loot') {
+          const configuredDC = Number(o.target?.document?.getFlag?.('pf2e-visioner', 'stealthDC')) || 0;
+          return configuredDC > 0;
+        }
+        return true;
+      });
+
       // If overrides specify a particular token/wall, limit to those only (per-row apply)
       try {
         const ov = actionData?.overrides || {};
@@ -656,14 +678,103 @@ export class SeekActionHandler extends ActionHandlerBase {
 
       // Build changes for tokens and walls
       const changes = filtered.map((o) => this.outcomeToChange(actionData, o)).filter(Boolean);
-      await this.applyChangesInternal(changes);
-      this.cacheAfterApply(actionData, changes);
-      this.updateButtonToRevert(button);
-      return changes.length;
+
+      // Partition by LOS: walls always immediate, tokens checked for LOS
+      const { immediateChanges, deferredResults } = await this.#partitionByLOS(
+        actionData, changes, filtered
+      );
+
+      if (immediateChanges.length > 0) {
+        await this.applyChangesInternal(immediateChanges);
+        this.cacheAfterApply(actionData, immediateChanges);
+      }
+
+      if (deferredResults.length > 0) {
+        const deferredSeekManager = (await import('../infra/DeferredSeekManager.js')).default;
+        const observerId = (actionData.actorToken || actionData.actor)?.document?.id;
+        if (observerId) {
+          await deferredSeekManager.storeDeferredResults(observerId, deferredResults);
+          const { notify } = await import('../infra/notifications.js');
+          notify.info(game.i18n.format('PF2E_VISIONER.DIALOG_TITLES.SEEK_DEFERRED_COUNT', {
+            count: deferredResults.length,
+          }));
+        }
+      }
+
+      if (immediateChanges.length > 0) {
+        this.updateButtonToRevert(button);
+      }
+      return immediateChanges.length + deferredResults.length;
     } catch (e) {
       (await import('../infra/notifications.js')).log.error(e);
       return 0;
     }
+  }
+
+  async #partitionByLOS(actionData, changes, outcomes) {
+    const immediateChanges = [];
+    const deferredResults = [];
+
+    let va = null;
+    try {
+      const { VisionAnalyzer } = await import(
+        '../../../visibility/auto-visibility/VisionAnalyzer.js'
+      );
+      va = VisionAnalyzer.getInstance();
+    } catch { }
+
+    const observer = actionData.actorToken || actionData.actor;
+
+    for (let i = 0; i < changes.length; i++) {
+      const change = changes[i];
+      const outcome = outcomes[i];
+
+      if (change.wallId || outcome?._isWall) {
+        immediateChanges.push(change);
+        continue;
+      }
+
+      // Skip loot/hazard tokens with no configured stealth DC from deferral
+      const targetActorType = change.target?.actor?.type?.toLowerCase();
+      if (targetActorType === 'loot') {
+        const configuredDC = Number(change.target?.document?.getFlag?.('pf2e-visioner', 'stealthDC')) || 0;
+        if (configuredDC <= 0) {
+          immediateChanges.push(change);
+          continue;
+        }
+      }
+      if (targetActorType === 'hazard' && (!outcome?.dc || outcome.dc <= 0)) {
+        immediateChanges.push(change);
+        continue;
+      }
+
+      // Skip allies — no need to defer seek results for friendly tokens
+      const observerAlliance = observer?.actor?.alliance ?? observer?.actor?.system?.details?.alliance;
+      const targetAlliance = change.target?.actor?.alliance ?? change.target?.actor?.system?.details?.alliance;
+      if (observerAlliance && targetAlliance && observerAlliance === targetAlliance) {
+        immediateChanges.push(change);
+        continue;
+      }
+
+      if (!va || !change.target) {
+        immediateChanges.push(change);
+        continue;
+      }
+
+      const los = va.hasLineOfSight(observer, change.target);
+      if (los !== false) {
+        immediateChanges.push(change);
+      } else {
+        deferredResults.push({
+          targetId: change.target?.document?.id,
+          newVisibility: change.newVisibility,
+          oldVisibility: change.oldVisibility,
+          outcome: outcome?.outcome,
+        });
+      }
+    }
+
+    return { immediateChanges, deferredResults };
   }
 
   /**

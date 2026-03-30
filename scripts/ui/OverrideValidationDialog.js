@@ -63,6 +63,10 @@ export class OverrideValidationDialog extends foundry.applications.api.Handlebar
         badgeLabel = 'Sneak Override';
         badgeIcon = 'fa-ninja';
         badgeClass = 'badge-sneak';
+      } else if (/seek.*deferred/i.test(src)) {
+        badgeLabel = 'Seek (Deferred)';
+        badgeIcon = 'fa-search';
+        badgeClass = 'badge-seek';
       } else if (/seek/i.test(src)) {
         badgeLabel = 'Seek action';
         badgeIcon = 'fa-search';
@@ -92,8 +96,9 @@ export class OverrideValidationDialog extends foundry.applications.api.Handlebar
       // Use actor portrait for consistency with Token Manager
       const observerToken = canvas.tokens?.get(override.observerId);
       const targetToken = canvas.tokens?.get(override.targetId);
-      const observerImg = observerToken?.actor?.img ?? observerToken?.document?.texture?.src ?? observerToken?.texture?.src ?? observerToken?.document?.img ?? 'icons/svg/book.svg';
-      const targetImg = targetToken?.actor?.img ?? targetToken?.document?.texture?.src ?? targetToken?.texture?.src ?? targetToken?.document?.img ?? 'icons/svg/book.svg';
+      const resolveImg = (t) => t?.document?.texture?.src ?? t?.actor?.img ?? t?.actor?.prototypeToken?.texture?.src ?? t?.texture?.src ?? t?.document?.img ?? null;
+      const observerImg = resolveImg(observerToken) || 'icons/svg/book.svg';
+      const targetImg = resolveImg(targetToken) || 'icons/svg/book.svg';
 
       console.log(`PF2E Visioner | Image resolution for ${override.observerName} → ${override.targetName}:`, {
         observerImg,
@@ -215,7 +220,7 @@ export class OverrideValidationDialog extends foundry.applications.api.Handlebar
     try { headerToken = canvas.tokens?.placeables?.find(t => t?.document?.name === this.tokenName) || null; } catch { }
     const targetHeader = {
       name: this.tokenName,
-      img: headerToken?.actor?.img ?? headerToken?.document?.texture?.src ?? headerToken?.texture?.src ?? headerToken?.document?.img ?? 'icons/svg/book.svg'
+      img: headerToken?.document?.texture?.src ?? headerToken?.actor?.img ?? headerToken?.actor?.prototypeToken?.texture?.src ?? headerToken?.texture?.src ?? 'icons/svg/book.svg'
     };
 
     const result = {

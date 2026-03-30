@@ -178,6 +178,11 @@
             </td>
             <td class="outcome {{outcome.outcomeClass}}" {{#if outcome.unmetCondition}}data-tooltip="{{outcome.unmetCondition}}"{{/if}}>
               {{outcome.outcomeLabel}}
+              {{#if outcome.deferred}}
+                <span class="tag tag-deferred" data-tooltip="{{localize 'PF2E_VISIONER.DIALOG_TITLES.SEEK_DEFERRED'}}" style="font-size:0.75em; padding:1px 5px; border-radius:8px; background:var(--color-border-light-2, #aaa); color:var(--color-text-dark-primary, #333); margin-left:4px; white-space:nowrap;">
+                  <i class="fas fa-clock" style="margin-right:2px;"></i>{{localize 'PF2E_VISIONER.DIALOG_TITLES.SEEK_DEFERRED_SHORT'}}
+                </span>
+              {{/if}}
               {{#if outcome.sneakyFeatApplied}}
                 <span class="sneaky-feat-indicator" data-tooltip="{{localize 'PF2E_VISIONER.SNEAKY_FEAT.TOOLTIP'}}">
                   <i class="fas fa-mask"></i>

@@ -233,67 +233,7 @@ export function bindAutomationEvents(panel, message, actionData) {
             return;
           }
         }
-        // For Seek: respect distance and template limits when applying directly from panel
-        if (action === 'apply-now-seek') {
-          try {
-            const { SeekActionHandler } = await import('../services/actions/SeekAction.js');
-            const {
-              filterOutcomesByEncounter,
-              filterOutcomesBySeekDistance,
-              filterOutcomesByTemplate,
-            } = await import('../services/infra/shared-utils.js');
-            const handler = new SeekActionHandler();
-            await handler.ensurePrerequisites(actionData);
-            const subjects = await handler.discoverSubjects(actionData);
-            const outcomes = await Promise.all(
-              subjects.map((s) => handler.analyzeOutcome(actionData, s)),
-            );
-            const encounterOnly = game.settings.get('pf2e-visioner', 'defaultEncounterFilter');
-            let actionable = outcomes.filter((o) => o && o.changed);
-            actionable = filterOutcomesByEncounter(actionable, encounterOnly, 'target');
-            actionable = filterOutcomesBySeekDistance(actionable, actionData.actor, 'target');
-            // Apply template filter if present (flags or fallback on-scene template)
-            const msg = game.messages.get(actionData.messageId);
-            const pending = msg?.flags?.['pf2e-visioner']?.seekTemplate;
-            let tplCenter = pending?.center;
-            let tplRadius = pending?.radiusFeet;
-            let fallbackTemplate = null;
-            if (
-              (!tplCenter || !tplRadius) &&
-              game.user.isGM &&
-              msg?.author &&
-              msg.author.isGM === false
-            ) {
-              try {
-                fallbackTemplate = canvas.scene?.templates?.find?.((t) => {
-                  const f = t?.flags?.['pf2e-visioner'];
-                  return (
-                    f?.seekPreviewManual === true &&
-                    f?.messageId === actionData.messageId &&
-                    f?.actorTokenId === actionData.actor.id &&
-                    t?.user?.id === msg.author.id
-                  );
-                });
-                if (fallbackTemplate) {
-                  tplCenter = { x: fallbackTemplate.x, y: fallbackTemplate.y };
-                  tplRadius = Number(fallbackTemplate.distance) || 0;
-                }
-              } catch { }
-            }
-            if (tplCenter && tplRadius) {
-              const tplType = pending?.templateType || fallbackTemplate?.t || 'circle';
-              actionable = filterOutcomesByTemplate(actionable, tplCenter, tplRadius, 'target', tplType, actionData.messageId, actionData.actor?.id);
-            }
-            if (actionable.length === 0) {
-              notify.info('No changes to apply');
-              return;
-            }
-          } catch (seekValidationErr) {
-            console.warn('PF2E Visioner | Seek validation failed, blocking apply:', seekValidationErr);
-            notify.warn('Unable to validate Seek targets');
-            return;
-          }
-        }
+        // Seek: validation and LOS deferral are handled inside SeekAction.apply()
         await applyHandlers[action](actionData, button);
       } else if (action === 'start-sneak') {
         // Special case: ensure we pass the actual button element so the service can refresh the UI

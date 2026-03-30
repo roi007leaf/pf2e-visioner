@@ -56,7 +56,7 @@ export class OverrideValidationManager {
     // No timeout - caller will trigger processQueuedValidations when ready
   }
 
-  async processQueuedValidations() {
+  async processQueuedValidations({ skipMovedFilter = false } = {}) {
     if (!game.user?.isGM) {
       return;
     }
@@ -64,7 +64,7 @@ export class OverrideValidationManager {
     // Using setTimeout instead of requestAnimationFrame so validations work when window is unfocused
     try {
       await new Promise((resolve) => setTimeout(resolve, 0));
-    } catch {}
+    } catch { }
 
     const tokenIds = Array.from(this._tokensQueuedForValidation);
     this._tokensQueuedForValidation.clear();
@@ -103,7 +103,7 @@ export class OverrideValidationManager {
                 if (obsTok && !this.exclusionManager.isExcludedToken(obsTok)) ids.add(obsId);
               }
             }
-          } catch {}
+          } catch { }
           // mover as observer: flags on others
           try {
             const others = canvas.tokens?.placeables || [];
@@ -114,7 +114,7 @@ export class OverrideValidationManager {
                 if (!this.exclusionManager.isExcludedToken(ot)) ids.add(ot.id);
               }
             }
-          } catch {}
+          } catch { }
         }
         precomputedLights = new Map();
         for (const id of ids) {
@@ -135,31 +135,49 @@ export class OverrideValidationManager {
         precomputeStats,
       });
       if (result && result.__showAwareness && Array.isArray(result.overrides)) {
+        if (!skipMovedFilter) {
+          try {
+            const lastMovedId = globalThis?.game?.pf2eVisioner?.lastMovedTokenId || null;
+            if (lastMovedId && tokenId !== lastMovedId) {
+              continue;
+            }
+          } catch { }
+        }
+        let va = null;
         try {
-          const lastMovedId = globalThis?.game?.pf2eVisioner?.lastMovedTokenId || null;
-          if (lastMovedId && tokenId !== lastMovedId) {
-            continue;
-          }
-        } catch {}
+          const { VisionAnalyzer } = await import('../VisionAnalyzer.js');
+          va = VisionAnalyzer.getInstance();
+          va.clearCache();
+        } catch { }
+        const movedToken = canvas.tokens?.get(tokenId);
         const filtered = result.overrides.filter((o) => {
           const prevVis = o.state || (o.hasConcealment ? 'concealed' : 'observed');
           const prevCover = o.expectedCover ?? (o.hasCover ? 'standard' : 'none');
           const curVis = o.currentVisibility || 'observed';
           const curCover = o.currentCover || 'none';
           const isDifferent = prevVis !== curVis || prevCover !== curCover;
-          return isDifferent;
-        });
-        if (filtered.length > 0) {
+          if (!isDifferent) return false;
+          if (!va || !movedToken) return true;
           try {
-            const { default: indicator } = await import(
-              '../../../ui/OverrideValidationIndicator.js'
-            );
+            const otherId = o.observerId === tokenId ? o.targetId : o.observerId;
+            const otherToken = canvas.tokens?.get(otherId);
+            if (!otherToken) return false;
+            return va.hasLineOfSight(movedToken, otherToken) !== false;
+          } catch { return true; }
+        });
+        try {
+          const { default: indicator } = await import(
+            '../../../ui/OverrideValidationIndicator.js'
+          );
+          if (filtered.length > 0) {
             const movedId = globalThis?.game?.pf2eVisioner?.lastMovedTokenId || tokenId;
             const moverName = canvas.tokens?.get(movedId)?.document?.name || 'Token';
             indicator.show(filtered, moverName, movedId, { pulse: false });
-          } catch (e) {
-            console.warn('PF2E Visioner | Failed to show awareness indicator:', e);
+          } else {
+            indicator.hide(true);
           }
+        } catch (e) {
+          console.warn('PF2E Visioner | Failed to update awareness indicator:', e);
         }
       }
     }
@@ -174,7 +192,7 @@ export class OverrideValidationManager {
       let hasExistingOverrides = false;
       try {
         isSneaking = !!movedToken.document.getFlag(MODULE_ID, 'sneak-active');
-      } catch {}
+      } catch { }
       try {
         const moverFlags = movedToken.document.flags['pf2e-visioner'] || {};
         hasExistingOverrides = Object.keys(moverFlags).some((k) =>
@@ -189,7 +207,7 @@ export class OverrideValidationManager {
             }
           }
         }
-      } catch {}
+      } catch { }
       if (!isSneaking && !hasExistingOverrides) return { overrides: [], __showAwareness: false };
       const awareness = [];
       try {
@@ -221,7 +239,7 @@ export class OverrideValidationManager {
             const coverDetector = new CoverDetector();
             const observerPos = this.positionManager.getTokenPosition(movedToken);
             currentCover = coverDetector.detectFromPoint(observerPos, t);
-          } catch {}
+          } catch { }
           awareness.push({
             observerId: movedTokenId,
             targetId: t.id,
@@ -235,7 +253,7 @@ export class OverrideValidationManager {
             currentCover,
           });
         }
-      } catch {}
+      } catch { }
       return { overrides: awareness, __showAwareness: awareness.length > 0 };
     }
 
@@ -376,7 +394,7 @@ export class OverrideValidationManager {
           const coverDetector = new CoverDetector();
           const observerPos = this.positionManager.getTokenPosition(obs);
           currentCover = coverDetector.detectFromPoint(observerPos, movedToken);
-        } catch {}
+        } catch { }
         awareness.push({
           observerId,
           targetId: movedTokenId,
@@ -423,7 +441,7 @@ export class OverrideValidationManager {
           const coverDetector = new CoverDetector();
           const observerPos = this.positionManager.getTokenPosition(movedToken);
           currentCover = coverDetector.detectFromPoint(observerPos, t);
-        } catch {}
+        } catch { }
         awareness.push({
           observerId: movedTokenId,
           targetId: t.id,
@@ -437,7 +455,7 @@ export class OverrideValidationManager {
           currentCover,
         });
       }
-    } catch {}
+    } catch { }
 
     return { overrides: awareness, __showAwareness: awareness.length > 0 };
   }
@@ -466,7 +484,7 @@ export class OverrideValidationManager {
       __obsPosKey = obsPosKey;
       __tgtPosKey = tgtPosKey;
       __cacheKey = cacheKey;
-    } catch {}
+    } catch { }
 
     try {
       let visibility;
@@ -570,7 +588,7 @@ export class OverrideValidationManager {
                   });
                 }
               }
-            } catch {}
+            } catch { }
           }
         }
       }
@@ -612,7 +630,7 @@ export class OverrideValidationManager {
           obsPos: __obsPosKey,
           tgtPos: __tgtPosKey,
         });
-      } catch {}
+      } catch { }
 
       return result;
     } catch (error) {
@@ -626,7 +644,7 @@ export class OverrideValidationManager {
     try {
       const lastMoved = globalThis?.game?.pf2eVisioner?.lastMovedTokenId || null;
       if (lastMoved && movedTokenId && movedTokenId !== lastMoved) return;
-    } catch {}
+    } catch { }
     const overrideData = invalidOverrides.map(
       ({
         observerId,
@@ -672,7 +690,29 @@ export class OverrideValidationManager {
     try {
       const { default: indicator } = await import('../../../ui/OverrideValidationIndicator.js');
       const headerId = lastMoved || movedTokenId || null;
-      indicator.show(overrideData, movedTokenName, headerId);
+      // Filter by LOS — only show overrides where the moved token can see the other token
+      let dataToShow = overrideData;
+      const moverToken = headerId ? canvas.tokens?.get(headerId) : null;
+      if (moverToken) {
+        try {
+          const { VisionAnalyzer } = await import('../VisionAnalyzer.js');
+          const va = VisionAnalyzer.getInstance();
+          va.clearCache();
+          dataToShow = overrideData.filter((o) => {
+            try {
+              const otherId = o.observerId === headerId ? o.targetId : o.observerId;
+              const otherToken = canvas.tokens?.get(otherId);
+              if (!otherToken) return false;
+              return va.hasLineOfSight(moverToken, otherToken) !== false;
+            } catch { return true; }
+          });
+        } catch { }
+      }
+      if (dataToShow.length > 0) {
+        indicator.show(dataToShow, movedTokenName, headerId);
+      } else {
+        indicator.hide(true);
+      }
     } catch (err) {
       console.warn('PF2E Visioner | Failed to show indicator, falling back to dialog:', err);
       try {
@@ -693,7 +733,7 @@ export class OverrideValidationManager {
   _pruneCache() {
     try {
       this._overrideValidityCache.pruneIfDue(5000);
-    } catch {}
+    } catch { }
   }
 
   _hasActiveTimer(timedOverride) {

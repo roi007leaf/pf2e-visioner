@@ -168,6 +168,7 @@ export class BatchOrchestrator {
 
         // Pass session data to the batch for telemetry
         this.processBatch(toProcess, { movementSession: sessionData });
+        Hooks.callAll('pf2e-visioner.tokenMovementComplete', toProcess);
       } else {
         this._movementSession = null;
       }
@@ -513,6 +514,7 @@ export class BatchOrchestrator {
         }
       }
       this.processingBatch = false;
+      try { Hooks.callAll('pf2e-visioner.batchComplete', changedTokens); } catch { }
       // If new tokens accumulated during processing, schedule an immediate follow-up batch
       try {
         if (this._pendingTokens.size > 0) {

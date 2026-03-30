@@ -130,7 +130,6 @@ class OverrideValidationIndicator {
 
     if (movedTokenId && overrides.length > 0) {
       const alreadyInQueue = this._overrideStack.has(movedTokenId);
-      const isCurrentlyShown = this._currentTokenId === movedTokenId;
       if (alreadyInQueue) {
         console.log(`PF2E Visioner | Queue: Token ${movedTokenId} (${tokenName}) already in queue, updating data without re-ordering.`);
       } else {
@@ -142,15 +141,8 @@ class OverrideValidationIndicator {
         timestamp: Date.now()
       });
       console.log(`PF2E Visioner | Queue: Queue size: ${this._overrideStack.size}`);
-      if (!alreadyInQueue || !isCurrentlyShown) {
-        console.log(`PF2E Visioner | Queue: Showing indicator for ${movedTokenId}`);
-        this.#showStackedIndicator();
-      } else {
-        console.log(`PF2E Visioner | Queue: Token ${movedTokenId} already displayed, skipping re-show.`);
-        this.#updateBadge();
-        this.#updateQueueBadge();
-        this.#updateTurnChangeBadge();
-      }
+      console.log(`PF2E Visioner | Queue: Showing indicator for ${movedTokenId}`);
+      this.#showStackedIndicator();
     } else if (this._overrideStack.size > 0) {
       console.log(`PF2E Visioner | Queue: show() called without movedTokenId, but queue has ${this._overrideStack.size} items. Showing from queue.`);
       this.#showStackedIndicator();
@@ -236,7 +228,9 @@ class OverrideValidationIndicator {
   #updateBadge() {
     const badge = this._el?.querySelector('.indicator-badge');
     if (!badge) return;
-    const count = this._data?.overrides?.length || 0;
+    const raw = this._rawOverrides || [];
+    const count = raw.filter((o) => this.#shouldShowOverride(o) && o.state && o.state !== 'avs').length
+      || this._data?.overrides?.length || 0;
     badge.textContent = count > 0 ? String(count) : '';
   }
 
@@ -501,9 +495,14 @@ class OverrideValidationIndicator {
     document.addEventListener('mousemove', (ev) => this.#onMouseMove(ev));
     document.addEventListener('mouseup', (ev) => this.#onMouseUp(ev));
 
-    // Hover tooltip
-    el.addEventListener('mouseenter', () => this.#showTooltip());
-    el.addEventListener('mouseleave', () => this.#hideTooltip());
+    // Hover tooltip with delayed hide so cursor can reach the tooltip
+    el.addEventListener('mouseenter', () => {
+      clearTimeout(this._tooltipHideTimer);
+      this.#showTooltip();
+    });
+    el.addEventListener('mouseleave', () => {
+      this._tooltipHideTimer = setTimeout(() => this.#hideTooltip(), 150);
+    });
 
     // Scroll tooltip content when hovering over indicator
     el.addEventListener('wheel', (e) => {
@@ -589,7 +588,13 @@ class OverrideValidationIndicator {
     this._tooltipEl = tip;
     this.#renderTooltipContents();
 
+    tip.addEventListener('mouseenter', () => clearTimeout(this._tooltipHideTimer));
+    tip.addEventListener('mouseleave', () => {
+      this._tooltipHideTimer = setTimeout(() => this.#hideTooltip(), 150);
+    });
+
     document.body.appendChild(tip);
+    this.#bindRowContextMenus();
     const rect = this._el.getBoundingClientRect();
     tip.style.left = rect.right + 8 + 'px';
     tip.style.top = Math.max(8, rect.top - 8) + 'px';
@@ -598,6 +603,42 @@ class OverrideValidationIndicator {
   #hideTooltip() {
     if (this._tooltipEl?.parentElement) this._tooltipEl.parentElement.removeChild(this._tooltipEl);
     this._tooltipEl = null;
+  }
+
+  #bindRowContextMenus() {
+    if (!this._tooltipEl) return;
+    const rows = this._tooltipEl.querySelectorAll('.tip-row[data-observer-id][data-target-id]');
+    rows.forEach((row) => {
+      row.addEventListener('contextmenu', async (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        const observerId = row.dataset.observerId;
+        const targetId = row.dataset.targetId;
+        if (!observerId || !targetId) return;
+        try {
+          const { default: AvsOverrideManager } = await import(
+            '../chat/services/infra/AvsOverrideManager.js'
+          );
+          await AvsOverrideManager.removeOverride(observerId, targetId);
+          row.style.opacity = '0.3';
+          row.style.textDecoration = 'line-through';
+          this._rawOverrides = (this._rawOverrides || []).filter(
+            (o) => !(o.observerId === observerId && o.targetId === targetId)
+          );
+          if (this._data?.overrides) {
+            this._data.overrides = this._data.overrides.filter(
+              (o) => !(o.observerId === observerId && o.targetId === targetId)
+            );
+          }
+          this.#updateBadge();
+          if ((this._rawOverrides?.length || 0) === 0) {
+            this.hide(true);
+          }
+        } catch (e) {
+          console.warn('PF2E Visioner | Failed to accept row override:', e);
+        }
+      });
+    });
   }
 
   #renderTooltipContents() {
@@ -637,10 +678,12 @@ class OverrideValidationIndicator {
       const showCoverChange = prevCover !== curCover;
 
       const reasons = (o.reasonIcons || []).map((r) => `<i class="${r.icon}" data-tooltip="${r.text}"></i>`).join('');
+      const isDeferred = /deferred/i.test(o.source || '');
+      const deferredBadge = isDeferred ? ` <span style="font-size:0.75em; opacity:0.7;" data-tooltip="Applied from deferred Seek"><i class="fas fa-clock"></i></span>` : '';
       return `
-        <div class="tip-row">
+        <div class="tip-row" data-observer-id="${o.observerId || ''}" data-target-id="${o.targetId || ''}" style="cursor:pointer; padding:4px 6px; border-radius:4px; transition:background 0.15s;" onmouseenter="this.style.background='rgba(255,255,255,0.08)'" onmouseleave="this.style.background='transparent'" data-tooltip="${game.i18n.localize('PF2E_VISIONER.OVERRIDE_INDICATOR.ROW_RIGHT_CLICK')}">
           <div class="who">${o.observerName} <i class="fas fa-arrow-right"></i> ${o.targetName}</div>
-          ${showVisChange ? `<div class="state-pair vis">${mkVis(prevVis)} <i class="fas fa-arrow-right"></i> ${mkVis(curVis)}</div>` : ''}
+          ${showVisChange ? `<div class="state-pair vis">${mkVis(prevVis)} <i class="fas fa-arrow-right"></i> ${mkVis(curVis)}${deferredBadge}</div>` : ''}
           ${showCoverChange ? `<div class="state-pair cover">${mkCover(prevCover)} <i class="fas fa-arrow-right"></i> ${mkCover(curCover)}</div>` : ''}
           ${reasons ? `<div class="reasons">${reasons}</div>` : ''}
         </div>
@@ -691,6 +734,7 @@ class OverrideValidationIndicator {
 
     // After HTML injection, enforce per-state colors inline to defeat any external cascading !important rules.
     this.#applyInlineStateColors();
+    this.#bindRowContextMenus();
   }
 
   #applyInlineStateColors() {

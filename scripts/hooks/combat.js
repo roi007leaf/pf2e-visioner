@@ -73,12 +73,17 @@ async function handleCombatStart() {
 let combatEndCleanupInProgress = false;
 
 async function handleCombatEnd(combat = null) {
+  try {
+    const deferredSeekManager = (await import('../chat/services/infra/DeferredSeekManager.js')).default;
+    await deferredSeekManager.clearAll();
+  } catch { }
+
   if (combatEndCleanupInProgress) {
     return;
   }
-  
+
   combatEndCleanupInProgress = true;
-  
+
   try {
     const avsOnlyInCombat = game.settings.get(MODULE_ID, 'avsOnlyInCombat');
     if (!avsOnlyInCombat) {
@@ -172,6 +177,14 @@ function resetEncounterFiltersInDialogs() {
 }
 
 async function handleTurnAdvance(combat) {
+  try {
+    const prevToken = combat?.previous?.tokenId;
+    if (prevToken) {
+      const deferredSeekManager = (await import('../chat/services/infra/DeferredSeekManager.js')).default;
+      await deferredSeekManager.clearDeferredForToken(prevToken);
+    }
+  } catch { }
+
   try {
     const current = combat?.combatant?.actor;
     if (!current) return;

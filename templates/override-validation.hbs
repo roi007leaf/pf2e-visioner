@@ -92,9 +92,9 @@
                 </div>
                 <div class="state-row">
                   {{#unless (eq prevCover.key statusCover.key)}}
-                    <i class="prev-cover {{prevCover.icon}} cover-{{prevCover.key}}" data-state="{{prevCover.key}}" data-tooltip="{{prevCover.label}}"></i>
+                    <i class="prev-cover {{prevCover.icon}} cover-{{prevCover.key}}" data-state="{{prevCover.key}}" data-tooltip="{{prevCover.label}}" style="color:{{prevCover.color}};"></i>
                     <i class="fas fa-arrow-right state-arrow" aria-hidden="true"></i>
-                    <i class="status-cover {{statusCover.icon}} cover-{{statusCover.key}}" data-state="{{statusCover.key}}" aria-label="{{statusCover.label}}" data-tooltip="{{statusCover.label}}"></i>
+                    <i class="status-cover {{statusCover.icon}} cover-{{statusCover.key}}" data-state="{{statusCover.key}}" aria-label="{{statusCover.label}}" data-tooltip="{{statusCover.label}}" style="color:{{statusCover.color}};"></i>
                   {{/unless}}
                 </div>
               </div>
@@ -147,9 +147,9 @@
       <tbody>
         {{#each observerOrientedOverrides}}
           <tr class="token-row" data-override-id="{{id}}" data-token-id="{{targetId}}">
-            <td class="target-img" data-token-id="{{targetId}}">
+            <td class="target-img" data-token-id="{{targetId}}" style="width:64px;min-width:64px;padding:8px;">
               {{#if targetImg}}
-                <img src="{{targetImg}}" alt="{{targetName}}" width="48" height="48"/>
+                <img src="{{targetImg}}" alt="{{targetName}}" width="48" height="48" style="width:48px;min-width:48px;height:48px;border-radius:4px;object-fit:cover;"/>
               {{else}}
                 <i class="fas fa-user-circle"></i>
               {{/if}}
@@ -230,9 +230,9 @@
       <tbody>
         {{#each targetOrientedOverrides}}
           <tr class="token-row" data-override-id="{{id}}" data-token-id="{{observerId}}">
-            <td class="observer-img" data-token-id="{{observerId}}">
+            <td class="observer-img" data-token-id="{{observerId}}" style="width:64px;min-width:64px;padding:8px;">
               {{#if observerImg}}
-                <img src="{{observerImg}}" alt="{{observerName}}" width="48" height="48"/>
+                <img src="{{observerImg}}" alt="{{observerName}}" width="48" height="48" style="width:48px;min-width:48px;height:48px;border-radius:4px;object-fit:cover;"/>
               {{else}}
                 <i class="fas fa-user-circle"></i>
               {{/if}}

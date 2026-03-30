@@ -93,9 +93,11 @@ export class AvsOverrideManager {
         src === 'hide_action' ||
         src === 'diversion_action' ||
         src === 'seek_action' ||
+        src === 'seek_action_deferred' ||
         src === 'point_out_action' ||
         src === 'manual_action';
 
+      let appliedCount = 0;
       for (const [, changeData] of changesByTarget) {
         const target = changeData.target;
         const state = changeData.state;
@@ -128,6 +130,11 @@ export class AvsOverrideManager {
           } catch {}
           await this.onAVSOverride({ ...payload, observer: target, target: observer });
         }
+        appliedCount++;
+      }
+
+      if (appliedCount > 0 && !options.skipIndicatorRefresh) {
+        await this.#refreshSystems({ scope: 'pair', reason: 'set-pair-overrides' });
       }
     } catch (error) {
       console.error('PF2E Visioner | Error setting AVS overrides in manager:', error);
@@ -447,15 +454,12 @@ export class AvsOverrideManager {
         }
       } catch {}
 
-      try {
-        const mod = await import('../../../ui/OverrideValidationIndicator.js');
-        if (typeof mod.hide === 'function') {
-          mod.hide(true);
-        }
-      } catch {}
-
-      // 4. Override validation indicator: update (empty) so badge count drops immediately after batch clears
+      // 4. Override validation indicator — only update on batch clears, not on every pair set
       if (scope === 'batch') {
+        try {
+          const { default: indicator } = await import('../../../ui/OverrideValidationIndicator.js');
+          indicator.hide(true);
+        } catch {}
         try {
           const { default: indicator } = await import('../../../ui/OverrideValidationIndicator.js');
           indicator.update([], '');

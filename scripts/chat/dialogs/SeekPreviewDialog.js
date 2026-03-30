@@ -359,6 +359,17 @@ export class SeekPreviewDialog extends BaseActionDialog {
 
         const detectedBySense = outcome.usedSenseType || null;
 
+        let deferred = false;
+        if (!outcome._isWall && this.actorToken && outcome.target) {
+          try {
+            const { VisionAnalyzer } = await import(
+              '../../visibility/auto-visibility/VisionAnalyzer.js'
+            );
+            const va = VisionAnalyzer.getInstance();
+            deferred = va.hasLineOfSight(this.actorToken, outcome.target) === false;
+          } catch { }
+        }
+
         return {
           ...outcome,
           outcomeClass: outcome.noProficiency ? 'neutral' : this.getOutcomeClass(outcome.outcome),
@@ -375,6 +386,7 @@ export class SeekPreviewDialog extends BaseActionDialog {
           noProficiency: !!outcome.noProficiency,
           isOldStateAvsControlled,
           detectedBySense,
+          deferred,
         };
       }),
     );

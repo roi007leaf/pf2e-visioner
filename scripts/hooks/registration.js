@@ -162,6 +162,10 @@ export async function registerHooks() {
   // UI hues
   registerUIHooks();
   registerCombatHooks();
+  try {
+    const deferredSeekManager = (await import('../chat/services/infra/DeferredSeekManager.js')).default;
+    deferredSeekManager.initialize();
+  } catch { }
   AutoCoverHooks.registerHooks();
   registerSnipingDuoDamageBonusHooks();
 
@@ -531,6 +535,47 @@ export async function registerHooks() {
         }
       }
     } catch (_) {}
+    // Door state changed (opened/closed) — LOS changes, trigger batch recalc + deferred seek
+    if (changes.ds !== undefined) {
+      try {
+        const { autoVisibilitySystem } = await import(
+          '../visibility/auto-visibility/index.js'
+        );
+        const vsm = autoVisibilitySystem?.orchestrator?.visibilityState;
+        if (vsm) {
+          vsm.markAllTokensChangedImmediate();
+        }
+      } catch {}
+      // After batch completes: run validation first, then deferred seek (so deferred indicator wins)
+      Hooks.once('pf2e-visioner.batchComplete', async () => {
+        try {
+          const { autoVisibilitySystem } = await import(
+            '../visibility/auto-visibility/index.js'
+          );
+          const ovm = autoVisibilitySystem?.orchestrator?.overrideValidationManager;
+          if (ovm) {
+            const tokensToCheck = canvas.tokens?.controlled?.length > 0
+              ? canvas.tokens.controlled
+              : canvas.tokens?.placeables ?? [];
+            for (const ct of tokensToCheck) {
+              ovm.queueOverrideValidation(ct.document.id);
+            }
+            await ovm.processQueuedValidations({ skipMovedFilter: true });
+          }
+        } catch {}
+        try {
+          const deferredSeekManager = (await import(
+            '../chat/services/infra/DeferredSeekManager.js'
+          )).default;
+          for (const t of canvas.tokens?.placeables ?? []) {
+            const hasDef = t.document?.getFlag?.('pf2e-visioner', 'deferredSeekResults');
+            if (hasDef?.length > 0) {
+              await deferredSeekManager.checkAndApplyDeferred(t.document.id);
+            }
+          }
+        } catch {}
+      });
+    }
     try {
       const { updateWallVisuals } = await import('../services/visual-effects.js');
       const id = canvas.tokens.controlled?.[0]?.id || null;

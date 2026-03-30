@@ -1,10 +1,25 @@
 # Changelog
 
-## [7.5.3] - 2026-03-30
+## [7.6.0] - 2026-03-30
+
+### Added
+
+- **Deferred Seek for targets outside line of sight**: Seek no longer applies overrides to targets the seeker cannot see. Results for targets behind walls are stored on the seeker token and automatically applied when LOS is established (via movement or opening doors). Deferred results clear on turn change or combat end. A clock icon ("No LOS") appears in the Seek dialog for deferred targets.
+- **Per-row accept in override indicator tooltip**: Right-click individual rows in the AVS indicator tooltip to accept a single override change without opening the full dialog.
+- **Override indicator updates on door changes**: The AVS changes indicator now updates when doors are opened/closed, not just on token movement.
+- **Door changes trigger deferred seek and override validation**: Opening/closing doors now triggers batch recalculation, deferred seek application, and override indicator updates via the `batchComplete` hook.
+- **Deferred seek indicator badge**: The "Seek (Deferred)" source label appears in the override validation dialog and tooltip for overrides applied from deferred seek results.
 
 ### Fixed
 
-- **Seek/Hide "Apply Changes" no longer bypass validation**: Both action apply buttons silently swallowed validation errors via empty `catch {}`, allowing incorrect visibility changes (e.g., setting already-observed tokens to hidden on Seek critical success). Now blocks the apply and warns if validation fails.
+- **Seek/Hide "Apply Changes" no longer bypass validation**: Both action apply buttons silently swallowed validation errors via empty `catch {}`, allowing incorrect visibility changes. Now blocks the apply and warns if validation fails.
+- **Seek skips allies when ignoreAllies setting is enabled**: The "Apply Changes" button now respects the `ignoreAllies` setting, filtering out allied tokens from seek outcomes before applying overrides.
+- **Seek skips loot tokens without GM-configured stealth DC**: Loot tokens with no explicit stealth DC (or DC 0) are excluded from seek results entirely. Only loot with a GM-set DC participates in seek.
+- **Override indicator accumulates across multiple tokens**: When multiple PCs move simultaneously, overrides from all tokens are accumulated and shown together instead of the last token's result overwriting previous ones.
+- **Override indicator tooltip stays on hover**: Added 150ms hover delay so the tooltip doesn't disappear when moving the cursor from the indicator to the tooltip content.
+- **Override indicator per-row hover highlight**: Tooltip rows show a subtle background highlight on hover for better right-click targeting.
+- **Cover icon colors in validation dialog**: Greater cover icons now display correct red color instead of inheriting dark secondary text color from a CSS specificity issue.
+- **Token images in validation dialog**: Fixed image resolution order and added inline sizing to prevent Foundry's global `max-width: 100%` from collapsing token images to 0px.
 
 ## [7.5.2] - 2026-03-27
 
