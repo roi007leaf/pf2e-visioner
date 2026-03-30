@@ -290,7 +290,11 @@ export function bindAutomationEvents(panel, message, actionData) {
               notify.info('No changes to apply');
               return;
             }
-          } catch { }
+          } catch (seekValidationErr) {
+            console.warn('PF2E Visioner | Seek validation failed, blocking apply:', seekValidationErr);
+            notify.warn('Unable to validate Seek targets');
+            return;
+          }
         }
         await applyHandlers[action](actionData, button);
       } else if (action === 'start-sneak') {

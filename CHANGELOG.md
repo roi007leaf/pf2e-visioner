@@ -1,5 +1,11 @@
 # Changelog
 
+## [7.5.3] - 2026-03-30
+
+### Fixed
+
+- **Seek "Apply Changes" no longer bypasses validation**: The seek apply button silently swallowed validation errors, allowing visibility changes on already-observed tokens. Now blocks the apply and warns if validation fails.
+
 ## [7.5.2] - 2026-03-27
 
 ### Fixed
