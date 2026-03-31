@@ -329,6 +329,75 @@ describe('StealthCheckUseCase', () => {
     });
   });
 
+  describe('handleCheckRoll - preserves existing roll options', () => {
+    test('should preserve existing array options when cover is applied', async () => {
+      const hiderToken = mockToken({ id: 'hider', isOwner: true, x: 0, y: 0, name: 'Hider', alliance: 'party' });
+      const observerToken = mockToken({ id: 'observer', x: 5, y: 5, name: 'Observer', alliance: 'opposition' });
+
+      const mockCheck = { modifiers: [], push: jest.fn() };
+      const existingOptions = ['action:hide', 'secret', 'check:statistic:stealth', 'check:type:skill'];
+      const mockContext = {
+        actor: { getActiveTokens: () => [hiderToken] },
+        options: [...existingOptions],
+      };
+
+      global.canvas.tokens.placeables = [hiderToken, observerToken];
+      stealthCheckUseCase._detectCover = jest.fn().mockReturnValue('standard');
+
+      await stealthCheckUseCase.handleCheckRoll(mockCheck, mockContext);
+
+      for (const opt of existingOptions) {
+        expect(mockContext.options).toContain(opt);
+      }
+    });
+
+    test('should preserve existing Set options when cover is applied', async () => {
+      const hiderToken = mockToken({ id: 'hider', isOwner: true, x: 0, y: 0, name: 'Hider', alliance: 'party' });
+      const observerToken = mockToken({ id: 'observer', x: 5, y: 5, name: 'Observer', alliance: 'opposition' });
+
+      const mockCheck = { modifiers: [], push: jest.fn() };
+      const existingOptions = new Set(['action:hide', 'secret', 'check:statistic:stealth', 'check:type:skill']);
+      const mockContext = {
+        actor: { getActiveTokens: () => [hiderToken] },
+        options: existingOptions,
+      };
+
+      global.canvas.tokens.placeables = [hiderToken, observerToken];
+      stealthCheckUseCase._detectCover = jest.fn().mockReturnValue('standard');
+
+      await stealthCheckUseCase.handleCheckRoll(mockCheck, mockContext);
+
+      const finalOptions = Array.isArray(mockContext.options)
+        ? mockContext.options
+        : Array.from(mockContext.options);
+      expect(finalOptions).toContain('action:hide');
+      expect(finalOptions).toContain('secret');
+      expect(finalOptions).toContain('check:statistic:stealth');
+      expect(finalOptions).toContain('check:type:skill');
+    });
+
+    test('should not add area-effect to stealth check options', async () => {
+      const hiderToken = mockToken({ id: 'hider', isOwner: true, x: 0, y: 0, name: 'Hider', alliance: 'party' });
+      const observerToken = mockToken({ id: 'observer', x: 5, y: 5, name: 'Observer', alliance: 'opposition' });
+
+      const mockCheck = { modifiers: [], push: jest.fn() };
+      const mockContext = {
+        actor: { getActiveTokens: () => [hiderToken] },
+        options: ['action:hide', 'secret'],
+      };
+
+      global.canvas.tokens.placeables = [hiderToken, observerToken];
+      stealthCheckUseCase._detectCover = jest.fn().mockReturnValue('standard');
+
+      await stealthCheckUseCase.handleCheckRoll(mockCheck, mockContext);
+
+      const finalOptions = Array.isArray(mockContext.options)
+        ? mockContext.options
+        : Array.from(mockContext.options);
+      expect(finalOptions).not.toContain('area-effect');
+    });
+  });
+
   describe('handlePreCreateChatMessage - cover direction', () => {
     test('should detect cover from target (observer) to hider', async () => {
       const hiderToken = mockToken({ id: 'hider', isOwner: true, name: 'Hider', alliance: 'party' });

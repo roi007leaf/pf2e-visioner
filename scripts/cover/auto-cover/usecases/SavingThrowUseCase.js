@@ -502,7 +502,13 @@ class SavingThrowUseCase extends BaseAutoCoverUseCase {
             const domSet = new Set(Array.isArray(context.domains) ? context.domains : []);
             domSet.add('saving-throw');
             domSet.add(statSlug);
-            const optSet = new Set(Array.isArray(context.options) ? context.options : []);
+            const optSet = new Set(
+              Array.isArray(context.options)
+                ? context.options
+                : context.options instanceof Set
+                  ? context.options
+                  : [],
+            );
             optSet.add('area-effect');
             context.domains = Array.from(domSet);
             context.options = Array.from(optSet);
@@ -587,7 +593,13 @@ class SavingThrowUseCase extends BaseAutoCoverUseCase {
       if (bonus > 1) {
         const state = coverInfo?.state ?? 'standard';
         // Ensure predicate support
-        const optSet = new Set(Array.isArray(context.options) ? context.options : []);
+        const optSet = new Set(
+          Array.isArray(context.options)
+            ? context.options
+            : context.options instanceof Set
+              ? context.options
+              : [],
+        );
         optSet.add('area-effect');
         context.options = Array.from(optSet);
 

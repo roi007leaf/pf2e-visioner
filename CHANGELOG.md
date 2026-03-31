@@ -1,5 +1,12 @@
 # Changelog
 
+## [7.6.1] - 2026-03-31
+
+### Fixed
+
+- **Hide/Stealth with cover wipes all roll options**: When `context.options` was a `Set` (as PF2e system passes it), the cover injection code fell back to an empty array, stripping all existing roll options (action:hide, secret, check:statistic:stealth, etc.) and leaving only `area-effect`.
+- **Stealth checks incorrectly tagged as area-effect**: Cover injection for stealth checks was adding `area-effect` to roll options (copy-pasted from saving throw logic). Stealth cover uses `action:hide`/`action:sneak` predicates, not `area-effect`.
+
 ## [7.6.0] - 2026-03-30
 
 ### Added

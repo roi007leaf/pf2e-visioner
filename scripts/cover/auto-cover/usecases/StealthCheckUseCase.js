@@ -608,9 +608,12 @@ class StealthCheckUseCase extends BaseAutoCoverUseCase {
       if (bonus > 1 && !isSneakAction) {
         const state = coverInfo?.state ?? 'standard';
         // Ensure predicate support
-        const optSet = new Set(Array.isArray(context.options) ? context.options : []);
-        optSet.add('area-effect');
-        context.options = Array.from(optSet);
+        const optSource = Array.isArray(context.options)
+          ? context.options
+          : context.options instanceof Set
+            ? Array.from(context.options)
+            : [];
+        context.options = optSource;
 
         const label = getCoverLabel(state);
         let pf2eMod;
