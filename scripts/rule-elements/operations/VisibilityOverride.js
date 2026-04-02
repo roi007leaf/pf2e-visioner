@@ -22,14 +22,6 @@ export class VisibilityOverride {
       triggerRecalculation = false,
     } = operation;
 
-    console.log('PF2E Visioner | applyVisibilityOverride - full operation:', {
-      observers,
-      direction,
-      state,
-      predicate,
-      operationKeys: Object.keys(operation),
-    });
-
     const observerTokens = this.getObserverTokens(
       subjectToken,
       observers,
@@ -120,49 +112,16 @@ export class VisibilityOverride {
         const combinedOptions = PredicateHelper.combineRollOptions(originOptions, targetOptions);
 
         const passes = PredicateHelper.evaluate(predicate, combinedOptions);
-        const targetTraitOptions = combinedOptions.filter((o) => o.includes('target:trait'));
-        const allUndeadOptions = combinedOptions.filter((o) => o.includes('undead'));
-        const allGiantOptions = combinedOptions.filter((o) => o.includes('giant'));
-
-        console.log('PF2E Visioner | Predicate check:', {
-          observer: observingToken.name,
-          target: targetToken.name,
-          predicate,
-          predicateType: Array.isArray(predicate) ? 'array' : typeof predicate,
-          predicateString: JSON.stringify(predicate),
-          passes,
-          targetTraitOptions: targetTraitOptions.slice(0, 20),
-          allUndeadOptions,
-          allGiantOptions,
-          hasTargetTraitUndead: targetTraitOptions.some((o) => o.includes('undead')),
-          hasTargetTraitGiant: targetTraitOptions.some((o) => o.includes('giant')),
-        });
 
         if (!passes) {
           continue;
         }
       }
 
-      console.log('PF2E Visioner | Applying visibility state:', {
-        observer: observingToken.name,
-        target: targetToken.name,
-        state,
-        direction,
-      });
-
-      console.log(
-        `PF2E Visioner | setVisibilityState: storing source on ${targetToken.name} with observerId=${observingToken.id} (direction=${direction})`,
-      );
       await this.setVisibilityState(observingToken, targetToken, state, sourceData, applyOffGuard);
       appliedToAnyToken = true;
     }
 
-    console.log('PF2E Visioner | Visibility override complete:', {
-      appliedToAnyToken,
-      hasPredicates,
-      willSetGlobalFlag: appliedToAnyToken && !hasPredicates,
-      willRefreshVisuals: appliedToAnyToken,
-    });
 
     // Only set the ruleElementOverride flag if:
     // 1. We actually applied the state to at least one token, AND
@@ -182,13 +141,6 @@ export class VisibilityOverride {
     // When predicates are used, we need to refresh visuals to show the per-pair states
     // (since we're not setting the global ruleElementOverride flag)
     const shouldRefreshVisuals = triggerRecalculation || (appliedToAnyToken && hasPredicates);
-
-    console.log('PF2E Visioner | Checking if should refresh visuals:', {
-      triggerRecalculation,
-      appliedToAnyToken,
-      hasPredicates,
-      shouldRefreshVisuals,
-    });
 
     // Trigger visibility recalculation to update visibility maps from sources
     if (shouldRefreshVisuals) {
@@ -238,14 +190,6 @@ export class VisibilityOverride {
   }
 
   static async removeVisibilityOverride(operation, subjectToken, ruleElementId = null) {
-    console.log(`PF2E Visioner | removeVisibilityOverride called:`, {
-      token: subjectToken?.name,
-      operationType: operation?.type,
-      operationDirection: operation?.direction,
-      operationSource: operation?.source,
-      ruleElementId,
-      hasRuleElementId: !!ruleElementId,
-    });
 
     if (!subjectToken) return;
 
@@ -254,11 +198,6 @@ export class VisibilityOverride {
     let observers = operation?.observers;
     let range = operation?.range;
     let tokenIds = operation?.tokenIds;
-
-    console.log(
-      `PF2E Visioner | removeVisibilityOverride: Extracted values - sourceId=${sourceId}, operation?.source=${operation?.source}, operationKeys=${Object.keys(operation || {})}, fullOperation=`,
-      operation,
-    );
 
     // Determine what ID to use for cleanup
     // Priority: ruleElementId > sourceId from operation > extracted from existing flags
@@ -283,17 +222,11 @@ export class VisibilityOverride {
             idToMatch = existingReplacement.id;
           }
         }
-      } catch (_) {}
+      } catch (_) { }
     }
 
-    console.log(
-      `PF2E Visioner | removeVisibilityOverride: ID resolution - ruleElementId=${ruleElementId}, sourceId=${sourceId}, idToMatch=${idToMatch}`,
-    );
 
     if (idToMatch) {
-      console.log(
-        `PF2E Visioner | removeVisibilityOverride: Starting cleanup with idToMatch=${idToMatch} (ruleElementId=${ruleElementId}, sourceId=${sourceId}) for token ${subjectToken.name}`,
-      );
       const allTokens = canvas.tokens?.placeables.filter((t) => t.actor) || [];
       const { setVisibilityBetween, getVisibilityBetween } = await import(
         '../../stores/visibility-map.js'
@@ -325,11 +258,7 @@ export class VisibilityOverride {
                   sourceId === idToMatch ||
                   sourceId.startsWith(idToMatch + '-') ||
                   idToMatch.startsWith(sourceId + '-');
-                if (shouldRemove) {
-                  console.log(
-                    `PF2E Visioner | Removing source ${sourceId} from token ${token.name} with observerId ${observerId} (matched against ${idToMatch})`,
-                  );
-                }
+
                 return !shouldRemove;
               });
               const afterFilter = JSON.stringify(data.sources);
@@ -337,17 +266,13 @@ export class VisibilityOverride {
               if (data.sources.length !== originalLength) {
                 sourcesRemovedFromToken += originalLength - data.sources.length;
                 modified = true;
-                console.log(
-                  `PF2E Visioner | Filtered sources for ${token.name}[${observerId}]: ${originalLength} -> ${data.sources.length} (before=${beforeFilter.substring(0, 100)}, after=${afterFilter.substring(0, 100)})`,
-                );
+
               }
 
               // Clean up empty entries
               if (data.sources.length === 0) {
                 delete stateSource.visibilityByObserver[observerId];
-                console.log(
-                  `PF2E Visioner | Removed empty observer entry ${observerId} from token ${token.name}`,
-                );
+
               }
             }
           }
@@ -356,9 +281,7 @@ export class VisibilityOverride {
           if (Object.keys(stateSource.visibilityByObserver).length === 0) {
             delete stateSource.visibilityByObserver;
             modified = true;
-            console.log(
-              `PF2E Visioner | Removed empty visibilityByObserver from token ${token.name}`,
-            );
+
           }
         }
 
@@ -372,11 +295,7 @@ export class VisibilityOverride {
               sourceId === idToMatch ||
               sourceId.startsWith(idToMatch + '-') ||
               idToMatch.startsWith(sourceId + '-');
-            if (shouldRemove) {
-              console.log(
-                `PF2E Visioner | Removing general visibility source ${sourceId} from token ${token.name} (matched against ${idToMatch})`,
-              );
-            }
+
             return !shouldRemove;
           });
 
@@ -389,27 +308,19 @@ export class VisibilityOverride {
 
         if (modified) {
           totalSourcesRemoved += sourcesRemovedFromToken;
-          // Log the stateSource we're about to save
-          console.log(
-            `PF2E Visioner | About to save stateSource for ${token.name}:`,
-            JSON.stringify(stateSource, null, 2).substring(0, 500),
-          );
+
           // FoundryVTT's setFlag does deep merging, which causes issues when we want to replace the entire object
           // Use update() with explicit path to force replacement instead of merge
           if (Object.keys(stateSource).length === 0) {
             // Empty stateSource - use unsetFlag to remove it, then wait for it to complete
             await token.document.unsetFlag('pf2e-visioner', 'stateSource');
-            console.log(
-              `PF2E Visioner | Removed stateSource flag for ${token.name} using unsetFlag`,
-            );
+
           } else {
             // Use update() with explicit key path to ensure replacement, not merge
             await token.document.update({
               [`flags.pf2e-visioner.stateSource`]: stateSource,
             });
-            console.log(
-              `PF2E Visioner | Updated stateSource flag for ${token.name} using update() method`,
-            );
+
           }
 
           // Wait a moment for the update to propagate
@@ -437,23 +348,10 @@ export class VisibilityOverride {
               }
             }
           }
-          if (!hasSources) {
-            console.log(
-              `PF2E Visioner | Verification passed: No matching sources found in flags after update for ${token.name}`,
-            );
-          }
-          console.log(
-            `PF2E Visioner | Updated stateSource for token ${token.name}, removed ${sourcesRemovedFromToken} sources`,
-          );
+
         }
       }
 
-      console.log(`PF2E Visioner | Total sources removed: ${totalSourcesRemoved}`);
-
-      // Debug: Check what sources remain after cleanup (check ALL tokens for ALL observerIds)
-      console.log(
-        `PF2E Visioner | Checking remaining sources after cleanup for ${subjectToken.name}:`,
-      );
       let totalMatchingSourcesFound = 0;
       for (const token of allTokens) {
         const stateSource = token.document.getFlag('pf2e-visioner', 'stateSource') || {};
@@ -470,16 +368,6 @@ export class VisibilityOverride {
               });
               if (matchingSources.length > 0) {
                 totalMatchingSourcesFound += matchingSources.length;
-                const observerToken = canvas.tokens?.placeables.find((t) => t.id === observerId);
-                const observerName = observerToken?.name || observerId;
-                console.log(
-                  `PF2E Visioner | WARNING: Found ${matchingSources.length} matching sources remaining on ${token.name} with observerId ${observerId} (${observerName}):`,
-                  matchingSources.map((s) => ({
-                    id: typeof s === 'string' ? s : s?.id,
-                    direction: typeof s === 'object' ? s?.direction : undefined,
-                    state: typeof s === 'object' ? s?.state : undefined,
-                  })),
-                );
               }
             }
           }
@@ -496,23 +384,8 @@ export class VisibilityOverride {
           });
           if (matchingSources.length > 0) {
             totalMatchingSourcesFound += matchingSources.length;
-            console.log(
-              `PF2E Visioner | WARNING: Found ${matchingSources.length} matching general visibility sources remaining on ${token.name}:`,
-              matchingSources.map((s) => ({
-                id: typeof s === 'string' ? s : s?.id,
-                direction: typeof s === 'object' ? s?.direction : undefined,
-                state: typeof s === 'object' ? s?.state : undefined,
-              })),
-            );
           }
         }
-      }
-      if (totalMatchingSourcesFound === 0) {
-        console.log(`PF2E Visioner | Cleanup verified: No matching sources found after cleanup`);
-      } else {
-        console.warn(
-          `PF2E Visioner | Cleanup incomplete: ${totalMatchingSourcesFound} matching sources still exist!`,
-        );
       }
 
       // Clean up visibility map entries for all pairs involving subjectToken
@@ -537,20 +410,12 @@ export class VisibilityOverride {
           direction: 'observer_to_target',
         });
 
-        const after1 = getVisibilityBetween(token, subjectToken);
-        const after2 = getVisibilityBetween(subjectToken, token);
-
         if (before1 !== 'observed' || before2 !== 'observed') {
           visibilityMapCleared++;
-          console.log(
-            `PF2E Visioner | Cleared visibility map: ${token.name}->${subjectToken.name} (${before1}->${after1}), ${subjectToken.name}->${token.name} (${before2}->${after2})`,
-          );
         }
       }
 
-      console.log(
-        `PF2E Visioner | Cleared visibility maps for ${visibilityMapCleared} token pairs`,
-      );
+
 
       await subjectToken.document.unsetFlag('pf2e-visioner', 'ruleElementOverride');
       await subjectToken.document.unsetFlag('pf2e-visioner', 'visibilityReplacement');
@@ -560,7 +425,6 @@ export class VisibilityOverride {
       await new Promise((resolve) => setTimeout(resolve, 50));
 
       // Re-verify sources are actually gone after delay
-      console.log(`PF2E Visioner | Re-verifying cleanup after delay for ${subjectToken.name}:`);
       let postDelaySourcesFound = 0;
       for (const token of allTokens) {
         const stateSource = token.document.getFlag('pf2e-visioner', 'stateSource') || {};
@@ -591,17 +455,7 @@ export class VisibilityOverride {
           }
         }
       }
-      if (postDelaySourcesFound > 0) {
-        console.error(
-          `PF2E Visioner | CRITICAL: ${postDelaySourcesFound} sources still exist after cleanup + delay!`,
-        );
-      } else {
-        console.log(`PF2E Visioner | Re-verification passed: No sources found after delay`);
-      }
 
-      console.log(
-        `PF2E Visioner | removeVisibilityOverride: Cleanup complete for idToMatch=${idToMatch}`,
-      );
       return;
     }
 
@@ -627,7 +481,7 @@ export class VisibilityOverride {
       if (!direction && existingReplacement?.direction) {
         direction = existingReplacement.direction;
       }
-    } catch (_) {}
+    } catch (_) { }
 
     // Remove sources from ALL tokens, regardless of direction
     // This ensures we clean up sources stored with either 'to' or 'from' direction

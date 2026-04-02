@@ -838,13 +838,6 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
       const registryKey = this.ruleElementRegistryKey;
 
       for (const token of tokens) {
-        console.log(`PF2E Visioner | Processing token: ${token.name} (${token.id})`);
-
-        // Derive ruleElementId once for all operations
-        const ruleElementId = this.ruleElementId;
-        console.log(
-          `PF2E Visioner | removeAllFlagsForRuleElement: ruleElementId=${ruleElementId}, item=${this.item?.id}, slug=${this.slug}`,
-        );
 
         // Track visibility override cleanup to avoid duplicate cleanup
         // Visibility override cleanup is direction-agnostic and removes all sources for the rule element ID
@@ -860,18 +853,14 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
               !hasCleanedUpVisibilityOverride
             ) {
               hasCleanedUpVisibilityOverride = true;
-              console.log(
-                `PF2E Visioner | Calling removeOperation for operation type: ${operation.type} (once per rule element for direction-agnostic cleanup)`,
-              );
+
               await this.removeOperation(operation, token);
             } else if (
               operation.type !== 'overrideVisibility' &&
               operation.type !== 'conditionalState'
             ) {
               // For other operation types, clean up normally
-              console.log(
-                `PF2E Visioner | Calling removeOperation for operation type: ${operation.type}, direction: ${operation.direction}`,
-              );
+
               await this.removeOperation(operation, token);
             }
           } catch (error) {
@@ -971,9 +960,6 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
         }
       }
 
-      console.log(
-        `PF2E Visioner | removeOperation: ruleElementId=${ruleElementId}, item=${this.item?.id}, slug=${this.slug}, operationSource=${operation?.source}`,
-      );
       switch (operation.type) {
         case 'modifySenses':
           await SenseModifier.restoreSenses(token, ruleElementId);

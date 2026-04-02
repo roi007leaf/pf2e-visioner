@@ -100,28 +100,12 @@ export class OverrideValidationDialog extends foundry.applications.api.Handlebar
       const observerImg = resolveImg(observerToken) || 'icons/svg/book.svg';
       const targetImg = resolveImg(targetToken) || 'icons/svg/book.svg';
 
-      console.log(`PF2E Visioner | Image resolution for ${override.observerName} → ${override.targetName}:`, {
-        observerImg,
-        targetImg,
-        hasObserverToken: !!observerToken,
-        hasTargetToken: !!targetToken
-      });
-
       // Pick analysis icons from actual current state when provided by validator
       // Prefer current states provided by the validator/caller; fall back to safe defaults
       const visibilityKey = override.currentVisibility || 'observed';
       const coverKey = override.currentCover || 'none';
       const prevVisibilityKey = override.state || (override.hasConcealment ? 'concealed' : 'observed');
 
-      // Debug logging
-      if (game.settings.get('pf2e-visioner', 'debug')) {
-        console.log(`Override for ${override.observerName} → ${override.targetName}:`, {
-          state: override.state,
-          currentVisibility: override.currentVisibility,
-          prevVisibilityKey,
-          visibilityKey
-        });
-      }
       // Previous/original cover must reflect what the override expected at apply-time,
       // not what the currentCover is now. If we don't have a specific level, assume 'standard'.
       const prevCoverKey = (override.expectedCover != null)
@@ -235,16 +219,6 @@ export class OverrideValidationDialog extends foundry.applications.api.Handlebar
       targetHeader,
       isTurnChange: this.isTurnChange
     };
-
-    console.log('PF2E Visioner | Dialog context prepared:', {
-      isTurnChange: this.isTurnChange,
-      observerOrientedCount: observerOrientedOverrides.length,
-      targetOrientedCount: targetOrientedOverrides.length,
-      unifiedCount: unifiedOverrides.length,
-      sampleObserverOverride: observerOrientedOverrides[0],
-      sampleTargetOverride: targetOrientedOverrides[0],
-      sampleUnifiedOverride: unifiedOverrides[0]
-    });
 
     return result;
   }

@@ -41,9 +41,6 @@ async function cleanupAvsOverridesForDefeatedActor(actor) {
         const visionMasterId = token.document.getFlag(MODULE_ID, 'visionMasterTokenId');
 
         if (visionMasterId === defeatedToken.id) {
-          console.log(
-            `[PF2E Visioner] Cleaning up vision sharing for ${token.name} (master defeated)`,
-          );
 
           try {
             await token.document.unsetFlag(MODULE_ID, 'visionMasterTokenId');
@@ -452,7 +449,7 @@ export async function registerHooks() {
       const { updateWallVisuals } = await import('../services/visual-effects.js');
       const id = canvas.tokens.controlled?.[0]?.id || null;
       await updateWallVisuals(id);
-    } catch {}
+    } catch { }
   });
   Hooks.on('updateWall', async (doc, changes) => {
     try {
@@ -489,12 +486,12 @@ export async function registerHooks() {
                 await canvas.scene?.updateEmbeddedDocuments?.('Token', updates, { diff: false });
               }
             }
-          } catch (_) {}
+          } catch (_) { }
           // Mirror hidden flag to connected walls
           try {
             const { mirrorHiddenFlagToConnected } = await import('../services/connected-walls.js');
             await mirrorHiddenFlagToConnected(doc, true);
-          } catch (_) {}
+          } catch (_) { }
         } else {
           // If unhidden, remove entries for that wall from tokens
           try {
@@ -526,15 +523,15 @@ export async function registerHooks() {
                 await canvas.scene?.updateEmbeddedDocuments?.('Token', updates, { diff: false });
               }
             }
-          } catch (_) {}
+          } catch (_) { }
           // Mirror hidden flag to connected walls (set hidden=false)
           try {
             const { mirrorHiddenFlagToConnected } = await import('../services/connected-walls.js');
             await mirrorHiddenFlagToConnected(doc, false);
-          } catch (_) {}
+          } catch (_) { }
         }
       }
-    } catch (_) {}
+    } catch (_) { }
     // Door state changed (opened/closed) — LOS changes, trigger batch recalc + deferred seek
     if (changes.ds !== undefined) {
       try {
@@ -545,7 +542,7 @@ export async function registerHooks() {
         if (vsm) {
           vsm.markAllTokensChangedImmediate();
         }
-      } catch {}
+      } catch { }
       // After batch completes: run validation first, then deferred seek (so deferred indicator wins)
       Hooks.once('pf2e-visioner.batchComplete', async () => {
         try {
@@ -562,7 +559,7 @@ export async function registerHooks() {
             }
             await ovm.processQueuedValidations({ skipMovedFilter: true });
           }
-        } catch {}
+        } catch { }
         try {
           const deferredSeekManager = (await import(
             '../chat/services/infra/DeferredSeekManager.js'
@@ -573,14 +570,14 @@ export async function registerHooks() {
               await deferredSeekManager.checkAndApplyDeferred(t.document.id);
             }
           }
-        } catch {}
+        } catch { }
       });
     }
     try {
       const { updateWallVisuals } = await import('../services/visual-effects.js');
       const id = canvas.tokens.controlled?.[0]?.id || null;
       await updateWallVisuals(id);
-    } catch {}
+    } catch { }
   });
   Hooks.on('deleteWall', async (wallDocument) => {
     try {
@@ -600,7 +597,7 @@ export async function registerHooks() {
       const { updateWallVisuals } = await import('../services/visual-effects.js');
       const id = canvas.tokens.controlled?.[0]?.id || null;
       await updateWallVisuals(id);
-    } catch {}
+    } catch { }
   });
 
   // Removed controlToken hook - was causing excessive updateWallVisuals calls on token selection.
@@ -654,7 +651,7 @@ export async function registerHooks() {
           // Get the condition manager and clear established states
           const conditionManager = game.modules.get('pf2e-visioner')?.api?.getConditionManager?.();
           if (conditionManager?.clearEstablishedInvisibleStates) {
-            conditionManager.clearEstablishedInvisibleStates(token).catch(() => {});
+            conditionManager.clearEstablishedInvisibleStates(token).catch(() => { });
           }
         }
       }
@@ -796,10 +793,10 @@ export async function registerHooks() {
           if (t.document.getFlag('pf2e-visioner', 'waitingSneak')) {
             try {
               await t.document.unsetFlag('pf2e-visioner', 'waitingSneak');
-            } catch {}
+            } catch { }
             try {
               if (t.locked) t.locked = false;
-            } catch {}
+            } catch { }
           }
         }
       }

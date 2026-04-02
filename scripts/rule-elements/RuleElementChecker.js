@@ -258,9 +258,7 @@ export class RuleElementChecker {
       // Check target's sources (both directions store sources on targetToken)
       const targetSources = SourceTracker.getVisibilityStateSources(targetToken, observerToken.id);
       if (targetSources.length > 0) {
-        console.log(`PF2E Visioner | checkRuleElementOverride: Found ${targetSources.length} sources for ${observerToken.name}->${targetToken.name}:`, 
-          targetSources.map(s => ({ id: s.id, direction: s.direction, state: s.state })));
-        
+
         // CRITICAL: Filter sources by direction BEFORE checking predicates
         // When checking observer->target, we should only consider sources with matching direction:
         // - 'to' direction sources: observer sees target differently (stored on target with observerId = observer.id)
@@ -278,23 +276,23 @@ export class RuleElementChecker {
         // So when checking observerToken->targetToken:
         // - direction='to' sources are stored on targetToken with observerId = someOtherToken.id (where someOtherToken is the subject)
         // - direction='from' sources are stored on targetToken with observerId = observerToken.id (where targetToken is the subject)
-        
+
         // For now, check all sources but log warnings for mismatched directions
         for (const source of targetSources) {
           if (!source.predicate?.length) continue;
-          
+
           // Determine if this source's direction matches the check direction
           // When checking observerToken->targetToken:
           // - If source.direction='from', it means targetToken is seen differently by observerToken (correct match)
           // - If source.direction='to', it means someone (targetToken?) sees observerToken differently (needs verification)
-          
+
           // For predicate evaluation context:
           // - direction 'to': subject sees others → when checking, observer is the subject seeing the target
           // - direction 'from': others see subject → when checking, target is the subject being seen by observer
-          
+
           // Re-evaluate predicate based on direction
           let predicatePasses = false;
-          
+
           if (source.direction === 'to') {
             // Direction 'to': observer sees target differently
             // This means the source should apply when checking observer->target
@@ -312,15 +310,15 @@ export class RuleElementChecker {
             const combinedOptions = PredicateHelper.combineRollOptions(targetOptions, observerOptions);
             predicatePasses = PredicateHelper.evaluate(source.predicate, combinedOptions);
           }
-          
+
           console.log(`PF2E Visioner | checkRuleElementOverride: Source ${source.id} (direction: ${source.direction}): predicate ${predicatePasses ? 'PASSED' : 'FAILED'}`);
-          
+
           if (predicatePasses) {
             // Check visibility map to get the stored state
             const storedState = getVisibilityBetween(observerToken, targetToken);
-            
+
             console.log(`PF2E Visioner | checkRuleElementOverride: Returning override - source: ${source.id}, direction: ${source.direction}, state: ${source.state || storedState}`);
-            
+
             // Return the source state or stored state (prefer source.state if available)
             if (source.state || storedState !== 'observed') {
               return {
@@ -333,32 +331,32 @@ export class RuleElementChecker {
           }
         }
       }
-      
+
       // Also check the reverse direction: sources might be stored on observerToken for 'to' direction
       // When direction='to', source is stored on targetToken (which becomes observerToken in reverse check)
       // So we need to check observerToken's sources with targetToken.id as observerId
       const observerSources = SourceTracker.getVisibilityStateSources(observerToken, targetToken.id);
       if (observerSources.length > 0) {
-        console.log(`PF2E Visioner | checkRuleElementOverride: Found ${observerSources.length} reverse sources for ${observerToken.name}->${targetToken.name}:`, 
+        console.log(`PF2E Visioner | checkRuleElementOverride: Found ${observerSources.length} reverse sources for ${observerToken.name}->${targetToken.name}:`,
           observerSources.map(s => ({ id: s.id, direction: s.direction, state: s.state })));
-        
+
         // Check if any of these are 'to' direction sources that should apply to observer->target check
         for (const source of observerSources) {
           if (!source.predicate?.length || source.direction !== 'to') continue;
-          
+
           // Direction 'to' stored on observerToken: means observerToken (as subject) sees targetToken differently
           // When checking observerToken->targetToken, this source applies
           const observerOptions = PredicateHelper.getTokenRollOptions(observerToken);
           const targetOptions = PredicateHelper.getTargetRollOptions(targetToken, observerToken);
           const combinedOptions = PredicateHelper.combineRollOptions(observerOptions, targetOptions);
           const predicatePasses = PredicateHelper.evaluate(source.predicate, combinedOptions);
-          
+
           console.log(`PF2E Visioner | checkRuleElementOverride: Reverse source ${source.id} (direction: ${source.direction}): predicate ${predicatePasses ? 'PASSED' : 'FAILED'}`);
-          
+
           if (predicatePasses) {
             const storedState = getVisibilityBetween(observerToken, targetToken);
             console.log(`PF2E Visioner | checkRuleElementOverride: Returning override from reverse source - source: ${source.id}, direction: ${source.direction}, state: ${source.state || storedState}`);
-            
+
             if (source.state || storedState !== 'observed') {
               return {
                 state: source.state || storedState,

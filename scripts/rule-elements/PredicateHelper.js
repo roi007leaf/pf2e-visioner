@@ -20,26 +20,7 @@ export class PredicateHelper {
       const predicateInstance = new game.pf2e.Predicate(predicate);
       const optionsArray = Array.isArray(rollOptions) ? rollOptions : Array.from(rollOptions);
       const result = predicateInstance.test(optionsArray);
-      
-      // Debug logging for complex predicates
-      if (predicate.some(p => typeof p === 'object' && (p.or || p.and || p.not))) {
-        const allTraitOptions = optionsArray.filter(o => o.includes('trait'));
-        const targetTraitOptions = optionsArray.filter(o => o.includes('target:trait'));
-        const undeadOptions = optionsArray.filter(o => o.includes('undead'));
-        const giantOptions = optionsArray.filter(o => o.includes('giant'));
-        
-        console.log('PF2E Visioner | Evaluating complex predicate:', {
-          predicate,
-          predicateString: JSON.stringify(predicate),
-          optionsCount: optionsArray.length,
-          allTraitOptions: allTraitOptions.slice(0, 15),
-          targetTraitOptions: targetTraitOptions.slice(0, 15),
-          undeadOptions: undeadOptions,
-          giantOptions: giantOptions,
-          result,
-        });
-      }
-      
+
       return result;
     } catch (error) {
       console.warn('PF2E Visioner | PF2e predicate system unavailable, using fallback:', error);
@@ -125,7 +106,7 @@ export class PredicateHelper {
    */
   static combineRollOptions(...optionSets) {
     const combined = new Set();
-    
+
     for (const set of optionSets) {
       if (set instanceof Set) {
         set.forEach(opt => combined.add(opt));
@@ -157,7 +138,7 @@ export class PredicateHelper {
         return !this._evaluateTerm(statement.not, rollOptions);
       }
     }
-    
+
     return this._evaluateTerm(statement, rollOptions);
   }
 
@@ -169,7 +150,7 @@ export class PredicateHelper {
     if (Array.isArray(term)) {
       return this._evaluateStatement(term, rollOptions);
     }
-    
+
     if (typeof term === 'object' && term !== null) {
       return this._evaluateStatement(term, rollOptions);
     }
@@ -179,7 +160,7 @@ export class PredicateHelper {
       if (term.startsWith('not:')) {
         return !rollOptions.has(term.slice(4));
       }
-      
+
       return rollOptions.has(term);
     }
 
