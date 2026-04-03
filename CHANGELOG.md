@@ -1,5 +1,11 @@
 # Changelog
 
+## [7.6.3] - 2026-03-31
+
+### Fixed
+
+- Remove more debug logs.
+
 ## [7.6.2] - 2026-03-31
 
 ### Fixed

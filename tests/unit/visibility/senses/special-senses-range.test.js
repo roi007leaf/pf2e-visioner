@@ -251,10 +251,6 @@ describe('Special Senses Range Detection', () => {
         expect(capabilities.imprecise.tremorsense).toBeUndefined(); // Should NOT be in imprecise
         expect(capabilities.precise.tremorsense).toBe(30); // Should be in precise with 30ft range
       } else {
-        // If tremorsense is not in precise capabilities, something is still wrong
-        console.log('❌ Tremorsense not found in precise capabilities');
-        console.log('Precise capabilities:', visionCapabilities.precise);
-        console.log('Imprecise capabilities:', visionCapabilities.imprecise);
 
         // For now, expect the broken behavior
         expect(tremorsenseInPreciseCapabilities).toBeUndefined(); // Document current broken state

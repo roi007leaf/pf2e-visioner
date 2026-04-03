@@ -103,11 +103,9 @@ class OverrideValidationIndicator {
     // If dialog is already open, don't show another one (prevents conflicts)
     const existingDialog = Object.values(ui.windows).find(w => w.constructor.name === 'OverrideValidationDialog');
     if (existingDialog) {
-      console.log('PF2E Visioner | Queue: Dialog already open, skipping new show request');
       this.#updateTurnChangeBadge();
       return;
     }
-    console.log(`PF2E Visioner | Queue: show() called - tokenName: ${tokenName}, movedTokenId: ${movedTokenId}, overrides: ${Array.isArray(overrideData) ? overrideData.length : 0}`);
     try {
       const avsOnlyInCombat = game.settings.get(MODULE_ID, 'avsOnlyInCombat');
       if (avsOnlyInCombat) {
@@ -126,28 +124,18 @@ class OverrideValidationIndicator {
     this._rawOverrides = all;
     // Filter for display: show only entries that actually changed (visibility or cover) and handle sneak filtering
     const overrides = all.filter((o) => this.#hasDisplayChange(o) && this.#shouldShowOverride(o));
-    console.log(`PF2E Visioner | Queue: show() - all overrides: ${all.length}, filtered: ${overrides.length}`);
 
     if (movedTokenId && overrides.length > 0) {
-      const alreadyInQueue = this._overrideStack.has(movedTokenId);
-      if (alreadyInQueue) {
-        console.log(`PF2E Visioner | Queue: Token ${movedTokenId} (${tokenName}) already in queue, updating data without re-ordering.`);
-      } else {
-        console.log(`PF2E Visioner | Queue: Adding new token ${movedTokenId} (${tokenName}) to end of queue.`);
-      }
+
       this._overrideStack.set(movedTokenId, {
         overrides: all,
         tokenName,
         timestamp: Date.now()
       });
-      console.log(`PF2E Visioner | Queue: Queue size: ${this._overrideStack.size}`);
-      console.log(`PF2E Visioner | Queue: Showing indicator for ${movedTokenId}`);
       this.#showStackedIndicator();
     } else if (this._overrideStack.size > 0) {
-      console.log(`PF2E Visioner | Queue: show() called without movedTokenId, but queue has ${this._overrideStack.size} items. Showing from queue.`);
       this.#showStackedIndicator();
     } else {
-      console.log('PF2E Visioner | Queue: Empty queue, showing direct.');
       this.#showDirect(overrides, all, tokenName);
     }
   }
@@ -173,29 +161,23 @@ class OverrideValidationIndicator {
 
   #showStackedIndicator() {
     // First, clean up entries with no valid overrides
-    console.log(`PF2E Visioner | Queue: #showStackedIndicator() - Starting cleanup. Current queue:`, Array.from(this._overrideStack.keys()));
     for (const [tokenId, data] of Array.from(this._overrideStack.entries())) {
       const filtered = data.overrides.filter((o) => this.#hasDisplayChange(o) && this.#shouldShowOverride(o));
       if (filtered.length === 0) {
-        console.log(`PF2E Visioner | Queue: Cleaning up ${tokenId} (${data.tokenName}) - no valid overrides`);
         this._overrideStack.delete(tokenId);
       }
     }
 
     const entries = Array.from(this._overrideStack.entries());
-    console.log(`PF2E Visioner | Queue: #showStackedIndicator() - Queue size: ${entries.length}, entries:`, entries.map(([id, d]) => `${id}:${d.tokenName}`));
     if (entries.length === 0) {
-      console.log('PF2E Visioner | Queue: Empty, hiding.');
       this.hide(true);
       return;
     }
 
     const [currentTokenId, currentData] = entries[entries.length - 1];
-    console.log(`PF2E Visioner | Queue: Showing last entry (LIFO): ${currentTokenId} (${currentData.tokenName})`);
     const filtered = currentData.overrides.filter((o) => this.#hasDisplayChange(o) && this.#shouldShowOverride(o));
 
     if (filtered.length === 0) {
-      console.log(`PF2E Visioner | Queue: No valid overrides for ${currentTokenId}, removing and recursing.`);
       this._overrideStack.delete(currentTokenId);
       this.#showStackedIndicator();
       return;
@@ -252,7 +234,7 @@ class OverrideValidationIndicator {
     }
 
     queueContainer.innerHTML = `
-      <div class="queue-badge" title="${queueSize} tokens in queue">
+      <div class="queue-badge" data-tooltip="${queueSize} tokens in queue">
         <i class="fas fa-layer-group"></i>
         <span class="queue-count">${queueSize}</span>
       </div>
@@ -477,7 +459,7 @@ class OverrideValidationIndicator {
       <div class="indicator-icon"><i class="fas fa-bolt-auto"></i></div>
       <div class="indicator-badge"></div>
       <div class="indicator-queue"></div>
-      <div class="indicator-round-change" title="Turn Change"><i class="fas fa-clock"></i></div>
+      <div class="indicator-round-change" data-tooltip="Turn Change"><i class="fas fa-clock"></i></div>
     `;
 
     // Restore position

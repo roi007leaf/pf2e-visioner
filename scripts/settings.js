@@ -630,9 +630,7 @@ export function registerSettings() {
           // Re-inject chat automation styles to apply new colorblind colors
           try {
             reinjectChatAutomationStyles();
-            console.log(
-              `[PF2E Visioner] Re-injected chat automation styles for colorblind mode: ${value}`,
-            );
+
           } catch (error) {
             console.warn(`[PF2E Visioner] Failed to re-inject chat automation styles:`, error);
           }

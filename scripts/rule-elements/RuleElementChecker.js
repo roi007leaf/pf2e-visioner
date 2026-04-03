@@ -311,13 +311,9 @@ export class RuleElementChecker {
             predicatePasses = PredicateHelper.evaluate(source.predicate, combinedOptions);
           }
 
-          console.log(`PF2E Visioner | checkRuleElementOverride: Source ${source.id} (direction: ${source.direction}): predicate ${predicatePasses ? 'PASSED' : 'FAILED'}`);
-
           if (predicatePasses) {
             // Check visibility map to get the stored state
             const storedState = getVisibilityBetween(observerToken, targetToken);
-
-            console.log(`PF2E Visioner | checkRuleElementOverride: Returning override - source: ${source.id}, direction: ${source.direction}, state: ${source.state || storedState}`);
 
             // Return the source state or stored state (prefer source.state if available)
             if (source.state || storedState !== 'observed') {
@@ -337,8 +333,6 @@ export class RuleElementChecker {
       // So we need to check observerToken's sources with targetToken.id as observerId
       const observerSources = SourceTracker.getVisibilityStateSources(observerToken, targetToken.id);
       if (observerSources.length > 0) {
-        console.log(`PF2E Visioner | checkRuleElementOverride: Found ${observerSources.length} reverse sources for ${observerToken.name}->${targetToken.name}:`,
-          observerSources.map(s => ({ id: s.id, direction: s.direction, state: s.state })));
 
         // Check if any of these are 'to' direction sources that should apply to observer->target check
         for (const source of observerSources) {
@@ -351,11 +345,9 @@ export class RuleElementChecker {
           const combinedOptions = PredicateHelper.combineRollOptions(observerOptions, targetOptions);
           const predicatePasses = PredicateHelper.evaluate(source.predicate, combinedOptions);
 
-          console.log(`PF2E Visioner | checkRuleElementOverride: Reverse source ${source.id} (direction: ${source.direction}): predicate ${predicatePasses ? 'PASSED' : 'FAILED'}`);
 
           if (predicatePasses) {
             const storedState = getVisibilityBetween(observerToken, targetToken);
-            console.log(`PF2E Visioner | checkRuleElementOverride: Returning override from reverse source - source: ${source.id}, direction: ${source.direction}, state: ${source.state || storedState}`);
 
             if (source.state || storedState !== 'observed') {
               return {

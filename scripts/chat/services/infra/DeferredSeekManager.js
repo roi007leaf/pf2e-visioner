@@ -62,19 +62,11 @@ class DeferredSeekManager {
     const observer = canvas.tokens.placeables.find(
       (t) => t.document?.id === movedTokenId
     );
-    console.log('PF2E Visioner | checkAndApplyDeferred:', {
-      movedTokenId,
-      observerName: observer?.name,
-      hasObserver: !!observer,
-    });
+
     if (!observer) return;
 
     const deferred = observer.document.getFlag(MODULE_ID, DEFERRED_FLAG);
-    console.log('PF2E Visioner | checkAndApplyDeferred deferred:', {
-      observerName: observer.name,
-      deferredCount: deferred?.length ?? 0,
-      targets: deferred?.map(d => d.targetId) ?? [],
-    });
+
     if (!deferred || deferred.length === 0) return;
 
     const { VisionAnalyzer } = await import(
@@ -94,12 +86,7 @@ class DeferredSeekManager {
       if (!target) continue;
 
       const los = va.hasLineOfSight(observer, target);
-      console.log('PF2E Visioner | checkAndApplyDeferred LOS:', {
-        observer: observer.name,
-        target: target.name,
-        los,
-        newVis: entry.newVisibility,
-      });
+
       if (los !== false) {
         toApply.push({ target, newVisibility: entry.newVisibility });
       } else {
@@ -107,10 +94,6 @@ class DeferredSeekManager {
       }
     }
 
-    console.log('PF2E Visioner | checkAndApplyDeferred result:', {
-      toApply: toApply.length,
-      stillDeferred: stillDeferred.length,
-    });
     if (toApply.length > 0) {
       try {
         await applyVisibilityChanges(observer, toApply, {
