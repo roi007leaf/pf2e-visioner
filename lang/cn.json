@@ -531,7 +531,7 @@
                 "hint": "若启用，自动能见度系统将在该场景中被禁用，无法自动计算或更新能见度状态。"
             },
             "AVS_GM_VISION_WARNING_SUPPRESS": {
-                "name": "关闭GM视角警告",
+                "name": "阻止GM视角警告",
                 "hint": "仅限客户端：当GM视角阻止自动能见度系统启动时，不要显示“GM视角已激活”警告提示框。"
             },
             "SHARED_VISION_INDICATOR_SIZE": {
@@ -892,6 +892,9 @@
                 },
                 "COVER": {
                     "label": "区域掩蔽"
+                },
+                "SENSE_SUPPRESSION": {
+                    "label": "感官阻碍"
                 }
             },
             "CONCEALMENT_ENABLED": {
@@ -912,6 +915,22 @@
                 "lineOfSight": "视觉线 - 视线穿过区域边界或二者均在内部时提供掩蔽",
                 "oneWay": "单向 - 从外部观察时则仅对区域内部指示物提供掩蔽",
                 "hint": "该区域的掩蔽是如何确定的"
+            },
+            "SENSE_SUPPRESSION_ENABLED": {
+                "label": "启用感官阻碍",
+                "hint": "若启用，该区域将阻碍所选的指示物感官"
+            },
+            "SENSE_SUPPRESSION_AFFECTS_OBSERVER": {
+                "label": "影响观察者",
+                "hint": "若启用，处于区域内的指示物会失去所选感官（例如剧烈恶臭使灵敏嗅觉过载）"
+            },
+            "SENSE_SUPPRESSION_AFFECTS_TARGET": {
+                "label": "影响目标",
+                "hint": "若启用，处于区域内的指示物将无法被区域外观察者以所选感官侦测到"
+            },
+            "SENSE_SUPPRESSION_SENSES": {
+                "hint": "选择该区域内会被阻碍的感官",
+                "label": "被阻碍的感官"
             }
         },
         "SENSES": {
@@ -1039,7 +1058,9 @@
                 "DARKVISION_IN_DARKNESS": "黑暗视觉能在黑暗中如常视物",
                 "TARGET_INVISIBLE_OBSERVER_DEAFENED": "目标处于隐形，且观察者陷入耳聋",
                 "DETECTED_BY_SENSE_IMPRECISE": "被{sense}（模糊感官）侦测到",
-                "RULE_ELEMENT_OVERRIDE": "规则元素覆写状态"
+                "RULE_ELEMENT_OVERRIDE": "规则元素覆写状态",
+                "DETECTED_BY_THOUGHTSENSE": "被思维感知侦测到（{acuity}）",
+                "SENSES_SUPPRESSED": "该感官被区域阻碍：{senses}"
             },
             "NO_TOKEN_SELECTED": "选择至少一个指示物显示能见度因素",
             "STATE_LABEL": "状态",
@@ -1140,7 +1161,11 @@
             "OVERRIDE_VALIDATION": "状态覆写验证",
             "END_OF_TURN_SNEAK": "回合结束时的隐秘验证",
             "END_TURN_POSITION": "回合结束时的位置验证 - {name}",
-            "AVS_VALIDATION": "自动能见度变更验证"
+            "AVS_VALIDATION": "自动能见度变更验证",
+            "SEEK_DEFERRED": "已推迟（无视觉线）",
+            "SEEK_DEFERRED_SHORT": "无视觉线",
+            "SEEK_DEFERRED_COUNT": "{count}个搜索结果已被推迟，直到重新形成视觉线",
+            "SEEK_DEFERRED_APPLIED": "已应用推迟搜索结果"
         },
         "BUTTONS": {
             "KEEN_EYES": "敏锐视觉",
@@ -1168,12 +1193,14 @@
                 "FAIR": "合理位置数据",
                 "POOR": "糟糕位置数据",
                 "UNRELIABLE": "恶劣位置数据"
-            }
+            },
+            "SENSES_SUPPRESSED": "感官被阻碍"
         },
         "TOOLTIPS": {
             "AUTO_COVER_DETECTION": "自动掩蔽监测",
             "THAT_FEATURE": "你更容易发现密门，陷阱与危害（失败将改为获得成功）。",
-            "KEEN_EYES": "当你使用搜索动作时，获得+2环境加值（系统应用）。且将无踪生物视为隐匿，隐匿生物视为可见。"
+            "KEEN_EYES": "当你使用搜索动作时，获得+2环境加值（系统应用）。且将无踪生物视为隐匿，隐匿生物视为可见。",
+            "SENSES_SUPPRESSED": "以下感官会被某个区域阻碍：{senses}"
         },
         "SETTINGS_MENU": {
             "TITLE": "PF2E Visioner设置",
@@ -1367,7 +1394,8 @@
             "TOOLTIP_SHIFT_RIGHT_CLICK": "Shift+右键点击：拒绝全部",
             "TOOLTIP_HEADER": "有效的更改",
             "TOOLTIP_NEXT": "接下来：",
-            "QUEUE_POSITION": "{total}分之{current}"
+            "QUEUE_POSITION": "{total}分之{current}",
+            "ROW_RIGHT_CLICK": "右键点击以接受该次更改"
         },
         "TIMED_OVERRIDE": {
             "DURATION": "持续时间",
