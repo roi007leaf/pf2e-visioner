@@ -40,6 +40,11 @@ describe('Wall Sight Blocking Fix', () => {
         PROXIMITY: 30,
         DISTANCE: 40,
       },
+      EDGE_SENSE_TYPES: {
+        NONE: 0,
+        LIMITED: 10,
+        NORMAL: 20,
+      },
     };
 
     // Mock foundry utilities with proper geometric line-line intersection

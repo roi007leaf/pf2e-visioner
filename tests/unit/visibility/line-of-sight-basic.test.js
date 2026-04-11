@@ -54,6 +54,11 @@ describe('VisionAnalyzer - Line of Sight (Refactored)', () => {
                 NORMAL: 20,
                 PROXIMITY: 30,
                 DISTANCE: 40
+            },
+            EDGE_SENSE_TYPES: {
+                NONE: 0,
+                LIMITED: 10,
+                NORMAL: 20
             }
         };
 

@@ -142,6 +142,11 @@ describe('Wall Height Integration with Different Creature Sizes', () => {
         NORMAL: 1,
         LIMITED: 2,
       },
+      EDGE_SENSE_TYPES: {
+        NONE: 0,
+        LIMITED: 10,
+        NORMAL: 20,
+      },
     };
 
     global.foundry = {
