@@ -121,18 +121,17 @@ describe('BatchProcessor', () => {
         expect(typeof res.breakdown.pairsSkippedLOS).toBe('number');
     });
 
-    test('emits undetected updates when LOS blocked and prior visibility was observed', async () => {
+    test('proceeds to full calculation when LOS blocked but hearing available', async () => {
         processor.visionAnalyzer.hasLineOfSight.mockReturnValue(false);
 
         const allTokens = global.canvas.tokens.placeables;
         const changed = new Set(['A']);
         const res = await processor.process(allTokens, changed, {});
 
-        expect(res.breakdown.pairsSkippedLOS).toBeGreaterThan(0);
-        const undetected = res.updates.filter(u => u.visibility === 'undetected');
-        expect(undetected.length).toBeGreaterThan(0);
-        expect(undetected.some(u => u.observer.document.id === 'A')).toBe(true);
-        expect(undetected.some(u => u.target.document.id === 'A')).toBe(true);
+        // Non-deafened tokens have default hearing, so LOS-blocked pairs
+        // are NOT skipped — they proceed to full visibility calculation
+        expect(res.breakdown.pairsSkippedLOS).toBe(0);
+        expect(res.updates.length).toBeGreaterThan(0);
     });
 
     test('respects active overrides to avoid calculation', async () => {
