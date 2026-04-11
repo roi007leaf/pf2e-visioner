@@ -34,7 +34,11 @@ class LevelsIntegration {
   }
 
   get isActive() {
-    return this._isLevelsActive;
+    return this._isLevelsActive || this.isNativeLevelsActive;
+  }
+
+  get isNativeLevelsActive() {
+    return (canvas?.scene?.levels?.size ?? 0) > 0;
   }
 
   get hasWallHeight() {
@@ -46,6 +50,25 @@ class LevelsIntegration {
       return null;
     }
     return CONFIG.Levels.API;
+  }
+
+  getTokenLevel(token) {
+    const nativeLevel = token?.document?.level;
+    if (nativeLevel != null) return nativeLevel;
+    if (canvas?.inferLevelFromElevation) {
+      const level = canvas.inferLevelFromElevation(token?.document?.elevation ?? 0);
+      return level?.id ?? null;
+    }
+    return null;
+  }
+
+  areTokensOnSameLevel(token1, token2) {
+    if (this.isNativeLevelsActive) {
+      const l1 = this.getTokenLevel(token1);
+      const l2 = this.getTokenLevel(token2);
+      if (l1 != null && l2 != null) return l1 === l2;
+    }
+    return Math.abs(this.getElevationDifference(token1, token2)) < 5;
   }
 
   getTokenElevation(token) {
@@ -178,25 +201,25 @@ class LevelsIntegration {
   }
 
   hasFloorCeilingBetween(observer, target) {
-    if (!this._isLevelsActive) {
-      return false;
-    }
+    if (this._isLevelsActive) {
+      try {
+        const p0 = this.get3DPoint(observer);
+        const p1 = this.get3DPoint(target);
+        if (!p0 || !p1) {
+          return false;
+        }
 
-    try {
-      const p0 = this.get3DPoint(observer);
-      const p1 = this.get3DPoint(target);
-      if (!p0 || !p1) {
+        const collision = this.test3DPointCollision(p0, p1, 'sight');
+
+
+        return collision;
+      } catch (error) {
+        console.warn('[PF2E Visioner] Error checking floor/ceiling:', error);
         return false;
       }
-
-      const collision = this.test3DPointCollision(p0, p1, 'sight');
-
-
-      return collision;
-    } catch (error) {
-      console.warn('[PF2E Visioner] Error checking floor/ceiling:', error);
-      return false;
     }
+
+    return false;
   }
 
   adjustCoverForElevation(observer, target, baseCoverLevel) {

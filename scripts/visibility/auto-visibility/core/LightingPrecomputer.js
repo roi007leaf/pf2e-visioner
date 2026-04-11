@@ -18,6 +18,7 @@ export class LightingPrecomputer {
     static async precompute(tokens, positions = undefined, previous = undefined) {
         const stats = { batch: 'process', targetUsed: 0, targetMiss: 0, observerUsed: 0, observerMiss: 0 };
         let map = null;
+        let crossLevelMap = null;
         let posKeyMap = null;
         let currentLightingHash = null;
         try {
@@ -68,7 +69,7 @@ export class LightingPrecomputer {
                     // Preserve prior lighting hash if available; do not recompute
                     const lightingHash = previous?.lightingHash || null;
                     // Don't reset the force flag here - let it persist for rapid batches
-                    return { map: prevMap, stats, posKeyMap: prevPosKeyMap, lightingHash };
+                    return { map: prevMap, crossLevelMap: previous?.crossLevelMap ?? null, stats, posKeyMap: prevPosKeyMap, lightingHash };
                 }
             }
 
@@ -130,7 +131,7 @@ export class LightingPrecomputer {
                     stats.targetUsed = prevMap.size;
                     stats.targetMiss = 0;
                     stats.fastPathUsed = true; // Track that we used the fast path
-                    return { map: prevMap, stats, posKeyMap: prevPosKeyMap, lightingHash: currentLightingHash };
+                    return { map: prevMap, crossLevelMap: previous?.crossLevelMap ?? null, stats, posKeyMap: prevPosKeyMap, lightingHash: currentLightingHash };
                 }
             }
 
@@ -181,6 +182,44 @@ export class LightingPrecomputer {
                     // best-effort per token
                 }
             }
+
+            // Cross-level lighting: when native Foundry levels are active, a light restricted
+            // to one floor should not illuminate tokens when viewed from a different floor.
+            // Compute observer-level-keyed lighting for cross-level token pairs.
+            try {
+                const nativeLevelsActive = (canvas?.scene?.levels?.size ?? 0) > 0;
+                if (nativeLevelsActive) {
+                    const levelToRepresentative = new Map(); // levelId -> token
+                    const tokenLevelIds = new Map(); // tokenId -> levelId
+                    const tokenList = [...tokens].filter(t => t?.document?.id);
+
+                    for (const tok of tokenList) {
+                        const levelId = tok.document?.level ?? null;
+                        if (levelId !== null) {
+                            tokenLevelIds.set(tok.document.id, levelId);
+                            if (!levelToRepresentative.has(levelId)) {
+                                levelToRepresentative.set(levelId, tok);
+                            }
+                        }
+                    }
+
+                    if (levelToRepresentative.size > 1) {
+                        crossLevelMap = new Map();
+                        for (const [observerLevelId, observerRep] of levelToRepresentative) {
+                            for (const tok of tokenList) {
+                                const id = tok.document.id;
+                                const targetLevelId = tokenLevelIds.get(id);
+                                if (targetLevelId === observerLevelId) continue;
+                                const pos = LightingPrecomputer.#getPos(tok);
+                                const light = lightingCalculator.getLightLevelAt(pos, tok, observerRep);
+                                crossLevelMap.set(`${observerLevelId}:${id}`, light);
+                            }
+                        }
+                    }
+                }
+            } catch {
+                crossLevelMap = null;
+            }
         } catch {
             map = null;
             posKeyMap = null;
@@ -188,7 +227,7 @@ export class LightingPrecomputer {
         // Use already computed lighting hash to avoid redundant computation
         const finalLightingHash = currentLightingHash || LightingPrecomputer.#getLightingEnvironmentHash();
         // Don't reset the force flag here - let it persist for a brief time to handle multiple rapid batches
-        return { map, stats, posKeyMap, lightingHash: finalLightingHash };
+        return { map, crossLevelMap, stats, posKeyMap, lightingHash: finalLightingHash };
     }
 
     /**

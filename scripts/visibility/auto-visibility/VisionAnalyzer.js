@@ -195,6 +195,7 @@ export class VisionAnalyzer {
    * @returns {boolean}
    */
   hasLineOfSight(observer, target) {
+    console.log('[PF2E Visioner] hasLineOfSight CALLED', observer?.name, '->', target?.name);
     // Early exit: token always has LOS to itself
     if (observer?.document?.id === target?.document?.id) {
       return true;
@@ -213,10 +214,10 @@ export class VisionAnalyzer {
       // CRITICAL: Skip Levels 3D checks when window is minimized - they require rendered vision data
       const isMinimized = typeof document !== 'undefined' && document.hidden;
       const levelsIntegration = LevelsIntegration.getInstance();
-      if (levelsIntegration.isActive && !isMinimized) {
+      if (levelsIntegration._isLevelsActive && !isMinimized) {
         const has3DCollision = !levelsIntegration.hasFloorCeilingBetween(observer, target);
         return has3DCollision;
-      } else if (levelsIntegration.isActive && isMinimized) {
+      } else if (levelsIntegration._isLevelsActive && isMinimized) {
         // Fall through to 2D geometric LOS calculation below
       }
 
@@ -268,7 +269,32 @@ export class VisionAnalyzer {
         (Math.abs(observerPos.x - observer.center.x) > 5 ||
           Math.abs(observerPos.y - observer.center.y) > 5);
 
-      if (los?.points && !visionPolygonStale) {
+      const hasSceneLevels = (canvas?.scene?.levels?.size ?? 0) > 0;
+      const observerLevelId = observer?.document?.level || '';
+      const targetLevelId = target?.document?.level || '';
+      const crossLevel = hasSceneLevels && observerLevelId !== targetLevelId;
+
+      if (crossLevel) {
+        try {
+          const origin = { x: observerPos.x, y: observerPos.y, elevation: observer?.document?.elevation ?? 0 };
+          const destination = { x: targetPos.x, y: targetPos.y, elevation: target?.document?.elevation ?? 0 };
+          const level = canvas.scene.levels.get(observerLevelId);
+          const collision = CONFIG.Canvas.polygonBackends.sight.testCollision(origin, destination, {
+            type: 'sight',
+            mode: 'any',
+            source: observer.vision,
+            level,
+          });
+          console.log('[PF2E Visioner] LOS cross-level v14 API', { observer: observer?.name, target: target?.name, collision });
+          return !collision;
+        } catch (e) {
+          console.log('[PF2E Visioner] LOS cross-level v14 API failed, defaulting to blocked', e);
+          return false;
+        }
+      }
+
+      if (los?.points && !visionPolygonStale && !crossLevel) {
+        console.log('[PF2E Visioner] LOS via vision polygon', { observer: observer?.name, target: target?.name, path: 'vision-polygon' });
         const radius = target.externalRadius;
         // Use targetPos from PositionManager for accurate target position
         const circle = new PIXI.Circle(targetPos.x, targetPos.y, radius);
@@ -294,7 +320,7 @@ export class VisionAnalyzer {
         try {
           hybridObserverSpan = getTokenVerticalSpanFt(observer);
           hybridTargetSpan = getTokenVerticalSpanFt(target);
-        } catch (error) {}
+        } catch (error) { }
 
         // Check center-to-center first
         const centerHasLOS = this.#checkSingleRayLOSWithWalls(
@@ -374,6 +400,7 @@ export class VisionAnalyzer {
               object: target,
               source: visionSource,
             });
+            console.log('[PF2E Visioner] LOS via testVisibility', { observer: observer?.name, target: target?.name, isVisible, path: 'foundry-native' });
             log.debug(
               () =>
                 `testVisibility-result: ${observer.name} -> ${target.name}, isVisible=${isVisible}`,
@@ -410,10 +437,18 @@ export class VisionAnalyzer {
           bottom: Math.min(observerSpan.bottom, targetSpan.bottom),
           top: Math.max(observerSpan.top, targetSpan.top),
         };
-      } catch (error) {}
+      } catch (error) { }
 
       stage = 'get-walls';
-      const cachedWalls = this.#getCachedWalls(elevationRange);
+      let cachedWalls = this.#getCachedWalls(elevationRange, observer?.document?.level);
+
+      console.log('[PF2E Visioner] LOS wall check', {
+        observer: observer?.name,
+        target: target?.name,
+        observerLevel: observer?.document?.level,
+        wallCount: cachedWalls.length,
+        path: 'geometric-sampling',
+      });
 
       // Early exit: if no walls, always have LOS
       stage = 'wall-check';
@@ -506,8 +541,8 @@ export class VisionAnalyzer {
    * @param {Object} elevationRange
    * @returns {Array<Wall>}
    */
-  #getCachedWalls(elevationRange) {
-    const cacheKey = `${elevationRange?.bottom ?? 'none'}_${elevationRange?.top ?? 'none'}`;
+  #getCachedWalls(elevationRange, observerLevel = null, levelStrictMode = false) {
+    const cacheKey = `${elevationRange?.bottom ?? 'none'}_${elevationRange?.top ?? 'none'}_${observerLevel ?? 'all'}${levelStrictMode ? '_strict' : ''}`;
 
     const timestamp = this.#wallCacheTimestamp.get(cacheKey);
     if (timestamp && Date.now() - timestamp < this.#wallCacheTimeout) {
@@ -517,7 +552,7 @@ export class VisionAnalyzer {
       }
     }
 
-    const walls = this.#filterBlockingWalls(elevationRange);
+    const walls = this.#filterBlockingWalls(elevationRange, observerLevel, levelStrictMode);
     this.#wallCache.set(cacheKey, walls);
     this.#wallCacheTimestamp.set(cacheKey, Date.now());
 
@@ -530,8 +565,10 @@ export class VisionAnalyzer {
    * @param {Object} elevationRange
    * @returns {Array<Wall>}
    */
-  #filterBlockingWalls(elevationRange) {
+  #filterBlockingWalls(elevationRange, observerLevel = null, levelStrictMode = false) {
     const blockingWalls = [];
+
+    const observerLevelId = observerLevel ?? null;
 
     for (const wall of canvas.walls.placeables) {
       const isDoor = wall.document.door > 0;
@@ -540,8 +577,8 @@ export class VisionAnalyzer {
         continue;
       }
 
-      const blocksSight = wall.document.sight !== CONST.WALL_SENSE_TYPES.NONE;
-      const blocksSound = wall.document.sound !== CONST.WALL_SENSE_TYPES.NONE;
+      const blocksSight = wall.document.sight !== CONST.EDGE_SENSE_TYPES.NONE;
+      const blocksSound = wall.document.sound !== CONST.EDGE_SENSE_TYPES.NONE;
 
       if (!blocksSight && !blocksSound) {
         continue;
@@ -549,6 +586,16 @@ export class VisionAnalyzer {
 
       if (elevationRange && !doesWallBlockAtElevation(wall.document, elevationRange)) {
         continue;
+      }
+
+      if (observerLevelId !== null) {
+        const wallLevels = wall.document?.levels;
+        const hasLevelAssignment = wallLevels instanceof Set ? wallLevels.size > 0 : wallLevels?.size > 0;
+        if (hasLevelAssignment) {
+          if (!wallLevels.has(observerLevelId)) continue;
+        } else if (levelStrictMode) {
+          continue;
+        }
       }
 
       blockingWalls.push(wall);
@@ -613,7 +660,7 @@ export class VisionAnalyzer {
         const wallMidY = (wall.document.c[1] + wall.document.c[3]) / 2;
         const distToRayMid = Math.sqrt(
           (wallMidX - (fromPoint.x + toPoint.x) / 2) ** 2 +
-            (wallMidY - (fromPoint.y + toPoint.y) / 2) ** 2,
+          (wallMidY - (fromPoint.y + toPoint.y) / 2) ** 2,
         );
 
         if (distToRayMid > rayLength * 1.5) {
@@ -743,7 +790,7 @@ export class VisionAnalyzer {
           }
 
           // Check if this wall blocks sight
-          const blocksSight = wall.document.sight !== CONST.WALL_SENSE_TYPES.NONE;
+          const blocksSight = wall.document.sight !== CONST.EDGE_SENSE_TYPES.NONE;
 
           // If wall doesn't block sight, skip it for LOS check
           if (!blocksSight) {
@@ -755,9 +802,9 @@ export class VisionAnalyzer {
           }
 
           // Check if this is a Limited wall (sight/light/sound = LIMITED)
-          const isLimitedSight = wall.document.sight === CONST.WALL_SENSE_TYPES.LIMITED;
-          const isLimitedLight = wall.document.light === CONST.WALL_SENSE_TYPES.LIMITED;
-          const isLimitedSound = wall.document.sound === CONST.WALL_SENSE_TYPES.LIMITED;
+          const isLimitedSight = wall.document.sight === CONST.EDGE_SENSE_TYPES.LIMITED;
+          const isLimitedLight = wall.document.light === CONST.EDGE_SENSE_TYPES.LIMITED;
+          const isLimitedSound = wall.document.sound === CONST.EDGE_SENSE_TYPES.LIMITED;
           const isLimited = isLimitedSight || isLimitedLight || isLimitedSound;
 
           if (isLimited) {
@@ -824,6 +871,7 @@ export class VisionAnalyzer {
    * @param {Token} target
    * @returns {boolean} True if sound is blocked by walls, floors/ceilings, or Silence effect
    */
+
   isSoundBlocked(observer, target) {
     try {
       // Check for Silence spell effect on observer or target
@@ -834,18 +882,26 @@ export class VisionAnalyzer {
         return true;
       }
 
+      const nativeLevelsActiveSound = (canvas?.scene?.levels?.size ?? 0) > 0;
+
       // Check for sound-blocking walls manually, ignoring LIMITED walls
       // Limited walls (terrain walls) should NOT block sound - they represent fog/mist
       const ray = new foundry.canvas.geometry.Ray(observer.center, target.center);
+      const observerSoundLevelId = nativeLevelsActiveSound
+        ? (observer.document?.level ?? null)
+        : null;
+      const targetSoundLevelId = nativeLevelsActiveSound
+        ? (target.document?.level ?? null)
+        : null;
 
       for (const wall of canvas.walls.placeables) {
         // Skip walls that don't block sound
-        if (wall.document.sound === CONST.WALL_SENSE_TYPES.NONE) {
+        if (wall.document.sound === CONST.EDGE_SENSE_TYPES.NONE) {
           continue;
         }
 
         // Skip LIMITED walls - they don't block sound (fog, mist, etc.)
-        if (wall.document.sound === CONST.WALL_SENSE_TYPES.LIMITED) {
+        if (wall.document.sound === CONST.EDGE_SENSE_TYPES.LIMITED) {
           continue;
         }
 
@@ -854,6 +910,16 @@ export class VisionAnalyzer {
         const isOpen = wall.document.ds === 1;
         if (isDoor && isOpen) {
           continue;
+        }
+
+        // Skip walls restricted to a level that is neither the observer's nor the target's
+        if (observerSoundLevelId !== null || targetSoundLevelId !== null) {
+          const wallLevels = wall.document?.levels;
+          if (wallLevels instanceof Set ? wallLevels.size > 0 : wallLevels?.size > 0) {
+            const matchesObserver = observerSoundLevelId !== null && wallLevels.has(observerSoundLevelId);
+            const matchesTarget = targetSoundLevelId !== null && wallLevels.has(targetSoundLevelId);
+            if (!matchesObserver && !matchesTarget) continue;
+          }
         }
 
         // Check if the ray intersects this sound-blocking wall

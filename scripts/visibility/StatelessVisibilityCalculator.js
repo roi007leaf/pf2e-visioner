@@ -50,6 +50,7 @@ const log = getLogger('AVS/StatelessCalculator');
  * @returns {string} result.detection.sense - Which sense detected: one of SenseType enum values (VISION, DARKVISION, LOW_LIGHT_VISION, GREATER_DARKVISION, HEARING, TREMORSENSE, LIFESENSE, SCENT, ECHOLOCATION, SEE_INVISIBILITY, LIGHT_PERCEPTION)
  */
 export function calculateVisibility(input) {
+  console.log('[PF2E Visioner] STATELESS calculateVisibility called', input?._debug?.observerName, '->', input?._debug?.targetName);
   log.debug(() => ({
     msg: 'calculateVisibility:start',
     observerName: input._debug?.observerName,
@@ -110,6 +111,19 @@ export function calculateVisibility(input) {
   if (impreciseResult) {
     allDetectionResults.push(impreciseResult);
   }
+
+  console.log('[PF2E Visioner] calculateVisibility', {
+    observerName: input._debug?.observerName,
+    targetName: input._debug?.targetName,
+    hasLineOfSight,
+    soundBlocked,
+    isBlinded: observer.conditions.blinded,
+    isInvisible: target.auxiliary.includes('invisible'),
+    hearingAvailable: !!observer.imprecise.hearing,
+    impreciseResult: impreciseResult?.state,
+    visualCanDetect: visualDetection.canDetect,
+    allResults: allDetectionResults.map(r => r.state),
+  });
 
   // 3. Return the best detection result based on priority
   const bestResult = selectBestDetection(allDetectionResults);

@@ -39,6 +39,21 @@ export async function tokenStateToInput(
   lightingRasterService,
   options = {},
 ) {
+  console.log('[PF2E Visioner] tokenStateToInput ENTER', observer?.name, '->', target?.name);
+  {
+    const w = canvas?.walls?.placeables?.[0]?.document;
+    const wLevels = w?.levels;
+    console.log('[PF2E Visioner] v14 API', {
+      obsLevel: observer?.document?.level,
+      tgtLevel: target?.document?.level,
+      wallLevels: wLevels,
+      wallLevelsStr: wLevels ? JSON.stringify([...wLevels]) : 'null',
+      wallLevelsIsSet: wLevels instanceof Set,
+      wallLevelsSize: wLevels?.size,
+      wallKeys: w ? Object.keys(w).filter(k => k.includes('level')).join(',') : 'no wall',
+      wallAllKeys: w ? Object.getOwnPropertyNames(Object.getPrototypeOf(w)).filter(k => k.toLowerCase().includes('level')).join(',') : '',
+    });
+  }
   // Guard against null tokens or missing documents
   if (!observer || !target || !observer.document || !target.document) {
     return null;
@@ -63,6 +78,7 @@ export async function tokenStateToInput(
     options,
     observerPosition,
     targetPosition,
+    observer,
   );
 
   // Calculate distance for sense range filtering using PF2e rules (5-10-5 diagonal pattern)
@@ -176,6 +192,7 @@ export async function tokenStateToInput(
     losSource = 'fresh';
   }
 
+  console.log('[PF2E Visioner] LOS result', { observer: observer?.name, target: target?.name, hasLineOfSight, losSource });
   log.debug(() => ({
     msg: 'LOS-check',
     observerName: observer?.name,
@@ -184,6 +201,14 @@ export async function tokenStateToInput(
     losSource,
   }));
   const soundBlocked = visionAnalyzer.isSoundBlocked(observer, target);
+
+  // Cross-level LOS blocking: a floor/ceiling between tokens blocks visual LOS
+  if (hasLineOfSight !== false && !options?.skipLOS && levelsIntegration.isActive) {
+    const crossLevelBlocked = levelsIntegration.hasFloorCeilingBetween(observer, target);
+    if (crossLevelBlocked) {
+      hasLineOfSight = false;
+    }
+  }
 
   if (linePassesThroughDarkness && rayDarknessRank > 0) {
     // Map darkness rank to lighting level for the ray
@@ -201,13 +226,25 @@ export async function tokenStateToInput(
     };
   }
 
-  return {
+  const result = {
     target: targetState,
     observer: observerState,
     rayDarkness: rayDarkness,
-    soundBlocked: soundBlocked, // Add sound blocking information
-    hasLineOfSight: hasLineOfSight, // Add line of sight information
+    soundBlocked: soundBlocked,
+    hasLineOfSight: hasLineOfSight,
   };
+
+  console.log('[PF2E Visioner] tokenStateToInput', {
+    observer: observer?.name,
+    target: target?.name,
+    hasLineOfSight,
+    soundBlocked,
+    impreciseHearing: result.observer?.imprecise?.hearing,
+    observerElevation: observer?.document?.elevation,
+    targetElevation: target?.document?.elevation,
+  });
+
+  return result;
 }
 
 /**
@@ -219,6 +256,7 @@ function extractTargetState(
   options,
   observerPosition = null,
   targetPosition = null,
+  observer = null,
 ) {
   // Get lighting level at target position
   if (!targetPosition) {
@@ -229,17 +267,23 @@ function extractTargetState(
     };
   }
 
-  // Use precomputed lighting if available (much faster)
+  // Use precomputed lighting. For cross-level pairs, use the observer-level-keyed map
+  // so that floor-restricted lights don't illuminate targets on other floors.
+  const levelsIntegrationForLighting = LevelsIntegration.getInstance();
+  const crossLevel = observer && levelsIntegrationForLighting.isNativeLevelsActive
+    && !levelsIntegrationForLighting.areTokensOnSameLevel(observer, target);
+
   let lightLevel;
-  if (options?.precomputedLights) {
+  if (crossLevel && options?.precomputedCrossLevelLights) {
+    const observerLevelId = levelsIntegrationForLighting.getTokenLevel(observer);
+    const crossKey = observerLevelId ? `${observerLevelId}:${target.document.id}` : null;
+    const precomputed = crossKey ? options.precomputedCrossLevelLights.get(crossKey) : undefined;
+    lightLevel = precomputed ?? lightingCalculator.getLightLevelAt(targetPosition, target, observer);
+  } else if (!crossLevel && options?.precomputedLights) {
     const precomputed = options.precomputedLights.get(target.document.id);
-    if (precomputed) {
-      lightLevel = precomputed;
-    } else {
-      lightLevel = lightingCalculator.getLightLevelAt(targetPosition, target);
-    }
+    lightLevel = precomputed ?? lightingCalculator.getLightLevelAt(targetPosition, target, observer);
   } else {
-    lightLevel = lightingCalculator.getLightLevelAt(targetPosition, target);
+    lightLevel = lightingCalculator.getLightLevelAt(targetPosition, target, observer);
   }
 
   // Map lighting calculator output to standard format
@@ -638,7 +682,20 @@ export async function calculateVisibilityFromTokens(observer, target, dependenci
   }
 
   // Calculate using stateless calculator
+  console.log('[PF2E Visioner] ABOUT TO CALL calculateVisibility', observer?.name, '->', target?.name);
   const result = calculateVisibility(input);
+
+  console.log('[PF2E Visioner] calculateVisibility result', {
+    observer: observer?.name,
+    target: target?.name,
+    state: result.state,
+    detection: result.detection,
+    inputHasLOS: input.hasLineOfSight,
+    inputSoundBlocked: input.soundBlocked,
+    inputHearing: !!input.observer?.imprecise?.hearing,
+    inputBlinded: input.observer?.conditions?.blinded,
+    inputInvisible: input.target?.auxiliary?.includes('invisible'),
+  });
 
   log.debug(() => ({
     msg: 'calculateVisibilityFromTokens:complete',

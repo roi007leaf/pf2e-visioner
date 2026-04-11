@@ -63,6 +63,14 @@ async function cleanupAvsOverridesForDefeatedActor(actor) {
   }
 }
 
+async function _triggerFullAvsRecalculation() {
+  try {
+    const avs = window.pf2eVisioner?.services?.autoVisibilitySystem;
+    if (avs?.recalculateAll) await avs.recalculateAll();
+    else canvas.perception.update({ initializeVision: true, refreshLighting: true });
+  } catch (_) {}
+}
+
 export async function registerHooks() {
   Hooks.on('ready', onReady);
   Hooks.on('canvasReady', onCanvasReady);
@@ -123,6 +131,12 @@ export async function registerHooks() {
           console.warn('PF2E Visioner | Failed to update shared vision indicator:', error);
         }
       }
+    }
+
+    // v14 native levels: token changed level → re-evaluate all sightlines
+    if (foundry.utils.hasProperty(changes, 'level')) {
+      canvas.perception.update({ initializeVision: true, refreshLighting: true });
+      _triggerFullAvsRecalculation();
     }
   });
 
@@ -445,6 +459,7 @@ export async function registerHooks() {
 
   // Wall lifecycle: refresh indicators and see-through state when walls change
   Hooks.on('createWall', async () => {
+    _triggerFullAvsRecalculation();
     try {
       const { updateWallVisuals } = await import('../services/visual-effects.js');
       const id = canvas.tokens.controlled?.[0]?.id || null;
@@ -452,6 +467,11 @@ export async function registerHooks() {
     } catch { }
   });
   Hooks.on('updateWall', async (doc, changes) => {
+    console.log('[PF2E Visioner] updateWall hook fired', { wallId: doc.id, changes, sight: doc.sight, sound: doc.sound });
+    setTimeout(() => {
+      console.log('[PF2E Visioner] updateWall delayed recalc firing');
+      _triggerFullAvsRecalculation();
+    }, 200);
     try {
       // If Hidden Wall flag toggled on, default all observers to Hidden for that wall
       const hiddenChanged = changes?.flags?.[MODULE_ID]?.hiddenWall;
@@ -580,6 +600,7 @@ export async function registerHooks() {
     } catch { }
   });
   Hooks.on('deleteWall', async (wallDocument) => {
+    _triggerFullAvsRecalculation();
     try {
       // Clean up any lingering visual indicators for the deleted wall
       const { cleanupDeletedWallVisuals } = await import('../services/visual-effects.js');
@@ -895,4 +916,9 @@ export async function registerHooks() {
       console.warn('PF2E Visioner | Failed to handle scene update for disableAVS:', error);
     }
   });
+
+  // v14 native levels: re-trigger AVS when scene level documents change
+  Hooks.on('createLevel', _triggerFullAvsRecalculation);
+  Hooks.on('updateLevel', _triggerFullAvsRecalculation);
+  Hooks.on('deleteLevel', _triggerFullAvsRecalculation);
 }

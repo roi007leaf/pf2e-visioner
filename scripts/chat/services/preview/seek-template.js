@@ -1,5 +1,17 @@
 // Facade around seek template helpers to keep UI layer clean
 
+function filterSeekTargets(allTokens, seekerToken) {
+  const nativeLevelsActive = (canvas?.scene?.levels?.size ?? 0) > 0;
+  const seekerLevelId = nativeLevelsActive ? (seekerToken?.document?.level ?? null) : null;
+  return allTokens.filter((t) => {
+    if (!t || t === seekerToken || !t.actor) return false;
+    if (seekerLevelId !== null) {
+      if (t.document?.level !== seekerLevelId) return false;
+    }
+    return true;
+  });
+}
+
 export async function setupSeekTemplate(actionData, skipDialog = false) {
   const { notify } = await import('../infra/notifications.js');
   const { MODULE_ID } = await import('../../../constants.js');
@@ -62,8 +74,7 @@ export async function setupSeekTemplate(actionData, skipDialog = false) {
           actionData.seekTemplateRadiusFeet = Number(doc.distance) || distance;
           actionData.seekTemplateType = templateType;
           // Determine presence of potential targets within template by proximity
-          const tokens = canvas?.tokens?.placeables || [];
-          const targets = tokens.filter((t) => t && t !== actionData.actor && t.actor);
+          const targets = filterSeekTargets(canvas?.tokens?.placeables || [], actionData.actor);
           if (!dispatched && targets.length > 0) {
             dispatched = true;
             const { previewActionResults } = await import('../preview/preview-service.js');
@@ -103,8 +114,7 @@ export async function setupSeekTemplate(actionData, skipDialog = false) {
               actionData.seekTemplateCenter = { x: created.x, y: created.y };
               actionData.seekTemplateRadiusFeet = Number(created.distance) || distance;
               actionData.seekTemplateType = templateType;
-              const tokens = canvas?.tokens?.placeables || [];
-              const targets = tokens.filter((t) => t && t !== actionData.actor && t.actor);
+              const targets = filterSeekTargets(canvas?.tokens?.placeables || [], actionData.actor);
               if (targets.length > 0) {
                 const { previewActionResults } = await import('../preview/preview-service.js');
                 await previewActionResults({ ...actionData, actionType: 'seek' });
@@ -161,8 +171,7 @@ export async function setupSeekTemplate(actionData, skipDialog = false) {
           // Best-effort: annotate the chat message flags immediately so GM panel can switch without relying solely on sockets
           const msg = game.messages.get(actionData.messageId);
           if (msg) {
-            const all = canvas?.tokens?.placeables || [];
-            const targets = all.filter((t) => t && t !== actionData.actor && t.actor);
+            const targets = filterSeekTargets(canvas?.tokens?.placeables || [], actionData.actor);
             const { isTokenWithinTemplate } = await import('../infra/shared-utils.js');
             const hasTargets = targets.some((t) => isTokenWithinTemplate(center, radius, t));
               await msg.update({
@@ -222,8 +231,7 @@ export async function setupSeekTemplate(actionData, skipDialog = false) {
             // Best-effort: annotate chat message flags immediately
             const msg = game.messages.get(actionData.messageId);
             if (msg) {
-              const all = canvas?.tokens?.placeables || [];
-              const targets = all.filter((t) => t && t !== actionData.actor && t.actor);
+              const targets = filterSeekTargets(canvas?.tokens?.placeables || [], actionData.actor);
               const { isTokenWithinTemplate } = await import('../infra/shared-utils.js');
               const hasTargets = targets.some((t) =>
                 isTokenWithinTemplate(actionData.seekTemplateCenter, distance, t),
@@ -256,8 +264,7 @@ export async function setupSeekTemplate(actionData, skipDialog = false) {
             dieResult,
             templateType,
           );
-          const tokens = canvas?.tokens?.placeables || [];
-          const targets = tokens.filter((t) => t && t !== actionData.actor && t.actor);
+          const targets = filterSeekTargets(canvas?.tokens?.placeables || [], actionData.actor);
           if (targets.length === 0) {
             const { notify } = await import('../infra/notifications.js');
             notify.info('No valid targets within template');

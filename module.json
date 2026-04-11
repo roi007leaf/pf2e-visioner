@@ -9,10 +9,10 @@
       "flags": {}
     }
   ],
-  "version": "7.6.3",
+  "version": "7.7.0",
   "compatibility": {
-    "minimum": "13.341",
-    "verified": "13.350"
+    "minimum": "14",
+    "verified": "14"
   },
   "esmodules": ["scripts/main.js"],
   "styles": [
@@ -58,7 +58,7 @@
       "label": "PF2E Visioner Macros",
       "path": "packs/pf2e-visioner-macros",
       "type": "Macro",
-      "system": ["pf2e", "sf2e"],
+      "system": "pf2e",
       "ownership": {
         "PLAYER": "OBSERVER",
         "ASSISTANT": "OWNER"
@@ -86,8 +86,8 @@
         "id": "pf2e",
         "type": "system",
         "compatibility": {
-          "minimum": "7.0.0",
-          "verified": "7.7.1"
+          "minimum": "8.0.0",
+          "verified": "8.0.0"
         }
       },
       {

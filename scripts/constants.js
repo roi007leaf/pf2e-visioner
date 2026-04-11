@@ -982,7 +982,7 @@ export const DEFAULT_SETTINGS = {
     config: true,
     restricted: true,
     type: Number,
-    default: 50,
+    default: 30,
   },
   wallCoverGreaterThreshold: {
     name: 'PF2E_VISIONER.SETTINGS.WALL_GREATER_THRESHOLD.name',
@@ -991,7 +991,7 @@ export const DEFAULT_SETTINGS = {
     config: true,
     restricted: true,
     type: Number,
-    default: 70,
+    default: 55,
   },
   wallCoverAllowGreater: {
     name: 'PF2E_VISIONER.SETTINGS.WALLS_ALLOW_GREATER.name',

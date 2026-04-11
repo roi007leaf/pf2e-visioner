@@ -1162,9 +1162,17 @@ export class CoverDetector {
     const out = [];
     const log = getLogger('AutoCover');
 
+    const nativeLevelsActive = (canvas?.scene?.levels?.size ?? 0) > 0;
+    const attackerLevelId = nativeLevelsActive ? (attacker.document?.level ?? null) : null;
+
     for (const blocker of canvas.tokens.placeables) {
       if (!blocker?.actor) continue;
       if (blocker === attacker || blocker === target) continue;
+
+      // Skip blockers on a different native level than the attacker
+      if (attackerLevelId !== null) {
+        if (blocker.document?.level !== attackerLevelId) continue;
+      }
 
       // Exclude controlled/selected tokens from being blockers
       if (

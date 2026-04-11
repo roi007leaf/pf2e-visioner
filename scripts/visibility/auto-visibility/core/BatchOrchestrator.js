@@ -350,7 +350,7 @@ export class BatchOrchestrator {
       startDetectionBatch();
 
       // Precompute lighting for performance optimization
-      const { precomputedLights, precomputeStats } = await this._precomputeLighting(allTokens);
+      const { precomputedLights, precomputedCrossLevelLights, precomputeStats } = await this._precomputeLighting(allTokens);
 
       // Prepare calculation options
       // Reuse short-lived LOS memo for bursty batches (e.g., animation frames)
@@ -365,6 +365,7 @@ export class BatchOrchestrator {
       const calcOptions = {
         hasDarknessSources: this._detectDarknessSources(),
         precomputedLights,
+        precomputedCrossLevelLights: precomputedCrossLevelLights || null,
         precomputeStats,
         burstLosMemo: this._lastLosMemo.map,
         // Enable fast mode during active token movement to reduce LOS precision
@@ -563,6 +564,7 @@ export class BatchOrchestrator {
    */
   async _precomputeLighting(allTokens) {
     let precomputedLights = null;
+    let precomputedCrossLevelLights = null;
     let precomputeStats = {
       batch: 'process',
       targetUsed: 0,
@@ -605,6 +607,7 @@ export class BatchOrchestrator {
         result.lightingHash !== this._lastPrecompute.lightingHash;
       // Lighting changes are handled by event handlers clearing appropriate caches
       precomputedLights = result.map;
+      precomputedCrossLevelLights = result.crossLevelMap || null;
       precomputeStats = result.stats || precomputeStats;
       // Add cache reuse stats to precompute stats
       precomputeStats.cacheReused = wasReused;
@@ -612,6 +615,7 @@ export class BatchOrchestrator {
       // Update memo and timestamp
       this._lastPrecompute = {
         map: precomputedLights,
+        crossLevelMap: precomputedCrossLevelLights,
         stats: precomputeStats,
         posKeyMap: result.posKeyMap || null,
         lightingHash: result.lightingHash || null,
@@ -624,7 +628,7 @@ export class BatchOrchestrator {
       } catch { }
     }
 
-    return { precomputedLights, precomputeStats };
+    return { precomputedLights, precomputedCrossLevelLights, precomputeStats };
   }
 
   /**

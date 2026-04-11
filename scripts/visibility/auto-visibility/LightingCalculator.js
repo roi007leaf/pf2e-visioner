@@ -37,7 +37,7 @@ export class LightingCalculator {
    * @param {Object} position - {x, y, elevation} coordinates
    * @returns {Object} Light level information
    */
-  getLightLevelAt(position, token) {
+  getLightLevelAt(position, token, observer = null) {
     // if (log.enabled()) log.debug(() => ({ step: 'start-getLightLevelAt', position }));
 
     const DARK = 0;
@@ -129,12 +129,28 @@ export class LightingCalculator {
     const tokenClipperPoints = shapeInWorld.toClipperPoints({ scalingFactor: 1.0 });
     const tokenRadius = token?.externalRadius ?? Math.max(tokenWidth, tokenHeight) / 2;
 
+    // When native levels are active, resolve the observer's level ID for light filtering.
+    // Lights with a non-empty `levels` Set are restricted to those levels;
+    // lights with an empty Set apply to all levels.
+    const nativeLevelsActive = (canvas?.scene?.levels?.size ?? 0) > 0;
+    const observerLevelId = nativeLevelsActive
+      ? (observer?.document?.level ?? token?.document?.level ?? null)
+      : null;
+
     // First process all non-hidden darkness sources since they override illumination
     let maxDarknessResult = null;
     const darknessSources = canvas.effects?.darknessSources || [];
 
     for (const light of darknessSources) {
       if (!light.active) continue;
+
+      // Skip darkness sources restricted to a different native level than the observer
+      if (observerLevelId !== null) {
+        const lightLevels = (light.document ?? light.object?.document)?.levels;
+        if (lightLevels instanceof Set ? lightLevels.size > 0 : lightLevels?.size > 0) {
+          if (!lightLevels.has(observerLevelId)) continue;
+        }
+      }
 
       const dx = center.x - light.x;
       const dy = center.y - light.y;
@@ -241,6 +257,14 @@ export class LightingCalculator {
     for (const light of canvas.effects.lightSources) {
       if (!light.active || light instanceof foundry.canvas.sources.GlobalLightSource) continue;
 
+      // Skip light sources restricted to a different native level than the observer
+      if (observerLevelId !== null) {
+        const lightLevels = (light.document ?? light.object?.document)?.levels;
+        if (lightLevels instanceof Set ? lightLevels.size > 0 : lightLevels?.size > 0) {
+          if (!lightLevels.has(observerLevelId)) continue;
+        }
+      }
+
       // Do a cheap distance check to skip obviously out-of-range sources
       // We nudge out the radius a bit to not reject partially illuminated tokens
       const distanceSquared =
@@ -260,7 +284,6 @@ export class LightingCalculator {
       illumination = Math.max(illumination, DIM);
     }
 
-    // After considering all light sources, return the final illumination result
     return makeIlluminationResult(illumination);
   }
 }

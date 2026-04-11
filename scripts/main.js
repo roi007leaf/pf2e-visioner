@@ -1,3 +1,4 @@
+console.log('[PF2E Visioner] main.js loading');
 // Import settings
 import { registerKeybindings, registerSettings } from './settings.js';
 

@@ -55,7 +55,6 @@ export function refreshLocalPerception() {
     refreshVision: true,
     refreshSounds: true,
     refreshOcclusion: true,
-    refreshTiles: true,
   });
   // Removed redundant updateWallVisuals call - wall visual updates are properly handled
   // by TokenEventHandler._handleWallFlagChanges when wall flags actually change
@@ -313,9 +312,17 @@ async function seekTemplateHandler({
     try {
       const all = canvas?.tokens?.placeables || [];
 
+      const nativeLevelsActive = (canvas?.scene?.levels?.size ?? 0) > 0;
+      const actorLevelId = nativeLevelsActive ? (actorToken.document?.level ?? null) : null;
+
       // For Seek actions, include both tokens with actors AND walls from the walls collection
       const targets = all.filter((t) => {
         if (!t || t === actorToken) return false;
+
+        // Skip tokens on a different native level than the seeker
+        if (actorLevelId !== null) {
+          if (t.document?.level !== actorLevelId) return false;
+        }
 
         // Include tokens with actors (creatures, hazards, etc.)
         if (t.actor) return true;

@@ -191,6 +191,7 @@ export class BatchProcessor {
     // Precompute lighting per token once per batch (best-effort)
     // Prefer orchestrator-provided precompute (via calcOptions) and DO NOT override with nulls.
     let precomputedLights = (calcOptions && calcOptions.precomputedLights) || null;
+    let precomputedCrossLevelLights = (calcOptions && calcOptions.precomputedCrossLevelLights) || null;
     let precomputeStats = (calcOptions && calcOptions.precomputeStats) || null;
     if (!precomputedLights) {
       try {
@@ -204,6 +205,7 @@ export class BatchProcessor {
         }
         const res = await LightingPrecomputer.precompute(allTokens, positions);
         precomputedLights = res?.map || null;
+        precomputedCrossLevelLights = res?.crossLevelMap || null;
         precomputeStats = precomputeStats || res?.stats || null;
       } catch {
         // optional: continue without precomputed lights
@@ -297,6 +299,7 @@ export class BatchProcessor {
       ...calcOptions,
       // Never pass undefined; explicitly pass null or the actual map
       precomputedLights: precomputedLights || null,
+      precomputedCrossLevelLights: precomputedCrossLevelLights || null,
       precomputedLOS: precomputedLOS,
       precomputedSenses: precomputedSenses,
       precomputeStats, // guaranteed non-null object
@@ -745,9 +748,16 @@ export class BatchProcessor {
     }
 
     // Check for hearing - could work through thin walls depending on range
+    // In PF2e all creatures have hearing by default; sensingSummary.hearing is only set
+    // when explicitly listed in senses data, so fall back to default hearing for non-deafened
     if (sensingSummary.hearing && sensingSummary.hearing.range) {
       const hearingRange = sensingSummary.hearing.range || 60;
       if (distance <= hearingRange) {
+        return true;
+      }
+    } else {
+      const capabilities = this.visionAnalyzer.getVisionCapabilities(observer);
+      if (!capabilities?.isDeafened) {
         return true;
       }
     }
