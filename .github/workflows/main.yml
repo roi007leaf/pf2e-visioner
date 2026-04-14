@@ -95,13 +95,19 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      # Validate module.json on PRs
+      # Validate module.json
       - name: Validate Module Manifest
-        if: github.event_name == 'pull_request'
         run: |
           echo "Validating module.json syntax..."
-          cat module.json | jq empty
-          echo "✅ Module manifest is valid JSON"
+          jq empty module.json
+          jq -e '
+            [
+              .packs[]?
+              | select(has("system"))
+              | select((.system | type) != "string")
+            ] | length == 0
+          ' module.json > /dev/null
+          echo "Validated manifest JSON and pack schema constraints"
 
       # Extract version embedded in the tag.
       # This step expects the tag to be one of the following formats:

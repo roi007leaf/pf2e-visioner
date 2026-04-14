@@ -9,7 +9,7 @@
       "flags": {}
     }
   ],
-  "version": "8.0.0",
+  "version": "8.0.1",
   "compatibility": {
     "minimum": "13.341",
     "verified": "14"
@@ -58,7 +58,6 @@
       "label": "PF2E Visioner Macros",
       "path": "packs/pf2e-visioner-macros",
       "type": "Macro",
-      "system": ["pf2e", "sf2e"],
       "ownership": {
         "PLAYER": "OBSERVER",
         "ASSISTANT": "OWNER"
