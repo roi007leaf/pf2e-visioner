@@ -1,5 +1,23 @@
 # Changelog
 
+## [8.0.0] - 2026-04-14
+
+### Added
+
+- **Foundry VTT V14 support**: PF2E Visioner now supports Foundry VTT V14, including updated native region/surface collision handling for multi-level scenes.
+- **Automatic AVS recalculation for Define Surface changes**: AVS now immediately recalculates when `Define Surface` region behaviors are created, updated, or deleted.
+- **Automatic AVS recalculation for region level placement changes**: Changing a region's placement levels now forces an immediate AVS refresh, ensuring cross-level visibility stays in sync with Levels configuration.
+- **Seek template auto-cleanup after results open**: When a GM places a Seek template and opens the Seek results dialog, the placed template region is automatically removed and the setup button state is reset.
+
+### Improved
+
+- **Cross-level native surface collision side selection**: Levels/Foundry surface collision checks now choose the correct surface side based on ray direction (`above` for upward rays, `below` for downward rays), improving consistency for vertical LOS and sound checks between levels.
+
+### Fixed
+
+- **Visibility map persistence consistency**: Visibility map writes now use full token document updates consistently, matching cover map persistence and preventing store test regressions.
+- **Lighting region lookup safety**: Auto-visibility lighting calculations now safely handle scenes/tests where `scene.regions` is missing or not provided as a plain array.
+
 ## [7.6.3] - 2026-03-31
 
 ### Fixed
