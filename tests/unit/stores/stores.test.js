@@ -99,10 +99,9 @@ describe('Visibility Map Functions', () => {
 
       await setVisibilityMap(mockObserver, visibilityMap);
 
-      expect(mockObserver.document.setFlag).toHaveBeenCalledWith(
-        'pf2e-visioner',
-        'visibility',
-        visibilityMap,
+      expect(mockObserver.document.update).toHaveBeenCalledWith(
+        { 'flags.pf2e-visioner.visibility': visibilityMap },
+        { diff: false, render: false, animate: false },
       );
     });
 
@@ -111,10 +110,9 @@ describe('Visibility Map Functions', () => {
 
       await setVisibilityMap(mockObserver, { target1: 'hidden', target2: 'observed' });
 
-      expect(mockObserver.document.setFlag).toHaveBeenCalledWith(
-        'pf2e-visioner',
-        'visibility',
-        { target1: 'hidden' },
+      expect(mockObserver.document.update).toHaveBeenCalledWith(
+        { 'flags.pf2e-visioner.visibility': { target1: 'hidden' } },
+        { diff: false, render: false, animate: false },
       );
     });
 
@@ -124,9 +122,9 @@ describe('Visibility Map Functions', () => {
 
       await setVisibilityMap(mockObserver, {});
 
-      expect(mockObserver.document.unsetFlag).toHaveBeenCalledWith(
-        'pf2e-visioner',
-        'visibility',
+      expect(mockObserver.document.update).toHaveBeenCalledWith(
+        { 'flags.pf2e-visioner.visibility': {} },
+        { diff: false, render: false, animate: false },
       );
     });
   });
@@ -152,10 +150,9 @@ describe('Visibility Map Functions', () => {
 
       await setVisibilityBetween(mockObserver, mockTarget, 'hidden');
 
-      expect(mockObserver.document.setFlag).toHaveBeenCalledWith(
-        'pf2e-visioner',
-        'visibility',
-        { 'target': 'hidden' },
+      expect(mockObserver.document.update).toHaveBeenCalledWith(
+        { 'flags.pf2e-visioner.visibility': { target: 'hidden' } },
+        { diff: false, render: false, animate: false },
       );
     });
 
@@ -177,9 +174,9 @@ describe('Visibility Map Functions', () => {
 
       await setVisibilityBetween(mockObserver, mockTarget, 'observed', { skipEphemeralUpdate: true });
 
-      expect(mockObserver.document.unsetFlag).toHaveBeenCalledWith(
-        'pf2e-visioner',
-        'visibility',
+      expect(mockObserver.document.update).toHaveBeenCalledWith(
+        { 'flags.pf2e-visioner.visibility': {} },
+        { diff: false, render: false, animate: false },
       );
     });
 
@@ -189,10 +186,9 @@ describe('Visibility Map Functions', () => {
 
       await setVisibilityBetween(mockObserver, mockTarget, 'hidden', { skipEphemeralUpdate: true });
 
-      expect(mockObserver.document.setFlag).toHaveBeenCalledWith(
-        'pf2e-visioner',
-        'visibility',
-        { 'target': 'hidden' },
+      expect(mockObserver.document.update).toHaveBeenCalledWith(
+        { 'flags.pf2e-visioner.visibility': { target: 'hidden' } },
+        { diff: false, render: false, animate: false },
       );
     });
   });

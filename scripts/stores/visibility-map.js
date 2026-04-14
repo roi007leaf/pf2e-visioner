@@ -80,21 +80,20 @@ export async function setVisibilityMap(token, visibilityMap) {
     }));
   }
 
-  if (Object.keys(nextMap).length === 0) {
-    if (typeof token.document.unsetFlag === 'function') {
-      return token.document.unsetFlag(MODULE_ID, 'visibility');
-    }
-
-    const path = `flags.${MODULE_ID}.visibility`;
-    return token.document.update({ [path]: {} }, { diff: false });
-  }
-
   if (typeof token.document.setFlag === 'function') {
-    return token.document.setFlag(MODULE_ID, 'visibility', nextMap);
+    // Keep the document flag cache in sync before the full document update.
+    if (Object.keys(nextMap).length === 0 && typeof token.document.unsetFlag === 'function') {
+      await token.document.unsetFlag(MODULE_ID, 'visibility');
+    } else {
+      await token.document.setFlag(MODULE_ID, 'visibility', nextMap);
+    }
   }
 
   const path = `flags.${MODULE_ID}.visibility`;
-  return token.document.update({ [path]: nextMap }, { diff: false });
+  return token.document.update(
+    { [path]: nextMap },
+    { diff: false, render: false, animate: false },
+  );
 }
 
 

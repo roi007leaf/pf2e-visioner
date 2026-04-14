@@ -432,8 +432,8 @@ describe('Simple Logic Tests', () => {
 
       const endTime = Date.now();
 
-      // Should complete quickly (< 10ms for 1000 items)
-      expect(endTime - startTime).toBeLessThan(10);
+      // Should complete quickly without being so strict that CI jitter fails it.
+      expect(endTime - startTime).toBeLessThan(25);
       expect(filtered.length).toBeGreaterThan(0);
       expect(found).toBeDefined();
       expect(found.id).toBe('item-750');

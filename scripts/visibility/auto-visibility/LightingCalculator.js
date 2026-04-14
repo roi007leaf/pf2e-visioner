@@ -195,7 +195,15 @@ export class LightingCalculator {
     let sceneDarkness = globalLight?.enabled ? scene.environment.darknessLevel : 1.0;
 
     // Find all the darkness regions that apply to our position
-    const adlRegions = scene.regions.filter(
+    const sceneRegions = Array.isArray(scene?.regions)
+      ? scene.regions
+      : Array.isArray(scene?.regions?.contents)
+        ? scene.regions.contents
+        : Array.isArray(canvas?.regions?.placeables)
+          ? canvas.regions.placeables
+          : [];
+
+    const adlRegions = sceneRegions.filter(
       (r) =>
         elevation >= r.elevation.bottom &&
         elevation <= r.elevation.top &&
