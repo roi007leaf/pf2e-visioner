@@ -1,4 +1,5 @@
 import { MODULE_ID } from '../constants.js';
+import { updateCanvasPerception } from '../helpers/perception-refresh.js';
 import { showNotification } from '../utils.js';
 
 // Avoid name collision with Foundry/socket.io global `socket`
@@ -51,11 +52,10 @@ export function registerSocket() {
  * Refresh perception on the local canvas
  */
 export function refreshLocalPerception() {
-  canvas.perception.update({
+  updateCanvasPerception({
     refreshVision: true,
     refreshSounds: true,
     refreshOcclusion: true,
-    refreshTiles: true,
   });
   // Removed redundant updateWallVisuals call - wall visual updates are properly handled
   // by TokenEventHandler._handleWallFlagChanges when wall flags actually change
@@ -279,6 +279,7 @@ export function requestGMOpenSeekWithTemplate(
   rollTotal,
   dieResult,
   templateType = 'circle',
+  levels = [],
 ) {
   if (!_socketService.socket) return;
   _socketService.executeAsGM(SEEK_TEMPLATE_CHANNEL, {
@@ -289,6 +290,7 @@ export function requestGMOpenSeekWithTemplate(
     rollTotal,
     dieResult,
     templateType,
+    levels,
     userId: game.userId,
   });
 }
@@ -301,6 +303,7 @@ async function seekTemplateHandler({
   rollTotal,
   dieResult,
   templateType = 'circle',
+  levels = [],
   userId,
 }) {
   try {
@@ -358,6 +361,7 @@ async function seekTemplateHandler({
           center,
           radiusFeet,
           templateType,
+          levels,
           actorTokenId,
           rollTotal: typeof rollTotal === 'number' ? rollTotal : null,
           dieResult: typeof dieResult === 'number' ? dieResult : null,

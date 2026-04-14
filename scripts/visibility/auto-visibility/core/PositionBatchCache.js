@@ -167,7 +167,8 @@ export class PositionBatchCache {
     }
 
     /**
-     * Helper to build LOS pair key (uses coarse keys under the hood)
+     * Helper to build directional LOS cache key using coarse position keys.
+     * LOS can be directional in level-aware scenes, so this must not normalize id ordering.
      * @param {string} aId
      * @param {string} aCoarseKey
      * @param {string} bId
@@ -175,8 +176,7 @@ export class PositionBatchCache {
      * @returns {string}
      */
     makeLosPairKey(aId, aCoarseKey, bId, bCoarseKey) {
-        // Use symmetric ordering same as makePairKey
-        return aId < bId ? `${aId}|${aCoarseKey}::${bId}|${bCoarseKey}` : `${bId}|${bCoarseKey}::${aId}|${aCoarseKey}`;
+        return `${aId}|${aCoarseKey}>>${bId}|${bCoarseKey}`;
     }
 
     /**

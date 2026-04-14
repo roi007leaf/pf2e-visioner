@@ -29,7 +29,7 @@ describe('BatchOrchestrator', () => {
         visibilityMapService = {
             setVisibilityBetween: (o, t, v) => applied.push([o?.document?.id, t?.document?.id, v]),
             getVisibilityMap: () => ({}),
-            setVisibilityMap: (token, visMap) => {
+            setVisibilityMap: async (token, visMap) => {
                 for (const [targetId, state] of Object.entries(visMap)) {
                     applied.push([token?.document?.id, targetId, state]);
                 }
@@ -63,5 +63,42 @@ describe('BatchOrchestrator', () => {
         expect(orchestrator.isProcessing()).toBe(true);
         await p;
         expect(orchestrator.isProcessing()).toBe(false);
+    });
+
+    test('_applyBatchResults awaits visibility map persistence', async () => {
+        const deferred = {};
+        visibilityMapService.setVisibilityMap = jest.fn(
+            () =>
+                new Promise((resolve) => {
+                    deferred.resolve = resolve;
+                }),
+        );
+
+        const applyPromise = orchestrator._applyBatchResults({
+            updates: [
+                {
+                    observer: global.canvas.tokens.placeables[0],
+                    target: global.canvas.tokens.placeables[1],
+                    visibility: 'hidden',
+                },
+            ],
+        });
+
+        await Promise.resolve();
+
+        expect(visibilityMapService.setVisibilityMap).toHaveBeenCalledTimes(1);
+
+        let settled = false;
+        applyPromise.then(() => {
+            settled = true;
+        });
+
+        await Promise.resolve();
+        expect(settled).toBe(false);
+
+        deferred.resolve();
+        await applyPromise;
+
+        expect(settled).toBe(true);
     });
 });

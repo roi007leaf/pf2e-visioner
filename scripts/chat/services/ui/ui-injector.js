@@ -15,6 +15,9 @@ export async function injectAutomationUI(message, html, actionData) {
     const panel = $(panelHtml);
     const messageContent = html.find('.message-content');
     if (messageContent.length === 0) return;
+    try {
+      html.find('.pf2e-visioner-automation-panel').remove();
+    } catch (_) { }
     messageContent.after(panel);
     try {
       // After injecting controls, auto-scroll chat to the bottom so buttons are visible.

@@ -1,3 +1,5 @@
+import { updateCanvasPerception } from '../helpers/perception-refresh.js';
+
 /**
  * Effect Perception Hooks
  * Handles automatic perception refresh when active effects are created, updated, or deleted.
@@ -157,13 +159,12 @@ async function refreshPerceptionForTokens(tokens) {
     }
 
     // AVS is disabled - manually refresh Foundry's perception system
-    await canvas.perception.update({
+    await updateCanvasPerception({
       initializeVision: true,
       initializeLighting: false,
       refreshVision: true,
       refreshLighting: false,
       refreshOcclusion: true,
-      refreshTiles: true
     });
 
     // Update lifesense indicators

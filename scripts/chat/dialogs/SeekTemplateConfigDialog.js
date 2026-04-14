@@ -21,6 +21,23 @@ export class SeekTemplateConfigDialog extends foundry.applications.api.Handlebar
     content: { template: 'modules/pf2e-visioner/templates/dialogs/seek-template-config.hbs' },
   };
 
+  async _prepareContext(options) {
+    const context = await super._prepareContext(options);
+    const levels = Array.from(canvas?.scene?.levels?.sorted || canvas?.scene?.levels || [])
+      .filter((level) => level?.id)
+      .map((level) => ({
+        id: level.id,
+        name: level.name || level.label || level.id,
+        selected: false,
+      }));
+
+    return {
+      ...context,
+      levels,
+      hasLevels: levels.length > 0,
+    };
+  }
+
   _onRender(context, options) {
     super._onRender(context, options);
     const root = this.element;
@@ -57,6 +74,9 @@ export class SeekTemplateConfigDialog extends foundry.applications.api.Handlebar
         const templateType = selectedRadio?.value || 'circle';
         const radiusInput = root.querySelector('#template-radius');
         const radius = Number(radiusInput?.value) || 15;
+        const levels = Array.from(root.querySelectorAll('input[name="templateLevels"]:checked'))
+          .map((input) => input.value)
+          .filter(Boolean);
 
         if (radius < 1 || radius > 1000) {
           const { notify } = await import('../services/infra/notifications.js');
@@ -64,7 +84,7 @@ export class SeekTemplateConfigDialog extends foundry.applications.api.Handlebar
           return;
         }
 
-        this._resolve({ templateType, radius });
+        this._resolve({ templateType, radius, levels });
       });
     }
 

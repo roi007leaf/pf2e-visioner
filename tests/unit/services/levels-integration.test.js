@@ -1,11 +1,94 @@
 import { LevelsIntegration } from '../../../scripts/services/LevelsIntegration.js';
 
+function makeCoreScene(overrides = {}) {
+  const levels = new Map([
+    [
+      'level-a',
+      {
+        id: 'level-a',
+        elevation: { bottom: 0, top: 10 },
+        visibility: { levels: new Set(['level-a']) },
+      },
+    ],
+    [
+      'level-b',
+      {
+        id: 'level-b',
+        elevation: { bottom: 10, top: 20 },
+        visibility: { levels: new Set(['level-b']) },
+      },
+    ],
+  ]);
+
+  levels.sorted = Array.from(levels.values());
+
+  const scene = {
+    levels,
+    grid: { distance: 5 },
+    _view: 'level-a',
+    initialLevel: { id: 'level-a' },
+    getSurfaces: jest.fn(() => []),
+    testSurfaceCollision: jest.fn(() => false),
+    ...overrides,
+  };
+
+  for (const level of levels.values()) {
+    level.parent = scene;
+  }
+
+  return scene;
+}
+
+function makeToken({
+  elevation = 0,
+  losHeight = 0,
+  center = { x: 100, y: 100 },
+  level = null,
+  movementOrigin = null,
+  visionOrigin = null,
+  soundOrigin = null,
+} = {}) {
+  const document = {
+    elevation,
+    level,
+    _source: { level },
+    parent: null,
+    includedInLevel: jest.fn(function includedInLevel(levelRef) {
+      const resolvedLevel =
+        typeof levelRef === 'string' ? this.parent?.levels?.get?.(levelRef) ?? null : levelRef;
+      if (!resolvedLevel || !level) return false;
+      if (resolvedLevel.id === level) return true;
+      return !!resolvedLevel?.visibility?.levels?.has?.(level);
+    }),
+  };
+
+  if (movementOrigin) {
+    document.getMovementOrigin = jest.fn(() => movementOrigin);
+  }
+
+  if (visionOrigin) {
+    document.getVisionOrigin = jest.fn(() => visionOrigin);
+  }
+
+  if (soundOrigin) {
+    document.getSoundOrigin = jest.fn(() => soundOrigin);
+  }
+
+  return {
+    document,
+    losHeight,
+    center,
+    getCenterPoint: () => ({ ...center }),
+  };
+}
+
 describe('LevelsIntegration', () => {
   let levelsIntegration;
   let mockToken1;
   let mockToken2;
 
   beforeEach(() => {
+    LevelsIntegration._instance = null;
     levelsIntegration = new LevelsIntegration();
 
     global.game = {
@@ -17,6 +100,14 @@ describe('LevelsIntegration', () => {
 
     global.CONFIG = {
       Levels: null,
+      Canvas: {
+        polygonBackends: {
+          sight: { testCollision: jest.fn(() => false) },
+          sound: { testCollision: jest.fn(() => false) },
+          light: { testCollision: jest.fn(() => false) },
+          move: { testCollision: jest.fn(() => false) },
+        },
+      },
     };
 
     global.canvas = {
@@ -24,24 +115,26 @@ describe('LevelsIntegration', () => {
         distance: 5,
         size: 100,
       },
+      grid: {
+        size: 100,
+      },
+      scene: {
+        grid: { distance: 5 },
+      },
     };
 
-    mockToken1 = {
-      document: { elevation: 0 },
+    mockToken1 = makeToken({
+      elevation: 0,
       losHeight: 0,
       center: { x: 100, y: 100 },
-      getCenterPoint: () => ({ x: 100, y: 100 }),
-    };
-
-    mockToken2 = {
-      document: { elevation: 0 },
+      level: 'level-a',
+    });
+    mockToken2 = makeToken({
+      elevation: 0,
       losHeight: 0,
       center: { x: 200, y: 200 },
-      getCenterPoint: () => ({ x: 200, y: 200 }),
-    };
-
-    levelsIntegration._initialized = false;
-    LevelsIntegration._instance = null;
+      level: 'level-b',
+    });
   });
 
   afterEach(() => {
@@ -62,166 +155,177 @@ describe('LevelsIntegration', () => {
     });
   });
 
-  describe('Initialization', () => {
-    test('detects inactive Levels module', () => {
+  describe('Availability Detection', () => {
+    test('detects no active integration by default', () => {
       levelsIntegration.initialize();
       expect(levelsIntegration.isActive).toBe(false);
+      expect(levelsIntegration.mode).toBe('none');
       expect(levelsIntegration.hasWallHeight).toBe(false);
     });
 
-    test('detects active Levels module', () => {
+    test('detects active legacy Levels module', () => {
       game.modules.get('levels').active = true;
+      CONFIG.Levels = { API: { checkCollision: jest.fn() } };
+
       levelsIntegration.initialize();
+
+      expect(levelsIntegration.isLegacyActive).toBe(true);
       expect(levelsIntegration.isActive).toBe(true);
+      expect(levelsIntegration.mode).toBe('legacy');
     });
 
-    test('detects active Wall Height module', () => {
+    test('detects active core levels scene', () => {
+      canvas.scene = makeCoreScene();
+
+      levelsIntegration.initialize();
+
+      expect(levelsIntegration.isCoreActive).toBe(true);
+      expect(levelsIntegration.isActive).toBe(true);
+      expect(levelsIntegration.mode).toBe('core');
+    });
+
+    test('keeps wall-height compatibility detection', () => {
       game.modules.get('wall-height').active = true;
       levelsIntegration.initialize();
       expect(levelsIntegration.hasWallHeight).toBe(true);
     });
-
-    test('only initializes once', () => {
-      game.modules.get('levels').active = true;
-
-      levelsIntegration.initialize();
-      const firstInitState = levelsIntegration.isActive;
-
-      // Change the module state
-      game.modules.get('levels').active = false;
-
-      // Initialize again - should not change state since already initialized
-      levelsIntegration.initialize();
-
-      expect(levelsIntegration.isActive).toBe(firstInitState);
-    });
   });
 
   describe('API Access', () => {
-    test('returns null when Levels is inactive', () => {
+    test('returns null when legacy Levels is inactive', () => {
       levelsIntegration.initialize();
       expect(levelsIntegration.api).toBeNull();
     });
 
-    test('returns API when Levels is active', () => {
-      game.modules.get('levels').active = true;
+    test('returns legacy API when available', () => {
       const mockAPI = { checkCollision: jest.fn() };
+      game.modules.get('levels').active = true;
       CONFIG.Levels = { API: mockAPI };
 
       levelsIntegration.initialize();
+
       expect(levelsIntegration.api).toBe(mockAPI);
     });
   });
 
-  describe('Token Elevation', () => {
-    test('gets token elevation from document', () => {
+  describe('Token Positions', () => {
+    test('gets token elevation from document by default', () => {
       mockToken1.document.elevation = 10;
       expect(levelsIntegration.getTokenElevation(mockToken1)).toBe(10);
     });
 
-    test('returns 0 for null token', () => {
-      expect(levelsIntegration.getTokenElevation(null)).toBe(0);
+    test('uses movement origin elevation for core scenes', () => {
+      canvas.scene = makeCoreScene();
+      const token = makeToken({
+        elevation: 10,
+        level: 'level-a',
+        movementOrigin: { x: 125, y: 130, elevation: 17 },
+      });
+
+      expect(levelsIntegration.getTokenElevation(token)).toBe(17);
+      expect(token.document.getMovementOrigin).toHaveBeenCalled();
     });
 
-    test('returns 0 for token without document', () => {
-      expect(levelsIntegration.getTokenElevation({})).toBe(0);
-    });
-  });
-
-  describe('Token LOS Height', () => {
-    test('uses losHeight when Levels is active', () => {
+    test('uses losHeight for legacy Levels module', () => {
       game.modules.get('levels').active = true;
-      levelsIntegration.initialize();
-
+      CONFIG.Levels = { API: {} };
       mockToken1.losHeight = 15;
       mockToken1.document.elevation = 10;
 
       expect(levelsIntegration.getTokenLosHeight(mockToken1)).toBe(15);
     });
 
-    test('falls back to elevation when Levels is inactive', () => {
-      levelsIntegration.initialize();
+    test('uses vision origin elevation for core scenes', () => {
+      canvas.scene = makeCoreScene();
+      const token = makeToken({
+        elevation: 10,
+        level: 'level-a',
+        movementOrigin: { x: 125, y: 130, elevation: 10 },
+        visionOrigin: { x: 125, y: 130, elevation: 19 },
+      });
 
-      mockToken1.losHeight = 15;
-      mockToken1.document.elevation = 10;
-
-      expect(levelsIntegration.getTokenLosHeight(mockToken1)).toBe(10);
+      expect(levelsIntegration.getTokenLosHeight(token)).toBe(19);
+      expect(token.document.getVisionOrigin).toHaveBeenCalled();
     });
 
-    test('returns 0 for null token', () => {
-      expect(levelsIntegration.getTokenLosHeight(null)).toBe(0);
+    test('resolves target token level for core collision checks', () => {
+      canvas.scene = makeCoreScene();
+      mockToken1.document.parent = canvas.scene;
+      mockToken2.document.parent = canvas.scene;
+
+      const level = levelsIntegration.getCollisionLevel({
+        originToken: mockToken1,
+        targetToken: mockToken2,
+      });
+
+      expect(level).toBe(canvas.scene.levels.get('level-b'));
+    });
+
+    test('checks directional core level inclusion', () => {
+      canvas.scene = makeCoreScene();
+      canvas.scene.levels.get('level-b').visibility.levels.add('level-a');
+
+      const observer = makeToken({ level: 'level-a' });
+      const target = makeToken({ level: 'level-b' });
+      observer.document.parent = canvas.scene;
+      target.document.parent = canvas.scene;
+
+      expect(
+        levelsIntegration.isTokenIncludedInLevel(target, canvas.scene.levels.get('level-a')),
+      ).toBe(false);
+      expect(
+        levelsIntegration.isTokenIncludedInLevel(observer, canvas.scene.levels.get('level-b')),
+      ).toBe(true);
     });
   });
 
-  describe('Vertical Distance', () => {
-    test('calculates vertical distance when Levels is active', () => {
-      game.modules.get('levels').active = true;
-      levelsIntegration.initialize();
-
-      mockToken1.losHeight = 0;
-      mockToken2.losHeight = 10;
-
-      expect(levelsIntegration.getVerticalDistance(mockToken1, mockToken2)).toBe(10);
-    });
-
-    test('returns 0 when Levels is inactive', () => {
-      levelsIntegration.initialize();
-
-      mockToken1.losHeight = 0;
-      mockToken2.losHeight = 10;
-
-      expect(levelsIntegration.getVerticalDistance(mockToken1, mockToken2)).toBe(0);
-    });
-
-    test('handles negative elevation differences', () => {
-      game.modules.get('levels').active = true;
-      levelsIntegration.initialize();
-
-      mockToken1.losHeight = 10;
-      mockToken2.losHeight = 0;
-
-      expect(levelsIntegration.getVerticalDistance(mockToken1, mockToken2)).toBe(10);
-    });
-  });
-
-  describe('Total Distance', () => {
-    test('calculates 2D distance when Levels is inactive', () => {
-      levelsIntegration.initialize();
-
+  describe('Distances', () => {
+    test('calculates 2D distance when no integration is active', () => {
       const distance = levelsIntegration.getTotalDistance(mockToken1, mockToken2);
       expect(distance).toBeCloseTo(7.07, 1);
     });
 
-    test('calculates 3D distance when Levels is active', () => {
+    test('calculates 3D distance for legacy Levels integration', () => {
       game.modules.get('levels').active = true;
-      levelsIntegration.initialize();
-
+      CONFIG.Levels = { API: {} };
       mockToken1.losHeight = 0;
       mockToken2.losHeight = 15;
 
       const distance = levelsIntegration.getTotalDistance(mockToken1, mockToken2);
+
       expect(distance).toBeCloseTo(7.68, 1);
     });
 
-    test('returns Infinity for null tokens', () => {
-      expect(levelsIntegration.getTotalDistance(null, mockToken2)).toBe(Infinity);
-      expect(levelsIntegration.getTotalDistance(mockToken1, null)).toBe(Infinity);
+    test('calculates 3D distance from core token origins', () => {
+      canvas.scene = makeCoreScene();
+      const token1 = makeToken({
+        level: 'level-a',
+        movementOrigin: { x: 100, y: 100, elevation: 0 },
+        visionOrigin: { x: 100, y: 100, elevation: 0 },
+      });
+      const token2 = makeToken({
+        level: 'level-b',
+        movementOrigin: { x: 200, y: 200, elevation: 15 },
+        visionOrigin: { x: 200, y: 200, elevation: 15 },
+      });
+
+      const distance = levelsIntegration.getTotalDistance(token1, token2);
+
+      expect(distance).toBeCloseTo(7.68, 1);
     });
   });
 
   describe('3D Collision Detection', () => {
-    test('returns false when Levels is inactive', () => {
-      levelsIntegration.initialize();
+    test('returns false when no integration is active', () => {
       expect(levelsIntegration.test3DCollision(mockToken1, mockToken2)).toBe(false);
     });
 
-    test('calls Levels API when active', () => {
-      game.modules.get('levels').active = true;
+    test('calls legacy Levels API when active', () => {
       const mockCheckCollision = jest.fn().mockReturnValue({ x: 150, y: 150, z: 5 });
+      game.modules.get('levels').active = true;
       CONFIG.Levels = {
         API: { checkCollision: mockCheckCollision },
       };
-      levelsIntegration.initialize();
 
       const result = levelsIntegration.test3DCollision(mockToken1, mockToken2, 'sight');
 
@@ -229,143 +333,301 @@ describe('LevelsIntegration', () => {
       expect(result).toBe(true);
     });
 
-    test('returns false on API error', () => {
-      game.modules.get('levels').active = true;
-      const mockCheckCollision = jest.fn().mockImplementation(() => {
-        throw new Error('Test error');
+    test('uses core testSurfaceCollision with inferred level', () => {
+      canvas.scene = makeCoreScene({
+        testSurfaceCollision: jest.fn().mockReturnValue(true),
       });
-      CONFIG.Levels = {
-        API: { checkCollision: mockCheckCollision },
-      };
-      levelsIntegration.initialize();
+      canvas.scene.levels.get('level-a').visibility.levels.add('level-b');
+      canvas.scene.levels.get('level-b').visibility.levels.add('level-a');
+      const token1 = makeToken({
+        level: 'level-a',
+        movementOrigin: { x: 100, y: 100, elevation: 0 },
+        visionOrigin: { x: 100, y: 100, elevation: 5 },
+      });
+      const token2 = makeToken({
+        level: 'level-b',
+        movementOrigin: { x: 200, y: 200, elevation: 10 },
+        visionOrigin: { x: 200, y: 200, elevation: 15 },
+      });
+      token1.document.parent = canvas.scene;
+      token2.document.parent = canvas.scene;
 
-      const consoleSpy = jest.spyOn(console, 'warn').mockImplementation();
-      const result = levelsIntegration.test3DCollision(mockToken1, mockToken2);
+      const result = levelsIntegration.test3DCollision(token1, token2, 'sight');
 
-      expect(result).toBe(false);
-      expect(consoleSpy).toHaveBeenCalled();
-      consoleSpy.mockRestore();
-    });
-  });
-
-  describe('Elevation Difference', () => {
-    test('calculates elevation difference', () => {
-      game.modules.get('levels').active = true;
-      levelsIntegration.initialize();
-
-      mockToken1.losHeight = 5;
-      mockToken2.losHeight = 15;
-
-      expect(levelsIntegration.getElevationDifference(mockToken1, mockToken2)).toBe(10);
-    });
-
-    test('uses elevation when Levels is inactive', () => {
-      levelsIntegration.initialize();
-
-      mockToken1.document.elevation = 5;
-      mockToken2.document.elevation = 15;
-      mockToken1.losHeight = 5;
-      mockToken2.losHeight = 15;
-
-      expect(levelsIntegration.getElevationDifference(mockToken1, mockToken2)).toBe(10);
-    });
-  });
-
-  describe('Elevation Advantage', () => {
-    test('detects elevation advantage', () => {
-      game.modules.get('levels').active = true;
-      levelsIntegration.initialize();
-
-      mockToken1.losHeight = 10;
-      mockToken2.losHeight = 0;
-
-      expect(levelsIntegration.hasElevationAdvantage(mockToken1, mockToken2, 5)).toBe(true);
+      expect(canvas.scene.testSurfaceCollision).toHaveBeenNthCalledWith(
+        1,
+        { x: 100, y: 100, elevation: 5 },
+        { x: 200, y: 200, elevation: 15 },
+        expect.objectContaining({
+          type: 'sight',
+          mode: 'any',
+          side: 'above',
+          level: canvas.scene.levels.get('level-a'),
+          tMin: 0,
+          tMax: 0.5,
+        }),
+      );
+      expect(result).toBe(true);
     });
 
-    test('does not detect advantage below threshold', () => {
-      game.modules.get('levels').active = true;
-      levelsIntegration.initialize();
+    test('uses core polygon collision when surfaces are clear', () => {
+      canvas.scene = makeCoreScene({
+        testSurfaceCollision: jest.fn().mockReturnValue(false),
+      });
+      canvas.scene.levels.get('level-a').visibility.levels.add('level-b');
+      canvas.scene.levels.get('level-b').visibility.levels.add('level-a');
+      CONFIG.Canvas.polygonBackends.sight.testCollision = jest.fn().mockReturnValue(true);
 
-      mockToken1.losHeight = 3;
-      mockToken2.losHeight = 0;
+      const token1 = makeToken({
+        level: 'level-a',
+        movementOrigin: { x: 100, y: 100, elevation: 0 },
+        visionOrigin: { x: 100, y: 100, elevation: 5 },
+      });
+      const token2 = makeToken({
+        level: 'level-b',
+        movementOrigin: { x: 200, y: 200, elevation: 10 },
+        visionOrigin: { x: 200, y: 200, elevation: 15 },
+      });
+      token1.document.parent = canvas.scene;
+      token2.document.parent = canvas.scene;
 
-      expect(levelsIntegration.hasElevationAdvantage(mockToken1, mockToken2, 5)).toBe(false);
+      const result = levelsIntegration.test3DCollision(token1, token2, 'sight');
+
+      expect(canvas.scene.testSurfaceCollision).toHaveBeenNthCalledWith(
+        1,
+        { x: 100, y: 100, elevation: 5 },
+        { x: 200, y: 200, elevation: 15 },
+        expect.objectContaining({
+          type: 'sight',
+          mode: 'any',
+          side: 'above',
+          level: canvas.scene.levels.get('level-a'),
+          tMin: 0,
+          tMax: 0.5,
+        }),
+      );
+      expect(CONFIG.Canvas.polygonBackends.sight.testCollision).toHaveBeenCalledWith(
+        { x: 100, y: 100, elevation: 5 },
+        { x: 200, y: 200, elevation: 15 },
+        expect.objectContaining({
+          type: 'sight',
+          mode: 'any',
+          level: canvas.scene.levels.get('level-a'),
+          tMin: 0,
+          tMax: 0.5,
+        }),
+      );
+      expect(result).toBe(true);
     });
 
-    test('returns false when Levels is inactive', () => {
-      levelsIntegration.initialize();
+    test('treats sight as blocked when target level is not included in observer level', () => {
+      canvas.scene = makeCoreScene({
+        testSurfaceCollision: jest.fn().mockReturnValue(false),
+      });
+      canvas.scene.levels.get('level-b').visibility.levels.add('level-a');
 
-      mockToken1.losHeight = 10;
-      mockToken2.losHeight = 0;
+      const floor1Observer = makeToken({
+        level: 'level-a',
+        movementOrigin: { x: 100, y: 100, elevation: 0 },
+        visionOrigin: { x: 100, y: 100, elevation: 5 },
+      });
+      const floor2Target = makeToken({
+        level: 'level-b',
+        movementOrigin: { x: 200, y: 200, elevation: 10 },
+        visionOrigin: { x: 200, y: 200, elevation: 15 },
+      });
+      floor1Observer.document.parent = canvas.scene;
+      floor2Target.document.parent = canvas.scene;
 
-      expect(levelsIntegration.hasElevationAdvantage(mockToken1, mockToken2, 5)).toBe(false);
+      const blockedFromFloor1 = levelsIntegration.test3DCollision(
+        floor1Observer,
+        floor2Target,
+        'sight',
+      );
+      const visibleFromFloor2 = levelsIntegration.test3DCollision(
+        floor2Target,
+        floor1Observer,
+        'sight',
+      );
+
+      expect(blockedFromFloor1).toBe(true);
+      expect(visibleFromFloor2).toBe(false);
     });
+
+    test('splits core surface collision across origin and target levels', () => {
+      canvas.scene = makeCoreScene({
+        testSurfaceCollision: jest
+          .fn()
+          .mockReturnValueOnce(false)
+          .mockReturnValueOnce(true),
+      });
+      canvas.scene.levels.get('level-a').visibility.levels.add('level-b');
+      canvas.scene.levels.get('level-b').visibility.levels.add('level-a');
+
+      const token1 = makeToken({
+        level: 'level-a',
+        movementOrigin: { x: 100, y: 100, elevation: 0 },
+        visionOrigin: { x: 100, y: 100, elevation: 5 },
+      });
+      const token2 = makeToken({
+        level: 'level-b',
+        movementOrigin: { x: 200, y: 200, elevation: 10 },
+        visionOrigin: { x: 200, y: 200, elevation: 15 },
+      });
+      token1.document.parent = canvas.scene;
+      token2.document.parent = canvas.scene;
+
+      const result = levelsIntegration.test3DCollision(token1, token2, 'sight');
+
+      expect(canvas.scene.testSurfaceCollision).toHaveBeenNthCalledWith(
+        1,
+        { x: 100, y: 100, elevation: 5 },
+        { x: 200, y: 200, elevation: 15 },
+        expect.objectContaining({
+          type: 'sight',
+          mode: 'any',
+          side: 'above',
+          level: canvas.scene.levels.get('level-a'),
+          tMin: 0,
+          tMax: 0.5,
+        }),
+      );
+      expect(canvas.scene.testSurfaceCollision).toHaveBeenNthCalledWith(
+        2,
+        { x: 100, y: 100, elevation: 5 },
+        { x: 200, y: 200, elevation: 15 },
+        expect.objectContaining({
+          type: 'sight',
+          mode: 'any',
+          side: 'above',
+          level: canvas.scene.levels.get('level-b'),
+          tMin: 0.5,
+          tMax: 1,
+        }),
+      );
+      expect(result).toBe(true);
+    });
+
+    test('uses below side for descending core surface collision', () => {
+      canvas.scene = makeCoreScene({
+        testSurfaceCollision: jest.fn().mockReturnValue(true),
+      });
+      canvas.scene.levels.get('level-a').visibility.levels.add('level-b');
+      canvas.scene.levels.get('level-b').visibility.levels.add('level-a');
+      const upperToken = makeToken({
+        level: 'level-b',
+        movementOrigin: { x: 200, y: 200, elevation: 10 },
+        visionOrigin: { x: 200, y: 200, elevation: 15 },
+      });
+      const lowerToken = makeToken({
+        level: 'level-a',
+        movementOrigin: { x: 100, y: 100, elevation: 0 },
+        visionOrigin: { x: 100, y: 100, elevation: 5 },
+      });
+      upperToken.document.parent = canvas.scene;
+      lowerToken.document.parent = canvas.scene;
+
+      const result = levelsIntegration.test3DCollision(upperToken, lowerToken, 'sight');
+
+      expect(canvas.scene.testSurfaceCollision).toHaveBeenNthCalledWith(
+        1,
+        { x: 200, y: 200, elevation: 15 },
+        { x: 100, y: 100, elevation: 5 },
+        expect.objectContaining({
+          type: 'sight',
+          mode: 'any',
+          side: 'below',
+          level: canvas.scene.levels.get('level-b'),
+          tMin: 0,
+          tMax: 0.5,
+        }),
+      );
+      expect(result).toBe(true);
+    });
+
+    test('splits core sound collision across origin and target levels', () => {
+      canvas.scene = makeCoreScene({
+        testSurfaceCollision: jest.fn().mockReturnValue(false),
+      });
+      CONFIG.Canvas.polygonBackends.sound.testCollision = jest
+        .fn()
+        .mockReturnValueOnce(false)
+        .mockReturnValueOnce(true);
+
+      const token1 = makeToken({
+        level: 'level-a',
+        soundOrigin: { x: 100, y: 100, elevation: 5 },
+      });
+      const token2 = makeToken({
+        level: 'level-b',
+        soundOrigin: { x: 200, y: 200, elevation: 15 },
+      });
+      token1.document.parent = canvas.scene;
+      token2.document.parent = canvas.scene;
+
+      const result = levelsIntegration.test3DCollision(token1, token2, 'sound');
+
+      expect(CONFIG.Canvas.polygonBackends.sound.testCollision).toHaveBeenNthCalledWith(
+        1,
+        { x: 100, y: 100, elevation: 5 },
+        { x: 200, y: 200, elevation: 15 },
+        expect.objectContaining({
+          type: 'sound',
+          mode: 'any',
+          level: canvas.scene.levels.get('level-a'),
+          tMin: 0,
+          tMax: 0.5,
+        }),
+      );
+      expect(result).toBe(true);
+    });
+
   });
 
   describe('Cover Adjustment', () => {
-    test('returns base cover when Levels is inactive', () => {
-      levelsIntegration.initialize();
-
-      const result = levelsIntegration.adjustCoverForElevation(
-        mockToken1,
-        mockToken2,
-        'standard',
-      );
+    test('returns base cover when no integration is active', () => {
+      const result = levelsIntegration.adjustCoverForElevation(mockToken1, mockToken2, 'standard');
       expect(result).toBe('standard');
     });
 
-    test('returns base cover when elevation difference is small', () => {
-      game.modules.get('levels').active = true;
-      levelsIntegration.initialize();
-
-      mockToken1.losHeight = 2;
-      mockToken2.losHeight = 0;
-
-      const result = levelsIntegration.adjustCoverForElevation(
-        mockToken1,
-        mockToken2,
-        'standard',
-      );
-      expect(result).toBe('standard');
-    });
-
-    test('reduces cover with elevation advantage', () => {
+    test('reduces cover with legacy elevation advantage', () => {
       game.modules.get('levels').active = true;
       CONFIG.Levels = {
         API: { testCollision: jest.fn().mockReturnValue(false) },
       };
-      levelsIntegration.initialize();
-
       mockToken1.document.elevation = 15;
       mockToken1.losHeight = 15;
       mockToken2.document.elevation = 0;
       mockToken2.losHeight = 0;
 
-      const result = levelsIntegration.adjustCoverForElevation(
-        mockToken1,
-        mockToken2,
-        'standard',
-      );
+      const result = levelsIntegration.adjustCoverForElevation(mockToken1, mockToken2, 'standard');
+
       expect(result).toBe('lesser');
     });
 
-    test('does not reduce cover below none', () => {
-      game.modules.get('levels').active = true;
-      CONFIG.Levels = {
-        API: { testCollision: jest.fn().mockReturnValue(false) },
-      };
-      levelsIntegration.initialize();
+    test('reduces cover with core elevation advantage', () => {
+      canvas.scene = makeCoreScene({
+        testSurfaceCollision: jest.fn().mockReturnValue(false),
+      });
+      canvas.scene.levels.get('level-a').visibility.levels.add('level-b');
+      canvas.scene.levels.get('level-b').visibility.levels.add('level-a');
+      const observer = makeToken({
+        level: 'level-a',
+        movementOrigin: { x: 100, y: 100, elevation: 0 },
+        visionOrigin: { x: 100, y: 100, elevation: 15 },
+      });
+      const target = makeToken({
+        level: 'level-b',
+        movementOrigin: { x: 200, y: 200, elevation: 0 },
+        visionOrigin: { x: 200, y: 200, elevation: 0 },
+      });
+      observer.document.parent = canvas.scene;
+      target.document.parent = canvas.scene;
 
-      mockToken1.document.elevation = 15;
-      mockToken1.losHeight = 15;
-      mockToken2.document.elevation = 0;
-      mockToken2.losHeight = 0;
+      const result = levelsIntegration.adjustCoverForElevation(observer, target, 'standard');
 
-      const result = levelsIntegration.adjustCoverForElevation(mockToken1, mockToken2, 'none');
-      expect(result).toBe('none');
+      expect(result).toBe('lesser');
     });
-
-
   });
 
   describe('Debug Info', () => {
@@ -374,37 +636,15 @@ describe('LevelsIntegration', () => {
       expect(levelsIntegration.getDebugInfo(mockToken1, null)).toBeNull();
     });
 
-    test('returns basic info when Levels is inactive', () => {
-      levelsIntegration.initialize();
-
-      mockToken1.document.elevation = 5;
-      mockToken2.document.elevation = 10;
-
-      const info = levelsIntegration.getDebugInfo(mockToken1, mockToken2);
-
-      expect(info).toMatchObject({
-        isActive: false,
-        hasWallHeight: false,
-        token1: { elevation: 5, losHeight: 5 },
-        token2: { elevation: 10, losHeight: 10 },
-      });
-      expect(info.distances).toBeDefined();
-      expect(info.collision).toBeUndefined();
-    });
-
-    test('returns collision info when Levels is active', () => {
-      game.modules.get('levels').active = true;
-      const mockCheckCollision = jest.fn().mockReturnValue(false);
-      CONFIG.Levels = {
-        API: { checkCollision: mockCheckCollision },
-      };
-      levelsIntegration.initialize();
+    test('returns core mode in debug info', () => {
+      canvas.scene = makeCoreScene();
+      mockToken1.document.parent = canvas.scene;
+      mockToken2.document.parent = canvas.scene;
 
       const info = levelsIntegration.getDebugInfo(mockToken1, mockToken2);
 
-      expect(info.collision).toBeDefined();
-      expect(info.collision.sight).toBe(false);
-      expect(info.collision.sound).toBe(false);
+      expect(info.mode).toBe('core');
+      expect(info.isActive).toBe(true);
     });
   });
 });

@@ -62,12 +62,22 @@ describe('Visibility Map Functions', () => {
       expect(result).toEqual({});
     });
 
-    test('should return existing visibility map', () => {
+  test('should return existing visibility map', () => {
       const visibilityMap = { 'target1': 'hidden', 'target2': 'concealed' };
       mockObserver.document.getFlag.mockReturnValue(visibilityMap);
 
       const result = getVisibilityMap(mockObserver);
       expect(result).toEqual(visibilityMap);
+    });
+
+    test('should strip observed entries from stored visibility map', () => {
+      mockObserver.document.getFlag.mockReturnValue({
+        target1: 'hidden',
+        target2: 'observed',
+      });
+
+      const result = getVisibilityMap(mockObserver);
+      expect(result).toEqual({ target1: 'hidden' });
     });
   });
 
@@ -89,9 +99,34 @@ describe('Visibility Map Functions', () => {
 
       await setVisibilityMap(mockObserver, visibilityMap);
 
-      expect(mockObserver.document.update).toHaveBeenCalledWith(
-        { 'flags.pf2e-visioner.visibility': visibilityMap },
-        { diff: false }
+      expect(mockObserver.document.setFlag).toHaveBeenCalledWith(
+        'pf2e-visioner',
+        'visibility',
+        visibilityMap,
+      );
+    });
+
+    test('should not persist observed entries in visibility map', async () => {
+      global.game.user.isGM = true;
+
+      await setVisibilityMap(mockObserver, { target1: 'hidden', target2: 'observed' });
+
+      expect(mockObserver.document.setFlag).toHaveBeenCalledWith(
+        'pf2e-visioner',
+        'visibility',
+        { target1: 'hidden' },
+      );
+    });
+
+    test('should clear stored visibility flag when map becomes empty', async () => {
+      global.game.user.isGM = true;
+      mockObserver.document.getFlag.mockReturnValue({ target1: 'hidden' });
+
+      await setVisibilityMap(mockObserver, {});
+
+      expect(mockObserver.document.unsetFlag).toHaveBeenCalledWith(
+        'pf2e-visioner',
+        'visibility',
       );
     });
   });
@@ -117,9 +152,10 @@ describe('Visibility Map Functions', () => {
 
       await setVisibilityBetween(mockObserver, mockTarget, 'hidden');
 
-      expect(mockObserver.document.update).toHaveBeenCalledWith(
-        { 'flags.pf2e-visioner.visibility': { 'target': 'hidden' } },
-        { diff: false }
+      expect(mockObserver.document.setFlag).toHaveBeenCalledWith(
+        'pf2e-visioner',
+        'visibility',
+        { 'target': 'hidden' },
       );
     });
 
@@ -135,13 +171,29 @@ describe('Visibility Map Functions', () => {
       consoleSpy.mockRestore();
     });
 
+    test('should remove stored entry when state changes back to observed', async () => {
+      global.game.user.isGM = true;
+      mockObserver.document.getFlag.mockReturnValue({ target: 'hidden' });
+
+      await setVisibilityBetween(mockObserver, mockTarget, 'observed', { skipEphemeralUpdate: true });
+
+      expect(mockObserver.document.unsetFlag).toHaveBeenCalledWith(
+        'pf2e-visioner',
+        'visibility',
+      );
+    });
+
     test('should skip ephemeral update when specified', async () => {
       global.game.user.isGM = true;
       mockObserver.document.getFlag.mockReturnValue({});
 
       await setVisibilityBetween(mockObserver, mockTarget, 'hidden', { skipEphemeralUpdate: true });
 
-      expect(mockObserver.document.update).toHaveBeenCalled();
+      expect(mockObserver.document.setFlag).toHaveBeenCalledWith(
+        'pf2e-visioner',
+        'visibility',
+        { 'target': 'hidden' },
+      );
     });
   });
 

@@ -279,6 +279,33 @@ describe('Special Senses Range Detection', () => {
       // expect(summary.individualSenses?.scent).toBeUndefined();
       // TODO: Fix test isolation to prevent global state interference
     });
+
+    test('handles v14 collection-like detectionModes when building hearing senses', () => {
+      const token = {
+        actor: {
+          system: {
+            perception: {
+              senses: [],
+            },
+          },
+        },
+        document: {
+          detectionModes: {
+            contents: [
+              { id: 'hearing', enabled: true, range: 30 },
+              { id: 'basicSight', enabled: true, range: Infinity },
+            ],
+          },
+        },
+      };
+
+      const summary = visionAnalyzer.getVisionCapabilities(token).sensingSummary;
+
+      expect(summary.hearing).toEqual({ acuity: 'imprecise', range: 30 });
+      expect(summary.imprecise).toEqual(
+        expect.arrayContaining([{ type: 'hearing', range: 30 }]),
+      );
+    });
   });
 });
 

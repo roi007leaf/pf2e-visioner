@@ -282,8 +282,9 @@ export class BatchProcessor {
           }
 
           const losAB = this.visionAnalyzer.hasLineOfSight(tokenA, tokenB);
+          const losBA = this.visionAnalyzer.hasLineOfSight(tokenB, tokenA);
           precomputedLOS.set(`${tokenA.document.id}-${tokenB.document.id}`, losAB);
-          precomputedLOS.set(`${tokenB.document.id}-${tokenA.document.id}`, losAB);
+          precomputedLOS.set(`${tokenB.document.id}-${tokenA.document.id}`, losBA);
         }
       }
     }
@@ -358,7 +359,8 @@ export class BatchProcessor {
         // LOS keys use coarse grid-cell indices to improve cache reuse across micro-movements
         const coarseA = posCache.getCoarseKeyById(aId, posA);
         const coarseB = posCache.getCoarseKeyById(bId, posB);
-        const pairKey = posCache.makeLosPairKey(aId, coarseA, bId, coarseB);
+        const losKey1 = posCache.makeLosPairKey(aId, coarseA, bId, coarseB);
+        const losKey2 = posCache.makeLosPairKey(bId, coarseB, aId, coarseA);
 
         // Capture ORIGINAL map values BEFORE any calculations or override application
         // This ensures we compare against the true previous state, not values updated during processing
@@ -468,24 +470,26 @@ export class BatchProcessor {
 
         // Check LOS with global cache integration (after early no-change short-circuit)
         // Try per-batch cache first
-        let los = batchLosCache.get(pairKey);
-        if (los === undefined) {
-          // Batch-level cache miss for LOS
+        const getDirectionalLos = (observerToken, targetToken, cacheKey) => {
+          let directionalLos = batchLosCache.get(cacheKey);
+          if (directionalLos !== undefined) {
+            breakdown.losCacheHits++;
+            return directionalLos;
+          }
+
           breakdown.losCacheMisses++;
 
-          // Check orchestrator-provided short-lived memo (burst reuse across micro-batches)
           const burstLos = calcOptions?.burstLosMemo;
-          if (burstLos && burstLos.has(pairKey)) {
-            los = burstLos.get(pairKey);
-            // Treat as a hit analogous to batch-local reuse for telemetry simplicity
+          if (burstLos && burstLos.has(cacheKey)) {
+            directionalLos = burstLos.get(cacheKey);
             breakdown.losCacheHits++;
             breakdown.burstMemoHits++;
           }
-          // Check global LOS cache first
-          if (los === undefined && this.globalLosCache) {
-            const globalResult = this.globalLosCache.getWithMeta(pairKey);
+
+          if (directionalLos === undefined && this.globalLosCache) {
+            const globalResult = this.globalLosCache.getWithMeta(cacheKey);
             if (globalResult.state === 'hit') {
-              los = globalResult.value;
+              directionalLos = globalResult.value;
               breakdown.losGlobalHits++;
             } else if (globalResult.state === 'expired') {
               breakdown.losGlobalExpired++;
@@ -495,57 +499,58 @@ export class BatchProcessor {
             }
           }
 
-          // If not in global cache, compute it
-          if (los === undefined) {
-            los = this.visionAnalyzer.hasLineOfSight(changedToken, otherToken, 'sight');
+          if (directionalLos === undefined) {
+            directionalLos = this.visionAnalyzer.hasLineOfSight(observerToken, targetToken, 'sight');
 
-            // Store in global cache for future use
             if (this.globalLosCache) {
-              this.globalLosCache.set(pairKey, los);
+              this.globalLosCache.set(cacheKey, directionalLos);
             }
-            // Populate burst memo for immediate subsequent batches
             try {
-              if (calcOptions?.burstLosMemo) calcOptions.burstLosMemo.set(pairKey, los);
+              if (calcOptions?.burstLosMemo) calcOptions.burstLosMemo.set(cacheKey, directionalLos);
             } catch { }
           }
 
-          batchLosCache.set(pairKey, los);
-        } else {
-          // Batch-level cache hit for LOS
-          breakdown.losCacheHits++;
-        }
+          batchLosCache.set(cacheKey, directionalLos);
+          return directionalLos;
+        };
 
-        if (!los) {
-          // Check if observer has non-visual senses that could work without LoS
-          // Calculate distance using the existing position data
-          const distance =
-            Math.sqrt(Math.pow(posA.x - posB.x, 2) + Math.pow(posA.y - posB.y, 2)) /
-            canvas.grid.size;
-          const hasNonVisualSenses = this.#canUseNonVisualSenses(
+        const los1 = getDirectionalLos(changedToken, otherToken, losKey1);
+        const los2 = getDirectionalLos(otherToken, changedToken, losKey2);
+        const distance =
+          Math.sqrt(Math.pow(posA.x - posB.x, 2) + Math.pow(posA.y - posB.y, 2)) /
+          canvas.grid.size;
+        let skipVisibilityCalc1 = false;
+        let skipVisibilityCalc2 = false;
+
+        if (!hasOverride1 && !los1) {
+          const hasNonVisualSenses1 = this.#canUseNonVisualSenses(
             changedToken,
             otherToken,
             distance,
           );
-
-          if (!hasNonVisualSenses) {
-            // No LoS and no non-visual senses - both directions must be undetected.
-            // Still apply updates if the original visibility was something other than undetected
-            // (e.g. player moved behind a wall → creature must transition observed → undetected).
+          if (!hasNonVisualSenses1) {
+            effectiveVisibility1 = 'undetected';
+            skipVisibilityCalc1 = true;
             breakdown.pairsSkippedLOS++;
-            if (!hasOverride1 && originalVisibility1 !== 'undetected') {
-              updates.push({ observer: changedToken, target: otherToken, visibility: 'undetected' });
-            }
-            if (!hasOverride2 && originalVisibility2 !== 'undetected') {
-              updates.push({ observer: otherToken, target: changedToken, visibility: 'undetected' });
-            }
-            continue;
           }
-          // Either has non-visual senses OR blocked LoS (will be undetected) - proceed with visibility calculation
+        }
+
+        if (!hasOverride2 && !los2) {
+          const hasNonVisualSenses2 = this.#canUseNonVisualSenses(
+            otherToken,
+            changedToken,
+            distance,
+          );
+          if (!hasNonVisualSenses2) {
+            effectiveVisibility2 = 'undetected';
+            skipVisibilityCalc2 = true;
+            breakdown.pairsSkippedLOS++;
+          }
         }
 
         // Compute visibility in both directions when not overridden
         // Direction 1: changedToken -> otherToken (only calculate if no override)
-        if (!hasOverride1) {
+        if (!hasOverride1 && !skipVisibilityCalc1) {
           breakdown.pairsConsidered++;
           const vKey1 = posCache.makeDirectionalKey(aId, posKeyA, bId, posKeyB);
           let visibility1 = batchVisibilityCache.get(vKey1);
@@ -597,7 +602,7 @@ export class BatchProcessor {
           }
         }
         // Direction 2: otherToken -> changedToken (only calculate if no override)
-        if (!hasOverride2) {
+        if (!hasOverride2 && !skipVisibilityCalc2) {
           breakdown.pairsConsidered++;
           const vKey2 = posCache.makeDirectionalKey(bId, posKeyB, aId, posKeyA);
           let visibility2 = batchVisibilityCache.get(vKey2);
@@ -725,7 +730,7 @@ export class BatchProcessor {
    */
   #canUseNonVisualSenses(observer, target, distance) {
     // Get observer's sensing summary using the VisionAnalyzer (proper dependency injection)
-    const { sensingSummary } = this.visionAnalyzer.getVisionCapabilities(observer);
+    const { sensingSummary, isDeafened } = this.visionAnalyzer.getVisionCapabilities(observer);
     if (!sensingSummary) {
       return false;
     }
@@ -745,8 +750,11 @@ export class BatchProcessor {
     }
 
     // Check for hearing - could work through thin walls depending on range
-    if (sensingSummary.hearing && sensingSummary.hearing.range) {
-      const hearingRange = sensingSummary.hearing.range || 60;
+    // PF2e creatures normally have hearing even when it is not explicitly surfaced as a
+    // detection mode. Treat missing hearing as implicit unless the observer is deafened.
+    const hearing = sensingSummary.hearing || (isDeafened ? null : { range: Infinity });
+    if (hearing && hearing.range) {
+      const hearingRange = hearing.range || 60;
       if (distance <= hearingRange) {
         return true;
       }

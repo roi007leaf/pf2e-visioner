@@ -123,6 +123,14 @@ describe('BatchProcessor', () => {
 
     test('emits undetected updates when LOS blocked and prior visibility was observed', async () => {
         processor.visionAnalyzer.hasLineOfSight.mockReturnValue(false);
+        processor.visionAnalyzer.getVisionCapabilities.mockImplementation(() => ({
+            isDeafened: true,
+            sensingSummary: {
+                precise: [],
+                imprecise: [],
+                hearing: null,
+            },
+        }));
 
         const allTokens = global.canvas.tokens.placeables;
         const changed = new Set(['A']);
@@ -133,6 +141,83 @@ describe('BatchProcessor', () => {
         expect(undetected.length).toBeGreaterThan(0);
         expect(undetected.some(u => u.observer.document.id === 'A')).toBe(true);
         expect(undetected.some(u => u.target.document.id === 'A')).toBe(true);
+    });
+
+    test('precomputes LOS directionally instead of assuming symmetry', async () => {
+        processor.visionAnalyzer.hasLineOfSight.mockImplementation((observer, target) => {
+            return !(observer.document.id === 'A' && target.document.id === 'B');
+        });
+
+        await processor.process(global.canvas.tokens.placeables, new Set(['A']), {});
+
+        expect(processor.visionAnalyzer.hasLineOfSight).toHaveBeenCalledWith(
+            expect.objectContaining({ document: expect.objectContaining({ id: 'A' }) }),
+            expect.objectContaining({ document: expect.objectContaining({ id: 'B' }) }),
+        );
+        expect(processor.visionAnalyzer.hasLineOfSight).toHaveBeenCalledWith(
+            expect.objectContaining({ document: expect.objectContaining({ id: 'B' }) }),
+            expect.objectContaining({ document: expect.objectContaining({ id: 'A' }) }),
+        );
+
+        const firstOptions = optimizedVisibilityCalculator.calculateVisibilityBetweenTokens.mock.calls[0]?.at(-1);
+        expect(firstOptions?.precomputedLOS?.get('A-B')).toBe(false);
+        expect(firstOptions?.precomputedLOS?.get('B-A')).toBe(true);
+    });
+
+    test('handles LOS loss per direction instead of forcing both directions to match', async () => {
+        processor.visionAnalyzer.hasLineOfSight.mockImplementation((observer, target) => {
+            return observer.document.id === 'B' && target.document.id === 'A';
+        });
+        processor.visionAnalyzer.getVisionCapabilities.mockImplementation(() => ({
+            isDeafened: true,
+            sensingSummary: {
+                precise: [],
+                imprecise: [],
+                hearing: null,
+            },
+        }));
+        optimizedVisibilityCalculator.calculateVisibilityBetweenTokens.mockImplementation(
+            async (observer, target) => `${observer.document.id}->${target.document.id}`,
+        );
+
+        const res = await processor.process(global.canvas.tokens.placeables, new Set(['A']), {});
+
+        expect(res.updates).toEqual(
+            expect.arrayContaining([
+                expect.objectContaining({
+                    observer: expect.objectContaining({ document: expect.objectContaining({ id: 'A' }) }),
+                    target: expect.objectContaining({ document: expect.objectContaining({ id: 'B' }) }),
+                    visibility: 'undetected',
+                }),
+                expect.objectContaining({
+                    observer: expect.objectContaining({ document: expect.objectContaining({ id: 'B' }) }),
+                    target: expect.objectContaining({ document: expect.objectContaining({ id: 'A' }) }),
+                    visibility: 'B->A',
+                }),
+            ]),
+        );
+    });
+
+    test('does not short-circuit to undetected when LOS is blocked but implicit hearing should still work', async () => {
+        processor.visionAnalyzer.hasLineOfSight.mockReturnValue(false);
+        processor.visionAnalyzer.getVisionCapabilities.mockImplementation(() => ({
+            isDeafened: false,
+            sensingSummary: {
+                precise: [],
+                imprecise: [],
+                hearing: null,
+            },
+        }));
+        optimizedVisibilityCalculator.calculateVisibilityBetweenTokens.mockImplementation(
+            async () => 'hidden',
+        );
+
+        const res = await processor.process(global.canvas.tokens.placeables, new Set(['A']), {});
+
+        expect(res.breakdown.pairsSkippedLOS).toBe(0);
+        expect(optimizedVisibilityCalculator.calculateVisibilityBetweenTokens).toHaveBeenCalled();
+        expect(res.updates.some((u) => u.visibility === 'hidden')).toBe(true);
+        expect(res.updates.some((u) => u.visibility === 'undetected')).toBe(false);
     });
 
     test('respects active overrides to avoid calculation', async () => {

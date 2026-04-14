@@ -1,3 +1,5 @@
+import { updateCanvasPerception } from '../../../helpers/perception-refresh.js';
+
 /**
  * EffectEventHandler - Handles active effect events that may affect visibility
  *
@@ -182,11 +184,10 @@ export class EffectEventHandler {
       } else {
         // Fallback to direct canvas perception update
         if (canvas?.perception?.update) {
-          canvas.perception.update({
+          updateCanvasPerception({
             refreshVision: true,
             refreshOcclusion: true,
             refreshLighting: false,
-            refreshTiles: true,
           });
         }
       }

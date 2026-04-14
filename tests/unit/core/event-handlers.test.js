@@ -600,6 +600,12 @@ describe('Event Handler Tests', () => {
       sceneHandler.initialize();
 
       expect(mockHooks.on).toHaveBeenCalledWith('updateScene', expect.any(Function));
+      expect(mockHooks.on).toHaveBeenCalledWith('createRegion', expect.any(Function));
+      expect(mockHooks.on).toHaveBeenCalledWith('updateRegion', expect.any(Function));
+      expect(mockHooks.on).toHaveBeenCalledWith('deleteRegion', expect.any(Function));
+      expect(mockHooks.on).toHaveBeenCalledWith('createRegionBehavior', expect.any(Function));
+      expect(mockHooks.on).toHaveBeenCalledWith('updateRegionBehavior', expect.any(Function));
+      expect(mockHooks.on).toHaveBeenCalledWith('deleteRegionBehavior', expect.any(Function));
     });
 
     test('should handle darkness level changes', () => {
@@ -670,6 +676,78 @@ describe('Event Handler Tests', () => {
 
       expect(mockCacheManager.clearAllCaches).not.toHaveBeenCalled();
       expect(mockVisibilityState.markAllTokensChangedImmediate).not.toHaveBeenCalled();
+    });
+
+    test('should recalculate when defineSurface region behavior updates on current scene', () => {
+      const behavior = {
+        id: 'behavior-1',
+        type: 'defineSurface',
+        parent: { id: 'region-1', name: 'Floor Region', parent: global.canvas.scene },
+        scene: global.canvas.scene,
+      };
+
+      sceneHandler.initialize();
+      const updateHandler = mockHooks.on.mock.calls.find(
+        (call) => call[0] === 'updateRegionBehavior',
+      )[1];
+
+      updateHandler(behavior, { system: { types: ['sight'] } }, {});
+
+      expect(mockCacheManager.clearAllCaches).toHaveBeenCalled();
+      expect(mockVisibilityState.markAllTokensChangedImmediate).toHaveBeenCalled();
+    });
+
+    test('should ignore non-surface region behavior updates', () => {
+      const behavior = {
+        id: 'behavior-2',
+        type: 'toggleBehavior',
+        parent: { id: 'region-1', name: 'Floor Region', parent: global.canvas.scene },
+        scene: global.canvas.scene,
+      };
+
+      sceneHandler.initialize();
+      const updateHandler = mockHooks.on.mock.calls.find(
+        (call) => call[0] === 'updateRegionBehavior',
+      )[1];
+
+      updateHandler(behavior, { system: { enable: [] } }, {});
+
+      expect(mockCacheManager.clearAllCaches).not.toHaveBeenCalled();
+      expect(mockVisibilityState.markAllTokensChangedImmediate).not.toHaveBeenCalled();
+    });
+
+    test('should recalculate when region with defineSurface behavior updates', () => {
+      const region = {
+        id: 'region-1',
+        name: 'Floor Region',
+        parent: global.canvas.scene,
+        behaviors: [{ id: 'behavior-1', type: 'defineSurface' }],
+      };
+
+      sceneHandler.initialize();
+      const updateHandler = mockHooks.on.mock.calls.find((call) => call[0] === 'updateRegion')[1];
+
+      updateHandler(region, { shapes: [{ type: 'rectangle' }] }, {});
+
+      expect(mockCacheManager.clearAllCaches).toHaveBeenCalled();
+      expect(mockVisibilityState.markAllTokensChangedImmediate).toHaveBeenCalled();
+    });
+
+    test('should recalculate when region placement levels change', () => {
+      const region = {
+        id: 'region-2',
+        name: 'Placement Region',
+        parent: global.canvas.scene,
+        behaviors: [],
+      };
+
+      sceneHandler.initialize();
+      const updateHandler = mockHooks.on.mock.calls.find((call) => call[0] === 'updateRegion')[1];
+
+      updateHandler(region, { levels: ['level-a', 'level-b'] }, {});
+
+      expect(mockCacheManager.clearAllCaches).toHaveBeenCalled();
+      expect(mockVisibilityState.markAllTokensChangedImmediate).toHaveBeenCalled();
     });
 
     test('should defer lighting updates while SceneConfig is open', () => {

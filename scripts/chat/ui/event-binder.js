@@ -107,13 +107,13 @@ export function bindAutomationEvents(panel, message, actionData) {
         if (!pending && game.user.isGM && msg?.author && msg.author.isGM === false) {
           try {
             fallbackTemplate =
-              canvas.scene?.templates?.find?.((t) => {
+              Array.from(canvas.scene?.regions || []).find((t) => {
                 const f = t?.flags?.['pf2e-visioner'];
                 return (
-                  f?.seekPreviewManual === true &&
+                  (t?.getFlag?.('core', 'MeasuredTemplate') || f?.seekPreviewManual === true) &&
                   f?.messageId === actionData.messageId &&
                   f?.actorTokenId === actionData.actor.id &&
-                  t?.user?.id === msg.author.id
+                  f?.userId === msg.author.id
                 );
               }) || null;
           } catch { }
@@ -121,14 +121,24 @@ export function bindAutomationEvents(panel, message, actionData) {
         if ((pending || fallbackTemplate) && game.user.isGM) {
           const center =
             pending?.center ||
-            (fallbackTemplate ? { x: fallbackTemplate.x, y: fallbackTemplate.y } : undefined);
+            (fallbackTemplate ? { x: fallbackTemplate.shapes?.[0]?.x, y: fallbackTemplate.shapes?.[0]?.y } : undefined);
           const radiusFeet =
             pending?.radiusFeet ||
-            (fallbackTemplate ? Number(fallbackTemplate.distance) || 0 : undefined);
+            (fallbackTemplate
+              ? Number(
+                  (fallbackTemplate.shapes?.[0]?.radius ??
+                    fallbackTemplate.shapes?.[0]?.length ??
+                    0) / ((canvas?.scene?.grid?.size || 100) / (canvas?.scene?.grid?.distance || 5)),
+                ) || 0
+              : undefined);
           if (center && radiusFeet) {
             actionData.seekTemplateCenter = center;
             actionData.seekTemplateRadiusFeet = radiusFeet;
-            actionData.seekTemplateType = pending?.templateType || fallbackTemplate?.t || 'circle';
+            const fallbackShapeType = fallbackTemplate?.shapes?.[0]?.type;
+            actionData.seekTemplateType =
+              pending?.templateType ||
+              (fallbackShapeType === 'cone' ? 'cone' : fallbackShapeType === 'line' ? 'ray' : 'circle');
+            actionData.seekTemplateLevels = pending?.levels || fallbackTemplate?.levels || [];
           }
           if (pending && typeof pending.rollTotal === 'number') {
             actionData.roll = {
@@ -145,6 +155,7 @@ export function bindAutomationEvents(panel, message, actionData) {
                 ['flags.pf2e-visioner.seekTemplate']: {
                   center,
                   radiusFeet,
+                  levels: fallbackTemplate?.levels || [],
                   actorTokenId: actionData.actor.id,
                   rollTotal: actionData.roll?.total ?? null,
                   dieResult:

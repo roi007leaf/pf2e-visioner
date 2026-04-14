@@ -197,6 +197,17 @@
       "QUICK_STANDARD_COVER": "Set Standard Cover",
       "QUICK_GREATER_COVER": "Set Greater Cover"
     },
+    "LEVEL_CONFIG": {
+      "LEGEND": "PF2E Visioner",
+      "INTRO": "Native Visible Levels controls which levels can see each other. Visioner adds whether this level's floor surface blocks sight or sound when rays cross between levels.",
+      "SIGHT_LABEL": "Floor Surface and Sight",
+      "SIGHT_HINT": "Choose whether this level boundary uses native V14 sight collision, always blocks sight, or never blocks sight.",
+      "SOUND_LABEL": "Floor Surface and Sound",
+      "SOUND_HINT": "Choose whether this level boundary uses native V14 sound collision, always blocks sound, or never blocks sound.",
+      "DEFAULT": "Use Native V14",
+      "BLOCK": "Always Block",
+      "IGNORE": "Never Block"
+    },
     "MOVEMENT": {
       "walk": "Walk",
       "stride": "Stride",
@@ -556,6 +567,8 @@
       "LENGTH": "Length",
       "SIZE": "Size",
       "FEET": "feet",
+      "LEVELS": "Levels",
+      "LEVELS_HINT": "Optional. Pick one or more native scene levels for the template. Leave empty to apply on all levels.",
       "CREATE": "Create Template",
       "INVALID_RADIUS": "Radius must be between 1 and 1000 feet",
       "ECHOLOCATION_LABEL": "Echolocation",

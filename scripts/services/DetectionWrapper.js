@@ -57,7 +57,7 @@ export class DetectionWrapper {
     try {
       libWrapper.register(
         'pf2e-visioner',
-        'Token.prototype._isVisionSource',
+        'foundry.canvas.placeables.Token.prototype._isVisionSource',
         tokenIsVisionSourceWrapper,
         'WRAPPER',
       );
@@ -110,7 +110,8 @@ function detectionModeTestVisibility(visionSource, mode, config = {}) {
     return false;
   }
 
-  if (!this._canDetect(visionSource, config.object, config)) return false;
+  const level = config.level ?? config.object?.document?.level ?? config.object?.document?._source?.level;
+  if (!this._canDetect(visionSource, config.object, level)) return false;
   return config.tests.some((test) => this._testPoint(visionSource, mode, config.object, test));
 }
 
@@ -118,8 +119,8 @@ function detectionModeTestVisibility(visionSource, mode, config = {}) {
  * Create a wrapper for detection functions that respects our visibility flags
  */
 function canDetectWrapper(threshold) {
-  return function (wrapped, visionSource, target, config) {
-    const canDetect = wrapped(visionSource, target);
+  return function (wrapped, visionSource, target, ...args) {
+    const canDetect = wrapped(visionSource, target, ...args);
     if (canDetect === false) return false;
 
     const observerToken = visionSource?.object;
@@ -144,7 +145,7 @@ function canDetectWrapper(threshold) {
     } catch (_) {}
 
     const origin = observerToken;
-    const reachedThreshold = reachesVisibilityThreshold(origin, target, threshold, config);
+    const reachedThreshold = reachesVisibilityThreshold(origin, target, threshold);
 
     return !reachedThreshold;
   };

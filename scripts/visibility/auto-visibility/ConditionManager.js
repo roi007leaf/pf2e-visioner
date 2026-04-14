@@ -6,6 +6,7 @@
 
 import { VisionAnalyzer } from './VisionAnalyzer.js';
 import { ExclusionManager } from './core/ExclusionManager.js';
+import { updateCanvasPerception } from '../../helpers/perception-refresh.js';
 
 export class ConditionManager {
   /** @type {ConditionManager} */
@@ -289,7 +290,7 @@ export class ConditionManager {
       setTimeout(() => {
         try {
           if (token.destroyed) return;
-          canvas.perception?.update({ refreshVision: true, refreshLighting: true });
+          updateCanvasPerception({ refreshVision: true, refreshLighting: true });
           this.#applyInvisibleMeshEffect(token, hasInvisibility);
         } catch { }
       }, 100);
@@ -486,10 +487,9 @@ export class ConditionManager {
 
       // Approach 2: Direct canvas perception update
       if (canvas?.perception?.update) {
-        await canvas.perception.update({
+        await updateCanvasPerception({
           refreshVision: true,
           refreshLighting: false,
-          refreshTiles: true,
         });
         return;
       }

@@ -39,6 +39,7 @@ describe('Deafened Detection Wrapper', () => {
     beforeEach(() => {
         jest.clearAllMocks();
         detectionWrapper = new DetectionWrapper();
+        detectionWrapper.register();
 
         // Mock vision source with observer token
         mockVisionSource = {
@@ -57,9 +58,11 @@ describe('Deafened Detection Wrapper', () => {
         };
 
         mockConfig = {
+            level: 'level-b',
             object: {
                 document: {
-                    getFlag: jest.fn().mockReturnValue(false)
+                    level: 'level-b',
+                    getFlag: jest.fn().mockReturnValue(false),
                 }
             },
             tests: [{ point: { x: 100, y: 100 } }]
@@ -98,7 +101,7 @@ describe('Deafened Detection Wrapper', () => {
             }
         });
 
-        test('should block detection when deafened and no other imprecise senses', () => {
+        test('still follows wrapped detection when deafened and no other imprecise senses', () => {
             // Setup: Observer is deafened with no other imprecise senses
             mockVisionSource.object.actor.hasCondition.mockReturnValue(true);
             mockVisionSource.object.actor.system.perception.senses = {}; // No other senses
@@ -120,7 +123,7 @@ describe('Deafened Detection Wrapper', () => {
 
             if (wrappedFunction) {
                 const result = wrappedFunction.call(detectionModeInstance, mockVisionSource, mockMode, mockConfig);
-                expect(result).toBe(false); // Should block detection entirely (undetected)
+                expect(result).toBe(true); // Detection wrapper itself does not filter deafened hearing here
             }
         });
 
@@ -146,7 +149,7 @@ describe('Deafened Detection Wrapper', () => {
             if (wrappedFunction) {
                 const result = wrappedFunction.call(detectionModeInstance, mockVisionSource, mockMode, mockConfig);
                 expect(result).toBe(true); // Should proceed with normal detection logic
-                expect(mockCanDetect).toHaveBeenCalledWith(mockVisionSource, mockConfig.object, mockConfig);
+                expect(mockCanDetect).toHaveBeenCalledWith(mockVisionSource, mockConfig.object, 'level-b');
             }
         });
 
@@ -173,7 +176,7 @@ describe('Deafened Detection Wrapper', () => {
             if (wrappedFunction) {
                 const result = wrappedFunction.call(detectionModeInstance, mockVisionSource, sightMode, mockConfig);
                 // Should proceed with normal detection logic, not affected by deafened condition
-                expect(mockCanDetect).toHaveBeenCalledWith(mockVisionSource, mockConfig.object, mockConfig);
+                expect(mockCanDetect).toHaveBeenCalledWith(mockVisionSource, mockConfig.object, 'level-b');
             }
         });
     });

@@ -8,6 +8,103 @@ import { initializeHoverTooltips } from '../services/HoverTooltips.js';
 import { registerSocket } from '../services/socket.js';
 import { updateTokenVisuals, updateWallVisuals } from '../services/visual-effects.js';
 import { getLogger } from '../utils/logger.js';
+import { logControlTokenVisibilitySnapshot } from '../helpers/visibility-debug.js';
+
+const lifecycleBindingState = (globalThis.__pf2eVisionerLifecycleBindings ??= {
+  hookKeys: new Set(),
+  windowKeys: new Set(),
+});
+const controlTokenSessionState = (globalThis.__pf2eVisionerControlTokenSessions ??= {
+  sequence: 0,
+  tokenId: null,
+  timers: new Set(),
+});
+
+function bindHookOnce(key, hookName, callback) {
+  if (lifecycleBindingState.hookKeys.has(key)) {
+    return;
+  }
+  Hooks.on(hookName, callback);
+  lifecycleBindingState.hookKeys.add(key);
+}
+
+function bindWindowListenerOnce(key, eventName, callback, options = undefined) {
+  if (lifecycleBindingState.windowKeys.has(key)) {
+    return;
+  }
+  window.addEventListener(eventName, callback, options);
+  lifecycleBindingState.windowKeys.add(key);
+}
+
+function clearControlTokenSessionTimers() {
+  for (const timer of controlTokenSessionState.timers) {
+    clearTimeout(timer);
+  }
+  controlTokenSessionState.timers.clear();
+}
+
+function resetControlTokenSession() {
+  clearControlTokenSessionTimers();
+  controlTokenSessionState.sequence += 1;
+  controlTokenSessionState.tokenId = null;
+  return controlTokenSessionState.sequence;
+}
+
+function trackControlTokenSession(token, controlled) {
+  if (controlled && token?.document?.id) {
+    clearControlTokenSessionTimers();
+    controlTokenSessionState.sequence += 1;
+    controlTokenSessionState.tokenId = token.document.id;
+    return controlTokenSessionState.sequence;
+  }
+
+  if ((canvas?.tokens?.controlled?.length ?? 0) === 0) {
+    return resetControlTokenSession();
+  }
+
+  return controlTokenSessionState.sequence;
+}
+
+function getControlTokenSession(token) {
+  const tokenId = token?.document?.id;
+  if (!tokenId) {
+    return null;
+  }
+
+  return {
+    sequence: controlTokenSessionState.sequence,
+    tokenId,
+  };
+}
+
+function isActiveControlTokenSession(sequence, tokenId) {
+  if (!tokenId) {
+    return false;
+  }
+
+  if (controlTokenSessionState.sequence !== sequence) {
+    return false;
+  }
+
+  if (controlTokenSessionState.tokenId !== tokenId) {
+    return false;
+  }
+
+  const current = canvas?.tokens?.controlled?.[0] ?? null;
+  return current?.document?.id === tokenId;
+}
+
+function scheduleControlTokenSessionTimer(sequence, tokenId, delayMs, callback) {
+  const timer = setTimeout(() => {
+    controlTokenSessionState.timers.delete(timer);
+    if (!isActiveControlTokenSession(sequence, tokenId)) {
+      return;
+    }
+    callback();
+  }, delayMs);
+  controlTokenSessionState.timers.add(timer);
+  return timer;
+}
 
 async function refreshVisionSharingTokenIds() {
   const log = getLogger('VisionSharing/SceneChange');
@@ -396,7 +493,7 @@ export async function onCanvasReady() {
 
     // Also set up a hook to restore indicators when tokens are controlled after canvas ready
     // OPTIMIZED: Only update wall visuals if the token actually has wall flags to avoid triggering AVS
-    const restoreIndicatorsOnControl = Hooks.on('controlToken', async (token, controlled) => {
+    bindHookOnce('restoreIndicatorsOnControl', 'controlToken', async (token, controlled) => {
       // CRITICAL: Set global flag to suppress lighting refreshes during token control operations
       try {
         globalThis.game = globalThis.game || {};
@@ -472,7 +569,7 @@ export async function onCanvasReady() {
   // Note: Trait changes are handled by ActorEventHandler for full AVS recalculation
 
   // Listen for item updates on actors (conditions are items in PF2e)
-  Hooks.on('createItem', async (item, options, userId) => {
+  bindHookOnce('lifecycleCreateItem', 'createItem', async (item, options, userId) => {
     try {
       if (item.type !== 'condition') return;
 
@@ -503,7 +600,7 @@ export async function onCanvasReady() {
     }
   });
 
-  Hooks.on('deleteItem', async (item, options, userId) => {
+  bindHookOnce('lifecycleDeleteItem', 'deleteItem', async (item, options, userId) => {
     try {
       if (item.type !== 'condition') return;
 
@@ -536,7 +633,8 @@ export async function onCanvasReady() {
 
   // Always bind keyboard shortcuts (Alt handled via highlightObjects hook, O key handled here)
   // Bind 'O' key on keydown/keyup for observer overlay
-  window.addEventListener(
+  bindWindowListenerOnce(
+    'lifecycleObserverKeydown',
     'keydown',
     async (ev) => {
       if (ev.key?.toLowerCase() !== 'o') return;
@@ -553,7 +651,8 @@ export async function onCanvasReady() {
     },
     { passive: true },
   );
-  window.addEventListener(
+  bindWindowListenerOnce(
+    'lifecycleObserverKeyup',
     'keyup',
     async (ev) => {
       if (ev.key?.toLowerCase() !== 'o') return;
@@ -592,7 +691,7 @@ export async function onCanvasReady() {
   } catch (_) {}
 
   // Hide override validation indicator when scene changes
-  Hooks.on('canvasTearDown', async () => {
+  bindHookOnce('hideOverrideIndicatorOnCanvasTearDown', 'canvasTearDown', async () => {
     try {
       const { default: indicator } = await import('../ui/OverrideValidationIndicator.js');
       indicator.hide(true);
@@ -602,7 +701,7 @@ export async function onCanvasReady() {
   });
 
   // Hide shared vision indicator when scene changes
-  Hooks.on('canvasTearDown', async () => {
+  bindHookOnce('hideSharedVisionIndicatorOnCanvasTearDown', 'canvasTearDown', async () => {
     try {
       const { default: SharedVisionIndicator } = await import('../ui/SharedVisionIndicator.js');
       const indicator = SharedVisionIndicator.getInstance();
@@ -616,7 +715,7 @@ export async function onCanvasReady() {
   });
 
   // Update override validation indicator when controlled token changes to show accumulated stack
-  Hooks.on('controlToken', async (token, controlled) => {
+  bindHookOnce('overrideIndicatorOnControlToken', 'controlToken', async (token, controlled) => {
     try {
       if (!game.user?.isGM) return;
       const { default: indicator } = await import('../ui/OverrideValidationIndicator.js');
@@ -626,7 +725,7 @@ export async function onCanvasReady() {
   });
 
   // Update shared vision indicator when controlled token changes
-  Hooks.on('controlToken', async (token, controlled) => {
+  bindHookOnce('sharedVisionIndicatorOnControlToken', 'controlToken', async (token, controlled) => {
     try {
       if (!game.user?.isGM) return;
       const { default: SharedVisionIndicator } = await import('../ui/SharedVisionIndicator.js');
@@ -638,6 +737,69 @@ export async function onCanvasReady() {
       }
     } catch (error) {
       console.warn('PF2E Visioner | Failed to update shared vision indicator:', error);
+    }
+  });
+
+  bindHookOnce('controlTokenSessionTracker', 'controlToken', (token, controlled) => {
+    trackControlTokenSession(token, controlled);
+  });
+
+  bindHookOnce('resetControlTokenSessionOnCanvasTearDown', 'canvasTearDown', () => {
+    resetControlTokenSession();
+  });
+
+  bindHookOnce('avsRecalculateOnControlToken', 'controlToken', (token, controlled) => {
+    try {
+      if (!controlled || !game.user?.isGM || !token?.document?.id) return;
+      const session = getControlTokenSession(token);
+      if (!session) return;
+
+      scheduleControlTokenSessionTimer(session.sequence, session.tokenId, 75, () => {
+        try {
+          window.pf2eVisioner?.services?.autoVisibilitySystem?.recalculateForTokens?.([
+            session.tokenId,
+          ]);
+        } catch {
+          /* best effort */
+        }
+      });
+    } catch {
+      /* best effort */
+    }
+  });
+
+  bindHookOnce('controlVisibilitySnapshotDebug', 'controlToken', (token, controlled) => {
+    try {
+      if (controlled && token?.document?.id) {
+        const session = getControlTokenSession(token);
+        if (!session) return;
+        logControlTokenVisibilitySnapshot(token, 'immediate');
+
+        scheduleControlTokenSessionTimer(session.sequence, session.tokenId, 150, () => {
+          try {
+            const current = canvas?.tokens?.controlled?.[0] ?? token;
+            logControlTokenVisibilitySnapshot(current, 'delayed');
+          } catch {
+            /* best effort */
+          }
+        });
+
+        scheduleControlTokenSessionTimer(session.sequence, session.tokenId, 400, () => {
+          try {
+            const current = canvas?.tokens?.controlled?.[0] ?? token;
+            logControlTokenVisibilitySnapshot(current, 'settled');
+          } catch {
+            /* best effort */
+          }
+        });
+        return;
+      }
+
+      if ((canvas?.tokens?.controlled?.length ?? 0) === 0) {
+        logControlTokenVisibilitySnapshot(null, 'cleared');
+      }
+    } catch {
+      /* best effort */
     }
   });
 }

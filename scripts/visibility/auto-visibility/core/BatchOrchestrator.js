@@ -398,7 +398,7 @@ export class BatchOrchestrator {
       }
 
       // Apply results - this writes NEW values to maps
-      const uniqueUpdateCount = this._applyBatchResults(batchResult);
+      const uniqueUpdateCount = await this._applyBatchResults(batchResult);
 
       // Flush batched detection writes (turns 110+ writes into one batched operation)
       const { flushDetectionBatch } = await import('../../../stores/detection-map.js');
@@ -821,7 +821,7 @@ export class BatchOrchestrator {
    * @returns {number} Number of unique updates applied
    * @private
    */
-  _applyBatchResults(batchResult) {
+  async _applyBatchResults(batchResult) {
     let uniqueUpdateCount = 0;
 
     if (!game.user.isGM || !batchResult.updates || batchResult.updates.length === 0) {
@@ -875,8 +875,16 @@ export class BatchOrchestrator {
       }
     }
 
-    for (const observer of dirtyObservers) {
-      this.visibilityMapService.setVisibilityMap(observer, observerMaps.get(observer));
+    const persistResults = await Promise.allSettled(
+      Array.from(dirtyObservers).map((observer) =>
+        this.visibilityMapService.setVisibilityMap(observer, observerMaps.get(observer)),
+      ),
+    );
+
+    for (const result of persistResults) {
+      if (result.status === 'rejected') {
+        console.warn('PF2E Visioner | Failed to persist visibility map:', result.reason);
+      }
     }
 
     return uniqueUpdateCount;

@@ -8,6 +8,7 @@
  */
 
 import { VisionAnalyzer } from '../../../scripts/visibility/auto-visibility/VisionAnalyzer.js';
+import { LevelsIntegration } from '../../../scripts/services/LevelsIntegration.js';
 
 describe('VisionAnalyzer - Line of Sight (Refactored)', () => {
     let visionAnalyzer;
@@ -15,6 +16,7 @@ describe('VisionAnalyzer - Line of Sight (Refactored)', () => {
     let mockTarget;
 
     beforeEach(() => {
+        LevelsIntegration._instance = null;
         visionAnalyzer = VisionAnalyzer.getInstance();
         visionAnalyzer.clearCache();
 
@@ -57,6 +59,25 @@ describe('VisionAnalyzer - Line of Sight (Refactored)', () => {
             }
         };
 
+        global.game = {
+            settings: {
+                get: jest.fn(() => false)
+            },
+            modules: new Map([
+                ['levels', { active: false }],
+                ['wall-height', { active: false }]
+            ])
+        };
+
+        global.CONFIG = {
+            Canvas: {
+                polygonBackends: {
+                    sight: { testCollision: jest.fn(() => false) },
+                    sound: { testCollision: jest.fn(() => false) }
+                }
+            }
+        };
+
         // Setup canvas
         global.canvas = {
             walls: {
@@ -66,6 +87,11 @@ describe('VisionAnalyzer - Line of Sight (Refactored)', () => {
                 size: 50
             }
         };
+    });
+
+    afterEach(() => {
+        LevelsIntegration._instance = null;
+        jest.restoreAllMocks();
     });
 
     describe('hasLineOfSight - No Walls', () => {
@@ -281,6 +307,21 @@ describe('VisionAnalyzer - Line of Sight (Refactored)', () => {
 
             const result2 = visionAnalyzer.hasLineOfSight(mockObserver, mockTarget);
             expect(result2).toBe(true);
+        });
+    });
+
+    describe('hasLineOfSight - Levels Integration', () => {
+        test('should use 3D collision results when levels integration is active', () => {
+            const test3DCollision = jest.fn().mockReturnValue(true);
+            jest.spyOn(LevelsIntegration, 'getInstance').mockReturnValue({
+                isActive: true,
+                test3DCollision
+            });
+
+            const result = visionAnalyzer.hasLineOfSight(mockObserver, mockTarget);
+
+            expect(test3DCollision).toHaveBeenCalledWith(mockObserver, mockTarget, 'sight');
+            expect(result).toBe(false);
         });
     });
 });

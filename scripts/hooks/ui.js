@@ -5,6 +5,7 @@
 import { FeatsHandler } from '../chat/services/FeatsHandler.js';
 import { COVER_STATES, MODULE_ID } from '../constants.js';
 import { onRenderTokenHUD } from '../services/token-hud.js';
+import { isDarknessSource } from '../utils/darkness-source.js';
 
 export function registerUIHooks() {
   Hooks.on('renderTokenHUD', onRenderTokenHUD);
@@ -43,10 +44,6 @@ export function registerUIHooks() {
       if (!tool) return;
 
       const selectedLights = canvas?.lighting?.controlled ?? [];
-      const isDarkness = (l) => {
-        const cfg = l?.document?.config ?? l?.config;
-        return !!(cfg?.negative || cfg?.darkness?.negative);
-      };
       const isHeightened = (l) => {
         const flags = l?.document?.flags?.[MODULE_ID] || {};
         const h = !!flags.heightenedDarkness;
@@ -58,7 +55,7 @@ export function registerUIHooks() {
       let iconClass = 'fa-regular fa-circle';
       let titleText = 'Set Darkness Mode (Selected Lights)';
       if (selectedLights.length > 0) {
-        const darkStatuses = selectedLights.map(isDarkness);
+        const darkStatuses = selectedLights.map(isDarknessSource);
         const heightenedStatuses = selectedLights.map(isHeightened);
         const allDark = darkStatuses.every(Boolean);
         const noneDark = darkStatuses.every((s) => !s);
@@ -1326,10 +1323,6 @@ export function registerUIHooks() {
       if (lighting) {
         // Darkness Mode tool (dialog-based): Plain Darkness vs Heightened Darkness
         const selectedLights = canvas?.lighting?.controlled ?? [];
-        const isDarkness = (l) => {
-          const cfg = l?.document?.config ?? l?.config;
-          return !!(cfg?.negative || cfg?.darkness?.negative);
-        };
         const isHeightened = (l) => {
           const flags = l?.document?.flags?.[MODULE_ID] || {};
           const h = !!flags.heightenedDarkness;
@@ -1341,7 +1334,7 @@ export function registerUIHooks() {
         let iconClass = 'fa-regular fa-circle';
         let titleText = 'Set Darkness Mode (Selected Lights)';
         if (selectedLights.length > 0) {
-          const darkStatuses = selectedLights.map(isDarkness);
+          const darkStatuses = selectedLights.map(isDarknessSource);
           const heightenedStatuses = selectedLights.map(isHeightened);
           const allDark = darkStatuses.every(Boolean);
           const noneDark = darkStatuses.every((s) => !s);

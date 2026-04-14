@@ -366,7 +366,10 @@ export class SeekPreviewDialog extends BaseActionDialog {
               '../../visibility/auto-visibility/VisionAnalyzer.js'
             );
             const va = VisionAnalyzer.getInstance();
-            deferred = va.hasLineOfSight(this.actorToken, outcome.target) === false;
+            const effectiveNewState = outcome.overrideState || outcome.newVisibility;
+            const requiresVisualLos = effectiveNewState === 'observed';
+            deferred =
+              requiresVisualLos && va.hasLineOfSight(this.actorToken, outcome.target) === false;
           } catch { }
         }
 

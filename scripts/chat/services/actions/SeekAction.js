@@ -761,6 +761,12 @@ export class SeekActionHandler extends ActionHandlerBase {
         continue;
       }
 
+      const requiresVisualLos = change.newVisibility === 'observed';
+      if (!requiresVisualLos) {
+        immediateChanges.push(change);
+        continue;
+      }
+
       const los = va.hasLineOfSight(observer, change.target);
       if (los !== false) {
         immediateChanges.push(change);

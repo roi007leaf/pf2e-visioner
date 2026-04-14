@@ -13,6 +13,7 @@ import { calculateDistanceInFeet } from '../helpers/geometry-utils.js';
 import { ConcealmentRegionBehavior } from '../regions/ConcealmentRegionBehavior.js';
 import { SenseSuppressionRegionBehavior } from '../regions/SenseSuppressionRegionBehavior.js';
 import { LevelsIntegration } from '../services/LevelsIntegration.js';
+import { isDarknessSource } from '../utils/darkness-source.js';
 import { getLogger } from '../utils/logger.js';
 import { calculateVisibility } from './StatelessVisibilityCalculator.js';
 
@@ -44,18 +45,11 @@ export async function tokenStateToInput(
     return null;
   }
 
-  // Calculate positions first (needed by multiple functions)
-  const observerPosition = {
-    x: observer.document.x + (observer.document.width * canvas.grid.size) / 2,
-    y: observer.document.y + (observer.document.height * canvas.grid.size) / 2,
-    elevation: observer.document.elevation || 0,
-  };
+  const levelsIntegration = LevelsIntegration.getInstance();
 
-  const targetPosition = {
-    x: target.document.x + (target.document.width * canvas.grid.size) / 2,
-    y: target.document.y + (target.document.height * canvas.grid.size) / 2,
-    elevation: target.document.elevation || 0,
-  };
+  // Calculate positions first (needed by multiple functions)
+  const observerPosition = levelsIntegration.getTokenPosition(observer, { origin: 'movement' });
+  const targetPosition = levelsIntegration.getTokenPosition(target, { origin: 'movement' });
 
   const targetState = extractTargetState(
     target,
@@ -68,7 +62,6 @@ export async function tokenStateToInput(
   // Calculate distance for sense range filtering using PF2e rules (5-10-5 diagonal pattern)
   // Use Levels integration for 3D distance if available
   let distanceInFeet = calculateDistanceInFeet(observer, target);
-  const levelsIntegration = LevelsIntegration.getInstance();
   if (levelsIntegration.isActive) {
     const distance3D = levelsIntegration.getTotalDistance(observer, target);
     if (distance3D !== Infinity) {
@@ -84,6 +77,7 @@ export async function tokenStateToInput(
     lightingCalculator,
     options,
     distanceInFeet,
+    observerPosition,
   );
 
   try {
@@ -310,6 +304,7 @@ function extractObserverState(
   lightingCalculator,
   options,
   distanceInFeet,
+  observerPosition = null,
 ) {
   // Use precomputed senses if available (much faster)
   let visionCapabilities;
@@ -335,11 +330,9 @@ function extractObserverState(
   };
 
   // Extract observer's lighting level (needed for magical darkness rules)
-  const observerPosition = {
-    x: observer.document.x + (observer.document.width * canvas.grid.size) / 2,
-    y: observer.document.y + (observer.document.height * canvas.grid.size) / 2,
-    elevation: observer.document.elevation || 0,
-  };
+  observerPosition ??= LevelsIntegration.getInstance().getTokenPosition(observer, {
+    origin: 'movement',
+  });
 
   // Use precomputed lighting if available (much faster)
   let observerLightLevel;
@@ -483,7 +476,7 @@ function extractImpreciseSenses(capabilities, distanceInFeet) {
     if (hearingRange > 0 && (hearingRange >= distanceInFeet || !Number.isFinite(hearingRange))) {
       imprecise.hearing = { range: hearingRange };
     }
-  } else if (!capabilities.conditions?.deafened) {
+  } else if (!capabilities.conditions?.deafened && !capabilities.isDeafened) {
     // Default: creatures have hearing unless deafened (always in range with Infinity)
     imprecise.hearing = { range: Infinity };
   }
@@ -864,7 +857,7 @@ const checkSingleRayForDarkness = (ray) => {
 
       lightSources = allSources.filter((light) => {
         // Check for darkness sources - either isDarknessSource property or negative config
-        const isDarkness = light.isDarknessSource || light.document?.config?.negative || false;
+        const isDarkness = isDarknessSource(light);
 
         // Treat undefined active as true (some darkness sources may not have explicit active property)
         const isActive = light.active !== false;
@@ -1153,7 +1146,7 @@ const getAllDarknessSources = () => {
  */
 const filterIntersectedDarknessSources = (ray, allSources) => {
   return allSources.filter((light) => {
-    const isDarkness = light.isDarknessSource || light.document?.config?.negative || false;
+    const isDarkness = isDarknessSource(light);
     const isActive = light.active !== false;
     const isVisible = light.visible !== false;
 

@@ -4,8 +4,44 @@
 
 import { MODULE_ID } from '../constants.js';
 import { getBestVisibilityState, getControlledObserverTokens } from '../utils.js';
+import { getLogger } from '../utils/logger.js';
 import { autoVisibilitySystem } from '../visibility/auto-visibility/index.js';
 import { updateEphemeralEffectsForVisibility } from '../visibility/ephemeral.js';
+
+const log = getLogger('AVS/VisibilityMap');
+
+export function normalizeVisibilityMap(map = {}) {
+  const normalized = {};
+
+  for (const [id, state] of Object.entries(map ?? {})) {
+    if (!id) continue;
+    if (!state || state === 'observed') continue;
+    normalized[id] = state;
+  }
+
+  return normalized;
+}
+
+function buildVisibilityMapDiff(previousMap = {}, nextMap = {}) {
+  const ids = new Set([...Object.keys(previousMap ?? {}), ...Object.keys(nextMap ?? {})]);
+  const changes = [];
+
+  for (const id of ids) {
+    const before = previousMap?.[id] ?? 'observed';
+    const after = nextMap?.[id] ?? 'observed';
+    if (before === after) continue;
+
+    const target = canvas?.tokens?.get?.(id);
+    changes.push({
+      targetId: id,
+      targetName: target?.name ?? target?.document?.name ?? id,
+      from: before,
+      to: after,
+    });
+  }
+
+  return changes;
+}
 
 /**
  * Get the visibility map for a token
@@ -14,7 +50,7 @@ import { updateEphemeralEffectsForVisibility } from '../visibility/ephemeral.js'
  */
 export function getVisibilityMap(token) {
   const map = token?.document.getFlag(MODULE_ID, 'visibility') ?? {};
-  return map;
+  return normalizeVisibilityMap(map);
 }
 
 /**
@@ -30,9 +66,35 @@ export async function setVisibilityMap(token, visibilityMap) {
     return;
   }
 
+  const previousMap = normalizeVisibilityMap(getVisibilityMap(token));
+  const nextMap = normalizeVisibilityMap(visibilityMap);
+  const changes = buildVisibilityMapDiff(previousMap, nextMap);
+
+  if (changes.length) {
+    log.debug(() => ({
+      msg: 'persist-visibility-map',
+      observerId: token.document.id,
+      observerName: token.name ?? token.document.name ?? token.document.id,
+      changeCount: changes.length,
+      changes,
+    }));
+  }
+
+  if (Object.keys(nextMap).length === 0) {
+    if (typeof token.document.unsetFlag === 'function') {
+      return token.document.unsetFlag(MODULE_ID, 'visibility');
+    }
+
+    const path = `flags.${MODULE_ID}.visibility`;
+    return token.document.update({ [path]: {} }, { diff: false });
+  }
+
+  if (typeof token.document.setFlag === 'function') {
+    return token.document.setFlag(MODULE_ID, 'visibility', nextMap);
+  }
+
   const path = `flags.${MODULE_ID}.visibility`;
-  const result = await token.document.update({ [path]: visibilityMap }, { diff: false });
-  return result;
+  return token.document.update({ [path]: nextMap }, { diff: false });
 }
 
 
@@ -61,7 +123,7 @@ export async function setVisibilityBetween(
 ) {
   if (!observer?.document?.id || !target?.document?.id) return;
 
-  const visibilityMap = getVisibilityMap(observer);
+  const visibilityMap = { ...getVisibilityMap(observer) };
   const currentState = visibilityMap[target.document.id];
 
   // Track if state changed for hook notification
@@ -69,7 +131,21 @@ export async function setVisibilityBetween(
 
   // Update map if state has changed
   if (stateChanged) {
-    visibilityMap[target.document.id] = state;
+    if (!state || state === 'observed') {
+      delete visibilityMap[target.document.id];
+    } else {
+      visibilityMap[target.document.id] = state;
+    }
+    log.debug(() => ({
+      msg: 'set-visibility-between',
+      observerId: observer.document.id,
+      observerName: observer.name ?? observer.document.name ?? observer.document.id,
+      targetId: target.document.id,
+      targetName: target.name ?? target.document.name ?? target.document.id,
+      from: currentState ?? 'observed',
+      to: state,
+      options,
+    }));
     await setVisibilityMap(observer, visibilityMap);
 
     // Notify UI listeners that a visibility map changed so tooltips can refresh

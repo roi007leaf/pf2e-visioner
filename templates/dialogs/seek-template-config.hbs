@@ -52,6 +52,28 @@
     </div>
   </div>
 
+  {{#if hasLevels}}
+  <div class="radius-input-group">
+    <label class="radius-label">
+      <i class="fas fa-layer-group" style="margin-right: 6px;"></i>
+      <span>{{localize "PF2E_VISIONER.SEEK_TEMPLATE_CONFIG.LEVELS"}}</span>
+    </label>
+    <div class="radius-input-wrapper" style="display:block;">
+      <div id="template-levels" style="display:grid; gap:6px;">
+        {{#each levels}}
+        <label style="display:flex; align-items:center; gap:8px;">
+          <input type="checkbox" name="templateLevels" value="{{this.id}}" {{#if this.selected}}checked{{/if}}>
+          <span>{{this.name}}</span>
+        </label>
+        {{/each}}
+      </div>
+      <p class="notes" style="margin:6px 0 0 0; color: var(--color-text-secondary);">
+        {{localize "PF2E_VISIONER.SEEK_TEMPLATE_CONFIG.LEVELS_HINT"}}
+      </p>
+    </div>
+  </div>
+  {{/if}}
+
   <footer class="form-footer seek-template-footer">
     <button type="button" class="dialog-button seek-template-cancel" data-action="cancel">
       <i class="fas fa-times"></i> {{localize "Cancel"}}

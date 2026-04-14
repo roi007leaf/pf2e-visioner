@@ -28,6 +28,10 @@ import { SensingCapabilitiesBuilder } from './SensingCapabilitiesBuilder.js';
 
 const log = getLogger('VisionAnalyzer');
 
+function getEdgeSenseTypes() {
+  return CONST?.EDGE_SENSE_TYPES ?? CONST?.WALL_SENSE_TYPES;
+}
+
 export class VisionAnalyzer {
   static #instance = null;
 
@@ -214,9 +218,35 @@ export class VisionAnalyzer {
       const isMinimized = typeof document !== 'undefined' && document.hidden;
       const levelsIntegration = LevelsIntegration.getInstance();
       if (levelsIntegration.isActive && !isMinimized) {
-        const has3DCollision = !levelsIntegration.hasFloorCeilingBetween(observer, target);
-        return has3DCollision;
+        const hasSightCollision = levelsIntegration.test3DCollision(observer, target, 'sight');
+        const log = getLogger('AVS/VisionAnalyzer');
+        log.debug(() => ({
+          msg: 'v14-levels-los',
+          observerId: observer?.document?.id ?? null,
+          observerLevel: levelsIntegration.getTokenLevelId(observer),
+          observerName: observer?.name ?? null,
+          result: !hasSightCollision,
+          targetId: target?.document?.id ?? null,
+          targetLevel: levelsIntegration.getTokenLevelId(target),
+          targetName: target?.name ?? null,
+          blocked: hasSightCollision,
+          minimized: false,
+          mode: levelsIntegration.mode,
+        }));
+        return !hasSightCollision;
       } else if (levelsIntegration.isActive && isMinimized) {
+        const log = getLogger('AVS/VisionAnalyzer');
+        log.debug(() => ({
+          msg: 'v14-levels-los-fallback-2d',
+          observerId: observer?.document?.id ?? null,
+          observerLevel: levelsIntegration.getTokenLevelId(observer),
+          observerName: observer?.name ?? null,
+          targetId: target?.document?.id ?? null,
+          targetLevel: levelsIntegration.getTokenLevelId(target),
+          targetName: target?.name ?? null,
+          minimized: true,
+          mode: levelsIntegration.mode,
+        }));
         // Fall through to 2D geometric LOS calculation below
       }
 
@@ -360,9 +390,20 @@ export class VisionAnalyzer {
         // CRITICAL: When vision polygon is unavailable, use Foundry's testVisibility
         // This computes the vision polygon on-demand and is more accurate than geometric sampling
         try {
-          // testVisibility requires a point to test - use target's center
-          const testPoint = { x: targetPos.x, y: targetPos.y };
+          const testPoints =
+            target?.document?.getVisibilityTestPoints?.() ?? [
+              {
+                x: targetPos.x,
+                y: targetPos.y,
+                elevation: target.document?.elevation || 0,
+              },
+            ];
           const visionSource = observer.vision;
+          const level =
+            target?.document?.level ??
+            target?.document?._source?.level ??
+            observer?.document?.level ??
+            observer?.document?._source?.level;
 
           log.debug(
             () =>
@@ -370,9 +411,10 @@ export class VisionAnalyzer {
           );
 
           if (visionSource && canvas.visibility) {
-            const isVisible = canvas.visibility.testVisibility(testPoint, {
+            const isVisible = canvas.visibility.testVisibility(testPoints, {
               object: target,
               source: visionSource,
+              level,
             });
             log.debug(
               () =>
@@ -532,6 +574,7 @@ export class VisionAnalyzer {
    */
   #filterBlockingWalls(elevationRange) {
     const blockingWalls = [];
+    const edgeSenseTypes = getEdgeSenseTypes();
 
     for (const wall of canvas.walls.placeables) {
       const isDoor = wall.document.door > 0;
@@ -540,8 +583,8 @@ export class VisionAnalyzer {
         continue;
       }
 
-      const blocksSight = wall.document.sight !== CONST.WALL_SENSE_TYPES.NONE;
-      const blocksSound = wall.document.sound !== CONST.WALL_SENSE_TYPES.NONE;
+      const blocksSight = wall.document.sight !== edgeSenseTypes.NONE;
+      const blocksSound = wall.document.sound !== edgeSenseTypes.NONE;
 
       if (!blocksSight && !blocksSound) {
         continue;
@@ -599,6 +642,7 @@ export class VisionAnalyzer {
     const ray = new foundry.canvas.geometry.Ray(fromPoint, toPoint);
     const rayLength = Math.sqrt((toPoint.x - fromPoint.x) ** 2 + (toPoint.y - fromPoint.y) ** 2);
     const limitedWallIntersections = [];
+    const edgeSenseTypes = getEdgeSenseTypes();
 
     // Debug: log ray details for problematic case
     const isProblematicRay = Math.abs(fromPoint.x - 1702) < 5 && Math.abs(fromPoint.y - 1102) < 5;
@@ -743,7 +787,7 @@ export class VisionAnalyzer {
           }
 
           // Check if this wall blocks sight
-          const blocksSight = wall.document.sight !== CONST.WALL_SENSE_TYPES.NONE;
+          const blocksSight = wall.document.sight !== edgeSenseTypes.NONE;
 
           // If wall doesn't block sight, skip it for LOS check
           if (!blocksSight) {
@@ -755,9 +799,9 @@ export class VisionAnalyzer {
           }
 
           // Check if this is a Limited wall (sight/light/sound = LIMITED)
-          const isLimitedSight = wall.document.sight === CONST.WALL_SENSE_TYPES.LIMITED;
-          const isLimitedLight = wall.document.light === CONST.WALL_SENSE_TYPES.LIMITED;
-          const isLimitedSound = wall.document.sound === CONST.WALL_SENSE_TYPES.LIMITED;
+          const isLimitedSight = wall.document.sight === edgeSenseTypes.LIMITED;
+          const isLimitedLight = wall.document.light === edgeSenseTypes.LIMITED;
+          const isLimitedSound = wall.document.sound === edgeSenseTypes.LIMITED;
           const isLimited = isLimitedSight || isLimitedLight || isLimitedSound;
 
           if (isLimited) {
@@ -826,6 +870,8 @@ export class VisionAnalyzer {
    */
   isSoundBlocked(observer, target) {
     try {
+      const edgeSenseTypes = getEdgeSenseTypes();
+
       // Check for Silence spell effect on observer or target
       const observerHasSilence = this.#hasSilenceEffect(observer.actor);
       const targetHasSilence = this.#hasSilenceEffect(target.actor);
@@ -834,18 +880,36 @@ export class VisionAnalyzer {
         return true;
       }
 
+      const levelsIntegration = LevelsIntegration.getInstance();
+      if (levelsIntegration.isActive) {
+        const blocked = levelsIntegration.test3DCollision(observer, target, 'sound');
+        const log = getLogger('AVS/VisionAnalyzer');
+        log.debug(() => ({
+          msg: 'v14-levels-sound',
+          observerId: observer?.document?.id ?? null,
+          observerLevel: levelsIntegration.getTokenLevelId(observer),
+          observerName: observer?.name ?? null,
+          result: blocked,
+          targetId: target?.document?.id ?? null,
+          targetLevel: levelsIntegration.getTokenLevelId(target),
+          targetName: target?.name ?? null,
+          mode: levelsIntegration.mode,
+        }));
+        return blocked;
+      }
+
       // Check for sound-blocking walls manually, ignoring LIMITED walls
       // Limited walls (terrain walls) should NOT block sound - they represent fog/mist
       const ray = new foundry.canvas.geometry.Ray(observer.center, target.center);
 
       for (const wall of canvas.walls.placeables) {
         // Skip walls that don't block sound
-        if (wall.document.sound === CONST.WALL_SENSE_TYPES.NONE) {
+        if (wall.document.sound === edgeSenseTypes.NONE) {
           continue;
         }
 
         // Skip LIMITED walls - they don't block sound (fog, mist, etc.)
-        if (wall.document.sound === CONST.WALL_SENSE_TYPES.LIMITED) {
+        if (wall.document.sound === edgeSenseTypes.LIMITED) {
           continue;
         }
 
@@ -886,12 +950,6 @@ export class VisionAnalyzer {
           }
         }
       }
-      // Check for 3D collision using Levels if available
-      const levelsIntegration = LevelsIntegration.getInstance();
-      if (levelsIntegration.isActive) {
-        return levelsIntegration.test3DCollision(observer, target, 'sound');
-      }
-
       // Check if polygon backend for sound is available
       const soundBackend = CONFIG.Canvas.polygonBackends?.sound;
       if (!soundBackend?.testCollision) {
@@ -1407,8 +1465,9 @@ export class VisionAnalyzer {
    * @private
    */
   #buildDetectionModes(token, result) {
-    // Add detection modes from token
-    const tokenDetectionModes = token.document?.detectionModes || [];
+    // Add detection modes from token. Foundry v14 can expose this as an array,
+    // a collection-like object, or another non-iterable structure.
+    const tokenDetectionModes = this.#normalizeDetectionModes(token?.document?.detectionModes);
     for (const mode of tokenDetectionModes) {
       if (mode.id && mode.enabled && mode.range > 0) {
         result.detectionModes[mode.id] = {
@@ -1449,6 +1508,56 @@ export class VisionAnalyzer {
         source: 'vision',
       };
     }
+  }
+
+  #normalizeDetectionModes(detectionModes) {
+    if (!detectionModes) {
+      return [];
+    }
+
+    if (Array.isArray(detectionModes)) {
+      return detectionModes;
+    }
+
+    if (Array.isArray(detectionModes.contents)) {
+      return detectionModes.contents;
+    }
+
+    if (typeof detectionModes.values === 'function') {
+      try {
+        return Array.from(detectionModes.values());
+      } catch {
+        // Fall through to other normalization strategies.
+      }
+    }
+
+    if (typeof detectionModes[Symbol.iterator] === 'function') {
+      try {
+        return Array.from(detectionModes);
+      } catch {
+        // Fall through to object-value normalization.
+      }
+    }
+
+    if (typeof detectionModes.toObject === 'function') {
+      try {
+        const asObject = detectionModes.toObject();
+        if (Array.isArray(asObject)) {
+          return asObject;
+        }
+        if (asObject && typeof asObject === 'object') {
+          return Object.values(asObject);
+        }
+      } catch {
+        // Fall through to object-value normalization.
+      }
+    }
+
+    if (typeof detectionModes === 'object') {
+      return Object.values(detectionModes);
+    }
+
+    return [];
   }
 
   /**

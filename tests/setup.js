@@ -830,6 +830,15 @@ global.createMockToken = (data = {}) => {
         flags[moduleId][key] = value;
         return Promise.resolve(true);
       }),
+      unsetFlag: jest.fn((moduleId, key) => {
+        if (flags[moduleId]) {
+          delete flags[moduleId][key];
+          if (Object.keys(flags[moduleId]).length === 0) {
+            delete flags[moduleId];
+          }
+        }
+        return Promise.resolve(true);
+      }),
       update: jest.fn((updates) => {
         // Simulate Foundry VTT update behavior
         if (updates.flags) {

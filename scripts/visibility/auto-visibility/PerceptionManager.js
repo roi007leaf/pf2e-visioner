@@ -4,6 +4,7 @@
  */
 
 import { MODULE_ID } from '../../constants.js';
+import { updateCanvasPerception } from '../../helpers/perception-refresh.js';
 import { refreshEveryonesPerception } from '../../services/socket.js';
 import { scheduleTaskWithKeepAlive } from '../../utils/scheduler.js';
 
@@ -74,11 +75,10 @@ export class OptimizedPerceptionManager {
 
     try {
       // Also refresh local canvas perception
-      canvas.perception.update({
+      updateCanvasPerception({
         refreshVision: true,
         refreshLighting: false,
         refreshOcclusion: true,
-        refreshTiles: true,
       });
     } catch (error) {
       console.warn(`${MODULE_ID} | Error refreshing canvas perception:`, error);

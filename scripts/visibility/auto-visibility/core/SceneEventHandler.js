@@ -36,6 +36,12 @@ export class SceneEventHandler {
     initialize() {
         // Scene events that affect lighting and perception
         Hooks.on('updateScene', this.#onSceneUpdate.bind(this));
+        Hooks.on('createRegion', this.#onRegionChange.bind(this));
+        Hooks.on('updateRegion', this.#onRegionChange.bind(this));
+        Hooks.on('deleteRegion', this.#onRegionChange.bind(this));
+        Hooks.on('createRegionBehavior', this.#onRegionBehaviorChange.bind(this));
+        Hooks.on('updateRegionBehavior', this.#onRegionBehaviorChange.bind(this));
+        Hooks.on('deleteRegionBehavior', this.#onRegionBehaviorChange.bind(this));
 
         // Track SceneConfig open/close to defer visibility recalculations until Save
         Hooks.on('renderSceneConfig', this.#onSceneConfigOpen.bind(this));
@@ -149,5 +155,98 @@ export class SceneEventHandler {
             }
             this.#visibilityStateManager.markAllTokensChangedImmediate();
         }
+    }
+
+    #isCurrentScene(scene) {
+        if (!scene) return false;
+        const activeScene = canvas?.scene;
+        return !!activeScene && ((scene === activeScene) || (scene.id && scene.id === activeScene.id));
+    }
+
+    #isDefineSurfaceBehavior(behavior) {
+        return behavior?.type === 'defineSurface';
+    }
+
+    #regionHasDefineSurfaceBehavior(region) {
+        const behaviors = region?.behaviors;
+        if (!behaviors) return false;
+
+        if (typeof behaviors.some === 'function') {
+            return behaviors.some((behavior) => this.#isDefineSurfaceBehavior(behavior));
+        }
+
+        if (Symbol.iterator in Object(behaviors)) {
+            for (const behavior of behaviors) {
+                if (this.#isDefineSurfaceBehavior(behavior)) return true;
+            }
+        }
+
+        if (typeof behaviors.values === 'function') {
+            for (const behavior of behaviors.values()) {
+                if (this.#isDefineSurfaceBehavior(behavior)) return true;
+            }
+        }
+
+        return false;
+    }
+
+    #regionPlacementLevelsChanged(changes) {
+        return !!changes && Object.prototype.hasOwnProperty.call(changes, 'levels');
+    }
+
+    #triggerRegionSurfaceRecalculation(reason, detail = {}) {
+        if (!this.#systemStateProvider.shouldProcessEvents()) return;
+
+        this.#systemStateProvider.debug('SceneEventHandler: region surface change detected', {
+            reason,
+            ...detail
+        });
+
+        if (this.#cacheManager?.clearAllCaches) {
+            this.#cacheManager.clearAllCaches();
+        }
+        this.#visibilityStateManager.markAllTokensChangedImmediate();
+    }
+
+    #onRegionChange(region, changes = {}, options = {}, userId) {
+        const scene = region?.parent ?? region?.scene ?? null;
+        if (!this.#isCurrentScene(scene)) return;
+
+        const placementLevelsChanged = this.#regionPlacementLevelsChanged(changes);
+        const hasDefineSurface = this.#regionHasDefineSurfaceBehavior(region);
+        if (!placementLevelsChanged && !hasDefineSurface) return;
+
+        this.#triggerRegionSurfaceRecalculation(
+            placementLevelsChanged ? 'region-placement-levels-update' : 'region-update',
+            {
+            sceneId: scene?.id ?? null,
+            sceneName: scene?.name ?? null,
+            regionId: region?.id ?? null,
+            regionName: region?.name ?? null,
+            placementLevelsChanged,
+            hasDefineSurface,
+            changes,
+            options,
+            userId
+        });
+    }
+
+    #onRegionBehaviorChange(behavior, changes = {}, options = {}, userId) {
+        if (!this.#isDefineSurfaceBehavior(behavior)) return;
+
+        const region = behavior?.region ?? behavior?.parent ?? null;
+        const scene = behavior?.scene ?? region?.parent ?? null;
+        if (!this.#isCurrentScene(scene)) return;
+
+        this.#triggerRegionSurfaceRecalculation('region-behavior-update', {
+            sceneId: scene?.id ?? null,
+            sceneName: scene?.name ?? null,
+            regionId: region?.id ?? null,
+            regionName: region?.name ?? null,
+            behaviorId: behavior?.id ?? null,
+            changes,
+            options,
+            userId
+        });
     }
 }

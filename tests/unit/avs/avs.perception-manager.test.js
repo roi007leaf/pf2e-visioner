@@ -32,7 +32,6 @@ describe('OptimizedPerceptionManager', () => {
             refreshVision: true,
             refreshLighting: false,
             refreshOcclusion: true,
-            refreshTiles: true,
         });
         expect(mgr.isRefreshScheduled()).toBe(false);
     });

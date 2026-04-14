@@ -5,7 +5,54 @@
 
 import { MODULE_ID } from '../constants.js';
 import { getCoverMap, setCoverMap } from '../stores/cover-map.js';
-import { getVisibilityMap, setVisibilityMap } from '../stores/visibility-map.js';
+import { getVisibilityMap, normalizeVisibilityMap, setVisibilityMap } from '../stores/visibility-map.js';
+
+const PARTY_RESTORE_MARKER_FLAG = 'partyStateRestoredAt';
+const activePartyRestorations = new Set();
+
+function normalizeCoverMap(map = {}) {
+  const normalized = {};
+
+  for (const [id, state] of Object.entries(map ?? {})) {
+    if (!id) continue;
+    if (!state || state === 'none') continue;
+    normalized[id] = state;
+  }
+
+  return normalized;
+}
+
+function getPartyRestoreMarker(tokenDoc) {
+  try {
+    return (
+      Number(tokenDoc?.getFlag?.(MODULE_ID, PARTY_RESTORE_MARKER_FLAG)) ||
+      Number(tokenDoc?.flags?.[MODULE_ID]?.[PARTY_RESTORE_MARKER_FLAG]) ||
+      0
+    );
+  } catch {
+    return 0;
+  }
+}
+
+async function markPartyStateRestored(tokenDoc, savedAt) {
+  const restoredAt = Number(savedAt) || Date.now();
+
+  try {
+    if (typeof tokenDoc?.setFlag === 'function') {
+      await tokenDoc.setFlag(MODULE_ID, PARTY_RESTORE_MARKER_FLAG, restoredAt);
+      return;
+    }
+
+    if (typeof tokenDoc?.update === 'function') {
+      await tokenDoc.update(
+        { [`flags.${MODULE_ID}.${PARTY_RESTORE_MARKER_FLAG}`]: restoredAt },
+        { diff: false },
+      );
+    }
+  } catch (error) {
+    console.warn('PF2E Visioner: Failed to mark party restoration on token:', error);
+  }
+}
 
 /**
  * Save a token's current visibility and cover state before it's consolidated into a party token
@@ -55,8 +102,8 @@ export async function saveTokenStateForParty(tokenDoc) {
     }
 
     // Save visibility and cover maps FROM this token (as observer)
-    tokenState.visibility = getVisibilityMap(token) || {};
-    tokenState.cover = getCoverMap(token) || {};
+    tokenState.visibility = normalizeVisibilityMap(getVisibilityMap(token) || {});
+    tokenState.cover = normalizeCoverMap(getCoverMap(token) || {});
 
     // Save visibility and cover states TO this token (from other observers)
     const allTokens = canvas.tokens?.placeables || [];
@@ -114,6 +161,8 @@ export async function saveTokenStateForParty(tokenDoc) {
  * @param {TokenDocument} tokenDoc - The token being restored
  */
 export async function restoreTokenStateFromParty(tokenDoc) {
+  let actorSignature = null;
+
   try {
     if (!game.user.isGM) {
       return;
@@ -129,13 +178,28 @@ export async function restoreTokenStateFromParty(tokenDoc) {
 
     // Get state cache
     const cache = scene.getFlag(MODULE_ID, 'partyTokenStateCache') || {};
-    const actorSignature = tokenDoc.actor.signature;
+    actorSignature = tokenDoc.actor.signature;
 
     const savedState = cache[actorSignature];
 
     if (!savedState) {
       return false;
     }
+
+    if (savedState.tokenId && tokenDoc.id === savedState.tokenId) {
+      return false;
+    }
+
+    const restoredAt = getPartyRestoreMarker(tokenDoc);
+    if (restoredAt && savedState.savedAt && restoredAt >= savedState.savedAt) {
+      return false;
+    }
+
+    if (activePartyRestorations.has(actorSignature)) {
+      return false;
+    }
+
+    activePartyRestorations.add(actorSignature);
 
     // Get the token object
     const token = canvas.tokens?.get?.(tokenDoc.id) || tokenDoc.object;
@@ -144,12 +208,15 @@ export async function restoreTokenStateFromParty(tokenDoc) {
     }
 
     // Restore visibility and cover maps FOR this token (as observer)
-    if (Object.keys(savedState.visibility).length > 0) {
-      await setVisibilityMap(token, savedState.visibility);
+    const sanitizedVisibility = normalizeVisibilityMap(savedState.visibility || {});
+    const sanitizedCover = normalizeCoverMap(savedState.cover || {});
+
+    if (Object.keys(sanitizedVisibility).length > 0) {
+      await setVisibilityMap(token, sanitizedVisibility);
     }
 
-    if (Object.keys(savedState.cover).length > 0) {
-      await setCoverMap(token, savedState.cover);
+    if (Object.keys(sanitizedCover).length > 0) {
+      await setCoverMap(token, sanitizedCover);
     }
 
     // Restore visibility and cover states FROM other observers TO this token
@@ -239,10 +306,16 @@ export async function restoreTokenStateFromParty(tokenDoc) {
       console.warn('PF2E Visioner: Failed to process deferred party updates:', error);
     }
 
+    await markPartyStateRestored(tokenDoc, savedState.savedAt);
+
     return true;
   } catch (error) {
     console.error('PF2E Visioner: Error restoring token state from party:', error);
     return false;
+  } finally {
+    if (actorSignature) {
+      activePartyRestorations.delete(actorSignature);
+    }
   }
 }
 
@@ -265,9 +338,25 @@ export function isLikelyPartyTokenRestoration(tokenDoc) {
 
     // Check if we have saved state for this actor signature
     const cache = scene.getFlag(MODULE_ID, 'partyTokenStateCache') || {};
-    const hasCachedState = !!cache[tokenDoc.actor.signature];
+    const savedState = cache[tokenDoc.actor.signature];
+    if (!savedState) {
+      return false;
+    }
 
-    return hasCachedState;
+    if (savedState.tokenId && tokenDoc.id === savedState.tokenId) {
+      return false;
+    }
+
+    const restoredAt = getPartyRestoreMarker(tokenDoc);
+    if (restoredAt && savedState.savedAt && restoredAt >= savedState.savedAt) {
+      return false;
+    }
+
+    if (activePartyRestorations.has(tokenDoc.actor.signature)) {
+      return false;
+    }
+
+    return true;
   } catch (error) {
     console.error('PF2E Visioner: Error checking party restoration:', error);
     return false;

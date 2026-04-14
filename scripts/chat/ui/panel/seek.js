@@ -16,13 +16,14 @@ export function buildSeekPanel(actionData, message) {
 
   const hasExistingTemplate =
     isSeekWithTemplateOption &&
-    !!canvas?.scene?.templates?.find?.((t) => {
-      const f = t?.flags?.['pf2e-visioner'];
+    Array.from(canvas?.scene?.regions || []).some((region) => {
+      const f = region?.flags?.['pf2e-visioner'];
+      const isTemplate = region?.getFlag?.('core', 'MeasuredTemplate') || f?.seekPreviewManual;
       return (
-        f?.seekPreviewManual &&
+        isTemplate &&
         f?.messageId === actionData.messageId &&
         f?.actorTokenId === actionData.actor.id &&
-        t?.user?.id === game.userId
+        f?.userId === game.userId
       );
     });
 
