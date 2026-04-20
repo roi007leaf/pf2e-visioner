@@ -856,7 +856,39 @@ global.createMockToken = (data = {}) => {
             if (parts.length === 3) {
               const [, moduleId, key] = parts;
               if (!flags[moduleId]) flags[moduleId] = {};
-              flags[moduleId][key] = updates[path];
+
+              if (key.startsWith('-=')) {
+                const actualKey = key.slice(2);
+                delete flags[moduleId][actualKey];
+                if (Object.keys(flags[moduleId]).length === 0) {
+                  delete flags[moduleId];
+                }
+              } else {
+                flags[moduleId][key] = updates[path];
+              }
+            }
+
+            if (parts.length === 4) {
+              const [, moduleId, key, nestedKey] = parts;
+              if (!flags[moduleId]) flags[moduleId] = {};
+              if (!flags[moduleId][key] || typeof flags[moduleId][key] !== 'object') {
+                flags[moduleId][key] = {};
+              }
+
+              if (nestedKey.startsWith('-=')) {
+                const actualNestedKey = nestedKey.slice(2);
+                delete flags[moduleId][key][actualNestedKey];
+
+                if (Object.keys(flags[moduleId][key]).length === 0) {
+                  delete flags[moduleId][key];
+                }
+
+                if (Object.keys(flags[moduleId]).length === 0) {
+                  delete flags[moduleId];
+                }
+              } else {
+                flags[moduleId][key][nestedKey] = updates[path];
+              }
             }
           }
         });
