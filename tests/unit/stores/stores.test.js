@@ -123,9 +123,56 @@ describe('Visibility Map Functions', () => {
       await setVisibilityMap(mockObserver, {});
 
       expect(mockObserver.document.update).toHaveBeenCalledWith(
-        { 'flags.pf2e-visioner.visibility': {} },
+        { 'flags.pf2e-visioner.-=visibility': null },
         { diff: false, render: false, animate: false },
       );
+    });
+
+    test('should remove observed entries from a non-empty stored map even when flag writes merge', async () => {
+      global.game.user.isGM = true;
+
+      const flags = {
+        'pf2e-visioner': {
+          visibility: {
+            keep: 'undetected',
+            remove: 'undetected',
+          },
+        },
+      };
+
+      mockObserver.document.getFlag.mockImplementation((moduleId, key) => flags[moduleId]?.[key] ?? null);
+      mockObserver.document.setFlag.mockImplementation(async (moduleId, key, value) => {
+        if (!flags[moduleId]) flags[moduleId] = {};
+        const current = flags[moduleId][key] ?? {};
+        flags[moduleId][key] = { ...current, ...value };
+        return true;
+      });
+      mockObserver.document.update.mockImplementation(async (updates) => {
+        const visibility = flags['pf2e-visioner']?.visibility ?? {};
+
+        for (const [path, value] of Object.entries(updates)) {
+          if (path === 'flags.pf2e-visioner.visibility') {
+            flags['pf2e-visioner'].visibility = { ...visibility, ...value };
+            continue;
+          }
+
+          if (path === 'flags.pf2e-visioner.-=visibility') {
+            delete flags['pf2e-visioner'].visibility;
+            continue;
+          }
+
+          if (path.startsWith('flags.pf2e-visioner.visibility.-=')) {
+            const targetId = path.slice('flags.pf2e-visioner.visibility.-='.length);
+            delete flags['pf2e-visioner'].visibility[targetId];
+          }
+        }
+
+        return true;
+      });
+
+      await setVisibilityMap(mockObserver, { keep: 'undetected' });
+
+      expect(getVisibilityMap(mockObserver)).toEqual({ keep: 'undetected' });
     });
   });
 
@@ -175,7 +222,7 @@ describe('Visibility Map Functions', () => {
       await setVisibilityBetween(mockObserver, mockTarget, 'observed', { skipEphemeralUpdate: true });
 
       expect(mockObserver.document.update).toHaveBeenCalledWith(
-        { 'flags.pf2e-visioner.visibility': {} },
+        { 'flags.pf2e-visioner.-=visibility': null },
         { diff: false, render: false, animate: false },
       );
     });

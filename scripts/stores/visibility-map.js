@@ -79,19 +79,21 @@ export async function setVisibilityMap(token, visibilityMap) {
       changes,
     }));
   }
+  const path = `flags.${MODULE_ID}.visibility`;
+  const updates = {};
+  const removedTargetIds = Object.keys(previousMap).filter((id) => !(id in nextMap));
 
-  if (typeof token.document.setFlag === 'function') {
-    // Keep the document flag cache in sync before the full document update.
-    if (Object.keys(nextMap).length === 0 && typeof token.document.unsetFlag === 'function') {
-      await token.document.unsetFlag(MODULE_ID, 'visibility');
-    } else {
-      await token.document.setFlag(MODULE_ID, 'visibility', nextMap);
+  if (Object.keys(nextMap).length === 0) {
+    updates[`flags.${MODULE_ID}.-=visibility`] = null;
+  } else {
+    updates[path] = nextMap;
+    for (const targetId of removedTargetIds) {
+      updates[`${path}.-=${targetId}`] = null;
     }
   }
 
-  const path = `flags.${MODULE_ID}.visibility`;
   return token.document.update(
-    { [path]: nextMap },
+    updates,
     { diff: false, render: false, animate: false },
   );
 }
@@ -127,7 +129,6 @@ export async function setVisibilityBetween(
 
   // Track if state changed for hook notification
   const stateChanged = currentState !== state;
-
   // Update map if state has changed
   if (stateChanged) {
     if (!state || state === 'observed') {

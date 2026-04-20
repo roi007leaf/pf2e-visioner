@@ -665,13 +665,12 @@ export class VisionAnalyzer {
         }
       }
 
-      // For doors, check if ray crosses through the door's area with threshold
-      // This catches near-misses where ray passes within a few pixels of door
+      // For doors, do a fast plane-crossing check before the more general wall intersection.
+      // This avoids false positives from the old "close to the door plane" shortcut when
+      // both sampled points are actually on the same side of a closed door.
       if (isDoor) {
         const doorThreshold = 3; // pixels
 
-        // Check if ray endpoints are on opposite sides of the door
-        // and if the ray passes close enough to the door span
         const wallX1 = wall.document.c[0];
         const wallY1 = wall.document.c[1];
         const wallX2 = wall.document.c[2];
@@ -683,36 +682,66 @@ export class VisionAnalyzer {
         const isHorizontalDoor = doorDx > doorDy;
 
         if (isHorizontalDoor) {
-          // Horizontal door: check if ray crosses the Y plane
           const doorY = wallY1;
           const doorMinX = Math.min(wallX1, wallX2);
           const doorMaxX = Math.max(wallX1, wallX2);
+          const fromOffset = fromPoint.y - doorY;
+          const toOffset = toPoint.y - doorY;
 
-          // Check if ray crosses the door's Y coordinate
-          const rayMinY = Math.min(fromPoint.y, toPoint.y);
-          const rayMaxY = Math.max(fromPoint.y, toPoint.y);
+          // If both points are strictly on the same side of the door plane, the ray cannot cross it.
+          if (fromOffset !== 0 && toOffset !== 0 && fromOffset * toOffset > 0) {
+            continue;
+          }
 
-          if (rayMinY <= doorY + doorThreshold && rayMaxY >= doorY - doorThreshold) {
-            // Ray crosses door's Y plane, check if it's within door's X span (with threshold)
-            const rayX = fromPoint.x; // For vertical rays, X is constant
-            if (rayX >= doorMinX - doorThreshold && rayX <= doorMaxX + doorThreshold) {
+          const rayDy = toPoint.y - fromPoint.y;
+          if (rayDy === 0) {
+            // Horizontal ray exactly on the door plane: only block if it overlaps the door span.
+            if (fromOffset === 0 && toOffset === 0) {
+              const rayMinX = Math.min(fromPoint.x, toPoint.x);
+              const rayMaxX = Math.max(fromPoint.x, toPoint.x);
+              if (rayMaxX >= doorMinX - doorThreshold && rayMinX <= doorMaxX + doorThreshold) {
+                return false;
+              }
+            }
+            continue;
+          }
+
+          const t = (doorY - fromPoint.y) / rayDy;
+          if (t >= 0 && t <= 1) {
+            const crossX = fromPoint.x + (toPoint.x - fromPoint.x) * t;
+            if (crossX >= doorMinX - doorThreshold && crossX <= doorMaxX + doorThreshold) {
               return false;
             }
           }
         } else {
-          // Vertical door: check if ray crosses the X plane
           const doorX = wallX1;
           const doorMinY = Math.min(wallY1, wallY2);
           const doorMaxY = Math.max(wallY1, wallY2);
+          const fromOffset = fromPoint.x - doorX;
+          const toOffset = toPoint.x - doorX;
 
-          // Check if ray crosses the door's X coordinate
-          const rayMinX = Math.min(fromPoint.x, toPoint.x);
-          const rayMaxX = Math.max(fromPoint.x, toPoint.x);
+          // If both points are strictly on the same side of the door plane, the ray cannot cross it.
+          if (fromOffset !== 0 && toOffset !== 0 && fromOffset * toOffset > 0) {
+            continue;
+          }
 
-          if (rayMinX <= doorX + doorThreshold && rayMaxX >= doorX - doorThreshold) {
-            // Ray crosses door's X plane, check if it's within door's Y span (with threshold)
-            const rayY = fromPoint.y; // For horizontal rays, Y is constant
-            if (rayY >= doorMinY - doorThreshold && rayY <= doorMaxY + doorThreshold) {
+          const rayDx = toPoint.x - fromPoint.x;
+          if (rayDx === 0) {
+            // Vertical ray exactly on the door plane: only block if it overlaps the door span.
+            if (fromOffset === 0 && toOffset === 0) {
+              const rayMinY = Math.min(fromPoint.y, toPoint.y);
+              const rayMaxY = Math.max(fromPoint.y, toPoint.y);
+              if (rayMaxY >= doorMinY - doorThreshold && rayMinY <= doorMaxY + doorThreshold) {
+                return false;
+              }
+            }
+            continue;
+          }
+
+          const t = (doorX - fromPoint.x) / rayDx;
+          if (t >= 0 && t <= 1) {
+            const crossY = fromPoint.y + (toPoint.y - fromPoint.y) * t;
+            if (crossY >= doorMinY - doorThreshold && crossY <= doorMaxY + doorThreshold) {
               return false;
             }
           }

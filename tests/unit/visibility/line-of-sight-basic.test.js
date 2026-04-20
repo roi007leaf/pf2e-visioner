@@ -204,6 +204,96 @@ describe('VisionAnalyzer - Line of Sight (Refactored)', () => {
 
             expect(result).toBe(false);
         });
+
+        test('should return true when a closed horizontal door is near the ray but both tokens are on the same side', () => {
+            mockObserver = {
+                id: 'observer-same-side-horizontal',
+                center: { x: 2300, y: 4700 },
+                document: {
+                    id: 'observer-doc-same-side-horizontal',
+                    x: 2275,
+                    y: 4675,
+                    width: 1,
+                    height: 1,
+                    elevation: 0
+                }
+            };
+
+            mockTarget = {
+                id: 'target-same-side-horizontal',
+                center: { x: 2602, y: 3802 },
+                document: {
+                    id: 'target-doc-same-side-horizontal',
+                    x: 2577,
+                    y: 3777,
+                    width: 1,
+                    height: 1,
+                    elevation: 0
+                }
+            };
+
+            global.canvas.walls.placeables = [
+                {
+                    document: {
+                        move: CONST.WALL_SENSE_TYPES.NORMAL,
+                        sight: CONST.WALL_SENSE_TYPES.NORMAL,
+                        sound: CONST.WALL_SENSE_TYPES.NONE,
+                        c: [2013, 3800, 2388, 3800],
+                        door: 1,
+                        ds: 0 // Closed
+                    }
+                }
+            ];
+
+            const result = visionAnalyzer.hasLineOfSight(mockObserver, mockTarget);
+
+            expect(result).toBe(true);
+        });
+
+        test('should return true when a closed vertical door is near the ray but both tokens are on the same side', () => {
+            mockObserver = {
+                id: 'observer-same-side-vertical',
+                center: { x: 3700, y: 2900 },
+                document: {
+                    id: 'observer-doc-same-side-vertical',
+                    x: 3675,
+                    y: 2875,
+                    width: 1,
+                    height: 1,
+                    elevation: 0
+                }
+            };
+
+            mockTarget = {
+                id: 'target-same-side-vertical',
+                center: { x: 4598, y: 2398 },
+                document: {
+                    id: 'target-doc-same-side-vertical',
+                    x: 4573,
+                    y: 2373,
+                    width: 1,
+                    height: 1,
+                    elevation: 0
+                }
+            };
+
+            global.canvas.walls.placeables = [
+                {
+                    document: {
+                        move: CONST.WALL_SENSE_TYPES.NORMAL,
+                        sight: CONST.WALL_SENSE_TYPES.NORMAL,
+                        sound: CONST.WALL_SENSE_TYPES.NONE,
+                        c: [4600, 2838, 4600, 2963],
+                        door: 1,
+                        ds: 0 // Closed
+                    }
+                }
+            ];
+
+            const result = visionAnalyzer.hasLineOfSight(mockObserver, mockTarget);
+
+            expect(result).toBe(true);
+        });
     });
 
     describe('hasLineOfSight - Wall Filtering', () => {
