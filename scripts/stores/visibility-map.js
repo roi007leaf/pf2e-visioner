@@ -7,6 +7,7 @@ import { getBestVisibilityState, getControlledObserverTokens } from '../utils.js
 import { getLogger } from '../utils/logger.js';
 import { autoVisibilitySystem } from '../visibility/auto-visibility/index.js';
 import { updateEphemeralEffectsForVisibility } from '../visibility/ephemeral.js';
+import { waitForTokenDocumentUpdateSafe } from './document-update-guard.js';
 
 const log = getLogger('AVS/VisibilityMap');
 
@@ -91,6 +92,8 @@ export async function setVisibilityMap(token, visibilityMap) {
       updates[`${path}.-=${targetId}`] = null;
     }
   }
+
+  await waitForTokenDocumentUpdateSafe(token);
 
   return token.document.update(
     updates,

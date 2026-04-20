@@ -145,6 +145,7 @@ export class EventDrivenVisibilitySystem {
         telemetryReporter: coreServices.telemetryReporter,
         exclusionManager: coreServices.exclusionManager,
         viewportFilterService: this.#viewportFilterService,
+        positionManager: coreServices.positionManager,
         visibilityMapService: coreServices.visibilityMapService,
         overrideValidationManager: coreServices.overrideValidationManager,
         moduleId: MODULE_ID

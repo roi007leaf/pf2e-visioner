@@ -33,6 +33,26 @@ export class PositionManager {
   }
 
   /**
+   * Get the latest stored document update for a token, if any.
+   * Used by movement-sensitive orchestrators to defer work until the
+   * rendered token catches up to its pending destination.
+   * @param {string} tokenId - Token ID
+   * @returns {Object|null} Stored document data or null if none exists
+   */
+  getUpdatedTokenDoc(tokenId) {
+    return this.updatedTokenDocs.get(tokenId) ?? null;
+  }
+
+  /**
+   * Get the currently pinned position for a token, if any.
+   * @param {string} tokenId - Token ID
+   * @returns {Object|null} Pinned position data or null if none exists
+   */
+  getPinnedPosition(tokenId) {
+    return this.pinnedPositions.get(tokenId) ?? null;
+  }
+
+  /**
    * Pin a token position during animation to ensure consistent visibility calculations
    * @param {string} tokenId - Token ID
    * @param {Object} positionData - Position data with x, y, elevation, until timestamp

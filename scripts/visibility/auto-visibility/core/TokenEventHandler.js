@@ -29,6 +29,9 @@ export class TokenEventHandler {
     this.positionManager = positionManager;
     this.cacheManager = cacheManager;
     this.batchOrchestrator = batchOrchestrator;
+    this._deferredAnimatedMoves = new Set();
+    this._recentlyHandledAnimatedMoves = new Map();
+    this._recentAnimationSkipMs = 1000;
   }
 
   initialize() {
@@ -63,39 +66,78 @@ export class TokenEventHandler {
     // Use destination from updateData - this is the final position after animation
     const finalX = updateData.destination?.x ?? tokenDoc.x;
     const finalY = updateData.destination?.y ?? tokenDoc.y;
+    const tokenId = tokenDoc.id;
+    const token = tokenDoc.object;
+    const activeAnimation = token?._animation;
+
+    if (this._wasAnimatedMoveHandledRecently(tokenId)) {
+      return;
+    }
+
+    if (this._deferredAnimatedMoves.has(tokenId)) {
+      return;
+    }
 
     try {
-      // Reapply rule element operations after movement to restore overrides
-      await this._reapplyRuleElementsAfterMovement(tokenDoc);
+      if (activeAnimation?.promise && activeAnimation.state !== 'completed') {
+        try {
+          await activeAnimation.promise;
+        } catch {
+          /* ignore animation errors */
+        }
 
-      // Clear position-dependent caches since token has moved
-      // CRITICAL: Clear lighting caches FIRST to set forceFreshComputation flag
-      // This ensures subsequent batches bypass burst optimization and use fresh lighting
-      const globalVisCache = this.cacheManager?.getGlobalVisibilityCache();
-      LightingPrecomputer.clearLightingCaches(globalVisCache);
-      this.cacheManager?.clearLosCache?.();
-      this.cacheManager?.clearVisibilityCache?.();
-
-      // CRITICAL: Clear VisionAnalyzer's internal caches for this specific token
-      // The wall cache and capabilities cache can become stale when token moves
-      if (this.visionAnalyzer?.clearCache) {
-        this.visionAnalyzer.clearCache(tokenDoc);
+        if (this._wasAnimatedMoveHandledRecently(tokenId) || this._deferredAnimatedMoves.has(tokenId)) {
+          return;
+        }
       }
 
-      if (this.overrideValidationManager) {
-        this.overrideValidationManager.queueOverrideValidation(tokenDoc.id);
-        this.overrideValidationManager.processQueuedValidations().catch(() => { });
-        this.overrideValidationManager.processQueuedValidations().catch(() => { });
-      }
-
-      const movementChanges = {
+      await this._finalizeCompletedMovement(tokenDoc, {
         x: finalX,
         y: finalY,
-      };
-
-      this.visibilityState.markTokenChangedWithSpatialOptimization(tokenDoc, movementChanges);
+      });
     } catch (e) {
       console.warn('PF2E Visioner | Error processing move token:', e);
+    }
+  }
+
+  _wasAnimatedMoveHandledRecently(tokenId) {
+    const until = this._recentlyHandledAnimatedMoves.get(tokenId);
+    if (!until) return false;
+    if (until < Date.now()) {
+      this._recentlyHandledAnimatedMoves.delete(tokenId);
+      return false;
+    }
+    return true;
+  }
+
+  _markAnimatedMoveHandledRecently(tokenId) {
+    this._recentlyHandledAnimatedMoves.set(tokenId, Date.now() + this._recentAnimationSkipMs);
+  }
+
+  async _finalizeCompletedMovement(tokenDoc, movementChanges) {
+    if (!tokenDoc) return;
+
+    await this._reapplyRuleElementsAfterMovement(tokenDoc);
+
+    // Clear position-dependent caches since token has moved
+    // CRITICAL: Clear lighting caches FIRST to set forceFreshComputation flag
+    // This ensures subsequent batches bypass burst optimization and use fresh lighting
+    const globalVisCache = this.cacheManager?.getGlobalVisibilityCache();
+    LightingPrecomputer.clearLightingCaches(globalVisCache);
+    this.cacheManager?.clearLosCache?.();
+    this.cacheManager?.clearVisibilityCache?.();
+
+    // CRITICAL: Clear VisionAnalyzer's internal caches for this specific token
+    // The wall cache and capabilities cache can become stale when token moves
+    if (this.visionAnalyzer?.clearCache) {
+      this.visionAnalyzer.clearCache(tokenDoc);
+    }
+
+    this.visibilityState.markTokenChangedWithSpatialOptimization(tokenDoc, movementChanges);
+
+    if (this.overrideValidationManager) {
+      this.overrideValidationManager.queueOverrideValidation(tokenDoc.id);
+      this.overrideValidationManager.processQueuedValidations().catch(() => { });
     }
   }
 
@@ -231,41 +273,24 @@ export class TokenEventHandler {
             x: changes.x ?? tokenDoc.x,
             y: changes.y ?? tokenDoc.y,
           };
+          this._deferredAnimatedMoves.add(tokenId);
 
           token._animation.promise
-            .then(() => {
+            .then(async () => {
               // After animation completes, clear position-dependent caches and trigger visibility recalculation
               try {
-                const globalVisCache = this.cacheManager?.getGlobalVisibilityCache();
-                LightingPrecomputer.clearLightingCaches(globalVisCache);
-                this.cacheManager?.clearLosCache?.();
-                this.cacheManager?.clearVisibilityCache?.();
-
-                // CRITICAL: Clear VisionAnalyzer's internal caches for this specific token
                 const tokenDocObj = canvas.tokens?.get(tokenId)?.document;
-                if (tokenDocObj && this.visionAnalyzer?.clearCache) {
-                  this.visionAnalyzer.clearCache(tokenDocObj);
-                }
-
-                // Trigger visibility recalculation with spatial optimization
-                if (tokenDocObj) {
-                  this.visibilityState.markTokenChangedWithSpatialOptimization(
-                    tokenDocObj,
-                    movementChanges,
-                  );
-                }
-
-                // Queue override validation
-                if (this.overrideValidationManager) {
-                  this.overrideValidationManager.queueOverrideValidation(tokenId);
-                  this.overrideValidationManager.processQueuedValidations().catch(() => { });
-                }
+                await this._finalizeCompletedMovement(tokenDocObj ?? tokenDoc, movementChanges);
+                this._markAnimatedMoveHandledRecently(tokenId);
               } catch (e) {
                 console.warn('PF2E Visioner | Error processing validation after animation:', e);
+              } finally {
+                this._deferredAnimatedMoves.delete(tokenId);
               }
             })
             .catch(() => {
               /* ignore animation errors */
+              this._deferredAnimatedMoves.delete(tokenId);
             });
           return; // Early return only when we have a promise to wait for
         }

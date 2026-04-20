@@ -82,6 +82,10 @@ describe('Visibility Map Functions', () => {
   });
 
   describe('setVisibilityMap', () => {
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
     test('should not update if token is null', async () => {
       const result = await setVisibilityMap(null, {});
       expect(result).toBeUndefined();
@@ -173,6 +177,30 @@ describe('Visibility Map Functions', () => {
       await setVisibilityMap(mockObserver, { keep: 'undetected' });
 
       expect(getVisibilityMap(mockObserver)).toEqual({ keep: 'undetected' });
+    });
+
+    test('should defer visibility-map document writes until a moving token settles', async () => {
+      jest.useFakeTimers();
+      global.game.user.isGM = true;
+
+      mockObserver.x = 2000;
+      mockObserver.y = 3325.72;
+      mockObserver.document.x = 2000;
+      mockObserver.document.y = 2200;
+
+      const updatePromise = setVisibilityMap(mockObserver, { target1: 'hidden' });
+      await Promise.resolve();
+
+      expect(mockObserver.document.update).not.toHaveBeenCalled();
+
+      mockObserver.y = 2200;
+      await jest.advanceTimersByTimeAsync(50);
+      await updatePromise;
+
+      expect(mockObserver.document.update).toHaveBeenCalledWith(
+        { 'flags.pf2e-visioner.visibility': { target1: 'hidden' } },
+        { diff: false, render: false, animate: false },
+      );
     });
   });
 

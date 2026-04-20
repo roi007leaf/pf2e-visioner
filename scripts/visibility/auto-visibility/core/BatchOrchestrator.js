@@ -23,6 +23,7 @@ export class BatchOrchestrator {
    * @param {ExclusionManager} dependencies.exclusionManager - ExclusionManager instance
    * @param {import('./ViewportFilterService.js').ViewportFilterService} [dependencies.viewportFilterService] - Optional viewport filter service for client-aware filtering
    * @param {import('./VisibilityMapService.js').VisibilityMapService} dependencies.visibilityMapService - Visibility map service to persist results
+   * @param {import('./PositionManager.js').PositionManager} [dependencies.positionManager] - Optional position manager for pending destination awareness
    * @param {import('./OverrideValidationManager.js').OverrideValidationManager} [dependencies.overrideValidationManager] - Optional override validation manager
    * @param {string} dependencies.moduleId - Module ID for settings
    */
@@ -32,6 +33,7 @@ export class BatchOrchestrator {
     this.exclusionManager = dependencies.exclusionManager;
     this.viewportFilterService = dependencies.viewportFilterService || null;
     this.visibilityMapService = dependencies.visibilityMapService;
+    this.positionManager = dependencies.positionManager || null;
     this.overrideValidationManager = dependencies.overrideValidationManager || null;
     this.moduleId = dependencies.moduleId;
 
@@ -175,6 +177,62 @@ export class BatchOrchestrator {
     }, this._movementStopDelayMs);
   }
 
+  _getAnimatingChangedTokenIds(changedTokens) {
+    const animatingIds = [];
+    for (const id of changedTokens) {
+      const token =
+        canvas?.tokens?.get?.(id) ||
+        canvas?.tokens?.placeables?.find?.((placeable) => placeable?.document?.id === id) ||
+        null;
+      if (!token) continue;
+
+      const animation = token._animation;
+      const animationState = animation?.state;
+      const isAnimationCompleted = animationState === 'completed';
+      const isAnimating = !!animation && !isAnimationCompleted && (
+        !!animation.promise ||
+        !!animation.active ||
+        animationState !== undefined
+      );
+      const isDragging =
+        token?._dragHandle != null ||
+        !!token?._dragPassthrough ||
+        !!token?.document?.flags?.core?.isDragging;
+      const renderX = Number(token?.x);
+      const renderY = Number(token?.y);
+      const documentX = Number(token?.document?.x);
+      const documentY = Number(token?.document?.y);
+      const hasRenderDocumentDesync =
+        Number.isFinite(renderX) &&
+        Number.isFinite(renderY) &&
+        Number.isFinite(documentX) &&
+        Number.isFinite(documentY) &&
+        Math.hypot(renderX - documentX, renderY - documentY) > 1;
+      const pendingUpdatedDoc = this.positionManager?.getUpdatedTokenDoc?.(id) ?? null;
+      const hasPendingDestinationDesync =
+        pendingUpdatedDoc != null &&
+        Number.isFinite(Number(pendingUpdatedDoc.x)) &&
+        Number.isFinite(Number(pendingUpdatedDoc.y)) &&
+        (
+          (
+            Number.isFinite(renderX) &&
+            Number.isFinite(renderY) &&
+            Math.hypot(renderX - Number(pendingUpdatedDoc.x), renderY - Number(pendingUpdatedDoc.y)) > 1
+          ) ||
+          (
+            Number.isFinite(documentX) &&
+            Number.isFinite(documentY) &&
+            Math.hypot(documentX - Number(pendingUpdatedDoc.x), documentY - Number(pendingUpdatedDoc.y)) > 1
+          )
+        );
+
+      if (isAnimating || isDragging || hasRenderDocumentDesync || hasPendingDestinationDesync) {
+        animatingIds.push(id);
+      }
+    }
+    return animatingIds;
+  }
+
   /**
    * Enqueue token changes and coalesce into a single batch on the next frame.
    * @param {Set<string>} changedTokens
@@ -242,6 +300,8 @@ export class BatchOrchestrator {
       return;
     }
 
+    const movementSession = options.movementSession || null;
+
     // Check if AVS is disabled for the current scene
     const disableAVS = canvas?.scene?.getFlag?.(this.moduleId, 'disableAVS');
     if (disableAVS) {
@@ -267,6 +327,23 @@ export class BatchOrchestrator {
       return;
     }
 
+    const animatingChangedTokenIds = this._getAnimatingChangedTokenIds(changedTokens);
+    if (animatingChangedTokenIds.length > 0) {
+      for (const id of changedTokens) {
+        this._pendingTokens.add(id);
+      }
+
+      getLogger('AVS/Batch').debug(() => ({
+        msg: 'processBatch:deferred',
+        reason: 'changed-token-animation-still-active',
+        changedCount: changedTokens.size,
+        animatingTokenIds: animatingChangedTokenIds,
+      }));
+
+      this.notifyTokenMovementStart();
+      return;
+    }
+
     this.processingBatch = true;
     const batchId = `batch-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     try {
@@ -282,7 +359,6 @@ export class BatchOrchestrator {
         stack: stack?.split('\n').slice(1, 4).join('\n'),
       }));
     } catch { }
-    const movementSession = options.movementSession || null;
 
     // Invalidate global caches to ensure fresh calculations
     // This is critical when the GM window regains focus after player movements

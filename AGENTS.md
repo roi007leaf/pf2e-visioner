@@ -1,17 +1,15 @@
 <claude-mem-context>
 # Memory Context
 
-# [pf2e-visioner] recent context, 2026-04-20 12:11pm GMT+3
+# [pf2e-visioner] recent context, 2026-04-20 2:32pm GMT+3
 
 Legend: 🎯session 🔴bugfix 🟣feature 🔄refactor ✅change 🔵discovery ⚖️decision
 Format: ID TIME TYPE TITLE
 Fetch details: get_observations([IDs]) | Search: mem-search skill
 
-Stats: 50 obs (23,068t read) | 921,431t work | 97% savings
+Stats: 50 obs (23,113t read) | 941,693t work | 98% savings
 
 ### Apr 20, 2026
-53 9:43a 🔴 BatchOrchestrator test suite passes 6/6 including new "syncs authoritative ephemeral states when batch updates empty" test
-54 9:44a 🔴 Full pf2e-visioner test suite green after BatchOrchestrator candidateUpdates fix — 76 tests across 4 suites
 63 9:46a 🔵 Pre-commit verification: old log confirms fix scope — batch 2 ran ephemeral sync but excluded Berk via stale-effects gate
 64 9:59a 🔵 Live game log confirms AVS fix pipeline works end-to-end with correct authoritative state resolution
 65 " 🔵 _applyBatchResults and setVisibilityMap full implementation traced: dedup, override-flag guard, and hook notification chain
@@ -60,6 +58,8 @@ Stats: 50 obs (23,068t read) | 921,431t work | 97% savings
 136 " 🔵 Integration test mock: document.update doesn't update getFlag — "observed" deletion not reflected in reads
 138 12:10p 🔴 tests/setup.js mock token update() now handles Foundry dotted-path unset syntax and 4-part flag paths
 141 " 🔴 Full test suite green: 218 suites / 2392 tests after setup.js mock fix
+143 12:12p 🔵 TokenEventHandler animation/drag guard and moveToken vs updateToken split for visibility batching
+144 12:15p 🔵 PositionManager: 4-priority position resolution for tokens during animation and drag
 
-Access 921k tokens of past work via get_observations([IDs]) or mem-search skill.
+Access 942k tokens of past work via get_observations([IDs]) or mem-search skill.
 </claude-mem-context>

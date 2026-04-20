@@ -7,12 +7,16 @@ describe('TokenEventHandler - animation detection on position change', () => {
   let notifyTokenMovementStart;
   let storeUpdatedTokenDoc;
   let pinTokenDestination;
+  let queueOverrideValidation;
+  let processQueuedValidations;
 
   beforeEach(() => {
     markTokenChangedWithSpatialOptimization = jest.fn();
     notifyTokenMovementStart = jest.fn();
     storeUpdatedTokenDoc = jest.fn();
     pinTokenDestination = jest.fn();
+    queueOverrideValidation = jest.fn();
+    processQueuedValidations = jest.fn(() => Promise.resolve());
 
     const systemState = {
       shouldProcessEvents: () => true,
@@ -36,8 +40,8 @@ describe('TokenEventHandler - animation detection on position change', () => {
     };
 
     const overrideValidationManager = {
-      queueOverrideValidation: jest.fn(),
-      processQueuedValidations: jest.fn(() => Promise.resolve()),
+      queueOverrideValidation,
+      processQueuedValidations,
     };
 
     const positionManager = {
@@ -165,4 +169,83 @@ describe('TokenEventHandler - animation detection on position change', () => {
     expect(markTokenChangedWithSpatialOptimization).not.toHaveBeenCalled();
     expect(notifyTokenMovementStart).toHaveBeenCalled();
   });
+
+  test('final move waits for active animation promise before processing', async () => {
+    let resolveAnimation;
+    const animationPromise = new Promise((resolve) => {
+      resolveAnimation = resolve;
+    });
+
+    const tokenDoc = makeTokenDoc({
+      object: {
+        _animation: { state: 'running', promise: animationPromise },
+        _dragHandle: null,
+        actor: { id: 'actor-1', items: [] },
+      },
+    });
+
+    const movePromise = handler.handleMoveToken(
+      tokenDoc,
+      { destination: { x: 100, y: 100 }, chain: [] },
+      {},
+      'user-1',
+    );
+
+    await Promise.resolve();
+
+    expect(markTokenChangedWithSpatialOptimization).not.toHaveBeenCalled();
+
+    resolveAnimation();
+    await movePromise;
+
+    expect(markTokenChangedWithSpatialOptimization).toHaveBeenCalledWith(tokenDoc, {
+      x: 100,
+      y: 100,
+    });
+  });
+
+  test('final move does not process early when updateToken already deferred to animation completion', async () => {
+    let resolveAnimation;
+    const animationPromise = new Promise((resolve) => {
+      resolveAnimation = resolve;
+    });
+
+    const tokenDoc = makeTokenDoc({
+      object: {
+        _animation: { state: 'running', promise: animationPromise },
+        _dragHandle: null,
+        actor: { id: 'actor-1', items: [] },
+      },
+    });
+
+    global.canvas.tokens.get = jest.fn(() => ({
+      document: tokenDoc,
+    }));
+
+    handler.handleTokenUpdate(tokenDoc, { x: 100, y: 100 });
+
+    const movePromise = handler.handleMoveToken(
+      tokenDoc,
+      { destination: { x: 100, y: 100 }, chain: [] },
+      {},
+      'user-1',
+    );
+
+    await Promise.resolve();
+
+    expect(markTokenChangedWithSpatialOptimization).not.toHaveBeenCalled();
+
+    resolveAnimation();
+    await animationPromise;
+    await movePromise;
+    await Promise.resolve();
+
+    expect(markTokenChangedWithSpatialOptimization).toHaveBeenCalledTimes(1);
+    expect(markTokenChangedWithSpatialOptimization).toHaveBeenCalledWith(tokenDoc, {
+      x: 100,
+      y: 100,
+    });
+    expect(queueOverrideValidation).toHaveBeenCalledWith('token-1');
+  });
+
 });

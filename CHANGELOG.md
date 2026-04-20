@@ -6,6 +6,7 @@
 
 - **Observed visibility now clears stale stored entries correctly**: When a visibility pair returned to `observed` while the observer still had other non-observed targets, the old target entry could remain in the persisted visibility map and be read back as stale `hidden`/`undetected`. Visibility map writes now explicitly remove obsolete target keys during the document update, keeping persisted state aligned with the calculated result.
 - **Closed doors no longer incorrectly block same-side line of sight**: The door LOS shortcut could treat diagonal rays that passed near a closed door as blocked even when both sampled points were on the same side of the door plane. Door checks now require a real plane crossing, preventing false `hidden`/`undetected` results when tokens remain on the same side of a closed door.
+- **Long token moves no longer snap to the destination mid-animation**: Auto-visibility batches could finalize against a moving token before the rendered token had reached its destination, then persist visibility/detection state onto that token and cause Foundry to snap it to the endpoint. Movement batches and token flag writes now wait for the token to settle before processing.
 
 ## [8.0.0] - 2026-04-14
 

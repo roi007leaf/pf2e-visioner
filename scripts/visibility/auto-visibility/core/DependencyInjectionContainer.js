@@ -138,6 +138,7 @@ export class DependencyInjectionContainer {
         telemetryReporter: dependencies.telemetryReporter,
         exclusionManager: dependencies.exclusionManager,
         viewportFilterService: dependencies.viewportFilterService,
+        positionManager: dependencies.positionManager,
         visibilityMapService: dependencies.visibilityMapService,
         overrideValidationManager: dependencies.overrideValidationManager,
         moduleId: dependencies.moduleId,

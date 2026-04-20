@@ -14,6 +14,7 @@
 import { MODULE_ID } from '../constants.js';
 import { getBestVisibilityState, getControlledObserverTokens } from '../utils.js';
 import { getVisibilityBetween } from './visibility-map.js';
+import { waitForTokenDocumentUpdateSafe } from './document-update-guard.js';
 
 let batchMode = false;
 const batchedUpdates = new Map();
@@ -38,7 +39,15 @@ export async function flushDetectionBatch() {
 
       if (hasChanged) {
         const path = `flags.${MODULE_ID}.detection`;
-        updates.push(token.document.update({ [path]: detectionMap }, { diff: false }));
+        updates.push(
+          (async () => {
+            await waitForTokenDocumentUpdateSafe(token);
+            return token.document.update(
+              { [path]: detectionMap },
+              { diff: false, render: false, animate: false },
+            );
+          })(),
+        );
         written++;
       } else {
         skipped++;
@@ -79,7 +88,11 @@ export async function setDetectionMap(token, detectionMap) {
   }
 
   const path = `flags.${MODULE_ID}.detection`;
-  const result = await token.document.update({ [path]: detectionMap }, { diff: false });
+  await waitForTokenDocumentUpdateSafe(token);
+  const result = await token.document.update(
+    { [path]: detectionMap },
+    { diff: false, render: false, animate: false },
+  );
   return result;
 }
 
@@ -246,4 +259,3 @@ export async function clearAllDetections(observer) {
   if (!observer?.document) return;
   await setDetectionMap(observer, {});
 }
-
