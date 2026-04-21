@@ -232,6 +232,65 @@ describe('VisibilityOverride', () => {
         'visibilityReplacement'
       );
     });
+
+    it('should remove custom operation source even when ruleElementId is also provided', async () => {
+      const customSource = 'ear-sight-broken';
+      const ruleElementId = 'item-123-effect';
+      const mockTargetToken = {
+        id: 'target-token',
+        name: 'Target Token',
+        actor: { hasPlayerOwner: false, token: { disposition: -1 } },
+        document: {
+          id: 'target-token',
+          getFlag: jest.fn((scope, key) => {
+            if (key === 'stateSource') {
+              return {
+                visibilityByObserver: {
+                  'subject-token': {
+                    sources: [{ id: customSource, state: 'undetected', predicate: [{ not: 'self:condition:deafened' }] }],
+                    state: 'undetected',
+                  },
+                },
+              };
+            }
+            return null;
+          }),
+          unsetFlag: jest.fn(() => Promise.resolve()),
+          update: jest.fn(function (updates) {
+            this.flags = this.flags || { 'pf2e-visioner': {} };
+            if (updates['flags.pf2e-visioner.stateSource']) {
+              this.flags['pf2e-visioner'].stateSource = updates['flags.pf2e-visioner.stateSource'];
+            }
+            return Promise.resolve();
+          }),
+          flags: { 'pf2e-visioner': {} },
+        },
+      };
+
+      global.canvas.tokens.placeables = [mockSubjectToken, mockTargetToken];
+      mockSubjectToken.document.getFlag.mockImplementation((scope, key) => {
+        if (key === 'ruleElementOverride') return { source: customSource, direction: 'to' };
+        return null;
+      });
+
+      await VisibilityOverride.removeVisibilityOverride(
+        { source: customSource, direction: 'to', observers: 'all' },
+        mockSubjectToken,
+        ruleElementId,
+      );
+
+      expect(
+        mockTargetToken.document.update.mock.calls.some(
+          ([updates]) => updates?.['flags.pf2e-visioner.stateSource'],
+        ) || mockTargetToken.document.unsetFlag.mock.calls.some(
+          ([scope, key]) => scope === 'pf2e-visioner' && key === 'stateSource',
+        ),
+      ).toBe(true);
+      expect(mockSubjectToken.document.unsetFlag).toHaveBeenCalledWith(
+        'pf2e-visioner',
+        'ruleElementOverride',
+      );
+    });
   });
 
   describe('getObserverTokens', () => {
