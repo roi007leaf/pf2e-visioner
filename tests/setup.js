@@ -175,6 +175,28 @@ global.Hooks = {
 };
 
 global.foundry = {
+  data: {
+    operators: {
+      ForcedDeletion: Symbol.for('foundry.data.operators.ForcedDeletion'),
+    },
+    models: {
+      Token: class MockToken {
+        constructor(data) {
+          Object.assign(this, data);
+        }
+      },
+      Actor: class MockActor {
+        constructor(data) {
+          Object.assign(this, data);
+        }
+      },
+      Scene: class MockScene {
+        constructor(data) {
+          Object.assign(this, data);
+        }
+      },
+    },
+  },
   utils: {
     getProperty: jest.fn((obj, path) => {
       return path.split('.').reduce((o, i) => o?.[i], obj);
@@ -240,25 +262,6 @@ global.foundry = {
         }
       }
     }
-  },
-  data: {
-    models: {
-      Token: class MockToken {
-        constructor(data) {
-          Object.assign(this, data);
-        }
-      },
-      Actor: class MockActor {
-        constructor(data) {
-          Object.assign(this, data);
-        }
-      },
-      Scene: class MockScene {
-        constructor(data) {
-          Object.assign(this, data);
-        }
-      },
-    },
   },
   applications: {
     api: {

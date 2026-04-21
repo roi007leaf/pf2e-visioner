@@ -1,5 +1,13 @@
 # Changelog
 
+## [8.0.3] - 2026-04-21
+
+### Fixed
+
+- **Attack-roll auto-cover works again with PF2E check dialogs on Foundry V14**: PF2E V14 uses a submit button in the check modifiers dialog instead of the older `button.roll` path, so Visioner's dialog cover callback could fail to bind and selected cover overrides would never apply. Auto-cover now binds to both dialog button variants, defers attack cover application to the dialog when PF2E check dialogs are enabled, and correctly applies the selected cover level to the target AC/DC.
+- **Attack-roll auto-cover no longer drops to detected lesser cover before dialog selection**: Attack rolls were applying detected cover in the pre-roll wrapper before the PF2E check dialog existed, causing the later manual selection in the dialog to be ignored. The wrapper now detects cover and defers final application to the dialog callback, making the chosen cover state authoritative.
+- **Visibility-map deletions stay compatible with both Foundry V13 and V14**: V14 now uses `foundry.data.operators.ForcedDeletion`, while V13 still expects legacy `-=` deletion syntax. Visibility-map persistence now uses the modern operator when available and falls back to legacy whole-flag and nested-key deletion syntax otherwise, preserving backward compatibility.
+
 ## [8.0.2] - 2026-04-20
 
 ### Fixed

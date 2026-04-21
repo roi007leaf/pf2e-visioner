@@ -9,7 +9,7 @@
       "flags": {}
     }
   ],
-  "version": "8.0.2",
+  "version": "8.0.3",
   "compatibility": {
     "minimum": "13.341",
     "verified": "14"
@@ -86,7 +86,7 @@
         "type": "system",
         "compatibility": {
           "minimum": "7.0.0",
-          "verified": "8.0.1"
+          "verified": "8.0.3"
         }
       },
       {

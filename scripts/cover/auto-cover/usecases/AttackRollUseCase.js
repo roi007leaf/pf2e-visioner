@@ -19,6 +19,111 @@ class AttackRollUseCase extends BaseAutoCoverUseCase {
     // Use the singleton auto-cover system directly
     this.autoCoverSystem = autoCoverSystem;
   }
+
+  _syncClonedDefenderIntoContext(token, clonedActor, context) {
+    if (!clonedActor) return;
+
+    if (token) {
+      try {
+        const actorDescriptor =
+          Object.getOwnPropertyDescriptor(token, 'actor') ||
+          Object.getOwnPropertyDescriptor(Object.getPrototypeOf(token), 'actor');
+        const canAssignActor = !actorDescriptor || !!actorDescriptor.writable || !!actorDescriptor.set;
+        if (canAssignActor) {
+          token.actor = clonedActor;
+        }
+      } catch (_) { }
+    }
+
+    const targetContext = context?.target;
+    if (targetContext) {
+      targetContext.actor = clonedActor;
+      if (targetContext.token) {
+        try {
+          const actorDescriptor =
+            Object.getOwnPropertyDescriptor(targetContext.token, 'actor') ||
+            Object.getOwnPropertyDescriptor(Object.getPrototypeOf(targetContext.token), 'actor');
+          const canAssignActor = !actorDescriptor || !!actorDescriptor.writable || !!actorDescriptor.set;
+          if (canAssignActor) {
+            targetContext.token.actor = clonedActor;
+          }
+        } catch (_) { }
+      }
+    }
+  }
+
+  _createContextModifier({ slug, label, modifier, type = 'circumstance' }) {
+    if (!modifier) return null;
+
+    try {
+      if (game?.pf2e?.Modifier) {
+        return new game.pf2e.Modifier({
+          slug,
+          label,
+          modifier,
+          type,
+        });
+      }
+    } catch (_) { }
+
+    return {
+      slug,
+      label,
+      modifier,
+      type,
+      enabled: true,
+    };
+  }
+
+  _applyAdjustedDcFromTargetActor(targetActor, dcObj, adjustments = []) {
+    if (!targetActor || !dcObj?.slug) return false;
+
+    const activeAdjustments = adjustments.filter((entry) => Number(entry?.modifier));
+    if (activeAdjustments.length === 0) return false;
+
+    const statSlug = dcObj.slug === 'ac' ? 'armor' : dcObj.slug;
+    const defenseStat =
+      targetActor.getStatistic?.(statSlug) ||
+      (statSlug === 'armor' || dcObj.slug === 'ac' ? targetActor.armorClass : null);
+
+    const modifiers = activeAdjustments
+      .map((entry) => this._createContextModifier(entry))
+      .filter(Boolean);
+
+    const clonedDefense =
+      typeof defenseStat?.clone === 'function'
+        ? defenseStat.clone({ modifiers, rollOptions: [] })
+        : null;
+
+    if (clonedDefense?.dc) {
+      dcObj.value = clonedDefense.dc.value;
+      dcObj.statistic = clonedDefense.dc;
+      console.log('PF2E Visioner [AutoCover/AttackRoll]', {
+        msg: 'apply-adjusted-dc-from-target-actor:cloned-defense-applied',
+        targetActorId: targetActor?.id ?? null,
+        dcSlug: dcObj?.slug ?? null,
+        appliedDcValue: dcObj?.value ?? null,
+      });
+      return true;
+    }
+
+    const totalAdjustment = activeAdjustments.reduce(
+      (sum, entry) => sum + Number(entry.modifier || 0),
+      0,
+    );
+    dcObj.value = Number(dcObj.value || 0) + totalAdjustment;
+    dcObj.statistic = {
+      ...(dcObj.statistic || {}),
+      value: dcObj.value,
+      modifiers: [...(dcObj.statistic?.modifiers || []), ...modifiers],
+    };
+
+    return true;
+  }
+
+  _isPf2eCheckDialogEnabled() {
+    return !!game?.user?.flags?.pf2e?.settings?.showCheckDialogs;
+  }
   /**
    * Handle a chat message context
    * @param {Object} data - Message data
@@ -188,13 +293,13 @@ class AttackRollUseCase extends BaseAutoCoverUseCase {
 
           try {
             const bonus = getCoverBonusByState(chosen) || 0;
+            const label = getCoverLabel(chosen);
             let items = foundry.utils.deepClone(tgtActor._source?.items ?? []);
             items = items.filter(
               (i) =>
                 !(i?.type === 'effect' && i?.flags?.['pf2e-visioner']?.ephemeralCoverRoll === true),
             );
             if (bonus > 0) {
-              const label = getCoverLabel(chosen);
               const img = getCoverImageForState(chosen);
               const effectRules = [
                 ...getCoverLevelRollOptions(chosen),
@@ -224,10 +329,19 @@ class AttackRollUseCase extends BaseAutoCoverUseCase {
                 flags: { 'pf2e-visioner': { forThisRoll: true, ephemeralCoverRoll: true } },
               });
             }
-            tgt.actor = tgtActor.clone({ items }, { keepId: true });
+            const clonedActor = tgtActor.clone({ items }, { keepId: true });
+            this._syncClonedDefenderIntoContext(tgt, clonedActor, dctx);
             const dcObj = dctx.dc;
             if (dcObj?.slug) {
-              const st = tgt.actor.getStatistic(dcObj.slug)?.dc;
+              const didAdjustDc = this._applyAdjustedDcFromTargetActor(tgtActor, dcObj, [
+                {
+                  slug: 'pf2e-visioner-cover',
+                  label,
+                  modifier: bonus,
+                  type: 'circumstance',
+                },
+              ]);
+              const st = didAdjustDc ? null : clonedActor.getStatistic(dcObj.slug)?.dc;
               if (st) {
                 dcObj.value = st.value;
                 dcObj.statistic = st;
@@ -298,6 +412,7 @@ class AttackRollUseCase extends BaseAutoCoverUseCase {
     try {
       const attacker = this._resolveAttackerFromCtx(context);
       const target = this._resolveTargetFromCtx(context);
+      const checkDialogsEnabled = this._isPf2eCheckDialogEnabled();
 
       if (attacker && target && (attacker.isOwner || game.user.isGM)) {
         // Ensure visibility-driven off-guard ephemerals are up-to-date on defender before any DC calculation
@@ -323,10 +438,14 @@ class AttackRollUseCase extends BaseAutoCoverUseCase {
 
         // If popup was used and a choice was made, use it; otherwise, use detected state
         const finalState =
-          chosen !== null ? chosen : manualCover !== 'none' ? manualCover : detected;
+          chosen ?? (manualCover !== 'none' ? manualCover : detected);
+
+        if (checkDialogsEnabled) {
+          return { success: true };
+        }
 
         // Store the override for onPreCreateChatMessage if popup was used
-        if (chosen && manualCover === 'none' && chosen !== detected) {
+        if (chosen != null && manualCover === 'none' && chosen !== detected) {
           this.autoCoverSystem.setPopupOverride(attacker, target, chosen, detected);
         }
 
@@ -352,6 +471,14 @@ class AttackRollUseCase extends BaseAutoCoverUseCase {
     const bonus = getCoverBonusByState(state) || 0;
     if (bonus <= 0) return;
     const tgtActor = target.actor;
+    const dcAdjustments = [
+      {
+        slug: 'pf2e-visioner-cover',
+        label: getCoverLabel(state),
+        modifier: bonus,
+        type: 'circumstance',
+      },
+    ];
     let items = foundry.utils.deepClone(tgtActor._source?.items ?? []);
     // Remove any existing one-roll cover effects we may have added
     items = items.filter(
@@ -391,6 +518,12 @@ class AttackRollUseCase extends BaseAutoCoverUseCase {
         const suppressOffGuard = OffGuardSuppression.shouldSuppressOffGuardForState(target, visState);
         if (!suppressOffGuard) {
           const reason = visState.charAt(0).toUpperCase() + visState.slice(1);
+          dcAdjustments.push({
+            slug: 'pf2e-visioner-off-guard',
+            label: `Off-Guard (${reason})`,
+            modifier: -2,
+            type: 'circumstance',
+          });
           items.push({
             name: `Off-Guard (${reason})`,
             type: 'effect',
@@ -415,9 +548,13 @@ class AttackRollUseCase extends BaseAutoCoverUseCase {
       }
     } catch (_) { }
     const clonedActor = tgtActor.clone({ items }, { keepId: true });
+    this._syncClonedDefenderIntoContext(target, clonedActor, context);
     const dcObj = context.dc;
     if (dcObj?.slug) {
-      const clonedStat = clonedActor.getStatistic?.(dcObj.slug)?.dc;
+      const didAdjustDc =
+        manualCover === 'none' &&
+        this._applyAdjustedDcFromTargetActor(tgtActor, dcObj, dcAdjustments);
+      const clonedStat = didAdjustDc ? null : clonedActor.getStatistic?.(dcObj.slug)?.dc;
       if (clonedStat && manualCover === 'none') {
         dcObj.value = clonedStat.value;
         dcObj.statistic = clonedStat;

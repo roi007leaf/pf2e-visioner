@@ -390,6 +390,109 @@ describe('AttackRollUseCase', () => {
         }
       }).not.toThrow();
     });
+
+    test('should sync cloned defender actor into roll context target on chosen cover', async () => {
+      const { getCoverBetween } = await import('../../../../scripts/utils.js');
+      getCoverBetween.mockReturnValue('none');
+
+      const originalActor = {
+        _source: { items: [{ type: 'effect', name: 'Old Effect' }] },
+        clone: jest.fn(),
+      };
+      const clonedDc = { value: 24, slug: 'ac', label: 'AC' };
+      const clonedActor = {
+        getStatistic: jest.fn().mockReturnValue({ dc: clonedDc }),
+      };
+      originalActor.clone.mockReturnValue(clonedActor);
+      originalActor.armorClass = {
+        clone: jest.fn().mockReturnValue({
+          dc: clonedDc,
+        }),
+      };
+      targetToken.actor = originalActor;
+
+      attackRollUseCase._detectCover = jest.fn().mockReturnValue('standard');
+
+      let callbackFunction;
+      mockCoverUIManager.injectDialogCoverUI.mockImplementation(
+        (dialog, html, state, target, manualCover, snipingDuoCoverIgnore, callback) => {
+          callbackFunction = callback;
+        },
+      );
+
+      await attackRollUseCase.handleCheckDialog(mockDialog, mockHtml);
+
+      const dctx = {
+        dc: { slug: 'ac', value: 22, statistic: { value: 22 } },
+        target: {
+          actor: originalActor,
+          token: { actor: originalActor },
+        },
+      };
+
+      callbackFunction({
+        chosen: 'standard',
+        dctx,
+        target: targetToken,
+        targetActor: originalActor,
+      });
+
+      expect(targetToken.actor).toBe(clonedActor);
+      expect(dctx.target.actor).toBe(clonedActor);
+      expect(dctx.target.token.actor).toBe(clonedActor);
+      expect(dctx.dc.value).toBe(24);
+      expect(dctx.dc.statistic).toBe(clonedDc);
+    });
+
+    test('should derive adjusted AC from defense statistic clone when actor clone stays stale', async () => {
+      const { getCoverBetween } = await import('../../../../scripts/utils.js');
+      getCoverBetween.mockReturnValue('none');
+
+      const defenseClone = jest.fn().mockReturnValue({
+        dc: {
+          value: 24,
+          modifiers: [{ slug: 'pf2e-visioner-cover', modifier: 2, type: 'circumstance' }],
+        },
+      });
+      const originalActor = {
+        _source: { items: [] },
+        armorClass: { clone: defenseClone },
+        clone: jest.fn().mockReturnValue({
+          getStatistic: jest.fn().mockReturnValue({ dc: { value: 22 } }),
+        }),
+      };
+      targetToken.actor = originalActor;
+
+      let callbackFunction;
+      mockCoverUIManager.injectDialogCoverUI.mockImplementation(
+        (dialog, html, state, target, manualCover, snipingDuoCoverIgnore, callback) => {
+          callbackFunction = callback;
+        },
+      );
+
+      await attackRollUseCase.handleCheckDialog(mockDialog, mockHtml);
+
+      const dctx = {
+        dc: { slug: 'ac', value: 22, statistic: { value: 22, modifiers: [] } },
+        target: {
+          actor: originalActor,
+          token: { actor: originalActor },
+        },
+      };
+
+      callbackFunction({
+        chosen: 'standard',
+        dctx,
+        target: targetToken,
+        targetActor: originalActor,
+      });
+
+      expect(defenseClone).toHaveBeenCalled();
+      expect(dctx.dc.value).toBe(24);
+      expect(dctx.dc.statistic.modifiers).toEqual(
+        expect.arrayContaining([expect.objectContaining({ slug: 'pf2e-visioner-cover' })]),
+      );
+    });
   });
 
   describe('handleCheckRoll', () => {
@@ -428,6 +531,8 @@ describe('AttackRollUseCase', () => {
         getVisibilityBetween: jest.fn().mockReturnValue('observed'),
         setVisibilityBetween: jest.fn(),
       }));
+
+      global.game.user.flags = {};
     });
 
     test('should handle check roll and return success', async () => {
@@ -488,6 +593,45 @@ describe('AttackRollUseCase', () => {
         mockContext,
         'none', // manualCover parameter
       );
+    });
+
+    test('should use detected state when popup path returns undefined', async () => {
+      const { getCoverBetween } = await import('../../../../scripts/utils.js');
+      getCoverBetween.mockReturnValue('none');
+
+      attackRollUseCase.coverUIManager.showPopupAndApply.mockResolvedValue(undefined);
+
+      await attackRollUseCase.handleCheckRoll(mockCheck, mockContext);
+
+      expect(attackRollUseCase._applyCoverEphemeralEffect).toHaveBeenCalledWith(
+        targetToken,
+        attackerToken,
+        'standard',
+        mockContext,
+        'none',
+      );
+      expect(attackRollUseCase.autoCoverSystem.setPopupOverride).not.toHaveBeenCalled();
+    });
+
+    test('should defer attack cover application to check dialog when PF2E check dialogs are enabled', async () => {
+      const { getCoverBetween } = await import('../../../../scripts/utils.js');
+      getCoverBetween.mockReturnValue('none');
+
+      global.game.user.flags = {
+        pf2e: {
+          settings: {
+            showCheckDialogs: true,
+          },
+        },
+      };
+
+      attackRollUseCase.coverUIManager.showPopupAndApply.mockResolvedValue(undefined);
+
+      const result = await attackRollUseCase.handleCheckRoll(mockCheck, mockContext);
+
+      expect(result).toEqual({ success: true });
+      expect(attackRollUseCase._applyCoverEphemeralEffect).not.toHaveBeenCalled();
+      expect(attackRollUseCase.autoCoverSystem.setPopupOverride).not.toHaveBeenCalled();
     });
 
     test('should set popup override when manual cover is none and choice differs from detected', async () => {
@@ -636,6 +780,134 @@ describe('AttackRollUseCase', () => {
       await expect(
         attackRollUseCase.handleCheckDialog(malformedDialog, document.createElement('div')),
       ).resolves.toBeUndefined();
+    });
+  });
+
+  describe('_applyCoverEphemeralEffect', () => {
+    test('should not throw when target token actor is getter-only', async () => {
+      const originalActor = {
+        _source: { items: [] },
+        armorClass: {
+          clone: jest.fn().mockReturnValue({
+            dc: { value: 24, slug: 'armor', label: 'AC', modifiers: [] },
+          }),
+        },
+        clone: jest.fn().mockReturnValue({
+          getStatistic: jest.fn().mockReturnValue({ dc: { value: 24, slug: 'armor' } }),
+        }),
+      };
+
+      const targetToken = global.createMockToken({ id: 'target', actor: originalActor });
+      Object.defineProperty(targetToken, 'actor', {
+        get: () => originalActor,
+        configurable: true,
+      });
+
+      const attackerToken = global.createMockToken({ id: 'attacker' });
+      const context = {
+        dc: { slug: 'armor', value: 22, statistic: { value: 22, modifiers: [] } },
+        options: [],
+        target: {
+          actor: originalActor,
+          token: targetToken,
+        },
+      };
+
+      await expect(
+        attackRollUseCase._applyCoverEphemeralEffect(
+          targetToken,
+          attackerToken,
+          'standard',
+          context,
+          'none',
+        ),
+      ).resolves.toBeUndefined();
+
+      expect(context.dc.value).toBe(24);
+      expect(context.target.actor).not.toBe(originalActor);
+    });
+
+    test('should sync cloned defender actor into roll context target', async () => {
+      const originalActor = {
+        _source: { items: [] },
+        clone: jest.fn(),
+      };
+      const clonedDc = { value: 26, slug: 'ac', label: 'AC' };
+      const clonedActor = {
+        getStatistic: jest.fn().mockReturnValue({ dc: clonedDc }),
+      };
+      originalActor.clone.mockReturnValue(clonedActor);
+      originalActor.armorClass = {
+        clone: jest.fn().mockReturnValue({
+          dc: { value: 24, slug: 'ac', label: 'AC' },
+        }),
+      };
+
+      const targetToken = global.createMockToken({ id: 'target', actor: originalActor });
+      const attackerToken = global.createMockToken({ id: 'attacker' });
+      const context = {
+        dc: { slug: 'ac', value: 22, statistic: { value: 22 } },
+        options: [],
+        target: {
+          actor: originalActor,
+          token: { actor: originalActor },
+        },
+      };
+
+      await attackRollUseCase._applyCoverEphemeralEffect(
+        targetToken,
+        attackerToken,
+        'standard',
+        context,
+        'none',
+      );
+
+      expect(targetToken.actor).toBe(clonedActor);
+      expect(context.target.actor).toBe(clonedActor);
+      expect(context.target.token.actor).toBe(clonedActor);
+      expect(context.dc.value).toBe(24);
+      expect(context.dc.statistic).toEqual(expect.objectContaining({ value: 24 }));
+    });
+
+    test('should use defense statistic clone when actor clone keeps stale AC', async () => {
+      const defenseClone = jest.fn().mockReturnValue({
+        dc: {
+          value: 24,
+          modifiers: [{ slug: 'pf2e-visioner-cover', modifier: 2, type: 'circumstance' }],
+        },
+      });
+      const originalActor = {
+        _source: { items: [] },
+        armorClass: { clone: defenseClone },
+        clone: jest.fn().mockReturnValue({
+          getStatistic: jest.fn().mockReturnValue({ dc: { value: 22 } }),
+        }),
+      };
+
+      const targetToken = global.createMockToken({ id: 'target', actor: originalActor });
+      const attackerToken = global.createMockToken({ id: 'attacker' });
+      const context = {
+        dc: { slug: 'ac', value: 22, statistic: { value: 22, modifiers: [] } },
+        options: [],
+        target: {
+          actor: originalActor,
+          token: { actor: originalActor },
+        },
+      };
+
+      await attackRollUseCase._applyCoverEphemeralEffect(
+        targetToken,
+        attackerToken,
+        'standard',
+        context,
+        'none',
+      );
+
+      expect(defenseClone).toHaveBeenCalled();
+      expect(context.dc.value).toBe(24);
+      expect(context.dc.statistic.modifiers).toEqual(
+        expect.arrayContaining([expect.objectContaining({ slug: 'pf2e-visioner-cover' })]),
+      );
     });
   });
 });

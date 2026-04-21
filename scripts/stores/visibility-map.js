@@ -13,10 +13,13 @@ const log = getLogger('AVS/VisibilityMap');
 
 export function normalizeVisibilityMap(map = {}) {
   const normalized = {};
+  const forcedDeletion = foundry?.data?.operators?.ForcedDeletion;
 
   for (const [id, state] of Object.entries(map ?? {})) {
     if (!id) continue;
+    if (id.startsWith?.('-=')) continue;
     if (!state || state === 'observed') continue;
+    if (forcedDeletion && state === forcedDeletion) continue;
     normalized[id] = state;
   }
 
@@ -42,6 +45,30 @@ function buildVisibilityMapDiff(previousMap = {}, nextMap = {}) {
   }
 
   return changes;
+}
+
+function buildVisibilityDeletionUpdate(path, nextMap, removedTargetIds, forcedDeletion) {
+  if (forcedDeletion) {
+    if (Object.keys(nextMap).length === 0) {
+      return { [path]: forcedDeletion };
+    }
+
+    const persistedMap = { ...nextMap };
+    for (const targetId of removedTargetIds) {
+      persistedMap[targetId] = forcedDeletion;
+    }
+    return { [path]: persistedMap };
+  }
+
+  if (Object.keys(nextMap).length === 0) {
+    return { [`flags.${MODULE_ID}.-=visibility`]: null };
+  }
+
+  const persistedMap = { ...nextMap };
+  for (const targetId of removedTargetIds) {
+    persistedMap[`-=${targetId}`] = null;
+  }
+  return { [path]: persistedMap };
 }
 
 /**
@@ -81,17 +108,9 @@ export async function setVisibilityMap(token, visibilityMap) {
     }));
   }
   const path = `flags.${MODULE_ID}.visibility`;
-  const updates = {};
   const removedTargetIds = Object.keys(previousMap).filter((id) => !(id in nextMap));
-
-  if (Object.keys(nextMap).length === 0) {
-    updates[`flags.${MODULE_ID}.-=visibility`] = null;
-  } else {
-    updates[path] = nextMap;
-    for (const targetId of removedTargetIds) {
-      updates[`${path}.-=${targetId}`] = null;
-    }
-  }
+  const forcedDeletion = foundry?.data?.operators?.ForcedDeletion ?? null;
+  const updates = buildVisibilityDeletionUpdate(path, nextMap, removedTargetIds, forcedDeletion);
 
   await waitForTokenDocumentUpdateSafe(token);
 

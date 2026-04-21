@@ -114,7 +114,19 @@ export class CoverUIManager {
 
       // Ensure current roll uses selected (or auto) cover via dialog injection
       try {
-        const rollBtnEl = html?.find?.('button.roll')?.[0];
+        const getFirstMatch = (...selectors) => {
+          for (const selector of selectors) {
+            const matches = html?.find?.(selector);
+            const el = matches?.[0];
+            if (el) return el;
+          }
+          return null;
+        };
+        const rollBtnEl = getFirstMatch(
+          'button.roll',
+          'button[type=submit]',
+          'button[type="submit"]',
+        );
         if (rollBtnEl && !rollBtnEl.dataset?.pvCoverBind) {
           rollBtnEl.dataset.pvCoverBind = '1';
           rollBtnEl.addEventListener(
