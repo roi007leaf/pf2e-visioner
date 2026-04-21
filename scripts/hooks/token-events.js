@@ -21,9 +21,6 @@ async function cleanupVisionSharingForDeletedToken(deletedTokenDoc) {
     const visionMasterId = token.document.getFlag(MODULE_ID, 'visionMasterTokenId');
 
     if (visionMasterId === deletedTokenId) {
-      console.log(
-        `[PF2E Visioner] Cleaning up vision sharing for ${token.name} (master token deleted)`,
-      );
 
       try {
         await token.document.unsetFlag(MODULE_ID, 'visionMasterTokenId');
@@ -69,7 +66,7 @@ export async function onTokenCreated(scene, tokenDoc) {
         );
       }
     }
-  } catch (_) {}
+  } catch (_) { }
   setTimeout(async () => {
     await updateTokenVisuals();
     // Add hover tooltip listeners to the new token

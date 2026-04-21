@@ -98,12 +98,6 @@ class AttackRollUseCase extends BaseAutoCoverUseCase {
     if (clonedDefense?.dc) {
       dcObj.value = clonedDefense.dc.value;
       dcObj.statistic = clonedDefense.dc;
-      console.log('PF2E Visioner [AutoCover/AttackRoll]', {
-        msg: 'apply-adjusted-dc-from-target-actor:cloned-defense-applied',
-        targetActorId: targetActor?.id ?? null,
-        dcSlug: dcObj?.slug ?? null,
-        appliedDcValue: dcObj?.value ?? null,
-      });
       return true;
     }
 
