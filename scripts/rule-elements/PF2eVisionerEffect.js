@@ -60,6 +60,7 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
               'modifyDetectionModes',
               'overrideVisibility',
               'overrideCover',
+              'provideCover',
               'modifyActionQualification',
               'modifyLighting',
               'conditionalState',

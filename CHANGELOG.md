@@ -1,5 +1,13 @@
 # Changelog
 
+## [8.0.4] - 2026-04-21
+
+### Fixed
+
+- **Deleted rule-element effects no longer leave stale visibility or cover overrides behind**: Some PF2e effect deletions were skipping Visioner cleanup because the delete hook relied on live `item.rules` instances instead of the persisted `item.system.rules` data. Deleted effect cleanup now reconstructs Visioner operations from item data, removes stale override/cover sources, and clears the matching registry flags reliably.
+- **Rule-element visibility cleanup now removes custom source IDs correctly**: Visibility overrides using a custom `source` value could survive deletion because cleanup matched only the generated rule-element ID. Cleanup now matches both the rule-element ID and any explicit operation source, preventing stale predicate-based visibility overrides from reappearing after movement or recalculation.
+- **`provideCover` rule element is now recognized by the schema**: The operation existed in the implementation and documentation, but was missing from the PF2eVisionerEffect schema choices, so item data using `type: "provideCover"` was rejected before it could run. The schema now accepts `provideCover` correctly.
+
 ## [8.0.3] - 2026-04-21
 
 ### Fixed

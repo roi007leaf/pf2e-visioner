@@ -13,6 +13,7 @@ import { onCanvasReady, onReady } from './lifecycle.js';
 import { registerMovementCostHooks } from './movement-cost.js';
 import { registerTokenHooks } from './token-events.js';
 import { registerUIHooks } from './ui.js';
+import { cleanupDeletedVisionerRuleElements } from '../rule-elements/deleted-item-cleanup.js';
 
 /**
  * Clean up AVS overrides for a defeated actor
@@ -819,7 +820,7 @@ export async function registerHooks() {
       const rules = item.system?.rules || [];
       const hasVisionerRules = rules.some((rule) => rule.key === 'PF2eVisionerEffect');
 
-      if (hasVisionerRules && Array.isArray(item.rules)) {
+      if (hasVisionerRules) {
         const { getLogger } = await import('../utils/logger.js');
         const log = getLogger('RuleElements/Cleanup');
 
@@ -828,53 +829,9 @@ export async function registerHooks() {
           itemName: item.name,
           itemId: item.id,
           tokenCount: tokens.length,
-          ruleElementCount: item.rules.length,
+          ruleElementCount: item.system?.rules?.length || 0,
         }));
-
-        for (const token of tokens) {
-          const registryKey = `item-${item.id}`;
-          const flagRegistry = token.document.getFlag('pf2e-visioner', 'ruleElementRegistry') || {};
-
-          if (!flagRegistry[registryKey]) {
-            log.debug(() => ({
-              msg: 'No registry entry found for effect',
-              tokenName: token.name,
-              registryKey,
-            }));
-            continue;
-          }
-
-          for (const ruleElement of item.rules) {
-            if (ruleElement?.key !== 'PF2eVisionerEffect') {
-              continue;
-            }
-
-            try {
-              log.debug(() => ({
-                msg: 'Removing rule element flags',
-                tokenName: token.name,
-                ruleKey: ruleElement.key,
-                ruleSlug: ruleElement.slug,
-              }));
-
-              if (typeof ruleElement.removeAllFlagsForRuleElement === 'function') {
-                await ruleElement.removeAllFlagsForRuleElement();
-                log.debug(() => ({
-                  msg: 'Successfully removed rule element flags',
-                  tokenName: token.name,
-                  ruleKey: ruleElement.key,
-                }));
-              }
-            } catch (error) {
-              log.warn(() => ({
-                msg: 'Failed to remove flags for rule element on effect deletion',
-                tokenName: token.name,
-                ruleKey: ruleElement?.key,
-                error: error.message,
-              }));
-            }
-          }
-        }
+        await cleanupDeletedVisionerRuleElements(item, tokens, log);
       }
     } catch (e) {
       console.warn('PF2E Visioner | deleteItem cleanup failed:', e);

@@ -2,6 +2,18 @@ import { PredicateHelper } from '../PredicateHelper.js';
 import { SourceTracker } from '../SourceTracker.js';
 
 export class VisibilityOverride {
+  static _matchesAnyCleanupId(sourceId, cleanupIds) {
+    if (!sourceId || !Array.isArray(cleanupIds) || cleanupIds.length === 0) return false;
+    return cleanupIds.some((cleanupId) => {
+      if (!cleanupId) return false;
+      return (
+        sourceId === cleanupId ||
+        sourceId.startsWith(cleanupId + '-') ||
+        cleanupId.startsWith(sourceId + '-')
+      );
+    });
+  }
+
   static async applyVisibilityOverride(operation, subjectToken, options = {}) {
     if (!subjectToken) {
       console.warn('PF2E Visioner | No subject token provided to applyVisibilityOverride');
@@ -226,7 +238,13 @@ export class VisibilityOverride {
     }
 
 
-    if (idToMatch) {
+    const cleanupIds = Array.from(
+      new Set(
+        [ruleElementId, sourceId, idToMatch].filter((id) => typeof id === 'string' && id.length > 0),
+      ),
+    );
+
+    if (cleanupIds.length > 0) {
       const allTokens = canvas.tokens?.placeables.filter((t) => t.actor) || [];
       const { setVisibilityBetween, getVisibilityBetween } = await import(
         '../../stores/visibility-map.js'
@@ -253,11 +271,7 @@ export class VisibilityOverride {
               data.sources = data.sources.filter((s) => {
                 const sourceId = typeof s === 'string' ? s : s?.id;
                 if (!sourceId) return false;
-                // Check if this source should be removed - match exact or prefix
-                const shouldRemove =
-                  sourceId === idToMatch ||
-                  sourceId.startsWith(idToMatch + '-') ||
-                  idToMatch.startsWith(sourceId + '-');
+                const shouldRemove = this._matchesAnyCleanupId(sourceId, cleanupIds);
 
                 return !shouldRemove;
               });
@@ -291,10 +305,7 @@ export class VisibilityOverride {
           const removedSources = stateSource.visibility.sources.filter((s) => {
             const sourceId = typeof s === 'string' ? s : s?.id;
             if (!sourceId) return false;
-            const shouldRemove =
-              sourceId === idToMatch ||
-              sourceId.startsWith(idToMatch + '-') ||
-              idToMatch.startsWith(sourceId + '-');
+            const shouldRemove = this._matchesAnyCleanupId(sourceId, cleanupIds);
 
             return !shouldRemove;
           });
@@ -335,7 +346,7 @@ export class VisibilityOverride {
                 Array.isArray(data?.sources) &&
                 data.sources.some((s) => {
                   const sourceId = typeof s === 'string' ? s : s?.id;
-                  return sourceId === idToMatch || sourceId?.startsWith(idToMatch + '-');
+                  return this._matchesAnyCleanupId(sourceId, cleanupIds);
                 })
               ) {
                 hasSources = true;
@@ -360,11 +371,7 @@ export class VisibilityOverride {
             if (Array.isArray(data?.sources) && data.sources.length > 0) {
               const matchingSources = data.sources.filter((s) => {
                 const sourceId = typeof s === 'string' ? s : s?.id;
-                return (
-                  sourceId === idToMatch ||
-                  sourceId?.startsWith(idToMatch + '-') ||
-                  idToMatch.startsWith(sourceId + '-')
-                );
+                return this._matchesAnyCleanupId(sourceId, cleanupIds);
               });
               if (matchingSources.length > 0) {
                 totalMatchingSourcesFound += matchingSources.length;
@@ -376,11 +383,7 @@ export class VisibilityOverride {
         if (stateSource.visibility?.sources) {
           const matchingSources = stateSource.visibility.sources.filter((s) => {
             const sourceId = typeof s === 'string' ? s : s?.id;
-            return (
-              sourceId === idToMatch ||
-              sourceId?.startsWith(idToMatch + '-') ||
-              idToMatch.startsWith(sourceId + '-')
-            );
+            return this._matchesAnyCleanupId(sourceId, cleanupIds);
           });
           if (matchingSources.length > 0) {
             totalMatchingSourcesFound += matchingSources.length;
@@ -433,11 +436,7 @@ export class VisibilityOverride {
             if (Array.isArray(data?.sources)) {
               const matching = data.sources.filter((s) => {
                 const sourceId = typeof s === 'string' ? s : s?.id;
-                return (
-                  sourceId === idToMatch ||
-                  sourceId?.startsWith(idToMatch + '-') ||
-                  idToMatch.startsWith(sourceId + '-')
-                );
+                return this._matchesAnyCleanupId(sourceId, cleanupIds);
               });
               if (matching.length > 0) {
                 postDelaySourcesFound += matching.length;

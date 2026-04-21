@@ -227,6 +227,85 @@ describe('SourceTracker', () => {
 
 
 describe('Rule Element Integration', () => {
+  it('should include provideCover in PF2eVisionerEffect schema operation choices', async () => {
+    const baseRuleElementClass = class {
+      static defineSchema() {
+        return {};
+      }
+    };
+
+    class MockAnyField {
+      constructor(options = {}) {
+        Object.assign(this, options);
+      }
+    }
+    class MockArrayField {
+      constructor(element, options = {}) {
+        this.element = element;
+        Object.assign(this, options);
+      }
+    }
+    class MockSchemaField {
+      constructor(schema, options = {}) {
+        this.schema = schema;
+        Object.assign(this, options);
+      }
+    }
+    class MockStringField {
+      constructor(options = {}) {
+        Object.assign(this, options);
+      }
+    }
+    class MockNumberField {
+      constructor(options = {}) {
+        Object.assign(this, options);
+      }
+    }
+    class MockBooleanField {
+      constructor(options = {}) {
+        Object.assign(this, options);
+      }
+    }
+    class MockObjectField {
+      constructor(options = {}) {
+        Object.assign(this, options);
+      }
+    }
+    class MockPredicateField {
+      constructor(options = {}) {
+        Object.assign(this, options);
+      }
+    }
+
+    const fields = {
+      AnyField: MockAnyField,
+      ArrayField: MockArrayField,
+      SchemaField: MockSchemaField,
+      StringField: MockStringField,
+      NumberField: MockNumberField,
+      BooleanField: MockBooleanField,
+      ObjectField: MockObjectField,
+    };
+
+    global.game.pf2e = global.game.pf2e || {};
+    global.game.pf2e.RuleElements = global.game.pf2e.RuleElements || {};
+    global.game.pf2e.RuleElements.builtin = global.game.pf2e.RuleElements.builtin || {};
+    global.game.pf2e.RuleElements.builtin.RollOption = {
+      defineSchema: () => ({
+        predicate: { constructor: MockPredicateField },
+      }),
+    };
+
+    const { createPF2eVisionerEffectRuleElement } = await import(
+      '../../../scripts/rule-elements/PF2eVisionerEffect.js'
+    );
+    const EffectRuleElement = createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields);
+    const schema = EffectRuleElement.defineSchema();
+    const operationChoices = schema.operations.element.schema.type.choices;
+
+    expect(operationChoices).toContain('provideCover');
+  });
+
   it('should have all required operation types', () => {
     const expectedOperations = [
       'modifySenses',
