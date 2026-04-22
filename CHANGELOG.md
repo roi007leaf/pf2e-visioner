@@ -1,5 +1,11 @@
 # Changelog
 
+## [8.0.5] - 2026-04-22
+
+### Fixed
+
+- **Saving throws and skill checks no longer get stuck in PF2E check dialogs**: `8.0.4` expanded Visioner's dialog callback binding to generic submit buttons so attack-roll cover overrides would keep working on Foundry V14, but saving throw and skill-check dialogs use that same submit button for the actual roll. Visioner now limits the submit-button fallback to attack contexts only, preserving V14 attack support without blocking non-attack rolls.
+
 ## [8.0.4] - 2026-04-21
 
 ### Fixed

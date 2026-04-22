@@ -13,6 +13,16 @@ export class CoverUIManager {
     this.autoCoverSystem = autoCoverSystem;
   }
 
+  _shouldUseSubmitButtonFallback(dialog) {
+    const ctx = dialog?.context ?? {};
+
+    if (ctx.type === 'attack-roll' || ctx.type === 'strike-attack-roll') return true;
+    if (ctx.type === 'action-check' && ctx.action === 'attack') return true;
+
+    const domains = Array.isArray(ctx.domains) ? ctx.domains : [];
+    return domains.includes('attack') || domains.includes('attack-roll');
+  }
+
   /**
    * Injects cover override UI into a roll/dialog (buttons + roll binding)
    * @param {Dialog} dialog - The check modifiers dialog
@@ -122,11 +132,11 @@ export class CoverUIManager {
           }
           return null;
         };
-        const rollBtnEl = getFirstMatch(
-          'button.roll',
-          'button[type=submit]',
-          'button[type="submit"]',
-        );
+        const selectors = ['button.roll'];
+        if (this._shouldUseSubmitButtonFallback(dialog)) {
+          selectors.push('button[type=submit]', 'button[type="submit"]');
+        }
+        const rollBtnEl = getFirstMatch(...selectors);
         if (rollBtnEl && !rollBtnEl.dataset?.pvCoverBind) {
           rollBtnEl.dataset.pvCoverBind = '1';
           rollBtnEl.addEventListener(
