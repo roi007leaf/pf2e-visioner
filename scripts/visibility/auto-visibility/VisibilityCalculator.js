@@ -1,7 +1,7 @@
 /**
  * VisibilityCalculator - Zero-delay visibility calculation
  * Bypasses all throttling and circuit breaking for immediate processing
- * 
+ *
  * NOTE: This class now uses the StatelessVisibilityCalculator as its backend
  * via the adapter pattern, maintaining the same interface while using pure
  * function-based calculation logic.
@@ -56,12 +56,7 @@ export class VisibilityCalculator {
    * @param {SpatialAnalysisService} spatialAnalyzer - Optional spatial analysis service for optimizations
    * @param {ExclusionManager} exclusionManager - Optional exclusion manager for token exclusions
    */
-  initialize(
-    lightingCalculator,
-    visionAnalyzer,
-    ConditionManager,
-    lightingRasterService,
-  ) {
+  initialize(lightingCalculator, visionAnalyzer, ConditionManager, lightingRasterService) {
     this.#lightingCalculator = lightingCalculator;
     this.#visionAnalyzer = visionAnalyzer;
     this.#conditionManager = ConditionManager;
@@ -166,7 +161,7 @@ export class VisibilityCalculator {
       observerId: observer?.id,
       targetName: target?.name,
       targetId: target?.id,
-      hasOptions: !!options
+      hasOptions: !!options,
     }));
 
     // Use stateless calculator via adapter
@@ -177,9 +172,9 @@ export class VisibilityCalculator {
         lightingCalculator: this.#lightingCalculator,
         visionAnalyzer: this.#visionAnalyzer,
         conditionManager: this.#conditionManager,
-        lightingRasterService: this.#lightingRasterService
+        lightingRasterService: this.#lightingRasterService,
       },
-      options
+      options,
     );
 
     log.debug(() => ({
@@ -187,7 +182,7 @@ export class VisibilityCalculator {
       observerName: observer?.name,
       targetName: target?.name,
       state: result.state,
-      detection: result.detection
+      detection: result.detection,
     }));
 
     try {
@@ -198,7 +193,6 @@ export class VisibilityCalculator {
 
     return result.state;
   }
-
 
   /**
    * Clear caches in all components

@@ -86,13 +86,15 @@ describe('API AVS cleanup integration', () => {
     expect(removeSpy).toHaveBeenCalledWith('A', 'B');
     expect(removeSpy).toHaveBeenCalledWith('B', 'A');
 
-    // It should attempt to cleanup flags; when present, an explicit -= removal update is sent
+    // It should attempt to cleanup flags without V14 legacy deletion keys.
     const maybeCall = canvas.scene.updateEmbeddedDocuments.mock.calls.find((c) => c[1]?.some?.((u) => u._id === 'C'));
     if (maybeCall) {
       const updateForC = maybeCall[1].find((u) => u._id === 'C');
-      // Either namespace cleared or explicit key removal is present
       const keys = Object.keys(updateForC);
-      expect(keys.some((k) => k === 'flags.pf2e-visioner' || k.includes('flags.pf2e-visioner.-=avs-override'))).toBe(true);
+      expect(keys.some((k) => k.includes('.-='))).toBe(false);
+      expect(
+        keys.some((k) => k === 'flags.pf2e-visioner' || k.includes('flags.pf2e-visioner.avs-override')),
+      ).toBe(true);
     }
   });
 });

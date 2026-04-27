@@ -306,6 +306,123 @@ describe('Wall Coverage Percentage Calculation', () => {
   });
 
   describe('integration with _evaluateWallsCover', () => {
+    test('detectBetweenTokens should apply wall thresholds when center ray is clear but target samples are blocked', () => {
+      global.game.settings.get = jest.fn((module, setting) => {
+        if (setting === 'wallCoverStandardThreshold') return 50;
+        if (setting === 'wallCoverGreaterThreshold') return 70;
+        if (setting === 'wallCoverAllowGreater') return true;
+        if (setting === 'autoCoverTokenIntersectionMode') return 'coverage';
+        return false;
+      });
+
+      const attacker = global.createMockToken({
+        id: 'attacker',
+        x: 0,
+        y: 0,
+        width: 1,
+        height: 1,
+        center: { x: 50, y: 50 },
+      });
+      const target = global.createMockToken({
+        id: 'target',
+        x: 200,
+        y: 200,
+        width: 1,
+        height: 1,
+        center: { x: 250, y: 250 },
+      });
+
+      global.canvas.tokens.placeables = [attacker, target];
+      global.canvas.walls.objects.children = [
+        {
+          document: {
+            id: 'edge-cover-wall',
+            sight: 1,
+            door: 0,
+            ds: 0,
+            dir: 0,
+            getFlag: jest.fn(() => null),
+          },
+          coords: [150, 180, 300, 180],
+        },
+      ];
+
+      jest.spyOn(coverDetector, '_checkRuleElementCover').mockReturnValue(null);
+      jest.spyOn(coverDetector, '_checkWallCoverOverrides').mockReturnValue(null);
+      jest.spyOn(coverDetector, '_analyzeSegmentObstructions').mockReturnValue({
+        hasBlockingTerrain: false,
+        hasCreatures: false,
+        blockingWalls: [],
+        intersectingCreatures: [],
+        totalBlockedLength: 0,
+        segmentLength: 280,
+      });
+      jest.spyOn(coverDetector, '_findNearestTokenToPoint').mockReturnValue(target);
+      jest.spyOn(coverDetector, '_estimateWallCoveragePercent').mockReturnValue(80);
+      jest.spyOn(coverDetector, '_applyLevelsCoverAdjustment').mockImplementation((att, tgt, cover) => cover);
+      jest.spyOn(coverDetector, '_applyRegionCover').mockImplementation((p1, p2, cover) => cover);
+
+      const result = coverDetector.detectBetweenTokens(attacker, target);
+
+      expect(result).toBe('greater');
+      expect(coverDetector._estimateWallCoveragePercent).toHaveBeenCalledWith(
+        attacker.center,
+        target,
+        expect.any(Object),
+        expect.any(Object),
+        expect.any(Object),
+      );
+    });
+
+    test('detectBetweenTokens should detect wall cover when walls are available only as placeables', () => {
+      global.game.settings.get = jest.fn((module, setting) => {
+        if (setting === 'wallCoverStandardThreshold') return 50;
+        if (setting === 'wallCoverGreaterThreshold') return 70;
+        if (setting === 'wallCoverAllowGreater') return true;
+        if (setting === 'autoCoverTokenIntersectionMode') return 'coverage';
+        return false;
+      });
+
+      const attacker = global.createMockToken({
+        id: 'attacker',
+        x: 0,
+        y: 0,
+        width: 1,
+        height: 1,
+        center: { x: 50, y: 50 },
+      });
+      const target = global.createMockToken({
+        id: 'target',
+        x: 200,
+        y: 0,
+        width: 1,
+        height: 1,
+        center: { x: 250, y: 50 },
+      });
+
+      const wall = {
+        document: {
+          id: 'placeable-wall',
+          sight: 1,
+          door: 0,
+          ds: 0,
+          dir: 0,
+          getFlag: jest.fn(() => null),
+        },
+        coords: [150, -50, 150, 150],
+      };
+
+      global.canvas.tokens.placeables = [attacker, target];
+      global.canvas.walls = {
+        placeables: [wall],
+        objects: { children: [] },
+      };
+
+      const result = coverDetector.detectBetweenTokens(attacker, target);
+
+      expect(result).toBe('greater');
+    });
+
     test('should use improved percentage calculation in wall cover evaluation', () => {
       // Mock settings
       global.game.settings.get = jest.fn((module, setting) => {
@@ -417,9 +534,10 @@ describe('Wall Coverage Percentage Calculation', () => {
       const targetPos = { x: 250, y: 250 };
 
       // Test different percentage values
-      // Note: When walls are detected, minimum cover is 'standard' even if percentage is low
+      // Measured wall coverage follows thresholds. If sampling cannot measure coverage
+      // at all, _evaluateWallsCover still falls back to standard for a detected wall.
       const testCases = [
-        { percentage: 30, expectedCover: 'standard' }, // Below standard threshold, but walls detected = standard minimum
+        { percentage: 30, expectedCover: 'none' }, // Below standard threshold
         { percentage: 50, expectedCover: 'standard' }, // Above standard, below greater
         { percentage: 80, expectedCover: 'greater' }, // Above greater threshold
       ];

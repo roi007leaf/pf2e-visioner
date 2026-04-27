@@ -76,6 +76,9 @@ export class BatchProcessor {
       allTokenCount: allTokens.length,
       changedTokenCount: changedTokenIds.size,
       changedTokens: Array.from(changedTokenIds),
+      skipPrecomputedLOS: !!calcOptions?.skipPrecomputedLOS,
+      skipViewportFilter: !!calcOptions?.skipViewportFilter,
+      burstLosMemoSize: calcOptions?.burstLosMemo?.size ?? 0,
     }));
 
     // Detailed timing collection for performance analysis
@@ -234,7 +237,7 @@ export class BatchProcessor {
           msg: 'skipping-all-precomputed-los',
           reason: isWindowMinimized ? 'window-minimized' : 'batch-after-movement',
         }));
-      } catch { }
+      } catch {}
     } else {
       // Only precompute LOS if not skipping
       const animatingTokenIds = new Set();
@@ -253,7 +256,7 @@ export class BatchProcessor {
               isAnimating,
               isDragging,
             }));
-          } catch { }
+          } catch {}
         }
       }
 
@@ -264,7 +267,7 @@ export class BatchProcessor {
             animatingCount: animatingTokenIds.size,
             animatingTokens: Array.from(animatingTokenIds),
           }));
-        } catch { }
+        } catch {}
       }
 
       for (let i = 0; i < allTokens.length; i++) {
@@ -425,7 +428,8 @@ export class BatchProcessor {
 
         // Early short-circuit: if both directional vis states are in global cache and equal originals, skip pair entirely
         // Skip global cache when forcing fresh computation due to lighting changes
-        const skipGlobalVisCache = LightingPrecomputer.isForcingFreshComputation();
+        const skipGlobalVisCache =
+          LightingPrecomputer.isForcingFreshComputation() || !!calcOptions?.skipPrecomputedLOS;
         {
           const vKey1 = posCache.makeDirectionalKey(aId, posKeyA, bId, posKeyB);
           const vKey2 = posCache.makeDirectionalKey(bId, posKeyB, aId, posKeyA);
@@ -474,12 +478,13 @@ export class BatchProcessor {
           let directionalLos = batchLosCache.get(cacheKey);
           if (directionalLos !== undefined) {
             breakdown.losCacheHits++;
+
             return directionalLos;
           }
 
           breakdown.losCacheMisses++;
 
-          const burstLos = calcOptions?.burstLosMemo;
+          const burstLos = calcOptions?.skipPrecomputedLOS ? null : calcOptions?.burstLosMemo;
           if (burstLos && burstLos.has(cacheKey)) {
             directionalLos = burstLos.get(cacheKey);
             breakdown.losCacheHits++;
@@ -500,25 +505,31 @@ export class BatchProcessor {
           }
 
           if (directionalLos === undefined) {
-            directionalLos = this.visionAnalyzer.hasLineOfSight(observerToken, targetToken, 'sight');
+            directionalLos = this.visionAnalyzer.hasLineOfSight(
+              observerToken,
+              targetToken,
+              'sight',
+            );
 
             if (this.globalLosCache) {
               this.globalLosCache.set(cacheKey, directionalLos);
             }
             try {
-              if (calcOptions?.burstLosMemo) calcOptions.burstLosMemo.set(cacheKey, directionalLos);
-            } catch { }
+              if (!calcOptions?.skipPrecomputedLOS && calcOptions?.burstLosMemo) {
+                calcOptions.burstLosMemo.set(cacheKey, directionalLos);
+              }
+            } catch {}
           }
 
           batchLosCache.set(cacheKey, directionalLos);
+
           return directionalLos;
         };
 
         const los1 = getDirectionalLos(changedToken, otherToken, losKey1);
         const los2 = getDirectionalLos(otherToken, changedToken, losKey2);
         const distance =
-          Math.sqrt(Math.pow(posA.x - posB.x, 2) + Math.pow(posA.y - posB.y, 2)) /
-          canvas.grid.size;
+          Math.sqrt(Math.pow(posA.x - posB.x, 2) + Math.pow(posA.y - posB.y, 2)) / canvas.grid.size;
         let skipVisibilityCalc1 = false;
         let skipVisibilityCalc2 = false;
 
@@ -596,7 +607,11 @@ export class BatchProcessor {
           }
           effectiveVisibility1 = visibility1;
 
-          const ruleElementResult1 = RuleElementChecker.checkRuleElements(changedToken, otherToken, visibility1);
+          const ruleElementResult1 = RuleElementChecker.checkRuleElements(
+            changedToken,
+            otherToken,
+            visibility1,
+          );
           if (ruleElementResult1) {
             effectiveVisibility1 = ruleElementResult1.state;
           }
@@ -648,7 +663,11 @@ export class BatchProcessor {
           }
           effectiveVisibility2 = visibility2;
 
-          const ruleElementResult2 = RuleElementChecker.checkRuleElements(otherToken, changedToken, visibility2);
+          const ruleElementResult2 = RuleElementChecker.checkRuleElements(
+            otherToken,
+            changedToken,
+            visibility2,
+          );
           if (ruleElementResult2) {
             effectiveVisibility2 = ruleElementResult2.state;
           }

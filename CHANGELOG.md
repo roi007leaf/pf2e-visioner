@@ -1,5 +1,18 @@
 # Changelog
 
+## [8.0.6] - 2026-04-27
+
+### Fixed
+
+- **Wall auto-cover thresholds now apply when walls obscure token edges but not the center ray**: Wall cover detection now runs target coverage sampling whenever scene walls are present, so Foundry V14 wall threshold settings can produce standard or greater cover even when the exact center-to-center line is clear.
+- **Wall auto-cover detects Foundry V14 wall placeables reliably**: Wall cover checks now read both `canvas.walls.objects.children` and `canvas.walls.placeables`, preventing always-`none` cover results when Foundry exposes walls only through the placeables collection.
+- **Wall auto-cover no longer skips real wall intersections because of Levels' broad collision pre-check**: Cover detection now evaluates intersected walls directly with per-wall height checks, reads Foundry V14 wall coordinates from document and edge data, and treats measured wall coverage thresholds as authoritative instead of always falling back to standard cover.
+- **Clear selected token data no longer emits Foundry V14 forced-deletion warnings**: Token flag cleanup now uses `foundry.data.operators.ForcedDeletion` when available and falls back to legacy `-=` syntax only on older Foundry versions.
+- **Movement through wall boundaries now refreshes LOS immediately**: Movement batches no longer reuse burst LOS memo entries or stale global visibility cache hits, perception now rebuilds vision after hidden/undetected effect cleanup, and observed/concealed batch updates also remove legacy off-guard effects so tokens become visible immediately after moving back into line of sight.
+- **AVS movement re-detection no longer repeats stale visibility writes**: Visibility map cleanup now uses Foundry V14 dotted forced-deletion paths for individual target entries, preventing old `undetected` values from surviving an `observed` update.
+- **AVS movement batches now keep the latest duplicate pair result**: When the same observer-target pair is recalculated more than once during a movement batch, the final result now wins instead of keeping an earlier stale state.
+- **Wall quick cover icons use cover colors again**: The wall quick settings dialog now uses the same cover icon color utility classes as the wall manager, including the missing lesser-cover utility.
+
 ## [8.0.5] - 2026-04-22
 
 ### Fixed

@@ -28,6 +28,28 @@ import {
 } from './utils.js';
 import { autoVisibilitySystem, ConditionManager } from './visibility/auto-visibility/index.js';
 
+function getForcedDeletion() {
+  return foundry?.data?.operators?.ForcedDeletion ?? null;
+}
+
+function setFlagDeletion(update, flagKey) {
+  const forcedDeletion = getForcedDeletion();
+  if (forcedDeletion) {
+    update[`flags.${MODULE_ID}.${flagKey}`] = forcedDeletion;
+  } else {
+    update[`flags.${MODULE_ID}.-=${flagKey}`] = null;
+  }
+}
+
+function setModuleFlagsDeletion(update) {
+  const forcedDeletion = getForcedDeletion();
+  if (forcedDeletion) {
+    update[`flags.${MODULE_ID}`] = forcedDeletion;
+  } else {
+    update[`flags.-=${MODULE_ID}`] = null;
+  }
+}
+
 /**
  * Main API class for the module
  */
@@ -1801,10 +1823,11 @@ export class Pf2eVisionerApi {
       const tokens = canvas.tokens?.placeables ?? [];
       const updates = tokens
         .filter((t) => t.document.getFlag('pf2e-visioner', 'sneak-active'))
-        .map((t) => ({
-          _id: t.id,
-          [`flags.${MODULE_ID}.-=sneak-active`]: null,
-        }));
+        .map((t) => {
+          const update = { _id: t.id };
+          setFlagDeletion(update, 'sneak-active');
+          return update;
+        });
 
       if (updates.length && scene.updateEmbeddedDocuments) {
         await scene.updateEmbeddedDocuments('Token', updates, { diff: false });
@@ -1857,21 +1880,21 @@ export class Pf2eVisionerApi {
       }
 
       // For tokens WITHOUT rule elements, remove all flags completely
-      const updates = tokensWithoutRuleElements.map((t) => ({
-        _id: t.id,
-        [`flags.${MODULE_ID}`]: null,
-        [`flags.-=${MODULE_ID}`]: null,
-      }));
+      const updates = tokensWithoutRuleElements.map((t) => {
+        const update = { _id: t.id };
+        setModuleFlagsDeletion(update);
+        return update;
+      });
 
       // For tokens WITH rule elements, only remove manual override flags, keep rule element flags
       const selectiveUpdates = tokensWithRuleElements.map((t) => {
         const update = { _id: t.id };
 
         // Remove only manual override flags, NOT rule element managed flags
-        update[`flags.${MODULE_ID}.-=coverOverride`] = null;
-        update[`flags.${MODULE_ID}.-=waitingSneak`] = null;
-        update[`flags.${MODULE_ID}.-=sneak-speed-effect-id`] = null;
-        update[`flags.${MODULE_ID}.-=invisibility`] = null;
+        setFlagDeletion(update, 'coverOverride');
+        setFlagDeletion(update, 'waitingSneak');
+        setFlagDeletion(update, 'sneak-speed-effect-id');
+        setFlagDeletion(update, 'invisibility');
 
         // Clear visibility/cover maps (these get recalculated by AVS)
         update[`flags.${MODULE_ID}.visibility`] = {};
@@ -1909,7 +1932,7 @@ export class Pf2eVisionerApi {
                 // Build explicit removal updates for stubborn flags
                 const explicitUpdate = { _id: t.id };
                 Object.keys(flags).forEach((flagKey) => {
-                  explicitUpdate[`flags.${MODULE_ID}.-=${flagKey}`] = null;
+                  setFlagDeletion(explicitUpdate, flagKey);
                 });
                 explicitUpdates.push(explicitUpdate);
               }
@@ -2179,16 +2202,17 @@ export class Pf2eVisionerApi {
 
       // 1.5) Additional safety: explicitly clear ALL visioner flags from selected tokens
       try {
-        const flagUpdates = tokens.map((t) => ({
-          _id: t.id,
-          [`flags.${MODULE_ID}.-=sneak-active`]: null,
-          [`flags.${MODULE_ID}.-=waitingSneak`]: null,
-          [`flags.${MODULE_ID}.-=invisibility`]: null,
-          [`flags.${MODULE_ID}.-=coverOverride`]: null,
-          [`flags.${MODULE_ID}.-=visibility`]: null,
-          [`flags.${MODULE_ID}.-=cover`]: null,
-          [`flags.${MODULE_ID}.-=sneak-speed-effect-id`]: null,
-        }));
+        const flagUpdates = tokens.map((t) => {
+          const update = { _id: t.id };
+          setFlagDeletion(update, 'sneak-active');
+          setFlagDeletion(update, 'waitingSneak');
+          setFlagDeletion(update, 'invisibility');
+          setFlagDeletion(update, 'coverOverride');
+          setFlagDeletion(update, 'visibility');
+          setFlagDeletion(update, 'cover');
+          setFlagDeletion(update, 'sneak-speed-effect-id');
+          return update;
+        });
 
         // Also clear any AVS override flags
         const allTokens = canvas.tokens?.placeables ?? [];
@@ -2201,7 +2225,7 @@ export class Pf2eVisionerApi {
           // Find and remove any AVS override flags
           for (const flagKey of Object.keys(flags)) {
             if (flagKey.startsWith('avs-override-')) {
-              additionalUpdates[`flags.${MODULE_ID}.-=${flagKey}`] = null;
+              setFlagDeletion(additionalUpdates, flagKey);
             }
           }
 
@@ -2345,7 +2369,7 @@ export class Pf2eVisionerApi {
               // Extract the referenced token ID from the flag key
               const match = flagKey.match(/^avs-override-(?:to|from)-(.+)$/);
               if (match && purgedTokenIds.includes(match[1])) {
-                updates[`flags.${MODULE_ID}.-=${flagKey}`] = null;
+                setFlagDeletion(updates, flagKey);
                 hasUpdates = true;
               }
             }

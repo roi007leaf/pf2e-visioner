@@ -103,10 +103,7 @@ describe('Visibility Map Functions', () => {
 
       await setVisibilityMap(mockObserver, visibilityMap);
 
-      expect(mockObserver.document.update).toHaveBeenCalledWith(
-        { 'flags.pf2e-visioner.visibility': visibilityMap },
-        { diff: false, render: false, animate: false },
-      );
+      expect(mockObserver.document.setFlag).toHaveBeenCalledWith('pf2e-visioner', 'visibility', visibilityMap);
     });
 
     test('should not persist observed entries in visibility map', async () => {
@@ -114,10 +111,7 @@ describe('Visibility Map Functions', () => {
 
       await setVisibilityMap(mockObserver, { target1: 'hidden', target2: 'observed' });
 
-      expect(mockObserver.document.update).toHaveBeenCalledWith(
-        { 'flags.pf2e-visioner.visibility': { target1: 'hidden' } },
-        { diff: false, render: false, animate: false },
-      );
+      expect(mockObserver.document.setFlag).toHaveBeenCalledWith('pf2e-visioner', 'visibility', { target1: 'hidden' });
     });
 
     test('should clear stored visibility flag when map becomes empty', async () => {
@@ -126,18 +120,14 @@ describe('Visibility Map Functions', () => {
 
       await setVisibilityMap(mockObserver, {});
 
-      expect(mockObserver.document.update).toHaveBeenCalledWith(
-        {
-          'flags.pf2e-visioner.visibility': global.foundry.data.operators.ForcedDeletion,
-        },
-        { diff: false, render: false, animate: false },
-      );
+      expect(mockObserver.document.unsetFlag).toHaveBeenCalledWith('pf2e-visioner', 'visibility');
     });
 
     test('should fall back to legacy whole-flag deletion syntax when ForcedDeletion operator is unavailable', async () => {
       global.game.user.isGM = true;
       const originalForcedDeletion = global.foundry.data.operators.ForcedDeletion;
       global.foundry.data.operators.ForcedDeletion = undefined;
+      mockObserver.document.unsetFlag = undefined;
       mockObserver.document.getFlag.mockReturnValue({ target1: 'hidden' });
 
       await setVisibilityMap(mockObserver, {});
@@ -167,19 +157,15 @@ describe('Visibility Map Functions', () => {
       mockObserver.document.getFlag.mockImplementation((moduleId, key) => flags[moduleId]?.[key] ?? null);
       mockObserver.document.setFlag.mockImplementation(async (moduleId, key, value) => {
         if (!flags[moduleId]) flags[moduleId] = {};
-        const current = flags[moduleId][key] ?? {};
-        flags[moduleId][key] = { ...current, ...value };
+        flags[moduleId][key] = value;
+        return true;
+      });
+      mockObserver.document.unsetFlag.mockImplementation(async (moduleId, key) => {
+        delete flags[moduleId]?.[key];
         return true;
       });
       mockObserver.document.update.mockImplementation(async (updates) => {
-        const visibility = flags['pf2e-visioner']?.visibility ?? {};
-
         for (const [path, value] of Object.entries(updates)) {
-          if (path === 'flags.pf2e-visioner.visibility') {
-            flags['pf2e-visioner'].visibility = { ...visibility, ...value };
-            continue;
-          }
-
           if (
             path === 'flags.pf2e-visioner.visibility' &&
             value === global.foundry.data.operators.ForcedDeletion
@@ -189,11 +175,16 @@ describe('Visibility Map Functions', () => {
           }
 
           if (path === 'flags.pf2e-visioner.visibility' && value && typeof value === 'object') {
-            for (const [targetId, targetValue] of Object.entries(value)) {
-              if (targetValue === global.foundry.data.operators.ForcedDeletion) {
-                delete flags['pf2e-visioner'].visibility[targetId];
-              }
-            }
+            const visibility = flags['pf2e-visioner']?.visibility ?? {};
+            flags['pf2e-visioner'].visibility = { ...visibility, ...value };
+            continue;
+          }
+
+          if (
+            path.startsWith('flags.pf2e-visioner.visibility.') &&
+            value === global.foundry.data.operators.ForcedDeletion
+          ) {
+            delete flags['pf2e-visioner'].visibility[path.split('.').at(-1)];
           }
         }
 
@@ -202,6 +193,8 @@ describe('Visibility Map Functions', () => {
 
       await setVisibilityMap(mockObserver, { keep: 'undetected' });
 
+      expect(mockObserver.document.unsetFlag).toHaveBeenCalledWith('pf2e-visioner', 'visibility');
+      expect(mockObserver.document.setFlag).toHaveBeenCalledWith('pf2e-visioner', 'visibility', { keep: 'undetected' });
       expect(getVisibilityMap(mockObserver)).toEqual({ keep: 'undetected' });
     });
 
@@ -209,6 +202,8 @@ describe('Visibility Map Functions', () => {
       global.game.user.isGM = true;
       const originalForcedDeletion = global.foundry.data.operators.ForcedDeletion;
       global.foundry.data.operators.ForcedDeletion = undefined;
+      mockObserver.document.unsetFlag = undefined;
+      mockObserver.document.setFlag = undefined;
 
       const flags = {
         'pf2e-visioner': {
@@ -222,16 +217,13 @@ describe('Visibility Map Functions', () => {
       mockObserver.document.getFlag.mockImplementation((moduleId, key) => flags[moduleId]?.[key] ?? null);
       mockObserver.document.update.mockImplementation(async (updates) => {
         for (const [path, value] of Object.entries(updates)) {
+          if (path === 'flags.pf2e-visioner.-=visibility') {
+            delete flags['pf2e-visioner'].visibility;
+            continue;
+          }
+
           if (path === 'flags.pf2e-visioner.visibility' && value && typeof value === 'object') {
-            const current = flags['pf2e-visioner'].visibility ?? {};
-            const next = { ...current, ...value };
-            for (const key of Object.keys(next)) {
-              if (key.startsWith('-=')) {
-                delete next[key.slice(2)];
-                delete next[key];
-              }
-            }
-            flags['pf2e-visioner'].visibility = next;
+            flags['pf2e-visioner'].visibility = value;
           }
         }
 
@@ -240,13 +232,16 @@ describe('Visibility Map Functions', () => {
 
       await setVisibilityMap(mockObserver, { keep: 'undetected' });
 
-      expect(mockObserver.document.update).toHaveBeenCalledWith(
+      expect(mockObserver.document.update).toHaveBeenNthCalledWith(
+        1,
         {
-          'flags.pf2e-visioner.visibility': {
-            keep: 'undetected',
-            '-=remove': null,
-          },
+          'flags.pf2e-visioner.-=visibility': null,
         },
+        { diff: false, render: false, animate: false },
+      );
+      expect(mockObserver.document.update).toHaveBeenNthCalledWith(
+        2,
+        { 'flags.pf2e-visioner.visibility': { keep: 'undetected' } },
         { diff: false, render: false, animate: false },
       );
       expect(getVisibilityMap(mockObserver)).toEqual({ keep: 'undetected' });
@@ -272,10 +267,7 @@ describe('Visibility Map Functions', () => {
       await jest.advanceTimersByTimeAsync(50);
       await updatePromise;
 
-      expect(mockObserver.document.update).toHaveBeenCalledWith(
-        { 'flags.pf2e-visioner.visibility': { target1: 'hidden' } },
-        { diff: false, render: false, animate: false },
-      );
+      expect(mockObserver.document.setFlag).toHaveBeenCalledWith('pf2e-visioner', 'visibility', { target1: 'hidden' });
     });
   });
 
@@ -300,10 +292,7 @@ describe('Visibility Map Functions', () => {
 
       await setVisibilityBetween(mockObserver, mockTarget, 'hidden');
 
-      expect(mockObserver.document.update).toHaveBeenCalledWith(
-        { 'flags.pf2e-visioner.visibility': { target: 'hidden' } },
-        { diff: false, render: false, animate: false },
-      );
+      expect(mockObserver.document.setFlag).toHaveBeenCalledWith('pf2e-visioner', 'visibility', { target: 'hidden' });
     });
 
     test('should handle ephemeral update errors gracefully', async () => {
@@ -324,18 +313,14 @@ describe('Visibility Map Functions', () => {
 
       await setVisibilityBetween(mockObserver, mockTarget, 'observed', { skipEphemeralUpdate: true });
 
-      expect(mockObserver.document.update).toHaveBeenCalledWith(
-        {
-          'flags.pf2e-visioner.visibility': global.foundry.data.operators.ForcedDeletion,
-        },
-        { diff: false, render: false, animate: false },
-      );
+      expect(mockObserver.document.unsetFlag).toHaveBeenCalledWith('pf2e-visioner', 'visibility');
     });
 
     test('should use legacy deletion syntax for observed state when ForcedDeletion operator is unavailable', async () => {
       global.game.user.isGM = true;
       const originalForcedDeletion = global.foundry.data.operators.ForcedDeletion;
       global.foundry.data.operators.ForcedDeletion = undefined;
+      mockObserver.document.unsetFlag = undefined;
       mockObserver.document.getFlag.mockReturnValue({ target: 'hidden' });
 
       await setVisibilityBetween(mockObserver, mockTarget, 'observed', { skipEphemeralUpdate: true });
@@ -356,10 +341,7 @@ describe('Visibility Map Functions', () => {
 
       await setVisibilityBetween(mockObserver, mockTarget, 'hidden', { skipEphemeralUpdate: true });
 
-      expect(mockObserver.document.update).toHaveBeenCalledWith(
-        { 'flags.pf2e-visioner.visibility': { target: 'hidden' } },
-        { diff: false, render: false, animate: false },
-      );
+      expect(mockObserver.document.setFlag).toHaveBeenCalledWith('pf2e-visioner', 'visibility', { target: 'hidden' });
     });
   });
 

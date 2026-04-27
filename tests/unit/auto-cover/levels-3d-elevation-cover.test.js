@@ -77,6 +77,33 @@ describe('Levels 3D elevation cover detection', () => {
       expect(result.blockingWalls).toHaveLength(0);
     });
 
+    test('should not skip normal walls only because Levels API says no 3D collision', () => {
+      global.CONFIG.Levels.API.testCollision.mockReturnValue(false);
+
+      const mockWall = {
+        document: {
+          id: 'normal-wall',
+          sight: 1,
+          door: 0,
+          ds: 0,
+          dir: 0,
+          getFlag: jest.fn(() => null),
+        },
+        coords: [125, 0, 125, 250],
+      };
+      global.canvas.walls.objects.children = [mockWall];
+
+      const attackerSpan = { bottom: 0, top: 5 };
+      const targetSpan = { bottom: 0, top: 5 };
+      const p1 = { x: 25, y: 25 };
+      const p2 = { x: 225, y: 25 };
+
+      const result = coverDetector._analyzeSegmentObstructions(p1, p2, null, attackerSpan, targetSpan);
+
+      expect(result.hasBlockingTerrain).toBe(true);
+      expect(result.blockingWalls).toHaveLength(1);
+    });
+
     test('should detect wall when Levels API says 3D collision exists', () => {
       global.CONFIG.Levels.API.testCollision.mockReturnValue({ x: 125, y: 25, z: 5 });
 

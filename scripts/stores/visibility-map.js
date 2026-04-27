@@ -47,28 +47,34 @@ function buildVisibilityMapDiff(previousMap = {}, nextMap = {}) {
   return changes;
 }
 
-function buildVisibilityDeletionUpdate(path, nextMap, removedTargetIds, forcedDeletion) {
+async function unsetVisibilityFlag(token, forcedDeletion) {
+  if (typeof token.document.unsetFlag === 'function') {
+    return token.document.unsetFlag(MODULE_ID, 'visibility');
+  }
+
+  const path = `flags.${MODULE_ID}.visibility`;
   if (forcedDeletion) {
-    if (Object.keys(nextMap).length === 0) {
-      return { [path]: forcedDeletion };
-    }
-
-    const persistedMap = { ...nextMap };
-    for (const targetId of removedTargetIds) {
-      persistedMap[targetId] = forcedDeletion;
-    }
-    return { [path]: persistedMap };
+    return token.document.update(
+      { [path]: forcedDeletion },
+      { diff: false, render: false, animate: false },
+    );
   }
 
-  if (Object.keys(nextMap).length === 0) {
-    return { [`flags.${MODULE_ID}.-=visibility`]: null };
+  return token.document.update(
+    { [`flags.${MODULE_ID}.-=visibility`]: null },
+    { diff: false, render: false, animate: false },
+  );
+}
+
+async function setVisibilityFlag(token, visibilityMap) {
+  if (typeof token.document.setFlag === 'function') {
+    return token.document.setFlag(MODULE_ID, 'visibility', visibilityMap);
   }
 
-  const persistedMap = { ...nextMap };
-  for (const targetId of removedTargetIds) {
-    persistedMap[`-=${targetId}`] = null;
-  }
-  return { [path]: persistedMap };
+  return token.document.update(
+    { [`flags.${MODULE_ID}.visibility`]: visibilityMap },
+    { diff: false, render: false, animate: false },
+  );
 }
 
 /**
@@ -107,19 +113,24 @@ export async function setVisibilityMap(token, visibilityMap) {
       changes,
     }));
   }
-  const path = `flags.${MODULE_ID}.visibility`;
   const removedTargetIds = Object.keys(previousMap).filter((id) => !(id in nextMap));
   const forcedDeletion = foundry?.data?.operators?.ForcedDeletion ?? null;
-  const updates = buildVisibilityDeletionUpdate(path, nextMap, removedTargetIds, forcedDeletion);
 
   await waitForTokenDocumentUpdateSafe(token);
 
-  return token.document.update(
-    updates,
-    { diff: false, render: false, animate: false },
-  );
-}
+  let result;
 
+  if (Object.keys(nextMap).length === 0) {
+    result = await unsetVisibilityFlag(token, forcedDeletion);
+  } else if (removedTargetIds.length > 0) {
+    await unsetVisibilityFlag(token, forcedDeletion);
+    result = await setVisibilityFlag(token, nextMap);
+  } else {
+    result = await setVisibilityFlag(token, nextMap);
+  }
+
+  return result;
+}
 
 /**
  * Read visibility state between two tokens
@@ -178,7 +189,7 @@ export async function setVisibilityBetween(
         state,
         direction: options.direction || 'observer_to_target',
       });
-    } catch (_) { }
+    } catch (_) {}
   }
 
   // Skip ephemeral effects for socket-triggered processing to avoid permission errors
@@ -191,7 +202,9 @@ export async function setVisibilityBetween(
   // This is important when suppression flags change (e.g., Blind-Fight added/removed)
   // Check if off-guard effects should be suppressed for this visibility state
   // The suppression is on the OBSERVER (the one with Blind-Fight feat)
-  const { OffGuardSuppression } = await import('../rule-elements/operations/OffGuardSuppression.js');
+  const { OffGuardSuppression } = await import(
+    '../rule-elements/operations/OffGuardSuppression.js'
+  );
   if (OffGuardSuppression.shouldSuppressOffGuardForState(observer, state)) {
     // Remove any existing off-guard effects
     try {
@@ -199,7 +212,10 @@ export async function setVisibilityBetween(
         autoVisibilitySystem.setUpdatingEffects(true);
       }
       // Force removal of all ephemeral effects for this pair when suppression is active
-      await updateEphemeralEffectsForVisibility(observer, target, state, { ...options, removeAllEffects: true });
+      await updateEphemeralEffectsForVisibility(observer, target, state, {
+        ...options,
+        removeAllEffects: true,
+      });
     } catch (error) {
       console.error('PF2E Visioner: Error removing off-guard effects:', error);
     } finally {
@@ -308,8 +324,8 @@ function getVisibilityBetweenWithAggregation(observer, target) {
   // Multiple observer tokens - aggregate visibility from all of them
   // Get the best visibility state from all observer tokens
   const visibilityStates = observerTokens
-    .map(observerToken => getVisibilityBetween(observerToken, target))
-    .filter(state => state !== undefined && state !== null);
+    .map((observerToken) => getVisibilityBetween(observerToken, target))
+    .filter((state) => state !== undefined && state !== null);
 
   if (visibilityStates.length === 0) {
     return 'observed';

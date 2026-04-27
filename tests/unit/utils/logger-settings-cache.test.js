@@ -48,4 +48,24 @@ describe('Logger settings cache', () => {
     expect(avsLog.enabled()).toBe(true);
     expect(globalLog.enabled()).toBe(false);
   });
+
+  test('does not print lazy function source when payload evaluation fails', () => {
+    game.settings.set('pf2e-visioner', 'autoVisibilityDebugMode', true);
+    const debugSpy = jest.spyOn(console, 'debug').mockImplementation(() => { });
+
+    const log = getLogger('AVS');
+    const badPayload = () => {
+      throw new Error('payload failed');
+    };
+    log.debug(badPayload);
+
+    expect(debugSpy).toHaveBeenCalledWith(
+      expect.stringContaining('PF2E Visioner [AVS]'),
+      expect.objectContaining({
+        msg: 'logger-lazy-payload-error',
+        error: 'payload failed',
+      }),
+    );
+    expect(debugSpy.mock.calls[0]).not.toContain(badPayload);
+  });
 });

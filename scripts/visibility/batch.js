@@ -5,6 +5,28 @@ import {
 } from '../helpers/visibility-helpers.js';
 import { runWithEffectLock } from './utils.js';
 
+async function deleteLegacyVisibilityEffects(actor, hiddenActorSignature) {
+  if (!game.user.isGM || !actor?.itemTypes?.effect || !hiddenActorSignature) return 0;
+  const legacyEffects = actor.itemTypes.effect.filter(
+    (effect) =>
+      effect?.flags?.[MODULE_ID]?.isEphemeralOffGuard === true &&
+      effect?.flags?.[MODULE_ID]?.hiddenActorSignature === hiddenActorSignature,
+  );
+  const ids = legacyEffects
+    .map((effect) => effect?.id)
+    .filter((id) => !!id && (actor.items?.get?.(id) ?? true));
+  if (!ids.length) return 0;
+  await actor.deleteEmbeddedDocuments?.('Item', ids);
+  return ids.length;
+}
+
+async function cleanupLegacyObservedPair(observerToken, targetToken) {
+  const observerSignature = observerToken?.actor?.signature;
+  const targetSignature = targetToken?.actor?.signature;
+  await deleteLegacyVisibilityEffects(observerToken?.actor, targetSignature);
+  await deleteLegacyVisibilityEffects(targetToken?.actor, observerSignature);
+}
+
 export async function batchUpdateVisibilityEffects(observerToken, targetUpdates, options = {}) {
   if (!observerToken?.actor || !targetUpdates?.length) return;
   try {
@@ -22,6 +44,9 @@ export async function batchUpdateVisibilityEffects(observerToken, targetUpdates,
     } catch (_) {}
     const receiver = effectTarget === 'observer' ? observerToken : update.target;
     const receiverId = receiver.actor.id;
+    if (update.state === 'observed' || update.state === 'concealed' || options.removeAllEffects) {
+      await cleanupLegacyObservedPair(observerToken, update.target);
+    }
     if (!updatesByReceiver.has(receiverId))
       updatesByReceiver.set(receiverId, { receiver, updates: [] });
     updatesByReceiver.get(receiverId).updates.push({

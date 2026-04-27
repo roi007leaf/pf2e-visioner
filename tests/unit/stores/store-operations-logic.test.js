@@ -227,11 +227,10 @@ describe('Store Operations Core Logic', () => {
 
       await setVisibilityBetween(observer, target, 'hidden');
 
-      // Should attempt to update token document with visibility data
-      expect(observer.document.update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          [`flags.${global.MODULE_ID}.visibility`]: expect.any(Object),
-        }),
+      // Should attempt to persist visibility data
+      expect(observer.document.setFlag).toHaveBeenCalledWith(
+        global.MODULE_ID,
+        'visibility',
         expect.any(Object),
       );
     });

@@ -84,11 +84,38 @@ describe('api.clearAllSneakFlags', () => {
     expect(canvas.scene.updateEmbeddedDocuments).toHaveBeenCalledWith(
       'Token',
       expect.arrayContaining([
-        { _id: 't1', 'flags.pf2e-visioner.-=sneak-active': null },
-        { _id: 't3', 'flags.pf2e-visioner.-=sneak-active': null },
+        { _id: 't1', 'flags.pf2e-visioner.sneak-active': global.foundry.data.operators.ForcedDeletion },
+        { _id: 't3', 'flags.pf2e-visioner.sneak-active': global.foundry.data.operators.ForcedDeletion },
       ]),
       { diff: false },
     );
+  });
+
+  test('uses legacy deletion syntax only when ForcedDeletion is unavailable', async () => {
+    game.user.isGM = true;
+    const originalForcedDeletion = global.foundry.data.operators.ForcedDeletion;
+    global.foundry.data.operators.ForcedDeletion = undefined;
+
+    const t1 = {
+      id: 't1',
+      name: 'One',
+      document: {
+        getFlag: jest.fn((mod, key) => (mod === 'pf2e-visioner' && key === 'sneak-active' ? true : undefined)),
+      },
+    };
+    canvas.tokens.placeables = [t1];
+
+    const { Pf2eVisionerApi } = await import('../../../scripts/api.js');
+    const ok = await Pf2eVisionerApi.clearAllSneakFlags();
+
+    expect(ok).toBe(true);
+    expect(canvas.scene.updateEmbeddedDocuments).toHaveBeenCalledWith(
+      'Token',
+      [{ _id: 't1', 'flags.pf2e-visioner.-=sneak-active': null }],
+      { diff: false },
+    );
+
+    global.foundry.data.operators.ForcedDeletion = originalForcedDeletion;
   });
 
   test('no updates when no tokens have flag', async () => {

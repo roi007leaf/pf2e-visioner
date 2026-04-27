@@ -61,6 +61,33 @@ describe('Walls never grant lesser cover', () => {
       expect(result).toBe('standard');
     });
 
+    test('should return none when measured wall coverage is below standard threshold', () => {
+      jest.spyOn(coverDetector, '_checkWallCoverOverrides').mockReturnValue(null);
+      jest.spyOn(coverDetector, '_analyzeSegmentObstructions').mockReturnValue({
+        hasBlockingTerrain: true,
+        hasCreatures: false,
+        blockingWalls: [{ id: 'wall-1' }],
+        intersectingCreatures: [],
+        totalBlockedLength: 50,
+        segmentLength: 200,
+      });
+      jest.spyOn(coverDetector, '_findNearestTokenToPoint').mockReturnValue({ id: 'target' });
+      jest.spyOn(coverDetector, '_estimateWallCoveragePercent').mockReturnValue(25);
+      global.game.settings.get = jest.fn((module, setting) => {
+        if (setting === 'wallCoverStandardThreshold') return 50;
+        if (setting === 'wallCoverGreaterThreshold') return 70;
+        if (setting === 'wallCoverAllowGreater') return true;
+        return false;
+      });
+
+      const p1 = { x: 0, y: 0 };
+      const p2 = { x: 200, y: 0 };
+
+      const result = coverDetector._evaluateWallsCover(p1, p2);
+
+      expect(result).toBe('none');
+    });
+
     test('should return none when no obstructions', () => {
       jest.spyOn(coverDetector, '_checkWallCoverOverrides').mockReturnValue(null);
       jest.spyOn(coverDetector, '_analyzeSegmentObstructions').mockReturnValue({

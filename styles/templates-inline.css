@@ -80,9 +80,10 @@
 /* Icon color utilities extracted */
 .icon-color-text-primary { color: var(--color-text-primary); }
 .icon-color-gray { color:#888; }
-.icon-color-cover-none { color:var(--cover-none); }
-.icon-color-cover-standard { color:var(--cover-standard); }
-.icon-color-cover-greater { color:var(--cover-greater); }
+.icon-color-cover-none { color:var(--cover-none, #4caf50) !important; }
+.icon-color-cover-lesser { color:var(--cover-lesser, #ffc107) !important; }
+.icon-color-cover-standard { color:var(--cover-standard, #ff6600) !important; }
+.icon-color-cover-greater { color:var(--cover-greater, #f44336) !important; }
 
 /* Generic flex & spacing utilities (scoped by common prefix to avoid clashes) */
 .pv-u-flex { display:flex; }

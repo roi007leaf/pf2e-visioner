@@ -124,9 +124,13 @@ export class CoverDetector {
       const segmentAnalysis = this._analyzeSegmentObstructions(p1, p2, elevationRange, attackerSpan, targetSpan);
       const hasWallsInTheWay = segmentAnalysis.hasBlockingTerrain;
 
-      // NEW LOGIC: Priority based on wall presence
+      const wallCover = hasWallsInTheWay || this._hasSceneWalls()
+        ? this._evaluateWallsCover(p1, p2, elevationRange, attackerSpan, targetSpan, target)
+        : 'none';
+
+      // NEW LOGIC: Priority based on wall cover presence
       let calculatedCover;
-      if (!hasWallsInTheWay) {
+      if (wallCover === 'none') {
         // Case 1: No walls in the way - use token cover
         const intersectionMode = this._getIntersectionMode();
         const filters = { ...this._getAutoCoverFilterSettings(attacker), attackContext: options.attackContext };
@@ -153,21 +157,21 @@ export class CoverDetector {
 
         calculatedCover = tokenCover;
       } else {
-        // Case 2: There IS a wall in the way - use new wall cover rules
-        let wallCover = this._evaluateWallsCover(p1, p2, elevationRange, attackerSpan, targetSpan);
+        // Case 2: There IS wall cover - use new wall cover rules
+        let adjustedWallCover = wallCover;
 
-        wallCover = this._applyLevelsCoverAdjustment(attacker, target, wallCover);
+        adjustedWallCover = this._applyLevelsCoverAdjustment(attacker, target, adjustedWallCover);
 
-        if (wallCover === 'lesser') {
-          wallCover = 'standard';
+        if (adjustedWallCover === 'lesser') {
+          adjustedWallCover = 'standard';
         }
 
         const allowGreater = !!game.settings.get('pf2e-visioner', 'wallCoverAllowGreater');
-        if (!allowGreater && wallCover === 'greater') {
-          wallCover = 'standard';
+        if (!allowGreater && adjustedWallCover === 'greater') {
+          adjustedWallCover = 'standard';
         }
 
-        calculatedCover = wallCover;
+        calculatedCover = adjustedWallCover;
       }
 
       return this._applyRegionCover(p1, p2, calculatedCover);
@@ -345,6 +349,59 @@ export class CoverDetector {
     }
   }
 
+  _hasSceneWalls() {
+    return this._getSceneWalls().length > 0;
+  }
+
+  _getSceneWalls() {
+    const walls = canvas?.walls;
+    if (!walls) return [];
+
+    const objectChildren = Array.isArray(walls.objects?.children) ? walls.objects.children : [];
+    const placeables = Array.isArray(walls.placeables) ? walls.placeables : [];
+
+    if (objectChildren.length === 0) return placeables;
+    if (placeables.length === 0) return objectChildren;
+
+    const seen = new Set();
+    const merged = [];
+    for (const wall of [...objectChildren, ...placeables]) {
+      const id = wall?.document?.id || wall?.id;
+      const key = id || wall;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      merged.push(wall);
+    }
+    return merged;
+  }
+
+  _getWallCoords(wall) {
+    const candidates = [wall?.coords, wall?.document?.c, wall?.c];
+    for (const candidate of candidates) {
+      if (!Array.isArray(candidate) || candidate.length < 4) continue;
+      const coords = candidate.slice(0, 4).map((value) => Number(value));
+      if (coords.every(Number.isFinite)) return coords;
+    }
+
+    const doc = wall?.document || wall;
+    const coords = [doc?.x, doc?.y, doc?.x2, doc?.y2].map((value) => Number(value));
+    if (coords.every(Number.isFinite)) return coords;
+
+    const pointPairs = [
+      [wall?.edge?.a, wall?.edge?.b],
+      [wall?.edge?.A, wall?.edge?.B],
+      [wall?.ray?.A, wall?.ray?.B],
+      [wall?.line?.a, wall?.line?.b],
+      [wall?.line?.A, wall?.line?.B],
+    ];
+    for (const [a, b] of pointPairs) {
+      const edgeCoords = [a?.x, a?.y, b?.x, b?.y].map((value) => Number(value));
+      if (edgeCoords.every(Number.isFinite)) return edgeCoords;
+    }
+
+    return null;
+  }
+
   /**
    * Evaluate walls cover using center-to-center segment analysis
    * @param {Object} p1 - Attacker center point
@@ -353,7 +410,7 @@ export class CoverDetector {
    * @returns {string} Cover category ('none', 'lesser', 'standard', 'greater')
    * @private
    */
-  _evaluateWallsCover(p1, p2, elevationRange = null, attackerSpan = null, targetSpan = null) {
+  _evaluateWallsCover(p1, p2, elevationRange = null, attackerSpan = null, targetSpan = null, targetToken = null) {
     if (!canvas?.walls) return 'none';
 
     // First check for manual wall cover overrides - if present, use it directly and skip all other checks
@@ -365,27 +422,26 @@ export class CoverDetector {
     // Analyze the center-to-center segment
     const segmentAnalysis = this._analyzeSegmentObstructions(p1, p2, elevationRange, attackerSpan, targetSpan);
 
+    const target = targetToken || this._findNearestTokenToPoint(p2);
+    let wallCoveragePercent = 0;
+
+    if (target) {
+      wallCoveragePercent = this._estimateWallCoveragePercent(p1, target, elevationRange, attackerSpan, targetSpan);
+    }
+
     // Determine cover category based on new rules
     let coverCategory = 'none';
 
     // Rule 1: No obstructions
-    if (!segmentAnalysis.hasBlockingTerrain && !segmentAnalysis.hasCreatures) {
+    if (!segmentAnalysis.hasBlockingTerrain && !segmentAnalysis.hasCreatures && wallCoveragePercent <= 0) {
       coverCategory = 'none';
     }
     // Rule 2: Creature space only, no blocking terrain
     else if (!segmentAnalysis.hasBlockingTerrain && segmentAnalysis.hasCreatures) {
       coverCategory = 'standard';
     }
-    // Rule 3: Any blocking terrain
-    else if (segmentAnalysis.hasBlockingTerrain) {
-      // Calculate wall coverage percentage using existing method
-      const target = this._findNearestTokenToPoint(p2);
-      let wallCoveragePercent = 0;
-
-      if (target) {
-        wallCoveragePercent = this._estimateWallCoveragePercent(p1, target, elevationRange, attackerSpan, targetSpan);
-      }
-
+    // Rule 3: Any blocking terrain, or target sampling shows wall coverage
+    else if (segmentAnalysis.hasBlockingTerrain || wallCoveragePercent > 0) {
       // Get threshold settings
       const stdThreshold = Math.max(
         0,
@@ -397,14 +453,20 @@ export class CoverDetector {
       );
       const allowGreater = !!game.settings.get('pf2e-visioner', 'wallCoverAllowGreater');
 
-      // Determine cover level based on coverage percentage
-      if (allowGreater && wallCoveragePercent >= grtThreshold) {
-        coverCategory = 'greater';
-      } else if (wallCoveragePercent >= stdThreshold) {
+      // Determine cover level based on coverage percentage. If sampling found a non-zero
+      // wall coverage, thresholds are authoritative. Fallback only when sampling failed.
+      if (wallCoveragePercent > 0) {
+        if (allowGreater && wallCoveragePercent >= grtThreshold) {
+          coverCategory = 'greater';
+        } else if (wallCoveragePercent >= stdThreshold) {
+          coverCategory = 'standard';
+        } else {
+          coverCategory = 'none';
+        }
+      } else if (segmentAnalysis.hasBlockingTerrain) {
         coverCategory = 'standard';
       } else {
-        // Fallback for cases where coverage calculation fails but walls are detected
-        coverCategory = 'standard';
+        coverCategory = 'none';
       }
     }
 
@@ -432,54 +494,42 @@ export class CoverDetector {
     };
 
     // Check for blocking walls/terrain
-    let skipWallCheck = false;
-    if (attackerSpan && targetSpan) {
-      const levelsIntegration = LevelsIntegration.getInstance();
-      if (levelsIntegration.isActive) {
-        const p0_3d = { x: p1.x, y: p1.y, z: (attackerSpan.bottom + attackerSpan.top) / 2 };
-        const p1_3d = { x: p2.x, y: p2.y, z: (targetSpan.bottom + targetSpan.top) / 2 };
-        skipWallCheck = !levelsIntegration.test3DPointCollision(p0_3d, p1_3d, 'sight');
-      }
-    }
+    const walls = this._getSceneWalls();
+    for (const wall of walls) {
+      const wallDoc = wall.document || wall;
 
-    if (!skipWallCheck) {
-      const walls = canvas?.walls?.objects?.children || [];
-      for (const wall of walls) {
-        const wallDoc = wall.document || wall;
+      if (!this._doesWallBlockFromDirection(wallDoc, p1)) continue;
 
-        if (!this._doesWallBlockFromDirection(wallDoc, p1)) continue;
+      const coords = this._getWallCoords(wall);
+      if (!coords) continue;
 
-        const coords = wall?.coords;
-        if (!coords) continue;
+      const intersection = this._lineIntersectionPoint(
+        p1.x,
+        p1.y,
+        p2.x,
+        p2.y,
+        coords[0],
+        coords[1],
+        coords[2],
+        coords[3],
+      );
 
-        const intersection = this._lineIntersectionPoint(
-          p1.x,
-          p1.y,
-          p2.x,
-          p2.y,
-          coords[0],
-          coords[1],
-          coords[2],
-          coords[3],
-        );
-
-        if (intersection) {
-          if (attackerSpan && targetSpan && segmentLength > 0) {
-            const t = Math.sqrt((intersection.x - p1.x) ** 2 + (intersection.y - p1.y) ** 2) / segmentLength;
-            if (!doesWallBlockLineOfSight(wallDoc, attackerSpan, targetSpan, t)) {
-              continue;
-            }
-          } else if (elevationRange && !doesWallBlockAtElevation(wallDoc, elevationRange)) {
+      if (intersection) {
+        if (attackerSpan && targetSpan && segmentLength > 0) {
+          const t = Math.sqrt((intersection.x - p1.x) ** 2 + (intersection.y - p1.y) ** 2) / segmentLength;
+          if (!doesWallBlockLineOfSight(wallDoc, attackerSpan, targetSpan, t)) {
             continue;
           }
-
-          analysis.hasBlockingTerrain = true;
-          analysis.blockingWalls.push({
-            wall: wallDoc,
-            intersection: intersection,
-            coords: coords,
-          });
+        } else if (elevationRange && !doesWallBlockAtElevation(wallDoc, elevationRange)) {
+          continue;
         }
+
+        analysis.hasBlockingTerrain = true;
+        analysis.blockingWalls.push({
+          wall: wallDoc,
+          intersection: intersection,
+          coords: coords,
+        });
       }
     }
 
@@ -550,7 +600,7 @@ export class CoverDetector {
     try {
       const ray = this._createRay(p1, p2);
       const rayLength = Math.sqrt((p2.x - p1.x) ** 2 + (p2.y - p1.y) ** 2);
-      const walls = canvas.walls.objects?.children || [];
+      const walls = this._getSceneWalls();
 
       let highestCover = null;
       const coverOrder = ['none', 'lesser', 'standard', 'greater'];
@@ -563,7 +613,7 @@ export class CoverDetector {
           continue;
         }
 
-        const coords = wall?.coords;
+        const coords = this._getWallCoords(wall);
         if (!coords) {
           continue;
         }
@@ -720,25 +770,14 @@ export class CoverDetector {
     const rayLength = Math.sqrt((b.x - a.x) ** 2 + (b.y - a.y) ** 2);
 
     // Check if there are any walls at all
-    const totalWalls = canvas?.walls?.objects?.children?.length || 0;
+    const totalWalls = this._getSceneWalls().length;
     if (totalWalls === 0) {
       return false;
     }
 
-    if (attackerSpan && targetSpan) {
-      const levelsIntegration = LevelsIntegration.getInstance();
-      if (levelsIntegration.isActive) {
-        const a3d = { x: a.x, y: a.y, z: (attackerSpan.bottom + attackerSpan.top) / 2 };
-        const b3d = { x: b.x, y: b.y, z: (targetSpan.bottom + targetSpan.top) / 2 };
-        if (!levelsIntegration.test3DPointCollision(a3d, b3d, 'sight')) {
-          return false;
-        }
-      }
-    }
-
-    const walls = canvas.walls.objects?.children || [];
+    const walls = this._getSceneWalls();
     for (const wall of walls) {
-      const c = wall?.coords;
+      const c = this._getWallCoords(wall);
       if (!c) continue;
 
       // Check wall type and direction - walls that block sight should provide cover
@@ -1276,23 +1315,6 @@ export class CoverDetector {
           nBlocker?.id &&
           (nBlocker.id === nSpotter?.id || nBlocker.id === nSniper?.id)
         );
-
-        if (candidate) {
-          log.debug('Sniping Duo: strike context not detected; not ignoring blocker', () => ({
-            attackerName: attacker?.name,
-            attackerActorKey: attackerKey,
-            blockerName: blocker?.name,
-            blockerActorKey: blockerKey,
-            spotterKey,
-            sniperKey,
-            attackContextType: attackContext?.type ?? null,
-            attackContextOptions: this._formatRollOptionsForLog(attackContext?.options),
-            attackContextDomains: Array.isArray(attackContext?.domains)
-              ? attackContext.domains.slice(0, 20)
-              : null,
-            itemName: attackContext?.item?.name ?? null,
-          }));
-        }
       }
       if (attackContext && !strikeOk) return false;
 
@@ -1342,15 +1364,6 @@ export class CoverDetector {
         });
       }
     } catch { }
-
-    log.debug('Sniping Duo: ignored blocker', () => ({
-      attackerTokenId: attacker?.id,
-      attackerName: attacker?.name,
-      attackerActorKey: this._getActorKey(attacker?.actor),
-      blockerTokenId: blocker?.id,
-      blockerName: blocker?.name,
-      blockerActorKey: this._getActorKey(blocker?.actor),
-    }));
   }
 
   _formatRollOptionsForLog(rollOptions) {

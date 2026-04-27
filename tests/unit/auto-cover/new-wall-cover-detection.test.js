@@ -47,6 +47,61 @@ describe('New Wall Cover Detection', () => {
       expect(analysis.hasBlockingTerrain).toBe(true);
       expect(analysis.blockingWalls.length).toBe(1);
     });
+
+    test('should detect Foundry V14 wall placeables with document coordinates', () => {
+      const p1 = { x: 0, y: 0 };
+      const p2 = { x: 100, y: 100 };
+
+      const mockWall = {
+        document: {
+          id: 'v14-wall',
+          c: [50, 0, 50, 100],
+          sight: 1,
+          door: 0,
+          ds: 0,
+          dir: 0,
+        },
+      };
+
+      global.canvas = {
+        walls: { placeables: [mockWall], objects: { children: [] } },
+        tokens: { placeables: [] },
+      };
+
+      const analysis = coverDetector._analyzeSegmentObstructions(p1, p2);
+      expect(analysis.hasBlockingTerrain).toBe(true);
+      expect(analysis.blockingWalls).toHaveLength(1);
+      expect(analysis.blockingWalls[0].coords).toEqual([50, 0, 50, 100]);
+    });
+
+    test('should detect Foundry V14 wall placeables with edge coordinates', () => {
+      const p1 = { x: 0, y: 0 };
+      const p2 = { x: 100, y: 100 };
+
+      const mockWall = {
+        document: {
+          id: 'v14-edge-wall',
+          sight: 1,
+          door: 0,
+          ds: 0,
+          dir: 0,
+        },
+        edge: {
+          a: { x: 50, y: 0 },
+          b: { x: 50, y: 100 },
+        },
+      };
+
+      global.canvas = {
+        walls: { placeables: [mockWall], objects: { children: [] } },
+        tokens: { placeables: [] },
+      };
+
+      const analysis = coverDetector._analyzeSegmentObstructions(p1, p2);
+      expect(analysis.hasBlockingTerrain).toBe(true);
+      expect(analysis.blockingWalls).toHaveLength(1);
+      expect(analysis.blockingWalls[0].coords).toEqual([50, 0, 50, 100]);
+    });
   });
 
   describe('Cover Category Rules', () => {
