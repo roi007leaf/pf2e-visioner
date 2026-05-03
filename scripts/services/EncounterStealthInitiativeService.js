@@ -110,6 +110,10 @@ export class EncounterStealthInitiativeService {
     return getCombatantInitiativeStatistic(combatant) === 'stealth';
   }
 
+  isInitiativeRelevantUpdate(changes = {}) {
+    return this._isInitiativeRelevantUpdate(changes);
+  }
+
   async applyEncounterStartVisibility(combat = game.combat, { requireStarted = true } = {}) {
     if (!this.isEnabled()) return;
     if (!combat) return;

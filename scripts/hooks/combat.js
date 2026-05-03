@@ -5,6 +5,7 @@
 import { MODULE_ID } from '../constants.js';
 import { combatStartCoverService } from '../services/CombatStartCoverService.js';
 import { encounterStealthInitiativeService } from '../services/EncounterStealthInitiativeService.js';
+import { requestGMApplyEncounterStealthInitiative } from '../services/socket.js';
 
 export function registerCombatHooks() {
   Hooks.on('combatStart', onCombatStart);
@@ -42,11 +43,25 @@ function onUpdateCombat(combat, updateData) {
 }
 
 async function onUpdateCombatant(combatant, updateData) {
-  await encounterStealthInitiativeService.handleCombatantInitiativeUpdate(
-    combatant,
-    updateData,
-    combatant?.combat ?? combatant?.encounter ?? game.combat,
-  );
+  const combat = combatant?.combat ?? combatant?.encounter ?? game.combat;
+
+  if (!game.user?.isGM) {
+    const relevantStealthInitiativeUpdate =
+      encounterStealthInitiativeService.isEnabled()
+      && encounterStealthInitiativeService.isInitiativeRelevantUpdate(updateData);
+
+    if (relevantStealthInitiativeUpdate) {
+      requestGMApplyEncounterStealthInitiative({
+        combatId: combat?.id ?? combat?.uuid ?? null,
+        combatantId: combatant?.id ?? null,
+        updateData,
+      });
+      encounterStealthInitiativeService.scheduleTrackerVisibilityRefresh(combat);
+    }
+    return;
+  }
+
+  await encounterStealthInitiativeService.handleCombatantInitiativeUpdate(combatant, updateData, combat);
 }
 
 function onDeleteCombat(combat) {

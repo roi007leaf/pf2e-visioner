@@ -1,5 +1,11 @@
 # Changelog
 
+## [8.1.5] - 2026-05-03
+
+### Fixed
+
+- **Player Stealth initiative rolls now apply encounter visibility through the GM**: Non-GM initiative updates now request GM-side encounter stealth processing over socketlib, avoiding permission errors and allowing enemy `undetected`/`unnoticed` overrides to be written correctly.
+
 ## [8.1.4] - 2026-05-03
 
 ### Fixed

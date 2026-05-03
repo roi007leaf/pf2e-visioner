@@ -20,6 +20,7 @@ class SocketService {
     this._socket.register(SEEK_TEMPLATE_CHANNEL, seekTemplateHandler);
     this._socket.register(POINTOUT_REQUEST_CHANNEL, pointOutRequestHandler);
     this._socket.register(WALL_VISUALS_CHANNEL, updateWallVisualsHandler);
+    this._socket.register(ENCOUNTER_STEALTH_INITIATIVE_CHANNEL, encounterStealthInitiativeHandler);
     return this._socket;
   }
   get socket() {
@@ -43,6 +44,7 @@ const POINT_OUT_CHANNEL = 'PointOut';
 const SEEK_TEMPLATE_CHANNEL = 'SeekTemplate';
 const POINTOUT_REQUEST_CHANNEL = 'PointOutRequest';
 const WALL_VISUALS_CHANNEL = 'UpdateWallVisuals';
+export const ENCOUNTER_STEALTH_INITIATIVE_CHANNEL = 'EncounterStealthInitiative';
 
 export function registerSocket() {
   _socketService.register();
@@ -104,6 +106,51 @@ export function refreshEveryonesPerception() {
  */
 export function requestGMHandlePointOut(...args) {
   if (_socketService.socket) _socketService.executeAsGM(POINT_OUT_CHANNEL, ...args);
+}
+
+export function requestGMApplyEncounterStealthInitiative({ combatId, combatantId, updateData }) {
+  if (!_socketService.socket) return;
+  _socketService.executeAsGM(ENCOUNTER_STEALTH_INITIATIVE_CHANNEL, {
+    combatId,
+    combatantId,
+    updateData,
+    userId: game.userId,
+  });
+}
+
+async function encounterStealthInitiativeHandler({ combatId, combatantId, updateData } = {}) {
+  try {
+    if (!game.user?.isGM) return;
+
+    const combat = resolveCombatById(combatId);
+    if (!combat) return;
+
+    const combatant = resolveCombatantById(combat, combatantId);
+    if (!combatant) return;
+
+    const { encounterStealthInitiativeService } = await import('./EncounterStealthInitiativeService.js');
+    await encounterStealthInitiativeService.handleCombatantInitiativeUpdate(
+      combatant,
+      updateData ?? {},
+      combat,
+    );
+  } catch (error) {
+    console.error(`[${MODULE_ID}] Failed to apply encounter stealth initiative from player request:`, error);
+  }
+}
+
+function resolveCombatById(combatId) {
+  const activeCombat = game.combat ?? null;
+  if (!combatId) return activeCombat;
+  if (activeCombat?.id === combatId || activeCombat?.uuid === combatId) return activeCombat;
+  return game.combats?.get?.(combatId) ?? null;
+}
+
+function resolveCombatantById(combat, combatantId) {
+  if (!combatantId) return null;
+  return combat?.combatants?.get?.(combatantId)
+    ?? combat?.turns?.find?.((combatant) => combatant?.id === combatantId)
+    ?? null;
 }
 
 /*
