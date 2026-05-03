@@ -93,6 +93,18 @@
     color: var(--visibility-undetected, #f44336) !important;
   }
 
+  .bulk-state-header.visibility-unnoticed,
+  .bulk-state-header.visibility-unnoticed i {
+    color: var(--visibility-unnoticed, #9c27b0) !important;
+    border-color: var(--visibility-unnoticed, #9c27b0) !important;
+  }
+
+  .bulk-state-header.visibility-unnoticed:hover,
+  .bulk-state-header.visibility-unnoticed:hover i {
+    background: var(--visibility-unnoticed-bg-strong, rgba(156, 39, 176, 0.3)) !important;
+    color: var(--visibility-unnoticed, #9c27b0) !important;
+  }
+
   .bulk-state-header.visibility-avs,
   .bulk-state-header.visibility-avs i {
     color: #ffffff !important;

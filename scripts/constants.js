@@ -13,6 +13,7 @@ export const VisibilityState = {
   CONCEALED: 'concealed',
   HIDDEN: 'hidden',
   UNDETECTED: 'undetected',
+  UNNOTICED: 'unnoticed',
 };
 
 /**
@@ -87,6 +88,14 @@ export const VISIBILITY_STATES = {
     icon: 'fas fa-ghost',
     color: 'var(--visibility-undetected, #f44336)', // Red - danger
     cssClass: 'visibility-undetected',
+  },
+  unnoticed: {
+    label: 'PF2E_VISIONER.VISIBILITY_STATES.unnoticed',
+    pf2eCondition: null,
+    visible: false,
+    icon: 'fas fa-user-secret',
+    color: 'var(--visibility-unnoticed, #9c27b0)', // Purple - unknown presence
+    cssClass: 'visibility-unnoticed',
   },
 };
 
@@ -598,6 +607,16 @@ export const DEFAULT_SETTINGS = {
   avsOnlyInCombat: {
     name: 'PF2E_VISIONER.SETTINGS.AVS_ONLY_IN_COMBAT.name',
     hint: 'PF2E_VISIONER.SETTINGS.AVS_ONLY_IN_COMBAT.hint',
+    scope: 'world',
+    config: true,
+    restricted: true,
+    type: Boolean,
+    default: false,
+  },
+
+  enableStealthInitiativeVisibility: {
+    name: 'PF2E_VISIONER.SETTINGS.ENABLE_STEALTH_INITIATIVE_VISIBILITY.name',
+    hint: 'PF2E_VISIONER.SETTINGS.ENABLE_STEALTH_INITIATIVE_VISIBILITY.hint',
     scope: 'world',
     config: true,
     restricted: true,

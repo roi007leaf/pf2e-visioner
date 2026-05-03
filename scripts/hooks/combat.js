@@ -3,26 +3,32 @@
  */
 
 import { MODULE_ID } from '../constants.js';
+import { encounterStealthInitiativeService } from '../services/EncounterStealthInitiativeService.js';
 
 export function registerCombatHooks() {
   Hooks.on('combatStart', onCombatStart);
   Hooks.on('combatEnd', onCombatEnd);
   Hooks.on('updateCombat', onUpdateCombat);
+  Hooks.on('updateCombatant', onUpdateCombatant);
   Hooks.on('deleteCombat', onDeleteCombat);
+  Hooks.on('renderCombatTracker', onRenderCombatTracker);
+  Hooks.on('pf2e-visioner.visibilityMapUpdated', onVisibilityMapUpdated);
 }
 
 async function onCombatStart(combat) {
   resetEncounterFiltersInDialogs();
-  await handleCombatStart();
+  await handleCombatStart(combat);
 }
 
 function onCombatEnd(combat) {
   resetEncounterFiltersInDialogs();
+  encounterStealthInitiativeService.clearCombat(combat);
   handleCombatEnd(combat);
 }
 
 function onUpdateCombat(combat, updateData) {
   if (Object.prototype.hasOwnProperty.call(updateData, 'started') && updateData.started === false) {
+    encounterStealthInitiativeService.clearCombat(combat);
     handleCombatEnd(combat);
     resetEncounterFiltersInDialogs();
   }
@@ -30,43 +36,65 @@ function onUpdateCombat(combat, updateData) {
   const turnChanged = Object.prototype.hasOwnProperty.call(updateData, 'turn') || Object.prototype.hasOwnProperty.call(updateData, 'round');
   if (turnChanged) {
     handleTurnAdvance(combat);
+    encounterStealthInitiativeService.scheduleTrackerVisibilityRefresh(combat);
   }
+}
+
+async function onUpdateCombatant(combatant, updateData) {
+  await encounterStealthInitiativeService.handleCombatantInitiativeUpdate(
+    combatant,
+    updateData,
+    combatant?.combat ?? combatant?.encounter ?? game.combat,
+  );
 }
 
 function onDeleteCombat(combat) {
   resetEncounterFiltersInDialogs();
+  encounterStealthInitiativeService.clearCombat(combat);
   handleCombatEnd(combat);
 }
 
-async function handleCombatStart() {
+function onRenderCombatTracker(tracker) {
+  encounterStealthInitiativeService.scheduleTrackerVisibilityRefresh(tracker?.viewed ?? game.combat);
+}
+
+function onVisibilityMapUpdated() {
+  encounterStealthInitiativeService.scheduleTrackerVisibilityRefresh(game.combat);
+}
+
+async function handleCombatStart(combat) {
   try {
     const avsOnlyInCombat = game.settings.get(MODULE_ID, 'avsOnlyInCombat');
-    if (!avsOnlyInCombat) return;
-    if (!game.user.isGM) return;
+    const shouldRunAvsStartRecalculation =
+      avsOnlyInCombat &&
+      game.user.isGM &&
+      game.settings.get(MODULE_ID, 'autoVisibilityEnabled');
 
-    const autoVisibilityEnabled = game.settings.get(MODULE_ID, 'autoVisibilityEnabled');
-    if (!autoVisibilityEnabled) return;
+    if (shouldRunAvsStartRecalculation) {
+      try {
+        const { autoVisibilitySystem } = await import('../visibility/auto-visibility/index.js');
 
-    try {
-      const { autoVisibilitySystem } = await import('../visibility/auto-visibility/index.js');
-
-      let retries = 5;
-      while (retries > 0) {
-        const inCombat = !!(game.combat?.started && game.combat?.combatants?.size > 0);
-        if (inCombat) {
-          await autoVisibilitySystem.recalculateAllVisibility(true);
-          break;
+        let retries = 5;
+        while (retries > 0) {
+          const inCombat = !!(game.combat?.started && game.combat?.combatants?.size > 0);
+          if (inCombat) {
+            await autoVisibilitySystem.recalculateAllVisibility(true);
+            break;
+          }
+          await new Promise(resolve => setTimeout(resolve, 100));
+          retries--;
         }
-        await new Promise(resolve => setTimeout(resolve, 100));
-        retries--;
+      } catch (error) {
+        console.error('PF2E Visioner: Error recalculating visibility on combat start:', error);
       }
-    } catch (error) {
-      console.error('PF2E Visioner: Error recalculating visibility on combat start:', error);
     }
   } catch (error) {
     console.error('PF2E Visioner: Error setting up visibility recalculation on combat start:', error);
   }
 
+  await encounterStealthInitiativeService.applyEncounterStartVisibility(combat ?? game.combat, {
+    requireStarted: false,
+  });
   await checkAvsOverrides();
 }
 

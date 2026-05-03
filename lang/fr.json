@@ -22,7 +22,11 @@
       "observed": "Observé",
       "hidden": "Caché",
       "undetected": "Non détecté",
+      "unnoticed": "(FR TODO) Unnoticed",
       "concealed": "Masqué"
+    },
+    "ENCOUNTER_STEALTH": {
+      "STEALTH_INITIATIVE_TOOLTIP": "(FR TODO) Rolled Stealth for initiative"
     },
     "COVER_STATES": {
       "none": "Pas d'abri",
@@ -508,7 +512,7 @@
       },
       "AUTO_VISIBILITY_ENABLED": {
         "name": "(FR TODO) Enable Auto-Visibility System",
-        "hint": "(FR TODO) Automatically set visibility flags based on lighting conditions and creature senses. This system will analyze scene lighting, token positions, and creature abilities to determine appropriate visibility states (observed, concealed, hidden, undetected)."
+        "hint": "(FR TODO) Automatically set visibility flags based on lighting conditions and creature senses. This system will analyze scene lighting, token positions, and creature abilities to determine appropriate visibility states (observed, concealed, hidden, undetected, unnoticed)."
       },
       "AVS_GM_VISION_WARNING_SUPPRESS": {
         "name": "(FR TODO) Suppress GM Vision warning",

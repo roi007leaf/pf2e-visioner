@@ -1,7 +1,7 @@
 {
   "id": "pf2e-visioner",
   "title": "PF2E Visioner",
-  "description": "<p>Advanced per-token visibility and cover management for Pathfinder 2E and Starfinder 2E. PF2E Visioner allows GMs to set different visibility states (observed, concealed, hidden, undetected) and cover states (none, lesser, standard, greater) for each token from each observer's perspective, with automatic PF2E condition integration and mechanical effects.</p>",
+  "description": "<p>Advanced per-token visibility and cover management for Pathfinder 2E and Starfinder 2E. PF2E Visioner allows GMs to set different visibility states (observed, concealed, hidden, undetected, unnoticed) and cover states (none, lesser, standard, greater) for each token from each observer's perspective, with automatic PF2E condition integration and mechanical effects.</p>",
   "authors": [
     {
       "name": "RoiLeaf",
@@ -9,7 +9,7 @@
       "flags": {}
     }
   ],
-  "version": "8.0.6",
+  "version": "8.1.0",
   "compatibility": {
     "minimum": "13.341",
     "verified": "14"

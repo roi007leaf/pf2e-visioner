@@ -20,6 +20,7 @@
   --visibility-concealed: var(--visibility-concealed-color, #ffc107); /* Yellow - caution */
   --visibility-hidden: var(--visibility-hidden-color, #ff6600); /* Bright orange - warning */
   --visibility-undetected: var(--visibility-undetected-color, #f44336); /* Red - danger */
+  --visibility-unnoticed: var(--visibility-unnoticed-color, #9c27b0); /* Purple - unknown */
 
   /* Visibility state background colors (with alpha) */
   --visibility-avs-bg-light: var(--visibility-avs-bg-light-color, rgba(156, 39, 176, 0.05));
@@ -83,6 +84,24 @@
   --visibility-undetected-bg-solid: var(
     --visibility-undetected-bg-solid-color,
     rgba(244, 67, 54, 0.9)
+  );
+
+  --visibility-unnoticed-bg-light: var(
+    --visibility-unnoticed-bg-light-color,
+    rgba(156, 39, 176, 0.05)
+  );
+  --visibility-unnoticed-bg: var(--visibility-unnoticed-bg-color, rgba(156, 39, 176, 0.1));
+  --visibility-unnoticed-bg-medium: var(
+    --visibility-unnoticed-bg-medium-color,
+    rgba(156, 39, 176, 0.15)
+  );
+  --visibility-unnoticed-bg-strong: var(
+    --visibility-unnoticed-bg-strong-color,
+    rgba(156, 39, 176, 0.2)
+  );
+  --visibility-unnoticed-bg-solid: var(
+    --visibility-unnoticed-bg-solid-color,
+    rgba(156, 39, 176, 0.9)
   );
 
   /* Cover state colors */
@@ -183,6 +202,7 @@
   --visibility-concealed-color: #ffc107;
   --visibility-hidden-color: #ff6600;
   --visibility-undetected-color: #f44336;
+  --visibility-unnoticed-color: #9c27b0;
   --cover-none-color: #4caf50;
   --cover-lesser-color: #ffc107;
   --cover-standard-color: #ff6600;
@@ -387,6 +407,10 @@
 
   .visibility-undetected {
     color: var(--visibility-undetected);
+  }
+
+  .visibility-unnoticed {
+    color: var(--visibility-unnoticed);
   }
 
   /* Cover state indicators */
@@ -790,6 +814,10 @@
   color: var(--visibility-undetected);
 }
 
+.pf2e-visioner-tooltip-badge.visibility-unnoticed {
+  color: var(--visibility-unnoticed);
+}
+
 /* Map cover states to colors (global, not scoped) */
 .pf2e-visioner-tooltip-badge.cover-none {
   color: var(--cover-none);
@@ -888,6 +916,21 @@
 
 .pv-wall-quick .cover-override-buttons .icon-color-gray {
   color: var(--color-text-dark-secondary);
+}
+
+.pf2e-visioner-stealth-tracker-hidden {
+  display: none !important;
+}
+
+.pf2e-visioner-stealth-initiative-marker {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 6px;
+  color: var(--visibility-unnoticed);
+  font-size: 0.72em;
+  line-height: 1;
+  vertical-align: middle;
 }
 
 /* Utility classes */

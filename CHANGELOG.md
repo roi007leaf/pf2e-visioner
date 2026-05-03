@@ -1,5 +1,30 @@
 # Changelog
 
+## [8.1.0] - 2026-05-03
+
+### Added
+
+- **First-class `unnoticed` visibility support**: PF2E Visioner now recognizes `unnoticed` as its own visibility state throughout the module, including labels, colors, Token Manager state options, hover tooltip badges, and AVS override flows. This lets Visioner model the PF2E distinction between a creature whose location is unknown (`undetected`) and a creature whose presence is not known at all (`unnoticed`).
+- **Encounter stealth initiative setup**: Added an opt-in world setting for PF2E Avoid Notice style encounter starts. When enabled, combatants who rolled initiative with the Stealth statistic receive encounter-start AVS overrides against enemy observers.
+- **Rules-accurate Avoid Notice visibility states**: Stealth initiative is now compared against each enemy observer's Perception DC. If the Stealth initiative meets or exceeds the DC, the stealther becomes `unnoticed`; otherwise the stealther becomes `undetected`, matching PF2E guidance where enemies can be known to exist without being located.
+- **Tracker hiding for initial unnoticed enemies**: Player combat trackers now hide stealthers only while the initial encounter-start `unnoticed` override is active. `undetected` enemies remain visible in the tracker, because the observer knows someone is present.
+- **PF2E HUD combat tracker support**: The encounter stealth tracker filtering also applies to PF2E HUD tracker rows in addition to the core Foundry combat tracker.
+- **Stealth initiative tracker marker**: Combatants who rolled Stealth for initiative now show a small purple `user-secret` marker beside their tracker name, with a tooltip that identifies the roll statistic without exposing per-user visibility state.
+- **Unnoticed hover tooltip state**: `unnoticed` uses a purple `user-secret` hover badge and the same no-sense-badge behavior as `undetected`, making it visually distinct from hidden and undetected states.
+
+### Improved
+
+- **Compatibility with PF2E Avoid Notice workflows**: Encounter stealth setup is disabled by default so tables that prefer the PF2E Avoid Notice module or manual handling can keep their existing flow unchanged.
+- **Multi-token player ownership handling**: If a player owns several tokens and any owned enemy observer can see a stealther, that stealther remains visible to the player in the combat tracker.
+- **Initial stealth override lifecycle**: Encounter-start `unnoticed`/`undetected` overrides preserve any previous AVS override for the same observer-target pair and restore it when the encounter-start override is removed.
+
+### Fixed
+
+- **Stealth initiative no longer depends on initiative order for visibility**: Avoid Notice visibility now follows Stealth roll versus Perception DC, including equal values counting as a success for the stealther.
+- **Only enemy observers participate in encounter stealth setup**: Allies are no longer considered when deciding whether a stealth initiative combatant is initially unnoticed or undetected.
+- **Tracker rows no longer reveal stealthers on their turn while the initial unnoticed override remains active**: Repeated tracker refreshes keep hidden rows suppressed until the GM removes the encounter-start override.
+- **Initial tracker hiding is not recreated after later Sneak/undetected states**: Once the initial encounter-start unnoticed override is removed, later changes back to undetected or unnoticed do not re-hide the combatant as part of this feature.
+
 ## [8.0.6] - 2026-04-27
 
 ### Fixed

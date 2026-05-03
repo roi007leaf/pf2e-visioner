@@ -10,6 +10,8 @@ import { getDetectionBetween } from '../stores/detection-map.js';
 import { getCoverMap, getVisibilityMap } from '../utils.js';
 import { setPanningState } from '../utils/scheduler.js';
 
+const SENSE_BADGE_BLOCKED_VISIBILITY_STATES = new Set(['undetected', 'unnoticed']);
+
 /**
  * Lightweight service wrapper for lifecycle control.
  * Keeps existing functional API intact for compatibility.
@@ -825,9 +827,9 @@ function showVisibilityIndicators(hoveredToken) {
       if (visibilityState === 'avs') visibilityState = 'observed';
 
       // Check if there's detection info (sense used)
-      // Don't check for sense if target is undetected
+      // Don't check for sense if target's location/presence is unknown.
       let hasSense = false;
-      if (visibilityState !== 'undetected') {
+      if (!SENSE_BADGE_BLOCKED_VISIBILITY_STATES.has(visibilityState)) {
         try {
           const detectionInfo = getDetectionBetween(hoveredToken, targetToken);
           hasSense = !!(detectionInfo && detectionInfo.sense);
@@ -860,9 +862,9 @@ function showVisibilityIndicators(hoveredToken) {
           if (visibilityState === 'avs') visibilityState = 'observed';
 
           // Check if there's detection info (sense used)
-          // Don't check for sense if target is undetected
+          // Don't check for sense if target's location/presence is unknown.
           let hasSense = false;
-          if (visibilityState !== 'undetected') {
+          if (!SENSE_BADGE_BLOCKED_VISIBILITY_STATES.has(visibilityState)) {
             try {
               const detectionInfo = getDetectionBetween(otherToken, hoveredToken);
               hasSense = !!(detectionInfo && detectionInfo.sense);
@@ -887,9 +889,9 @@ function showVisibilityIndicators(hoveredToken) {
         if (visibilityState === 'avs') visibilityState = 'observed';
 
         // Check if there's detection info (sense used)
-        // Don't check for sense if target is undetected
+        // Don't check for sense if target's location/presence is unknown.
         let hasSense = false;
-        if (visibilityState !== 'undetected') {
+        if (!SENSE_BADGE_BLOCKED_VISIBILITY_STATES.has(visibilityState)) {
           try {
             const detectionInfo = getDetectionBetween(observerToken, hoveredToken);
             hasSense = !!(detectionInfo && detectionInfo.sense);
@@ -947,9 +949,9 @@ function showVisibilityIndicatorsForToken(observerToken, forceMode = null) {
       if (visibilityState === 'avs') visibilityState = 'observed';
 
       // Check if there's detection info (sense used)
-      // Don't check for sense if target is undetected
+      // Don't check for sense if target's location/presence is unknown.
       let hasSense = false;
-      if (visibilityState !== 'undetected') {
+      if (!SENSE_BADGE_BLOCKED_VISIBILITY_STATES.has(visibilityState)) {
         try {
           const detectionInfo = getDetectionBetween(observerToken, targetToken);
           hasSense = !!(detectionInfo && detectionInfo.sense);
@@ -978,9 +980,9 @@ function showVisibilityIndicatorsForToken(observerToken, forceMode = null) {
         if (visibilityState === 'avs') visibilityState = 'observed';
 
         // Check if there's detection info (sense used)
-        // Don't check for sense if target is undetected
+        // Don't check for sense if target's location/presence is unknown.
         let hasSense = false;
-        if (visibilityState !== 'undetected') {
+        if (!SENSE_BADGE_BLOCKED_VISIBILITY_STATES.has(visibilityState)) {
           try {
             const detectionInfo = getDetectionBetween(otherToken, observerToken);
             hasSense = !!(detectionInfo && detectionInfo.sense);
@@ -1003,9 +1005,9 @@ function showVisibilityIndicatorsForToken(observerToken, forceMode = null) {
         if (visibilityState === 'avs') visibilityState = 'observed';
 
         // Check if there's detection info (sense used)
-        // Don't check for sense if target is undetected
+        // Don't check for sense if target's location/presence is unknown.
         let hasSense = false;
-        if (visibilityState !== 'undetected') {
+        if (!SENSE_BADGE_BLOCKED_VISIBILITY_STATES.has(visibilityState)) {
           try {
             const detectionInfo = getDetectionBetween(otherToken, observerToken);
             hasSense = !!(detectionInfo && detectionInfo.sense);
@@ -1322,10 +1324,10 @@ function addVisibilityIndicator(
   const avsEnabled = game.settings?.get?.(MODULE_ID, 'autoVisibilityEnabled') ?? false;
 
   // Get detection info (which sense was used) from detection map
-  // Don't show sense badges for undetected targets (observer doesn't know about them)
+  // Don't show sense badges for targets whose location/presence is unknown.
   let detectionInfo = null;
   let senseUsed = null;
-  if (avsEnabled && visibilityState !== 'undetected') {
+  if (avsEnabled && !SENSE_BADGE_BLOCKED_VISIBILITY_STATES.has(visibilityState)) {
     try {
       // In target mode, detectionTarget is the hoveredToken (what observer is detecting)
       // In observer mode, detectionTarget is the targetToken (same as where badge appears)

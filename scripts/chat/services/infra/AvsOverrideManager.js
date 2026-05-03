@@ -95,7 +95,8 @@ export class AvsOverrideManager {
         src === 'seek_action' ||
         src === 'seek_action_deferred' ||
         src === 'point_out_action' ||
-        src === 'manual_action';
+        src === 'manual_action' ||
+      src === 'encounter_stealth_initiative';
 
       let appliedCount = 0;
       for (const [, changeData] of changesByTarget) {

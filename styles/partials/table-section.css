@@ -253,6 +253,10 @@
     color: var(--visibility-undetected) !important;
   }
 
+  .visibility-table select option[value='unnoticed'] {
+    color: var(--visibility-unnoticed) !important;
+  }
+
   .current-state {
     width: 120px;
   }
@@ -299,6 +303,12 @@
     --state-indicator-bg: var(--visibility-undetected-bg-strong) !important;
     background: var(--visibility-undetected-bg-strong) !important;
     color: var(--visibility-undetected) !important;
+  }
+
+  .state-indicator.visibility-unnoticed {
+    --state-indicator-bg: var(--visibility-unnoticed-bg-strong) !important;
+    background: var(--visibility-unnoticed-bg-strong) !important;
+    color: var(--visibility-unnoticed) !important;
   }
 
   /* Icon-based Selection Styling */
@@ -381,6 +391,10 @@
 
   .state-icon[data-state='undetected'] {
     color: var(--visibility-undetected);
+  }
+
+  .state-icon[data-state='unnoticed'] {
+    color: var(--visibility-unnoticed);
   }
 
   /* Hide the hidden input */

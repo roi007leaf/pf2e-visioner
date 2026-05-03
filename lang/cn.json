@@ -20,8 +20,12 @@
             "observed": "可见",
             "hidden": "隐藏",
             "undetected": "无踪",
+            "unnoticed": "未察觉",
             "concealed": "隐蔽",
             "avs": "自动能见度"
+        },
+        "ENCOUNTER_STEALTH": {
+            "STEALTH_INITIATIVE_TOOLTIP": "使用隐秘掷先攻"
         },
         "COVER_STATES": {
             "none": "无掩蔽",

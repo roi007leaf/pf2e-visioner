@@ -1,65 +1,66 @@
 <claude-mem-context>
 # Memory Context
 
-# [pf2e-visioner] recent context, 2026-04-20 2:32pm GMT+3
+# [pf2e-visioner] recent context, 2026-05-03 10:59am GMT+3
 
-Legend: 🎯session 🔴bugfix 🟣feature 🔄refactor ✅change 🔵discovery ⚖️decision
+Legend: 🎯session 🔴bugfix 🟣feature 🔄refactor ✅change 🔵discovery ⚖️decision 🚨security_alert 🔐security_note
 Format: ID TIME TYPE TITLE
 Fetch details: get_observations([IDs]) | Search: mem-search skill
 
-Stats: 50 obs (23,113t read) | 941,693t work | 98% savings
+Stats: 50 obs (16,068t read) | 693,890t work | 98% savings
 
-### Apr 20, 2026
-63 9:46a 🔵 Pre-commit verification: old log confirms fix scope — batch 2 ran ephemeral sync but excluded Berk via stale-effects gate
-64 9:59a 🔵 Live game log confirms AVS fix pipeline works end-to-end with correct authoritative state resolution
-65 " 🔵 _applyBatchResults and setVisibilityMap full implementation traced: dedup, override-flag guard, and hook notification chain
-67 10:00a 🔵 BatchProcessor full pair-computation pipeline traced: override guard, LOS short-circuit, cache hierarchy, and update condition
-69 10:01a 🔵 setVisibilityMap has 10+ direct callers across the codebase outside BatchOrchestrator pipeline
-73 10:02a 🟣 _applyBatchResults instrumented with 5 new probe events for full update decision tracing
-74 10:50a 🔄 debug-probe.js: emitProbe collapses to single-line output
-77 10:56a 🔵 batch-apply-post-persist reads stale Foundry document cache after setVisibilityMap
-78 " 🔵 Live log confirms full batch pipeline firing correctly — only post-persist read is wrong
-79 10:58a 🔴 setVisibilityMap refactored to use Foundry .-= deletion syntax to prevent stale key merges
-80 " 🔵 batch-apply-post-persist stale read confirmed reproducible in unit tests
-81 11:08a 🔵 _collectAuthoritativeEphemeralUpdates stale-read root cause confirmed in code
-82 " 🔵 registration.js updateToken hook: scheduleLocalPerceptionRefreshForTokenUpdate wired before movement guard
-83 " 🔵 TDD approach confirmed for batch-apply-post-persist stale-read fix
-84 11:10a 🔵 AVS re-detection regression: token stays undetected after moving back into sight
-85 11:11a 🔄 pf2e-visioner: debug-probe removed, visibility-map deletion fixed, ephemeral sync scoped to actual updates
-89 11:23a ✅ pf2e-visioner bumped to v8.0.2 with AVS stale-entry fix documented
-93 11:27a 🔴 AVS re-detection fix: Foundry flag merge causes stale visibility map entries
-96 11:30a 🔵 StatelessVisibilityCalculator: full decision pipeline and hasLineOfSight short-circuit mapped
-97 " 🔵 VisionAnalyzer.hasLineOfSight: hybrid polygon+geometric strategy with stale-polygon detection
-100 11:35a 🔵 pf2e-visioner AVS logger usage mapped across all core files
-101 11:38a 🟣 TDD test added for VisionAnalyzer door-shortcut-block debug log emission
-102 11:39a 🔵 VisionAnalyzer door-shortcut bug: same-side endpoints trigger false LOS block
-103 " 🔴 door-shortcut-debug test: fixed mockLogger hoisting error
-104 11:41a 🔴 door-shortcut-debug test: loggerProxy pattern fixes undefined logger at module load
-106 " 🟣 VisionAnalyzer door-shortcut-block structured debug log added to #checkSingleRayLOSWithWalls
-107 11:42a 🔵 line-of-sight-basic.test.js: all 11 tests green after door-shortcut-block log changes
-108 11:43a 🟣 VisionAnalyzer.js door-shortcut-block logging finalized: observer/target fields removed to fix scope
-110 11:44a 🔵 logger.js: getLogger creates new object per call; VisionAnalyzer scope split between two settings
-111 11:45a 🔴 VisionAnalyzer: door-shortcut-block logs switched from 'VisionAnalyzer' to 'AutoVisibility:VisionAnalyzer' scope
-112 11:50a ✅ door-shortcut-debug test: assertion pivoted from mockLogger.debug to console.info spy
-113 11:51a 🟣 VisionAnalyzer: emitDoorShortcutDiagnostic implemented — always-on console.info for door shortcut blocks
-115 11:52a 🔵 AVS re-detection bug: token stays undetected after moving back into line of sight
-117 " 🔴 VisionAnalyzer door-shortcut diagnostic: emit guard added for same-side-only firing
-119 11:56a 🔵 VisionAnalyzer.hasLineOfSight: hybrid vision-polygon + geometric LOS pipeline mapped
-120 " 🔴 LOS same-side door false-block: regression tests added for horizontal and vertical cases
-123 11:57a 🔵 Door shortcut still fires return-false for same-side rays — tests pass only via multi-point sampling fallback
-124 11:58a 🔴 VisionAnalyzer door-shortcut: replaced proximity bounding-box check with parametric ray-plane intersection
-125 11:59a 🔴 VisionAnalyzer door-shortcut fix verified: all 14 LOS tests green, door-shortcut-debug test updated for new behavior
-128 12:04p ✅ door-shortcut-debug.test.js: consoleInfoSpy removed, test renamed to reflect new behavior
-129 12:05p ✅ AVS door-shortcut bugfix: final working tree diff — 2 files changed, 139 insertions, 20 deletions
-130 12:06p 🔵 pf2e-visioner current version is 8.0.2 — door-shortcut fix needs changelog entry
-131 " ✅ CHANGELOG.md updated: door-shortcut LOS fix added to [8.0.2] Fixed section
-133 12:08p 🔵 Test suite: one failing integration test — api-integration state management
-134 12:09p 🔵 Root cause of failing test: setVisibilityBetween treats "observed" as deletion/no-op, not a write
-136 " 🔵 Integration test mock: document.update doesn't update getFlag — "observed" deletion not reflected in reads
-138 12:10p 🔴 tests/setup.js mock token update() now handles Foundry dotted-path unset syntax and 4-part flag paths
-141 " 🔴 Full test suite green: 218 suites / 2392 tests after setup.js mock fix
-143 12:12p 🔵 TokenEventHandler animation/drag guard and moveToken vs updateToken split for visibility batching
-144 12:15p 🔵 PositionManager: 4-priority position resolution for tokens during animation and drag
+### May 3, 2026
+772 8:53a 🔵 RED: requireStarted Option Test Confirms Guard Blocks combatStart Hook Timing
+773 " 🔴 requireStarted Option Implemented: combatStart Hook Bypasses started Guard
+774 " 🔵 Test Still Failing: Context Decay — Primary Session Returning Cached Test Output
+775 8:54a 🔴 All 10 Service Tests GREEN: requireStarted Fix Confirmed Working
+776 " 🔴 Lint Clean After Full Bug Fix: updateCombatant + requireStarted
+777 " 🔵 Combat Tracker Stealth Row Hiding Not Working for Players
+778 8:56a 🟣 EncounterStealthInitiativeService Switched to AvsOverrideManager.setPairOverrides
+779 " 🔵 Combat Tracker Row Selector May Not Match Actual PF2e HUD HTML Structure
+782 9:04a 🔵 Stealth Initiative Scoping Bug: All Combatants Evaluated Instead of Enemies Only
+780 9:06a 🔵 OverrideValidationIndicator Structure — Floating Tooltip Row Architecture
+781 " 🔵 Canvas Token Highlight Mechanism — HoverTooltips + highlighting.js Pattern
+783 9:11a 🔵 shouldFilterAlly Is the Right Tool for Enemy-Only Observer Scoping
+784 " 🟣 Enemy-Only Scoping Tests Added for Stealth Initiative Visibility
+785 " 🔵 Enemy-Only Tests Confirmed RED — Two Distinct Failure Points
+786 " 🔴 areEnemies Helper Added to Scope Stealth Initiative to Enemy Combatants Only
+788 " ✅ Git Status: Stealth Initiative Changes Uncommitted, Other Feature Files Also Pending
+787 9:14a 🔴 Enemy-Only Stealth Initiative: Test Corrected and All 13 Tests Green
+789 " 🔴 Stealth initiative GM dots must persist until AVS override removed, not just until combat start
+790 9:44a ⚖️ GM dots design reverted to show all users — both can-see and cannot-see
+791 " 🟣 GM dots show both can-see and cannot-see users — keyed on `hasInitialOverride`
+792 9:45a 🔴 GM dots now pass 15/15 with both can-see and cannot-see users shown
+793 " ✅ Full suite 122/122 green, lint clean — stealth initiative feature ready to commit
+794 9:48a 🔵 GM dots still removed before override is removed — `hasInitialOverride` fix insufficient
+795 9:49a 🔵 Root cause trace: `applyTrackerVisibility` early-return path on GM — dots survive, not removed
+796 " 🔵 New test exposes dot-condition bug: `canSee` is true after override removal, so dot persists incorrectly
+797 9:50a 🔴 GM dot lifecycle fixed: `hasInitialOverride` now checks `_hasInitialHideRecord` OR any override flag, not just source-matched flags
+798 " 🔄 New `_hasActiveInitialTrackerRecord` helper unifies record+flag check with auto-cleanup on flag removal
+799 " 🔴 16/16 tests passing — `_hasActiveInitialTrackerRecord` fix confirmed green
+800 " ✅ Full suite 123/123 green, lint clean — stealth initiative feature ready to commit
+801 9:55a 🔵 Design question: two dots show even when only one user beats stealther initiative
+S119 GM tracker dots design pivot — dots should only show users who CAN see the stealther, not users blocked by overrides (May 3 at 9:55 AM)
+802 9:56a ⚖️ Final GM dots design: show ONLY canSee=true users; `hasInitialOverride` gates canSee computation only
+803 " 🔄 GM dots simplified back to `canSee`-only gate — `hasInitialOverride` removed from dot rendering
+804 " ✅ Full suite 123/123 green, lint clean — stealth initiative feature final verified state
+805 9:57a ⚖️ Tracker turn-reveal behavior: user prefers stealther stays hidden until override explicitly removed
+806 10:00a 🟣 GM Tracker Initial-Stealth Marker (eye-slash icon)
+807 10:01a 🟣 CSS for GM stealth initial-marker icon
+808 10:07a 🟣 Tests added for eye-slash initial-stealth marker in GM dots
+809 10:09a 🟣 Eye-slash initial-stealth marker: full suite green
+810 10:10a ⚖️ GM dots flipped: now show users who CANNOT see the stealther
+811 10:11a 🔵 Tests fail: service still renders dots for canSee=true, tests now expect canSee=false
+812 10:13a 🟣 Service implementation flipped: GM dots now show blocked players, eye-slash marker removed
+813 " ✅ Remaining initial-marker test assertions flipped to toBeNull
+814 " 🔵 Test "keeps GM tracker dot while metadata changes" has stale expectation at line 540
+815 " 🔴 All 17 stealth tests green after "cannot see" dot migration
+816 " 🔄 Dead code removed: eye-slash marker method and CSS deleted
+817 " 🟣 Stealth initiative feature complete: 124/124 green, lint clean
+818 10:14a 🟣 Two-tier stealth visibility: unnoticed/undetected in EncounterStealthInitiativeService
+819 " 🟣 Unnoticed hover tooltip requested (matching undetected purple tooltip)
+820 10:21a 🔵 Undetected tooltip/styling system structure discovered for unnoticed parity work
+821 10:38a 🔵 Duplicate styles directory discovered: scripts/styles/ mirrors styles/
 
-Access 942k tokens of past work via get_observations([IDs]) or mem-search skill.
+Access 694k tokens of past work via get_observations([IDs]) or mem-search skill.
 </claude-mem-context>

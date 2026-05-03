@@ -77,7 +77,11 @@
       "observed": "Obserwowany",
       "concealed": "Przysłonięty",
       "hidden": "Ukryty",
-      "undetected": "Niewykryty"
+      "undetected": "Niewykryty",
+      "unnoticed": "Niezauważony"
+    },
+    "ENCOUNTER_STEALTH": {
+      "STEALTH_INITIATIVE_TOOLTIP": "Rzut na inicjatywę oparty na Skradaniu"
     },
     "COVER_STATES": {
       "none": "Brak osłony",

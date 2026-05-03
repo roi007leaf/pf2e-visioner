@@ -2,22 +2,24 @@
  * Token border utilities for VisionerTokenManager
  */
 
-export function addTokenBorder(token, strong = false) {
+export function addTokenBorder(token, strong = false, options = {}) {
   if (!token) return;
-  
-  let border = token._highlightBorder;
+
+  const key = options.key || '_highlightBorder';
+  let border = token[key];
   if (!border) {
     border = new PIXI.Graphics();
-    token._highlightBorder = border;
+    token[key] = border;
     canvas.tokens.addChild(border);
   } else {
     border.clear();
   }
-  
-  const padding = 4;
-  const borderColor = strong ? 0xffd700 : 0xffa500;
-  const borderWidth = strong ? 3 : 2;
-  const alpha = strong ? 0.9 : 0.7;
+
+  const padding = options.padding ?? 4;
+  const borderColor = options.color ?? (strong ? 0xffd700 : 0xffa500);
+  const borderWidth = options.width ?? (strong ? 3 : 2);
+  const alpha = options.alpha ?? (strong ? 0.9 : 0.7);
+  const radius = options.radius ?? 8;
   const tokenWidth = token.document.width * canvas.grid.size;
   const tokenHeight = token.document.height * canvas.grid.size;
   border.lineStyle(borderWidth, borderColor, alpha);
@@ -26,22 +28,23 @@ export function addTokenBorder(token, strong = false) {
     -tokenHeight / 2 - padding,
     tokenWidth + padding * 2,
     tokenHeight + padding * 2,
-    8,
+    radius,
   );
   border.x = token.document.x + tokenWidth / 2;
   border.y = token.document.y + tokenHeight / 2;
 }
 
-export function removeTokenBorder(token) {
-  if (token?._highlightBorder) {
+export function removeTokenBorder(token, options = {}) {
+  const key = options.key || '_highlightBorder';
+  if (token?.[key]) {
     try {
-      if (token._highlightBorder.parent) {
-        token._highlightBorder.parent.removeChild(token._highlightBorder);
+      if (token[key].parent) {
+        token[key].parent.removeChild(token[key]);
       }
     } catch (_) {}
     try {
-      token._highlightBorder.destroy();
+      token[key].destroy();
     } catch (_) {}
-    delete token._highlightBorder;
+    delete token[key];
   }
 }

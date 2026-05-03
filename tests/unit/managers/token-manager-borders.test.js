@@ -129,6 +129,22 @@ describe('Token Border Management', () => {
       expect(mockGraphics.lineStyle).toHaveBeenCalledWith(3, 0xffd700, 0.9);
     });
 
+    test('uses custom border style and storage key when provided', () => {
+      addTokenBorder(mockToken, false, {
+        color: 0x2196f3,
+        width: 4,
+        alpha: 0.8,
+        padding: 7,
+        radius: 10,
+        key: '_observerHoverBorder',
+      });
+
+      expect(mockGraphics.lineStyle).toHaveBeenCalledWith(4, 0x2196f3, 0.8);
+      expect(mockGraphics.drawRoundedRect).toHaveBeenCalledWith(-32, -32, 64, 64, 10);
+      expect(mockToken._observerHoverBorder).toBe(mockGraphics);
+      expect(mockToken._highlightBorder).toBeUndefined();
+    });
+
     test('handles null token gracefully', () => {
       expect(() => addTokenBorder(null, false)).not.toThrow();
       expect(global.PIXI.Graphics).not.toHaveBeenCalled();
@@ -146,6 +162,21 @@ describe('Token Border Management', () => {
       expect(mockCanvasTokens.removeChild).toHaveBeenCalledWith(border);
       expect(border.destroy).toHaveBeenCalled();
       expect(mockToken._highlightBorder).toBeUndefined();
+    });
+
+    test('removes custom-key border without touching default border', () => {
+      addTokenBorder(mockToken, false);
+      const defaultBorder = mockToken._highlightBorder;
+      addTokenBorder(mockToken, false, { key: '_targetHoverBorder', color: 0xffd54f });
+      const targetBorder = mockToken._targetHoverBorder;
+      mockCanvasTokens.children = [defaultBorder, targetBorder];
+
+      removeTokenBorder(mockToken, { key: '_targetHoverBorder' });
+
+      expect(mockCanvasTokens.removeChild).toHaveBeenCalledWith(targetBorder);
+      expect(targetBorder.destroy).toHaveBeenCalled();
+      expect(mockToken._targetHoverBorder).toBeUndefined();
+      expect(mockToken._highlightBorder).toBe(defaultBorder);
     });
 
     test('handles missing border gracefully', () => {

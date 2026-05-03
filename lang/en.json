@@ -77,7 +77,11 @@
       "observed": "Observed",
       "concealed": "Concealed",
       "hidden": "Hidden",
-      "undetected": "Undetected"
+      "undetected": "Undetected",
+      "unnoticed": "Unnoticed"
+    },
+    "ENCOUNTER_STEALTH": {
+      "STEALTH_INITIATIVE_TOOLTIP": "Rolled Stealth for initiative"
     },
     "COVER_STATES": {
       "none": "No Cover",
@@ -712,7 +716,7 @@
       },
       "AUTO_VISIBILITY_ENABLED": {
         "name": "Enable Auto-Visibility System",
-        "hint": "Automatically set visibility flags based on lighting conditions and creature senses. This system will analyze scene lighting, token positions, and creature abilities to determine appropriate visibility states (observed, concealed, hidden, undetected)."
+        "hint": "Automatically set visibility flags based on lighting conditions and creature senses. This system will analyze scene lighting, token positions, and creature abilities to determine appropriate visibility states (observed, concealed, hidden, undetected, unnoticed)."
       },
       "AVS_GM_VISION_WARNING_SUPPRESS": {
         "name": "Suppress GM Vision warning",
@@ -725,6 +729,10 @@
       "AVS_ONLY_IN_COMBAT": {
         "name": "AVS Only Active in Combat",
         "hint": "When enabled, the Auto-Visibility System will only be active during encounters and will only track visibility for tokens in the encounter. Visibility will be reset when combat ends."
+      },
+      "ENABLE_STEALTH_INITIATIVE_VISIBILITY": {
+        "name": "Encounter Stealth Initiative Visibility",
+        "hint": "When enabled, PF2E Visioner handles Stealth-initiative encounter setup: combatants who rolled Stealth are initially undetected and hidden from tracker rows for creatures they beat in initiative. Leave disabled if PF2e Avoid Notice or another module manages this."
       },
       "DISABLE_LINE_OF_SIGHT": {
         "name": "Disable Line of Sight Raycasting",

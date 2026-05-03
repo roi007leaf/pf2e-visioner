@@ -9,6 +9,7 @@
 
 
 import { COVER_STATES, MODULE_ID, VISIBILITY_STATES } from '../constants.js';
+import { addTokenBorder, removeTokenBorder } from '../managers/token-manager/borders.js';
 
 class OverrideValidationIndicator {
   static #instance = null;
@@ -29,6 +30,7 @@ class OverrideValidationIndicator {
     this._overrideStack = new Map(); // tokenId -> { overrides, tokenName, timestamp }
     this._currentTokenId = null;
     this._drag = { active: false, start: { x: 0, y: 0 }, offset: { x: 0, y: 0 }, moved: false };
+    this._rowHighlightTokens = [];
     // Guard against rapid show->hide flicker when recomputations settle to 0
     this._lastShowAt = 0; // ms timestamp of last show() with non-empty items
     this._lastCount = 0; // last shown count
@@ -576,24 +578,72 @@ class OverrideValidationIndicator {
     });
 
     document.body.appendChild(tip);
-    this.#bindRowContextMenus();
     const rect = this._el.getBoundingClientRect();
     tip.style.left = rect.right + 8 + 'px';
     tip.style.top = Math.max(8, rect.top - 8) + 'px';
   }
 
   #hideTooltip() {
+    this.#clearRowTokenHighlights();
     if (this._tooltipEl?.parentElement) this._tooltipEl.parentElement.removeChild(this._tooltipEl);
     this._tooltipEl = null;
+  }
+
+  #clearRowTokenHighlights() {
+    const entries = Array.isArray(this._rowHighlightTokens) ? this._rowHighlightTokens : [];
+    for (const { token, key } of entries) {
+      try {
+        removeTokenBorder(token, { key });
+      } catch { /* best-effort hover cleanup */ }
+    }
+    this._rowHighlightTokens = [];
+  }
+
+  #highlightRowTokens(row) {
+    this.#clearRowTokenHighlights();
+    const observerId = row?.dataset?.observerId;
+    const targetId = row?.dataset?.targetId;
+    if (!observerId && !targetId) return;
+
+    const observer = observerId ? canvas?.tokens?.get?.(observerId) : null;
+    const target = targetId ? canvas?.tokens?.get?.(targetId) : null;
+
+    const addHighlight = (token, options) => {
+      if (!token) return;
+      try {
+        addTokenBorder(token, false, options);
+        this._rowHighlightTokens.push({ token, key: options.key });
+      } catch { /* best-effort hover highlight */ }
+    };
+
+    addHighlight(observer, {
+      key: '_pf2eVisionerObserverHoverBorder',
+      color: 0x2196f3,
+      width: 3,
+      alpha: 0.95,
+      padding: 4,
+      radius: 8,
+    });
+    addHighlight(target, {
+      key: '_pf2eVisionerTargetHoverBorder',
+      color: 0xffd54f,
+      width: 3,
+      alpha: 0.95,
+      padding: observer && target && observer === target ? 9 : 4,
+      radius: 8,
+    });
   }
 
   #bindRowContextMenus() {
     if (!this._tooltipEl) return;
     const rows = this._tooltipEl.querySelectorAll('.tip-row[data-observer-id][data-target-id]');
     rows.forEach((row) => {
+      row.addEventListener('mouseenter', () => this.#highlightRowTokens(row));
+      row.addEventListener('mouseleave', () => this.#clearRowTokenHighlights());
       row.addEventListener('contextmenu', async (ev) => {
         ev.preventDefault();
         ev.stopPropagation();
+        this.#clearRowTokenHighlights();
         const observerId = row.dataset.observerId;
         const targetId = row.dataset.targetId;
         if (!observerId || !targetId) return;
@@ -625,6 +675,7 @@ class OverrideValidationIndicator {
 
   #renderTooltipContents() {
     if (!this._tooltipEl) return;
+    this.#clearRowTokenHighlights();
     // Render the already-filtered display items to keep counts and grouping consistent
     // The _data.overrides should already be filtered by both #hasDisplayChange and #shouldShowOverride
     const all = this._data?.overrides || [];
@@ -922,4 +973,3 @@ class OverrideValidationIndicator {
 const overrideValidationIndicator = OverrideValidationIndicator.getInstance();
 export default overrideValidationIndicator;
 export { OverrideValidationIndicator };
-
