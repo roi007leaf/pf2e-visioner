@@ -783,6 +783,7 @@ class OverrideValidationIndicator {
           concealed: '#f0e442', // yellow
           hidden: '#cc79a7', // pink/magenta
           undetected: '#d55e00', // dark orange
+          unnoticed: '#9467bd', // purple
         },
         cover: {
           none: '#0072b2',
@@ -797,6 +798,7 @@ class OverrideValidationIndicator {
           concealed: '#f0e442',
           hidden: '#ff8c00',
           undetected: '#d946ef',
+          unnoticed: '#d946ef',
         },
         cover: {
           none: '#0072b2',
@@ -811,6 +813,7 @@ class OverrideValidationIndicator {
           concealed: '#ffd700',
           hidden: '#ff6600',
           undetected: '#dc143c',
+          unnoticed: '#9c27b0',
         },
         cover: {
           none: '#00b050',
@@ -825,6 +828,7 @@ class OverrideValidationIndicator {
           concealed: '#cccccc',
           hidden: '#888888',
           undetected: '#333333',
+          unnoticed: '#999999',
         },
         cover: {
           none: '#ffffff',
@@ -843,6 +847,7 @@ class OverrideValidationIndicator {
         concealed: ['--visibility-concealed', '--visibility-concealed-color', '#ffc107'],
         hidden: ['--visibility-hidden', '--visibility-hidden-color', '#ff9800'],
         undetected: ['--visibility-undetected', '--visibility-undetected-color', '#f44336'],
+        unnoticed: ['--visibility-unnoticed', '--visibility-unnoticed-color', '#9c27b0'],
       },
       cover: {
         none: ['--cover-none', '--cover-none-color', '#4caf50'],
@@ -860,6 +865,7 @@ class OverrideValidationIndicator {
       // Variable chain fallback
       const chain = variableFallbacks[kind]?.[state] || [];
       for (const v of chain) {
+        if (v.startsWith('#')) return v;
         const val = bodyStyle.getPropertyValue(v).trim();
         if (val) return val;
       }
