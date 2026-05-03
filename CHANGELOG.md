@@ -1,5 +1,15 @@
 # Changelog
 
+## [8.1.1] - 2026-05-03
+
+### Fixed
+
+- **Unnoticed override tooltip icons now use the correct purple color**: Floating override tooltips now include an explicit `unnoticed` state color rule, preventing the `user-secret` icon from inheriting the generic green observed styling.
+
+### Improved
+
+- **Stealth initiative tracker indication is now neutral**: Combatants who rolled Stealth for initiative keep a small `user-secret` marker beside their tracker name, while per-user visibility details stay in Visioner's normal `unnoticed` tooltip and override UI.
+
 ## [8.1.0] - 2026-05-03
 
 ### Added

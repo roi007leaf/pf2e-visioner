@@ -122,4 +122,37 @@ describe('OverrideValidationIndicator row hover highlighting', () => {
     expect(observer._pf2eVisionerObserverHoverBorder).toBeUndefined();
     expect(target._pf2eVisionerTargetHoverBorder).toBeUndefined();
   });
+
+  test('renders unnoticed state icons with the purple tooltip color rule', () => {
+    const observer = global.canvas.tokens.get('observer-1');
+    const target = global.canvas.tokens.get('target-1');
+
+    indicator.show(
+      [
+        {
+          observerId: observer.id,
+          targetId: target.id,
+          observerName: observer.name,
+          targetName: target.name,
+          state: 'unnoticed',
+          currentVisibility: 'observed',
+        },
+      ],
+      'Observer',
+    );
+
+    document
+      .querySelector('.pf2e-visioner-override-indicator')
+      .dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
+
+    const unnoticedIcon = document.querySelector(
+      '.pf2e-visioner-override-tooltip .state-indicator.visibility-unnoticed',
+    );
+    expect(unnoticedIcon).toBeTruthy();
+    expect(unnoticedIcon.className).toContain('fa-user-secret');
+
+    const styleText = document.querySelector('#pf2e-visioner-override-indicator-styles')?.textContent;
+    expect(styleText).toContain('.state-indicator.visibility-unnoticed');
+    expect(styleText).toContain('--visibility-unnoticed');
+  });
 });

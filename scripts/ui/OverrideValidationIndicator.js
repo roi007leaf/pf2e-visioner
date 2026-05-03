@@ -925,6 +925,7 @@ class OverrideValidationIndicator {
       .pf2e-visioner-override-tooltip .state-indicator.visibility-concealed { color: var(--visibility-concealed, var(--visibility-concealed-color, #ffc107)) !important; }
       .pf2e-visioner-override-tooltip .state-indicator.visibility-hidden { color: var(--visibility-hidden, var(--visibility-hidden-color, #ff9800)) !important; }
       .pf2e-visioner-override-tooltip .state-indicator.visibility-undetected { color: var(--visibility-undetected, var(--visibility-undetected-color, #f44336)) !important; }
+      .pf2e-visioner-override-tooltip .state-indicator.visibility-unnoticed { color: var(--visibility-unnoticed, var(--visibility-unnoticed-color, #9c27b0)) !important; }
       .pf2e-visioner-override-tooltip .state-indicator.cover-none { color: var(--cover-none, var(--cover-none-color, #4caf50)) !important; }
       .pf2e-visioner-override-tooltip .state-indicator.cover-lesser { color: var(--cover-lesser, var(--cover-lesser-color, #ffc107)) !important; }
       .pf2e-visioner-override-tooltip .state-indicator.cover-standard { color: var(--cover-standard, var(--cover-standard-color, #ff6600)) !important; }
