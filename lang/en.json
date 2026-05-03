@@ -881,6 +881,10 @@
         "name": "Enable Auto-Cover",
         "hint": "Allows cover to be automatically applied based on token coverage in relation to walls and other tokens"
       },
+      "COMPUTE_COVER_AT_COMBAT_START": {
+        "name": "Compute Cover at Combat Start",
+        "hint": "Automatically compute cover between non-allied combatant tokens at combat start. It is only used for this check."
+      },
       "EXPERIMENTAL_SEE_THROUGH_WALLS": {
         "name": "Experimental: Per-Token See-Through Walls (Client-Only)",
         "hint": "When enabled on your client, selected token(s) will ignore walls you have marked as Observed in the Hidden Walls list. Visual-only and highly experimental."

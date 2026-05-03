@@ -1,5 +1,12 @@
 # Changelog
 
+## [8.1.2] - 2026-05-03
+
+### Added
+
+- **Combat-start cover computation**: Added an opt-in Cover setting that computes normal auto-cover states between non-allied combatants when combat starts, seeding encounter cover without creating manual cover overrides.
+- **GM-hidden token support for stealth initiative**: Encounter stealth initiative setup now toggles GM-hidden stealth combatants visible at combat start before applying the appropriate encounter-start visibility overrides.
+
 ## [8.1.1] - 2026-05-03
 
 ### Fixed

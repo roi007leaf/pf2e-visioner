@@ -3,6 +3,7 @@
  */
 
 import { MODULE_ID } from '../constants.js';
+import { combatStartCoverService } from '../services/CombatStartCoverService.js';
 import { encounterStealthInitiativeService } from '../services/EncounterStealthInitiativeService.js';
 
 export function registerCombatHooks() {
@@ -92,7 +93,9 @@ async function handleCombatStart(combat) {
     console.error('PF2E Visioner: Error setting up visibility recalculation on combat start:', error);
   }
 
-  await encounterStealthInitiativeService.applyEncounterStartVisibility(combat ?? game.combat, {
+  const combatTracker = combat ?? game.combat;
+  await combatStartCoverService.applyCombatStartAutoCover(combatTracker);
+  await encounterStealthInitiativeService.applyEncounterStartVisibility(combatTracker, {
     requireStarted: false,
   });
   await checkAvsOverrides();

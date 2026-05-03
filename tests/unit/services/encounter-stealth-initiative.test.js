@@ -47,6 +47,7 @@ function makeToken(
     name,
     actor,
     disposition,
+    hidden: false,
     flags,
     getFlag: jest.fn((moduleId, key) => flags[moduleId]?.[key]),
     setFlag: jest.fn((moduleId, key, value) => {
@@ -57,6 +58,10 @@ function makeToken(
     unsetFlag: jest.fn((moduleId, key) => {
       delete flags[moduleId]?.[key];
       return Promise.resolve(true);
+    }),
+    update: jest.fn((changes) => {
+      Object.assign(document, changes);
+      return Promise.resolve(document);
     }),
   };
   return { id, name, actor, document, isOwner };
@@ -148,6 +153,12 @@ describe('EncounterStealthInitiativeService', () => {
       default: false,
       restricted: true,
     });
+    expect(DEFAULT_SETTINGS.computeCoverAtCombatStart).toMatchObject({
+      scope: 'world',
+      type: Boolean,
+      default: false,
+      restricted: true,
+    });
   });
 
   test('does nothing when the feature setting is disabled', async () => {
@@ -215,6 +226,27 @@ describe('EncounterStealthInitiativeService', () => {
     expect(changesByTarget.get(stealther.id)).toMatchObject({
       target: stealther,
       state: 'undetected',
+    });
+  });
+
+  test('combat start unhides GM-hidden stealth combatants before applying encounter stealth overrides', async () => {
+    setSetting(true);
+    stealther.document.hidden = true;
+    const { encounterStealthInitiativeService } = await importService();
+    const combat = makeCombat([
+      makeCombatant('low', observerLow, 10),
+      makeCombatant('stealth', stealther, 20, 'stealth'),
+    ]);
+
+    await encounterStealthInitiativeService.applyEncounterStartVisibility(combat);
+
+    expect(stealther.document.update).toHaveBeenCalledWith({ hidden: false });
+    expect(stealther.document.hidden).toBe(false);
+    expect(mockSetPairOverrides).toHaveBeenCalledTimes(1);
+    const changesByTarget = mockSetPairOverrides.mock.calls[0][1];
+    expect(changesByTarget.get(stealther.id)).toMatchObject({
+      target: stealther,
+      state: 'unnoticed',
     });
   });
 

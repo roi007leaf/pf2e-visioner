@@ -149,6 +149,7 @@ export class EncounterStealthInitiativeService {
       if (!hasNumericInitiative(stealther)) continue;
       const stealtherToken = getTokenFromCombatant(stealther);
       if (!stealtherToken?.document?.id) continue;
+      await this._unhideFoundryHiddenCombatantToken(stealtherToken);
 
       for (const observer of combatants) {
         if (observer === stealther) continue;
@@ -197,6 +198,12 @@ export class EncounterStealthInitiativeService {
         }
       }
     }
+  }
+
+  async _unhideFoundryHiddenCombatantToken(token) {
+    if (!game.user?.isGM) return;
+    if (token?.document?.hidden !== true) return;
+    await token.document?.update?.({ hidden: false });
   }
 
   _isInitiativeRelevantUpdate(changes = {}) {

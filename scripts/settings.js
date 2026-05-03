@@ -54,6 +54,7 @@ const SETTINGS_GROUPS = {
       // First item acts as parent (Enable Auto-Cover) others depend visually/logic on it
       keys: [
         'autoCover',
+        'computeCoverAtCombatStart',
         'autoCoverVisualizationOnlyInEncounter',
         'autoCoverVisualizationRespectFogForGM',
       ],
@@ -188,6 +189,7 @@ class VisionerSettingsForm extends foundry.applications.api.ApplicationV2 {
         [
           'autoCoverVisualizationOnlyInEncounter',
           'autoCoverVisualizationRespectFogForGM',
+          'computeCoverAtCombatStart',
           'autoCoverTokenIntersectionMode',
           'autoCoverIgnoreUndetected',
           'autoCoverIgnoreDead',
@@ -323,6 +325,7 @@ class VisionerSettingsForm extends foundry.applications.api.ApplicationV2 {
         autoCover: [
           'autoCoverVisualizationOnlyInEncounter',
           'autoCoverVisualizationRespectFogForGM',
+          'computeCoverAtCombatStart',
           'autoCoverTokenIntersectionMode',
           'autoCoverIgnoreUndetected',
           'autoCoverIgnoreDead',
@@ -537,6 +540,7 @@ export function registerSettings() {
         settingConfig.onChange = () => { };
       } else if (
         key === 'autoCover' ||
+        key === 'computeCoverAtCombatStart' ||
         key === 'autoCoverTokenIntersectionMode' ||
         key === 'autoCoverCoverageStandardPct' ||
         key === 'autoCoverCoverageGreaterPct' ||

@@ -902,6 +902,15 @@ export const DEFAULT_SETTINGS = {
     type: Boolean,
     default: true,
   },
+  computeCoverAtCombatStart: {
+    name: 'PF2E_VISIONER.SETTINGS.COMPUTE_COVER_AT_COMBAT_START.name',
+    hint: 'PF2E_VISIONER.SETTINGS.COMPUTE_COVER_AT_COMBAT_START.hint',
+    scope: 'world',
+    config: true,
+    restricted: true,
+    type: Boolean,
+    default: false,
+  },
 
   // Auto-Cover behavior tuning
   autoCoverTokenIntersectionMode: {
