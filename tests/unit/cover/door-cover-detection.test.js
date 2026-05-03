@@ -289,6 +289,44 @@ describe('Door Cover Detection', () => {
       expect(result).toBe(false); // Should not block (open door doesn't naturally block, so override ignored)
     });
 
+    test('should not apply cover override from an open door in full detection', () => {
+      const attacker = global.createMockToken({
+        id: 'attacker',
+        x: 0,
+        y: 1,
+        width: 1,
+        height: 1,
+        center: { x: 50, y: 100 },
+      });
+      const target = global.createMockToken({
+        id: 'target',
+        x: 2,
+        y: 1,
+        width: 1,
+        height: 1,
+        center: { x: 250, y: 100 },
+      });
+      const openDoorWithStandardOverride = {
+        document: {
+          id: 'open-door',
+          sight: 20,
+          door: 1,
+          ds: 1,
+          dir: 0,
+          c: [150, 50, 150, 150],
+          getFlag: jest.fn().mockReturnValue('standard'),
+        },
+        coords: [150, 50, 150, 150],
+      };
+
+      mockCanvas.tokens.placeables = [attacker, target];
+      mockWalls.push(openDoorWithStandardOverride);
+
+      const result = coverDetector.detectBetweenTokens(attacker, target);
+
+      expect(result).toBe('none');
+    });
+
     test('should respect cover override on closed door (none override)', () => {
       const closedDoorWithNoneOverride = {
         sight: 20,

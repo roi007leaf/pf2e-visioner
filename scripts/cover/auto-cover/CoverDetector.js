@@ -123,8 +123,11 @@ export class CoverDetector {
       // Check if there's any blocking terrain (walls) in the way
       const segmentAnalysis = this._analyzeSegmentObstructions(p1, p2, elevationRange, attackerSpan, targetSpan);
       const hasWallsInTheWay = segmentAnalysis.hasBlockingTerrain;
+      const hasSampledWallCoverage = !hasWallsInTheWay && this._hasSceneWalls()
+        ? this._estimateWallCoveragePercent(p1, target, elevationRange, attackerSpan, targetSpan) > 0
+        : false;
 
-      const wallCover = hasWallsInTheWay || this._hasSceneWalls()
+      const wallCover = hasWallsInTheWay || hasSampledWallCoverage
         ? this._evaluateWallsCover(p1, p2, elevationRange, attackerSpan, targetSpan, target)
         : 'none';
 
@@ -610,6 +613,11 @@ export class CoverDetector {
         const coverOverride = wallDoc.getFlag?.(MODULE_ID, 'coverOverride');
 
         if (!coverOverride || coverOverride === 'auto') {
+          continue;
+        }
+
+        const isOpenDoor = Number(wallDoc.door) > 0 && Number(wallDoc.ds ?? wallDoc.doorState ?? 0) === 1;
+        if (isOpenDoor) {
           continue;
         }
 

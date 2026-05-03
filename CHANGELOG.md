@@ -1,5 +1,13 @@
 # Changelog
 
+## [8.1.3] - 2026-05-03
+
+### Fixed
+
+- **Auto-cover no longer upgrades creature-provided lesser cover when unrelated walls exist**: Creature-only cover now stays on the token-cover path unless a wall actually intersects the attacker-target line.
+- **Open doors no longer grant wall cover**: Wall cover overrides on open doors are ignored, matching the door's non-blocking state.
+- **Wall cover now requires a real in-between wall hit**: Off-axis sampled-only wall coverage no longer grants standard or greater cover, while walls directly between attacker and defender still grant at least standard cover even when edge sampling is below threshold.
+
 ## [8.1.2] - 2026-05-03
 
 ### Added

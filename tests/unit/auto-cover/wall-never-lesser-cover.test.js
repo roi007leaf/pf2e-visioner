@@ -109,6 +109,49 @@ describe('Walls never grant lesser cover', () => {
   });
 
   describe('detectBetweenTokens wall path', () => {
+    test('should keep creature-only cover lesser when unrelated scene walls exist', () => {
+      const attacker = global.createMockToken({
+        id: 'attacker',
+        x: 0, y: 0, width: 1, height: 1,
+        center: { x: 25, y: 25 },
+      });
+      const target = global.createMockToken({
+        id: 'target',
+        x: 200, y: 0, width: 1, height: 1,
+        center: { x: 225, y: 25 },
+      });
+      const blocker = global.createMockToken({
+        id: 'blocker',
+        x: 100, y: 0, width: 1, height: 1,
+        center: { x: 125, y: 25 },
+      });
+      const unrelatedWall = {
+        document: {
+          id: 'unrelated-wall',
+          sight: 1,
+          door: 0,
+          dir: 0,
+          c: [500, 500, 600, 500],
+          getFlag: jest.fn(() => null),
+        },
+        coords: [500, 500, 600, 500],
+      };
+
+      global.canvas.tokens = { placeables: [attacker, target, blocker], controlled: [] };
+      global.canvas.walls.placeables = [unrelatedWall];
+      global.canvas.walls.objects.children = [unrelatedWall];
+      global.game.settings.get = jest.fn((module, setting) => {
+        if (setting === 'autoCoverTokenIntersectionMode') return 'any';
+        if (setting === 'autoCoverAllowProneBlockers') return true;
+        if (setting === 'wallCoverAllowGreater') return true;
+        return false;
+      });
+
+      const result = coverDetector.detectBetweenTokens(attacker, target);
+
+      expect(result).toBe('lesser');
+    });
+
     test('should clamp lesser to standard when Levels downgrades wall cover', () => {
       const attacker = global.createMockToken({
         id: 'attacker',
