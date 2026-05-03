@@ -1235,6 +1235,18 @@ function getChatAutomationCSS() {
             border-color: var(--visibility-undetected) !important;
             box-shadow: 0 0 12px var(--visibility-undetected) !important;
         }
+
+        .state-icon[data-state='unnoticed'].selected,
+        .seek-preview-dialog .state-icon[data-state='unnoticed'].selected,
+        .hide-preview-dialog .state-icon[data-state='unnoticed'].selected,
+        .sneak-preview-dialog .state-icon[data-state='unnoticed'].selected,
+        .visibility-table .state-icon[data-state='unnoticed'].selected,
+        .override-icons .state-icon[data-state='unnoticed'].selected {
+            background: var(--visibility-unnoticed-bg-strong) !important;
+            color: var(--visibility-unnoticed) !important;
+            border-color: var(--visibility-unnoticed) !important;
+            box-shadow: 0 0 12px var(--visibility-unnoticed) !important;
+        }
         
         /* Enhanced Point Out Dialog Selected State Glow */
         .point-out-preview-dialog .override-icons .state-icon.selected,
