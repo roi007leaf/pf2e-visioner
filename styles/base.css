@@ -922,15 +922,25 @@
   display: none !important;
 }
 
+.pf2e-visioner-stealth-tracker-masked img,
+.pf2e-visioner-stealth-tracker-masked .token-image,
+.pf2e-visioner-stealth-tracker-masked .combatant-image {
+  visibility: hidden;
+}
+
 .pf2e-visioner-stealth-initiative-marker {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   margin-left: 6px;
-  color: var(--visibility-unnoticed);
+  color: var(--visibility-unnoticed, #9c27b0) !important;
   font-size: 0.72em;
   line-height: 1;
   vertical-align: middle;
+}
+
+.pf2e-visioner-stealth-initiative-marker i {
+  color: var(--visibility-unnoticed, #9c27b0) !important;
 }
 
 /* Utility classes */

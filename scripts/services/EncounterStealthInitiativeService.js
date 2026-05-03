@@ -4,11 +4,14 @@ import AvsOverrideManager from '../chat/services/infra/AvsOverrideManager.js';
 const FEATURE_SETTING = 'enableStealthInitiativeVisibility';
 const ENCOUNTER_STEALTH_STATES = new Set(['undetected', 'unnoticed']);
 const TRACKER_HIDDEN_STATES = new Set(['unnoticed']);
+const TRACKER_MASKED_STATES = new Set(['undetected']);
 const RECORD_SEPARATOR = '::';
 const OVERRIDE_SOURCE = 'encounter_stealth_initiative';
 const TRACKER_HIDDEN_CLASS = 'pf2e-visioner-stealth-tracker-hidden';
+const TRACKER_MASKED_CLASS = 'pf2e-visioner-stealth-tracker-masked';
 const TRACKER_STEALTH_MARKER_SELECTOR = '[data-pf2e-visioner-stealth-initiative-marker="true"]';
 const PREVIOUS_OVERRIDE_PREFIX = 'encounter-stealth-previous-from-';
+const MASKED_COMBATANT_LABEL = 'Undetected Combatant';
 
 function collectionToArray(collection) {
   if (!collection) return [];
@@ -230,19 +233,20 @@ export class EncounterStealthInitiativeService {
       const combatantId = combatant?.id;
       if (!combatantId) continue;
       seenIds.add(combatantId);
+      const hidden = this.shouldHideCombatantFromCurrentUser(combatant, combat);
+      const masked = !hidden && this.shouldMaskCombatantDetailsFromCurrentUser(combatant, combat);
+      this._setCombatantRowsHidden(combatantId, hidden);
+      this._setCombatantRowsMasked(combatantId, masked);
       this._setStealthInitiativeMarker(
         combatantId,
         this.isEnabled() && this.isStealthInitiativeCombatant(combatant) && hasNumericInitiative(combatant),
-      );
-      this._setCombatantRowsHidden(
-        combatantId,
-        this.shouldHideCombatantFromCurrentUser(combatant, combat),
       );
       this._restoreExpiredInitialOverridesForCombatant(combatant, combat);
     }
 
     if (!this.isEnabled() || game.user?.isGM) {
       this._showRowsHiddenByVisioner();
+      this._unmaskRowsMaskedByVisioner();
       this._removeStaleStealthInitiativeMarkers(seenIds);
       return;
     }
@@ -293,6 +297,45 @@ export class EncounterStealthInitiativeService {
     }
 
     return true;
+  }
+
+  shouldMaskCombatantDetailsFromCurrentUser(combatant, combat = game.combat) {
+    if (!this.isEnabled()) return false;
+    if (game.user?.isGM) return false;
+    if (!this.isStealthInitiativeCombatant(combatant)) return false;
+    if (!hasNumericInitiative(combatant)) return false;
+
+    const stealtherToken = getTokenFromCombatant(combatant);
+    if (!stealtherToken?.document?.id) return false;
+
+    const combatants = collectionToArray(combat?.combatants ?? combat?.turns);
+    const ownedObservers = this._getOwnedObserverTokens(combatants, stealtherToken);
+    if (ownedObservers.length === 0) return false;
+
+    let hasUndetectedOverride = false;
+    for (const { token: observerToken } of ownedObservers) {
+      const recordKey = makeRecordKey(observerToken.document.id, stealtherToken.document.id);
+      if (!this._hasInitialHideRecord(combat, recordKey) && !this._seedInitialHideRecordFromOverride(
+        combat,
+        recordKey,
+        observerToken,
+        stealtherToken,
+      )) {
+        return false;
+      }
+
+      const override = this._getInitialOverride(observerToken, stealtherToken);
+      if (!this._isActiveInitialOverride(override, observerToken, stealtherToken)) {
+        this._deleteInitialHideRecord(combat, recordKey);
+        return false;
+      }
+
+      if (TRACKER_MASKED_STATES.has(override?.state)) {
+        hasUndetectedOverride = true;
+      }
+    }
+
+    return hasUndetectedOverride;
   }
 
   _getOwnedObserverTokens(combatants, stealtherToken) {
@@ -463,6 +506,39 @@ export class EncounterStealthInitiativeService {
     }
   }
 
+  _setCombatantRowsMasked(combatantId, masked) {
+    const rows = this._getCombatantRows(combatantId);
+
+    for (const row of rows) {
+      if (masked) {
+        row.classList.add(TRACKER_MASKED_CLASS);
+        row.dataset.pf2eVisionerStealthMasked = 'true';
+        this._maskCombatantRowName(row);
+      } else if (row.dataset.pf2eVisionerStealthMasked === 'true') {
+        row.classList.remove(TRACKER_MASKED_CLASS);
+        delete row.dataset.pf2eVisionerStealthMasked;
+        this._restoreCombatantRowName(row);
+      }
+    }
+  }
+
+  _maskCombatantRowName(row) {
+    const anchor = this._getTrackerMarkerAnchor(row);
+    if (!anchor) return;
+    if (!anchor.dataset.pf2eVisionerOriginalHtml) {
+      anchor.dataset.pf2eVisionerOriginalHtml = anchor.innerHTML;
+    }
+    anchor.textContent = MASKED_COMBATANT_LABEL;
+  }
+
+  _restoreCombatantRowName(row) {
+    const maskedNames = row.querySelectorAll?.('[data-pf2e-visioner-original-html]') ?? [];
+    for (const name of maskedNames) {
+      name.innerHTML = name.dataset.pf2eVisionerOriginalHtml;
+      delete name.dataset.pf2eVisionerOriginalHtml;
+    }
+  }
+
   _setStealthInitiativeMarker(combatantId, show) {
     const rows = this._getCombatantRows(combatantId);
 
@@ -541,6 +617,15 @@ export class EncounterStealthInitiativeService {
     }
   }
 
+  _unmaskRowsMaskedByVisioner() {
+    const rows = document?.querySelectorAll?.('[data-pf2e-visioner-stealth-masked="true"]') ?? [];
+    for (const row of rows) {
+      row.classList.remove(TRACKER_MASKED_CLASS);
+      delete row.dataset.pf2eVisionerStealthMasked;
+      this._restoreCombatantRowName(row);
+    }
+  }
+
   _showStaleRows(currentCombatantIds) {
     const rows = document?.querySelectorAll?.('[data-pf2e-visioner-stealth-hidden="true"]') ?? [];
     for (const row of rows) {
@@ -549,6 +634,15 @@ export class EncounterStealthInitiativeService {
       row.hidden = false;
       row.classList.remove(TRACKER_HIDDEN_CLASS);
       delete row.dataset.pf2eVisionerStealthHidden;
+    }
+
+    const maskedRows = document?.querySelectorAll?.('[data-pf2e-visioner-stealth-masked="true"]') ?? [];
+    for (const row of maskedRows) {
+      const combatantId = row.dataset.combatantId;
+      if (currentCombatantIds.has(combatantId)) continue;
+      row.classList.remove(TRACKER_MASKED_CLASS);
+      delete row.dataset.pf2eVisionerStealthMasked;
+      this._restoreCombatantRowName(row);
     }
   }
 }

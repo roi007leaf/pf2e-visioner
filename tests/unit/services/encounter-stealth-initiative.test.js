@@ -272,6 +272,53 @@ describe('EncounterStealthInitiativeService', () => {
     expect(encounterStealthInitiativeService.shouldHideCombatantFromCurrentUser(stealthCombatant, combat)).toBe(false);
   });
 
+  test('masks undetected stealth initiative combatant details until the encounter override is removed', async () => {
+    setSetting(true);
+    global.game.user.isGM = false;
+    observerLow.isOwner = true;
+    observerLow.actor.isOwner = true;
+    observerLow.actor.system.perception.dc = 31;
+    stealther.document.flags['pf2e-visioner'][`avs-override-from-${observerLow.id}`] = {
+      state: 'undetected',
+      source: 'encounter_stealth_initiative',
+      observerId: observerLow.id,
+      targetId: stealther.id,
+    };
+    const { encounterStealthInitiativeService } = await importService();
+    const lowCombatant = makeCombatant('low', observerLow, 10, 'perception', { isOwner: true });
+    const stealthCombatant = makeCombatant('stealth', stealther, 30, 'stealth');
+    const combat = makeCombat([lowCombatant, stealthCombatant], {
+      id: 'undetected-details-masked',
+    });
+    document.body.innerHTML = `
+      <ol id="combat-tracker">
+        <li class="combatant" data-combatant-id="stealth">
+          <img class="token-image" src="kobold.webp" alt="Kobold Warrior">
+          <div class="token-name"><h4>Kobold Warrior</h4></div>
+          <div class="token-initiative">30</div>
+        </li>
+      </ol>
+    `;
+
+    encounterStealthInitiativeService.applyTrackerVisibility(combat);
+
+    const row = document.querySelector('[data-combatant-id="stealth"]');
+    const name = row.querySelector('.token-name h4');
+    expect(row.hidden).toBe(false);
+    expect(row.dataset.pf2eVisionerStealthMasked).toBe('true');
+    expect(row.classList.contains('pf2e-visioner-stealth-tracker-masked')).toBe(true);
+    expect(name.textContent).toBe('Undetected Combatant');
+    expect(name.dataset.pf2eVisionerOriginalHtml).toBe('Kobold Warrior');
+
+    delete stealther.document.flags['pf2e-visioner'][`avs-override-from-${observerLow.id}`];
+    encounterStealthInitiativeService.applyTrackerVisibility(combat);
+
+    expect(row.dataset.pf2eVisionerStealthMasked).toBeUndefined();
+    expect(row.classList.contains('pf2e-visioner-stealth-tracker-masked')).toBe(false);
+    expect(name.textContent).toBe('Kobold Warrior');
+    expect(name.dataset.pf2eVisionerOriginalHtml).toBeUndefined();
+  });
+
   test('restores a pre-existing AVS override when the encounter stealth override is removed', async () => {
     setSetting(true);
     global.game.user.isGM = true;

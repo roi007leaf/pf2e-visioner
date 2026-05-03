@@ -1,5 +1,12 @@
 # Changelog
 
+## [8.1.4] - 2026-05-03
+
+### Fixed
+
+- **Undetected stealth initiative combatants no longer reveal their identity in trackers**: Player combat tracker rows now mask names and token images for encounter-start `undetected` stealth initiative combatants until the matching encounter override is removed.
+- **Stealth initiative tracker marker stays purple in PF2E HUD**: The marker now forces its icon color so PF2E HUD tracker styles cannot recolor the `user-secret` indicator green.
+
 ## [8.1.3] - 2026-05-03
 
 ### Fixed
