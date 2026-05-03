@@ -127,14 +127,6 @@ export class EncounterStealthInitiativeService {
     if (!this.isEnabled()) return;
     if (!combat?.started) return;
     if (!this._isInitiativeRelevantUpdate(changes)) return;
-
-    const updatedCombatant = combatant ?? null;
-    if (!updatedCombatant || !this.isStealthInitiativeCombatant(updatedCombatant)) {
-      this.applyTrackerVisibility(combat);
-      return;
-    }
-
-    await this._applyVisibilityForCombat(combat);
     this.applyTrackerVisibility(combat);
   }
 

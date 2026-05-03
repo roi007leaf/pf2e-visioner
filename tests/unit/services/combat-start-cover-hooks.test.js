@@ -8,7 +8,6 @@ const mockScheduleTrackerVisibilityRefresh = jest.fn();
 const mockHandleCombatantInitiativeUpdate = jest.fn();
 const mockIsEnabled = jest.fn();
 const mockIsInitiativeRelevantUpdate = jest.fn();
-const mockRequestGMApplyEncounterStealthInitiative = jest.fn();
 
 jest.mock('../../../scripts/services/CombatStartCoverService.js', () => ({
   __esModule: true,
@@ -27,11 +26,6 @@ jest.mock('../../../scripts/services/EncounterStealthInitiativeService.js', () =
     isEnabled: (...args) => mockIsEnabled(...args),
     isInitiativeRelevantUpdate: (...args) => mockIsInitiativeRelevantUpdate(...args),
   },
-}));
-
-jest.mock('../../../scripts/services/socket.js', () => ({
-  __esModule: true,
-  requestGMApplyEncounterStealthInitiative: (...args) => mockRequestGMApplyEncounterStealthInitiative(...args),
 }));
 
 describe('combat start cover hook integration', () => {
@@ -61,7 +55,7 @@ describe('combat start cover hook integration', () => {
     );
   });
 
-  test('player initiative updates request GM stealth initiative handling over socket', async () => {
+  test('player initiative updates refresh tracker visibility without GM stealth recalculation', async () => {
     const { registerCombatHooks } = await import('../../../scripts/hooks/combat.js');
     const combat = { id: 'combat-1', started: true };
     const combatant = { id: 'combatant-1', combat };
@@ -73,11 +67,6 @@ describe('combat start cover hook integration', () => {
 
     await updateCombatantCallback(combatant, updateData);
 
-    expect(mockRequestGMApplyEncounterStealthInitiative).toHaveBeenCalledWith({
-      combatId: 'combat-1',
-      combatantId: 'combatant-1',
-      updateData,
-    });
     expect(mockHandleCombatantInitiativeUpdate).not.toHaveBeenCalled();
     expect(mockScheduleTrackerVisibilityRefresh).toHaveBeenCalledWith(combat);
   });
@@ -95,10 +84,9 @@ describe('combat start cover hook integration', () => {
     await updateCombatantCallback(combatant, updateData);
 
     expect(mockHandleCombatantInitiativeUpdate).toHaveBeenCalledWith(combatant, updateData, combat);
-    expect(mockRequestGMApplyEncounterStealthInitiative).not.toHaveBeenCalled();
   });
 
-  test('player non-initiative combatant updates do not request GM stealth handling', async () => {
+  test('player non-initiative combatant updates do not refresh stealth tracker handling', async () => {
     const { registerCombatHooks } = await import('../../../scripts/hooks/combat.js');
     const combat = { id: 'combat-1', started: true };
     const combatant = { id: 'combatant-1', combat };
@@ -110,7 +98,6 @@ describe('combat start cover hook integration', () => {
 
     await updateCombatantCallback(combatant, { name: 'No Initiative Change' });
 
-    expect(mockRequestGMApplyEncounterStealthInitiative).not.toHaveBeenCalled();
     expect(mockScheduleTrackerVisibilityRefresh).not.toHaveBeenCalled();
     expect(mockHandleCombatantInitiativeUpdate).not.toHaveBeenCalled();
   });

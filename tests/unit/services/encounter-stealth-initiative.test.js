@@ -229,6 +229,29 @@ describe('EncounterStealthInitiativeService', () => {
     });
   });
 
+  test('combat start uses the latest edited initiative value to determine encounter stealth state', async () => {
+    setSetting(true);
+    observerLow.actor.system.perception.dc = 18;
+    const { encounterStealthInitiativeService } = await importService();
+    const stealtherCombatant = makeCombatant('stealth', stealther, 10, 'stealth');
+    const combat = makeCombat([
+      makeCombatant('low', observerLow, 10),
+      stealtherCombatant,
+    ]);
+
+    stealtherCombatant.initiative = 20;
+    await encounterStealthInitiativeService.applyEncounterStartVisibility(combat, {
+      requireStarted: false,
+    });
+
+    expect(mockSetPairOverrides).toHaveBeenCalledTimes(1);
+    const changesByTarget = mockSetPairOverrides.mock.calls[0][1];
+    expect(changesByTarget.get(stealther.id)).toMatchObject({
+      target: stealther,
+      state: 'unnoticed',
+    });
+  });
+
   test('combat start unhides GM-hidden stealth combatants before applying encounter stealth overrides', async () => {
     setSetting(true);
     stealther.document.hidden = true;
@@ -732,7 +755,7 @@ describe('EncounterStealthInitiativeService', () => {
     );
   });
 
-  test('applies setup when stealth initiative is rolled after combat has started', async () => {
+  test('does not apply encounter stealth setup from initiative updates after combat has started', async () => {
     setSetting(true);
     const { encounterStealthInitiativeService } = await importService();
     const combat = makeCombat([
@@ -747,14 +770,8 @@ describe('EncounterStealthInitiativeService', () => {
       combat,
     );
 
-    expect(mockSetPairOverrides).toHaveBeenCalledTimes(1);
-    expect(mockSetPairOverrides).toHaveBeenCalledWith(
-      observerLow,
-      expect.any(Map),
-      expect.objectContaining({
-        source: 'encounter_stealth_initiative',
-      }),
-    );
+    expect(mockSetPairOverrides).not.toHaveBeenCalled();
+    expect(document.querySelector('[data-pf2e-visioner-stealth-initiative-marker]')).toBeNull();
   });
 
   test('combat-start setup can run from the start hook before the passed combat object is marked started', async () => {

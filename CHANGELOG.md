@@ -1,5 +1,13 @@
 # Changelog
 
+## [8.1.6] - 2026-05-03
+
+### Fixed
+
+- **Stealth initiative visibility is only determined at encounter start**: Initiative edits before combat starts now naturally use the latest values when encounter stealth overrides are first applied, while later initiative updates only refresh tracker UI and no longer recalculate initial `undetected`/`unnoticed` states.
+- **Selected unnoticed icons stay purple in Visioner dialogs**: Selected `unnoticed` state buttons now use the same purple styling as the rest of the unnoticed UI instead of falling back to white.
+- **Stealth initiative tracker markers stay purple on NPC rows**: Markers now render outside the tracker name element so PF2E HUD hidden-name hue filters, NPC row icon styling, and row-scoped visibility color variables can no longer recolor them green.
+
 ## [8.1.5] - 2026-05-03
 
 ### Fixed
