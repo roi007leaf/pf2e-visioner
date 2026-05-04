@@ -79,18 +79,18 @@ export class AutoCoverSystem {
   /**
    * Gets all active pairs involving a specific token ID
    * @param {string} tokenId
-   * @returns {Array<Array<string>>} Array of [attackerId, targetId] pairs
+   * @returns {Array<{attackerId: string, targetId: string}>}
    */
   getActivePairsInvolving(tokenId) {
     const pairs = [];
     // As attacker
     const tset = this._activePairsByAttacker.get(tokenId);
     if (tset && tset.size > 0) {
-      for (const targetId of tset) pairs.push([tokenId, targetId]);
+      for (const targetId of tset) pairs.push({ attackerId: tokenId, targetId });
     }
     // As target
     for (const [attackerId, set] of this._activePairsByAttacker.entries()) {
-      if (set.has(tokenId)) pairs.push([attackerId, tokenId]);
+      if (set.has(tokenId)) pairs.push({ attackerId, targetId: tokenId });
     }
     return pairs;
   }
@@ -139,7 +139,12 @@ export class AutoCoverSystem {
    */
   async cleanupCover(attacker, target) {
     if (!attacker || !target) return;
-    await this.setCoverBetween(attacker, target, 'none', { skipEphemeralUpdate: true });
+    await this.setCoverBetween(attacker, target, 'none', { skipEphemeralUpdate: false });
+    const targets = this._activePairsByAttacker.get(attacker.id);
+    targets?.delete(target.id);
+    if (targets?.size === 0) {
+      this._activePairsByAttacker.delete(attacker.id);
+    }
   }
 
   /**
@@ -269,23 +274,23 @@ export class AutoCoverSystem {
   async onUpdateDocument(document, changes) {
     if (document?.documentName !== 'Token') return;
     // Skip if auto-cover is disabled
-    if (!this.autoCoverSystem.isEnabled()) return;
+    if (!this.isEnabled()) return;
 
     // Skip if not a position or size change
-    if (!changes.x && !changes.y && !changes.width && !changes.height) return;
+    if (!('x' in changes) && !('y' in changes) && !('width' in changes) && !('height' in changes)) return;
 
     const tokenId = document.id;
     const token = canvas?.tokens?.get(tokenId);
     if (!token) return;
 
     // Update all active cover relationships
-    const pairs = this.autoCoverSystem.getActivePairsInvolving(tokenId);
+    const pairs = this.getActivePairsInvolving(tokenId);
     for (const pair of pairs) {
       const attacker = canvas.tokens.get(pair.attackerId);
       const target = canvas.tokens.get(pair.targetId);
 
       if (attacker && target) {
-        await this.autoCoverSystem.cleanupCover(attacker, target);
+        await this.cleanupCover(attacker, target);
       }
     }
     return;

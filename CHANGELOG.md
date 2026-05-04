@@ -1,5 +1,11 @@
 # Changelog
 
+## [8.1.7] - 2026-05-04
+
+### Fixed
+
+- **Combat-start cover no longer gets stuck after token movement**: Combat-start cover now registers active auto-cover pairs and movement cleanup clears both the stored cover state and applied ephemeral cover effects when tokens move.
+
 ## [8.1.6] - 2026-05-03
 
 ### Fixed

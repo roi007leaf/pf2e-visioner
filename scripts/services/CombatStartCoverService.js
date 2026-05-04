@@ -77,6 +77,9 @@ export class CombatStartCoverService {
         await autoCoverSystem.setCoverBetween(observerToken, targetToken, coverState, {
           skipEphemeralUpdate: false,
         });
+        if (coverState !== 'none') {
+          autoCoverSystem.recordPair(observerToken.id, targetToken.id);
+        }
       }
     }
   }

@@ -3,12 +3,14 @@ import { jest } from '@jest/globals';
 
 const mockDetectCoverBetweenTokens = jest.fn();
 const mockSetCoverBetween = jest.fn();
+const mockRecordPair = jest.fn();
 
 jest.mock('../../../scripts/cover/auto-cover/AutoCoverSystem.js', () => ({
   __esModule: true,
   default: {
     detectCoverBetweenTokens: (...args) => mockDetectCoverBetweenTokens(...args),
     setCoverBetween: (...args) => mockSetCoverBetween(...args),
+    recordPair: (...args) => mockRecordPair(...args),
   },
 }));
 
@@ -114,6 +116,7 @@ describe('CombatStartCoverService', () => {
 
     expect(mockDetectCoverBetweenTokens).not.toHaveBeenCalled();
     expect(mockSetCoverBetween).not.toHaveBeenCalled();
+    expect(mockRecordPair).not.toHaveBeenCalled();
   });
 
   test('computes cover for all non-allied combatant pairs regardless of initiative statistic', async () => {
@@ -142,5 +145,20 @@ describe('CombatStartCoverService', () => {
     });
     expect(mockDetectCoverBetweenTokens).not.toHaveBeenCalledWith(party, ally, expect.anything());
     expect(mockDetectCoverBetweenTokens).not.toHaveBeenCalledWith(ally, party, expect.anything());
+  });
+
+  test('records non-none combat-start cover pairs so movement can clear them later', async () => {
+    setCombatStartCoverSetting(true);
+    const { combatStartCoverService } = await importService();
+    const combat = makeCombat([
+      makeCombatant('party', party),
+      makeCombatant('enemy', enemy),
+    ]);
+
+    await combatStartCoverService.applyCombatStartAutoCover(combat);
+
+    expect(mockRecordPair).toHaveBeenCalledWith(party.id, enemy.id);
+    expect(mockRecordPair).toHaveBeenCalledWith(enemy.id, party.id);
+    expect(mockRecordPair).toHaveBeenCalledTimes(2);
   });
 });

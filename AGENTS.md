@@ -1,44 +1,15 @@
 <claude-mem-context>
 # Memory Context
 
-# [pf2e-visioner] recent context, 2026-05-03 11:32am GMT+3
+# [pf2e-visioner] recent context, 2026-05-04 7:58am GMT+3
 
 Legend: 🎯session 🔴bugfix 🟣feature 🔄refactor ✅change 🔵discovery ⚖️decision 🚨security_alert 🔐security_note
 Format: ID TIME TYPE TITLE
 Fetch details: get_observations([IDs]) | Search: mem-search skill
 
-Stats: 50 obs (16,068t read) | 693,890t work | 98% savings
+Stats: 50 obs (16,196t read) | 749,569t work | 98% savings
 
 ### May 3, 2026
-772 8:53a 🔵 RED: requireStarted Option Test Confirms Guard Blocks combatStart Hook Timing
-773 " 🔴 requireStarted Option Implemented: combatStart Hook Bypasses started Guard
-774 " 🔵 Test Still Failing: Context Decay — Primary Session Returning Cached Test Output
-775 8:54a 🔴 All 10 Service Tests GREEN: requireStarted Fix Confirmed Working
-776 " 🔴 Lint Clean After Full Bug Fix: updateCombatant + requireStarted
-777 " 🔵 Combat Tracker Stealth Row Hiding Not Working for Players
-778 8:56a 🟣 EncounterStealthInitiativeService Switched to AvsOverrideManager.setPairOverrides
-779 " 🔵 Combat Tracker Row Selector May Not Match Actual PF2e HUD HTML Structure
-782 9:04a 🔵 Stealth Initiative Scoping Bug: All Combatants Evaluated Instead of Enemies Only
-780 9:06a 🔵 OverrideValidationIndicator Structure — Floating Tooltip Row Architecture
-781 " 🔵 Canvas Token Highlight Mechanism — HoverTooltips + highlighting.js Pattern
-783 9:11a 🔵 shouldFilterAlly Is the Right Tool for Enemy-Only Observer Scoping
-784 " 🟣 Enemy-Only Scoping Tests Added for Stealth Initiative Visibility
-785 " 🔵 Enemy-Only Tests Confirmed RED — Two Distinct Failure Points
-786 " 🔴 areEnemies Helper Added to Scope Stealth Initiative to Enemy Combatants Only
-788 " ✅ Git Status: Stealth Initiative Changes Uncommitted, Other Feature Files Also Pending
-787 9:14a 🔴 Enemy-Only Stealth Initiative: Test Corrected and All 13 Tests Green
-789 " 🔴 Stealth initiative GM dots must persist until AVS override removed, not just until combat start
-790 9:44a ⚖️ GM dots design reverted to show all users — both can-see and cannot-see
-791 " 🟣 GM dots show both can-see and cannot-see users — keyed on `hasInitialOverride`
-792 9:45a 🔴 GM dots now pass 15/15 with both can-see and cannot-see users shown
-793 " ✅ Full suite 122/122 green, lint clean — stealth initiative feature ready to commit
-794 9:48a 🔵 GM dots still removed before override is removed — `hasInitialOverride` fix insufficient
-795 9:49a 🔵 Root cause trace: `applyTrackerVisibility` early-return path on GM — dots survive, not removed
-796 " 🔵 New test exposes dot-condition bug: `canSee` is true after override removal, so dot persists incorrectly
-797 9:50a 🔴 GM dot lifecycle fixed: `hasInitialOverride` now checks `_hasInitialHideRecord` OR any override flag, not just source-matched flags
-798 " 🔄 New `_hasActiveInitialTrackerRecord` helper unifies record+flag check with auto-cleanup on flag removal
-799 " 🔴 16/16 tests passing — `_hasActiveInitialTrackerRecord` fix confirmed green
-800 " ✅ Full suite 123/123 green, lint clean — stealth initiative feature ready to commit
 801 9:55a 🔵 Design question: two dots show even when only one user beats stealther initiative
 S119 GM tracker dots design pivot — dots should only show users who CAN see the stealther, not users blocked by overrides (May 3 at 9:55 AM)
 802 9:56a ⚖️ Final GM dots design: show ONLY canSee=true users; `hasInitialOverride` gates canSee computation only
@@ -61,6 +32,36 @@ S119 GM tracker dots design pivot — dots should only show users who CAN see th
 819 " 🟣 Unnoticed hover tooltip requested (matching undetected purple tooltip)
 820 10:21a 🔵 Undetected tooltip/styling system structure discovered for unnoticed parity work
 821 10:38a 🔵 Duplicate styles directory discovered: scripts/styles/ mirrors styles/
+822 10:39a 🔴 Floating indication tooltip unnoticed state rendered green instead of purple
+823 " ✅ Version bumped from 8.1.0 to 8.1.1 in module.json
+824 11:33a ✅ CHANGELOG.md updated with 8.1.1 entry
+825 " 🔵 Unnoticed tooltip color still green — inline style overrides CSS class rule
+826 11:38a 🔵 Root cause of green unnoticed color: #applyInlineStateColors() missing unnoticed in variableFallbacks
+827 " 🔴 Fixed unnoticed color in #applyInlineStateColors() palettes and variableFallbacks
+828 11:39a ⚖️ Encounter stealth setup now only grants unnoticed — RAW intent confirmed
+829 11:42a 🔵 Primary session in replay loop — created redundant plan for already-completed RAW work
+830 11:47a 🟣 Encounter stealth setup gains reverse-undetected RAW logic for higher-initiative stealthers
+831 " 🟣 RAW encounter stealth: stealther gains undetected-of-observer when out-initiating but failing DC
+832 11:48a ✅ CHANGELOG updated to document RAW reverse-undetected Avoid Notice behavior
+833 " 🟣 RAW Avoid Notice three-way split: 20/20 tests pass with fresh session
+834 " 🟣 Full suite 182/182 green after RAW Avoid Notice three-way split implementation
+835 " ⚖️ PF2E RAW Avoid Notice: all enemies undetected/unnoticed to stealther when stealther beats all initiatives but fails all DCs
+836 11:54a ⚖️ New plan: restore observer-to-stealther RAW overrides after user RAW correction
+837 " 🔴 Reverted reverseUndetected direction flip — restored observer-to-stealther overrides per RAW
+838 11:55a 🟣 Final RAW Avoid Notice: two-branch observer→stealther model — unnoticed or undetected per DC result
+839 11:56a ✅ pf2e-visioner 8.1.1 full suite verified: 182/182 pass, lint clean
+840 " 🔴 Removed dead reverseRecordKey cleanup logic from _restoreExpiredInitialOverridesForCombatant
+841 1:05p 🔴 Dead reverseRecordKey cleanup removed; encounter-stealth suite 20/20 confirmed
+### May 4, 2026
+845 7:52a 🔵 Combat Cover Calculation Bug: Stuck State After Token Movement
+846 7:53a 🔵 pf2e-visioner Cover System Architecture Mapped
+847 " 🔵 Root Cause: Combat Cover Sticks Because CombatStartCoverService Never Records Pairs
+848 " 🔵 Secondary Bug: AutoCoverSystem.onUpdateDocument References Nonexistent this.autoCoverSystem
+849 " 🔵 recordPair Only Called in StealthCheckUseCase — Never in CombatStartCoverService or AttackRollUseCase
+850 7:54a 🔴 TDD Tests Written for recordPair Gap in CombatStartCoverService and AutoCoverSystem
+851 " 🔴 CombatStartCoverService Fixed: recordPair Called After Non-None Cover Set at Combat Start
+852 " 🔴 AutoCoverSystem Refactored: getActivePairsInvolving Shape, cleanupCover Semantics, onUpdateDocument Self-Reference Bugs Fixed
+853 7:55a 🔴 Combat Cover Stuck-on-Move Bug Fully Fixed and Verified
 
-Access 694k tokens of past work via get_observations([IDs]) or mem-search skill.
+Access 750k tokens of past work via get_observations([IDs]) or mem-search skill.
 </claude-mem-context>

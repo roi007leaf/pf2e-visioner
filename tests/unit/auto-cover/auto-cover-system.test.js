@@ -141,6 +141,33 @@ describe('AutoCoverSystem', () => {
     });
   });
 
+  describe('active pair cleanup', () => {
+    test('returns active pairs as attacker-target records for movement cleanup', () => {
+      autoCoverSystem.recordPair('attacker', 'target');
+
+      expect(autoCoverSystem.getActivePairsInvolving('attacker')).toEqual([
+        { attackerId: 'attacker', targetId: 'target' },
+      ]);
+      expect(autoCoverSystem.getActivePairsInvolving('target')).toEqual([
+        { attackerId: 'attacker', targetId: 'target' },
+      ]);
+    });
+
+    test('cleanupCover removes stored cover and associated ephemeral effects', async () => {
+      const sourceToken = global.createMockToken({ id: 'source' });
+      const targetToken = global.createMockToken({ id: 'target' });
+
+      await autoCoverSystem.cleanupCover(sourceToken, targetToken);
+
+      expect(mockCoverStateManager.setCoverBetween).toHaveBeenCalledWith(
+        sourceToken,
+        targetToken,
+        'none',
+        { skipEphemeralUpdate: false },
+      );
+    });
+  });
+
   describe('isEnabled method', () => {
     test('should return true when auto-cover is enabled', () => {
       global.game.settings.get.mockImplementation((module, setting) => {
