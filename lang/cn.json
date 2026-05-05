@@ -20,12 +20,9 @@
             "observed": "可见",
             "hidden": "隐藏",
             "undetected": "无踪",
-            "unnoticed": "未察觉",
             "concealed": "隐蔽",
-            "avs": "自动能见度"
-        },
-        "ENCOUNTER_STEALTH": {
-            "STEALTH_INITIATIVE_TOOLTIP": "使用隐秘掷先攻"
+            "avs": "自动能见度",
+            "unnoticed": "未发现"
         },
         "COVER_STATES": {
             "none": "无掩蔽",
@@ -396,7 +393,7 @@
             },
             "AUTO_VISIBILITY_ENABLED": {
                 "name": "启用自动能见度系统",
-                "hint": "根据光照条件和生物感知自动设置能见度标志。该系统会分析场景光照、指示物位置以及生物能力，以确定合适的能见度状态（可见、隐蔽、藏匿、无踪）。"
+                "hint": "根据光照条件和生物感知自动设置能见度标志。该系统会分析场景光照、指示物位置以及生物能力，以确定合适的能见度状态（可见、隐蔽、藏匿、无踪、未发现）。"
             },
             "AUTO_VISIBILITY_DEBUG_MODE": {
                 "name": "自动能见度调试模式",
@@ -567,6 +564,14 @@
             "AUTO_COVER_IGNORE_LARGER_TOKENS": {
                 "name": "忽略更大体型的指示物",
                 "hint": "体型大于攻击者的指示物将不会提供自动掩蔽"
+            },
+            "COMPUTE_COVER_AT_COMBAT_START": {
+                "name": "战斗开始时计算掩蔽",
+                "hint": "战斗开始时自动计算非盟友参战者指示物之间的掩蔽。该功能仅用于此次检查。"
+            },
+            "ENABLE_STEALTH_INITIATIVE_VISIBILITY": {
+                "name": "遭遇阶段隐秘先攻能见度",
+                "hint": "若启用，PF2e视野管理会处理隐秘先攻遭遇的设置：骰掷隐秘作为先攻的参战者，对那些在先攻顺序先于他们的追踪者生物最初处于无踪或藏匿状态。若已启用PF2e Avoid Notice或其他管理该功能的模组，则可以禁用此选项。"
             }
         },
         "UI": {
@@ -1384,7 +1389,9 @@
             "TITLE": "搜索测量板配置",
             "DESCRIPTION": "选择搜索动作的测量板形状和大小。",
             "LIFESENSE_TOOLTIP": "可以感知到范围内的活物与不死生物（模糊感官）",
-            "SENSE_UNSEEN_APPLIED": "察觉未见已应用"
+            "SENSE_UNSEEN_APPLIED": "察觉未见已应用",
+            "LEVELS": "层级",
+            "LEVELS_HINT": "可选。为测量板选择一个或多个原始场景层级。若留空则表示在所有层级上应用。"
         },
         "AVS_GM_VISION_WARNING": {
             "TITLE": "GM视角已激活",
@@ -1450,6 +1457,20 @@
             "MODE_TWO_WAY": "双向（主仆能从彼此视角进行观察）",
             "MODE_REPLACE": "替代（仆从仅能从主人视角进行观察）",
             "MODE_REVERSE": "反向（主人只能从仆从视角进行观察）"
+        },
+        "ENCOUNTER_STEALTH": {
+            "STEALTH_INITIATIVE_TOOLTIP": "骰先攻时骰掷隐秘"
+        },
+        "LEVEL_CONFIG": {
+            "LEGEND": "PF2e 视野管理",
+            "DEFAULT": "使用原生V14功能",
+            "BLOCK": "始终阻挡",
+            "IGNORE": "从不阻挡",
+            "INTRO": "原生可见层级用于控制哪些层级相互间可见。而视野管理添加了以下设置，当层级间的光线彼此交汇时，该层级的地面是否会阻挡视线或声音。",
+            "SIGHT_LABEL": "层级地面与视线",
+            "SOUND_LABEL": "层级地面与声音",
+            "SIGHT_HINT": "选择该层级边界是采用原生V14视线碰撞，始终阻挡视线还是从不阻挡视线的模式。",
+            "SOUND_HINT": "选择该层级边界是采用原生V14声音碰撞，始终阻挡声音还是从不阻挡声音的模式。"
         }
     }
 }
