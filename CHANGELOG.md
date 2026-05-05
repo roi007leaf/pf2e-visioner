@@ -1,5 +1,11 @@
 # Changelog
 
+## [8.1.8] - 2026-05-05
+
+### Fixed
+
+- **Stealth initiative now uses initiative order and degree of Perception DC failure**: Passing Perception DC is split between `unnoticed` when the stealther beats the observer's initiative and `undetected` otherwise, while failed checks become `hidden` unless they miss the DC by more than 10 and do not beat the observer's initiative, in which case they become `observed`.
+
 ## [8.1.7] - 2026-05-04
 
 ### Fixed

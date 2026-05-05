@@ -36,6 +36,10 @@ function hasNumericInitiative(combatant) {
   return typeof combatant?.initiative === 'number' && Number.isFinite(combatant.initiative);
 }
 
+function getNumericInitiative(combatant) {
+  return hasNumericInitiative(combatant) ? combatant.initiative : null;
+}
+
 function getPerceptionDC(token) {
   const override = Number(token?.document?.getFlag?.(MODULE_ID, 'perceptionDC'));
   if (Number.isFinite(override) && override > 0) return override;
@@ -159,9 +163,7 @@ export class EncounterStealthInitiativeService {
 
         const recordKey = makeRecordKey(observerToken.document.id, stealtherToken.document.id);
         if (records.has(recordKey)) continue;
-        const state = this._stealthInitiativeMeetsPerceptionDC(stealther, observerToken)
-          ? 'unnoticed'
-          : 'undetected';
+        const state = this._getStealthInitiativeState(stealther, observer, observerToken);
 
         if (game.user?.isGM) {
           await this._savePreviousOverride(observerToken, stealtherToken);
@@ -272,10 +274,6 @@ export class EncounterStealthInitiativeService {
     if (ownedObservers.length === 0) return false;
 
     for (const { token: observerToken, combatant: observerCombatant } of ownedObservers) {
-      if (!this._stealthInitiativeMeetsPerceptionDC(combatant, observerToken)) {
-        return false;
-      }
-
       const recordKey = makeRecordKey(observerToken.document.id, stealtherToken.document.id);
       if (!this._hasInitialHideRecord(combat, recordKey) && !this._seedInitialHideRecordFromOverride(
         combat,
@@ -286,8 +284,13 @@ export class EncounterStealthInitiativeService {
         return false;
       }
 
-      if (!this._hasActiveInitialTrackerHiddenOverride(observerToken, stealtherToken)) {
+      const override = this._getInitialOverride(observerToken, stealtherToken);
+      if (!this._isActiveInitialOverride(override, observerToken, stealtherToken)) {
         this._deleteInitialHideRecord(combat, recordKey);
+        return false;
+      }
+
+      if (!TRACKER_HIDDEN_STATES.has(override?.state)) {
         return false;
       }
     }
@@ -381,11 +384,26 @@ export class EncounterStealthInitiativeService {
     return stealtherToken.document?.getFlag?.(MODULE_ID, flagKey);
   }
 
-  _stealthInitiativeMeetsPerceptionDC(stealthCombatant, observerToken) {
-    if (!hasNumericInitiative(stealthCombatant)) return false;
+  _getStealthInitiativeState(stealthCombatant, observerCombatant, observerToken) {
+    const stealthInitiative = getNumericInitiative(stealthCombatant);
+    if (!Number.isFinite(stealthInitiative)) return 'hidden';
+
     const perceptionDC = getPerceptionDC(observerToken);
-    if (!Number.isFinite(perceptionDC)) return false;
-    return stealthCombatant.initiative >= perceptionDC;
+    if (!Number.isFinite(perceptionDC)) return 'hidden';
+
+    const observerInitiative = getNumericInitiative(observerCombatant);
+    const beatsObserverInitiative =
+      Number.isFinite(observerInitiative) && stealthInitiative > observerInitiative;
+
+    if (stealthInitiative >= perceptionDC) {
+      return beatsObserverInitiative ? 'unnoticed' : 'undetected';
+    }
+
+    if (stealthInitiative < perceptionDC - 10 && !beatsObserverInitiative) {
+      return 'observed';
+    }
+
+    return 'hidden';
   }
 
   _getPreviousOverrideFlagKey(observerToken) {

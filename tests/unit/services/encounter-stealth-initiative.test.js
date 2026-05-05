@@ -173,7 +173,7 @@ describe('EncounterStealthInitiativeService', () => {
     expect(mockSetPairOverrides).not.toHaveBeenCalled();
   });
 
-  test('stealth initiative makes enemies unnoticed only when it meets their Perception DC', async () => {
+  test('stealth initiative state uses Perception DC and observer initiative', async () => {
     setSetting(true);
     observerLow.actor.system.perception.dc = 18;
     observerEqual.actor.system.perception.dc = 21;
@@ -206,11 +206,21 @@ describe('EncounterStealthInitiativeService', () => {
     const equalChangesByTarget = mockSetPairOverrides.mock.calls.find(([observer]) => observer === observerEqual)[1];
     expect(equalChangesByTarget.get(stealther.id)).toMatchObject({
       target: stealther,
-      state: 'undetected',
+      state: 'hidden',
+    });
+    const highChangesByTarget = mockSetPairOverrides.mock.calls.find(([observer]) => observer === observerHigh)[1];
+    expect(highChangesByTarget.get(stealther.id)).toMatchObject({
+      target: stealther,
+      state: 'hidden',
+    });
+    const perceptionChangesByTarget = mockSetPairOverrides.mock.calls.find(([observer]) => observer === perceptionRoller)[1];
+    expect(perceptionChangesByTarget.get(stealther.id)).toMatchObject({
+      target: stealther,
+      state: 'hidden',
     });
   });
 
-  test('Perception DC beating a high stealth initiative roll creates undetected but not unnoticed', async () => {
+  test('failed Perception DC by 10 or less creates hidden', async () => {
     setSetting(true);
     observerLow.actor.system.perception.dc = 31;
     const { encounterStealthInitiativeService } = await importService();
@@ -225,7 +235,26 @@ describe('EncounterStealthInitiativeService', () => {
     const changesByTarget = mockSetPairOverrides.mock.calls[0][1];
     expect(changesByTarget.get(stealther.id)).toMatchObject({
       target: stealther,
-      state: 'undetected',
+      state: 'hidden',
+    });
+  });
+
+  test('failed Perception DC by more than 10 creates observed when observer initiative is not beaten', async () => {
+    setSetting(true);
+    observerLow.actor.system.perception.dc = 31;
+    const { encounterStealthInitiativeService } = await importService();
+    const combat = makeCombat([
+      makeCombatant('low', observerLow, 30),
+      makeCombatant('stealth', stealther, 20, 'stealth'),
+    ]);
+
+    await encounterStealthInitiativeService.applyEncounterStartVisibility(combat);
+
+    expect(mockSetPairOverrides).toHaveBeenCalledTimes(1);
+    const changesByTarget = mockSetPairOverrides.mock.calls[0][1];
+    expect(changesByTarget.get(stealther.id)).toMatchObject({
+      target: stealther,
+      state: 'observed',
     });
   });
 
@@ -397,7 +426,7 @@ describe('EncounterStealthInitiativeService', () => {
     )).toBeUndefined();
   });
 
-  test('meeting Perception DC makes the stealther unnoticed even if initiative ties', async () => {
+  test('meeting Perception DC with tied initiative makes the stealther undetected', async () => {
     setSetting(true);
     observerEqual.actor.system.perception.dc = 20;
     const { encounterStealthInitiativeService } = await importService();
@@ -418,7 +447,7 @@ describe('EncounterStealthInitiativeService', () => {
     const changesByTarget = mockSetPairOverrides.mock.calls[0][1];
     expect(changesByTarget.get(stealther.id)).toMatchObject({
       target: stealther,
-      state: 'unnoticed',
+      state: 'undetected',
     });
   });
 
