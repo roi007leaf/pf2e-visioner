@@ -87,6 +87,7 @@ jest.mock('../../../scripts/constants.js', () => ({
     },
     concealed: {
       label: 'PF2E_VISIONER.VISIBILITY.CONCEALED',
+      manualLabel: 'PF2E_VISIONER.VISIBILITY.OBSERVED_CONCEALED',
       icon: 'fas fa-cloud',
       color: '#ffeb3b',
       cssClass: 'visibility-concealed',
@@ -104,6 +105,18 @@ jest.mock('../../../scripts/constants.js', () => ({
       cssClass: 'visibility-undetected',
     },
   },
+  getVisibilityStateLabelKey: jest.fn((state, { manual = false } = {}) => {
+    const labels = {
+      observed: 'PF2E_VISIONER.VISIBILITY.OBSERVED',
+      concealed: 'PF2E_VISIONER.VISIBILITY.CONCEALED',
+      hidden: 'PF2E_VISIONER.VISIBILITY.HIDDEN',
+      undetected: 'PF2E_VISIONER.VISIBILITY.UNDETECTED',
+    };
+    const manualLabels = {
+      concealed: 'PF2E_VISIONER.VISIBILITY.OBSERVED_CONCEALED',
+    };
+    return manual && manualLabels[state] ? manualLabels[state] : labels[state] || String(state ?? '');
+  }),
 }));
 
 // Mock FoundryVTT ApplicationV2
@@ -332,6 +345,26 @@ describe('Token Manager Context Building - DC Display Fix', () => {
   });
 
   describe('Context Properties', () => {
+    test('labels manual concealed controls as observed plus concealed without changing value', async () => {
+      mockApp.mode = 'observer';
+
+      const context = await buildContext(mockApp, {});
+      const bulkConcealed = context.visibilityStates.find((state) => state.value === 'concealed');
+      const rowConcealed = context.pcTargets
+        .flatMap((target) => target.visibilityStates)
+        .find((state) => state.value === 'concealed');
+
+      expect(bulkConcealed).toMatchObject({
+        key: 'concealed',
+        value: 'concealed',
+        label: 'PF2E_VISIONER.VISIBILITY.OBSERVED_CONCEALED',
+      });
+      expect(rowConcealed).toMatchObject({
+        value: 'concealed',
+        label: 'PF2E_VISIONER.VISIBILITY.OBSERVED_CONCEALED',
+      });
+    });
+
     test('should set correct mode properties in target mode', async () => {
       mockApp.mode = 'target';
 

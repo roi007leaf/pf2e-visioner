@@ -1,5 +1,21 @@
 # Changelog
 
+## [8.2.0] - 2026-05-06
+
+### Changed
+
+- Separated detection, concealment, cover, and encounter awareness semantics internally.
+- Scoped Unnoticed to encounter-start Avoid Notice awareness instead of treating it as a general manual visibility state.
+- Preserved legacy visibility strings for existing worlds, macros, and UI compatibility.
+- Visioner Manager manual controls and bulk visibility buttons now present legacy `concealed` overrides as "Observed + Concealed" to match the separated detection/concealment model while keeping the saved value unchanged.
+- Hover tooltip badges, visibility factor overlays, and override validation indicators now use the same "Observed + Concealed" display label for concealed visibility.
+- Action preview dialogs now use "Observed + Concealed" for concealed visibility tooltips instead of falling back to raw state-name capitalization.
+
+### Fixed
+
+- Concealment-sensitive stealth logic no longer treats Hidden or Undetected as if they were the concealed condition.
+- Encounter-start Unnoticed continues to hide tokens and tracker rows while using Undetected as the underlying detection state.
+
 ## [8.1.10] - 2026-05-06
 
 ### Fixed

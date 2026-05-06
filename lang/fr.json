@@ -22,8 +22,9 @@
       "observed": "Observé",
       "hidden": "Caché",
       "undetected": "Non détecté",
-      "unnoticed": "(FR TODO) Unnoticed",
-      "concealed": "Masqué"
+      "unnoticed": "Inaperçu",
+      "concealed": "Masqué",
+      "observed_concealed": "Observé + Masqué"
     },
     "ENCOUNTER_STEALTH": {
       "STEALTH_INITIATIVE_TOOLTIP": "(FR TODO) Rolled Stealth for initiative"

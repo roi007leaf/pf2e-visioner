@@ -8,7 +8,7 @@
  */
 
 
-import { COVER_STATES, MODULE_ID, VISIBILITY_STATES } from '../constants.js';
+import { COVER_STATES, MODULE_ID, VISIBILITY_STATES, getVisibilityStateLabelKey } from '../constants.js';
 import { addTokenBorder, removeTokenBorder } from '../managers/token-manager/borders.js';
 
 class OverrideValidationIndicator {
@@ -684,8 +684,10 @@ class OverrideValidationIndicator {
     const mkVis = (key) => {
       if (key === 'avs') return '';
       const cfg = VISIBILITY_STATES?.[key];
+      if (!cfg) return '';
       // Filter out 'avs' state from visibility display
-      const label = game?.i18n?.localize?.(cfg.label) || cfg.label || '';
+      const labelKey = getVisibilityStateLabelKey(key, { manual: true });
+      const label = game?.i18n?.localize?.(labelKey) || labelKey || '';
       const cls = cfg.cssClass || `visibility-${key}`;
       return `<i class="${cfg.icon} state-indicator ${cls}" data-kind="visibility" data-state="${key}" data-tooltip="${label}"></i>`;
     };

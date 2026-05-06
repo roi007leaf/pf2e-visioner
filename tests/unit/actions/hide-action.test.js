@@ -5,6 +5,8 @@
  */
 
 import '../../setup.js';
+import fs from 'fs';
+import path from 'path';
 
 describe('Hide Action Comprehensive Tests', () => {
   let originalSettings;
@@ -36,6 +38,112 @@ describe('Hide Action Comprehensive Tests', () => {
   });
 
   describe('Status Mapping Tests', () => {
+    test('hide prerequisite predicate distinguishes concealment from detection states', () => {
+      const {
+        canAttemptHideOrRemainHidden,
+        legacyVisibilityToProfile,
+      } = require('../../../scripts/visibility/perception-profile.js');
+
+      const hiddenNoCover = legacyVisibilityToProfile('hidden', { coverState: 'none' });
+      const concealedNoCover = legacyVisibilityToProfile('concealed', { coverState: 'none' });
+      const observedStandardCover = legacyVisibilityToProfile('observed', { coverState: 'standard' });
+
+      expect(canAttemptHideOrRemainHidden(hiddenNoCover)).toBe(false);
+      expect(canAttemptHideOrRemainHidden(concealedNoCover)).toBe(true);
+      expect(canAttemptHideOrRemainHidden(observedStandardCover)).toBe(true);
+    });
+
+    test('hide caller prerequisites use explicit cover or concealment', async () => {
+      const { evaluateHidePrerequisites } = await import('../../../scripts/chat/services/actions/HideAction.js');
+
+      expect(evaluateHidePrerequisites('hidden', 'hidden', 'none')).toMatchObject({
+        startQualifies: false,
+        endQualifies: false,
+        bothQualify: false,
+      });
+      expect(evaluateHidePrerequisites('concealed', 'concealed', 'none')).toMatchObject({
+        startQualifies: true,
+        endQualifies: true,
+        bothQualify: true,
+      });
+      expect(evaluateHidePrerequisites('observed', 'observed', 'standard')).toMatchObject({
+        startQualifies: true,
+        endQualifies: true,
+        bothQualify: true,
+      });
+    });
+
+    test('mirrored hide callers use the same prerequisite fallback behavior', async () => {
+      const canonical = await import('../../../scripts/chat/services/actions/HideAction.js');
+      const mirrored = await import('../../../scripts/chat/services/actions/hide-action.js');
+      const startOnlyFails = {
+        startQualifies: false,
+        endQualifies: true,
+        bothQualify: false,
+      };
+
+      expect(canonical.applyHidePrerequisiteFallback('hidden', startOnlyFails)).toBe('avs');
+      expect(mirrored.applyHidePrerequisiteFallback('hidden', startOnlyFails)).toBe('avs');
+    });
+
+    test('hide preview prerequisites do not treat hidden or undetected as concealment', () => {
+      const filePath = path.join(
+        __dirname,
+        '../../../scripts/chat/dialogs/HidePreviewDialog.js',
+      );
+      const sourceCode = fs.readFileSync(filePath, 'utf8');
+
+      expect(sourceCode).toContain('canAttemptHideOrRemainHidden');
+      expect(sourceCode).not.toContain("startVisibility === 'hidden'");
+      expect(sourceCode).not.toContain("startVisibility === 'undetected'");
+    });
+
+    test('sneak override metadata does not treat hidden or undetected as concealment', () => {
+      const filePath = path.join(
+        __dirname,
+        '../../../scripts/chat/services/DualSystemResultApplication.js',
+      );
+      const sourceCode = fs.readFileSync(filePath, 'utf8');
+
+      expect(sourceCode).toContain('legacyVisibilityToProfile');
+      expect(sourceCode).toContain('isConcealed');
+      expect(sourceCode).not.toContain("['concealed', 'hidden', 'undetected'].includes");
+    });
+
+    test('lowercase hide action imports the canonical FeatsHandler module', () => {
+      const filePath = path.join(
+        __dirname,
+        '../../../scripts/chat/services/actions/hide-action.js',
+      );
+      const sourceCode = fs.readFileSync(filePath, 'utf8');
+
+      expect(sourceCode).toContain("import('../FeatsHandler.js')");
+      expect(sourceCode).not.toContain("import('../feats-handler.js')");
+    });
+
+    test('uppercase hide action applies Ceaseless Shadows cover upgrading', () => {
+      const filePath = path.join(
+        __dirname,
+        '../../../scripts/chat/services/actions/HideAction.js',
+      );
+      const sourceCode = fs.readFileSync(filePath, 'utf8');
+
+      expect(sourceCode).toContain('FeatsHandler.upgradeCoverForCreature');
+      expect(sourceCode).toContain('coverState = upgraded.state');
+    });
+
+    test('lowercase hide action safely resolves token-shaped inputs for rule elements', () => {
+      const filePath = path.join(
+        __dirname,
+        '../../../scripts/chat/services/actions/hide-action.js',
+      );
+      const sourceCode = fs.readFileSync(filePath, 'utf8');
+
+      expect(sourceCode).toContain('let hidingToken = actionData.actorToken || actionData.actor');
+      expect(sourceCode).toContain('hidingToken = hidingToken.getActiveTokens()[0]');
+      expect(sourceCode).not.toContain('actionData.actor.getActiveTokens()[0]');
+    });
+
     test('hide from observed state produces correct outcomes', () => {
       const {
         getDefaultNewStateFor,

@@ -3,7 +3,12 @@
  */
 
 import { extractPerceptionDC, extractStealthDC } from '../../chat/services/infra/shared-utils.js';
-import { COVER_STATES, MODULE_ID, VISIBILITY_STATES } from '../../constants.js';
+import {
+  COVER_STATES,
+  MODULE_ID,
+  VISIBILITY_STATES,
+  getVisibilityStateLabelKey,
+} from '../../constants.js';
 import {
   getCoverMap,
   getLastRollTotalForActor,
@@ -12,6 +17,24 @@ import {
   hasActiveEncounter,
 } from '../../utils.js';
 import { TimedOverrideManager } from '../../services/TimedOverrideManager.js';
+
+function getManualVisibilityKeys() {
+  return Object.entries(VISIBILITY_STATES)
+    .filter(([, config]) => config.manual !== false)
+    .map(([key]) => key);
+}
+
+function buildVisibilityStateContext(key, { selected = false, manual = true } = {}) {
+  const config = VISIBILITY_STATES[key];
+  return {
+    value: key,
+    label: game.i18n.localize(getVisibilityStateLabelKey(key, { manual })),
+    selected,
+    icon: config.icon,
+    color: config.color,
+    cssClass: config.cssClass,
+  };
+}
 
 function getTokenImage(token) {
   if (token.actor?.img) return token.actor.img;
@@ -194,7 +217,7 @@ export async function buildContext(app, options) {
 
         let allowedVisKeys = isNonAvsToken
           ? ['observed', 'hidden']
-          : Object.keys(VISIBILITY_STATES);
+          : getManualVisibilityKeys();
 
         // Remove 'avs' from allowed keys if AVS is disabled
         if (!avsEnabled) {
@@ -208,14 +231,7 @@ export async function buildContext(app, options) {
             let selected = false;
 
             // This will be set after we determine the override/AVS logic
-            return {
-              value: key,
-              label: game.i18n.localize(VISIBILITY_STATES[key].label),
-              selected, // Will be updated below
-              icon: VISIBILITY_STATES[key].icon,
-              color: VISIBILITY_STATES[key].color,
-              cssClass: VISIBILITY_STATES[key].cssClass,
-            };
+            return buildVisibilityStateContext(key, { selected });
           });
 
         // Determine current state and selection logic
@@ -398,7 +414,7 @@ export async function buildContext(app, options) {
 
         let allowedVisKeys = isNonAvsToken
           ? ['observed', 'hidden']
-          : Object.keys(VISIBILITY_STATES);
+          : getManualVisibilityKeys();
 
         // Remove 'avs' from allowed keys if AVS is disabled
         if (!avsEnabledForTarget) {
@@ -413,14 +429,7 @@ export async function buildContext(app, options) {
             let selected = false;
 
             // This will be set after we determine the override/AVS logic
-            return {
-              value: key,
-              label: game.i18n.localize(VISIBILITY_STATES[key].label),
-              selected, // Will be updated below
-              icon: VISIBILITY_STATES[key].icon,
-              color: VISIBILITY_STATES[key].color,
-              cssClass: VISIBILITY_STATES[key].cssClass,
-            };
+            return buildVisibilityStateContext(key, { selected });
           });
 
         // In target mode, determine current state and selection logic
@@ -601,14 +610,9 @@ export async function buildContext(app, options) {
         const doorType = Number(d?.door) || 0;
         const fallback = `${game.i18n?.localize?.('PF2E_VISIONER.WALL.VISIBLE_TO_YOU') || isDoor ? 'Hidden Door' : 'Hidden Wall'} ${++autoIndex}`;
         const currentState = wallMap?.[d.id] || 'hidden';
-        const states = ['hidden', 'observed'].map((key) => ({
-          value: key,
-          label: game.i18n.localize(VISIBILITY_STATES[key].label),
-          selected: currentState === key,
-          icon: VISIBILITY_STATES[key].icon,
-          color: VISIBILITY_STATES[key].color,
-          cssClass: VISIBILITY_STATES[key].cssClass,
-        }));
+        const states = ['hidden', 'observed'].map((key) =>
+          buildVisibilityStateContext(key, { selected: currentState === key }),
+        );
         const img = getWallImage(doorType);
         // DC: per-wall override else global default
         const overrideDC = Number(d?.getFlag?.(MODULE_ID, 'stealthDC'));
@@ -665,19 +669,16 @@ export async function buildContext(app, options) {
     isLootObserver || context.hazardObserver ? ['observed', 'hidden'] : null;
 
   context.visibilityStates = Object.entries(VISIBILITY_STATES)
-    .filter(([key]) => {
+    .filter(([key, config]) => {
+      if (config.manual === false) return false;
       // If observer is loot/hazard, only allow observed and hidden
       if (allowedLegendKeys) return allowedLegendKeys.includes(key);
       // Otherwise filter out 'avs' if AVS is disabled
       return avsEnabled || key !== 'avs';
     })
-    .map(([key, config]) => ({
+    .map(([key]) => ({
       key,
-      value: key,
-      label: game.i18n.localize(config.label),
-      icon: config.icon,
-      color: config.color,
-      cssClass: config.cssClass,
+      ...buildVisibilityStateContext(key, { selected: false }),
     }));
 
   context.coverStates = Object.entries(COVER_STATES).map(([key, config]) => ({

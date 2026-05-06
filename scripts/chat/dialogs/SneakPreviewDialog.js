@@ -3,6 +3,10 @@ import autoCoverSystem from '../../cover/auto-cover/AutoCoverSystem.js';
 import { ActionQualifier } from '../../rule-elements/operations/ActionQualifier.js';
 import { getCoverBetween, getVisibilityBetween } from '../../utils.js';
 import { optimizedVisibilityCalculator } from '../../visibility/auto-visibility/index.js';
+import {
+  canAttemptHideOrRemainHidden,
+  legacyVisibilityToProfile,
+} from '../../visibility/perception-profile.js';
 import { getDesiredOverrideStatesForAction } from '../services/data/action-state-config.js';
 import { FeatsHandler } from '../services/FeatsHandler.js';
 import { notify } from '../services/infra/notifications.js';
@@ -13,6 +17,31 @@ import { BaseActionDialog } from './base-action-dialog.js';
 
 // Store reference to current sneak dialog
 let currentSneakDialog = null;
+
+function allowHiddenUndetectedSneakEndStates() {
+  try {
+    return game.settings.get('pf2e-visioner', 'sneakAllowHiddenUndetectedEndPosition');
+  } catch {
+    return false;
+  }
+}
+
+export function sneakStartPositionQualifies(visibility) {
+  const { detectionState } = legacyVisibilityToProfile(visibility);
+  return detectionState === 'hidden' || detectionState === 'undetected';
+}
+
+export function sneakEndPositionQualifies(visibility, coverState = 'none', options = {}) {
+  const allowExtendedEndStates =
+    options.allowExtendedEndStates ?? allowHiddenUndetectedSneakEndStates();
+  const profile = legacyVisibilityToProfile(visibility, { coverState });
+
+  if (canAttemptHideOrRemainHidden(profile)) return true;
+  return (
+    allowExtendedEndStates &&
+    (profile.detectionState === 'hidden' || profile.detectionState === 'undetected')
+  );
+}
 
 /**
  * Dialog for previewing and applying Sneak action results
@@ -2127,13 +2156,14 @@ export class SneakPreviewDialog extends BaseActionDialog {
    * @private
    */
   _getDisplayProperty(type, value, property) {
+    if (type === 'visibility') {
+      const config = this.visibilityConfig(value);
+      if (!config) return value;
+      if (property === 'class') return config.cssClass;
+      return config[property] || value;
+    }
+
     const configs = {
-      visibility: {
-        observed: { label: game.i18n.localize('PF2E_VISIONER.BUTTONS.OBSERVED'), icon: 'fas fa-eye', class: 'visibility-observed' },
-        concealed: { label: game.i18n.localize('PF2E_VISIONER.BUTTONS.CONCEALED'), icon: 'fas fa-eye-slash', class: 'visibility-concealed' },
-        hidden: { label: game.i18n.localize('PF2E_VISIONER.BUTTONS.HIDDEN'), icon: 'fas fa-user-secret', class: 'visibility-hidden' },
-        undetected: { label: game.i18n.localize('PF2E_VISIONER.BUTTONS.UNDETECTED'), icon: 'fas fa-ghost', class: 'visibility-undetected' },
-      },
       cover: {
         none: { label: game.i18n.localize('PF2E_VISIONER.BUTTONS.NO_COVER'), icon: 'fas fa-shield-slash', class: 'cover-none' },
         lesser: { label: game.i18n.localize('PF2E_VISIONER.BUTTONS.LESSER_COVER'), icon: 'fas fa-shield-alt', class: 'cover-lesser' },
@@ -2254,7 +2284,7 @@ export class SneakPreviewDialog extends BaseActionDialog {
       if (overrideFlag && overrideFlag.state) {
         const s = overrideFlag.state;
 
-        if (s === 'hidden' || s === 'undetected') return true;
+        if (sneakStartPositionQualifies(s)) return true;
         // concealed/observed do not satisfy start prerequisite
       }
 
@@ -2264,7 +2294,7 @@ export class SneakPreviewDialog extends BaseActionDialog {
       if (startState && startState.visibility) {
         const startVisibility = startState.visibility;
 
-        return startVisibility === 'hidden' || startVisibility === 'undetected';
+        return sneakStartPositionQualifies(startVisibility);
       }
 
       // Priority 2: Use position transition data
@@ -2272,21 +2302,21 @@ export class SneakPreviewDialog extends BaseActionDialog {
       if (positionTransition && positionTransition.startPosition) {
         const startVisibility = positionTransition.startPosition.avsVisibility;
 
-        return startVisibility === 'hidden' || startVisibility === 'undetected';
+        return sneakStartPositionQualifies(startVisibility);
       }
 
       // Priority 3: Use outcome start state data
       if (outcome && (outcome.startVisibility || outcome.startState)) {
         const startVisibility = outcome.startVisibility || outcome.startState?.visibility;
 
-        return startVisibility === 'hidden' || startVisibility === 'undetected';
+        return sneakStartPositionQualifies(startVisibility);
       }
 
       // Final fallback to current visibility check
       // Use the observer -> sneaking token perspective
       const visibility = getVisibilityBetween(observerToken, this.sneakingToken);
 
-      return visibility === 'hidden' || visibility === 'undetected';
+      return sneakStartPositionQualifies(visibility);
     } catch (error) {
       // Error checking start position qualification
       return false;
@@ -2348,10 +2378,10 @@ export class SneakPreviewDialog extends BaseActionDialog {
           `avs-override-from-${observerId}`,
         );
         if (overrideFlag) {
+          const overrideCoverState = overrideFlag.expectedCover ?? (overrideFlag.hasCover ? 'standard' : 'none');
           // Qualify if override provides standard/greater cover or concealment
-          if (overrideFlag.hasCover || ['standard', 'greater'].includes(overrideFlag.expectedCover))
+          if (sneakEndPositionQualifies(overrideFlag.state, overrideCoverState))
             return true;
-          if (overrideFlag.state === 'concealed') return true;
           // hidden/undetected do not satisfy end prerequisite
         }
       }
@@ -2365,10 +2395,7 @@ export class SneakPreviewDialog extends BaseActionDialog {
         // Treat these as positive signals only; do not early-return false so we can still run
         // a real-time visibility check (fixes cases like dim light where cached fields lag).
         if (outcome && (outcome.endCover || outcome.endVisibility)) {
-          // Qualify if end cover indicates standard or greater
-          if (outcome.endCover && ['standard', 'greater'].includes(outcome.endCover)) return true;
-          // Qualify if outcome reports concealed at end
-          if (outcome.endVisibility === 'concealed') return true;
+          if (sneakEndPositionQualifies(outcome.endVisibility, outcome.endCover)) return true;
           // Otherwise, continue to check positionTransition and live visibility below
         }
 
@@ -2376,27 +2403,21 @@ export class SneakPreviewDialog extends BaseActionDialog {
           // Use the actual end position data
           const endPosition = positionTransition.endPosition;
 
-          // Qualify if standard/greater cover at end
-          if (endPosition.coverState && ['standard', 'greater'].includes(endPosition.coverState)) {
-            return true;
-          }
-
-          // Qualify if concealed at end (not hidden/undetected)
           const endVisibility = endPosition.avsVisibility;
-          const allowExtendedEndStates = game.settings.get('pf2e-visioner', 'sneakAllowHiddenUndetectedEndPosition');
-          if (endVisibility === 'concealed') {
+          const allowExtendedEndStates = allowHiddenUndetectedSneakEndStates();
+          if (
+            sneakEndPositionQualifies(endVisibility, endPosition.coverState, {
+              allowExtendedEndStates,
+            })
+          )
             return true;
-          }
-          if (allowExtendedEndStates && (endVisibility === 'hidden' || endVisibility === 'undetected')) {
-            return true;
-          }
           // Additionally, if we calculated a live end visibility and it's concealed, qualify
-          if (outcome?.liveEndVisibility === 'concealed') {
+          if (
+            sneakEndPositionQualifies(outcome?.liveEndVisibility, endPosition.coverState, {
+              allowExtendedEndStates,
+            })
+          )
             return true;
-          }
-          if (allowExtendedEndStates && (outcome?.liveEndVisibility === 'hidden' || outcome?.liveEndVisibility === 'undetected')) {
-            return true;
-          }
           // Otherwise, fall through to live visibility check below
         }
       }
@@ -2419,15 +2440,10 @@ export class SneakPreviewDialog extends BaseActionDialog {
         }
       }
 
-      if (coverState === 'standard' || coverState === 'greater') return true;
-
       // Live check last: qualify if currently concealed from this observer
       // (dim light and similar lighting effects are captured here)
       const visibility = getVisibilityBetween(observerToken, this.sneakingToken);
-      const allowExtendedEndStates = game.settings.get('pf2e-visioner', 'sneakAllowHiddenUndetectedEndPosition');
-
-      const qualifies = visibility === 'concealed' || (allowExtendedEndStates && (visibility === 'hidden' || visibility === 'undetected'));
-      return qualifies;
+      return sneakEndPositionQualifies(visibility, coverState);
     } catch (error) {
       // Error checking end position qualification
       return false;
@@ -2590,16 +2606,9 @@ export class SneakPreviewDialog extends BaseActionDialog {
       endQualifies = outcome.positionDisplay.endPosition.qualifies;
     } else {
       // Calculate qualifications from position transition data
-      const { default: EnhancedSneakOutcome } = await import(
-        '../services/actions/EnhancedSneakOutcome.js'
-      );
-      startQualifies = EnhancedSneakOutcome.doesPositionQualifyForSneak(
-        positionTransition.startPosition?.avsVisibility,
-        true,
-      );
-      endQualifies = EnhancedSneakOutcome.doesPositionQualifyForSneak(
+      startQualifies = sneakStartPositionQualifies(positionTransition.startPosition?.avsVisibility);
+      endQualifies = sneakEndPositionQualifies(
         positionTransition.endPosition?.avsVisibility,
-        false,
         positionTransition.endPosition?.coverState,
       );
     }

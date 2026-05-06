@@ -3,7 +3,7 @@
  * Shows when manual overrides become invalid due to position/lighting changes
  */
 
-import { COVER_STATES, VISIBILITY_STATES } from '../constants.js';
+import { COVER_STATES, VISIBILITY_STATES, getVisibilityStateLabelKey } from '../constants.js';
 import { loadDialogCSS, loadSharedUICSS } from '../css-loader.js';
 
 export class OverrideValidationDialog extends foundry.applications.api.HandlebarsApplicationMixin(foundry.applications.api.ApplicationV2) {
@@ -116,6 +116,12 @@ export class OverrideValidationDialog extends foundry.applications.api.Handlebar
       const coverCfg = (COVER_STATES && COVER_STATES[coverKey]) || { icon: 'fas fa-shield-slash', color: '#4caf50', label: 'No Cover' };
       const prevVisCfg = (VISIBILITY_STATES && VISIBILITY_STATES[prevVisibilityKey]) || { icon: 'fas fa-eye', color: '#9e9e9e', label: 'Observed' };
       const prevCoverCfg = (COVER_STATES && COVER_STATES[prevCoverKey]) || { icon: 'fas fa-shield', color: '#9e9e9e', label: game.i18n.localize('PF2E_VISIONER.TOKEN_MANAGER.COVER_STATE') };
+      const localizeVisibilityLabel = (key, fallback) => {
+        const labelKey = getVisibilityStateLabelKey(key, { manual: true });
+        return game?.i18n?.localize?.(labelKey) || fallback;
+      };
+      const currentVisibilityLabel = localizeVisibilityLabel(visibilityKey, 'Observed');
+      const previousVisibilityLabel = localizeVisibilityLabel(prevVisibilityKey, 'Previous');
 
       return {
         id: `${override.observerId}-${override.targetId}`,
@@ -128,7 +134,7 @@ export class OverrideValidationDialog extends foundry.applications.api.Handlebar
         reason: override.reason,
         // Optionally surface a friendly description of current states
         currentVisibilityDescription: (VISIBILITY_STATES && VISIBILITY_STATES[visibilityKey]?.label)
-          ? (game?.i18n?.localize?.(VISIBILITY_STATES[visibilityKey].label) + (coverKey && COVER_STATES && COVER_STATES[coverKey]?.label ? ` • ${game?.i18n?.localize?.(COVER_STATES[coverKey].label)}` : ''))
+          ? (currentVisibilityLabel + (coverKey && COVER_STATES && COVER_STATES[coverKey]?.label ? ` • ${game?.i18n?.localize?.(COVER_STATES[coverKey].label)}` : ''))
           : undefined,
         state: override.state || 'undetected',
         source: override.source || 'unknown',
@@ -139,13 +145,13 @@ export class OverrideValidationDialog extends foundry.applications.api.Handlebar
           key: prevVisibilityKey,
           icon: prevVisCfg.icon,
           color: prevVisCfg.color,
-          label: game?.i18n?.localize?.(prevVisCfg.label) || 'Previous'
+          label: previousVisibilityLabel
         },
         statusVisibility: {
           key: visibilityKey,
           icon: visCfg.icon,
           color: visCfg.color,
-          label: game?.i18n?.localize?.(visCfg.label) || 'Observed'
+          label: currentVisibilityLabel
         },
         prevCover: {
           key: prevCoverKey,

@@ -22,7 +22,7 @@ import errorHandlingService, { SYSTEM_TYPES } from '../infra/ErrorHandlingServic
  * @typedef {Object} CombinedSystemState
  * @property {SystemResult} avsResult - AVS system result
  * @property {SystemResult} coverResult - Auto-Cover system result
- * @property {string} effectiveVisibility - Combined effective visibility state
+ * @property {string} effectiveVisibility - AVS visibility state with cover tracked separately
  * @property {number} stealthBonus - Combined stealth bonus
  * @property {Array<string>} warnings - Any warnings from system integration
  * @property {boolean} systemsAvailable - Whether both systems are available
@@ -680,24 +680,14 @@ export class DualSystemIntegration {
   }
 
   /**
-   * Combines AVS and Auto-Cover states into effective visibility
+   * Returns the AVS visibility state while keeping Auto-Cover as separate position metadata.
    * @param {string} avsVisibility - AVS visibility state
-   * @param {string} coverState - Cover state
-   * @returns {string} Combined effective visibility
+   * @param {string} coverState - Cover state tracked separately from detection visibility
+   * @returns {string} AVS visibility state
    * @private
    */
   _combineSystemStates(avsVisibility, coverState) {
-    // If already hidden or undetected, cover doesn't change that
-    if (['hidden', 'undetected'].includes(avsVisibility)) {
-      return avsVisibility;
-    }
-
-    // If observed but has cover that allows hiding, consider it concealed
-    if (avsVisibility === 'observed' && coverState && COVER_STATES[coverState]?.canHide) {
-      return 'concealed';
-    }
-
-    // Otherwise, return the AVS visibility state
+    void coverState;
     return avsVisibility;
   }
 

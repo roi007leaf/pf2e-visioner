@@ -4,6 +4,10 @@
 
 import { MODULE_ID } from '../constants.js';
 import { getBestVisibilityState, getControlledObserverTokens, getVisibilityMap } from '../utils.js';
+import {
+  blocksCanvasDetection,
+  legacyVisibilityToProfile,
+} from '../visibility/perception-profile.js';
 
 /**
  * Class wrapper for PF2E detection integration to support init/teardown.
@@ -94,7 +98,6 @@ const VISIBILITY_VALUES = {
   concealed: 1,
   hidden: 2,
   undetected: 3,
-  unnoticed: 3,
 };
 
 /**
@@ -319,6 +322,9 @@ function reachesVisibilityThreshold(origin, target, threshold, config = {}) {
   if (!config.visibility) {
     config.visibility = getVisibilityBetweenTokens(origin, target);
   }
+
+  const profile = legacyVisibilityToProfile(config.visibility);
+  if (blocksCanvasDetection(profile)) return true;
 
   return VISIBILITY_VALUES[config.visibility] >= threshold;
 }

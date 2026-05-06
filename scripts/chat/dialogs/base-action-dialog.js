@@ -35,8 +35,10 @@ export class BaseActionDialog extends BasePreviewDialog {
   }
 
   // Shared UI helpers
-  visibilityConfig(state) {
-    return getVisibilityStateConfig(state) || { icon: '', color: '', label: String(state ?? '') };
+  visibilityConfig(state, options = {}) {
+    return (
+      getVisibilityStateConfig(state, options) || { icon: '', color: '', label: String(state ?? '') }
+    );
   }
 
   resolveTokenImage(token) {
@@ -349,7 +351,10 @@ export class BaseActionDialog extends BasePreviewDialog {
         states = states.filter((s) => s !== 'avs');
       }
 
-      this._cachedBulkStates = states.map((s) => ({ value: s, ...this.visibilityConfig(s) }));
+      this._cachedBulkStates = states.map((s) => ({
+        value: s,
+        ...this.visibilityConfig(s, { manual: true }),
+      }));
       return this._cachedBulkStates;
     } catch {
       return [];
@@ -376,7 +381,10 @@ export class BaseActionDialog extends BasePreviewDialog {
           }
         }
       }
-      return Array.from(set).map((v) => ({ value: v, ...this.visibilityConfig(v) }));
+      return Array.from(set).map((v) => ({
+        value: v,
+        ...this.visibilityConfig(v, { manual: true }),
+      }));
     } catch {
       return [];
     }

@@ -12,6 +12,10 @@ import {
 import { getVisibilityStateConfig } from '../services/data/visibility-states.js';
 import { notify } from '../services/infra/notifications.js';
 import { hasActiveEncounter } from '../services/infra/shared-utils.js';
+import {
+  canAttemptHideOrRemainHidden,
+  legacyVisibilityToProfile,
+} from '../../visibility/perception-profile.js';
 import { BaseActionDialog } from './base-action-dialog.js';
 
 // Store reference to current hide dialog
@@ -187,11 +191,11 @@ export class HidePreviewDialog extends BaseActionDialog {
             const endVisibility = endPos?.effectiveVisibility || startVisibility;
             const endCoverState = endPos?.coverState || 'none';
             // Construct a base prerequisite object (start: need cover/concealment unless feats)
+            const startProfile = legacyVisibilityToProfile(startVisibility, {
+              coverState: endCoverState,
+            });
             let base = {
-              startQualifies:
-                startVisibility === 'hidden' ||
-                startVisibility === 'undetected' ||
-                startVisibility === 'concealed',
+              startQualifies: canAttemptHideOrRemainHidden(startProfile),
               endQualifies: qualifies,
               bothQualify: false,
               reason: 'Hide (dialog) prerequisites',
@@ -667,13 +671,7 @@ export class HidePreviewDialog extends BaseActionDialog {
   }
 
   getStateLabel(state) {
-    const labels = {
-      observed: 'Observed',
-      concealed: 'Concealed',
-      hidden: 'Hidden',
-      undetected: 'Undetected',
-    };
-    return labels[state] || state;
+    return this.visibilityConfig(state)?.label || state;
   }
 
   // Use base outcome helpers

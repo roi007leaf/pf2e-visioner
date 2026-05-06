@@ -2,7 +2,13 @@
  * Hover tooltips for token visibility states
  */
 
-import { COVER_STATES, MODULE_ID, SPECIAL_SENSES, VISIBILITY_STATES } from '../constants.js';
+import {
+  COVER_STATES,
+  MODULE_ID,
+  SPECIAL_SENSES,
+  VISIBILITY_STATES,
+  getVisibilityStateLabelKey,
+} from '../constants.js';
 import autoCoverSystem from '../cover/auto-cover/AutoCoverSystem.js';
 import { canShowTooltips, computeSizesFromSetting } from '../helpers/tooltip-utils.js';
 import { SenseSuppressionRegionBehavior } from '../regions/SenseSuppressionRegionBehavior.js';
@@ -11,6 +17,11 @@ import { getCoverMap, getVisibilityMap } from '../utils.js';
 import { setPanningState } from '../utils/scheduler.js';
 
 const SENSE_BADGE_BLOCKED_VISIBILITY_STATES = new Set(['undetected', 'unnoticed']);
+
+function getExplicitVisibilityStateLabel(state) {
+  const labelKey = getVisibilityStateLabelKey(state, { manual: true });
+  return game.i18n?.localize?.(labelKey) || labelKey;
+}
 
 /**
  * Lightweight service wrapper for lifecycle control.
@@ -1374,7 +1385,7 @@ function addVisibilityIndicator(
   const verticalOffset = hudActive ? 26 : -6; // nudge up slightly when HUD is not active
   const centerY = canvasRect.top + globalPoint.y - badgeHeight / 2 + verticalOffset;
 
-  const placeBadge = (leftPx, topPx, stateClass, iconClass, kind) => {
+  const placeBadge = (leftPx, topPx, stateClass, iconClass, kind, tooltipLabel = '') => {
     const el = document.createElement('div');
     el.style.position = 'fixed';
     el.style.pointerEvents = 'auto';
@@ -1384,6 +1395,10 @@ function addVisibilityIndicator(
     el.style.top = '0';
     el.style.transform = `translate(${Math.round(leftPx)}px, ${Math.round(topPx)}px)`;
     el.style.willChange = 'transform';
+    if (tooltipLabel) {
+      el.dataset.tooltip = tooltipLabel;
+      el.setAttribute('aria-label', tooltipLabel);
+    }
 
     el.innerHTML = `<span class="pf2e-visioner-tooltip-badge ${kind === 'cover' ? `cover-${stateClass}` : `visibility-${stateClass}`}" style="--pf2e-visioner-tooltip-badge-width: ${badgeWidth}px; --pf2e-visioner-tooltip-badge-height: ${badgeHeight}px; --pf2e-visioner-tooltip-badge-radius: ${borderRadius}px;">
       <i class="${iconClass}"></i>
@@ -1517,6 +1532,7 @@ function addVisibilityIndicator(
       visibilityState,
       config.icon,
       'visibility',
+      getExplicitVisibilityStateLabel(visibilityState),
     );
     addBadgeClickHandler(indicator._visBadgeEl, observerToken, targetToken, mode, detectionTarget);
 
@@ -2034,8 +2050,7 @@ function formatVisibilityFactors(factors) {
   const lines = [];
 
   if (factors.state) {
-    const stateLabel = VISIBILITY_STATES[factors.state]?.label || factors.state;
-    const localizedState = game.i18n?.localize?.(stateLabel) || stateLabel;
+    const localizedState = getExplicitVisibilityStateLabel(factors.state);
     const stateLabelKey = game.i18n.localize('PF2E_VISIONER.VISIBILITY_FACTORS.STATE_LABEL');
     lines.push(`${stateLabelKey}: ${localizedState}`);
   }

@@ -1,4 +1,4 @@
-import { MODULE_ID, VISIBILITY_STATES } from '../../../constants.js';
+import { MODULE_ID, VISIBILITY_STATES, getVisibilityStateLabelKey } from '../../../constants.js';
 import { LevelsIntegration } from '../../../services/LevelsIntegration.js';
 import { SeekDialogAdapter } from '../../../visibility/auto-visibility/SeekDialogAdapter.js';
 import { appliedSeekChangesByMessage } from '../data/message-cache.js';
@@ -417,7 +417,7 @@ export class SeekActionHandler extends ActionHandlerBase {
       outcome,
       currentVisibility: current,
       oldVisibility: current,
-      oldVisibilityLabel: VISIBILITY_STATES[current]?.label || current,
+      oldVisibilityLabel: getVisibilityStateLabelKey(current, { manual: true }) || current,
       newVisibility,
       changed: newVisibility !== current,
       usedImprecise: !!usedImprecise,

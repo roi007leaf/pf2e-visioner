@@ -1,67 +1,67 @@
 <claude-mem-context>
 # Memory Context
 
-# [pf2e-visioner] recent context, 2026-05-06 8:10am GMT+3
+# [pf2e-visioner] recent context, 2026-05-06 11:36am GMT+3
 
 Legend: 🎯session 🔴bugfix 🟣feature 🔄refactor ✅change 🔵discovery ⚖️decision 🚨security_alert 🔐security_note
 Format: ID TIME TYPE TITLE
 Fetch details: get_observations([IDs]) | Search: mem-search skill
 
-Stats: 50 obs (16,196t read) | 749,569t work | 98% savings
+Stats: 50 obs (22,103t read) | 3,050,706t work | 99% savings
 
 ### May 3, 2026
-801 9:55a 🔵 Design question: two dots show even when only one user beats stealther initiative
 S119 GM tracker dots design pivot — dots should only show users who CAN see the stealther, not users blocked by overrides (May 3 at 9:55 AM)
-802 9:56a ⚖️ Final GM dots design: show ONLY canSee=true users; `hasInitialOverride` gates canSee computation only
-803 " 🔄 GM dots simplified back to `canSee`-only gate — `hasInitialOverride` removed from dot rendering
-804 " ✅ Full suite 123/123 green, lint clean — stealth initiative feature final verified state
-805 9:57a ⚖️ Tracker turn-reveal behavior: user prefers stealther stays hidden until override explicitly removed
-806 10:00a 🟣 GM Tracker Initial-Stealth Marker (eye-slash icon)
-807 10:01a 🟣 CSS for GM stealth initial-marker icon
-808 10:07a 🟣 Tests added for eye-slash initial-stealth marker in GM dots
-809 10:09a 🟣 Eye-slash initial-stealth marker: full suite green
-810 10:10a ⚖️ GM dots flipped: now show users who CANNOT see the stealther
-811 10:11a 🔵 Tests fail: service still renders dots for canSee=true, tests now expect canSee=false
-812 10:13a 🟣 Service implementation flipped: GM dots now show blocked players, eye-slash marker removed
-813 " ✅ Remaining initial-marker test assertions flipped to toBeNull
-814 " 🔵 Test "keeps GM tracker dot while metadata changes" has stale expectation at line 540
-815 " 🔴 All 17 stealth tests green after "cannot see" dot migration
-816 " 🔄 Dead code removed: eye-slash marker method and CSS deleted
-817 " 🟣 Stealth initiative feature complete: 124/124 green, lint clean
-818 10:14a 🟣 Two-tier stealth visibility: unnoticed/undetected in EncounterStealthInitiativeService
-819 " 🟣 Unnoticed hover tooltip requested (matching undetected purple tooltip)
-820 10:21a 🔵 Undetected tooltip/styling system structure discovered for unnoticed parity work
-821 10:38a 🔵 Duplicate styles directory discovered: scripts/styles/ mirrors styles/
-822 10:39a 🔴 Floating indication tooltip unnoticed state rendered green instead of purple
-823 " ✅ Version bumped from 8.1.0 to 8.1.1 in module.json
-824 11:33a ✅ CHANGELOG.md updated with 8.1.1 entry
-825 " 🔵 Unnoticed tooltip color still green — inline style overrides CSS class rule
-826 11:38a 🔵 Root cause of green unnoticed color: #applyInlineStateColors() missing unnoticed in variableFallbacks
-827 " 🔴 Fixed unnoticed color in #applyInlineStateColors() palettes and variableFallbacks
-828 11:39a ⚖️ Encounter stealth setup now only grants unnoticed — RAW intent confirmed
-829 11:42a 🔵 Primary session in replay loop — created redundant plan for already-completed RAW work
-830 11:47a 🟣 Encounter stealth setup gains reverse-undetected RAW logic for higher-initiative stealthers
-831 " 🟣 RAW encounter stealth: stealther gains undetected-of-observer when out-initiating but failing DC
-832 11:48a ✅ CHANGELOG updated to document RAW reverse-undetected Avoid Notice behavior
-833 " 🟣 RAW Avoid Notice three-way split: 20/20 tests pass with fresh session
-834 " 🟣 Full suite 182/182 green after RAW Avoid Notice three-way split implementation
-835 " ⚖️ PF2E RAW Avoid Notice: all enemies undetected/unnoticed to stealther when stealther beats all initiatives but fails all DCs
-836 11:54a ⚖️ New plan: restore observer-to-stealther RAW overrides after user RAW correction
-837 " 🔴 Reverted reverseUndetected direction flip — restored observer-to-stealther overrides per RAW
-838 11:55a 🟣 Final RAW Avoid Notice: two-branch observer→stealther model — unnoticed or undetected per DC result
-839 11:56a ✅ pf2e-visioner 8.1.1 full suite verified: 182/182 pass, lint clean
-840 " 🔴 Removed dead reverseRecordKey cleanup logic from _restoreExpiredInitialOverridesForCombatant
-841 1:05p 🔴 Dead reverseRecordKey cleanup removed; encounter-stealth suite 20/20 confirmed
-### May 4, 2026
-845 7:52a 🔵 Combat Cover Calculation Bug: Stuck State After Token Movement
-846 7:53a 🔵 pf2e-visioner Cover System Architecture Mapped
-847 " 🔵 Root Cause: Combat Cover Sticks Because CombatStartCoverService Never Records Pairs
-848 " 🔵 Secondary Bug: AutoCoverSystem.onUpdateDocument References Nonexistent this.autoCoverSystem
-849 " 🔵 recordPair Only Called in StealthCheckUseCase — Never in CombatStartCoverService or AttackRollUseCase
-850 7:54a 🔴 TDD Tests Written for recordPair Gap in CombatStartCoverService and AutoCoverSystem
-851 " 🔴 CombatStartCoverService Fixed: recordPair Called After Non-None Cover Set at Combat Start
-852 " 🔴 AutoCoverSystem Refactored: getActivePairsInvolving Shape, cleanupCover Semantics, onUpdateDocument Self-Reference Bugs Fixed
-853 7:55a 🔴 Combat Cover Stuck-on-Move Bug Fully Fixed and Verified
+### May 6, 2026
+1142 10:11a 🔵 hide-action.js and HideAction.js have divergent semantics beyond import paths — behavioral differences confirmed
+1145 10:13a 🔵 Task 6 Code Review Re-Verification Scope — pf2e-visioner
+1146 10:14a 🔴 Task 6 Prior Findings All Verified Fixed
+1147 " 🔵 SneakPreviewDialog Prerequisite Logic Unified via perception-profile.js Helpers
+1148 " 🔵 Divergence: HideAction.js Missing FeatsHandler.upgradeCoverForCreature Call
+1149 " 🟣 New Tests Cover All Three Prior Findings in Task 6
+1150 10:15a 🔵 Task 6 Test Suite: 71/71 Pass — All Three Target Files Green
+1151 " 🔵 Confirmed Remaining Divergences: HideAction.js vs hide-action.js (New Findings)
+1152 10:16a 🔵 Task 6 Hide Action Code Quality Re-Review (pf2e-visioner)
+1153 10:18a 🔄 Hide Action Mirroring: Prerequisite Logic Unified via perception-profile.js
+1154 " 🔵 Remaining Divergence: outcomeToChange/entriesToRevertChanges Between Hide Files
+1155 " 🔄 SneakPreviewDialog: Extracted sneakStartPositionQualifies and sneakEndPositionQualifies
+1156 " 🔄 DualSystemIntegration._combineSystemStates Simplified to Pass-Through
+1157 " 🟣 Task 6 Regression Tests Added for Hide/Sneak Alignment
+1158 " 🔵 perception-profile.js: canAttemptHideOrRemainHidden Semantics
+1159 10:19a 🔵 Task 6 Test Suite: 73/73 Passing After Hide Alignment
+1160 " 🔵 Concealment Detection Model Plan: Architecture and Design Decisions
+1161 10:20a 🔵 VISIBILITY_STATES Option Builders: All Sites Requiring Task 7 Filter
+1162 10:21a 🟣 TDD RED: New Test Added for Task 7 Scope/Manual Metadata
+1163 " 🟣 Task 7: scope/manual Metadata Added to VISIBILITY_STATES + getManualVisibilityStateEntries Helper
+1164 " 🟣 Task 7: Option Builder Filters Applied to context.js and QuickPanel.js
+1165 10:22a 🟣 Task 7: TDD GREEN — All 135 Tests Passing After Option Builder Filters
+1166 " 🟣 Task 7 Complete: Full Verification — 413 Tests Passing, Diff Confirmed
+1167 " ✅ Task 7 Final Verification: Lint Clean, Changed Files Confirmed
+1168 10:23a 🔵 Task 7 VISIBILITY_STATES metadata verified in constants.js
+1169 " 🔵 Generic manual option builders in context.js and QuickPanel.js both filter unnoticed correctly
+1170 10:24a 🔵 Full git diff reveals all Task 7 changes across 5 files
+1171 " 🔵 VisibilityRegionBehavior.js uses Object.keys(VISIBILITY_STATES) for schema choices — includes unnoticed
+1172 " 🔵 context.js has a third manual filter site at line 673 — legend/bulk-action bar
+1173 10:25a 🔵 Task 7 test suite: 23 suites / 135 tests all PASS
+1174 10:28a 🔵 Task 7 Spec Compliance: constants.js and VisibilityRegionBehavior.js Verified
+1175 " 🔵 Task 7 Full Spec Compliance Verified Across All Files
+1177 10:29a 🔵 Code Quality Review Initiated for pf2e-visioner Task 7
+1176 10:31a 🔵 Task 7 Spec Compliance: All 144 Tests Pass Across 24 Suites
+1183 10:32a 🔵 Task 8 Final Sweep: High-Risk Remaining Caller in DualSystemResultApplication
+1184 " 🔵 Final Sweep Sweep Classification: Remaining Hits Are Mostly Safe Leftovers
+1178 10:33a 🟣 Task 7: `unnoticed` State Locked Out of Manual UI Surfaces
+1179 " 🔵 Duplicate `manual !== false` Filter Helper: `getManualVisibilityStateEntries` vs `getManualVisibilityKeys`
+1180 " 🔵 Bug: `stealthDC` in Target Mode Uses `extractPerceptionDC` Twice
+1181 " 🔵 Stub: `PositionAwareStateTransitions._applyStateChange` Has No Return Value on Success Path
+1182 " 🔵 Task 7 Tests Pass; ESLint Clean on All 7 Review Files
+1188 10:36a 🟣 perception-profile.js adapter module added to pf2e-visioner
+1189 " 🔴 DetectionWrapper unnoticed threshold bug fixed via profile adapter
+1190 " 🔄 EncounterStealthInitiativeService migrated to profile-based semantics
+1191 " 🔄 unnoticed scoped to encounter-only in VISIBILITY_STATES constants and all UI pickers
+1192 " 🔴 Hide/Sneak prerequisite logic no longer treats hidden or undetected as concealment
+1193 " 🟣 StatelessVisibilityCalculator now emits profile metadata alongside legacy state
+1194 " 🔴 hide-action.js fixed: FeatsHandler import case and token resolution for rule elements
+1195 " 🔵 Focused test run: 100 tests across 5 core suites pass after concealment/detection model implementation
+1196 " ✅ pf2e-visioner bumped to 8.2.0 with concealment/detection model changelog
 
-Access 750k tokens of past work via get_observations([IDs]) or mem-search skill.
+Access 3051k tokens of past work via get_observations([IDs]) or mem-search skill.
 </claude-mem-context>

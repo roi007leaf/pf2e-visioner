@@ -106,4 +106,39 @@ describe('OverrideValidationDialog - shows all overrides', () => {
         expect(indicator._rawOverrides.length).toBe(2);
         expect(indicator._rawOverrides).toEqual(rawOverrides);
     });
+
+    it('should label concealed override states as observed plus concealed', async () => {
+        const dialog = new OverrideValidationDialog({
+            invalidOverrides: [
+                {
+                    observerId: 'obs1',
+                    targetId: 'tgt1',
+                    observerName: 'Observer1',
+                    targetName: 'Target1',
+                    state: 'concealed',
+                    currentVisibility: 'concealed',
+                    currentCover: 'none',
+                    expectedCover: 'none',
+                    source: 'manual_action',
+                    reason: 'Position changed'
+                }
+            ],
+            tokenName: 'TestToken'
+        });
+
+        const context = await dialog._prepareContext({});
+        const override = context.overrides[0];
+
+        expect(override.prevVisibility).toMatchObject({
+            key: 'concealed',
+            label: 'PF2E_VISIONER.VISIBILITY_STATES.observed_concealed'
+        });
+        expect(override.statusVisibility).toMatchObject({
+            key: 'concealed',
+            label: 'PF2E_VISIONER.VISIBILITY_STATES.observed_concealed'
+        });
+        expect(override.currentVisibilityDescription).toContain(
+            'PF2E_VISIONER.VISIBILITY_STATES.observed_concealed'
+        );
+    });
 });

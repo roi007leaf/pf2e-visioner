@@ -512,9 +512,9 @@ export class PositionAwareStateTransitions {
       { 
         id: 'modify', 
         label: game.i18n.localize('PF2E_VISIONER.BUTTONS.CHOOSE_DIFFERENT'), 
-        options: Object.keys(VISIBILITY_STATES).filter(state => 
-          state !== stateTransition.fromState
-        )
+        options: Object.entries(VISIBILITY_STATES)
+          .filter(([state, config]) => config.manual !== false && state !== stateTransition.fromState)
+          .map(([state]) => state)
       }
     ];
   }

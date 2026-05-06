@@ -20,7 +20,7 @@
  * - scripts/visibility/auto-visibility/core/VisibilityStateManager.js (uses setTimeout)
  */
 
-import { MODULE_ID, VISIBILITY_STATES } from '../constants.js';
+import { MODULE_ID, VISIBILITY_STATES, getVisibilityStateLabelKey } from '../constants.js';
 import { getVisibilityBetween } from '../utils.js';
 import { scheduleRAF } from '../utils/scheduler.js';
 import { _internal as visibilityCalculatorInternal } from '../visibility/StatelessVisibilityCalculator.js';
@@ -1622,7 +1622,8 @@ export async function updateSystemHiddenTokenHighlights(
               const lines = [];
               try {
                 if (factors.state) {
-                  const stateLabelKey = VISIBILITY_STATES[factors.state]?.label || factors.state;
+                  const stateLabelKey =
+                    getVisibilityStateLabelKey(factors.state, { manual: true }) || factors.state;
                   const localizedState = game.i18n?.localize?.(stateLabelKey) || stateLabelKey;
                   const stateHdr =
                     game.i18n?.localize?.('PF2E_VISIONER.VISIBILITY_FACTORS.STATE_LABEL') ||

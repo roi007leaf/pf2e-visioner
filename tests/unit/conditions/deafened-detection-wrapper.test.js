@@ -237,15 +237,18 @@ describe('Deafened Detection Wrapper', () => {
     });
 
     describe('Visioner visibility states', () => {
-        test('basic sight cannot detect unnoticed targets', () => {
-            const basicSightWrapper = mockLibWrapper.register.mock.calls.find(
-                call => call[1] === 'CONFIG.Canvas.detectionModes.basicSight._canDetect'
+        function getDetectionWrapperRegistration(path) {
+            return mockLibWrapper.register.mock.calls.find(
+                call => call[1] === path
             )?.[2];
+        }
+
+        function buildTokenPair(visibilityState) {
             const observer = {
                 actor: {},
                 document: {
                     id: 'observer',
-                    getFlag: jest.fn().mockReturnValue({ target: 'unnoticed' }),
+                    getFlag: jest.fn().mockReturnValue({ target: visibilityState }),
                 },
             };
             const target = {
@@ -253,7 +256,52 @@ describe('Deafened Detection Wrapper', () => {
                 document: { id: 'target' },
             };
 
+            return { observer, target };
+        }
+
+        test('basic sight blocks legacy unnoticed through profile semantics', () => {
+            const basicSightWrapper = mockLibWrapper.register.mock.calls.find(
+                call => call[1] === 'CONFIG.Canvas.detectionModes.basicSight._canDetect'
+            )?.[2];
+            const { observer, target } = buildTokenPair('unnoticed');
+
             expect(basicSightWrapper(jest.fn().mockReturnValue(true), { object: observer }, target)).toBe(false);
+        });
+
+        test('basic sight allows concealed because concealment is not detection loss', () => {
+            const basicSightWrapper = getDetectionWrapperRegistration(
+                'CONFIG.Canvas.detectionModes.basicSight._canDetect',
+            );
+            const { observer, target } = buildTokenPair('concealed');
+
+            expect(basicSightWrapper(jest.fn().mockReturnValue(true), { object: observer }, target)).toBe(true);
+        });
+
+        test('hearing allows hidden but blocks undetected and legacy unnoticed', () => {
+            const hearingWrapper = getDetectionWrapperRegistration(
+                'CONFIG.Canvas.detectionModes.hearing._canDetect',
+            );
+
+            const hiddenPair = buildTokenPair('hidden');
+            expect(hearingWrapper(
+                jest.fn().mockReturnValue(true),
+                { object: hiddenPair.observer },
+                hiddenPair.target,
+            )).toBe(true);
+
+            const undetectedPair = buildTokenPair('undetected');
+            expect(hearingWrapper(
+                jest.fn().mockReturnValue(true),
+                { object: undetectedPair.observer },
+                undetectedPair.target,
+            )).toBe(false);
+
+            const unnoticedPair = buildTokenPair('unnoticed');
+            expect(hearingWrapper(
+                jest.fn().mockReturnValue(true),
+                { object: unnoticedPair.observer },
+                unnoticedPair.target,
+            )).toBe(false);
         });
     });
 });

@@ -152,4 +152,35 @@ describe('OverrideValidationIndicator row hover highlighting', () => {
     expect(unnoticedIcon.className).toContain('fa-user-secret');
     expect(unnoticedIcon.getAttribute('style')).toContain('156, 39, 176');
   });
+
+  test('labels concealed override tooltip icons as observed plus concealed', () => {
+    const observer = global.canvas.tokens.get('observer-1');
+    const target = global.canvas.tokens.get('target-1');
+
+    indicator.show(
+      [
+        {
+          observerId: observer.id,
+          targetId: target.id,
+          observerName: observer.name,
+          targetName: target.name,
+          state: 'concealed',
+          currentVisibility: 'observed',
+        },
+      ],
+      'Observer',
+    );
+
+    document
+      .querySelector('.pf2e-visioner-override-indicator')
+      .dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
+
+    const concealedIcon = document.querySelector(
+      '.pf2e-visioner-override-tooltip .state-indicator.visibility-concealed',
+    );
+    expect(concealedIcon).toBeTruthy();
+    expect(concealedIcon.dataset.tooltip).toBe(
+      'PF2E_VISIONER.VISIBILITY_STATES.observed_concealed',
+    );
+  });
 });

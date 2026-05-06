@@ -452,3 +452,14 @@ describe('Position State Helper Functions', () => {
     });
   });
 });
+
+describe('Dual System Integration state combination', () => {
+  it('keeps cover separate from AVS detection state', async () => {
+    const { DualSystemIntegration } = await import('../../../scripts/chat/services/position/DualSystemIntegration.js');
+    const integration = new DualSystemIntegration();
+
+    expect(integration._combineSystemStates('observed', 'standard')).toBe('observed');
+    expect(integration._combineSystemStates('observed', 'greater')).toBe('observed');
+    expect(integration._combineSystemStates('concealed', 'standard')).toBe('concealed');
+  });
+});

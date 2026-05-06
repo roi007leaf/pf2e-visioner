@@ -49,7 +49,9 @@ export class VisibilityRegionBehavior extends RegionBehaviorBase {
       visibilityState: new fields.StringField({
         required: true,
         choices: Object.fromEntries(
-          Object.keys(VISIBILITY_STATES).map((k) => [k, `PF2E_VISIONER.VISIBILITY_STATES.${k}`]),
+          Object.entries(VISIBILITY_STATES)
+            .filter(([, config]) => config.manual !== false)
+            .map(([key]) => [key, `PF2E_VISIONER.VISIBILITY_STATES.${key}`]),
         ),
         initial: 'hidden',
         label: 'PF2E_VISIONER.REGION_BEHAVIOR.VISIBILITY_STATE.label',

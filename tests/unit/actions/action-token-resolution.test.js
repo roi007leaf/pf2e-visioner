@@ -18,6 +18,9 @@ jest.mock('../../../scripts/constants.js', () => ({
         hidden: { label: 'Hidden' },
         undetected: { label: 'Undetected' },
     },
+    getVisibilityStateLabelKey: jest.fn((state) =>
+        state === 'concealed' ? 'PF2E_VISIONER.VISIBILITY_STATES.observed_concealed' : state
+    ),
 }));
 
 jest.mock('../../../scripts/utils.js', () => ({

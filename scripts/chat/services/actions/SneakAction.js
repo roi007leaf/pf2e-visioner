@@ -1,4 +1,10 @@
-import { COVER_STATES, MODULE_ID, SNEAK_FLAGS, VISIBILITY_STATES } from '../../../constants.js';
+import {
+  COVER_STATES,
+  MODULE_ID,
+  SNEAK_FLAGS,
+  VISIBILITY_STATES,
+  getVisibilityStateLabelKey,
+} from '../../../constants.js';
 import autoCoverSystem from '../../../cover/auto-cover/AutoCoverSystem.js';
 import stealthCheckUseCase from '../../../cover/auto-cover/usecases/StealthCheckUseCase.js';
 import { getCoverBetween } from '../../../utils.js';
@@ -983,7 +989,9 @@ export class SneakActionHandler extends ActionHandlerBase {
         return positionTransition?.startPosition?.avsVisibility || current;
       })(),
       oldVisibilityLabel:
-        VISIBILITY_STATES[positionTransition?.startPosition?.avsVisibility || current]?.label ||
+        getVisibilityStateLabelKey(positionTransition?.startPosition?.avsVisibility || current, {
+          manual: true,
+        }) ||
         positionTransition?.startPosition?.avsVisibility ||
         current,
       newVisibility,

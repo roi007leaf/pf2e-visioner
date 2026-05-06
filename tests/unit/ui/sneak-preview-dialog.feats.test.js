@@ -40,6 +40,50 @@ jest.mock('../../../scripts/chat/services/infra/shared-utils.js', () => ({
 }));
 
 describe('SneakPreviewDialog - feat-based end-position relaxation', () => {
+  test('profile helpers keep sneak start detection separate from end concealment', async () => {
+    const originalAllowExtended = game.settings.get(
+      'pf2e-visioner',
+      'sneakAllowHiddenUndetectedEndPosition',
+    );
+    game.settings.set('pf2e-visioner', 'sneakAllowHiddenUndetectedEndPosition', false);
+    const {
+      sneakEndPositionQualifies,
+      sneakStartPositionQualifies,
+    } = await import('../../../scripts/chat/dialogs/SneakPreviewDialog.js');
+
+    try {
+      expect(sneakStartPositionQualifies('hidden')).toBe(true);
+      expect(sneakStartPositionQualifies('undetected')).toBe(true);
+      expect(sneakStartPositionQualifies('concealed')).toBe(false);
+
+      expect(sneakEndPositionQualifies('hidden', 'none')).toBe(false);
+      expect(sneakEndPositionQualifies('undetected', 'none')).toBe(false);
+      expect(sneakEndPositionQualifies('concealed', 'none')).toBe(true);
+      expect(sneakEndPositionQualifies('observed', 'standard')).toBe(true);
+
+      game.settings.set('pf2e-visioner', 'sneakAllowHiddenUndetectedEndPosition', true);
+      expect(sneakEndPositionQualifies('hidden', 'none')).toBe(true);
+      expect(sneakEndPositionQualifies('undetected', 'none')).toBe(true);
+    } finally {
+      game.settings.set(
+        'pf2e-visioner',
+        'sneakAllowHiddenUndetectedEndPosition',
+        originalAllowExtended,
+      );
+    }
+  });
+
+  test('labels concealed display helpers as observed plus concealed', async () => {
+    const { SneakPreviewDialog } = await import(
+      '../../../scripts/chat/dialogs/SneakPreviewDialog.js'
+    );
+    const dialog = Object.create(SneakPreviewDialog.prototype);
+
+    expect(dialog._getDisplayProperty('visibility', 'concealed', 'label')).toBe(
+      'PF2E_VISIONER.VISIBILITY_STATES.observed_concealed',
+    );
+  });
+
   test('very-very-sneaky relaxes end position requirement', async () => {
     // Lazy import to align with module system
     const mod = require('../../../scripts/chat/dialogs/SneakPreviewDialog.js');

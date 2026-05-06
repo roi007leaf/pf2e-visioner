@@ -2,11 +2,14 @@ import { MODULE_ID } from '../constants.js';
 import AvsOverrideManager from '../chat/services/infra/AvsOverrideManager.js';
 import { getCoverBetween } from '../stores/cover-map.js';
 import { getVisibilityBetween } from '../stores/visibility-map.js';
+import {
+  canAttemptHideOrRemainHidden,
+  hidesEncounterTracker,
+  legacyVisibilityToProfile,
+  profileToLegacyVisibility,
+} from '../visibility/perception-profile.js';
 
 const FEATURE_SETTING = 'enableStealthInitiativeVisibility';
-const ENCOUNTER_STEALTH_STATES = new Set(['undetected', 'unnoticed']);
-const TRACKER_HIDDEN_STATES = new Set(['unnoticed']);
-const TRACKER_MASKED_STATES = new Set(['undetected']);
 const RECORD_SEPARATOR = '::';
 const OVERRIDE_SOURCE = 'encounter_stealth_initiative';
 const TRACKER_HIDDEN_CLASS = 'pf2e-visioner-stealth-tracker-hidden';
@@ -14,6 +17,8 @@ const TRACKER_MASKED_CLASS = 'pf2e-visioner-stealth-tracker-masked';
 const TRACKER_STEALTH_MARKER_SELECTOR = '[data-pf2e-visioner-stealth-initiative-marker="true"]';
 const PREVIOUS_OVERRIDE_PREFIX = 'encounter-stealth-previous-from-';
 const MASKED_COMBATANT_LABEL = 'Undetected Combatant';
+const STANDARD_OR_GREATER_COVER = new Set(['standard', 'greater']);
+const VALID_COVER_STATES = new Set(['none', 'lesser', 'standard', 'greater']);
 
 function collectionToArray(collection) {
   if (!collection) return [];
@@ -176,12 +181,13 @@ export class EncounterStealthInitiativeService {
 
         const recordKey = makeRecordKey(observerToken.document.id, stealtherToken.document.id);
         if (records.has(recordKey)) continue;
-        const state = this._getStealthInitiativeState(
+        const profile = this._getStealthInitiativeProfile(
           stealther,
           observer,
           observerToken,
           stealtherToken,
         );
+        const state = profileToLegacyVisibility(profile, { preserveEncounterUnnoticed: true });
 
         if (game.user?.isGM) {
           await this._savePreviousOverride(observerToken, stealtherToken);
@@ -193,8 +199,12 @@ export class EncounterStealthInitiativeService {
                 {
                   target: stealtherToken,
                   state,
-                  hasCover: false,
-                  hasConcealment: false,
+                  detectionState: profile.detectionState,
+                  awarenessState: profile.awarenessState,
+                  coverState: profile.coverState,
+                  detectionSense: profile.detectionSense,
+                  hasCover: STANDARD_OR_GREATER_COVER.has(profile.coverState),
+                  hasConcealment: profile.hasConcealment,
                 },
               ],
             ]),
@@ -308,7 +318,8 @@ export class EncounterStealthInitiativeService {
         return false;
       }
 
-      if (!TRACKER_HIDDEN_STATES.has(override?.state)) {
+      const profile = legacyVisibilityToProfile(override?.state, override);
+      if (!hidesEncounterTracker(profile, { source: override?.source })) {
         return false;
       }
     }
@@ -329,7 +340,7 @@ export class EncounterStealthInitiativeService {
     const ownedObservers = this._getOwnedObserverTokens(combatants, stealtherToken);
     if (ownedObservers.length === 0) return false;
 
-    let hasUndetectedOverride = false;
+    let hasVisibleUndetectedOverride = false;
     for (const { token: observerToken } of ownedObservers) {
       const recordKey = makeRecordKey(observerToken.document.id, stealtherToken.document.id);
       if (!this._hasInitialHideRecord(combat, recordKey) && !this._seedInitialHideRecordFromOverride(
@@ -347,12 +358,17 @@ export class EncounterStealthInitiativeService {
         return false;
       }
 
-      if (TRACKER_MASKED_STATES.has(override?.state)) {
-        hasUndetectedOverride = true;
+      const profile = legacyVisibilityToProfile(override?.state, override);
+      if (profile.detectionState === 'undetected') {
+        if (!hidesEncounterTracker(profile, { source: override?.source })) {
+          hasVisibleUndetectedOverride = true;
+        }
+      } else {
+        return false;
       }
     }
 
-    return hasUndetectedOverride;
+    return hasVisibleUndetectedOverride;
   }
 
   _getOwnedObserverTokens(combatants, stealtherToken) {
@@ -403,44 +419,85 @@ export class EncounterStealthInitiativeService {
   }
 
   _getStealthInitiativeState(stealthCombatant, observerCombatant, observerToken, stealtherToken) {
+    return profileToLegacyVisibility(
+      this._getStealthInitiativeProfile(stealthCombatant, observerCombatant, observerToken, stealtherToken),
+      { preserveEncounterUnnoticed: true },
+    );
+  }
+
+  _getStealthInitiativeProfile(stealthCombatant, observerCombatant, observerToken, stealtherToken) {
     const stealthInitiative = getNumericInitiative(stealthCombatant);
-    if (!Number.isFinite(stealthInitiative)) return 'observed';
+    if (!Number.isFinite(stealthInitiative)) return legacyVisibilityToProfile('observed');
 
     const perceptionDC = getPerceptionDC(observerToken);
-    if (!Number.isFinite(perceptionDC)) return 'observed';
+    if (!Number.isFinite(perceptionDC)) return legacyVisibilityToProfile('observed');
 
     const observerInitiative = getNumericInitiative(observerCombatant);
     const beatsObserverInitiative =
       Number.isFinite(observerInitiative) && stealthInitiative > observerInitiative;
 
     if (stealthInitiative >= perceptionDC) {
-      return beatsObserverInitiative ? 'unnoticed' : 'undetected';
+      return {
+        detectionState: 'undetected',
+        awarenessState: beatsObserverInitiative ? 'unnoticed' : 'noticed',
+        hasConcealment: false,
+        coverState: 'none',
+        detectionSense: null,
+      };
     }
 
-    if (stealthInitiative < perceptionDC - 10 && !beatsObserverInitiative) {
-      return 'observed';
+    const prerequisiteProfile = this._getEncounterPrerequisiteProfile(observerToken, stealtherToken);
+    if (
+      stealthInitiative >= perceptionDC - 10
+      && canAttemptHideOrRemainHidden(prerequisiteProfile)
+    ) {
+      return {
+        ...prerequisiteProfile,
+        detectionState: 'hidden',
+        awarenessState: 'noticed',
+      };
     }
 
-    return this._canUseHiddenEncounterState(observerToken, stealtherToken) ? 'hidden' : 'observed';
+    return {
+      detectionState: 'observed',
+      awarenessState: 'noticed',
+      hasConcealment: false,
+      coverState: 'none',
+      detectionSense: null,
+    };
+  }
+
+  _getEncounterPrerequisiteProfile(observerToken, stealtherToken) {
+    let coverState = 'none';
+    if (observerToken && stealtherToken) {
+      try {
+        const cover = getCoverBetween(observerToken, stealtherToken);
+        coverState = VALID_COVER_STATES.has(cover) ? cover : 'none';
+      } catch {
+        coverState = 'none';
+      }
+    }
+
+    let hasConcealment = false;
+    if (observerToken && stealtherToken) {
+      try {
+        hasConcealment = getVisibilityBetween(observerToken, stealtherToken) === 'concealed';
+      } catch {
+        hasConcealment = false;
+      }
+    }
+
+    return {
+      detectionState: 'observed',
+      awarenessState: 'noticed',
+      hasConcealment: hasConcealment || hasConcealedCondition(stealtherToken),
+      coverState,
+      detectionSense: null,
+    };
   }
 
   _canUseHiddenEncounterState(observerToken, stealtherToken) {
-    if (!observerToken || !stealtherToken) return false;
-
-    try {
-      const cover = getCoverBetween(observerToken, stealtherToken);
-      if (cover === 'standard' || cover === 'greater') return true;
-    } catch {
-      /* ignore cover lookup failures */
-    }
-
-    try {
-      if (getVisibilityBetween(observerToken, stealtherToken) === 'concealed') return true;
-    } catch {
-      /* ignore visibility lookup failures */
-    }
-
-    return hasConcealedCondition(stealtherToken);
+    return canAttemptHideOrRemainHidden(this._getEncounterPrerequisiteProfile(observerToken, stealtherToken));
   }
 
   _getPreviousOverrideFlagKey(observerToken) {
@@ -480,6 +537,10 @@ export class EncounterStealthInitiativeService {
           {
             target: stealtherToken,
             state: previousOverride.state,
+            detectionState: previousOverride.detectionState,
+            awarenessState: previousOverride.awarenessState,
+            coverState: previousOverride.coverState,
+            detectionSense: previousOverride.detectionSense,
             hasCover: previousOverride.hasCover,
             hasConcealment: previousOverride.hasConcealment,
             expectedCover: previousOverride.expectedCover,
@@ -494,9 +555,10 @@ export class EncounterStealthInitiativeService {
   }
 
   _isActiveInitialOverride(override, observerToken, stealtherToken) {
+    const profile = legacyVisibilityToProfile(override?.state, override);
     return (
       override?.source === OVERRIDE_SOURCE &&
-      ENCOUNTER_STEALTH_STATES.has(override?.state) &&
+      profile.detectionState === 'undetected' &&
       override?.observerId === observerToken.document.id &&
       override?.targetId === stealtherToken.document.id
     );
@@ -506,7 +568,9 @@ export class EncounterStealthInitiativeService {
     const override = this._getInitialOverride(observerToken, stealtherToken);
     return (
       this._isActiveInitialOverride(override, observerToken, stealtherToken) &&
-      TRACKER_HIDDEN_STATES.has(override?.state)
+      hidesEncounterTracker(legacyVisibilityToProfile(override?.state, override), {
+        source: override?.source,
+      })
     );
   }
 

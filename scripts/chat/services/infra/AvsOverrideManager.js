@@ -36,7 +36,17 @@ function asChangesByTarget(changesInput, defaultState = null) {
     const hasConcealment =
       typeof ch.hasConcealment === 'boolean' ? ch.hasConcealment : ['concealed'].includes(state);
 
-    map.set(target.document.id, { target, state, hasCover, hasConcealment, expectedCover });
+    map.set(target.document.id, {
+      target,
+      state,
+      hasCover,
+      hasConcealment,
+      expectedCover,
+      detectionState: ch.detectionState,
+      awarenessState: ch.awarenessState,
+      coverState: ch.coverState,
+      detectionSense: ch.detectionSense,
+    });
   }
   return map;
 }
@@ -116,6 +126,10 @@ export class AvsOverrideManager {
           hasCover: typeof changeData.hasCover === 'boolean' ? changeData.hasCover : undefined,
           hasConcealment: changeData.hasConcealment || false,
           expectedCover: changeData.expectedCover,
+          detectionState: changeData.detectionState,
+          awarenessState: changeData.awarenessState,
+          coverState: changeData.coverState,
+          detectionSense: changeData.detectionSense,
           timedOverride: changeData.timedOverride || options.timedOverride || null,
         };
 
@@ -143,7 +157,17 @@ export class AvsOverrideManager {
   }
 
   static async onAVSOverride(overrideData) {
-    const { observer, target, state, source, timedOverride } = overrideData || {};
+    const {
+      observer,
+      target,
+      state,
+      source,
+      timedOverride,
+      detectionState,
+      awarenessState,
+      coverState,
+      detectionSense,
+    } = overrideData || {};
     let { hasCover, hasConcealment, expectedCover } = overrideData || {};
     if (!observer?.document?.id || !target?.document?.id || !state) {
       console.warn('PF2E Visioner | Invalid AVS override data:', overrideData);
@@ -193,6 +217,10 @@ export class AvsOverrideManager {
         hasCover: !!hasCover,
         hasConcealment: !!hasConcealment,
         expectedCover,
+        detectionState,
+        awarenessState,
+        coverState,
+        detectionSense,
         timedOverride: timedOverride || null,
       });
     } catch (e) {

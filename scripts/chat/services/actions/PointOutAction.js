@@ -1,4 +1,4 @@
-import { VISIBILITY_STATES } from '../../../constants.js';
+import { VISIBILITY_STATES, getVisibilityStateLabelKey } from '../../../constants.js';
 import { appliedPointOutChangesByMessage } from '../data/message-cache.js';
 import { ActionHandlerBase } from './BaseAction.js';
 
@@ -90,7 +90,7 @@ export class PointOutActionHandler extends ActionHandlerBase {
       targetToken: subject.target,
       currentVisibility: current,
       oldVisibility: current,
-      oldVisibilityLabel: VISIBILITY_STATES[current]?.label || current,
+      oldVisibilityLabel: getVisibilityStateLabelKey(current, { manual: true }) || current,
       newVisibility,
       changed: newVisibility !== current,
     };

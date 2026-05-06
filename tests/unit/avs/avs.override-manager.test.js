@@ -243,6 +243,121 @@ describe('AvsOverrideManager (AVS overrides lifecycle)', () => {
     );
   });
 
+  test('setPairOverrides stores profile metadata without replacing legacy state', async () => {
+    const A = mkToken('A', 'Observer');
+    const B = mkToken('B', 'Target');
+
+    let AvsOverrideManager;
+    await jest.isolateModulesAsync(async () => {
+      jest.doMock('../../../scripts/utils.js', () => ({
+        __esModule: true,
+        setVisibilityBetween: jest.fn().mockResolvedValue(true),
+      }));
+      AvsOverrideManager = (await import('../../../scripts/chat/services/infra/AvsOverrideManager.js')).default;
+    });
+
+    await AvsOverrideManager.setPairOverrides(
+      A,
+      new Map([
+        [
+          B.document.id,
+          {
+            target: B,
+            state: 'unnoticed',
+            detectionState: 'undetected',
+            awarenessState: 'unnoticed',
+            hasConcealment: false,
+            expectedCover: 'none',
+          },
+        ],
+      ]),
+      { source: 'encounter_stealth_initiative' },
+    );
+
+    expect(B.document.setFlag).toHaveBeenCalledWith(
+      'pf2e-visioner',
+      'avs-override-from-A',
+      expect.objectContaining({
+        state: 'unnoticed',
+        detectionState: 'undetected',
+        awarenessState: 'unnoticed',
+        hasConcealment: false,
+        expectedCover: 'none',
+        source: 'encounter_stealth_initiative',
+      }),
+    );
+  });
+
+  test('setPairOverrides does not infer concealment from undetected', async () => {
+    const A = mkToken('A', 'Observer');
+    const B = mkToken('B', 'Target');
+
+    let AvsOverrideManager;
+    await jest.isolateModulesAsync(async () => {
+      jest.doMock('../../../scripts/utils.js', () => ({
+        __esModule: true,
+        setVisibilityBetween: jest.fn().mockResolvedValue(true),
+      }));
+      AvsOverrideManager = (await import('../../../scripts/chat/services/infra/AvsOverrideManager.js')).default;
+    });
+
+    await AvsOverrideManager.setPairOverrides(
+      A,
+      new Map([[B.document.id, { target: B, state: 'undetected' }]]),
+      { source: 'manual_action' },
+    );
+
+    expect(B.document.setFlag).toHaveBeenCalledWith(
+      'pf2e-visioner',
+      'avs-override-from-A',
+      expect.objectContaining({
+        state: 'undetected',
+        hasConcealment: false,
+      }),
+    );
+  });
+
+  test('applyOverrides preserves profile metadata from array input', async () => {
+    const A = mkToken('A', 'Observer');
+    const B = mkToken('B', 'Target');
+
+    let AvsOverrideManager;
+    await jest.isolateModulesAsync(async () => {
+      jest.doMock('../../../scripts/utils.js', () => ({
+        __esModule: true,
+        setVisibilityBetween: jest.fn().mockResolvedValue(true),
+      }));
+      AvsOverrideManager = (await import('../../../scripts/chat/services/infra/AvsOverrideManager.js')).default;
+    });
+
+    await AvsOverrideManager.applyOverrides(
+      A,
+      [
+        {
+          target: B,
+          state: 'hidden',
+          detectionState: 'hidden',
+          awarenessState: 'noticed',
+          coverState: 'standard',
+          detectionSense: 'imprecise',
+        },
+      ],
+      { source: 'hide_action' },
+    );
+
+    expect(B.document.setFlag).toHaveBeenCalledWith(
+      'pf2e-visioner',
+      'avs-override-from-A',
+      expect.objectContaining({
+        state: 'hidden',
+        detectionState: 'hidden',
+        awarenessState: 'noticed',
+        coverState: 'standard',
+        detectionSense: 'imprecise',
+      }),
+    );
+  });
+
   test('removeOverride unsets flag on target and returns true', async () => {
     // Observer id is used as a string; we only need the target token mocked here
     const B = mkToken('B');
