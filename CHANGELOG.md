@@ -1,5 +1,11 @@
 # Changelog
 
+## [8.1.9] - 2026-05-05
+
+### Fixed
+
+- **Stealth initiative hidden results now require a valid hiding prerequisite**: Failed Stealth initiative checks only become `hidden` when the stealther has standard or greater cover, is concealed by the current Visioner state, or has the concealed condition; otherwise the encounter-start override is `observed`.
+
 ## [8.1.8] - 2026-05-05
 
 ### Fixed

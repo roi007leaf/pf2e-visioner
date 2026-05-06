@@ -3,7 +3,13 @@ import { jest } from '@jest/globals';
 
 const mockSetVisibilityBetween = jest.fn();
 const mockGetVisibilityBetween = jest.fn();
+const mockGetCoverBetween = jest.fn();
 const mockSetPairOverrides = jest.fn();
+
+jest.mock('../../../scripts/stores/cover-map.js', () => ({
+  __esModule: true,
+  getCoverBetween: (...args) => mockGetCoverBetween(...args),
+}));
 
 jest.mock('../../../scripts/stores/visibility-map.js', () => ({
   __esModule: true,
@@ -142,6 +148,7 @@ describe('EncounterStealthInitiativeService', () => {
     mockSetVisibilityBetween.mockResolvedValue(true);
     mockSetPairOverrides.mockResolvedValue(true);
     mockGetVisibilityBetween.mockReturnValue('undetected');
+    mockGetCoverBetween.mockReturnValue('none');
   });
 
   test('setting defaults to disabled for PF2e Avoid Notice compatibility', async () => {
@@ -206,23 +213,63 @@ describe('EncounterStealthInitiativeService', () => {
     const equalChangesByTarget = mockSetPairOverrides.mock.calls.find(([observer]) => observer === observerEqual)[1];
     expect(equalChangesByTarget.get(stealther.id)).toMatchObject({
       target: stealther,
-      state: 'hidden',
+      state: 'observed',
     });
     const highChangesByTarget = mockSetPairOverrides.mock.calls.find(([observer]) => observer === observerHigh)[1];
     expect(highChangesByTarget.get(stealther.id)).toMatchObject({
       target: stealther,
-      state: 'hidden',
+      state: 'observed',
     });
     const perceptionChangesByTarget = mockSetPairOverrides.mock.calls.find(([observer]) => observer === perceptionRoller)[1];
     expect(perceptionChangesByTarget.get(stealther.id)).toMatchObject({
+      target: stealther,
+      state: 'observed',
+    });
+  });
+
+  test('failed Perception DC by 10 or less creates observed without cover or concealment', async () => {
+    setSetting(true);
+    observerLow.actor.system.perception.dc = 31;
+    const { encounterStealthInitiativeService } = await importService();
+    const combat = makeCombat([
+      makeCombatant('low', observerLow, 10),
+      makeCombatant('stealth', stealther, 30, 'stealth'),
+    ]);
+
+    await encounterStealthInitiativeService.applyEncounterStartVisibility(combat);
+
+    expect(mockSetPairOverrides).toHaveBeenCalledTimes(1);
+    const changesByTarget = mockSetPairOverrides.mock.calls[0][1];
+    expect(changesByTarget.get(stealther.id)).toMatchObject({
+      target: stealther,
+      state: 'observed',
+    });
+  });
+
+  test('failed Perception DC by 10 or less creates hidden with standard or greater cover', async () => {
+    setSetting(true);
+    observerLow.actor.system.perception.dc = 31;
+    mockGetCoverBetween.mockReturnValue('standard');
+    const { encounterStealthInitiativeService } = await importService();
+    const combat = makeCombat([
+      makeCombatant('low', observerLow, 10),
+      makeCombatant('stealth', stealther, 30, 'stealth'),
+    ]);
+
+    await encounterStealthInitiativeService.applyEncounterStartVisibility(combat);
+
+    expect(mockSetPairOverrides).toHaveBeenCalledTimes(1);
+    const changesByTarget = mockSetPairOverrides.mock.calls[0][1];
+    expect(changesByTarget.get(stealther.id)).toMatchObject({
       target: stealther,
       state: 'hidden',
     });
   });
 
-  test('failed Perception DC by 10 or less creates hidden', async () => {
+  test('failed Perception DC by 10 or less creates hidden when the stealther is concealed', async () => {
     setSetting(true);
     observerLow.actor.system.perception.dc = 31;
+    mockGetVisibilityBetween.mockReturnValue('concealed');
     const { encounterStealthInitiativeService } = await importService();
     const combat = makeCombat([
       makeCombatant('low', observerLow, 10),
@@ -256,6 +303,36 @@ describe('EncounterStealthInitiativeService', () => {
       target: stealther,
       state: 'observed',
     });
+  });
+
+  test('missing stealth initiative or Perception DC falls back to observed even with cover', async () => {
+    setSetting(true);
+    mockGetCoverBetween.mockReturnValue('standard');
+    const { encounterStealthInitiativeService } = await importService();
+    const observerCombatant = makeCombatant('low', observerLow, 10);
+    const stealthCombatant = makeCombatant('stealth', stealther, null, 'stealth');
+
+    expect(
+      encounterStealthInitiativeService._getStealthInitiativeState(
+        stealthCombatant,
+        observerCombatant,
+        observerLow,
+        stealther,
+      ),
+    ).toBe('observed');
+
+    stealther.initiative = 20;
+    observerLow.actor.system.perception.dc = null;
+    observerLow.actor.getStatistic.mockReturnValue(null);
+
+    expect(
+      encounterStealthInitiativeService._getStealthInitiativeState(
+        makeCombatant('stealth', stealther, 20, 'stealth'),
+        observerCombatant,
+        observerLow,
+        stealther,
+      ),
+    ).toBe('observed');
   });
 
   test('combat start uses the latest edited initiative value to determine encounter stealth state', async () => {

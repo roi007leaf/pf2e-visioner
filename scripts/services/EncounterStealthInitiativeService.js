@@ -1,5 +1,7 @@
 import { MODULE_ID } from '../constants.js';
 import AvsOverrideManager from '../chat/services/infra/AvsOverrideManager.js';
+import { getCoverBetween } from '../stores/cover-map.js';
+import { getVisibilityBetween } from '../stores/visibility-map.js';
 
 const FEATURE_SETTING = 'enableStealthInitiativeVisibility';
 const ENCOUNTER_STEALTH_STATES = new Set(['undetected', 'unnoticed']);
@@ -96,6 +98,17 @@ function areEnemies(tokenA, tokenB) {
   return false;
 }
 
+function hasConcealedCondition(token) {
+  try {
+    const itemTypeConditions = token?.actor?.itemTypes?.condition || [];
+    if (itemTypeConditions.some((condition) => condition?.slug === 'concealed')) return true;
+    const legacyConditions = token?.actor?.conditions?.conditions || [];
+    return legacyConditions.some((condition) => condition?.slug === 'concealed');
+  } catch {
+    return false;
+  }
+}
+
 export class EncounterStealthInitiativeService {
   constructor() {
     this._initialHideRecordsByCombat = new Map();
@@ -163,7 +176,12 @@ export class EncounterStealthInitiativeService {
 
         const recordKey = makeRecordKey(observerToken.document.id, stealtherToken.document.id);
         if (records.has(recordKey)) continue;
-        const state = this._getStealthInitiativeState(stealther, observer, observerToken);
+        const state = this._getStealthInitiativeState(
+          stealther,
+          observer,
+          observerToken,
+          stealtherToken,
+        );
 
         if (game.user?.isGM) {
           await this._savePreviousOverride(observerToken, stealtherToken);
@@ -384,12 +402,12 @@ export class EncounterStealthInitiativeService {
     return stealtherToken.document?.getFlag?.(MODULE_ID, flagKey);
   }
 
-  _getStealthInitiativeState(stealthCombatant, observerCombatant, observerToken) {
+  _getStealthInitiativeState(stealthCombatant, observerCombatant, observerToken, stealtherToken) {
     const stealthInitiative = getNumericInitiative(stealthCombatant);
-    if (!Number.isFinite(stealthInitiative)) return 'hidden';
+    if (!Number.isFinite(stealthInitiative)) return 'observed';
 
     const perceptionDC = getPerceptionDC(observerToken);
-    if (!Number.isFinite(perceptionDC)) return 'hidden';
+    if (!Number.isFinite(perceptionDC)) return 'observed';
 
     const observerInitiative = getNumericInitiative(observerCombatant);
     const beatsObserverInitiative =
@@ -403,7 +421,26 @@ export class EncounterStealthInitiativeService {
       return 'observed';
     }
 
-    return 'hidden';
+    return this._canUseHiddenEncounterState(observerToken, stealtherToken) ? 'hidden' : 'observed';
+  }
+
+  _canUseHiddenEncounterState(observerToken, stealtherToken) {
+    if (!observerToken || !stealtherToken) return false;
+
+    try {
+      const cover = getCoverBetween(observerToken, stealtherToken);
+      if (cover === 'standard' || cover === 'greater') return true;
+    } catch {
+      /* ignore cover lookup failures */
+    }
+
+    try {
+      if (getVisibilityBetween(observerToken, stealtherToken) === 'concealed') return true;
+    } catch {
+      /* ignore visibility lookup failures */
+    }
+
+    return hasConcealedCondition(stealtherToken);
   }
 
   _getPreviousOverrideFlagKey(observerToken) {
