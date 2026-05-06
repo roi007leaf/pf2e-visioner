@@ -198,6 +198,7 @@ describe('Cover Array Selector Bug Fix', () => {
             rules: expect.arrayContaining([
               expect.objectContaining({
                 key: 'FlatModifier',
+                slug: 'cover',
                 value: 2, // Standard cover bonus
               }),
               expect.objectContaining({

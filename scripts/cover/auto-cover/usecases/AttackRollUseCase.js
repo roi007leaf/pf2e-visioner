@@ -300,6 +300,7 @@ class AttackRollUseCase extends BaseAutoCoverUseCase {
                 {
                   key: 'FlatModifier',
                   selector: 'ac',
+                  slug: 'cover',
                   type: 'circumstance',
                   value: bonus,
                 },
@@ -329,7 +330,7 @@ class AttackRollUseCase extends BaseAutoCoverUseCase {
             if (dcObj?.slug) {
               const didAdjustDc = this._applyAdjustedDcFromTargetActor(tgtActor, dcObj, [
                 {
-                  slug: 'pf2e-visioner-cover',
+                  slug: 'cover',
                   label,
                   modifier: bonus,
                   type: 'circumstance',
@@ -467,7 +468,7 @@ class AttackRollUseCase extends BaseAutoCoverUseCase {
     const tgtActor = target.actor;
     const dcAdjustments = [
       {
-        slug: 'pf2e-visioner-cover',
+        slug: 'cover',
         label: getCoverLabel(state),
         modifier: bonus,
         type: 'circumstance',
@@ -490,7 +491,7 @@ class AttackRollUseCase extends BaseAutoCoverUseCase {
         },
         rules: [
           ...getCoverLevelRollOptions(state),
-          { key: 'FlatModifier', selector: 'ac', type: 'circumstance', value: bonus },
+          { key: 'FlatModifier', selector: 'ac', slug: 'cover', type: 'circumstance', value: bonus },
         ],
         traits: { otherTags: [], value: [] },
         level: { value: 1 },
@@ -614,4 +615,3 @@ export default attackRollUseCase;
 
 // Also export the class for reference
 export { AttackRollUseCase };
-

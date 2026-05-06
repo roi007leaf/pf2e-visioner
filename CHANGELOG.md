@@ -5,6 +5,7 @@
 ### Fixed
 
 - **Stealth initiative hidden results now require a valid hiding prerequisite**: Failed Stealth initiative checks only become `hidden` when the stealther has standard or greater cover, is concealed by the current Visioner state, or has the concealed condition; otherwise the encounter-start override is `observed`.
+- **Auto-cover now works with cover-reducing attack features**: Visioner-created AC cover modifiers now use the PF2E/SF2E system `cover` slug, allowing features such as Starfinder 2e Operative Aim to reduce or suppress the cover bonus instead of treating Visioner cover as unrelated custom AC.
 
 ## [8.1.8] - 2026-05-05
 

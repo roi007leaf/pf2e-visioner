@@ -271,6 +271,7 @@ export async function batchUpdateCoverEffects(observerToken, targetUpdates, opti
                 const newACRule = {
                   key: 'FlatModifier',
                   selector: 'ac',
+                  slug: 'cover',
                   type: 'circumstance',
                   value: getBonus(coverState),
                   label: `${getCoverLabel(coverState)} vs ${signature} (${observer.name})`,

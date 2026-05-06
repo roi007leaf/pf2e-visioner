@@ -203,6 +203,7 @@ export class CoverStateManager {
             {
               key: 'FlatModifier',
               selector: 'ac',
+              slug: 'cover',
               type: 'circumstance',
               value: bonus,
               predicate: [

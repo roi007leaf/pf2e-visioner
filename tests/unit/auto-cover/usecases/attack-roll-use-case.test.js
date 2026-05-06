@@ -451,7 +451,7 @@ describe('AttackRollUseCase', () => {
       const defenseClone = jest.fn().mockReturnValue({
         dc: {
           value: 24,
-          modifiers: [{ slug: 'pf2e-visioner-cover', modifier: 2, type: 'circumstance' }],
+          modifiers: [{ slug: 'cover', modifier: 2, type: 'circumstance' }],
         },
       });
       const originalActor = {
@@ -490,7 +490,7 @@ describe('AttackRollUseCase', () => {
       expect(defenseClone).toHaveBeenCalled();
       expect(dctx.dc.value).toBe(24);
       expect(dctx.dc.statistic.modifiers).toEqual(
-        expect.arrayContaining([expect.objectContaining({ slug: 'pf2e-visioner-cover' })]),
+        expect.arrayContaining([expect.objectContaining({ slug: 'cover' })]),
       );
     });
   });
@@ -873,7 +873,7 @@ describe('AttackRollUseCase', () => {
       const defenseClone = jest.fn().mockReturnValue({
         dc: {
           value: 24,
-          modifiers: [{ slug: 'pf2e-visioner-cover', modifier: 2, type: 'circumstance' }],
+          modifiers: [{ slug: 'cover', modifier: 2, type: 'circumstance' }],
         },
       });
       const originalActor = {
@@ -906,7 +906,46 @@ describe('AttackRollUseCase', () => {
       expect(defenseClone).toHaveBeenCalled();
       expect(context.dc.value).toBe(24);
       expect(context.dc.statistic.modifiers).toEqual(
-        expect.arrayContaining([expect.objectContaining({ slug: 'pf2e-visioner-cover' })]),
+        expect.arrayContaining([expect.objectContaining({ slug: 'cover' })]),
+      );
+    });
+
+    test('should mark one-roll AC cover modifiers with the system cover slug', async () => {
+      const clonedActor = { getStatistic: jest.fn().mockReturnValue({ dc: { value: 24 } }) };
+      const originalActor = {
+        _source: { items: [] },
+        armorClass: { clone: jest.fn().mockReturnValue({ dc: { value: 24 } }) },
+        clone: jest.fn().mockReturnValue(clonedActor),
+      };
+      const targetToken = global.createMockToken({ id: 'target', actor: originalActor });
+      const attackerToken = global.createMockToken({ id: 'attacker' });
+      const context = {
+        dc: { slug: 'ac', value: 22, statistic: { value: 22, modifiers: [] } },
+        options: [],
+        target: {
+          actor: originalActor,
+          token: { actor: originalActor },
+        },
+      };
+
+      await attackRollUseCase._applyCoverEphemeralEffect(
+        targetToken,
+        attackerToken,
+        'standard',
+        context,
+        'none',
+      );
+
+      const clonedItems = originalActor.clone.mock.calls[0][0].items;
+      const coverEffect = clonedItems.find((item) => item.flags?.['pf2e-visioner']?.ephemeralCoverRoll);
+      expect(coverEffect.system.rules).toContainEqual(
+        expect.objectContaining({
+          key: 'FlatModifier',
+          selector: 'ac',
+          slug: 'cover',
+          type: 'circumstance',
+          value: 2,
+        }),
       );
     });
   });
