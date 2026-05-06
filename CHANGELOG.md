@@ -1,5 +1,11 @@
 # Changelog
 
+## [8.1.10] - 2026-05-06
+
+### Fixed
+
+- **Unnoticed tokens now disappear from observer vision like undetected tokens**: The detection wrapper now treats `unnoticed` as reaching the same non-detection threshold as `undetected`, so encounter-start unnoticed enemies are hidden on canvas as well as in combat trackers.
+
 ## [8.1.9] - 2026-05-05
 
 ### Fixed

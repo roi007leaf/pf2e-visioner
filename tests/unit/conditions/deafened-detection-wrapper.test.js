@@ -235,4 +235,25 @@ describe('Deafened Detection Wrapper', () => {
             }
         });
     });
+
+    describe('Visioner visibility states', () => {
+        test('basic sight cannot detect unnoticed targets', () => {
+            const basicSightWrapper = mockLibWrapper.register.mock.calls.find(
+                call => call[1] === 'CONFIG.Canvas.detectionModes.basicSight._canDetect'
+            )?.[2];
+            const observer = {
+                actor: {},
+                document: {
+                    id: 'observer',
+                    getFlag: jest.fn().mockReturnValue({ target: 'unnoticed' }),
+                },
+            };
+            const target = {
+                actor: {},
+                document: { id: 'target' },
+            };
+
+            expect(basicSightWrapper(jest.fn().mockReturnValue(true), { object: observer }, target)).toBe(false);
+        });
+    });
 });

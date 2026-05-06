@@ -94,6 +94,7 @@ const VISIBILITY_VALUES = {
   concealed: 1,
   hidden: 2,
   undetected: 3,
+  unnoticed: 3,
 };
 
 /**
