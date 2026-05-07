@@ -2789,16 +2789,17 @@ button.row-timer-toggle.active:not(:hover) {
 
 .hide-preview-dialog .hide-results-table td.actions .row-timer-toggle {
   gap: 0 !important;
-.point-out-results-table td.actions,
-.seek-results-table td.actions,
-.hide-results-table td.actions,
-.sneak-results-table td.actions,
-.create-a-diversion-results-table td.actions,
-.consequences-results-table td.actions,
-.take-cover-results-table td.actions {
-  text-align: center;
-  white-space: nowrap;
-  min-width: 120px;
+  .point-out-results-table td.actions,
+  .seek-results-table td.actions,
+  .hide-results-table td.actions,
+  .sneak-results-table td.actions,
+  .create-a-diversion-results-table td.actions,
+  .consequences-results-table td.actions,
+  .take-cover-results-table td.actions {
+    text-align: center;
+    white-space: nowrap;
+    min-width: 120px;
+  }
 }
 
 .point-out-results-table td.actions .row-action-btn,
