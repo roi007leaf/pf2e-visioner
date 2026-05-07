@@ -10,6 +10,9 @@ import { SeekActionHandler } from '../../../scripts/chat/services/actions/SeekAc
 import { SneakActionHandler } from '../../../scripts/chat/services/actions/SneakAction.js';
 import { TakeCoverActionHandler } from '../../../scripts/chat/services/actions/TakeCoverAction.js';
 
+const mockGetCoverBetween = jest.fn(() => 'none');
+const mockDetectCoverBetweenTokens = jest.fn(() => 'none');
+
 jest.mock('../../../scripts/constants.js', () => ({
     MODULE_ID: 'pf2e-visioner',
     VISIBILITY_STATES: {
@@ -18,11 +21,26 @@ jest.mock('../../../scripts/constants.js', () => ({
         hidden: { label: 'Hidden' },
         undetected: { label: 'Undetected' },
     },
+    COVER_STATES: {
+        none: { label: 'None' },
+        lesser: { label: 'Lesser' },
+        standard: { label: 'Standard' },
+        greater: { label: 'Greater' },
+    },
 }));
 
 jest.mock('../../../scripts/utils.js', () => ({
     getVisibilityBetween: jest.fn(() => 'hidden'),
+    getCoverBetween: (...args) => mockGetCoverBetween(...args),
     setCoverBetween: jest.fn(),
+}));
+
+jest.mock('../../../scripts/cover/auto-cover/AutoCoverSystem.js', () => ({
+    __esModule: true,
+    default: {
+        isEnabled: jest.fn(() => true),
+        detectCoverBetweenTokens: (...args) => mockDetectCoverBetweenTokens(...args),
+    },
 }));
 
 describe('Action Token Resolution Tests', () => {
@@ -31,6 +49,9 @@ describe('Action Token Resolution Tests', () => {
     let mockTarget;
 
     beforeEach(() => {
+        mockGetCoverBetween.mockReset().mockReturnValue('none');
+        mockDetectCoverBetweenTokens.mockReset().mockReturnValue('none');
+
         mockActorToken = {
             id: 'correct-token-id',
             name: 'Correct Token',
@@ -331,6 +352,23 @@ describe('Action Token Resolution Tests', () => {
     });
 
     describe('TakeCoverAction - outcomeToChange (inverted)', () => {
+        test('should initialize desired cover from live auto-cover detection', async () => {
+            const handler = new TakeCoverActionHandler();
+            mockGetCoverBetween.mockReturnValue('greater');
+            mockDetectCoverBetweenTokens.mockReturnValue('none');
+
+            const outcome = await handler.analyzeOutcome(
+                { actor: mockActorToken, actorToken: mockActorToken },
+                mockTarget,
+            );
+
+            expect(mockDetectCoverBetweenTokens).toHaveBeenCalledWith(mockTarget, mockActorToken);
+            expect(outcome.oldCover).toBe('greater');
+            expect(outcome.currentCover).toBe('greater');
+            expect(outcome.newCover).toBe('none');
+            expect(outcome.changed).toBe(true);
+        });
+
         test('should use actorToken when available for target (actor taking cover)', () => {
             const handler = new TakeCoverActionHandler();
             const actionData = {

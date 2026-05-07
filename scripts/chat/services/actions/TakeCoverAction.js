@@ -1,4 +1,5 @@
 import { COVER_STATES } from '../../../constants.js';
+import autoCoverSystem from '../../../cover/auto-cover/AutoCoverSystem.js';
 import { appliedTakeCoverChangesByMessage } from '../data/message-cache.js';
 import { shouldFilterAlly } from '../infra/shared-utils.js';
 import { ActionHandlerBase } from './BaseAction.js';
@@ -45,70 +46,31 @@ export class TakeCoverActionHandler extends ActionHandlerBase {
   async analyzeOutcome(actionData, subject) {
     const { getCoverBetween } = await import('../../../utils.js');
     // Orientation: observer = subject (row token), target = actor (taking cover)
-    let current = getCoverBetween(subject, actionData.actor) || 'none';
+    const storedCover = getCoverBetween(subject, actionData.actor) || 'none';
+    let calculatedCover = storedCover;
 
-    // Check for PF2e system cover effect on the actor taking cover
-    let hasPF2eEffect = false;
-    if (game.user?.isGM) {
-      // Try different ways to access the actor
-      let actor = actionData.actor?.actor || actionData.actor;
-
-      if (actor?.itemTypes?.effect) {
-        const allEffects = actor.itemTypes.effect.map((e) => ({ slug: e.slug, name: e.name }));
-        const coverEffect = actor.itemTypes.effect.find((e) => e.slug === 'effect-cover');
-
-        if (coverEffect) {
-          const coverLevel = coverEffect.flags?.pf2e?.rulesSelections?.cover?.level;
-          if (coverLevel) {
-            current = coverLevel;
-            hasPF2eEffect = true;
-          }
-        }
+    try {
+      if (autoCoverSystem?.isEnabled?.() !== false) {
+        calculatedCover =
+          autoCoverSystem.detectCoverBetweenTokens(subject, actionData.actor) || 'none';
       }
+    } catch {
+      calculatedCover = storedCover;
     }
 
-    let newCover;
-    let originalCurrent = current;
-
-    if (hasPF2eEffect) {
-      // PF2e effect present: use the PF2e level as final result (GM has already calculated it)
-      // Compare against existing Visioner cover (not the PF2e effect level)
-      const existingVisionerCover = getCoverBetween(subject, actionData.actor) || 'none';
-      newCover = current; // Use PF2e effect level as new cover
-      const changed = newCover !== existingVisionerCover;
-
-      return {
-        target: subject,
-        currentCover: existingVisionerCover,
-        oldCover: existingVisionerCover,
-        newCover,
-        // Visibility-aligned aliases so shared UI helpers work
-        currentVisibility: existingVisionerCover,
-        oldVisibility: existingVisionerCover,
-        newVisibility: newCover,
-        changed,
-      };
-    } else {
-      // No PF2e effect: apply normal Take Cover upgrade rules
-      newCover = current;
-      if (current === 'lesser' || current === 'none') newCover = 'standard';
-      else if (current === 'standard') newCover = 'greater';
-      // If already greater, no change
-    }
-
-    const changed = newCover !== current;
+    const changed = calculatedCover !== storedCover;
 
     // Mirror fields to align with BaseActionDialog utilities
     return {
       target: subject,
-      currentCover: current,
-      oldCover: current,
-      newCover,
+      currentCover: storedCover,
+      oldCover: storedCover,
+      newCover: calculatedCover,
       // Visibility-aligned aliases so shared UI helpers work
-      currentVisibility: current,
-      oldVisibility: current,
-      oldVisibilityLabel: COVER_STATES[current]?.label || current,
-      newVisibility: newCover,
+      currentVisibility: storedCover,
+      oldVisibility: storedCover,
+      oldVisibilityLabel: COVER_STATES[storedCover]?.label || storedCover,
+      newVisibility: calculatedCover,
       changed,
     };
   }

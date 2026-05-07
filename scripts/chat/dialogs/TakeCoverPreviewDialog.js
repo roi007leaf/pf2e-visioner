@@ -12,7 +12,7 @@ export class TakeCoverPreviewDialog extends BaseActionDialog {
       icon: 'fas fa-shield-alt',
       resizable: true,
     },
-    position: { width: 560, height: 'auto' },
+    position: { width: 600, height: 'auto' },
     actions: {
       close: TakeCoverPreviewDialog._onClose,
       applyAll: TakeCoverPreviewDialog._onApplyAll,
@@ -54,6 +54,52 @@ export class TakeCoverPreviewDialog extends BaseActionDialog {
 
   getOutcomeTokenId(outcome) {
     return outcome?.target?.id ?? null;
+  }
+
+  coverConfig(state) {
+    const cfg = COVER_STATES[state] || null;
+    if (!cfg)
+      return {
+        label: String(state ?? ''),
+        icon: 'fas fa-shield-alt',
+        color: '#795548',
+        cssClass: 'cover-none',
+      };
+    let label = cfg.label;
+    try {
+      label = game.i18n.localize(cfg.label);
+    } catch { }
+    return {
+      label,
+      icon: cfg.icon || 'fas fa-shield-alt',
+      color: cfg.color || '#795548',
+      cssClass: cfg.cssClass || 'cover-none',
+    };
+  }
+
+  _buildBulkOverrideStates() {
+    return ['none', 'lesser', 'standard', 'greater'].map((state) => ({
+      value: state,
+      ...this.coverConfig(state),
+    }));
+  }
+
+  _deriveBulkStatesFromOutcomes(outcomes) {
+    try {
+      if (!Array.isArray(outcomes) || outcomes.length === 0) return this._buildBulkOverrideStates();
+      const set = new Set();
+      for (const outcome of outcomes) {
+        if (!Array.isArray(outcome?.availableStates)) continue;
+        for (const state of outcome.availableStates) {
+          const value = state?.value ?? state?.key;
+          if (typeof value === 'string' && COVER_STATES[value]) set.add(value);
+        }
+      }
+      const states = set.size ? Array.from(set) : ['none', 'lesser', 'standard', 'greater'];
+      return states.map((state) => ({ value: state, ...this.coverConfig(state) }));
+    } catch {
+      return this._buildBulkOverrideStates();
+    }
   }
 
   async getFilteredOutcomes() {
@@ -158,28 +204,6 @@ export class TakeCoverPreviewDialog extends BaseActionDialog {
       }
     } catch { }
 
-    // Map cover constants to templating-friendly config
-    const coverCfg = (s) => {
-      const cfg = COVER_STATES[s] || null;
-      if (!cfg)
-        return {
-          label: String(s ?? ''),
-          icon: 'fas fa-shield-alt',
-          color: '#795548',
-          cssClass: 'cover-none',
-        };
-      let label = cfg.label;
-      try {
-        label = game.i18n.localize(cfg.label);
-      } catch { }
-      return {
-        label,
-        icon: cfg.icon || 'fas fa-shield-alt',
-        color: cfg.color || '#795548',
-        cssClass: cfg.cssClass || 'cover-none',
-      };
-    };
-
     const allStates = ['none', 'lesser', 'standard', 'greater']; // for override icons
 
     const processed = filteredOutcomes.map((o) => {
@@ -188,18 +212,18 @@ export class TakeCoverPreviewDialog extends BaseActionDialog {
       let hasActionableChange = baseOld != null && effectiveNew != null && effectiveNew !== baseOld;
       const availableStates = allStates.map((s) => ({
         value: s,
-        label: coverCfg(s).label,
-        icon: coverCfg(s).icon,
-        color: coverCfg(s).color,
-        cssClass: coverCfg(s).cssClass,
+        label: this.coverConfig(s).label,
+        icon: this.coverConfig(s).icon,
+        color: this.coverConfig(s).color,
+        cssClass: this.coverConfig(s).cssClass,
         selected: s === effectiveNew,
         calculatedOutcome: s === (o.newVisibility || o.newCover),
       }));
       return {
         ...o,
         tokenImage: this.resolveTokenImage(o.target),
-        oldCoverCfg: coverCfg(baseOld),
-        newCoverCfg: coverCfg(effectiveNew),
+        oldCoverCfg: this.coverConfig(baseOld),
+        newCoverCfg: this.coverConfig(effectiveNew),
         availableStates,
         overrideState: effectiveNew,
         // Compatibility fields so base handlers work with cover like visibility
@@ -210,55 +234,6 @@ export class TakeCoverPreviewDialog extends BaseActionDialog {
       };
     });
 
-    // Process system condition replacement for GM users
-    if (game.user?.isGM) {
-      const actor = this.actorToken?.actor;
-      if (actor) {
-        // Check for PF2e cover effect system
-        const coverEffect = actor?.itemTypes?.effect?.find?.((e) => e.slug === 'effect-cover');
-
-        if (coverEffect) {
-          // Extract cover level from PF2e flags, with robust fallbacks
-          let coverLevel = coverEffect.flags?.pf2e?.rulesSelections?.cover?.level;
-          if (!coverLevel) {
-            try {
-              // Fallback: infer from FlatModifier to AC in rules
-              const rules = Array.isArray(coverEffect.system?.rules)
-                ? coverEffect.system.rules
-                : [];
-              const acMods = rules.filter(
-                (r) => String(r?.key) === 'FlatModifier' && String(r?.selector) === 'ac',
-              );
-              const val = acMods.map((r) => Number(r?.value)).find((n) => !Number.isNaN(n));
-              if (val === 4) coverLevel = 'greater';
-              else if (val === 2) coverLevel = 'standard';
-              else if (val === 1) coverLevel = 'lesser';
-            } catch { }
-          }
-
-          if (coverLevel) {
-            // Convert PF2e system cover to Visioner cover (no upgrade rules).
-            // Keep the original Visioner state as "old/current" and set the PF2e level as the desired new state.
-            for (const outcome of processed) {
-              const currentVisioner =
-                outcome.currentCover ??
-                outcome.oldCover ??
-                outcome.currentVisibility ??
-                outcome.oldVisibility ??
-                'none';
-              const desired = coverLevel;
-              outcome.newCover = desired;
-              outcome.newVisibility = desired; // compatibility
-              outcome.overrideState = desired;
-              outcome.hasActionableChange = desired !== currentVisioner;
-              // Persist PF2e level to use during Apply All
-              outcome.pf2eEffectLevel = coverLevel;
-            }
-          }
-        }
-      }
-    }
-
     // Filter display based on showOnlyChanges
     const displayOutcomes = this.showOnlyChanges
       ? processed.filter((o) => !!o.hasActionableChange)
@@ -267,6 +242,7 @@ export class TakeCoverPreviewDialog extends BaseActionDialog {
     context.actorTokenImage = this.resolveTokenImage(this.actorToken);
     context.outcomes = displayOutcomes;
     Object.assign(context, this.buildCommonContext(displayOutcomes));
+    context.bulkOverrideLabel = game?.i18n?.localize?.('PF2E_VISIONER.UI.BULK_SET_COVER') || 'Bulk Set Cover';
     // Expose UI flags
     context.hideFoundryHidden = !!this.hideFoundryHidden;
     context.ignoreAllies = !!this.ignoreAllies;
@@ -380,9 +356,7 @@ export class TakeCoverPreviewDialog extends BaseActionDialog {
     const overrides = {};
     for (const o of changed) {
       const id = o?.target?.id;
-      // If PF2e system cover effect exists and indicates a level, prefer that as final (bypass upgrade rules)
-      const systemOverride = o?.pf2eEffectLevel || null;
-      const s = systemOverride ?? o?.overrideState ?? o?.newVisibility ?? o?.newCover;
+      const s = o?.overrideState ?? o?.newVisibility ?? o?.newCover;
       if (id && s) overrides[id] = s;
     }
     const { applyNowTakeCover } = await import('../services/index.js');

@@ -27,7 +27,7 @@ export class HidePreviewDialog extends BaseActionDialog {
       resizable: true,
     },
     position: {
-      width: 800,
+      width: 950,
       height: 'auto',
     },
     actions: {

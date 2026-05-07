@@ -1013,6 +1013,7 @@
       "REVERT_ALL": "Revert All",
       "REMOVE_OVERRIDES": "Remove Overrides",
       "BULK_SET_VISIBILITY": "Bulk Set Visibility",
+      "BULK_SET_COVER": "Bulk Set Cover",
       "CLEAR_BULK_OVERRIDES": "Clear Bulk Overrides",
       "FILTER_BY_DETECTION_LABEL": "Filter By Viewport",
       "FILTER_BY_DETECTION_TOOLTIP": "Only show tokens that are within the current viewport",

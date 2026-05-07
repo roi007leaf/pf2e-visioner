@@ -1,5 +1,9 @@
 # Changelog
 
+## [8.1.12] - 2026-05-07
+### Added
+- **PF2E HUD Take Cover now opens Visioner's cover workflow**: Clicking PF2E HUD's AC Take Cover button is intercepted when Visioner automation is enabled and opens the existing Visioner Take Cover preview dialog instead of applying PF2E's generic cover effect directly.
+
 ## [8.1.11] - 2026-05-07
 
 ### Fixed

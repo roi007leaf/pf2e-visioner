@@ -40,7 +40,7 @@ export class SneakPreviewDialog extends BaseActionDialog {
         minimizable: false,
       },
       position: {
-        width: 950, // Increased width for position display components
+        width: 1000, // Increased width for position display components
         height: 'auto',
       },
       form: {

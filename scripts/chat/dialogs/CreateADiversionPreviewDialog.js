@@ -16,7 +16,7 @@ export class CreateADiversionPreviewDialog extends BaseActionDialog {
     // Set localized title before calling super
     if (!options.window) options.window = {};
     options.window.title = game?.i18n?.localize('PF2E_VISIONER.DIALOG_TITLES.CREATE_DIVERSION_RESULTS') || 'Create a Diversion Results';
-    
+
     super(options);
 
     this.divertingToken = divertingToken;
@@ -52,7 +52,7 @@ export class CreateADiversionPreviewDialog extends BaseActionDialog {
       resizable: true,
     },
     position: {
-      width: 600,
+      width: 800,
       height: 'auto',
     },
     actions: {
