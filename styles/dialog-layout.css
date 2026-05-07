@@ -598,7 +598,7 @@ button.row-timer-toggle.active:not(:hover) {
 
     /* Cover state colors for buttons */
     .cover-bonus-btn[data-bonus='0'] {
-      color: var(--cover-none, #9e9e9e);
+      color: var(--cover-none, #4caf50);
     }
 
     .cover-bonus-btn[data-bonus='2'] {
@@ -606,7 +606,7 @@ button.row-timer-toggle.active:not(:hover) {
     }
 
     .cover-bonus-btn[data-bonus='4'] {
-      color: var(--cover-greater, #4caf50);
+      color: var(--cover-greater, #f44336);
     }
 
     /* Apply All Cover Section - Top of dialog, module style */
@@ -702,7 +702,13 @@ button.row-timer-toggle.active:not(:hover) {
 
     .cover-bonus-btn.module-style[data-bonus='4'],
     .apply-all-cover-btn.module-style[data-bonus='4'] {
-      color: var(--cover-greater, #4caf50);
+      color: var(--cover-greater, #f44336);
+    }
+
+    .cover-bonus-btn[data-bonus='4'] i,
+    .cover-bonus-btn.module-style[data-bonus='4'] i,
+    .apply-all-cover-btn.module-style[data-bonus='4'] i {
+      color: var(--cover-greater, #f44336);
     }
   }
 
@@ -859,6 +865,11 @@ button.row-timer-toggle.active:not(:hover) {
     background: #007bff;
     color: white;
     border-color: #0056b3;
+  }
+
+  .hide-preview-dialog .old-visibility-state .state-icon {
+    border-color: currentColor !important;
+    box-shadow: 0 0 8px color-mix(in srgb, currentColor 55%, transparent) !important;
   }
 
   /* Action buttons styling */
@@ -1469,6 +1480,34 @@ button.row-timer-toggle.active:not(:hover) {
   justify-content: space-between;
 }
 
+.point-out-preview-dialog-bulk-actions-buttons,
+.seek-preview-dialog-bulk-actions-buttons,
+.hide-preview-dialog-bulk-actions-buttons,
+.sneak-preview-dialog-bulk-actions-buttons,
+.create-a-diversion-preview-dialog-bulk-actions-buttons,
+.consequences-preview-dialog-bulk-actions-buttons,
+.take-cover-preview-dialog-bulk-actions-buttons {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.point-out-preview-dialog-bulk-actions-buttons .bulk-action-btn,
+.seek-preview-dialog-bulk-actions-buttons .bulk-action-btn,
+.hide-preview-dialog-bulk-actions-buttons .bulk-action-btn,
+.sneak-preview-dialog-bulk-actions-buttons .bulk-action-btn,
+.create-a-diversion-preview-dialog-bulk-actions-buttons .bulk-action-btn,
+.consequences-preview-dialog-bulk-actions-buttons .bulk-action-btn,
+.take-cover-preview-dialog-bulk-actions-buttons .bulk-action-btn {
+  display: inline-flex;
+  width: auto;
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
 /* Override Validation footer (non-action dialog) */
 .override-validation-bulk-actions-header {
   flex: 0 0 auto;
@@ -1767,8 +1806,12 @@ button.row-timer-toggle.active:not(:hover) {
   display: flex;
   align-items: center;
   gap: 4px;
-  color: var(--color-text-dark-secondary);
   display: inline-flex;
+}
+
+.hide-preview-dialog th.end-position .legend-icon.cover-standard,
+.sneak-preview-dialog th.end-position .legend-icon.cover-standard {
+  color: var(--cover-standard, #ff6600);
 }
 
 /* Current-state (right) icons are emphasized with a gentle glow */
@@ -1949,6 +1992,22 @@ button.row-timer-toggle.active:not(:hover) {
   color: white;
 }
 
+.seek-results-table th.detected-by,
+.seek-results-table td.detected-by {
+  width: 64px;
+  min-width: 64px;
+  max-width: 64px;
+  text-align: center;
+  white-space: normal;
+}
+
+.seek-results-table td.detected-by i,
+.seek-results-table td.detected-by .no-detection {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
 /* Point Out - Orange */
 .point-out-preview-dialog .results-table-container {
   scrollbar-color: var(--visibility-hidden) transparent;
@@ -2083,14 +2142,71 @@ button.row-timer-toggle.active:not(:hover) {
   color: var(--color-text-light-primary);
 }
 
-/* Visibility change layout for consequences dialog */
-.consequences-preview-dialog .visibility-change {
-  width: 100px;
+.take-cover-results-table td.actions {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 120px;
+  white-space: nowrap;
+}
+
+.take-cover-results-table td.actions .row-action-btn,
+.take-cover-results-table td.actions .row-timer-toggle {
+  flex: 0 0 auto;
+  margin: 0;
 }
 
 /* Visibility change layout for consequences dialog */
-.consequences-preview-dialog .actions {
-  width: 50px;
+.consequences-results-table {
+  table-layout: fixed;
+  width: 100%;
+  min-width: 700px;
+}
+
+.consequences-results-table th.token-image,
+.consequences-results-table td.token-image {
+  width: 70px;
+  min-width: 70px;
+  max-width: 70px;
+}
+
+.consequences-results-table th.token-name,
+.consequences-results-table td.token-name {
+  width: 180px;
+  min-width: 180px;
+  max-width: 180px;
+}
+
+.consequences-results-table td.token-name strong {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.consequences-results-table th.visibility-change,
+.consequences-results-table td.visibility-change {
+  width: 360px;
+  min-width: 360px;
+  max-width: 360px;
+}
+
+.consequences-results-table th.actions,
+.consequences-results-table td.actions {
+  width: 130px;
+  min-width: 130px;
+  max-width: 130px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.consequences-results-table th.row-spacer,
+.consequences-results-table td.row-spacer {
+  width: auto;
+  min-width: 0;
+  padding: 0;
 }
 
 .consequences-preview-dialog .visibility-change-with-override {
@@ -2110,6 +2226,18 @@ button.row-timer-toggle.active:not(:hover) {
 .consequences-preview-dialog .override-icons {
   display: flex;
   gap: 4px;
+  flex: 0 0 auto;
+}
+
+.consequences-results-table td.actions {
+  text-align: center;
+}
+
+.consequences-results-table td.actions .row-action-btn,
+.consequences-results-table td.actions .row-timer-toggle {
+  display: inline-flex !important;
+  vertical-align: middle;
+  margin: 0 3px;
 }
 
 /* State icon styling for consequences dialog */
@@ -2193,67 +2321,6 @@ button.row-timer-toggle.active:not(:hover) {
   border: 2px solid var(--visibility-undetected);
   box-shadow: 0 0 8px var(--visibility-undetected);
   transform: scale(1.1);
-}
-
-/* Selected dot indicator for each visibility state */
-.consequences-preview-dialog .override-icons .state-icon[data-state='avs'].selected::after {
-  content: '';
-  position: absolute;
-  bottom: -2px;
-  right: -2px;
-  width: 8px;
-  height: 8px;
-  background-color: var(--visibility-avs);
-  border-radius: 50%;
-  border: 1px solid var(--color-text-light-primary);
-}
-
-.consequences-preview-dialog .override-icons .state-icon[data-state='observed'].selected::after {
-  content: '';
-  position: absolute;
-  bottom: -2px;
-  right: -2px;
-  width: 8px;
-  height: 8px;
-  background-color: var(--visibility-observed);
-  border-radius: 50%;
-  border: 1px solid var(--color-text-light-primary);
-}
-
-.consequences-preview-dialog .override-icons .state-icon[data-state='concealed'].selected::after {
-  content: '';
-  position: absolute;
-  bottom: -2px;
-  right: -2px;
-  width: 8px;
-  height: 8px;
-  background-color: var(--visibility-concealed);
-  border-radius: 50%;
-  border: 1px solid var(--color-text-light-primary);
-}
-
-.consequences-preview-dialog .override-icons .state-icon[data-state='hidden'].selected::after {
-  content: '';
-  position: absolute;
-  bottom: -2px;
-  right: -2px;
-  width: 8px;
-  height: 8px;
-  background-color: var(--visibility-hidden);
-  border-radius: 50%;
-  border: 1px solid var(--color-text-light-primary);
-}
-
-.consequences-preview-dialog .override-icons .state-icon[data-state='undetected'].selected::after {
-  content: '';
-  position: absolute;
-  bottom: -2px;
-  right: -2px;
-  width: 8px;
-  height: 8px;
-  background-color: var(--visibility-undetected);
-  border-radius: 50%;
-  border: 1px solid var(--color-text-light-primary);
 }
 
 /* Bulk action buttons styling */
@@ -2527,6 +2594,36 @@ button.row-timer-toggle.active:not(:hover) {
   color: var(--visibility-undetected, #f44336);
 }
 
+/* Cover state color tints on bulk buttons (reuse cssClass) */
+.bulk-override-state-btn.cover-none {
+  color: var(--cover-none, #4caf50);
+  border-color: var(--cover-none, #4caf50);
+}
+.bulk-override-state-btn.cover-lesser {
+  color: var(--cover-lesser, #ffc107);
+  border-color: var(--cover-lesser, #ffc107);
+}
+.bulk-override-state-btn.cover-standard {
+  color: var(--cover-standard, #ff6600);
+  border-color: var(--cover-standard, #ff6600);
+}
+.bulk-override-state-btn.cover-greater {
+  color: var(--cover-greater, #f44336);
+  border-color: var(--cover-greater, #f44336);
+}
+.bulk-override-state-btn.cover-none:hover {
+  background: var(--cover-none-bg-strong, rgba(76, 175, 80, 0.3));
+}
+.bulk-override-state-btn.cover-lesser:hover {
+  background: var(--cover-lesser-bg-strong, rgba(255, 193, 7, 0.3));
+}
+.bulk-override-state-btn.cover-standard:hover {
+  background: var(--cover-standard-bg-strong, rgba(255, 102, 0, 0.3));
+}
+.bulk-override-state-btn.cover-greater:hover {
+  background: var(--cover-greater-bg-strong, rgba(244, 67, 54, 0.3));
+}
+
 /* Row action buttons styling */
 .row-action-btn {
   width: 30px;
@@ -2551,15 +2648,42 @@ button.row-timer-toggle.active:not(:hover) {
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
+.pf2e-visioner .row-action-btn {
+  width: 30px;
+  height: 20px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  line-height: 1;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    0 1px 2px rgba(0, 0, 0, 0.25);
+}
+
 .row-action-btn.apply-change {
   background: var(--color-bg-btn-primary);
   color: var(--color-text-light-primary);
   border-color: var(--color-bg-btn-primary);
 }
 
+.pf2e-visioner .row-action-btn.apply-change {
+  background: var(--pf2e-visioner-success, #4caf50);
+  color: var(--color-text-light-primary, #fff);
+  border-color: var(--pf2e-visioner-success-hover, #45a049);
+}
+
 .row-action-btn.apply-change:hover {
   background: var(--color-bg-btn-primary-active);
   border-color: var(--color-bg-btn-primary-active);
+}
+
+.pf2e-visioner .row-action-btn.apply-change:hover {
+  background: var(--pf2e-visioner-success-hover, #45a049);
+  border-color: var(--pf2e-visioner-success-hover, #45a049);
 }
 
 .row-action-btn.revert-change {
@@ -2568,15 +2692,26 @@ button.row-timer-toggle.active:not(:hover) {
   border-color: var(--color-bg-btn-secondary);
 }
 
+.pf2e-visioner .row-action-btn.revert-change {
+  background: var(--pf2e-visioner-warning, #ff9800);
+  color: var(--color-text-light-primary, #fff);
+  border-color: var(--pf2e-visioner-warning-hover, #f57c00);
+}
+
 .row-action-btn.revert-change:hover {
   background: var(--color-bg-btn-secondary-active);
   border-color: var(--color-bg-btn-secondary-active);
 }
 
+.pf2e-visioner .row-action-btn.revert-change:hover {
+  background: var(--pf2e-visioner-warning-hover, #f57c00);
+  border-color: var(--pf2e-visioner-warning-hover, #f57c00);
+}
+
 /* Action buttons styling for specific dialogs */
 .consequences-preview-dialog .row-action-btn {
   width: 30px;
-  height: 30px;
+  height: 20px;
   margin: 0 3px;
   border-radius: 4px;
   display: flex;
@@ -2654,6 +2789,35 @@ button.row-timer-toggle.active:not(:hover) {
 
 .hide-preview-dialog .hide-results-table td.actions .row-timer-toggle {
   gap: 0 !important;
+.point-out-results-table td.actions,
+.seek-results-table td.actions,
+.hide-results-table td.actions,
+.sneak-results-table td.actions,
+.create-a-diversion-results-table td.actions,
+.consequences-results-table td.actions,
+.take-cover-results-table td.actions {
+  text-align: center;
+  white-space: nowrap;
+  min-width: 120px;
+}
+
+.point-out-results-table td.actions .row-action-btn,
+.seek-results-table td.actions .row-action-btn,
+.hide-results-table td.actions .row-action-btn,
+.sneak-results-table td.actions .row-action-btn,
+.create-a-diversion-results-table td.actions .row-action-btn,
+.consequences-results-table td.actions .row-action-btn,
+.take-cover-results-table td.actions .row-action-btn,
+.point-out-results-table td.actions .row-timer-toggle,
+.seek-results-table td.actions .row-timer-toggle,
+.hide-results-table td.actions .row-timer-toggle,
+.sneak-results-table td.actions .row-timer-toggle,
+.create-a-diversion-results-table td.actions .row-timer-toggle,
+.consequences-results-table td.actions .row-timer-toggle,
+.take-cover-results-table td.actions .row-timer-toggle {
+  display: inline-flex !important;
+  vertical-align: middle;
+  margin: 0 3px;
 }
 
 /* Wall Manager specific styles */

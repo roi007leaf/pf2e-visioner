@@ -548,6 +548,7 @@
       "REMOVE_TEMPLATE": "Remove Seek Template",
       "SETUP_TEMPLATE_TOOLTIP": "Click to place a 15-foot burst anywhere; Seek will use tokens within it",
       "ENCOUNTER_ONLY": "Show only encounter tokens",
+      "TEMPLATE_OUT_OF_RANGE": "Seek template center is {distance} ft away, beyond the {max} ft placement limit.",
       "SETTING_NAME": "Enable Seek Automation",
       "SETTING_HINT": "Automatically add buttons to Seek chat messages for applying visibility changes",
       "OUT_OF_RANGE": "Out of Range",
@@ -802,6 +803,10 @@
         "name": "Always Skip Seek Template Dialog",
         "hint": "When enabled, the Seek template configuration dialog will be skipped and default values (15ft burst) will be used."
       },
+      "SEEK_TEMPLATE_MAX_PLACEMENT_DISTANCE": {
+        "name": "Seek Template Max Placement Distance",
+        "hint": "Maximum distance in feet from the seeking token to the placed Seek template center. Set to 0 for unlimited placement."
+      },
       "SEEK_USE_TEMPLATE": {
         "name": "Use Seek Template",
         "hint": "When Seeking, targets will be decided using a 15-foot burst template. Template button replaces standard Visioner buttons in Seek chat card"
@@ -1014,6 +1019,7 @@
       "REVERT_ALL": "Revert All",
       "REMOVE_OVERRIDES": "Remove Overrides",
       "BULK_SET_VISIBILITY": "Bulk Set Visibility",
+      "BULK_SET_COVER": "Bulk Set Cover",
       "CLEAR_BULK_OVERRIDES": "Clear Bulk Overrides",
       "FILTER_BY_DETECTION_LABEL": "Filter By Viewport",
       "FILTER_BY_DETECTION_TOOLTIP": "Only show tokens that are within the current viewport",

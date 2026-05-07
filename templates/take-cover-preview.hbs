@@ -4,9 +4,8 @@
       <img src="{{actorTokenImage}}" alt="{{actorToken.name}}" />
     </div>
     <div class="hider-details">
-            <h3 class="taker-name">{{taker.name}}</h3>
+      <h3 class="taker-name">{{taker.name}}</h3>
       <p class="hint">{{localize "PF2E_VISIONER.UI.TAKING_COVER_HINT"}}</p>
-    </div>
     </div>
   </div>
 
@@ -36,7 +35,12 @@
     </label>
   </div>
 
-  {{!-- (No visibility bulk override bar for cover mechanic) --}}
+  {{#if bulkOverrideStates}}
+  <div class="bulk-action-group">
+    {{> "pf2e-visioner.bulk-override"}}
+  </div>
+  {{/if}}
+
   <div class="results-table-container">
     <table class="visibility-table take-cover-results-table">
       <thead>
@@ -104,5 +108,3 @@
     </div>
   </div>
 </div>
-
-

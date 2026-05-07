@@ -125,6 +125,26 @@ describe('Store Operations Core Logic', () => {
       // Should not have called update
       expect(global.canvas.scene.setFlag).not.toHaveBeenCalled();
     });
+
+    test('falls back to token id when target document id is unavailable', async () => {
+      const { setCoverBetween } = await import('../../../scripts/stores/cover-map.js');
+
+      const observer = createMockToken('observer-token');
+      const target = createMockToken('target-token');
+      target.document.id = undefined;
+
+      await setCoverBetween(observer, target, 'none', {
+        takeCover: true,
+        takeCoverProneRangedOnly: true,
+      });
+
+      expect(observer.document.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          [`flags.${global.MODULE_ID}.cover`]: {},
+        }),
+        expect.any(Object),
+      );
+    });
   });
 
   describe('getCoverBetween - Cover State Retrieval', () => {
@@ -141,6 +161,26 @@ describe('Store Operations Core Logic', () => {
         if (module === global.MODULE_ID && key === 'cover') {
           return {
             'target-token-doc': 'standard',
+          };
+        }
+        return {};
+      });
+
+      const result = getCoverBetween(observer, target);
+      expect(result).toBe('standard');
+    });
+
+    test('retrieves cover using token id when target document id is unavailable', async () => {
+      const { getCoverBetween } = await import('../../../scripts/stores/cover-map.js');
+
+      const observer = createMockToken('observer-token');
+      const target = createMockToken('target-token');
+      target.document.id = undefined;
+
+      observer.document.getFlag.mockImplementation((module, key) => {
+        if (module === global.MODULE_ID && key === 'cover') {
+          return {
+            'target-token': 'standard',
           };
         }
         return {};

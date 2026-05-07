@@ -251,7 +251,6 @@ export class VisionerQuickPanel extends foundry.applications.api.ApplicationV2 {
       for (const [obs, tgt] of pairs) {
         await setCoverBetween(obs, tgt, state);
       }
-      ui.notifications?.info?.(`Applied cover ${state} to ${pairs.length} pair(s).`);
     } catch (e) {
       console.error('[pf2e-visioner] quick cover error', e);
     }

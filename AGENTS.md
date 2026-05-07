@@ -10,8 +10,11 @@ Fetch details: get_observations([IDs]) | Search: mem-search skill
 Stats: 50 obs (22,103t read) | 3,050,706t work | 99% savings
 
 ### May 3, 2026
+
 S119 GM tracker dots design pivot — dots should only show users who CAN see the stealther, not users blocked by overrides (May 3 at 9:55 AM)
+
 ### May 6, 2026
+
 1142 10:11a 🔵 hide-action.js and HideAction.js have divergent semantics beyond import paths — behavioral differences confirmed
 1145 10:13a 🔵 Task 6 Code Review Re-Verification Scope — pf2e-visioner
 1146 10:14a 🔴 Task 6 Prior Findings All Verified Fixed
@@ -24,7 +27,7 @@ S119 GM tracker dots design pivot — dots should only show users who CAN see th
 1153 10:18a 🔄 Hide Action Mirroring: Prerequisite Logic Unified via perception-profile.js
 1154 " 🔵 Remaining Divergence: outcomeToChange/entriesToRevertChanges Between Hide Files
 1155 " 🔄 SneakPreviewDialog: Extracted sneakStartPositionQualifies and sneakEndPositionQualifies
-1156 " 🔄 DualSystemIntegration._combineSystemStates Simplified to Pass-Through
+1156 " 🔄 DualSystemIntegration.\_combineSystemStates Simplified to Pass-Through
 1157 " 🟣 Task 6 Regression Tests Added for Hide/Sneak Alignment
 1158 " 🔵 perception-profile.js: canAttemptHideOrRemainHidden Semantics
 1159 10:19a 🔵 Task 6 Test Suite: 73/73 Passing After Hide Alignment

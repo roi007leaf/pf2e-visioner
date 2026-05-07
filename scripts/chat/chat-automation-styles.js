@@ -1236,6 +1236,16 @@ function getChatAutomationCSS() {
             box-shadow: 0 0 12px var(--visibility-undetected) !important;
         }
 
+        .hide-preview-dialog .old-visibility-state .state-icon {
+            border-color: currentColor !important;
+            box-shadow: 0 0 8px color-mix(in srgb, currentColor 55%, transparent) !important;
+        }
+
+        .hide-preview-dialog th.end-position .legend-icon.cover-standard,
+        .sneak-preview-dialog th.end-position .legend-icon.cover-standard {
+            color: var(--cover-standard, #ff6600) !important;
+        }
+
         .state-icon[data-state='unnoticed'].selected,
         .seek-preview-dialog .state-icon[data-state='unnoticed'].selected,
         .hide-preview-dialog .state-icon[data-state='unnoticed'].selected,

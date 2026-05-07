@@ -14,6 +14,7 @@ import { registerMovementCostHooks } from './movement-cost.js';
 import { registerTokenHooks } from './token-events.js';
 import { registerUIHooks } from './ui.js';
 import { cleanupDeletedVisionerRuleElements } from '../rule-elements/deleted-item-cleanup.js';
+import { registerPf2eHudTakeCoverIntegration } from '../integrations/pf2e-hud-take-cover.js';
 
 /**
  * Clean up AVS overrides for a defeated actor
@@ -65,6 +66,8 @@ async function cleanupAvsOverridesForDefeatedActor(actor) {
 }
 
 export async function registerHooks() {
+  registerPf2eHudTakeCoverIntegration();
+
   Hooks.on('ready', onReady);
   Hooks.on('canvasReady', onCanvasReady);
 
@@ -149,6 +152,14 @@ export async function registerHooks() {
       await captureRollTimePosition(message);
     } catch (error) {
       console.warn('PF2E Visioner | Failed to capture roll-time position:', error);
+    }
+
+    try {
+      const { expireTakeCoverOnAttackMessage } =
+        await import('../chat/services/take-cover-expiration-service.js');
+      await expireTakeCoverOnAttackMessage(message);
+    } catch (error) {
+      console.warn('PF2E Visioner | Failed to expire Take Cover on attack:', error);
     }
   });
 

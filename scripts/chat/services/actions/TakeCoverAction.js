@@ -1,7 +1,38 @@
 import { COVER_STATES } from '../../../constants.js';
+import autoCoverSystem from '../../../cover/auto-cover/AutoCoverSystem.js';
 import { appliedTakeCoverChangesByMessage } from '../data/message-cache.js';
 import { shouldFilterAlly } from '../infra/shared-utils.js';
 import { ActionHandlerBase } from './BaseAction.js';
+
+function getTakeCoverResultForBaselineCover(coverState) {
+  return coverState === 'standard' || coverState === 'greater' ? 'greater' : 'standard';
+}
+
+function isProneToken(token) {
+  const actor = token?.actor;
+  try {
+    if (token?.isProne === true) return true;
+    if (actor?.statuses?.has?.('prone')) return true;
+    if (actor?.itemTypes?.condition?.some?.((condition) => condition?.slug === 'prone')) return true;
+    if (actor?.conditions?.conditions?.some?.((condition) => condition?.slug === 'prone')) return true;
+    if (Array.isArray(actor?.conditions) && actor.conditions.some((condition) => condition?.slug === 'prone')) {
+      return true;
+    }
+  } catch {
+    return false;
+  }
+  return false;
+}
+
+function hasTakeCoverProneRangedOnlyEffect(token) {
+  try {
+    return token?.actor?.itemTypes?.effect?.some?.(
+      (effect) => effect.flags?.['pf2e-visioner']?.takeCoverProneRangedOnly === true,
+    ) === true;
+  } catch {
+    return false;
+  }
+}
 
 // Take Cover raises the cover level that the ACTOR (taking cover) has AGAINST each other token (observers).
 // Cover storage/orientation is observer -> target. For Take Cover that means:
@@ -44,72 +75,38 @@ export class TakeCoverActionHandler extends ActionHandlerBase {
 
   async analyzeOutcome(actionData, subject) {
     const { getCoverBetween } = await import('../../../utils.js');
+    const takingCoverToken = actionData.actorToken || actionData.actor;
     // Orientation: observer = subject (row token), target = actor (taking cover)
-    let current = getCoverBetween(subject, actionData.actor) || 'none';
+    const storedCover = getCoverBetween(subject, takingCoverToken) || 'none';
+    let baselineCover = storedCover;
 
-    // Check for PF2e system cover effect on the actor taking cover
-    let hasPF2eEffect = false;
-    if (game.user?.isGM) {
-      // Try different ways to access the actor
-      let actor = actionData.actor?.actor || actionData.actor;
-
-      if (actor?.itemTypes?.effect) {
-        const allEffects = actor.itemTypes.effect.map((e) => ({ slug: e.slug, name: e.name }));
-        const coverEffect = actor.itemTypes.effect.find((e) => e.slug === 'effect-cover');
-
-        if (coverEffect) {
-          const coverLevel = coverEffect.flags?.pf2e?.rulesSelections?.cover?.level;
-          if (coverLevel) {
-            current = coverLevel;
-            hasPF2eEffect = true;
-          }
-        }
+    try {
+      if (autoCoverSystem?.isEnabled?.() !== false) {
+        baselineCover = autoCoverSystem.detectCoverBetweenTokens(subject, takingCoverToken) || 'none';
       }
+    } catch {
+      baselineCover = storedCover;
     }
 
-    let newCover;
-    let originalCurrent = current;
-
-    if (hasPF2eEffect) {
-      // PF2e effect present: use the PF2e level as final result (GM has already calculated it)
-      // Compare against existing Visioner cover (not the PF2e effect level)
-      const existingVisionerCover = getCoverBetween(subject, actionData.actor) || 'none';
-      newCover = current; // Use PF2e effect level as new cover
-      const changed = newCover !== existingVisionerCover;
-
-      return {
-        target: subject,
-        currentCover: existingVisionerCover,
-        oldCover: existingVisionerCover,
-        newCover,
-        // Visibility-aligned aliases so shared UI helpers work
-        currentVisibility: existingVisionerCover,
-        oldVisibility: existingVisionerCover,
-        newVisibility: newCover,
-        changed,
-      };
-    } else {
-      // No PF2e effect: apply normal Take Cover upgrade rules
-      newCover = current;
-      if (current === 'lesser' || current === 'none') newCover = 'standard';
-      else if (current === 'standard') newCover = 'greater';
-      // If already greater, no change
-    }
-
-    const changed = newCover !== current;
+    const takeCoverProneRangedOnly = baselineCover === 'none' && isProneToken(takingCoverToken);
+    const calculatedCover = takeCoverProneRangedOnly
+      ? 'none'
+      : getTakeCoverResultForBaselineCover(baselineCover);
+    const changed = takeCoverProneRangedOnly || calculatedCover !== storedCover;
 
     // Mirror fields to align with BaseActionDialog utilities
     return {
       target: subject,
-      currentCover: current,
-      oldCover: current,
-      newCover,
+      currentCover: storedCover,
+      oldCover: storedCover,
+      newCover: calculatedCover,
       // Visibility-aligned aliases so shared UI helpers work
-      currentVisibility: current,
-      oldVisibility: current,
-      oldVisibilityLabel: COVER_STATES[current]?.label || current,
-      newVisibility: newCover,
+      currentVisibility: storedCover,
+      oldVisibility: storedCover,
+      oldVisibilityLabel: COVER_STATES[storedCover]?.label || storedCover,
+      newVisibility: calculatedCover,
       changed,
+      takeCoverProneRangedOnly,
     };
   }
 
@@ -122,14 +119,28 @@ export class TakeCoverActionHandler extends ActionHandlerBase {
       target: actionData.actorToken || actionData.actor,
       newCover: desired,
       oldCover: outcome.oldCover || outcome.oldVisibility || outcome.currentCover,
+      takeCoverProneRangedOnly: outcome.takeCoverProneRangedOnly === true,
     };
   }
 
   async applyChangesInternal(changes) {
     const { setCoverBetween } = await import('../../../utils.js');
+    const { applyTakeCoverProneRangedOnlyEffect } = await import('../../../cover/batch.js');
+    let appliedProneRangedOnly = false;
 
     for (const ch of changes) {
-      await setCoverBetween(ch.observer, ch.target, ch.newCover, { skipEphemeralUpdate: false });
+      if (ch.takeCoverProneRangedOnly === true) {
+        if (!appliedProneRangedOnly) {
+          await applyTakeCoverProneRangedOnlyEffect(ch.target);
+          appliedProneRangedOnly = true;
+        }
+        continue;
+      }
+      await setCoverBetween(ch.observer, ch.target, ch.newCover, {
+        skipEphemeralUpdate: false,
+        takeCover: true,
+        takeCoverProneRangedOnly: false,
+      });
     }
 
     // Remove PF2e cover effect from the actor taking cover to avoid conflicts
@@ -151,6 +162,52 @@ export class TakeCoverActionHandler extends ActionHandlerBase {
         }
       }
     }
+  }
+
+  applyOverrides(actionData, outcomes) {
+    const result = super.applyOverrides(actionData, outcomes);
+    for (const outcome of result || []) {
+      if (outcome?.takeCoverProneRangedOnly === true) {
+        outcome.changed = true;
+      }
+    }
+    return result;
+  }
+
+  getDirectApplyOutcomes(outcomes) {
+    const changed = (outcomes || []).filter((outcome) => outcome?.changed);
+    if (changed.length === 0) return [];
+    return changed.every((outcome) => outcome.takeCoverProneRangedOnly === true) ? changed : [];
+  }
+
+  shouldApplyWithoutDialog(outcomes, actionData = null) {
+    const takingCoverToken = actionData?.actorToken || actionData?.actor;
+    const isProne = isProneToken(takingCoverToken);
+    if (isProne && hasTakeCoverProneRangedOnlyEffect(takingCoverToken)) return false;
+    if (isProne) return true;
+    if (this.getDirectApplyOutcomes(outcomes).length > 0) return true;
+    return (outcomes || []).length === 0 && isProne;
+  }
+
+  async applyOutcomesDirectly(actionData, outcomes, button = null) {
+    const directOutcomes = this.getDirectApplyOutcomes(outcomes);
+    const takingCoverToken = actionData.actorToken || actionData.actor;
+    if (directOutcomes.length === 0 && !isProneToken(takingCoverToken)) {
+      return 0;
+    }
+
+    const { applyTakeCoverProneRangedOnlyEffect } = await import('../../../cover/batch.js');
+    await applyTakeCoverProneRangedOnlyEffect(takingCoverToken);
+    const changes = directOutcomes.length
+      ? directOutcomes.map((outcome) => this.outcomeToChange(actionData, outcome))
+      : [{ target: takingCoverToken, takeCoverProneRangedOnly: true, oldCover: 'none' }];
+    this.cacheAfterApply(actionData, changes);
+    this.updateButtonToRevert(button);
+    try {
+      const { notify } = await import('../infra/notifications.js');
+      notify.info('Applied Take Cover: greater cover against ranged attacks while prone');
+    } catch { }
+    return changes.length;
   }
 
   buildCacheEntryFromChange(change) {

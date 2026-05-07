@@ -32,7 +32,7 @@ export async function ensureAggregateCoverEffect(effectReceiverToken, state, opt
                 sustained: false,
               }
             : { value: -1, unit: 'unlimited', expiry: null, sustained: false },
-        tokenIcon: { show: false },
+        tokenIcon: { show: true },
         unidentified: true,
         start: {
           value: 0,

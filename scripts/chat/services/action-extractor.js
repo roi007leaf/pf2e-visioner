@@ -7,6 +7,12 @@ export async function extractActionData(message) {
 
   const context = message.flags?.pf2e?.context;
   const origin = message.flags?.pf2e?.origin;
+  const isAttackRollContext =
+    context?.type === 'attack-roll' ||
+    context?.type === 'spell-attack-roll' ||
+    context?.type === 'strike-attack-roll' ||
+    context?.type === 'impulse-attack-roll' ||
+    context?.options?.some((opt) => opt.includes('attack-roll'));
 
   const isPointOutAction =
     message.flavor?.toLowerCase?.().includes?.('point out') ||
@@ -31,10 +37,11 @@ export async function extractActionData(message) {
     // Avoid matching generic messages that merely mention "Take Cover" (e.g., condition summaries).
     (context?.type === 'action' &&
       (context.options?.includes?.('action:take-cover') || context.slug === 'take-cover')) ||
-    origin?.rollOptions?.includes?.('origin:item:take-cover') ||
-    origin?.rollOptions?.includes?.('origin:item:slug:take-cover') ||
-    message.flavor?.toLowerCase?.().includes?.('take cover') ||
-    message.flavor?.includes?.("Mise à l'abri");
+    (!isAttackRollContext &&
+      (origin?.rollOptions?.includes?.('origin:item:take-cover') ||
+        origin?.rollOptions?.includes?.('origin:item:slug:take-cover') ||
+        message.flavor?.toLowerCase?.().trim?.() === 'take cover' ||
+        message.flavor?.trim?.() === "Mise à l'abri"));
 
   // Only detect Avoid Notice if explicit context or origin flags present
   const isAvoidNoticeAction =
@@ -60,10 +67,7 @@ export async function extractActionData(message) {
     (context.options?.includes('action:hide') || context.slug === 'hide');
 
   const isAttackRoll =
-    (context?.type === 'attack-roll' ||
-      context?.type === 'spell-attack-roll' ||
-      context?.type === 'strike-attack-roll' ||
-      context?.type === 'impulse-attack-roll' ||
+    (isAttackRollContext ||
       message.content?.includes('Attack Roll') ||
       message.content?.includes('Strike') ||
       context?.options?.some((opt) => opt.includes('attack-roll'))) &&

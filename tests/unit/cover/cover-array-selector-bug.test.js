@@ -2,7 +2,11 @@
  * @jest-environment jsdom
  */
 
-import { batchUpdateCoverEffects } from '../../../scripts/cover/batch.js';
+import {
+  applyTakeCoverProneRangedOnlyEffect,
+  batchUpdateCoverEffects,
+  removeTakeCoverProneRangedEffects,
+} from '../../../scripts/cover/batch.js';
 
 // Import test setup first to define global mock functions
 import '../../setup.js';
@@ -209,6 +213,111 @@ describe('Cover Array Selector Bug Fix', () => {
           }),
         }),
       ]),
+    );
+  });
+
+  test('does not add prone-ranged upgrade rules for generic standard cover', async () => {
+    await batchUpdateCoverEffects(mockObserver, [{ target: mockTarget, state: 'standard' }]);
+
+    const standardAggregate = mockTarget.actor.itemTypes.effect.find(
+      (e) => e.flags?.['pf2e-visioner']?.coverState === 'standard',
+    );
+
+    expect(standardAggregate.system.rules).not.toContainEqual(
+      expect.objectContaining({ slug: 'take-cover-prone-ranged-upgrade' }),
+    );
+  });
+
+  test('adds prone-ranged upgrade rules for standard cover from Take Cover', async () => {
+    await batchUpdateCoverEffects(mockObserver, [
+      { target: mockTarget, state: 'standard', takeCover: true },
+    ]);
+
+    const standardAggregate = mockTarget.actor.itemTypes.effect.find(
+      (e) => e.flags?.['pf2e-visioner']?.coverState === 'standard',
+    );
+
+    expect(standardAggregate.system.rules).toContainEqual(
+      expect.objectContaining({
+        slug: 'take-cover-prone-ranged-upgrade',
+        value: 2,
+        predicate: expect.arrayContaining([
+          `origin:signature:${mockObserver.actor.signature}`,
+          `cover-against:${mockObserver.id}`,
+          'self:condition:prone',
+          { or: ['item:ranged', 'item:trait:ranged', 'attack:ranged'] },
+        ]),
+      }),
+    );
+  });
+
+  test('shows aggregate cover effects on tokens while keeping them unidentified', async () => {
+    await batchUpdateCoverEffects(mockObserver, [{ target: mockTarget, state: 'standard' }]);
+
+    const standardAggregate = mockTarget.actor.itemTypes.effect.find(
+      (e) => e.flags?.['pf2e-visioner']?.coverState === 'standard',
+    );
+
+    expect(standardAggregate.system.tokenIcon).toEqual({ show: true });
+    expect(standardAggregate.system.unidentified).toBe(true);
+  });
+
+  test('adds one generic ranged greater-cover rule for prone Take Cover with no cover baseline', async () => {
+    await applyTakeCoverProneRangedOnlyEffect(mockTarget);
+
+    const proneTakeCoverEffect = mockTarget.actor.itemTypes.effect.find(
+      (e) => e.flags?.['pf2e-visioner']?.takeCoverProneRangedOnly === true,
+    );
+    const standardAggregate = mockTarget.actor.itemTypes.effect.find(
+      (e) => e.flags?.['pf2e-visioner']?.coverState === 'standard',
+    );
+
+    expect(standardAggregate).toBeUndefined();
+    expect(proneTakeCoverEffect.system.rules).toContainEqual(
+      expect.objectContaining({
+        slug: 'take-cover-prone-ranged-cover',
+        value: 4,
+        predicate: [
+          'self:condition:prone',
+          { or: ['item:ranged', 'item:trait:ranged', 'attack:ranged'] },
+        ],
+      }),
+    );
+    expect(proneTakeCoverEffect.system.rules).not.toContainEqual(
+      expect.objectContaining({ option: `cover-against:${mockObserver.id}` }),
+    );
+    expect(proneTakeCoverEffect.system.tokenIcon).toEqual({ show: true });
+    expect(proneTakeCoverEffect.system.unidentified).toBe(true);
+  });
+
+  test('removes prone-ranged-only Take Cover aggregate when prone is removed', async () => {
+    await applyTakeCoverProneRangedOnlyEffect(mockTarget);
+
+    await removeTakeCoverProneRangedEffects(mockTarget);
+
+    expect(mockTarget.actor.itemTypes.effect).not.toContainEqual(
+      expect.objectContaining({
+        flags: expect.objectContaining({
+          'pf2e-visioner': expect.objectContaining({ takeCoverProneRangedOnly: true }),
+        }),
+      }),
+    );
+  });
+
+  test('removes prone-ranged upgrade rules from standard cover aggregates when prone is removed', async () => {
+    await batchUpdateCoverEffects(mockObserver, [
+      { target: mockTarget, state: 'standard', takeCover: true },
+    ]);
+
+    await removeTakeCoverProneRangedEffects(mockTarget);
+
+    const standardAggregate = mockTarget.actor.itemTypes.effect.find(
+      (e) => e.flags?.['pf2e-visioner']?.coverState === 'standard',
+    );
+
+    expect(standardAggregate).toBeDefined();
+    expect(standardAggregate.system.rules).not.toContainEqual(
+      expect.objectContaining({ slug: 'take-cover-prone-ranged-upgrade' }),
     );
   });
 

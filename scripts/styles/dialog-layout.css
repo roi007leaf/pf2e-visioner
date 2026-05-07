@@ -806,16 +806,16 @@
   }
 
   .consequences-preview-dialog .override-icons .state-icon[data-state='concealed'].selected {
-    background: rgba(255, 193, 7, 0.2);
+    background: var(--visibility-concealed-bg-strong);
     border: 2px solid var(--visibility-concealed);
-    box-shadow: 0 0 8px rgba(255, 193, 7, 0.5);
+    box-shadow: 0 0 8px var(--visibility-concealed);
     transform: scale(1.1);
   }
 
   .consequences-preview-dialog .override-icons .state-icon[data-state='hidden'].selected {
     background: var(--visibility-hidden-bg-strong);
     border: 2px solid var(--visibility-hidden);
-    box-shadow: 0 0 8px rgba(255, 102, 0, 0.5);
+    box-shadow: 0 0 8px var(--visibility-hidden);
     transform: scale(1.1);
   }
 
@@ -824,57 +824,6 @@
     border: 2px solid var(--visibility-undetected);
     box-shadow: 0 0 8px var(--visibility-undetected);
     transform: scale(1.1);
-  }
-
-  /* Selected dot indicator for each visibility state */
-  .consequences-preview-dialog .override-icons .state-icon[data-state='observed'].selected::after {
-    content: '';
-    position: absolute;
-    bottom: -2px;
-    right: -2px;
-    width: 8px;
-    height: 8px;
-    background-color: var(--visibility-observed);
-    border-radius: 50%;
-    border: 1px solid var(--color-text-light-primary);
-  }
-
-  .consequences-preview-dialog .override-icons .state-icon[data-state='concealed'].selected::after {
-    content: '';
-    position: absolute;
-    bottom: -2px;
-    right: -2px;
-    width: 8px;
-    height: 8px;
-    background-color: var(--visibility-concealed);
-    border-radius: 50%;
-    border: 1px solid var(--color-text-light-primary);
-  }
-
-  .consequences-preview-dialog .override-icons .state-icon[data-state='hidden'].selected::after {
-    content: '';
-    position: absolute;
-    bottom: -2px;
-    right: -2px;
-    width: 8px;
-    height: 8px;
-    background-color: var(--visibility-hidden);
-    border-radius: 50%;
-    border: 1px solid var(--color-text-light-primary);
-  }
-
-  .consequences-preview-dialog
-    .override-icons
-    .state-icon[data-state='undetected'].selected::after {
-    content: '';
-    position: absolute;
-    bottom: -2px;
-    right: -2px;
-    width: 8px;
-    height: 8px;
-    background-color: var(--visibility-undetected);
-    border-radius: 50%;
-    border: 1px solid var(--color-text-light-primary);
   }
 
   /* Bulk action buttons styling */

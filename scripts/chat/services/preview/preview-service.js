@@ -271,6 +271,10 @@ export async function previewActionResults(actionData) {
           subjects.map((s) => handler.analyzeOutcome(actionData, s)),
         );
         const changes = outcomes.filter((o) => o && o.changed);
+        if (handler.shouldApplyWithoutDialog(outcomes, actionData)) {
+          await handler.applyOutcomesDirectly(actionData, outcomes);
+          return;
+        }
         new TakeCoverPreviewDialog(actionData.actor, outcomes, changes, actionData).render(true);
         return;
       }
