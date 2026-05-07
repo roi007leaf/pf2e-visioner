@@ -41,6 +41,7 @@ const SETTINGS_GROUPS = {
       keys: [
         'seekUseTemplate',
         'seekTemplateSkipDialog',
+        'seekTemplateMaxPlacementDistance',
         'limitSeekRangeInCombat',
         'customSeekDistance',
         'limitSeekRangeOutOfCombat',
@@ -376,11 +377,13 @@ class VisionerSettingsForm extends foundry.applications.api.ApplicationV2 {
           toggleSettingVisibility('customSeekDistance', false);
           toggleSettingVisibility('customSeekDistanceOutOfCombat', false);
           toggleSettingVisibility('seekTemplateSkipDialog', true);
+          toggleSettingVisibility('seekTemplateMaxPlacementDistance', true);
         } else {
           // Ensure limit toggles visible
           toggleSettingVisibility('limitSeekRangeInCombat', true);
           toggleSettingVisibility('limitSeekRangeOutOfCombat', true);
           toggleSettingVisibility('seekTemplateSkipDialog', false);
+          toggleSettingVisibility('seekTemplateMaxPlacementDistance', false);
           // Distance inputs re-evaluated by parent dependency pass above
         }
       };

@@ -1,24 +1,31 @@
 # Changelog
 
-## [8.1.13] - 2026-05-07
+## [8.1.12] - 2026-05-07
+
 ### Added
+
 - **Take Cover preview now supports bulk cover overrides**: The Take Cover dialog shows bulk cover buttons for none, lesser, standard, and greater cover, using cover-specific icons and styling.
+- **Seek template placement can be range-limited**: A new Advanced Seek setting can limit Seek template placement by center-to-center distance from the seeker, with the placement preview clamping to the allowed edge when the mouse moves beyond the configured range.
+- **PF2E HUD Take Cover now opens Visioner's cover workflow**: Clicking PF2E HUD's AC Take Cover button is intercepted when Visioner automation is enabled and opens the existing Visioner Take Cover preview dialog instead of applying PF2E's generic cover effect directly.
+
 ### Changed
+
+- **Seek template range preview matches Seek styling**: The placement limit ring now uses the Seek blue accent color instead of the cover-warning orange.
 - **Take Cover initializes from live auto-cover**: The Take Cover preview now starts each row from the freshly calculated auto-cover state instead of upgrading stale stored cover or a PF2E system cover effect level.
 - **Bulk cover controls use cover-specific presentation**: The Take Cover bulk override bar now uses a cover-specific label and colors none, lesser, standard, and greater cover buttons with the same green, yellow, orange, and red palette used elsewhere.
 - **Action dialogs have more room for their controls**: Seek, Hide, Sneak, and Create a Diversion preview dialogs open wider so result tables and action controls do not crowd each other.
 - **Row Apply and Revert buttons match the compact icon-button style**: Per-row action buttons now use the same 30px rounded border treatment as adjacent action buttons while keeping their green and orange action colors.
 - **Seek Detected By column is more compact**: The Seek results table now keeps the Detected By column narrow and centered since it only displays an icon.
+
 ### Fixed
+
+- **Seek template placement no longer fails when the mouse is out of range**: Out-of-range mouse positions now place the template at the maximum allowed center-to-center range instead of showing an error and doing nothing, including when Foundry creates the underlying region before Visioner receives it.
+- **Seek template placement returns to token controls**: After placing a Seek template, Visioner switches back to the token controls layer instead of leaving the user in region/template tooling.
 - **Action dialog row buttons stay horizontal**: Seek, Hide, Sneak, Point Out, Create a Diversion, Consequences, and Take Cover action buttons now share explicit horizontal table-cell styling so Apply, Revert, and timer buttons do not stack vertically.
 - **Action dialog footer buttons stay horizontal**: Bulk Apply All and Revert All footer buttons in action dialogs now use explicit row styling so they stay side by side.
 - **Take Cover preview layout stays contained while resizing**: The Take Cover filters, bulk controls, results table, and footer now remain inside the dialog content layout instead of drifting or resizing independently.
 - **Take Cover bulk cover controls include every cover level**: The dialog exposes none, lesser, standard, and greater cover as bulk-set options and keeps the clear action separate.
 - **Consequences dialog columns no longer crush the Actions column**: The Attack Consequences table now reserves enough space for visibility controls and row action buttons instead of clipping the Actions header and buttons.
-
-## [8.1.12] - 2026-05-07
-### Added
-- **PF2E HUD Take Cover now opens Visioner's cover workflow**: Clicking PF2E HUD's AC Take Cover button is intercepted when Visioner automation is enabled and opens the existing Visioner Take Cover preview dialog instead of applying PF2E's generic cover effect directly.
 
 ## [8.1.11] - 2026-05-07
 

@@ -1,5 +1,9 @@
 // Facade around seek template helpers to keep UI layer clean
 
+import { MODULE_ID } from '../../../constants.js';
+
+const SEEK_TEMPLATE_PLACEMENT_LIMIT_SETTING = 'seekTemplateMaxPlacementDistance';
+
 function getRegionDocumentClass() {
   return (
     globalThis.CONFIG?.Region?.documentClass ||
@@ -104,12 +108,234 @@ function getTemplateStateFromRegion(region) {
   };
 }
 
-async function launchSeekTemplatePreview(layer, tplData) {
-  if (typeof layer?.createPreview === 'function') {
+function getGridDistanceScale() {
+  const grid = canvas?.scene?.grid || canvas?.grid?.grid || canvas?.grid || {};
+  const size = Number(grid.size ?? 100);
+  const distance = Number(grid.distance ?? 5);
+  return {
+    size: Number.isFinite(size) && size > 0 ? size : 100,
+    distance: Number.isFinite(distance) && distance > 0 ? distance : 5,
+  };
+}
+
+function getTokenCenter(token) {
+  const directCenter = token?.center || token?.object?.center;
+  if (Number.isFinite(directCenter?.x) && Number.isFinite(directCenter?.y)) {
+    return { x: Number(directCenter.x), y: Number(directCenter.y) };
+  }
+
+  const document = token?.document || token;
+  const x = Number(document?.x);
+  const y = Number(document?.y);
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+
+  const { size } = getGridDistanceScale();
+  const width = Number(document?.width ?? 1);
+  const height = Number(document?.height ?? 1);
+  return {
+    x: x + ((Number.isFinite(width) && width > 0 ? width : 1) * size) / 2,
+    y: y + ((Number.isFinite(height) && height > 0 ? height : 1) * size) / 2,
+  };
+}
+
+function getSeekTemplateMaxPlacementDistance() {
+  const value = Number(game?.settings?.get?.(MODULE_ID, SEEK_TEMPLATE_PLACEMENT_LIMIT_SETTING) ?? 0);
+  return Number.isFinite(value) && value > 0 ? value : 0;
+}
+
+function getDistanceFeetBetweenPoints(from, to) {
+  const { size, distance } = getGridDistanceScale();
+  const pixelDistance = Math.hypot(Number(to.x) - from.x, Number(to.y) - from.y);
+  return (pixelDistance / size) * distance;
+}
+
+function getAllowedTemplateCenterDistanceFeet() {
+  return getSeekTemplateMaxPlacementDistance();
+}
+
+export function validateSeekTemplatePlacement(actionData, center) {
+  const maxDistanceFeet = getSeekTemplateMaxPlacementDistance();
+  const centerMaxDistanceFeet = getAllowedTemplateCenterDistanceFeet();
+  if (maxDistanceFeet <= 0) {
+    return { allowed: true, distanceFeet: 0, maxDistanceFeet, centerMaxDistanceFeet };
+  }
+
+  if (!Number.isFinite(center?.x) || !Number.isFinite(center?.y)) {
+    return { allowed: true, distanceFeet: 0, maxDistanceFeet, centerMaxDistanceFeet };
+  }
+
+  const origin = getTokenCenter(actionData?.actor);
+  if (!origin) {
+    return { allowed: true, distanceFeet: 0, maxDistanceFeet, centerMaxDistanceFeet };
+  }
+
+  const distanceFeet = getDistanceFeetBetweenPoints(origin, center);
+
+  return {
+    allowed: distanceFeet <= centerMaxDistanceFeet + 0.000001,
+    distanceFeet,
+    maxDistanceFeet,
+    centerMaxDistanceFeet,
+  };
+}
+
+export function clampSeekTemplatePlacement(actionData, center) {
+  const maxDistanceFeet = getSeekTemplateMaxPlacementDistance();
+  const centerMaxDistanceFeet = getAllowedTemplateCenterDistanceFeet();
+  if (maxDistanceFeet <= 0 || !Number.isFinite(center?.x) || !Number.isFinite(center?.y)) {
+    return {
+      center,
+      clamped: false,
+      distanceFeet: 0,
+      pointerDistanceFeet: 0,
+      maxDistanceFeet,
+      centerMaxDistanceFeet,
+    };
+  }
+
+  const origin = getTokenCenter(actionData?.actor);
+  if (!origin) {
+    return {
+      center,
+      clamped: false,
+      distanceFeet: 0,
+      pointerDistanceFeet: 0,
+      maxDistanceFeet,
+      centerMaxDistanceFeet,
+    };
+  }
+
+  const pointerDistanceFeet = getDistanceFeetBetweenPoints(origin, center);
+  if (pointerDistanceFeet <= centerMaxDistanceFeet + 0.000001) {
+    return {
+      center: { x: Number(center.x), y: Number(center.y) },
+      clamped: false,
+      distanceFeet: pointerDistanceFeet,
+      pointerDistanceFeet,
+      maxDistanceFeet,
+      centerMaxDistanceFeet,
+    };
+  }
+
+  const { size, distance } = getGridDistanceScale();
+  const maxDistancePixels = (centerMaxDistanceFeet / distance) * size;
+  const dx = Number(center.x) - origin.x;
+  const dy = Number(center.y) - origin.y;
+  const pixelDistance = Math.hypot(dx, dy);
+  if (pixelDistance <= 0) {
+    return {
+      center: { x: origin.x, y: origin.y },
+      clamped: false,
+      distanceFeet: 0,
+      pointerDistanceFeet,
+      maxDistanceFeet,
+      centerMaxDistanceFeet,
+    };
+  }
+
+  const scale = maxDistancePixels / pixelDistance;
+  return {
+    center: {
+      x: origin.x + dx * scale,
+      y: origin.y + dy * scale,
+    },
+    clamped: true,
+    distanceFeet: centerMaxDistanceFeet,
+    pointerDistanceFeet,
+    maxDistanceFeet,
+    centerMaxDistanceFeet,
+  };
+}
+
+export function normalizeSeekTemplatePlacement(actionData, templateState) {
+  const placement = clampSeekTemplatePlacement(actionData, templateState?.center);
+  if (!placement?.clamped) {
+    return { templateState, clamped: false, placement };
+  }
+
+  return {
+    templateState: {
+      ...templateState,
+      center: placement.center,
+    },
+    clamped: true,
+    placement,
+  };
+}
+
+async function warnSeekTemplateOutOfRange(validation) {
+  const { notify } = await import('../infra/notifications.js');
+  const distance = Number(validation.distanceFeet.toFixed(1));
+  notify.warn(
+    game.i18n.format('PF2E_VISIONER.SEEK_AUTOMATION.TEMPLATE_OUT_OF_RANGE', {
+      distance,
+      max: validation.maxDistanceFeet,
+    }),
+  );
+}
+
+async function validateOrWarnSeekTemplatePlacement(actionData, center) {
+  const validation = validateSeekTemplatePlacement(actionData, center);
+  if (!validation.allowed) {
+    await warnSeekTemplateOutOfRange(validation);
+    return false;
+  }
+  return true;
+}
+
+async function deleteRejectedSeekTemplateRegion(regionId) {
+  if (!regionId || !canvas?.scene) return;
+  try {
+    await canvas.scene.deleteEmbeddedDocuments('Region', [regionId]);
+  } catch (_) { }
+}
+
+async function updateSeekTemplateRegionCenter(region, center) {
+  const shapes = Array.isArray(region?.shapes) ? region.shapes : [];
+  const shape = shapes[0];
+  if (!shape || !Number.isFinite(center?.x) || !Number.isFinite(center?.y)) return;
+
+  try {
+    await region.update?.({
+      shapes: [{ ...shape, x: center.x, y: center.y }, ...shapes.slice(1)],
+    });
+  } catch (_) { }
+}
+
+function createPlacementLimitRangeIndicator(actionData) {
+  const maxDistanceFeet = getSeekTemplateMaxPlacementDistance();
+  const origin = getTokenCenter(actionData?.actor);
+  if (maxDistanceFeet <= 0 || !origin || !globalThis.PIXI?.Graphics) return null;
+
+  const { size, distance } = getGridDistanceScale();
+  const radiusPixels = (maxDistanceFeet / distance) * size;
+  const graphics = new PIXI.Graphics();
+  try {
+    graphics.lineStyle(2, 0x2196f3, 0.8);
+    graphics.beginFill(0x2196f3, 0.05);
+    graphics.drawCircle(origin.x, origin.y, radiusPixels);
+    graphics.endFill();
+    graphics.zIndex = 9999;
+    const parent = canvas?.controls || canvas?.stage;
+    parent?.addChild?.(graphics);
+    return graphics;
+  } catch (_) {
+    graphics.destroy?.({ children: true });
+    return null;
+  }
+}
+
+async function launchSeekTemplatePreview(
+  layer,
+  tplData,
+  { actionData = null, clampPlacement = null, validatePlacement = null } = {},
+) {
+  const shouldUseManualPreview = !!clampPlacement && typeof layer?._createPreview === 'function';
+  if (!shouldUseManualPreview && typeof layer?.createPreview === 'function') {
     layer.createPreview(tplData);
     return true;
   }
-  if (typeof MeasuredTemplate?.createPreview === 'function') {
+  if (!shouldUseManualPreview && typeof MeasuredTemplate?.createPreview === 'function') {
     MeasuredTemplate.createPreview(tplData);
     return true;
   }
@@ -126,6 +352,7 @@ async function launchSeekTemplatePreview(layer, tplData) {
     { renderSheet: false },
   );
   if (!preview) return false;
+  const rangeIndicator = createPlacementLimitRangeIndicator(actionData);
 
   const getSnapped = (event) => {
     const local = event.data.getLocalPosition(canvas.stage);
@@ -139,24 +366,29 @@ async function launchSeekTemplatePreview(layer, tplData) {
     try {
       canvas.stage.off('pointermove', moveHandler);
       canvas.stage.off('pointerdown', downHandler);
+      rangeIndicator?.destroy?.({ children: true });
       preview?.destroy?.({ children: true });
-    } catch (_) {}
+    } catch (_) { }
   };
 
   const moveHandler = (event) => {
-    const snapped = getSnapped(event);
+    const pointer = getSnapped(event);
+    const snapped = clampPlacement?.(pointer)?.center || pointer;
     preview.document.updateSource({ x: snapped.x, y: snapped.y });
     preview.renderFlags?.set?.({ refreshPosition: true, refreshShape: true });
   };
 
   const downHandler = async (event) => {
-    const snapped = getSnapped(event);
+    const pointer = getSnapped(event);
+    const clampedPlacement = clampPlacement?.(pointer);
+    const snapped = clampedPlacement?.center || pointer;
+    if (!clampedPlacement?.clamped && validatePlacement && !(await validatePlacement(snapped))) return;
     destroyPreview();
     await createTemplateRegions([{ ...tplData, x: snapped.x, y: snapped.y }]);
   };
 
   canvas.stage.on('pointermove', moveHandler);
-  canvas.stage.on('pointerdown', downHandler, { once: true });
+  canvas.stage.on('pointerdown', downHandler);
   return true;
 }
 
@@ -202,7 +434,6 @@ async function consumeSeekTemplateAfterDialog(actionData, regionId) {
 
 export async function setupSeekTemplate(actionData, skipDialog = false) {
   const { notify } = await import('../infra/notifications.js');
-  const { MODULE_ID } = await import('../../../constants.js');
 
   let config = null;
   if (!skipDialog && !game.settings.get(MODULE_ID, 'seekTemplateSkipDialog')) {
@@ -221,6 +452,10 @@ export async function setupSeekTemplate(actionData, skipDialog = false) {
   notify.info(game.i18n.localize('PF2E_VISIONER.SEEK_AUTOMATION.SETUP_TEMPLATE_TOOLTIP'));
 
   await cleanupOrphanedSeekTemplates(actionData.actor?.id, game.userId);
+  const validatePlacement = (center) => validateOrWarnSeekTemplatePlacement(actionData, center);
+  const clampPlacement = getSeekTemplateMaxPlacementDistance() > 0
+    ? (center) => clampSeekTemplatePlacement(actionData, center)
+    : null;
   if (game.user.isGM) {
     const tplData = {
       t: templateType,
@@ -249,14 +484,27 @@ export async function setupSeekTemplate(actionData, skipDialog = false) {
     }
     let dispatched = false;
     const layer = canvas?.templates;
-    const launchedPreview = await launchSeekTemplatePreview(layer, tplData);
+    const launchedPreview = await launchSeekTemplatePreview(layer, tplData, {
+      actionData,
+      clampPlacement,
+      validatePlacement,
+    });
     await new Promise((resolve) => {
       const createHookId = Hooks.on('createRegion', async (doc) => {
         if (!doc?.getFlag?.('core', 'MeasuredTemplate')) return;
         if (doc.getFlag('pf2e-visioner', 'userId') !== game.userId) return;
         try {
           Hooks.off('createRegion', createHookId);
-          const templateState = getTemplateStateFromRegion(doc);
+          let templateState = getTemplateStateFromRegion(doc);
+          const normalized = normalizeSeekTemplatePlacement(actionData, templateState);
+          templateState = normalized.templateState;
+          if (normalized.clamped) {
+            await updateSeekTemplateRegionCenter(doc, templateState.center);
+          }
+          if (!(await validatePlacement(templateState.center))) {
+            await deleteRejectedSeekTemplateRegion(doc.id);
+            return;
+          }
           actionData.seekTemplateCenter = templateState.center;
           actionData.seekTemplateRadiusFeet = Number(templateState.radiusFeet) || distance;
           actionData.seekTemplateType = templateState.templateType || templateType;
@@ -291,20 +539,26 @@ export async function setupSeekTemplate(actionData, skipDialog = false) {
             updateSeekTemplateButton(actionData, true);
           }
         } finally {
+          restoreTokenControlsAfterSeekTemplate();
           resolve();
         }
       });
       if (!launchedPreview) {
         const pointerHandler = async (event) => {
-          canvas.stage.off('pointerdown', pointerHandler);
+          let accepted = false;
           try {
             const local = event.data.getLocalPosition(canvas.stage);
             const snapped = canvas.grid?.getSnappedPosition?.(local.x, local.y, 2) || {
               x: local.x,
               y: local.y,
             };
+            const clampedPlacement = clampPlacement?.(snapped);
+            const center = clampedPlacement?.center || snapped;
+            if (!clampedPlacement?.clamped && !(await validatePlacement(center))) return;
+            accepted = true;
+            canvas.stage.off('pointerdown', pointerHandler);
             const [created] = await createTemplateRegions([
-              { ...tplData, x: snapped.x, y: snapped.y },
+              { ...tplData, x: center.x, y: center.y },
             ]);
             if (created) {
               const templateState = getTemplateStateFromRegion(created);
@@ -341,10 +595,13 @@ export async function setupSeekTemplate(actionData, skipDialog = false) {
               }
             }
           } finally {
-            resolve();
+            if (accepted) {
+              restoreTokenControlsAfterSeekTemplate();
+              resolve();
+            }
           }
         };
-        canvas.stage.on('pointerdown', pointerHandler, { once: true });
+        canvas.stage.on('pointerdown', pointerHandler);
       }
     });
     return;
@@ -376,7 +633,11 @@ export async function setupSeekTemplate(actionData, skipDialog = false) {
   }
   let usedPreview = false;
   const layer = canvas?.templates;
-  const launchedPreview = await launchSeekTemplatePreview(layer, tplData);
+  const launchedPreview = await launchSeekTemplatePreview(layer, tplData, {
+    actionData,
+    clampPlacement,
+    validatePlacement,
+  });
   await new Promise((resolve) => {
     const createHookId = Hooks.on('createRegion', async (doc) => {
       if (!doc?.getFlag?.('core', 'MeasuredTemplate')) return;
@@ -384,8 +645,17 @@ export async function setupSeekTemplate(actionData, skipDialog = false) {
       try {
         Hooks.off('createRegion', createHookId);
         usedPreview = true;
-        const templateState = getTemplateStateFromRegion(doc);
+        let templateState = getTemplateStateFromRegion(doc);
+        const normalized = normalizeSeekTemplatePlacement(actionData, templateState);
+        templateState = normalized.templateState;
+        if (normalized.clamped) {
+          await updateSeekTemplateRegionCenter(doc, templateState.center);
+        }
         const center = templateState.center;
+        if (!(await validatePlacement(center))) {
+          await deleteRejectedSeekTemplateRegion(doc.id);
+          return;
+        }
         const radius = Number(templateState.radiusFeet) || distance;
         actionData.seekTemplateCenter = center;
         actionData.seekTemplateRadiusFeet = radius;
@@ -429,24 +699,31 @@ export async function setupSeekTemplate(actionData, skipDialog = false) {
           actionData.seekTemplateLevels,
         );
       } finally {
+        restoreTokenControlsAfterSeekTemplate();
         resolve();
       }
     });
     if (!launchedPreview) {
+      restoreTokenControlsAfterSeekTemplate();
       resolve();
     }
   });
   if (!usedPreview) {
     await new Promise((resolve) => {
       const pointerHandler = async (event) => {
-        canvas.stage.off('pointerdown', pointerHandler);
+        let accepted = false;
         try {
           const local = event.data.getLocalPosition(canvas.stage);
           const snapped = canvas.grid?.getSnappedPosition?.(local.x, local.y, 2) || {
             x: local.x,
             y: local.y,
           };
-          actionData.seekTemplateCenter = { x: snapped.x, y: snapped.y };
+          const clampedPlacement = clampPlacement?.(snapped);
+          const center = clampedPlacement?.center || snapped;
+          if (!clampedPlacement?.clamped && !(await validatePlacement(center))) return;
+          accepted = true;
+          canvas.stage.off('pointerdown', pointerHandler);
+          actionData.seekTemplateCenter = { x: center.x, y: center.y };
           actionData.seekTemplateRadiusFeet = distance;
           actionData.seekTemplateType = templateType;
           actionData.seekTemplateLevels = levels;
@@ -496,12 +773,21 @@ export async function setupSeekTemplate(actionData, skipDialog = false) {
             notify.info('No valid targets within template');
           }
         } finally {
-          resolve();
+          if (accepted) {
+            restoreTokenControlsAfterSeekTemplate();
+            resolve();
+          }
         }
       };
-      canvas.stage.on('pointerdown', pointerHandler, { once: true });
+      canvas.stage.on('pointerdown', pointerHandler);
     });
   }
+}
+
+export function restoreTokenControlsAfterSeekTemplate() {
+  try {
+    canvas?.tokens?.activate?.();
+  } catch (_) { }
 }
 
 export async function removeSeekTemplate(actionData) {
