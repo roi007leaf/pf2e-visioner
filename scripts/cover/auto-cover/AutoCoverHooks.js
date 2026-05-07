@@ -405,16 +405,26 @@ export class AutoCoverHooks {
       return this.savingThrowUseCase;
     }
 
-    // Check for stealth context (exclude sneak checks)
-    if (
-      ctx.type === 'skill-check' &&
-      Array.isArray(ctx.domains) &&
-      ctx.domains.includes('stealth') &&
-      !options?.includes("action:sneak")
-    ) {
+    // Check for stealth context
+    if (this._isStealthContext(ctx, options)) {
       return this.stealthCheckUseCase;
     }
     return null;
+  }
+
+  _isStealthContext(ctx, options = Array.from(ctx?.options || [])) {
+    if (options.includes('action:sneak')) return false;
+    if (options.includes('action:hide')) return false;
+
+    const isStealthInitiative =
+      ctx?.type === 'initiative' &&
+      (options.includes('check:statistic:base:stealth') ||
+        options.includes('stealth-check') ||
+        ctx.slug === 'stealth' ||
+        ctx.statistic === 'stealth' ||
+        ctx.statistic?.slug === 'stealth');
+
+    return isStealthInitiative;
   }
 
   /**

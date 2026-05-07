@@ -28,30 +28,55 @@ describe('Vision for NPCs setting application', () => {
 
         const pcToken = {
             id: 'pc',
+            actorId: 'pc-actor',
             vision: true,
             sight: { enabled: true },
             actor: { type: 'character' },
         };
 
+        const partyToken = {
+            id: 'party',
+            actorId: 'party-actor',
+            vision: true,
+            sight: { enabled: true },
+            get actor() {
+                throw new Error('party token actor getter should not be accessed');
+            },
+        };
+
         const mockScene = {
-            tokens: { contents: [npcTokenOff, npcTokenOn, pcToken] },
+            tokens: { contents: [npcTokenOff, npcTokenOn, pcToken, partyToken] },
             updateEmbeddedDocuments: jest.fn().mockResolvedValue([]),
         };
 
         const npcActor = {
+            id: 'npc-actor',
             type: 'npc',
             prototypeToken: { vision: false, sight: { enabled: false } },
             update: jest.fn().mockResolvedValue({}),
         };
 
         const pcActor = {
+            id: 'pc-actor',
             type: 'character',
             prototypeToken: { vision: false, sight: { enabled: false } },
             update: jest.fn().mockResolvedValue({}),
         };
 
+        const partyActor = {
+            id: 'party-actor',
+            type: 'party',
+            prototypeToken: { vision: true, sight: { enabled: true } },
+            update: jest.fn().mockResolvedValue({}),
+        };
+
         game.scenes = { contents: [mockScene] };
-        game.actors = { contents: [npcActor, pcActor] };
+        game.actors = {
+            contents: [npcActor, pcActor, partyActor],
+            get: jest.fn((id) =>
+                [npcActor, pcActor, partyActor].find((actor) => actor.id === id) ?? null,
+            ),
+        };
     });
 
     afterEach(() => {
@@ -64,6 +89,7 @@ describe('Vision for NPCs setting application', () => {
         const scene = game.scenes.contents[0];
         const npcActor = game.actors.contents[0];
         const pcActor = game.actors.contents[1];
+        const partyActor = game.actors.contents[2];
 
         game.settings.set('pf2e-visioner', 'enableAllTokensVision', true);
 
@@ -85,6 +111,7 @@ describe('Vision for NPCs setting application', () => {
         );
 
         expect(pcActor.update).not.toHaveBeenCalled();
+        expect(partyActor.update).not.toHaveBeenCalled();
     });
 
     test('disabling turns off vision for existing NPC tokens and NPC prototype tokens only', async () => {
