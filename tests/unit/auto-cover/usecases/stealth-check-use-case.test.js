@@ -151,12 +151,12 @@ describe('StealthCheckUseCase', () => {
       expect(getCoverBetween).toHaveBeenCalledWith(observerToken, hiderToken);
     });
 
-    test('should skip observers with no line of sight', async () => {
+    test('should ignore observers with no line of sight and no detected cover', async () => {
       const hiderToken = mockToken({ id: 'hider', isOwner: true, x: 0, y: 0, alliance: 'party' });
       const blockedObserver = mockToken({ id: 'blocked', x: 10, y: 10, name: 'Blocked', alliance: 'opposition' });
       const visibleObserver = mockToken({ id: 'visible', x: 2, y: 2, name: 'Visible', alliance: 'opposition' });
 
-      mockHasLineOfSight.mockImplementation((obs, tgt) => obs.id !== 'blocked');
+      mockHasLineOfSight.mockImplementation((obs) => obs.id !== 'blocked');
 
       const mockDialog = {
         context: { actor: { getActiveTokens: () => [hiderToken] } },
@@ -167,14 +167,144 @@ describe('StealthCheckUseCase', () => {
       };
 
       global.canvas.tokens.placeables = [hiderToken, blockedObserver, visibleObserver];
+      stealthCheckUseCase._detectCover = jest.fn((obs) => obs.id === 'blocked' ? 'none' : 'standard');
+
+      await stealthCheckUseCase.handleCheckDialog(mockDialog, {
+        find: jest.fn().mockReturnValue({ length: 0, before: jest.fn() }),
+      });
+
+      expect(stealthCheckUseCase._detectCover).toHaveBeenCalledWith(blockedObserver, hiderToken);
+      expect(stealthCheckUseCase._detectCover).toHaveBeenCalledWith(visibleObserver, hiderToken);
+      expect(mockCoverUIManager.injectDialogCoverUI).toHaveBeenCalledWith(
+        mockDialog,
+        expect.anything(),
+        'standard',
+        visibleObserver,
+        'none',
+        expect.any(Function),
+      );
+    });
+
+    test('should use detected cover from hostile observers even when PF2E LOS is blocked', async () => {
+      const hiderToken = mockToken({ id: 'hider', isOwner: true, x: 0, y: 0, alliance: 'party' });
+      const wallCoveredObserver = mockToken({ id: 'covered', x: 10, y: 10, name: 'Covered', alliance: 'opposition' });
+
+      mockHasLineOfSight.mockReturnValue(false);
+
+      const mockDialog = {
+        context: { actor: { getActiveTokens: () => [hiderToken] } },
+        check: { modifiers: [], calculateTotal: jest.fn() },
+        _pvCoverOverride: undefined,
+        render: jest.fn(),
+        setPosition: jest.fn(),
+      };
+
+      global.canvas.tokens.placeables = [hiderToken, wallCoveredObserver];
       stealthCheckUseCase._detectCover = jest.fn().mockReturnValue('standard');
 
       await stealthCheckUseCase.handleCheckDialog(mockDialog, {
         find: jest.fn().mockReturnValue({ length: 0, before: jest.fn() }),
       });
 
-      expect(stealthCheckUseCase._detectCover).not.toHaveBeenCalledWith(blockedObserver, hiderToken);
-      expect(stealthCheckUseCase._detectCover).toHaveBeenCalledWith(visibleObserver, hiderToken);
+      expect(mockCoverUIManager.injectDialogCoverUI).toHaveBeenCalledWith(
+        mockDialog,
+        expect.anything(),
+        'standard',
+        wallCoveredObserver,
+        'none',
+        expect.any(Function),
+      );
+    });
+
+    test('should apply selected cover modifier to the dialog check before rolling', async () => {
+      const hiderToken = mockToken({ id: 'hider', isOwner: true, x: 0, y: 0, alliance: 'party' });
+      const observerToken = mockToken({ id: 'observer', x: 10, y: 10, name: 'Observer', alliance: 'opposition' });
+
+      mockCoverUIManager.injectDialogCoverUI.mockImplementation(
+        async (dialog, html, state, target, manualCover, onChosen) => {
+          await onChosen({
+            chosen: 'greater',
+            dialog,
+            dctx: dialog.context,
+            subject: hiderToken,
+            target: observerToken,
+            targetActor: observerToken.actor,
+            originalState: state,
+            rollId: 'initiative-stealth-roll',
+          });
+        },
+      );
+
+      const mockDialog = {
+        context: {
+          type: 'initiative',
+          options: ['stealth-check', 'check:statistic:base:stealth'],
+          actor: { getActiveTokens: () => [hiderToken] },
+        },
+        check: { modifiers: [], push: jest.fn(), calculateTotal: jest.fn() },
+        _pvCoverOverride: undefined,
+        render: jest.fn(),
+        setPosition: jest.fn(),
+      };
+
+      global.canvas.tokens.placeables = [hiderToken, observerToken];
+      stealthCheckUseCase._detectCover = jest.fn().mockReturnValue('greater');
+
+      await stealthCheckUseCase.handleCheckDialog(mockDialog, {
+        find: jest.fn().mockReturnValue({ length: 0, before: jest.fn() }),
+      });
+
+      expect(mockDialog.check.push).toHaveBeenCalledWith(
+        expect.objectContaining({
+          slug: 'pf2e-visioner-cover',
+          modifier: 4,
+          type: 'circumstance',
+          enabled: true,
+        }),
+      );
+      expect(mockDialog.check.calculateTotal).toHaveBeenCalled();
+      expect(mockDialog.render).not.toHaveBeenCalled();
+    });
+
+    test('should not apply selected cover modifier to Hide action dialog checks', async () => {
+      const hiderToken = mockToken({ id: 'hider', isOwner: true, x: 0, y: 0, alliance: 'party' });
+      const observerToken = mockToken({ id: 'observer', x: 10, y: 10, name: 'Observer', alliance: 'opposition' });
+
+      mockCoverUIManager.injectDialogCoverUI.mockImplementation(
+        async (dialog, html, state, target, manualCover, onChosen) => {
+          await onChosen({
+            chosen: 'greater',
+            dialog,
+            dctx: dialog.context,
+            subject: hiderToken,
+            target: observerToken,
+            targetActor: observerToken.actor,
+            originalState: state,
+            rollId: 'hide-roll',
+          });
+        },
+      );
+
+      const mockDialog = {
+        context: {
+          type: 'skill-check',
+          options: ['action:hide', 'check:statistic:stealth'],
+          actor: { getActiveTokens: () => [hiderToken] },
+        },
+        check: { modifiers: [], push: jest.fn(), calculateTotal: jest.fn() },
+        _pvCoverOverride: undefined,
+        render: jest.fn(),
+        setPosition: jest.fn(),
+      };
+
+      global.canvas.tokens.placeables = [hiderToken, observerToken];
+      stealthCheckUseCase._detectCover = jest.fn().mockReturnValue('greater');
+
+      await stealthCheckUseCase.handleCheckDialog(mockDialog, {
+        find: jest.fn().mockReturnValue({ length: 0, before: jest.fn() }),
+      });
+
+      expect(mockDialog.check.push).not.toHaveBeenCalled();
     });
 
     test('should skip allied observers', async () => {
@@ -262,7 +392,7 @@ describe('StealthCheckUseCase', () => {
       expect(getCoverBetween).toHaveBeenCalledWith(observerToken, hiderToken);
     });
 
-    test('should skip observers with no line of sight', async () => {
+    test('should not apply cover for observers with no line of sight and no detected cover', async () => {
       const hiderToken = mockToken({ id: 'hider', isOwner: true, x: 0, y: 0, name: 'Hider', alliance: 'party' });
       const blockedObserver = mockToken({ id: 'blocked', x: 10, y: 10, name: 'Blocked', alliance: 'opposition' });
 
@@ -272,11 +402,61 @@ describe('StealthCheckUseCase', () => {
       const mockContext = { actor: { getActiveTokens: () => [hiderToken] }, options: [] };
 
       global.canvas.tokens.placeables = [hiderToken, blockedObserver];
+      stealthCheckUseCase._detectCover = jest.fn().mockReturnValue('none');
+
+      await stealthCheckUseCase.handleCheckRoll(mockCheck, mockContext);
+
+      expect(stealthCheckUseCase._detectCover).toHaveBeenCalledWith(blockedObserver, hiderToken);
+      expect(mockCheck.push).not.toHaveBeenCalled();
+    });
+
+    test('should apply detected cover modifier to initiative when PF2E LOS is blocked by cover', async () => {
+      const hiderToken = mockToken({ id: 'hider', isOwner: true, x: 0, y: 0, name: 'Hider', alliance: 'party' });
+      const wallCoveredObserver = mockToken({ id: 'covered', x: 10, y: 10, name: 'Covered', alliance: 'opposition' });
+
+      mockHasLineOfSight.mockReturnValue(false);
+
+      const mockCheck = { modifiers: [], push: jest.fn() };
+      const mockContext = {
+        type: 'initiative',
+        actor: { getActiveTokens: () => [hiderToken] },
+        options: ['stealth-check', 'check:statistic:base:stealth'],
+      };
+
+      global.canvas.tokens.placeables = [hiderToken, wallCoveredObserver];
+      stealthCheckUseCase._detectCover = jest.fn().mockReturnValue('standard');
+
+      await stealthCheckUseCase.handleCheckRoll(mockCheck, mockContext);
+
+      expect(mockCheck.push).toHaveBeenCalledWith(
+        expect.objectContaining({
+          slug: 'pf2e-visioner-cover',
+          modifier: 2,
+          type: 'circumstance',
+          enabled: true,
+        }),
+      );
+    });
+
+    test('should not apply detected cover modifier to Hide action rolls', async () => {
+      const hiderToken = mockToken({ id: 'hider', isOwner: true, x: 0, y: 0, name: 'Hider', alliance: 'party' });
+      const wallCoveredObserver = mockToken({ id: 'covered', x: 10, y: 10, name: 'Covered', alliance: 'opposition' });
+
+      mockHasLineOfSight.mockReturnValue(false);
+
+      const mockCheck = { modifiers: [], push: jest.fn() };
+      const mockContext = {
+        type: 'skill-check',
+        actor: { getActiveTokens: () => [hiderToken] },
+        options: ['action:hide', 'check:statistic:stealth'],
+      };
+
+      global.canvas.tokens.placeables = [hiderToken, wallCoveredObserver];
       stealthCheckUseCase._detectCover = jest.fn().mockReturnValue('greater');
 
       await stealthCheckUseCase.handleCheckRoll(mockCheck, mockContext);
 
-      expect(stealthCheckUseCase._detectCover).not.toHaveBeenCalled();
+      expect(mockCheck.push).not.toHaveBeenCalled();
     });
 
     test('should skip allied observers', async () => {

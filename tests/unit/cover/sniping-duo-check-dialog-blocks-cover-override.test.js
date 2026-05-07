@@ -285,7 +285,7 @@ describe('Sniping Duo check dialog blocks cover override', () => {
         expect(submitBtnEl.dataset.pvCoverBind).toBeUndefined();
     });
 
-    test('does not bind submit fallback for skill check dialogs', async () => {
+    test('does not bind submit fallback for Stealth skill check dialogs', async () => {
         jest.resetModules();
 
         jest.unmock('../../../scripts/cover/auto-cover/CoverUIManager.js');
@@ -354,5 +354,86 @@ describe('Sniping Duo check dialog blocks cover override', () => {
         expect(findSpy.mock.calls.map((call) => call?.[0])).not.toContain('button[type=submit]');
         expect(submitBtnEl.addEventListener).not.toHaveBeenCalled();
         expect(submitBtnEl.dataset.pvCoverBind).toBeUndefined();
+    });
+
+    test('binds submit fallback for Stealth initiative dialogs', async () => {
+        jest.resetModules();
+
+        jest.unmock('../../../scripts/cover/auto-cover/CoverUIManager.js');
+
+        jest.doMock(
+            '../../../scripts/cover/auto-cover/AutoCoverSystem.js',
+            () => ({ default: { normalizeTokenRef: (v) => v } }),
+        );
+
+        jest.doMock(
+            '../../../scripts/constants.js',
+            () => ({ MODULE_ID: 'pf2e-visioner', COVER_STATES: {} }),
+        );
+
+        jest.doMock(
+            '../../../scripts/helpers/cover-helpers.js',
+            () => ({
+                getCoverLabel: (s) => s,
+                getCoverBonusByState: () => 0,
+            }),
+        );
+
+        if (!global.game) global.game = {};
+        if (!global.game.i18n) global.game.i18n = {};
+        global.game.i18n.localize = (k) => k;
+
+        const submitBtnEl = {
+            dataset: {},
+            addEventListener: jest.fn(() => { }),
+        };
+
+        global.$ = (htmlString) => ({
+            _html: String(htmlString || ''),
+            find: () => ({ length: 0, append: () => { } }),
+            on: () => { },
+            addClass: () => { },
+        });
+
+        const findSpy = jest.fn((selector) => {
+            if (selector === '.pv-cover-override') return { length: 0 };
+            if (selector === '.roll-mode-panel') return { length: 0, before: () => { } };
+            if (selector === '.dialog-buttons') return { before: () => { } };
+            if (selector === 'button.roll') return [];
+            if (selector === 'button[type=submit]') return [submitBtnEl];
+            return { length: 0, before: () => { } };
+        });
+        const html = { find: findSpy };
+
+        const dialog = {
+            _pvCoverOverride: 'greater',
+            setPosition: jest.fn(() => { }),
+            context: {
+                type: 'initiative',
+                options: [
+                    'initiative',
+                    'stealth',
+                    'stealth-check',
+                    'check:statistic:base:stealth',
+                    'check:type:initiative',
+                ],
+                actor: { token: { id: 'actor' } },
+                target: { id: 'target', actor: {} },
+            },
+        };
+
+        const mod = jest.requireActual('../../../scripts/cover/auto-cover/CoverUIManager.js');
+        const mgr = mod.default || mod;
+
+        await mgr.injectDialogCoverUI(dialog, html, 'greater', { id: 'target', actor: {} }, 'none', jest.fn());
+
+        expect(findSpy.mock.calls.map((call) => call?.[0])).toContain('button.roll');
+        expect(findSpy.mock.calls.map((call) => call?.[0])).toContain('button[type=submit]');
+        expect(submitBtnEl.addEventListener).toHaveBeenCalledWith(
+            'click',
+            expect.any(Function),
+            true,
+        );
+        expect(submitBtnEl.dataset.pvCoverBind).toBe('1');
     });
 });
