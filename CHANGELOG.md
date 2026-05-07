@@ -23,6 +23,13 @@
 - Concealment-sensitive stealth logic no longer treats Hidden or Undetected as if they were the concealed condition.
 - Encounter-start Unnoticed continues to hide tokens and tracker rows while using Undetected as the underlying detection state.
 
+## [8.1.11] - 2026-05-07
+
+### Fixed
+
+- **Foundry v14 party tokens no longer cause recursive actor preparation during NPC vision sync**: Visioner now resolves scene token actor types by actor ID before touching token actor getters, avoiding stack overflows from party token synthetic actors.
+- **Stealth-based initiative rolls now receive detected cover bonuses**: Stealth initiative rolls are routed through Visioner's stealth cover handling, can detect cover from wall-blocked hostile observers, and apply the selected cover modifier to the initiative roll without re-rendering the submitting dialog.
+
 ## [8.1.10] - 2026-05-06
 
 ### Fixed

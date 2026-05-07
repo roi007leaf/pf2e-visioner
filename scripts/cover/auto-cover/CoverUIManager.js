@@ -15,12 +15,24 @@ export class CoverUIManager {
 
   _shouldUseSubmitButtonFallback(dialog) {
     const ctx = dialog?.context ?? {};
+    const options = Array.from(ctx.options || []);
 
     if (ctx.type === 'attack-roll' || ctx.type === 'strike-attack-roll') return true;
     if (ctx.type === 'action-check' && ctx.action === 'attack') return true;
 
     const domains = Array.isArray(ctx.domains) ? ctx.domains : [];
-    return domains.includes('attack') || domains.includes('attack-roll');
+    const isAttack = domains.includes('attack') || domains.includes('attack-roll');
+    if (isAttack) return true;
+
+    const isStealthInitiative =
+      ctx.type === 'initiative' &&
+      (options.includes('check:statistic:base:stealth') ||
+        options.includes('stealth-check') ||
+        ctx.slug === 'stealth' ||
+        ctx.statistic === 'stealth' ||
+        ctx.statistic?.slug === 'stealth');
+
+    return isStealthInitiative;
   }
 
   /**

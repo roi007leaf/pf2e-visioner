@@ -3,9 +3,15 @@
  * Shows when manual overrides become invalid due to position/lighting changes
  */
 
-import { COVER_STATES, VISIBILITY_STATES, getVisibilityStateLabelKey } from '../constants.js';
+import { COVER_STATES, VISIBILITY_STATES } from '../constants.js';
 import { loadDialogCSS, loadSharedUICSS } from '../css-loader.js';
 import { overrideToDisplayVisibility } from '../visibility/perception-profile.js';
+
+function getVisibilityStateLabelKey(state, { manual = false } = {}) {
+  const config = VISIBILITY_STATES?.[state];
+  if (!config) return String(state ?? '');
+  return manual && config.manualLabel ? config.manualLabel : config.label;
+}
 
 export class OverrideValidationDialog extends foundry.applications.api.HandlebarsApplicationMixin(foundry.applications.api.ApplicationV2) {
 

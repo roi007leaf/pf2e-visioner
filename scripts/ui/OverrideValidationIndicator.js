@@ -8,7 +8,7 @@
  */
 
 
-import { COVER_STATES, MODULE_ID, VISIBILITY_STATES, getVisibilityStateLabelKey } from '../constants.js';
+import { COVER_STATES, MODULE_ID, VISIBILITY_STATES } from '../constants.js';
 import { addTokenBorder, removeTokenBorder } from '../managers/token-manager/borders.js';
 import { overrideToDisplayVisibility } from '../visibility/perception-profile.js';
 
@@ -19,6 +19,12 @@ function hasOverrideVisibilityData(override) {
     typeof override?.hasConcealment === 'boolean' ||
     typeof override?.awarenessState === 'string'
   );
+}
+
+function getVisibilityStateLabelKey(state, { manual = false } = {}) {
+  const config = VISIBILITY_STATES?.[state];
+  if (!config) return String(state ?? '');
+  return manual && config.manualLabel ? config.manualLabel : config.label;
 }
 
 class OverrideValidationIndicator {

@@ -825,12 +825,25 @@ function getTokenVisionEnabled(doc) {
   return false;
 }
 
+function getActorById(actorId) {
+  if (!actorId) return null;
+  return game.actors?.get?.(actorId) ?? game.actors?.contents?.find?.((actor) => actor?.id === actorId) ?? null;
+}
+
+function getTokenActorTypeForVisionSync(tokenDoc) {
+  const actorId = tokenDoc?.actorId;
+  if (actorId) {
+    return getActorById(actorId)?.type ?? null;
+  }
+  return tokenDoc?.actor?.type ?? null;
+}
+
 async function syncNpcVisionInScenes(enabled) {
   const scenes = Array.from(game.scenes?.contents ?? []);
   for (const scene of scenes) {
     try {
       const tokens = Array.from(scene.tokens?.contents ?? []).filter(
-        (t) => t?.actor?.type === 'npc',
+        (t) => getTokenActorTypeForVisionSync(t) === 'npc',
       );
       const updates = [];
       for (const t of tokens) {

@@ -49,7 +49,7 @@ class StealthCheckUseCase extends BaseAutoCoverUseCase {
    * - If keepWhenZero=false: keep only when bonus > 1 (standard/greater), otherwise remove.
    * - If keepWhenZero=true: allow 0 to update existing or be shown transiently (used on onChosen path).
    */
-  _applyDialogCoverModifier(dialog, bonus, label, { keepWhenZero = false } = {}) {
+  _applyDialogCoverModifier(dialog, bonus, label, { keepWhenZero = false, render = true } = {}) {
     try {
       if (!dialog?.check || !Array.isArray(dialog.check.modifiers)) return;
       const mods = dialog.check.modifiers;
@@ -114,12 +114,35 @@ class StealthCheckUseCase extends BaseAutoCoverUseCase {
         console.warn('PF2E Visioner | Failed to recalculate dialog total:', e);
       }
 
-      try {
-        dialog.render(false);
-      } catch (e) {
-        console.warn('PF2E Visioner | Dialog re-render failed:', e);
+      if (render) {
+        try {
+          dialog.render(false);
+        } catch (e) {
+          console.warn('PF2E Visioner | Dialog re-render failed:', e);
+        }
       }
     } catch (_) { }
+  }
+
+  _shouldApplyStealthCoverModifier(context) {
+    try {
+      const options = Array.isArray(context?.options)
+        ? context.options
+        : context?.options instanceof Set
+          ? Array.from(context.options)
+          : [];
+      if (options.includes('action:hide') || options.includes('action:sneak')) return false;
+      if (context?.type !== 'initiative') return false;
+      return (
+        options.includes('check:statistic:base:stealth') ||
+        options.includes('stealth-check') ||
+        context.slug === 'stealth' ||
+        context.statistic === 'stealth' ||
+        context.statistic?.slug === 'stealth'
+      );
+    } catch (_) {
+      return false;
+    }
   }
 
   /**
@@ -269,10 +292,10 @@ class StealthCheckUseCase extends BaseAutoCoverUseCase {
       try {
         const observers = (canvas?.tokens?.placeables || []).filter(
           (t) => t && t.actor && t.id !== hider.id &&
-            _hasLineOfSight(t, hider) &&
             _isHostile(t, hider),
         );
         for (const obs of observers) {
+          const hasLineOfSight = _hasLineOfSight(obs, hider);
           // First check for manual cover between tokens
           let s = null;
           try {
@@ -289,6 +312,10 @@ class StealthCheckUseCase extends BaseAutoCoverUseCase {
           // Fallback to auto-detection if no manual cover
           if (!s) {
             s = this._detectCover(obs, hider);
+          }
+
+          if (!hasLineOfSight && (!s || s === 'none')) {
+            continue;
           }
 
           if (s && s !== 'none') {
@@ -360,13 +387,11 @@ class StealthCheckUseCase extends BaseAutoCoverUseCase {
               // Calculate the new bonus for the chosen state
               const newBonus = getCoverStealthBonusByState(detectedState);
 
-              // Check if this is a sneak action - if so, don't apply cover bonus
-              const isSneakAction = this._isSneakAction(dialog.context || {});
-
-              if (!isSneakAction) {
+              if (this._shouldApplyStealthCoverModifier(dialog.context || {})) {
                 // Update the current dialog's modifiers immediately (in onChosen allow zero to be kept)
                 this._applyDialogCoverModifier(dialog, newBonus, getCoverLabel(chosen), {
                   keepWhenZero: true,
+                  render: false,
                 });
               }
               // Apply cover state between tokens (for both attacks and saves)
@@ -489,9 +514,8 @@ class StealthCheckUseCase extends BaseAutoCoverUseCase {
 
             // If not overridden, evaluate cover against all other tokens and pick the best (highest stealth bonus)
             const observers = (canvas?.tokens?.placeables || []).filter(
-              (t) => t && t.actor && t.id !== hider.id &&
-                _hasLineOfSight(t, hider) &&
-                (t.actor.alliance !== 'party' && t.actor?.alliance !== 'neutral'),
+              (t) => t && t.actor && t.id !== hider.id
+                && (t.actor.alliance !== 'party' && t.actor?.alliance !== 'neutral'),
             );
             let highestFoundManualCover = 'none';
             if (!state) {
@@ -499,6 +523,7 @@ class StealthCheckUseCase extends BaseAutoCoverUseCase {
               try {
                 for (const obs of observers) {
                   try {
+                    const hasLineOfSight = _hasLineOfSight(obs, hider);
                     // First check for manual cover between tokens
                     let s = null;
                     try {
@@ -515,6 +540,10 @@ class StealthCheckUseCase extends BaseAutoCoverUseCase {
                     // Fallback to auto-detection if no manual cover
                     if (!s) {
                       s = this._detectCover(obs, hider);
+                    }
+
+                    if (!hasLineOfSight && (!s || s === 'none')) {
+                      continue;
                     }
 
                     if (s) {
@@ -602,10 +631,7 @@ class StealthCheckUseCase extends BaseAutoCoverUseCase {
       const coverInfo = context?._visionerStealth;
       const bonus = Number(coverInfo?.bonus) || 0;
 
-      // Check if this is a Sneak action (not Hide) to skip cover bonus
-      const isSneakAction = this._isSneakAction(context);
-
-      if (bonus > 1 && !isSneakAction) {
+      if (bonus > 1 && this._shouldApplyStealthCoverModifier(context)) {
         const state = coverInfo?.state ?? 'standard';
         // Ensure predicate support
         const optSource = Array.isArray(context.options)
@@ -733,4 +759,3 @@ export default stealthCheckUseCase;
 
 // Also export the class for reference
 export { StealthCheckUseCase };
-
