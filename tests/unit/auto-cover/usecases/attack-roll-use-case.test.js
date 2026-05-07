@@ -948,5 +948,6 @@ describe('AttackRollUseCase', () => {
         }),
       );
     });
+
   });
 });

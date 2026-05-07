@@ -4,6 +4,10 @@
 
 import { MODULE_ID } from '../constants.js';
 
+function getTokenId(token) {
+  return token?.document?.id || token?.id || null;
+}
+
 /**
  * Get the cover map for a token
  * @param {Token} token
@@ -58,7 +62,7 @@ export async function setCoverMap(token, coverMap) {
  */
 export function getCoverBetween(observer, target) {
   const coverMap = getCoverMap(observer);
-  return coverMap[target?.document?.id] || 'none';
+  return coverMap[getTokenId(target)] || 'none';
 }
 
 /**
@@ -69,7 +73,7 @@ export function getCoverBetween(observer, target) {
  */
 export async function setCoverBetween(observer, target, state, options = {}) {
   const coverMap = getCoverMap(observer);
-  const targetId = target?.document?.id;
+  const targetId = getTokenId(target);
   if (!targetId) return;
 
   // Skip if no change
@@ -77,7 +81,12 @@ export async function setCoverBetween(observer, target, state, options = {}) {
     if (!options.skipEphemeralUpdate) {
       try {
         const { batchUpdateCoverEffects } = await import('../cover/ephemeral.js');
-        await batchUpdateCoverEffects(observer, [{ target, state }]);
+        await batchUpdateCoverEffects(observer, [{
+          target,
+          state,
+          takeCover: options.takeCover === true,
+          takeCoverProneRangedOnly: options.takeCoverProneRangedOnly === true,
+        }]);
       } catch (error) {
         console.error('Error updating cover effects:', error);
       }
@@ -85,7 +94,8 @@ export async function setCoverBetween(observer, target, state, options = {}) {
     return;
   }
 
-  coverMap[targetId] = state;
+  if (state === 'none') delete coverMap[targetId];
+  else coverMap[targetId] = state;
   await setCoverMap(observer, coverMap);
 
   // Track the source for sneak/action qualification checks
@@ -104,7 +114,12 @@ export async function setCoverBetween(observer, target, state, options = {}) {
   if (options.skipEphemeralUpdate) return;
   try {
     const { batchUpdateCoverEffects } = await import('../cover/ephemeral.js');
-    await batchUpdateCoverEffects(observer, [{ target, state }]);
+    await batchUpdateCoverEffects(observer, [{
+      target,
+      state,
+      takeCover: options.takeCover === true,
+      takeCoverProneRangedOnly: options.takeCoverProneRangedOnly === true,
+    }]);
   } catch (error) {
     console.error('Error updating cover effects:', error);
   }

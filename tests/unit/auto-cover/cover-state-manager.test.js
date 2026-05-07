@@ -160,6 +160,76 @@ describe('CoverStateManager', () => {
     });
   });
 
+  describe('_updateEphemeralEffects', () => {
+    test('does not add a prone-ranged upgrade rule to generic standard cover effects', async () => {
+      const created = [];
+      sourceToken = global.createMockToken({
+        id: 'source-123',
+        name: 'Source Token',
+        actor: { id: 'source-actor', signature: 'source-signature' },
+      });
+      targetToken = global.createMockToken({
+        id: 'target-456',
+        name: 'Target Token',
+        actor: {
+          itemTypes: { effect: [] },
+          createEmbeddedDocuments: jest.fn(async (_type, docs) => {
+            created.push(...docs);
+          }),
+          deleteEmbeddedDocuments: jest.fn(),
+        },
+      });
+
+      await coverStateManager._updateEphemeralEffects(sourceToken, targetToken, 'standard');
+
+      const coverEffect = created[0];
+      expect(coverEffect.system.rules).not.toContainEqual(
+        expect.objectContaining({ slug: 'take-cover-prone-ranged-upgrade' }),
+      );
+      expect(coverEffect.system.tokenIcon).toEqual({ show: true });
+      expect(coverEffect.system.unidentified).toBe(true);
+    });
+
+    test('adds a prone-ranged upgrade rule to standard cover effects from Take Cover', async () => {
+      const created = [];
+      sourceToken = global.createMockToken({
+        id: 'source-123',
+        name: 'Source Token',
+        actor: { id: 'source-actor', signature: 'source-signature' },
+      });
+      targetToken = global.createMockToken({
+        id: 'target-456',
+        name: 'Target Token',
+        actor: {
+          itemTypes: { effect: [] },
+          createEmbeddedDocuments: jest.fn(async (_type, docs) => {
+            created.push(...docs);
+          }),
+          deleteEmbeddedDocuments: jest.fn(),
+        },
+      });
+
+      await coverStateManager._updateEphemeralEffects(sourceToken, targetToken, 'standard', {
+        takeCover: true,
+      });
+
+      const coverEffect = created[0];
+      expect(coverEffect.system.rules).toContainEqual({
+        key: 'FlatModifier',
+        selector: 'ac',
+        slug: 'take-cover-prone-ranged-upgrade',
+        type: 'circumstance',
+        value: 2,
+        predicate: [
+          'origin:signature:source-signature',
+          'cover-against:source-123',
+          'self:condition:prone',
+          { or: ['item:ranged', 'item:trait:ranged', 'attack:ranged'] },
+        ],
+      });
+    });
+  });
+
   describe('clearCover', () => {
     test('should not clear cover for invalid token', async () => {
       await coverStateManager.clearCover(null);

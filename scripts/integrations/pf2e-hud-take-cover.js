@@ -84,6 +84,10 @@ export async function openVisionerTakeCoverPreview(actorToken) {
   const subjects = await handler.discoverSubjects({ ...actionData, ignoreAllies: false });
   const outcomes = await Promise.all(subjects.map((subject) => handler.analyzeOutcome(actionData, subject)));
   const changes = outcomes.filter((outcome) => outcome?.changed);
+  if (handler.shouldApplyWithoutDialog(outcomes, actionData)) {
+    await handler.applyOutcomesDirectly(actionData, outcomes);
+    return;
+  }
   new TakeCoverPreviewDialog(actorToken, outcomes, changes, actionData).render(true);
 }
 
@@ -117,4 +121,3 @@ export function registerPf2eHudTakeCoverIntegration(root = document) {
     true,
   );
 }
-

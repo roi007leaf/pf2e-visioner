@@ -153,13 +153,29 @@ export async function batchUpdateCoverEffects(observerToken, targetUpdates, opti
     if (!update.target?.actor) continue;
     const targetId = update.target.actor.id;
     if (!updatesByTarget.has(targetId))
-      updatesByTarget.set(targetId, { target: update.target, states: new Map() });
+      updatesByTarget.set(targetId, {
+        target: update.target,
+        states: new Map(),
+        takeCoverObserverKeys: new Set(),
+        takeCoverProneRangedOnlyObservers: [],
+      });
     const targetData = updatesByTarget.get(targetId);
     const state = update.state || 'none';
     if (!targetData.states.has(state)) targetData.states.set(state, []);
     targetData.states.get(state).push(observerToken);
+    if (update.takeCover === true) {
+      targetData.takeCoverObserverKeys.add(`${state}:${observerToken.id}`);
+    }
+    if (update.takeCoverProneRangedOnly === true) {
+      targetData.takeCoverProneRangedOnlyObservers.push(observerToken);
+    }
   }
-  for (const { target, states } of updatesByTarget.values()) {
+  for (const {
+    target,
+    states,
+    takeCoverObserverKeys,
+    takeCoverProneRangedOnlyObservers,
+  } of updatesByTarget.values()) {
     // Skip ignored actor types (targets like loot/vehicle/party)
     try {
       if (['loot', 'vehicle', 'party'].includes(target?.actor?.type)) continue;
@@ -183,9 +199,31 @@ export async function batchUpdateCoverEffects(observerToken, targetUpdates, opti
         const effectsToCreate = [];
         const effectsToUpdate = [];
         const effectsToDelete = [];
+        const takeCoverProneRangedEffect = allCoverAggregates.find(
+          (e) => e.flags?.[MODULE_ID]?.takeCoverProneRangedOnly === true,
+        );
+        let takeCoverProneRangedRules = Array.isArray(takeCoverProneRangedEffect?.system?.rules)
+          ? [...takeCoverProneRangedEffect.system.rules]
+          : [];
+        const removeTakeCoverProneRangedFor = (observers) => {
+          for (const observer of observers) {
+            const signature = observer.actor?.signature || observer.actor?.id || observer.id;
+            const tokenId = observer.id;
+            takeCoverProneRangedRules = takeCoverProneRangedRules.filter((rule) => {
+              if (rule?.key === 'RollOption' && rule.option === `cover-against:${tokenId}`) {
+                return false;
+              }
+              if (rule?.key !== 'FlatModifier' || rule.selector !== 'ac') return true;
+              const hasSig = extractSignaturesFromPredicate(rule.predicate).includes(signature);
+              const hasAgainst = extractCoverAgainstFromPredicate(rule.predicate).includes(tokenId);
+              return !(hasSig || hasAgainst);
+            });
+          }
+        };
         for (const [coverState, observers] of states.entries()) {
           const isRemove = coverState === 'none';
           if (isRemove) {
+            removeTakeCoverProneRangedFor(observers);
             for (const [state, rules] of rulesByState.entries()) {
               const aggregate = aggregatesByState.get(state);
               if (!aggregate) continue;
@@ -278,6 +316,12 @@ export async function batchUpdateCoverEffects(observerToken, targetUpdates, opti
                   predicate: [`origin:signature:${signature}`],
                 };
                 nextRules.push(newACRule);
+                if (
+                  coverState === 'standard' &&
+                  takeCoverObserverKeys.has(`${coverState}:${tokenId}`)
+                ) {
+                  nextRules.push(getProneRangedStandardCoverUpgradeRule(signature, tokenId));
+                }
               }
               rules = nextRules;
               modified = true;
@@ -336,6 +380,18 @@ export async function batchUpdateCoverEffects(observerToken, targetUpdates, opti
               }
             }
           }
+        }
+        if (takeCoverProneRangedOnlyObservers.length > 0) {
+          takeCoverProneRangedRules = [getTakeCoverProneRangedOnlyRule()];
+        }
+        if (takeCoverProneRangedEffect) {
+          if (takeCoverProneRangedRules.length === 0) effectsToDelete.push(takeCoverProneRangedEffect.id);
+          else effectsToUpdate.push({
+            _id: takeCoverProneRangedEffect.id,
+            'system.rules': canonicalizeObserverRules(takeCoverProneRangedRules),
+          });
+        } else if (takeCoverProneRangedRules.length > 0) {
+          effectsToCreate.push(createTakeCoverProneRangedOnlyAggregate(target, takeCoverProneRangedRules, options));
         }
         if (effectsToDelete.length > 0)
           await target.actor.deleteEmbeddedDocuments('Item', effectsToDelete);
@@ -405,6 +461,62 @@ export async function batchUpdateCoverEffects(observerToken, targetUpdates, opti
   }
 }
 
+export async function removeTakeCoverProneRangedEffects(effectReceiverToken) {
+  if (!game.user?.isGM) return;
+  if (!effectReceiverToken?.actor) return;
+
+  await runWithCoverEffectLock(effectReceiverToken.actor, async () => {
+    const effects = effectReceiverToken.actor.itemTypes?.effect || [];
+    const effectsToDelete = effects
+      .filter((effect) => effect.flags?.[MODULE_ID]?.takeCoverProneRangedOnly === true)
+      .map((effect) => effect.id)
+      .filter(Boolean);
+    const effectsToUpdate = [];
+
+    for (const effect of effects) {
+      if (effect.flags?.[MODULE_ID]?.aggregateCover !== true) continue;
+      const rules = Array.isArray(effect.system?.rules) ? effect.system.rules : [];
+      const filteredRules = rules.filter(
+        (rule) =>
+          rule?.slug !== 'take-cover-prone-ranged-upgrade' &&
+          rule?.slug !== 'take-cover-prone-ranged-cover',
+      );
+      if (filteredRules.length === rules.length) continue;
+      effectsToUpdate.push({ _id: effect.id, 'system.rules': filteredRules });
+    }
+
+    if (effectsToDelete.length > 0) {
+      await effectReceiverToken.actor.deleteEmbeddedDocuments('Item', effectsToDelete);
+    }
+    if (effectsToUpdate.length > 0) {
+      await effectReceiverToken.actor.updateEmbeddedDocuments('Item', effectsToUpdate);
+    }
+  });
+}
+
+export async function applyTakeCoverProneRangedOnlyEffect(effectReceiverToken, options = {}) {
+  if (!game.user?.isGM) return;
+  if (!effectReceiverToken?.actor) return;
+
+  await runWithCoverEffectLock(effectReceiverToken.actor, async () => {
+    const effects = effectReceiverToken.actor.itemTypes?.effect || [];
+    const existing = effects.find(
+      (effect) => effect.flags?.[MODULE_ID]?.takeCoverProneRangedOnly === true,
+    );
+    const rules = [getTakeCoverProneRangedOnlyRule()];
+
+    if (existing) {
+      await effectReceiverToken.actor.updateEmbeddedDocuments('Item', [
+        { _id: existing.id, 'system.rules': rules },
+      ]);
+    } else {
+      await effectReceiverToken.actor.createEmbeddedDocuments('Item', [
+        createTakeCoverProneRangedOnlyAggregate(effectReceiverToken, rules, options),
+      ]);
+    }
+  });
+}
+
 function getBonus(state) {
   // local helper
   switch (state) {
@@ -428,6 +540,40 @@ export function getCoverLevelRollOptions(coverState) {
     { key: 'RollOption', domain: 'all', option: `self:cover-level:${coverState}` },
     { key: 'RollOption', domain: 'all', option: `self:cover-bonus:${bonus}` },
   ];
+}
+
+export function getProneRangedStandardCoverUpgradeRule(observerSignature, observerTokenId = null) {
+  const predicate = [
+    `origin:signature:${observerSignature}`,
+    ...(observerTokenId ? [`cover-against:${observerTokenId}`] : []),
+    'self:condition:prone',
+    { or: ['item:ranged', 'item:trait:ranged', 'attack:ranged'] },
+  ];
+  return {
+    key: 'FlatModifier',
+    selector: 'ac',
+    slug: 'take-cover-prone-ranged-upgrade',
+    type: 'circumstance',
+    value: 2,
+    predicate,
+  };
+}
+
+export function getTakeCoverProneRangedOnlyRule(observerSignature, observerTokenId = null) {
+  const predicate = [
+    ...(observerSignature ? [`origin:signature:${observerSignature}`] : []),
+    ...(observerTokenId ? [`cover-against:${observerTokenId}`] : []),
+    'self:condition:prone',
+    { or: ['item:ranged', 'item:trait:ranged', 'attack:ranged'] },
+  ];
+  return {
+    key: 'FlatModifier',
+    selector: 'ac',
+    slug: 'take-cover-prone-ranged-cover',
+    type: 'circumstance',
+    value: 4,
+    predicate,
+  };
 }
 
 export function ensureCoverLevelRules(rules, coverState) {
@@ -463,7 +609,7 @@ function createAggregate(target, coverState, rules, options) {
               sustained: false,
             }
           : { value: -1, unit: 'unlimited', expiry: null, sustained: false },
-      tokenIcon: { show: false },
+      tokenIcon: { show: true },
       unidentified: true,
       start: {
         value: 0,
@@ -475,6 +621,44 @@ function createAggregate(target, coverState, rules, options) {
     },
     img,
     flags: { [MODULE_ID]: { aggregateCover: true, coverState } },
+  };
+}
+
+function createTakeCoverProneRangedOnlyAggregate(target, rules, options) {
+  const img = getCoverImageForState('greater');
+  return {
+    name: 'Take Cover (Prone vs Ranged)',
+    type: 'effect',
+    system: {
+      description: {
+        value: '<p>Take Cover while prone: greater cover against ranged attacks.</p>',
+        gm: '',
+      },
+      rules: Array.isArray(rules) ? rules : [],
+      slug: null,
+      traits: { otherTags: [], value: [] },
+      level: { value: 1 },
+      duration:
+        options.durationRounds >= 0
+          ? {
+              value: options.durationRounds,
+              unit: 'rounds',
+              expiry: 'turn-start',
+              sustained: false,
+            }
+          : { value: -1, unit: 'unlimited', expiry: null, sustained: false },
+      tokenIcon: { show: true },
+      unidentified: true,
+      start: {
+        value: 0,
+        initiative: options.initiative
+          ? game.combat?.getCombatantByToken(target?.id)?.initiative
+          : null,
+      },
+      badge: null,
+    },
+    img,
+    flags: { [MODULE_ID]: { takeCoverProneRangedOnly: true } },
   };
 }
 
@@ -497,11 +681,17 @@ export function canonicalizeObserverRules(rules) {
       const sigs = extractSignaturesFromPredicate(r.predicate);
       if (sigs.length > 0) {
         const sig = sigs[0];
-
-        // Keep only the latest AC rule per signature (last one wins)
         const normalizedRule = { ...r, selector: normalizedSelector };
-        // Always replace with the latest rule for this signature
-        acRules.set(sig, normalizedRule);
+
+        const ruleIdentity = [
+          sig,
+          r.slug || '',
+          r.value,
+          JSON.stringify(normalizedRule.predicate || []),
+        ].join(':');
+
+        // Keep only the latest matching AC rule for this signature/rule identity.
+        acRules.set(ruleIdentity, normalizedRule);
         continue; // Only continue if we actually processed it as an AC rule
       }
       // If no signatures found, let it fall through to "other rules"

@@ -172,10 +172,9 @@ describe('Take Cover preview layout', () => {
       },
     ]);
 
-    expect(states.map((state) => state.value)).toEqual(['none', 'lesser', 'standard', 'greater']);
+    expect(states.map((state) => state.value)).toEqual(['none', 'standard', 'greater']);
     expect(states.map((state) => state.cssClass)).toEqual([
       'cover-none',
-      'cover-lesser',
       'cover-standard',
       'cover-greater',
     ]);

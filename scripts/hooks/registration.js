@@ -153,6 +153,14 @@ export async function registerHooks() {
     } catch (error) {
       console.warn('PF2E Visioner | Failed to capture roll-time position:', error);
     }
+
+    try {
+      const { expireTakeCoverOnAttackMessage } =
+        await import('../chat/services/take-cover-expiration-service.js');
+      await expireTakeCoverOnAttackMessage(message);
+    } catch (error) {
+      console.warn('PF2E Visioner | Failed to expire Take Cover on attack:', error);
+    }
   });
 
   Hooks.on('highlightObjects', onHighlightObjects);

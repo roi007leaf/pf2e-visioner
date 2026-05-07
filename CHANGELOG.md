@@ -1,5 +1,19 @@
 # Changelog
 
+## [8.1.13] - 2026-05-07
+
+### Changed
+
+- **Take Cover better matches PF2E prone rules**: Prone tokens taking cover now receive a dedicated ranged-attack greater cover effect instead of being treated as generic standard or greater cover.
+- **Cover effects are visible but unidentified on tokens**: Visioner cover effects now show token icons while remaining unidentified to players.
+
+### Fixed
+
+- **Prone Take Cover no longer opens an unnecessary dialog**: Taking Cover while prone and without other cover now applies the special ranged-only cover effect directly.
+- **Prone Take Cover expires after attacking or standing up**: The special prone Take Cover effect is removed when the actor makes an attack roll or loses the prone condition.
+- **Attack rolls no longer show false Take Cover automation panels**: Attack roll messages that mention Take Cover through cover effect metadata are no longer misidentified as Take Cover action messages.
+- **Rule-element cover checks handle missing token documents safely**: Cover rule element lookup now guards missing token document flag APIs instead of throwing during Take Cover analysis.
+
 ## [8.1.12] - 2026-05-07
 
 ### Added

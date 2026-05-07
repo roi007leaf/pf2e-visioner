@@ -607,6 +607,15 @@ export async function onCanvasReady() {
       const actor = item.parent;
       if (!actor) return;
 
+      const conditionSlug = item.slug || item.system?.slug || item.name?.toLowerCase?.();
+      if (conditionSlug === 'prone' && game.user?.isGM) {
+        const { removeTakeCoverProneRangedEffects } = await import('../cover/batch.js');
+        const tokens = canvas?.tokens?.placeables?.filter((token) => token.actor?.id === actor.id) || [];
+        for (const token of tokens) {
+          await removeTakeCoverProneRangedEffects(token);
+        }
+      }
+
       // Trigger perception refresh to recalculate visibility based on removed conditions
       if (canvas?.perception) {
         canvas.perception.update({

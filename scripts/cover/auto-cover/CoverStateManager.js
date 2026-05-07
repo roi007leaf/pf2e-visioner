@@ -5,7 +5,7 @@
 
 import { MODULE_ID } from '../../constants.js';
 import { getCoverBonusByState } from '../../helpers/cover-helpers.js';
-import { getCoverLevelRollOptions } from '../batch.js';
+import { getCoverLevelRollOptions, getProneRangedStandardCoverUpgradeRule } from '../batch.js';
 import { systemIconPath } from '../../system-adapter.js';
 
 export class CoverStateManager {
@@ -96,7 +96,7 @@ export class CoverStateManager {
 
     // Apply ephemeral effects if needed
     if (!options.skipEphemeralUpdate) {
-      await this._updateEphemeralEffects(source, target, state);
+      await this._updateEphemeralEffects(source, target, state, options);
     }
   }
 
@@ -150,7 +150,7 @@ export class CoverStateManager {
    * @returns {Promise}
    * @private
    */
-  async _updateEphemeralEffects(attacker, target, state) {
+  async _updateEphemeralEffects(attacker, target, state, options = {}) {
     try {
       const actor = target.actor;
       if (!actor) return;
@@ -227,7 +227,7 @@ export class CoverStateManager {
             sustained: false,
           },
           tokenIcon: {
-            show: false,
+            show: true,
           },
           unidentified: true,
           start: {
@@ -251,6 +251,15 @@ export class CoverStateManager {
       if (state === 'standard' || state === 'greater') {
         const reflexBonus = state === 'standard' ? 2 : 4;
         const stealthBonus = state === 'standard' ? 2 : 4;
+
+        if (state === 'standard' && options.takeCover === true) {
+          ephemeralEffect.system.rules.push(
+            getProneRangedStandardCoverUpgradeRule(
+              attacker.actor.signature || attacker.actor.id,
+              attacker.id,
+            ),
+          );
+        }
 
         ephemeralEffect.system.rules.push(
           {

@@ -312,6 +312,47 @@ describe('Action Extractor Tests', () => {
         actionType: 'take-cover',
       });
     });
+
+    test('does not detect take cover from attack roll flavor caused by cover effects', async () => {
+      const message = {
+        id: 'msg1',
+        flavor: 'Ranged Strike: Spear <span>Take Cover (Prone vs Ranged)</span>',
+        flags: {
+          pf2e: {
+            context: {
+              type: 'attack-roll',
+              options: ['item:ranged'],
+            },
+          },
+        },
+      };
+
+      const result = await extractActionData(message);
+
+      expect(result).toBeNull();
+    });
+
+    test('does not detect take cover from attack roll origin caused by cover effects', async () => {
+      const message = {
+        id: 'msg1',
+        flavor: 'Ranged Strike: Spear',
+        flags: {
+          pf2e: {
+            context: {
+              type: 'attack-roll',
+              options: ['item:ranged'],
+            },
+            origin: {
+              rollOptions: ['origin:item:take-cover'],
+            },
+          },
+        },
+      };
+
+      const result = await extractActionData(message);
+
+      expect(result).toBeNull();
+    });
   });
 
   describe('Avoid Notice Action Detection', () => {

@@ -2,6 +2,7 @@ import { COVER_STATES, MODULE_ID, MODULE_TITLE } from '../../constants.js';
 import { BaseActionDialog } from './base-action-dialog.js';
 
 let currentTakeCoverDialog = null;
+const TAKE_COVER_OVERRIDE_STATES = ['none', 'standard', 'greater'];
 
 export class TakeCoverPreviewDialog extends BaseActionDialog {
   static DEFAULT_OPTIONS = {
@@ -78,7 +79,7 @@ export class TakeCoverPreviewDialog extends BaseActionDialog {
   }
 
   _buildBulkOverrideStates() {
-    return ['none', 'lesser', 'standard', 'greater'].map((state) => ({
+    return TAKE_COVER_OVERRIDE_STATES.map((state) => ({
       value: state,
       ...this.coverConfig(state),
     }));
@@ -95,7 +96,9 @@ export class TakeCoverPreviewDialog extends BaseActionDialog {
           if (typeof value === 'string' && COVER_STATES[value]) set.add(value);
         }
       }
-      const states = set.size ? Array.from(set) : ['none', 'lesser', 'standard', 'greater'];
+      const states = set.size
+        ? TAKE_COVER_OVERRIDE_STATES.filter((state) => set.has(state))
+        : TAKE_COVER_OVERRIDE_STATES;
       return states.map((state) => ({ value: state, ...this.coverConfig(state) }));
     } catch {
       return this._buildBulkOverrideStates();
@@ -204,12 +207,14 @@ export class TakeCoverPreviewDialog extends BaseActionDialog {
       }
     } catch { }
 
-    const allStates = ['none', 'lesser', 'standard', 'greater']; // for override icons
+    const allStates = TAKE_COVER_OVERRIDE_STATES; // for Take Cover override icons
 
     const processed = filteredOutcomes.map((o) => {
       const effectiveNew = o.overrideState || o.newVisibility || o.newCover;
       const baseOld = o.oldVisibility || o.oldCover || o.currentCover;
-      let hasActionableChange = baseOld != null && effectiveNew != null && effectiveNew !== baseOld;
+      let hasActionableChange =
+        o.takeCoverProneRangedOnly === true ||
+        (baseOld != null && effectiveNew != null && effectiveNew !== baseOld);
       const availableStates = allStates.map((s) => ({
         value: s,
         label: this.coverConfig(s).label,
@@ -342,6 +347,7 @@ export class TakeCoverPreviewDialog extends BaseActionDialog {
     // but fall back to recomputing if not present
     const changed = filtered.filter((o) => {
       if (o?.hasActionableChange === true) return true;
+      if (o?.takeCoverProneRangedOnly === true) return true;
       const eff = o.overrideState ?? o.newVisibility ?? o.newCover;
       const base = o.oldVisibility ?? o.oldCover ?? o.currentCover;
       return eff != null && base != null && eff !== base;
@@ -399,7 +405,7 @@ export class TakeCoverPreviewDialog extends BaseActionDialog {
     if (!outcome) return;
     const eff = outcome.overrideState || outcome.newVisibility || outcome.newCover;
     const base = outcome.oldVisibility || outcome.oldCover || outcome.currentCover;
-    if (eff === base) return;
+    if (eff === base && outcome.takeCoverProneRangedOnly !== true) return;
     const overrides = { [tokenId]: eff };
     const { applyNowTakeCover } = await import('../services/index.js');
     await applyNowTakeCover({ ...app.actionData, overrides }, { html: () => { }, attr: () => { } });

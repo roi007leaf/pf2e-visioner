@@ -3,8 +3,12 @@ import { SourceTracker } from './SourceTracker.js';
 export class RuleElementCoverService {
   static canTokenProvideCoverToTarget(blocker, target, attackContext = null) {
     try {
+      if (typeof target?.document?.getFlag !== 'function') {
+        return { allowed: true, ruleElement: null };
+      }
+
       const stateSource = target.document.getFlag('pf2e-visioner', 'stateSource');
-      const blockerCoverSources = stateSource?.coverByObserver?.[blocker.id];
+      const blockerCoverSources = stateSource?.coverByObserver?.[blocker?.id];
       
       if (!blockerCoverSources?.sources?.length) {
         return { allowed: true, ruleElement: null };
@@ -24,11 +28,11 @@ export class RuleElementCoverService {
             return { allowed: true, ruleElement: null };
           }
         }
-        return { 
-          allowed: false, 
+        return {
+          allowed: false,
           ruleElement: {
-            blockerId: blocker.id,
-            blockerName: blocker.name,
+            blockerId: blocker?.id,
+            blockerName: blocker?.name,
             source: highestPriority.id,
             type: highestPriority.type
           }
@@ -44,7 +48,11 @@ export class RuleElementCoverService {
 
   static getCoverFromRuleElements(attacker, target) {
     try {
-      const coverSources = target.document.getFlag('pf2e-visioner', 'stateSource')?.coverByObserver?.[attacker.id];
+      if (typeof target?.document?.getFlag !== 'function') {
+        return null;
+      }
+
+      const coverSources = target.document.getFlag('pf2e-visioner', 'stateSource')?.coverByObserver?.[attacker?.id];
       
       if (!coverSources?.sources?.length) {
         return null;
