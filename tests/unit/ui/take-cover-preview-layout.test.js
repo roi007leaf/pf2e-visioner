@@ -115,6 +115,20 @@ describe('Take Cover preview layout', () => {
     expect(css).toContain('color: var(--cover-standard, #ff6600)');
   });
 
+  it('colors Sneak greater cover bonus controls from the greater cover color', async () => {
+    const fs = await import('node:fs/promises');
+    const path = await import('node:path');
+    const css = await fs.readFile(path.join(process.cwd(), 'styles/dialog-layout.css'), 'utf8');
+    const greaterCoverBonusRule =
+      css.match(
+        /\.cover-bonus-btn\.module-style\[data-bonus='4'\],[\s\S]*?\.apply-all-cover-btn\.module-style\[data-bonus='4'\] \{[\s\S]*?\}/,
+      )?.[0] ?? '';
+
+    expect(css).toContain(".cover-bonus-btn.module-style[data-bonus='4']");
+    expect(css).toContain(".apply-all-cover-btn.module-style[data-bonus='4']");
+    expect(greaterCoverBonusRule).toContain('color: var(--cover-greater, #f44336)');
+  });
+
   it('defines horizontal footer bulk buttons for all action preview dialogs', async () => {
     const fs = await import('node:fs/promises');
     const path = await import('node:path');

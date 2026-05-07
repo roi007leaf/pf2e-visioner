@@ -598,7 +598,7 @@ button.row-timer-toggle.active:not(:hover) {
 
     /* Cover state colors for buttons */
     .cover-bonus-btn[data-bonus='0'] {
-      color: var(--cover-none, #9e9e9e);
+      color: var(--cover-none, #4caf50);
     }
 
     .cover-bonus-btn[data-bonus='2'] {
@@ -606,7 +606,7 @@ button.row-timer-toggle.active:not(:hover) {
     }
 
     .cover-bonus-btn[data-bonus='4'] {
-      color: var(--cover-greater, #4caf50);
+      color: var(--cover-greater, #f44336);
     }
 
     /* Apply All Cover Section - Top of dialog, module style */
@@ -702,7 +702,13 @@ button.row-timer-toggle.active:not(:hover) {
 
     .cover-bonus-btn.module-style[data-bonus='4'],
     .apply-all-cover-btn.module-style[data-bonus='4'] {
-      color: var(--cover-greater, #4caf50);
+      color: var(--cover-greater, #f44336);
+    }
+
+    .cover-bonus-btn[data-bonus='4'] i,
+    .cover-bonus-btn.module-style[data-bonus='4'] i,
+    .apply-all-cover-btn.module-style[data-bonus='4'] i {
+      color: var(--cover-greater, #f44336);
     }
   }
 
@@ -1800,7 +1806,6 @@ button.row-timer-toggle.active:not(:hover) {
   display: flex;
   align-items: center;
   gap: 4px;
-  color: var(--color-text-dark-secondary);
   display: inline-flex;
 }
 

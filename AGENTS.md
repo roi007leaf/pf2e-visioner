@@ -1,42 +1,19 @@
 <claude-mem-context>
 # Memory Context
 
-# [pf2e-visioner] recent context, 2026-05-07 1:51pm GMT+3
+# [pf2e-visioner] recent context, 2026-05-07 2:11pm GMT+3
 
 Legend: 🎯session 🔴bugfix 🟣feature 🔄refactor ✅change 🔵discovery ⚖️decision 🚨security_alert 🔐security_note
 Format: ID TIME TYPE TITLE
 Fetch details: get_observations([IDs]) | Search: mem-search skill
 
-Stats: 50 obs (20,245t read) | 242,519t work | 92% savings
+Stats: 50 obs (17,664t read) | 269,587t work | 93% savings
 
 ### May 3, 2026
 S245 Fix stealth cover bonus not appearing on stealth rolls — expanded to include third discovered bug in context routing (May 3 at 9:55 AM)
 S119 GM tracker dots design pivot — dots should only show users who CAN see the stealther, not users blocked by overrides (May 3 at 9:55 AM)
 ### May 7, 2026
 S246 Fix stealth cover bonus not appearing on stealth rolls — three bugs found and fixed, Bug 3 fix verified in source but test not yet re-run (May 7 at 8:07 AM)
-1402 12:04p 🟣 Full Test Suite Passes: 2514 Tests Across 230 Suites After Prone+Ranged Cover Refactor
-1403 " 🔵 Full Branch Changeset Spans 13 Files Including TakeCoverAction and TakeCoverPreviewDialog
-1404 12:05p 🔵 Two-Tier Cover Update Architecture: setCoverBetween vs batchUpdateCoverEffects Callers
-1405 " 🔵 cover-map.js setCoverBetween Calls batchUpdateCoverEffects Even on No-Change, Tracks Cover Source
-1406 " 🔵 Design Refinement: Prone+Ranged Upgrade Rule Should Only Apply to Take Cover Action, Not All Standard Cover
-1407 " 🔴 Prone+Ranged Upgrade Rule Gated Behind options.takeCover in CoverStateManager
-1408 " 🟣 CoverStateManager Tests Green: 19/19 Pass With Take Cover-Scoped Prone+Ranged Upgrade
-1409 12:06p 🟣 takeCover Flag Propagated Through TakeCoverAction → setCoverBetween → batchUpdateCoverEffects
-1410 " 🟣 batchUpdateCoverEffects Uses takeCoverObserverKeys Set to Scope Prone+Ranged Upgrade Per Observer
-1411 " 🔵 cover-array-selector-bug.test.js Lacks Expected Anchor for New Test Insertion
-1412 12:07p 🟣 25 Tests Pass Across batchUpdateCoverEffects and CoverStateManager Suites With takeCover Scoping
-1413 " 🟣 Test Added to Verify TakeCoverActionHandler Passes takeCover: true to setCoverBetween
-1414 " 🟣 All 7 Cover-Related Test Suites Pass: 130 Tests Green With Full takeCover Flag Implementation
-1415 12:08p 🟣 Prone+Ranged Cover Upgrade Feature Complete: 2518 Tests Pass, 15 Files Changed
-1426 12:10p 🔵 TakeCoverAction analyzeOutcome Logic: Cover Upgrade Rules and Prone Handling
-1429 12:11p 🟣 New TakeCoverAction Design: Prone Actors With No Detected Cover Get takeCoverProneRangedOnly Flag Instead of Standard Cover
-1430 " 🟣 takeCoverProneRangedOnly Mode Implemented in TakeCoverAction
-1432 " 🔴 Test Updated to Expect takeCoverProneRangedOnly: false in Standard Cover setCoverBetween Call
-1433 " 🟣 takeCoverProneRangedOnly Propagated Through cover-map.js to batchUpdateCoverEffects
-1435 12:12p 🟣 getTakeCoverProneRangedOnlyRule Added to batch.js for Prone+Ranged Cover Without Standard Cover
-1437 " 🟣 batchUpdateCoverEffects Handles takeCoverProneRangedOnly Aggregate Effects as Separate Effect Track
-1439 " 🟣 createTakeCoverProneRangedOnlyAggregate Factory Function Added to batch.js
-1440 " 🟣 Integration Test Added for Prone Take Cover With No Cover Baseline Creating Separate Prone-Ranged-Only Effect
 1443 12:13p 🟣 60 Tests Pass Across 4 Core Cover Suites Including New Prone Take Cover With No Baseline Test
 1444 " 🟣 TakeCoverPreviewDialog Updated to Show Prone+Ranged-Only Cover Outcomes in UI
 1445 " 🟣 62 Tests Pass Including TakeCoverPreviewDialog; ESLint Clean After Full prone+Ranged Feature
@@ -64,6 +41,29 @@ S246 Fix stealth cover bonus not appearing on stealth rolls — three bugs found
 1476 12:29p 🔵 Take Cover Feature Full Architecture Map
 1477 " 🔵 Take Cover Apply/Preview Wiring in event-binder.js and apply-service.js
 1478 12:30p 🔵 batch.js Post-Write Pipeline and Aggregate Effect Item Structure
+1479 1:51p ✅ Patch Version Increment with Changelog for Cover System
+1480 " 🔵 pf2e-visioner Module Manifest Snapshot
+1481 " 🔵 pf2e-visioner CHANGELOG.md Structure and History
+1482 " ✅ module.json Patch Version Bumped to 8.1.13
+1483 1:52p 🟣 pf2e-visioner 8.1.13 Released: Prone Take Cover and Cover Effect Visibility
+1491 2:00p 🟣 Attack Trait Actions Remove Prone Take Cover Effect
+1492 2:01p 🔵 take-cover-expiration-service.js: Current Attack Roll Detection Logic
+1493 " 🔵 AutoCoverHooks._isAttackContext Has Broader Attack Detection Than Expiration Service
+1494 " 🔵 Existing Expiration Tests Cover Roll Types Only, Not Attack-Trait Actions
+1495 " 🟣 TDD: Failing Test Added for Attack-Trait Action Expiry
+1496 " 🟣 Expiration Service Refactored to Detect Any Attack-Trait Action
+1497 " 🔴 Prone Take Cover Now Expires on Any Attack-Trait Action (All Tests Pass)
+1498 2:02p 🟣 Attack-Trait Expiry Change Passes Full Chat Test Suite and Lint
+1499 " 🟣 Full Test Suite Passes After Attack-Trait Expiry Feature (2538 Tests, 233 Suites)
+1500 2:06p 🔵 autoCover Object Shape Used Across Sneak and Hide Actions
+1501 " 🔵 cover-bonus-btn Greater Cover CSS Uses Wrong Fallback Color (#4caf50 = Green, Not Red)
+1502 2:07p 🔴 TDD: Failing Test Added for Greater Cover Bonus Button Wrong Fallback Color
+1503 " 🔴 Greater Cover Bonus Button Test Hardened to Avoid False Positive
+1504 " 🔴 Confirmed: Greater Cover Bonus Button Uses #4caf50 (Green) Fallback in CSS Rule
+1505 " 🔴 Greater Cover Bonus Button Fallback Color Fixed to #f44336 (Red)
+1506 " 🔴 Greater Cover Bonus Button Color Fix Verified and All Layout Tests Pass
+1507 2:08p 🔴 Greater Cover Bonus Button Color Fix Shipped to v8.1.13 Changelog
+1508 2:09p 🔴 Prone Take Cover Always Bypasses Dialog, Even With Regular Cover Outcomes Present
 
-Access 243k tokens of past work via get_observations([IDs]) or mem-search skill.
+Access 270k tokens of past work via get_observations([IDs]) or mem-search skill.
 </claude-mem-context>

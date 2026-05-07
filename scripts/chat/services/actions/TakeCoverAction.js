@@ -24,6 +24,16 @@ function isProneToken(token) {
   return false;
 }
 
+function hasTakeCoverProneRangedOnlyEffect(token) {
+  try {
+    return token?.actor?.itemTypes?.effect?.some?.(
+      (effect) => effect.flags?.['pf2e-visioner']?.takeCoverProneRangedOnly === true,
+    ) === true;
+  } catch {
+    return false;
+  }
+}
+
 // Take Cover raises the cover level that the ACTOR (taking cover) has AGAINST each other token (observers).
 // Cover storage/orientation is observer -> target. For Take Cover that means:
 //   observer = subject row token, target = actor taking cover
@@ -171,9 +181,12 @@ export class TakeCoverActionHandler extends ActionHandlerBase {
   }
 
   shouldApplyWithoutDialog(outcomes, actionData = null) {
-    if (this.getDirectApplyOutcomes(outcomes).length > 0) return true;
     const takingCoverToken = actionData?.actorToken || actionData?.actor;
-    return (outcomes || []).length === 0 && isProneToken(takingCoverToken);
+    const isProne = isProneToken(takingCoverToken);
+    if (isProne && hasTakeCoverProneRangedOnlyEffect(takingCoverToken)) return false;
+    if (isProne) return true;
+    if (this.getDirectApplyOutcomes(outcomes).length > 0) return true;
+    return (outcomes || []).length === 0 && isProne;
   }
 
   async applyOutcomesDirectly(actionData, outcomes, button = null) {

@@ -1,5 +1,13 @@
 # Changelog
 
+## [8.1.14] - 2026-05-07
+
+### Fixed
+
+- **Prone Take Cover reopens the normal dialog after the special effect is active**: Taking Cover while prone applies the ranged-only effect directly on first use, but opens the normal Take Cover dialog on later uses while that effect is already present.
+- **Prone Take Cover expires after all attack-trait actions**: The special prone Take Cover effect now clears from actions with the attack trait, such as Grapple, in addition to attack rolls.
+- **Greater cover bonus controls use the greater cover color**: Sneak and Hide cover controls now color the greater cover option with the greater cover palette instead of the standard cover color.
+
 ## [8.1.13] - 2026-05-07
 
 ### Changed
@@ -9,9 +17,10 @@
 
 ### Fixed
 
-- **Prone Take Cover no longer opens an unnecessary dialog**: Taking Cover while prone and without other cover now applies the special ranged-only cover effect directly.
-- **Prone Take Cover expires after attacking or standing up**: The special prone Take Cover effect is removed when the actor makes an attack roll or loses the prone condition.
+- **Prone Take Cover no longer opens an unnecessary first-use dialog**: Taking Cover while prone now applies the special ranged-only cover effect directly unless that effect is already present, in which case the normal Take Cover dialog opens.
+- **Prone Take Cover expires after attack actions or standing up**: The special prone Take Cover effect is removed when the actor makes an attack roll, uses an action with the attack trait, or loses the prone condition.
 - **Attack rolls no longer show false Take Cover automation panels**: Attack roll messages that mention Take Cover through cover effect metadata are no longer misidentified as Take Cover action messages.
+- **Greater cover bonus controls use the greater cover color**: Sneak and Hide cover controls now color the greater cover option with the greater cover palette instead of the standard cover color.
 - **Rule-element cover checks handle missing token documents safely**: Cover rule element lookup now guards missing token document flag APIs instead of throwing during Take Cover analysis.
 
 ## [8.1.12] - 2026-05-07

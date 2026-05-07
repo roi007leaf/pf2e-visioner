@@ -1,17 +1,61 @@
-function isAttackRollMessage(message) {
+function optionList(value) {
+  if (!value) return [];
+  if (Array.isArray(value)) return value;
+  if (value instanceof Set) return Array.from(value);
+  return [];
+}
+
+function traitList(value) {
+  if (!value) return [];
+  if (Array.isArray(value)) return value;
+  if (value instanceof Set) return Array.from(value);
+  if (Array.isArray(value.value)) return value.value;
+  return [];
+}
+
+function hasAttackTrait(message, context) {
+  const origin = message?.flags?.pf2e?.origin;
+  const options = optionList(context?.options).concat(optionList(origin?.rollOptions));
+  if (
+    options.some(
+      (option) =>
+        option === 'attack' ||
+        option === 'trait:attack' ||
+        option === 'item:trait:attack' ||
+        option.endsWith(':trait:attack'),
+    )
+  ) {
+    return true;
+  }
+
+  const traits = [
+    ...traitList(context?.traits),
+    ...traitList(context?.item?.traits),
+    ...traitList(origin?.traits),
+    ...traitList(origin?.item?.traits),
+  ];
+  return traits.includes('attack');
+}
+
+function isAttackActionMessage(message) {
   const context = message?.flags?.pf2e?.context;
   if (!context) return false;
   if (context.type === 'damage-taken' || context.type === 'self-effect') return false;
   if (message?.flags?.pf2e?.appliedDamage) return false;
-  if (context.domains?.some?.((domain) => domain.includes('skill-check'))) return false;
 
-  return (
+  const options = optionList(context.options);
+  const isAttackRoll =
     context.type === 'attack-roll' ||
     context.type === 'spell-attack-roll' ||
     context.type === 'strike-attack-roll' ||
     context.type === 'impulse-attack-roll' ||
-    context.options?.some?.((option) => option.includes('attack-roll'))
-  );
+    options.some((option) => option.includes('attack-roll'));
+
+  if (isAttackRoll && !context.domains?.some?.((domain) => domain.includes('skill-check'))) {
+    return true;
+  }
+
+  return hasAttackTrait(message, context);
 }
 
 function resolveMessageToken(message) {
@@ -36,7 +80,7 @@ function resolveMessageToken(message) {
 
 export async function expireTakeCoverOnAttackMessage(message) {
   if (!game.user?.isGM) return false;
-  if (!isAttackRollMessage(message)) return false;
+  if (!isAttackActionMessage(message)) return false;
 
   const token = resolveMessageToken(message);
   if (!token?.actor) return false;
