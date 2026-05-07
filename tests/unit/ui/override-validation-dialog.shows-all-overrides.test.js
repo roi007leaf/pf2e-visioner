@@ -141,4 +141,22 @@ describe('OverrideValidationDialog - shows all overrides', () => {
             'PF2E_VISIONER.VISIBILITY_STATES.observed_concealed'
         );
     });
+
+    it('should not statically import the visibility label helper from validation UI files', async () => {
+        const fs = await import('node:fs/promises');
+        const path = await import('node:path');
+        const files = [
+            'scripts/ui/OverrideValidationDialog.js',
+            'scripts/ui/OverrideValidationIndicator.js'
+        ];
+
+        for (const file of files) {
+            const source = await fs.readFile(path.join(process.cwd(), file), 'utf8');
+            const importLine = source
+                .split('\n')
+                .find((line) => line.includes("from '../constants.js'"));
+
+            expect(importLine).not.toContain('getVisibilityStateLabelKey');
+        }
+    });
 });
