@@ -168,6 +168,19 @@ describe('EncounterStealthInitiativeService', () => {
     });
   });
 
+  test('seek template placement limit defaults to unlimited', async () => {
+    const { DEFAULT_SETTINGS } = await import('../../../scripts/constants.js');
+
+    expect(DEFAULT_SETTINGS.seekTemplateMaxPlacementDistance).toMatchObject({
+      scope: 'world',
+      config: true,
+      restricted: true,
+      type: Number,
+      default: 0,
+      range: { min: 0, max: 500, step: 5 },
+    });
+  });
+
   test('does nothing when the feature setting is disabled', async () => {
     const { encounterStealthInitiativeService } = await importService();
     const combat = makeCombat([
