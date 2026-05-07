@@ -21,12 +21,14 @@ import { updateTokenVisuals } from './services/visual-effects.js';
 import {
   cleanupDeletedToken,
   getCoverBetween,
+  getVisibilityMap,
   getVisibility,
   setCoverBetween,
   setVisibilityBetween,
   showNotification,
 } from './utils.js';
 import { autoVisibilitySystem, ConditionManager } from './visibility/auto-visibility/index.js';
+import { overrideToLegacyVisibility } from './visibility/perception-profile.js';
 
 function getForcedDeletion() {
   return foundry?.data?.operators?.ForcedDeletion ?? null;
@@ -304,7 +306,7 @@ export class Pf2eVisionerApi {
       );
 
       // Check for manual overrides
-      const visibilityMap = observerToken.document.getFlag('pf2e-visioner', 'visibility') || {};
+      const visibilityMap = getVisibilityMap(observerToken) || {};
       const manualState = visibilityMap[targetToken.id];
 
       // Get lighting at target
@@ -1897,7 +1899,7 @@ export class Pf2eVisionerApi {
         setFlagDeletion(update, 'invisibility');
 
         // Clear visibility/cover maps (these get recalculated by AVS)
-        update[`flags.${MODULE_ID}.visibility`] = {};
+        update[`flags.${MODULE_ID}.visibilityV2`] = {};
         update[`flags.${MODULE_ID}.cover`] = {};
 
         return update;
@@ -2208,7 +2210,7 @@ export class Pf2eVisionerApi {
           setFlagDeletion(update, 'waitingSneak');
           setFlagDeletion(update, 'invisibility');
           setFlagDeletion(update, 'coverOverride');
-          setFlagDeletion(update, 'visibility');
+          setFlagDeletion(update, 'visibilityV2');
           setFlagDeletion(update, 'cover');
           setFlagDeletion(update, 'sneak-speed-effect-id');
           return update;
@@ -2313,17 +2315,18 @@ export class Pf2eVisionerApi {
             const update = { _id: token.id };
             let hasChanges = false;
 
-            // Remove selected tokens from this token's visibility map
-            const visibilityMap = token.document.getFlag(MODULE_ID, 'visibility') || {};
-            const cleanedVisibilityMap = { ...visibilityMap };
+            // Remove selected tokens from this token's canonical visibility profile map
+            const visibilityProfileMap = token.document.getFlag(MODULE_ID, 'visibilityV2') || {};
+            const cleanedVisibilityProfileMap = { ...visibilityProfileMap };
+            hasChanges = false;
             for (const selectedId of selectedTokenIds) {
-              if (cleanedVisibilityMap[selectedId]) {
-                delete cleanedVisibilityMap[selectedId];
+              if (cleanedVisibilityProfileMap[selectedId]) {
+                delete cleanedVisibilityProfileMap[selectedId];
                 hasChanges = true;
               }
             }
             if (hasChanges) {
-              update[`flags.${MODULE_ID}.visibility`] = cleanedVisibilityMap;
+              update[`flags.${MODULE_ID}.visibilityV2`] = cleanedVisibilityProfileMap;
             }
 
             // Remove selected tokens from this token's cover map
@@ -2566,7 +2569,7 @@ export class Pf2eVisionerApi {
               targetName: flagData.targetName,
               observerImg: observerToken?.document?.texture?.src || null,
               targetImg: targetToken?.document?.texture?.src || null,
-              state: flagData.state,
+              state: overrideToLegacyVisibility(flagData),
               source: flagData.source,
               hasCover: flagData.hasCover,
               hasConcealment: flagData.hasConcealment,
@@ -2591,7 +2594,7 @@ export class Pf2eVisionerApi {
             targetName: flagData.targetName,
             observerImg: observerToken?.document?.texture?.src || null,
             targetImg: t?.document?.texture?.src || null,
-            state: flagData.state,
+            state: overrideToLegacyVisibility(flagData),
             source: flagData.source,
             hasCover: flagData.hasCover,
             hasConcealment: flagData.hasConcealment,

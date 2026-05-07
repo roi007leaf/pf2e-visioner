@@ -118,6 +118,27 @@ export function profileToLegacyVisibility(profile = {}, options = {}) {
   return normalized.detectionState;
 }
 
+export function overrideToPerceptionProfile(override = {}) {
+  return normalizePerceptionProfile(override);
+}
+
+export function overrideToDisplayVisibility(override = {}, options = {}) {
+  return profileToLegacyVisibility(overrideToPerceptionProfile(override), {
+    preserveEncounterUnnoticed:
+      options.preserveEncounterUnnoticed ??
+      (override?.source === 'encounter_stealth_initiative' || override?.state === 'unnoticed'),
+  });
+}
+
+export function overrideMatchesVisibility(override = {}, visibility, options = {}) {
+  if (!visibility || visibility === 'avs') return false;
+  return overrideToDisplayVisibility(override, options) === visibility;
+}
+
+export function overrideToLegacyVisibility(override = {}, options = {}) {
+  return overrideToDisplayVisibility(override, options);
+}
+
 export function isObserved(profile) {
   return normalizePerceptionProfile(profile).detectionState === 'observed';
 }

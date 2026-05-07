@@ -6,6 +6,7 @@ import {
   canAttemptHideOrRemainHidden,
   hidesEncounterTracker,
   legacyVisibilityToProfile,
+  overrideToPerceptionProfile,
   profileToLegacyVisibility,
 } from '../visibility/perception-profile.js';
 
@@ -318,7 +319,7 @@ export class EncounterStealthInitiativeService {
         return false;
       }
 
-      const profile = legacyVisibilityToProfile(override?.state, override);
+      const profile = overrideToPerceptionProfile(override);
       if (!hidesEncounterTracker(profile, { source: override?.source })) {
         return false;
       }
@@ -358,7 +359,7 @@ export class EncounterStealthInitiativeService {
         return false;
       }
 
-      const profile = legacyVisibilityToProfile(override?.state, override);
+      const profile = overrideToPerceptionProfile(override);
       if (profile.detectionState === 'undetected') {
         if (!hidesEncounterTracker(profile, { source: override?.source })) {
           hasVisibleUndetectedOverride = true;
@@ -509,8 +510,15 @@ export class EncounterStealthInitiativeService {
     if (!previousOverride || previousOverride.source === OVERRIDE_SOURCE) return;
 
     const flagKey = this._getPreviousOverrideFlagKey(observerToken);
+    const { state: _legacyState, ...canonicalOverride } = previousOverride;
+    const previousProfile = overrideToPerceptionProfile(previousOverride);
     await stealtherToken.document?.setFlag?.(MODULE_ID, flagKey, {
-      ...previousOverride,
+      ...canonicalOverride,
+      detectionState: previousProfile.detectionState,
+      awarenessState: previousProfile.awarenessState,
+      coverState: previousProfile.coverState,
+      detectionSense: previousProfile.detectionSense,
+      hasConcealment: previousProfile.hasConcealment,
       observerId: previousOverride.observerId ?? observerToken.document.id,
       targetId: previousOverride.targetId ?? stealtherToken.document.id,
     });
@@ -526,7 +534,8 @@ export class EncounterStealthInitiativeService {
 
     const flagKey = this._getPreviousOverrideFlagKey(observerToken);
     const previousOverride = stealtherToken.document?.getFlag?.(MODULE_ID, flagKey);
-    if (!previousOverride?.state) return;
+    if (!previousOverride) return;
+    const state = profileToLegacyVisibility(previousOverride, { preserveEncounterUnnoticed: true });
 
     stealtherToken.document?.unsetFlag?.(MODULE_ID, flagKey);
     AvsOverrideManager.setPairOverrides(
@@ -536,7 +545,7 @@ export class EncounterStealthInitiativeService {
           stealtherToken.document.id,
           {
             target: stealtherToken,
-            state: previousOverride.state,
+            state,
             detectionState: previousOverride.detectionState,
             awarenessState: previousOverride.awarenessState,
             coverState: previousOverride.coverState,
@@ -555,7 +564,7 @@ export class EncounterStealthInitiativeService {
   }
 
   _isActiveInitialOverride(override, observerToken, stealtherToken) {
-    const profile = legacyVisibilityToProfile(override?.state, override);
+    const profile = overrideToPerceptionProfile(override);
     return (
       override?.source === OVERRIDE_SOURCE &&
       profile.detectionState === 'undetected' &&
@@ -568,7 +577,7 @@ export class EncounterStealthInitiativeService {
     const override = this._getInitialOverride(observerToken, stealtherToken);
     return (
       this._isActiveInitialOverride(override, observerToken, stealtherToken) &&
-      hidesEncounterTracker(legacyVisibilityToProfile(override?.state, override), {
+      hidesEncounterTracker(overrideToPerceptionProfile(override), {
         source: override?.source,
       })
     );

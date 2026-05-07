@@ -5,6 +5,7 @@
  */
 
 import { VisibilityCalculator } from './VisibilityCalculator.js';
+import { isUndetected, normalizePerceptionProfile } from '../perception-profile.js';
 
 export class OverrideValidationSystem {
   /** @type {OverrideValidationSystem} */
@@ -133,10 +134,10 @@ export class OverrideValidationSystem {
           override: {
             observer: canvas.tokens?.get(observerId),
             target: token,
-            state: flagData.state,
             source: flagData.source,
             hasCover: flagData.hasCover,
             hasConcealment: flagData.hasConcealment,
+            ...normalizePerceptionProfile(flagData),
             observerId,
             targetId,
             observerName: flagData.observerName,
@@ -243,7 +244,10 @@ export class OverrideValidationSystem {
 
       // Check for "undetected" overrides that may become invalid when visibility improves significantly
       // Check overrides from manual actions, sneak actions, etc.
-      if ((override.source === 'manual_action' || override.source === 'sneak_action') && override.state === 'undetected') {
+      if (
+        (override.source === 'manual_action' || override.source === 'sneak_action') &&
+        isUndetected(override)
+      ) {
         // If target is now clearly observed (in bright light with no concealment), 
         // "undetected" may be too strong
         if (visibility.visibility === 'observed' && !currentlyHasCover && !currentlyConcealed) {
@@ -310,7 +314,7 @@ export class OverrideValidationSystem {
         targetId,
         observerName: observer?.document?.name || 'Unknown',
         targetName: target?.document?.name || 'Unknown',
-        state: override.state || 'undetected',
+        ...normalizePerceptionProfile(override),
         source: override.source || 'unknown',
         reason,
         hasCover: override.hasCover || false,

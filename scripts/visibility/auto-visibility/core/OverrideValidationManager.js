@@ -1,4 +1,5 @@
 import { MODULE_ID } from '../../../constants.js';
+import { normalizePerceptionProfile, overrideMatchesVisibility } from '../../perception-profile.js';
 import { LastValidationRequest } from '../utils/LastValidationRequest.js';
 import { OverrideValidityCache } from '../utils/OverrideValidityCache.js';
 
@@ -151,11 +152,10 @@ export class OverrideValidationManager {
         } catch { }
         const movedToken = canvas.tokens?.get(tokenId);
         const filtered = result.overrides.filter((o) => {
-          const prevVis = o.state || (o.hasConcealment ? 'concealed' : 'observed');
           const prevCover = o.expectedCover ?? (o.hasCover ? 'standard' : 'none');
           const curVis = o.currentVisibility || 'observed';
           const curCover = o.currentCover || 'none';
-          const isDifferent = prevVis !== curVis || prevCover !== curCover;
+          const isDifferent = !overrideMatchesVisibility(o, curVis) || prevCover !== curCover;
           if (!isDifferent) return false;
           if (!va || !movedToken) return true;
           try {
@@ -245,9 +245,9 @@ export class OverrideValidationManager {
             targetId: t.id,
             observerName: movedToken.name,
             targetName: t.name,
-            state: fd.state,
             hasCover: fd.hasCover,
             hasConcealment: fd.hasConcealment,
+            ...normalizePerceptionProfile(fd),
             expectedCover: fd.expectedCover,
             currentVisibility,
             currentCover,
@@ -275,10 +275,10 @@ export class OverrideValidationManager {
           override: {
             observer,
             target: movedToken,
-            state: flagData.state,
             source: flagData.source,
             hasCover: flagData.hasCover,
             hasConcealment: flagData.hasConcealment,
+            ...normalizePerceptionProfile(flagData),
             expectedCover: flagData.expectedCover,
             timedOverride: flagData.timedOverride,
             observerId,
@@ -313,10 +313,10 @@ export class OverrideValidationManager {
           override: {
             observer: movedToken,
             target: token,
-            state: flagData.state,
             source: flagData.source,
             hasCover: flagData.hasCover,
             hasConcealment: flagData.hasConcealment,
+            ...normalizePerceptionProfile(flagData),
             expectedCover: flagData.expectedCover,
             timedOverride: flagData.timedOverride,
             observerId,
@@ -400,9 +400,9 @@ export class OverrideValidationManager {
           targetId: movedTokenId,
           observerName: obs?.name || fd.observerName || 'Observer',
           targetName: movedToken.name,
-          state: fd.state,
           hasCover: fd.hasCover,
           hasConcealment: fd.hasConcealment,
+          ...normalizePerceptionProfile(fd),
           expectedCover: fd.expectedCover,
           currentVisibility,
           currentCover,
@@ -447,9 +447,9 @@ export class OverrideValidationManager {
           targetId: t.id,
           observerName: movedToken.name,
           targetName: t.name,
-          state: fd.state,
           hasCover: fd.hasCover,
           hasConcealment: fd.hasConcealment,
+          ...normalizePerceptionProfile(fd),
           expectedCover: fd.expectedCover,
           currentVisibility,
           currentCover,
@@ -663,7 +663,7 @@ export class OverrideValidationManager {
           targetId,
           observerName: observer?.document?.name || 'Unknown',
           targetName: target?.document?.name || 'Unknown',
-          state: override.state || 'undetected',
+          ...normalizePerceptionProfile(override),
           source: override.source || 'unknown',
           reason,
           reasonIcons: reasonIcons || [],

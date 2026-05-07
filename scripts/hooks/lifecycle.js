@@ -5,6 +5,7 @@
 import { injectChatAutomationStyles } from '../chat/chat-automation-styles.js';
 import { MODULE_ID } from '../constants.js';
 import { initializeHoverTooltips } from '../services/HoverTooltips.js';
+import { runVisibilityV2MigrationIfNeeded } from '../migrations/visibility-v2-migration.js';
 import { registerSocket } from '../services/socket.js';
 import { updateTokenVisuals, updateWallVisuals } from '../services/visual-effects.js';
 import { getLogger } from '../utils/logger.js';
@@ -456,6 +457,11 @@ export function onReady() {
     setTimeout(() => {
       enableVisionForAllTokensAndPrototypes().catch(() => {});
     }, 25);
+    setTimeout(() => {
+      runVisibilityV2MigrationIfNeeded().catch((error) => {
+        console.warn('PF2E Visioner | Failed to migrate visibility profiles:', error);
+      });
+    }, 50);
   }
 }
 

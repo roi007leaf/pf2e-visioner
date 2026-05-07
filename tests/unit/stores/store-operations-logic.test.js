@@ -230,8 +230,10 @@ describe('Store Operations Core Logic', () => {
       // Should attempt to persist visibility data
       expect(observer.document.setFlag).toHaveBeenCalledWith(
         global.MODULE_ID,
-        'visibility',
-        expect.any(Object),
+        'visibilityV2',
+        {
+          'target-token-doc': expect.objectContaining({ detectionState: 'hidden' }),
+        },
       );
     });
 

@@ -632,7 +632,7 @@ describe('EncounterStealthInitiativeService', () => {
       'pf2e-visioner',
       `encounter-stealth-previous-from-${observerLow.id}`,
     )).toMatchObject({
-      state: 'hidden',
+      detectionState: 'hidden',
       source: 'manual_action',
       observerId: observerLow.id,
       targetId: stealther.id,

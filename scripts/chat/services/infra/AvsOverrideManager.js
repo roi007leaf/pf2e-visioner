@@ -9,7 +9,35 @@
  */
 
 import { MODULE_ID } from '../../../constants.js';
-import { setVisibilityBetween as setVisibility } from '../../../utils.js';
+import {
+  setPerceptionProfileBetween,
+  setVisibilityBetween as setVisibility,
+} from '../../../utils.js';
+import {
+  legacyVisibilityToProfile,
+  normalizePerceptionProfile,
+  overrideToDisplayVisibility,
+} from '../../../visibility/perception-profile.js';
+
+function buildOverrideProfile(data = {}) {
+  const baseProfile = legacyVisibilityToProfile(data.state);
+  const coverState = data.coverState ?? data.expectedCover ?? baseProfile.coverState;
+  const hasConcealment =
+    data.state === 'concealed'
+      ? true
+      : typeof data.hasConcealment === 'boolean'
+        ? data.hasConcealment
+        : baseProfile.hasConcealment;
+
+  return normalizePerceptionProfile({
+    ...baseProfile,
+    detectionState: data.detectionState ?? baseProfile.detectionState,
+    awarenessState: data.awarenessState ?? baseProfile.awarenessState,
+    coverState,
+    detectionSense: data.detectionSense ?? baseProfile.detectionSense,
+    hasConcealment,
+  });
+}
 
 function asChangesByTarget(changesInput, defaultState = null) {
   // Accept Map<string, { target, state, hasCover?, hasConcealment?, expectedCover? }>
@@ -192,6 +220,7 @@ export class AvsOverrideManager {
     if (isHazardOrLoot(observer) || isHazardOrLoot(target)) {
       return; // Skip override creation entirely for hazard/loot tokens
     }
+    let profile = null;
     try {
       // If expectedCover isn't provided, compute it once at apply-time ONLY for non-manual sources
       if (!expectedCover && (source || '').toLowerCase() !== 'manual_action') {
@@ -211,16 +240,25 @@ export class AvsOverrideManager {
       if (typeof hasCover !== 'boolean' && expectedCover) {
         hasCover = expectedCover !== 'none';
       }
-      await this.storeOverrideFlag(observer, target, {
+      profile = buildOverrideProfile({
         state,
-        source: source || 'unknown',
-        hasCover: !!hasCover,
-        hasConcealment: !!hasConcealment,
-        expectedCover,
         detectionState,
         awarenessState,
         coverState,
         detectionSense,
+        hasConcealment,
+        expectedCover,
+      });
+      await this.storeOverrideFlag(observer, target, {
+        state,
+        source: source || 'unknown',
+        hasCover: !!hasCover,
+        hasConcealment: profile.hasConcealment,
+        expectedCover,
+        detectionState: profile.detectionState,
+        awarenessState: profile.awarenessState,
+        coverState: profile.coverState,
+        detectionSense: profile.detectionSense,
         timedOverride: timedOverride || null,
       });
     } catch (e) {
@@ -228,8 +266,12 @@ export class AvsOverrideManager {
     }
 
     try {
+      if (!profile) return;
       await this.clearGlobalCaches();
-      await this.applyOverrideFromFlag(observer, target, state);
+      await this.applyOverrideProfileFromFlag(observer, target, profile, {
+        source,
+        preserveEncounterUnnoticed: source === 'encounter_stealth_initiative',
+      });
     } catch (e) {
       console.error('PF2E Visioner | Error applying AVS override from flag:', e);
     }
@@ -249,9 +291,10 @@ export class AvsOverrideManager {
     const targetDocId = target.document.id;
 
     const flagKey = `avs-override-from-${observerDocId}`;
+    const { state: _legacyState, ...canonicalData } = data;
 
     const flagData = {
-      ...data,
+      ...canonicalData,
       timestamp: Date.now(),
       observerId: observerDocId,
       targetId: targetDocId,
@@ -270,6 +313,30 @@ export class AvsOverrideManager {
         observer.document.id,
         target.document.id,
         state,
+      );
+    } catch {}
+  }
+
+  static async applyOverrideProfileFromFlag(observer, target, profile, options = {}) {
+    const normalized = normalizePerceptionProfile(profile);
+    const displayState = overrideToDisplayVisibility({
+      ...normalized,
+      source: options.source,
+    }, {
+      preserveEncounterUnnoticed: !!options.preserveEncounterUnnoticed,
+    });
+
+    await setPerceptionProfileBetween(observer, target, normalized, {
+      isAutomatic: true,
+      source: 'avs_override',
+      preserveEncounterUnnoticed: !!options.preserveEncounterUnnoticed,
+    });
+    try {
+      Hooks.call(
+        'pf2e-visioner.visibilityChanged',
+        observer.document.id,
+        target.document.id,
+        displayState,
       );
     } catch {}
   }
@@ -501,14 +568,30 @@ export class AvsOverrideManager {
 
   static async getOverride(observer, target) {
     try {
-      const overrideFlagKey = `avs-override-from-${observer.document.id}`;
-      const overrideData = target.document.getFlag('pf2e-visioner', overrideFlagKey);
-      if (overrideData && overrideData.state) {
-        return overrideData.state;
-      }
+      const overrideData = await this.getOverrideData(observer, target);
+      if (overrideData) return overrideToDisplayVisibility(overrideData);
     } catch {
       /* ignore */
     }
+  }
+
+  static async getOverrideProfile(observer, target) {
+    try {
+      const overrideData = await this.getOverrideData(observer, target);
+      return overrideData ? normalizePerceptionProfile(overrideData) : null;
+    } catch {
+      return null;
+    }
+  }
+
+  static async getOverrideData(observer, target) {
+    const observerToken =
+      typeof observer === 'string' ? canvas.tokens?.get?.(observer) : observer;
+    const targetToken = typeof target === 'string' ? canvas.tokens?.get?.(target) : target;
+    if (!observerToken?.document?.id || !targetToken?.document?.getFlag) return null;
+
+    const overrideFlagKey = `avs-override-from-${observerToken.document.id}`;
+    return targetToken.document.getFlag('pf2e-visioner', overrideFlagKey) || null;
   }
 }
 

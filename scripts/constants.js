@@ -505,6 +505,16 @@ export const SNEAK_FLAGS = {
  * Default module settings
  */
 export const DEFAULT_SETTINGS = {
+  visibilityV2MigrationVersion: {
+    name: 'PF2E Visioner Visibility V2 Migration Version',
+    hint: 'Internal migration marker for canonical perception profile storage.',
+    scope: 'world',
+    config: false,
+    restricted: true,
+    type: Number,
+    default: 0,
+  },
+
   // Visibility Indicators
   hiddenWallsEnabled: {
     name: 'PF2E_VISIONER.SETTINGS.HIDDEN_WALLS.name',

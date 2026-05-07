@@ -49,6 +49,36 @@ describe('API AVS cleanup integration', () => {
     expect(calls.some((c) => c?.[0] === 'pf2e-visioner' && c?.[1] === 'deletedEntryCache')).toBe(true);
   });
 
+  test('clearAllSceneData clears only visibilityV2 for rule-element tokens', async () => {
+    const token = global.createMockToken({
+      id: 'rule-token',
+      flags: {
+        'pf2e-visioner': {
+          ruleElementRegistry: { one: true },
+          visibilityV2: { target: { detectionState: 'hidden' } },
+        },
+      },
+    });
+    canvas.tokens.placeables = [token];
+
+    const { Pf2eVisionerApi } = await import('../../../scripts/api.js');
+    const ok = await Pf2eVisionerApi.clearAllSceneData();
+
+    expect(ok).toBe(true);
+    const update = canvas.scene.updateEmbeddedDocuments.mock.calls
+      .flatMap((call) => call[1] ?? [])
+      .find((entry) => entry._id === 'rule-token');
+
+    expect(update).toEqual(
+      expect.objectContaining({
+        'flags.pf2e-visioner.visibilityV2': {},
+      }),
+    );
+    expect(Object.prototype.hasOwnProperty.call(update, 'flags.pf2e-visioner.visibility')).toBe(
+      false,
+    );
+  });
+
   test('clearAllDataForSelectedTokens removes avs-override-* flags referencing purged tokens and calls removeOverride between them', async () => {
     const mkToken = (id, flags = {}) => ({
       id,
@@ -96,5 +126,62 @@ describe('API AVS cleanup integration', () => {
         keys.some((k) => k === 'flags.pf2e-visioner' || k.includes('flags.pf2e-visioner.avs-override')),
       ).toBe(true);
     }
+  });
+
+  test('clearAllDataForSelectedTokens clears visibilityV2 data for selected and observing tokens', async () => {
+    const mkToken = (id, flags = {}) => ({
+      id,
+      name: id,
+      actor: {},
+      document: {
+        id,
+        getFlag: jest.fn((moduleId, key) => flags[moduleId]?.[key] ?? null),
+        unsetFlag: jest.fn().mockResolvedValue(true),
+        flags,
+      },
+    });
+
+    const selected = mkToken('selected', {
+      'pf2e-visioner': {
+        visibility: { observer: 'hidden' },
+        visibilityV2: { observer: { detectionState: 'hidden', hasConcealment: true } },
+      },
+    });
+    const observer = mkToken('observer', {
+      'pf2e-visioner': {
+        visibility: { selected: 'hidden', keep: 'concealed' },
+        visibilityV2: {
+          selected: { detectionState: 'hidden', hasConcealment: true },
+          keep: { detectionState: 'observed', hasConcealment: true },
+        },
+      },
+    });
+
+    canvas.tokens.placeables = [selected, observer];
+
+    const { Pf2eVisionerApi } = await import('../../../scripts/api.js');
+    const ok = await Pf2eVisionerApi.clearAllDataForSelectedTokens([selected]);
+
+    expect(ok).toBe(true);
+
+    const selectedUpdate = canvas.scene.updateEmbeddedDocuments.mock.calls
+      .flatMap((call) => call[1] ?? [])
+      .find((update) => update._id === 'selected');
+    expect(selectedUpdate).toEqual(
+      expect.objectContaining({
+        'flags.pf2e-visioner.visibilityV2': expect.anything(),
+      }),
+    );
+
+    const observerUpdate = canvas.scene.updateEmbeddedDocuments.mock.calls
+      .flatMap((call) => call[1] ?? [])
+      .find((update) => update._id === 'observer' && update['flags.pf2e-visioner.visibilityV2']);
+    expect(observerUpdate).toEqual(
+      expect.objectContaining({
+        'flags.pf2e-visioner.visibilityV2': {
+          keep: { detectionState: 'observed', hasConcealment: true },
+        },
+      }),
+    );
   });
 });

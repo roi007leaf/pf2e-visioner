@@ -31,7 +31,7 @@ export class HidePreviewDialog extends BaseActionDialog {
       resizable: true,
     },
     position: {
-      width: 800,
+      width: 950,
       height: 'auto',
     },
     actions: {
@@ -607,14 +607,21 @@ export class HidePreviewDialog extends BaseActionDialog {
         try {
           const existing = (this.outcomes || []).find((x) => x?.target?.id === o?.target?.id);
           const overrideState = existing?.overrideState ?? o?.overrideState ?? null;
-          const currentVisibility = o.oldVisibility || o.currentVisibility;
-          const effectiveNewState = overrideState || o.newVisibility || currentVisibility;
-          const baseOldState = o.oldVisibility || currentVisibility;
-          const isOldStateAvsControlled = this.isOldStateAvsControlled(o);
+          const currentVisibility =
+            existing?.oldVisibility ??
+            existing?.currentVisibility ??
+            o.oldVisibility ??
+            o.currentVisibility ??
+            null;
+          const newVisibility = existing?.newVisibility ?? o.newVisibility ?? currentVisibility;
+          const effectiveNewState = overrideState ?? newVisibility ?? currentVisibility;
+          const baseOldState = currentVisibility;
+          const mergedOutcome = { ...o, ...existing, overrideState, newVisibility };
+          const isOldStateAvsControlled = this.isOldStateAvsControlled(mergedOutcome);
 
           // Special case: If current state is AVS-controlled and override is 'avs', no change
           let hasActionableChange = false;
-          if (overrideState === 'avs' && this.isCurrentStateAvsControlled(o)) {
+          if (effectiveNewState === 'avs' && this.isCurrentStateAvsControlled(mergedOutcome)) {
             hasActionableChange = false;
           } else {
             // If old state matches new state, check if old state was AVS-controlled
@@ -624,7 +631,7 @@ export class HidePreviewDialog extends BaseActionDialog {
               (baseOldState != null && effectiveNewState != null && effectiveNewState !== baseOldState) ||
               (statesMatch && isOldStateAvsControlled);
           }
-          return { ...o, overrideState, hasActionableChange };
+          return { ...mergedOutcome, hasActionableChange };
         } catch {
           return { ...o };
         }

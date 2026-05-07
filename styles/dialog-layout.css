@@ -2584,6 +2584,78 @@ button.row-timer-toggle.active:not(:hover) {
   justify-content: center;
 }
 
+.sneak-preview-dialog .sneak-results-table td.actions {
+  white-space: nowrap;
+  text-align: center;
+  min-width: 112px;
+}
+
+.sneak-preview-dialog .sneak-results-table td.actions .row-action-btn,
+.sneak-preview-dialog .sneak-results-table td.actions .row-timer-toggle {
+  flex: 0 0 30px;
+  width: 30px;
+  height: 30px;
+  box-sizing: border-box;
+  margin: 0 3px !important;
+  padding: 0 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  vertical-align: middle;
+}
+
+.sneak-preview-dialog .sneak-results-table td.actions .row-timer-toggle {
+  gap: 0 !important;
+}
+
+.seek-preview-dialog .seek-results-table td.actions {
+  white-space: nowrap;
+  text-align: center;
+  min-width: 112px;
+}
+
+.seek-preview-dialog .seek-results-table td.actions .row-action-btn,
+.seek-preview-dialog .seek-results-table td.actions .row-timer-toggle {
+  flex: 0 0 30px;
+  width: 30px;
+  height: 30px;
+  box-sizing: border-box;
+  margin: 0 3px !important;
+  padding: 0 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  vertical-align: middle;
+}
+
+.seek-preview-dialog .seek-results-table td.actions .row-timer-toggle {
+  gap: 0 !important;
+}
+
+.hide-preview-dialog .hide-results-table td.actions {
+  white-space: nowrap;
+  text-align: center;
+  min-width: 112px;
+}
+
+.hide-preview-dialog .hide-results-table td.actions .row-action-btn,
+.hide-preview-dialog .hide-results-table td.actions .row-timer-toggle {
+  flex: 0 0 30px;
+  width: 30px;
+  height: 30px;
+  box-sizing: border-box;
+  margin: 0 3px !important;
+  padding: 0 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  vertical-align: middle;
+}
+
+.hide-preview-dialog .hide-results-table td.actions .row-timer-toggle {
+  gap: 0 !important;
+}
+
 /* Wall Manager specific styles */
 .pf2e-visioner-wall-manager {
   display: flex;

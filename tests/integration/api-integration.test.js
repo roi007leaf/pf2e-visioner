@@ -290,8 +290,8 @@ describe('PF2E Visioner API Integration Tests', () => {
     test('should handle invalid states gracefully', async () => {
       // Invalid visibility states should not crash the system
       await setVisibilityBetween(observer, target, 'invalid-state');
-      // The function doesn't validate, so it just sets the invalid state
-      expect(getVisibilityBetween(observer, target)).toBe('invalid-state');
+      // v2-only visibility storage ignores unknown legacy states
+      expect(getVisibilityBetween(observer, target)).toBe('observed');
 
       // Same for cover states
       await setCoverBetween(observer, target, 'invalid-cover');

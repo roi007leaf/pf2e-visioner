@@ -10,6 +10,16 @@
 
 import { COVER_STATES, MODULE_ID, VISIBILITY_STATES, getVisibilityStateLabelKey } from '../constants.js';
 import { addTokenBorder, removeTokenBorder } from '../managers/token-manager/borders.js';
+import { overrideToDisplayVisibility } from '../visibility/perception-profile.js';
+
+function hasOverrideVisibilityData(override) {
+  return (
+    typeof override?.state === 'string' ||
+    typeof override?.detectionState === 'string' ||
+    typeof override?.hasConcealment === 'boolean' ||
+    typeof override?.awarenessState === 'string'
+  );
+}
 
 class OverrideValidationIndicator {
   static #instance = null;
@@ -44,13 +54,16 @@ class OverrideValidationIndicator {
   // - concealment expectation vs current (concealed or hidden)
   #hasDisplayChange(o) {
     if (!o) return false;
+    if (!hasOverrideVisibilityData(o)) return false;
+    if (o.state === 'avs') return false;
 
-    // Filter out overrides with no state or 'avs' state
-    if (!o.state || o.state === 'avs') {
+    const prevVis = overrideToDisplayVisibility(o);
+
+    // Filter out overrides with no meaningful state or 'avs' state
+    if (!prevVis || prevVis === 'avs') {
       return false;
     }
 
-    const prevVis = o.state || (o.hasConcealment ? 'concealed' : 'observed');
     const prevCover = (o.expectedCover ?? (o.hasCover ? 'standard' : 'none'));
     const curVis = o.currentVisibility || 'observed';
     const curCover = o.currentCover || 'none';
@@ -213,7 +226,11 @@ class OverrideValidationIndicator {
     const badge = this._el?.querySelector('.indicator-badge');
     if (!badge) return;
     const raw = this._rawOverrides || [];
-    const count = raw.filter((o) => this.#shouldShowOverride(o) && o.state && o.state !== 'avs').length
+    const count = raw.filter((o) => {
+      if (!hasOverrideVisibilityData(o) || o.state === 'avs') return false;
+      const state = overrideToDisplayVisibility(o);
+      return this.#shouldShowOverride(o) && state && state !== 'avs';
+    }).length
       || this._data?.overrides?.length || 0;
     badge.textContent = count > 0 ? String(count) : '';
   }
@@ -277,7 +294,7 @@ class OverrideValidationIndicator {
           targetId: tokenId,
           observerName: flagData.observerName || observerToken?.name || 'Unknown',
           targetName: token.name,
-          state: flagData.state,
+          state: overrideToDisplayVisibility(flagData),
           hasCover: flagData.hasCover,
           hasConcealment: flagData.hasConcealment,
           expectedCover: flagData.expectedCover,
@@ -295,7 +312,7 @@ class OverrideValidationIndicator {
             targetId: t.id,
             observerName: token.name,
             targetName: t.name,
-            state: fd.state,
+            state: overrideToDisplayVisibility(fd),
             hasCover: fd.hasCover,
             hasConcealment: fd.hasConcealment,
             expectedCover: fd.expectedCover,
@@ -703,7 +720,7 @@ class OverrideValidationIndicator {
       // So we should always display them, even if they don't show state changes
       if (!o) return '';
 
-      const prevVis = o.state || (o.hasConcealment ? 'concealed' : 'observed');
+      const prevVis = overrideToDisplayVisibility(o);
       const prevCover = (o.expectedCover ?? (o.hasCover ? 'standard' : 'none'));
       const curVis = o.currentVisibility || 'observed';
       const curCover = o.currentCover || 'none';

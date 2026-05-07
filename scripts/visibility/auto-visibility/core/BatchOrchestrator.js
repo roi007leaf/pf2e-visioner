@@ -2,6 +2,7 @@ import { MODULE_ID } from '../../../constants.js';
 import { updateCanvasPerception } from '../../../helpers/perception-refresh.js';
 import { getLogger } from '../../../utils/logger.js';
 import { scheduleTask } from '../../../utils/scheduler.js';
+import { overrideMatchesVisibility } from '../../perception-profile.js';
 import { BatchProcessor } from './BatchProcessor.js';
 import { ExclusionManager } from './ExclusionManager.js';
 import { LightingPrecomputer } from './LightingPrecomputer.js';
@@ -927,7 +928,7 @@ export class BatchOrchestrator {
         if (obsId && tgtDoc?.getFlag) {
           const flagKey = `avs-override-from-${obsId}`;
           const overrideData = tgtDoc.getFlag(MODULE_ID, flagKey);
-          if (overrideData?.state && overrideData.state !== update.visibility) {
+          if (overrideData && !overrideMatchesVisibility(overrideData, update.visibility)) {
             continue;
           }
         }

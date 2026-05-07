@@ -392,23 +392,26 @@ export class ConsequencesActionHandler extends ActionHandlerBase {
 
       // Explicitly persist visibility maps for observers toward attacker in one scene batch
       try {
-        const { getVisibilityMap } = await import('../../../utils.js');
+        const { getPerceptionProfileMap } = await import('../../../utils.js');
+        const { legacyVisibilityToProfile } = await import(
+          '../../../visibility/perception-profile.js'
+        );
         const groups = this.groupChangesByObserver(changes);
         const updates = [];
         for (const group of groups) {
           const observer = group.observer;
           if (!observer?.document?.id) continue;
-          const current = { ...(getVisibilityMap(observer) || {}) };
+          const current = { ...(getPerceptionProfileMap(observer) || {}) };
           for (const item of group.items) {
             const targetId = item?.target?.id;
             if (!targetId) continue;
             const state = item?.overrideState || item?.newVisibility;
             if (!state || state === 'observed') delete current[targetId];
-            else current[targetId] = state;
+            else current[targetId] = legacyVisibilityToProfile(state);
           }
           const update = { _id: observer.document.id };
-          if (Object.keys(current).length === 0) update[`flags.${MODULE_ID}.-=visibility`] = null;
-          else update[`flags.${MODULE_ID}.visibility`] = current;
+          if (Object.keys(current).length === 0) update[`flags.${MODULE_ID}.-=visibilityV2`] = null;
+          else update[`flags.${MODULE_ID}.visibilityV2`] = current;
           updates.push(update);
         }
         if (updates.length) await canvas.scene.updateEmbeddedDocuments('Token', updates);

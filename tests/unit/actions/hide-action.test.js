@@ -73,17 +73,28 @@ describe('Hide Action Comprehensive Tests', () => {
       });
     });
 
-    test('mirrored hide callers use the same prerequisite fallback behavior', async () => {
+    test('hide action fallback uses end-position qualification like the preview dialog', async () => {
       const canonical = await import('../../../scripts/chat/services/actions/HideAction.js');
       const mirrored = await import('../../../scripts/chat/services/actions/hide-action.js');
-      const startOnlyFails = {
+      const endPositionQualifies = {
         startQualifies: false,
         endQualifies: true,
         bothQualify: false,
       };
 
-      expect(canonical.applyHidePrerequisiteFallback('hidden', startOnlyFails)).toBe('avs');
-      expect(mirrored.applyHidePrerequisiteFallback('hidden', startOnlyFails)).toBe('avs');
+      expect(canonical.applyHidePrerequisiteFallback('hidden', endPositionQualifies)).toBe('hidden');
+      expect(mirrored.applyHidePrerequisiteFallback('hidden', endPositionQualifies)).toBe('hidden');
+    });
+
+    test('hide apply treats AVS-controlled matching states as actionable manual overrides', async () => {
+      const canonical = await import('../../../scripts/chat/services/actions/HideAction.js');
+      const mirrored = await import('../../../scripts/chat/services/actions/hide-action.js');
+
+      expect(canonical.isHideVisibilityChangeActionable('hidden', 'hidden', true)).toBe(true);
+      expect(mirrored.isHideVisibilityChangeActionable('hidden', 'hidden', true)).toBe(true);
+      expect(canonical.isHideVisibilityChangeActionable('hidden', 'hidden', false)).toBe(false);
+      expect(canonical.isHideVisibilityChangeActionable('observed', 'hidden', false)).toBe(true);
+      expect(canonical.isHideVisibilityChangeActionable('observed', 'avs', true)).toBe(false);
     });
 
     test('hide preview prerequisites do not treat hidden or undetected as concealment', () => {
@@ -282,6 +293,59 @@ describe('Hide Action Comprehensive Tests', () => {
       };
 
       expect(actionDataWithIgnoreAllies.ignoreAllies).toBe(true);
+    });
+
+    test('filtered hide outcomes preserve the rendered actionable state for apply all', async () => {
+      game.settings.set('pf2e-visioner', 'autoVisibilityEnabled', true);
+
+      const { HidePreviewDialog } = await import(
+        '../../../scripts/chat/dialogs/HidePreviewDialog.js'
+      );
+
+      const observer = {
+        id: 'observer-1',
+        name: 'Observer',
+        actor: { alliance: 'opposition' },
+        document: { id: 'observer-1', hidden: false },
+      };
+      const hider = {
+        id: 'hider-1',
+        name: 'Hider',
+        actor: { id: 'actor-1', alliance: 'opposition' },
+        document: { id: 'hider-1', getFlag: jest.fn(() => undefined) },
+      };
+
+      const dialog = new HidePreviewDialog(
+        hider,
+        [
+          {
+            target: observer,
+            oldVisibility: 'hidden',
+            currentVisibility: 'hidden',
+            newVisibility: 'avs',
+            hasActionableChange: false,
+          },
+        ],
+        [],
+        { actor: hider },
+      );
+
+      dialog.outcomes = [
+        {
+          target: observer,
+          oldVisibility: 'hidden',
+          currentVisibility: 'hidden',
+          newVisibility: 'hidden',
+          hasActionableChange: true,
+          overrideState: null,
+        },
+      ];
+
+      const filtered = await dialog.getFilteredOutcomes();
+
+      expect(filtered).toHaveLength(1);
+      expect(filtered[0].newVisibility).toBe('hidden');
+      expect(filtered[0].hasActionableChange).toBe(true);
     });
   });
 

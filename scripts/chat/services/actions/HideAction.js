@@ -32,7 +32,17 @@ export function evaluateHidePrerequisites(startVisibility, endVisibility, coverS
 }
 
 export function applyHidePrerequisiteFallback(newVisibility, qualification) {
-  return qualification?.bothQualify ? newVisibility : 'avs';
+  return qualification?.endQualifies ? newVisibility : 'avs';
+}
+
+export function isHideVisibilityChangeActionable(
+  currentVisibility,
+  newVisibility,
+  isOldStateAvsControlled = false,
+) {
+  if (!newVisibility || newVisibility === 'avs') return false;
+  if (currentVisibility == null) return true;
+  return newVisibility !== currentVisibility || !!isOldStateAvsControlled;
 }
 
 export class HideActionHandler extends ActionHandlerBase {
@@ -386,6 +396,15 @@ export class HideActionHandler extends ActionHandlerBase {
         outcome !== originalOutcome ||
         newVisibility !== originalNewVisibility);
 
+    const oldStateAvsControlled = this.isOldStateAvsControlled(
+      {
+        target: subject,
+        currentVisibility: current,
+        oldVisibility: current,
+      },
+      actionData,
+    );
+
     return {
       target: subject,
       dc: adjustedDC,
@@ -403,7 +422,7 @@ export class HideActionHandler extends ActionHandlerBase {
       oldVisibility: current,
       oldVisibilityLabel: getVisibilityStateLabelKey(current, { manual: true }) || current,
       newVisibility,
-      changed: newVisibility !== 'avs' && newVisibility !== current,
+      changed: isHideVisibilityChangeActionable(current, newVisibility, oldStateAvsControlled),
       autoCover: result.autoCover, // Add auto-cover information
       // Add original total for override display
       originalRollTotal: originalTotal,

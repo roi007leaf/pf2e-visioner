@@ -1,4 +1,5 @@
 import { MODULE_ID, REALTIME_CHECK_INTERVAL_MS, TIMED_OVERRIDE_TYPES } from '../constants.js';
+import { overrideToDisplayVisibility } from '../visibility/perception-profile.js';
 
 export class TimedOverrideManager {
   static _realtimeIntervalId = null;
@@ -471,7 +472,7 @@ export class TimedOverrideManager {
             targetId,
             observerName: flagData.observerName || 'Unknown',
             targetName: flagData.targetName || token.name || 'Unknown',
-            state: flagData.state,
+            state: overrideToDisplayVisibility(flagData),
             timedOverride: flagData.timedOverride,
             source: flagData.source,
           });

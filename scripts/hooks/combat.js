@@ -175,8 +175,8 @@ async function handleCombatEnd(combat = null) {
           /* ignore individual effect clearing errors */
         }
 
-        if (currentFlags.visibility) {
-          await token.document.unsetFlag(MODULE_ID, 'visibility');
+        if (currentFlags.visibilityV2) {
+          await token.document.unsetFlag(MODULE_ID, 'visibilityV2');
         }
 
         if (currentFlags.detection) {

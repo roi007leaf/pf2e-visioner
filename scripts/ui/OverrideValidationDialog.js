@@ -5,6 +5,7 @@
 
 import { COVER_STATES, VISIBILITY_STATES, getVisibilityStateLabelKey } from '../constants.js';
 import { loadDialogCSS, loadSharedUICSS } from '../css-loader.js';
+import { overrideToDisplayVisibility } from '../visibility/perception-profile.js';
 
 export class OverrideValidationDialog extends foundry.applications.api.HandlebarsApplicationMixin(foundry.applications.api.ApplicationV2) {
 
@@ -104,7 +105,7 @@ export class OverrideValidationDialog extends foundry.applications.api.Handlebar
       // Prefer current states provided by the validator/caller; fall back to safe defaults
       const visibilityKey = override.currentVisibility || 'observed';
       const coverKey = override.currentCover || 'none';
-      const prevVisibilityKey = override.state || (override.hasConcealment ? 'concealed' : 'observed');
+      const prevVisibilityKey = overrideToDisplayVisibility(override);
 
       // Previous/original cover must reflect what the override expected at apply-time,
       // not what the currentCover is now. If we don't have a specific level, assume 'standard'.
@@ -136,7 +137,7 @@ export class OverrideValidationDialog extends foundry.applications.api.Handlebar
         currentVisibilityDescription: (VISIBILITY_STATES && VISIBILITY_STATES[visibilityKey]?.label)
           ? (currentVisibilityLabel + (coverKey && COVER_STATES && COVER_STATES[coverKey]?.label ? ` • ${game?.i18n?.localize?.(COVER_STATES[coverKey].label)}` : ''))
           : undefined,
-        state: override.state || 'undetected',
+        state: overrideToDisplayVisibility(override) || 'undetected',
         source: override.source || 'unknown',
         badgeLabel,
         badgeIcon,
