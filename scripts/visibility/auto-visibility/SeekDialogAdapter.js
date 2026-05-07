@@ -87,7 +87,11 @@ export class SeekDialogAdapter {
 
         // Get observer's vision capabilities
         const visCaps = this.#visionAnalyzer.getVisionCapabilities(observer);
-        const sensingSummary = this.#applySenseSuppression(visCaps.sensingSummary || {}, observer, target);
+        const sensingSummary = this.#applySenseSuppression(
+            this.#withDefaultHearing(visCaps.sensingSummary || {}, visCaps),
+            observer,
+            target,
+        );
 
         // Calculate distance for range checks
         const distance = this.#visionAnalyzer.distanceFeet(observer, target);
@@ -132,6 +136,18 @@ export class SeekDialogAdapter {
         } catch {
             return sensingSummary;
         }
+    }
+
+    #withDefaultHearing(sensingSummary, visCaps) {
+        if (visCaps?.isDeafened !== false || sensingSummary?.hearing) return sensingSummary;
+        const hasListedHearing = Array.isArray(sensingSummary?.imprecise)
+            && sensingSummary.imprecise.some((sense) => sense?.type === 'hearing');
+        if (hasListedHearing) return sensingSummary;
+
+        return {
+            ...sensingSummary,
+            hearing: { acuity: 'imprecise', range: Infinity },
+        };
     }
 
     /**
@@ -472,7 +488,12 @@ export class SeekDialogAdapter {
         }
 
         const sensingSummary = caps?.sensingSummary || {};
-        if (includeHearing && sensingSummary.hearing) {
+        const defaultHearing =
+            includeHearing && caps?.isDeafened === false && !sensingSummary.hearing
+                ? { acuity: 'imprecise', range: Infinity }
+                : null;
+        const hearingForDisplay = sensingSummary.hearing || defaultHearing;
+        if (includeHearing && hearingForDisplay) {
             const existingHearing = allSenses.find(s => s.type === 'hearing');
             if (!existingHearing) {
                 const hearingConfig = SPECIAL_SENSES.hearing || {
@@ -482,10 +503,10 @@ export class SeekDialogAdapter {
                 };
                 allSenses.push({
                     type: 'hearing',
-                    range: sensingSummary.hearing.range,
-                    isPrecise: sensingSummary.hearing.acuity === 'precise',
+                    range: hearingForDisplay.range,
+                    isPrecise: hearingForDisplay.acuity === 'precise',
                     config: hearingConfig,
-                    displayRange: sensingSummary.hearing.range === Infinity ? '∞' : String(sensingSummary.hearing.range),
+                    displayRange: hearingForDisplay.range === Infinity ? '∞' : String(hearingForDisplay.range),
                     wasUsed: 'hearing' === usedSenseType,
                 });
             }

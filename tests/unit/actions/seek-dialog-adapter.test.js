@@ -241,6 +241,30 @@ describe('SeekDialogAdapter', () => {
             expect(result.precision).toBe('imprecise');
         });
 
+        test('uses default hearing when visual sense is blocked by wall and hearing is not explicit', async () => {
+            visionAnalyzer.getVisionCapabilities.mockReturnValue({
+                hasVision: true,
+                isBlinded: false,
+                isDeafened: false,
+                precise: { 'low-light-vision': { range: Infinity } },
+                imprecise: {},
+                sensingSummary: {
+                    precise: [{ type: 'low-light-vision', range: Infinity }],
+                    imprecise: [],
+                },
+            });
+            visionAnalyzer.distanceFeet.mockReturnValue(20);
+            visionAnalyzer.hasLineOfSight.mockReturnValue(false);
+            visionAnalyzer.hasPreciseNonVisualInRange.mockReturnValue(false);
+
+            const result = await adapter.determineSenseUsed(mockObserver, mockTarget);
+
+            expect(result.canDetect).toBe(true);
+            expect(result.senseType).toBe('hearing');
+            expect(result.precision).toBe('imprecise');
+            expect(result.range).toBe(Infinity);
+        });
+
         test('returns unmet condition when lifesense cannot detect construct', async () => {
             mockTarget.actor.system.details.creatureType = 'construct';
 
