@@ -55,6 +55,8 @@ describe('Region Behavior Override Creation Integration', () => {
     let applyOverridesSpy, removeOverrideSpy, getVisibilitySpy;
 
     beforeEach(() => {
+        global.game.user.isGM = true;
+
         mockToken1 = {
             id: 'token1',
             document: { id: 'token1' },
@@ -147,5 +149,20 @@ describe('Region Behavior Override Creation Integration', () => {
         await regionBehavior._applyVisibilityUpdates(updates);
 
         expect(applyOverridesSpy).not.toHaveBeenCalled();
+    });
+
+    test('should ignore region override mutations on non-GM clients', async () => {
+        global.game.user.isGM = false;
+
+        const updates = [
+            { source: mockToken1.id, target: mockToken2.id, state: 'concealed' },
+            { source: mockToken2.id, target: mockToken1.id, state: 'observed' },
+        ];
+
+        await regionBehavior._applyVisibilityUpdates(updates);
+
+        expect(applyOverridesSpy).not.toHaveBeenCalled();
+        expect(removeOverrideSpy).not.toHaveBeenCalled();
+        expect(global.canvas.perception.update).not.toHaveBeenCalled();
     });
 });

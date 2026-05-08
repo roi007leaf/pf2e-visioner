@@ -157,6 +157,7 @@ export class OverrideValidationManager {
           const curCover = o.currentCover || 'none';
           const isDifferent = !overrideMatchesVisibility(o, curVis) || prevCover !== curCover;
           if (!isDifferent) return false;
+          if (o.targetId === tokenId) return true;
           if (!va || !movedToken) return true;
           try {
             const otherId = o.observerId === tokenId ? o.targetId : o.observerId;
@@ -700,6 +701,7 @@ export class OverrideValidationManager {
           va.clearCache();
           dataToShow = overrideData.filter((o) => {
             try {
+              if (o.targetId === headerId) return true;
               const otherId = o.observerId === headerId ? o.targetId : o.observerId;
               const otherToken = canvas.tokens?.get(otherId);
               if (!otherToken) return false;

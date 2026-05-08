@@ -43,8 +43,6 @@ class OverrideValidationIndicator {
     this._rawOverrides = [];
     this._overrideStack = new Map(); // tokenId -> { overrides, tokenName, timestamp }
     this._currentTokenId = null;
-    this._overrideStack = new Map(); // tokenId -> { overrides, tokenName, timestamp }
-    this._currentTokenId = null;
     this._drag = { active: false, start: { x: 0, y: 0 }, offset: { x: 0, y: 0 }, moved: false };
     this._rowHighlightTokens = [];
     // Guard against rapid show->hide flicker when recomputations settle to 0
@@ -86,7 +84,7 @@ class OverrideValidationIndicator {
   // Determine whether an override should be shown based on sneak status
   // For tokens with active sneak flag, only show observer changes (where the sneaking token is observing others)
   // and filter out target changes (where others are observing the sneaking token)
-  #shouldShowOverride(o) {
+  #shouldShowOverride(o, movedTokenId = null) {
     if (!o || !o.observerId || !o.targetId) return true; // If missing data, show by default
 
     try {
@@ -105,8 +103,9 @@ class OverrideValidationIndicator {
         return true; // Show observer changes (sneaking token observing others)
       }
 
-      // If target is sneaking, filter out overrides where they are the target (others observing them)
-      if (targetIsSneaking) {
+      // If target is sneaking, filter out passive target changes except for the token that just moved.
+      // Moved target overrides must stay visible so stale stealth can be cleared.
+      if (targetIsSneaking && o.targetId !== movedTokenId) {
         return false; // Hide target changes (others observing sneaking token)
       }
 
@@ -144,7 +143,7 @@ class OverrideValidationIndicator {
     const all = Array.isArray(overrideData) ? overrideData : [];
     this._rawOverrides = all;
     // Filter for display: show only entries that actually changed (visibility or cover) and handle sneak filtering
-    const overrides = all.filter((o) => this.#hasDisplayChange(o) && this.#shouldShowOverride(o));
+    const overrides = all.filter((o) => this.#hasDisplayChange(o) && this.#shouldShowOverride(o, movedTokenId));
 
     if (movedTokenId && overrides.length > 0) {
 
@@ -183,7 +182,7 @@ class OverrideValidationIndicator {
   #showStackedIndicator() {
     // First, clean up entries with no valid overrides
     for (const [tokenId, data] of Array.from(this._overrideStack.entries())) {
-      const filtered = data.overrides.filter((o) => this.#hasDisplayChange(o) && this.#shouldShowOverride(o));
+      const filtered = data.overrides.filter((o) => this.#hasDisplayChange(o) && this.#shouldShowOverride(o, tokenId));
       if (filtered.length === 0) {
         this._overrideStack.delete(tokenId);
       }
@@ -196,7 +195,7 @@ class OverrideValidationIndicator {
     }
 
     const [currentTokenId, currentData] = entries[entries.length - 1];
-    const filtered = currentData.overrides.filter((o) => this.#hasDisplayChange(o) && this.#shouldShowOverride(o));
+    const filtered = currentData.overrides.filter((o) => this.#hasDisplayChange(o) && this.#shouldShowOverride(o, currentTokenId));
 
     if (filtered.length === 0) {
       this._overrideStack.delete(currentTokenId);
@@ -232,11 +231,8 @@ class OverrideValidationIndicator {
     const badge = this._el?.querySelector('.indicator-badge');
     if (!badge) return;
     const raw = this._rawOverrides || [];
-    const count = raw.filter((o) => {
-      if (!hasOverrideVisibilityData(o) || o.state === 'avs') return false;
-      const state = overrideToDisplayVisibility(o);
-      return this.#shouldShowOverride(o) && state && state !== 'avs';
-    }).length
+    const movedTokenId = this._data?.movedTokenId || this._currentTokenId || null;
+    const count = raw.filter((o) => this.#hasDisplayChange(o) && this.#shouldShowOverride(o, movedTokenId)).length
       || this._data?.overrides?.length || 0;
     badge.textContent = count > 0 ? String(count) : '';
   }

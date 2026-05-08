@@ -97,6 +97,8 @@ export class AvsOverrideManager {
    * @param {{source?: string}} options
    */
   static async setPairOverrides(observer, changesByTarget, options = {}) {
+    if (!game.user?.isGM) return false;
+
     try {
       const src = options.source || 'manual_action';
       // Do not create overrides when the observer is Foundry-hidden
@@ -185,6 +187,8 @@ export class AvsOverrideManager {
   }
 
   static async onAVSOverride(overrideData) {
+    if (!game.user?.isGM) return false;
+
     const {
       observer,
       target,
@@ -263,6 +267,7 @@ export class AvsOverrideManager {
       });
     } catch (e) {
       console.error('PF2E Visioner | Failed to store override flag:', e);
+      return false;
     }
 
     try {
@@ -287,6 +292,8 @@ export class AvsOverrideManager {
   }
 
   static async storeOverrideFlag(observer, target, data) {
+    if (!game.user?.isGM) return false;
+
     const observerDocId = observer.document.id;
     const targetDocId = target.document.id;
 
@@ -343,6 +350,8 @@ export class AvsOverrideManager {
 
   // Remove a specific override (persistent flag-based)
   static async removeOverride(observerId, targetId) {
+    if (!game.user?.isGM) return false;
+
     try {
       const targetToken = canvas.tokens?.get(targetId);
       if (!targetToken) return false;
@@ -367,6 +376,7 @@ export class AvsOverrideManager {
   }
 
   static async removeAllOverridesInvolving(tokenId) {
+    if (!game.user?.isGM) return false;
     if (!tokenId) return;
     if (!canvas?.tokens?.placeables) return;
 
@@ -425,6 +435,8 @@ export class AvsOverrideManager {
 
   // Clear all overrides across all tokens
   static async clearAllOverrides() {
+    if (!game.user?.isGM) return false;
+
     const allTokens = canvas.tokens?.placeables || [];
     for (const token of allTokens) {
       try {
@@ -447,6 +459,8 @@ export class AvsOverrideManager {
     } catch {}
   }
   static async applyOverrides(observer, changesInput, { source, timedOverride, ...options } = {}) {
+    if (!game.user?.isGM) return false;
+
     try {
       if (observer?.document?.hidden === true) return false;
     } catch {}
@@ -506,6 +520,8 @@ export class AvsOverrideManager {
 
   // Sneak: one-way overrides from observers to sneaking token(s)
   static async applyForSneak(observer, changesInput, options = {}) {
+    if (!game.user?.isGM) return false;
+
     const map = asChangesByTarget(changesInput);
     if (map.size === 0 || !observer) return false;
     // Mark as sneak so setAVSPairOverrides enforces one-way semantics

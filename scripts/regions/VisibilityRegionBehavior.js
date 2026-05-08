@@ -75,6 +75,8 @@ export class VisibilityRegionBehavior extends RegionBehaviorBase {
   }
 
   async _handleRegionEvent(event) {
+    if (!game.user?.isGM) return;
+
     const name = event?.name ?? event?.type;
     if (!name) return;
 
@@ -458,6 +460,8 @@ export class VisibilityRegionBehavior extends RegionBehaviorBase {
   }
 
   async _applyVisibilityUpdates(updates) {
+    if (!game.user?.isGM) return;
+
     if (!updates || updates.length === 0) return;
     try {
       const updatesByObserver = new Map();

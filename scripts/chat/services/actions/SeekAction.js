@@ -7,7 +7,7 @@ import { ActionHandlerBase } from './BaseAction.js';
 export class SeekActionHandler extends ActionHandlerBase {
   constructor() {
     super('seek');
-    // Store used sense per seek action (not per subject)
+    // Store first used sense as an action-level hint; rows keep their own per-target sense.
     this._usedSenseType = null;
     this._usedSensePrecision = null;
   }
@@ -251,6 +251,8 @@ export class SeekActionHandler extends ActionHandlerBase {
     let usedImprecise = false;
     let usedImpreciseSenseType = null;
     let usedImpreciseSenseRange = null;
+    let usedSenseType = null;
+    let usedSensePrecision = null;
 
     // Track failure conditions for reporting in final outcome
     let __impreciseReason = undefined;
@@ -270,79 +272,74 @@ export class SeekActionHandler extends ActionHandlerBase {
         const observerToken =
           actionData.actorToken || actionData.actor?.token?.object || actionData.actor;
 
-        // Use adapter to determine which sense is being used (only once per seek action)
-        if (!this._usedSenseType) {
-          try {
-            const senseResult = await adapter.determineSenseUsed(observerToken, subject);
+        try {
+          const senseResult = await adapter.determineSenseUsed(observerToken, subject);
+          usedSenseType = senseResult.senseType || null;
+          usedSensePrecision = senseResult.precision || null;
 
-            if (senseResult.canDetect) {
-              this._usedSenseType = senseResult.senseType;
-              this._usedSensePrecision = senseResult.precision;
-
-              // Track imprecise sense usage for this specific subject
-              if (senseResult.precision === 'imprecise') {
-                usedImprecise = true;
-                usedImpreciseSenseType = senseResult.senseType;
-                usedImpreciseSenseRange = senseResult.range;
-              }
-            } else {
-              // Handle unmet conditions (e.g., lifesense vs construct)
-              if (senseResult.unmetCondition) {
-                const total = Number(actionData?.roll?.total ?? 0);
-                const die = Number(
-                  actionData?.roll?.dice?.[0]?.results?.[0]?.result ??
-                  actionData?.roll?.dice?.[0]?.total ??
-                  actionData?.roll?.terms?.[0]?.total ??
-                  0,
-                );
-                const dcBlocked = extractStealthDC(subject) || 0;
-                return {
-                  target: subject,
-                  dc: dcBlocked,
-                  roll: total,
-                  die,
-                  rollTotal: total,
-                  dieResult: die,
-                  margin: total - dcBlocked,
-                  outcome: 'unmet-conditions',
-                  currentVisibility: current,
-                  oldVisibility: current,
-                  newVisibility: current,
-                  changed: false,
-                  unmetConditions: true,
-                  unmetCondition: senseResult.reason,
-                  senseType: senseResult.senseType,
-                  senseRange: senseResult.range,
-                };
-              }
-
-              // Track failure reason for final outcome reporting
-              if (senseResult.outOfRange) {
-                __impreciseReason = 'out-of-range';
-                __impreciseSenseType = senseResult.senseType;
-                __impreciseSenseRange = senseResult.range;
-              } else if (senseResult.reason) {
-                __impreciseReason = 'unmet-conditions';
-                __impreciseSenseType = senseResult.senseType;
-                __impreciseSenseRange = senseResult.range;
-                __impreciseUnmet = senseResult.reason;
-              }
-
-              // Set used sense type even if detection failed (for UI indication)
-              if (senseResult.senseType) {
-                this._usedSenseType = senseResult.senseType;
-                this._usedSensePrecision = senseResult.precision;
-              }
-            }
-          } catch (err) {
-            console.warn('Error determining sense used for seek:', err);
+          if (!this._usedSenseType && usedSenseType) {
+            this._usedSenseType = usedSenseType;
+            this._usedSensePrecision = usedSensePrecision;
           }
+
+          if (senseResult.canDetect) {
+            // Track imprecise sense usage for this specific subject
+            if (senseResult.precision === 'imprecise') {
+              usedImprecise = true;
+              usedImpreciseSenseType = senseResult.senseType;
+              usedImpreciseSenseRange = senseResult.range;
+            }
+          } else {
+            // Handle unmet conditions (e.g., lifesense vs construct)
+            if (senseResult.unmetCondition) {
+              const total = Number(actionData?.roll?.total ?? 0);
+              const die = Number(
+                actionData?.roll?.dice?.[0]?.results?.[0]?.result ??
+                actionData?.roll?.dice?.[0]?.total ??
+                actionData?.roll?.terms?.[0]?.total ??
+                0,
+              );
+              const dcBlocked = extractStealthDC(subject) || 0;
+              return {
+                target: subject,
+                dc: dcBlocked,
+                roll: total,
+                die,
+                rollTotal: total,
+                dieResult: die,
+                margin: total - dcBlocked,
+                outcome: 'unmet-conditions',
+                currentVisibility: current,
+                oldVisibility: current,
+                newVisibility: current,
+                changed: false,
+                unmetConditions: true,
+                unmetCondition: senseResult.reason,
+                senseType: senseResult.senseType,
+                senseRange: senseResult.range,
+              };
+            }
+
+            // Track failure reason for final outcome reporting
+            if (senseResult.outOfRange) {
+              __impreciseReason = 'out-of-range';
+              __impreciseSenseType = senseResult.senseType;
+              __impreciseSenseRange = senseResult.range;
+            } else if (senseResult.reason) {
+              __impreciseReason = 'unmet-conditions';
+              __impreciseSenseType = senseResult.senseType;
+              __impreciseSenseRange = senseResult.range;
+              __impreciseUnmet = senseResult.reason;
+            }
+          }
+        } catch (err) {
+          console.warn('Error determining sense used for seek:', err);
         }
       }
     } catch { }
 
     // If no senses are available at all, the seek cannot detect anything
-    if (!this._usedSenseType && !usedImprecise) {
+    if (!usedSenseType && !usedImprecise) {
       newVisibility = current;
     }
 
@@ -423,9 +420,9 @@ export class SeekActionHandler extends ActionHandlerBase {
       usedImprecise: !!usedImprecise,
       usedImpreciseSenseType: usedImpreciseSenseType || null,
       usedImpreciseSenseRange: usedImpreciseSenseRange ?? null,
-      // Used sense information for UI display (set once per seek action, not per subject)
-      usedSenseType: this._usedSenseType,
-      usedSensePrecision: this._usedSensePrecision,
+      // Used sense information for UI display, calculated per subject.
+      usedSenseType,
+      usedSensePrecision,
       // Informational flags when neither precise nor imprecise could detect
       unmetConditions:
         typeof __impreciseReason !== 'undefined' && __impreciseReason === 'unmet-conditions'

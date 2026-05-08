@@ -154,6 +154,42 @@ describe('OverrideValidationIndicator - Sneak Filtering', () => {
             expect(indicator._el.classList.remove).toHaveBeenCalledWith('pf2e-visioner-override-indicator--visible');
         });
 
+        it('should show target changes when the sneaking target is the moved token', () => {
+            // Mock target as sneaking, observer not sneaking
+            global.canvas.tokens.get.mockImplementation((tokenId) => {
+                if (tokenId === 'observer1') {
+                    return {
+                        document: {
+                            getFlag: jest.fn().mockReturnValue(false)
+                        }
+                    };
+                } else if (tokenId === 'target1') {
+                    return {
+                        document: {
+                            getFlag: jest.fn().mockReturnValue(true)
+                        }
+                    };
+                }
+                return null;
+            });
+
+            const overrides = [
+                {
+                    observerId: 'observer1',
+                    targetId: 'target1',
+                    state: 'unnoticed',
+                    currentVisibility: 'observed'
+                }
+            ];
+
+            indicator.show(overrides, 'Stealther', 'target1');
+
+            // A moved stealther must still show stale observer -> stealther overrides,
+            // so the GM can remove them after movement.
+            expect(indicator._badge.textContent).toBe('1');
+            expect(indicator._el.classList.add).toHaveBeenCalledWith('pf2e-visioner-override-indicator--visible');
+        });
+
         it('should show observer changes when observer is sneaking', () => {
             // Mock observer as sneaking, target not sneaking
             global.canvas.tokens.get.mockImplementation((tokenId) => {
