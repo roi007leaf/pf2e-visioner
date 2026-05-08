@@ -983,9 +983,9 @@ const checkSingleRayForDarkness = (ray) => {
         darknessRank = Number(config.darknessRank || config.spellLevel || 0) || 0;
       }
 
-      // Default to rank 4 for darkness sources if no specific rank is found
-      // This matches the expectation that darkness spells are typically rank 4
-      if (darknessRank === 0) darknessRank = 4;
+      // Default unranked darkness sources to rank 2, matching the raster path and
+      // preserving regular darkvision for ordinary darkness lights.
+      if (darknessRank === 0) darknessRank = 2;
 
       darknessEffects.push({
         light: lightSource,

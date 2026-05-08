@@ -25,6 +25,10 @@ export class TemplateEventHandler {
         Hooks.on('createMeasuredTemplate', this.handleTemplateCreate.bind(this));
         Hooks.on('updateMeasuredTemplate', this.handleTemplateUpdate.bind(this));
         Hooks.on('deleteMeasuredTemplate', this.handleTemplateDelete.bind(this));
+        // PF2e v14 places spell effect areas as Regions instead of MeasuredTemplates.
+        Hooks.on('createRegion', this.handleRegionCreate.bind(this));
+        Hooks.on('updateRegion', this.handleRegionUpdate.bind(this));
+        Hooks.on('deleteRegion', this.handleRegionDelete.bind(this));
     }
 
     /**
@@ -107,6 +111,63 @@ export class TemplateEventHandler {
     }
 
     /**
+     * Handle PF2e v14 region creation (spell effect areas).
+     */
+    async handleRegionCreate(region) {
+        if (!this.#systemState.shouldProcessEvents()) return;
+
+        try {
+            if (this.#isDarknessRegion(region)) {
+                await this.#ensureDarknessLightForRegion(region);
+            }
+        } catch {
+            /* best-effort */
+        }
+    }
+
+    /**
+     * Handle PF2e v14 region updates (spell effect areas).
+     */
+    async handleRegionUpdate(region, changes = {}) {
+        if (!this.#systemState.shouldProcessEvents()) return;
+
+        const significantChange =
+            changes.x !== undefined ||
+            changes.y !== undefined ||
+            changes.shapes !== undefined ||
+            changes.flags !== undefined ||
+            changes.name !== undefined ||
+            changes.hidden !== undefined;
+
+        if (!significantChange) return;
+
+        try {
+            if (this.#isDarknessRegion(region)) {
+                const existingId = region.getFlag?.(MODULE_ID, 'darknessLightId');
+                if (existingId) await this.#syncDarknessLightForRegion(region);
+                else await this.#ensureDarknessLightForRegion(region);
+            } else if (region.getFlag?.(MODULE_ID, 'darknessLightId')) {
+                await this.#removeDarknessLightForRegion(region);
+            }
+        } catch {
+            /* best-effort */
+        }
+    }
+
+    /**
+     * Handle PF2e v14 region deletion (spell effect areas).
+     */
+    async handleRegionDelete(region) {
+        if (!this.#systemState.shouldProcessEvents()) return;
+
+        try {
+            await this.#removeDarknessLightForRegion(region);
+        } catch {
+            /* best-effort */
+        }
+    }
+
+    /**
      * Heuristics to extract name and identify light-like templates from PF2e flags.
      */
     #getTemplateNameAndLightHint(template) {
@@ -129,6 +190,20 @@ export class TemplateEventHandler {
      * Robust check if a measured template represents the Darkness spell
      */
     #isDarknessTemplate(template) {
+        return this.#isDarknessAreaDocument(template);
+    }
+
+    /**
+     * Robust check if a PF2e Region represents the Darkness spell.
+     */
+    #isDarknessRegion(region) {
+        return this.#isDarknessAreaDocument(region);
+    }
+
+    /**
+     * Robust check if a PF2e effect area document represents the Darkness spell.
+     */
+    #isDarknessAreaDocument(document) {
         try {
             const normalize = (v = '') =>
                 String(v)
@@ -137,7 +212,7 @@ export class TemplateEventHandler {
                     .replace(/'+/g, '')
                     .replace(/[^a-z0-9]+/g, '-')
                     .replace(/^-+|-+$/g, '');
-            const pf2e = template.flags?.pf2e || {};
+            const pf2e = document.flags?.pf2e || {};
             const item = pf2e.item || {};
             const origin = pf2e.origin || {};
             const slug = normalize(origin.slug || item.slug || origin.name || item.name || '');
@@ -174,6 +249,29 @@ export class TemplateEventHandler {
     }
 
     /**
+     * Determine spell rank from PF2e origin/item flags.
+     */
+    #extractDarknessRank(document, fallback = 0) {
+        try {
+            const pf2e = document.flags?.pf2e || {};
+            const origin = pf2e.origin || {};
+            const item = pf2e.item || {};
+            let darknessRank = Number(origin.castRank || item.castRank || 0) || 0;
+            if (!darknessRank) {
+                const rolls = [...(origin.rollOptions || []), ...(item.rollOptions || [])];
+                const rankOpt = rolls.find((r) => /(^|:)rank:(\d+)/i.test(String(r)));
+                if (rankOpt) {
+                    const m = String(rankOpt).match(/(^|:)rank:(\d+)/i);
+                    if (m) darknessRank = Number(m[2]) || 0;
+                }
+            }
+            return darknessRank || fallback;
+        } catch {
+            return fallback;
+        }
+    }
+
+    /**
      * Ensure a magical darkness light exists for a Darkness template and link it via flags.
      * Creates the light if missing.
      */
@@ -187,24 +285,7 @@ export class TemplateEventHandler {
             }
 
             const dist = Number(template.distance) || 20;
-            // Determine cast rank from PF2e flags (origin preferred)
-            let darknessRank = 0;
-            try {
-                const pf2e = template.flags?.pf2e || {};
-                const origin = pf2e.origin || {};
-                const item = pf2e.item || {};
-                darknessRank = Number(origin.castRank || item.castRank || 0) || 0;
-                if (!darknessRank) {
-                    const rolls = [...(origin.rollOptions || []), ...(item.rollOptions || [])];
-                    const rankOpt = rolls.find((r) => /(^|:)rank:(\d+)/i.test(String(r)));
-                    if (rankOpt) {
-                        const m = String(rankOpt).match(/(^|:)rank:(\d+)/i);
-                        if (m) darknessRank = Number(m[2]) || 0;
-                    }
-                }
-            } catch {
-                /* ignore */
-            }
+            const darknessRank = this.#extractDarknessRank(template);
             const data = {
                 x: template.x,
                 y: template.y,
@@ -245,24 +326,7 @@ export class TemplateEventHandler {
             const lightId = template.getFlag?.(MODULE_ID, 'darknessLightId');
             if (!lightId) return;
             const dist = Number(template.distance) || 20;
-            // Try to update the darkness rank flag as well
-            let darknessRank = null;
-            try {
-                const pf2e = template.flags?.pf2e || {};
-                const origin = pf2e.origin || {};
-                const item = pf2e.item || {};
-                darknessRank = Number(origin.castRank || item.castRank || 0) || null;
-                if (!darknessRank) {
-                    const rolls = [...(origin.rollOptions || []), ...(item.rollOptions || [])];
-                    const rankOpt = rolls.find((r) => /(^|:)rank:(\d+)/i.test(String(r)));
-                    if (rankOpt) {
-                        const m = String(rankOpt).match(/(^|:)rank:(\d+)/i);
-                        if (m) darknessRank = Number(m[2]) || null;
-                    }
-                }
-            } catch {
-                /* ignore */
-            }
+            const darknessRank = this.#extractDarknessRank(template, null);
             const update = {
                 _id: lightId,
                 x: template.x,
@@ -304,6 +368,141 @@ export class TemplateEventHandler {
         } catch (e) {
             console.warn('PF2E Visioner | Failed to remove Darkness light for template:', e);
         }
+    }
+
+    /**
+     * Ensure a magical darkness light exists for a PF2e v14 Darkness effect-area Region.
+     */
+    async #ensureDarknessLightForRegion(region) {
+        try {
+            const existingId = region.getFlag?.(MODULE_ID, 'darknessLightId');
+            if (existingId && canvas.scene?.lights?.get?.(existingId)) {
+                await this.#syncDarknessLightForRegion(region);
+                return;
+            }
+
+            const metrics = this.#getRegionLightMetrics(region);
+            if (!metrics) return;
+
+            const darknessRank = this.#extractDarknessRank(region);
+            const data = {
+                x: metrics.x,
+                y: metrics.y,
+                hidden: false,
+                flags: {
+                    [MODULE_ID]: {
+                        heightenedDarkness: darknessRank >= 4,
+                        linkedRegionId: region.id,
+                        source: 'pf2e-darkness',
+                        darknessRank,
+                    },
+                },
+                config: { bright: metrics.distance, dim: metrics.distance, negative: true },
+                rotation: 0,
+                walls: true,
+                vision: true,
+            };
+
+            const created = await canvas.scene?.createEmbeddedDocuments?.('AmbientLight', [data]);
+            const createdDoc = Array.isArray(created) ? created[0] : null;
+            const lightId = createdDoc?.id || createdDoc?._id || null;
+            if (lightId) {
+                try {
+                    await region.setFlag?.(MODULE_ID, 'darknessLightId', lightId);
+                } catch {
+                    /* ignore */
+                }
+            }
+        } catch (e) {
+            console.warn('PF2E Visioner | Failed to create Darkness light for region:', e);
+        }
+    }
+
+    /**
+     * Sync a linked Darkness light to its PF2e v14 effect-area Region.
+     */
+    async #syncDarknessLightForRegion(region) {
+        try {
+            const lightId = region.getFlag?.(MODULE_ID, 'darknessLightId');
+            if (!lightId) return;
+
+            const metrics = this.#getRegionLightMetrics(region);
+            if (!metrics) return;
+
+            const darknessRank = this.#extractDarknessRank(region, null);
+            const update = {
+                _id: lightId,
+                x: metrics.x,
+                y: metrics.y,
+                'config.bright': metrics.distance,
+                'config.dim': metrics.distance,
+                'config.negative': true,
+                hidden: false,
+                ...(darknessRank ? { [`flags.${MODULE_ID}.darknessRank`]: darknessRank } : {}),
+            };
+            if (typeof darknessRank === 'number') {
+                update[`flags.${MODULE_ID}.heightenedDarkness`] = darknessRank >= 4;
+            }
+
+            await canvas.scene?.updateEmbeddedDocuments?.('AmbientLight', [update]);
+        } catch (e) {
+            console.warn('PF2E Visioner | Failed to sync Darkness light for region:', e);
+        }
+    }
+
+    /**
+     * Remove the linked Darkness light when the PF2e v14 effect-area Region is deleted.
+     */
+    async #removeDarknessLightForRegion(region) {
+        try {
+            const lightId = region.getFlag?.(MODULE_ID, 'darknessLightId');
+            if (!lightId) return;
+            try {
+                await canvas.scene?.deleteEmbeddedDocuments?.('AmbientLight', [lightId]);
+            } catch {
+                /* ignore delete errors */
+            }
+            try {
+                await region.unsetFlag?.(MODULE_ID, 'darknessLightId');
+            } catch {
+                /* ignore flag errors */
+            }
+        } catch (e) {
+            console.warn('PF2E Visioner | Failed to remove Darkness light for region:', e);
+        }
+    }
+
+    /**
+     * Convert a Region shape into AmbientLight coordinates and distance units.
+     */
+    #getRegionLightMetrics(region) {
+        const shape = region.shapes?.[0];
+        if (!shape) return null;
+
+        const x = Number(shape.x ?? region.x);
+        const y = Number(shape.y ?? region.y);
+        if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+
+        const radiusPixels = this.#getRegionShapeRadiusPixels(shape);
+        const distance = this.#pixelsToSceneDistance(radiusPixels) || 20;
+        return { x, y, distance };
+    }
+
+    #getRegionShapeRadiusPixels(shape) {
+        const type = String(shape.type || '').toLowerCase();
+        if (type === 'circle' || type === 'cone') return Number(shape.radius) || 0;
+        if (type === 'ellipse') return Math.max(Number(shape.radiusX) || 0, Number(shape.radiusY) || 0);
+        if (type === 'rectangle') return Math.max(Number(shape.width) || 0, Number(shape.height) || 0) / 2;
+        if (type === 'line') return Number(shape.length) || 0;
+        if (type === 'emanation') return Number(shape.radius) || 0;
+        return Number(shape.radius || shape.radiusX || shape.width || shape.length || 0) || 0;
+    }
+
+    #pixelsToSceneDistance(pixels) {
+        const size = Number(canvas?.grid?.size || canvas?.dimensions?.size || 0);
+        const distance = Number(canvas?.dimensions?.distance || canvas?.scene?.grid?.distance || 5);
+        if (size > 0) return (Number(pixels) / size) * distance;
+        return Number(pixels) || 0;
     }
 
     /**
