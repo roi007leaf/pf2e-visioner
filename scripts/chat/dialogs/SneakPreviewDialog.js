@@ -6,6 +6,7 @@ import { optimizedVisibilityCalculator } from '../../visibility/auto-visibility/
 import {
   canAttemptHideOrRemainHidden,
   legacyVisibilityToProfile,
+  overrideToDisplayVisibility,
 } from '../../visibility/perception-profile.js';
 import { getDesiredOverrideStatesForAction } from '../services/data/action-state-config.js';
 import { FeatsHandler } from '../services/FeatsHandler.js';
@@ -433,8 +434,9 @@ export class SneakPreviewDialog extends BaseActionDialog {
         outcome.oldVisibility ||
         outcome.currentVisibility;
 
-      if (overrideFlag?.state) {
-        currentVisibility = overrideFlag.state;
+      const overrideVisibility = overrideFlag ? overrideToDisplayVisibility(overrideFlag) : null;
+      if (overrideVisibility) {
+        currentVisibility = overrideVisibility;
       }
 
       // Prepare available states for override
@@ -2281,8 +2283,9 @@ export class SneakPreviewDialog extends BaseActionDialog {
         MODULE_ID,
         `avs-override-from-${observerId}`,
       );
-      if (overrideFlag && overrideFlag.state) {
-        const s = overrideFlag.state;
+      const overrideVisibility = overrideFlag ? overrideToDisplayVisibility(overrideFlag) : null;
+      if (overrideVisibility) {
+        const s = overrideVisibility;
 
         if (sneakStartPositionQualifies(s)) return true;
         // concealed/observed do not satisfy start prerequisite
@@ -2380,7 +2383,7 @@ export class SneakPreviewDialog extends BaseActionDialog {
         if (overrideFlag) {
           const overrideCoverState = overrideFlag.expectedCover ?? (overrideFlag.hasCover ? 'standard' : 'none');
           // Qualify if override provides standard/greater cover or concealment
-          if (sneakEndPositionQualifies(overrideFlag.state, overrideCoverState))
+          if (sneakEndPositionQualifies(overrideToDisplayVisibility(overrideFlag), overrideCoverState))
             return true;
           // hidden/undetected do not satisfy end prerequisite
         }
@@ -3589,8 +3592,9 @@ export class SneakPreviewDialog extends BaseActionDialog {
       }
     }
 
-    if (overrideFlag?.state) {
-      currentVisibility = overrideFlag.state;
+    const overrideVisibility = overrideFlag ? overrideToDisplayVisibility(overrideFlag) : null;
+    if (overrideVisibility) {
+      currentVisibility = overrideVisibility;
     }
 
     const baseOldState = outcome.oldVisibility || currentVisibility;

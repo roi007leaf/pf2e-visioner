@@ -1,4 +1,5 @@
-import { MODULE_ID, VISIBILITY_STATES, getVisibilityStateLabelKey } from '../../../constants.js';
+import { MODULE_ID, getVisibilityStateLabelKey } from '../../../constants.js';
+import { overrideToDisplayVisibility } from '../../../visibility/perception-profile.js';
 import { appliedConsequencesChangesByMessage } from '../data/message-cache.js';
 import { log, notify } from '../infra/notifications.js';
 import { shouldFilterAlly } from '../infra/shared-utils.js';
@@ -295,7 +296,7 @@ export class ConsequencesActionHandler extends ActionHandlerBase {
                 targetId,
                 observerName: v.observerName || observerId,
                 targetName: v.targetName || t.document.name,
-                state: v.state,
+                state: overrideToDisplayVisibility(v),
                 hasCover: v.hasCover,
                 hasConcealment: v.hasConcealment,
                 expectedCover: v.expectedCover,
@@ -331,7 +332,7 @@ export class ConsequencesActionHandler extends ActionHandlerBase {
                 ? r.target.document.id
                 : r.observer.document.id,
             original: {
-              state: r.data?.state,
+              state: overrideToDisplayVisibility(r.data),
               source: r.data?.source,
               hasCover: r.data?.hasCover,
               hasConcealment: r.data?.hasConcealment,

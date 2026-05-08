@@ -2,6 +2,8 @@
  * Extract action data from a chat message. Supports Seek, Point Out, Hide, Sneak,
  * Create a Diversion, and damage consequences.
  */
+import { overrideToDisplayVisibility } from '../../visibility/perception-profile.js';
+
 export async function extractActionData(message) {
   if (!message) return null;
 
@@ -113,7 +115,8 @@ export async function extractActionData(message) {
   else if (isAttackRoll && !isDamageTakenMessage) {
     const flags = actorToken?.document?.flags?.['pf2e-visioner'] || {};
     const hasHiddenOverride = Object.entries(flags).some(([k, v]) =>
-      k.startsWith('avs-override-from-') && ['hidden', 'undetected'].includes(v?.state));
+      k.startsWith('avs-override-from-') &&
+      ['hidden', 'undetected'].includes(overrideToDisplayVisibility(v)));
     if (hasHiddenOverride) actionType = 'consequences';
   }
 

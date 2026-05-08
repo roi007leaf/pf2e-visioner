@@ -8,6 +8,7 @@ import {
 import autoCoverSystem from '../../../cover/auto-cover/AutoCoverSystem.js';
 import stealthCheckUseCase from '../../../cover/auto-cover/usecases/StealthCheckUseCase.js';
 import { getCoverBetween } from '../../../utils.js';
+import { overrideToDisplayVisibility } from '../../../visibility/perception-profile.js';
 import { appliedSneakChangesByMessage } from '../data/message-cache.js';
 import errorHandlingService, { SYSTEM_TYPES } from '../infra/ErrorHandlingService.js';
 import { notify } from '../infra/notifications.js';
@@ -974,8 +975,8 @@ export class SneakActionHandler extends ActionHandlerBase {
             'pf2e-visioner',
             `avs-override-from-${observerId}`,
           );
-          if (overrideFlag && overrideFlag.state) {
-            avsOverride = overrideFlag.state;
+          if (overrideFlag) {
+            avsOverride = overrideToDisplayVisibility(overrideFlag);
           }
         }
         if (avsOverride) return avsOverride;

@@ -3,6 +3,20 @@
  * Facade for interacting with overrides (active manual overrides between tokens).
  */
 import { getLogger } from '../../../utils/logger.js';
+import { overrideToDisplayVisibility } from '../../perception-profile.js';
+
+function toOverrideState(override) {
+    if (
+        !override ||
+        typeof override !== 'object' ||
+        (typeof override.state !== 'string' &&
+            typeof override.detectionState !== 'string' &&
+            typeof override.hasConcealment !== 'boolean')
+    ) {
+        return null;
+    }
+    return overrideToDisplayVisibility(override);
+}
 
 export class OverrideService {
     constructor() { }
@@ -47,13 +61,15 @@ export class OverrideService {
                 observer?.document?.id,
                 target?.document?.id
             );
-            if (byIds?.state) return byIds;
+            const byIdsState = toOverrideState(byIds);
+            if (byIdsState) return { state: byIdsState };
             // As a last resort, attempt to peek at a cached last result if exposed
             const peek = AvsOverrideManager?.peekOverrideCache?.(
                 observer?.document?.id,
                 target?.document?.id
             );
-            if (peek?.state) return peek;
+            const peekState = toOverrideState(peek);
+            if (peekState) return { state: peekState };
         } catch { /* ignore */ }
         return null;
     }

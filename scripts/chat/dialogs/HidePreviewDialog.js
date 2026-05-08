@@ -15,6 +15,7 @@ import { hasActiveEncounter } from '../services/infra/shared-utils.js';
 import {
   canAttemptHideOrRemainHidden,
   legacyVisibilityToProfile,
+  overrideToDisplayVisibility,
 } from '../../visibility/perception-profile.js';
 import { BaseActionDialog } from './base-action-dialog.js';
 
@@ -316,9 +317,10 @@ export class HidePreviewDialog extends BaseActionDialog {
 
           const flag = flags[flagKeyToFind];
 
-          if (flag?.state) {
+          const flagVisibility = flag ? overrideToDisplayVisibility(flag) : null;
+          if (flagVisibility) {
             overrideFlag = flag;
-            currentVisibility = flag.state;
+            currentVisibility = flagVisibility;
             break;
           }
         }
@@ -833,9 +835,10 @@ export class HidePreviewDialog extends BaseActionDialog {
               const flags = hidingToken.document?.flags?.['pf2e-visioner'] || {};
               const flag = flags[flagKeyToFind];
 
-              if (flag?.state) {
+              const flagVisibility = flag ? overrideToDisplayVisibility(flag) : null;
+              if (flagVisibility) {
                 overrideFlag = flag;
-                currentVisibility = flag.state;
+                currentVisibility = flagVisibility;
                 break;
               }
             }
