@@ -482,23 +482,29 @@ export async function applyCurrent(event, button) {
     const visibilityInputs = app.element.querySelectorAll('input[name^="visibility."]');
     const coverInputs = app.element.querySelectorAll('input[name^="cover."]');
     const wallInputs = app.element.querySelectorAll('input[name^="walls."]');
+    const isVisibilityTab = app.activeTab === 'visibility';
+    const isCoverTab = app.activeTab === 'cover';
 
-    // Create form data object from current inputs
+    // Create form data object from the active tab only.
     const formDataObj = {};
-    visibilityInputs.forEach((input) => {
-      const tokenId = input.name.replace('visibility.', '');
-      if (allowedTokenIds && !allowedTokenIds.has(tokenId)) return;
-      formDataObj[input.name] = input.value;
-    });
-    coverInputs.forEach((input) => {
-      const tokenId = input.name.replace('cover.', '');
-      if (allowedTokenIds && !allowedTokenIds.has(tokenId)) return;
-      formDataObj[input.name] = input.value;
-    });
-    wallInputs.forEach((input) => {
-      const wallId = input.name.replace('walls.', '');
-      formDataObj[input.name] = input.value;
-    });
+    if (isVisibilityTab) {
+      visibilityInputs.forEach((input) => {
+        const tokenId = input.name.replace('visibility.', '');
+        if (allowedTokenIds && !allowedTokenIds.has(tokenId)) return;
+        formDataObj[input.name] = input.value;
+      });
+      wallInputs.forEach((input) => {
+        const wallId = input.name.replace('walls.', '');
+        formDataObj[input.name] = input.value;
+      });
+    }
+    if (isCoverTab) {
+      coverInputs.forEach((input) => {
+        const tokenId = input.name.replace('cover.', '');
+        if (allowedTokenIds && !allowedTokenIds.has(tokenId)) return;
+        formDataObj[input.name] = input.value;
+      });
+    }
 
     // Call formHandler with forceOverride to create overrides even when state matches
     await formHandler.call(app, event, app.element, formDataObj, { forceOverride: true });
