@@ -216,6 +216,7 @@ describe('Token Manager Context Building - DC Display Fix', () => {
     global.canvas = {
       tokens: {
         placeables: [mockTarget1, mockTarget2],
+        get: jest.fn((id) => [mockObserver, mockTarget1, mockTarget2].find((t) => t.id === id) || null),
       },
       walls: {
         placeables: [],
@@ -341,6 +342,67 @@ describe('Token Manager Context Building - DC Display Fix', () => {
       // Verify we're in observer mode
       expect(context.isObserverMode).toBe(true);
       expect(context.isTargetMode).toBe(false);
+    });
+  });
+
+  describe('Canonical AVS Override Display', () => {
+    beforeEach(() => {
+      global.game.settings.get.mockImplementation((moduleId, settingId) => {
+        if (settingId === 'autoVisibilityEnabled') return true;
+        if (settingId === 'integrateRollOutcome') return false;
+        if (settingId === 'hiddenWallsEnabled') return false;
+        return false;
+      });
+    });
+
+    test('observer mode selects concealed for canonical concealed override flags', async () => {
+      mockApp.mode = 'observer';
+      mockTarget1.document.getFlag.mockImplementation((moduleId, flagKey) => {
+        if (
+          moduleId === 'pf2e-visioner' &&
+          flagKey === `avs-override-from-${mockObserver.document.id}`
+        ) {
+          return {
+            source: 'manual_action',
+            detectionState: 'observed',
+            hasConcealment: true,
+            coverState: 'none',
+          };
+        }
+        return null;
+      });
+
+      const context = await buildContext(mockApp, {});
+      const amiriTarget = context.pcTargets.find((t) => t.id === mockTarget1.id);
+
+      expect(amiriTarget.currentVisibilityState).toBe('concealed');
+      expect(amiriTarget.visibilityStates.find((state) => state.value === 'concealed').selected).toBe(true);
+      expect(amiriTarget.visibilityStates.find((state) => state.value === 'observed').selected).toBe(false);
+    });
+
+    test('target mode selects concealed for canonical concealed override flags', async () => {
+      mockApp.mode = 'target';
+      mockObserver.document.getFlag.mockImplementation((moduleId, flagKey) => {
+        if (
+          moduleId === 'pf2e-visioner' &&
+          flagKey === `avs-override-from-${mockTarget1.document.id}`
+        ) {
+          return {
+            source: 'manual_action',
+            detectionState: 'observed',
+            hasConcealment: true,
+            coverState: 'none',
+          };
+        }
+        return null;
+      });
+
+      const context = await buildContext(mockApp, {});
+      const amiriTarget = context.pcTargets.find((t) => t.id === mockTarget1.id);
+
+      expect(amiriTarget.currentVisibilityState).toBe('concealed');
+      expect(amiriTarget.visibilityStates.find((state) => state.value === 'concealed').selected).toBe(true);
+      expect(amiriTarget.visibilityStates.find((state) => state.value === 'observed').selected).toBe(false);
     });
   });
 

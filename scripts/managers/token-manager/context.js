@@ -17,6 +17,7 @@ import {
   hasActiveEncounter,
 } from '../../utils.js';
 import { TimedOverrideManager } from '../../services/TimedOverrideManager.js';
+import { overrideToDisplayVisibility } from '../../visibility/perception-profile.js';
 
 function getManualVisibilityKeys() {
   return Object.entries(VISIBILITY_STATES)
@@ -34,6 +35,10 @@ function buildVisibilityStateContext(key, { selected = false, manual = true } = 
     color: config.color,
     cssClass: config.cssClass,
   };
+}
+
+function getOverrideDisplayState(overrideFlag) {
+  return overrideToDisplayVisibility(overrideFlag) || 'observed';
 }
 
 function getTokenImage(token) {
@@ -252,7 +257,7 @@ export async function buildContext(app, options) {
             if (avsOverrideFlag) {
               // There's an override - use the override state
               hasAvsOverride = true;
-              actualCurrentState = avsOverrideFlag.state || 'observed';
+              actualCurrentState = getOverrideDisplayState(avsOverrideFlag);
               isAvsControlled = false; // Override is controlling, not AVS
             } else {
               // No override - AVS is controlling (unless it's a hazard/loot token)
@@ -450,7 +455,7 @@ export async function buildContext(app, options) {
             if (avsOverrideFlag) {
               // There's an override - use the override state
               hasAvsOverride = true;
-              actualCurrentState = avsOverrideFlag.state || 'observed';
+              actualCurrentState = getOverrideDisplayState(avsOverrideFlag);
               isAvsControlled = false; // Override is controlling, not AVS
             } else {
               // No override - AVS is controlling (unless it's a hazard/loot token)
