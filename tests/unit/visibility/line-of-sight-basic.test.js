@@ -103,6 +103,17 @@ describe('VisionAnalyzer - Line of Sight (Refactored)', () => {
             expect(result).toBe(true);
         });
 
+        test('should fall back to geometric LOS when Foundry visibility says false without walls', () => {
+            global.canvas.walls.placeables = [];
+            global.canvas.visibility = { testVisibility: jest.fn(() => false) };
+            mockObserver.vision = {};
+
+            const result = visionAnalyzer.hasLineOfSight(mockObserver, mockTarget);
+
+            expect(global.canvas.visibility.testVisibility).toHaveBeenCalled();
+            expect(result).toBe(true);
+        });
+
         test('should return true when wall does not intersect ray', () => {
             // Wall at x=400, which is beyond the target
             global.canvas.walls.placeables = [
@@ -412,6 +423,29 @@ describe('VisionAnalyzer - Line of Sight (Refactored)', () => {
 
             expect(test3DCollision).toHaveBeenCalledWith(mockObserver, mockTarget, 'sight');
             expect(result).toBe(false);
+        });
+
+        test('should fall back to geometric LOS for core Levels polygon-only collisions', () => {
+            const get3DCollisionDetails = jest.fn().mockReturnValue({
+                mode: 'core',
+                result: true,
+                surfaceCollision: false,
+                polygonCollision: true,
+                levelInclusionCollision: false,
+                reason: 'polygon',
+            });
+            jest.spyOn(LevelsIntegration, 'getInstance').mockReturnValue({
+                isActive: true,
+                mode: 'core',
+                get3DCollisionDetails,
+                getTokenLevelId: () => 'defaultLevel0000',
+            });
+            global.canvas.walls.placeables = [];
+
+            const result = visionAnalyzer.hasLineOfSight(mockObserver, mockTarget);
+
+            expect(get3DCollisionDetails).toHaveBeenCalledWith(mockObserver, mockTarget, 'sight');
+            expect(result).toBe(true);
         });
     });
 });

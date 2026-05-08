@@ -253,6 +253,10 @@ class LevelsIntegration {
   }
 
   test3DCollision(token1, token2, type = 'sight') {
+    return !!this.get3DCollisionDetails(token1, token2, type).result;
+  }
+
+  get3DCollisionDetails(token1, token2, type = 'sight') {
     try {
       if (this.isCoreActive) {
         const originType = type === 'sight' ? 'vision' : type === 'sound' ? 'sound' : 'movement';
@@ -260,7 +264,7 @@ class LevelsIntegration {
         const p1 = this.getTokenPosition(token2, { origin: originType });
         const originLevel = this.getTokenVisionLevel(token1);
         const targetLevel = this.getTokenVisionLevel(token2);
-        return this._testCoreCombinedCollision(p0, p1, type, {
+        return this._getCoreCombinedCollisionDetails(p0, p1, type, {
           originToken: token1,
           targetToken: token2,
           originLevel,
@@ -269,14 +273,28 @@ class LevelsIntegration {
       }
 
       if (!this.isLegacyActive) {
-        return false;
+        return {
+          mode: 'none',
+          result: false,
+          reason: 'inactive',
+        };
       }
 
       const collision = this.api.checkCollision(token1, token2, type);
-      return !!collision;
+      return {
+        mode: 'legacy',
+        result: !!collision,
+        reason: collision ? 'legacy-collision' : 'clear',
+        rawCollision: collision || null,
+      };
     } catch (error) {
       console.warn('[PF2E Visioner] Error testing 3D collision:', error);
-      return false;
+      return {
+        mode: this.mode,
+        result: false,
+        reason: 'error',
+        error: error.message,
+      };
     }
   }
 
@@ -672,8 +690,16 @@ class LevelsIntegration {
   }
 
   _testCoreCombinedCollision(p0, p1, type = 'sight', options = {}) {
+    return this._getCoreCombinedCollisionDetails(p0, p1, type, options).result;
+  }
+
+  _getCoreCombinedCollisionDetails(p0, p1, type = 'sight', options = {}) {
     if (!p0 || !p1) {
-      return false;
+      return this._coreCollisionDetails({
+        result: false,
+        reason: 'missing-points',
+        options,
+      });
     }
 
     const origin = this._normalizePoint(p0);
@@ -693,7 +719,15 @@ class LevelsIntegration {
       originLevel;
 
     if (!originLevel && !targetLevel) {
-      return false;
+      return this._coreCollisionDetails({
+        result: false,
+        reason: 'no-level',
+        origin,
+        destination,
+        originLevel,
+        targetLevel,
+        options,
+      });
     }
 
     if (
@@ -703,7 +737,16 @@ class LevelsIntegration {
       originLevel &&
       !this.isTokenIncludedInLevel(options.targetToken, originLevel)
     ) {
-      return true;
+      return this._coreCollisionDetails({
+        result: true,
+        reason: 'level-inclusion',
+        levelInclusionCollision: true,
+        origin,
+        destination,
+        originLevel,
+        targetLevel,
+        options,
+      });
     }
 
     const resolvedOriginLevel = originLevel ?? targetLevel;
@@ -719,7 +762,15 @@ class LevelsIntegration {
         ...options,
         level: resolvedTargetLevel ?? resolvedOriginLevel,
       });
-      return collision.result;
+      return this._coreCollisionDetails({
+        ...collision,
+        reason: this._coreCollisionReason(collision),
+        origin,
+        destination,
+        originLevel: resolvedOriginLevel,
+        targetLevel: resolvedTargetLevel,
+        options,
+      });
     }
 
     const t = this._getIntermediateTValue(
@@ -737,7 +788,16 @@ class LevelsIntegration {
       tMax: t,
     });
     if (originCollision.result) {
-      return true;
+      return this._coreCollisionDetails({
+        ...originCollision,
+        reason: this._coreCollisionReason(originCollision),
+        segment: 'origin',
+        origin,
+        destination,
+        originLevel: resolvedOriginLevel,
+        targetLevel: resolvedTargetLevel,
+        options,
+      });
     }
 
     const targetCollision = this._evaluateCoreVisibilityCollision(origin, destination, type, {
@@ -747,7 +807,51 @@ class LevelsIntegration {
       tMin: t,
       tMax: 1,
     });
-    return targetCollision.result;
+    return this._coreCollisionDetails({
+      ...targetCollision,
+      reason: this._coreCollisionReason(targetCollision),
+      segment: 'target',
+      origin,
+      destination,
+      originLevel: resolvedOriginLevel,
+      targetLevel: resolvedTargetLevel,
+      options,
+    });
+  }
+
+  _coreCollisionDetails({
+    result = false,
+    reason = 'clear',
+    surfaceCollision = false,
+    polygonCollision = false,
+    levelInclusionCollision = false,
+    segment = null,
+    origin = null,
+    destination = null,
+    originLevel = null,
+    targetLevel = null,
+    options = {},
+  } = {}) {
+    return {
+      mode: 'core',
+      result: !!result,
+      reason,
+      surfaceCollision: !!surfaceCollision,
+      polygonCollision: !!polygonCollision,
+      levelInclusionCollision: !!levelInclusionCollision,
+      segment,
+      originLevelId: originLevel?.id ?? null,
+      targetLevelId: targetLevel?.id ?? null,
+      origin,
+      destination,
+      type: options.type ?? null,
+    };
+  }
+
+  _coreCollisionReason(collision) {
+    if (collision.surfaceCollision) return 'surface';
+    if (collision.polygonCollision) return 'polygon';
+    return 'clear';
   }
 
   _getCoreCollisionSource(type, token) {

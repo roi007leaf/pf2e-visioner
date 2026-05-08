@@ -1,5 +1,12 @@
 # Changelog
 
+## [8.1.15] - 2026-05-08
+
+### Fixed
+
+- **Darkness spell areas create linked darkness lights in Foundry v13 and v14**: Visioner now handles PF2E v14 effect-area Regions in addition to v13 MeasuredTemplates, restoring automatic AmbientLight creation, syncing, and cleanup for Darkness spell areas.
+- **Darkvision sees through non-heightened Darkness again**: Unranked Darkness lights now default to ordinary spell darkness instead of rank 4, PF2E system and prepared senses are merged correctly, and core Levels polygon-only vision blocks fall back to wall LOS so rank 1-3 Darkness does not hide creatures from darkvision.
+
 ## [8.1.14] - 2026-05-07
 
 ### Fixed

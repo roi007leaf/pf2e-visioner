@@ -218,7 +218,19 @@ export class VisionAnalyzer {
       const isMinimized = typeof document !== 'undefined' && document.hidden;
       const levelsIntegration = LevelsIntegration.getInstance();
       if (levelsIntegration.isActive && !isMinimized) {
-        const hasSightCollision = levelsIntegration.test3DCollision(observer, target, 'sight');
+        const collisionDetails =
+          typeof levelsIntegration.get3DCollisionDetails === 'function'
+            ? levelsIntegration.get3DCollisionDetails(observer, target, 'sight')
+            : {
+                mode: levelsIntegration.mode,
+                result: levelsIntegration.test3DCollision(observer, target, 'sight'),
+              };
+        const hasSightCollision = !!collisionDetails.result;
+        const polygonOnlyCollision =
+          collisionDetails.mode === 'core' &&
+          collisionDetails.polygonCollision === true &&
+          collisionDetails.surfaceCollision !== true &&
+          collisionDetails.levelInclusionCollision !== true;
         const log = getLogger('AVS/VisionAnalyzer');
         log.debug(() => ({
           msg: 'v14-levels-los',
@@ -232,8 +244,18 @@ export class VisionAnalyzer {
           blocked: hasSightCollision,
           minimized: false,
           mode: levelsIntegration.mode,
+          collisionDetails,
         }));
-        return !hasSightCollision;
+        if (!hasSightCollision) {
+          return true;
+        }
+
+        if (!polygonOnlyCollision) {
+          return false;
+        }
+
+        // Core polygon collision can include non-wall vision blockers such as darkness.
+        // Fall through to 2D wall LOS so darkvision can handle rank 1-3 darkness.
       } else if (levelsIntegration.isActive && isMinimized) {
         const log = getLogger('AVS/VisionAnalyzer');
         log.debug(() => ({
@@ -420,7 +442,13 @@ export class VisionAnalyzer {
               () =>
                 `testVisibility-result: ${observer.name} -> ${target.name}, isVisible=${isVisible}`,
             );
-            return isVisible;
+            if (isVisible) {
+              return true;
+            }
+            log.debug(
+              () =>
+                `testVisibility-negative-fallback: ${observer.name} -> ${target.name}, falling back to geometric LOS`,
+            );
           } else {
             log.debug(
               () =>
@@ -1394,12 +1422,11 @@ export class VisionAnalyzer {
         result.hasVision = false;
       }
 
-      // Extract senses
-      if (actor.system?.perception?.senses) {
-        result.senses = actor.system.perception.senses;
-      } else if (actor.perception?.senses) {
-        result.senses = actor.perception.senses;
-      }
+      // Extract senses. PF2e keeps source senses on system data and prepared
+      // synthetic senses (from rules/effects) on actor.perception.senses.
+      const sourceSenses = this.#normalizeSenseCollection(actor.system?.perception?.senses);
+      const preparedSenses = this.#normalizeSenseCollection(actor.perception?.senses);
+      result.senses = this.#mergeSenseCollections(sourceSenses, preparedSenses);
 
       // Process senses to extract vision types
       if (result.senses) {
@@ -1427,15 +1454,15 @@ export class VisionAnalyzer {
     if (Array.isArray(senses)) {
       // NPC format
       for (const sense of senses) {
-        const type = sense.type || sense.slug;
-        if (type === 'greater-darkvision' || type === 'greaterDarkvision') {
+        const type = String(sense.type || sense.slug || '').toLowerCase();
+        if (type === 'greater-darkvision' || type === 'greaterdarkvision') {
           result.hasDarkvision = true;
           result.hasGreaterDarkvision = true;
           result.darkvisionRange = sense.range || Infinity;
         } else if (type === 'darkvision') {
           result.hasDarkvision = true;
           result.darkvisionRange = sense.range || Infinity;
-        } else if (type === 'low-light-vision' || type === 'lowLightVision') {
+        } else if (type === 'low-light-vision' || type === 'lowlightvision') {
           result.hasLowLightVision = true;
           result.lowLightRange = sense.range || Infinity;
         }
@@ -1458,6 +1485,81 @@ export class VisionAnalyzer {
         result.lowLightRange = ll?.range || Infinity;
       }
     }
+  }
+
+  #normalizeSenseCollection(senses) {
+    if (!senses) return [];
+
+    if (Array.isArray(senses)) {
+      return senses;
+    }
+
+    if (Array.isArray(senses.contents)) {
+      return senses.contents;
+    }
+
+    if (typeof senses.entries === 'function') {
+      try {
+        return Array.from(senses.entries()).map(([type, sense]) =>
+          this.#normalizeSenseEntry(type, sense),
+        );
+      } catch {
+        // Fall through to other collection shapes.
+      }
+    }
+
+    if (typeof senses.values === 'function') {
+      try {
+        return Array.from(senses.values());
+      } catch {
+        // Fall through to other collection shapes.
+      }
+    }
+
+    if (typeof senses[Symbol.iterator] === 'function') {
+      try {
+        return Array.from(senses);
+      } catch {
+        // Fall through to object values.
+      }
+    }
+
+    if (typeof senses === 'object') {
+      return Object.entries(senses).map(([type, sense]) =>
+        this.#normalizeSenseEntry(type, sense),
+      );
+    }
+
+    return [];
+  }
+
+  #mergeSenseCollections(...collections) {
+    const merged = [];
+
+    for (const collection of collections) {
+      for (const sense of collection || []) {
+        if (sense && typeof sense === 'object') {
+          merged.push(sense);
+        }
+      }
+    }
+
+    return merged.length ? merged : null;
+  }
+
+  #normalizeSenseEntry(type, sense) {
+    if (sense && typeof sense === 'object') {
+      return {
+        ...sense,
+        type: sense.type ?? sense.slug ?? sense.id ?? type,
+      };
+    }
+
+    return {
+      type,
+      range: Infinity,
+      acuity: String(sense || 'imprecise'),
+    };
   }
 
   #checkForVisionFeats(actor, result) {

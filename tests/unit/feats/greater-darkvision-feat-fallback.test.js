@@ -70,6 +70,77 @@ describe('Greater Darkvision Feat Fallback Detection', () => {
         expect(caps.darkvisionRange).toBe(Infinity);
     });
 
+    test('detects darkvision from prepared PF2e perception senses when source senses are empty', () => {
+        const actor = {
+            type: 'character',
+            system: {
+                perception: {
+                    senses: {}
+                }
+            },
+            perception: {
+                senses: new Map([
+                    ['darkvision', { type: 'darkvision', acuity: 'precise', range: Infinity }]
+                ])
+            },
+            itemTypes: {
+                feat: []
+            },
+            items: [],
+            flags: {}
+        };
+
+        const token = {
+            actor,
+            document: { id: 'test-token-prepared-senses', getFlag: () => undefined },
+            center: { x: 0, y: 0 }
+        };
+
+        const va = VisionAnalyzer.getInstance();
+        const caps = va.getVisionCapabilities(token);
+
+        expect(caps.hasDarkvision).toBe(true);
+        expect(caps.darkvisionRange).toBe(Infinity);
+        expect(caps.precise.darkvision).toBe(Infinity);
+    });
+
+    test('keeps system darkvision when prepared PF2e senses also exist', () => {
+        const actor = {
+            type: 'character',
+            system: {
+                perception: {
+                    senses: {
+                        darkvision: { acuity: 'precise', range: Infinity }
+                    }
+                }
+            },
+            perception: {
+                senses: new Map([
+                    ['hearing', { type: 'hearing', acuity: 'imprecise', range: Infinity }]
+                ])
+            },
+            itemTypes: {
+                feat: []
+            },
+            items: [],
+            flags: {}
+        };
+
+        const token = {
+            actor,
+            document: { id: 'test-token-system-and-prepared-senses', getFlag: () => undefined },
+            center: { x: 0, y: 0 }
+        };
+
+        const va = VisionAnalyzer.getInstance();
+        const caps = va.getVisionCapabilities(token);
+
+        expect(caps.hasDarkvision).toBe(true);
+        expect(caps.darkvisionRange).toBe(Infinity);
+        expect(caps.precise.darkvision).toBe(Infinity);
+        expect(caps.imprecise.hearing).toBe(Infinity);
+    });
+
     test('senses take priority over feats', () => {
         const actor = {
             type: 'character',
