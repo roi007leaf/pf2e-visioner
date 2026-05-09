@@ -23,6 +23,10 @@ export async function extractActionData(message) {
   const isSeekAction =
     context?.type === 'perception-check' &&
     (context.options?.includes('action:seek') || context.slug === 'seek');
+  const searchExplorationFlag = message.flags?.['pf2e-visioner']?.searchExploration;
+  const isSearchExplorationCheck =
+    !!searchExplorationFlag ||
+    !!context?.options?.some?.((opt) => opt === 'exploration:search' || opt === 'activity:search');
 
   // Only detect Create a Diversion if explicit context present
   const isCreateADiversionAction =
@@ -103,7 +107,7 @@ export async function extractActionData(message) {
   // Debug logging for action type detection
 
   let actionType = null;
-  if (isSeekAction) actionType = 'seek';
+  if (isSeekAction || isSearchExplorationCheck) actionType = 'seek';
   else if (isPointOutAction) actionType = 'point-out';
   else if (isSneakAction)
     actionType = 'sneak'; // Check sneak BEFORE hide
@@ -133,7 +137,20 @@ export async function extractActionData(message) {
     data.attackData = { isAttackRoll: true };
   }
 
-  if (context?.type === 'skill-check' && message.rolls?.[0]) {
+  if (actionType === 'seek' && isSearchExplorationCheck) {
+    const radiusFeet = Number(searchExplorationFlag?.radiusFeet);
+    data.searchExploration = true;
+    data.searchExplorationRadiusFeet = Number.isFinite(radiusFeet) && radiusFeet > 0
+      ? radiusFeet
+      : undefined;
+    data.searchExplorationTokenId =
+      searchExplorationFlag?.tokenId || message.speaker?.token || actorToken?.id || null;
+    data.searchExplorationTargetTokenId = searchExplorationFlag?.targetTokenId || null;
+    data.searchExplorationTargetWallId = searchExplorationFlag?.targetWallId || null;
+    data.searchExplorationGroupId = searchExplorationFlag?.groupId || null;
+  }
+
+  if ((context?.type === 'skill-check' || context?.type === 'perception-check') && message.rolls?.[0]) {
     try {
       const roll = message.rolls[0];
       const total = Number(roll.total ?? roll?._total ?? 0);

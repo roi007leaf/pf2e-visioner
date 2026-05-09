@@ -239,6 +239,11 @@ describe('SeekActionHandler.analyzeOutcome', () => {
             expect(result._isWall).toBe(true);
             expect(result.dc).toBe(20);
             expect(result.outcome).toBe('success');
+            expect(result.oldVisibility).toBe('hidden');
+            expect(result.newVisibility).toBe('observed');
+            expect(result.changed).toBe(true);
+            expect(result.usedSenseType).toBe('vision');
+            expect(result.usedSensePrecision).toBe('precise');
             expect(result.wallId).toBe('wall-1');
             expect(result.wallIdentifier).toBe('Secret Passage');
         });

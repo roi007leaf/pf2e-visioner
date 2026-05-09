@@ -1159,6 +1159,12 @@ export const KEYBINDINGS = {
     editable: [],
     restricted: true,
   },
+  openHazardLootManager: {
+    name: 'PF2E_VISIONER.KEYBINDINGS.OPEN_HAZARD_LOOT_MANAGER.name',
+    hint: 'PF2E_VISIONER.KEYBINDINGS.OPEN_HAZARD_LOOT_MANAGER.hint',
+    editable: [],
+    restricted: true,
+  },
   showVisibilityFactors: {
     name: 'PF2E_VISIONER.KEYBINDINGS.SHOW_VISIBILITY_FACTORS.name',
     hint: 'PF2E_VISIONER.KEYBINDINGS.SHOW_VISIBILITY_FACTORS.hint',

@@ -1171,6 +1171,47 @@ export function registerUIHooks() {
             } catch {}
           },
         });
+
+        addTool(walls.tools, {
+          name: 'pf2e-visioner-search-exploration-wall',
+          title: 'Roll Search Exploration (Selected Hidden Wall)',
+          icon: 'fa-solid fa-search',
+          button: true,
+          onChange: async () => {
+            try {
+              const selected = canvas?.walls?.controlled ?? [];
+              if (!selected.length) {
+                ui.notifications?.warn?.('PF2E Visioner: Select a hidden wall first.');
+                return;
+              }
+
+              const hiddenWalls = selected.filter((wall) =>
+                !!wall?.document?.getFlag?.(MODULE_ID, 'hiddenWall'),
+              );
+              if (!hiddenWalls.length) {
+                ui.notifications?.warn?.('PF2E Visioner: Selected wall is not a hidden wall.');
+                return;
+              }
+
+              const { runSearchExplorationForWall } = await import(
+                '../chat/services/search-exploration-service.js'
+              );
+              let rolled = 0;
+              for (const wall of hiddenWalls) {
+                rolled += await runSearchExplorationForWall(wall);
+              }
+
+              if (rolled > 0 && hiddenWalls.length > 1) {
+                ui.notifications?.info?.(
+                  `PF2E Visioner: Rolled Search exploration for ${hiddenWalls.length} hidden walls.`,
+                );
+              }
+            } catch (error) {
+              console.error('PF2E Visioner | Error rolling Search exploration for wall:', error);
+              ui.notifications?.error?.('PF2E Visioner: Failed to roll Search exploration.');
+            }
+          },
+        });
       }
 
       // === TOKEN TOOL ADDITIONS ===
@@ -1192,6 +1233,68 @@ export function registerUIHooks() {
             },
           });
         }
+
+        addTool(tokens.tools, {
+          name: 'pf2e-visioner-hazard-loot-manager',
+          title: 'Hazard/Loot Manager',
+          icon: 'fa-solid fa-box-open',
+          button: true,
+          onChange: async () => {
+            try {
+              const { VisionerHazardLootManager } = await import(
+                '../managers/hazard-loot-manager/HazardLootManager.js'
+              );
+              new VisionerHazardLootManager().render(true);
+            } catch (error) {
+              console.error('PF2E Visioner | Error opening Hazard/Loot Manager:', error);
+            }
+          },
+        });
+
+        addTool(tokens.tools, {
+          name: 'pf2e-visioner-initialize-hidden-scene',
+          title: 'Initialize Hidden Scene Visibility',
+          icon: 'fa-solid fa-eye-slash',
+          button: true,
+          onChange: async () => {
+            try {
+              if (!game.user?.isGM) return;
+
+              const { VisionerConfirmDialog } = await import('../ui/dialogs/ConfirmDialog.js');
+              const confirmed = await VisionerConfirmDialog.confirm({
+                title: game.i18n.localize('PF2E_VISIONER.MODULE_TITLE'),
+                content:
+                  '<p>Set all loot tokens, hazards, and hidden walls to <strong>Hidden</strong> for every player character token on this scene?</p>',
+                yes: 'Set Hidden',
+                no: 'Cancel',
+              });
+              if (!confirmed) return;
+
+              const { initializeSceneHiddenForPCs } = await import(
+                '../services/initial-scene-hidden-setup.js'
+              );
+              const result = await initializeSceneHiddenForPCs();
+
+              if (result.observers === 0) {
+                ui.notifications?.warn?.('PF2E Visioner: No player character tokens found.');
+              } else if (result.tokenTargets === 0 && result.wallTargets === 0) {
+                ui.notifications?.warn?.(
+                  'PF2E Visioner: No loot tokens, hazards, or hidden walls found.',
+                );
+              } else {
+                ui.notifications?.info?.(
+                  `PF2E Visioner: Set ${result.tokenPairs} token and ${result.wallEntries} wall visibility entries to Hidden for ${result.observers} PC token(s).`,
+                );
+              }
+
+              ui.controls?.render?.(true);
+            } catch (error) {
+              console.error('PF2E Visioner | Error initializing hidden scene visibility:', error);
+              ui.notifications?.error?.('PF2E Visioner: Failed to initialize hidden scene visibility.');
+            }
+          },
+        });
+
         // Toggle Provide Auto-Cover (Selected Tokens)
         const selectedTokens = canvas?.tokens?.controlled ?? [];
 
@@ -1656,6 +1759,7 @@ function injectPF2eVisionerBox(app, root) {
     snipingDuoSpotterActorKey && spotterName
       ? spotterName
       : game.i18n.localize('PF2E_VISIONER.UI.SNIPING_DUO_SPOTTER_CHOOSE');
+  const showMasterControls = actor.type !== 'hazard';
 
   // Build content
   let inner = `
@@ -1687,44 +1791,49 @@ function injectPF2eVisionerBox(app, root) {
       <input type="hidden" name="flags.${MODULE_ID}.coverOverride" value="${coverOverride || ''}">
       <p class="notes">Set how this token provides cover in combat.</p>
     </div>
-    <div class="form-group">
-      <label data-tooltip="${game.i18n.localize('PF2E_VISIONER.UI.ENCOUNTER_MASTER_TOOLTIP')}">${game.i18n.localize('PF2E_VISIONER.UI.ENCOUNTER_MASTER_LABEL')}</label>
-      <div style="display: flex; gap: 4px; align-items: center;">
-        <button type="button" class="pv-encounter-master-btn" style="flex: 1; text-align: left;">
-          <i class="fas fa-users" style="margin-right: 4px;"></i>
-          <span class="pv-encounter-master-label">${masterDisplayText}</span>
-        </button>
-        ${encounterMasterTokenId ? `<button type="button" class="pv-encounter-master-clear" data-tooltip="Clear"><i class="fas fa-times"></i></button>` : ''}
-      </div>
-      <input type="hidden" name="flags.${MODULE_ID}.encounterMasterTokenId" class="pv-encounter-master-input" value="${encounterMasterTokenId}">
-    </div>
-    <div class="form-group">
-      <label data-tooltip="${game.i18n.localize('PF2E_VISIONER.UI.VISION_MASTER_TOOLTIP')}">${game.i18n.localize('PF2E_VISIONER.UI.VISION_MASTER_LABEL')}</label>
-      <div style="display: flex; gap: 4px; align-items: center;">
-        <button type="button" class="pv-vision-master-btn" style="flex: 1; text-align: left;">
-          <i class="fas fa-eye" style="margin-right: 4px;"></i>
-          <span class="pv-vision-master-label">${visionMasterDisplayText}</span>
-        </button>
-        ${visionMasterTokenId ? `<button type="button" class="pv-vision-master-clear" data-tooltip="Clear"><i class="fas fa-times"></i></button>` : ''}
-      </div>
-      ${
-        visionMasterTokenId
-          ? `
-        <div style="margin-top: 8px;">
-          <label style="font-size: 0.9em; margin-bottom: 4px; display: block;">${game.i18n.localize('PF2E_VISIONER.VISION_MASTER_DIALOG.MODE_LABEL')}</label>
-          <select name="flags.${MODULE_ID}.visionSharingMode" class="pv-vision-mode-select" style="width: 100%;">
-            <option value="one-way" ${visionSharingMode === 'one-way' ? 'selected' : ''}>${modeLabels['one-way']}</option>
-            <option value="two-way" ${visionSharingMode === 'two-way' ? 'selected' : ''}>${modeLabels['two-way']}</option>
-            <option value="replace" ${visionSharingMode === 'replace' ? 'selected' : ''}>${modeLabels['replace']}</option>
-            <option value="reverse" ${visionSharingMode === 'reverse' ? 'selected' : ''}>${modeLabels['reverse']}</option>
-          </select>
-        </div>
-      `
-          : ''
-      }
-      <input type="hidden" name="flags.${MODULE_ID}.visionMasterTokenId" class="pv-vision-master-input" value="${visionMasterTokenId}">
-    </div>
   `;
+
+  if (showMasterControls) {
+    inner += `
+      <div class="form-group">
+        <label data-tooltip="${game.i18n.localize('PF2E_VISIONER.UI.ENCOUNTER_MASTER_TOOLTIP')}">${game.i18n.localize('PF2E_VISIONER.UI.ENCOUNTER_MASTER_LABEL')}</label>
+        <div style="display: flex; gap: 4px; align-items: center;">
+          <button type="button" class="pv-encounter-master-btn" style="flex: 1; text-align: left;">
+            <i class="fas fa-users" style="margin-right: 4px;"></i>
+            <span class="pv-encounter-master-label">${masterDisplayText}</span>
+          </button>
+          ${encounterMasterTokenId ? `<button type="button" class="pv-encounter-master-clear" data-tooltip="Clear"><i class="fas fa-times"></i></button>` : ''}
+        </div>
+        <input type="hidden" name="flags.${MODULE_ID}.encounterMasterTokenId" class="pv-encounter-master-input" value="${encounterMasterTokenId}">
+      </div>
+      <div class="form-group">
+        <label data-tooltip="${game.i18n.localize('PF2E_VISIONER.UI.VISION_MASTER_TOOLTIP')}">${game.i18n.localize('PF2E_VISIONER.UI.VISION_MASTER_LABEL')}</label>
+        <div style="display: flex; gap: 4px; align-items: center;">
+          <button type="button" class="pv-vision-master-btn" style="flex: 1; text-align: left;">
+            <i class="fas fa-eye" style="margin-right: 4px;"></i>
+            <span class="pv-vision-master-label">${visionMasterDisplayText}</span>
+          </button>
+          ${visionMasterTokenId ? `<button type="button" class="pv-vision-master-clear" data-tooltip="Clear"><i class="fas fa-times"></i></button>` : ''}
+        </div>
+        ${
+          visionMasterTokenId
+            ? `
+          <div style="margin-top: 8px;">
+            <label style="font-size: 0.9em; margin-bottom: 4px; display: block;">${game.i18n.localize('PF2E_VISIONER.VISION_MASTER_DIALOG.MODE_LABEL')}</label>
+            <select name="flags.${MODULE_ID}.visionSharingMode" class="pv-vision-mode-select" style="width: 100%;">
+              <option value="one-way" ${visionSharingMode === 'one-way' ? 'selected' : ''}>${modeLabels['one-way']}</option>
+              <option value="two-way" ${visionSharingMode === 'two-way' ? 'selected' : ''}>${modeLabels['two-way']}</option>
+              <option value="replace" ${visionSharingMode === 'replace' ? 'selected' : ''}>${modeLabels['replace']}</option>
+              <option value="reverse" ${visionSharingMode === 'reverse' ? 'selected' : ''}>${modeLabels['reverse']}</option>
+            </select>
+          </div>
+        `
+            : ''
+        }
+        <input type="hidden" name="flags.${MODULE_ID}.visionMasterTokenId" class="pv-vision-master-input" value="${visionMasterTokenId}">
+      </div>
+    `;
+  }
 
   if (hasSnipingDuo) {
     inner += `

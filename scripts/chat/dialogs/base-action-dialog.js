@@ -474,7 +474,15 @@ export class BaseActionDialog extends BasePreviewDialog {
     // Normalize outcomes so helpers can locate rows regardless of shape
     // Some dialogs (e.g., Sneak) use `token` instead of `target`
     const normalized = Array.isArray(outcomes)
-      ? outcomes.map((o) => (o?.target?.id ? o : o?.token?.id ? { target: { id: o.token.id } } : o))
+      ? outcomes.map((o) =>
+        o?.rowId || o?.searchExplorationRowId
+          ? { target: { id: o.rowId || o.searchExplorationRowId } }
+          : o?.target?.id
+            ? o
+            : o?.token?.id
+              ? { target: { id: o.token.id } }
+              : o,
+      )
       : outcomes;
     import('../services/ui/dialog-utils.js').then(({ updateRowButtonsToApplied }) => {
       try {
@@ -486,7 +494,15 @@ export class BaseActionDialog extends BasePreviewDialog {
   updateRowButtonsToReverted(outcomes) {
     // Normalize outcomes so helpers can locate rows regardless of shape
     const normalized = Array.isArray(outcomes)
-      ? outcomes.map((o) => (o?.target?.id ? o : o?.token?.id ? { target: { id: o.token.id } } : o))
+      ? outcomes.map((o) =>
+        o?.rowId || o?.searchExplorationRowId
+          ? { target: { id: o.rowId || o.searchExplorationRowId } }
+          : o?.target?.id
+            ? o
+            : o?.token?.id
+              ? { target: { id: o.token.id } }
+              : o,
+      )
       : outcomes;
     import('../services/ui/dialog-utils.js').then(({ updateRowButtonsToReverted }) => {
       try {

@@ -17,20 +17,80 @@ function getBaseRegionClass() {
   return globalThis.foundry?.documents?.BaseRegion || null;
 }
 
-function getSceneRegionCollection() {
-  return Array.from(canvas?.scene?.regions || []);
+function collectionToArray(collection) {
+  if (!collection) return [];
+  if (Array.isArray(collection)) return collection;
+  if (Array.isArray(collection.contents)) return collection.contents;
+  if (typeof collection.values === 'function') return Array.from(collection.values());
+  try {
+    return Array.from(collection);
+  } catch (_) {
+    return [];
+  }
 }
 
-function getSeekTemplateRegions({ actorId = null, messageId = null, userId = null } = {}) {
-  return getSceneRegionCollection().filter((region) => {
-    const flags = region?.flags?.['pf2e-visioner'];
-    const isTemplate = region?.getFlag?.('core', 'MeasuredTemplate') || flags?.seekPreviewManual;
-    if (!isTemplate) return false;
+function getSceneRegionCollection() {
+  return collectionToArray(canvas?.scene?.regions);
+}
+
+function getSceneTemplateCollection() {
+  return collectionToArray(canvas?.scene?.templates);
+}
+
+function getCanvasTemplatePlaceables() {
+  return collectionToArray(canvas?.templates?.placeables);
+}
+
+function getTemplateFlags(template, scope = MODULE_ID) {
+  return template?.flags?.[scope] || template?.document?.flags?.[scope] || null;
+}
+
+function isSeekTemplateDocument(template) {
+  const flags = getTemplateFlags(template);
+  return !!(flags?.seekPreviewManual || flags?.seekTemplate);
+}
+
+function getTemplateDocumentName(template) {
+  const explicitName =
+    template?.documentName ||
+    template?.document?.documentName ||
+    template?.constructor?.documentName ||
+    template?.document?.constructor?.documentName;
+  if (explicitName) return explicitName;
+  if (Array.isArray(template?.shapes) || template?.shapes?.size !== undefined) return 'Region';
+  return 'MeasuredTemplate';
+}
+
+function getTemplateId(template) {
+  return template?.document?.id || template?.id;
+}
+
+function getSeekTemplateDocuments({ actorId = null, messageId = null, userId = null } = {}) {
+  const seen = new Set();
+  return [
+    ...getSceneRegionCollection(),
+    ...getSceneTemplateCollection(),
+    ...getCanvasTemplatePlaceables(),
+  ].filter((template) => {
+    const flags = getTemplateFlags(template);
+    const id = getTemplateId(template);
+    const key = `${getTemplateDocumentName(template)}:${id || Math.random()}`;
+    if (id && seen.has(key)) return false;
+    if (id) seen.add(key);
+    if (!isSeekTemplateDocument(template)) return false;
     if (actorId && flags?.actorTokenId !== actorId) return false;
     if (messageId && flags?.messageId !== messageId) return false;
     if (userId && flags?.userId !== userId) return false;
     return true;
   });
+}
+
+export function findSeekTemplateDocument(filters = {}) {
+  return getSeekTemplateDocuments(filters)[0] || null;
+}
+
+export function hasSeekTemplateDocument(filters = {}) {
+  return !!findSeekTemplateDocument(filters);
 }
 
 function buildRegionDataFromTemplate(template) {
@@ -73,39 +133,64 @@ async function createTemplateRegions(data) {
   return created;
 }
 
-function getTemplateStateFromRegion(region) {
-  const shape = region?.shapes?.[0];
+function normalizeTemplateType(type) {
+  if (type === 'line') return 'ray';
+  if (type === 'rectangle') return 'rect';
+  return type || 'circle';
+}
+
+function normalizeTemplateLevels(levels) {
+  return collectionToArray(levels).filter((level) => level !== undefined && level !== null);
+}
+
+export function getTemplateStateFromDocument(template) {
+  const document = template?.document || template;
+  const shapes = collectionToArray(template?.shapes || document?.shapes);
+  const shape = shapes[0];
   const grid = canvas?.scene?.grid || canvas?.grid?.grid;
   const distancePixels = (grid?.size || 100) / (grid?.distance || 5);
   let templateType = 'circle';
   let center = { x: 0, y: 0 };
   let radiusFeet = 0;
 
-  switch (shape?.type) {
-    case 'cone':
-      templateType = 'cone';
-      center = { x: shape.x, y: shape.y };
-      radiusFeet = (shape.radius || 0) / distancePixels;
-      break;
-    case 'line':
-      templateType = 'ray';
-      center = { x: shape.x, y: shape.y };
-      radiusFeet = (shape.length || 0) / distancePixels;
-      break;
-    case 'circle':
-    default:
-      templateType = 'circle';
-      center = { x: shape?.x || 0, y: shape?.y || 0 };
-      radiusFeet = (shape?.radius || 0) / distancePixels;
-      break;
+  if (shape) {
+    switch (shape.type) {
+      case 'cone':
+        templateType = 'cone';
+        center = { x: shape.x, y: shape.y };
+        radiusFeet = (shape.radius || 0) / distancePixels;
+        break;
+      case 'line':
+        templateType = 'ray';
+        center = { x: shape.x, y: shape.y };
+        radiusFeet = (shape.length || 0) / distancePixels;
+        break;
+      case 'circle':
+      default:
+        templateType = normalizeTemplateType(shape.type);
+        center = { x: shape?.x || 0, y: shape?.y || 0 };
+        radiusFeet = ((shape?.radius ?? shape?.length) || 0) / distancePixels;
+        break;
+    }
+  } else {
+    templateType = normalizeTemplateType(document?.t ?? template?.t);
+    center = {
+      x: Number(document?.x ?? template?.x ?? 0),
+      y: Number(document?.y ?? template?.y ?? 0),
+    };
+    radiusFeet = Number(document?.distance ?? template?.distance ?? 0);
   }
 
   return {
     center,
     radiusFeet,
     templateType,
-    levels: Array.from(region?.levels || []),
+    levels: normalizeTemplateLevels(document?.levels ?? template?.levels),
   };
+}
+
+function getTemplateStateFromRegion(region) {
+  return getTemplateStateFromDocument(region);
 }
 
 function getGridDistanceScale() {
@@ -139,7 +224,9 @@ function getTokenCenter(token) {
 }
 
 function getSeekTemplateMaxPlacementDistance() {
-  const value = Number(game?.settings?.get?.(MODULE_ID, SEEK_TEMPLATE_PLACEMENT_LIMIT_SETTING) ?? 0);
+  const value = Number(
+    game?.settings?.get?.(MODULE_ID, SEEK_TEMPLATE_PLACEMENT_LIMIT_SETTING) ?? 0,
+  );
   return Number.isFinite(value) && value > 0 ? value : 0;
 }
 
@@ -283,23 +370,56 @@ async function validateOrWarnSeekTemplatePlacement(actionData, center) {
   return true;
 }
 
-async function deleteRejectedSeekTemplateRegion(regionId) {
-  if (!regionId || !canvas?.scene) return;
-  try {
-    await canvas.scene.deleteEmbeddedDocuments('Region', [regionId]);
-  } catch (_) { }
+function getEmbeddedDocumentTypeForTemplate(template) {
+  return getTemplateDocumentName(template) === 'Region' ? 'Region' : 'MeasuredTemplate';
 }
 
-async function updateSeekTemplateRegionCenter(region, center) {
-  const shapes = Array.isArray(region?.shapes) ? region.shapes : [];
+async function deleteSeekTemplateDocument(template) {
+  const id = getTemplateId(template);
+  if (!id || !canvas?.scene?.deleteEmbeddedDocuments) return;
+  try {
+    await canvas.scene.deleteEmbeddedDocuments(getEmbeddedDocumentTypeForTemplate(template), [id]);
+  } catch (_) {}
+}
+
+async function deleteSeekTemplateDocuments(templates) {
+  if (!canvas?.scene?.deleteEmbeddedDocuments) return;
+  const grouped = new Map();
+  for (const template of templates) {
+    const id = getTemplateId(template);
+    if (!id) continue;
+    const type = getEmbeddedDocumentTypeForTemplate(template);
+    if (!grouped.has(type)) grouped.set(type, []);
+    grouped.get(type).push(id);
+  }
+  for (const [type, ids] of grouped.entries()) {
+    try {
+      await canvas.scene.deleteEmbeddedDocuments(type, ids);
+    } catch (_) {}
+  }
+}
+
+async function deleteRejectedSeekTemplateDocument(template) {
+  if (!template || !canvas?.scene) return;
+  try {
+    await deleteSeekTemplateDocument(template);
+  } catch (_) {}
+}
+
+async function updateSeekTemplateDocumentCenter(template, center) {
+  const shapes = Array.isArray(template?.shapes) ? template.shapes : [];
   const shape = shapes[0];
-  if (!shape || !Number.isFinite(center?.x) || !Number.isFinite(center?.y)) return;
+  if (!Number.isFinite(center?.x) || !Number.isFinite(center?.y)) return;
 
   try {
-    await region.update?.({
-      shapes: [{ ...shape, x: center.x, y: center.y }, ...shapes.slice(1)],
-    });
-  } catch (_) { }
+    if (shape) {
+      await template.update?.({
+        shapes: [{ ...shape, x: center.x, y: center.y }, ...shapes.slice(1)],
+      });
+    } else {
+      await (template?.document || template)?.update?.({ x: center.x, y: center.y });
+    }
+  } catch (_) {}
 }
 
 function createPlacementLimitRangeIndicator(actionData) {
@@ -356,10 +476,12 @@ async function launchSeekTemplatePreview(
 
   const getSnapped = (event) => {
     const local = event.data.getLocalPosition(canvas.stage);
-    return canvas.grid?.getSnappedPosition?.(local.x, local.y, 2) || {
-      x: local.x,
-      y: local.y,
-    };
+    return (
+      canvas.grid?.getSnappedPosition?.(local.x, local.y, 2) || {
+        x: local.x,
+        y: local.y,
+      }
+    );
   };
 
   const destroyPreview = () => {
@@ -368,7 +490,7 @@ async function launchSeekTemplatePreview(
       canvas.stage.off('pointerdown', downHandler);
       rangeIndicator?.destroy?.({ children: true });
       preview?.destroy?.({ children: true });
-    } catch (_) { }
+    } catch (_) {}
   };
 
   const moveHandler = (event) => {
@@ -382,7 +504,8 @@ async function launchSeekTemplatePreview(
     const pointer = getSnapped(event);
     const clampedPlacement = clampPlacement?.(pointer);
     const snapped = clampedPlacement?.center || pointer;
-    if (!clampedPlacement?.clamped && validatePlacement && !(await validatePlacement(snapped))) return;
+    if (!clampedPlacement?.clamped && validatePlacement && !(await validatePlacement(snapped)))
+      return;
     destroyPreview();
     await createTemplateRegions([{ ...tplData, x: snapped.x, y: snapped.y }]);
   };
@@ -401,7 +524,7 @@ async function persistSeekTemplateFlag(actionData, data) {
   });
   try {
     await msg.render(true);
-  } catch (_) { }
+  } catch (_) {}
 }
 
 async function clearSeekTemplateFlag(messageId) {
@@ -413,23 +536,48 @@ async function clearSeekTemplateFlag(messageId) {
   });
   try {
     await msg.render(true);
-  } catch (_) { }
+  } catch (_) {}
 }
 
-async function consumeSeekTemplateAfterDialog(actionData, regionId) {
+async function consumeSeekTemplateAfterDialog(actionData, template) {
   try {
-    if (regionId && canvas?.scene) {
-      await canvas.scene.deleteEmbeddedDocuments('Region', [regionId]);
-    }
-  } catch (_) { }
+    await deleteSeekTemplateDocument(template);
+  } catch (_) {}
 
   try {
     await clearSeekTemplateFlag(actionData.messageId);
-  } catch (_) { }
+  } catch (_) {}
 
   try {
     updateSeekTemplateButton(actionData, false);
-  } catch (_) { }
+  } catch (_) {}
+}
+
+function isOwnSeekTemplateDocument(template) {
+  const flags = getTemplateFlags(template);
+  if (!isSeekTemplateDocument(template)) return false;
+  return flags?.userId === game.userId;
+}
+
+function registerSeekTemplateCreateHooks(handler) {
+  let createRegionHookId = null;
+  let createMeasuredTemplateHookId = null;
+  const release = () => {
+    try {
+      if (createRegionHookId) Hooks.off('createRegion', createRegionHookId);
+      if (createMeasuredTemplateHookId) {
+        Hooks.off('createMeasuredTemplate', createMeasuredTemplateHookId);
+      }
+    } catch (_) {}
+  };
+  const wrapped = async (doc) => {
+    if (!isOwnSeekTemplateDocument(doc)) return;
+    await handler(doc, release);
+  };
+
+  createRegionHookId = Hooks.on('createRegion', wrapped);
+  createMeasuredTemplateHookId = Hooks.on('createMeasuredTemplate', wrapped);
+  return release;
 }
 
 export async function setupSeekTemplate(actionData, skipDialog = false) {
@@ -453,9 +601,10 @@ export async function setupSeekTemplate(actionData, skipDialog = false) {
 
   await cleanupOrphanedSeekTemplates(actionData.actor?.id, game.userId);
   const validatePlacement = (center) => validateOrWarnSeekTemplatePlacement(actionData, center);
-  const clampPlacement = getSeekTemplateMaxPlacementDistance() > 0
-    ? (center) => clampSeekTemplatePlacement(actionData, center)
-    : null;
+  const clampPlacement =
+    getSeekTemplateMaxPlacementDistance() > 0
+      ? (center) => clampSeekTemplatePlacement(actionData, center)
+      : null;
   if (game.user.isGM) {
     const tplData = {
       t: templateType,
@@ -490,19 +639,17 @@ export async function setupSeekTemplate(actionData, skipDialog = false) {
       validatePlacement,
     });
     await new Promise((resolve) => {
-      const createHookId = Hooks.on('createRegion', async (doc) => {
-        if (!doc?.getFlag?.('core', 'MeasuredTemplate')) return;
-        if (doc.getFlag('pf2e-visioner', 'userId') !== game.userId) return;
+      registerSeekTemplateCreateHooks(async (doc, releaseCreateHooks) => {
         try {
-          Hooks.off('createRegion', createHookId);
-          let templateState = getTemplateStateFromRegion(doc);
+          releaseCreateHooks();
+          let templateState = getTemplateStateFromDocument(doc);
           const normalized = normalizeSeekTemplatePlacement(actionData, templateState);
           templateState = normalized.templateState;
           if (normalized.clamped) {
-            await updateSeekTemplateRegionCenter(doc, templateState.center);
+            await updateSeekTemplateDocumentCenter(doc, templateState.center);
           }
           if (!(await validatePlacement(templateState.center))) {
-            await deleteRejectedSeekTemplateRegion(doc.id);
+            await deleteRejectedSeekTemplateDocument(doc);
             return;
           }
           actionData.seekTemplateCenter = templateState.center;
@@ -520,7 +667,7 @@ export async function setupSeekTemplate(actionData, skipDialog = false) {
             const { SeekPreviewDialog } = await import('../../dialogs/SeekPreviewDialog.js');
             dialogOpened = !!SeekPreviewDialog.currentSeekDialog;
             if (dialogOpened) {
-              await consumeSeekTemplateAfterDialog(actionData, doc.id);
+              await consumeSeekTemplateAfterDialog(actionData, doc);
             }
           }
           if (!dialogOpened) {
@@ -575,7 +722,7 @@ export async function setupSeekTemplate(actionData, skipDialog = false) {
                 const { SeekPreviewDialog } = await import('../../dialogs/SeekPreviewDialog.js');
                 dialogOpened = !!SeekPreviewDialog.currentSeekDialog;
                 if (dialogOpened) {
-                  await consumeSeekTemplateAfterDialog(actionData, created.id);
+                  await consumeSeekTemplateAfterDialog(actionData, created);
                 }
               }
               if (!dialogOpened) {
@@ -639,21 +786,19 @@ export async function setupSeekTemplate(actionData, skipDialog = false) {
     validatePlacement,
   });
   await new Promise((resolve) => {
-    const createHookId = Hooks.on('createRegion', async (doc) => {
-      if (!doc?.getFlag?.('core', 'MeasuredTemplate')) return;
-      if (doc.getFlag('pf2e-visioner', 'userId') !== game.userId) return;
+    registerSeekTemplateCreateHooks(async (doc, releaseCreateHooks) => {
       try {
-        Hooks.off('createRegion', createHookId);
+        releaseCreateHooks();
         usedPreview = true;
-        let templateState = getTemplateStateFromRegion(doc);
+        let templateState = getTemplateStateFromDocument(doc);
         const normalized = normalizeSeekTemplatePlacement(actionData, templateState);
         templateState = normalized.templateState;
         if (normalized.clamped) {
-          await updateSeekTemplateRegionCenter(doc, templateState.center);
+          await updateSeekTemplateDocumentCenter(doc, templateState.center);
         }
         const center = templateState.center;
         if (!(await validatePlacement(center))) {
-          await deleteRejectedSeekTemplateRegion(doc.id);
+          await deleteRejectedSeekTemplateDocument(doc);
           return;
         }
         const radius = Number(templateState.radiusFeet) || distance;
@@ -662,7 +807,7 @@ export async function setupSeekTemplate(actionData, skipDialog = false) {
         actionData.seekTemplateType = templateState.templateType || templateType;
         actionData.seekTemplateLevels = templateState.levels;
         updateSeekTemplateButton(actionData, true);
-        const { requestGMOpenSeekWithTemplate } = await import('../../socket.js');
+        const { requestGMOpenSeekWithTemplate } = await import('../../../services/socket.js');
         try {
           // Best-effort: annotate the chat message flags immediately so GM panel can switch without relying solely on sockets
           const msg = game.messages.get(actionData.messageId);
@@ -684,7 +829,7 @@ export async function setupSeekTemplate(actionData, skipDialog = false) {
               hasTargets,
             });
           }
-        } catch (_) { }
+        } catch (_) {}
         const roll = actionData.roll || game.messages.get(actionData.messageId)?.rolls?.[0] || null;
         const rollTotal = roll?.total ?? null;
         const dieResult = roll?.dice?.[0]?.total ?? roll?.terms?.[0]?.total ?? null;
@@ -727,7 +872,7 @@ export async function setupSeekTemplate(actionData, skipDialog = false) {
           actionData.seekTemplateRadiusFeet = distance;
           actionData.seekTemplateType = templateType;
           actionData.seekTemplateLevels = levels;
-          const { requestGMOpenSeekWithTemplate } = await import('../../socket.js');
+          const { requestGMOpenSeekWithTemplate } = await import('../../../services/socket.js');
           try {
             // Best-effort: annotate chat message flags immediately
             const msg = game.messages.get(actionData.messageId);
@@ -751,7 +896,7 @@ export async function setupSeekTemplate(actionData, skipDialog = false) {
                 hasTargets,
               });
             }
-          } catch (_) { }
+          } catch (_) {}
           const roll =
             actionData.roll || game.messages.get(actionData.messageId)?.rolls?.[0] || null;
           const rollTotal = roll?.total ?? null;
@@ -787,63 +932,37 @@ export async function setupSeekTemplate(actionData, skipDialog = false) {
 export function restoreTokenControlsAfterSeekTemplate() {
   try {
     canvas?.tokens?.activate?.();
-  } catch (_) { }
+  } catch (_) {}
 }
 
 export async function removeSeekTemplate(actionData) {
-  if (!canvas?.scene?.templates) return;
+  if (!canvas?.scene) return;
   try {
     // First, clean up any orphaned seek templates for this actor/user
     await cleanupOrphanedSeekTemplates(actionData.actor?.id, game.userId);
 
-    // Get all seek template regions on the scene
-    const allTemplates = getSeekTemplateRegions();
-
     // First, try to remove templates by exact message ID match (most specific)
-    let toRemove = allTemplates
-      .filter((t) => {
-        const flags = t?.flags?.['pf2e-visioner'];
-        const isSeekTemplate = flags?.seekPreviewManual || flags?.seekTemplate;
-        const matchesMessage = flags?.messageId === actionData.messageId;
-        const matchesActor = flags?.actorTokenId === actionData.actor?.id;
-        const matchesUser = flags?.userId === game.userId;
-
-        // Exact match: seek template, same message, same actor, same user
-        return isSeekTemplate && matchesMessage && matchesActor && matchesUser;
-      })
-      .map((t) => t.id);
+    let toRemove = getSeekTemplateDocuments({
+      messageId: actionData.messageId,
+      actorId: actionData.actor?.id,
+      userId: game.userId,
+    });
 
     // If no exact matches found, try to remove by actor ID (for reroll scenarios)
     if (toRemove.length === 0) {
-      toRemove = allTemplates
-        .filter((t) => {
-          const flags = t?.flags?.['pf2e-visioner'];
-          const isSeekTemplate = flags?.seekPreviewManual || flags?.seekTemplate;
-          const matchesActor = flags?.actorTokenId === actionData.actor?.id;
-          const matchesUser = flags?.userId === game.userId;
-
-          // Actor match: seek template, same actor, same user (message ID might be different due to reroll)
-          return isSeekTemplate && matchesActor && matchesUser;
-        })
-        .map((t) => t.id);
+      toRemove = getSeekTemplateDocuments({
+        actorId: actionData.actor?.id,
+        userId: game.userId,
+      });
     }
 
     // If still no matches, try to remove any seek templates by the current user (fallback)
     if (toRemove.length === 0) {
-      toRemove = allTemplates
-        .filter((t) => {
-          const flags = t?.flags?.['pf2e-visioner'];
-          const isSeekTemplate = flags?.seekPreviewManual || flags?.seekTemplate;
-          const matchesUser = flags?.userId === game.userId;
-
-          // User fallback: any seek template by the current user
-          return isSeekTemplate && matchesUser;
-        })
-        .map((t) => t.id);
+      toRemove = getSeekTemplateDocuments({ userId: game.userId });
     }
 
     if (toRemove.length) {
-      await canvas.scene.deleteEmbeddedDocuments('Region', toRemove);
+      await deleteSeekTemplateDocuments(toRemove);
     }
 
     // Clear the action data
@@ -853,7 +972,7 @@ export async function removeSeekTemplate(actionData) {
 
     try {
       await clearSeekTemplateFlag(actionData.messageId);
-    } catch (_) { }
+    } catch (_) {}
 
     const { notify } = await import('../infra/notifications.js');
     notify.info(game.i18n.localize('PF2E_VISIONER.SEEK_AUTOMATION.REMOVE_TEMPLATE'));
@@ -873,26 +992,17 @@ export async function removeSeekTemplate(actionData) {
  * This helps with reroll scenarios where old templates might still exist
  */
 async function cleanupOrphanedSeekTemplates(actorId, userId) {
-  if (!canvas?.scene?.templates || !actorId || !userId) return;
+  if (!canvas?.scene || !actorId || !userId) return;
 
   try {
-    const allTemplates = getSeekTemplateRegions({ actorId, userId });
-    const orphanedTemplates = allTemplates
-      .filter((t) => {
-        const flags = t?.flags?.['pf2e-visioner'];
-        const isSeekTemplate = flags?.seekPreviewManual || flags?.seekTemplate;
-        const matchesActor = flags?.actorTokenId === actorId;
-        const matchesUser = flags?.userId === userId;
-
-        // Check if the message still exists
-        const messageExists = game.messages.has(flags?.messageId);
-
-        return isSeekTemplate && matchesActor && matchesUser && !messageExists;
-      })
-      .map((t) => t.id);
+    const orphanedTemplates = getSeekTemplateDocuments({ actorId, userId }).filter((t) => {
+      const flags = getTemplateFlags(t);
+      const messageExists = game.messages.has(flags?.messageId);
+      return !messageExists;
+    });
 
     if (orphanedTemplates.length > 0) {
-      await canvas.scene.deleteEmbeddedDocuments('Region', orphanedTemplates);
+      await deleteSeekTemplateDocuments(orphanedTemplates);
     }
   } catch (error) {
     console.warn('Failed to cleanup orphaned seek templates:', error);

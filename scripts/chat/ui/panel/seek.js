@@ -1,3 +1,6 @@
+import { hasSeekTemplateDocument } from '../../services/preview/seek-template.js';
+import { hasActiveEncounter } from '../../services/infra/shared-utils.js';
+
 export function buildSeekPanel(actionData, message) {
   const label = game.i18n.localize('PF2E_VISIONER.SEEK_AUTOMATION.OPEN_RESULTS');
   const tooltip = game.i18n.localize('PF2E_VISIONER.SEEK_AUTOMATION.OPEN_RESULTS_TOOLTIP');
@@ -7,8 +10,13 @@ export function buildSeekPanel(actionData, message) {
   const buttonClass = 'visioner-btn-seek';
   const panelClass = 'seek-panel';
 
-  const isSeekWithTemplateOption = game.settings.get('pf2e-visioner', 'seekUseTemplate');
   const msgForPanel = message || game.messages.get(actionData.messageId);
+  const isSearchExploration =
+    !!actionData.searchExploration || !!msgForPanel?.flags?.['pf2e-visioner']?.searchExploration;
+  const isSeekWithTemplateOption =
+    !isSearchExploration &&
+    hasActiveEncounter() &&
+    game.settings.get('pf2e-visioner', 'seekUseTemplate');
   const pendingSeek = msgForPanel?.flags?.['pf2e-visioner']?.seekTemplate;
   const hasPendingTemplateFromPlayer = !!pendingSeek && game.user.isGM;
   const pendingHasTargets = !!pendingSeek?.hasTargets;
@@ -16,19 +24,24 @@ export function buildSeekPanel(actionData, message) {
 
   const hasExistingTemplate =
     isSeekWithTemplateOption &&
-    Array.from(canvas?.scene?.regions || []).some((region) => {
-      const f = region?.flags?.['pf2e-visioner'];
-      const isTemplate = region?.getFlag?.('core', 'MeasuredTemplate') || f?.seekPreviewManual;
-      return (
-        isTemplate &&
-        f?.messageId === actionData.messageId &&
-        f?.actorTokenId === actionData.actor.id &&
-        f?.userId === game.userId
-      );
+    hasSeekTemplateDocument({
+      messageId: actionData.messageId,
+      actorId: actionData.actor?.id,
+      userId: game.userId,
     });
 
   let actionButtonsHtml = '';
-  if (hasPendingTemplateFromPlayer) {
+  if (isSearchExploration) {
+    if (game.user.isGM) {
+      actionButtonsHtml = `
+        <button type="button" 
+                class="visioner-btn ${buttonClass}" 
+                data-action="${actionName}"
+                data-tooltip="${tooltip}">
+          <i class="${icon}"></i> ${label}
+        </button>`;
+    }
+  } else if (hasPendingTemplateFromPlayer) {
     if (pendingHasTargets) {
       actionButtonsHtml = `
         <button type="button" 

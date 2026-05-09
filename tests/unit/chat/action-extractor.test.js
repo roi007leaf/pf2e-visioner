@@ -174,6 +174,70 @@ describe('Action Extractor Tests', () => {
 
       expect(result).toBeNull();
     });
+
+    test('marks Search exploration seek checks from Visioner flag', async () => {
+      const message = {
+        id: 'msg1',
+        flags: {
+          pf2e: {
+            context: {
+              type: 'perception-check',
+              options: ['action:seek', 'exploration:search'],
+            },
+          },
+          'pf2e-visioner': {
+            searchExploration: {
+              tokenId: 'token-1',
+              radiusFeet: 30,
+            },
+          },
+        },
+      };
+
+      const result = await extractActionData(message);
+
+      expect(result).toMatchObject({
+        messageId: 'msg1',
+        actionType: 'seek',
+        searchExploration: true,
+        searchExplorationRadiusFeet: 30,
+      });
+    });
+
+    test('detects Search exploration from Visioner flag even when PF2E context lacks seek option', async () => {
+      const message = {
+        id: 'msg1',
+        speaker: { token: 'pc-1' },
+        flags: {
+          pf2e: {
+            context: {
+              type: 'perception-check',
+              options: ['exploration:search'],
+            },
+          },
+          'pf2e-visioner': {
+            searchExploration: {
+              tokenId: 'pc-1',
+              targetWallId: 'wall-1',
+              groupId: 'group-1',
+            },
+          },
+        },
+        rolls: [{ total: 22, dice: [{ total: 15 }] }],
+      };
+
+      const result = await extractActionData(message);
+
+      expect(result).toMatchObject({
+        messageId: 'msg1',
+        actionType: 'seek',
+        searchExploration: true,
+        searchExplorationTokenId: 'pc-1',
+        searchExplorationTargetWallId: 'wall-1',
+        searchExplorationGroupId: 'group-1',
+        roll: { total: 22, dice: [{ total: 15 }] },
+      });
+    });
   });
 
   describe('Create a Diversion Action Detection', () => {

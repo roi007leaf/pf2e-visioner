@@ -84,23 +84,52 @@ export async function previewActionResults(actionData) {
           const { SeekActionHandler } = await import('../actions/SeekAction.js');
           const { SeekPreviewDialog } = await import('../../dialogs/SeekPreviewDialog.js');
           const handler = new SeekActionHandler();
+
+          if (actionData.searchExploration) {
+            const { openSearchExplorationGroupResults } = await import(
+              '../search-exploration-service.js'
+            );
+            await openSearchExplorationGroupResults({
+              ...actionData,
+              actorToken: seekerToken,
+            });
+            return;
+          }
+
           await handler.ensurePrerequisites(actionData);
 
           // RAW enforcement gate: check if there are valid seek targets
-          try {
-            const { checkForValidTargets } = await import('../infra/target-checker.js');
-            const canSeek = checkForValidTargets({ ...actionData, actionType: 'seek' });
-            if (!canSeek) {
-              const { notify } = await import('../infra/notifications.js');
-              notify.warn(
-                'No valid Seek targets found. According to RAW, you can only Seek targets that are Undetected or Hidden from you.',
-              );
-              return;
-            }
-          } catch { }
+          if (!actionData.searchExploration) {
+            try {
+              const { checkForValidTargets } = await import('../infra/target-checker.js');
+              const canSeek = checkForValidTargets({ ...actionData, actionType: 'seek' });
+              if (!canSeek) {
+                const { notify } = await import('../infra/notifications.js');
+                notify.warn(
+                  'No valid Seek targets found. According to RAW, you can only Seek targets that are Undetected or Hidden from you.',
+                );
+                return;
+              }
+            } catch { }
+          }
 
           // Do NOT pre-filter allies at discovery time; let the dialog control it live
-          const subjects = await handler.discoverSubjects({ ...actionData, ignoreAllies: false });
+          let subjects = await handler.discoverSubjects({ ...actionData, ignoreAllies: false });
+          if (actionData.searchExploration) {
+            const {
+              filterSearchExplorationSubjects,
+              getSearchExplorationRangeFeet,
+            } = await import('../search-exploration-service.js');
+            const rangeFeet = Number(
+              actionData.searchExplorationRadiusFeet ?? getSearchExplorationRangeFeet(),
+            );
+            subjects = filterSearchExplorationSubjects(subjects, seekerToken, rangeFeet);
+            if (subjects.length === 0) {
+              const { notify } = await import('../infra/notifications.js');
+              notify.warn('No Search exploration targets found.');
+              return;
+            }
+          }
           const outcomes = await Promise.all(
             subjects.map((s) => handler.analyzeOutcome(actionData, s)),
           );

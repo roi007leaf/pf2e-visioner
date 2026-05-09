@@ -4,6 +4,10 @@
  */
 
 import { openVisibilityManagerWithMode } from '../api.js';
+import {
+  isSearchExplorationHudTarget,
+  runSearchExplorationForTarget,
+} from '../chat/services/search-exploration-service.js';
 import { MODULE_ID } from '../constants.js';
 
 /**
@@ -17,7 +21,9 @@ export function onRenderTokenHUD(app, html) {
     return;
   }
 
-  // Respect loot-actors setting: do not add for loot when disabled
+  renderSearchExplorationButton(app, html);
+
+  // Respect loot-actors setting for the visibility manager only.
   try {
     const token = app?.object;
     if (token?.actor?.type === 'loot' && !game.settings.get(MODULE_ID, 'includeLootActors')) {
@@ -26,6 +32,53 @@ export function onRenderTokenHUD(app, html) {
   } catch (_) {}
 
   renderVisibilityButton(app, html);
+}
+
+function getHudLeftColumn(html) {
+  const root = html?.jquery ? html[0] : html;
+  if (!root) return null;
+  let column = root.querySelector('div.col.left');
+  if (!column && html?.find) {
+    column = html.find('div.col.left')[0];
+  }
+  return column || null;
+}
+
+function renderSearchExplorationButton(app, html) {
+  const token = app.object;
+  if (!token || !game.user.isGM || !isSearchExplorationHudTarget(token)) return;
+
+  const column = getHudLeftColumn(html);
+  if (!column) {
+    console.warn('PF2E Visioner: Could not find left column in token HUD');
+    return;
+  }
+
+  const existing = column.querySelector('[data-action="pf2e-visioner-search-exploration"]');
+  if (existing) existing.remove();
+
+  const buttonElement = document.createElement('div');
+  buttonElement.className = 'control-icon';
+  buttonElement.style.display = 'flex';
+  buttonElement.setAttribute('data-action', 'pf2e-visioner-search-exploration');
+  buttonElement.setAttribute(
+    'data-tooltip',
+    'Roll Search exploration for PCs searching this area',
+  );
+  buttonElement.innerHTML = '<i class="fas fa-search"></i>';
+
+  buttonElement.addEventListener('click', async (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+
+    try {
+      await runSearchExplorationForTarget(token);
+    } catch (error) {
+      console.error('PF2E Visioner: Error rolling Search exploration:', error);
+    }
+  });
+
+  column.appendChild(buttonElement);
 }
 
 /**
@@ -42,15 +95,7 @@ function renderVisibilityButton(app, html) {
     return;
   }
 
-  // html is a jQuery in Foundry; normalize to a DOM element
-  const root = html?.jquery ? html[0] : html;
-  if (!root) return;
-
-  // Find the left column to add the button
-  let column = root.querySelector('div.col.left');
-  if (!column && html?.find) {
-    column = html.find('div.col.left')[0];
-  }
+  const column = getHudLeftColumn(html);
   if (!column) {
     console.warn('PF2E Visioner: Could not find left column in token HUD');
     return;

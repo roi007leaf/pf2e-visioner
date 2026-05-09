@@ -866,6 +866,21 @@ export function registerKeybindings() {
           }
         };
         break;
+      case 'openHazardLootManager':
+        keybindingConfig.onDown = async () => {
+          const { VisionerHazardLootManager } = await import(
+            './managers/hazard-loot-manager/HazardLootManager.js'
+          );
+          const existing =
+            Object.values(ui.windows || {}).find((w) => w instanceof VisionerHazardLootManager) ||
+            null;
+          if (existing) {
+            existing.bringToFront();
+          } else {
+            new VisionerHazardLootManager().render(true);
+          }
+        };
+        break;
       case 'showVisibilityFactors':
         keybindingConfig.onDown = async () => {
           const { showVisibilityFactorsOverlay } = await import('./services/HoverTooltips.js');

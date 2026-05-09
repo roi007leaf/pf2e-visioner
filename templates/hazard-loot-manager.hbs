@@ -1,0 +1,262 @@
+<form class="pf2e-visioner-hazard-loot-manager">
+  <div class="search-filter-container hazard-loot-filter-toolbar">
+    <div class="inline-flex hazard-loot-search-field">
+      <i class="fas fa-search icon-color-text-primary"></i>
+      <input
+        type="text"
+        id="hazard-loot-search"
+        class="pf2e-visioner-form-control hazard-loot-filter-control"
+        placeholder="Search hazards and loot"
+        aria-label="Search hazards and loot"
+      />
+    </div>
+
+    <div class="inline-flex hazard-loot-filter-pill" data-tooltip="Filter by type">
+      <i class="fas fa-tags icon-color-text-primary"></i>
+      <select
+        id="hazard-loot-type-filter"
+        class="pf2e-visioner-form-control hazard-loot-filter-control"
+        aria-label="Filter by type"
+      >
+        <option value="">All Types</option>
+        <option value="loot">Loot</option>
+        <option value="hazard">Hazards</option>
+      </select>
+    </div>
+
+    <div class="inline-flex hazard-loot-filter-pill" data-tooltip="Filter by visibility">
+      <i class="fas fa-eye icon-color-text-primary"></i>
+      <select
+        id="hazard-loot-visibility-filter"
+        class="pf2e-visioner-form-control hazard-loot-filter-control"
+        aria-label="Filter by visibility"
+      >
+        <option value="">All</option>
+        <option value="observed">Observed</option>
+        <option value="hidden">Hidden</option>
+        <option value="mixed">Mixed</option>
+      </select>
+    </div>
+
+    <button
+      type="button"
+      id="hazard-loot-clear-filters"
+      class="visioner-icon-btn hazard-loot-clear-filters"
+      data-tooltip="Clear filters"
+      aria-label="Clear filters"
+    >
+      <i class="fas fa-times icon-color-text-primary"></i>
+    </button>
+  </div>
+
+  <div class="table-container hazard-loot-table-container">
+    <section class="hazard-loot-section hazard-loot-section-loot">
+      <h3>
+        <span><i class="fas fa-box-open"></i> Loot</span>
+        <span class="hazard-loot-section-actions hazard-loot-bulk-actions">
+          <button type="button" class="visioner-icon-btn" data-action="bulkHidden" data-tooltip="Set visible loot Hidden for all player characters">
+            <i class="fas fa-eye-slash visibility-hidden"></i>
+          </button>
+          <button type="button" class="visioner-icon-btn" data-action="bulkObserved" data-tooltip="Set visible loot Observed for all player characters">
+            <i class="fas fa-eye visibility-observed"></i>
+          </button>
+          <button type="button" class="visioner-icon-btn" data-action="setPartyDC" data-party-dc="{{partyDC}}" data-tooltip="Set visible loot to party level DC {{partyDC}} (level {{partyLevel}})">
+            <i class="fas fa-table-list hazard-loot-dc-icon"></i>
+          </button>
+        </span>
+      </h3>
+      <table class="visibility-table sticky-header-table hazard-loot-table">
+        <thead class="sticky-header">
+          <tr class="sticky-row">
+            <th class="col-w-6">Type</th>
+            <th class="col-w-26">Name</th>
+            <th class="col-w-12">Visibility</th>
+            <th class="col-w-10">Stealth DC</th>
+            <th class="col-w-12">Party DC</th>
+            <th class="col-w-12">Actions</th>
+            <th class="col-w-26">Token ID</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{#each lootRows as |row|}}
+            <tr data-token-id="{{row.id}}" data-token-name="{{row.name}}" data-token-type="{{row.type}}" data-visibility="{{row.visibility}}">
+              <td class="text-center">
+                <img class="hazard-loot-token-icon" src="{{row.img}}" width="28" height="28" data-tooltip="{{row.typeLabel}}" />
+              </td>
+              <td class="hazard-loot-token-name">
+                <strong>{{row.name}}</strong>
+                <div class="notes">{{row.typeLabel}}{{#if row.actorLevel}} level {{row.actorLevel}}{{/if}}</div>
+              </td>
+              <td class="text-center">
+                <div class="hazard-loot-state-buttons">
+                  <input type="hidden" name="token.{{row.id}}.visibility" value="{{row.visibility}}" />
+                  <button
+                    type="button"
+                    class="visioner-icon-btn hazard-loot-state-btn {{#if (eq row.visibility "observed")}}active{{/if}}"
+                    data-state="observed"
+                    data-tooltip="Observed for all player characters"
+                    aria-label="Set observed"
+                  >
+                    <i class="fas fa-eye visibility-observed"></i>
+                  </button>
+                  <button
+                    type="button"
+                    class="visioner-icon-btn hazard-loot-state-btn {{#if (eq row.visibility "hidden")}}active{{/if}}"
+                    data-state="hidden"
+                    data-tooltip="Hidden from all player characters"
+                    aria-label="Set hidden"
+                  >
+                    <i class="fas fa-eye-slash visibility-hidden"></i>
+                  </button>
+                  {{#if (eq row.visibility "mixed")}}
+                    <span class="hazard-loot-mixed-indicator" data-tooltip="Mixed visibility across player characters">Mixed</span>
+                  {{/if}}
+                </div>
+              </td>
+              <td class="text-center">
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  class="pf2e-visioner-form-control hazard-loot-dc-input"
+                  name="token.{{row.id}}.dc"
+                  value="{{row.stealthDC}}"
+                  placeholder="DC"
+                />
+              </td>
+              <td class="text-center">
+                <button type="button" class="visioner-icon-btn hazard-loot-party-dc" data-action="setPartyDC" data-party-dc="{{row.partyDC}}" data-tooltip="Use party level DC {{row.partyDC}}">
+                  {{row.partyDC}}
+                </button>
+              </td>
+              <td class="text-center">
+                <div class="hazard-loot-row-actions">
+                  <button type="button" class="visioner-icon-btn" data-action="openSheet" data-token-id="{{row.id}}" data-tooltip="Open sheet">
+                    <i class="fas fa-file-lines icon-color-text-primary"></i>
+                  </button>
+                  <button type="button" class="visioner-icon-btn" data-action="selectToken" data-token-id="{{row.id}}" data-tooltip="Select and pan">
+                    <i class="fas fa-crosshairs icon-color-text-primary"></i>
+                  </button>
+                </div>
+              </td>
+              <td class="hazard-loot-token-id"><code>{{row.id}}</code></td>
+            </tr>
+          {{/each}}
+        </tbody>
+      </table>
+    </section>
+
+    <section class="hazard-loot-section hazard-loot-section-hazards">
+      <h3>
+        <span><i class="fas fa-exclamation-triangle"></i> Hazards</span>
+        <span class="hazard-loot-section-actions hazard-loot-bulk-actions">
+          <button type="button" class="visioner-icon-btn" data-action="bulkHidden" data-tooltip="Set visible hazards Hidden for all player characters">
+            <i class="fas fa-eye-slash visibility-hidden"></i>
+          </button>
+          <button type="button" class="visioner-icon-btn" data-action="bulkObserved" data-tooltip="Set visible hazards Observed for all player characters">
+            <i class="fas fa-eye visibility-observed"></i>
+          </button>
+        </span>
+      </h3>
+      <table class="visibility-table sticky-header-table hazard-loot-table">
+        <thead class="sticky-header">
+          <tr class="sticky-row">
+            <th class="col-w-6">Type</th>
+            <th class="col-w-26">Name</th>
+            <th class="col-w-12">Visibility</th>
+            <th class="col-w-10">Sheet DC</th>
+            <th class="col-w-14">Proficiency</th>
+            <th class="col-w-12">Actions</th>
+            <th class="col-w-20">Token ID</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{#each hazardRows as |row|}}
+            <tr data-token-id="{{row.id}}" data-token-name="{{row.name}}" data-token-type="{{row.type}}" data-visibility="{{row.visibility}}">
+              <td class="text-center">
+                <img class="hazard-loot-token-icon" src="{{row.img}}" width="28" height="28" data-tooltip="{{row.typeLabel}}" />
+              </td>
+              <td class="hazard-loot-token-name">
+                <strong>{{row.name}}</strong>
+                <div class="notes">{{row.typeLabel}}{{#if row.actorLevel}} level {{row.actorLevel}}{{/if}}</div>
+              </td>
+              <td class="text-center">
+                <div class="hazard-loot-state-buttons">
+                  <input type="hidden" name="token.{{row.id}}.visibility" value="{{row.visibility}}" />
+                  <button
+                    type="button"
+                    class="visioner-icon-btn hazard-loot-state-btn {{#if (eq row.visibility "observed")}}active{{/if}}"
+                    data-state="observed"
+                    data-tooltip="Observed for all player characters"
+                    aria-label="Set observed"
+                  >
+                    <i class="fas fa-eye visibility-observed"></i>
+                  </button>
+                  <button
+                    type="button"
+                    class="visioner-icon-btn hazard-loot-state-btn {{#if (eq row.visibility "hidden")}}active{{/if}}"
+                    data-state="hidden"
+                    data-tooltip="Hidden from all player characters"
+                    aria-label="Set hidden"
+                  >
+                    <i class="fas fa-eye-slash visibility-hidden"></i>
+                  </button>
+                  {{#if (eq row.visibility "mixed")}}
+                    <span class="hazard-loot-mixed-indicator" data-tooltip="Mixed visibility across player characters">Mixed</span>
+                  {{/if}}
+                </div>
+              </td>
+              <td class="text-center">
+                <span class="hazard-loot-sheet-dc">{{row.stealthDC}}</span>
+              </td>
+              <td class="text-center">
+                <div class="hazard-loot-rank-buttons">
+                  <input type="hidden" name="token.{{row.id}}.minPerceptionRank" value="{{row.minPerceptionRank}}" />
+                  {{#each ../proficiencyRanks as |rank|}}
+                    <button
+                      type="button"
+                      class="visioner-icon-btn hazard-loot-rank-btn {{#if (eq ../minPerceptionRank rank.rank)}}active{{/if}}"
+                      data-rank="{{rank.rank}}"
+                      data-tooltip="{{rank.label}}"
+                      aria-label="Set minimum proficiency {{rank.label}}"
+                    >
+                      {{rank.shortLabel}}
+                    </button>
+                  {{/each}}
+                </div>
+              </td>
+              <td class="text-center">
+                <div class="hazard-loot-row-actions">
+                  <button type="button" class="visioner-icon-btn" data-action="openSheet" data-token-id="{{row.id}}" data-tooltip="Open sheet">
+                    <i class="fas fa-file-lines icon-color-text-primary"></i>
+                  </button>
+                  <button type="button" class="visioner-icon-btn" data-action="selectToken" data-token-id="{{row.id}}" data-tooltip="Select and pan">
+                    <i class="fas fa-crosshairs icon-color-text-primary"></i>
+                  </button>
+                </div>
+              </td>
+              <td class="hazard-loot-token-id"><code>{{row.id}}</code></td>
+            </tr>
+          {{/each}}
+        </tbody>
+      </table>
+    </section>
+  </div>
+  <div class="wall-count hazard-loot-count">
+    Total: <span id="hazard-loot-count-total">{{rows.length}}</span> |
+    Showing: <span id="hazard-loot-count-visible">{{rows.length}}</span> |
+    Loot: {{lootRows.length}} |
+    Hazards: {{hazardRows.length}} |
+    Party level: {{partyLevel}} |
+    Party DC: {{partyDC}}
+  </div>
+
+  <footer class="sheet-footer">
+    <button type="button" class="visioner-btn visioner-primary" data-action="apply">
+      <i class="fas fa-check hazard-loot-apply-icon"></i> Apply
+    </button>
+    <button type="button" class="visioner-btn" data-action="close">
+      <i class="fas fa-times hazard-loot-close-icon"></i> Close
+    </button>
+  </footer>
+</form>
