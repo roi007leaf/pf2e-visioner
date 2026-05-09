@@ -442,7 +442,7 @@ describe('VisionAnalyzer - Line of Sight (Refactored)', () => {
             });
             global.canvas.walls.placeables = [];
 
-            const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+            const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => { });
             const result = visionAnalyzer.hasLineOfSight(mockObserver, mockTarget);
             warnSpy.mockRestore();
 

@@ -1,6 +1,6 @@
 # Changelog
 
-## [8.2.0] - 2026-05-06
+## [8.3.0] - 2026-05-06
 
 ### Added
 
@@ -22,6 +22,40 @@
 - Fresh AVS override flags now store canonical detection/concealment metadata, so `concealed` manual overrides save as `detectionState: "observed"` with `hasConcealment: true` instead of an old-shaped legacy-only override.
 - Concealment-sensitive stealth logic no longer treats Hidden or Undetected as if they were the concealed condition.
 - Encounter-start Unnoticed continues to hide tokens and tracker rows while using Undetected as the underlying detection state.
+
+## [8.2.0] - 2026-05-09
+
+### Added
+
+- **Search exploration automation for out-of-encounter play**: Added GM-triggered Search exploration support for PF2E exploration activity workflows. GMs can roll Seek checks for every PC currently using the Search exploration activity against a specific hidden target, without relying on token movement, encounter turns, or automatic 10-minute polling.
+- **Search exploration target HUD buttons**: Loot, hazards, and hidden NPCs now get a dedicated Token HUD Search button outside combat when they are valid exploration Search targets. Hidden walls get the same workflow through wall tools when no Token HUD exists.
+- **Consolidated Search exploration results dialog**: Exploration Search results now open in a target-focused dialog. The target is the subject, each row is a searching PC, and Apply updates the PC-to-target visibility relationship in the correct direction.
+- **Search exploration support for hidden walls**: Hidden walls can be searched through the exploration Search workflow, use wall stealth DCs, default to vision-based detection presentation, and successful results can set the wall observed for the searching PC.
+- **Initial scene hidden setup tool**: Added a GM scene setup action that marks all scene loot tokens, hazard tokens, and Visioner hidden walls as hidden to every player character, creating the expected starting visibility state for exploration Search scenes.
+- **Hazard/Loot Manager**: Added a dedicated manager for scene hazards and loot. It shows hazard and loot tables separately, opens actor sheets, applies hidden or observed visibility for all player characters, and exposes scene setup controls for hidden exploration content.
+- **Loot stealth DC management**: Loot rows in the Hazard/Loot Manager can edit their Visioner stealth DC and can set that DC from the PF2E party-level simple DC table.
+- **Hazard minimum proficiency management**: Hazard rows in the Hazard/Loot Manager expose the minimum Perception proficiency rank used for detection, matching PF2E hazard sheet behavior where stealth DC is read from the system sheet rather than edited by Visioner.
+
+### Fixed
+
+- **Foundry v13 Seek template placement no longer leaves a false waiting warning**: The v13 MeasuredTemplate Seek flow now recognizes the template after placement so the GM does not keep seeing the "waiting for the player's Seek template" warning after the template exists.
+- **Seek template and region cleanup after results open**: GM-placed Seek templates and v14 regions are removed after the GM opens the Seek results dialog, and the chat panel returns to the correct result-opening state.
+- **Seek outside combat no longer shows encounter template controls to the GM**: Out-of-combat Seek no longer exposes the setup-template workflow intended for encounter Seek.
+- **Hidden loot-only Seek opens results**: Seek now opens results when the only valid target is hidden loot, avoiding the incorrect "No valid Seek targets found" warning.
+- **Hidden wall-only Seek opens results**: Seek now opens results when the only valid target is a hidden wall, even when no NPCs are inside the Seek area.
+- **Hidden wall successes now offer action buttons**: Search results for hidden walls now treat successful detection as a real visibility change to observed, so Apply buttons appear when the outcome changes the wall state.
+- **Initial scene setup clears Foundry core hidden on loot and hazards**: When the GM initializes loot and hazards as Visioner-hidden to PCs, Visioner also clears Foundry's core `hidden` flag on those target tokens so players can discover them through Visioner state instead of core canvas hiding.
+- **Search exploration HUD appears for Visioner-hidden NPCs**: NPCs hidden or undetected to any PC through Visioner visibility maps now show the Search exploration Token HUD button, even when they do not have a PF2E Hidden/Undetected condition or Foundry core hidden state.
+- **Search exploration activity detection handles PF2E effect activity data**: PCs with Search represented through PF2E exploration activity data or active Search effect items are detected as valid searchers.
+- **Search exploration rolls once per GM action**: The old multi-trigger behavior that could create repeated rolls from a single movement/update path is removed.
+- **Hazard manager no longer edits unsupported hazard stealth DCs**: Hazard stealth DC editing was removed from the manager because hazard DCs come from the PF2E sheet; Visioner now edits only the supported proficiency requirement for hazards.
+
+## [8.1.15] - 2026-05-08
+
+### Fixed
+
+- **Darkness spell areas create linked darkness lights in Foundry v13 and v14**: Visioner now handles PF2E v14 effect-area Regions in addition to v13 MeasuredTemplates, restoring automatic AmbientLight creation, syncing, and cleanup for Darkness spell areas.
+- **Darkvision sees through non-heightened Darkness again**: Unranked Darkness lights now default to ordinary spell darkness instead of rank 4, PF2E system and prepared senses are merged correctly, and core Levels polygon-only vision blocks fall back to wall LOS so rank 1-3 Darkness does not hide creatures from darkvision.
 
 ## [8.1.14] - 2026-05-07
 

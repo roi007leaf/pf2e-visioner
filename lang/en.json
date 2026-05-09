@@ -555,7 +555,8 @@
       "RANGE_LIMIT_ACTIVE": "Range limit active: Only showing targets within 30 feet",
       "RANGE_LIMIT_ACTIVE_CUSTOM": "Range limit active: Only showing targets within {distance} feet",
       "NO_TARGETS_IN_RANGE": "No valid targets within 30 feet range",
-      "NO_TARGETS_IN_RANGE_CUSTOM": "No valid targets within {distance} feet range"
+      "NO_TARGETS_IN_RANGE_CUSTOM": "No valid targets within {distance} feet range",
+      "SEARCH_EXPLORATION_ROLL": "Search Exploration: Secret Seek"
     },
     "SEEK_TEMPLATE_CONFIG": {
       "TITLE": "Seek Template Configuration",
@@ -1307,6 +1308,10 @@
       "OPEN_WALL_MANAGER": {
         "name": "Open Wall Manager",
         "hint": "Open the Visioner Wall Manager dialog to bulk edit wall settings."
+      },
+      "OPEN_HAZARD_LOOT_MANAGER": {
+        "name": "Open Hazard/Loot Manager",
+        "hint": "Open the Visioner Hazard/Loot Manager dialog to bulk edit scene loot and hazard visibility."
       },
       "SHOW_VISIBILITY_FACTORS": {
         "name": "Show Visibility Factors",

@@ -118,7 +118,7 @@
       <thead>
         <tr>
           <th class="token-image">{{localize "PF2E_VISIONER.UI.TOKEN"}}</th>
-          <th class="token-name">{{localize "PF2E_VISIONER.UI.NAME"}}</th>
+          <th class="token-name">{{#if searchExplorationGroup}}Searcher{{else}}{{localize "PF2E_VISIONER.UI.NAME"}}{{/if}}</th>
           {{#if avsEnabled}}
             <th class="detected-by">{{localize "PF2E_VISIONER.SEEK_AUTOMATION.DETECTED_BY"}}</th>
           {{/if}}
@@ -130,9 +130,11 @@
       </thead>
       <tbody>
         {{#each outcomes as |outcome|}}
-          <tr class="token-row" {{#unless outcome._isWall}}data-token-id="{{outcome.target.id}}"{{/unless}} {{#if outcome._isWall}}data-wall-id="{{outcome.wallId}}"{{/if}}>
+          <tr class="token-row" {{#unless outcome._isWall}}data-token-id="{{outcome.rowId}}" data-target-id="{{outcome.target.id}}"{{/unless}} {{#if outcome._isWall}}data-wall-id="{{outcome.wallId}}"{{/if}}>
             <td class="token-image">
-              {{#if outcome._isWall}}
+              {{#if ../searchExplorationGroup}}
+                <img src="{{outcome.searchExplorationObserverImage}}" data-tooltip="{{outcome.searchExplorationObserverName}}" width="28" height="28" />
+              {{else if outcome._isWall}}
                 <img src="{{outcome.wallImg}}" data-tooltip="{{outcome.wallIdentifier}}" width="28" height="28" />
               {{else}}
                 <span class="token-img-wrapper">
@@ -144,11 +146,18 @@
               {{/if}}
             </td>
             <td class="token-name">
-              {{#if outcome._isWall}}
+              {{#if ../searchExplorationGroup}}
+                <div class="token-name-and-tags">
+                  <strong data-tooltip="{{outcome.searchExplorationObserverName}}">{{outcome.searchExplorationObserverName}}</strong>
+                </div>
+              {{else if outcome._isWall}}
                 <strong data-tooltip="{{outcome.wallIdentifier}}">{{outcome.wallIdentifier}}</strong>
               {{else}}
                 <div class="token-name-and-tags">
                   <strong data-tooltip="{{outcome.target.name}}">{{outcome.target.name}}</strong>
+                  {{#if outcome.searchExplorationObserverName}}
+                    <small class="search-exploration-seeker">Searcher: {{outcome.searchExplorationObserverName}}</small>
+                  {{/if}}
                 </div>
               {{/if}}
             </td>
@@ -201,30 +210,37 @@
                   {{/if}}
                 </span>
                 <i class="fas fa-arrow-right position-arrow" aria-hidden="true"></i>
-                <div class="override-icons" data-target="{{#unless outcome._isWall}}{{outcome.target.id}}{{/unless}}" data-wall-id="{{#if outcome._isWall}}{{outcome.wallId}}{{/if}}">
+                <div class="override-icons" data-target="{{#unless outcome._isWall}}{{outcome.rowId}}{{/unless}}" data-wall-id="{{#if outcome._isWall}}{{outcome.wallId}}{{/if}}">
                   {{#each outcome.availableStates as |state|}}
                     <button type="button" class="state-icon {{#if state.selected}}selected{{/if}} {{#if state.calculatedOutcome}}calculated-outcome{{/if}} {{state.cssClass}}" 
-                            data-state="{{state.value}}" data-target="{{outcome.target.id}}" 
+                            data-state="{{state.value}}" data-target="{{#unless outcome._isWall}}{{outcome.rowId}}{{/unless}}" data-wall-id="{{#if outcome._isWall}}{{outcome.wallId}}{{/if}}"
                             data-tooltip="{{localize 'PF2E_VISIONER.UI.OVERRIDE_TO_STATE' label=state.label}}">
                       <i class="{{state.icon}}"></i>
                     </button>
                   {{/each}}
-                  <input type="hidden" name="override.{{outcome.target.id}}" value="{{outcome.overrideState}}" />
+                  <input type="hidden" name="override.{{outcome.rowId}}" value="{{outcome.overrideState}}" />
                 </div>
               </div>
             </td>
-                        <td class="actions">
-              {{#unless outcome._isWall}}
-                <button type="button" class="row-timer-toggle" data-token-id="{{outcome.target.id}}" data-tooltip="{{localize 'PF2E_VISIONER.TIMED_OVERRIDE.SET_DURATION_FOR_ROW'}}">
-                  <i class="fas fa-clock"></i>
-                </button>
-                <button type="button" class="row-action-btn apply-change" data-action="applyChange" data-token-id="{{outcome.target.id}}" data-tooltip="{{localize 'PF2E_VISIONER.UI.APPLY_VISIBILITY_CHANGE'}}">
+            <td class="actions">
+              {{#if outcome._isWall}}
+                <button type="button" class="row-action-btn apply-change" data-action="applyChange" data-wall-id="{{outcome.wallId}}" data-tooltip="{{localize 'PF2E_VISIONER.UI.APPLY_VISIBILITY_CHANGE'}}">
                   <i class="fas fa-check"></i>
                 </button>
-                <button type="button" class="row-action-btn revert-change" data-action="revertChange" data-token-id="{{outcome.target.id}}" data-tooltip="{{localize 'PF2E_VISIONER.UI.REVERT_TO_ORIGINAL'}}">
+                <button type="button" class="row-action-btn revert-change" data-action="revertChange" data-wall-id="{{outcome.wallId}}" data-tooltip="{{localize 'PF2E_VISIONER.UI.REVERT_TO_ORIGINAL'}}">
                   <i class="fas fa-undo"></i>
                 </button>
-              {{/unless}}
+              {{else}}
+                <button type="button" class="row-timer-toggle" data-token-id="{{outcome.rowId}}" data-tooltip="{{localize 'PF2E_VISIONER.TIMED_OVERRIDE.SET_DURATION_FOR_ROW'}}">
+                  <i class="fas fa-clock"></i>
+                </button>
+                <button type="button" class="row-action-btn apply-change" data-action="applyChange" data-token-id="{{outcome.rowId}}" data-tooltip="{{localize 'PF2E_VISIONER.UI.APPLY_VISIBILITY_CHANGE'}}">
+                  <i class="fas fa-check"></i>
+                </button>
+                <button type="button" class="row-action-btn revert-change" data-action="revertChange" data-token-id="{{outcome.rowId}}" data-tooltip="{{localize 'PF2E_VISIONER.UI.REVERT_TO_ORIGINAL'}}">
+                  <i class="fas fa-undo"></i>
+                </button>
+              {{/if}}
             </td>
           </tr>
         {{/each}}

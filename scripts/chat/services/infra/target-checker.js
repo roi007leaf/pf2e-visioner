@@ -3,6 +3,23 @@ import { getVisibilityBetween } from '../../../utils.js';
 // Debug logger removed
 import { isTokenWithinTemplate, shouldFilterAlly } from './shared-utils.js';
 
+function getWallCenter(wall) {
+  if (!wall) return null;
+  if (Number.isFinite(wall.center?.x) && Number.isFinite(wall.center?.y)) return wall.center;
+  const doc = wall.document ?? wall;
+  const c = Array.isArray(doc?.c) ? doc.c : null;
+  if (c && c.length >= 4) return { x: (c[0] + c[2]) / 2, y: (c[1] + c[3]) / 2 };
+  if (
+    Number.isFinite(doc?.x) &&
+    Number.isFinite(doc?.y) &&
+    Number.isFinite(doc?.x2) &&
+    Number.isFinite(doc?.y2)
+  ) {
+    return { x: (doc.x + doc.x2) / 2, y: (doc.y + doc.y2) / 2 };
+  }
+  return null;
+}
+
 export function checkForValidTargets(actionData) {
   // Guard: canvas or tokens not ready yet in early hook timings
   const tokenLayer = canvas?.tokens;
@@ -12,12 +29,9 @@ export function checkForValidTargets(actionData) {
   const potentialTargets = allTokens.filter((token) => {
     if (token === actionData.actor) return false;
     if (!token.actor) return false;
-    if (
-      token.actor.type !== 'character' &&
-      token.actor.type !== 'npc' &&
-      token.actor.type !== 'hazard'
-    )
-      return false;
+    const actorType = token.actor.type;
+    if (actionData.actionType === 'seek' && actorType === 'loot') return true;
+    if (actorType !== 'character' && actorType !== 'npc' && actorType !== 'hazard') return false;
     return true;
   });
 
@@ -45,12 +59,8 @@ export function checkForValidTargets(actionData) {
 }
 
 function checkConsequencesTargets(actionData, potentialTargets) {
-
   for (const target of potentialTargets) {
-    if (
-
-      shouldFilterAlly(actionData.actor, target, 'enemies', actionData?.ignoreAllies)
-    ) {
+    if (shouldFilterAlly(actionData.actor, target, 'enemies', actionData?.ignoreAllies)) {
       continue;
     }
     let visibility = getVisibilityBetween(target, actionData.actor);
@@ -88,13 +98,15 @@ function checkSeekTargets(actionData, potentialTargets) {
         if (hasTemplate) {
           const wallsInTemplate = hiddenWalls.some((wall) => {
             try {
-              const wallCenter = wall.center;
+              const wallCenter = getWallCenter(wall);
               if (wallCenter && canvas.scene?.grid?.size) {
                 const distance = Math.sqrt(
                   Math.pow(wallCenter.x - actionData.seekTemplateCenter.x, 2) +
-                  Math.pow(wallCenter.y - actionData.seekTemplateCenter.y, 2),
+                    Math.pow(wallCenter.y - actionData.seekTemplateCenter.y, 2),
                 );
-                const radiusPixels = (actionData.seekTemplateRadiusFeet * canvas.scene.grid.size) / 5;
+                const gridDistance = canvas.scene.grid.distance ?? canvas.grid?.distance ?? 5;
+                const radiusPixels =
+                  (actionData.seekTemplateRadiusFeet * canvas.scene.grid.size) / gridDistance;
                 return distance <= radiusPixels;
               }
               return false;
@@ -120,7 +132,11 @@ function checkSeekTargets(actionData, potentialTargets) {
       if (lootTokens.length > 0) {
         const validLootTokens = hasTemplate
           ? lootTokens.filter((token) =>
-              isTokenWithinTemplate(actionData.seekTemplateCenter, actionData.seekTemplateRadiusFeet, token),
+              isTokenWithinTemplate(
+                actionData.seekTemplateCenter,
+                actionData.seekTemplateRadiusFeet,
+                token,
+              ),
             )
           : lootTokens;
 
@@ -142,7 +158,7 @@ function checkSeekTargets(actionData, potentialTargets) {
         }
       }
     }
-  } catch (_) { }
+  } catch (_) {}
 
   for (const target of potentialTargets) {
     // Check if target is a hazard/loot with a minimum perception rank
@@ -184,7 +200,7 @@ function checkSeekTargets(actionData, potentialTargets) {
           return true;
         }
       }
-    } catch (_) { }
+    } catch (_) {}
 
     const visibility = getVisibilityBetween(actionData.actor, target);
     if (['hidden', 'undetected'].includes(visibility)) return true;
@@ -198,9 +214,7 @@ function checkSeekTargets(actionData, potentialTargets) {
     if (actionData.actor.actor?.getRollOptions) {
       const rollOptions = actionData.actor.actor.getRollOptions();
       const hasHiddenOrUndetected = rollOptions.some(
-        (opt) =>
-          opt.includes('target:hidden') ||
-          opt.includes('target:undetected'),
+        (opt) => opt.includes('target:hidden') || opt.includes('target:undetected'),
       );
       if (hasHiddenOrUndetected) return true;
     }
@@ -226,7 +240,6 @@ function checkPointOutTargets(actionData, potentialTargets) {
 
 function checkHideTargets(actionData, potentialTargets) {
   return potentialTargets.length > 0;
-
 }
 
 function checkSneakTargets(actionData, potentialTargets) {
@@ -240,7 +253,7 @@ function checkDiversionTargets(actionData, potentialTargets) {
       const observers = discoverDiversionObservers(actionData.actor);
       return observers.length > 0;
     }
-  } catch (_) { }
+  } catch (_) {}
   // Fallback to simple heuristic if dynamic import not cached
   return potentialTargets.length > 0;
 }

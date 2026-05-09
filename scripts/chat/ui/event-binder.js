@@ -4,6 +4,22 @@
  */
 
 import { notify } from '../services/infra/notifications.js';
+import {
+  findSeekTemplateDocument,
+  getTemplateStateFromDocument,
+} from '../services/preview/seek-template.js';
+import { hasActiveEncounter } from '../services/infra/shared-utils.js';
+
+export function shouldWaitForPlayerSeekTemplate({ message, pending, fallbackTemplate } = {}) {
+  return !!(
+    game.user.isGM &&
+    game.settings.get('pf2e-visioner', 'seekUseTemplate') &&
+    hasActiveEncounter() &&
+    message?.author?.isGM === false &&
+    !pending &&
+    !fallbackTemplate
+  );
+}
 
 export function bindAutomationEvents(panel, message, actionData) {
   panel.on('click', '[data-action]', async (event) => {
@@ -89,8 +105,16 @@ export function bindAutomationEvents(panel, message, actionData) {
               updateSeekTemplateButton(actionData, false);
             }
           }
-        } catch { }
+        } catch {}
       } else if (action === 'open-seek-results' && actionData.actionType === 'seek') {
+        if (actionData.searchExploration) {
+          await previewActionResults({
+            ...actionData,
+            ignoreAllies: game.settings.get('pf2e-visioner', 'ignoreAllies'),
+          });
+          return;
+        }
+
         let msg = game.messages.get(actionData.messageId);
         let pending = msg?.flags?.['pf2e-visioner']?.seekTemplate;
         // If authored by a player but flags haven't arrived yet, wait briefly and retry
@@ -106,39 +130,25 @@ export function bindAutomationEvents(panel, message, actionData) {
         let fallbackTemplate = null;
         if (!pending && game.user.isGM && msg?.author && msg.author.isGM === false) {
           try {
-            fallbackTemplate =
-              Array.from(canvas.scene?.regions || []).find((t) => {
-                const f = t?.flags?.['pf2e-visioner'];
-                return (
-                  (t?.getFlag?.('core', 'MeasuredTemplate') || f?.seekPreviewManual === true) &&
-                  f?.messageId === actionData.messageId &&
-                  f?.actorTokenId === actionData.actor.id &&
-                  f?.userId === msg.author.id
-                );
-              }) || null;
-          } catch { }
+            fallbackTemplate = findSeekTemplateDocument({
+              messageId: actionData.messageId,
+              actorId: actionData.actor.id,
+              userId: msg.author.id,
+            });
+          } catch {}
         }
         if ((pending || fallbackTemplate) && game.user.isGM) {
-          const center =
-            pending?.center ||
-            (fallbackTemplate ? { x: fallbackTemplate.shapes?.[0]?.x, y: fallbackTemplate.shapes?.[0]?.y } : undefined);
-          const radiusFeet =
-            pending?.radiusFeet ||
-            (fallbackTemplate
-              ? Number(
-                  (fallbackTemplate.shapes?.[0]?.radius ??
-                    fallbackTemplate.shapes?.[0]?.length ??
-                    0) / ((canvas?.scene?.grid?.size || 100) / (canvas?.scene?.grid?.distance || 5)),
-                ) || 0
-              : undefined);
+          const fallbackState = fallbackTemplate
+            ? getTemplateStateFromDocument(fallbackTemplate)
+            : null;
+          const center = pending?.center || fallbackState?.center;
+          const radiusFeet = pending?.radiusFeet || fallbackState?.radiusFeet;
           if (center && radiusFeet) {
             actionData.seekTemplateCenter = center;
             actionData.seekTemplateRadiusFeet = radiusFeet;
-            const fallbackShapeType = fallbackTemplate?.shapes?.[0]?.type;
             actionData.seekTemplateType =
-              pending?.templateType ||
-              (fallbackShapeType === 'cone' ? 'cone' : fallbackShapeType === 'line' ? 'ray' : 'circle');
-            actionData.seekTemplateLevels = pending?.levels || fallbackTemplate?.levels || [];
+              pending?.templateType || fallbackState?.templateType || 'circle';
+            actionData.seekTemplateLevels = pending?.levels || fallbackState?.levels || [];
           }
           if (pending && typeof pending.rollTotal === 'number') {
             actionData.roll = {
@@ -155,7 +165,9 @@ export function bindAutomationEvents(panel, message, actionData) {
                 ['flags.pf2e-visioner.seekTemplate']: {
                   center,
                   radiusFeet,
-                  levels: fallbackTemplate?.levels || [],
+                  templateType:
+                    actionData.seekTemplateType || fallbackState?.templateType || 'circle',
+                  levels: actionData.seekTemplateLevels || fallbackState?.levels || [],
                   actorTokenId: actionData.actor.id,
                   rollTotal: actionData.roll?.total ?? null,
                   dieResult:
@@ -164,9 +176,9 @@ export function bindAutomationEvents(panel, message, actionData) {
                   hasTargets: true,
                 },
               });
-            } catch { }
+            } catch {}
           }
-        } else if (game.user.isGM && game.settings.get('pf2e-visioner', 'seekUseTemplate')) {
+        } else if (shouldWaitForPlayerSeekTemplate({ message: msg, pending, fallbackTemplate })) {
           // Still no template data: avoid opening unfiltered results
           notify.warn(
             "Waiting for the player's Seek template. Please click again once it appears.",
@@ -200,7 +212,7 @@ export function bindAutomationEvents(panel, message, actionData) {
               );
               const first = dialog?.outcomes?.[0]?.targetToken;
               if (first) token = first;
-            } catch { }
+            } catch {}
             if (!token) {
               const msg = game.messages.get(actionData?.messageId);
               const pointOutFlags = msg?.flags?.['pf2e-visioner']?.pointOut;
@@ -214,10 +226,10 @@ export function bindAutomationEvents(panel, message, actionData) {
               const { pingTokenCenter } = await import('../services/gm-ping.js');
               try {
                 pingTokenCenter(token, 'Point Out Target');
-              } catch { }
+              } catch {}
             }
           }
-        } catch { }
+        } catch {}
 
         // For Hide: if there are no actionable changes (respecting default encounter filter),
         // show a no-changes notification and skip applying
@@ -239,7 +251,10 @@ export function bindAutomationEvents(panel, message, actionData) {
               return;
             }
           } catch (hideValidationErr) {
-            console.warn('PF2E Visioner | Hide validation failed, blocking apply:', hideValidationErr);
+            console.warn(
+              'PF2E Visioner | Hide validation failed, blocking apply:',
+              hideValidationErr,
+            );
             notify.warn('Unable to validate Hide targets');
             return;
           }

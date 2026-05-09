@@ -21,7 +21,17 @@ export class SeekActionHandler extends ActionHandlerBase {
     return appliedSeekChangesByMessage;
   }
   getOutcomeTokenId(outcome) {
-    return outcome?.target?.id ?? null;
+    return outcome?.searchExplorationRowId ?? outcome?.target?.id ?? null;
+  }
+
+  getOutcomeObserver(actionData, outcome) {
+    return (
+      outcome?.observerToken ||
+      outcome?.observer ||
+      outcome?.searchExplorationObserver ||
+      actionData.actorToken ||
+      actionData.actor
+    );
   }
 
   async ensurePrerequisites(actionData) {
@@ -253,6 +263,14 @@ export class SeekActionHandler extends ActionHandlerBase {
     let usedImpreciseSenseRange = null;
     let usedSenseType = null;
     let usedSensePrecision = null;
+    if (subject?._isWall) {
+      usedSenseType = 'vision';
+      usedSensePrecision = 'precise';
+      if (!this._usedSenseType) {
+        this._usedSenseType = usedSenseType;
+        this._usedSensePrecision = usedSensePrecision;
+      }
+    }
 
     // Track failure conditions for reporting in final outcome
     let __impreciseReason = undefined;
@@ -339,8 +357,12 @@ export class SeekActionHandler extends ActionHandlerBase {
     } catch { }
 
     // If no senses are available at all, the seek cannot detect anything
-    if (!usedSenseType && !usedImprecise) {
+    if (!subject?._isWall && !usedSenseType && !usedImprecise) {
       newVisibility = current;
+    }
+
+    if (subject?._isWall && (outcome === 'success' || outcome === 'critical-success')) {
+      newVisibility = 'observed';
     }
 
     // PF2e RAW correction: You CAN Seek with imprecise senses,
@@ -489,23 +511,34 @@ export class SeekActionHandler extends ActionHandlerBase {
   buildCacheEntryFromChange(change) {
     // Support both token and wall changes in cache
     if (change?.wallId) {
-      return { wallId: change.wallId, oldVisibility: change.oldVisibility };
+      return {
+        wallId: change.wallId,
+        observerId: change?.observer?.id ?? null,
+        oldVisibility: change.oldVisibility,
+      };
     }
     const tid = change?.target?.id || change?.targetId || null;
-    return { targetId: tid, oldVisibility: change.oldVisibility };
+    return {
+      targetId: tid,
+      observerId: change?.observer?.id ?? null,
+      oldVisibility: change.oldVisibility,
+    };
   }
 
   entriesToRevertChanges(entries, actionData) {
     const changes = [];
     for (const e of entries) {
+      const observer = e?.observerId
+        ? canvas?.tokens?.get?.(e.observerId) || actionData.actorToken || actionData.actor
+        : actionData.actorToken || actionData.actor;
       if (e?.wallId) {
         // Revert wall state on the seeker back to previous visibility (default hidden)
         const prev = typeof e.oldVisibility === 'string' ? e.oldVisibility : 'hidden';
-        changes.push({ observer: actionData.actorToken || actionData.actor, wallId: e.wallId, newWallState: prev });
+        changes.push({ observer, wallId: e.wallId, newWallState: prev });
       } else if (e?.targetId) {
         const tgt = this.getTokenById(e.targetId);
         if (tgt)
-          changes.push({ observer: actionData.actorToken || actionData.actor, target: tgt, newVisibility: e.oldVisibility });
+          changes.push({ observer, target: tgt, newVisibility: e.oldVisibility });
       }
     }
     return changes;
@@ -517,14 +550,17 @@ export class SeekActionHandler extends ActionHandlerBase {
       if (outcome?._isWall && outcome?.wallId) {
         const effective = outcome?.overrideState || outcome?.newVisibility || null;
         return {
-          observer: actionData.actorToken || actionData.actor,
+          observer: this.getOutcomeObserver(actionData, outcome),
           wallId: outcome.wallId,
           newWallState: effective,
           oldVisibility: outcome?.oldVisibility || outcome?.currentVisibility || null,
         };
       }
     } catch { }
-    return super.outcomeToChange(actionData, outcome);
+    return {
+      ...super.outcomeToChange(actionData, outcome),
+      observer: this.getOutcomeObserver(actionData, outcome),
+    };
   }
 
   // Override base to support wall overrides passed from UI
@@ -618,6 +654,10 @@ export class SeekActionHandler extends ActionHandlerBase {
     try {
       await this.ensurePrerequisites(actionData);
 
+      if (Array.isArray(actionData?.searchExplorationGroupedOutcomes)) {
+        return await this.#applySearchExplorationGroupedOutcomes(actionData, button);
+      }
+
       const subjects = await this.discoverSubjects(actionData);
       const outcomes = [];
       for (const subject of subjects) {
@@ -706,6 +746,37 @@ export class SeekActionHandler extends ActionHandlerBase {
       (await import('../infra/notifications.js')).log.error(e);
       return 0;
     }
+  }
+
+  async #applySearchExplorationGroupedOutcomes(actionData, button) {
+    const outcomes = actionData.searchExplorationGroupedOutcomes.map((outcome) => ({ ...outcome }));
+    this.applyOverrides(actionData, outcomes);
+
+    let filtered = outcomes.filter((outcome) => outcome && (outcome.changed || outcome.hasActionableChange));
+
+    try {
+      const overrides = actionData?.overrides || {};
+      const allowedIds = new Set(Object.keys(overrides).filter((key) => key !== '__wall__'));
+      const wallIds = new Set(Object.keys(overrides.__wall__ || {}));
+      if (allowedIds.size > 0 || wallIds.size > 0) {
+        filtered = filtered.filter((outcome) => {
+          if (outcome?._isWall && outcome?.wallId) return wallIds.has(outcome.wallId);
+          const id = this.getOutcomeTokenId(outcome);
+          return id ? allowedIds.has(id) : false;
+        });
+      }
+    } catch { }
+
+    if (filtered.length === 0) {
+      (await import('../infra/notifications.js')).notify.info('No changes to apply');
+      return 0;
+    }
+
+    const changes = filtered.map((outcome) => this.outcomeToChange(actionData, outcome)).filter(Boolean);
+    await this.applyChangesInternal(changes);
+    this.cacheAfterApply(actionData, changes);
+    this.updateButtonToRevert(button);
+    return changes.length;
   }
 
   async #partitionByLOS(actionData, changes, outcomes) {

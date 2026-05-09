@@ -32,6 +32,280 @@ button.row-timer-toggle {
   visibility: visible !important;
   opacity: 1 !important;
 }
+
+/* Hazard/Loot Manager */
+.pf2e-visioner .pf2e-visioner-hazard-loot-manager {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  height: 100%;
+  min-height: 0;
+}
+
+.pf2e-visioner .pf2e-visioner-hazard-loot-manager .hazard-loot-filter-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 8px;
+  background: rgba(0, 0, 0, 0.1);
+  border: 1px solid var(--color-border-light-primary, rgba(255, 255, 255, 0.16));
+  border-radius: 4px;
+}
+
+.pf2e-visioner .pf2e-visioner-hazard-loot-manager .hazard-loot-filter-toolbar .inline-flex {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pf2e-visioner .pf2e-visioner-hazard-loot-manager .hazard-loot-search-field {
+  flex: 1 1 240px;
+  min-width: 220px;
+}
+
+.pf2e-visioner .pf2e-visioner-hazard-loot-manager .hazard-loot-filter-pill {
+  flex: 0 0 auto;
+}
+
+.pf2e-visioner .pf2e-visioner-hazard-loot-manager .hazard-loot-filter-control {
+  height: 30px;
+  min-height: 30px;
+  padding: 4px 8px;
+  border: 1px solid var(--color-border-light-primary);
+  border-radius: 4px;
+  background: var(--color-bg-option, var(--color-bg-input, #2a2a2a));
+  color: var(--color-text-primary);
+  font-size: 12px;
+}
+
+.pf2e-visioner .pf2e-visioner-hazard-loot-manager .hazard-loot-search-field input {
+  width: 100%;
+}
+
+.pf2e-visioner .pf2e-visioner-hazard-loot-manager .hazard-loot-filter-pill select {
+  width: auto;
+  min-width: 118px;
+}
+
+.pf2e-visioner .pf2e-visioner-hazard-loot-manager .hazard-loot-filter-control:focus {
+  outline: none;
+  border-color: var(--pf2e-visioner-primary, var(--color-text-hyperlink, #ff9800));
+  box-shadow: 0 0 0 2px rgba(255, 152, 0, 0.22);
+}
+
+.pf2e-visioner .pf2e-visioner-hazard-loot-manager .hazard-loot-toolbar-spacer {
+  flex: 1 1 auto;
+  min-width: 8px;
+}
+
+.pf2e-visioner .pf2e-visioner-hazard-loot-manager .hazard-loot-bulk-actions,
+.pf2e-visioner .pf2e-visioner-hazard-loot-manager .hazard-loot-row-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.pf2e-visioner .pf2e-visioner-hazard-loot-manager .visioner-icon-btn {
+  width: 30px;
+  min-width: 30px;
+  height: 30px;
+  min-height: 30px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--color-border-light-primary);
+  border-radius: 4px;
+  background: var(--color-bg-option, rgba(0, 0, 0, 0.18));
+  color: var(--color-text-primary);
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    transform 0.15s ease;
+}
+
+.pf2e-visioner .pf2e-visioner-hazard-loot-manager .visioner-icon-btn:hover {
+  background: var(--color-bg-btn, rgba(255, 152, 0, 0.12));
+  border-color: var(--pf2e-visioner-primary, var(--color-text-hyperlink, #ff9800));
+  transform: translateY(-1px);
+}
+
+.pf2e-visioner .pf2e-visioner-hazard-loot-manager .table-container {
+  flex: 1 1 auto;
+  min-height: 0;
+  margin: 0;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  background: var(--color-bg-primary);
+  overflow: auto;
+}
+
+.pf2e-visioner .pf2e-visioner-hazard-loot-manager .hazard-loot-table-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.pf2e-visioner .pf2e-visioner-hazard-loot-manager .hazard-loot-section {
+  flex: 0 0 auto;
+}
+
+.pf2e-visioner .pf2e-visioner-hazard-loot-manager .hazard-loot-section h3 {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin: 8px 8px 6px;
+  color: var(--color-text-primary);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.pf2e-visioner .pf2e-visioner-hazard-loot-manager .hazard-loot-section h3 > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pf2e-visioner .pf2e-visioner-hazard-loot-manager .hazard-loot-section-actions {
+  margin-left: auto;
+}
+
+.pf2e-visioner .pf2e-visioner-hazard-loot-manager .hazard-loot-table {
+  width: 100%;
+  margin: 0;
+  border-collapse: collapse;
+}
+
+.pf2e-visioner .pf2e-visioner-hazard-loot-manager .hazard-loot-table th,
+.pf2e-visioner .pf2e-visioner-hazard-loot-manager .hazard-loot-table td {
+  padding: 7px 8px;
+  vertical-align: middle;
+}
+
+.pf2e-visioner .pf2e-visioner-hazard-loot-manager .hazard-loot-token-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+  object-fit: cover;
+  object-position: center;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+}
+
+.pf2e-visioner .pf2e-visioner-hazard-loot-manager .hazard-loot-token-name strong {
+  display: block;
+  line-height: 1.2;
+}
+
+.pf2e-visioner .pf2e-visioner-hazard-loot-manager .hazard-loot-token-name .notes {
+  margin-top: 2px;
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  line-height: 1.2;
+}
+
+.pf2e-visioner .pf2e-visioner-hazard-loot-manager .hazard-loot-dc-input {
+  width: 62px;
+  text-align: center;
+}
+
+.pf2e-visioner .pf2e-visioner-hazard-loot-manager .hazard-loot-sheet-dc {
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+
+.pf2e-visioner .pf2e-visioner-hazard-loot-manager .hazard-loot-state-buttons {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.pf2e-visioner .pf2e-visioner-hazard-loot-manager .hazard-loot-rank-buttons {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+}
+
+.pf2e-visioner .pf2e-visioner-hazard-loot-manager .hazard-loot-rank-btn {
+  width: 26px;
+  min-width: 26px;
+  height: 26px;
+  min-height: 26px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--color-text-secondary);
+}
+
+.pf2e-visioner .pf2e-visioner-hazard-loot-manager .hazard-loot-rank-btn.active {
+  border-color: var(--color-text-hyperlink, #ff9800);
+  color: var(--color-text-hyperlink, #ff9800);
+  background: rgba(255, 152, 0, 0.12);
+  box-shadow: 0 0 8px rgba(255, 152, 0, 0.25);
+}
+
+.pf2e-visioner .pf2e-visioner-hazard-loot-manager .hazard-loot-state-btn[data-state='observed'] {
+  color: var(--visibility-observed, #4caf50);
+}
+
+.pf2e-visioner .pf2e-visioner-hazard-loot-manager .hazard-loot-state-btn[data-state='hidden'] {
+  color: var(--visibility-hidden, #ff9800);
+}
+
+.pf2e-visioner .pf2e-visioner-hazard-loot-manager .hazard-loot-dc-icon {
+  color: var(--color-text-hyperlink, #ff9800);
+}
+
+.pf2e-visioner .pf2e-visioner-hazard-loot-manager .hazard-loot-apply-icon {
+  color: var(--visibility-observed, #4caf50);
+}
+
+.pf2e-visioner .pf2e-visioner-hazard-loot-manager .hazard-loot-close-icon {
+  color: var(--visibility-undetected, #f44336);
+}
+
+.pf2e-visioner .pf2e-visioner-hazard-loot-manager .hazard-loot-state-btn.active {
+  border-color: currentColor;
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 0 8px rgba(255, 152, 0, 0.25);
+}
+
+.pf2e-visioner .pf2e-visioner-hazard-loot-manager .hazard-loot-mixed-indicator {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 0 6px;
+  border: 1px solid var(--color-border-light-primary);
+  border-radius: 4px;
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  line-height: 1;
+}
+
+.pf2e-visioner .pf2e-visioner-hazard-loot-manager .hazard-loot-party-dc {
+  width: auto;
+  min-width: 38px;
+  padding: 0 8px;
+  font-weight: 700;
+}
+
+.pf2e-visioner .pf2e-visioner-hazard-loot-manager .hazard-loot-token-id code {
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.pf2e-visioner .pf2e-visioner-hazard-loot-manager .hazard-loot-count {
+  flex: 0 0 auto;
+  margin: 0;
+  text-align: right;
+}
 .pf2e-visioner .row-timer-toggle:hover,
 .hide-preview-dialog .row-timer-toggle:hover,
 .sneak-preview-dialog .row-timer-toggle:hover,
