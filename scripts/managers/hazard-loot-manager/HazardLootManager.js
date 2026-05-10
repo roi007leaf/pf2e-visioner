@@ -86,6 +86,22 @@ function getActorLevel(actor) {
   return null;
 }
 
+function getActivePartyLevel() {
+  const party = game?.actors?.party;
+  if (!actorIsType(party, 'party')) return null;
+
+  const partyLevel = getActorLevel(party);
+  if (Number.isFinite(partyLevel) && partyLevel > 0) return partyLevel;
+
+  const memberLevels = (Array.isArray(party?.members) ? party.members : [])
+    .filter((member) => actorIsType(member, 'character'))
+    .map((member) => getActorLevel(member))
+    .filter((level) => Number.isFinite(level));
+
+  if (!memberLevels.length) return null;
+  return Math.max(0, Math.round(memberLevels.reduce((sum, level) => sum + level, 0) / memberLevels.length));
+}
+
 function getHazardStealthDC(actor) {
   const dc = Number(actor?.system?.attributes?.stealth?.dc);
   return Number.isFinite(dc) && dc > 0 ? dc : '';
@@ -118,6 +134,9 @@ export function getHazardLootTokens(tokens = getPlaceableTokens()) {
 }
 
 export function getPartyLevel(tokens = getPlaceableTokens()) {
+  const activePartyLevel = getActivePartyLevel();
+  if (Number.isFinite(activePartyLevel)) return activePartyLevel;
+
   const levels = getPlayerCharacterTokens(tokens)
     .map((token) => getActorLevel(token.actor))
     .filter((level) => Number.isFinite(level));

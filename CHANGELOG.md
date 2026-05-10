@@ -1,5 +1,11 @@
 # Changelog
 
+## [8.2.2] - 2026-05-10
+
+### Fixed
+
+- **Hazard/Loot Manager party DC uses active party level**: The Party DC button now reads the active PF2E Party actor level before falling back to scene player-token averaging, so level 4 parties show DC 19 instead of the level 1 fallback DC 15.
+
 ## [8.2.1] - 2026-05-10
 
 ### Fixed

@@ -76,6 +76,47 @@ describe('Hazard/Loot manager helpers', () => {
     });
   });
 
+  test('uses the active PF2E party actor level for party DC when scene ownership is incomplete', async () => {
+    const { getHazardLootManagerRows, getPartyLevel } = await import(
+      '../../../scripts/managers/hazard-loot-manager/HazardLootManager.js'
+    );
+
+    const previousActors = game.actors;
+    const activeParty = createMockActor({
+      type: 'party',
+      system: { details: { level: { value: 4 }, members: [] } },
+    });
+    game.actors = { party: activeParty };
+
+    const unownedSceneCharacter = createMockToken({
+      id: 'npc-looking-pc',
+      name: 'Scene Character Without Player Owner',
+      actor: createMockActor({
+        type: 'character',
+        hasPlayerOwner: false,
+        system: { details: { level: { value: 1 } } },
+      }),
+    });
+    const loot = createMockToken({
+      id: 'loot1',
+      name: 'Hidden Cache',
+      actor: createMockActor({ type: 'loot' }),
+    });
+
+    try {
+      const rows = getHazardLootManagerRows({ tokens: [unownedSceneCharacter, loot] });
+
+      expect(getPartyLevel([unownedSceneCharacter, loot])).toBe(4);
+      expect(rows[0]).toMatchObject({
+        id: 'loot1',
+        partyLevel: 4,
+        partyDC: 19,
+      });
+    } finally {
+      game.actors = previousActors;
+    }
+  });
+
   test('applies loot stealth DC and hazard proficiency requirement without writing hazard stealth DC', async () => {
     const { applyHazardLootManagerUpdates } = await import(
       '../../../scripts/managers/hazard-loot-manager/HazardLootManager.js'
