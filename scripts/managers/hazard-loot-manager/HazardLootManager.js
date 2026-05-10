@@ -105,8 +105,7 @@ export function getPlayerCharacterTokens(tokens = getPlaceableTokens()) {
   return getPlaceableTokens(tokens).filter(
     (token) =>
       !!getTokenId(token) &&
-      actorIsType(token?.actor, 'character') &&
-      !!token?.actor?.hasPlayerOwner,
+      actorIsType(token?.actor, 'character'),
   );
 }
 
