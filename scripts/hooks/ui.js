@@ -1658,7 +1658,7 @@ function injectPF2eVisionerBox(app, root) {
   // is being rendered: a TokenConfig, PrototypeTokenConfig, or the PF2e
   // specialized PrototypeTokenConfigPF2e which may expose the Actor as
   // `app.object` or provide a `prototypeToken` payload on the actor.
-  const tokenDoc = app?.document;
+  const tokenDoc = app?.document ?? app?.token;
 
   // Resolve an Actor document robustly across these shapes. Prioritize any
   // explicit actor references on token documents, fall back to parent,
@@ -1666,6 +1666,8 @@ function injectPF2eVisionerBox(app, root) {
   let actor = null;
   if (tokenDoc?.actor)
     actor = tokenDoc.actor; // Token document
+  else if (app?.actor)
+    actor = app.actor; // PF2e TokenConfig exposes the actor through an app getter
   else if (tokenDoc?.parent)
     actor = tokenDoc.parent; // Some token-like documents
   else if (app?.object?.actor)
@@ -1680,7 +1682,8 @@ function injectPF2eVisionerBox(app, root) {
     return;
   }
 
-  const panel = root.querySelector('div.tab[data-group="sheet"][data-tab="vision"]');
+  const container = (root?.jquery ? root[0] : root) || root;
+  const panel = container.querySelector('.tab[data-group="sheet"][data-tab="vision"]');
   if (!panel || panel.querySelector('.pf2e-visioner-box')) return;
 
   // Find the detection fieldset (used as an anchor) if present
@@ -1759,7 +1762,7 @@ function injectPF2eVisionerBox(app, root) {
     snipingDuoSpotterActorKey && spotterName
       ? spotterName
       : game.i18n.localize('PF2E_VISIONER.UI.SNIPING_DUO_SPOTTER_CHOOSE');
-  const showMasterControls = actor.type !== 'hazard';
+  const showMasterControls = !['hazard', 'loot'].includes(actor.type);
 
   // Build content
   let inner = `

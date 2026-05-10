@@ -1,5 +1,11 @@
 # Changelog
 
+## [8.2.1] - 2026-05-10
+
+### Fixed
+
+- **Token config Visioner controls match actor type support**: Companion and familiar PF2E token configs now show the Visioner box, while loot token configs no longer show Encounter Master or Vision Master controls.
+
 ## [8.2.0] - 2026-05-09
 
 ### Added

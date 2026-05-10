@@ -7,13 +7,13 @@ function getRenderTokenConfigHook() {
   return calls.at(-1)?.[1];
 }
 
-function makeVisionRoot() {
+function makeVisionRoot({ tagName = 'div' } = {}) {
   const root = document.createElement('div');
   root.innerHTML = `
     <form>
-      <div class="tab" data-group="sheet" data-tab="vision">
+      <${tagName} class="tab" data-group="sheet" data-tab="vision">
         <fieldset><legend>Detection</legend></fieldset>
-      </div>
+      </${tagName}>
     </form>
   `;
   return root;
@@ -29,6 +29,28 @@ function makeTokenConfigApp(actorType) {
       id: `${actorType}-token`,
       uuid: `Token.${actorType}`,
       actor,
+      flags: { [MODULE_ID]: {} },
+      getFlag: jest.fn(() => null),
+    },
+  };
+}
+
+function makePF2eTokenConfigAppWithActorGetter(actorType) {
+  const actor = createMockActor({
+    type: actorType,
+    getFlag: jest.fn(() => null),
+  });
+  return {
+    actor,
+    token: {
+      id: `${actorType}-token`,
+      uuid: `Token.${actorType}`,
+      flags: { [MODULE_ID]: {} },
+      getFlag: jest.fn(() => null),
+    },
+    document: {
+      id: `${actorType}-token`,
+      uuid: `Token.${actorType}`,
       flags: { [MODULE_ID]: {} },
       getFlag: jest.fn(() => null),
     },
@@ -60,6 +82,29 @@ describe('Token config PF2E Visioner box', () => {
 
     hook(makeTokenConfigApp('character'), root);
 
+    expect(root.querySelector('.pv-encounter-master-btn')).toBeTruthy();
+    expect(root.querySelector('.pv-vision-master-btn')).toBeTruthy();
+  });
+
+  test('does not show master controls for loot tokens', () => {
+    const hook = getRenderTokenConfigHook();
+    const root = makeVisionRoot();
+
+    hook(makeTokenConfigApp('loot'), root);
+
+    expect(root.querySelector('.pf2e-visioner-box')).toBeTruthy();
+    expect(root.querySelector('.pv-encounter-master-btn')).toBeNull();
+    expect(root.querySelector('.pv-vision-master-btn')).toBeNull();
+    expect(root.querySelector('input[name="flags.pf2e-visioner.stealthDC"]')).toBeTruthy();
+  });
+
+  test('shows Visioner controls for familiar or animal companion PF2e token configs', () => {
+    const hook = getRenderTokenConfigHook();
+    const root = makeVisionRoot({ tagName: 'section' });
+
+    hook(makePF2eTokenConfigAppWithActorGetter('familiar'), root);
+
+    expect(root.querySelector('.pf2e-visioner-box')).toBeTruthy();
     expect(root.querySelector('.pv-encounter-master-btn')).toBeTruthy();
     expect(root.querySelector('.pv-vision-master-btn')).toBeTruthy();
   });
