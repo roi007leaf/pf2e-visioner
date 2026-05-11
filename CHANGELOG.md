@@ -1,5 +1,11 @@
 # Changelog
 
+## [8.2.4] - 2026-05-11
+
+### Fixed
+
+- **Visioner LOS now matches Foundry token visibility polygons**: AVS line-of-sight checks now respect Foundry's point visibility results in both Foundry v13 and v14, preventing targets hidden by the rendered vision/lighting polygon from being marked observed by Visioner's geometric fallback while preserving Visioner's custom proximity wall behavior.
+
 ## [8.2.3] - 2026-05-11
 
 ### Fixed
