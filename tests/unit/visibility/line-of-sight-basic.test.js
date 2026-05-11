@@ -78,6 +78,10 @@ describe('VisionAnalyzer - Line of Sight (Refactored)', () => {
             }
         };
 
+        global.PIXI = {
+            Circle: jest.fn((x, y, radius) => ({ x, y, radius }))
+        };
+
         // Setup canvas
         global.canvas = {
             walls: {
@@ -103,7 +107,18 @@ describe('VisionAnalyzer - Line of Sight (Refactored)', () => {
             expect(result).toBe(true);
         });
 
-        test('should fall back to geometric LOS when Foundry visibility says false without walls', () => {
+        test('should fall back to geometric LOS when Foundry visibility source is unavailable', () => {
+            global.canvas.walls.placeables = [];
+            global.canvas.visibility = { testVisibility: jest.fn(() => false) };
+            mockObserver.vision = null;
+
+            const result = visionAnalyzer.hasLineOfSight(mockObserver, mockTarget);
+
+            expect(global.canvas.visibility.testVisibility).not.toHaveBeenCalled();
+            expect(result).toBe(true);
+        });
+
+        test('should trust Foundry point visibility when LOS polygon is unavailable', () => {
             global.canvas.walls.placeables = [];
             global.canvas.visibility = { testVisibility: jest.fn(() => false) };
             mockObserver.vision = {};
@@ -111,7 +126,51 @@ describe('VisionAnalyzer - Line of Sight (Refactored)', () => {
             const result = visionAnalyzer.hasLineOfSight(mockObserver, mockTarget);
 
             expect(global.canvas.visibility.testVisibility).toHaveBeenCalled();
-            expect(result).toBe(true);
+            expect(result).toBe(false);
+        });
+
+        test('should use legacy canvas sight visibility when canvas visibility is unavailable', () => {
+            global.canvas.walls.placeables = [];
+            delete global.canvas.visibility;
+            global.canvas.sight = { testVisibility: jest.fn(() => false) };
+            mockObserver.vision = {};
+
+            const result = visionAnalyzer.hasLineOfSight(mockObserver, mockTarget);
+
+            expect(global.canvas.sight.testVisibility).toHaveBeenCalled();
+            expect(result).toBe(false);
+        });
+
+        test('should trust Foundry vision polygon when it excludes the target', () => {
+            global.canvas.walls.placeables = [];
+            mockObserver.vision = {
+                los: {
+                    points: [0, 0, 200, 0, 200, 200, 0, 200],
+                    intersectCircle: jest.fn(() => ({ points: [] })),
+                },
+            };
+
+            const result = visionAnalyzer.hasLineOfSight(mockObserver, mockTarget);
+
+            expect(mockObserver.vision.los.intersectCircle).toHaveBeenCalled();
+            expect(result).toBe(false);
+        });
+
+        test('should trust Foundry point visibility when LOS polygon includes the target', () => {
+            global.canvas.walls.placeables = [];
+            global.canvas.visibility = { testVisibility: jest.fn(() => false) };
+            mockObserver.vision = {
+                los: {
+                    points: [0, 0, 500, 0, 500, 500, 0, 500],
+                    intersectCircle: jest.fn(() => ({ points: [{ x: 300, y: 300 }] })),
+                },
+            };
+
+            const result = visionAnalyzer.hasLineOfSight(mockObserver, mockTarget);
+
+            expect(mockObserver.vision.los.intersectCircle).toHaveBeenCalled();
+            expect(global.canvas.visibility.testVisibility).toHaveBeenCalled();
+            expect(result).toBe(false);
         });
 
         test('should return true when wall does not intersect ray', () => {

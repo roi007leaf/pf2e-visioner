@@ -21,7 +21,12 @@
 import { MODULE_ID } from '../../constants.js';
 import { calculateDistanceInFeet } from '../../helpers/geometry-utils.js';
 import { getTokenVerticalSpanFt } from '../../helpers/size-elevation-utils.js';
-import { doesWallSenseBlockFromPoint } from '../../helpers/wall-sense-utils.js';
+import {
+  distancePointToSegment,
+  doesWallSenseBlockFromPoint,
+  getWallSenseThreshold,
+  pixelsToWallSenseUnits,
+} from '../../helpers/wall-sense-utils.js';
 import { doesWallBlockAtElevation, doesWallBlockLineOfSight } from '../../helpers/wall-height-utils.js';
 import { LevelsIntegration } from '../../services/LevelsIntegration.js';
 import { getLogger } from '../../utils/logger.js';
@@ -327,6 +332,7 @@ export class VisionAnalyzer {
         const circle = new PIXI.Circle(targetPos.x, targetPos.y, radius);
         const intersection = los.intersectCircle(circle, { density: 8, scalingFactor: 1.0 });
         const visible = intersection?.points?.length > 0;
+        const foundryPointVisible = this.#testFoundryVisibility(observer, target, targetPos);
 
         const log = getLogger('AVS/VisionAnalyzer');
         log.debug(
@@ -384,14 +390,26 @@ export class VisionAnalyzer {
         }
 
         if (visible === geometricResult) {
+          if (visible && foundryPointVisible === false) {
+            return false;
+          }
+
           // Both systems agree - high confidence result
           log.debug(
             () =>
               `vision-polygon-AGREEMENT: ${observer.name} -> ${target.name}, both polygon and geometric agree: ${visible}`,
           );
           return visible;
+        } else if (!visible && geometricResult) {
+          const customWallPass = this.#findNonBlockingCustomSightWallPath(
+            observerCenter,
+            targetPoints,
+            cachedWalls,
+          );
+          return !!customWallPass;
         } else {
-          // Systems disagree - use geometric as tiebreaker (more predictable)
+          // If Foundry's polygon includes the target but Visioner's wall-aware geometry blocks it,
+          // keep the geometric block so custom wall-height/elevation rules still apply.
           log.debug(
             () =>
               `vision-polygon-DISAGREEMENT: ${observer.name} -> ${target.name}, polygon=${visible}, geometric=${geometricResult}, using geometric result`,
@@ -433,12 +451,15 @@ export class VisionAnalyzer {
               `testVisibility-check: visionSource=${!!visionSource}, canvas.visibility=${!!canvas.visibility}`,
           );
 
-          if (visionSource && canvas.visibility) {
-            const isVisible = canvas.visibility.testVisibility(testPoints, {
-              object: target,
-              source: visionSource,
-              level,
-            });
+          const foundryVisibility = this.#callFoundryVisibilityTest({
+            observer,
+            target,
+            testPoints,
+            level,
+          });
+
+          if (foundryVisibility.available) {
+            const isVisible = foundryVisibility.result;
             log.debug(
               () =>
                 `testVisibility-result: ${observer.name} -> ${target.name}, isVisible=${isVisible}`,
@@ -446,10 +467,20 @@ export class VisionAnalyzer {
             if (isVisible) {
               return true;
             }
-            log.debug(
-              () =>
-                `testVisibility-negative-fallback: ${observer.name} -> ${target.name}, falling back to geometric LOS`,
+
+            const observerCenter = { x: observerPos.x, y: observerPos.y };
+            const targetPoints = this.#getTokenSamplePoints(target, targetPos);
+            const cachedWalls = this.#getCachedWalls(null);
+            const customWallPass = this.#findNonBlockingCustomSightWallPath(
+              observerCenter,
+              targetPoints,
+              cachedWalls,
             );
+            if (customWallPass) {
+              return true;
+            }
+
+            return false;
           } else {
             log.debug(
               () =>
@@ -928,6 +959,163 @@ export class VisionAnalyzer {
     }
 
     return true;
+  }
+
+  #findNonBlockingCustomSightWallPath(fromPoint, targetPoints, walls) {
+    for (let pointIndex = 0; pointIndex < targetPoints.length; pointIndex++) {
+      const customWallPass = this.#findNonBlockingCustomSightWall(
+        fromPoint,
+        targetPoints[pointIndex],
+        walls,
+      );
+      if (customWallPass) {
+        return {
+          pointIndex,
+          targetPoint: this.#roundPointForLosDebug(targetPoints[pointIndex]),
+          ...customWallPass,
+        };
+      }
+    }
+
+    return null;
+  }
+
+  #testFoundryVisibility(observer, target, targetPos) {
+    try {
+      const testPoints =
+        target?.document?.getVisibilityTestPoints?.() ?? [
+          {
+            x: targetPos.x,
+            y: targetPos.y,
+            elevation: target.document?.elevation || 0,
+          },
+        ];
+      const level =
+        target?.document?.level ??
+        target?.document?._source?.level ??
+        observer?.document?.level ??
+        observer?.document?._source?.level;
+      const foundryVisibility = this.#callFoundryVisibilityTest({
+        observer,
+        target,
+        testPoints,
+        level,
+      });
+
+      if (!foundryVisibility.available) {
+        return null;
+      }
+
+      return foundryVisibility.result;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  #callFoundryVisibilityTest({ observer, target, testPoints, level }) {
+    if (!observer?.vision) {
+      return { available: false, api: null, result: null };
+    }
+
+    if (canvas?.visibility?.testVisibility) {
+      return {
+        available: true,
+        api: 'canvas.visibility.testVisibility',
+        result: canvas.visibility.testVisibility(testPoints, {
+          object: target,
+          source: observer.vision,
+          level,
+        }),
+      };
+    }
+
+    if (canvas?.sight?.testVisibility) {
+      const points = Array.isArray(testPoints) ? testPoints : [testPoints];
+      return {
+        available: true,
+        api: 'canvas.sight.testVisibility',
+        result: points.some((point) => canvas.sight.testVisibility(point, { tolerance: 0 })),
+      };
+    }
+
+    return { available: false, api: null, result: null };
+  }
+
+  #findNonBlockingCustomSightWall(fromPoint, toPoint, walls) {
+    const edgeSenseTypes = getEdgeSenseTypes();
+    const customSightTypes = new Set(
+      [edgeSenseTypes.PROXIMITY, edgeSenseTypes.DISTANCE].filter((type) => type !== undefined),
+    );
+
+    for (const wall of walls) {
+      if (!customSightTypes.has(wall.document.sight)) {
+        continue;
+      }
+
+      const intersection = foundry.utils.lineLineIntersection(
+        fromPoint,
+        toPoint,
+        { x: wall.document.c[0], y: wall.document.c[1] },
+        { x: wall.document.c[2], y: wall.document.c[3] },
+      );
+
+      if (
+        !intersection ||
+        typeof intersection.t0 !== 'number' ||
+        intersection.t0 < 0 ||
+        intersection.t0 > 1
+      ) {
+        continue;
+      }
+
+      const wallDx = wall.document.c[2] - wall.document.c[0];
+      const wallDy = wall.document.c[3] - wall.document.c[1];
+      const t1 =
+        Math.abs(wallDx) > Math.abs(wallDy)
+          ? (intersection.x - wall.document.c[0]) / wallDx
+          : (intersection.y - wall.document.c[1]) / wallDy;
+
+      if (t1 < 0 || t1 > 1) {
+        continue;
+      }
+
+      if (
+        !doesWallSenseBlockFromPoint(wall.document, fromPoint, wall.document.c, 'sight', {
+          system: 'line-of-sight',
+          endpoint: 'polygon-disagreement',
+          fromPoint,
+          toPoint,
+        })
+      ) {
+        return {
+          wallId: wall.document.id ?? wall.id ?? null,
+          wallSight: wall.document.sight,
+          wallCoords: wall.document.c,
+          threshold: getWallSenseThreshold(wall.document, 'sight'),
+          sourceDistance: Number(
+            pixelsToWallSenseUnits(distancePointToSegment(fromPoint, wall.document.c)).toFixed(2),
+          ),
+          targetDistance: Number(
+            pixelsToWallSenseUnits(distancePointToSegment(toPoint, wall.document.c)).toFixed(2),
+          ),
+          intersection: {
+            x: Math.round(intersection.x),
+            y: Math.round(intersection.y),
+            t0: Number(intersection.t0.toFixed(3)),
+            t1: Number(t1.toFixed(3)),
+          },
+        };
+      }
+    }
+
+    return null;
+  }
+
+  #roundPointForLosDebug(point) {
+    return {
+      x: Math.round(point?.x ?? 0),
+      y: Math.round(point?.y ?? 0),
+    };
   }
 
   /**
