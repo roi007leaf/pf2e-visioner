@@ -2,6 +2,7 @@
  * LightingPrecomputer precomputes light levels for a set of tokens at their current positions.
  */
 import { MODULE_ID } from '../../../constants.js';
+import { LightingCalculator } from '../LightingCalculator.js';
 export class LightingPrecomputer {
     // Short-term memoization for lighting environment hash (200ms TTL for more aggressive caching)
     static #lightingHashMemo = { hash: null, ts: 0 };
@@ -72,7 +73,6 @@ export class LightingPrecomputer {
                 }
             }
 
-            const { LightingCalculator } = await import('../LightingCalculator.js');
             const lightingCalculator = LightingCalculator.getInstance?.();
             if (!lightingCalculator) {
                 // Don't reset the force flag on error - let it persist

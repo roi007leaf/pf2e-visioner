@@ -4,7 +4,7 @@
 
 ### Fixed
 
-- **AVS large-scene batch performance improved**: Full AVS recalculations with many changed tokens now avoid duplicate bidirectional pair processing, avoid hot dynamic imports inside batch execution, and reuse freshly recomputed lighting after one forced refresh instead of recalculating every token's light for rapid follow-up batches.
+- **AVS large-scene batch performance improved**: Full AVS recalculations with many changed tokens now avoid duplicate bidirectional pair processing, preserve global visibility and line-of-sight caches for non-movement batches, avoid hot dynamic imports inside batch execution, and reuse freshly recomputed lighting after one forced refresh instead of recalculating every token's light for rapid follow-up batches.
 - **AVS override validation performance improved**: Override validity checks now prewarm and reuse the visibility, cover, and vision analyzer modules, removing multi-second import stalls from large-token override validation runs.
 
 ## [8.2.4] - 2026-05-11

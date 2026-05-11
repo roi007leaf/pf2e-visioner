@@ -389,19 +389,6 @@ export class BatchOrchestrator {
       }));
     } catch {}
 
-    // Invalidate global caches to ensure fresh calculations
-    // This is critical when the GM window regains focus after player movements
-    try {
-      if (this.batchProcessor?.globalVisibilityCache) {
-        this.batchProcessor.globalVisibilityCache.clear();
-      }
-      if (this.batchProcessor?.globalLosCache) {
-        this.batchProcessor.globalLosCache.clear();
-      }
-    } catch (err) {
-      console.warn('PF2E Visioner | BatchOrchestrator.processBatch: Failed to clear caches:', err);
-    }
-
     // NOTE: VisionAnalyzer now uses PositionManager directly, so we don't need
     // to sync canvas token positions. The LOS calculation will use the correct
     // positions from PositionManager instead of relying on token.center.
@@ -412,6 +399,15 @@ export class BatchOrchestrator {
     // Without this, creatures in a newly-entered room are excluded and stay "undetected".
     // Detect movement batches via movementSession (stop-timer path) or a current
     // lastMovedTokenId that is actually part of this changed-token set.
+
+    if (isMovementBatch) {
+      try {
+        this.batchProcessor?.globalVisibilityCache?.clear?.();
+        this.batchProcessor?.globalLosCache?.clear?.();
+      } catch (err) {
+        console.warn('PF2E Visioner | BatchOrchestrator.processBatch: Failed to clear caches:', err);
+      }
+    }
 
     // Start telemetry with viewport-filtered changed count
     this.telemetryReporter.start({
