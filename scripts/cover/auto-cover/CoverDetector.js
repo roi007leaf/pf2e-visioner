@@ -17,6 +17,7 @@ import {
   getTokenRect,
   getTokenVerticalSpanFt,
 } from '../../helpers/size-elevation-utils.js';
+import { doesWallSenseBlockFromPoint } from '../../helpers/wall-sense-utils.js';
 import { doesWallBlockAtElevation, doesWallBlockLineOfSight } from '../../helpers/wall-height-utils.js';
 import { RuleElementCoverService } from '../../rule-elements/RuleElementCoverService.js';
 import { LevelsIntegration } from '../../services/LevelsIntegration.js';
@@ -242,6 +243,10 @@ export class CoverDetector {
     try {
       if (wallDoc.sight === 0) return false;
 
+      const coords = Array.isArray(wallDoc.c)
+        ? wallDoc.c
+        : [wallDoc.x, wallDoc.y, wallDoc.x2, wallDoc.y2];
+
       const isDoor = Number(wallDoc.door) > 0;
       const doorState = Number(wallDoc.ds ?? wallDoc.doorState ?? 0);
 
@@ -255,9 +260,7 @@ export class CoverDetector {
         if (wallDoc.dir === 0) {
           directionAllowsBlocking = true;
         } else {
-          const [x1, y1, x2, y2] = Array.isArray(wallDoc.c)
-            ? wallDoc.c
-            : [wallDoc.x, wallDoc.y, wallDoc.x2, wallDoc.y2];
+          const [x1, y1, x2, y2] = coords;
 
           const wallDx = x2 - x1;
           const wallDy = y2 - y1;
@@ -273,7 +276,14 @@ export class CoverDetector {
         }
       }
 
-      return doorAllowsBlocking && directionAllowsBlocking;
+      const senseAllowsBlocking = doesWallSenseBlockFromPoint(
+        wallDoc,
+        attackerPos,
+        coords,
+        'sight',
+      );
+
+      return doorAllowsBlocking && directionAllowsBlocking && senseAllowsBlocking;
     } catch {
       return true;
     }
@@ -773,7 +783,14 @@ export class CoverDetector {
    * @returns {boolean} True if ray is blocked by walls
    * @private
    */
-  _isRayBlockedByWalls(a, b, elevationRange = null, attackerSpan = null, targetSpan = null) {
+  _isRayBlockedByWalls(
+    a,
+    b,
+    elevationRange = null,
+    attackerSpan = null,
+    targetSpan = null,
+    wallSenseSourcePoint = a,
+  ) {
     const ray = this._createRay(a, b);
     const rayLength = Math.sqrt((b.x - a.x) ** 2 + (b.y - a.y) ** 2);
 
@@ -792,7 +809,7 @@ export class CoverDetector {
       const wallDoc = wall.document || wall;
 
       // Skip walls that don't block sight from this direction
-      if (!this._doesWallBlockFromDirection(wallDoc, a)) continue;
+      if (!this._doesWallBlockFromDirection(wallDoc, wallSenseSourcePoint)) continue;
 
       // Check if the ray intersects this wall
       const intersection = this._lineIntersectionPoint(
@@ -1836,7 +1853,16 @@ export class CoverDetector {
         let lineBlocked = false;
 
         // Check if this line is blocked by walls
-        if (this._isRayBlockedByWalls(targetCorner, attackerCorner, elevationRange, attackerSpan, targetSpan)) {
+        if (
+          this._isRayBlockedByWalls(
+            targetCorner,
+            attackerCorner,
+            elevationRange,
+            attackerSpan,
+            targetSpan,
+            attackerCorner,
+          )
+        ) {
           lineBlocked = true;
           wallBlockedAny = true;
         }

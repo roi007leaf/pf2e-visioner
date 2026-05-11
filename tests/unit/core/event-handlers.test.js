@@ -65,6 +65,7 @@ const createMockCacheManager = () => ({
 
 const createMockSpatialAnalyzer = () => ({
   getTokensInRange: jest.fn(() => []),
+  getAffectedTokens: jest.fn(() => []),
   canTokensSeeEachOther: jest.fn(() => true),
   tokenEmitsLight: jest.fn(() => false),
 });
@@ -119,6 +120,7 @@ describe('Event Handler Tests', () => {
     // Setup mock Hooks
     mockHooks = {
       on: jest.fn(),
+      once: jest.fn(),
       off: jest.fn(),
       call: jest.fn(),
     };
@@ -521,7 +523,7 @@ describe('Event Handler Tests', () => {
       expect(mockHooks.on).toHaveBeenCalledWith('deleteAmbientLight', expect.any(Function));
     });
 
-    test('should handle light updates that affect visibility', async () => {
+    test('should handle light updates after lighting refresh', async () => {
       const mockLight = { id: 'light1' };
       const changes = { config: { bright: 20 } };
 
@@ -549,6 +551,14 @@ describe('Event Handler Tests', () => {
       )[1];
 
       await updateHandler(mockLight, changes, {}, 'user1');
+
+      expect(mockHooks.once).toHaveBeenCalledWith('lightingRefresh', expect.any(Function));
+      expect(mockVisibilityState.markAllTokensChangedImmediate).not.toHaveBeenCalled();
+
+      const lightingRefreshHandler = mockHooks.once.mock.calls.find(
+        (call) => call[0] === 'lightingRefresh',
+      )[1];
+      await lightingRefreshHandler();
 
       // Add debugging
       expect(mockSystemState.shouldProcessEvents).toHaveBeenCalled();
@@ -888,17 +898,44 @@ describe('Event Handler Tests', () => {
       expect(mockHooks.on).toHaveBeenCalledWith('moveToken', expect.any(Function));
     });
 
-    test('should handle light changes with global recalculation', () => {
+    test('should handle light changes after lighting refresh', () => {
       const mockTokenDoc = {
         id: 'token1',
         name: 'Test Token',
+        x: 100,
+        y: 100,
+        width: 1,
+        height: 1,
+        hidden: false,
+      };
+      const changes = { light: { enabled: true, bright: 20 } };
+
+      tokenHandler.handleTokenUpdate(mockTokenDoc, changes);
+      const lightingRefreshHandler = mockHooks.once.mock.calls.find(
+        (call) => call[0] === 'lightingRefresh',
+      )[1];
+      lightingRefreshHandler();
+
+      expect(mockVisibilityState.markTokenChangedImmediate).toHaveBeenCalledWith('token1');
+    });
+
+    test('should defer token light recalculation until lighting refresh completes', () => {
+      const mockTokenDoc = {
+        id: 'token1',
+        name: 'Test Token',
+        x: 100,
+        y: 100,
+        width: 1,
+        height: 1,
         hidden: false,
       };
       const changes = { light: { enabled: true, bright: 20 } };
 
       tokenHandler.handleTokenUpdate(mockTokenDoc, changes);
 
-      expect(mockVisibilityState.markAllTokensChangedImmediate).toHaveBeenCalled();
+      expect(mockHooks.once).toHaveBeenCalledWith('lightingRefresh', expect.any(Function));
+      expect(mockVisibilityState.markAllTokensChangedImmediate).not.toHaveBeenCalled();
+      expect(mockVisibilityState.markTokenChangedImmediate).not.toHaveBeenCalled();
     });
 
     test('should handle movementAction changes for tremorsense detection', () => {
@@ -984,6 +1021,15 @@ describe('Event Handler Tests', () => {
     test('should handle wall updates that affect line of sight', () => {
       const mockWall = { id: 'wall1' };
       const changes = { c: [0, 0, 100, 100] }; // coordinates change
+
+      wallHandler.handleWallUpdate(mockWall, changes);
+
+      expect(mockVisibilityState.markAllTokensChangedImmediate).toHaveBeenCalled();
+    });
+
+    test('should handle wall threshold updates that affect line of sight', () => {
+      const mockWall = { id: 'wall1' };
+      const changes = { threshold: { sight: 10 } };
 
       wallHandler.handleWallUpdate(mockWall, changes);
 

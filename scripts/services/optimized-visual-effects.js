@@ -9,12 +9,37 @@ import { getVisibilityBetween } from '../utils.js';
 /**
  * Update token visuals - optimized version with no delays
  */
+function isTokenInCurrentViewport(token, paddingPx = 64) {
+  try {
+    const screen = canvas.app?.renderer?.screen;
+    const wt = canvas.stage?.worldTransform;
+    if (!screen || typeof wt?.applyInverse !== 'function') return false;
+
+    const topLeft = wt.applyInverse({ x: 0, y: 0 });
+    const bottomRight = wt.applyInverse({ x: screen.width, y: screen.height });
+    const minX = Math.min(topLeft.x, bottomRight.x) - paddingPx;
+    const minY = Math.min(topLeft.y, bottomRight.y) - paddingPx;
+    const maxX = Math.max(topLeft.x, bottomRight.x) + paddingPx;
+    const maxY = Math.max(topLeft.y, bottomRight.y) + paddingPx;
+
+    const gridSize = canvas.grid?.size || 1;
+    const doc = token?.document;
+    const centerX = token?.center?.x ?? (doc?.x ?? token?.x ?? 0) + ((doc?.width ?? 1) * gridSize) / 2;
+    const centerY = token?.center?.y ?? (doc?.y ?? token?.y ?? 0) + ((doc?.height ?? 1) * gridSize) / 2;
+
+    return centerX >= minX && centerX <= maxX && centerY >= minY && centerY <= maxY;
+  } catch {
+    return false;
+  }
+}
+
 export async function updateTokenVisuals() {
   if (!canvas?.tokens) return;
 
   // No dice animation check - immediate processing
   for (const token of canvas.tokens.placeables) {
     try {
+      if (!isTokenInCurrentViewport(token)) continue;
       if (token?.visible && !token.destroyed && token.sprite && token.mesh) {
         if (!token.turnMarker || token.turnMarker.mesh) {
           token.refresh();
@@ -466,7 +491,7 @@ export async function updateWallVisuals(observerId = null) {
         // Force token refresh
         try {
           for (const t of canvas.tokens.placeables) {
-            if (!t.destroyed && t.sprite && t.mesh) {
+            if (!t.destroyed && isTokenInCurrentViewport(t) && t.sprite && t.mesh) {
               if (!t.turnMarker || t.turnMarker.mesh) {
                 t.refresh?.();
               }
@@ -497,14 +522,14 @@ export async function updateSpecificTokenPairs(pairs) {
     if (!observer || !target) continue;
 
     try {
-      if (!observer.destroyed && observer.sprite && observer.mesh) {
+      if (!observer.destroyed && isTokenInCurrentViewport(observer) && observer.sprite && observer.mesh) {
         if (!observer.turnMarker || observer.turnMarker.mesh) {
           observer.refresh();
         }
       }
     } catch (_) { }
     try {
-      if (!target.destroyed && target.sprite && target.mesh) {
+      if (!target.destroyed && isTokenInCurrentViewport(target) && target.sprite && target.mesh) {
         if (!target.turnMarker || target.turnMarker.mesh) {
           target.refresh();
         }

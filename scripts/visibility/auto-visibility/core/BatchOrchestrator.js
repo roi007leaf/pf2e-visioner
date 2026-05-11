@@ -343,6 +343,36 @@ export class BatchOrchestrator {
       return;
     }
 
+    // Prepare tokens before any perception refresh. If client-aware filtering says
+    // none of the changed tokens are visible to this client, avoid touching token
+    // rendering at all; refreshing offscreen tokens during lighting rebuilds can
+    // produce transient canvas artifacts.
+    const lastMovedTokenId = globalThis?.game?.pf2eVisioner?.lastMovedTokenId;
+    const isMovementBatch =
+      !!options.movementSession || (!!lastMovedTokenId && changedTokens.has(lastMovedTokenId));
+    const allTokens = isMovementBatch
+      ? (canvas.tokens?.placeables || []).filter((t) => !this.exclusionManager.isExcludedToken(t))
+      : this._getAllTokens().filter((t) => !this.exclusionManager.isExcludedToken(t));
+
+    const visibleIdSet = new Set();
+    for (const t of allTokens) {
+      const id = t?.document?.id;
+      if (id) visibleIdSet.add(id);
+    }
+    const visibleChangedTokens = new Set();
+    for (const id of changedTokens) {
+      if (visibleIdSet.has(id)) visibleChangedTokens.add(id);
+    }
+
+    if (visibleChangedTokens.size === 0) {
+      getLogger('AVS/Batch').debug(() => ({
+        msg: 'processBatch:skipped',
+        reason: 'changed-tokens-outside-viewport',
+        changedCount: changedTokens.size,
+      }));
+      return;
+    }
+
     this.processingBatch = true;
     const batchId = `batch-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     try {
@@ -376,39 +406,12 @@ export class BatchOrchestrator {
     // to sync canvas token positions. The LOS calculation will use the correct
     // positions from PositionManager instead of relying on token.center.
 
-    // Update perception to ensure vision polygons are current
-    try {
-      await canvas.perception.update({
-        initializeVision: false,
-        refreshLighting: false,
-        refreshVision: true,
-        refreshSounds: false,
-      });
-    } catch (e) {
-      console.warn('PF2E Visioner | Failed to update perception before batch:', e);
-    }
-
     // Prepare tokens and calculation options (moved before telemetry start to report viewport-filtered changed count)
     // For movement batches, bypass viewport filtering so that tokens in the destination room
     // (which may be off-screen from the GM's perspective) are included in visibility calculations.
     // Without this, creatures in a newly-entered room are excluded and stay "undetected".
-    // Detect movement batches via movementSession (stop-timer path) or lastMovedTokenId (direct path).
-    const isMovementBatch =
-      !!options.movementSession || !!globalThis?.game?.pf2eVisioner?.lastMovedTokenId;
-    const allTokens = isMovementBatch
-      ? (canvas.tokens?.placeables || []).filter((t) => !this.exclusionManager.isExcludedToken(t))
-      : this._getAllTokens().filter((t) => !this.exclusionManager.isExcludedToken(t));
-
-    // Filter the changed set to tokens present in allTokens
-    const visibleIdSet = new Set();
-    for (const t of allTokens) {
-      const id = t?.document?.id;
-      if (id) visibleIdSet.add(id);
-    }
-    const visibleChangedTokens = new Set();
-    for (const id of changedTokens) {
-      if (visibleIdSet.has(id)) visibleChangedTokens.add(id);
-    }
+    // Detect movement batches via movementSession (stop-timer path) or a current
+    // lastMovedTokenId that is actually part of this changed-token set.
 
     // Start telemetry with viewport-filtered changed count
     this.telemetryReporter.start({
@@ -617,7 +620,7 @@ export class BatchOrchestrator {
       const vf = this.viewportFilterService;
       if (vf?.isClientAwareFilteringEnabled?.()) {
         const ids = vf.getViewportTokenIdSet?.(64) || null;
-        if (ids && ids.size > 0) {
+        if (ids) {
           const result = [];
           const all = canvas.tokens?.placeables || [];
           for (const t of all) {

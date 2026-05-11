@@ -17,6 +17,21 @@ import { initCoverVisualization } from './cover/CoverVisualization.js';
 import './regions/register.js';
 // Import Levels integration
 import { LevelsIntegration } from './services/LevelsIntegration.js';
+import { exposeVisionerGlobalsAsync } from './services/visioner-globals.js';
+
+let initializedAutoVisibilitySystem = null;
+
+async function refreshVisionerGlobals() {
+  await exposeVisionerGlobalsAsync({
+    autoVisibilitySystem: initializedAutoVisibilitySystem,
+    AuraVisibility,
+    loadAutoVisibilitySystem: async () => {
+      const { autoVisibilitySystem } = await import('./visibility/auto-visibility/index.js');
+      initializedAutoVisibilitySystem = autoVisibilitySystem;
+      return autoVisibilitySystem;
+    },
+  });
+}
 
 // Function to update colorblind mode
 function updateColorblindMode() {
@@ -125,11 +140,8 @@ Hooks.once('init', async () => {
     await autoVisibilitySystem.initialize();
 
     // Expose AVS and other services globally for rule element system
-    window.pf2eVisioner = window.pf2eVisioner || {};
-    window.pf2eVisioner.services = window.pf2eVisioner.services || {};
-    window.pf2eVisioner.services.autoVisibilitySystem = autoVisibilitySystem;
-    window.pf2eVisioner.ruleElements = window.pf2eVisioner.ruleElements || {};
-    window.pf2eVisioner.ruleElements.AuraVisibility = AuraVisibility;
+    initializedAutoVisibilitySystem = autoVisibilitySystem;
+    await refreshVisionerGlobals();
 
     // Initialize Levels integration
     const levelsIntegration = LevelsIntegration.getInstance();
@@ -153,12 +165,15 @@ Hooks.once('init', async () => {
 
 // Apply colorblind mode when canvas is ready (most UI elements are rendered by this point)
 Hooks.once('canvasReady', () => {
+  refreshVisionerGlobals();
   updateColorblindMode();
 });
 
 // Initialize colorblind mode and cleanup effects on ready
 Hooks.once('ready', async () => {
   try {
+    refreshVisionerGlobals();
+
     // Apply initial colorblind mode again to ensure it's set
     updateColorblindMode();
 

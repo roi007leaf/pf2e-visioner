@@ -100,12 +100,46 @@ const VISIBILITY_VALUES = {
   undetected: 3,
 };
 
+const NON_VISUAL_DETECTION_MODE_IDS = new Set([
+  'hearing',
+  'feelTremor',
+  'tremorsense',
+  'scent',
+  'lifesense',
+  'thoughtsense',
+]);
+
+function isObjectInCurrentViewport(object, paddingPx = 64) {
+  try {
+    const screen = canvas?.app?.renderer?.screen;
+    const wt = canvas?.stage?.worldTransform;
+    if (!screen || typeof wt?.applyInverse !== 'function') return true;
+
+    const topLeft = wt.applyInverse({ x: 0, y: 0 });
+    const bottomRight = wt.applyInverse({ x: screen.width, y: screen.height });
+    const minX = Math.min(topLeft.x, bottomRight.x) - paddingPx;
+    const minY = Math.min(topLeft.y, bottomRight.y) - paddingPx;
+    const maxX = Math.max(topLeft.x, bottomRight.x) + paddingPx;
+    const maxY = Math.max(topLeft.y, bottomRight.y) + paddingPx;
+
+    const gridSize = canvas?.grid?.size || 1;
+    const doc = object?.document;
+    const centerX = object?.center?.x ?? (doc?.x ?? object?.x ?? 0) + ((doc?.width ?? 1) * gridSize) / 2;
+    const centerY = object?.center?.y ?? (doc?.y ?? object?.y ?? 0) + ((doc?.height ?? 1) * gridSize) / 2;
+
+    return centerX >= minX && centerX <= maxX && centerY >= minY && centerY <= maxY;
+  } catch {
+    return true;
+  }
+}
+
 /**
  * Override the detection mode test visibility function
  * This makes the PF2E system think tokens have actual conditions
  */
 function detectionModeTestVisibility(visionSource, mode, config = {}) {
   if (!mode.enabled) return false;
+  if (!isObjectInCurrentViewport(config.object)) return false;
 
   // Check if target is currently sneaking - if so, force hidden visibility
   // This prevents other tokens from seeing the sneaking token
@@ -116,6 +150,15 @@ function detectionModeTestVisibility(visionSource, mode, config = {}) {
 
   const level = config.level ?? config.object?.document?.level ?? config.object?.document?._source?.level;
   if (!this._canDetect(visionSource, config.object, level)) return false;
+
+  const modeId = mode?.id ?? this?.id ?? null;
+  if (NON_VISUAL_DETECTION_MODE_IDS.has(modeId)) {
+    const visibility = getVisibilityBetweenTokens(visionSource?.object, config.object);
+    if (visibility === 'hidden' || visibility === 'concealed') {
+      return true;
+    }
+  }
+
   return config.tests.some((test) => this._testPoint(visionSource, mode, config.object, test));
 }
 
@@ -336,6 +379,7 @@ function reachesVisibilityThreshold(origin, target, threshold, config = {}) {
  */
 function getVisibilityBetweenTokens(observer, target) {
   if (!observer || !target) return 'observed';
+  if (!observer.document?.getFlag || !target.document?.id) return 'observed';
 
   // Check if camera vision aggregation is enabled
   let aggregationEnabled = false;

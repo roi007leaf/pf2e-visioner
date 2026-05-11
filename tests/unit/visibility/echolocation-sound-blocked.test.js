@@ -104,6 +104,44 @@ describe('Echolocation with sound-blocked walls', () => {
     expect(result.detection).toBeNull();
   });
 
+  test('hearing should set hidden when vision is blocked but proximity sound can pass', () => {
+    const input = {
+      target: {
+        lightingLevel: 'bright',
+        concealment: false,
+        auxiliary: [],
+        traits: [],
+        movementAction: 0
+      },
+      observer: {
+        precise: {
+          vision: { range: 60 }
+        },
+        imprecise: {
+          hearing: { range: 60 }
+        },
+        conditions: {
+          blinded: false,
+          deafened: false,
+          dazzled: false
+        },
+        movementAction: 0
+      },
+      soundBlocked: false,
+      rayDarkness: null,
+      hasLineOfSight: false
+    };
+
+    const result = calculateVisibility(input);
+
+    expect(result.state).toBe('hidden');
+    expect(result.detection).toEqual({
+      isPrecise: false,
+      sense: 'hearing'
+    });
+  });
+
+
   test('scent should still work through sound-blocking walls', () => {
     const input = {
       target: {

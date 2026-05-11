@@ -153,6 +153,57 @@ describe('Deafened Detection Wrapper', () => {
             }
         });
 
+        test('skips offscreen targets before Foundry detection point tests run', () => {
+            const originalCanvas = global.canvas;
+            global.canvas = {
+                app: {
+                    renderer: {
+                        screen: { width: 1000, height: 1000 },
+                    },
+                },
+                stage: {
+                    worldTransform: {
+                        applyInverse: jest.fn((point) => ({ x: point.x, y: point.y })),
+                    },
+                },
+                grid: { size: 100 },
+            };
+
+            const mockCanDetect = jest.fn().mockReturnValue(true);
+            const mockTestPoint = jest.fn().mockReturnValue(true);
+            const detectionModeInstance = {
+                _canDetect: mockCanDetect,
+                _testPoint: mockTestPoint,
+            };
+            const offscreenConfig = {
+                ...mockConfig,
+                object: {
+                    center: { x: 5050, y: 5050 },
+                    document: {
+                        id: 'offscreen-target',
+                        x: 5000,
+                        y: 5000,
+                        width: 1,
+                        height: 1,
+                        level: 'level-b',
+                        getFlag: jest.fn().mockReturnValue(false),
+                    },
+                },
+            };
+
+            const wrappedFunction = mockLibWrapper.register.mock.calls.find(
+                call => call[1] === 'foundry.canvas.perception.DetectionMode.prototype.testVisibility'
+            )?.[2];
+
+            const result = wrappedFunction.call(detectionModeInstance, mockVisionSource, mockMode, offscreenConfig);
+
+            expect(result).toBe(false);
+            expect(mockCanDetect).not.toHaveBeenCalled();
+            expect(mockTestPoint).not.toHaveBeenCalled();
+
+            global.canvas = originalCanvas;
+        });
+
         test('should not affect non-hearing detection modes', () => {
             // Setup: Testing with basicSight mode, observer is deafened
             const sightMode = { id: 'basicSight', enabled: true };
@@ -302,6 +353,41 @@ describe('Deafened Detection Wrapper', () => {
                 { object: unnoticedPair.observer },
                 unnoticedPair.target,
             )).toBe(false);
+            test('hearing renders Visioner-hidden targets even when Foundry point visibility fails', () => {
+                const wrappedFunction = mockLibWrapper.register.mock.calls.find(
+                    call => call[1] === 'foundry.canvas.perception.DetectionMode.prototype.testVisibility'
+                )?.[2];
+                const observer = {
+                    actor: {},
+                    document: {
+                        id: 'observer',
+                        getFlag: jest.fn().mockReturnValue({ target: 'hidden' }),
+                    },
+                };
+                const target = {
+                    actor: {},
+                    document: {
+                        id: 'target',
+                        level: 'level-b',
+                        getFlag: jest.fn().mockReturnValue(false),
+                    },
+                };
+                const detectionModeInstance = {
+                    id: 'hearing',
+                    _canDetect: jest.fn().mockReturnValue(true),
+                    _testPoint: jest.fn().mockReturnValue(false),
+                };
+
+                const result = wrappedFunction.call(
+                    detectionModeInstance,
+                    { object: observer },
+                    { id: 'hearing', enabled: true },
+                    { ...mockConfig, object: target },
+                );
+
+                expect(result).toBe(true);
+                expect(detectionModeInstance._testPoint).not.toHaveBeenCalled();
+            });
         });
     });
 });

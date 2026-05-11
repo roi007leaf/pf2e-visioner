@@ -49,6 +49,34 @@ export class LightingEventHandler {
     return geometryFields.some((field) => foundry.utils.hasProperty(changeData, field));
   }
 
+  #runAfterLightingRefresh(callback) {
+    let completed = false;
+    const finish = async () => {
+      if (completed) return;
+      completed = true;
+      try {
+        await callback();
+      } finally {
+        try {
+          delete globalThis.game?.pf2eVisioner?.suppressLightingRefresh;
+        } catch {
+          /* best-effort */
+        }
+      }
+    };
+
+    try {
+      globalThis.game = globalThis.game || {};
+      game.pf2eVisioner = game.pf2eVisioner || {};
+      game.pf2eVisioner.suppressLightingRefresh = true;
+      Hooks.once('lightingRefresh', finish);
+      setTimeout(finish, 100);
+    } catch (error) {
+      console.warn('[PF2E Visioner] Failed to schedule post-lighting refresh work:', error);
+      finish();
+    }
+  }
+
   /**
    * Handle ambient light update - affects visibility for all tokens
    */
@@ -69,9 +97,11 @@ export class LightingEventHandler {
         console.warn('Failed to clear LightingPrecomputer caches:', e);
       }
 
-      // Use immediate processing for ambient lights to ensure responsive updates
-      // Ambient light changes are less frequent than token movements, so no need for throttling
-      this.visibilityState.markAllTokensChangedImmediate();
+      this.#runAfterLightingRefresh(() => {
+        // Use immediate processing after Foundry has rebuilt light sources.
+        // Ambient light changes are less frequent than token movements, so no need for throttling.
+        this.visibilityState.markAllTokensChangedImmediate();
+      });
     }
   }
 

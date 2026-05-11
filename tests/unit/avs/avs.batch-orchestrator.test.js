@@ -170,6 +170,44 @@ describe('BatchOrchestrator', () => {
     expect(order).toEqual(['effects', 'post-perception']);
   });
 
+  test('processBatch does not refresh perception when no visibility updates are applied', async () => {
+    batchProcessor.process.mockResolvedValueOnce({
+      updates: [],
+      breakdown: { visGlobalHits: 0, visGlobalMisses: 0, losGlobalHits: 0, losGlobalMisses: 0 },
+      processedTokens: 1,
+      precomputeStats: { observerUsed: 0, observerMiss: 0, targetUsed: 0, targetMiss: 0 },
+    });
+
+    await orchestrator.processBatch(new Set(['A']));
+
+    expect(global.canvas.perception.update).not.toHaveBeenCalled();
+  });
+
+  test('processBatch skips when viewport filtering excludes all changed tokens', async () => {
+    orchestrator.viewportFilterService = {
+      isClientAwareFilteringEnabled: jest.fn(() => true),
+      getViewportTokenIdSet: jest.fn(() => new Set()),
+    };
+
+    await orchestrator.processBatch(new Set(['A']));
+
+    expect(batchProcessor.process).not.toHaveBeenCalled();
+    expect(global.canvas.perception.update).not.toHaveBeenCalled();
+  });
+
+  test('processBatch ignores stale lastMovedTokenId for non-movement batches', async () => {
+    global.game.pf2eVisioner = { lastMovedTokenId: 'stale-token' };
+    orchestrator.viewportFilterService = {
+      isClientAwareFilteringEnabled: jest.fn(() => true),
+      getViewportTokenIdSet: jest.fn(() => new Set(['B'])),
+    };
+
+    await orchestrator.processBatch(new Set(['A']));
+
+    expect(batchProcessor.process).not.toHaveBeenCalled();
+    expect(global.canvas.perception.update).not.toHaveBeenCalled();
+  });
+
   test('processBatch defers while changed token is still animating', async () => {
     jest.useFakeTimers();
 
