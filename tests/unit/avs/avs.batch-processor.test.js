@@ -89,6 +89,16 @@ describe('BatchProcessor', () => {
         expect(res.breakdown.pairsConsidered).toBeGreaterThan(0);
     });
 
+    test('processes each unordered pair only once when both tokens changed', async () => {
+        const allTokens = [...global.canvas.tokens.placeables].slice(0, 2);
+
+        const res = await processor.process(allTokens, new Set(['A', 'B']), {});
+
+        const updatePairs = res.updates.map((u) => `${u.observer.document.id}->${u.target.document.id}`);
+        expect(updatePairs).toEqual(['A->B', 'B->A']);
+        expect(optimizedVisibilityCalculator.calculateVisibilityBetweenTokens).toHaveBeenCalledTimes(2);
+    });
+
     test('uses global caches for LOS and visibility', async () => {
         // prime caches
         const allTokens = [...global.canvas.tokens.placeables];
@@ -153,10 +163,12 @@ describe('BatchProcessor', () => {
         expect(processor.visionAnalyzer.hasLineOfSight).toHaveBeenCalledWith(
             expect.objectContaining({ document: expect.objectContaining({ id: 'A' }) }),
             expect.objectContaining({ document: expect.objectContaining({ id: 'B' }) }),
+            'sight',
         );
         expect(processor.visionAnalyzer.hasLineOfSight).toHaveBeenCalledWith(
             expect.objectContaining({ document: expect.objectContaining({ id: 'B' }) }),
             expect.objectContaining({ document: expect.objectContaining({ id: 'A' }) }),
+            'sight',
         );
 
         const firstOptions = optimizedVisibilityCalculator.calculateVisibilityBetweenTokens.mock.calls[0]?.at(-1);

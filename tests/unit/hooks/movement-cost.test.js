@@ -43,6 +43,29 @@ describe('Movement Cost Hooks', () => {
         expect(TerrainDataClass.getMovementCostFunction).not.toBe(mockGetMovementCostFunction);
     });
 
+    test('registering twice does not wrap movement cost twice', () => {
+        const mockCostCalculator = jest.fn().mockReturnValue(10);
+        mockGetMovementCostFunction.mockReturnValue(mockCostCalculator);
+
+        registerMovementCostHooks();
+        const wrappedFactory = TerrainDataClass.getMovementCostFunction;
+
+        registerMovementCostHooks();
+
+        expect(TerrainDataClass.getMovementCostFunction).toBe(wrappedFactory);
+
+        const mockActor = {
+            hasCondition: jest.fn().mockReturnValue(true),
+            itemTypes: { effect: [] }
+        };
+        const mockToken = { actor: mockActor };
+        const costFn = wrappedFactory.call(TerrainDataClass, mockToken, {});
+        costFn({}, {}, 10, { terrain: { difficulty: 1 } });
+
+        expect(mockGetMovementCostFunction).toHaveBeenCalledTimes(1);
+        expect(mockCostCalculator).toHaveBeenCalledTimes(1);
+    });
+
     test('applies difficult terrain when blinded', () => {
         const mockCostCalculator = jest.fn().mockReturnValue(10);
         mockGetMovementCostFunction.mockReturnValue(mockCostCalculator);

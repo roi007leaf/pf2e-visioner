@@ -3,6 +3,8 @@
  * Handles modification of movement costs for specific conditions like Blinded or Darkness.
  */
 
+const MOVEMENT_COST_WRAPPED = Symbol.for('pf2e-visioner.movement-cost-wrapped');
+
 /**
  * Register movement cost wrappers
  */
@@ -15,7 +17,6 @@ export function registerMovementCostHooks() {
 }
 
 function _registerMovementCostHooks() {
-    console.log('PF2E Visioner | Registering movement cost hooks');
     // We need to wrap the static method on the class configured in CONFIG
     const TerrainDataClass = CONFIG.Token.movement.TerrainData;
 
@@ -24,8 +25,15 @@ function _registerMovementCostHooks() {
         return;
     }
 
+    if (TerrainDataClass[MOVEMENT_COST_WRAPPED]) {
+        return;
+    }
+
+    console.log('PF2E Visioner | Registering movement cost hooks');
+
     // Store original method
     const originalGetMovementCostFunction = TerrainDataClass.getMovementCostFunction;
+    TerrainDataClass[MOVEMENT_COST_WRAPPED] = true;
 
     // Override the method
     TerrainDataClass.getMovementCostFunction = function (token, options) {

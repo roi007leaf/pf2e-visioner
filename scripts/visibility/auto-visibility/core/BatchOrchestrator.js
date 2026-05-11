@@ -1,5 +1,6 @@
 import { MODULE_ID } from '../../../constants.js';
 import { updateCanvasPerception } from '../../../helpers/perception-refresh.js';
+import { flushDetectionBatch, startDetectionBatch } from '../../../stores/detection-map.js';
 import { getLogger } from '../../../utils/logger.js';
 import { scheduleTask } from '../../../utils/scheduler.js';
 import { BatchProcessor } from './BatchProcessor.js';
@@ -423,7 +424,6 @@ export class BatchOrchestrator {
     let telemetryStopped = false;
     try {
       // Start detection batch mode to defer writes
-      const { startDetectionBatch } = await import('../../../stores/detection-map.js');
       startDetectionBatch();
 
       // Precompute lighting for performance optimization
@@ -478,7 +478,6 @@ export class BatchOrchestrator {
       const uniqueUpdateCount = await this._applyBatchResults(batchResult);
 
       // Flush batched detection writes (turns 110+ writes into one batched operation)
-      const { flushDetectionBatch } = await import('../../../stores/detection-map.js');
       await flushDetectionBatch();
 
       // Only refresh perception if there were actual updates to avoid triggering feedback loops
