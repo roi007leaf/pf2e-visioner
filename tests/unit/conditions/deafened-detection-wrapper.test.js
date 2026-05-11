@@ -353,41 +353,42 @@ describe('Deafened Detection Wrapper', () => {
                 { object: unnoticedPair.observer },
                 unnoticedPair.target,
             )).toBe(false);
-            test('hearing renders Visioner-hidden targets even when Foundry point visibility fails', () => {
-                const wrappedFunction = mockLibWrapper.register.mock.calls.find(
-                    call => call[1] === 'foundry.canvas.perception.DetectionMode.prototype.testVisibility'
-                )?.[2];
-                const observer = {
-                    actor: {},
-                    document: {
-                        id: 'observer',
-                        getFlag: jest.fn().mockReturnValue({ target: 'hidden' }),
-                    },
-                };
-                const target = {
-                    actor: {},
-                    document: {
-                        id: 'target',
-                        level: 'level-b',
-                        getFlag: jest.fn().mockReturnValue(false),
-                    },
-                };
-                const detectionModeInstance = {
-                    id: 'hearing',
-                    _canDetect: jest.fn().mockReturnValue(true),
-                    _testPoint: jest.fn().mockReturnValue(false),
-                };
+        });
 
-                const result = wrappedFunction.call(
-                    detectionModeInstance,
-                    { object: observer },
-                    { id: 'hearing', enabled: true },
-                    { ...mockConfig, object: target },
-                );
+        test('hearing renders Visioner-hidden targets even when Foundry point visibility fails', () => {
+            const wrappedFunction = mockLibWrapper.register.mock.calls.find(
+                call => call[1] === 'foundry.canvas.perception.DetectionMode.prototype.testVisibility'
+            )?.[2];
+            const observer = {
+                actor: {},
+                document: {
+                    id: 'observer',
+                    getFlag: jest.fn().mockReturnValue({ target: 'hidden' }),
+                },
+            };
+            const target = {
+                actor: {},
+                document: {
+                    id: 'target',
+                    level: 'level-b',
+                    getFlag: jest.fn().mockReturnValue(false),
+                },
+            };
+            const detectionModeInstance = {
+                id: 'hearing',
+                _canDetect: jest.fn().mockReturnValue(true),
+                _testPoint: jest.fn().mockReturnValue(false),
+            };
 
-                expect(result).toBe(true);
-                expect(detectionModeInstance._testPoint).not.toHaveBeenCalled();
-            });
+            const result = wrappedFunction.call(
+                detectionModeInstance,
+                { object: observer },
+                { id: 'hearing', enabled: true },
+                { ...mockConfig, object: target },
+            );
+
+            expect(result).toBe(true);
+            expect(detectionModeInstance._testPoint).not.toHaveBeenCalled();
         });
     });
 });
