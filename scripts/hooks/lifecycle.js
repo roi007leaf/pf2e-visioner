@@ -6,7 +6,7 @@ import { injectChatAutomationStyles } from '../chat/chat-automation-styles.js';
 import { MODULE_ID } from '../constants.js';
 import { initializeHoverTooltips } from '../services/HoverTooltips.js';
 import { registerSocket } from '../services/socket.js';
-import { updateTokenVisuals, updateWallVisuals } from '../services/visual-effects.js';
+import { updateWallVisuals } from '../services/visual-effects.js';
 import { getLogger } from '../utils/logger.js';
 import { logControlTokenVisibilitySnapshot } from '../helpers/visibility-debug.js';
 
@@ -118,6 +118,8 @@ async function refreshVisionSharingTokenIds() {
     scene: canvas.scene?.name,
   }));
 
+  let hasVisionSharingTokenIdChanges = false;
+
   for (const token of canvas.tokens.placeables) {
     try {
       const masterActorUuid = token.document.getFlag(MODULE_ID, 'visionMasterActorUuid');
@@ -146,6 +148,7 @@ async function refreshVisionSharingTokenIds() {
           }));
 
           await token.document.setFlag(MODULE_ID, 'visionMasterTokenId', newSceneTokenId);
+          hasVisionSharingTokenIdChanges = true;
         }
       } else {
         log.warn(() => ({
@@ -164,7 +167,9 @@ async function refreshVisionSharingTokenIds() {
     }
   }
 
-  canvas.perception.update({ initializeVision: true, refreshLighting: true });
+  if (hasVisionSharingTokenIdChanges) {
+    canvas.perception.update({ initializeVision: true, refreshLighting: true });
+  }
 }
 
 async function reapplyRuleElementsOnLoad() {
@@ -460,10 +465,6 @@ export function onReady() {
 }
 
 export async function onCanvasReady() {
-  if (canvas.ready && canvas.tokens?.placeables) {
-    await updateTokenVisuals();
-  }
-
   try {
     await refreshVisionSharingTokenIds();
   } catch (error) {

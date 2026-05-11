@@ -42,7 +42,11 @@ export class WallEventHandler {
             'sense',                         // Wall sense restrictions
             'dir',                           // Wall direction restrictions
             'sight',                         // Sight restriction
-            'sound'                          // Sound restriction (affects some LOS calculations)
+            'sound',                         // Sound restriction (affects some LOS calculations)
+            'threshold',                     // Proximity/reverse proximity thresholds
+            'threshold.sight',               // Vision proximity threshold
+            'threshold.sound',               // Sound proximity threshold
+            'threshold.attenuation'          // Vision/light proximity attenuation
         ];
 
         const affectedFields = geometryFields.filter(field =>

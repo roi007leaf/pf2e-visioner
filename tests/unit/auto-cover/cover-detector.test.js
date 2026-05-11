@@ -7,6 +7,31 @@ import '../../setup.js';
 
 describe('CoverDetector', () => {
   let coverDetector;
+  const WALL_SENSE_TYPES = {
+    NONE: 0,
+    LIMITED: 10,
+    NORMAL: 20,
+    PROXIMITY: 30,
+    DISTANCE: 40,
+  };
+
+  function makeVerticalWall(sight, threshold) {
+    return {
+      document: {
+        id: `wall-${sight}-${threshold}`,
+        c: [50, -100, 50, 100],
+        sight,
+        sound: 0,
+        light: 20,
+        move: 20,
+        door: 0,
+        ds: 0,
+        dir: 0,
+        threshold: { sight: threshold },
+        getFlag: jest.fn(() => undefined),
+      },
+    };
+  }
 
   beforeEach(async () => {
     jest.resetModules();
@@ -95,6 +120,82 @@ describe('CoverDetector', () => {
       const result = coverDetector.detectBetweenTokens(sourceToken, targetToken);
       // Just check that it returns a valid cover state
       expect(['none', 'lesser', 'standard', 'greater']).toContain(result);
+    });
+
+    test('should not grant wall cover for proximity walls when attacker is within threshold', () => {
+      sourceToken.center = { x: 40, y: 0 };
+      sourceToken.document.x = 40;
+      sourceToken.document.y = 0;
+      sourceToken.document.width = 0;
+      sourceToken.document.height = 0;
+      targetToken.center = { x: 100, y: 0 };
+      targetToken.document.x = 100;
+      targetToken.document.y = 0;
+      targetToken.document.width = 0;
+      targetToken.document.height = 0;
+
+      global.canvas.walls.placeables = [makeVerticalWall(WALL_SENSE_TYPES.PROXIMITY, 2)];
+      global.canvas.tokens.placeables = [sourceToken, targetToken];
+
+      const result = coverDetector.detectBetweenTokens(sourceToken, targetToken);
+      expect(result).toBe('none');
+    });
+
+    test('should grant wall cover for proximity walls when attacker is outside threshold', () => {
+      sourceToken.center = { x: 0, y: 0 };
+      sourceToken.document.x = 0;
+      sourceToken.document.y = 0;
+      sourceToken.document.width = 0;
+      sourceToken.document.height = 0;
+      targetToken.center = { x: 100, y: 0 };
+      targetToken.document.x = 100;
+      targetToken.document.y = 0;
+      targetToken.document.width = 0;
+      targetToken.document.height = 0;
+
+      global.canvas.walls.placeables = [makeVerticalWall(WALL_SENSE_TYPES.PROXIMITY, 2)];
+      global.canvas.tokens.placeables = [sourceToken, targetToken];
+
+      const result = coverDetector.detectBetweenTokens(sourceToken, targetToken);
+      expect(result).toBe('standard');
+    });
+
+    test('should grant wall cover for reverse proximity walls when attacker is within threshold', () => {
+      sourceToken.center = { x: 40, y: 0 };
+      sourceToken.document.x = 40;
+      sourceToken.document.y = 0;
+      sourceToken.document.width = 0;
+      sourceToken.document.height = 0;
+      targetToken.center = { x: 100, y: 0 };
+      targetToken.document.x = 100;
+      targetToken.document.y = 0;
+      targetToken.document.width = 0;
+      targetToken.document.height = 0;
+
+      global.canvas.walls.placeables = [makeVerticalWall(WALL_SENSE_TYPES.DISTANCE, 2)];
+      global.canvas.tokens.placeables = [sourceToken, targetToken];
+
+      const result = coverDetector.detectBetweenTokens(sourceToken, targetToken);
+      expect(result).toBe('standard');
+    });
+
+    test('should not grant wall cover for reverse proximity walls when attacker is outside threshold', () => {
+      sourceToken.center = { x: 0, y: 0 };
+      sourceToken.document.x = 0;
+      sourceToken.document.y = 0;
+      sourceToken.document.width = 0;
+      sourceToken.document.height = 0;
+      targetToken.center = { x: 100, y: 0 };
+      targetToken.document.x = 100;
+      targetToken.document.y = 0;
+      targetToken.document.width = 0;
+      targetToken.document.height = 0;
+
+      global.canvas.walls.placeables = [makeVerticalWall(WALL_SENSE_TYPES.DISTANCE, 2)];
+      global.canvas.tokens.placeables = [sourceToken, targetToken];
+
+      const result = coverDetector.detectBetweenTokens(sourceToken, targetToken);
+      expect(result).toBe('none');
     });
   });
 

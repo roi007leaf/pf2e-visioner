@@ -1,69 +1,71 @@
 <claude-mem-context>
 # Memory Context
 
-# [pf2e-visioner] recent context, 2026-05-07 2:11pm GMT+3
+# [pf2e-visioner] recent context, 2026-05-11 12:58pm GMT+3
 
 Legend: 🎯session 🔴bugfix 🟣feature 🔄refactor ✅change 🔵discovery ⚖️decision 🚨security_alert 🔐security_note
 Format: ID TIME TYPE TITLE
 Fetch details: get_observations([IDs]) | Search: mem-search skill
 
-Stats: 50 obs (17,664t read) | 269,587t work | 93% savings
+Stats: 50 obs (20,124t read) | 586,221t work | 97% savings
 
 ### May 3, 2026
 S245 Fix stealth cover bonus not appearing on stealth rolls — expanded to include third discovered bug in context routing (May 3 at 9:55 AM)
 S119 GM tracker dots design pivot — dots should only show users who CAN see the stealther, not users blocked by overrides (May 3 at 9:55 AM)
 ### May 7, 2026
-S246 Fix stealth cover bonus not appearing on stealth rolls — three bugs found and fixed, Bug 3 fix verified in source but test not yet re-run (May 7 at 8:07 AM)
-1443 12:13p 🟣 60 Tests Pass Across 4 Core Cover Suites Including New Prone Take Cover With No Baseline Test
-1444 " 🟣 TakeCoverPreviewDialog Updated to Show Prone+Ranged-Only Cover Outcomes in UI
-1445 " 🟣 62 Tests Pass Including TakeCoverPreviewDialog; ESLint Clean After Full prone+Ranged Feature
-1449 " 🟣 Complete Feature: 2519 Tests Pass Across 230 Suites — Full Prone+Ranged Cover System Implemented
-1455 12:20p 🔵 cover-map.js setCoverBetween Implementation Details
-1456 " 🔵 TakeCoverAction Orientation: Observer = Subject Row, Target = Actor Taking Cover
-1457 " 🔵 batchUpdateCoverEffects Manages PF2E Rule Elements as Aggregate Cover Items
-1458 " 🔵 Cover Store Imports batchUpdateCoverEffects from ephemeral.js Not batch.js Directly
-1459 12:21p 🔴 Cover Map 'none' State Now Deletes Key Instead of Setting to 'none'
-1460 " ✅ Full Test Suite Passes After cover-map.js 'none' Key Deletion Fix
-1461 12:22p 🔵 RuleElementCoverService Governs Rule-Element-Based Cover Blocking and Override Logic
-1462 12:23p 🔵 CoverDetector Integrates RuleElementCoverService in Blocker Filtering Loop
-1463 " 🔵 pf2e-visioner Token Flag Namespace Inventory
-1464 " 🔵 RuleElementCoverService Has No Dedicated Unit Tests
-1465 " 🔵 Rule-Element Test Pattern: Mock SourceTracker and setCoverBetween, Use getFlag/setFlag Stubs
-1466 12:24p 🔵 TDD Red Phase: canTokenProvideCoverToTarget Emits console.warn on undefined document
-1468 " 🔴 RuleElementCoverService Hardened Against Missing document/getFlag and Null Blocker
-1469 " 🟣 RuleElementCoverService Now Has Unit Test Coverage — Full Suite at 231/2520
-1470 12:25p 🔄 RuleElementCoverService Return Statement Indentation Cleaned Up
-1471 12:26p 🟣 Second TDD Test Added for getCoverFromRuleElements with Missing document
-1472 " 🔴 getCoverFromRuleElements Also Hardened Against Missing target.document
-1473 " 🟣 RuleElementCoverService Fully Hardened and Tested — Suite at 231/2521
-1474 12:27p 🔵 Prone Detection Uses Four-Path Fallback Pattern Across the Codebase
-1475 " 🔵 BaseAction.apply() Pipeline and Condition Hook Architecture
-1476 12:29p 🔵 Take Cover Feature Full Architecture Map
-1477 " 🔵 Take Cover Apply/Preview Wiring in event-binder.js and apply-service.js
-1478 12:30p 🔵 batch.js Post-Write Pipeline and Aggregate Effect Item Structure
-1479 1:51p ✅ Patch Version Increment with Changelog for Cover System
-1480 " 🔵 pf2e-visioner Module Manifest Snapshot
-1481 " 🔵 pf2e-visioner CHANGELOG.md Structure and History
-1482 " ✅ module.json Patch Version Bumped to 8.1.13
-1483 1:52p 🟣 pf2e-visioner 8.1.13 Released: Prone Take Cover and Cover Effect Visibility
-1491 2:00p 🟣 Attack Trait Actions Remove Prone Take Cover Effect
-1492 2:01p 🔵 take-cover-expiration-service.js: Current Attack Roll Detection Logic
-1493 " 🔵 AutoCoverHooks._isAttackContext Has Broader Attack Detection Than Expiration Service
-1494 " 🔵 Existing Expiration Tests Cover Roll Types Only, Not Attack-Trait Actions
-1495 " 🟣 TDD: Failing Test Added for Attack-Trait Action Expiry
-1496 " 🟣 Expiration Service Refactored to Detect Any Attack-Trait Action
-1497 " 🔴 Prone Take Cover Now Expires on Any Attack-Trait Action (All Tests Pass)
-1498 2:02p 🟣 Attack-Trait Expiry Change Passes Full Chat Test Suite and Lint
-1499 " 🟣 Full Test Suite Passes After Attack-Trait Expiry Feature (2538 Tests, 233 Suites)
-1500 2:06p 🔵 autoCover Object Shape Used Across Sneak and Hide Actions
-1501 " 🔵 cover-bonus-btn Greater Cover CSS Uses Wrong Fallback Color (#4caf50 = Green, Not Red)
-1502 2:07p 🔴 TDD: Failing Test Added for Greater Cover Bonus Button Wrong Fallback Color
-1503 " 🔴 Greater Cover Bonus Button Test Hardened to Avoid False Positive
-1504 " 🔴 Confirmed: Greater Cover Bonus Button Uses #4caf50 (Green) Fallback in CSS Rule
-1505 " 🔴 Greater Cover Bonus Button Fallback Color Fixed to #f44336 (Red)
-1506 " 🔴 Greater Cover Bonus Button Color Fix Verified and All Layout Tests Pass
-1507 2:08p 🔴 Greater Cover Bonus Button Color Fix Shipped to v8.1.13 Changelog
-1508 2:09p 🔴 Prone Take Cover Always Bypasses Dialog, Even With Regular Cover Outcomes Present
+S246 Fix stealth cover bonus not appearing on stealth rolls — three bugs found and fixed, Bug 3 fix verified in source but test not yet re-run (May 7 at 8:04 AM)
+### May 11, 2026
+S258 Debugging persistent token image flash bug in pf2e-visioner FoundryVTT module — user asked what debug log was added (May 11 at 10:50 AM)
+2051 11:11a 🔵 TokenFlashDebug Architecture: Singleton State, Monkey-Patching, and DOM Observer
+2052 " ⚖️ TokenFlashDebug Uses Namespaced Token Prototype, Not Deprecated Global
+2053 11:12a 🔵 Three Failing Tests Reveal Missing Behaviors in token-flash-debug.js
+2054 " 🔴 token-flash-debug.js: Fixed isEnabled, Added Parent/Ancestry to Log, Added DOM Image Deduplication
+2055 11:13a 🔵 Time-Based DOM Image Deduplication Fails in Jest: 9 Events Fired for 2 Images
+2056 " 🔴 token-flash-debug.js Test Suite Now 10/10 Pass; Deduplication Scoped to Event Store Only
+2057 11:16a 🔵 isEnabled() Fix Reverted: token-flash-debug.js on Disk Still Has Hardcoded return true
+2058 11:17a 🔵 Full token-flash-debug.js Code Review: isEnabled Fix Absent on Disk, Complete Public API Confirmed
+2059 11:18a 🟣 DOM Image Owner Kind Classification Added: pf2e-hud-owned-actor Pattern Detected
+2060 " 🔵 Final Verified State: token-flash-debug.js Correct on Disk; Broader Project Context Revealed
+2061 11:19a 🔵 Token Flash Root Cause Investigation: Systematic Debugging Approach Initiated
+2062 " 🔵 refreshToken Hook in registration.js Calls updateSystemHiddenTokenHighlights on Every Controlled Token Refresh
+2063 " 🔵 controlToken Session Tracking and Suppression Architecture Mapped
+2064 " 🔵 pf2e-hud-take-cover Integration Identifies #pf2e-hud-persistent as Key DOM Element
+2065 11:30a 🔵 Wall Sense Proximity/Distance/Attenuation Logic in pf2e-visioner
+2066 11:34a 🔵 FoundryVTT Running on Port 30000, No Chrome Debug Port Active
+2067 " 🔵 FoundryVTT Accessible at localhost:30000, No Browser Automation Libraries Available
+2068 11:35a 🔵 pf2e-visioner Project Structure Confirmed, No Playwright/Vite Config Present
+2069 " 🔵 pf2e-visioner Uses Jest with jsdom, Not Playwright — Version 6.1.0
+2070 " 🔵 FoundryVTT Version 14 Build 361 Running with World Named "Test"
+2071 " 🔵 Playwright 1.52.0 Available via npx for Browser Automation
+2072 11:36a 🔵 npx -p playwright Does Not Expose Module to require() in node -e Scripts
+2073 " 🔵 Playwright Installed to /tmp Sandbox for Browser Automation Against FoundryVTT
+2074 " 🔵 Debugging Token Visibility: Amiri Appearing in Daylight Instead of Darkness
+2075 " 🔵 Playwright Browser Binaries Not Downloaded — chromium_headless_shell Missing
+2076 11:37a ✅ Chromium 136 Browser Binaries Downloaded for Playwright Automation
+2077 " 🔵 pf2e-visioner Lighting & Visibility Architecture Mapped
+2079 " 🔵 DetectionWrapper Overrides FoundryVTT Detection with Viewport & Sneak Guards
+2080 " 🔵 TokenEventHandler Movement Pipeline: Animation Deferral and Cache Clearing
+2078 " 🔵 FoundryVTT V14 Requires Chromium 146+, Playwright 1.52.0 Ships Chromium 136 — Compatibility Warning
+2081 11:38a 🔵 Playwright Latest Version is 1.59.1 — Likely Bundles Chromium 146+ for FVTT V14 Compatibility
+2082 " 🔵 LightingCalculator Rule Element Short-Circuit: LightingModifier Overrides All Scene Lighting
+2083 " 🔵 TokenEventHandler Light Change Path Uses lightingRefresh Hook with suppressLightingRefresh Guard
+2084 " 🔵 VisibilityCalculator Adapter Pattern: Delegates All Calculations to StatelessVisibilityCalculator
+2085 " ✅ Playwright 1.59.1 with Chrome 147 Set Up in New /tmp Sandbox for FVTT V14 Compatible Automation
+2086 11:39a 🔵 FoundryVTT /join Page Fully Mapped with Chrome 147 — No Compatibility Errors, WebGL Lost in Headless
+2087 11:40a 🔵 Player2 Login Succeeds but Page Stays on /join — World Not Active (No GM Connected)
+2088 11:41a 🔵 Game Canvas Loads as Player2 — Zero TokenFlashDebug Events, PF2E Visioner Registers Hooks Twice
+2089 11:42a 🔵 Double "Registering movement cost hooks" Confirmed on Both GM and Player Sessions — Systematic Double-Init Bug
+2090 11:44a 🔵 TokenFlashDebug Events Confirmed Working — All Perception Updates on Landing Scene Sourced from pf2e-hud, Not pf2e-visioner
+2091 11:45a 🔵 TokenFlashDebug dom.img Event Type Revealed — Tracks DOM Image Additions via MutationObserver with ownerKind Classification
+2092 11:46a 🔵 Custom systematic-debugging Superpower Loaded — Defines Iron Law: No Fixes Without Root Cause Investigation
+2093 " 🔵 Git Status Reveals Active "Proximity Walls" Feature Branch — token-flash-debug.js is Untracked, BatchOrchestrator Modified Unstaged
+2094 " 🔵 BatchOrchestrator Architecture Confirmed — Only Fires on Explicit enqueueTokens() Call, Not on Passive Scene Events
+2095 " 🔵 npm test -- --runInBand Conflicts with Baked-in --maxWorkers=50% in package.json test Script
+2096 11:47a 🔴 Root Cause Found: token-flash-debug.js isEnabled() Hardcoded to Return true — Always Active Regardless of Debug Setting
+2097 " 🔵 token-flash-debug.js Always Installed in Hooks.once('init') — Performance Impact on Every Session
+2098 " 🔴 Fixed: token-flash-debug.js isEnabled() Now Checks Debug Setting — All 11 Tests Pass
+2099 11:48a 🔴 Full Test Suite Green After isEnabled() Fix — 250 Suites, 2651 Tests Pass in 7.6s
+2100 12:54p 🔵 PF2e Visioner Module – Reverse Proximity Approach Explored
 
-Access 270k tokens of past work via get_observations([IDs]) or mem-search skill.
+Access 586k tokens of past work via get_observations([IDs]) or mem-search skill.
 </claude-mem-context>

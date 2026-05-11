@@ -1,5 +1,22 @@
 # Changelog
 
+## [8.2.3] - 2026-05-11
+
+### Fixed
+
+- **Proximity wall sight and sound types respected by Visioner**: Proximity and reverse proximity walls now use their sight and sound thresholds in Visioner's line-of-sight, sound-blocking, and wall auto-cover checks instead of behaving like normal always-blocking walls, and threshold edits now invalidate Visioner's wall visibility caches.
+- **Sound proximity uses the sound source side**: Visioner now evaluates sound proximity walls from the target/noise-maker side, so sight-blocked targets within a sound proximity threshold can still be detected as hidden by hearing instead of incorrectly remaining undetected.
+- **Light toggles wait for Foundry lighting refresh**: Ambient and token-emitted light changes no longer trigger AVS recalculation before Foundry finishes rebuilding light sources, preventing transient token-render artifacts during light enable/disable.
+- **Offscreen light recalculations respect the viewport**: Empty viewport-filter results no longer fall back to processing every token, and stale movement tracking no longer makes normal light batches refresh offscreen tokens.
+- **Startup token visual refreshes skip offscreen tokens**: Scene reload/canvas-ready visual refreshes no longer call `refresh()` on tokens outside the current viewport, avoiding offscreen token texture flashes after reloading the game.
+- **Reload-time visual refreshes avoid no-op canvas work**: Pair-specific visual updates now skip offscreen tokens too, early reload refreshes wait for viewport geometry, and vision-sharing scene checks no longer force a perception rebuild when no token IDs changed.
+- **Hidden-wall visual refreshes skip offscreen tokens**: Hidden wall sight-restoration paths no longer force-refresh every token on the scene, closing another reload/control-token path that could briefly draw offscreen token textures.
+- **Offscreen tokens skipped during Foundry detection tests**: Visioner's detection-mode wrapper now ignores targets outside the current viewport before running Foundry point tests, preventing reload and lighting perception rebuilds from touching hidden offscreen token meshes.
+- **Imprecise detection renders hidden targets outside sight**: Targets that Visioner marks hidden via hearing, tremorsense, or similar non-visual senses now remain visible to the selected observer even when Foundry's visual point test fails, instead of disappearing as undetected.
+- **Foundry core sound wall collisions respect proximity**: In Foundry v14/core Levels scenes, sound wall polygon collisions now fall through to Visioner's proximity-aware wall checks instead of short-circuiting all sound proximity walls as blocked.
+- **Proximity sight attenuation respected**: Proximity and reverse proximity sight walls with threshold attenuation now limit how far Visioner line of sight can continue past the wall instead of becoming fully transparent as soon as the observer qualifies for the threshold.
+- **AVS rule-element global restored without debug instrumentation**: The module now preserves `window.pf2eVisioner.services.autoVisibilitySystem` for rule elements after reloads while removing the temporary token-flash diagnostic hooks.
+
 ## [8.2.2] - 2026-05-10
 
 ### Fixed

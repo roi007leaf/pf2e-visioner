@@ -219,6 +219,7 @@ export class TokenEventHandler {
       tokenId: tokenDoc?.id,
       changeFlags,
     }));
+    let effectiveChangeFlags = changeFlags;
 
     // Skip position updates during animation/dragging - only process completed movements
     const hasPositionChange = changes.x !== undefined || changes.y !== undefined;
@@ -360,12 +361,15 @@ export class TokenEventHandler {
           }
         }, 50);
       }
-      // Continue processing other changes (e.g., movement) for position pinning
+      // Continue processing other changes (e.g., movement) for position pinning,
+      // but don't also run the generic light-change recalculation before Foundry
+      // has refreshed lighting sources.
+      effectiveChangeFlags = { ...changeFlags, lightChanged: false };
     }
 
     // Movement action changes (flying vs grounded) affect tremorsense detection
     // Clear visibility cache to avoid stale tremorsense results
-    if (changeFlags.movementActionChanged) {
+    if (effectiveChangeFlags.movementActionChanged) {
       try {
         this.cacheManager?.clearVisibilityCache?.();
       } catch {
@@ -387,12 +391,12 @@ export class TokenEventHandler {
     const isHidden = tokenDoc.hidden === true;
 
     // Log wall flag changes for debugging
-    if (changeFlags.wallFlagsChanged) {
+    if (effectiveChangeFlags.wallFlagsChanged) {
       this.systemState.debug('wall-flags-detected', tokenDoc.id, changes.flags?.[MODULE_ID]?.walls);
     }
 
     // Handle light emitter movement (global recalculation)
-    const emitterMoved = changeFlags.positionChanged && this._tokenEmitsLight(tokenDoc, changes);
+    const emitterMoved = effectiveChangeFlags.positionChanged && this._tokenEmitsLight(tokenDoc, changes);
     if (emitterMoved) {
       this.systemState.debug(() => ({
         msg: 'handleTokenUpdate light emitter moved - global recalc',
@@ -407,7 +411,7 @@ export class TokenEventHandler {
     }
 
     // Handle hidden tokens (with sneak special case)
-    if (isHidden && !changeFlags.lightChanged && !emitterMoved) {
+    if (isHidden && !effectiveChangeFlags.lightChanged && !emitterMoved) {
       this.systemState.debug(() => ({
         msg: 'handleTokenUpdate hidden token',
         tokenId: tokenDoc?.id,
@@ -426,13 +430,13 @@ export class TokenEventHandler {
     }
 
     // Process relevant changes
-    if (this._hasRelevantChanges(changeFlags)) {
+    if (this._hasRelevantChanges(effectiveChangeFlags)) {
       this.systemState.debug(() => ({
         msg: 'handleTokenUpdate processing relevant changes',
         tokenId: tokenDoc?.id,
-        changeFlags,
+        changeFlags: effectiveChangeFlags,
       }));
-      this._processRelevantChanges(tokenDoc, changes, changeFlags);
+      this._processRelevantChanges(tokenDoc, changes, effectiveChangeFlags);
     } else {
       this.systemState.debug(() => ({
         msg: 'handleTokenUpdate no relevant changes',

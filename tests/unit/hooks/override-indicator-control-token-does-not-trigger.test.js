@@ -57,6 +57,57 @@ describe('Override indicator should not trigger on controlToken', () => {
         expect(secondControlHookCount).toBe(firstControlHookCount);
     });
 
+    test('onCanvasReady does not refresh perception when vision sharing ids are unchanged', async () => {
+        const perceptionUpdate = jest.fn();
+        global.canvas.perception = { update: perceptionUpdate };
+        global.canvas.tokens.placeables = [{
+            document: {
+                getFlag: jest.fn(() => null),
+            },
+        }];
+
+        const { onCanvasReady } = await import('../../../scripts/hooks/lifecycle.js');
+        await onCanvasReady();
+
+        expect(perceptionUpdate).not.toHaveBeenCalled();
+    });
+
+    test('onCanvasReady does not broadly refresh tokens during startup', async () => {
+        const refresh = jest.fn();
+        global.canvas.ready = true;
+        global.canvas.app = {
+            renderer: {
+                screen: { width: 1000, height: 1000 },
+            },
+        };
+        global.canvas.stage = {
+            worldTransform: {
+                applyInverse: jest.fn((point) => ({ x: point.x, y: point.y })),
+            },
+        };
+        global.canvas.tokens.placeables = [{
+            id: 't1',
+            center: { x: 100, y: 100 },
+            document: {
+                id: 't1',
+                width: 1,
+                height: 1,
+                getFlag: jest.fn(() => null),
+            },
+            visible: true,
+            destroyed: false,
+            sprite: {},
+            mesh: {},
+            on: jest.fn(),
+            refresh,
+        }];
+
+        const { onCanvasReady } = await import('../../../scripts/hooks/lifecycle.js');
+        await onCanvasReady();
+
+        expect(refresh).not.toHaveBeenCalled();
+    });
+
     test('controlToken schedules AVS recalculation for the controlled token', async () => {
         const { onCanvasReady } = await import('../../../scripts/hooks/lifecycle.js');
         await onCanvasReady();

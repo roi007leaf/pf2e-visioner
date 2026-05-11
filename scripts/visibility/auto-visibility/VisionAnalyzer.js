@@ -21,6 +21,7 @@
 import { MODULE_ID } from '../../constants.js';
 import { calculateDistanceInFeet } from '../../helpers/geometry-utils.js';
 import { getTokenVerticalSpanFt } from '../../helpers/size-elevation-utils.js';
+import { doesWallSenseBlockFromPoint } from '../../helpers/wall-sense-utils.js';
 import { doesWallBlockAtElevation, doesWallBlockLineOfSight } from '../../helpers/wall-height-utils.js';
 import { LevelsIntegration } from '../../services/LevelsIntegration.js';
 import { getLogger } from '../../utils/logger.js';
@@ -855,6 +856,17 @@ export class VisionAnalyzer {
             continue;
           }
 
+          if (
+            !doesWallSenseBlockFromPoint(wall.document, fromPoint, wall.document.c, 'sight', {
+              system: 'line-of-sight',
+              endpoint: 'ray-start',
+              fromPoint,
+              toPoint,
+            })
+          ) {
+            continue;
+          }
+
           // Check if this is a Limited wall (sight/light/sound = LIMITED)
           const isLimitedSight = wall.document.sight === edgeSenseTypes.LIMITED;
           const isLimitedLight = wall.document.light === edgeSenseTypes.LIMITED;
@@ -939,7 +951,23 @@ export class VisionAnalyzer {
 
       const levelsIntegration = LevelsIntegration.getInstance();
       if (levelsIntegration.isActive) {
-        const blocked = levelsIntegration.test3DCollision(observer, target, 'sound');
+        const collisionDetails =
+          typeof levelsIntegration.get3DCollisionDetails === 'function'
+            ? levelsIntegration.get3DCollisionDetails(observer, target, 'sound')
+            : {
+                mode: levelsIntegration.mode,
+                result: levelsIntegration.test3DCollision(observer, target, 'sound'),
+              };
+        const blocked = !!collisionDetails.result;
+        const coreSurfaceCollision =
+          collisionDetails.mode === 'core' &&
+          (collisionDetails.surfaceCollision === true ||
+            collisionDetails.levelInclusionCollision === true);
+        const corePolygonOnlyCollision =
+          collisionDetails.mode === 'core' &&
+          collisionDetails.polygonCollision === true &&
+          collisionDetails.surfaceCollision !== true &&
+          collisionDetails.levelInclusionCollision !== true;
         const log = getLogger('AVS/VisionAnalyzer');
         log.debug(() => ({
           msg: 'v14-levels-sound',
@@ -951,8 +979,23 @@ export class VisionAnalyzer {
           targetLevel: levelsIntegration.getTokenLevelId(target),
           targetName: target?.name ?? null,
           mode: levelsIntegration.mode,
+          collisionDetails,
         }));
-        return blocked;
+
+        if (coreSurfaceCollision || collisionDetails.mode !== 'core') {
+          return blocked;
+        }
+
+        if (!blocked) {
+          return false;
+        }
+
+        if (!corePolygonOnlyCollision) {
+          return blocked;
+        }
+
+        // Core polygon sound collisions identify that a sound wall was hit, but not whether a
+        // proximity/reverse-proximity wall should block from the sound source side.
       }
 
       // Check for sound-blocking walls manually, ignoring LIMITED walls
@@ -1002,6 +1045,20 @@ export class VisionAnalyzer {
           }
 
           if (t1 >= 0 && t1 <= 1) {
+            const soundSenseBlocks = doesWallSenseBlockFromPoint(
+              wall.document,
+              target.center,
+              wall.document.c,
+              'sound',
+              {
+                system: 'sound',
+                endpoint: 'target-center',
+              },
+            );
+
+            if (!soundSenseBlocks) {
+              continue;
+            }
             // Found a normal (non-limited) sound-blocking wall
             return true;
           }

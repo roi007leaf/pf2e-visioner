@@ -3,6 +3,7 @@
  */
 
 import { VisionAnalyzer } from '../../../scripts/visibility/auto-visibility/VisionAnalyzer.js';
+import { LevelsIntegration } from '../../../scripts/services/LevelsIntegration.js';
 
 // Mock the wall-height-utils module
 jest.mock('../../../scripts/helpers/wall-height-utils.js', () => ({
@@ -13,6 +14,51 @@ jest.mock('../../../scripts/helpers/wall-height-utils.js', () => ({
 
 describe('Wall Sight Blocking Fix', () => {
   let visionAnalyzer;
+
+  function makeZeroSizeToken({ x, y, id = 'token' }) {
+    return {
+      center: { x, y },
+      vision: null,
+      shape: null,
+      actor: {
+        system: {
+          perception: { vision: true },
+          traits: { size: { value: 'med' } },
+        },
+      },
+      document: { id, x, y, width: 0, height: 0, elevation: 0 },
+    };
+  }
+
+  function makeVerticalSightWall(sight, threshold, thresholdOptions = {}) {
+    return {
+      document: {
+        move: CONST.WALL_SENSE_TYPES.NORMAL,
+        sight,
+        sound: CONST.WALL_SENSE_TYPES.NONE,
+        light: CONST.WALL_SENSE_TYPES.NORMAL,
+        door: 0,
+        ds: 0,
+        threshold: { sight: threshold, ...thresholdOptions },
+        c: [50, -100, 50, 100],
+      },
+    };
+  }
+
+  function makeVerticalSoundWall(sound, threshold) {
+    return {
+      document: {
+        move: CONST.WALL_SENSE_TYPES.NORMAL,
+        sight: CONST.WALL_SENSE_TYPES.NONE,
+        sound,
+        light: CONST.WALL_SENSE_TYPES.NONE,
+        door: 0,
+        ds: 0,
+        threshold: { sound: threshold },
+        c: [50, -100, 50, 100],
+      },
+    };
+  }
 
   beforeEach(() => {
     // Setup mocks
@@ -303,6 +349,90 @@ describe('Wall Sight Blocking Fix', () => {
       expect(result).toBe(false);
     });
 
+    test('should allow line of sight through proximity walls when observer is within threshold', () => {
+      const observer = makeZeroSizeToken({ id: 'proximity-near-observer', x: 40, y: 0 });
+      const target = makeZeroSizeToken({ id: 'proximity-near-target', x: 100, y: 0 });
+
+      global.canvas.walls.placeables = [
+        makeVerticalSightWall(CONST.WALL_SENSE_TYPES.PROXIMITY, 1),
+      ];
+
+      const result = visionAnalyzer.hasLineOfSight(observer, target);
+      expect(result).toBe(true);
+    });
+
+    test('should attenuate proximity sight beyond the remaining threshold distance', () => {
+      const observer = makeZeroSizeToken({ id: 'proximity-attenuated-observer', x: 40, y: 0 });
+      const target = makeZeroSizeToken({ id: 'proximity-attenuated-target', x: 100, y: 0 });
+
+      global.canvas.walls.placeables = [
+        makeVerticalSightWall(CONST.WALL_SENSE_TYPES.PROXIMITY, 1, { attenuation: true }),
+      ];
+
+      const result = visionAnalyzer.hasLineOfSight(observer, target);
+      expect(result).toBe(false);
+    });
+
+    test('should allow attenuated proximity sight inside the penetration distance', () => {
+      const observer = makeZeroSizeToken({ id: 'proximity-attenuated-observer-near', x: 40, y: 0 });
+      const target = makeZeroSizeToken({ id: 'proximity-attenuated-target-near', x: 55, y: 0 });
+
+      global.canvas.walls.placeables = [
+        makeVerticalSightWall(CONST.WALL_SENSE_TYPES.PROXIMITY, 1, { attenuation: true }),
+      ];
+
+      const result = visionAnalyzer.hasLineOfSight(observer, target);
+      expect(result).toBe(true);
+    });
+
+    test('should block line of sight through proximity walls when observer is outside threshold', () => {
+      const observer = makeZeroSizeToken({ id: 'proximity-far-observer', x: 0, y: 0 });
+      const target = makeZeroSizeToken({ id: 'proximity-far-target', x: 100, y: 0 });
+
+      global.canvas.walls.placeables = [
+        makeVerticalSightWall(CONST.WALL_SENSE_TYPES.PROXIMITY, 1),
+      ];
+
+      const result = visionAnalyzer.hasLineOfSight(observer, target);
+      expect(result).toBe(false);
+    });
+
+    test('should block line of sight through reverse proximity walls when observer is within threshold', () => {
+      const observer = makeZeroSizeToken({ id: 'reverse-proximity-near-observer', x: 40, y: 0 });
+      const target = makeZeroSizeToken({ id: 'reverse-proximity-near-target', x: 100, y: 0 });
+
+      global.canvas.walls.placeables = [
+        makeVerticalSightWall(CONST.WALL_SENSE_TYPES.DISTANCE, 1),
+      ];
+
+      const result = visionAnalyzer.hasLineOfSight(observer, target);
+      expect(result).toBe(false);
+    });
+
+    test('should allow line of sight through reverse proximity walls when observer is outside threshold', () => {
+      const observer = makeZeroSizeToken({ id: 'reverse-proximity-far-observer', x: 0, y: 0 });
+      const target = makeZeroSizeToken({ id: 'reverse-proximity-far-target', x: 100, y: 0 });
+
+      global.canvas.walls.placeables = [
+        makeVerticalSightWall(CONST.WALL_SENSE_TYPES.DISTANCE, 1),
+      ];
+
+      const result = visionAnalyzer.hasLineOfSight(observer, target);
+      expect(result).toBe(true);
+    });
+
+    test('should attenuate reverse proximity sight beyond the excess threshold distance', () => {
+      const observer = makeZeroSizeToken({ id: 'reverse-proximity-attenuated-observer', x: 0, y: 0 });
+      const target = makeZeroSizeToken({ id: 'reverse-proximity-attenuated-target', x: 100, y: 0 });
+
+      global.canvas.walls.placeables = [
+        makeVerticalSightWall(CONST.WALL_SENSE_TYPES.DISTANCE, 2, { attenuation: true }),
+      ];
+
+      const result = visionAnalyzer.hasLineOfSight(observer, target);
+      expect(result).toBe(false);
+    });
+
     test('should return false for observers with no vision capabilities', () => {
       const observerWithNoVision = {
         center: { x: 0, y: 0 },
@@ -424,5 +554,94 @@ describe('Wall Sight Blocking Fix', () => {
       const result = visionAnalyzer.hasPreciseNonVisualInRange(observer, target);
       expect(result).toBe(false); // Should not use echolocation when deafened
     });
+  });
+
+  describe('isSoundBlocked - proximity wall logic', () => {
+    test('should allow sound through proximity walls when sound source target is within threshold', () => {
+      const observer = makeZeroSizeToken({ id: 'sound-proximity-listener-far', x: 0, y: 0 });
+      const target = makeZeroSizeToken({ id: 'sound-proximity-source-near', x: 60, y: 0 });
+
+      global.canvas.walls.placeables = [
+        makeVerticalSoundWall(CONST.WALL_SENSE_TYPES.PROXIMITY, 1),
+      ];
+
+      const result = visionAnalyzer.isSoundBlocked(observer, target);
+      expect(result).toBe(false);
+    });
+
+    test('should let proximity sound walls override core polygon sound collisions', () => {
+      const observer = makeZeroSizeToken({ id: 'core-sound-proximity-listener', x: 0, y: 0 });
+      const target = makeZeroSizeToken({ id: 'core-sound-proximity-source-near', x: 60, y: 0 });
+      const get3DCollisionDetails = jest.fn(() => ({
+        mode: 'core',
+        result: true,
+        reason: 'polygon',
+        surfaceCollision: false,
+        polygonCollision: true,
+        levelInclusionCollision: false,
+      }));
+
+      jest.spyOn(LevelsIntegration, 'getInstance').mockReturnValue({
+        isActive: true,
+        mode: 'core',
+        getTokenLevelId: jest.fn(() => null),
+        get3DCollisionDetails,
+        test3DCollision: jest.fn(() => true),
+      });
+
+      global.canvas.walls.placeables = [
+        makeVerticalSoundWall(CONST.WALL_SENSE_TYPES.PROXIMITY, 1),
+      ];
+
+      const result = visionAnalyzer.isSoundBlocked(observer, target);
+
+      expect(result).toBe(false);
+      expect(get3DCollisionDetails).toHaveBeenCalledWith(observer, target, 'sound');
+    });
+
+    test('should block sound through proximity walls when sound source target is outside threshold', () => {
+      const observer = makeZeroSizeToken({ id: 'sound-proximity-listener-near', x: 40, y: 0 });
+      const target = makeZeroSizeToken({ id: 'sound-proximity-source-far', x: 100, y: 0 });
+
+      global.canvas.walls.placeables = [
+        makeVerticalSoundWall(CONST.WALL_SENSE_TYPES.PROXIMITY, 1),
+      ];
+
+      const result = visionAnalyzer.isSoundBlocked(observer, target);
+      expect(result).toBe(true);
+    });
+
+    test('should block sound through reverse proximity walls when sound source target is within threshold', () => {
+      const observer = makeZeroSizeToken({
+        id: 'sound-reverse-proximity-listener-far',
+        x: 0,
+        y: 0,
+      });
+      const target = makeZeroSizeToken({ id: 'sound-reverse-proximity-source-near', x: 60, y: 0 });
+
+      global.canvas.walls.placeables = [
+        makeVerticalSoundWall(CONST.WALL_SENSE_TYPES.DISTANCE, 1),
+      ];
+
+      const result = visionAnalyzer.isSoundBlocked(observer, target);
+      expect(result).toBe(true);
+    });
+
+    test('should allow sound through reverse proximity walls when sound source target is outside threshold', () => {
+      const observer = makeZeroSizeToken({
+        id: 'sound-reverse-proximity-listener-near',
+        x: 40,
+        y: 0,
+      });
+      const target = makeZeroSizeToken({ id: 'sound-reverse-proximity-source-far', x: 100, y: 0 });
+
+      global.canvas.walls.placeables = [
+        makeVerticalSoundWall(CONST.WALL_SENSE_TYPES.DISTANCE, 1),
+      ];
+
+      const result = visionAnalyzer.isSoundBlocked(observer, target);
+      expect(result).toBe(false);
+    });
+
   });
 });
