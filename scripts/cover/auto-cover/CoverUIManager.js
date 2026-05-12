@@ -277,6 +277,7 @@ export class CoverUIManager {
       let featUpgradeInfo = message?.flags?.['pf2e-visioner']?.coverFeatUpgrade;
       let ruleElementBlocks = message?.flags?.['pf2e-visioner']?.ruleElementBlocks;
       let snipingDuoCoverIgnore = message?.flags?.['pf2e-visioner']?.snipingDuoCoverIgnore;
+      let offGuardSuppression = message?.flags?.['pf2e-visioner']?.offGuardSuppression;
 
       // Also check for manual cover by examining the message for token references
       let manualCoverInfo = null;
@@ -314,7 +315,14 @@ export class CoverUIManager {
       }
 
       // If no override info and no manual cover, nothing to show
-      if (!overrideInfo && !manualCoverInfo && !featUpgradeInfo && !ruleElementBlocks && !snipingDuoCoverIgnore) {
+      if (
+        !overrideInfo &&
+        !manualCoverInfo &&
+        !featUpgradeInfo &&
+        !ruleElementBlocks &&
+        !snipingDuoCoverIgnore &&
+        !offGuardSuppression
+      ) {
         return;
       }
 
@@ -324,7 +332,7 @@ export class CoverUIManager {
 
       // Check if indicator already exists to avoid duplicates
       if (
-        $html.find('.pf2e-visioner-cover-override-indicator, .pf2e-visioner-cover-manual-indicator, .pf2e-visioner-cover-feat-indicator, .pf2e-visioner-cover-rule-element-indicator, .pf2e-visioner-cover-sniping-duo-indicator')
+        $html.find('.pf2e-visioner-cover-override-indicator, .pf2e-visioner-cover-manual-indicator, .pf2e-visioner-cover-feat-indicator, .pf2e-visioner-cover-rule-element-indicator, .pf2e-visioner-cover-sniping-duo-indicator, .pf2e-visioner-off-guard-suppression-indicator')
           .length > 0
       ) {
         return;
@@ -580,6 +588,53 @@ export class CoverUIManager {
         } catch (e) { }
       }
 
+      if (offGuardSuppression) {
+        try {
+          const featureName = offGuardSuppression?.label || 'Deny Advantage';
+          const state = offGuardSuppression?.visibilityState || 'hidden';
+          const preventedModifier = offGuardSuppression?.preventedModifier ?? -2;
+          const attackerName = offGuardSuppression?.attackerName || 'attacker';
+          const defenderName = offGuardSuppression?.defenderName || 'defender';
+          const tooltip =
+            `${featureName}: ${defenderName} is not off-guard to ${state} ${attackerName} ` +
+            `(${preventedModifier} AC penalty prevented)`;
+
+          indicatorHtml += `
+                 <span class="pf2e-visioner-off-guard-suppression-indicator" style="
+                   margin-left: 4px;
+                   padding: 2px 4px;
+                   background: rgba(52, 152, 219, 0.12);
+                   border-radius: 3px;
+                   font-size: 1em;
+                   display: inline-flex;
+                   align-items: center;
+                   gap: 3px;
+                   vertical-align: middle;
+                   border: 1px solid rgba(52, 152, 219, 0.25);
+                 ">
+                   <i class="fas fa-book" style="
+                     color: rgb(52, 152, 219);
+                     font-size: 0.7em;
+                     opacity: 0.85;
+                   "></i>
+                   <span 
+                     data-tooltip="${tooltip}"
+                     data-tooltip-direction="UP"
+                     style="
+                       color: rgb(52, 152, 219);
+                       cursor: help;
+                       display: inline-flex;
+                       align-items: center;
+                       filter: brightness(0.9);
+                       font-size: 0.8em;
+                     "
+                   >
+                     <i class="fas fa-user-shield" style="font-size: 0.9em;"></i>
+                   </span>
+                 </span>`;
+        } catch (e) { }
+      }
+
       if (!indicatorHtml) return;
 
       // Find the specific AC span element (the adjusted AC value)
@@ -661,6 +716,7 @@ export class CoverUIManager {
       const hasFeatUpgrade = !!message?.flags?.['pf2e-visioner']?.coverFeatUpgrade;
       const hasRuleElementBlocks = !!message?.flags?.['pf2e-visioner']?.ruleElementBlocks;
       const hasSnipingDuoCoverIgnore = !!message?.flags?.['pf2e-visioner']?.snipingDuoCoverIgnore;
+      const hasOffGuardSuppression = !!message?.flags?.['pf2e-visioner']?.offGuardSuppression;
 
       // Also check for manual cover
       let hasManualCover = false;
@@ -687,7 +743,14 @@ export class CoverUIManager {
         );
       }
 
-      return hasOverride || hasManualCover || hasFeatUpgrade || hasRuleElementBlocks || hasSnipingDuoCoverIgnore;
+      return (
+        hasOverride ||
+        hasManualCover ||
+        hasFeatUpgrade ||
+        hasRuleElementBlocks ||
+        hasSnipingDuoCoverIgnore ||
+        hasOffGuardSuppression
+      );
     } catch (e) {
       console.warn('PF2E Visioner | Error in shouldShowCoverOverrideIndicator:', e);
       return false;

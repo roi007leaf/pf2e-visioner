@@ -47,31 +47,54 @@ function buildVisibilityMapDiff(previousMap = {}, nextMap = {}) {
   return changes;
 }
 
+function getTokenDocument(tokenOrDocument) {
+  if (typeof tokenOrDocument?.document?.getFlag === 'function') return tokenOrDocument.document;
+  if (typeof tokenOrDocument?.getFlag === 'function') return tokenOrDocument;
+  if (typeof tokenOrDocument?.object?.document?.getFlag === 'function') {
+    return tokenOrDocument.object.document;
+  }
+  return null;
+}
+
+function getTokenId(tokenOrDocument) {
+  return (
+    tokenOrDocument?.document?.id ||
+    tokenOrDocument?.id ||
+    tokenOrDocument?.object?.document?.id ||
+    tokenOrDocument?.object?.id ||
+    null
+  );
+}
+
 async function unsetVisibilityFlag(token, forcedDeletion) {
-  if (typeof token.document.unsetFlag === 'function') {
-    return token.document.unsetFlag(MODULE_ID, 'visibility');
+  const document = getTokenDocument(token);
+  if (!document) return;
+  if (typeof document.unsetFlag === 'function') {
+    return document.unsetFlag(MODULE_ID, 'visibility');
   }
 
   const path = `flags.${MODULE_ID}.visibility`;
   if (forcedDeletion) {
-    return token.document.update(
+    return document.update(
       { [path]: forcedDeletion },
       { diff: false, render: false, animate: false },
     );
   }
 
-  return token.document.update(
+  return document.update(
     { [`flags.${MODULE_ID}.-=visibility`]: null },
     { diff: false, render: false, animate: false },
   );
 }
 
 async function setVisibilityFlag(token, visibilityMap) {
-  if (typeof token.document.setFlag === 'function') {
-    return token.document.setFlag(MODULE_ID, 'visibility', visibilityMap);
+  const document = getTokenDocument(token);
+  if (!document) return;
+  if (typeof document.setFlag === 'function') {
+    return document.setFlag(MODULE_ID, 'visibility', visibilityMap);
   }
 
-  return token.document.update(
+  return document.update(
     { [`flags.${MODULE_ID}.visibility`]: visibilityMap },
     { diff: false, render: false, animate: false },
   );
@@ -83,7 +106,8 @@ async function setVisibilityFlag(token, visibilityMap) {
  * @returns {Record<string,string>}
  */
 export function getVisibilityMap(token) {
-  const map = token?.document.getFlag(MODULE_ID, 'visibility') ?? {};
+  const document = getTokenDocument(token);
+  const map = document?.getFlag?.(MODULE_ID, 'visibility') ?? {};
   return normalizeVisibilityMap(map);
 }
 
@@ -93,7 +117,8 @@ export function getVisibilityMap(token) {
  * @param {Record<string,string>} visibilityMap
  */
 export async function setVisibilityMap(token, visibilityMap) {
-  if (!token?.document) return;
+  const document = getTokenDocument(token);
+  if (!document) return;
   // Only GMs can update token documents
   if (!game.user.isGM) {
     console.warn('PF2E Visioner | setVisibilityMap: Not GM, skipping visibility map update');
@@ -107,8 +132,8 @@ export async function setVisibilityMap(token, visibilityMap) {
   if (changes.length) {
     log.debug(() => ({
       msg: 'persist-visibility-map',
-      observerId: token.document.id,
-      observerName: token.name ?? token.document.name ?? token.document.id,
+      observerId: document.id,
+      observerName: token.name ?? document.name ?? document.id,
       changeCount: changes.length,
       changes,
     }));
@@ -139,7 +164,7 @@ export async function setVisibilityMap(token, visibilityMap) {
  */
 export function getVisibilityBetween(observer, target) {
   const visibilityMap = getVisibilityMap(observer);
-  return visibilityMap[target?.document?.id] || 'observed';
+  return visibilityMap[getTokenId(target)] || 'observed';
 }
 
 /**
@@ -155,26 +180,28 @@ export async function setVisibilityBetween(
   state,
   options = { skipEphemeralUpdate: false, direction: 'observer_to_target', skipCleanup: false },
 ) {
-  if (!observer?.document?.id || !target?.document?.id) return;
+  const observerId = getTokenId(observer);
+  const targetId = getTokenId(target);
+  if (!observerId || !targetId) return;
 
   const visibilityMap = { ...getVisibilityMap(observer) };
-  const currentState = visibilityMap[target.document.id];
+  const currentState = visibilityMap[targetId];
 
   // Track if state changed for hook notification
   const stateChanged = currentState !== state;
   // Update map if state has changed
   if (stateChanged) {
     if (!state || state === 'observed') {
-      delete visibilityMap[target.document.id];
+      delete visibilityMap[targetId];
     } else {
-      visibilityMap[target.document.id] = state;
+      visibilityMap[targetId] = state;
     }
     log.debug(() => ({
       msg: 'set-visibility-between',
-      observerId: observer.document.id,
-      observerName: observer.name ?? observer.document.name ?? observer.document.id,
-      targetId: target.document.id,
-      targetName: target.name ?? target.document.name ?? target.document.id,
+      observerId,
+      observerName: observer.name ?? getTokenDocument(observer)?.name ?? observerId,
+      targetId,
+      targetName: target.name ?? getTokenDocument(target)?.name ?? targetId,
       from: currentState ?? 'observed',
       to: state,
       options,
@@ -184,8 +211,8 @@ export async function setVisibilityBetween(
     // Notify UI listeners that a visibility map changed so tooltips can refresh
     try {
       Hooks.callAll?.('pf2e-visioner.visibilityMapUpdated', {
-        observerId: observer.document.id,
-        targetId: target.document.id,
+        observerId,
+        targetId,
         state,
         direction: options.direction || 'observer_to_target',
       });
@@ -205,7 +232,7 @@ export async function setVisibilityBetween(
   const { OffGuardSuppression } = await import(
     '../rule-elements/operations/OffGuardSuppression.js'
   );
-  if (OffGuardSuppression.shouldSuppressOffGuardForState(observer, state)) {
+  if (OffGuardSuppression.shouldSuppressOffGuardForState(observer, state, target)) {
     // Remove any existing off-guard effects
     try {
       if (autoVisibilitySystem) {

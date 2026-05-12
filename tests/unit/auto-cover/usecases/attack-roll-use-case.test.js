@@ -15,6 +15,8 @@ describe('AttackRollUseCase', () => {
     // Mock getCoverBetween function from utils
     jest.doMock('../../../../scripts/utils.js', () => ({
       getCoverBetween: jest.fn().mockReturnValue(false), // Return false (no manual cover) by default
+      getVisibilityBetween: jest.fn().mockReturnValue('observed'),
+      setVisibilityBetween: jest.fn(),
     }));
 
     // Mock dependencies
@@ -119,7 +121,11 @@ describe('AttackRollUseCase', () => {
       await attackRollUseCase.handlePreCreateChatMessage(mockData);
 
       expect(getCoverBetween).toHaveBeenCalledWith(speakerToken, targetToken);
-      expect(attackRollUseCase._detectCover).toHaveBeenCalledWith(speakerToken, targetToken, expect.any(Object));
+      expect(attackRollUseCase._detectCover).toHaveBeenCalledWith(
+        speakerToken,
+        targetToken,
+        expect.any(Object),
+      );
     });
 
     test('should not auto-detect cover when manual cover exists', async () => {
@@ -159,6 +165,60 @@ describe('AttackRollUseCase', () => {
         attackerName: 'Attacker',
         targetName: 'Target',
       });
+    });
+
+    test('should store Deny Advantage off-guard suppression in chat flags', async () => {
+      const { getCoverBetween, getVisibilityBetween } = await import(
+        '../../../../scripts/utils.js'
+      );
+      getCoverBetween.mockReturnValue('none');
+      getVisibilityBetween.mockImplementation((observer, target) =>
+        observer === targetToken && target === speakerToken ? 'hidden' : 'observed',
+      );
+
+      speakerToken.name = 'Cutthroat';
+      speakerToken.actor = { system: { details: { level: { value: 8 } } } };
+      targetToken.name = 'Calder';
+      targetToken.actor = {
+        system: { details: { level: { value: 8 } } },
+        itemTypes: { feat: [{ slug: 'deny-advantage' }] },
+      };
+
+      await attackRollUseCase.handlePreCreateChatMessage(mockData);
+
+      expect(mockData.flags['pf2e-visioner'].offGuardSuppression).toEqual(
+        expect.objectContaining({
+          source: 'deny-advantage',
+          feat: 'deny-advantage',
+          label: 'Deny Advantage',
+          visibilityState: 'hidden',
+          preventedModifier: -2,
+          attackerName: 'Cutthroat',
+          defenderName: 'Calder',
+        }),
+      );
+    });
+
+    test('should not store Constant Gaze off-guard suppression in chat flags', async () => {
+      const { getCoverBetween, getVisibilityBetween } = await import(
+        '../../../../scripts/utils.js'
+      );
+      getCoverBetween.mockReturnValue('none');
+      getVisibilityBetween.mockImplementation((observer, target) =>
+        observer === targetToken && target === speakerToken ? 'undetected' : 'observed',
+      );
+
+      speakerToken.name = 'Scout';
+      speakerToken.actor = { system: { details: { level: { value: 8 } } } };
+      targetToken.name = 'Watcher';
+      targetToken.actor = {
+        system: { details: { level: { value: 8 } } },
+        itemTypes: { feat: [{ slug: 'constant-gaze' }] },
+      };
+
+      await attackRollUseCase.handlePreCreateChatMessage(mockData);
+
+      expect(mockData.flags?.['pf2e-visioner']?.offGuardSuppression).toBeUndefined();
     });
 
     test('should handle missing tokens gracefully', async () => {
@@ -225,6 +285,23 @@ describe('AttackRollUseCase', () => {
         null, // snipingDuoCoverIgnore
         expect.any(Function), // onChosen callback
       );
+    });
+
+    test('should refresh defender-to-attacker visibility before check dialog roll binding', async () => {
+      const { getVisibilityBetween, setVisibilityBetween } = await import(
+        '../../../../scripts/utils.js'
+      );
+      getVisibilityBetween.mockImplementation((observer, target) =>
+        observer === targetToken && target === attackerToken ? 'hidden' : 'observed',
+      );
+
+      await attackRollUseCase.handleCheckDialog(mockDialog, mockHtml);
+
+      expect(getVisibilityBetween).toHaveBeenCalledWith(targetToken, attackerToken);
+      expect(setVisibilityBetween).toHaveBeenCalledWith(targetToken, attackerToken, 'hidden', {
+        skipEphemeralUpdate: false,
+        direction: 'observer_to_target',
+      });
     });
 
     test('should use manual cover when it exists', async () => {
@@ -493,6 +570,207 @@ describe('AttackRollUseCase', () => {
         expect.arrayContaining([expect.objectContaining({ slug: 'cover' })]),
       );
     });
+
+    test('should not clone stale visibility off-guard effect when defender suppresses hidden off-guard', async () => {
+      const { getCoverBetween, getVisibilityBetween } = await import(
+        '../../../../scripts/utils.js'
+      );
+      getCoverBetween.mockReturnValue('none');
+      getVisibilityBetween.mockImplementation((observer, target) =>
+        observer === targetToken && target === attackerToken ? 'hidden' : 'observed',
+      );
+
+      const staleOffGuardEffect = {
+        id: 'hidden-offguard',
+        type: 'effect',
+        name: 'Hidden',
+        flags: {
+          'pf2e-visioner': {
+            aggregateOffGuard: true,
+            visibilityState: 'hidden',
+          },
+        },
+      };
+      const originalActor = {
+        _source: { items: [staleOffGuardEffect] },
+        itemTypes: {
+          feat: [{ slug: 'blind-fight' }],
+        },
+        clone: jest.fn().mockReturnValue({
+          getStatistic: jest.fn().mockReturnValue({ dc: { value: 22 } }),
+        }),
+      };
+      targetToken.actor = originalActor;
+
+      let callbackFunction;
+      mockCoverUIManager.injectDialogCoverUI.mockImplementation(
+        (dialog, html, state, target, manualCover, snipingDuoCoverIgnore, callback) => {
+          callbackFunction = callback;
+        },
+      );
+
+      await attackRollUseCase.handleCheckDialog(mockDialog, mockHtml);
+
+      callbackFunction({
+        chosen: 'none',
+        dctx: { dc: { slug: 'ac', value: 20 }, target: { actor: originalActor } },
+        target: targetToken,
+        targetActor: originalActor,
+      });
+
+      const clonedItems = originalActor.clone.mock.calls[0][0].items;
+      expect(clonedItems).not.toContainEqual(
+        expect.objectContaining({
+          flags: expect.objectContaining({
+            'pf2e-visioner': expect.objectContaining({ aggregateOffGuard: true }),
+          }),
+        }),
+      );
+    });
+
+    test('should remove suppressed hidden off-guard modifiers already built in the check dialog', async () => {
+      const { getCoverBetween, getVisibilityBetween } = await import(
+        '../../../../scripts/utils.js'
+      );
+      getCoverBetween.mockReturnValue('none');
+      getVisibilityBetween.mockImplementation((observer, target) =>
+        observer === targetToken && target === attackerToken ? 'hidden' : 'observed',
+      );
+
+      targetToken.actor = {
+        itemTypes: {
+          feat: [{ slug: 'blind-fight' }],
+        },
+      };
+      const hiddenOffGuard = {
+        slug: 'pf2e-visioner-off-guard',
+        label: 'Off-Guard (Hidden)',
+        modifier: -2,
+      };
+      mockDialog.check.modifiers = [hiddenOffGuard, { slug: 'cover', modifier: 2 }];
+      mockDialog.context.dc = {
+        value: 18,
+        statistic: {
+          modifiers: [hiddenOffGuard, { slug: 'armor-potency', modifier: 1 }],
+        },
+      };
+
+      await attackRollUseCase.handleCheckDialog(mockDialog, mockHtml);
+
+      expect(mockDialog.check.modifiers).toEqual([{ slug: 'cover', modifier: 2 }]);
+      expect(mockDialog.context.dc.statistic.modifiers).toEqual([
+        { slug: 'armor-potency', modifier: 1 },
+      ]);
+      expect(mockDialog.context.dc.value).toBe(20);
+    });
+
+    test('should use resolved dialog target when callback target loses hidden visibility', async () => {
+      const { getCoverBetween, getVisibilityBetween } = await import(
+        '../../../../scripts/utils.js'
+      );
+      getCoverBetween.mockReturnValue('none');
+      getVisibilityBetween.mockImplementation((observer, target) =>
+        observer === targetToken && target === attackerToken ? 'hidden' : 'observed',
+      );
+
+      const originalActor = {
+        _source: { items: [] },
+        itemTypes: {
+          feat: [{ slug: 'blind-fight' }],
+        },
+        clone: jest.fn().mockReturnValue({
+          getStatistic: jest.fn().mockReturnValue(null),
+        }),
+      };
+      targetToken.actor = originalActor;
+
+      let callbackFunction;
+      mockCoverUIManager.injectDialogCoverUI.mockImplementation(
+        (dialog, html, state, target, manualCover, snipingDuoCoverIgnore, callback) => {
+          callbackFunction = callback;
+        },
+      );
+
+      await attackRollUseCase.handleCheckDialog(mockDialog, mockHtml);
+
+      const hiddenOffGuard = {
+        slug: 'pf2e-visioner-off-guard',
+        label: 'Off-Guard (Hidden)',
+        modifier: -2,
+      };
+      const dctx = {
+        dc: {
+          slug: 'ac',
+          value: 18,
+          statistic: {
+            modifiers: [hiddenOffGuard],
+          },
+        },
+        target: { actor: originalActor },
+      };
+      const callbackTarget = global.createMockToken({ id: 'callback-target' });
+      callbackTarget.actor = originalActor;
+
+      callbackFunction({
+        chosen: 'none',
+        dctx,
+        target: callbackTarget,
+        targetActor: originalActor,
+      });
+
+      expect(dctx.dc.statistic.modifiers).toEqual([]);
+      expect(dctx.dc.value).toBe(20);
+    });
+
+    test('should add hidden off-guard in dialog callback when defender has no suppression', async () => {
+      const { getCoverBetween, getVisibilityBetween } = await import(
+        '../../../../scripts/utils.js'
+      );
+      getCoverBetween.mockReturnValue('none');
+      getVisibilityBetween.mockImplementation((observer, target) =>
+        observer === targetToken && target === attackerToken ? 'hidden' : 'observed',
+      );
+
+      const originalActor = {
+        _source: { items: [] },
+        itemTypes: { feat: [] },
+        clone: jest.fn().mockReturnValue({
+          getStatistic: jest.fn().mockReturnValue({
+            dc: { slug: 'ac', value: 20, statistic: { modifiers: [] } },
+          }),
+        }),
+      };
+      targetToken.actor = originalActor;
+
+      let callbackFunction;
+      mockCoverUIManager.injectDialogCoverUI.mockImplementation(
+        (dialog, html, state, target, manualCover, snipingDuoCoverIgnore, callback) => {
+          callbackFunction = callback;
+        },
+      );
+
+      await attackRollUseCase.handleCheckDialog(mockDialog, mockHtml);
+
+      const dctx = {
+        dc: { slug: 'ac', value: 20, statistic: { modifiers: [] } },
+        target: { actor: originalActor },
+      };
+
+      callbackFunction({
+        chosen: 'none',
+        dctx,
+        target: targetToken,
+        targetActor: originalActor,
+      });
+
+      expect(dctx.dc.value).toBe(18);
+      expect(dctx.dc.statistic.modifiers).toContainEqual(
+        expect.objectContaining({
+          slug: 'pf2e-visioner-off-guard',
+          modifier: -2,
+        }),
+      );
+    });
   });
 
   describe('handleCheckRoll', () => {
@@ -538,6 +816,129 @@ describe('AttackRollUseCase', () => {
     test('should handle check roll and return success', async () => {
       const result = await attackRollUseCase.handleCheckRoll(mockCheck, mockContext);
       expect(result).toEqual({ success: true });
+    });
+
+    test('should refresh defender-to-attacker visibility before attack roll', async () => {
+      const { getVisibilityBetween, setVisibilityBetween } = await import(
+        '../../../../scripts/utils.js'
+      );
+      getVisibilityBetween.mockImplementation((observer, target) =>
+        observer === targetToken && target === attackerToken ? 'hidden' : 'observed',
+      );
+
+      await attackRollUseCase.handleCheckRoll(mockCheck, mockContext);
+
+      expect(getVisibilityBetween).toHaveBeenCalledWith(targetToken, attackerToken);
+      expect(setVisibilityBetween).toHaveBeenCalledWith(targetToken, attackerToken, 'hidden', {
+        skipEphemeralUpdate: false,
+        direction: 'observer_to_target',
+      });
+    });
+
+    test('should clone attacker without stale aggregate off-guard when defender suppresses hidden off-guard', async () => {
+      const { getCoverBetween, getVisibilityBetween } = await import(
+        '../../../../scripts/utils.js'
+      );
+      getCoverBetween.mockReturnValue('none');
+      getVisibilityBetween.mockImplementation((observer, target) =>
+        observer === targetToken && target === attackerToken ? 'hidden' : 'observed',
+      );
+
+      const clonedActor = { id: 'attacker-actor-clone' };
+      const originalAttackerActor = {
+        id: 'attacker-actor',
+        signature: 'attacker-signature',
+        _source: {
+          items: [
+            {
+              id: 'hidden-offguard',
+              type: 'effect',
+              flags: { 'pf2e-visioner': { aggregateOffGuard: true, visibilityState: 'hidden' } },
+              system: {
+                rules: [
+                  {
+                    key: 'EphemeralEffect',
+                    predicate: ['target:signature:target-signature'],
+                  },
+                  {
+                    key: 'EphemeralEffect',
+                    predicate: ['target:signature:other-target-signature'],
+                  },
+                ],
+              },
+            },
+            { id: 'real-effect', type: 'effect', name: 'Keep Me' },
+          ],
+        },
+        clone: jest.fn().mockReturnValue(clonedActor),
+      };
+      const targetActor = {
+        id: 'target-actor',
+        signature: 'target-signature',
+        itemTypes: {
+          feat: [{ slug: 'blind-fight' }],
+        },
+      };
+      attackerToken.actor = originalAttackerActor;
+      targetToken.actor = targetActor;
+      mockContext.actor = originalAttackerActor;
+      mockContext.token = attackerToken;
+      mockContext.target = { actor: targetActor, token: targetToken };
+
+      await attackRollUseCase.handleCheckRoll(mockCheck, mockContext);
+
+      expect(originalAttackerActor.clone).toHaveBeenCalledWith(
+        {
+          items: [
+            { id: 'real-effect', type: 'effect', name: 'Keep Me' },
+          ],
+        },
+        { keepId: true },
+      );
+      expect(mockContext.actor).toBe(clonedActor);
+      expect(mockContext.token.actor).toBe(clonedActor);
+    });
+
+    test('should apply hidden off-guard without cover when defender has no suppression', async () => {
+      const { getCoverBetween, getVisibilityBetween } = await import(
+        '../../../../scripts/utils.js'
+      );
+      getCoverBetween.mockReturnValue('none');
+      getVisibilityBetween.mockImplementation((observer, target) =>
+        observer === targetToken && target === attackerToken ? 'hidden' : 'observed',
+      );
+
+      const targetActor = {
+        _source: { items: [] },
+        itemTypes: { feat: [] },
+        armorClass: {
+          clone: jest.fn().mockReturnValue({
+            dc: {
+              value: 18,
+              statistic: {
+                modifiers: [{ slug: 'pf2e-visioner-off-guard', modifier: -2 }],
+              },
+            },
+          }),
+        },
+        clone: jest.fn().mockReturnValue({
+          getStatistic: jest.fn().mockReturnValue(null),
+        }),
+      };
+      targetToken.actor = targetActor;
+      attackRollUseCase._detectCover = jest.fn().mockReturnValue('none');
+      mockContext.dc = { slug: 'ac', value: 20, statistic: { modifiers: [] } };
+      mockContext.target = { actor: targetActor, token: targetToken };
+
+      await attackRollUseCase.handleCheckRoll(mockCheck, mockContext);
+
+      expect(mockContext.dc.value).toBe(18);
+      expect(mockContext.dc.statistic.modifiers).toContainEqual(
+        expect.objectContaining({
+          slug: 'pf2e-visioner-off-guard',
+          modifier: -2,
+        }),
+      );
     });
 
     test('should use manual cover when it exists (not none)', async () => {
@@ -937,7 +1338,9 @@ describe('AttackRollUseCase', () => {
       );
 
       const clonedItems = originalActor.clone.mock.calls[0][0].items;
-      const coverEffect = clonedItems.find((item) => item.flags?.['pf2e-visioner']?.ephemeralCoverRoll);
+      const coverEffect = clonedItems.find(
+        (item) => item.flags?.['pf2e-visioner']?.ephemeralCoverRoll,
+      );
       expect(coverEffect.system.rules).toContainEqual(
         expect.objectContaining({
           key: 'FlatModifier',
@@ -948,6 +1351,5 @@ describe('AttackRollUseCase', () => {
         }),
       );
     });
-
   });
 });

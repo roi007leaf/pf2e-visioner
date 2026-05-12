@@ -1,5 +1,16 @@
 # Changelog
 
+## [8.2.7] - 2026-05-12
+
+### Added
+
+- **Deny Advantage chat indication added**: Attack chat cards now show a GM-facing Deny Advantage indicator when the class feature suppresses visibility-driven off-guard from hidden or undetected attackers.
+
+### Fixed
+
+- **Hidden-attacker off-guard suppression respected**: Visibility-driven off-guard now honors native Blind-Fight and Deny Advantage during batch effect sync and attack-roll refreshes, handles PF2e token-document roll contexts, and repairs already-built AC DCs so hidden attackers no longer make protected defenders off-guard.
+- **PF2E off-guard suppression sources expanded**: Visibility-driven off-guard suppression now also recognizes PF2E's `offGuardable` flanking attribute for Deny Advantage, off-guard immunity rules, and Starsong Nectar's undetected-only protection, with matching chat-source labels.
+
 ## [8.2.6] - 2026-05-11
 
 ### Fixed

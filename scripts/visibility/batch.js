@@ -3,6 +3,7 @@ import {
   createAggregateEffectData,
   createEphemeralEffectRule,
 } from '../helpers/visibility-helpers.js';
+import { OffGuardSuppression } from '../rule-elements/operations/OffGuardSuppression.js';
 import { runWithEffectLock } from './utils.js';
 
 async function deleteLegacyVisibilityEffects(actor, hiddenActorSignature) {
@@ -43,15 +44,25 @@ export async function batchUpdateVisibilityEffects(observerToken, targetUpdates,
       if (tType && ['loot', 'vehicle', 'party'].includes(tType)) continue;
     } catch (_) {}
     const receiver = effectTarget === 'observer' ? observerToken : update.target;
+    const source = effectTarget === 'observer' ? update.target : observerToken;
+    const suppressionActive =
+      ['hidden', 'undetected'].includes(update.state) &&
+      OffGuardSuppression.shouldSuppressOffGuardForState(source, update.state, receiver);
     const receiverId = receiver.actor.id;
-    if (update.state === 'observed' || update.state === 'concealed' || options.removeAllEffects) {
+    if (
+      update.state === 'observed' ||
+      update.state === 'concealed' ||
+      options.removeAllEffects ||
+      suppressionActive
+    ) {
       await cleanupLegacyObservedPair(observerToken, update.target);
     }
     if (!updatesByReceiver.has(receiverId))
       updatesByReceiver.set(receiverId, { receiver, updates: [] });
     updatesByReceiver.get(receiverId).updates.push({
-      source: effectTarget === 'observer' ? update.target : observerToken,
+      source,
       state: update.state,
+      suppressionActive,
     });
   }
   for (const { receiver, updates } of updatesByReceiver.values()) {
@@ -86,13 +97,18 @@ export async function batchUpdateVisibilityEffects(observerToken, targetUpdates,
       const effectsToCreate = [];
       const effectsToUpdate = [];
       const effectsToDelete = [];
-      for (const { source, state } of updates) {
+      for (const { source, state, suppressionActive } of updates) {
         const signature = source.actor.signature;
         const operations = {
           hidden: { add: false, remove: false },
           undetected: { add: false, remove: false },
         };
-        if (options.removeAllEffects || state === 'observed' || state === 'concealed') {
+        if (
+          options.removeAllEffects ||
+          suppressionActive ||
+          state === 'observed' ||
+          state === 'concealed'
+        ) {
           operations.hidden.remove = true;
           operations.undetected.remove = true;
         } else if (state === 'hidden') {
