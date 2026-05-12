@@ -2130,7 +2130,7 @@ export class SneakPreviewDialog extends BaseActionDialog {
     const configs = {
       visibility: {
         observed: { label: game.i18n.localize('PF2E_VISIONER.BUTTONS.OBSERVED'), icon: 'fas fa-eye', class: 'visibility-observed' },
-        concealed: { label: game.i18n.localize('PF2E_VISIONER.BUTTONS.CONCEALED'), icon: 'fas fa-eye-slash', class: 'visibility-concealed' },
+        concealed: { label: game.i18n.localize('PF2E_VISIONER.BUTTONS.CONCEALED'), icon: 'fas fa-cloud', class: 'visibility-concealed' },
         hidden: { label: game.i18n.localize('PF2E_VISIONER.BUTTONS.HIDDEN'), icon: 'fas fa-user-secret', class: 'visibility-hidden' },
         undetected: { label: game.i18n.localize('PF2E_VISIONER.BUTTONS.UNDETECTED'), icon: 'fas fa-ghost', class: 'visibility-undetected' },
       },
