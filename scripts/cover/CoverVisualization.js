@@ -9,7 +9,7 @@ import { setPanningState } from '../utils/scheduler.js';
  * Shows cover levels from cursor position to hovered token when hotkey is held
  * Each client sees only their own visualization (client-specific, not shared)
  */
-class CoverVisualization {
+export class CoverVisualization {
   constructor() {
     this.isActive = false;
     this.currentTarget = null;
@@ -563,10 +563,10 @@ class CoverVisualization {
     return false;
   }
 
-  isPositionOccupied(worldX, worldY, selectedToken, canvas) {
+  buildPositionOccupancyBlockers(selectedToken, canvas) {
     const gridSize = canvas.grid.size;
+    const blockers = [];
 
-    // Check all tokens on the scene
     for (const token of canvas.tokens.placeables) {
       if (!token?.actor) continue;
       if (token.id === selectedToken.id) continue; // Skip the selected token itself
@@ -577,7 +577,6 @@ class CoverVisualization {
         continue;
       }
 
-      // Check if the token is hidden or undetected from the selected token's perspective
       try {
         // Check if the token is foundry hidden first (simple check)
         if (token.document.hidden) {
@@ -599,14 +598,25 @@ class CoverVisualization {
         );
       }
 
-      // Get token's bounds
-      const tokenRect = {
+      blockers.push({
         x1: token.document.x,
         y1: token.document.y,
         x2: token.document.x + token.document.width * gridSize,
         y2: token.document.y + token.document.height * gridSize,
-      };
+        size: token?.actor?.system?.traits?.size?.value ?? 'med',
+      });
+    }
 
+    return blockers;
+  }
+
+  isPositionOccupied(worldX, worldY, selectedToken, canvas, positionBlockers = null) {
+    const gridSize = canvas.grid.size;
+    const blockers =
+      positionBlockers || this.buildPositionOccupancyBlockers(selectedToken, canvas);
+    const selectedSize = selectedToken?.actor?.system?.traits?.size?.value ?? 'med';
+
+    for (const blocker of blockers) {
       // Check if the world position overlaps with this token's area
       const positionRect = {
         x1: worldX - gridSize / 2,
@@ -617,18 +627,15 @@ class CoverVisualization {
 
       // Check for overlap
       const overlaps = !(
-        positionRect.x2 <= tokenRect.x1 ||
-        positionRect.x1 >= tokenRect.x2 ||
-        positionRect.y2 <= tokenRect.y1 ||
-        positionRect.y1 >= tokenRect.y2
+        positionRect.x2 <= blocker.x1 ||
+        positionRect.x1 >= blocker.x2 ||
+        positionRect.y2 <= blocker.y1 ||
+        positionRect.y1 >= blocker.y2
       );
 
       if (overlaps) {
         // Check if tiny creatures can share - both must be tiny
-        const selectedSize = selectedToken?.actor?.system?.traits?.size?.value ?? 'med';
-        const blockerSize = token?.actor?.system?.traits?.size?.value ?? 'med';
-
-        if (selectedSize === 'tiny' && blockerSize === 'tiny') {
+        if (selectedSize === 'tiny' && blocker.size === 'tiny') {
           // Tiny creatures can share the same square
           continue;
         }
@@ -725,6 +732,7 @@ class CoverVisualization {
       range,
       Math.floor((viewportWorld.maxY - selectedCenter.y) / gridSize),
     );
+    const positionBlockers = this.buildPositionOccupancyBlockers(selectedToken, canvas);
 
     for (let x = minIndexX; x <= maxIndexX; x++) {
       for (let y = minIndexY; y <= maxIndexY; y++) {
@@ -742,7 +750,13 @@ class CoverVisualization {
         }
 
         // Check if this position is occupied by any token (except tiny creatures can share)
-        const isOccupied = this.isPositionOccupied(worldX, worldY, selectedToken, canvas);
+        const isOccupied = this.isPositionOccupied(
+          worldX,
+          worldY,
+          selectedToken,
+          canvas,
+          positionBlockers,
+        );
         if (isOccupied) {
           // Skip coloring occupied squares - tokens can't move there
           continue;

@@ -65,6 +65,12 @@ async function cleanupAvsOverridesForDefeatedActor(actor) {
   }
 }
 
+export function getMatchingControlledTokenForRefresh(token, controlledTokens) {
+  const tokenId = token?.document?.id;
+  if (!tokenId) return null;
+  return controlledTokens?.find?.((controlledToken) => controlledToken?.document?.id === tokenId) ?? null;
+}
+
 export async function registerHooks() {
   registerPf2eHudTakeCoverIntegration();
 
@@ -725,14 +731,12 @@ export async function registerHooks() {
     try {
       const controlledTokens = canvas?.tokens?.controlled || [];
       if (controlledTokens.length === 0) return;
+      const controlledToken = getMatchingControlledTokenForRefresh(token, controlledTokens);
+      if (!controlledToken) return;
 
       const { updateSystemHiddenTokenHighlights } = await import('../services/visual-effects.js');
 
-      for (const controlledToken of controlledTokens) {
-        if (controlledToken.document.id === token.document.id) {
-          await updateSystemHiddenTokenHighlights(controlledToken.document.id);
-        }
-      }
+      await updateSystemHiddenTokenHighlights(controlledToken.document.id);
     } catch (error) {
       console.warn('PF2E Visioner | refreshToken hook for lifesense indicators failed:', error);
     }

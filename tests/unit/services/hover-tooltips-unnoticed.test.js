@@ -108,4 +108,24 @@ describe('HoverTooltips unnoticed badges', () => {
     expect(badge.querySelector('i')?.className).toContain('fa-user-secret');
     expect(document.querySelector('.pf2e-visioner-sense-badge')).toBeNull();
   });
+
+  test('observer-mode hover reads observer visibility map once per hover', async () => {
+    const observer = makeToken('observer', 0);
+    const targets = Array.from({ length: 5 }, (_, index) => makeToken(`target-${index}`, 100 + index * 50));
+    global.canvas.tokens.placeables = [observer, ...targets];
+
+    mockGetVisibilityMap.mockReturnValue(
+      Object.fromEntries(targets.map((target) => [target.document.id, 'hidden'])),
+    );
+    mockGetDetectionBetween.mockReturnValue(null);
+
+    const { setTooltipMode, showVisibilityIndicators } = await import(
+      '../../../scripts/services/HoverTooltips.js'
+    );
+
+    setTooltipMode('observer');
+    showVisibilityIndicators(observer);
+
+    expect(mockGetVisibilityMap).toHaveBeenCalledTimes(1);
+  });
 });

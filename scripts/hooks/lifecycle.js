@@ -19,6 +19,16 @@ const controlTokenSessionState = (globalThis.__pf2eVisionerControlTokenSessions 
   tokenId: null,
   timers: new Set(),
 });
+const fallbackHudButtonState = (globalThis.__pf2eVisionerFallbackHudButton ??= {
+  styleInstalled: false,
+  documentListenersBound: false,
+  button: null,
+  token: null,
+  isDragging: false,
+  hasDragged: false,
+  dragStartPos: { x: 0, y: 0 },
+  dragOffset: { x: 0, y: 0 },
+});
 
 function bindHookOnce(key, hookName, callback) {
   if (lifecycleBindingState.hookKeys.has(key)) {
@@ -888,73 +898,83 @@ export async function applyEnableAllTokensVisionSetting(enabled) {
   } catch (_) {}
 }
 
-function setupFallbackHUDButton() {
+export function setupFallbackHUDButton() {
   // Add CSS for floating button
-  const style = document.createElement('style');
-  style.textContent = `
-    .pf2e-visioner-floating-button { position: fixed; top: 50%; left: 10px; width: 40px; height: 40px; background: rgba(0, 0, 0, 0.8); border: 2px solid #4a90e2; border-radius: 8px; color: white; display: flex; align-items: center; justify-content: center; cursor: move; z-index: 1000; font-size: 16px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3); transition: all 0.2s ease; user-select: none; }
-    .pf2e-visioner-floating-button:hover { background: rgba(0, 0, 0, 0.9); border-color: #6bb6ff; transform: scale(1.05); }
-    .pf2e-visioner-floating-button.dragging { cursor: grabbing; transform: scale(1.1); box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5); transition: none !important; }
-  `;
-  document.head.appendChild(style);
+  if (!fallbackHudButtonState.styleInstalled) {
+    const style = document.createElement('style');
+    style.textContent = `
+      .pf2e-visioner-floating-button { position: fixed; top: 50%; left: 10px; width: 40px; height: 40px; background: rgba(0, 0, 0, 0.8); border: 2px solid #4a90e2; border-radius: 8px; color: white; display: flex; align-items: center; justify-content: center; cursor: move; z-index: 1000; font-size: 16px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3); transition: all 0.2s ease; user-select: none; }
+      .pf2e-visioner-floating-button:hover { background: rgba(0, 0, 0, 0.9); border-color: #6bb6ff; transform: scale(1.05); }
+      .pf2e-visioner-floating-button.dragging { cursor: grabbing; transform: scale(1.1); box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5); transition: none !important; }
+    `;
+    document.head.appendChild(style);
+    fallbackHudButtonState.styleInstalled = true;
+  }
 
-  Hooks.on('controlToken', (token, controlled) => {
+  if (!fallbackHudButtonState.documentListenersBound) {
+    document.addEventListener('mousemove', (event) => {
+      if (!fallbackHudButtonState.isDragging || !fallbackHudButtonState.button) return;
+      const button = fallbackHudButtonState.button;
+      const dragDistance = Math.hypot(
+        event.clientX - fallbackHudButtonState.dragStartPos.x,
+        event.clientY - fallbackHudButtonState.dragStartPos.y,
+      );
+      if (dragDistance > 5 && !fallbackHudButtonState.hasDragged) {
+        fallbackHudButtonState.hasDragged = true;
+        button.classList.add('dragging');
+      }
+      if (fallbackHudButtonState.hasDragged) {
+        const x = event.clientX - fallbackHudButtonState.dragOffset.x;
+        const y = event.clientY - fallbackHudButtonState.dragOffset.y;
+        const maxX = window.innerWidth - button.offsetWidth;
+        const maxY = window.innerHeight - button.offsetHeight;
+        button.style.left = Math.max(0, Math.min(x, maxX)) + 'px';
+        button.style.top = Math.max(0, Math.min(y, maxY)) + 'px';
+      }
+      event.preventDefault();
+    });
+    document.addEventListener('mouseup', () => {
+      if (!fallbackHudButtonState.isDragging || !fallbackHudButtonState.button) return;
+      const button = fallbackHudButtonState.button;
+      fallbackHudButtonState.isDragging = false;
+      button.classList.remove('dragging');
+      if (fallbackHudButtonState.hasDragged) {
+        localStorage.setItem(
+          'pf2e-visioner-button-pos',
+          JSON.stringify({ left: button.style.left, top: button.style.top }),
+        );
+        setTimeout(() => (fallbackHudButtonState.hasDragged = false), 100);
+      } else {
+        fallbackHudButtonState.hasDragged = false;
+      }
+    });
+    fallbackHudButtonState.documentListenersBound = true;
+  }
+
+  bindHookOnce('fallbackHudButtonControlToken', 'controlToken', (token, controlled) => {
     document.querySelectorAll('.pf2e-visioner-floating-button').forEach((btn) => btn.remove());
+    fallbackHudButtonState.button = null;
+    fallbackHudButtonState.token = null;
+    fallbackHudButtonState.isDragging = false;
     if (controlled && game.user.isGM && !game.settings.get(MODULE_ID, 'useHudButton')) {
       const button = document.createElement('div');
       button.className = 'pf2e-visioner-floating-button';
       button.innerHTML = '<i class="fas fa-face-hand-peeking"></i>';
       button.title = 'Token Manager (Left: Target, Right: Observer) - Drag to move';
-
-      let isDragging = false;
-      let hasDragged = false;
-      const dragStartPos = { x: 0, y: 0 };
-      const dragOffset = { x: 0, y: 0 };
+      fallbackHudButtonState.button = button;
+      fallbackHudButtonState.token = token;
 
       button.addEventListener('mousedown', (event) => {
         if (event.button === 0) {
-          isDragging = true;
-          hasDragged = false;
-          dragStartPos.x = event.clientX;
-          dragStartPos.y = event.clientY;
+          fallbackHudButtonState.isDragging = true;
+          fallbackHudButtonState.hasDragged = false;
+          fallbackHudButtonState.dragStartPos.x = event.clientX;
+          fallbackHudButtonState.dragStartPos.y = event.clientY;
           const rect = button.getBoundingClientRect();
-          dragOffset.x = event.clientX - rect.left;
-          dragOffset.y = event.clientY - rect.top;
+          fallbackHudButtonState.dragOffset.x = event.clientX - rect.left;
+          fallbackHudButtonState.dragOffset.y = event.clientY - rect.top;
           event.preventDefault();
         }
-      });
-      document.addEventListener('mousemove', (event) => {
-        if (!isDragging) return;
-        const dragDistance = Math.hypot(
-          event.clientX - dragStartPos.x,
-          event.clientY - dragStartPos.y,
-        );
-        if (dragDistance > 5 && !hasDragged) {
-          hasDragged = true;
-          button.classList.add('dragging');
-        }
-        if (hasDragged) {
-          const x = event.clientX - dragOffset.x;
-          const y = event.clientY - dragOffset.y;
-          const maxX = window.innerWidth - button.offsetWidth;
-          const maxY = window.innerHeight - button.offsetHeight;
-          button.style.left = Math.max(0, Math.min(x, maxX)) + 'px';
-          button.style.top = Math.max(0, Math.min(y, maxY)) + 'px';
-        }
-        event.preventDefault();
-      });
-      document.addEventListener('mouseup', (event) => {
-        if (!isDragging) return;
-        isDragging = false;
-        button.classList.remove('dragging');
-        if (hasDragged) {
-          localStorage.setItem(
-            'pf2e-visioner-button-pos',
-            JSON.stringify({ left: button.style.left, top: button.style.top }),
-          );
-        }
-        if (hasDragged) setTimeout(() => (hasDragged = false), 100);
-        else hasDragged = false;
       });
 
       const savedPos = localStorage.getItem('pf2e-visioner-button-pos');
@@ -967,7 +987,7 @@ function setupFallbackHUDButton() {
       }
 
       button.addEventListener('click', async (event) => {
-        if (hasDragged) {
+        if (fallbackHudButtonState.hasDragged) {
           event.preventDefault();
           event.stopPropagation();
           return;
@@ -982,7 +1002,7 @@ function setupFallbackHUDButton() {
         }
       });
       button.addEventListener('contextmenu', async (event) => {
-        if (hasDragged) {
+        if (fallbackHudButtonState.hasDragged) {
           event.preventDefault();
           event.stopPropagation();
           return;
