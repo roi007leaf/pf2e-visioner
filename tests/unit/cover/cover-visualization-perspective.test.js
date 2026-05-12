@@ -125,4 +125,78 @@ describe('CoverVisualization token perspective', () => {
 
     visualization.cleanup();
   });
+
+  test('GM fog-respecting overlay falls back to selected token LOS when FOV is unavailable', async () => {
+    const selected = makeToken('selected', 75, 75);
+    delete selected.vision.fov;
+    selected.vision.los = {
+      contains: jest.fn(() => true),
+    };
+    const hovered = makeToken('target', 175, 75);
+    global.canvas.tokens.controlled = [selected];
+    global.canvas.tokens.placeables = [selected, hovered];
+
+    const { CoverVisualization } = await import('../../../scripts/cover/CoverVisualization.js');
+    const visualization = new CoverVisualization();
+
+    visualization.createCoverOverlay(hovered);
+
+    expect(mockDetectCoverBetweenTokens).toHaveBeenCalled();
+    expect(global.canvas.visibility.testVisibility).not.toHaveBeenCalled();
+    expect(selected.vision.los.contains).toHaveBeenCalled();
+
+    visualization.cleanup();
+  });
+
+  test('GM fog-respecting overlay falls back to Foundry visibility with the selected token source', async () => {
+    const selected = makeToken('selected', 75, 75);
+    selected.vision = {};
+    const hovered = makeToken('target', 175, 75);
+    global.canvas.tokens.controlled = [selected];
+    global.canvas.tokens.placeables = [selected, hovered];
+    global.canvas.visibility.testVisibility = jest.fn((_point, options) => Boolean(options?.source));
+
+    const { CoverVisualization } = await import('../../../scripts/cover/CoverVisualization.js');
+    const visualization = new CoverVisualization();
+
+    visualization.createCoverOverlay(hovered);
+
+    expect(mockDetectCoverBetweenTokens).toHaveBeenCalled();
+    expect(global.canvas.visibility.testVisibility).toHaveBeenCalledWith(
+      expect.objectContaining({ x: expect.any(Number), y: expect.any(Number) }),
+      expect.objectContaining({ source: selected.vision }),
+    );
+
+    visualization.cleanup();
+  });
+
+  test('cover overlay occupancy only checks visibility for tokens near sampled grid cells', async () => {
+    global.game.settings.get = jest.fn((moduleId, settingId) => {
+      if (moduleId !== 'pf2e-visioner') return false;
+      if (settingId === 'autoCoverVisualizationRespectFogForGM') return false;
+      if (settingId === 'colorblindMode') return 'none';
+      return false;
+    });
+
+    const selected = makeToken('selected', 75, 75);
+    const hovered = makeToken('target', 175, 75);
+    const farTokens = Array.from({ length: 30 }, (_, index) =>
+      makeToken(`far-${index}`, 2000 + index * 100, 2000),
+    );
+    global.canvas.tokens.controlled = [selected];
+    global.canvas.tokens.placeables = [selected, hovered, ...farTokens];
+
+    const { CoverVisualization } = await import('../../../scripts/cover/CoverVisualization.js');
+    const visualization = new CoverVisualization();
+
+    visualization.createCoverOverlay(hovered);
+
+    expect(mockDetectCoverBetweenTokens).toHaveBeenCalled();
+    expect(mockGetVisibilityBetween.mock.calls.map(([, token]) => token.id)).not.toContain(
+      'far-0',
+    );
+    expect(mockGetVisibilityBetween).toHaveBeenCalledTimes(1);
+
+    visualization.cleanup();
+  });
 });
