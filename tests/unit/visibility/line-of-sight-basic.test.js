@@ -156,7 +156,7 @@ describe('VisionAnalyzer - Line of Sight (Refactored)', () => {
             expect(result).toBe(false);
         });
 
-        test('should trust Foundry point visibility when LOS polygon includes the target', () => {
+        test('should trust agreeing vision polygon and geometry when point visibility is false', () => {
             global.canvas.walls.placeables = [];
             global.canvas.visibility = { testVisibility: jest.fn(() => false) };
             mockObserver.vision = {
@@ -169,8 +169,31 @@ describe('VisionAnalyzer - Line of Sight (Refactored)', () => {
             const result = visionAnalyzer.hasLineOfSight(mockObserver, mockTarget);
 
             expect(mockObserver.vision.los.intersectCircle).toHaveBeenCalled();
-            expect(global.canvas.visibility.testVisibility).toHaveBeenCalled();
-            expect(result).toBe(false);
+            expect(global.canvas.visibility.testVisibility).not.toHaveBeenCalled();
+            expect(result).toBe(true);
+        });
+
+        test('should call Foundry canvas visibility with individual points when polygon is unavailable', () => {
+            global.canvas.walls.placeables = [];
+            const hiddenPoint = { x: 250, y: 250, elevation: 0 };
+            const visiblePoint = { x: 300, y: 300, elevation: 0 };
+            mockTarget.document.getVisibilityTestPoints = jest.fn(() => [hiddenPoint, visiblePoint]);
+            global.canvas.visibility = {
+                testVisibility: jest.fn((point) => point === visiblePoint)
+            };
+            mockObserver.vision = {};
+
+            const result = visionAnalyzer.hasLineOfSight(mockObserver, mockTarget);
+
+            expect(global.canvas.visibility.testVisibility).toHaveBeenCalledWith(
+                hiddenPoint,
+                expect.objectContaining({ object: mockTarget, source: mockObserver.vision })
+            );
+            expect(global.canvas.visibility.testVisibility).toHaveBeenCalledWith(
+                visiblePoint,
+                expect.objectContaining({ object: mockTarget, source: mockObserver.vision })
+            );
+            expect(result).toBe(true);
         });
 
         test('should return true when wall does not intersect ray', () => {

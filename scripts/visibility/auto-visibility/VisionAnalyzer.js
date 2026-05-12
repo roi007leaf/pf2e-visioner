@@ -225,9 +225,9 @@ export class VisionAnalyzer {
           typeof levelsIntegration.get3DCollisionDetails === 'function'
             ? levelsIntegration.get3DCollisionDetails(observer, target, 'sight')
             : {
-                mode: levelsIntegration.mode,
-                result: levelsIntegration.test3DCollision(observer, target, 'sight'),
-              };
+              mode: levelsIntegration.mode,
+              result: levelsIntegration.test3DCollision(observer, target, 'sight'),
+            };
         const hasSightCollision = !!collisionDetails.result;
         const polygonOnlyCollision =
           collisionDetails.mode === 'core' &&
@@ -329,7 +329,6 @@ export class VisionAnalyzer {
         const circle = new PIXI.Circle(targetPos.x, targetPos.y, radius);
         const intersection = los.intersectCircle(circle, { density: 8, scalingFactor: 1.0 });
         const visible = intersection?.points?.length > 0;
-        const foundryPointVisible = this.#testFoundryVisibility(observer, target, targetPos);
 
         const log = getLogger('AVS/VisionAnalyzer');
         log.debug(
@@ -350,7 +349,7 @@ export class VisionAnalyzer {
         try {
           hybridObserverSpan = getTokenVerticalSpanFt(observer);
           hybridTargetSpan = getTokenVerticalSpanFt(target);
-        } catch (error) {}
+        } catch (error) { }
 
         // Check center-to-center first
         const centerHasLOS = this.#checkSingleRayLOSWithWalls(
@@ -387,10 +386,6 @@ export class VisionAnalyzer {
         }
 
         if (visible === geometricResult) {
-          if (visible && foundryPointVisible === false) {
-            return false;
-          }
-
           // Both systems agree - high confidence result
           log.debug(
             () =>
@@ -509,7 +504,7 @@ export class VisionAnalyzer {
           bottom: Math.min(observerSpan.bottom, targetSpan.bottom),
           top: Math.max(observerSpan.top, targetSpan.top),
         };
-      } catch (error) {}
+      } catch (error) { }
 
       stage = 'get-walls';
       const cachedWalls = this.#getCachedWalls(elevationRange);
@@ -711,7 +706,7 @@ export class VisionAnalyzer {
         const wallMidY = (wall.document.c[1] + wall.document.c[3]) / 2;
         const distToRayMid = Math.sqrt(
           (wallMidX - (fromPoint.x + toPoint.x) / 2) ** 2 +
-            (wallMidY - (fromPoint.y + toPoint.y) / 2) ** 2,
+          (wallMidY - (fromPoint.y + toPoint.y) / 2) ** 2,
         );
 
         if (distToRayMid > rayLength * 1.5) {
@@ -928,57 +923,28 @@ export class VisionAnalyzer {
     return null;
   }
 
-  #testFoundryVisibility(observer, target, targetPos) {
-    try {
-      const testPoints =
-        target?.document?.getVisibilityTestPoints?.() ?? [
-          {
-            x: targetPos.x,
-            y: targetPos.y,
-            elevation: target.document?.elevation || 0,
-          },
-        ];
-      const level =
-        target?.document?.level ??
-        target?.document?._source?.level ??
-        observer?.document?.level ??
-        observer?.document?._source?.level;
-      const foundryVisibility = this.#callFoundryVisibilityTest({
-        observer,
-        target,
-        testPoints,
-        level,
-      });
-
-      if (!foundryVisibility.available) {
-        return null;
-      }
-
-      return foundryVisibility.result;
-    } catch (error) {
-      return null;
-    }
-  }
-
   #callFoundryVisibilityTest({ observer, target, testPoints, level }) {
     if (!observer?.vision) {
       return { available: false, api: null, result: null };
     }
 
+    const points = Array.isArray(testPoints) ? testPoints : [testPoints];
+
     if (canvas?.visibility?.testVisibility) {
       return {
         available: true,
         api: 'canvas.visibility.testVisibility',
-        result: canvas.visibility.testVisibility(testPoints, {
-          object: target,
-          source: observer.vision,
-          level,
-        }),
+        result: points.some((point) =>
+          canvas.visibility.testVisibility(point, {
+            object: target,
+            source: observer.vision,
+            level,
+          }),
+        ),
       };
     }
 
     if (canvas?.sight?.testVisibility) {
-      const points = Array.isArray(testPoints) ? testPoints : [testPoints];
       return {
         available: true,
         api: 'canvas.sight.testVisibility',
@@ -1067,9 +1033,9 @@ export class VisionAnalyzer {
           typeof levelsIntegration.get3DCollisionDetails === 'function'
             ? levelsIntegration.get3DCollisionDetails(observer, target, 'sound')
             : {
-                mode: levelsIntegration.mode,
-                result: levelsIntegration.test3DCollision(observer, target, 'sound'),
-              };
+              mode: levelsIntegration.mode,
+              result: levelsIntegration.test3DCollision(observer, target, 'sound'),
+            };
         const blocked = !!collisionDetails.result;
         const coreSurfaceCollision =
           collisionDetails.mode === 'core' &&
