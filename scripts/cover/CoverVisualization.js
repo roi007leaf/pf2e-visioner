@@ -9,7 +9,7 @@ import { setPanningState } from '../utils/scheduler.js';
  * Shows cover levels from cursor position to hovered token when hotkey is held
  * Each client sees only their own visualization (client-specific, not shared)
  */
-class CoverVisualization {
+export class CoverVisualization {
   constructor() {
     this.isActive = false;
     this.currentTarget = null;
@@ -448,19 +448,8 @@ class CoverVisualization {
         }
       }
 
-      // Alternative approach: check visibility through canvas layers
-      if (canvas.visibility && canvas.visibility.testVisibility) {
-        const point = { x: worldX, y: worldY };
-        return canvas.visibility.testVisibility(point);
-      }
-
-      // Try the sight layer approach
-      if (canvas.sight && canvas.sight.testVisibility) {
-        const point = { x: worldX, y: worldY };
-        return canvas.sight.testVisibility(point, { tolerance: 0 });
-      }
-
-      // Check against token vision polygons
+      // Token cover visualization is from the controlled token's perspective.
+      // Prefer its FOV over Foundry's aggregate canvas visibility layer.
       const controlledTokens = canvas.tokens.controlled;
       if (controlledTokens.length > 0) {
         for (const token of controlledTokens) {
@@ -473,6 +462,18 @@ class CoverVisualization {
         }
         // If no controlled token can see it, it's not visible
         return false;
+      }
+
+      // Alternative approach: check visibility through canvas layers
+      if (canvas.visibility && canvas.visibility.testVisibility) {
+        const point = { x: worldX, y: worldY };
+        return canvas.visibility.testVisibility(point);
+      }
+
+      // Try the sight layer approach
+      if (canvas.sight && canvas.sight.testVisibility) {
+        const point = { x: worldX, y: worldY };
+        return canvas.sight.testVisibility(point, { tolerance: 0 });
       }
 
       // If no controlled tokens, default to not visible for players
