@@ -54,10 +54,10 @@
       <h3>
         <span><i class="fas fa-box-open"></i> Loot</span>
         <span class="hazard-loot-section-actions hazard-loot-bulk-actions">
-          <button type="button" class="visioner-icon-btn" data-action="bulkHidden" data-tooltip="Set visible loot Hidden for all player characters">
+          <button type="button" class="visioner-icon-btn" data-action="bulkHidden" data-tooltip="Set visible loot Hidden for all current and future player characters">
             <i class="fas fa-eye-slash visibility-hidden"></i>
           </button>
-          <button type="button" class="visioner-icon-btn" data-action="bulkObserved" data-tooltip="Set visible loot Observed for all player characters">
+          <button type="button" class="visioner-icon-btn" data-action="bulkObserved" data-tooltip="Set visible loot Observed and clear prep defaults for all player characters">
             <i class="fas fa-eye visibility-observed"></i>
           </button>
           <button type="button" class="visioner-icon-btn" data-action="setPartyDC" data-party-dc="{{partyDC}}" data-tooltip="Set visible loot to party level DC {{partyDC}} (level {{partyLevel}})">
@@ -94,7 +94,7 @@
                     type="button"
                     class="visioner-icon-btn hazard-loot-state-btn {{#if (eq row.visibility "observed")}}active{{/if}}"
                     data-state="observed"
-                    data-tooltip="Observed for all player characters"
+                    data-tooltip="Observed for all player characters; clears prep default"
                     aria-label="Set observed"
                   >
                     <i class="fas fa-eye visibility-observed"></i>
@@ -103,7 +103,7 @@
                     type="button"
                     class="visioner-icon-btn hazard-loot-state-btn {{#if (eq row.visibility "hidden")}}active{{/if}}"
                     data-state="hidden"
-                    data-tooltip="Hidden from all player characters"
+                    data-tooltip="Hidden from all current and future player characters"
                     aria-label="Set hidden"
                   >
                     <i class="fas fa-eye-slash visibility-hidden"></i>
@@ -150,10 +150,10 @@
       <h3>
         <span><i class="fas fa-exclamation-triangle"></i> Hazards</span>
         <span class="hazard-loot-section-actions hazard-loot-bulk-actions">
-          <button type="button" class="visioner-icon-btn" data-action="bulkHidden" data-tooltip="Set visible hazards Hidden for all player characters">
+          <button type="button" class="visioner-icon-btn" data-action="bulkHidden" data-tooltip="Set visible hazards Hidden for all current and future player characters">
             <i class="fas fa-eye-slash visibility-hidden"></i>
           </button>
-          <button type="button" class="visioner-icon-btn" data-action="bulkObserved" data-tooltip="Set visible hazards Observed for all player characters">
+          <button type="button" class="visioner-icon-btn" data-action="bulkObserved" data-tooltip="Set visible hazards Observed and clear prep defaults for all player characters">
             <i class="fas fa-eye visibility-observed"></i>
           </button>
         </span>
@@ -187,7 +187,7 @@
                     type="button"
                     class="visioner-icon-btn hazard-loot-state-btn {{#if (eq row.visibility "observed")}}active{{/if}}"
                     data-state="observed"
-                    data-tooltip="Observed for all player characters"
+                    data-tooltip="Observed for all player characters; clears prep default"
                     aria-label="Set observed"
                   >
                     <i class="fas fa-eye visibility-observed"></i>
@@ -196,7 +196,7 @@
                     type="button"
                     class="visioner-icon-btn hazard-loot-state-btn {{#if (eq row.visibility "hidden")}}active{{/if}}"
                     data-state="hidden"
-                    data-tooltip="Hidden from all player characters"
+                    data-tooltip="Hidden from all current and future player characters"
                     aria-label="Set hidden"
                   >
                     <i class="fas fa-eye-slash visibility-hidden"></i>

@@ -1252,8 +1252,8 @@ export function registerUIHooks() {
         });
 
         addTool(tokens.tools, {
-          name: 'pf2e-visioner-initialize-hidden-scene',
-          title: 'Initialize Hidden Scene Visibility',
+          name: 'pf2e-visioner-hidden-scene-visibility',
+          title: 'Hidden Scene Visibility',
           icon: 'fa-solid fa-eye-slash',
           button: true,
           onChange: async () => {
@@ -1261,36 +1261,80 @@ export function registerUIHooks() {
               if (!game.user?.isGM) return;
 
               const { VisionerConfirmDialog } = await import('../ui/dialogs/ConfirmDialog.js');
-              const confirmed = await VisionerConfirmDialog.confirm({
-                title: game.i18n.localize('PF2E_VISIONER.MODULE_TITLE'),
+              const action = await VisionerConfirmDialog.confirm({
+                title: 'Hidden Scene Visibility',
                 content:
-                  '<p>Set all loot tokens, hazards, and hidden walls to <strong>Hidden</strong> for every player character token on this scene?</p>',
+                  '<p>Set loot, hazards, and hidden walls to <strong>Hidden</strong> for current and future PC tokens, or clear that prep back to <strong>Observed</strong>.</p>',
                 yes: 'Set Hidden',
+                yesValue: 'set-hidden',
                 no: 'Cancel',
+                noValue: null,
+                extra: {
+                  label: 'Clear Prep',
+                  value: 'clear-prep',
+                  icon: 'fa-solid fa-eye',
+                  variant: 'secondary',
+                },
+                icon: 'fa-solid fa-eye-slash',
               });
-              if (!confirmed) return;
+              if (!action) return;
 
-              const { initializeSceneHiddenForPCs } = await import(
-                '../services/initial-scene-hidden-setup.js'
-              );
-              const result = await initializeSceneHiddenForPCs();
+              if (action === 'set-hidden') {
+                const { initializeSceneHiddenForPCs } = await import(
+                  '../services/initial-scene-hidden-setup.js'
+                );
+                const result = await initializeSceneHiddenForPCs();
 
-              if (result.observers === 0) {
-                ui.notifications?.warn?.('PF2E Visioner: No player character tokens found.');
-              } else if (result.tokenTargets === 0 && result.wallTargets === 0) {
-                ui.notifications?.warn?.(
-                  'PF2E Visioner: No loot tokens, hazards, or hidden walls found.',
+                if (result.tokenTargets === 0 && result.wallTargets === 0) {
+                  ui.notifications?.warn?.(
+                    'PF2E Visioner: No loot tokens, hazards, or hidden walls found.',
+                  );
+                } else if (result.observers === 0) {
+                  const prepParts = [];
+                  if (result.tokenTargets > 0) {
+                    prepParts.push(`${result.tokenTargets} loot/hazard token(s)`);
+                  }
+                  if (result.wallDefaults > 0) {
+                    prepParts.push(`${result.wallDefaults} hidden wall(s)`);
+                  }
+
+                  if (prepParts.length > 0) {
+                    ui.notifications?.info?.(
+                      `PF2E Visioner: Prepared ${prepParts.join(' and ')} as Hidden for future PC token(s).`,
+                    );
+                  } else {
+                    ui.notifications?.warn?.('PF2E Visioner: No player character tokens found.');
+                  }
+                } else {
+                  ui.notifications?.info?.(
+                    `PF2E Visioner: Set ${result.tokenPairs} token and ${result.wallEntries} wall visibility entries to Hidden for ${result.observers} PC token(s).`,
+                  );
+                }
+              } else if (action === 'clear-prep') {
+                const { clearSceneHiddenForPCs } = await import(
+                  '../services/initial-scene-hidden-setup.js'
                 );
-              } else {
-                ui.notifications?.info?.(
-                  `PF2E Visioner: Set ${result.tokenPairs} token and ${result.wallEntries} wall visibility entries to Hidden for ${result.observers} PC token(s).`,
-                );
+                const result = await clearSceneHiddenForPCs();
+
+                if (
+                  result.tokenTargets === 0 &&
+                  result.wallTargets === 0 &&
+                  result.actorPrepCleared === 0
+                ) {
+                  ui.notifications?.warn?.(
+                    'PF2E Visioner: No loot tokens, hazards, or hidden walls found.',
+                  );
+                } else {
+                  ui.notifications?.info?.(
+                    `PF2E Visioner: Cleared ${result.defaultsCleared} token prep default(s), ${result.wallDefaultsCleared} wall prep default(s), ${result.actorPrepCleared} actor prep result(s), ${result.tokenPairs} token visibility entries, and ${result.wallEntries} wall visibility entries for ${result.observers} PC token(s).`,
+                  );
+                }
               }
 
               ui.controls?.render?.(true);
             } catch (error) {
-              console.error('PF2E Visioner | Error initializing hidden scene visibility:', error);
-              ui.notifications?.error?.('PF2E Visioner: Failed to initialize hidden scene visibility.');
+              console.error('PF2E Visioner | Error updating hidden scene visibility:', error);
+              ui.notifications?.error?.('PF2E Visioner: Failed to update hidden scene visibility.');
             }
           },
         });

@@ -8,6 +8,7 @@ describe('Search exploration Seek automation helpers', () => {
     };
     global.canvas.grid = { size: 100, distance: 5 };
     global.canvas.tokens.placeables = [];
+    game.actors = { contents: [], get: jest.fn() };
     game.combat = null;
   });
 
@@ -403,6 +404,64 @@ describe('Search exploration Seek automation helpers', () => {
     ).toEqual(expect.any(String));
   });
 
+  test('target HUD action rolls for PC actors with Search active when no PC tokens are on the scene', async () => {
+    const rollOptions = [];
+    const statisticRoll = jest.fn(async (options) => {
+      rollOptions.push(options);
+      return { total: 17, dice: [{ total: 10, results: [{ result: 10 }] }] };
+    });
+    const target = createMockToken({
+      id: 'hidden-loot',
+      actor: createMockActor({
+        id: 'hidden-loot-actor',
+        type: 'loot',
+        conditions: { conditions: [{ slug: 'hidden' }] },
+      }),
+    });
+    const searchingPcActor = createMockActor({
+      id: 'pc-searching-actor',
+      name: 'Searching PC',
+      type: 'character',
+      hasPlayerOwner: true,
+      system: { exploration: ['search'] },
+      getStatistic: jest.fn(() => ({ roll: statisticRoll })),
+    });
+    const idlePcActor = createMockActor({
+      id: 'pc-idle-actor',
+      name: 'Idle PC',
+      type: 'character',
+      hasPlayerOwner: true,
+      system: { exploration: [] },
+      getStatistic: jest.fn(() => ({ roll: jest.fn() })),
+    });
+    const npcActor = createMockActor({
+      id: 'npc-search-actor',
+      type: 'npc',
+      system: { exploration: ['search'] },
+      getStatistic: jest.fn(() => ({ roll: jest.fn() })),
+    });
+    global.canvas.tokens.placeables = [target];
+    game.actors = {
+      contents: [searchingPcActor, idlePcActor, npcActor],
+      get: jest.fn((id) => [searchingPcActor, idlePcActor, npcActor].find((a) => a.id === id)),
+    };
+
+    const { runSearchExplorationForTarget } = await import(
+      '../../../scripts/chat/services/search-exploration-service.js'
+    );
+    const count = await runSearchExplorationForTarget(target);
+
+    expect(count).toBe(1);
+    expect(statisticRoll).toHaveBeenCalledTimes(1);
+    expect(
+      rollOptions[0].message.flags['pf2e-visioner'].searchExploration,
+    ).toMatchObject({
+      tokenId: 'pc-searching-actor',
+      sceneId: 'scene-1',
+      targetTokenId: 'hidden-loot',
+    });
+  });
+
   test('wall tool action rolls once for each PC with Search exploration active against a hidden wall', async () => {
     const rollOptions = [];
     const statisticRoll = jest.fn(async (options) => {
@@ -461,6 +520,63 @@ describe('Search exploration Seek automation helpers', () => {
     expect(
       rollOptions[0].message.flags['pf2e-visioner'].searchExploration.groupId,
     ).toEqual(expect.any(String));
+  });
+
+  test('wall tool action rolls for PC actors with Search active when no PC tokens are on the scene', async () => {
+    const rollOptions = [];
+    const statisticRoll = jest.fn(async (options) => {
+      rollOptions.push(options);
+      return { total: 18, dice: [{ total: 11, results: [{ result: 11 }] }] };
+    });
+    const hiddenWall = {
+      id: 'hidden-wall',
+      document: {
+        id: 'hidden-wall',
+        getFlag: jest.fn((scope, key) => {
+          if (scope !== 'pf2e-visioner') return undefined;
+          if (key === 'hiddenWall') return true;
+          if (key === 'stealthDC') return 22;
+          return undefined;
+        }),
+      },
+    };
+    const searchingPcActor = createMockActor({
+      id: 'pc-searching-actor',
+      name: 'Searching PC',
+      type: 'character',
+      hasPlayerOwner: true,
+      system: { exploration: ['search'] },
+      getStatistic: jest.fn(() => ({ roll: statisticRoll })),
+    });
+    const idlePcActor = createMockActor({
+      id: 'pc-idle-actor',
+      name: 'Idle PC',
+      type: 'character',
+      hasPlayerOwner: true,
+      system: { exploration: [] },
+      getStatistic: jest.fn(() => ({ roll: jest.fn() })),
+    });
+    global.canvas.tokens.placeables = [];
+    game.actors = {
+      contents: [searchingPcActor, idlePcActor],
+      get: jest.fn((id) => [searchingPcActor, idlePcActor].find((a) => a.id === id)),
+    };
+
+    const { runSearchExplorationForWall } = await import(
+      '../../../scripts/chat/services/search-exploration-service.js'
+    );
+    const count = await runSearchExplorationForWall(hiddenWall);
+
+    expect(count).toBe(1);
+    expect(statisticRoll).toHaveBeenCalledTimes(1);
+    expect(
+      rollOptions[0].message.flags['pf2e-visioner'].searchExploration,
+    ).toMatchObject({
+      tokenId: 'pc-searching-actor',
+      sceneId: 'scene-1',
+      targetTokenId: null,
+      targetWallId: 'hidden-wall',
+    });
   });
 
   test('wall tool action rolls during combat when GM chooses Search exploration', async () => {

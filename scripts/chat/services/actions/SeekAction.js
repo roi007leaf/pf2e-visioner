@@ -590,16 +590,49 @@ export class SeekActionHandler extends ActionHandlerBase {
   async applyChangesInternal(changes) {
     try {
       const tokenChanges = [];
+      const actorPreparedTokenChanges = [];
+      const actorPreparedWallChanges = [];
       const wallChangesByObserver = new Map();
       for (const ch of changes) {
         if (ch?.wallId) {
+          if (ch?.observer?._isActorSearchSeeker) {
+            actorPreparedWallChanges.push(ch);
+            continue;
+          }
           const obsId = ch?.observer?.id;
           if (!obsId) continue;
           if (!wallChangesByObserver.has(obsId))
             wallChangesByObserver.set(obsId, { observer: ch.observer, walls: new Map() });
           wallChangesByObserver.get(obsId).walls.set(ch.wallId, ch.newWallState);
         } else {
+          if (ch?.observer?._isActorSearchSeeker) {
+            actorPreparedTokenChanges.push(ch);
+            continue;
+          }
           tokenChanges.push(ch);
+        }
+      }
+
+      if (actorPreparedTokenChanges.length > 0 || actorPreparedWallChanges.length > 0) {
+        const {
+          setPreparedActorTokenVisibility,
+          setPreparedActorWallVisibility,
+        } = await import('../../../services/initial-scene-hidden-setup.js');
+
+        for (const ch of actorPreparedTokenChanges) {
+          await setPreparedActorTokenVisibility(
+            ch.observer?.actor,
+            ch.target,
+            ch.overrideState || ch.newVisibility,
+          );
+        }
+
+        for (const ch of actorPreparedWallChanges) {
+          await setPreparedActorWallVisibility(
+            ch.observer?.actor,
+            ch.wallId,
+            ch.overrideState || ch.newWallState,
+          );
         }
       }
 

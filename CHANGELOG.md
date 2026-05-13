@@ -1,5 +1,13 @@
 # Changelog
 
+## [8.2.9] - 2026-05-13
+
+### Fixed
+
+- **Hazard/Loot and hidden-wall prep without PC tokens persists and can be cleared**: GMs can now mark loot, hazards, and hidden walls Hidden from PCs while prepping scenes that have no player character tokens yet. The Hazard/Loot Manager and Hidden Scene Visibility scene tool store prep defaults on those targets, future player-owned character tokens inherit the hidden visibility when they are added, and that same scene tool can Clear Prep to remove prep defaults plus current PC token and hidden-wall visibility entries.
+- **Search exploration works during no-PC scene prep**: The Search token HUD button recognizes prepped-hidden loot targets, and the token HUD action plus hidden-wall scene button now fall back to player-owned PC actors with Search active when there are no PC tokens on the scene.
+- **No-PC Search exploration results apply later**: Open Results rebuilds actor-based PC searchers instead of requiring scene tokens, and applying those results stores actor-specific scene prep so future PC tokens inherit the discovered token and hidden-wall visibility.
+
 ## [8.2.8] - 2026-05-13
 
 ### Fixed

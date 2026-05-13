@@ -117,6 +117,60 @@ describe('Hazard/Loot manager helpers', () => {
     }
   });
 
+  test('uses prep default visibility when no player character tokens are on the scene', async () => {
+    const { getHazardLootManagerRows } = await import(
+      '../../../scripts/managers/hazard-loot-manager/HazardLootManager.js'
+    );
+
+    const loot = createMockToken({
+      id: 'loot1',
+      name: 'Prepped Cache',
+      actor: createMockActor({ type: 'loot' }),
+      flags: { 'pf2e-visioner': { defaultPlayerVisibility: 'hidden' } },
+    });
+    const hazard = createMockToken({
+      id: 'hazard1',
+      name: 'Unprepped Trap',
+      actor: createMockActor({ type: 'hazard' }),
+    });
+
+    const rows = getHazardLootManagerRows({ tokens: [loot, hazard] });
+
+    expect(rows).toHaveLength(2);
+    expect(rows.find((row) => row.id === 'loot1')).toMatchObject({ visibility: 'hidden' });
+    expect(rows.find((row) => row.id === 'hazard1')).toMatchObject({
+      visibility: 'observed',
+    });
+  });
+
+  test('stores prep visibility defaults when applying with no player character observers', async () => {
+    const { applyHazardLootManagerUpdates } = await import(
+      '../../../scripts/managers/hazard-loot-manager/HazardLootManager.js'
+    );
+
+    const loot = createMockToken({
+      id: 'loot1',
+      actor: createMockActor({ type: 'loot' }),
+    });
+    const hazard = createMockToken({
+      id: 'hazard1',
+      actor: createMockActor({ type: 'hazard' }),
+      flags: { 'pf2e-visioner': { defaultPlayerVisibility: 'hidden' } },
+    });
+
+    const result = await applyHazardLootManagerUpdates(
+      [
+        { tokenId: 'loot1', visibility: 'hidden' },
+        { tokenId: 'hazard1', visibility: 'observed' },
+      ],
+      { tokens: [loot, hazard] },
+    );
+
+    expect(result).toEqual({ targets: 2, visibilityPairs: 0, dcUpdates: 0, rankUpdates: 0 });
+    expect(loot.document.getFlag('pf2e-visioner', 'defaultPlayerVisibility')).toBe('hidden');
+    expect(hazard.document.getFlag('pf2e-visioner', 'defaultPlayerVisibility')).toBeNull();
+  });
+
   test('applies loot stealth DC and hazard proficiency requirement without writing hazard stealth DC', async () => {
     const { applyHazardLootManagerUpdates } = await import(
       '../../../scripts/managers/hazard-loot-manager/HazardLootManager.js'

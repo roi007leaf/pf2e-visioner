@@ -1,3 +1,70 @@
+const MODULE_ID = 'pf2e-visioner';
+
+function createFlaggedActor(data = {}) {
+  const flags = data.flags || {};
+  return createMockActor({
+    ...data,
+    flags,
+    getFlag: jest.fn((scope, key) => flags[scope]?.[key] ?? null),
+    setFlag: jest.fn(async (scope, key, value) => {
+      flags[scope] ||= {};
+      flags[scope][key] = value;
+      return value;
+    }),
+    unsetFlag: jest.fn(async (scope, key) => {
+      if (flags[scope]) delete flags[scope][key];
+      return true;
+    }),
+  });
+}
+
+function createActorSearchSeeker(actor) {
+  const flags = {};
+  const seeker = {
+    id: actor.id,
+    name: actor.name,
+    actor,
+    _isActorSearchSeeker: true,
+    document: {
+      id: actor.id,
+      actor,
+      getFlag: jest.fn((scope, key) => flags[scope]?.[key] ?? actor.getFlag?.(scope, key) ?? null),
+      setFlag: jest.fn(async (scope, key, value) => {
+        flags[scope] ||= {};
+        flags[scope][key] = value;
+        return value;
+      }),
+      unsetFlag: jest.fn(async (scope, key) => {
+        if (flags[scope]) delete flags[scope][key];
+        return true;
+      }),
+    },
+  };
+  seeker.document.object = seeker;
+  return seeker;
+}
+
+function createFlaggedWall(data = {}) {
+  const flags = data.flags || {};
+  return {
+    id: data.id,
+    document: {
+      id: data.id,
+      c: data.c || [0, 0, 100, 0],
+      getFlag: jest.fn((scope, key) => flags[scope]?.[key] ?? null),
+      setFlag: jest.fn(async (scope, key, value) => {
+        flags[scope] ||= {};
+        flags[scope][key] = value;
+        return value;
+      }),
+      unsetFlag: jest.fn(async (scope, key) => {
+        if (flags[scope]) delete flags[scope][key];
+        return true;
+      }),
+    },
+  };
+}
+
 describe('Search exploration preview flow', () => {
   afterEach(() => {
     jest.resetModules();
@@ -489,6 +556,94 @@ describe('Search exploration preview flow', () => {
     });
   });
 
+  test('group results recover PC actor searchers when no PC tokens are on the scene', async () => {
+    jest.resetModules();
+    jest.dontMock('../../../scripts/chat/services/search-exploration-service.js');
+    const render = jest.fn();
+    const SearchExplorationPreviewDialog = jest.fn(() => ({ render }));
+    const analyzeOutcome = jest.fn(async (actionData, target) => ({
+      _isWall: true,
+      wall: target.wall,
+      wallId: target.wall.id,
+      target: actionData.actor,
+      rollTotal: actionData.roll.total,
+      dc: target.dc,
+      outcome: 'success',
+      oldVisibility: 'hidden',
+      newVisibility: 'observed',
+      changed: true,
+    }));
+
+    jest.doMock('../../../scripts/chat/dialogs/SearchExplorationPreviewDialog.js', () => ({
+      SearchExplorationPreviewDialog,
+    }));
+    jest.doMock('../../../scripts/chat/dialogs/SeekPreviewDialog.js', () => ({
+      SeekPreviewDialog: { currentSeekDialog: null },
+    }));
+    jest.doMock('../../../scripts/chat/services/actions/SeekAction.js', () => ({
+      SeekActionHandler: jest.fn(() => ({ analyzeOutcome })),
+    }));
+
+    const hiddenWall = {
+      id: 'hidden-wall',
+      document: {
+        id: 'hidden-wall',
+        getFlag: jest.fn((scope, key) => {
+          if (scope !== 'pf2e-visioner') return undefined;
+          if (key === 'hiddenWall') return true;
+          if (key === 'stealthDC') return 22;
+          return undefined;
+        }),
+      },
+    };
+    const searchingPcActor = createMockActor({
+      id: 'pc-searching-actor',
+      name: 'Searching PC',
+      type: 'character',
+      hasPlayerOwner: true,
+      system: { exploration: ['search'] },
+      getStatistic: jest.fn(() => ({
+        roll: jest.fn(async () => ({ total: 18, dice: [{ total: 11 }] })),
+      })),
+    });
+    canvas.tokens.placeables = [];
+    canvas.tokens.get = jest.fn(() => null);
+    canvas.walls.placeables = [hiddenWall];
+    canvas.walls.get = jest.fn((id) => (id === 'hidden-wall' ? hiddenWall : null));
+    game.actors = {
+      contents: [searchingPcActor],
+      get: jest.fn((id) => (id === 'pc-searching-actor' ? searchingPcActor : null)),
+    };
+    game.messages = { contents: [], get: jest.fn(() => null) };
+
+    const { runSearchExplorationForWall, openSearchExplorationGroupResults } = await import(
+      '../../../scripts/chat/services/search-exploration-service.js'
+    );
+    await runSearchExplorationForWall(hiddenWall, { groupId: 'actor-group' });
+
+    const count = await openSearchExplorationGroupResults({
+      messageId: 'msg-actor',
+      searchExploration: true,
+      searchExplorationTokenId: 'pc-searching-actor',
+      roll: { total: 18, dice: [{ total: 11 }] },
+    });
+
+    expect(count).toBe(1);
+    expect(SearchExplorationPreviewDialog).toHaveBeenCalledTimes(1);
+    const [dialogTarget, outcomes, changes, actionData] =
+      SearchExplorationPreviewDialog.mock.calls[0];
+    expect(dialogTarget).toMatchObject({ _isWall: true, wall: hiddenWall, dc: 22 });
+    expect(outcomes).toHaveLength(1);
+    expect(outcomes[0].searchExplorationObserverName).toBe('Searching PC');
+    expect(changes).toHaveLength(1);
+    expect(actionData).toMatchObject({
+      searchExploration: true,
+      searchExplorationGroup: true,
+      searchExplorationTargetWallId: 'hidden-wall',
+    });
+    expect(render).toHaveBeenCalledWith(true);
+  });
+
   test('SearchExplorationPreviewDialog uses target as subject and seeker rows as observers', async () => {
     jest.resetModules();
     jest.dontMock('../../../scripts/chat/dialogs/SearchExplorationPreviewDialog.js');
@@ -579,5 +734,160 @@ describe('Search exploration preview flow', () => {
     expect(applied).toBe(1);
     expect(getVisibilityBetween(seeker, target)).toBe('hidden');
     expect(getVisibilityBetween(target, seeker)).toBe('observed');
+  });
+
+  test('applying actor-based token result persists for that PC actor and future token', async () => {
+    jest.resetModules();
+    jest.dontMock('../../../scripts/chat/services/actions/SeekAction.js');
+    jest.dontMock('../../../scripts/services/initial-scene-hidden-setup.js');
+    jest.dontMock('../../../scripts/stores/visibility-map.js');
+    const { SeekActionHandler } = await import('../../../scripts/chat/services/actions/SeekAction.js');
+    const { applyDefaultPlayerVisibilityForToken } = await import(
+      '../../../scripts/services/initial-scene-hidden-setup.js'
+    );
+    const { getVisibilityBetween } = await import('../../../scripts/stores/visibility-map.js');
+
+    const target = createMockToken({
+      id: 'hidden-loot',
+      name: 'Hidden Chest',
+      actor: createMockActor({ id: 'loot-actor', type: 'loot' }),
+      flags: { [MODULE_ID]: { defaultPlayerVisibility: 'hidden' } },
+    });
+    const pcActor = createFlaggedActor({
+      id: 'pc-actor-1',
+      name: 'Searcher One',
+      type: 'character',
+      hasPlayerOwner: true,
+    });
+    const seeker = createActorSearchSeeker(pcActor);
+    canvas.tokens.placeables = [target];
+    canvas.tokens.get = jest.fn((id) => canvas.tokens.placeables.find((token) => token.id === id));
+
+    const outcome = {
+      target,
+      observer: seeker,
+      observerToken: seeker,
+      searchExplorationObserver: seeker,
+      searchExplorationRowId: 'pc-actor-1:hidden-loot',
+      oldVisibility: 'hidden',
+      currentVisibility: 'hidden',
+      newVisibility: 'observed',
+      changed: true,
+      hasActionableChange: true,
+    };
+
+    const handler = new SeekActionHandler();
+    const applied = await handler.apply(
+      {
+        actionType: 'seek',
+        actor: target,
+        actorToken: target,
+        searchExploration: true,
+        searchExplorationGroup: true,
+        searchExplorationGroupedOutcomes: [outcome],
+      },
+      { html: () => {}, attr: () => {} },
+    );
+
+    expect(applied).toBe(1);
+    expect(pcActor.getFlag(MODULE_ID, 'preparedSceneVisibility')).toMatchObject({
+      'test-scene': { tokens: { 'hidden-loot': 'observed' } },
+    });
+
+    const futureToken = createMockToken({
+      id: 'future-pc-token',
+      name: 'Searcher One Token',
+      actor: pcActor,
+    });
+    canvas.tokens.placeables = [target, futureToken];
+    canvas.tokens.get = jest.fn((id) => canvas.tokens.placeables.find((token) => token.id === id));
+
+    await applyDefaultPlayerVisibilityForToken(futureToken, {
+      tokens: [target, futureToken],
+      walls: [],
+    });
+
+    expect(getVisibilityBetween(futureToken, target)).toBe('observed');
+  });
+
+  test('applying actor-based wall result persists for that PC actor and future token', async () => {
+    jest.resetModules();
+    jest.dontMock('../../../scripts/chat/services/actions/SeekAction.js');
+    jest.dontMock('../../../scripts/services/initial-scene-hidden-setup.js');
+    const { SeekActionHandler } = await import('../../../scripts/chat/services/actions/SeekAction.js');
+    const { applyDefaultPlayerVisibilityForToken } = await import(
+      '../../../scripts/services/initial-scene-hidden-setup.js'
+    );
+
+    const wall = createFlaggedWall({
+      id: 'hidden-wall',
+      flags: {
+        [MODULE_ID]: {
+          defaultPlayerWallVisibility: 'hidden',
+          hiddenWall: true,
+          stealthDC: 22,
+        },
+      },
+    });
+    const pcActor = createFlaggedActor({
+      id: 'pc-actor-1',
+      name: 'Searcher One',
+      type: 'character',
+      hasPlayerOwner: true,
+    });
+    const seeker = createActorSearchSeeker(pcActor);
+    canvas.tokens.placeables = [];
+    canvas.walls.placeables = [wall];
+    canvas.walls.get = jest.fn((id) => (id === 'hidden-wall' ? wall : null));
+
+    const outcome = {
+      _isWall: true,
+      wall,
+      wallId: 'hidden-wall',
+      target: seeker,
+      observer: seeker,
+      observerToken: seeker,
+      searchExplorationObserver: seeker,
+      searchExplorationRowId: 'pc-actor-1:hidden-wall',
+      oldVisibility: 'hidden',
+      currentVisibility: 'hidden',
+      newVisibility: 'observed',
+      changed: true,
+      hasActionableChange: true,
+    };
+
+    const handler = new SeekActionHandler();
+    const applied = await handler.apply(
+      {
+        actionType: 'seek',
+        actor: wall,
+        actorToken: wall,
+        searchExploration: true,
+        searchExplorationGroup: true,
+        searchExplorationGroupedOutcomes: [outcome],
+      },
+      { html: () => {}, attr: () => {} },
+    );
+
+    expect(applied).toBe(1);
+    expect(pcActor.getFlag(MODULE_ID, 'preparedSceneVisibility')).toMatchObject({
+      'test-scene': { walls: { 'hidden-wall': 'observed' } },
+    });
+
+    const futureToken = createMockToken({
+      id: 'future-pc-token',
+      name: 'Searcher One Token',
+      actor: pcActor,
+    });
+    canvas.tokens.placeables = [futureToken];
+
+    await applyDefaultPlayerVisibilityForToken(futureToken, {
+      tokens: [futureToken],
+      walls: [wall],
+    });
+
+    expect(futureToken.document.getFlag(MODULE_ID, 'walls')).toMatchObject({
+      'hidden-wall': 'observed',
+    });
   });
 });

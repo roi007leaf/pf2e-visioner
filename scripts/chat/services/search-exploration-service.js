@@ -2,6 +2,7 @@ import { MODULE_ID } from '../../constants.js';
 
 export const SEARCH_EXPLORATION_FLAG = 'searchExploration';
 
+const DEFAULT_PLAYER_VISIBILITY_FLAG = 'defaultPlayerVisibility';
 const SEEK_ACTION_TRAITS = ['concentrate', 'secret'];
 const SEEK_EXPLORATION_ROLL_OPTIONS = [
   'action:seek',
@@ -298,6 +299,103 @@ function isPlayerCharacterToken(token) {
   );
 }
 
+function getActorId(actor) {
+  return actor?.id ?? actor?._id ?? actor?.uuid ?? null;
+}
+
+function getActorCollectionValues(collection) {
+  if (Array.isArray(collection?.contents)) return collection.contents;
+  return collectionValues(collection);
+}
+
+function isPlayerCharacterActor(actor) {
+  try {
+    const isCharacter = actor?.type === 'character' || actor?.isOfType?.('character');
+    return !!(isCharacter && (actor?.hasPlayerOwner || actor?.isOwner));
+  } catch {
+    return false;
+  }
+}
+
+function makeActorSearchSeeker(actor, visibilityTarget = null) {
+  const actorId = getActorId(actor);
+  const moduleFlags = { ...(actor?.flags?.[MODULE_ID] || {}) };
+  const targetId = getTokenId(visibilityTarget);
+  if (targetId && tokenHasHiddenPrepDefault(visibilityTarget)) {
+    moduleFlags.visibility = {
+      ...(moduleFlags.visibility || {}),
+      [targetId]: 'hidden',
+    };
+  }
+  const center = getSubjectCenter(visibilityTarget);
+  const document = {
+    id: actorId,
+    name: actor?.name || actorId || 'PC',
+    actor,
+    uuid: actor?.uuid,
+    img: actor?.img,
+    texture: { src: actor?.img },
+    getFlag(scope, key) {
+      if (scope !== MODULE_ID) return actor?.getFlag?.(scope, key) ?? actor?.flags?.[scope]?.[key] ?? null;
+      return moduleFlags[key] ?? actor?.getFlag?.(scope, key) ?? actor?.flags?.[scope]?.[key] ?? null;
+    },
+    async setFlag(scope, key, value) {
+      if (scope === MODULE_ID) {
+        moduleFlags[key] = value;
+        return value;
+      }
+      return actor?.setFlag?.(scope, key, value);
+    },
+    async unsetFlag(scope, key) {
+      if (scope === MODULE_ID) {
+        delete moduleFlags[key];
+        return true;
+      }
+      return actor?.unsetFlag?.(scope, key);
+    },
+  };
+  const seeker = {
+    id: actorId,
+    name: actor?.name || actorId || 'PC',
+    actor,
+    document,
+    center,
+    x: center?.x ?? 0,
+    y: center?.y ?? 0,
+    width: 1,
+    height: 1,
+    w: 1,
+    h: 1,
+    _isActorSearchSeeker: true,
+  };
+  document.object = seeker;
+  return seeker;
+}
+
+function getActorSearchExplorationSeekers() {
+  return getActorCollectionValues(game?.actors)
+    .filter((actor) => isPlayerCharacterActor(actor) && actorHasSearchExplorationActivity(actor))
+    .map((actor) => makeActorSearchSeeker(actor));
+}
+
+function resolveActorById(actorId) {
+  if (!actorId) return null;
+  return (
+    game?.actors?.get?.(actorId) ||
+    getActorCollectionValues(game?.actors).find((actor) => getActorId(actor) === actorId) ||
+    null
+  );
+}
+
+function resolveSearchSeekerById(seekerId, target = null) {
+  const token = resolveTokenById(seekerId);
+  if (token) return token;
+
+  const actor = resolveActorById(seekerId);
+  if (!isPlayerCharacterActor(actor)) return null;
+  return makeActorSearchSeeker(actor, target);
+}
+
 function tokenIsHiddenByVisionerToAnyPC(token) {
   const targetId = getTokenId(token);
   if (!targetId) return false;
@@ -311,9 +409,18 @@ function tokenIsHiddenByVisionerToAnyPC(token) {
   });
 }
 
+function tokenHasHiddenPrepDefault(token) {
+  try {
+    return token?.document?.getFlag?.(MODULE_ID, DEFAULT_PLAYER_VISIBILITY_FLAG) === 'hidden';
+  } catch {
+    return false;
+  }
+}
+
 function tokenHasHiddenState(token) {
   return !!(
     token?.document?.hidden === true ||
+    tokenHasHiddenPrepDefault(token) ||
     actorHasCondition(token?.actor, ['hidden', 'undetected']) ||
     tokenIsHiddenByVisionerToAnyPC(token)
   );
@@ -361,11 +468,19 @@ export function isSearchExplorationWallTarget(wall) {
 
 export function getSearchExplorationSeekers(targetToken, tokens = canvas?.tokens?.placeables || []) {
   const targetId = getTokenId(targetToken);
-  return (tokens || []).filter((token) => {
+  const tokenList = tokens || [];
+  const tokenSeekers = tokenList.filter((token) => {
     if (!token?.actor) return false;
     if (getTokenId(token) === targetId) return false;
     return isPlayerCharacterToken(token) && actorHasSearchExplorationActivity(token.actor);
   });
+
+  const hasPcTokensOnScene = tokenList.some(
+    (token) => getTokenId(token) !== targetId && isPlayerCharacterToken(token),
+  );
+  if (tokenSeekers.length > 0 || hasPcTokensOnScene) return tokenSeekers;
+
+  return getActorSearchExplorationSeekers();
 }
 
 export function filterSearchExplorationSubjects(subjects, seekerToken, rangeFeet) {
@@ -836,7 +951,10 @@ export async function openSearchExplorationGroupResults(actionData = {}) {
 
     for (const message of messages) {
       const flag = getSearchExplorationFlagFromMessage(message) || {};
-      const seekerToken = resolveTokenById(flag.tokenId || message?.speaker?.token);
+      const seekerToken = resolveSearchSeekerById(
+        flag.tokenId || message?.speaker?.token || message?.speaker?.actor,
+        target,
+      );
       if (!seekerToken?.actor) continue;
 
       const roll = extractRollFromMessage(message, actionData.roll);

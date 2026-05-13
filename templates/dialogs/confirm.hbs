@@ -6,7 +6,13 @@
     </div>
   </div>
   <footer class="pvv-confirm-footer">
+    {{#if extra}}
+    <button type="button" class="pvv-btn pvv-btn-primary" data-action="yes" autofocus><i class="fas fa-check"></i> {{yes}}</button>
+    <button type="button" class="pvv-btn {{extra.className}}" data-action="extra"><i class="{{extra.icon}}"></i> {{extra.label}}</button>
+    <button type="button" class="pvv-btn pvv-btn-secondary" data-action="no"><i class="fas fa-times"></i> {{no}}</button>
+    {{else}}
     <button type="button" class="pvv-btn pvv-btn-secondary" data-action="no"><i class="fas fa-times"></i> {{no}}</button>
     <button type="button" class="pvv-btn pvv-btn-primary" data-action="yes" autofocus><i class="fas fa-check"></i> {{yes}}</button>
+    {{/if}}
   </footer>
 </div>
