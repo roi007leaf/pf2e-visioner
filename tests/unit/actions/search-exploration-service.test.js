@@ -288,7 +288,7 @@ describe('Search exploration Seek automation helpers', () => {
     expect(isSearchExplorationHudTarget(visibleNpc)).toBe(false);
   });
 
-  test('does not expose Search exploration targets during combat encounters', async () => {
+  test('exposes Search exploration targets during combat encounters for GM control', async () => {
     const { isSearchExplorationHudTarget, isSearchExplorationWallTarget } = await import(
       '../../../scripts/chat/services/search-exploration-service.js'
     );
@@ -308,8 +308,30 @@ describe('Search exploration Seek automation helpers', () => {
 
     game.combat = { started: true, combatants: new Map([['c1', {}]]) };
 
-    expect(isSearchExplorationHudTarget(hiddenLoot)).toBe(false);
-    expect(isSearchExplorationWallTarget(hiddenWall)).toBe(false);
+    expect(isSearchExplorationHudTarget(hiddenLoot)).toBe(true);
+    expect(isSearchExplorationWallTarget(hiddenWall)).toBe(true);
+  });
+
+  test('allows hidden wall Search exploration when active combat is on another scene', async () => {
+    const { isSearchExplorationWallTarget } = await import(
+      '../../../scripts/chat/services/search-exploration-service.js'
+    );
+    const hiddenWall = {
+      document: {
+        getFlag: jest.fn((scope, key) =>
+          scope === 'pf2e-visioner' && key === 'hiddenWall' ? true : undefined,
+        ),
+      },
+    };
+
+    global.canvas.scene.id = 'exploration-scene';
+    game.combat = {
+      started: true,
+      scene: { id: 'combat-scene' },
+      combatants: new Map([['c1', {}]]),
+    };
+
+    expect(isSearchExplorationWallTarget(hiddenWall)).toBe(true);
   });
 
   test('target HUD action rolls once for each PC with Search exploration active', async () => {
@@ -439,6 +461,45 @@ describe('Search exploration Seek automation helpers', () => {
     expect(
       rollOptions[0].message.flags['pf2e-visioner'].searchExploration.groupId,
     ).toEqual(expect.any(String));
+  });
+
+  test('wall tool action rolls during combat when GM chooses Search exploration', async () => {
+    const statisticRoll = jest.fn(async () => ({
+      total: 18,
+      dice: [{ total: 11, results: [{ result: 11 }] }],
+    }));
+    const hiddenWall = {
+      id: 'hidden-wall',
+      document: {
+        id: 'hidden-wall',
+        getFlag: jest.fn((scope, key) => {
+          if (scope !== 'pf2e-visioner') return undefined;
+          if (key === 'hiddenWall') return true;
+          if (key === 'stealthDC') return 22;
+          return undefined;
+        }),
+      },
+    };
+    const searchingPc = createMockToken({
+      id: 'pc-searching',
+      actor: createMockActor({
+        id: 'pc-searching-actor',
+        type: 'character',
+        hasPlayerOwner: true,
+        system: { exploration: ['search'] },
+        getStatistic: jest.fn(() => ({ roll: statisticRoll })),
+      }),
+    });
+    global.canvas.tokens.placeables = [searchingPc];
+    game.combat = { started: true, combatants: new Map([['c1', {}]]) };
+
+    const { runSearchExplorationForWall } = await import(
+      '../../../scripts/chat/services/search-exploration-service.js'
+    );
+    const count = await runSearchExplorationForWall(hiddenWall);
+
+    expect(count).toBe(1);
+    expect(statisticRoll).toHaveBeenCalledTimes(1);
   });
 
   test('token movement no longer creates Search exploration rolls', async () => {

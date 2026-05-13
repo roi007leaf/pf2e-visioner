@@ -1,5 +1,12 @@
 # Changelog
 
+## [8.2.8] - 2026-05-13
+
+### Fixed
+
+- **Hidden wall settings reveal immediately**: The wall quick settings dialog now shows the hidden wall identifier, stealth DC, and connected wall inputs as soon as the GM checks Hidden Wall, without waiting for Apply.
+- **Search exploration no longer blocked by combat**: GM-triggered Search exploration for hidden walls, hidden loot, hazards, and hidden NPCs is now available whenever the GM chooses to run it, including during active combat or while testing exploration on another scene.
+
 ## [8.2.7] - 2026-05-12
 
 ### Added

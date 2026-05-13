@@ -61,23 +61,7 @@ export class VisionerWallQuickSettings extends foundry.applications.api.Applicat
   _replaceHTML(result, content, _options) {
     content.innerHTML = result;
 
-    // Add event listener for the hidden wall checkbox
-    const hiddenWallCheckbox = content.querySelector('input[name="hiddenWall"]');
-    const hiddenWallSections = content.querySelectorAll('.hidden-wall-section');
-
-    if (hiddenWallCheckbox && hiddenWallSections.length > 0) {
-      // Set initial state
-      hiddenWallSections.forEach((section) => {
-        section.style.display = hiddenWallCheckbox.checked ? '' : 'none';
-      });
-
-      // Add change listener
-      hiddenWallCheckbox.addEventListener('change', (event) => {
-        hiddenWallSections.forEach((section) => {
-          section.style.display = event.target.checked ? '' : 'none';
-        });
-      });
-    }
+    this._bindHiddenWallSectionToggle(content);
 
     // Add event listeners for cover override functionality
     this._bindCoverOverrideListeners(content);
@@ -91,25 +75,34 @@ export class VisionerWallQuickSettings extends foundry.applications.api.Applicat
     // Also bind after render in case _replaceHTML wasn't called
     try {
       const root = this.element;
-      const hiddenWallCheckbox = root.querySelector('input[name="hiddenWall"]');
-      const hiddenWallSections = root.querySelectorAll('.hidden-wall-section');
-
-      if (hiddenWallCheckbox && hiddenWallSections.length > 0) {
-        // Set initial state
-        hiddenWallSections.forEach((section) => {
-          section.style.display = hiddenWallCheckbox.checked ? '' : 'none';
-        });
-
-        // Add change listener
-        hiddenWallCheckbox.addEventListener('change', (event) => {
-          hiddenWallSections.forEach((section) => {
-            section.style.display = event.target.checked ? '' : 'none';
-          });
-        });
-      }
+      this._bindHiddenWallSectionToggle(root);
 
       // Bind cover override listeners
       this._bindCoverOverrideListeners(root);
+    } catch (_) {
+      /* ignore */
+    }
+  }
+
+  _bindHiddenWallSectionToggle(root) {
+    try {
+      const hiddenWallCheckbox = root?.querySelector?.('input[name="hiddenWall"]');
+      const hiddenWallSections = Array.from(root?.querySelectorAll?.('.hidden-wall-section') || []);
+      if (!hiddenWallCheckbox || hiddenWallSections.length === 0) return;
+
+      const syncHiddenWallSections = () => {
+        const show = !!hiddenWallCheckbox.checked;
+        hiddenWallSections.forEach((section) => {
+          section.classList.toggle('is-hidden', !show);
+          section.hidden = !show;
+          section.style.display = show ? '' : 'none';
+        });
+      };
+
+      syncHiddenWallSections();
+      if (hiddenWallCheckbox.dataset.pf2eVisionerHiddenWallToggleBound === 'true') return;
+      hiddenWallCheckbox.dataset.pf2eVisionerHiddenWallToggleBound = 'true';
+      hiddenWallCheckbox.addEventListener('change', syncHiddenWallSections);
     } catch (_) {
       /* ignore */
     }

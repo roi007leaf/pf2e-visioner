@@ -148,10 +148,6 @@ export function isMovementUpdate(changes) {
   );
 }
 
-export function hasActiveCombatEncounter() {
-  return !!(game?.combat?.started && game.combat?.combatants?.size > 0);
-}
-
 function getGridSize() {
   return Number(canvas?.grid?.size ?? canvas?.scene?.grid?.size ?? 100) || 100;
 }
@@ -347,7 +343,6 @@ export function isSearchExplorationCandidate(subject) {
 export function isSearchExplorationHudTarget(token) {
   try {
     if (!game?.user?.isGM) return false;
-    if (hasActiveCombatEncounter()) return false;
     const actorType = token?.actor?.type;
     if (!['loot', 'hazard', 'npc'].includes(actorType)) return false;
     return isSearchExplorationCandidate(token);
@@ -358,7 +353,6 @@ export function isSearchExplorationHudTarget(token) {
 
 export function isSearchExplorationWallTarget(wall) {
   try {
-    if (hasActiveCombatEncounter()) return false;
     return !!(game?.user?.isGM && wall?.document?.getFlag?.(MODULE_ID, 'hiddenWall'));
   } catch {
     return false;
@@ -921,7 +915,6 @@ export async function openSearchExplorationGroupResults(actionData = {}) {
 
 export async function openSearchExplorationResults(token, options = {}) {
   if (!token?.actor) return 0;
-  if (hasActiveCombatEncounter()) return 0;
   if (!isSearchExplorationActive(token)) return 0;
 
   const now = Number(options.now ?? getSearchExplorationTime());
@@ -966,7 +959,6 @@ export async function openSearchExplorationResults(token, options = {}) {
 
 export async function createSearchExplorationCheck(token, options = {}) {
   if (!token?.actor) return 0;
-  if (hasActiveCombatEncounter()) return 0;
   if (!isSearchExplorationActive(token)) return 0;
 
   const rangeFeet = Number(options.rangeFeet ?? getSearchExplorationRangeFeet());
