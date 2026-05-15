@@ -94,7 +94,7 @@ export class DetectionWrapper {
 export function initializeDetectionWrapper() {
   try {
     (DetectionWrapper._instance ||= new DetectionWrapper()).register();
-  } catch (_) {}
+  } catch (_) { }
 }
 
 /**
@@ -116,39 +116,12 @@ const NON_VISUAL_DETECTION_MODE_IDS = new Set([
   'thoughtsense',
 ]);
 
-function isObjectInCurrentViewport(object, paddingPx = 64) {
-  try {
-    const screen = canvas?.app?.renderer?.screen;
-    const wt = canvas?.stage?.worldTransform;
-    if (!screen || typeof wt?.applyInverse !== 'function') return true;
-
-    const topLeft = wt.applyInverse({ x: 0, y: 0 });
-    const bottomRight = wt.applyInverse({ x: screen.width, y: screen.height });
-    const minX = Math.min(topLeft.x, bottomRight.x) - paddingPx;
-    const minY = Math.min(topLeft.y, bottomRight.y) - paddingPx;
-    const maxX = Math.max(topLeft.x, bottomRight.x) + paddingPx;
-    const maxY = Math.max(topLeft.y, bottomRight.y) + paddingPx;
-
-    const gridSize = canvas?.grid?.size || 1;
-    const doc = object?.document;
-    const centerX =
-      object?.center?.x ?? (doc?.x ?? object?.x ?? 0) + ((doc?.width ?? 1) * gridSize) / 2;
-    const centerY =
-      object?.center?.y ?? (doc?.y ?? object?.y ?? 0) + ((doc?.height ?? 1) * gridSize) / 2;
-
-    return centerX >= minX && centerX <= maxX && centerY >= minY && centerY <= maxY;
-  } catch {
-    return true;
-  }
-}
-
 /**
  * Override the detection mode test visibility function
  * This makes the PF2E system think tokens have actual conditions
  */
 function detectionModeTestVisibility(visionSource, mode, config = {}) {
   if (!mode.enabled) return false;
-  if (!isObjectInCurrentViewport(config.object)) return false;
 
   // Check if target is currently sneaking - if so, force hidden visibility
   // This prevents other tokens from seeing the sneaking token
@@ -205,7 +178,7 @@ function canDetectWrapper(threshold) {
           return false;
         }
       }
-    } catch (_) {}
+    } catch (_) { }
 
     const origin = observerToken;
     const reachedThreshold = reachesVisibilityThreshold(origin, target, threshold, { visibility });

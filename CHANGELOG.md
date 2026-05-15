@@ -31,6 +31,12 @@
 - Concealment-sensitive stealth logic no longer treats Hidden or Undetected as if they were the concealed condition.
 - Encounter-start Unnoticed continues to hide tokens and tracker rows while using Undetected as the underlying detection state.
 
+## [8.2.10] - 2026-05-15
+
+### Fixed
+
+- **Offscreen tokens no longer stay hidden after zooming out**: Visioner's detection wrapper no longer treats targets outside the current camera viewport as undetectable during Foundry detection tests, preventing zoomed-in movement from leaving offscreen tokens visually hidden until another movement refresh.
+
 ## [8.2.9] - 2026-05-13
 
 ### Fixed
@@ -2544,4 +2550,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Compatibility
 
 - FoundryVTT v12 and earlier
+- Basic ApplicationV1 framework
 - Basic ApplicationV1 framework
