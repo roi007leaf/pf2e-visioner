@@ -16,6 +16,8 @@ describe('BatchOrchestrator', () => {
     jest.useRealTimers();
     applied = [];
     batchProcessor = {
+      globalVisibilityCache: { clear: jest.fn() },
+      globalLosCache: { clear: jest.fn() },
       process: jest.fn(async () => ({
         updates: [
           // duplicate pair should be deduped
@@ -80,6 +82,20 @@ describe('BatchOrchestrator', () => {
     expect(telemetryReporter.start).toHaveBeenCalled();
     expect(telemetryReporter.stop).toHaveBeenCalled();
     expect(applied).toEqual([['A', 'B', 'hidden']]);
+  });
+
+  test('processBatch preserves global caches for non-movement batches', async () => {
+    await orchestrator.processBatch(new Set(['A']));
+
+    expect(batchProcessor.globalVisibilityCache.clear).not.toHaveBeenCalled();
+    expect(batchProcessor.globalLosCache.clear).not.toHaveBeenCalled();
+  });
+
+  test('processBatch clears global caches for movement batches', async () => {
+    await orchestrator.processBatch(new Set(['A']), { movementSession: { sessionId: 'move-1' } });
+
+    expect(batchProcessor.globalVisibilityCache.clear).toHaveBeenCalledTimes(1);
+    expect(batchProcessor.globalLosCache.clear).toHaveBeenCalledTimes(1);
   });
 
   test('processBatch uses latest duplicate visibility update for same observer-target pair', async () => {

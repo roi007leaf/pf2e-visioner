@@ -21,12 +21,7 @@
 import { MODULE_ID } from '../../constants.js';
 import { calculateDistanceInFeet } from '../../helpers/geometry-utils.js';
 import { getTokenVerticalSpanFt } from '../../helpers/size-elevation-utils.js';
-import {
-  distancePointToSegment,
-  doesWallSenseBlockFromPoint,
-  getWallSenseThreshold,
-  pixelsToWallSenseUnits,
-} from '../../helpers/wall-sense-utils.js';
+import { doesWallSenseBlockFromPoint } from '../../helpers/wall-sense-utils.js';
 import { doesWallBlockAtElevation, doesWallBlockLineOfSight } from '../../helpers/wall-height-utils.js';
 import { LevelsIntegration } from '../../services/LevelsIntegration.js';
 import { getLogger } from '../../utils/logger.js';
@@ -396,12 +391,7 @@ export class VisionAnalyzer {
             targetPoints,
             cachedWalls,
           );
-
-          if (customWallPass) {
-            return true;
-          }
-
-          return false;
+          return !!customWallPass;
         } else {
           // If Foundry's polygon includes the target but Visioner's wall-aware geometry blocks it,
           // keep the geometric block so custom wall-height/elevation rules still apply.
@@ -424,7 +414,6 @@ export class VisionAnalyzer {
                 elevation: target.document?.elevation || 0,
               },
             ];
-          const visionSource = observer.vision;
           const level =
             target?.document?.level ??
             target?.document?._source?.level ??
@@ -672,9 +661,6 @@ export class VisionAnalyzer {
     const limitedWallIntersections = [];
     const edgeSenseTypes = getEdgeSenseTypes();
 
-    // Debug: log ray details for problematic case
-    const isProblematicRay = Math.abs(fromPoint.x - 1702) < 5 && Math.abs(fromPoint.y - 1102) < 5;
-
     for (const wall of walls) {
       // For doors, skip the distance optimization since they need special proximity handling
       // Doors can block vision even when the ray midpoint is far from the door midpoint
@@ -784,14 +770,6 @@ export class VisionAnalyzer {
         { x: wall.document.c[2], y: wall.document.c[3] },
       );
 
-      if (isProblematicRay) {
-        const log = getLogger('AVS/VisionAnalyzer');
-        log.debug(
-          () =>
-            `wall-check: from=(${Math.round(fromPoint.x)},${Math.round(fromPoint.y)}), to=(${Math.round(toPoint.x)},${Math.round(toPoint.y)}), wall=(${wall.document.c[0]},${wall.document.c[1]})->(${wall.document.c[2]},${wall.document.c[3]}), hasIntersection=${!!intersection}, t0=${intersection?.t0?.toFixed(3)}`,
-        );
-      }
-
       // Check if intersection is within the ray segment (0 <= t0 <= 1)
       if (
         intersection &&
@@ -814,14 +792,6 @@ export class VisionAnalyzer {
         // Check if t1 is also within [0, 1] (intersection within wall segment)
         if (t1 >= 0 && t1 <= 1) {
           // Ray intersects this wall
-
-          if (isProblematicRay) {
-            const log = getLogger('AVS/VisionAnalyzer');
-            log.debug(
-              () =>
-                `wall-intersection-found: t1=${t1.toFixed(3)}, wallDir=${wall.document.dir}, checking directional...`,
-            );
-          }
 
           // Check for directional walls (one-way walls)
           // dir: 0 = both directions, 1 = left side blocks, 2 = right side blocks
@@ -848,10 +818,6 @@ export class VisionAnalyzer {
 
           // If wall doesn't block sight, skip it for LOS check
           if (!blocksSight) {
-            if (isProblematicRay) {
-              const log = getLogger('AVS/VisionAnalyzer');
-              log.debug(() => `wall-doesnt-block-sight: sight=${wall.document.sight}, skipping`);
-            }
             continue;
           }
 
@@ -873,10 +839,6 @@ export class VisionAnalyzer {
           const isLimited = isLimitedSight || isLimitedLight || isLimitedSound;
 
           if (isLimited) {
-            if (isProblematicRay) {
-              const log = getLogger('AVS/VisionAnalyzer');
-              log.debug(() => `wall-limited: adding to limitedWallIntersections`);
-            }
             limitedWallIntersections.push({
               x: intersection.x,
               y: intersection.y,
@@ -888,28 +850,10 @@ export class VisionAnalyzer {
                 continue;
               }
             }
-            if (isProblematicRay) {
-              const log = getLogger('AVS/VisionAnalyzer');
-              log.debug(() => `wall-BLOCKS-completely: returning false immediately`);
-            }
             return false;
           }
-        } else if (isProblematicRay) {
-          const log = getLogger('AVS/VisionAnalyzer');
-          log.debug(() => `wall-t1-out-of-range: t1=${t1?.toFixed(3)} not in [0,1]`);
         }
-      } else if (isProblematicRay && intersection) {
-        const log = getLogger('AVS/VisionAnalyzer');
-        log.debug(() => `wall-t0-out-of-range: t0=${intersection.t0?.toFixed(3)} not in [0,1]`);
       }
-    }
-
-    if (isProblematicRay) {
-      const log = getLogger('AVS/VisionAnalyzer');
-      log.debug(
-        () =>
-          `ray-final-result: limitedWalls=${limitedWallIntersections.length}, returning=${limitedWallIntersections.length < 2}`,
-      );
     }
 
     // Check if we hit 2+ Limited walls at different locations
@@ -937,11 +881,7 @@ export class VisionAnalyzer {
         walls,
       );
       if (customWallPass) {
-        return {
-          pointIndex,
-          targetPoint: this.#roundPointForLosDebug(targetPoints[pointIndex]),
-          ...customWallPass,
-        };
+        return true;
       }
     }
 
@@ -985,20 +925,23 @@ export class VisionAnalyzer {
       return { available: false, api: null, result: null };
     }
 
+    const points = Array.isArray(testPoints) ? testPoints : [testPoints];
+
     if (canvas?.visibility?.testVisibility) {
       return {
         available: true,
         api: 'canvas.visibility.testVisibility',
-        result: canvas.visibility.testVisibility(testPoints, {
-          object: target,
-          source: observer.vision,
-          level,
-        }),
+        result: points.some((point) =>
+          canvas.visibility.testVisibility(point, {
+            object: target,
+            source: observer.vision,
+            level,
+          }),
+        ),
       };
     }
 
     if (canvas?.sight?.testVisibility) {
-      const points = Array.isArray(testPoints) ? testPoints : [testPoints];
       return {
         available: true,
         api: 'canvas.sight.testVisibility',
@@ -1055,35 +998,11 @@ export class VisionAnalyzer {
           toPoint,
         })
       ) {
-        return {
-          wallId: wall.document.id ?? wall.id ?? null,
-          wallSight: wall.document.sight,
-          wallCoords: wall.document.c,
-          threshold: getWallSenseThreshold(wall.document, 'sight'),
-          sourceDistance: Number(
-            pixelsToWallSenseUnits(distancePointToSegment(fromPoint, wall.document.c)).toFixed(2),
-          ),
-          targetDistance: Number(
-            pixelsToWallSenseUnits(distancePointToSegment(toPoint, wall.document.c)).toFixed(2),
-          ),
-          intersection: {
-            x: Math.round(intersection.x),
-            y: Math.round(intersection.y),
-            t0: Number(intersection.t0.toFixed(3)),
-            t1: Number(t1.toFixed(3)),
-          },
-        };
+        return true;
       }
     }
 
     return null;
-  }
-
-  #roundPointForLosDebug(point) {
-    return {
-      x: Math.round(point?.x ?? 0),
-      y: Math.round(point?.y ?? 0),
-    };
   }
 
   /**

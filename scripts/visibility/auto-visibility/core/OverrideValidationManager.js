@@ -3,6 +3,48 @@ import { normalizePerceptionProfile, overrideMatchesVisibility } from '../../per
 import { LastValidationRequest } from '../utils/LastValidationRequest.js';
 import { OverrideValidityCache } from '../utils/OverrideValidityCache.js';
 
+let visibilityCalculatorModulePromise = null;
+let coverDetectorModulePromise = null;
+let visionAnalyzerModulePromise = null;
+
+function loadVisibilityCalculatorModule() {
+  if (!visibilityCalculatorModulePromise) {
+    visibilityCalculatorModulePromise = import('../VisibilityCalculator.js').catch((error) => {
+      visibilityCalculatorModulePromise = null;
+      throw error;
+    });
+  }
+  return visibilityCalculatorModulePromise;
+}
+
+function loadCoverDetectorModule() {
+  if (!coverDetectorModulePromise) {
+    coverDetectorModulePromise = import('../../../cover/auto-cover/CoverDetector.js').catch(
+      (error) => {
+        coverDetectorModulePromise = null;
+        throw error;
+      },
+    );
+  }
+  return coverDetectorModulePromise;
+}
+
+function loadVisionAnalyzerModule() {
+  if (!visionAnalyzerModulePromise) {
+    visionAnalyzerModulePromise = import('../VisionAnalyzer.js').catch((error) => {
+      visionAnalyzerModulePromise = null;
+      throw error;
+    });
+  }
+  return visionAnalyzerModulePromise;
+}
+
+function prewarmOverrideValidationModules() {
+  loadVisibilityCalculatorModule().catch(() => {});
+  loadCoverDetectorModule().catch(() => {});
+  loadVisionAnalyzerModule().catch(() => {});
+}
+
 export class OverrideValidationManager {
   /**
    * @param {ExclusionManager} exclusionManager - Manager for token exclusion logic
@@ -19,6 +61,7 @@ export class OverrideValidationManager {
     this._overrideValidityCache = new OverrideValidityCache(750);
     this._validationRequestDebounceMs = 250;
     this._lastPruneAt = 0;
+    prewarmOverrideValidationModules();
   }
 
   /**
@@ -146,7 +189,7 @@ export class OverrideValidationManager {
         }
         let va = null;
         try {
-          const { VisionAnalyzer } = await import('../VisionAnalyzer.js');
+          const { VisionAnalyzer } = await loadVisionAnalyzerModule();
           va = VisionAnalyzer.getInstance();
           va.clearCache();
         } catch { }
@@ -224,7 +267,7 @@ export class OverrideValidationManager {
           let currentCover = undefined;
           try {
             let visibility;
-            const { optimizedVisibilityCalculator } = await import('../VisibilityCalculator.js');
+            const { optimizedVisibilityCalculator } = await loadVisibilityCalculatorModule();
             if (
               typeof optimizedVisibilityCalculator.calculateVisibilityWithoutOverrides ===
               'function'
@@ -236,7 +279,7 @@ export class OverrideValidationManager {
               );
             }
             currentVisibility = visibility;
-            const { CoverDetector } = await import('../../../cover/auto-cover/CoverDetector.js');
+            const { CoverDetector } = await loadCoverDetectorModule();
             const coverDetector = new CoverDetector();
             const observerPos = this.positionManager.getTokenPosition(movedToken);
             currentCover = coverDetector.detectFromPoint(observerPos, t);
@@ -374,7 +417,7 @@ export class OverrideValidationManager {
         let currentCover = undefined;
         try {
           let visibility;
-          const { optimizedVisibilityCalculator } = await import('../VisibilityCalculator.js');
+          const { optimizedVisibilityCalculator } = await loadVisibilityCalculatorModule();
           if (
             typeof optimizedVisibilityCalculator.calculateVisibilityWithoutOverrides === 'function'
           ) {
@@ -391,7 +434,7 @@ export class OverrideValidationManager {
             );
           }
           currentVisibility = visibility;
-          const { CoverDetector } = await import('../../../cover/auto-cover/CoverDetector.js');
+          const { CoverDetector } = await loadCoverDetectorModule();
           const coverDetector = new CoverDetector();
           const observerPos = this.positionManager.getTokenPosition(obs);
           currentCover = coverDetector.detectFromPoint(observerPos, movedToken);
@@ -421,7 +464,7 @@ export class OverrideValidationManager {
         let currentCover = undefined;
         try {
           let visibility;
-          const { optimizedVisibilityCalculator } = await import('../VisibilityCalculator.js');
+          const { optimizedVisibilityCalculator } = await loadVisibilityCalculatorModule();
           if (
             typeof optimizedVisibilityCalculator.calculateVisibilityWithoutOverrides === 'function'
           ) {
@@ -438,7 +481,7 @@ export class OverrideValidationManager {
             );
           }
           currentVisibility = visibility;
-          const { CoverDetector } = await import('../../../cover/auto-cover/CoverDetector.js');
+          const { CoverDetector } = await loadCoverDetectorModule();
           const coverDetector = new CoverDetector();
           const observerPos = this.positionManager.getTokenPosition(movedToken);
           currentCover = coverDetector.detectFromPoint(observerPos, t);
@@ -462,14 +505,51 @@ export class OverrideValidationManager {
   }
 
   async checkOverrideValidity(observerId, targetId, override, options = undefined) {
+    const perfEnabled = !!options?.debugPerformance;
+    const perfStartedAt = perfEnabled ? performance.now() : 0;
+    const perfMarks = [];
+    const markPerf = (step) => {
+      if (!perfEnabled) return;
+      const at = Number((performance.now() - perfStartedAt).toFixed(2));
+      perfMarks.push({ step, at });
+      console.log('PF2E Visioner [AVS/OverrideValidation/perf-step]', {
+        observerId,
+        targetId,
+        step,
+        at,
+      });
+    };
+    const flushPerf = (extra = {}) => {
+      if (!perfEnabled) return;
+      console.log('PF2E Visioner [AVS/OverrideValidation/perf]', {
+        observerId,
+        observerName: observer?.name ?? null,
+        targetId,
+        targetName: target?.name ?? null,
+        totalMs: Number((performance.now() - perfStartedAt).toFixed(2)),
+        marks: perfMarks,
+        ...extra,
+      });
+    };
+
     const observer = canvas.tokens?.get(observerId);
     const target = canvas.tokens?.get(targetId);
-    if (!observer || !target) return null;
+    markPerf('resolve-tokens');
+    if (!observer || !target) {
+      flushPerf({ reason: 'missing-token' });
+      return null;
+    }
 
     if (override.timedOverride) {
       const timer = override.timedOverride;
-      if (timer.type === 'realtime' && timer.expiresAt && timer.expiresAt > Date.now()) return null;
-      if (timer.type === 'rounds' && timer.roundsRemaining !== 0) return null;
+      if (timer.type === 'realtime' && timer.expiresAt && timer.expiresAt > Date.now()) {
+        flushPerf({ reason: 'active-realtime-timer' });
+        return null;
+      }
+      if (timer.type === 'rounds' && timer.roundsRemaining !== 0) {
+        flushPerf({ reason: 'active-rounds-timer' });
+        return null;
+      }
     }
     let __obsPosKey, __tgtPosKey, __cacheKey;
     try {
@@ -480,45 +560,65 @@ export class OverrideValidationManager {
       const cacheKey = `${observerId}-${targetId}`;
       const cached = this._overrideValidityCache.get(cacheKey);
       if (cached && cached.obsPos === obsPosKey && cached.tgtPos === tgtPosKey) {
+        markPerf('cache-hit');
+        flushPerf({ reason: 'cache-hit', result: cached.result });
         return cached.result;
       }
       __obsPosKey = obsPosKey;
       __tgtPosKey = tgtPosKey;
       __cacheKey = cacheKey;
     } catch { }
+    markPerf('cache-check');
 
     try {
       let visibility;
       try {
-        const { optimizedVisibilityCalculator } = await import('../VisibilityCalculator.js');
+        markPerf('visibility-import-start');
+        const { optimizedVisibilityCalculator } = await loadVisibilityCalculatorModule();
+        markPerf('visibility-import-done');
         if (
           typeof optimizedVisibilityCalculator.calculateVisibilityWithoutOverrides === 'function'
         ) {
+          markPerf('visibility-calc-without-overrides-start');
           visibility = await optimizedVisibilityCalculator.calculateVisibilityWithoutOverrides(
             observer,
             target,
             options,
           );
+          markPerf('visibility-calc-without-overrides-done');
         } else {
+          markPerf('visibility-calc-start');
           visibility = await optimizedVisibilityCalculator.calculateVisibility(
             observer,
             target,
             options,
           );
+          markPerf('visibility-calc-done');
         }
       } catch {
+        markPerf('visibility-fallback-start');
         visibility = await this.visibilityCalculator.calculateVisibility(observer, target, options);
+        markPerf('visibility-fallback-done');
       }
 
       let targetHasCoverFromObserver = false;
       let coverResult = 'none';
       try {
-        const { CoverDetector } = await import('../../../cover/auto-cover/CoverDetector.js');
+        markPerf('cover-import-start');
+        const { CoverDetector } = await loadCoverDetectorModule();
+        markPerf('cover-import-done');
+        markPerf('cover-construct-start');
         const coverDetector = new CoverDetector();
+        markPerf('cover-construct-done');
+        markPerf('observer-position-start');
         const observerPos = this.positionManager.getTokenPosition(observer);
+        markPerf('observer-position-done');
+        markPerf('cover-detect-start');
         coverResult = coverDetector.detectFromPoint(observerPos, target);
+        markPerf('cover-detect-done');
         targetHasCoverFromObserver = coverResult === 'standard' || coverResult === 'greater';
       } catch {
+        markPerf('cover-detect-failed');
         targetHasCoverFromObserver = false;
         coverResult = 'none';
       }
@@ -526,7 +626,11 @@ export class OverrideValidationManager {
       const targetHasConcealmentFromObserver =
         visibility === 'concealed' || visibility === 'hidden';
       const targetIsVisibleToObserver = visibility === 'observed' || visibility === 'concealed';
-      if (!visibility) return null;
+      if (!visibility) {
+        flushPerf({ reason: 'no-visibility-result', visibility, coverResult });
+        return null;
+      }
+      markPerf('state-compare-start');
 
       const reasons = [];
       if (override.hasCover && !targetHasCoverFromObserver) {
@@ -577,9 +681,13 @@ export class OverrideValidationManager {
           const observerToken = canvas.tokens?.get(observerId);
           if (observerToken?.actor) {
             try {
-              const { VisionAnalyzer } = await import('../VisionAnalyzer.js');
+              markPerf('vision-analyzer-import-start');
+              const { VisionAnalyzer } = await loadVisionAnalyzerModule();
+              markPerf('vision-analyzer-import-done');
               const visionAnalyzer = VisionAnalyzer.getInstance();
+              markPerf('vision-capabilities-start');
               const visionCapabilities = visionAnalyzer.getVisionCapabilities(observerToken.actor);
+              markPerf('vision-capabilities-done');
               if (!visionCapabilities.hasDarkvision) {
                 if (override.source !== 'sneak_action') {
                   reasons.push({
@@ -624,6 +732,7 @@ export class OverrideValidationManager {
           currentCover: coverResult,
         };
       }
+      markPerf('state-compare-done');
 
       try {
         this._overrideValidityCache.set(__cacheKey || `${observerId}-${targetId}`, {
@@ -632,9 +741,12 @@ export class OverrideValidationManager {
           tgtPos: __tgtPosKey,
         });
       } catch { }
+      markPerf('cache-store');
+      flushPerf({ reason: 'complete', visibility, coverResult, result });
 
       return result;
     } catch (error) {
+      flushPerf({ reason: 'error', error: error?.message ?? String(error) });
       console.warn('PF2E Visioner | Error validating override:', error);
       return null;
     }
@@ -696,7 +808,7 @@ export class OverrideValidationManager {
       const moverToken = headerId ? canvas.tokens?.get(headerId) : null;
       if (moverToken) {
         try {
-          const { VisionAnalyzer } = await import('../VisionAnalyzer.js');
+          const { VisionAnalyzer } = await loadVisionAnalyzerModule();
           const va = VisionAnalyzer.getInstance();
           va.clearCache();
           dataToShow = overrideData.filter((o) => {

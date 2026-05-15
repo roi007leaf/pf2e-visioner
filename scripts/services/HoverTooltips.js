@@ -98,7 +98,7 @@ class HoverTooltipsImpl {
         '--pf2e-visioner-tooltip-badge-radius',
         `${borderRadius}px`,
       );
-    } catch (_) {}
+    } catch (_) { }
   }
 }
 export const HoverTooltips = new HoverTooltipsImpl();
@@ -325,7 +325,7 @@ export function initializeHoverTooltips() {
       try {
         canvas.app?.ticker?.remove?.(HoverTooltips.badgeTicker);
         HoverTooltips.badgeTicker = null;
-      } catch (_) {}
+      } catch (_) { }
     }
 
     // Clear any existing timeout
@@ -459,7 +459,7 @@ export function initializeHoverTooltips() {
         }
       }, 150); // 150ms debounce - batch multiple rapid updates
     });
-  } catch (_) {}
+  } catch (_) { }
 
   // Detect token movement and pause tooltip updates during movement
   // This prevents tooltips from consuming CPU during drag operations
@@ -576,7 +576,7 @@ export function initializeHoverTooltips() {
     // Deactivate tooltips
     try {
       game.tooltip.deactivate();
-    } catch (e) {}
+    } catch (e) { }
 
     // Hide factors overlay
     hideVisibilityFactorsOverlay();
@@ -607,7 +607,7 @@ export function initializeHoverTooltips() {
     if (HoverTooltips.badgeTicker) {
       try {
         canvas.app?.ticker?.remove?.(HoverTooltips.badgeTicker);
-      } catch (e) {}
+      } catch (e) { }
       HoverTooltips.badgeTicker = null;
       delete HoverTooltips._canvasRectCache;
       HoverTooltips._canvasRectInvalidated = true;
@@ -831,8 +831,8 @@ function showVisibilityIndicators(hoveredToken) {
       return;
     }
 
+    const visibilityMap = getVisibilityMap(hoveredToken);
     otherTokens.forEach((targetToken) => {
-      const visibilityMap = getVisibilityMap(hoveredToken);
       let visibilityState = visibilityMap[targetToken.document.id] || 'observed';
       // Never show 'avs' in tooltips - it's a control mechanism, not a visibility state
       if (visibilityState === 'avs') visibilityState = 'observed';
@@ -844,7 +844,7 @@ function showVisibilityIndicators(hoveredToken) {
         try {
           const detectionInfo = getDetectionBetween(hoveredToken, targetToken);
           hasSense = !!(detectionInfo && detectionInfo.sense);
-        } catch {}
+        } catch { }
       }
 
       // Show badge if visibility is not observed OR if there's a sense (even for observed)
@@ -879,7 +879,7 @@ function showVisibilityIndicators(hoveredToken) {
             try {
               const detectionInfo = getDetectionBetween(otherToken, hoveredToken);
               hasSense = !!(detectionInfo && detectionInfo.sense);
-            } catch {}
+            } catch { }
           }
 
           // Show badge if visibility is not observed OR if there's a sense (even for observed)
@@ -906,7 +906,7 @@ function showVisibilityIndicators(hoveredToken) {
           try {
             const detectionInfo = getDetectionBetween(observerToken, hoveredToken);
             hasSense = !!(detectionInfo && detectionInfo.sense);
-          } catch {}
+          } catch { }
         }
 
         // Show badge if visibility is not observed OR if there's a sense (even for observed)
@@ -953,8 +953,8 @@ function showVisibilityIndicatorsForToken(observerToken, forceMode = null) {
 
   if (effectiveMode === 'observer') {
     // Default mode: Show how the observer token sees others
+    const visibilityMap = getVisibilityMap(observerToken);
     otherTokens.forEach((targetToken) => {
-      const visibilityMap = getVisibilityMap(observerToken);
       let visibilityState = visibilityMap[targetToken.document.id] || 'observed';
       // Never show 'avs' in tooltips - it's a control mechanism, not a visibility state
       if (visibilityState === 'avs') visibilityState = 'observed';
@@ -966,7 +966,7 @@ function showVisibilityIndicatorsForToken(observerToken, forceMode = null) {
         try {
           const detectionInfo = getDetectionBetween(observerToken, targetToken);
           hasSense = !!(detectionInfo && detectionInfo.sense);
-        } catch {}
+        } catch { }
       }
 
       // Show badge if visibility is not observed OR if there's a sense (even for observed)
@@ -997,7 +997,7 @@ function showVisibilityIndicatorsForToken(observerToken, forceMode = null) {
           try {
             const detectionInfo = getDetectionBetween(otherToken, observerToken);
             hasSense = !!(detectionInfo && detectionInfo.sense);
-          } catch {}
+          } catch { }
         }
 
         // Show badge if visibility is not observed OR if there's a sense (even for observed)
@@ -1022,7 +1022,7 @@ function showVisibilityIndicatorsForToken(observerToken, forceMode = null) {
           try {
             const detectionInfo = getDetectionBetween(otherToken, observerToken);
             hasSense = !!(detectionInfo && detectionInfo.sense);
-          } catch {}
+          } catch { }
         }
 
         // Show badge if visibility is not observed OR if there's a sense (even for observed)
@@ -1084,7 +1084,7 @@ export function showAutoCoverComputedOverlay(sourceToken) {
         addCoverIndicator(target, sourceToken, autoCover, false);
       }
     }
-  } catch (_) {}
+  } catch (_) { }
 }
 
 export function hideAutoCoverComputedOverlay() {
@@ -1600,12 +1600,12 @@ function ensureBadgeTicker() {
 
       updateBadgePositions();
       lastUpdateTime = now;
-    } catch (_) {}
+    } catch (_) { }
   };
 
   try {
     canvas.app.ticker.add(HoverTooltips.badgeTicker);
-  } catch (_) {}
+  } catch (_) { }
 }
 
 function updateBadgePositions() {
@@ -1856,7 +1856,7 @@ function hideAllVisibilityIndicators() {
         badge.container.parent.removeChild(badge.container);
       }
       badge.container?.destroy?.({ children: true });
-    } catch (e) {}
+    } catch (e) { }
   });
 
   // Clear non-factor badges from the map
@@ -1881,7 +1881,7 @@ function hideAllVisibilityIndicators() {
       delete HoverTooltips._canvasRectCache;
       HoverTooltips._canvasRectInvalidated = true;
     }
-  } catch (_) {}
+  } catch (_) { }
 }
 
 /**
@@ -1890,7 +1890,7 @@ function hideAllVisibilityIndicators() {
 function hideAllCoverIndicators() {
   try {
     game.tooltip.deactivate();
-  } catch (_) {}
+  } catch (_) { }
   HoverTooltips.coverIndicators.forEach((indicator) => {
     try {
       if (indicator._coverBadgeEl && indicator._coverBadgeEl.parentNode) {
@@ -1906,7 +1906,7 @@ function hideAllCoverIndicators() {
       if (indicator.parent) indicator.parent.removeChild(indicator);
       // Destroy with all children to ensure PIXI graphics are fully destroyed
       indicator.destroy({ children: true, texture: true, baseTexture: true });
-    } catch (_) {}
+    } catch (_) { }
   });
   HoverTooltips.coverIndicators.clear();
   // Stop ticker if nothing remains
@@ -1922,7 +1922,7 @@ function hideAllCoverIndicators() {
       delete HoverTooltips._canvasRectCache;
       HoverTooltips._canvasRectInvalidated = true;
     }
-  } catch (_) {}
+  } catch (_) { }
 }
 
 /**
@@ -1960,7 +1960,7 @@ export function showVisibilityFactorsOverlay() {
   HoverTooltips.factorsOverlayTokens = new Set();
   try {
     Hooks.call('pf2e-visioner:visibilityFactorsOverlay', { active: true });
-  } catch (_) {}
+  } catch (_) { }
 
   hideAllVisibilityIndicators();
   hideAllCoverIndicators();
@@ -1981,7 +1981,7 @@ export function hideVisibilityFactorsOverlay() {
   HoverTooltips.factorsOverlayTokens.clear();
   try {
     Hooks.call('pf2e-visioner:visibilityFactorsOverlay', { active: false });
-  } catch (_) {}
+  } catch (_) { }
 
   // Clean up factor badges (DOM elements)
   HoverTooltips.visibilityBadges.forEach((badge, key) => {

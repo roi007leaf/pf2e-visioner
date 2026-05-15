@@ -9,7 +9,7 @@ import { setPanningState } from '../utils/scheduler.js';
  * Shows cover levels from cursor position to hovered token when hotkey is held
  * Each client sees only their own visualization (client-specific, not shared)
  */
-class CoverVisualization {
+export class CoverVisualization {
   constructor() {
     this.isActive = false;
     this.currentTarget = null;
@@ -448,6 +448,48 @@ class CoverVisualization {
         }
       }
 
+      // Token cover visualization is from the controlled token's perspective.
+      // Prefer its FOV over Foundry's aggregate canvas visibility layer.
+      const controlledTokens = canvas.tokens.controlled;
+      if (controlledTokens.length > 0) {
+        let checkedTokenPolygon = false;
+        for (const token of controlledTokens) {
+          if (token.vision?.fov?.contains) {
+            checkedTokenPolygon = true;
+            // Check if point is in field of view
+            if (token.vision.fov.contains(worldX, worldY)) {
+              return true;
+            }
+          }
+          if (token.vision?.los?.contains) {
+            checkedTokenPolygon = true;
+            if (token.vision.los.contains(worldX, worldY)) {
+              return true;
+            }
+          }
+        }
+        if (checkedTokenPolygon) {
+          // If token polygons exist and no controlled token contains it, it is not visible.
+          return false;
+        }
+
+        if (canvas.visibility?.testVisibility) {
+          const point = { x: worldX, y: worldY };
+          for (const token of controlledTokens) {
+            if (!token.vision) continue;
+            if (canvas.visibility.testVisibility(point, { source: token.vision, object: token })) {
+              return true;
+            }
+          }
+          return false;
+        }
+
+        if (canvas.sight?.testVisibility) {
+          const point = { x: worldX, y: worldY };
+          return controlledTokens.some(() => canvas.sight.testVisibility(point, { tolerance: 0 }));
+        }
+      }
+
       // Alternative approach: check visibility through canvas layers
       if (canvas.visibility && canvas.visibility.testVisibility) {
         const point = { x: worldX, y: worldY };
@@ -458,21 +500,6 @@ class CoverVisualization {
       if (canvas.sight && canvas.sight.testVisibility) {
         const point = { x: worldX, y: worldY };
         return canvas.sight.testVisibility(point, { tolerance: 0 });
-      }
-
-      // Check against token vision polygons
-      const controlledTokens = canvas.tokens.controlled;
-      if (controlledTokens.length > 0) {
-        for (const token of controlledTokens) {
-          if (token.vision && token.vision.fov) {
-            // Check if point is in field of view
-            if (token.vision.fov.contains(worldX, worldY)) {
-              return true;
-            }
-          }
-        }
-        // If no controlled token can see it, it's not visible
-        return false;
       }
 
       // If no controlled tokens, default to not visible for players
@@ -563,10 +590,20 @@ class CoverVisualization {
     return false;
   }
 
-  isPositionOccupied(worldX, worldY, selectedToken, canvas) {
+  buildTokenOccupancyIndex(selectedToken, canvas) {
     const gridSize = canvas.grid.size;
+    const cells = new Map();
 
-    // Check all tokens on the scene
+    const addToCell = (x, y, entry) => {
+      const key = `${x},${y}`;
+      const bucket = cells.get(key);
+      if (bucket) {
+        bucket.push(entry);
+      } else {
+        cells.set(key, [entry]);
+      }
+    };
+
     for (const token of canvas.tokens.placeables) {
       if (!token?.actor) continue;
       if (token.id === selectedToken.id) continue; // Skip the selected token itself
@@ -576,6 +613,94 @@ class CoverVisualization {
       if (actorType === 'loot' || actorType === 'hazard') {
         continue;
       }
+
+      const tokenRect = {
+        x1: token.document.x,
+        y1: token.document.y,
+        x2: token.document.x + token.document.width * gridSize,
+        y2: token.document.y + token.document.height * gridSize,
+      };
+      const entry = {
+        token,
+        tokenRect,
+        blockerSize: token?.actor?.system?.traits?.size?.value ?? 'med',
+      };
+      const minCellX = Math.floor(tokenRect.x1 / gridSize);
+      const maxCellX = Math.floor((tokenRect.x2 - 1) / gridSize);
+      const minCellY = Math.floor(tokenRect.y1 / gridSize);
+      const maxCellY = Math.floor((tokenRect.y2 - 1) / gridSize);
+      for (let cellX = minCellX; cellX <= maxCellX; cellX++) {
+        for (let cellY = minCellY; cellY <= maxCellY; cellY++) {
+          addToCell(cellX, cellY, entry);
+        }
+      }
+    }
+
+    return { gridSize, cells };
+  }
+
+  getTokenOccupancyCandidates(positionRect, occupancyIndex) {
+    if (!occupancyIndex) return null;
+
+    const { gridSize, cells } = occupancyIndex;
+    const candidates = new Set();
+    const minCellX = Math.floor(positionRect.x1 / gridSize);
+    const maxCellX = Math.floor((positionRect.x2 - 1) / gridSize);
+    const minCellY = Math.floor(positionRect.y1 / gridSize);
+    const maxCellY = Math.floor((positionRect.y2 - 1) / gridSize);
+
+    for (let cellX = minCellX; cellX <= maxCellX; cellX++) {
+      for (let cellY = minCellY; cellY <= maxCellY; cellY++) {
+        const bucket = cells.get(`${cellX},${cellY}`);
+        if (!bucket) continue;
+        for (const entry of bucket) candidates.add(entry);
+      }
+    }
+
+    return candidates;
+  }
+
+  isPositionOccupied(worldX, worldY, selectedToken, canvas, occupancyIndex = null) {
+    const gridSize = canvas.grid.size;
+    const positionRect = {
+      x1: worldX - gridSize / 2,
+      y1: worldY - gridSize / 2,
+      x2: worldX + gridSize / 2,
+      y2: worldY + gridSize / 2,
+    };
+    const selectedSize = selectedToken?.actor?.system?.traits?.size?.value ?? 'med';
+
+    const indexedCandidates = this.getTokenOccupancyCandidates(positionRect, occupancyIndex);
+    const candidates =
+      indexedCandidates ||
+      canvas.tokens.placeables
+        .filter((token) => token?.actor && token.id !== selectedToken.id)
+        .map((token) => ({
+          token,
+          tokenRect: {
+            x1: token.document.x,
+            y1: token.document.y,
+            x2: token.document.x + token.document.width * gridSize,
+            y2: token.document.y + token.document.height * gridSize,
+          },
+          blockerSize: token?.actor?.system?.traits?.size?.value ?? 'med',
+        }));
+
+    for (const { token, tokenRect, blockerSize } of candidates) {
+      // Skip loot tokens and hazards - they don't block movement for cover visualization
+      const actorType = token.actor.type;
+      if (actorType === 'loot' || actorType === 'hazard') {
+        continue;
+      }
+
+      // Check for overlap before visibility work; non-overlapping tokens cannot occupy this square.
+      const overlaps = !(
+        positionRect.x2 <= tokenRect.x1 ||
+        positionRect.x1 >= tokenRect.x2 ||
+        positionRect.y2 <= tokenRect.y1 ||
+        positionRect.y1 >= tokenRect.y2
+      );
+      if (!overlaps) continue;
 
       // Check if the token is hidden or undetected from the selected token's perspective
       try {
@@ -599,43 +724,14 @@ class CoverVisualization {
         );
       }
 
-      // Get token's bounds
-      const tokenRect = {
-        x1: token.document.x,
-        y1: token.document.y,
-        x2: token.document.x + token.document.width * gridSize,
-        y2: token.document.y + token.document.height * gridSize,
-      };
-
-      // Check if the world position overlaps with this token's area
-      const positionRect = {
-        x1: worldX - gridSize / 2,
-        y1: worldY - gridSize / 2,
-        x2: worldX + gridSize / 2,
-        y2: worldY + gridSize / 2,
-      };
-
-      // Check for overlap
-      const overlaps = !(
-        positionRect.x2 <= tokenRect.x1 ||
-        positionRect.x1 >= tokenRect.x2 ||
-        positionRect.y2 <= tokenRect.y1 ||
-        positionRect.y1 >= tokenRect.y2
-      );
-
-      if (overlaps) {
-        // Check if tiny creatures can share - both must be tiny
-        const selectedSize = selectedToken?.actor?.system?.traits?.size?.value ?? 'med';
-        const blockerSize = token?.actor?.system?.traits?.size?.value ?? 'med';
-
-        if (selectedSize === 'tiny' && blockerSize === 'tiny') {
-          // Tiny creatures can share the same square
-          continue;
-        }
-
-        // Position is occupied and can't be shared
-        return true;
+      // Check if tiny creatures can share - both must be tiny
+      if (selectedSize === 'tiny' && blockerSize === 'tiny') {
+        // Tiny creatures can share the same square
+        continue;
       }
+
+      // Position is occupied and can't be shared
+      return true;
     }
 
     return false; // Position is free
@@ -725,6 +821,7 @@ class CoverVisualization {
       range,
       Math.floor((viewportWorld.maxY - selectedCenter.y) / gridSize),
     );
+    const tokenOccupancyIndex = this.buildTokenOccupancyIndex(selectedToken, canvas);
 
     for (let x = minIndexX; x <= maxIndexX; x++) {
       for (let y = minIndexY; y <= maxIndexY; y++) {
@@ -742,7 +839,13 @@ class CoverVisualization {
         }
 
         // Check if this position is occupied by any token (except tiny creatures can share)
-        const isOccupied = this.isPositionOccupied(worldX, worldY, selectedToken, canvas);
+        const isOccupied = this.isPositionOccupied(
+          worldX,
+          worldY,
+          selectedToken,
+          canvas,
+          tokenOccupancyIndex,
+        );
         if (isOccupied) {
           // Skip coloring occupied squares - tokens can't move there
           continue;

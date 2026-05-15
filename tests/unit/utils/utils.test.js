@@ -79,6 +79,12 @@ describe('Utility Functions', () => {
       expect(() => getVisibilityBetween(null, null)).not.toThrow();
     });
 
+    test('should read visibility when PF2e passes token documents instead of placeable tokens', async () => {
+      await setVisibilityBetween(mockObserver, mockTarget, 'hidden');
+
+      expect(getVisibilityBetween(mockObserver.document, mockTarget.document)).toBe('hidden');
+    });
+
     test('should consider token elevation', () => {
       // Mock tokens at different elevations
       const elevatedTarget = createMockToken({

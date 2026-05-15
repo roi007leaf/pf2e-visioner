@@ -2,6 +2,7 @@
  * LightingPrecomputer precomputes light levels for a set of tokens at their current positions.
  */
 import { MODULE_ID } from '../../../constants.js';
+import { LightingCalculator } from '../LightingCalculator.js';
 export class LightingPrecomputer {
     // Short-term memoization for lighting environment hash (200ms TTL for more aggressive caching)
     static #lightingHashMemo = { hash: null, ts: 0 };
@@ -72,7 +73,6 @@ export class LightingPrecomputer {
                 }
             }
 
-            const { LightingCalculator } = await import('../LightingCalculator.js');
             const lightingCalculator = LightingCalculator.getInstance?.();
             if (!lightingCalculator) {
                 // Don't reset the force flag on error - let it persist
@@ -187,7 +187,12 @@ export class LightingPrecomputer {
         }
         // Use already computed lighting hash to avoid redundant computation
         const finalLightingHash = currentLightingHash || LightingPrecomputer.#getLightingEnvironmentHash();
-        // Don't reset the force flag here - let it persist for a brief time to handle multiple rapid batches
+        // A forced refresh only needs one successful full recompute. Keeping the flag set makes
+        // rapid follow-up batches recalculate every token's lighting even when the new lighting
+        // map is already current.
+        if (map instanceof Map) {
+            LightingPrecomputer.#consumeForcedFreshComputation();
+        }
         return { map, stats, posKeyMap, lightingHash: finalLightingHash };
     }
 
@@ -337,6 +342,15 @@ export class LightingPrecomputer {
             LightingPrecomputer.#forceFreshComputation = false;
             LightingPrecomputer.#forceResetTimeout = null;
         }, 3000); // Match global visibility cache TTL to prevent stale cache entries
+    }
+
+    static #consumeForcedFreshComputation() {
+        if (!LightingPrecomputer.#forceFreshComputation) return;
+        LightingPrecomputer.#forceFreshComputation = false;
+        if (LightingPrecomputer.#forceResetTimeout) {
+            clearTimeout(LightingPrecomputer.#forceResetTimeout);
+            LightingPrecomputer.#forceResetTimeout = null;
+        }
     }
 
     static #getPos(tok) {

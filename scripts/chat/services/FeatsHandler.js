@@ -12,6 +12,14 @@
  * - Unknown feats or actions result in a 0 shift.
  */
 
+import coverDetector from '../../cover/auto-cover/CoverDetector.js';
+import {
+  actorHasFeature,
+  getActorFeatureSlugs,
+  normalizeSlug,
+  resolveActor,
+} from '../../utils/actor-features.js';
+import EnvironmentHelper from '../../utils/environment.js';
 
 const OUTCOME_ORDER = ['critical-failure', 'failure', 'success', 'critical-success'];
 
@@ -22,11 +30,7 @@ const OUTCOME_ORDER = ['critical-failure', 'failure', 'success', 'critical-succe
  */
 class FeatsHandlerInternal {
   static resolveActor(tokenOrActor) {
-    if (!tokenOrActor) return null;
-    if (tokenOrActor.actor) return tokenOrActor.actor;
-    if (tokenOrActor.document?.actor) return tokenOrActor.document.actor;
-    if (tokenOrActor.system?.attributes) return tokenOrActor;
-    return null;
+    return resolveActor(tokenOrActor);
   }
 
   /**
@@ -48,43 +52,14 @@ class FeatsHandlerInternal {
         const tokens = actor.getActiveTokens(true);
         if (tokens?.length) return tokens[0];
       }
-    } catch { }
+    } catch {}
     return null;
   }
 }
 
 /**
- * Extract feat slugs present on the actor.
- * Supports PF2e system item structure: item.type === 'feat' and item.system.slug
- * Also checks passive actions (type === 'action') for NPCs that have abilities like "Swift Sneak"
- * @param {Actor} actor
- * @returns {Set<string>}
- */
-function getActorFeatSlugs(actor) {
-  try {
-    const items = actor?.items ?? [];
-    const slugs = new Set();
-    for (const item of items) {
-      if (item?.type === 'feat') {
-        const raw = item.system?.slug ?? item.slug ?? item.name?.toLowerCase()?.replace(/\s+/g, '-');
-        const slug = normalizeSlug(raw);
-        if (slug) slugs.add(slug);
-      } else if (item?.system?.actionType?.value === 'passive') {
-        const raw = item.system?.slug ?? item.slug ?? item.name?.toLowerCase()?.replace(/\s+/g, '-');
-        const slug = normalizeSlug(raw);
-        if (slug) slugs.add(slug);
-      }
-    }
-    return slugs;
-  } catch (e) {
-    console.warn('PF2E Visioner | Failed to read actor feats:', e);
-    return new Set();
-  }
-}
-
-/**
  * Mapping of supported feats to adjustment logic.
- * Keys are feat slugs. Values are functions returning integer outcome shift for given context.
+ * Keys are feature slugs. Values are functions returning integer outcome shift for given context.
  */
 // Simple outcome shift adjusters per action
 const SNEAK_FEAT_ADJUSTERS = {
@@ -101,26 +76,12 @@ const HIDE_FEAT_ADJUSTERS = {
 
 const SEEK_FEAT_ADJUSTERS = {
   // These mostly post-process visibility, but small shift can represent stronger detection
-  'thats-odd': (ctx) => (ctx.isHiddenWall || ctx.subjectType === 'hazard' || ctx.subjectType === 'loot' ? +1 : 0),
+  'thats-odd': (ctx) =>
+    ctx.isHiddenWall || ctx.subjectType === 'hazard' || ctx.subjectType === 'loot' ? +1 : 0,
   'keen-eyes': () => 0, // handled in visibility post-processing
 };
 
 const DIVERSION_FEAT_ADJUSTERS = {};
-
-function normalizeSlug(nameOrSlug = '') {
-  try {
-    const lower = String(nameOrSlug).toLowerCase();
-    // unify curly apostrophes to straight and then remove all apostrophes
-    const noApos = lower.replace(/\u2019/g, "'").replace(/'+/g, '');
-    // replace any remaining non-alphanumeric with single hyphens
-    const dashed = noApos.replace(/[^a-z0-9]+/g, '-');
-    // trim leading/trailing hyphens
-    return dashed.replace(/^-+|-+$/g, '');
-  } catch {
-    return nameOrSlug;
-  }
-}
-
 
 function getAdjusterMapForAction(action) {
   switch (action) {
@@ -137,16 +98,6 @@ function getAdjusterMapForAction(action) {
   }
 }
 
-/**
- * Compute the total outcome adjustment for the given action.
- * @param {Token|Actor} tokenOrActor - Acting creature
- * @param {string} action - e.g., 'sneak', 'hide'
- * @param {object} context - environment context (lighting, terrain, observer senses)
- * @returns {{ shift: number, notes: string[] }} - Net shift and contributing notes
- */
-import coverDetector from '../../cover/auto-cover/CoverDetector.js';
-import EnvironmentHelper from '../../utils/environment.js';
-
 export class FeatsHandler {
   /**
    * Compute the total outcome adjustment for the given action.
@@ -159,15 +110,15 @@ export class FeatsHandler {
     const actor = FeatsHandlerInternal.resolveActor(tokenOrActor);
     if (!actor) return { shift: 0, notes: [] };
 
-    const featSlugs = getActorFeatSlugs(actor);
+    const featureSlugs = getActorFeatureSlugs(actor);
     let shift = 0;
     const notes = [];
 
     const map = getAdjusterMapForAction(action);
-    if (!map || featSlugs.size === 0) return { shift, notes };
+    if (!map || featureSlugs.size === 0) return { shift, notes };
 
     for (const [slug, adjust] of Object.entries(map)) {
-      if (!featSlugs.has(slug)) continue;
+      if (!featureSlugs.has(slug)) continue;
       try {
         const delta = Number(adjust(context) || 0);
         if (!Number.isFinite(delta) || delta === 0) continue;
@@ -199,13 +150,7 @@ export class FeatsHandler {
    * Check if the actor has a feat by slug (or any of slugs)
    */
   static hasFeat(tokenOrActor, slugOrSlugs) {
-    const actor = FeatsHandlerInternal.resolveActor(tokenOrActor);
-    if (!actor) return false;
-    const featSlugs = getActorFeatSlugs(actor);
-    if (Array.isArray(slugOrSlugs)) {
-      return slugOrSlugs.some((s) => featSlugs.has(normalizeSlug(s)));
-    }
-    return featSlugs.has(normalizeSlug(slugOrSlugs));
+    return actorHasFeature(tokenOrActor, slugOrSlugs);
   }
 
   /**
@@ -226,7 +171,9 @@ export class FeatsHandler {
         if (state === 'lesser') state = 'standard';
         else if (state === 'standard') state = 'greater';
       }
-    } catch { /* best-effort */ }
+    } catch {
+      /* best-effort */
+    }
     const canTakeCover = state === 'standard' || state === 'greater';
     return { state, canTakeCover };
   }
@@ -236,8 +183,12 @@ export class FeatsHandler {
    */
   static shouldSkipEndCoverRequirement(tokenOrActor, action) {
     try {
-      if ((action === 'sneak' || action === 'hide') && FeatsHandler.hasCeaselessShadows(tokenOrActor)) return true;
-    } catch { }
+      if (
+        (action === 'sneak' || action === 'hide') &&
+        FeatsHandler.hasCeaselessShadows(tokenOrActor)
+      )
+        return true;
+    } catch {}
     return false;
   }
 
@@ -248,7 +199,7 @@ export class FeatsHandler {
   static adjustVisibility(action, tokenOrActor, current, newVisibility, context = {}) {
     const actor = FeatsHandlerInternal.resolveActor(tokenOrActor);
     if (!actor) return newVisibility;
-    const feats = getActorFeatSlugs(actor);
+    const feats = getActorFeatureSlugs(actor);
 
     // Helper ladders
     const towardsObserved = ['undetected', 'hidden', 'observed'];
@@ -267,8 +218,12 @@ export class FeatsHandler {
         newVisibility = step(newVisibility, towardsObserved, +1);
       }
       // That's Odd: anomalies (hazards/loot/hidden walls) are easier to notice
-      if (feats.has("thats-odd") || feats.has("that's-odd")) {
-        const isAnomaly = !!(context?.isHiddenWall || context?.subjectType === 'hazard' || context?.subjectType === 'loot');
+      if (feats.has('thats-odd') || feats.has("that's-odd")) {
+        const isAnomaly = !!(
+          context?.isHiddenWall ||
+          context?.subjectType === 'hazard' ||
+          context?.subjectType === 'loot'
+        );
         if (isAnomaly) newVisibility = step(newVisibility, towardsObserved, +1);
       }
       return newVisibility;
@@ -278,9 +233,14 @@ export class FeatsHandler {
     if ((action === 'hide' || action === 'sneak') && feats.has('vanish-into-the-land')) {
       let inNatural = !!context?.inNaturalTerrain;
       if (!inNatural) {
-        try { inNatural = EnvironmentHelper.isEnvironmentActive(tokenOrActor, 'natural'); } catch { }
+        try {
+          inNatural = EnvironmentHelper.isEnvironmentActive(tokenOrActor, 'natural');
+        } catch {}
       }
-      if (inNatural && (context?.outcome === 'success' || context?.outcome === 'critical-success')) {
+      if (
+        inNatural &&
+        (context?.outcome === 'success' || context?.outcome === 'critical-success')
+      ) {
         newVisibility = step(newVisibility, towardsConcealment, +1);
       }
       return newVisibility;
@@ -318,9 +278,10 @@ export class FeatsHandler {
   static getSneakSpeedMultiplier(tokenOrActor) {
     const actor = FeatsHandlerInternal.resolveActor(tokenOrActor);
     if (!actor) return 0.5;
-    const feats = getActorFeatSlugs(actor);
+    const feats = getActorFeatureSlugs(actor);
     // Full-speed Sneak feats
-    if (feats.has('swift-sneak') || feats.has('legendary-sneak') || feats.has('very-very-sneaky')) return 1.0;
+    if (feats.has('swift-sneak') || feats.has('legendary-sneak') || feats.has('very-very-sneaky'))
+      return 1.0;
     // Future: partial reductions could be handled here (e.g., 0.75)
     return 0.5;
   }
@@ -332,7 +293,7 @@ export class FeatsHandler {
   static getSneakDistanceBonusFeet(tokenOrActor) {
     const actor = FeatsHandlerInternal.resolveActor(tokenOrActor);
     if (!actor) return 0;
-    const feats = getActorFeatSlugs(actor);
+    const feats = getActorFeatureSlugs(actor);
     let bonus = 0;
     if (feats.has('very-sneaky') || feats.has('sneaky')) bonus += 5;
     // Room for other feats that extend Sneak distance (stack carefully)
@@ -350,7 +311,7 @@ export class FeatsHandler {
   static overridePrerequisites(tokenOrActor, base, extra = {}) {
     const actor = FeatsHandlerInternal.resolveActor(tokenOrActor);
     if (!actor) return base;
-    const feats = getActorFeatSlugs(actor);
+    const feats = getActorFeatureSlugs(actor);
 
     let { startQualifies, endQualifies } = base;
     let reason = base.reason || '';
@@ -366,15 +327,28 @@ export class FeatsHandler {
     // (but NOT urban environments)
     if (feats.has('camouflage')) {
       try {
-        const naturalTerrains = ['aquatic', 'arctic', 'desert', 'forest', 'mountain', 'plains', 'sky', 'swamp', 'underground'];
-        const inNaturalTerrain = naturalTerrains.some(terrain =>
-          EnvironmentHelper.isEnvironmentActive(tokenOrActor, terrain)
+        const naturalTerrains = [
+          'aquatic',
+          'arctic',
+          'desert',
+          'forest',
+          'mountain',
+          'plains',
+          'sky',
+          'swamp',
+          'underground',
+        ];
+        const inNaturalTerrain = naturalTerrains.some((terrain) =>
+          EnvironmentHelper.isEnvironmentActive(tokenOrActor, terrain),
         );
         if (inNaturalTerrain) {
           endQualifies = true;
-          if (!reason) reason = 'Camouflage removes cover/concealment requirement in natural terrain';
+          if (!reason)
+            reason = 'Camouflage removes cover/concealment requirement in natural terrain';
         }
-      } catch { /* best-effort only */ }
+      } catch {
+        /* best-effort only */
+      }
     }
 
     // Legendary Sneak: You can Hide and Sneak even without cover or being concealed.
@@ -397,7 +371,8 @@ export class FeatsHandler {
       try {
         const selections = FeatsHandler._getTerrainStalkerSelections(actor);
         for (const selection of selections) {
-          const regions = EnvironmentHelper.getMatchingEnvironmentRegions(tokenOrActor, selection) || [];
+          const regions =
+            EnvironmentHelper.getMatchingEnvironmentRegions(tokenOrActor, selection) || [];
           if (regions.length > 0) {
             // In matching difficult terrain for ANY TS selection: relax end requirement
             if (!endQualifies) endQualifies = true;
@@ -405,7 +380,9 @@ export class FeatsHandler {
             break;
           }
         }
-      } catch { /* best-effort only */ }
+      } catch {
+        /* best-effort only */
+      }
     }
 
     // Terrain Stalker: Can Hide or Sneak while observed in chosen terrain
@@ -432,7 +409,10 @@ export class FeatsHandler {
     // as cover for the Hide and Sneak actions (but not for other uses).
     // Scope: only applies to Hide/Sneak prerequisite checks; does not modify actual cover state,
     // bonuses, or Take Cover eligibility.
-    if (feats.has('distracting-shadows') && (extra?.action === 'hide' || extra?.action === 'sneak')) {
+    if (
+      feats.has('distracting-shadows') &&
+      (extra?.action === 'hide' || extra?.action === 'sneak')
+    ) {
       try {
         const observer = extra?.observer || null;
         const actorToken = FeatsHandlerInternal.resolveToken(tokenOrActor) || tokenOrActor;
@@ -443,9 +423,12 @@ export class FeatsHandler {
         // For end: prefer explicit boolean, else compute using endHint if provided.
         // If no hint is available (e.g., end position is virtual during preview), allow a conservative
         // fallback: if system detected only 'lesser' cover at end, consider it sufficient for prerequisites.
-        let endHasLargeCover = typeof extra?.endHasLargeCreatureCover === 'boolean'
-          ? extra.endHasLargeCreatureCover
-          : (endHint ? coverDetector.hasLargeCreatureCover(observer, actorToken, endHint) : false);
+        let endHasLargeCover =
+          typeof extra?.endHasLargeCreatureCover === 'boolean'
+            ? extra.endHasLargeCreatureCover
+            : endHint
+              ? coverDetector.hasLargeCreatureCover(observer, actorToken, endHint)
+              : false;
         if (!endHasLargeCover && extra?.endCoverState === 'lesser') {
           endHasLargeCover = true; // Treat creature-provided lesser cover as sufficient for DS prerequisites
         }
@@ -511,9 +494,11 @@ export class FeatsHandler {
             const maybe = it.system?.selection ?? it.system?.value?.selection ?? null;
             if (typeof maybe === 'string' && maybe) selections.add(normalizeSlug(maybe));
           }
-        } catch { /* skip malformed item */ }
+        } catch {
+          /* skip malformed item */
+        }
       }
-    } catch { }
+    } catch {}
     return Array.from(selections);
   }
 

@@ -3,7 +3,15 @@ jest.mock('../../../scripts/cover/auto-cover/AutoCoverSystem.js', () => ({
 }));
 
 function getManager() {
-    const mod = require('../../../scripts/cover/auto-cover/CoverUIManager.js');
+    jest.unmock('../../../scripts/cover/auto-cover/CoverUIManager.js');
+    const mod = jest.requireActual('../../../scripts/cover/auto-cover/CoverUIManager.js');
+    if (mod.default?.shouldShowCoverOverrideIndicator) return mod.default;
+    if (mod.default?.default?.shouldShowCoverOverrideIndicator) return mod.default.default;
+    const ManagerClass =
+        mod.CoverUIManager ||
+        mod.default?.CoverUIManager ||
+        mod.default?.default?.CoverUIManager;
+    if (ManagerClass) return new ManagerClass();
     return mod.default || mod;
 }
 
@@ -57,20 +65,28 @@ describe('Ceaseless Shadows chat indicator', () => {
         });
 
         let indicatorAdded = false;
+        const emptyResult = {
+            length: 0,
+            first: () => emptyResult,
+            after: () => { },
+            append: () => { },
+            html: () => '',
+            is: () => false,
+            prepend: () => { },
+            find: () => emptyResult,
+            filter: () => emptyResult,
+            last: () => emptyResult,
+            text: () => ''
+        };
+        const acSpan = {
+            length: 1,
+            first: () => acSpan,
+            after: () => { indicatorAdded = true; }
+        };
         const html = {
             find: (selector) => {
-                if (selector && selector.includes('pf2e-visioner-cover-feat-indicator')) {
-                    indicatorAdded = true;
-                }
-                return {
-                    length: 0,
-                    first: () => ({ length: 0 }),
-                    after: () => { },
-                    append: () => { },
-                    html: () => { },
-                    is: () => false,
-                    prepend: () => { }
-                };
+                if (selector === '.target-dc .adjusted') return acSpan;
+                return emptyResult;
             }
         };
 
@@ -84,5 +100,77 @@ describe('Ceaseless Shadows chat indicator', () => {
         if (prevIsGM !== undefined) global.game.user.isGM = prevIsGM;
 
         expect(indicatorAdded).toBe(false);
+    });
+
+    test('shouldShowCoverOverrideIndicator true with off-guard suppression flag', async () => {
+        const message = makeMessage({
+            'pf2e-visioner': {
+                offGuardSuppression: {
+                    source: 'deny-advantage',
+                    feat: 'deny-advantage',
+                    label: 'Deny Advantage',
+                    visibilityState: 'hidden',
+                    preventedModifier: -2
+                }
+            }
+        });
+        const prevIsGM = global.game?.user?.isGM;
+        if (!global.game) global.game = { user: { isGM: true } };
+        else global.game.user.isGM = true;
+        const mgr = getManager();
+
+        const res = await mgr.shouldShowCoverOverrideIndicator(message);
+
+        if (prevIsGM !== undefined) global.game.user.isGM = prevIsGM;
+        expect(res).toBe(true);
+    });
+
+    test('injectCoverOverrideIndicator adds off-guard suppression element', async () => {
+        const message = makeMessage({
+            'pf2e-visioner': {
+                offGuardSuppression: {
+                    source: 'deny-advantage',
+                    feat: 'deny-advantage',
+                    label: 'Deny Advantage',
+                    visibilityState: 'hidden',
+                    preventedModifier: -2
+                }
+            }
+        });
+        let inserted = '';
+        const emptyResult = {
+            length: 0,
+            first: () => emptyResult,
+            after: () => { },
+            append: () => { },
+            html: () => '',
+            is: () => false,
+            prepend: () => { },
+            find: () => emptyResult,
+            filter: () => emptyResult,
+            last: () => emptyResult,
+            text: () => ''
+        };
+        const acSpan = {
+            length: 1,
+            first: () => acSpan,
+            after: (html) => { inserted = html; }
+        };
+        const html = {
+            find: (selector) => {
+                if (selector === '.target-dc .adjusted') return acSpan;
+                return emptyResult;
+            }
+        };
+        const prevIsGM = global.game?.user?.isGM;
+        if (!global.game) global.game = { user: { isGM: true } };
+        else global.game.user.isGM = true;
+        const mgr = getManager();
+
+        await mgr.injectCoverOverrideIndicator(message, html, true);
+
+        if (prevIsGM !== undefined) global.game.user.isGM = prevIsGM;
+        expect(inserted).toContain('pf2e-visioner-off-guard-suppression-indicator');
+        expect(inserted).toContain('Deny Advantage');
     });
 });

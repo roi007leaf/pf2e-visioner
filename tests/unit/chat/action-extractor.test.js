@@ -238,6 +238,32 @@ describe('Action Extractor Tests', () => {
         roll: { total: 22, dice: [{ total: 15 }] },
       });
     });
+
+    test('uses actor speaker id for Search exploration when no token is on the scene', async () => {
+      const message = {
+        id: 'msg1',
+        speaker: { actor: 'pc-actor-1' },
+        flags: {
+          pf2e: {
+            context: {
+              type: 'perception-check',
+              options: ['exploration:search'],
+            },
+          },
+        },
+        rolls: [{ total: 18, dice: [{ total: 11 }] }],
+      };
+
+      const result = await extractActionData(message);
+
+      expect(result).toMatchObject({
+        messageId: 'msg1',
+        actionType: 'seek',
+        searchExploration: true,
+        searchExplorationTokenId: 'pc-actor-1',
+        roll: { total: 18, dice: [{ total: 11 }] },
+      });
+    });
   });
 
   describe('Create a Diversion Action Detection', () => {

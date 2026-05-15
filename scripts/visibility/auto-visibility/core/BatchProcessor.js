@@ -1,4 +1,5 @@
 import { RuleElementChecker } from '../../../rule-elements/RuleElementChecker.js';
+import { SensePrecomputer } from '../../../services/SensePrecomputer.js';
 import { getLogger } from '../../../utils/logger.js';
 import { GlobalLosCache } from '../utils/GlobalLosCache.js';
 import { GlobalVisibilityCache } from '../utils/GlobalVisibilityCache.js';
@@ -172,7 +173,6 @@ export class BatchProcessor {
         sensesCache = this._persistentCaches.sensesCache;
       } else {
         // Build fresh senses cache
-        const { VisionAnalyzer } = await import('../VisionAnalyzer.js');
         const visionAnalyzer = VisionAnalyzer.getInstance();
         sensesCache = new SensesCapabilitiesCache(visionAnalyzer);
         sensesCache.build(allTokens);
@@ -197,7 +197,6 @@ export class BatchProcessor {
     let precomputeStats = (calcOptions && calcOptions.precomputeStats) || null;
     if (!precomputedLights) {
       try {
-        const { LightingPrecomputer } = await import('../LightingPrecomputer.js');
         const positions = new Map();
         for (const t of allTokens) {
           const id = t?.document?.id;
@@ -223,77 +222,11 @@ export class BatchProcessor {
       };
     }
 
-    // Precompute LOS for all token pairs to avoid redundant checks
-    // CRITICAL: Skip ALL precomputed LOS if this batch is after movement (skipPrecomputedLOS flag)
-    // because token positions have changed and any precomputed LOS would be stale
-    // ALSO: Skip when window is minimized because vision polygons aren't computed
+    // Lazily populated during the main directional LOS checks below. This avoids an eager
+    // all-pairs LOS pass followed by a second LOS pass in the main loop.
     const precomputedLOS = new Map();
 
-    const isWindowMinimized = typeof document !== 'undefined' && document.hidden;
-
-    if (calcOptions?.skipPrecomputedLOS || isWindowMinimized) {
-      try {
-        getLogger('AVS/BatchProcessor').debug(() => ({
-          msg: 'skipping-all-precomputed-los',
-          reason: isWindowMinimized ? 'window-minimized' : 'batch-after-movement',
-        }));
-      } catch {}
-    } else {
-      // Only precompute LOS if not skipping
-      const animatingTokenIds = new Set();
-
-      // Detect which tokens are currently animating or being dragged
-      for (const token of allTokens) {
-        const isAnimating = token._animation?.promise || token._animation?.active;
-        const isDragging = token._dragPassthrough || token.document?.flags?.core?.isDragging;
-        if (isAnimating || isDragging) {
-          animatingTokenIds.add(token.document.id);
-          try {
-            getLogger('AVS/BatchProcessor').debug(() => ({
-              msg: 'detected-animating-token',
-              tokenName: token.name,
-              tokenId: token.document.id,
-              isAnimating,
-              isDragging,
-            }));
-          } catch {}
-        }
-      }
-
-      if (animatingTokenIds.size > 0) {
-        try {
-          getLogger('AVS/BatchProcessor').debug(() => ({
-            msg: 'skipping-precomputed-los-for-animating-tokens',
-            animatingCount: animatingTokenIds.size,
-            animatingTokens: Array.from(animatingTokenIds),
-          }));
-        } catch {}
-      }
-
-      for (let i = 0; i < allTokens.length; i++) {
-        for (let j = i + 1; j < allTokens.length; j++) {
-          const tokenA = allTokens[i];
-          const tokenB = allTokens[j];
-
-          // Skip precomputing LOS if either token is animating/dragging
-          // The LOS will be calculated fresh during visibility calculation instead
-          if (
-            animatingTokenIds.has(tokenA.document.id) ||
-            animatingTokenIds.has(tokenB.document.id)
-          ) {
-            continue;
-          }
-
-          const losAB = this.visionAnalyzer.hasLineOfSight(tokenA, tokenB);
-          const losBA = this.visionAnalyzer.hasLineOfSight(tokenB, tokenA);
-          precomputedLOS.set(`${tokenA.document.id}-${tokenB.document.id}`, losAB);
-          precomputedLOS.set(`${tokenB.document.id}-${tokenA.document.id}`, losBA);
-        }
-      }
-    }
-
     // Precompute sense capabilities for all tokens
-    const { SensePrecomputer } = await import('../../../services/SensePrecomputer.js');
     const precomputedSenses = SensePrecomputer.precompute(allTokens, this.visionAnalyzer);
 
     // Common calc options composed once per batch
@@ -310,6 +243,13 @@ export class BatchProcessor {
       useStatelessCalculator: true,
       visibilityMapCache: visCache,
     };
+
+    const processedChangedPairKeys = new Set();
+    let viewportTokenIds = null;
+    if (!calcOptions?.skipViewportFilter) {
+      viewportTokenIds =
+        this.viewportFilterService.getTokenIdSet?.(64, index, (t) => getPos(t)) || null;
+    }
 
     for (const changedTokenId of changedTokenIds) {
       const changedToken = idToToken.get(changedTokenId);
@@ -336,12 +276,8 @@ export class BatchProcessor {
       // Optional client-side viewport filtering for relevant tokens.
       // Skipped for movement batches: the destination room may be off-screen from the GM's
       // viewport, so creatures there must still be included for correct recalculation.
-      if (!calcOptions?.skipViewportFilter) {
-        const inView =
-          this.viewportFilterService.getTokenIdSet?.(64, index, (t) => getPos(t)) || null;
-        if (inView && inView.size > 0) {
-          relevantTokens = relevantTokens.filter((t) => inView.has(t.document.id));
-        }
+      if (viewportTokenIds && viewportTokenIds.size > 0) {
+        relevantTokens = relevantTokens.filter((t) => viewportTokenIds.has(t.document.id));
       }
 
       const potentialOthers = Math.max(0, allTokens.length - 1);
@@ -353,6 +289,12 @@ export class BatchProcessor {
 
         const aId = changedToken.document.id;
         const bId = otherToken.document.id;
+        if (changedTokenIds.has(bId)) {
+          const pairKey = aId < bId ? `${aId}|${bId}` : `${bId}|${aId}`;
+          if (processedChangedPairKeys.has(pairKey)) continue;
+          processedChangedPairKeys.add(pairKey);
+        }
+
         const posA = changedTokenPos; // reuse memoized
         const posB =
           posCache.getPositionById(bId) || this.positionManager.getTokenPosition(otherToken);
@@ -522,6 +464,10 @@ export class BatchProcessor {
           }
 
           batchLosCache.set(cacheKey, directionalLos);
+          precomputedLOS.set(
+            `${observerToken.document.id}-${targetToken.document.id}`,
+            directionalLos,
+          );
 
           return directionalLos;
         };

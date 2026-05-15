@@ -23,6 +23,54 @@
 - Concealment-sensitive stealth logic no longer treats Hidden or Undetected as if they were the concealed condition.
 - Encounter-start Unnoticed continues to hide tokens and tracker rows while using Undetected as the underlying detection state.
 
+## [8.2.9] - 2026-05-13
+
+### Fixed
+
+- **Hazard/Loot and hidden-wall prep without PC tokens persists and can be cleared**: GMs can now mark loot, hazards, and hidden walls Hidden from PCs while prepping scenes that have no player character tokens yet. The Hazard/Loot Manager and Hidden Scene Visibility scene tool store prep defaults on those targets, future player-owned character tokens inherit the hidden visibility when they are added, and that same scene tool can Clear Prep to remove prep defaults plus current PC token and hidden-wall visibility entries.
+- **Search exploration works during no-PC scene prep**: The Search token HUD button recognizes prepped-hidden loot targets, and the token HUD action plus hidden-wall scene button now fall back to player-owned PC actors with Search active when there are no PC tokens on the scene.
+- **No-PC Search exploration results apply later**: Open Results rebuilds actor-based PC searchers instead of requiring scene tokens, and applying those results stores actor-specific scene prep so future PC tokens inherit the discovered token and hidden-wall visibility.
+
+## [8.2.8] - 2026-05-13
+
+### Fixed
+
+- **Hidden wall settings reveal immediately**: The wall quick settings dialog now shows the hidden wall identifier, stealth DC, and connected wall inputs as soon as the GM checks Hidden Wall, without waiting for Apply.
+- **Search exploration no longer blocked by combat**: GM-triggered Search exploration for hidden walls, hidden loot, hazards, and hidden NPCs is now available whenever the GM chooses to run it, including during active combat or while testing exploration on another scene.
+
+## [8.2.7] - 2026-05-12
+
+### Added
+
+- **Deny Advantage chat indication added**: Attack chat cards now show a GM-facing Deny Advantage indicator when the class feature suppresses visibility-driven off-guard from hidden or undetected attackers.
+
+### Fixed
+
+- **Hidden-attacker off-guard suppression respected**: Visibility-driven off-guard now honors native Blind-Fight and Deny Advantage during batch effect sync and attack-roll refreshes, handles PF2e token-document roll contexts, and repairs already-built AC DCs so hidden attackers no longer make protected defenders off-guard.
+- **PF2E off-guard suppression sources expanded**: Visibility-driven off-guard suppression now also recognizes PF2E's `offGuardable` flanking attribute for Deny Advantage, off-guard immunity rules, and Starsong Nectar's undetected-only protection, with matching chat-source labels.
+
+## [8.2.6] - 2026-05-11
+
+### Fixed
+
+- **Non-AVS interaction overhead reduced**: The fallback floating HUD button no longer accumulates document-level drag listeners across token selections, observer-mode hover tooltips now read the observer visibility map once per hover instead of once per visible target, and token refresh hooks now skip visual-effect helper loading unless the refreshed token is actually controlled.
+- **Cover visualization occupancy checks precomputed**: The cover overlay now builds its blocking-token occupancy list once per overlay instead of rechecking every scene token and visibility state for every sampled grid square, reducing work in crowded scenes while holding the cover visualization key.
+
+## [8.2.5] - 2026-05-11
+
+### Fixed
+
+- **AVS large-scene batch performance improved**: Full AVS recalculations with many changed tokens now avoid duplicate bidirectional pair processing, preserve global visibility and line-of-sight caches for non-movement batches, avoid hot dynamic imports inside batch execution, and reuse freshly recomputed lighting after one forced refresh instead of recalculating every token's light for rapid follow-up batches.
+- **AVS override validation performance improved**: Override validity checks now prewarm and reuse the visibility, cover, and vision analyzer modules, removing multi-second import stalls from large-token override validation runs.
+- **Non-AVS interaction overhead reduced**: The fallback floating HUD button no longer accumulates document-level drag listeners across token selections, observer-mode hover tooltips now read the observer visibility map once per hover instead of once per visible target, and token refresh hooks now skip visual-effect helper loading unless the refreshed token is actually controlled.
+- **Cover visualization occupancy checks precomputed**: The cover overlay now builds its blocking-token occupancy list once per overlay instead of rechecking every scene token and visibility state for every sampled grid square, reducing work in crowded scenes while holding the cover visualization key.
+
+## [8.2.4] - 2026-05-11
+
+### Fixed
+
+- **Visioner LOS now matches Foundry token visibility polygons**: AVS line-of-sight checks now respect Foundry's point visibility results in both Foundry v13 and v14, preventing targets hidden by the rendered vision/lighting polygon from being marked observed by Visioner's geometric fallback while preserving Visioner's custom proximity wall behavior.
+
 ## [8.2.3] - 2026-05-11
 
 ### Fixed

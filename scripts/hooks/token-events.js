@@ -97,6 +97,11 @@ async function checkAndRestorePartyTokenState(tokenDoc) {
         await restoreTokenStateFromParty(tokenDoc);
       }
     }
+
+    const { applyDefaultPlayerVisibilityForToken } = await import(
+      '../services/initial-scene-hidden-setup.js'
+    );
+    await applyDefaultPlayerVisibilityForToken(tokenDoc);
   } catch (error) {
     console.error('PF2E Visioner: Error in checkAndRestorePartyTokenState:', error);
   }
@@ -191,6 +196,17 @@ export function registerTokenHooks() {
 
   // Hook into token creation after it's fully created with proper ID and actor
   Hooks.on('createToken', async (tokenDoc, options, userId) => {
+    if (game.user?.isGM && game.user?.id !== userId) {
+      try {
+        const { applyDefaultPlayerVisibilityForToken } = await import(
+          '../services/initial-scene-hidden-setup.js'
+        );
+        await applyDefaultPlayerVisibilityForToken(tokenDoc);
+      } catch (error) {
+        console.warn('PF2E Visioner | Error applying default player visibility:', error);
+      }
+    }
+
     if (game.user.id !== userId) return; // Only handle for the user who created the token
 
     // Small delay to ensure actor data is fully loaded

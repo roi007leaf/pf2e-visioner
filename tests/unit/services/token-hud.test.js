@@ -32,6 +32,27 @@ describe('Token HUD buttons', () => {
     expect(root.querySelector('[data-action="pf2e-visioner-visibility"]')).toBeNull();
   });
 
+  test('renders Search exploration target button for loot prepped hidden without PC tokens', async () => {
+    game.settings.set('pf2e-visioner', 'useHudButton', true);
+    game.settings.set('pf2e-visioner', 'includeLootActors', false);
+    const token = createMockToken({
+      id: 'prepped-hidden-loot',
+      actor: createMockActor({ type: 'loot' }),
+      flags: { [MODULE_ID]: { defaultPlayerVisibility: 'hidden' } },
+    });
+    canvas.tokens.placeables = [token];
+    const root = document.createElement('div');
+    const column = document.createElement('div');
+    column.className = 'col left';
+    root.appendChild(column);
+
+    const { onRenderTokenHUD } = await import('../../../scripts/services/token-hud.js');
+    onRenderTokenHUD({ object: token, render: jest.fn() }, root);
+
+    expect(root.querySelector('[data-action="pf2e-visioner-search-exploration"]')).not.toBeNull();
+    expect(root.querySelector('[data-action="pf2e-visioner-visibility"]')).toBeNull();
+  });
+
   test('renders Search exploration target button for hidden NPCs but not visible NPCs', async () => {
     game.settings.set('pf2e-visioner', 'useHudButton', true);
     const { onRenderTokenHUD } = await import('../../../scripts/services/token-hud.js');

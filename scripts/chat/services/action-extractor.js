@@ -147,7 +147,11 @@ export async function extractActionData(message) {
       ? radiusFeet
       : undefined;
     data.searchExplorationTokenId =
-      searchExplorationFlag?.tokenId || message.speaker?.token || actorToken?.id || null;
+      searchExplorationFlag?.tokenId ||
+      message.speaker?.token ||
+      actorToken?.id ||
+      message.speaker?.actor ||
+      null;
     data.searchExplorationTargetTokenId = searchExplorationFlag?.targetTokenId || null;
     data.searchExplorationTargetWallId = searchExplorationFlag?.targetWallId || null;
     data.searchExplorationGroupId = searchExplorationFlag?.groupId || null;

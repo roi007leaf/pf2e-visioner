@@ -104,38 +104,83 @@ export function normalizeVisibilityMap(map = {}) {
   return normalized;
 }
 
+function buildVisibilityMapDiff(previousMap = {}, nextMap = {}) {
+  const ids = new Set([...Object.keys(previousMap ?? {}), ...Object.keys(nextMap ?? {})]);
+  const changes = [];
+
+  for (const id of ids) {
+    const before = previousMap?.[id] ?? 'observed';
+    const after = nextMap?.[id] ?? 'observed';
+    if (before === after) continue;
+
+    const target = canvas?.tokens?.get?.(id);
+    changes.push({
+      targetId: id,
+      targetName: target?.name ?? target?.document?.name ?? id,
+      from: before,
+      to: after,
+    });
+  }
+
+  return changes;
+}
+
+function getTokenDocument(tokenOrDocument) {
+  if (typeof tokenOrDocument?.document?.getFlag === 'function') return tokenOrDocument.document;
+  if (typeof tokenOrDocument?.getFlag === 'function') return tokenOrDocument;
+  if (typeof tokenOrDocument?.object?.document?.getFlag === 'function') {
+    return tokenOrDocument.object.document;
+  }
+  return null;
+}
+
+function getTokenId(tokenOrDocument) {
+  return (
+    tokenOrDocument?.document?.id ||
+    tokenOrDocument?.id ||
+    tokenOrDocument?.object?.document?.id ||
+    tokenOrDocument?.object?.id ||
+    null
+  );
+}
+
 async function unsetDocumentFlag(token, flagKey, forcedDeletion) {
-  if (typeof token.document.unsetFlag === 'function') {
-    return token.document.unsetFlag(MODULE_ID, flagKey);
+  const document = getTokenDocument(token);
+  if (!document) return;
+  if (typeof document.unsetFlag === 'function') {
+    return document.unsetFlag(MODULE_ID, flagKey);
   }
 
   const path = `flags.${MODULE_ID}.${flagKey}`;
   if (forcedDeletion) {
-    return token.document.update(
+    return document.update(
       { [path]: forcedDeletion },
       { diff: false, render: false, animate: false },
     );
   }
 
-  return token.document.update(
+  return document.update(
     { [`flags.${MODULE_ID}.-=${flagKey}`]: null },
     { diff: false, render: false, animate: false },
   );
 }
 
 async function setDocumentFlag(token, flagKey, value) {
-  if (typeof token.document.setFlag === 'function') {
-    return token.document.setFlag(MODULE_ID, flagKey, value);
+  const document = getTokenDocument(token);
+  if (!document) return;
+  if (typeof document.setFlag === 'function') {
+    return document.setFlag(MODULE_ID, flagKey, value);
   }
 
-  return token.document.update(
+  return document.update(
     { [`flags.${MODULE_ID}.${flagKey}`]: value },
     { diff: false, render: false, animate: false },
   );
 }
 
 function getRawPerceptionProfileMap(token) {
-  const map = token?.document?.getFlag?.(MODULE_ID, VISIBILITY_V2_FLAG) ?? {};
+  const document = getTokenDocument(token);
+  const map = document?.getFlag?.(MODULE_ID, VISIBILITY_V2_FLAG) ?? {};
   return normalizePerceptionProfileMap(map);
 }
 
@@ -186,14 +231,27 @@ export function getPerceptionProfileMap(token) {
  * @param {Record<string,string>} visibilityMap
  */
 export async function setVisibilityMap(token, visibilityMap) {
-  if (!token?.document) return;
+  const document = getTokenDocument(token);
+  if (!document) return;
   // Only GMs can update token documents
   if (!game.user.isGM) {
     console.warn('PF2E Visioner | setVisibilityMap: Not GM, skipping visibility map update');
     return;
   }
 
+  const previousMap = getVisibilityMap(token);
   const nextMap = normalizeVisibilityMap(visibilityMap);
+  const changes = buildVisibilityMapDiff(previousMap, nextMap);
+  if (changes.length) {
+    log.debug(() => ({
+      msg: 'persist-visibility-map',
+      observerId: document.id,
+      observerName: token.name ?? document.name ?? document.id,
+      changeCount: changes.length,
+      changes,
+    }));
+  }
+
   const previousProfiles = getPerceptionProfileMap(token);
   const nextProfiles = legacyVisibilityMapToProfiles(nextMap, previousProfiles);
   return setPerceptionProfileFlag(token, nextProfiles);
@@ -206,7 +264,9 @@ export async function setVisibilityMap(token, visibilityMap) {
  * @param {{syncLegacy?: boolean, preserveEncounterUnnoticed?: boolean}} options
  */
 export async function setPerceptionProfileMap(token, profileMap, options = {}) {
-  if (!token?.document) return;
+  void options;
+  const document = getTokenDocument(token);
+  if (!document) return;
   if (!game.user.isGM) {
     console.warn('PF2E Visioner | setPerceptionProfileMap: Not GM, skipping visibility map update');
     return;
@@ -223,7 +283,7 @@ export async function setPerceptionProfileMap(token, profileMap, options = {}) {
  */
 export function getVisibilityBetween(observer, target) {
   const visibilityMap = getVisibilityMap(observer);
-  return visibilityMap[target?.document?.id] || 'observed';
+  return visibilityMap[getTokenId(target)] || 'observed';
 }
 
 /**
@@ -233,7 +293,7 @@ export function getVisibilityBetween(observer, target) {
  */
 export function getPerceptionProfileBetween(observer, target) {
   const profileMap = getPerceptionProfileMap(observer);
-  return profileMap[target?.document?.id] || { ...DEFAULT_PERCEPTION_PROFILE };
+  return profileMap[getTokenId(target)] || { ...DEFAULT_PERCEPTION_PROFILE };
 }
 
 async function applyVisibilitySideEffects(observer, target, state, options = {}) {
@@ -250,7 +310,7 @@ async function applyVisibilitySideEffects(observer, target, state, options = {})
   const { OffGuardSuppression } = await import(
     '../rule-elements/operations/OffGuardSuppression.js'
   );
-  if (OffGuardSuppression.shouldSuppressOffGuardForState(observer, state)) {
+  if (OffGuardSuppression.shouldSuppressOffGuardForState(observer, state, target)) {
     // Remove any existing off-guard effects
     try {
       if (autoVisibilitySystem) {
@@ -291,9 +351,11 @@ async function applyVisibilitySideEffects(observer, target, state, options = {})
 
 function notifyVisibilityMapUpdated(observer, target, state, options = {}) {
   try {
+    const observerId = getTokenId(observer);
+    const targetId = getTokenId(target);
     Hooks.callAll?.('pf2e-visioner.visibilityMapUpdated', {
-      observerId: observer.document.id,
-      targetId: target.document.id,
+      observerId,
+      targetId,
       state,
       direction: options.direction || 'observer_to_target',
     });
@@ -301,12 +363,16 @@ function notifyVisibilityMapUpdated(observer, target, state, options = {}) {
 }
 
 function logVisibilityPairChange(observer, target, from, to, options = {}) {
+  const observerId = getTokenId(observer);
+  const targetId = getTokenId(target);
+  const observerDocument = getTokenDocument(observer);
+  const targetDocument = getTokenDocument(target);
   log.debug(() => ({
     msg: 'set-visibility-between',
-    observerId: observer.document.id,
-    observerName: observer.name ?? observer.document.name ?? observer.document.id,
-    targetId: target.document.id,
-    targetName: target.name ?? target.document.name ?? target.document.id,
+    observerId,
+    observerName: observer.name ?? observerDocument?.name ?? observerId,
+    targetId,
+    targetName: target.name ?? targetDocument?.name ?? targetId,
     from,
     to,
     options,
@@ -316,8 +382,8 @@ function logVisibilityPairChange(observer, target, from, to, options = {}) {
 async function setUnknownLegacyVisibilityBetween(observer, target, state, options = {}) {
   log.warn?.(() => ({
     msg: 'ignore-unknown-legacy-visibility-state',
-    observerId: observer.document.id,
-    targetId: target.document.id,
+    observerId: getTokenId(observer),
+    targetId: getTokenId(target),
     state,
   }));
   await applyVisibilitySideEffects(observer, target, 'observed', options);
@@ -336,7 +402,9 @@ export async function setPerceptionProfileBetween(
   profile,
   options = { skipEphemeralUpdate: false, direction: 'observer_to_target', skipCleanup: false },
 ) {
-  if (!observer?.document?.id || !target?.document?.id) return;
+  const observerId = getTokenId(observer);
+  const targetId = getTokenId(target);
+  if (!observerId || !targetId) return;
 
   const profileMap = { ...getPerceptionProfileMap(observer) };
   const rawProfileMap = getRawPerceptionProfileMap(observer);
@@ -351,13 +419,13 @@ export async function setPerceptionProfileBetween(
   const profileChanged =
     JSON.stringify(normalizePerceptionProfile(currentProfile)) !== JSON.stringify(nextProfile);
   const missingStoredProfile =
-    !rawProfileMap[target.document.id] && !isDefaultProfile(nextProfile);
+    !rawProfileMap[targetId] && !isDefaultProfile(nextProfile);
 
   if (profileChanged || missingStoredProfile) {
     if (isDefaultProfile(nextProfile)) {
-      delete profileMap[target.document.id];
+      delete profileMap[targetId];
     } else {
-      profileMap[target.document.id] = nextProfile;
+      profileMap[targetId] = nextProfile;
     }
 
     logVisibilityPairChange(
@@ -389,7 +457,7 @@ export async function setVisibilityBetween(
   state,
   options = { skipEphemeralUpdate: false, direction: 'observer_to_target', skipCleanup: false },
 ) {
-  if (!observer?.document?.id || !target?.document?.id) return;
+  if (!getTokenId(observer) || !getTokenId(target)) return;
 
   if (!isKnownLegacyVisibilityState(state)) {
     await setUnknownLegacyVisibilityBetween(observer, target, state, options);

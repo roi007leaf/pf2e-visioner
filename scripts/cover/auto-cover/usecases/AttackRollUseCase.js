@@ -8,11 +8,21 @@ import {
   getCoverImageForState,
   getCoverLabel,
 } from '../../../helpers/cover-helpers.js';
-import { getCoverBetween } from '../../../utils.js';
+import { MODULE_ID } from '../../../constants.js';
+import { OffGuardSuppression } from '../../../rule-elements/operations/OffGuardSuppression.js';
+import { getCoverBetween, getVisibilityBetween, setVisibilityBetween } from '../../../utils.js';
 import { getCoverLevelRollOptions } from '../../batch.js';
 import autoCoverSystem from '../AutoCoverSystem.js';
 import coverDetector from '../CoverDetector.js';
 import { BaseAutoCoverUseCase } from './BaseUseCase.js';
+
+const OFF_GUARD_SUPPRESSION_CHAT = {
+  'deny-advantage': { feat: 'deny-advantage', label: 'Deny Advantage' },
+  'blind-fight': { feat: 'blind-fight', label: 'Blind-Fight' },
+  'starsong-nectar': { feat: 'starsong-nectar', label: 'Starsong Nectar' },
+  'off-guard-immunity': { feat: 'off-guard-immunity', label: 'Off-Guard Immunity' },
+};
+
 class AttackRollUseCase extends BaseAutoCoverUseCase {
   constructor() {
     super();
@@ -20,35 +30,131 @@ class AttackRollUseCase extends BaseAutoCoverUseCase {
     this.autoCoverSystem = autoCoverSystem;
   }
 
+  _assignActorToToken(token, clonedActor) {
+    if (!token || !clonedActor) return;
+
+    try {
+      const actorDescriptor =
+        Object.getOwnPropertyDescriptor(token, 'actor') ||
+        Object.getOwnPropertyDescriptor(Object.getPrototypeOf(token), 'actor');
+      const canAssignActor = !actorDescriptor || !!actorDescriptor.writable || !!actorDescriptor.set;
+      if (canAssignActor) {
+        token.actor = clonedActor;
+      }
+    } catch (_) {}
+  }
+
+  _traceToken(token) {
+    const document = token?.document ?? (typeof token?.getFlag === 'function' ? token : null);
+    const actor = token?.actor ?? document?.actor ?? null;
+    return {
+      tokenId: token?.id ?? document?.id ?? null,
+      documentId: document?.id ?? null,
+      tokenName: token?.name ?? document?.name ?? null,
+      actorId: actor?.id ?? null,
+      actorName: actor?.name ?? null,
+      actorType: actor?.type ?? null,
+      actorSignature: actor?.signature ?? null,
+      isTokenDocument: !!token?.actor && typeof token?.getFlag === 'function',
+      hasPlaceableDocument: !!token?.document,
+      isOwner: token?.isOwner ?? actor?.isOwner ?? null,
+    };
+  }
+
+  _traceModifier(modifier) {
+    return {
+      slug: modifier?.slug ?? null,
+      label: modifier?.label ?? modifier?.name ?? modifier?.title ?? null,
+      modifier: modifier?.modifier ?? null,
+      type: modifier?.type ?? null,
+      enabled: modifier?.enabled ?? null,
+    };
+  }
+
+  _traceContext(stage, attacker, target, context = null, check = null) {
+    try {
+      const targetToAttacker = attacker && target ? getVisibilityBetween(target, attacker) : null;
+      const attackerToTarget = attacker && target ? getVisibilityBetween(attacker, target) : null;
+      const suppressed =
+        attacker && target && ['hidden', 'undetected'].includes(targetToAttacker)
+          ? OffGuardSuppression.shouldSuppressOffGuardForState(target, targetToAttacker, attacker)
+          : false;
+      console.info('PF2E Visioner | Attack roll off-guard trace', {
+        stage,
+        attacker: this._traceToken(attacker),
+        target: this._traceToken(target),
+        targetToAttacker,
+        attackerToTarget,
+        suppressed,
+        contextType: context?.type ?? null,
+        contextToken: this._traceToken(context?.token),
+        contextOriginToken: this._traceToken(context?.origin?.token),
+        contextTargetToken: this._traceToken(context?.target?.token),
+        contextActorId: context?.actor?.id ?? null,
+        contextOriginActorId: context?.origin?.actor?.id ?? null,
+        contextTargetActorId: context?.target?.actor?.id ?? null,
+        dc: context?.dc
+          ? {
+              slug: context.dc.slug ?? null,
+              value: context.dc.value ?? null,
+              statisticValue: context.dc.statistic?.value ?? null,
+              statisticModifierCount: context.dc.statistic?.modifiers?.length ?? null,
+            }
+          : null,
+        checkModifierCount: Array.isArray(check?.modifiers) ? check.modifiers.length : null,
+        checkModifiers: Array.isArray(check?.modifiers)
+          ? check.modifiers.map((modifier) => this._traceModifier(modifier))
+          : null,
+      });
+    } catch (error) {
+      console.info('PF2E Visioner | Attack roll off-guard trace failed', {
+        stage,
+        error: error?.message ?? String(error),
+      });
+    }
+  }
+
   _syncClonedDefenderIntoContext(token, clonedActor, context) {
     if (!clonedActor) return;
 
-    if (token) {
-      try {
-        const actorDescriptor =
-          Object.getOwnPropertyDescriptor(token, 'actor') ||
-          Object.getOwnPropertyDescriptor(Object.getPrototypeOf(token), 'actor');
-        const canAssignActor = !actorDescriptor || !!actorDescriptor.writable || !!actorDescriptor.set;
-        if (canAssignActor) {
-          token.actor = clonedActor;
-        }
-      } catch (_) { }
-    }
+    this._assignActorToToken(token, clonedActor);
 
     const targetContext = context?.target;
     if (targetContext) {
       targetContext.actor = clonedActor;
       if (targetContext.token) {
-        try {
-          const actorDescriptor =
-            Object.getOwnPropertyDescriptor(targetContext.token, 'actor') ||
-            Object.getOwnPropertyDescriptor(Object.getPrototypeOf(targetContext.token), 'actor');
-          const canAssignActor = !actorDescriptor || !!actorDescriptor.writable || !!actorDescriptor.set;
-          if (canAssignActor) {
-            targetContext.token.actor = clonedActor;
-          }
-        } catch (_) { }
+        this._assignActorToToken(targetContext.token, clonedActor);
       }
+    }
+  }
+
+  _syncClonedAttackerIntoContext(token, clonedActor, context, check = null) {
+    if (!clonedActor) return;
+
+    this._assignActorToToken(token, clonedActor);
+
+    if (context) {
+      context.actor = clonedActor;
+      if (context.token) {
+        this._assignActorToToken(context.token, clonedActor);
+        this._assignActorToToken(context.token.object, clonedActor);
+        try {
+          if (!context.token.object) context.token.actor = clonedActor;
+        } catch (_) {}
+      }
+      if (context.origin) {
+        try {
+          context.origin.actor = clonedActor;
+        } catch (_) {}
+        this._assignActorToToken(context.origin.token, clonedActor);
+        this._assignActorToToken(context.origin.token?.object, clonedActor);
+      }
+    }
+
+    if (check) {
+      try {
+        check.actor = clonedActor;
+      } catch (_) {}
     }
   }
 
@@ -64,7 +170,7 @@ class AttackRollUseCase extends BaseAutoCoverUseCase {
           type,
         });
       }
-    } catch (_) { }
+    } catch (_) {}
 
     return {
       slug,
@@ -118,6 +224,355 @@ class AttackRollUseCase extends BaseAutoCoverUseCase {
   _isPf2eCheckDialogEnabled() {
     return !!game?.user?.flags?.pf2e?.settings?.showCheckDialogs;
   }
+
+  _getVisibilityStateForAttack(attacker, target) {
+    try {
+      return getVisibilityBetween(target, attacker);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  _isOffGuardSuppressedForAttack(attacker, target, visibilityState = null) {
+    const visState = visibilityState ?? this._getVisibilityStateForAttack(attacker, target);
+    if (!['hidden', 'undetected'].includes(visState)) return false;
+    return OffGuardSuppression.shouldSuppressOffGuardForState(target, visState, attacker);
+  }
+
+  _getOffGuardSuppressionChatInfo(attacker, target, visibilityState = null) {
+    const visState = visibilityState ?? this._getVisibilityStateForAttack(attacker, target);
+    if (!['hidden', 'undetected'].includes(visState)) return null;
+
+    const decision = OffGuardSuppression.getOffGuardSuppressionDecision(target, visState, attacker);
+    const sourceInfo = OFF_GUARD_SUPPRESSION_CHAT[decision?.source];
+    if (!decision?.result || !sourceInfo) return null;
+
+    return {
+      source: decision.source,
+      feat: sourceInfo.feat,
+      label: sourceInfo.label,
+      visibilityState: decision.state,
+      preventedModifier: -2,
+      attackerName: attacker?.name ?? attacker?.document?.name ?? null,
+      defenderName: target?.name ?? target?.document?.name ?? null,
+      attackerLevel: decision.attackerLevel,
+      defenderLevel: decision.defenderLevel,
+    };
+  }
+
+  _storeOffGuardSuppressionChatInfo(data, doc, attacker, target) {
+    const suppressionInfo = this._getOffGuardSuppressionChatInfo(attacker, target);
+    if (!suppressionInfo) return false;
+
+    if (!data.flags) data.flags = {};
+    if (!data.flags[MODULE_ID]) data.flags[MODULE_ID] = {};
+    data.flags[MODULE_ID].offGuardSuppression = suppressionInfo;
+
+    if (doc?.updateSource) {
+      try {
+        doc.updateSource({ [`flags.${MODULE_ID}.offGuardSuppression`]: suppressionInfo });
+      } catch (_) {}
+    }
+
+    return true;
+  }
+
+  _getUnsuppressedOffGuardAdjustment(attacker, target, visibilityState = null) {
+    const visState = visibilityState ?? this._getVisibilityStateForAttack(attacker, target);
+    if (!['hidden', 'undetected'].includes(visState)) return null;
+    if (this._isOffGuardSuppressedForAttack(attacker, target, visState)) return null;
+
+    const reason = visState.charAt(0).toUpperCase() + visState.slice(1);
+    return {
+      slug: 'pf2e-visioner-off-guard',
+      label: `Off-Guard (${reason})`,
+      modifier: -2,
+      type: 'circumstance',
+    };
+  }
+
+  _createOneRollOffGuardEffect(adjustment) {
+    if (!adjustment) return null;
+    return {
+      name: adjustment.label,
+      type: 'effect',
+      system: {
+        description: {
+          value: `<p>${adjustment.label}: -2 circumstance penalty to AC for this roll.</p>`,
+          gm: '',
+        },
+        rules: [
+          {
+            key: 'FlatModifier',
+            selector: 'ac',
+            slug: adjustment.slug,
+            label: adjustment.label,
+            type: adjustment.type,
+            value: adjustment.modifier,
+          },
+        ],
+        traits: { otherTags: [], value: [] },
+        level: { value: 1 },
+        duration: { value: -1, unit: 'unlimited' },
+        tokenIcon: { show: false },
+        unidentified: false,
+        start: { value: 0 },
+        badge: null,
+      },
+      img: 'icons/svg/terror.svg',
+      flags: { 'pf2e-visioner': { forThisRoll: true, ephemeralOffGuardRoll: true } },
+    };
+  }
+
+  _applyOffGuardAdjustmentToContainer(container, adjustment, attacker, target) {
+    if (!container || !adjustment) return false;
+    const dcPaths = ['dc', 'context.dc'];
+    let changed = false;
+
+    for (const dcPath of dcPaths) {
+      const dcObj = foundry.utils.getProperty(container, dcPath);
+      if (!dcObj) continue;
+
+      const modifierPaths = [
+        `${dcPath}.statistic.modifiers`,
+        `${dcPath}.modifiers`,
+        `${dcPath}.statistic.check.modifiers`,
+      ];
+      const hasOffGuard = modifierPaths.some((path) => {
+        const modifiers = foundry.utils.getProperty(container, path);
+        return (
+          Array.isArray(modifiers) &&
+          modifiers.some((modifier) => this._isSuppressedOffGuardModifier(modifier))
+        );
+      });
+      if (hasOffGuard) continue;
+
+      const existingPath =
+        modifierPaths.find((path) => Array.isArray(foundry.utils.getProperty(container, path))) ||
+        `${dcPath}.statistic.modifiers`;
+      const modifiers = foundry.utils.getProperty(container, existingPath);
+      const nextModifiers = [
+        ...(Array.isArray(modifiers) ? modifiers : []),
+        this._createContextModifier(adjustment) || adjustment,
+      ];
+      foundry.utils.setProperty(container, existingPath, nextModifiers);
+
+      const dcValueBefore = dcObj.value ?? null;
+      if (Number.isFinite(dcObj.value)) {
+        dcObj.value += adjustment.modifier;
+      }
+      changed = true;
+
+      console.info('PF2E Visioner | Off-guard modifier added', {
+        path: existingPath,
+        modifier: this._traceModifier(adjustment),
+        dcPath,
+        dcValueBefore,
+        dcValueAfter: dcObj.value ?? null,
+        attacker: this._traceToken(attacker),
+        target: this._traceToken(target),
+      });
+    }
+
+    if (changed) {
+      try {
+        const check = container.check ?? container.context?.check ?? container;
+        check?.calculateTotal?.();
+      } catch (_) {}
+    }
+
+    return changed;
+  }
+
+  _ensureUnsuppressedOffGuardModifier(container, attacker, target) {
+    const adjustment = this._getUnsuppressedOffGuardAdjustment(attacker, target);
+    return this._applyOffGuardAdjustmentToContainer(container, adjustment, attacker, target);
+  }
+
+  _filterSuppressedOffGuardItems(items, attacker, target) {
+    if (!this._isOffGuardSuppressedForAttack(attacker, target)) return items;
+    return items.filter((item) => {
+      const flags = item?.flags?.[MODULE_ID];
+      return !(flags?.ephemeralOffGuardRoll === true || flags?.aggregateOffGuard === true);
+    });
+  }
+
+  _getTokenActorSignature(token) {
+    return (
+      token?.actor?.signature ||
+      token?.document?.actor?.signature ||
+      token?.actor?.id ||
+      token?.document?.actor?.id ||
+      null
+    );
+  }
+
+  _filterSuppressedAttackerOffGuardItems(items, attacker, target) {
+    if (!this._isOffGuardSuppressedForAttack(attacker, target)) {
+      return { items, changed: false };
+    }
+
+    const filteredItems = items.filter(
+      (item) => item?.flags?.[MODULE_ID]?.aggregateOffGuard !== true,
+    );
+    const changed = filteredItems.length !== items.length;
+    return { items: filteredItems, changed };
+  }
+
+  _applySuppressedAttackerOffGuardClone(attacker, target, context, check = null) {
+    const actor = attacker?.actor;
+    if (!actor?.clone) {
+      console.info('PF2E Visioner | Attacker off-guard clone skipped', {
+        reason: 'missing actor.clone',
+        attacker: this._traceToken(attacker),
+        target: this._traceToken(target),
+      });
+      return false;
+    }
+
+    const items = foundry.utils.deepClone(actor._source?.items ?? []);
+    const aggregateCountBefore = items.filter(
+      (item) => item?.flags?.[MODULE_ID]?.aggregateOffGuard === true,
+    ).length;
+    const { items: filteredItems, changed } = this._filterSuppressedAttackerOffGuardItems(
+      items,
+      attacker,
+      target,
+    );
+    const aggregateCountAfter = filteredItems.filter(
+      (item) => item?.flags?.[MODULE_ID]?.aggregateOffGuard === true,
+    ).length;
+    console.info('PF2E Visioner | Attacker off-guard clone decision', {
+      changed,
+      itemCountBefore: items.length,
+      itemCountAfter: filteredItems.length,
+      aggregateCountBefore,
+      aggregateCountAfter,
+      attacker: this._traceToken(attacker),
+      target: this._traceToken(target),
+    });
+    if (!changed) return false;
+
+    const clonedActor = actor.clone({ items: filteredItems }, { keepId: true });
+    this._syncClonedAttackerIntoContext(attacker, clonedActor, context, check);
+    console.info('PF2E Visioner | Attacker off-guard clone applied', {
+      clonedActorId: clonedActor?.id ?? null,
+      contextActorId: context?.actor?.id ?? null,
+      checkActorId: check?.actor?.id ?? null,
+    });
+    return true;
+  }
+
+  _isSuppressedOffGuardModifier(modifier) {
+    const slug = String(modifier?.slug ?? modifier?.key ?? modifier?.selector ?? '').toLowerCase();
+    const label = String(
+      modifier?.label ?? modifier?.name ?? modifier?.title ?? modifier?.source ?? '',
+    ).toLowerCase();
+    const isVisionerOffGuard =
+      slug === 'pf2e-visioner-off-guard' ||
+      (slug.includes('pf2e-visioner') && slug.includes('off-guard'));
+    const isVisibilityOffGuard =
+      label.includes('off-guard') && (label.includes('hidden') || label.includes('undetected'));
+    return isVisionerOffGuard || isVisibilityOffGuard;
+  }
+
+  _stripSuppressedOffGuardModifiers(container, attacker, target) {
+    if (!container) return false;
+    if (!this._isOffGuardSuppressedForAttack(attacker, target)) {
+      console.info('PF2E Visioner | Off-guard modifier strip skipped', {
+        reason: 'not suppressed',
+        attacker: this._traceToken(attacker),
+        target: this._traceToken(target),
+      });
+      return false;
+    }
+
+    const paths = [
+      'modifiers',
+      'check.modifiers',
+      'context.modifiers',
+      'context.check.modifiers',
+      'dc.modifiers',
+      'dc.statistic.modifiers',
+      'dc.statistic.check.modifiers',
+      'context.dc.modifiers',
+      'context.dc.statistic.modifiers',
+      'context.dc.statistic.check.modifiers',
+    ];
+    let changed = false;
+    const adjustedDcs = new Set();
+
+    for (const path of paths) {
+      const modifiers = foundry.utils.getProperty(container, path);
+      if (!Array.isArray(modifiers)) continue;
+      const removed = modifiers.filter((modifier) => this._isSuppressedOffGuardModifier(modifier));
+      const filtered = modifiers.filter((modifier) => !this._isSuppressedOffGuardModifier(modifier));
+      if (filtered.length === modifiers.length) continue;
+      const dcPath = path.startsWith('context.dc') ? 'context.dc' : path.startsWith('dc') ? 'dc' : null;
+      const dcObj = dcPath ? foundry.utils.getProperty(container, dcPath) : null;
+      const dcValueBefore = dcObj?.value ?? null;
+      foundry.utils.setProperty(container, path, filtered);
+      if (dcPath && !adjustedDcs.has(dcPath)) {
+        const removedTotal = removed.reduce(
+          (total, modifier) => total + Number(modifier?.modifier || 0),
+          0,
+        );
+        if (Number.isFinite(dcObj?.value) && Number.isFinite(removedTotal)) {
+          dcObj.value -= removedTotal;
+        }
+        adjustedDcs.add(dcPath);
+      }
+      console.info('PF2E Visioner | Off-guard modifier stripped', {
+        path,
+        removed: removed.map((modifier) => this._traceModifier(modifier)),
+        beforeCount: modifiers.length,
+        afterCount: filtered.length,
+        dcPath,
+        dcValueBefore,
+        dcValueAfter: dcObj?.value ?? null,
+        attacker: this._traceToken(attacker),
+        target: this._traceToken(target),
+      });
+      changed = true;
+    }
+
+    if (changed) {
+      try {
+        const check = container.check ?? container.context?.check ?? container;
+        check?.calculateTotal?.();
+      } catch (_) {}
+    }
+
+    console.info('PF2E Visioner | Off-guard modifier strip complete', {
+      changed,
+      attacker: this._traceToken(attacker),
+      target: this._traceToken(target),
+    });
+    return changed;
+  }
+
+  async _refreshDefenderVisibilityEffectsForAttack(attacker, target) {
+    if (!attacker || !target) return;
+    try {
+      const currentVisibility = getVisibilityBetween(target, attacker);
+      console.info('PF2E Visioner | Refresh defender visibility effects for attack', {
+        currentVisibility,
+        attacker: this._traceToken(attacker),
+        target: this._traceToken(target),
+      });
+      await setVisibilityBetween(target, attacker, currentVisibility, {
+        skipEphemeralUpdate: false,
+        direction: 'observer_to_target',
+      });
+    } catch (error) {
+      console.info('PF2E Visioner | Refresh defender visibility effects failed', {
+        error: error?.message ?? String(error),
+        attacker: this._traceToken(attacker),
+        target: this._traceToken(target),
+      });
+    }
+  }
+
   /**
    * Handle a chat message context
    * @param {Object} data - Message data
@@ -133,6 +588,8 @@ class AttackRollUseCase extends BaseAutoCoverUseCase {
     const attacker = tokens.get(speakerTokenId);
 
     const target = tokens.get(targetTokenId);
+
+    this._storeOffGuardSuppressionChatInfo(data, doc, attacker, target);
 
     // Determine base cover state (manual token cover first, then auto-detection)
     let state = null;
@@ -203,13 +660,16 @@ class AttackRollUseCase extends BaseAutoCoverUseCase {
         if (doc && doc.updateSource) {
           try {
             doc.updateSource({ 'flags.pf2e-visioner.coverFeatUpgrade': upgradeRec });
-          } catch (_) { }
+          } catch (_) {}
         }
       }
-    } catch (_) { }
+    } catch (_) {}
 
     try {
-      const ruleElementBlocks = coverDetector.consumeRuleElementBlocks(speakerTokenId, targetTokenId);
+      const ruleElementBlocks = coverDetector.consumeRuleElementBlocks(
+        speakerTokenId,
+        targetTokenId,
+      );
       if (ruleElementBlocks) {
         if (!data.flags) data.flags = {};
         if (!data.flags['pf2e-visioner']) data.flags['pf2e-visioner'] = {};
@@ -217,7 +677,7 @@ class AttackRollUseCase extends BaseAutoCoverUseCase {
         if (doc && doc.updateSource) {
           try {
             doc.updateSource({ 'flags.pf2e-visioner.ruleElementBlocks': ruleElementBlocks });
-          } catch (_) { }
+          } catch (_) {}
         }
       }
     } catch (e) {
@@ -238,10 +698,10 @@ class AttackRollUseCase extends BaseAutoCoverUseCase {
             doc.updateSource({
               'flags.pf2e-visioner.snipingDuoCoverIgnore': snipingDuoCoverIgnore,
             });
-          } catch (_) { }
+          } catch (_) {}
         }
       }
-    } catch (_) { }
+    } catch (_) {}
   }
 
   /**
@@ -256,6 +716,13 @@ class AttackRollUseCase extends BaseAutoCoverUseCase {
     let attacker = this._resolveAttackerFromCtx(ctx);
     let target = this._resolveTargetFromCtx(ctx);
     if (!attacker || !target) return;
+    this._traceContext('check-dialog:start', attacker, target, ctx, dialog?.check);
+    await this._refreshDefenderVisibilityEffectsForAttack(attacker, target);
+    this._stripSuppressedOffGuardModifiers(dialog, attacker, target);
+    this._stripSuppressedOffGuardModifiers(ctx, attacker, target);
+    this._ensureUnsuppressedOffGuardModifier(dialog, attacker, target);
+    this._ensureUnsuppressedOffGuardModifier(ctx, attacker, target);
+    this._traceContext('check-dialog:after-suppression', attacker, target, ctx, dialog?.check);
     const manualCover = getCoverBetween(attacker, target);
     let state = this._detectCover(attacker, target, ctx);
 
@@ -271,6 +738,12 @@ class AttackRollUseCase extends BaseAutoCoverUseCase {
         manualCover,
         snipingDuoCoverIgnore,
         ({ chosen, dctx, target: tgt, targetActor: tgtActor }) => {
+          const effectiveTarget = target || tgt;
+          const sourceTargetActor = tgtActor || effectiveTarget?.actor;
+          const callbackOffGuardAdjustment = this._getUnsuppressedOffGuardAdjustment(
+            attacker,
+            effectiveTarget,
+          );
           try {
             if (attacker && target && manualCover === 'none' && chosen !== state) {
               // Use the correctly resolved token objects from outer scope
@@ -286,13 +759,26 @@ class AttackRollUseCase extends BaseAutoCoverUseCase {
           }
 
           try {
+            this._traceContext(
+              'check-dialog:callback-start',
+              attacker,
+              effectiveTarget,
+              dctx,
+              dialog?.check,
+            );
+            this._stripSuppressedOffGuardModifiers(dctx, attacker, effectiveTarget);
             const bonus = getCoverBonusByState(chosen) || 0;
             const label = getCoverLabel(chosen);
-            let items = foundry.utils.deepClone(tgtActor._source?.items ?? []);
+            let items = foundry.utils.deepClone(sourceTargetActor._source?.items ?? []);
             items = items.filter(
               (i) =>
-                !(i?.type === 'effect' && i?.flags?.['pf2e-visioner']?.ephemeralCoverRoll === true),
+                !(
+                  i?.type === 'effect' &&
+                  (i?.flags?.['pf2e-visioner']?.ephemeralCoverRoll === true ||
+                    i?.flags?.['pf2e-visioner']?.ephemeralOffGuardRoll === true)
+                ),
             );
+            items = this._filterSuppressedOffGuardItems(items, attacker, effectiveTarget);
             if (bonus > 0) {
               const img = getCoverImageForState(chosen);
               const effectRules = [
@@ -324,11 +810,15 @@ class AttackRollUseCase extends BaseAutoCoverUseCase {
                 flags: { 'pf2e-visioner': { forThisRoll: true, ephemeralCoverRoll: true } },
               });
             }
-            const clonedActor = tgtActor.clone({ items }, { keepId: true });
-            this._syncClonedDefenderIntoContext(tgt, clonedActor, dctx);
+            if (callbackOffGuardAdjustment) {
+              const offGuardEffect = this._createOneRollOffGuardEffect(callbackOffGuardAdjustment);
+              if (offGuardEffect) items.push(offGuardEffect);
+            }
+            const clonedActor = sourceTargetActor.clone({ items }, { keepId: true });
+            this._syncClonedDefenderIntoContext(effectiveTarget, clonedActor, dctx);
             const dcObj = dctx.dc;
             if (dcObj?.slug) {
-              const didAdjustDc = this._applyAdjustedDcFromTargetActor(tgtActor, dcObj, [
+              const didAdjustDc = this._applyAdjustedDcFromTargetActor(sourceTargetActor, dcObj, [
                 {
                   slug: 'cover',
                   label,
@@ -342,8 +832,21 @@ class AttackRollUseCase extends BaseAutoCoverUseCase {
                 dcObj.statistic = st;
               }
             }
+            this._applyOffGuardAdjustmentToContainer(
+              dctx,
+              callbackOffGuardAdjustment,
+              attacker,
+              effectiveTarget,
+            );
             this._injectCoverRollOptions(dctx, chosen, bonus);
-          } catch (_) { }
+            this._traceContext(
+              'check-dialog:callback-end',
+              attacker,
+              effectiveTarget,
+              dctx,
+              dialog?.check,
+            );
+          } catch (_) {}
         },
       );
     } catch (e) {
@@ -394,7 +897,7 @@ class AttackRollUseCase extends BaseAutoCoverUseCase {
           console.warn('PF2E Visioner | Failed to cleanup ephemeral cover effects:', e);
         }
       }
-    } catch (_) { }
+    } catch (_) {}
   }
 
   /**
@@ -410,15 +913,15 @@ class AttackRollUseCase extends BaseAutoCoverUseCase {
       const checkDialogsEnabled = this._isPf2eCheckDialogEnabled();
 
       if (attacker && target && (attacker.isOwner || game.user.isGM)) {
+        this._traceContext('check-roll:start', attacker, target, context, check);
         // Ensure visibility-driven off-guard ephemerals are up-to-date on defender before any DC calculation
-        try {
-          const { getVisibilityBetween, setVisibilityBetween } = await import('../../../utils.js');
-          const currentVisEarly = getVisibilityBetween(attacker, target);
-          await setVisibilityBetween(attacker, target, currentVisEarly, {
-            skipEphemeralUpdate: false,
-            direction: 'observer_to_target',
-          });
-        } catch (_) { }
+        await this._refreshDefenderVisibilityEffectsForAttack(attacker, target);
+        this._stripSuppressedOffGuardModifiers(check, attacker, target);
+        this._stripSuppressedOffGuardModifiers(context, attacker, target);
+        this._applySuppressedAttackerOffGuardClone(attacker, target, context, check);
+        this._ensureUnsuppressedOffGuardModifier(check, attacker, target);
+        this._ensureUnsuppressedOffGuardModifier(context, attacker, target);
+        this._traceContext('check-roll:after-suppression', attacker, target, context, check);
 
         const manualCover = getCoverBetween(attacker, target);
         const detected = this._detectCover(attacker, target, context);
@@ -432,8 +935,7 @@ class AttackRollUseCase extends BaseAutoCoverUseCase {
         }
 
         // If popup was used and a choice was made, use it; otherwise, use detected state
-        const finalState =
-          chosen ?? (manualCover !== 'none' ? manualCover : detected);
+        const finalState = chosen ?? (manualCover !== 'none' ? manualCover : detected);
 
         if (checkDialogsEnabled) {
           return { success: true };
@@ -446,6 +948,7 @@ class AttackRollUseCase extends BaseAutoCoverUseCase {
 
         // Apply effect/clone/stat logic for the final state
         await this._applyCoverEphemeralEffect(target, attacker, finalState, context, manualCover);
+        this._ensureUnsuppressedOffGuardModifier(context, attacker, target);
       }
 
       return {
@@ -462,100 +965,104 @@ class AttackRollUseCase extends BaseAutoCoverUseCase {
    * @private
    */
   async _applyCoverEphemeralEffect(target, attacker, state, context, manualCover) {
-    if (!state || state === 'none') return;
-    const bonus = getCoverBonusByState(state) || 0;
-    if (bonus <= 0) return;
+    const bonus = state && state !== 'none' ? getCoverBonusByState(state) || 0 : 0;
+    const hasCoverBonus = bonus > 0;
+    const offGuardAdjustment = this._getUnsuppressedOffGuardAdjustment(attacker, target);
+    if (!hasCoverBonus && !offGuardAdjustment) return;
+
     const tgtActor = target.actor;
-    const dcAdjustments = [
-      {
+    const dcAdjustments = [];
+
+    if (hasCoverBonus) {
+      dcAdjustments.push({
         slug: 'cover',
         label: getCoverLabel(state),
         modifier: bonus,
         type: 'circumstance',
-      },
-    ];
+      });
+    }
+
+    if (offGuardAdjustment) {
+      dcAdjustments.push(offGuardAdjustment);
+    }
+
     let items = foundry.utils.deepClone(tgtActor._source?.items ?? []);
     // Remove any existing one-roll cover effects we may have added
     items = items.filter(
-      (i) => !(i?.type === 'effect' && i?.flags?.['pf2e-visioner']?.ephemeralCoverRoll === true),
+      (i) =>
+        !(
+          i?.type === 'effect' &&
+          (i?.flags?.['pf2e-visioner']?.ephemeralCoverRoll === true ||
+            i?.flags?.['pf2e-visioner']?.ephemeralOffGuardRoll === true)
+        ),
     );
+    items = this._filterSuppressedOffGuardItems(items, attacker, target);
     const label = getCoverLabel(state);
     const img = getCoverImageForState(state);
-    items.push({
-      name: label,
-      type: 'effect',
-      system: {
-        description: {
-          value: `<p>${label}: +${bonus} circumstance bonus to AC for this roll.</p>`,
-          gm: '',
-        },
-        rules: [
-          ...getCoverLevelRollOptions(state),
-          { key: 'FlatModifier', selector: 'ac', slug: 'cover', type: 'circumstance', value: bonus },
-        ],
-        traits: { otherTags: [], value: [] },
-        level: { value: 1 },
-        duration: { value: -1, unit: 'unlimited' },
-        tokenIcon: { show: false },
-        unidentified: false,
-        start: { value: 0 },
-        badge: null,
-      },
-      img,
-      flags: { 'pf2e-visioner': { forThisRoll: true, ephemeralCoverRoll: true } },
-    });
-    // If defender is hidden/undetected to attacker, add a one-roll Flat-Footed item so it shows on the roll
-    try {
-      const { getVisibilityBetween } = await import('../../../stores/visibility-map.js');
-      const { OffGuardSuppression } = await import('../../../rule-elements/operations/OffGuardSuppression.js');
-      const visState = getVisibilityBetween(target, attacker);
-      if (['hidden', 'undetected'].includes(visState)) {
-        const suppressOffGuard = OffGuardSuppression.shouldSuppressOffGuardForState(target, visState);
-        if (!suppressOffGuard) {
-          const reason = visState.charAt(0).toUpperCase() + visState.slice(1);
-          dcAdjustments.push({
-            slug: 'pf2e-visioner-off-guard',
-            label: `Off-Guard (${reason})`,
-            modifier: -2,
-            type: 'circumstance',
-          });
-          items.push({
-            name: `Off-Guard (${reason})`,
-            type: 'effect',
-            system: {
-              description: {
-                value: `<p>Off-Guard (${reason}): -2 circumstance penalty to AC for this roll.</p>`,
-                gm: '',
-              },
-              rules: [{ key: 'FlatModifier', selector: 'ac', type: 'circumstance', value: -2 }],
-              traits: { otherTags: [], value: [] },
-              level: { value: 1 },
-              duration: { value: -1, unit: 'unlimited' },
-              tokenIcon: { show: false },
-              unidentified: false,
-              start: { value: 0 },
-              badge: null,
+    if (hasCoverBonus) {
+      items.push({
+        name: label,
+        type: 'effect',
+        system: {
+          description: {
+            value: `<p>${label}: +${bonus} circumstance bonus to AC for this roll.</p>`,
+            gm: '',
+          },
+          rules: [
+            ...getCoverLevelRollOptions(state),
+            {
+              key: 'FlatModifier',
+              selector: 'ac',
+              slug: 'cover',
+              type: 'circumstance',
+              value: bonus,
             },
-            img: 'icons/svg/terror.svg',
-            flags: { 'pf2e-visioner': { forThisRoll: true, ephemeralOffGuardRoll: true } },
-          });
-        }
-      }
-    } catch (_) { }
+          ],
+          traits: { otherTags: [], value: [] },
+          level: { value: 1 },
+          duration: { value: -1, unit: 'unlimited' },
+          tokenIcon: { show: false },
+          unidentified: false,
+          start: { value: 0 },
+          badge: null,
+        },
+        img,
+        flags: { 'pf2e-visioner': { forThisRoll: true, ephemeralCoverRoll: true } },
+      });
+    }
+
+    if (offGuardAdjustment) {
+      const offGuardEffect = this._createOneRollOffGuardEffect(offGuardAdjustment);
+      if (offGuardEffect) items.push(offGuardEffect);
+      console.info('PF2E Visioner | One-roll off-guard effect added', {
+        coverState: state,
+        manualCover,
+        attacker: this._traceToken(attacker),
+        target: this._traceToken(target),
+        adjustment: this._traceModifier(offGuardAdjustment),
+      });
+    }
+
     const clonedActor = tgtActor.clone({ items }, { keepId: true });
     this._syncClonedDefenderIntoContext(target, clonedActor, context);
     const dcObj = context.dc;
     if (dcObj?.slug) {
+      const activeDcAdjustments =
+        manualCover === 'none'
+          ? dcAdjustments
+          : dcAdjustments.filter((adjustment) => adjustment.slug === 'pf2e-visioner-off-guard');
       const didAdjustDc =
-        manualCover === 'none' &&
-        this._applyAdjustedDcFromTargetActor(tgtActor, dcObj, dcAdjustments);
+        activeDcAdjustments.length > 0 &&
+        this._applyAdjustedDcFromTargetActor(tgtActor, dcObj, activeDcAdjustments);
       const clonedStat = didAdjustDc ? null : clonedActor.getStatistic?.(dcObj.slug)?.dc;
       if (clonedStat && manualCover === 'none') {
         dcObj.value = clonedStat.value;
         dcObj.statistic = clonedStat;
       }
     }
-    this._injectCoverRollOptions(context, state, bonus);
+    if (hasCoverBonus) {
+      this._injectCoverRollOptions(context, state, bonus);
+    }
   }
 
   _injectCoverRollOptions(context, state, bonus) {

@@ -29,7 +29,7 @@ export async function updateSingleVisibilityEffect(
   try {
     const t = effectReceiverToken?.actor?.type;
     if (t && ['loot', 'vehicle', 'party'].includes(t)) return;
-  } catch (_) { }
+  } catch (_) {}
 
   await runWithEffectLock(effectReceiverToken.actor, async () => {
     const effects = effectReceiverToken.actor.itemTypes.effect;
@@ -52,7 +52,9 @@ export async function updateSingleVisibilityEffect(
     // We need to check what visibility state the effectSourceToken has TO the effectReceiverToken
     let suppressionActive = false;
     try {
-      const { OffGuardSuppression } = await import('../rule-elements/operations/OffGuardSuppression.js');
+      const { OffGuardSuppression } = await import(
+        '../rule-elements/operations/OffGuardSuppression.js'
+      );
       const { getVisibilityBetween } = await import('../stores/visibility-map.js');
 
       // Get the reverse visibility: what state does effectSource have to effectReceiver?
@@ -64,7 +66,11 @@ export async function updateSingleVisibilityEffect(
       // Check if the effectSource (the one being observed) has suppression active
       // for the reverse visibility state
       if (['hidden', 'undetected'].includes(reverseState)) {
-        suppressionActive = OffGuardSuppression.shouldSuppressOffGuardForState(effectSourceToken, reverseState);
+        suppressionActive = OffGuardSuppression.shouldSuppressOffGuardForState(
+          effectSourceToken,
+          reverseState,
+          effectReceiverToken,
+        );
       }
     } catch (err) {
       // Silently fail if suppression check errors
@@ -86,20 +92,21 @@ export async function updateSingleVisibilityEffect(
     } else {
       operations.hidden.remove = true;
       operations.undetected.remove = true;
-    } const effectsToCreate = [];
+    }
+    const effectsToCreate = [];
     const effectsToUpdate = [];
     const effectsToDelete = [];
 
     if (operations.hidden.remove && hiddenAggregate) {
       const rules = Array.isArray(hiddenAggregate.system.rules)
         ? hiddenAggregate.system.rules.filter(
-          (r) =>
-            !(
-              r?.key === 'EphemeralEffect' &&
-              Array.isArray(r.predicate) &&
-              r.predicate.includes(`target:signature:${signature}`)
-            ),
-        )
+            (r) =>
+              !(
+                r?.key === 'EphemeralEffect' &&
+                Array.isArray(r.predicate) &&
+                r.predicate.includes(`target:signature:${signature}`)
+              ),
+          )
         : [];
       if (rules.length === 0) effectsToDelete.push(hiddenAggregate.id);
       else effectsToUpdate.push({ _id: hiddenAggregate.id, 'system.rules': rules });
@@ -107,13 +114,13 @@ export async function updateSingleVisibilityEffect(
     if (operations.undetected.remove && undetectedAggregate) {
       const rules = Array.isArray(undetectedAggregate.system.rules)
         ? undetectedAggregate.system.rules.filter(
-          (r) =>
-            !(
-              r?.key === 'EphemeralEffect' &&
-              Array.isArray(r.predicate) &&
-              r.predicate.includes(`target:signature:${signature}`)
-            ),
-        )
+            (r) =>
+              !(
+                r?.key === 'EphemeralEffect' &&
+                Array.isArray(r.predicate) &&
+                r.predicate.includes(`target:signature:${signature}`)
+              ),
+          )
         : [];
       if (rules.length === 0) effectsToDelete.push(undetectedAggregate.id);
       else effectsToUpdate.push({ _id: undetectedAggregate.id, 'system.rules': rules });

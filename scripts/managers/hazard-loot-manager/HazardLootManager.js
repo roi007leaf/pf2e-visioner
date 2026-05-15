@@ -4,6 +4,10 @@
 
 import { MODULE_ID } from '../../constants.js';
 import { loadDialogCSS, loadSharedUICSS } from '../../css-loader.js';
+import {
+  getDefaultPlayerVisibility,
+  setDefaultPlayerVisibility,
+} from '../../services/initial-scene-hidden-setup.js';
 import { getVisibilityBetween, setVisibilityBetween } from '../../stores/visibility-map.js';
 
 // Archives of Nethys, PF2E GM Core "DCs by Level":
@@ -145,7 +149,7 @@ export function getPartyLevel(tokens = getPlaceableTokens()) {
 }
 
 function getVisibilityForAllPlayers(target, observers) {
-  if (!observers.length) return 'observed';
+  if (!observers.length) return getDefaultPlayerVisibility(target);
   const states = observers.map((observer) => getVisibilityBetween(observer, target));
   if (states.every((state) => state === 'hidden')) return 'hidden';
   if (states.every((state) => state === 'observed')) return 'observed';
@@ -257,6 +261,8 @@ export async function applyHazardLootManagerUpdates(
     targets += 1;
 
     if (update.visibility === 'hidden' || update.visibility === 'observed') {
+      await setDefaultPlayerVisibility(target, update.visibility);
+
       for (const observer of observers) {
         if (!getTokenId(observer) || getTokenId(observer) === getTokenId(target)) continue;
         await setVisibilityBetween(observer, target, update.visibility, {
