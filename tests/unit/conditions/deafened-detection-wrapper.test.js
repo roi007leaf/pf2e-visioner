@@ -153,7 +153,7 @@ describe('Deafened Detection Wrapper', () => {
             }
         });
 
-        test('skips offscreen targets before Foundry detection point tests run', () => {
+        test('does not skip offscreen targets before Foundry detection point tests run', () => {
             const originalCanvas = global.canvas;
             global.canvas = {
                 app: {
@@ -197,9 +197,13 @@ describe('Deafened Detection Wrapper', () => {
 
             const result = wrappedFunction.call(detectionModeInstance, mockVisionSource, mockMode, offscreenConfig);
 
-            expect(result).toBe(false);
-            expect(mockCanDetect).not.toHaveBeenCalled();
-            expect(mockTestPoint).not.toHaveBeenCalled();
+            expect(result).toBe(true);
+            expect(mockCanDetect).toHaveBeenCalledWith(
+                mockVisionSource,
+                offscreenConfig.object,
+                'level-b',
+            );
+            expect(mockTestPoint).toHaveBeenCalled();
 
             global.canvas = originalCanvas;
         });

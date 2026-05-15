@@ -1,5 +1,11 @@
 # Changelog
 
+## [8.2.10] - 2026-05-15
+
+### Fixed
+
+- **Offscreen tokens no longer stay hidden after zooming out**: Visioner's detection wrapper no longer treats targets outside the current camera viewport as undetectable during Foundry detection tests, preventing zoomed-in movement from leaving offscreen tokens visually hidden until another movement refresh.
+
 ## [8.2.9] - 2026-05-13
 
 ### Fixed
