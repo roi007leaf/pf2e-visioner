@@ -30,7 +30,7 @@ export class VisibilityMapService {
         return storeSetVisibilityBetween(observer, target, state, options);
     }
 
-    async setVisibilityMap(token, visibilityMap) {
-        return storeSetVisibilityMap(token, visibilityMap);
+    async setVisibilityMap(token, visibilityMap, options = undefined) {
+        return storeSetVisibilityMap(token, visibilityMap, options);
     }
 }

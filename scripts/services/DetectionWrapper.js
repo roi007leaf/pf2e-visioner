@@ -3,11 +3,18 @@
  */
 
 import { MODULE_ID } from '../constants.js';
-import { getBestVisibilityState, getControlledObserverTokens, getVisibilityMap } from '../utils.js';
+import {
+  getBestVisibilityState,
+  getControlledObserverTokens,
+  getPerceptionProfileBetween,
+  getVisibilityMap,
+} from '../utils.js';
+import { AVS_EXPLICIT_VISIBLE_DETECTION_SENSE } from '../stores/visibility-map.js';
 import {
   blocksCanvasDetection,
   legacyVisibilityToProfile,
 } from '../visibility/perception-profile.js';
+import { isExplicitVisiblePair } from './ExplicitVisibilityPairs.js';
 
 /**
  * Class wrapper for PF2E detection integration to support init/teardown.
@@ -124,8 +131,10 @@ function isObjectInCurrentViewport(object, paddingPx = 64) {
 
     const gridSize = canvas?.grid?.size || 1;
     const doc = object?.document;
-    const centerX = object?.center?.x ?? (doc?.x ?? object?.x ?? 0) + ((doc?.width ?? 1) * gridSize) / 2;
-    const centerY = object?.center?.y ?? (doc?.y ?? object?.y ?? 0) + ((doc?.height ?? 1) * gridSize) / 2;
+    const centerX =
+      object?.center?.x ?? (doc?.x ?? object?.x ?? 0) + ((doc?.width ?? 1) * gridSize) / 2;
+    const centerY =
+      object?.center?.y ?? (doc?.y ?? object?.y ?? 0) + ((doc?.height ?? 1) * gridSize) / 2;
 
     return centerX >= minX && centerX <= maxX && centerY >= minY && centerY <= maxY;
   } catch {
@@ -148,7 +157,8 @@ function detectionModeTestVisibility(visionSource, mode, config = {}) {
     return false;
   }
 
-  const level = config.level ?? config.object?.document?.level ?? config.object?.document?._source?.level;
+  const level =
+    config.level ?? config.object?.document?.level ?? config.object?.document?._source?.level;
   if (!this._canDetect(visionSource, config.object, level)) return false;
 
   const modeId = mode?.id ?? this?.id ?? null;
@@ -168,9 +178,15 @@ function detectionModeTestVisibility(visionSource, mode, config = {}) {
 function canDetectWrapper(threshold) {
   return function (wrapped, visionSource, target, ...args) {
     const canDetect = wrapped(visionSource, target, ...args);
-    if (canDetect === false) return false;
-
     const observerToken = visionSource?.object;
+    const modeId = this?.id ?? args?.[0]?.id ?? null;
+    const visibility = getVisibilityBetweenTokens(observerToken, target);
+
+    if (canUseExplicitVisionerDetection(observerToken, target, modeId, visibility, threshold)) {
+      return true;
+    }
+
+    if (canDetect === false) return false;
 
     try {
       const targetToken = target;
@@ -192,10 +208,35 @@ function canDetectWrapper(threshold) {
     } catch (_) {}
 
     const origin = observerToken;
-    const reachedThreshold = reachesVisibilityThreshold(origin, target, threshold);
+    const reachedThreshold = reachesVisibilityThreshold(origin, target, threshold, { visibility });
 
     return !reachedThreshold;
   };
+}
+
+function canUseExplicitVisionerDetection(
+  observer,
+  target,
+  modeId,
+  visibility,
+  threshold = VISIBILITY_VALUES.hidden,
+) {
+  if (threshold !== VISIBILITY_VALUES.hidden) return false;
+  if (modeId && NON_VISUAL_DETECTION_MODE_IDS.has(modeId)) return false;
+  if (visibility !== 'observed' && visibility !== 'concealed') return false;
+  if (isExplicitVisiblePair(observer, target)) return true;
+  return hasExplicitObservedProfile(observer, target);
+}
+
+function hasExplicitObservedProfile(observer, target) {
+  try {
+    return (
+      getPerceptionProfileBetween(observer, target)?.detectionSense ===
+      AVS_EXPLICIT_VISIBLE_DETECTION_SENSE
+    );
+  } catch {
+    return false;
+  }
 }
 
 /**

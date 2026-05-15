@@ -30,8 +30,9 @@ async function cleanupAvsOverridesForDefeatedActor(actor) {
       return;
     }
 
-    const { default: AvsOverrideManager } =
-      await import('../chat/services/infra/AvsOverrideManager.js');
+    const { default: AvsOverrideManager } = await import(
+      '../chat/services/infra/AvsOverrideManager.js'
+    );
 
     for (const token of tokens) {
       await AvsOverrideManager.removeAllOverridesInvolving(token.document.id);
@@ -43,7 +44,6 @@ async function cleanupAvsOverridesForDefeatedActor(actor) {
         const visionMasterId = token.document.getFlag(MODULE_ID, 'visionMasterTokenId');
 
         if (visionMasterId === defeatedToken.id) {
-
           try {
             await token.document.unsetFlag(MODULE_ID, 'visionMasterTokenId');
             await token.document.unsetFlag(MODULE_ID, 'visionMasterActorUuid');
@@ -68,7 +68,9 @@ async function cleanupAvsOverridesForDefeatedActor(actor) {
 export function getMatchingControlledTokenForRefresh(token, controlledTokens) {
   const tokenId = token?.document?.id;
   if (!tokenId) return null;
-  return controlledTokens?.find?.((controlledToken) => controlledToken?.document?.id === tokenId) ?? null;
+  return (
+    controlledTokens?.find?.((controlledToken) => controlledToken?.document?.id === tokenId) ?? null
+  );
 }
 
 export async function registerHooks() {
@@ -153,16 +155,18 @@ export async function registerHooks() {
   Hooks.on('preCreateChatMessage', async (message) => {
     try {
       // Import the position capture service
-      const { captureRollTimePosition } =
-        await import('../chat/services/position-capture-service.js');
+      const { captureRollTimePosition } = await import(
+        '../chat/services/position-capture-service.js'
+      );
       await captureRollTimePosition(message);
     } catch (error) {
       console.warn('PF2E Visioner | Failed to capture roll-time position:', error);
     }
 
     try {
-      const { expireTakeCoverOnAttackMessage } =
-        await import('../chat/services/take-cover-expiration-service.js');
+      const { expireTakeCoverOnAttackMessage } = await import(
+        '../chat/services/take-cover-expiration-service.js'
+      );
       await expireTakeCoverOnAttackMessage(message);
     } catch (error) {
       console.warn('PF2E Visioner | Failed to expire Take Cover on attack:', error);
@@ -178,9 +182,10 @@ export async function registerHooks() {
   registerUIHooks();
   registerCombatHooks();
   try {
-    const deferredSeekManager = (await import('../chat/services/infra/DeferredSeekManager.js')).default;
+    const deferredSeekManager = (await import('../chat/services/infra/DeferredSeekManager.js'))
+      .default;
     deferredSeekManager.initialize();
-  } catch { }
+  } catch {}
   AutoCoverHooks.registerHooks();
   registerSnipingDuoDamageBonusHooks();
 
@@ -202,8 +207,9 @@ export async function registerHooks() {
 
   // Register effect perception hooks for automatic perception refresh
   // These work independently of the Auto-Visibility System
-  const { onCreateActiveEffect, onUpdateActiveEffect, onDeleteActiveEffect } =
-    await import('./effect-perception.js');
+  const { onCreateActiveEffect, onUpdateActiveEffect, onDeleteActiveEffect } = await import(
+    './effect-perception.js'
+  );
   Hooks.on('createActiveEffect', onCreateActiveEffect);
   Hooks.on('updateActiveEffect', onUpdateActiveEffect);
   Hooks.on('deleteActiveEffect', onDeleteActiveEffect);
@@ -467,7 +473,7 @@ export async function registerHooks() {
       const { updateWallVisuals } = await import('../services/visual-effects.js');
       const id = canvas.tokens.controlled?.[0]?.id || null;
       await updateWallVisuals(id);
-    } catch { }
+    } catch {}
   });
   Hooks.on('updateWall', async (doc, changes) => {
     try {
@@ -478,8 +484,9 @@ export async function registerHooks() {
           try {
             const tokens = canvas.tokens?.placeables || [];
             const updates = [];
-            const { getConnectedWallDocsBySourceId } =
-              await import('../services/connected-walls.js');
+            const { getConnectedWallDocsBySourceId } = await import(
+              '../services/connected-walls.js'
+            );
             const connected = getConnectedWallDocsBySourceId(doc.id) || [];
             const wallIds = [doc.id, ...connected.map((d) => d.id)];
             for (const t of tokens) {
@@ -504,19 +511,20 @@ export async function registerHooks() {
                 await canvas.scene?.updateEmbeddedDocuments?.('Token', updates, { diff: false });
               }
             }
-          } catch (_) { }
+          } catch (_) {}
           // Mirror hidden flag to connected walls
           try {
             const { mirrorHiddenFlagToConnected } = await import('../services/connected-walls.js');
             await mirrorHiddenFlagToConnected(doc, true);
-          } catch (_) { }
+          } catch (_) {}
         } else {
           // If unhidden, remove entries for that wall from tokens
           try {
             const tokens = canvas.tokens?.placeables || [];
             const updates = [];
-            const { getConnectedWallDocsBySourceId } =
-              await import('../services/connected-walls.js');
+            const { getConnectedWallDocsBySourceId } = await import(
+              '../services/connected-walls.js'
+            );
             const connected = getConnectedWallDocsBySourceId(doc.id) || [];
             const wallIds = [doc.id, ...connected.map((d) => d.id)];
             for (const t of tokens) {
@@ -541,61 +549,70 @@ export async function registerHooks() {
                 await canvas.scene?.updateEmbeddedDocuments?.('Token', updates, { diff: false });
               }
             }
-          } catch (_) { }
+          } catch (_) {}
           // Mirror hidden flag to connected walls (set hidden=false)
           try {
             const { mirrorHiddenFlagToConnected } = await import('../services/connected-walls.js');
             await mirrorHiddenFlagToConnected(doc, false);
-          } catch (_) { }
+          } catch (_) {}
         }
       }
-    } catch (_) { }
+    } catch (_) {}
     // Door state changed (opened/closed) — LOS changes, trigger batch recalc + deferred seek
     if (changes.ds !== undefined) {
       try {
-        const { autoVisibilitySystem } = await import(
-          '../visibility/auto-visibility/index.js'
-        );
+        if (!globalThis.game) globalThis.game = {};
+        if (!globalThis.game.pf2eVisioner) globalThis.game.pf2eVisioner = {};
+        globalThis.game.pf2eVisioner.suppressNextAvsPostBatchPerceptionRefresh = {
+          reason: 'door-state-change',
+          doorId: doc?.id ?? null,
+          doorCoords: Array.isArray(doc?.c) ? Array.from(doc.c) : null,
+          doorState: changes.ds,
+          until: Date.now() + 1000,
+          perceptionRefreshed: false,
+        };
+      } catch {}
+      try {
+        const { autoVisibilitySystem } = await import('../visibility/auto-visibility/index.js');
         const vsm = autoVisibilitySystem?.orchestrator?.visibilityState;
         if (vsm) {
           vsm.markAllTokensChangedImmediate();
         }
-      } catch { }
+      } catch {}
       // After batch completes: run validation first, then deferred seek (so deferred indicator wins)
       Hooks.once('pf2e-visioner.batchComplete', async () => {
         try {
-          const { autoVisibilitySystem } = await import(
-            '../visibility/auto-visibility/index.js'
-          );
+          const { autoVisibilitySystem } = await import('../visibility/auto-visibility/index.js');
           const ovm = autoVisibilitySystem?.orchestrator?.overrideValidationManager;
           if (ovm) {
-            const tokensToCheck = canvas.tokens?.controlled?.length > 0
-              ? canvas.tokens.controlled
-              : canvas.tokens?.placeables ?? [];
+            const tokensToCheck =
+              canvas.tokens?.controlled?.length > 0
+                ? canvas.tokens.controlled
+                : (canvas.tokens?.placeables ?? []);
             for (const ct of tokensToCheck) {
               ovm.queueOverrideValidation(ct.document.id);
             }
             await ovm.processQueuedValidations({ skipMovedFilter: true });
           }
-        } catch { }
+        } catch {}
         try {
-          const deferredSeekManager = (await import(
-            '../chat/services/infra/DeferredSeekManager.js'
-          )).default;
+          const deferredSeekManager = (
+            await import('../chat/services/infra/DeferredSeekManager.js')
+          ).default;
           for (const t of canvas.tokens?.placeables ?? []) {
             const hasDef = t.document?.getFlag?.('pf2e-visioner', 'deferredSeekResults');
             if (hasDef?.length > 0) {
               await deferredSeekManager.checkAndApplyDeferred(t.document.id);
             }
           }
-        } catch { }
+        } catch {}
       });
     }
     try {
       const { updateWallVisuals } = await import('../services/visual-effects.js');
       const id = canvas.tokens.controlled?.[0]?.id || null;
       await updateWallVisuals(id);
-    } catch { }
+    } catch {}
   });
   Hooks.on('deleteWall', async (wallDocument) => {
     try {
@@ -615,7 +632,7 @@ export async function registerHooks() {
       const { updateWallVisuals } = await import('../services/visual-effects.js');
       const id = canvas.tokens.controlled?.[0]?.id || null;
       await updateWallVisuals(id);
-    } catch { }
+    } catch {}
   });
 
   // Removed controlToken hook - was causing excessive updateWallVisuals calls on token selection.
@@ -669,7 +686,7 @@ export async function registerHooks() {
           // Get the condition manager and clear established states
           const conditionManager = game.modules.get('pf2e-visioner')?.api?.getConditionManager?.();
           if (conditionManager?.clearEstablishedInvisibleStates) {
-            conditionManager.clearEstablishedInvisibleStates(token).catch(() => { });
+            conditionManager.clearEstablishedInvisibleStates(token).catch(() => {});
           }
         }
       }
@@ -809,10 +826,10 @@ export async function registerHooks() {
           if (t.document.getFlag('pf2e-visioner', 'waitingSneak')) {
             try {
               await t.document.unsetFlag('pf2e-visioner', 'waitingSneak');
-            } catch { }
+            } catch {}
             try {
               if (t.locked) t.locked = false;
-            } catch { }
+            } catch {}
           }
         }
       }

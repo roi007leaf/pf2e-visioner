@@ -61,7 +61,7 @@ function hasOffGuardImmunity(token) {
   if (!actor) return false;
   try {
     if (typeof actor.isImmuneTo === 'function' && actor.isImmuneTo('off-guard')) return true;
-  } catch (_) {}
+  } catch (_) { }
 
   const immunities = [
     ...(Array.isArray(actor?.attributes?.immunities) ? actor.attributes.immunities : []),
@@ -159,14 +159,6 @@ export class OffGuardSuppression {
     if (!token || !visibilityState) return false;
 
     const decision = this.getOffGuardSuppressionDecision(token, visibilityState, sourceToken);
-    const state = decision.state;
-    if (['hidden', 'undetected'].includes(state)) {
-      console.info('PF2E Visioner | Off-guard suppression decision', {
-        ...decision,
-        defender: tokenTraceData(token),
-        attacker: tokenTraceData(sourceToken),
-      });
-    }
 
     return decision.result;
   }

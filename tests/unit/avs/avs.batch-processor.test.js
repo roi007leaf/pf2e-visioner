@@ -4,239 +4,304 @@ import { BatchProcessor } from '../../../scripts/visibility/auto-visibility/core
 import { GlobalLosCache } from '../../../scripts/visibility/auto-visibility/utils/GlobalLosCache.js';
 import { GlobalVisibilityCache } from '../../../scripts/visibility/auto-visibility/utils/GlobalVisibilityCache.js';
 
-const makeToken = (id, x, y) => createMockToken({ id, x, y, width: 1, height: 1, actor: createMockActor() });
+const makeToken = (id, x, y) =>
+  createMockToken({ id, x, y, width: 1, height: 1, actor: createMockActor() });
 
 describe('BatchProcessor', () => {
-    let spatialAnalyzer;
-    let viewportFilterService;
-    let optimizedVisibilityCalculator;
-    let globalLosCache;
-    let globalVisibilityCache;
-    let getTokenPosition;
-    let positionManager;
-    let getActiveOverride;
-    let getVisibilityMap;
-    let processor;
+  let spatialAnalyzer;
+  let viewportFilterService;
+  let optimizedVisibilityCalculator;
+  let globalLosCache;
+  let globalVisibilityCache;
+  let getTokenPosition;
+  let positionManager;
+  let getActiveOverride;
+  let getVisibilityMap;
+  let processor;
 
-    beforeEach(() => {
-        global.canvas.grid.size = 100;
-        spatialAnalyzer = {
-            getTokensInRange: jest.fn((pos, max, changedId) => {
-                // return all tokens on canvas other than the changedId
-                return global.canvas.tokens.placeables.filter(t => t.document.id !== changedId);
-            }),
-            canTokensSeeEachOther: jest.fn(() => true),
-        };
-        viewportFilterService = { isEnabled: jest.fn(() => false) };
-        optimizedVisibilityCalculator = {
-            // Return non-default state so updates are generated vs original 'observed'
-            calculateVisibilityBetweenTokens: jest.fn(async () => 'hidden'),
-        };
-        globalLosCache = new GlobalLosCache(1000);
-        globalVisibilityCache = new GlobalVisibilityCache(1000);
-        getTokenPosition = (t) => ({ x: t.document.x + 50, y: t.document.y + 50, elevation: 0 });
-        getActiveOverride = jest.fn(() => null);
-        const maps = new Map();
-        getVisibilityMap = (t) => maps.get(t.document.id) || {};
+  beforeEach(() => {
+    global.canvas.grid.size = 100;
+    spatialAnalyzer = {
+      getTokensInRange: jest.fn((pos, max, changedId) => {
+        // return all tokens on canvas other than the changedId
+        return global.canvas.tokens.placeables.filter((t) => t.document.id !== changedId);
+      }),
+      canTokensSeeEachOther: jest.fn(() => true),
+    };
+    viewportFilterService = { isEnabled: jest.fn(() => false) };
+    optimizedVisibilityCalculator = {
+      // Return non-default state so updates are generated vs original 'observed'
+      calculateVisibilityBetweenTokens: jest.fn(async () => 'hidden'),
+    };
+    globalLosCache = new GlobalLosCache(1000);
+    globalVisibilityCache = new GlobalVisibilityCache(1000);
+    getTokenPosition = (t) => ({ x: t.document.x + 50, y: t.document.y + 50, elevation: 0 });
+    getActiveOverride = jest.fn(() => null);
+    const maps = new Map();
+    getVisibilityMap = (t) => maps.get(t.document.id) || {};
 
-        // Provide positionManager for new dependency shape; keep legacy function for back-compat
-        positionManager = { getTokenPosition };
+    // Provide positionManager for new dependency shape; keep legacy function for back-compat
+    positionManager = { getTokenPosition };
 
-        // Mock the VisionAnalyzer dependency
-        const mockVisionAnalyzer = {
-            getVisionCapabilities: jest.fn(() => ({ sensingSummary: { imprecise: [], precise: [], hearing: null } })),
-            hasLineOfSight: jest.fn(() => true)
-        };
+    // Mock the VisionAnalyzer dependency
+    const mockVisionAnalyzer = {
+      getVisionCapabilities: jest.fn(() => ({
+        sensingSummary: { imprecise: [], precise: [], hearing: null },
+      })),
+      hasLineOfSight: jest.fn(() => true),
+    };
 
-        // Mock the SystemStateProvider dependency
-        const mockSystemState = {
-            debug: jest.fn(),
-            isDebugMode: jest.fn(() => false)
-        };
+    // Mock the SystemStateProvider dependency
+    const mockSystemState = {
+      debug: jest.fn(),
+      isDebugMode: jest.fn(() => false),
+    };
 
-        processor = new BatchProcessor({
-            spatialAnalyzer,
-            viewportFilterService,
-            optimizedVisibilityCalculator,
-            globalLosCache,
-            globalVisibilityCache,
-            positionManager,
-            getTokenPosition,
-            getActiveOverride,
-            getVisibilityMap,
-            visionAnalyzer: mockVisionAnalyzer,
-            systemState: mockSystemState,
-            maxVisibilityDistance: 10,
-        });
-
-        // canvas tokens
-        const tA = makeToken('A', 0, 0);
-        const tB = makeToken('B', 100, 0);
-        const tC = makeToken('C', 300, 0);
-        global.canvas.tokens.placeables = [tA, tB, tC];
+    processor = new BatchProcessor({
+      spatialAnalyzer,
+      viewportFilterService,
+      optimizedVisibilityCalculator,
+      globalLosCache,
+      globalVisibilityCache,
+      positionManager,
+      getTokenPosition,
+      getActiveOverride,
+      getVisibilityMap,
+      visionAnalyzer: mockVisionAnalyzer,
+      systemState: mockSystemState,
+      maxVisibilityDistance: 10,
     });
 
-    test('computes visibility and returns updates for changed tokens', async () => {
-        const allTokens = [...global.canvas.tokens.placeables];
-        const changed = new Set(['A']);
-        const res = await processor.process(allTokens, changed, { hasDarknessSources: false });
-        expect(res.processedTokens).toBe(1);
-        // expect updates (A->B, B->A, A->C, C->A)
-        const pairs = res.updates.map(u => [u.observer.document.id, u.target.document.id]);
-        expect(pairs).toEqual(expect.arrayContaining([
-            ['A', 'B'], ['B', 'A'], ['A', 'C'], ['C', 'A']
-        ]));
-        expect(res.breakdown.pairsConsidered).toBeGreaterThan(0);
+    // canvas tokens
+    const tA = makeToken('A', 0, 0);
+    const tB = makeToken('B', 100, 0);
+    const tC = makeToken('C', 300, 0);
+    global.canvas.tokens.placeables = [tA, tB, tC];
+  });
+
+  test('computes visibility and returns updates for changed tokens', async () => {
+    const allTokens = [...global.canvas.tokens.placeables];
+    const changed = new Set(['A']);
+    const res = await processor.process(allTokens, changed, { hasDarknessSources: false });
+    expect(res.processedTokens).toBe(1);
+    // expect updates (A->B, B->A, A->C, C->A)
+    const pairs = res.updates.map((u) => [u.observer.document.id, u.target.document.id]);
+    expect(pairs).toEqual(
+      expect.arrayContaining([
+        ['A', 'B'],
+        ['B', 'A'],
+        ['A', 'C'],
+        ['C', 'A'],
+      ]),
+    );
+    expect(res.breakdown.pairsConsidered).toBeGreaterThan(0);
+  });
+
+  test('processes each unordered pair only once when both tokens changed', async () => {
+    const allTokens = [...global.canvas.tokens.placeables].slice(0, 2);
+
+    const res = await processor.process(allTokens, new Set(['A', 'B']), {});
+
+    const updatePairs = res.updates.map(
+      (u) => `${u.observer.document.id}->${u.target.document.id}`,
+    );
+    expect(updatePairs).toEqual(['A->B', 'B->A']);
+    expect(optimizedVisibilityCalculator.calculateVisibilityBetweenTokens).toHaveBeenCalledTimes(2);
+  });
+
+  test('uses global caches for LOS and visibility', async () => {
+    // prime caches
+    const allTokens = [...global.canvas.tokens.placeables];
+    const changed = new Set(['A']);
+    await processor.process(allTokens, changed, {});
+
+    // next run should hit global caches
+    const res2 = await processor.process(allTokens, changed, {});
+    expect(res2.breakdown.losGlobalHits).toBeGreaterThanOrEqual(1);
+    expect(res2.breakdown.visGlobalHits).toBeGreaterThanOrEqual(1);
+  });
+
+  test('door batches force detection sync for unchanged visible LOS pairs', async () => {
+    optimizedVisibilityCalculator.calculateVisibilityBetweenTokens.mockResolvedValue('observed');
+
+    const allTokens = [...global.canvas.tokens.placeables].slice(0, 2);
+    const res = await processor.process(allTokens, new Set(['A']), {
+      postBatchPerceptionSuppression: { reason: 'door-state-change' },
     });
 
-    test('processes each unordered pair only once when both tokens changed', async () => {
-        const allTokens = [...global.canvas.tokens.placeables].slice(0, 2);
+    expect(res.breakdown.visGlobalMisses).toBeGreaterThan(0);
+    expect(res.breakdown.losGlobalMisses).toBeGreaterThan(0);
+    expect(res.updates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          observer: expect.objectContaining({ document: expect.objectContaining({ id: 'A' }) }),
+          target: expect.objectContaining({ document: expect.objectContaining({ id: 'B' }) }),
+          visibility: 'observed',
+          forceDetectionSyncOnly: true,
+          explicitVisiblePair: true,
+        }),
+      ]),
+    );
+  });
 
-        const res = await processor.process(allTokens, new Set(['A', 'B']), {});
+  test('door batches only calculate pairs whose sight rays cross the changed door', async () => {
+    const left = makeToken('A', 0, 0);
+    const right = makeToken('B', 300, 0);
+    const sameSide = makeToken('C', 0, 300);
+    global.canvas.tokens.placeables = [left, right, sameSide];
 
-        const updatePairs = res.updates.map((u) => `${u.observer.document.id}->${u.target.document.id}`);
-        expect(updatePairs).toEqual(['A->B', 'B->A']);
-        expect(optimizedVisibilityCalculator.calculateVisibilityBetweenTokens).toHaveBeenCalledTimes(2);
+    const res = await processor.process(global.canvas.tokens.placeables, new Set(['A', 'B', 'C']), {
+      postBatchPerceptionSuppression: {
+        reason: 'door-state-change',
+        doorCoords: [200, -50, 200, 120],
+      },
     });
 
-    test('uses global caches for LOS and visibility', async () => {
-        // prime caches
-        const allTokens = [...global.canvas.tokens.placeables];
-        const changed = new Set(['A']);
-        await processor.process(allTokens, changed, {});
+    const calculatedPairs =
+      optimizedVisibilityCalculator.calculateVisibilityBetweenTokens.mock.calls.map(
+        ([observer, target]) => `${observer.document.id}->${target.document.id}`,
+      );
 
-        // next run should hit global caches
-        const res2 = await processor.process(allTokens, changed, {});
-        expect(res2.breakdown.losGlobalHits).toBeGreaterThanOrEqual(1);
-        expect(res2.breakdown.visGlobalHits).toBeGreaterThanOrEqual(1);
+    expect(calculatedPairs).toEqual(['A->B', 'B->A']);
+    expect(res.breakdown.pairsSkippedDoorScope).toBe(4);
+  });
+
+  test('skips LOS-failed pairs and counts pairsSkippedLOS', async () => {
+    // Mock spatialAnalyzer to indicate no LOS between tokens
+    spatialAnalyzer.canTokensSeeEachOther.mockReturnValue(false);
+
+    const allTokens = global.canvas.tokens.placeables;
+    const changed = new Set(['A']);
+    const res = await processor.process(allTokens, changed, {});
+
+    // When canTokensSeeEachOther returns false, pairs should be skipped
+    // Note: The exact count depends on implementation details
+    // If LOS check is used, pairsSkippedLOS should be > 0
+    // If not all pairs use LOS check, we may have updates
+    expect(res.breakdown.pairsSkippedLOS).toBeGreaterThanOrEqual(0);
+
+    // With the refactored code, LOS checks might be handled differently
+    // So we just verify the breakdown is populated correctly
+    expect(res.breakdown).toHaveProperty('pairsSkippedLOS');
+    expect(typeof res.breakdown.pairsSkippedLOS).toBe('number');
+  });
+
+  test('emits undetected updates when LOS blocked and prior visibility was observed', async () => {
+    processor.visionAnalyzer.hasLineOfSight.mockReturnValue(false);
+    processor.visionAnalyzer.getVisionCapabilities.mockImplementation(() => ({
+      isDeafened: true,
+      sensingSummary: {
+        precise: [],
+        imprecise: [],
+        hearing: null,
+      },
+    }));
+
+    const allTokens = global.canvas.tokens.placeables;
+    const changed = new Set(['A']);
+    const res = await processor.process(allTokens, changed, {});
+
+    expect(res.breakdown.pairsSkippedLOS).toBeGreaterThan(0);
+    const undetected = res.updates.filter((u) => u.visibility === 'undetected');
+    expect(undetected.length).toBeGreaterThan(0);
+    expect(undetected.some((u) => u.observer.document.id === 'A')).toBe(true);
+    expect(undetected.some((u) => u.target.document.id === 'A')).toBe(true);
+  });
+
+  test('precomputes LOS directionally instead of assuming symmetry', async () => {
+    processor.visionAnalyzer.hasLineOfSight.mockImplementation((observer, target) => {
+      return !(observer.document.id === 'A' && target.document.id === 'B');
     });
 
-    test('skips LOS-failed pairs and counts pairsSkippedLOS', async () => {
-        // Mock spatialAnalyzer to indicate no LOS between tokens
-        spatialAnalyzer.canTokensSeeEachOther.mockReturnValue(false);
+    await processor.process(global.canvas.tokens.placeables, new Set(['A']), {});
 
-        const allTokens = global.canvas.tokens.placeables;
-        const changed = new Set(['A']);
-        const res = await processor.process(allTokens, changed, {});
+    expect(processor.visionAnalyzer.hasLineOfSight).toHaveBeenCalledWith(
+      expect.objectContaining({ document: expect.objectContaining({ id: 'A' }) }),
+      expect.objectContaining({ document: expect.objectContaining({ id: 'B' }) }),
+      'sight',
+    );
+    expect(processor.visionAnalyzer.hasLineOfSight).toHaveBeenCalledWith(
+      expect.objectContaining({ document: expect.objectContaining({ id: 'B' }) }),
+      expect.objectContaining({ document: expect.objectContaining({ id: 'A' }) }),
+      'sight',
+    );
 
-        // When canTokensSeeEachOther returns false, pairs should be skipped
-        // Note: The exact count depends on implementation details
-        // If LOS check is used, pairsSkippedLOS should be > 0
-        // If not all pairs use LOS check, we may have updates
-        expect(res.breakdown.pairsSkippedLOS).toBeGreaterThanOrEqual(0);
+    const firstOptions =
+      optimizedVisibilityCalculator.calculateVisibilityBetweenTokens.mock.calls[0]?.at(-1);
+    expect(firstOptions?.precomputedLOS?.get('A-B')).toBe(false);
+    expect(firstOptions?.precomputedLOS?.get('B-A')).toBe(true);
+  });
 
-        // With the refactored code, LOS checks might be handled differently
-        // So we just verify the breakdown is populated correctly
-        expect(res.breakdown).toHaveProperty('pairsSkippedLOS');
-        expect(typeof res.breakdown.pairsSkippedLOS).toBe('number');
+  test('handles LOS loss per direction instead of forcing both directions to match', async () => {
+    processor.visionAnalyzer.hasLineOfSight.mockImplementation((observer, target) => {
+      return observer.document.id === 'B' && target.document.id === 'A';
     });
+    processor.visionAnalyzer.getVisionCapabilities.mockImplementation(() => ({
+      isDeafened: true,
+      sensingSummary: {
+        precise: [],
+        imprecise: [],
+        hearing: null,
+      },
+    }));
+    optimizedVisibilityCalculator.calculateVisibilityBetweenTokens.mockImplementation(
+      async (observer, target) => `${observer.document.id}->${target.document.id}`,
+    );
 
-    test('emits undetected updates when LOS blocked and prior visibility was observed', async () => {
-        processor.visionAnalyzer.hasLineOfSight.mockReturnValue(false);
-        processor.visionAnalyzer.getVisionCapabilities.mockImplementation(() => ({
-            isDeafened: true,
-            sensingSummary: {
-                precise: [],
-                imprecise: [],
-                hearing: null,
-            },
-        }));
+    const res = await processor.process(global.canvas.tokens.placeables, new Set(['A']), {});
 
-        const allTokens = global.canvas.tokens.placeables;
-        const changed = new Set(['A']);
-        const res = await processor.process(allTokens, changed, {});
+    expect(res.updates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          observer: expect.objectContaining({ document: expect.objectContaining({ id: 'A' }) }),
+          target: expect.objectContaining({ document: expect.objectContaining({ id: 'B' }) }),
+          visibility: 'undetected',
+        }),
+        expect.objectContaining({
+          observer: expect.objectContaining({ document: expect.objectContaining({ id: 'B' }) }),
+          target: expect.objectContaining({ document: expect.objectContaining({ id: 'A' }) }),
+          visibility: 'B->A',
+        }),
+      ]),
+    );
+  });
 
-        expect(res.breakdown.pairsSkippedLOS).toBeGreaterThan(0);
-        const undetected = res.updates.filter(u => u.visibility === 'undetected');
-        expect(undetected.length).toBeGreaterThan(0);
-        expect(undetected.some(u => u.observer.document.id === 'A')).toBe(true);
-        expect(undetected.some(u => u.target.document.id === 'A')).toBe(true);
-    });
+  test('does not short-circuit to undetected when LOS is blocked but implicit hearing should still work', async () => {
+    processor.visionAnalyzer.hasLineOfSight.mockReturnValue(false);
+    processor.visionAnalyzer.getVisionCapabilities.mockImplementation(() => ({
+      isDeafened: false,
+      sensingSummary: {
+        precise: [],
+        imprecise: [],
+        hearing: null,
+      },
+    }));
+    optimizedVisibilityCalculator.calculateVisibilityBetweenTokens.mockImplementation(
+      async () => 'hidden',
+    );
 
-    test('precomputes LOS directionally instead of assuming symmetry', async () => {
-        processor.visionAnalyzer.hasLineOfSight.mockImplementation((observer, target) => {
-            return !(observer.document.id === 'A' && target.document.id === 'B');
-        });
+    const res = await processor.process(global.canvas.tokens.placeables, new Set(['A']), {});
 
-        await processor.process(global.canvas.tokens.placeables, new Set(['A']), {});
+    expect(res.breakdown.pairsSkippedLOS).toBe(0);
+    expect(optimizedVisibilityCalculator.calculateVisibilityBetweenTokens).toHaveBeenCalled();
+    expect(res.updates.some((u) => u.visibility === 'hidden')).toBe(true);
+    expect(res.updates.some((u) => u.visibility === 'undetected')).toBe(false);
+  });
 
-        expect(processor.visionAnalyzer.hasLineOfSight).toHaveBeenCalledWith(
-            expect.objectContaining({ document: expect.objectContaining({ id: 'A' }) }),
-            expect.objectContaining({ document: expect.objectContaining({ id: 'B' }) }),
-            'sight',
-        );
-        expect(processor.visionAnalyzer.hasLineOfSight).toHaveBeenCalledWith(
-            expect.objectContaining({ document: expect.objectContaining({ id: 'B' }) }),
-            expect.objectContaining({ document: expect.objectContaining({ id: 'A' }) }),
-            'sight',
-        );
-
-        const firstOptions = optimizedVisibilityCalculator.calculateVisibilityBetweenTokens.mock.calls[0]?.at(-1);
-        expect(firstOptions?.precomputedLOS?.get('A-B')).toBe(false);
-        expect(firstOptions?.precomputedLOS?.get('B-A')).toBe(true);
-    });
-
-    test('handles LOS loss per direction instead of forcing both directions to match', async () => {
-        processor.visionAnalyzer.hasLineOfSight.mockImplementation((observer, target) => {
-            return observer.document.id === 'B' && target.document.id === 'A';
-        });
-        processor.visionAnalyzer.getVisionCapabilities.mockImplementation(() => ({
-            isDeafened: true,
-            sensingSummary: {
-                precise: [],
-                imprecise: [],
-                hearing: null,
-            },
-        }));
-        optimizedVisibilityCalculator.calculateVisibilityBetweenTokens.mockImplementation(
-            async (observer, target) => `${observer.document.id}->${target.document.id}`,
-        );
-
-        const res = await processor.process(global.canvas.tokens.placeables, new Set(['A']), {});
-
-        expect(res.updates).toEqual(
-            expect.arrayContaining([
-                expect.objectContaining({
-                    observer: expect.objectContaining({ document: expect.objectContaining({ id: 'A' }) }),
-                    target: expect.objectContaining({ document: expect.objectContaining({ id: 'B' }) }),
-                    visibility: 'undetected',
-                }),
-                expect.objectContaining({
-                    observer: expect.objectContaining({ document: expect.objectContaining({ id: 'B' }) }),
-                    target: expect.objectContaining({ document: expect.objectContaining({ id: 'A' }) }),
-                    visibility: 'B->A',
-                }),
-            ]),
-        );
-    });
-
-    test('does not short-circuit to undetected when LOS is blocked but implicit hearing should still work', async () => {
-        processor.visionAnalyzer.hasLineOfSight.mockReturnValue(false);
-        processor.visionAnalyzer.getVisionCapabilities.mockImplementation(() => ({
-            isDeafened: false,
-            sensingSummary: {
-                precise: [],
-                imprecise: [],
-                hearing: null,
-            },
-        }));
-        optimizedVisibilityCalculator.calculateVisibilityBetweenTokens.mockImplementation(
-            async () => 'hidden',
-        );
-
-        const res = await processor.process(global.canvas.tokens.placeables, new Set(['A']), {});
-
-        expect(res.breakdown.pairsSkippedLOS).toBe(0);
-        expect(optimizedVisibilityCalculator.calculateVisibilityBetweenTokens).toHaveBeenCalled();
-        expect(res.updates.some((u) => u.visibility === 'hidden')).toBe(true);
-        expect(res.updates.some((u) => u.visibility === 'undetected')).toBe(false);
-    });
-
-    test('respects active overrides to avoid calculation', async () => {
-        // set override for A->B only
-        getActiveOverride.mockImplementation((obs, tgt) => (obs === 'A' && tgt === 'B' ? { state: 'hidden' } : null));
-        const res = await processor.process(global.canvas.tokens.placeables, new Set(['A']), {});
-        // ensure we have at least one update for the overridden direction
-        expect(res.updates.some(u => u.observer.document.id === 'A' && u.target.document.id === 'B' && u.visibility === 'hidden')).toBe(true);
-    });
+  test('respects active overrides to avoid calculation', async () => {
+    // set override for A->B only
+    getActiveOverride.mockImplementation((obs, tgt) =>
+      obs === 'A' && tgt === 'B' ? { state: 'hidden' } : null,
+    );
+    const res = await processor.process(global.canvas.tokens.placeables, new Set(['A']), {});
+    // ensure we have at least one update for the overridden direction
+    expect(
+      res.updates.some(
+        (u) =>
+          u.observer.document.id === 'A' &&
+          u.target.document.id === 'B' &&
+          u.visibility === 'hidden',
+      ),
+    ).toBe(true);
+  });
 });

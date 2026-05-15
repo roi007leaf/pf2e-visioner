@@ -17,6 +17,7 @@ import { waitForTokenDocumentUpdateSafe } from './document-update-guard.js';
 
 const log = getLogger('AVS/VisibilityMap');
 export const VISIBILITY_V2_FLAG = 'visibilityV2';
+export const AVS_EXPLICIT_VISIBLE_DETECTION_SENSE = 'avs-visible';
 const KNOWN_LEGACY_VISIBILITY_STATES = new Set([
   'observed',
   'concealed',
@@ -68,10 +69,12 @@ function profilesToLegacyVisibilityMap(profileMap = {}, options = {}) {
   return visibilityMap;
 }
 
-function legacyVisibilityMapToProfiles(visibilityMap = {}, previousProfiles = {}) {
+function legacyVisibilityMapToProfiles(visibilityMap = {}, previousProfiles = {}, options = {}) {
   const profileMap = {};
 
-  for (const [id, state] of Object.entries(normalizeVisibilityMap(visibilityMap))) {
+  for (const [id, state] of Object.entries(
+    normalizeVisibilityMap(visibilityMap, { includeObserved: options.preserveObserved === true }),
+  )) {
     if (!isKnownLegacyVisibilityState(state)) continue;
 
     const previousProfile = previousProfiles?.[id];
@@ -83,20 +86,26 @@ function legacyVisibilityMapToProfiles(visibilityMap = {}, previousProfiles = {}
       continue;
     }
 
-    profileMap[id] = legacyVisibilityToProfile(state);
+    profileMap[id] = legacyVisibilityToProfile(
+      state,
+      state === 'observed' && options.preserveObserved === true
+        ? { detectionSense: AVS_EXPLICIT_VISIBLE_DETECTION_SENSE }
+        : {},
+    );
   }
 
   return profileMap;
 }
 
-export function normalizeVisibilityMap(map = {}) {
+export function normalizeVisibilityMap(map = {}, options = {}) {
   const normalized = {};
   const forcedDeletion = foundry?.data?.operators?.ForcedDeletion;
 
   for (const [id, state] of Object.entries(map ?? {})) {
     if (!id) continue;
     if (id.startsWith?.('-=')) continue;
-    if (!state || state === 'observed') continue;
+    if (!state) continue;
+    if (state === 'observed' && options.includeObserved !== true) continue;
     if (forcedDeletion && state === forcedDeletion) continue;
     normalized[id] = state;
   }
@@ -144,30 +153,40 @@ function getTokenId(tokenOrDocument) {
   );
 }
 
-async function unsetDocumentFlag(token, flagKey, forcedDeletion) {
+function noRenderUpdateOptions() {
+  return { diff: false, render: false, animate: false };
+}
+
+async function unsetDocumentFlag(token, flagKey, forcedDeletion, options = {}) {
   const document = getTokenDocument(token);
   if (!document) return;
-  if (typeof document.unsetFlag === 'function') {
+  const suppressRender = options?.suppressRender === true;
+
+  if (!suppressRender && typeof document.unsetFlag === 'function') {
     return document.unsetFlag(MODULE_ID, flagKey);
+  }
+
+  if (typeof document.update !== 'function') {
+    return typeof document.unsetFlag === 'function'
+      ? document.unsetFlag(MODULE_ID, flagKey)
+      : undefined;
   }
 
   const path = `flags.${MODULE_ID}.${flagKey}`;
   if (forcedDeletion) {
-    return document.update(
-      { [path]: forcedDeletion },
-      { diff: false, render: false, animate: false },
-    );
+    return document.update({ [path]: forcedDeletion }, noRenderUpdateOptions());
   }
 
-  return document.update(
-    { [`flags.${MODULE_ID}.-=${flagKey}`]: null },
-    { diff: false, render: false, animate: false },
-  );
+  return document.update({ [`flags.${MODULE_ID}.-=${flagKey}`]: null }, noRenderUpdateOptions());
 }
 
-async function setDocumentFlag(token, flagKey, value) {
+async function setDocumentFlag(token, flagKey, value, options = {}) {
   const document = getTokenDocument(token);
   if (!document) return;
+  if (options?.suppressRender === true && typeof document.update === 'function') {
+    return document.update({ [`flags.${MODULE_ID}.${flagKey}`]: value }, noRenderUpdateOptions());
+  }
+
   if (typeof document.setFlag === 'function') {
     return document.setFlag(MODULE_ID, flagKey, value);
   }
@@ -184,7 +203,7 @@ function getRawPerceptionProfileMap(token) {
   return normalizePerceptionProfileMap(map);
 }
 
-async function setPerceptionProfileFlag(token, profileMap) {
+async function setPerceptionProfileFlag(token, profileMap, options = {}) {
   const previousMap = getRawPerceptionProfileMap(token);
   const nextMap = normalizePerceptionProfileMap(profileMap);
   const removedTargetIds = Object.keys(previousMap).filter((id) => !(id in nextMap));
@@ -193,15 +212,15 @@ async function setPerceptionProfileFlag(token, profileMap) {
   await waitForTokenDocumentUpdateSafe(token);
 
   if (Object.keys(nextMap).length === 0) {
-    return unsetDocumentFlag(token, VISIBILITY_V2_FLAG, forcedDeletion);
+    return unsetDocumentFlag(token, VISIBILITY_V2_FLAG, forcedDeletion, options);
   }
 
   if (removedTargetIds.length > 0) {
-    await unsetDocumentFlag(token, VISIBILITY_V2_FLAG, forcedDeletion);
-    return setDocumentFlag(token, VISIBILITY_V2_FLAG, nextMap);
+    await unsetDocumentFlag(token, VISIBILITY_V2_FLAG, forcedDeletion, options);
+    return setDocumentFlag(token, VISIBILITY_V2_FLAG, nextMap, options);
   }
 
-  return setDocumentFlag(token, VISIBILITY_V2_FLAG, nextMap);
+  return setDocumentFlag(token, VISIBILITY_V2_FLAG, nextMap, options);
 }
 
 /**
@@ -230,7 +249,7 @@ export function getPerceptionProfileMap(token) {
  * @param {Token} token
  * @param {Record<string,string>} visibilityMap
  */
-export async function setVisibilityMap(token, visibilityMap) {
+export async function setVisibilityMap(token, visibilityMap, options = {}) {
   const document = getTokenDocument(token);
   if (!document) return;
   // Only GMs can update token documents
@@ -240,7 +259,9 @@ export async function setVisibilityMap(token, visibilityMap) {
   }
 
   const previousMap = getVisibilityMap(token);
-  const nextMap = normalizeVisibilityMap(visibilityMap);
+  const nextMap = normalizeVisibilityMap(visibilityMap, {
+    includeObserved: options?.preserveObserved === true,
+  });
   const changes = buildVisibilityMapDiff(previousMap, nextMap);
   if (changes.length) {
     log.debug(() => ({
@@ -253,8 +274,10 @@ export async function setVisibilityMap(token, visibilityMap) {
   }
 
   const previousProfiles = getPerceptionProfileMap(token);
-  const nextProfiles = legacyVisibilityMapToProfiles(nextMap, previousProfiles);
-  return setPerceptionProfileFlag(token, nextProfiles);
+  const nextProfiles = legacyVisibilityMapToProfiles(nextMap, previousProfiles, {
+    preserveObserved: options?.preserveObserved === true,
+  });
+  return setPerceptionProfileFlag(token, nextProfiles, options);
 }
 
 /**
@@ -264,7 +287,6 @@ export async function setVisibilityMap(token, visibilityMap) {
  * @param {{syncLegacy?: boolean, preserveEncounterUnnoticed?: boolean}} options
  */
 export async function setPerceptionProfileMap(token, profileMap, options = {}) {
-  void options;
   const document = getTokenDocument(token);
   if (!document) return;
   if (!game.user.isGM) {
@@ -273,7 +295,7 @@ export async function setPerceptionProfileMap(token, profileMap, options = {}) {
   }
 
   const nextProfiles = normalizePerceptionProfileMap(profileMap);
-  return setPerceptionProfileFlag(token, nextProfiles);
+  return setPerceptionProfileFlag(token, nextProfiles, options);
 }
 
 /**
@@ -418,8 +440,7 @@ export async function setPerceptionProfileBetween(
   const currentLegacyState = getVisibilityBetween(observer, target);
   const profileChanged =
     JSON.stringify(normalizePerceptionProfile(currentProfile)) !== JSON.stringify(nextProfile);
-  const missingStoredProfile =
-    !rawProfileMap[targetId] && !isDefaultProfile(nextProfile);
+  const missingStoredProfile = !rawProfileMap[targetId] && !isDefaultProfile(nextProfile);
 
   if (profileChanged || missingStoredProfile) {
     if (isDefaultProfile(nextProfile)) {

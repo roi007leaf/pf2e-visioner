@@ -1,9 +1,9 @@
 /**
  * Detection map store and helpers
- * 
+ *
  * Stores which sense was used to detect each target, alongside the visibility state.
  * This allows tooltips and UI to show players/GMs which sense is being used.
- * 
+ *
  * Detection info format:
  * {
  *   sense: "tremorsense" | "darkvision" | "hearing" | etc.,
@@ -21,6 +21,11 @@ const batchedUpdates = new Map();
 
 export function startDetectionBatch() {
   batchMode = true;
+  batchedUpdates.clear();
+}
+
+export function discardDetectionBatch() {
+  batchMode = false;
   batchedUpdates.clear();
 }
 
@@ -219,18 +224,18 @@ function getDetectionBetweenWithAggregation(observer, target) {
   // Multiple observer tokens - get detection from the observer with best visibility
   // First, get all visibility states from all observer tokens
   const visibilityStates = observerTokens
-    .map(observerToken => ({
+    .map((observerToken) => ({
       token: observerToken,
       visibility: getVisibilityBetween(observerToken, target),
     }))
-    .filter(item => item.visibility !== undefined && item.visibility !== null);
+    .filter((item) => item.visibility !== undefined && item.visibility !== null);
 
   if (visibilityStates.length === 0) {
     return null;
   }
 
   // Find which observer has the best visibility
-  const visibilities = visibilityStates.map(item => item.visibility);
+  const visibilities = visibilityStates.map((item) => item.visibility);
   const bestVisibility = getBestVisibilityState(visibilities);
 
   // Find the first observer with that best visibility and return their detection

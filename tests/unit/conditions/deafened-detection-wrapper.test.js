@@ -3,6 +3,7 @@
  */
 
 import { DetectionWrapper } from '../../../scripts/services/DetectionWrapper.js';
+import { markExplicitVisiblePair } from '../../../scripts/services/ExplicitVisibilityPairs.js';
 
 // Mock dependencies
 const mockLibWrapper = {
@@ -326,6 +327,17 @@ describe('Deafened Detection Wrapper', () => {
             const { observer, target } = buildTokenPair('concealed');
 
             expect(basicSightWrapper(jest.fn().mockReturnValue(true), { object: observer }, target)).toBe(true);
+        });
+
+        test('basic sight allows explicit door-visible pair when Foundry detection is stale false', () => {
+            const basicSightWrapper = getDetectionWrapperRegistration(
+                'CONFIG.Canvas.detectionModes.basicSight._canDetect',
+            );
+            const { observer, target } = buildTokenPair('observed');
+            global.game.pf2eVisioner = {};
+            markExplicitVisiblePair(observer, target);
+
+            expect(basicSightWrapper(jest.fn().mockReturnValue(false), { object: observer }, target)).toBe(true);
         });
 
         test('hearing allows hidden but blocks undetected and legacy unnoticed', () => {

@@ -16,6 +16,7 @@ import { VisibilityMapBatchCache } from './VisibilityMapBatchCache.js';
 import { VisibilityMapService } from './VisibilityMapService.js';
 
 const log = getLogger('AVS/BatchProcessor');
+const EXPLICIT_VISIBLE_STATES = new Set(['observed', 'concealed']);
 
 /**
  * BatchProcessor centralizes the heavy per-batch computation:
@@ -116,6 +117,7 @@ export class BatchProcessor {
       losGlobalHits: 0,
       losGlobalMisses: 0,
       losGlobalExpired: 0,
+      pairsSkippedDoorScope: 0,
     };
     let processedTokens = 0;
     const now = Date.now();
@@ -250,6 +252,14 @@ export class BatchProcessor {
       viewportTokenIds =
         this.viewportFilterService.getTokenIdSet?.(64, index, (t) => getPos(t)) || null;
     }
+    const isDoorStateBatch =
+      calcOptions?.postBatchPerceptionSuppression?.reason === 'door-state-change';
+    const doorScopeCoords = this.#getDoorScopeCoords(calcOptions);
+    const skipGlobalVisCache =
+      LightingPrecomputer.isForcingFreshComputation() ||
+      !!calcOptions?.skipPrecomputedLOS ||
+      isDoorStateBatch;
+    const skipLosCache = !!calcOptions?.skipPrecomputedLOS || isDoorStateBatch;
 
     for (const changedTokenId of changedTokenIds) {
       const changedToken = idToToken.get(changedTokenId);
@@ -298,6 +308,14 @@ export class BatchProcessor {
         const posA = changedTokenPos; // reuse memoized
         const posB =
           posCache.getPositionById(bId) || this.positionManager.getTokenPosition(otherToken);
+
+        if (
+          doorScopeCoords &&
+          !this.#doesPairCrossDoorScope(changedToken, otherToken, posA, posB, doorScopeCoords)
+        ) {
+          breakdown.pairsSkippedDoorScope += 2;
+          continue;
+        }
 
         const posKeyA = posCache.getPositionKeyById(aId, posA);
         const posKeyB = posCache.getPositionKeyById(bId, posB);
@@ -368,10 +386,8 @@ export class BatchProcessor {
           });
         }
 
-        // Early short-circuit: if both directional vis states are in global cache and equal originals, skip pair entirely
-        // Skip global cache when forcing fresh computation due to lighting changes
-        const skipGlobalVisCache =
-          LightingPrecomputer.isForcingFreshComputation() || !!calcOptions?.skipPrecomputedLOS;
+        // Early short-circuit: if both directional vis states are in global cache and equal originals, skip pair entirely.
+        // Door batches skip this cache because Foundry vision state can lag behind wall state changes.
         {
           const vKey1 = posCache.makeDirectionalKey(aId, posKeyA, bId, posKeyB);
           const vKey2 = posCache.makeDirectionalKey(bId, posKeyB, aId, posKeyA);
@@ -426,14 +442,14 @@ export class BatchProcessor {
 
           breakdown.losCacheMisses++;
 
-          const burstLos = calcOptions?.skipPrecomputedLOS ? null : calcOptions?.burstLosMemo;
+          const burstLos = skipLosCache ? null : calcOptions?.burstLosMemo;
           if (burstLos && burstLos.has(cacheKey)) {
             directionalLos = burstLos.get(cacheKey);
             breakdown.losCacheHits++;
             breakdown.burstMemoHits++;
           }
 
-          if (directionalLos === undefined && this.globalLosCache) {
+          if (directionalLos === undefined && this.globalLosCache && !skipLosCache) {
             const globalResult = this.globalLosCache.getWithMeta(cacheKey);
             if (globalResult.state === 'hit') {
               directionalLos = globalResult.value;
@@ -444,6 +460,8 @@ export class BatchProcessor {
             } else {
               breakdown.losGlobalMisses++;
             }
+          } else if (directionalLos === undefined && skipLosCache) {
+            breakdown.losGlobalMisses++;
           }
 
           if (directionalLos === undefined) {
@@ -453,11 +471,11 @@ export class BatchProcessor {
               'sight',
             );
 
-            if (this.globalLosCache) {
+            if (this.globalLosCache && !skipLosCache) {
               this.globalLosCache.set(cacheKey, directionalLos);
             }
             try {
-              if (!calcOptions?.skipPrecomputedLOS && calcOptions?.burstLosMemo) {
+              if (!skipLosCache && calcOptions?.burstLosMemo) {
                 calcOptions.burstLosMemo.set(cacheKey, directionalLos);
               }
             } catch {}
@@ -623,12 +641,27 @@ export class BatchProcessor {
         // OR if we need to force ephemeral effect updates (e.g., when suppression flags change)
         const needsEphemeralUpdate1 = effectiveVisibility1 !== originalVisibility1;
         const needsEphemeralUpdate2 = effectiveVisibility2 !== originalVisibility2;
+        const explicitVisiblePair1 =
+          !hasOverride1 && los1 === true && EXPLICIT_VISIBLE_STATES.has(effectiveVisibility1);
+        const explicitVisiblePair2 =
+          !hasOverride2 && los2 === true && EXPLICIT_VISIBLE_STATES.has(effectiveVisibility2);
+        const needsDoorDetectionSync1 =
+          isDoorStateBatch &&
+          !hasOverride1 &&
+          !needsEphemeralUpdate1 &&
+          (explicitVisiblePair1 || los1 === false);
+        const needsDoorDetectionSync2 =
+          isDoorStateBatch &&
+          !hasOverride2 &&
+          !needsEphemeralUpdate2 &&
+          (explicitVisiblePair2 || los2 === false);
 
         if (needsEphemeralUpdate1) {
           updates.push({
             observer: changedToken,
             target: otherToken,
             visibility: effectiveVisibility1,
+            explicitVisiblePair: explicitVisiblePair1,
           });
         }
         if (needsEphemeralUpdate2) {
@@ -636,6 +669,25 @@ export class BatchProcessor {
             observer: otherToken,
             target: changedToken,
             visibility: effectiveVisibility2,
+            explicitVisiblePair: explicitVisiblePair2,
+          });
+        }
+        if (needsDoorDetectionSync1) {
+          updates.push({
+            observer: changedToken,
+            target: otherToken,
+            visibility: effectiveVisibility1,
+            forceDetectionSyncOnly: true,
+            explicitVisiblePair: los1 === false ? false : explicitVisiblePair1,
+          });
+        }
+        if (needsDoorDetectionSync2) {
+          updates.push({
+            observer: otherToken,
+            target: changedToken,
+            visibility: effectiveVisibility2,
+            forceDetectionSyncOnly: true,
+            explicitVisiblePair: los2 === false ? false : explicitVisiblePair2,
           });
         }
 
@@ -727,6 +779,77 @@ export class BatchProcessor {
 
     // Could add other non-visual senses here (scent, etc.)
     return false;
+  }
+
+  #getDoorScopeCoords(calcOptions) {
+    const suppression = calcOptions?.postBatchPerceptionSuppression;
+    if (suppression?.reason !== 'door-state-change') return null;
+    const coords = suppression?.doorCoords;
+    if (!Array.isArray(coords) || coords.length < 4) return null;
+    const numericCoords = coords.slice(0, 4).map((value) => Number(value));
+    return numericCoords.every((value) => Number.isFinite(value)) ? numericCoords : null;
+  }
+
+  #doesPairCrossDoorScope(tokenA, tokenB, posA, posB, doorCoords) {
+    if (!posA || !posB || !doorCoords) return true;
+    const doorStart = { x: doorCoords[0], y: doorCoords[1] };
+    const doorEnd = { x: doorCoords[2], y: doorCoords[3] };
+    const tokenBSamples = this.#getDoorScopeTokenSamples(tokenB, posB);
+    if (tokenBSamples.some((sample) => this.#segmentsIntersect(posA, sample, doorStart, doorEnd))) {
+      return true;
+    }
+    const tokenASamples = this.#getDoorScopeTokenSamples(tokenA, posA);
+    return tokenASamples.some((sample) =>
+      this.#segmentsIntersect(posB, sample, doorStart, doorEnd),
+    );
+  }
+
+  #getDoorScopeTokenSamples(token, fallbackPosition) {
+    const samples = [];
+    if (fallbackPosition) {
+      samples.push({ x: fallbackPosition.x, y: fallbackPosition.y });
+    }
+    const document = token?.document;
+    const gridSize = globalThis.canvas?.grid?.size || 100;
+    const x = Number(document?.x);
+    const y = Number(document?.y);
+    const width = (Number(document?.width) || 1) * gridSize;
+    const height = (Number(document?.height) || 1) * gridSize;
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return samples;
+    samples.push(
+      { x, y },
+      { x: x + width, y },
+      { x, y: y + height },
+      { x: x + width, y: y + height },
+    );
+    return samples;
+  }
+
+  #segmentsIntersect(a, b, c, d) {
+    if (!a || !b || !c || !d) return false;
+    const denominator = (b.x - a.x) * (d.y - c.y) - (b.y - a.y) * (d.x - c.x);
+    const epsilon = 1e-6;
+    if (Math.abs(denominator) < epsilon) {
+      return (
+        this.#isPointOnSegment(a, c, b) ||
+        this.#isPointOnSegment(a, d, b) ||
+        this.#isPointOnSegment(c, a, d) ||
+        this.#isPointOnSegment(c, b, d)
+      );
+    }
+    const t = ((c.x - a.x) * (d.y - c.y) - (c.y - a.y) * (d.x - c.x)) / denominator;
+    const u = ((c.x - a.x) * (b.y - a.y) - (c.y - a.y) * (b.x - a.x)) / denominator;
+    return t >= -epsilon && t <= 1 + epsilon && u >= -epsilon && u <= 1 + epsilon;
+  }
+
+  #isPointOnSegment(a, point, b) {
+    const epsilon = 1e-6;
+    const cross = (point.y - a.y) * (b.x - a.x) - (point.x - a.x) * (b.y - a.y);
+    if (Math.abs(cross) > epsilon) return false;
+    const dot = (point.x - a.x) * (b.x - a.x) + (point.y - a.y) * (b.y - a.y);
+    if (dot < -epsilon) return false;
+    const lengthSquared = Math.pow(b.x - a.x, 2) + Math.pow(b.y - a.y, 2);
+    return dot <= lengthSquared + epsilon;
   }
 
   _hasRuleElementOverride(token) {

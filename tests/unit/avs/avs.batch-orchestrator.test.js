@@ -135,6 +135,118 @@ describe('BatchOrchestrator', () => {
     expect(orchestrator.isProcessing()).toBe(false);
   });
 
+  test('processBatch drops stale results when movement starts while batch is running', async () => {
+    jest.useFakeTimers();
+    orchestrator._syncEphemeralEffectsForUpdates = jest.fn(async () => {});
+    orchestrator._precomputeLighting = jest.fn(async () => ({
+      precomputedLights: null,
+      precomputeStats: { observerUsed: 0, observerMiss: 0, targetUsed: 0, targetMiss: 0 },
+    }));
+
+    let resolveFirstBatch;
+    batchProcessor.process
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveFirstBatch = resolve;
+          }),
+      )
+      .mockResolvedValueOnce({
+        updates: [
+          {
+            observer: global.canvas.tokens.placeables[0],
+            target: global.canvas.tokens.placeables[1],
+            visibility: 'concealed',
+          },
+        ],
+        breakdown: { visGlobalHits: 0, visGlobalMisses: 1, losGlobalHits: 0, losGlobalMisses: 1 },
+        processedTokens: 1,
+        precomputeStats: { observerUsed: 0, observerMiss: 1, targetUsed: 0, targetMiss: 1 },
+      });
+
+    const firstBatch = orchestrator.processBatch(new Set(['A']));
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(batchProcessor.process).toHaveBeenCalledTimes(1);
+
+    orchestrator.notifyTokenMovementStart();
+    resolveFirstBatch({
+      updates: [
+        {
+          observer: global.canvas.tokens.placeables[0],
+          target: global.canvas.tokens.placeables[1],
+          visibility: 'hidden',
+        },
+      ],
+      breakdown: { visGlobalHits: 0, visGlobalMisses: 1, losGlobalHits: 0, losGlobalMisses: 1 },
+      processedTokens: 1,
+      precomputeStats: { observerUsed: 0, observerMiss: 1, targetUsed: 0, targetMiss: 1 },
+    });
+
+    await firstBatch;
+
+    expect(applied).toEqual([]);
+    expect(global.canvas.perception.update).not.toHaveBeenCalled();
+
+    await jest.advanceTimersByTimeAsync(250);
+    await Promise.resolve();
+
+    expect(batchProcessor.process).toHaveBeenCalledTimes(2);
+    expect(applied).toEqual([['A', 'B', 'concealed']]);
+  });
+
+  test('movement stop keeps pending movement tokens when an older batch is still running', async () => {
+    jest.useFakeTimers();
+    orchestrator._syncEphemeralEffectsForUpdates = jest.fn(async () => {});
+    orchestrator._precomputeLighting = jest.fn(async () => ({
+      precomputedLights: null,
+      precomputeStats: { observerUsed: 0, observerMiss: 0, targetUsed: 0, targetMiss: 0 },
+    }));
+
+    let resolveFirstBatch;
+    batchProcessor.process
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveFirstBatch = resolve;
+          }),
+      )
+      .mockResolvedValueOnce({
+        updates: [],
+        breakdown: { visGlobalHits: 0, visGlobalMisses: 0, losGlobalHits: 0, losGlobalMisses: 0 },
+        processedTokens: 1,
+        precomputeStats: { observerUsed: 0, observerMiss: 0, targetUsed: 0, targetMiss: 0 },
+      });
+
+    const firstBatch = orchestrator.processBatch(new Set(['A']));
+    await Promise.resolve();
+    await Promise.resolve();
+
+    orchestrator.notifyTokenMovementStart();
+    orchestrator.enqueueTokens(new Set(['B']));
+
+    await jest.advanceTimersByTimeAsync(250);
+
+    expect(batchProcessor.process).toHaveBeenCalledTimes(1);
+
+    resolveFirstBatch({
+      updates: [],
+      breakdown: { visGlobalHits: 0, visGlobalMisses: 0, losGlobalHits: 0, losGlobalMisses: 0 },
+      processedTokens: 1,
+      precomputeStats: { observerUsed: 0, observerMiss: 0, targetUsed: 0, targetMiss: 0 },
+    });
+    await firstBatch;
+    await jest.advanceTimersByTimeAsync(0);
+    await Promise.resolve();
+
+    expect(batchProcessor.process).toHaveBeenCalledTimes(2);
+    expect(Array.from(batchProcessor.process.mock.calls[1][1])).toEqual(['B', 'A']);
+    expect(batchProcessor.process.mock.calls[1][2]).toEqual(
+      expect.objectContaining({ skipPrecomputedLOS: true, skipViewportFilter: true }),
+    );
+  });
+
   test('_applyBatchResults awaits visibility map persistence', async () => {
     const deferred = {};
     visibilityMapService.setVisibilityMap = jest.fn(
@@ -170,6 +282,32 @@ describe('BatchOrchestrator', () => {
     await applyPromise;
 
     expect(settled).toBe(true);
+  });
+
+  test('_applyBatchResults records door detection sync without map write', async () => {
+    global.game.pf2eVisioner = {};
+    visibilityMapService.setVisibilityMap = jest.fn(async () => {});
+
+    const count = await orchestrator._applyBatchResults(
+      {
+        updates: [
+          {
+            observer: global.canvas.tokens.placeables[0],
+            target: global.canvas.tokens.placeables[1],
+            visibility: 'observed',
+            forceDetectionSyncOnly: true,
+            explicitVisiblePair: true,
+          },
+        ],
+      },
+      { suppressVisibilityMapRender: true },
+    );
+
+    expect(count).toBe(1);
+    expect(visibilityMapService.setVisibilityMap).not.toHaveBeenCalled();
+    expect([...global.game.pf2eVisioner.explicitlyVisiblePairs]).toEqual(
+      expect.arrayContaining([expect.stringContaining('A->B')]),
+    );
   });
 
   test('processBatch refreshes perception after ephemeral effect sync', async () => {
