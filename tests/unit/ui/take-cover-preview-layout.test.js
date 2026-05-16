@@ -162,6 +162,8 @@ describe('Take Cover preview layout', () => {
 
     expect(template).toContain('{{> "pf2e-visioner.bulk-override"}}');
     expect(template).toContain('bulkOverrideStates');
+    expect(template).toContain('{{taker.name}}');
+    expect(template).toContain('takeCoverBadges');
   });
 
   it('builds bulk override buttons from cover states', async () => {
@@ -194,6 +196,68 @@ describe('Take Cover preview layout', () => {
     ]);
   });
 
+  it('normalizes lesser cover out of Take Cover rows', async () => {
+    const { TakeCoverPreviewDialog } = await import(
+      '../../../scripts/chat/dialogs/TakeCoverPreviewDialog.js'
+    );
+    const target = { id: 'observer', name: 'Observer', actor: {}, document: {} };
+    const dialog = new TakeCoverPreviewDialog(
+      { id: 'taker', name: 'Taker', actor: {} },
+      [
+        {
+          target,
+          oldCover: 'lesser',
+          currentCover: 'lesser',
+          newCover: 'lesser',
+          changed: true,
+        },
+      ],
+      [],
+      {},
+    );
+
+    const context = await dialog._prepareContext({});
+    const row = context.outcomes[0];
+
+    expect(row.oldVisibility).toBe('none');
+    expect(row.newVisibility).toBe('standard');
+    expect(row.oldCoverCfg.cssClass).toBe('cover-none');
+    expect(row.newCoverCfg.cssClass).toBe('cover-standard');
+    expect(row.availableStates.map((state) => state.value)).toEqual([
+      'none',
+      'standard',
+      'greater',
+    ]);
+  });
+
+  it('shows the taking-cover token name and Ceaseless Shadows badge context', async () => {
+    const { TakeCoverPreviewDialog } = await import(
+      '../../../scripts/chat/dialogs/TakeCoverPreviewDialog.js'
+    );
+    const taker = {
+      id: 'taker',
+      name: 'Celdar',
+      actor: {
+        itemTypes: {
+          feat: [{ name: 'Ceaseless Shadows', slug: 'ceaseless-shadows', type: 'feat' }],
+        },
+      },
+    };
+    const dialog = new TakeCoverPreviewDialog(taker, [], [], {});
+
+    const context = await dialog._prepareContext({});
+
+    expect(context.taker.name).toBe('Celdar');
+    expect(context.takeCoverBadges).toEqual([
+      expect.objectContaining({
+        key: 'ceaseless-shadows',
+        icon: 'fas fa-infinity',
+        label: 'PF2E_VISIONER.FEAT.CEASELESS_SHADOWS',
+        tooltip: 'PF2E_VISIONER.UI.CEASELESS_SHADOWS_TAKE_COVER_TOOLTIP',
+      }),
+    ]);
+  });
+
   it('colors bulk cover override buttons from cover state classes', async () => {
     const fs = await import('node:fs/promises');
     const path = await import('node:path');
@@ -207,5 +271,15 @@ describe('Take Cover preview layout', () => {
     expect(css).toContain('color: var(--cover-standard');
     expect(css).toContain('.bulk-override-state-btn.cover-greater');
     expect(css).toContain('color: var(--cover-greater');
+  });
+
+  it('keeps the Take Cover actor name at panel scale', async () => {
+    const fs = await import('node:fs/promises');
+    const path = await import('node:path');
+    const css = await fs.readFile(path.join(process.cwd(), 'styles/dialog-layout.css'), 'utf8');
+    const nameRule = css.match(/\.take-cover-preview-dialog \.taker-name \{[\s\S]*?\}/)?.[0] ?? '';
+
+    expect(nameRule).toContain('font-size: 16px');
+    expect(nameRule).toContain('line-height: 1.15');
   });
 });

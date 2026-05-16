@@ -1,10 +1,60 @@
 import { MODULE_ID } from '../../../constants.js';
+import { FeatsHandler } from '../../../chat/services/FeatsHandler.js';
 import { LastValidationRequest } from '../utils/LastValidationRequest.js';
 import { OverrideValidityCache } from '../utils/OverrideValidityCache.js';
 
 let visibilityCalculatorModulePromise = null;
 let coverDetectorModulePromise = null;
 let visionAnalyzerModulePromise = null;
+
+const STEALTH_OVERRIDE_STATES = new Set(['hidden', 'undetected', 'unnoticed']);
+const STEALTH_POSITION_BYPASS_DETAILS = {
+  'legendary-sneak': {
+    slug: 'legendary-sneak',
+    label: 'Legendary Sneak',
+    icon: 'fas fa-user-ninja',
+    tooltip:
+      "You're always sneaking unless you choose to be seen, even when there's nowhere to hide. You can Hide and Sneak even without cover or being Concealed. When you employ an exploration tactic other than Avoiding Notice, you also gain the benefits of Avoiding Notice unless you choose not to.",
+  },
+  'very-very-sneaky': {
+    slug: 'very-very-sneaky',
+    label: 'Very, Very Sneaky',
+    icon: 'fas fa-user-ninja',
+    tooltip: 'Very, Very Sneaky removes the cover or concealment requirement for Sneak.',
+  },
+};
+
+function getStealthPositionBypassContext(target, override = {}) {
+  const source = override.source || 'manual_action';
+  if (!['manual_action', 'sneak_action', 'hide_action'].includes(source)) return null;
+  if (!STEALTH_OVERRIDE_STATES.has(override.state)) return null;
+  if (FeatsHandler.hasFeat(target, 'legendary-sneak')) {
+    return STEALTH_POSITION_BYPASS_DETAILS['legendary-sneak'];
+  }
+  if (
+    (source === 'manual_action' || source === 'sneak_action') &&
+    FeatsHandler.hasFeat(target, 'very-very-sneaky')
+  ) {
+    return STEALTH_POSITION_BYPASS_DETAILS['very-very-sneaky'];
+  }
+  return null;
+}
+
+function targetIgnoresStealthPositionValidation(target, override = {}) {
+  return !!getStealthPositionBypassContext(target, override);
+}
+
+function withStealthPositionBypassContext(target, override = {}) {
+  const context = getStealthPositionBypassContext(target, override);
+  if (!context) return override;
+  return {
+    ...override,
+    stealthPositionBypassFeat: context.slug,
+    stealthPositionBypassLabel: context.label,
+    stealthPositionBypassIcon: context.icon,
+    stealthPositionBypassTooltip: context.tooltip,
+  };
+}
 
 function loadVisibilityCalculatorModule() {
   if (!visibilityCalculatorModulePromise) {
@@ -39,9 +89,9 @@ function loadVisionAnalyzerModule() {
 }
 
 function prewarmOverrideValidationModules() {
-  loadVisibilityCalculatorModule().catch(() => {});
-  loadCoverDetectorModule().catch(() => {});
-  loadVisionAnalyzerModule().catch(() => {});
+  loadVisibilityCalculatorModule().catch(() => { });
+  loadCoverDetectorModule().catch(() => { });
+  loadVisionAnalyzerModule().catch(() => { });
 }
 
 export class OverrideValidationManager {
@@ -284,18 +334,21 @@ export class OverrideValidationManager {
             const observerPos = this.positionManager.getTokenPosition(movedToken);
             currentCover = coverDetector.detectFromPoint(observerPos, t);
           } catch { }
-          awareness.push({
+          awareness.push(withStealthPositionBypassContext(t, {
             observerId: movedTokenId,
             targetId: t.id,
             observerName: movedToken.name,
             targetName: t.name,
             state: fd.state,
+            source: fd.source,
             hasCover: fd.hasCover,
             hasConcealment: fd.hasConcealment,
             expectedCover: fd.expectedCover,
+            coverOnly: fd.coverOnly,
+            coverOverrideSource: fd.coverOverrideSource,
             currentVisibility,
             currentCover,
-          });
+          }));
         }
       } catch { }
       return { overrides: awareness, __showAwareness: awareness.length > 0 };
@@ -324,6 +377,8 @@ export class OverrideValidationManager {
             hasCover: flagData.hasCover,
             hasConcealment: flagData.hasConcealment,
             expectedCover: flagData.expectedCover,
+            coverOnly: flagData.coverOnly,
+            coverOverrideSource: flagData.coverOverrideSource,
             timedOverride: flagData.timedOverride,
             observerId,
             targetId,
@@ -362,6 +417,8 @@ export class OverrideValidationManager {
             hasCover: flagData.hasCover,
             hasConcealment: flagData.hasConcealment,
             expectedCover: flagData.expectedCover,
+            coverOnly: flagData.coverOnly,
+            coverOverrideSource: flagData.coverOverrideSource,
             timedOverride: flagData.timedOverride,
             observerId,
             targetId,
@@ -439,18 +496,21 @@ export class OverrideValidationManager {
           const observerPos = this.positionManager.getTokenPosition(obs);
           currentCover = coverDetector.detectFromPoint(observerPos, movedToken);
         } catch { }
-        awareness.push({
+        awareness.push(withStealthPositionBypassContext(movedToken, {
           observerId,
           targetId: movedTokenId,
           observerName: obs?.name || fd.observerName || 'Observer',
           targetName: movedToken.name,
           state: fd.state,
+          source: fd.source,
           hasCover: fd.hasCover,
           hasConcealment: fd.hasConcealment,
           expectedCover: fd.expectedCover,
+          coverOnly: fd.coverOnly,
+          coverOverrideSource: fd.coverOverrideSource,
           currentVisibility,
           currentCover,
-        });
+        }));
       }
       const allTokens = canvas.tokens?.placeables || [];
       for (const t of allTokens) {
@@ -486,18 +546,21 @@ export class OverrideValidationManager {
           const observerPos = this.positionManager.getTokenPosition(movedToken);
           currentCover = coverDetector.detectFromPoint(observerPos, t);
         } catch { }
-        awareness.push({
+        awareness.push(withStealthPositionBypassContext(t, {
           observerId: movedTokenId,
           targetId: t.id,
           observerName: movedToken.name,
           targetName: t.name,
           state: fd.state,
+          source: fd.source,
           hasCover: fd.hasCover,
           hasConcealment: fd.hasConcealment,
           expectedCover: fd.expectedCover,
+          coverOnly: fd.coverOnly,
+          coverOverrideSource: fd.coverOverrideSource,
           currentVisibility,
           currentCover,
-        });
+        }));
       }
     } catch { }
 
@@ -505,32 +568,8 @@ export class OverrideValidationManager {
   }
 
   async checkOverrideValidity(observerId, targetId, override, options = undefined) {
-    const perfEnabled = !!options?.debugPerformance;
-    const perfStartedAt = perfEnabled ? performance.now() : 0;
-    const perfMarks = [];
-    const markPerf = (step) => {
-      if (!perfEnabled) return;
-      const at = Number((performance.now() - perfStartedAt).toFixed(2));
-      perfMarks.push({ step, at });
-      console.log('PF2E Visioner [AVS/OverrideValidation/perf-step]', {
-        observerId,
-        targetId,
-        step,
-        at,
-      });
-    };
-    const flushPerf = (extra = {}) => {
-      if (!perfEnabled) return;
-      console.log('PF2E Visioner [AVS/OverrideValidation/perf]', {
-        observerId,
-        observerName: observer?.name ?? null,
-        targetId,
-        targetName: target?.name ?? null,
-        totalMs: Number((performance.now() - perfStartedAt).toFixed(2)),
-        marks: perfMarks,
-        ...extra,
-      });
-    };
+    const markPerf = () => undefined;
+    const flushPerf = () => undefined;
 
     const observer = canvas.tokens?.get(observerId);
     const target = canvas.tokens?.get(targetId);
@@ -614,7 +653,15 @@ export class OverrideValidationManager {
         const observerPos = this.positionManager.getTokenPosition(observer);
         markPerf('observer-position-done');
         markPerf('cover-detect-start');
-        coverResult = coverDetector.detectFromPoint(observerPos, target);
+        const useTokenCoverDetection =
+          override?.coverOnly === true ||
+          override?.coverOverrideSource === 'take_cover_action' ||
+          override?.source === 'take_cover_action';
+        if (useTokenCoverDetection && typeof coverDetector.detectBetweenTokens === 'function') {
+          coverResult = coverDetector.detectBetweenTokens(observer, target, options);
+        } else {
+          coverResult = coverDetector.detectFromPoint(observerPos, target);
+        }
         markPerf('cover-detect-done');
         targetHasCoverFromObserver = coverResult === 'standard' || coverResult === 'greater';
       } catch {
@@ -626,6 +673,12 @@ export class OverrideValidationManager {
       const targetHasConcealmentFromObserver =
         visibility === 'concealed' || visibility === 'hidden';
       const targetIsVisibleToObserver = visibility === 'observed' || visibility === 'concealed';
+      const ignoresStealthPositionValidation = targetIgnoresStealthPositionValidation(
+        target,
+        override,
+      );
+      const overrideExpectsObscuredVisibility =
+        override.hasConcealment || STEALTH_OVERRIDE_STATES.has(override.state);
       if (!visibility) {
         flushPerf({ reason: 'no-visibility-result', visibility, coverResult });
         return null;
@@ -633,7 +686,28 @@ export class OverrideValidationManager {
       markPerf('state-compare-start');
 
       const reasons = [];
-      if (override.hasCover && !targetHasCoverFromObserver) {
+      const isCoverOnlyOverride =
+        override?.coverOnly === true ||
+        override?.coverOverrideSource === 'take_cover_action' ||
+        override?.source === 'take_cover_action';
+      if (
+        isCoverOnlyOverride &&
+        override.expectedCover &&
+        override.expectedCover !== coverResult
+      ) {
+        reasons.push({
+          icon: 'fas fa-shield-alt',
+          text: coverResult === 'none' ? 'no cover' : `has ${coverResult} cover`,
+          type: `cover-${coverResult}`,
+          crossed: coverResult === 'none',
+        });
+      }
+      if (
+        !isCoverOnlyOverride &&
+        !ignoresStealthPositionValidation &&
+        override.hasCover &&
+        !targetHasCoverFromObserver
+      ) {
         if (coverResult === 'none') {
           reasons.push({
             icon: 'fas fa-shield-alt',
@@ -643,7 +717,12 @@ export class OverrideValidationManager {
           });
         }
       }
-      if (!override.hasCover && targetHasCoverFromObserver) {
+      if (
+        !isCoverOnlyOverride &&
+        !ignoresStealthPositionValidation &&
+        !override.hasCover &&
+        targetHasCoverFromObserver
+      ) {
         reasons.push({
           icon: 'fas fa-shield-alt',
           text: `has ${coverResult} cover`,
@@ -651,6 +730,7 @@ export class OverrideValidationManager {
         });
       }
       if (
+        !ignoresStealthPositionValidation &&
         override.hasConcealment &&
         targetIsVisibleToObserver &&
         !targetHasConcealmentFromObserver
@@ -662,17 +742,29 @@ export class OverrideValidationManager {
           crossed: true,
         });
       }
-      if (!override.hasConcealment && targetHasConcealmentFromObserver) {
+      if (
+        !ignoresStealthPositionValidation &&
+        !override.hasConcealment &&
+        targetHasConcealmentFromObserver
+      ) {
         reasons.push({
           icon: 'fas fa-eye-slash',
           text: 'has concealment',
           type: 'concealment-has',
         });
       }
-      if (override.hasConcealment && visibility === 'observed') {
+      if (
+        !ignoresStealthPositionValidation &&
+        override.hasConcealment &&
+        visibility === 'observed'
+      ) {
         reasons.push({ icon: 'fas fa-eye', text: 'clearly visible', type: 'visibility-clear' });
       }
-      if (override.source === 'manual_action' || override.source === 'sneak_action') {
+      if (
+        !ignoresStealthPositionValidation &&
+        overrideExpectsObscuredVisibility &&
+        (override.source === 'manual_action' || override.source === 'sneak_action')
+      ) {
         if (
           visibility === 'observed' &&
           !targetHasCoverFromObserver &&
@@ -718,6 +810,7 @@ export class OverrideValidationManager {
           type: 'diversion-source',
         },
         manual_action: { icon: 'fas fa-tools', text: 'manual', type: 'manual-source' },
+        take_cover_action: { icon: 'fas fa-shield-alt', text: 'take cover', type: 'cover-source' },
       };
       const srcKey = override.source || 'manual_action';
       if (sourceIconMap[srcKey]) reasonIconsForUi.push(sourceIconMap[srcKey]);
@@ -756,7 +849,9 @@ export class OverrideValidationManager {
     if (invalidOverrides.length === 0) return;
     try {
       const lastMoved = globalThis?.game?.pf2eVisioner?.lastMovedTokenId || null;
-      if (lastMoved && movedTokenId && movedTokenId !== lastMoved) return;
+      if (lastMoved && movedTokenId && movedTokenId !== lastMoved) {
+        return;
+      }
     } catch { }
     const overrideData = invalidOverrides.map(
       ({
@@ -767,6 +862,10 @@ export class OverrideValidationManager {
         reasonIcons,
         currentVisibility,
         currentCover,
+        stealthPositionBypassFeat,
+        stealthPositionBypassLabel,
+        stealthPositionBypassIcon,
+        stealthPositionBypassTooltip,
       }) => {
         const observer = canvas.tokens?.get(observerId);
         const target = canvas.tokens?.get(targetId);
@@ -783,8 +882,18 @@ export class OverrideValidationManager {
           hasCover: override.hasCover || false,
           hasConcealment: override.hasConcealment || false,
           expectedCover: override.expectedCover,
+          coverOnly: override.coverOnly === true,
+          coverOverrideSource: override.coverOverrideSource,
           currentVisibility,
           currentCover,
+          stealthPositionBypassFeat:
+            stealthPositionBypassFeat || override.stealthPositionBypassFeat,
+          stealthPositionBypassLabel:
+            stealthPositionBypassLabel || override.stealthPositionBypassLabel,
+          stealthPositionBypassIcon:
+            stealthPositionBypassIcon || override.stealthPositionBypassIcon,
+          stealthPositionBypassTooltip:
+            stealthPositionBypassTooltip || override.stealthPositionBypassTooltip,
           isManual: override.source === 'manual_action',
         };
       },

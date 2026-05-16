@@ -128,6 +128,7 @@ export class TakeCoverActionHandler extends ActionHandlerBase {
     const { applyTakeCoverProneRangedOnlyEffect } = await import('../../../cover/batch.js');
     let appliedProneRangedOnly = false;
 
+
     for (const ch of changes) {
       if (ch.takeCoverProneRangedOnly === true) {
         if (!appliedProneRangedOnly) {

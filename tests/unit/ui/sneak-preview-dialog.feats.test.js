@@ -40,6 +40,14 @@ jest.mock('../../../scripts/chat/services/infra/shared-utils.js', () => ({
 }));
 
 describe('SneakPreviewDialog - feat-based end-position relaxation', () => {
+  test('Legendary Sneak badge tooltip says the cover and concealment rule', () => {
+    const en = require('../../../lang/en.json');
+
+    expect(en.PF2E_VISIONER.SNEAK_AUTOMATION.BADGES.LEGENDARY_SNEAK_TOOLTIP).toBe(
+      'You can Hide and Sneak even without cover or being Concealed.',
+    );
+  });
+
   test('very-very-sneaky relaxes end position requirement', async () => {
     // Lazy import to align with module system
     const mod = require('../../../scripts/chat/dialogs/SneakPreviewDialog.js');

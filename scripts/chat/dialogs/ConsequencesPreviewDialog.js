@@ -13,6 +13,14 @@ import { BaseActionDialog } from './base-action-dialog.js';
 // Store reference to current consequences dialog
 let currentConsequencesDialog = null;
 
+function getDefaultConsequencesVisibility() {
+  try {
+    return game.settings.get(MODULE_ID, 'autoVisibilityEnabled') === true ? 'avs' : 'observed';
+  } catch {
+    return 'observed';
+  }
+}
+
 export class ConsequencesPreviewDialog extends BaseActionDialog {
   constructor(attackingToken, outcomes, changes, attackData, options = {}) {
     // Set localized title before calling super
@@ -129,7 +137,8 @@ export class ConsequencesPreviewDialog extends BaseActionDialog {
 
     // Prepare outcomes with additional UI data (and normalize shape)
     processedOutcomes = processedOutcomes.map((outcome) => {
-      const effectiveNewState = outcome.overrideState || 'avs'; // Default to AVS
+      const effectiveNewState =
+        outcome.overrideState || outcome.newVisibility || getDefaultConsequencesVisibility();
       const baseOldState = outcome.currentVisibility;
       // Use the centralized logic that handles AVS cases
       const hasActionableChange = this.calculateHasActionableChange({
@@ -381,7 +390,8 @@ export class ConsequencesPreviewDialog extends BaseActionDialog {
     const outcome = app.outcomes.find((o) => o.target.id === tokenId);
     if (!outcome) return;
 
-    const effectiveNewState = outcome.overrideState || 'avs';
+    const effectiveNewState =
+      outcome.overrideState || outcome.newVisibility || getDefaultConsequencesVisibility();
 
     // If AVS is selected, remove any existing override
     if (effectiveNewState === 'avs') {
@@ -526,7 +536,7 @@ export class ConsequencesPreviewDialog extends BaseActionDialog {
     const avsRemovals = [];
     for (const o of changedOutcomes) {
       const id = o?.target?.id;
-      const state = o?.overrideState || 'avs';
+      const state = o?.overrideState || o?.newVisibility || getDefaultConsequencesVisibility();
       if (id && state) {
         if (state === 'avs') {
           // AVS selections - remove any existing overrides

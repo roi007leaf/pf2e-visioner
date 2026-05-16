@@ -258,7 +258,6 @@ async function checkAvsOverrides() {
     return;
   }
 
-  console.log('PF2E Visioner | Checking AVS overrides at turn change...');
 
   try {
     const { optimizedVisibilityCalculator } = await import('../visibility/auto-visibility/VisibilityCalculator.js');
@@ -271,7 +270,6 @@ async function checkAvsOverrides() {
       if (!token) continue;
 
       if (api.hasAVSOverrides(token)) {
-        console.log(`PF2E Visioner | Token ${token.name} has AVS overrides`);
         tokensWithOverrides.push(token);
         const overrides = api.getAVSOverrides(token);
 
@@ -306,7 +304,6 @@ async function checkAvsOverrides() {
     }
 
     const allOverrides = Array.from(overrideMap.values());
-    console.log(`PF2E Visioner | Found ${tokensWithOverrides.length} tokens with ${allOverrides.length} unique overrides`);
 
     if (allOverrides.length > 0) {
       const { default: indicator } = await import('../ui/OverrideValidationIndicator.js');

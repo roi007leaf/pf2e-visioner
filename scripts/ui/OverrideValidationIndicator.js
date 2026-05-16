@@ -11,6 +11,24 @@
 import { COVER_STATES, MODULE_ID, VISIBILITY_STATES } from '../constants.js';
 import { addTokenBorder, removeTokenBorder } from '../managers/token-manager/borders.js';
 
+const AUTO_COVER_DISPLAY = {
+  icon: 'fas fa-arrows-rotate',
+  label: 'Auto Cover',
+  cssClass: 'cover-auto',
+};
+
+function isTakeCoverAutoRelease(override) {
+  return (
+    override?.coverOnly === true ||
+    override?.coverOverrideSource === 'take_cover_action' ||
+    override?.source === 'take_cover_action'
+  );
+}
+
+function getDisplayCurrentCover(override) {
+  return isTakeCoverAutoRelease(override) ? 'auto' : override?.currentCover || 'none';
+}
+
 class OverrideValidationIndicator {
   static #instance = null;
 
@@ -44,24 +62,25 @@ class OverrideValidationIndicator {
   // - concealment expectation vs current (concealed or hidden)
   #hasDisplayChange(o) {
     if (!o) return false;
+    const coverOnly = o.coverOnly === true;
 
     // Filter out overrides with no state or 'avs' state
-    if (!o.state || o.state === 'avs') {
+    if ((!o.state || o.state === 'avs') && !coverOnly) {
       return false;
     }
 
     const prevVis = o.state || (o.hasConcealment ? 'concealed' : 'observed');
     const prevCover = (o.expectedCover ?? (o.hasCover ? 'standard' : 'none'));
     const curVis = o.currentVisibility || 'observed';
-    const curCover = o.currentCover || 'none';
+    const curCover = getDisplayCurrentCover(o);
 
     // Filter out 'avs' visibility states from display
-    if (prevVis === 'avs' || curVis === 'avs') {
+    if (!coverOnly && (prevVis === 'avs' || curVis === 'avs')) {
       return false;
     }
 
     // Only show if there are actual state differences
-    return prevVis !== curVis || prevCover !== curCover;
+    return (!coverOnly && prevVis !== curVis) || prevCover !== curCover;
   }
 
   // Determine whether an override should be shown based on sneak status
@@ -99,7 +118,9 @@ class OverrideValidationIndicator {
   }
 
   show(overrideData, tokenName, movedTokenId = null, options = {}) {
-    if (!game.user?.isGM) return;
+    if (!game.user?.isGM) {
+      return;
+    }
 
     this._showOptions = options || {};
 
@@ -129,7 +150,6 @@ class OverrideValidationIndicator {
     const overrides = all.filter((o) => this.#hasDisplayChange(o) && this.#shouldShowOverride(o, movedTokenId));
 
     if (movedTokenId && overrides.length > 0) {
-
       this._overrideStack.set(movedTokenId, {
         overrides: all,
         tokenName,
@@ -145,7 +165,9 @@ class OverrideValidationIndicator {
 
   #showDirect(overrides, rawOverrides, tokenName) {
     if (overrides.length === 0) {
-      if (Date.now() - this._lastShowAt < this._minVisibleMs) return;
+      if (Date.now() - this._lastShowAt < this._minVisibleMs) {
+        return;
+      }
       this.hide(true);
       return;
     }
@@ -283,6 +305,8 @@ class OverrideValidationIndicator {
           hasCover: flagData.hasCover,
           hasConcealment: flagData.hasConcealment,
           expectedCover: flagData.expectedCover,
+          coverOnly: flagData.coverOnly,
+          coverOverrideSource: flagData.coverOverrideSource,
           source: flagData.source,
         });
       }
@@ -301,6 +325,8 @@ class OverrideValidationIndicator {
             hasCover: fd.hasCover,
             hasConcealment: fd.hasConcealment,
             expectedCover: fd.expectedCover,
+            coverOnly: fd.coverOnly,
+            coverOverrideSource: fd.coverOverrideSource,
             source: fd.source,
           });
         }
@@ -384,8 +410,11 @@ class OverrideValidationIndicator {
       const { default: AvsOverrideManager } = await import('../chat/services/infra/AvsOverrideManager.js');
       // Track pairs we clear to immediately recompute their natural AVS states
       const affectedPairs = new Set(); // key: `${observerId}-${targetId}`
-      for (const { observerId, targetId } of raw) {
-        await AvsOverrideManager.removeOverride(observerId, targetId);
+      for (const override of raw) {
+        const { observerId, targetId } = override;
+        const options = this.#getAcceptOptions(override);
+        if (options) await AvsOverrideManager.removeOverride(observerId, targetId, options);
+        else await AvsOverrideManager.removeOverride(observerId, targetId);
         if (observerId && targetId) affectedPairs.add(`${observerId}-${targetId}`);
       }
       ui.notifications?.info?.(`Accepted ${raw.length} AVS change(s)`);
@@ -452,6 +481,16 @@ class OverrideValidationIndicator {
     } catch (e) {
       console.error('PF2E Visioner | Failed to keep overrides from indicator:', e);
     }
+  }
+
+  #getAcceptOptions(override) {
+    const isTakeCoverTracking =
+      override?.coverOnly === true ||
+      override?.coverOverrideSource === 'take_cover_action' ||
+      override?.source === 'take_cover_action';
+    return isTakeCoverTracking
+      ? { acceptedCoverState: override.currentCover || 'none' }
+      : undefined;
   }
 
   #createElement() {
@@ -653,7 +692,12 @@ class OverrideValidationIndicator {
           const { default: AvsOverrideManager } = await import(
             '../chat/services/infra/AvsOverrideManager.js'
           );
-          await AvsOverrideManager.removeOverride(observerId, targetId);
+          const override = (this._rawOverrides || []).find(
+            (o) => o.observerId === observerId && o.targetId === targetId,
+          );
+          const options = this.#getAcceptOptions(override);
+          if (options) await AvsOverrideManager.removeOverride(observerId, targetId, options);
+          else await AvsOverrideManager.removeOverride(observerId, targetId);
           row.style.opacity = '0.3';
           row.style.textDecoration = 'line-through';
           this._rawOverrides = (this._rawOverrides || []).filter(
@@ -692,13 +736,28 @@ class OverrideValidationIndicator {
       return `<i class="${cfg.icon} state-indicator ${cls}" data-kind="visibility" data-state="${key}" data-tooltip="${label}"></i>`;
     };
     const mkCover = (key) => {
-      const cfg = COVER_STATES?.[key] || { icon: 'fas fa-shield', label: game.i18n.localize('PF2E_VISIONER.TOKEN_MANAGER.COVER_STATE'), cssClass: 'cover-none' };
+      const cfg =
+        key === 'auto'
+          ? AUTO_COVER_DISPLAY
+          : COVER_STATES?.[key] || { icon: 'fas fa-shield', label: game.i18n.localize('PF2E_VISIONER.TOKEN_MANAGER.COVER_STATE'), cssClass: 'cover-none' };
       const label = game?.i18n?.localize?.(cfg.label) || cfg.label || '';
       const cls = cfg.cssClass || `cover-${key}`;
       return `<i class="${cfg.icon} state-indicator ${cls}" data-kind="cover" data-state="${key}" data-tooltip="${label}"></i>`;
     };
+    const escapeAttr = (value) => String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/"/g, '&quot;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+    const escapeText = (value) => String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+    const buildStealthPositionBypassBadge = (o) => o?.stealthPositionBypassLabel
+      ? `<span class="stealth-position-bypass-badge" data-tooltip="${escapeAttr(o.stealthPositionBypassTooltip || o.stealthPositionBypassLabel)}"><i class="${escapeAttr(o.stealthPositionBypassIcon || 'fas fa-user-ninja')}"></i><span>${escapeText(o.stealthPositionBypassLabel)}</span></span>`
+      : '';
 
-    const buildRow = (o) => {
+    const buildRow = (o, { showStealthPositionBypass = true } = {}) => {
       // Items that reach here have already been filtered by #hasDisplayChange() and #shouldShowOverride()
       // So we should always display them, even if they don't show state changes
       if (!o) return '';
@@ -706,13 +765,16 @@ class OverrideValidationIndicator {
       const prevVis = o.state || (o.hasConcealment ? 'concealed' : 'observed');
       const prevCover = (o.expectedCover ?? (o.hasCover ? 'standard' : 'none'));
       const curVis = o.currentVisibility || 'observed';
-      const curCover = o.currentCover || 'none';
+      const curCover = getDisplayCurrentCover(o);
 
       // Filter out 'avs' states from display but still show the row
       const showVisChange = prevVis !== curVis && prevVis !== 'avs' && curVis !== 'avs';
       const showCoverChange = prevCover !== curCover;
 
       const reasons = (o.reasonIcons || []).map((r) => `<i class="${r.icon}" data-tooltip="${r.text}"></i>`).join('');
+      const stealthPositionBypassBadge = showStealthPositionBypass
+        ? buildStealthPositionBypassBadge(o)
+        : '';
       const isDeferred = /deferred/i.test(o.source || '');
       const deferredBadge = isDeferred ? ` <span style="font-size:0.75em; opacity:0.7;" data-tooltip="Applied from deferred Seek"><i class="fas fa-clock"></i></span>` : '';
       return `
@@ -720,7 +782,7 @@ class OverrideValidationIndicator {
           <div class="who">${o.observerName} <i class="fas fa-arrow-right"></i> ${o.targetName}</div>
           ${showVisChange ? `<div class="state-pair vis">${mkVis(prevVis)} <i class="fas fa-arrow-right"></i> ${mkVis(curVis)}${deferredBadge}</div>` : ''}
           ${showCoverChange ? `<div class="state-pair cover">${mkCover(prevCover)} <i class="fas fa-arrow-right"></i> ${mkCover(curCover)}</div>` : ''}
-          ${reasons ? `<div class="reasons">${reasons}</div>` : ''}
+          ${reasons || stealthPositionBypassBadge ? `<div class="reasons">${reasons}${stealthPositionBypassBadge}</div>` : ''}
         </div>
       `;
     };
@@ -732,16 +794,23 @@ class OverrideValidationIndicator {
       const asTarget = all.filter((o) => o.targetId === movedId);
 
       const movedTokenName = this._overrideStack.get(movedId)?.tokenName || null;
-      const section = (title, arr, groupKey) => arr.length
-        ? `
+      const section = (title, arr, groupKey) => {
+        if (!arr.length) return '';
+        const headerBypassBadge = groupKey === 'target'
+          ? buildStealthPositionBypassBadge(arr.find((o) => o.targetId === movedId))
+          : '';
+        const movingTokenIndicator = movedTokenName
+          ? ` <span class="moving-token-indicator"><i class="fas fa-person-walking"></i> ${escapeText(movedTokenName)}${headerBypassBadge ? ` ${headerBypassBadge}` : ''}</span>`
+          : '';
+        return `
           <div class="tip-group" data-group="${groupKey}">
             <div class="tip-group-header">
-              <div class="tip-subheader">${title}${movedTokenName ? ` <span class="moving-token-indicator"><i class="fas fa-person-walking"></i> ${movedTokenName}</span>` : ''}</div>
+              <div class="tip-subheader">${title}${movingTokenIndicator}</div>
             </div>
-            <div class="tip-group-body">${arr.map(buildRow).join('')}</div>
+            <div class="tip-group-body">${arr.map((o) => buildRow(o, { showStealthPositionBypass: !headerBypassBadge })).join('')}</div>
           </div>
-        `
-        : '';
+        `;
+      };
 
       contentHTML = section('Changes as observer', asObserver, 'observer') + section('Changes as target', asTarget, 'target');
       if (!contentHTML) contentHTML = '<div class="tip-empty">No details available</div>';
@@ -789,6 +858,7 @@ class OverrideValidationIndicator {
         },
         cover: {
           none: '#0072b2',
+          auto: '#4fc3f7',
           lesser: '#f0e442',
           standard: '#cc79a7',
           greater: '#9467bd',
@@ -804,6 +874,7 @@ class OverrideValidationIndicator {
         },
         cover: {
           none: '#0072b2',
+          auto: '#4fc3f7',
           lesser: '#f0e442',
           standard: '#ff8c00',
           greater: '#d946ef',
@@ -819,6 +890,7 @@ class OverrideValidationIndicator {
         },
         cover: {
           none: '#00b050',
+          auto: '#4fc3f7',
           lesser: '#ffd700',
           standard: '#ff6600',
           greater: '#dc143c',
@@ -834,6 +906,7 @@ class OverrideValidationIndicator {
         },
         cover: {
           none: '#ffffff',
+          auto: '#66ccff',
           lesser: '#cccccc',
           standard: '#888888',
           greater: '#333333',
@@ -853,6 +926,7 @@ class OverrideValidationIndicator {
       },
       cover: {
         none: ['--cover-none', '--cover-none-color', '#4caf50'],
+        auto: ['--pf2e-visioner-info', '--color-text-accent', '#4fc3f7'],
         lesser: ['--cover-lesser', '--cover-lesser-color', '#ffc107'],
         standard: ['--cover-standard', '--cover-standard-color', '#ff6600'],
         greater: ['--cover-greater', '--cover-greater-color', '#f44336'],
@@ -935,6 +1009,7 @@ class OverrideValidationIndicator {
       .pf2e-visioner-override-tooltip .state-indicator.visibility-undetected { color: var(--visibility-undetected, var(--visibility-undetected-color, #f44336)) !important; }
       .pf2e-visioner-override-tooltip .state-indicator.visibility-unnoticed { color: var(--visibility-unnoticed, var(--visibility-unnoticed-color, #9c27b0)) !important; }
       .pf2e-visioner-override-tooltip .state-indicator.cover-none { color: var(--cover-none, var(--cover-none-color, #4caf50)) !important; }
+      .pf2e-visioner-override-tooltip .state-indicator.cover-auto { color: var(--pf2e-visioner-info, #4fc3f7) !important; }
       .pf2e-visioner-override-tooltip .state-indicator.cover-lesser { color: var(--cover-lesser, var(--cover-lesser-color, #ffc107)) !important; }
       .pf2e-visioner-override-tooltip .state-indicator.cover-standard { color: var(--cover-standard, var(--cover-standard-color, #ff6600)) !important; }
       .pf2e-visioner-override-tooltip .state-indicator.cover-greater { color: var(--cover-greater, var(--cover-greater-color, #f44336)) !important; }
@@ -966,6 +1041,8 @@ class OverrideValidationIndicator {
       }
       .pf2e-visioner-override-tooltip .reasons { display: inline-flex; align-items: center; gap: 4px; color: var(--pf2e-visioner-info, #90caf9); }
   .pf2e-visioner-override-tooltip .reasons i { font-size: ${Math.max(10, p.tipFont - 1)}px; }
+      .pf2e-visioner-override-tooltip .stealth-position-bypass-badge { display: inline-flex; align-items: center; gap: 4px; padding: 1px 5px; border: 1px solid rgba(144, 202, 249, 0.42); border-radius: 7px; background: rgba(33, 150, 243, 0.16); color: #bbdefb; font-weight: 700; white-space: nowrap; }
+      .pf2e-visioner-override-tooltip .stealth-position-bypass-badge i { color: #90caf9; }
       .pf2e-visioner-override-tooltip .tip-empty { color: var(--color-text-dark-secondary, #bbb); padding: 8px 0; }
     `;
     if (existing) {

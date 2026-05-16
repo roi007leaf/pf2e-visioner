@@ -179,6 +179,112 @@ describe('ConsequencesPreviewDialog - AVS Tag Display', () => {
     });
 
     describe('Manual override with same state', () => {
+        it('defaults the row selection to AVS when AVS is enabled', async () => {
+            const observerId = 'observer-123';
+            const attackerId = 'attacker-456';
+
+            const mockObserver = {
+                id: observerId,
+                name: 'Observer',
+                actor: { type: 'npc' },
+                document: { id: observerId, getFlag: jest.fn(() => undefined), hidden: false },
+            };
+
+            const mockAttacker = {
+                id: attackerId,
+                name: 'Attacker',
+                actor: { type: 'character' },
+                document: {
+                    id: attackerId,
+                    getFlag: jest.fn(() => undefined),
+                    texture: { src: 'attacker.webp' },
+                },
+            };
+
+            const outcome = {
+                target: mockObserver,
+                currentVisibility: 'hidden',
+                changed: true,
+            };
+
+            const dialog = new ConsequencesPreviewDialog(
+                mockAttacker,
+                [outcome],
+                [],
+                {},
+                { actionData: { actor: mockAttacker } },
+            );
+
+            const context = await dialog._prepareContext({});
+
+            expect(context.outcomes[0].newVisibility).toBe('avs');
+            expect(context.outcomes[0].newVisibilityState).toEqual(
+                expect.objectContaining({ cssClass: 'visibility-avs' }),
+            );
+            expect(context.outcomes[0].availableStates).toContainEqual(
+                expect.objectContaining({ value: 'avs', selected: true }),
+            );
+        });
+
+        it('apply all uses AVS as the fallback row state when AVS is enabled', async () => {
+            const removeOverride = jest.fn().mockResolvedValue(true);
+            const applyNowConsequences = jest.fn().mockResolvedValue(1);
+            const updateTokenVisuals = jest.fn().mockResolvedValue();
+
+            jest.doMock('../../../scripts/chat/services/infra/AvsOverrideManager.js', () => ({
+                __esModule: true,
+                default: { removeOverride },
+            }));
+            jest.doMock('../../../scripts/chat/services/index.js', () => ({
+                __esModule: true,
+                applyNowConsequences,
+            }));
+            jest.doMock('../../../scripts/services/visual-effects.js', () => ({
+                __esModule: true,
+                updateTokenVisuals,
+            }));
+
+            const observerId = 'observer-123';
+            const attackerId = 'attacker-456';
+
+            const mockObserver = {
+                id: observerId,
+                name: 'Observer',
+                actor: { type: 'npc' },
+                document: { id: observerId, getFlag: jest.fn(() => undefined), hidden: false },
+            };
+
+            const mockAttacker = {
+                id: attackerId,
+                name: 'Attacker',
+                actor: { type: 'character' },
+                document: { id: attackerId, getFlag: jest.fn(() => undefined) },
+            };
+
+            const outcome = {
+                target: mockObserver,
+                currentVisibility: 'hidden',
+                hasActionableChange: true,
+            };
+
+            const dialog = new ConsequencesPreviewDialog(
+                mockAttacker,
+                [outcome],
+                [],
+                {},
+                { actionData: { actor: mockAttacker } },
+            );
+            dialog.updateRowButtonsToApplied = jest.fn();
+            dialog.updateBulkActionButtons = jest.fn();
+            dialog.updateChangesCount = jest.fn();
+
+            await ConsequencesPreviewDialog._onApplyAll();
+
+            expect(removeOverride).toHaveBeenCalledWith(observerId, attackerId);
+            expect(updateTokenVisuals).toHaveBeenCalled();
+            expect(applyNowConsequences).not.toHaveBeenCalled();
+        });
+
         it('should allow applying when state matches but old is AVS-controlled', () => {
             const observerId = 'observer-123';
             const attackerId = 'attacker-456';

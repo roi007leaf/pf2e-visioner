@@ -70,4 +70,23 @@ describe('OverrideValidationDialog - accept forces hide', () => {
         const methodSource = dialog._onAcceptIndividual.toString();
         expect(methodSource).toContain('indicator.hide(true)');
     });
+
+    it('should accept current cover state for Take Cover overrides', async () => {
+        const dialog = new OverrideValidationDialog({
+            invalidOverrides: [],
+            tokenName: 'TestToken',
+            movedTokenId: 'moved1'
+        });
+
+        expect(dialog._getAcceptOptions({
+            coverOnly: true,
+            source: 'take_cover_action',
+            currentCover: 'lesser'
+        })).toEqual({ acceptedCoverState: 'lesser' });
+
+        expect(dialog._getAcceptOptions({
+            source: 'manual_action',
+            currentCover: 'lesser'
+        })).toBeUndefined();
+    });
 });

@@ -465,24 +465,6 @@ export class VisionerTokenManager extends foundry.applications.api.ApplicationV2
     if (timerRows.length === 0 && timerBadges.length === 0) return;
 
     try {
-      if (game.settings.get(MODULE_ID, 'debug')) {
-        const now = Date.now();
-        this._lastTimerRefreshDebugTs = this._lastTimerRefreshDebugTs || 0;
-        if (now - this._lastTimerRefreshDebugTs > 5000) {
-          this._lastTimerRefreshDebugTs = now;
-          console.debug('PF2E Visioner | TokenManager: timer refresh tick', {
-            timerRows: timerRows.length,
-            timerBadges: timerBadges.length,
-            hasRoot: !!root,
-            hasElement: !!this.element,
-            hasWindowElement: !!this.window?.element,
-            hasWindowContent: !!this.window?.content,
-          });
-        }
-      }
-    } catch (_) {}
-
-    try {
       const { default: TimedOverrideManager } = await import(
         '../../services/TimedOverrideManager.js'
       );

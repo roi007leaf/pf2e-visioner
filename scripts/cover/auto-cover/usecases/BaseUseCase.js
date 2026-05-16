@@ -37,8 +37,6 @@ export class BaseAutoCoverUseCase {
       console.error(`PF2E Visioner | ${this.useCaseType}.${method}: ${message}`, logData);
     } else if (level === 'warn') {
       console.warn(`PF2E Visioner | ${this.useCaseType}.${method}: ${message}`, logData);
-    } else if (level === 'info') {
-      console.info(`PF2E Visioner | ${this.useCaseType}.${method}: ${message}`, logData);
     }
   }
 

@@ -50,6 +50,85 @@ function setModuleFlagsDeletion(update) {
   }
 }
 
+function getStateFromSources(sources) {
+  if (!Array.isArray(sources) || sources.length === 0) return undefined;
+  const source = sources.reduce((best, current) => {
+    const bestPriority = best?.priority ?? 0;
+    const currentPriority = current?.priority ?? 0;
+    return currentPriority > bestPriority ? current : best;
+  }, sources[0]);
+  return source?.state;
+}
+
+function scrubManualCoverSources(stateSource) {
+  if (!stateSource || typeof stateSource !== 'object') {
+    return { changed: false, value: stateSource };
+  }
+
+  const next = JSON.parse(JSON.stringify(stateSource));
+  let changed = false;
+
+  const scrubSourcesObject = (containerKey) => {
+    const container = next[containerKey];
+    if (!container || typeof container !== 'object') return;
+
+    for (const [observerId, data] of Object.entries(container)) {
+      const sources = Array.isArray(data?.sources) ? data.sources : [];
+      const filtered = sources.filter((source) => source?.type !== 'manual-cover');
+      if (filtered.length === sources.length) continue;
+
+      changed = true;
+      if (filtered.length === 0) {
+        delete container[observerId];
+        continue;
+      }
+
+      data.sources = filtered;
+      const state = getStateFromSources(filtered);
+      if (state) data.state = state;
+      else delete data.state;
+    }
+
+    if (Object.keys(container).length === 0) {
+      delete next[containerKey];
+    }
+  };
+
+  const scrubGlobalSources = (key) => {
+    const data = next[key];
+    const sources = Array.isArray(data?.sources) ? data.sources : [];
+    if (sources.length === 0) return;
+
+    const filtered = sources.filter((source) => source?.type !== 'manual-cover');
+    if (filtered.length === sources.length) return;
+
+    changed = true;
+    if (filtered.length === 0) {
+      delete next[key];
+      return;
+    }
+
+    data.sources = filtered;
+    const state = getStateFromSources(filtered);
+    if (state) data.state = state;
+    else delete data.state;
+  };
+
+  scrubSourcesObject('coverByObserver');
+  scrubGlobalSources('cover');
+
+  return { changed, value: next };
+}
+
+function setCommonSceneDataDeletion(update) {
+  setFlagDeletion(update, 'visibility');
+  setFlagDeletion(update, 'cover');
+  setFlagDeletion(update, 'autoCoverMap');
+  setFlagDeletion(update, 'stateSource');
+  setFlagDeletion(update, 'coverOverride');
+  setFlagDeletion(update, 'providesCover');
+}
+
 /**
  * Main API class for the module
  */
@@ -1883,6 +1962,7 @@ export class Pf2eVisionerApi {
       const updates = tokensWithoutRuleElements.map((t) => {
         const update = { _id: t.id };
         setModuleFlagsDeletion(update);
+        setCommonSceneDataDeletion(update);
         return update;
       });
 
@@ -1896,9 +1976,20 @@ export class Pf2eVisionerApi {
         setFlagDeletion(update, 'sneak-speed-effect-id');
         setFlagDeletion(update, 'invisibility');
 
-        // Clear visibility/cover maps (these get recalculated by AVS)
-        update[`flags.${MODULE_ID}.visibility`] = {};
-        update[`flags.${MODULE_ID}.cover`] = {};
+        // Clear visibility/cover maps (these get recalculated by AVS). Use deletion, not
+        // empty objects, because Foundry can merge `{}` and leave old manual entries.
+        setFlagDeletion(update, 'visibility');
+        setFlagDeletion(update, 'cover');
+        setFlagDeletion(update, 'autoCoverMap');
+        const stateSource = t.document.getFlag(MODULE_ID, 'stateSource') || {};
+        const scrubbedStateSource = scrubManualCoverSources(stateSource);
+        if (scrubbedStateSource.changed) {
+          if (Object.keys(scrubbedStateSource.value || {}).length > 0) {
+            update[`flags.${MODULE_ID}.stateSource`] = scrubbedStateSource.value;
+          } else {
+            setFlagDeletion(update, 'stateSource');
+          }
+        }
 
         return update;
       });
@@ -1908,13 +1999,6 @@ export class Pf2eVisionerApi {
       if (allUpdates.length && scene.updateEmbeddedDocuments) {
         try {
           await scene.updateEmbeddedDocuments('Token', allUpdates, { diff: false });
-
-          if (tokensWithRuleElements.length > 0) {
-            console.log(
-              `PF2E Visioner | Preserved rule element flags on ${tokensWithRuleElements.length} token(s):`,
-              tokensWithRuleElements.map((t) => t.name),
-            );
-          }
 
           // Additional verification and cleanup: check if flags are actually gone
           setTimeout(async () => {
@@ -2210,6 +2294,8 @@ export class Pf2eVisionerApi {
           setFlagDeletion(update, 'coverOverride');
           setFlagDeletion(update, 'visibility');
           setFlagDeletion(update, 'cover');
+          setFlagDeletion(update, 'autoCoverMap');
+          setFlagDeletion(update, 'stateSource');
           setFlagDeletion(update, 'sneak-speed-effect-id');
           return update;
         });
@@ -2323,7 +2409,11 @@ export class Pf2eVisionerApi {
               }
             }
             if (hasChanges) {
-              update[`flags.${MODULE_ID}.visibility`] = cleanedVisibilityMap;
+              if (Object.keys(cleanedVisibilityMap).length > 0) {
+                update[`flags.${MODULE_ID}.visibility`] = cleanedVisibilityMap;
+              } else {
+                setFlagDeletion(update, 'visibility');
+              }
             }
 
             // Remove selected tokens from this token's cover map
@@ -2337,7 +2427,11 @@ export class Pf2eVisionerApi {
               }
             }
             if (hasChanges) {
-              update[`flags.${MODULE_ID}.cover`] = cleanedCoverMap;
+              if (Object.keys(cleanedCoverMap).length > 0) {
+                update[`flags.${MODULE_ID}.cover`] = cleanedCoverMap;
+              } else {
+                setFlagDeletion(update, 'cover');
+              }
             }
 
             // Only add update if there are actual changes

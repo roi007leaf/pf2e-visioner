@@ -37,6 +37,14 @@ describe('actor feature helpers', () => {
     expect(getActorFeatureSlugs(actor)).toEqual(new Set(['blind-fight', 'deny-advantage']));
   });
 
+  test('reads feature slugs from PF2e actor roll options', () => {
+    const actor = {
+      getRollOptions: jest.fn(() => ['self:feat:legendary-sneak']),
+    };
+
+    expect(actorHasFeature({ actor }, 'legendary-sneak')).toBe(true);
+  });
+
   test('reads levels from token or raw actor references', () => {
     const actor = { system: { details: { level: { value: 8 } } } };
 

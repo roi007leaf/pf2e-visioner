@@ -8,6 +8,12 @@
           Turn change detected. AVS wants to make <strong>{{overrideCount}}</strong> change{{#unless (eq overrideCount 1)}}s{{/unless}} for combat tokens.
         {{else}}
           Token <strong><em>{{tokenName}}</em></strong> has moved. AVS wants to make <strong>{{overrideCount}}</strong> change{{#unless (eq overrideCount 1)}}s{{/unless}}.
+          {{#if targetHeader.stealthPositionBypassLabel}}
+            <span class="stealth-position-bypass-badge" data-tooltip="{{targetHeader.stealthPositionBypassTooltip}}">
+              <i class="{{targetHeader.stealthPositionBypassIcon}}"></i>
+              <span>{{targetHeader.stealthPositionBypassLabel}}</span>
+            </span>
+          {{/if}}
         {{/if}}
         <i class="fas fa-info-circle" data-tooltip="{{localize 'PF2E_VISIONER.UI.AVS_CHANGE_INFO_TOOLTIP'}}"></i>
       </p>
@@ -76,6 +82,12 @@
                 <i class="fas {{badgeIcon}}"></i>
                 <span>{{badgeLabel}}</span>
               </div>
+              {{#if stealthPositionBypassLabel}}
+                <div class="stealth-position-bypass-badge" data-tooltip="{{stealthPositionBypassTooltip}}">
+                  <i class="{{stealthPositionBypassIcon}}"></i>
+                  <span>{{stealthPositionBypassLabel}}</span>
+                </div>
+              {{/if}}
             </td>
             <td class="status">
               <div class="status-icons column" role="group" aria-label="State change">
@@ -162,6 +174,12 @@
                 <i class="fas {{badgeIcon}}"></i>
                 <span>{{badgeLabel}}</span>
               </div>
+              {{#if stealthPositionBypassLabel}}
+                <div class="stealth-position-bypass-badge" data-tooltip="{{stealthPositionBypassTooltip}}">
+                  <i class="{{stealthPositionBypassIcon}}"></i>
+                  <span>{{stealthPositionBypassLabel}}</span>
+                </div>
+              {{/if}}
             </td>
             <td class="status">
               <div class="status-icons column" role="group" aria-label="State change">
@@ -245,6 +263,14 @@
                 <i class="fas {{badgeIcon}}"></i>
                 <span>{{badgeLabel}}</span>
               </div>
+              {{#if stealthPositionBypassLabel}}
+                {{#unless ../targetHeader.stealthPositionBypassLabel}}
+                  <div class="stealth-position-bypass-badge" data-tooltip="{{stealthPositionBypassTooltip}}">
+                    <i class="{{stealthPositionBypassIcon}}"></i>
+                    <span>{{stealthPositionBypassLabel}}</span>
+                  </div>
+                {{/unless}}
+              {{/if}}
             </td>
             <td class="status">
               <div class="status-icons column" role="group" aria-label="State change">

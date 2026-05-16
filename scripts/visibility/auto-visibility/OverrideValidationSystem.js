@@ -5,6 +5,42 @@
  */
 
 import { VisibilityCalculator } from './VisibilityCalculator.js';
+import { FeatsHandler } from '../../chat/services/FeatsHandler.js';
+
+const STEALTH_OVERRIDE_STATES = new Set(['hidden', 'undetected', 'unnoticed']);
+
+function targetIgnoresStealthPositionValidation(target, override = {}) {
+  const source = override.source || 'manual_action';
+  if (!['manual_action', 'sneak_action', 'hide_action'].includes(source)) return false;
+  if (!STEALTH_OVERRIDE_STATES.has(override.state)) return false;
+  if (FeatsHandler.hasFeat(target, 'legendary-sneak')) return true;
+  if (
+    (source === 'manual_action' || source === 'sneak_action') &&
+    FeatsHandler.hasFeat(target, 'very-very-sneaky')
+  ) {
+    return true;
+  }
+  return false;
+}
+
+function getAcceptOptions(override) {
+  const isTakeCoverTracking =
+    override?.coverOnly === true ||
+    override?.coverOverrideSource === 'take_cover_action' ||
+    override?.source === 'take_cover_action';
+  return isTakeCoverTracking
+    ? { acceptedCoverState: override.currentCover || 'none' }
+    : undefined;
+}
+
+async function removeAcceptedOverride(AvsOverrideManager, observerId, targetId, override) {
+  const options = getAcceptOptions(override);
+  if (options) {
+    await AvsOverrideManager.removeOverride(observerId, targetId, options);
+  } else {
+    await AvsOverrideManager.removeOverride(observerId, targetId);
+  }
+}
 
 export class OverrideValidationSystem {
   /** @type {OverrideValidationSystem} */
@@ -137,6 +173,9 @@ export class OverrideValidationSystem {
             source: flagData.source,
             hasCover: flagData.hasCover,
             hasConcealment: flagData.hasConcealment,
+            expectedCover: flagData.expectedCover,
+            coverOnly: flagData.coverOnly,
+            coverOverrideSource: flagData.coverOverrideSource,
             observerId,
             targetId,
             observerName: flagData.observerName,
@@ -175,6 +214,7 @@ export class OverrideValidationSystem {
         });
       }
     }
+
 
     // If we found invalid overrides, show the validation dialog
     if (invalidOverrides.length > 0) {
@@ -217,33 +257,75 @@ export class OverrideValidationSystem {
       const currentlyHasCover = visibility.cover !== 'none';
       const currentlyConcealed = visibility.visibility === 'concealed' || visibility.visibility === 'hidden';
       const currentlyVisible = visibility.visibility === 'observed' || visibility.visibility === 'concealed';
+      const ignoresStealthPositionValidation = targetIgnoresStealthPositionValidation(
+        target,
+        override,
+      );
+      const isCoverOnlyOverride =
+        override?.coverOnly === true ||
+        override?.coverOverrideSource === 'take_cover_action' ||
+        override?.source === 'take_cover_action';
 
       const reasons = [];
 
       // Check if cover conditions have changed
-      if (override.hasCover && !currentlyHasCover) {
+      if (
+        isCoverOnlyOverride &&
+        override.expectedCover &&
+        override.expectedCover !== visibility.cover
+      ) {
+        reasons.push(
+          visibility.cover === 'none'
+            ? 'has NO cover (override expected cover)'
+            : `now has ${visibility.cover} cover (override expected ${override.expectedCover} cover)`,
+        );
+      }
+      if (
+        !isCoverOnlyOverride &&
+        !ignoresStealthPositionValidation &&
+        override.hasCover &&
+        !currentlyHasCover
+      ) {
         reasons.push('has NO cover (override expected cover)');
       }
-      if (!override.hasCover && currentlyHasCover) {
+      if (
+        !isCoverOnlyOverride &&
+        !ignoresStealthPositionValidation &&
+        !override.hasCover &&
+        currentlyHasCover
+      ) {
         reasons.push('now has cover (override expected no cover)');
       }
 
       // Check if concealment conditions have changed
-      if (override.hasConcealment && currentlyVisible && !currentlyConcealed) {
+      if (
+        !ignoresStealthPositionValidation &&
+        override.hasConcealment &&
+        currentlyVisible &&
+        !currentlyConcealed
+      ) {
         reasons.push('has NO concealment (override expected concealment)');
       }
-      if (!override.hasConcealment && currentlyConcealed) {
+      if (!ignoresStealthPositionValidation && !override.hasConcealment && currentlyConcealed) {
         reasons.push('now has concealment (override expected no concealment)');
       }
 
       // Additional check for concealment: if override claims hidden but token is now observed
-      if (override.hasConcealment && visibility.visibility === 'observed') {
+      if (
+        !ignoresStealthPositionValidation &&
+        override.hasConcealment &&
+        visibility.visibility === 'observed'
+      ) {
         reasons.push('is now clearly observed (override expected concealment)');
       }
 
       // Check for "undetected" overrides that may become invalid when visibility improves significantly
       // Check overrides from manual actions, sneak actions, etc.
-      if ((override.source === 'manual_action' || override.source === 'sneak_action') && override.state === 'undetected') {
+      if (
+        !ignoresStealthPositionValidation &&
+        (override.source === 'manual_action' || override.source === 'sneak_action') &&
+        override.state === 'undetected'
+      ) {
         // If target is now clearly observed (in bright light with no concealment), 
         // "undetected" may be too strong
         if (visibility.visibility === 'observed' && !currentlyHasCover && !currentlyConcealed) {
@@ -315,6 +397,9 @@ export class OverrideValidationSystem {
         reason,
         hasCover: override.hasCover || false,
         hasConcealment: override.hasConcealment || false,
+        expectedCover: override.expectedCover,
+        coverOnly: override.coverOnly === true,
+        coverOverrideSource: override.coverOverrideSource,
         // Provide actual current states so the dialog can render accurate icon deltas
         currentVisibility: override.currentVisibility || null,
         currentCover: override.currentCover || null,
@@ -345,8 +430,8 @@ export class OverrideValidationSystem {
             // Remove all overrides
             {
               const { default: AvsOverrideManager } = await import('../../chat/services/infra/AvsOverrideManager.js');
-              for (const { observerId, targetId } of invalidOverrides) {
-                await AvsOverrideManager.removeOverride(observerId, targetId);
+              for (const { observerId, targetId, override } of invalidOverrides) {
+                await removeAcceptedOverride(AvsOverrideManager, observerId, targetId, override);
               }
             }
             ui.notifications.info(game.i18n.format('PF2E_VISIONER.NOTIFICATIONS.AVS_ACCEPTED_PLURAL', { count: invalidOverrides.length, plural: invalidOverrides.length > 1 ? 's' : '' }));
@@ -359,7 +444,7 @@ export class OverrideValidationSystem {
               const { default: AvsOverrideManager } = await import('../../chat/services/infra/AvsOverrideManager.js');
               for (const { observerId, targetId, override } of invalidOverrides) {
                 if (override.source === 'manual_action') {
-                  await AvsOverrideManager.removeOverride(observerId, targetId);
+                  await removeAcceptedOverride(AvsOverrideManager, observerId, targetId, override);
                   clearedCount++;
                 }
               }
@@ -398,7 +483,12 @@ export class OverrideValidationSystem {
         if (result) {
           {
             const { default: AvsOverrideManager } = await import('../../chat/services/infra/AvsOverrideManager.js');
-            await AvsOverrideManager.removeOverride(first.observerId, first.targetId);
+            await removeAcceptedOverride(
+              AvsOverrideManager,
+              first.observerId,
+              first.targetId,
+              first.override,
+            );
           }
         }
       }

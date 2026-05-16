@@ -1,5 +1,16 @@
 # Changelog
 
+## [8.2.11] - 2026-05-16
+
+### Fixed
+
+- **Take Cover AVS cleanup returns cover to auto**: Accepting cover-only AVS validation for Take Cover now clears the manual cover override instead of applying a new lower cover effect, letting automatic cover calculation take over after movement.
+- **Take Cover cover overrides validate and display clearly**: Take Cover manual cover changes now create AVS cover-only override markers, show as manual cover to auto-cover transitions in the AVS indicator and dialog, and use an auto-cover icon instead of another shield icon.
+- **Take Cover Ceaseless Shadows context shown**: The Take Cover preview now shows the acting token name and a Ceaseless Shadows badge when the feat is active, making creature-cover upgrades visible before applying cover changes.
+- **Scene purge clears manual cover state**: Scene data purge now removes manual cover map entries and related Take Cover override markers so stale manual cover no longer survives cleanup.
+- **Consequences apply defaults to AVS when enabled**: Consequences changes now prefer AVS override handling when AVS is active, preventing chat Apply Changes from leaving visibility state stuck until token movement.
+- **Legendary Sneak AVS context**: Stealth overrides from Sneak or manual changes are no longer flagged for stale positioning when the target has Legendary Sneak; AVS awareness rows now show a Legendary Sneak badge in the tooltip and validation dialog, including when PF2E exposes the feat through actor roll options instead of item collections.
+
 ## [8.2.10] - 2026-05-15
 
 ### Fixed

@@ -23,6 +23,51 @@ describe('Take Cover Action Comprehensive Tests', () => {
     });
   });
 
+  describe('AVS cover override tracking', () => {
+    test('applying Take Cover writes a cover-only AVS override marker', async () => {
+      jest.resetModules();
+
+      const setCoverBetween = jest.fn().mockResolvedValue(true);
+      const applyTakeCoverProneRangedOnlyEffect = jest.fn().mockResolvedValue(true);
+
+      jest.doMock('../../../scripts/utils.js', () => ({
+        __esModule: true,
+        setCoverBetween,
+      }));
+      jest.doMock('../../../scripts/cover/batch.js', () => ({
+        __esModule: true,
+        applyTakeCoverProneRangedOnlyEffect,
+      }));
+
+      const { TakeCoverActionHandler } = await import(
+        '../../../scripts/chat/services/actions/TakeCoverAction.js'
+      );
+      const handler = new TakeCoverActionHandler();
+      const observer = global.createMockToken({ id: 'observer' });
+      const target = global.createMockToken({
+        id: 'target',
+        actor: { itemTypes: { effect: [] } },
+      });
+
+      await handler.applyChangesInternal([
+        {
+          observer,
+          target,
+          newCover: 'standard',
+          oldCover: 'none',
+          takeCoverProneRangedOnly: false,
+        },
+      ]);
+
+      expect(setCoverBetween).toHaveBeenCalledWith(
+        observer,
+        target,
+        'standard',
+        expect.objectContaining({ takeCover: true }),
+      );
+    });
+  });
+
   describe('Panel Generation and Button Actions', () => {
     test('chat panel generates correct apply-changes button', () => {
       // Note: Take Cover may not have a standard panel like other actions

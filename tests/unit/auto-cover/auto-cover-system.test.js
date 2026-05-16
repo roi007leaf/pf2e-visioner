@@ -153,6 +153,36 @@ describe('AutoCoverSystem', () => {
       ]);
     });
 
+    test('setCoverBetween records non-none pairs so movement cleanup can remove accepted AVS cover effects', async () => {
+      const sourceToken = global.createMockToken({ id: 'source' });
+      const targetToken = global.createMockToken({ id: 'target' });
+
+      await autoCoverSystem.setCoverBetween(sourceToken, targetToken, 'lesser');
+
+      expect(autoCoverSystem.getActivePairsInvolving('source')).toEqual([
+        { attackerId: 'source', targetId: 'target' },
+      ]);
+      expect(autoCoverSystem.getActivePairsInvolving('target')).toEqual([
+        { attackerId: 'source', targetId: 'target' },
+      ]);
+    });
+
+    test('getActivePairsInvolving includes persisted autoCoverMap pairs when in-memory tracking is absent', () => {
+      const sourceToken = global.createMockToken({ id: 'source' });
+      const targetToken = global.createMockToken({ id: 'target' });
+      sourceToken.document.getFlag = jest.fn((moduleId, key) =>
+        moduleId === 'pf2e-visioner' && key === 'autoCoverMap' ? { target: 'lesser' } : null,
+      );
+      canvas.tokens.placeables = [sourceToken, targetToken];
+
+      expect(autoCoverSystem.getActivePairsInvolving('source')).toEqual([
+        { attackerId: 'source', targetId: 'target' },
+      ]);
+      expect(autoCoverSystem.getActivePairsInvolving('target')).toEqual([
+        { attackerId: 'source', targetId: 'target' },
+      ]);
+    });
+
     test('cleanupCover removes stored cover and associated ephemeral effects', async () => {
       const sourceToken = global.createMockToken({ id: 'source' });
       const targetToken = global.createMockToken({ id: 'target' });

@@ -6,6 +6,29 @@
 import { COVER_STATES, VISIBILITY_STATES } from '../constants.js';
 import { loadDialogCSS, loadSharedUICSS } from '../css-loader.js';
 
+const AUTO_COVER_DISPLAY = {
+  icon: 'fas fa-arrows-rotate',
+  color: '#4fc3f7',
+  label: 'Auto Cover',
+};
+
+function isTakeCoverAutoRelease(override) {
+  return (
+    override?.coverOnly === true ||
+    override?.coverOverrideSource === 'take_cover_action' ||
+    override?.source === 'take_cover_action'
+  );
+}
+
+function getDisplayCoverKey(override) {
+  return isTakeCoverAutoRelease(override) ? 'auto' : override?.currentCover || 'none';
+}
+
+function getCoverDisplayConfig(key, fallback = {}) {
+  if (key === 'auto') return AUTO_COVER_DISPLAY;
+  return (COVER_STATES && COVER_STATES[key]) || fallback;
+}
+
 export class OverrideValidationDialog extends foundry.applications.api.HandlebarsApplicationMixin(foundry.applications.api.ApplicationV2) {
 
   constructor(options = {}) {
@@ -83,6 +106,10 @@ export class OverrideValidationDialog extends foundry.applications.api.Handlebar
         badgeLabel = 'Hide Override';
         badgeIcon = 'fa-user-secret';
         badgeClass = 'badge-hide';
+      } else if (/take[_-]?cover/i.test(src)) {
+        badgeLabel = 'Take Cover';
+        badgeIcon = 'fa-shield-alt';
+        badgeClass = 'badge-manual';
       } else if (/manual|popup|dialog|roll/i.test(src)) {
         badgeLabel = 'Manual Override';
         badgeIcon = 'fa-user-edit';
@@ -92,6 +119,9 @@ export class OverrideValidationDialog extends foundry.applications.api.Handlebar
         badgeIcon = 'fa-adjust';
         badgeClass = 'badge-generic';
       }
+      const stealthPositionBypassLabel = override.stealthPositionBypassLabel || null;
+      const stealthPositionBypassTooltip =
+        override.stealthPositionBypassTooltip || stealthPositionBypassLabel || null;
       // Resolve token images if available on the canvas
       // Use actor portrait for consistency with Token Manager
       const observerToken = canvas.tokens?.get(override.observerId);
@@ -103,8 +133,11 @@ export class OverrideValidationDialog extends foundry.applications.api.Handlebar
       // Pick analysis icons from actual current state when provided by validator
       // Prefer current states provided by the validator/caller; fall back to safe defaults
       const visibilityKey = override.currentVisibility || 'observed';
-      const coverKey = override.currentCover || 'none';
-      const prevVisibilityKey = override.state || (override.hasConcealment ? 'concealed' : 'observed');
+      const coverOnly = override.coverOnly === true;
+      const coverKey = getDisplayCoverKey(override);
+      const prevVisibilityKey = coverOnly
+        ? visibilityKey
+        : override.state || (override.hasConcealment ? 'concealed' : 'observed');
 
       // Previous/original cover must reflect what the override expected at apply-time,
       // not what the currentCover is now. If we don't have a specific level, assume 'standard'.
@@ -113,9 +146,9 @@ export class OverrideValidationDialog extends foundry.applications.api.Handlebar
         : (override.hasCover ? (override.originalCover || 'standard') : 'none');
 
       const visCfg = (VISIBILITY_STATES && VISIBILITY_STATES[visibilityKey]) || { icon: 'fas fa-eye', color: '#4caf50', label: 'Observed' };
-      const coverCfg = (COVER_STATES && COVER_STATES[coverKey]) || { icon: 'fas fa-shield-slash', color: '#4caf50', label: 'No Cover' };
+      const coverCfg = getCoverDisplayConfig(coverKey, { icon: 'fas fa-shield-slash', color: '#4caf50', label: 'No Cover' });
       const prevVisCfg = (VISIBILITY_STATES && VISIBILITY_STATES[prevVisibilityKey]) || { icon: 'fas fa-eye', color: '#9e9e9e', label: 'Observed' };
-      const prevCoverCfg = (COVER_STATES && COVER_STATES[prevCoverKey]) || { icon: 'fas fa-shield', color: '#9e9e9e', label: game.i18n.localize('PF2E_VISIONER.TOKEN_MANAGER.COVER_STATE') };
+      const prevCoverCfg = getCoverDisplayConfig(prevCoverKey, { icon: 'fas fa-shield', color: '#9e9e9e', label: game.i18n.localize('PF2E_VISIONER.TOKEN_MANAGER.COVER_STATE') });
 
       return {
         id: `${override.observerId}-${override.targetId}`,
@@ -128,13 +161,18 @@ export class OverrideValidationDialog extends foundry.applications.api.Handlebar
         reason: override.reason,
         // Optionally surface a friendly description of current states
         currentVisibilityDescription: (VISIBILITY_STATES && VISIBILITY_STATES[visibilityKey]?.label)
-          ? (game?.i18n?.localize?.(VISIBILITY_STATES[visibilityKey].label) + (coverKey && COVER_STATES && COVER_STATES[coverKey]?.label ? ` • ${game?.i18n?.localize?.(COVER_STATES[coverKey].label)}` : ''))
+          ? (game?.i18n?.localize?.(VISIBILITY_STATES[visibilityKey].label) + (coverKey && coverCfg?.label ? ` • ${game?.i18n?.localize?.(coverCfg.label)}` : ''))
           : undefined,
         state: override.state || 'undetected',
         source: override.source || 'unknown',
+        coverOnly,
         badgeLabel,
         badgeIcon,
         badgeClass,
+        stealthPositionBypassFeat: override.stealthPositionBypassFeat || null,
+        stealthPositionBypassLabel,
+        stealthPositionBypassIcon: override.stealthPositionBypassIcon || 'fas fa-user-ninja',
+        stealthPositionBypassTooltip,
         prevVisibility: {
           key: prevVisibilityKey,
           icon: prevVisCfg.icon,
@@ -166,6 +204,7 @@ export class OverrideValidationDialog extends foundry.applications.api.Handlebar
     const observerOrientedOverrides = [];
     const targetOrientedOverrides = [];
     let unifiedOverrides = [];
+    let refTokenId = this.movedTokenId || game?.pf2eVisioner?.lastMovedTokenId || null;
 
     // In turn change mode, deduplicate and use unified view
     if (this.isTurnChange) {
@@ -179,7 +218,6 @@ export class OverrideValidationDialog extends foundry.applications.api.Handlebar
       }
     } else {
       // Group relative to the actual mover when available; fallback to global, then header-by-name
-      let refTokenId = this.movedTokenId || game?.pf2eVisioner?.lastMovedTokenId || null;
       if (!refTokenId) {
         try {
           const headerTokenByName = canvas.tokens?.placeables?.find(t => t?.document?.name === this.tokenName);
@@ -202,9 +240,16 @@ export class OverrideValidationDialog extends foundry.applications.api.Handlebar
     // Determine header info for target table. Prefer the moved token if available.
     let headerToken = null;
     try { headerToken = canvas.tokens?.placeables?.find(t => t?.document?.name === this.tokenName) || null; } catch { }
+    const headerStealthPositionBypass = refTokenId
+      ? overrides.find((o) => o.targetId === refTokenId && o.stealthPositionBypassLabel)
+      : null;
     const targetHeader = {
       name: this.tokenName,
-      img: headerToken?.document?.texture?.src ?? headerToken?.actor?.img ?? headerToken?.actor?.prototypeToken?.texture?.src ?? headerToken?.texture?.src ?? 'icons/svg/book.svg'
+      img: headerToken?.document?.texture?.src ?? headerToken?.actor?.img ?? headerToken?.actor?.prototypeToken?.texture?.src ?? headerToken?.texture?.src ?? 'icons/svg/book.svg',
+      stealthPositionBypassFeat: headerStealthPositionBypass?.stealthPositionBypassFeat || null,
+      stealthPositionBypassLabel: headerStealthPositionBypass?.stealthPositionBypassLabel || null,
+      stealthPositionBypassIcon: headerStealthPositionBypass?.stealthPositionBypassIcon || null,
+      stealthPositionBypassTooltip: headerStealthPositionBypass?.stealthPositionBypassTooltip || null,
     };
 
     const result = {
@@ -351,6 +396,28 @@ export class OverrideValidationDialog extends foundry.applications.api.Handlebar
 
   }
 
+  _getAcceptOptions(override) {
+    const isTakeCoverTracking =
+      override?.coverOnly === true ||
+      override?.coverOverrideSource === 'take_cover_action' ||
+      override?.source === 'take_cover_action';
+    return isTakeCoverTracking
+      ? { acceptedCoverState: override.currentCover || 'none' }
+      : undefined;
+  }
+
+  async _removeAcceptedOverride(override) {
+    const { default: AvsOverrideManager } = await import(
+      '../chat/services/infra/AvsOverrideManager.js'
+    );
+    const options = this._getAcceptOptions(override);
+    if (options) {
+      await AvsOverrideManager.removeOverride(override.observerId, override.targetId, options);
+    } else {
+      await AvsOverrideManager.removeOverride(override.observerId, override.targetId);
+    }
+  }
+
   async _onAcceptByGroup(group) {
     try {
       const moved = game?.pf2eVisioner?.lastMovedTokenId || null;
@@ -358,8 +425,7 @@ export class OverrideValidationDialog extends foundry.applications.api.Handlebar
       const toRemove = this.invalidOverrides.filter(o => group === 'observer' ? o.observerId === moved : o.targetId === moved);
       for (const override of toRemove) {
         try {
-          const { default: AvsOverrideManager } = await import('../chat/services/infra/AvsOverrideManager.js');
-          await AvsOverrideManager.removeOverride(override.observerId, override.targetId);
+          await this._removeAcceptedOverride(override);
         } catch (err) {
           console.error('PF2E Visioner | Error removing override:', err);
         }
@@ -444,8 +510,7 @@ export class OverrideValidationDialog extends foundry.applications.api.Handlebar
       const target = canvas.tokens?.get(override.targetId);
 
       if (observer && target) {
-        const { default: AvsOverrideManager } = await import('../chat/services/infra/AvsOverrideManager.js');
-        await AvsOverrideManager.removeOverride(override.observerId, override.targetId);
+        await this._removeAcceptedOverride(override);
 
         // Remove from the dialog's data
         this.invalidOverrides = this.invalidOverrides.filter(o => `${o.observerId}-${o.targetId}` !== overrideId);
@@ -494,8 +559,7 @@ export class OverrideValidationDialog extends foundry.applications.api.Handlebar
     // Remove all invalid overrides
     for (const override of this.invalidOverrides) {
       try {
-        const { default: AvsOverrideManager } = await import('../chat/services/infra/AvsOverrideManager.js');
-        await AvsOverrideManager.removeOverride(override.observerId, override.targetId);
+        await this._removeAcceptedOverride(override);
       } catch (error) {
         console.error('PF2E Visioner | Error removing override:', error);
       }

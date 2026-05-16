@@ -1,4 +1,7 @@
 describe('OverrideValidationDialog - shows all overrides', () => {
+    const LEGENDARY_SNEAK_RULES_TEXT =
+        "You're always sneaking unless you choose to be seen, even when there's nowhere to hide. You can Hide and Sneak even without cover or being Concealed. When you employ an exploration tactic other than Avoiding Notice, you also gain the benefits of Avoiding Notice unless you choose not to.";
+
     let OverrideValidationDialog;
     let OverrideValidationIndicator;
 
@@ -105,5 +108,96 @@ describe('OverrideValidationDialog - shows all overrides', () => {
         expect(indicator._rawOverrides).toBeDefined();
         expect(indicator._rawOverrides.length).toBe(2);
         expect(indicator._rawOverrides).toEqual(rawOverrides);
+    });
+
+    it('should render Take Cover cover-only current cover as auto cover', async () => {
+        const dialog = new OverrideValidationDialog({
+            invalidOverrides: [
+                {
+                    observerId: 'obs1',
+                    targetId: 'tgt1',
+                    observerName: 'Observer1',
+                    targetName: 'Target1',
+                    state: 'avs',
+                    coverOnly: true,
+                    source: 'take_cover_action',
+                    currentVisibility: 'observed',
+                    currentCover: 'lesser',
+                    expectedCover: 'standard',
+                    reason: 'Cover changed'
+                }
+            ],
+            tokenName: 'TestToken',
+            movedTokenId: 'tgt1'
+        });
+
+        const context = await dialog._prepareContext({});
+
+        expect(context.overrides[0].prevCover.key).toBe('standard');
+        expect(context.overrides[0].statusCover.key).toBe('auto');
+        expect(context.overrides[0].statusCover.icon).toBe('fas fa-arrows-rotate');
+        expect(context.overrides[0].statusCover.label).toBe('Auto Cover');
+    });
+
+    it('should preserve Legendary Sneak context for override rows', async () => {
+        const dialog = new OverrideValidationDialog({
+            invalidOverrides: [
+                {
+                    observerId: 'obs1',
+                    targetId: 'tgt1',
+                    observerName: 'Observer1',
+                    targetName: 'Target1',
+                    state: 'undetected',
+                    currentVisibility: 'observed',
+                    currentCover: 'none',
+                    source: 'sneak_action',
+                    reason: 'Legendary Sneak applies',
+                    stealthPositionBypassFeat: 'legendary-sneak',
+                    stealthPositionBypassLabel: 'Legendary Sneak',
+                    stealthPositionBypassIcon: 'fas fa-user-ninja',
+                    stealthPositionBypassTooltip: LEGENDARY_SNEAK_RULES_TEXT
+                }
+            ],
+            tokenName: 'TestToken',
+            movedTokenId: 'tgt1'
+        });
+
+        const context = await dialog._prepareContext({});
+
+        expect(context.overrides[0].stealthPositionBypassFeat).toBe('legendary-sneak');
+        expect(context.overrides[0].stealthPositionBypassLabel).toBe('Legendary Sneak');
+        expect(context.overrides[0].stealthPositionBypassTooltip).toContain("there's nowhere to hide");
+        expect(context.overrides[0].stealthPositionBypassTooltip).toContain('Avoiding Notice');
+    });
+
+    it('should expose Legendary Sneak context on the moved target header', async () => {
+        const dialog = new OverrideValidationDialog({
+            invalidOverrides: [
+                {
+                    observerId: 'obs1',
+                    targetId: 'tgt1',
+                    observerName: 'Observer1',
+                    targetName: 'Celdar',
+                    state: 'undetected',
+                    currentVisibility: 'observed',
+                    currentCover: 'none',
+                    source: 'sneak_action',
+                    reason: 'Legendary Sneak applies',
+                    stealthPositionBypassFeat: 'legendary-sneak',
+                    stealthPositionBypassLabel: 'Legendary Sneak',
+                    stealthPositionBypassIcon: 'fas fa-user-ninja',
+                    stealthPositionBypassTooltip: LEGENDARY_SNEAK_RULES_TEXT
+                }
+            ],
+            tokenName: 'Celdar',
+            movedTokenId: 'tgt1'
+        });
+
+        const context = await dialog._prepareContext({});
+
+        expect(context.targetHeader.stealthPositionBypassFeat).toBe('legendary-sneak');
+        expect(context.targetHeader.stealthPositionBypassLabel).toBe('Legendary Sneak');
+        expect(context.targetHeader.stealthPositionBypassTooltip).toContain("there's nowhere to hide");
+        expect(context.targetHeader.stealthPositionBypassTooltip).toContain('Avoiding Notice');
     });
 });
