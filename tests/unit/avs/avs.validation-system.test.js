@@ -12,7 +12,12 @@ describe('OverrideValidationSystem - movement validation', () => {
     jest.useRealTimers();
   });
 
-  async function setupEnvironment({ dialogAction = 'clear-all', skipTimedOverrides = false } = {}) {
+  async function setupEnvironment({
+    dialogAction = 'clear-all',
+    skipTimedOverrides = false,
+    targetActorItems = [],
+    visibilityResult = { visibility: 'observed', cover: 'none' },
+  } = {}) {
     // Minimal mock for the dialog to control user decision
     jest.resetModules();
 
@@ -47,6 +52,10 @@ describe('OverrideValidationSystem - movement validation', () => {
     const observer = global.createMockToken({ id: 'obs1', name: 'Observer' });
     const target = global.createMockToken({
       id: 'tgt1',
+      actor: global.createMockActor({
+        id: 'tgt1-actor',
+        items: targetActorItems,
+      }),
       flags: {
         'pf2e-visioner': {
           // override expects cover+concealment, which we'll purposely contradict
@@ -71,7 +80,7 @@ describe('OverrideValidationSystem - movement validation', () => {
     // Visibility system contract used by OverrideValidationSystem
     const visibilityCalculator = {
       calculateVisibility: jest.fn(async (obs, tgt) => {
-
+        return visibilityResult;
       }),
     }
     const ovs = OverrideValidationSystem.getInstance(visibilityCalculator);
@@ -97,6 +106,16 @@ describe('OverrideValidationSystem - movement validation', () => {
 
     expect(setTimeoutSpy).not.toHaveBeenCalled();
     setTimeoutSpy.mockRestore();
+  });
+
+  test('Ceaseless Shadows does not bypass movement validation for bad stealth overrides', async () => {
+    const { ovs, observer, removeOverride } = await setupEnvironment({
+      targetActorItems: [{ type: 'feat', system: { slug: 'ceaseless-shadows' } }],
+    });
+
+    await ovs.debugValidateToken(observer.id);
+
+    expect(removeOverride).toHaveBeenCalledWith(observer.id, 'tgt1');
   });
 
   test('active timed override is filtered from validation', async () => {

@@ -1593,6 +1593,20 @@ button.row-timer-toggle.active:not(:hover) {
   border-radius: 10px;
   border: 1px solid transparent;
 }
+.pf2e-visioner .override-validation-dialog .stealth-position-bypass-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 4px;
+  padding: 3px 7px;
+  border: 1px solid rgba(144, 202, 249, 0.4);
+  border-radius: 10px;
+  background: rgba(33, 150, 243, 0.12);
+  color: #bbdefb;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
 .pf2e-visioner .override-validation-dialog .override-badge.badge-sneak {
   background: rgba(0, 0, 0, 0.15);
   color: #cfd8dc;
@@ -2414,6 +2428,39 @@ button.row-timer-toggle.active:not(:hover) {
 .take-cover-preview-dialog .results-table-container thead th {
   background-color: var(--pf2e-visioner-brown);
   color: var(--color-text-light-primary);
+}
+
+.take-cover-preview-dialog .taker-name {
+  margin: 0 0 4px 0;
+  font-size: 16px;
+  line-height: 1.15;
+  font-weight: 700;
+  color: #d7ccc8;
+}
+
+.take-cover-preview-dialog .action-context-badges {
+  display: flex;
+  gap: 6px;
+  margin-top: 4px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.take-cover-preview-dialog .badge.badge-feat {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  line-height: 1;
+  padding: 4px 6px;
+  border-radius: 6px;
+  color: #d7ccc8;
+  background: rgba(121, 85, 72, 0.22);
+  border: 1px solid rgba(121, 85, 72, 0.45);
+}
+
+.take-cover-preview-dialog .badge.badge-feat i {
+  color: inherit;
 }
 
 .take-cover-results-table td.actions {

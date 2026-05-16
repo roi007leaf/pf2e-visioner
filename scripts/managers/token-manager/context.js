@@ -269,7 +269,6 @@ export async function buildContext(app, options) {
                 const { getVisibilityMap } = await import('../../stores/visibility-map.js');
                 const visibilityMap = getVisibilityMap(app.observer);
                 actualCurrentState = visibilityMap[token.document.id] || 'observed';
-                // Debug: console.log(`[AVS Debug] Observer mode - ${token.document.name}:`, { actualCurrentState, visibilityMapState: visibilityMap[token.document.id] });
               } catch (error) {
                 console.error(`[AVS Debug] Observer mode - Error getting visibility map:`, error);
                 actualCurrentState = 'observed'; // Fallback if map access fails
@@ -426,7 +425,6 @@ export async function buildContext(app, options) {
           allowedVisKeys = allowedVisKeys.filter((key) => key !== 'avs');
         }
 
-        // Debug: console.log(`[AVS Debug] Target mode allowedVisKeys for ${observerToken.document.name}:`, { isRowLoot, isLootObserver, allowedVisKeys });
         const visibilityStates = allowedVisKeys
           .filter((key) => !isNonAvsToken || key !== 'avs') // Extra safety: never include 'avs' for loot/hazard
           .map((key) => {
@@ -467,7 +465,6 @@ export async function buildContext(app, options) {
                 const { getVisibilityMap } = await import('../../stores/visibility-map.js');
                 const visibilityMap = getVisibilityMap(observerToken);
                 actualCurrentState = visibilityMap[app.observer.document.id] || 'observed';
-                // Debug: console.log(`[AVS Debug] Target mode - ${app.observer.document.name}:`, { actualCurrentState, visibilityMapState: visibilityMap[app.observer.document.id] });
               } catch (error) {
                 console.error(`[AVS Debug] Target mode - Error getting visibility map:`, error);
                 actualCurrentState = 'observed'; // Fallback if map access fails

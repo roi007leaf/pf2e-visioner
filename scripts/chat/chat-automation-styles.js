@@ -1324,8 +1324,12 @@ function getChatAutomationCSS() {
             background: var(--visibility-undetected-bg-medium); border-radius: 6px; border-left: 4px solid var(--pf2e-visioner-brown);
         }
         .take-cover-preview-dialog .hider-image img { width: 48px; height: 48px; border-radius: 50%; border: 2px solid var(--pf2e-visioner-brown); margin-right: 12px; }
+        .take-cover-preview-dialog .taker-name { margin: 0 0 4px 0; font-size: 16px; line-height: 1.15; font-weight: 700; color: #d7ccc8; }
         .take-cover-preview-dialog .hider-name { margin: 0 0 4px 0; font-size: 16px; font-weight: bold; color: #ffcdd2; color: #ffecb3; color: #d7ccc8; color: #d7ccc8; }
         .take-cover-preview-dialog .hider-name { color: #d7ccc8; }
+        .take-cover-preview-dialog .action-context-badges { display: flex; gap: 6px; margin-top: 4px; align-items: center; flex-wrap: wrap; }
+        .take-cover-preview-dialog .badge.badge-feat { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; line-height: 1; padding: 4px 6px; border-radius: 6px; color: #d7ccc8; background: rgba(121, 85, 72, 0.22); border: 1px solid rgba(121, 85, 72, 0.45); }
+        .take-cover-preview-dialog .badge.badge-feat i { color: inherit; }
         .take-cover-results-table th { background: linear-gradient(135deg, var(--pf2e-visioner-brown), var(--pf2e-visioner-brown)) !important; color: white !important; }
         .take-cover-results-table .visibility-change, .take-cover-results-table .actions { text-align: center; }
         .take-cover-preview-dialog .visibility-arrow { color: #bdbdbd; }

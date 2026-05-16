@@ -50,6 +50,39 @@ export function getActorItems(actor) {
   ];
 }
 
+function getActorRollOptions(actor) {
+  try {
+    const options = actor?.getRollOptions?.(['all']);
+    if (Array.isArray(options)) return options;
+    if (options instanceof Set) return Array.from(options);
+  } catch {}
+
+  try {
+    const options = actor?.getRollOptions?.();
+    if (Array.isArray(options)) return options;
+    if (options instanceof Set) return Array.from(options);
+  } catch {}
+
+  return [];
+}
+
+function addFeatureSlugFromRollOption(slugs, option) {
+  const parts = String(option ?? '')
+    .split(':')
+    .map((part) => normalizeSlug(part))
+    .filter(Boolean);
+  if (parts.length === 0) return;
+
+  const last = parts[parts.length - 1];
+  const hasFeaturePrefix = parts.includes('feat') || parts.includes('feature');
+  const hasItemSlugPrefix =
+    parts.includes('item') && parts.some((part, index) => part === 'slug' && index < parts.length - 1);
+
+  if ((hasFeaturePrefix || hasItemSlugPrefix) && last) {
+    slugs.add(last);
+  }
+}
+
 export function getActorFeatureSlugs(tokenOrActor) {
   try {
     const actor = resolveActor(tokenOrActor);
@@ -62,6 +95,9 @@ export function getActorFeatureSlugs(tokenOrActor) {
         const slug = normalizeSlug(item.system?.slug ?? item.slug ?? item.name);
         if (slug) slugs.add(slug);
       }
+    }
+    for (const option of getActorRollOptions(actor)) {
+      addFeatureSlugFromRollOption(slugs, option);
     }
     return slugs;
   } catch (error) {

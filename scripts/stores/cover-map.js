@@ -28,16 +28,23 @@ export async function setCoverMap(token, coverMap) {
   // Only GMs can update token documents
   if (!game.user.isGM) return;
 
-  const path = `flags.${MODULE_ID}.cover`;
-  const result = await token.document.update(
-    { [path]: coverMap },
-    { diff: false, render: false, animate: false },
-  );
+  const normalizedCoverMap = coverMap && typeof coverMap === 'object' ? coverMap : {};
+  const hasCoverEntries = Object.keys(normalizedCoverMap).length > 0;
+  let result;
+  if (!hasCoverEntries && typeof token.document.unsetFlag === 'function') {
+    result = await token.document.unsetFlag(MODULE_ID, 'cover');
+  } else {
+    const path = `flags.${MODULE_ID}.cover`;
+    result = await token.document.update(
+      { [path]: normalizedCoverMap },
+      { diff: false, render: false, animate: false },
+    );
+  }
 
   // Track sources for each cover entry
   try {
     const { SourceTracker } = await import('../rule-elements/SourceTracker.js');
-    for (const [targetId, state] of Object.entries(coverMap)) {
+    for (const [targetId, state] of Object.entries(normalizedCoverMap)) {
       if (state && state !== 'none') {
         const targetToken = canvas.tokens.get(targetId);
         if (targetToken) {
@@ -65,6 +72,39 @@ export function getCoverBetween(observer, target) {
   return coverMap[getTokenId(target)] || 'none';
 }
 
+async function syncTakeCoverOverrideMarker(observer, target, state, options = {}) {
+  if (options.takeCover !== true) return;
+
+  const observerId = getTokenId(observer);
+  const targetId = getTokenId(target);
+
+  if (options.takeCoverProneRangedOnly === true) {
+    return;
+  }
+  if (!game.user?.isGM) {
+    return;
+  }
+
+  try {
+    const { default: AvsOverrideManager } = await import(
+      '../chat/services/infra/AvsOverrideManager.js'
+    );
+
+    if (state === 'none') {
+      await AvsOverrideManager.removeTakeCoverTracking(observerId, targetId);
+      return;
+    }
+
+    await AvsOverrideManager.applyForTakeCover(observer, {
+      target,
+      state: 'avs',
+      coverOnly: true,
+      hasCover: true,
+      expectedCover: state,
+    });
+  } catch {}
+}
+
 /**
  * Write cover state between two tokens and apply PF2E condition
  * @param {Token} observer
@@ -75,6 +115,7 @@ export async function setCoverBetween(observer, target, state, options = {}) {
   const coverMap = getCoverMap(observer);
   const targetId = getTokenId(target);
   if (!targetId) return;
+  await syncTakeCoverOverrideMarker(observer, target, state, options);
 
   // Skip if no change
   if (coverMap[targetId] === state) {
@@ -99,6 +140,16 @@ export async function setCoverBetween(observer, target, state, options = {}) {
   await setCoverMap(observer, coverMap);
 
   // Track the source for sneak/action qualification checks
+  if (state === 'none' && !options.skipSourceTracking) {
+    try {
+      const { SourceTracker } = await import('../rule-elements/SourceTracker.js');
+      const sourceId = observer?.id || getTokenId(observer);
+      await SourceTracker.removeSource(target, sourceId, 'cover', sourceId);
+    } catch (error) {
+      console.warn('Error removing cover source:', error);
+    }
+  }
+
   if (state && state !== 'none' && !options.skipSourceTracking) {
     try {
       const { SourceTracker } = await import('../rule-elements/SourceTracker.js');

@@ -24,6 +24,7 @@ describe('Store Operations Core Logic', () => {
           return {};
         }),
         setFlag: jest.fn().mockResolvedValue({}),
+        unsetFlag: jest.fn().mockResolvedValue({}),
         update: jest.fn().mockResolvedValue({}),
       },
     };
@@ -108,8 +109,58 @@ describe('Store Operations Core Logic', () => {
       // Then remove it
       await setCoverBetween(observer, target, 'none');
 
-      // Should have been called twice (set then remove)
-      expect(observer.document.update).toHaveBeenCalledTimes(2);
+      // Should set once, then unset the now-empty cover flag.
+      expect(observer.document.update).toHaveBeenCalledTimes(1);
+      expect(observer.document.unsetFlag).toHaveBeenCalledWith(global.MODULE_ID, 'cover');
+    });
+
+    test('removing the last manual cover unsets the cover flag instead of persisting an empty map', async () => {
+      const { setCoverBetween } = await import('../../../scripts/stores/cover-map.js');
+
+      const observer = createMockToken('observer-token');
+      const target = createMockToken('target-token');
+      observer.document.getFlag.mockImplementation((module, key) => {
+        if (module === global.MODULE_ID && key === 'cover') {
+          return { 'target-token-doc': 'standard' };
+        }
+        return {};
+      });
+
+      await setCoverBetween(observer, target, 'none');
+
+      expect(observer.document.unsetFlag).toHaveBeenCalledWith(global.MODULE_ID, 'cover');
+      expect(observer.document.update).not.toHaveBeenCalledWith(
+        expect.objectContaining({ [`flags.${global.MODULE_ID}.cover`]: {} }),
+        expect.any(Object),
+      );
+    });
+
+    test('removing manual cover removes observer-scoped cover source tracking', async () => {
+      jest.resetModules();
+      const removeSource = jest.fn().mockResolvedValue(undefined);
+      jest.doMock('../../../scripts/rule-elements/SourceTracker.js', () => ({
+        __esModule: true,
+        SourceTracker: {
+          addSourceToState: jest.fn().mockResolvedValue(undefined),
+          removeSource,
+        },
+      }));
+
+      const { setCoverBetween } = await import('../../../scripts/stores/cover-map.js');
+
+      const observer = createMockToken('observer-token');
+      const target = createMockToken('target-token');
+      observer.document.getFlag.mockImplementation((module, key) => {
+        if (module === global.MODULE_ID && key === 'cover') {
+          return { 'target-token-doc': 'standard' };
+        }
+        return {};
+      });
+
+      await setCoverBetween(observer, target, 'none');
+
+      expect(removeSource).toHaveBeenCalledWith(target, observer.id, 'cover', observer.id);
+      jest.dontMock('../../../scripts/rule-elements/SourceTracker.js');
     });
 
     test('handles null/undefined tokens gracefully', async () => {
@@ -138,11 +189,76 @@ describe('Store Operations Core Logic', () => {
         takeCoverProneRangedOnly: true,
       });
 
-      expect(observer.document.update).toHaveBeenCalledWith(
+      expect(observer.document.unsetFlag).toHaveBeenCalledWith(global.MODULE_ID, 'cover');
+    });
+
+    test('take cover writes a cover-only AVS override marker from the cover store boundary', async () => {
+      jest.resetModules();
+
+      const applyForTakeCover = jest.fn().mockResolvedValue(true);
+      jest.doMock('../../../scripts/chat/services/infra/AvsOverrideManager.js', () => ({
+        __esModule: true,
+        default: {
+          applyForTakeCover,
+        },
+      }));
+
+      const { setCoverBetween } = await import('../../../scripts/stores/cover-map.js');
+
+      const observer = createMockToken('observer-token');
+      const target = createMockToken('target-token');
+
+      await setCoverBetween(observer, target, 'standard', { takeCover: true });
+
+      expect(applyForTakeCover).toHaveBeenCalledWith(
+        observer,
         expect.objectContaining({
-          [`flags.${global.MODULE_ID}.cover`]: {},
+          target,
+          state: 'avs',
+          coverOnly: true,
+          hasCover: true,
+          expectedCover: 'standard',
         }),
-        expect.any(Object),
+      );
+    });
+
+    test('take cover store path writes the real cover-only AVS flag', async () => {
+      jest.resetModules();
+      jest.unmock('../../../scripts/chat/services/infra/AvsOverrideManager.js');
+
+      const { setCoverBetween } = await import('../../../scripts/stores/cover-map.js');
+
+      const observer = createMockToken('observer-token');
+      const target = createMockToken('target-token');
+      target.name = 'Target';
+      observer.name = 'Observer';
+      target.document.name = 'Target';
+      observer.document.name = 'Observer';
+      target.document.flags = { 'pf2e-visioner': {} };
+      target.document.getFlag.mockImplementation((module, key) => {
+        return target.document.flags?.[module]?.[key];
+      });
+      target.document.setFlag.mockImplementation(async (module, key, value) => {
+        target.document.flags[module] ||= {};
+        target.document.flags[module][key] = value;
+        return target.document;
+      });
+
+      await setCoverBetween(observer, target, 'standard', { takeCover: true });
+
+      expect(target.document.setFlag).toHaveBeenCalledWith(
+        'pf2e-visioner',
+        'avs-override-from-observer-token-doc',
+        expect.objectContaining({
+          observerId: 'observer-token-doc',
+          targetId: 'target-token-doc',
+          state: 'avs',
+          source: 'take_cover_action',
+          coverOnly: true,
+          coverOverrideSource: 'take_cover_action',
+          hasCover: true,
+          expectedCover: 'standard',
+        }),
       );
     });
   });

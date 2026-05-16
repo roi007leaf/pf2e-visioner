@@ -49,7 +49,8 @@ describe('API AVS cleanup integration', () => {
     expect(calls.some((c) => c?.[0] === 'pf2e-visioner' && c?.[1] === 'deletedEntryCache')).toBe(true);
   });
 
-  test('clearAllSceneData clears only visibilityV2 for rule-element tokens', async () => {
+  test('clearAllSceneData clears visibilityV2 for rule-element tokens without deleting registry', async () => {
+    const forcedDeletion = foundry.data.operators.ForcedDeletion;
     const token = global.createMockToken({
       id: 'rule-token',
       flags: {
@@ -59,6 +60,7 @@ describe('API AVS cleanup integration', () => {
         },
       },
     });
+
     canvas.tokens.placeables = [token];
 
     const { Pf2eVisionerApi } = await import('../../../scripts/api.js');
@@ -69,14 +71,94 @@ describe('API AVS cleanup integration', () => {
       .flatMap((call) => call[1] ?? [])
       .find((entry) => entry._id === 'rule-token');
 
-    expect(update).toEqual(
-      expect.objectContaining({
-        'flags.pf2e-visioner.visibilityV2': {},
-      }),
-    );
-    expect(Object.prototype.hasOwnProperty.call(update, 'flags.pf2e-visioner.visibility')).toBe(
-      false,
-    );
+    expect(update['flags.pf2e-visioner.visibilityV2']).toBe(forcedDeletion);
+    expect(Object.prototype.hasOwnProperty.call(update, 'flags.pf2e-visioner')).toBe(false);
+  });
+
+  test('clearAllSceneData explicitly removes manual cover flags from tokens without rule elements', async () => {
+    const forcedDeletion = foundry.data.operators.ForcedDeletion;
+    const token = {
+      id: 'A',
+      name: 'A',
+      actor: null,
+      document: {
+        flags: {
+          'pf2e-visioner': {
+            cover: { B: 'standard' },
+            visibility: { B: 'hidden' },
+          },
+        },
+        getFlag: jest.fn((module, key) => {
+          if (module !== 'pf2e-visioner') return undefined;
+          if (key === 'ruleElementRegistry') return {};
+          return token.document.flags['pf2e-visioner']?.[key];
+        }),
+      },
+    };
+    canvas.tokens.placeables = [token];
+
+    const { Pf2eVisionerApi } = await import('../../../scripts/api.js');
+    const ok = await Pf2eVisionerApi.clearAllSceneData();
+
+    expect(ok).toBe(true);
+    const updateForToken = canvas.scene.updateEmbeddedDocuments.mock.calls
+      .flatMap((call) => call[1] || [])
+      .find((update) => update._id === 'A');
+
+    expect(updateForToken).toEqual(expect.objectContaining({
+      'flags.pf2e-visioner': forcedDeletion,
+    }));
+  });
+
+  test('clearAllSceneData removes manual-cover state sources while preserving rule-element sources', async () => {
+    const forcedDeletion = foundry.data.operators.ForcedDeletion;
+    const token = {
+      id: 'A',
+      name: 'A',
+      actor: null,
+      document: {
+        flags: {
+          'pf2e-visioner': {
+            ruleElementRegistry: { 'item-rule': ['stateSource'] },
+            cover: { B: 'standard' },
+            stateSource: {
+              coverByObserver: {
+                B: {
+                  state: 'standard',
+                  sources: [
+                    { id: 'B', type: 'manual-cover' },
+                    { id: 'rule-cover', type: 'rule-element', state: 'greater' },
+                  ],
+                },
+              },
+            },
+          },
+        },
+        getFlag: jest.fn((module, key) => {
+          if (module !== 'pf2e-visioner') return undefined;
+          return token.document.flags['pf2e-visioner']?.[key];
+        }),
+      },
+    };
+    canvas.tokens.placeables = [token];
+
+    const { Pf2eVisionerApi } = await import('../../../scripts/api.js');
+    const ok = await Pf2eVisionerApi.clearAllSceneData();
+
+    expect(ok).toBe(true);
+    const updateForToken = canvas.scene.updateEmbeddedDocuments.mock.calls
+      .flatMap((call) => call[1] || [])
+      .find((update) => update._id === 'A');
+
+    expect(updateForToken['flags.pf2e-visioner.cover']).toBe(forcedDeletion);
+    expect(updateForToken['flags.pf2e-visioner.stateSource']).toEqual({
+      coverByObserver: {
+        B: {
+          state: 'greater',
+          sources: [{ id: 'rule-cover', type: 'rule-element', state: 'greater' }],
+        },
+      },
+    });
   });
 
   test('clearAllDataForSelectedTokens removes avs-override-* flags referencing purged tokens and calls removeOverride between them', async () => {
@@ -183,5 +265,43 @@ describe('API AVS cleanup integration', () => {
         },
       }),
     );
+  });
+
+  test('clearAllDataForSelectedTokens unsets other tokens cover map when selected token was last entry', async () => {
+    const forcedDeletion = foundry.data.operators.ForcedDeletion;
+    const mkToken = (id, flags = {}) => ({
+      id,
+      name: id,
+      actor: {},
+      document: {
+        id,
+        getFlag: jest.fn((module, key) => {
+          if (module !== 'pf2e-visioner') return undefined;
+          return flags[key];
+        }),
+        unsetFlag: jest.fn().mockResolvedValue(true),
+        flags: { 'pf2e-visioner': { ...flags } },
+      },
+    });
+
+    const selected = mkToken('A');
+    const observer = mkToken('C', {
+      cover: { A: 'standard' },
+      visibility: { A: 'hidden' },
+    });
+    canvas.tokens.placeables = [selected, observer];
+
+    const { Pf2eVisionerApi } = await import('../../../scripts/api.js');
+    const ok = await Pf2eVisionerApi.clearAllDataForSelectedTokens([selected]);
+
+    expect(ok).toBe(true);
+    const updateForObserver = canvas.scene.updateEmbeddedDocuments.mock.calls
+      .flatMap((call) => call[1] || [])
+      .find((update) => update._id === 'C' && update['flags.pf2e-visioner.cover']);
+
+    expect(updateForObserver).toEqual(expect.objectContaining({
+      'flags.pf2e-visioner.cover': forcedDeletion,
+      'flags.pf2e-visioner.visibility': forcedDeletion,
+    }));
   });
 });

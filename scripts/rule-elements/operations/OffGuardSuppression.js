@@ -159,7 +159,6 @@ export class OffGuardSuppression {
     if (!token || !visibilityState) return false;
 
     const decision = this.getOffGuardSuppressionDecision(token, visibilityState, sourceToken);
-
     return decision.result;
   }
 

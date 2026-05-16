@@ -44,76 +44,6 @@ class AttackRollUseCase extends BaseAutoCoverUseCase {
     } catch (_) {}
   }
 
-  _traceToken(token) {
-    const document = token?.document ?? (typeof token?.getFlag === 'function' ? token : null);
-    const actor = token?.actor ?? document?.actor ?? null;
-    return {
-      tokenId: token?.id ?? document?.id ?? null,
-      documentId: document?.id ?? null,
-      tokenName: token?.name ?? document?.name ?? null,
-      actorId: actor?.id ?? null,
-      actorName: actor?.name ?? null,
-      actorType: actor?.type ?? null,
-      actorSignature: actor?.signature ?? null,
-      isTokenDocument: !!token?.actor && typeof token?.getFlag === 'function',
-      hasPlaceableDocument: !!token?.document,
-      isOwner: token?.isOwner ?? actor?.isOwner ?? null,
-    };
-  }
-
-  _traceModifier(modifier) {
-    return {
-      slug: modifier?.slug ?? null,
-      label: modifier?.label ?? modifier?.name ?? modifier?.title ?? null,
-      modifier: modifier?.modifier ?? null,
-      type: modifier?.type ?? null,
-      enabled: modifier?.enabled ?? null,
-    };
-  }
-
-  _traceContext(stage, attacker, target, context = null, check = null) {
-    try {
-      const targetToAttacker = attacker && target ? getVisibilityBetween(target, attacker) : null;
-      const attackerToTarget = attacker && target ? getVisibilityBetween(attacker, target) : null;
-      const suppressed =
-        attacker && target && ['hidden', 'undetected'].includes(targetToAttacker)
-          ? OffGuardSuppression.shouldSuppressOffGuardForState(target, targetToAttacker, attacker)
-          : false;
-      console.info('PF2E Visioner | Attack roll off-guard trace', {
-        stage,
-        attacker: this._traceToken(attacker),
-        target: this._traceToken(target),
-        targetToAttacker,
-        attackerToTarget,
-        suppressed,
-        contextType: context?.type ?? null,
-        contextToken: this._traceToken(context?.token),
-        contextOriginToken: this._traceToken(context?.origin?.token),
-        contextTargetToken: this._traceToken(context?.target?.token),
-        contextActorId: context?.actor?.id ?? null,
-        contextOriginActorId: context?.origin?.actor?.id ?? null,
-        contextTargetActorId: context?.target?.actor?.id ?? null,
-        dc: context?.dc
-          ? {
-              slug: context.dc.slug ?? null,
-              value: context.dc.value ?? null,
-              statisticValue: context.dc.statistic?.value ?? null,
-              statisticModifierCount: context.dc.statistic?.modifiers?.length ?? null,
-            }
-          : null,
-        checkModifierCount: Array.isArray(check?.modifiers) ? check.modifiers.length : null,
-        checkModifiers: Array.isArray(check?.modifiers)
-          ? check.modifiers.map((modifier) => this._traceModifier(modifier))
-          : null,
-      });
-    } catch (error) {
-      console.info('PF2E Visioner | Attack roll off-guard trace failed', {
-        stage,
-        error: error?.message ?? String(error),
-      });
-    }
-  }
-
   _syncClonedDefenderIntoContext(token, clonedActor, context) {
     if (!clonedActor) return;
 
@@ -363,15 +293,6 @@ class AttackRollUseCase extends BaseAutoCoverUseCase {
       }
       changed = true;
 
-      console.info('PF2E Visioner | Off-guard modifier added', {
-        path: existingPath,
-        modifier: this._traceModifier(adjustment),
-        dcPath,
-        dcValueBefore,
-        dcValueAfter: dcObj.value ?? null,
-        attacker: this._traceToken(attacker),
-        target: this._traceToken(target),
-      });
     }
 
     if (changed) {
@@ -422,11 +343,6 @@ class AttackRollUseCase extends BaseAutoCoverUseCase {
   _applySuppressedAttackerOffGuardClone(attacker, target, context, check = null) {
     const actor = attacker?.actor;
     if (!actor?.clone) {
-      console.info('PF2E Visioner | Attacker off-guard clone skipped', {
-        reason: 'missing actor.clone',
-        attacker: this._traceToken(attacker),
-        target: this._traceToken(target),
-      });
       return false;
     }
 
@@ -442,24 +358,10 @@ class AttackRollUseCase extends BaseAutoCoverUseCase {
     const aggregateCountAfter = filteredItems.filter(
       (item) => item?.flags?.[MODULE_ID]?.aggregateOffGuard === true,
     ).length;
-    console.info('PF2E Visioner | Attacker off-guard clone decision', {
-      changed,
-      itemCountBefore: items.length,
-      itemCountAfter: filteredItems.length,
-      aggregateCountBefore,
-      aggregateCountAfter,
-      attacker: this._traceToken(attacker),
-      target: this._traceToken(target),
-    });
     if (!changed) return false;
 
     const clonedActor = actor.clone({ items: filteredItems }, { keepId: true });
     this._syncClonedAttackerIntoContext(attacker, clonedActor, context, check);
-    console.info('PF2E Visioner | Attacker off-guard clone applied', {
-      clonedActorId: clonedActor?.id ?? null,
-      contextActorId: context?.actor?.id ?? null,
-      checkActorId: check?.actor?.id ?? null,
-    });
     return true;
   }
 
@@ -479,11 +381,6 @@ class AttackRollUseCase extends BaseAutoCoverUseCase {
   _stripSuppressedOffGuardModifiers(container, attacker, target) {
     if (!container) return false;
     if (!this._isOffGuardSuppressedForAttack(attacker, target)) {
-      console.info('PF2E Visioner | Off-guard modifier strip skipped', {
-        reason: 'not suppressed',
-        attacker: this._traceToken(attacker),
-        target: this._traceToken(target),
-      });
       return false;
     }
 
@@ -522,17 +419,6 @@ class AttackRollUseCase extends BaseAutoCoverUseCase {
         }
         adjustedDcs.add(dcPath);
       }
-      console.info('PF2E Visioner | Off-guard modifier stripped', {
-        path,
-        removed: removed.map((modifier) => this._traceModifier(modifier)),
-        beforeCount: modifiers.length,
-        afterCount: filtered.length,
-        dcPath,
-        dcValueBefore,
-        dcValueAfter: dcObj?.value ?? null,
-        attacker: this._traceToken(attacker),
-        target: this._traceToken(target),
-      });
       changed = true;
     }
 
@@ -543,11 +429,6 @@ class AttackRollUseCase extends BaseAutoCoverUseCase {
       } catch (_) {}
     }
 
-    console.info('PF2E Visioner | Off-guard modifier strip complete', {
-      changed,
-      attacker: this._traceToken(attacker),
-      target: this._traceToken(target),
-    });
     return changed;
   }
 
@@ -555,22 +436,11 @@ class AttackRollUseCase extends BaseAutoCoverUseCase {
     if (!attacker || !target) return;
     try {
       const currentVisibility = getVisibilityBetween(target, attacker);
-      console.info('PF2E Visioner | Refresh defender visibility effects for attack', {
-        currentVisibility,
-        attacker: this._traceToken(attacker),
-        target: this._traceToken(target),
-      });
       await setVisibilityBetween(target, attacker, currentVisibility, {
         skipEphemeralUpdate: false,
         direction: 'observer_to_target',
       });
-    } catch (error) {
-      console.info('PF2E Visioner | Refresh defender visibility effects failed', {
-        error: error?.message ?? String(error),
-        attacker: this._traceToken(attacker),
-        target: this._traceToken(target),
-      });
-    }
+    } catch {}
   }
 
   /**
@@ -716,13 +586,11 @@ class AttackRollUseCase extends BaseAutoCoverUseCase {
     let attacker = this._resolveAttackerFromCtx(ctx);
     let target = this._resolveTargetFromCtx(ctx);
     if (!attacker || !target) return;
-    this._traceContext('check-dialog:start', attacker, target, ctx, dialog?.check);
     await this._refreshDefenderVisibilityEffectsForAttack(attacker, target);
     this._stripSuppressedOffGuardModifiers(dialog, attacker, target);
     this._stripSuppressedOffGuardModifiers(ctx, attacker, target);
     this._ensureUnsuppressedOffGuardModifier(dialog, attacker, target);
     this._ensureUnsuppressedOffGuardModifier(ctx, attacker, target);
-    this._traceContext('check-dialog:after-suppression', attacker, target, ctx, dialog?.check);
     const manualCover = getCoverBetween(attacker, target);
     let state = this._detectCover(attacker, target, ctx);
 
@@ -759,13 +627,6 @@ class AttackRollUseCase extends BaseAutoCoverUseCase {
           }
 
           try {
-            this._traceContext(
-              'check-dialog:callback-start',
-              attacker,
-              effectiveTarget,
-              dctx,
-              dialog?.check,
-            );
             this._stripSuppressedOffGuardModifiers(dctx, attacker, effectiveTarget);
             const bonus = getCoverBonusByState(chosen) || 0;
             const label = getCoverLabel(chosen);
@@ -839,13 +700,6 @@ class AttackRollUseCase extends BaseAutoCoverUseCase {
               effectiveTarget,
             );
             this._injectCoverRollOptions(dctx, chosen, bonus);
-            this._traceContext(
-              'check-dialog:callback-end',
-              attacker,
-              effectiveTarget,
-              dctx,
-              dialog?.check,
-            );
           } catch (_) {}
         },
       );
@@ -913,7 +767,6 @@ class AttackRollUseCase extends BaseAutoCoverUseCase {
       const checkDialogsEnabled = this._isPf2eCheckDialogEnabled();
 
       if (attacker && target && (attacker.isOwner || game.user.isGM)) {
-        this._traceContext('check-roll:start', attacker, target, context, check);
         // Ensure visibility-driven off-guard ephemerals are up-to-date on defender before any DC calculation
         await this._refreshDefenderVisibilityEffectsForAttack(attacker, target);
         this._stripSuppressedOffGuardModifiers(check, attacker, target);
@@ -921,7 +774,6 @@ class AttackRollUseCase extends BaseAutoCoverUseCase {
         this._applySuppressedAttackerOffGuardClone(attacker, target, context, check);
         this._ensureUnsuppressedOffGuardModifier(check, attacker, target);
         this._ensureUnsuppressedOffGuardModifier(context, attacker, target);
-        this._traceContext('check-roll:after-suppression', attacker, target, context, check);
 
         const manualCover = getCoverBetween(attacker, target);
         const detected = this._detectCover(attacker, target, context);
@@ -1034,13 +886,6 @@ class AttackRollUseCase extends BaseAutoCoverUseCase {
     if (offGuardAdjustment) {
       const offGuardEffect = this._createOneRollOffGuardEffect(offGuardAdjustment);
       if (offGuardEffect) items.push(offGuardEffect);
-      console.info('PF2E Visioner | One-roll off-guard effect added', {
-        coverState: state,
-        manualCover,
-        attacker: this._traceToken(attacker),
-        target: this._traceToken(target),
-        adjustment: this._traceModifier(offGuardAdjustment),
-      });
     }
 
     const clonedActor = tgtActor.clone({ items }, { keepId: true });

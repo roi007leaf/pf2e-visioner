@@ -39,6 +39,22 @@ function buildOverrideProfile(data = {}) {
   });
 }
 
+function getTokenId(tokenLike) {
+  return tokenLike?.document?.id || tokenLike?.id || null;
+}
+
+function resolveTokenPlaceable(tokenLike) {
+  if (!tokenLike) return null;
+  if (tokenLike.document?.id) return tokenLike;
+  if (tokenLike.object?.document?.id) return tokenLike.object;
+
+  const tokenId = getTokenId(tokenLike);
+  const canvasToken = tokenId ? globalThis.canvas?.tokens?.get?.(tokenId) : null;
+  if (canvasToken?.document?.id) return canvasToken;
+
+  return tokenLike;
+}
+
 function asChangesByTarget(changesInput, defaultState = null) {
   // Accept Map<string, { target, state, hasCover?, hasConcealment?, expectedCover? }>
   if (changesInput instanceof Map) return changesInput;
@@ -47,13 +63,14 @@ function asChangesByTarget(changesInput, defaultState = null) {
   const arr = Array.isArray(changesInput) ? changesInput : [changesInput].filter(Boolean);
   for (const ch of arr) {
     if (!ch) continue;
-    const target = ch.target || ch.targetToken || null;
+    const target = resolveTokenPlaceable(ch.target || ch.targetToken || null);
     if (!target?.document?.id) continue;
+    const coverOnly = ch.coverOnly === true;
     const state = ch.state || ch.overrideState || ch.newVisibility || defaultState;
     if (!state) continue;
 
     // Skip 'avs' visibility state
-    if (state === 'avs') continue;
+    if (state === 'avs' && !coverOnly) continue;
 
     // Prefer provided flags; otherwise infer conservatively
     const expectedCover = ch.expectedCover;
@@ -74,9 +91,19 @@ function asChangesByTarget(changesInput, defaultState = null) {
       awarenessState: ch.awarenessState,
       coverState: ch.coverState,
       detectionSense: ch.detectionSense,
+      coverOnly,
+      coverOverrideSource: ch.coverOverrideSource,
     });
   }
   return map;
+}
+
+function hasTakeCoverCoverTracking(data) {
+  return (
+    data?.coverOnly === true ||
+    data?.coverOverrideSource === 'take_cover_action' ||
+    (data?.source === 'take_cover_action' && data?.expectedCover)
+  );
 }
 
 export class AvsOverrideManager {
@@ -136,7 +163,8 @@ export class AvsOverrideManager {
         src === 'seek_action_deferred' ||
         src === 'point_out_action' ||
         src === 'manual_action' ||
-      src === 'encounter_stealth_initiative';
+        src === 'take_cover_action' ||
+        src === 'encounter_stealth_initiative';
 
       let appliedCount = 0;
       for (const [, changeData] of changesByTarget) {
@@ -161,6 +189,8 @@ export class AvsOverrideManager {
           coverState: changeData.coverState,
           detectionSense: changeData.detectionSense,
           timedOverride: changeData.timedOverride || options.timedOverride || null,
+          coverOnly: changeData.coverOnly === true || options.coverOnly === true,
+          coverOverrideSource: changeData.coverOverrideSource || options.coverOverrideSource,
         };
 
         if (isOneWayBySource) {
@@ -199,6 +229,7 @@ export class AvsOverrideManager {
       awarenessState,
       coverState,
       detectionSense,
+      coverOnly,
     } = overrideData || {};
     let { hasCover, hasConcealment, expectedCover } = overrideData || {};
     if (!observer?.document?.id || !target?.document?.id || !state) {
@@ -207,7 +238,7 @@ export class AvsOverrideManager {
     }
 
     // Filter out 'avs' visibility state from override processing
-    if (state === 'avs') {
+    if (state === 'avs' && coverOnly !== true) {
       return;
     }
 
@@ -264,6 +295,8 @@ export class AvsOverrideManager {
         coverState: profile.coverState,
         detectionSense: profile.detectionSense,
         timedOverride: timedOverride || null,
+        coverOnly: coverOnly === true,
+        coverOverrideSource: overrideData.coverOverrideSource || (coverOnly ? source : undefined),
       });
     } catch (e) {
       console.error('PF2E Visioner | Failed to store override flag:', e);
@@ -273,10 +306,12 @@ export class AvsOverrideManager {
     try {
       if (!profile) return;
       await this.clearGlobalCaches();
-      await this.applyOverrideProfileFromFlag(observer, target, profile, {
-        source,
-        preserveEncounterUnnoticed: source === 'encounter_stealth_initiative',
-      });
+      if (coverOnly !== true && state !== 'avs') {
+        await this.applyOverrideProfileFromFlag(observer, target, profile, {
+          source,
+          preserveEncounterUnnoticed: source === 'encounter_stealth_initiative',
+        });
+      }
     } catch (e) {
       console.error('PF2E Visioner | Error applying AVS override from flag:', e);
     }
@@ -298,10 +333,30 @@ export class AvsOverrideManager {
     const targetDocId = target.document.id;
 
     const flagKey = `avs-override-from-${observerDocId}`;
-    const { state: _legacyState, ...canonicalData } = data;
+    const existing = target.document.getFlag?.(MODULE_ID, flagKey);
+    const isMergingCoverIntoVisibilityOverride =
+      data.coverOnly === true &&
+      existing &&
+      typeof existing === 'object' &&
+      !!existing.state &&
+      existing.state !== 'avs' &&
+      existing.coverOnly !== true;
 
-    const flagData = {
-      ...canonicalData,
+    const flagData = isMergingCoverIntoVisibilityOverride ? {
+      ...existing,
+      hasCover: data.hasCover,
+      expectedCover: data.expectedCover,
+      coverOnly: false,
+      coverOverrideSource: data.coverOverrideSource || 'take_cover_action',
+      timestamp: Date.now(),
+      observerId: observerDocId,
+      targetId: targetDocId,
+      observerName: observer.name,
+      targetName: target.name,
+    } : {
+      ...data,
+      coverOverrideSource:
+        data.coverOverrideSource || (data.coverOnly ? data.source || 'take_cover_action' : undefined),
       timestamp: Date.now(),
       observerId: observerDocId,
       targetId: targetDocId,
@@ -349,15 +404,18 @@ export class AvsOverrideManager {
   }
 
   // Remove a specific override (persistent flag-based)
-  static async removeOverride(observerId, targetId) {
+  static async removeOverride(observerId, targetId, options = {}) {
     if (!game.user?.isGM) return false;
 
     try {
       const targetToken = canvas.tokens?.get(targetId);
       if (!targetToken) return false;
       const flagKey = `avs-override-from-${observerId}`;
-      const flagExists = targetToken.document.getFlag(MODULE_ID, flagKey);
-      if (flagExists) {
+      const flagData = targetToken.document.getFlag(MODULE_ID, flagKey);
+      if (flagData) {
+        if (hasTakeCoverCoverTracking(flagData)) {
+          await this.#clearTakeCoverMapEntry(observerId, targetId, options);
+        }
         await targetToken.document.unsetFlag(MODULE_ID, flagKey);
         await this.clearGlobalCaches();
         try {
@@ -373,6 +431,36 @@ export class AvsOverrideManager {
       console.error('PF2E Visioner | Failed to remove override flag:', error);
     }
     return false;
+  }
+
+  static async removeTakeCoverTracking(observerId, targetId) {
+    try {
+      const targetToken = canvas.tokens?.get(targetId);
+      if (!targetToken) {
+        return false;
+      }
+      const flagKey = `avs-override-from-${observerId}`;
+      const flagData = targetToken.document.getFlag(MODULE_ID, flagKey);
+      if (!hasTakeCoverCoverTracking(flagData)) {
+        return false;
+      }
+      if (flagData.coverOnly === true) {
+        return this.removeOverride(observerId, targetId);
+      }
+
+      const nextFlag = { ...flagData };
+      delete nextFlag.coverOverrideSource;
+      delete nextFlag.expectedCover;
+      nextFlag.hasCover = false;
+      nextFlag.coverOnly = false;
+      nextFlag.timestamp = Date.now();
+      await targetToken.document.setFlag(MODULE_ID, flagKey, nextFlag);
+      await this.clearGlobalCaches();
+      return true;
+    } catch (error) {
+      console.warn('PF2E Visioner | Failed to remove Take Cover tracking:', error);
+      return false;
+    }
   }
 
   static async removeAllOverridesInvolving(tokenId) {
@@ -433,6 +521,20 @@ export class AvsOverrideManager {
     }
   }
 
+  static async #clearTakeCoverMapEntry(observerId, targetId, options = {}) {
+    try {
+      const observerToken = canvas.tokens?.get?.(observerId);
+      const targetToken = canvas.tokens?.get?.(targetId);
+      if (!observerToken || !targetToken) return;
+      const { getCoverBetween, setCoverBetween } = await import('../../../stores/cover-map.js');
+      await setCoverBetween(observerToken, targetToken, 'none', {
+        skipEphemeralUpdate: false,
+      });
+    } catch (error) {
+      console.warn('PF2E Visioner | Failed to clear Take Cover manual cover:', error);
+    }
+  }
+
   // Clear all overrides across all tokens
   static async clearAllOverrides() {
     if (!game.user?.isGM) return false;
@@ -461,12 +563,15 @@ export class AvsOverrideManager {
   static async applyOverrides(observer, changesInput, { source, timedOverride, ...options } = {}) {
     if (!game.user?.isGM) return false;
 
+    const normalizedObserver = resolveTokenPlaceable(observer);
     try {
-      if (observer?.document?.hidden === true) return false;
+      if (normalizedObserver?.document?.hidden === true) return false;
     } catch {}
     const map = asChangesByTarget(changesInput);
-    if (map.size === 0 || !observer) return false;
-    await this.setPairOverrides(observer, map, {
+    if (map.size === 0 || !normalizedObserver?.document?.id) {
+      return false;
+    }
+    await this.setPairOverrides(normalizedObserver, map, {
       source: source || 'manual_action',
       timedOverride,
       ...options,
@@ -497,7 +602,11 @@ export class AvsOverrideManager {
 
   // Take Cover: not strictly an AVS state but some flows may tag concealment reasons
   static async applyForTakeCover(observer, changesInput) {
-    return this.applyOverrides(observer, changesInput, { source: 'take_cover_action' });
+    return this.applyOverrides(observer, changesInput, {
+      source: 'take_cover_action',
+      coverOnly: true,
+      coverOverrideSource: 'take_cover_action',
+    });
   }
 
   // Consequences: clear pair overrides for provided pairs (both directions for safety)

@@ -124,6 +124,29 @@ describe('OverrideValidationIndicator - Sneak Filtering', () => {
             expect(indicator._badge.textContent).toBe('1');
         });
 
+        it('should show cover-only AVS rows when cover changed', () => {
+            global.canvas.tokens.get.mockImplementation(() => ({
+                document: {
+                    getFlag: jest.fn().mockReturnValue(false)
+                }
+            }));
+
+            const overrides = [
+                {
+                    observerId: 'observer1',
+                    targetId: 'target1',
+                    state: 'avs',
+                    coverOnly: true,
+                    expectedCover: 'standard',
+                    currentCover: 'none'
+                }
+            ];
+
+            indicator.show(overrides);
+
+            expect(indicator._badge.textContent).toBe('1');
+        });
+
         it('should filter out target changes when target is sneaking', () => {
             // Mock target as sneaking, observer not sneaking
             global.canvas.tokens.get.mockImplementation((tokenId) => {

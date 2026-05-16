@@ -8,6 +8,11 @@ import coverOverrideManager from '../../cover/CoverOverrideManager.js';
 import { getCoverBonusByState } from '../../helpers/cover-helpers.js';
 import coverDetector from './CoverDetector.js';
 import coverStateManager from './CoverStateManager.js';
+
+function getTokenId(token) {
+  return token?.id || token?.document?.id || null;
+}
+
 export class AutoCoverSystem {
   /**
    * @type {CoverDetector}
@@ -82,17 +87,36 @@ export class AutoCoverSystem {
    * @returns {Array<{attackerId: string, targetId: string}>}
    */
   getActivePairsInvolving(tokenId) {
-    const pairs = [];
+    const pairsByKey = new Map();
+    const addPair = (attackerId, targetId) => {
+      if (!attackerId || !targetId) return;
+      if (attackerId !== tokenId && targetId !== tokenId) return;
+      pairsByKey.set(`${attackerId}->${targetId}`, { attackerId, targetId });
+    };
+
     // As attacker
     const tset = this._activePairsByAttacker.get(tokenId);
     if (tset && tset.size > 0) {
-      for (const targetId of tset) pairs.push({ attackerId: tokenId, targetId });
+      for (const targetId of tset) addPair(tokenId, targetId);
     }
     // As target
     for (const [attackerId, set] of this._activePairsByAttacker.entries()) {
-      if (set.has(tokenId)) pairs.push({ attackerId, targetId: tokenId });
+      if (set.has(tokenId)) addPair(attackerId, tokenId);
     }
-    return pairs;
+
+    // Persisted auto-cover maps are source of truth after reloads or external writes.
+    const tokens = canvas?.tokens?.placeables || [];
+    for (const token of tokens) {
+      const attackerId = getTokenId(token);
+      const coverMap = token?.document?.getFlag?.(MODULE_ID, 'autoCoverMap');
+      if (!coverMap || typeof coverMap !== 'object') continue;
+      for (const [targetId, state] of Object.entries(coverMap)) {
+        if (!state || state === 'none') continue;
+        addPair(attackerId, targetId);
+      }
+    }
+
+    return Array.from(pairsByKey.values());
   }
 
   /**
@@ -125,7 +149,21 @@ export class AutoCoverSystem {
    * @param {Object} options - Additional options
    */
   async setCoverBetween(attacker, target, state, options = {}) {
-    return this._stateManager.setCoverBetween(attacker, target, state, options);
+    const result = await this._stateManager.setCoverBetween(attacker, target, state, options);
+    const attackerId = getTokenId(attacker);
+    const targetId = getTokenId(target);
+
+    if (state === 'none') {
+      const targets = this._activePairsByAttacker.get(attackerId);
+      targets?.delete(targetId);
+      if (targets?.size === 0) {
+        this._activePairsByAttacker.delete(attackerId);
+      }
+    } else {
+      this.recordPair(attackerId, targetId);
+    }
+
+    return result;
   }
 
   getCoverBetween(attacker, target) {

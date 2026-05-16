@@ -137,6 +137,132 @@ describe('Attack Consequences Action Comprehensive Tests', () => {
         expect(filteredOutcomes[0].token.id).toBe('enemy1');
       });
     });
+
+    test('chat apply defaults to AVS when AVS is enabled', async () => {
+      jest.resetModules();
+
+      const originalGetSetting = game.settings.get;
+      game.settings.get = jest.fn((module, key) => {
+        if (module === 'pf2e-visioner' && key === 'autoVisibilityEnabled') return true;
+        if (module === 'pf2e-visioner' && key === 'ignoreAllies') return false;
+        if (module === 'pf2e-visioner' && key === 'defaultEncounterFilter') return false;
+        return false;
+      });
+
+      jest.doMock('../../../scripts/utils.js', () => ({
+        getVisibilityBetween: jest.fn(() => 'undetected'),
+      }));
+
+      const setPairOverrides = jest.fn().mockResolvedValue(true);
+      const removeOverride = jest.fn().mockResolvedValue(false);
+      jest.doMock('../../../scripts/chat/services/infra/AvsOverrideManager.js', () => ({
+        __esModule: true,
+        default: {
+          setPairOverrides,
+          removeOverride,
+        },
+      }));
+      jest.doMock('../../../scripts/ui/OverrideValidationIndicator.js', () => ({
+        __esModule: true,
+        default: {
+          hide: jest.fn(),
+          update: jest.fn(),
+        },
+      }));
+
+      try {
+        const { ConsequencesActionHandler } = await import(
+          '../../../scripts/chat/services/actions/ConsequencesAction.js'
+        );
+
+        const attacker = global.createMockToken({
+          id: 'attacker',
+          name: 'Attacker',
+          actor: global.createMockActor({ type: 'character' }),
+        });
+        const observer = global.createMockToken({
+          id: 'observer',
+          name: 'Observer',
+          actor: global.createMockActor({ type: 'npc' }),
+        });
+
+        global.canvas.tokens.placeables = [attacker, observer];
+        global.canvas.tokens.get = jest.fn((id) =>
+          global.canvas.tokens.placeables.find((token) => token.id === id) || null,
+        );
+
+        const handler = new ConsequencesActionHandler();
+        const count = await handler.apply(
+          { actor: attacker, actorToken: attacker, messageId: 'message-1' },
+          { html: jest.fn().mockReturnThis(), attr: jest.fn().mockReturnThis() },
+        );
+
+        expect(count).toBe(0);
+        expect(setPairOverrides).not.toHaveBeenCalled();
+        expect(removeOverride).toHaveBeenCalledWith(observer.document.id, attacker.document.id);
+        expect(removeOverride).toHaveBeenCalledWith(attacker.document.id, observer.document.id);
+      } finally {
+        game.settings.get = originalGetSetting;
+      }
+    });
+
+    test('chat apply creates observed override by default when AVS is disabled', async () => {
+      jest.resetModules();
+
+      const originalGetSetting = game.settings.get;
+      game.settings.get = jest.fn((module, key) => {
+        if (module === 'pf2e-visioner' && key === 'autoVisibilityEnabled') return false;
+        if (module === 'pf2e-visioner' && key === 'ignoreAllies') return false;
+        if (module === 'pf2e-visioner' && key === 'defaultEncounterFilter') return false;
+        return false;
+      });
+
+      jest.doMock('../../../scripts/utils.js', () => ({
+        getVisibilityBetween: jest.fn(() => 'undetected'),
+        setVisibilityBetween: jest.fn().mockResolvedValue(true),
+        getVisibilityMap: jest.fn(() => ({})),
+        getPerceptionProfileMap: jest.fn(() => ({})),
+      }));
+
+      try {
+        const { ConsequencesActionHandler } = await import(
+          '../../../scripts/chat/services/actions/ConsequencesAction.js'
+        );
+
+        const attacker = global.createMockToken({
+          id: 'attacker',
+          name: 'Attacker',
+          actor: global.createMockActor({ type: 'character' }),
+        });
+        const observer = global.createMockToken({
+          id: 'observer',
+          name: 'Observer',
+          actor: global.createMockActor({ type: 'npc' }),
+        });
+
+        global.canvas.tokens.placeables = [attacker, observer];
+        global.canvas.tokens.get = jest.fn((id) =>
+          global.canvas.tokens.placeables.find((token) => token.id === id) || null,
+        );
+        global.canvas.scene.updateEmbeddedDocuments = jest.fn().mockResolvedValue([]);
+
+        const handler = new ConsequencesActionHandler();
+        const count = await handler.apply(
+          { actor: attacker, actorToken: attacker, messageId: 'message-1' },
+          { html: jest.fn().mockReturnThis(), attr: jest.fn().mockReturnThis() },
+        );
+
+        expect(count).toBe(1);
+        expect(global.canvas.scene.updateEmbeddedDocuments).toHaveBeenCalledWith('Token', [
+          {
+            _id: observer.document.id,
+            'flags.pf2e-visioner.-=visibilityV2': null,
+          },
+        ]);
+      } finally {
+        game.settings.get = originalGetSetting;
+      }
+    });
   });
 
   describe('Dialog Apply All Tests', () => {

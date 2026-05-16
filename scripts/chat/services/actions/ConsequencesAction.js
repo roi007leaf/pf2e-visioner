@@ -5,6 +5,14 @@ import { log, notify } from '../infra/notifications.js';
 import { shouldFilterAlly } from '../infra/shared-utils.js';
 import { ActionHandlerBase } from './BaseAction.js';
 
+function getDefaultConsequencesVisibility() {
+  try {
+    return game.settings.get(MODULE_ID, 'autoVisibilityEnabled') === true ? 'avs' : 'observed';
+  } catch {
+    return 'observed';
+  }
+}
+
 export class ConsequencesActionHandler extends ActionHandlerBase {
   constructor() {
     super('consequences');
@@ -104,12 +112,12 @@ export class ConsequencesActionHandler extends ActionHandlerBase {
       oldVisibilityLabel:
         getVisibilityStateLabelKey(currentVisibility, { manual: true }) || currentVisibility,
       changed: currentVisibility === 'hidden' || currentVisibility === 'undetected',
-      newVisibility: 'avs',
+      newVisibility: getDefaultConsequencesVisibility(),
     };
   }
   outcomeToChange(actionData, outcome) {
-    // Use the outcome's newVisibility if set (from overrides), otherwise default to AVS
-    const newVisibility = outcome.newVisibility || 'avs';
+    // Use the outcome's newVisibility if set (from overrides), otherwise use the current mode default
+    const newVisibility = outcome.newVisibility || getDefaultConsequencesVisibility();
     return {
       observer: outcome.target,
       target: actionData.actorToken || actionData.actor,
@@ -245,7 +253,9 @@ export class ConsequencesActionHandler extends ActionHandlerBase {
         for (const outcome of changed) {
           try {
             const observer = outcome.target;
-            const newVisibility = outcome.overrideState || outcome.newVisibility || 'observed';
+            const newVisibility =
+              outcome.overrideState || outcome.newVisibility || getDefaultConsequencesVisibility();
+            if (newVisibility === 'avs') continue;
 
             const changesByTarget = new Map([
               [

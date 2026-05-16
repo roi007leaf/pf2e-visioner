@@ -29,7 +29,6 @@ function _registerMovementCostHooks() {
         return;
     }
 
-    console.log('PF2E Visioner | Registering movement cost hooks');
 
     // Store original method
     const originalGetMovementCostFunction = TerrainDataClass.getMovementCostFunction;

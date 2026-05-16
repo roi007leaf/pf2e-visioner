@@ -73,6 +73,42 @@ export function getMatchingControlledTokenForRefresh(token, controlledTokens) {
   );
 }
 
+async function refreshAfterCoverEffectMapSync(tokenIds) {
+  const ids = Array.from(new Set((tokenIds || []).filter(Boolean)));
+  if (ids.length === 0) return;
+
+  try {
+    await globalThis.window?.pf2eVisioner?.services?.autoVisibilitySystem?.recalculateForTokens?.(
+      ids,
+    );
+  } catch {}
+
+  try {
+    const { autoVisibilitySystem } = await import('../visibility/auto-visibility/index.js');
+    await autoVisibilitySystem?.recalculateForTokens?.(ids);
+
+    const ovm = autoVisibilitySystem?.orchestrator?.overrideValidationManager;
+    if (ovm) {
+      const visionerState = (globalThis.game.pf2eVisioner ||= {});
+      const previousLastMovedTokenId = visionerState.lastMovedTokenId;
+      delete visionerState.lastMovedTokenId;
+
+      try {
+        for (const id of ids) ovm.queueOverrideValidation(id);
+        await ovm.processQueuedValidations({ skipMovedFilter: true });
+      } finally {
+        if (previousLastMovedTokenId !== undefined) {
+          visionerState.lastMovedTokenId = previousLastMovedTokenId;
+        }
+      }
+    }
+  } catch {}
+
+  try {
+    canvas?.perception?.update?.({ refreshVision: true, refreshOcclusion: true });
+  } catch {}
+}
+
 export async function registerHooks() {
   registerPf2eHudTakeCoverIntegration();
 
@@ -816,6 +852,16 @@ export async function registerHooks() {
 
       // Find any active tokens for this actor on the current scene
       const tokens = canvas.tokens?.placeables?.filter((t) => t.actor?.id === actor.id) || [];
+
+      try {
+        const { syncCoverMapsForDeletedCoverEffect } = await import('../cover/cleanup.js');
+        const coverSyncResult = await syncCoverMapsForDeletedCoverEffect(item);
+        if (coverSyncResult?.changed) {
+          await refreshAfterCoverEffectMapSync(coverSyncResult.tokenIds);
+        }
+      } catch (error) {
+        console.warn('PF2E Visioner | cover effect removal cleanup failed:', error);
+      }
 
       // Only handle sneak-related cleanup if AVS is enabled
       const avsEnabled = game.settings?.get?.('pf2e-visioner', 'autoVisibilityEnabled') ?? false;

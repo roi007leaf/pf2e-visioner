@@ -1,8 +1,16 @@
 import { COVER_STATES, MODULE_ID, MODULE_TITLE } from '../../constants.js';
+import { FeatsHandler } from '../services/FeatsHandler.js';
 import { BaseActionDialog } from './base-action-dialog.js';
 
 let currentTakeCoverDialog = null;
 const TAKE_COVER_OVERRIDE_STATES = ['none', 'standard', 'greater'];
+
+function normalizeTakeCoverDialogCover(state, { result = false } = {}) {
+  if (state === 'greater') return 'greater';
+  if (state === 'standard') return 'standard';
+  if (state === 'lesser') return result ? 'standard' : 'none';
+  return 'none';
+}
 
 export class TakeCoverPreviewDialog extends BaseActionDialog {
   static DEFAULT_OPTIONS = {
@@ -157,7 +165,7 @@ export class TakeCoverPreviewDialog extends BaseActionDialog {
   }
 
   async _prepareContext(options) {
-    await super._prepareContext(options);
+    const context = await super._prepareContext(options);
 
     // Filter outcomes (use encounter filter + optional Foundry-hidden filter)
     let filteredOutcomes = this.applyEncounterFilter(
@@ -210,8 +218,13 @@ export class TakeCoverPreviewDialog extends BaseActionDialog {
     const allStates = TAKE_COVER_OVERRIDE_STATES; // for Take Cover override icons
 
     const processed = filteredOutcomes.map((o) => {
-      const effectiveNew = o.overrideState || o.newVisibility || o.newCover;
-      const baseOld = o.oldVisibility || o.oldCover || o.currentCover;
+      const calculatedNew = normalizeTakeCoverDialogCover(o.newVisibility || o.newCover, {
+        result: true,
+      });
+      const effectiveNew = normalizeTakeCoverDialogCover(o.overrideState || calculatedNew, {
+        result: true,
+      });
+      const baseOld = normalizeTakeCoverDialogCover(o.oldVisibility || o.oldCover || o.currentCover);
       let hasActionableChange =
         o.takeCoverProneRangedOnly === true ||
         (baseOld != null && effectiveNew != null && effectiveNew !== baseOld);
@@ -222,7 +235,7 @@ export class TakeCoverPreviewDialog extends BaseActionDialog {
         color: this.coverConfig(s).color,
         cssClass: this.coverConfig(s).cssClass,
         selected: s === effectiveNew,
-        calculatedOutcome: s === (o.newVisibility || o.newCover),
+        calculatedOutcome: s === calculatedNew,
       }));
       return {
         ...o,
@@ -243,11 +256,17 @@ export class TakeCoverPreviewDialog extends BaseActionDialog {
     const displayOutcomes = this.showOnlyChanges
       ? processed.filter((o) => !!o.hasActionableChange)
       : processed;
+    const takerName = this.actorToken?.name || '';
     context.actorToken = this.actorToken;
     context.actorTokenImage = this.resolveTokenImage(this.actorToken);
+    context.taker = {
+      name: takerName,
+      image: context.actorTokenImage,
+    };
     context.outcomes = displayOutcomes;
     Object.assign(context, this.buildCommonContext(displayOutcomes));
     context.bulkOverrideLabel = game?.i18n?.localize?.('PF2E_VISIONER.UI.BULK_SET_COVER') || 'Bulk Set Cover';
+    context.takeCoverBadges = this._buildTakeCoverBadges();
     // Expose UI flags
     context.hideFoundryHidden = !!this.hideFoundryHidden;
     context.ignoreAllies = !!this.ignoreAllies;
@@ -255,6 +274,21 @@ export class TakeCoverPreviewDialog extends BaseActionDialog {
     context.showOnlyChanges = !!this.showOnlyChanges;
     context.encounterOnly = !!this.encounterOnly;
     return context;
+  }
+
+  _buildTakeCoverBadges() {
+    const badges = [];
+    try {
+      if (FeatsHandler.hasCeaselessShadows(this.actorToken)) {
+        badges.push({
+          key: 'ceaseless-shadows',
+          icon: 'fas fa-infinity',
+          label: game.i18n.localize('PF2E_VISIONER.FEAT.CEASELESS_SHADOWS'),
+          tooltip: game.i18n.localize('PF2E_VISIONER.UI.CEASELESS_SHADOWS_TAKE_COVER_TOOLTIP'),
+        });
+      }
+    } catch { }
+    return badges;
   }
 
   async _renderHTML(context) {
