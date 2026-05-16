@@ -14,12 +14,7 @@ function targetIgnoresStealthPositionValidation(target, override = {}) {
   if (!['manual_action', 'sneak_action', 'hide_action'].includes(source)) return false;
   if (!STEALTH_OVERRIDE_STATES.has(override.state)) return false;
   if (FeatsHandler.hasFeat(target, 'legendary-sneak')) return true;
-  if (
-    (source === 'manual_action' || source === 'sneak_action') &&
-    FeatsHandler.hasFeat(target, 'very-very-sneaky')
-  ) {
-    return true;
-  }
+
   return false;
 }
 

@@ -15,13 +15,7 @@ const STEALTH_POSITION_BYPASS_DETAILS = {
     icon: 'fas fa-user-ninja',
     tooltip:
       "You're always sneaking unless you choose to be seen, even when there's nowhere to hide. You can Hide and Sneak even without cover or being Concealed. When you employ an exploration tactic other than Avoiding Notice, you also gain the benefits of Avoiding Notice unless you choose not to.",
-  },
-  'very-very-sneaky': {
-    slug: 'very-very-sneaky',
-    label: 'Very, Very Sneaky',
-    icon: 'fas fa-user-ninja',
-    tooltip: 'Very, Very Sneaky removes the cover or concealment requirement for Sneak.',
-  },
+  }
 };
 
 function getStealthPositionBypassContext(target, override = {}) {
@@ -31,12 +25,7 @@ function getStealthPositionBypassContext(target, override = {}) {
   if (FeatsHandler.hasFeat(target, 'legendary-sneak')) {
     return STEALTH_POSITION_BYPASS_DETAILS['legendary-sneak'];
   }
-  if (
-    (source === 'manual_action' || source === 'sneak_action') &&
-    FeatsHandler.hasFeat(target, 'very-very-sneaky')
-  ) {
-    return STEALTH_POSITION_BYPASS_DETAILS['very-very-sneaky'];
-  }
+
   return null;
 }
 
