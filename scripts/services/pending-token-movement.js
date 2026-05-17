@@ -5,6 +5,8 @@ const PENDING_MOVEMENT_RENDER_LOCK_GRACE_MS = 1000;
 const PENDING_MOVEMENT_ANIMATION_DETECTION_DELAY_MS = 50;
 const PENDING_MOVEMENT_ANIMATION_DETECTION_SETTLE_MS = 250;
 const PENDING_MOVEMENT_POST_COMPLETION_REFRESH_DELAYS_MS = [100, 300, 700, 1200];
+const PENDING_MOVEMENT_MAX_ROUTE_POINTS = 96;
+const PENDING_MOVEMENT_MAX_ACTIVE_ROUTE_POINTS = 256;
 const HIDDEN_FROM_OBSERVER_STATES = new Set(['concealed', 'hidden', 'undetected', 'unnoticed']);
 const RENDER_HIDDEN_FROM_OBSERVER_STATES = new Set(['hidden', 'undetected', 'unnoticed']);
 const NPC_RENDER_VISIBLE_STATES = new Set(['hidden']);
@@ -200,27 +202,76 @@ function buildPendingMovementRoutePositions(tokenDoc, changes = {}, options = {}
 }
 
 function sampleMovementRoutePoints(tokenDoc, routePositions) {
-  const routePoints = [];
   const gridSize = Math.max(1, Number(canvas?.grid?.size ?? 50));
   const sampleDistance = Math.max(1, gridSize / 2);
   const maxSamplesPerSegment = 32;
   const centers = routePositions.map((position) => centerForToken(tokenDoc, position)).filter(Boolean);
+  if (centers.length <= 1) return centers;
 
-  for (let i = 0; i < centers.length; i += 1) {
+  const segmentLengths = [];
+  let uncappedPointCount = 1;
+  let totalDistance = 0;
+  for (let i = 0; i < centers.length - 1; i += 1) {
     const start = centers[i];
     const end = centers[i + 1];
-    if (!end) {
-      routePoints.push(start);
-      continue;
-    }
-
     const distance = Math.hypot(end.x - start.x, end.y - start.y);
+    segmentLengths.push(distance);
     const steps = Math.max(
       1,
       Math.min(maxSamplesPerSegment, Math.ceil(distance / sampleDistance)),
     );
-    for (let step = 0; step < steps; step += 1) {
-      const t = step / steps;
+    uncappedPointCount += steps;
+    totalDistance += distance;
+  }
+
+  if (uncappedPointCount <= PENDING_MOVEMENT_MAX_ROUTE_POINTS || totalDistance <= 0) {
+    const routePoints = [];
+    for (let i = 0; i < centers.length; i += 1) {
+      const start = centers[i];
+      const end = centers[i + 1];
+      if (!end) {
+        routePoints.push(start);
+        continue;
+      }
+
+      const distance = segmentLengths[i];
+      const steps = Math.max(
+        1,
+        Math.min(maxSamplesPerSegment, Math.ceil(distance / sampleDistance)),
+      );
+      for (let step = 0; step < steps; step += 1) {
+        const t = step / steps;
+        routePoints.push({
+          x: start.x + (end.x - start.x) * t,
+          y: start.y + (end.y - start.y) * t,
+        });
+      }
+    }
+
+    return routePoints;
+  }
+
+  const routePoints = [];
+  let segmentIndex = 0;
+  let segmentStartDistance = 0;
+  for (let sampleIndex = 0; sampleIndex < PENDING_MOVEMENT_MAX_ROUTE_POINTS; sampleIndex += 1) {
+    const distanceAlongRoute =
+      (totalDistance * sampleIndex) / (PENDING_MOVEMENT_MAX_ROUTE_POINTS - 1);
+    while (
+      segmentIndex < segmentLengths.length - 1 &&
+      distanceAlongRoute > segmentStartDistance + segmentLengths[segmentIndex]
+    ) {
+      segmentStartDistance += segmentLengths[segmentIndex];
+      segmentIndex += 1;
+    }
+
+    const start = centers[segmentIndex];
+    const end = centers[segmentIndex + 1] ?? start;
+    const segmentLength = segmentLengths[segmentIndex] || 0;
+    if (segmentLength <= 0) {
+      routePoints.push(start);
+    } else {
+      const t = (distanceAlongRoute - segmentStartDistance) / segmentLength;
       routePoints.push({
         x: start.x + (end.x - start.x) * t,
         y: start.y + (end.y - start.y) * t,
@@ -231,12 +282,97 @@ function sampleMovementRoutePoints(tokenDoc, routePositions) {
   return routePoints;
 }
 
+function downsampleRoutePoints(routePoints, budget) {
+  if (!routePoints?.length || budget <= 0) return [];
+  if (routePoints.length <= budget) return routePoints;
+  if (budget === 1) return [routePoints[0]];
+
+  const sampled = [];
+  let lastIndex = -1;
+  for (let index = 0; index < budget; index += 1) {
+    const sourceIndex = Math.round(((routePoints.length - 1) * index) / (budget - 1));
+    if (sourceIndex === lastIndex) continue;
+    sampled.push(routePoints[sourceIndex]);
+    lastIndex = sourceIndex;
+  }
+
+  return sampled;
+}
+
+function rebalancePendingMovementRoutePointBudgets() {
+  const entries = [...pendingTokenMovementPositions.values()].filter(
+    (entry) => entry?.routePoints?.length,
+  );
+  const totalRoutePoints = entries.reduce(
+    (total, entry) => total + entry.routePoints.length,
+    0,
+  );
+
+  if (totalRoutePoints <= PENDING_MOVEMENT_MAX_ACTIVE_ROUTE_POINTS) {
+    for (const entry of entries) {
+      entry.budgetedRoutePoints = entry.routePoints;
+    }
+    return;
+  }
+
+  const budgets = new Map(entries.map((entry) => [entry, 0]));
+  let remainingBudget = PENDING_MOVEMENT_MAX_ACTIVE_ROUTE_POINTS;
+
+  for (const entry of entries) {
+    if (remainingBudget <= 0) break;
+    budgets.set(entry, 1);
+    remainingBudget -= 1;
+  }
+
+  for (const entry of entries) {
+    if (remainingBudget <= 0) break;
+    if (entry.routePoints.length <= 1 || budgets.get(entry) < 1) continue;
+    budgets.set(entry, budgets.get(entry) + 1);
+    remainingBudget -= 1;
+  }
+
+  const weightedEntries = entries
+    .map((entry) => ({
+      entry,
+      weight: Math.max(0, entry.routePoints.length - budgets.get(entry)),
+      fraction: 0,
+    }))
+    .filter(({ weight }) => weight > 0);
+  const totalWeight = weightedEntries.reduce((total, { weight }) => total + weight, 0);
+  if (remainingBudget > 0 && totalWeight > 0) {
+    for (const weightedEntry of weightedEntries) {
+      const exactShare = (remainingBudget * weightedEntry.weight) / totalWeight;
+      const share = Math.floor(exactShare);
+      budgets.set(weightedEntry.entry, budgets.get(weightedEntry.entry) + share);
+      weightedEntry.fraction = exactShare - share;
+    }
+
+    let unassignedBudget =
+      PENDING_MOVEMENT_MAX_ACTIVE_ROUTE_POINTS -
+      [...budgets.values()].reduce((total, budget) => total + budget, 0);
+    weightedEntries.sort((a, b) => b.fraction - a.fraction);
+    for (const { entry } of weightedEntries) {
+      if (unassignedBudget <= 0) break;
+      if (budgets.get(entry) >= entry.routePoints.length) continue;
+      budgets.set(entry, budgets.get(entry) + 1);
+      unassignedBudget -= 1;
+    }
+  }
+
+  for (const entry of entries) {
+    entry.budgetedRoutePoints = downsampleRoutePoints(entry.routePoints, budgets.get(entry));
+  }
+}
+
 function cleanupExpiredPendingMovements(now = Date.now()) {
+  let removedExpiredMovement = false;
   for (const [tokenId, entry] of pendingTokenMovementPositions.entries()) {
     if (!entry || entry.expiresAt <= now) {
       pendingTokenMovementPositions.delete(tokenId);
+      removedExpiredMovement = true;
     }
   }
+  if (removedExpiredMovement) rebalancePendingMovementRoutePointBudgets();
 }
 
 function hasActivePendingMovementForObserver(observerId) {
@@ -432,8 +568,10 @@ function getPendingMovementBlockContext(observer, target) {
 
   const originPoint = centerForToken(observer, pendingPosition || null);
   const originPoints =
-    pendingMovementEntry?.routePoints?.length
-      ? pendingMovementEntry.routePoints
+    pendingMovementEntry?.budgetedRoutePoints?.length
+      ? pendingMovementEntry.budgetedRoutePoints
+      : pendingMovementEntry?.routePoints?.length
+        ? pendingMovementEntry.routePoints
       : [originPoint].filter(Boolean);
   const targetPoint = centerForToken(target);
   const wallBlocked = originPoints.some((point) => lineOfSightBlockedByWall(point, targetPoint));
@@ -958,6 +1096,7 @@ export function clearPendingTokenMovementPosition(tokenId) {
     clearTimeout(entry.timeoutId);
   }
   pendingTokenMovementPositions.delete(tokenId);
+  rebalancePendingMovementRoutePointBudgets();
 }
 
 export function setPendingTokenMovementPosition(
@@ -993,10 +1132,12 @@ export function setPendingTokenMovementPosition(
     position,
     routePositions,
     routePoints,
+    budgetedRoutePoints: routePoints,
     serial,
     expiresAt: Date.now() + PENDING_MOVEMENT_TTL_MS,
     timeoutId,
   });
+  rebalancePendingMovementRoutePointBudgets();
 
   return true;
 }
@@ -1280,12 +1421,16 @@ export function refreshPendingMovementTokenVisibility(
   for (const token of tokens) {
     if (ids.has(tokenIdOf(token))) continue;
     try {
-      if (shouldTemporarilyForceTokenInvisible(token, { hasDetectionWork })) {
+      const shouldForceInvisible = shouldTemporarilyForceTokenInvisible(token, { hasDetectionWork });
+      token?.refresh?.();
+      if (shouldForceInvisible) {
         forcePendingMovementTokenInvisible(token);
       } else {
-        restorePendingMovementTokenRendering(token, { ignoreObservedGrace });
+        const restored = restorePendingMovementTokenRendering(token, { ignoreObservedGrace });
+        if (!restored && token?.[PENDING_MOVEMENT_RENDER_STATE_KEY]) {
+          forcePendingMovementTokenInvisible(token);
+        }
       }
-      token?.refresh?.();
     } catch {
       /* best-effort visual refresh */
     }

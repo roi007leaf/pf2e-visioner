@@ -81,6 +81,89 @@ describe('pending token movement hidden detection guard', () => {
     expect(shouldTemporarilyBlockHiddenDetection(observer, target, 'hidden')).toBe(true);
   });
 
+  test('caps route point checks for long waypoint movement', () => {
+    let sightReads = 0;
+    global.canvas.walls.placeables = [
+      {
+        document: {
+          id: 'far-wall',
+          c: [10000, 0, 10000, 100],
+          get sight() {
+            sightReads += 1;
+            return 1;
+          },
+          door: 0,
+          ds: 0,
+        },
+      },
+    ];
+    const observer = createMockToken({ id: 'observer', x: 0, y: 5 });
+    const target = createMockToken({ id: 'target', x: 0, y: 0 });
+    const waypoints = Array.from({ length: 120 }, (_, index) => ({
+      x: (index + 1) * 50,
+      y: 250,
+    }));
+
+    setPendingTokenMovementPosition(
+      observer.document,
+      { x: 6100, y: 250 },
+      [observer],
+      { waypoints },
+    );
+
+    expect(shouldTemporarilyBlockHiddenDetection(observer, target, 'hidden')).toBe(false);
+    expect(sightReads).toBeLessThanOrEqual(96);
+  });
+
+  test('caps total route point checks across simultaneous movement', () => {
+    let sightReads = 0;
+    global.canvas.walls.placeables = [
+      {
+        document: {
+          id: 'far-wall',
+          c: [10000, 0, 10000, 100],
+          get sight() {
+            sightReads += 1;
+            return 1;
+          },
+          door: 0,
+          ds: 0,
+        },
+      },
+    ];
+    const target = createMockToken({ id: 'target', x: 0, y: 0 });
+    const observers = Array.from({ length: 4 }, (_, index) =>
+      createMockToken({ id: `observer-${index}`, x: 0, y: index + 5 }),
+    );
+    const waypoints = Array.from({ length: 120 }, (_, index) => ({
+      x: (index + 1) * 50,
+      y: 250,
+    }));
+
+    try {
+      for (const observer of observers) {
+        setPendingTokenMovementPosition(
+          observer.document,
+          { x: 6100, y: observer.document.y * 50 },
+          [observer],
+          { waypoints },
+        );
+      }
+
+      expect(
+        getPendingMovementBlockedDetectionSources(target, {
+          visionSources: observers.map((observer) => ({ active: true, object: observer })),
+          lightSources: [],
+        }),
+      ).toEqual([]);
+      expect(sightReads).toBeLessThanOrEqual(256);
+    } finally {
+      for (const observer of observers) {
+        clearPendingTokenMovementPosition(observer.id);
+      }
+    }
+  });
+
   test('guards hidden detection for a controlled token drag preview source', () => {
     const original = createMockToken({ id: 'observer', x: 3, y: 3 });
     const preview = {
@@ -783,6 +866,50 @@ describe('pending token movement hidden detection guard', () => {
     expect(target.nameplate.visible).toBe(false);
 
     expect(restorePendingMovementTokenRendering(target)).toBe(false);
+    expect(target.renderable).toBe(false);
+    expect(target.mesh.renderable).toBe(false);
+    expect(target.mesh.alpha).toBe(0);
+    expect(target.nameplate.visible).toBe(false);
+  });
+
+  test('keeps undetected token hidden when token refresh redraws it visible', () => {
+    global.canvas.walls.placeables = [];
+    const observer = createMockToken({
+      id: 'observer',
+      flags: {
+        'pf2e-visioner': {
+          visibility: {
+            target: 'undetected',
+          },
+        },
+      },
+    });
+    const target = createMockToken({ id: 'target', actorType: 'npc', visible: true });
+    target.renderable = true;
+    target.mesh = { visible: true, renderable: true, alpha: 1 };
+    target.nameplate = { visible: true };
+    target.refresh = jest.fn(() => {
+      target.visible = true;
+      target.renderable = true;
+      target.mesh.visible = true;
+      target.mesh.renderable = true;
+      target.mesh.alpha = 1;
+      target.nameplate.visible = true;
+    });
+    global.canvas = {
+      ...global.canvas,
+      tokens: {
+        get: jest.fn((id) => (id === 'observer' ? observer : null)),
+        placeables: [observer, target],
+      },
+      perception: {
+        update: jest.fn(),
+      },
+    };
+
+    setPendingTokenMovementPosition(observer.document, { x: 0, y: 0 }, [observer]);
+    refreshPendingMovementTokenVisibility('observer');
+
     expect(target.renderable).toBe(false);
     expect(target.mesh.renderable).toBe(false);
     expect(target.mesh.alpha).toBe(0);
