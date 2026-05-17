@@ -6,7 +6,6 @@ import { MODULE_ID } from '../constants.js';
 import { AutoCoverHooks } from '../cover/auto-cover/AutoCoverHooks.js';
 import { registerSnipingDuoDamageBonusHooks } from '../feats/sniping-duo-damage-bonus.js';
 import { onHighlightObjects } from '../services/HoverTooltips.js';
-import { getLogger } from '../utils/logger.js';
 import { registerChatHooks } from './chat.js';
 import { registerCombatHooks } from './combat.js';
 import { onCanvasReady, onReady } from './lifecycle.js';
@@ -15,6 +14,12 @@ import { registerTokenHooks } from './token-events.js';
 import { registerUIHooks } from './ui.js';
 import { cleanupDeletedVisionerRuleElements } from '../rule-elements/deleted-item-cleanup.js';
 import { registerPf2eHudTakeCoverIntegration } from '../integrations/pf2e-hud-take-cover.js';
+import {
+  hasPendingMovementRenderWork,
+  refreshPendingMovementTokenVisibility,
+  schedulePendingTokenMovementCompletion,
+  setPendingTokenMovementPosition,
+} from '../services/pending-token-movement.js';
 
 /**
  * Clean up AVS overrides for a defeated actor
@@ -34,6 +39,12 @@ async function cleanupAvsOverridesForDefeatedActor(actor) {
       await import('../chat/services/infra/AvsOverrideManager.js');
 
     for (const token of tokens) {
+      try {
+        const { requestTakeCoverExpirationForToken } = await import(
+          '../chat/services/take-cover-expiration-service.js'
+        );
+        await requestTakeCoverExpirationForToken(token, 'unconscious');
+      } catch {}
       await AvsOverrideManager.removeAllOverridesInvolving(token.document.id);
     }
 
@@ -692,6 +703,10 @@ export async function registerHooks() {
         }
       }
 
+      if (setPendingTokenMovementPosition(tokenDoc, changes, canvas?.tokens?.controlled || [])) {
+        refreshPendingMovementTokenVisibility(tokenDoc.id);
+      }
+
       // Clear established invisible states when invisible creatures move (async, fire and forget)
       // This allows them to be re-detected through sound/movement
       const token = tokenDoc.object;
@@ -715,16 +730,12 @@ export async function registerHooks() {
   });
 
   Hooks.on('updateToken', async (tokenDoc, changes, options, userId) => {
-    const log = getLogger('AVS/Hooks');
-    log.debug(() => ({
-      msg: 'updateToken (registration.js) fired',
-      tokenName: tokenDoc?.name,
-      tokenId: tokenDoc?.id,
-      changes,
-      stack: new Error().stack,
-    }));
     try {
       if (!('x' in changes || 'y' in changes)) return;
+
+      try {
+        schedulePendingTokenMovementCompletion(tokenDoc);
+      } catch {}
 
       const controlledTokens = canvas?.tokens?.controlled || [];
       if (controlledTokens.length === 0) return;
@@ -749,18 +760,9 @@ export async function registerHooks() {
   });
 
   Hooks.on('refreshToken', async (token) => {
-    const log = getLogger('AVS/Hooks');
-    log.debug(() => ({
-      msg: 'refreshToken fired',
-      tokenName: token?.name,
-      tokenId: token?.id,
-      stack: new Error().stack,
-    }));
-
     // Skip processing if we're in the middle of ephemeral effect sync
     // This prevents feedback loops where effect updates trigger refreshToken → lightingRefresh → new batch
     if (globalThis.game?.pf2eVisioner?.suppressRefreshTokenProcessing) {
-      log.debug?.('refreshToken: skipping processing during ephemeral effect sync');
       return;
     }
 
@@ -776,6 +778,14 @@ export async function registerHooks() {
     } catch (error) {
       console.warn('PF2E Visioner | refreshToken hook for lifesense indicators failed:', error);
     }
+  });
+
+  Hooks.on('pf2eVisionerAvsBatchComplete', () => {
+    try {
+      if (hasPendingMovementRenderWork()) {
+        refreshPendingMovementTokenVisibility([], { ignoreObservedGrace: true });
+      }
+    } catch {}
   });
 
   // Removed createToken hook - was causing excessive updateWallVisuals calls on token creation.

@@ -317,8 +317,8 @@ describe('Wall Coverage Fixes Integration Tests', () => {
 
       const result = coverDetector._evaluateWallsCover(attackerPos, targetPos);
 
-      // With improved calculation, should get more predictable results
-      // The exact result depends on how many sample points intersect
+      // The exact result depends on how many sample points intersect, but walls
+      // below the standard threshold must not grant lesser cover.
       expect(['none', 'standard'].includes(result)).toBe(true);
     });
 

@@ -290,6 +290,23 @@ export async function previewActionResults(actionData) {
         return;
       }
       case 'take-cover': {
+        if (!game.user?.isGM) {
+          const actorToken = actionData.actorToken || actionData.actor;
+          const messageId = actionData.message?.id || actionData.messageId || null;
+          const { requestGMOpenTakeCover } = await import('../../../services/socket.js');
+          requestGMOpenTakeCover(actorToken?.id, messageId);
+          return;
+        }
+
+        const {
+          notifyTakeCoverAlreadyActive,
+          tokenHasActiveTakeCoverState,
+        } = await import('../take-cover-expiration-service.js');
+        const actorToken = actionData.actorToken || actionData.actor;
+        if (tokenHasActiveTakeCoverState(actorToken)) {
+          notifyTakeCoverAlreadyActive(actorToken);
+          return;
+        }
         const { TakeCoverActionHandler } = await import('../actions/TakeCoverAction.js');
         const { TakeCoverPreviewDialog } = await import(
           '../../dialogs/TakeCoverPreviewDialog.js'

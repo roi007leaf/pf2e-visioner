@@ -122,6 +122,229 @@ describe('CoverDetector', () => {
       expect(['none', 'lesser', 'standard', 'greater']).toContain(result);
     });
 
+    test.each(['tactical', 'length10'])(
+      'should apply token cover override only from blockers that actually block the pair in %s mode',
+      (intersectionMode) => {
+      const attacker = global.createMockToken({
+        id: 'attacker',
+        x: 0,
+        y: 0,
+        width: 1,
+        height: 1,
+        center: { x: 25, y: 25 },
+      });
+      const target = global.createMockToken({
+        id: 'target',
+        x: 200,
+        y: 0,
+        width: 1,
+        height: 1,
+        center: { x: 225, y: 25 },
+      });
+      const unrelatedStandardBlocker = global.createMockToken({
+        id: 'unrelated-standard-blocker',
+        x: 100,
+        y: 200,
+        width: 1,
+        height: 1,
+        center: { x: 125, y: 225 },
+        flags: { 'pf2e-visioner': { coverOverride: 'standard' } },
+      });
+      const actualLesserBlocker = global.createMockToken({
+        id: 'actual-lesser-blocker',
+        x: 100,
+        y: 0,
+        width: 1,
+        height: 1,
+        center: { x: 125, y: 25 },
+        flags: { 'pf2e-visioner': { coverOverride: 'lesser' } },
+      });
+
+      global.canvas.walls.placeables = [];
+      global.canvas.tokens.placeables = [
+        attacker,
+        target,
+        unrelatedStandardBlocker,
+        actualLesserBlocker,
+      ];
+      global.canvas.tokens.controlled = [];
+      const originalGetSetting = global.game.settings.get;
+      global.game.settings.get = jest.fn((_moduleId, setting) => {
+        if (setting === 'autoCoverTokenIntersectionMode') return intersectionMode;
+        if (setting === 'autoCoverAllowProneBlockers') return true;
+        if (setting === 'wallCoverAllowGreater') return true;
+        return false;
+      });
+
+      let result;
+      try {
+        result = coverDetector.detectBetweenTokens(attacker, target);
+      } finally {
+        global.game.settings.get = originalGetSetting;
+      }
+
+      expect(result).toBe('lesser');
+      },
+    );
+
+    test('should merge per-call filter overrides into blocker filtering', () => {
+      const attacker = global.createMockToken({
+        id: 'attacker',
+        x: 0,
+        y: 0,
+        width: 1,
+        height: 1,
+        center: { x: 25, y: 25 },
+      });
+      const target = global.createMockToken({
+        id: 'target',
+        x: 200,
+        y: 0,
+        width: 1,
+        height: 1,
+        center: { x: 225, y: 25 },
+      });
+      const deadBlocker = global.createMockToken({
+        id: 'dead-blocker',
+        x: 100,
+        y: 0,
+        width: 1,
+        height: 1,
+        center: { x: 125, y: 25 },
+        actor: {
+          id: 'dead-actor',
+          type: 'npc',
+          alliance: 'hostile',
+          hitPoints: { value: 0 },
+          system: {
+            traits: { size: { value: 'med' } },
+            attributes: { perception: { value: 10 } },
+          },
+        },
+      });
+
+      global.canvas.walls.placeables = [];
+      global.canvas.tokens.placeables = [attacker, target, deadBlocker];
+      global.canvas.tokens.controlled = [];
+
+      const baseline = coverDetector.detectBetweenTokens(attacker, target);
+      const filtered = coverDetector.detectBetweenTokens(attacker, target, {
+        filterOverrides: { ignoreDead: true },
+      });
+
+      expect(baseline).not.toBe('none');
+      expect(filtered).toBe('none');
+    });
+
+    test('should use token grid space even when texture is scaled', () => {
+      const attacker = global.createMockToken({
+        id: 'attacker',
+        x: 0,
+        y: 0,
+        width: 1,
+        height: 1,
+        center: { x: 25, y: 90 },
+      });
+      const target = global.createMockToken({
+        id: 'target',
+        x: 200,
+        y: 0,
+        width: 1,
+        height: 1,
+        center: { x: 225, y: 90 },
+      });
+      const scaledBlocker = global.createMockToken({
+        id: 'scaled-blocker',
+        x: 100,
+        y: 50,
+        width: 1,
+        height: 1,
+        center: { x: 125, y: 75 },
+      });
+      scaledBlocker.document.texture = { scaleX: 0.5, scaleY: 0.5 };
+
+      global.canvas.walls.placeables = [];
+      global.canvas.tokens.placeables = [attacker, target, scaledBlocker];
+      global.canvas.tokens.controlled = [];
+      const originalGetSetting = global.game.settings.get;
+      global.game.settings.get = jest.fn((_moduleId, setting) => {
+        if (setting === 'autoCoverTokenIntersectionMode') return 'length10';
+        if (setting === 'autoCoverAllowProneBlockers') return true;
+        if (setting === 'wallCoverAllowGreater') return true;
+        return false;
+      });
+
+      let result;
+      try {
+        result = coverDetector.detectBetweenTokens(attacker, target);
+      } finally {
+        global.game.settings.get = originalGetSetting;
+      }
+
+      expect(result).toBe('lesser');
+    });
+
+    test('should not grant wall cover for sampled wall coverage below standard threshold', () => {
+      const attacker = global.createMockToken({
+        id: 'attacker',
+        x: 0,
+        y: 0,
+        width: 1,
+        height: 1,
+        center: { x: 25, y: 25 },
+      });
+      const target = global.createMockToken({
+        id: 'target',
+        x: 200,
+        y: 0,
+        width: 1,
+        height: 1,
+        center: { x: 225, y: 25 },
+      });
+
+      global.canvas.tokens.placeables = [attacker, target];
+      global.canvas.tokens.controlled = [];
+      global.canvas.walls.placeables = [
+        {
+          document: {
+            id: 'near-target-wall',
+            sight: 1,
+            door: 0,
+            ds: 0,
+            dir: 0,
+            c: [215, 80, 245, 80],
+            getFlag: jest.fn(() => null),
+          },
+          coords: [215, 80, 245, 80],
+        },
+      ];
+      jest.spyOn(coverDetector, '_analyzeSegmentObstructions').mockReturnValue({
+        hasBlockingTerrain: false,
+        hasCreatures: false,
+        blockingWalls: [],
+        intersectingCreatures: [],
+        totalBlockedLength: 0,
+        segmentLength: 200,
+      });
+      jest.spyOn(coverDetector, '_estimateWallCoveragePercent').mockReturnValue(25);
+      const originalGetSetting = global.game.settings.get;
+      global.game.settings.get = jest.fn((_moduleId, setting) => {
+        if (setting === 'wallCoverStandardThreshold') return 50;
+        if (setting === 'wallCoverGreaterThreshold') return 70;
+        if (setting === 'wallCoverAllowGreater') return true;
+        return false;
+      });
+
+      let result;
+      try {
+        result = coverDetector.detectBetweenTokens(attacker, target);
+      } finally {
+        global.game.settings.get = originalGetSetting;
+      }
+
+      expect(result).toBe('none');
+    });
+
     test('should not grant wall cover for proximity walls when attacker is within threshold', () => {
       sourceToken.center = { x: 40, y: 0 };
       sourceToken.document.x = 40;

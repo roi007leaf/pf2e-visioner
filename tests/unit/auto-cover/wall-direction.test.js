@@ -564,25 +564,31 @@ describe('Wall Direction Checking', () => {
         objects: { children: [mockWall] },
       };
 
-      // Mock the ray blocking method
-      coverDetector._isRayBlockedByWalls = jest
-        .fn()
-        .mockReturnValueOnce(true) // First call: blocking side
-        .mockReturnValueOnce(false); // Second call: non-blocking side
+      jest.spyOn(coverDetector, '_findNearestTokenToPoint').mockReturnValue({ id: 'target' });
+      jest
+        .spyOn(coverDetector, '_estimateWallCoveragePercent')
+        .mockReturnValueOnce(0)
+        .mockReturnValueOnce(60);
+      global.game.settings.get = jest.fn((module, setting) => {
+        if (setting === 'wallCoverStandardThreshold') return 50;
+        if (setting === 'wallCoverGreaterThreshold') return 70;
+        if (setting === 'wallCoverAllowGreater') return true;
+        return false;
+      });
 
-      // Test 1: Attack from left side (should be blocked by LEFT wall)
-      const p1_blocking = { x: 50, y: 50 }; // Below wall (positive cross product)
-      const p2_blocking = { x: 50, y: -50 }; // Above wall
-
-      const result_blocking = coverDetector._evaluateWallsCover(p1_blocking, p2_blocking);
-      expect(result_blocking).toBe('none'); // Should provide cover
-
-      // Test 2: Attack from right side (should not be blocked by LEFT wall)
-      const p1_nonblocking = { x: 50, y: -50 }; // Above wall (negative cross product)
-      const p2_nonblocking = { x: 50, y: 50 }; // Below wall
+      // Test 1: Attack from non-blocking side should not meet wall-cover threshold.
+      const p1_nonblocking = { x: 50, y: 50 };
+      const p2_nonblocking = { x: 50, y: -50 };
 
       const result_nonblocking = coverDetector._evaluateWallsCover(p1_nonblocking, p2_nonblocking);
-      expect(result_nonblocking).toBe('standard'); // Should provide cover
+      expect(result_nonblocking).toBe('none');
+
+      // Test 2: Attack from blocking side should grant standard only when threshold is met.
+      const p1_blocking = { x: 50, y: -50 };
+      const p2_blocking = { x: 50, y: 50 };
+
+      const result_blocking = coverDetector._evaluateWallsCover(p1_blocking, p2_blocking);
+      expect(result_blocking).toBe('standard');
     });
 
     test('should respect wall cover overrides with directional logic', () => {

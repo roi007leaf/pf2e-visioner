@@ -46,7 +46,7 @@ export class RuleElementCoverService {
     }
   }
 
-  static getCoverFromRuleElements(attacker, target) {
+  static getCoverFromRuleElements(attacker, target, options = {}) {
     try {
       if (typeof target?.document?.getFlag !== 'function') {
         return null;
@@ -58,7 +58,21 @@ export class RuleElementCoverService {
         return null;
       }
 
-      const highestPriority = SourceTracker.getHighestPrioritySource(coverSources.sources);
+      const sources = typeof options.ignoreRuleElementCoverSource === 'function'
+        ? coverSources.sources.filter((source) => {
+          try {
+            return !options.ignoreRuleElementCoverSource(source);
+          } catch {
+            return true;
+          }
+        })
+        : coverSources.sources;
+
+      if (!sources.length) {
+        return null;
+      }
+
+      const highestPriority = SourceTracker.getHighestPrioritySource(sources);
       
       if (!highestPriority) {
         return null;

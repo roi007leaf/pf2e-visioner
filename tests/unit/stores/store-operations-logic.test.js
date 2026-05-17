@@ -222,6 +222,36 @@ describe('Store Operations Core Logic', () => {
       );
     });
 
+    test('clearing cover removes existing Take Cover tracking even outside take cover apply', async () => {
+      jest.resetModules();
+
+      const removeTakeCoverTracking = jest.fn().mockResolvedValue(true);
+      jest.doMock('../../../scripts/chat/services/infra/AvsOverrideManager.js', () => ({
+        __esModule: true,
+        default: {
+          removeTakeCoverTracking,
+        },
+      }));
+
+      const { setCoverBetween } = await import('../../../scripts/stores/cover-map.js');
+
+      const observer = createMockToken('observer-token');
+      const target = createMockToken('target-token');
+      observer.document.getFlag.mockImplementation((module, key) => {
+        if (module === global.MODULE_ID && key === 'cover') {
+          return { 'target-token-doc': 'standard' };
+        }
+        return {};
+      });
+
+      await setCoverBetween(observer, target, 'none');
+
+      expect(removeTakeCoverTracking).toHaveBeenCalledWith(
+        'observer-token-doc',
+        'target-token-doc',
+      );
+    });
+
     test('take cover store path writes the real cover-only AVS flag', async () => {
       jest.resetModules();
       jest.unmock('../../../scripts/chat/services/infra/AvsOverrideManager.js');

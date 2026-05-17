@@ -212,11 +212,25 @@ export class ConsequencesActionHandler extends ActionHandlerBase {
     return removed;
   }
 
+  async #expireTakeCoverForAttack(actionData) {
+    try {
+      const attacker = actionData?.actorToken || actionData?.actor;
+      if (!attacker?.actor) return;
+      const { requestTakeCoverExpirationForToken } = await import(
+        '../take-cover-expiration-service.js'
+      );
+      await requestTakeCoverExpirationForToken(attacker, 'attack');
+    } catch (error) {
+      console.warn('PF2E Visioner | Failed to request Take Cover expiration prompt:', error);
+    }
+  }
+
   // APPLY: If AVS enabled -> ONLY remove overrides (do not apply visibility states). If AVS disabled -> legacy behavior.
   async apply(actionData, button) {
     try {
       const avsEnabled = await this.#isAVSEnabled();
       await this.ensurePrerequisites(actionData);
+      await this.#expireTakeCoverForAttack(actionData);
 
       const subjects = await this.discoverSubjects(actionData);
       const attacker = actionData.actor; // use in AVS branch and legacy path (for clarity)

@@ -221,6 +221,16 @@ export class AutoCoverHooks {
       const tokenId = tokenDoc?.id;
       if (!tokenId) return;
 
+      const token = canvas?.tokens?.get?.(tokenId);
+      if (token?.actor) {
+        try {
+          const { requestTakeCoverExpirationForToken } = await import(
+            '../../chat/services/take-cover-expiration-service.js'
+          );
+          await requestTakeCoverExpirationForToken(token, 'movement');
+        } catch {}
+      }
+
       // Clean up cover for token
       await this._cleanupCoverForMovedToken(tokenId);
     } catch (error) {

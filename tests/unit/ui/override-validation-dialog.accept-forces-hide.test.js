@@ -89,4 +89,19 @@ describe('OverrideValidationDialog - accept forces hide', () => {
             currentCover: 'lesser'
         })).toBeUndefined();
     });
+
+    it('should preserve Take Cover tracking when accepting mixed visibility overrides', async () => {
+        const dialog = new OverrideValidationDialog({
+            invalidOverrides: [],
+            tokenName: 'TestToken',
+            movedTokenId: 'moved1'
+        });
+
+        expect(dialog._getAcceptOptions({
+            coverOnly: false,
+            source: 'sneak_action',
+            coverOverrideSource: 'take_cover_action',
+            currentCover: 'none'
+        })).toEqual({ preserveTakeCoverTracking: true });
+    });
 });

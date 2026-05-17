@@ -118,6 +118,212 @@ describe('OverrideValidationSystem - movement validation', () => {
     expect(removeOverride).toHaveBeenCalledWith(observer.id, 'tgt1');
   });
 
+  test('skips Take Cover cover-only validation when the covered token moved', async () => {
+    jest.resetModules();
+
+    const dialogShow = jest.fn().mockResolvedValue({ action: 'clear-all' });
+    const dialogMockModule = () => ({
+      OverrideValidationDialog: {
+        show: dialogShow,
+      },
+    });
+    jest.doMock('../../ui/OverrideValidationDialog.js', dialogMockModule, { virtual: true });
+    jest.doMock('../../../scripts/ui/OverrideValidationDialog.js', dialogMockModule, {
+      virtual: true,
+    });
+
+    const removeOverride = jest.fn().mockResolvedValue(true);
+    const avsMgrMockModule = () => ({ __esModule: true, default: { removeOverride } });
+    jest.doMock('../../chat/services/infra/AvsOverrideManager.js', avsMgrMockModule, {
+      virtual: true,
+    });
+    jest.doMock('../../../scripts/chat/services/infra/AvsOverrideManager.js', avsMgrMockModule, {
+      virtual: true,
+    });
+
+    const { OverrideValidationSystem } = await import(
+      '../../../scripts/visibility/auto-visibility/OverrideValidationSystem.js'
+    );
+
+    const observer = global.createMockToken({ id: 'obs1', name: 'Observer' });
+    const target = global.createMockToken({
+      id: 'tgt1',
+      flags: {
+        'pf2e-visioner': {
+          'avs-override-from-obs1': {
+            state: 'avs',
+            source: 'take_cover_action',
+            coverOnly: true,
+            coverOverrideSource: 'take_cover_action',
+            expectedCover: 'standard',
+            observerName: 'Observer',
+            targetName: 'Target',
+          },
+        },
+      },
+      name: 'Target',
+    });
+
+    global.canvas.tokens.placeables = [observer, target];
+    global.canvas.tokens.get.mockImplementation((id) =>
+      [observer, target].find((t) => t.id === id || t.document?.id === id) || null,
+    );
+
+    const visibilityCalculator = {
+      calculateVisibility: jest.fn(async () => ({ visibility: 'observed', cover: 'none' })),
+    };
+    const ovs = OverrideValidationSystem.getInstance(visibilityCalculator);
+    ovs.enable();
+
+    await ovs.debugValidateToken(target.id);
+
+    expect(visibilityCalculator.calculateVisibility).not.toHaveBeenCalled();
+    expect(dialogShow).not.toHaveBeenCalled();
+    expect(removeOverride).not.toHaveBeenCalled();
+  });
+
+  test('keeps Take Cover-tracked visibility validation when the covered token moved', async () => {
+    jest.resetModules();
+
+    const dialogShow = jest.fn().mockResolvedValue({ action: 'keep' });
+    const dialogMockModule = () => ({
+      OverrideValidationDialog: {
+        show: dialogShow,
+      },
+    });
+    jest.doMock('../../ui/OverrideValidationDialog.js', dialogMockModule, { virtual: true });
+    jest.doMock('../../../scripts/ui/OverrideValidationDialog.js', dialogMockModule, {
+      virtual: true,
+    });
+
+    const removeOverride = jest.fn().mockResolvedValue(true);
+    const avsMgrMockModule = () => ({ __esModule: true, default: { removeOverride } });
+    jest.doMock('../../chat/services/infra/AvsOverrideManager.js', avsMgrMockModule, {
+      virtual: true,
+    });
+    jest.doMock('../../../scripts/chat/services/infra/AvsOverrideManager.js', avsMgrMockModule, {
+      virtual: true,
+    });
+
+    const { OverrideValidationSystem } = await import(
+      '../../../scripts/visibility/auto-visibility/OverrideValidationSystem.js'
+    );
+
+    const observer = global.createMockToken({ id: 'obs1', name: 'Observer' });
+    const target = global.createMockToken({
+      id: 'tgt1',
+      flags: {
+        'pf2e-visioner': {
+          'avs-override-from-obs1': {
+            state: 'hidden',
+            source: 'take_cover_action',
+            coverOnly: false,
+            coverOverrideSource: 'take_cover_action',
+            hasCover: true,
+            hasConcealment: false,
+            expectedCover: 'standard',
+            observerName: 'Observer',
+            targetName: 'Target',
+          },
+        },
+      },
+      name: 'Target',
+    });
+
+    global.canvas.tokens.placeables = [observer, target];
+    global.canvas.tokens.get.mockImplementation((id) =>
+      [observer, target].find((t) => t.id === id || t.document?.id === id) || null,
+    );
+
+    const visibilityCalculator = {
+      calculateVisibility: jest.fn(async () => ({ visibility: 'observed', cover: 'none' })),
+    };
+    const ovs = OverrideValidationSystem.getInstance(visibilityCalculator);
+    ovs.enable();
+
+    await ovs.debugValidateToken(target.id);
+
+    expect(dialogShow).toHaveBeenCalledWith(
+      [
+        expect.objectContaining({
+          observerId: 'obs1',
+          targetId: 'tgt1',
+          state: 'hidden',
+          suppressCoverChange: true,
+        }),
+      ],
+      'Token Movement',
+      null,
+    );
+    expect(removeOverride).not.toHaveBeenCalled();
+  });
+
+  test('accepting Take Cover-tracked visibility validation preserves Take Cover tracking', async () => {
+    jest.resetModules();
+
+    const dialogShow = jest.fn().mockResolvedValue({ action: 'clear-all' });
+    const dialogMockModule = () => ({
+      OverrideValidationDialog: {
+        show: dialogShow,
+      },
+    });
+    jest.doMock('../../ui/OverrideValidationDialog.js', dialogMockModule, { virtual: true });
+    jest.doMock('../../../scripts/ui/OverrideValidationDialog.js', dialogMockModule, {
+      virtual: true,
+    });
+
+    const removeOverride = jest.fn().mockResolvedValue(true);
+    const avsMgrMockModule = () => ({ __esModule: true, default: { removeOverride } });
+    jest.doMock('../../chat/services/infra/AvsOverrideManager.js', avsMgrMockModule, {
+      virtual: true,
+    });
+    jest.doMock('../../../scripts/chat/services/infra/AvsOverrideManager.js', avsMgrMockModule, {
+      virtual: true,
+    });
+
+    const { OverrideValidationSystem } = await import(
+      '../../../scripts/visibility/auto-visibility/OverrideValidationSystem.js'
+    );
+
+    const observer = global.createMockToken({ id: 'obs1', name: 'Observer' });
+    const target = global.createMockToken({
+      id: 'tgt1',
+      flags: {
+        'pf2e-visioner': {
+          'avs-override-from-obs1': {
+            state: 'hidden',
+            source: 'sneak_action',
+            coverOnly: false,
+            coverOverrideSource: 'take_cover_action',
+            hasCover: true,
+            hasConcealment: false,
+            expectedCover: 'standard',
+            observerName: 'Observer',
+            targetName: 'Target',
+          },
+        },
+      },
+      name: 'Target',
+    });
+
+    global.canvas.tokens.placeables = [observer, target];
+    global.canvas.tokens.get.mockImplementation((id) =>
+      [observer, target].find((t) => t.id === id || t.document?.id === id) || null,
+    );
+
+    const visibilityCalculator = {
+      calculateVisibility: jest.fn(async () => ({ visibility: 'observed', cover: 'none' })),
+    };
+    const ovs = OverrideValidationSystem.getInstance(visibilityCalculator);
+    ovs.enable();
+
+    await ovs.debugValidateToken(target.id);
+
+    expect(removeOverride).toHaveBeenCalledWith('obs1', 'tgt1', {
+      preserveTakeCoverTracking: true,
+    });
+  });
+
   test('active timed override is filtered from validation', async () => {
     jest.resetModules();
 

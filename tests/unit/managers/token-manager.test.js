@@ -77,6 +77,26 @@ describe('VisionerTokenManager', () => {
       const nonControlledManager = new VisionerTokenManager(nonControlledObserver);
       expect(nonControlledManager.mode).toBe('observer');
     });
+
+    test('refreshes target-mode manager when visibility change targets the managed token', () => {
+      jest.useFakeTimers();
+      try {
+        manager.render = jest.fn();
+        manager.rendered = true;
+        manager.mode = 'target';
+
+        const visibilityHook = Hooks.on.mock.calls.find(
+          ([event]) => event === 'pf2e-visioner.visibilityChanged',
+        )?.[1];
+
+        visibilityHook?.('npc-observer', observer.id, 'avs');
+        jest.advanceTimersByTime(60);
+
+        expect(manager.render).toHaveBeenCalledWith({ force: true });
+      } finally {
+        jest.useRealTimers();
+      }
+    });
   });
 
   describe('Mode Management', () => {

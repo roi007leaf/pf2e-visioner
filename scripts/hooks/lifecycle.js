@@ -587,6 +587,17 @@ export async function onCanvasReady() {
       const actor = item.parent;
       if (!actor) return;
 
+      const conditionSlug = item.slug || item.system?.slug || item.name?.toLowerCase?.();
+      if (['unconscious', 'dead', 'dying'].includes(conditionSlug) && game.user?.isGM) {
+        const { requestTakeCoverExpirationForToken } = await import(
+          '../chat/services/take-cover-expiration-service.js'
+        );
+        const tokens = canvas?.tokens?.placeables?.filter((token) => token.actor?.id === actor.id) || [];
+        for (const token of tokens) {
+          await requestTakeCoverExpirationForToken(token, 'unconscious');
+        }
+      }
+
       // Trigger perception refresh to recalculate visibility based on new conditions
       if (canvas?.perception) {
         canvas.perception.update({

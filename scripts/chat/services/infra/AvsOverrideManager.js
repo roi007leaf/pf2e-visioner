@@ -17,6 +17,9 @@ function getTokenId(tokenLike) {
 
 function resolveTokenPlaceable(tokenLike) {
   if (!tokenLike) return null;
+  if (typeof tokenLike === 'string') {
+    return globalThis.canvas?.tokens?.get?.(tokenLike) || null;
+  }
   if (tokenLike.document?.id) return tokenLike;
   if (tokenLike.object?.document?.id) return tokenLike.object;
 
@@ -72,6 +75,42 @@ function hasTakeCoverCoverTracking(data) {
     data?.coverOverrideSource === 'take_cover_action' ||
     (data?.source === 'take_cover_action' && data?.expectedCover)
   );
+}
+
+function isRemainingVisibilityOverrideData(flagData) {
+  if (!flagData || flagData.takeCoverExpirationPending === true) return false;
+  if (flagData.coverOnly === true && hasTakeCoverCoverTracking(flagData)) return false;
+  return !!flagData.state && flagData.state !== 'avs';
+}
+
+function willKeepVisibilityAfterTakeCoverRemoval(flagData) {
+  if (!flagData) return false;
+  if (flagData.coverOnly === true) return false;
+  return !!flagData.state && flagData.state !== 'avs';
+}
+
+function hasRemainingVisibilityOverrideInvolving(tokenLike) {
+  const tokenId = getTokenId(tokenLike);
+  if (!tokenId) return false;
+
+  const checkFlags = (token) => {
+    const tokenTargetId = getTokenId(token);
+    const flags = token?.document?.flags?.[MODULE_ID] || {};
+    return Object.entries(flags).some(([flagKey, flagData]) => {
+      if (!flagKey.startsWith('avs-override-from-')) return false;
+      if (!isRemainingVisibilityOverrideData(flagData)) return false;
+      const observerId = flagData?.observerId || flagKey.slice('avs-override-from-'.length);
+      const targetId = flagData?.targetId || tokenTargetId;
+      return observerId === tokenId || targetId === tokenId;
+    });
+  };
+
+  if (checkFlags(tokenLike)) return true;
+  for (const token of globalThis.canvas?.tokens?.placeables || []) {
+    if (checkFlags(token)) return true;
+  }
+
+  return false;
 }
 
 export class AvsOverrideManager {
@@ -315,11 +354,32 @@ export class AvsOverrideManager {
       const flagKey = `avs-override-from-${observerId}`;
       const flagData = targetToken.document.getFlag(MODULE_ID, flagKey);
       if (flagData) {
+        if (
+          options.preserveTakeCoverTracking === true &&
+          hasTakeCoverCoverTracking(flagData) &&
+          flagData.coverOnly !== true
+        ) {
+          await this.#convertToTakeCoverOnlyOverride(observerId, targetId, flagData, targetToken);
+          await this.clearGlobalCaches();
+          await this.#syncPairVisibilityToAvs(observerId, targetId);
+          try {
+            const { eventDrivenVisibilitySystem } = await import(
+              '../../../visibility/auto-visibility/EventDrivenVisibilitySystem.js'
+            );
+            await eventDrivenVisibilitySystem.recalculateForTokens([observerId, targetId]);
+          } catch {}
+          this.#notifyVisibilityControlReleased(observerId, targetId);
+          return true;
+        }
+        const wasVisibilityOverride = !!flagData.state && flagData.state !== 'avs';
         if (hasTakeCoverCoverTracking(flagData)) {
           await this.#clearTakeCoverMapEntry(observerId, targetId, options);
         }
         await targetToken.document.unsetFlag(MODULE_ID, flagKey);
         await this.clearGlobalCaches();
+        if (wasVisibilityOverride) {
+          await this.#syncPairVisibilityToAvs(observerId, targetId);
+        }
         try {
           const { eventDrivenVisibilitySystem } = await import(
             '../../../visibility/auto-visibility/EventDrivenVisibilitySystem.js'
@@ -327,6 +387,9 @@ export class AvsOverrideManager {
           // Recalc both sides to be thorough
           await eventDrivenVisibilitySystem.recalculateForTokens([observerId, targetId]);
         } catch {}
+        if (wasVisibilityOverride) {
+          this.#notifyVisibilityControlReleased(observerId, targetId);
+        }
         return true;
       }
     } catch (error) {
@@ -335,7 +398,70 @@ export class AvsOverrideManager {
     return false;
   }
 
-  static async removeTakeCoverTracking(observerId, targetId) {
+  static async #convertToTakeCoverOnlyOverride(observerId, targetId, flagData, targetToken) {
+    const flagKey = `avs-override-from-${observerId}`;
+    const coverSource = flagData.coverOverrideSource || 'take_cover_action';
+    const expectedCover = flagData.expectedCover;
+    const hasCover =
+      typeof flagData.hasCover === 'boolean'
+        ? flagData.hasCover
+        : expectedCover === 'standard' || expectedCover === 'greater' || expectedCover === 'lesser';
+
+    const nextFlag = {
+      ...flagData,
+      observerId,
+      targetId,
+      state: 'avs',
+      source: coverSource,
+      hasCover,
+      hasConcealment: false,
+      coverOnly: true,
+      coverOverrideSource: coverSource,
+      expectedCover,
+      timestamp: Date.now(),
+    };
+
+    await targetToken.document.setFlag(MODULE_ID, flagKey, nextFlag);
+  }
+
+  static async #syncPairVisibilityToAvs(observerId, targetId) {
+    try {
+      const observer = canvas.tokens?.get(observerId);
+      const target = canvas.tokens?.get(targetId);
+      if (!observer || !target) return false;
+
+      const [{ optimizedVisibilityCalculator }, { setVisibilityBetween }] = await Promise.all([
+        import('../../../visibility/auto-visibility/index.js'),
+        import('../../../stores/visibility-map.js'),
+      ]);
+      const calculate =
+        optimizedVisibilityCalculator?.calculateVisibilityWithoutOverrides ||
+        optimizedVisibilityCalculator?.calculateVisibility;
+      if (typeof calculate !== 'function' || typeof setVisibilityBetween !== 'function') {
+        return false;
+      }
+
+      const result = await calculate.call(optimizedVisibilityCalculator, observer, target);
+      const state = typeof result === 'object' && result?.state ? result.state : result;
+      if (!state) return false;
+
+      await setVisibilityBetween(observer, target, state, {
+        isAutomatic: true,
+        source: 'avs_control_release',
+      });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  static #notifyVisibilityControlReleased(observerId, targetId) {
+    try {
+      Hooks.call('pf2e-visioner.visibilityChanged', observerId, targetId, 'avs');
+    } catch {}
+  }
+
+  static async removeTakeCoverTracking(observerId, targetId, options = {}) {
     try {
       const targetToken = canvas.tokens?.get(targetId);
       if (!targetToken) {
@@ -347,12 +473,16 @@ export class AvsOverrideManager {
         return false;
       }
       if (flagData.coverOnly === true) {
-        return this.removeOverride(observerId, targetId);
+        return this.removeOverride(observerId, targetId, options);
       }
+
+      await this.#clearTakeCoverMapEntry(observerId, targetId, options);
 
       const nextFlag = { ...flagData };
       delete nextFlag.coverOverrideSource;
       delete nextFlag.expectedCover;
+      delete nextFlag.takeCoverExpirationPending;
+      delete nextFlag.takeCoverExpirationReason;
       nextFlag.hasCover = false;
       nextFlag.coverOnly = false;
       nextFlag.timestamp = Date.now();
@@ -361,6 +491,109 @@ export class AvsOverrideManager {
       return true;
     } catch (error) {
       console.warn('PF2E Visioner | Failed to remove Take Cover tracking:', error);
+      return false;
+    }
+  }
+
+  static async markTakeCoverExpirationPending(tokenLike, reason = 'unknown') {
+    try {
+      if (!game.user?.isGM) return false;
+      const targetToken = resolveTokenPlaceable(tokenLike);
+      const targetId = getTokenId(targetToken);
+      if (!targetToken?.document || !targetId) return false;
+
+      const flags = targetToken.document.flags?.[MODULE_ID] || {};
+      const entries = Object.entries(flags).filter(
+        ([flagKey, flagData]) =>
+          flagKey.startsWith('avs-override-from-') && hasTakeCoverCoverTracking(flagData),
+      );
+      if (entries.length === 0) return false;
+
+      for (const [flagKey, flagData] of entries) {
+        const nextFlag = {
+          ...flagData,
+          takeCoverExpirationPending: true,
+          takeCoverExpirationReason: reason,
+          timestamp: Date.now(),
+        };
+        await targetToken.document.setFlag(MODULE_ID, flagKey, nextFlag);
+      }
+      return true;
+    } catch (error) {
+      console.warn('PF2E Visioner | Failed to mark Take Cover expiration pending:', error);
+      return false;
+    }
+  }
+
+  static async expireTakeCoverForToken(tokenLike, reason = 'unknown', options = {}) {
+    try {
+      if (!game.user?.isGM) return false;
+      const targetToken = resolveTokenPlaceable(tokenLike);
+      const targetId = getTokenId(targetToken);
+      if (!targetToken?.document || !targetId) return false;
+
+      const observerIds = new Set();
+      const flags = targetToken.document.flags?.[MODULE_ID] || {};
+      for (const [flagKey, flagData] of Object.entries(flags)) {
+        if (!flagKey.startsWith('avs-override-from-')) continue;
+        if (!hasTakeCoverCoverTracking(flagData)) continue;
+        observerIds.add(flagData?.observerId || flagKey.slice('avs-override-from-'.length));
+      }
+
+      for (const token of canvas.tokens?.placeables || []) {
+        const observerId = getTokenId(token);
+        if (!observerId || observerIds.has(observerId)) continue;
+        const flagData = targetToken.document.getFlag?.(MODULE_ID, `avs-override-from-${observerId}`);
+        if (hasTakeCoverCoverTracking(flagData)) observerIds.add(observerId);
+      }
+
+      if (observerIds.size === 0) return false;
+
+      let removedCount = 0;
+      let shouldQueueVisibilityValidation = false;
+      const tokenIdsToRefresh = new Set([targetId]);
+      for (const observerId of observerIds) {
+        const flagData = targetToken.document.getFlag?.(
+          MODULE_ID,
+          `avs-override-from-${observerId}`,
+        );
+        if (willKeepVisibilityAfterTakeCoverRemoval(flagData)) {
+          shouldQueueVisibilityValidation = true;
+        }
+        const removed = await this.removeTakeCoverTracking(observerId, targetId, {
+          ...options,
+          reason,
+        });
+        if (removed) {
+          removedCount++;
+          tokenIdsToRefresh.add(observerId);
+        }
+      }
+
+      if (removedCount > 0 && options.refresh !== false) {
+        await this.clearGlobalCaches();
+        try {
+          const { eventDrivenVisibilitySystem } = await import(
+            '../../../visibility/auto-visibility/EventDrivenVisibilitySystem.js'
+          );
+          await eventDrivenVisibilitySystem.recalculateForTokens(Array.from(tokenIdsToRefresh));
+        } catch {}
+        try {
+          const { default: indicator } = await import('../../../ui/OverrideValidationIndicator.js');
+          if (
+            shouldQueueVisibilityValidation ||
+            hasRemainingVisibilityOverrideInvolving(targetToken)
+          ) {
+            await this.#queuePostTakeCoverVisibilityValidation(targetId);
+          } else {
+            indicator?.hide?.(true);
+          }
+        } catch {}
+      }
+
+      return removedCount > 0;
+    } catch (error) {
+      console.warn('PF2E Visioner | Failed to expire Take Cover tracking:', error);
       return false;
     }
   }
@@ -381,6 +614,12 @@ export class AvsOverrideManager {
 
             if (overrideData?.observerId === tokenId || overrideData?.targetId === tokenId) {
               try {
+                if (hasTakeCoverCoverTracking(overrideData)) {
+                  const observerId =
+                    overrideData?.observerId || flagKey.slice('avs-override-from-'.length);
+                  const targetId = overrideData?.targetId || token.document?.id || token.id;
+                  await this.#clearTakeCoverMapEntry(observerId, targetId);
+                }
                 await token.document.unsetFlag(MODULE_ID, flagKey);
                 tokensToRecalculate.add(token.id);
               } catch (e) {
@@ -427,12 +666,39 @@ export class AvsOverrideManager {
       const observerToken = canvas.tokens?.get?.(observerId);
       const targetToken = canvas.tokens?.get?.(targetId);
       if (!observerToken || !targetToken) return;
-      const { getCoverBetween, setCoverBetween } = await import('../../../stores/cover-map.js');
+      const { setCoverBetween } = await import('../../../stores/cover-map.js');
       await setCoverBetween(observerToken, targetToken, 'none', {
         skipEphemeralUpdate: false,
+        skipTakeCoverTrackingSync: true,
       });
     } catch (error) {
       console.warn('PF2E Visioner | Failed to clear Take Cover manual cover:', error);
+    }
+  }
+
+  static async #queuePostTakeCoverVisibilityValidation(tokenId) {
+    if (!tokenId) return false;
+    try {
+      const { eventDrivenVisibilitySystem } = await import(
+        '../../../visibility/auto-visibility/EventDrivenVisibilitySystem.js'
+      );
+      const manager = eventDrivenVisibilitySystem?.overrideValidationManager;
+      if (!manager) return false;
+
+      if (typeof manager.queueOverrideValidation === 'function') {
+        manager.queueOverrideValidation(tokenId, { force: true });
+      } else if (typeof manager.queue === 'function') {
+        manager.queue(tokenId, { force: true });
+      } else {
+        return false;
+      }
+
+      if (typeof manager.processQueuedValidations === 'function') {
+        await manager.processQueuedValidations({ skipMovedFilter: true });
+      }
+      return true;
+    } catch {
+      return false;
     }
   }
 
@@ -445,6 +711,13 @@ export class AvsOverrideManager {
         for (const flagKey of Object.keys(flags)) {
           if (flagKey.startsWith('avs-override-from-')) {
             try {
+              const overrideData = flags[flagKey];
+              if (hasTakeCoverCoverTracking(overrideData)) {
+                const observerId =
+                  overrideData?.observerId || flagKey.slice('avs-override-from-'.length);
+                const targetId = overrideData?.targetId || token.document?.id || token.id;
+                await this.#clearTakeCoverMapEntry(observerId, targetId);
+              }
               await token.document.unsetFlag(MODULE_ID, flagKey);
             } catch {}
           }

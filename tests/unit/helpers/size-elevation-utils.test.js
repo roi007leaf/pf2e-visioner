@@ -1,6 +1,7 @@
 import { describe, test, expect, beforeEach, jest } from '@jest/globals';
 import {
   getTokenHeightFt,
+  getTokenRect,
   getTokenVerticalSpanFt,
   parseFeet,
 } from '../../../scripts/helpers/size-elevation-utils.js';
@@ -371,6 +372,28 @@ describe('Size and Elevation Utils', () => {
 
       const span = getTokenVerticalSpanFt(token);
       expect(span).toEqual({ bottom: 0, top: 5 });
+    });
+  });
+
+  describe('getTokenRect', () => {
+    test('uses token grid space, ignoring texture scale', () => {
+      global.canvas = { grid: { size: 50 } };
+      const token = {
+        document: {
+          x: 100,
+          y: 200,
+          width: 2,
+          height: 1,
+          texture: { scaleX: 0.5, scaleY: 0.25 },
+        },
+      };
+
+      expect(getTokenRect(token)).toEqual({
+        x1: 100,
+        y1: 200,
+        x2: 200,
+        y2: 250,
+      });
     });
   });
 });

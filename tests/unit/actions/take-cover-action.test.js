@@ -33,6 +33,7 @@ describe('Take Cover Action Comprehensive Tests', () => {
       jest.doMock('../../../scripts/utils.js', () => ({
         __esModule: true,
         setCoverBetween,
+        setVisibilityBetween: jest.fn(),
       }));
       jest.doMock('../../../scripts/cover/batch.js', () => ({
         __esModule: true,
@@ -64,6 +65,129 @@ describe('Take Cover Action Comprehensive Tests', () => {
         target,
         'standard',
         expect.objectContaining({ takeCover: true }),
+      );
+    });
+
+    test('does not apply Take Cover again while the target already has active Take Cover', async () => {
+      jest.resetModules();
+
+      const setCoverBetween = jest.fn().mockResolvedValue(true);
+      const applyTakeCoverProneRangedOnlyEffect = jest.fn().mockResolvedValue(true);
+
+      jest.doMock('../../../scripts/utils.js', () => ({
+        __esModule: true,
+        setCoverBetween,
+        setVisibilityBetween: jest.fn(),
+      }));
+      jest.doMock('../../../scripts/cover/batch.js', () => ({
+        __esModule: true,
+        applyTakeCoverProneRangedOnlyEffect,
+      }));
+
+      const { TakeCoverActionHandler } = await import(
+        '../../../scripts/chat/services/actions/TakeCoverAction.js'
+      );
+      const handler = new TakeCoverActionHandler();
+      const observer = global.createMockToken({ id: 'observer' });
+      const target = global.createMockToken({
+        id: 'target',
+        actor: { itemTypes: { effect: [] } },
+        flags: {
+          'pf2e-visioner': {
+            'avs-override-from-existing-observer': {
+              source: 'take_cover_action',
+              coverOverrideSource: 'take_cover_action',
+              coverOnly: true,
+              expectedCover: 'standard',
+            },
+          },
+        },
+      });
+
+      await handler.applyChangesInternal([
+        {
+          observer,
+          target,
+          newCover: 'greater',
+          oldCover: 'standard',
+          takeCoverProneRangedOnly: false,
+        },
+      ]);
+
+      expect(setCoverBetween).not.toHaveBeenCalled();
+      expect(ui.notifications.warn).toHaveBeenCalledWith(
+        expect.stringContaining('already has Take Cover'),
+      );
+    });
+
+    test('does not run the apply flow when the actor already has active Take Cover', async () => {
+      const { TakeCoverActionHandler } = await import(
+        '../../../scripts/chat/services/actions/TakeCoverAction.js'
+      );
+      const handler = new TakeCoverActionHandler();
+      handler.discoverSubjects = jest.fn();
+      const actor = global.createMockToken({
+        id: 'target',
+        actor: { itemTypes: { effect: [] } },
+        flags: {
+          'pf2e-visioner': {
+            'avs-override-from-existing-observer': {
+              source: 'take_cover_action',
+              coverOverrideSource: 'take_cover_action',
+              coverOnly: true,
+              expectedCover: 'standard',
+            },
+          },
+        },
+      });
+
+      const result = await handler.apply({ actor }, null);
+
+      expect(result).toBe(0);
+      expect(handler.discoverSubjects).not.toHaveBeenCalled();
+      expect(ui.notifications.warn).toHaveBeenCalledWith(
+        expect.stringContaining('already has Take Cover'),
+      );
+    });
+
+    test('does not direct-apply prone Take Cover when already active', async () => {
+      jest.resetModules();
+
+      const applyTakeCoverProneRangedOnlyEffect = jest.fn().mockResolvedValue(true);
+      jest.doMock('../../../scripts/cover/batch.js', () => ({
+        __esModule: true,
+        applyTakeCoverProneRangedOnlyEffect,
+      }));
+
+      const { TakeCoverActionHandler } = await import(
+        '../../../scripts/chat/services/actions/TakeCoverAction.js'
+      );
+      const handler = new TakeCoverActionHandler();
+      const actor = global.createMockToken({
+        id: 'target',
+        isProne: true,
+        actor: { itemTypes: { effect: [] } },
+        flags: {
+          'pf2e-visioner': {
+            'avs-override-from-existing-observer': {
+              source: 'take_cover_action',
+              coverOverrideSource: 'take_cover_action',
+              coverOnly: true,
+              expectedCover: 'standard',
+            },
+          },
+        },
+      });
+
+      const result = await handler.applyOutcomesDirectly(
+        { actor },
+        [{ target: global.createMockToken({ id: 'observer' }), changed: true, takeCoverProneRangedOnly: true }],
+      );
+
+      expect(result).toBe(0);
+      expect(applyTakeCoverProneRangedOnlyEffect).not.toHaveBeenCalled();
+      expect(ui.notifications.warn).toHaveBeenCalledWith(
+        expect.stringContaining('already has Take Cover'),
       );
     });
   });

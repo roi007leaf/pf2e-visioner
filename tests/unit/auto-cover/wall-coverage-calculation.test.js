@@ -533,9 +533,7 @@ describe('Wall Coverage Percentage Calculation', () => {
       const attackerPos = { x: 0, y: 0 };
       const targetPos = { x: 250, y: 250 };
 
-      // Test different percentage values
-      // Measured wall coverage follows thresholds. If sampling cannot measure coverage
-      // at all, _evaluateWallsCover still falls back to standard for a detected wall.
+      // Test different percentage values. Measured wall coverage follows thresholds exactly.
       const testCases = [
         { percentage: 30, expectedCover: 'none' }, // Below standard threshold
         { percentage: 50, expectedCover: 'standard' }, // Above standard, below greater

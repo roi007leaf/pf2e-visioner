@@ -92,7 +92,6 @@ export class BatchOrchestrator {
         msg: 'movement:start',
         wasMoving: this._isTokenMoving,
         pendingTokens: this._pendingTokens.size,
-        stack: new Error().stack?.split('\n').slice(1, 4).join('\n'),
       }));
     } catch {}
     // Start a new movement session if not already moving

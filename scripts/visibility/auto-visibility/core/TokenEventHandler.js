@@ -2,6 +2,31 @@ import { MODULE_ID } from '../../../constants.js';
 import { updateWallVisualsForEveryone } from '../../../services/socket.js';
 import { updateWallVisuals } from '../../../services/visual-effects.js';
 import { LightingPrecomputer } from './LightingPrecomputer.js';
+
+function hasTakeCoverTrackingFlag(flagData) {
+  return (
+    flagData?.coverOnly === true ||
+    flagData?.coverOverrideSource === 'take_cover_action' ||
+    (flagData?.source === 'take_cover_action' && flagData?.expectedCover)
+  );
+}
+
+function tokenHasTakeCoverExpirationState(tokenLike) {
+  try {
+    const token = tokenLike?.object || tokenLike;
+    const flags = token?.document?.flags?.[MODULE_ID] || token?.flags?.[MODULE_ID] || {};
+    if (Object.values(flags).some((flagData) => hasTakeCoverTrackingFlag(flagData))) {
+      return true;
+    }
+    return (
+      token?.actor?.itemTypes?.effect?.some?.(
+        (effect) => effect.flags?.[MODULE_ID]?.takeCoverProneRangedOnly === true,
+      ) === true
+    );
+  } catch {
+    return false;
+  }
+}
 /**
  * Handles token-related events and updates for the auto-visibility system.
  * Manages position changes, light updates, exclusions, and override validations.
@@ -135,6 +160,8 @@ export class TokenEventHandler {
 
     this.visibilityState.markTokenChangedWithSpatialOptimization(tokenDoc, movementChanges);
 
+    await this._expireTakeCoverForMovement(tokenDoc);
+
     if (this.overrideValidationManager) {
       this.overrideValidationManager.queueOverrideValidation(tokenDoc.id);
       this.overrideValidationManager.processQueuedValidations().catch(() => { });
@@ -178,7 +205,6 @@ export class TokenEventHandler {
       tokenId: tokenDoc?.id,
       changes,
       options,
-      stack: new Error().stack,
     }));
 
     // Use token-specific check if available, otherwise fall back to general check
@@ -454,7 +480,6 @@ export class TokenEventHandler {
       msg: 'handleTokenCreate fired',
       tokenName: tokenDoc?.name,
       tokenId: tokenDoc?.id,
-      stack: new Error().stack,
     }));
 
     if (!this.systemState.shouldProcessEvents()) return;
@@ -592,7 +617,9 @@ export class TokenEventHandler {
           game.pf2eVisioner = game.pf2eVisioner || {};
           game.pf2eVisioner.lastMovedTokenId = tokenDoc.id;
         } catch { }
-        this.overrideValidationManager.queueOverrideValidation(tokenDoc.id);
+        this._expireTakeCoverForMovement(tokHidden || tokenDoc).finally(() => {
+          this.overrideValidationManager.queueOverrideValidation(tokenDoc.id);
+        });
       }
     } catch {
       /* best-effort */
@@ -613,7 +640,9 @@ export class TokenEventHandler {
             game.pf2eVisioner = game.pf2eVisioner || {};
             game.pf2eVisioner.lastMovedTokenId = tokenDoc.id;
           } catch { }
-          this.overrideValidationManager.queueOverrideValidation(tokenDoc.id);
+          this._expireTakeCoverForMovement(tok || tokenDoc).finally(() => {
+            this.overrideValidationManager.queueOverrideValidation(tokenDoc.id);
+          });
         }
         return true; // Token was excluded
       }
@@ -758,8 +787,24 @@ export class TokenEventHandler {
       this.systemState.debug('set lastMovedTokenId', tokenDoc.id);
     } catch { }
 
-    // Queue override validation for the moved token
-    this.overrideValidationManager.queueOverrideValidation(tokenDoc.id);
+    this._expireTakeCoverForMovement(tokenDoc).finally(() => {
+      // Queue override validation for the moved token after Take Cover cover-only markers expire.
+      this.overrideValidationManager.queueOverrideValidation(tokenDoc.id);
+    });
+  }
+
+  async _expireTakeCoverForMovement(tokenDoc) {
+    try {
+      if (!tokenDoc?.id) return;
+      const token = tokenDoc.object || canvas.tokens?.get?.(tokenDoc.id) || tokenDoc;
+      if (!tokenHasTakeCoverExpirationState(token)) return;
+      const { requestTakeCoverExpirationForToken } = await import(
+        '../../../chat/services/take-cover-expiration-service.js'
+      );
+      await requestTakeCoverExpirationForToken(token, 'movement');
+    } catch (error) {
+      console.warn('PF2E Visioner | Failed to request Take Cover expiration prompt:', error);
+    }
   }
 
   _handleWallFlagChanges(tokenDoc) {

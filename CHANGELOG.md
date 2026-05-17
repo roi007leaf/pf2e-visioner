@@ -2,14 +2,27 @@
 
 ## [8.2.11] - 2026-05-16
 
+### Added
+
+- **PF2E HUD Take Cover can route player requests to the GM**: Non-GM Take Cover clicks from PF2E HUD now request the GM to open the Visioner Take Cover preview for the active canvas token, while GM-side preview resolution prefers the real scene token over actor prototype token data.
 ### Fixed
 
+- **Visioner Manager manual visibility choices hide Unnoticed**: The Visioner Manager no longer offers Unnoticed in per-row visibility action buttons or bulk visibility buttons, keeping Unnoticed reserved for encounter-driven awareness flows.
 - **Take Cover AVS cleanup returns cover to auto**: Accepting cover-only AVS validation for Take Cover now clears the manual cover override instead of applying a new lower cover effect, letting automatic cover calculation take over after movement.
 - **Take Cover cover overrides validate and display clearly**: Take Cover manual cover changes now create AVS cover-only override markers, show as manual cover to auto-cover transitions in the AVS indicator and dialog, and use an auto-cover icon instead of another shield icon.
+- **Take Cover expiration uses GM chat confirmation**: Movement, attack actions, and unconscious/dead/dying conditions now create a GM chat prompt to remove Take Cover and return cover to automation, instead of silently clearing the manual cover state. When the covered token moves, pure Take Cover cover-only AVS rows are suppressed; mixed visibility rows still show, including Take Cover-sourced rows, but omit the expiring cover change.
+- **Take Cover duplicate application blocked**: Take Cover cannot be applied again while the target already has an active Take Cover state, including direct action use, prone shortcut handling, preview application, and PF2E HUD entry points.
+- **Take Cover baselines match the cover overlay**: Take Cover preview calculations now use the same manual-cover-first cover state path as the `G` overlay, so lesser, standard, and greater cover upgrades are based on the same scene state the GM sees.
 - **Take Cover Ceaseless Shadows context shown**: The Take Cover preview now shows the acting token name and a Ceaseless Shadows badge when the feat is active, making creature-cover upgrades visible before applying cover changes.
 - **Scene purge clears manual cover state**: Scene data purge now removes manual cover map entries and related Take Cover override markers so stale manual cover no longer survives cleanup.
 - **Consequences apply defaults to AVS when enabled**: Consequences changes now prefer AVS override handling when AVS is active, preventing chat Apply Changes from leaving visibility state stuck until token movement.
 - **Legendary Sneak AVS context**: Stealth overrides from Sneak or manual changes are no longer flagged for stale positioning when the target has Legendary Sneak; AVS awareness rows now show a Legendary Sneak badge in the tooltip and validation dialog, including when PF2E exposes the feat through actor roll options instead of item collections.
+- **Pending movement visibility no longer flashes wrong tokens**: Controlled-token movement now tracks the pending destination through Foundry detection wrappers, suppresses blocked vision and light sources while the mover crosses walls, preserves hidden/undetected render state during animation, restores rendering after the final AVS assessment, and waits briefly for Foundry's token animation to attach so movement does not snap to the destination.
+- **Hidden state rendering matches actor type during movement**: Loot and hazard tokens marked hidden by Visioner stay hidden from the observer during pending movement, while NPCs marked hidden can remain visible when line of sight allows it; undetected and unnoticed NPCs still stay hidden.
+- **Debug console noise removed**: Temporary pending-movement, system-hidden, AVS hook, visibility-factor, and token-manager diagnostics no longer print to the browser console or capture stack traces during normal play.
+- **Auto-cover blocker and wall results are stricter**: Token cover overrides now apply only from blockers that actually contribute to the attacker-target pair, per-call filter overrides are honored, wall cover no longer falls back to lesser or standard cover below configured thresholds, and creature-only obstruction is handled by the creature-cover path instead of the wall-cover evaluator.
+- **AVS validation preserves mixed Take Cover visibility rows**: Removing Take Cover can release visibility back to AVS without discarding remaining visibility overrides, force post-removal validation through same-position debounce, suppress expiring Take Cover cover deltas on mixed rows, and show auto-calculated cover changes distinctly in the indicator and dialog.
+- **Visioner Manager handles cover-only AVS flags correctly**: Cover-only Take Cover flags are treated as AVS-controlled visibility instead of manual visibility overrides, and target-mode managers refresh when a visibility change targets the managed token.
 
 ## [8.2.10] - 2026-05-15
 

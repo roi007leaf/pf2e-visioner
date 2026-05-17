@@ -561,8 +561,8 @@ describe('Wall Coverage Scenarios Integration', () => {
 
       const result = coverDetector.detectBetweenTokens(attacker, target);
 
-      // Should still work and return standard for wall detection
-      expect(result).toBe('standard');
+      // Without measurable target coverage, wall thresholds are not met.
+      expect(result).toBe('none');
     });
   });
 });

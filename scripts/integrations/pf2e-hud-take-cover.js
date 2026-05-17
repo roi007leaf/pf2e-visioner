@@ -1,4 +1,8 @@
 import { MODULE_ID } from '../constants.js';
+import {
+  notifyTakeCoverAlreadyActive,
+  tokenHasActiveTakeCoverState,
+} from '../chat/services/take-cover-expiration-service.js';
 
 const PF2E_HUD_ROOT_SELECTOR = [
   '#pf2e-hud',
@@ -21,10 +25,21 @@ function isVisionerAutomationEnabled() {
 
 function tokenFromActor(actor) {
   if (!actor) return null;
-  const token = actor.token?.object || actor.token || null;
-  if (token?.actor) return token;
   const active = actor.getActiveTokens?.(true, true) || actor.getActiveTokens?.(true) || [];
-  return active[0] || null;
+  if (active[0]?.actor) return active[0];
+
+  return normalizeCanvasToken(actor.token?.object || actor.token || null);
+}
+
+function normalizeCanvasToken(token) {
+  if (!token) return null;
+
+  const tokenId = token?.document?.id || token?.id || null;
+  const canvasToken = tokenId ? canvas?.tokens?.get?.(tokenId) : null;
+  if (canvasToken?.actor) return canvasToken;
+  if (token?.document?.object?.actor) return token.document.object;
+  if (token?.object?.actor) return token.object;
+  return token?.actor ? token : null;
 }
 
 function getApplicationCandidates() {
@@ -53,7 +68,7 @@ export function resolvePf2eHudActorToken(element) {
     try {
       const appElement = app.element instanceof HTMLElement ? app.element : app.element?.[0];
       if (hudRoot && appElement?.contains?.(hudRoot)) {
-        const token = app.token || tokenFromActor(app.actor);
+        const token = normalizeCanvasToken(app.token) || tokenFromActor(app.actor);
         if (token?.actor) return token;
       }
     } catch {
@@ -70,7 +85,20 @@ export function resolvePf2eHudActorToken(element) {
   return null;
 }
 
-export async function openVisionerTakeCoverPreview(actorToken) {
+export async function openVisionerTakeCoverPreview(actorToken, options = {}) {
+  actorToken = normalizeCanvasToken(actorToken) || actorToken;
+
+  if (!game.user?.isGM) {
+    const { requestGMOpenTakeCover } = await import('../services/socket.js');
+    requestGMOpenTakeCover(actorToken?.id, options.messageId ?? null);
+    return;
+  }
+
+  if (tokenHasActiveTakeCoverState(actorToken)) {
+    notifyTakeCoverAlreadyActive(actorToken);
+    return false;
+  }
+
   const { TakeCoverActionHandler } = await import('../chat/services/actions/TakeCoverAction.js');
   const { TakeCoverPreviewDialog } = await import('../chat/dialogs/TakeCoverPreviewDialog.js');
   const handler = new TakeCoverActionHandler();
@@ -78,7 +106,9 @@ export async function openVisionerTakeCoverPreview(actorToken) {
     actionType: 'take-cover',
     actor: actorToken,
     actorToken,
-    source: 'pf2e-hud',
+    source: options.source || 'pf2e-hud',
+    messageId: options.messageId ?? null,
+    requestedByUserId: options.requestedByUserId ?? null,
     ignoreAllies: game?.settings?.get?.(MODULE_ID, 'ignoreAllies') ?? false,
   };
   const subjects = await handler.discoverSubjects({ ...actionData, ignoreAllies: false });

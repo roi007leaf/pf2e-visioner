@@ -304,8 +304,6 @@ class DualSystemResultApplication {
 
 const dualSystemApplication = new DualSystemResultApplication();
 
-// Debug: Log that this file was loaded
-
 // Set up periodic cleanup (every 5 minutes)
 setInterval(
   () => {

@@ -106,6 +106,9 @@
                   {{#unless (eq prevCover.key statusCover.key)}}
                     <i class="prev-cover {{prevCover.icon}} cover-{{prevCover.key}}" data-state="{{prevCover.key}}" data-tooltip="{{prevCover.label}}" style="color:{{prevCover.color}};"></i>
                     <i class="fas fa-arrow-right state-arrow" aria-hidden="true"></i>
+                    {{#if statusCover.autoCalculated}}
+                      <i class="status-cover-auto {{statusCover.autoIcon}} cover-auto" data-state="auto" aria-label="{{statusCover.autoLabel}}" data-tooltip="{{statusCover.autoLabel}}" style="color:#4fc3f7;"></i>
+                    {{/if}}
                     <i class="status-cover {{statusCover.icon}} cover-{{statusCover.key}}" data-state="{{statusCover.key}}" aria-label="{{statusCover.label}}" data-tooltip="{{statusCover.label}}" style="color:{{statusCover.color}};"></i>
                   {{/unless}}
                 </div>
@@ -198,6 +201,9 @@
           {{#unless (eq prevCover.key statusCover.key)}}
             <i class="prev-cover {{prevCover.icon}} cover-{{prevCover.key}}" data-state="{{prevCover.key}}" data-tooltip="{{prevCover.label}}"></i>
             <i class="fas fa-arrow-right state-arrow" aria-hidden="true"></i>
+            {{#if statusCover.autoCalculated}}
+              <i class="status-cover-auto {{statusCover.autoIcon}} cover-auto" data-state="auto" aria-label="{{statusCover.autoLabel}}" data-tooltip="{{statusCover.autoLabel}}"></i>
+            {{/if}}
             <i class="status-cover {{statusCover.icon}} cover-{{statusCover.key}}" data-state="{{statusCover.key}}" aria-label="{{statusCover.label}}" data-tooltip="{{statusCover.label}}"></i>
           {{/unless}}
         </div>
@@ -289,6 +295,9 @@
           {{#unless (eq prevCover.key statusCover.key)}}
             <i class="prev-cover {{prevCover.icon}} cover-{{prevCover.key}}" data-state="{{prevCover.key}}" data-tooltip="{{prevCover.label}}"></i>
             <i class="fas fa-arrow-right state-arrow" aria-hidden="true"></i>
+            {{#if statusCover.autoCalculated}}
+              <i class="status-cover-auto {{statusCover.autoIcon}} cover-auto" data-state="auto" aria-label="{{statusCover.autoLabel}}" data-tooltip="{{statusCover.autoLabel}}"></i>
+            {{/if}}
             <i class="status-cover {{statusCover.icon}} cover-{{statusCover.key}}" data-state="{{statusCover.key}}" aria-label="{{statusCover.label}}" data-tooltip="{{statusCover.label}}"></i>
           {{/unless}}
         </div>
