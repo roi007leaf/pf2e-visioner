@@ -1276,6 +1276,7 @@ function cleanupLifesenseKeyHandler() {
 export async function updateSystemHiddenTokenHighlights(
   observerId = null,
   positionOverride = null,
+  options = {},
 ) {
   try {
     if (!game.settings?.get?.(MODULE_ID, 'autoVisibilityEnabled')) {
@@ -1290,12 +1291,13 @@ export async function updateSystemHiddenTokenHighlights(
     // Ensure keyboard handler is installed
     ensureKeyHandlerInstalled();
 
+    const allowControlledFallback = options?.allowControlledFallback !== false;
     let observer = null;
     try {
       if (observerId) {
         observer = canvas.tokens.get(observerId) || null;
       }
-      if (!observer) {
+      if (!observer && allowControlledFallback) {
         observer = canvas.tokens.controlled?.[0] || null;
       }
     } catch (_) {

@@ -518,7 +518,9 @@ function capturePendingRenderState(token) {
   }
 
   const state = {
+    tokenVisible: token.visible,
     tokenRenderable: token.renderable,
+    meshVisible: token.mesh?.visible,
     meshRenderable: token.mesh?.renderable,
     meshAlpha: token.mesh?.alpha,
     lastForcedAt: null,
@@ -577,42 +579,53 @@ function clearHiddenRenderLock(token, state) {
   }
 }
 
-export function restorePendingMovementTokenRendering(token, { ignoreObservedGrace = false } = {}) {
+export function restorePendingMovementTokenRendering(
+  token,
+  { ignoreObservedGrace = false, ignoreObserverLocks = false } = {},
+) {
   const state = token?.[PENDING_MOVEMENT_RENDER_STATE_KEY];
   if (!token || !state) return false;
 
-  const hiddenStateContext = getPendingMovementHiddenStateContext(token);
-  if (hiddenStateContext) {
-    if (hiddenRenderLockCanBeBypassedByVisibilityProbe(token, hiddenStateContext)) {
-      clearHiddenRenderLock(token, state);
-    } else {
-      return false;
+  if (ignoreObserverLocks) {
+    clearHiddenRenderLock(token, state);
+  } else {
+    const hiddenStateContext = getPendingMovementHiddenStateContext(token);
+    if (hiddenStateContext) {
+      if (hiddenRenderLockCanBeBypassedByVisibilityProbe(token, hiddenStateContext)) {
+        clearHiddenRenderLock(token, state);
+      } else {
+        return false;
+      }
     }
-  }
 
-  const controlledHiddenStateContext = getControlledObserverHiddenStateContext(token);
-  if (controlledHiddenStateContext) {
-    if (hiddenRenderLockCanBeBypassedByVisibilityProbe(token, controlledHiddenStateContext)) {
-      clearHiddenRenderLock(token, state);
-    } else {
-      return false;
+    const controlledHiddenStateContext = getControlledObserverHiddenStateContext(token);
+    if (controlledHiddenStateContext) {
+      if (hiddenRenderLockCanBeBypassedByVisibilityProbe(token, controlledHiddenStateContext)) {
+        clearHiddenRenderLock(token, state);
+      } else {
+        return false;
+      }
     }
-  }
 
-  const stickyHiddenStateContext = getStickyHiddenRenderLockContext(token, state);
-  if (stickyHiddenStateContext) {
-    if (ignoreObservedGrace && stickyHiddenStateContext.observedDuringGrace) {
-      clearHiddenRenderLock(token, state);
-    } else if (hiddenRenderLockCanBeBypassedByVisibilityProbe(token, stickyHiddenStateContext)) {
-      clearHiddenRenderLock(token, state);
-    } else {
-      return false;
+    const stickyHiddenStateContext = getStickyHiddenRenderLockContext(token, state);
+    if (stickyHiddenStateContext) {
+      if (ignoreObservedGrace && stickyHiddenStateContext.observedDuringGrace) {
+        clearHiddenRenderLock(token, state);
+      } else if (hiddenRenderLockCanBeBypassedByVisibilityProbe(token, stickyHiddenStateContext)) {
+        clearHiddenRenderLock(token, state);
+      } else {
+        return false;
+      }
     }
   }
 
   try {
+    if (state.tokenVisible !== undefined) token.visible = state.tokenVisible;
     token.renderable = state.tokenRenderable;
     if (token.mesh) {
+      if ('visible' in token.mesh && state.meshVisible !== undefined) {
+        token.mesh.visible = state.meshVisible;
+      }
       if ('renderable' in token.mesh) token.mesh.renderable = state.meshRenderable;
       if ('alpha' in token.mesh && state.meshAlpha !== undefined) token.mesh.alpha = state.meshAlpha;
     }

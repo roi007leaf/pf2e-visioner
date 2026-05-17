@@ -5,6 +5,7 @@
 import { injectChatAutomationStyles } from '../chat/chat-automation-styles.js';
 import { MODULE_ID } from '../constants.js';
 import { initializeHoverTooltips } from '../services/HoverTooltips.js';
+import { restorePendingMovementTokenRendering } from '../services/pending-token-movement.js';
 import { registerSocket } from '../services/socket.js';
 import { updateWallVisuals } from '../services/visual-effects.js';
 import { getLogger } from '../utils/logger.js';
@@ -114,6 +115,23 @@ function scheduleControlTokenSessionTimer(sequence, tokenId, delayMs, callback) 
   }, delayMs);
   controlTokenSessionState.timers.add(timer);
   return timer;
+}
+
+function scheduleNoObserverVisibilityRefresh() {
+  setTimeout(() => {
+    try {
+      if ((canvas?.tokens?.controlled?.length ?? 0) > 0) return;
+      for (const token of canvas?.tokens?.placeables || []) {
+        restorePendingMovementTokenRendering(token, {
+          ignoreObservedGrace: true,
+          ignoreObserverLocks: true,
+        });
+      }
+      canvas?.perception?.update?.({ initializeVision: true, refreshVision: true });
+    } catch {
+      /* best effort */
+    }
+  }, 75);
 }
 
 async function refreshVisionSharingTokenIds() {
@@ -550,7 +568,8 @@ export async function onCanvasReady() {
           const { updateSystemHiddenTokenHighlights } = await import(
             '../services/visual-effects.js'
           );
-          await updateSystemHiddenTokenHighlights(null);
+          await updateSystemHiddenTokenHighlights(null, null, { allowControlledFallback: false });
+          scheduleNoObserverVisibilityRefresh();
         } catch (error) {
           console.warn('PF2E Visioner | Failed to clear system-hidden token highlights:', error);
         }

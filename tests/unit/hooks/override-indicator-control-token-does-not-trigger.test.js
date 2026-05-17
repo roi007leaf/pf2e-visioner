@@ -173,6 +173,73 @@ describe('Override indicator should not trigger on controlToken', () => {
             .not.toHaveBeenCalled();
     });
 
+    test('deselecting the last observer clears hidden-token perspective and refreshes visibility', async () => {
+        const updateSystemHiddenTokenHighlights = jest.fn().mockResolvedValue(undefined);
+        jest.doMock('../../../scripts/services/visual-effects.js', () => ({
+            updateWallVisuals: jest.fn(),
+            updateWallIndicatorsOnly: jest.fn(),
+            updateSystemHiddenTokenHighlights,
+        }));
+
+        const perceptionUpdate = jest.fn();
+        global.canvas.perception = { update: perceptionUpdate };
+
+        const { onCanvasReady } = await import('../../../scripts/hooks/lifecycle.js');
+        await onCanvasReady();
+
+        const controlTokenCbs = global.Hooks.on.mock.calls
+            .filter((c) => c?.[0] === 'controlToken')
+            .map((c) => c?.[1])
+            .filter(Boolean);
+
+        const restoreIndicatorsCb = controlTokenCbs.find((cb) =>
+            String(cb).includes('allowControlledFallback'),
+        );
+
+        expect(restoreIndicatorsCb).toBeTruthy();
+
+        const token = { document: { id: 'observer', getFlag: jest.fn(() => ({})) } };
+        const nameplate = { visible: false };
+        const hiddenToken = {
+            document: { id: 'hidden-target' },
+            visible: false,
+            renderable: false,
+            mesh: { visible: false, renderable: false, alpha: 0 },
+            nameplate,
+            _pf2eVisionerPendingRenderState: {
+                tokenVisible: true,
+                tokenRenderable: true,
+                meshVisible: true,
+                meshRenderable: true,
+                meshAlpha: 1,
+                surfaceVisibility: [{ name: 'nameplate', surface: nameplate, visible: true }],
+            },
+        };
+        global.canvas.tokens.controlled = [token];
+        global.canvas.tokens.placeables = [token, hiddenToken];
+
+        await restoreIndicatorsCb(token, false);
+
+        expect(updateSystemHiddenTokenHighlights).toHaveBeenCalledWith(null, null, {
+            allowControlledFallback: false,
+        });
+        expect(perceptionUpdate).not.toHaveBeenCalled();
+
+        global.canvas.tokens.controlled = [];
+        jest.advanceTimersByTime(75);
+
+        expect(hiddenToken.visible).toBe(true);
+        expect(hiddenToken.renderable).toBe(true);
+        expect(hiddenToken.mesh.visible).toBe(true);
+        expect(hiddenToken.mesh.renderable).toBe(true);
+        expect(hiddenToken.mesh.alpha).toBe(1);
+        expect(hiddenToken.nameplate.visible).toBe(true);
+        expect(perceptionUpdate).toHaveBeenCalledWith({
+            initializeVision: true,
+            refreshVision: true,
+        });
+    });
+
     test('controlToken only keeps the latest queued recalculation across token switches', async () => {
         const { onCanvasReady } = await import('../../../scripts/hooks/lifecycle.js');
         await onCanvasReady();

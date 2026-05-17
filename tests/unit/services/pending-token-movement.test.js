@@ -1074,4 +1074,48 @@ describe('pending token movement hidden detection guard', () => {
     expect(target.mesh.alpha).toBe(0);
     expect(target.nameplate.visible).toBe(false);
   });
+
+  test('restores hidden render lock when observer perspective is intentionally cleared', () => {
+    jest.useFakeTimers();
+
+    global.canvas.walls.placeables = [];
+    const observer = createMockToken({
+      id: 'observer',
+      flags: {
+        'pf2e-visioner': {
+          visibility: {
+            target: 'hidden',
+          },
+        },
+      },
+    });
+    const target = createMockToken({ id: 'target', visible: true });
+    target.renderable = true;
+    target.mesh = { visible: true, renderable: true, alpha: 1 };
+    target.nameplate = { visible: true };
+    global.canvas = {
+      ...global.canvas,
+      tokens: {
+        get: jest.fn((id) => (id === 'observer' ? observer : null)),
+        controlled: [],
+        placeables: [observer, target],
+      },
+      perception: {
+        update: jest.fn(),
+      },
+    };
+
+    setPendingTokenMovementPosition(observer.document, { x: 0, y: 0 }, [observer]);
+    refreshPendingMovementTokenVisibility('observer');
+    clearPendingTokenMovementPosition('observer');
+
+    expect(restorePendingMovementTokenRendering(target)).toBe(false);
+    expect(restorePendingMovementTokenRendering(target, { ignoreObserverLocks: true })).toBe(true);
+    expect(target.visible).toBe(true);
+    expect(target.renderable).toBe(true);
+    expect(target.mesh.visible).toBe(true);
+    expect(target.mesh.renderable).toBe(true);
+    expect(target.mesh.alpha).toBe(1);
+    expect(target.nameplate.visible).toBe(true);
+  });
 });

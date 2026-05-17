@@ -923,7 +923,7 @@ describe('Deafened Detection Wrapper', () => {
             expect(canvasVisibilityWrapper(wrapped, [{ x: 150, y: 25 }], {
                 object: target,
             })).toBe(false);
-            expect(wrapped).not.toHaveBeenCalled();
+            expect(wrapped).toHaveBeenCalledTimes(1);
             expect(pendingSource.active).toBe(true);
             expect(otherSource.active).toBe(true);
 
@@ -996,7 +996,7 @@ describe('Deafened Detection Wrapper', () => {
             expect(canvasVisibilityWrapper(wrapped, [{ x: 150, y: 25 }], {
                 object: target,
             })).toBe(false);
-            expect(wrapped).not.toHaveBeenCalled();
+            expect(wrapped).toHaveBeenCalledTimes(1);
 
             clearPendingTokenMovementPosition('observer');
             global.canvas = originalCanvas;
