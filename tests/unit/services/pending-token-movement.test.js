@@ -81,6 +81,40 @@ describe('pending token movement hidden detection guard', () => {
     expect(shouldTemporarilyBlockHiddenDetection(observer, target, 'hidden')).toBe(true);
   });
 
+  test('caps route point checks for long waypoint movement', () => {
+    let sightReads = 0;
+    global.canvas.walls.placeables = [
+      {
+        document: {
+          id: 'far-wall',
+          c: [10000, 0, 10000, 100],
+          get sight() {
+            sightReads += 1;
+            return 1;
+          },
+          door: 0,
+          ds: 0,
+        },
+      },
+    ];
+    const observer = createMockToken({ id: 'observer', x: 0, y: 5 });
+    const target = createMockToken({ id: 'target', x: 0, y: 0 });
+    const waypoints = Array.from({ length: 120 }, (_, index) => ({
+      x: (index + 1) * 50,
+      y: 250,
+    }));
+
+    setPendingTokenMovementPosition(
+      observer.document,
+      { x: 6100, y: 250 },
+      [observer],
+      { waypoints },
+    );
+
+    expect(shouldTemporarilyBlockHiddenDetection(observer, target, 'hidden')).toBe(false);
+    expect(sightReads).toBeLessThanOrEqual(96);
+  });
+
   test('guards hidden detection for a controlled token drag preview source', () => {
     const original = createMockToken({ id: 'observer', x: 3, y: 3 });
     const preview = {

@@ -5,6 +5,7 @@ const PENDING_MOVEMENT_RENDER_LOCK_GRACE_MS = 1000;
 const PENDING_MOVEMENT_ANIMATION_DETECTION_DELAY_MS = 50;
 const PENDING_MOVEMENT_ANIMATION_DETECTION_SETTLE_MS = 250;
 const PENDING_MOVEMENT_POST_COMPLETION_REFRESH_DELAYS_MS = [100, 300, 700, 1200];
+const PENDING_MOVEMENT_MAX_ROUTE_POINTS = 96;
 const HIDDEN_FROM_OBSERVER_STATES = new Set(['concealed', 'hidden', 'undetected', 'unnoticed']);
 const RENDER_HIDDEN_FROM_OBSERVER_STATES = new Set(['hidden', 'undetected', 'unnoticed']);
 const NPC_RENDER_VISIBLE_STATES = new Set(['hidden']);
@@ -200,27 +201,76 @@ function buildPendingMovementRoutePositions(tokenDoc, changes = {}, options = {}
 }
 
 function sampleMovementRoutePoints(tokenDoc, routePositions) {
-  const routePoints = [];
   const gridSize = Math.max(1, Number(canvas?.grid?.size ?? 50));
   const sampleDistance = Math.max(1, gridSize / 2);
   const maxSamplesPerSegment = 32;
   const centers = routePositions.map((position) => centerForToken(tokenDoc, position)).filter(Boolean);
+  if (centers.length <= 1) return centers;
 
-  for (let i = 0; i < centers.length; i += 1) {
+  const segmentLengths = [];
+  let uncappedPointCount = 1;
+  let totalDistance = 0;
+  for (let i = 0; i < centers.length - 1; i += 1) {
     const start = centers[i];
     const end = centers[i + 1];
-    if (!end) {
-      routePoints.push(start);
-      continue;
-    }
-
     const distance = Math.hypot(end.x - start.x, end.y - start.y);
+    segmentLengths.push(distance);
     const steps = Math.max(
       1,
       Math.min(maxSamplesPerSegment, Math.ceil(distance / sampleDistance)),
     );
-    for (let step = 0; step < steps; step += 1) {
-      const t = step / steps;
+    uncappedPointCount += steps;
+    totalDistance += distance;
+  }
+
+  if (uncappedPointCount <= PENDING_MOVEMENT_MAX_ROUTE_POINTS || totalDistance <= 0) {
+    const routePoints = [];
+    for (let i = 0; i < centers.length; i += 1) {
+      const start = centers[i];
+      const end = centers[i + 1];
+      if (!end) {
+        routePoints.push(start);
+        continue;
+      }
+
+      const distance = segmentLengths[i];
+      const steps = Math.max(
+        1,
+        Math.min(maxSamplesPerSegment, Math.ceil(distance / sampleDistance)),
+      );
+      for (let step = 0; step < steps; step += 1) {
+        const t = step / steps;
+        routePoints.push({
+          x: start.x + (end.x - start.x) * t,
+          y: start.y + (end.y - start.y) * t,
+        });
+      }
+    }
+
+    return routePoints;
+  }
+
+  const routePoints = [];
+  let segmentIndex = 0;
+  let segmentStartDistance = 0;
+  for (let sampleIndex = 0; sampleIndex < PENDING_MOVEMENT_MAX_ROUTE_POINTS; sampleIndex += 1) {
+    const distanceAlongRoute =
+      (totalDistance * sampleIndex) / (PENDING_MOVEMENT_MAX_ROUTE_POINTS - 1);
+    while (
+      segmentIndex < segmentLengths.length - 1 &&
+      distanceAlongRoute > segmentStartDistance + segmentLengths[segmentIndex]
+    ) {
+      segmentStartDistance += segmentLengths[segmentIndex];
+      segmentIndex += 1;
+    }
+
+    const start = centers[segmentIndex];
+    const end = centers[segmentIndex + 1] ?? start;
+    const segmentLength = segmentLengths[segmentIndex] || 0;
+    if (segmentLength <= 0) {
+      routePoints.push(start);
+    } else {
+      const t = (distanceAlongRoute - segmentStartDistance) / segmentLength;
       routePoints.push({
         x: start.x + (end.x - start.x) * t,
         y: start.y + (end.y - start.y) * t,
