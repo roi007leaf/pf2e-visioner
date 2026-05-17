@@ -165,6 +165,14 @@ function detectionModeTestVisibility(visionSource, mode, config = {}) {
     return false;
   }
 
+  if (
+    !NON_VISUAL_DETECTION_MODE_IDS.has(modeId) &&
+    !isPendingMovementHiddenStateVisibilityProbe() &&
+    shouldTemporarilyBlockSightDetection(observerToken, targetToken)
+  ) {
+    return false;
+  }
+
   if (NON_VISUAL_DETECTION_MODE_IDS.has(modeId)) {
     const visibility = getVisibilityBetweenTokens(observerToken, targetToken);
     if (visibility === 'hidden' || visibility === 'concealed') {
@@ -206,6 +214,14 @@ function canvasVisibilityTestVisibilityWrapper(wrapped, points, options = {}) {
           return false;
         }
 
+        if (
+          wrappedResult &&
+          blockedSources?.length &&
+          !hasActiveUnblockedDetectionSource(blockedSources)
+        ) {
+          return false;
+        }
+
         return wrappedResult;
       },
     );
@@ -213,6 +229,26 @@ function canvasVisibilityTestVisibilityWrapper(wrapped, points, options = {}) {
     if (wrappedCalled) throw error;
     return callWrapped();
   }
+}
+
+function sourceFromCollectionEntry(entry) {
+  return Array.isArray(entry) && entry.length === 2 ? entry[1] : entry;
+}
+
+function detectionSourceList(sources) {
+  return Array.from(sources || [], sourceFromCollectionEntry);
+}
+
+function hasActiveUnblockedDetectionSource(blockedSources = []) {
+  const blockedSourceSet = new Set(blockedSources);
+  const activeSources = [
+    ...detectionSourceList(canvas?.effects?.visionSources),
+    ...detectionSourceList(canvas?.effects?.lightSources),
+  ];
+
+  return activeSources.some(
+    (source) => source?.active && source?.object && !blockedSourceSet.has(source),
+  );
 }
 
 function tokenRefreshVisibilityWrapper(wrapped, ...args) {
@@ -238,8 +274,15 @@ function canDetectWrapper(threshold) {
     const observerToken = visionSource?.object;
     const modeId = this?.id ?? args?.[0]?.id ?? null;
     const visibility = getVisibilityBetweenTokens(observerToken, target);
+    const pendingMovementSightBlocked =
+      !isPendingMovementHiddenStateVisibilityProbe() &&
+      threshold === VISIBILITY_VALUES.hidden &&
+      shouldTemporarilyBlockSightDetection(observerToken, target);
 
-    if (canUseExplicitVisionerDetection(observerToken, target, modeId, visibility, threshold)) {
+    if (
+      !pendingMovementSightBlocked &&
+      canUseExplicitVisionerDetection(observerToken, target, modeId, visibility, threshold)
+    ) {
       return true;
     }
 
@@ -269,11 +312,7 @@ function canDetectWrapper(threshold) {
     }
 
     const origin = observerToken;
-    if (
-      threshold === VISIBILITY_VALUES.hidden &&
-      visibility !== 'observed' &&
-      shouldTemporarilyBlockSightDetection(origin, target)
-    ) {
+    if (pendingMovementSightBlocked) {
       return false;
     }
 
