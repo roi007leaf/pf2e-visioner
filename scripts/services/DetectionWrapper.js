@@ -181,6 +181,12 @@ function detectionModeTestVisibility(visionSource, mode, config = {}) {
 }
 
 function canvasVisibilityTestVisibilityWrapper(wrapped, points, options = {}) {
+  let wrappedCalled = false;
+  const callWrapped = () => {
+    wrappedCalled = true;
+    return wrapped(points, options);
+  };
+
   try {
     return withPendingMovementBlockedDetectionSourcesSuppressed(
       options?.object,
@@ -194,15 +200,18 @@ function canvasVisibilityTestVisibilityWrapper(wrapped, points, options = {}) {
                 ({ context }) => context?.hiddenByVisioner || context?.foundryHidden,
               )?.context ||
               getPendingMovementHiddenStateBlock(options?.object);
+
+        const wrappedResult = callWrapped();
         if (sourceHiddenStateContext) {
           return false;
         }
 
-        return wrapped(points, options);
+        return wrappedResult;
       },
     );
-  } catch {
-    return wrapped(points, options);
+  } catch (error) {
+    if (wrappedCalled) throw error;
+    return callWrapped();
   }
 }
 
