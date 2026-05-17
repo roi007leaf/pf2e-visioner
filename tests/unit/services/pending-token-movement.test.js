@@ -789,6 +789,50 @@ describe('pending token movement hidden detection guard', () => {
     expect(target.nameplate.visible).toBe(false);
   });
 
+  test('keeps undetected token hidden when token refresh redraws it visible', () => {
+    global.canvas.walls.placeables = [];
+    const observer = createMockToken({
+      id: 'observer',
+      flags: {
+        'pf2e-visioner': {
+          visibility: {
+            target: 'undetected',
+          },
+        },
+      },
+    });
+    const target = createMockToken({ id: 'target', actorType: 'npc', visible: true });
+    target.renderable = true;
+    target.mesh = { visible: true, renderable: true, alpha: 1 };
+    target.nameplate = { visible: true };
+    target.refresh = jest.fn(() => {
+      target.visible = true;
+      target.renderable = true;
+      target.mesh.visible = true;
+      target.mesh.renderable = true;
+      target.mesh.alpha = 1;
+      target.nameplate.visible = true;
+    });
+    global.canvas = {
+      ...global.canvas,
+      tokens: {
+        get: jest.fn((id) => (id === 'observer' ? observer : null)),
+        placeables: [observer, target],
+      },
+      perception: {
+        update: jest.fn(),
+      },
+    };
+
+    setPendingTokenMovementPosition(observer.document, { x: 0, y: 0 }, [observer]);
+    refreshPendingMovementTokenVisibility('observer');
+
+    expect(target.renderable).toBe(false);
+    expect(target.mesh.renderable).toBe(false);
+    expect(target.mesh.alpha).toBe(0);
+    expect(target.nameplate.visible).toBe(false);
+  });
+
   test('hides alternate token render surfaces while pending hidden visibility is active', () => {
     jest.useFakeTimers();
 

@@ -1280,12 +1280,16 @@ export function refreshPendingMovementTokenVisibility(
   for (const token of tokens) {
     if (ids.has(tokenIdOf(token))) continue;
     try {
-      if (shouldTemporarilyForceTokenInvisible(token, { hasDetectionWork })) {
+      const shouldForceInvisible = shouldTemporarilyForceTokenInvisible(token, { hasDetectionWork });
+      token?.refresh?.();
+      if (shouldForceInvisible) {
         forcePendingMovementTokenInvisible(token);
       } else {
-        restorePendingMovementTokenRendering(token, { ignoreObservedGrace });
+        const restored = restorePendingMovementTokenRendering(token, { ignoreObservedGrace });
+        if (!restored && token?.[PENDING_MOVEMENT_RENDER_STATE_KEY]) {
+          forcePendingMovementTokenInvisible(token);
+        }
       }
-      token?.refresh?.();
     } catch {
       /* best-effort visual refresh */
     }
