@@ -3,6 +3,8 @@ import { MODULE_ID } from '../constants.js';
 const PENDING_MOVEMENT_TTL_MS = 2500;
 const PENDING_MOVEMENT_RENDER_LOCK_GRACE_MS = 1000;
 const PENDING_MOVEMENT_ANIMATION_DETECTION_DELAY_MS = 50;
+const PENDING_MOVEMENT_ANIMATION_DETECTION_SETTLE_MS = 250;
+const PENDING_MOVEMENT_POST_COMPLETION_REFRESH_DELAYS_MS = [100, 300, 700, 1200];
 const HIDDEN_FROM_OBSERVER_STATES = new Set(['concealed', 'hidden', 'undetected', 'unnoticed']);
 const RENDER_HIDDEN_FROM_OBSERVER_STATES = new Set(['hidden', 'undetected', 'unnoticed']);
 const NPC_RENDER_VISIBLE_STATES = new Set(['hidden']);
@@ -13,6 +15,7 @@ const pendingTokenMovementPositions = new Map();
 const pendingTokenMovementCompletionTimeouts = new Map();
 const pendingTokenHiddenForceContexts = new Map();
 const pendingMovementRenderLockedTokens = new Set();
+const pendingMovementPostCompletionRefreshTimeouts = new Map();
 let pendingMovementHiddenStateVisibilityProbeDepth = 0;
 let pendingMovementSerial = 0;
 
@@ -85,12 +88,161 @@ function centerForToken(tokenOrDoc, positionOverride = null) {
   );
 }
 
+function finiteCoordinate(value) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
+function cloneMovementPosition(position) {
+  const x = finiteCoordinate(position?.x);
+  const y = finiteCoordinate(position?.y);
+  if (x === null || y === null) return null;
+  return { x, y };
+}
+
+function movementPositionFromCenter(tokenOrDoc, center) {
+  const x = finiteCoordinate(center?.x);
+  const y = finiteCoordinate(center?.y);
+  if (x === null || y === null) return null;
+
+  const dimensions = tokenDimensions(tokenOrDoc);
+  return {
+    x: x - dimensions.width / 2,
+    y: y - dimensions.height / 2,
+  };
+}
+
+function movementPositionFromWaypoint(tokenOrDoc, waypoint) {
+  if (!waypoint) return null;
+
+  if (Array.isArray(waypoint)) {
+    return cloneMovementPosition({ x: waypoint[0], y: waypoint[1] });
+  }
+
+  if (waypoint.center) return movementPositionFromCenter(tokenOrDoc, waypoint.center);
+  if (waypoint.destination) return cloneMovementPosition(waypoint.destination);
+  if (waypoint.position) return cloneMovementPosition(waypoint.position);
+  if (waypoint.point) return cloneMovementPosition(waypoint.point);
+  if (waypoint.B) return movementPositionFromCenter(tokenOrDoc, waypoint.B);
+  if (waypoint.ray?.B) return movementPositionFromCenter(tokenOrDoc, waypoint.ray.B);
+
+  return cloneMovementPosition(waypoint);
+}
+
+function movementWaypointArraysFromOptions(options = {}, changes = {}) {
+  const hookOptions = options.hookOptions || options.options || null;
+  const candidates = [
+    options.waypoints,
+    options.path,
+    options.route,
+    options.movement?.waypoints,
+    options.movement?.path,
+    options.movement?.route,
+    options.animation?.waypoints,
+    options.animation?.path,
+    options.animation?.route,
+    options.animation?.movement?.waypoints,
+    hookOptions?.waypoints,
+    hookOptions?.path,
+    hookOptions?.route,
+    hookOptions?.movement?.waypoints,
+    hookOptions?.movement?.path,
+    hookOptions?.movement?.route,
+    hookOptions?.animation?.waypoints,
+    hookOptions?.animation?.path,
+    hookOptions?.animation?.route,
+    hookOptions?.animation?.movement?.waypoints,
+    changes.waypoints,
+    changes.path,
+    changes.route,
+    changes.movement?.waypoints,
+    changes.movement?.path,
+    changes.movement?.route,
+  ];
+
+  return candidates.filter((candidate) => Array.isArray(candidate) && candidate.length);
+}
+
+function positionsEqual(a, b) {
+  return a && b && Math.abs(a.x - b.x) < 0.001 && Math.abs(a.y - b.y) < 0.001;
+}
+
+function pushUniqueMovementPosition(positions, position) {
+  if (!position) return;
+  if (positions.length && positionsEqual(positions[positions.length - 1], position)) return;
+  positions.push(position);
+}
+
+function buildPendingMovementRoutePositions(tokenDoc, changes = {}, options = {}) {
+  const routePositions = [];
+  pushUniqueMovementPosition(
+    routePositions,
+    cloneMovementPosition({
+      x: tokenDoc?.x ?? tokenDoc?.document?.x ?? 0,
+      y: tokenDoc?.y ?? tokenDoc?.document?.y ?? 0,
+    }),
+  );
+
+  for (const waypoints of movementWaypointArraysFromOptions(options, changes)) {
+    for (const waypoint of waypoints) {
+      pushUniqueMovementPosition(routePositions, movementPositionFromWaypoint(tokenDoc, waypoint));
+    }
+  }
+
+  pushUniqueMovementPosition(
+    routePositions,
+    cloneMovementPosition({
+      x: changes.x ?? tokenDoc?.x ?? tokenDoc?.document?.x ?? 0,
+      y: changes.y ?? tokenDoc?.y ?? tokenDoc?.document?.y ?? 0,
+    }),
+  );
+  return routePositions;
+}
+
+function sampleMovementRoutePoints(tokenDoc, routePositions) {
+  const routePoints = [];
+  const gridSize = Math.max(1, Number(canvas?.grid?.size ?? 50));
+  const sampleDistance = Math.max(1, gridSize / 2);
+  const maxSamplesPerSegment = 32;
+  const centers = routePositions.map((position) => centerForToken(tokenDoc, position)).filter(Boolean);
+
+  for (let i = 0; i < centers.length; i += 1) {
+    const start = centers[i];
+    const end = centers[i + 1];
+    if (!end) {
+      routePoints.push(start);
+      continue;
+    }
+
+    const distance = Math.hypot(end.x - start.x, end.y - start.y);
+    const steps = Math.max(
+      1,
+      Math.min(maxSamplesPerSegment, Math.ceil(distance / sampleDistance)),
+    );
+    for (let step = 0; step < steps; step += 1) {
+      const t = step / steps;
+      routePoints.push({
+        x: start.x + (end.x - start.x) * t,
+        y: start.y + (end.y - start.y) * t,
+      });
+    }
+  }
+
+  return routePoints;
+}
+
 function cleanupExpiredPendingMovements(now = Date.now()) {
   for (const [tokenId, entry] of pendingTokenMovementPositions.entries()) {
     if (!entry || entry.expiresAt <= now) {
       pendingTokenMovementPositions.delete(tokenId);
     }
   }
+}
+
+function hasActivePendingMovementForObserver(observerId) {
+  if (!observerId) return false;
+  cleanupExpiredPendingMovements();
+  return pendingTokenMovementPositions.has(observerId);
 }
 
 function isControlledTokenDocument(tokenDoc, controlledTokens = canvas?.tokens?.controlled || []) {
@@ -100,12 +252,100 @@ function isControlledTokenDocument(tokenDoc, controlledTokens = canvas?.tokens?.
   return controlledTokens.some((token) => tokenIdOf(token) === tokenId);
 }
 
+function currentUserOwnsMovedToken(tokenDoc, userId = null) {
+  const currentUser = game?.user;
+  if (!tokenDoc || !currentUser || currentUser.isGM) return false;
+  if (userId && userId !== currentUser.id) return false;
+
+  try {
+    if (tokenDoc.testUserPermission?.(currentUser, 'OWNER')) return true;
+  } catch {
+    /* fall through to local ownership hints */
+  }
+
+  const ownerLevel = Number(globalThis.CONST?.DOCUMENT_OWNERSHIP_LEVELS?.OWNER ?? 3);
+  const ownershipValue = Number(
+    tokenDoc.ownership?.[currentUser.id] ?? tokenDoc.actor?.ownership?.[currentUser.id],
+  );
+  return (
+    tokenDoc.isOwner === true ||
+    tokenDoc.object?.isOwner === true ||
+    tokenDoc.actor?.isOwner === true ||
+    (Number.isFinite(ownershipValue) && ownershipValue >= ownerLevel)
+  );
+}
+
+function getPendingMovementTrackingReason(tokenDoc, controlledTokens, options = {}) {
+  if (isControlledTokenDocument(tokenDoc, controlledTokens)) return 'controlled-token';
+  if (currentUserOwnsMovedToken(tokenDoc, options.userId)) return 'player-owned-token';
+  return null;
+}
+
 function isControlledMovementPreviewToken(tokenOrDoc) {
   const token = tokenOrDoc?.document ? tokenOrDoc : null;
   if (!token?.isPreview || !token?._original) return false;
   if (token._previewType === 'config') return false;
 
   return isControlledTokenDocument(token._original);
+}
+
+function movementAnimationIsRunning(animation) {
+  if (!animation || animation.state === 'completed') return false;
+  return !!animation.promise || !!animation.active || animation.state !== undefined;
+}
+
+function movementAnimationInfo(animation) {
+  if (!animation) return null;
+  return {
+    state: animation.state ?? null,
+    active: animation.active ?? null,
+    hasPromise: !!animation.promise,
+  };
+}
+
+function addPostCompletionRefreshTimeout(tokenId, timeoutId) {
+  if (!tokenId || !timeoutId) return;
+  if (!pendingMovementPostCompletionRefreshTimeouts.has(tokenId)) {
+    pendingMovementPostCompletionRefreshTimeouts.set(tokenId, new Set());
+  }
+  pendingMovementPostCompletionRefreshTimeouts.get(tokenId).add(timeoutId);
+}
+
+function removePostCompletionRefreshTimeout(tokenId, timeoutId) {
+  const timeouts = pendingMovementPostCompletionRefreshTimeouts.get(tokenId);
+  if (!timeouts) return;
+  timeouts.delete(timeoutId);
+  if (!timeouts.size) pendingMovementPostCompletionRefreshTimeouts.delete(tokenId);
+}
+
+function clearPostCompletionRenderRefreshes(tokenId) {
+  const timeouts = pendingMovementPostCompletionRefreshTimeouts.get(tokenId);
+  if (!timeouts) return;
+
+  for (const timeoutId of timeouts) {
+    clearTimeout(timeoutId);
+  }
+  pendingMovementPostCompletionRefreshTimeouts.delete(tokenId);
+}
+
+function schedulePostCompletionRenderRefreshes(tokenId, serial) {
+  clearPostCompletionRenderRefreshes(tokenId);
+  for (const delayMs of PENDING_MOVEMENT_POST_COMPLETION_REFRESH_DELAYS_MS) {
+    const timeoutId = setTimeout(() => {
+      removePostCompletionRefreshTimeout(tokenId, timeoutId);
+      if (hasActivePendingMovementForObserver(tokenId)) {
+        return;
+      }
+
+      if (!hasPendingMovementRenderWork()) {
+
+        return;
+      }
+
+      refreshPendingMovementTokenVisibility([], { ignoreObservedGrace: true });
+    }, delayMs);
+    addPostCompletionRefreshTimeout(tokenId, timeoutId);
+  }
 }
 
 function wallBlocksSight(wall) {
@@ -178,7 +418,8 @@ function tokenObjectForId(tokenId) {
 
 function getPendingMovementBlockContext(observer, target) {
   const observerId = tokenIdOf(observer);
-  const pendingPosition = getPendingTokenMovementPosition(observerId);
+  const pendingMovementEntry = getPendingTokenMovementEntry(observerId);
+  const pendingPosition = pendingMovementEntry?.position ?? null;
   const isMovementPreview = isControlledMovementPreviewToken(observer);
   if (!pendingPosition && !isMovementPreview) {
     return {
@@ -190,8 +431,12 @@ function getPendingMovementBlockContext(observer, target) {
   }
 
   const originPoint = centerForToken(observer, pendingPosition || null);
+  const originPoints =
+    pendingMovementEntry?.routePoints?.length
+      ? pendingMovementEntry.routePoints
+      : [originPoint].filter(Boolean);
   const targetPoint = centerForToken(target);
-  const wallBlocked = lineOfSightBlockedByWall(originPoint, targetPoint);
+  const wallBlocked = originPoints.some((point) => lineOfSightBlockedByWall(point, targetPoint));
   const visibilityState = getStoredVisibilityState(observer, target);
   const hiddenByVisioner = visionerStateHidesTargetRendering(target, visibilityState);
   const foundryHidden = !!tokenDocOf(target)?.hidden;
@@ -207,6 +452,7 @@ function getPendingMovementBlockContext(observer, target) {
     isMovementPreview,
     pendingPosition,
     originPoint,
+    originPointCount: originPoints.length,
     targetPoint,
     visibilityState,
     hiddenByVisioner,
@@ -335,6 +581,8 @@ function normalizeHiddenRenderLockContext(context) {
     visibilityState: context.visibilityState ?? 'observed',
     hiddenByVisioner: !!context.hiddenByVisioner,
     foundryHidden: !!context.foundryHidden,
+    wallBlocked: !!context.wallBlocked,
+    blocked: !!context.blocked,
     pendingPosition: clonePoint(context.pendingPosition),
   };
 }
@@ -377,6 +625,16 @@ function getHiddenRenderLockContext(target) {
   return hiddenBlockedEntry?.context ?? null;
 }
 
+function getPendingMovementRenderLockContext(target) {
+  const hiddenRenderLockContext = getHiddenRenderLockContext(target);
+  if (hiddenRenderLockContext) return hiddenRenderLockContext;
+
+  const blockedEntry = getPendingMovementBlockedDetectionEntries(target)[0];
+  if (blockedEntry?.context) return blockedEntry.context;
+
+  return getRememberedHiddenForceContext(target);
+}
+
 function getStickyHiddenRenderLockContext(target, state) {
   const rememberedLockContext = getRememberedHiddenForceContext(target);
   const stateLockContext = state?.lastHiddenContext
@@ -384,7 +642,7 @@ function getStickyHiddenRenderLockContext(target, state) {
     : null;
   const lockContext =
     Number(rememberedLockContext?.lastForcedAt ?? -1) >
-    Number(stateLockContext?.lastForcedAt ?? -1)
+      Number(stateLockContext?.lastForcedAt ?? -1)
       ? rememberedLockContext
       : stateLockContext;
   if (!lockContext) return null;
@@ -395,6 +653,18 @@ function getStickyHiddenRenderLockContext(target, state) {
     Number.isFinite(elapsedMs) &&
     elapsedMs >= 0 &&
     elapsedMs < PENDING_MOVEMENT_RENDER_LOCK_GRACE_MS;
+  const activePendingMovementLock =
+    !!lockContext.wallBlocked && hasActivePendingMovementForObserver(lockContext.observerId);
+  if (activePendingMovementLock) {
+    return {
+      ...lockContext,
+      foundryHidden: foundryHidden || lockContext.foundryHidden,
+      activePendingMovementLock: true,
+      elapsedMs,
+      renderLockGraceMs: PENDING_MOVEMENT_RENDER_LOCK_GRACE_MS,
+    };
+  }
+
   const observer = tokenObjectForId(lockContext.observerId);
   if (observer) {
     const visibilityState = getStoredVisibilityState(observer, target);
@@ -651,7 +921,7 @@ export function forcePendingMovementTokenInvisible(token) {
 
   const state = capturePendingRenderState(token);
   const hiddenRenderLockContext =
-    getHiddenRenderLockContext(token) || getRememberedHiddenForceContext(token);
+    getPendingMovementRenderLockContext(token) || getRememberedHiddenForceContext(token);
   if (state) {
     state.lastForcedAt = Date.now();
     state.lastHiddenContext = hiddenRenderLockContext
@@ -675,6 +945,7 @@ export function forcePendingMovementTokenInvisible(token) {
 
 export function clearPendingTokenMovementPosition(tokenId) {
   if (!tokenId) return;
+  clearPostCompletionRenderRefreshes(tokenId);
 
   const completionTimeoutId = pendingTokenMovementCompletionTimeouts.get(tokenId);
   if (completionTimeoutId) {
@@ -693,16 +964,23 @@ export function setPendingTokenMovementPosition(
   tokenDoc,
   changes = {},
   controlledTokens = canvas?.tokens?.controlled || [],
+  options = {},
 ) {
   const tokenId = tokenIdOf(tokenDoc);
   if (!tokenId || !('x' in changes || 'y' in changes)) return false;
-  if (!isControlledTokenDocument(tokenDoc, controlledTokens)) return false;
+  const trackingReason = getPendingMovementTrackingReason(tokenDoc, controlledTokens, options);
+  if (!trackingReason) {
+
+    return false;
+  }
 
   const serial = ++pendingMovementSerial;
-  const position = {
+  const routePositions = buildPendingMovementRoutePositions(tokenDoc, changes, options);
+  const position = routePositions[routePositions.length - 1] ?? {
     x: changes.x ?? tokenDoc?.x ?? tokenDoc?.document?.x ?? 0,
     y: changes.y ?? tokenDoc?.y ?? tokenDoc?.document?.y ?? 0,
   };
+  const routePoints = sampleMovementRoutePoints(tokenDoc, routePositions);
 
   clearPendingTokenMovementPosition(tokenId);
 
@@ -713,6 +991,8 @@ export function setPendingTokenMovementPosition(
   pendingTokenMovementPositions.set(tokenId, {
     tokenDoc,
     position,
+    routePositions,
+    routePoints,
     serial,
     expiresAt: Date.now() + PENDING_MOVEMENT_TTL_MS,
     timeoutId,
@@ -726,6 +1006,11 @@ export function getPendingTokenMovementPosition(tokenId) {
   return pendingTokenMovementPositions.get(tokenId)?.position || null;
 }
 
+function getPendingTokenMovementEntry(tokenId) {
+  cleanupExpiredPendingMovements();
+  return pendingTokenMovementPositions.get(tokenId) ?? null;
+}
+
 export function completePendingTokenMovement(
   tokenOrId,
   expectedSerial = null,
@@ -734,11 +1019,18 @@ export function completePendingTokenMovement(
   if (!tokenId) return false;
 
   const entry = pendingTokenMovementPositions.get(tokenId);
-  if (!entry) return false;
-  if (expectedSerial !== null && entry.serial !== expectedSerial) return false;
+  if (!entry) {
+
+    return false;
+  }
+  if (expectedSerial !== null && entry.serial !== expectedSerial) {
+
+    return false;
+  }
 
   clearPendingTokenMovementPosition(tokenId);
   refreshPendingMovementTokenVisibility([], { ignoreObservedGrace: true });
+  schedulePostCompletionRenderRefreshes(tokenId, entry.serial);
 
   return true;
 }
@@ -757,23 +1049,61 @@ export function schedulePendingTokenMovementCompletion(tokenDoc) {
   }
 
   const serial = entry.serial;
+  const startedAt = Date.now();
   const complete = () => completePendingTokenMovement(tokenId, serial);
-  const token = tokenDoc?.object || tokenObjectForId(tokenId);
-  const animation = token?._animation;
-  if (animation?.promise && animation.state !== 'completed') {
-    animation.promise.finally(complete);
+  const initialAnimation = (tokenDoc?.object || tokenObjectForId(tokenId))?._animation;
+
+  if (initialAnimation?.promise && movementAnimationIsRunning(initialAnimation)) {
+    initialAnimation.promise.finally(complete);
     return true;
   }
 
-  const timeoutId = setTimeout(() => {
+  const waitForAnimationOrComplete = () => {
     pendingTokenMovementCompletionTimeouts.delete(tokenId);
-    const deferredAnimation = (tokenDoc?.object || tokenObjectForId(tokenId))?._animation;
-    if (deferredAnimation?.promise && deferredAnimation.state !== 'completed') {
+    const currentEntry = pendingTokenMovementPositions.get(tokenId);
+    if (!currentEntry || currentEntry.serial !== serial) {
+      return;
+    }
+
+    const token = tokenDoc?.object || tokenObjectForId(tokenId);
+    const deferredAnimation = token?._animation;
+    const elapsedMs = Date.now() - startedAt;
+
+    if (deferredAnimation?.promise && movementAnimationIsRunning(deferredAnimation)) {
+
       deferredAnimation.promise.finally(complete);
       return;
     }
+    if (
+      movementAnimationIsRunning(deferredAnimation) &&
+      elapsedMs < PENDING_MOVEMENT_TTL_MS
+    ) {
+
+      const timeoutId = setTimeout(
+        waitForAnimationOrComplete,
+        PENDING_MOVEMENT_ANIMATION_DETECTION_DELAY_MS,
+      );
+      pendingTokenMovementCompletionTimeouts.set(tokenId, timeoutId);
+      return;
+    }
+
+    if (elapsedMs < PENDING_MOVEMENT_ANIMATION_DETECTION_SETTLE_MS) {
+
+      const timeoutId = setTimeout(
+        waitForAnimationOrComplete,
+        PENDING_MOVEMENT_ANIMATION_DETECTION_DELAY_MS,
+      );
+      pendingTokenMovementCompletionTimeouts.set(tokenId, timeoutId);
+      return;
+    }
+
     complete();
-  }, PENDING_MOVEMENT_ANIMATION_DETECTION_DELAY_MS);
+  };
+
+  const timeoutId = setTimeout(
+    waitForAnimationOrComplete,
+    PENDING_MOVEMENT_ANIMATION_DETECTION_DELAY_MS,
+  );
   pendingTokenMovementCompletionTimeouts.set(tokenId, timeoutId);
   return true;
 }
@@ -901,6 +1231,7 @@ export function shouldTemporarilyForceTokenInvisible(
   }
 
   const blockedSources = blockedEntries.map(({ source }) => source);
+  const renderLockContext = blockedEntries[0]?.context ?? null;
 
   return withSuppressedDetectionSources(blockedSources, () => {
     const testPoints = target.document.getVisibilityTestPoints?.();
@@ -911,6 +1242,9 @@ export function shouldTemporarilyForceTokenInvisible(
       tolerance: 0,
       object: target,
     });
+    if (shouldForceInvisible && renderLockContext) {
+      rememberHiddenForceContext(target, renderLockContext);
+    }
 
     return shouldForceInvisible;
   });

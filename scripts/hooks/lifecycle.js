@@ -488,7 +488,7 @@ export function onReady() {
   if (game.user?.isGM) {
     // Run shortly after ready to avoid competing with other modules' migrations
     setTimeout(() => {
-      enableVisionForAllTokensAndPrototypes().catch(() => {});
+      enableVisionForAllTokensAndPrototypes().catch(() => { });
     }, 25);
     setTimeout(() => {
       runVisibilityV2MigrationIfNeeded().catch((error) => {
@@ -592,14 +592,14 @@ export async function onCanvasReady() {
         }
       }, 50);
     });
-  } catch (_) {}
+  } catch (_) { }
 
   initializeHoverTooltips();
 
   try {
     const { registerAvsGmVisionWarning } = await import('../ui/AvsGmVisionWarning.js');
     registerAvsGmVisionWarning();
-  } catch (_) {}
+  } catch (_) { }
 
   // Listen for condition changes to update lifesense highlights
   // Note: Trait changes are handled by ActorEventHandler for full AVS recalculation
@@ -741,10 +741,10 @@ export async function onCanvasReady() {
             const wrapper = typeof window.$ === 'function' ? window.$(el) : el;
             await handleRenderChatMessage(msg, wrapper);
           }
-        } catch (_) {}
+        } catch (_) { }
       }, 50);
     }
-  } catch (_) {}
+  } catch (_) { }
 
   // Hide override validation indicator when scene changes
   bindHookOnce('hideOverrideIndicatorOnCanvasTearDown', 'canvasTearDown', async () => {
@@ -777,7 +777,7 @@ export async function onCanvasReady() {
       const { default: indicator } = await import('../ui/OverrideValidationIndicator.js');
       if (!controlled || !indicator?.hasQueuedTokens?.()) return;
       indicator.show([], '', null);
-    } catch (error) {}
+    } catch (error) { }
   });
 
   // Update shared vision indicator when controlled token changes
@@ -864,7 +864,7 @@ async function enableVisionForAllTokensAndPrototypes() {
   try {
     const enabled = !!game.settings.get(MODULE_ID, 'enableAllTokensVision');
     await applyEnableAllTokensVisionSetting(enabled);
-  } catch (_) {}
+  } catch (_) { }
 }
 
 function getTokenVisionEnabled(doc) {
@@ -905,7 +905,7 @@ async function syncNpcVisionInScenes(enabled) {
       if (updates.length) {
         await scene.updateEmbeddedDocuments('Token', updates, { diff: false, render: false });
       }
-    } catch (_) {}
+    } catch (_) { }
   }
 }
 
@@ -921,7 +921,7 @@ async function syncNpcPrototypeVision(enabled) {
           { diff: false },
         );
       }
-    } catch (_) {}
+    } catch (_) { }
   }
 }
 
@@ -931,7 +931,7 @@ export async function applyEnableAllTokensVisionSetting(enabled) {
     const desired = !!enabled;
     await syncNpcVisionInScenes(desired);
     await syncNpcPrototypeVision(desired);
-  } catch (_) {}
+  } catch (_) { }
 }
 
 export function setupFallbackHUDButton() {
@@ -1019,7 +1019,7 @@ export function setupFallbackHUDButton() {
           const pos = JSON.parse(savedPos);
           if (pos.left) button.style.left = pos.left;
           if (pos.top) button.style.top = pos.top;
-        } catch (_) {}
+        } catch (_) { }
       }
 
       button.addEventListener('click', async (event) => {

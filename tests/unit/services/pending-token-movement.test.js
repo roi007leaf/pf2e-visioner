@@ -39,6 +39,8 @@ describe('pending token movement hidden detection guard', () => {
   afterEach(() => {
     jest.useRealTimers();
     clearPendingTokenMovementPosition('observer');
+    global.game.user.id = undefined;
+    global.game.user.isGM = true;
     global.canvas = originalCanvas;
   });
 
@@ -59,6 +61,22 @@ describe('pending token movement hidden detection guard', () => {
     };
 
     setPendingTokenMovementPosition(tokenDoc, { x: 0, y: 0 }, [observer]);
+
+    expect(shouldTemporarilyBlockHiddenDetection(observer, target, 'hidden')).toBe(true);
+  });
+
+  test('guards hidden detection when a waypoint crosses a wall even if the final point is clear', () => {
+    const observer = createMockToken({ id: 'observer', x: 3, y: 3 });
+    const target = createMockToken({ id: 'target', x: 3, y: 0 });
+
+    setPendingTokenMovementPosition(
+      observer.document,
+      { x: 150, y: 50 },
+      [observer],
+      {
+        waypoints: [{ x: 0, y: 0 }],
+      },
+    );
 
     expect(shouldTemporarilyBlockHiddenDetection(observer, target, 'hidden')).toBe(true);
   });
@@ -157,6 +175,25 @@ describe('pending token movement hidden detection guard', () => {
         lightSources: [],
       }),
     ).toEqual([]);
+  });
+
+  test('stores pending movement for current player-owned token even when not locally controlled', () => {
+    global.game.user.id = 'player';
+    global.game.user.isGM = false;
+
+    const observer = createMockToken({ id: 'observer', x: 0, y: 0 });
+    observer.document.testUserPermission = jest.fn((user, permission) => {
+      return user?.id === 'player' && permission === 'OWNER';
+    });
+    const target = createMockToken({ id: 'target', x: 3, y: 0 });
+
+    expect(
+      setPendingTokenMovementPosition(observer.document, { x: 0, y: 0 }, [], {
+        userId: 'player',
+      }),
+    ).toBe(true);
+
+    expect(shouldTemporarilyBlockHiddenDetection(observer, target, 'hidden')).toBe(true);
   });
 
   test('suppresses pending moving source for Foundry-hidden targets', () => {
@@ -347,6 +384,55 @@ describe('pending token movement hidden detection guard', () => {
     expect(target.nameplate.visible).toBe(true);
   });
 
+  test('keeps wall-blocked token hidden when LOS probe flickers visible during active movement', () => {
+    const observer = createMockToken({ id: 'observer', x: 0, y: 0 });
+    const target = createMockToken({ id: 'target', x: 3, y: 0, visible: true });
+    target.renderable = true;
+    target.mesh = { visible: true, renderable: true, alpha: 1 };
+    target.nameplate = { visible: true };
+    target.document.getVisibilityTestPoints = jest.fn(() => [{ x: 175, y: 25 }]);
+    target.refresh = jest.fn();
+    global.canvas = {
+      ...global.canvas,
+      tokens: {
+        get: jest.fn((id) => (id === 'observer' ? observer : null)),
+        placeables: [observer, target],
+      },
+      effects: {
+        visionSources: [{ active: true, object: observer }],
+        lightSources: [],
+      },
+      visibility: {
+        testVisibility: jest.fn().mockReturnValueOnce(false).mockReturnValue(true),
+      },
+      perception: {
+        update: jest.fn(),
+      },
+    };
+
+    setPendingTokenMovementPosition(observer.document, { x: 0, y: 0 }, [observer]);
+    refreshPendingMovementTokenVisibility('observer');
+
+    expect(target.renderable).toBe(false);
+    expect(target.mesh.renderable).toBe(false);
+    expect(target.mesh.alpha).toBe(0);
+    expect(target.nameplate.visible).toBe(false);
+
+    refreshPendingMovementTokenVisibility('observer');
+
+    expect(target.renderable).toBe(false);
+    expect(target.mesh.renderable).toBe(false);
+    expect(target.mesh.alpha).toBe(0);
+    expect(target.nameplate.visible).toBe(false);
+    expect(global.canvas.visibility.testVisibility).toHaveBeenCalledTimes(2);
+
+    expect(completePendingTokenMovement('observer')).toBe(true);
+    expect(target.renderable).toBe(true);
+    expect(target.mesh.renderable).toBe(true);
+    expect(target.mesh.alpha).toBe(1);
+    expect(target.nameplate.visible).toBe(true);
+  });
+
   test('restores observed token rendering after movement animation completes', async () => {
     jest.useFakeTimers();
 
@@ -453,6 +539,60 @@ describe('pending token movement hidden detection guard', () => {
     expect(target.nameplate.visible).toBe(true);
   });
 
+  test('keeps token rendering hidden when player animation appears after first completion check', async () => {
+    jest.useFakeTimers();
+
+    let resolveAnimation;
+    const animationPromise = new Promise((resolve) => {
+      resolveAnimation = resolve;
+    });
+    const observer = createMockToken({ id: 'observer', x: 0, y: 0 });
+    const target = createMockToken({ id: 'target', x: 3, y: 0, visible: true });
+    target.renderable = true;
+    target.mesh = { visible: true, renderable: true, alpha: 1 };
+    target.nameplate = { visible: true };
+    target.document.getVisibilityTestPoints = jest.fn(() => [{ x: 175, y: 25 }]);
+    target.refresh = jest.fn();
+    global.canvas = {
+      ...global.canvas,
+      tokens: {
+        get: jest.fn((id) => (id === 'observer' ? observer : null)),
+        placeables: [observer, target],
+      },
+      effects: {
+        visionSources: [{ active: true, object: observer }],
+        lightSources: [],
+      },
+      visibility: {
+        testVisibility: jest.fn(() => false),
+      },
+      perception: {
+        update: jest.fn(),
+      },
+    };
+
+    setPendingTokenMovementPosition(observer.document, { x: 0, y: 0 }, [observer]);
+    refreshPendingMovementTokenVisibility('observer');
+
+    expect(schedulePendingTokenMovementCompletion(observer.document)).toBe(true);
+    setTimeout(() => {
+      observer._animation = { state: 'running', promise: animationPromise };
+    }, 75);
+
+    jest.advanceTimersByTime(100);
+    expect(target.renderable).toBe(false);
+    expect(target.mesh.renderable).toBe(false);
+
+    resolveAnimation();
+    await animationPromise;
+    await Promise.resolve();
+
+    expect(target.renderable).toBe(true);
+    expect(target.mesh.renderable).toBe(true);
+    expect(target.mesh.alpha).toBe(1);
+    expect(target.nameplate.visible).toBe(true);
+  });
+
   test('movement completion restores token when final visibility becomes observed during grace', () => {
     jest.useFakeTimers();
 
@@ -491,6 +631,80 @@ describe('pending token movement hidden detection guard', () => {
     expect(target.mesh.renderable).toBe(true);
     expect(target.mesh.alpha).toBe(1);
     expect(target.nameplate.visible).toBe(true);
+  });
+
+  test('post-completion refresh restores token when player-side visibility settles late', () => {
+    jest.useFakeTimers();
+
+    global.canvas.walls.placeables = [];
+    const observer = createMockToken({
+      id: 'observer',
+      flags: {
+        'pf2e-visioner': {
+          visibility: {
+            target: 'hidden',
+          },
+        },
+      },
+    });
+    const target = createMockToken({ id: 'target', actorType: 'loot', visible: true });
+    target.renderable = true;
+    target.mesh = { visible: true, renderable: true, alpha: 1 };
+    target.nameplate = { visible: true };
+    target.refresh = jest.fn();
+    global.canvas = {
+      ...global.canvas,
+      tokens: {
+        get: jest.fn((id) => (id === 'observer' ? observer : null)),
+        placeables: [observer, target],
+      },
+      perception: {
+        update: jest.fn(),
+      },
+    };
+
+    setPendingTokenMovementPosition(observer.document, { x: 0, y: 0 }, [observer]);
+    refreshPendingMovementTokenVisibility('observer');
+
+    expect(completePendingTokenMovement('observer')).toBe(true);
+    expect(target.renderable).toBe(false);
+    expect(target.mesh.renderable).toBe(false);
+
+    observer.document.getFlag.mockReturnValue({ target: 'observed' });
+    jest.advanceTimersByTime(100);
+
+    expect(target.renderable).toBe(true);
+    expect(target.mesh.renderable).toBe(true);
+    expect(target.mesh.alpha).toBe(1);
+    expect(target.nameplate.visible).toBe(true);
+  });
+
+  test('does not run stale post-completion refresh after the same token starts moving again', () => {
+    jest.useFakeTimers();
+
+    global.canvas.walls.placeables = [];
+    const observer = createMockToken({ id: 'observer', x: 0, y: 0 });
+    const target = createMockToken({ id: 'target', x: 3, y: 0, visible: true });
+    target.refresh = jest.fn();
+    global.canvas = {
+      ...global.canvas,
+      tokens: {
+        get: jest.fn((id) => (id === 'observer' ? observer : null)),
+        placeables: [observer, target],
+      },
+      perception: {
+        update: jest.fn(),
+      },
+    };
+
+    setPendingTokenMovementPosition(observer.document, { x: 0, y: 0 }, [observer]);
+    expect(completePendingTokenMovement('observer')).toBe(true);
+    target.refresh.mockClear();
+
+    setPendingTokenMovementPosition(observer.document, { x: 100, y: 0 }, [observer]);
+    jest.advanceTimersByTime(100);
+
+    expect(target.refresh).not.toHaveBeenCalled();
   });
 
   test('keeps undetected targets invisible even when pending position can see them', () => {
