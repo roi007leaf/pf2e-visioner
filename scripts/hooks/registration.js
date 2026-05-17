@@ -44,7 +44,7 @@ async function cleanupAvsOverridesForDefeatedActor(actor) {
           '../chat/services/take-cover-expiration-service.js'
         );
         await requestTakeCoverExpirationForToken(token, 'unconscious');
-      } catch {}
+      } catch { }
       await AvsOverrideManager.removeAllOverridesInvolving(token.document.id);
     }
 
@@ -90,7 +90,7 @@ async function refreshAfterCoverEffectMapSync(tokenIds) {
     await globalThis.window?.pf2eVisioner?.services?.autoVisibilitySystem?.recalculateForTokens?.(
       ids,
     );
-  } catch {}
+  } catch { }
 
   try {
     const { autoVisibilitySystem } = await import('../visibility/auto-visibility/index.js');
@@ -111,11 +111,11 @@ async function refreshAfterCoverEffectMapSync(tokenIds) {
         }
       }
     }
-  } catch {}
+  } catch { }
 
   try {
     canvas?.perception?.update?.({ refreshVision: true, refreshOcclusion: true });
-  } catch {}
+  } catch { }
 }
 
 export async function registerHooks() {
@@ -703,7 +703,13 @@ export async function registerHooks() {
         }
       }
 
-      if (setPendingTokenMovementPosition(tokenDoc, changes, canvas?.tokens?.controlled || [])) {
+      if (
+        setPendingTokenMovementPosition(tokenDoc, changes, canvas?.tokens?.controlled || [], {
+          userId,
+          hookOptions: options,
+        })
+      ) {
+
         refreshPendingMovementTokenVisibility(tokenDoc.id);
       }
 
@@ -735,7 +741,7 @@ export async function registerHooks() {
 
       try {
         schedulePendingTokenMovementCompletion(tokenDoc);
-      } catch {}
+      } catch { }
 
       const controlledTokens = canvas?.tokens?.controlled || [];
       if (controlledTokens.length === 0) return;
@@ -785,7 +791,7 @@ export async function registerHooks() {
       if (hasPendingMovementRenderWork()) {
         refreshPendingMovementTokenVisibility([], { ignoreObservedGrace: true });
       }
-    } catch {}
+    } catch { }
   });
 
   // Removed createToken hook - was causing excessive updateWallVisuals calls on token creation.
