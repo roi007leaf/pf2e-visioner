@@ -11,6 +11,7 @@ import { SneakActionHandler } from '../../../scripts/chat/services/actions/Sneak
 import { TakeCoverActionHandler } from '../../../scripts/chat/services/actions/TakeCoverAction.js';
 
 const mockGetCoverBetween = jest.fn(() => 'none');
+const mockGetCoverMap = jest.fn(() => ({}));
 const mockDetectCoverBetweenTokens = jest.fn(() => 'none');
 const mockSetCoverBetween = jest.fn();
 const mockApplyTakeCoverProneRangedOnlyEffect = jest.fn();
@@ -37,6 +38,7 @@ jest.mock('../../../scripts/constants.js', () => ({
 jest.mock('../../../scripts/utils.js', () => ({
     getVisibilityBetween: jest.fn(() => 'hidden'),
     getCoverBetween: (...args) => mockGetCoverBetween(...args),
+    getCoverMap: (...args) => mockGetCoverMap(...args),
     setCoverBetween: (...args) => mockSetCoverBetween(...args),
 }));
 
@@ -59,6 +61,7 @@ describe('Action Token Resolution Tests', () => {
 
     beforeEach(() => {
         mockGetCoverBetween.mockReset().mockReturnValue('none');
+        mockGetCoverMap.mockReset().mockReturnValue({});
         mockDetectCoverBetweenTokens.mockReset().mockReturnValue('none');
         mockSetCoverBetween.mockReset();
         mockApplyTakeCoverProneRangedOnlyEffect.mockReset().mockResolvedValue(undefined);
@@ -393,6 +396,56 @@ describe('Action Token Resolution Tests', () => {
             expect(mockDetectCoverBetweenTokens).toHaveBeenCalledWith(mockTarget, mockActorToken);
             expect(outcome.oldCover).toBe('none');
             expect(outcome.currentCover).toBe('none');
+            expect(outcome.newCover).toBe('standard');
+            expect(outcome.changed).toBe(true);
+        });
+
+        test('should use the same auto-cover detector call as the G overlay for Take Cover baseline', async () => {
+            const handler = new TakeCoverActionHandler();
+            mockGetCoverBetween.mockReturnValue('none');
+            mockDetectCoverBetweenTokens.mockReturnValue('standard');
+
+            const outcome = await handler.analyzeOutcome(
+                { actor: mockActorToken, actorToken: mockActorToken },
+                mockTarget,
+            );
+
+            expect(mockDetectCoverBetweenTokens).toHaveBeenCalledWith(mockTarget, mockActorToken);
+            expect(outcome.baselineCover).toBe('standard');
+            expect(outcome.oldCover).toBe('none');
+            expect(outcome.newCover).toBe('greater');
+            expect(outcome.changed).toBe(true);
+        });
+
+        test('should use the same G overlay cover state path including manual cover precedence', async () => {
+            const handler = new TakeCoverActionHandler();
+            mockGetCoverBetween.mockReturnValue('none');
+            mockGetCoverMap.mockReturnValue({ [mockActorToken.id]: 'lesser' });
+            mockDetectCoverBetweenTokens.mockReturnValue('standard');
+
+            const outcome = await handler.analyzeOutcome(
+                { actor: mockActorToken, actorToken: mockActorToken },
+                mockTarget,
+            );
+
+            expect(mockGetCoverMap).toHaveBeenCalledWith(mockTarget);
+            expect(mockDetectCoverBetweenTokens).not.toHaveBeenCalled();
+            expect(outcome.newCover).toBe('standard');
+            expect(outcome.changed).toBe(true);
+        });
+
+        test('should not pass Take Cover-specific detector options when computing baseline', async () => {
+            const handler = new TakeCoverActionHandler();
+            mockGetCoverBetween.mockReturnValue('none');
+            mockDetectCoverBetweenTokens.mockReturnValue('none');
+
+            const outcome = await handler.analyzeOutcome(
+                { actor: mockActorToken, actorToken: mockActorToken },
+                mockTarget,
+            );
+
+            expect(mockDetectCoverBetweenTokens).toHaveBeenCalledWith(mockTarget, mockActorToken);
+            expect(mockDetectCoverBetweenTokens.mock.calls[0]).toHaveLength(2);
             expect(outcome.newCover).toBe('standard');
             expect(outcome.changed).toBe(true);
         });

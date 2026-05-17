@@ -33,6 +33,10 @@ jest.mock('../../../scripts/utils.js', () => ({
   hasActiveEncounter: jest.fn(() => false),
 }));
 
+jest.mock('../../../scripts/stores/visibility-map.js', () => ({
+  getVisibilityMap: jest.fn(() => ({})),
+}));
+
 // Mock the constants
 jest.mock('../../../scripts/constants.js', () => ({
   COVER_STATES: {
@@ -103,6 +107,18 @@ jest.mock('../../../scripts/constants.js', () => ({
       icon: 'fas fa-ghost',
       color: '#9c27b0',
       cssClass: 'visibility-undetected',
+    },
+    unnoticed: {
+      label: 'PF2E_VISIONER.VISIBILITY.UNNOTICED',
+      icon: 'fas fa-user-secret',
+      color: '#9c27b0',
+      cssClass: 'visibility-unnoticed',
+    },
+    avs: {
+      label: 'PF2E_VISIONER.VISIBILITY.AVS',
+      icon: 'fas fa-bolt-auto',
+      color: '#9c27b0',
+      cssClass: 'visibility-avs',
     },
   },
   getVisibilityStateLabelKey: jest.fn((state, { manual = false } = {}) => {
@@ -245,6 +261,7 @@ describe('Token Manager Context Building - DC Display Fix', () => {
     } = require('../../../scripts/utils.js');
     getSceneTargets.mockReturnValue([mockTarget1, mockTarget2]);
     getVisibilityMap.mockReturnValue({});
+    require('../../../scripts/stores/visibility-map.js').getVisibilityMap.mockReturnValue({});
     getCoverMap.mockReturnValue({});
     hasActiveEncounter.mockReturnValue(false);
     getLastRollTotalForActor.mockReturnValue(null);
@@ -427,6 +444,15 @@ describe('Token Manager Context Building - DC Display Fix', () => {
       });
     });
 
+    test('should not offer unnoticed as a manual visibility action or bulk action', async () => {
+      const context = await buildContext(mockApp, {});
+
+      expect(context.visibilityStates.map((state) => state.value)).not.toContain('unnoticed');
+      for (const target of context.pcTargets) {
+        expect(target.visibilityStates.map((state) => state.value)).not.toContain('unnoticed');
+      }
+    });
+
     test('should set correct mode properties in target mode', async () => {
       mockApp.mode = 'target';
 
@@ -435,6 +461,49 @@ describe('Token Manager Context Building - DC Display Fix', () => {
       expect(context.mode).toBe('target');
       expect(context.isTargetMode).toBe(true);
       expect(context.isObserverMode).toBe(false);
+    });
+
+    test('target mode treats cover-only AVS flags as AVS-controlled visibility', async () => {
+      mockApp.mode = 'target';
+      global.game.settings.get.mockImplementation((moduleId, settingId) => {
+        if (settingId === 'autoVisibilityEnabled') return true;
+        if (settingId === 'integrateRollOutcome') return false;
+        if (settingId === 'hiddenWallsEnabled') return false;
+        return false;
+      });
+      mockObserver.document.getFlag.mockImplementation((moduleId, key) =>
+        moduleId === 'pf2e-visioner' && key === `avs-override-from-${mockTarget1.document.id}`
+          ? {
+              state: 'avs',
+              source: 'take_cover_action',
+              coverOnly: true,
+              coverOverrideSource: 'take_cover_action',
+              expectedCover: 'standard',
+            }
+          : null,
+      );
+      const { getVisibilityMap } = require('../../../scripts/utils.js');
+      getVisibilityMap.mockImplementation((token) =>
+        token?.document?.id === mockTarget1.document.id
+          ? { [mockObserver.document.id]: 'hidden' }
+          : {},
+      );
+      require('../../../scripts/stores/visibility-map.js').getVisibilityMap.mockImplementation(
+        (token) =>
+          token?.document?.id === mockTarget1.document.id
+            ? { [mockObserver.document.id]: 'hidden' }
+            : {},
+      );
+
+      const context = await buildContext(mockApp, {});
+      const amiriTarget = context.pcTargets.find((t) => t.id === mockTarget1.document.id);
+
+      expect(amiriTarget.hasAvsOverride).toBe(false);
+      expect(amiriTarget.isAvsControlled).toBe(true);
+      expect(amiriTarget.currentVisibilityState).toBe('hidden');
+      expect(amiriTarget.visibilityStates.find((state) => state.value === 'avs')?.selected).toBe(
+        true,
+      );
     });
 
     test('should set correct mode properties in observer mode', async () => {

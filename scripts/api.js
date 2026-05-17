@@ -414,8 +414,7 @@ export class Pf2eVisionerApi {
           observerPos,
           targetPos,
         );
-      } catch (e) {
-        console.error('[Visibility Factors API Debug] Region concealment check failed:', e);
+      } catch {
       }
 
       // Check for darkness along the ray (magical darkness templates)
@@ -511,8 +510,7 @@ export class Pf2eVisionerApi {
             }
           }
         }
-      } catch (e) {
-        console.error('[Visibility Factors API Debug] Ray darkness check failed:', e);
+      } catch {
       }
 
       // Determine lighting factor

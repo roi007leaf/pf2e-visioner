@@ -15,6 +15,17 @@ import {
   legacyVisibilityToProfile,
 } from '../visibility/perception-profile.js';
 import { isExplicitVisiblePair } from './ExplicitVisibilityPairs.js';
+import {
+  forcePendingMovementTokenInvisible,
+  restorePendingMovementTokenRendering,
+  isPendingMovementHiddenStateVisibilityProbe,
+  shouldTemporarilyBlockHiddenDetection,
+  shouldTemporarilyBlockSightDetection,
+  shouldBypassPendingMovementVisionerRenderState,
+  shouldTemporarilyForceTokenInvisible,
+  getPendingMovementHiddenStateBlock,
+  withPendingMovementBlockedDetectionSourcesSuppressed,
+} from './pending-token-movement.js';
 
 /**
  * Class wrapper for PF2E detection integration to support init/teardown.
@@ -38,6 +49,12 @@ export class DetectionWrapper {
       'foundry.canvas.perception.DetectionMode.prototype.testVisibility',
       detectionModeTestVisibility,
       'OVERRIDE',
+    );
+    libWrapper.register(
+      'pf2e-visioner',
+      'foundry.canvas.groups.CanvasVisibility.prototype.testVisibility',
+      canvasVisibilityTestVisibilityWrapper,
+      'WRAPPER',
     );
     libWrapper.register(
       'pf2e-visioner',
@@ -70,6 +87,12 @@ export class DetectionWrapper {
         'pf2e-visioner',
         'foundry.canvas.placeables.Token.prototype._isVisionSource',
         tokenIsVisionSourceWrapper,
+        'WRAPPER',
+      );
+      libWrapper.register(
+        'pf2e-visioner',
+        'foundry.canvas.placeables.Token.prototype._refreshVisibility',
+        tokenRefreshVisibilityWrapper,
         'WRAPPER',
       );
       libWrapper.register(
@@ -135,14 +158,66 @@ function detectionModeTestVisibility(visionSource, mode, config = {}) {
   if (!this._canDetect(visionSource, config.object, level)) return false;
 
   const modeId = mode?.id ?? this?.id ?? null;
+  const observerToken = visionSource?.object;
+  const targetToken = config.object;
+  const hiddenStateContext = getPendingMovementHiddenStateBlock(targetToken);
+  if (hiddenStateContext && !isPendingMovementHiddenStateVisibilityProbe()) {
+    return false;
+  }
+
   if (NON_VISUAL_DETECTION_MODE_IDS.has(modeId)) {
-    const visibility = getVisibilityBetweenTokens(visionSource?.object, config.object);
+    const visibility = getVisibilityBetweenTokens(observerToken, targetToken);
     if (visibility === 'hidden' || visibility === 'concealed') {
+      if (
+        shouldTemporarilyBlockHiddenDetection(observerToken, targetToken, visibility)
+      ) {
+        return false;
+      }
       return true;
     }
   }
 
   return config.tests.some((test) => this._testPoint(visionSource, mode, config.object, test));
+}
+
+function canvasVisibilityTestVisibilityWrapper(wrapped, points, options = {}) {
+  try {
+    return withPendingMovementBlockedDetectionSourcesSuppressed(
+      options?.object,
+      (blockedSources, blockedEntries = [], hiddenStateContext = null) => {
+        const probingHiddenState = isPendingMovementHiddenStateVisibilityProbe();
+        const sourceHiddenStateContext =
+          probingHiddenState
+            ? null
+            : hiddenStateContext ||
+              blockedEntries.find(
+                ({ context }) => context?.hiddenByVisioner || context?.foundryHidden,
+              )?.context ||
+              getPendingMovementHiddenStateBlock(options?.object);
+        if (sourceHiddenStateContext) {
+          return false;
+        }
+
+        return wrapped(points, options);
+      },
+    );
+  } catch {
+    return wrapped(points, options);
+  }
+}
+
+function tokenRefreshVisibilityWrapper(wrapped, ...args) {
+  const result = wrapped(...args);
+  try {
+    if (shouldTemporarilyForceTokenInvisible(this)) {
+      forcePendingMovementTokenInvisible(this);
+    } else {
+      restorePendingMovementTokenRendering(this);
+    }
+  } catch {
+    /* keep Foundry visibility if guard fails */
+  }
+  return result;
 }
 
 /**
@@ -180,8 +255,26 @@ function canDetectWrapper(threshold) {
       }
     } catch (_) { }
 
+    if (isPendingMovementHiddenStateVisibilityProbe()) {
+      return true;
+    }
+
     const origin = observerToken;
-    const reachedThreshold = reachesVisibilityThreshold(origin, target, threshold, { visibility });
+    if (
+      threshold === VISIBILITY_VALUES.hidden &&
+      visibility !== 'observed' &&
+      shouldTemporarilyBlockSightDetection(origin, target)
+    ) {
+      return false;
+    }
+
+    if (shouldBypassPendingMovementVisionerRenderState(origin, target, visibility)) {
+      return true;
+    }
+
+    const reachedThreshold = reachesVisibilityThreshold(origin, target, threshold, {
+      visibility,
+    });
 
     return !reachedThreshold;
   };

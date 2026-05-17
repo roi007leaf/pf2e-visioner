@@ -19,6 +19,7 @@ class SocketService {
     this._socket.register(POINT_OUT_CHANNEL, pointOutHandler);
     this._socket.register(SEEK_TEMPLATE_CHANNEL, seekTemplateHandler);
     this._socket.register(POINTOUT_REQUEST_CHANNEL, pointOutRequestHandler);
+    this._socket.register(TAKE_COVER_REQUEST_CHANNEL, takeCoverRequestHandler);
     this._socket.register(WALL_VISUALS_CHANNEL, updateWallVisualsHandler);
     return this._socket;
   }
@@ -42,6 +43,7 @@ export const REFRESH_CHANNEL = 'RefreshPerception';
 const POINT_OUT_CHANNEL = 'PointOut';
 const SEEK_TEMPLATE_CHANNEL = 'SeekTemplate';
 const POINTOUT_REQUEST_CHANNEL = 'PointOutRequest';
+const TAKE_COVER_REQUEST_CHANNEL = 'TakeCoverRequest';
 const WALL_VISUALS_CHANNEL = 'UpdateWallVisuals';
 
 export function registerSocket() {
@@ -135,6 +137,34 @@ export function requestGMOpenPointOut(pointerTokenId, targetTokenId, messageId) 
     messageId,
     userId: game.userId,
   });
+}
+
+export function requestGMOpenTakeCover(actorTokenId, messageId = null) {
+  if (!_socketService.socket || !actorTokenId) return false;
+  _socketService.executeAsGM(TAKE_COVER_REQUEST_CHANNEL, {
+    actorTokenId,
+    messageId,
+    userId: game.userId,
+  });
+  return true;
+}
+
+async function takeCoverRequestHandler({ actorTokenId, messageId = null, userId = null } = {}) {
+  try {
+    if (!game.user?.isGM) return;
+
+    const actorToken = canvas.tokens?.get?.(actorTokenId);
+    if (!actorToken?.actor) return;
+
+    const { openVisionerTakeCoverPreview } = await import('../integrations/pf2e-hud-take-cover.js');
+    await openVisionerTakeCoverPreview(actorToken, {
+      source: 'player-request',
+      messageId,
+      requestedByUserId: userId,
+    });
+  } catch (error) {
+    console.error(`[${MODULE_ID}] Failed to handle GM Take Cover preview from player:`, error);
+  }
 }
 
 async function pointOutRequestHandler({ pointerTokenId, targetTokenId, messageId, userId }) {

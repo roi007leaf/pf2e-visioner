@@ -27,13 +27,46 @@ function isTakeCoverAutoRelease(override) {
   );
 }
 
+function shouldSuppressCoverChange(override) {
+  return override?.suppressCoverChange === true;
+}
+
+function getExpectedCoverKey(override) {
+  return override?.expectedCover != null
+    ? override.expectedCover
+    : override?.hasCover ? (override.originalCover || 'standard') : 'none';
+}
+
 function getDisplayCoverKey(override) {
+  if (shouldSuppressCoverChange(override)) return getExpectedCoverKey(override);
   return isTakeCoverAutoRelease(override) ? 'auto' : override?.currentCover || 'none';
+}
+
+function isAutoCalculatedCoverChange(override) {
+  if (shouldSuppressCoverChange(override)) return false;
+  if (isTakeCoverAutoRelease(override)) return false;
+  const previousCover = getExpectedCoverKey(override);
+  const currentCover = override?.currentCover || 'none';
+  return (
+    override?.coverChangeSource === 'auto' ||
+    (currentCover !== previousCover && !!override?.currentCover)
+  );
 }
 
 function getCoverDisplayConfig(key, fallback = {}) {
   if (key === 'auto') return AUTO_COVER_DISPLAY;
   return (COVER_STATES && COVER_STATES[key]) || fallback;
+}
+
+function localizeCoverLabel(config, key, fallback = 'No Cover') {
+  const raw = config?.label || fallback;
+  const localized = game?.i18n?.localize?.(raw) || raw;
+  if (localized !== raw) return localized;
+  const words = String(key || fallback)
+    .split(/[-_]/g)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1));
+  return words.length ? `${words.join(' ')} Cover` : fallback;
 }
 
 export class OverrideValidationDialog extends foundry.applications.api.HandlebarsApplicationMixin(foundry.applications.api.ApplicationV2) {
@@ -141,16 +174,17 @@ export class OverrideValidationDialog extends foundry.applications.api.Handlebar
       // Prefer current states provided by the validator/caller; fall back to safe defaults
       const visibilityKey = override.currentVisibility || 'observed';
       const coverOnly = override.coverOnly === true;
+      const controlReleaseOnly = override.controlReleaseOnly === true;
       const coverKey = getDisplayCoverKey(override);
+      const autoCalculatedCover = isAutoCalculatedCoverChange(override);
+      const suppressCoverChange = shouldSuppressCoverChange(override);
       const prevVisibilityKey = coverOnly
         ? visibilityKey
         : overrideToDisplayVisibility(override);
 
       // Previous/original cover must reflect what the override expected at apply-time,
       // not what the currentCover is now. If we don't have a specific level, assume 'standard'.
-      const prevCoverKey = (override.expectedCover != null)
-        ? override.expectedCover
-        : (override.hasCover ? (override.originalCover || 'standard') : 'none');
+      const prevCoverKey = getExpectedCoverKey(override);
 
       const visCfg = (VISIBILITY_STATES && VISIBILITY_STATES[visibilityKey]) || { icon: 'fas fa-eye', color: '#4caf50', label: 'Observed' };
       const coverCfg = getCoverDisplayConfig(coverKey, { icon: 'fas fa-shield-slash', color: '#4caf50', label: 'No Cover' });
@@ -162,6 +196,16 @@ export class OverrideValidationDialog extends foundry.applications.api.Handlebar
       };
       const currentVisibilityLabel = localizeVisibilityLabel(visibilityKey, 'Observed');
       const previousVisibilityLabel = localizeVisibilityLabel(prevVisibilityKey, 'Previous');
+      const currentVisibilityDescription = controlReleaseOnly
+        ? 'Return to AVS control'
+        : (VISIBILITY_STATES && VISIBILITY_STATES[visibilityKey]?.label)
+          ? (
+            currentVisibilityLabel +
+            (!suppressCoverChange && coverKey && coverCfg?.label
+              ? ` • ${game?.i18n?.localize?.(coverCfg.label)}`
+              : '')
+          )
+          : undefined;
 
       return {
         id: `${override.observerId}-${override.targetId}`,
@@ -173,12 +217,12 @@ export class OverrideValidationDialog extends foundry.applications.api.Handlebar
         targetImg,
         reason: override.reason,
         // Optionally surface a friendly description of current states
-        currentVisibilityDescription: (VISIBILITY_STATES && VISIBILITY_STATES[visibilityKey]?.label)
-          ? (currentVisibilityLabel + (coverKey && coverCfg?.label ? ` • ${game?.i18n?.localize?.(coverCfg.label)}` : ''))
-          : undefined,
+        currentVisibilityDescription,
         state: overrideToDisplayVisibility(override) || 'undetected',
         source: override.source || 'unknown',
         coverOnly,
+        controlReleaseOnly,
+        suppressCoverChange,
         badgeLabel,
         badgeIcon,
         badgeClass,
@@ -208,7 +252,12 @@ export class OverrideValidationDialog extends foundry.applications.api.Handlebar
           key: coverKey,
           icon: coverCfg.icon,
           color: coverCfg.color,
-          label: game?.i18n?.localize?.(coverCfg.label) || 'No Cover'
+          label: autoCalculatedCover
+            ? `Auto Cover: ${localizeCoverLabel(coverCfg, coverKey)}`
+            : game?.i18n?.localize?.(coverCfg.label) || 'No Cover',
+          autoCalculated: autoCalculatedCover,
+          autoIcon: AUTO_COVER_DISPLAY.icon,
+          autoLabel: 'Auto cover calculation',
         }
       };
     });
@@ -414,9 +463,10 @@ export class OverrideValidationDialog extends foundry.applications.api.Handlebar
       override?.coverOnly === true ||
       override?.coverOverrideSource === 'take_cover_action' ||
       override?.source === 'take_cover_action';
-    return isTakeCoverTracking
+    if (!isTakeCoverTracking) return undefined;
+    return override?.coverOnly === true
       ? { acceptedCoverState: override.currentCover || 'none' }
-      : undefined;
+      : { preserveTakeCoverTracking: true };
   }
 
   async _removeAcceptedOverride(override) {

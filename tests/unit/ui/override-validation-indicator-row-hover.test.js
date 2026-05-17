@@ -228,6 +228,91 @@ describe('OverrideValidationIndicator row hover highlighting', () => {
     ).toBeFalsy();
   });
 
+  test('suppresses Take Cover cover icons on mixed visibility rows', () => {
+    const observer = global.canvas.tokens.get('observer-1');
+    const target = global.canvas.tokens.get('target-1');
+
+    indicator.show(
+      [
+        {
+          observerId: observer.id,
+          targetId: target.id,
+          observerName: observer.name,
+          targetName: target.name,
+          state: 'undetected',
+          currentVisibility: 'observed',
+          coverOnly: false,
+          source: 'sneak_action',
+          coverOverrideSource: 'take_cover_action',
+          expectedCover: 'standard',
+          currentCover: 'none',
+          suppressCoverChange: true,
+        },
+      ],
+      'Target',
+      target.id,
+    );
+
+    document
+      .querySelector('.pf2e-visioner-override-indicator')
+      .dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
+
+    expect(
+      document.querySelector('.pf2e-visioner-override-tooltip .state-indicator.visibility-undetected'),
+    ).toBeTruthy();
+    expect(
+      document.querySelector('.pf2e-visioner-override-tooltip .state-indicator.visibility-observed'),
+    ).toBeTruthy();
+    expect(
+      document.querySelector('.pf2e-visioner-override-tooltip .state-indicator.cover-standard'),
+    ).toBeFalsy();
+    expect(
+      document.querySelector('.pf2e-visioner-override-tooltip .state-indicator.cover-auto'),
+    ).toBeFalsy();
+    expect(
+      document.querySelector('.pf2e-visioner-override-tooltip .state-indicator.cover-none'),
+    ).toBeFalsy();
+  });
+
+  test('renders auto-calculated cover level with auto marker and actual cover level', () => {
+    const observer = global.canvas.tokens.get('observer-1');
+    const target = global.canvas.tokens.get('target-1');
+
+    indicator.show(
+      [
+        {
+          observerId: observer.id,
+          targetId: target.id,
+          observerName: observer.name,
+          targetName: target.name,
+          state: 'hidden',
+          currentVisibility: 'hidden',
+          expectedCover: 'none',
+          currentCover: 'lesser',
+        },
+      ],
+      'Target',
+      target.id,
+    );
+
+    document
+      .querySelector('.pf2e-visioner-override-indicator')
+      .dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
+
+    const autoIcon = document.querySelector(
+      '.pf2e-visioner-override-tooltip .state-indicator.cover-auto',
+    );
+    const lesserIcon = document.querySelector(
+      '.pf2e-visioner-override-tooltip .state-indicator.cover-lesser',
+    );
+
+    expect(autoIcon).toBeTruthy();
+    expect(autoIcon.className).toContain('fa-arrows-rotate');
+    expect(autoIcon.dataset.tooltip).toContain('Auto cover calculation');
+    expect(lesserIcon).toBeTruthy();
+    expect(lesserIcon.dataset.tooltip).toContain('auto calculated');
+  });
+
   test('renders Legendary Sneak context next to the moved target name', () => {
     const observer = global.canvas.tokens.get('observer-1');
     const target = global.canvas.tokens.get('target-1');
@@ -281,5 +366,41 @@ describe('OverrideValidationIndicator row hover highlighting', () => {
         '.pf2e-visioner-override-tooltip .tip-row .stealth-position-bypass-badge',
       ),
     ).toBeFalsy();
+  });
+
+  test('renders stable visibility overrides as release-to-AVS rows', () => {
+    const observer = global.canvas.tokens.get('observer-1');
+    const target = global.canvas.tokens.get('target-1');
+
+    indicator.show(
+      [
+        {
+          observerId: observer.id,
+          targetId: target.id,
+          observerName: observer.name,
+          targetName: target.name,
+          state: 'hidden',
+          currentVisibility: 'hidden',
+          controlReleaseOnly: true,
+          reason: 'Return to AVS control',
+        },
+      ],
+      target.name,
+      target.id,
+    );
+
+    document
+      .querySelector('.pf2e-visioner-override-indicator')
+      .dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
+
+    const row = document.querySelector('.pf2e-visioner-override-tooltip .tip-row');
+    expect(row).toBeTruthy();
+    expect(
+      document.querySelector('.pf2e-visioner-override-tooltip .state-indicator.visibility-avs'),
+    ).toBeTruthy();
+    expect(
+      document.querySelector('.pf2e-visioner-override-tooltip .state-indicator.visibility-avs')
+        .dataset.tooltip,
+    ).toContain('AVS');
   });
 });

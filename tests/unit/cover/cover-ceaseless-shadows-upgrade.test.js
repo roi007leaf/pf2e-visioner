@@ -60,11 +60,19 @@ describe('CoverDetector - Ceaseless Shadows cover upgrade', () => {
         const { default: cd } = require('../../../scripts/cover/auto-cover/CoverDetector.js');
         const c1 = cd._evaluateCreatureSizeCover(attacker, target, [smallBlocker]);
         expect(c1).toBe('standard');
+        const c1Raw = cd._evaluateCreatureSizeCover(attacker, target, [smallBlocker], null, {
+            skipCreatureCoverFeatUpgrade: true,
+        });
+        expect(c1Raw).toBe('lesser');
 
         // Case 2: big blocker gives standard which upgrades to greater
         canvas.tokens.placeables = [attacker, target, bigBlocker];
         const c2 = cd._evaluateCreatureSizeCover(attacker, target, [bigBlocker]);
         expect(c2).toBe('greater');
+        const c2Raw = cd._evaluateCreatureSizeCover(attacker, target, [bigBlocker], null, {
+            skipCreatureCoverFeatUpgrade: true,
+        });
+        expect(c2Raw).toBe('standard');
     });
 
     test('no upgrade when target lacks feat', () => {

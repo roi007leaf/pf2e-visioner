@@ -789,6 +789,342 @@ describe('AvsOverrideManager (AVS overrides lifecycle)', () => {
     expect(B.document.unsetFlag).toHaveBeenCalledWith('pf2e-visioner', 'avs-override-from-A');
   });
 
+  test('removeTakeCoverTracking clears manual cover while preserving merged visibility override', async () => {
+    const A = mkToken('A', 'Observer');
+    const B = mkToken('B', 'Target');
+    B.document.getFlag.mockImplementation((mod, key) =>
+      mod === 'pf2e-visioner' && key === 'avs-override-from-A'
+        ? {
+            observerId: 'A',
+            targetId: 'B',
+            state: 'hidden',
+            source: 'sneak_action',
+            hasCover: true,
+            hasConcealment: true,
+            coverOnly: false,
+            coverOverrideSource: 'take_cover_action',
+            expectedCover: 'standard',
+          }
+        : undefined,
+    );
+    canvas.tokens.get.mockImplementation((id) => ({ A, B }[id] || null));
+
+    const setCoverBetween = jest.fn().mockResolvedValue(true);
+    jest.doMock('../../../scripts/stores/cover-map.js', () => ({
+      __esModule: true,
+      getCoverBetween: jest.fn(() => 'standard'),
+      setCoverBetween,
+    }));
+
+    const { default: AvsOverrideManager } = await import(
+      '../../../scripts/chat/services/infra/AvsOverrideManager.js'
+    );
+
+    const result = await AvsOverrideManager.removeTakeCoverTracking('A', 'B');
+
+    expect(result).toBe(true);
+    expect(setCoverBetween).toHaveBeenCalledWith(
+      A,
+      B,
+      'none',
+      expect.objectContaining({ skipEphemeralUpdate: false }),
+    );
+    expect(B.document.setFlag).toHaveBeenCalledWith(
+      'pf2e-visioner',
+      'avs-override-from-A',
+      expect.objectContaining({
+        observerId: 'A',
+        targetId: 'B',
+        state: 'hidden',
+        source: 'sneak_action',
+        hasCover: false,
+        hasConcealment: true,
+        coverOnly: false,
+      }),
+    );
+    const stored = B.document.setFlag.mock.calls[0][2];
+    expect(stored.coverOverrideSource).toBeUndefined();
+    expect(stored.expectedCover).toBeUndefined();
+  });
+
+  test('expireTakeCoverForToken does not hide AVS indicator when mixed visibility override remains', async () => {
+    const A = mkToken('A', 'Observer');
+    const B = mkToken('B', 'Target');
+    B.document.flags['pf2e-visioner']['avs-override-from-A'] = {
+      observerId: 'A',
+      targetId: 'B',
+      state: 'hidden',
+      source: 'sneak_action',
+      hasCover: true,
+      hasConcealment: true,
+      coverOnly: false,
+      coverOverrideSource: 'take_cover_action',
+      expectedCover: 'standard',
+      takeCoverExpirationPending: true,
+      takeCoverExpirationReason: 'movement',
+    };
+    B.document.getFlag.mockImplementation((mod, key) => B.document.flags[mod]?.[key]);
+    B.document.setFlag.mockImplementation(async (mod, key, value) => {
+      B.document.flags[mod] ||= {};
+      B.document.flags[mod][key] = value;
+      return true;
+    });
+    canvas.tokens.get.mockImplementation((id) => ({ A, B }[id] || null));
+    canvas.tokens.placeables = [A, B];
+
+    const setCoverBetween = jest.fn().mockResolvedValue(true);
+    const recalculateForTokens = jest.fn().mockResolvedValue(undefined);
+    const queueOverrideValidation = jest.fn();
+    const processQueuedValidations = jest.fn().mockResolvedValue(undefined);
+    const hide = jest.fn();
+    jest.doMock('../../../scripts/stores/cover-map.js', () => ({
+      __esModule: true,
+      getCoverBetween: jest.fn(() => 'standard'),
+      setCoverBetween,
+    }));
+    jest.doMock('../../../scripts/visibility/auto-visibility/EventDrivenVisibilitySystem.js', () => ({
+      __esModule: true,
+      eventDrivenVisibilitySystem: {
+        recalculateForTokens,
+        overrideValidationManager: {
+          queueOverrideValidation,
+          processQueuedValidations,
+        },
+      },
+    }));
+    jest.doMock('../../../scripts/ui/OverrideValidationIndicator.js', () => ({
+      __esModule: true,
+      default: { hide },
+    }));
+
+    const { default: AvsOverrideManager } = await import(
+      '../../../scripts/chat/services/infra/AvsOverrideManager.js'
+    );
+
+    const result = await AvsOverrideManager.expireTakeCoverForToken(B, 'movement');
+
+    expect(result).toBe(true);
+    expect(recalculateForTokens).toHaveBeenCalledWith(expect.arrayContaining(['A', 'B']));
+    expect(queueOverrideValidation).toHaveBeenCalledWith('B', { force: true });
+    expect(processQueuedValidations).toHaveBeenCalledWith({ skipMovedFilter: true });
+    expect(hide).not.toHaveBeenCalled();
+    expect(B.document.flags['pf2e-visioner']['avs-override-from-A']).toEqual(
+      expect.objectContaining({
+        state: 'hidden',
+        source: 'sneak_action',
+        hasCover: false,
+        hasConcealment: true,
+        coverOnly: false,
+      }),
+    );
+  });
+
+  test('expireTakeCoverForToken revalidates mixed visibility even when document flags are stale during chat accept', async () => {
+    const A = mkToken('A', 'Observer');
+    const B = mkToken('B', 'Target');
+    B.document.flags['pf2e-visioner']['avs-override-from-A'] = {
+      observerId: 'A',
+      targetId: 'B',
+      state: 'hidden',
+      source: 'sneak_action',
+      hasCover: true,
+      hasConcealment: true,
+      coverOnly: false,
+      coverOverrideSource: 'take_cover_action',
+      expectedCover: 'standard',
+      takeCoverExpirationPending: true,
+      takeCoverExpirationReason: 'movement',
+    };
+    B.document.getFlag.mockImplementation((mod, key) => B.document.flags[mod]?.[key]);
+    B.document.setFlag.mockResolvedValue(true);
+    canvas.tokens.get.mockImplementation((id) => ({ A, B }[id] || null));
+    canvas.tokens.placeables = [A, B];
+
+    const setCoverBetween = jest.fn().mockResolvedValue(true);
+    const recalculateForTokens = jest.fn().mockResolvedValue(undefined);
+    const queueOverrideValidation = jest.fn();
+    const processQueuedValidations = jest.fn().mockResolvedValue(undefined);
+    const hide = jest.fn();
+    jest.doMock('../../../scripts/stores/cover-map.js', () => ({
+      __esModule: true,
+      getCoverBetween: jest.fn(() => 'standard'),
+      setCoverBetween,
+    }));
+    jest.doMock('../../../scripts/visibility/auto-visibility/EventDrivenVisibilitySystem.js', () => ({
+      __esModule: true,
+      eventDrivenVisibilitySystem: {
+        recalculateForTokens,
+        overrideValidationManager: {
+          queueOverrideValidation,
+          processQueuedValidations,
+        },
+      },
+    }));
+    jest.doMock('../../../scripts/ui/OverrideValidationIndicator.js', () => ({
+      __esModule: true,
+      default: { hide },
+    }));
+
+    const { default: AvsOverrideManager } = await import(
+      '../../../scripts/chat/services/infra/AvsOverrideManager.js'
+    );
+
+    const result = await AvsOverrideManager.expireTakeCoverForToken(B, 'movement');
+
+    expect(result).toBe(true);
+    expect(queueOverrideValidation).toHaveBeenCalledWith('B', { force: true });
+    expect(processQueuedValidations).toHaveBeenCalledWith({ skipMovedFilter: true });
+    expect(hide).not.toHaveBeenCalled();
+    expect(B.document.setFlag).toHaveBeenCalledWith(
+      'pf2e-visioner',
+      'avs-override-from-A',
+      expect.objectContaining({
+        state: 'hidden',
+        source: 'sneak_action',
+        hasCover: false,
+        hasConcealment: true,
+        coverOnly: false,
+      }),
+    );
+    const stored = B.document.setFlag.mock.calls[0][2];
+    expect(stored.coverOverrideSource).toBeUndefined();
+    expect(stored.expectedCover).toBeUndefined();
+    expect(stored.takeCoverExpirationPending).toBeUndefined();
+  });
+
+  test('removeOverride can remove visibility while preserving merged Take Cover tracking', async () => {
+    const A = mkToken('A', 'Observer');
+    const B = mkToken('B', 'Target');
+    B.document.getFlag.mockImplementation((mod, key) =>
+      mod === 'pf2e-visioner' && key === 'avs-override-from-A'
+        ? {
+            observerId: 'A',
+            targetId: 'B',
+            state: 'hidden',
+            source: 'sneak_action',
+            hasCover: true,
+            hasConcealment: true,
+            coverOnly: false,
+            coverOverrideSource: 'take_cover_action',
+            expectedCover: 'standard',
+          }
+        : undefined,
+    );
+    canvas.tokens.get.mockImplementation((id) => ({ A, B }[id] || null));
+
+    const setCoverBetween = jest.fn().mockResolvedValue(true);
+    jest.doMock('../../../scripts/stores/cover-map.js', () => ({
+      __esModule: true,
+      getCoverBetween: jest.fn(() => 'standard'),
+      setCoverBetween,
+    }));
+
+    const { default: AvsOverrideManager } = await import(
+      '../../../scripts/chat/services/infra/AvsOverrideManager.js'
+    );
+
+    const result = await AvsOverrideManager.removeOverride('A', 'B', {
+      preserveTakeCoverTracking: true,
+    });
+
+    expect(result).toBe(true);
+    expect(setCoverBetween).not.toHaveBeenCalled();
+    expect(B.document.unsetFlag).not.toHaveBeenCalled();
+    expect(B.document.setFlag).toHaveBeenCalledWith(
+      'pf2e-visioner',
+      'avs-override-from-A',
+      expect.objectContaining({
+        observerId: 'A',
+        targetId: 'B',
+        state: 'avs',
+        source: 'take_cover_action',
+        hasCover: true,
+        hasConcealment: false,
+        coverOnly: true,
+        coverOverrideSource: 'take_cover_action',
+        expectedCover: 'standard',
+      }),
+    );
+  });
+
+  test('removeOverride notifies visibility change so open token managers can show AVS control', async () => {
+    const A = mkToken('A', 'Observer');
+    const B = mkToken('B', 'Target');
+    B.document.getFlag.mockImplementation((mod, key) =>
+      mod === 'pf2e-visioner' && key === 'avs-override-from-A'
+        ? {
+            observerId: 'A',
+            targetId: 'B',
+            state: 'hidden',
+            source: 'sneak_action',
+            hasCover: false,
+            hasConcealment: true,
+            coverOnly: false,
+          }
+        : undefined,
+    );
+    canvas.tokens.get.mockImplementation((id) => ({ A, B }[id] || null));
+
+    const { default: AvsOverrideManager } = await import(
+      '../../../scripts/chat/services/infra/AvsOverrideManager.js'
+    );
+
+    await AvsOverrideManager.removeOverride('A', 'B');
+
+    expect(Hooks.call).toHaveBeenCalledWith(
+      'pf2e-visioner.visibilityChanged',
+      'A',
+      'B',
+      'avs',
+    );
+  });
+
+  test('removeOverride immediately syncs pair visibility to AVS-calculated state', async () => {
+    const A = mkToken('A', 'Observer');
+    const B = mkToken('B', 'Target');
+    B.document.getFlag.mockImplementation((mod, key) =>
+      mod === 'pf2e-visioner' && key === 'avs-override-from-A'
+        ? {
+            observerId: 'A',
+            targetId: 'B',
+            state: 'hidden',
+            source: 'sneak_action',
+            hasCover: false,
+            hasConcealment: true,
+            coverOnly: false,
+          }
+        : undefined,
+    );
+    canvas.tokens.get.mockImplementation((id) => ({ A, B }[id] || null));
+
+    const calculateVisibilityWithoutOverrides = jest.fn().mockResolvedValue('observed');
+    const setVisibilityBetween = jest.fn().mockResolvedValue(true);
+    jest.doMock('../../../scripts/visibility/auto-visibility/index.js', () => ({
+      __esModule: true,
+      optimizedVisibilityCalculator: {
+        calculateVisibilityWithoutOverrides,
+      },
+    }));
+    jest.doMock('../../../scripts/stores/visibility-map.js', () => ({
+      __esModule: true,
+      setVisibilityBetween,
+    }));
+
+    const { default: AvsOverrideManager } = await import(
+      '../../../scripts/chat/services/infra/AvsOverrideManager.js'
+    );
+
+    await AvsOverrideManager.removeOverride('A', 'B');
+
+    expect(calculateVisibilityWithoutOverrides).toHaveBeenCalledWith(A, B);
+    expect(setVisibilityBetween).toHaveBeenCalledWith(
+      A,
+      B,
+      'observed',
+      expect.objectContaining({ isAutomatic: true, source: 'avs_control_release' }),
+    );
+  });
+
   test('removeOverride returns false when target missing or flag absent', async () => {
     const { default: AvsOverrideManager } = await import(
       '../../../scripts/chat/services/infra/AvsOverrideManager.js'

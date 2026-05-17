@@ -30,4 +30,37 @@ describe('RuleElementCoverService', () => {
     expect(result).toBeNull();
     expect(warnSpy).not.toHaveBeenCalled();
   });
+
+  it('can ignore native PF2e cover effect sources for Take Cover baseline detection', () => {
+    const attacker = { id: 'attacker-1', name: 'Attacker' };
+    const target = {
+      id: 'target-1',
+      name: 'Target',
+      document: {
+        getFlag: jest.fn((moduleId, key) => {
+          if (moduleId !== 'pf2e-visioner' || key !== 'stateSource') return null;
+          return {
+            coverByObserver: {
+              'attacker-1': {
+                sources: [
+                  {
+                    id: 'rule-element-effect-cover',
+                    state: 'standard',
+                    priority: 100,
+                  },
+                ],
+              },
+            },
+          };
+        }),
+      },
+    };
+
+    const result = RuleElementCoverService.getCoverFromRuleElements(attacker, target, {
+      ignoreRuleElementCoverSource: (source) => source?.id === 'rule-element-effect-cover',
+    });
+
+    expect(result).toBeNull();
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
 });

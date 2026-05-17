@@ -46,6 +46,26 @@ function withStealthPositionBypassContext(target, override = {}) {
   };
 }
 
+function isTakeCoverTrackingOverride(override = {}) {
+  return (
+    override?.coverOnly === true ||
+    override?.coverOverrideSource === 'take_cover_action' ||
+    override?.source === 'take_cover_action'
+  );
+}
+
+function isPureTakeCoverCoverOnlyOverride(override = {}) {
+  return override?.coverOnly === true && isTakeCoverTrackingOverride(override);
+}
+
+function canReleaseVisibilityOverrideToAvs(override = {}) {
+  return !!override?.state && override.state !== 'avs' && override.coverOnly !== true;
+}
+
+function shouldSuppressTakeCoverCoverChange(override = {}, targetId = null, movedTokenId = null) {
+  return targetId === movedTokenId && isTakeCoverTrackingOverride(override);
+}
+
 function loadVisibilityCalculatorModule() {
   if (!visibilityCalculatorModulePromise) {
     visibilityCalculatorModulePromise = import('../VisibilityCalculator.js').catch((error) => {
@@ -107,32 +127,34 @@ export class OverrideValidationManager {
    * Queue a token for override validation (alias for queue method)
    * @param {string} tokenId - ID of the token that moved
    */
-  queueOverrideValidation(tokenId) {
+  queueOverrideValidation(tokenId, options = {}) {
     this.pendingValidations.add(tokenId); // Track for tests
-    this.queue(tokenId);
+    this.queue(tokenId, options);
   }
 
-  queue(tokenId) {
+  queue(tokenId, { force = false } = {}) {
     // GM-only; EVS already guards enabled
     if (!game.user?.isGM) {
       return;
     }
     // Deduplicate rapid requests at the same position
-    try {
-      const tok = canvas.tokens?.get?.(tokenId);
-      const doc = tok?.document;
-      const gs = canvas.grid?.size || 1;
-      const cx = doc ? doc.x + (doc.width * gs) / 2 : 0;
-      const cy = doc ? doc.y + (doc.height * gs) / 2 : 0;
-      const posKey = `${Math.round(cx)}:${Math.round(cy)}:${doc?.elevation ?? 0}`;
-      const ok = this._lastValidationRequest.shouldQueue(
-        tokenId,
-        posKey,
-        this._validationRequestDebounceMs,
-      );
-      if (!ok) return;
-    } catch {
-      /* best-effort */
+    if (!force) {
+      try {
+        const tok = canvas.tokens?.get?.(tokenId);
+        const doc = tok?.document;
+        const gs = canvas.grid?.size || 1;
+        const cx = doc ? doc.x + (doc.width * gs) / 2 : 0;
+        const cy = doc ? doc.y + (doc.height * gs) / 2 : 0;
+        const posKey = `${Math.round(cx)}:${Math.round(cy)}:${doc?.elevation ?? 0}`;
+        const ok = this._lastValidationRequest.shouldQueue(
+          tokenId,
+          posKey,
+          this._validationRequestDebounceMs,
+        );
+        if (!ok) return;
+      } catch {
+        /* best-effort */
+      }
     }
 
     this._tokensQueuedForValidation.add(tokenId);
@@ -301,6 +323,7 @@ export class OverrideValidationManager {
           const fk = `avs-override-from-${movedTokenId}`;
           const fd = t.document.flags['pf2e-visioner']?.[fk];
           if (!fd) continue;
+          if (fd.takeCoverExpirationPending === true) continue;
           if (this._hasActiveTimer(fd.timedOverride)) continue;
           let currentVisibility = undefined;
           let currentCover = undefined;
@@ -349,9 +372,16 @@ export class OverrideValidationManager {
       const moverFlags = movedToken.document.flags['pf2e-visioner'] || {};
       for (const [flagKey, flagData] of Object.entries(moverFlags)) {
         if (!flagKey.startsWith('avs-override-from-')) continue;
+        if (flagData.takeCoverExpirationPending === true) continue;
+        if (isPureTakeCoverCoverOnlyOverride(flagData)) continue;
         if (this._hasActiveTimer(flagData.timedOverride)) continue;
         const observerId = flagKey.replace('avs-override-from-', '');
         const targetId = movedToken.document.id;
+        const suppressCoverChange = shouldSuppressTakeCoverCoverChange(
+          flagData,
+          targetId,
+          movedTokenId,
+        );
         const observerTok = canvas.tokens?.get(observerId) || null;
         const observer =
           !observerTok || this.exclusionManager.isExcludedToken(observerTok)
@@ -369,6 +399,7 @@ export class OverrideValidationManager {
             expectedCover: flagData.expectedCover,
             coverOnly: flagData.coverOnly,
             coverOverrideSource: flagData.coverOverrideSource,
+            suppressCoverChange,
             timedOverride: flagData.timedOverride,
             observerId,
             targetId,
@@ -394,6 +425,7 @@ export class OverrideValidationManager {
         const flagKey = `avs-override-from-${movedTokenId}`;
         const flagData = flags[flagKey];
         if (!flagData) continue;
+        if (flagData.takeCoverExpirationPending === true) continue;
         if (this._hasActiveTimer(flagData.timedOverride)) continue;
         const observerId = movedTokenId;
         const targetId = token.document.id;
@@ -409,6 +441,7 @@ export class OverrideValidationManager {
             expectedCover: flagData.expectedCover,
             coverOnly: flagData.coverOnly,
             coverOverrideSource: flagData.coverOverrideSource,
+            suppressCoverChange: flagData.suppressCoverChange === true,
             timedOverride: flagData.timedOverride,
             observerId,
             targetId,
@@ -427,11 +460,21 @@ export class OverrideValidationManager {
     }
 
     const invalidOverrides = [];
+    const stableReleaseOverrides = [];
+    const validationOptions = {
+      ...(options || {}),
+      includeStableOverrideState: true,
+    };
     for (const checkData of overridesToCheck) {
       const { override, observerId, targetId, type, flagKey, token } = checkData;
-      const checkResult = await this.checkOverrideValidity(observerId, targetId, override, options);
+      const checkResult = await this.checkOverrideValidity(
+        observerId,
+        targetId,
+        override,
+        validationOptions,
+      );
       if (checkResult) {
-        invalidOverrides.push({
+        const entry = {
           observerId,
           targetId,
           override,
@@ -439,16 +482,22 @@ export class OverrideValidationManager {
           reasonIcons: checkResult.reasonIcons || [],
           currentVisibility: checkResult.currentVisibility,
           currentCover: checkResult.currentCover,
+          coverChangeSource: checkResult.coverChangeSource,
+          controlReleaseOnly: checkResult.controlReleaseOnly === true,
+          suppressCoverChange: override.suppressCoverChange === true,
           type,
           flagKey,
           token,
-        });
+        };
+        if (checkResult.controlReleaseOnly === true) stableReleaseOverrides.push(entry);
+        else invalidOverrides.push(entry);
       }
     }
 
     if (invalidOverrides.length > 0) {
-      await this.showOverrideValidationDialog(invalidOverrides, movedTokenId);
-      return { overrides: invalidOverrides, __showAwareness: false };
+      const overridesToShow = [...invalidOverrides, ...stableReleaseOverrides];
+      await this.showOverrideValidationDialog(overridesToShow, movedTokenId);
+      return { overrides: overridesToShow, __showAwareness: false };
     }
 
     const awareness = [];
@@ -456,10 +505,17 @@ export class OverrideValidationManager {
       const moverFlags = movedToken.document.flags['pf2e-visioner'] || {};
       for (const [flagKey, fd] of Object.entries(moverFlags)) {
         if (!flagKey.startsWith('avs-override-from-')) continue;
+        if (fd.takeCoverExpirationPending === true) continue;
+        if (isPureTakeCoverCoverOnlyOverride(fd)) continue;
         if (this._hasActiveTimer(fd.timedOverride)) continue;
         const observerId = flagKey.replace('avs-override-from-', '');
         const obs = canvas.tokens?.get(observerId);
         if (!obs || obs.document?.hidden) continue;
+        const suppressCoverChange = shouldSuppressTakeCoverCoverChange(
+          fd,
+          movedTokenId,
+          movedTokenId,
+        );
         let currentVisibility = undefined;
         let currentCover = undefined;
         try {
@@ -499,6 +555,7 @@ export class OverrideValidationManager {
           expectedCover: fd.expectedCover,
           coverOnly: fd.coverOnly,
           coverOverrideSource: fd.coverOverrideSource,
+          suppressCoverChange,
           currentVisibility,
           currentCover,
         }));
@@ -510,6 +567,7 @@ export class OverrideValidationManager {
         const fk = `avs-override-from-${movedTokenId}`;
         const fd = t.document.flags['pf2e-visioner']?.[fk];
         if (!fd) continue;
+        if (fd.takeCoverExpirationPending === true) continue;
         if (this._hasActiveTimer(fd.timedOverride)) continue;
         let currentVisibility = undefined;
         let currentCover = undefined;
@@ -588,7 +646,8 @@ export class OverrideValidationManager {
       const tgtPos = this.positionManager.getTokenPosition(target);
       const obsPosKey = `${Math.round(obsPos.x)}:${Math.round(obsPos.y)}:${obsPos.elevation ?? 0}`;
       const tgtPosKey = `${Math.round(tgtPos.x)}:${Math.round(tgtPos.y)}:${tgtPos.elevation ?? 0}`;
-      const cacheKey = `${observerId}-${targetId}`;
+      const includeStableOverrideState = options?.includeStableOverrideState === true;
+      const cacheKey = `${observerId}-${targetId}-${includeStableOverrideState ? 'stable' : 'default'}`;
       const cached = this._overrideValidityCache.get(cacheKey);
       if (cached && cached.obsPos === obsPosKey && cached.tgtPos === tgtPosKey) {
         markPerf('cache-hit');
@@ -645,10 +704,7 @@ export class OverrideValidationManager {
         const observerPos = this.positionManager.getTokenPosition(observer);
         markPerf('observer-position-done');
         markPerf('cover-detect-start');
-        const useTokenCoverDetection =
-          override?.coverOnly === true ||
-          override?.coverOverrideSource === 'take_cover_action' ||
-          override?.source === 'take_cover_action';
+        const useTokenCoverDetection = isTakeCoverTrackingOverride(override);
         if (useTokenCoverDetection && typeof coverDetector.detectBetweenTokens === 'function') {
           coverResult = coverDetector.detectBetweenTokens(observer, target, options);
         } else {
@@ -671,6 +727,10 @@ export class OverrideValidationManager {
       );
       const overrideExpectsObscuredVisibility =
         override.hasConcealment || STEALTH_OVERRIDE_STATES.has(override.state);
+      const shouldValidateObscuredVisibility =
+        override.source === 'manual_action' ||
+        override.source === 'sneak_action' ||
+        isTakeCoverTrackingOverride(override);
       if (!visibility) {
         flushPerf({ reason: 'no-visibility-result', visibility, coverResult });
         return null;
@@ -678,11 +738,17 @@ export class OverrideValidationManager {
       markPerf('state-compare-start');
 
       const reasons = [];
-      const isCoverOnlyOverride =
-        override?.coverOnly === true ||
-        override?.coverOverrideSource === 'take_cover_action' ||
-        override?.source === 'take_cover_action';
+      const suppressCoverChange = override?.suppressCoverChange === true;
+      const isCoverOnlyOverride = isPureTakeCoverCoverOnlyOverride(override);
+      const expectedCoverForDisplay =
+        override.expectedCover ?? (override.hasCover ? 'standard' : 'none');
+      const hasAutoCalculatedCoverChange =
+        !isCoverOnlyOverride &&
+        !suppressCoverChange &&
+        coverResult &&
+        coverResult !== expectedCoverForDisplay;
       if (
+        !suppressCoverChange &&
         isCoverOnlyOverride &&
         override.expectedCover &&
         override.expectedCover !== coverResult
@@ -695,6 +761,7 @@ export class OverrideValidationManager {
         });
       }
       if (
+        !suppressCoverChange &&
         !isCoverOnlyOverride &&
         !ignoresStealthPositionValidation &&
         override.hasCover &&
@@ -710,6 +777,7 @@ export class OverrideValidationManager {
         }
       }
       if (
+        !suppressCoverChange &&
         !isCoverOnlyOverride &&
         !ignoresStealthPositionValidation &&
         !override.hasCover &&
@@ -755,7 +823,7 @@ export class OverrideValidationManager {
       if (
         !ignoresStealthPositionValidation &&
         overrideExpectsObscuredVisibility &&
-        (override.source === 'manual_action' || override.source === 'sneak_action')
+        shouldValidateObscuredVisibility
       ) {
         if (
           visibility === 'observed' &&
@@ -815,6 +883,20 @@ export class OverrideValidationManager {
           reasonIcons: reasonIconsForUi,
           currentVisibility: visibility,
           currentCover: coverResult,
+          coverChangeSource: hasAutoCalculatedCoverChange ? 'auto' : undefined,
+        };
+      } else if (
+        options?.includeStableOverrideState === true &&
+        canReleaseVisibilityOverrideToAvs(override)
+      ) {
+        result = {
+          shouldRemove: false,
+          controlReleaseOnly: true,
+          reason: 'Return to AVS control',
+          reasonIcons: reasonIconsForUi,
+          currentVisibility: visibility,
+          currentCover: coverResult,
+          coverChangeSource: hasAutoCalculatedCoverChange ? 'auto' : undefined,
         };
       }
       markPerf('state-compare-done');
@@ -854,6 +936,9 @@ export class OverrideValidationManager {
         reasonIcons,
         currentVisibility,
         currentCover,
+        coverChangeSource,
+        controlReleaseOnly,
+        suppressCoverChange,
         stealthPositionBypassFeat,
         stealthPositionBypassLabel,
         stealthPositionBypassIcon,
@@ -876,8 +961,11 @@ export class OverrideValidationManager {
           expectedCover: override.expectedCover,
           coverOnly: override.coverOnly === true,
           coverOverrideSource: override.coverOverrideSource,
+          suppressCoverChange: suppressCoverChange || override.suppressCoverChange === true,
           currentVisibility,
           currentCover,
+          coverChangeSource: coverChangeSource || override.coverChangeSource,
+          controlReleaseOnly: controlReleaseOnly === true,
           stealthPositionBypassFeat:
             stealthPositionBypassFeat || override.stealthPositionBypassFeat,
           stealthPositionBypassLabel:

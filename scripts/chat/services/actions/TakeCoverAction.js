@@ -1,7 +1,12 @@
 import { COVER_STATES } from '../../../constants.js';
 import autoCoverSystem from '../../../cover/auto-cover/AutoCoverSystem.js';
+import { getCoverOverlayState } from '../../../cover/auto-cover/cover-state-query.js';
 import { appliedTakeCoverChangesByMessage } from '../data/message-cache.js';
 import { shouldFilterAlly } from '../infra/shared-utils.js';
+import {
+  notifyTakeCoverAlreadyActive,
+  tokenHasActiveTakeCoverState,
+} from '../take-cover-expiration-service.js';
 import { ActionHandlerBase } from './BaseAction.js';
 
 function getTakeCoverResultForBaselineCover(coverState) {
@@ -59,6 +64,15 @@ export class TakeCoverActionHandler extends ActionHandlerBase {
     return 'observer_to_target';
   }
 
+  async apply(actionData, button) {
+    const takingCoverToken = actionData?.actorToken || actionData?.actor;
+    if (tokenHasActiveTakeCoverState(takingCoverToken)) {
+      notifyTakeCoverAlreadyActive(takingCoverToken);
+      return 0;
+    }
+    return super.apply(actionData, button);
+  }
+
   async discoverSubjects(actionData) {
     const allTokens = canvas?.tokens?.placeables || [];
     const actorId = actionData?.actor?.id || actionData?.actor?.document?.id || null;
@@ -79,10 +93,12 @@ export class TakeCoverActionHandler extends ActionHandlerBase {
     // Orientation: observer = subject (row token), target = actor (taking cover)
     const storedCover = getCoverBetween(subject, takingCoverToken) || 'none';
     let baselineCover = storedCover;
+    let autoCoverResult = null;
 
     try {
       if (autoCoverSystem?.isEnabled?.() !== false) {
-        baselineCover = autoCoverSystem.detectCoverBetweenTokens(subject, takingCoverToken) || 'none';
+        autoCoverResult = getCoverOverlayState(subject, takingCoverToken).state || 'none';
+        baselineCover = autoCoverResult;
       }
     } catch {
       baselineCover = storedCover;
@@ -99,6 +115,7 @@ export class TakeCoverActionHandler extends ActionHandlerBase {
       target: subject,
       currentCover: storedCover,
       oldCover: storedCover,
+      baselineCover,
       newCover: calculatedCover,
       // Visibility-aligned aliases so shared UI helpers work
       currentVisibility: storedCover,
@@ -128,6 +145,13 @@ export class TakeCoverActionHandler extends ActionHandlerBase {
     const { applyTakeCoverProneRangedOnlyEffect } = await import('../../../cover/batch.js');
     let appliedProneRangedOnly = false;
 
+    const targetWithActiveTakeCover = (changes || []).find((ch) =>
+      tokenHasActiveTakeCoverState(ch?.target),
+    )?.target;
+    if (targetWithActiveTakeCover) {
+      notifyTakeCoverAlreadyActive(targetWithActiveTakeCover);
+      return 0;
+    }
 
     for (const ch of changes) {
       if (ch.takeCoverProneRangedOnly === true) {
@@ -193,6 +217,10 @@ export class TakeCoverActionHandler extends ActionHandlerBase {
   async applyOutcomesDirectly(actionData, outcomes, button = null) {
     const directOutcomes = this.getDirectApplyOutcomes(outcomes);
     const takingCoverToken = actionData.actorToken || actionData.actor;
+    if (tokenHasActiveTakeCoverState(takingCoverToken)) {
+      notifyTakeCoverAlreadyActive(takingCoverToken);
+      return 0;
+    }
     if (directOutcomes.length === 0 && !isProneToken(takingCoverToken)) {
       return 0;
     }

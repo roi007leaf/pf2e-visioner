@@ -67,4 +67,46 @@ describe('AutoCoverHooks stealth context routing', () => {
 
     expect(useCase).toBeNull();
   });
+
+  test('movement requests Take Cover expiration prompt through auto-cover hooks', async () => {
+    jest.resetModules();
+
+    const requestTakeCoverExpirationForToken = jest.fn().mockResolvedValue(true);
+    jest.doMock('../../../scripts/chat/services/take-cover-expiration-service.js', () => ({
+      __esModule: true,
+      requestTakeCoverExpirationForToken,
+    }));
+    jest.doMock('../../../scripts/cover/auto-cover/AutoCoverSystem.js', () => ({
+      __esModule: true,
+      default: {
+        isEnabled: jest.fn(() => true),
+        getActivePairsInvolving: jest.fn(() => []),
+        cleanupCover: jest.fn(),
+      },
+    }));
+
+    const { AutoCoverHooks } = await import('../../../scripts/cover/auto-cover/AutoCoverHooks.js');
+    const hooks = new AutoCoverHooks();
+    const token = {
+      id: 'token-1',
+      actor: { id: 'actor-1', itemTypes: { effect: [] } },
+      document: {
+        id: 'token-1',
+        flags: {
+          'pf2e-visioner': {
+            'avs-override-from-observer-1': {
+              source: 'take_cover_action',
+              coverOnly: true,
+              expectedCover: 'standard',
+            },
+          },
+        },
+      },
+    };
+    canvas.tokens.get.mockImplementation((id) => (id === 'token-1' ? token : null));
+
+    await hooks.onUpdateToken({ id: 'token-1' }, { x: 100 });
+
+    expect(requestTakeCoverExpirationForToken).toHaveBeenCalledWith(token, 'movement');
+  });
 });

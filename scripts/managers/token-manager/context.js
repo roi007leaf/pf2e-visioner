@@ -19,12 +19,6 @@ import {
 import { TimedOverrideManager } from '../../services/TimedOverrideManager.js';
 import { overrideToDisplayVisibility } from '../../visibility/perception-profile.js';
 
-function getManualVisibilityKeys() {
-  return Object.entries(VISIBILITY_STATES)
-    .filter(([, config]) => config.manual !== false)
-    .map(([key]) => key);
-}
-
 function buildVisibilityStateContext(key, { selected = false, manual = true } = {}) {
   const config = VISIBILITY_STATES[key];
   return {
@@ -44,6 +38,26 @@ function getOverrideDisplayState(overrideFlag) {
 function getTokenImage(token) {
   if (token.actor?.img) return token.actor.img;
   return 'icons/svg/book.svg';
+}
+
+const MANUAL_VISIBILITY_STATE_EXCLUSIONS = new Set(['unnoticed']);
+
+function isVisibilityOverrideFlag(flagData) {
+  if (!flagData) return false;
+  if (flagData.coverOnly === true) return false;
+  const displayState = overrideToDisplayVisibility(flagData);
+  if (!displayState || displayState === 'avs') return false;
+  return true;
+}
+
+function getManualVisibilityStateKeys({ isNonAvsToken = false, avsEnabled = false } = {}) {
+  const keys = isNonAvsToken ? ['observed', 'hidden'] : Object.keys(VISIBILITY_STATES);
+  return keys.filter((key) => {
+    if (VISIBILITY_STATES[key]?.manual === false) return false;
+    if (MANUAL_VISIBILITY_STATE_EXCLUSIONS.has(key)) return false;
+    if (key === 'avs' && !avsEnabled) return false;
+    return true;
+  });
 }
 
 function svgDataUri(svg) {
@@ -220,14 +234,7 @@ export async function buildContext(app, options) {
         // Check if AVS is enabled to determine if 'avs' button should be available
         const avsEnabled = game.settings.get(MODULE_ID, 'autoVisibilityEnabled');
 
-        let allowedVisKeys = isNonAvsToken
-          ? ['observed', 'hidden']
-          : getManualVisibilityKeys();
-
-        // Remove 'avs' from allowed keys if AVS is disabled
-        if (!avsEnabled) {
-          allowedVisKeys = allowedVisKeys.filter((key) => key !== 'avs');
-        }
+        const allowedVisKeys = getManualVisibilityStateKeys({ isNonAvsToken, avsEnabled });
 
         const visibilityStates = allowedVisKeys
           .filter((key) => !isNonAvsToken || key !== 'avs') // Extra safety: never include 'avs' for loot/hazard
@@ -254,7 +261,7 @@ export async function buildContext(app, options) {
               `avs-override-from-${app.observer.document.id}`,
             );
 
-            if (avsOverrideFlag) {
+            if (isVisibilityOverrideFlag(avsOverrideFlag)) {
               // There's an override - use the override state
               hasAvsOverride = true;
               actualCurrentState = getOverrideDisplayState(avsOverrideFlag);
@@ -269,8 +276,7 @@ export async function buildContext(app, options) {
                 const { getVisibilityMap } = await import('../../stores/visibility-map.js');
                 const visibilityMap = getVisibilityMap(app.observer);
                 actualCurrentState = visibilityMap[token.document.id] || 'observed';
-              } catch (error) {
-                console.error(`[AVS Debug] Observer mode - Error getting visibility map:`, error);
+              } catch {
                 actualCurrentState = 'observed'; // Fallback if map access fails
               }
             }
@@ -416,14 +422,10 @@ export async function buildContext(app, options) {
         // Check if AVS is enabled to determine if 'avs' button should be available
         const avsEnabledForTarget = game.settings.get(MODULE_ID, 'autoVisibilityEnabled');
 
-        let allowedVisKeys = isNonAvsToken
-          ? ['observed', 'hidden']
-          : getManualVisibilityKeys();
-
-        // Remove 'avs' from allowed keys if AVS is disabled
-        if (!avsEnabledForTarget) {
-          allowedVisKeys = allowedVisKeys.filter((key) => key !== 'avs');
-        }
+        const allowedVisKeys = getManualVisibilityStateKeys({
+          isNonAvsToken,
+          avsEnabled: avsEnabledForTarget,
+        });
 
         const visibilityStates = allowedVisKeys
           .filter((key) => !isNonAvsToken || key !== 'avs') // Extra safety: never include 'avs' for loot/hazard
@@ -450,7 +452,7 @@ export async function buildContext(app, options) {
               `avs-override-from-${observerToken.document.id}`,
             );
 
-            if (avsOverrideFlag) {
+            if (isVisibilityOverrideFlag(avsOverrideFlag)) {
               // There's an override - use the override state
               hasAvsOverride = true;
               actualCurrentState = getOverrideDisplayState(avsOverrideFlag);
@@ -465,8 +467,7 @@ export async function buildContext(app, options) {
                 const { getVisibilityMap } = await import('../../stores/visibility-map.js');
                 const visibilityMap = getVisibilityMap(observerToken);
                 actualCurrentState = visibilityMap[app.observer.document.id] || 'observed';
-              } catch (error) {
-                console.error(`[AVS Debug] Target mode - Error getting visibility map:`, error);
+              } catch {
                 actualCurrentState = 'observed'; // Fallback if map access fails
               }
             }
@@ -666,22 +667,15 @@ export async function buildContext(app, options) {
   // Check if AVS is enabled to filter out 'avs' state from bulk actions
   const avsEnabled = game.settings.get(MODULE_ID, 'autoVisibilityEnabled');
 
-  // For loot/hazard observers, only show Observed and Hidden in legend and bulk actions
-  const allowedLegendKeys =
-    isLootObserver || context.hazardObserver ? ['observed', 'hidden'] : null;
+  const allowedLegendKeys = getManualVisibilityStateKeys({
+    isNonAvsToken: isLootObserver || context.hazardObserver,
+    avsEnabled,
+  });
 
-  context.visibilityStates = Object.entries(VISIBILITY_STATES)
-    .filter(([key, config]) => {
-      if (config.manual === false) return false;
-      // If observer is loot/hazard, only allow observed and hidden
-      if (allowedLegendKeys) return allowedLegendKeys.includes(key);
-      // Otherwise filter out 'avs' if AVS is disabled
-      return avsEnabled || key !== 'avs';
-    })
-    .map(([key]) => ({
-      key,
-      ...buildVisibilityStateContext(key, { selected: false }),
-    }));
+  context.visibilityStates = allowedLegendKeys.map((key) => ({
+    key,
+    ...buildVisibilityStateContext(key, { selected: false }),
+  }));
 
   context.coverStates = Object.entries(COVER_STATES).map(([key, config]) => ({
     key,

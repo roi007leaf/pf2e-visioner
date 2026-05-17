@@ -84,7 +84,7 @@ export class CoverDetector {
       if (attacker.id === target.id) return 'none';
 
       try {
-        const ruleElementCover = this._checkRuleElementCover(attacker, target);
+        const ruleElementCover = this._checkRuleElementCover(attacker, target, options);
         if (ruleElementCover) {
           return ruleElementCover;
         }
@@ -124,9 +124,10 @@ export class CoverDetector {
       // Check if there's any blocking terrain (walls) in the way
       const segmentAnalysis = this._analyzeSegmentObstructions(p1, p2, elevationRange, attackerSpan, targetSpan);
       const hasWallsInTheWay = segmentAnalysis.hasBlockingTerrain;
-      const hasSampledWallCoverage = !hasWallsInTheWay && this._hasSceneWalls()
-        ? this._estimateWallCoveragePercent(p1, target, elevationRange, attackerSpan, targetSpan) > 0
-        : false;
+      const wallCoveragePercent = !hasWallsInTheWay && this._hasSceneWalls()
+        ? this._estimateWallCoveragePercent(p1, target, elevationRange, attackerSpan, targetSpan)
+        : 0;
+      const hasSampledWallCoverage = wallCoveragePercent > 0;
 
       const wallCover = hasWallsInTheWay || hasSampledWallCoverage
         ? this._evaluateWallsCover(p1, p2, elevationRange, attackerSpan, targetSpan, target)
@@ -137,7 +138,15 @@ export class CoverDetector {
       if (wallCover === 'none') {
         // Case 1: No walls in the way - use token cover
         const intersectionMode = this._getIntersectionMode();
-        const filters = { ...this._getAutoCoverFilterSettings(attacker), attackContext: options.attackContext };
+        const filterOverrides =
+          options.filterOverrides && typeof options.filterOverrides === 'object'
+            ? options.filterOverrides
+            : {};
+        const filters = {
+          ...this._getAutoCoverFilterSettings(attacker),
+          ...filterOverrides,
+          attackContext: options.attackContext,
+        };
         let blockers = this._getEligibleBlockingTokens(attacker, target, filters);
 
         // Apply elevation filtering (mode-aware)
@@ -145,16 +154,42 @@ export class CoverDetector {
 
         // Determine token cover based on intersection mode
         let tokenCover;
+        let tokenCoverBlockers = blockers;
         if (intersectionMode === 'tactical') {
-          tokenCover = this._evaluateCoverByTactical(attacker, target, blockers, elevationRange, options.attackContext, attackerSpan, targetSpan);
+          const tokenCoverResult = this._evaluateCoverByTacticalDetailed(
+            attacker,
+            target,
+            blockers,
+            elevationRange,
+            options.attackContext,
+            attackerSpan,
+            targetSpan,
+          );
+          tokenCover = tokenCoverResult.state;
+          tokenCoverBlockers = tokenCoverResult.blockers;
         } else if (intersectionMode === 'coverage') {
-          tokenCover = this._evaluateCoverByCoverage(attacker, target, blockers, options.attackContext);
+          const tokenCoverResult = this._evaluateCoverByCoverageDetailed(
+            attacker,
+            target,
+            blockers,
+            options.attackContext,
+          );
+          tokenCover = tokenCoverResult.state;
+          tokenCoverBlockers = tokenCoverResult.blockers;
         } else {
-          tokenCover = this._evaluateCreatureSizeCover(attacker, target, blockers, options.attackContext);
+          const tokenCoverResult = this._evaluateCreatureSizeCoverDetailed(
+            attacker,
+            target,
+            blockers,
+            options.attackContext,
+            options,
+          );
+          tokenCover = tokenCoverResult.state;
+          tokenCoverBlockers = tokenCoverResult.blockers;
         }
 
         // Apply token cover overrides
-        tokenCover = this._applyTokenCoverOverrides(attacker, target, blockers, tokenCover);
+        tokenCover = this._applyTokenCoverOverrides(attacker, target, tokenCoverBlockers, tokenCover);
 
         // Apply Levels integration for elevation-based cover adjustment
         tokenCover = this._applyLevelsCoverAdjustment(attacker, target, tokenCover);
@@ -166,7 +201,7 @@ export class CoverDetector {
 
         adjustedWallCover = this._applyLevelsCoverAdjustment(attacker, target, adjustedWallCover);
 
-        if (adjustedWallCover === 'lesser') {
+        if (adjustedWallCover === 'lesser' && wallCover !== 'lesser') {
           adjustedWallCover = 'standard';
         }
 
@@ -178,7 +213,8 @@ export class CoverDetector {
         calculatedCover = adjustedWallCover;
       }
 
-      return this._applyRegionCover(p1, p2, calculatedCover);
+      const finalCover = this._applyRegionCover(p1, p2, calculatedCover);
+      return finalCover;
     } catch (error) {
       console.error('PF2E Visioner | CoverDetector.detectForAttack error:', error);
       return 'none';
@@ -449,11 +485,8 @@ export class CoverDetector {
     if (!segmentAnalysis.hasBlockingTerrain && !segmentAnalysis.hasCreatures && wallCoveragePercent <= 0) {
       coverCategory = 'none';
     }
-    // Rule 2: Creature space only, no blocking terrain
-    else if (!segmentAnalysis.hasBlockingTerrain && segmentAnalysis.hasCreatures) {
-      coverCategory = 'standard';
-    }
-    // Rule 3: Any blocking terrain, or target sampling shows wall coverage
+    // Rule 2: Any blocking terrain, or target sampling shows wall coverage.
+    // Creature-only obstruction is handled by the token-cover path after this returns none.
     else if (segmentAnalysis.hasBlockingTerrain || wallCoveragePercent > 0) {
       // Get threshold settings
       const stdThreshold = Math.max(
@@ -466,8 +499,7 @@ export class CoverDetector {
       );
       const allowGreater = !!game.settings.get('pf2e-visioner', 'wallCoverAllowGreater');
 
-      // Determine cover level based on coverage percentage. If sampling found a non-zero
-      // wall coverage, thresholds are authoritative. Fallback only when sampling failed.
+      // Determine cover level based on coverage percentage. Thresholds are authoritative.
       if (wallCoveragePercent > 0) {
         if (allowGreater && wallCoveragePercent >= grtThreshold) {
           coverCategory = 'greater';
@@ -476,8 +508,6 @@ export class CoverDetector {
         } else {
           coverCategory = 'none';
         }
-      } else if (segmentAnalysis.hasBlockingTerrain) {
-        coverCategory = 'standard';
       } else {
         coverCategory = 'none';
       }
@@ -1680,12 +1710,13 @@ export class CoverDetector {
    * @returns {string} Cover state ('none', 'lesser', 'standard', 'greater')
    * @private
    */
-  _evaluateCreatureSizeCover(attacker, target, blockers, attackContext = null) {
+  _evaluateCreatureSizeCoverDetailed(attacker, target, blockers, attackContext = null, options = {}) {
     try {
-      if (!attacker || !target) return 'none';
+      if (!attacker || !target) return { state: 'none', blockers: [] };
 
       let any = false;
       let standard = false;
+      const contributingBlockers = [];
       const attackerSize = getSizeRank(attacker);
       const targetSize = getSizeRank(target);
 
@@ -1721,6 +1752,7 @@ export class CoverDetector {
         }
 
         any = true;
+        contributingBlockers.push(blocker);
         const blockerSize = getSizeRank(blocker);
         const sizeDiffAttacker = blockerSize - attackerSize;
         const sizeDiffTarget = blockerSize - targetSize;
@@ -1739,7 +1771,9 @@ export class CoverDetector {
 
       try {
         // Ceaseless Shadows: the TARGET (being attacked) has the feat and gets upgraded cover
-        const upgraded = FeatsHandler.upgradeCoverForCreature(target, result)?.state || result;
+        const upgraded = options.skipCreatureCoverFeatUpgrade === true
+          ? result
+          : FeatsHandler.upgradeCoverForCreature(target, result)?.state || result;
         if (upgraded !== result) {
           try {
             const aId = attacker?.id;
@@ -1757,11 +1791,21 @@ export class CoverDetector {
         }
         finalState = upgraded;
       } catch { }
-      return finalState;
+      return { state: finalState, blockers: contributingBlockers };
     } catch (error) {
       console.error('PF2E Visioner | Error in evaluateCreatureSizeCover:', error);
-      return 'none';
+      return { state: 'none', blockers: [] };
     }
+  }
+
+  _evaluateCreatureSizeCover(attacker, target, blockers, attackContext = null, options = {}) {
+    return this._evaluateCreatureSizeCoverDetailed(
+      attacker,
+      target,
+      blockers,
+      attackContext,
+      options,
+    ).state;
   }
 
   consumeFeatCoverUpgrade(attackerId, targetId) {
@@ -1824,7 +1868,7 @@ export class CoverDetector {
    * @returns {string}
    * @private
    */
-  _evaluateCoverByTactical(attacker, target, blockers, elevationRange = null, attackContext = null, attackerSpan = null, targetSpan = null) {
+  _evaluateCoverByTacticalDetailed(attacker, target, blockers, elevationRange = null, attackContext = null, attackerSpan = null, targetSpan = null) {
     // Tactical mode: corner-to-corner calculations
     // Choose the best corner of the attacker and check lines from all target corners to that corner
     // This matches the "choose a corner" tactical rule
@@ -1839,13 +1883,15 @@ export class CoverDetector {
     const attackerCorners = getTokenCorners(attacker, attackerRect, attackerSizeValue);
     const targetCorners = getTokenCorners(target, targetRect, targetSizeValue);
 
-    let bestCover = 'greater'; // Start with worst case
+    let bestCover = null;
+    let bestBlockers = [];
 
     // Try each attacker corner and find the one with the least cover (best for attacking)
     for (let a = 0; a < attackerCorners.length; a++) {
       const attackerCorner = attackerCorners[a];
       let blockedLines = 0;
       let wallBlockedAny = false;
+      const blockingTokensForCorner = new Set();
 
       // Check lines from all target corners to this attacker corner
       for (let t = 0; t < targetCorners.length; t++) {
@@ -1884,6 +1930,7 @@ export class CoverDetector {
                 continue;
               }
               lineBlocked = true;
+              blockingTokensForCorner.add(blocker);
               break;
             }
           }
@@ -1902,19 +1949,34 @@ export class CoverDetector {
 
       // Keep the best (lowest) cover result
       const coverOrder = ['none', 'lesser', 'standard', 'greater'];
-      if (coverOrder.indexOf(coverForThisCorner) < coverOrder.indexOf(bestCover)) {
+      const cornerCoverIndex = coverOrder.indexOf(coverForThisCorner);
+      const bestCoverIndex = bestCover === null ? Number.POSITIVE_INFINITY : coverOrder.indexOf(bestCover);
+      if (cornerCoverIndex < bestCoverIndex) {
         bestCover = coverForThisCorner;
+        bestBlockers = Array.from(blockingTokensForCorner);
       }
     }
 
     // Return the best (lowest) cover across attacker corners
-    return bestCover;
+    return { state: bestCover || 'none', blockers: bestBlockers };
   }
 
-  _evaluateCoverByCoverage(attacker, target, blockers, attackContext = null) {
+  _evaluateCoverByTactical(attacker, target, blockers, elevationRange = null, attackContext = null, attackerSpan = null, targetSpan = null) {
+    return this._evaluateCoverByTacticalDetailed(
+      attacker,
+      target,
+      blockers,
+      elevationRange,
+      attackContext,
+      attackerSpan,
+      targetSpan,
+    ).state;
+  }
+
+  _evaluateCoverByCoverageDetailed(attacker, target, blockers, attackContext = null) {
     try {
       // If no blockers, no cover
-      if (!blockers.length) return 'none';
+      if (!blockers.length) return { state: 'none', blockers: [] };
 
       // Get centers
       const p1 = attacker.center ?? attacker.getCenterPoint();
@@ -1922,6 +1984,7 @@ export class CoverDetector {
 
       const coverOrder = ['none', 'lesser', 'standard', 'greater'];
       let bestCover = 'none';
+      const contributingBlockers = [];
 
       for (const blocker of blockers) {
         const perBlocker = this._calculateCoverageByBlocker(p1, p2, [blocker]);
@@ -1932,16 +1995,21 @@ export class CoverDetector {
           continue;
         }
 
+        contributingBlockers.push(blocker);
         if (coverOrder.indexOf(perBlocker) > coverOrder.indexOf(bestCover)) {
           bestCover = perBlocker;
         }
       }
 
-      return bestCover;
+      return { state: bestCover, blockers: contributingBlockers };
     } catch (error) {
       console.error('PF2E Visioner | Error in evaluateCoverByCoverage:', error);
-      return 'none';
+      return { state: 'none', blockers: [] };
     }
+  }
+
+  _evaluateCoverByCoverage(attacker, target, blockers, attackContext = null) {
+    return this._evaluateCoverByCoverageDetailed(attacker, target, blockers, attackContext).state;
   }
 
   /**
@@ -2087,8 +2155,8 @@ export class CoverDetector {
     }
   }
 
-  _checkRuleElementCover(attacker, target) {
-    return RuleElementCoverService.getCoverFromRuleElements(attacker, target);
+  _checkRuleElementCover(attacker, target, options = {}) {
+    return RuleElementCoverService.getCoverFromRuleElements(attacker, target, options);
   }
 }
 

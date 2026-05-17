@@ -41,8 +41,28 @@ function isTakeCoverAutoRelease(override) {
   );
 }
 
+function shouldSuppressCoverChange(override) {
+  return override?.suppressCoverChange === true;
+}
+
+function getExpectedCover(override) {
+  return override?.expectedCover ?? (override?.hasCover ? 'standard' : 'none');
+}
+
 function getDisplayCurrentCover(override) {
+  if (shouldSuppressCoverChange(override)) return getExpectedCover(override);
   return isTakeCoverAutoRelease(override) ? 'auto' : override?.currentCover || 'none';
+}
+
+function isAutoCalculatedCoverChange(override) {
+  if (shouldSuppressCoverChange(override)) return false;
+  if (isTakeCoverAutoRelease(override)) return false;
+  const previousCover = getExpectedCover(override);
+  const currentCover = override?.currentCover || 'none';
+  return (
+    override?.coverChangeSource === 'auto' ||
+    (currentCover !== previousCover && !!override?.currentCover)
+  );
 }
 
 class OverrideValidationIndicator {
@@ -76,6 +96,7 @@ class OverrideValidationIndicator {
   // - concealment expectation vs current (concealed or hidden)
   #hasDisplayChange(o) {
     if (!o) return false;
+    if (o.controlReleaseOnly === true) return true;
     const coverOnly = o.coverOnly === true;
     if (!coverOnly && !hasOverrideVisibilityData(o)) return false;
 
@@ -86,9 +107,10 @@ class OverrideValidationIndicator {
       return false;
     }
 
-    const prevCover = (o.expectedCover ?? (o.hasCover ? 'standard' : 'none'));
+    const prevCover = getExpectedCover(o);
     const curVis = o.currentVisibility || 'observed';
     const curCover = getDisplayCurrentCover(o);
+    const showCoverChange = !shouldSuppressCoverChange(o) && prevCover !== curCover;
 
     // Filter out 'avs' visibility states from display
     if (!coverOnly && (prevVis === 'avs' || curVis === 'avs')) {
@@ -96,7 +118,7 @@ class OverrideValidationIndicator {
     }
 
     // Only show if there are actual state differences
-    return (!coverOnly && prevVis !== curVis) || prevCover !== curCover;
+    return (!coverOnly && prevVis !== curVis) || showCoverChange;
   }
 
   // Determine whether an override should be shown based on sneak status
@@ -753,14 +775,24 @@ class OverrideValidationIndicator {
       const cls = cfg.cssClass || `visibility-${key}`;
       return `<i class="${cfg.icon} state-indicator ${cls}" data-kind="visibility" data-state="${key}" data-tooltip="${label}"></i>`;
     };
-    const mkCover = (key) => {
+    const mkCover = (key, options = {}) => {
       const cfg =
         key === 'auto'
           ? AUTO_COVER_DISPLAY
           : COVER_STATES?.[key] || { icon: 'fas fa-shield', label: game.i18n.localize('PF2E_VISIONER.TOKEN_MANAGER.COVER_STATE'), cssClass: 'cover-none' };
       const label = game?.i18n?.localize?.(cfg.label) || cfg.label || '';
       const cls = cfg.cssClass || `cover-${key}`;
+      if (options.autoCalculated && key !== 'auto') {
+        const autoLabel = 'Auto cover calculation';
+        return `<span class="auto-cover-result" data-tooltip="${autoLabel}: ${label}"><i class="${AUTO_COVER_DISPLAY.icon} state-indicator cover-auto" data-kind="cover" data-state="auto" data-tooltip="${autoLabel}"></i><i class="${cfg.icon} state-indicator ${cls}" data-kind="cover" data-state="${key}" data-tooltip="${label} (auto calculated)"></i></span>`;
+      }
       return `<i class="${cfg.icon} state-indicator ${cls}" data-kind="cover" data-state="${key}" data-tooltip="${label}"></i>`;
+    };
+    const mkAvsControl = () => {
+      const cfg = VISIBILITY_STATES?.avs || { icon: 'fas fa-bolt-auto', cssClass: 'visibility-avs' };
+      const label = game?.i18n?.localize?.(cfg.label) || 'AVS';
+      const cls = cfg.cssClass || 'visibility-avs';
+      return `<i class="${cfg.icon} state-indicator ${cls}" data-kind="visibility" data-state="avs" data-tooltip="${label}: return control to AVS"></i>`;
     };
     const escapeAttr = (value) => String(value ?? '')
       .replace(/&/g, '&amp;')
@@ -781,13 +813,15 @@ class OverrideValidationIndicator {
       if (!o) return '';
 
       const prevVis = overrideToDisplayVisibility(o);
-      const prevCover = (o.expectedCover ?? (o.hasCover ? 'standard' : 'none'));
+      const prevCover = getExpectedCover(o);
       const curVis = o.currentVisibility || 'observed';
       const curCover = getDisplayCurrentCover(o);
+      const autoCalculatedCover = isAutoCalculatedCoverChange(o);
 
       // Filter out 'avs' states from display but still show the row
       const showVisChange = prevVis !== curVis && prevVis !== 'avs' && curVis !== 'avs';
-      const showCoverChange = prevCover !== curCover;
+      const showCoverChange = !shouldSuppressCoverChange(o) && prevCover !== curCover;
+      const showControlRelease = o.controlReleaseOnly === true && !showVisChange && !showCoverChange;
 
       const reasons = (o.reasonIcons || []).map((r) => `<i class="${r.icon}" data-tooltip="${r.text}"></i>`).join('');
       const stealthPositionBypassBadge = showStealthPositionBypass
@@ -799,7 +833,8 @@ class OverrideValidationIndicator {
         <div class="tip-row" data-observer-id="${o.observerId || ''}" data-target-id="${o.targetId || ''}" style="cursor:pointer; padding:4px 6px; border-radius:4px; transition:background 0.15s;" onmouseenter="this.style.background='rgba(255,255,255,0.08)'" onmouseleave="this.style.background='transparent'" data-tooltip="${game.i18n.localize('PF2E_VISIONER.OVERRIDE_INDICATOR.ROW_RIGHT_CLICK')}">
           <div class="who">${o.observerName} <i class="fas fa-arrow-right"></i> ${o.targetName}</div>
           ${showVisChange ? `<div class="state-pair vis">${mkVis(prevVis)} <i class="fas fa-arrow-right"></i> ${mkVis(curVis)}${deferredBadge}</div>` : ''}
-          ${showCoverChange ? `<div class="state-pair cover">${mkCover(prevCover)} <i class="fas fa-arrow-right"></i> ${mkCover(curCover)}</div>` : ''}
+          ${showControlRelease ? `<div class="state-pair vis">${mkVis(prevVis)} <i class="fas fa-arrow-right"></i> ${mkVis(curVis)} ${mkAvsControl()}</div>` : ''}
+          ${showCoverChange ? `<div class="state-pair cover">${mkCover(prevCover)} <i class="fas fa-arrow-right"></i> ${mkCover(curCover, { autoCalculated: autoCalculatedCover })}</div>` : ''}
           ${reasons || stealthPositionBypassBadge ? `<div class="reasons">${reasons}${stealthPositionBypassBadge}</div>` : ''}
         </div>
       `;
@@ -941,6 +976,7 @@ class OverrideValidationIndicator {
         hidden: ['--visibility-hidden', '--visibility-hidden-color', '#ff9800'],
         undetected: ['--visibility-undetected', '--visibility-undetected-color', '#f44336'],
         unnoticed: ['--visibility-unnoticed', '--visibility-unnoticed-color', '#9c27b0'],
+        avs: ['--visibility-avs', '--visibility-avs-color', '#9c27b0'],
       },
       cover: {
         none: ['--cover-none', '--cover-none-color', '#4caf50'],
@@ -1041,6 +1077,7 @@ class OverrideValidationIndicator {
       .pf2e-visioner-override-tooltip .tip-row:first-of-type { border-top: none; }
       .pf2e-visioner-override-tooltip .who { color: #ddd; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
       .pf2e-visioner-override-tooltip .state-pair { display: inline-flex; align-items: center; gap: 4px; color: #aaa; }
+      .pf2e-visioner-override-tooltip .auto-cover-result { display: inline-flex; align-items: center; gap: 3px; }
       /* Add separation between the visibility and cover state groups */
       .pf2e-visioner-override-tooltip .state-pair + .state-pair { margin-left: 10px; }
       .pf2e-visioner-override-tooltip .state-pair i.fas.fa-arrow-right { color: #999; }

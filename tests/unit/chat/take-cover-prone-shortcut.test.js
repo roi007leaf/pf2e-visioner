@@ -2,6 +2,7 @@ describe('Take Cover prone shortcut preview flow', () => {
   afterEach(() => {
     jest.resetModules();
     jest.clearAllMocks();
+    game.user.isGM = true;
   });
 
   it('applies prone-ranged-only Take Cover outcomes without opening the preview dialog', async () => {
@@ -92,6 +93,48 @@ describe('Take Cover prone shortcut preview flow', () => {
     expect(render).toHaveBeenCalledWith(true);
   });
 
+  it('routes player Take Cover preview to the GM without opening or applying locally', async () => {
+    game.user.isGM = false;
+
+    const actorToken = { id: 'actor-token', actor: { id: 'actor' } };
+    const requestGMOpenTakeCover = jest.fn(() => true);
+    const applyOutcomesDirectly = jest.fn();
+    const render = jest.fn();
+    const TakeCoverPreviewDialog = jest.fn(() => ({ render }));
+
+    jest.doMock('../../../scripts/services/socket.js', () => ({
+      requestGMOpenTakeCover,
+    }));
+    jest.doMock('../../../scripts/chat/services/actions/TakeCoverAction.js', () => ({
+      TakeCoverActionHandler: jest.fn(() => ({
+        discoverSubjects: jest.fn(),
+        analyzeOutcome: jest.fn(),
+        shouldApplyWithoutDialog: jest.fn(),
+        applyOutcomesDirectly,
+      })),
+    }));
+    jest.doMock('../../../scripts/chat/dialogs/TakeCoverPreviewDialog.js', () => ({
+      TakeCoverPreviewDialog,
+    }));
+
+    const { previewActionResults } = await import(
+      '../../../scripts/chat/services/preview/preview-service.js'
+    );
+
+    await previewActionResults({
+      actionType: 'take-cover',
+      actor: actorToken,
+      actorToken,
+      message: { id: 'message-1' },
+    });
+
+    expect(requestGMOpenTakeCover).toHaveBeenCalledWith('actor-token', 'message-1');
+    expect(applyOutcomesDirectly).not.toHaveBeenCalled();
+    expect(TakeCoverPreviewDialog).not.toHaveBeenCalled();
+    expect(render).not.toHaveBeenCalled();
+
+  });
+
   it('applies directly when the actor is prone even if regular cover outcomes are present', async () => {
     const actorToken = { id: 'actor-token', isProne: true, actor: { id: 'actor' } };
     const observer = { id: 'observer-token', actor: { id: 'observer' } };
@@ -141,7 +184,7 @@ describe('Take Cover prone shortcut preview flow', () => {
     expect(render).not.toHaveBeenCalled();
   });
 
-  it('opens the preview dialog when a prone actor already has the prone ranged Take Cover effect', async () => {
+  it('does not open the preview dialog when a prone actor already has the prone ranged Take Cover effect', async () => {
     const actorToken = {
       id: 'actor-token',
       isProne: true,
@@ -168,6 +211,7 @@ describe('Take Cover prone shortcut preview flow', () => {
     const applyOutcomesDirectly = jest.fn();
     const render = jest.fn();
     const TakeCoverPreviewDialog = jest.fn(() => ({ render }));
+    const notifyWarn = jest.fn();
 
     jest.doMock('../../../scripts/chat/services/actions/TakeCoverAction.js', () => {
       const Actual = jest.requireActual(
@@ -187,6 +231,7 @@ describe('Take Cover prone shortcut preview flow', () => {
       TakeCoverPreviewDialog,
     }));
     jest.doMock('../../../scripts/chat/services/infra/notifications.js', () => ({
+      notify: { warn: notifyWarn },
       log: { error: jest.fn(), warn: jest.fn() },
     }));
 
@@ -197,12 +242,8 @@ describe('Take Cover prone shortcut preview flow', () => {
     await previewActionResults({ actionType: 'take-cover', actor: actorToken, actorToken });
 
     expect(applyOutcomesDirectly).not.toHaveBeenCalled();
-    expect(TakeCoverPreviewDialog).toHaveBeenCalledWith(
-      actorToken,
-      [outcome],
-      [outcome],
-      expect.objectContaining({ actionType: 'take-cover', actorToken }),
-    );
-    expect(render).toHaveBeenCalledWith(true);
+    expect(TakeCoverPreviewDialog).not.toHaveBeenCalled();
+    expect(render).not.toHaveBeenCalled();
+    expect(notifyWarn).toHaveBeenCalledWith(expect.stringContaining('already has Take Cover'));
   });
 });

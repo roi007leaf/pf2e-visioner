@@ -9,11 +9,11 @@ import {
   VISIBILITY_STATES,
   getVisibilityStateLabelKey,
 } from '../constants.js';
-import autoCoverSystem from '../cover/auto-cover/AutoCoverSystem.js';
+import { getCoverOverlayState } from '../cover/auto-cover/cover-state-query.js';
 import { canShowTooltips, computeSizesFromSetting } from '../helpers/tooltip-utils.js';
 import { SenseSuppressionRegionBehavior } from '../regions/SenseSuppressionRegionBehavior.js';
 import { getDetectionBetween } from '../stores/detection-map.js';
-import { getCoverMap, getVisibilityMap } from '../utils.js';
+import { getVisibilityMap } from '../utils.js';
 import { setPanningState } from '../utils/scheduler.js';
 
 const SENSE_BADGE_BLOCKED_VISIBILITY_STATES = new Set(['undetected', 'unnoticed']);
@@ -1057,31 +1057,10 @@ export function showAutoCoverComputedOverlay(sourceToken) {
       (t) => t && t !== sourceToken && t.isVisible,
     );
 
-    // Get manual cover map for this source
-    const manualCoverMap = getCoverMap(sourceToken) || {};
-
     for (const target of others) {
-      const targetId = target.document.id;
-
-      // Check manual cover first - it takes precedence
-      const manualCover = manualCoverMap[targetId];
-      if (manualCover && manualCover !== 'none') {
-        // Show manual cover badge with cog overlay
-        addCoverIndicator(target, sourceToken, manualCover, true);
-        continue;
-      }
-
-      // If no manual cover, check auto cover
-      let autoCover = 'none';
-      try {
-        autoCover = autoCoverSystem.detectCoverBetweenTokens(sourceToken, target) || 'none';
-      } catch (_) {
-        autoCover = 'none';
-      }
-
-      if (autoCover && autoCover !== 'none') {
-        // Show auto cover badge (no overlay)
-        addCoverIndicator(target, sourceToken, autoCover, false);
+      const cover = getCoverOverlayState(sourceToken, target);
+      if (cover.state && cover.state !== 'none') {
+        addCoverIndicator(target, sourceToken, cover.state, cover.isManualCover);
       }
     }
   } catch (_) { }

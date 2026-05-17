@@ -5,11 +5,18 @@ import { BaseActionDialog } from './base-action-dialog.js';
 let currentTakeCoverDialog = null;
 const TAKE_COVER_OVERRIDE_STATES = ['none', 'standard', 'greater'];
 
-function normalizeTakeCoverDialogCover(state, { result = false } = {}) {
+function normalizeTakeCoverDialogCover(state, { result = false, baseline = false } = {}) {
   if (state === 'greater') return 'greater';
   if (state === 'standard') return 'standard';
-  if (state === 'lesser') return result ? 'standard' : 'none';
+  if (state === 'lesser') return result ? 'standard' : baseline ? 'lesser' : 'none';
   return 'none';
+}
+
+function getTakeCoverDisplayBaseline(outcome) {
+  return normalizeTakeCoverDialogCover(
+    outcome?.baselineCover ?? outcome?.currentCover ?? outcome?.oldVisibility ?? outcome?.oldCover,
+    { baseline: true },
+  );
 }
 
 export class TakeCoverPreviewDialog extends BaseActionDialog {
@@ -224,7 +231,7 @@ export class TakeCoverPreviewDialog extends BaseActionDialog {
       const effectiveNew = normalizeTakeCoverDialogCover(o.overrideState || calculatedNew, {
         result: true,
       });
-      const baseOld = normalizeTakeCoverDialogCover(o.oldVisibility || o.oldCover || o.currentCover);
+      const baseOld = getTakeCoverDisplayBaseline(o);
       let hasActionableChange =
         o.takeCoverProneRangedOnly === true ||
         (baseOld != null && effectiveNew != null && effectiveNew !== baseOld);
@@ -383,7 +390,7 @@ export class TakeCoverPreviewDialog extends BaseActionDialog {
       if (o?.hasActionableChange === true) return true;
       if (o?.takeCoverProneRangedOnly === true) return true;
       const eff = o.overrideState ?? o.newVisibility ?? o.newCover;
-      const base = o.oldVisibility ?? o.oldCover ?? o.currentCover;
+      const base = getTakeCoverDisplayBaseline(o);
       return eff != null && base != null && eff !== base;
     });
 
@@ -438,7 +445,7 @@ export class TakeCoverPreviewDialog extends BaseActionDialog {
     const outcome = app.outcomes.find((o) => o.target.id === tokenId);
     if (!outcome) return;
     const eff = outcome.overrideState || outcome.newVisibility || outcome.newCover;
-    const base = outcome.oldVisibility || outcome.oldCover || outcome.currentCover;
+    const base = getTakeCoverDisplayBaseline(outcome);
     if (eff === base && outcome.takeCoverProneRangedOnly !== true) return;
     const overrides = { [tokenId]: eff };
     const { applyNowTakeCover } = await import('../services/index.js');

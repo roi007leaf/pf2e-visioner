@@ -261,8 +261,6 @@ export class ConditionManager {
         actor.system?.conditions?.invisible?.active ||
         actor.conditions?.has?.('invisible');
 
-      // Debug: Show all condition detection methods
-
       if (hasInvisibility) {
         // Invisibility was added - record current visibility states and clear established states
         await this.#recordVisibilityBeforeInvisibility(token);

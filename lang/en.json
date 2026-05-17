@@ -115,8 +115,6 @@
       "vision_description": "Your standard visual sense used to perceive your surroundings.",
       "lifesense": "Lifesense",
       "lifesense_description": "You have a limited ability to sense life force. You gain lifesense as an imprecise sense. This allows you to sense the life force of living and undead creatures within the listed range. The sense can distinguish between the vitality energy animating living creatures and the void energy animating undead creatures.",
-      "thoughtsense": "Thoughtsense",
-      "thoughtsense_description": "You sense the minds of thinking creatures. You gain thoughtsense as an imprecise sense with the listed range. This sense has no effect on mindless creatures or objects.",
       "echolocation": "Echolocation",
       "echolocation_description": "You can use sound to navigate and detect objects. You gain echolocation as a precise sense. This allows you to detect all creatures and objects within range through sound reflection.",
       "tremorsense": "Tremorsense",
@@ -735,7 +733,7 @@
       },
       "ENABLE_STEALTH_INITIATIVE_VISIBILITY": {
         "name": "Encounter Stealth Initiative Visibility",
-        "hint": "When enabled, PF2E Visioner handles Stealth-initiative encounter setup: combatants who rolled Stealth are initially undetected and hidden from tracker rows for creatures they beat in initiative. Leave disabled if PF2e Avoid Notice or another module manages this."
+        "hint": "When enabled, PF2E Visioner handles Stealth-initiative encounter setup: combatants who rolled Stealth are initially undetected and hidden from tracker rows for creatures they beat their perception DC. Leave disabled if PF2e Avoid Notice or another module manages this."
       },
       "DISABLE_LINE_OF_SIGHT": {
         "name": "Disable Line of Sight Raycasting",

@@ -4,6 +4,11 @@
 
 import { DetectionWrapper } from '../../../scripts/services/DetectionWrapper.js';
 import { markExplicitVisiblePair } from '../../../scripts/services/ExplicitVisibilityPairs.js';
+import {
+    clearPendingTokenMovementPosition,
+    setPendingTokenMovementPosition,
+    shouldTemporarilyForceTokenInvisible,
+} from '../../../scripts/services/pending-token-movement.js';
 
 // Mock dependencies
 const mockLibWrapper = {
@@ -371,6 +376,1003 @@ describe('Deafened Detection Wrapper', () => {
             )).toBe(false);
         });
 
+        test('basic sight does not reveal a hidden target during pending wall-blocked movement', () => {
+            const originalCanvas = global.canvas;
+            global.canvas = {
+                grid: { size: 50 },
+                walls: {
+                    placeables: [
+                        {
+                            document: {
+                                id: 'wall',
+                                c: [100, 0, 100, 200],
+                                sight: 1,
+                                door: 0,
+                                ds: 0,
+                            },
+                        },
+                    ],
+                },
+            };
+
+            const basicSightWrapper = mockLibWrapper.register.mock.calls.find(
+                call => call[1] === 'CONFIG.Canvas.detectionModes.basicSight._canDetect'
+            )?.[2];
+            const observer = {
+                id: 'observer',
+                actor: {},
+                document: {
+                    id: 'observer',
+                    x: 0,
+                    y: 0,
+                    width: 1,
+                    height: 1,
+                    getFlag: jest.fn().mockReturnValue({ target: 'hidden' }),
+                },
+            };
+            const target = {
+                id: 'target',
+                actor: {},
+                document: {
+                    id: 'target',
+                    x: 150,
+                    y: 0,
+                    width: 1,
+                    height: 1,
+                },
+            };
+
+            setPendingTokenMovementPosition(observer.document, { x: 0, y: 0 }, [observer]);
+
+            expect(basicSightWrapper(jest.fn().mockReturnValue(true), { object: observer }, target)).toBe(false);
+
+            clearPendingTokenMovementPosition('observer');
+            global.canvas = originalCanvas;
+        });
+
+        test('basic sight keeps pending hidden NPC detectable when no wall blocks sight', () => {
+            const originalCanvas = global.canvas;
+            global.canvas = {
+                grid: { size: 50 },
+                walls: {
+                    placeables: [],
+                },
+            };
+
+            const basicSightWrapper = mockLibWrapper.register.mock.calls.find(
+                call => call[1] === 'CONFIG.Canvas.detectionModes.basicSight._canDetect'
+            )?.[2];
+            const observer = {
+                id: 'observer',
+                actor: {},
+                document: {
+                    id: 'observer',
+                    x: 0,
+                    y: 0,
+                    width: 1,
+                    height: 1,
+                    getFlag: jest.fn().mockReturnValue({ target: 'hidden' }),
+                },
+            };
+            const target = {
+                id: 'target',
+                actor: { type: 'npc' },
+                document: {
+                    id: 'target',
+                    x: 150,
+                    y: 0,
+                    width: 1,
+                    height: 1,
+                },
+            };
+
+            setPendingTokenMovementPosition(observer.document, { x: 0, y: 0 }, [observer]);
+
+            expect(basicSightWrapper(jest.fn().mockReturnValue(true), { object: observer }, target)).toBe(true);
+
+            clearPendingTokenMovementPosition('observer');
+            global.canvas = originalCanvas;
+        });
+
+        test('basic sight does not reveal pending undetected NPC when no wall blocks sight', () => {
+            const originalCanvas = global.canvas;
+            global.canvas = {
+                grid: { size: 50 },
+                walls: {
+                    placeables: [],
+                },
+            };
+
+            const basicSightWrapper = mockLibWrapper.register.mock.calls.find(
+                call => call[1] === 'CONFIG.Canvas.detectionModes.basicSight._canDetect'
+            )?.[2];
+            const observer = {
+                id: 'observer',
+                actor: {},
+                document: {
+                    id: 'observer',
+                    x: 0,
+                    y: 0,
+                    width: 1,
+                    height: 1,
+                    getFlag: jest.fn().mockReturnValue({ target: 'undetected' }),
+                },
+            };
+            const target = {
+                id: 'target',
+                actor: { type: 'npc' },
+                document: {
+                    id: 'target',
+                    x: 150,
+                    y: 0,
+                    width: 1,
+                    height: 1,
+                },
+            };
+
+            setPendingTokenMovementPosition(observer.document, { x: 0, y: 0 }, [observer]);
+
+            expect(basicSightWrapper(jest.fn().mockReturnValue(true), { object: observer }, target)).toBe(false);
+
+            clearPendingTokenMovementPosition('observer');
+            global.canvas = originalCanvas;
+        });
+
+        test('basic sight does not reveal pending undetected NPC when wall blocks sight', () => {
+            const originalCanvas = global.canvas;
+            global.canvas = {
+                grid: { size: 50 },
+                walls: {
+                    placeables: [
+                        {
+                            document: {
+                                id: 'wall',
+                                c: [100, 0, 100, 200],
+                                sight: 1,
+                                door: 0,
+                                ds: 0,
+                            },
+                        },
+                    ],
+                },
+            };
+
+            const basicSightWrapper = mockLibWrapper.register.mock.calls.find(
+                call => call[1] === 'CONFIG.Canvas.detectionModes.basicSight._canDetect'
+            )?.[2];
+            const observer = {
+                id: 'observer',
+                actor: {},
+                document: {
+                    id: 'observer',
+                    x: 0,
+                    y: 0,
+                    width: 1,
+                    height: 1,
+                    getFlag: jest.fn().mockReturnValue({ target: 'undetected' }),
+                },
+            };
+            const target = {
+                id: 'target',
+                actor: { type: 'npc' },
+                document: {
+                    id: 'target',
+                    x: 150,
+                    y: 0,
+                    width: 1,
+                    height: 1,
+                },
+            };
+
+            setPendingTokenMovementPosition(observer.document, { x: 0, y: 0 }, [observer]);
+
+            expect(basicSightWrapper(jest.fn().mockReturnValue(true), { object: observer }, target)).toBe(false);
+
+            clearPendingTokenMovementPosition('observer');
+            global.canvas = originalCanvas;
+        });
+
+        test('basic sight does not downgrade observed visibility during pending wall-blocked movement', () => {
+            const originalCanvas = global.canvas;
+            global.canvas = {
+                grid: { size: 50 },
+                walls: {
+                    placeables: [
+                        {
+                            document: {
+                                id: 'wall',
+                                c: [100, 0, 100, 200],
+                                sight: 1,
+                                door: 0,
+                                ds: 0,
+                            },
+                        },
+                    ],
+                },
+            };
+
+            const basicSightWrapper = mockLibWrapper.register.mock.calls.find(
+                call => call[1] === 'CONFIG.Canvas.detectionModes.basicSight._canDetect'
+            )?.[2];
+            const observer = {
+                id: 'observer',
+                actor: {},
+                document: {
+                    id: 'observer',
+                    x: 0,
+                    y: 0,
+                    width: 1,
+                    height: 1,
+                    getFlag: jest.fn().mockReturnValue({ target: 'observed' }),
+                },
+            };
+            const target = {
+                id: 'target',
+                actor: {},
+                document: {
+                    id: 'target',
+                    x: 150,
+                    y: 0,
+                    width: 1,
+                    height: 1,
+                },
+            };
+
+            setPendingTokenMovementPosition(observer.document, { x: 0, y: 0 }, [observer]);
+
+            expect(basicSightWrapper(jest.fn().mockReturnValue(true), { object: observer }, target)).toBe(true);
+
+            clearPendingTokenMovementPosition('observer');
+            global.canvas = originalCanvas;
+        });
+
+        test('pending wall-blocked observed movement defers to Foundry point visibility', () => {
+            const originalCanvas = global.canvas;
+            global.canvas = {
+                grid: { size: 50 },
+                walls: {
+                    placeables: [
+                        {
+                            document: {
+                                id: 'wall',
+                                c: [100, 0, 100, 200],
+                                sight: 1,
+                                door: 0,
+                                ds: 0,
+                            },
+                        },
+                    ],
+                },
+            };
+
+            const wrappedFunction = mockLibWrapper.register.mock.calls.find(
+                call => call[1] === 'foundry.canvas.perception.DetectionMode.prototype.testVisibility'
+            )?.[2];
+            const observer = {
+                id: 'observer',
+                actor: {},
+                document: {
+                    id: 'observer',
+                    x: 0,
+                    y: 0,
+                    width: 1,
+                    height: 1,
+                    getFlag: jest.fn().mockReturnValue({ target: 'observed' }),
+                },
+            };
+            const target = {
+                id: 'target',
+                actor: {},
+                document: {
+                    id: 'target',
+                    x: 150,
+                    y: 0,
+                    width: 1,
+                    height: 1,
+                    level: 'level-b',
+                    getFlag: jest.fn().mockReturnValue(false),
+                },
+            };
+            const basicSightInstance = {
+                id: 'basicSight',
+                _canDetect: jest.fn().mockReturnValue(true),
+                _testPoint: jest.fn().mockReturnValue(true),
+            };
+            const hearingInstance = {
+                id: 'hearing',
+                _canDetect: jest.fn().mockReturnValue(true),
+                _testPoint: jest.fn().mockReturnValue(true),
+            };
+
+            setPendingTokenMovementPosition(observer.document, { x: 0, y: 0 }, [observer]);
+
+            expect(wrappedFunction.call(
+                basicSightInstance,
+                { object: observer },
+                { id: 'basicSight', enabled: true },
+                { ...mockConfig, object: target },
+            )).toBe(true);
+            expect(wrappedFunction.call(
+                hearingInstance,
+                { object: observer },
+                { id: 'hearing', enabled: true },
+                { ...mockConfig, object: target },
+            )).toBe(true);
+            expect(basicSightInstance._testPoint).toHaveBeenCalled();
+            expect(hearingInstance._testPoint).toHaveBeenCalled();
+
+            clearPendingTokenMovementPosition('observer');
+            global.canvas = originalCanvas;
+        });
+
+        test('pending force check does not probe undetected basic sight state', () => {
+            const originalCanvas = global.canvas;
+            const basicSightWrapper = mockLibWrapper.register.mock.calls.find(
+                call => call[1] === 'CONFIG.Canvas.detectionModes.basicSight._canDetect'
+            )?.[2];
+            const observer = {
+                id: 'observer',
+                actor: {},
+                document: {
+                    id: 'observer',
+                    x: 0,
+                    y: 0,
+                    width: 1,
+                    height: 1,
+                    getFlag: jest.fn().mockReturnValue({ target: 'undetected' }),
+                },
+            };
+            const target = {
+                id: 'target',
+                actor: {},
+                controlled: false,
+                document: {
+                    id: 'target',
+                    x: 150,
+                    y: 0,
+                    width: 1,
+                    height: 1,
+                    getVisibilityTestPoints: jest.fn().mockReturnValue([{ x: 175, y: 25 }]),
+                },
+            };
+            global.canvas = {
+                grid: { size: 50 },
+                walls: { placeables: [] },
+                tokens: {
+                    get: jest.fn((id) => (id === 'observer' ? observer : null)),
+                    placeables: [observer, target],
+                },
+                effects: {
+                    visionSources: [{ active: true, object: observer }],
+                    lightSources: [],
+                },
+                visibility: {
+                    testVisibility: jest.fn(() =>
+                        basicSightWrapper(jest.fn().mockReturnValue(true), { object: observer }, target)
+                    ),
+                },
+            };
+
+            setPendingTokenMovementPosition(observer.document, { x: 0, y: 0 }, [observer]);
+
+            expect(shouldTemporarilyForceTokenInvisible(target)).toBe(true);
+            expect(global.canvas.visibility.testVisibility).not.toHaveBeenCalled();
+
+            clearPendingTokenMovementPosition('observer');
+            global.canvas = originalCanvas;
+        });
+
+        test('canvas visibility test is suppressed before light sources can reveal pending wall-blocked targets', () => {
+            const originalCanvas = global.canvas;
+            global.canvas = {
+                grid: { size: 50 },
+                walls: {
+                    placeables: [
+                        {
+                            document: {
+                                id: 'wall',
+                                c: [100, 0, 100, 200],
+                                sight: 1,
+                                door: 0,
+                                ds: 0,
+                            },
+                        },
+                    ],
+                },
+                effects: {
+                    visionSources: [
+                        {
+                            active: true,
+                            object: {
+                                id: 'observer',
+                                document: {
+                                    id: 'observer',
+                                    x: 0,
+                                    y: 0,
+                                    width: 1,
+                                    height: 1,
+                                },
+                            },
+                        },
+                    ],
+                    lightSources: [],
+                },
+            };
+            global.canvas.effects.lightSources.push({
+                active: true,
+                data: { vision: true },
+                object: global.canvas.effects.visionSources[0].object,
+            });
+
+            const canvasVisibilityWrapper = mockLibWrapper.register.mock.calls.find(
+                call => call[1] === 'foundry.canvas.groups.CanvasVisibility.prototype.testVisibility'
+            )?.[2];
+            const target = {
+                id: 'target',
+                actor: {},
+                document: {
+                    id: 'target',
+                    x: 150,
+                    y: 0,
+                    width: 1,
+                    height: 1,
+                },
+            };
+
+            setPendingTokenMovementPosition(
+                global.canvas.effects.visionSources[0].object.document,
+                { x: 0, y: 0 },
+                [global.canvas.effects.visionSources[0].object],
+            );
+
+            const wrapped = jest.fn(() =>
+                global.canvas.effects.visionSources.some(source => source.active) ||
+                global.canvas.effects.lightSources.some(source => source.active)
+            );
+
+            expect(canvasVisibilityWrapper(wrapped, [{ x: 150, y: 25 }], {
+                object: target,
+            })).toBe(false);
+            expect(global.canvas.effects.visionSources[0].active).toBe(true);
+            expect(global.canvas.effects.lightSources[0].active).toBe(true);
+
+            clearPendingTokenMovementPosition('observer');
+            global.canvas = originalCanvas;
+        });
+
+        test('canvas visibility ignores blocked pending vision source but keeps other sources available', () => {
+            const originalCanvas = global.canvas;
+            const pendingSource = {
+                active: true,
+                object: {
+                    id: 'observer',
+                    document: {
+                        id: 'observer',
+                        x: 0,
+                        y: 0,
+                        width: 1,
+                        height: 1,
+                    },
+                },
+            };
+            const otherSource = {
+                active: true,
+                object: {
+                    id: 'other-observer',
+                    document: {
+                        id: 'other-observer',
+                        x: 0,
+                        y: 150,
+                        width: 1,
+                        height: 1,
+                    },
+                },
+            };
+            global.canvas = {
+                grid: { size: 50 },
+                walls: {
+                    placeables: [
+                        {
+                            document: {
+                                id: 'wall',
+                                c: [100, 0, 100, 200],
+                                sight: 1,
+                                door: 0,
+                                ds: 0,
+                            },
+                        },
+                    ],
+                },
+                effects: {
+                    visionSources: [pendingSource, otherSource],
+                },
+            };
+
+            const canvasVisibilityWrapper = mockLibWrapper.register.mock.calls.find(
+                call => call[1] === 'foundry.canvas.groups.CanvasVisibility.prototype.testVisibility'
+            )?.[2];
+            const target = {
+                id: 'target',
+                actor: {},
+                document: {
+                    id: 'target',
+                    x: 150,
+                    y: 0,
+                    width: 1,
+                    height: 1,
+                },
+            };
+            const wrapped = jest.fn(() => pendingSource.active);
+
+            setPendingTokenMovementPosition(
+                pendingSource.object.document,
+                { x: 0, y: 0 },
+                [pendingSource.object],
+            );
+
+            expect(canvasVisibilityWrapper(wrapped, [{ x: 150, y: 25 }], {
+                object: target,
+            })).toBe(false);
+            expect(pendingSource.active).toBe(true);
+            expect(otherSource.active).toBe(true);
+
+            clearPendingTokenMovementPosition('observer');
+            global.canvas = originalCanvas;
+        });
+
+        test('canvas visibility hides Visioner-hidden target from pending observer even when another source sees it', () => {
+            const originalCanvas = global.canvas;
+            const pendingSource = {
+                active: true,
+                object: {
+                    id: 'observer',
+                    document: {
+                        id: 'observer',
+                        x: 0,
+                        y: 0,
+                        width: 1,
+                        height: 1,
+                        getFlag: jest.fn().mockReturnValue({ target: 'hidden' }),
+                    },
+                },
+            };
+            const otherSource = {
+                active: true,
+                object: {
+                    id: 'other-observer',
+                    document: {
+                        id: 'other-observer',
+                        x: 0,
+                        y: 150,
+                        width: 1,
+                        height: 1,
+                    },
+                },
+            };
+            global.canvas = {
+                grid: { size: 50 },
+                walls: {
+                    placeables: [],
+                },
+                effects: {
+                    visionSources: [pendingSource, otherSource],
+                    lightSources: [],
+                },
+            };
+
+            const canvasVisibilityWrapper = mockLibWrapper.register.mock.calls.find(
+                call => call[1] === 'foundry.canvas.groups.CanvasVisibility.prototype.testVisibility'
+            )?.[2];
+            const target = {
+                id: 'target',
+                actor: {},
+                document: {
+                    id: 'target',
+                    x: 150,
+                    y: 0,
+                    width: 1,
+                    height: 1,
+                },
+            };
+            const wrapped = jest.fn(() => otherSource.active);
+
+            setPendingTokenMovementPosition(pendingSource.object.document, { x: 0, y: 0 }, [
+                pendingSource.object,
+            ]);
+
+            expect(canvasVisibilityWrapper(wrapped, [{ x: 150, y: 25 }], {
+                object: target,
+            })).toBe(false);
+            expect(wrapped).not.toHaveBeenCalled();
+            expect(pendingSource.active).toBe(true);
+            expect(otherSource.active).toBe(true);
+
+            clearPendingTokenMovementPosition('observer');
+            global.canvas = originalCanvas;
+        });
+
+        test('canvas visibility hides target hidden to pending observer even without blocked sources', () => {
+            const originalCanvas = global.canvas;
+            const pendingObserver = {
+                id: 'observer',
+                document: {
+                    id: 'observer',
+                    x: 0,
+                    y: 0,
+                    width: 1,
+                    height: 1,
+                    getFlag: jest.fn().mockReturnValue({ target: 'hidden' }),
+                },
+            };
+            const otherSource = {
+                active: true,
+                object: {
+                    id: 'other-observer',
+                    document: {
+                        id: 'other-observer',
+                        x: 0,
+                        y: 150,
+                        width: 1,
+                        height: 1,
+                    },
+                },
+            };
+            global.canvas = {
+                grid: { size: 50 },
+                walls: {
+                    placeables: [],
+                },
+                tokens: {
+                    get: jest.fn((id) => (id === 'observer' ? pendingObserver : null)),
+                    placeables: [pendingObserver],
+                    controlled: [pendingObserver],
+                },
+                effects: {
+                    visionSources: [otherSource],
+                    lightSources: [],
+                },
+            };
+
+            const canvasVisibilityWrapper = mockLibWrapper.register.mock.calls.find(
+                call => call[1] === 'foundry.canvas.groups.CanvasVisibility.prototype.testVisibility'
+            )?.[2];
+            const target = {
+                id: 'target',
+                actor: {},
+                document: {
+                    id: 'target',
+                    x: 150,
+                    y: 0,
+                    width: 1,
+                    height: 1,
+                },
+            };
+            const wrapped = jest.fn(() => otherSource.active);
+
+            setPendingTokenMovementPosition(pendingObserver.document, { x: 0, y: 0 }, [
+                pendingObserver,
+            ]);
+
+            expect(canvasVisibilityWrapper(wrapped, [{ x: 150, y: 25 }], {
+                object: target,
+            })).toBe(false);
+            expect(wrapped).not.toHaveBeenCalled();
+
+            clearPendingTokenMovementPosition('observer');
+            global.canvas = originalCanvas;
+        });
+
+        test('token refresh forces stale visible token invisible during pending wall-blocked movement', () => {
+            const originalCanvas = global.canvas;
+            const pendingSource = {
+                active: true,
+                object: {
+                    id: 'observer',
+                    document: {
+                        id: 'observer',
+                        x: 0,
+                        y: 0,
+                        width: 1,
+                        height: 1,
+                    },
+                },
+            };
+            global.canvas = {
+                grid: { size: 50 },
+                walls: {
+                    placeables: [
+                        {
+                            document: {
+                                id: 'wall',
+                                c: [100, 0, 100, 200],
+                                sight: 1,
+                                door: 0,
+                                ds: 0,
+                            },
+                        },
+                    ],
+                },
+                effects: {
+                    visionSources: [pendingSource],
+                    lightSources: [],
+                },
+                visibility: {
+                    testVisibility: jest.fn(() =>
+                        global.canvas.effects.visionSources.some(source => source.active),
+                    ),
+                },
+            };
+
+            const tokenRefreshVisibilityWrapper = mockLibWrapper.register.mock.calls.find(
+                call => call[1] === 'foundry.canvas.placeables.Token.prototype._refreshVisibility'
+            )?.[2];
+            const target = {
+                visible: true,
+                renderable: true,
+                controlled: false,
+                mesh: { visible: true },
+                document: {
+                    id: 'target',
+                    x: 150,
+                    y: 0,
+                    width: 1,
+                    height: 1,
+                    getVisibilityTestPoints: jest.fn().mockReturnValue([{ x: 175, y: 25 }]),
+                },
+            };
+
+            setPendingTokenMovementPosition(pendingSource.object.document, { x: 0, y: 0 }, [
+                pendingSource.object,
+            ]);
+
+            tokenRefreshVisibilityWrapper.call(target, jest.fn(() => {
+                target.visible = true;
+                target.mesh.visible = true;
+            }));
+
+            expect(target.visible).toBe(false);
+            expect(target.mesh.visible).toBe(false);
+            expect(pendingSource.active).toBe(true);
+
+            clearPendingTokenMovementPosition('observer');
+            global.canvas = originalCanvas;
+        });
+
+        test('token refresh keeps target visible when another active source can still see it', () => {
+            const originalCanvas = global.canvas;
+            const pendingSource = {
+                active: true,
+                object: {
+                    id: 'observer',
+                    document: {
+                        id: 'observer',
+                        x: 0,
+                        y: 0,
+                        width: 1,
+                        height: 1,
+                    },
+                },
+            };
+            const otherSource = {
+                active: true,
+                object: {
+                    id: 'other-observer',
+                    document: {
+                        id: 'other-observer',
+                        x: 0,
+                        y: 150,
+                        width: 1,
+                        height: 1,
+                    },
+                },
+            };
+            global.canvas = {
+                grid: { size: 50 },
+                walls: {
+                    placeables: [
+                        {
+                            document: {
+                                id: 'wall',
+                                c: [100, 0, 100, 200],
+                                sight: 1,
+                                door: 0,
+                                ds: 0,
+                            },
+                        },
+                    ],
+                },
+                effects: {
+                    visionSources: [pendingSource, otherSource],
+                    lightSources: [],
+                },
+                visibility: {
+                    testVisibility: jest.fn(() => otherSource.active),
+                },
+            };
+
+            const tokenRefreshVisibilityWrapper = mockLibWrapper.register.mock.calls.find(
+                call => call[1] === 'foundry.canvas.placeables.Token.prototype._refreshVisibility'
+            )?.[2];
+            const target = {
+                visible: true,
+                renderable: true,
+                controlled: false,
+                mesh: { visible: true },
+                document: {
+                    id: 'target',
+                    x: 150,
+                    y: 0,
+                    width: 1,
+                    height: 1,
+                    getVisibilityTestPoints: jest.fn().mockReturnValue([{ x: 175, y: 25 }]),
+                },
+            };
+
+            setPendingTokenMovementPosition(pendingSource.object.document, { x: 0, y: 0 }, [
+                pendingSource.object,
+            ]);
+
+            tokenRefreshVisibilityWrapper.call(target, jest.fn(() => {
+                target.visible = true;
+                target.mesh.visible = true;
+            }));
+
+            expect(target.visible).toBe(true);
+            expect(target.mesh.visible).toBe(true);
+            expect(pendingSource.active).toBe(true);
+            expect(otherSource.active).toBe(true);
+
+            clearPendingTokenMovementPosition('observer');
+            global.canvas = originalCanvas;
+        });
+
+        test('token refresh hides Visioner-hidden target from pending observer even when another source sees it', () => {
+            const originalCanvas = global.canvas;
+            const pendingSource = {
+                active: true,
+                object: {
+                    id: 'observer',
+                    document: {
+                        id: 'observer',
+                        x: 0,
+                        y: 0,
+                        width: 1,
+                        height: 1,
+                        getFlag: jest.fn().mockReturnValue({ target: 'hidden' }),
+                    },
+                },
+            };
+            const otherSource = {
+                active: true,
+                object: {
+                    id: 'other-observer',
+                    document: {
+                        id: 'other-observer',
+                        x: 0,
+                        y: 150,
+                        width: 1,
+                        height: 1,
+                    },
+                },
+            };
+            global.canvas = {
+                grid: { size: 50 },
+                walls: {
+                    placeables: [],
+                },
+                effects: {
+                    visionSources: [pendingSource, otherSource],
+                    lightSources: [],
+                },
+                visibility: {
+                    testVisibility: jest.fn(() => otherSource.active),
+                },
+            };
+
+            const tokenRefreshVisibilityWrapper = mockLibWrapper.register.mock.calls.find(
+                call => call[1] === 'foundry.canvas.placeables.Token.prototype._refreshVisibility'
+            )?.[2];
+            const target = {
+                visible: true,
+                renderable: true,
+                controlled: false,
+                mesh: { visible: true },
+                document: {
+                    id: 'target',
+                    x: 150,
+                    y: 0,
+                    width: 1,
+                    height: 1,
+                    getVisibilityTestPoints: jest.fn().mockReturnValue([{ x: 175, y: 25 }]),
+                },
+            };
+
+            setPendingTokenMovementPosition(pendingSource.object.document, { x: 0, y: 0 }, [
+                pendingSource.object,
+            ]);
+
+            tokenRefreshVisibilityWrapper.call(target, jest.fn(() => {
+                target.visible = true;
+                target.mesh.visible = true;
+            }));
+
+            expect(target.visible).toBe(false);
+            expect(target.mesh.visible).toBe(false);
+            expect(pendingSource.active).toBe(true);
+            expect(otherSource.active).toBe(true);
+
+            clearPendingTokenMovementPosition('observer');
+            global.canvas = originalCanvas;
+        });
+
+        test('token refresh shows Visioner-hidden NPC during pending movement for GM client when Foundry sees it', () => {
+            const originalCanvas = global.canvas;
+            const originalUser = global.game.user;
+            global.game.user = { isGM: true };
+            const pendingSource = {
+                active: true,
+                object: {
+                    id: 'observer',
+                    document: {
+                        id: 'observer',
+                        x: 0,
+                        y: 0,
+                        width: 1,
+                        height: 1,
+                        getFlag: jest.fn().mockReturnValue({ target: 'hidden' }),
+                    },
+                },
+            };
+            global.canvas = {
+                grid: { size: 50 },
+                walls: {
+                    placeables: [],
+                },
+                effects: {
+                    visionSources: [pendingSource],
+                    lightSources: [],
+                },
+                visibility: {
+                    testVisibility: jest.fn(() => true),
+                },
+            };
+
+            const tokenRefreshVisibilityWrapper = mockLibWrapper.register.mock.calls.find(
+                call => call[1] === 'foundry.canvas.placeables.Token.prototype._refreshVisibility'
+            )?.[2];
+            const target = {
+                visible: true,
+                renderable: true,
+                controlled: false,
+                actor: { type: 'npc' },
+                mesh: { visible: true },
+                document: {
+                    id: 'target',
+                    x: 150,
+                    y: 0,
+                    width: 1,
+                    height: 1,
+                    getVisibilityTestPoints: jest.fn().mockReturnValue([{ x: 175, y: 25 }]),
+                },
+            };
+
+            setPendingTokenMovementPosition(pendingSource.object.document, { x: 0, y: 0 }, [
+                pendingSource.object,
+            ]);
+
+            tokenRefreshVisibilityWrapper.call(target, jest.fn(() => {
+                target.visible = true;
+                target.mesh.visible = true;
+            }));
+
+            expect(target.visible).toBe(true);
+            expect(target.mesh.visible).toBe(true);
+
+            clearPendingTokenMovementPosition('observer');
+            global.canvas = originalCanvas;
+            global.game.user = originalUser;
+        });
+
         test('hearing renders Visioner-hidden targets even when Foundry point visibility fails', () => {
             const wrappedFunction = mockLibWrapper.register.mock.calls.find(
                 call => call[1] === 'foundry.canvas.perception.DetectionMode.prototype.testVisibility'
@@ -405,6 +1407,75 @@ describe('Deafened Detection Wrapper', () => {
 
             expect(result).toBe(true);
             expect(detectionModeInstance._testPoint).not.toHaveBeenCalled();
+        });
+
+        test('hearing does not reveal a hidden target during pending wall-blocked movement', () => {
+            const originalCanvas = global.canvas;
+            global.canvas = {
+                grid: { size: 50 },
+                walls: {
+                    placeables: [
+                        {
+                            document: {
+                                id: 'wall',
+                                c: [100, 0, 100, 200],
+                                sight: 1,
+                                door: 0,
+                                ds: 0,
+                            },
+                        },
+                    ],
+                },
+            };
+
+            const wrappedFunction = mockLibWrapper.register.mock.calls.find(
+                call => call[1] === 'foundry.canvas.perception.DetectionMode.prototype.testVisibility'
+            )?.[2];
+            const observer = {
+                id: 'observer',
+                actor: {},
+                document: {
+                    id: 'observer',
+                    x: 0,
+                    y: 0,
+                    width: 1,
+                    height: 1,
+                    getFlag: jest.fn().mockReturnValue({ target: 'hidden' }),
+                },
+            };
+            const target = {
+                id: 'target',
+                actor: {},
+                document: {
+                    id: 'target',
+                    x: 150,
+                    y: 0,
+                    width: 1,
+                    height: 1,
+                    level: 'level-b',
+                    getFlag: jest.fn().mockReturnValue(false),
+                },
+            };
+            const detectionModeInstance = {
+                id: 'hearing',
+                _canDetect: jest.fn().mockReturnValue(true),
+                _testPoint: jest.fn().mockReturnValue(true),
+            };
+
+            setPendingTokenMovementPosition(observer.document, { x: 0, y: 0 }, [observer]);
+
+            const result = wrappedFunction.call(
+                detectionModeInstance,
+                { object: observer },
+                { id: 'hearing', enabled: true },
+                { ...mockConfig, object: target },
+            );
+
+            expect(result).toBe(false);
+            expect(detectionModeInstance._testPoint).not.toHaveBeenCalled();
+
+            clearPendingTokenMovementPosition('observer');
+            global.canvas = originalCanvas;
         });
     });
 });

@@ -73,7 +73,8 @@ export function getCoverBetween(observer, target) {
 }
 
 async function syncTakeCoverOverrideMarker(observer, target, state, options = {}) {
-  if (options.takeCover !== true) return;
+  if (options.skipTakeCoverTrackingSync === true) return;
+  if (state !== 'none' && options.takeCover !== true) return;
 
   const observerId = getTokenId(observer);
   const targetId = getTokenId(target);
@@ -121,8 +122,8 @@ export async function setCoverBetween(observer, target, state, options = {}) {
   if (coverMap[targetId] === state) {
     if (!options.skipEphemeralUpdate) {
       try {
-        const { batchUpdateCoverEffects } = await import('../cover/ephemeral.js');
-        await batchUpdateCoverEffects(observer, [{
+      const { batchUpdateCoverEffects } = await import('../cover/ephemeral.js');
+      await batchUpdateCoverEffects(observer, [{
           target,
           state,
           takeCover: options.takeCover === true,

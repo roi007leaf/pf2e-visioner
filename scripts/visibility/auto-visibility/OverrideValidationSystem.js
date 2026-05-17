@@ -5,7 +5,7 @@
  */
 
 import { VisibilityCalculator } from './VisibilityCalculator.js';
-import { isUndetected, normalizePerceptionProfile } from '../perception-profile.js';
+import { normalizePerceptionProfile } from '../perception-profile.js';
 import { FeatsHandler } from '../../chat/services/FeatsHandler.js';
 
 const STEALTH_OVERRIDE_STATES = new Set(['hidden', 'undetected', 'unnoticed']);
@@ -19,13 +19,26 @@ function targetIgnoresStealthPositionValidation(target, override = {}) {
 }
 
 function getAcceptOptions(override) {
-  const isTakeCoverTracking =
+  if (!isTakeCoverTrackingOverride(override)) return undefined;
+  return override?.coverOnly === true
+    ? { acceptedCoverState: override.currentCover || 'none' }
+    : { preserveTakeCoverTracking: true };
+}
+
+function isTakeCoverTrackingOverride(override = {}) {
+  return (
     override?.coverOnly === true ||
     override?.coverOverrideSource === 'take_cover_action' ||
-    override?.source === 'take_cover_action';
-  return isTakeCoverTracking
-    ? { acceptedCoverState: override.currentCover || 'none' }
-    : undefined;
+    override?.source === 'take_cover_action'
+  );
+}
+
+function isPureTakeCoverCoverOnlyOverride(override = {}) {
+  return override?.coverOnly === true && isTakeCoverTrackingOverride(override);
+}
+
+function shouldSuppressTakeCoverCoverChange(override = {}, targetId = null, movedTokenId = null) {
+  return targetId === movedTokenId && isTakeCoverTrackingOverride(override);
 }
 
 async function removeAcceptedOverride(AvsOverrideManager, observerId, targetId, override) {
@@ -151,6 +164,7 @@ export class OverrideValidationSystem {
       const flags = token.document.flags['pf2e-visioner'] || {};
       for (const [flagKey, flagData] of Object.entries(flags)) {
         if (!flagKey.startsWith('avs-override-from-')) continue;
+        if (flagData.takeCoverExpirationPending === true) continue;
         if (this.#shouldSkipTimedOverride(flagData.timedOverride)) continue;
 
         const observerId = flagKey.replace('avs-override-from-', '');
@@ -158,6 +172,12 @@ export class OverrideValidationSystem {
 
         // Skip if not involving the moved token
         if (observerId !== movedTokenId && targetId !== movedTokenId) continue;
+        if (targetId === movedTokenId && isPureTakeCoverCoverOnlyOverride(flagData)) continue;
+        const suppressCoverChange = shouldSuppressTakeCoverCoverChange(
+          flagData,
+          targetId,
+          movedTokenId,
+        );
 
         overridesToCheck.push({
           key: `${observerId}-${targetId}`,
@@ -171,6 +191,7 @@ export class OverrideValidationSystem {
             expectedCover: flagData.expectedCover,
             coverOnly: flagData.coverOnly,
             coverOverrideSource: flagData.coverOverrideSource,
+            suppressCoverChange,
             observerId,
             targetId,
             observerName: flagData.observerName,
@@ -197,6 +218,7 @@ export class OverrideValidationSystem {
         try {
           if (shouldRemove.currentVisibility) override.currentVisibility = shouldRemove.currentVisibility;
           if (shouldRemove.currentCover) override.currentCover = shouldRemove.currentCover;
+          if (shouldRemove.coverChangeSource) override.coverChangeSource = shouldRemove.coverChangeSource;
         } catch { /* ignore */ }
         invalidOverrides.push({
           observerId,
@@ -256,15 +278,26 @@ export class OverrideValidationSystem {
         target,
         override,
       );
-      const isCoverOnlyOverride =
-        override?.coverOnly === true ||
-        override?.coverOverrideSource === 'take_cover_action' ||
-        override?.source === 'take_cover_action';
+      const shouldValidateObscuredVisibility =
+        override.source === 'manual_action' ||
+        override.source === 'hide_action' ||
+        override.source === 'sneak_action' ||
+        isTakeCoverTrackingOverride(override);
+      const suppressCoverChange = override?.suppressCoverChange === true;
+      const isCoverOnlyOverride = isPureTakeCoverCoverOnlyOverride(override);
+      const expectedCoverForDisplay =
+        override.expectedCover ?? (override.hasCover ? 'standard' : 'none');
+      const hasAutoCalculatedCoverChange =
+        !isCoverOnlyOverride &&
+        !suppressCoverChange &&
+        visibility?.cover &&
+        visibility.cover !== expectedCoverForDisplay;
 
       const reasons = [];
 
       // Check if cover conditions have changed
       if (
+        !suppressCoverChange &&
         isCoverOnlyOverride &&
         override.expectedCover &&
         override.expectedCover !== visibility.cover
@@ -276,6 +309,7 @@ export class OverrideValidationSystem {
         );
       }
       if (
+        !suppressCoverChange &&
         !isCoverOnlyOverride &&
         !ignoresStealthPositionValidation &&
         override.hasCover &&
@@ -284,6 +318,7 @@ export class OverrideValidationSystem {
         reasons.push('has NO cover (override expected cover)');
       }
       if (
+        !suppressCoverChange &&
         !isCoverOnlyOverride &&
         !ignoresStealthPositionValidation &&
         !override.hasCover &&
@@ -318,8 +353,8 @@ export class OverrideValidationSystem {
       // Check overrides from manual actions, sneak actions, etc.
       if (
         !ignoresStealthPositionValidation &&
-        (override.source === 'manual_action' || override.source === 'sneak_action') &&
-        isUndetected(override)
+        shouldValidateObscuredVisibility &&
+        STEALTH_OVERRIDE_STATES.has(override.state)
       ) {
         // If target is now clearly observed (in bright light with no concealment), 
         // "undetected" may be too strong
@@ -358,7 +393,8 @@ export class OverrideValidationSystem {
           shouldRemove: true,
           reason: reasons.join(' and '),
           currentVisibility: visibility?.visibility || null,
-          currentCover: visibility?.cover || null
+          currentCover: visibility?.cover || null,
+          coverChangeSource: hasAutoCalculatedCoverChange ? 'auto' : undefined
         };
       }
 
@@ -395,9 +431,11 @@ export class OverrideValidationSystem {
         expectedCover: override.expectedCover,
         coverOnly: override.coverOnly === true,
         coverOverrideSource: override.coverOverrideSource,
+        suppressCoverChange: override.suppressCoverChange === true,
         // Provide actual current states so the dialog can render accurate icon deltas
         currentVisibility: override.currentVisibility || null,
         currentCover: override.currentCover || null,
+        coverChangeSource: override.coverChangeSource,
         isManual: override.source === 'manual_action'
       };
     });

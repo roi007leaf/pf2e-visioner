@@ -192,6 +192,69 @@ describe('OverrideValidationDialog - shows all overrides', () => {
         expect(context.overrides[0].statusCover.label).toBe('Auto Cover');
     });
 
+    it('should suppress Take Cover cover status on mixed visibility rows', async () => {
+        const dialog = new OverrideValidationDialog({
+            invalidOverrides: [
+                {
+                    observerId: 'obs1',
+                    targetId: 'tgt1',
+                    observerName: 'Observer1',
+                    targetName: 'Target1',
+                    state: 'undetected',
+                    coverOnly: false,
+                    source: 'sneak_action',
+                    coverOverrideSource: 'take_cover_action',
+                    currentVisibility: 'observed',
+                    currentCover: 'none',
+                    expectedCover: 'standard',
+                    suppressCoverChange: true,
+                    reason: 'clearly visible'
+                }
+            ],
+            tokenName: 'TestToken',
+            movedTokenId: 'tgt1'
+        });
+
+        const context = await dialog._prepareContext({});
+
+        expect(context.overrides[0].prevVisibility.key).toBe('undetected');
+        expect(context.overrides[0].statusVisibility.key).toBe('observed');
+        expect(context.overrides[0].prevCover.key).toBe('standard');
+        expect(context.overrides[0].statusCover.key).toBe('standard');
+        expect(context.overrides[0].statusCover.label).not.toContain('Auto Cover');
+        expect(context.overrides[0].currentVisibilityDescription).not.toContain('Cover');
+    });
+
+    it('should render auto-calculated cover as auto plus actual cover level', async () => {
+        const dialog = new OverrideValidationDialog({
+            invalidOverrides: [
+                {
+                    observerId: 'obs1',
+                    targetId: 'tgt1',
+                    observerName: 'Observer1',
+                    targetName: 'Target1',
+                    state: 'hidden',
+                    source: 'manual_action',
+                    currentVisibility: 'hidden',
+                    currentCover: 'lesser',
+                    expectedCover: 'none',
+                    reason: 'Cover changed'
+                }
+            ],
+            tokenName: 'TestToken',
+            movedTokenId: 'tgt1'
+        });
+
+        const context = await dialog._prepareContext({});
+
+        expect(context.overrides[0].prevCover.key).toBe('none');
+        expect(context.overrides[0].statusCover.key).toBe('lesser');
+        expect(context.overrides[0].statusCover.autoCalculated).toBe(true);
+        expect(context.overrides[0].statusCover.autoIcon).toBe('fas fa-arrows-rotate');
+        expect(context.overrides[0].statusCover.label).toContain('Auto Cover');
+        expect(context.overrides[0].statusCover.label).toContain('Lesser');
+    });
+
     it('should preserve Legendary Sneak context for override rows', async () => {
         const dialog = new OverrideValidationDialog({
             invalidOverrides: [

@@ -196,7 +196,7 @@ describe('Take Cover preview layout', () => {
     ]);
   });
 
-  it('normalizes lesser cover out of Take Cover rows', async () => {
+  it('keeps lesser cover as the displayed baseline but not as a selectable Take Cover result', async () => {
     const { TakeCoverPreviewDialog } = await import(
       '../../../scripts/chat/dialogs/TakeCoverPreviewDialog.js'
     );
@@ -219,15 +219,45 @@ describe('Take Cover preview layout', () => {
     const context = await dialog._prepareContext({});
     const row = context.outcomes[0];
 
-    expect(row.oldVisibility).toBe('none');
+    expect(row.oldVisibility).toBe('lesser');
     expect(row.newVisibility).toBe('standard');
-    expect(row.oldCoverCfg.cssClass).toBe('cover-none');
+    expect(row.oldCoverCfg.cssClass).toBe('cover-lesser');
     expect(row.newCoverCfg.cssClass).toBe('cover-standard');
     expect(row.availableStates.map((state) => state.value)).toEqual([
       'none',
       'standard',
       'greater',
     ]);
+  });
+
+  it('displays the live Take Cover baseline instead of the stored cover map value', async () => {
+    const { TakeCoverPreviewDialog } = await import(
+      '../../../scripts/chat/dialogs/TakeCoverPreviewDialog.js'
+    );
+    const target = { id: 'observer', name: 'Observer', actor: {}, document: {} };
+    const dialog = new TakeCoverPreviewDialog(
+      { id: 'taker', name: 'Taker', actor: {} },
+      [
+        {
+          target,
+          oldCover: 'none',
+          currentCover: 'none',
+          baselineCover: 'standard',
+          newCover: 'greater',
+          changed: true,
+        },
+      ],
+      [],
+      {},
+    );
+
+    const context = await dialog._prepareContext({});
+    const row = context.outcomes[0];
+
+    expect(row.oldVisibility).toBe('standard');
+    expect(row.oldCoverCfg.cssClass).toBe('cover-standard');
+    expect(row.newVisibility).toBe('greater');
+    expect(row.newCoverCfg.cssClass).toBe('cover-greater');
   });
 
   it('shows the taking-cover token name and Ceaseless Shadows badge context', async () => {
