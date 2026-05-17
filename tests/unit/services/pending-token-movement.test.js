@@ -115,6 +115,55 @@ describe('pending token movement hidden detection guard', () => {
     expect(sightReads).toBeLessThanOrEqual(96);
   });
 
+  test('caps total route point checks across simultaneous movement', () => {
+    let sightReads = 0;
+    global.canvas.walls.placeables = [
+      {
+        document: {
+          id: 'far-wall',
+          c: [10000, 0, 10000, 100],
+          get sight() {
+            sightReads += 1;
+            return 1;
+          },
+          door: 0,
+          ds: 0,
+        },
+      },
+    ];
+    const target = createMockToken({ id: 'target', x: 0, y: 0 });
+    const observers = Array.from({ length: 4 }, (_, index) =>
+      createMockToken({ id: `observer-${index}`, x: 0, y: index + 5 }),
+    );
+    const waypoints = Array.from({ length: 120 }, (_, index) => ({
+      x: (index + 1) * 50,
+      y: 250,
+    }));
+
+    try {
+      for (const observer of observers) {
+        setPendingTokenMovementPosition(
+          observer.document,
+          { x: 6100, y: observer.document.y * 50 },
+          [observer],
+          { waypoints },
+        );
+      }
+
+      expect(
+        getPendingMovementBlockedDetectionSources(target, {
+          visionSources: observers.map((observer) => ({ active: true, object: observer })),
+          lightSources: [],
+        }),
+      ).toEqual([]);
+      expect(sightReads).toBeLessThanOrEqual(256);
+    } finally {
+      for (const observer of observers) {
+        clearPendingTokenMovementPosition(observer.id);
+      }
+    }
+  });
+
   test('guards hidden detection for a controlled token drag preview source', () => {
     const original = createMockToken({ id: 'observer', x: 3, y: 3 });
     const preview = {
