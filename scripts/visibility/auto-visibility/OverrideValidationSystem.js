@@ -10,6 +10,31 @@ import { FeatsHandler } from '../../chat/services/FeatsHandler.js';
 
 const STEALTH_OVERRIDE_STATES = new Set(['hidden', 'undetected', 'unnoticed']);
 
+function profileToDisplayState(profile = {}) {
+  if (profile.detectionState === 'observed' && profile.hasConcealment) return 'concealed';
+  if (profile.detectionState === 'undetected' && profile.awarenessState === 'unnoticed') {
+    return 'unnoticed';
+  }
+  return profile.detectionState || 'observed';
+}
+
+function normalizeOverrideForValidation(override = {}) {
+  const normalized = normalizePerceptionProfile(override);
+  return {
+    ...normalized,
+    ...override,
+    detectionState: normalized.detectionState,
+    coverState: normalized.coverState,
+    detectionSense: normalized.detectionSense,
+    awarenessState: normalized.awarenessState,
+    hasConcealment:
+      typeof override.hasConcealment === 'boolean'
+        ? override.hasConcealment
+        : normalized.hasConcealment,
+    state: override.state ?? profileToDisplayState(normalized),
+  };
+}
+
 function targetIgnoresStealthPositionValidation(target, override = {}) {
   const source = override.source || 'manual_action';
   if (!['manual_action', 'sneak_action', 'hide_action'].includes(source)) return false;
@@ -187,7 +212,7 @@ export class OverrideValidationSystem {
             source: flagData.source,
             hasCover: flagData.hasCover,
             hasConcealment: flagData.hasConcealment,
-            ...normalizePerceptionProfile(flagData),
+            ...normalizeOverrideForValidation(flagData),
             expectedCover: flagData.expectedCover,
             coverOnly: flagData.coverOnly,
             coverOverrideSource: flagData.coverOverrideSource,
@@ -423,7 +448,7 @@ export class OverrideValidationSystem {
         targetId,
         observerName: observer?.document?.name || 'Unknown',
         targetName: target?.document?.name || 'Unknown',
-        ...normalizePerceptionProfile(override),
+        ...normalizeOverrideForValidation(override),
         source: override.source || 'unknown',
         reason,
         hasCover: override.hasCover || false,

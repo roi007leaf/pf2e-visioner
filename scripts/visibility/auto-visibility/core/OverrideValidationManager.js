@@ -46,6 +46,31 @@ function withStealthPositionBypassContext(target, override = {}) {
   };
 }
 
+function profileToDisplayState(profile = {}) {
+  if (profile.detectionState === 'observed' && profile.hasConcealment) return 'concealed';
+  if (profile.detectionState === 'undetected' && profile.awarenessState === 'unnoticed') {
+    return 'unnoticed';
+  }
+  return profile.detectionState || 'observed';
+}
+
+function normalizeOverrideForValidation(override = {}) {
+  const normalized = normalizePerceptionProfile(override);
+  return {
+    ...normalized,
+    ...override,
+    detectionState: normalized.detectionState,
+    coverState: normalized.coverState,
+    detectionSense: normalized.detectionSense,
+    awarenessState: normalized.awarenessState,
+    hasConcealment:
+      typeof override.hasConcealment === 'boolean'
+        ? override.hasConcealment
+        : normalized.hasConcealment,
+    state: override.state ?? profileToDisplayState(normalized),
+  };
+}
+
 function isTakeCoverTrackingOverride(override = {}) {
   return (
     override?.coverOnly === true ||
@@ -355,7 +380,7 @@ export class OverrideValidationManager {
             source: fd.source,
             hasCover: fd.hasCover,
             hasConcealment: fd.hasConcealment,
-            ...normalizePerceptionProfile(fd),
+            ...normalizeOverrideForValidation(fd),
             expectedCover: fd.expectedCover,
             coverOnly: fd.coverOnly,
             coverOverrideSource: fd.coverOverrideSource,
@@ -395,7 +420,7 @@ export class OverrideValidationManager {
             source: flagData.source,
             hasCover: flagData.hasCover,
             hasConcealment: flagData.hasConcealment,
-            ...normalizePerceptionProfile(flagData),
+            ...normalizeOverrideForValidation(flagData),
             expectedCover: flagData.expectedCover,
             coverOnly: flagData.coverOnly,
             coverOverrideSource: flagData.coverOverrideSource,
@@ -437,7 +462,7 @@ export class OverrideValidationManager {
             source: flagData.source,
             hasCover: flagData.hasCover,
             hasConcealment: flagData.hasConcealment,
-            ...normalizePerceptionProfile(flagData),
+            ...normalizeOverrideForValidation(flagData),
             expectedCover: flagData.expectedCover,
             coverOnly: flagData.coverOnly,
             coverOverrideSource: flagData.coverOverrideSource,
@@ -551,7 +576,7 @@ export class OverrideValidationManager {
           source: fd.source,
           hasCover: fd.hasCover,
           hasConcealment: fd.hasConcealment,
-          ...normalizePerceptionProfile(fd),
+          ...normalizeOverrideForValidation(fd),
           expectedCover: fd.expectedCover,
           coverOnly: fd.coverOnly,
           coverOverrideSource: fd.coverOverrideSource,
@@ -604,7 +629,7 @@ export class OverrideValidationManager {
           source: fd.source,
           hasCover: fd.hasCover,
           hasConcealment: fd.hasConcealment,
-          ...normalizePerceptionProfile(fd),
+          ...normalizeOverrideForValidation(fd),
           expectedCover: fd.expectedCover,
           coverOnly: fd.coverOnly,
           coverOverrideSource: fd.coverOverrideSource,
@@ -952,7 +977,7 @@ export class OverrideValidationManager {
           targetId,
           observerName: observer?.document?.name || 'Unknown',
           targetName: target?.document?.name || 'Unknown',
-          ...normalizePerceptionProfile(override),
+          ...normalizeOverrideForValidation(override),
           source: override.source || 'unknown',
           reason,
           reasonIcons: reasonIcons || [],
