@@ -21,6 +21,7 @@
             "hidden": "隐藏",
             "undetected": "无踪",
             "concealed": "隐蔽",
+            "observed_concealed": "可见 + 隐蔽",
             "avs": "自动能见度",
             "unnoticed": "未发现"
         },

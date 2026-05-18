@@ -1,4 +1,5 @@
 import { MODULE_ID } from '../../../constants.js';
+import { normalizePerceptionProfile, overrideMatchesVisibility } from '../../perception-profile.js';
 import { FeatsHandler } from '../../../chat/services/FeatsHandler.js';
 import { LastValidationRequest } from '../utils/LastValidationRequest.js';
 import { OverrideValidityCache } from '../utils/OverrideValidityCache.js';
@@ -15,7 +16,7 @@ const STEALTH_POSITION_BYPASS_DETAILS = {
     icon: 'fas fa-user-ninja',
     tooltip:
       "You're always sneaking unless you choose to be seen, even when there's nowhere to hide. You can Hide and Sneak even without cover or being Concealed. When you employ an exploration tactic other than Avoiding Notice, you also gain the benefits of Avoiding Notice unless you choose not to.",
-  }
+  },
 };
 
 function getStealthPositionBypassContext(target, override = {}) {
@@ -42,6 +43,31 @@ function withStealthPositionBypassContext(target, override = {}) {
     stealthPositionBypassLabel: context.label,
     stealthPositionBypassIcon: context.icon,
     stealthPositionBypassTooltip: context.tooltip,
+  };
+}
+
+function profileToDisplayState(profile = {}) {
+  if (profile.detectionState === 'observed' && profile.hasConcealment) return 'concealed';
+  if (profile.detectionState === 'undetected' && profile.awarenessState === 'unnoticed') {
+    return 'unnoticed';
+  }
+  return profile.detectionState || 'observed';
+}
+
+function normalizeOverrideForValidation(override = {}) {
+  const normalized = normalizePerceptionProfile(override);
+  return {
+    ...normalized,
+    ...override,
+    detectionState: normalized.detectionState,
+    coverState: normalized.coverState,
+    detectionSense: normalized.detectionSense,
+    awarenessState: normalized.awarenessState,
+    hasConcealment:
+      typeof override.hasConcealment === 'boolean'
+        ? override.hasConcealment
+        : normalized.hasConcealment,
+    state: override.state ?? profileToDisplayState(normalized),
   };
 }
 
@@ -255,11 +281,10 @@ export class OverrideValidationManager {
         } catch { }
         const movedToken = canvas.tokens?.get(tokenId);
         const filtered = result.overrides.filter((o) => {
-          const prevVis = o.state || (o.hasConcealment ? 'concealed' : 'observed');
           const prevCover = o.expectedCover ?? (o.hasCover ? 'standard' : 'none');
           const curVis = o.currentVisibility || 'observed';
           const curCover = o.currentCover || 'none';
-          const isDifferent = prevVis !== curVis || prevCover !== curCover;
+          const isDifferent = !overrideMatchesVisibility(o, curVis) || prevCover !== curCover;
           if (!isDifferent) return false;
           if (o.targetId === tokenId) return true;
           if (!va || !movedToken) return true;
@@ -355,6 +380,7 @@ export class OverrideValidationManager {
             source: fd.source,
             hasCover: fd.hasCover,
             hasConcealment: fd.hasConcealment,
+            ...normalizeOverrideForValidation(fd),
             expectedCover: fd.expectedCover,
             coverOnly: fd.coverOnly,
             coverOverrideSource: fd.coverOverrideSource,
@@ -391,10 +417,10 @@ export class OverrideValidationManager {
           override: {
             observer,
             target: movedToken,
-            state: flagData.state,
             source: flagData.source,
             hasCover: flagData.hasCover,
             hasConcealment: flagData.hasConcealment,
+            ...normalizeOverrideForValidation(flagData),
             expectedCover: flagData.expectedCover,
             coverOnly: flagData.coverOnly,
             coverOverrideSource: flagData.coverOverrideSource,
@@ -433,10 +459,10 @@ export class OverrideValidationManager {
           override: {
             observer: movedToken,
             target: token,
-            state: flagData.state,
             source: flagData.source,
             hasCover: flagData.hasCover,
             hasConcealment: flagData.hasConcealment,
+            ...normalizeOverrideForValidation(flagData),
             expectedCover: flagData.expectedCover,
             coverOnly: flagData.coverOnly,
             coverOverrideSource: flagData.coverOverrideSource,
@@ -550,6 +576,7 @@ export class OverrideValidationManager {
           source: fd.source,
           hasCover: fd.hasCover,
           hasConcealment: fd.hasConcealment,
+          ...normalizeOverrideForValidation(fd),
           expectedCover: fd.expectedCover,
           coverOnly: fd.coverOnly,
           coverOverrideSource: fd.coverOverrideSource,
@@ -602,6 +629,7 @@ export class OverrideValidationManager {
           source: fd.source,
           hasCover: fd.hasCover,
           hasConcealment: fd.hasConcealment,
+          ...normalizeOverrideForValidation(fd),
           expectedCover: fd.expectedCover,
           coverOnly: fd.coverOnly,
           coverOverrideSource: fd.coverOverrideSource,
@@ -949,7 +977,7 @@ export class OverrideValidationManager {
           targetId,
           observerName: observer?.document?.name || 'Unknown',
           targetName: target?.document?.name || 'Unknown',
-          state: override.state || 'undetected',
+          ...normalizeOverrideForValidation(override),
           source: override.source || 'unknown',
           reason,
           reasonIcons: reasonIcons || [],

@@ -3,7 +3,18 @@
  */
 
 import { MODULE_ID } from '../constants.js';
-import { getBestVisibilityState, getControlledObserverTokens, getVisibilityMap } from '../utils.js';
+import {
+  getBestVisibilityState,
+  getControlledObserverTokens,
+  getPerceptionProfileBetween,
+  getVisibilityMap,
+} from '../utils.js';
+import { AVS_EXPLICIT_VISIBLE_DETECTION_SENSE } from '../stores/visibility-map.js';
+import {
+  blocksCanvasDetection,
+  legacyVisibilityToProfile,
+} from '../visibility/perception-profile.js';
+import { isExplicitVisiblePair } from './ExplicitVisibilityPairs.js';
 import {
   forcePendingMovementTokenInvisible,
   restorePendingMovementTokenRendering,
@@ -106,7 +117,7 @@ export class DetectionWrapper {
 export function initializeDetectionWrapper() {
   try {
     (DetectionWrapper._instance ||= new DetectionWrapper()).register();
-  } catch (_) {}
+  } catch (_) { }
 }
 
 /**
@@ -117,7 +128,6 @@ const VISIBILITY_VALUES = {
   concealed: 1,
   hidden: 2,
   undetected: 3,
-  unnoticed: 3,
 };
 
 const NON_VISUAL_DETECTION_MODE_IDS = new Set([
@@ -143,7 +153,8 @@ function detectionModeTestVisibility(visionSource, mode, config = {}) {
     return false;
   }
 
-  const level = config.level ?? config.object?.document?.level ?? config.object?.document?._source?.level;
+  const level =
+    config.level ?? config.object?.document?.level ?? config.object?.document?._source?.level;
   if (!this._canDetect(visionSource, config.object, level)) return false;
 
   const modeId = mode?.id ?? this?.id ?? null;
@@ -151,6 +162,14 @@ function detectionModeTestVisibility(visionSource, mode, config = {}) {
   const targetToken = config.object;
   const hiddenStateContext = getPendingMovementHiddenStateBlock(targetToken);
   if (hiddenStateContext && !isPendingMovementHiddenStateVisibilityProbe()) {
+    return false;
+  }
+
+  if (
+    !NON_VISUAL_DETECTION_MODE_IDS.has(modeId) &&
+    !isPendingMovementHiddenStateVisibilityProbe() &&
+    shouldTemporarilyBlockSightDetection(observerToken, targetToken)
+  ) {
     return false;
   }
 
@@ -195,6 +214,14 @@ function canvasVisibilityTestVisibilityWrapper(wrapped, points, options = {}) {
           return false;
         }
 
+        if (
+          wrappedResult &&
+          blockedSources?.length &&
+          !hasActiveUnblockedDetectionSource(blockedSources)
+        ) {
+          return false;
+        }
+
         return wrappedResult;
       },
     );
@@ -202,6 +229,26 @@ function canvasVisibilityTestVisibilityWrapper(wrapped, points, options = {}) {
     if (wrappedCalled) throw error;
     return callWrapped();
   }
+}
+
+function sourceFromCollectionEntry(entry) {
+  return Array.isArray(entry) && entry.length === 2 ? entry[1] : entry;
+}
+
+function detectionSourceList(sources) {
+  return Array.from(sources || [], sourceFromCollectionEntry);
+}
+
+function hasActiveUnblockedDetectionSource(blockedSources = []) {
+  const blockedSourceSet = new Set(blockedSources);
+  const activeSources = [
+    ...detectionSourceList(canvas?.effects?.visionSources),
+    ...detectionSourceList(canvas?.effects?.lightSources),
+  ];
+
+  return activeSources.some(
+    (source) => source?.active && source?.object && !blockedSourceSet.has(source),
+  );
 }
 
 function tokenRefreshVisibilityWrapper(wrapped, ...args) {
@@ -224,9 +271,22 @@ function tokenRefreshVisibilityWrapper(wrapped, ...args) {
 function canDetectWrapper(threshold) {
   return function (wrapped, visionSource, target, ...args) {
     const canDetect = wrapped(visionSource, target, ...args);
-    if (canDetect === false) return false;
-
     const observerToken = visionSource?.object;
+    const modeId = this?.id ?? args?.[0]?.id ?? null;
+    const visibility = getVisibilityBetweenTokens(observerToken, target);
+    const pendingMovementSightBlocked =
+      !isPendingMovementHiddenStateVisibilityProbe() &&
+      threshold === VISIBILITY_VALUES.hidden &&
+      shouldTemporarilyBlockSightDetection(observerToken, target);
+
+    if (
+      !pendingMovementSightBlocked &&
+      canUseExplicitVisionerDetection(observerToken, target, modeId, visibility, threshold)
+    ) {
+      return true;
+    }
+
+    if (canDetect === false) return false;
 
     try {
       const targetToken = target;
@@ -245,19 +305,14 @@ function canDetectWrapper(threshold) {
           return false;
         }
       }
-    } catch (_) {}
+    } catch (_) { }
 
     if (isPendingMovementHiddenStateVisibilityProbe()) {
       return true;
     }
 
     const origin = observerToken;
-    const visibility = getVisibilityBetweenTokens(origin, target);
-    if (
-      threshold === VISIBILITY_VALUES.hidden &&
-      visibility !== 'observed' &&
-      shouldTemporarilyBlockSightDetection(origin, target)
-    ) {
+    if (pendingMovementSightBlocked) {
       return false;
     }
 
@@ -271,6 +326,31 @@ function canDetectWrapper(threshold) {
 
     return !reachedThreshold;
   };
+}
+
+function canUseExplicitVisionerDetection(
+  observer,
+  target,
+  modeId,
+  visibility,
+  threshold = VISIBILITY_VALUES.hidden,
+) {
+  if (threshold !== VISIBILITY_VALUES.hidden) return false;
+  if (modeId && NON_VISUAL_DETECTION_MODE_IDS.has(modeId)) return false;
+  if (visibility !== 'observed' && visibility !== 'concealed') return false;
+  if (isExplicitVisiblePair(observer, target)) return true;
+  return hasExplicitObservedProfile(observer, target);
+}
+
+function hasExplicitObservedProfile(observer, target) {
+  try {
+    return (
+      getPerceptionProfileBetween(observer, target)?.detectionSense ===
+      AVS_EXPLICIT_VISIBLE_DETECTION_SENSE
+    );
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -440,6 +520,9 @@ function reachesVisibilityThreshold(origin, target, threshold, config = {}) {
   if (!config.visibility) {
     config.visibility = getVisibilityBetweenTokens(origin, target);
   }
+
+  const profile = legacyVisibilityToProfile(config.visibility);
+  if (blocksCanvasDetection(profile)) return true;
 
   return VISIBILITY_VALUES[config.visibility] >= threshold;
 }

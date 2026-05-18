@@ -1,4 +1,5 @@
 import { MODULE_ID } from '../constants.js';
+import { profileToLegacyVisibility } from '../visibility/perception-profile.js';
 
 const PENDING_MOVEMENT_TTL_MS = 2500;
 const PENDING_MOVEMENT_RENDER_LOCK_GRACE_MS = 1000;
@@ -7,9 +8,11 @@ const PENDING_MOVEMENT_ANIMATION_DETECTION_SETTLE_MS = 250;
 const PENDING_MOVEMENT_POST_COMPLETION_REFRESH_DELAYS_MS = [100, 300, 700, 1200];
 const PENDING_MOVEMENT_MAX_ROUTE_POINTS = 96;
 const PENDING_MOVEMENT_MAX_ACTIVE_ROUTE_POINTS = 256;
+const PENDING_MOVEMENT_VISUAL_POSITION_TOLERANCE_PX = 1;
 const HIDDEN_FROM_OBSERVER_STATES = new Set(['concealed', 'hidden', 'undetected', 'unnoticed']);
 const RENDER_HIDDEN_FROM_OBSERVER_STATES = new Set(['hidden', 'undetected', 'unnoticed']);
 const NPC_RENDER_VISIBLE_STATES = new Set(['hidden']);
+const VISIBILITY_V2_FLAG = 'visibilityV2';
 const PENDING_MOVEMENT_SUPPRESSION_KEY = 'pf2eVisionerPendingMovement';
 const PENDING_MOVEMENT_RENDER_STATE_KEY = '_pf2eVisionerPendingRenderState';
 
@@ -175,14 +178,20 @@ function pushUniqueMovementPosition(positions, position) {
   positions.push(position);
 }
 
+function tokenVisualMovementPosition(tokenOrDoc) {
+  const token = tokenOrDoc?.object || (tokenOrDoc?.document ? tokenOrDoc : null);
+  return cloneMovementPosition({ x: token?.x, y: token?.y });
+}
+
 function buildPendingMovementRoutePositions(tokenDoc, changes = {}, options = {}) {
   const routePositions = [];
   pushUniqueMovementPosition(
     routePositions,
-    cloneMovementPosition({
-      x: tokenDoc?.x ?? tokenDoc?.document?.x ?? 0,
-      y: tokenDoc?.y ?? tokenDoc?.document?.y ?? 0,
-    }),
+    tokenVisualMovementPosition(tokenDoc) ||
+      cloneMovementPosition({
+        x: tokenDoc?.x ?? tokenDoc?.document?.x ?? 0,
+        y: tokenDoc?.y ?? tokenDoc?.document?.y ?? 0,
+      }),
   );
 
   for (const waypoints of movementWaypointArraysFromOptions(options, changes)) {
@@ -411,8 +420,16 @@ function currentUserOwnsMovedToken(tokenDoc, userId = null) {
   );
 }
 
+function currentGmMovedToken(tokenDoc, userId = null) {
+  const currentUser = game?.user;
+  if (!tokenDoc || !currentUser?.isGM) return false;
+  if (!userId || userId !== currentUser.id) return false;
+  return true;
+}
+
 function getPendingMovementTrackingReason(tokenDoc, controlledTokens, options = {}) {
   if (isControlledTokenDocument(tokenDoc, controlledTokens)) return 'controlled-token';
+  if (currentGmMovedToken(tokenDoc, options.userId)) return 'gm-token';
   if (currentUserOwnsMovedToken(tokenDoc, options.userId)) return 'player-owned-token';
   return null;
 }
@@ -437,6 +454,21 @@ function movementAnimationInfo(animation) {
     active: animation.active ?? null,
     hasPromise: !!animation.promise,
   };
+}
+
+function tokenVisualPositionReached(token, position) {
+  if (!token || !position) return true;
+
+  const tokenX = finiteCoordinate(token.x);
+  const tokenY = finiteCoordinate(token.y);
+  const positionX = finiteCoordinate(position.x);
+  const positionY = finiteCoordinate(position.y);
+  if (tokenX === null || tokenY === null || positionX === null || positionY === null) return true;
+
+  return (
+    Math.abs(tokenX - positionX) <= PENDING_MOVEMENT_VISUAL_POSITION_TOLERANCE_PX &&
+    Math.abs(tokenY - positionY) <= PENDING_MOVEMENT_VISUAL_POSITION_TOLERANCE_PX
+  );
 }
 
 function addPostCompletionRefreshTimeout(tokenId, timeoutId) {
@@ -529,9 +561,19 @@ function getStoredVisibilityState(observer, target) {
   const targetId = tokenIdOf(target);
   if (!targetId) return 'observed';
 
+  const doc = tokenDocOf(observer);
+  const profile = doc?.getFlag?.(MODULE_ID, VISIBILITY_V2_FLAG)?.[targetId];
+  if (profile) {
+    return profileToLegacyVisibility(profile, { preserveEncounterUnnoticed: true }) || 'observed';
+  }
+
   const map = tokenDocOf(observer)?.getFlag?.(MODULE_ID, 'visibility') || {};
   const state = map?.[targetId];
-  return typeof state === 'string' && state ? state : 'observed';
+  if (typeof state === 'string' && state) return state;
+  if (state && typeof state === 'object') {
+    return profileToLegacyVisibility(state, { preserveEncounterUnnoticed: true }) || 'observed';
+  }
+  return 'observed';
 }
 
 function visionerStateHidesTargetRendering(target, visibilityState) {
@@ -669,6 +711,18 @@ function withOnlyDetectionSourcesForObserver(observerId, callback) {
   );
 
   return withSuppressedDetectionSources(otherSources, callback);
+}
+
+function hasActiveUnblockedObserverDetectionSource(blockedSources = []) {
+  const blockedSourceSet = new Set(blockedSources);
+  const activeSources = [
+    ...sourceList(canvas?.effects?.visionSources),
+    ...sourceList(canvas?.effects?.lightSources),
+  ];
+
+  return activeSources.some(
+    (source) => source?.active && source?.object && !blockedSourceSet.has(source),
+  );
 }
 
 function getControlledObserverHiddenStateContext(target) {
@@ -1228,6 +1282,20 @@ export function schedulePendingTokenMovementCompletion(tokenDoc) {
       return;
     }
 
+    const visualPositionReached = tokenVisualPositionReached(token, currentEntry.position);
+    if (
+      elapsedMs >= PENDING_MOVEMENT_ANIMATION_DETECTION_SETTLE_MS &&
+      !visualPositionReached &&
+      elapsedMs < PENDING_MOVEMENT_TTL_MS
+    ) {
+      const timeoutId = setTimeout(
+        waitForAnimationOrComplete,
+        PENDING_MOVEMENT_ANIMATION_DETECTION_DELAY_MS,
+      );
+      pendingTokenMovementCompletionTimeouts.set(tokenId, timeoutId);
+      return;
+    }
+
     if (elapsedMs < PENDING_MOVEMENT_ANIMATION_DETECTION_SETTLE_MS) {
 
       const timeoutId = setTimeout(
@@ -1373,6 +1441,12 @@ export function shouldTemporarilyForceTokenInvisible(
 
   const blockedSources = blockedEntries.map(({ source }) => source);
   const renderLockContext = blockedEntries[0]?.context ?? null;
+  if (!hasActiveUnblockedObserverDetectionSource(blockedSources)) {
+    if (renderLockContext) {
+      rememberHiddenForceContext(target, renderLockContext);
+    }
+    return true;
+  }
 
   return withSuppressedDetectionSources(blockedSources, () => {
     const testPoints = target.document.getVisibilityTestPoints?.();

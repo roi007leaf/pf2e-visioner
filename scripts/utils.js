@@ -8,9 +8,13 @@ import { COVER_STATES, MODULE_ID, VISIBILITY_STATES } from './constants.js';
 export { cleanupDeletedToken, restoreDeletedTokenMaps } from './services/scene-cleanup.js';
 export { getCoverBetween, getCoverMap, setCoverBetween, setCoverMap } from './stores/cover-map.js';
 export {
+  getPerceptionProfileBetween,
+  getPerceptionProfileMap,
   getVisibility,
   getVisibilityBetween,
   getVisibilityMap,
+  setPerceptionProfileBetween,
+  setPerceptionProfileMap,
   setVisibilityBetween,
   setVisibilityMap,
 } from './stores/visibility-map.js';

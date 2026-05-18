@@ -5,6 +5,13 @@
 
 import { COVER_STATES, VISIBILITY_STATES } from '../constants.js';
 import { loadDialogCSS, loadSharedUICSS } from '../css-loader.js';
+import { overrideToDisplayVisibility } from '../visibility/perception-profile.js';
+
+function getVisibilityStateLabelKey(state, { manual = false } = {}) {
+  const config = VISIBILITY_STATES?.[state];
+  if (!config) return String(state ?? '');
+  return manual && config.manualLabel ? config.manualLabel : config.label;
+}
 
 const AUTO_COVER_DISPLAY = {
   icon: 'fas fa-arrows-rotate',
@@ -173,7 +180,7 @@ export class OverrideValidationDialog extends foundry.applications.api.Handlebar
       const suppressCoverChange = shouldSuppressCoverChange(override);
       const prevVisibilityKey = coverOnly
         ? visibilityKey
-        : override.state || (override.hasConcealment ? 'concealed' : 'observed');
+        : overrideToDisplayVisibility(override);
 
       // Previous/original cover must reflect what the override expected at apply-time,
       // not what the currentCover is now. If we don't have a specific level, assume 'standard'.
@@ -183,11 +190,17 @@ export class OverrideValidationDialog extends foundry.applications.api.Handlebar
       const coverCfg = getCoverDisplayConfig(coverKey, { icon: 'fas fa-shield-slash', color: '#4caf50', label: 'No Cover' });
       const prevVisCfg = (VISIBILITY_STATES && VISIBILITY_STATES[prevVisibilityKey]) || { icon: 'fas fa-eye', color: '#9e9e9e', label: 'Observed' };
       const prevCoverCfg = getCoverDisplayConfig(prevCoverKey, { icon: 'fas fa-shield', color: '#9e9e9e', label: game.i18n.localize('PF2E_VISIONER.TOKEN_MANAGER.COVER_STATE') });
+      const localizeVisibilityLabel = (key, fallback) => {
+        const labelKey = getVisibilityStateLabelKey(key, { manual: true });
+        return game?.i18n?.localize?.(labelKey) || fallback;
+      };
+      const currentVisibilityLabel = localizeVisibilityLabel(visibilityKey, 'Observed');
+      const previousVisibilityLabel = localizeVisibilityLabel(prevVisibilityKey, 'Previous');
       const currentVisibilityDescription = controlReleaseOnly
         ? 'Return to AVS control'
         : (VISIBILITY_STATES && VISIBILITY_STATES[visibilityKey]?.label)
           ? (
-            game?.i18n?.localize?.(VISIBILITY_STATES[visibilityKey].label) +
+            currentVisibilityLabel +
             (!suppressCoverChange && coverKey && coverCfg?.label
               ? ` • ${game?.i18n?.localize?.(coverCfg.label)}`
               : '')
@@ -205,7 +218,7 @@ export class OverrideValidationDialog extends foundry.applications.api.Handlebar
         reason: override.reason,
         // Optionally surface a friendly description of current states
         currentVisibilityDescription,
-        state: override.state || 'undetected',
+        state: overrideToDisplayVisibility(override) || 'undetected',
         source: override.source || 'unknown',
         coverOnly,
         controlReleaseOnly,
@@ -221,13 +234,13 @@ export class OverrideValidationDialog extends foundry.applications.api.Handlebar
           key: prevVisibilityKey,
           icon: prevVisCfg.icon,
           color: prevVisCfg.color,
-          label: game?.i18n?.localize?.(prevVisCfg.label) || 'Previous'
+          label: previousVisibilityLabel
         },
         statusVisibility: {
           key: visibilityKey,
           icon: visCfg.icon,
           color: visCfg.color,
-          label: game?.i18n?.localize?.(visCfg.label) || 'Observed'
+          label: currentVisibilityLabel
         },
         prevCover: {
           key: prevCoverKey,

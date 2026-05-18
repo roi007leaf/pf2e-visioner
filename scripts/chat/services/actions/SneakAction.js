@@ -1,7 +1,14 @@
-import { COVER_STATES, MODULE_ID, SNEAK_FLAGS, VISIBILITY_STATES } from '../../../constants.js';
+import {
+  COVER_STATES,
+  MODULE_ID,
+  SNEAK_FLAGS,
+  VISIBILITY_STATES,
+  getVisibilityStateLabelKey,
+} from '../../../constants.js';
 import autoCoverSystem from '../../../cover/auto-cover/AutoCoverSystem.js';
 import stealthCheckUseCase from '../../../cover/auto-cover/usecases/StealthCheckUseCase.js';
 import { getCoverBetween } from '../../../utils.js';
+import { overrideToDisplayVisibility } from '../../../visibility/perception-profile.js';
 import { appliedSneakChangesByMessage } from '../data/message-cache.js';
 import errorHandlingService, { SYSTEM_TYPES } from '../infra/ErrorHandlingService.js';
 import { notify } from '../infra/notifications.js';
@@ -968,8 +975,8 @@ export class SneakActionHandler extends ActionHandlerBase {
             'pf2e-visioner',
             `avs-override-from-${observerId}`,
           );
-          if (overrideFlag && overrideFlag.state) {
-            avsOverride = overrideFlag.state;
+          if (overrideFlag) {
+            avsOverride = overrideToDisplayVisibility(overrideFlag);
           }
         }
         if (avsOverride) return avsOverride;
@@ -983,7 +990,9 @@ export class SneakActionHandler extends ActionHandlerBase {
         return positionTransition?.startPosition?.avsVisibility || current;
       })(),
       oldVisibilityLabel:
-        VISIBILITY_STATES[positionTransition?.startPosition?.avsVisibility || current]?.label ||
+        getVisibilityStateLabelKey(positionTransition?.startPosition?.avsVisibility || current, {
+          manual: true,
+        }) ||
         positionTransition?.startPosition?.avsVisibility ||
         current,
       newVisibility,

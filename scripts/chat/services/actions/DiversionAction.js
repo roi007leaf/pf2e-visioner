@@ -1,4 +1,4 @@
-import { MODULE_ID, VISIBILITY_STATES } from '../../../constants.js';
+import { MODULE_ID, getVisibilityStateLabelKey } from '../../../constants.js';
 import { appliedDiversionChangesByMessage } from '../data/message-cache.js';
 import { shouldFilterAlly } from '../infra/shared-utils.js';
 import { ActionHandlerBase } from './BaseAction.js';
@@ -91,7 +91,7 @@ export class DiversionActionHandler extends ActionHandlerBase {
       outcome,
       currentVisibility: current,
       oldVisibility: current,
-      oldVisibilityLabel: VISIBILITY_STATES[current]?.label || current,
+      oldVisibilityLabel: getVisibilityStateLabelKey(current, { manual: true }) || current,
       newVisibility,
       changed: newVisibility !== current,
     };

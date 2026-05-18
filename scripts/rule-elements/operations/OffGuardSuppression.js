@@ -61,7 +61,7 @@ function hasOffGuardImmunity(token) {
   if (!actor) return false;
   try {
     if (typeof actor.isImmuneTo === 'function' && actor.isImmuneTo('off-guard')) return true;
-  } catch (_) {}
+  } catch (_) { }
 
   const immunities = [
     ...(Array.isArray(actor?.attributes?.immunities) ? actor.attributes.immunities : []),

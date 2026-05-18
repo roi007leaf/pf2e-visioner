@@ -112,7 +112,8 @@ describe('OverrideValidationManager display filtering', () => {
         expect.objectContaining({
           observerId: observer.id,
           targetId: stealther.id,
-          state: 'unnoticed',
+          detectionState: 'undetected',
+          awarenessState: 'unnoticed',
           currentVisibility: 'observed',
         }),
       ],

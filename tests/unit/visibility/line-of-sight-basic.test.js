@@ -156,7 +156,7 @@ describe('VisionAnalyzer - Line of Sight (Refactored)', () => {
             expect(result).toBe(false);
         });
 
-        test('should trust agreeing vision polygon and geometry when point visibility is false', () => {
+        test('should trust Foundry point visibility when LOS polygon includes the target', () => {
             global.canvas.walls.placeables = [];
             global.canvas.visibility = { testVisibility: jest.fn(() => false) };
             mockObserver.vision = {
@@ -169,8 +169,8 @@ describe('VisionAnalyzer - Line of Sight (Refactored)', () => {
             const result = visionAnalyzer.hasLineOfSight(mockObserver, mockTarget);
 
             expect(mockObserver.vision.los.intersectCircle).toHaveBeenCalled();
-            expect(global.canvas.visibility.testVisibility).not.toHaveBeenCalled();
-            expect(result).toBe(true);
+            expect(global.canvas.visibility.testVisibility).toHaveBeenCalled();
+            expect(result).toBe(false);
         });
 
         test('should call Foundry canvas visibility with individual points when polygon is unavailable', () => {
@@ -524,7 +524,9 @@ describe('VisionAnalyzer - Line of Sight (Refactored)', () => {
             });
             global.canvas.walls.placeables = [];
 
+            const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => { });
             const result = visionAnalyzer.hasLineOfSight(mockObserver, mockTarget);
+            warnSpy.mockRestore();
 
             expect(get3DCollisionDetails).toHaveBeenCalledWith(mockObserver, mockTarget, 'sight');
             expect(result).toBe(true);

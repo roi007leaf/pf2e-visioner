@@ -21,10 +21,11 @@
 import { MODULE_ID } from '../../constants.js';
 import { calculateDistanceInFeet } from '../../helpers/geometry-utils.js';
 import { getTokenVerticalSpanFt } from '../../helpers/size-elevation-utils.js';
+import { doesWallSenseBlockFromPoint } from '../../helpers/wall-sense-utils.js';
 import {
-  doesWallSenseBlockFromPoint,
-} from '../../helpers/wall-sense-utils.js';
-import { doesWallBlockAtElevation, doesWallBlockLineOfSight } from '../../helpers/wall-height-utils.js';
+  doesWallBlockAtElevation,
+  doesWallBlockLineOfSight,
+} from '../../helpers/wall-height-utils.js';
 import { LevelsIntegration } from '../../services/LevelsIntegration.js';
 import { getLogger } from '../../utils/logger.js';
 import { SensingCapabilitiesBuilder } from './SensingCapabilitiesBuilder.js';
@@ -225,9 +226,9 @@ export class VisionAnalyzer {
           typeof levelsIntegration.get3DCollisionDetails === 'function'
             ? levelsIntegration.get3DCollisionDetails(observer, target, 'sight')
             : {
-              mode: levelsIntegration.mode,
-              result: levelsIntegration.test3DCollision(observer, target, 'sight'),
-            };
+                mode: levelsIntegration.mode,
+                result: levelsIntegration.test3DCollision(observer, target, 'sight'),
+              };
         const hasSightCollision = !!collisionDetails.result;
         const polygonOnlyCollision =
           collisionDetails.mode === 'core' &&
@@ -328,13 +329,9 @@ export class VisionAnalyzer {
         // Use targetPos from PositionManager for accurate target position
         const circle = new PIXI.Circle(targetPos.x, targetPos.y, radius);
         const intersection = los.intersectCircle(circle, { density: 8, scalingFactor: 1.0 });
-        const visible = intersection?.points?.length > 0;
-
-        const log = getLogger('AVS/VisionAnalyzer');
-        log.debug(
-          () =>
-            `vision-polygon-check: ${observer.name} -> ${target.name}, hasIntersection=${visible}, polygonPoints=${los.points.length}`,
-        );
+        const circleVisible = intersection?.points?.length > 0;
+        const visible = circleVisible || this.#doesLosContainTokenShape(los, target, targetPos);
+        const foundryPointVisible = this.#testFoundryVisibility(observer, target, targetPos);
 
         // HYBRID VALIDATION: Compare vision polygon with full geometric LOS
         // When they agree, trust the result. When they disagree, use geometric as tiebreaker.
@@ -349,7 +346,7 @@ export class VisionAnalyzer {
         try {
           hybridObserverSpan = getTokenVerticalSpanFt(observer);
           hybridTargetSpan = getTokenVerticalSpanFt(target);
-        } catch (error) { }
+        } catch (error) {}
 
         // Check center-to-center first
         const centerHasLOS = this.#checkSingleRayLOSWithWalls(
@@ -385,12 +382,18 @@ export class VisionAnalyzer {
           }
         }
 
+        const openDoorGeometryPass =
+          geometricResult && this.#hasOpenDoorAlongRay(observerCenter, targetPoints);
+        if (openDoorGeometryPass) {
+          return true;
+        }
+
         if (visible === geometricResult) {
+          if (visible && foundryPointVisible === false) {
+            return false;
+          }
+
           // Both systems agree - high confidence result
-          log.debug(
-            () =>
-              `vision-polygon-AGREEMENT: ${observer.name} -> ${target.name}, both polygon and geometric agree: ${visible}`,
-          );
           return visible;
         } else if (!visible && geometricResult) {
           const customWallPass = this.#findNonBlockingCustomSightWallPath(
@@ -402,10 +405,6 @@ export class VisionAnalyzer {
         } else {
           // If Foundry's polygon includes the target but Visioner's wall-aware geometry blocks it,
           // keep the geometric block so custom wall-height/elevation rules still apply.
-          log.debug(
-            () =>
-              `vision-polygon-DISAGREEMENT: ${observer.name} -> ${target.name}, polygon=${visible}, geometric=${geometricResult}, using geometric result`,
-          );
           return geometricResult;
         }
       } else if (visionPolygonStale) {
@@ -414,34 +413,21 @@ export class VisionAnalyzer {
           () => `vision-polygon-STALE: ${observer.name} moved, falling back to geometric LOS`,
         );
       } else if (!los?.points) {
-        const log = getLogger('AVS/VisionAnalyzer');
-        log.debug(
-          () =>
-            `vision-polygon-UNAVAILABLE: ${observer.name} -> ${target.name}, attempting testVisibility`,
-        );
-
         // CRITICAL: When vision polygon is unavailable, use Foundry's testVisibility
         // This computes the vision polygon on-demand and is more accurate than geometric sampling
         try {
-          const testPoints =
-            target?.document?.getVisibilityTestPoints?.() ?? [
-              {
-                x: targetPos.x,
-                y: targetPos.y,
-                elevation: target.document?.elevation || 0,
-              },
-            ];
-          const visionSource = observer.vision;
+          const testPoints = target?.document?.getVisibilityTestPoints?.() ?? [
+            {
+              x: targetPos.x,
+              y: targetPos.y,
+              elevation: target.document?.elevation || 0,
+            },
+          ];
           const level =
             target?.document?.level ??
             target?.document?._source?.level ??
             observer?.document?.level ??
             observer?.document?._source?.level;
-
-          log.debug(
-            () =>
-              `testVisibility-check: visionSource=${!!visionSource}, canvas.visibility=${!!canvas.visibility}`,
-          );
 
           const foundryVisibility = this.#callFoundryVisibilityTest({
             observer,
@@ -452,10 +438,6 @@ export class VisionAnalyzer {
 
           if (foundryVisibility.available) {
             const isVisible = foundryVisibility.result;
-            log.debug(
-              () =>
-                `testVisibility-result: ${observer.name} -> ${target.name}, isVisible=${isVisible}`,
-            );
             if (isVisible) {
               return true;
             }
@@ -474,20 +456,12 @@ export class VisionAnalyzer {
 
             return false;
           } else {
-            log.debug(
-              () =>
-                `testVisibility-unavailable: ${observer.name} -> ${target.name}, visionSource=${!!visionSource}, canvas.visibility=${!!canvas.visibility}, falling back to geometric LOS`,
-            );
             // CRITICAL: When vision source is unavailable (token not controlled),
             // we can't compute accurate vision polygons. Fall back to geometric sampling
             // with the 2-ray requirement for better accuracy.
             // This is less accurate than vision polygons but better than center-only.
           }
         } catch (error) {
-          log.debug(
-            () =>
-              `testVisibility-failed: ${observer.name} -> ${target.name}, error=${error.message}`,
-          );
           // Fall through to geometric sampling if testVisibility fails
         }
       }
@@ -504,7 +478,7 @@ export class VisionAnalyzer {
           bottom: Math.min(observerSpan.bottom, targetSpan.bottom),
           top: Math.max(observerSpan.top, targetSpan.top),
         };
-      } catch (error) { }
+      } catch (error) {}
 
       stage = 'get-walls';
       const cachedWalls = this.#getCachedWalls(elevationRange);
@@ -537,8 +511,8 @@ export class VisionAnalyzer {
       );
 
       // Debug log for center-to-center check
-      const log = getLogger('AVS/VisionAnalyzer');
-      log.debug(
+      const losLog = getLogger('AVS/VisionAnalyzer');
+      losLog.debug(
         () =>
           `LOS-center-check: ${observer.name} -> ${target.name}, from=(${Math.round(observerCenter.x)},${Math.round(observerCenter.y)}), to=(${Math.round(targetCenter.x)},${Math.round(targetCenter.y)}), walls=${cachedWalls.length}, result=${centerHasLOS}`,
       );
@@ -566,14 +540,14 @@ export class VisionAnalyzer {
         );
         if (hasLOS) {
           clearRays++;
-          log.debug(
+          losLog.debug(
             () =>
               `LOS-center-to-target: ${observer.name} -> ${target.name}, from=(${Math.round(observerCenter.x)},${Math.round(observerCenter.y)}), to=(${Math.round(targetPoints[i].x)},${Math.round(targetPoints[i].y)}), pointIdx=${i}, clearRays=${clearRays}`,
           );
 
           // Conservative approach: require multiple clear rays to confirm LOS
           if (clearRays >= requiredRays) {
-            log.debug(
+            losLog.debug(
               () =>
                 `LOS-confirmed-conservative: ${observer.name} -> ${target.name}, found ${clearRays} clear rays (required ${requiredRays})`,
             );
@@ -582,7 +556,7 @@ export class VisionAnalyzer {
         }
       }
 
-      log.debug(
+      losLog.debug(
         () =>
           `LOS-no-clear-rays-conservative: ${observer.name} -> ${target.name}, found ${clearRays} clear rays (required ${requiredRays}), returning false`,
       );
@@ -686,6 +660,95 @@ export class VisionAnalyzer {
     ];
   }
 
+  #getDenseTokenShapeSamplePoints(token, centerPos = null) {
+    const center = centerPos
+      ? { x: centerPos.x, y: centerPos.y }
+      : { x: token.center.x, y: token.center.y };
+    const w = token.document.width * canvas.grid.size;
+    const h = token.document.height * canvas.grid.size;
+    const x = centerPos ? centerPos.x - w / 2 : token.document.x;
+    const y = centerPos ? centerPos.y - h / 2 : token.document.y;
+    const inset = 2;
+    const points = [center];
+
+    for (const xFactor of [0.2, 0.5, 0.8]) {
+      for (const yFactor of [0.2, 0.5, 0.8]) {
+        points.push({
+          x: x + inset + (w - inset * 2) * xFactor,
+          y: y + inset + (h - inset * 2) * yFactor,
+        });
+      }
+    }
+
+    return points;
+  }
+
+  #doesLosContainTokenShape(los, token, centerPos) {
+    return this.#getDenseTokenShapeSamplePoints(token, centerPos).some((point) =>
+      this.#doesLosContainPoint(los, point),
+    );
+  }
+
+  #doesLosContainPoint(los, point) {
+    try {
+      if (typeof los?.contains === 'function') {
+        return !!los.contains(point.x, point.y);
+      }
+      if (typeof los?.containsPoint === 'function') {
+        return !!los.containsPoint(point);
+      }
+    } catch {}
+    return false;
+  }
+
+  #hasOpenDoorAlongRay(fromPoint, targetPoints) {
+    try {
+      for (const wall of canvas?.walls?.placeables ?? []) {
+        const isOpenDoor = wall?.document?.door > 0 && wall.document.ds === 1;
+        if (!isOpenDoor) continue;
+
+        for (const targetPoint of targetPoints) {
+          if (this.#rayIntersectsWallSegment(fromPoint, targetPoint, wall.document.c)) {
+            return true;
+          }
+        }
+      }
+    } catch {}
+
+    return false;
+  }
+
+  #rayIntersectsWallSegment(fromPoint, toPoint, wallCoords) {
+    const intersection = foundry.utils.lineLineIntersection(
+      fromPoint,
+      toPoint,
+      { x: wallCoords[0], y: wallCoords[1] },
+      { x: wallCoords[2], y: wallCoords[3] },
+    );
+
+    if (
+      !intersection ||
+      typeof intersection.t0 !== 'number' ||
+      intersection.t0 < 0 ||
+      intersection.t0 > 1
+    ) {
+      return false;
+    }
+
+    if (typeof intersection.t1 === 'number') {
+      return intersection.t1 >= 0 && intersection.t1 <= 1;
+    }
+
+    const wallDx = wallCoords[2] - wallCoords[0];
+    const wallDy = wallCoords[3] - wallCoords[1];
+    const t1 =
+      Math.abs(wallDx) > Math.abs(wallDy)
+        ? (intersection.x - wallCoords[0]) / wallDx
+        : (intersection.y - wallCoords[1]) / wallDy;
+
+    return t1 >= 0 && t1 <= 1;
+  }
+
   /**
    * Check if a single ray has clear line of sight using cached walls
    * @private
@@ -706,7 +769,7 @@ export class VisionAnalyzer {
         const wallMidY = (wall.document.c[1] + wall.document.c[3]) / 2;
         const distToRayMid = Math.sqrt(
           (wallMidX - (fromPoint.x + toPoint.x) / 2) ** 2 +
-          (wallMidY - (fromPoint.y + toPoint.y) / 2) ** 2,
+            (wallMidY - (fromPoint.y + toPoint.y) / 2) ** 2,
         );
 
         if (distToRayMid > rayLength * 1.5) {
@@ -881,7 +944,9 @@ export class VisionAnalyzer {
             });
           } else {
             if (observerSpan && targetSpan) {
-              if (!doesWallBlockLineOfSight(wall.document, observerSpan, targetSpan, intersection.t0)) {
+              if (
+                !doesWallBlockLineOfSight(wall.document, observerSpan, targetSpan, intersection.t0)
+              ) {
                 continue;
               }
             }
@@ -921,6 +986,37 @@ export class VisionAnalyzer {
     }
 
     return null;
+  }
+
+  #testFoundryVisibility(observer, target, targetPos) {
+    try {
+      const testPoints = target?.document?.getVisibilityTestPoints?.() ?? [
+        {
+          x: targetPos.x,
+          y: targetPos.y,
+          elevation: target.document?.elevation || 0,
+        },
+      ];
+      const level =
+        target?.document?.level ??
+        target?.document?._source?.level ??
+        observer?.document?.level ??
+        observer?.document?._source?.level;
+      const foundryVisibility = this.#callFoundryVisibilityTest({
+        observer,
+        target,
+        testPoints,
+        level,
+      });
+
+      if (!foundryVisibility.available) {
+        return null;
+      }
+
+      return foundryVisibility.result;
+    } catch (error) {
+      return null;
+    }
   }
 
   #callFoundryVisibilityTest({ observer, target, testPoints, level }) {
@@ -1033,9 +1129,9 @@ export class VisionAnalyzer {
           typeof levelsIntegration.get3DCollisionDetails === 'function'
             ? levelsIntegration.get3DCollisionDetails(observer, target, 'sound')
             : {
-              mode: levelsIntegration.mode,
-              result: levelsIntegration.test3DCollision(observer, target, 'sound'),
-            };
+                mode: levelsIntegration.mode,
+                result: levelsIntegration.test3DCollision(observer, target, 'sound'),
+              };
         const blocked = !!collisionDetails.result;
         const coreSurfaceCollision =
           collisionDetails.mode === 'core' &&
@@ -1660,9 +1756,7 @@ export class VisionAnalyzer {
     }
 
     if (typeof senses === 'object') {
-      return Object.entries(senses).map(([type, sense]) =>
-        this.#normalizeSenseEntry(type, sense),
-      );
+      return Object.entries(senses).map(([type, sense]) => this.#normalizeSenseEntry(type, sense));
     }
 
     return [];

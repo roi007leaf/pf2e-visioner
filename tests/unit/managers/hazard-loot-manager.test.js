@@ -19,7 +19,9 @@ describe('Hazard/Loot manager helpers', () => {
         hasPlayerOwner: true,
         system: { details: { level: { value: 4 } } },
       }),
-      flags: { 'pf2e-visioner': { visibility: { loot1: 'hidden' } } },
+      flags: {
+        'pf2e-visioner': { visibilityV2: { loot1: { detectionState: 'hidden' } } },
+      },
     });
     const pc2 = createMockToken({
       id: 'pc-2',
@@ -172,19 +174,69 @@ describe('Hazard/Loot manager helpers', () => {
   });
 
   test('applies loot stealth DC and hazard proficiency requirement without writing hazard stealth DC', async () => {
-    const { applyHazardLootManagerUpdates } = await import(
+    const { getHazardLootManagerRows, getPartyLevel } = await import(
       '../../../scripts/managers/hazard-loot-manager/HazardLootManager.js'
     );
 
     const pc1 = createMockToken({
       id: 'pc-1',
+      actor: createMockActor({
+        type: 'character',
+        hasPlayerOwner: false,
+        system: { details: { level: { value: 4 } } },
+      }),
+    });
+    const pc2 = createMockToken({
+      id: 'pc-2',
+      actor: createMockActor({
+        type: 'character',
+        hasPlayerOwner: false,
+        system: { details: { level: { value: 4 } } },
+      }),
+    });
+    const npc = createMockToken({
+      id: 'npc1',
+      actor: createMockActor({
+        type: 'npc',
+        hasPlayerOwner: true,
+        system: { details: { level: { value: 20 } } },
+      }),
+    });
+    const loot = createMockToken({
+      id: 'loot1',
+      actor: createMockActor({ type: 'loot' }),
+    });
+
+    const tokens = [pc1, pc2, npc, loot];
+    const rows = getHazardLootManagerRows({ tokens });
+
+    expect(getPartyLevel(tokens)).toBe(4);
+    expect(rows[0]).toMatchObject({
+      id: 'loot1',
+      partyLevel: 4,
+      partyDC: 19,
+    });
+  });
+
+  test('applies loot stealth DC and hazard proficiency requirement without writing hazard stealth DC', async () => {
+    const { applyHazardLootManagerUpdates } = await import(
+      '../../../scripts/managers/hazard-loot-manager/HazardLootManager.js'
+    );
+    const { getVisibilityBetween } = await import('../../../scripts/stores/visibility-map.js');
+
+    const pc1 = createMockToken({
+      id: 'pc-1',
       actor: createMockActor({ type: 'character', hasPlayerOwner: true }),
-      flags: { 'pf2e-visioner': { visibility: { hazard1: 'hidden' } } },
+      flags: {
+        'pf2e-visioner': { visibilityV2: { hazard1: { detectionState: 'hidden' } } },
+      },
     });
     const pc2 = createMockToken({
       id: 'pc-2',
       actor: createMockActor({ type: 'character', hasPlayerOwner: true }),
-      flags: { 'pf2e-visioner': { visibility: { hazard1: 'hidden' } } },
+      flags: {
+        'pf2e-visioner': { visibilityV2: { hazard1: { detectionState: 'hidden' } } },
+      },
     });
     const loot = createMockToken({
       id: 'loot1',
@@ -205,8 +257,10 @@ describe('Hazard/Loot manager helpers', () => {
     );
 
     expect(result).toEqual({ targets: 2, visibilityPairs: 4, dcUpdates: 1, rankUpdates: 1 });
-    expect(pc1.document.getFlag('pf2e-visioner', 'visibility')).toEqual({ loot1: 'hidden' });
-    expect(pc2.document.getFlag('pf2e-visioner', 'visibility')).toEqual({ loot1: 'hidden' });
+    expect(getVisibilityBetween(pc1, loot)).toBe('hidden');
+    expect(getVisibilityBetween(pc2, loot)).toBe('hidden');
+    expect(getVisibilityBetween(pc1, hazard)).toBe('observed');
+    expect(getVisibilityBetween(pc2, hazard)).toBe('observed');
     expect(loot.document.getFlag('pf2e-visioner', 'stealthDC')).toBe(20);
     expect(hazard.document.getFlag('pf2e-visioner', 'stealthDC')).toBe(22);
     expect(hazard.document.getFlag('pf2e-visioner', 'minPerceptionRank')).toBe(3);

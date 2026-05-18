@@ -9,7 +9,28 @@
 
 import { LightingLevel, SenseType, VisibilityState } from '../constants.js';
 import { getLogger } from '../utils/logger.js';
+import { legacyVisibilityToProfile } from './perception-profile.js';
 const log = getLogger('AVS/StatelessCalculator');
+
+function withProfile(result, profileMetadata = {}) {
+  if (!result?.state) return result;
+  return {
+    ...result,
+    profile: legacyVisibilityToProfile(result.state, profileMetadata),
+  };
+}
+
+function profileMetadataForResult(result, target) {
+  const observedPath =
+    result?.state === VisibilityState.OBSERVED || result?.state === VisibilityState.CONCEALED;
+
+  return {
+    hasConcealment: result?.state === VisibilityState.CONCEALED ||
+      (observedPath && target.concealment === true),
+    coverState: target.coverLevel || 'none',
+    detectionSense: result?.detection?.sense ?? null,
+  };
+}
 
 /**
  * Calculate visibility state from standardized input
@@ -48,6 +69,7 @@ const log = getLogger('AVS/StatelessCalculator');
  * @returns {Object|null} result.detection - Detection info or null if undetected
  * @returns {boolean} result.detection.isPrecise - Whether detection is precise
  * @returns {string} result.detection.sense - Which sense detected: one of SenseType enum values (VISION, DARKVISION, LOW_LIGHT_VISION, GREATER_DARKVISION, HEARING, TREMORSENSE, LIFESENSE, SCENT, ECHOLOCATION, SEE_INVISIBILITY, LIGHT_PERCEPTION)
+ * @returns {Object} result.profile - Canonical perception metadata compatible with the legacy state
  */
 export function calculateVisibility(input) {
   log.debug(() => ({
@@ -77,7 +99,7 @@ export function calculateVisibility(input) {
     }));
     const result = handleBlindedObserver(observer, target, soundBlocked);
 
-    return result;
+    return withProfile(result, profileMetadataForResult(result, target));
   }
 
   // 2. Check all available senses and return the best detection result
@@ -123,14 +145,18 @@ export function calculateVisibility(input) {
       sense: bestResult.detection?.sense,
       isPrecise: bestResult.detection?.isPrecise,
     }));
-    return bestResult;
+    return withProfile(bestResult, profileMetadataForResult(bestResult, target));
   }
 
   // 4. Default: undetected (no senses can detect)
-  return {
+  return withProfile({
     state: VisibilityState.UNDETECTED,
     detection: null,
-  };
+  }, {
+    hasConcealment: false,
+    coverState: target.coverLevel || 'none',
+    detectionSense: null,
+  });
 }
 
 /**
@@ -140,6 +166,7 @@ function normalizeTargetState(target) {
   return {
     lightingLevel: target.lightingLevel || LightingLevel.BRIGHT,
     concealment: target.concealment ?? false,
+    coverLevel: target.coverLevel || 'none',
     auxiliary: Array.isArray(target.auxiliary) ? target.auxiliary : [],
     traits: Array.isArray(target.traits) ? target.traits : [],
     movementAction: target.movementAction ?? 0,

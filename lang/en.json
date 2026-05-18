@@ -76,6 +76,7 @@
       "avs": "AVS",
       "observed": "Observed",
       "concealed": "Concealed",
+      "observed_concealed": "Observed + Concealed",
       "hidden": "Hidden",
       "undetected": "Undetected",
       "unnoticed": "Unnoticed"

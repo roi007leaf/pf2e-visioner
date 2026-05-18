@@ -1,5 +1,36 @@
 # Changelog
 
+## [8.3.1] - 2026-05-15
+
+### Fixed
+
+- **Door LOS visibility stays in sync with Foundry detection**: Door open/close recalculations now refresh explicit visible pairs and detection state so tokens revealed through a door remain actually visible to Foundry, instead of being kept hidden by stale core detection results.
+- **Door LOS recalculation is scoped to the changed door**: Door batches now only run expensive visibility work for token pairs whose sight rays cross the changed door segment, avoiding full-scene pair recalculation on crowded maps.
+- **Fast token movement no longer applies stale AVS batches**: Movement batches now discard results if another movement starts before the batch finishes, drop stale batched detection writes, and preserve pending movement tokens for the final post-move recalculation.
+
+## [8.3.0] - 2026-05-06
+
+### Added
+
+- Added versioned `visibilityV2` profile storage and migration for legacy visibility maps and AVS override flags, preserving string-facing API compatibility while storing canonical detection/concealment metadata only.
+
+### Changed
+
+- Separated detection, concealment, cover, and encounter awareness semantics internally.
+- Scoped Unnoticed to encounter-start Avoid Notice awareness instead of treating it as a general manual visibility state.
+- Removed legacy `visibility` map and AVS override `state` persistence; visibility storage now writes only canonical `visibilityV2` profiles, and AVS override flags now store detection, concealment, cover, and awareness metadata without a legacy state field.
+- Runtime visibility lookups no longer fall back to old `visibility` flags; the migration is the only legacy reader and deletes those flags after conversion.
+- Existing string-facing APIs, dialogs, and hooks now synthesize their legacy labels from v2 profile data instead of reading legacy persistence.
+- Visioner Manager manual controls and bulk visibility buttons now present legacy `concealed` overrides as "Observed + Concealed" to match the separated detection/concealment model while keeping the saved value unchanged.
+- Hover tooltip badges, visibility factor overlays, and override validation indicators now use the same "Observed + Concealed" display label for concealed visibility.
+- Action preview dialogs now use "Observed + Concealed" for concealed visibility tooltips instead of falling back to raw state-name capitalization.
+
+### Fixed
+
+- Fresh AVS override flags now store canonical detection/concealment metadata, so `concealed` manual overrides save as `detectionState: "observed"` with `hasConcealment: true` instead of an old-shaped legacy-only override.
+- Concealment-sensitive stealth logic no longer treats Hidden or Undetected as if they were the concealed condition.
+- Encounter-start Unnoticed continues to hide tokens and tracker rows while using Undetected as the underlying detection state.
+
 ## [8.2.11] - 2026-05-16
 
 ### Added
@@ -2545,4 +2576,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Compatibility
 
 - FoundryVTT v12 and earlier
+- Basic ApplicationV1 framework
 - Basic ApplicationV1 framework

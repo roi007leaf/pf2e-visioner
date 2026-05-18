@@ -76,6 +76,7 @@
       "avs": "AVS",
       "observed": "Obserwowany",
       "concealed": "Przysłonięty",
+      "observed_concealed": "Obserwowany + przysłonięty",
       "hidden": "Ukryty",
       "undetected": "Niewykryty",
       "unnoticed": "Niezauważony"

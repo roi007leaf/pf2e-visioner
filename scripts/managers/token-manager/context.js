@@ -3,7 +3,12 @@
  */
 
 import { extractPerceptionDC, extractStealthDC } from '../../chat/services/infra/shared-utils.js';
-import { COVER_STATES, MODULE_ID, VISIBILITY_STATES } from '../../constants.js';
+import {
+  COVER_STATES,
+  MODULE_ID,
+  VISIBILITY_STATES,
+  getVisibilityStateLabelKey,
+} from '../../constants.js';
 import {
   getCoverMap,
   getLastRollTotalForActor,
@@ -12,6 +17,23 @@ import {
   hasActiveEncounter,
 } from '../../utils.js';
 import { TimedOverrideManager } from '../../services/TimedOverrideManager.js';
+import { overrideToDisplayVisibility } from '../../visibility/perception-profile.js';
+
+function buildVisibilityStateContext(key, { selected = false, manual = true } = {}) {
+  const config = VISIBILITY_STATES[key];
+  return {
+    value: key,
+    label: game.i18n.localize(getVisibilityStateLabelKey(key, { manual })),
+    selected,
+    icon: config.icon,
+    color: config.color,
+    cssClass: config.cssClass,
+  };
+}
+
+function getOverrideDisplayState(overrideFlag) {
+  return overrideToDisplayVisibility(overrideFlag) || 'observed';
+}
 
 function getTokenImage(token) {
   if (token.actor?.img) return token.actor.img;
@@ -23,13 +45,15 @@ const MANUAL_VISIBILITY_STATE_EXCLUSIONS = new Set(['unnoticed']);
 function isVisibilityOverrideFlag(flagData) {
   if (!flagData) return false;
   if (flagData.coverOnly === true) return false;
-  if (!flagData.state || flagData.state === 'avs') return false;
+  const displayState = overrideToDisplayVisibility(flagData);
+  if (!displayState || displayState === 'avs') return false;
   return true;
 }
 
 function getManualVisibilityStateKeys({ isNonAvsToken = false, avsEnabled = false } = {}) {
   const keys = isNonAvsToken ? ['observed', 'hidden'] : Object.keys(VISIBILITY_STATES);
   return keys.filter((key) => {
+    if (VISIBILITY_STATES[key]?.manual === false) return false;
     if (MANUAL_VISIBILITY_STATE_EXCLUSIONS.has(key)) return false;
     if (key === 'avs' && !avsEnabled) return false;
     return true;
@@ -219,14 +243,7 @@ export async function buildContext(app, options) {
             let selected = false;
 
             // This will be set after we determine the override/AVS logic
-            return {
-              value: key,
-              label: game.i18n.localize(VISIBILITY_STATES[key].label),
-              selected, // Will be updated below
-              icon: VISIBILITY_STATES[key].icon,
-              color: VISIBILITY_STATES[key].color,
-              cssClass: VISIBILITY_STATES[key].cssClass,
-            };
+            return buildVisibilityStateContext(key, { selected });
           });
 
         // Determine current state and selection logic
@@ -247,7 +264,7 @@ export async function buildContext(app, options) {
             if (isVisibilityOverrideFlag(avsOverrideFlag)) {
               // There's an override - use the override state
               hasAvsOverride = true;
-              actualCurrentState = avsOverrideFlag.state || 'observed';
+              actualCurrentState = getOverrideDisplayState(avsOverrideFlag);
               isAvsControlled = false; // Override is controlling, not AVS
             } else {
               // No override - AVS is controlling (unless it's a hazard/loot token)
@@ -417,14 +434,7 @@ export async function buildContext(app, options) {
             let selected = false;
 
             // This will be set after we determine the override/AVS logic
-            return {
-              value: key,
-              label: game.i18n.localize(VISIBILITY_STATES[key].label),
-              selected, // Will be updated below
-              icon: VISIBILITY_STATES[key].icon,
-              color: VISIBILITY_STATES[key].color,
-              cssClass: VISIBILITY_STATES[key].cssClass,
-            };
+            return buildVisibilityStateContext(key, { selected });
           });
 
         // In target mode, determine current state and selection logic
@@ -445,7 +455,7 @@ export async function buildContext(app, options) {
             if (isVisibilityOverrideFlag(avsOverrideFlag)) {
               // There's an override - use the override state
               hasAvsOverride = true;
-              actualCurrentState = avsOverrideFlag.state || 'observed';
+              actualCurrentState = getOverrideDisplayState(avsOverrideFlag);
               isAvsControlled = false; // Override is controlling, not AVS
             } else {
               // No override - AVS is controlling (unless it's a hazard/loot token)
@@ -603,14 +613,9 @@ export async function buildContext(app, options) {
         const doorType = Number(d?.door) || 0;
         const fallback = `${game.i18n?.localize?.('PF2E_VISIONER.WALL.VISIBLE_TO_YOU') || isDoor ? 'Hidden Door' : 'Hidden Wall'} ${++autoIndex}`;
         const currentState = wallMap?.[d.id] || 'hidden';
-        const states = ['hidden', 'observed'].map((key) => ({
-          value: key,
-          label: game.i18n.localize(VISIBILITY_STATES[key].label),
-          selected: currentState === key,
-          icon: VISIBILITY_STATES[key].icon,
-          color: VISIBILITY_STATES[key].color,
-          cssClass: VISIBILITY_STATES[key].cssClass,
-        }));
+        const states = ['hidden', 'observed'].map((key) =>
+          buildVisibilityStateContext(key, { selected: currentState === key }),
+        );
         const img = getWallImage(doorType);
         // DC: per-wall override else global default
         const overrideDC = Number(d?.getFlag?.(MODULE_ID, 'stealthDC'));
@@ -667,17 +672,10 @@ export async function buildContext(app, options) {
     avsEnabled,
   });
 
-  context.visibilityStates = allowedLegendKeys.map((key) => {
-    const config = VISIBILITY_STATES[key];
-    return {
-      key,
-      value: key,
-      label: game.i18n.localize(config.label),
-      icon: config.icon,
-      color: config.color,
-      cssClass: config.cssClass,
-    };
-  });
+  context.visibilityStates = allowedLegendKeys.map((key) => ({
+    key,
+    ...buildVisibilityStateContext(key, { selected: false }),
+  }));
 
   context.coverStates = Object.entries(COVER_STATES).map(([key, config]) => ({
     key,

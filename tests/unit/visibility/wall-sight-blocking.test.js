@@ -88,6 +88,10 @@ describe('Wall Sight Blocking Fix', () => {
       },
     };
 
+    global.PIXI = {
+      Circle: jest.fn((x, y, radius) => ({ x, y, radius })),
+    };
+
     // Mock foundry utilities with proper geometric line-line intersection
     global.foundry = {
       canvas: {
@@ -358,6 +362,26 @@ describe('Wall Sight Blocking Fix', () => {
       ];
 
       const result = visionAnalyzer.hasLineOfSight(observer, target);
+      expect(result).toBe(true);
+    });
+
+    test('should let Visioner proximity walls override a negative Foundry vision polygon', () => {
+      const observer = makeZeroSizeToken({ id: 'proximity-polygon-observer', x: 40, y: 0 });
+      const target = makeZeroSizeToken({ id: 'proximity-polygon-target', x: 100, y: 0 });
+      observer.vision = {
+        los: {
+          points: [0, -100, 50, -100, 50, 100, 0, 100],
+          intersectCircle: jest.fn(() => ({ points: [] })),
+        },
+      };
+
+      global.canvas.walls.placeables = [
+        makeVerticalSightWall(CONST.WALL_SENSE_TYPES.PROXIMITY, 1),
+      ];
+
+      const result = visionAnalyzer.hasLineOfSight(observer, target);
+
+      expect(observer.vision.los.intersectCircle).toHaveBeenCalled();
       expect(result).toBe(true);
     });
 

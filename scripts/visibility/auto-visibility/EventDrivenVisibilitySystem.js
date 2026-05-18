@@ -6,6 +6,7 @@
 
 import { MODULE_ID } from '../../constants.js';
 import { getLogger } from '../../utils/logger.js';
+import { profileToLegacyVisibility } from '../perception-profile.js';
 import { BatchOrchestrator } from './core/BatchOrchestrator.js';
 import { BatchProcessor } from './core/BatchProcessor.js';
 import { DependencyInjectionContainer } from './core/DependencyInjectionContainer.js';
@@ -363,9 +364,10 @@ export class EventDrivenVisibilitySystem {
 
       // 1) Check for active override (persisted flag)
       const { default: AvsOverrideManager } = await import('../../chat/services/infra/AvsOverrideManager.js');
-      const override = await AvsOverrideManager.getOverride(observer, target);
-      if (typeof override === 'string' && override) return override;
-      if (override?.state) return override.state;
+      const overrideProfile = await AvsOverrideManager.getOverrideProfile(observer, target);
+      if (overrideProfile) {
+        return profileToLegacyVisibility(overrideProfile, { preserveEncounterUnnoticed: true });
+      }
 
 
       // 2) Check current visibility map (observer -> target)

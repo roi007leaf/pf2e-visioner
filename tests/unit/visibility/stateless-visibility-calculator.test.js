@@ -60,6 +60,34 @@ describe('StatelessVisibilityCalculator', () => {
             });
         });
 
+        test('observed plus concealment includes profile metadata while preserving legacy state', () => {
+            const input = {
+                target: {
+                    lightingLevel: 'dim',
+                    coverLevel: 'none',
+                    concealment: false,
+                    auxiliary: []
+                },
+                observer: {
+                    precise: {
+                        vision: { range: Infinity }
+                    },
+                    imprecise: {},
+                    conditions: {}
+                }
+            };
+
+            const result = calculateVisibility(input);
+
+            expect(result.state).toBe('concealed');
+            expect(result.profile).toMatchObject({
+                detectionState: 'observed',
+                hasConcealment: true,
+                coverState: 'none',
+                detectionSense: 'vision'
+            });
+        });
+
         test('darkness + normal vision = undetected (with hearing fallback)', () => {
             const input = {
                 target: {
@@ -88,6 +116,36 @@ describe('StatelessVisibilityCalculator', () => {
             });
         });
 
+        test('hidden result does not imply concealment in profile metadata', () => {
+            const input = {
+                target: {
+                    lightingLevel: 'darkness',
+                    coverLevel: 'none',
+                    concealment: false,
+                    auxiliary: []
+                },
+                observer: {
+                    precise: {
+                        vision: { range: Infinity }
+                    },
+                    imprecise: {
+                        hearing: { range: 60 }
+                    },
+                    conditions: {}
+                }
+            };
+
+            const result = calculateVisibility(input);
+
+            expect(result.state).toBe('hidden');
+            expect(result.profile).toMatchObject({
+                detectionState: 'hidden',
+                hasConcealment: false,
+                coverState: 'none',
+                detectionSense: 'hearing'
+            });
+        });
+
         test('darkness + normal vision + no other senses = undetected', () => {
             const input = {
                 target: {
@@ -108,6 +166,34 @@ describe('StatelessVisibilityCalculator', () => {
             const result = calculateVisibility(input);
             expect(result.state).toBe('undetected');
             expect(result.detection).toBe(null);
+        });
+
+        test('undetected result includes profile metadata without concealment', () => {
+            const input = {
+                target: {
+                    lightingLevel: 'darkness',
+                    coverLevel: 'none',
+                    concealment: false,
+                    auxiliary: []
+                },
+                observer: {
+                    precise: {
+                        vision: { range: Infinity }
+                    },
+                    imprecise: {},
+                    conditions: {}
+                }
+            };
+
+            const result = calculateVisibility(input);
+
+            expect(result.state).toBe('undetected');
+            expect(result.profile).toMatchObject({
+                detectionState: 'undetected',
+                hasConcealment: false,
+                coverState: 'none',
+                detectionSense: null
+            });
         });
     });
 

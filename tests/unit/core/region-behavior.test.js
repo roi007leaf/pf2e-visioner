@@ -48,6 +48,10 @@ global.CONST = {
 // Import after setting up mocks
 import { VisibilityRegionBehavior } from '../../../scripts/regions/VisibilityRegionBehavior.js';
 
+VisibilityRegionBehavior._createEventsField = (events) => ({
+  events: new Set(events.events || events),
+});
+
 global.foundry.data.fields = {
   StringField: class StringField {
     constructor(options = {}) {
@@ -147,6 +151,16 @@ describe('VisibilityRegionBehavior', () => {
       expect(VisibilityRegionBehavior.LOCALIZATION_PREFIXES).toContain(
         'PF2E_VISIONER.REGION_BEHAVIOR',
       );
+    });
+
+    test('excludes encounter-only unnoticed from visibility choices while keeping AVS', () => {
+      const schema = VisibilityRegionBehavior.defineSchema();
+      const choices = Object.keys(schema.visibilityState.options.choices);
+
+      expect(choices).toEqual(
+        expect.arrayContaining(['avs', 'observed', 'concealed', 'hidden', 'undetected']),
+      );
+      expect(choices).not.toContain('unnoticed');
     });
   });
 

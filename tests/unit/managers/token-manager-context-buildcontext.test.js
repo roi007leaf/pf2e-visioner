@@ -91,6 +91,7 @@ jest.mock('../../../scripts/constants.js', () => ({
     },
     concealed: {
       label: 'PF2E_VISIONER.VISIBILITY.CONCEALED',
+      manualLabel: 'PF2E_VISIONER.VISIBILITY.OBSERVED_CONCEALED',
       icon: 'fas fa-cloud',
       color: '#ffeb3b',
       cssClass: 'visibility-concealed',
@@ -120,6 +121,18 @@ jest.mock('../../../scripts/constants.js', () => ({
       cssClass: 'visibility-avs',
     },
   },
+  getVisibilityStateLabelKey: jest.fn((state, { manual = false } = {}) => {
+    const labels = {
+      observed: 'PF2E_VISIONER.VISIBILITY.OBSERVED',
+      concealed: 'PF2E_VISIONER.VISIBILITY.CONCEALED',
+      hidden: 'PF2E_VISIONER.VISIBILITY.HIDDEN',
+      undetected: 'PF2E_VISIONER.VISIBILITY.UNDETECTED',
+    };
+    const manualLabels = {
+      concealed: 'PF2E_VISIONER.VISIBILITY.OBSERVED_CONCEALED',
+    };
+    return manual && manualLabels[state] ? manualLabels[state] : labels[state] || String(state ?? '');
+  }),
 }));
 
 // Mock FoundryVTT ApplicationV2
@@ -219,6 +232,7 @@ describe('Token Manager Context Building - DC Display Fix', () => {
     global.canvas = {
       tokens: {
         placeables: [mockTarget1, mockTarget2],
+        get: jest.fn((id) => [mockObserver, mockTarget1, mockTarget2].find((t) => t.id === id) || null),
       },
       walls: {
         placeables: [],
@@ -348,7 +362,88 @@ describe('Token Manager Context Building - DC Display Fix', () => {
     });
   });
 
+  describe('Canonical AVS Override Display', () => {
+    beforeEach(() => {
+      global.game.settings.get.mockImplementation((moduleId, settingId) => {
+        if (settingId === 'autoVisibilityEnabled') return true;
+        if (settingId === 'integrateRollOutcome') return false;
+        if (settingId === 'hiddenWallsEnabled') return false;
+        return false;
+      });
+    });
+
+    test('observer mode selects concealed for canonical concealed override flags', async () => {
+      mockApp.mode = 'observer';
+      mockTarget1.document.getFlag.mockImplementation((moduleId, flagKey) => {
+        if (
+          moduleId === 'pf2e-visioner' &&
+          flagKey === `avs-override-from-${mockObserver.document.id}`
+        ) {
+          return {
+            source: 'manual_action',
+            detectionState: 'observed',
+            hasConcealment: true,
+            coverState: 'none',
+          };
+        }
+        return null;
+      });
+
+      const context = await buildContext(mockApp, {});
+      const amiriTarget = context.pcTargets.find((t) => t.id === mockTarget1.id);
+
+      expect(amiriTarget.currentVisibilityState).toBe('concealed');
+      expect(amiriTarget.visibilityStates.find((state) => state.value === 'concealed').selected).toBe(true);
+      expect(amiriTarget.visibilityStates.find((state) => state.value === 'observed').selected).toBe(false);
+    });
+
+    test('target mode selects concealed for canonical concealed override flags', async () => {
+      mockApp.mode = 'target';
+      mockObserver.document.getFlag.mockImplementation((moduleId, flagKey) => {
+        if (
+          moduleId === 'pf2e-visioner' &&
+          flagKey === `avs-override-from-${mockTarget1.document.id}`
+        ) {
+          return {
+            source: 'manual_action',
+            detectionState: 'observed',
+            hasConcealment: true,
+            coverState: 'none',
+          };
+        }
+        return null;
+      });
+
+      const context = await buildContext(mockApp, {});
+      const amiriTarget = context.pcTargets.find((t) => t.id === mockTarget1.id);
+
+      expect(amiriTarget.currentVisibilityState).toBe('concealed');
+      expect(amiriTarget.visibilityStates.find((state) => state.value === 'concealed').selected).toBe(true);
+      expect(amiriTarget.visibilityStates.find((state) => state.value === 'observed').selected).toBe(false);
+    });
+  });
+
   describe('Context Properties', () => {
+    test('labels manual concealed controls as observed plus concealed without changing value', async () => {
+      mockApp.mode = 'observer';
+
+      const context = await buildContext(mockApp, {});
+      const bulkConcealed = context.visibilityStates.find((state) => state.value === 'concealed');
+      const rowConcealed = context.pcTargets
+        .flatMap((target) => target.visibilityStates)
+        .find((state) => state.value === 'concealed');
+
+      expect(bulkConcealed).toMatchObject({
+        key: 'concealed',
+        value: 'concealed',
+        label: 'PF2E_VISIONER.VISIBILITY.OBSERVED_CONCEALED',
+      });
+      expect(rowConcealed).toMatchObject({
+        value: 'concealed',
+        label: 'PF2E_VISIONER.VISIBILITY.OBSERVED_CONCEALED',
+      });
+    });
+
     test('should not offer unnoticed as a manual visibility action or bulk action', async () => {
       const context = await buildContext(mockApp, {});
 

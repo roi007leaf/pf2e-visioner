@@ -221,6 +221,7 @@ describe('Attack Consequences Action Comprehensive Tests', () => {
         getVisibilityBetween: jest.fn(() => 'undetected'),
         setVisibilityBetween: jest.fn().mockResolvedValue(true),
         getVisibilityMap: jest.fn(() => ({})),
+        getPerceptionProfileMap: jest.fn(() => ({})),
       }));
 
       try {
@@ -255,7 +256,7 @@ describe('Attack Consequences Action Comprehensive Tests', () => {
         expect(global.canvas.scene.updateEmbeddedDocuments).toHaveBeenCalledWith('Token', [
           {
             _id: observer.document.id,
-            'flags.pf2e-visioner.-=visibility': null,
+            'flags.pf2e-visioner.-=visibilityV2': null,
           },
         ]);
       } finally {

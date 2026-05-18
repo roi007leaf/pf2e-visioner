@@ -1,4 +1,5 @@
 import {
+  discardDetectionBatch,
   flushDetectionBatch,
   setDetectionBetween,
   setDetectionMap,
@@ -58,6 +59,20 @@ describe('Detection Map Store', () => {
       },
       { diff: false, render: false, animate: false },
     );
+  });
+
+  test('discardDetectionBatch drops batched writes without persisting stale detection', async () => {
+    startDetectionBatch();
+
+    await setDetectionBetween(observer, target, {
+      sense: 'darkvision',
+      isPrecise: true,
+    });
+
+    discardDetectionBatch();
+    await flushDetectionBatch();
+
+    expect(observer.document.update).not.toHaveBeenCalled();
   });
 
   test('setDetectionMap defers writes until the observer token settles', async () => {

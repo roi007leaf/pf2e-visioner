@@ -10,6 +10,22 @@
 
 import { COVER_STATES, MODULE_ID, VISIBILITY_STATES } from '../constants.js';
 import { addTokenBorder, removeTokenBorder } from '../managers/token-manager/borders.js';
+import { overrideToDisplayVisibility } from '../visibility/perception-profile.js';
+
+function hasOverrideVisibilityData(override) {
+  return (
+    typeof override?.state === 'string' ||
+    typeof override?.detectionState === 'string' ||
+    typeof override?.hasConcealment === 'boolean' ||
+    typeof override?.awarenessState === 'string'
+  );
+}
+
+function getVisibilityStateLabelKey(state, { manual = false } = {}) {
+  const config = VISIBILITY_STATES?.[state];
+  if (!config) return String(state ?? '');
+  return manual && config.manualLabel ? config.manualLabel : config.label;
+}
 
 const AUTO_COVER_DISPLAY = {
   icon: 'fas fa-arrows-rotate',
@@ -65,8 +81,6 @@ class OverrideValidationIndicator {
     this._rawOverrides = [];
     this._overrideStack = new Map(); // tokenId -> { overrides, tokenName, timestamp }
     this._currentTokenId = null;
-    this._overrideStack = new Map(); // tokenId -> { overrides, tokenName, timestamp }
-    this._currentTokenId = null;
     this._drag = { active: false, start: { x: 0, y: 0 }, offset: { x: 0, y: 0 }, moved: false };
     this._rowHighlightTokens = [];
     // Guard against rapid show->hide flicker when recomputations settle to 0
@@ -84,13 +98,15 @@ class OverrideValidationIndicator {
     if (!o) return false;
     if (o.controlReleaseOnly === true) return true;
     const coverOnly = o.coverOnly === true;
+    if (!coverOnly && !hasOverrideVisibilityData(o)) return false;
 
-    // Filter out overrides with no state or 'avs' state
-    if ((!o.state || o.state === 'avs') && !coverOnly) {
+    const prevVis = coverOnly ? null : overrideToDisplayVisibility(o);
+
+    // Filter out overrides with no meaningful state or 'avs' state
+    if (!coverOnly && (!prevVis || prevVis === 'avs')) {
       return false;
     }
 
-    const prevVis = o.state || (o.hasConcealment ? 'concealed' : 'observed');
     const prevCover = getExpectedCover(o);
     const curVis = o.currentVisibility || 'observed';
     const curCover = getDisplayCurrentCover(o);
@@ -259,7 +275,7 @@ class OverrideValidationIndicator {
     if (!badge) return;
     const raw = this._rawOverrides || [];
     const movedTokenId = this._data?.movedTokenId || this._currentTokenId || null;
-    const count = raw.filter((o) => this.#shouldShowOverride(o, movedTokenId) && o.state && o.state !== 'avs').length
+    const count = raw.filter((o) => this.#hasDisplayChange(o) && this.#shouldShowOverride(o, movedTokenId)).length
       || this._data?.overrides?.length || 0;
     badge.textContent = count > 0 ? String(count) : '';
   }
@@ -323,7 +339,7 @@ class OverrideValidationIndicator {
           targetId: tokenId,
           observerName: flagData.observerName || observerToken?.name || 'Unknown',
           targetName: token.name,
-          state: flagData.state,
+          state: overrideToDisplayVisibility(flagData),
           hasCover: flagData.hasCover,
           hasConcealment: flagData.hasConcealment,
           expectedCover: flagData.expectedCover,
@@ -343,7 +359,7 @@ class OverrideValidationIndicator {
             targetId: t.id,
             observerName: token.name,
             targetName: t.name,
-            state: fd.state,
+            state: overrideToDisplayVisibility(fd),
             hasCover: fd.hasCover,
             hasConcealment: fd.hasConcealment,
             expectedCover: fd.expectedCover,
@@ -752,8 +768,10 @@ class OverrideValidationIndicator {
     const mkVis = (key) => {
       if (key === 'avs') return '';
       const cfg = VISIBILITY_STATES?.[key];
+      if (!cfg) return '';
       // Filter out 'avs' state from visibility display
-      const label = game?.i18n?.localize?.(cfg.label) || cfg.label || '';
+      const labelKey = getVisibilityStateLabelKey(key, { manual: true });
+      const label = game?.i18n?.localize?.(labelKey) || labelKey || '';
       const cls = cfg.cssClass || `visibility-${key}`;
       return `<i class="${cfg.icon} state-indicator ${cls}" data-kind="visibility" data-state="${key}" data-tooltip="${label}"></i>`;
     };
@@ -794,7 +812,7 @@ class OverrideValidationIndicator {
       // So we should always display them, even if they don't show state changes
       if (!o) return '';
 
-      const prevVis = o.state || (o.hasConcealment ? 'concealed' : 'observed');
+      const prevVis = overrideToDisplayVisibility(o);
       const prevCover = getExpectedCover(o);
       const curVis = o.currentVisibility || 'observed';
       const curCover = getDisplayCurrentCover(o);

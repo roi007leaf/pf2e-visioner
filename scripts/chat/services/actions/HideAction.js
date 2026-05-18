@@ -1,10 +1,49 @@
-import { COVER_STATES, MODULE_ID, VISIBILITY_STATES } from '../../../constants.js';
+import {
+  COVER_STATES,
+  MODULE_ID,
+  VISIBILITY_STATES,
+  getVisibilityStateLabelKey,
+} from '../../../constants.js';
 import autoCoverSystem from '../../../cover/auto-cover/AutoCoverSystem.js';
 import stealthCheckUseCase from '../../../cover/auto-cover/usecases/StealthCheckUseCase.js';
 import { getCoverBetween } from '../../../utils.js';
+import {
+  canAttemptHideOrRemainHidden,
+  legacyVisibilityToProfile,
+} from '../../../visibility/perception-profile.js';
 import { appliedHideChangesByMessage } from '../data/message-cache.js';
 import { calculateStealthRollTotals, shouldFilterAlly } from '../infra/shared-utils.js';
 import { ActionHandlerBase } from './BaseAction.js';
+
+export function evaluateHidePrerequisites(startVisibility, endVisibility, coverState = 'none') {
+  const startQualifies = canAttemptHideOrRemainHidden(
+    legacyVisibilityToProfile(startVisibility, { coverState }),
+  );
+  const endQualifies = canAttemptHideOrRemainHidden(
+    legacyVisibilityToProfile(endVisibility, { coverState }),
+  );
+
+  return {
+    startQualifies,
+    endQualifies,
+    bothQualify: startQualifies && endQualifies,
+    reason: 'Hide prerequisites evaluated',
+  };
+}
+
+export function applyHidePrerequisiteFallback(newVisibility, qualification) {
+  return qualification?.endQualifies ? newVisibility : 'avs';
+}
+
+export function isHideVisibilityChangeActionable(
+  currentVisibility,
+  newVisibility,
+  isOldStateAvsControlled = false,
+) {
+  if (!newVisibility || newVisibility === 'avs') return false;
+  if (currentVisibility == null) return true;
+  return newVisibility !== currentVisibility || !!isOldStateAvsControlled;
+}
 
 export class HideActionHandler extends ActionHandlerBase {
   constructor() {
@@ -167,8 +206,14 @@ export class HideActionHandler extends ActionHandlerBase {
 
       // Create autoCover object if we have a cover state OR if there's an override
       if (coverState || isOverride) {
+        // Feat: Ceaseless Shadows upgrades cover from a creature's perspective
+        try {
+          const { FeatsHandler } = await import('../FeatsHandler.js');
+          const upgraded = FeatsHandler.upgradeCoverForCreature(actionData.actor, coverState);
+          coverState = upgraded.state;
+          var _csCanTakeCover = upgraded.canTakeCover;
+        } catch { }
         const coverConfig = COVER_STATES[coverState || 'none'];
-        const _csCanTakeCover = (coverState === 'standard' || coverState === 'greater') ? true : undefined;
         const actualStealthBonus = coverConfig?.bonusStealth || 0;
         result.autoCover = {
           state: coverState || 'none',
@@ -286,9 +331,7 @@ export class HideActionHandler extends ActionHandlerBase {
       const endVisibility = endSnapshot?.avsVisibility || current;
       const endCoverState = endSnapshot?.coverState || 'none';
       // Hide: you must have cover or concealment now to attempt (observed without either disqualifies unless feats)
-      const startQualifies = (startVisibility === 'hidden' || startVisibility === 'undetected' || startVisibility === 'concealed') || (endCoverState === 'standard' || endCoverState === 'greater');
-      const endQualifies = (endCoverState === 'standard' || endCoverState === 'greater') || endVisibility === 'concealed';
-      let qualification = { startQualifies, endQualifies, bothQualify: startQualifies && endQualifies, reason: 'Hide prerequisites evaluated' };
+      let qualification = evaluateHidePrerequisites(startVisibility, endVisibility, endCoverState);
       try {
         const { FeatsHandler } = await import('../FeatsHandler.js');
         const inNatural = (() => { try { return FeatsHandler.isEnvironmentActive(actionData.actor, 'natural'); } catch { return false; } })();
@@ -327,7 +370,7 @@ export class HideActionHandler extends ActionHandlerBase {
       }
 
       positionQualification = qualification;
-      if (!qualification.bothQualify) newVisibility = 'avs';
+      newVisibility = applyHidePrerequisiteFallback(newVisibility, qualification);
     } catch { /* non-fatal prereq */ }
 
     // Calculate what the visibility change would have been with original outcome
@@ -353,6 +396,15 @@ export class HideActionHandler extends ActionHandlerBase {
         outcome !== originalOutcome ||
         newVisibility !== originalNewVisibility);
 
+    const oldStateAvsControlled = this.isOldStateAvsControlled(
+      {
+        target: subject,
+        currentVisibility: current,
+        oldVisibility: current,
+      },
+      actionData,
+    );
+
     return {
       target: subject,
       dc: adjustedDC,
@@ -368,9 +420,9 @@ export class HideActionHandler extends ActionHandlerBase {
       shouldShowOverride,
       currentVisibility: current,
       oldVisibility: current,
-      oldVisibilityLabel: VISIBILITY_STATES[current]?.label || current,
+      oldVisibilityLabel: getVisibilityStateLabelKey(current, { manual: true }) || current,
       newVisibility,
-      changed: newVisibility !== 'avs' && newVisibility !== current,
+      changed: isHideVisibilityChangeActionable(current, newVisibility, oldStateAvsControlled),
       autoCover: result.autoCover, // Add auto-cover information
       // Add original total for override display
       originalRollTotal: originalTotal,

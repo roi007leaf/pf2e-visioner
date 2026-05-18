@@ -49,7 +49,9 @@ export class VisibilityRegionBehavior extends RegionBehaviorBase {
       visibilityState: new fields.StringField({
         required: true,
         choices: Object.fromEntries(
-          Object.keys(VISIBILITY_STATES).map((k) => [k, `PF2E_VISIONER.VISIBILITY_STATES.${k}`]),
+          Object.entries(VISIBILITY_STATES)
+            .filter(([, config]) => config.manual !== false)
+            .map(([key]) => [key, `PF2E_VISIONER.VISIBILITY_STATES.${key}`]),
         ),
         initial: 'hidden',
         label: 'PF2E_VISIONER.REGION_BEHAVIOR.VISIBILITY_STATE.label',
@@ -73,6 +75,8 @@ export class VisibilityRegionBehavior extends RegionBehaviorBase {
   }
 
   async _handleRegionEvent(event) {
+    if (!game.user?.isGM) return;
+
     const name = event?.name ?? event?.type;
     if (!name) return;
 
@@ -456,6 +460,8 @@ export class VisibilityRegionBehavior extends RegionBehaviorBase {
   }
 
   async _applyVisibilityUpdates(updates) {
+    if (!game.user?.isGM) return;
+
     if (!updates || updates.length === 0) return;
     try {
       const updatesByObserver = new Map();

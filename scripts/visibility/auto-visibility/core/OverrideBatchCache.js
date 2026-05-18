@@ -3,6 +3,18 @@
  * Per-batch memoization of visibility override states for directed pairs (aId -> bId).
  * It consults the provided getActiveOverride function and falls back to legacy flags on the target token.
  */
+import { overrideToDisplayVisibility } from '../../perception-profile.js';
+
+function hasOverrideVisibilityData(override) {
+    return !!(
+        override &&
+        typeof override === 'object' &&
+        (typeof override.state === 'string' ||
+            typeof override.detectionState === 'string' ||
+            typeof override.hasConcealment === 'boolean')
+    );
+}
+
 export class OverrideBatchCache {
     /**
      * @param {{ getActiveOverrideForTokens: (observer: Token, target: Token) => Promise<{ state?: string } | null> | ({ state?: string } | null) }} overrideService
@@ -37,12 +49,12 @@ export class OverrideBatchCache {
         try {
             const res = this._overrideService?.getActiveOverrideForTokens?.(tokenA, tokenB);
             const ov = (typeof res?.then === 'function') ? undefined : res; // avoid awaiting in sync path
-            if (ov && ov.state) state = ov.state;
+            if (hasOverrideVisibilityData(ov)) state = overrideToDisplayVisibility(ov);
             if (state == null) {
                 // Legacy flag fallback on tokenB
                 const overrideFlagKey = `avs-override-from-${aId}`;
                 const flag = tokenB?.document?.getFlag?.('pf2e-visioner', overrideFlagKey);
-                if (flag?.state) state = flag.state;
+                if (hasOverrideVisibilityData(flag)) state = overrideToDisplayVisibility(flag);
             }
         } catch {
             // noop

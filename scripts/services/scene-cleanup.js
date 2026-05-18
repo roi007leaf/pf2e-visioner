@@ -4,7 +4,8 @@
 
 import { MODULE_ID } from '../constants.js';
 import { getCoverMap } from '../stores/cover-map.js';
-import { getVisibilityMap } from '../stores/visibility-map.js';
+import { getPerceptionProfileMap } from '../stores/visibility-map.js';
+import { legacyVisibilityToProfile } from '../visibility/perception-profile.js';
 
 /**
  * Remove references to a deleted token id from all observers' maps.
@@ -32,27 +33,31 @@ export async function cleanupDeletedToken(tokenDoc) {
     const allTokens = canvas.tokens?.placeables || [];
     const updates = [];
 
-    const restoreEntry = { visibilityByObserver: {}, coverByObserver: {} };
+    const restoreEntry = {
+      perceptionProfilesByObserver: {},
+      coverByObserver: {},
+    };
 
     for (const token of allTokens) {
       if (!token?.document?.id) continue; // More robust check
 
       try {
-        const visMap = getVisibilityMap(token);
+        const profileMap = getPerceptionProfileMap(token);
         const covMap = getCoverMap(token);
-        const hadVis = visMap && Object.prototype.hasOwnProperty.call(visMap, tokenDoc.id);
+        const hadProfile =
+          profileMap && Object.prototype.hasOwnProperty.call(profileMap, tokenDoc.id);
         const hadCov = covMap && Object.prototype.hasOwnProperty.call(covMap, tokenDoc.id);
-        if (!hadVis && !hadCov) continue;
+        if (!hadProfile && !hadCov) continue;
 
         const tokenId = token.document.id;
         if (!tokenId) continue; // Extra safety check
 
         const patch = { _id: tokenId };
-        if (hadVis) {
-          restoreEntry.visibilityByObserver[tokenId] = visMap[tokenDoc.id];
-          const newVis = { ...visMap };
-          delete newVis[tokenDoc.id];
-          patch[`flags.${MODULE_ID}.visibility`] = newVis;
+        if (hadProfile) {
+          restoreEntry.perceptionProfilesByObserver[tokenId] = profileMap[tokenDoc.id];
+          const newProfiles = { ...profileMap };
+          delete newProfiles[tokenDoc.id];
+          patch[`flags.${MODULE_ID}.visibilityV2`] = newProfiles;
         }
         if (hadCov) {
           restoreEntry.coverByObserver[tokenId] = covMap[tokenDoc.id];
@@ -105,6 +110,7 @@ export async function restoreDeletedTokenMaps(tokenDoc) {
     const updates = [];
     const observerIds = new Set([
       ...Object.keys(entry.visibilityByObserver || {}),
+      ...Object.keys(entry.perceptionProfilesByObserver || {}),
       ...Object.keys(entry.coverByObserver || {}),
     ]);
 
@@ -113,12 +119,15 @@ export async function restoreDeletedTokenMaps(tokenDoc) {
       if (!token?.document) continue;
       const patch = { _id: obsId };
       const visState = entry.visibilityByObserver?.[obsId];
+      const perceptionProfile = entry.perceptionProfilesByObserver?.[obsId];
       const covState = entry.coverByObserver?.[obsId];
+      const profileToRestore =
+        perceptionProfile ?? (visState !== undefined ? legacyVisibilityToProfile(visState) : undefined);
 
-      if (visState !== undefined) {
-        const current = getVisibilityMap(token);
-        const newVis = { ...current, [tokenDoc.id]: visState };
-        patch[`flags.${MODULE_ID}.visibility`] = newVis;
+      if (profileToRestore !== undefined) {
+        const current = getPerceptionProfileMap(token);
+        const newProfiles = { ...current, [tokenDoc.id]: profileToRestore };
+        patch[`flags.${MODULE_ID}.visibilityV2`] = newProfiles;
       }
       if (covState !== undefined) {
         const current = getCoverMap(token);
