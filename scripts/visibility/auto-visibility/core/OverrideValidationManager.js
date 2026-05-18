@@ -1,4 +1,5 @@
 import { MODULE_ID } from '../../../constants.js';
+import { getLastMovedTokenId } from '../../../services/runtime-state.js';
 import { normalizePerceptionProfile, overrideMatchesVisibility } from '../../perception-profile.js';
 import { FeatsHandler } from '../../../chat/services/FeatsHandler.js';
 import { LastValidationRequest } from '../utils/LastValidationRequest.js';
@@ -267,7 +268,7 @@ export class OverrideValidationManager {
       if (result && result.__showAwareness && Array.isArray(result.overrides)) {
         if (!skipMovedFilter) {
           try {
-            const lastMovedId = globalThis?.game?.pf2eVisioner?.lastMovedTokenId || null;
+            const lastMovedId = getLastMovedTokenId();
             if (lastMovedId && tokenId !== lastMovedId) {
               continue;
             }
@@ -300,7 +301,7 @@ export class OverrideValidationManager {
             '../../../ui/OverrideValidationIndicator.js'
           );
           if (filtered.length > 0) {
-            const movedId = globalThis?.game?.pf2eVisioner?.lastMovedTokenId || tokenId;
+            const movedId = getLastMovedTokenId() || tokenId;
             const moverName = canvas.tokens?.get(movedId)?.document?.name || 'Token';
             indicator.show(filtered, moverName, movedId, { pulse: false });
           } else {
@@ -947,7 +948,7 @@ export class OverrideValidationManager {
   async showOverrideValidationDialog(invalidOverrides, movedTokenId = null) {
     if (invalidOverrides.length === 0) return;
     try {
-      const lastMoved = globalThis?.game?.pf2eVisioner?.lastMovedTokenId || null;
+      const lastMoved = getLastMovedTokenId();
       if (lastMoved && movedTokenId && movedTokenId !== lastMoved) {
         return;
       }
@@ -1004,7 +1005,7 @@ export class OverrideValidationManager {
       },
     );
     let movedTokenName = 'Unknown Token';
-    const lastMoved = globalThis?.game?.pf2eVisioner?.lastMovedTokenId || movedTokenId || null;
+    const lastMoved = getLastMovedTokenId() || movedTokenId || null;
     if (lastMoved) {
       movedTokenName = canvas.tokens?.get(lastMoved)?.document?.name || movedTokenName;
     } else if (invalidOverrides.length > 0) {

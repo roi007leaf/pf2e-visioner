@@ -2,6 +2,25 @@ import '../../setup.js';
 
 import { BatchOrchestrator } from '../../../scripts/visibility/auto-visibility/core/BatchOrchestrator.js';
 import { PositionManager } from '../../../scripts/visibility/auto-visibility/core/PositionManager.js';
+import {
+  discardDetectionBatch,
+  setDetectionMap,
+} from '../../../scripts/stores/detection-map.js';
+
+function emptyBatchResult() {
+  return {
+    updates: [],
+    breakdown: { visGlobalHits: 0, visGlobalMisses: 0, losGlobalHits: 0, losGlobalMisses: 0 },
+    processedTokens: 1,
+    precomputeStats: { observerUsed: 0, observerMiss: 0, targetUsed: 0, targetMiss: 0 },
+  };
+}
+
+async function flushPromises(times = 5) {
+  for (let i = 0; i < times; i++) {
+    await Promise.resolve();
+  }
+}
 
 describe('BatchOrchestrator', () => {
   let orchestrator;
@@ -11,6 +30,8 @@ describe('BatchOrchestrator', () => {
   let applied;
   let visibilityMapService;
   let positionManager;
+  let nowProvider;
+  let nowMs;
 
   beforeEach(() => {
     jest.useRealTimers();
@@ -35,6 +56,16 @@ describe('BatchOrchestrator', () => {
         breakdown: { visGlobalHits: 0, visGlobalMisses: 1, losGlobalHits: 0, losGlobalMisses: 1 },
         processedTokens: 1,
         precomputeStats: { observerUsed: 0, observerMiss: 1, targetUsed: 0, targetMiss: 1 },
+        detailedTimings: {
+          cacheBuilding: 1,
+          lightingPrecompute: 2,
+          mainProcessingLoop: 3,
+          spatialFiltering: 4,
+          losCalculations: 5,
+          visibilityCalculations: 6,
+          cacheOperations: 7,
+          updateCollection: 8,
+        },
       })),
     };
     telemetryReporter = { start: jest.fn(), stop: jest.fn() };
@@ -42,6 +73,11 @@ describe('BatchOrchestrator', () => {
     positionManager = {
       getUpdatedTokenDoc: jest.fn(() => null),
     };
+    nowMs = 0;
+    nowProvider = jest.fn(() => {
+      nowMs += 5;
+      return nowMs;
+    });
     visibilityMapService = {
       setVisibilityBetween: (o, t, v) => applied.push([o?.document?.id, t?.document?.id, v]),
       getVisibilityMap: () => ({}),
@@ -58,6 +94,7 @@ describe('BatchOrchestrator', () => {
       positionManager,
       visibilityMapService,
       moduleId: 'pf2e-visioner',
+      nowProvider,
     });
 
     // seed tokens
@@ -82,6 +119,34 @@ describe('BatchOrchestrator', () => {
     expect(telemetryReporter.start).toHaveBeenCalled();
     expect(telemetryReporter.stop).toHaveBeenCalled();
     expect(applied).toEqual([['A', 'B', 'hidden']]);
+  });
+
+  test('processBatch reports batch timestamps and stage timings', async () => {
+    await orchestrator.processBatch(new Set(['A']));
+
+    expect(telemetryReporter.stop).toHaveBeenCalledWith(
+      expect.objectContaining({
+        batchStartTime: expect.any(Number),
+        batchEndTime: expect.any(Number),
+        timings: expect.objectContaining({
+          tokenPrep: expect.any(Number),
+          lightingPrecompute: expect.any(Number),
+          calcOptionsPrep: expect.any(Number),
+          batchProcessing: expect.any(Number),
+          resultApplication: expect.any(Number),
+          detailedBatchTimings: expect.objectContaining({
+            cacheBuilding: 1,
+            lightingPrecompute: 2,
+            mainProcessingLoop: 3,
+            spatialFiltering: 4,
+            losCalculations: 5,
+            visibilityCalculations: 6,
+            cacheOperations: 7,
+            updateCollection: 8,
+          }),
+        }),
+      }),
+    );
   });
 
   test('processBatch preserves global caches for non-movement batches', async () => {
@@ -165,8 +230,7 @@ describe('BatchOrchestrator', () => {
       });
 
     const firstBatch = orchestrator.processBatch(new Set(['A']));
-    await Promise.resolve();
-    await Promise.resolve();
+    await flushPromises();
 
     expect(batchProcessor.process).toHaveBeenCalledTimes(1);
 
@@ -245,6 +309,96 @@ describe('BatchOrchestrator', () => {
     expect(batchProcessor.process.mock.calls[1][2]).toEqual(
       expect.objectContaining({ skipPrecomputedLOS: true, skipViewportFilter: true }),
     );
+  });
+
+  test('enqueue during a scheduled follow-up batch stays pending for the next follow-up', async () => {
+    jest.useFakeTimers();
+    global.canvas.tokens.placeables.push(createMockToken({ id: 'C', x: 200, y: 0 }));
+    orchestrator._syncEphemeralEffectsForUpdates = jest.fn(async () => {});
+    orchestrator._precomputeLighting = jest.fn(async () => ({
+      precomputedLights: null,
+      precomputeStats: { observerUsed: 0, observerMiss: 0, targetUsed: 0, targetMiss: 0 },
+    }));
+
+    let resolveFirstBatch;
+    let resolveFollowUpBatch;
+    batchProcessor.process
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveFirstBatch = resolve;
+          }),
+      )
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveFollowUpBatch = resolve;
+          }),
+      )
+      .mockResolvedValueOnce(emptyBatchResult());
+
+    const firstBatch = orchestrator.processBatch(new Set(['A']));
+    await Promise.resolve();
+    await Promise.resolve();
+
+    orchestrator.enqueueTokens(new Set(['B']));
+
+    resolveFirstBatch(emptyBatchResult());
+    await firstBatch;
+
+    orchestrator.enqueueTokens(new Set(['C']));
+    await jest.advanceTimersByTimeAsync(0);
+    await flushPromises();
+
+    expect(batchProcessor.process).toHaveBeenCalledTimes(2);
+    expect(Array.from(batchProcessor.process.mock.calls[1][1])).toEqual(['B']);
+    expect(Array.from(orchestrator._pendingTokens)).toEqual(['C']);
+
+    resolveFollowUpBatch(emptyBatchResult());
+    await flushPromises();
+    await jest.advanceTimersByTimeAsync(0);
+    await flushPromises();
+    await jest.advanceTimersByTimeAsync(0);
+    await flushPromises();
+
+    expect(batchProcessor.process).toHaveBeenCalledTimes(3);
+    expect(Array.from(batchProcessor.process.mock.calls[2][1])).toEqual(['C']);
+  });
+
+  test('direct processBatch call during an active batch is queued for a follow-up batch', async () => {
+    jest.useFakeTimers();
+    global.canvas.tokens.placeables.push(createMockToken({ id: 'C', x: 200, y: 0 }));
+    orchestrator._syncEphemeralEffectsForUpdates = jest.fn(async () => {});
+    orchestrator._precomputeLighting = jest.fn(async () => ({
+      precomputedLights: null,
+      precomputeStats: { observerUsed: 0, observerMiss: 0, targetUsed: 0, targetMiss: 0 },
+    }));
+
+    let resolveFirstBatch;
+    batchProcessor.process
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveFirstBatch = resolve;
+          }),
+      )
+      .mockResolvedValueOnce(emptyBatchResult());
+
+    const firstBatch = orchestrator.processBatch(new Set(['A']));
+    await flushPromises();
+
+    await orchestrator.processBatch(new Set(['C']));
+
+    expect(batchProcessor.process).toHaveBeenCalledTimes(1);
+
+    resolveFirstBatch(emptyBatchResult());
+    await firstBatch;
+    await flushPromises();
+    await jest.advanceTimersByTimeAsync(0);
+    await flushPromises();
+
+    expect(batchProcessor.process).toHaveBeenCalledTimes(2);
+    expect(Array.from(batchProcessor.process.mock.calls[1][1])).toEqual(['C']);
   });
 
   test('_applyBatchResults awaits visibility map persistence', async () => {
@@ -335,6 +489,38 @@ describe('BatchOrchestrator', () => {
     await orchestrator.processBatch(new Set(['A']));
 
     expect(global.canvas.perception.update).not.toHaveBeenCalled();
+  });
+
+  test('processBatch closes detection batch mode when result application fails', async () => {
+    const observer = createMockToken({ id: 'detection-observer' });
+    const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+    orchestrator._precomputeLighting = jest.fn(async () => ({
+      precomputedLights: null,
+      precomputeStats: { observerUsed: 0, observerMiss: 0, targetUsed: 0, targetMiss: 0 },
+    }));
+    orchestrator._applyBatchResults = jest.fn(async () => {
+      throw new Error('apply failed');
+    });
+
+    try {
+      await orchestrator.processBatch(new Set(['A']));
+
+      await setDetectionMap(observer, {
+        target: { sense: 'hearing', isPrecise: false },
+      });
+
+      expect(observer.document.update).toHaveBeenCalledWith(
+        {
+          'flags.pf2e-visioner.detection': {
+            target: { sense: 'hearing', isPrecise: false },
+          },
+        },
+        { diff: false, render: false, animate: false },
+      );
+    } finally {
+      discardDetectionBatch();
+      consoleError.mockRestore();
+    }
   });
 
   test('processBatch skips when viewport filtering excludes all changed tokens', async () => {

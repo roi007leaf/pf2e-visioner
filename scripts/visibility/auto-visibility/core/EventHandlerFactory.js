@@ -30,7 +30,7 @@ export class EventHandlerFactory {
             cacheManager
         } = managers;
 
-        const { batchOrchestrator = null } = options;
+        const { batchOrchestrator = null, invalidationCoordinator = null } = options;
 
         // Define handler configurations
         const handlerConfigs = [
@@ -45,43 +45,72 @@ export class EventHandlerFactory {
                     overrideValidationManager,
                     positionManager,
                     cacheManager,
-                    batchOrchestrator
+                    batchOrchestrator,
+                    invalidationCoordinator
                 ]
             },
             {
                 name: 'templateEventHandler',
                 Handler: TemplateEventHandler,
-                deps: [systemStateProvider, visibilityStateManager]
+                deps: [systemStateProvider, visibilityStateManager, invalidationCoordinator]
             },
             {
                 name: 'lightingEventHandler',
                 Handler: LightingEventHandler,
-                deps: [systemStateProvider, visibilityStateManager, cacheManager]
+                deps: [systemStateProvider, visibilityStateManager, cacheManager, invalidationCoordinator]
             },
             {
                 name: 'wallEventHandler',
                 Handler: WallEventHandler,
-                deps: [systemStateProvider, visibilityStateManager, cacheManager, batchOrchestrator]
+                deps: [
+                    systemStateProvider,
+                    visibilityStateManager,
+                    cacheManager,
+                    batchOrchestrator,
+                    invalidationCoordinator
+                ]
             },
             {
                 name: 'actorEventHandler',
                 Handler: ActorEventHandler,
-                deps: [systemStateProvider, visibilityStateManager, exclusionManager]
+                deps: [
+                    systemStateProvider,
+                    visibilityStateManager,
+                    exclusionManager,
+                    invalidationCoordinator
+                ]
             },
             {
                 name: 'itemEventHandler',
                 Handler: ItemEventHandler,
-                deps: [systemStateProvider, visibilityStateManager, exclusionManager, cacheManager]
+                deps: [
+                    systemStateProvider,
+                    visibilityStateManager,
+                    exclusionManager,
+                    cacheManager,
+                    invalidationCoordinator
+                ]
             },
             {
                 name: 'effectEventHandler',
                 Handler: EffectEventHandler,
-                deps: [systemStateProvider, visibilityStateManager, exclusionManager, cacheManager]
+                deps: [
+                    systemStateProvider,
+                    visibilityStateManager,
+                    exclusionManager,
+                    cacheManager,
+                    invalidationCoordinator
+                ]
             },
             {
                 name: 'sceneEventHandler',
                 Handler: SceneEventHandler,
-                deps: [systemStateProvider, visibilityStateManager, cacheManager]
+                deps: [
+                    systemStateProvider,
+                    visibilityStateManager,
+                    cacheManager,
+                    invalidationCoordinator
+                ]
             }
         ];
 

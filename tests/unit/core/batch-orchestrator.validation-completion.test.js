@@ -11,24 +11,15 @@ describe('BatchOrchestrator - validation completion', () => {
         path = require('path');
     });
 
-    it('should not use Promise.race for validation timeout', async () => {
-        const batchOrchestratorPath = path.resolve(
-            'scripts/visibility/auto-visibility/core/BatchOrchestrator.js',
+    it('should not use Promise.race for validation timeout', () => {
+        const batchOverrideValidationWorkflowPath = path.resolve(
+            'scripts/visibility/auto-visibility/core/BatchOverrideValidationWorkflow.js',
         );
-        const content = fs.readFileSync(batchOrchestratorPath, 'utf8');
+        const content = fs.readFileSync(batchOverrideValidationWorkflowPath, 'utf8');
 
-        const overrideValidationSection = content.match(
-            /\/\/\s*Queue and process override validation[\s\S]*?catch\s*\([^)]*\)\s*\{[\s\S]*?\}/
-        );
-
-        expect(overrideValidationSection).toBeTruthy();
-
-        const sectionText = overrideValidationSection[0];
-
-        expect(sectionText).not.toContain('Promise.race');
-        expect(sectionText).not.toContain('timeoutPromise');
-
-        expect(sectionText).toContain('await this.overrideValidationManager.processQueuedValidations()');
+        expect(content).not.toContain('Promise.race');
+        expect(content).not.toContain('timeoutPromise');
+        expect(content).toContain('await this.#overrideValidationManager.processQueuedValidations()');
     });
 
     it('should directly await processQueuedValidations without racing', () => {

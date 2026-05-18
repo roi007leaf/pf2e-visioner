@@ -1027,6 +1027,8 @@ export class SneakPreviewDialog extends BaseActionDialog {
     // Individual defer buttons
     const deferButtons = this.element.querySelectorAll('[data-action="toggleDefer"]');
     deferButtons.forEach((button) => {
+      if (button.dataset.sneakDeferBound === 'true') return;
+      button.dataset.sneakDeferBound = 'true';
       button.addEventListener('click', (event) => {
         event.preventDefault();
         event.stopPropagation();
@@ -1110,7 +1112,8 @@ export class SneakPreviewDialog extends BaseActionDialog {
 
     // Bulk defer button
     const bulkDeferButton = this.element.querySelector('[data-action="bulkDefer"]');
-    if (bulkDeferButton) {
+    if (bulkDeferButton && bulkDeferButton.dataset.sneakBulkDeferBound !== 'true') {
+      bulkDeferButton.dataset.sneakBulkDeferBound = 'true';
       bulkDeferButton.addEventListener('click', (event) => {
         event.preventDefault();
         event.stopPropagation();
@@ -1120,7 +1123,8 @@ export class SneakPreviewDialog extends BaseActionDialog {
 
     // Bulk undefer button
     const bulkUndeferButton = this.element.querySelector('[data-action="bulkUndefer"]');
-    if (bulkUndeferButton) {
+    if (bulkUndeferButton && bulkUndeferButton.dataset.sneakBulkUndeferBound !== 'true') {
+      bulkUndeferButton.dataset.sneakBulkUndeferBound = 'true';
       bulkUndeferButton.addEventListener('click', (event) => {
         event.preventDefault();
         event.stopPropagation();
@@ -2739,7 +2743,7 @@ export class SneakPreviewDialog extends BaseActionDialog {
    * @param {Object} outcome - Updated outcome object
    */
   async _updateOutcomeDisplayForToken(tokenId, outcome) {
-    const row = document.querySelector(`tr[data-token-id="${tokenId}"]`);
+    const row = this.element?.querySelector?.(`tr[data-token-id="${tokenId}"]`);
     if (!row) {
       return;
     }

@@ -5,6 +5,7 @@
 
 import { COVER_STATES, VISIBILITY_STATES } from '../constants.js';
 import { loadDialogCSS, loadSharedUICSS } from '../css-loader.js';
+import { getLastMovedTokenId } from '../services/runtime-state.js';
 import { overrideToDisplayVisibility } from '../visibility/perception-profile.js';
 
 function getVisibilityStateLabelKey(state, { manual = false } = {}) {
@@ -266,7 +267,7 @@ export class OverrideValidationDialog extends foundry.applications.api.Handlebar
     const observerOrientedOverrides = [];
     const targetOrientedOverrides = [];
     let unifiedOverrides = [];
-    let refTokenId = this.movedTokenId || game?.pf2eVisioner?.lastMovedTokenId || null;
+    let refTokenId = this.movedTokenId || getLastMovedTokenId();
 
     // In turn change mode, deduplicate and use unified view
     if (this.isTurnChange) {
@@ -483,7 +484,7 @@ export class OverrideValidationDialog extends foundry.applications.api.Handlebar
 
   async _onAcceptByGroup(group) {
     try {
-      const moved = game?.pf2eVisioner?.lastMovedTokenId || null;
+      const moved = getLastMovedTokenId();
       if (!moved) return this._onAcceptAll();
       const toRemove = this.invalidOverrides.filter(o => group === 'observer' ? o.observerId === moved : o.targetId === moved);
       for (const override of toRemove) {

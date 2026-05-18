@@ -1,4 +1,53 @@
 
+export function getVisibilityBatchProcessDecision({
+  processingBatch = false,
+  changedTokenCount = 0,
+  hasBatchProcessor = false,
+  systemStateProvider = null,
+} = {}) {
+  if (processingBatch) {
+    return { shouldProcess: false, shouldClearChanges: false, reason: 'already-processing' };
+  }
+
+  if (changedTokenCount === 0) {
+    return { shouldProcess: false, shouldClearChanges: false, reason: 'no-changes' };
+  }
+
+  if (!hasBatchProcessor) {
+    return { shouldProcess: false, shouldClearChanges: false, reason: 'missing-batch-processor' };
+  }
+
+  if (
+    systemStateProvider &&
+    typeof systemStateProvider.isEnabled === 'function' &&
+    !systemStateProvider.isEnabled()
+  ) {
+    return { shouldProcess: false, shouldClearChanges: true, reason: 'avs-disabled' };
+  }
+
+  if (
+    systemStateProvider &&
+    typeof systemStateProvider.shouldProcessEvents === 'function' &&
+    !systemStateProvider.shouldProcessEvents()
+  ) {
+    return { shouldProcess: false, shouldClearChanges: true, reason: 'events-paused' };
+  }
+
+  return { shouldProcess: true, shouldClearChanges: false, reason: 'ready' };
+}
+
+export function getEligibleVisibilityTokenIds(tokens = [], exclusionManager = null) {
+  const tokenIds = [];
+
+  tokens.forEach((token) => {
+    if (token.actor && (!exclusionManager || !exclusionManager.isExcludedToken(token))) {
+      tokenIds.push(token.document.id);
+    }
+  });
+
+  return tokenIds;
+}
+
 /**
  * VisibilityStateManager - Manages token visibility state changes and batch processing
  *
@@ -36,11 +85,17 @@ export class VisibilityStateManager {
   /** @type {import('./SystemStateProvider.js').SystemStateProvider} - System state provider for AVS enabled checks */
   #systemStateProvider = null;
 
+  /** @type {Function} - Lazily captures stack details for debug logging */
+  #debugStackFactory = () => new Error().stack;
+
   constructor(dependencies = {}) {
     this.#batchProcessor = dependencies.batchProcessor;
     this.#spatialAnalyzer = dependencies.spatialAnalyzer;
     this.#exclusionManager = dependencies.exclusionManager;
     this.#systemStateProvider = dependencies.systemStateProvider;
+    if (typeof dependencies.debugStackFactory === 'function') {
+      this.#debugStackFactory = dependencies.debugStackFactory;
+    }
   }
 
   /**
@@ -72,13 +127,9 @@ export class VisibilityStateManager {
    * @param {string} tokenId - ID of the token to mark as changed
    */
   markTokenChangedImmediate(tokenId) {
-    const stack = new Error().stack;
-    const caller = stack?.split('\n')?.[2]?.trim() || 'unknown';
-    this.#systemStateProvider?.debug?.('VSM:markTokenChangedImmediate', {
+    this.#debugWithStack('VSM:markTokenChangedImmediate', () => ({
       tokenId,
-      caller,
-      stack: stack?.split('\n').slice(1, 4).join('\n'),
-    });
+    }));
     this.#changedTokens.add(tokenId);
 
     // Execute immediately (not scheduled) to avoid browser throttling when window is minimized
@@ -93,15 +144,11 @@ export class VisibilityStateManager {
    * @param {Object} [changes] - Changes being made to the token (optional)
    */
   markTokenChangedWithSpatialOptimization(tokenDoc, changes) {
-    const stack = new Error().stack;
-    const caller = stack?.split('\n')?.[2]?.trim() || 'unknown';
-    this.#systemStateProvider?.debug?.('VSM:markTokenChangedWithSpatialOptimization', {
+    this.#debugWithStack('VSM:markTokenChangedWithSpatialOptimization', () => ({
       tokenId: tokenDoc?.id,
       tokenName: tokenDoc?.name,
       changes,
-      caller,
-      stack: stack?.split('\n').slice(1, 4).join('\n'),
-    });
+    }));
     // Handle the case where no parameters are provided (just trigger optimization)
     if (!tokenDoc) {
       this.markAllTokensChangedImmediate();
@@ -152,21 +199,15 @@ export class VisibilityStateManager {
    * Mark all eligible tokens as needing recalculation (immediate processing)
    */
   markAllTokensChangedImmediate() {
-    const stack = new Error().stack;
-    const caller = stack?.split('\n')?.[2]?.trim() || 'unknown';
     const tokenCount = canvas.tokens?.placeables?.length || 0;
-    this.#systemStateProvider?.debug?.('VSM:markAllTokensChangedImmediate', {
+    this.#debugWithStack('VSM:markAllTokensChangedImmediate', () => ({
       tokenCount,
-      caller,
-      stack: stack?.split('\n').slice(1, 4).join('\n'),
-    });
+    }));
     const tokens = canvas.tokens?.placeables || [];
     const exclusionManager = this.#exclusionManager?.();
 
-    tokens.forEach((token) => {
-      if (token.actor && (!exclusionManager || !exclusionManager.isExcludedToken(token))) {
-        this.#changedTokens.add(token.document.id);
-      }
+    getEligibleVisibilityTokenIds(tokens, exclusionManager).forEach((tokenId) => {
+      this.#changedTokens.add(tokenId);
     });
 
     // Process SYNCHRONOUSLY to avoid browser throttling when window is minimized
@@ -181,12 +222,7 @@ export class VisibilityStateManager {
    * Debounces rapid-fire events that would cause constant full recalculations
    */
   markAllTokensChangedThrottled() {
-    const stack = new Error().stack;
-    const caller = stack?.split('\n')?.[2]?.trim() || 'unknown';
-    this.#systemStateProvider?.debug?.('VSM:markAllTokensChangedThrottled', {
-      caller,
-      stack: stack?.split('\n').slice(1, 4).join('\n'),
-    });
+    this.#debugWithStack('VSM:markAllTokensChangedThrottled');
     // If already pending, just extend the timeout
     if (this.#pendingFullRecalc) {
       if (this.#fullRecalcTimeout) {
@@ -211,44 +247,57 @@ export class VisibilityStateManager {
     this.#systemStateProvider?.debug?.('VSM:processBatch:start', {
       changedCount: this.#changedTokens.size,
     });
-    if (this.#processingBatch || this.#changedTokens.size === 0 || !this.#batchProcessor) {
-      return;
-    }
 
-    // Critical check: Don't process batches when AVS is disabled
-    if (
-      this.#systemStateProvider &&
-      typeof this.#systemStateProvider.isEnabled === 'function' &&
-      !this.#systemStateProvider.isEnabled()
-    ) {
-      // AVS is disabled - clear any pending changes and don't process
-      this.#changedTokens.clear();
-      return;
-    }
+    const decision = getVisibilityBatchProcessDecision({
+      processingBatch: this.#processingBatch,
+      changedTokenCount: this.#changedTokens.size,
+      hasBatchProcessor: !!this.#batchProcessor,
+      systemStateProvider: this.#systemStateProvider,
+    });
 
-    // Critical check: Don't process batches when AVS is combat-only and not in combat
-    if (this.#systemStateProvider && typeof this.#systemStateProvider.shouldProcessEvents === 'function') {
-      if (!this.#systemStateProvider.shouldProcessEvents()) {
+    if (!decision.shouldProcess) {
+      if (decision.shouldClearChanges) {
         this.#changedTokens.clear();
-        return;
       }
+      return;
     }
 
     this.#processingBatch = true;
-    const tokenCount = this.#changedTokens.size;
+    const tokensForBatch = new Set(this.#changedTokens);
+    this.#changedTokens.clear();
+    const tokenCount = tokensForBatch.size;
+    let batchSucceeded = false;
 
     Hooks.callAll('pf2e-visioner.batchStart', { tokenCount });
 
     try {
-      await this.#batchProcessor(this.#changedTokens);
-      this.#changedTokens.clear();
+      await this.#batchProcessor(tokensForBatch);
+      batchSucceeded = true;
     } catch (error) {
+      tokensForBatch.forEach((tokenId) => this.#changedTokens.add(tokenId));
       console.error('PF2E Visioner | Batch processing failed:', error);
     } finally {
       this.#processingBatch = false;
       this.#systemStateProvider?.debug?.('VSM:processBatch:complete');
       Hooks.callAll('pf2e-visioner.batchComplete', { tokenCount });
+      if (batchSucceeded && this.#changedTokens.size > 0) {
+        this.#processBatch();
+      }
     }
+  }
+
+  #debugWithStack(message, getData = () => ({})) {
+    const provider = this.#systemStateProvider;
+    if (!provider?.debug) return;
+    if (typeof provider.isDebugMode === 'function' && !provider.isDebugMode()) return;
+
+    const stack = this.#debugStackFactory?.();
+    const caller = stack?.split('\n')?.[1]?.trim() || 'unknown';
+    provider.debug(message, {
+      ...getData(),
+      caller,
+      stack: stack?.split('\n').slice(1, 4).map((line) => line.trim()).join('\n'),
+    });
   }
 
   /**
@@ -311,14 +360,10 @@ export class VisibilityStateManager {
    * @param {string[]} tokenIds - Array of token IDs to recalculate
    */
   recalculateForTokens(tokenIds) {
-    const stack = new Error().stack;
-    const caller = stack?.split('\n')?.[2]?.trim() || 'unknown';
-    this.#systemStateProvider?.debug?.('VSM:recalculateForTokens', {
+    this.#debugWithStack('VSM:recalculateForTokens', () => ({
       tokenIds: Array.from(tokenIds),
       count: tokenIds?.length,
-      caller,
-      stack: stack?.split('\n').slice(1, 4).join('\n'),
-    });
+    }));
     // Add all specified tokens to the changed set
     tokenIds.forEach((id) => this.#changedTokens.add(id));
 

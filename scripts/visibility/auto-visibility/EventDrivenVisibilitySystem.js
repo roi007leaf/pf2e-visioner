@@ -7,6 +7,7 @@
 import { MODULE_ID } from '../../constants.js';
 import { getLogger } from '../../utils/logger.js';
 import { profileToLegacyVisibility } from '../perception-profile.js';
+import { AvsInvalidationCoordinator } from './core/AvsInvalidationCoordinator.js';
 import { BatchOrchestrator } from './core/BatchOrchestrator.js';
 import { BatchProcessor } from './core/BatchProcessor.js';
 import { DependencyInjectionContainer } from './core/DependencyInjectionContainer.js';
@@ -71,6 +72,9 @@ export class EventDrivenVisibilitySystem {
   /** @type {VisibilityStateManager} - Manages visibility state changes and batch operations */
   #visibilityStateManager = null;
 
+  /** @type {AvsInvalidationCoordinator} - Coordinates cross-handler AVS invalidation policy */
+  #invalidationCoordinator = null;
+
   /** @type {CacheManagementService} */
   #cacheManagementService = null;
 
@@ -85,6 +89,10 @@ export class EventDrivenVisibilitySystem {
 
   /** @type {import('./core/OverrideValidationManager.js').OverrideValidationManager} */
   overrideValidationManager = null;
+
+  #initialized = false;
+
+  #initializePromise = null;
 
   constructor() {
     if (EventDrivenVisibilitySystem.#instance) {
@@ -104,6 +112,23 @@ export class EventDrivenVisibilitySystem {
    * Initialize the system using dependency injection - cleaner architecture
    */
   async initialize() {
+    if (this.#initialized) {
+      return this;
+    }
+
+    if (this.#initializePromise) {
+      return this.#initializePromise;
+    }
+
+    this.#initializePromise = this.#runInitialization().catch((error) => {
+      this.#initializePromise = null;
+      throw error;
+    });
+
+    return this.#initializePromise;
+  }
+
+  async #runInitialization() {
     const log = getLogger('AVS/Init');
     log.debug('initialize:start');
 
@@ -164,6 +189,16 @@ export class EventDrivenVisibilitySystem {
         systemStateProvider: this.#systemStateProvider
       });
 
+      this.#invalidationCoordinator = new AvsInvalidationCoordinator({
+        systemStateProvider: this.#systemStateProvider,
+        visibilityStateManager: this.#visibilityStateManager,
+        cacheManager: this.#cacheManagementService,
+        batchOrchestrator: this.#batchOrchestrator,
+        visionAnalyzer: coreServices.visionAnalyzer,
+        spatialAnalyzer: coreServices.spatialAnalysisService,
+        overrideValidationManager: coreServices.overrideValidationManager,
+      });
+
       // Initialize all event handlers using EventHandlerFactory
       // Handlers register themselves automatically and don't need to be stored
       await EventHandlerFactory.createHandlers(
@@ -176,7 +211,10 @@ export class EventDrivenVisibilitySystem {
           positionManager: coreServices.positionManager,
           cacheManager: this.#cacheManagementService
         },
-        { batchOrchestrator: this.#batchOrchestrator }
+        {
+          batchOrchestrator: this.#batchOrchestrator,
+          invalidationCoordinator: this.#invalidationCoordinator
+        }
       );
 
       // Initialize the optimized visibility calculator with the core components
@@ -201,6 +239,9 @@ export class EventDrivenVisibilitySystem {
     } catch {
       /* best-effort */
     }
+
+    this.#initialized = true;
+    return this;
   }
 
   /**

@@ -85,26 +85,30 @@ export async function extractActionData(message) {
     context?.type === 'damage-taken' || message.flags?.pf2e?.appliedDamage;
 
   let actorToken = null;
-  if (message.token?.object) {
-    actorToken = message.token.object;
-  } else if (message.speaker?.token && canvas?.tokens?.get) {
-    actorToken = canvas.tokens.get(message.speaker.token);
-  }
-  if (!actorToken && message.speaker?.actor) {
-    try {
-      const speakerActor = game.actors?.get?.(message.speaker.actor);
-      const activeTokens = speakerActor?.getActiveTokens?.(true, true) || [];
-      actorToken = activeTokens[0] || null;
-    } catch (_) { }
-  }
-  if (!actorToken && origin?.uuid && typeof fromUuidSync === 'function') {
-    try {
-      const originDoc = fromUuidSync(origin.uuid);
-      const originActor = originDoc?.actor ?? originDoc?.parent?.actor ?? null;
-      const activeTokens = originActor?.getActiveTokens?.(true, true) || [];
-      actorToken = activeTokens[0] || null;
-    } catch (_) { }
-  }
+  const resolveActorToken = () => {
+    if (actorToken) return actorToken;
+    if (message.token?.object) {
+      actorToken = message.token.object;
+    } else if (message.speaker?.token && canvas?.tokens?.get) {
+      actorToken = canvas.tokens.get(message.speaker.token);
+    }
+    if (!actorToken && message.speaker?.actor) {
+      try {
+        const speakerActor = game.actors?.get?.(message.speaker.actor);
+        const activeTokens = speakerActor?.getActiveTokens?.(true, true) || [];
+        actorToken = activeTokens[0] || null;
+      } catch (_) { }
+    }
+    if (!actorToken && origin?.uuid && typeof fromUuidSync === 'function') {
+      try {
+        const originDoc = fromUuidSync(origin.uuid);
+        const originActor = originDoc?.actor ?? originDoc?.parent?.actor ?? null;
+        const activeTokens = originActor?.getActiveTokens?.(true, true) || [];
+        actorToken = activeTokens[0] || null;
+      } catch (_) { }
+    }
+    return actorToken;
+  };
 
   // Debug logging for action type detection
 
@@ -117,6 +121,7 @@ export async function extractActionData(message) {
   else if (isCreateADiversionAction) actionType = 'create-a-diversion';
   else if (isTakeCoverAction) actionType = 'take-cover';
   else if (isAttackRoll && !isDamageTakenMessage) {
+    actorToken = resolveActorToken();
     const flags = actorToken?.document?.flags?.['pf2e-visioner'] || {};
     const hasHiddenOverride = Object.entries(flags).some(([k, v]) =>
       k.startsWith('avs-override-from-') &&
@@ -125,6 +130,7 @@ export async function extractActionData(message) {
   }
 
   if (!actionType) return null;
+  actorToken = resolveActorToken();
 
   // Build common action data object
   const data = {

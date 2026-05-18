@@ -1,0 +1,241 @@
+import '../../setup.js';
+
+import * as itemUpdateRefresh from '../../../scripts/rule-elements/item-update-refresh.js';
+
+const {
+  buildRuleElementRegistryValues,
+  refreshVisionerRuleElementItem,
+  scheduleVisionerRuleElementItemRefresh,
+} = itemUpdateRefresh;
+
+function makeToken(id, actorId = 'actor-1', registry = {}) {
+  return {
+    id,
+    actor: { id: actorId },
+    document: {
+      id,
+      getFlag: jest.fn((moduleId, key) => {
+        if (moduleId === 'pf2e-visioner' && key === 'ruleElementRegistry') return registry;
+        return undefined;
+      }),
+      update: jest.fn().mockResolvedValue(undefined),
+      setFlag: jest.fn().mockResolvedValue(undefined),
+    },
+  };
+}
+
+function makeItem({ id = 'item-1', actorId = 'actor-1', operations = [], rules = null } = {}) {
+  return {
+    id,
+    parent: { id: actorId },
+    system: {
+      rules:
+        rules ??
+        [
+          {
+            key: 'PF2eVisionerEffect',
+            slug: 'effect',
+            operations,
+          },
+        ],
+    },
+  };
+}
+
+function makeOperationClasses() {
+  return {
+    VisibilityOverride: {
+      removeVisibilityOverride: jest.fn().mockResolvedValue(undefined),
+      applyVisibilityOverride: jest.fn().mockResolvedValue(undefined),
+    },
+    DistanceBasedVisibility: {
+      removeDistanceBasedVisibility: jest.fn().mockResolvedValue(undefined),
+      applyDistanceBasedVisibility: jest.fn().mockResolvedValue(undefined),
+    },
+    CoverOverride: {
+      removeCoverOverride: jest.fn().mockResolvedValue(undefined),
+      removeProvideCover: jest.fn().mockResolvedValue(undefined),
+    },
+    SenseModifier: {
+      restoreSenses: jest.fn().mockResolvedValue(undefined),
+      applySenseModifications: jest.fn().mockResolvedValue(undefined),
+    },
+    LightingModifier: {
+      removeLightingModification: jest.fn().mockResolvedValue(undefined),
+      applyLightingModification: jest.fn().mockResolvedValue(undefined),
+    },
+    OffGuardSuppression: {
+      removeOffGuardSuppression: jest.fn().mockResolvedValue(undefined),
+      applyOffGuardSuppression: jest.fn().mockResolvedValue(undefined),
+    },
+    AuraVisibility: {
+      removeAuraVisibility: jest.fn().mockResolvedValue(undefined),
+      applyAuraVisibility: jest.fn().mockResolvedValue(undefined),
+    },
+    ShareVision: {
+      removeShareVision: jest.fn().mockResolvedValue(undefined),
+      applyShareVision: jest.fn().mockResolvedValue(undefined),
+    },
+  };
+}
+
+describe('rule-element item update refresh', () => {
+  test('handles updateItem hooks by scheduling rule-element refreshes', () => {
+    const item = makeItem({ operations: [{ type: 'overrideVisibility' }] });
+    const changes = { system: { rules: [] } };
+    const scheduleVisionerRuleElementItemRefresh = jest.fn(() => true);
+    const warn = jest.fn();
+
+    const result = itemUpdateRefresh.handleVisionerRuleElementItemUpdate(item, changes, {}, 'gm-1', {
+      scheduleVisionerRuleElementItemRefresh,
+      warn,
+    });
+
+    expect(result).toEqual({ scheduled: true });
+    expect(scheduleVisionerRuleElementItemRefresh).toHaveBeenCalledWith(item, changes, {
+      warn,
+    });
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  test('contains updateItem hook failures inside the rule-element module', () => {
+    const item = makeItem({ operations: [{ type: 'overrideVisibility' }] });
+    const error = new Error('scheduler failed');
+    const scheduleVisionerRuleElementItemRefresh = jest.fn(() => {
+      throw error;
+    });
+    const warn = jest.fn();
+
+    const result = itemUpdateRefresh.handleVisionerRuleElementItemUpdate(item, {}, {}, 'gm-1', {
+      scheduleVisionerRuleElementItemRefresh,
+      warn,
+    });
+
+    expect(result).toEqual({ scheduled: false, reason: 'error' });
+    expect(warn).toHaveBeenCalledWith(
+      'PF2E Visioner | Failed to handle item update for rule elements:',
+      error,
+    );
+  });
+
+  test('maps operations back into rule-element registry flag names', () => {
+    expect(
+      buildRuleElementRegistryValues([
+        { type: 'distanceBasedVisibility' },
+        { type: 'overrideVisibility' },
+        { type: 'modifySenses' },
+        { type: 'modifyLighting', source: 'torch' },
+        { type: 'modifyLighting' },
+        { type: 'offGuardSuppression' },
+        { type: 'auraVisibility' },
+        { type: 'shareVision' },
+        { type: 'unsupported' },
+      ]),
+    ).toEqual([
+      'distanceBasedVisibility',
+      'visibilityReplacement',
+      'originalSenses',
+      'lightingModification.torch',
+      'lightingModification.lighting',
+      'offGuardSuppression',
+      'auraVisibility',
+      'visionSharing',
+    ]);
+  });
+
+  test('schedules relevant item updates after PF2e has processed the rules', async () => {
+    const token = makeToken('token-1');
+    const item = makeItem({ operations: [{ type: 'overrideVisibility' }] });
+    let scheduledCallback;
+    const refreshVisionerRuleElementItem = jest.fn().mockResolvedValue(undefined);
+    const scheduler = jest.fn((callback, delayMs) => {
+      scheduledCallback = callback;
+      return 123;
+    });
+
+    const scheduled = scheduleVisionerRuleElementItemRefresh(item, { system: { rules: [] } }, {
+      isGM: () => true,
+      getTokensForActor: () => [token],
+      refreshVisionerRuleElementItem,
+      scheduler,
+    });
+
+    expect(scheduled).toBe(true);
+    expect(scheduler).toHaveBeenCalledWith(expect.any(Function), 500);
+
+    await scheduledCallback();
+
+    expect(refreshVisionerRuleElementItem).toHaveBeenCalledWith(item, [token], expect.any(Object));
+  });
+
+  test('does not schedule irrelevant item updates', () => {
+    const scheduler = jest.fn();
+    const item = makeItem({ operations: [{ type: 'overrideVisibility' }] });
+
+    expect(
+      scheduleVisionerRuleElementItemRefresh(item, { system: { name: 'New' } }, {
+        isGM: () => true,
+        getTokensForActor: () => [makeToken('token-1')],
+        scheduler,
+      }),
+    ).toBe(false);
+
+    expect(scheduler).not.toHaveBeenCalled();
+  });
+
+  test('removes old operations, clears registry flags, reapplies current operations, and refreshes AVS once', async () => {
+    const operations = [
+      { type: 'overrideVisibility' },
+      { type: 'modifySenses', senseModifications: [{ sense: 'darkvision' }], predicate: ['self'] },
+      { type: 'modifyLighting', source: 'torch' },
+      { type: 'provideCover' },
+    ];
+    const item = makeItem({ operations });
+    const token = makeToken('token-1', 'actor-1', {
+      'item-item-1': ['visibilityReplacement', 'oldFlag'],
+    });
+    const operationClasses = makeOperationClasses();
+    const loadOperationClass = jest.fn(async (className) => operationClasses[className]);
+    const recalculateTokenIds = jest.fn().mockResolvedValue(undefined);
+
+    await refreshVisionerRuleElementItem(item, [token], {
+      loadOperationClass,
+      recalculateTokenIds,
+      warn: jest.fn(),
+    });
+
+    expect(operationClasses.VisibilityOverride.removeVisibilityOverride).toHaveBeenCalledWith(
+      { type: 'overrideVisibility', source: 'item-1-effect' },
+      token,
+      'item-1-effect',
+    );
+    expect(operationClasses.CoverOverride.removeProvideCover).toHaveBeenCalledWith(token);
+    expect(token.document.update).toHaveBeenCalledWith({
+      'flags.pf2e-visioner.visibilityReplacement': null,
+      'flags.pf2e-visioner.oldFlag': null,
+    });
+    expect(operationClasses.VisibilityOverride.applyVisibilityOverride).toHaveBeenCalledWith(
+      { type: 'overrideVisibility', source: 'item-1-effect' },
+      token,
+    );
+    expect(operationClasses.SenseModifier.applySenseModifications).toHaveBeenCalledWith(
+      token,
+      [{ sense: 'darkvision' }],
+      'item-1-effect',
+      ['self'],
+    );
+    expect(operationClasses.LightingModifier.applyLightingModification).toHaveBeenCalledWith(
+      { type: 'modifyLighting', source: 'torch' },
+      token,
+    );
+    expect(token.document.setFlag).toHaveBeenCalledWith('pf2e-visioner', 'ruleElementRegistry', {
+      'item-item-1': ['visibilityReplacement', 'originalSenses', 'lightingModification.torch'],
+    });
+    expect(recalculateTokenIds).toHaveBeenCalledWith(['token-1']);
+    expect(
+      operationClasses.VisibilityOverride.removeVisibilityOverride.mock.invocationCallOrder[0],
+    ).toBeLessThan(
+      operationClasses.VisibilityOverride.applyVisibilityOverride.mock.invocationCallOrder[0],
+    );
+  });
+});

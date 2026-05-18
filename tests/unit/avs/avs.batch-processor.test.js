@@ -1,11 +1,159 @@
 import '../../setup.js';
 
-import { BatchProcessor } from '../../../scripts/visibility/auto-visibility/core/BatchProcessor.js';
+import {
+  BatchProcessor,
+  buildTokenPositionCacheKey,
+  buildTokenSensesCacheKey,
+} from '../../../scripts/visibility/auto-visibility/core/BatchProcessor.js';
 import { GlobalLosCache } from '../../../scripts/visibility/auto-visibility/utils/GlobalLosCache.js';
 import { GlobalVisibilityCache } from '../../../scripts/visibility/auto-visibility/utils/GlobalVisibilityCache.js';
 
 const makeToken = (id, x, y) =>
   createMockToken({ id, x, y, width: 1, height: 1, actor: createMockActor() });
+
+describe('buildTokenPositionCacheKey', () => {
+  let previousCanvas;
+
+  const makePositionToken = (id, x, y, options = {}) => ({
+    document: {
+      id,
+      x,
+      y,
+      elevation: options.elevation ?? 0,
+      width: options.width ?? 1,
+      height: options.height ?? 1,
+    },
+  });
+
+  beforeEach(() => {
+    previousCanvas = global.canvas;
+    global.canvas = {
+      ...(previousCanvas || {}),
+      scene: { ...(previousCanvas?.scene || {}), id: 'scene-1' },
+    };
+  });
+
+  afterEach(() => {
+    global.canvas = previousCanvas;
+  });
+
+  test('builds a stable sorted key with scene, count, position, size, and elevation', () => {
+    const tokenB = makePositionToken('B', 100, 200, { elevation: 5, width: 2, height: 3 });
+    const tokenA = makePositionToken('A', 0, 50);
+    const positionManager = {
+      getTokenPosition: jest.fn((token) => ({
+        x: token.document.x,
+        y: token.document.y,
+        elevation: token.document.elevation,
+      })),
+    };
+
+    expect(buildTokenPositionCacheKey([tokenB, tokenA], null, positionManager)).toBe(
+      'scene:scene-1|count:2|A@0,50,0,1,1|B@100,200,5,2,3',
+    );
+  });
+
+  test('normalizes equivalent numeric values without rounding real movement', () => {
+    const token = makePositionToken('A', '100.0', '200.00', {
+      elevation: '0.0',
+      width: '1.0',
+      height: '1.00',
+    });
+    const positionManager = {
+      getTokenPosition: jest.fn(() => ({ x: '100.50', y: '200.25', elevation: '0.0' })),
+    };
+
+    expect(buildTokenPositionCacheKey([token], null, positionManager)).toBe(
+      'scene:scene-1|count:1|A@100.5,200.25,0,1,1',
+    );
+  });
+});
+
+describe('buildTokenSensesCacheKey', () => {
+  let previousCanvas;
+
+  const makeSensesToken = (id, actorData = {}, tokenData = {}) => ({
+    document: {
+      id,
+      elevation: tokenData.elevation ?? 0,
+      width: tokenData.width ?? 1,
+      height: tokenData.height ?? 1,
+    },
+    actor: {
+      id: actorData.id ?? `${id}-actor`,
+      uuid: actorData.uuid,
+      signature: actorData.signature,
+      type: actorData.type ?? 'character',
+      itemTypes: actorData.itemTypes ?? {},
+      conditions: actorData.conditions ?? [],
+      system: actorData.system ?? {},
+    },
+  });
+
+  beforeEach(() => {
+    previousCanvas = global.canvas;
+    global.canvas = {
+      ...(previousCanvas || {}),
+      scene: { ...(previousCanvas?.scene || {}), id: 'scene-1' },
+    };
+  });
+
+  afterEach(() => {
+    global.canvas = previousCanvas;
+  });
+
+  test('builds a stable sorted key from token and actor sensing inputs', () => {
+    const tokenB = makeSensesToken('B', {
+      id: 'actor-b',
+      uuid: 'Actor.b',
+      signature: 'sig-b',
+      type: 'npc',
+      itemTypes: { condition: [{ slug: 'deafened' }] },
+      conditions: [{ slug: 'dazzled' }],
+      system: {
+        senses: [{ type: 'darkvision', range: 60 }],
+        traits: { value: ['human'] },
+        attributes: { perception: { rank: 2 } },
+      },
+    });
+    const tokenA = makeSensesToken('A', {
+      id: 'actor-a',
+      itemTypes: { condition: [{ slug: 'blinded' }] },
+      system: { senses: [{ type: 'low-light-vision' }] },
+    });
+
+    const key = buildTokenSensesCacheKey([tokenB, tokenA]);
+
+    expect(key).toContain('scene:scene-1|count:2|');
+    expect(key.indexOf('A@')).toBeLessThan(key.indexOf('B@'));
+    expect(key).toContain('actor-a');
+    expect(key).toContain('actor-b');
+    expect(key).toContain('blinded');
+    expect(key).toContain('deafened');
+    expect(key).toContain('dazzled');
+    expect(key).toContain('darkvision');
+  });
+
+  test('changes when actor identity, conditions, or sense data changes', () => {
+    const token = makeSensesToken('A', {
+      id: 'actor-a',
+      itemTypes: { condition: [{ slug: 'blinded' }] },
+      system: { senses: [{ type: 'darkvision', range: 60 }] },
+    });
+    const original = buildTokenSensesCacheKey([token]);
+
+    token.actor.id = 'actor-a-replaced';
+    expect(buildTokenSensesCacheKey([token])).not.toBe(original);
+    token.actor.id = 'actor-a';
+
+    token.actor.itemTypes.condition[0].slug = 'deafened';
+    expect(buildTokenSensesCacheKey([token])).not.toBe(original);
+    token.actor.itemTypes.condition[0].slug = 'blinded';
+
+    token.actor.system.senses[0].range = 120;
+    expect(buildTokenSensesCacheKey([token])).not.toBe(original);
+  });
+});
 
 describe('BatchProcessor', () => {
   let spatialAnalyzer;
@@ -18,6 +166,8 @@ describe('BatchProcessor', () => {
   let getActiveOverride;
   let getVisibilityMap;
   let processor;
+  let nowProvider;
+  let nowMs;
 
   beforeEach(() => {
     global.canvas.grid.size = 100;
@@ -57,6 +207,12 @@ describe('BatchProcessor', () => {
       isDebugMode: jest.fn(() => false),
     };
 
+    nowMs = 0;
+    nowProvider = jest.fn(() => {
+      nowMs += 5;
+      return nowMs;
+    });
+
     processor = new BatchProcessor({
       spatialAnalyzer,
       viewportFilterService,
@@ -70,6 +226,7 @@ describe('BatchProcessor', () => {
       visionAnalyzer: mockVisionAnalyzer,
       systemState: mockSystemState,
       maxVisibilityDistance: 10,
+      nowProvider,
     });
 
     // canvas tokens
@@ -97,6 +254,30 @@ describe('BatchProcessor', () => {
     expect(res.breakdown.pairsConsidered).toBeGreaterThan(0);
   });
 
+  test('reports detailed processor timing buckets', async () => {
+    const allTokens = [...global.canvas.tokens.placeables];
+    const res = await processor.process(allTokens, new Set(['A']), {});
+
+    expect(res.detailedTimings).toEqual(
+      expect.objectContaining({
+        cacheBuilding: expect.any(Number),
+        lightingPrecompute: expect.any(Number),
+        mainProcessingLoop: expect.any(Number),
+        spatialFiltering: expect.any(Number),
+        losCalculations: expect.any(Number),
+        visibilityCalculations: expect.any(Number),
+        cacheOperations: expect.any(Number),
+        updateCollection: expect.any(Number),
+      }),
+    );
+    expect(res.detailedTimings.cacheBuilding).toBeGreaterThan(0);
+    expect(res.detailedTimings.mainProcessingLoop).toBeGreaterThan(0);
+    expect(res.detailedTimings.spatialFiltering).toBeGreaterThan(0);
+    expect(res.detailedTimings.losCalculations).toBeGreaterThan(0);
+    expect(res.detailedTimings.visibilityCalculations).toBeGreaterThan(0);
+    expect(res.detailedTimings.updateCollection).toBeGreaterThan(0);
+  });
+
   test('processes each unordered pair only once when both tokens changed', async () => {
     const allTokens = [...global.canvas.tokens.placeables].slice(0, 2);
 
@@ -119,6 +300,73 @@ describe('BatchProcessor', () => {
     const res2 = await processor.process(allTokens, changed, {});
     expect(res2.breakdown.losGlobalHits).toBeGreaterThanOrEqual(1);
     expect(res2.breakdown.visGlobalHits).toBeGreaterThanOrEqual(1);
+  });
+
+  test('rebuilds spatial index inside TTL when token positions change', async () => {
+    const tA = makeToken('A', 0, 0);
+    const tB = makeToken('B', 1000, 0);
+    global.canvas.tokens.placeables = [tA, tB];
+    processor.maxVisibilityDistance = 1;
+
+    const first = await processor.process(global.canvas.tokens.placeables, new Set(['A']), {});
+    expect(first.updates).toHaveLength(0);
+
+    tB.document.x = 25;
+    tB.document.y = 0;
+    optimizedVisibilityCalculator.calculateVisibilityBetweenTokens.mockClear();
+
+    const second = await processor.process(global.canvas.tokens.placeables, new Set(['A']), {});
+
+    expect(second.updates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          observer: expect.objectContaining({ document: expect.objectContaining({ id: 'A' }) }),
+          target: expect.objectContaining({ document: expect.objectContaining({ id: 'B' }) }),
+        }),
+      ]),
+    );
+    expect(optimizedVisibilityCalculator.calculateVisibilityBetweenTokens).toHaveBeenCalled();
+  });
+
+  test('rebuilds senses cache inside TTL when actor sensing inputs change', async () => {
+    const [tA] = global.canvas.tokens.placeables;
+    tA.actor.itemTypes = tA.actor.itemTypes || {};
+    tA.actor.itemTypes.condition = [{ slug: 'blinded' }];
+
+    await processor.process(global.canvas.tokens.placeables, new Set(['A']), {});
+    const firstCache = processor._persistentCaches.sensesCache;
+
+    tA.actor.itemTypes.condition = [{ slug: 'deafened' }];
+    await processor.process(global.canvas.tokens.placeables, new Set(['A']), {});
+
+    expect(processor._persistentCaches.sensesCache).not.toBe(firstCache);
+  });
+
+  test('clearPersistentCaches resets reusable local caches and revision keys', () => {
+    processor._persistentCaches.sensesCache = { some: 'senses' };
+    processor._persistentCaches.sensesCacheTs = 123;
+    processor._persistentCaches.sensesCacheKey = 'senses-key';
+    processor._persistentCaches.idToTokenMap = new Map([['A', global.canvas.tokens.placeables[0]]]);
+    processor._persistentCaches.idToTokenMapTs = 456;
+    processor._persistentCaches.idToTokenMapKey = 'ids-key';
+    processor._persistentCaches.spatialIndex = { some: 'index' };
+    processor._persistentCaches.spatialIndexTs = 789;
+    processor._persistentCaches.spatialIndexKey = 'positions-key';
+
+    processor.clearPersistentCaches();
+
+    expect(processor._persistentCaches).toEqual({
+      sensesCache: null,
+      sensesCacheTs: 0,
+      sensesCacheKey: null,
+      idToTokenMap: null,
+      idToTokenMapTs: 0,
+      idToTokenMapKey: null,
+      spatialIndex: null,
+      spatialIndexTs: 0,
+      spatialIndexKey: null,
+      CACHE_TTL_MS: 5000,
+    });
   });
 
   test('door batches force detection sync for unchanged visible LOS pairs', async () => {

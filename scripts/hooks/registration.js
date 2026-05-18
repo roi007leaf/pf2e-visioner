@@ -2,7 +2,6 @@
  * Central registration that composes small hook modules.
  */
 
-import { MODULE_ID } from '../constants.js';
 import { AutoCoverHooks } from '../cover/auto-cover/AutoCoverHooks.js';
 import { registerSnipingDuoDamageBonusHooks } from '../feats/sniping-duo-damage-bonus.js';
 import { onHighlightObjects } from '../services/HoverTooltips.js';
@@ -12,113 +11,26 @@ import { onCanvasReady, onReady } from './lifecycle.js';
 import { registerMovementCostHooks } from './movement-cost.js';
 import { registerTokenHooks } from './token-events.js';
 import { registerUIHooks } from './ui.js';
-import { cleanupDeletedVisionerRuleElements } from '../rule-elements/deleted-item-cleanup.js';
 import { registerPf2eHudTakeCoverIntegration } from '../integrations/pf2e-hud-take-cover.js';
+import { handleDefeatEffectCreated } from '../services/defeated-actor-cleanup.js';
+import { handleVisionerRuleElementItemUpdate } from '../rule-elements/item-update-refresh.js';
+import { cleanupDeletedEffectItem } from '../services/deleted-effect-cleanup.js';
+import { createVisionMasterTokenRefresh } from '../services/vision-master-token-refresh.js';
+import { handleSceneDisableAvsRefresh } from '../services/scene-disable-avs-refresh.js';
+import { handlePreCreateChatMessage } from '../chat/services/pre-create-message.js';
 import {
-  hasPendingMovementRenderWork,
-  refreshPendingMovementTokenVisibility,
-  schedulePendingTokenMovementCompletion,
-  setPendingTokenMovementPosition,
-} from '../services/pending-token-movement.js';
-
-/**
- * Clean up AVS overrides for a defeated actor
- * @param {Actor} actor - The defeated actor
- * @async
- * @throws {Error} If an error occurs during AVS override cleanup
- */
-async function cleanupAvsOverridesForDefeatedActor(actor) {
-  try {
-    const tokens = canvas.tokens?.placeables?.filter((t) => t.actor?.id === actor.id) || [];
-
-    if (tokens.length === 0) {
-      return;
-    }
-
-    const { default: AvsOverrideManager } = await import(
-      '../chat/services/infra/AvsOverrideManager.js'
-    );
-
-    for (const token of tokens) {
-      try {
-        const { requestTakeCoverExpirationForToken } = await import(
-          '../chat/services/take-cover-expiration-service.js'
-        );
-        await requestTakeCoverExpirationForToken(token, 'unconscious');
-      } catch { }
-      await AvsOverrideManager.removeAllOverridesInvolving(token.document.id);
-    }
-
-    for (const defeatedToken of tokens) {
-      const allTokens = canvas.tokens?.placeables || [];
-      for (const token of allTokens) {
-        const visionMasterId = token.document.getFlag(MODULE_ID, 'visionMasterTokenId');
-
-        if (visionMasterId === defeatedToken.id) {
-          try {
-            await token.document.unsetFlag(MODULE_ID, 'visionMasterTokenId');
-            await token.document.unsetFlag(MODULE_ID, 'visionMasterActorUuid');
-            await token.document.unsetFlag(MODULE_ID, 'visionSharingMode');
-            await token.document.unsetFlag(MODULE_ID, 'visionSharingSources');
-          } catch (error) {
-            console.warn(
-              `[PF2E Visioner] Failed to cleanup vision sharing for ${token.name}:`,
-              error,
-            );
-          }
-        }
-      }
-    }
-
-    canvas.perception.update({ initializeVision: true, refreshLighting: true });
-  } catch (error) {
-    console.error('PF2E Visioner | Failed to clean up AVS overrides for defeated actor:', error);
-  }
-}
-
-export function getMatchingControlledTokenForRefresh(token, controlledTokens) {
-  const tokenId = token?.document?.id;
-  if (!tokenId) return null;
-  return (
-    controlledTokens?.find?.((controlledToken) => controlledToken?.document?.id === tokenId) ?? null
-  );
-}
-
-async function refreshAfterCoverEffectMapSync(tokenIds) {
-  const ids = Array.from(new Set((tokenIds || []).filter(Boolean)));
-  if (ids.length === 0) return;
-
-  try {
-    await globalThis.window?.pf2eVisioner?.services?.autoVisibilitySystem?.recalculateForTokens?.(
-      ids,
-    );
-  } catch { }
-
-  try {
-    const { autoVisibilitySystem } = await import('../visibility/auto-visibility/index.js');
-    await autoVisibilitySystem?.recalculateForTokens?.(ids);
-
-    const ovm = autoVisibilitySystem?.orchestrator?.overrideValidationManager;
-    if (ovm) {
-      const visionerState = (globalThis.game.pf2eVisioner ||= {});
-      const previousLastMovedTokenId = visionerState.lastMovedTokenId;
-      delete visionerState.lastMovedTokenId;
-
-      try {
-        for (const id of ids) ovm.queueOverrideValidation(id);
-        await ovm.processQueuedValidations({ skipMovedFilter: true });
-      } finally {
-        if (previousLastMovedTokenId !== undefined) {
-          visionerState.lastMovedTokenId = previousLastMovedTokenId;
-        }
-      }
-    }
-  } catch { }
-
-  try {
-    canvas?.perception?.update?.({ refreshVision: true, refreshOcclusion: true });
-  } catch { }
-}
+  initializeDeferredSeekManager,
+  initializeTurnSneakTracker,
+  registerEffectPerceptionHooks,
+  registerTimedOverrideHooks,
+} from './startup-managers.js';
+import { handleWallCreated, handleWallDeleted, handleWallUpdated } from '../services/wall-lifecycle.js';
+import {
+  handleAvsBatchCompleteRefresh,
+  handleTokenPreUpdate,
+  handleTokenRefreshed,
+  handleTokenUpdated,
+} from '../services/token-render-lifecycle.js';
 
 export async function registerHooks() {
   registerPf2eHudTakeCoverIntegration();
@@ -126,63 +38,14 @@ export async function registerHooks() {
   Hooks.on('ready', onReady);
   Hooks.on('canvasReady', onCanvasReady);
 
-  // Store old master IDs before token updates
-  const oldMasterIds = new Map();
+  const visionMasterTokenRefresh = createVisionMasterTokenRefresh();
 
-  Hooks.on('preUpdateToken', (tokenDoc, changes, options, userId) => {
-    const visionMasterChanged = foundry.utils.hasProperty(
-      changes,
-      `flags.${MODULE_ID}.visionMasterTokenId`,
-    );
-    if (visionMasterChanged) {
-      const currentMasterId = tokenDoc.getFlag(MODULE_ID, 'visionMasterTokenId');
-      oldMasterIds.set(tokenDoc.id, currentMasterId);
-    }
+  Hooks.on('preUpdateToken', (tokenDoc, changes) => {
+    visionMasterTokenRefresh.capturePreUpdate(tokenDoc, changes);
   });
 
-  Hooks.on('updateToken', async (tokenDoc, changes, options, userId) => {
-    const visionMasterChanged = foundry.utils.hasProperty(
-      changes,
-      `flags.${MODULE_ID}.visionMasterTokenId`,
-    );
-    if (visionMasterChanged) {
-      const token = tokenDoc.object;
-      if (token) {
-        const oldMasterId = oldMasterIds.get(tokenDoc.id);
-        const newMasterId = changes.flags?.[MODULE_ID]?.visionMasterTokenId;
-
-        oldMasterIds.delete(tokenDoc.id);
-
-        token.initializeVisionSource();
-
-        if (oldMasterId) {
-          const oldMasterToken = canvas.tokens.get(oldMasterId);
-          if (oldMasterToken) {
-            oldMasterToken.initializeVisionSource();
-          }
-        }
-
-        if (newMasterId && newMasterId !== null) {
-          const newMasterToken = canvas.tokens.get(newMasterId);
-          if (newMasterToken) {
-            newMasterToken.initializeVisionSource();
-          }
-        }
-
-        canvas.perception.update({ initializeVision: true, refreshLighting: true });
-      }
-
-      // Update shared vision indicator if the updated token is controlled
-      if (token?.controlled && game.user?.isGM) {
-        try {
-          const { default: SharedVisionIndicator } = await import('../ui/SharedVisionIndicator.js');
-          const indicator = SharedVisionIndicator.getInstance();
-          indicator.update(token);
-        } catch (error) {
-          console.warn('PF2E Visioner | Failed to update shared vision indicator:', error);
-        }
-      }
-    }
+  Hooks.on('updateToken', async (tokenDoc, changes) => {
+    await visionMasterTokenRefresh.refreshAfterUpdate(tokenDoc, changes);
   });
 
   const { registerHooks: registerOptimized } = await import('../hooks/optimized-registration.js');
@@ -190,34 +53,11 @@ export async function registerHooks() {
   registerChatHooks();
   registerMovementCostHooks();
 
-  // Initialize turn-based sneak tracker for Sneaky/Very Sneaky feats
-  try {
-    await import('../chat/services/TurnSneakTracker.js');
-    // The tracker auto-registers its hooks in the constructor
-  } catch (error) {
-    console.error('PF2E Visioner | Failed to initialize turn sneak tracker:', error);
-  }
+  await initializeTurnSneakTracker();
 
   // Hook to capture token positions at the moment stealth rolls are made
   Hooks.on('preCreateChatMessage', async (message) => {
-    try {
-      // Import the position capture service
-      const { captureRollTimePosition } = await import(
-        '../chat/services/position-capture-service.js'
-      );
-      await captureRollTimePosition(message);
-    } catch (error) {
-      console.warn('PF2E Visioner | Failed to capture roll-time position:', error);
-    }
-
-    try {
-      const { expireTakeCoverOnAttackMessage } = await import(
-        '../chat/services/take-cover-expiration-service.js'
-      );
-      await expireTakeCoverOnAttackMessage(message);
-    } catch (error) {
-      console.warn('PF2E Visioner | Failed to expire Take Cover on attack:', error);
-    }
+    await handlePreCreateChatMessage(message);
   });
 
   Hooks.on('highlightObjects', onHighlightObjects);
@@ -228,458 +68,30 @@ export async function registerHooks() {
   // UI hues
   registerUIHooks();
   registerCombatHooks();
-  try {
-    const deferredSeekManager = (await import('../chat/services/infra/DeferredSeekManager.js'))
-      .default;
-    deferredSeekManager.initialize();
-  } catch {}
+  await initializeDeferredSeekManager();
   AutoCoverHooks.registerHooks();
   registerSnipingDuoDamageBonusHooks();
 
-  // Register timed override hooks for timer expiration
-  try {
-    const { TimedOverrideManager } = await import('../services/TimedOverrideManager.js');
-    TimedOverrideManager.registerHooks();
-  } catch (error) {
-    console.error('PF2E Visioner | Failed to register timed override hooks:', error);
-  }
-
-  // Register movement cost hooks (Blinded difficult terrain)
-  try {
-    const { registerMovementCostHooks } = await import('./movement-cost.js');
-    registerMovementCostHooks();
-  } catch (error) {
-    console.error('PF2E Visioner | Failed to register movement cost hooks:', error);
-  }
+  await registerTimedOverrideHooks();
 
   // Register effect perception hooks for automatic perception refresh
   // These work independently of the Auto-Visibility System
-  const { onCreateActiveEffect, onUpdateActiveEffect, onDeleteActiveEffect } = await import(
-    './effect-perception.js'
-  );
-  Hooks.on('createActiveEffect', onCreateActiveEffect);
-  Hooks.on('updateActiveEffect', onUpdateActiveEffect);
-  Hooks.on('deleteActiveEffect', onDeleteActiveEffect);
+  await registerEffectPerceptionHooks();
 
   // Register item update hooks for rule element updates
   Hooks.on('updateItem', async (item, changes, options, userId) => {
-    try {
-      const { getLogger } = await import('../utils/logger.js');
-      const log = getLogger('RuleElements/ItemUpdate');
-
-      // Only process on GM client to avoid duplicate processing
-      if (!game.user?.isGM) return;
-
-      // Check if the item has PF2eVisioner rule elements
-      const rules = item.system?.rules || [];
-      const hasVisionerRules = rules.some((rule) => rule.key === 'PF2eVisionerEffect');
-
-      if (!hasVisionerRules) return;
-
-      // Check if the changes affect rule elements
-      const systemChanges = changes.system || {};
-      const hasRuleChanges = Object.keys(systemChanges).some(
-        (key) => key === 'rules' || key.startsWith('rules.'),
-      );
-
-      if (!hasRuleChanges) return;
-
-      // Find tokens for this actor
-      const actor = item.parent;
-      if (!actor) return;
-
-      const tokens = canvas?.tokens?.placeables?.filter((t) => t.actor?.id === actor.id) || [];
-      if (tokens.length === 0) return;
-
-      // Wait a bit for PF2e to process the item update
-      setTimeout(async () => {
-        try {
-          const rules = item.system?.rules || [];
-          const visionerRule = rules.find((rule) => rule.key === 'PF2eVisionerEffect');
-
-          if (!visionerRule) return;
-
-          const operations = visionerRule.operations || [];
-          const ruleElementId = `${item.id}-${visionerRule.slug || 'effect'}`;
-
-          for (const token of tokens) {
-            // First, remove old operations using direction-aware cleanup
-            // Use the ruleElementId as the source for proper matching
-            // IMPORTANT: removeVisibilityOverride is now direction-agnostic - it removes ALL sources for the rule element ID
-            // So we only need to call it once, not once per direction
-            for (const operation of operations) {
-              const operationWithSource = {
-                ...operation,
-                source: operation.source || ruleElementId,
-              };
-              try {
-                let OperationClass = null;
-                switch (operationWithSource.type) {
-                  case 'overrideVisibility':
-                  case 'conditionalState':
-                    OperationClass = (
-                      await import('../rule-elements/operations/VisibilityOverride.js')
-                    ).VisibilityOverride;
-                    // Cleanup is direction-agnostic - removes all sources for the rule element ID regardless of direction
-                    // Pass ruleElementId to ensure proper cleanup
-                    await OperationClass.removeVisibilityOverride(
-                      operationWithSource,
-                      token,
-                      ruleElementId,
-                    );
-                    break;
-                  case 'distanceBasedVisibility':
-                    OperationClass = (
-                      await import('../rule-elements/operations/DistanceBasedVisibility.js')
-                    ).DistanceBasedVisibility;
-                    await OperationClass.removeDistanceBasedVisibility(operationWithSource, token);
-                    break;
-                  case 'overrideCover':
-                    OperationClass = (await import('../rule-elements/operations/CoverOverride.js'))
-                      .CoverOverride;
-                    await OperationClass.removeCoverOverride(operationWithSource, token, null);
-                    break;
-                  case 'provideCover':
-                    OperationClass = (await import('../rule-elements/operations/CoverOverride.js'))
-                      .CoverOverride;
-                    await OperationClass.removeProvideCover(token);
-                    break;
-                  case 'modifySenses':
-                    OperationClass = (await import('../rule-elements/operations/SenseModifier.js'))
-                      .SenseModifier;
-                    await OperationClass.restoreSenses(token, ruleElementId);
-                    break;
-                  case 'modifyDetectionModes':
-                    OperationClass = (
-                      await import('../rule-elements/operations/DetectionModeModifier.js')
-                    ).DetectionModeModifier;
-                    await OperationClass.restoreDetectionModes(token, ruleElementId);
-                    break;
-                  case 'modifyActionQualification':
-                    OperationClass = (
-                      await import('../rule-elements/operations/ActionQualifier.js')
-                    ).ActionQualifier;
-                    await OperationClass.removeActionQualifications(operationWithSource, token);
-                    break;
-                  case 'modifyLighting':
-                    OperationClass = (
-                      await import('../rule-elements/operations/LightingModifier.js')
-                    ).LightingModifier;
-                    await OperationClass.removeLightingModification(operationWithSource, token);
-                    break;
-                  case 'offGuardSuppression':
-                    OperationClass = (
-                      await import('../rule-elements/operations/OffGuardSuppression.js')
-                    ).OffGuardSuppression;
-                    await OperationClass.removeOffGuardSuppression(operationWithSource, token);
-                    break;
-                  case 'auraVisibility':
-                    OperationClass = (await import('../rule-elements/operations/AuraVisibility.js'))
-                      .AuraVisibility;
-                    await OperationClass.removeAuraVisibility(operationWithSource, token);
-                    break;
-                  case 'shareVision':
-                    OperationClass = (await import('../rule-elements/operations/ShareVision.js'))
-                      .ShareVision;
-                    await OperationClass.removeShareVision(operationWithSource, token);
-                    break;
-                }
-              } catch (error) {
-                console.warn(
-                  `PF2E Visioner | updateItem: Failed to remove operation ${operationWithSource.type}:`,
-                  error,
-                );
-              }
-            }
-
-            // Clean up any remaining registry flags
-            const registryKey = `item-${item.id}`;
-            const flagRegistry =
-              token.document.getFlag('pf2e-visioner', 'ruleElementRegistry') || {};
-            const flagsToRemove = flagRegistry[registryKey] || [];
-            const updates = {};
-
-            if (flagsToRemove.length > 0) {
-              for (const flagPath of flagsToRemove) {
-                updates[`flags.pf2e-visioner.${flagPath}`] = null;
-              }
-            }
-
-            if (Object.keys(updates).length > 0) {
-              await token.document.update(updates);
-            }
-
-            // Now manually apply each operation
-
-            for (const operation of operations) {
-              // Ensure operation has a source ID for proper tracking
-              const operationWithSource = {
-                ...operation,
-                source: operation.source || ruleElementId,
-              };
-              try {
-                // Import the operation class
-                let OperationClass = null;
-                switch (operationWithSource.type) {
-                  case 'distanceBasedVisibility':
-                    OperationClass = (
-                      await import('../rule-elements/operations/DistanceBasedVisibility.js')
-                    ).DistanceBasedVisibility;
-                    await OperationClass.applyDistanceBasedVisibility(operationWithSource, token);
-                    break;
-                  case 'overrideVisibility':
-                    OperationClass = (
-                      await import('../rule-elements/operations/VisibilityOverride.js')
-                    ).VisibilityOverride;
-                    await OperationClass.applyVisibilityOverride(operationWithSource, token);
-                    break;
-                  case 'modifySenses':
-                    OperationClass = (await import('../rule-elements/operations/SenseModifier.js'))
-                      .SenseModifier;
-                    await OperationClass.applySenseModifications(
-                      token,
-                      operationWithSource.senseModifications,
-                      ruleElementId,
-                      operationWithSource.predicate,
-                    );
-                    break;
-                  case 'modifyLighting':
-                    OperationClass = (
-                      await import('../rule-elements/operations/LightingModifier.js')
-                    ).LightingModifier;
-                    await OperationClass.applyLightingModification(operationWithSource, token);
-                    break;
-                  case 'offGuardSuppression':
-                    OperationClass = (
-                      await import('../rule-elements/operations/OffGuardSuppression.js')
-                    ).OffGuardSuppression;
-                    await OperationClass.applyOffGuardSuppression(operationWithSource, token);
-                    break;
-                  case 'auraVisibility':
-                    OperationClass = (await import('../rule-elements/operations/AuraVisibility.js'))
-                      .AuraVisibility;
-                    await OperationClass.applyAuraVisibility(operationWithSource, token);
-                    break;
-                  case 'shareVision':
-                    OperationClass = (await import('../rule-elements/operations/ShareVision.js'))
-                      .ShareVision;
-                    await OperationClass.applyShareVision(operationWithSource, token);
-                    break;
-                }
-              } catch (error) {
-                console.warn(`PF2E Visioner | Failed to apply operation ${operation.type}:`, error);
-              }
-            }
-
-            // Register the new flags
-            const newRegistry =
-              token.document.getFlag('pf2e-visioner', 'ruleElementRegistry') || {};
-            newRegistry[registryKey] = operations
-              .map((op) => {
-                switch (op.type) {
-                  case 'distanceBasedVisibility':
-                    return 'distanceBasedVisibility';
-                  case 'overrideVisibility':
-                    return 'visibilityReplacement';
-                  case 'modifySenses':
-                    return 'originalSenses';
-                  case 'modifyLighting':
-                    return `lightingModification.${op.source || 'lighting'}`;
-                  case 'offGuardSuppression':
-                    return 'offGuardSuppression';
-                  case 'auraVisibility':
-                    return 'auraVisibility';
-                  case 'shareVision':
-                    return 'visionSharing';
-                  default:
-                    return null;
-                }
-              })
-              .filter(Boolean);
-            await token.document.setFlag('pf2e-visioner', 'ruleElementRegistry', newRegistry);
-          }
-
-          if (window.pf2eVisioner?.services?.autoVisibilitySystem?.recalculateForTokens) {
-            const tokenIds = tokens.map((t) => t.id);
-            await window.pf2eVisioner.services.autoVisibilitySystem.recalculateForTokens(tokenIds);
-          } else if (canvas?.perception) {
-            canvas.perception.update({ refreshVision: true, refreshOcclusion: true });
-          }
-        } catch (error) {
-          console.warn('PF2E Visioner | Failed to process rule element update:', error);
-        }
-      }, 500);
-    } catch (error) {
-      console.warn('PF2E Visioner | Failed to handle item update for rule elements:', error);
-    }
+    handleVisionerRuleElementItemUpdate(item, changes, options, userId);
   });
 
   // Wall lifecycle: refresh indicators and see-through state when walls change
   Hooks.on('createWall', async () => {
-    try {
-      const { updateWallVisuals } = await import('../services/visual-effects.js');
-      const id = canvas.tokens.controlled?.[0]?.id || null;
-      await updateWallVisuals(id);
-    } catch {}
+    await handleWallCreated();
   });
   Hooks.on('updateWall', async (doc, changes) => {
-    try {
-      // If Hidden Wall flag toggled on, default all observers to Hidden for that wall
-      const hiddenChanged = changes?.flags?.[MODULE_ID]?.hiddenWall;
-      if (hiddenChanged !== undefined) {
-        if (hiddenChanged) {
-          try {
-            const tokens = canvas.tokens?.placeables || [];
-            const updates = [];
-            const { getConnectedWallDocsBySourceId } = await import(
-              '../services/connected-walls.js'
-            );
-            const connected = getConnectedWallDocsBySourceId(doc.id) || [];
-            const wallIds = [doc.id, ...connected.map((d) => d.id)];
-            for (const t of tokens) {
-              const current = t.document.getFlag?.(MODULE_ID, 'walls') || {};
-              const next = { ...current };
-              let changedAny = false;
-              for (const wid of wallIds) {
-                if (next[wid] !== 'hidden') {
-                  next[wid] = 'hidden';
-                  changedAny = true;
-                }
-              }
-              if (changedAny) {
-                const patch = { _id: t.document.id };
-                patch[`flags.${MODULE_ID}.walls`] = next;
-                updates.push(patch);
-              }
-            }
-            if (updates.length) {
-              // Only GMs can update token documents
-              if (game.user.isGM) {
-                await canvas.scene?.updateEmbeddedDocuments?.('Token', updates, { diff: false });
-              }
-            }
-          } catch (_) {}
-          // Mirror hidden flag to connected walls
-          try {
-            const { mirrorHiddenFlagToConnected } = await import('../services/connected-walls.js');
-            await mirrorHiddenFlagToConnected(doc, true);
-          } catch (_) {}
-        } else {
-          // If unhidden, remove entries for that wall from tokens
-          try {
-            const tokens = canvas.tokens?.placeables || [];
-            const updates = [];
-            const { getConnectedWallDocsBySourceId } = await import(
-              '../services/connected-walls.js'
-            );
-            const connected = getConnectedWallDocsBySourceId(doc.id) || [];
-            const wallIds = [doc.id, ...connected.map((d) => d.id)];
-            for (const t of tokens) {
-              const current = t.document.getFlag?.(MODULE_ID, 'walls') || {};
-              let changedAny = false;
-              const next = { ...current };
-              for (const wid of wallIds) {
-                if (next[wid]) {
-                  delete next[wid];
-                  changedAny = true;
-                }
-              }
-              if (changedAny) {
-                const patch = { _id: t.document.id };
-                patch[`flags.${MODULE_ID}.walls`] = next;
-                updates.push(patch);
-              }
-            }
-            if (updates.length) {
-              // Only GMs can update token documents
-              if (game.user.isGM) {
-                await canvas.scene?.updateEmbeddedDocuments?.('Token', updates, { diff: false });
-              }
-            }
-          } catch (_) {}
-          // Mirror hidden flag to connected walls (set hidden=false)
-          try {
-            const { mirrorHiddenFlagToConnected } = await import('../services/connected-walls.js');
-            await mirrorHiddenFlagToConnected(doc, false);
-          } catch (_) {}
-        }
-      }
-    } catch (_) {}
-    // Door state changed (opened/closed) — LOS changes, trigger batch recalc + deferred seek
-    if (changes.ds !== undefined) {
-      try {
-        if (!globalThis.game) globalThis.game = {};
-        if (!globalThis.game.pf2eVisioner) globalThis.game.pf2eVisioner = {};
-        globalThis.game.pf2eVisioner.suppressNextAvsPostBatchPerceptionRefresh = {
-          reason: 'door-state-change',
-          doorId: doc?.id ?? null,
-          doorCoords: Array.isArray(doc?.c) ? Array.from(doc.c) : null,
-          doorState: changes.ds,
-          until: Date.now() + 1000,
-          perceptionRefreshed: false,
-        };
-      } catch {}
-      try {
-        const { autoVisibilitySystem } = await import('../visibility/auto-visibility/index.js');
-        const vsm = autoVisibilitySystem?.orchestrator?.visibilityState;
-        if (vsm) {
-          vsm.markAllTokensChangedImmediate();
-        }
-      } catch {}
-      // After batch completes: run validation first, then deferred seek (so deferred indicator wins)
-      Hooks.once('pf2e-visioner.batchComplete', async () => {
-        try {
-          const { autoVisibilitySystem } = await import('../visibility/auto-visibility/index.js');
-          const ovm = autoVisibilitySystem?.orchestrator?.overrideValidationManager;
-          if (ovm) {
-            const tokensToCheck =
-              canvas.tokens?.controlled?.length > 0
-                ? canvas.tokens.controlled
-                : (canvas.tokens?.placeables ?? []);
-            for (const ct of tokensToCheck) {
-              ovm.queueOverrideValidation(ct.document.id);
-            }
-            await ovm.processQueuedValidations({ skipMovedFilter: true });
-          }
-        } catch {}
-        try {
-          const deferredSeekManager = (
-            await import('../chat/services/infra/DeferredSeekManager.js')
-          ).default;
-          for (const t of canvas.tokens?.placeables ?? []) {
-            const hasDef = t.document?.getFlag?.('pf2e-visioner', 'deferredSeekResults');
-            if (hasDef?.length > 0) {
-              await deferredSeekManager.checkAndApplyDeferred(t.document.id);
-            }
-          }
-        } catch {}
-      });
-    }
-    try {
-      const { updateWallVisuals } = await import('../services/visual-effects.js');
-      const id = canvas.tokens.controlled?.[0]?.id || null;
-      await updateWallVisuals(id);
-    } catch {}
+    await handleWallUpdated(doc, changes);
   });
   Hooks.on('deleteWall', async (wallDocument) => {
-    try {
-      // Clean up any lingering visual indicators for the deleted wall
-      const { cleanupDeletedWallVisuals } = await import('../services/visual-effects.js');
-      await cleanupDeletedWallVisuals(wallDocument);
-
-      // Check if we have very few walls left - might indicate mass deletion
-      const remainingWalls = canvas?.walls?.placeables?.length || 0;
-      if (remainingWalls <= 2) {
-        // Likely a mass deletion scenario - do global cleanup to catch any orphaned indicators
-        const { cleanupAllWallIndicators } = await import('../services/visual-effects.js');
-        await cleanupAllWallIndicators();
-      }
-
-      // Update wall visuals for remaining walls
-      const { updateWallVisuals } = await import('../services/visual-effects.js');
-      const id = canvas.tokens.controlled?.[0]?.id || null;
-      await updateWallVisuals(id);
-    } catch {}
+    await handleWallDeleted(wallDocument);
   });
 
   // Removed controlToken hook - was causing excessive updateWallVisuals calls on token selection.
@@ -692,123 +104,19 @@ export async function registerHooks() {
 
   // Handle token movement events
   Hooks.on('preUpdateToken', (tokenDoc, changes, options, userId) => {
-    try {
-      // Only care about positional movement
-      if (!('x' in changes || 'y' in changes)) return;
-
-      // Prevent movement while awaiting Start Sneak confirmation (MUST BE SYNCHRONOUS)
-      // Allow GMs to always move
-      // Only block movement if AVS is enabled
-      const avsEnabled = game.settings?.get?.('pf2e-visioner', 'autoVisibilityEnabled') ?? false;
-      if (!game.users?.get(userId)?.isGM && avsEnabled) {
-        const actor = tokenDoc?.actor;
-        if (actor) {
-          // Determine waiting state either via our custom token flag or effect slug.
-          const hasWaitingFlag = tokenDoc.getFlag?.(MODULE_ID, 'waitingSneak');
-          let waitingEffect = null;
-          // Only search effects if we don't already have the flag (cheap boolean first)
-          if (!hasWaitingFlag) {
-            waitingEffect = actor.itemTypes?.effect?.find?.(
-              (e) => e?.system?.slug === 'waiting-for-sneak-start',
-            );
-          }
-          if (hasWaitingFlag || waitingEffect) {
-            // Block movement for non-GM users
-            ui.notifications?.warn?.('You cannot move until Sneak has started.');
-            return false; // Cancel update
-          }
-        }
-      }
-
-      if (
-        setPendingTokenMovementPosition(tokenDoc, changes, canvas?.tokens?.controlled || [], {
-          userId,
-          hookOptions: options,
-        })
-      ) {
-
-        refreshPendingMovementTokenVisibility(tokenDoc.id);
-      }
-
-      // Clear established invisible states when invisible creatures move (async, fire and forget)
-      // This allows them to be re-detected through sound/movement
-      const token = tokenDoc.object;
-      if (token?.actor) {
-        const isInvisible =
-          token.actor.hasCondition?.('invisible') ||
-          token.actor.system?.conditions?.invisible?.active ||
-          token.actor.conditions?.has?.('invisible');
-
-        if (isInvisible) {
-          // Get the condition manager and clear established states
-          const conditionManager = game.modules.get('pf2e-visioner')?.api?.getConditionManager?.();
-          if (conditionManager?.clearEstablishedInvisibleStates) {
-            conditionManager.clearEstablishedInvisibleStates(token).catch(() => {});
-          }
-        }
-      }
-    } catch (e) {
-      console.warn('PF2E Visioner | preUpdateToken hook failed:', e);
-    }
+    return handleTokenPreUpdate(tokenDoc, changes, options, userId);
   });
 
-  Hooks.on('updateToken', async (tokenDoc, changes, options, userId) => {
-    try {
-      if (!('x' in changes || 'y' in changes)) return;
-
-      try {
-        schedulePendingTokenMovementCompletion(tokenDoc);
-      } catch { }
-
-      const controlledTokens = canvas?.tokens?.controlled || [];
-      if (controlledTokens.length === 0) return;
-
-      const movedTokenId = tokenDoc.id;
-      const targetPosition = {
-        x: changes.x ?? tokenDoc.x,
-        y: changes.y ?? tokenDoc.y,
-      };
-
-      const { updateSystemHiddenTokenHighlights } = await import('../services/visual-effects.js');
-
-      for (const controlledToken of controlledTokens) {
-        const positionOverride =
-          controlledToken.document.id === movedTokenId ? targetPosition : null;
-
-        await updateSystemHiddenTokenHighlights(controlledToken.document.id, positionOverride);
-      }
-    } catch (error) {
-      console.warn('PF2E Visioner | updateToken hook failed:', error);
-    }
+  Hooks.on('updateToken', async (tokenDoc, changes) => {
+    await handleTokenUpdated(tokenDoc, changes);
   });
 
   Hooks.on('refreshToken', async (token) => {
-    // Skip processing if we're in the middle of ephemeral effect sync
-    // This prevents feedback loops where effect updates trigger refreshToken → lightingRefresh → new batch
-    if (globalThis.game?.pf2eVisioner?.suppressRefreshTokenProcessing) {
-      return;
-    }
-
-    try {
-      const controlledTokens = canvas?.tokens?.controlled || [];
-      if (controlledTokens.length === 0) return;
-      const controlledToken = getMatchingControlledTokenForRefresh(token, controlledTokens);
-      if (!controlledToken) return;
-
-      const { updateSystemHiddenTokenHighlights } = await import('../services/visual-effects.js');
-
-      await updateSystemHiddenTokenHighlights(controlledToken.document.id);
-    } catch (error) {
-      console.warn('PF2E Visioner | refreshToken hook for lifesense indicators failed:', error);
-    }
+    await handleTokenRefreshed(token);
   });
 
   Hooks.on('pf2eVisionerAvsBatchComplete', () => {
-    try {
-      if (hasPendingMovementRenderWork()) {
-        refreshPendingMovementTokenVisibility([], { ignoreObservedGrace: true });
-      }
-    } catch { }
+    handleAvsBatchCompleteRefresh();
   });
 
   // Removed createToken hook - was causing excessive updateWallVisuals calls on token creation.
@@ -823,127 +131,18 @@ export async function registerHooks() {
   // This was triggered by animation frames during movement, causing hundreds of calls. Wall visual updates are now
   // properly handled by TokenEventHandler._handleWallFlagChanges only when wall flags actually change.
 
-  // Handle actor updates to detect death/defeat and clean up AVS overrides
-
   // Handle ActiveEffect creation to detect death conditions
-  Hooks.on('createActiveEffect', async (effect, options, userId) => {
-    try {
-      if (!game.user?.isGM) return;
-
-      const avsEnabled = game.settings?.get?.('pf2e-visioner', 'autoVisibilityEnabled') ?? false;
-      if (!avsEnabled) {
-        return;
-      }
-
-      const actor = effect?.parent;
-      if (!actor) {
-        return;
-      }
-
-      // Check if this is a death-related effect
-      const effectName = effect?.name?.toLowerCase() || '';
-      const effectSlug = effect?.system?.slug || effect?.slug || '';
-      const deathConditions = ['unconscious', 'dead', 'dying'];
-      const deathNames = ['dead', 'unconscious', 'dying'];
-
-      if (
-        deathConditions.includes(effectSlug) ||
-        deathNames.some((name) => effectName.includes(name))
-      ) {
-        // Actor got a death effect - clean up AVS overrides
-        await cleanupAvsOverridesForDefeatedActor(actor);
-      }
-    } catch (error) {
-      console.warn('PF2E Visioner | Error handling ActiveEffect creation:', error);
-    }
+  Hooks.on('createActiveEffect', async (effect) => {
+    await handleDefeatEffectCreated(effect);
   });
 
   // If effects are manually removed, clear corresponding token flags
   Hooks.on('deleteItem', async (item) => {
-    try {
-      if (item?.type !== 'effect') return;
-
-      const actor = item?.parent;
-      if (!actor) return;
-
-      // Find any active tokens for this actor on the current scene
-      const tokens = canvas.tokens?.placeables?.filter((t) => t.actor?.id === actor.id) || [];
-
-      try {
-        const { syncCoverMapsForDeletedCoverEffect } = await import('../cover/cleanup.js');
-        const coverSyncResult = await syncCoverMapsForDeletedCoverEffect(item);
-        if (coverSyncResult?.changed) {
-          await refreshAfterCoverEffectMapSync(coverSyncResult.tokenIds);
-        }
-      } catch (error) {
-        console.warn('PF2E Visioner | cover effect removal cleanup failed:', error);
-      }
-
-      // Only handle sneak-related cleanup if AVS is enabled
-      const avsEnabled = game.settings?.get?.('pf2e-visioner', 'autoVisibilityEnabled') ?? false;
-
-      // Handle waiting-for-sneak-start effect removal
-      if (item?.system?.slug === 'waiting-for-sneak-start' && avsEnabled) {
-        for (const t of tokens) {
-          if (t.document.getFlag('pf2e-visioner', 'waitingSneak')) {
-            try {
-              await t.document.unsetFlag('pf2e-visioner', 'waitingSneak');
-            } catch {}
-            try {
-              if (t.locked) t.locked = false;
-            } catch {}
-          }
-        }
-      }
-
-      // Handle Sneaking effect removal - clear sneak-active flag as failsafe
-      const isSneakingEffect = item?.flags?.['pf2e-visioner']?.sneakingEffect;
-      if (isSneakingEffect && avsEnabled) {
-        for (const t of tokens) {
-          const hasSneakActive = t.document.getFlag('pf2e-visioner', 'sneak-active');
-          if (hasSneakActive) {
-            try {
-              await t.document.unsetFlag('pf2e-visioner', 'sneak-active');
-            } catch {
-              console.error(`PF2E Visioner | Failed to clear sneak-active flag for ${t.name}`);
-            }
-          }
-        }
-      }
-
-      const rules = item.system?.rules || [];
-      const hasVisionerRules = rules.some((rule) => rule.key === 'PF2eVisionerEffect');
-
-      if (hasVisionerRules) {
-        const { getLogger } = await import('../utils/logger.js');
-        const log = getLogger('RuleElements/Cleanup');
-
-        log.debug(() => ({
-          msg: 'Cleaning up rule elements for deleted effect',
-          itemName: item.name,
-          itemId: item.id,
-          tokenCount: tokens.length,
-          ruleElementCount: item.system?.rules?.length || 0,
-        }));
-        await cleanupDeletedVisionerRuleElements(item, tokens, log);
-      }
-    } catch (e) {
-      console.warn('PF2E Visioner | deleteItem cleanup failed:', e);
-    }
+    await cleanupDeletedEffectItem(item);
   });
 
   // Handle scene updates to trigger AVS recalculation when disableAVS flag changes
-  Hooks.on('updateScene', async (scene, changes, options, userId) => {
-    try {
-      if (scene.id !== canvas?.scene?.id) return;
-      const disableAVSChanged = changes?.flags?.[MODULE_ID]?.disableAVS !== undefined;
-      if (disableAVSChanged) {
-        // Trigger AVS recalculation when the disable flag changes
-        const { autoVisibility } = await import('../api.js');
-        await autoVisibility.recalculateAll(true); // Force recalculation
-      }
-    } catch (error) {
-      console.warn('PF2E Visioner | Failed to handle scene update for disableAVS:', error);
-    }
+  Hooks.on('updateScene', async (scene, changes) => {
+    await handleSceneDisableAvsRefresh(scene, changes);
   });
 }

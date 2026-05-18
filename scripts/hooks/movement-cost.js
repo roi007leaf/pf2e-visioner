@@ -3,17 +3,21 @@
  * Handles modification of movement costs for specific conditions like Blinded or Darkness.
  */
 
+import { registerOnce } from '../utils/register-once.js';
+
 const MOVEMENT_COST_WRAPPED = Symbol.for('pf2e-visioner.movement-cost-wrapped');
+export const MOVEMENT_COST_REGISTRATION_KEY = 'hooks:movement-cost';
 
 /**
  * Register movement cost wrappers
  */
 export function registerMovementCostHooks() {
-    if (game.ready) {
-        _registerMovementCostHooks();
-    } else {
+    return registerOnce(MOVEMENT_COST_REGISTRATION_KEY, () => {
+        if (game.ready) {
+            return _registerMovementCostHooks();
+        }
         Hooks.once('ready', _registerMovementCostHooks);
-    }
+    });
 }
 
 function _registerMovementCostHooks() {
@@ -22,11 +26,11 @@ function _registerMovementCostHooks() {
 
     if (!TerrainDataClass) {
         console.warn('PF2E Visioner | CONFIG.Token.movement.TerrainData not found. Movement cost features disabled.');
-        return;
+        return false;
     }
 
     if (TerrainDataClass[MOVEMENT_COST_WRAPPED]) {
-        return;
+        return true;
     }
 
 
@@ -74,4 +78,6 @@ function _registerMovementCostHooks() {
             return originalCostFunction(from, to, distance, modifiedSegment);
         };
     };
+
+    return true;
 }

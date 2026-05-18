@@ -11,29 +11,42 @@
  * and delegating state management to injected dependencies.
  */
 
-import { VisionAnalyzer } from '../VisionAnalyzer.js';
+import { AvsInvalidationCoordinator } from './AvsInvalidationCoordinator.js';
+import {
+  itemLightEmitterUpdated,
+  itemVisibilityUpdated,
+  itemVisionEquipmentUpdated,
+} from './InvalidationIntents.js';
 
 export class ItemEventHandler {
   /** @type {SystemStateProvider} */
   #systemStateProvider = null;
 
-  /** @type {VisibilityStateManager} */
-  #visibilityStateManager = null;
-
   /** @type {ExclusionManager} */
   #exclusionManager = null;
-
-  /** @type {CacheManagementService} */
-  #cacheManager = null;
 
   /** @type {boolean} */
   #batchInProgress = false;
 
-  constructor(systemStateProvider, visibilityStateManager, exclusionManager, cacheManager) {
+  /** @type {AvsInvalidationCoordinator|null} */
+  #invalidation = null;
+
+  constructor(
+    systemStateProvider,
+    visibilityStateManager,
+    exclusionManager,
+    cacheManager,
+    invalidationCoordinator = null,
+  ) {
     this.#systemStateProvider = systemStateProvider;
-    this.#visibilityStateManager = visibilityStateManager;
     this.#exclusionManager = exclusionManager;
-    this.#cacheManager = cacheManager;
+    this.#invalidation =
+      invalidationCoordinator ??
+      new AvsInvalidationCoordinator({
+        systemStateProvider,
+        visibilityStateManager,
+        cacheManager,
+      });
 
     Hooks.on('pf2e-visioner.batchStart', () => {
       this.#batchInProgress = true;
@@ -244,31 +257,16 @@ export class ItemEventHandler {
       const tokens =
         canvas.tokens?.placeables.filter(
           (t) => t.actor?.id === actor.id && !this.#exclusionManager.isExcludedToken(t),
-        ) || [];
+      ) || [];
 
       if (tokens.length > 0) {
-        // Clear VisionAnalyzer cache for affected tokens
-        // This ensures vision/sensing capabilities are recalculated with new conditions
-        const visionAnalyzer = VisionAnalyzer.getInstance();
-        tokens.forEach((token) => {
-          visionAnalyzer.clearCache(token);
-        });
-
         if (lightEmitterHint) {
           // Emitting light changed: recalc ALL because others are affected by the emitter's aura
-          this.#visibilityStateManager.markAllTokensChangedImmediate();
+          this.#invalidation.invalidate(itemLightEmitterUpdated(item, { action, actor, tokens }));
         } else if (isVisibilityRelated || isVisibilityFeat) {
-          // Visibility-affecting condition changed - process immediately
-          // Clear cache to ensure fresh calculations
-          this.#cacheManager?.getGlobalVisibilityCache()?.clear();
-          tokens.forEach((token) =>
-            this.#visibilityStateManager.markTokenChangedImmediate(token.document.id),
-          );
+          this.#invalidation.invalidate(itemVisibilityUpdated(item, { action, actor, tokens }));
         } else {
-          // Non-visibility items - process immediately
-          tokens.forEach((token) =>
-            this.#visibilityStateManager.markTokenChangedImmediate(token.document.id),
-          );
+          this.#invalidation.invalidate(itemVisibilityUpdated(item, { action, actor, tokens }));
         }
       }
     }
@@ -310,15 +308,7 @@ export class ItemEventHandler {
           equipped: changes.system?.equipped,
         });
 
-        // Clear VisionAnalyzer cache for affected tokens
-        const visionAnalyzer = VisionAnalyzer.getInstance();
-        tokens.forEach((token) => {
-          visionAnalyzer.clearCache(token);
-        });
-
-        tokens.forEach((token) =>
-          this.#visibilityStateManager.markTokenChangedImmediate(token.document.id),
-        );
+        this.#invalidation.invalidate(itemVisionEquipmentUpdated(item, { actor, tokens, changes }));
       }
     }
   }

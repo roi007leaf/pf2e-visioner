@@ -1,10 +1,13 @@
 import { registerMovementCostHooks } from '../../../scripts/hooks/movement-cost.js';
+import { resetRegistrationsForTests } from '../../../scripts/utils/register-once.js';
 
 describe('Movement Cost Hooks', () => {
     let mockGetMovementCostFunction;
     let TerrainDataClass;
 
     beforeEach(() => {
+        resetRegistrationsForTests();
+
         // Mock CONFIG and TerrainData
         mockGetMovementCostFunction = jest.fn();
 
@@ -64,6 +67,17 @@ describe('Movement Cost Hooks', () => {
 
         expect(mockGetMovementCostFunction).toHaveBeenCalledTimes(1);
         expect(mockCostCalculator).toHaveBeenCalledTimes(1);
+    });
+
+    test('registering twice before ready binds one ready hook', () => {
+        global.game.ready = false;
+        global.Hooks.once = jest.fn();
+
+        registerMovementCostHooks();
+        registerMovementCostHooks();
+
+        expect(global.Hooks.once).toHaveBeenCalledTimes(1);
+        expect(global.Hooks.once).toHaveBeenCalledWith('ready', expect.any(Function));
     });
 
     test('applies difficult terrain when blinded', () => {

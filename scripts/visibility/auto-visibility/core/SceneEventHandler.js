@@ -1,6 +1,10 @@
-import { CacheManagementService } from './CacheManagementService.js';
+import { AvsInvalidationCoordinator } from './AvsInvalidationCoordinator.js';
+import {
+    regionSurfaceUpdated,
+    sceneConfigLightingFlushed,
+    sceneLightingUpdated,
+} from './InvalidationIntents.js';
 import { SystemStateProvider } from './SystemStateProvider.js';
-import { VisibilityStateManager } from './VisibilityStateManager.js';
 
 /**
  * SceneEventHandler - Handles scene-related events that may affect visibility
@@ -17,17 +21,18 @@ export class SceneEventHandler {
     /** @type {SystemStateProvider} */
     #systemStateProvider = null;
 
-    /** @type {VisibilityStateManager} */
-    #visibilityStateManager = null;
-
-    /** @type {CacheManagementService} */
-    #cacheManager = null;
-
-
-    constructor(systemStateProvider, visibilityStateManager, cacheManager = null) {
+    constructor(
+        systemStateProvider,
+        visibilityStateManager,
+        cacheManager = null,
+        invalidationCoordinator = null,
+    ) {
         this.#systemStateProvider = systemStateProvider;
-        this.#visibilityStateManager = visibilityStateManager;
-        this.#cacheManager = cacheManager;
+        this.invalidation = invalidationCoordinator ?? new AvsInvalidationCoordinator({
+            systemStateProvider,
+            visibilityStateManager,
+            cacheManager,
+        });
     }
 
     /**
@@ -123,11 +128,7 @@ export class SceneEventHandler {
                 }
             });
 
-            // Persisted lighting changes: clear caches and recalc immediately
-            if (this.#cacheManager?.clearAllCaches) {
-                this.#cacheManager.clearAllCaches();
-            }
-            this.#visibilityStateManager.markAllTokensChangedImmediate();
+            this.invalidation.invalidate(sceneLightingUpdated(scene, changes, { options, userId }));
         }
     }
 
@@ -150,10 +151,7 @@ export class SceneEventHandler {
 
         if (hadPending) {
             this.#systemStateProvider.debug('SceneEventHandler: SceneConfig closed - applying deferred lighting updates');
-            if (this.#cacheManager?.clearAllCaches) {
-                this.#cacheManager.clearAllCaches();
-            }
-            this.#visibilityStateManager.markAllTokensChangedImmediate();
+            this.invalidation.invalidate(sceneConfigLightingFlushed());
         }
     }
 
@@ -202,10 +200,7 @@ export class SceneEventHandler {
             ...detail
         });
 
-        if (this.#cacheManager?.clearAllCaches) {
-            this.#cacheManager.clearAllCaches();
-        }
-        this.#visibilityStateManager.markAllTokensChangedImmediate();
+        this.invalidation.invalidate(regionSurfaceUpdated(reason, detail));
     }
 
     #onRegionChange(region, changes = {}, options = {}, userId) {
@@ -219,6 +214,7 @@ export class SceneEventHandler {
         this.#triggerRegionSurfaceRecalculation(
             placementLevelsChanged ? 'region-placement-levels-update' : 'region-update',
             {
+            document: region,
             sceneId: scene?.id ?? null,
             sceneName: scene?.name ?? null,
             regionId: region?.id ?? null,
@@ -239,6 +235,7 @@ export class SceneEventHandler {
         if (!this.#isCurrentScene(scene)) return;
 
         this.#triggerRegionSurfaceRecalculation('region-behavior-update', {
+            document: behavior,
             sceneId: scene?.id ?? null,
             sceneName: scene?.name ?? null,
             regionId: region?.id ?? null,

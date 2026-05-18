@@ -8,6 +8,10 @@ import { initializeHoverTooltips } from '../services/HoverTooltips.js';
 import { restorePendingMovementTokenRendering } from '../services/pending-token-movement.js';
 import { runVisibilityV2MigrationIfNeeded } from '../migrations/visibility-v2-migration.js';
 import { registerSocket } from '../services/socket.js';
+import {
+  clearSuppressLightingRefresh,
+  setSuppressLightingRefresh,
+} from '../services/runtime-state.js';
 import { updateWallVisuals } from '../services/visual-effects.js';
 import { getLogger } from '../utils/logger.js';
 import { logControlTokenVisibilitySnapshot } from '../helpers/visibility-debug.js';
@@ -531,9 +535,7 @@ export async function onCanvasReady() {
     bindHookOnce('restoreIndicatorsOnControl', 'controlToken', async (token, controlled) => {
       // CRITICAL: Set global flag to suppress lighting refreshes during token control operations
       try {
-        globalThis.game = globalThis.game || {};
-        globalThis.game.pf2eVisioner = globalThis.game.pf2eVisioner || {};
-        globalThis.game.pf2eVisioner.suppressLightingRefresh = true;
+        setSuppressLightingRefresh(true);
 
         // Track this controlToken event to prevent AVS from responding to related lighting refreshes
         const { LightingEventHandler } = await import(
@@ -584,9 +586,7 @@ export async function onCanvasReady() {
       // Clear the suppression flag after a short delay
       setTimeout(() => {
         try {
-          if (globalThis.game?.pf2eVisioner) {
-            globalThis.game.pf2eVisioner.suppressLightingRefresh = false;
-          }
+          clearSuppressLightingRefresh();
         } catch {
           // Best effort
         }

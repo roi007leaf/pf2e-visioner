@@ -4,11 +4,31 @@
  *
  * Follows SOLID principles by depending on abstractions rather than concrete implementations.
  */
+import { AvsInvalidationCoordinator } from './AvsInvalidationCoordinator.js';
+import {
+  ambientLightCreated,
+  ambientLightDeleted,
+  ambientLightUpdated,
+  lightingRefresh,
+} from './InvalidationIntents.js';
+
 export class LightingEventHandler {
-  constructor(systemStateProvider, visibilityStateManager, cacheManager = null) {
+  constructor(
+    systemStateProvider,
+    visibilityStateManager,
+    cacheManager = null,
+    invalidationCoordinator = null,
+  ) {
     this.systemState = systemStateProvider;
     this.visibilityState = visibilityStateManager;
     this.cacheManager = cacheManager;
+    this.invalidation =
+      invalidationCoordinator ??
+      new AvsInvalidationCoordinator({
+        systemStateProvider,
+        visibilityStateManager,
+        cacheManager,
+      });
   }
 
   /**
@@ -23,128 +43,26 @@ export class LightingEventHandler {
   }
 
   /**
-   * Check if a light change affects visibility calculations
-   * @param {Object} changeData - The change data from the update
-   * @returns {boolean} Whether this change affects visibility
-   */
-  #affectsVisibility(changeData) {
-    if (!changeData) return true; // Safe default - assume it affects visibility
-
-    // Check for geometry changes that affect visibility
-    const geometryFields = [
-      'x',
-      'y',
-      'elevation', // Position changes
-      'config.dim',
-      'config.bright', // Light range changes
-      'config.angle',
-      'rotation', // Direction changes
-      'config.alpha', // Visibility changes
-      'config.darkness.min',
-      'config.darkness.max', // Darkness interaction
-      'hidden', // Visibility toggle
-      'config.walls', // Wall interaction
-    ];
-
-    return geometryFields.some((field) => foundry.utils.hasProperty(changeData, field));
-  }
-
-  #runAfterLightingRefresh(callback) {
-    let completed = false;
-    const finish = async () => {
-      if (completed) return;
-      completed = true;
-      try {
-        await callback();
-      } finally {
-        try {
-          delete globalThis.game?.pf2eVisioner?.suppressLightingRefresh;
-        } catch {
-          /* best-effort */
-        }
-      }
-    };
-
-    try {
-      globalThis.game = globalThis.game || {};
-      game.pf2eVisioner = game.pf2eVisioner || {};
-      game.pf2eVisioner.suppressLightingRefresh = true;
-      Hooks.once('lightingRefresh', finish);
-      setTimeout(finish, 100);
-    } catch (error) {
-      console.warn('[PF2E Visioner] Failed to schedule post-lighting refresh work:', error);
-      finish();
-    }
-  }
-
-  /**
    * Handle ambient light update - affects visibility for all tokens
    */
   async handleLightUpdate(document, changeData, options, userId) {
-    if (!this.systemState.shouldProcessEvents()) return;
-
-    // Only clear caches if the change actually affects visibility
-    if (this.#affectsVisibility(changeData)) {
-      if (this.cacheManager?.clearVisibilityCache) {
-        this.cacheManager.clearVisibilityCache();
-      }
-      // CRITICAL: Clear LightingPrecomputer caches when ambient lights change
-      // This ensures the lighting environment hash will be recalculated
-      try {
-        const { LightingPrecomputer } = await import('./LightingPrecomputer.js');
-        LightingPrecomputer.clearLightingCaches();
-      } catch (e) {
-        console.warn('Failed to clear LightingPrecomputer caches:', e);
-      }
-
-      this.#runAfterLightingRefresh(() => {
-        // Use immediate processing after Foundry has rebuilt light sources.
-        // Ambient light changes are less frequent than token movements, so no need for throttling.
-        this.visibilityState.markAllTokensChangedImmediate();
-      });
-    }
+    return this.invalidation.invalidate(
+      ambientLightUpdated(document, changeData, { options, userId }),
+    );
   }
 
   /**
    * Handle ambient light creation - affects visibility for all tokens
    */
-  async handleLightCreate() {
-    if (!this.systemState.shouldProcessEvents()) return;
-    // New lights always affect visibility, so clear caches
-    if (this.cacheManager?.clearVisibilityCache) {
-      this.cacheManager.clearVisibilityCache();
-    }
-    // CRITICAL: Clear LightingPrecomputer caches when ambient lights are created
-    try {
-      const { LightingPrecomputer } = await import('./LightingPrecomputer.js');
-      LightingPrecomputer.clearLightingCaches();
-    } catch (e) {
-      console.warn('Failed to clear LightingPrecomputer caches:', e);
-    }
-
-    // Use immediate processing for ambient light creation
-    this.visibilityState.markAllTokensChangedImmediate();
+  async handleLightCreate(document, options, userId) {
+    return this.invalidation.invalidate(ambientLightCreated(document, { options, userId }));
   }
 
   /**
    * Handle ambient light deletion - affects visibility for all tokens
    */
-  async handleLightDelete() {
-    if (!this.systemState.shouldProcessEvents()) return;
-    // Deleted lights always affect visibility, so clear caches
-    if (this.cacheManager?.clearVisibilityCache) {
-      this.cacheManager.clearVisibilityCache();
-    }
-    // CRITICAL: Clear LightingPrecomputer caches when ambient lights are deleted
-    try {
-      const { LightingPrecomputer } = await import('./LightingPrecomputer.js');
-      LightingPrecomputer.clearLightingCaches();
-    } catch (e) {
-      console.warn('Failed to clear LightingPrecomputer caches:', e);
-    }
-
-    // Use immediate processing for ambient light deletion
-    this.visibilityState.markAllTokensChangedImmediate();
+  async handleLightDelete(document, options, userId) {
+    return this.invalidation.invalidate(ambientLightDeleted(document, { options, userId }));
   }
 
   /**
@@ -152,77 +70,13 @@ export class LightingEventHandler {
    * We use a throttled recalculation to avoid over-processing during continuous refreshes.
    */
   handleLightingRefresh() {
-    if (!this.systemState.shouldProcessEvents()) {
-      return;
-    }
-
-    if (globalThis.game?.pf2eVisioner?.suppressLightingRefresh) {
-      this.systemState.debug?.(
-        'LightingEventHandler: suppressing lightingRefresh during token operation',
-      );
-      return;
-    }
-
-    if (this.#isLightingRefreshFromTokenSelection()) {
-      this.systemState.debug?.(
-        'LightingEventHandler: ignoring lightingRefresh from token selection',
-      );
-      return;
-    }
-
-    if (this.systemState.isSceneConfigOpen?.()) {
-      this.systemState.markPendingLightingChange?.();
-      this.systemState.debug?.(
-        'LightingEventHandler: deferring lightingRefresh during open SceneConfig',
-      );
-      return;
-    }
-
-    // Check if we're in a feedback loop - if a batch just completed, don't immediately trigger another
-    // This flag is set by BatchOrchestrator and cleared after the next render frame
-    if (globalThis.game?.pf2eVisioner?.suppressLightingRefreshAfterBatch) {
-      this.systemState.debug?.(
-        'LightingEventHandler: ignoring lightingRefresh after batch completion (feedback loop prevention)',
-      );
-      return;
-    }
-
-    try {
-      this.cacheManager?.clearAllCaches?.();
-    } catch {
-      /* best-effort */
-    }
-    this.visibilityState.markAllTokensChangedThrottled();
-  }
-
-  /**
-   * Check if a lighting refresh event was likely triggered by token selection
-   * @returns {boolean} True if this refresh should be ignored
-   */
-  #isLightingRefreshFromTokenSelection() {
-    try {
-      // Get the current time
-      const now = Date.now();
-
-      // Check if there was a recent controlToken event (within last 100ms)
-      const lastControlEvent = this.constructor._lastControlTokenTime || 0;
-      const timeSinceControl = now - lastControlEvent;
-
-      // If a controlToken happened very recently, this lighting refresh is likely from that
-      if (timeSinceControl < 100) {
-        return true;
-      }
-
-      return false;
-    } catch {
-      return false;
-    }
+    return this.invalidation.invalidate(lightingRefresh());
   }
 
   /**
    * Track when controlToken events occur
    */
   static trackControlTokenEvent() {
-    LightingEventHandler._lastControlTokenTime = Date.now();
+    AvsInvalidationCoordinator.trackControlTokenEvent();
   }
 }

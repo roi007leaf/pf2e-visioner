@@ -9,6 +9,14 @@ describe('TokenEventHandler - animation detection on position change', () => {
   let pinTokenDestination;
   let queueOverrideValidation;
   let processQueuedValidations;
+  let systemState;
+  let visibilityState;
+  let spatialAnalyzer;
+  let exclusionManager;
+  let overrideValidationManager;
+  let positionManager;
+  let cacheManager;
+  let batchOrchestrator;
 
   beforeEach(() => {
     markTokenChangedWithSpatialOptimization = jest.fn();
@@ -18,33 +26,33 @@ describe('TokenEventHandler - animation detection on position change', () => {
     queueOverrideValidation = jest.fn();
     processQueuedValidations = jest.fn(() => Promise.resolve());
 
-    const systemState = {
+    systemState = {
       shouldProcessEvents: () => true,
       shouldProcessEventsForToken: undefined,
       debug: jest.fn(),
     };
 
-    const visibilityState = {
+    visibilityState = {
       markTokenChangedWithSpatialOptimization,
       markTokenChangedImmediate: jest.fn(),
       markAllTokensChangedImmediate: jest.fn(),
       recalculateForTokens: jest.fn(),
     };
 
-    const spatialAnalyzer = {
+    spatialAnalyzer = {
       getAffectedTokens: jest.fn(() => []),
     };
 
-    const exclusionManager = {
+    exclusionManager = {
       isExcludedToken: () => false,
     };
 
-    const overrideValidationManager = {
+    overrideValidationManager = {
       queueOverrideValidation,
       processQueuedValidations,
     };
 
-    const positionManager = {
+    positionManager = {
       storeUpdatedTokenDoc,
       pinTokenDestination,
       pinPosition: jest.fn(),
@@ -52,13 +60,13 @@ describe('TokenEventHandler - animation detection on position change', () => {
       getPinDurationMs: () => 500,
     };
 
-    const cacheManager = {
+    cacheManager = {
       getGlobalVisibilityCache: () => null,
       clearLosCache: jest.fn(),
       clearVisibilityCache: jest.fn(),
     };
 
-    const batchOrchestrator = {
+    batchOrchestrator = {
       notifyTokenMovementStart,
     };
 
@@ -155,6 +163,43 @@ describe('TokenEventHandler - animation detection on position change', () => {
     expect(markTokenChangedWithSpatialOptimization).toHaveBeenCalled();
   });
 
+  test('position update delegates movement invalidation without directly queuing override validation', async () => {
+    const invalidationCoordinator = { invalidate: jest.fn(() => true) };
+    handler = new TokenEventHandler(
+      systemState,
+      visibilityState,
+      spatialAnalyzer,
+      exclusionManager,
+      overrideValidationManager,
+      positionManager,
+      cacheManager,
+      batchOrchestrator,
+      invalidationCoordinator,
+    );
+    const tokenDoc = makeTokenDoc({
+      object: {
+        _animation: { state: 'completed' },
+        _dragHandle: null,
+        actor: { id: 'actor-1' },
+      },
+    });
+    const changes = { x: 100, y: 100 };
+    const options = { diff: true };
+
+    handler.handleTokenUpdate(tokenDoc, changes, options, 'user-1');
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(invalidationCoordinator.invalidate).toHaveBeenCalledWith({
+      reason: 'token-position-updated',
+      document: tokenDoc,
+      changeData: changes,
+      options,
+      userId: 'user-1',
+    });
+    expect(queueOverrideValidation).not.toHaveBeenCalled();
+  });
+
   test('position change while dragging should defer processing', () => {
     const tokenDoc = makeTokenDoc({
       object: {
@@ -168,6 +213,92 @@ describe('TokenEventHandler - animation detection on position change', () => {
 
     expect(markTokenChangedWithSpatialOptimization).not.toHaveBeenCalled();
     expect(notifyTokenMovementStart).toHaveBeenCalled();
+  });
+
+  test('hidden sneaking movement delegates override validation without recalculating visibility', () => {
+    const invalidationCoordinator = { invalidate: jest.fn(() => true) };
+    handler = new TokenEventHandler(
+      systemState,
+      visibilityState,
+      spatialAnalyzer,
+      exclusionManager,
+      overrideValidationManager,
+      positionManager,
+      cacheManager,
+      batchOrchestrator,
+      invalidationCoordinator,
+    );
+    const hiddenToken = {
+      document: {
+        id: 'token-1',
+        getFlag: jest.fn(() => true),
+      },
+    };
+    global.canvas.tokens.get = jest.fn(() => hiddenToken);
+    const tokenDoc = makeTokenDoc({
+      hidden: true,
+      object: {
+        _animation: { state: 'completed' },
+        _dragHandle: null,
+        actor: { id: 'actor-1' },
+      },
+    });
+    const changes = { x: 100, y: 100 };
+
+    handler.handleTokenUpdate(tokenDoc, changes, {}, 'user-1');
+
+    expect(invalidationCoordinator.invalidate).toHaveBeenCalledWith({
+      reason: 'token-movement-override-validation-required',
+      document: hiddenToken,
+      changeData: changes,
+      options: {},
+      userId: 'user-1',
+    });
+    expect(markTokenChangedWithSpatialOptimization).not.toHaveBeenCalled();
+    expect(queueOverrideValidation).not.toHaveBeenCalled();
+  });
+
+  test('excluded sneaking movement delegates override validation without recalculating visibility', () => {
+    const invalidationCoordinator = { invalidate: jest.fn(() => true) };
+    exclusionManager.isExcludedToken = jest.fn(() => true);
+    handler = new TokenEventHandler(
+      systemState,
+      visibilityState,
+      spatialAnalyzer,
+      exclusionManager,
+      overrideValidationManager,
+      positionManager,
+      cacheManager,
+      batchOrchestrator,
+      invalidationCoordinator,
+    );
+    const excludedToken = {
+      document: {
+        id: 'token-1',
+        getFlag: jest.fn(() => true),
+      },
+    };
+    global.canvas.tokens.get = jest.fn(() => excludedToken);
+    const tokenDoc = makeTokenDoc({
+      object: {
+        _animation: { state: 'completed' },
+        _dragHandle: null,
+        actor: { id: 'actor-1' },
+      },
+    });
+    const changes = { x: 100, y: 100 };
+
+    handler.handleTokenUpdate(tokenDoc, changes, {}, 'user-1');
+
+    expect(invalidationCoordinator.invalidate).toHaveBeenCalledWith({
+      reason: 'token-movement-override-validation-required',
+      document: excludedToken,
+      changeData: changes,
+      options: {},
+      userId: 'user-1',
+    });
+    expect(markTokenChangedWithSpatialOptimization).not.toHaveBeenCalled();
+    expect(queueOverrideValidation).not.toHaveBeenCalled();
   });
 
   test('final move waits for active animation promise before processing', async () => {
@@ -202,6 +333,44 @@ describe('TokenEventHandler - animation detection on position change', () => {
       x: 100,
       y: 100,
     });
+  });
+
+  test('final move delegates completed movement invalidation without directly queuing override validation', async () => {
+    const invalidationCoordinator = { invalidate: jest.fn(() => true) };
+    handler = new TokenEventHandler(
+      systemState,
+      visibilityState,
+      spatialAnalyzer,
+      exclusionManager,
+      overrideValidationManager,
+      positionManager,
+      cacheManager,
+      batchOrchestrator,
+      invalidationCoordinator,
+    );
+    const tokenDoc = makeTokenDoc({
+      object: {
+        _animation: null,
+        _dragHandle: null,
+        actor: { id: 'actor-1', items: [] },
+      },
+    });
+
+    await handler.handleMoveToken(
+      tokenDoc,
+      { destination: { x: 100, y: 100 }, chain: [] },
+      { animate: true },
+      'user-1',
+    );
+
+    expect(invalidationCoordinator.invalidate).toHaveBeenCalledWith({
+      reason: 'token-movement-completed',
+      document: tokenDoc,
+      changeData: { x: 100, y: 100 },
+      options: { animate: true },
+      userId: 'user-1',
+    });
+    expect(queueOverrideValidation).not.toHaveBeenCalled();
   });
 
   test('final move does not process early when updateToken already deferred to animation completion', async () => {

@@ -3,6 +3,12 @@ import { getVisibilityStateConfig } from '../services/data/visibility-states.js'
 import '../services/hbs-helpers.js';
 import { notify } from '../services/infra/notifications.js';
 import { filterOutcomesByEncounter, hasActiveEncounter } from '../services/infra/shared-utils.js';
+import {
+  updateBulkActionButtons as updateBulkActionButtonsInDom,
+  updateChangesCount as updateChangesCountInDom,
+  updateRowButtonsToApplied as updateRowButtonsToAppliedInDom,
+  updateRowButtonsToReverted as updateRowButtonsToRevertedInDom,
+} from '../services/ui/dialog-utils.js';
 import { BasePreviewDialog } from './BasePreviewDialog.js';
 
 export class BaseActionDialog extends BasePreviewDialog {
@@ -10,6 +16,7 @@ export class BaseActionDialog extends BasePreviewDialog {
     super(options);
     this.bulkActionState = this.bulkActionState ?? 'initial';
     this.rowTimers = new Map();
+    this._dropdownDocumentClickHandler = null;
     // Per-dialog visual filter: show only rows with actionable changes
     if (typeof this.showOnlyChanges === 'undefined') this.showOnlyChanges = false;
     // LOS filter: enabled out of combat by default, disabled in combat (UI disabled while in combat)
@@ -306,7 +313,19 @@ export class BaseActionDialog extends BasePreviewDialog {
       });
     });
 
-    document.addEventListener('click', () => this._closeAllDropdowns(), { once: true });
+    if (!this._dropdownDocumentClickHandler && typeof document !== 'undefined') {
+      this._dropdownDocumentClickHandler = () => {
+        this._dropdownDocumentClickHandler = null;
+        this._closeAllDropdowns();
+      };
+      document.addEventListener('click', this._dropdownDocumentClickHandler, { once: true });
+    }
+  }
+
+  _detachDropdownDocumentHandler() {
+    if (!this._dropdownDocumentClickHandler || typeof document === 'undefined') return;
+    document.removeEventListener('click', this._dropdownDocumentClickHandler);
+    this._dropdownDocumentClickHandler = null;
   }
 
   _closeAllDropdowns() {
@@ -314,6 +333,11 @@ export class BaseActionDialog extends BasePreviewDialog {
     this.element.querySelectorAll('.dropdown-menu').forEach((menu) => {
       menu.style.display = 'none';
     });
+  }
+
+  async close(options) {
+    this._detachDropdownDocumentHandler();
+    return super.close(options);
   }
 
   buildCommonContext(outcomes) {
@@ -492,11 +516,9 @@ export class BaseActionDialog extends BasePreviewDialog {
               : o,
       )
       : outcomes;
-    import('../services/ui/dialog-utils.js').then(({ updateRowButtonsToApplied }) => {
-      try {
-        updateRowButtonsToApplied(this.element, normalized);
-      } catch { }
-    });
+    try {
+      updateRowButtonsToAppliedInDom(this.element, normalized);
+    } catch { }
   }
 
   updateRowButtonsToReverted(outcomes) {
@@ -512,61 +534,57 @@ export class BaseActionDialog extends BasePreviewDialog {
               : o,
       )
       : outcomes;
-    import('../services/ui/dialog-utils.js').then(({ updateRowButtonsToReverted }) => {
-      try {
-        updateRowButtonsToReverted(this.element, normalized);
-      } catch { }
-      try {
-        // After reverting, reset each row's selection to its initial calculated outcome
-        if (!Array.isArray(outcomes)) return;
-        for (const o of outcomes) {
-          const tokenId = o?.target?.id;
-          if (!tokenId) continue;
-          const row = this.element?.querySelector?.(`tr[data-token-id="${tokenId}"]`);
-          if (!row) continue;
-          const container = row.querySelector('.override-icons');
-          if (!container) continue;
-          // Clear current selection
-          container.querySelectorAll('.state-icon').forEach((i) => i.classList.remove('selected'));
-          // Prefer icon marked as calculated outcome; fallback to the hidden input's value
-          let selectedIcon = container.querySelector('.state-icon.calculated-outcome');
-          if (!selectedIcon) {
-            const hidden = container.querySelector('input[type="hidden"]');
-            if (hidden)
-              selectedIcon = container.querySelector(`.state-icon[data-state="${hidden.value}"]`);
-          }
-          if (selectedIcon) {
-            selectedIcon.classList.add('selected');
-            const state = selectedIcon.dataset.state;
-            const hidden = container.querySelector('input[type="hidden"]');
-            if (hidden) hidden.value = state;
-          }
-          // Clear any explicit override so selection reflects initial calculated state
-          try {
-            const outcome = this.outcomes?.find?.(
-              (x) => String(this.getOutcomeTokenId(x)) === String(tokenId),
-            );
-            if (outcome) outcome.overrideState = null;
-          } catch { }
+    try {
+      updateRowButtonsToRevertedInDom(this.element, normalized);
+    } catch { }
+    try {
+      // After reverting, reset each row's selection to its initial calculated outcome
+      if (!Array.isArray(outcomes)) return;
+      for (const o of outcomes) {
+        const tokenId = o?.target?.id;
+        if (!tokenId) continue;
+        const row = this.element?.querySelector?.(`tr[data-token-id="${tokenId}"]`);
+        if (!row) continue;
+        const container = row.querySelector('.override-icons');
+        if (!container) continue;
+        // Clear current selection
+        container.querySelectorAll('.state-icon').forEach((i) => i.classList.remove('selected'));
+        // Prefer icon marked as calculated outcome; fallback to the hidden input's value
+        let selectedIcon = container.querySelector('.state-icon.calculated-outcome');
+        if (!selectedIcon) {
+          const hidden = container.querySelector('input[type="hidden"]');
+          if (hidden)
+            selectedIcon = container.querySelector(`.state-icon[data-state="${hidden.value}"]`);
         }
-      } catch { }
-    });
+        if (selectedIcon) {
+          selectedIcon.classList.add('selected');
+          const state = selectedIcon.dataset.state;
+          const hidden = container.querySelector('input[type="hidden"]');
+          if (hidden) hidden.value = state;
+        }
+        // Clear any explicit override so selection reflects initial calculated state
+        try {
+          const outcome = this.outcomes?.find?.(
+            (x) => String(this.getOutcomeTokenId(x)) === String(tokenId),
+          );
+          if (outcome) outcome.overrideState = null;
+        } catch { }
+      }
+    } catch { }
   }
 
   updateBulkActionButtons() {
-    import('../services/ui/dialog-utils.js').then(({ updateBulkActionButtons }) => {
-      try {
-        updateBulkActionButtons(this.element, this.bulkActionState);
-      } catch { }
-    });
+    try {
+      updateBulkActionButtonsInDom(this.element, this.bulkActionState);
+    } catch { }
   }
 
   updateChangesCount() {
-    import('../services/ui/dialog-utils.js').then(({ updateChangesCount }) => {
-      try {
-        updateChangesCount(this.element, this.getChangesCounterClass());
-      } catch { }
-    });
+    try {
+      return updateChangesCountInDom(this.element, this.getChangesCounterClass());
+    } catch {
+      return 0;
+    }
   }
 
   // Default token id resolver for outcomes; subclasses can override

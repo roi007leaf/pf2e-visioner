@@ -10,6 +10,7 @@
 
 import { COVER_STATES, MODULE_ID, VISIBILITY_STATES } from '../constants.js';
 import { addTokenBorder, removeTokenBorder } from '../managers/token-manager/borders.js';
+import { getLastMovedTokenId, setLastMovedTokenId } from '../services/runtime-state.js';
 import { overrideToDisplayVisibility } from '../visibility/perception-profile.js';
 
 function hasOverrideVisibilityData(override) {
@@ -421,7 +422,9 @@ class OverrideValidationIndicator {
     try {
       const { OverrideValidationDialog } = await import('./OverrideValidationDialog.js');
       // Expose moved token id for grouping via a global scratch, then show dialog
-      try { game.pf2eVisioner = game.pf2eVisioner || {}; game.pf2eVisioner.lastMovedTokenId = this._data.movedTokenId || null; } catch { }
+      try {
+        setLastMovedTokenId(this._data?.movedTokenId || null);
+      } catch { }
 
       const dialog = new OverrideValidationDialog({
         invalidOverrides: this._rawOverrides,
@@ -763,7 +766,7 @@ class OverrideValidationIndicator {
     // Render the already-filtered display items to keep counts and grouping consistent
     // The _data.overrides should already be filtered by both #hasDisplayChange and #shouldShowOverride
     const all = this._data?.overrides || [];
-    const movedId = this._data?.movedTokenId ?? (globalThis?.game?.pf2eVisioner?.lastMovedTokenId ?? null);
+    const movedId = this._data?.movedTokenId ?? getLastMovedTokenId();
 
     const mkVis = (key) => {
       if (key === 'avs') return '';

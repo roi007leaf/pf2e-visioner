@@ -36,6 +36,7 @@
 ### Added
 
 - **PF2E HUD Take Cover can route player requests to the GM**: Non-GM Take Cover clicks from PF2E HUD now request the GM to open the Visioner Take Cover preview for the active canvas token, while GM-side preview resolution prefers the real scene token over actor prototype token data.
+
 ### Fixed
 
 - **Visioner Manager manual visibility choices hide Unnoticed**: The Visioner Manager no longer offers Unnoticed in per-row visibility action buttons or bulk visibility buttons, keeping Unnoticed reserved for encounter-driven awareness flows.

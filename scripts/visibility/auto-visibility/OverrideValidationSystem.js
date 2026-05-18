@@ -7,6 +7,7 @@
 import { VisibilityCalculator } from './VisibilityCalculator.js';
 import { normalizePerceptionProfile } from '../perception-profile.js';
 import { FeatsHandler } from '../../chat/services/FeatsHandler.js';
+import { getLastMovedTokenId } from '../../services/runtime-state.js';
 
 const STEALTH_OVERRIDE_STATES = new Set(['hidden', 'undetected', 'unnoticed']);
 
@@ -474,7 +475,7 @@ export class OverrideValidationSystem {
       let movedTokenId = null;
       let movedTokenName = 'Token Movement';
       try {
-        movedTokenId = globalThis?.game?.pf2eVisioner?.lastMovedTokenId || null;
+        movedTokenId = getLastMovedTokenId();
         if (movedTokenId) {
           movedTokenName = canvas.tokens?.get(movedTokenId)?.document?.name || movedTokenName;
         }

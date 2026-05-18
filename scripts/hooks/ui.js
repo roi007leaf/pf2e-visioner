@@ -5,6 +5,10 @@
 import { FeatsHandler } from '../chat/services/FeatsHandler.js';
 import { COVER_STATES, MODULE_ID } from '../constants.js';
 import { onRenderTokenHUD } from '../services/token-hud.js';
+import {
+  clearSuppressLightingRefresh,
+  setSuppressLightingRefresh,
+} from '../services/runtime-state.js';
 import { isDarknessSource } from '../utils/darkness-source.js';
 
 export function registerUIHooks() {
@@ -739,9 +743,7 @@ export function registerUIHooks() {
   Hooks.on('controlToken', (token, controlled) => {
     // CRITICAL: Set global flag to suppress lighting refreshes during token control operations
     try {
-      globalThis.game = globalThis.game || {};
-      globalThis.game.pf2eVisioner = globalThis.game.pf2eVisioner || {};
-      globalThis.game.pf2eVisioner.suppressLightingRefresh = true;
+      setSuppressLightingRefresh(true);
 
       // Track this controlToken event to prevent AVS from responding to related lighting refreshes
       import('../visibility/auto-visibility/core/LightingEventHandler.js').then(
@@ -753,9 +755,7 @@ export function registerUIHooks() {
       // Clear the suppression flag after a short delay
       setTimeout(() => {
         try {
-          if (globalThis.game?.pf2eVisioner) {
-            globalThis.game.pf2eVisioner.suppressLightingRefresh = false;
-          }
+          clearSuppressLightingRefresh();
         } catch {
           // Best effort
         }

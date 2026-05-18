@@ -114,7 +114,7 @@ Hooks.once('init', async () => {
     registerKeybindings();
 
     // Register hooks
-    registerHooks();
+    await registerHooks();
 
     // Set up API
     const { api } = await import('./api.js');

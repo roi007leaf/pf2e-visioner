@@ -86,7 +86,11 @@ describe('SeekAction LOS partition and filtering', () => {
 describe('DeferredSeekManager integration patterns', () => {
   let managerCode;
   let registrationCode;
+  let wallLifecycleCode;
+  let doorRefreshCode;
   let batchCode;
+  let batchWorkflowFactoryCode;
+  let batchFinalizationCode;
   let combatCode;
 
   beforeAll(() => {
@@ -100,8 +104,30 @@ describe('DeferredSeekManager integration patterns', () => {
       join(__dirname, '../../../scripts/hooks/registration.js'),
       'utf8'
     );
+    wallLifecycleCode = readFileSync(
+      join(__dirname, '../../../scripts/services/wall-lifecycle.js'),
+      'utf8'
+    );
+    doorRefreshCode = readFileSync(
+      join(__dirname, '../../../scripts/services/door-state-visibility-refresh.js'),
+      'utf8'
+    );
     batchCode = readFileSync(
       join(__dirname, '../../../scripts/visibility/auto-visibility/core/BatchOrchestrator.js'),
+      'utf8'
+    );
+    batchWorkflowFactoryCode = readFileSync(
+      join(
+        __dirname,
+        '../../../scripts/visibility/auto-visibility/core/BatchWorkflowFactory.js'
+      ),
+      'utf8'
+    );
+    batchFinalizationCode = readFileSync(
+      join(
+        __dirname,
+        '../../../scripts/visibility/auto-visibility/core/BatchFinalizationWorkflow.js'
+      ),
       'utf8'
     );
     combatCode = readFileSync(
@@ -123,12 +149,16 @@ describe('DeferredSeekManager integration patterns', () => {
   });
 
   test('BatchOrchestrator emits batchComplete hook', () => {
-    expect(batchCode).toContain("pf2e-visioner.batchComplete");
+    expect(batchCode).toContain('createDefaultBatchWorkflowFactory');
+    expect(batchWorkflowFactoryCode).toContain('BatchFinalizationWorkflow');
+    expect(batchFinalizationCode).toContain("'pf2e-visioner.batchComplete'");
   });
 
   test('door handler listens for batchComplete to check deferred seek', () => {
-    expect(registrationCode).toContain("pf2e-visioner.batchComplete");
-    expect(registrationCode).toContain('checkAndApplyDeferred');
+    expect(registrationCode).toContain('handleWallUpdated');
+    expect(wallLifecycleCode).toContain('handleDoorStateVisibilityRefresh');
+    expect(doorRefreshCode).toContain("pf2e-visioner.batchComplete");
+    expect(doorRefreshCode).toContain('checkAndApplyDeferred');
   });
 
   test('combat turn change clears deferred results', () => {
