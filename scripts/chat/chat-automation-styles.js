@@ -1502,7 +1502,26 @@ function getChatAutomationCSS() {
             margin: 0 4px;
         }
         
-        /* Point Out state icon styles removed - now using unified styles */
+        /* State-specific colors for Point Out dialog icons */
+        .point-out-preview-dialog .state-icon[data-state='observed'] {
+            color: var(--visibility-observed) !important;
+        }
+        
+        .point-out-preview-dialog .state-icon[data-state='concealed'] {
+            color: var(--visibility-concealed) !important;
+        }
+        
+        .point-out-preview-dialog .state-icon[data-state='hidden'] {
+            color: var(--visibility-hidden) !important;
+        }
+        
+        .point-out-preview-dialog .state-icon[data-state='undetected'] {
+            color: var(--visibility-undetected) !important;
+        }
+        
+        .point-out-preview-dialog .state-icon[data-state='unnoticed'] {
+            color: var(--visibility-unnoticed) !important;
+        }
         
         .point-out-preview-dialog .no-change-indicator {
             color: var(--color-text-secondary, #b0b0b0);
