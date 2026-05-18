@@ -105,6 +105,26 @@ describe('Take Cover preview layout', () => {
     expect(css).toContain('box-shadow: 0 0 8px color-mix(in srgb, currentColor 55%, transparent)');
   });
 
+  it('colors Point Out visibility change icons from their visibility state', async () => {
+    const fs = await import('node:fs/promises');
+    const path = await import('node:path');
+    const css = await fs.readFile(
+      path.join(process.cwd(), 'scripts/chat/chat-automation-styles.js'),
+      'utf8',
+    );
+
+    expect(css).toContain(".point-out-preview-dialog .state-icon[data-state='observed']");
+    expect(css).toContain('color: var(--visibility-observed)');
+    expect(css).toContain(".point-out-preview-dialog .state-icon[data-state='concealed']");
+    expect(css).toContain('color: var(--visibility-concealed)');
+    expect(css).toContain(".point-out-preview-dialog .state-icon[data-state='hidden']");
+    expect(css).toContain('color: var(--visibility-hidden)');
+    expect(css).toContain(".point-out-preview-dialog .state-icon[data-state='undetected']");
+    expect(css).toContain('color: var(--visibility-undetected)');
+    expect(css).toContain(".point-out-preview-dialog .state-icon[data-state='unnoticed']");
+    expect(css).toContain('color: var(--visibility-unnoticed)');
+  });
+
   it('colors Hide and Sneak prerequisite standard-cover legends orange', async () => {
     const fs = await import('node:fs/promises');
     const path = await import('node:path');
