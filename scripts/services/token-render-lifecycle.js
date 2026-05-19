@@ -6,6 +6,7 @@ import {
 import { isRefreshTokenProcessingSuppressed as defaultIsRefreshTokenProcessingSuppressed } from './runtime-state.js';
 import {
   refreshSystemHiddenHighlightsForMovedToken as defaultRefreshSystemHiddenHighlightsForMovedToken,
+  refreshSystemHiddenHighlightsForControlledTokens as defaultRefreshSystemHiddenHighlightsForControlledTokens,
   refreshSystemHiddenHighlightsForRenderedToken as defaultRefreshSystemHiddenHighlightsForRenderedToken,
 } from './system-hidden-token-highlights.js';
 import { handlePreUpdateTokenMovement as defaultHandlePreUpdateTokenMovement } from './token-movement-preupdate.js';
@@ -84,9 +85,11 @@ export async function handleTokenRefreshed(
   }
 }
 
-export function handleAvsBatchCompleteRefresh({
+export async function handleAvsBatchCompleteRefresh({
   hasPendingMovementRenderWork = defaultHasPendingMovementRenderWork,
   refreshPendingMovementTokenVisibility = defaultRefreshPendingMovementTokenVisibility,
+  refreshSystemHiddenHighlightsForControlledTokens =
+    defaultRefreshSystemHiddenHighlightsForControlledTokens,
 } = {}) {
   try {
     if (!hasPendingMovementRenderWork()) {
@@ -94,6 +97,7 @@ export function handleAvsBatchCompleteRefresh({
     }
 
     refreshPendingMovementTokenVisibility([], { ignoreObservedGrace: true });
+    await refreshSystemHiddenHighlightsForControlledTokens();
     return { handled: true };
   } catch {
     return { handled: false, reason: 'error' };

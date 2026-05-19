@@ -130,6 +130,34 @@ function prewarmOverrideValidationModules() {
   loadVisionAnalyzerModule().catch(() => { });
 }
 
+async function loadSharedValidationResources(options = {}) {
+  const resources = {};
+
+  if (options?.optimizedVisibilityCalculator) {
+    resources.optimizedVisibilityCalculator = options.optimizedVisibilityCalculator;
+  } else {
+    try {
+      const { optimizedVisibilityCalculator } = await loadVisibilityCalculatorModule();
+      resources.optimizedVisibilityCalculator = optimizedVisibilityCalculator;
+    } catch {
+      /* caller fallback handles missing calculator */
+    }
+  }
+
+  if (options?.coverDetector) {
+    resources.coverDetector = options.coverDetector;
+  } else {
+    try {
+      const { CoverDetector } = await loadCoverDetectorModule();
+      resources.coverDetector = new CoverDetector();
+    } catch {
+      /* caller fallback handles missing detector */
+    }
+  }
+
+  return resources;
+}
+
 export class OverrideValidationManager {
   /**
    * @param {ExclusionManager} exclusionManager - Manager for token exclusion logic
@@ -317,6 +345,13 @@ export class OverrideValidationManager {
   async validateOverridesForToken(movedTokenId, options = undefined) {
     const movedToken = canvas.tokens?.get(movedTokenId);
     if (!movedToken) return;
+    let sharedValidationResources = null;
+    const getSharedValidationResources = async () => {
+      if (!sharedValidationResources) {
+        sharedValidationResources = await loadSharedValidationResources(options);
+      }
+      return sharedValidationResources;
+    };
 
     if (this.exclusionManager.isExcludedToken(movedToken)) {
       let isSneaking = false;
@@ -355,9 +390,10 @@ export class OverrideValidationManager {
           let currentCover = undefined;
           try {
             let visibility;
-            const { optimizedVisibilityCalculator } = await loadVisibilityCalculatorModule();
+            const { optimizedVisibilityCalculator, coverDetector } =
+              await getSharedValidationResources();
             if (
-              typeof optimizedVisibilityCalculator.calculateVisibilityWithoutOverrides ===
+              typeof optimizedVisibilityCalculator?.calculateVisibilityWithoutOverrides ===
               'function'
             ) {
               visibility = await optimizedVisibilityCalculator.calculateVisibilityWithoutOverrides(
@@ -367,10 +403,8 @@ export class OverrideValidationManager {
               );
             }
             currentVisibility = visibility;
-            const { CoverDetector } = await loadCoverDetectorModule();
-            const coverDetector = new CoverDetector();
             const observerPos = this.positionManager.getTokenPosition(movedToken);
-            currentCover = coverDetector.detectFromPoint(observerPos, t);
+            currentCover = coverDetector?.detectFromPoint?.(observerPos, t);
           } catch { }
           awareness.push(withStealthPositionBypassContext(t, {
             observerId: movedTokenId,
@@ -487,8 +521,12 @@ export class OverrideValidationManager {
 
     const invalidOverrides = [];
     const stableReleaseOverrides = [];
+    const resources = overridesToCheck.length > 0
+      ? await getSharedValidationResources()
+      : {};
     const validationOptions = {
       ...(options || {}),
+      ...resources,
       includeStableOverrideState: true,
     };
     for (const checkData of overridesToCheck) {
@@ -546,9 +584,10 @@ export class OverrideValidationManager {
         let currentCover = undefined;
         try {
           let visibility;
-          const { optimizedVisibilityCalculator } = await loadVisibilityCalculatorModule();
+          const { optimizedVisibilityCalculator, coverDetector } =
+            await getSharedValidationResources();
           if (
-            typeof optimizedVisibilityCalculator.calculateVisibilityWithoutOverrides === 'function'
+            typeof optimizedVisibilityCalculator?.calculateVisibilityWithoutOverrides === 'function'
           ) {
             visibility = await optimizedVisibilityCalculator.calculateVisibilityWithoutOverrides(
               obs,
@@ -563,10 +602,8 @@ export class OverrideValidationManager {
             );
           }
           currentVisibility = visibility;
-          const { CoverDetector } = await loadCoverDetectorModule();
-          const coverDetector = new CoverDetector();
           const observerPos = this.positionManager.getTokenPosition(obs);
-          currentCover = coverDetector.detectFromPoint(observerPos, movedToken);
+          currentCover = coverDetector?.detectFromPoint?.(observerPos, movedToken);
         } catch { }
         awareness.push(withStealthPositionBypassContext(movedToken, {
           observerId,
@@ -599,9 +636,10 @@ export class OverrideValidationManager {
         let currentCover = undefined;
         try {
           let visibility;
-          const { optimizedVisibilityCalculator } = await loadVisibilityCalculatorModule();
+          const { optimizedVisibilityCalculator, coverDetector } =
+            await getSharedValidationResources();
           if (
-            typeof optimizedVisibilityCalculator.calculateVisibilityWithoutOverrides === 'function'
+            typeof optimizedVisibilityCalculator?.calculateVisibilityWithoutOverrides === 'function'
           ) {
             visibility = await optimizedVisibilityCalculator.calculateVisibilityWithoutOverrides(
               movedToken,
@@ -616,10 +654,8 @@ export class OverrideValidationManager {
             );
           }
           currentVisibility = visibility;
-          const { CoverDetector } = await loadCoverDetectorModule();
-          const coverDetector = new CoverDetector();
           const observerPos = this.positionManager.getTokenPosition(movedToken);
-          currentCover = coverDetector.detectFromPoint(observerPos, t);
+          currentCover = coverDetector?.detectFromPoint?.(observerPos, t);
         } catch { }
         awareness.push(withStealthPositionBypassContext(t, {
           observerId: movedTokenId,
@@ -690,10 +726,14 @@ export class OverrideValidationManager {
       let visibility;
       try {
         markPerf('visibility-import-start');
-        const { optimizedVisibilityCalculator } = await loadVisibilityCalculatorModule();
+        let optimizedVisibilityCalculator = options?.optimizedVisibilityCalculator;
+        if (!optimizedVisibilityCalculator) {
+          const module = await loadVisibilityCalculatorModule();
+          optimizedVisibilityCalculator = module.optimizedVisibilityCalculator;
+        }
         markPerf('visibility-import-done');
         if (
-          typeof optimizedVisibilityCalculator.calculateVisibilityWithoutOverrides === 'function'
+          typeof optimizedVisibilityCalculator?.calculateVisibilityWithoutOverrides === 'function'
         ) {
           markPerf('visibility-calc-without-overrides-start');
           visibility = await optimizedVisibilityCalculator.calculateVisibilityWithoutOverrides(
@@ -721,10 +761,13 @@ export class OverrideValidationManager {
       let coverResult = 'none';
       try {
         markPerf('cover-import-start');
-        const { CoverDetector } = await loadCoverDetectorModule();
+        let coverDetector = options?.coverDetector;
+        if (!coverDetector) {
+          const { CoverDetector } = await loadCoverDetectorModule();
+          coverDetector = new CoverDetector();
+        }
         markPerf('cover-import-done');
         markPerf('cover-construct-start');
-        const coverDetector = new CoverDetector();
         markPerf('cover-construct-done');
         markPerf('observer-position-start');
         const observerPos = this.positionManager.getTokenPosition(observer);

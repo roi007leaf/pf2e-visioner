@@ -93,13 +93,15 @@ describe('visual-effects updateTokenVisuals', () => {
 
   test('skips offscreen tokens during wall visual forced refreshes', async () => {
     const [inView, offscreen] = global.canvas.tokens.placeables;
-    global.canvas.walls.placeables = [{
-      document: {
-        id: 'wall-1',
-        sight: 0,
-        getFlag: jest.fn((moduleId, key) => (key === 'originalSight' ? 1 : false)),
+    global.canvas.walls.placeables = [
+      {
+        document: {
+          id: 'wall-1',
+          sight: 0,
+          getFlag: jest.fn((moduleId, key) => (key === 'originalSight' ? 1 : false)),
+        },
       },
-    }];
+    ];
 
     await updateWallVisuals();
 
@@ -115,13 +117,15 @@ describe('visual-effects updateTokenVisuals', () => {
   test('skips offscreen tokens during optimized wall visual forced refreshes', async () => {
     const [inView, offscreen] = global.canvas.tokens.placeables;
     global.canvas.tokens.controlled = [inView];
-    global.canvas.walls.placeables = [{
-      document: {
-        id: 'wall-1',
-        sight: 0,
-        getFlag: jest.fn((moduleId, key) => (key === 'originalSight' ? 1 : false)),
+    global.canvas.walls.placeables = [
+      {
+        document: {
+          id: 'wall-1',
+          sight: 0,
+          getFlag: jest.fn((moduleId, key) => (key === 'originalSight' ? 1 : false)),
+        },
       },
-    }];
+    ];
 
     await updateOptimizedWallVisuals();
 

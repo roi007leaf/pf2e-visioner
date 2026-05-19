@@ -79,4 +79,71 @@ describe('checkForValidTargets loot actor handling', () => {
 
     expect(canSeek).toBe(true);
   });
+
+  test('checks seeker perception rank once across rank-gated Seek targets', async () => {
+    const getStatistic = jest.fn(() => ({ proficiency: { rank: 1 } }));
+    const seeker = createMockToken({
+      id: 'seeker-1',
+      actor: createMockActor({
+        id: 'seeker-actor',
+        type: 'character',
+        getStatistic,
+      }),
+    });
+    const makeHazard = (id) =>
+      createMockToken({
+        id,
+        actor: createMockActor({ id: `${id}-actor`, type: 'hazard' }),
+        flags: {
+          'pf2e-visioner': {
+            minPerceptionRank: 3,
+          },
+        },
+      });
+
+    global.canvas.tokens.placeables = [seeker, makeHazard('hazard-1'), makeHazard('hazard-2')];
+
+    const { checkForValidTargets } = await import(
+      '../../../scripts/chat/services/infra/target-checker.js'
+    );
+
+    const canSeek = checkForValidTargets({
+      actionType: 'seek',
+      actor: seeker,
+    });
+
+    expect(canSeek).toBe(false);
+    expect(getStatistic).toHaveBeenCalledTimes(1);
+  });
+
+  test('reads actor roll options once across visible Seek targets', async () => {
+    const getRollOptions = jest.fn(() => []);
+    const seeker = createMockToken({
+      id: 'seeker-1',
+      actor: createMockActor({
+        id: 'seeker-actor',
+        type: 'character',
+        getRollOptions,
+      }),
+    });
+    const makeNpc = (id) =>
+      createMockToken({
+        id,
+        actor: createMockActor({ id: `${id}-actor`, type: 'npc' }),
+      });
+
+    global.canvas.tokens.placeables = [seeker, makeNpc('npc-1'), makeNpc('npc-2')];
+
+    const { checkForValidTargets } = await import(
+      '../../../scripts/chat/services/infra/target-checker.js'
+    );
+
+    const canSeek = checkForValidTargets({
+      actionType: 'seek',
+      actor: seeker,
+    });
+
+    expect(canSeek).toBe(false);
+    expect(getRollOptions).toHaveBeenCalledTimes(1);
+  });
 });

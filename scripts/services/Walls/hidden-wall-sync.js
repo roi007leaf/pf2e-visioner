@@ -1,4 +1,4 @@
-import { MODULE_ID } from '../constants.js';
+import { MODULE_ID } from '../../constants.js';
 import {
   getConnectedWallDocsBySourceId,
   mirrorHiddenFlagToConnected,

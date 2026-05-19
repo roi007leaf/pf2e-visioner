@@ -61,6 +61,58 @@ describe('Detection Map Store', () => {
     );
   });
 
+  test('setDetectionBetween persists immediate writes without mutating current flag map first', async () => {
+    observer.document.flags['pf2e-visioner'] = { detection: {} };
+
+    await setDetectionBetween(observer, target, {
+      sense: 'darkvision',
+      isPrecise: true,
+    });
+
+    expect(observer.document.update).toHaveBeenCalledWith(
+      {
+        'flags.pf2e-visioner.detection': {
+          target: { sense: 'darkvision', isPrecise: true },
+        },
+      },
+      { diff: false, render: false, animate: false },
+    );
+  });
+
+  test('setDetectionBetween reuses a mutable map inside one detection batch', async () => {
+    const firstTarget = global.createMockToken({ id: 'target-a' });
+    const secondTarget = global.createMockToken({ id: 'target-b' });
+    const currentMap = {
+      existing: { sense: 'vision', isPrecise: true },
+    };
+    const getFlag = jest.fn(() => currentMap);
+    observer.document.getFlag = getFlag;
+
+    startDetectionBatch();
+
+    await setDetectionBetween(observer, firstTarget, {
+      sense: 'darkvision',
+      isPrecise: true,
+    });
+    await setDetectionBetween(observer, secondTarget, {
+      sense: 'hearing',
+      isPrecise: false,
+    });
+    await flushDetectionBatch();
+
+    expect(getFlag).toHaveBeenCalledTimes(2);
+    expect(observer.document.update).toHaveBeenCalledWith(
+      {
+        'flags.pf2e-visioner.detection': {
+          existing: { sense: 'vision', isPrecise: true },
+          'target-a': { sense: 'darkvision', isPrecise: true },
+          'target-b': { sense: 'hearing', isPrecise: false },
+        },
+      },
+      { diff: false, render: false, animate: false },
+    );
+  });
+
   test('discardDetectionBatch drops batched writes without persisting stale detection', async () => {
     startDetectionBatch();
 

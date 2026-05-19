@@ -31,12 +31,14 @@ export class TemplateManager {
    * @private
    */
   _templatesOrigins = null;
+  _templateTargetIndex = null;
 
   constructor() {
     // Initialize or reference global maps for template data
     this._templatesData = new Map();
     this._activeReflexSaves = new Map();
     this._templatesOrigins = new Map();
+    this._templateTargetIndex = new Map();
     this.autoCoverSystem = autoCoverSystem;
     // Start cleanup timer
     this._startCleanupTimer();
@@ -148,6 +150,7 @@ export class TemplateManager {
             try {
               if (this._templatesData?.has?.(document.id)) {
                 // Remove from our maps
+                this._removeTemplateFromTargetIndex(document.id);
                 this._templatesData.delete(document.id);
 
                 // Also clean up from active reflex saves tracking
@@ -161,6 +164,7 @@ export class TemplateManager {
           }, 10000); // 10 seconds delay
         } else {
           // Only remove from our maps, don't delete the actual template from canvas
+          this._removeTemplateFromTargetIndex(document.id);
           this._templatesData.delete(document.id);
 
           // Also clean up from active reflex saves tracking
@@ -209,6 +213,7 @@ export class TemplateManager {
 
     // Only remove template data from our maps, don't delete templates from canvas
     for (const id of oldTemplates) {
+      this._removeTemplateFromTargetIndex(id);
       this._templatesData.delete(id);
     }
   }
@@ -302,6 +307,7 @@ export class TemplateManager {
     };
 
     this._templatesData.set(document.id, templateData);
+    this._indexTemplateData(document.id, templateData);
 
     this.setTemplateOrigin(creatorId, center);
     if (document.flags?.pf2e?.origin?.rollOptions?.includes('origin:item:defense:reflex')) {
@@ -359,6 +365,65 @@ export class TemplateManager {
     return this._templatesData.get(templateId) || null;
   }
 
+  _removeTemplateFromTargetIndex(templateId) {
+    if (!templateId || !this._templateTargetIndex) return;
+
+    for (const [targetId, entries] of this._templateTargetIndex.entries()) {
+      const filtered = entries.filter((entry) => entry.id !== templateId);
+      if (filtered.length > 0) this._templateTargetIndex.set(targetId, filtered);
+      else this._templateTargetIndex.delete(targetId);
+    }
+  }
+
+  _indexTemplateData(templateId, templateData) {
+    if (!templateId || !templateData?.targets || !this._templateTargetIndex) return;
+
+    this._removeTemplateFromTargetIndex(templateId);
+    const timestamp = Number(templateData.timestamp || 0);
+    for (const targetId of Object.keys(templateData.targets)) {
+      const entries = this._templateTargetIndex.get(targetId) || [];
+      entries.push({ id: templateId, data: templateData, timestamp });
+      entries.sort((a, b) => b.timestamp - a.timestamp);
+      this._templateTargetIndex.set(targetId, entries);
+    }
+  }
+
+  _findLatestTemplateForTargetByScan(targetId) {
+    if (!targetId) return null;
+
+    let latest = null;
+    let latestTs = 0;
+    for (const [id, data] of this._templatesData.entries()) {
+      if (!data?.targets?.[targetId]) continue;
+      const timestamp = Number(data.timestamp || 0);
+      if (timestamp > latestTs) {
+        latest = { id, data };
+        latestTs = timestamp;
+      }
+    }
+
+    return latest;
+  }
+
+  getLatestTemplateForTarget(targetId) {
+    if (!targetId) return null;
+
+    const entries = this._templateTargetIndex?.get?.(targetId) || [];
+    while (entries.length > 0) {
+      const entry = entries[0];
+      if (this._templatesData.get(entry.id) === entry.data) {
+        return { id: entry.id, data: entry.data };
+      }
+      entries.shift();
+    }
+
+    if (entries.length === 0) this._templateTargetIndex?.delete?.(targetId);
+
+    const latest = this._findLatestTemplateForTargetByScan(targetId);
+    if (latest) this._indexTemplateData(latest.id, latest.data);
+    return latest;
+  }
+
   /**
    * Check if a template is being used for reflex saves
    * @param {string} templateId
@@ -414,6 +479,7 @@ export class TemplateManager {
    */
   removeTemplateData(templateId) {
     if (!templateId) return;
+    this._removeTemplateFromTargetIndex(templateId);
     this._templatesData.delete(templateId);
     this._activeReflexSaves.delete(templateId);
   }

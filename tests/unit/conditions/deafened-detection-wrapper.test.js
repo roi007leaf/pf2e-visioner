@@ -1673,6 +1673,42 @@ describe('Deafened Detection Wrapper', () => {
             expect(detectionModeInstance._testPoint).not.toHaveBeenCalled();
         });
 
+        test('hearing does not skip point tests for concealed targets', () => {
+            const wrappedFunction = mockLibWrapper.register.mock.calls.find(
+                call => call[1] === 'foundry.canvas.perception.DetectionMode.prototype.testVisibility'
+            )?.[2];
+            const observer = {
+                actor: {},
+                document: {
+                    id: 'observer',
+                    getFlag: jest.fn().mockReturnValue({ target: 'concealed' }),
+                },
+            };
+            const target = {
+                actor: {},
+                document: {
+                    id: 'target',
+                    level: 'level-b',
+                    getFlag: jest.fn().mockReturnValue(false),
+                },
+            };
+            const detectionModeInstance = {
+                id: 'hearing',
+                _canDetect: jest.fn().mockReturnValue(true),
+                _testPoint: jest.fn().mockReturnValue(false),
+            };
+
+            const result = wrappedFunction.call(
+                detectionModeInstance,
+                { object: observer },
+                { id: 'hearing', enabled: true },
+                { ...mockConfig, object: target },
+            );
+
+            expect(result).toBe(false);
+            expect(detectionModeInstance._testPoint).toHaveBeenCalled();
+        });
+
         test('hearing does not reveal a hidden target during pending wall-blocked movement', () => {
             const originalCanvas = global.canvas;
             global.canvas = {

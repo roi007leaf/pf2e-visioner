@@ -438,6 +438,25 @@ describe('BatchOrchestrator', () => {
     expect(settled).toBe(true);
   });
 
+  test('_applyBatchResults pre-hides controlled observer hidden target after map persistence', async () => {
+    const observer = global.canvas.tokens.placeables[0];
+    const target = global.canvas.tokens.placeables[1];
+    global.canvas.tokens.controlled = [observer];
+
+    await orchestrator._applyBatchResults({
+      updates: [
+        {
+          observer,
+          target,
+          visibility: 'undetected',
+        },
+      ],
+    });
+
+    expect(target.renderable).toBe(false);
+    expect(target.visible).toBe(false);
+  });
+
   test('_applyBatchResults records door detection sync without map write', async () => {
     global.game.pf2eVisioner = {};
     visibilityMapService.setVisibilityMap = jest.fn(async () => {});

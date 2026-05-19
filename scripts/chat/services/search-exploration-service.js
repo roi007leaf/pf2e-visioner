@@ -106,6 +106,17 @@ function collectionHasSearchExplorationEffect(collection, requireEffectType = fa
   });
 }
 
+function createActorSearchActivityReader() {
+  const cache = new WeakMap();
+  return (actor) => {
+    if (!actor || typeof actor !== 'object') return actorHasSearchExplorationActivity(actor);
+    if (!cache.has(actor)) {
+      cache.set(actor, actorHasSearchExplorationActivity(actor));
+    }
+    return cache.get(actor);
+  };
+}
+
 export function actorHasSearchExplorationActivity(actor) {
   try {
     if (!actor) return false;
@@ -373,8 +384,9 @@ function makeActorSearchSeeker(actor, visibilityTarget = null) {
 }
 
 function getActorSearchExplorationSeekers() {
+  const hasSearchActivity = createActorSearchActivityReader();
   return getActorCollectionValues(game?.actors)
-    .filter((actor) => isPlayerCharacterActor(actor) && actorHasSearchExplorationActivity(actor))
+    .filter((actor) => isPlayerCharacterActor(actor) && hasSearchActivity(actor))
     .map((actor) => makeActorSearchSeeker(actor));
 }
 
@@ -469,10 +481,11 @@ export function isSearchExplorationWallTarget(wall) {
 export function getSearchExplorationSeekers(targetToken, tokens = canvas?.tokens?.placeables || []) {
   const targetId = getTokenId(targetToken);
   const tokenList = tokens || [];
+  const hasSearchActivity = createActorSearchActivityReader();
   const tokenSeekers = tokenList.filter((token) => {
     if (!token?.actor) return false;
     if (getTokenId(token) === targetId) return false;
-    return isPlayerCharacterToken(token) && actorHasSearchExplorationActivity(token.actor);
+    return isPlayerCharacterToken(token) && hasSearchActivity(token.actor);
   });
 
   const hasPcTokensOnScene = tokenList.some(

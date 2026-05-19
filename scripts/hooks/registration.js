@@ -24,7 +24,7 @@ import {
   registerEffectPerceptionHooks,
   registerTimedOverrideHooks,
 } from './startup-managers.js';
-import { handleWallCreated, handleWallDeleted, handleWallUpdated } from '../services/wall-lifecycle.js';
+import { handleWallCreated, handleWallDeleted, handleWallUpdated } from '../services/Walls/wall-lifecycle.js';
 import {
   handleAvsBatchCompleteRefresh,
   handleTokenPreUpdate,
@@ -115,8 +115,8 @@ export async function registerHooks() {
     await handleTokenRefreshed(token);
   });
 
-  Hooks.on('pf2eVisionerAvsBatchComplete', () => {
-    handleAvsBatchCompleteRefresh();
+  Hooks.on('pf2eVisionerAvsBatchComplete', async () => {
+    await handleAvsBatchCompleteRefresh();
   });
 
   // Removed createToken hook - was causing excessive updateWallVisuals calls on token creation.

@@ -4,6 +4,7 @@ describe('Override indicator should not trigger on controlToken', () => {
     beforeEach(() => {
         jest.resetModules();
         jest.clearAllMocks();
+        jest.unmock('../../../scripts/services/pending-token-movement.js');
         delete global.__pf2eVisionerLifecycleBindings;
         delete global.__pf2eVisionerControlTokenSessions;
         document.body.innerHTML = '';
@@ -135,6 +136,70 @@ describe('Override indicator should not trigger on controlToken', () => {
 
         expect(global.window.pf2eVisioner.services.autoVisibilitySystem.recalculateForTokens)
             .toHaveBeenCalledWith(['t1']);
+    });
+
+    test('controlToken AVS recalculation runs on the next tick, not after a visible delay', async () => {
+        const { onCanvasReady } = await import('../../../scripts/hooks/lifecycle.js');
+        await onCanvasReady();
+
+        const controlTokenCbs = global.Hooks.on.mock.calls
+            .filter((c) => c?.[0] === 'controlToken')
+            .map((c) => c?.[1])
+            .filter(Boolean);
+
+        const trackerCb = controlTokenCbs.find((cb) =>
+            String(cb).includes('trackControlTokenSession'),
+        );
+        const recalcCb = controlTokenCbs.find((cb) =>
+            String(cb).includes('avsRecalculateOnControlToken') ||
+            String(cb).includes('recalculateForTokens'),
+        );
+
+        const token = { document: { id: 't1' } };
+        global.canvas.tokens.controlled = [token];
+
+        trackerCb(token, true);
+        recalcCb(token, true);
+
+        expect(global.window.pf2eVisioner.services.autoVisibilitySystem.recalculateForTokens)
+            .not.toHaveBeenCalled();
+
+        jest.advanceTimersByTime(0);
+
+        expect(global.window.pf2eVisioner.services.autoVisibilitySystem.recalculateForTokens)
+            .toHaveBeenCalledWith(['t1']);
+    });
+
+    test('controlToken immediately settles pending hidden render locks for the new observer', async () => {
+        const refreshPendingMovementTokenVisibility = jest.fn();
+        jest.doMock('../../../scripts/services/pending-token-movement.js', () => ({
+            hasPendingMovementRenderWork: jest.fn(() => true),
+            refreshPendingMovementTokenVisibility,
+            restorePendingMovementTokenRendering: jest.fn(),
+        }));
+
+        const { onCanvasReady } = await import('../../../scripts/hooks/lifecycle.js');
+        await onCanvasReady();
+
+        const controlTokenCbs = global.Hooks.on.mock.calls
+            .filter((c) => c?.[0] === 'controlToken')
+            .map((c) => c?.[1])
+            .filter(Boolean);
+
+        const restoreIndicatorsCb = controlTokenCbs.find((cb) =>
+            String(cb).includes('allowControlledFallback'),
+        );
+
+        expect(restoreIndicatorsCb).toBeTruthy();
+
+        const token = { document: { id: 'observer', getFlag: jest.fn(() => ({})) } };
+        global.canvas.tokens.controlled = [token];
+
+        await restoreIndicatorsCb(token, true);
+
+        expect(refreshPendingMovementTokenVisibility).toHaveBeenCalledWith([], {
+            ignoreObservedGrace: true,
+        });
     });
 
     test('controlToken clears stale AVS recalculation when control is removed', async () => {

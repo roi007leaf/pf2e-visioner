@@ -144,7 +144,9 @@ describe('HoverTooltips unnoticed badges', () => {
 
   test('observer-mode hover reads observer visibility map once per hover', async () => {
     const observer = makeToken('observer', 0);
-    const targets = Array.from({ length: 5 }, (_, index) => makeToken(`target-${index}`, 100 + index * 50));
+    const targets = Array.from({ length: 5 }, (_, index) =>
+      makeToken(`target-${index}`, 100 + index * 50),
+    );
     global.canvas.tokens.placeables = [observer, ...targets];
 
     mockGetVisibilityMap.mockReturnValue(
@@ -160,6 +162,25 @@ describe('HoverTooltips unnoticed badges', () => {
     showVisibilityIndicators(observer);
 
     expect(mockGetVisibilityMap).toHaveBeenCalledTimes(1);
+  });
+
+  test('observer-mode hover reuses detection result when rendering sense badges', async () => {
+    const observer = makeToken('observer', 0);
+    const target = makeToken('target', 100);
+    global.canvas.tokens.placeables = [observer, target];
+
+    mockGetVisibilityMap.mockReturnValue({ target: 'observed' });
+    mockGetDetectionBetween.mockReturnValue({ sense: 'lifesense' });
+
+    const { setTooltipMode, showVisibilityIndicators } = await import(
+      '../../../scripts/services/HoverTooltips.js'
+    );
+
+    setTooltipMode('observer');
+    showVisibilityIndicators(observer);
+
+    expect(mockGetDetectionBetween).toHaveBeenCalledTimes(1);
+    expect(document.querySelector('.pf2e-visioner-sense-badge')).toBeTruthy();
   });
 
   test('labels concealed visibility factor overlays as observed plus concealed', async () => {
@@ -181,10 +202,40 @@ describe('HoverTooltips unnoticed badges', () => {
     );
   });
 
-  test('keeps unnoticed encounter-scoped while generic manual states exclude it', async () => {
-    const { VISIBILITY_STATES, getManualVisibilityStateEntries, getVisibilityStateLabelKey } = await import(
-      '../../../scripts/constants.js'
+  test('requests visibility factors for overlay targets without serial wait', async () => {
+    const observer = makeToken('observer', 0);
+    const targetA = makeToken('target-a', 100);
+    const targetB = makeToken('target-b', 150);
+    global.canvas.tokens.controlled = [observer];
+    global.canvas.tokens.placeables = [observer, targetA, targetB];
+
+    let resolveFirstTarget;
+    mockGetVisibilityFactors.mockImplementation((_observerId, targetId) => {
+      if (targetId === 'target-a') {
+        return new Promise((resolve) => {
+          resolveFirstTarget = resolve;
+        });
+      }
+      return Promise.resolve({ state: 'hidden' });
+    });
+
+    const { showVisibilityFactorsOverlay } = await import(
+      '../../../scripts/services/HoverTooltips.js'
     );
+
+    showVisibilityFactorsOverlay();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(mockGetVisibilityFactors).toHaveBeenCalledWith('observer', 'target-a');
+    expect(mockGetVisibilityFactors).toHaveBeenCalledWith('observer', 'target-b');
+
+    resolveFirstTarget({ state: 'hidden' });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+
+  test('keeps unnoticed encounter-scoped while generic manual states exclude it', async () => {
+    const { VISIBILITY_STATES, getManualVisibilityStateEntries, getVisibilityStateLabelKey } =
+      await import('../../../scripts/constants.js');
 
     expect(VISIBILITY_STATES.unnoticed).toMatchObject({
       scope: 'encounter',

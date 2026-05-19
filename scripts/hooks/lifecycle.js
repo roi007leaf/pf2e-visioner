@@ -5,7 +5,11 @@
 import { injectChatAutomationStyles } from '../chat/chat-automation-styles.js';
 import { MODULE_ID } from '../constants.js';
 import { initializeHoverTooltips } from '../services/HoverTooltips.js';
-import { restorePendingMovementTokenRendering } from '../services/pending-token-movement.js';
+import {
+  hasPendingMovementRenderWork,
+  refreshPendingMovementTokenVisibility,
+  restorePendingMovementTokenRendering,
+} from '../services/pending-token-movement.js';
 import { runVisibilityV2MigrationIfNeeded } from '../migrations/visibility-v2-migration.js';
 import { registerSocket } from '../services/socket.js';
 import {
@@ -25,6 +29,7 @@ const controlTokenSessionState = (globalThis.__pf2eVisionerControlTokenSessions 
   tokenId: null,
   timers: new Set(),
 });
+const CONTROL_TOKEN_RECALC_DELAY_MS = 0;
 const fallbackHudButtonState = (globalThis.__pf2eVisionerFallbackHudButton ??= {
   styleInstalled: false,
   documentListenersBound: false,
@@ -137,6 +142,15 @@ function scheduleNoObserverVisibilityRefresh() {
       /* best effort */
     }
   }, 75);
+}
+
+function refreshPendingVisibilityAfterControlToken() {
+  try {
+    if (!hasPendingMovementRenderWork()) return;
+    refreshPendingMovementTokenVisibility([], { ignoreObservedGrace: true });
+  } catch {
+    /* best effort */
+  }
 }
 
 async function refreshVisionSharingTokenIds() {
@@ -547,6 +561,8 @@ export async function onCanvasReady() {
       }
 
       if (controlled) {
+        refreshPendingVisibilityAfterControlToken();
+
         const wallFlags = token?.document?.getFlag?.(MODULE_ID, 'walls') || {};
         if (Object.keys(wallFlags).length > 0) {
           // CRITICAL: Always use the optimized version that doesn't trigger lightingRefresh
@@ -810,15 +826,20 @@ export async function onCanvasReady() {
       const session = getControlTokenSession(token);
       if (!session) return;
 
-      scheduleControlTokenSessionTimer(session.sequence, session.tokenId, 75, () => {
-        try {
-          window.pf2eVisioner?.services?.autoVisibilitySystem?.recalculateForTokens?.([
-            session.tokenId,
-          ]);
-        } catch {
-          /* best effort */
-        }
-      });
+      scheduleControlTokenSessionTimer(
+        session.sequence,
+        session.tokenId,
+        CONTROL_TOKEN_RECALC_DELAY_MS,
+        () => {
+          try {
+            window.pf2eVisioner?.services?.autoVisibilitySystem?.recalculateForTokens?.([
+              session.tokenId,
+            ]);
+          } catch {
+            /* best effort */
+          }
+        },
+      );
     } catch {
       /* best effort */
     }

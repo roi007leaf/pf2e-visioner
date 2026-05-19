@@ -9,7 +9,7 @@ const PENDING_MOVEMENT_POST_COMPLETION_REFRESH_DELAYS_MS = [100, 300, 700, 1200]
 const PENDING_MOVEMENT_MAX_ROUTE_POINTS = 96;
 const PENDING_MOVEMENT_MAX_ACTIVE_ROUTE_POINTS = 256;
 const PENDING_MOVEMENT_VISUAL_POSITION_TOLERANCE_PX = 1;
-const HIDDEN_FROM_OBSERVER_STATES = new Set(['concealed', 'hidden', 'undetected', 'unnoticed']);
+const HIDDEN_FROM_OBSERVER_STATES = new Set(['hidden', 'undetected', 'unnoticed']);
 const RENDER_HIDDEN_FROM_OBSERVER_STATES = new Set(['hidden', 'undetected', 'unnoticed']);
 const NPC_RENDER_VISIBLE_STATES = new Set(['hidden']);
 const VISIBILITY_V2_FLAG = 'visibilityV2';
@@ -30,6 +30,10 @@ function tokenIdOf(tokenOrDoc) {
 
 function tokenDocOf(tokenOrDoc) {
   return tokenOrDoc?.document || tokenOrDoc || null;
+}
+
+function hasPendingRenderState(token) {
+  return !!token?.[PENDING_MOVEMENT_RENDER_STATE_KEY];
 }
 
 function sourceFromCollectionEntry(entry) {
@@ -862,18 +866,6 @@ function getStickyHiddenRenderLockContext(target, state) {
     const visibilityState = getStoredVisibilityState(observer, target);
     const hiddenByVisioner = visionerStateHidesTargetRendering(target, visibilityState);
     if (!hiddenByVisioner && !foundryHidden) {
-      if (withinGrace) {
-        return {
-          ...lockContext,
-          visibilityState,
-          hiddenByVisioner,
-          foundryHidden,
-          currentObserverState: true,
-          observedDuringGrace: true,
-          elapsedMs,
-          renderLockGraceMs: PENDING_MOVEMENT_RENDER_LOCK_GRACE_MS,
-        };
-      }
       forgetHiddenForceContext(target);
       return null;
     }
@@ -1133,6 +1125,28 @@ export function forcePendingMovementTokenInvisible(token) {
   for (const [, surface] of tokenInterfaceSurfaces(token)) {
     hideVisibleSurface(surface);
   }
+}
+
+export function forceTokenInvisibleForObserverVisibility(observer, target, visibilityState) {
+  if (!observer || !target?.document?.id) return false;
+  if (target.controlled) return false;
+  if (!RENDER_HIDDEN_FROM_OBSERVER_STATES.has(visibilityState)) return false;
+
+  const context = rememberHiddenForceContext(target, {
+    observerId: tokenIdOf(observer),
+    observerName: observer?.name ?? observer?.document?.name,
+    targetId: tokenIdOf(target),
+    targetName: target?.name ?? target?.document?.name,
+    visibilityState,
+    hiddenByVisioner: true,
+    foundryHidden: !!tokenDocOf(target)?.hidden,
+    wallBlocked: false,
+    pendingPosition: getPendingTokenMovementPosition(tokenIdOf(observer)),
+  });
+  if (!context) return false;
+
+  forcePendingMovementTokenInvisible(target);
+  return true;
 }
 
 export function clearPendingTokenMovementPosition(tokenId) {
@@ -1484,25 +1498,42 @@ export function hasPendingMovementRenderWork() {
 
 export function refreshPendingMovementTokenVisibility(
   movingTokenIds = [],
-  { ignoreObservedGrace = false } = {},
+  {
+    ignoreObservedGrace = false,
+    skipTokenRefresh = false,
+    skipPerceptionRefresh = false,
+    targetTokenIds = null,
+  } = {},
 ) {
   const ids = new Set(
     (Array.isArray(movingTokenIds) ? movingTokenIds : [movingTokenIds]).filter(Boolean),
   );
-  const tokens = canvas?.tokens?.placeables || [];
+  const targetIds = targetTokenIds
+    ? new Set((Array.isArray(targetTokenIds) ? targetTokenIds : [targetTokenIds]).filter(Boolean))
+    : null;
+  const tokens = targetIds
+    ? (canvas?.tokens?.placeables || []).filter((token) => targetIds.has(tokenIdOf(token)))
+    : canvas?.tokens?.placeables || [];
   const hasDetectionWork = hasPendingMovementDetectionWork();
 
   for (const token of tokens) {
-    if (ids.has(tokenIdOf(token))) continue;
+    if (ids.has(tokenIdOf(token))) {
+      continue;
+    }
     try {
       const shouldForceInvisible = shouldTemporarilyForceTokenInvisible(token, { hasDetectionWork });
-      token?.refresh?.();
       if (shouldForceInvisible) {
         forcePendingMovementTokenInvisible(token);
-      } else {
-        const restored = restorePendingMovementTokenRendering(token, { ignoreObservedGrace });
-        if (!restored && token?.[PENDING_MOVEMENT_RENDER_STATE_KEY]) {
+      }
+      if (!skipTokenRefresh) {
+        token?.refresh?.();
+        if (shouldForceInvisible) {
           forcePendingMovementTokenInvisible(token);
+        } else {
+          const restored = restorePendingMovementTokenRendering(token, { ignoreObservedGrace });
+          if (!restored && token?.[PENDING_MOVEMENT_RENDER_STATE_KEY]) {
+            forcePendingMovementTokenInvisible(token);
+          }
         }
       }
     } catch {
@@ -1510,9 +1541,11 @@ export function refreshPendingMovementTokenVisibility(
     }
   }
 
-  try {
-    canvas?.perception?.update?.({ refreshVision: true, refreshOcclusion: true });
-  } catch {
-    /* best-effort perception refresh */
+  if (!skipTokenRefresh && !skipPerceptionRefresh) {
+    try {
+      canvas?.perception?.update?.({ refreshVision: true, refreshOcclusion: true });
+    } catch {
+      /* best-effort perception refresh */
+    }
   }
 }

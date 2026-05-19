@@ -1,6 +1,6 @@
 import { MODULE_ID } from '../constants.js';
 import { setVisibilityBetween } from '../stores/visibility-map.js';
-import { expandWallIdWithConnected } from './connected-walls.js';
+import { expandWallIdWithConnected } from './Walls/connected-walls.js';
 
 export const DEFAULT_PLAYER_VISIBILITY_FLAG = 'defaultPlayerVisibility';
 export const DEFAULT_PLAYER_WALL_VISIBILITY_FLAG = 'defaultPlayerWallVisibility';

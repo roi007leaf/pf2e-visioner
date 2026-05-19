@@ -15,42 +15,47 @@ jest.mock('../../../scripts/constants.js', () => ({
 
 describe('SeekAction LOS partition and filtering', () => {
   describe('#partitionByLOS code patterns', () => {
-    let code;
+    let actionCode;
+    let partitionCode;
 
     beforeAll(() => {
       const { readFileSync } = require('fs');
       const { join } = require('path');
-      code = readFileSync(
+      actionCode = readFileSync(
         join(__dirname, '../../../scripts/chat/services/actions/SeekAction.js'),
+        'utf8'
+      );
+      partitionCode = readFileSync(
+        join(__dirname, '../../../scripts/chat/services/actions/Seek/seek-los-partition.js'),
         'utf8'
       );
     });
 
     test('partitions changes by LOS', () => {
-      expect(code).toContain('partitionByLOS');
-      expect(code).toContain('immediateChanges');
-      expect(code).toContain('deferredResults');
+      expect(actionCode).toContain('partitionSeekChangesByLOS');
+      expect(partitionCode).toContain('immediateChanges');
+      expect(partitionCode).toContain('deferredResults');
     });
 
     test('walls always go to immediate', () => {
-      expect(code).toContain('change.wallId || outcome?._isWall');
-      expect(code).toContain('immediateChanges.push(change)');
+      expect(partitionCode).toContain('change.wallId || outcome?._isWall');
+      expect(partitionCode).toContain('immediateChanges.push(change)');
     });
 
     test('loot tokens without configured DC skip deferral', () => {
-      expect(code).toMatch(/targetActorType === 'loot'/);
-      expect(code).toMatch(/getFlag.*stealthDC/);
+      expect(partitionCode).toMatch(/targetActorType === 'loot'/);
+      expect(partitionCode).toMatch(/getFlag.*stealthDC/);
     });
 
     test('allies skip deferral', () => {
-      expect(code).toContain('observerAlliance');
-      expect(code).toContain('targetAlliance');
-      expect(code).toContain('observerAlliance === targetAlliance');
+      expect(partitionCode).toContain('observerAlliance');
+      expect(partitionCode).toContain('targetAlliance');
+      expect(partitionCode).toContain('observerAlliance === targetAlliance');
     });
 
     test('stores deferred results via DeferredSeekManager', () => {
-      expect(code).toContain('DeferredSeekManager');
-      expect(code).toContain('storeDeferredResults');
+      expect(actionCode).toContain('DeferredSeekManager');
+      expect(actionCode).toContain('storeDeferredResults');
     });
   });
 
@@ -105,7 +110,7 @@ describe('DeferredSeekManager integration patterns', () => {
       'utf8'
     );
     wallLifecycleCode = readFileSync(
-      join(__dirname, '../../../scripts/services/wall-lifecycle.js'),
+      join(__dirname, '../../../scripts/services/Walls/wall-lifecycle.js'),
       'utf8'
     );
     doorRefreshCode = readFileSync(

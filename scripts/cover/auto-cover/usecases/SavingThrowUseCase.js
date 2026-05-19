@@ -71,29 +71,8 @@ class SavingThrowUseCase extends BaseAutoCoverUseCase {
 
     // Check for active template data with precalculated cover state
     let state;
-    const savedTemplateData = this.templateManager.getTemplatesData();
-
-    if (savedTemplateData && savedTemplateData.size > 0) {
-      // Find the most recent template that contains this target
-      let mostRecentTemplate = null;
-      let mostRecentTs = 0;
-
-      for (const [id, data] of savedTemplateData.entries()) {
-        // Check if this target is in the template's targets
-        if (data.targets && data.targets[target.id]) {
-          // Found a match - check if it's the most recent
-          if (data.timestamp > mostRecentTs) {
-            mostRecentTemplate = { id, data };
-            mostRecentTs = data.timestamp;
-          }
-        }
-      }
-
-      if (mostRecentTemplate) {
-        const { data } = mostRecentTemplate;
-        state = data.targets[target.id].state;
-      }
-    }
+    const templateMatch = this._getLatestTemplateForTarget(target.id);
+    if (templateMatch) state = templateMatch.data.targets[target.id].state;
 
     let highestFoundManualCover = 'none';
     // Fallback to direct token calculation if no template data
@@ -224,38 +203,19 @@ class SavingThrowUseCase extends BaseAutoCoverUseCase {
       let templateId = null;
       let templateData = null;
 
-      // First check our dedicated template data map
-      const savedTemplateData = this.templateManager.getTemplatesData();
+      const templateMatch = this._getLatestTemplateForTarget(target.id);
+      if (templateMatch) {
+        const { id, data } = templateMatch;
+        templateId = id;
+        templateData = data;
+        isTargetInTemplate = true;
 
-      if (savedTemplateData && savedTemplateData.size > 0) {
-        // Find the most recent template that contains this target
-        let mostRecentTemplate = null;
-        let mostRecentTs = 0;
+        // Track that this template is being used for a reflex save
+        this.templateManager.addActiveReflexSaveTemplate(id);
 
-        for (const [id, data] of savedTemplateData.entries()) {
-          // Check if this target is in the template's targets
-          if (data.targets && data.targets[target.id]) {
-            // Found a match - check if it's the most recent
-            if (data.timestamp > mostRecentTs) {
-              mostRecentTemplate = { id, data };
-              mostRecentTs = data.timestamp;
-            }
-          }
-        }
-
-        if (mostRecentTemplate) {
-          const { id, data } = mostRecentTemplate;
-          templateId = id;
-          templateData = data;
-          isTargetInTemplate = true;
-
-          // Track that this template is being used for a reflex save
-          this.templateManager.addActiveReflexSaveTemplate(id);
-
-          // Try to get the attacker token if creator ID is available
-          if (data.creatorId && !data.creatorId.startsWith('actor:')) {
-            attacker = canvas.tokens.get(data.creatorId) || null;
-          }
+        // Try to get the attacker token if creator ID is available
+        if (data.creatorId && !data.creatorId.startsWith('actor:')) {
+          attacker = canvas.tokens.get(data.creatorId) || null;
         }
       }
 
@@ -297,6 +257,7 @@ class SavingThrowUseCase extends BaseAutoCoverUseCase {
             // Prefer the spell's caster when available (template creator or context origin),
             // falling back to controlled/targeted token.
             let caster = null;
+            const targeted = Array.from(game.user.targets || [])?.[0]?.document?.object;
             try {
               // 1) Try template creator ID (may be a UUID like Scene.X.Token.Y or Actor.X)
               if (templateData?.creatorId) {
@@ -334,7 +295,6 @@ class SavingThrowUseCase extends BaseAutoCoverUseCase {
             }
 
             attacker = caster;
-            const targeted = Array.from(game.user.targets || [])?.[0]?.document?.object;
           }
           isTargetInTemplate = true;
         }
@@ -652,8 +612,32 @@ class SavingThrowUseCase extends BaseAutoCoverUseCase {
     }
   }
 
+  _getLatestTemplateForTarget(targetId) {
+    if (!targetId) return null;
+
+    if (typeof this.templateManager.getLatestTemplateForTarget === 'function') {
+      return this.templateManager.getLatestTemplateForTarget(targetId);
+    }
+
+    const templatesData = this.templateManager.getTemplatesData?.();
+    if (!templatesData?.size) return null;
+
+    let latest = null;
+    let latestTs = 0;
+    for (const [id, data] of templatesData.entries()) {
+      if (!data?.targets?.[targetId]) continue;
+      const timestamp = Number(data.timestamp || 0);
+      if (timestamp > latestTs) {
+        latest = { id, data };
+        latestTs = timestamp;
+      }
+    }
+
+    return latest;
+  }
+
   /**
-   * Resolve stealther token from stealth check context
+   * Resolve attacker token from saving throw context
    * @param {Object} ctx - Context object
    * @returns {Object|null}
    * @private

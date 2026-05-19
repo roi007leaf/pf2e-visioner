@@ -9,11 +9,13 @@ import {
   getPerceptionProfileBetween,
   getVisibilityMap,
 } from '../utils.js';
+import { getCacheInvalidationRevision } from '../utils/cache-invalidation.js';
 import { AVS_EXPLICIT_VISIBLE_DETECTION_SENSE } from '../stores/visibility-map.js';
 import {
   blocksCanvasDetection,
   legacyVisibilityToProfile,
 } from '../visibility/perception-profile.js';
+import { DetectionFrameCache } from './detection-frame-cache.js';
 import { isExplicitVisiblePair } from './ExplicitVisibilityPairs.js';
 import {
   forcePendingMovementTokenInvisible,
@@ -139,6 +141,24 @@ const NON_VISUAL_DETECTION_MODE_IDS = new Set([
   'thoughtsense',
 ]);
 
+function getDetectionAggregationObserverTokens() {
+  if (game.user?.isGM) {
+    return canvas?.tokens?.controlled || [];
+  }
+  return getControlledObserverTokens();
+}
+
+const detectionFrameCache = new DetectionFrameCache({
+  moduleId: MODULE_ID,
+  getVisibilityMap,
+  getPerceptionProfileBetween,
+  getControlledObserverTokens: getDetectionAggregationObserverTokens,
+  getBestVisibilityState,
+  getSetting: (key) => game.settings.get(MODULE_ID, key),
+  getTokens: () => canvas?.tokens?.placeables || [],
+  getInvalidationRevision: getCacheInvalidationRevision,
+});
+
 /**
  * Override the detection mode test visibility function
  * This makes the PF2E system think tokens have actual conditions
@@ -175,7 +195,7 @@ function detectionModeTestVisibility(visionSource, mode, config = {}) {
 
   if (NON_VISUAL_DETECTION_MODE_IDS.has(modeId)) {
     const visibility = getVisibilityBetweenTokens(observerToken, targetToken);
-    if (visibility === 'hidden' || visibility === 'concealed') {
+    if (visibility === 'hidden') {
       if (
         shouldTemporarilyBlockHiddenDetection(observerToken, targetToken, visibility)
       ) {
@@ -286,7 +306,9 @@ function canDetectWrapper(threshold) {
       return true;
     }
 
-    if (canDetect === false) return false;
+    if (canDetect === false) {
+      return false;
+    }
 
     try {
       const targetToken = target;
@@ -324,7 +346,8 @@ function canDetectWrapper(threshold) {
       visibility,
     });
 
-    return !reachedThreshold;
+    const result = !reachedThreshold;
+    return result;
   };
 }
 
@@ -345,7 +368,7 @@ function canUseExplicitVisionerDetection(
 function hasExplicitObservedProfile(observer, target) {
   try {
     return (
-      getPerceptionProfileBetween(observer, target)?.detectionSense ===
+      detectionFrameCache.getPerceptionProfile(observer, target)?.detectionSense ===
       AVS_EXPLICIT_VISIBLE_DETECTION_SENSE
     );
   } catch {
@@ -380,8 +403,8 @@ function isTokenBlinded(tokenOrDoc) {
 function tokenDocumentPrepareBaseDataWrapper(wrapped) {
   wrapped();
 
-  const visionMasterTokenId = this.getFlag?.(MODULE_ID, 'visionMasterTokenId');
-  const mode = this.getFlag?.(MODULE_ID, 'visionSharingMode') || 'one-way';
+  const visionMasterTokenId = detectionFrameCache.getVisionMasterTokenId(this);
+  const mode = detectionFrameCache.getVisionSharingMode(this);
 
   // REPLACE: Disable minion's sight completely
   if (visionMasterTokenId && mode === 'replace' && this.sight) {
@@ -390,12 +413,7 @@ function tokenDocumentPrepareBaseDataWrapper(wrapped) {
 
   // REVERSE: Check if THIS token is a master for a minion with reverse mode
   // If so, disable this master's sight
-  const tokens = canvas?.tokens?.placeables || [];
-  const hasReverseMinionPointingToMe = tokens.some((t) => {
-    const minionMasterId = t.document?.getFlag?.(MODULE_ID, 'visionMasterTokenId');
-    const minionMode = t.document?.getFlag?.(MODULE_ID, 'visionSharingMode') || 'one-way';
-    return minionMasterId === this.id && minionMode === 'reverse';
-  });
+  const hasReverseMinionPointingToMe = detectionFrameCache.hasMinionWithMode(this.id, 'reverse');
 
   if (hasReverseMinionPointingToMe && this.sight) {
     this.sight.enabled = false;
@@ -414,11 +432,10 @@ function tokenIsVisionSourceWrapper(wrapped) {
   // Check if any controlled token has this token as their vision master
   const controlledTokens = canvas?.tokens?.controlled || [];
   for (const controlledToken of controlledTokens) {
-    const visionMasterTokenId = controlledToken.document?.getFlag?.(
-      MODULE_ID,
-      'visionMasterTokenId',
+    const visionMasterTokenId = detectionFrameCache.getVisionMasterTokenId(
+      controlledToken.document,
     );
-    const mode = controlledToken.document?.getFlag?.(MODULE_ID, 'visionSharingMode') || 'one-way';
+    const mode = detectionFrameCache.getVisionSharingMode(controlledToken.document);
 
     // Check if this token is the master for a controlled minion
     if (visionMasterTokenId === this.id) {
@@ -443,8 +460,8 @@ function tokenIsVisionSourceWrapper(wrapped) {
   }
 
   // Check if this token is a minion with a vision master
-  const visionMasterTokenId = this.document?.getFlag?.(MODULE_ID, 'visionMasterTokenId');
-  const mode = this.document?.getFlag?.(MODULE_ID, 'visionSharingMode') || 'one-way';
+  const visionMasterTokenId = detectionFrameCache.getVisionMasterTokenId(this.document);
+  const mode = detectionFrameCache.getVisionSharingMode(this.document);
 
   // REPLACE: minion uses ONLY master's vision (minion is NOT a vision source)
   // UNLESS master is blinded, then minion falls back to own vision
@@ -479,11 +496,7 @@ function tokenIsVisionSourceWrapper(wrapped) {
 
   // TWO-WAY: When THIS token is the master and is controlled, it should be a vision source
   // Check if this token has any two-way minions
-  const hasTwoWayMinion = canvas?.tokens?.placeables?.some((t) => {
-    const minionMasterId = t.document?.getFlag?.(MODULE_ID, 'visionMasterTokenId');
-    const minionMode = t.document?.getFlag?.(MODULE_ID, 'visionSharingMode') || 'one-way';
-    return minionMasterId === this.id && minionMode === 'two-way';
-  });
+  const hasTwoWayMinion = detectionFrameCache.hasMinionWithMode(this.id, 'two-way');
 
   if (hasTwoWayMinion && controlledTokens.some((ct) => ct.id === this.id) && !thisTokenBlinded) {
     return true;
@@ -492,11 +505,7 @@ function tokenIsVisionSourceWrapper(wrapped) {
   // REVERSE: When THIS token is the master and is controlled, it should NOT be a vision source
   // UNLESS the minion is blinded (then master uses their own vision)
   // Find if there's a minion with reverse mode that has this token as master
-  const reverseMinion = canvas?.tokens?.placeables?.find((t) => {
-    const minionMasterId = t.document?.getFlag?.(MODULE_ID, 'visionMasterTokenId');
-    const minionMode = t.document?.getFlag?.(MODULE_ID, 'visionSharingMode') || 'one-way';
-    return minionMasterId === this.id && minionMode === 'reverse';
-  });
+  const reverseMinion = detectionFrameCache.getMinionsForMaster(this.id, 'reverse')[0]?.token;
 
   if (reverseMinion && controlledTokens.some((ct) => ct.id === this.id)) {
     // If the minion is blinded, master should use their own vision (if they have any)
@@ -536,40 +545,5 @@ function getVisibilityBetweenTokens(observer, target) {
   if (!observer || !target) return 'observed';
   if (!observer.document?.getFlag || !target.document?.id) return 'observed';
 
-  // Check if camera vision aggregation is enabled
-  let aggregationEnabled = false;
-  try {
-    aggregationEnabled = game.settings.get(MODULE_ID, 'enableCameraVisionAggregation');
-  } catch (e) {
-    aggregationEnabled = false;
-  }
-
-  if (!aggregationEnabled) {
-    // Standard behavior: get visibility from the single observer
-    const visibilityMap = getVisibilityMap(observer);
-    return visibilityMap[target.document.id] || 'observed';
-  }
-
-  // Camera vision aggregation enabled - get tokens with observer permissions
-  const observerTokens = getControlledObserverTokens();
-  if (observerTokens.length <= 1) {
-    // Only one or no observer tokens, no aggregation needed
-    const visibilityMap = getVisibilityMap(observer);
-    return visibilityMap[target.document.id] || 'observed';
-  }
-
-  // Multiple observer tokens - aggregate visibility from all of them
-  const visibilityStates = observerTokens
-    .map((observerToken) => {
-      const map = getVisibilityMap(observerToken);
-      return map[target.document.id] || 'observed';
-    })
-    .filter((state) => state !== undefined && state !== null);
-
-  if (visibilityStates.length === 0) {
-    return 'observed';
-  }
-
-  // Return the best (most permissive) visibility state
-  return getBestVisibilityState(visibilityStates);
+  return detectionFrameCache.getVisibility(observer, target);
 }

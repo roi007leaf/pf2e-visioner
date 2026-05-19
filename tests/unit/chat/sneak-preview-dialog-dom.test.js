@@ -28,6 +28,10 @@ describe('SneakPreviewDialog DOM updates', () => {
       <table><tbody>
         <tr data-token-id="target-1">
           <td class="outcome"><span class="outcome-text">inside</span></td>
+          <td>
+            <span class="state-icon selected" data-state="observed"></span>
+            <span class="state-icon" data-state="hidden"></span>
+          </td>
           <td class="actions"></td>
         </tr>
       </tbody></table>
@@ -38,7 +42,6 @@ describe('SneakPreviewDialog DOM updates', () => {
     dialog.element = dialogRoot;
     dialog.getOutcomeLabel = jest.fn(() => 'Success');
     dialog.getOutcomeClass = jest.fn(() => 'success');
-    dialog._updateVisibilityStateIndicators = jest.fn();
     dialog.updateActionButtonsForToken = jest.fn();
 
     await dialog._updateOutcomeDisplayForToken('target-1', {
@@ -49,9 +52,8 @@ describe('SneakPreviewDialog DOM updates', () => {
 
     expect(outside.querySelector('.outcome-text').textContent).toBe('outside');
     expect(dialogRoot.querySelector('.outcome-text').textContent).toBe('Success');
-    expect(dialog._updateVisibilityStateIndicators).toHaveBeenCalledWith(
-      dialogRoot.querySelector('tr[data-token-id="target-1"]'),
-      'hidden',
+    expect(dialogRoot.querySelector('[data-state="hidden"]').classList.contains('selected')).toBe(
+      true,
     );
   });
 
@@ -83,18 +85,14 @@ describe('SneakPreviewDialog DOM updates', () => {
     dialog._bulkUndeferAll = jest.fn();
     dialog._bulkRestoreDefers = jest.fn();
 
-    const deferButton = dialogRoot.querySelector('[data-action="toggleDefer"]');
-    const bulkDeferButton = dialogRoot.querySelector('[data-action="bulkDefer"]');
-    const bulkUndeferButton = dialogRoot.querySelector('[data-action="bulkUndefer"]');
-    const deferSpy = jest.spyOn(deferButton, 'addEventListener');
-    const bulkDeferSpy = jest.spyOn(bulkDeferButton, 'addEventListener');
-    const bulkUndeferSpy = jest.spyOn(bulkUndeferButton, 'addEventListener');
+    const listenerSpy = jest.spyOn(dialogRoot, 'addEventListener');
 
     dialog.addDeferHandlers();
     dialog.addDeferHandlers();
+    dialogRoot.querySelector('[data-action="bulkDefer"]').click();
 
-    expect(deferSpy).toHaveBeenCalledTimes(1);
-    expect(bulkDeferSpy).toHaveBeenCalledTimes(1);
-    expect(bulkUndeferSpy).toHaveBeenCalledTimes(1);
+    const clickBindings = listenerSpy.mock.calls.filter(([eventName]) => eventName === 'click');
+    expect(clickBindings).toHaveLength(1);
+    expect(dialog._bulkDeferAllEligible).toHaveBeenCalledTimes(1);
   });
 });

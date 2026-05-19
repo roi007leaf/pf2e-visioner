@@ -365,8 +365,31 @@ describe('BatchProcessor', () => {
       spatialIndex: null,
       spatialIndexTs: 0,
       spatialIndexKey: null,
+      cacheInvalidationRevision: 0,
       CACHE_TTL_MS: 5000,
     });
+  });
+
+  test('global cache invalidation revision clears reusable caches before next batch', () => {
+    let revision = 0;
+    const tokenSenseSignatureCache = { clear: jest.fn() };
+    processor.getCacheInvalidationRevision = () => revision;
+    processor._tokenSenseSignatureCache = tokenSenseSignatureCache;
+    processor._persistentCaches.sensesCache = { some: 'senses' };
+    processor._persistentCaches.sensesCacheKey = 'senses-key';
+    processor._persistentCaches.idToTokenMap = new Map([['A', global.canvas.tokens.placeables[0]]]);
+    processor._persistentCaches.idToTokenMapKey = 'ids-key';
+    processor._persistentCaches.spatialIndex = { some: 'index' };
+    processor._persistentCaches.spatialIndexKey = 'positions-key';
+
+    revision = 1;
+    processor._clearPersistentCachesIfInvalidated();
+
+    expect(processor._persistentCaches.sensesCache).toBeNull();
+    expect(processor._persistentCaches.idToTokenMap).toBeNull();
+    expect(processor._persistentCaches.spatialIndex).toBeNull();
+    expect(processor._persistentCaches.cacheInvalidationRevision).toBe(1);
+    expect(tokenSenseSignatureCache.clear).toHaveBeenCalledTimes(1);
   });
 
   test('door batches force detection sync for unchanged visible LOS pairs', async () => {

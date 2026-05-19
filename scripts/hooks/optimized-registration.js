@@ -7,7 +7,7 @@ import { MODULE_ID } from '../constants.js';
 import {
   getControlledWallVisualObserverId,
   refreshOptimizedWallVisualsForObserverId,
-} from '../services/wall-visual-refresh.js';
+} from '../services/Walls/wall-visual-refresh.js';
 import { scheduleTask } from '../utils/scheduler.js';
 
 function getControlledObserverId() {

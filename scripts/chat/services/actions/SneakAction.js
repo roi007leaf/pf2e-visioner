@@ -1,21 +1,26 @@
 import {
-  COVER_STATES,
   MODULE_ID,
-  SNEAK_FLAGS,
-  VISIBILITY_STATES,
   getVisibilityStateLabelKey,
 } from '../../../constants.js';
 import autoCoverSystem from '../../../cover/auto-cover/AutoCoverSystem.js';
 import stealthCheckUseCase from '../../../cover/auto-cover/usecases/StealthCheckUseCase.js';
-import { getCoverBetween } from '../../../utils.js';
 import { overrideToDisplayVisibility } from '../../../visibility/perception-profile.js';
 import { appliedSneakChangesByMessage } from '../data/message-cache.js';
 import errorHandlingService, { SYSTEM_TYPES } from '../infra/ErrorHandlingService.js';
 import { notify } from '../infra/notifications.js';
-import { calculateStealthRollTotals, shouldFilterAlly } from '../infra/shared-utils.js';
 import sneakCore from '../SneakCore.js';
 import turnSneakTracker from '../TurnSneakTracker.js';
 import { ActionHandlerBase } from './BaseAction.js';
+import { clearSneakFlag } from './Sneak/sneak-cleanup.js';
+import { buildSneakAutoCoverData } from './Sneak/sneak-cover-analysis.js';
+import { checkSneakPositionQualification } from './Sneak/sneak-position-qualification.js';
+import { resolveSneakRollOutcome } from './Sneak/sneak-roll-outcome.js';
+import { captureSneakStartPosition } from './Sneak/sneak-start-position.js';
+import { enrichSneakOutcomesWithStartStates } from './Sneak/sneak-start-state-enrichment.js';
+import { discoverSneakSubjects } from './Sneak/sneak-subject-discovery.js';
+import { resolveSneakingToken } from './Sneak/sneak-token-resolution.js';
+import { initializeSneakVisibility } from './Sneak/sneak-visibility-initialization.js';
+import { resolveSneakVisibilityOutcome } from './Sneak/sneak-visibility-outcome.js';
 
 export class SneakActionHandler extends ActionHandlerBase {
   constructor() {
@@ -73,83 +78,16 @@ export class SneakActionHandler extends ActionHandlerBase {
       // Without this, analyzeOutcome falls back to standard logic using the current
       // (post-movement) visibility, ignoring whether the token started hidden/undetected
       // or ended in cover — producing incorrect results for the direct "Apply Changes" path.
-      await this._enrichOutcomesWithStartStates(actionData, result);
+      await enrichSneakOutcomesWithStartStates(actionData, result, {
+        getSneakingToken: (data) => this._getSneakingToken(data),
+        autoCoverSystem: this.autoCoverSystem,
+        stealthCheckUseCase: this.stealthCheckUseCase,
+      });
 
       return result;
     } catch (error) {
       console.error('PF2E Visioner | Error getting cached outcomes:', error);
       return [];
-    }
-  }
-
-  /**
-   * Applies start-state-based position qualification to outcomes that lack position data.
-   * Mirrors the logic in SneakPreviewDialog._captureCurrentEndPositionsForOutcomes /
-   * _prepareContext so that "Apply Changes" produces the same result as the dialog path.
-   * @param {Object} actionData
-   * @param {Array} outcomes
-   * @private
-   */
-  async _enrichOutcomesWithStartStates(actionData, outcomes) {
-    try {
-      const message = actionData?.message || game.messages.get(actionData?.messageId);
-      const sneakStartStates = message?.flags?.['pf2e-visioner']?.sneakStartStates;
-      if (!sneakStartStates || !Object.keys(sneakStartStates).length) return;
-
-      const sneakingToken = this._getSneakingToken(actionData);
-      if (!sneakingToken) return;
-
-      const allowExtendedEndStates =
-        game.settings?.get?.('pf2e-visioner', 'sneakAllowHiddenUndetectedEndPosition') ?? false;
-      const { getDefaultNewStateFor } = await import('../data/action-state-config.js');
-      const { getCoverBetween } = await import('../../../utils.js');
-
-      for (const outcome of outcomes) {
-        if (!outcome?.token) continue;
-        // Skip if analyzeOutcome already produced position-aware results
-        if (outcome.positionTransition) continue;
-
-        const observerId = outcome.token?.document?.id || outcome.token?.id;
-        const startState = sneakStartStates[observerId];
-        if (!startState) continue;
-
-        const startVisibility = startState.visibility || 'observed';
-
-        // Start prerequisite: must have been hidden or undetected when sneak began
-        const startQualifies = startVisibility === 'hidden' || startVisibility === 'undetected';
-
-        // End prerequisite: must be in cover or concealed at current position
-        let endCoverState = 'none';
-        let endVisibility = outcome.currentVisibility || 'observed';
-        try {
-          endCoverState = getCoverBetween(outcome.token, sneakingToken) || 'none';
-          if (endCoverState === 'none' && this.autoCoverSystem?.isEnabled?.()) {
-            endCoverState =
-              this.stealthCheckUseCase?._detectCover?.(outcome.token, sneakingToken) || 'none';
-          }
-        } catch { }
-
-        const endQualifies =
-          endCoverState === 'standard' ||
-          endCoverState === 'greater' ||
-          endVisibility === 'concealed' ||
-          (allowExtendedEndStates &&
-            (endVisibility === 'hidden' || endVisibility === 'undetected'));
-
-        // Correct oldVisibility to reflect the actual state at sneak start
-        outcome.oldVisibility = startVisibility;
-
-        if (!startQualifies || !endQualifies) {
-          outcome.newVisibility = 'avs';
-        } else {
-          const newVis = getDefaultNewStateFor('sneak', startVisibility, outcome.outcome);
-          if (newVis) outcome.newVisibility = newVis;
-        }
-
-        outcome.changed = outcome.newVisibility !== outcome.currentVisibility;
-      }
-    } catch (e) {
-      console.warn('PF2E Visioner | Error enriching outcomes with start states:', e);
     }
   }
 
@@ -206,112 +144,9 @@ export class SneakActionHandler extends ActionHandlerBase {
    * @private
    */
   async _initializeSneakVisibility(actionData) {
-    try {
-      // Skip initialization if this is a preview-only operation
-      if (actionData.previewOnly) {
-        return;
-      }
-
-      // Get the sneaking token
-      const sneakingToken = this._getSneakingToken(actionData);
-      if (!sneakingToken) {
-        return;
-      }
-
-
-      // Set sneak flag on the token to indicate it's currently sneaking
-      await sneakingToken.document.setFlag('pf2e-visioner', SNEAK_FLAGS.SNEAK_ACTIVE, true);
-
-      // Apply Sneaking effect while sneaking
-      try {
-        const { SneakSpeedService } = await import('../SneakSpeedService.js');
-        await SneakSpeedService.applySneakWalkSpeed(sneakingToken);
-      } catch (speedErr) {
-        console.warn('PF2E Visioner | Failed to apply sneak walk speed:', speedErr);
-      }
-
-      // Get all observer tokens (include Foundry-hidden; UI checkbox controls visibility only)
-      const observerTokens = canvas.tokens.placeables
-        .filter((t) => t && t.actor)
-        .filter((t) => t.id !== sneakingToken.id);
-
-      // Import the visibility calculator to get proper AVS calculations
-
-      let visibilityModule;
-      let optimizedVisibilityCalculator;
-
-      try {
-        visibilityModule = await import('../../../visibility/auto-visibility/index.js');
-
-        optimizedVisibilityCalculator = visibilityModule.optimizedVisibilityCalculator;
-
-        if (!optimizedVisibilityCalculator) {
-          throw new Error('optimizedVisibilityCalculator is undefined');
-        }
-      } catch (importError) {
-        console.error('PF2E Visioner | Import error:', importError);
-        throw importError;
-      }
-
-      // Import visibility map utilities
-      const { getVisibilityMap } = await import('../../../stores/visibility-map.js');
-
-      // Set visibility for sneak: ONLY affect how observers see the sneaking token, NOT how sneaking token sees observers
-      for (const observer of observerTokens) {
-        try {
-          // Calculate proper visibility using AVS
-          const sneakingTokenPosition = {
-            x: sneakingToken.document.x,
-            y: sneakingToken.document.y,
-            elevation: sneakingToken.document.elevation || 0,
-          };
-          const observerPosition = {
-            x: observer.document.x,
-            y: observer.document.y,
-            elevation: observer.document.elevation || 0,
-          };
-
-          // Calculate how the observer sees the sneaking token (this is what sneak affects)
-          const observerToSneaking =
-            await optimizedVisibilityCalculator.calculateVisibilityBetweenTokens(
-              observer,
-              sneakingToken,
-              observerPosition,
-              sneakingTokenPosition,
-            );
-
-          // DO NOT set how the sneaking token sees the observer - they should see normally
-          // Sneak only affects how others see the sneaking token, not how the sneaking token sees others
-
-          // Set how the observer sees the sneaking token (observer's visibility map)
-          const observerVisibilityMap = getVisibilityMap(observer);
-          observerVisibilityMap[sneakingToken.document.id] = observerToSneaking;
-        } catch (observerError) {
-          console.error('PF2E Visioner | Error processing observer:', observer.name, observerError);
-        }
-      }
-
-      // Manually trigger AVS to recalculate specifically for sneaking tokens
-      // This ensures AVS processes the sneaking token even when it's hidden by Foundry
-      try {
-        const { eventDrivenVisibilitySystem } = await import(
-          '../../../visibility/auto-visibility/EventDrivenVisibilitySystem.js'
-        );
-        if (eventDrivenVisibilitySystem) {
-          await eventDrivenVisibilitySystem.recalculateSneakingTokens();
-        }
-      } catch (avsError) {
-        console.warn('PF2E Visioner | Failed to trigger AVS recalculation:', avsError);
-      }
-    } catch (error) {
-      console.error('PF2E Visioner | Error initializing sneak visibility:', error);
-      console.error('PF2E Visioner | Error stack:', error.stack);
-      console.error('PF2E Visioner | Error details:', {
-        name: error.name,
-        message: error.message,
-        cause: error.cause,
-      });
-    }
+    await initializeSneakVisibility(actionData, {
+      getSneakingToken: (data) => this._getSneakingToken(data),
+    });
   }
 
   /**
@@ -322,47 +157,11 @@ export class SneakActionHandler extends ActionHandlerBase {
    * @private
    */
   async _captureStartPositions(actionData, storedStartPosition = null) {
-    try {
-      // Skip if we already have a session started
-      if (this._currentSessionId) {
-        return;
-      }
-
-      // Store the provided stored position for later use
-      if (storedStartPosition) {
-        actionData.storedStartPosition = storedStartPosition;
-      } else {
-        // Try to get stored position from message flags if not provided directly
-        const message = actionData?.message || game.messages.get(actionData?.messageId);
-
-        // Check for sneakStartPosition first (from "Start Sneak" button), then rollTimePosition
-        if (message?.flags?.['pf2e-visioner']?.sneakStartPosition) {
-          actionData.storedStartPosition = message.flags['pf2e-visioner'].sneakStartPosition;
-        } else if (message?.flags?.['pf2e-visioner']?.rollTimePosition) {
-          actionData.storedStartPosition = message.flags['pf2e-visioner'].rollTimePosition;
-        }
-
-        // Fallback: if still not set, capture current token center NOW (prerequisites time)
-        if (!actionData.storedStartPosition) {
-          const token = this._getSneakingToken(actionData);
-          const cx = token?.center?.x;
-          const cy = token?.center?.y;
-          if (typeof cx === 'number' && typeof cy === 'number') {
-            actionData.storedStartPosition = {
-              x: typeof token.x === 'number' ? token.x : undefined,
-              y: typeof token.y === 'number' ? token.y : undefined,
-              center: { x: cx, y: cy },
-              elevation: token?.document?.elevation || 0,
-              tokenId: token?.id,
-              tokenName: token?.name,
-              timestamp: Date.now(),
-            };
-          }
-        }
-      }
-    } catch (error) {
-      console.warn('PF2E Visioner | Error in position capture setup:', error);
-    }
+    if (this._currentSessionId) return;
+    captureSneakStartPosition(actionData, {
+      storedStartPosition,
+      getSneakingToken: (data) => this._getSneakingToken(data),
+    });
   }
 
   /**
@@ -372,81 +171,13 @@ export class SneakActionHandler extends ActionHandlerBase {
    * @private
    */
   _getSneakingToken(actionData) {
-    // Try multiple ways to get the token, compatible with v13 APIs
-    let token = null;
-
-
-    // Direct token references
-    token = actionData.actorToken || actionData.sneakingToken;
-    if (token) {
-      return token;
-    }
-
-    // From actor's token object
-    if (actionData.actor?.token?.object) {
-      const foundToken = actionData.actor.token.object;
-      return foundToken;
-    }
-
-    // From actor's active tokens
-    if (actionData.actor?.getActiveTokens) {
-      const activeTokens = actionData.actor.getActiveTokens();
-      if (activeTokens.length > 0) {
-        const foundToken = activeTokens[0];
-        return foundToken;
-      }
-    }
-
-    // Search canvas tokens by actor ID
-    if (actionData.actor?.id && canvas?.tokens?.placeables) {
-      const tokenByName = canvas.tokens.placeables.find((t) => t.name === actionData.actor?.name);
-      if (tokenByName) {
-        return tokenByName;
-      }
-      token = canvas.tokens.placeables.find((t) => t.actor?.id === actionData.actor.id);
-      if (token) {
-        return token;
-      }
-    }
-
-    // Fallback: try to get from message context
-    if (actionData.message?.speaker?.token) {
-      const tokenId = actionData.message.speaker.token;
-      token = canvas?.tokens?.placeables?.find((t) => t.id === tokenId);
-      if (token) {
-        return token;
-      }
-    }
-
-    return null;
+    return resolveSneakingToken(actionData);
   }
 
   async discoverSubjects(actionData) {
-    // Observers are all other tokens; dialog filters encounter as needed
-    const tokens = canvas?.tokens?.placeables || [];
-    // Resolve the actual sneaking token to exclude it reliably
-    const sneakingToken = this._getSneakingToken(actionData) || actionData?.actor || null;
-    const sneakingTokenId = sneakingToken?.document?.id || sneakingToken?.id || null;
-
-    const base = tokens
-      .filter((t) => t && t.actor)
-      // Include Foundry-hidden tokens; visual filter handled in dialog
-      // Exclude the sneaking token itself
-      .filter((t) => (sneakingTokenId ? t.document?.id !== sneakingTokenId : t !== sneakingToken))
-      // Use global ignoreAllies setting when not explicitly provided in actionData
-      .filter(
-        (t) =>
-          !shouldFilterAlly(
-            actionData.actor,
-            t,
-            'enemies',
-            actionData?.ignoreAllies ?? game.settings.get('pf2e-visioner', 'ignoreAllies'),
-          ),
-      )
-      // Exclude loot and hazards from observers list
-      .filter((t) => t.actor?.type !== 'loot' && t.actor?.type !== 'hazard');
-
-    return base;
+    return discoverSneakSubjects(actionData, {
+      getSneakingToken: (data) => this._getSneakingToken(data),
+    });
   }
 
   async analyzeOutcome(actionData, subject) {
@@ -475,7 +206,7 @@ export class SneakActionHandler extends ActionHandlerBase {
     }
 
     const { getVisibilityBetween } = await import('../../../utils.js');
-    const { extractPerceptionDC, determineOutcome } = await import('../infra/shared-utils.js');
+    const { extractPerceptionDC } = await import('../infra/shared-utils.js');
 
     // Use fresh visibility calculation that accounts for darkvision instead of stored state
     let current;
@@ -553,378 +284,52 @@ export class SneakActionHandler extends ActionHandlerBase {
     // Calculate roll information (stealth vs observer's perception DC)
     let adjustedDC = extractPerceptionDC(subject);
 
-    // Initialize result object for auto-cover data
-    const result = {};
-
-    try {
-      const sneakingToken =
-        actionData.actorToken || actionData.actor?.token?.object || actionData.actor;
-
-      let coverState = null;
-      let isOverride = false;
-      let coverSource = 'none';
-
-      // Compute base cover (manual first, then auto-cover fallback)
-      try {
-        // First check for manual cover
-        const manualDetected = getCoverBetween(subject, sneakingToken);
-        if (manualDetected && manualDetected !== 'none') {
-          coverState = manualDetected;
-          coverSource = 'manual';
-        } else if (this.autoCoverSystem.isEnabled()) {
-          // Fallback to auto-cover detection if no manual cover
-          // For cover detection: observer is "attacking" (perceiving) the sneaking token
-          // So observer is attacker, sneaking token is target
-          const autoDetected = this.stealthCheckUseCase._detectCover(subject, sneakingToken);
-          if (autoDetected && autoDetected !== 'none') {
-            coverState = autoDetected;
-            coverSource = 'automatic';
-          }
-        }
-      } catch (e) {
-        console.warn(`PF2E Visioner | Cover calculation failed for Sneak action:`, e);
-      }
-
-      // Apply overrides last (take precedence over base)
-      // Prefer roll-specific override if a rollId exists in the action or message context.
-      // Don't delete on consume yet - we need it for all observers
-      let originalDetectedState = coverState || 'none'; // Store what we actually detected for this observer
-      try {
-        const rollId =
-          actionData?.context?._visionerRollId ||
-          actionData?.context?.rollId ||
-          actionData?.message?.flags?.['pf2e-visioner']?.rollId ||
-          null;
-
-        // First check if there's a stored modifier for this roll (from StealthCheckUseCase)
-        let storedModifier = null;
-        if (rollId) {
-          storedModifier = this.stealthCheckUseCase?.getOriginalCoverModifier?.(rollId);
-        }
-
-        if (storedModifier && storedModifier.isOverride) {
-          // Use the stored modifier data to determine override
-          originalDetectedState = coverState || 'none';
-          coverState = storedModifier.finalState;
-
-          // Only mark as override if the final state is different from what we detected
-          if (originalDetectedState !== coverState) {
-            isOverride = true;
-            coverSource = storedModifier.source || 'dialog';
-          }
-        } else {
-          // Fallback to the old method (but don't consume yet)
-          // NOTE: Override parameter order is DIFFERENT from cover detection!
-          // Stealth check stores overrides as (sneaking token -> observer)
-          // Cover detection uses (observer -> sneaking token)
-          const overrideData = this.autoCoverSystem.consumeCoverOverride(
-            sneakingToken,
-            subject,
-            rollId,
-            false,
-          );
-          if (overrideData) {
-            // Store the original detected state before applying override
-            originalDetectedState = coverState || 'none';
-            // Apply the override
-            coverState = overrideData.state;
-
-            // Only mark as override if there's actually a difference from what we detected
-            if (originalDetectedState !== coverState) {
-              isOverride = true;
-              coverSource = overrideData.source;
-            }
-          }
-        }
-      } catch (e) {
-        console.warn('PF2E Visioner | Error checking for cover override in Sneak:', e);
-      }
-
-      // Create autoCover object if we have a cover state OR if there's an override
-      if (coverState || isOverride) {
-        const coverConfig = COVER_STATES[coverState || 'none'];
-        const _csCanTakeCover = (coverState === 'standard' || coverState === 'greater') ? true : undefined;
-        const actualStealthBonus = coverConfig?.bonusStealth || 0;
-        result.autoCover = {
-          state: coverState || 'none',
-          label: game.i18n.localize(coverConfig?.label || 'None'),
-          icon: coverConfig?.icon || 'fas fa-shield',
-          color: coverConfig?.color || '#999',
-          cssClass: coverConfig?.cssClass || '',
-          bonus: actualStealthBonus,
-          // Ceaseless Shadows: gaining Standard or better allows Take Cover
-          canTakeCover:
-            _csCanTakeCover ||
-            (coverState === 'standard' || coverState === 'greater' ? true : undefined),
-          isOverride: isOverride && originalDetectedState !== coverState,
-          source: coverSource,
-          // Add override details for template display (only if actually overridden)
-          ...(isOverride && {
-            overrideDetails: {
-              originalState: originalDetectedState,
-              originalLabel: game.i18n.localize(
-                COVER_STATES[originalDetectedState]?.label || 'None',
-              ),
-              originalIcon: COVER_STATES[originalDetectedState]?.icon || 'fas fa-shield',
-              originalColor: COVER_STATES[originalDetectedState]?.color || '#999',
-              finalState: coverState || 'none',
-              finalLabel: game.i18n.localize(coverConfig?.label || 'None'),
-              finalIcon: coverConfig?.icon || 'fas fa-shield',
-              finalColor: coverConfig?.color || '#999',
-              source: coverSource,
-            },
-          }),
-        };
-      }
-    } catch (e) {
-      console.error(`PF2E Visioner | Error in cover calculation for Sneak action:`, e);
-    }
-
-    // Calculate roll information (stealth vs observer's perception DC)
-    const baseTotal = Number(actionData?.roll?.total ?? 0);
-
-    // Use shared utility to calculate stealth roll totals with cover adjustments
-    // Pass null for autoCover - cover bonuses should only apply when user explicitly selects them via UI buttons
-    const { total, originalTotal, baseRollTotal } = calculateStealthRollTotals(
-      baseTotal,
-      null,
-      actionData,
-    );
+    const result = {
+      autoCover: await buildSneakAutoCoverData({
+        actionData,
+        subject,
+        autoCoverSystem: this.autoCoverSystem,
+        stealthCheckUseCase: this.stealthCheckUseCase,
+      }),
+    };
 
     const dc = adjustedDC;
-    const die = Number(
-      actionData?.roll?.dice?.[0]?.results?.[0]?.result ??
-      actionData?.roll?.dice?.[0]?.total ??
-      actionData?.roll?.terms?.[0]?.total ??
-      0,
-    );
-    const margin = total - dc;
-    const originalMargin = originalTotal ? originalTotal - dc : margin;
-    const baseMargin = baseRollTotal ? baseRollTotal - dc : margin;
-    const outcome = determineOutcome(total, die, dc);
-    const originalOutcome = originalTotal ? determineOutcome(originalTotal, die, dc) : outcome;
+    const {
+      baseTotal,
+      total,
+      originalTotal,
+      baseRollTotal,
+      die,
+      margin,
+      originalMargin,
+      baseMargin,
+      outcome,
+      adjustedOutcome,
+      originalOutcome,
+      originalOutcomeLabel,
+      featNotes,
+      sneakAdeptApplied,
+    } = await resolveSneakRollOutcome({ actionData, dc });
 
-    // Adjust outcome by feats that influence sneak/hide
-    let adjustedOutcome = outcome;
-    let featNotes = [];
-    try {
-      const { FeatsHandler } = await import('../FeatsHandler.js');
-
-      const { shift, notes } = FeatsHandler.getOutcomeAdjustment(actionData.actor, 'sneak');
-      if (shift) {
-        adjustedOutcome = FeatsHandler.applyOutcomeShift(outcome, shift);
-        featNotes = notes;
-      }
-    } catch (e) {
-      console.warn('PF2E Visioner | Feats adjustment failed:', e);
-    }
-
-    // Sneak Adept feat: upgrade failure to success (but not critical failure)
-    let sneakAdeptApplied = false;
-    try {
-      if (adjustedOutcome === 'failure' && this.#hasSneakAdeptFeat(actionData.actor)) {
-        adjustedOutcome = 'success';
-        sneakAdeptApplied = true;
-        featNotes.push('Sneak Adept: failure upgraded to success');
-      }
-    } catch (e) {
-      console.warn('PF2E Visioner | Sneak Adept feat check failed:', e);
-    }
-
-    // Generate outcome labels
-    const getOutcomeLabel = (outcomeValue) => {
-      switch (outcomeValue) {
-        case 'critical-success':
-          return 'Critical Success';
-        case 'success':
-          return 'Success';
-        case 'failure':
-          return 'Failure';
-        case 'critical-failure':
-          return 'Critical Failure';
-        default:
-          return outcomeValue?.charAt(0).toUpperCase() + outcomeValue?.slice(1) || '';
-      }
-    };
-    const originalOutcomeLabel = originalTotal ? getOutcomeLabel(originalOutcome) : null;
-
-    // Use enhanced outcome determination if position data is available
-    let newVisibility = current;
-    let originalNewVisibility = current;
-    let enhancedOutcome = null;
-
-    let positionTransition = null;
-    try {
-      // Get position transition for enhanced outcome determination
-      positionTransition = await this._getPositionTransitionForSubject(subject);
-      if (positionTransition?.startPosition && positionTransition?.endPosition) {
-        const { default: EnhancedSneakOutcome } = await import('./enhanced-sneak-outcome.js');
-        enhancedOutcome = await EnhancedSneakOutcome.determineEnhancedOutcome({
-          startVisibilityState: positionTransition.startPosition.avsVisibility,
-          endVisibilityState: positionTransition.endPosition.avsVisibility,
-          currentVisibilityState: current,
-          rollOutcome: adjustedOutcome,
-          rollTotal: total,
-          perceptionDC: dc,
-          dieResult: die,
-          observerToken: subject,
-          sneakingToken: actionData.actor,
-          positionTransition,
-        });
-        newVisibility = enhancedOutcome.newVisibility;
-        // Enforce end-position prerequisite unless a feat removes it
-        try {
-          const { FeatsHandler } = await import('../FeatsHandler.js');
-          const skip = FeatsHandler.shouldSkipEndCoverRequirement(actionData.actor, 'sneak');
-          if (!skip) {
-            const endCover = positionTransition?.endPosition?.coverState;
-            const endVis = positionTransition?.endPosition?.avsVisibility;
-            const endQualifies =
-              endCover === 'standard' || endCover === 'greater' || endVis === 'concealed';
-            if (!endQualifies) newVisibility = 'avs';
-          }
-        } catch { }
-        // Feat-based post visibility adjustments (e.g., Vanish into the Land)
-        try {
-          const { FeatsHandler } = await import('../FeatsHandler.js');
-          const inNatural = (() => {
-            try {
-              return FeatsHandler.isEnvironmentActive(actionData.actor, 'natural');
-            } catch {
-              return false;
-            }
-          })();
-          newVisibility = FeatsHandler.adjustVisibility(
-            'sneak',
-            actionData.actor,
-            current,
-            newVisibility,
-            {
-              inNaturalTerrain: inNatural,
-              outcome: adjustedOutcome,
-            },
-          );
-        } catch { }
-      } else {
-        // Fall back to standard outcome determination
-        const { getDefaultNewStateFor } = await import('../data/action-state-config.js');
-        newVisibility = getDefaultNewStateFor('sneak', current, adjustedOutcome) || current;
-        // Feat-based post visibility adjustments
-        try {
-          const { FeatsHandler } = await import('../FeatsHandler.js');
-          const inNatural = (() => {
-            try {
-              return FeatsHandler.isEnvironmentActive(actionData.actor, 'natural');
-            } catch {
-              return false;
-            }
-          })();
-          newVisibility = FeatsHandler.adjustVisibility(
-            'sneak',
-            actionData.actor,
-            current,
-            newVisibility,
-            {
-              inNaturalTerrain: inNatural,
-              outcome: adjustedOutcome,
-            },
-          );
-        } catch { }
-      }
-    } catch (error) {
-      console.warn(
-        'PF2E Visioner | Enhanced outcome determination failed, using standard logic:',
-        error,
-      );
-      // Fall back to standard outcome determination
-      const { getDefaultNewStateFor } = await import('../data/action-state-config.js');
-      newVisibility = getDefaultNewStateFor('sneak', current, adjustedOutcome) || current;
-      // Feat-based post visibility adjustments
-      try {
-        const { FeatsHandler } = await import('../FeatsHandler.js');
-        const inNatural = (() => {
-          try {
-            return FeatsHandler.isEnvironmentActive(actionData.actor, 'natural');
-          } catch {
-            return false;
-          }
-        })();
-        newVisibility = FeatsHandler.adjustVisibility(
-          'sneak',
-          actionData.actor,
-          current,
-          newVisibility,
-          {
-            inNaturalTerrain: inNatural,
-            outcome: adjustedOutcome,
-          },
-        );
-      } catch { }
-    }
-
-    // Track roll outcomes for Sneaky/Very Sneaky feat mechanics
-    let shouldApplyOutcome = true;
-    try {
-      const sneakingToken = this._getSneakingToken(actionData);
-      if (sneakingToken && turnSneakTracker.hasSneakyFeat(sneakingToken)) {
-        // Record the roll outcome for this observer
-        shouldApplyOutcome = turnSneakTracker.recordRollOutcome(
-          sneakingToken,
-          subject,
-          adjustedOutcome,
-          newVisibility,
-        );
-
-        // If roll outcome tracking indicates this observer already failed a previous roll,
-        // override the newVisibility to 'avs' to let AVS control it
-        if (!shouldApplyOutcome) {
-          newVisibility = 'avs';
-        }
-      }
-    } catch (error) {
-      console.warn('PF2E Visioner | Error tracking roll outcome for Sneaky feat:', error);
-    }
-
-    // Calculate what the visibility change would have been with original outcome
-    if (originalTotal) {
-      try {
-        if (enhancedOutcome) {
-          // Use enhanced logic for original outcome too if available
-          const { default: EnhancedSneakOutcome } = await import('./enhanced-sneak-outcome.js');
-          // positionTransition already computed above
-
-          if (positionTransition?.startPosition && positionTransition?.endPosition) {
-            const originalEnhanced = await EnhancedSneakOutcome.determineEnhancedOutcome({
-              startVisibilityState: positionTransition.startPosition.avsVisibility,
-              endVisibilityState: positionTransition.endPosition.avsVisibility,
-              currentVisibilityState: current,
-              rollOutcome: originalOutcome,
-              rollTotal: originalTotal,
-              perceptionDC: dc,
-              dieResult: die,
-              observerToken: subject,
-              sneakingToken: actionData.actor,
-              positionTransition,
-            });
-            originalNewVisibility = originalEnhanced.newVisibility;
-          } else {
-            const { getDefaultNewStateFor } = await import('../data/action-state-config.js');
-            originalNewVisibility =
-              getDefaultNewStateFor('sneak', current, originalOutcome) || current;
-          }
-        } else {
-          const { getDefaultNewStateFor } = await import('../data/action-state-config.js');
-          originalNewVisibility =
-            getDefaultNewStateFor('sneak', current, originalOutcome) || current;
-        }
-      } catch (error) {
-        console.warn('PF2E Visioner | Failed to calculate original enhanced outcome:', error);
-        const { getDefaultNewStateFor } = await import('../data/action-state-config.js');
-        originalNewVisibility = getDefaultNewStateFor('sneak', current, originalOutcome) || current;
-      }
-    } else {
-      originalNewVisibility = newVisibility;
-    }
+    const {
+      newVisibility,
+      originalNewVisibility,
+      enhancedOutcome,
+      positionTransition,
+    } = await resolveSneakVisibilityOutcome({
+      actionData,
+      subject,
+      current,
+      adjustedOutcome,
+      originalOutcome,
+      originalTotal,
+      total,
+      dc,
+      die,
+      getPositionTransitionForSubject: (target) => this._getPositionTransitionForSubject(target),
+      getSneakingToken: (data) => this._getSneakingToken(data),
+      turnSneakTracker,
+    });
 
     // Check if we should show override displays (only if there's a meaningful difference)
     const shouldShowOverride =
@@ -942,11 +347,13 @@ export class SneakActionHandler extends ActionHandlerBase {
     const finalMargin = margin;
 
     // Simple position qualification check
-    const positionQualifies = await this._checkPositionQualification(
+    const positionQualifies = await checkSneakPositionQualification({
       positionTransition,
       actionData,
-      subject,
-    );
+      observerToken: subject,
+      getSneakingToken: (data) => this._getSneakingToken(data),
+      turnSneakTracker,
+    });
 
     const outcomeData = {
       token: subject,
@@ -1204,139 +611,11 @@ export class SneakActionHandler extends ActionHandlerBase {
   }
 
   /**
-   * Checks if start and end positions qualify for sneak
-   * @param {PositionTransition|null} positionTransition - Position transition data
-   * @returns {Object} Position qualification data
-   * @private
-   */
-  async _checkPositionQualification(positionTransition, actionData, observerToken = null) {
-    if (!positionTransition) {
-      return {
-        startQualifies: false,
-        endQualifies: false,
-        bothQualify: false,
-        reason: 'No position data available',
-      };
-    }
-
-    const startPos = positionTransition.startPosition;
-    const endPos = positionTransition.endPosition;
-    const sneakingToken = this._getSneakingToken(actionData);
-
-    // PF2E Rules: Start position must be Hidden or Undetected to attempt Sneak
-    // End position needs cover or concealment to maintain stealth
-    let startQualifies =
-      startPos.avsVisibility === 'hidden' || startPos.avsVisibility === 'undetected';
-    // Only Standard or Greater cover qualifies (lesser is insufficient per PF2E rules)
-    const allowExtendedEndStates = game.settings.get('pf2e-visioner', 'sneakAllowHiddenUndetectedEndPosition');
-    let endQualifies =
-      endPos.coverState === 'standard' ||
-      endPos.coverState === 'greater' ||
-      endPos.avsVisibility === 'concealed' ||
-      (allowExtendedEndStates && (endPos.avsVisibility === 'hidden' || endPos.avsVisibility === 'undetected'));
-
-    try {
-      const { ActionQualificationIntegration } = await import('../../../rule-elements/ActionQualificationIntegration.js');
-      
-      const startCheck = await ActionQualificationIntegration.checkSneakWithRuleElements(
-        sneakingToken,
-        { startQualifies, endQualifies, bothQualify: startQualifies && endQualifies },
-        'start'
-      );
-      
-      const endCheck = await ActionQualificationIntegration.checkSneakWithRuleElements(
-        sneakingToken,
-        startCheck,
-        'end'
-      );
-      
-      startQualifies = endCheck.startQualifies;
-      endQualifies = endCheck.endQualifies;
-    } catch (err) {
-      console.warn('PF2E Visioner | Error checking rule element qualifications:', err);
-    }
-
-    // Check for Sneaky/Very Sneaky feat mechanics
-    if (sneakingToken && observerToken && turnSneakTracker.hasSneakyFeat(sneakingToken)) {
-      const shouldDefer = turnSneakTracker.shouldDeferEndPositionCheck(
-        sneakingToken,
-        observerToken,
-      );
-      if (shouldDefer) {
-        // Defer end position check to end of turn
-        turnSneakTracker.recordDeferredCheck(sneakingToken, observerToken, {
-          position: endPos,
-          visibility: endPos.avsVisibility,
-          coverState: endPos.coverState,
-        });
-
-        // For now, allow the sneak to proceed (end check happens at turn end)
-        endQualifies = true;
-      }
-    }
-
-    let bothQualify = startQualifies && endQualifies;
-
-    let result = {
-      startQualifies,
-      endQualifies,
-      bothQualify,
-      reason: bothQualify
-        ? 'Both positions qualify for sneak'
-        : 'Position does not qualify for sneak',
-    };
-
-    // Allow feats to override prerequisites (e.g., Legendary Sneak, Distracting Shadows)
-    try {
-      const { FeatsHandler } = await import('../FeatsHandler.js');
-      const acting = this._getSneakingToken?.(actionData) || actionData?.actor || null;
-      const inNatural = (() => {
-        try {
-          return FeatsHandler.isEnvironmentActive(acting, 'natural');
-        } catch {
-          return false;
-        }
-      })();
-      // Position hints for Distracting Shadows
-      const startCenter = actionData?.storedStartPosition?.center || null;
-      const endCenter = (this._getSneakingToken?.(actionData) || actionData?.actor)?.center || null;
-      result = FeatsHandler.overridePrerequisites(acting, result, {
-        action: 'sneak',
-        observer: observerToken,
-        startVisibility: startPos.avsVisibility,
-        endVisibility: endPos.avsVisibility,
-        endCoverState: endPos.coverState,
-        inNaturalTerrain: inNatural,
-        startCenter,
-        endCenter,
-      });
-    } catch {
-      // ignore
-    }
-
-    return result;
-  }
-
-  /**
    * Clear the sneak-active flag from the sneaking token
    * @param {Object} actionData - The action data containing the sneaking token
    */
   async _clearSneakFlag(actionData) {
-    try {
-      const avsEnabled = game.settings?.get?.('pf2e-visioner', 'autoVisibilityEnabled') ?? false;
-      if (actionData?.sneakingToken && avsEnabled) {
-        await actionData.sneakingToken.document.unsetFlag('pf2e-visioner', 'sneak-active');
-        // Restore walk speed after sneak ends
-        try {
-          const { SneakSpeedService } = await import('../SneakSpeedService.js');
-          await SneakSpeedService.restoreSneakWalkSpeed(actionData.sneakingToken);
-        } catch (speedErr) {
-          console.warn('PF2E Visioner | Failed to restore sneak walk speed:', speedErr);
-        }
-      }
-    } catch (error) {
-      console.error('PF2E Visioner | Error clearing sneak flag:', error);
-    }
+    await clearSneakFlag(actionData);
   }
 
   // Removed incorrect Sneaky feat effect application
@@ -1349,23 +628,4 @@ export class SneakActionHandler extends ActionHandlerBase {
   // The correct feat mechanics (turn-based consecutive sneaks with deferred end-position checks)
   // are handled by the TurnSneakTracker.js service
 
-  /**
-   * Check if an actor has the Sneak Adept feat
-   * @param {Actor} actor - The actor to check
-   * @returns {boolean} True if the actor has the Sneak Adept feat
-   */
-  #hasSneakAdeptFeat(actor) {
-    if (!actor) return false;
-
-    // Handle both Token and Actor objects - get the actual Actor
-    const actualActor = actor.actor ?? actor;
-    if (!actualActor) return false;
-
-    const feats = actualActor.itemTypes?.feat ?? actualActor.items?.filter?.((i) => i?.type === 'feat') ?? [];
-    return feats.some((feat) => {
-      const name = feat?.name?.toLowerCase?.() || '';
-      const slug = feat?.system?.slug?.toLowerCase?.() || '';
-      return name.includes('sneak adept') || slug.includes('sneak-adept');
-    });
-  }
 }

@@ -6,7 +6,7 @@ import {
   refreshOptimizedWallVisualsForObserverId,
   refreshWallVisualsForControlledToken,
   refreshWallVisualsForObserverId,
-} from '../../../scripts/services/wall-visual-refresh.js';
+} from '../../../scripts/services/Walls/wall-visual-refresh.js';
 
 describe('wall visual refresh service', () => {
   test('uses the first controlled token id as wall visual observer', () => {

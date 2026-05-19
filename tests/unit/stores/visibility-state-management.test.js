@@ -294,5 +294,47 @@ describe('Visibility State Management Core Logic', () => {
         }),
       ).resolves.toBeUndefined();
     });
+
+    test('removes legacy hidden off-guard effects when state becomes undetected', async () => {
+      global.game.user = { isGM: true };
+      const { updateSingleVisibilityEffect } = await import('../../../scripts/visibility/update.js');
+
+      const legacyHiddenEffect = {
+        id: 'legacy-hidden-on-target',
+        flags: {
+          'pf2e-visioner': {
+            isEphemeralOffGuard: true,
+            hiddenActorSignature: 'observer-sig',
+          },
+        },
+      };
+      const observerToken = {
+        actor: {
+          id: 'observer',
+          signature: 'observer-sig',
+          itemTypes: { effect: [] },
+          items: { get: jest.fn(() => null) },
+          deleteEmbeddedDocuments: jest.fn().mockResolvedValue([]),
+        },
+      };
+      const targetToken = {
+        actor: {
+          id: 'target',
+          type: 'character',
+          signature: 'target-sig',
+          itemTypes: { effect: [legacyHiddenEffect] },
+          items: { get: jest.fn((id) => (id === legacyHiddenEffect.id ? legacyHiddenEffect : null)) },
+          createEmbeddedDocuments: jest.fn().mockResolvedValue([]),
+          updateEmbeddedDocuments: jest.fn().mockResolvedValue([]),
+          deleteEmbeddedDocuments: jest.fn().mockResolvedValue([]),
+        },
+      };
+
+      await updateSingleVisibilityEffect(observerToken, targetToken, 'undetected');
+
+      expect(targetToken.actor.deleteEmbeddedDocuments).toHaveBeenCalledWith('Item', [
+        'legacy-hidden-on-target',
+      ]);
+    });
   });
 });

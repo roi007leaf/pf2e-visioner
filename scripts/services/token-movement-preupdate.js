@@ -104,7 +104,7 @@ export function handlePreUpdateTokenMovement(
       hookOptions: options,
     })
   ) {
-    refreshPendingVisibility(tokenDoc.id);
+    refreshPendingVisibility(tokenDoc.id, { skipPerceptionRefresh: true });
   }
 
   clearEstablishedInvisibleStatesForMovement(tokenDoc?.object, getConditionManager);

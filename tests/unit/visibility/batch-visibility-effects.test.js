@@ -60,6 +60,28 @@ describe('batchUpdateVisibilityEffects', () => {
     expect(targetActor.deleteEmbeddedDocuments).toHaveBeenCalledWith('Item', ['legacy-on-target']);
   });
 
+  test('removes legacy hidden off-guard effects when pair becomes undetected', async () => {
+    const targetLegacy = {
+      id: 'legacy-hidden-on-target',
+      flags: {
+        'pf2e-visioner': {
+          isEphemeralOffGuard: true,
+          hiddenActorSignature: 'observer-sig',
+        },
+      },
+    };
+    const observerActor = makeActor('observer-actor', 'observer-sig', []);
+    const targetActor = makeActor('target-actor', 'target-sig', [targetLegacy]);
+    const observer = makeToken('observer', 'Observer', observerActor);
+    const target = makeToken('target', 'Target', targetActor);
+
+    await batchUpdateVisibilityEffects(observer, [{ target, state: 'undetected' }]);
+
+    expect(targetActor.deleteEmbeddedDocuments).toHaveBeenCalledWith('Item', [
+      'legacy-hidden-on-target',
+    ]);
+  });
+
   test('keeps legacy off-guard effects when pair remains hidden', async () => {
     const targetLegacy = {
       id: 'legacy-on-target',

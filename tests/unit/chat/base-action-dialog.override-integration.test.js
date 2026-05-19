@@ -11,8 +11,11 @@ describe('BaseActionDialog - Override Removal Integration', () => {
     const fs = require('fs');
     const path = require('path');
 
-    const dialogPath = path.join(__dirname, '../../../scripts/chat/dialogs/base-action-dialog.js');
-    const content = fs.readFileSync(dialogPath, 'utf8');
+    const workflowPath = path.join(
+      __dirname,
+      '../../../scripts/chat/dialogs/BaseAction/base-action-apply-revert.js',
+    );
+    const content = fs.readFileSync(workflowPath, 'utf8');
 
     // Verify onRevertChange includes override removal with direction-aware logic
     expect(content).toMatch(/AvsOverrideManager.*removeOverride/);
@@ -23,22 +26,25 @@ describe('BaseActionDialog - Override Removal Integration', () => {
     expect(content).toMatch(/for.*const outcome of appliedOutcomes/);
     expect(content).toMatch(/removedOverrides\+\+/);
 
-    // Verify functions import AvsOverrideManager (in onApplyChange, onRevertChange, onApplyAll, onRevertAll)
-    // Count occurrences of AvsOverrideManager usage - imports may span multiple lines
+    // Verify shared removal helper is used by apply/revert functions.
     const avsUsageMatches = content.match(/AvsOverrideManager\.removeOverride/g);
-    expect(avsUsageMatches?.length || 0).toBeGreaterThanOrEqual(2); // At least in apply/revert functions
+    expect(avsUsageMatches?.length || 0).toBeGreaterThanOrEqual(1);
+    expect(content).toMatch(/removeOverrideForTarget\(app, targetId/);
   });
 
   test('revert functions handle non-AVS states correctly', () => {
     const fs = require('fs');
     const path = require('path');
 
-    const dialogPath = path.join(__dirname, '../../../scripts/chat/dialogs/base-action-dialog.js');
-    const content = fs.readFileSync(dialogPath, 'utf8');
+    const workflowPath = path.join(
+      __dirname,
+      '../../../scripts/chat/dialogs/BaseAction/base-action-apply-revert.js',
+    );
+    const content = fs.readFileSync(workflowPath, 'utf8');
 
     // Verify the logic checks for non-AVS states
-    expect(content).toMatch(/effectiveOldState.*!==.*'avs'/);
-    expect(content).toMatch(/effectiveOldState.*!==.*outcome\.currentVisibility/);
+    expect(content).toMatch(/effectiveOldState === 'avs'/);
+    expect(content).toMatch(/effectiveOldState === outcome\.currentVisibility/);
 
     // Verify it calls updateTokenVisuals after removing overrides
     expect(content).toMatch(/updateTokenVisuals.*await/);

@@ -1,7 +1,7 @@
 import { MODULE_ID, getVisibilityStateLabelKey } from '../../../constants.js';
 import { appliedDiversionChangesByMessage } from '../data/message-cache.js';
-import { shouldFilterAlly } from '../infra/shared-utils.js';
 import { ActionHandlerBase } from './BaseAction.js';
+import { discoverDiversionSubjects } from './Diversion/diversion-subject-discovery.js';
 
 export class DiversionActionHandler extends ActionHandlerBase {
   constructor() {
@@ -34,27 +34,7 @@ export class DiversionActionHandler extends ActionHandlerBase {
     }
   }
   async discoverSubjects(actionData) {
-    // Observers are all other tokens; exclude acting token, loot, and hazards
-    const tokens = canvas?.tokens?.placeables || [];
-    const actorId = actionData?.actor?.id || actionData?.actor?.document?.id || null;
-    return (
-      tokens
-        .filter((t) => t && t.actor)
-        .filter((t) => (actorId ? t.id !== actorId : t !== actionData.actor))
-        // Only apply ignoreAllies when explicitly provided; otherwise let dialog filter live
-        .filter(
-          (t) =>
-            !shouldFilterAlly(
-              actionData.actor,
-              t,
-              'enemies',
-              actionData?.ignoreAllies === true || actionData?.ignoreAllies === false
-                ? actionData.ignoreAllies
-                : null,
-            ),
-        )
-        .filter((t) => t.actor?.type !== 'loot' && t.actor?.type !== 'hazard')
-    );
+    return discoverDiversionSubjects(actionData);
   }
   async analyzeOutcome(actionData, subject) {
     const { getVisibilityBetween } = await import('../../../utils.js');

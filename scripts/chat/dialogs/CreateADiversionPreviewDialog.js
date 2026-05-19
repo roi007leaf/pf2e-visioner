@@ -3,10 +3,15 @@
  * Shows Create a Diversion results with GM override capability
  */
 
-import { MODULE_ID, MODULE_TITLE } from '../../constants.js';
-import { getDesiredOverrideStatesForAction } from '../services/data/action-state-config.js';
-import { notify } from '../services/infra/notifications.js';
+import { MODULE_ID } from '../../constants.js';
 import { BaseActionDialog } from './base-action-dialog.js';
+import {
+  applyAllDiversionChanges,
+  applyDiversionChange,
+  revertAllDiversionChanges,
+  revertDiversionChange,
+} from './CreateADiversion/create-a-diversion-dialog-actions.js';
+import { prepareCreateADiversionDialogContext } from './CreateADiversion/create-a-diversion-dialog-context.js';
 
 // Store reference to current create a diversion dialog
 let currentDiversionDialog = null;
@@ -74,124 +79,7 @@ export class CreateADiversionPreviewDialog extends BaseActionDialog {
 
   async _prepareContext(options) {
     const context = await super._prepareContext(options);
-
-    // Filter outcomes with base helper
-    let processedOutcomes = this.applyEncounterFilter(
-      this.outcomes,
-      'observer',
-      'No encounter observers found, showing all',
-    );
-    // Ensure the acting/diverting token never appears in the list
-    try {
-      const actorId = this.divertingToken?.id || this.divertingToken?.document?.id;
-      if (actorId) {
-        processedOutcomes = processedOutcomes.filter((o) => o?.observer?.id !== actorId);
-      }
-    } catch { }
-
-    // Apply ignore-allies filtering for display
-    try {
-      const { filterOutcomesByAllies } = await import('../services/infra/shared-utils.js');
-      processedOutcomes = filterOutcomesByAllies(
-        processedOutcomes,
-        this.divertingToken,
-        this.ignoreAllies,
-        'observer',
-      );
-    } catch { }
-
-    // Apply viewport filtering if enabled
-    if (this.filterByDetection && this.divertingToken) {
-      try {
-        const { filterOutcomesByDetection } = await import('../services/infra/shared-utils.js');
-        processedOutcomes = await filterOutcomesByDetection(
-          processedOutcomes,
-          this.divertingToken,
-          'observer',
-          false,
-          true,
-          'target_to_observer',
-        );
-      } catch {
-        /* Viewport filtering is non-critical */
-      }
-    }
-
-    // Apply defeated token filtering (exclude dead/unconscious tokens)
-    try {
-      const { filterOutcomesByDefeated } = await import('../services/infra/shared-utils.js');
-      processedOutcomes = filterOutcomesByDefeated(processedOutcomes, 'observer');
-    } catch {
-      /* Defeated filtering is non-critical */
-    }
-
-    // Prepare outcomes with additional UI data
-    processedOutcomes = processedOutcomes.map((outcome) => {
-      const desired = getDesiredOverrideStatesForAction('create-a-diversion');
-      const availableStates = this.buildOverrideStates(desired, outcome).map((s) => ({
-        key: s.value,
-        icon: s.icon,
-        label: s.label,
-        selected: s.selected,
-        calculatedOutcome: s.calculatedOutcome,
-      }));
-
-      const effectiveNewState = outcome.overrideState || outcome.newVisibility;
-      const baseOldState = outcome.currentVisibility;
-      // Use the centralized logic that handles AVS cases
-      const hasActionableChange = this.calculateHasActionableChange({
-        ...outcome,
-        newVisibility: effectiveNewState,
-        currentVisibility: baseOldState,
-        overrideState: outcome.overrideState,
-      });
-
-      return {
-        ...outcome,
-        availableStates,
-        hasActionableChange,
-        overrideState: outcome.overrideState || null,
-        tokenImage:
-          outcome.observer.document?.texture?.src ||
-          outcome.observer.img ||
-          'icons/svg/mystery-man.svg',
-        outcomeClass: this.getOutcomeClass(outcome.outcome),
-        outcomeLabel: this.getOutcomeLabel(outcome.outcome),
-      };
-    });
-
-    // Visual filtering: hide Foundry-hidden tokens from display if enabled
-    try {
-      if (this.hideFoundryHidden) {
-        processedOutcomes = processedOutcomes.filter((o) => o?.observer?.document?.hidden !== true);
-      }
-    } catch { }
-
-    // Show-only-changes visual filter
-    try {
-      if (this.showOnlyChanges) {
-        processedOutcomes = processedOutcomes.filter((o) => !!o.hasActionableChange);
-      }
-    } catch { }
-
-    // Prepare diverting token with proper image path
-    context.divertingToken = {
-      ...this.divertingToken,
-      image: this.resolveTokenImage(this.divertingToken),
-    };
-    context.outcomes = processedOutcomes;
-    context.ignoreAllies = !!this.ignoreAllies;
-    context.hideFoundryHidden = !!this.hideFoundryHidden;
-
-    // Store processed outcomes in instance for Apply All to use
-    this.processedOutcomes = processedOutcomes;
-
-    Object.assign(context, this.buildCommonContext(processedOutcomes));
-    context.marginText = this.getMarginText.bind(this);
-    context.getOutcomeClass = this.getOutcomeClass.bind(this);
-    context.getOutcomeLabel = this.getOutcomeLabel.bind(this);
-
-    return context;
+    return prepareCreateADiversionDialogContext(this, context);
   }
 
   /**
@@ -349,204 +237,28 @@ export class CreateADiversionPreviewDialog extends BaseActionDialog {
    * Handle individual apply change
    */
   static async _onApplyChange(event, button) {
-    const app = currentDiversionDialog;
-    if (!app) return;
-    const tokenId = button?.dataset.tokenId;
-    const outcome = app.outcomes.find((o) => o.observer.id === tokenId);
-    if (!outcome) return;
-
-    const effectiveNewState = outcome.overrideState || outcome.newVisibility;
-    try {
-      const { applyNowDiversion } = await import('../services/index.js');
-
-      // Check for row timer configuration
-      const rowTimerConfig = app.rowTimers?.get(tokenId);
-      let overrideValue = effectiveNewState;
-
-      if (rowTimerConfig) {
-        try {
-          const { TimedOverrideManager } = await import('../../services/TimedOverrideManager.js');
-          const timedOverride = TimedOverrideManager._buildTimedOverrideData(rowTimerConfig);
-          overrideValue = { state: effectiveNewState, timedOverride };
-        } catch (e) {
-          console.error('PF2E Visioner | Diversion row apply: Failed to build timer:', e);
-        }
-      }
-
-      const overrides = { [tokenId]: overrideValue };
-      await applyNowDiversion({ ...app.actionData, overrides }, { html: () => { }, attr: () => { } });
-
-      // Clear row timer after applying
-      if (rowTimerConfig) {
-        app.rowTimers.delete(tokenId);
-        app._updateRowTimerButton?.(tokenId);
-      }
-    } catch { }
-
-    // Update button states
-    app.updateRowButtonsToApplied([{ target: { id: tokenId }, hasActionableChange: true }]);
-    // Enable Revert All without marking bulk state as fully applied (so Apply All remains available)
-    try {
-      const revertAllButton = app.element.querySelector(
-        '.bulk-action-btn[data-action="revertAll"]',
-      );
-      if (revertAllButton) {
-        revertAllButton.disabled = false;
-        revertAllButton.innerHTML = `<i class="fas fa-undo"></i> ${game.i18n.localize('PF2E_VISIONER.UI.REVERT_ALL_BUTTON')}`;
-      }
-    } catch { }
-    app.updateChangesCount();
+    await applyDiversionChange(currentDiversionDialog, button);
   }
 
   /**
    * Handle individual revert change
    */
   static async _onRevertChange(event, button) {
-    const app = currentDiversionDialog;
-    if (!app) return;
-    const tokenId = button?.dataset.tokenId;
-    const outcome = app.outcomes.find((o) => o.observer.id === tokenId);
-    if (!outcome) return;
-
-    try {
-      // Apply the original visibility state for just this specific token
-      const { applyVisibilityChanges } = await import('../../services/infra/shared-utils.js');
-      const revertVisibility = outcome.oldVisibility || outcome.currentVisibility;
-      const changes = [{ target: outcome.observer, newVisibility: revertVisibility }];
-
-      await applyVisibilityChanges(app.actionData.actor, changes, {
-        direction: 'observer_to_target',
-      });
-    } catch { }
-
-    // Update button states
-    app.updateRowButtonsToReverted([{ target: { id: tokenId }, hasActionableChange: true }]);
-    // If at least one row was reverted, enable Apply All again
-    app.bulkActionState = 'initial';
-    app.updateBulkActionButtons();
-    app.updateChangesCount();
+    await revertDiversionChange(currentDiversionDialog, button);
   }
 
   /**
    * Handle apply all changes
    */
   static async _onApplyAll() {
-    // Get the dialog instance
-    const app = currentDiversionDialog;
-    if (!app) {
-      console.error('Create a Diversion Dialog not found');
-      return;
-    }
-
-    // If the user already applied all previously, but then reverted some rows manually,
-    // we still allow Apply All to re-apply remaining changes. Only block if state is already "applied"
-    // AND there are no actionable changes left.
-    if (app.bulkActionState === 'applied') {
-      const anyActionable = (app.outcomes || []).some((o) => o?.hasActionableChange);
-      if (!anyActionable) {
-        notify.warn(
-          `${MODULE_TITLE}: Apply All has already been used. Use Revert All to undo changes.`,
-        );
-        return;
-      }
-    }
-
-    // Count active changes in the rendered dialog context
-    // Count is displayed in UI; Apply All uses filtered outcomes below
-
-    // Use the processed outcomes that have already been filtered by encounter and ignore allies settings
-    const filteredOutcomes = app.processedOutcomes || app.outcomes || [];
-
-    // Only apply changes to filtered outcomes that have actionable changes
-    const changedOutcomes = filteredOutcomes.filter((outcome) => {
-      return outcome.hasActionableChange || (outcome.changed && outcome.newVisibility !== 'avs');
-    });
-
-    if (changedOutcomes.length === 0) {
-      notify.warn(`${MODULE_TITLE}: No visibility changes to apply.`);
-      return;
-    }
-
-    try {
-      const { applyNowDiversion } = await import('../services/index.js');
-      const overrides = {};
-      for (const o of changedOutcomes) {
-        const id = o?.observer?.id;
-        const state = o?.overrideState || o?.newVisibility;
-        if (id && state) overrides[id] = state;
-      }
-      await applyNowDiversion(
-        { ...app.actionData, ignoreAllies: app.ignoreAllies, overrides },
-        { html: () => { }, attr: () => { } },
-      );
-    } catch { }
-
-    // Update UI for each row
-    app.updateRowButtonsToApplied(
-      changedOutcomes.map((o) => ({ target: { id: o.observer.id }, hasActionableChange: true })),
-    );
-
-    app.bulkActionState = 'applied';
-    app.updateBulkActionButtons();
-    app.updateChangesCount();
-
-    notify.info(
-      `${MODULE_TITLE}: Applied all diversion visibility changes. Dialog remains open for further adjustments.`,
-    );
+    await applyAllDiversionChanges(currentDiversionDialog);
   }
 
   /**
    * Handle revert all changes
    */
   static async _onRevertAll() {
-    // Get the dialog instance
-    const app = currentDiversionDialog;
-    if (!app) {
-      console.error('Create a Diversion Dialog not found');
-      return;
-    }
-
-    if (app.bulkActionState === 'reverted') {
-      notify.warn(
-        `${MODULE_TITLE}: Revert All has already been used. Use Apply All to reapply changes.`,
-      );
-      return;
-    }
-
-    // Count active changes in the rendered dialog context
-    // Count is displayed in UI; Revert All uses filtered outcomes below
-
-    // Use the processed outcomes that have already been filtered by encounter and ignore allies settings
-    const filteredOutcomes = app.processedOutcomes || app.outcomes || [];
-
-    // Only revert changes to filtered outcomes that have actionable changes
-    const changedOutcomes = filteredOutcomes.filter((outcome) => {
-      return outcome.hasActionableChange || (outcome.changed && outcome.newVisibility !== 'avs');
-    });
-
-    if (changedOutcomes.length === 0) {
-      notify.warn(`${MODULE_TITLE}: No visibility changes to revert.`);
-      return;
-    }
-
-    try {
-      const { revertNowDiversion } = await import('../services/index.js');
-      await revertNowDiversion(
-        { ...app.actionData, ignoreAllies: app.ignoreAllies },
-        { html: () => { }, attr: () => { } },
-      );
-    } catch { }
-    app.updateRowButtonsToReverted(
-      changedOutcomes.map((o) => ({ target: { id: o.observer.id }, hasActionableChange: true })),
-    );
-
-    app.bulkActionState = 'reverted';
-    app.updateBulkActionButtons();
-    app.updateChangesCount();
-
-    notify.info(
-      `${MODULE_TITLE}: Reverted all diversion visibility changes. Dialog remains open for further adjustments.`,
-    );
+    await revertAllDiversionChanges(currentDiversionDialog);
   }
 
   /**
@@ -662,24 +374,27 @@ export class CreateADiversionPreviewDialog extends BaseActionDialog {
    * Add click handlers for state icons - Override to use AVS-aware logic
    */
   addIconClickHandlers() {
-    const stateIcons = this.element.querySelectorAll('.state-icon');
-    stateIcons.forEach((icon) => {
-      icon.addEventListener('click', (event) => {
+    if (!this.element || this.element.dataset.diversionStateIconDelegated === 'true') return;
+    this.element.dataset.diversionStateIconDelegated = 'true';
+    this.element.addEventListener('click', (event) => {
+      const icon = event.target?.closest?.('.state-icon');
+      if (!icon || !this.element?.contains?.(icon)) return;
+
         // Only handle clicks within override selection container
-        const overrideIcons = event.currentTarget.closest('.override-icons');
+        const overrideIcons = icon.closest('.override-icons');
         if (!overrideIcons) return;
 
         // Robustly resolve target id from data attributes or row
-        let targetId = event.currentTarget.dataset.target || event.currentTarget.dataset.tokenId;
+        let targetId = icon.dataset.target || icon.dataset.tokenId;
         if (!targetId) {
-          const row = event.currentTarget.closest('tr[data-token-id]');
+          const row = icon.closest('tr[data-token-id]');
           targetId = row?.dataset?.tokenId;
         }
-        const newState = event.currentTarget.dataset.state;
+        const newState = icon.dataset.state;
         overrideIcons
           .querySelectorAll('.state-icon')
           .forEach((i) => i.classList.remove('selected'));
-        event.currentTarget.classList.add('selected');
+        icon.classList.add('selected');
         const hiddenInput = overrideIcons?.querySelector('input[type="hidden"]');
         if (hiddenInput) hiddenInput.value = newState;
         let outcome = this.outcomes?.find?.(
@@ -695,11 +410,10 @@ export class CreateADiversionPreviewDialog extends BaseActionDialog {
           outcome.hasActionableChange = hasActionableChange;
           try {
             this.updateActionButtonsForToken(targetId || null, hasActionableChange, {
-              row: event.currentTarget.closest('tr'),
+              row: icon.closest('tr'),
             });
           } catch { }
         }
-      });
     });
   }
 

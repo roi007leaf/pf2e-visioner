@@ -817,8 +817,7 @@ function checkImpreciseSenses(observer, target, soundBlocked = false) {
 function resolveInvisibilityFromPreviousState(previousState) {
   if (
     previousState === VisibilityState.OBSERVED ||
-    previousState === VisibilityState.CONCEALED ||
-    previousState === VisibilityState.HIDDEN
+    previousState === VisibilityState.CONCEALED
   ) {
     return {
       state: VisibilityState.HIDDEN,
@@ -826,6 +825,12 @@ function resolveInvisibilityFromPreviousState(previousState) {
         isPrecise: false,
         sense: SenseType.VISION,
       },
+    };
+  }
+  if (previousState === VisibilityState.HIDDEN) {
+    return {
+      state: VisibilityState.UNDETECTED,
+      detection: null,
     };
   }
   return null;

@@ -1,5 +1,5 @@
-import { MODULE_ID } from '../constants.js';
-import { handleDoorStateVisibilityRefresh as defaultHandleDoorStateVisibilityRefresh } from './door-state-visibility-refresh.js';
+import { MODULE_ID } from '../../constants.js';
+import { handleDoorStateVisibilityRefresh as defaultHandleDoorStateVisibilityRefresh } from '../door-state-visibility-refresh.js';
 import { syncHiddenWallTokenFlags as defaultSyncHiddenWallTokenFlags } from './hidden-wall-sync.js';
 import {
   cleanupDeletedWallVisualsAndRefresh as defaultCleanupDeletedWallVisualsAndRefresh,

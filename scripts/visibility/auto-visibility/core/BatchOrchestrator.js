@@ -5,6 +5,10 @@ import {
   markExplicitVisiblePair,
 } from '../../../services/ExplicitVisibilityPairs.js';
 import {
+  forceTokenInvisibleForObserverVisibility,
+  refreshPendingMovementTokenVisibility,
+} from '../../../services/pending-token-movement.js';
+import {
   discardDetectionBatch,
   flushDetectionBatch,
   startDetectionBatch,
@@ -934,25 +938,56 @@ export class BatchOrchestrator {
       options.suppressVisibilityMapRender === true
         ? { suppressRender: true, preserveObserved: true }
         : undefined;
-    const persistResults = await Promise.allSettled(
-      applicationPlan.dirtyObservers.map((observer) =>
-        visibilityMapOptions
-          ? this.visibilityMapService.setVisibilityMap(
-            observer,
-            applicationPlan.observerMaps.get(observer),
-            visibilityMapOptions,
-          )
-          : this.visibilityMapService.setVisibilityMap(
-            observer,
-            applicationPlan.observerMaps.get(observer),
-          ),
-      ),
-    );
+    const dirtyVisibilityEntries = applicationPlan.dirtyObservers.map((observer) => ({
+      token: observer,
+      visibilityMap: applicationPlan.observerMaps.get(observer),
+    }));
+    const persistResults = this.visibilityMapService.setVisibilityMaps
+      ? await Promise.allSettled([
+        this.visibilityMapService.setVisibilityMaps(
+          dirtyVisibilityEntries,
+          visibilityMapOptions,
+        ),
+      ])
+      : await Promise.allSettled(
+        dirtyVisibilityEntries.map(({ token, visibilityMap }) =>
+          visibilityMapOptions
+            ? this.visibilityMapService.setVisibilityMap(token, visibilityMap, visibilityMapOptions)
+            : this.visibilityMapService.setVisibilityMap(token, visibilityMap),
+        ),
+      );
 
     for (const result of persistResults) {
       if (result.status === 'rejected') {
         console.warn('PF2E Visioner | Failed to persist visibility map:', result.reason);
       }
+    }
+
+    const controlledObserverIds = new Set(
+      (canvas?.tokens?.controlled || [])
+        .map((token) => token?.document?.id)
+        .filter(Boolean),
+    );
+    for (const update of batchResult.updates) {
+      const observerId = update.observer?.document?.id;
+      if (!controlledObserverIds.has(observerId)) continue;
+      forceTokenInvisibleForObserverVisibility(update.observer, update.target, update.visibility);
+    }
+
+    const hiddenVisibilityTargetIds = batchResult.updates
+      .filter((update) =>
+        update.visibility === 'hidden' ||
+        update.visibility === 'undetected' ||
+        update.visibility === 'unnoticed'
+      )
+      .map((update) => update.target?.document?.id)
+      .filter(Boolean);
+    if (hiddenVisibilityTargetIds.length > 0) {
+      refreshPendingMovementTokenVisibility([], {
+        ignoreObservedGrace: true,
+        skipTokenRefresh: true,
+        targetTokenIds: hiddenVisibilityTargetIds,
+      });
     }
 
     return applicationPlan.uniqueUpdateCount;

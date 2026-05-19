@@ -404,6 +404,29 @@ describe('Search exploration Seek automation helpers', () => {
     ).toEqual(expect.any(String));
   });
 
+  test('reuses Search activity scan per actor while resolving token seekers', async () => {
+    const effectValues = jest.fn(() => [
+      { type: 'effect', name: 'Search', system: { slug: 'effect-search' } },
+    ]);
+    const actor = createMockActor({
+      id: 'pc-linked-actor',
+      type: 'character',
+      hasPlayerOwner: true,
+      system: { exploration: [] },
+      itemTypes: { effect: { values: effectValues } },
+    });
+    const firstToken = createMockToken({ id: 'pc-1', actor });
+    const secondToken = createMockToken({ id: 'pc-2', actor });
+
+    const { getSearchExplorationSeekers } = await import(
+      '../../../scripts/chat/services/search-exploration-service.js'
+    );
+    const seekers = getSearchExplorationSeekers(null, [firstToken, secondToken]);
+
+    expect(seekers).toEqual([firstToken, secondToken]);
+    expect(effectValues).toHaveBeenCalledTimes(1);
+  });
+
   test('target HUD action rolls for PC actors with Search active when no PC tokens are on the scene', async () => {
     const rollOptions = [];
     const statisticRoll = jest.fn(async (options) => {

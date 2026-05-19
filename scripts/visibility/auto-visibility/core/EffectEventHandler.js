@@ -196,7 +196,9 @@ export class EffectEventHandler {
       const conditionManager = ConditionManager.getInstance();
 
       // Call the condition manager to handle invisibility flags
-      await conditionManager.handleInvisibilityChange(actor);
+      await conditionManager.handleInvisibilityChange(actor, {
+        hasInvisibility: action === 'deleted' ? false : null,
+      });
     } catch (error) {
       console.error('PF2E Visioner | Failed to handle invisibility effect change:', error);
     }

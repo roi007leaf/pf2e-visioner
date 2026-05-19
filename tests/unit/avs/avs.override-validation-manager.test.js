@@ -180,6 +180,74 @@ describe('OverrideValidationManager display filtering', () => {
     );
   });
 
+  test('reuses override validation cover detector across one moved-token batch', async () => {
+    const calculateVisibilityWithoutOverrides = jest.fn(async () => 'observed');
+    jest.doMock('../../../scripts/visibility/auto-visibility/VisibilityCalculator.js', () => ({
+      __esModule: true,
+      optimizedVisibilityCalculator: {
+        calculateVisibilityWithoutOverrides,
+      },
+    }));
+
+    const coverDetectorInstance = {
+      detectFromPoint: jest.fn(() => 'none'),
+      detectBetweenTokens: jest.fn(() => 'none'),
+    };
+    const CoverDetector = jest.fn(() => coverDetectorInstance);
+    jest.doMock('../../../scripts/cover/auto-cover/CoverDetector.js', () => ({
+      __esModule: true,
+      CoverDetector,
+      default: coverDetectorInstance,
+    }));
+
+    const { OverrideValidationManager } = await import(
+      '../../../scripts/visibility/auto-visibility/core/OverrideValidationManager.js'
+    );
+
+    const observerA = global.createMockToken({ id: 'observer-a', name: 'Observer A' });
+    const observerB = global.createMockToken({ id: 'observer-b', name: 'Observer B' });
+    const target = global.createMockToken({ id: 'target', name: 'Target' });
+    target.document.flags['pf2e-visioner'] = {
+      'avs-override-from-observer-a': {
+        state: 'observed',
+        source: 'manual_action',
+        hasCover: true,
+        hasConcealment: false,
+        expectedCover: 'standard',
+        observerName: observerA.name,
+        targetName: target.name,
+      },
+      'avs-override-from-observer-b': {
+        state: 'observed',
+        source: 'manual_action',
+        hasCover: true,
+        hasConcealment: false,
+        expectedCover: 'standard',
+        observerName: observerB.name,
+        targetName: target.name,
+      },
+    };
+
+    global.canvas.tokens.placeables = [observerA, observerB, target];
+    global.canvas.tokens.get.mockImplementation((id) =>
+      global.canvas.tokens.placeables.find((token) => token.id === id) || null,
+    );
+
+    const manager = new OverrideValidationManager(
+      { isExcludedToken: jest.fn(() => false) },
+      { getTokenPosition: jest.fn(() => ({ x: 0, y: 0, elevation: 0 })) },
+      { calculateVisibility: jest.fn() },
+    );
+    manager.showOverrideValidationDialog = jest.fn(async () => undefined);
+
+    const result = await manager.validateOverridesForToken(target.id);
+
+    expect(result.overrides).toHaveLength(2);
+    expect(CoverDetector).toHaveBeenCalledTimes(1);
+    expect(coverDetectorInstance.detectFromPoint).toHaveBeenCalledTimes(2);
+    expect(calculateVisibilityWithoutOverrides).toHaveBeenCalledTimes(2);
+  });
+
   test('skips Take Cover cover-only validation when the covered token moved', async () => {
     const { OverrideValidationManager } = await import(
       '../../../scripts/visibility/auto-visibility/core/OverrideValidationManager.js'

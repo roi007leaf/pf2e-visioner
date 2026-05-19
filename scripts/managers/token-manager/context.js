@@ -155,6 +155,28 @@ export async function buildContext(app, options) {
   } catch (_) {
     context.hideFoundryHidden = false;
   }
+  const tokenManagerSettings = {
+    integrateRollOutcome: !!game.settings.get(MODULE_ID, 'integrateRollOutcome'),
+    autoVisibilityEnabled: !!game.settings.get(MODULE_ID, 'autoVisibilityEnabled'),
+    hiddenWallsEnabled: !!game.settings.get(MODULE_ID, 'hiddenWallsEnabled'),
+    wallStealthDC: Number(game.settings.get(MODULE_ID, 'wallStealthDC')) || 15,
+  };
+  const coverStateBase = Object.entries(COVER_STATES).map(([key, config]) => ({
+    value: key,
+    label: game.i18n.localize(config.label),
+    icon: config.icon,
+    color: config.color,
+    cssClass: config.cssClass,
+    bonusAC: config.bonusAC,
+    bonusReflex: config.bonusReflex,
+    bonusStealth: config.bonusStealth,
+    canHide: config.canHide,
+  }));
+  const buildCoverStateList = (currentCoverState) =>
+    coverStateBase.map((state) => ({
+      ...state,
+      selected: currentCoverState === state.value,
+    }));
 
   const sceneTokens = getSceneTargets(app.observer, app.encounterOnly, app.ignoreAllies);
 
@@ -203,11 +225,10 @@ export async function buildContext(app, options) {
 
         const perceptionDC = extractPerceptionDC(token);
         const stealthDC = extractStealthDC(token);
-        const showOutcomeSetting = game.settings.get(MODULE_ID, 'integrateRollOutcome');
         let showOutcome = false;
         let outcomeLabel = '';
         let outcomeClass = '';
-        if (showOutcomeSetting) {
+        if (tokenManagerSettings.integrateRollOutcome) {
           const lastRoll = getLastRollTotalForActor(app.observer?.actor, null);
           if (typeof lastRoll === 'number' && typeof stealthDC === 'number') {
             const diff = lastRoll - stealthDC;
@@ -232,7 +253,7 @@ export async function buildContext(app, options) {
         const isNonAvsToken = isRowLoot || isRowHazard;
 
         // Check if AVS is enabled to determine if 'avs' button should be available
-        const avsEnabled = game.settings.get(MODULE_ID, 'autoVisibilityEnabled');
+        const avsEnabled = tokenManagerSettings.autoVisibilityEnabled;
 
         const allowedVisKeys = getManualVisibilityStateKeys({ isNonAvsToken, avsEnabled });
 
@@ -253,7 +274,7 @@ export async function buildContext(app, options) {
 
         try {
           // Check if AVS is enabled first
-          const avsEnabled = game.settings.get(MODULE_ID, 'autoVisibilityEnabled');
+          const avsEnabled = tokenManagerSettings.autoVisibilityEnabled;
           if (avsEnabled) {
             // Check for AVS override flag
             const avsOverrideFlag = token.document.getFlag(
@@ -272,13 +293,7 @@ export async function buildContext(app, options) {
               isAvsControlled = !isNonAvsToken; // AVS is controlling only if NOT hazard/loot
 
               // Get the actual current state from the visibility map
-              try {
-                const { getVisibilityMap } = await import('../../stores/visibility-map.js');
-                const visibilityMap = getVisibilityMap(app.observer);
-                actualCurrentState = visibilityMap[token.document.id] || 'observed';
-              } catch {
-                actualCurrentState = 'observed'; // Fallback if map access fails
-              }
+              actualCurrentState = app.visibilityData?.[token.document.id] || 'observed';
             }
           } else {
             // If AVS is disabled, nothing is AVS controlled
@@ -341,18 +356,7 @@ export async function buildContext(app, options) {
           isAvsControlled: isNonAvsToken ? false : isAvsControlled,
           hasAvsOverride,
           visibilityStates,
-          coverStates: Object.entries(COVER_STATES).map(([key, config]) => ({
-            value: key,
-            label: game.i18n.localize(config.label),
-            selected: currentCoverState === key,
-            icon: config.icon,
-            color: config.color,
-            cssClass: config.cssClass,
-            bonusAC: config.bonusAC,
-            bonusReflex: config.bonusReflex,
-            bonusStealth: config.bonusStealth,
-            canHide: config.canHide,
-          })),
+          coverStates: buildCoverStateList(currentCoverState),
           perceptionDC,
           stealthDC,
           showOutcome,
@@ -391,11 +395,10 @@ export async function buildContext(app, options) {
 
         const perceptionDC = extractPerceptionDC(observerToken);
         const stealthDC = extractPerceptionDC(observerToken);
-        const showOutcomeSetting = game.settings.get(MODULE_ID, 'integrateRollOutcome');
         let showOutcome = false;
         let outcomeLabel = '';
         let outcomeClass = '';
-        if (showOutcomeSetting) {
+        if (tokenManagerSettings.integrateRollOutcome) {
           const lastRoll = getLastRollTotalForActor(app.observer?.actor, null);
           if (typeof lastRoll === 'number' && typeof perceptionDC === 'number') {
             const diff = lastRoll - perceptionDC;
@@ -420,7 +423,7 @@ export async function buildContext(app, options) {
         const isNonAvsToken = isRowLoot || isRowHazard;
 
         // Check if AVS is enabled to determine if 'avs' button should be available
-        const avsEnabledForTarget = game.settings.get(MODULE_ID, 'autoVisibilityEnabled');
+        const avsEnabledForTarget = tokenManagerSettings.autoVisibilityEnabled;
 
         const allowedVisKeys = getManualVisibilityStateKeys({
           isNonAvsToken,
@@ -444,7 +447,7 @@ export async function buildContext(app, options) {
 
         try {
           // Check if AVS is enabled first
-          const avsEnabled = game.settings.get(MODULE_ID, 'autoVisibilityEnabled');
+          const avsEnabled = tokenManagerSettings.autoVisibilityEnabled;
           if (avsEnabled) {
             // Check for AVS override flag
             const avsOverrideFlag = app.observer.document.getFlag(
@@ -463,13 +466,7 @@ export async function buildContext(app, options) {
               isAvsControlled = !isNonAvsToken; // AVS is controlling only if NOT hazard/loot
 
               // Get the actual current state from the visibility map
-              try {
-                const { getVisibilityMap } = await import('../../stores/visibility-map.js');
-                const visibilityMap = getVisibilityMap(observerToken);
-                actualCurrentState = visibilityMap[app.observer.document.id] || 'observed';
-              } catch {
-                actualCurrentState = 'observed'; // Fallback if map access fails
-              }
+              actualCurrentState = observerVisibilityData?.[app.observer.document.id] || 'observed';
             }
           } else {
             // If AVS is disabled, nothing is AVS controlled
@@ -532,18 +529,7 @@ export async function buildContext(app, options) {
           isAvsControlled: isNonAvsToken ? false : isAvsControlled,
           hasAvsOverride,
           visibilityStates,
-          coverStates: Object.entries(COVER_STATES).map(([key, config]) => ({
-            value: key,
-            label: game.i18n.localize(config.label),
-            selected: currentCoverState === key,
-            icon: config.icon,
-            color: config.color,
-            cssClass: config.cssClass,
-            bonusAC: config.bonusAC,
-            bonusReflex: config.bonusReflex,
-            bonusStealth: config.bonusStealth,
-            canHide: config.canHide,
-          })),
+          coverStates: buildCoverStateList(currentCoverState),
           perceptionDC,
           stealthDC,
           showOutcome,
@@ -598,7 +584,7 @@ export async function buildContext(app, options) {
   context.wallTargets = [];
   context.includeWalls = false;
   try {
-    if (context.isObserverMode && game.settings.get(MODULE_ID, 'hiddenWallsEnabled')) {
+    if (context.isObserverMode && tokenManagerSettings.hiddenWallsEnabled) {
       const walls = canvas?.walls?.placeables || [];
       // Respect UI filter: Ignore walls (visibility tab only)
       const ignoreWalls = !!app.ignoreWalls && context.isVisibilityTab === true;
@@ -619,14 +605,14 @@ export async function buildContext(app, options) {
         const img = getWallImage(doorType);
         // DC: per-wall override else global default
         const overrideDC = Number(d?.getFlag?.(MODULE_ID, 'stealthDC'));
-        const defaultWallDC = Number(game.settings.get(MODULE_ID, 'wallStealthDC')) || 15;
+        const defaultWallDC = tokenManagerSettings.wallStealthDC;
         const dc = Number.isFinite(overrideDC) && overrideDC > 0 ? overrideDC : defaultWallDC;
         // Outcome (optional): compare last Perception roll of observer vs dc
         let showOutcome = false;
         let outcomeLabel = '';
         let outcomeClass = '';
         try {
-          if (game.settings.get(MODULE_ID, 'integrateRollOutcome')) {
+          if (tokenManagerSettings.integrateRollOutcome) {
             const lastRoll = getLastRollTotalForActor(app.observer?.actor, 'perception');
             if (typeof lastRoll === 'number') {
               const diff = lastRoll - dc;
@@ -665,7 +651,7 @@ export async function buildContext(app, options) {
   } catch {}
 
   // Check if AVS is enabled to filter out 'avs' state from bulk actions
-  const avsEnabled = game.settings.get(MODULE_ID, 'autoVisibilityEnabled');
+  const avsEnabled = tokenManagerSettings.autoVisibilityEnabled;
 
   const allowedLegendKeys = getManualVisibilityStateKeys({
     isNonAvsToken: isLootObserver || context.hazardObserver,
@@ -677,18 +663,7 @@ export async function buildContext(app, options) {
     ...buildVisibilityStateContext(key, { selected: false }),
   }));
 
-  context.coverStates = Object.entries(COVER_STATES).map(([key, config]) => ({
-    key,
-    value: key,
-    label: game.i18n.localize(config.label),
-    icon: config.icon,
-    color: config.color,
-    cssClass: config.cssClass,
-    bonusAC: config.bonusAC,
-    bonusReflex: config.bonusReflex,
-    bonusStealth: config.bonusStealth,
-    canHide: config.canHide,
-  }));
+  context.coverStates = coverStateBase.map((state) => ({ key: state.value, ...state }));
 
   context.hasTargets = allTargets.length > 0;
   context.hasPCs = context.pcTargets.length > 0;
@@ -697,7 +672,7 @@ export async function buildContext(app, options) {
   context.hasLoots = app.mode === 'observer' && context.lootTargets.length > 0;
   context.includeWalls = context.includeWalls || false;
   try {
-    context.showOutcomeColumn = game.settings.get(MODULE_ID, 'integrateRollOutcome');
+    context.showOutcomeColumn = tokenManagerSettings.integrateRollOutcome;
   } catch {
     context.showOutcomeColumn = false;
   }

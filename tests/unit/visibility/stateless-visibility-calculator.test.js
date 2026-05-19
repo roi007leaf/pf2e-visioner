@@ -693,7 +693,7 @@ describe('StatelessVisibilityCalculator', () => {
             });
         });
 
-        test('invisible + previousState hidden = hidden (persists across recalculations)', () => {
+        test('invisible + previousState hidden = undetected (no hidden flash before final state)', () => {
             const input = {
                 target: {
                     lightingLevel: 'bright',
@@ -711,11 +711,8 @@ describe('StatelessVisibilityCalculator', () => {
             };
 
             const result = calculateVisibility(input);
-            expect(result.state).toBe('hidden');
-            expect(result.detection).toEqual({
-                isPrecise: false,
-                sense: 'vision'
-            });
+            expect(result.state).toBe('undetected');
+            expect(result.detection).toBe(null);
         });
 
         test('invisible + no previousState = undetected (backwards compatible)', () => {

@@ -5,7 +5,7 @@ import {
   buildHiddenWallTokenUpdates,
   getHiddenWallSyncWallIds,
   syncHiddenWallTokenFlags,
-} from '../../../scripts/services/hidden-wall-sync.js';
+} from '../../../scripts/services/Walls/hidden-wall-sync.js';
 
 function makeToken(id, walls = {}) {
   return {

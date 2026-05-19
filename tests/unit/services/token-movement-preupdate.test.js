@@ -88,7 +88,9 @@ describe('token movement pre-update service', () => {
         hookOptions: { animate: true },
       },
     );
-    expect(refreshPendingMovementTokenVisibility).toHaveBeenCalledWith('mover');
+    expect(refreshPendingMovementTokenVisibility).toHaveBeenCalledWith('mover', {
+      skipPerceptionRefresh: true,
+    });
   });
 
   test('fires established invisible cleanup without awaiting it', () => {

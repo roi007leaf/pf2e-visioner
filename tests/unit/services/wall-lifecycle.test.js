@@ -4,7 +4,7 @@ import {
   handleWallCreated,
   handleWallDeleted,
   handleWallUpdated,
-} from '../../../scripts/services/wall-lifecycle.js';
+} from '../../../scripts/services/Walls/wall-lifecycle.js';
 
 const MODULE_ID = 'pf2e-visioner';
 

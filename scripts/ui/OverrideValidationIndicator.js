@@ -88,6 +88,7 @@ class OverrideValidationIndicator {
     this._lastShowAt = 0; // ms timestamp of last show() with non-empty items
     this._lastCount = 0; // last shown count
     this._minVisibleMs = 800; // minimum time to keep visible after a non-empty show
+    this._lastStyleSize = null;
   }
 
   // Determine whether an override item represents a meaningful change to display
@@ -125,19 +126,38 @@ class OverrideValidationIndicator {
   // Determine whether an override should be shown based on sneak status
   // For tokens with active sneak flag, only show observer changes (where the sneaking token is observing others)
   // and filter out target changes (where others are observing the sneaking token)
-  #shouldShowOverride(o, movedTokenId = null) {
+  #createDisplayFilterContext(movedTokenId = null) {
+    return {
+      movedTokenId,
+      sneakingByTokenId: new Map(),
+    };
+  }
+
+  #isSneakingToken(tokenId, context) {
+    if (!tokenId) return false;
+    const cache = context?.sneakingByTokenId;
+    if (cache?.has(tokenId)) return cache.get(tokenId);
+    const token = canvas?.tokens?.get?.(tokenId);
+    const sneaking = !!token?.document?.getFlag?.('pf2e-visioner', 'sneak-active');
+    cache?.set(tokenId, sneaking);
+    return sneaking;
+  }
+
+  #getDisplayOverrides(overrides, movedTokenId = null) {
+    const all = Array.isArray(overrides) ? overrides : [];
+    const context = this.#createDisplayFilterContext(movedTokenId);
+    return all.filter((o) => this.#hasDisplayChange(o) && this.#shouldShowOverride(o, movedTokenId, context));
+  }
+
+  #shouldShowOverride(o, movedTokenId = null, context = null) {
     if (!o || !o.observerId || !o.targetId) return true; // If missing data, show by default
 
     try {
-      // Get the observer and target tokens
-      const observerToken = canvas?.tokens?.get?.(o.observerId);
-      const targetToken = canvas?.tokens?.get?.(o.targetId);
-
       // Check if observer is sneaking
-      const observerIsSneaking = !!observerToken?.document?.getFlag?.('pf2e-visioner', 'sneak-active');
+      const observerIsSneaking = this.#isSneakingToken(o.observerId, context);
 
       // Check if target is sneaking  
-      const targetIsSneaking = !!targetToken?.document?.getFlag?.('pf2e-visioner', 'sneak-active');
+      const targetIsSneaking = this.#isSneakingToken(o.targetId, context);
 
       // If observer is sneaking, only show overrides where they are the observer (what they can see)
       if (observerIsSneaking) {
@@ -186,7 +206,7 @@ class OverrideValidationIndicator {
     const all = Array.isArray(overrideData) ? overrideData : [];
     this._rawOverrides = all;
     // Filter for display: show only entries that actually changed (visibility or cover) and handle sneak filtering
-    const overrides = all.filter((o) => this.#hasDisplayChange(o) && this.#shouldShowOverride(o, movedTokenId));
+    const overrides = this.#getDisplayOverrides(all, movedTokenId);
 
     if (movedTokenId && overrides.length > 0) {
       this._overrideStack.set(movedTokenId, {
@@ -225,27 +245,22 @@ class OverrideValidationIndicator {
 
   #showStackedIndicator() {
     // First, clean up entries with no valid overrides
+    const entries = [];
     for (const [tokenId, data] of Array.from(this._overrideStack.entries())) {
-      const filtered = data.overrides.filter((o) => this.#hasDisplayChange(o) && this.#shouldShowOverride(o, tokenId));
+      const filtered = this.#getDisplayOverrides(data.overrides, tokenId);
       if (filtered.length === 0) {
         this._overrideStack.delete(tokenId);
+      } else {
+        entries.push([tokenId, data, filtered]);
       }
     }
 
-    const entries = Array.from(this._overrideStack.entries());
     if (entries.length === 0) {
       this.hide(true);
       return;
     }
 
-    const [currentTokenId, currentData] = entries[entries.length - 1];
-    const filtered = currentData.overrides.filter((o) => this.#hasDisplayChange(o) && this.#shouldShowOverride(o, currentTokenId));
-
-    if (filtered.length === 0) {
-      this._overrideStack.delete(currentTokenId);
-      this.#showStackedIndicator();
-      return;
-    }
+    const [currentTokenId, currentData, filtered] = entries[entries.length - 1];
 
     this._rawOverrides = currentData.overrides;
     this._currentTokenId = currentTokenId;
@@ -274,10 +289,7 @@ class OverrideValidationIndicator {
   #updateBadge() {
     const badge = this._el?.querySelector('.indicator-badge');
     if (!badge) return;
-    const raw = this._rawOverrides || [];
-    const movedTokenId = this._data?.movedTokenId || this._currentTokenId || null;
-    const count = raw.filter((o) => this.#hasDisplayChange(o) && this.#shouldShowOverride(o, movedTokenId)).length
-      || this._data?.overrides?.length || 0;
+    const count = this._data?.overrides?.length || 0;
     badge.textContent = count > 0 ? String(count) : '';
   }
 
@@ -410,7 +422,7 @@ class OverrideValidationIndicator {
     const all = Array.isArray(overrideData) ? overrideData : [];
     this._rawOverrides = all;
     // Maintain the same filtering rule for display - including sneak filtering
-    const overrides = all.filter((o) => this.#hasDisplayChange(o) && this.#shouldShowOverride(o));
+    const overrides = this.#getDisplayOverrides(all);
     this._data = { overrides, tokenName };
     this.#updateBadge();
     if (this._tooltipEl?.isConnected) this.#renderTooltipContents();
@@ -1022,6 +1034,7 @@ class OverrideValidationIndicator {
     try {
       size = game.settings.get('pf2e-visioner', 'avsChangesIndicatorSize') || 'medium';
     } catch { /* setting might not exist yet during early loads */ }
+    if (existing && this._lastStyleSize === size) return;
 
     const presets = {
       small: { box: 34, radius: 8, font: 15, badgeFont: 10, badgePadX: 5, badgePadY: 2, badgeOffset: 5, pulseInset: -5, pulseRadius: 10, pulseBorder: 2, border: 2, tipFont: 11, tipPad: 6 },
@@ -1111,6 +1124,7 @@ class OverrideValidationIndicator {
       style.textContent = css;
       document.head.appendChild(style);
     }
+    this._lastStyleSize = size;
   }
 }
 

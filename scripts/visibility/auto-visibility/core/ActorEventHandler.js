@@ -265,7 +265,7 @@ export class ActorEventHandler {
     // Check if this is the invisible condition
     if (statusId === 'invisible') {
       if (token.actor) {
-        this._handleInvisibilityConditionChange(token.actor);
+        this._handleInvisibilityConditionChange(token.actor, null, active);
       }
     }
   }
@@ -276,7 +276,7 @@ export class ActorEventHandler {
    * @param {Object} changes - Optional changes object from preUpdateActor
    * @private
    */
-  async _handleInvisibilityConditionChange(actor, changes = null) {
+  async _handleInvisibilityConditionChange(actor, changes = null, hasInvisibility = null) {
     try {
       // Check if the system is ready to process condition changes
       if (!canvas?.tokens?.placeables) {
@@ -288,7 +288,9 @@ export class ActorEventHandler {
       const conditionManager = ConditionManager.getInstance();
 
       // Call the condition manager to handle invisibility flags
-      await conditionManager.handleInvisibilityChange(actor);
+      await conditionManager.handleInvisibilityChange(actor, {
+        hasInvisibility,
+      });
     } catch (error) {
       console.error('PF2E Visioner | Failed to handle invisibility condition change:', error);
     }

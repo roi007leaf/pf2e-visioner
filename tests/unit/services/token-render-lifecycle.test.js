@@ -103,6 +103,26 @@ describe('token render lifecycle service', () => {
     expect(refreshSystemHiddenHighlightsForMovedToken).toHaveBeenCalledTimes(1);
   });
 
+  test('keeps moved-token highlight refresh active while pending movement render work exists', async () => {
+    const refreshSystemHiddenHighlightsForMovedToken = jest.fn().mockResolvedValue(undefined);
+
+    const result = await handleTokenUpdated(
+      { id: 'token-1' },
+      { x: 100 },
+      {
+        schedulePendingTokenMovementCompletion: jest.fn(),
+        hasPendingMovementRenderWork: () => true,
+        refreshSystemHiddenHighlightsForMovedToken,
+      },
+    );
+
+    expect(result).toEqual({ handled: true });
+    expect(refreshSystemHiddenHighlightsForMovedToken).toHaveBeenCalledWith(
+      { id: 'token-1' },
+      { x: 100 },
+    );
+  });
+
   test('warns when moved-token highlight refresh fails', async () => {
     const failure = new Error('refresh failed');
     const warn = jest.fn();
@@ -149,25 +169,30 @@ describe('token render lifecycle service', () => {
     expect(refreshSystemHiddenHighlightsForRenderedToken).toHaveBeenCalledWith(token);
   });
 
-  test('refreshes pending movement visibility after AVS batch completion only when work is pending', () => {
+  test('refreshes pending movement visibility and highlights after AVS batch completion only when work is pending', async () => {
     const refreshPendingMovementTokenVisibility = jest.fn();
+    const refreshSystemHiddenHighlightsForControlledTokens = jest.fn();
 
-    expect(
+    await expect(
       handleAvsBatchCompleteRefresh({
         hasPendingMovementRenderWork: () => false,
         refreshPendingMovementTokenVisibility,
+        refreshSystemHiddenHighlightsForControlledTokens,
       }),
-    ).toEqual({ handled: false, reason: 'no-pending-work' });
+    ).resolves.toEqual({ handled: false, reason: 'no-pending-work' });
     expect(refreshPendingMovementTokenVisibility).not.toHaveBeenCalled();
+    expect(refreshSystemHiddenHighlightsForControlledTokens).not.toHaveBeenCalled();
 
-    expect(
+    await expect(
       handleAvsBatchCompleteRefresh({
         hasPendingMovementRenderWork: () => true,
         refreshPendingMovementTokenVisibility,
+        refreshSystemHiddenHighlightsForControlledTokens,
       }),
-    ).toEqual({ handled: true });
+    ).resolves.toEqual({ handled: true });
     expect(refreshPendingMovementTokenVisibility).toHaveBeenCalledWith([], {
       ignoreObservedGrace: true,
     });
+    expect(refreshSystemHiddenHighlightsForControlledTokens).toHaveBeenCalledTimes(1);
   });
 });

@@ -7,6 +7,8 @@ import {
   createAggregateEffectData,
   createEphemeralEffectRule,
 } from '../helpers/visibility-helpers.js';
+import { EphemeralEffectIndex } from './ephemeral-effect-index.js';
+import { cleanupLegacyVisibilityPair } from './legacy-effect-cleanup.js';
 import { runWithEffectLock } from './utils.js';
 
 export async function updateSingleVisibilityEffect(
@@ -31,20 +33,17 @@ export async function updateSingleVisibilityEffect(
     if (t && ['loot', 'vehicle', 'party'].includes(t)) return;
   } catch (_) {}
 
+  if (newVisibilityState !== 'hidden' || options.removeAllEffects) {
+    await cleanupLegacyVisibilityPair(observerToken, targetToken);
+  }
+
   await runWithEffectLock(effectReceiverToken.actor, async () => {
     const effects = effectReceiverToken.actor.itemTypes.effect;
-    const hiddenAggregate = effects.find(
-      (e) =>
-        e.flags?.[MODULE_ID]?.aggregateOffGuard === true &&
-        e.flags?.[MODULE_ID]?.visibilityState === 'hidden' &&
-        e.flags?.[MODULE_ID]?.effectTarget === effectTarget,
-    );
-    const undetectedAggregate = effects.find(
-      (e) =>
-        e.flags?.[MODULE_ID]?.aggregateOffGuard === true &&
-        e.flags?.[MODULE_ID]?.visibilityState === 'undetected' &&
-        e.flags?.[MODULE_ID]?.effectTarget === effectTarget,
-    );
+    const effectIndex = new EphemeralEffectIndex({
+      effects,
+      moduleId: MODULE_ID,
+      effectTarget,
+    });
     const signature = effectSourceToken.actor.signature;
 
     // Check if off-guard suppression is active
@@ -93,87 +92,26 @@ export async function updateSingleVisibilityEffect(
       operations.hidden.remove = true;
       operations.undetected.remove = true;
     }
-    const effectsToCreate = [];
-    const effectsToUpdate = [];
-    const effectsToDelete = [];
-
-    if (operations.hidden.remove && hiddenAggregate) {
-      const rules = Array.isArray(hiddenAggregate.system.rules)
-        ? hiddenAggregate.system.rules.filter(
-            (r) =>
-              !(
-                r?.key === 'EphemeralEffect' &&
-                Array.isArray(r.predicate) &&
-                r.predicate.includes(`target:signature:${signature}`)
-              ),
-          )
-        : [];
-      if (rules.length === 0) effectsToDelete.push(hiddenAggregate.id);
-      else effectsToUpdate.push({ _id: hiddenAggregate.id, 'system.rules': rules });
+    if (operations.hidden.remove) {
+      effectIndex.removeSignature('hidden', signature);
     }
-    if (operations.undetected.remove && undetectedAggregate) {
-      const rules = Array.isArray(undetectedAggregate.system.rules)
-        ? undetectedAggregate.system.rules.filter(
-            (r) =>
-              !(
-                r?.key === 'EphemeralEffect' &&
-                Array.isArray(r.predicate) &&
-                r.predicate.includes(`target:signature:${signature}`)
-              ),
-          )
-        : [];
-      if (rules.length === 0) effectsToDelete.push(undetectedAggregate.id);
-      else effectsToUpdate.push({ _id: undetectedAggregate.id, 'system.rules': rules });
+    if (operations.undetected.remove) {
+      effectIndex.removeSignature('undetected', signature);
     }
 
     if (operations.hidden.add) {
-      if (!hiddenAggregate) {
-        effectsToCreate.push(
-          createAggregateEffectData('hidden', signature, {
-            ...options,
-            receiverId: effectReceiverToken.actor.id,
-          }),
-        );
-      } else {
-        const rules = Array.isArray(hiddenAggregate.system.rules)
-          ? [...hiddenAggregate.system.rules]
-          : [];
-        const exists = rules.some(
-          (r) =>
-            r?.key === 'EphemeralEffect' &&
-            Array.isArray(r.predicate) &&
-            r.predicate.includes(`target:signature:${signature}`),
-        );
-        if (!exists) {
-          rules.push(createEphemeralEffectRule(signature));
-          effectsToUpdate.push({ _id: hiddenAggregate.id, 'system.rules': rules });
-        }
-      }
+      effectIndex.addSignature('hidden', signature, createEphemeralEffectRule);
     }
     if (operations.undetected.add) {
-      if (!undetectedAggregate) {
-        effectsToCreate.push(
-          createAggregateEffectData('undetected', signature, {
-            ...options,
-            receiverId: effectReceiverToken.actor.id,
-          }),
-        );
-      } else {
-        const rules = Array.isArray(undetectedAggregate.system.rules)
-          ? [...undetectedAggregate.system.rules]
-          : [];
-        const exists = rules.some(
-          (r) =>
-            r?.key === 'EphemeralEffect' &&
-            Array.isArray(r.predicate) &&
-            r.predicate.includes(`target:signature:${signature}`),
-        );
-        if (!exists) {
-          rules.push(createEphemeralEffectRule(signature));
-          effectsToUpdate.push({ _id: undetectedAggregate.id, 'system.rules': rules });
-        }
-      }
+      effectIndex.addSignature('undetected', signature, createEphemeralEffectRule);
     }
+
+    const { effectsToCreate, effectsToUpdate, effectsToDelete } = effectIndex.buildMutationPlan({
+      createAggregateEffectData,
+      options,
+      receiverId: effectReceiverToken.actor.id,
+      aggregateSignature: signature,
+    });
 
     if (effectsToDelete.length > 0) {
       // Only GMs can delete effects

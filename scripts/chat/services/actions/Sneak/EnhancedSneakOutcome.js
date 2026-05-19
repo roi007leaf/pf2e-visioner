@@ -6,7 +6,7 @@
  * roll results vs perception DC.
  */
 
-import { getDefaultNewStateFor } from '../data/action-state-config.js';
+import { getDefaultNewStateFor } from '../../data/action-state-config.js';
 
 /**
  * Enhanced outcome determination for sneak actions
@@ -137,7 +137,7 @@ export class EnhancedSneakOutcome {
     // Apply position-aware state transition if needed
     if (finalOutcome.enhancedLogic && (finalOutcome.avsDecisionUsed || finalOutcome.positionImpact)) {
       try {
-        const { default: positionAwareStateTransitions } = await import('../position/PositionAwareStateTransitions.js');
+        const { default: positionAwareStateTransitions } = await import('../../position/PositionAwareStateTransitions.js');
         
         const transitionResult = await positionAwareStateTransitions.initiateTransition({
           observerToken,

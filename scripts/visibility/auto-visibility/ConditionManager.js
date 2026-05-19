@@ -240,7 +240,7 @@ export class ConditionManager {
    * Handle invisibility condition changes to set proper flags
    * @param {Actor} actor
    */
-  async handleInvisibilityChange(actor) {
+  async handleInvisibilityChange(actor, { hasInvisibility: hasInvisibilityOverride = null } = {}) {
     if (!game.user.isGM) return;
 
     // Scope to the specific token that triggered the change:
@@ -257,9 +257,12 @@ export class ConditionManager {
     for (const token of tokens) {
       // Check if invisibility was added (try multiple methods)
       const hasInvisibility =
-        actor.hasCondition?.('invisible') ||
-        actor.system?.conditions?.invisible?.active ||
-        actor.conditions?.has?.('invisible');
+        hasInvisibilityOverride ??
+        !!(
+          actor.hasCondition?.('invisible') ||
+          actor.system?.conditions?.invisible?.active ||
+          actor.conditions?.has?.('invisible')
+        );
 
       if (hasInvisibility) {
         // Invisibility was added - record current visibility states and clear established states

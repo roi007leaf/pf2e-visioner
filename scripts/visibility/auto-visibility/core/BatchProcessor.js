@@ -1,6 +1,7 @@
 import { RuleElementChecker } from '../../../rule-elements/RuleElementChecker.js';
 import { SensePrecomputer } from '../../../services/SensePrecomputer.js';
 import { getLogger } from '../../../utils/logger.js';
+import { getCacheInvalidationRevision } from '../../../utils/cache-invalidation.js';
 import { GlobalLosCache } from '../utils/GlobalLosCache.js';
 import { GlobalVisibilityCache } from '../utils/GlobalVisibilityCache.js';
 import { VisionAnalyzer } from '../VisionAnalyzer.js';
@@ -12,10 +13,17 @@ import { OverrideBatchCache } from './OverrideBatchCache.js';
 import { OverrideService } from './OverrideService.js';
 import { PositionBatchCache } from './PositionBatchCache.js';
 import { PositionManager } from './PositionManager.js';
+import { RuleElementBatchContext } from './RuleElementBatchContext.js';
 import { SensesCapabilitiesCache } from './SensesCapabilitiesCache.js';
+import {
+  TokenSenseSignatureCache,
+  buildTokenSensesCacheKey as buildTokenSensesCacheKeyFromCache,
+} from './TokenSenseSignatureCache.js';
 import { ViewportFilterService } from './ViewportFilterService.js';
 import { VisibilityMapBatchCache } from './VisibilityMapBatchCache.js';
 import { VisibilityMapService } from './VisibilityMapService.js';
+
+export { buildTokenSensesCacheKey } from './TokenSenseSignatureCache.js';
 
 const log = getLogger('AVS/BatchProcessor');
 const EXPLICIT_VISIBLE_STATES = new Set(['observed', 'concealed']);
@@ -48,102 +56,6 @@ function getTokenPositionForCacheKey(token, posCache, positionManager) {
   }
 }
 
-function stableNormalize(value, seen = new WeakSet()) {
-  if (value == null) return value;
-  if (typeof value === 'number') return Number.isFinite(value) ? value : String(value);
-  if (typeof value !== 'object') return value;
-  if (seen.has(value)) return '[Circular]';
-
-  seen.add(value);
-
-  if (Array.isArray(value)) {
-    const normalized = value.map((entry) => stableNormalize(entry, seen));
-    seen.delete(value);
-    return normalized;
-  }
-
-  if (value instanceof Set) {
-    const normalized = Array.from(value, (entry) => stableNormalize(entry, seen)).sort();
-    seen.delete(value);
-    return normalized;
-  }
-
-  if (value instanceof Map) {
-    const normalized = Array.from(value.entries())
-      .map(([key, entry]) => [String(key), stableNormalize(entry, seen)])
-      .sort(([a], [b]) => a.localeCompare(b));
-    seen.delete(value);
-    return normalized;
-  }
-
-  const normalized = {};
-  for (const key of Object.keys(value).sort()) {
-    if (typeof value[key] === 'function') continue;
-    normalized[key] = stableNormalize(value[key], seen);
-  }
-  seen.delete(value);
-  return normalized;
-}
-
-function stableStringify(value) {
-  return JSON.stringify(stableNormalize(value));
-}
-
-function getActorConditions(actor) {
-  const entries = [];
-  const addCondition = (condition) => {
-    if (!condition) return;
-    const value =
-      condition.slug ||
-      condition.system?.slug ||
-      condition.name ||
-      condition.id ||
-      condition._id ||
-      condition;
-    if (value != null) entries.push(String(value).toLowerCase());
-  };
-
-  for (const condition of actor?.itemTypes?.condition || []) {
-    addCondition(condition);
-  }
-
-  const actorConditions = actor?.conditions;
-  if (actorConditions) {
-    if (Array.isArray(actorConditions)) {
-      for (const condition of actorConditions) addCondition(condition);
-    } else if (typeof actorConditions.values === 'function') {
-      for (const condition of actorConditions.values()) addCondition(condition);
-    } else if (typeof actorConditions[Symbol.iterator] === 'function') {
-      for (const condition of actorConditions) addCondition(condition);
-    } else if (typeof actorConditions === 'object') {
-      for (const condition of Object.values(actorConditions)) addCondition(condition);
-    }
-  }
-
-  if (typeof actor?.hasCondition === 'function') {
-    for (const slug of ['blinded', 'deafened', 'dazzled', 'invisible']) {
-      try {
-        if (actor.hasCondition(slug)) entries.push(slug);
-      } catch {
-        /* best effort */
-      }
-    }
-  }
-
-  return Array.from(new Set(entries)).sort();
-}
-
-function getActorSensesSystemSignature(actor) {
-  const system = actor?.system || {};
-  return {
-    traits: system.traits ?? null,
-    perceptionAttributes: system.attributes?.perception ?? null,
-    perception: system.perception ?? null,
-    senses: system.senses ?? system.attributes?.senses ?? null,
-    conditions: system.conditions ?? null,
-  };
-}
-
 export function buildTokenIdCacheKey(tokens) {
   const ids = (tokens || [])
     .map((token) => token?.document?.id)
@@ -170,38 +82,6 @@ export function buildTokenPositionCacheKey(tokens, posCache = null, positionMana
       const height = normalizeCacheKeyNumber(token?.document?.height ?? 1);
 
       return `${String(id)}@${x},${y},${elevation},${width},${height}`;
-    })
-    .filter(Boolean)
-    .sort();
-
-  return `scene:${getSceneCacheId()}|count:${entries.length}|${entries.join('|')}`;
-}
-
-export function buildTokenSensesCacheKey(tokens) {
-  const entries = (tokens || [])
-    .map((token) => {
-      const id = token?.document?.id;
-      if (!id) return null;
-
-      const actor = token?.actor || token?.document?.actor || {};
-      const signature = {
-        token: {
-          id: String(id),
-          elevation: normalizeCacheKeyNumber(token?.document?.elevation ?? 0),
-          width: normalizeCacheKeyNumber(token?.document?.width ?? 1),
-          height: normalizeCacheKeyNumber(token?.document?.height ?? 1),
-        },
-        actor: {
-          id: actor?.id ?? null,
-          uuid: actor?.uuid ?? null,
-          signature: actor?.signature ?? null,
-          type: actor?.type ?? null,
-          conditions: getActorConditions(actor),
-          system: getActorSensesSystemSignature(actor),
-        },
-      };
-
-      return `${String(id)}@${stableStringify(signature)}`;
     })
     .filter(Boolean)
     .sort();
@@ -252,6 +132,10 @@ export class BatchProcessor {
           return Date.now();
         }
       });
+    this.getCacheInvalidationRevision =
+      dependencies.getCacheInvalidationRevision || getCacheInvalidationRevision;
+    this._tokenSenseSignatureCache =
+      dependencies.tokenSenseSignatureCache || new TokenSenseSignatureCache();
 
     // Persistent caches to reduce expensive rebuilding between batches
     this._persistentCaches = {
@@ -264,6 +148,7 @@ export class BatchProcessor {
       spatialIndex: null,
       spatialIndexTs: 0,
       spatialIndexKey: null,
+      cacheInvalidationRevision: this.getCacheInvalidationRevision(),
       // TTL for cache invalidation (5 seconds)
       CACHE_TTL_MS: 5000,
     };
@@ -282,6 +167,16 @@ export class BatchProcessor {
     caches.spatialIndex = null;
     caches.spatialIndexTs = 0;
     caches.spatialIndexKey = null;
+    caches.cacheInvalidationRevision = this.getCacheInvalidationRevision();
+    this._tokenSenseSignatureCache?.clear?.();
+  }
+
+  _clearPersistentCachesIfInvalidated() {
+    const caches = this._persistentCaches;
+    if (!caches) return;
+    const revision = this.getCacheInvalidationRevision();
+    if (caches.cacheInvalidationRevision === revision) return;
+    this.clearPersistentCaches();
   }
 
   /**
@@ -340,6 +235,7 @@ export class BatchProcessor {
     };
     let processedTokens = 0;
     const now = Date.now();
+    this._clearPersistentCachesIfInvalidated();
 
     // Precompute token positions and position keys once per batch (always needed fresh)
     let stageStart = this.nowProvider();
@@ -354,7 +250,10 @@ export class BatchProcessor {
       this.positionManager,
     );
     const tokenIdCacheKey = buildTokenIdCacheKey(allTokens);
-    const tokenSensesCacheKey = buildTokenSensesCacheKey(allTokens);
+    const tokenSensesCacheKey = buildTokenSensesCacheKeyFromCache(
+      allTokens,
+      this._tokenSenseSignatureCache,
+    );
 
     // Build or reuse spatial index with revision-key + TTL-based invalidation
     let index;
@@ -514,6 +413,10 @@ export class BatchProcessor {
       commonCalcOptions,
       breakdown,
       skipGlobalVisCache,
+    });
+    const ruleElementContext = new RuleElementBatchContext({
+      checker: RuleElementChecker,
+      tokens: allTokens,
     });
 
     const mainLoopStart = this.nowProvider();
@@ -741,7 +644,7 @@ export class BatchProcessor {
           });
           effectiveVisibility1 = visibility1;
 
-          const ruleElementResult1 = RuleElementChecker.checkRuleElements(
+          const ruleElementResult1 = ruleElementContext.checkRuleElements(
             changedToken,
             otherToken,
             visibility1,
@@ -763,7 +666,7 @@ export class BatchProcessor {
           });
           effectiveVisibility2 = visibility2;
 
-          const ruleElementResult2 = RuleElementChecker.checkRuleElements(
+          const ruleElementResult2 = ruleElementContext.checkRuleElements(
             otherToken,
             changedToken,
             visibility2,

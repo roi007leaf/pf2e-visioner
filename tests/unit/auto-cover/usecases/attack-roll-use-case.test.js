@@ -80,6 +80,31 @@ describe('AttackRollUseCase', () => {
     });
   });
 
+  describe('_stripSuppressedOffGuardModifiers', () => {
+    test('classifies each modifier once while removing suppressed off-guard modifiers', () => {
+      attackRollUseCase._isOffGuardSuppressedForAttack = jest.fn(() => true);
+      const classifySpy = jest.spyOn(attackRollUseCase, '_isSuppressedOffGuardModifier');
+      const container = {
+        modifiers: [
+          { slug: 'pf2e-visioner-off-guard', modifier: -2 },
+          { slug: 'other-bonus', modifier: 1 },
+        ],
+        calculateTotal: jest.fn(),
+      };
+
+      const changed = attackRollUseCase._stripSuppressedOffGuardModifiers(
+        container,
+        { id: 'attacker' },
+        { id: 'target' },
+      );
+
+      expect(changed).toBe(true);
+      expect(container.modifiers).toEqual([{ slug: 'other-bonus', modifier: 1 }]);
+      expect(classifySpy).toHaveBeenCalledTimes(2);
+      expect(container.calculateTotal).toHaveBeenCalled();
+    });
+  });
+
   describe('handlePreCreateChatMessage', () => {
     let mockData, speakerToken, targetToken;
 

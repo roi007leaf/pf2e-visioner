@@ -6,6 +6,7 @@ describe('TemplateManager', () => {
     templateManager._templatesData?.clear?.();
     templateManager._activeReflexSaves?.clear?.();
     templateManager._templatesOrigins?.clear?.();
+    templateManager._templateTargetIndex?.clear?.();
   });
 
   describe('singleton instance', () => {
@@ -14,6 +15,7 @@ describe('TemplateManager', () => {
       expect(templateManager._templatesData).toBeInstanceOf(Map);
       expect(templateManager._activeReflexSaves).toBeInstanceOf(Map);
       expect(templateManager._templatesOrigins).toBeInstanceOf(Map);
+      expect(templateManager._templateTargetIndex).toBeInstanceOf(Map);
     });
   });
 
@@ -43,6 +45,46 @@ describe('TemplateManager', () => {
     test('should return null for undefined template ID', () => {
       const result = templateManager.getTemplateData(undefined);
       expect(result).toBeNull();
+    });
+  });
+
+  describe('getLatestTemplateForTarget', () => {
+    test('returns newest indexed template for target without scanning callers', () => {
+      const oldTemplate = {
+        id: 'old-template',
+        timestamp: 100,
+        targets: { target1: { state: 'standard' } },
+      };
+      const newTemplate = {
+        id: 'new-template',
+        timestamp: 200,
+        targets: { target1: { state: 'greater' } },
+      };
+
+      templateManager._templatesData.set('old-template', oldTemplate);
+      templateManager._indexTemplateData('old-template', oldTemplate);
+      templateManager._templatesData.set('new-template', newTemplate);
+      templateManager._indexTemplateData('new-template', newTemplate);
+
+      expect(templateManager.getLatestTemplateForTarget('target1')).toEqual({
+        id: 'new-template',
+        data: newTemplate,
+      });
+    });
+
+    test('removes target-index entries when template data is removed', () => {
+      const templateData = {
+        id: 'template-1',
+        timestamp: 100,
+        targets: { target1: { state: 'standard' } },
+      };
+      templateManager._templatesData.set('template-1', templateData);
+      templateManager._indexTemplateData('template-1', templateData);
+
+      templateManager.removeTemplateData('template-1');
+
+      expect(templateManager.getLatestTemplateForTarget('target1')).toBeNull();
+      expect(templateManager._templateTargetIndex.has('target1')).toBe(false);
     });
   });
 

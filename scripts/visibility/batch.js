@@ -4,29 +4,9 @@ import {
   createEphemeralEffectRule,
 } from '../helpers/visibility-helpers.js';
 import { OffGuardSuppression } from '../rule-elements/operations/OffGuardSuppression.js';
+import { EphemeralEffectIndex } from './ephemeral-effect-index.js';
+import { cleanupLegacyVisibilityPair } from './legacy-effect-cleanup.js';
 import { runWithEffectLock } from './utils.js';
-
-async function deleteLegacyVisibilityEffects(actor, hiddenActorSignature) {
-  if (!game.user.isGM || !actor?.itemTypes?.effect || !hiddenActorSignature) return 0;
-  const legacyEffects = actor.itemTypes.effect.filter(
-    (effect) =>
-      effect?.flags?.[MODULE_ID]?.isEphemeralOffGuard === true &&
-      effect?.flags?.[MODULE_ID]?.hiddenActorSignature === hiddenActorSignature,
-  );
-  const ids = legacyEffects
-    .map((effect) => effect?.id)
-    .filter((id) => !!id && (actor.items?.get?.(id) ?? true));
-  if (!ids.length) return 0;
-  await actor.deleteEmbeddedDocuments?.('Item', ids);
-  return ids.length;
-}
-
-async function cleanupLegacyObservedPair(observerToken, targetToken) {
-  const observerSignature = observerToken?.actor?.signature;
-  const targetSignature = targetToken?.actor?.signature;
-  await deleteLegacyVisibilityEffects(observerToken?.actor, targetSignature);
-  await deleteLegacyVisibilityEffects(targetToken?.actor, observerSignature);
-}
 
 export async function batchUpdateVisibilityEffects(observerToken, targetUpdates, options = {}) {
   if (!observerToken?.actor || !targetUpdates?.length) return;
@@ -52,10 +32,11 @@ export async function batchUpdateVisibilityEffects(observerToken, targetUpdates,
     if (
       update.state === 'observed' ||
       update.state === 'concealed' ||
+      update.state === 'undetected' ||
       options.removeAllEffects ||
       suppressionActive
     ) {
-      await cleanupLegacyObservedPair(observerToken, update.target);
+      await cleanupLegacyVisibilityPair(observerToken, update.target);
     }
     if (!updatesByReceiver.has(receiverId))
       updatesByReceiver.set(receiverId, { receiver, updates: [] });
@@ -72,31 +53,11 @@ export async function batchUpdateVisibilityEffects(observerToken, targetUpdates,
     } catch (_) {}
     await runWithEffectLock(receiver.actor, async () => {
       const effects = receiver.actor.itemTypes.effect;
-      const hiddenAggregate = effects.find(
-        (e) =>
-          e.flags?.[MODULE_ID]?.aggregateOffGuard === true &&
-          e.flags?.[MODULE_ID]?.visibilityState === 'hidden' &&
-          e.flags?.[MODULE_ID]?.effectTarget === effectTarget,
-      );
-      const undetectedAggregate = effects.find(
-        (e) =>
-          e.flags?.[MODULE_ID]?.aggregateOffGuard === true &&
-          e.flags?.[MODULE_ID]?.visibilityState === 'undetected' &&
-          e.flags?.[MODULE_ID]?.effectTarget === effectTarget,
-      );
-      let hiddenRules = hiddenAggregate
-        ? Array.isArray(hiddenAggregate.system.rules)
-          ? [...hiddenAggregate.system.rules]
-          : []
-        : [];
-      let undetectedRules = undetectedAggregate
-        ? Array.isArray(undetectedAggregate.system.rules)
-          ? [...undetectedAggregate.system.rules]
-          : []
-        : [];
-      const effectsToCreate = [];
-      const effectsToUpdate = [];
-      const effectsToDelete = [];
+      const effectIndex = new EphemeralEffectIndex({
+        effects,
+        moduleId: MODULE_ID,
+        effectTarget,
+      });
       for (const { source, state, suppressionActive } of updates) {
         const signature = source.actor.signature;
         const operations = {
@@ -119,66 +80,24 @@ export async function batchUpdateVisibilityEffects(observerToken, targetUpdates,
           operations.undetected.add = true;
         }
         if (operations.hidden.remove) {
-          hiddenRules = hiddenRules.filter(
-            (r) =>
-              !(
-                r?.key === 'EphemeralEffect' &&
-                Array.isArray(r.predicate) &&
-                r.predicate.includes(`target:signature:${signature}`)
-              ),
-          );
+          effectIndex.removeSignature('hidden', signature);
         }
         if (operations.undetected.remove) {
-          undetectedRules = undetectedRules.filter(
-            (r) =>
-              !(
-                r?.key === 'EphemeralEffect' &&
-                Array.isArray(r.predicate) &&
-                r.predicate.includes(`target:signature:${signature}`)
-              ),
-          );
+          effectIndex.removeSignature('undetected', signature);
         }
         if (operations.hidden.add) {
-          const exists = hiddenRules.some(
-            (r) =>
-              r?.key === 'EphemeralEffect' &&
-              Array.isArray(r.predicate) &&
-              r.predicate.includes(`target:signature:${signature}`),
-          );
-          if (!exists) hiddenRules.push(createEphemeralEffectRule(signature));
+          effectIndex.addSignature('hidden', signature, createEphemeralEffectRule);
         }
         if (operations.undetected.add) {
-          const exists = undetectedRules.some(
-            (r) =>
-              r?.key === 'EphemeralEffect' &&
-              Array.isArray(r.predicate) &&
-              r.predicate.includes(`target:signature:${signature}`),
-          );
-          if (!exists) undetectedRules.push(createEphemeralEffectRule(signature));
+          effectIndex.addSignature('undetected', signature, createEphemeralEffectRule);
         }
       }
-      if (hiddenAggregate) {
-        if (hiddenRules.length === 0) effectsToDelete.push(hiddenAggregate.id);
-        else effectsToUpdate.push({ _id: hiddenAggregate.id, 'system.rules': hiddenRules });
-      } else if (hiddenRules.length > 0)
-        effectsToCreate.push(
-          createAggregateEffectData('hidden', 'batch', {
-            ...options,
-            receiverId: receiver.actor.id,
-            existingRules: hiddenRules,
-          }),
-        );
-      if (undetectedAggregate) {
-        if (undetectedRules.length === 0) effectsToDelete.push(undetectedAggregate.id);
-        else effectsToUpdate.push({ _id: undetectedAggregate.id, 'system.rules': undetectedRules });
-      } else if (undetectedRules.length > 0)
-        effectsToCreate.push(
-          createAggregateEffectData('undetected', 'batch', {
-            ...options,
-            receiverId: receiver.actor.id,
-            existingRules: undetectedRules,
-          }),
-        );
+      const { effectsToCreate, effectsToUpdate, effectsToDelete } =
+        effectIndex.buildMutationPlan({
+          createAggregateEffectData,
+          options,
+          receiverId: receiver.actor.id,
+        });
       if (effectsToDelete.length > 0) {
         // Only GMs can delete effects
         if (game.user.isGM) {

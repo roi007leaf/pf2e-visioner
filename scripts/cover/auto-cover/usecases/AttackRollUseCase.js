@@ -347,17 +347,11 @@ class AttackRollUseCase extends BaseAutoCoverUseCase {
     }
 
     const items = foundry.utils.deepClone(actor._source?.items ?? []);
-    const aggregateCountBefore = items.filter(
-      (item) => item?.flags?.[MODULE_ID]?.aggregateOffGuard === true,
-    ).length;
     const { items: filteredItems, changed } = this._filterSuppressedAttackerOffGuardItems(
       items,
       attacker,
       target,
     );
-    const aggregateCountAfter = filteredItems.filter(
-      (item) => item?.flags?.[MODULE_ID]?.aggregateOffGuard === true,
-    ).length;
     if (!changed) return false;
 
     const clonedActor = actor.clone({ items: filteredItems }, { keepId: true });
@@ -402,8 +396,12 @@ class AttackRollUseCase extends BaseAutoCoverUseCase {
     for (const path of paths) {
       const modifiers = foundry.utils.getProperty(container, path);
       if (!Array.isArray(modifiers)) continue;
-      const removed = modifiers.filter((modifier) => this._isSuppressedOffGuardModifier(modifier));
-      const filtered = modifiers.filter((modifier) => !this._isSuppressedOffGuardModifier(modifier));
+      const removed = [];
+      const filtered = [];
+      for (const modifier of modifiers) {
+        if (this._isSuppressedOffGuardModifier(modifier)) removed.push(modifier);
+        else filtered.push(modifier);
+      }
       if (filtered.length === modifiers.length) continue;
       const dcPath = path.startsWith('context.dc') ? 'context.dc' : path.startsWith('dc') ? 'dc' : null;
       const dcObj = dcPath ? foundry.utils.getProperty(container, dcPath) : null;

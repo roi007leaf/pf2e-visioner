@@ -2,6 +2,7 @@ import {
   getPerceptionProfileBetween,
   getPerceptionProfileMap,
   getVisibilityBetween,
+  setVisibilityMapsBatch,
   setPerceptionProfileBetween,
   setVisibilityBetween,
 } from '../../../scripts/stores/visibility-map.js';
@@ -70,6 +71,32 @@ describe('Visibility Map V2 profile storage', () => {
     expect(getVisibilityBetween(observer, target)).toBe('concealed');
   });
 
+  test('getVisibilityBetween reads only the requested visibilityV2 profile', () => {
+    const requestedProfile = jest.fn(() => ({
+      detectionState: 'hidden',
+      hasConcealment: false,
+    }));
+    const unrelatedProfile = jest.fn(() => ({
+      detectionState: 'undetected',
+      hasConcealment: false,
+    }));
+    const visibilityV2 = {};
+    Object.defineProperties(visibilityV2, {
+      target: { enumerable: true, get: requestedProfile },
+      unrelated: { enumerable: true, get: unrelatedProfile },
+    });
+
+    observer.document.getFlag.mockImplementation((moduleId, key) => {
+      if (moduleId !== 'pf2e-visioner') return null;
+      if (key === 'visibilityV2') return visibilityV2;
+      return {};
+    });
+
+    expect(getVisibilityBetween(observer, target)).toBe('hidden');
+    expect(requestedProfile).toHaveBeenCalledTimes(1);
+    expect(unrelatedProfile).not.toHaveBeenCalled();
+  });
+
   test('setPerceptionProfileBetween preserves concealment beside hidden detection', async () => {
     await setPerceptionProfileBetween(observer, target, {
       detectionState: 'hidden',
@@ -103,5 +130,40 @@ describe('Visibility Map V2 profile storage', () => {
     );
     expect(getVisibilityBetween(observer, target)).toBe('observed');
     expect(getPerceptionProfileMap(observer)).toEqual({});
+  });
+
+  test('setVisibilityMapsBatch persists multiple observer maps through scene bulk updates', async () => {
+    const observerB = global.createMockToken({ id: 'observer-b' });
+    const originalUpdateEmbeddedDocuments = global.canvas.scene.updateEmbeddedDocuments;
+    global.canvas.scene.updateEmbeddedDocuments = jest.fn().mockResolvedValue([]);
+
+    await setVisibilityMapsBatch([
+      { token: observer, visibilityMap: { target: 'hidden' } },
+      { token: observerB, visibilityMap: { target: 'concealed' } },
+    ]);
+
+    expect(global.canvas.scene.updateEmbeddedDocuments).toHaveBeenCalledWith(
+      'Token',
+      [
+        {
+          _id: 'observer',
+          'flags.pf2e-visioner.visibilityV2': {
+            target: expect.objectContaining({ detectionState: 'hidden' }),
+          },
+        },
+        {
+          _id: 'observer-b',
+          'flags.pf2e-visioner.visibilityV2': {
+            target: expect.objectContaining({
+              detectionState: 'observed',
+              hasConcealment: true,
+            }),
+          },
+        },
+      ],
+      { diff: false, render: false, animate: false },
+    );
+
+    global.canvas.scene.updateEmbeddedDocuments = originalUpdateEmbeddedDocuments;
   });
 });

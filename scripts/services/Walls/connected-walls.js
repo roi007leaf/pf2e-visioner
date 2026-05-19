@@ -2,7 +2,7 @@
  * Helpers for resolving and expanding connected hidden walls.
  */
 
-import { MODULE_ID } from '../constants.js';
+import { MODULE_ID } from '../../constants.js';
 
 function normalizeIdentifier(id) {
   return String(id || '').trim();
@@ -37,7 +37,7 @@ export function getConnectedWallDocsBySourceId(wallId) {
         if (myIdent && Array.isArray(theirs) && theirs.map(normalizeIdentifier).includes(myIdent)) {
           resultsById.set(d.id, d);
         }
-      } catch (_) {}
+      } catch (_) { }
     }
     return Array.from(resultsById.values());
   } catch (_) {
@@ -61,7 +61,7 @@ export function expandWallIdWithConnected(wallId) {
         if (!seen.has(nd.id)) queue.push(nd.id);
       }
     }
-  } catch (_) {}
+  } catch (_) { }
   return ids;
 }
 
@@ -75,5 +75,5 @@ export async function mirrorHiddenFlagToConnected(sourceDoc, hidden) {
     }
     if (updates.length)
       await canvas.scene?.updateEmbeddedDocuments?.('Wall', updates, { diff: false });
-  } catch (_) {}
+  } catch (_) { }
 }
