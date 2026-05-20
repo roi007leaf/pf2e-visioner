@@ -51,4 +51,14 @@ describe('detection wrapper module ownership', () => {
       expect(source).not.toContain("from './pending-token-movement.js'");
     }
   });
+
+  test('token refresh wrapper uses the pending movement render lock seam', () => {
+    const renderLockPath = path.join(servicesRoot, 'pending-movement-render-lock.js');
+    const tokenRefreshPath = path.join(servicesRoot, 'detection-token-refresh.js');
+    const tokenRefreshSource = fs.readFileSync(tokenRefreshPath, 'utf8');
+
+    expect(fs.existsSync(renderLockPath)).toBe(true);
+    expect(tokenRefreshSource).toContain("from './pending-movement-render-lock.js'");
+    expect(tokenRefreshSource).not.toContain("from './pending-token-movement.js'");
+  });
 });

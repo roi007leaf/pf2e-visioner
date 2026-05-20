@@ -1,6 +1,8 @@
 import {
   hasPendingMovementRenderWork as defaultHasPendingMovementRenderWork,
   refreshPendingMovementTokenVisibility as defaultRefreshPendingMovementTokenVisibility,
+} from './pending-movement-render-lock.js';
+import {
   schedulePendingTokenMovementCompletion as defaultSchedulePendingTokenMovementCompletion,
 } from './pending-token-movement.js';
 import { isRefreshTokenProcessingSuppressed as defaultIsRefreshTokenProcessingSuppressed } from './runtime-state.js';

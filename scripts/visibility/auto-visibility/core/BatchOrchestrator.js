@@ -7,7 +7,7 @@ import {
 import {
   forceTokenInvisibleForObserverVisibility,
   refreshPendingMovementTokenVisibility,
-} from '../../../services/pending-token-movement.js';
+} from '../../../services/pending-movement-render-lock.js';
 import {
   discardDetectionBatch,
   flushDetectionBatch,

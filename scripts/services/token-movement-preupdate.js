@@ -1,5 +1,7 @@
 import {
   refreshPendingMovementTokenVisibility,
+} from './pending-movement-render-lock.js';
+import {
   setPendingTokenMovementPosition,
 } from './pending-token-movement.js';
 

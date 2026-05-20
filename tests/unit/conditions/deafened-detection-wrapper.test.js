@@ -7,8 +7,10 @@ import { markExplicitVisiblePair } from '../../../scripts/services/ExplicitVisib
 import {
     clearPendingTokenMovementPosition,
     setPendingTokenMovementPosition,
-    shouldTemporarilyForceTokenInvisible,
 } from '../../../scripts/services/pending-token-movement.js';
+import {
+    shouldTemporarilyForceTokenInvisible,
+} from '../../../scripts/services/pending-movement-render-lock.js';
 
 // Mock dependencies
 const mockLibWrapper = {

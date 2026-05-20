@@ -4,16 +4,18 @@ import {
   clearPendingTokenMovementPosition,
   completePendingTokenMovement,
   getPendingTokenMovementPosition,
-  refreshPendingMovementTokenVisibility,
-  restorePendingMovementTokenRendering,
   schedulePendingTokenMovementCompletion,
   setPendingTokenMovementPosition,
-  shouldTemporarilyForceTokenInvisible,
 } from '../../../scripts/services/pending-token-movement.js';
 import {
   getPendingMovementBlockedDetectionSources,
   shouldTemporarilyBlockHiddenDetection,
 } from '../../../scripts/services/pending-movement-detection-gate.js';
+import {
+  refreshPendingMovementTokenVisibility,
+  restorePendingMovementTokenRendering,
+  shouldTemporarilyForceTokenInvisible,
+} from '../../../scripts/services/pending-movement-render-lock.js';
 
 describe('pending token movement hidden detection guard', () => {
   let originalCanvas;

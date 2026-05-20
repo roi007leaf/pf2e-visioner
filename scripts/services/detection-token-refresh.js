@@ -2,7 +2,7 @@ import {
   forcePendingMovementTokenInvisible,
   restorePendingMovementTokenRendering,
   shouldTemporarilyForceTokenInvisible,
-} from './pending-token-movement.js';
+} from './pending-movement-render-lock.js';
 
 export function wrapTokenRefreshVisibility(wrapped, ...args) {
   const result = wrapped(...args);

@@ -9,7 +9,7 @@ import {
   hasPendingMovementRenderWork,
   refreshPendingMovementTokenVisibility,
   restorePendingMovementTokenRendering,
-} from '../services/pending-token-movement.js';
+} from '../services/pending-movement-render-lock.js';
 import { runVisibilityV2MigrationIfNeeded } from '../migrations/visibility-v2-migration.js';
 import { registerSocket } from '../services/socket.js';
 import {

@@ -5,6 +5,7 @@ describe('Override indicator should not trigger on controlToken', () => {
         jest.resetModules();
         jest.clearAllMocks();
         jest.unmock('../../../scripts/services/pending-token-movement.js');
+        jest.unmock('../../../scripts/services/pending-movement-render-lock.js');
         delete global.__pf2eVisionerLifecycleBindings;
         delete global.__pf2eVisionerControlTokenSessions;
         document.body.innerHTML = '';
@@ -172,7 +173,7 @@ describe('Override indicator should not trigger on controlToken', () => {
 
     test('controlToken immediately settles pending hidden render locks for the new observer', async () => {
         const refreshPendingMovementTokenVisibility = jest.fn();
-        jest.doMock('../../../scripts/services/pending-token-movement.js', () => ({
+        jest.doMock('../../../scripts/services/pending-movement-render-lock.js', () => ({
             hasPendingMovementRenderWork: jest.fn(() => true),
             refreshPendingMovementTokenVisibility,
             restorePendingMovementTokenRendering: jest.fn(),
