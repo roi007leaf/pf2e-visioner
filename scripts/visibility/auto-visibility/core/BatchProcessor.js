@@ -391,6 +391,7 @@ export class BatchProcessor {
     }
     const isDoorStateBatch =
       calcOptions?.postBatchPerceptionSuppression?.reason === 'door-state-change';
+    const isMovementBatch = calcOptions?.isMovementBatch === true;
     const doorScopeCoords = this.#getDoorScopeCoords(calcOptions);
     const skipGlobalVisCache =
       LightingPrecomputer.isForcingFreshComputation() ||
@@ -442,6 +443,12 @@ export class BatchProcessor {
       let relevantTokens = candidates
         .map((pt) => pt.token)
         .filter((t) => t?.document?.id && t.document.id !== changedTokenId);
+      const usedMovementFallback = calcOptions?.isMovementBatch === true && relevantTokens.length === 0;
+      if (usedMovementFallback) {
+        relevantTokens = allTokens.filter(
+          (token) => token?.document?.id && token.document.id !== changedTokenId,
+        );
+      }
 
       // Optional client-side viewport filtering for relevant tokens.
       // Skipped for movement batches: the destination room may be off-screen from the GM's
@@ -696,6 +703,10 @@ export class BatchProcessor {
           !hasOverride2 &&
           !needsEphemeralUpdate2 &&
           (explicitVisiblePair2 || los2 === false);
+        const needsMovementDetectionSync1 =
+          isMovementBatch && !hasOverride1 && !needsEphemeralUpdate1 && explicitVisiblePair1;
+        const needsMovementDetectionSync2 =
+          isMovementBatch && !hasOverride2 && !needsEphemeralUpdate2 && explicitVisiblePair2;
 
         if (needsEphemeralUpdate1) {
           updates.push({
@@ -713,7 +724,7 @@ export class BatchProcessor {
             explicitVisiblePair: explicitVisiblePair2,
           });
         }
-        if (needsDoorDetectionSync1) {
+        if (needsDoorDetectionSync1 || needsMovementDetectionSync1) {
           updates.push({
             observer: changedToken,
             target: otherToken,
@@ -722,7 +733,7 @@ export class BatchProcessor {
             explicitVisiblePair: los1 === false ? false : explicitVisiblePair1,
           });
         }
-        if (needsDoorDetectionSync2) {
+        if (needsDoorDetectionSync2 || needsMovementDetectionSync2) {
           updates.push({
             observer: otherToken,
             target: changedToken,

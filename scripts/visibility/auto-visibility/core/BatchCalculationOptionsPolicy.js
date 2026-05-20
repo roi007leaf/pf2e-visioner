@@ -38,6 +38,7 @@ export function buildBatchCalculationOptions({
       fastMode: isTokenMoving,
       skipPrecomputedLOS: !!movementSession,
       skipViewportFilter: isMovementBatch,
+      isMovementBatch,
       postBatchPerceptionSuppression,
     },
   };

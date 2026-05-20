@@ -182,30 +182,15 @@ export class BatchOrchestrator {
    */
   notifyTokenMovementStart() {
     this._movementRevision++;
-    try {
-      getLogger('AVS/Batch').debug(() => ({
-        msg: 'movement:start',
-        wasMoving: this._isTokenMoving,
-        pendingTokens: this._pendingTokens.size,
-        movementRevision: this._movementRevision,
-      }));
-    } catch { }
-    // Start a new movement session if not already moving
-    if (!this._isTokenMoving) {
-      this._movementSession = {
-        positionUpdates: 0,
-        tokensAccumulated: new Set(),
-        sessionId: `movement-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      };
+    // Start a new movement session if one is missing. The moving flag can outlive a
+    // previous session after async batch cleanup, so session existence is the invariant.
+    if (!this._movementSession) {
+      this._movementSession = this._createMovementSession();
 
       // CRITICAL: Clear LOS cache when movement starts to prevent stale precomputed LOS
       // This ensures fresh LOS calculations when the batch processes after movement completes
       try {
         this.cacheManager?.clearLosCache?.();
-        getLogger('AVS/Batch').debug(() => ({
-          msg: 'movement:cleared-los-cache',
-          reason: 'movement-started',
-        }));
       } catch (error) {
         console.warn('PF2E Visioner | Failed to clear LOS cache on movement start:', error);
       }
@@ -223,19 +208,13 @@ export class BatchOrchestrator {
 
     // Set timer to detect when movement stops
     this._movementStopTimer = setTimeout(() => {
-      try {
-        getLogger('AVS/Batch').debug(() => ({
-          msg: 'movement:stop-timer-fired',
-          hasSession: !!this._movementSession,
-          pendingTokens: this._pendingTokens.size,
-        }));
-      } catch { }
-
       if (!this._movementSession) {
-        console.warn('PF2E Visioner | Movement stop timer fired but no session exists');
-        this._isTokenMoving = false;
-        this._movementStopTimer = null;
-        return;
+        if (this._pendingTokens.size === 0) {
+          this._isTokenMoving = false;
+          this._movementStopTimer = null;
+          return;
+        }
+        this._movementSession = this._createMovementSession(this._pendingTokens);
       }
 
       const sessionData = {
@@ -247,14 +226,6 @@ export class BatchOrchestrator {
 
       this._isTokenMoving = false;
       this._movementStopTimer = null;
-
-      try {
-        getLogger('AVS/Batch').debug(() => ({
-          msg: 'movement:stopped',
-          sessionData,
-          willProcessBatch: this._pendingTokens.size > 0,
-        }));
-      } catch { }
 
       // If there are pending tokens, process them immediately now that movement stopped
       if (this._pendingTokens.size > 0) {
@@ -277,6 +248,14 @@ export class BatchOrchestrator {
         this._movementSession = null;
       }
     }, this._movementStopDelayMs);
+  }
+
+  _createMovementSession(initialTokenIds = []) {
+    return {
+      positionUpdates: 0,
+      tokensAccumulated: new Set(initialTokenIds),
+      sessionId: `movement-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+    };
   }
 
   _getAnimatingChangedTokenIds(changedTokens) {
@@ -444,11 +423,9 @@ export class BatchOrchestrator {
     // none of the changed tokens are visible to this client, avoid touching token
     // rendering at all; refreshing offscreen tokens during lighting rebuilds can
     // produce transient canvas artifacts.
-    const lastMovedTokenId = getLastMovedTokenId();
     const isMovementBatch = isMovementVisibilityBatch({
       changedTokens,
       movementSession: options.movementSession,
-      lastMovedTokenId,
     });
     const candidateTokens = isMovementBatch ? canvas.tokens?.placeables || [] : this._getAllTokens();
     const { allTokens, visibleChangedTokens, hasVisibleChangedTokens } =
@@ -490,8 +467,8 @@ export class BatchOrchestrator {
     // For movement batches, bypass viewport filtering so that tokens in the destination room
     // (which may be off-screen from the GM's perspective) are included in visibility calculations.
     // Without this, creatures in a newly-entered room are excluded and stay "undetected".
-    // Detect movement batches via movementSession (stop-timer path) or a current
-    // lastMovedTokenId that is actually part of this changed-token set.
+    // Detect movement batches via the stop-timer movementSession only. lastMovedTokenId can
+    // outlive movement, so using it here makes later non-movement refreshes bypass filters.
 
     if (isMovementBatch) {
       try {
@@ -575,6 +552,7 @@ export class BatchOrchestrator {
         batchResult,
         postBatchPerceptionSuppression,
         flushDetectionBatch: () => detectionBatch.flush(),
+        isMovementBatch,
       });
       timings.resultApplication = this.nowProvider() - stageStart;
 
@@ -953,7 +931,7 @@ export class BatchOrchestrator {
         dirtyVisibilityEntries.map(({ token, visibilityMap }) =>
           visibilityMapOptions
             ? this.visibilityMapService.setVisibilityMap(token, visibilityMap, visibilityMapOptions)
-            : this.visibilityMapService.setVisibilityMap(token, visibilityMap),
+          : this.visibilityMapService.setVisibilityMap(token, visibilityMap),
         ),
       );
 
@@ -972,6 +950,18 @@ export class BatchOrchestrator {
       const observerId = update.observer?.document?.id;
       if (!controlledObserverIds.has(observerId)) continue;
       forceTokenInvisibleForObserverVisibility(update.observer, update.target, update.visibility);
+    }
+
+    const revealedVisibilityTargetIds = batchResult.updates
+      .filter((update) => update.visibility === 'observed' || update.visibility === 'concealed')
+      .map((update) => update.target?.document?.id)
+      .filter(Boolean);
+    if (revealedVisibilityTargetIds.length > 0) {
+      refreshPendingMovementTokenVisibility([], {
+        ignoreObservedGrace: true,
+        skipPerceptionRefresh: true,
+        targetTokenIds: revealedVisibilityTargetIds,
+      });
     }
 
     const hiddenVisibilityTargetIds = batchResult.updates

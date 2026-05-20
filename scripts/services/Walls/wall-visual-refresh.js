@@ -7,11 +7,11 @@ function getDefaultRemainingWallCount() {
 }
 
 async function loadDefaultVisualEffects() {
-  return import('./visual-effects.js');
+  return import('../visual-effects.js');
 }
 
 async function loadDefaultOptimizedVisualEffects() {
-  return import('./optimized-visual-effects.js');
+  return import('../optimized-visual-effects.js');
 }
 
 export function getControlledWallVisualObserverId(controlledTokens = getDefaultControlledTokens()) {

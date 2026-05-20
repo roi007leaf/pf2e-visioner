@@ -66,6 +66,7 @@ describe('BatchCalculationOptionsPolicy', () => {
       fastMode: false,
       skipPrecomputedLOS: true,
       skipViewportFilter: true,
+      isMovementBatch: true,
       postBatchPerceptionSuppression: suppression,
     });
   });

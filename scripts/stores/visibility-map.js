@@ -281,16 +281,58 @@ export function buildVisibilityMapDocumentUpdatePasses(token, visibilityMap, opt
   })]];
 }
 
+function visibilityMapValueFor(visibilityMap = {}, targetId) {
+  if (!targetId) return 'observed';
+  return visibilityMap?.[targetId] ?? 'observed';
+}
+
+function collectVisibilityReadbackTargetIds(previousMap = {}, nextMap = {}) {
+  return Array.from(new Set([
+    ...Object.keys(previousMap ?? {}),
+    ...Object.keys(nextMap ?? {}),
+  ]));
+}
+
+function hasVisibilityReadbackMismatch(token, visibilityMap = {}, targetIds = []) {
+  const actualMap = getVisibilityMap(token);
+  return targetIds.some(
+    (targetId) =>
+      visibilityMapValueFor(actualMap, targetId) !==
+      visibilityMapValueFor(visibilityMap, targetId),
+  );
+}
+
+async function repairStaleVisibilityBatchReadback(entries = [], options = {}) {
+  const staleEntries = entries.filter(({ token, visibilityMap, targetIds }) =>
+    hasVisibilityReadbackMismatch(token, visibilityMap, targetIds),
+  );
+  if (!staleEntries.length) return 0;
+
+  await Promise.all(
+    staleEntries.map(({ token, visibilityMap }) => setVisibilityMap(token, visibilityMap, options)),
+  );
+  return staleEntries.length;
+}
+
 export async function setVisibilityMapsBatch(entries = [], options = {}) {
   if (!game.user.isGM || entries.length === 0) return { written: 0 };
 
   const updatePasses = [];
   const tokensToWaitFor = [];
+  const readbackEntries = [];
 
   for (const entry of entries) {
     const token = entry?.token;
     if (!getTokenDocument(token)) continue;
     tokensToWaitFor.push(token);
+    readbackEntries.push({
+      token,
+      visibilityMap: entry.visibilityMap ?? {},
+      targetIds: collectVisibilityReadbackTargetIds(
+        getVisibilityMap(token),
+        entry.visibilityMap ?? {},
+      ),
+    });
 
     const passes = buildVisibilityMapDocumentUpdatePasses(token, entry.visibilityMap, options);
     passes.forEach((updates, index) => {
@@ -299,7 +341,7 @@ export async function setVisibilityMapsBatch(entries = [], options = {}) {
     });
   }
 
-  return applyTokenFlagUpdatePasses({
+  const result = await applyTokenFlagUpdatePasses({
     updatePasses,
     tokensToWaitFor,
     waitForToken: waitForTokenDocumentUpdateSafe,
@@ -309,6 +351,8 @@ export async function setVisibilityMapsBatch(entries = [], options = {}) {
       entries.map((entry) => setVisibilityMap(entry.token, entry.visibilityMap, options)),
     ),
   });
+  const repaired = await repairStaleVisibilityBatchReadback(readbackEntries, options);
+  return { ...result, repaired };
 }
 
 /**

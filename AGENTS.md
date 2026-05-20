@@ -1,13 +1,13 @@
 <claude-mem-context>
 # Memory Context
 
-# [pf2e-visioner] recent context, 2026-05-18 8:24pm GMT+3
+# [pf2e-visioner] recent context, 2026-05-20 9:38am GMT+3
 
 Legend: 🎯session 🔴bugfix 🟣feature 🔄refactor ✅change 🔵discovery ⚖️decision 🚨security_alert 🔐security_note
 Format: ID TIME TYPE TITLE
 Fetch details: get_observations([IDs]) | Search: mem-search skill
 
-Stats: 50 obs (17,679t read) | 221,911t work | 92% savings
+Stats: 50 obs (19,433t read) | 220,094t work | 91% savings
 
 ### May 3, 2026
 S245 Fix stealth cover bonus not appearing on stealth rolls — expanded to include third discovered bug in context routing (May 3 at 9:55 AM)
@@ -19,58 +19,62 @@ S258 Debugging persistent token image flash bug in pf2e-visioner FoundryVTT modu
 S262 Fix PF2E Visioner runtime SyntaxError — missing 'getVisibilityStateLabelKey' export from constants.js crashing token-hud.js visibility manager (May 11 at 10:50 AM)
 S266 Non-AVS performance investigation — identifying hot paths outside the AVS batch system (May 11 at 2:48 PM)
 S272 Fix failing tests in pf2e-visioner FoundryVTT module — cover visualization performance test and related test failures (May 11 at 6:33 PM)
+### May 12, 2026
+S401 Migrate remaining globalThis.game.pf2eVisioner.suppressLightingRefresh accesses in lifecycle.js and ui.js to runtime-state.js, then add BatchProcessor.clearPersistentCaches() method with TDD (May 12 at 10:54 AM)
 ### May 18, 2026
-S401 Migrate remaining globalThis.game.pf2eVisioner.suppressLightingRefresh accesses in lifecycle.js and ui.js to runtime-state.js, then add BatchProcessor.clearPersistentCaches() method with TDD (May 18 at 8:42 AM)
-3952 7:09p 🔵 Complete BatchOrchestrator Policy Architecture — 6 Policies, Each with Dedicated Test
-3953 " 🔵 BatchFinalizationPolicy Interface: Fallback Telemetry and Follow-Up Batch Planning
-3954 7:10p 🟣 BatchCalculationOptionsPolicy Extraction Begun — TDD Red Phase
-3955 " 🟣 BatchCalculationOptionsPolicy Created — TDD Green Phase
-3956 " 🔄 BatchOrchestrator Wired to BatchCalculationOptionsPolicy
-3957 " 🔄 BatchCalculationOptionsPolicy TDD Cycle Complete — 21 Tests Pass, ESLint Clean
-3958 " 🔵 Complete AVS Batch Subsystem: 10 Test Suites, 66 Tests, 7 Policy Modules
-3959 7:11p 🔄 BatchOrchestrator Policy Extraction Complete — 3197 Tests, 307 Suites, ESLint Clean
-3960 7:13p 🔵 VisibilityStateManager Architecture — Next Refactor Candidate Under Exploration
-3961 " 🔄 VisibilityStateManager Debug Stack Capture Consolidated to #debugWithStack Method
-3962 7:14p 🔵 SystemStateProvider Interface — AVS System Gate and Debug Conduit
-3963 " 🔵 recalculateForTokens Still Uses Inline Stack Capture — Missed in #debugWithStack Refactor
-3964 " 🔴 TDD Red Phase: recalculateForTokens Debug Bypass Added to Test
-3965 7:15p 🔴 TDD Red Confirmed: recalculateForTokens Fires Debug Calls Regardless of Debug Mode
-3966 " 🔴 Red Phase Narrowed: Test Assertion Scoped to VSM:recalculateForTokens
-3967 " 🔴 recalculateForTokens Fixed to Use #debugWithStack
-3968 " 🔴 recalculateForTokens Debug Fix — TDD Green, Both Tests Pass
-3969 " 🔴 Positive Debug Test Added for recalculateForTokens
-3970 7:16p 🔵 Full Working Tree Scope: 100+ Files Changed Across Major pf2e-visioner Refactor
-3971 " 🔴 Full Suite Passes After VisibilityStateManager Debug Fix — 3198 Tests
-3972 7:17p 🔵 pf2e-visioner Project Has HANDOVER.md (109KB) and AGENTS.md (6.3KB) Documentation
-3973 " 🔵 AvsInvalidationCoordinator Has #shouldProcessEvents() Guard Called 24+ Times
-3974 7:18p 🟣 getVisibilityBatchProcessDecision Extraction Begun — TDD Red Phase
-3975 7:59p 🔵 improve-codebase-architecture Skill Loaded for pf2e-visioner
-3976 " 🔵 BatchOrchestrator Finalization Logic Extracted to BatchFinalizationPolicy
-3977 8:00p 🟣 TDD Red Phase: BatchFinalizationWorkflow Test Written Before Implementation
-3978 " 🔵 BatchFinalizationWorkflow TDD Red Phase Confirmed
-3979 " 🟣 BatchFinalizationWorkflow Implementation Created (TDD Green Phase)
-3980 " 🟣 BatchFinalizationWorkflow Tests Pass — TDD Green Phase Complete
-3981 8:01p 🔄 BatchOrchestrator Finally-Block Replaced with BatchFinalizationWorkflow
-3982 " 🔄 Full AVS Test Suite Green After BatchOrchestrator Refactor
-3983 8:02p 🔵 BatchOrchestrator Ongoing Large-Scale Refactor: Many Policies and Workflows Already Extracted
-3984 " 🔴 Test Failure: seek-deferred-partition Stale File-Content Assertion After BatchFinalizationWorkflow Extraction
-3985 " 🔴 seek-deferred-partition Test Updated to Track batchComplete Hook Through BatchFinalizationWorkflow
-3986 " 🔴 seek-deferred-partition Test Fix Verified: 16/16 Pass, ESLint Clean
-3987 " 🟣 BatchFinalizationWorkflow Refactor Complete: 3236/3236 Tests Pass
-3988 8:03p 🔵 Pre-Commit State: Two New Files Untracked, Two Modified Files Staged
-3989 8:05p 🔵 BatchOrchestrator.processBatch Instantiates Four Workflow/Lifecycle Objects Inline
-3990 8:06p 🟣 TDD Red: BatchPostResultWorkflow Per-Run flushDetectionBatch Override Test Added
-3991 " 🟣 TDD Red: BatchWorkflowFactory Test Defines Interface for Injected Workflow Orchestration
-3992 " 🔵 TDD Red Confirmed for Both BatchWorkflowFactory and Per-Run flushDetectionBatch Override
-3993 8:07p 🟣 BatchPostResultWorkflow.run() Gains Per-Run flushDetectionBatch Override
-3994 " 🟣 BatchWorkflowFactory and createDefaultBatchWorkflowFactory Implemented
-3995 " 🟣 BatchWorkflowFactory and Per-Run Flush Override TDD Green Phase Complete
-3996 8:08p 🔄 BatchOrchestrator Imports Consolidated: Four Workflow Imports Replaced by createDefaultBatchWorkflowFactory
-3997 " 🔄 BatchOrchestrator Constructor Now Builds workflowFactory with All Adapter Wiring
-3998 " 🔄 BatchOrchestrator.processBatch Fully Wired to WorkflowFactory — Inline Instantiations Removed
-3999 " 🔴 seek-deferred-partition Stale Again: BatchFinalizationWorkflow No Longer Imported by BatchOrchestrator
-4000 8:09p 🔴 seek-deferred-partition Assertion Updated for Three-Level Hook Indirection — All 52 Tests Pass
-4001 8:11p 🔄 BatchWorkflowFactory Refactor Complete: 3238/3238 Tests Pass, ESLint Clean
+S475 Improve pf2e-visioner codebase architecture (performance + coding principles) — session complete, final summary checkpoint (May 18 at 8:42 AM)
+### May 20, 2026
+S476 Continue pf2e-visioner architecture improvements (performance + coding principles) — spatial fallback fix and ongoing investigation of Ezren/Kobold visibility pair (May 20 at 8:06 AM)
+4202 8:55a 🔵 setVisibilityMapsBatch Call Chain: BatchOrchestrator → VisibilityMapService → Store
+4203 " 🔵 Existing Batch Write Return Shape Contract: { written, skipped }
+4204 " 🟣 Implemented Stale Bulk Readback Repair in setVisibilityMapsBatch
+4205 8:56a 🔄 BatchOrchestrator Stale Readback Fallback Logic Removed — Moved to Store Layer
+4206 " 🔄 Deleted BatchOrchestrator Stale Readback Test — Responsibility Moved to Store Layer
+4207 " 🔵 Stale Readback Repair Implementation Not Taking Effect Despite Patch Application
+4208 " 🔵 Dead Code Bug: repairStaleVisibilityBatchReadback Lines Are Unreachable
+4209 " 🔴 Fixed Dead Code: return → const result = await in setVisibilityMapsBatch
+4210 8:57a 🟣 Stale Readback Repair Feature Fully Shipped and Verified
+4211 " 🟣 Full Test Suite Green: 3624 Tests Pass After Stale Readback Repair Refactor
+4212 " 🔵 HoverTooltips.js Architecture: Singleton Class Wrapping a Large Functional API
+4213 8:58a 🔵 HoverTooltips Dynamic Import Pattern Avoids Circular Dependencies
+4214 " 🔄 Removed refreshCurrentHoverIndicators and Its BatchOrchestrator Caller
+4215 " 🔄 refreshCurrentHoverIndicators Removal Fully Verified
+4216 " 🔄 Full Suite Green After HoverTooltips Cleanup: 3624 Tests Pass
+4217 8:59a 🔄 Session Complete: BatchOrchestrator Simplified by 64 Lines, Store Layer Gains Repair Capability
+4218 " 🔵 TokenEventHandler Movement Pipeline: Dual Hook Strategy with Animation Await
+4219 " 🔵 BatchOrchestrator Pipeline: Policy/Workflow Decomposition Pattern
+4220 9:00a 🟣 TDD: New Test for Movement Session Recreation When Moving Flag Survives Cleanup
+4221 9:01a 🔵 Confirmed Bug: Movement Stop Timer Fires With No Session When Moving Flag Survives Cleanup
+4222 " 🔵 Precise Bug Location: notifyTokenMovementStart Skips Session Creation When Already Moving
+4223 " 🟣 Second TDD Test: Movement Stop Timer Should Drain Tokens Even When Session Disappears Mid-Flight
+4224 " 🔵 Both Movement Session Tests Fail (RED): Two Distinct Orphaned Session Paths Confirmed
+4225 " 🔴 Fixed Orphaned Movement Session: notifyTokenMovementStart Now Recreates Missing Sessions
+4226 9:02a 🔴 Movement Session Orphan Bug Fixed: Both Tests GREEN
+4227 " 🔴 Movement Session Fix Verified: 57 Tests Pass, Lint Clean
+4228 " 🔴 Full Suite Green: 3626 Tests Pass After Movement Session Orphan Fix
+4229 " 🔄 Movement Session Fix Incremental Diff: BatchOrchestrator.js +24 -11 Lines
+4256 9:17a ⚖️ Detection Must Not Preserve Stale Undetected/Concealed State After Observed Visibility
+4258 9:18a 🟣 CONTEXT.md Created for PF2E Visioner Domain Language
+4261 9:21a ⚖️ Observed State Must Track Detection Source (Which Sense)
+4262 9:23a ✅ CONTEXT.md Updated with "Boring Observed" Concept and Persistence Rules
+4268 9:28a 🔵 TDD Skill Loaded for pf2e-visioner Batch/Visibility Work
+4269 " 🔵 pf2e-visioner Visibility Map V2: Structured Perception Profiles Replace Legacy String Flags
+4270 " 🔵 VisibilityCalculator.calculateVisibilityBetweenTokens Architecture
+4271 9:29a 🔵 token-flag-map-persistence.js: Generic Multi-Pass Token Flag Batch Writer
+4272 " 🟣 TDD Red Phase: New perception-state.js Store with Compaction Logic
+4273 9:30a 🟣 New perception-state.js Store: Unified Perception + Detection Flag Writer with Compaction
+4274 9:31a 🔴 perception-state.js: Detection Map Over-Deletion Fixed — Preserve Existing Sense When No New Sense
+4275 " 🔄 visibility-map.js Refactored to Delegate to perception-state.js
+4276 " 🔄 visibility-map.js: Removed Duplicate isDefaultProfile and normalizePerceptionProfileMap Implementations
+4277 " 🔵 visibility-map.js Refactor Incomplete: Local Implementations Still Reference Removed Imports
+4278 9:32a 🔄 visibility-map.js: Batch Write Infrastructure Fully Delegated to perception-state.js
+4279 9:33a 🔵 visibility-map.js Still Has Broken Call Sites After Patch: getRawPerceptionProfileMap and setPerceptionProfileFlag Deleted But Still Referenced
+4280 " 🔵 visibility-map.js Still Has Two More Broken Call Sites: setPerceptionProfileFlag and isDefaultProfile
+4281 " 🔴 visibility-map.js Broken Call Sites Fixed: All 78 Store Tests Now Pass
+4282 " 🟣 perception-state.js Refactor Validated: 6 AVS Test Suites Green (59 Tests)
+4283 9:34a ✅ Refactor Complete: visibility-map.js Net -192 Lines; Lint and Git Check Clean
+4284 " 🟣 perception-state.js Extraction: Full 417-Suite Test Run Passes — 3625 Tests Green
+4285 " 🔵 Git Status Reveals perception-state.js Work Is Part of Larger Branch with AVS Core Changes
 
-Access 222k tokens of past work via get_observations([IDs]) or mem-search skill.
+Access 220k tokens of past work via get_observations([IDs]) or mem-search skill.
 </claude-mem-context>

@@ -17,6 +17,7 @@ import {
   tokenPositionUpdated,
   tokenVisibilityAffectingUpdated,
 } from './InvalidationIntents.js';
+
 /**
  * Handles token-related events and updates for the auto-visibility system.
  * Manages position changes, light updates, exclusions, and override validations.
@@ -146,6 +147,20 @@ export class TokenEventHandler {
   async _finalizeCompletedMovement(tokenDoc, movementChanges, context = {}) {
     if (!tokenDoc) return;
 
+    try {
+      this.positionManager.storeUpdatedTokenDoc(tokenDoc.id, {
+        id: tokenDoc.id,
+        x: movementChanges.x ?? tokenDoc.x,
+        y: movementChanges.y ?? tokenDoc.y,
+        width: tokenDoc.width,
+        height: tokenDoc.height,
+        name: tokenDoc.name,
+        elevation: tokenDoc.elevation,
+      });
+    } catch {
+      /* best-effort */
+    }
+
     await this._reapplyRuleElementsAfterMovement(tokenDoc);
 
     this.invalidation.invalidate(tokenMovementCompleted(tokenDoc, movementChanges, context));
@@ -270,9 +285,6 @@ export class TokenEventHandler {
           name: tokenDoc.name,
           elevation: tokenDoc.elevation,
         });
-
-        // Also pin the destination position
-        this.positionManager.pinTokenDestination(tokenDoc, changes);
 
         // If animating (e.g., remote player movement), wait for animation to complete
         if (isAnimating && token?._animation?.promise) {
@@ -532,9 +544,6 @@ export class TokenEventHandler {
     // Store the updated document for position calculations
     this._storeUpdatedDocument(tokenDoc, changes);
 
-    // Pin final destination center for smooth animations
-    this._pinTokenPosition(tokenDoc, changes, changeFlags.positionChanged);
-
     // Handle visibility recalculation
     this._handleVisibilityRecalculation(tokenDoc, changes, changeFlags, context);
 
@@ -556,37 +565,6 @@ export class TokenEventHandler {
       w: tokenDoc.width,
       h: tokenDoc.height,
     });
-  }
-
-  _pinTokenPosition(tokenDoc, changes, positionChanged) {
-    try {
-      if (positionChanged && canvas?.grid?.size) {
-        const cx =
-          (changes.x !== undefined ? changes.x : tokenDoc.x) +
-          (tokenDoc.width * canvas.grid.size) / 2;
-        const cy =
-          (changes.y !== undefined ? changes.y : tokenDoc.y) +
-          (tokenDoc.height * canvas.grid.size) / 2;
-
-        // Use shorter pin duration to reduce visual teleport effect
-        const pinDuration = Math.min(this.positionManager.getPinDurationMs(), 500); // Max 500ms
-
-        this.positionManager.pinPosition(tokenDoc.id, {
-          x: cx,
-          y: cy,
-          elevation: changes.elevation !== undefined ? changes.elevation : tokenDoc.elevation || 0,
-          until: Date.now() + pinDuration,
-        });
-
-        this.systemState.debug('pin-position', tokenDoc.id, {
-          x: cx,
-          y: cy,
-          untilMs: pinDuration,
-        });
-      }
-    } catch {
-      /* ignore */
-    }
   }
 
   _handleVisibilityRecalculation(tokenDoc, changes, changeFlags, context = {}) {

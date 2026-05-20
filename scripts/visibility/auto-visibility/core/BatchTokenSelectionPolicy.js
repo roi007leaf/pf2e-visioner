@@ -1,9 +1,9 @@
 export function isMovementVisibilityBatch({
-  changedTokens = new Set(),
   movementSession = null,
-  lastMovedTokenId = null,
 } = {}) {
-  return !!movementSession || (!!lastMovedTokenId && changedTokens.has(lastMovedTokenId));
+  // lastMovedTokenId is diagnostic/runtime memory, not proof of active movement.
+  // It can outlive movement and otherwise make normal batches act like movement forever.
+  return !!movementSession;
 }
 
 export function resolveVisibleBatchTokens({

@@ -311,6 +311,66 @@ describe('BatchOrchestrator', () => {
     );
   });
 
+  test('movement start recreates missing session when moving flag survived cleanup', async () => {
+    jest.useFakeTimers();
+    const consoleWarn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    orchestrator._syncEphemeralEffectsForUpdates = jest.fn(async () => {});
+    orchestrator._precomputeLighting = jest.fn(async () => ({
+      precomputedLights: null,
+      precomputeStats: { observerUsed: 0, observerMiss: 0, targetUsed: 0, targetMiss: 0 },
+    }));
+    orchestrator._isTokenMoving = true;
+    orchestrator._movementSession = null;
+
+    try {
+      orchestrator.enqueueTokens(new Set(['A']));
+      orchestrator.notifyTokenMovementStart();
+
+      expect(orchestrator._movementSession).toEqual(
+        expect.objectContaining({
+          positionUpdates: 1,
+          tokensAccumulated: expect.any(Set),
+          sessionId: expect.stringContaining('movement-'),
+        }),
+      );
+
+      await jest.advanceTimersByTimeAsync(250);
+      await Promise.resolve();
+
+      expect(consoleWarn).not.toHaveBeenCalled();
+      expect(batchProcessor.process).toHaveBeenCalledTimes(1);
+    } finally {
+      consoleWarn.mockRestore();
+    }
+  });
+
+  test('movement stop drains pending tokens without warning when session disappeared', async () => {
+    jest.useFakeTimers();
+    const consoleWarn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    orchestrator._syncEphemeralEffectsForUpdates = jest.fn(async () => {});
+    orchestrator._precomputeLighting = jest.fn(async () => ({
+      precomputedLights: null,
+      precomputeStats: { observerUsed: 0, observerMiss: 0, targetUsed: 0, targetMiss: 0 },
+    }));
+
+    try {
+      orchestrator.notifyTokenMovementStart();
+      orchestrator.enqueueTokens(new Set(['A']));
+      orchestrator._movementSession = null;
+
+      await jest.advanceTimersByTimeAsync(250);
+      await Promise.resolve();
+
+      expect(consoleWarn).not.toHaveBeenCalled();
+      expect(batchProcessor.process).toHaveBeenCalledTimes(1);
+      expect(batchProcessor.process.mock.calls[0][2]).toEqual(
+        expect.objectContaining({ skipPrecomputedLOS: true, skipViewportFilter: true }),
+      );
+    } finally {
+      consoleWarn.mockRestore();
+    }
+  });
+
   test('enqueue during a scheduled follow-up batch stays pending for the next follow-up', async () => {
     jest.useFakeTimers();
     global.canvas.tokens.placeables.push(createMockToken({ id: 'C', x: 200, y: 0 }));
@@ -442,6 +502,7 @@ describe('BatchOrchestrator', () => {
     const observer = global.canvas.tokens.placeables[0];
     const target = global.canvas.tokens.placeables[1];
     global.canvas.tokens.controlled = [observer];
+    target.renderable = true;
 
     await orchestrator._applyBatchResults({
       updates: [
@@ -455,6 +516,39 @@ describe('BatchOrchestrator', () => {
 
     expect(target.renderable).toBe(false);
     expect(target.visible).toBe(false);
+  });
+
+  test('_applyBatchResults restores controlled observer target when movement reveals it', async () => {
+    const observer = global.canvas.tokens.placeables[0];
+    const target = global.canvas.tokens.placeables[1];
+    global.canvas.tokens.controlled = [observer];
+    target.renderable = true;
+
+    await orchestrator._applyBatchResults({
+      updates: [
+        {
+          observer,
+          target,
+          visibility: 'undetected',
+        },
+      ],
+    });
+
+    expect(target.visible).toBe(false);
+
+    await orchestrator._applyBatchResults({
+      updates: [
+        {
+          observer,
+          target,
+          visibility: 'observed',
+          explicitVisiblePair: true,
+        },
+      ],
+    });
+
+    expect(target.visible).toBe(true);
+    expect(target.renderable).toBe(true);
   });
 
   test('_applyBatchResults records door detection sync without map write', async () => {
@@ -556,6 +650,19 @@ describe('BatchOrchestrator', () => {
 
   test('processBatch ignores stale lastMovedTokenId for non-movement batches', async () => {
     global.game.pf2eVisioner = { lastMovedTokenId: 'stale-token' };
+    orchestrator.viewportFilterService = {
+      isClientAwareFilteringEnabled: jest.fn(() => true),
+      getViewportTokenIdSet: jest.fn(() => new Set(['B'])),
+    };
+
+    await orchestrator.processBatch(new Set(['A']));
+
+    expect(batchProcessor.process).not.toHaveBeenCalled();
+    expect(global.canvas.perception.update).not.toHaveBeenCalled();
+  });
+
+  test('processBatch ignores matching lastMovedTokenId without active movement session', async () => {
+    global.game.pf2eVisioner = { lastMovedTokenId: 'A' };
     orchestrator.viewportFilterService = {
       isClientAwareFilteringEnabled: jest.fn(() => true),
       getViewportTokenIdSet: jest.fn(() => new Set(['B'])),

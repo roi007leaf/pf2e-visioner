@@ -18,6 +18,7 @@ import { LevelsIntegration } from './services/LevelsIntegration.js';
 import { manuallyRestoreAllPartyTokens } from './services/party-token-state.js';
 import { refreshEveryonesPerception } from './services/socket.js';
 import { updateTokenVisuals } from './services/visual-effects.js';
+import { invalidateCaches, CACHE_INVALIDATION_REASONS } from './utils/cache-invalidation.js';
 import {
   cleanupDeletedToken,
   getCoverBetween,
@@ -123,12 +124,83 @@ function scrubManualCoverSources(stateSource) {
 }
 
 function setCommonSceneDataDeletion(update) {
+  setFlagDeletion(update, 'visibilityV2');
   setFlagDeletion(update, 'visibility');
+  setFlagDeletion(update, 'detection');
   setFlagDeletion(update, 'cover');
   setFlagDeletion(update, 'autoCoverMap');
   setFlagDeletion(update, 'stateSource');
   setFlagDeletion(update, 'coverOverride');
   setFlagDeletion(update, 'providesCover');
+}
+
+function getModuleFlags(token) {
+  return token?.document?.flags?.[MODULE_ID] || {};
+}
+
+function remainingFlagKeys(token, allowedKeys = null) {
+  const flags = getModuleFlags(token);
+  const keys = Object.keys(flags);
+  if (!allowedKeys) return keys;
+  const allowed = new Set(allowedKeys);
+  return keys.filter((key) => allowed.has(key));
+}
+
+async function unsetTokenFlagsDirectly(token, flagKeys = []) {
+  const unsetFlag = token?.document?.unsetFlag;
+  if (typeof unsetFlag !== 'function') return;
+
+  for (const flagKey of flagKeys) {
+    try {
+      await unsetFlag.call(token.document, MODULE_ID, flagKey);
+    } catch {}
+  }
+}
+
+async function clearRemainingTokenFlags(tokens, getFlagKeys) {
+  const before = [];
+
+  for (const token of tokens) {
+    const flagKeys = getFlagKeys(token);
+    if (flagKeys.length === 0) continue;
+    before.push({
+      token,
+      flagKeys,
+    });
+    await unsetTokenFlagsDirectly(token, flagKeys);
+  }
+
+  const remaining = before
+    .map(({ token, flagKeys }) => ({
+      tokenName: token?.name,
+      remainingFlags: remainingFlagKeys(token, flagKeys),
+    }))
+    .filter((entry) => entry.remainingFlags.length > 0);
+
+  if (remaining.length > 0) {
+    console.warn(
+      'PF2E Visioner | Some flags were not removed after direct cleanup:',
+      remaining,
+    );
+  }
+
+  if (before.length > 0) {
+    invalidateCaches(CACHE_INVALIDATION_REASONS.manualClear, {
+      reason: 'clear-remaining-token-flags',
+      tokenCount: before.length,
+    });
+  }
+}
+
+async function clearHoverIndicatorsAfterPurge() {
+  try {
+    const {
+      hideAllVisibilityIndicators,
+      hideAllCoverIndicators,
+    } = await import('./services/HoverTooltips.js');
+    hideAllVisibilityIndicators?.();
+    hideAllCoverIndicators?.();
+  } catch {}
 }
 
 /**
@@ -1980,6 +2052,7 @@ export class Pf2eVisionerApi {
         // empty objects, because Foundry can merge `{}` and leave old manual entries.
         setFlagDeletion(update, 'visibilityV2');
         setFlagDeletion(update, 'visibility');
+        setFlagDeletion(update, 'detection');
         setFlagDeletion(update, 'cover');
         setFlagDeletion(update, 'autoCoverMap');
         const stateSource = t.document.getFlag(MODULE_ID, 'stateSource') || {};
@@ -2000,45 +2073,29 @@ export class Pf2eVisionerApi {
       if (allUpdates.length && scene.updateEmbeddedDocuments) {
         try {
           await scene.updateEmbeddedDocuments('Token', allUpdates, { diff: false });
-
-          // Additional verification and cleanup: check if flags are actually gone
-          setTimeout(async () => {
-            const remainingFlags = [];
-            const explicitUpdates = [];
-
-            tokensWithoutRuleElements.forEach((t) => {
-              const flags = t.document.flags?.[MODULE_ID] || {};
-              if (Object.keys(flags).length > 0) {
-                remainingFlags.push({
-                  tokenName: t.name,
-                  remainingFlags: Object.keys(flags),
-                });
-
-                // Build explicit removal updates for stubborn flags
-                const explicitUpdate = { _id: t.id };
-                Object.keys(flags).forEach((flagKey) => {
-                  setFlagDeletion(explicitUpdate, flagKey);
-                });
-                explicitUpdates.push(explicitUpdate);
-              }
-            });
-
-            if (remainingFlags.length > 0) {
-              console.warn(
-                'PF2E Visioner | ⚠️ Some flags were not removed, attempting explicit removal:',
-                remainingFlags,
-              );
-
-              // Try explicit flag removal
-              if (explicitUpdates.length > 0) {
-                try {
-                  await scene.updateEmbeddedDocuments('Token', explicitUpdates, { diff: false });
-                } catch (error) {
-                  console.error('PF2E Visioner | Error in explicit flag removal:', error);
-                }
-              }
-            }
-          }, 100);
+          invalidateCaches(CACHE_INVALIDATION_REASONS.manualClear, {
+            reason: 'clear-all-scene-data-token-flags',
+            updateCount: allUpdates.length,
+          });
+          await clearRemainingTokenFlags(
+            tokensWithoutRuleElements,
+            (token) => remainingFlagKeys(token),
+          );
+          await clearRemainingTokenFlags(
+            tokensWithRuleElements,
+            (token) => remainingFlagKeys(token, [
+              'coverOverride',
+              'waitingSneak',
+              'sneak-speed-effect-id',
+              'invisibility',
+              'visibilityV2',
+              'visibility',
+              'detection',
+              'cover',
+              'autoCoverMap',
+              'stateSource',
+            ]),
+          );
         } catch (error) {
           console.error('PF2E Visioner | Error updating tokens:', error);
         }
@@ -2166,6 +2223,7 @@ export class Pf2eVisionerApi {
       } catch {}
 
       // 6) Rebuild effects and refresh visuals/perception
+      await clearHoverIndicatorsAfterPurge();
       // Removed effects-coordinator: bulk rebuild handled elsewhere
       try {
         await updateTokenVisuals();
@@ -2294,6 +2352,8 @@ export class Pf2eVisionerApi {
           setFlagDeletion(update, 'invisibility');
           setFlagDeletion(update, 'coverOverride');
           setFlagDeletion(update, 'visibilityV2');
+          setFlagDeletion(update, 'visibility');
+          setFlagDeletion(update, 'detection');
           setFlagDeletion(update, 'cover');
           setFlagDeletion(update, 'autoCoverMap');
           setFlagDeletion(update, 'stateSource');
@@ -2327,6 +2387,10 @@ export class Pf2eVisionerApi {
 
         if (flagUpdates.length && scene.updateEmbeddedDocuments) {
           await scene.updateEmbeddedDocuments('Token', flagUpdates, { diff: false });
+          invalidateCaches(CACHE_INVALIDATION_REASONS.manualClear, {
+            reason: 'clear-selected-token-flags',
+            updateCount: flagUpdates.length,
+          });
         }
       } catch {}
 
@@ -2436,6 +2500,24 @@ export class Pf2eVisionerApi {
               }
             }
 
+            // Remove selected tokens from this token's detection map
+            const detectionMap = token.document.getFlag(MODULE_ID, 'detection') || {};
+            const cleanedDetectionMap = { ...detectionMap };
+            hasChanges = false;
+            for (const selectedId of selectedTokenIds) {
+              if (cleanedDetectionMap[selectedId]) {
+                delete cleanedDetectionMap[selectedId];
+                hasChanges = true;
+              }
+            }
+            if (hasChanges) {
+              if (Object.keys(cleanedDetectionMap).length > 0) {
+                update[`flags.${MODULE_ID}.detection`] = cleanedDetectionMap;
+              } else {
+                setFlagDeletion(update, 'detection');
+              }
+            }
+
             // Remove selected tokens from this token's cover map
             const coverMap = token.document.getFlag(MODULE_ID, 'cover') || {};
             const cleanedCoverMap = { ...coverMap };
@@ -2462,6 +2544,10 @@ export class Pf2eVisionerApi {
 
           if (updates.length > 0 && scene.updateEmbeddedDocuments) {
             await scene.updateEmbeddedDocuments('Token', updates, { diff: false });
+            invalidateCaches(CACHE_INVALIDATION_REASONS.manualClear, {
+              reason: 'clear-selected-token-references',
+              updateCount: updates.length,
+            });
           }
         }
       } catch {}
@@ -2558,6 +2644,7 @@ export class Pf2eVisionerApi {
       } catch {}
 
       // 8) Rebuild effects and refresh visuals/perception
+      await clearHoverIndicatorsAfterPurge();
       try {
         await updateTokenVisuals();
       } catch {}

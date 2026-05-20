@@ -149,7 +149,7 @@ describe('TokenEventHandler - Drag to Same Position', () => {
       height: 1,
       name: 'Test Token',
     });
-    expect(mockPositionManager.pinPosition).toHaveBeenCalled();
+    expect(mockPositionManager.pinPosition).not.toHaveBeenCalled();
     expect(mockVisibilityState.markTokenChangedWithSpatialOptimization).toHaveBeenCalled();
   });
 

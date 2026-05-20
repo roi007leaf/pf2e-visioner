@@ -132,4 +132,5 @@ describe('BatchPostResultWorkflow', () => {
     expect(runFlushDetectionBatch).toHaveBeenCalledTimes(1);
     expect(constructorFlushDetectionBatch).not.toHaveBeenCalled();
   });
+
 });

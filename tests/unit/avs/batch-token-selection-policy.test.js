@@ -12,7 +12,7 @@ function token(id, extras = {}) {
 }
 
 describe('BatchTokenSelectionPolicy', () => {
-  test('treats active movement session and current last moved token as movement batches', () => {
+  test('treats only active movement sessions as movement batches', () => {
     expect(
       isMovementVisibilityBatch({
         changedTokens: new Set(['A']),
@@ -27,7 +27,7 @@ describe('BatchTokenSelectionPolicy', () => {
         movementSession: null,
         lastMovedTokenId: 'A',
       }),
-    ).toBe(true);
+    ).toBe(false);
 
     expect(
       isMovementVisibilityBatch({

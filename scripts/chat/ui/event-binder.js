@@ -21,6 +21,29 @@ export function shouldWaitForPlayerSeekTemplate({ message, pending, fallbackTemp
   );
 }
 
+export function applyPendingSeekTemplateToActionData(
+  actionData,
+  { pending = null, fallbackState = null } = {},
+) {
+  const center = pending?.center || fallbackState?.center;
+  const radiusFeet = pending?.radiusFeet || fallbackState?.radiusFeet;
+  if (!center || !radiusFeet) return false;
+
+  actionData.seekTemplateCenter = center;
+  actionData.seekTemplateRadiusFeet = radiusFeet;
+  actionData.seekTemplateType = pending?.templateType || fallbackState?.templateType || 'circle';
+  actionData.seekTemplateLevels = pending?.levels || fallbackState?.levels || [];
+
+  if (pending && typeof pending.rollTotal === 'number') {
+    actionData.roll = {
+      total: pending.rollTotal,
+      dice: [{ total: typeof pending.dieResult === 'number' ? pending.dieResult : undefined }],
+    };
+  }
+
+  return true;
+}
+
 export function bindAutomationEvents(panel, message, actionData) {
   panel.on('click', '[data-action]', async (event) => {
     event.preventDefault();
@@ -141,26 +164,12 @@ export function bindAutomationEvents(panel, message, actionData) {
           const fallbackState = fallbackTemplate
             ? getTemplateStateFromDocument(fallbackTemplate)
             : null;
-          const center = pending?.center || fallbackState?.center;
-          const radiusFeet = pending?.radiusFeet || fallbackState?.radiusFeet;
-          if (center && radiusFeet) {
-            actionData.seekTemplateCenter = center;
-            actionData.seekTemplateRadiusFeet = radiusFeet;
-            actionData.seekTemplateType =
-              pending?.templateType || fallbackState?.templateType || 'circle';
-            actionData.seekTemplateLevels = pending?.levels || fallbackState?.levels || [];
-          }
-          if (pending && typeof pending.rollTotal === 'number') {
-            actionData.roll = {
-              total: pending.rollTotal,
-              dice: [
-                { total: typeof pending.dieResult === 'number' ? pending.dieResult : undefined },
-              ],
-            };
-          }
+          applyPendingSeekTemplateToActionData(actionData, { pending, fallbackState });
           // If we used a fallback scene template and flags are missing, best-effort to write them now
           if (!pending && fallbackTemplate) {
             try {
+              const center = actionData.seekTemplateCenter;
+              const radiusFeet = actionData.seekTemplateRadiusFeet;
               await msg.update({
                 ['flags.pf2e-visioner.seekTemplate']: {
                   center,
@@ -201,6 +210,25 @@ export function bindAutomationEvents(panel, message, actionData) {
           ignoreAllies: game.settings.get('pf2e-visioner', 'ignoreAllies'),
         });
       } else if (applyHandlers[action]) {
+        if (action === 'apply-now-seek') {
+          try {
+            const msg = game.messages.get(actionData.messageId);
+            const pending = msg?.flags?.['pf2e-visioner']?.seekTemplate;
+            let fallbackState = null;
+            if (!pending && game.user.isGM) {
+              const fallbackTemplate = findSeekTemplateDocument({
+                messageId: actionData.messageId,
+                actorId: actionData.actor?.id,
+                userId: msg?.author?.id || game.userId,
+              });
+              fallbackState = fallbackTemplate ? getTemplateStateFromDocument(fallbackTemplate) : null;
+            }
+            applyPendingSeekTemplateToActionData(actionData, { pending, fallbackState });
+          } catch {
+            /* Template hydration is best-effort; SeekAction still validates normally. */
+          }
+        }
+
         // For Point Out, ping the pointed target when applying from the chat panel
         try {
           if (action === 'apply-now-point-out' && game.user.isGM) {

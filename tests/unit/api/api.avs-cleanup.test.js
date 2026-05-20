@@ -57,6 +57,7 @@ describe('API AVS cleanup integration', () => {
         'pf2e-visioner': {
           ruleElementRegistry: { one: true },
           visibilityV2: { target: { detectionState: 'hidden' } },
+          detection: { target: { sense: 'vision', isPrecise: true } },
         },
       },
     });
@@ -72,7 +73,45 @@ describe('API AVS cleanup integration', () => {
       .find((entry) => entry._id === 'rule-token');
 
     expect(update['flags.pf2e-visioner.visibilityV2']).toBe(forcedDeletion);
+    expect(update['flags.pf2e-visioner.detection']).toBe(forcedDeletion);
     expect(Object.prototype.hasOwnProperty.call(update, 'flags.pf2e-visioner')).toBe(false);
+  });
+
+  test('clearAllSceneData clears stale hover indicators after purge', async () => {
+    const hideAllVisibilityIndicators = jest.fn();
+    const hideAllCoverIndicators = jest.fn();
+    jest.doMock('../../../scripts/services/HoverTooltips.js', () => ({
+      hideAllVisibilityIndicators,
+      hideAllCoverIndicators,
+    }));
+
+    const { Pf2eVisionerApi } = await import('../../../scripts/api.js');
+    const ok = await Pf2eVisionerApi.clearAllSceneData();
+
+    expect(ok).toBe(true);
+    expect(hideAllVisibilityIndicators).toHaveBeenCalledTimes(1);
+    expect(hideAllCoverIndicators).toHaveBeenCalledTimes(1);
+  });
+
+  test('clearAllSceneData synchronously unsets stubborn token flags before returning', async () => {
+    const token = global.createMockToken({
+      id: 'stubborn-token',
+      flags: {
+        'pf2e-visioner': {
+          visibilityV2: { target: { detectionState: 'undetected' } },
+          detection: { target: { sense: 'vision', isPrecise: true } },
+        },
+      },
+    });
+    canvas.tokens.placeables = [token];
+
+    const { Pf2eVisionerApi } = await import('../../../scripts/api.js');
+    const ok = await Pf2eVisionerApi.clearAllSceneData();
+
+    expect(ok).toBe(true);
+    expect(token.document.unsetFlag).toHaveBeenCalledWith('pf2e-visioner', 'visibilityV2');
+    expect(token.document.unsetFlag).toHaveBeenCalledWith('pf2e-visioner', 'detection');
+    expect(token.document.flags['pf2e-visioner']).toBeUndefined();
   });
 
   test('clearAllSceneData explicitly removes manual cover flags from tokens without rule elements', async () => {
@@ -227,6 +266,7 @@ describe('API AVS cleanup integration', () => {
       'pf2e-visioner': {
         visibility: { observer: 'hidden' },
         visibilityV2: { observer: { detectionState: 'hidden', hasConcealment: true } },
+        detection: { observer: { sense: 'vision', isPrecise: true } },
       },
     });
     const observer = mkToken('observer', {
@@ -235,6 +275,10 @@ describe('API AVS cleanup integration', () => {
         visibilityV2: {
           selected: { detectionState: 'hidden', hasConcealment: true },
           keep: { detectionState: 'observed', hasConcealment: true },
+        },
+        detection: {
+          selected: { sense: 'vision', isPrecise: true },
+          keep: { sense: 'hearing', isPrecise: false },
         },
       },
     });
@@ -252,6 +296,8 @@ describe('API AVS cleanup integration', () => {
     expect(selectedUpdate).toEqual(
       expect.objectContaining({
         'flags.pf2e-visioner.visibilityV2': expect.anything(),
+        'flags.pf2e-visioner.visibility': expect.anything(),
+        'flags.pf2e-visioner.detection': expect.anything(),
       }),
     );
 
@@ -262,6 +308,17 @@ describe('API AVS cleanup integration', () => {
       expect.objectContaining({
         'flags.pf2e-visioner.visibilityV2': {
           keep: { detectionState: 'observed', hasConcealment: true },
+        },
+      }),
+    );
+
+    const observerDetectionUpdate = canvas.scene.updateEmbeddedDocuments.mock.calls
+      .flatMap((call) => call[1] ?? [])
+      .find((update) => update._id === 'observer' && update['flags.pf2e-visioner.detection']);
+    expect(observerDetectionUpdate).toEqual(
+      expect.objectContaining({
+        'flags.pf2e-visioner.detection': {
+          keep: { sense: 'hearing', isPrecise: false },
         },
       }),
     );

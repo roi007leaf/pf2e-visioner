@@ -1,5 +1,7 @@
 import '../../setup.js';
 
+import fs from 'fs';
+import path from 'path';
 import {
   cleanupDeletedWallVisualsAndRefresh,
   getControlledWallVisualObserverId,
@@ -9,6 +11,17 @@ import {
 } from '../../../scripts/services/Walls/wall-visual-refresh.js';
 
 describe('wall visual refresh service', () => {
+  test('default imports resolve shared visual effect services from the parent folder', () => {
+    const source = fs.readFileSync(
+      path.join(process.cwd(), 'scripts/services/Walls/wall-visual-refresh.js'),
+      'utf8',
+    );
+
+    expect(source).toContain("import('../visual-effects.js')");
+    expect(source).toContain("import('../optimized-visual-effects.js')");
+    expect(source).not.toContain("import('./optimized-visual-effects.js')");
+  });
+
   test('uses the first controlled token id as wall visual observer', () => {
     expect(getControlledWallVisualObserverId([{ id: 'observer' }, { id: 'other' }])).toBe(
       'observer',

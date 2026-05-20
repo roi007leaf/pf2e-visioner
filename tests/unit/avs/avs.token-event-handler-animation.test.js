@@ -147,6 +147,7 @@ describe('TokenEventHandler - animation detection on position change', () => {
     expect(markTokenChangedWithSpatialOptimization).not.toHaveBeenCalled();
     expect(notifyTokenMovementStart).toHaveBeenCalled();
     expect(storeUpdatedTokenDoc).toHaveBeenCalled();
+    expect(pinTokenDestination).not.toHaveBeenCalled();
   });
 
   test('position change with completed animation should process normally', () => {
@@ -371,6 +372,51 @@ describe('TokenEventHandler - animation detection on position change', () => {
       userId: 'user-1',
     });
     expect(queueOverrideValidation).not.toHaveBeenCalled();
+  });
+
+  test('final move stores destination coordinates before completed movement invalidation', async () => {
+    const invalidationCoordinator = { invalidate: jest.fn(() => true) };
+    handler = new TokenEventHandler(
+      systemState,
+      visibilityState,
+      spatialAnalyzer,
+      exclusionManager,
+      overrideValidationManager,
+      positionManager,
+      cacheManager,
+      batchOrchestrator,
+      invalidationCoordinator,
+    );
+    const tokenDoc = makeTokenDoc({
+      width: 2,
+      height: 3,
+      elevation: 7,
+      object: {
+        _animation: null,
+        _dragHandle: null,
+        actor: { id: 'actor-1', items: [] },
+      },
+    });
+
+    await handler.handleMoveToken(
+      tokenDoc,
+      { destination: { x: 250, y: 300 }, chain: [] },
+      { animate: true },
+      'user-1',
+    );
+
+    expect(storeUpdatedTokenDoc).toHaveBeenCalledWith('token-1', {
+      id: 'token-1',
+      x: 250,
+      y: 300,
+      width: 2,
+      height: 3,
+      name: 'TestToken',
+      elevation: 7,
+    });
+    expect(storeUpdatedTokenDoc.mock.invocationCallOrder[0]).toBeLessThan(
+      invalidationCoordinator.invalidate.mock.invocationCallOrder[0],
+    );
   });
 
   test('final move does not process early when updateToken already deferred to animation completion', async () => {

@@ -166,4 +166,47 @@ describe('Visibility Map V2 profile storage', () => {
 
     global.canvas.scene.updateEmbeddedDocuments = originalUpdateEmbeddedDocuments;
   });
+
+  test('setVisibilityMapsBatch repairs stale bulk readback with direct observer writes', async () => {
+    observer = global.createMockToken({
+      id: 'observer',
+      flags: {
+        'pf2e-visioner': {
+          visibilityV2: {
+            target: {
+              detectionState: 'undetected',
+              hasConcealment: false,
+              coverState: 'none',
+              detectionSense: null,
+              awarenessState: null,
+            },
+          },
+        },
+      },
+    });
+    const originalUpdateEmbeddedDocuments = global.canvas.scene.updateEmbeddedDocuments;
+    global.canvas.scene.updateEmbeddedDocuments = jest.fn().mockResolvedValue([]);
+
+    try {
+      const result = await setVisibilityMapsBatch([
+        { token: observer, visibilityMap: { target: 'observed' } },
+      ]);
+
+      expect(result).toEqual(expect.objectContaining({ repaired: 1 }));
+      expect(global.canvas.scene.updateEmbeddedDocuments).toHaveBeenCalledWith(
+        'Token',
+        [
+          {
+            _id: 'observer',
+            'flags.pf2e-visioner.visibilityV2': foundry.data.operators.ForcedDeletion,
+          },
+        ],
+        { diff: false, render: false, animate: false },
+      );
+      expect(observer.document.unsetFlag).toHaveBeenCalledWith('pf2e-visioner', 'visibilityV2');
+      expect(getVisibilityBetween(observer, target)).toBe('observed');
+    } finally {
+      global.canvas.scene.updateEmbeddedDocuments = originalUpdateEmbeddedDocuments;
+    }
+  });
 });
