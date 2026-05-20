@@ -1,0 +1,84 @@
+import { detectionFrameCache, isTokenBlinded } from './detection-visibility-context.js';
+
+export function wrapTokenDocumentPrepareBaseData(wrapped) {
+  wrapped();
+
+  const visionMasterTokenId = detectionFrameCache.getVisionMasterTokenId(this);
+  const mode = detectionFrameCache.getVisionSharingMode(this);
+
+  if (visionMasterTokenId && mode === 'replace' && this.sight) {
+    this.sight.enabled = false;
+  }
+
+  const hasReverseMinionPointingToMe = detectionFrameCache.hasMinionWithMode(this.id, 'reverse');
+  if (hasReverseMinionPointingToMe && this.sight) {
+    this.sight.enabled = false;
+  }
+}
+
+export function wrapTokenVisionSource(wrapped) {
+  const isNormalVisionSource = wrapped();
+  const thisTokenBlinded = isTokenBlinded(this);
+  const controlledTokens = canvas?.tokens?.controlled || [];
+
+  for (const controlledToken of controlledTokens) {
+    const visionMasterTokenId = detectionFrameCache.getVisionMasterTokenId(
+      controlledToken.document,
+    );
+    const mode = detectionFrameCache.getVisionSharingMode(controlledToken.document);
+
+    if (visionMasterTokenId === this.id) {
+      if (thisTokenBlinded) {
+        return false;
+      }
+
+      if (mode === 'one-way' || mode === 'two-way' || mode === 'replace') {
+        return true;
+      }
+    }
+  }
+
+  if (thisTokenBlinded) {
+    return false;
+  }
+
+  const visionMasterTokenId = detectionFrameCache.getVisionMasterTokenId(this.document);
+  const mode = detectionFrameCache.getVisionSharingMode(this.document);
+
+  if (visionMasterTokenId && mode === 'replace') {
+    const masterToken = canvas?.tokens?.get(visionMasterTokenId);
+    if (!masterToken || !isTokenBlinded(masterToken)) {
+      return false;
+    }
+  }
+
+  if (visionMasterTokenId && mode === 'two-way') {
+    const isMasterControlled = controlledTokens.some((ct) => ct.id === visionMasterTokenId);
+    if (isMasterControlled && !isTokenBlinded(this)) {
+      return true;
+    }
+  }
+
+  if (visionMasterTokenId && mode === 'reverse') {
+    const isMasterControlled = controlledTokens.some((ct) => ct.id === visionMasterTokenId);
+    if (isMasterControlled && !isTokenBlinded(this)) {
+      return true;
+    }
+  }
+
+  const hasTwoWayMinion = detectionFrameCache.hasMinionWithMode(this.id, 'two-way');
+  if (hasTwoWayMinion && controlledTokens.some((ct) => ct.id === this.id) && !thisTokenBlinded) {
+    return true;
+  }
+
+  const reverseMinion = detectionFrameCache.getMinionsForMaster(this.id, 'reverse')[0]?.token;
+  if (reverseMinion && controlledTokens.some((ct) => ct.id === this.id)) {
+    if (isTokenBlinded(reverseMinion)) {
+      return isNormalVisionSource;
+    }
+
+    return false;
+  }
+
+  return isNormalVisionSource;
+}

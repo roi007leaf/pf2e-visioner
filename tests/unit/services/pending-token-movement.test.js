@@ -3,15 +3,17 @@ import '../../setup.js';
 import {
   clearPendingTokenMovementPosition,
   completePendingTokenMovement,
-  getPendingMovementBlockedDetectionSources,
   getPendingTokenMovementPosition,
   refreshPendingMovementTokenVisibility,
   restorePendingMovementTokenRendering,
   schedulePendingTokenMovementCompletion,
   setPendingTokenMovementPosition,
-  shouldTemporarilyBlockHiddenDetection,
   shouldTemporarilyForceTokenInvisible,
 } from '../../../scripts/services/pending-token-movement.js';
+import {
+  getPendingMovementBlockedDetectionSources,
+  shouldTemporarilyBlockHiddenDetection,
+} from '../../../scripts/services/pending-movement-detection-gate.js';
 
 describe('pending token movement hidden detection guard', () => {
   let originalCanvas;

@@ -9,7 +9,7 @@ const PENDING_MOVEMENT_POST_COMPLETION_REFRESH_DELAYS_MS = [100, 300, 700, 1200]
 const PENDING_MOVEMENT_MAX_ROUTE_POINTS = 96;
 const PENDING_MOVEMENT_MAX_ACTIVE_ROUTE_POINTS = 256;
 const PENDING_MOVEMENT_VISUAL_POSITION_TOLERANCE_PX = 1;
-const HIDDEN_FROM_OBSERVER_STATES = new Set(['hidden', 'undetected', 'unnoticed']);
+export const HIDDEN_FROM_OBSERVER_STATES = new Set(['hidden', 'undetected', 'unnoticed']);
 const RENDER_HIDDEN_FROM_OBSERVER_STATES = new Set(['hidden', 'undetected', 'unnoticed']);
 const NPC_RENDER_VISIBLE_STATES = new Set(['hidden']);
 const VISIBILITY_V2_FLAG = 'visibilityV2';
@@ -598,7 +598,7 @@ function tokenObjectForId(tokenId) {
   );
 }
 
-function getPendingMovementBlockContext(observer, target) {
+export function getPendingMovementBlockContext(observer, target) {
   const observerId = tokenIdOf(observer);
   const pendingMovementEntry = getPendingTokenMovementEntry(observerId);
   const pendingPosition = pendingMovementEntry?.position ?? null;
@@ -646,7 +646,7 @@ function getPendingMovementBlockContext(observer, target) {
   };
 }
 
-function getPendingMovementHiddenStateContext(target) {
+export function getPendingMovementHiddenStateContext(target) {
   if (!target?.document?.id) return null;
   cleanupExpiredPendingMovements();
 
@@ -696,7 +696,7 @@ function withPendingMovementHiddenStateVisibilityProbe(callback) {
   }
 }
 
-function contextBlocksPendingDetection(context) {
+export function contextBlocksPendingDetection(context) {
   if (!context?.blocked) return false;
   if (!isPendingMovementHiddenStateVisibilityProbe()) return context.blocked;
 
@@ -923,7 +923,7 @@ function suppressDetectionSource(source) {
   };
 }
 
-function withSuppressedDetectionSources(sources, callback) {
+export function withSuppressedDetectionSources(sources, callback) {
   const restoreSuppressedSources = [];
   try {
     for (const source of sources || []) {
@@ -1331,20 +1331,7 @@ export function schedulePendingTokenMovementCompletion(tokenDoc) {
   return true;
 }
 
-export function shouldTemporarilyBlockHiddenDetection(observer, target, visibilityState) {
-  if (!HIDDEN_FROM_OBSERVER_STATES.has(visibilityState)) return false;
-
-  return shouldTemporarilyBlockSightDetection(observer, target);
-}
-
-export function shouldTemporarilyBlockSightDetection(observer, target) {
-  const context = getPendingMovementBlockContext(observer, target);
-  if (!context.active) return false;
-
-  return contextBlocksPendingDetection(context);
-}
-
-function getPendingMovementBlockedDetectionEntries(
+export function getPendingMovementBlockedDetectionEntries(
   target,
   {
     visionSources = canvas?.effects?.visionSources || [],
@@ -1372,32 +1359,6 @@ function getPendingMovementBlockedDetectionEntries(
     seenSources.add(source);
     return true;
   });
-}
-
-export function getPendingMovementBlockedDetectionSources(target, options = {}) {
-  const blockedEntries = getPendingMovementBlockedDetectionEntries(target, options);
-  return blockedEntries.map(({ source }) => source);
-}
-
-export function withPendingMovementBlockedDetectionSourcesSuppressed(target, callback) {
-  const blockedEntries = getPendingMovementBlockedDetectionEntries(target);
-  const blockedSources = blockedEntries.map(({ source }) => source);
-  return withSuppressedDetectionSources(
-    blockedSources,
-    () =>
-      callback?.(
-        blockedSources,
-        blockedEntries,
-        isPendingMovementHiddenStateVisibilityProbe()
-          ? null
-          : getPendingMovementHiddenStateContext(target),
-      ) ??
-      false,
-  );
-}
-
-export function getPendingMovementHiddenStateBlock(target) {
-  return getPendingMovementHiddenStateContext(target);
 }
 
 function pendingHiddenTargetIsVisibleFromCurrentSources(target, hiddenStateContext) {
