@@ -293,6 +293,7 @@ describe('Override indicator should not trigger on controlToken', () => {
 
         global.canvas.tokens.controlled = [];
         jest.advanceTimersByTime(75);
+        jest.runOnlyPendingTimers();
 
         expect(hiddenToken.visible).toBe(true);
         expect(hiddenToken.renderable).toBe(true);

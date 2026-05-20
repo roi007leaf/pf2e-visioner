@@ -1,4 +1,5 @@
 import { MODULE_ID } from '../constants.js';
+import { scheduleCanvasPerceptionUpdate } from '../helpers/perception-refresh.js';
 
 const DEFEAT_SLUGS = new Set(['unconscious', 'dead', 'dying']);
 const DEFEAT_NAME_PARTS = ['dead', 'unconscious', 'dying'];
@@ -39,7 +40,7 @@ async function loadDefaultTakeCoverExpirationService() {
 }
 
 function updateDefaultPerception(updateData) {
-  return globalThis.canvas?.perception?.update?.(updateData);
+  return scheduleCanvasPerceptionUpdate(updateData);
 }
 
 async function clearVisionSharingForDefeatedTokens(defeatedTokens, allTokens, { warn = console.warn } = {}) {

@@ -8,6 +8,7 @@
 import AvsOverrideManager from '../chat/services/infra/AvsOverrideManager.js';
 import { VISIBILITY_STATES } from '../constants.js';
 import { segmentsIntersect } from '../helpers/geometry-utils.js';
+import { scheduleCanvasPerceptionUpdate } from '../helpers/perception-refresh.js';
 import { getVisibility } from '../stores/visibility-map.js';
 import { isValidToken } from '../utils.js';
 import RegionHelper from '../utils/region.js';
@@ -540,8 +541,7 @@ export class VisibilityRegionBehavior extends RegionBehaviorBase {
       }
 
       try {
-        if (typeof canvas !== 'undefined' && canvas?.perception?.update)
-          canvas.perception.update({ refreshVision: true });
+        scheduleCanvasPerceptionUpdate({ refreshVision: true });
       } catch (err) {
         console.error('PF2e Visioner | Error requesting canvas perception refresh:', err);
       }

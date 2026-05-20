@@ -36,6 +36,33 @@ export function canRefreshTokenVisual(token, { requireVisibleTrue = false } = {}
   return true;
 }
 
+export function resolveTokenVisualRefreshTargets(
+  tokens = undefined,
+  { tokensLayer = globalThis.canvas?.tokens } = {},
+) {
+  if (tokens === undefined || tokens === null) return tokensLayer?.placeables || [];
+
+  const values =
+    Array.isArray(tokens) || tokens instanceof Set ? Array.from(tokens) : [tokens];
+  const resolved = [];
+  const seen = new Set();
+
+  for (const value of values) {
+    const token =
+      typeof value === 'string'
+        ? tokensLayer?.get?.(value)
+        : (value?.object ?? value);
+    if (!token) continue;
+
+    const key = token.document?.id ?? token.id ?? token;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    resolved.push(token);
+  }
+
+  return resolved;
+}
+
 export function refreshTokenVisual(
   token,
   { canvasRef = globalThis.canvas, paddingPx, requireVisibleTrue = false } = {},

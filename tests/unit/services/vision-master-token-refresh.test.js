@@ -1,6 +1,10 @@
 import '../../setup.js';
 
 import {
+  clearScheduledCanvasPerceptionUpdate,
+  flushScheduledCanvasPerceptionUpdate,
+} from '../../../scripts/helpers/perception-refresh.js';
+import {
   createVisionMasterTokenRefresh,
   hasVisionMasterTokenIdChange,
 } from '../../../scripts/services/vision-master-token-refresh.js';
@@ -31,6 +35,10 @@ function makeTokenDoc(id, { object = makeToken(id), currentMasterId = null } = {
 describe('vision master token refresh service', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+  });
+
+  afterEach(() => {
+    clearScheduledCanvasPerceptionUpdate();
   });
 
   test('detects explicit vision master flag changes, including null clears', () => {
@@ -81,6 +89,7 @@ describe('vision master token refresh service', () => {
     const result = await controller.refreshAfterUpdate(makeTokenDoc('subject', { object: subject }), {
       flags: { [MODULE_ID]: { visionMasterTokenId: 'new-master' } },
     });
+    flushScheduledCanvasPerceptionUpdate();
 
     expect(result).toEqual({ refreshed: true, oldMasterId: 'old-master', newMasterId: 'new-master' });
     expect(oldMasterIds.has('subject')).toBe(false);
@@ -132,6 +141,7 @@ describe('vision master token refresh service', () => {
     await controller.refreshAfterUpdate(makeTokenDoc('subject', { object: subject }), {
       flags: { [MODULE_ID]: { visionMasterTokenId: null } },
     });
+    flushScheduledCanvasPerceptionUpdate();
 
     expect(subject.initializeVisionSource).toHaveBeenCalledTimes(1);
     expect(canvasRef.perception.update).toHaveBeenCalledTimes(1);

@@ -1,3 +1,5 @@
+import { scheduleCanvasPerceptionUpdate } from '../../helpers/perception-refresh.js';
+
 export class DistanceBasedVisibility {
   static async applyDistanceBasedVisibility(operation, subjectToken) {
     if (!subjectToken) {
@@ -37,7 +39,7 @@ export class DistanceBasedVisibility {
     } else if (window.pf2eVisioner?.services?.autoVisibilitySystem?.recalculateAll) {
       await window.pf2eVisioner.services.autoVisibilitySystem.recalculateAll();
     } else if (canvas?.perception) {
-      canvas.perception.update({ refreshVision: true, refreshOcclusion: true });
+      scheduleCanvasPerceptionUpdate({ refreshVision: true, refreshOcclusion: true });
     }
   }
 

@@ -4,6 +4,7 @@
  */
 
 import { MODULE_ID } from '../../../constants.js';
+import { scheduleCanvasPerceptionUpdate } from '../../../helpers/perception-refresh.js';
 import { refreshEveryonesPerception } from '../../../services/socket.js';
 import {
   getCoverMap,
@@ -821,7 +822,7 @@ export async function applyCurrent(event, button) {
   (async () => {
     try {
       refreshEveryonesPerception();
-      canvas.perception.update({ refreshVision: true });
+      scheduleCanvasPerceptionUpdate({ refreshVision: true });
     } catch (error) {
       console.warn('Token Manager: Error refreshing perception:', error);
     }
@@ -1111,7 +1112,7 @@ export async function applyBoth(_event, _button) {
   (async () => {
     try {
       refreshEveryonesPerception();
-      canvas.perception.update({ refreshVision: true });
+      scheduleCanvasPerceptionUpdate({ refreshVision: true });
     } catch (error) {
       console.warn('Token Manager: Error refreshing perception:', error);
     }

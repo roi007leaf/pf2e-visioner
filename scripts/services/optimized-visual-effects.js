@@ -3,7 +3,10 @@
  * Token refresh stays immediate; shared workflow owns wall visual updates.
  */
 
-import { refreshTokenVisuals } from './token-visual-refresh.js';
+import {
+  refreshTokenVisuals,
+  resolveTokenVisualRefreshTargets,
+} from './token-visual-refresh.js';
 import {
   resolveStrictWallVisualObserver,
   runWallVisualWorkflow,
@@ -12,14 +15,10 @@ import {
 
 export { cleanupDeletedWallVisuals, updateSpecificTokenPairs } from './visual-effects.js';
 
-/**
- * Update token visuals - optimized version with no delays
- */
-export async function updateTokenVisuals() {
+export async function updateTokenVisuals(tokens = undefined) {
   if (!canvas?.tokens) return;
 
-  // No dice animation check - immediate processing
-  refreshTokenVisuals(canvas.tokens.placeables, { requireVisibleTrue: true });
+  refreshTokenVisuals(resolveTokenVisualRefreshTargets(tokens), { requireVisibleTrue: true });
 }
 
 /**

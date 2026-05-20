@@ -3,6 +3,7 @@
  */
 
 import { MODULE_ID } from '../constants.js';
+import { scheduleCanvasPerceptionUpdate } from '../helpers/perception-refresh.js';
 import {
   addTokenEventListener,
   cleanupHoverTooltips,
@@ -33,7 +34,7 @@ async function cleanupVisionSharingForDeletedToken(deletedTokenDoc) {
     }
   }
 
-  canvas.perception.update({ initializeVision: true, refreshLighting: true });
+  scheduleCanvasPerceptionUpdate({ initializeVision: true, refreshLighting: true });
 }
 
 export async function onTokenCreated(scene, tokenDoc) {

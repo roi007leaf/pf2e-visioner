@@ -4,6 +4,7 @@ import {
   isTokenInCurrentViewport,
   refreshTokenVisual,
   refreshTokenVisuals,
+  resolveTokenVisualRefreshTargets,
 } from '../../../scripts/services/token-visual-refresh.js';
 
 describe('token visual refresh helpers', () => {
@@ -92,5 +93,22 @@ describe('token visual refresh helpers', () => {
     const outside = makeToken('outside', 5000, 5000);
 
     expect(refreshTokenVisuals([inside, outside], { canvasRef })).toBe(1);
+  });
+
+  test('resolves and deduplicates targeted refresh inputs', () => {
+    const token = makeToken('token');
+    const other = makeToken('other');
+    token.document.object = token;
+    const tokensLayer = {
+      placeables: [token, other],
+      get: jest.fn((id) => (id === 'token' ? token : null)),
+    };
+
+    expect(
+      resolveTokenVisualRefreshTargets(['token', token.document, token, null], {
+        tokensLayer,
+      }),
+    ).toEqual([token]);
+    expect(resolveTokenVisualRefreshTargets(undefined, { tokensLayer })).toEqual([token, other]);
   });
 });

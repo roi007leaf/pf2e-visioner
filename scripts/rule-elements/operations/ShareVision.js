@@ -1,4 +1,5 @@
 import { MODULE_ID } from '../../constants.js';
+import { scheduleCanvasPerceptionUpdate } from '../../helpers/perception-refresh.js';
 import { PredicateHelper } from '../PredicateHelper.js';
 
 export class ShareVision {
@@ -103,7 +104,7 @@ export class ShareVision {
         }
 
         subjectToken.initializeVisionSource();
-        canvas.perception.update({ initializeVision: true, refreshLighting: true });
+        scheduleCanvasPerceptionUpdate({ initializeVision: true, refreshLighting: true });
       }
     } catch (error) {
       console.error('PF2E Visioner | Failed to apply shareVision:', error);
@@ -151,7 +152,7 @@ export class ShareVision {
         }
 
         subjectToken.initializeVisionSource();
-        canvas.perception.update({ initializeVision: true, refreshLighting: true });
+        scheduleCanvasPerceptionUpdate({ initializeVision: true, refreshLighting: true });
       }
     } catch (error) {
       console.error('PF2E Visioner | Failed to remove shareVision:', error);

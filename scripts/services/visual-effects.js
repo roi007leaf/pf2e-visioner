@@ -36,7 +36,11 @@ import {
   removeSystemHiddenIndicator,
 } from './system-hidden-indicator-rendering.js';
 import { HoverTooltips } from './HoverTooltips.js';
-import { refreshTokenVisual, refreshTokenVisuals } from './token-visual-refresh.js';
+import {
+  refreshTokenVisual,
+  refreshTokenVisuals,
+  resolveTokenVisualRefreshTargets,
+} from './token-visual-refresh.js';
 import {
   buildTokenWallFlagCleanupUpdates,
   cleanupAllWallReferences,
@@ -54,22 +58,48 @@ export { removeSystemHiddenIndicator } from './system-hidden-indicator-rendering
  * This function mainly refreshes rendered token sprites after visibility state changes.
  */
 let updateTokenVisualsPending = false;
+let pendingTokenVisualRefreshTargets = undefined;
 
-export async function updateTokenVisuals() {
+function queueTokenVisualRefresh(targets) {
+  if (targets === null) {
+    pendingTokenVisualRefreshTargets = null;
+    return;
+  }
+  if (pendingTokenVisualRefreshTargets === null) return;
+  if (!pendingTokenVisualRefreshTargets) pendingTokenVisualRefreshTargets = new Set();
+  for (const target of targets || []) pendingTokenVisualRefreshTargets.add(target);
+}
+
+function consumePendingTokenVisualRefreshTargets() {
+  const targets = pendingTokenVisualRefreshTargets;
+  pendingTokenVisualRefreshTargets = undefined;
+  if (targets instanceof Set) return Array.from(targets);
+  return targets;
+}
+
+function refreshTokenVisualTargets(targets) {
+  const tokens = targets === null ? canvas.tokens.placeables : targets;
+  refreshTokenVisuals(tokens);
+}
+
+export async function updateTokenVisuals(tokens = undefined) {
   if (!canvas?.tokens) return;
+  const targets =
+    tokens === undefined || tokens === null ? null : resolveTokenVisualRefreshTargets(tokens);
+
   if (isDiceSoNiceAnimating()) {
-    // Defer refresh until dice animations complete, but avoid multiple pending calls
+    queueTokenVisualRefresh(targets);
     if (!updateTokenVisualsPending) {
       updateTokenVisualsPending = true;
-      // Wait a short time and retry
       await new Promise((resolve) => setTimeout(resolve, 100));
       updateTokenVisualsPending = false;
-      updateTokenVisuals();
+      const pendingTargets = consumePendingTokenVisualRefreshTargets();
+      updateTokenVisuals(pendingTargets === null ? undefined : pendingTargets);
     }
     return;
   }
-  // Minimal per-token refresh; token.visibility managed by PF2e detection wrapper
-  refreshTokenVisuals(canvas.tokens.placeables);
+
+  refreshTokenVisualTargets(targets);
 }
 
 /**

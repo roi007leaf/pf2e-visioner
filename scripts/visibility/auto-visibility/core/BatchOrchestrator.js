@@ -799,15 +799,13 @@ export class BatchOrchestrator {
   async _forcePerceptionRefresh() {
     try {
       // Update canvas perception
-      if (canvas?.perception?.update) {
-        await canvas.perception.update({
-          refreshVision: true,
-          refreshLighting: true,
-          refreshOcclusion: true,
-          refreshSounds: false,
-          initializeVision: false,
-        });
-      }
+      await updateCanvasPerception({
+        refreshVision: true,
+        refreshLighting: true,
+        refreshOcclusion: true,
+        refreshSounds: false,
+        initializeVision: false,
+      });
 
       // Also refresh via socket
       await this._refreshEveryonesPerception();

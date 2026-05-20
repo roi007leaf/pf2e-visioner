@@ -4,6 +4,7 @@
 
 import { FeatsHandler } from '../chat/services/FeatsHandler.js';
 import { COVER_STATES, MODULE_ID } from '../constants.js';
+import { scheduleCanvasPerceptionUpdate } from '../helpers/perception-refresh.js';
 import { onRenderTokenHUD } from '../services/token-hud.js';
 import {
   clearSuppressLightingRefresh,
@@ -1527,7 +1528,7 @@ export function registerUIHooks() {
                   LightingPrecomputer.clearLightingCaches();
                 } catch {}
 
-                canvas.perception.update({
+                scheduleCanvasPerceptionUpdate({
                   refreshVision: true,
                   initializeVision: true,
                   refreshLighting: true,

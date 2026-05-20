@@ -9,6 +9,7 @@
 
 
 import { COVER_STATES, MODULE_ID, VISIBILITY_STATES } from '../constants.js';
+import { scheduleCanvasPerceptionUpdate } from '../helpers/perception-refresh.js';
 import { addTokenBorder, removeTokenBorder } from '../managers/token-manager/borders.js';
 import { getLastMovedTokenId, setLastMovedTokenId } from '../services/runtime-state.js';
 import { overrideToDisplayVisibility } from '../visibility/perception-profile.js';
@@ -516,7 +517,7 @@ class OverrideValidationIndicator {
         // Refresh token visuals and client perception
         try { await apiModule.api.updateTokenVisuals(); } catch { /* noop */ }
         try { apiModule.api.refreshEveryonesPerception(); } catch { /* noop */ }
-        try { canvas?.perception?.update?.({ refreshVision: true }); } catch { /* noop */ }
+        try { scheduleCanvasPerceptionUpdate({ refreshVision: true }); } catch { /* noop */ }
       } catch (e) {
         console.warn('PF2E Visioner | Post-clear AVS refresh failed:', e);
       }

@@ -1,3 +1,5 @@
+import { scheduleCanvasPerceptionUpdate } from '../helpers/perception-refresh.js';
+
 const MODULE_ID = 'pf2e-visioner';
 const VISION_MASTER_TOKEN_ID_FLAG = 'visionMasterTokenId';
 const VISION_MASTER_TOKEN_ID_PATH = `flags.${MODULE_ID}.${VISION_MASTER_TOKEN_ID_FLAG}`;
@@ -76,7 +78,10 @@ export function createVisionMasterTokenRefresh({
       initializeTokenVisionSource(canvas?.tokens?.get?.(newMasterId));
     }
 
-    canvas?.perception?.update?.({ initializeVision: true, refreshLighting: true });
+    scheduleCanvasPerceptionUpdate(
+      { initializeVision: true, refreshLighting: true },
+      { perception: canvas?.perception },
+    );
 
     if (token.controlled && getGame()?.user?.isGM) {
       try {

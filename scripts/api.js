@@ -4,6 +4,7 @@
 
 import { MODULE_ID } from './constants.js';
 import autoCoverSystem from './cover/auto-cover/AutoCoverSystem.js';
+import { scheduleCanvasPerceptionUpdate } from './helpers/perception-refresh.js';
 import { getCoverMap } from './stores/cover-map.js';
 import { VisionerTokenManager } from './managers/token-manager/TokenManager.js';
 import {
@@ -2232,7 +2233,7 @@ export class Pf2eVisionerApi {
         refreshEveryonesPerception();
       } catch {}
       try {
-        canvas.perception.update({ refreshVision: true });
+        scheduleCanvasPerceptionUpdate({ refreshVision: true });
       } catch {}
 
       ui.notifications.info(game.i18n.localize('PF2E_VISIONER.NOTIFICATIONS.SCENE_DATA_CLEARED'));
@@ -2652,7 +2653,7 @@ export class Pf2eVisionerApi {
         refreshEveryonesPerception();
       } catch {}
       try {
-        canvas.perception.update({ refreshVision: true });
+        scheduleCanvasPerceptionUpdate({ refreshVision: true });
       } catch {}
 
       ui.notifications.info(

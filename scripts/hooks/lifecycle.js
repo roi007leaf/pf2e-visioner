@@ -4,6 +4,7 @@
 
 import { injectChatAutomationStyles } from '../chat/chat-automation-styles.js';
 import { MODULE_ID } from '../constants.js';
+import { scheduleCanvasPerceptionUpdate } from '../helpers/perception-refresh.js';
 import { initializeHoverTooltips } from '../services/HoverTooltips.js';
 import {
   hasPendingMovementRenderWork,
@@ -137,7 +138,7 @@ function scheduleNoObserverVisibilityRefresh() {
           ignoreObserverLocks: true,
         });
       }
-      canvas?.perception?.update?.({ initializeVision: true, refreshVision: true });
+      scheduleCanvasPerceptionUpdate({ initializeVision: true, refreshVision: true });
     } catch {
       /* best effort */
     }
@@ -215,7 +216,7 @@ async function refreshVisionSharingTokenIds() {
   }
 
   if (hasVisionSharingTokenIdChanges) {
-    canvas.perception.update({ initializeVision: true, refreshLighting: true });
+    scheduleCanvasPerceptionUpdate({ initializeVision: true, refreshLighting: true });
   }
 }
 
@@ -367,7 +368,7 @@ async function reapplyRuleElementsOnLoad() {
       } else if (window.pf2eVisioner?.services?.autoVisibilitySystem?.recalculateAll) {
         await window.pf2eVisioner.services.autoVisibilitySystem.recalculateAll();
       } else if (canvas?.perception) {
-        canvas.perception.update({ refreshVision: true, refreshOcclusion: true });
+        scheduleCanvasPerceptionUpdate({ refreshVision: true, refreshOcclusion: true });
       }
     } catch (error) {
       log.warn(() => ({
@@ -641,7 +642,7 @@ export async function onCanvasReady() {
 
       // Trigger perception refresh to recalculate visibility based on new conditions
       if (canvas?.perception) {
-        canvas.perception.update({
+        scheduleCanvasPerceptionUpdate({
           refreshVision: true,
           refreshOcclusion: true,
         });
@@ -681,7 +682,7 @@ export async function onCanvasReady() {
 
       // Trigger perception refresh to recalculate visibility based on removed conditions
       if (canvas?.perception) {
-        canvas.perception.update({
+        scheduleCanvasPerceptionUpdate({
           refreshVision: true,
           refreshOcclusion: true,
         });

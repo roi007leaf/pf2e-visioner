@@ -1,5 +1,6 @@
 import '../../setup.js';
 
+import { flushScheduledCanvasPerceptionUpdate } from '../../../scripts/helpers/perception-refresh.js';
 import {
   clearPendingTokenMovementPosition,
   completePendingTokenMovement,
@@ -362,6 +363,7 @@ describe('pending token movement hidden detection guard', () => {
     };
 
     refreshPendingMovementTokenVisibility('observer');
+    flushScheduledCanvasPerceptionUpdate();
 
     expect(observer.refresh).not.toHaveBeenCalled();
     expect(target.refresh).toHaveBeenCalledTimes(1);

@@ -1,3 +1,4 @@
+import { scheduleCanvasPerceptionUpdate } from '../helpers/perception-refresh.js';
 import { getLogger } from '../utils/logger.js';
 import { ActionQualifier } from './operations/ActionQualifier.js';
 import { AuraVisibility } from './operations/AuraVisibility.js';
@@ -331,7 +332,7 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
         } else if (window.pf2eVisioner?.services?.autoVisibilitySystem?.recalculateAll) {
           await window.pf2eVisioner.services.autoVisibilitySystem.recalculateAll();
         } else if (canvas?.perception) {
-          canvas.perception.update({ refreshVision: true, refreshOcclusion: true });
+          scheduleCanvasPerceptionUpdate({ refreshVision: true, refreshOcclusion: true });
         }
       }
     }

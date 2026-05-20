@@ -1,4 +1,5 @@
 import { MODULE_ID } from '../constants.js';
+import { scheduleCanvasPerceptionUpdate } from '../helpers/perception-refresh.js';
 import { profileToLegacyVisibility } from '../visibility/perception-profile.js';
 
 const PENDING_MOVEMENT_TTL_MS = 2500;
@@ -1520,7 +1521,7 @@ export function refreshPendingMovementTokenVisibility(
 
   if (!skipTokenRefresh && !skipPerceptionRefresh) {
     try {
-      canvas?.perception?.update?.({ refreshVision: true, refreshOcclusion: true });
+      scheduleCanvasPerceptionUpdate({ refreshVision: true, refreshOcclusion: true });
     } catch {
       /* best-effort perception refresh */
     }
