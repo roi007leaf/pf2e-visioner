@@ -1,9 +1,9 @@
 import {
   contextBlocksPendingDetection,
+  DETECTION_BLOCKING_VISIBILITY_STATES,
   getPendingMovementBlockContext,
   getPendingMovementBlockedDetectionEntries,
   getPendingMovementHiddenStateContext,
-  HIDDEN_FROM_OBSERVER_STATES,
   isPendingMovementHiddenStateVisibilityProbe,
   shouldBypassPendingMovementVisionerRenderState,
   withSuppressedDetectionSources,
@@ -15,7 +15,7 @@ export {
 };
 
 export function shouldTemporarilyBlockHiddenDetection(observer, target, visibilityState) {
-  if (!HIDDEN_FROM_OBSERVER_STATES.has(visibilityState)) return false;
+  if (!DETECTION_BLOCKING_VISIBILITY_STATES.has(visibilityState)) return false;
 
   return shouldTemporarilyBlockSightDetection(observer, target);
 }

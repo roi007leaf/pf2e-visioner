@@ -372,7 +372,7 @@ describe('pending token movement hidden detection guard', () => {
     });
   });
 
-  test('immediately hides Visioner-hidden loot before scheduled token refresh applies', () => {
+  test('does not force Visioner-hidden loot invisible during movement refresh', () => {
     global.canvas.walls.placeables = [];
     const observer = createMockToken({
       id: 'observer',
@@ -401,10 +401,11 @@ describe('pending token movement hidden detection guard', () => {
     setPendingTokenMovementPosition(observer.document, { x: 0, y: 0 }, [observer]);
     refreshPendingMovementTokenVisibility('observer');
 
-    expect(target.visible).toBe(false);
-    expect(target.mesh.visible).toBe(false);
-    expect(target.detectionFilter).toBeNull();
+    expect(target.visible).toBe(true);
+    expect(target.mesh.visible).toBe(true);
+    expect(target.detectionFilter).toEqual({ id: 'native-filter' });
     expect(target.refresh).toHaveBeenCalledTimes(1);
+    expect(shouldTemporarilyForceTokenInvisible(target)).toBe(false);
   });
 
   test('does not force Visioner-hidden NPC tokens invisible', () => {
@@ -805,7 +806,7 @@ describe('pending token movement hidden detection guard', () => {
       flags: {
         'pf2e-visioner': {
           visibility: {
-            target: 'hidden',
+            target: 'undetected',
           },
         },
       },
@@ -1035,7 +1036,7 @@ describe('pending token movement hidden detection guard', () => {
     expect(target.nameplate.visible).toBe(false);
   });
 
-  test('hides alternate token render surfaces while pending hidden visibility is active', () => {
+  test('hides alternate token render surfaces while pending undetected visibility is active', () => {
     jest.useFakeTimers();
 
     global.canvas.walls.placeables = [];
@@ -1044,7 +1045,7 @@ describe('pending token movement hidden detection guard', () => {
       flags: {
         'pf2e-visioner': {
           visibility: {
-            target: 'hidden',
+            target: 'undetected',
           },
         },
       },
@@ -1099,7 +1100,7 @@ describe('pending token movement hidden detection guard', () => {
     expect(target.turnMarker.mesh.visible).toBe(true);
   });
 
-  test('does not restore token rendering while remembered observer still has target hidden', () => {
+  test('does not restore token rendering while remembered observer still has target undetected', () => {
     jest.useFakeTimers();
 
     global.canvas.walls.placeables = [];
@@ -1108,7 +1109,7 @@ describe('pending token movement hidden detection guard', () => {
       flags: {
         'pf2e-visioner': {
           visibility: {
-            target: 'hidden',
+            target: 'undetected',
           },
         },
       },
@@ -1140,14 +1141,14 @@ describe('pending token movement hidden detection guard', () => {
     expect(target.nameplate.visible).toBe(false);
   });
 
-  test('does not restore token rendering while hidden pending visibility is still active', () => {
+  test('does not restore token rendering while undetected pending visibility is still active', () => {
     global.canvas.walls.placeables = [];
     const observer = createMockToken({
       id: 'observer',
       flags: {
         'pf2e-visioner': {
           visibility: {
-            target: 'hidden',
+            target: 'undetected',
           },
         },
       },
@@ -1190,7 +1191,7 @@ describe('pending token movement hidden detection guard', () => {
       flags: {
         'pf2e-visioner': {
           visibility: {
-            target: 'hidden',
+            target: 'undetected',
             unrelated: 'hidden',
           },
         },
@@ -1231,7 +1232,7 @@ describe('pending token movement hidden detection guard', () => {
       flags: {
         'pf2e-visioner': {
           visibility: {
-            target: 'hidden',
+            target: 'undetected',
           },
         },
       },
@@ -1260,7 +1261,7 @@ describe('pending token movement hidden detection guard', () => {
     expect(global.canvas.perception.update).not.toHaveBeenCalled();
   });
 
-  test('does not restore hidden token rendering during a transient observer lookup gap', () => {
+  test('does not restore undetected token rendering during a transient observer lookup gap', () => {
     jest.useFakeTimers();
 
     global.canvas.walls.placeables = [];
@@ -1269,7 +1270,7 @@ describe('pending token movement hidden detection guard', () => {
       flags: {
         'pf2e-visioner': {
           visibility: {
-            target: 'hidden',
+            target: 'undetected',
           },
         },
       },
@@ -1310,7 +1311,7 @@ describe('pending token movement hidden detection guard', () => {
     expect(target.nameplate.visible).toBe(true);
   });
 
-  test('does not restore hidden token rendering from a remembered hidden force decision', () => {
+  test('does not restore undetected token rendering from a remembered force decision', () => {
     jest.useFakeTimers();
 
     global.canvas.walls.placeables = [];
@@ -1319,7 +1320,7 @@ describe('pending token movement hidden detection guard', () => {
       flags: {
         'pf2e-visioner': {
           visibility: {
-            target: 'hidden',
+            target: 'undetected',
           },
         },
       },
@@ -1366,7 +1367,7 @@ describe('pending token movement hidden detection guard', () => {
     expect(target.nameplate.visible).toBe(true);
   });
 
-  test('does not clear remembered hidden rendering during a later wall-only force check', () => {
+  test('does not clear remembered undetected rendering during a later wall-only force check', () => {
     jest.useFakeTimers();
 
     const observer = createMockToken({
@@ -1376,7 +1377,7 @@ describe('pending token movement hidden detection guard', () => {
       flags: {
         'pf2e-visioner': {
           visibility: {
-            target: 'hidden',
+            target: 'undetected',
           },
         },
       },
@@ -1432,7 +1433,7 @@ describe('pending token movement hidden detection guard', () => {
     expect(target.nameplate.visible).toBe(false);
   });
 
-  test('restores hidden token rendering immediately when observer state becomes observed', () => {
+  test('restores undetected token rendering immediately when observer state becomes observed', () => {
     jest.useFakeTimers();
 
     global.canvas.walls.placeables = [];
@@ -1441,7 +1442,7 @@ describe('pending token movement hidden detection guard', () => {
       flags: {
         'pf2e-visioner': {
           visibility: {
-            target: 'hidden',
+            target: 'undetected',
           },
         },
       },
@@ -1488,7 +1489,7 @@ describe('pending token movement hidden detection guard', () => {
       flags: {
         'pf2e-visioner': {
           visibility: {
-            target: 'hidden',
+            target: 'undetected',
           },
         },
       },
@@ -1573,7 +1574,7 @@ describe('pending token movement hidden detection guard', () => {
       flags: {
         'pf2e-visioner': {
           visibility: {
-            target: 'hidden',
+            target: 'undetected',
           },
         },
       },
@@ -1605,7 +1606,7 @@ describe('pending token movement hidden detection guard', () => {
     expect(target.nameplate.visible).toBe(true);
   });
 
-  test('does not restore token rendering while controlled observer still has target hidden', () => {
+  test('does not restore token rendering while controlled observer still has target undetected', () => {
     jest.useFakeTimers();
 
     global.canvas.walls.placeables = [];
@@ -1614,7 +1615,7 @@ describe('pending token movement hidden detection guard', () => {
       flags: {
         'pf2e-visioner': {
           visibility: {
-            target: 'hidden',
+            target: 'undetected',
           },
         },
       },
@@ -1647,7 +1648,7 @@ describe('pending token movement hidden detection guard', () => {
     expect(target.nameplate.visible).toBe(false);
   });
 
-  test('restores hidden render lock when observer perspective is intentionally cleared', () => {
+  test('restores undetected render lock when observer perspective is intentionally cleared', () => {
     jest.useFakeTimers();
 
     global.canvas.walls.placeables = [];
@@ -1656,7 +1657,7 @@ describe('pending token movement hidden detection guard', () => {
       flags: {
         'pf2e-visioner': {
           visibility: {
-            target: 'hidden',
+            target: 'undetected',
           },
         },
       },

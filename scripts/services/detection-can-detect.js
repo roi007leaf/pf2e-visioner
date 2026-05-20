@@ -44,12 +44,12 @@ export function createCanDetectVisibilityWrapper(threshold) {
       return true;
     }
 
-    if (pendingMovementSightBlocked) {
-      return false;
-    }
-
     if (shouldBypassPendingMovementVisionerRenderState(observerToken, target, visibility)) {
       return true;
+    }
+
+    if (pendingMovementSightBlocked) {
+      return false;
     }
 
     return !reachesVisibilityThreshold(observerToken, target, threshold, {

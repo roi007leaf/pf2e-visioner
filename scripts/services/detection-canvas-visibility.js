@@ -41,7 +41,7 @@ export function wrapCanvasVisibilityTest(wrapped, points, options = {}) {
             ? null
             : hiddenStateContext ||
               blockedEntries.find(
-                ({ context }) => context?.hiddenByVisioner || context?.foundryHidden,
+                ({ context }) => context?.renderHiddenByVisioner || context?.foundryHidden,
               )?.context ||
               getPendingMovementHiddenStateBlock(options?.object);
 

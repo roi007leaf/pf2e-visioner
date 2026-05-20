@@ -9,9 +9,12 @@ const PENDING_MOVEMENT_POST_COMPLETION_REFRESH_DELAYS_MS = [100, 300, 700, 1200]
 const PENDING_MOVEMENT_MAX_ROUTE_POINTS = 96;
 const PENDING_MOVEMENT_MAX_ACTIVE_ROUTE_POINTS = 256;
 const PENDING_MOVEMENT_VISUAL_POSITION_TOLERANCE_PX = 1;
-export const HIDDEN_FROM_OBSERVER_STATES = new Set(['hidden', 'undetected', 'unnoticed']);
-const RENDER_HIDDEN_FROM_OBSERVER_STATES = new Set(['hidden', 'undetected', 'unnoticed']);
-const NPC_RENDER_VISIBLE_STATES = new Set(['hidden']);
+export const DETECTION_BLOCKING_VISIBILITY_STATES = new Set([
+  'hidden',
+  'undetected',
+  'unnoticed',
+]);
+const RENDER_HIDDEN_FROM_OBSERVER_STATES = new Set(['undetected', 'unnoticed']);
 const VISIBILITY_V2_FLAG = 'visibilityV2';
 const PENDING_MOVEMENT_SUPPRESSION_KEY = 'pf2eVisionerPendingMovement';
 const PENDING_MOVEMENT_RENDER_STATE_KEY = '_pf2eVisionerPendingRenderState';
@@ -580,13 +583,14 @@ function getStoredVisibilityState(observer, target) {
   return 'observed';
 }
 
-function visionerStateHidesTargetRendering(target, visibilityState) {
+function visionerStateHidesTargetRendering(visibilityState) {
   if (!RENDER_HIDDEN_FROM_OBSERVER_STATES.has(visibilityState)) return false;
-  if (target?.actor?.type === 'npc' && NPC_RENDER_VISIBLE_STATES.has(visibilityState)) {
-    return false;
-  }
 
   return true;
+}
+
+function visionerStateBlocksPendingDetection(visibilityState) {
+  return DETECTION_BLOCKING_VISIBILITY_STATES.has(visibilityState);
 }
 
 function tokenObjectForId(tokenId) {
@@ -622,9 +626,11 @@ export function getPendingMovementBlockContext(observer, target) {
   const targetPoint = centerForToken(target);
   const wallBlocked = originPoints.some((point) => lineOfSightBlockedByWall(point, targetPoint));
   const visibilityState = getStoredVisibilityState(observer, target);
-  const hiddenByVisioner = visionerStateHidesTargetRendering(target, visibilityState);
+  const hiddenByVisioner = visionerStateBlocksPendingDetection(visibilityState);
+  const renderHiddenByVisioner = visionerStateHidesTargetRendering(visibilityState);
   const foundryHidden = !!tokenDocOf(target)?.hidden;
   const blocked = wallBlocked || hiddenByVisioner || foundryHidden;
+  const renderBlocked = wallBlocked || renderHiddenByVisioner || foundryHidden;
 
   return {
     active: true,
@@ -640,9 +646,11 @@ export function getPendingMovementBlockContext(observer, target) {
     targetPoint,
     visibilityState,
     hiddenByVisioner,
+    renderHiddenByVisioner,
     foundryHidden,
     wallBlocked,
     blocked,
+    renderBlocked,
   };
 }
 
@@ -653,7 +661,7 @@ export function getPendingMovementHiddenStateContext(target) {
   for (const [observerId, entry] of pendingTokenMovementPositions.entries()) {
     const observer = tokenObjectForId(observerId) || entry?.tokenDoc || { id: observerId };
     const visibilityState = getStoredVisibilityState(observer, target);
-    const hiddenByVisioner = visionerStateHidesTargetRendering(target, visibilityState);
+    const hiddenByVisioner = visionerStateHidesTargetRendering(visibilityState);
     const foundryHidden = !!tokenDocOf(target)?.hidden;
     if (!hiddenByVisioner && !foundryHidden) continue;
 
@@ -664,6 +672,7 @@ export function getPendingMovementHiddenStateContext(target) {
       targetName: target?.name ?? target?.document?.name,
       visibilityState,
       hiddenByVisioner,
+      renderHiddenByVisioner: hiddenByVisioner,
       foundryHidden,
       pendingPosition: entry?.position ?? null,
     };
@@ -677,11 +686,10 @@ export function isPendingMovementHiddenStateVisibilityProbe() {
 }
 
 export function shouldBypassPendingMovementVisionerRenderState(observer, target, visibilityState) {
-  if (!NPC_RENDER_VISIBLE_STATES.has(visibilityState)) return false;
-  if (target?.actor?.type !== 'npc') return false;
+  if (visibilityState !== 'hidden') return false;
 
   const context = getPendingMovementBlockContext(observer, target);
-  return context.active && !context.foundryHidden;
+  return context.active && !context.wallBlocked && !context.foundryHidden;
 }
 
 function withPendingMovementHiddenStateVisibilityProbe(callback) {
@@ -739,7 +747,7 @@ function getControlledObserverHiddenStateContext(target) {
     if (!observerId || observerId === targetId) continue;
 
     const visibilityState = getStoredVisibilityState(observer, target);
-    const hiddenByVisioner = visionerStateHidesTargetRendering(target, visibilityState);
+    const hiddenByVisioner = visionerStateHidesTargetRendering(visibilityState);
     if (!hiddenByVisioner && !foundryHidden) continue;
 
     return {
@@ -749,6 +757,7 @@ function getControlledObserverHiddenStateContext(target) {
       targetName: target?.name ?? target?.document?.name,
       visibilityState,
       hiddenByVisioner,
+      renderHiddenByVisioner: hiddenByVisioner,
       foundryHidden,
       controlledObserver: true,
       pendingPosition: getPendingTokenMovementPosition(observerId),
@@ -776,9 +785,11 @@ function normalizeHiddenRenderLockContext(context) {
     targetName: context.targetName,
     visibilityState: context.visibilityState ?? 'observed',
     hiddenByVisioner: !!context.hiddenByVisioner,
+    renderHiddenByVisioner: !!context.renderHiddenByVisioner,
     foundryHidden: !!context.foundryHidden,
     wallBlocked: !!context.wallBlocked,
     blocked: !!context.blocked,
+    renderBlocked: !!context.renderBlocked,
     pendingPosition: clonePoint(context.pendingPosition),
   };
 }
@@ -816,7 +827,7 @@ function getHiddenRenderLockContext(target) {
   if (controlledHiddenStateContext) return controlledHiddenStateContext;
 
   const hiddenBlockedEntry = getPendingMovementBlockedDetectionEntries(target).find(
-    ({ context }) => context.hiddenByVisioner || context.foundryHidden,
+    ({ context }) => context.renderHiddenByVisioner || context.foundryHidden,
   );
   return hiddenBlockedEntry?.context ?? null;
 }
@@ -826,7 +837,7 @@ function getPendingMovementRenderLockContext(target) {
   if (hiddenRenderLockContext) return hiddenRenderLockContext;
 
   const blockedEntry = getPendingMovementBlockedDetectionEntries(target)[0];
-  if (blockedEntry?.context) return blockedEntry.context;
+  if (blockedEntry?.context?.renderBlocked) return blockedEntry.context;
 
   return getRememberedHiddenForceContext(target);
 }
@@ -864,7 +875,7 @@ function getStickyHiddenRenderLockContext(target, state) {
   const observer = tokenObjectForId(lockContext.observerId);
   if (observer) {
     const visibilityState = getStoredVisibilityState(observer, target);
-    const hiddenByVisioner = visionerStateHidesTargetRendering(target, visibilityState);
+    const hiddenByVisioner = visionerStateHidesTargetRendering(visibilityState);
     if (!hiddenByVisioner && !foundryHidden) {
       forgetHiddenForceContext(target);
       return null;
@@ -874,6 +885,7 @@ function getStickyHiddenRenderLockContext(target, state) {
       ...lockContext,
       visibilityState,
       hiddenByVisioner,
+      renderHiddenByVisioner: hiddenByVisioner,
       foundryHidden,
       currentObserverState: true,
       elapsedMs,
@@ -1139,6 +1151,7 @@ export function forceTokenInvisibleForObserverVisibility(observer, target, visib
     targetName: target?.name ?? target?.document?.name,
     visibilityState,
     hiddenByVisioner: true,
+    renderHiddenByVisioner: true,
     foundryHidden: !!tokenDocOf(target)?.hidden,
     wallBlocked: false,
     pendingPosition: getPendingTokenMovementPosition(tokenIdOf(observer)),
@@ -1407,15 +1420,18 @@ export function shouldTemporarilyForceTokenInvisible(
   if (!blockedEntries.length) return false;
 
   const hiddenBlockedEntry = blockedEntries.find(
-    ({ context }) => context.hiddenByVisioner || context.foundryHidden,
+    ({ context }) => context.renderHiddenByVisioner || context.foundryHidden,
   );
   if (hiddenBlockedEntry) {
     rememberHiddenForceContext(target, hiddenBlockedEntry.context);
     return true;
   }
 
-  const blockedSources = blockedEntries.map(({ source }) => source);
-  const renderLockContext = blockedEntries[0]?.context ?? null;
+  const renderBlockedEntries = blockedEntries.filter(({ context }) => context.renderBlocked);
+  if (!renderBlockedEntries.length) return false;
+
+  const blockedSources = renderBlockedEntries.map(({ source }) => source);
+  const renderLockContext = renderBlockedEntries[0]?.context ?? null;
   if (!hasActiveUnblockedObserverDetectionSource(blockedSources)) {
     if (renderLockContext) {
       rememberHiddenForceContext(target, renderLockContext);

@@ -487,7 +487,7 @@ describe('Deafened Detection Wrapper', () => {
             global.canvas = originalCanvas;
         });
 
-        test('basic sight keeps pending hidden NPC detectable when no wall blocks sight', () => {
+        test('basic sight keeps pending hidden target detectable when no wall blocks sight', () => {
             const originalCanvas = global.canvas;
             global.canvas = {
                 grid: { size: 50 },
@@ -1111,7 +1111,7 @@ describe('Deafened Detection Wrapper', () => {
             global.canvas = originalCanvas;
         });
 
-        test('canvas visibility hides Visioner-hidden target from pending observer even when another source sees it', () => {
+        test('canvas visibility keeps Visioner-hidden target visible when another source sees it', () => {
             const originalCanvas = global.canvas;
             const pendingSource = {
                 active: true,
@@ -1173,7 +1173,7 @@ describe('Deafened Detection Wrapper', () => {
 
             expect(canvasVisibilityWrapper(wrapped, [{ x: 150, y: 25 }], {
                 object: target,
-            })).toBe(false);
+            })).toBe(true);
             expect(wrapped).toHaveBeenCalledTimes(1);
             expect(pendingSource.active).toBe(true);
             expect(otherSource.active).toBe(true);
@@ -1182,7 +1182,7 @@ describe('Deafened Detection Wrapper', () => {
             global.canvas = originalCanvas;
         });
 
-        test('canvas visibility hides target hidden to pending observer even without blocked sources', () => {
+        test('canvas visibility keeps target visible when only pending observer has it hidden', () => {
             const originalCanvas = global.canvas;
             const pendingObserver = {
                 id: 'observer',
@@ -1246,7 +1246,7 @@ describe('Deafened Detection Wrapper', () => {
 
             expect(canvasVisibilityWrapper(wrapped, [{ x: 150, y: 25 }], {
                 object: target,
-            })).toBe(false);
+            })).toBe(true);
             expect(wrapped).toHaveBeenCalledTimes(1);
 
             clearPendingTokenMovementPosition('observer');
@@ -1492,7 +1492,7 @@ describe('Deafened Detection Wrapper', () => {
             global.canvas = originalCanvas;
         });
 
-        test('token refresh hides Visioner-hidden target from pending observer even when another source sees it', () => {
+        test('token refresh keeps Visioner-hidden target visible when another source sees it', () => {
             const originalCanvas = global.canvas;
             const pendingSource = {
                 active: true,
@@ -1562,8 +1562,8 @@ describe('Deafened Detection Wrapper', () => {
                 target.mesh.visible = true;
             }));
 
-            expect(target.visible).toBe(false);
-            expect(target.mesh.visible).toBe(false);
+            expect(target.visible).toBe(true);
+            expect(target.mesh.visible).toBe(true);
             expect(pendingSource.active).toBe(true);
             expect(otherSource.active).toBe(true);
 
