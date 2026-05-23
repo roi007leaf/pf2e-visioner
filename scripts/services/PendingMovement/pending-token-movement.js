@@ -7,6 +7,9 @@ import {
   normalizePendingVisibilityState as normalizeVisibilityState,
 } from './pending-movement-final-visibility.js';
 import {
+  createPendingMovementCurrentViewSoundwaveController,
+} from './pending-movement-current-view-soundwave.js';
+import {
   buildPendingMovementRoutePositions,
   centerForToken,
   positionsEqual,
@@ -85,8 +88,6 @@ const pendingTokenMovementCompletionTimeouts = new Map();
 const pendingTokenHiddenForceContexts = new Map();
 const pendingMovementCoreVisibleGraceContexts = new Map();
 const pendingMovementCurrentSightLineGraceContexts = new Map();
-const pendingMovementObservedHiddenSoundwaveGraceContexts = new Map();
-const pendingObservedDetectionFilterSuppressionTokens = new WeakMap();
 let pendingMovementHiddenStateVisibilityProbeDepth = 0;
 let pendingMovementSerial = 0;
 
@@ -119,6 +120,50 @@ const pendingFinalVisibilityController = createPendingMovementFinalVisibilityCon
   tokenIdOf,
   tokenObjectForId,
 });
+const pendingCurrentViewSoundwaveController = createPendingMovementCurrentViewSoundwaveController({
+  clearDetectionFilterVisuals,
+  currentPendingMovementSightLineSeesTarget,
+  detectionBlockingVisibilityStates: DETECTION_BLOCKING_VISIBILITY_STATES,
+  getPendingMovementCanonicalToken,
+  getPendingMovementVisibilityState,
+  getPendingTokenMovementEntry,
+  getPendingTokenMovementPosition,
+  getPredictedFinalVisibilityState,
+  getStoredVisibilityState,
+  graceMs: PENDING_MOVEMENT_RENDER_LOCK_GRACE_MS,
+  hasPendingControlledTokenDragIntent,
+  hasPendingMovementDetectionWork,
+  pendingMovementEntryVisualReachedDestination,
+  restorePendingMovementTokenRendering,
+  shouldUseCoreDetectionDuringPendingMovement,
+  tokenHasDetectionFilterVisual,
+  tokenIdOf,
+  tokenObjectForId,
+});
+const {
+  clearObservedDetectionFilterVisualsForCurrentSightLine,
+  clearObservedDetectionFilterVisualsForCurrentView,
+  clearPredictedObservedTransitionVisualsForCompletingMovement,
+  currentViewObservedDetectionShouldYieldToCore,
+  getCurrentViewObservedDetectionFilterSuppressionContext,
+  getCurrentViewObservers,
+  hasObservedHiddenSoundwaveGraceContexts,
+  hasObservedTransitionDetectionFilterSuppression,
+  hasPendingControlledTokenDragIntentForCurrentView,
+  rememberObservedHiddenSoundwaveGraceForCompletingMovement,
+  predictedObservedMovementReachedDestination,
+  pruneExpiredObservedHiddenSoundwaveGraceContexts,
+  shouldAllowCoreHiddenSoundwaveForCurrentView,
+  shouldPreserveHiddenSoundwaveForCurrentView,
+} = pendingCurrentViewSoundwaveController;
+
+export function suppressPendingMovementDetectionFilterVisualsForObservedTransition(
+  token,
+  options,
+) {
+  return pendingCurrentViewSoundwaveController
+    .suppressPendingMovementDetectionFilterVisualsForObservedTransition(token, options);
+}
 
 function tokenIdOf(tokenOrDoc) {
   return tokenOrDoc?.document?.id || tokenOrDoc?.id || null;
@@ -1243,72 +1288,6 @@ function pruneExpiredCoreVisibleGraceContexts(now = Date.now()) {
   }
 }
 
-function rememberObservedHiddenSoundwaveGraceContext(observer, target, context) {
-  const observerId = tokenIdOf(observer);
-  const targetId = tokenIdOf(target);
-  if (!observerId || !targetId) return null;
-
-  const graceContext = {
-    observerId,
-    observerName: observer?.name ?? observer?.document?.name,
-    targetId,
-    targetName: target?.name ?? target?.document?.name,
-    visibilityState: 'hidden',
-    expiresAt: Date.now() + PENDING_MOVEMENT_RENDER_LOCK_GRACE_MS,
-    ...context,
-  };
-  if (!pendingMovementObservedHiddenSoundwaveGraceContexts.has(targetId)) {
-    pendingMovementObservedHiddenSoundwaveGraceContexts.set(targetId, new Map());
-  }
-  pendingMovementObservedHiddenSoundwaveGraceContexts.get(targetId).set(observerId, graceContext);
-  return graceContext;
-}
-
-function pruneExpiredObservedHiddenSoundwaveGraceContexts(now = Date.now()) {
-  for (const [targetId, contextsByObserver] of pendingMovementObservedHiddenSoundwaveGraceContexts.entries()) {
-    for (const [observerId, context] of contextsByObserver.entries()) {
-      if (!context?.expiresAt || context.expiresAt <= now) {
-        contextsByObserver.delete(observerId);
-      }
-    }
-    if (!contextsByObserver.size) {
-      pendingMovementObservedHiddenSoundwaveGraceContexts.delete(targetId);
-    }
-  }
-}
-
-function getObservedHiddenSoundwaveGraceContextForCurrentView(target) {
-  pruneExpiredObservedHiddenSoundwaveGraceContexts();
-  const targetId = tokenIdOf(target);
-  if (!targetId) return null;
-
-  const contextsByObserver = pendingMovementObservedHiddenSoundwaveGraceContexts.get(targetId);
-  if (!contextsByObserver) return null;
-
-  for (const observer of getCurrentViewObservers()) {
-    const observerId = tokenIdOf(observer);
-    if (!observerId) continue;
-
-    const context = contextsByObserver.get(observerId);
-    if (!context) continue;
-
-    const storedVisibilityState = getStoredVisibilityState(observer, target);
-    if (storedVisibilityState !== 'observed' && storedVisibilityState !== 'concealed') {
-      contextsByObserver.delete(observerId);
-      continue;
-    }
-    if (currentPendingMovementSightLineSeesTarget(observer, target)) {
-      contextsByObserver.delete(observerId);
-      continue;
-    }
-
-    return context;
-  }
-
-  if (!contextsByObserver.size) pendingMovementObservedHiddenSoundwaveGraceContexts.delete(targetId);
-  return null;
-}
-
 function getCoreVisibleGraceContext(observer, target, visibilityState) {
   if (!RENDER_HIDDEN_FROM_OBSERVER_STATES.has(visibilityState)) return null;
   if (tokenDocOf(target)?.hidden) return null;
@@ -1400,160 +1379,12 @@ function getVisibleCoreGraceContextForTarget(target) {
   return null;
 }
 
-function getCurrentViewObservers() {
-  const observers = [];
-  const seen = new Set();
-  const add = (token) => {
-    const tokenId = tokenIdOf(token);
-    if (!tokenId || seen.has(tokenId)) return;
-    seen.add(tokenId);
-    observers.push(token);
-  };
-
-  add(canvas?.tokens?._draggedToken);
-  for (const token of canvas?.tokens?.controlled || []) add(token);
-  return observers;
-}
-
-function hasPendingControlledTokenDragIntentForCurrentView() {
-  return getCurrentViewObservers().some((observer) => hasPendingControlledTokenDragIntent(observer));
-}
-
-function shouldPreserveHiddenSoundwaveForCurrentView(target) {
-  if (!target?.document?.id) return false;
-
-  for (const observer of getCurrentViewObservers()) {
-    const predictedFinalState = getPredictedFinalVisibilityState(observer, target);
-    if (
-      predictedFinalState &&
-      !DETECTION_BLOCKING_VISIBILITY_STATES.has(predictedFinalState)
-    ) {
-      continue;
-    }
-
-    const storedVisibilityState = getStoredVisibilityState(observer, target);
-    if (storedVisibilityState === 'hidden') {
-      if (!currentPendingMovementSightLineSeesTarget(observer, target)) return true;
-      continue;
-    }
-    if (storedVisibilityState !== 'observed' && storedVisibilityState !== 'concealed') continue;
-    if (!tokenHasDetectionFilterVisual(target)) continue;
-    if (!currentPendingMovementSightLineSeesTarget(observer, target)) return true;
-  }
-
-  return false;
-}
-
-function shouldAllowCoreHiddenSoundwaveForCurrentView(target) {
-  if (!target?.document?.id) return false;
-
-  for (const observer of getCurrentViewObservers()) {
-    const storedVisibilityState = getStoredVisibilityState(observer, target);
-    if (storedVisibilityState !== 'observed' && storedVisibilityState !== 'concealed') continue;
-    if (getPendingMovementVisibilityState(observer, target) !== 'hidden') continue;
-    if (!shouldUseCoreDetectionDuringPendingMovement(observer, target)) continue;
-    if (!currentPendingMovementSightLineSeesTarget(observer, target)) return true;
-  }
-
-  return false;
-}
-
-function currentObservedSightLineSeesTarget(target) {
-  if (!target?.document?.id) return false;
-
-  for (const observer of getCurrentViewObservers()) {
-    const visibilityState = getPendingMovementVisibilityState(observer, target);
-    if (visibilityState !== 'observed' && visibilityState !== 'concealed') continue;
-    if (currentPendingMovementSightLineSeesTarget(observer, target)) return true;
-  }
-
-  return false;
-}
-
 function pendingMovementEntryVisualReachedDestination(tokenOrDoc, entry) {
   if (!entry?.position) return false;
   const tokenId = tokenIdOf(tokenOrDoc);
   const token = tokenOrDoc?.document ? tokenOrDoc : tokenObjectForId(tokenId);
   if (!token) return false;
   return tokenVisualPositionReached(token, entry.position);
-}
-
-function predictedObservedMovementReachedDestination(observer, target) {
-  const visibilityObserver = getPendingMovementCanonicalToken(observer);
-  const visibilityTarget = getPendingMovementCanonicalToken(target);
-  const observerId = tokenIdOf(visibilityObserver);
-  const targetId = tokenIdOf(visibilityTarget);
-  if (!observerId || !targetId) return false;
-
-  const observerEntry = getPendingTokenMovementEntry(observerId);
-  const observerFinalState = observerEntry?.finalVisibilityStatesByTargetId?.get(targetId);
-  if (
-    predictedObservedTransitionState(observerFinalState) &&
-    pendingMovementEntryVisualReachedDestination(visibilityObserver, observerEntry)
-  ) {
-    return true;
-  }
-
-  const targetEntry = getPendingTokenMovementEntry(targetId);
-  const targetFinalState = targetEntry?.finalVisibilityStatesByObserverId?.get(observerId);
-  return (
-    predictedObservedTransitionState(targetFinalState) &&
-    pendingMovementEntryVisualReachedDestination(visibilityTarget, targetEntry)
-  );
-}
-
-function currentViewObservedDetectionShouldYieldToCore(observer, target) {
-  if (predictedObservedMovementReachedDestination(observer, target)) return false;
-
-  return (
-    (hasPendingMovementDetectionWork() || hasPendingControlledTokenDragIntent(observer)) &&
-    !currentPendingMovementSightLineSeesTarget(observer, target)
-  );
-}
-
-function getCurrentViewObservedDetectionFilterSuppressionContext(target) {
-  if (!target?.document?.id) return null;
-
-  for (const observer of getCurrentViewObservers()) {
-    const visibilityState = getPendingMovementVisibilityState(observer, target);
-    if (visibilityState !== 'observed' && visibilityState !== 'concealed') continue;
-    if (currentViewObservedDetectionShouldYieldToCore(observer, target)) continue;
-
-    return {
-      active: true,
-      observerId: tokenIdOf(observer),
-      observerName: observer?.name ?? observer?.document?.name,
-      targetId: tokenIdOf(target),
-      targetName: target?.name ?? target?.document?.name,
-      visibilityState,
-      observedByVisioner: true,
-      currentViewObserver: true,
-    };
-  }
-
-  return null;
-}
-
-function clearObservedDetectionFilterVisualsForCurrentSightLine(target) {
-  if (!tokenHasDetectionFilterVisual(target)) return false;
-  if (!currentObservedSightLineSeesTarget(target)) return false;
-
-  restorePendingMovementTokenRendering(target, { ignoreObservedGrace: true });
-  clearDetectionFilterVisuals(target);
-  suppressPendingMovementDetectionFilterVisualsForObservedTransition(target);
-  return true;
-}
-
-function clearObservedDetectionFilterVisualsForCurrentView(target) {
-  if (!tokenHasDetectionFilterVisual(target)) return false;
-  if (getObservedHiddenSoundwaveGraceContextForCurrentView(target)) return false;
-  if (shouldAllowCoreHiddenSoundwaveForCurrentView(target)) return false;
-  if (!getCurrentViewObservedDetectionFilterSuppressionContext(target)) return false;
-
-  restorePendingMovementTokenRendering(target, { ignoreObservedGrace: true });
-  clearDetectionFilterVisuals(target);
-  suppressPendingMovementDetectionFilterVisualsForObservedTransition(target);
-  return true;
 }
 
 function restoreCoreVisibleGraceRendering(token) {
@@ -1573,27 +1404,6 @@ function restoreCoreVisibleGraceRendering(token) {
   } catch {
     return false;
   }
-}
-
-export function suppressPendingMovementDetectionFilterVisualsForObservedTransition(
-  token,
-  { durationMs = 300 } = {},
-) {
-  if (!token?.document?.id) return false;
-  const duration = Math.max(0, Number(durationMs) || 0);
-  pendingObservedDetectionFilterSuppressionTokens.set(token, Date.now() + duration);
-  return true;
-}
-
-function hasObservedTransitionDetectionFilterSuppression(token) {
-  if (!token) return false;
-
-  const expiresAt = pendingObservedDetectionFilterSuppressionTokens.get(token);
-  if (!expiresAt) return false;
-  if (expiresAt > Date.now()) return true;
-
-  pendingObservedDetectionFilterSuppressionTokens.delete(token);
-  return false;
 }
 
 function suppressDetectionFilterProperty(token, { value = null } = {}) {
@@ -1828,85 +1638,6 @@ export function withSuppressedPendingMovementDetectionFilterRender(token, callba
       clearDetectionFilterVisuals(token);
     }
   }
-}
-
-function predictedObservedTransitionState(visibilityState) {
-  return visibilityState === 'observed' || visibilityState === 'concealed';
-}
-
-function clearPredictedObservedTransitionVisuals(token) {
-  if (!token?.document?.id) return false;
-
-  restorePendingMovementTokenRendering(token, { ignoreObservedGrace: true });
-  clearDetectionFilterVisuals(token);
-  suppressPendingMovementDetectionFilterVisualsForObservedTransition(token);
-  return true;
-}
-
-function clearPredictedObservedTransitionVisualsForCompletingMovement(tokenId, entry) {
-  if (!tokenId || !entry) return false;
-
-  const currentViewObserverIds = new Set(getCurrentViewObservers().map((observer) => tokenIdOf(observer)));
-  let cleared = false;
-
-  if (currentViewObserverIds.has(tokenId)) {
-    for (const [targetId, visibilityState] of entry.finalVisibilityStatesByTargetId || []) {
-      if (!predictedObservedTransitionState(visibilityState)) continue;
-      cleared = clearPredictedObservedTransitionVisuals(tokenObjectForId(targetId)) || cleared;
-    }
-  }
-
-  for (const [observerId, visibilityState] of entry.finalVisibilityStatesByObserverId || []) {
-    if (!currentViewObserverIds.has(observerId)) continue;
-    if (!predictedObservedTransitionState(visibilityState)) continue;
-    cleared = clearPredictedObservedTransitionVisuals(tokenObjectForId(tokenId)) || cleared;
-  }
-
-  return cleared;
-}
-
-function rememberObservedHiddenSoundwaveGrace(observer, target, visibilityState) {
-  if (visibilityState !== 'hidden') return false;
-  if (!observer || !target?.document?.id) return false;
-  if (!tokenHasDetectionFilterVisual(target)) return false;
-
-  const storedVisibilityState = getStoredVisibilityState(observer, target);
-  if (storedVisibilityState !== 'observed' && storedVisibilityState !== 'concealed') return false;
-  if (currentPendingMovementSightLineSeesTarget(observer, target)) return false;
-
-  rememberObservedHiddenSoundwaveGraceContext(observer, target, {
-    storedVisibilityState,
-    pendingPosition: getPendingTokenMovementPosition(tokenIdOf(observer)),
-  });
-  return true;
-}
-
-function rememberObservedHiddenSoundwaveGraceForCompletingMovement(tokenId, entry) {
-  if (!tokenId || !entry) return false;
-
-  const currentViewObserverIds = new Set(getCurrentViewObservers().map((observer) => tokenIdOf(observer)));
-  let remembered = false;
-
-  if (currentViewObserverIds.has(tokenId)) {
-    const observer = tokenObjectForId(tokenId) || entry?.tokenDoc || null;
-    for (const [targetId, visibilityState] of entry.finalVisibilityStatesByTargetId || []) {
-      remembered =
-        rememberObservedHiddenSoundwaveGrace(observer, tokenObjectForId(targetId), visibilityState) ||
-        remembered;
-    }
-  }
-
-  for (const [observerId, visibilityState] of entry.finalVisibilityStatesByObserverId || []) {
-    if (!currentViewObserverIds.has(observerId)) continue;
-    remembered =
-      rememberObservedHiddenSoundwaveGrace(
-        tokenObjectForId(observerId),
-        tokenObjectForId(tokenId),
-        visibilityState,
-      ) || remembered;
-  }
-
-  return remembered;
 }
 
 function forgetHiddenForceContext(target) {
@@ -2777,7 +2508,7 @@ export function hasPendingMovementRenderWork() {
   if (pendingTokenHiddenForceContexts.size > 0) return true;
   if (pendingMovementCoreVisibleGraceContexts.size > 0) return true;
   if (pendingMovementCurrentSightLineGraceContexts.size > 0) return true;
-  if (pendingMovementObservedHiddenSoundwaveGraceContexts.size > 0) return true;
+  if (hasObservedHiddenSoundwaveGraceContexts()) return true;
   if (!hasPendingMovementRenderLocks()) return false;
 
   const sceneTokens = new Set(canvas?.tokens?.placeables || []);

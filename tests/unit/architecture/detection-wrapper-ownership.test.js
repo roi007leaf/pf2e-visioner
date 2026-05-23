@@ -64,14 +64,14 @@ describe('detection wrapper module ownership', () => {
     expect(fs.existsSync(renderLockPath)).toBe(true);
     for (const modulePath of tokenVisibilityModulePaths) {
       const source = fs.readFileSync(modulePath, 'utf8');
-      expect(source).toContain("from './pending-movement-render-lock.js'");
-      expect(source).not.toContain("from './pending-token-movement.js'");
+      expect(source).toContain("from './PendingMovement/pending-movement-render-lock.js'");
+      expect(source).not.toContain("from './PendingMovement/pending-token-movement.js'");
     }
   });
 
   test('pending movement render-state module owns render-lock storage', () => {
-    const pendingMovementPath = path.join(servicesRoot, 'pending-token-movement.js');
-    const renderStatePath = path.join(servicesRoot, 'pending-movement-render-state.js');
+    const pendingMovementPath = path.join(servicesRoot, 'PendingMovement/pending-token-movement.js');
+    const renderStatePath = path.join(servicesRoot, 'PendingMovement/pending-movement-render-state.js');
 
     expect(fs.existsSync(renderStatePath)).toBe(true);
 
@@ -81,15 +81,15 @@ describe('detection wrapper module ownership', () => {
     expect(renderStateSource).toContain('PENDING_MOVEMENT_RENDER_STATE_KEY');
     expect(renderStateSource).toContain('pendingMovementRenderLockedTokens');
     expect(renderStateSource).toContain('capturePendingRenderState');
-    expect(pendingSource).toContain("from './pending-movement-render-state.js'");
+    expect(pendingSource).toContain("from './PendingMovement/pending-movement-render-state.js'");
     expect(pendingSource).not.toContain('const PENDING_MOVEMENT_RENDER_STATE_KEY');
     expect(pendingSource).not.toContain('const pendingMovementRenderLockedTokens');
     expect(pendingSource).not.toContain('function tokenInterfaceSurfaces');
   });
 
   test('pending movement geometry module owns route sampling and position math', () => {
-    const pendingMovementPath = path.join(servicesRoot, 'pending-token-movement.js');
-    const geometryPath = path.join(servicesRoot, 'pending-movement-geometry.js');
+    const pendingMovementPath = path.join(servicesRoot, 'PendingMovement/pending-token-movement.js');
+    const geometryPath = path.join(servicesRoot, 'PendingMovement/pending-movement-geometry.js');
 
     expect(fs.existsSync(geometryPath)).toBe(true);
 
@@ -100,7 +100,7 @@ describe('detection wrapper module ownership', () => {
     expect(geometrySource).toContain('buildPendingMovementRoutePositions');
     expect(geometrySource).toContain('sampleMovementRoutePoints');
     expect(geometrySource).toContain('tokenSamplePoints');
-    expect(pendingSource).toContain("from './pending-movement-geometry.js'");
+    expect(pendingSource).toContain("from './PendingMovement/pending-movement-geometry.js'");
     expect(pendingSource).not.toContain('function buildPendingMovementRoutePositions');
     expect(pendingSource).not.toContain('function sampleMovementRoutePoints');
     expect(pendingSource).not.toContain('function tokenSamplePoints');
@@ -108,8 +108,8 @@ describe('detection wrapper module ownership', () => {
   });
 
   test('pending movement refresh scheduler owns timeout maps and delayed refresh cadence', () => {
-    const pendingMovementPath = path.join(servicesRoot, 'pending-token-movement.js');
-    const schedulerPath = path.join(servicesRoot, 'pending-movement-refresh-scheduler.js');
+    const pendingMovementPath = path.join(servicesRoot, 'PendingMovement/pending-token-movement.js');
+    const schedulerPath = path.join(servicesRoot, 'PendingMovement/pending-movement-refresh-scheduler.js');
 
     expect(fs.existsSync(schedulerPath)).toBe(true);
 
@@ -120,7 +120,7 @@ describe('detection wrapper module ownership', () => {
     expect(schedulerSource).toContain('pendingMovementAnimationRefreshTimeouts');
     expect(schedulerSource).toContain('pendingMovementPostCompletionRefreshTimeouts');
     expect(schedulerSource).toContain('pendingMovementDetectionFilterRestoreTimeouts');
-    expect(pendingSource).toContain("from './pending-movement-refresh-scheduler.js'");
+    expect(pendingSource).toContain("from './PendingMovement/pending-movement-refresh-scheduler.js'");
     expect(pendingSource).not.toContain('const PENDING_MOVEMENT_ANIMATION_REFRESH_DELAYS_MS');
     expect(pendingSource).not.toContain('const pendingMovementAnimationRefreshTimeouts');
     expect(pendingSource).not.toContain('function addAnimationRefreshTimeout');
@@ -129,8 +129,8 @@ describe('detection wrapper module ownership', () => {
   });
 
   test('pending movement wall-blocking module owns sight and sound ray checks', () => {
-    const pendingMovementPath = path.join(servicesRoot, 'pending-token-movement.js');
-    const wallBlockingPath = path.join(servicesRoot, 'pending-movement-wall-blocking.js');
+    const pendingMovementPath = path.join(servicesRoot, 'PendingMovement/pending-token-movement.js');
+    const wallBlockingPath = path.join(servicesRoot, 'PendingMovement/pending-movement-wall-blocking.js');
 
     expect(fs.existsSync(wallBlockingPath)).toBe(true);
 
@@ -141,7 +141,7 @@ describe('detection wrapper module ownership', () => {
     expect(wallBlockingSource).toContain('lineOfSoundBlockedByWall');
     expect(wallBlockingSource).toContain('doesWallSenseBlockFromPoint');
     expect(wallBlockingSource).toContain('getWallSenseTypes');
-    expect(pendingSource).toContain("from './pending-movement-wall-blocking.js'");
+    expect(pendingSource).toContain("from './PendingMovement/pending-movement-wall-blocking.js'");
     expect(pendingSource).not.toContain("from '../helpers/wall-sense-utils.js'");
     expect(pendingSource).not.toContain('function wallBlocksSight');
     expect(pendingSource).not.toContain('function wallBlocksSound');
@@ -149,8 +149,8 @@ describe('detection wrapper module ownership', () => {
   });
 
   test('pending movement detection-filter visuals module owns visual capture and clearing', () => {
-    const pendingMovementPath = path.join(servicesRoot, 'pending-token-movement.js');
-    const visualsPath = path.join(servicesRoot, 'pending-movement-detection-filter-visuals.js');
+    const pendingMovementPath = path.join(servicesRoot, 'PendingMovement/pending-token-movement.js');
+    const visualsPath = path.join(servicesRoot, 'PendingMovement/pending-movement-detection-filter-visuals.js');
 
     expect(fs.existsSync(visualsPath)).toBe(true);
 
@@ -161,7 +161,7 @@ describe('detection wrapper module ownership', () => {
     expect(visualsSource).toContain('restorePendingMovementDetectionFilterState');
     expect(visualsSource).toContain('clearDetectionFilterVisuals');
     expect(visualsSource).toContain('tokenHasDetectionFilterVisual');
-    expect(pendingSource).toContain("from './pending-movement-detection-filter-visuals.js'");
+    expect(pendingSource).toContain("from './PendingMovement/pending-movement-detection-filter-visuals.js'");
     expect(pendingSource).not.toContain('function captureDetectionFilterMeshState');
     expect(pendingSource).not.toContain('function tokenHasDetectionFilterVisual');
     expect(pendingSource).not.toContain('function clearDetectionFilterVisuals');
@@ -169,8 +169,8 @@ describe('detection wrapper module ownership', () => {
   });
 
   test('pending movement controlled-drag intent module owns intent state and timers', () => {
-    const pendingMovementPath = path.join(servicesRoot, 'pending-token-movement.js');
-    const dragIntentPath = path.join(servicesRoot, 'pending-movement-controlled-drag-intent.js');
+    const pendingMovementPath = path.join(servicesRoot, 'PendingMovement/pending-token-movement.js');
+    const dragIntentPath = path.join(servicesRoot, 'PendingMovement/pending-movement-controlled-drag-intent.js');
 
     expect(fs.existsSync(dragIntentPath)).toBe(true);
 
@@ -182,7 +182,7 @@ describe('detection wrapper module ownership', () => {
     expect(dragIntentSource).toContain('__pf2eVisionerPendingControlledDragIntent');
     expect(dragIntentSource).toContain('primeControlledTokenDragIntent');
     expect(dragIntentSource).toContain('releaseControlledTokenDragIntent');
-    expect(pendingSource).toContain("from './pending-movement-controlled-drag-intent.js'");
+    expect(pendingSource).toContain("from './PendingMovement/pending-movement-controlled-drag-intent.js'");
     expect(pendingSource).not.toContain('const PENDING_MOVEMENT_CONTROLLED_DRAG_REFRESH_DELAYS_MS');
     expect(pendingSource).not.toContain('const pendingControlledTokenDragIntentState');
     expect(pendingSource).not.toContain('function clearControlledTokenDragIntentRefreshes');
@@ -190,8 +190,8 @@ describe('detection wrapper module ownership', () => {
   });
 
   test('pending movement observer-senses module owns condition and sense probes', () => {
-    const pendingMovementPath = path.join(servicesRoot, 'pending-token-movement.js');
-    const observerSensesPath = path.join(servicesRoot, 'pending-movement-observer-senses.js');
+    const pendingMovementPath = path.join(servicesRoot, 'PendingMovement/pending-token-movement.js');
+    const observerSensesPath = path.join(servicesRoot, 'PendingMovement/pending-movement-observer-senses.js');
 
     expect(fs.existsSync(observerSensesPath)).toBe(true);
 
@@ -202,7 +202,7 @@ describe('detection wrapper module ownership', () => {
     expect(observerSensesSource).toContain('observerHasUsableSight');
     expect(observerSensesSource).toContain('observerCanHearTarget');
     expect(observerSensesSource).toContain('explicitHearingRange');
-    expect(pendingSource).toContain("from './pending-movement-observer-senses.js'");
+    expect(pendingSource).toContain("from './PendingMovement/pending-movement-observer-senses.js'");
     expect(pendingSource).not.toContain('function actorHasConditionSlug');
     expect(pendingSource).not.toContain('function observerHasUsableSight');
     expect(pendingSource).not.toContain('function observerCanHearTarget');
@@ -210,8 +210,8 @@ describe('detection wrapper module ownership', () => {
   });
 
   test('pending movement final-visibility module owns final state prediction', () => {
-    const pendingMovementPath = path.join(servicesRoot, 'pending-token-movement.js');
-    const finalVisibilityPath = path.join(servicesRoot, 'pending-movement-final-visibility.js');
+    const pendingMovementPath = path.join(servicesRoot, 'PendingMovement/pending-token-movement.js');
+    const finalVisibilityPath = path.join(servicesRoot, 'PendingMovement/pending-movement-final-visibility.js');
 
     expect(fs.existsSync(finalVisibilityPath)).toBe(true);
 
@@ -222,7 +222,7 @@ describe('detection wrapper module ownership', () => {
     expect(finalVisibilitySource).toContain('predictCheapFinalVisibilityStates');
     expect(finalVisibilitySource).toContain('scheduleFinalVisibilityPrediction');
     expect(finalVisibilitySource).toContain('PENDING_MOVEMENT_FINAL_VISIBILITY_PREDICTION_DELAY_MS');
-    expect(pendingSource).toContain("from './pending-movement-final-visibility.js'");
+    expect(pendingSource).toContain("from './PendingMovement/pending-movement-final-visibility.js'");
     expect(pendingSource).not.toContain('function calculateCheapFinalRenderVisibilityState');
     expect(pendingSource).not.toContain('function predictCheapPendingFinalVisibilityStates');
     expect(pendingSource).not.toContain('function calculatePendingFinalVisibilityState');

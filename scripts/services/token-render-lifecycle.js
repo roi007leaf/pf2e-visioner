@@ -1,10 +1,10 @@
 import {
   hasPendingMovementRenderWork as defaultHasPendingMovementRenderWork,
   refreshPendingMovementTokenVisibility as defaultRefreshPendingMovementTokenVisibility,
-} from './pending-movement-render-lock.js';
+} from './PendingMovement/pending-movement-render-lock.js';
 import {
   schedulePendingTokenMovementCompletion as defaultSchedulePendingTokenMovementCompletion,
-} from './pending-token-movement.js';
+} from './PendingMovement/pending-token-movement.js';
 import { isRefreshTokenProcessingSuppressed as defaultIsRefreshTokenProcessingSuppressed } from './runtime-state.js';
 import {
   refreshSystemHiddenHighlightsForMovedToken as defaultRefreshSystemHiddenHighlightsForMovedToken,
@@ -70,7 +70,7 @@ export async function handleTokenRefreshed(
   {
     isRefreshTokenProcessingSuppressed = defaultIsRefreshTokenProcessingSuppressed,
     refreshSystemHiddenHighlightsForRenderedToken =
-      defaultRefreshSystemHiddenHighlightsForRenderedToken,
+    defaultRefreshSystemHiddenHighlightsForRenderedToken,
     warn = console.warn,
   } = {},
 ) {
@@ -91,7 +91,7 @@ export async function handleAvsBatchCompleteRefresh({
   hasPendingMovementRenderWork = defaultHasPendingMovementRenderWork,
   refreshPendingMovementTokenVisibility = defaultRefreshPendingMovementTokenVisibility,
   refreshSystemHiddenHighlightsForControlledTokens =
-    defaultRefreshSystemHiddenHighlightsForControlledTokens,
+  defaultRefreshSystemHiddenHighlightsForControlledTokens,
 } = {}) {
   try {
     if (!hasPendingMovementRenderWork()) {
