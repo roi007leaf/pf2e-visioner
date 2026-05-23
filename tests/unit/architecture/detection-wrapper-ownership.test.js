@@ -10,8 +10,11 @@ describe('detection wrapper module ownership', () => {
   const registrationPath = path.join(detectionRoot, 'detection-wrapper-registration.js');
 
   test('DetectionWrapper is only the lifecycle adapter', () => {
+    const mainSource = fs.readFileSync(path.join(root, 'scripts/main.js'), 'utf8');
     const source = fs.readFileSync(detectionWrapperPath, 'utf8');
 
+    expect(mainSource).toContain("from './services/Detection/DetectionWrapper.js'");
+    expect(mainSource).not.toContain("from './services/DetectionWrapper.js'");
     expect(source).toContain("from './detection-wrapper-registration.js'");
     expect(source).toContain('registerDetectionWrappers()');
     expect(source).not.toContain('libWrapper.register');

@@ -2,7 +2,7 @@
 import { registerKeybindings, registerSettings } from './settings.js';
 
 // Import detection wrapper
-import { initializeDetectionWrapper } from './services/DetectionWrapper.js';
+import { initializeDetectionWrapper } from './services/Detection/DetectionWrapper.js';
 
 // Import hooks
 import { registerHooks } from './hooks.js';
