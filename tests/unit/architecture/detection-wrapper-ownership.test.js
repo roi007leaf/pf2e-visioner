@@ -173,6 +173,31 @@ describe('detection wrapper module ownership', () => {
     expect(pendingSource).not.toContain('export function clearNoObserverDetectionFilterVisuals');
   });
 
+  test('pending movement detection-filter rendering module owns render transactions', () => {
+    const pendingMovementPath = path.join(pendingMovementRoot, 'pending-token-movement.js');
+    const renderingPath = path.join(
+      pendingMovementRoot,
+      'pending-movement-detection-filter-rendering.js',
+    );
+
+    expect(fs.existsSync(renderingPath)).toBe(true);
+
+    const pendingSource = fs.readFileSync(pendingMovementPath, 'utf8');
+    const renderingSource = fs.readFileSync(renderingPath, 'utf8');
+
+    expect(renderingSource).toContain('createPendingMovementDetectionFilterRenderingController');
+    expect(renderingSource).toContain('SUPPRESSED_DETECTION_FILTER_RENDER_FILTER');
+    expect(renderingSource).toContain('suppressDetectionFilterProperty');
+    expect(renderingSource).toContain('preserveDetectionFilterProperty');
+    expect(renderingSource).toContain('isOutlineOverlayDetectionFilter');
+    expect(pendingSource).toContain("from './pending-movement-detection-filter-rendering.js'");
+    expect(pendingSource).not.toContain('const SUPPRESSED_DETECTION_FILTER_RENDER_FILTER');
+    expect(pendingSource).not.toContain('function suppressDetectionFilterProperty');
+    expect(pendingSource).not.toContain('function preserveDetectionFilterProperty');
+    expect(pendingSource).not.toContain('function isOutlineOverlayDetectionFilter');
+    expect(pendingSource).not.toContain('function shouldSuppressPendingMovementDetectionFilterRender');
+  });
+
   test('pending movement controlled-drag intent module owns intent state and timers', () => {
     const pendingMovementPath = path.join(pendingMovementRoot, 'pending-token-movement.js');
     const dragIntentPath = path.join(pendingMovementRoot, 'pending-movement-controlled-drag-intent.js');
@@ -197,21 +222,28 @@ describe('detection wrapper module ownership', () => {
   test('pending movement observer-senses module owns condition and sense probes', () => {
     const pendingMovementPath = path.join(pendingMovementRoot, 'pending-token-movement.js');
     const observerSensesPath = path.join(pendingMovementRoot, 'pending-movement-observer-senses.js');
+    const senseDistancePath = path.join(servicesRoot, 'sense-distance.js');
 
     expect(fs.existsSync(observerSensesPath)).toBe(true);
+    expect(fs.existsSync(senseDistancePath)).toBe(true);
 
     const pendingSource = fs.readFileSync(pendingMovementPath, 'utf8');
     const observerSensesSource = fs.readFileSync(observerSensesPath, 'utf8');
+    const senseDistanceSource = fs.readFileSync(senseDistancePath, 'utf8');
 
-    expect(observerSensesSource).toContain('actorHasConditionSlug');
+    expect(senseDistanceSource).toContain('actorHasConditionSlug');
+    expect(senseDistanceSource).toContain('observerCanHearTarget');
+    expect(senseDistanceSource).toContain('explicitHearingRange');
+    expect(senseDistanceSource).toContain('effectiveHearingRange');
+    expect(observerSensesSource).toContain("from '../sense-distance.js'");
     expect(observerSensesSource).toContain('observerHasUsableSight');
-    expect(observerSensesSource).toContain('observerCanHearTarget');
-    expect(observerSensesSource).toContain('explicitHearingRange');
     expect(pendingSource).toContain("from './pending-movement-observer-senses.js'");
     expect(pendingSource).not.toContain('function actorHasConditionSlug');
     expect(pendingSource).not.toContain('function observerHasUsableSight');
     expect(pendingSource).not.toContain('function observerCanHearTarget');
     expect(pendingSource).not.toContain('function explicitHearingRange');
+    expect(observerSensesSource).not.toContain('function explicitHearingRange');
+    expect(observerSensesSource).not.toContain('function observerCanHearTarget');
   });
 
   test('pending movement final-visibility module owns final state prediction', () => {
@@ -256,6 +288,30 @@ describe('detection wrapper module ownership', () => {
     expect(pendingSource).not.toContain('function shouldPreserveHiddenSoundwaveForCurrentView');
     expect(pendingSource).not.toContain('function currentViewObservedDetectionShouldYieldToCore');
     expect(pendingSource).not.toContain('function rememberObservedHiddenSoundwaveGrace');
+  });
+
+  test('pending movement decision-context module owns observer-target block context', () => {
+    const pendingMovementPath = path.join(pendingMovementRoot, 'pending-token-movement.js');
+    const decisionContextPath = path.join(
+      pendingMovementRoot,
+      'pending-movement-decision-context.js',
+    );
+
+    expect(fs.existsSync(decisionContextPath)).toBe(true);
+
+    const pendingSource = fs.readFileSync(pendingMovementPath, 'utf8');
+    const decisionContextSource = fs.readFileSync(decisionContextPath, 'utf8');
+
+    expect(decisionContextSource).toContain('createPendingMovementDecisionContextController');
+    expect(decisionContextSource).toContain('routeWallBlockedForPendingMovement');
+    expect(decisionContextSource).toContain('routeWallBlockedCache');
+    expect(decisionContextSource).toContain('getPendingMovementBlockContextUncached');
+    expect(pendingSource).toContain("from './pending-movement-decision-context.js'");
+    expect(pendingSource).not.toContain('function getPendingMovementBlockContextUncached');
+    expect(pendingSource).not.toContain('function routeWallBlockedForPendingMovement');
+    expect(pendingSource).not.toContain('function wallCollectionEvaluationKey');
+    expect(pendingSource).not.toContain('lineOfSoundBlockedByWall');
+    expect(pendingSource).not.toContain('observerCanHearTarget');
   });
 
   test('BatchOrchestrator does not own pending movement render-lock side effects', () => {

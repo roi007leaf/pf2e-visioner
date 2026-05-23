@@ -13,6 +13,10 @@ import { calculateDistanceInFeet } from '../helpers/geometry-utils.js';
 import { ConcealmentRegionBehavior } from '../regions/ConcealmentRegionBehavior.js';
 import { SenseSuppressionRegionBehavior } from '../regions/SenseSuppressionRegionBehavior.js';
 import { LevelsIntegration } from '../services/LevelsIntegration.js';
+import {
+  calculateHearingDistanceInFeet,
+  hearingSenseForVisibility,
+} from '../services/sense-distance.js';
 import { isDarknessSource } from '../utils/darkness-source.js';
 import { getLogger } from '../utils/logger.js';
 import { calculateVisibility } from './StatelessVisibilityCalculator.js';
@@ -62,6 +66,7 @@ export async function tokenStateToInput(
   // Calculate distance for sense range filtering using PF2e rules (5-10-5 diagonal pattern)
   // Use Levels integration for 3D distance if available
   let distanceInFeet = calculateDistanceInFeet(observer, target);
+  let hearingDistanceInFeet = calculateHearingDistanceInFeet(observer, target);
   if (levelsIntegration.isActive) {
     const distance3D = levelsIntegration.getTotalDistance(observer, target);
     if (distance3D !== Infinity) {
@@ -78,6 +83,7 @@ export async function tokenStateToInput(
     options,
     distanceInFeet,
     observerPosition,
+    hearingDistanceInFeet,
   );
 
   try {
@@ -305,6 +311,7 @@ function extractObserverState(
   options,
   distanceInFeet,
   observerPosition = null,
+  hearingDistanceInFeet = distanceInFeet,
 ) {
   // Use precomputed senses if available (much faster)
   let visionCapabilities;
@@ -320,7 +327,9 @@ function extractObserverState(
   // Extract precise and imprecise senses from sensingSummary (single source of truth)
   // Filter by range - only include senses that can reach the target
   const precise = extractPreciseSenses(visionCapabilities, distanceInFeet);
-  const imprecise = extractImpreciseSenses(visionCapabilities, distanceInFeet);
+  const imprecise = extractImpreciseSenses(visionCapabilities, distanceInFeet, {
+    hearingDistanceInFeet,
+  });
 
   // Extract observer conditions
   const conditions = {
@@ -451,7 +460,7 @@ function extractPreciseSenses(capabilities, distanceInFeet) {
  * @param {number} distanceInFeet - Distance to target in feet
  * @returns {Object} Imprecise senses object filtered by range
  */
-function extractImpreciseSenses(capabilities, distanceInFeet) {
+function extractImpreciseSenses(capabilities, distanceInFeet, { hearingDistanceInFeet = distanceInFeet } = {}) {
   const imprecise = {};
   const sensingSummary = capabilities.sensingSummary || {};
 
@@ -468,18 +477,8 @@ function extractImpreciseSenses(capabilities, distanceInFeet) {
     }
   }
 
-  // Extract hearing from sensingSummary with proper fallback
-  // In PF2e, hearing defaults to Infinity range unless explicitly limited or deafened
-  if (sensingSummary.hearing) {
-    const hearingRange = sensingSummary.hearing.range ?? Infinity;
-    // CRITICAL: Exclude range-0 hearing (explicitly disabled)
-    if (hearingRange > 0 && (hearingRange >= distanceInFeet || !Number.isFinite(hearingRange))) {
-      imprecise.hearing = { range: hearingRange };
-    }
-  } else if (!capabilities.conditions?.deafened && !capabilities.isDeafened) {
-    // Default: creatures have hearing unless deafened (always in range with Infinity)
-    imprecise.hearing = { range: Infinity };
-  }
+  const hearing = hearingSenseForVisibility(capabilities, hearingDistanceInFeet);
+  if (hearing) imprecise.hearing = hearing;
 
   return imprecise;
 }

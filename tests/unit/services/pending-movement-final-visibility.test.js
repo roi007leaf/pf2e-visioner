@@ -56,6 +56,47 @@ describe('pending movement final visibility prediction', () => {
     expect(prediction.finalVisibilityStatesByTargetId.get('target')).toBe('hidden');
   });
 
+  test('cheap final prediction skips sound wall geometry when scene has no sound-blocking walls', () => {
+    let geometryReads = 0;
+    global.canvas.walls.placeables = Array.from({ length: 1000 }, (_, index) => ({
+      document: {
+        id: `sight-wall-${index}`,
+        get c() {
+          geometryReads += 1;
+          return [10000 + index, 0, 10000 + index, 100];
+        },
+        sight: 20,
+        sound: 0,
+        door: 0,
+        ds: 0,
+      },
+    }));
+    const observer = createMockToken({
+      id: 'observer',
+      x: 0,
+      y: 0,
+      flags: visibilityV2Flags({ target: 'observed' }),
+    });
+    const target = createMockToken({ id: 'target', x: 6, y: 0 });
+    observer.document.object = observer;
+    target.document.object = target;
+
+    const controller = createPendingMovementFinalVisibilityController({
+      getPlaceableTokens: () => [observer, target],
+      getStoredVisibilityState: (source, candidate) =>
+        source?.id === 'observer' && candidate?.id === 'target' ? 'observed' : 'observed',
+      hasLineOfSightToSampledToken: () => false,
+    });
+
+    const prediction = controller.predictCheapFinalVisibilityStates(observer.document, {
+      x: 100,
+      y: 0,
+    });
+
+    expect(prediction.finalVisibilityStatesByTargetId.get('target')).toBe('hidden');
+    expect(geometryReads).toBe(0);
+  });
+
   test('cheaply predicts observed targets become undetected when final LOS and sound are blocked', () => {
     const observer = createMockToken({
       id: 'observer',

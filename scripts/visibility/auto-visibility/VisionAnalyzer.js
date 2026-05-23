@@ -27,6 +27,7 @@ import {
   doesWallBlockLineOfSight,
 } from '../../helpers/wall-height-utils.js';
 import { LevelsIntegration } from '../../services/LevelsIntegration.js';
+import { getActiveSceneHearingRange } from '../../services/scene-hearing-range.js';
 import { getLogger } from '../../utils/logger.js';
 import { SensingCapabilitiesBuilder } from './SensingCapabilitiesBuilder.js';
 
@@ -1383,11 +1384,7 @@ export class VisionAnalyzer {
    */
   clearCache(token = null) {
     if (token) {
-      const key = token.id || token.document?.id;
-      if (key) {
-        this.#capabilitiesCache.delete(key);
-        this.#cacheTimestamp.delete(key);
-      }
+      this.#deleteCachedTokenCapabilities(token.id || token.document?.id);
     } else {
       this.#capabilitiesCache.clear();
       this.#cacheTimestamp.clear();
@@ -1402,8 +1399,7 @@ export class VisionAnalyzer {
    */
   clearVisionCache(tokenId = null) {
     if (tokenId) {
-      this.#capabilitiesCache.delete(tokenId);
-      this.#cacheTimestamp.delete(tokenId);
+      this.#deleteCachedTokenCapabilities(tokenId);
     } else {
       this.clearCache();
     }
@@ -1579,9 +1575,32 @@ export class VisionAnalyzer {
         // Add echolocation as a precise sense (keeping hearing as imprecise if it exists)
         enhanced.precise.echolocation = echolocation.range;
       }
+
+      this.#applySceneHearingRange(enhanced);
     }
 
     return enhanced;
+  }
+
+  #applySceneHearingRange(sensing) {
+    const sceneRange = getActiveSceneHearingRange();
+    if (sceneRange === null) return;
+
+    const capRange = (range) => {
+      if (range === undefined || range === null) return sceneRange;
+      const numeric = Number(range);
+      if (!Number.isFinite(numeric)) return sceneRange;
+      if (numeric <= 0) return numeric;
+      return Math.min(numeric, sceneRange);
+    };
+
+    if (sensing.precise.hearing !== undefined) {
+      sensing.precise.hearing = capRange(sensing.precise.hearing);
+      delete sensing.imprecise.hearing;
+      return;
+    }
+
+    sensing.imprecise.hearing = capRange(sensing.imprecise.hearing);
   }
 
   /**
@@ -2060,11 +2079,36 @@ export class VisionAnalyzer {
   }
 
   /**
+   * Build capability-cache key.
+   * Scene hearing range changes alter implicit hearing, so token id alone is not enough.
+   * @private
+   */
+  #capabilitiesCacheKey(token) {
+    const tokenId = token?.id || token?.document?.id;
+    if (!tokenId) return null;
+    const sceneId = globalThis.canvas?.scene?.id ?? globalThis.canvas?.scene?._id ?? 'none';
+    const hearingRange = getActiveSceneHearingRange();
+    const hearingKey = hearingRange === null ? 'none' : String(hearingRange);
+    return `${tokenId}|scene:${sceneId}|hearing:${hearingKey}`;
+  }
+
+  #deleteCachedTokenCapabilities(tokenId) {
+    if (!tokenId) return;
+    const prefix = `${tokenId}|`;
+    for (const key of this.#capabilitiesCache.keys()) {
+      if (key === tokenId || key.startsWith(prefix)) {
+        this.#capabilitiesCache.delete(key);
+        this.#cacheTimestamp.delete(key);
+      }
+    }
+  }
+
+  /**
    * Get cached capabilities
    * @private
    */
   #getFromCache(token) {
-    const key = token.id || token.document?.id;
+    const key = this.#capabilitiesCacheKey(token);
     if (!key) return null;
 
     const timestamp = this.#cacheTimestamp.get(key);
@@ -2085,7 +2129,7 @@ export class VisionAnalyzer {
    * @private
    */
   #setCache(token, result) {
-    const key = token.id || token.document?.id;
+    const key = this.#capabilitiesCacheKey(token);
     if (!key) return;
 
     this.#capabilitiesCache.set(key, result);

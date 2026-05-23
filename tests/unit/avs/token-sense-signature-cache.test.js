@@ -43,4 +43,23 @@ describe('TokenSenseSignatureCache', () => {
 
     expect(cache.getEntry(observer)).not.toBe(firstEntry);
   });
+
+  test('changes public key when active scene hearing range changes', () => {
+    const cache = new TokenSenseSignatureCache();
+    const observer = token('observer');
+    const previousScene = global.canvas.scene;
+    global.canvas.scene = {
+      id: 'scene-cache',
+      flags: { pf2e: { hearingRange: 20 } },
+    };
+
+    try {
+      const firstKey = buildTokenSensesCacheKey([observer], cache);
+      global.canvas.scene.flags.pf2e.hearingRange = 40;
+
+      expect(buildTokenSensesCacheKey([observer], cache)).not.toBe(firstKey);
+    } finally {
+      global.canvas.scene = previousScene;
+    }
+  });
 });

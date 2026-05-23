@@ -2,110 +2,27 @@ import {
   clearSuppressLightingRefresh,
   isLightingRefreshAfterBatchSuppressed,
   isLightingRefreshSuppressed,
-  setLastMovedTokenId,
   setSuppressLightingRefresh,
 } from '../../../services/runtime-state.js';
-import { MODULE_ID } from '../../../constants.js';
 import { LightingPrecomputer } from './LightingPrecomputer.js';
 import { VisionAnalyzer } from '../VisionAnalyzer.js';
+import {
+  AvsMovementInvalidationWorkflow,
+  defaultRequestTakeCoverExpirationForToken,
+} from './AvsMovementInvalidationWorkflow.js';
+import {
+  AvsInvalidationReasonRouter,
+  changeAffectsLineOfSight,
+  changeAffectsVisibility,
+} from './AvsInvalidationReasonRouter.js';
 
-const LIGHT_VISIBILITY_FIELDS = [
-  'x',
-  'y',
-  'elevation',
-  'config.dim',
-  'config.bright',
-  'config.angle',
-  'rotation',
-  'config.alpha',
-  'config.darkness.min',
-  'config.darkness.max',
-  'hidden',
-  'config.walls',
-];
-
-const WALL_LOS_FIELDS = [
-  'c',
-  'ds',
-  'door',
-  'sense',
-  'dir',
-  'sight',
-  'sound',
-  'threshold',
-  'threshold.sight',
-  'threshold.sound',
-  'threshold.attenuation',
-];
-
-export const AVS_INVALIDATION_REASON_HANDLERS = Object.freeze({
-  'ambient-light-updated': 'ambientLightUpdated',
-  'ambient-light-created': 'ambientLightCreatedOrDeleted',
-  'ambient-light-deleted': 'ambientLightCreatedOrDeleted',
-  'lighting-refresh': 'lightingRefresh',
-  'wall-updated': 'wallUpdated',
-  'wall-created': 'wallCreatedOrDeleted',
-  'wall-deleted': 'wallCreatedOrDeleted',
-  'scene-lighting-updated': 'fullSceneImmediateInvalidation',
-  'scene-config-lighting-flushed': 'fullSceneImmediateInvalidation',
-  'region-surface-updated': 'fullSceneImmediateInvalidation',
-  'token-light-updated': 'tokenLightUpdated',
-  'token-light-emitter-moved': 'tokenLightEmitterMoved',
-  'token-light-recalculation-required': 'tokenLightRecalculationRequired',
-  'token-position-updated': 'tokenPositionUpdated',
-  'token-movement-completed': 'tokenMovementCompleted',
-  'token-movement-override-validation-required': 'tokenMovementOverrideValidationRequired',
-  'token-movement-action-cache-invalidated': 'tokenMovementActionCacheInvalidated',
-  'token-movement-action-updated': 'tokenMovementActionUpdated',
-  'token-hidden-toggled': 'tokenHiddenToggled',
-  'token-created': 'tokenCreated',
-  'token-deleted': 'tokenDeleted',
-  'token-visibility-affecting-updated': 'tokenVisibilityAffectingUpdated',
-  'effect-visibility-updated': 'effectVisibilityUpdated',
-  'effect-light-emitter-updated': 'effectLightEmitterUpdated',
-  'item-visibility-updated': 'itemVisibilityUpdated',
-  'item-vision-equipment-updated': 'itemVisionEquipmentUpdated',
-  'item-light-emitter-updated': 'itemLightEmitterUpdated',
-  'actor-visibility-updated': 'actorVisibilityUpdated',
-  'template-light-updated': 'templateLightUpdated',
-});
-
-function hasTakeCoverTrackingFlag(flagData) {
-  return (
-    flagData?.coverOnly === true ||
-    flagData?.coverOverrideSource === 'take_cover_action' ||
-    (flagData?.source === 'take_cover_action' && flagData?.expectedCover)
-  );
-}
-
-function tokenHasTakeCoverExpirationState(tokenLike) {
-  try {
-    const token = tokenLike?.object || tokenLike;
-    const flags = token?.document?.flags?.[MODULE_ID] || token?.flags?.[MODULE_ID] || {};
-    if (Object.values(flags).some((flagData) => hasTakeCoverTrackingFlag(flagData))) {
-      return true;
-    }
-    return (
-      token?.actor?.itemTypes?.effect?.some?.(
-        (effect) => effect.flags?.[MODULE_ID]?.takeCoverProneRangedOnly === true,
-      ) === true
-    );
-  } catch {
-    return false;
-  }
-}
-
-async function defaultRequestTakeCoverExpirationForToken(token, reason) {
-  const { requestTakeCoverExpirationForToken } = await import(
-    '../../../chat/services/take-cover-expiration-service.js'
-  );
-  return requestTakeCoverExpirationForToken(token, reason);
-}
+export { AVS_INVALIDATION_REASON_HANDLERS } from './AvsInvalidationReasonRouter.js';
 
 export class AvsInvalidationCoordinator {
   static _lastControlTokenTime = 0;
 
-  #reasonHandlers;
+  #reasonRouter;
+  #movementInvalidation;
 
   constructor({
     systemStateProvider,
@@ -116,7 +33,7 @@ export class AvsInvalidationCoordinator {
     spatialAnalyzer = null,
     overrideValidationManager = null,
     requestTakeCoverExpirationForToken = defaultRequestTakeCoverExpirationForToken,
-    setMovedTokenId = setLastMovedTokenId,
+    setMovedTokenId,
   } = {}) {
     this.systemState = systemStateProvider;
     this.visibilityState = visibilityStateManager;
@@ -124,19 +41,27 @@ export class AvsInvalidationCoordinator {
     this.batchOrchestrator = batchOrchestrator;
     this.visionAnalyzer = visionAnalyzer ?? VisionAnalyzer.getInstance?.();
     this.spatialAnalyzer = spatialAnalyzer;
-    this.overrideValidationManager = overrideValidationManager;
-    this.requestTakeCoverExpirationForToken = requestTakeCoverExpirationForToken;
-    this.setMovedTokenId = setMovedTokenId;
-    this.#reasonHandlers = this.#createReasonHandlers();
+    this.#movementInvalidation = new AvsMovementInvalidationWorkflow({
+      shouldProcessEvents: () => this.#shouldProcessEvents(),
+      visibilityState: this.visibilityState,
+      cacheManager: this.cacheManager,
+      batchOrchestrator: this.batchOrchestrator,
+      visionAnalyzer: this.visionAnalyzer,
+      overrideValidationManager,
+      requestTakeCoverExpirationForToken,
+      setMovedTokenId,
+    });
+    this.#reasonRouter = new AvsInvalidationReasonRouter({
+      handlersByName: this.#createReasonHandlers(),
+    });
   }
 
   invalidate(change = {}) {
-    const handler = this.#reasonHandlers?.[change.reason];
-    return handler ? handler(change) : false;
+    return this.#reasonRouter.dispatch(change);
   }
 
   #createReasonHandlers() {
-    const handlersByName = {
+    return {
       ambientLightUpdated: (change) => this.#handleAmbientLightUpdated(change.changeData),
       ambientLightCreatedOrDeleted: () => this.#handleAmbientLightCreatedOrDeleted(),
       lightingRefresh: () => this.#handleLightingRefresh(),
@@ -170,33 +95,10 @@ export class AvsInvalidationCoordinator {
       actorVisibilityUpdated: (change) => this.#handleActorVisibilityUpdated(change.metadata),
       templateLightUpdated: () => this.#handleTemplateLightUpdated(),
     };
-
-    return Object.freeze(
-      Object.fromEntries(
-        Object.entries(AVS_INVALIDATION_REASON_HANDLERS).map(([reason, handlerName]) => [
-          reason,
-          handlersByName[handlerName],
-        ]),
-      ),
-    );
   }
 
   #shouldProcessEvents() {
     return this.systemState?.shouldProcessEvents?.() !== false;
-  }
-
-  #affectsVisibility(changeData) {
-    if (!changeData) return true;
-    return LIGHT_VISIBILITY_FIELDS.some((field) =>
-      globalThis.foundry?.utils?.hasProperty?.(changeData, field),
-    );
-  }
-
-  #affectsLineOfSight(changeData) {
-    if (!changeData) return true;
-    return WALL_LOS_FIELDS.some((field) =>
-      globalThis.foundry?.utils?.hasProperty?.(changeData, field),
-    );
   }
 
   #clearAmbientLightingCaches() {
@@ -265,7 +167,7 @@ export class AvsInvalidationCoordinator {
 
   #handleAmbientLightUpdated(changeData) {
     if (!this.#shouldProcessEvents()) return false;
-    if (!this.#affectsVisibility(changeData)) return false;
+    if (!changeAffectsVisibility(changeData)) return false;
 
     this.#clearAmbientLightingCaches();
     this.#runAfterLightingRefresh(() => {
@@ -330,7 +232,7 @@ export class AvsInvalidationCoordinator {
 
   #handleWallUpdated(changeData) {
     if (!this.#shouldProcessEvents()) return false;
-    if (!this.#affectsLineOfSight(changeData)) return false;
+    if (!changeAffectsLineOfSight(changeData)) return false;
 
     this.#clearWallInvalidationCaches();
     this.visibilityState?.markAllTokensChangedImmediate?.();
@@ -411,103 +313,23 @@ export class AvsInvalidationCoordinator {
   }
 
   #handleTokenMovementCompleted(tokenDoc, movementChanges) {
-    if (!this.#shouldProcessEvents()) return false;
-    if (!tokenDoc) return false;
-
-    this.#clearTokenPositionCaches();
-    this.visionAnalyzer?.clearCache?.(tokenDoc);
-    this.visibilityState?.markTokenChangedWithSpatialOptimization?.(tokenDoc, movementChanges);
-    this.batchOrchestrator?.notifyTokenMovementComplete?.();
-    this.#queueMovementOverrideValidation(tokenDoc, { processQueuedValidations: true });
-    return true;
+    return this.#movementInvalidation.handleTokenMovementCompleted(tokenDoc, movementChanges);
   }
 
   #handleTokenPositionUpdated(tokenDoc, movementChanges) {
-    if (!this.#shouldProcessEvents()) return false;
-    if (!tokenDoc) return false;
-
-    this.#clearTokenPositionCaches();
-    this.batchOrchestrator?.notifyTokenMovementStart?.();
-    this.visibilityState?.markTokenChangedWithSpatialOptimization?.(tokenDoc, movementChanges);
-    this.#queueMovementOverrideValidation(tokenDoc, { recordLastMoved: true });
-    return true;
+    return this.#movementInvalidation.handleTokenPositionUpdated(tokenDoc, movementChanges);
   }
 
   #handleTokenMovementOverrideValidationRequired(tokenDoc) {
-    if (!this.#shouldProcessEvents()) return false;
-    if (!tokenDoc?.id && !tokenDoc?.document?.id) return false;
-
-    this.#queueMovementOverrideValidation(tokenDoc, { recordLastMoved: true });
-    return true;
-  }
-
-  #clearTokenPositionCaches() {
-    try {
-      const globalVisCache = this.cacheManager?.getGlobalVisibilityCache?.();
-      LightingPrecomputer.clearLightingCaches(globalVisCache);
-      this.cacheManager?.clearLosCache?.();
-      this.cacheManager?.clearVisibilityCache?.();
-    } catch {
-      /* best-effort */
-    }
-  }
-
-  #queueMovementOverrideValidation(
-    tokenDoc,
-    { processQueuedValidations = false, recordLastMoved = false } = {},
-  ) {
-    const tokenId = tokenDoc?.id ?? tokenDoc?.document?.id;
-    if (!tokenId || !this.overrideValidationManager?.queueOverrideValidation) return;
-
-    if (recordLastMoved) {
-      try {
-        this.setMovedTokenId?.(tokenId);
-      } catch {
-        /* best-effort */
-      }
-    }
-
-    this.#expireTakeCoverForMovement(tokenDoc).finally(() => {
-      try {
-        this.overrideValidationManager.queueOverrideValidation(tokenId);
-        if (processQueuedValidations) {
-          const result = this.overrideValidationManager.processQueuedValidations?.();
-          result?.catch?.(() => {});
-        }
-      } catch {
-        /* best-effort */
-      }
-    });
-  }
-
-  async #expireTakeCoverForMovement(tokenDoc) {
-    try {
-      if (!tokenDoc?.id) return;
-      const token = tokenDoc.object || globalThis.canvas?.tokens?.get?.(tokenDoc.id) || tokenDoc;
-      if (!tokenHasTakeCoverExpirationState(token)) return;
-      await this.requestTakeCoverExpirationForToken(token, 'movement');
-    } catch (error) {
-      console.warn('PF2E Visioner | Failed to request Take Cover expiration prompt:', error);
-    }
+    return this.#movementInvalidation.handleTokenMovementOverrideValidationRequired(tokenDoc);
   }
 
   #handleTokenMovementActionCacheInvalidated() {
-    if (!this.#shouldProcessEvents()) return false;
-
-    try {
-      this.cacheManager?.clearVisibilityCache?.();
-    } catch {
-      /* best-effort */
-    }
-    return true;
+    return this.#movementInvalidation.handleTokenMovementActionCacheInvalidated();
   }
 
   #handleTokenMovementActionUpdated(tokenDoc) {
-    if (!this.#shouldProcessEvents()) return false;
-    if (!tokenDoc?.id) return false;
-
-    this.visibilityState?.markTokenChangedImmediate?.(tokenDoc.id);
-    return true;
+    return this.#movementInvalidation.handleTokenMovementActionUpdated(tokenDoc);
   }
 
   #handleTokenHiddenToggled(tokenDoc, changes) {

@@ -47,6 +47,35 @@ export function calculateDistanceInFeet(tokenOrPosA, tokenOrPosB, gridSize = 100
   return Math.floor(distance / gridDistance) * gridDistance;
 }
 
+function centerPointForRealDistance(tokenOrPos, gridSize) {
+  if (tokenOrPos?.center) return tokenOrPos.center;
+  if (typeof tokenOrPos?.getCenterPoint === 'function') return tokenOrPos.getCenterPoint();
+
+  const doc = tokenOrPos?.document || tokenOrPos;
+  const x = Number(doc?.x ?? tokenOrPos?.x ?? 0) || 0;
+  const y = Number(doc?.y ?? tokenOrPos?.y ?? 0) || 0;
+  const width = Number(doc?.width ?? tokenOrPos?.width ?? 1) || 1;
+  const height = Number(doc?.height ?? tokenOrPos?.height ?? 1) || 1;
+
+  return {
+    x: x + (width * gridSize) / 2,
+    y: y + (height * gridSize) / 2,
+  };
+}
+
+export function calculateRealDistanceInFeet(
+  tokenOrPosA,
+  tokenOrPosB,
+  gridSize = Number(globalThis.canvas?.grid?.size ?? globalThis.canvas?.dimensions?.size ?? 100) || 100,
+  gridDistance = Number(
+    globalThis.canvas?.scene?.grid?.distance ?? globalThis.canvas?.dimensions?.distance ?? 5,
+  ) || 5,
+) {
+  const posA = centerPointForRealDistance(tokenOrPosA, gridSize);
+  const posB = centerPointForRealDistance(tokenOrPosB, gridSize);
+  return (Math.hypot(posB.x - posA.x, posB.y - posA.y) / gridSize) * gridDistance;
+}
+
 /**
  * Check if a point is inside a rectangle
  * @param {number} px - Point x coordinate

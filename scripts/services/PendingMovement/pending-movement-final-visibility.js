@@ -6,7 +6,10 @@ import {
   observerCanHearTarget,
   observerHasUsableSight,
 } from './pending-movement-observer-senses.js';
-import { lineOfSoundBlockedByWall } from './pending-movement-wall-blocking.js';
+import {
+  lineOfSoundBlockedByWall,
+  sceneHasBlockingWallSense,
+} from './pending-movement-wall-blocking.js';
 
 const PENDING_MOVEMENT_FINAL_VISIBILITY_PREDICTION_DELAY_MS = 250;
 const DEFAULT_DETECTION_BLOCKING_VISIBILITY_STATES = new Set([
@@ -80,7 +83,12 @@ export function createPendingMovementFinalVisibilityController(adapter = {}) {
   const getTokenObjectForDocument = (tokenDoc) =>
     tokenDoc?.object || tokenObjectForId(tokenIdOf(tokenDoc));
 
-  const calculateCheapFinalRenderVisibilityState = (observer, target, storedState) => {
+  const calculateCheapFinalRenderVisibilityState = (
+    observer,
+    target,
+    storedState,
+    { soundCanBeBlocked = true } = {},
+  ) => {
     const normalizedStoredState = normalizePendingVisibilityState(storedState);
     if (tokenDocOf(target)?.hidden) return normalizedStoredState;
 
@@ -100,7 +108,7 @@ export function createPendingMovementFinalVisibilityController(adapter = {}) {
 
     const canHearAtFinalPosition =
       observerCanHearTarget(observer, target) &&
-      !lineOfSoundBlockedByWall(originPoint, targetPoint);
+      (!soundCanBeBlocked || !lineOfSoundBlockedByWall(originPoint, targetPoint));
 
     if (canHearAtFinalPosition) {
       if (
@@ -139,6 +147,7 @@ export function createPendingMovementFinalVisibilityController(adapter = {}) {
     });
     const finalVisibilityStatesByTargetId = new Map();
     const finalVisibilityStatesByObserverId = new Map();
+    const soundCanBeBlocked = sceneHasBlockingWallSense('sound');
 
     for (const token of getPlaceableTokens()) {
       const tokenId = tokenIdOf(token);
@@ -149,6 +158,7 @@ export function createPendingMovementFinalVisibilityController(adapter = {}) {
         movedToken,
         token,
         targetStoredState,
+        { soundCanBeBlocked },
       );
       if (targetState) finalVisibilityStatesByTargetId.set(tokenId, targetState);
 
@@ -157,6 +167,7 @@ export function createPendingMovementFinalVisibilityController(adapter = {}) {
         token,
         movedToken,
         observerStoredState,
+        { soundCanBeBlocked },
       );
       if (observerState) finalVisibilityStatesByObserverId.set(tokenId, observerState);
     }

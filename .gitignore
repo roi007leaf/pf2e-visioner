@@ -7,3 +7,5 @@ pf2e/
 .bmad-core
 web-bundles/
 .github/
+.playwright-cli/
+output/playwright/

@@ -465,6 +465,98 @@ describe('Lifesense Range Filtering', () => {
             expect(input.observer.imprecise.hearing).toBeDefined();
             expect(input.observer.imprecise.hearing.range).toBe(Infinity);
         });
+
+        test('scene-limited hearing uses real radius instead of rounded token distance', async () => {
+            mockTarget.document.x = 160;
+            mockTarget.document.y = 160;
+            mockVisionAnalyzer.getVisionCapabilities.mockReturnValue({
+                hasVision: true,
+                hasGreaterDarkvision: true,
+                darkvisionRange: Infinity,
+                sensingSummary: {
+                    precise: [
+                        { type: 'greater-darkvision', range: Infinity },
+                        { type: 'vision', range: Infinity }
+                    ],
+                    imprecise: [],
+                    hearing: { range: 10 }
+                }
+            });
+
+            const input = await tokenStateToInput(
+                mockObserver,
+                mockTarget,
+                mockLightingCalculator,
+                mockVisionAnalyzer,
+                mockConditionManager,
+                mockLightingRasterService
+            );
+
+            expect(mockObserver.distanceTo(mockTarget)).toBe(10);
+            expect(input.observer.imprecise.hearing).toBeUndefined();
+        });
+
+        test('scene-limited hearing caps default hearing fallback when capabilities omit hearing', async () => {
+            mockCanvas.scene = {
+                id: 'active-scene',
+                grid: { distance: 5 },
+                flags: { pf2e: { hearingRange: 10 } }
+            };
+            mockTarget.document.x = 300;
+            mockVisionAnalyzer.getVisionCapabilities.mockReturnValue({
+                hasVision: true,
+                hasGreaterDarkvision: true,
+                darkvisionRange: Infinity,
+                isDeafened: false,
+                sensingSummary: {
+                    precise: [],
+                    imprecise: [],
+                    hearing: null
+                }
+            });
+
+            const input = await tokenStateToInput(
+                mockObserver,
+                mockTarget,
+                mockLightingCalculator,
+                mockVisionAnalyzer,
+                mockConditionManager,
+                mockLightingRasterService
+            );
+
+            expect(input.observer.imprecise.hearing).toBeUndefined();
+        });
+
+        test('scene-limited hearing caps explicit infinite hearing from sensing summary', async () => {
+            mockCanvas.scene = {
+                id: 'active-scene',
+                grid: { distance: 5 },
+                flags: { pf2e: { hearingRange: 10 } }
+            };
+            mockTarget.document.x = 300;
+            mockVisionAnalyzer.getVisionCapabilities.mockReturnValue({
+                hasVision: true,
+                hasGreaterDarkvision: true,
+                darkvisionRange: Infinity,
+                isDeafened: false,
+                sensingSummary: {
+                    precise: [],
+                    imprecise: [],
+                    hearing: { range: Infinity }
+                }
+            });
+
+            const input = await tokenStateToInput(
+                mockObserver,
+                mockTarget,
+                mockLightingCalculator,
+                mockVisionAnalyzer,
+                mockConditionManager,
+                mockLightingRasterService
+            );
+
+            expect(input.observer.imprecise.hearing).toBeUndefined();
+        });
     });
 
     describe('Edge cases', () => {

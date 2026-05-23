@@ -1,3 +1,5 @@
+import { getActiveSceneHearingRange } from '../../../services/scene-hearing-range.js';
+
 function normalizeCacheKeyNumber(value) {
   const numeric = Number(value);
   return Number.isFinite(numeric) ? String(numeric) : '0';
@@ -5,6 +7,11 @@ function normalizeCacheKeyNumber(value) {
 
 function getSceneCacheId() {
   return String(globalThis.canvas?.scene?.id ?? globalThis.canvas?.scene?._id ?? 'none');
+}
+
+function getSceneHearingRangeCacheKey() {
+  const range = getActiveSceneHearingRange();
+  return range === null ? 'none' : normalizeCacheKeyNumber(range);
 }
 
 function stableNormalize(value, seen = new WeakSet()) {
@@ -151,7 +158,7 @@ export class TokenSenseSignatureCache {
       .filter(Boolean)
       .sort();
 
-    return `scene:${getSceneCacheId()}|count:${entries.length}|${entries.join('|')}`;
+    return `scene:${getSceneCacheId()}|count:${entries.length}|hearing:${getSceneHearingRangeCacheKey()}|${entries.join('|')}`;
   }
 
   clear() {

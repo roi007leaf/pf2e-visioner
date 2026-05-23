@@ -306,6 +306,87 @@ describe('Special Senses Range Detection', () => {
         expect.arrayContaining([{ type: 'hearing', range: 30 }]),
       );
     });
+
+    test('uses active PF2e scene hearing range for implicit hearing', () => {
+      const previousCanvas = global.canvas;
+      global.canvas = {
+        ...previousCanvas,
+        scene: {
+          id: 'active-scene',
+          grid: { distance: 5 },
+          flags: { pf2e: { hearingRange: 20 } },
+        },
+      };
+      visionAnalyzer.clearVisionCache();
+
+      const token = {
+        id: 'scene-hearing-observer',
+        actor: {
+          hasCondition: jest.fn(() => false),
+          system: {
+            perception: {
+              senses: [],
+            },
+          },
+        },
+        document: {
+          id: 'scene-hearing-observer',
+          detectionModes: [],
+        },
+      };
+
+      let summary;
+      try {
+        summary = visionAnalyzer.getVisionCapabilities(token).sensingSummary;
+      } finally {
+        global.canvas = previousCanvas;
+      }
+
+      expect(summary.hearing).toEqual({ acuity: 'imprecise', range: 20 });
+      expect(summary.imprecise).toEqual(
+        expect.arrayContaining([{ type: 'hearing', range: 20 }]),
+      );
+    });
+
+    test('refreshes cached hearing when active scene hearing range changes', () => {
+      const previousCanvas = global.canvas;
+      global.canvas = {
+        ...previousCanvas,
+        scene: {
+          id: 'active-scene',
+          grid: { distance: 5 },
+          flags: { pf2e: { hearingRange: 20 } },
+        },
+      };
+      const token = {
+        id: 'cached-scene-hearing-observer',
+        actor: {
+          hasCondition: jest.fn(() => false),
+          system: {
+            perception: {
+              senses: [],
+            },
+          },
+        },
+        document: {
+          id: 'cached-scene-hearing-observer',
+          detectionModes: [],
+        },
+      };
+
+      let firstSummary;
+      let secondSummary;
+      try {
+        firstSummary = visionAnalyzer.getVisionCapabilities(token).sensingSummary;
+        global.canvas.scene.flags.pf2e.hearingRange = 40;
+        secondSummary = visionAnalyzer.getVisionCapabilities(token).sensingSummary;
+      } finally {
+        global.canvas = previousCanvas;
+      }
+
+      expect(firstSummary.hearing).toEqual({ acuity: 'imprecise', range: 20 });
+      expect(secondSummary.hearing).toEqual({ acuity: 'imprecise', range: 40 });
+    });
   });
 });
 

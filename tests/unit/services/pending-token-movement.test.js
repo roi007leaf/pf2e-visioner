@@ -5,6 +5,7 @@ import { legacyVisibilityToProfile } from '../../../scripts/visibility/perceptio
 import {
   clearPendingTokenMovementPosition,
   completePendingTokenMovement,
+  getPendingMovementBlockContext,
   getPendingTokenMovementPosition,
   primePendingControlledTokenDragIntent,
   releasePendingControlledTokenDragIntent,
@@ -16,6 +17,9 @@ import {
   shouldUseCoreDetectionDuringPendingMovement,
   shouldTemporarilyBlockHiddenDetection,
 } from '../../../scripts/services/PendingMovement/pending-movement-detection-gate.js';
+import { currentPendingMovementSightLineSeesTarget } from '../../../scripts/services/PendingMovement/pending-movement-sight-line.js';
+import { withPendingMovementEvaluationCache } from '../../../scripts/services/PendingMovement/pending-movement-evaluation-cache.js';
+import { lineIntersectsLimitedWall } from '../../../scripts/services/PendingMovement/pending-movement-wall-blocking.js';
 import {
   clearNoObserverDetectionFilterVisuals,
   capturePendingMovementDetectionFilterState,
@@ -43,11 +47,21 @@ function visibilityV2Flags(map) {
   };
 }
 
+const WALL_SENSE_TYPES = {
+  NONE: 0,
+  LIMITED: 10,
+  NORMAL: 20,
+  PROXIMITY: 30,
+  DISTANCE: 40,
+};
+
 describe('pending token movement hidden detection guard', () => {
   let originalCanvas;
+  let originalConst;
 
   beforeEach(() => {
     originalCanvas = global.canvas;
+    originalConst = global.CONST;
     global.canvas = {
       ...global.canvas,
       grid: { size: 50 },
@@ -74,6 +88,8 @@ describe('pending token movement hidden detection guard', () => {
     global.game.user.id = undefined;
     global.game.user.isGM = true;
     global.canvas = originalCanvas;
+    if (originalConst === undefined) delete global.CONST;
+    else global.CONST = originalConst;
   });
 
   test('does not guard hidden detection without a pending controlled-token movement', () => {
@@ -161,6 +177,113 @@ describe('pending token movement hidden detection guard', () => {
     expect(sightReads).toBeLessThanOrEqual(96);
   });
 
+  test('reuses route wall-block result across repeated checks for unchanged movement', () => {
+    let sightReads = 0;
+    global.canvas.walls.placeables = [
+      {
+        document: {
+          id: 'open-sight-wall',
+          c: [100, -10000, 100, 10000],
+          get sight() {
+            sightReads += 1;
+            return 0;
+          },
+          door: 0,
+          ds: 0,
+        },
+      },
+    ];
+    const observer = createMockToken({ id: 'observer', x: 0, y: 5 });
+    const target = createMockToken({ id: 'target', x: 0, y: 0 });
+    const waypoints = Array.from({ length: 120 }, (_, index) => ({
+      x: (index + 1) * 50,
+      y: 250,
+    }));
+
+    setPendingTokenMovementPosition(
+      observer.document,
+      { x: 6100, y: 250 },
+      [observer],
+      { waypoints },
+    );
+
+    expect(shouldTemporarilyBlockHiddenDetection(observer, target, 'hidden')).toBe(false);
+    const firstReadCount = sightReads;
+    expect(firstReadCount).toBeGreaterThan(0);
+
+    expect(shouldTemporarilyBlockHiddenDetection(observer, target, 'hidden')).toBe(false);
+    expect(sightReads).toBe(firstReadCount);
+  });
+
+  test('does not rescan wall geometry after cached route wall-block result', () => {
+    let geometryReads = 0;
+    global.canvas.walls.placeables = Array.from({ length: 1000 }, (_, index) => ({
+      document: {
+        id: `wall-${index}`,
+        get c() {
+          geometryReads += 1;
+          return [10000 + index, 0, 10000 + index, 100];
+        },
+        sight: 1,
+        sound: 1,
+        door: 0,
+        ds: 0,
+      },
+    }));
+    const observer = createMockToken({ id: 'observer', x: 0, y: 5 });
+    const target = createMockToken({ id: 'target', x: 0, y: 0 });
+    const waypoints = Array.from({ length: 120 }, (_, index) => ({
+      x: (index + 1) * 50,
+      y: 250,
+    }));
+
+    setPendingTokenMovementPosition(
+      observer.document,
+      { x: 6100, y: 250 },
+      [observer],
+      { waypoints },
+    );
+
+    expect(shouldTemporarilyBlockHiddenDetection(observer, target, 'hidden')).toBe(false);
+    const firstGeometryReadCount = geometryReads;
+    expect(firstGeometryReadCount).toBeGreaterThan(0);
+
+    expect(shouldTemporarilyBlockHiddenDetection(observer, target, 'hidden')).toBe(false);
+    expect(geometryReads).toBe(firstGeometryReadCount);
+  });
+
+  test('does not rescan sound wall geometry after cached wall-blocked context', () => {
+    let geometryReads = 0;
+    global.canvas.walls.placeables = Array.from({ length: 1000 }, (_, index) => ({
+      document: {
+        id: `wall-${index}`,
+        get c() {
+          geometryReads += 1;
+          return index === 0 ? [100, 0, 100, 200] : [10000 + index, 0, 10000 + index, 100];
+        },
+        sight: 1,
+        sound: 0,
+        door: 0,
+        ds: 0,
+      },
+    }));
+    const observer = createMockToken({ id: 'observer', x: 0, y: 0 });
+    const target = createMockToken({ id: 'target', x: 3, y: 0 });
+
+    setPendingTokenMovementPosition(observer.document, { x: 0, y: 0 }, [observer]);
+
+    const context = getPendingMovementBlockContext(observer, target);
+    expect(context.wallBlocked).toBe(true);
+    expect(context.wallDetectionBlocked).toBe(false);
+    const firstGeometryReadCount = geometryReads;
+    expect(firstGeometryReadCount).toBeGreaterThan(0);
+
+    const cachedContext = getPendingMovementBlockContext(observer, target);
+    expect(cachedContext.wallBlocked).toBe(true);
+    expect(cachedContext.wallDetectionBlocked).toBe(false);
+    expect(geometryReads).toBe(firstGeometryReadCount);
+  });
+
   test('caps total route point checks across simultaneous movement', () => {
     let sightReads = 0;
     global.canvas.walls.placeables = [
@@ -208,6 +331,497 @@ describe('pending token movement hidden detection guard', () => {
         clearPendingTokenMovementPosition(observer.id);
       }
     }
+  });
+
+  test('treats active LOS polygon as observed through the first limited sight wall', () => {
+    global.CONST = {
+      ...(global.CONST || {}),
+      WALL_SENSE_TYPES,
+      EDGE_SENSE_TYPES: WALL_SENSE_TYPES,
+    };
+    global.canvas.walls.placeables = [
+      createMockWall({
+        id: 'terrain-wall',
+        c: [100, 0, 100, 200],
+        sight: WALL_SENSE_TYPES.LIMITED,
+        sound: WALL_SENSE_TYPES.NONE,
+      }),
+    ];
+    const observer = createMockToken({ id: 'observer', x: 0, y: 0 });
+    const target = createMockToken({ id: 'target', x: 3, y: 0 });
+    target.document.getVisibilityTestPoints = jest.fn(() => [{ x: 175, y: 25 }]);
+    global.canvas.effects = {
+      visionSources: [
+        {
+          active: true,
+          object: observer,
+          los: { contains: jest.fn(() => true) },
+        },
+      ],
+      lightSources: [],
+    };
+
+    setPendingTokenMovementPosition(observer.document, { x: 0, y: 0 }, [observer]);
+
+    expect(currentPendingMovementSightLineSeesTarget(observer, target)).toBe(true);
+  });
+
+  test('reuses current sight-line evaluation inside one pending movement cache scope', () => {
+    global.canvas.walls.placeables = [];
+    const observer = createMockToken({ id: 'observer', x: 0, y: 0 });
+    const target = createMockToken({ id: 'target', x: 3, y: 0 });
+    const los = { contains: jest.fn(() => true) };
+    target.document.getVisibilityTestPoints = jest.fn(() => [target.center]);
+    global.canvas.effects = {
+      visionSources: [
+        {
+          active: true,
+          object: observer,
+          los,
+        },
+      ],
+      lightSources: [],
+    };
+
+    withPendingMovementEvaluationCache(() => {
+      expect(currentPendingMovementSightLineSeesTarget(observer, target)).toBe(true);
+      expect(currentPendingMovementSightLineSeesTarget(observer, target)).toBe(true);
+    });
+
+    expect(target.document.getVisibilityTestPoints).toHaveBeenCalledTimes(1);
+
+    los.contains.mockReturnValue(false);
+    target.document.getVisibilityTestPoints = jest.fn(() => [target.center]);
+
+    expect(currentPendingMovementSightLineSeesTarget(observer, target)).toBe(false);
+    expect(target.document.getVisibilityTestPoints).toHaveBeenCalledTimes(1);
+  });
+
+  test('reuses active sight source lookup for one observer across targets in one cache scope', () => {
+    global.canvas.walls.placeables = [];
+    const observer = createMockToken({ id: 'observer', x: 0, y: 0 });
+    const firstTarget = createMockToken({ id: 'first-target', x: 3, y: 0 });
+    const secondTarget = createMockToken({ id: 'second-target', x: 4, y: 0 });
+    let sourceIterations = 0;
+    global.canvas.effects = {
+      visionSources: {
+        *[Symbol.iterator]() {
+          sourceIterations += 1;
+          yield {
+            active: true,
+            object: observer,
+            los: { contains: jest.fn(() => true) },
+          };
+        },
+      },
+      lightSources: [],
+    };
+
+    withPendingMovementEvaluationCache(() => {
+      expect(currentPendingMovementSightLineSeesTarget(observer, firstTarget)).toBe(true);
+      expect(currentPendingMovementSightLineSeesTarget(observer, secondTarget)).toBe(true);
+    });
+
+    expect(sourceIterations).toBe(1);
+
+    expect(currentPendingMovementSightLineSeesTarget(observer, firstTarget)).toBe(true);
+    expect(sourceIterations).toBe(2);
+  });
+
+  test('reuses source-list conversion inside one pending movement cache scope', () => {
+    const observer = createMockToken({ id: 'observer', x: 0, y: 0 });
+    const target = createMockToken({ id: 'target', x: 3, y: 0 });
+    let sourceIterations = 0;
+    const visionSources = {
+      *[Symbol.iterator]() {
+        sourceIterations += 1;
+        yield { active: true, object: observer };
+      },
+    };
+
+    setPendingTokenMovementPosition(observer.document, { x: 0, y: 0 }, [observer]);
+
+    withPendingMovementEvaluationCache(() => {
+      expect(
+        getPendingMovementBlockedDetectionSources(target, {
+          visionSources,
+          lightSources: [],
+        }),
+      ).toHaveLength(1);
+      expect(
+        getPendingMovementBlockedDetectionSources(target, {
+          visionSources,
+          lightSources: [],
+        }),
+      ).toHaveLength(1);
+    });
+
+    expect(sourceIterations).toBe(1);
+  });
+
+  test('does not treat active LOS polygon as observed through a second limited sight wall', () => {
+    global.CONST = {
+      ...(global.CONST || {}),
+      WALL_SENSE_TYPES,
+      EDGE_SENSE_TYPES: WALL_SENSE_TYPES,
+    };
+    global.canvas.walls.placeables = [
+      createMockWall({
+        id: 'near-terrain-wall',
+        c: [100, 0, 100, 200],
+        sight: WALL_SENSE_TYPES.LIMITED,
+        sound: WALL_SENSE_TYPES.NONE,
+      }),
+      createMockWall({
+        id: 'far-terrain-wall',
+        c: [200, 0, 200, 200],
+        sight: WALL_SENSE_TYPES.LIMITED,
+        sound: WALL_SENSE_TYPES.NONE,
+      }),
+    ];
+    const observer = createMockToken({ id: 'observer', x: 0, y: 0 });
+    const target = createMockToken({ id: 'target', x: 5, y: 0 });
+    target.document.getVisibilityTestPoints = jest.fn(() => [{ x: 275, y: 25 }]);
+    global.canvas.effects = {
+      visionSources: [
+        {
+          active: true,
+          object: observer,
+          los: { contains: jest.fn(() => true) },
+        },
+      ],
+      lightSources: [],
+    };
+
+    setPendingTokenMovementPosition(observer.document, { x: 0, y: 0 }, [observer]);
+
+    expect(currentPendingMovementSightLineSeesTarget(observer, target)).toBe(false);
+  });
+
+  test('allows active LOS polygon through proximity sight walls inside threshold', () => {
+    global.CONST = {
+      ...(global.CONST || {}),
+      WALL_SENSE_TYPES,
+      EDGE_SENSE_TYPES: WALL_SENSE_TYPES,
+    };
+    global.canvas.scene.grid.distance = 5;
+    global.canvas.walls.placeables = [
+      {
+        document: {
+          id: 'proximity-wall',
+          c: [50, 0, 50, 200],
+          sight: WALL_SENSE_TYPES.PROXIMITY,
+          sound: WALL_SENSE_TYPES.NONE,
+          threshold: { sight: 3 },
+          door: 0,
+          ds: 0,
+        },
+      },
+    ];
+    const observer = createMockToken({ id: 'observer', x: 0, y: 0 });
+    const target = createMockToken({ id: 'target', x: 2, y: 0 });
+    target.document.getVisibilityTestPoints = jest.fn(() => [{ x: 125, y: 25 }]);
+    global.canvas.effects = {
+      visionSources: [
+        {
+          active: true,
+          object: observer,
+          los: { contains: jest.fn(() => true) },
+        },
+      ],
+      lightSources: [],
+    };
+
+    setPendingTokenMovementPosition(observer.document, { x: 0, y: 0 }, [observer]);
+
+    expect(currentPendingMovementSightLineSeesTarget(observer, target)).toBe(true);
+  });
+
+  test('blocks active LOS polygon through proximity sight walls outside threshold', () => {
+    global.CONST = {
+      ...(global.CONST || {}),
+      WALL_SENSE_TYPES,
+      EDGE_SENSE_TYPES: WALL_SENSE_TYPES,
+    };
+    global.canvas.scene.grid.distance = 5;
+    global.canvas.walls.placeables = [
+      {
+        document: {
+          id: 'proximity-wall',
+          c: [100, 0, 100, 200],
+          sight: WALL_SENSE_TYPES.PROXIMITY,
+          sound: WALL_SENSE_TYPES.NONE,
+          threshold: { sight: 1 },
+          door: 0,
+          ds: 0,
+        },
+      },
+    ];
+    const observer = createMockToken({ id: 'observer', x: 0, y: 0 });
+    const target = createMockToken({ id: 'target', x: 3, y: 0 });
+    target.document.getVisibilityTestPoints = jest.fn(() => [{ x: 175, y: 25 }]);
+    global.canvas.effects = {
+      visionSources: [
+        {
+          active: true,
+          object: observer,
+          los: { contains: jest.fn(() => true) },
+        },
+      ],
+      lightSources: [],
+    };
+
+    setPendingTokenMovementPosition(observer.document, { x: 0, y: 0 }, [observer]);
+
+    expect(currentPendingMovementSightLineSeesTarget(observer, target)).toBe(false);
+  });
+
+  test('does not block hearing through limited sound walls during final movement prediction', () => {
+    global.CONST = {
+      ...(global.CONST || {}),
+      WALL_SENSE_TYPES,
+      EDGE_SENSE_TYPES: WALL_SENSE_TYPES,
+    };
+    global.canvas.walls.placeables = [
+      createMockWall({
+        id: 'limited-sound-wall',
+        c: [100, 0, 100, 200],
+        sight: WALL_SENSE_TYPES.NORMAL,
+        sound: WALL_SENSE_TYPES.LIMITED,
+      }),
+    ];
+    const observer = createMockToken({
+      id: 'observer',
+      x: 0,
+      y: 0,
+      flags: visibilityV2Flags({ target: 'undetected' }),
+    });
+    observer._animation = { state: 'running', promise: Promise.resolve() };
+    const target = createMockToken({ id: 'target', x: 3, y: 0, visible: true });
+    global.canvas = {
+      ...global.canvas,
+      tokens: {
+        get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+        placeables: [observer, target],
+      },
+    };
+
+    setPendingTokenMovementPosition(observer.document, { x: 0, y: 0 }, [observer], {
+      predictFinalVisibility: () => new Promise(() => {}),
+    });
+
+    expect(shouldUseCoreDetectionDuringPendingMovement(observer, target)).toBe(true);
+    expect(shouldTemporarilyForceTokenInvisible(target)).toBe(false);
+  });
+
+  test('limits pending movement hearing from the pending observer position', () => {
+    global.CONST = {
+      ...(global.CONST || {}),
+      WALL_SENSE_TYPES,
+      EDGE_SENSE_TYPES: WALL_SENSE_TYPES,
+    };
+    global.canvas.scene = {
+      ...(global.canvas.scene || {}),
+      id: 'active-scene',
+      grid: { distance: 5 },
+      flags: { pf2e: { hearingRange: 10 } },
+    };
+    global.canvas.walls.placeables = [
+      createMockWall({
+        id: 'sight-wall-open-sound',
+        c: [0, -100, 0, 200],
+        sight: WALL_SENSE_TYPES.NORMAL,
+        sound: WALL_SENSE_TYPES.NONE,
+      }),
+    ];
+    const observer = createMockToken({
+      id: 'observer',
+      x: 0,
+      y: 0,
+      flags: visibilityV2Flags({ target: 'undetected' }),
+    });
+    const target = createMockToken({ id: 'target', x: 2, y: 0, visible: true });
+    global.canvas = {
+      ...global.canvas,
+      tokens: {
+        get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+        placeables: [observer, target],
+      },
+    };
+
+    setPendingTokenMovementPosition(observer.document, { x: -150, y: 0 }, [observer], {
+      predictFinalVisibility: () => new Promise(() => {}),
+    });
+
+    const context = getPendingMovementBlockContext(observer, target);
+
+    expect(context.wallBlocked).toBe(true);
+    expect(context.soundBlocked).toBe(true);
+    expect(context.wallDetectionBlocked).toBe(true);
+  });
+
+  test('keeps hidden soundwave visible while dragging past limited sound but blocked sight', () => {
+    global.CONST = {
+      ...(global.CONST || {}),
+      WALL_SENSE_TYPES,
+      EDGE_SENSE_TYPES: WALL_SENSE_TYPES,
+    };
+    global.canvas.walls.placeables = [
+      createMockWall({
+        id: 'limited-sight-sound-wall',
+        c: [100, 0, 100, 200],
+        sight: WALL_SENSE_TYPES.LIMITED,
+        sound: WALL_SENSE_TYPES.LIMITED,
+      }),
+      createMockWall({
+        id: 'normal-sight-open-sound-wall',
+        c: [200, 0, 200, 200],
+        sight: WALL_SENSE_TYPES.NORMAL,
+        sound: WALL_SENSE_TYPES.NONE,
+      }),
+    ];
+    const observer = createMockToken({
+      id: 'observer',
+      x: 0,
+      y: 0,
+      controlled: true,
+      flags: visibilityV2Flags({ target: 'hidden' }),
+    });
+    const target = createMockToken({ id: 'target', x: 5, y: 0, visible: true });
+    target.detectionFilter = { id: 'limited-wall-soundwave-filter' };
+    target.detectionFilterMesh = { visible: true, renderable: true, alpha: 1 };
+    global.canvas = {
+      ...global.canvas,
+      effects: {
+        visionSources: [
+        {
+          active: true,
+          object: observer,
+          los: { contains: jest.fn(() => false) },
+        },
+      ],
+        lightSources: [],
+      },
+      tokens: {
+        get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+        _draggedToken: observer,
+        controlled: [observer],
+        placeables: [observer, target],
+      },
+    };
+
+    primePendingControlledTokenDragIntent(observer, { refreshDelayMs: 0 });
+
+    expect(currentPendingMovementSightLineSeesTarget(observer, target)).toBe(false);
+    expect(shouldTemporarilyForceTokenInvisible(target)).toBe(false);
+  });
+
+  test('keeps Visioner-hidden soundwave visible during drag even when wall blocks sound', () => {
+    global.CONST = {
+      ...(global.CONST || {}),
+      WALL_SENSE_TYPES,
+      EDGE_SENSE_TYPES: WALL_SENSE_TYPES,
+    };
+    global.canvas.walls.placeables = [
+      createMockWall({
+        id: 'near-limited-sight-sound-wall',
+        c: [100, 0, 100, 200],
+        sight: WALL_SENSE_TYPES.LIMITED,
+        sound: WALL_SENSE_TYPES.LIMITED,
+      }),
+      createMockWall({
+        id: 'far-limited-sight-sound-wall',
+        c: [200, 0, 200, 200],
+        sight: WALL_SENSE_TYPES.LIMITED,
+        sound: WALL_SENSE_TYPES.LIMITED,
+      }),
+    ];
+    const observer = createMockToken({
+      id: 'observer',
+      x: 0,
+      y: 0,
+      controlled: true,
+      flags: visibilityV2Flags({ target: 'hidden' }),
+    });
+    const target = createMockToken({ id: 'target', x: 5, y: 0, visible: true });
+    target.detectionFilter = { id: 'blocked-sound-hidden-filter' };
+    target.detectionFilterMesh = { visible: true, renderable: true, alpha: 1 };
+    global.canvas = {
+      ...global.canvas,
+      effects: {
+        visionSources: [
+          {
+            active: true,
+            object: observer,
+            los: { contains: jest.fn(() => false) },
+          },
+        ],
+        lightSources: [],
+      },
+      tokens: {
+        get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+        _draggedToken: observer,
+        controlled: [observer],
+        placeables: [observer, target],
+      },
+    };
+
+    primePendingControlledTokenDragIntent(observer, { refreshDelayMs: 0 });
+
+    expect(currentPendingMovementSightLineSeesTarget(observer, target)).toBe(false);
+    expect(shouldTemporarilyForceTokenInvisible(target)).toBe(false);
+  });
+
+  test('keeps hidden soundwave when limited wall LOS polygon contains target during drag', () => {
+    global.CONST = {
+      ...(global.CONST || {}),
+      WALL_SENSE_TYPES,
+      EDGE_SENSE_TYPES: WALL_SENSE_TYPES,
+    };
+    global.canvas.walls.placeables = [
+      createMockWall({
+        id: 'limited-sight-sound-wall',
+        c: [100, 0, 100, 200],
+        sight: WALL_SENSE_TYPES.LIMITED,
+        sound: WALL_SENSE_TYPES.LIMITED,
+      }),
+    ];
+    const observer = createMockToken({
+      id: 'observer',
+      x: 0,
+      y: 0,
+      controlled: true,
+      flags: visibilityV2Flags({ target: 'hidden' }),
+    });
+    const target = createMockToken({ id: 'target', x: 3, y: 0, visible: true });
+    target.detectionFilter = { id: 'limited-wall-soundwave-filter' };
+    target.detectionFilterMesh = { visible: true, renderable: true, alpha: 1 };
+    global.canvas = {
+      ...global.canvas,
+      effects: {
+        visionSources: [
+          {
+            active: true,
+            object: observer,
+            los: { contains: jest.fn(() => true) },
+          },
+        ],
+        lightSources: [],
+      },
+      tokens: {
+        get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+        _draggedToken: observer,
+        controlled: [observer],
+        placeables: [observer, target],
+      },
+    };
+
+    primePendingControlledTokenDragIntent(observer, { refreshDelayMs: 0 });
+
+    expect(lineIntersectsLimitedWall(observer.center, target.center, 'sight')).toBe(true);
+    expect(currentPendingMovementSightLineSeesTarget(observer, target)).toBe(true);
+    expect(shouldSuppressPendingMovementDetectionFilterVisuals(target)).toBe(false);
+    expect(shouldTemporarilyForceTokenInvisible(target)).toBe(false);
   });
 
   test('guards hidden detection for a controlled token drag preview source', () => {
@@ -2572,6 +3186,55 @@ describe('pending token movement hidden detection guard', () => {
 
     expect(shouldSuppressPendingMovementDetectionFilterVisuals(target)).toBe(true);
     expect(capturePendingMovementDetectionFilterState(target, { hasDetectionWork: true })).toBeNull();
+  });
+
+  test('does not scan wall geometry for current sight-line soundwave suppression without limited walls', () => {
+    let geometryReads = 0;
+    global.canvas.walls.placeables = Array.from({ length: 1000 }, (_, index) => ({
+      document: {
+        id: `normal-wall-${index}`,
+        get c() {
+          geometryReads += 1;
+          return [10000 + index, 0, 10000 + index, 100];
+        },
+        sight: WALL_SENSE_TYPES.NORMAL,
+        sound: WALL_SENSE_TYPES.NORMAL,
+        door: 0,
+        ds: 0,
+      },
+    }));
+    const observer = createMockToken({
+      id: 'observer',
+      controlled: true,
+      flags: visibilityV2Flags({ target: 'hidden' }),
+    });
+    const target = createMockToken({ id: 'target', x: 3, y: 0, visible: true });
+    target.detectionFilter = { id: 'stale-soundwave-filter' };
+    target.detectionFilterMesh = { visible: true, renderable: true, alpha: 1 };
+    global.canvas = {
+      ...global.canvas,
+      effects: {
+        visionSources: [
+          {
+            active: true,
+            object: observer,
+            los: { contains: jest.fn(() => true) },
+          },
+        ],
+        lightSources: [],
+      },
+      tokens: {
+        get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+        _draggedToken: observer,
+        controlled: [observer],
+        placeables: [observer, target],
+      },
+    };
+
+    setPendingTokenMovementPosition(observer.document, { x: 100, y: 0 }, [observer]);
+
+    expect(shouldSuppressPendingMovementDetectionFilterVisuals(target)).toBe(true);
+    expect(geometryReads).toBe(0);
   });
 
   test('suppresses hidden soundwave during drag before pending movement entry exists', () => {

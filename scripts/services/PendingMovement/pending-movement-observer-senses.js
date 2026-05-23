@@ -1,3 +1,13 @@
+import {
+  actorHasConditionSlug,
+  observerCanHearTarget,
+} from '../sense-distance.js';
+
+export {
+  actorHasConditionSlug,
+  observerCanHearTarget,
+};
+
 function tokenDocOf(tokenOrDoc) {
   return tokenOrDoc?.document || tokenOrDoc || null;
 }
@@ -53,37 +63,6 @@ function calculateProxyDistanceInFeet(firstToken, secondToken) {
   return Math.floor(distance / gridDistance) * gridDistance;
 }
 
-function collectionValues(collection) {
-  if (!collection) return [];
-  if (Array.isArray(collection)) return collection;
-  if (typeof collection.values === 'function') return Array.from(collection.values());
-  if (typeof collection === 'object') return Object.values(collection);
-  return [];
-}
-
-export function actorHasConditionSlug(actor, slug) {
-  if (!actor || !slug) return false;
-  const normalizedSlug = String(slug).toLowerCase();
-
-  try {
-    if (actor.hasCondition?.(normalizedSlug)) return true;
-  } catch {}
-
-  if (actor.system?.conditions?.[normalizedSlug]?.active) return true;
-  if (actor.conditions?.has?.(normalizedSlug)) return true;
-
-  const conditionItems = [
-    ...collectionValues(actor.itemTypes?.condition),
-    ...collectionValues(actor.itemTypes?.effect),
-    ...collectionValues(actor.items),
-  ];
-  return conditionItems.some((item) => {
-    const itemSlug = String(item?.slug ?? item?.system?.slug ?? '').toLowerCase();
-    const itemName = String(item?.name ?? '').toLowerCase();
-    return itemSlug === normalizedSlug || itemName === normalizedSlug;
-  });
-}
-
 export function observerHasUsableSight(observer) {
   const doc = tokenDocOf(observer);
   if (actorHasConditionSlug(actorOf(observer), 'blinded')) return false;
@@ -93,37 +72,6 @@ export function observerHasUsableSight(observer) {
 
   const sightRange = Number(doc?.sight?.range ?? doc?.vision?.range ?? Infinity);
   return sightRange !== 0;
-}
-
-function explicitHearingRange(actor) {
-  const senses = actor?.system?.perception?.senses;
-  const candidates = [];
-
-  if (Array.isArray(senses)) {
-    candidates.push(...senses.filter((sense) => sense?.type === 'hearing'));
-  } else if (senses && typeof senses === 'object') {
-    candidates.push(senses.hearing, senses.value?.hearing);
-  }
-
-  for (const candidate of candidates) {
-    if (!candidate) continue;
-    const range = Number(candidate.range ?? candidate.value?.range ?? candidate.distance);
-    if (Number.isFinite(range)) return range;
-  }
-
-  return null;
-}
-
-export function observerCanHearTarget(observer, target) {
-  const actor = actorOf(observer);
-  if (actorHasConditionSlug(actor, 'deafened')) return false;
-
-  const hearingRange = explicitHearingRange(actor);
-  if (hearingRange === 0) return false;
-  if (hearingRange === null) return true;
-
-  const distance = calculateProxyDistanceInFeet(observer, target);
-  return hearingRange >= distance;
 }
 
 export function createPositionedTokenProxy(tokenOrDoc, position, { getTokenObjectForDocument } = {}) {

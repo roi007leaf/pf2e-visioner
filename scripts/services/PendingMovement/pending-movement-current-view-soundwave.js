@@ -1,3 +1,5 @@
+import { cachePendingMovementEvaluation } from './pending-movement-evaluation-cache.js';
+
 function predictedObservedTransitionState(visibilityState) {
   return visibilityState === 'observed' || visibilityState === 'concealed';
 }
@@ -21,6 +23,7 @@ export function createPendingMovementCurrentViewSoundwaveController({
   graceMs,
   hasPendingControlledTokenDragIntent,
   hasPendingMovementDetectionWork,
+  hiddenSoundwaveShouldSurviveLimitedWall = () => false,
   pendingMovementEntryVisualReachedDestination,
   restorePendingMovementTokenRendering,
   shouldUseCoreDetectionDuringPendingMovement,
@@ -31,7 +34,7 @@ export function createPendingMovementCurrentViewSoundwaveController({
   const observedHiddenSoundwaveGraceContexts = new Map();
   const observedDetectionFilterSuppressionTokens = new WeakMap();
 
-  function getCurrentViewObservers() {
+  function buildCurrentViewObservers() {
     const observers = [];
     const seen = new Set();
     const add = (token) => {
@@ -44,6 +47,14 @@ export function createPendingMovementCurrentViewSoundwaveController({
     add(getDraggedToken());
     for (const token of getControlledTokens()) add(token);
     return observers;
+  }
+
+  function getCurrentViewObservers() {
+    return cachePendingMovementEvaluation(
+      'currentViewObservers',
+      'active',
+      buildCurrentViewObservers,
+    );
   }
 
   function hasPendingControlledTokenDragIntentForCurrentView() {
@@ -130,7 +141,12 @@ export function createPendingMovementCurrentViewSoundwaveController({
 
       const storedVisibilityState = getStoredVisibilityState(observer, target);
       if (storedVisibilityState === 'hidden') {
-        if (!currentPendingMovementSightLineSeesTarget(observer, target)) return true;
+        if (
+          !currentPendingMovementSightLineSeesTarget(observer, target) ||
+          hiddenSoundwaveShouldSurviveLimitedWall(observer, target)
+        ) {
+          return true;
+        }
         continue;
       }
       if (!isStoredObservedState(storedVisibilityState)) continue;

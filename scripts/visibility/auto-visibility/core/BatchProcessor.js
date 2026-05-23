@@ -1,4 +1,5 @@
 import { RuleElementChecker } from '../../../rule-elements/RuleElementChecker.js';
+import { applyActiveSceneHearingRangeLimit } from '../../../services/scene-hearing-range.js';
 import { SensePrecomputer } from '../../../services/SensePrecomputer.js';
 import { getLogger } from '../../../utils/logger.js';
 import { getCacheInvalidationRevision } from '../../../utils/cache-invalidation.js';
@@ -807,6 +808,8 @@ export class BatchProcessor {
     if (!sensingSummary) {
       return false;
     }
+    const gridDistance = Number(canvas?.scene?.grid?.distance ?? canvas?.dimensions?.distance ?? 5) || 5;
+    const distanceInFeet = distance * gridDistance;
 
     // Check for tremorsense in precise or imprecise senses - works through walls if both tokens on ground
     const allSenses = [...(sensingSummary.precise || []), ...(sensingSummary.imprecise || [])];
@@ -817,7 +820,7 @@ export class BatchProcessor {
       const targetElevation = target.document.elevation || 0;
 
       // Tremorsense works if both tokens are on ground and within range
-      if (observerElevation === 0 && targetElevation === 0 && distance <= tremorsenseRange) {
+      if (observerElevation === 0 && targetElevation === 0 && distanceInFeet <= tremorsenseRange) {
         return true;
       }
     }
@@ -825,10 +828,12 @@ export class BatchProcessor {
     // Check for hearing - could work through thin walls depending on range
     // PF2e creatures normally have hearing even when it is not explicitly surfaced as a
     // detection mode. Treat missing hearing as implicit unless the observer is deafened.
-    const hearing = sensingSummary.hearing || (isDeafened ? null : { range: Infinity });
+    const implicitHearingRange = applyActiveSceneHearingRangeLimit(null);
+    const hearing =
+      sensingSummary.hearing || (isDeafened ? null : { range: implicitHearingRange ?? Infinity });
     if (hearing && hearing.range) {
-      const hearingRange = hearing.range || 60;
-      if (distance <= hearingRange) {
+      const hearingRange = applyActiveSceneHearingRangeLimit(hearing.range ?? Infinity) ?? Infinity;
+      if (hearingRange > 0 && distanceInFeet <= hearingRange) {
         return true;
       }
     }

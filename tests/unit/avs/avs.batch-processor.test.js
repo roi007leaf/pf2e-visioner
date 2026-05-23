@@ -559,6 +559,52 @@ describe('BatchProcessor', () => {
     expect(res.updates.some((u) => u.visibility === 'undetected')).toBe(false);
   });
 
+  test('short-circuits LOS-blocked pairs outside active scene hearing range', async () => {
+    const previousScene = global.canvas.scene;
+    global.canvas.scene = {
+      ...global.canvas.scene,
+      id: 'scene-1',
+      grid: { distance: 5 },
+      flags: { pf2e: { hearingRange: 10 } },
+    };
+    const observer = makeToken('A', 0, 0);
+    const farTarget = makeToken('B', 300, 0);
+    global.canvas.tokens.placeables = [observer, farTarget];
+    processor.visionAnalyzer.hasLineOfSight.mockReturnValue(false);
+    processor.visionAnalyzer.getVisionCapabilities.mockImplementation(() => ({
+      isDeafened: false,
+      sensingSummary: {
+        precise: [],
+        imprecise: [],
+        hearing: null,
+      },
+    }));
+    optimizedVisibilityCalculator.calculateVisibilityBetweenTokens.mockClear();
+
+    let res;
+    try {
+      res = await processor.process(global.canvas.tokens.placeables, new Set(['A']), {});
+    } finally {
+      global.canvas.scene = previousScene;
+    }
+
+    expect(optimizedVisibilityCalculator.calculateVisibilityBetweenTokens).not.toHaveBeenCalled();
+    expect(res.updates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          observer: expect.objectContaining({ document: expect.objectContaining({ id: 'A' }) }),
+          target: expect.objectContaining({ document: expect.objectContaining({ id: 'B' }) }),
+          visibility: 'undetected',
+        }),
+        expect.objectContaining({
+          observer: expect.objectContaining({ document: expect.objectContaining({ id: 'B' }) }),
+          target: expect.objectContaining({ document: expect.objectContaining({ id: 'A' }) }),
+          visibility: 'undetected',
+        }),
+      ]),
+    );
+  });
+
   test('respects active overrides to avoid calculation', async () => {
     // set override for A->B only
     getActiveOverride.mockImplementation((obs, tgt) =>

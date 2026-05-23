@@ -5,6 +5,7 @@
 import { MODULE_ID } from './constants.js';
 import autoCoverSystem from './cover/auto-cover/AutoCoverSystem.js';
 import { scheduleCanvasPerceptionUpdate } from './helpers/perception-refresh.js';
+import { calculateRealDistanceInFeet } from './helpers/geometry-utils.js';
 import { getCoverMap } from './stores/cover-map.js';
 import { VisionerTokenManager } from './managers/token-manager/TokenManager.js';
 import {
@@ -16,6 +17,7 @@ import {
   unsetMapsForTokens,
 } from './services/api-internal.js';
 import { LevelsIntegration } from './services/LevelsIntegration.js';
+import { applyActiveSceneHearingRangeLimit } from './services/scene-hearing-range.js';
 import { manuallyRestoreAllPartyTokens } from './services/party-token-state.js';
 import { refreshEveryonesPerception } from './services/socket.js';
 import { updateTokenVisuals } from './services/visual-effects.js';
@@ -622,6 +624,7 @@ export class Pf2eVisionerApi {
 
       // Calculate distance for sense range checks
       const distance = visionAnalyzer.distanceFeet(observerToken, targetToken);
+      const hearingDistance = calculateRealDistanceInFeet(observerToken, targetToken);
 
       // Check special detection
       const detection = {
@@ -656,6 +659,8 @@ export class Pf2eVisionerApi {
 
       // Build comprehensive senses object from sensingSummary
       const sensingSummary = visionCaps.sensingSummary || {};
+      const hearingRange =
+        applyActiveSceneHearingRangeLimit(sensingSummary.hearing?.range ?? null) ?? Infinity;
       const senses = {
         darkvision: {
           has: visionCaps.hasDarkvision,
@@ -694,8 +699,8 @@ export class Pf2eVisionerApi {
         },
         hearing: {
           has: (sensingSummary.hearing?.range || 0) > 0 || !observerConditions.includes('deafened'),
-          range: sensingSummary.hearing?.range || Infinity,
-          inRange: distance <= (sensingSummary.hearing?.range || Infinity),
+          range: hearingRange,
+          inRange: hearingDistance <= hearingRange,
           type: 'imprecise',
         },
       };
@@ -1219,10 +1224,12 @@ export class Pf2eVisionerApi {
       // Imprecise senses (provide hidden state, not observed)
       if (visibility === 'hidden') {
         // Check if detection is via imprecise senses
+        const hearingDistance = calculateRealDistanceInFeet(observerToken, targetToken);
         const hasHearing =
           sensingSummary.hearing &&
           !isDeafened &&
-          distance <= (sensingSummary.hearing.range || Infinity);
+          hearingDistance <=
+            (applyActiveSceneHearingRangeLimit(sensingSummary.hearing.range ?? null) ?? Infinity);
         const hasScent = sensingSummary.scent && distance <= (sensingSummary.scent?.range || 0);
 
         if (hasHearing && targetConditions.includes('invisible')) {
@@ -2955,6 +2962,7 @@ export const autoVisibility = {
 
       // Use standardized distance calculation (now that distanceFeet is public)
       const distance = visionAnalyzer.distanceFeet(observer, target);
+      const hearingDistance = calculateRealDistanceInFeet(observer, target);
 
       return {
         observer: observer.name,
@@ -2965,6 +2973,7 @@ export const autoVisibility = {
         canDetectCreatureType: canDetectType,
         canDetectInRange: canDetectInRange,
         distance: Math.round(distance * 10) / 10, // Round to 1 decimal
+        hearingDistance: Math.round(hearingDistance * 10) / 10,
         sensingSummary: sensingSummary,
       };
     } catch (error) {
