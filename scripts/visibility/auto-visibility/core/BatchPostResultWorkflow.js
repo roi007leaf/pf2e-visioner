@@ -5,6 +5,7 @@ import {
 
 export class BatchPostResultWorkflow {
   #applyBatchResults;
+  #applyBatchResultRenderLock;
   #flushDetectionBatch;
   #syncEphemeralEffectsForUpdates;
   #refreshPerceptionAfterBatch;
@@ -15,6 +16,7 @@ export class BatchPostResultWorkflow {
 
   constructor({
     applyBatchResults = async () => 0,
+    applyBatchResultRenderLock = async () => {},
     flushDetectionBatch = async () => {},
     syncEphemeralEffectsForUpdates = async () => {},
     refreshPerceptionAfterBatch = async () => {},
@@ -24,6 +26,7 @@ export class BatchPostResultWorkflow {
     debug = () => {},
   } = {}) {
     this.#applyBatchResults = applyBatchResults;
+    this.#applyBatchResultRenderLock = applyBatchResultRenderLock;
     this.#flushDetectionBatch = flushDetectionBatch;
     this.#syncEphemeralEffectsForUpdates = syncEphemeralEffectsForUpdates;
     this.#refreshPerceptionAfterBatch = refreshPerceptionAfterBatch;
@@ -38,6 +41,13 @@ export class BatchPostResultWorkflow {
     postBatchPerceptionSuppression = null,
     flushDetectionBatch = this.#flushDetectionBatch,
   } = {}) {
+    if (batchResult.updates?.length > 0) {
+      await this.#applyBatchResultRenderLock(batchResult.updates, {
+        forceVisibility: true,
+        refreshTargets: false,
+      });
+    }
+
     const uniqueUpdateCount = await this.#applyBatchResults(batchResult, {
       suppressVisibilityMapRender: shouldSuppressVisibilityMapRender(
         postBatchPerceptionSuppression,
@@ -45,6 +55,13 @@ export class BatchPostResultWorkflow {
     });
 
     await flushDetectionBatch();
+
+    if (batchResult.updates?.length > 0) {
+      await this.#applyBatchResultRenderLock(batchResult.updates, {
+        forceVisibility: false,
+        refreshTargets: true,
+      });
+    }
 
     const postProcessingPlan = buildBatchPostProcessingPlan({
       updates: batchResult.updates,

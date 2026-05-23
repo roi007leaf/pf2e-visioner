@@ -21,6 +21,9 @@ function createWorkflow(overrides = {}) {
     syncEphemeralEffectsForUpdates: jest.fn(async (updates) => {
       order.push(`effects:${updates.length}`);
     }),
+    applyBatchResultRenderLock: jest.fn(async (updates) => {
+      order.push(`render-lock:${updates.length}`);
+    }),
     refreshPerceptionAfterBatch: jest.fn(async () => {
       order.push('refresh');
     }),
@@ -53,8 +56,10 @@ describe('BatchPostResultWorkflow', () => {
 
     expect(result.uniqueUpdateCount).toBe(2);
     expect(order).toEqual([
+      'render-lock:2',
       'apply:false',
       'flush',
+      'render-lock:2',
       'effects:2',
       'refresh',
       'suppress:true',
@@ -113,7 +118,14 @@ describe('BatchPostResultWorkflow', () => {
     expect(debug).toHaveBeenCalledWith(
       'BatchOrchestrator: skipping perception refresh (no updates)',
     );
-    expect(order).toEqual(['flush', 'suppress:true', 'schedule-clear', 'clear-suppress']);
+    expect(order).toEqual([
+      'render-lock:1',
+      'flush',
+      'render-lock:1',
+      'suppress:true',
+      'schedule-clear',
+      'clear-suppress',
+    ]);
   });
 
   test('uses a per-run detection flush adapter when provided', async () => {
@@ -133,4 +145,17 @@ describe('BatchPostResultWorkflow', () => {
     expect(constructorFlushDetectionBatch).not.toHaveBeenCalled();
   });
 
+  test('does not run render-lock workflow when batch has no updates', async () => {
+    const applyBatchResultRenderLock = jest.fn(async () => {});
+    const workflow = new BatchPostResultWorkflow({
+      applyBatchResults: jest.fn(async () => 0),
+      applyBatchResultRenderLock,
+    });
+
+    await workflow.run({
+      batchResult: { updates: [] },
+    });
+
+    expect(applyBatchResultRenderLock).not.toHaveBeenCalled();
+  });
 });

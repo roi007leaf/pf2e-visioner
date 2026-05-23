@@ -413,7 +413,10 @@ describe('AvsInvalidationCoordinator completed movement reasons', () => {
     systemState = makeSystemState();
     visibilityState = makeVisibilityState();
     cacheManager = makeCacheManager();
-    batchOrchestrator = { notifyTokenMovementStart: jest.fn() };
+    batchOrchestrator = {
+      notifyTokenMovementStart: jest.fn(),
+      notifyTokenMovementComplete: jest.fn(),
+    };
     visionAnalyzer = { clearCache: jest.fn() };
     overrideValidationManager = {
       queueOverrideValidation: jest.fn(),
@@ -453,6 +456,10 @@ describe('AvsInvalidationCoordinator completed movement reasons', () => {
       tokenDoc,
       movementChanges,
     );
+    expect(batchOrchestrator.notifyTokenMovementComplete).toHaveBeenCalledTimes(1);
+    expect(
+      visibilityState.markTokenChangedWithSpatialOptimization.mock.invocationCallOrder[0],
+    ).toBeLessThan(batchOrchestrator.notifyTokenMovementComplete.mock.invocationCallOrder[0]);
   });
 
   test('token-movement-completed expires Take Cover before queuing override validation and processing it', async () => {
@@ -513,6 +520,7 @@ describe('AvsInvalidationCoordinator completed movement reasons', () => {
     expect(cacheManager.clearLosCache).toHaveBeenCalledTimes(1);
     expect(cacheManager.clearVisibilityCache).toHaveBeenCalledTimes(1);
     expect(batchOrchestrator.notifyTokenMovementStart).toHaveBeenCalledTimes(1);
+    expect(batchOrchestrator.notifyTokenMovementComplete).not.toHaveBeenCalled();
     expect(visionAnalyzer.clearCache).not.toHaveBeenCalled();
     expect(visibilityState.markTokenChangedWithSpatialOptimization).toHaveBeenCalledWith(
       tokenDoc,

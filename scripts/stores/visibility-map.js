@@ -16,6 +16,11 @@ import {
 } from '../visibility/perception-profile.js';
 import { waitForTokenDocumentUpdateSafe } from './document-update-guard.js';
 import {
+  currentPendingMovementSightLineSeesTarget,
+  hasPendingMovementRenderWork,
+  suppressPendingMovementDetectionFilterVisualsForObservedTransition,
+} from '../services/PendingMovement/pending-movement-render-lock.js';
+import {
   areTokenFlagValuesEqual,
   applyTokenFlagUpdatePasses,
   buildTokenFlagSetUpdate,
@@ -144,6 +149,163 @@ function buildVisibilityMapDiff(previousMap = {}, nextMap = {}) {
   return changes;
 }
 
+function tokenObjectById(tokenId) {
+  if (!tokenId) return null;
+  return (
+    canvas?.tokens?.get?.(tokenId) ||
+    canvas?.tokens?.placeables?.find?.((token) => getTokenId(token) === tokenId) ||
+    null
+  );
+}
+
+function getCurrentViewObserverIds() {
+  const ids = new Set();
+  const addToken = (token) => {
+    const id = getTokenId(token);
+    if (id) ids.add(id);
+  };
+
+  addToken(canvas?.tokens?._draggedToken);
+  for (const token of canvas?.tokens?.controlled || []) {
+    addToken(token);
+  }
+
+  return ids;
+}
+
+function shouldClearObservedDetectionFilterForChange(change) {
+  const viewObserverIds = getCurrentViewObserverIds();
+  if (viewObserverIds.size === 0) return true;
+  if (!change?.observerId) return true;
+  if (!viewObserverIds.has(change.observerId)) return false;
+  if (!hasPendingMovementRenderWork()) return true;
+
+  const observer = tokenObjectById(change.observerId);
+  const target = tokenObjectById(change.targetId);
+  if (!observer || !target) return true;
+  return currentPendingMovementSightLineSeesTarget(observer, target);
+}
+
+function clearDetectionFilterVisuals(token) {
+  if (!token) return;
+
+  try {
+    token.detectionFilter = null;
+  } catch {
+    /* best-effort filter clear */
+  }
+
+  const detectionFilterMesh = token.detectionFilterMesh;
+  if (detectionFilterMesh) {
+    try {
+      if ('visible' in detectionFilterMesh) detectionFilterMesh.visible = false;
+      if ('renderable' in detectionFilterMesh) detectionFilterMesh.renderable = false;
+      if ('alpha' in detectionFilterMesh) detectionFilterMesh.alpha = 0;
+    } catch {
+      /* best-effort filter mesh clear */
+    }
+  }
+
+  if (token._pvHiddenEcho) {
+    try {
+      if ('visible' in token._pvHiddenEcho) token._pvHiddenEcho.visible = false;
+    } catch {
+      /* best-effort hidden echo clear */
+    }
+  }
+}
+
+function tokenHasDetectionFilterMeshVisual(token) {
+  const mesh = token?.detectionFilterMesh;
+  if (!mesh) return false;
+
+  const alpha = Number(mesh.alpha);
+  const activeSignal =
+    mesh.visible === true ||
+    mesh.renderable === true ||
+    (Number.isFinite(alpha) && alpha > 0);
+  const hiddenSignal =
+    mesh.visible === false ||
+    mesh.renderable === false ||
+    (Number.isFinite(alpha) && alpha <= 0);
+
+  return activeSignal && !hiddenSignal;
+}
+
+function tokenHasDetectionFilterVisual(token) {
+  return (
+    !!token?.detectionFilter ||
+    tokenHasDetectionFilterMeshVisual(token) ||
+    !!token?._pvHiddenEcho
+  );
+}
+
+function clearObservedDetectionFilterVisualsForChanges(changes = []) {
+  for (const change of changes) {
+    if (change?.to !== 'observed' && change?.to !== 'concealed') continue;
+    if (!shouldClearObservedDetectionFilterForChange(change)) continue;
+    const target = tokenObjectById(change.targetId);
+    clearDetectionFilterVisuals(target);
+    suppressPendingMovementDetectionFilterVisualsForObservedTransition(target);
+  }
+}
+
+function visibilityTestPointsForToken(token) {
+  const documentPoints = token?.document?.getVisibilityTestPoints?.();
+  if (Array.isArray(documentPoints) && documentPoints.length) return documentPoints;
+
+  const centerPoint = token?.center || token?.getCenterPoint?.();
+  return centerPoint ? [centerPoint] : [];
+}
+
+function refreshCoreDetectionFilterForHiddenTarget(target) {
+  const testVisibility = canvas?.visibility?.testVisibility;
+  if (!target || typeof testVisibility !== 'function') return false;
+
+  const points = visibilityTestPointsForToken(target);
+  if (!points.length) return false;
+
+  try {
+    testVisibility.call(canvas.visibility, points, { object: target });
+    return !!target.detectionFilter;
+  } catch {
+    return false;
+  }
+}
+
+function primeHiddenDetectionFilterVisuals(target) {
+  if (!target || tokenHasDetectionFilterMeshVisual(target) || target._pvHiddenEcho) return false;
+
+  const detectionFilterMesh = target.detectionFilterMesh;
+  if (!detectionFilterMesh) return false;
+
+  try {
+    if ('visible' in detectionFilterMesh) detectionFilterMesh.visible = true;
+    if ('renderable' in detectionFilterMesh) detectionFilterMesh.renderable = true;
+    if ('alpha' in detectionFilterMesh) detectionFilterMesh.alpha = 1;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function refreshHiddenDetectionFilterVisualsForChanges(changes = []) {
+  for (const change of changes) {
+    if (change?.to !== 'hidden') continue;
+    const target = tokenObjectById(change.targetId);
+    if (!target || tokenHasDetectionFilterMeshVisual(target) || target._pvHiddenEcho) continue;
+    refreshCoreDetectionFilterForHiddenTarget(target);
+    if (tokenHasDetectionFilterMeshVisual(target) || target._pvHiddenEcho) continue;
+
+    try {
+      primeHiddenDetectionFilterVisuals(target);
+      target.refresh?.();
+    } catch {
+      /* best-effort immediate hidden visual refresh */
+    }
+  }
+}
+
 async function unsetDocumentFlag(token, flagKey, forcedDeletion, options = {}) {
   const document = getTokenDocument(token);
   if (!document) return;
@@ -257,20 +419,14 @@ export function buildVisibilityMapDocumentUpdatePasses(token, visibilityMap, opt
   }
 
   if (removedTargetIds.length > 0) {
-    return [
-      [buildTokenFlagUnsetUpdate({
+    return [[
+      buildTokenFlagSetUpdate({
         document,
         moduleId: MODULE_ID,
         flagKey: VISIBILITY_V2_FLAG,
-        forcedDeletion,
-      })],
-      [buildTokenFlagSetUpdate({
-        document,
-        moduleId: MODULE_ID,
-        flagKey: VISIBILITY_V2_FLAG,
-        value: nextProfiles,
-      })],
-    ];
+        value: buildProfileMapPatch(nextProfiles, removedTargetIds),
+      }),
+    ]];
   }
 
   return [[buildTokenFlagSetUpdate({
@@ -291,6 +447,14 @@ function collectVisibilityReadbackTargetIds(previousMap = {}, nextMap = {}) {
     ...Object.keys(previousMap ?? {}),
     ...Object.keys(nextMap ?? {}),
   ]));
+}
+
+function buildProfileMapPatch(nextProfiles = {}, removedTargetIds = []) {
+  const patch = { ...nextProfiles };
+  for (const targetId of removedTargetIds) {
+    patch[`-=${targetId}`] = null;
+  }
+  return patch;
 }
 
 function hasVisibilityReadbackMismatch(token, visibilityMap = {}, targetIds = []) {
@@ -324,14 +488,25 @@ export async function setVisibilityMapsBatch(entries = [], options = {}) {
   for (const entry of entries) {
     const token = entry?.token;
     if (!getTokenDocument(token)) continue;
+    const previousMap = getVisibilityMap(token);
+    const nextMap = normalizeVisibilityMap(entry.visibilityMap ?? {}, {
+      includeObserved: options?.preserveObserved === true,
+    });
     tokensToWaitFor.push(token);
+    const observerId = getTokenId(token);
+    const observerName = token?.name ?? getTokenDocument(token)?.name ?? observerId;
     readbackEntries.push({
       token,
       visibilityMap: entry.visibilityMap ?? {},
       targetIds: collectVisibilityReadbackTargetIds(
-        getVisibilityMap(token),
+        previousMap,
         entry.visibilityMap ?? {},
       ),
+      changes: buildVisibilityMapDiff(previousMap, nextMap).map((change) => ({
+        ...change,
+        observerId,
+        observerName,
+      })),
     });
 
     const passes = buildVisibilityMapDocumentUpdatePasses(token, entry.visibilityMap, options);
@@ -339,6 +514,11 @@ export async function setVisibilityMapsBatch(entries = [], options = {}) {
       if (!updatePasses[index]) updatePasses[index] = [];
       updatePasses[index].push(...updates);
     });
+  }
+
+  for (const entry of readbackEntries) {
+    clearObservedDetectionFilterVisualsForChanges(entry.changes);
+    refreshHiddenDetectionFilterVisualsForChanges(entry.changes);
   }
 
   const result = await applyTokenFlagUpdatePasses({
@@ -351,6 +531,9 @@ export async function setVisibilityMapsBatch(entries = [], options = {}) {
       entries.map((entry) => setVisibilityMap(entry.token, entry.visibilityMap, options)),
     ),
   });
+  for (const entry of readbackEntries) {
+    refreshHiddenDetectionFilterVisualsForChanges(entry.changes);
+  }
   const repaired = await repairStaleVisibilityBatchReadback(readbackEntries, options);
   return { ...result, repaired };
 }
@@ -395,6 +578,13 @@ export async function setVisibilityMap(token, visibilityMap, options = {}) {
     includeObserved: options?.preserveObserved === true,
   });
   const changes = buildVisibilityMapDiff(previousMap, nextMap);
+  const observerId = getTokenId(token);
+  const observerName = token?.name ?? document?.name ?? observerId;
+  const observedClearChanges = changes.map((change) => ({
+    ...change,
+    observerId,
+    observerName,
+  }));
   if (changes.length) {
     log.debug(() => ({
       msg: 'persist-visibility-map',
@@ -409,7 +599,11 @@ export async function setVisibilityMap(token, visibilityMap, options = {}) {
   const nextProfiles = legacyVisibilityMapToProfiles(nextMap, previousProfiles, {
     preserveObserved: options?.preserveObserved === true,
   });
-  return setPerceptionProfileFlag(token, nextProfiles, options);
+  clearObservedDetectionFilterVisualsForChanges(observedClearChanges);
+  refreshHiddenDetectionFilterVisualsForChanges(changes);
+  const result = await setPerceptionProfileFlag(token, nextProfiles, options);
+  refreshHiddenDetectionFilterVisualsForChanges(changes);
+  return result;
 }
 
 /**
@@ -516,7 +710,7 @@ function notifyVisibilityMapUpdated(observer, target, state, options = {}) {
       state,
       direction: options.direction || 'observer_to_target',
     });
-  } catch (_) {}
+  } catch (_) { }
 }
 
 function logVisibilityPairChange(observer, target, from, to, options = {}) {
@@ -594,6 +788,9 @@ export async function setPerceptionProfileBetween(
     await setPerceptionProfileMap(observer, profileMap, {
       preserveEncounterUnnoticed: !!options.preserveEncounterUnnoticed,
     });
+    if (legacyState === 'observed' || legacyState === 'concealed') {
+      clearDetectionFilterVisuals(target);
+    }
     notifyVisibilityMapUpdated(observer, target, legacyState, options);
   }
 

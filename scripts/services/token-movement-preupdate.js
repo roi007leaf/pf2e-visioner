@@ -1,9 +1,6 @@
 import {
-  refreshPendingMovementTokenVisibility,
-} from './pending-movement-render-lock.js';
-import {
   setPendingTokenMovementPosition,
-} from './pending-token-movement.js';
+} from './PendingMovement/pending-token-movement.js';
 
 function hasPositionChange(changes) {
   return !!changes && ('x' in changes || 'y' in changes);
@@ -68,7 +65,7 @@ function clearEstablishedInvisibleStatesForMovement(token, getConditionManager) 
 
   const conditionManager = getConditionManager?.();
   if (typeof conditionManager?.clearEstablishedInvisibleStates === 'function') {
-    conditionManager.clearEstablishedInvisibleStates(token).catch(() => {});
+    conditionManager.clearEstablishedInvisibleStates(token).catch(() => { });
   }
 }
 
@@ -83,8 +80,6 @@ export function handlePreUpdateTokenMovement(
     notifyWarn = notifyDefaultWarn,
     getControlledTokens = getDefaultControlledTokens,
     setPendingTokenMovementPosition: recordPendingMovement = setPendingTokenMovementPosition,
-    refreshPendingMovementTokenVisibility: refreshPendingVisibility =
-      refreshPendingMovementTokenVisibility,
     getConditionManager = getDefaultConditionManager,
   } = {},
 ) {
@@ -100,14 +95,11 @@ export function handlePreUpdateTokenMovement(
     return false;
   }
 
-  if (
-    recordPendingMovement(tokenDoc, changes, getControlledTokens(), {
-      userId,
-      hookOptions: options,
-    })
-  ) {
-    refreshPendingVisibility(tokenDoc.id, { skipPerceptionRefresh: true });
-  }
+  recordPendingMovement(tokenDoc, changes, getControlledTokens(), {
+    userId,
+    hookOptions: options,
+    predictFinalVisibility: true,
+  });
 
   clearEstablishedInvisibleStatesForMovement(tokenDoc?.object, getConditionManager);
   return undefined;

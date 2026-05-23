@@ -1,4 +1,5 @@
 import { MODULE_ID } from '../constants.js';
+import { deleteExistingEmbeddedItems } from './utils.js';
 
 export async function deleteLegacyVisibilityEffects(actor, hiddenActorSignature) {
   if (!game.user?.isGM || !actor?.itemTypes?.effect || !hiddenActorSignature) return 0;
@@ -11,7 +12,7 @@ export async function deleteLegacyVisibilityEffects(actor, hiddenActorSignature)
     .map((effect) => effect?.id)
     .filter((id) => !!id && (actor.items?.get?.(id) ?? true));
   if (!ids.length) return 0;
-  await actor.deleteEmbeddedDocuments?.('Item', ids);
+  await deleteExistingEmbeddedItems(actor, ids);
   return ids.length;
 }
 

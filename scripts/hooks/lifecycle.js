@@ -7,10 +7,13 @@ import { MODULE_ID } from '../constants.js';
 import { scheduleCanvasPerceptionUpdate } from '../helpers/perception-refresh.js';
 import { initializeHoverTooltips } from '../services/HoverTooltips.js';
 import {
+  clearNoObserverDetectionFilterVisuals,
   hasPendingMovementRenderWork,
+  primePendingControlledTokenDragIntent,
   refreshPendingMovementTokenVisibility,
+  releasePendingControlledTokenDragIntent,
   restorePendingMovementTokenRendering,
-} from '../services/pending-movement-render-lock.js';
+} from '../services/PendingMovement/pending-movement-render-lock.js';
 import { runVisibilityV2MigrationIfNeeded } from '../migrations/visibility-v2-migration.js';
 import { registerSocket } from '../services/socket.js';
 import {
@@ -138,6 +141,7 @@ function scheduleNoObserverVisibilityRefresh() {
           ignoreObserverLocks: true,
         });
       }
+      clearNoObserverDetectionFilterVisuals();
       scheduleCanvasPerceptionUpdate({ initializeVision: true, refreshVision: true });
     } catch {
       /* best effort */
@@ -147,11 +151,59 @@ function scheduleNoObserverVisibilityRefresh() {
 
 function refreshPendingVisibilityAfterControlToken() {
   try {
-    if (!hasPendingMovementRenderWork()) return;
-    refreshPendingMovementTokenVisibility([], { ignoreObservedGrace: true });
+    const hasRenderWork = hasPendingMovementRenderWork();
+    refreshPendingMovementTokenVisibility(
+      [],
+      hasRenderWork
+        ? { ignoreObservedGrace: true }
+        : {
+          ignoreObservedGrace: true,
+          skipTokenRefresh: true,
+          skipPerceptionRefresh: true,
+        },
+    );
   } catch {
     /* best effort */
   }
+}
+
+function eventTargetsCanvasView(event) {
+  const canvasView = canvas?.app?.view || canvas?.app?.renderer?.view || null;
+  return !!canvasView && event?.target === canvasView;
+}
+
+function primeControlledTokenDragIntentFromCanvasPointer(event) {
+  if (event?.button !== 0) return;
+  if (!eventTargetsCanvasView(event)) return;
+
+  for (const token of canvas?.tokens?.controlled || []) {
+    primePendingControlledTokenDragIntent(token);
+  }
+}
+
+function releaseControlledTokenDragIntentFromCanvasPointer() {
+  releasePendingControlledTokenDragIntent();
+}
+
+function registerPendingMovementPointerIntentListeners() {
+  bindWindowListenerOnce(
+    'pendingMovementControlledDragIntentPointerDown',
+    'pointerdown',
+    primeControlledTokenDragIntentFromCanvasPointer,
+    { capture: true },
+  );
+  bindWindowListenerOnce(
+    'pendingMovementControlledDragIntentPointerUp',
+    'pointerup',
+    releaseControlledTokenDragIntentFromCanvasPointer,
+    { capture: true },
+  );
+  bindWindowListenerOnce(
+    'pendingMovementControlledDragIntentPointerCancel',
+    'pointercancel',
+    releaseControlledTokenDragIntentFromCanvasPointer,
+    { capture: true },
+  );
 }
 
 async function refreshVisionSharingTokenIds() {
@@ -518,6 +570,8 @@ export function onReady() {
 }
 
 export async function onCanvasReady() {
+  registerPendingMovementPointerIntentListeners();
+
   try {
     await refreshVisionSharingTokenIds();
   } catch (error) {
@@ -594,10 +648,10 @@ export async function onCanvasReady() {
             '../services/visual-effects.js'
           );
           await updateSystemHiddenTokenHighlights(null, null, { allowControlledFallback: false });
-          scheduleNoObserverVisibilityRefresh();
         } catch (error) {
           console.warn('PF2E Visioner | Failed to clear system-hidden token highlights:', error);
         }
+        scheduleNoObserverVisibilityRefresh();
       }
 
       // Clear the suppression flag after a short delay

@@ -4,16 +4,48 @@ import {
   createEphemeralEffectRule,
 } from '../helpers/visibility-helpers.js';
 import { OffGuardSuppression } from '../rule-elements/operations/OffGuardSuppression.js';
+import {
+  hasPendingMovementRenderWork,
+  suppressPendingMovementDetectionFilterVisualsForObservedTransition,
+} from '../services/PendingMovement/pending-movement-render-lock.js';
 import { EphemeralEffectIndex } from './ephemeral-effect-index.js';
 import { cleanupLegacyVisibilityPair } from './legacy-effect-cleanup.js';
-import { runWithEffectLock } from './utils.js';
+import { deleteExistingEmbeddedItems, runWithEffectLock } from './utils.js';
+
+const OBSERVED_EFFECT_MUTATION_SUPPRESSION_MS = 750;
+
+function tokenIdOf(token) {
+  return token?.document?.id || token?.id || null;
+}
+
+function getCurrentViewObserverIds() {
+  const ids = new Set();
+  const addToken = (token) => {
+    const id = tokenIdOf(token);
+    if (id) ids.add(id);
+  };
+
+  addToken(canvas?.tokens?._draggedToken);
+  for (const token of canvas?.tokens?.controlled || []) {
+    addToken(token);
+  }
+
+  return ids;
+}
+
+function shouldSuppressObservedTargetForObserver(observerToken) {
+  const viewObserverIds = getCurrentViewObserverIds();
+  if (viewObserverIds.size === 0) return true;
+  return viewObserverIds.has(tokenIdOf(observerToken));
+}
 
 export async function batchUpdateVisibilityEffects(observerToken, targetUpdates, options = {}) {
   if (!observerToken?.actor || !targetUpdates?.length) return;
+  if (options.deferDuringPendingMovement !== false && hasPendingMovementRenderWork()) return;
   try {
     const oType = observerToken?.actor?.type;
     if (oType && ['loot', 'vehicle', 'party'].includes(oType)) return;
-  } catch (_) {}
+  } catch (_) { }
   const effectTarget =
     options.effectTarget || (options.direction === 'target_to_observer' ? 'observer' : 'subject');
   const updatesByReceiver = new Map();
@@ -22,12 +54,20 @@ export async function batchUpdateVisibilityEffects(observerToken, targetUpdates,
     try {
       const tType = update.target.actor?.type;
       if (tType && ['loot', 'vehicle', 'party'].includes(tType)) continue;
-    } catch (_) {}
+    } catch (_) { }
     const receiver = effectTarget === 'observer' ? observerToken : update.target;
     const source = effectTarget === 'observer' ? update.target : observerToken;
     const suppressionActive =
       ['hidden', 'undetected'].includes(update.state) &&
       OffGuardSuppression.shouldSuppressOffGuardForState(source, update.state, receiver);
+    if (
+      (update.state === 'observed' || update.state === 'concealed') &&
+      shouldSuppressObservedTargetForObserver(observerToken)
+    ) {
+      suppressPendingMovementDetectionFilterVisualsForObservedTransition(update.target, {
+        durationMs: OBSERVED_EFFECT_MUTATION_SUPPRESSION_MS,
+      });
+    }
     const receiverId = receiver.actor.id;
     if (
       update.state === 'observed' ||
@@ -50,7 +90,7 @@ export async function batchUpdateVisibilityEffects(observerToken, targetUpdates,
     try {
       const rType = receiver?.actor?.type;
       if (rType && ['loot', 'vehicle', 'party'].includes(rType)) continue;
-    } catch (_) {}
+    } catch (_) { }
     await runWithEffectLock(receiver.actor, async () => {
       const effects = receiver.actor.itemTypes.effect;
       const effectIndex = new EphemeralEffectIndex({
@@ -101,7 +141,7 @@ export async function batchUpdateVisibilityEffects(observerToken, targetUpdates,
       if (effectsToDelete.length > 0) {
         // Only GMs can delete effects
         if (game.user.isGM) {
-          await receiver.actor.deleteEmbeddedDocuments('Item', effectsToDelete);
+          await deleteExistingEmbeddedItems(receiver.actor, effectsToDelete);
         }
       }
       if (effectsToUpdate.length > 0)

@@ -1,3 +1,5 @@
+import { shouldSkipPendingMovementTokenVisibilityRefresh } from '../PendingMovement/pending-movement-render-lock.js';
+
 export const SENSE_BADGE_BLOCKED_VISIBILITY_STATES = new Set(['undetected', 'unnoticed']);
 
 export function normalizeTooltipVisibilityState(visibilityState) {
@@ -5,7 +7,12 @@ export function normalizeTooltipVisibilityState(visibilityState) {
 }
 
 export function getVisibleOtherTokens(allTokens = [], subjectToken = null) {
-  return allTokens.filter((token) => token && token !== subjectToken && token.isVisible);
+  return allTokens.filter(
+    (token) =>
+      token &&
+      token !== subjectToken &&
+      (shouldSkipPendingMovementTokenVisibilityRefresh(token) || token.isVisible),
+  );
 }
 
 export function getTooltipSenseUsed(

@@ -374,6 +374,76 @@ describe('TokenEventHandler - animation detection on position change', () => {
     expect(queueOverrideValidation).not.toHaveBeenCalled();
   });
 
+  test('final move skips only recently handled duplicate destination', async () => {
+    const invalidationCoordinator = { invalidate: jest.fn(() => true) };
+    handler = new TokenEventHandler(
+      systemState,
+      visibilityState,
+      spatialAnalyzer,
+      exclusionManager,
+      overrideValidationManager,
+      positionManager,
+      cacheManager,
+      batchOrchestrator,
+      invalidationCoordinator,
+    );
+    const tokenDoc = makeTokenDoc({
+      object: {
+        _animation: null,
+        _dragHandle: null,
+        actor: { id: 'actor-1', items: [] },
+      },
+    });
+
+    handler._markAnimatedMoveHandledRecently('token-1', { x: 100, y: 100 });
+    await handler.handleMoveToken(
+      tokenDoc,
+      { destination: { x: 100, y: 100 }, chain: [] },
+      { animate: true },
+      'user-1',
+    );
+
+    expect(invalidationCoordinator.invalidate).not.toHaveBeenCalled();
+  });
+
+  test('final move processes recently handled token when destination changes', async () => {
+    const invalidationCoordinator = { invalidate: jest.fn(() => true) };
+    handler = new TokenEventHandler(
+      systemState,
+      visibilityState,
+      spatialAnalyzer,
+      exclusionManager,
+      overrideValidationManager,
+      positionManager,
+      cacheManager,
+      batchOrchestrator,
+      invalidationCoordinator,
+    );
+    const tokenDoc = makeTokenDoc({
+      object: {
+        _animation: null,
+        _dragHandle: null,
+        actor: { id: 'actor-1', items: [] },
+      },
+    });
+
+    handler._markAnimatedMoveHandledRecently('token-1', { x: 100, y: 100 });
+    await handler.handleMoveToken(
+      tokenDoc,
+      { destination: { x: 200, y: 100 }, chain: [] },
+      { animate: true },
+      'user-1',
+    );
+
+    expect(invalidationCoordinator.invalidate).toHaveBeenCalledWith({
+      reason: 'token-movement-completed',
+      document: tokenDoc,
+      changeData: { x: 200, y: 100 },
+      options: { animate: true },
+      userId: 'user-1',
+    });
+  });
+
   test('final move stores destination coordinates before completed movement invalidation', async () => {
     const invalidationCoordinator = { invalidate: jest.fn(() => true) };
     handler = new TokenEventHandler(

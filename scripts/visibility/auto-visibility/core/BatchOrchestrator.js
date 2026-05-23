@@ -5,14 +5,14 @@ import {
   markExplicitVisiblePair,
 } from '../../../services/ExplicitVisibilityPairs.js';
 import {
-  forceTokenInvisibleForObserverVisibility,
-  refreshPendingMovementTokenVisibility,
-} from '../../../services/pending-movement-render-lock.js';
-import {
   discardDetectionBatch,
   flushDetectionBatch,
   startDetectionBatch,
 } from '../../../stores/detection-map.js';
+import {
+  currentPendingMovementSightLineSeesTarget,
+  hasPendingMovementEntryForPair,
+} from '../../../services/PendingMovement/pending-movement-sight-line.js';
 import { getLogger } from '../../../utils/logger.js';
 import { scheduleTask } from '../../../utils/scheduler.js';
 import {
@@ -208,46 +208,57 @@ export class BatchOrchestrator {
 
     // Set timer to detect when movement stops
     this._movementStopTimer = setTimeout(() => {
-      if (!this._movementSession) {
-        if (this._pendingTokens.size === 0) {
-          this._isTokenMoving = false;
-          this._movementStopTimer = null;
-          return;
-        }
-        this._movementSession = this._createMovementSession(this._pendingTokens);
-      }
-
-      const sessionData = {
-        sessionId: this._movementSession.sessionId,
-        positionUpdates: this._movementSession.positionUpdates,
-        tokensAccumulated: this._movementSession.tokensAccumulated.size,
-        pendingTokensCount: this._pendingTokens.size,
-      };
-
-      this._isTokenMoving = false;
-      this._movementStopTimer = null;
-
-      // If there are pending tokens, process them immediately now that movement stopped
-      if (this._pendingTokens.size > 0) {
-        if (this.processingBatch) {
-          this._pendingMovementSessionData = sessionData;
-          return;
-        }
-
-        const toProcess = new Set(this._pendingTokens);
-        this._pendingTokens.clear();
-        if (this._coalesceTimer) {
-          clearTimeout(this._coalesceTimer);
-          this._coalesceTimer = null;
-        }
-
-        // Pass session data to the batch for telemetry
-        this.processBatch(toProcess, { movementSession: sessionData });
-        Hooks.callAll('pf2e-visioner.tokenMovementComplete', toProcess);
-      } else {
-        this._movementSession = null;
-      }
+      this._flushMovementStop();
     }, this._movementStopDelayMs);
+  }
+
+  notifyTokenMovementComplete() {
+    this._flushMovementStop();
+  }
+
+  _flushMovementStop() {
+    if (this._movementStopTimer) {
+      clearTimeout(this._movementStopTimer);
+      this._movementStopTimer = null;
+    }
+
+    if (!this._movementSession) {
+      if (this._pendingTokens.size === 0) {
+        this._isTokenMoving = false;
+        return;
+      }
+      this._movementSession = this._createMovementSession(this._pendingTokens);
+    }
+
+    const sessionData = {
+      sessionId: this._movementSession.sessionId,
+      positionUpdates: this._movementSession.positionUpdates,
+      tokensAccumulated: this._movementSession.tokensAccumulated.size,
+      pendingTokensCount: this._pendingTokens.size,
+    };
+
+    this._isTokenMoving = false;
+
+    // If there are pending tokens, process them immediately now that movement stopped
+    if (this._pendingTokens.size > 0) {
+      if (this.processingBatch) {
+        this._pendingMovementSessionData = sessionData;
+        return;
+      }
+
+      const toProcess = new Set(this._pendingTokens);
+      this._pendingTokens.clear();
+      if (this._coalesceTimer) {
+        clearTimeout(this._coalesceTimer);
+        this._coalesceTimer = null;
+      }
+
+      // Pass session data to the batch for telemetry
+      this.processBatch(toProcess, { movementSession: sessionData });
+      Hooks.callAll('pf2e-visioner.tokenMovementComplete', toProcess);
+    } else {
+      this._movementSession = null;
+    }
   }
 
   _createMovementSession(initialTokenIds = []) {
@@ -890,6 +901,19 @@ export class BatchOrchestrator {
     return clearExplicitVisiblePair(update.observer, update.target);
   }
 
+  _resolvePendingMovementVisibilityUpdate(update, currentVisibility) {
+    if (currentVisibility !== 'hidden') return update?.visibility;
+    if (update?.visibility !== 'observed' && update?.visibility !== 'concealed') {
+      return update?.visibility;
+    }
+    if (!update?.observer || !update?.target) return update?.visibility;
+    if (!hasPendingMovementEntryForPair(update.observer, update.target)) return update.visibility;
+
+    return currentPendingMovementSightLineSeesTarget(update.observer, update.target)
+      ? update.visibility
+      : currentVisibility;
+  }
+
   /**
    * Apply batch results with deduplication.
    * @param {Object} batchResult - Result from BatchProcessor
@@ -906,6 +930,8 @@ export class BatchOrchestrator {
       updates: batchResult.updates,
       getVisibilityMap: (observer) => this.visibilityMapService.getVisibilityMap(observer),
       recordExplicitVisiblePair: (update) => this._recordExplicitVisiblePair(update),
+      resolveVisibilityForUpdate: (update, currentVisibility) =>
+        this._resolvePendingMovementVisibilityUpdate(update, currentVisibility),
       overrideMatchesVisibilityFn: overrideMatchesVisibility,
       moduleId: MODULE_ID,
     });
@@ -929,7 +955,7 @@ export class BatchOrchestrator {
         dirtyVisibilityEntries.map(({ token, visibilityMap }) =>
           visibilityMapOptions
             ? this.visibilityMapService.setVisibilityMap(token, visibilityMap, visibilityMapOptions)
-          : this.visibilityMapService.setVisibilityMap(token, visibilityMap),
+            : this.visibilityMapService.setVisibilityMap(token, visibilityMap),
         ),
       );
 
@@ -937,45 +963,6 @@ export class BatchOrchestrator {
       if (result.status === 'rejected') {
         console.warn('PF2E Visioner | Failed to persist visibility map:', result.reason);
       }
-    }
-
-    const controlledObserverIds = new Set(
-      (canvas?.tokens?.controlled || [])
-        .map((token) => token?.document?.id)
-        .filter(Boolean),
-    );
-    for (const update of batchResult.updates) {
-      const observerId = update.observer?.document?.id;
-      if (!controlledObserverIds.has(observerId)) continue;
-      forceTokenInvisibleForObserverVisibility(update.observer, update.target, update.visibility);
-    }
-
-    const revealedVisibilityTargetIds = batchResult.updates
-      .filter((update) => update.visibility === 'observed' || update.visibility === 'concealed')
-      .map((update) => update.target?.document?.id)
-      .filter(Boolean);
-    if (revealedVisibilityTargetIds.length > 0) {
-      refreshPendingMovementTokenVisibility([], {
-        ignoreObservedGrace: true,
-        skipPerceptionRefresh: true,
-        targetTokenIds: revealedVisibilityTargetIds,
-      });
-    }
-
-    const hiddenVisibilityTargetIds = batchResult.updates
-      .filter((update) =>
-        update.visibility === 'hidden' ||
-        update.visibility === 'undetected' ||
-        update.visibility === 'unnoticed'
-      )
-      .map((update) => update.target?.document?.id)
-      .filter(Boolean);
-    if (hiddenVisibilityTargetIds.length > 0) {
-      refreshPendingMovementTokenVisibility([], {
-        ignoreObservedGrace: true,
-        skipTokenRefresh: true,
-        targetTokenIds: hiddenVisibilityTargetIds,
-      });
     }
 
     return applicationPlan.uniqueUpdateCount;

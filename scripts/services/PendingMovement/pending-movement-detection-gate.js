@@ -6,12 +6,14 @@ import {
   getPendingMovementHiddenStateContext,
   isPendingMovementHiddenStateVisibilityProbe,
   shouldBypassPendingMovementVisionerRenderState,
+  shouldUseCoreDetectionDuringPendingMovement,
   withSuppressedDetectionSources,
 } from './pending-token-movement.js';
 
 export {
   isPendingMovementHiddenStateVisibilityProbe,
   shouldBypassPendingMovementVisionerRenderState,
+  shouldUseCoreDetectionDuringPendingMovement,
 };
 
 export function shouldTemporarilyBlockHiddenDetection(observer, target, visibilityState) {
@@ -34,13 +36,16 @@ export function getPendingMovementBlockedDetectionSources(target, options = {}) 
 
 export function withPendingMovementBlockedDetectionSourcesSuppressed(target, callback) {
   const blockedEntries = getPendingMovementBlockedDetectionEntries(target);
-  const blockedSources = blockedEntries.map(({ source }) => source);
+  const suppressedEntries = blockedEntries.filter(
+    ({ source }) => !shouldUseCoreDetectionDuringPendingMovement(source?.object, target),
+  );
+  const blockedSources = suppressedEntries.map(({ source }) => source);
   return withSuppressedDetectionSources(
     blockedSources,
     () =>
       callback?.(
         blockedSources,
-        blockedEntries,
+        suppressedEntries,
         isPendingMovementHiddenStateVisibilityProbe()
           ? null
           : getPendingMovementHiddenStateContext(target),

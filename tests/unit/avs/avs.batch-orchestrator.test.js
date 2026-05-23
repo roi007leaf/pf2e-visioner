@@ -6,6 +6,10 @@ import {
   discardDetectionBatch,
   setDetectionMap,
 } from '../../../scripts/stores/detection-map.js';
+import {
+  clearPendingTokenMovementPosition,
+  setPendingTokenMovementPosition,
+} from '../../../scripts/services/PendingMovement/pending-token-movement.js';
 
 function emptyBatchResult() {
   return {
@@ -105,12 +109,14 @@ describe('BatchOrchestrator', () => {
       (id) => global.canvas.tokens.placeables.find((token) => token.document.id === id) ?? null,
     );
     global.canvas.perception = {
-      update: jest.fn(async () => {}),
+      update: jest.fn(async () => { }),
     };
   });
 
   afterEach(() => {
     jest.useRealTimers();
+    clearPendingTokenMovementPosition('A');
+    global.canvas.walls.placeables = [];
   });
 
   test('processBatch starts/stop telemetry, applies deduped updates', async () => {
@@ -119,6 +125,35 @@ describe('BatchOrchestrator', () => {
     expect(telemetryReporter.start).toHaveBeenCalled();
     expect(telemetryReporter.stop).toHaveBeenCalled();
     expect(applied).toEqual([['A', 'B', 'hidden']]);
+  });
+
+  test('applies hidden to observed update after movement has settled even when current sight helper is blocked', () => {
+    const [observer, target] = global.canvas.tokens.placeables;
+    global.canvas.walls.placeables = [
+      createMockWall({ id: 'wall', c: [75, -100, 75, 100], sight: 1 }),
+    ];
+
+    expect(
+      orchestrator._resolvePendingMovementVisibilityUpdate(
+        { observer, target, visibility: 'observed' },
+        'hidden',
+      ),
+    ).toBe('observed');
+  });
+
+  test('preserves hidden during active pending movement when current sight is still blocked', () => {
+    const [observer, target] = global.canvas.tokens.placeables;
+    global.canvas.walls.placeables = [
+      createMockWall({ id: 'wall', c: [75, -100, 75, 100], sight: 1 }),
+    ];
+    setPendingTokenMovementPosition(observer.document, { x: 100, y: 0 }, [observer]);
+
+    expect(
+      orchestrator._resolvePendingMovementVisibilityUpdate(
+        { observer, target, visibility: 'observed' },
+        'hidden',
+      ),
+    ).toBe('hidden');
   });
 
   test('processBatch reports batch timestamps and stage timings', async () => {
@@ -182,7 +217,7 @@ describe('BatchOrchestrator', () => {
       precomputeStats: { observerUsed: 0, observerMiss: 1, targetUsed: 0, targetMiss: 1 },
     });
     visibilityMapService.getVisibilityMap = jest.fn(() => ({ B: 'undetected' }));
-    visibilityMapService.setVisibilityMap = jest.fn(async () => {});
+    visibilityMapService.setVisibilityMap = jest.fn(async () => { });
 
     await orchestrator.processBatch(new Set(['A']));
 
@@ -202,7 +237,7 @@ describe('BatchOrchestrator', () => {
 
   test('processBatch drops stale results when movement starts while batch is running', async () => {
     jest.useFakeTimers();
-    orchestrator._syncEphemeralEffectsForUpdates = jest.fn(async () => {});
+    orchestrator._syncEphemeralEffectsForUpdates = jest.fn(async () => { });
     orchestrator._precomputeLighting = jest.fn(async () => ({
       precomputedLights: null,
       precomputeStats: { observerUsed: 0, observerMiss: 0, targetUsed: 0, targetMiss: 0 },
@@ -262,7 +297,7 @@ describe('BatchOrchestrator', () => {
 
   test('movement stop keeps pending movement tokens when an older batch is still running', async () => {
     jest.useFakeTimers();
-    orchestrator._syncEphemeralEffectsForUpdates = jest.fn(async () => {});
+    orchestrator._syncEphemeralEffectsForUpdates = jest.fn(async () => { });
     orchestrator._precomputeLighting = jest.fn(async () => ({
       precomputedLights: null,
       precomputeStats: { observerUsed: 0, observerMiss: 0, targetUsed: 0, targetMiss: 0 },
@@ -311,10 +346,36 @@ describe('BatchOrchestrator', () => {
     );
   });
 
+  test('movement complete drains pending movement tokens without waiting for stop timer', async () => {
+    jest.useFakeTimers();
+    orchestrator._syncEphemeralEffectsForUpdates = jest.fn(async () => { });
+    orchestrator._precomputeLighting = jest.fn(async () => ({
+      precomputedLights: null,
+      precomputeStats: { observerUsed: 0, observerMiss: 0, targetUsed: 0, targetMiss: 0 },
+    }));
+    batchProcessor.process.mockResolvedValue(emptyBatchResult());
+
+    orchestrator.notifyTokenMovementStart();
+    orchestrator.enqueueTokens(new Set(['A']));
+    orchestrator.notifyTokenMovementComplete();
+
+    await flushPromises();
+
+    expect(batchProcessor.process).toHaveBeenCalledTimes(1);
+    expect(batchProcessor.process.mock.calls[0][2]).toEqual(
+      expect.objectContaining({ skipPrecomputedLOS: true, skipViewportFilter: true }),
+    );
+
+    await jest.advanceTimersByTimeAsync(250);
+    await flushPromises();
+
+    expect(batchProcessor.process).toHaveBeenCalledTimes(1);
+  });
+
   test('movement start recreates missing session when moving flag survived cleanup', async () => {
     jest.useFakeTimers();
-    const consoleWarn = jest.spyOn(console, 'warn').mockImplementation(() => {});
-    orchestrator._syncEphemeralEffectsForUpdates = jest.fn(async () => {});
+    const consoleWarn = jest.spyOn(console, 'warn').mockImplementation(() => { });
+    orchestrator._syncEphemeralEffectsForUpdates = jest.fn(async () => { });
     orchestrator._precomputeLighting = jest.fn(async () => ({
       precomputedLights: null,
       precomputeStats: { observerUsed: 0, observerMiss: 0, targetUsed: 0, targetMiss: 0 },
@@ -346,8 +407,8 @@ describe('BatchOrchestrator', () => {
 
   test('movement stop drains pending tokens without warning when session disappeared', async () => {
     jest.useFakeTimers();
-    const consoleWarn = jest.spyOn(console, 'warn').mockImplementation(() => {});
-    orchestrator._syncEphemeralEffectsForUpdates = jest.fn(async () => {});
+    const consoleWarn = jest.spyOn(console, 'warn').mockImplementation(() => { });
+    orchestrator._syncEphemeralEffectsForUpdates = jest.fn(async () => { });
     orchestrator._precomputeLighting = jest.fn(async () => ({
       precomputedLights: null,
       precomputeStats: { observerUsed: 0, observerMiss: 0, targetUsed: 0, targetMiss: 0 },
@@ -374,7 +435,7 @@ describe('BatchOrchestrator', () => {
   test('enqueue during a scheduled follow-up batch stays pending for the next follow-up', async () => {
     jest.useFakeTimers();
     global.canvas.tokens.placeables.push(createMockToken({ id: 'C', x: 200, y: 0 }));
-    orchestrator._syncEphemeralEffectsForUpdates = jest.fn(async () => {});
+    orchestrator._syncEphemeralEffectsForUpdates = jest.fn(async () => { });
     orchestrator._precomputeLighting = jest.fn(async () => ({
       precomputedLights: null,
       precomputeStats: { observerUsed: 0, observerMiss: 0, targetUsed: 0, targetMiss: 0 },
@@ -428,7 +489,7 @@ describe('BatchOrchestrator', () => {
   test('direct processBatch call during an active batch is queued for a follow-up batch', async () => {
     jest.useFakeTimers();
     global.canvas.tokens.placeables.push(createMockToken({ id: 'C', x: 200, y: 0 }));
-    orchestrator._syncEphemeralEffectsForUpdates = jest.fn(async () => {});
+    orchestrator._syncEphemeralEffectsForUpdates = jest.fn(async () => { });
     orchestrator._precomputeLighting = jest.fn(async () => ({
       precomputedLights: null,
       precomputeStats: { observerUsed: 0, observerMiss: 0, targetUsed: 0, targetMiss: 0 },
@@ -498,7 +559,7 @@ describe('BatchOrchestrator', () => {
     expect(settled).toBe(true);
   });
 
-  test('_applyBatchResults pre-hides controlled observer hidden target after map persistence', async () => {
+  test('_applyBatchResults leaves render-lock side effects to post-result workflow', async () => {
     const observer = global.canvas.tokens.placeables[0];
     const target = global.canvas.tokens.placeables[1];
     global.canvas.tokens.controlled = [observer];
@@ -514,46 +575,13 @@ describe('BatchOrchestrator', () => {
       ],
     });
 
-    expect(target.renderable).toBe(false);
-    expect(target.visible).toBe(false);
-  });
-
-  test('_applyBatchResults restores controlled observer target when movement reveals it', async () => {
-    const observer = global.canvas.tokens.placeables[0];
-    const target = global.canvas.tokens.placeables[1];
-    global.canvas.tokens.controlled = [observer];
-    target.renderable = true;
-
-    await orchestrator._applyBatchResults({
-      updates: [
-        {
-          observer,
-          target,
-          visibility: 'undetected',
-        },
-      ],
-    });
-
-    expect(target.visible).toBe(false);
-
-    await orchestrator._applyBatchResults({
-      updates: [
-        {
-          observer,
-          target,
-          visibility: 'observed',
-          explicitVisiblePair: true,
-        },
-      ],
-    });
-
-    expect(target.visible).toBe(true);
     expect(target.renderable).toBe(true);
+    expect(target.visible).toBe(true);
   });
 
   test('_applyBatchResults records door detection sync without map write', async () => {
     global.game.pf2eVisioner = {};
-    visibilityMapService.setVisibilityMap = jest.fn(async () => {});
+    visibilityMapService.setVisibilityMap = jest.fn(async () => { });
 
     const count = await orchestrator._applyBatchResults(
       {
@@ -575,6 +603,71 @@ describe('BatchOrchestrator', () => {
     expect([...global.game.pf2eVisioner.explicitlyVisiblePairs]).toEqual(
       expect.arrayContaining([expect.stringContaining('A->B')]),
     );
+  });
+
+  test('_applyBatchResults holds hidden during pending movement when current sight is blocked', async () => {
+    global.game.pf2eVisioner = {};
+    const observer = createMockToken({ id: 'A', x: 0, y: 0 });
+    const target = createMockToken({ id: 'B', x: 3, y: 0 });
+    global.canvas.tokens.placeables = [observer, target];
+    global.canvas.tokens.controlled = [observer];
+    global.canvas.walls.placeables = [
+      createMockWall({ id: 'sight-wall', c: [100, 0, 100, 100], sight: 1, sound: 0 }),
+    ];
+    visibilityMapService.getVisibilityMap = jest.fn(() => ({ B: 'hidden' }));
+    visibilityMapService.setVisibilityMap = jest.fn(async () => { });
+
+    expect(setPendingTokenMovementPosition(observer.document, { x: 1, y: 0 }, [observer])).toBe(
+      true,
+    );
+
+    const count = await orchestrator._applyBatchResults({
+      updates: [{ observer, target, visibility: 'observed' }],
+    });
+
+    expect(count).toBe(0);
+    expect(visibilityMapService.setVisibilityMap).not.toHaveBeenCalled();
+  });
+
+  test('_applyBatchResults applies observed after movement work clears even when stale current sight is blocked', async () => {
+    global.game.pf2eVisioner = {};
+    const observer = createMockToken({ id: 'A', x: 0, y: 0 });
+    const target = createMockToken({ id: 'B', x: 3, y: 0 });
+    global.canvas.tokens.placeables = [observer, target];
+    global.canvas.tokens.controlled = [observer];
+    global.canvas.walls.placeables = [
+      createMockWall({ id: 'sight-wall', c: [100, 0, 100, 100], sight: 1, sound: 0 }),
+    ];
+    visibilityMapService.getVisibilityMap = jest.fn(() => ({ B: 'hidden' }));
+    visibilityMapService.setVisibilityMap = jest.fn(async () => { });
+
+    const count = await orchestrator._applyBatchResults({
+      updates: [{ observer, target, visibility: 'observed' }],
+    });
+
+    expect(count).toBe(1);
+    expect(visibilityMapService.setVisibilityMap).toHaveBeenCalledWith(observer, { B: 'observed' });
+  });
+
+  test('_applyBatchResults applies observed during pending movement when current sight sees target', async () => {
+    global.game.pf2eVisioner = {};
+    const observer = createMockToken({ id: 'A', x: 0, y: 0 });
+    const target = createMockToken({ id: 'B', x: 1, y: 0 });
+    global.canvas.tokens.placeables = [observer, target];
+    global.canvas.tokens.controlled = [observer];
+    visibilityMapService.getVisibilityMap = jest.fn(() => ({ B: 'hidden' }));
+    visibilityMapService.setVisibilityMap = jest.fn(async () => { });
+
+    expect(setPendingTokenMovementPosition(observer.document, { x: 1, y: 0 }, [observer])).toBe(
+      true,
+    );
+
+    const count = await orchestrator._applyBatchResults({
+      updates: [{ observer, target, visibility: 'observed' }],
+    });
+
+    expect(count).toBe(1);
+    expect(visibilityMapService.setVisibilityMap).toHaveBeenCalledWith(observer, { B: 'observed' });
   });
 
   test('processBatch refreshes perception after ephemeral effect sync', async () => {
@@ -606,7 +699,7 @@ describe('BatchOrchestrator', () => {
 
   test('processBatch closes detection batch mode when result application fails', async () => {
     const observer = createMockToken({ id: 'detection-observer' });
-    const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const consoleError = jest.spyOn(console, 'error').mockImplementation(() => { });
     orchestrator._precomputeLighting = jest.fn(async () => ({
       precomputedLights: null,
       precomputeStats: { observerUsed: 0, observerMiss: 0, targetUsed: 0, targetMiss: 0 },

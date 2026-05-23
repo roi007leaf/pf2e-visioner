@@ -1,6 +1,11 @@
 import '../../setup.js';
 
 import { batchUpdateVisibilityEffects } from '../../../scripts/visibility/batch.js';
+import {
+  clearPendingTokenMovementPosition,
+  setPendingTokenMovementPosition,
+  shouldSuppressPendingMovementDetectionFilterVisuals,
+} from '../../../scripts/services/PendingMovement/pending-token-movement.js';
 
 const makeActor = (id, signature, effects = []) => ({
   id,
@@ -160,5 +165,124 @@ describe('batchUpdateVisibilityEffects', () => {
     await batchUpdateVisibilityEffects(observer, [{ target, state: 'hidden' }]);
 
     expect(targetActor.deleteEmbeddedDocuments).toHaveBeenCalledWith('Item', ['hidden-aggregate']);
+  });
+
+  test('suppresses observed target detection filters while aggregate effects mutate', async () => {
+    const existingHiddenAggregate = {
+      id: 'hidden-aggregate',
+      flags: {
+        'pf2e-visioner': {
+          aggregateOffGuard: true,
+          visibilityState: 'hidden',
+          effectTarget: 'subject',
+        },
+      },
+      system: {
+        rules: [
+          {
+            key: 'EphemeralEffect',
+            predicate: ['target:signature:observer-sig'],
+          },
+        ],
+      },
+    };
+    const observerActor = makeActor('observer-actor', 'observer-sig', []);
+    const targetActor = makeActor('target-actor', 'target-sig', [existingHiddenAggregate]);
+    const observer = makeToken('observer', 'Observer', observerActor);
+    const target = makeToken('target', 'Target', targetActor);
+    targetActor.deleteEmbeddedDocuments.mockImplementation(async () => {
+      expect(shouldSuppressPendingMovementDetectionFilterVisuals(target)).toBe(true);
+      return [];
+    });
+
+    await batchUpdateVisibilityEffects(observer, [{ target, state: 'observed' }]);
+
+    expect(targetActor.deleteEmbeddedDocuments).toHaveBeenCalledWith('Item', ['hidden-aggregate']);
+    expect(shouldSuppressPendingMovementDetectionFilterVisuals(target)).toBe(true);
+  });
+
+  test('does not suppress observed target filters for a non-controlled observer', async () => {
+    const existingHiddenAggregate = {
+      id: 'hidden-aggregate',
+      flags: {
+        'pf2e-visioner': {
+          aggregateOffGuard: true,
+          visibilityState: 'hidden',
+          effectTarget: 'subject',
+        },
+      },
+      system: {
+        rules: [
+          {
+            key: 'EphemeralEffect',
+            predicate: ['target:signature:observer-sig'],
+          },
+        ],
+      },
+    };
+    const observerActor = makeActor('observer-actor', 'observer-sig', []);
+    const controlledActor = makeActor('controlled-actor', 'controlled-sig', []);
+    const targetActor = makeActor('target-actor', 'target-sig', [existingHiddenAggregate]);
+    const observer = makeToken('observer', 'Observer', observerActor);
+    const controlledObserver = makeToken('controlled-observer', 'Controlled', controlledActor, {
+      'pf2e-visioner': {
+        visibilityV2: {
+          target: {
+            detectionState: 'hidden',
+            hasConcealment: false,
+            coverState: 'none',
+          },
+        },
+      },
+    });
+    const target = makeToken('target', 'Target', targetActor);
+    const originalCanvas = global.canvas;
+    global.canvas = {
+      ...global.canvas,
+      tokens: {
+        ...global.canvas.tokens,
+        controlled: [controlledObserver],
+        placeables: [observer, controlledObserver, target],
+        get: jest.fn((id) =>
+          id === 'observer'
+            ? observer
+            : id === 'controlled-observer'
+              ? controlledObserver
+              : id === 'target'
+                ? target
+                : null,
+        ),
+      },
+    };
+
+    try {
+      await batchUpdateVisibilityEffects(observer, [{ target, state: 'observed' }]);
+
+      expect(targetActor.deleteEmbeddedDocuments).toHaveBeenCalledWith('Item', ['hidden-aggregate']);
+      expect(shouldSuppressPendingMovementDetectionFilterVisuals(target)).toBe(false);
+    } finally {
+      global.canvas = originalCanvas;
+    }
+  });
+
+  test('defers aggregate mutations while token movement is pending', async () => {
+    const observerActor = makeActor('observer-actor', 'observer-sig', []);
+    const targetActor = makeActor('target-actor', 'target-sig', []);
+    const observer = makeToken('observer', 'Observer', observerActor);
+    observer.document.x = 0;
+    observer.document.y = 0;
+    observer.document.width = 1;
+    observer.document.height = 1;
+    const target = makeToken('target', 'Hidden Enemy', targetActor);
+
+    setPendingTokenMovementPosition(observer.document, { x: 200, y: 0 }, [observer]);
+
+    await batchUpdateVisibilityEffects(observer, [{ target, state: 'hidden' }]);
+
+    expect(targetActor.createEmbeddedDocuments).not.toHaveBeenCalled();
+    expect(targetActor.updateEmbeddedDocuments).not.toHaveBeenCalled();
+    expect(targetActor.deleteEmbeddedDocuments).not.toHaveBeenCalled();
+
+    clearPendingTokenMovementPosition('observer');
   });
 });

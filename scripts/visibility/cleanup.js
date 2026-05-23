@@ -3,6 +3,7 @@
  */
 
 import { MODULE_ID } from '../constants.js';
+import { deleteExistingEmbeddedItems } from './utils.js';
 
 async function removeObserverFromAggregate(
   effectReceiverToken,
@@ -36,7 +37,7 @@ async function removeObserverFromAggregate(
     try {
       const id = aggregate?.id;
       if (id && effectReceiverToken?.actor?.items?.get?.(id)) {
-        await effectReceiverToken.actor.deleteEmbeddedDocuments('Item', [id]);
+        await deleteExistingEmbeddedItems(effectReceiverToken.actor, [id]);
       } else {
         await aggregate.update({ 'system.rules': [] });
       }
@@ -68,7 +69,7 @@ async function pruneEmptyAggregates(effectReceiverToken) {
         .filter((id) => !!id && !!effectReceiverToken?.actor?.items?.get?.(id));
       if (ids.length) {
         try {
-          await effectReceiverToken.actor.deleteEmbeddedDocuments('Item', ids);
+          await deleteExistingEmbeddedItems(effectReceiverToken.actor, ids);
         } catch (error) {
           console.error(`[${MODULE_ID}] Error pruning empty aggregates:`, error);
         }
@@ -95,13 +96,13 @@ export async function cleanupEphemeralEffectsForTarget(observerToken, hiddenToke
       const existingIds = effectIds.filter((id) => !!observerToken?.actor?.items?.get?.(id));
       if (existingIds.length > 0) {
         try {
-          await observerToken.actor.deleteEmbeddedDocuments('Item', existingIds);
+          await deleteExistingEmbeddedItems(observerToken.actor, existingIds);
         } catch (error) {
           console.error(`[${MODULE_ID}] Error bulk deleting observer effects:`, error);
           for (const id of existingIds) {
             if (!!id && !!observerToken?.actor?.items?.get?.(id)) {
               try {
-                await observerToken.actor.deleteEmbeddedDocuments('Item', [id]);
+                await deleteExistingEmbeddedItems(observerToken.actor, [id]);
               } catch (_) {}
             }
           }
@@ -120,7 +121,7 @@ export async function cleanupEphemeralEffectsForTarget(observerToken, hiddenToke
           .filter((id) => !!hiddenToken.actor.items.get(id));
         if (ids.length) {
           try {
-            await hiddenToken.actor.deleteEmbeddedDocuments('Item', ids);
+            await deleteExistingEmbeddedItems(hiddenToken.actor, ids);
           } catch (error) {
             console.error(`[${MODULE_ID}] Error deleting legacy off-guard effects:`, error);
           }
@@ -204,7 +205,7 @@ export async function cleanupDeletedTokenEffects(tokenDoc) {
         }
         try {
           if (effectsToDelete.length > 0) {
-            await token.actor.deleteEmbeddedDocuments('Item', effectsToDelete);
+            await deleteExistingEmbeddedItems(token.actor, effectsToDelete);
           }
           if (effectsToUpdate.length > 0) {
             await token.actor.updateEmbeddedDocuments('Item', effectsToUpdate);

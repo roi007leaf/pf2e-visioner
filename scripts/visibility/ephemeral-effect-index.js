@@ -8,26 +8,65 @@ function hasSignaturePredicate(rule, signature) {
   );
 }
 
+function signaturePredicate(rule) {
+  if (rule?.key !== 'EphemeralEffect' || !Array.isArray(rule.predicate)) return null;
+
+  return rule.predicate.find(
+    (predicate) => typeof predicate === 'string' && predicate.startsWith('target:signature:'),
+  ) ?? null;
+}
+
+function ruleIdentity(rule) {
+  return signaturePredicate(rule) ?? JSON.stringify(rule);
+}
+
+function mergeAggregateRules(aggregates) {
+  const seen = new Set();
+  const rules = [];
+
+  for (const aggregate of aggregates) {
+    const aggregateRules = Array.isArray(aggregate?.system?.rules) ? aggregate.system.rules : [];
+    for (const rule of aggregateRules) {
+      const identity = ruleIdentity(rule);
+      if (seen.has(identity)) continue;
+
+      seen.add(identity);
+      rules.push(rule);
+    }
+  }
+
+  return rules;
+}
+
 export class EphemeralEffectIndex {
   constructor({ effects = [], moduleId, effectTarget = 'subject' } = {}) {
     this.moduleId = moduleId;
     this.effectTarget = effectTarget;
     this.aggregates = new Map();
+    this.duplicateAggregates = new Map();
     this.rulesByState = new Map();
     this.changedStates = new Set();
 
     for (const state of VISIBILITY_EFFECT_STATES) {
-      const aggregate = effects.find(
+      const aggregates = effects.filter(
         (effect) =>
           effect?.flags?.[moduleId]?.aggregateOffGuard === true &&
           effect?.flags?.[moduleId]?.visibilityState === state &&
           effect?.flags?.[moduleId]?.effectTarget === effectTarget,
       );
+      const aggregate = aggregates[0] || null;
+      const duplicates = aggregates.slice(1);
+      const rules = mergeAggregateRules(aggregates);
+
       this.aggregates.set(state, aggregate || null);
-      this.rulesByState.set(
-        state,
-        aggregate && Array.isArray(aggregate.system?.rules) ? [...aggregate.system.rules] : [],
-      );
+      this.duplicateAggregates.set(state, duplicates);
+      this.rulesByState.set(state, rules);
+      if (
+        duplicates.length > 0 ||
+        (aggregate && Array.isArray(aggregate.system?.rules) && rules.length !== aggregate.system.rules.length)
+      ) {
+        this.changedStates.add(state);
+      }
     }
   }
 
@@ -68,14 +107,19 @@ export class EphemeralEffectIndex {
 
     for (const state of VISIBILITY_EFFECT_STATES) {
       const aggregate = this.getAggregate(state);
+      const duplicateIds = this.duplicateAggregates
+        .get(state)
+        .map((duplicate) => duplicate?.id)
+        .filter(Boolean);
       const rules = this.getRules(state);
       const changed = this.changedStates.has(state);
 
       if (aggregate) {
         if (rules.length === 0) {
-          effectsToDelete.push(aggregate.id);
+          effectsToDelete.push(aggregate.id, ...duplicateIds);
         } else if (changed) {
           effectsToUpdate.push({ _id: aggregate.id, 'system.rules': rules });
+          effectsToDelete.push(...duplicateIds);
         }
       } else if (rules.length > 0) {
         effectsToCreate.push(

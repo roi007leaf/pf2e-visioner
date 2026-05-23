@@ -1,14 +1,20 @@
-import { MODULE_ID } from '../constants.js';
+import { MODULE_ID } from '../../constants.js';
 import {
   getPendingMovementHiddenStateBlock,
   isPendingMovementHiddenStateVisibilityProbe,
-  shouldTemporarilyBlockHiddenDetection,
+  shouldUseCoreDetectionDuringPendingMovement,
   shouldTemporarilyBlockSightDetection,
-} from './pending-movement-detection-gate.js';
+} from '../PendingMovement/pending-movement-detection-gate.js';
 import {
   getVisionerVisibilityBetweenTokens,
   NON_VISUAL_DETECTION_MODE_IDS,
 } from './detection-visibility-context.js';
+
+function testDetectionPoints(detectionMode, visionSource, mode, config) {
+  return (config.tests || []).some((test) =>
+    detectionMode._testPoint(visionSource, mode, config.object, test),
+  );
+}
 
 export function testDetectionModeVisibility(visionSource, mode, config = {}) {
   if (!mode.enabled) return false;
@@ -25,15 +31,22 @@ export function testDetectionModeVisibility(visionSource, mode, config = {}) {
   const modeId = mode?.id ?? this?.id ?? null;
   const observerToken = visionSource?.object;
   const targetToken = config.object;
+  if (shouldUseCoreDetectionDuringPendingMovement(observerToken, targetToken)) {
+    return testDetectionPoints(this, visionSource, mode, config);
+  }
+
   const hiddenStateContext = getPendingMovementHiddenStateBlock(targetToken);
   if (hiddenStateContext && !isPendingMovementHiddenStateVisibilityProbe()) {
     return false;
   }
 
+  const pendingMovementSightBlocked =
+    !isPendingMovementHiddenStateVisibilityProbe() &&
+    shouldTemporarilyBlockSightDetection(observerToken, targetToken);
+
   if (
     !NON_VISUAL_DETECTION_MODE_IDS.has(modeId) &&
-    !isPendingMovementHiddenStateVisibilityProbe() &&
-    shouldTemporarilyBlockSightDetection(observerToken, targetToken)
+    pendingMovementSightBlocked
   ) {
     return false;
   }
@@ -41,12 +54,12 @@ export function testDetectionModeVisibility(visionSource, mode, config = {}) {
   if (NON_VISUAL_DETECTION_MODE_IDS.has(modeId)) {
     const visibility = getVisionerVisibilityBetweenTokens(observerToken, targetToken);
     if (visibility === 'hidden') {
-      if (shouldTemporarilyBlockHiddenDetection(observerToken, targetToken, visibility)) {
-        return false;
+      if (pendingMovementSightBlocked) {
+        return testDetectionPoints(this, visionSource, mode, config);
       }
       return true;
     }
   }
 
-  return config.tests.some((test) => this._testPoint(visionSource, mode, config.object, test));
+  return testDetectionPoints(this, visionSource, mode, config);
 }

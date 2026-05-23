@@ -2,7 +2,15 @@ import {
   getPendingMovementHiddenStateBlock,
   isPendingMovementHiddenStateVisibilityProbe,
   withPendingMovementBlockedDetectionSourcesSuppressed,
-} from './pending-movement-detection-gate.js';
+} from '../PendingMovement/pending-movement-detection-gate.js';
+import {
+  capturePendingMovementDetectionFilterVisualState,
+  restorePendingMovementDetectionFilterVisualState,
+  shouldPreservePendingMovementDetectionFilterVisuals,
+  shouldSuppressPendingMovementDetectionFilterVisuals,
+  withPreservedPendingMovementDetectionFilterVisuals,
+  withSuppressedPendingMovementDetectionFilterVisuals,
+} from '../PendingMovement/pending-movement-render-lock.js';
 
 function sourceFromCollectionEntry(entry) {
   return Array.isArray(entry) && entry.length === 2 ? entry[1] : entry;
@@ -25,6 +33,10 @@ function hasActiveUnblockedDetectionSource(blockedSources = []) {
 }
 
 export function wrapCanvasVisibilityTest(wrapped, points, options = {}) {
+  if (isPendingMovementHiddenStateVisibilityProbe()) {
+    return wrapped(points, options);
+  }
+
   let wrappedCalled = false;
   const callWrapped = () => {
     wrappedCalled = true;
@@ -40,13 +52,25 @@ export function wrapCanvasVisibilityTest(wrapped, points, options = {}) {
           probingHiddenState
             ? null
             : hiddenStateContext ||
-              blockedEntries.find(
-                ({ context }) => context?.renderHiddenByVisioner || context?.foundryHidden,
-              )?.context ||
-              getPendingMovementHiddenStateBlock(options?.object);
+            blockedEntries.find(
+              ({ context }) => context?.renderHiddenByVisioner || context?.foundryHidden,
+            )?.context ||
+            getPendingMovementHiddenStateBlock(options?.object);
 
-        const wrappedResult = callWrapped();
+        const object = options?.object;
+        const detectionFilterState = capturePendingMovementDetectionFilterVisualState(object);
+        const suppressDetectionFilterVisuals =
+          shouldSuppressPendingMovementDetectionFilterVisuals(object);
+        const preserveDetectionFilterVisuals =
+          !suppressDetectionFilterVisuals &&
+          shouldPreservePendingMovementDetectionFilterVisuals(object);
+        const wrappedResult = suppressDetectionFilterVisuals
+          ? withSuppressedPendingMovementDetectionFilterVisuals(object, callWrapped)
+          : preserveDetectionFilterVisuals
+            ? withPreservedPendingMovementDetectionFilterVisuals(object, callWrapped)
+            : callWrapped();
         if (sourceHiddenStateContext) {
+          restorePendingMovementDetectionFilterVisualState(object, detectionFilterState);
           return false;
         }
 
@@ -55,6 +79,7 @@ export function wrapCanvasVisibilityTest(wrapped, points, options = {}) {
           blockedSources?.length &&
           !hasActiveUnblockedDetectionSource(blockedSources)
         ) {
+          restorePendingMovementDetectionFilterVisualState(object, detectionFilterState);
           return false;
         }
 

@@ -67,7 +67,7 @@ describe('token movement pre-update service', () => {
     expect(warn).toHaveBeenCalledWith('You cannot move until Sneak has started.');
   });
 
-  test('records pending movement and refreshes pending visibility when movement tracking changes', () => {
+  test('records pending movement without refreshing Visioner visuals before movement completes', () => {
     const setPendingTokenMovementPosition = jest.fn(() => true);
     const refreshPendingMovementTokenVisibility = jest.fn();
 
@@ -86,11 +86,10 @@ describe('token movement pre-update service', () => {
       {
         userId: 'u1',
         hookOptions: { animate: true },
+        predictFinalVisibility: true,
       },
     );
-    expect(refreshPendingMovementTokenVisibility).toHaveBeenCalledWith('mover', {
-      skipPerceptionRefresh: true,
-    });
+    expect(refreshPendingMovementTokenVisibility).not.toHaveBeenCalled();
   });
 
   test('fires established invisible cleanup without awaiting it', () => {

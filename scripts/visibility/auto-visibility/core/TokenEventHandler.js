@@ -54,7 +54,7 @@ export class TokenEventHandler {
       spatialAnalyzer,
       overrideValidationManager,
     });
-    this._deferredAnimatedMoves = new Set();
+    this._deferredAnimatedMoves = new Map();
     this._recentlyHandledAnimatedMoves = new Map();
     this._recentAnimationSkipMs = 1000;
   }
@@ -96,11 +96,16 @@ export class TokenEventHandler {
     const token = tokenDoc.object;
     const activeAnimation = token?._animation;
 
-    if (this._wasAnimatedMoveHandledRecently(tokenId)) {
+    const movementChanges = {
+      x: finalX,
+      y: finalY,
+    };
+
+    if (this._wasAnimatedMoveHandledRecently(tokenId, movementChanges)) {
       return;
     }
 
-    if (this._deferredAnimatedMoves.has(tokenId)) {
+    if (this._isAnimatedMoveDeferred(tokenId, movementChanges)) {
       return;
     }
 
@@ -112,17 +117,17 @@ export class TokenEventHandler {
           /* ignore animation errors */
         }
 
-        if (this._wasAnimatedMoveHandledRecently(tokenId) || this._deferredAnimatedMoves.has(tokenId)) {
+        if (
+          this._wasAnimatedMoveHandledRecently(tokenId, movementChanges) ||
+          this._isAnimatedMoveDeferred(tokenId, movementChanges)
+        ) {
           return;
         }
       }
 
       await this._finalizeCompletedMovement(
         tokenDoc,
-        {
-          x: finalX,
-          y: finalY,
-        },
+        movementChanges,
         { options, userId },
       );
     } catch (e) {
@@ -130,18 +135,45 @@ export class TokenEventHandler {
     }
   }
 
-  _wasAnimatedMoveHandledRecently(tokenId) {
-    const until = this._recentlyHandledAnimatedMoves.get(tokenId);
-    if (!until) return false;
-    if (until < Date.now()) {
+  _sameMovementDestination(left, right) {
+    if (!left || !right) return false;
+    return left.x === right.x && left.y === right.y;
+  }
+
+  _wasAnimatedMoveHandledRecently(tokenId, movementChanges = null) {
+    const entry = this._recentlyHandledAnimatedMoves.get(tokenId);
+    if (!entry) return false;
+    if (entry.until < Date.now()) {
       this._recentlyHandledAnimatedMoves.delete(tokenId);
       return false;
     }
-    return true;
+    return !movementChanges || this._sameMovementDestination(entry, movementChanges);
   }
 
-  _markAnimatedMoveHandledRecently(tokenId) {
-    this._recentlyHandledAnimatedMoves.set(tokenId, Date.now() + this._recentAnimationSkipMs);
+  _markAnimatedMoveHandledRecently(tokenId, movementChanges = {}) {
+    this._recentlyHandledAnimatedMoves.set(tokenId, {
+      x: movementChanges.x,
+      y: movementChanges.y,
+      until: Date.now() + this._recentAnimationSkipMs,
+    });
+  }
+
+  _isAnimatedMoveDeferred(tokenId, movementChanges = null) {
+    const deferredMovement = this._deferredAnimatedMoves.get(tokenId);
+    if (!deferredMovement) return false;
+    return !movementChanges || this._sameMovementDestination(deferredMovement, movementChanges);
+  }
+
+  _markAnimatedMoveDeferred(tokenId, movementChanges) {
+    this._deferredAnimatedMoves.set(tokenId, {
+      x: movementChanges.x,
+      y: movementChanges.y,
+    });
+  }
+
+  _clearAnimatedMoveDeferred(tokenId, movementChanges = null) {
+    if (movementChanges && !this._isAnimatedMoveDeferred(tokenId, movementChanges)) return;
+    this._deferredAnimatedMoves.delete(tokenId);
   }
 
   async _finalizeCompletedMovement(tokenDoc, movementChanges, context = {}) {
@@ -293,27 +325,28 @@ export class TokenEventHandler {
             x: changes.x ?? tokenDoc.x,
             y: changes.y ?? tokenDoc.y,
           };
-          this._deferredAnimatedMoves.add(tokenId);
+          this._markAnimatedMoveDeferred(tokenId, movementChanges);
 
           token._animation.promise
             .then(async () => {
               // After animation completes, clear position-dependent caches and trigger visibility recalculation
               try {
+                if (!this._isAnimatedMoveDeferred(tokenId, movementChanges)) return;
                 const tokenDocObj = canvas.tokens?.get(tokenId)?.document;
                 await this._finalizeCompletedMovement(tokenDocObj ?? tokenDoc, movementChanges, {
                   options,
                   userId,
                 });
-                this._markAnimatedMoveHandledRecently(tokenId);
+                this._markAnimatedMoveHandledRecently(tokenId, movementChanges);
               } catch (e) {
                 console.warn('PF2E Visioner | Error processing validation after animation:', e);
               } finally {
-                this._deferredAnimatedMoves.delete(tokenId);
+                this._clearAnimatedMoveDeferred(tokenId, movementChanges);
               }
             })
             .catch(() => {
               /* ignore animation errors */
-              this._deferredAnimatedMoves.delete(tokenId);
+              this._clearAnimatedMoveDeferred(tokenId, movementChanges);
             });
           return; // Early return only when we have a promise to wait for
         }

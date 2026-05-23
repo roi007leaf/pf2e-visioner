@@ -59,6 +59,43 @@ describe('Override indicator should not trigger on controlToken', () => {
         expect(secondControlHookCount).toBe(firstControlHookCount);
     });
 
+    test('canvas pointerdown primes selected token movement intent before Foundry drag starts', async () => {
+        const primePendingControlledTokenDragIntent = jest.fn();
+        const releasePendingControlledTokenDragIntent = jest.fn();
+        jest.doMock('../../../scripts/services/pending-movement-render-lock.js', () => ({
+            clearNoObserverDetectionFilterVisuals: jest.fn(),
+            hasPendingMovementRenderWork: jest.fn(() => false),
+            primePendingControlledTokenDragIntent,
+            refreshPendingMovementTokenVisibility: jest.fn(),
+            releasePendingControlledTokenDragIntent,
+            restorePendingMovementTokenRendering: jest.fn(),
+        }));
+        const canvasView = {};
+        const token = { document: { id: 'observer', getFlag: jest.fn(() => ({})) } };
+        global.canvas.app = { view: canvasView };
+        global.canvas.tokens.controlled = [token];
+        const addEventListenerSpy = jest.spyOn(global.window, 'addEventListener');
+
+        const { onCanvasReady } = await import('../../../scripts/hooks/lifecycle.js');
+        await onCanvasReady();
+
+        const pointerDown = addEventListenerSpy.mock.calls.find(
+            ([eventName]) => eventName === 'pointerdown',
+        )?.[1];
+        const pointerUp = addEventListenerSpy.mock.calls.find(
+            ([eventName]) => eventName === 'pointerup',
+        )?.[1];
+
+        expect(pointerDown).toBeTruthy();
+        expect(pointerUp).toBeTruthy();
+
+        pointerDown({ button: 0, target: canvasView });
+        expect(primePendingControlledTokenDragIntent).toHaveBeenCalledWith(token);
+
+        pointerUp();
+        expect(releasePendingControlledTokenDragIntent).toHaveBeenCalledWith();
+    });
+
     test('onCanvasReady does not refresh perception when vision sharing ids are unchanged', async () => {
         const perceptionUpdate = jest.fn();
         global.canvas.perception = { update: perceptionUpdate };
@@ -175,7 +212,9 @@ describe('Override indicator should not trigger on controlToken', () => {
         const refreshPendingMovementTokenVisibility = jest.fn();
         jest.doMock('../../../scripts/services/pending-movement-render-lock.js', () => ({
             hasPendingMovementRenderWork: jest.fn(() => true),
+            primePendingControlledTokenDragIntent: jest.fn(),
             refreshPendingMovementTokenVisibility,
+            releasePendingControlledTokenDragIntent: jest.fn(),
             restorePendingMovementTokenRendering: jest.fn(),
         }));
 
@@ -200,6 +239,42 @@ describe('Override indicator should not trigger on controlToken', () => {
 
         expect(refreshPendingMovementTokenVisibility).toHaveBeenCalledWith([], {
             ignoreObservedGrace: true,
+        });
+    });
+
+    test('controlToken settles stale observed soundwaves without pending render work', async () => {
+        const refreshPendingMovementTokenVisibility = jest.fn();
+        jest.doMock('../../../scripts/services/pending-movement-render-lock.js', () => ({
+            hasPendingMovementRenderWork: jest.fn(() => false),
+            primePendingControlledTokenDragIntent: jest.fn(),
+            refreshPendingMovementTokenVisibility,
+            releasePendingControlledTokenDragIntent: jest.fn(),
+            restorePendingMovementTokenRendering: jest.fn(),
+        }));
+
+        const { onCanvasReady } = await import('../../../scripts/hooks/lifecycle.js');
+        await onCanvasReady();
+
+        const controlTokenCbs = global.Hooks.on.mock.calls
+            .filter((c) => c?.[0] === 'controlToken')
+            .map((c) => c?.[1])
+            .filter(Boolean);
+
+        const restoreIndicatorsCb = controlTokenCbs.find((cb) =>
+            String(cb).includes('allowControlledFallback'),
+        );
+
+        expect(restoreIndicatorsCb).toBeTruthy();
+
+        const token = { document: { id: 'observer', getFlag: jest.fn(() => ({})) } };
+        global.canvas.tokens.controlled = [token];
+
+        await restoreIndicatorsCb(token, true);
+
+        expect(refreshPendingMovementTokenVisibility).toHaveBeenCalledWith([], {
+            ignoreObservedGrace: true,
+            skipTokenRefresh: true,
+            skipPerceptionRefresh: true,
         });
     });
 
@@ -240,6 +315,16 @@ describe('Override indicator should not trigger on controlToken', () => {
     });
 
     test('deselecting the last observer clears hidden-token perspective and refreshes visibility', async () => {
+        const clearNoObserverDetectionFilterVisuals = jest.fn();
+        const restorePendingMovementTokenRendering = jest.fn();
+        jest.doMock('../../../scripts/services/pending-movement-render-lock.js', () => ({
+            clearNoObserverDetectionFilterVisuals,
+            hasPendingMovementRenderWork: jest.fn(() => false),
+            primePendingControlledTokenDragIntent: jest.fn(),
+            refreshPendingMovementTokenVisibility: jest.fn(),
+            releasePendingControlledTokenDragIntent: jest.fn(),
+            restorePendingMovementTokenRendering,
+        }));
         const updateSystemHiddenTokenHighlights = jest.fn().mockResolvedValue(undefined);
         jest.doMock('../../../scripts/services/visual-effects.js', () => ({
             updateWallVisuals: jest.fn(),
@@ -295,12 +380,11 @@ describe('Override indicator should not trigger on controlToken', () => {
         jest.advanceTimersByTime(75);
         jest.runOnlyPendingTimers();
 
-        expect(hiddenToken.visible).toBe(true);
-        expect(hiddenToken.renderable).toBe(true);
-        expect(hiddenToken.mesh.visible).toBe(true);
-        expect(hiddenToken.mesh.renderable).toBe(true);
-        expect(hiddenToken.mesh.alpha).toBe(1);
-        expect(hiddenToken.nameplate.visible).toBe(true);
+        expect(restorePendingMovementTokenRendering).toHaveBeenCalledWith(hiddenToken, {
+            ignoreObservedGrace: true,
+            ignoreObserverLocks: true,
+        });
+        expect(clearNoObserverDetectionFilterVisuals).toHaveBeenCalled();
         expect(perceptionUpdate).toHaveBeenCalledWith({
             initializeVision: true,
             refreshVision: true,

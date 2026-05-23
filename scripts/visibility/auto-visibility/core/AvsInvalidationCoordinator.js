@@ -417,6 +417,7 @@ export class AvsInvalidationCoordinator {
     this.#clearTokenPositionCaches();
     this.visionAnalyzer?.clearCache?.(tokenDoc);
     this.visibilityState?.markTokenChangedWithSpatialOptimization?.(tokenDoc, movementChanges);
+    this.batchOrchestrator?.notifyTokenMovementComplete?.();
     this.#queueMovementOverrideValidation(tokenDoc, { processQueuedValidations: true });
     return true;
   }

@@ -95,4 +95,31 @@ describe('BatchResultApplicationPolicy', () => {
     expect(plan.dirtyObservers).toEqual([]);
     expect(plan.observerMaps.size).toBe(0);
   });
+
+  test('resolves visibility against current map before persisting movement updates', () => {
+    const observerA = observer('A');
+    const targetB = target('B');
+    const recordExplicitVisiblePair = jest.fn(() => false);
+    const resolveVisibilityForUpdate = jest.fn(() => 'hidden');
+
+    const plan = buildVisibilityMapApplicationPlan({
+      updates: [{ observer: observerA, target: targetB, visibility: 'observed' }],
+      getVisibilityMap: jest.fn(() => ({ B: 'hidden' })),
+      recordExplicitVisiblePair,
+      resolveVisibilityForUpdate,
+      overrideMatchesVisibility: jest.fn(() => true),
+      moduleId: 'pf2e-visioner',
+    });
+
+    expect(resolveVisibilityForUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ visibility: 'observed' }),
+      'hidden',
+    );
+    expect(recordExplicitVisiblePair).toHaveBeenCalledWith(
+      expect.objectContaining({ visibility: 'hidden' }),
+    );
+    expect(plan.uniqueUpdateCount).toBe(0);
+    expect(plan.dirtyObservers).toEqual([]);
+    expect(plan.observerMaps.get(observerA)).toEqual({ B: 'hidden' });
+  });
 });

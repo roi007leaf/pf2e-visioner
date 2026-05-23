@@ -37,6 +37,7 @@ export function buildBatchResultApplicationPlan({
   updates = [],
   getVisibilityMap = () => ({}),
   recordExplicitVisiblePair = () => false,
+  resolveVisibilityForUpdate = null,
   overrideMatchesVisibility = null,
   overrideMatchesVisibilityFn = null,
   moduleId = 'pf2e-visioner',
@@ -62,8 +63,8 @@ export function buildBatchResultApplicationPlan({
     const targetId = update.target?.document?.id;
     if (!observer?.document?.id || !targetId) continue;
 
-    const explicitPairChanged = recordExplicitVisiblePair(update);
-    if (update.forceDetectionSyncOnly) {
+    if (update.forceDetectionSyncOnly && !resolveVisibilityForUpdate) {
+      const explicitPairChanged = recordExplicitVisiblePair(update);
       if (explicitPairChanged) uniqueUpdateCount++;
       continue;
     }
@@ -74,8 +75,20 @@ export function buildBatchResultApplicationPlan({
 
     const visibilityMap = observerMaps.get(observer);
     const from = visibilityMap[targetId] ?? 'observed';
-    if (from !== update.visibility) {
-      visibilityMap[targetId] = update.visibility;
+    const resolvedVisibility =
+      resolveVisibilityForUpdate?.(update, from) ?? update.visibility;
+    const resolvedUpdate =
+      resolvedVisibility === update.visibility
+        ? update
+        : { ...update, visibility: resolvedVisibility };
+    const explicitPairChanged = recordExplicitVisiblePair(resolvedUpdate);
+    if (resolvedUpdate.forceDetectionSyncOnly) {
+      if (explicitPairChanged) uniqueUpdateCount++;
+      continue;
+    }
+
+    if (from !== resolvedVisibility) {
+      visibilityMap[targetId] = resolvedVisibility;
       dirtyObserverSet.add(observer);
       uniqueUpdateCount++;
     } else if (explicitPairChanged) {

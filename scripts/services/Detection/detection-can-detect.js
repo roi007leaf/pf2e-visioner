@@ -1,11 +1,11 @@
-import { MODULE_ID } from '../constants.js';
-import { AVS_EXPLICIT_VISIBLE_DETECTION_SENSE } from '../stores/visibility-map.js';
+import { MODULE_ID } from '../../constants.js';
+import { AVS_EXPLICIT_VISIBLE_DETECTION_SENSE } from '../../stores/visibility-map.js';
 import {
   isPendingMovementHiddenStateVisibilityProbe,
-  shouldBypassPendingMovementVisionerRenderState,
+  shouldUseCoreDetectionDuringPendingMovement,
   shouldTemporarilyBlockSightDetection,
-} from './pending-movement-detection-gate.js';
-import { isExplicitVisiblePair } from './ExplicitVisibilityPairs.js';
+} from '../PendingMovement/pending-movement-detection-gate.js';
+import { isExplicitVisiblePair } from '../ExplicitVisibilityPairs.js';
 import {
   detectionFrameCache,
   getVisionerVisibilityBetweenTokens,
@@ -19,6 +19,8 @@ export function createCanDetectVisibilityWrapper(threshold) {
     const canDetect = wrapped(visionSource, target, ...args);
     const observerToken = visionSource?.object;
     const modeId = this?.id ?? args?.[0]?.id ?? null;
+    if (shouldUseCoreDetectionDuringPendingMovement(observerToken, target)) return canDetect;
+
     const visibility = getVisionerVisibilityBetweenTokens(observerToken, target);
     const pendingMovementSightBlocked =
       !isPendingMovementHiddenStateVisibilityProbe() &&
@@ -38,14 +40,6 @@ export function createCanDetectVisibilityWrapper(threshold) {
 
     if (!meetsMinimumPerceptionRank(observerToken, target)) {
       return false;
-    }
-
-    if (isPendingMovementHiddenStateVisibilityProbe()) {
-      return true;
-    }
-
-    if (shouldBypassPendingMovementVisionerRenderState(observerToken, target, visibility)) {
-      return true;
     }
 
     if (pendingMovementSightBlocked) {

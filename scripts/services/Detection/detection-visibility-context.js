@@ -1,15 +1,15 @@
-import { MODULE_ID } from '../constants.js';
+import { MODULE_ID } from '../../constants.js';
 import {
   getBestVisibilityState,
   getControlledObserverTokens,
   getPerceptionProfileBetween,
   getVisibilityMap,
-} from '../utils.js';
-import { getCacheInvalidationRevision } from '../utils/cache-invalidation.js';
+} from '../../utils.js';
+import { getCacheInvalidationRevision } from '../../utils/cache-invalidation.js';
 import {
   blocksCanvasDetection,
   legacyVisibilityToProfile,
-} from '../visibility/perception-profile.js';
+} from '../../visibility/perception-profile.js';
 import { DetectionFrameCache } from './detection-frame-cache.js';
 
 export const VISIBILITY_DETECTION_THRESHOLDS = {
