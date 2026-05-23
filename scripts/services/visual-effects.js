@@ -21,6 +21,7 @@
  */
 
 import { MODULE_ID } from '../constants.js';
+import { getDetectionBetween } from '../stores/detection-map.js';
 import { getVisibilityBetween } from '../utils.js';
 import { _internal as visibilityCalculatorInternal } from '../visibility/StatelessVisibilityCalculator.js';
 import {
@@ -305,7 +306,12 @@ export async function updateSystemHiddenTokenHighlights(
     }
 
     for (const token of getSystemHiddenIndicatorCandidates(tokens, observer)) {
-      const { shouldShowIndicator, indicatorMode, shouldShowThoughtsenseIndicator } =
+      const {
+        shouldShowIndicator,
+        indicatorMode,
+        shouldShowThoughtsenseIndicator,
+        shouldShowEcholocationIndicator,
+      } =
         buildSystemHiddenIndicatorDecision({
           observer,
           token,
@@ -313,6 +319,7 @@ export async function updateSystemHiddenTokenHighlights(
           senseContext,
           grid: canvas.grid,
           getVisibilityState: getVisibilityBetween,
+          getDetectionBetween,
           canLifesenseDetect: visibilityCalculatorInternal.canLifesenseDetect,
           canThoughtsenseDetect: visibilityCalculatorInternal.canThoughtsenseDetect,
         });
@@ -346,6 +353,7 @@ export async function updateSystemHiddenTokenHighlights(
             indicatorMode,
             observerIsBlindAndDeaf,
             shouldShowThoughtsenseIndicator,
+            shouldShowEcholocationIndicator,
           });
         } catch (error) {
           console.warn(

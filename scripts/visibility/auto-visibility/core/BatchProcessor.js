@@ -28,6 +28,90 @@ export { buildTokenSensesCacheKey } from './TokenSenseSignatureCache.js';
 
 const log = getLogger('AVS/BatchProcessor');
 const EXPLICIT_VISIBLE_STATES = new Set(['observed', 'concealed']);
+const VISUAL_SENSE_TYPES = new Set([
+  'vision',
+  'darkvision',
+  'greater-darkvision',
+  'greaterdarkvision',
+  'low-light-vision',
+  'lowlightvision',
+  'light-perception',
+  'see-invisibility',
+  'seeinvisibility',
+  'infrared-vision',
+  'truesight',
+]);
+const NON_VISUAL_SENSE_DEFAULT_RANGES = {
+  lifesense: 10,
+  thoughtsense: 30,
+  scent: 30,
+  echolocation: 40,
+  tremorsense: 30,
+  bloodsense: 30,
+  magicsense: 30,
+  'motion-sense': 30,
+  spiritsense: 30,
+  wavesense: 30,
+  hearing: Infinity,
+};
+
+function normalizeSenseType(sense) {
+  return String(sense?.type ?? '')
+    .trim()
+    .toLowerCase();
+}
+
+function getSenseRange(sense, senseType) {
+  const explicitRange = Number(sense?.range);
+  if (Number.isFinite(explicitRange)) return explicitRange;
+  const defaultRange = NON_VISUAL_SENSE_DEFAULT_RANGES[senseType] ?? 0;
+  return Number.isFinite(defaultRange) ? defaultRange : Infinity;
+}
+
+function getActorTraits(token) {
+  const traits = token?.actor?.system?.traits;
+  const value = Array.isArray(traits?.value) ? traits.value : Array.isArray(traits) ? traits : [];
+  return value.map((trait) => String(trait).toLowerCase());
+}
+
+function canLifesenseReachTarget(target) {
+  const traits = getActorTraits(target);
+  return !traits.includes('construct');
+}
+
+function canThoughtsenseReachTarget(target) {
+  const traits = getActorTraits(target);
+  return !traits.includes('mindless') && !traits.includes('construct') && !traits.includes('ooze');
+}
+
+function canSenseReachDistance(sense, senseType, distanceInFeet) {
+  const range = getSenseRange(sense, senseType);
+  return range > 0 && distanceInFeet <= range;
+}
+
+function canSpecialSenseBypassLineOfSight(sense, target, distanceInFeet, isDeafened) {
+  const senseType = normalizeSenseType(sense);
+  if (!senseType || VISUAL_SENSE_TYPES.has(senseType)) return false;
+  if (senseType === 'tremorsense') return false;
+  if (!canSenseReachDistance(sense, senseType, distanceInFeet)) return false;
+
+  if (senseType === 'echolocation' || senseType === 'hearing') return !isDeafened;
+  if (senseType === 'lifesense') return canLifesenseReachTarget(target);
+  if (senseType === 'thoughtsense') return canThoughtsenseReachTarget(target);
+
+  return true;
+}
+
+function calculateSenseDistanceInFeet(observer, target, distanceInGridUnits) {
+  const gridDistance = Number(canvas?.scene?.grid?.distance ?? canvas?.dimensions?.distance ?? 5) || 5;
+  if (typeof observer?.distanceTo === 'function') {
+    try {
+      const tokenDistance = Number(observer.distanceTo(target));
+      if (Number.isFinite(tokenDistance)) return tokenDistance;
+    } catch (_) {}
+  }
+  return distanceInGridUnits * gridDistance;
+}
 
 function normalizeCacheKeyNumber(value) {
   const numeric = Number(value);
@@ -796,7 +880,7 @@ export class BatchProcessor {
   }
 
   /**
-   * Check if observer has non-visual senses (tremorsense, hearing) that could work without LoS.
+   * Check if observer has non-visual senses that could work without LoS.
    * @param {Token} observer - The observing token
    * @param {Token} target - The target token
    * @param {number} distance - Distance between tokens in grid units
@@ -808,14 +892,18 @@ export class BatchProcessor {
     if (!sensingSummary) {
       return false;
     }
-    const gridDistance = Number(canvas?.scene?.grid?.distance ?? canvas?.dimensions?.distance ?? 5) || 5;
-    const distanceInFeet = distance * gridDistance;
+    const distanceInFeet = calculateSenseDistanceInFeet(observer, target, distance);
 
-    // Check for tremorsense in precise or imprecise senses - works through walls if both tokens on ground
     const allSenses = [...(sensingSummary.precise || []), ...(sensingSummary.imprecise || [])];
+    const hasSpecialSense = allSenses.some((sense) =>
+      canSpecialSenseBypassLineOfSight(sense, target, distanceInFeet, isDeafened),
+    );
+    if (hasSpecialSense) return true;
+
+    // Tremorsense also requires both tokens to be on the ground.
     const tremorsenseSense = allSenses.find((sense) => sense.type === 'tremorsense');
     if (tremorsenseSense) {
-      const tremorsenseRange = tremorsenseSense.range || 30;
+      const tremorsenseRange = getSenseRange(tremorsenseSense, 'tremorsense');
       const observerElevation = observer.document.elevation || 0;
       const targetElevation = target.document.elevation || 0;
 
@@ -838,7 +926,6 @@ export class BatchProcessor {
       }
     }
 
-    // Could add other non-visual senses here (scent, etc.)
     return false;
   }
 

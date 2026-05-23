@@ -21,6 +21,7 @@ import { buildVisibilityFactorTooltipLines } from './HoverTooltip/hover-tooltip-
 
 const LIFESENSE_INDICATOR_COLOR = 0x00d4ff;
 const THOUGHTSENSE_INDICATOR_COLOR = 0x9400d3;
+const ECHOLOCATION_INDICATOR_COLOR = 0x3aa6ff;
 const BLIND_DEAF_INDICATOR_COLOR = 0x555555;
 const TARGETED_FRIENDLY_COLOR = 0x00ff00;
 const TARGETED_HOSTILE_COLOR = 0xff0000;
@@ -33,9 +34,11 @@ function getTokenDispositions() {
 export function getSystemHiddenIndicatorBaseColor({
   observerIsBlindAndDeaf = false,
   shouldShowThoughtsenseIndicator = false,
+  shouldShowEcholocationIndicator = false,
 } = {}) {
   if (observerIsBlindAndDeaf) return BLIND_DEAF_INDICATOR_COLOR;
   if (shouldShowThoughtsenseIndicator) return THOUGHTSENSE_INDICATOR_COLOR;
+  if (shouldShowEcholocationIndicator) return ECHOLOCATION_INDICATOR_COLOR;
   return LIFESENSE_INDICATOR_COLOR;
 }
 
@@ -59,6 +62,7 @@ export function getSystemHiddenTargetedColor({
 export function getSystemHiddenIndicatorColor({
   observerIsBlindAndDeaf = false,
   shouldShowThoughtsenseIndicator = false,
+  shouldShowEcholocationIndicator = false,
   isTargeted = false,
   disposition = null,
   tokenDispositions = getTokenDispositions(),
@@ -66,6 +70,7 @@ export function getSystemHiddenIndicatorColor({
   const baseColor = getSystemHiddenIndicatorBaseColor({
     observerIsBlindAndDeaf,
     shouldShowThoughtsenseIndicator,
+    shouldShowEcholocationIndicator,
   });
   if (!isTargeted) return baseColor;
   return getSystemHiddenTargetedColor({
@@ -359,6 +364,7 @@ function updateIndicatorColor({
   token,
   observerIsBlindAndDeaf,
   shouldShowThoughtsenseIndicator,
+  shouldShowEcholocationIndicator,
   size,
   canvasLayer,
 }) {
@@ -366,6 +372,7 @@ function updateIndicatorColor({
   const color = getSystemHiddenIndicatorColor({
     observerIsBlindAndDeaf,
     shouldShowThoughtsenseIndicator,
+    shouldShowEcholocationIndicator,
     isTargeted: targetToken?.isTargeted ?? false,
     disposition: token.document.disposition ?? getTokenDispositions().NEUTRAL,
   });
@@ -504,6 +511,7 @@ function attachPulseAnimation({
   token,
   size,
   shouldShowThoughtsenseIndicator,
+  shouldShowEcholocationIndicator,
   canvasLayer,
   pixi,
 }) {
@@ -526,6 +534,7 @@ function attachPulseAnimation({
       const targetToken = canvasLayer.tokens.get(token.document.id);
       const animColor = getSystemHiddenIndicatorColor({
         shouldShowThoughtsenseIndicator,
+        shouldShowEcholocationIndicator,
         isTargeted: targetToken?.isTargeted ?? false,
         disposition: token.document.disposition ?? getTokenDispositions().NEUTRAL,
       });
@@ -563,6 +572,7 @@ export async function createSystemHiddenIndicator({
   indicatorMode,
   observerIsBlindAndDeaf = false,
   shouldShowThoughtsenseIndicator = false,
+  shouldShowEcholocationIndicator = false,
   canvasLayer = globalThis.canvas,
   pixi = globalThis.PIXI,
 } = {}) {
@@ -596,6 +606,7 @@ export async function createSystemHiddenIndicator({
       token,
       observerIsBlindAndDeaf,
       shouldShowThoughtsenseIndicator,
+      shouldShowEcholocationIndicator,
       size,
       canvasLayer,
     });
@@ -637,6 +648,7 @@ export async function createSystemHiddenIndicator({
     token,
     size,
     shouldShowThoughtsenseIndicator,
+    shouldShowEcholocationIndicator,
     canvasLayer,
     pixi,
   });

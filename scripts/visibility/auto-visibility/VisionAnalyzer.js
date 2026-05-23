@@ -47,6 +47,9 @@ export class VisionAnalyzer {
   #wallCache = new Map();
   #wallCacheTimestamp = new Map();
   #wallCacheTimeout = 5000;
+  #wallSpatialIndexCache = new WeakMap();
+  #soundBlockingWallCache = null;
+  #soundBlockingWallCacheTimestamp = 0;
 
   #positionManager = null;
 
@@ -593,6 +596,148 @@ export class VisionAnalyzer {
     return walls;
   }
 
+  #getCachedSoundBlockingWalls() {
+    const timestamp = this.#soundBlockingWallCacheTimestamp;
+    if (
+      this.#soundBlockingWallCache &&
+      timestamp &&
+      Date.now() - timestamp < this.#wallCacheTimeout
+    ) {
+      return this.#soundBlockingWallCache;
+    }
+
+    const edgeSenseTypes = getEdgeSenseTypes();
+    const walls = [];
+    for (const wall of canvas?.walls?.placeables ?? []) {
+      if (wall?.document?.sound === edgeSenseTypes.NONE) {
+        continue;
+      }
+
+      if (wall?.document?.sound === edgeSenseTypes.LIMITED) {
+        continue;
+      }
+
+      const isDoor = wall?.document?.door > 0;
+      const isOpen = wall?.document?.ds === 1;
+      if (isDoor && isOpen) {
+        continue;
+      }
+
+      walls.push(wall);
+    }
+
+    this.#soundBlockingWallCache = walls;
+    this.#soundBlockingWallCacheTimestamp = Date.now();
+    return walls;
+  }
+
+  #getSegmentBounds(fromPoint, toPoint, padding = 0) {
+    return {
+      minX: Math.min(fromPoint.x, toPoint.x) - padding,
+      maxX: Math.max(fromPoint.x, toPoint.x) + padding,
+      minY: Math.min(fromPoint.y, toPoint.y) - padding,
+      maxY: Math.max(fromPoint.y, toPoint.y) + padding,
+    };
+  }
+
+  #wallOverlapsBounds(wallCoords, bounds) {
+    if (!Array.isArray(wallCoords) || wallCoords.length < 4) {
+      return true;
+    }
+
+    const minX = Math.min(wallCoords[0], wallCoords[2]);
+    const maxX = Math.max(wallCoords[0], wallCoords[2]);
+    const minY = Math.min(wallCoords[1], wallCoords[3]);
+    const maxY = Math.max(wallCoords[1], wallCoords[3]);
+
+    return !(maxX < bounds.minX || minX > bounds.maxX || maxY < bounds.minY || minY > bounds.maxY);
+  }
+
+  #getWallSpatialIndex(walls) {
+    const cached = this.#wallSpatialIndexCache.get(walls);
+    if (cached) {
+      return cached;
+    }
+
+    const cellSize = Math.max(128, Math.floor((canvas?.grid?.size || 100) * 2));
+    const cells = new Map();
+
+    for (const wall of walls ?? []) {
+      const wallCoords = wall?.document?.c;
+      if (!Array.isArray(wallCoords) || wallCoords.length < 4) {
+        continue;
+      }
+
+      const bounds = this.#getSegmentBounds(
+        { x: wallCoords[0], y: wallCoords[1] },
+        { x: wallCoords[2], y: wallCoords[3] },
+      );
+      const minCx = Math.floor(bounds.minX / cellSize);
+      const maxCx = Math.floor(bounds.maxX / cellSize);
+      const minCy = Math.floor(bounds.minY / cellSize);
+      const maxCy = Math.floor(bounds.maxY / cellSize);
+
+      for (let cy = minCy; cy <= maxCy; cy++) {
+        for (let cx = minCx; cx <= maxCx; cx++) {
+          const key = `${cx},${cy}`;
+          let bucket = cells.get(key);
+          if (!bucket) {
+            bucket = [];
+            cells.set(key, bucket);
+          }
+          bucket.push(wall);
+        }
+      }
+    }
+
+    const index = { cellSize, cells };
+    this.#wallSpatialIndexCache.set(walls, index);
+    return index;
+  }
+
+  #getRayCandidateWalls(walls, fromPoint, toPoint, padding = 3) {
+    if (!Array.isArray(walls) || walls.length === 0) {
+      return [];
+    }
+
+    const bounds = this.#getSegmentBounds(fromPoint, toPoint, padding);
+
+    if (walls.length <= 32) {
+      return walls.filter((wall) => this.#wallOverlapsBounds(wall?.document?.c, bounds));
+    }
+
+    const index = this.#getWallSpatialIndex(walls);
+    const { cellSize, cells } = index;
+    const minCx = Math.floor(bounds.minX / cellSize);
+    const maxCx = Math.floor(bounds.maxX / cellSize);
+    const minCy = Math.floor(bounds.minY / cellSize);
+    const maxCy = Math.floor(bounds.maxY / cellSize);
+    const candidates = [];
+    const seen = new Set();
+
+    for (let cy = minCy; cy <= maxCy; cy++) {
+      for (let cx = minCx; cx <= maxCx; cx++) {
+        const bucket = cells.get(`${cx},${cy}`);
+        if (!bucket) {
+          continue;
+        }
+
+        for (const wall of bucket) {
+          if (seen.has(wall)) {
+            continue;
+          }
+          seen.add(wall);
+
+          if (this.#wallOverlapsBounds(wall?.document?.c, bounds)) {
+            candidates.push(wall);
+          }
+        }
+      }
+    }
+
+    return candidates;
+  }
+
   /**
    * Filter walls that block sight, respecting elevation and custom rules
    * @private
@@ -603,7 +748,7 @@ export class VisionAnalyzer {
     const blockingWalls = [];
     const edgeSenseTypes = getEdgeSenseTypes();
 
-    for (const wall of canvas.walls.placeables) {
+    for (const wall of canvas?.walls?.placeables ?? []) {
       const isDoor = wall.document.door > 0;
       const isOpen = wall.document.ds === 1;
       if (isDoor && isOpen) {
@@ -704,11 +849,14 @@ export class VisionAnalyzer {
 
   #hasOpenDoorAlongRay(fromPoint, targetPoints) {
     try {
-      for (const wall of canvas?.walls?.placeables ?? []) {
-        const isOpenDoor = wall?.document?.door > 0 && wall.document.ds === 1;
-        if (!isOpenDoor) continue;
+      const walls = canvas?.walls?.placeables ?? [];
 
-        for (const targetPoint of targetPoints) {
+      for (const targetPoint of targetPoints) {
+        const candidateWalls = this.#getRayCandidateWalls(walls, fromPoint, targetPoint);
+        for (const wall of candidateWalls) {
+          const isOpenDoor = wall?.document?.door > 0 && wall.document.ds === 1;
+          if (!isOpenDoor) continue;
+
           if (this.#rayIntersectsWallSegment(fromPoint, targetPoint, wall.document.c)) {
             return true;
           }
@@ -720,6 +868,10 @@ export class VisionAnalyzer {
   }
 
   #rayIntersectsWallSegment(fromPoint, toPoint, wallCoords) {
+    if (!this.#wallOverlapsBounds(wallCoords, this.#getSegmentBounds(fromPoint, toPoint, 3))) {
+      return false;
+    }
+
     const intersection = foundry.utils.lineLineIntersection(
       fromPoint,
       toPoint,
@@ -759,15 +911,21 @@ export class VisionAnalyzer {
     const rayLength = Math.sqrt((toPoint.x - fromPoint.x) ** 2 + (toPoint.y - fromPoint.y) ** 2);
     const limitedWallIntersections = [];
     const edgeSenseTypes = getEdgeSenseTypes();
+    const candidateWalls = this.#getRayCandidateWalls(walls, fromPoint, toPoint);
 
-    for (const wall of walls) {
+    for (const wall of candidateWalls) {
+      const wallCoords = wall?.document?.c;
+      if (!Array.isArray(wallCoords) || wallCoords.length < 4) {
+        continue;
+      }
+
       // For doors, skip the distance optimization since they need special proximity handling
       // Doors can block vision even when the ray midpoint is far from the door midpoint
       const isDoor = wall.document.door > 0;
 
       if (!isDoor) {
-        const wallMidX = (wall.document.c[0] + wall.document.c[2]) / 2;
-        const wallMidY = (wall.document.c[1] + wall.document.c[3]) / 2;
+        const wallMidX = (wallCoords[0] + wallCoords[2]) / 2;
+        const wallMidY = (wallCoords[1] + wallCoords[3]) / 2;
         const distToRayMid = Math.sqrt(
           (wallMidX - (fromPoint.x + toPoint.x) / 2) ** 2 +
             (wallMidY - (fromPoint.y + toPoint.y) / 2) ** 2,
@@ -784,10 +942,10 @@ export class VisionAnalyzer {
       if (isDoor) {
         const doorThreshold = 3; // pixels
 
-        const wallX1 = wall.document.c[0];
-        const wallY1 = wall.document.c[1];
-        const wallX2 = wall.document.c[2];
-        const wallY2 = wall.document.c[3];
+        const wallX1 = wallCoords[0];
+        const wallY1 = wallCoords[1];
+        const wallX2 = wallCoords[2];
+        const wallY2 = wallCoords[3];
 
         // Determine if door is more horizontal or vertical
         const doorDx = Math.abs(wallX2 - wallX1);
@@ -865,8 +1023,8 @@ export class VisionAnalyzer {
       const intersection = foundry.utils.lineLineIntersection(
         { x: ray.A.x, y: ray.A.y },
         { x: ray.B.x, y: ray.B.y },
-        { x: wall.document.c[0], y: wall.document.c[1] },
-        { x: wall.document.c[2], y: wall.document.c[3] },
+        { x: wallCoords[0], y: wallCoords[1] },
+        { x: wallCoords[2], y: wallCoords[3] },
       );
 
       // Check if intersection is within the ray segment (0 <= t0 <= 1)
@@ -877,15 +1035,15 @@ export class VisionAnalyzer {
         intersection.t0 <= 1
       ) {
         // Compute t1 for the wall segment
-        const wallDx = wall.document.c[2] - wall.document.c[0];
-        const wallDy = wall.document.c[3] - wall.document.c[1];
+        const wallDx = wallCoords[2] - wallCoords[0];
+        const wallDy = wallCoords[3] - wallCoords[1];
         let t1;
 
         // Use the larger component to avoid division by near-zero
         if (Math.abs(wallDx) > Math.abs(wallDy)) {
-          t1 = (intersection.x - wall.document.c[0]) / wallDx;
+          t1 = (intersection.x - wallCoords[0]) / wallDx;
         } else {
-          t1 = (intersection.y - wall.document.c[1]) / wallDy;
+          t1 = (intersection.y - wallCoords[1]) / wallDy;
         }
 
         // Check if t1 is also within [0, 1] (intersection within wall segment)
@@ -895,8 +1053,8 @@ export class VisionAnalyzer {
           // Check for directional walls (one-way walls)
           // dir: 0 = both directions, 1 = left side blocks, 2 = right side blocks
           if (wall.document.dir && wall.document.dir !== 0) {
-            const observerDx = fromPoint.x - wall.document.c[0];
-            const observerDy = fromPoint.y - wall.document.c[1];
+            const observerDx = fromPoint.x - wallCoords[0];
+            const observerDy = fromPoint.y - wallCoords[1];
 
             // Cross product determines which side the observer is on
             const crossProduct = wallDx * observerDy - wallDy * observerDx;
@@ -1057,17 +1215,23 @@ export class VisionAnalyzer {
     const customSightTypes = new Set(
       [edgeSenseTypes.PROXIMITY, edgeSenseTypes.DISTANCE].filter((type) => type !== undefined),
     );
+    const candidateWalls = this.#getRayCandidateWalls(walls, fromPoint, toPoint);
 
-    for (const wall of walls) {
+    for (const wall of candidateWalls) {
       if (!customSightTypes.has(wall.document.sight)) {
+        continue;
+      }
+
+      const wallCoords = wall?.document?.c;
+      if (!Array.isArray(wallCoords) || wallCoords.length < 4) {
         continue;
       }
 
       const intersection = foundry.utils.lineLineIntersection(
         fromPoint,
         toPoint,
-        { x: wall.document.c[0], y: wall.document.c[1] },
-        { x: wall.document.c[2], y: wall.document.c[3] },
+        { x: wallCoords[0], y: wallCoords[1] },
+        { x: wallCoords[2], y: wallCoords[3] },
       );
 
       if (
@@ -1079,19 +1243,19 @@ export class VisionAnalyzer {
         continue;
       }
 
-      const wallDx = wall.document.c[2] - wall.document.c[0];
-      const wallDy = wall.document.c[3] - wall.document.c[1];
+      const wallDx = wallCoords[2] - wallCoords[0];
+      const wallDy = wallCoords[3] - wallCoords[1];
       const t1 =
         Math.abs(wallDx) > Math.abs(wallDy)
-          ? (intersection.x - wall.document.c[0]) / wallDx
-          : (intersection.y - wall.document.c[1]) / wallDy;
+          ? (intersection.x - wallCoords[0]) / wallDx
+          : (intersection.y - wallCoords[1]) / wallDy;
 
       if (t1 < 0 || t1 > 1) {
         continue;
       }
 
       if (
-        !doesWallSenseBlockFromPoint(wall.document, fromPoint, wall.document.c, 'sight', {
+        !doesWallSenseBlockFromPoint(wall.document, fromPoint, wallCoords, 'sight', {
           system: 'line-of-sight',
           endpoint: 'polygon-disagreement',
           fromPoint,
@@ -1114,8 +1278,6 @@ export class VisionAnalyzer {
    */
   isSoundBlocked(observer, target) {
     try {
-      const edgeSenseTypes = getEdgeSenseTypes();
-
       // Check for Silence spell effect on observer or target
       const observerHasSilence = this.#hasSilenceEffect(observer.actor);
       const targetHasSilence = this.#hasSilenceEffect(target.actor);
@@ -1173,25 +1335,17 @@ export class VisionAnalyzer {
         // proximity/reverse-proximity wall should block from the sound source side.
       }
 
-      // Check for sound-blocking walls manually, ignoring LIMITED walls
-      // Limited walls (terrain walls) should NOT block sound - they represent fog/mist
       const ray = new foundry.canvas.geometry.Ray(observer.center, target.center);
+      const soundBlockingWalls = this.#getCachedSoundBlockingWalls();
+      const candidateWalls = this.#getRayCandidateWalls(
+        soundBlockingWalls,
+        observer.center,
+        target.center,
+      );
 
-      for (const wall of canvas.walls.placeables) {
-        // Skip walls that don't block sound
-        if (wall.document.sound === edgeSenseTypes.NONE) {
-          continue;
-        }
-
-        // Skip LIMITED walls - they don't block sound (fog, mist, etc.)
-        if (wall.document.sound === edgeSenseTypes.LIMITED) {
-          continue;
-        }
-
-        // Skip open doors
-        const isDoor = wall.document.door > 0;
-        const isOpen = wall.document.ds === 1;
-        if (isDoor && isOpen) {
+      for (const wall of candidateWalls) {
+        const wallCoords = wall?.document?.c;
+        if (!Array.isArray(wallCoords) || wallCoords.length < 4) {
           continue;
         }
 
@@ -1199,8 +1353,8 @@ export class VisionAnalyzer {
         const intersection = foundry.utils.lineLineIntersection(
           { x: ray.A.x, y: ray.A.y },
           { x: ray.B.x, y: ray.B.y },
-          { x: wall.document.c[0], y: wall.document.c[1] },
-          { x: wall.document.c[2], y: wall.document.c[3] },
+          { x: wallCoords[0], y: wallCoords[1] },
+          { x: wallCoords[2], y: wallCoords[3] },
         );
 
         if (
@@ -1209,21 +1363,21 @@ export class VisionAnalyzer {
           intersection.t0 >= 0 &&
           intersection.t0 <= 1
         ) {
-          const wallDx = wall.document.c[2] - wall.document.c[0];
-          const wallDy = wall.document.c[3] - wall.document.c[1];
+          const wallDx = wallCoords[2] - wallCoords[0];
+          const wallDy = wallCoords[3] - wallCoords[1];
           let t1;
 
           if (Math.abs(wallDx) > Math.abs(wallDy)) {
-            t1 = (intersection.x - wall.document.c[0]) / wallDx;
+            t1 = (intersection.x - wallCoords[0]) / wallDx;
           } else {
-            t1 = (intersection.y - wall.document.c[1]) / wallDy;
+            t1 = (intersection.y - wallCoords[1]) / wallDy;
           }
 
           if (t1 >= 0 && t1 <= 1) {
             const soundSenseBlocks = doesWallSenseBlockFromPoint(
               wall.document,
               target.center,
-              wall.document.c,
+              wallCoords,
               'sound',
               {
                 system: 'sound',
@@ -1281,17 +1435,19 @@ export class VisionAnalyzer {
    */
   distanceFeet(a, b) {
     try {
+      const distance2D = calculateDistanceInFeet(a, b);
+      if (Number.isFinite(distance2D)) {
+        return distance2D;
+      }
+
       const levelsIntegration = LevelsIntegration.getInstance();
 
       if (levelsIntegration.isActive) {
         const distance3D = levelsIntegration.getTotalDistance(a, b);
         if (distance3D !== Infinity) {
-          const feetPerGrid = canvas.scene?.grid?.distance || 5;
-          const distanceInFeet = distance3D * feetPerGrid;
-          return distanceInFeet;
+          return distance3D;
         }
       }
-      const distance2D = calculateDistanceInFeet(a, b);
       return distance2D;
     } catch (error) {
       console.error('[VisionAnalyzer] distanceFeet - Error:', error);
@@ -1390,6 +1546,9 @@ export class VisionAnalyzer {
       this.#cacheTimestamp.clear();
       this.#wallCache.clear();
       this.#wallCacheTimestamp.clear();
+      this.#wallSpatialIndexCache = new WeakMap();
+      this.#soundBlockingWallCache = null;
+      this.#soundBlockingWallCacheTimestamp = 0;
     }
   }
 

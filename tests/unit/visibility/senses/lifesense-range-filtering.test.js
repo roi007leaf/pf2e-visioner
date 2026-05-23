@@ -16,6 +16,8 @@ import { jest } from '@jest/globals';
 describe('Lifesense Range Filtering', () => {
     let tokenStateToInput;
     let calculateVisibility;
+    let createPositionedTokenProxy;
+    let LevelsIntegration;
     let mockCanvas;
     let mockObserver;
     let mockTarget;
@@ -41,6 +43,12 @@ describe('Lifesense Range Filtering', () => {
 
         const calculatorModule = await import('../../../../scripts/visibility/StatelessVisibilityCalculator.js');
         calculateVisibility = calculatorModule.calculateVisibility;
+
+        const pendingObserverSensesModule = await import('../../../../scripts/services/PendingMovement/pending-movement-observer-senses.js');
+        createPositionedTokenProxy = pendingObserverSensesModule.createPositionedTokenProxy;
+
+        const levelsModule = await import('../../../../scripts/services/LevelsIntegration.js');
+        LevelsIntegration = levelsModule.LevelsIntegration;
 
         // Mock observer token (Ezren with greater darkvision + lifesense 10 ft)
         mockObserver = {
@@ -155,6 +163,7 @@ describe('Lifesense Range Filtering', () => {
 
     afterEach(() => {
         jest.clearAllMocks();
+        jest.restoreAllMocks();
     });
 
     describe('Invisible creature beyond lifesense range', () => {
@@ -494,6 +503,72 @@ describe('Lifesense Range Filtering', () => {
 
             expect(mockObserver.distanceTo(mockTarget)).toBe(10);
             expect(input.observer.imprecise.hearing).toBeUndefined();
+        });
+
+        test('pending movement proxies preserve native token distance for special-sense range filtering', async () => {
+            mockObserver.distanceTo = jest.fn(function (target) {
+                expect(this.center).toEqual({ x: 550, y: 50, elevation: 0 });
+                expect(target).toBe(mockTarget);
+                return 5;
+            });
+            mockTarget.document.x = 2000;
+            mockVisionAnalyzer.getVisionCapabilities.mockReturnValue({
+                hasVision: true,
+                isDeafened: false,
+                sensingSummary: {
+                    precise: [{ type: 'vision', range: Infinity }],
+                    imprecise: [{ type: 'lifesense', range: 10 }],
+                    hearing: null
+                }
+            });
+
+            const movedObserver = createPositionedTokenProxy(mockObserver, { x: 500, y: 0 });
+
+            const input = await tokenStateToInput(
+                movedObserver,
+                mockTarget,
+                mockLightingCalculator,
+                mockVisionAnalyzer,
+                mockConditionManager,
+                mockLightingRasterService
+            );
+
+            expect(mockObserver.distanceTo).toHaveBeenCalledWith(mockTarget);
+            expect(input.observer.imprecise.lifesense).toEqual({ range: 10 });
+        });
+
+        test('active Levels distance does not double-convert native token distance for precise lifesense', async () => {
+            mockObserver.distanceTo = jest.fn(() => 35);
+            mockTarget.document.x = 1400;
+            mockVisionAnalyzer.getVisionCapabilities.mockReturnValue({
+                hasVision: false,
+                isDeafened: true,
+                sensingSummary: {
+                    precise: [{ type: 'lifesense', range: 120 }],
+                    imprecise: [],
+                    hearing: null
+                }
+            });
+            jest.spyOn(LevelsIntegration, 'getInstance').mockReturnValue({
+                isActive: true,
+                getTokenPosition: (token) => ({
+                    x: token.center.x,
+                    y: token.center.y,
+                    elevation: token.document.elevation ?? 0
+                }),
+                getTotalDistance: jest.fn(() => 35)
+            });
+
+            const input = await tokenStateToInput(
+                mockObserver,
+                mockTarget,
+                mockLightingCalculator,
+                mockVisionAnalyzer,
+                mockConditionManager,
+                mockLightingRasterService
+            );
+
+            expect(input.observer.precise.lifesense).toEqual({ range: 120 });
         });
 
         test('scene-limited hearing caps default hearing fallback when capabilities omit hearing', async () => {

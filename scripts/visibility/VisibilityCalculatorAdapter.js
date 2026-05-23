@@ -63,15 +63,15 @@ export async function tokenStateToInput(
     targetPosition,
   );
 
-  // Calculate distance for sense range filtering using PF2e rules (5-10-5 diagonal pattern)
-  // Use Levels integration for 3D distance if available
+  // Calculate distance for sense range filtering using PF2e's token distance rules.
+  // Do not replace this with Levels distance here: LevelsIntegration#getTotalDistance already
+  // returns scene distance units, and multiplying it again filters in-range special senses out.
   let distanceInFeet = calculateDistanceInFeet(observer, target);
   let hearingDistanceInFeet = calculateHearingDistanceInFeet(observer, target);
-  if (levelsIntegration.isActive) {
+  if (!Number.isFinite(distanceInFeet) && levelsIntegration.isActive) {
     const distance3D = levelsIntegration.getTotalDistance(observer, target);
     if (distance3D !== Infinity) {
-      const feetPerGrid = canvas.scene?.grid?.distance || 5;
-      distanceInFeet = distance3D * feetPerGrid;
+      distanceInFeet = distance3D;
     }
   }
 

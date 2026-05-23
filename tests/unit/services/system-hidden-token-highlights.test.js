@@ -245,6 +245,18 @@ describe('system-hidden token highlight service', () => {
         getSystemHiddenSenseContext({
           actor: {
             system: { perception: { senses: [] } },
+            perception: { senses: [{ type: 'echolocation', acuity: 'precise', range: 40 }] },
+            hasCondition: jest.fn(() => false),
+          },
+        }),
+      ),
+    ).toBe(true);
+
+    expect(
+      shouldEvaluateSystemHiddenIndicators(
+        getSystemHiddenSenseContext({
+          actor: {
+            system: { perception: { senses: [] } },
             hasCondition: jest.fn((slug) => slug === 'blinded' || slug === 'deafened'),
           },
         }),
@@ -285,6 +297,84 @@ describe('system-hidden token highlight service', () => {
       indicatorMode: 'lifesense',
       shouldShowLifesenseIndicator: true,
       distanceInFeet: 25,
+    });
+  });
+
+  test('builds echolocation indicator decision from stored precise detection', () => {
+    const observer = {
+      document: { id: 'observer', x: 0, y: 0, width: 1, height: 1 },
+      distanceTo: jest.fn(() => 35),
+      actor: {
+        perception: {
+          senses: [{ type: 'echolocation', acuity: 'precise', range: 40 }],
+        },
+        system: { perception: { senses: [] } },
+        hasCondition: jest.fn(() => false),
+      },
+    };
+    const target = {
+      visible: false,
+      renderable: false,
+      document: { id: 'target', x: 1000, y: 0, width: 1, height: 1 },
+      actor: { system: { traits: { value: ['construct'] } } },
+    };
+    const grid = {
+      size: 50,
+      distance: 5,
+      measurePath: jest.fn(() => ({ distance: 100 })),
+    };
+
+    expect(
+      buildSystemHiddenIndicatorDecision({
+        observer,
+        token: target,
+        senseContext: getSystemHiddenSenseContext(observer),
+        grid,
+        getDetectionBetween: jest.fn(() => ({ sense: 'echolocation', isPrecise: true })),
+      }),
+    ).toMatchObject({
+      shouldShowIndicator: true,
+      indicatorMode: 'echolocation',
+      shouldShowEcholocationIndicator: true,
+      distanceInFeet: 35,
+    });
+    expect(observer.distanceTo).toHaveBeenCalledWith(target);
+  });
+
+  test('does not build echolocation indicator without stored echolocation detection', () => {
+    const observer = {
+      document: { id: 'observer', x: 0, y: 0, width: 1, height: 1 },
+      actor: {
+        system: {
+          perception: {
+            senses: [{ type: 'echolocation', acuity: 'precise', range: 40 }],
+          },
+        },
+        hasCondition: jest.fn(() => false),
+      },
+    };
+    const target = {
+      visible: false,
+      renderable: false,
+      document: { id: 'target', x: 250, y: 0, width: 1, height: 1 },
+      actor: { system: { traits: { value: [] } } },
+    };
+
+    expect(
+      buildSystemHiddenIndicatorDecision({
+        observer,
+        token: target,
+        senseContext: getSystemHiddenSenseContext(observer),
+        grid: {
+          size: 50,
+          distance: 5,
+          measurePath: jest.fn(() => ({ distance: 5 })),
+        },
+        getDetectionBetween: jest.fn(() => null),
+      }),
+    ).toMatchObject({
+      shouldShowIndicator: false,
+      shouldShowEcholocationIndicator: false,
     });
   });
 

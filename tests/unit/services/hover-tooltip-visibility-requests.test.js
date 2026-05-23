@@ -91,6 +91,53 @@ describe('hover tooltip visibility request planning', () => {
     ]);
   });
 
+  test('keeps observer-mode lifesense targets when core visibility hides them', () => {
+    const observer = makeToken('observer');
+    const target = makeToken('target', { isVisible: false });
+    const getVisibilityMap = jest.fn(() => ({ target: 'observed' }));
+    const getDetectionBetween = jest.fn(() => ({ sense: 'lifesense' }));
+
+    const requests = buildTooltipVisibilityRequests({
+      subjectToken: observer,
+      allTokens: [observer, target],
+      mode: 'observer',
+      isGM: true,
+      getVisibilityMap,
+      getDetectionBetween,
+    });
+
+    expect(getVisibilityMap).toHaveBeenCalledTimes(1);
+    expect(getDetectionBetween).toHaveBeenCalledTimes(1);
+    expect(requests).toEqual([
+      {
+        renderToken: target,
+        observerToken: observer,
+        visibilityState: 'observed',
+        mode: 'observer',
+        detectionTarget: null,
+        senseUsed: 'lifesense',
+      },
+    ]);
+  });
+
+  test('does not show core-hidden observer-mode observed targets without a sense badge', () => {
+    const observer = makeToken('observer');
+    const target = makeToken('target', { isVisible: false });
+    const getVisibilityMap = jest.fn(() => ({ target: 'observed' }));
+    const getDetectionBetween = jest.fn(() => null);
+
+    const requests = buildTooltipVisibilityRequests({
+      subjectToken: observer,
+      allTokens: [observer, target],
+      mode: 'observer',
+      isGM: true,
+      getVisibilityMap,
+      getDetectionBetween,
+    });
+
+    expect(requests).toEqual([]);
+  });
+
   test('builds target-mode requests from each visible observer perspective', () => {
     const subject = makeToken('subject');
     const observerA = makeToken('observer-a');

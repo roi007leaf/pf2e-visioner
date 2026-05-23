@@ -6,12 +6,13 @@ export function normalizeTooltipVisibilityState(visibilityState) {
   return visibilityState === 'avs' ? 'observed' : visibilityState || 'observed';
 }
 
+function canRenderTooltipToken(token) {
+  return shouldSkipPendingMovementTokenVisibilityRefresh(token) || token.isVisible;
+}
+
 export function getVisibleOtherTokens(allTokens = [], subjectToken = null) {
   return allTokens.filter(
-    (token) =>
-      token &&
-      token !== subjectToken &&
-      (shouldSkipPendingMovementTokenVisibilityRefresh(token) || token.isVisible),
+    (token) => token && token !== subjectToken && canRenderTooltipToken(token),
   );
 }
 
@@ -89,16 +90,20 @@ export function buildObserverTooltipVisibilityRequests({
 
   const visibilityMap = getVisibilityMap(observerToken);
   return targetTokens
-    .map((targetToken) =>
-      buildTooltipRequest({
+    .map((targetToken) => {
+      const canRenderToken = canRenderTooltipToken(targetToken);
+      const request = buildTooltipRequest({
         renderToken: targetToken,
         observerToken,
         targetToken,
         visibilityMap,
         mode: 'observer',
         getDetectionBetween,
-      }),
-    )
+      });
+
+      if (!request) return null;
+      return canRenderToken || request.senseUsed ? request : null;
+    })
     .filter(Boolean);
 }
 
@@ -137,7 +142,10 @@ export function buildTooltipVisibilityRequests({
   if (!subjectToken) return [];
   if (!isGM && !subjectToken.isOwner) return [];
 
-  const otherTokens = getVisibleOtherTokens(allTokens, subjectToken);
+  const otherTokens =
+    mode === 'observer'
+      ? allTokens.filter((token) => token && token !== subjectToken)
+      : getVisibleOtherTokens(allTokens, subjectToken);
   if (otherTokens.length === 0) return [];
 
   if (mode === 'observer') {

@@ -7,6 +7,7 @@ function getDefaultControlledTokens() {
 }
 
 const SYSTEM_HIDDEN_EXCLUDED_ACTOR_TYPES = new Set(['hazard', 'loot', 'vehicle']);
+const SYSTEM_HIDDEN_AUDITORY_PRECISE_SENSES = new Set(['echolocation']);
 
 async function loadDefaultVisualEffects() {
   return import('./visual-effects.js');
@@ -64,19 +65,23 @@ export function buildControlledTokenHighlightRequests(controlledTokens) {
 }
 
 export function getSystemHiddenSenseContext(observer) {
-  const observerSenses = observer?.actor?.system?.perception?.senses || [];
+  const observerSenses = getObserverPerceptionSenses(observer);
   const lifesenseSense = observerSenses.find?.((sense) => sense.type === 'lifesense') ?? null;
   const thoughtsenseSense = observerSenses.find?.((sense) => sense.type === 'thoughtsense') ?? null;
+  const echolocationSense = observerSenses.find?.((sense) => sense.type === 'echolocation') ?? null;
   const observerIsBlinded = observer?.actor?.hasCondition?.('blinded') ?? false;
   const observerIsDeafened = observer?.actor?.hasCondition?.('deafened') ?? false;
 
   return {
     lifesenseSense,
     thoughtsenseSense,
+    echolocationSense,
     observerHasLifesense: !!lifesenseSense,
     lifesenseIsPrecise: lifesenseSense?.acuity === 'precise',
     observerHasThoughtsense: !!thoughtsenseSense,
+    observerHasEcholocation: !!echolocationSense,
     observerIsBlindAndDeaf: observerIsBlinded && observerIsDeafened,
+    observerIsDeafened,
   };
 }
 
@@ -84,8 +89,55 @@ export function shouldEvaluateSystemHiddenIndicators(senseContext) {
   return (
     !!senseContext?.observerHasLifesense ||
     !!senseContext?.observerHasThoughtsense ||
+    !!senseContext?.observerHasEcholocation ||
     !!senseContext?.observerIsBlindAndDeaf
   );
+}
+
+function normalizeSenseCollection(senses) {
+  if (!senses) return [];
+  if (Array.isArray(senses)) return senses;
+  if (Array.isArray(senses.contents)) return senses.contents;
+  if (typeof senses.values === 'function') {
+    try {
+      return Array.from(senses.values());
+    } catch (_) {}
+  }
+  if (typeof senses[Symbol.iterator] === 'function') {
+    try {
+      return Array.from(senses);
+    } catch (_) {}
+  }
+  if (typeof senses === 'object') return Object.values(senses);
+  return [];
+}
+
+function normalizeSenseEntry(sense) {
+  if (!sense || typeof sense !== 'object') return null;
+  const type = String(sense.type ?? sense.slug ?? sense.id ?? '').toLowerCase();
+  if (!type) return null;
+  return {
+    ...sense,
+    type,
+  };
+}
+
+function getObserverPerceptionSenses(observer) {
+  const actor = observer?.actor;
+  return [
+    ...normalizeSenseCollection(actor?.system?.perception?.senses),
+    ...normalizeSenseCollection(actor?.perception?.senses),
+  ]
+    .map(normalizeSenseEntry)
+    .filter(Boolean);
+}
+
+function getStoredDetection({ observer, token, getDetectionBetween }) {
+  try {
+    return getDetectionBetween?.(observer, token) ?? null;
+  } catch (_) {
+    return null;
+  }
 }
 
 export function isSystemHiddenIndicatorCandidate(token, observer) {
@@ -134,6 +186,7 @@ export function buildSystemHiddenIndicatorDecision({
   senseContext = getSystemHiddenSenseContext(observer),
   grid = null,
   getVisibilityState = null,
+  getDetectionBetween = null,
   canLifesenseDetect = () => false,
   canThoughtsenseDetect = () => false,
 } = {}) {
@@ -142,35 +195,53 @@ export function buildSystemHiddenIndicatorDecision({
   const distanceInFeet = getSystemHiddenTokenDistance(observer, token, positionOverride, grid);
   const lifesenseRange = senseContext?.lifesenseSense?.range ?? 0;
   const thoughtsenseRange = senseContext?.thoughtsenseSense?.range ?? 0;
+  const echolocationRange = senseContext?.echolocationSense?.range ?? 0;
+  const detection = getStoredDetection({ observer, token, getDetectionBetween });
   const canBeDetectedByLifesense = canLifesenseDetect({ traits: targetTraits });
   const canBeDetectedByThoughtsense = canThoughtsenseDetect({ traits: targetTraits });
   const isWithinLifesenseRange = lifesenseRange === Infinity || distanceInFeet <= lifesenseRange;
   const isWithinThoughtsenseRange =
     thoughtsenseRange === Infinity || distanceInFeet <= thoughtsenseRange;
+  const isWithinEcholocationRange =
+    echolocationRange === Infinity || distanceInFeet <= echolocationRange;
   const visibilityState = senseContext?.observerIsBlindAndDeaf
     ? getVisibilityState?.(observer, token)
     : null;
   const isHiddenFromObserver = visibilityState === 'hidden';
+  const detectedByEcholocation =
+    SYSTEM_HIDDEN_AUDITORY_PRECISE_SENSES.has(detection?.sense) && detection?.isPrecise !== false;
 
   const shouldShowLifesenseIndicator =
     isSystemHidden && canBeDetectedByLifesense && isWithinLifesenseRange;
   const shouldShowThoughtsenseIndicator =
     isSystemHidden && canBeDetectedByThoughtsense && isWithinThoughtsenseRange;
+  const shouldShowEcholocationIndicator =
+    isSystemHidden &&
+    !!senseContext?.observerHasEcholocation &&
+    !senseContext?.observerIsDeafened &&
+    isWithinEcholocationRange &&
+    detectedByEcholocation;
   const shouldShowBlindDeafIndicator =
     !!senseContext?.observerIsBlindAndDeaf && isHiddenFromObserver;
   const shouldShowIndicator =
-    shouldShowLifesenseIndicator || shouldShowThoughtsenseIndicator || shouldShowBlindDeafIndicator;
+    shouldShowLifesenseIndicator ||
+    shouldShowThoughtsenseIndicator ||
+    shouldShowEcholocationIndicator ||
+    shouldShowBlindDeafIndicator;
   const indicatorMode = shouldShowBlindDeafIndicator
     ? 'blind-deaf'
     : shouldShowThoughtsenseIndicator
       ? 'thoughtsense'
-      : 'lifesense';
+      : shouldShowEcholocationIndicator
+        ? 'echolocation'
+        : 'lifesense';
 
   return {
     shouldShowIndicator,
     indicatorMode,
     shouldShowLifesenseIndicator,
     shouldShowThoughtsenseIndicator,
+    shouldShowEcholocationIndicator,
     shouldShowBlindDeafIndicator,
     distanceInFeet,
   };

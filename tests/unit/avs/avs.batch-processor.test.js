@@ -559,6 +559,105 @@ describe('BatchProcessor', () => {
     expect(res.updates.some((u) => u.visibility === 'undetected')).toBe(false);
   });
 
+  test('does not short-circuit LOS-blocked precise lifesense pairs to undetected', async () => {
+    const observer = makeToken('A', 0, 0);
+    const target = makeToken('B', 100, 0);
+    target.actor.system.traits = { value: ['humanoid'] };
+    global.canvas.tokens.placeables = [observer, target];
+    processor.visibilityMapService = {
+      getVisibilityMap: jest.fn((token) =>
+        token.document.id === 'A' ? { B: 'undetected' } : {},
+      ),
+    };
+    processor.visionAnalyzer.hasLineOfSight.mockReturnValue(false);
+    processor.visionAnalyzer.getVisionCapabilities.mockImplementation((token) => ({
+      isDeafened: true,
+      sensingSummary:
+        token.document.id === 'A'
+          ? {
+              precise: [{ type: 'lifesense', range: 120 }],
+              imprecise: [],
+              hearing: null,
+            }
+          : {
+              precise: [],
+              imprecise: [],
+              hearing: null,
+            },
+    }));
+    optimizedVisibilityCalculator.calculateVisibilityBetweenTokens.mockImplementation(
+      async (observerToken) => (observerToken.document.id === 'A' ? 'observed' : 'undetected'),
+    );
+
+    const res = await processor.process(global.canvas.tokens.placeables, new Set(['A']), {});
+
+    expect(
+      optimizedVisibilityCalculator.calculateVisibilityBetweenTokens.mock.calls.some(
+        ([observerToken, targetToken]) =>
+          observerToken.document.id === 'A' && targetToken.document.id === 'B',
+      ),
+    ).toBe(true);
+    expect(res.updates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          observer: expect.objectContaining({ document: expect.objectContaining({ id: 'A' }) }),
+          target: expect.objectContaining({ document: expect.objectContaining({ id: 'B' }) }),
+          visibility: 'observed',
+        }),
+      ]),
+    );
+  });
+
+  test('does not short-circuit LOS-blocked precise echolocation pairs to undetected', async () => {
+    const observer = makeToken('A', 0, 0);
+    observer.distanceTo = jest.fn(() => 35);
+    const target = makeToken('B', 1000, 0);
+    global.canvas.tokens.placeables = [observer, target];
+    processor.visibilityMapService = {
+      getVisibilityMap: jest.fn((token) =>
+        token.document.id === 'A' ? { B: 'undetected' } : {},
+      ),
+    };
+    processor.visionAnalyzer.hasLineOfSight.mockReturnValue(false);
+    processor.visionAnalyzer.getVisionCapabilities.mockImplementation((token) => ({
+      isDeafened: false,
+      sensingSummary:
+        token.document.id === 'A'
+          ? {
+              precise: [{ type: 'echolocation', range: 40 }],
+              imprecise: [],
+              hearing: null,
+            }
+          : {
+              precise: [],
+              imprecise: [],
+              hearing: null,
+            },
+    }));
+    optimizedVisibilityCalculator.calculateVisibilityBetweenTokens.mockImplementation(
+      async (observerToken) => (observerToken.document.id === 'A' ? 'observed' : 'undetected'),
+    );
+
+    const res = await processor.process(global.canvas.tokens.placeables, new Set(['A']), {});
+
+    expect(observer.distanceTo).toHaveBeenCalledWith(target);
+    expect(
+      optimizedVisibilityCalculator.calculateVisibilityBetweenTokens.mock.calls.some(
+        ([observerToken, targetToken]) =>
+          observerToken.document.id === 'A' && targetToken.document.id === 'B',
+      ),
+    ).toBe(true);
+    expect(res.updates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          observer: expect.objectContaining({ document: expect.objectContaining({ id: 'A' }) }),
+          target: expect.objectContaining({ document: expect.objectContaining({ id: 'B' }) }),
+          visibility: 'observed',
+        }),
+      ]),
+    );
+  });
+
   test('short-circuits LOS-blocked pairs outside active scene hearing range', async () => {
     const previousScene = global.canvas.scene;
     global.canvas.scene = {
