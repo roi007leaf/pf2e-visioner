@@ -4,8 +4,8 @@ describe('Override indicator should not trigger on controlToken', () => {
     beforeEach(() => {
         jest.resetModules();
         jest.clearAllMocks();
-        jest.unmock('../../../scripts/services/pending-token-movement.js');
-        jest.unmock('../../../scripts/services/pending-movement-render-lock.js');
+        jest.unmock('../../../scripts/services/PendingMovement/pending-token-movement.js');
+        jest.unmock('../../../scripts/services/PendingMovement/pending-movement-render-lock.js');
         delete global.__pf2eVisionerLifecycleBindings;
         delete global.__pf2eVisionerControlTokenSessions;
         document.body.innerHTML = '';
@@ -62,7 +62,7 @@ describe('Override indicator should not trigger on controlToken', () => {
     test('canvas pointerdown primes selected token movement intent before Foundry drag starts', async () => {
         const primePendingControlledTokenDragIntent = jest.fn();
         const releasePendingControlledTokenDragIntent = jest.fn();
-        jest.doMock('../../../scripts/services/pending-movement-render-lock.js', () => ({
+        jest.doMock('../../../scripts/services/PendingMovement/pending-movement-render-lock.js', () => ({
             clearNoObserverDetectionFilterVisuals: jest.fn(),
             hasPendingMovementRenderWork: jest.fn(() => false),
             primePendingControlledTokenDragIntent,
