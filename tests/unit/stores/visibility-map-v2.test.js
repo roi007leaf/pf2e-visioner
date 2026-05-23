@@ -184,6 +184,7 @@ describe('Visibility Map V2 profile storage', () => {
 
   test('setVisibilityMapsBatch removes observed entries without clearing the whole visibilityV2 map', async () => {
     observer = global.createMockToken({ id: 'observer' });
+    const forcedDeletion = foundry.data.operators.ForcedDeletion;
     const flags = {
       'pf2e-visioner': {
         visibilityV2: {
@@ -214,7 +215,9 @@ describe('Visibility Map V2 profile storage', () => {
 
         const current = flags['pf2e-visioner'].visibilityV2 ?? {};
         for (const [key, value] of Object.entries(patch)) {
-          if (key.startsWith('-=')) {
+          if (value === forcedDeletion) {
+            delete current[key];
+          } else if (key.startsWith('-=')) {
             delete current[key.slice(2)];
           } else {
             current[key] = value;
@@ -239,7 +242,7 @@ describe('Visibility Map V2 profile storage', () => {
             _id: 'observer',
             'flags.pf2e-visioner.visibilityV2': {
               keep: expect.objectContaining({ detectionState: 'undetected' }),
-              '-=remove': null,
+              remove: forcedDeletion,
             },
           },
         ],
@@ -247,6 +250,8 @@ describe('Visibility Map V2 profile storage', () => {
       );
       expect(global.canvas.scene.updateEmbeddedDocuments.mock.calls[0][1][0])
         .not.toHaveProperty('flags.pf2e-visioner.-=visibilityV2');
+      expect(global.canvas.scene.updateEmbeddedDocuments.mock.calls[0][1][0]['flags.pf2e-visioner.visibilityV2'])
+        .not.toHaveProperty('-=remove');
       expect(getVisibilityMap(observer)).toEqual({ keep: 'undetected' });
     } finally {
       global.canvas.scene.updateEmbeddedDocuments = originalUpdateEmbeddedDocuments;

@@ -424,7 +424,7 @@ export function buildVisibilityMapDocumentUpdatePasses(token, visibilityMap, opt
         document,
         moduleId: MODULE_ID,
         flagKey: VISIBILITY_V2_FLAG,
-        value: buildProfileMapPatch(nextProfiles, removedTargetIds),
+        value: buildProfileMapPatch(nextProfiles, removedTargetIds, forcedDeletion),
       }),
     ]];
   }
@@ -449,10 +449,14 @@ function collectVisibilityReadbackTargetIds(previousMap = {}, nextMap = {}) {
   ]));
 }
 
-function buildProfileMapPatch(nextProfiles = {}, removedTargetIds = []) {
+function buildProfileMapPatch(nextProfiles = {}, removedTargetIds = [], forcedDeletion = null) {
   const patch = { ...nextProfiles };
   for (const targetId of removedTargetIds) {
-    patch[`-=${targetId}`] = null;
+    if (forcedDeletion) {
+      patch[targetId] = forcedDeletion;
+    } else {
+      patch[`-=${targetId}`] = null;
+    }
   }
   return patch;
 }
