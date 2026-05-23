@@ -1,4 +1,4 @@
-import { DetectionFrameCache } from '../../../scripts/services/detection-frame-cache.js';
+import { DetectionFrameCache } from '../../../scripts/services/Detection/detection-frame-cache.js';
 
 function token(id, flags = {}) {
   const document = {
