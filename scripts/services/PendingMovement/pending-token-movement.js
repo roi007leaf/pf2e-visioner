@@ -1020,6 +1020,18 @@ function getPendingMovementRefreshTargetIdSet() {
   return ids;
 }
 
+function hasPendingFinalVisibilityStateForToken(token) {
+  const tokenId = tokenIdOf(token);
+  if (!tokenId) return false;
+
+  for (const entry of pendingTokenMovementPositions.values()) {
+    if (entry?.finalVisibilityStatesByTargetId?.has(tokenId)) return true;
+    if (entry?.finalVisibilityStatesByObserverId?.has(tokenId)) return true;
+  }
+
+  return false;
+}
+
 export function shouldHandlePendingMovementCanvasVisibilityForToken(token) {
   if (!token?.document?.id) return false;
   cleanupExpiredPendingMovements();
@@ -1027,6 +1039,7 @@ export function shouldHandlePendingMovementCanvasVisibilityForToken(token) {
   if (isPendingMovementRenderLocked(token)) return true;
   if (hasPendingRenderState(token)) return true;
   if (tokenHasDetectionFilterVisual(token)) return true;
+  if (hasPendingFinalVisibilityStateForToken(token)) return true;
 
   return getPendingMovementRefreshTargetIdSet().has(tokenIdOf(token));
 }
@@ -2552,16 +2565,6 @@ export function hasPendingMovementRenderWork() {
 
   const sceneTokens = new Set(canvas?.tokens?.placeables || []);
   return prunePendingMovementRenderLocks(sceneTokens) > 0;
-}
-
-export function shouldSuppressPendingMovementOcclusionUpdate(flags = {}) {
-  cleanupExpiredPendingMovements();
-  if (pendingTokenMovementPositions.size <= 0 && pendingTokenMovementCompletionTimeouts.size <= 0) {
-    return false;
-  }
-
-  const enabledFlags = Object.entries(flags ?? {}).filter(([, value]) => value === true);
-  return enabledFlags.length === 1 && enabledFlags[0]?.[0] === 'refreshOcclusion';
 }
 
 export function resetPendingMovementPerformanceCounters() {

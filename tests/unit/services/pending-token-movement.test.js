@@ -39,7 +39,6 @@ import {
   refreshPendingMovementTokenVisibility,
   restorePendingMovementDetectionFilterState,
   restorePendingMovementTokenRendering,
-  shouldSuppressPendingMovementOcclusionUpdate,
   shouldSuppressPendingMovementDetectionFilterVisuals,
   shouldTemporarilyForceTokenInvisible,
   suppressPendingMovementDetectionFilterVisualsForObservedTransition,
@@ -2968,32 +2967,6 @@ describe('pending token movement hidden detection guard', () => {
     jest.advanceTimersByTime(100);
 
     expect(refreshTokenVisibility).toHaveBeenCalledTimes(4);
-  });
-
-  test('suppresses occlusion-only perception updates during pending movement', () => {
-    const observer = createMockToken({ id: 'observer' });
-    global.canvas = {
-      ...global.canvas,
-      tokens: {
-        get: jest.fn((id) => (id === 'observer' ? observer : null)),
-        controlled: [observer],
-        placeables: [observer],
-      },
-    };
-
-    setPendingTokenMovementPosition(observer.document, { x: 100, y: 0 }, [observer]);
-
-    expect(shouldSuppressPendingMovementOcclusionUpdate({ refreshOcclusion: true })).toBe(true);
-    expect(
-      shouldSuppressPendingMovementOcclusionUpdate({
-        refreshOcclusion: true,
-        refreshVision: true,
-      }),
-    ).toBe(false);
-
-    clearPendingTokenMovementPosition(observer.document.id);
-
-    expect(shouldSuppressPendingMovementOcclusionUpdate({ refreshOcclusion: true })).toBe(false);
   });
 
   test('can refresh pending movement token visuals without refreshing perception', () => {
