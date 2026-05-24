@@ -4,6 +4,7 @@ import { resetRegistrationsForTests } from '../../../scripts/utils/register-once
 describe('Movement Cost Hooks', () => {
     let mockGetMovementCostFunction;
     let TerrainDataClass;
+    let RulerClass;
 
     beforeEach(() => {
         resetRegistrationsForTests();
@@ -14,9 +15,19 @@ describe('Movement Cost Hooks', () => {
         TerrainDataClass = {
             getMovementCostFunction: mockGetMovementCostFunction
         };
+        RulerClass = class MockTokenRuler {
+            _getWaypointLabelContext() {
+                return {
+                    cost: { total: 5 },
+                    distance: { total: '5' },
+                    units: 'ft',
+                };
+            }
+        };
 
         global.CONFIG = {
             Token: {
+                rulerClass: RulerClass,
                 movement: {
                     TerrainData: TerrainDataClass
                 }
@@ -106,6 +117,126 @@ describe('Movement Cost Hooks', () => {
             expect.anything(),
             expect.objectContaining({ terrain: { difficulty: 2 } })
         );
+    });
+
+    test('adds missing measured movement cost to ruler label context', () => {
+        mockGetMovementCostFunction.mockReturnValue(jest.fn().mockReturnValue(10));
+
+        registerMovementCostHooks();
+
+        const ruler = new RulerClass();
+        const context = ruler._getWaypointLabelContext(
+            {
+                cost: 10,
+                measurement: {
+                    distance: 5,
+                    cost: 10,
+                },
+            },
+            {},
+        );
+
+        expect(context.cost.additional).toEqual({ total: 5 });
+    });
+
+    test('adds missing delta movement cost to ruler label context', () => {
+        mockGetMovementCostFunction.mockReturnValue(jest.fn().mockReturnValue(10));
+
+        registerMovementCostHooks();
+
+        const ruler = new RulerClass();
+        const context = ruler._getWaypointLabelContext(
+            {
+                cost: 10,
+                measurement: {
+                    distance: 10,
+                    cost: 20,
+                    backward: { distance: 5 },
+                },
+            },
+            {},
+        );
+
+        expect(context.cost.additional).toEqual({ total: 10, delta: 5 });
+    });
+
+    test('preserves existing ruler label additional movement cost', () => {
+        RulerClass = class MockTokenRulerWithAdditionalCost {
+            _getWaypointLabelContext() {
+                return {
+                    cost: { total: 5, additional: { total: 7, delta: 3 } },
+                    distance: { total: '5' },
+                    units: 'ft',
+                };
+            }
+        };
+        global.CONFIG.Token.rulerClass = RulerClass;
+        mockGetMovementCostFunction.mockReturnValue(jest.fn().mockReturnValue(10));
+
+        registerMovementCostHooks();
+
+        const ruler = new RulerClass();
+        const context = ruler._getWaypointLabelContext(
+            {
+                cost: 10,
+                measurement: {
+                    distance: 5,
+                    cost: 10,
+                    backward: { distance: 5 },
+                },
+            },
+            {},
+        );
+
+        expect(context.cost.additional).toEqual({ total: 7, delta: 3 });
+    });
+
+    test('applies difficult terrain when blinded is stored as a PF2E condition item', () => {
+        const mockCostCalculator = jest.fn().mockReturnValue(10);
+        mockGetMovementCostFunction.mockReturnValue(mockCostCalculator);
+
+        registerMovementCostHooks();
+        const wrappedFactory = TerrainDataClass.getMovementCostFunction;
+
+        const mockActor = {
+            hasCondition: jest.fn().mockReturnValue(false),
+            itemTypes: {
+                condition: [{ slug: 'blinded', isExpired: false }],
+                effect: [],
+            },
+        };
+        const mockToken = { actor: mockActor };
+
+        const costFn = wrappedFactory.call(TerrainDataClass, mockToken, {});
+        costFn({}, {}, 10, { terrain: { difficulty: 1 } });
+
+        expect(mockCostCalculator).toHaveBeenCalledWith(
+            expect.anything(),
+            expect.anything(),
+            expect.anything(),
+            expect.objectContaining({ terrain: { difficulty: 2 } })
+        );
+    });
+
+    test('does not apply difficult terrain for expired blinded condition item', () => {
+        const mockCostCalculator = jest.fn().mockReturnValue(10);
+        mockGetMovementCostFunction.mockReturnValue(mockCostCalculator);
+
+        registerMovementCostHooks();
+        const wrappedFactory = TerrainDataClass.getMovementCostFunction;
+
+        const mockActor = {
+            hasCondition: jest.fn().mockReturnValue(false),
+            itemTypes: {
+                condition: [{ slug: 'blinded', isExpired: true }],
+                effect: [],
+            },
+        };
+        const mockToken = { actor: mockActor };
+
+        const costFn = wrappedFactory.call(TerrainDataClass, mockToken, {});
+
+        expect(costFn).toBe(mockCostCalculator);
     });
 
     test('does not apply difficult terrain when has darkness effect (handled by region now)', () => {
