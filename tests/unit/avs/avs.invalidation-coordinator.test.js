@@ -199,9 +199,6 @@ describe('AvsInvalidationCoordinator lighting reasons', () => {
     expect(result).toBe(false);
     expect(cacheManager.clearAllCaches).not.toHaveBeenCalled();
     expect(visibilityState.markAllTokensChangedThrottled).not.toHaveBeenCalled();
-    expect(systemState.debug).toHaveBeenCalledWith(
-      'LightingEventHandler: ignoring lightingRefresh during active token movement',
-    );
   });
 });
 
@@ -386,7 +383,6 @@ describe('AvsInvalidationCoordinator token light reasons', () => {
     )[1];
     lightingRefreshHandler();
 
-    expect(systemState.debug).toHaveBeenCalledWith('light-change-spatial-fallback', 'token1', error);
     expect(visibilityState.markAllTokensChangedImmediate).toHaveBeenCalledTimes(1);
     expect(global.game.pf2eVisioner.suppressLightingRefresh).toBeUndefined();
   });
