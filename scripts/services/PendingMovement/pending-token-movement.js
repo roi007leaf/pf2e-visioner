@@ -625,6 +625,10 @@ function sourceContainsAnyTargetPoint(source, targetPoints) {
   );
 }
 
+function observerIsBlinded(observer) {
+  return actorHasConditionSlug(actorOf(observer), 'blinded');
+}
+
 function sightSourceObserverHasActiveMovement(observer, target) {
   const observerId = tokenIdOf(observer);
   if (!observerId) return false;
@@ -635,6 +639,7 @@ function sightSourceObserverHasActiveMovement(observer, target) {
 
 function currentPendingMovementSightLineSeesTargetUncached(observer, target) {
   if (!observer || !target?.document?.id) return false;
+  if (observerIsBlinded(observer)) return false;
 
   const targetPoints = visibilityTestPointsForPendingTarget(target);
   if (!targetPoints.length) return false;
@@ -800,6 +805,7 @@ function currentSightLineSeesHiddenTargetDuringPendingMovement(
   ]) {
     if (!source?.active || !source.object) continue;
     const observer = source.object;
+    if (observerIsBlinded(observer)) continue;
     if (tokenIdOf(observer) === tokenIdOf(target)) continue;
     if (
       !sightSourceObserverHasActiveMovement(observer, target) &&

@@ -4641,6 +4641,47 @@ describe('pending token movement hidden detection guard', () => {
     expect(capturePendingMovementDetectionFilterState(target, { hasDetectionWork: true })).not.toBeNull();
   });
 
+  test('keeps hidden soundwave while blinded moving observer light overlaps target', () => {
+    global.canvas.walls.placeables = [];
+    const observer = createMockToken({
+      id: 'observer',
+      controlled: true,
+      actor: {
+        hasCondition: jest.fn((slug) => slug === 'blinded'),
+      },
+      flags: visibilityV2Flags({ target: 'hidden' }),
+    });
+    const target = createMockToken({ id: 'target', x: 3, y: 0, visible: true });
+    target.detectionFilter = { id: 'soundwave-filter' };
+    target.detectionFilterMesh = { visible: true, renderable: true, alpha: 1 };
+    global.canvas = {
+      ...global.canvas,
+      effects: {
+        visionSources: [],
+        lightSources: [
+          {
+            active: true,
+            object: observer,
+            los: { contains: jest.fn(() => true) },
+            shape: { contains: jest.fn(() => true) },
+          },
+        ],
+      },
+      tokens: {
+        get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+        _draggedToken: observer,
+        controlled: [observer],
+        placeables: [observer, target],
+      },
+    };
+
+    setPendingTokenMovementPosition(observer.document, { x: 100, y: 0 }, [observer]);
+
+    expect(currentPendingMovementSightLineSeesTarget(observer, target)).toBe(false);
+    expect(shouldSuppressPendingMovementDetectionFilterVisuals(target)).toBe(false);
+    expect(capturePendingMovementDetectionFilterState(target, { hasDetectionWork: true })).not.toBeNull();
+  });
+
   test('refreshes wall-blocked hidden soundwave targets without freezing animation', () => {
     const observer = createMockToken({
       id: 'observer',

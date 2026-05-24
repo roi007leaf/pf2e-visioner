@@ -34,6 +34,7 @@ const controlTokenSessionState = (globalThis.__pf2eVisionerControlTokenSessions 
   timers: new Set(),
 });
 const CONTROL_TOKEN_RECALC_DELAY_MS = 0;
+const NO_OBSERVER_VISIBILITY_REFRESH_DELAYS_MS = Object.freeze([0, 75, 250]);
 const fallbackHudButtonState = (globalThis.__pf2eVisionerFallbackHudButton ??= {
   styleInstalled: false,
   documentListenersBound: false,
@@ -132,8 +133,10 @@ function scheduleControlTokenSessionTimer(sequence, tokenId, delayMs, callback) 
 }
 
 function scheduleNoObserverVisibilityRefresh() {
-  setTimeout(() => {
+  let completed = false;
+  const run = () => {
     try {
+      if (completed) return;
       if ((canvas?.tokens?.controlled?.length ?? 0) > 0) return;
       for (const token of canvas?.tokens?.placeables || []) {
         restorePendingMovementTokenRendering(token, {
@@ -143,10 +146,15 @@ function scheduleNoObserverVisibilityRefresh() {
       }
       clearNoObserverDetectionFilterVisuals();
       scheduleCanvasPerceptionUpdate({ initializeVision: true, refreshVision: true });
+      completed = true;
     } catch {
       /* best effort */
     }
-  }, 75);
+  };
+
+  for (const delayMs of NO_OBSERVER_VISIBILITY_REFRESH_DELAYS_MS) {
+    setTimeout(run, delayMs);
+  }
 }
 
 function refreshPendingVisibilityAfterControlToken() {

@@ -391,6 +391,59 @@ describe('Override indicator should not trigger on controlToken', () => {
         });
     });
 
+    test('deselect cleanup retries until Foundry controlled list is empty', async () => {
+        const clearNoObserverDetectionFilterVisuals = jest.fn();
+        const restorePendingMovementTokenRendering = jest.fn();
+        jest.doMock('../../../scripts/services/PendingMovement/pending-movement-render-lock.js', () => ({
+            clearNoObserverDetectionFilterVisuals,
+            hasPendingMovementRenderWork: jest.fn(() => false),
+            primePendingControlledTokenDragIntent: jest.fn(),
+            refreshPendingMovementTokenVisibility: jest.fn(),
+            releasePendingControlledTokenDragIntent: jest.fn(),
+            restorePendingMovementTokenRendering,
+        }));
+        jest.doMock('../../../scripts/services/visual-effects.js', () => ({
+            updateWallVisuals: jest.fn(),
+            updateWallIndicatorsOnly: jest.fn(),
+            updateSystemHiddenTokenHighlights: jest.fn().mockResolvedValue(undefined),
+        }));
+
+        const perceptionUpdate = jest.fn();
+        global.canvas.perception = { update: perceptionUpdate };
+
+        const { onCanvasReady } = await import('../../../scripts/hooks/lifecycle.js');
+        await onCanvasReady();
+
+        const controlTokenCbs = global.Hooks.on.mock.calls
+            .filter((c) => c?.[0] === 'controlToken')
+            .map((c) => c?.[1])
+            .filter(Boolean);
+        const restoreIndicatorsCb = controlTokenCbs.find((cb) =>
+            String(cb).includes('allowControlledFallback'),
+        );
+
+        const token = { document: { id: 'observer', getFlag: jest.fn(() => ({})) } };
+        const hiddenToken = { document: { id: 'hidden-target' } };
+        global.canvas.tokens.controlled = [token];
+        global.canvas.tokens.placeables = [token, hiddenToken];
+
+        await restoreIndicatorsCb(token, false);
+        jest.advanceTimersByTime(75);
+
+        expect(restorePendingMovementTokenRendering).not.toHaveBeenCalled();
+
+        global.canvas.tokens.controlled = [];
+        jest.advanceTimersByTime(175);
+        jest.runOnlyPendingTimers();
+
+        expect(restorePendingMovementTokenRendering).toHaveBeenCalledWith(hiddenToken, {
+            ignoreObservedGrace: true,
+            ignoreObserverLocks: true,
+        });
+        expect(clearNoObserverDetectionFilterVisuals).toHaveBeenCalledTimes(1);
+        expect(perceptionUpdate).toHaveBeenCalledTimes(1);
+    });
+
     test('controlToken only keeps the latest queued recalculation across token switches', async () => {
         const { onCanvasReady } = await import('../../../scripts/hooks/lifecycle.js');
         await onCanvasReady();
