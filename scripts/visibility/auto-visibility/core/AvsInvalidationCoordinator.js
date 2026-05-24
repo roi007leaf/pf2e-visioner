@@ -187,6 +187,10 @@ export class AvsInvalidationCoordinator {
   #handleLightingRefresh() {
     if (!this.#shouldProcessEvents()) return false;
 
+    if (this.batchOrchestrator?.isTokenMovementActive?.()) {
+      return false;
+    }
+
     if (isLightingRefreshSuppressed()) {
       this.systemState?.debug?.(
         'LightingEventHandler: suppressing lightingRefresh during token operation',

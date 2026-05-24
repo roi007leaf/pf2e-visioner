@@ -183,6 +183,26 @@ describe('AvsInvalidationCoordinator lighting reasons', () => {
     expect(cacheManager.clearAllCaches).toHaveBeenCalledTimes(1);
     expect(visibilityState.markAllTokensChangedThrottled).toHaveBeenCalledTimes(1);
   });
+
+  test('lighting-refresh is ignored while token movement is already queued', async () => {
+    coordinator = new AvsInvalidationCoordinator({
+      systemStateProvider: systemState,
+      visibilityStateManager: visibilityState,
+      cacheManager,
+      batchOrchestrator: {
+        isTokenMovementActive: jest.fn(() => true),
+      },
+    });
+
+    const result = await coordinator.invalidate({ reason: 'lighting-refresh' });
+
+    expect(result).toBe(false);
+    expect(cacheManager.clearAllCaches).not.toHaveBeenCalled();
+    expect(visibilityState.markAllTokensChangedThrottled).not.toHaveBeenCalled();
+    expect(systemState.debug).toHaveBeenCalledWith(
+      'LightingEventHandler: ignoring lightingRefresh during active token movement',
+    );
+  });
 });
 
 describe('AvsInvalidationCoordinator wall reasons', () => {

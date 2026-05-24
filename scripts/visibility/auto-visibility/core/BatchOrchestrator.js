@@ -216,6 +216,10 @@ export class BatchOrchestrator {
     this._flushMovementStop();
   }
 
+  isTokenMovementActive() {
+    return this._isTokenMoving || !!this._movementSession;
+  }
+
   _flushMovementStop() {
     if (this._movementStopTimer) {
       clearTimeout(this._movementStopTimer);
