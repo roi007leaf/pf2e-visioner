@@ -63,6 +63,39 @@ describe('API AVS override persistence', () => {
     });
   });
 
+  describe('setPerceptionProfile', () => {
+    test('creates AVS override for manual v2 profile updates', async () => {
+      await VisionerAPI.setPerceptionProfile(observer.id, target.id, {
+        detectionState: 'hidden',
+        hasConcealment: true,
+        coverState: 'standard',
+      });
+
+      const override = getOverride(observer, target);
+      expect(override).toEqual(
+        expect.objectContaining({
+          detectionState: 'hidden',
+          hasConcealment: true,
+          coverState: 'standard',
+          expectedCover: 'standard',
+          state: 'hidden',
+          source: 'manual_action',
+        }),
+      );
+    });
+
+    test('does NOT create AVS override for automatic v2 profile updates', async () => {
+      await VisionerAPI.setPerceptionProfile(
+        observer.id,
+        target.id,
+        { detectionState: 'hidden' },
+        { isAutomatic: true },
+      );
+
+      expect(getOverride(observer, target)).toBeFalsy();
+    });
+  });
+
   describe('setCover (should not set overrides)', () => {
     test('manual cover change does NOT create new override when none existed', async () => {
       await VisionerAPI.setCover(observer.id, target.id, 'standard');

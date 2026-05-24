@@ -40,7 +40,11 @@ import {
   showNotification,
 } from './utils.js';
 import { autoVisibilitySystem, ConditionManager } from './visibility/auto-visibility/index.js';
-import { overrideToLegacyVisibility } from './visibility/perception-profile.js';
+import {
+  normalizePerceptionProfile,
+  overrideToLegacyVisibility,
+  profileToLegacyVisibility,
+} from './visibility/perception-profile.js';
 
 function getForcedDeletion() {
   return foundry?.data?.operators?.ForcedDeletion ?? null;
@@ -72,6 +76,25 @@ function getStateFromSources(sources) {
     return currentPriority > bestPriority ? current : best;
   }, sources[0]);
   return source?.state;
+}
+
+function profileToManualOverrideChange(targetToken, profile, options = {}) {
+  const normalized = normalizePerceptionProfile(profile);
+  const state = profileToLegacyVisibility(normalized, {
+    preserveEncounterUnnoticed: !!options.preserveEncounterUnnoticed,
+  });
+  const expectedCover = normalized.coverState !== 'none' ? normalized.coverState : undefined;
+
+  return {
+    target: targetToken,
+    state,
+    hasConcealment: normalized.hasConcealment,
+    expectedCover,
+    detectionState: normalized.detectionState,
+    awarenessState: normalized.awarenessState,
+    coverState: normalized.coverState,
+    detectionSense: normalized.detectionSense,
+  };
 }
 
 function scrubManualCoverSources(stateSource) {
@@ -1503,6 +1526,23 @@ export class Pf2eVisionerApi {
         return false;
       }
 
+      try {
+        if (!options?.isAutomatic) {
+          const AvsOverrideManager = (await import('./chat/services/infra/AvsOverrideManager.js'))
+            .default;
+          await AvsOverrideManager.applyOverrides(
+            observerToken,
+            profileToManualOverrideChange(targetToken, profile, options),
+            { source: 'manual_action' },
+          );
+        }
+      } catch (e) {
+        console.warn(
+          'PF2E Visioner API: Failed to set AVS overrides for manual perception profile',
+          e,
+        );
+      }
+
       await setPerceptionProfileBetweenStore(observerToken, targetToken, profile, options);
       try {
         await updateTokenVisuals();
@@ -1522,6 +1562,29 @@ export class Pf2eVisionerApi {
       if (!observerToken) {
         console.error(`Observer token not found with ID: ${observerId}`);
         return false;
+      }
+
+      try {
+        if (!options?.isAutomatic) {
+          const AvsOverrideManager = (await import('./chat/services/infra/AvsOverrideManager.js'))
+            .default;
+          const changes = [];
+          for (const [targetId, profile] of Object.entries(profileMap ?? {})) {
+            const targetToken = canvas.tokens.get(targetId);
+            if (!targetToken) continue;
+            changes.push(profileToManualOverrideChange(targetToken, profile, options));
+          }
+          if (changes.length) {
+            await AvsOverrideManager.applyOverrides(observerToken, changes, {
+              source: 'manual_action',
+            });
+          }
+        }
+      } catch (e) {
+        console.warn(
+          'PF2E Visioner API: Failed to set AVS overrides for manual perception profile map',
+          e,
+        );
       }
 
       await setPerceptionProfileMapStore(observerToken, profileMap, options);
