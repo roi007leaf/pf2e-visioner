@@ -30,14 +30,12 @@ describe('detection wrapper module ownership', () => {
 
     expect(source).toContain("from './detection-mode-visibility.js'");
     expect(source).toContain("from './detection-canvas-visibility.js'");
-    expect(source).toContain("from './detection-perception-update.js'");
     expect(source).toContain("from './detection-filter-render.js'");
     expect(source).toContain("from './detection-can-detect.js'");
     expect(source).toContain("from './detection-token-refresh.js'");
     expect(source).toContain("from './detection-vision-sharing.js'");
     expect(source).toContain('testDetectionModeVisibility');
     expect(source).toContain('wrapCanvasVisibilityTest');
-    expect(source).toContain('wrapCanvasPerceptionUpdate');
     expect(source).toContain('wrapTokenRenderDetectionFilter');
     expect(source).toContain('createCanDetectVisibilityWrapper');
     expect(source).toContain('wrapTokenRefreshVisibility');

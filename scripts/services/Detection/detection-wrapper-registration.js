@@ -3,7 +3,6 @@ import { createCanDetectVisibilityWrapper } from './detection-can-detect.js';
 import { wrapCanvasVisibilityTest } from './detection-canvas-visibility.js';
 import { wrapTokenRenderDetectionFilter } from './detection-filter-render.js';
 import { testDetectionModeVisibility } from './detection-mode-visibility.js';
-import { wrapCanvasPerceptionUpdate } from './detection-perception-update.js';
 import { wrapPrimarySpriteMeshRender } from './detection-primary-mesh-render.js';
 import { wrapTokenRefreshVisibility } from './detection-token-refresh.js';
 import {
@@ -32,12 +31,6 @@ function registerCoreDetectionWrappers(libWrapperAdapter) {
     'foundry.canvas.groups.CanvasVisibility.prototype.testVisibility',
     wrapCanvasVisibilityTest,
     'WRAPPER',
-  );
-  libWrapperAdapter.register(
-    MODULE_ID,
-    'foundry.canvas.perception.PerceptionManager.prototype.update',
-    wrapCanvasPerceptionUpdate,
-    'MIXED',
   );
   libWrapperAdapter.register(
     MODULE_ID,

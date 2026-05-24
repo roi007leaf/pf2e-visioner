@@ -36,7 +36,6 @@ export {
   shouldPrimePendingMovementDetectionFilterVisuals,
   shouldStabilizeHiddenDetectionFilterAnimation,
   shouldSkipPendingMovementTokenVisibilityRefresh,
-  shouldSuppressPendingMovementOcclusionUpdate,
   shouldSuppressPendingMovementDetectionFilterVisuals,
   shouldTemporarilyForceTokenInvisible,
   suppressPendingMovementDetectionFilterVisualsForObservedTransition,
