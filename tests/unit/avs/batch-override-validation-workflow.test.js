@@ -58,6 +58,27 @@ describe('BatchOverrideValidationWorkflow', () => {
     expect(overrideValidationManager.processQueuedValidations).not.toHaveBeenCalled();
   });
 
+  test('skips validation during movement batches', async () => {
+    const overrideValidationManager = {
+      queueOverrideValidation: jest.fn(),
+      processQueuedValidations: jest.fn(),
+    };
+
+    await expect(
+      new BatchOverrideValidationWorkflow({
+        getLastMovedTokenId: () => 'mover',
+        overrideValidationManager,
+      }).runBeforeResultApplication({ isMovementBatch: true }),
+    ).resolves.toEqual({
+      queued: false,
+      tokenId: 'mover',
+      skipped: 'movement-batch',
+    });
+
+    expect(overrideValidationManager.queueOverrideValidation).not.toHaveBeenCalled();
+    expect(overrideValidationManager.processQueuedValidations).not.toHaveBeenCalled();
+  });
+
   test('warns and resolves when validation processing fails', async () => {
     const error = new Error('validation failed');
     const warn = jest.fn();

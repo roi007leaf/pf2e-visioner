@@ -71,7 +71,7 @@ export class ItemEventHandler {
    * Handle item creation events
    * @param {Item} item - The created item
    */
-  #onItemCreate(item) {
+  async #onItemCreate(item) {
     if (!this.#systemStateProvider.shouldProcessEvents()) {
       return;
     }
@@ -81,7 +81,7 @@ export class ItemEventHandler {
       return;
     }
 
-    this.#handleItemChange(item, 'created');
+    await this.#handleItemChange(item, 'created');
   }
 
   /**
@@ -89,7 +89,7 @@ export class ItemEventHandler {
    * @param {Item} item - The updated item
    * @param {Object} changes - The changes made to the item
    */
-  #onItemUpdate(item, changes) {
+  async #onItemUpdate(item, changes) {
     if (this.#batchInProgress) {
       return;
     }
@@ -126,7 +126,7 @@ export class ItemEventHandler {
       }
     }
 
-    this.#handleItemChange(item, 'updated');
+    await this.#handleItemChange(item, 'updated');
     this.#handleEquipmentChange(item, changes);
   }
 
@@ -134,7 +134,7 @@ export class ItemEventHandler {
    * Handle item deletion events
    * @param {Item} item - The deleted item
    */
-  #onItemDelete(item) {
+  async #onItemDelete(item) {
     if (!this.#systemStateProvider.shouldProcessEvents()) {
       return;
     }
@@ -144,7 +144,7 @@ export class ItemEventHandler {
       return;
     }
 
-    this.#handleItemChange(item, 'deleted');
+    await this.#handleItemChange(item, 'deleted');
   }
 
   /**
@@ -167,7 +167,7 @@ export class ItemEventHandler {
    * @param {Item} item - The item that changed
    * @param {string} action - The action performed ('created', 'updated', 'deleted')
    */
-  #handleItemChange(item, action) {
+  async #handleItemChange(item, action) {
     // CRITICAL: Skip our own ephemeral effects to prevent feedback loops
     // Our ephemeral effects are marked with aggregateOffGuard flag
     // Check for the flag directly without needing to import MODULE_ID
@@ -182,7 +182,10 @@ export class ItemEventHandler {
     // In PF2e, conditions might be items, but also spells and effects
     const itemName = item.name?.toLowerCase() || '';
     const itemType = item.type?.toLowerCase() || '';
-    const itemSlug = item.slug?.toLowerCase() || '';
+    const itemSlug = (item.slug || item.system?.slug || item.key || '').toLowerCase();
+    const isInvisibilityCondition =
+      itemType === 'condition' &&
+      (itemName.includes('invisible') || itemSlug.includes('invisible'));
 
     // Expand the types that might affect visibility
     const isRelevantType =
@@ -254,21 +257,50 @@ export class ItemEventHandler {
       item.parent?.documentName === 'Actor'
     ) {
       const actor = item.parent;
+      if (isInvisibilityCondition) {
+        await this.#handleInvisibilityConditionItemChange(actor, action);
+      }
+
       const tokens =
         canvas.tokens?.placeables.filter(
           (t) => t.actor?.id === actor.id && !this.#exclusionManager.isExcludedToken(t),
-      ) || [];
+        ) || [];
 
       if (tokens.length > 0) {
         if (lightEmitterHint) {
           // Emitting light changed: recalc ALL because others are affected by the emitter's aura
           this.#invalidation.invalidate(itemLightEmitterUpdated(item, { action, actor, tokens }));
         } else if (isVisibilityRelated || isVisibilityFeat) {
-          this.#invalidation.invalidate(itemVisibilityUpdated(item, { action, actor, tokens }));
+          this.#invalidation.invalidate(
+            itemVisibilityUpdated(item, {
+              action,
+              actor,
+              tokens,
+              recalculateAllTokenPairs: isInvisibilityCondition,
+            }),
+          );
         } else {
-          this.#invalidation.invalidate(itemVisibilityUpdated(item, { action, actor, tokens }));
+          this.#invalidation.invalidate(
+            itemVisibilityUpdated(item, {
+              action,
+              actor,
+              tokens,
+              recalculateAllTokenPairs: isInvisibilityCondition,
+            }),
+          );
         }
       }
+    }
+  }
+
+  async #handleInvisibilityConditionItemChange(actor, action) {
+    try {
+      const { ConditionManager } = await import('../ConditionManager.js');
+      await ConditionManager.getInstance().handleInvisibilityChange(actor, {
+        hasInvisibility: action !== 'deleted',
+      });
+    } catch (error) {
+      console.error('PF2E Visioner | Failed to handle invisibility condition item change:', error);
     }
   }
 

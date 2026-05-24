@@ -34,8 +34,8 @@ export class BatchWorkflowFactory {
     return this.#createDetectionBatchLifecycle();
   }
 
-  runOverrideValidationBeforeResultApplication() {
-    return this.#overrideValidationWorkflow.runBeforeResultApplication();
+  runOverrideValidationBeforeResultApplication(context = {}) {
+    return this.#overrideValidationWorkflow.runBeforeResultApplication(context);
   }
 
   runPostResults(context) {

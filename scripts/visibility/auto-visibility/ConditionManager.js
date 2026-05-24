@@ -240,19 +240,13 @@ export class ConditionManager {
    * Handle invisibility condition changes to set proper flags
    * @param {Actor} actor
    */
-  async handleInvisibilityChange(actor, { hasInvisibility: hasInvisibilityOverride = null } = {}) {
+  async handleInvisibilityChange(
+    actor,
+    { hasInvisibility: hasInvisibilityOverride = null, token: tokenOverride = null } = {},
+  ) {
     if (!game.user.isGM) return;
 
-    // Scope to the specific token that triggered the change:
-    // use the controlled token if it matches, otherwise fall back to actor lookup
-    const controlled = canvas.tokens.controlled.find(
-      (t) => t.actor?.id === actor.id
-    );
-    const tokens = controlled
-      ? [controlled]
-      : canvas.tokens.placeables.filter((token) =>
-        token.actor?.id === actor.id && !this.#exclusionManager.isExcludedToken(token)
-      );
+    const tokens = this.#resolveActorTokens(actor, tokenOverride);
 
     for (const token of tokens) {
       // Check if invisibility was added (try multiple methods)
@@ -298,41 +292,66 @@ export class ConditionManager {
     }
   }
 
+  #resolveActorTokens(actor, tokenOverride = null) {
+    if (tokenOverride && !this.#exclusionManager.isExcludedToken(tokenOverride)) {
+      return [tokenOverride];
+    }
+
+    const controlled = canvas.tokens.controlled.find(
+      (token) => token.actor === actor || token.actor?.token?.id === actor?.token?.id,
+    );
+    if (controlled && !this.#exclusionManager.isExcludedToken(controlled)) {
+      return [controlled];
+    }
+
+    const actorTokenId = actor?.token?.object?.document?.id || actor?.token?.id;
+    if (actorTokenId) {
+      const token =
+        canvas.tokens?.get?.(actorTokenId) ||
+        canvas.tokens?.placeables?.find?.((placeable) => placeable.document?.id === actorTokenId);
+      if (token && !this.#exclusionManager.isExcludedToken(token)) {
+        return [token];
+      }
+    }
+
+    try {
+      const activeTokens = actor?.getActiveTokens?.(true, true) || [];
+      const tokens = activeTokens.filter(
+        (token) => token?.document?.id && !this.#exclusionManager.isExcludedToken(token),
+      );
+      if (tokens.length > 0) return tokens;
+    } catch {
+      /* fall through to actor-id lookup */
+    }
+
+    return canvas.tokens.placeables.filter(
+      (token) => token.actor?.id === actor.id && !this.#exclusionManager.isExcludedToken(token),
+    );
+  }
+
   /**
    * Record current visibility states before invisibility is applied
    * @param {Token} token
    */
   async #recordVisibilityBeforeInvisibility(token) {
-    // Get visibility map with proper error handling
-    let visibilityMap = {};
-    try {
-      const api = game.modules.get('pf2e-visioner')?.api;
-      if (api && api.getVisibilityMap) {
-        visibilityMap = api.getVisibilityMap(token);
-      } else {
-        console.warn('PF2E Visioner | API not available, using fallback visibility map');
-        // Fallback: use the store directly
-        const { getVisibilityBetween } = await import('../../stores/visibility-map.js');
-        // Build visibility map manually
-        for (const otherToken of canvas.tokens.placeables) {
-          if (otherToken === token || !otherToken.actor || this.#exclusionManager.isExcludedToken(otherToken)) continue;
-          const observerId = otherToken.document.id;
-          visibilityMap[observerId] = getVisibilityBetween(otherToken, token);
-        }
-      }
-    } catch (error) {
-      console.error('PF2E Visioner | Failed to get visibility map:', error);
-      visibilityMap = {};
-    }
+    const getObserverToTargetVisibility = await this.#createInvisibilityVisibilityReader();
 
     const invisibilityFlags = {};
+    const conditionItemId = this.#getInvisibleConditionId(token.actor);
 
     // Check visibility from all other tokens to this token
     for (const otherToken of canvas.tokens.placeables) {
       if (otherToken === token || !otherToken.actor || this.#exclusionManager.isExcludedToken(otherToken)) continue;
 
       const observerId = otherToken.document.id;
-      const currentVisibility = visibilityMap[observerId] || 'observed';
+      const existingFlags =
+        token.document.flags?.['pf2e-visioner']?.invisibility?.[observerId] || {};
+      const shouldPreservePreviousState =
+        !!conditionItemId && existingFlags.conditionItemId === conditionItemId;
+      const currentVisibility =
+        (shouldPreservePreviousState ? existingFlags.previousState : null) ||
+        getObserverToTargetVisibility(otherToken, token) ||
+        'observed';
 
       // Record the current visibility state for all observers
       // This allows us to apply proper PF2E invisible condition transitions:
@@ -340,6 +359,7 @@ export class ConditionManager {
       invisibilityFlags[observerId] = {
         wasVisible: currentVisibility === 'observed' || currentVisibility === 'concealed',
         previousState: currentVisibility,
+        ...(conditionItemId ? { conditionItemId } : {}),
         // Clear any previously established states when invisibility is reapplied
         establishedState: null,
         establishedAt: null,
@@ -349,6 +369,55 @@ export class ConditionManager {
     // Set the flags on the token
     if (Object.keys(invisibilityFlags).length > 0) {
       await token.document.setFlag('pf2e-visioner', 'invisibility', invisibilityFlags);
+      this.#scheduleInvisibilityFlagPersistence(token, invisibilityFlags);
+    }
+  }
+
+  #scheduleInvisibilityFlagPersistence(token, invisibilityFlags) {
+    setTimeout(() => {
+      try {
+        if (token.destroyed || !this.#actorHasInvisibleCondition(token.actor)) return;
+        token.document.setFlag('pf2e-visioner', 'invisibility', invisibilityFlags);
+      } catch {
+        /* best-effort persistence after PF2E condition updates settle */
+      }
+    }, 150);
+  }
+
+  #actorHasInvisibleCondition(actor) {
+    return !!(
+      actor?.hasCondition?.('invisible') ||
+      actor?.system?.conditions?.invisible?.active ||
+      actor?.conditions?.has?.('invisible') ||
+      actor?.itemTypes?.condition?.some?.(
+        (condition) => condition.slug === 'invisible' && !condition.isExpired,
+      )
+    );
+  }
+
+  #getInvisibleConditionId(actor) {
+    try {
+      const condition = actor?.itemTypes?.condition?.find?.(
+        (item) => item.slug === 'invisible' && !item.isExpired,
+      );
+      return condition?.id || condition?._id || null;
+    } catch {
+      return null;
+    }
+  }
+
+  async #createInvisibilityVisibilityReader() {
+    const api = game.modules.get('pf2e-visioner')?.api;
+    if (typeof api?.getVisibility === 'function') {
+      return (observer, target) => api.getVisibility(observer?.document?.id, target?.document?.id);
+    }
+
+    try {
+      const { getVisibilityBetween } = await import('../../stores/visibility-map.js');
+      return (observer, target) => getVisibilityBetween(observer, target);
+    } catch (error) {
+      console.error('PF2E Visioner | Failed to prepare invisibility visibility reader:', error);
+      return () => 'observed';
     }
   }
 
@@ -472,6 +541,12 @@ export class ConditionManager {
       if (token._configureFilterEffect) {
         token._configureFilterEffect(statusId, isInvisible);
       }
+      token.renderFlags?.set?.({
+        refreshState: true,
+        refreshMesh: true,
+        refreshVisibility: true,
+      });
+      token.refresh?.();
     } catch { }
   }
 

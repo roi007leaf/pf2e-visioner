@@ -156,6 +156,19 @@ describe('token render lifecycle service', () => {
     expect(refreshSystemHiddenHighlightsForRenderedToken).not.toHaveBeenCalled();
   });
 
+  test('returns synchronously for skipped refreshToken processing', () => {
+    const result = handleTokenRefreshed(
+      { document: { id: 'token-1' } },
+      {
+        isRefreshTokenProcessingSuppressed: () => false,
+        shouldRefreshRenderedTokenHighlights: () => false,
+      },
+    );
+
+    expect(result).toEqual({ handled: false, reason: 'not-controlled' });
+    expect(result?.then).toBeUndefined();
+  });
+
   test('re-hides pending render-locked token surfaces after core refresh', async () => {
     const token = {
       document: { id: 'target' },
@@ -219,14 +232,14 @@ describe('token render lifecycle service', () => {
       }),
     ).resolves.toEqual({ handled: true });
 
-    await expect(
+    expect(
       handleTokenRefreshed(token, {
         isRefreshTokenProcessingSuppressed: () => false,
         shouldRefreshRenderedTokenHighlights: () => true,
         shouldThrottleRenderedTokenHighlightRefresh,
         refreshSystemHiddenHighlightsForRenderedToken,
       }),
-    ).resolves.toEqual({ handled: false, reason: 'throttled' });
+    ).toEqual({ handled: false, reason: 'throttled' });
 
     expect(refreshSystemHiddenHighlightsForRenderedToken).toHaveBeenCalledTimes(1);
   });

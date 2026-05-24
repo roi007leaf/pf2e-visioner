@@ -2,12 +2,13 @@ function tokenIdsFor(tokens = []) {
   return (tokens || []).map((token) => token.document.id);
 }
 
-function itemMetadata({ action, actor, tokens }) {
+function itemMetadata({ action, actor, tokens, recalculateAllTokenPairs = false }) {
   return {
     action,
     actorId: actor.id,
     tokenIds: tokenIdsFor(tokens),
     tokens,
+    ...(recalculateAllTokenPairs ? { recalculateAllTokenPairs: true } : {}),
   };
 }
 

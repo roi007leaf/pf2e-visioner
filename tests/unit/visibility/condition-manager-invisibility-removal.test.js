@@ -48,4 +48,312 @@ describe('ConditionManager invisibility removal', () => {
     expect(token.document.unsetFlag).toHaveBeenCalledWith('pf2e-visioner', 'invisibility');
     expect(global.canvas.perception.update).toHaveBeenCalled();
   });
+
+  test('records observer-to-target visibility before invisibility is applied', async () => {
+    const actor = {
+      id: 'actor-1',
+      hasCondition: jest.fn(() => false),
+      system: { conditions: { invisible: { active: false } } },
+      conditions: { has: jest.fn(() => false) },
+    };
+    const target = {
+      id: 'target',
+      name: 'Target',
+      actor,
+      document: {
+        id: 'target',
+        flags: {},
+        setFlag: jest.fn().mockResolvedValue(undefined),
+        unsetFlag: jest.fn().mockResolvedValue(undefined),
+      },
+    };
+    const observerSeeingTarget = {
+      id: 'observer-seeing',
+      actor: { id: 'observer-actor-1' },
+      document: { id: 'observer-seeing' },
+    };
+    const observerHiddenFromTarget = {
+      id: 'observer-hidden',
+      actor: { id: 'observer-actor-2' },
+      document: { id: 'observer-hidden' },
+    };
+    const api = {
+      getVisibilityMap: jest.fn(() => ({
+        'observer-seeing': 'undetected',
+        'observer-hidden': 'undetected',
+      })),
+      getVisibility: jest.fn((observerId, targetId) => {
+        if (targetId !== 'target') return 'observed';
+        if (observerId === 'observer-seeing') return 'observed';
+        if (observerId === 'observer-hidden') return 'hidden';
+        return 'observed';
+      }),
+    };
+
+    global.game.modules.get.mockReturnValue({ api });
+    global.canvas.tokens.controlled = [];
+    global.canvas.tokens.placeables = [target, observerSeeingTarget, observerHiddenFromTarget];
+
+    await ConditionManager.getInstance().handleInvisibilityChange(actor, {
+      hasInvisibility: true,
+    });
+
+    expect(api.getVisibility).toHaveBeenCalledWith('observer-seeing', 'target');
+    expect(api.getVisibility).toHaveBeenCalledWith('observer-hidden', 'target');
+    expect(target.document.setFlag).toHaveBeenCalledWith('pf2e-visioner', 'invisibility', {
+      'observer-seeing': {
+        wasVisible: true,
+        previousState: 'observed',
+        establishedState: null,
+        establishedAt: null,
+      },
+      'observer-hidden': {
+        wasVisible: false,
+        previousState: 'hidden',
+        establishedState: null,
+        establishedAt: null,
+      },
+    });
+  });
+
+  test('uses the exact synthetic actor token instead of every token with the same actor id', async () => {
+    const actor = {
+      id: 'shared-actor',
+      token: { id: 'target' },
+      hasCondition: jest.fn(() => true),
+      system: { conditions: { invisible: { active: true } } },
+      conditions: { has: jest.fn(() => true) },
+    };
+    const target = {
+      id: 'target',
+      name: 'Target',
+      actor,
+      document: {
+        id: 'target',
+        flags: {},
+        setFlag: jest.fn().mockResolvedValue(undefined),
+        unsetFlag: jest.fn().mockResolvedValue(undefined),
+      },
+    };
+    const sibling = {
+      id: 'sibling',
+      name: 'Sibling',
+      actor: {
+        id: 'shared-actor',
+        token: { id: 'sibling' },
+      },
+      document: {
+        id: 'sibling',
+        flags: {},
+        setFlag: jest.fn().mockResolvedValue(undefined),
+        unsetFlag: jest.fn().mockResolvedValue(undefined),
+      },
+    };
+    const observer = {
+      id: 'observer',
+      actor: { id: 'observer-actor' },
+      document: { id: 'observer' },
+    };
+
+    global.game.modules.get.mockReturnValue({
+      api: {
+        getVisibility: jest.fn(() => 'observed'),
+      },
+    });
+    global.canvas.tokens.get = jest.fn((id) => (id === 'target' ? target : null));
+    global.canvas.tokens.controlled = [];
+    global.canvas.tokens.placeables = [target, sibling, observer];
+
+    await ConditionManager.getInstance().handleInvisibilityChange(actor, {
+      hasInvisibility: true,
+    });
+
+    expect(target.document.setFlag).toHaveBeenCalledWith(
+      'pf2e-visioner',
+      'invisibility',
+      expect.any(Object),
+    );
+    expect(sibling.document.setFlag).not.toHaveBeenCalled();
+  });
+
+  test('reapplies invisibility flags after PF2E condition document updates settle', async () => {
+    const actor = {
+      id: 'actor-1',
+      hasCondition: jest.fn(() => true),
+      system: { conditions: { invisible: { active: true } } },
+      conditions: { has: jest.fn(() => true) },
+      itemTypes: { condition: [{ slug: 'invisible', isExpired: false }] },
+    };
+    const target = {
+      id: 'target',
+      name: 'Target',
+      actor,
+      destroyed: false,
+      document: {
+        id: 'target',
+        flags: {},
+        setFlag: jest.fn().mockResolvedValue(undefined),
+        unsetFlag: jest.fn().mockResolvedValue(undefined),
+      },
+    };
+    const observer = {
+      id: 'observer',
+      actor: { id: 'observer-actor' },
+      document: { id: 'observer' },
+    };
+
+    global.game.modules.get.mockReturnValue({
+      api: {
+        getVisibility: jest.fn(() => 'observed'),
+      },
+    });
+    global.canvas.tokens.controlled = [];
+    global.canvas.tokens.placeables = [target, observer];
+
+    await ConditionManager.getInstance().handleInvisibilityChange(actor, {
+      hasInvisibility: true,
+      token: target,
+    });
+
+    expect(target.document.setFlag).toHaveBeenCalledTimes(1);
+    jest.advanceTimersByTime(150);
+    expect(target.document.setFlag).toHaveBeenCalledTimes(2);
+    expect(target.document.setFlag).toHaveBeenLastCalledWith(
+      'pf2e-visioner',
+      'invisibility',
+      {
+        observer: {
+          wasVisible: true,
+          previousState: 'observed',
+          establishedState: null,
+          establishedAt: null,
+        },
+      },
+    );
+  });
+
+  test('does not overwrite pre-invisibility states when duplicate invisible handlers run', async () => {
+    const actor = {
+      id: 'actor-1',
+      hasCondition: jest.fn(() => true),
+      system: { conditions: { invisible: { active: true } } },
+      conditions: { has: jest.fn(() => true) },
+      itemTypes: { condition: [{ id: 'invisible-item', slug: 'invisible', isExpired: false }] },
+    };
+    const target = {
+      id: 'target',
+      name: 'Target',
+      actor,
+      document: {
+        id: 'target',
+        flags: {
+          'pf2e-visioner': {
+            invisibility: {
+              'observer-seeing': {
+                wasVisible: true,
+                previousState: 'observed',
+                conditionItemId: 'invisible-item',
+                establishedState: 'hidden',
+                establishedAt: 123,
+              },
+              'observer-hidden': {
+                wasVisible: false,
+                previousState: 'hidden',
+                conditionItemId: 'invisible-item',
+                establishedState: 'undetected',
+                establishedAt: 123,
+              },
+            },
+          },
+        },
+        setFlag: jest.fn().mockResolvedValue(undefined),
+        unsetFlag: jest.fn().mockResolvedValue(undefined),
+      },
+    };
+    const observerSeeingTarget = {
+      id: 'observer-seeing',
+      actor: { id: 'observer-actor-1' },
+      document: { id: 'observer-seeing' },
+    };
+    const observerHiddenFromTarget = {
+      id: 'observer-hidden',
+      actor: { id: 'observer-actor-2' },
+      document: { id: 'observer-hidden' },
+    };
+    const api = {
+      getVisibility: jest.fn(() => 'undetected'),
+    };
+
+    global.game.modules.get.mockReturnValue({ api });
+    global.canvas.tokens.controlled = [];
+    global.canvas.tokens.placeables = [target, observerSeeingTarget, observerHiddenFromTarget];
+
+    await ConditionManager.getInstance().handleInvisibilityChange(actor, {
+      hasInvisibility: true,
+    });
+
+    expect(target.document.setFlag).toHaveBeenCalledWith('pf2e-visioner', 'invisibility', {
+      'observer-seeing': {
+        wasVisible: true,
+        previousState: 'observed',
+        conditionItemId: 'invisible-item',
+        establishedState: null,
+        establishedAt: null,
+      },
+      'observer-hidden': {
+        wasVisible: false,
+        previousState: 'hidden',
+        conditionItemId: 'invisible-item',
+        establishedState: null,
+        establishedAt: null,
+      },
+    });
+  });
+
+  test('refreshes token rendering after applying the invisible mesh effect', async () => {
+    const actor = {
+      id: 'actor-1',
+      hasCondition: jest.fn(() => true),
+      system: { conditions: { invisible: { active: true } } },
+      conditions: { has: jest.fn(() => true) },
+    };
+    const token = {
+      id: 'target',
+      name: 'Target',
+      actor,
+      destroyed: false,
+      _configureFilterEffect: jest.fn(),
+      renderFlags: { set: jest.fn() },
+      refresh: jest.fn(),
+      document: {
+        id: 'target',
+        flags: {},
+        setFlag: jest.fn().mockResolvedValue(undefined),
+        unsetFlag: jest.fn().mockResolvedValue(undefined),
+      },
+    };
+
+    global.CONFIG = {
+      ...global.CONFIG,
+      specialStatusEffects: {
+        ...(global.CONFIG?.specialStatusEffects || {}),
+        INVISIBLE: 'invisible',
+      },
+    };
+    global.canvas.tokens.controlled = [];
+    global.canvas.tokens.placeables = [token];
+
+    await ConditionManager.getInstance().handleInvisibilityChange(actor, {
+      hasInvisibility: true,
+    });
+    jest.runOnlyPendingTimers();
+
+    expect(token._configureFilterEffect).toHaveBeenCalledWith('invisible', true);
+    expect(token.renderFlags.set).toHaveBeenCalledWith({
+      refreshState: true,
+      refreshMesh: true,
+      refreshVisibility: true,
+    });
+    expect(token.refresh).toHaveBeenCalled();
+  });
 });

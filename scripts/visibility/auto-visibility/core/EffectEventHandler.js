@@ -90,7 +90,12 @@ export class EffectEventHandler {
   async #handleEffectChange(effect, action) {
     // Check if this effect is related to invisibility, vision, or conditions that affect sight
     const effectName = effect.name?.toLowerCase() || effect.label?.toLowerCase() || '';
-    const effectSlug = effect.system?.slug?.toLowerCase() || '';
+    const effectSlug = (
+      effect.system?.slug ||
+      effect.slug ||
+      effect.key ||
+      ''
+    ).toLowerCase();
 
     const isVisibilityRelated =
       effectName.includes('invisible') ||
@@ -113,7 +118,7 @@ export class EffectEventHandler {
     const isInvisibilityEffect =
       effectName.includes('invisible') || effectSlug.includes('invisible');
     if (isInvisibilityEffect && effect.parent?.documentName === 'Actor') {
-      this._handleInvisibilityEffectChange(effect.parent, action);
+      await this._handleInvisibilityEffectChange(effect.parent, action);
     }
 
     // Strong hint that this effect toggles a LIGHT/DARKNESS emitter on the token
@@ -197,7 +202,7 @@ export class EffectEventHandler {
 
       // Call the condition manager to handle invisibility flags
       await conditionManager.handleInvisibilityChange(actor, {
-        hasInvisibility: action === 'deleted' ? false : null,
+        hasInvisibility: action !== 'deleted',
       });
     } catch (error) {
       console.error('PF2E Visioner | Failed to handle invisibility effect change:', error);

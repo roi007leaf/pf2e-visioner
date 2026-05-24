@@ -84,6 +84,16 @@ function refreshTokenVisualTargets(targets) {
   refreshTokenVisuals(tokens);
 }
 
+function hasSystemHiddenIndicators(tokens) {
+  return tokens.some((token) => !!token?._pvSystemHiddenIndicator);
+}
+
+function removeSystemHiddenIndicators(tokens) {
+  for (const token of tokens) {
+    removeSystemHiddenIndicator(token);
+  }
+}
+
 export async function updateTokenVisuals(tokens = undefined) {
   if (!canvas?.tokens) return;
   const targets =
@@ -269,8 +279,6 @@ export async function updateSystemHiddenTokenHighlights(
       return;
     }
 
-    ensureSystemHiddenKeyHandlerInstalled();
-
     const observer = resolveSystemHiddenObserver({
       observerId,
       allowControlledFallback: options?.allowControlledFallback !== false,
@@ -278,9 +286,7 @@ export async function updateSystemHiddenTokenHighlights(
     });
 
     if (!observer) {
-      for (const token of tokens) {
-        removeSystemHiddenIndicator(token);
-      }
+      if (hasSystemHiddenIndicators(tokens)) removeSystemHiddenIndicators(tokens);
       return;
     }
 
@@ -300,9 +306,7 @@ export async function updateSystemHiddenTokenHighlights(
     // All other tokens should show an indicator because they are effectively undetectable
     // (no precise or imprecise senses can work)
     if (!shouldEvaluateSystemHiddenIndicators(senseContext)) {
-      for (const token of tokens) {
-        removeSystemHiddenIndicator(token);
-      }
+      if (hasSystemHiddenIndicators(tokens)) removeSystemHiddenIndicators(tokens);
       return;
     }
 
@@ -350,6 +354,7 @@ export async function updateSystemHiddenTokenHighlights(
 
       if (shouldShowIndicator) {
         try {
+          ensureSystemHiddenKeyHandlerInstalled();
           await createSystemHiddenIndicator({
             observer,
             token,

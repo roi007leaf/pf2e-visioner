@@ -111,9 +111,7 @@ export async function registerHooks() {
     await handleTokenUpdated(tokenDoc, changes);
   });
 
-  Hooks.on('refreshToken', async (token) => {
-    await handleTokenRefreshed(token);
-  });
+  Hooks.on('refreshToken', (token) => handleTokenRefreshed(token));
 
   Hooks.on('pf2eVisionerAvsBatchComplete', async () => {
     await handleAvsBatchCompleteRefresh();

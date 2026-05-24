@@ -13,8 +13,12 @@ export class BatchOverrideValidationWorkflow {
     this.#warn = warn;
   }
 
-  async runBeforeResultApplication() {
+  async runBeforeResultApplication({ isMovementBatch = false } = {}) {
     const tokenId = this.#getLastMovedTokenId();
+    if (isMovementBatch) {
+      return { queued: false, tokenId, skipped: 'movement-batch' };
+    }
+
     if (!tokenId || !this.#overrideValidationManager) {
       return { queued: false, tokenId };
     }

@@ -591,7 +591,7 @@ export class BatchOrchestrator {
       }
 
       stageStart = this.nowProvider();
-      await this.workflowFactory.runOverrideValidationBeforeResultApplication();
+      await this.workflowFactory.runOverrideValidationBeforeResultApplication({ isMovementBatch });
 
       const { uniqueUpdateCount } = await this.workflowFactory.runPostResults({
         batchResult,

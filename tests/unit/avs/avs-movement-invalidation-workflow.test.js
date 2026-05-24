@@ -80,7 +80,8 @@ describe('AvsMovementInvalidationWorkflow', () => {
     ).toBeLessThan(batchOrchestrator.notifyTokenMovementComplete.mock.invocationCallOrder[0]);
   });
 
-  test('completed movement expires Take Cover before queueing and processing override validation', async () => {
+  test('completed movement expires Take Cover before queueing and scheduling override validation', async () => {
+    jest.useFakeTimers();
     let finishExpiration;
     const requestTakeCoverExpirationForToken = jest.fn(
       () =>
@@ -119,10 +120,36 @@ describe('AvsMovementInvalidationWorkflow', () => {
     await Promise.resolve();
 
     expect(overrideValidationManager.queueOverrideValidation).toHaveBeenCalledWith('token1');
+    expect(overrideValidationManager.processQueuedValidations).not.toHaveBeenCalled();
+    await jest.runOnlyPendingTimersAsync();
     expect(overrideValidationManager.processQueuedValidations).toHaveBeenCalledTimes(1);
     expect(requestTakeCoverExpirationForToken.mock.invocationCallOrder[0]).toBeLessThan(
       overrideValidationManager.queueOverrideValidation.mock.invocationCallOrder[0],
     );
+    jest.useRealTimers();
+  });
+
+  test('coalesces repeated completed movement override validation processing', async () => {
+    jest.useFakeTimers();
+    const overrideValidationManager = {
+      queueOverrideValidation: jest.fn(),
+      processQueuedValidations: jest.fn().mockResolvedValue(undefined),
+    };
+    const workflow = makeWorkflow({
+      overrideValidationManager,
+      requestTakeCoverExpirationForToken: jest.fn().mockResolvedValue(undefined),
+    });
+
+    workflow.handleTokenMovementCompleted({ id: 'token1' }, {});
+    workflow.handleTokenMovementCompleted({ id: 'token1' }, {});
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(overrideValidationManager.queueOverrideValidation).toHaveBeenCalledTimes(2);
+    expect(overrideValidationManager.processQueuedValidations).not.toHaveBeenCalled();
+    await jest.runOnlyPendingTimersAsync();
+    expect(overrideValidationManager.processQueuedValidations).toHaveBeenCalledTimes(1);
+    jest.useRealTimers();
   });
 
   test('position update records moved token and queues override validation after Take Cover expiration', async () => {

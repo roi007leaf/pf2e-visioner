@@ -108,7 +108,7 @@ export async function handleTokenUpdated(
   }
 }
 
-export async function handleTokenRefreshed(
+export function handleTokenRefreshed(
   token,
   {
     isRefreshTokenProcessingSuppressed = defaultIsRefreshTokenProcessingSuppressed,
@@ -140,13 +140,12 @@ export async function handleTokenRefreshed(
     return { handled: false, reason: 'throttled' };
   }
 
-  try {
-    await refreshSystemHiddenHighlightsForRenderedToken(token);
-    return { handled: true };
-  } catch (error) {
-    warn('PF2E Visioner | refreshToken hook for lifesense indicators failed:', error);
-    return { handled: false, reason: 'error' };
-  }
+  return Promise.resolve(refreshSystemHiddenHighlightsForRenderedToken(token))
+    .then(() => ({ handled: true }))
+    .catch((error) => {
+      warn('PF2E Visioner | refreshToken hook for lifesense indicators failed:', error);
+      return { handled: false, reason: 'error' };
+    });
 }
 
 export async function handleAvsBatchCompleteRefresh({

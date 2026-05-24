@@ -408,9 +408,7 @@ export class AvsInvalidationCoordinator {
     if (!Array.isArray(tokenIds) || tokenIds.length === 0) return false;
 
     this.#clearVisibilityAndLosCaches();
-    tokenIds.forEach((tokenId) => {
-      this.visibilityState?.markTokenChangedImmediate?.(tokenId);
-    });
+    this.visibilityState?.markAllTokensChangedImmediate?.();
     return true;
   }
 
@@ -438,6 +436,12 @@ export class AvsInvalidationCoordinator {
 
     this.#clearVisionAnalyzerCaches(metadata.tokens);
     this.cacheManager?.getGlobalVisibilityCache?.()?.clear?.();
+    if (metadata.recalculateAllTokenPairs) {
+      this.#clearVisibilityAndLosCaches();
+      this.visibilityState?.markAllTokensChangedImmediate?.();
+      return true;
+    }
+
     this.#markTokenIdsImmediate(tokenIds);
     return true;
   }
@@ -465,7 +469,7 @@ export class AvsInvalidationCoordinator {
     const tokenIds = Array.isArray(metadata.tokenIds) ? metadata.tokenIds : [];
     if (tokenIds.length === 0) return false;
 
-    this.#markTokenIdsImmediate(tokenIds);
+    this.visibilityState?.markAllTokensChangedImmediate?.();
     return true;
   }
 

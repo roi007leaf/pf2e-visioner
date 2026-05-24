@@ -45,6 +45,7 @@ export class AvsMovementInvalidationWorkflow {
     requestTakeCoverExpirationForToken = defaultRequestTakeCoverExpirationForToken,
     setMovedTokenId = setLastMovedTokenId,
     lightingPrecomputer = LightingPrecomputer,
+    overrideValidationProcessDelayMs = 150,
   } = {}) {
     this.shouldProcessEvents = shouldProcessEvents;
     this.visibilityState = visibilityState;
@@ -55,6 +56,8 @@ export class AvsMovementInvalidationWorkflow {
     this.requestTakeCoverExpirationForToken = requestTakeCoverExpirationForToken;
     this.setMovedTokenId = setMovedTokenId;
     this.lightingPrecomputer = lightingPrecomputer;
+    this.overrideValidationProcessDelayMs = overrideValidationProcessDelayMs;
+    this.overrideValidationProcessTimer = null;
   }
 
   handleTokenMovementCompleted(tokenDoc, movementChanges) {
@@ -137,13 +140,29 @@ export class AvsMovementInvalidationWorkflow {
       try {
         this.overrideValidationManager.queueOverrideValidation(tokenId);
         if (processQueuedValidations) {
-          const result = this.overrideValidationManager.processQueuedValidations?.();
-          result?.catch?.(() => {});
+          this.#scheduleOverrideValidationProcessing();
         }
       } catch {
         /* best-effort */
       }
     });
+  }
+
+  #scheduleOverrideValidationProcessing() {
+    if (!this.overrideValidationManager?.processQueuedValidations) return;
+    if (this.overrideValidationProcessTimer) {
+      clearTimeout(this.overrideValidationProcessTimer);
+    }
+
+    this.overrideValidationProcessTimer = setTimeout(() => {
+      this.overrideValidationProcessTimer = null;
+      try {
+        const result = this.overrideValidationManager.processQueuedValidations?.();
+        result?.catch?.(() => {});
+      } catch {
+        /* best-effort */
+      }
+    }, this.overrideValidationProcessDelayMs);
   }
 
   async #expireTakeCoverForMovement(tokenDoc) {

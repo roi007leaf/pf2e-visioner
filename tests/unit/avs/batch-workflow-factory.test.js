@@ -32,10 +32,14 @@ describe('BatchWorkflowFactory', () => {
     expect(factory.createDetectionBatchLifecycle()).toBe(secondDetectionLifecycle);
     expect(createDetectionBatchLifecycle).toHaveBeenCalledTimes(2);
 
-    await expect(factory.runOverrideValidationBeforeResultApplication()).resolves.toEqual({
+    const overrideContext = { isMovementBatch: true };
+    await expect(factory.runOverrideValidationBeforeResultApplication(overrideContext)).resolves.toEqual({
       queued: true,
       tokenId: 'mover',
     });
+    expect(overrideValidationWorkflow.runBeforeResultApplication).toHaveBeenCalledWith(
+      overrideContext,
+    );
 
     const postContext = {
       batchResult: { updates: [] },
