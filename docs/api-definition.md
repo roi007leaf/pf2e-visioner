@@ -223,4 +223,5 @@ Notes:
 - `detectionState` does not accept `'concealed'`; concealed is represented as `{ detectionState: 'observed', hasConcealment: true }`.
 - `'unnoticed'` is represented as `{ detectionState: 'undetected', awarenessState: 'unnoticed' }`.
 - Passing legacy strings to `setPerceptionProfile` is accepted and normalized, but new integrations should send profile objects.
+- Manual `setPerceptionProfile` and `setPerceptionProfileMap` calls create AVS overrides by default, matching `setVisibility`. Pass `{ isAutomatic: true }` for internal/system recalculations that should not create manual overrides.
 - `setVisibility` remains for compatibility and writes through the v2 store internally.
