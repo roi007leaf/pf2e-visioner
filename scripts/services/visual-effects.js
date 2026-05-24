@@ -24,6 +24,7 @@ import { MODULE_ID } from '../constants.js';
 import { getDetectionBetween } from '../stores/detection-map.js';
 import { getVisibilityBetween } from '../utils.js';
 import { _internal as visibilityCalculatorInternal } from '../visibility/StatelessVisibilityCalculator.js';
+import { VisionAnalyzer } from '../visibility/auto-visibility/VisionAnalyzer.js';
 import {
   buildSystemHiddenIndicatorDecision,
   getSystemHiddenIndicatorCandidates,
@@ -320,6 +321,8 @@ export async function updateSystemHiddenTokenHighlights(
           grid: canvas.grid,
           getVisibilityState: getVisibilityBetween,
           getDetectionBetween,
+          isSoundBlocked: (observerToken, targetToken) =>
+            VisionAnalyzer.getInstance().isSoundBlocked(observerToken, targetToken),
           canLifesenseDetect: visibilityCalculatorInternal.canLifesenseDetect,
           canThoughtsenseDetect: visibilityCalculatorInternal.canThoughtsenseDetect,
         });

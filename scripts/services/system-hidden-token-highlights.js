@@ -140,6 +140,14 @@ function getStoredDetection({ observer, token, getDetectionBetween }) {
   }
 }
 
+function getSoundBlocked({ observer, token, isSoundBlocked }) {
+  try {
+    return isSoundBlocked?.(observer, token) === true;
+  } catch (_) {
+    return false;
+  }
+}
+
 export function isSystemHiddenIndicatorCandidate(token, observer) {
   if (!token || token.id === observer?.id) return false;
   if (!token.actor) return false;
@@ -187,6 +195,7 @@ export function buildSystemHiddenIndicatorDecision({
   grid = null,
   getVisibilityState = null,
   getDetectionBetween = null,
+  isSoundBlocked = null,
   canLifesenseDetect = () => false,
   canThoughtsenseDetect = () => false,
 } = {}) {
@@ -210,6 +219,8 @@ export function buildSystemHiddenIndicatorDecision({
   const isHiddenFromObserver = visibilityState === 'hidden';
   const detectedByEcholocation =
     SYSTEM_HIDDEN_AUDITORY_PRECISE_SENSES.has(detection?.sense) && detection?.isPrecise !== false;
+  const echolocationSoundBlocked =
+    detectedByEcholocation && getSoundBlocked({ observer, token, isSoundBlocked });
 
   const shouldShowLifesenseIndicator =
     isSystemHidden && canBeDetectedByLifesense && isWithinLifesenseRange;
@@ -219,6 +230,7 @@ export function buildSystemHiddenIndicatorDecision({
     isSystemHidden &&
     !!senseContext?.observerHasEcholocation &&
     !senseContext?.observerIsDeafened &&
+    !echolocationSoundBlocked &&
     isWithinEcholocationRange &&
     detectedByEcholocation;
   const shouldShowBlindDeafIndicator =

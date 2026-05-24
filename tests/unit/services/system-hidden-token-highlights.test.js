@@ -378,6 +378,42 @@ describe('system-hidden token highlight service', () => {
     });
   });
 
+  test('does not build echolocation indicator through sound-blocking walls', () => {
+    const observer = {
+      document: { id: 'observer', x: 0, y: 0, width: 1, height: 1 },
+      distanceTo: jest.fn(() => 25),
+      actor: {
+        system: {
+          perception: {
+            senses: [{ type: 'echolocation', acuity: 'precise', range: 40 }],
+          },
+        },
+        hasCondition: jest.fn(() => false),
+      },
+    };
+    const target = {
+      visible: false,
+      renderable: false,
+      document: { id: 'target', x: 250, y: 0, width: 1, height: 1 },
+      actor: { system: { traits: { value: [] } } },
+    };
+    const isSoundBlocked = jest.fn(() => true);
+
+    expect(
+      buildSystemHiddenIndicatorDecision({
+        observer,
+        token: target,
+        senseContext: getSystemHiddenSenseContext(observer),
+        getDetectionBetween: jest.fn(() => ({ sense: 'echolocation', isPrecise: true })),
+        isSoundBlocked,
+      }),
+    ).toMatchObject({
+      shouldShowIndicator: false,
+      shouldShowEcholocationIndicator: false,
+    });
+    expect(isSoundBlocked).toHaveBeenCalledWith(observer, target);
+  });
+
   test('uses position override when measuring system-hidden indicator distance', () => {
     const observer = {
       document: { x: 0, y: 0, width: 1, height: 1 },
