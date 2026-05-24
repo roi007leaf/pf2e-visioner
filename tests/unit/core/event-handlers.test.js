@@ -527,7 +527,7 @@ describe('Event Handler Tests', () => {
       createHandler(mockItem);
 
       // Visibility-affecting items are processed immediately
-      expect(mockVisibilityState.recalculateForTokens).toHaveBeenCalledWith(['token1']);
+      expect(mockVisibilityState.markTokenChangedImmediate).toHaveBeenCalledWith('token1');
 
       jest.useRealTimers();
     });
@@ -642,7 +642,7 @@ describe('Event Handler Tests', () => {
 
       await updateHandler(mockItem, changes);
 
-      expect(mockVisibilityState.recalculateForTokens).toHaveBeenCalledWith(['token1']);
+      expect(mockVisibilityState.markTokenChangedImmediate).toHaveBeenCalledWith('token1');
     });
 
     test('should translate vision equipment changes into invalidation reasons', async () => {
