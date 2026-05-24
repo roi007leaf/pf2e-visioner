@@ -527,7 +527,7 @@ describe('Event Handler Tests', () => {
       createHandler(mockItem);
 
       // Visibility-affecting items are processed immediately
-      expect(mockVisibilityState.markTokenChangedImmediate).toHaveBeenCalledWith('token1');
+      expect(mockVisibilityState.recalculateForTokens).toHaveBeenCalledWith(['token1']);
 
       jest.useRealTimers();
     });

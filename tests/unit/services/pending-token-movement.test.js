@@ -971,7 +971,8 @@ describe('pending token movement hidden detection guard', () => {
     await Promise.resolve();
 
     expect(calculateFinalVisibility.mock.calls[0][1].document.id).toBe('target');
-    expect(target.refresh).toHaveBeenCalled();
+    expect(target.refresh).not.toHaveBeenCalled();
+    expect(target.visible).toBe(false);
 
     releaseOther();
     await slowOtherPrediction;
@@ -1227,7 +1228,7 @@ describe('pending token movement hidden detection guard', () => {
 
     expect(target.visible).toBe(false);
     expect(target.mesh.visible).toBe(false);
-    expect(target.refresh).toHaveBeenCalledTimes(1);
+    expect(target.refresh).not.toHaveBeenCalled();
     expect(shouldTemporarilyForceTokenInvisible(target)).toBe(true);
   });
 
@@ -2580,7 +2581,7 @@ describe('pending token movement hidden detection guard', () => {
     });
 
     expect(target.renderable).toBe(false);
-    expect(target.refresh).toHaveBeenCalledTimes(1);
+    expect(target.refresh).not.toHaveBeenCalled();
     expect(unrelated.renderable).toBe(true);
     expect(unrelated.refresh).not.toHaveBeenCalled();
   });
@@ -2617,7 +2618,7 @@ describe('pending token movement hidden detection guard', () => {
       targetTokenIds: ['target'],
     });
 
-    expect(target.refresh).toHaveBeenCalledTimes(1);
+    expect(target.refresh).not.toHaveBeenCalled();
     expect(getPendingMovementPerformanceSnapshot()).toEqual({
       refreshCalls: 0,
       targetedRefreshCalls: 0,
@@ -2995,7 +2996,7 @@ describe('pending token movement hidden detection guard', () => {
     refreshPendingMovementTokenVisibility('observer', { skipPerceptionRefresh: true });
 
     expect(target.renderable).toBe(false);
-    expect(target.refresh).toHaveBeenCalledTimes(1);
+    expect(target.refresh).not.toHaveBeenCalled();
     expect(global.canvas.perception.update).not.toHaveBeenCalled();
   });
 
