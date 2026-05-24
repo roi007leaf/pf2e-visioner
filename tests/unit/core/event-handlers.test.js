@@ -642,7 +642,7 @@ describe('Event Handler Tests', () => {
 
       await updateHandler(mockItem, changes);
 
-      expect(mockVisibilityState.markTokenChangedImmediate).toHaveBeenCalledWith('token1');
+      expect(mockVisibilityState.recalculateForTokens).toHaveBeenCalledWith(['token1']);
     });
 
     test('should translate vision equipment changes into invalidation reasons', async () => {
