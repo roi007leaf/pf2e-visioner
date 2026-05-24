@@ -1435,7 +1435,7 @@ describe('Event Handler Tests', () => {
       )[1];
       lightingRefreshHandler();
 
-      expect(mockVisibilityState.markTokenChangedImmediate).toHaveBeenCalledWith('token1');
+      expect(mockVisibilityState.recalculateForTokens).toHaveBeenCalledWith(['token1']);
     });
 
     test('should defer token light recalculation until lighting refresh completes', () => {
