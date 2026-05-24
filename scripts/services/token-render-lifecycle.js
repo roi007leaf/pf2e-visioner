@@ -1,12 +1,16 @@
 import {
   hasPendingMovementRenderWork as defaultHasPendingMovementRenderWork,
+  getPendingMovementRefreshTargetIds as defaultGetPendingMovementRefreshTargetIds,
   refreshPendingMovementTokenVisibility as defaultRefreshPendingMovementTokenVisibility,
+  hasPendingRenderState as defaultHasPendingRenderState,
+  forceTokenRenderStateInvisible as defaultForceTokenRenderStateInvisible,
 } from './PendingMovement/pending-movement-render-lock.js';
 import {
   schedulePendingTokenMovementCompletion as defaultSchedulePendingTokenMovementCompletion,
 } from './PendingMovement/pending-token-movement.js';
 import { isRefreshTokenProcessingSuppressed as defaultIsRefreshTokenProcessingSuppressed } from './runtime-state.js';
 import {
+  getMatchingControlledTokenForRefresh,
   refreshSystemHiddenHighlightsForMovedToken as defaultRefreshSystemHiddenHighlightsForMovedToken,
   refreshSystemHiddenHighlightsForControlledTokens as defaultRefreshSystemHiddenHighlightsForControlledTokens,
   refreshSystemHiddenHighlightsForRenderedToken as defaultRefreshSystemHiddenHighlightsForRenderedToken,
@@ -15,6 +19,45 @@ import { handlePreUpdateTokenMovement as defaultHandlePreUpdateTokenMovement } f
 
 function hasPositionChange(changes) {
   return !!changes && ('x' in changes || 'y' in changes);
+}
+
+const RENDERED_TOKEN_HIGHLIGHT_REFRESH_MIN_INTERVAL_MS = 100;
+const renderedTokenHighlightRefreshTimes = new Map();
+
+function getDefaultControlledTokens() {
+  return globalThis.canvas?.tokens?.controlled || [];
+}
+
+function tokenIdForRefresh(token) {
+  return token?.document?.id ?? token?.id ?? null;
+}
+
+export function shouldRefreshRenderedTokenHighlights(
+  token,
+  controlledTokens = getDefaultControlledTokens(),
+) {
+  return !!getMatchingControlledTokenForRefresh(token, controlledTokens);
+}
+
+export function resetRenderedTokenHighlightRefreshThrottle() {
+  renderedTokenHighlightRefreshTimes.clear();
+}
+
+export function shouldThrottleRenderedTokenHighlightRefresh(
+  token,
+  { now = Date.now, minIntervalMs = RENDERED_TOKEN_HIGHLIGHT_REFRESH_MIN_INTERVAL_MS } = {},
+) {
+  const tokenId = tokenIdForRefresh(token);
+  if (!tokenId) return false;
+
+  const currentTime = now();
+  const lastRefreshTime = renderedTokenHighlightRefreshTimes.get(tokenId);
+  if (lastRefreshTime !== undefined && currentTime - lastRefreshTime < minIntervalMs) {
+    return true;
+  }
+
+  renderedTokenHighlightRefreshTimes.set(tokenId, currentTime);
+  return false;
 }
 
 export function handleTokenPreUpdate(
@@ -69,6 +112,12 @@ export async function handleTokenRefreshed(
   token,
   {
     isRefreshTokenProcessingSuppressed = defaultIsRefreshTokenProcessingSuppressed,
+    shouldRefreshRenderedTokenHighlights: shouldRefreshRenderedTokenHighlightsForToken =
+    shouldRefreshRenderedTokenHighlights,
+    shouldThrottleRenderedTokenHighlightRefresh: shouldThrottleRenderedTokenHighlightRefreshForToken =
+    shouldThrottleRenderedTokenHighlightRefresh,
+    hasPendingRenderState = defaultHasPendingRenderState,
+    forceTokenRenderStateInvisible = defaultForceTokenRenderStateInvisible,
     refreshSystemHiddenHighlightsForRenderedToken =
     defaultRefreshSystemHiddenHighlightsForRenderedToken,
     warn = console.warn,
@@ -76,6 +125,19 @@ export async function handleTokenRefreshed(
 ) {
   if (isRefreshTokenProcessingSuppressed()) {
     return { handled: false, reason: 'suppressed' };
+  }
+
+  if (hasPendingRenderState(token)) {
+    forceTokenRenderStateInvisible(token);
+    return { handled: false, reason: 'pending-render-lock' };
+  }
+
+  if (!shouldRefreshRenderedTokenHighlightsForToken(token)) {
+    return { handled: false, reason: 'not-controlled' };
+  }
+
+  if (shouldThrottleRenderedTokenHighlightRefreshForToken(token)) {
+    return { handled: false, reason: 'throttled' };
   }
 
   try {
@@ -89,6 +151,7 @@ export async function handleTokenRefreshed(
 
 export async function handleAvsBatchCompleteRefresh({
   hasPendingMovementRenderWork = defaultHasPendingMovementRenderWork,
+  getPendingMovementRefreshTargetIds = defaultGetPendingMovementRefreshTargetIds,
   refreshPendingMovementTokenVisibility = defaultRefreshPendingMovementTokenVisibility,
   refreshSystemHiddenHighlightsForControlledTokens =
   defaultRefreshSystemHiddenHighlightsForControlledTokens,
@@ -98,7 +161,12 @@ export async function handleAvsBatchCompleteRefresh({
       return { handled: false, reason: 'no-pending-work' };
     }
 
-    refreshPendingMovementTokenVisibility([], { ignoreObservedGrace: true });
+    const targetTokenIds = getPendingMovementRefreshTargetIds();
+    refreshPendingMovementTokenVisibility([], {
+      ignoreObservedGrace: true,
+      source: 'avs-batch-complete',
+      ...(targetTokenIds.length ? { targetTokenIds } : {}),
+    });
     await refreshSystemHiddenHighlightsForControlledTokens();
     return { handled: true };
   } catch {

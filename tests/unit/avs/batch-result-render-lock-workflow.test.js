@@ -46,12 +46,16 @@ describe('BatchResultRenderLockWorkflow', () => {
       'undetected',
     );
     expect(refreshPendingMovementTokenVisibility).toHaveBeenNthCalledWith(1, [], {
+      coalesceFrame: true,
       ignoreObservedGrace: true,
       skipPerceptionRefresh: true,
+      source: 'batch-result-reveal-refresh',
       targetTokenIds: ['revealed-target'],
     });
     expect(refreshPendingMovementTokenVisibility).toHaveBeenNthCalledWith(2, [], {
+      coalesceFrame: true,
       ignoreObservedGrace: true,
+      source: 'batch-result-hidden-refresh',
       targetTokenIds: ['hidden-target'],
     });
     expect(plan.hasWork).toBe(true);

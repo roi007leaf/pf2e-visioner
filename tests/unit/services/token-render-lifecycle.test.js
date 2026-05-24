@@ -156,17 +156,93 @@ describe('token render lifecycle service', () => {
     expect(refreshSystemHiddenHighlightsForRenderedToken).not.toHaveBeenCalled();
   });
 
+  test('re-hides pending render-locked token surfaces after core refresh', async () => {
+    const token = {
+      document: { id: 'target' },
+      visible: true,
+      renderable: true,
+      mesh: { visible: true, renderable: true, alpha: 1 },
+      targetPips: { visible: true },
+      levelIndicator: { visible: true },
+    };
+    const forceTokenRenderStateInvisible = jest.fn((refreshedToken) => {
+      refreshedToken.visible = false;
+      refreshedToken.renderable = false;
+      refreshedToken.targetPips.visible = false;
+      refreshedToken.levelIndicator.visible = false;
+    });
+    const refreshSystemHiddenHighlightsForRenderedToken = jest.fn();
+
+    const result = await handleTokenRefreshed(token, {
+      isRefreshTokenProcessingSuppressed: () => false,
+      hasPendingRenderState: () => true,
+      forceTokenRenderStateInvisible,
+      shouldRefreshRenderedTokenHighlights: () => false,
+      refreshSystemHiddenHighlightsForRenderedToken,
+    });
+
+    expect(result).toEqual({ handled: false, reason: 'pending-render-lock' });
+    expect(forceTokenRenderStateInvisible).toHaveBeenCalledWith(token);
+    expect(token.targetPips.visible).toBe(false);
+    expect(token.levelIndicator.visible).toBe(false);
+    expect(refreshSystemHiddenHighlightsForRenderedToken).not.toHaveBeenCalled();
+  });
+
   test('refreshes rendered-token highlights when refreshToken processing is not suppressed', async () => {
     const token = { id: 'token-1' };
     const refreshSystemHiddenHighlightsForRenderedToken = jest.fn().mockResolvedValue(undefined);
 
     const result = await handleTokenRefreshed(token, {
       isRefreshTokenProcessingSuppressed: () => false,
+      shouldRefreshRenderedTokenHighlights: () => true,
       refreshSystemHiddenHighlightsForRenderedToken,
     });
 
     expect(result).toEqual({ handled: true });
     expect(refreshSystemHiddenHighlightsForRenderedToken).toHaveBeenCalledWith(token);
+  });
+
+  test('throttles repeated rendered-token highlight refreshes for same token', async () => {
+    const token = { document: { id: 'token-1' } };
+    const refreshSystemHiddenHighlightsForRenderedToken = jest.fn().mockResolvedValue(undefined);
+    const shouldThrottleRenderedTokenHighlightRefresh = jest
+      .fn()
+      .mockReturnValueOnce(false)
+      .mockReturnValueOnce(true);
+
+    await expect(
+      handleTokenRefreshed(token, {
+        isRefreshTokenProcessingSuppressed: () => false,
+        shouldRefreshRenderedTokenHighlights: () => true,
+        shouldThrottleRenderedTokenHighlightRefresh,
+        refreshSystemHiddenHighlightsForRenderedToken,
+      }),
+    ).resolves.toEqual({ handled: true });
+
+    await expect(
+      handleTokenRefreshed(token, {
+        isRefreshTokenProcessingSuppressed: () => false,
+        shouldRefreshRenderedTokenHighlights: () => true,
+        shouldThrottleRenderedTokenHighlightRefresh,
+        refreshSystemHiddenHighlightsForRenderedToken,
+      }),
+    ).resolves.toEqual({ handled: false, reason: 'throttled' });
+
+    expect(refreshSystemHiddenHighlightsForRenderedToken).toHaveBeenCalledTimes(1);
+  });
+
+  test('skips rendered-token highlight refresh for tokens that are not controlled', async () => {
+    const token = { document: { id: 'target' } };
+    const refreshSystemHiddenHighlightsForRenderedToken = jest.fn().mockResolvedValue(undefined);
+
+    const result = await handleTokenRefreshed(token, {
+      isRefreshTokenProcessingSuppressed: () => false,
+      shouldRefreshRenderedTokenHighlights: () => false,
+      refreshSystemHiddenHighlightsForRenderedToken,
+    });
+
+    expect(result).toEqual({ handled: false, reason: 'not-controlled' });
+    expect(refreshSystemHiddenHighlightsForRenderedToken).not.toHaveBeenCalled();
   });
 
   test('refreshes pending movement visibility and highlights after AVS batch completion only when work is pending', async () => {
@@ -192,7 +268,53 @@ describe('token render lifecycle service', () => {
     ).resolves.toEqual({ handled: true });
     expect(refreshPendingMovementTokenVisibility).toHaveBeenCalledWith([], {
       ignoreObservedGrace: true,
+      source: 'avs-batch-complete',
     });
     expect(refreshSystemHiddenHighlightsForControlledTokens).toHaveBeenCalledTimes(1);
+  });
+
+  test('targets pending movement visibility refresh after AVS batch completion when targets are known', async () => {
+    const refreshPendingMovementTokenVisibility = jest.fn();
+
+    await expect(
+      handleAvsBatchCompleteRefresh({
+        hasPendingMovementRenderWork: () => true,
+        getPendingMovementRefreshTargetIds: () => ['target'],
+        refreshPendingMovementTokenVisibility,
+        refreshSystemHiddenHighlightsForControlledTokens: jest.fn(),
+      }),
+    ).resolves.toEqual({ handled: true });
+
+    expect(refreshPendingMovementTokenVisibility).toHaveBeenCalledWith([], {
+      ignoreObservedGrace: true,
+      source: 'avs-batch-complete',
+      targetTokenIds: ['target'],
+    });
+  });
+
+  test('refreshes pending movement synchronously before system-hidden highlights after AVS batch completion', async () => {
+    const calls = [];
+    const refreshPendingMovementTokenVisibility = jest.fn(() => {
+      calls.push('pending');
+    });
+    const refreshSystemHiddenHighlightsForControlledTokens = jest.fn(() => {
+      calls.push('highlights');
+    });
+
+    await expect(
+      handleAvsBatchCompleteRefresh({
+        hasPendingMovementRenderWork: () => true,
+        getPendingMovementRefreshTargetIds: () => ['target'],
+        refreshPendingMovementTokenVisibility,
+        refreshSystemHiddenHighlightsForControlledTokens,
+      }),
+    ).resolves.toEqual({ handled: true });
+
+    expect(refreshPendingMovementTokenVisibility).toHaveBeenCalledWith([], {
+      ignoreObservedGrace: true,
+      source: 'avs-batch-complete',
+      targetTokenIds: ['target'],
+    });
+    expect(calls).toEqual(['pending', 'highlights']);
   });
 });

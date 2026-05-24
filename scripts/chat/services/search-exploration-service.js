@@ -1,4 +1,5 @@
 import { MODULE_ID } from '../../constants.js';
+import { getVisibilityBetween } from '../../stores/visibility-map.js';
 
 export const SEARCH_EXPLORATION_FLAG = 'searchExploration';
 
@@ -415,8 +416,7 @@ function tokenIsHiddenByVisionerToAnyPC(token) {
   const tokens = canvas?.tokens?.placeables || [];
   return tokens.some((observer) => {
     if (!isPlayerCharacterToken(observer) || getTokenId(observer) === targetId) return false;
-    const visibilityMap = observer?.document?.getFlag?.(MODULE_ID, 'visibility') || {};
-    const visibility = visibilityMap?.[targetId];
+    const visibility = getVisibilityBetween(observer, token);
     return visibility === 'hidden' || visibility === 'undetected';
   });
 }

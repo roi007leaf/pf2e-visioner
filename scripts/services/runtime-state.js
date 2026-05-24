@@ -49,6 +49,30 @@ export function isRefreshTokenProcessingSuppressed() {
   return !!getRuntimeFlag('suppressRefreshTokenProcessing');
 }
 
+export function setSuppressPendingMovementVisualRefresh(value = true) {
+  return setRuntimeFlag('suppressPendingMovementVisualRefresh', value);
+}
+
+export function clearSuppressPendingMovementVisualRefresh() {
+  setRuntimeFlag('suppressPendingMovementVisualRefresh', false);
+}
+
+export function isPendingMovementVisualRefreshSuppressed() {
+  return !!getRuntimeFlag('suppressPendingMovementVisualRefresh');
+}
+
+export function setMovementPerformanceDiagnosticsEnabled(value = true) {
+  return setRuntimeFlag('enableMovementPerformanceDiagnostics', value);
+}
+
+export function clearMovementPerformanceDiagnosticsEnabled() {
+  setRuntimeFlag('enableMovementPerformanceDiagnostics', false);
+}
+
+export function isMovementPerformanceDiagnosticsEnabled() {
+  return !!getRuntimeFlag('enableMovementPerformanceDiagnostics');
+}
+
 export function setSuppressLightingRefreshAfterBatch(value = true) {
   return setRuntimeFlag('suppressLightingRefreshAfterBatch', value);
 }

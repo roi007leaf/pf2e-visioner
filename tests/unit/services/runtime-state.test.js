@@ -30,11 +30,15 @@ describe('runtime state service', () => {
     service.setRuntimeFlag('unrelated', 'value');
     service.setSuppressLightingRefresh(true);
     service.setSuppressRefreshTokenProcessing(true);
+    service.setSuppressPendingMovementVisualRefresh(true);
+    service.setMovementPerformanceDiagnosticsEnabled(true);
     service.setSuppressLightingRefreshAfterBatch(true);
     service.setLastMovedTokenId('token-1');
 
     expect(service.isLightingRefreshSuppressed()).toBe(true);
     expect(service.isRefreshTokenProcessingSuppressed()).toBe(true);
+    expect(service.isPendingMovementVisualRefreshSuppressed()).toBe(true);
+    expect(service.isMovementPerformanceDiagnosticsEnabled()).toBe(true);
     expect(service.isLightingRefreshAfterBatchSuppressed()).toBe(true);
     expect(service.getLastMovedTokenId()).toBe('token-1');
     expect(service.getRuntimeFlag('unrelated')).toBe('value');
@@ -48,6 +52,14 @@ describe('runtime state service', () => {
     service.setSuppressRefreshTokenProcessing(true);
     service.clearSuppressRefreshTokenProcessing();
     expect(service.getRuntimeFlag('suppressRefreshTokenProcessing')).toBe(false);
+
+    service.setSuppressPendingMovementVisualRefresh(true);
+    service.clearSuppressPendingMovementVisualRefresh();
+    expect(service.getRuntimeFlag('suppressPendingMovementVisualRefresh')).toBe(false);
+
+    service.setMovementPerformanceDiagnosticsEnabled(true);
+    service.clearMovementPerformanceDiagnosticsEnabled();
+    expect(service.getRuntimeFlag('enableMovementPerformanceDiagnostics')).toBe(false);
 
     service.setSuppressLightingRefreshAfterBatch(true);
     service.clearSuppressLightingRefreshAfterBatch();

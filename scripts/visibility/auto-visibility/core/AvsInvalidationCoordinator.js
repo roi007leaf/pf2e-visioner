@@ -188,6 +188,7 @@ export class AvsInvalidationCoordinator {
     if (!this.#shouldProcessEvents()) return false;
 
     if (this.batchOrchestrator?.isTokenMovementActive?.()) {
+      this.batchOrchestrator.recordMovementLightingRefreshSuppressed?.();
       return false;
     }
 

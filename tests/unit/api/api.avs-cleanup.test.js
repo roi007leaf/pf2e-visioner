@@ -296,10 +296,10 @@ describe('API AVS cleanup integration', () => {
     expect(selectedUpdate).toEqual(
       expect.objectContaining({
         'flags.pf2e-visioner.visibilityV2': expect.anything(),
-        'flags.pf2e-visioner.visibility': expect.anything(),
         'flags.pf2e-visioner.detection': expect.anything(),
       }),
     );
+    expect(selectedUpdate).not.toHaveProperty('flags.pf2e-visioner.visibility');
 
     const observerUpdate = canvas.scene.updateEmbeddedDocuments.mock.calls
       .flatMap((call) => call[1] ?? [])
@@ -344,7 +344,7 @@ describe('API AVS cleanup integration', () => {
     const selected = mkToken('A');
     const observer = mkToken('C', {
       cover: { A: 'standard' },
-      visibility: { A: 'hidden' },
+      visibilityV2: { A: { detectionState: 'hidden' } },
     });
     canvas.tokens.placeables = [selected, observer];
 
@@ -358,7 +358,8 @@ describe('API AVS cleanup integration', () => {
 
     expect(updateForObserver).toEqual(expect.objectContaining({
       'flags.pf2e-visioner.cover': forcedDeletion,
-      'flags.pf2e-visioner.visibility': forcedDeletion,
+      'flags.pf2e-visioner.visibilityV2': forcedDeletion,
     }));
+    expect(updateForObserver).not.toHaveProperty('flags.pf2e-visioner.visibility');
   });
 });

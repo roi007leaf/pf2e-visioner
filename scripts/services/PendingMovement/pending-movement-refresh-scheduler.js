@@ -20,7 +20,17 @@ const PENDING_MOVEMENT_ANIMATION_REFRESH_DELAYS_MS = [
   650,
   800,
 ];
+const PENDING_MOVEMENT_LIGHT_ANIMATION_REFRESH_DELAYS_MS = [
+  33,
+  66,
+  100,
+  200,
+  350,
+  500,
+  800,
+];
 const PENDING_MOVEMENT_POST_COMPLETION_REFRESH_DELAYS_MS = [100, 300, 700, 1200];
+const PENDING_MOVEMENT_LIGHT_POST_COMPLETION_REFRESH_DELAYS_MS = [100, 300];
 const PENDING_MOVEMENT_DETECTION_FILTER_RESTORE_DELAYS_MS = [16, 50, 100, 200];
 
 const pendingMovementAnimationRefreshTimeouts = new Map();
@@ -65,10 +75,18 @@ export function clearDetectionFilterRestoreTimeouts(targetId) {
 export function scheduleAnimationRenderRefreshes(
   tokenId,
   serial,
-  { getEntry, getTargetTokenIds, refreshTokenVisibility } = {},
+  {
+    getEntry,
+    getTargetTokenIds,
+    shouldUseFullAnimationRefreshCadence = () => false,
+    refreshTokenVisibility,
+  } = {},
 ) {
   clearAnimationRenderRefreshes(tokenId);
-  for (const delayMs of PENDING_MOVEMENT_ANIMATION_REFRESH_DELAYS_MS) {
+  const refreshDelays = shouldUseFullAnimationRefreshCadence(tokenId)
+    ? PENDING_MOVEMENT_ANIMATION_REFRESH_DELAYS_MS
+    : PENDING_MOVEMENT_LIGHT_ANIMATION_REFRESH_DELAYS_MS;
+  for (const delayMs of refreshDelays) {
     const timeoutId = setTimeout(() => {
       removeRefreshTimeout(pendingMovementAnimationRefreshTimeouts, tokenId, timeoutId);
       const currentEntry = getEntry?.(tokenId);
@@ -78,8 +96,10 @@ export function scheduleAnimationRenderRefreshes(
       if (!targetTokenIds.length) return;
 
       refreshTokenVisibility?.([tokenId], {
+        coalesceFrame: true,
         ignoreObservedGrace: true,
         skipPerceptionRefresh: true,
+        source: 'animation-refresh',
         targetTokenIds,
       });
     }, delayMs);
@@ -100,8 +120,10 @@ export function scheduleDetectionFilterRestoreRefreshes(
       if (!hasRenderWork?.()) return;
 
       refreshTokenVisibility?.([], {
+        coalesceFrame: true,
         ignoreObservedGrace: true,
         skipPerceptionRefresh: true,
+        source: 'detection-filter-restore',
         targetTokenIds: [targetId],
       });
     }, delayMs);
@@ -112,16 +134,30 @@ export function scheduleDetectionFilterRestoreRefreshes(
 export function schedulePostCompletionRenderRefreshes(
   tokenId,
   serial,
-  { hasActivePendingMovementForObserver, hasRenderWork, refreshTokenVisibility } = {},
+  {
+    getTargetTokenIds,
+    hasActivePendingMovementForObserver,
+    hasRenderWork,
+    shouldUseFullPostCompletionRefreshCadence = () => false,
+    refreshTokenVisibility,
+  } = {},
 ) {
   clearPostCompletionRenderRefreshes(tokenId);
-  for (const delayMs of PENDING_MOVEMENT_POST_COMPLETION_REFRESH_DELAYS_MS) {
+  const refreshDelays = shouldUseFullPostCompletionRefreshCadence(tokenId)
+    ? PENDING_MOVEMENT_POST_COMPLETION_REFRESH_DELAYS_MS
+    : PENDING_MOVEMENT_LIGHT_POST_COMPLETION_REFRESH_DELAYS_MS;
+  for (const delayMs of refreshDelays) {
     const timeoutId = setTimeout(() => {
       removeRefreshTimeout(pendingMovementPostCompletionRefreshTimeouts, tokenId, timeoutId);
       if (hasActivePendingMovementForObserver?.(tokenId)) return;
       if (!hasRenderWork?.()) return;
 
-      refreshTokenVisibility?.([], { ignoreObservedGrace: true });
+      const targetTokenIds = getTargetTokenIds?.(tokenId) ?? [];
+      refreshTokenVisibility?.([], {
+        ignoreObservedGrace: true,
+        source: 'post-completion-refresh',
+        ...(targetTokenIds.length ? { targetTokenIds } : {}),
+      });
     }, delayMs);
     addRefreshTimeout(pendingMovementPostCompletionRefreshTimeouts, tokenId, timeoutId);
   }

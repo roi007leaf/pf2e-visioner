@@ -405,6 +405,25 @@ describe('BatchOrchestrator', () => {
     }
   });
 
+  test('tracks suppressed lighting refreshes during active movement', () => {
+    orchestrator.notifyTokenMovementStart();
+
+    expect(orchestrator.recordMovementLightingRefreshSuppressed()).toBe(true);
+    expect(orchestrator.recordMovementLightingRefreshSuppressed()).toBe(true);
+
+    expect(orchestrator.getMovementPerformanceSnapshot()).toEqual(
+      expect.objectContaining({
+        active: true,
+        currentSession: expect.objectContaining({
+          suppressedLightingRefreshes: 2,
+        }),
+        totals: expect.objectContaining({
+          suppressedLightingRefreshes: 2,
+        }),
+      }),
+    );
+  });
+
   test('movement stop drains pending tokens without warning when session disappeared', async () => {
     jest.useFakeTimers();
     const consoleWarn = jest.spyOn(console, 'warn').mockImplementation(() => { });

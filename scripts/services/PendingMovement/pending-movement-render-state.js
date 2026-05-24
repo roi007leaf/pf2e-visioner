@@ -153,3 +153,13 @@ export function showTokenInterfaceSurfaces(token) {
     }
   }
 }
+
+export function hideTokenLevelIndicatorSurface(token) {
+  try {
+    if (token?.levelIndicator && 'visible' in token.levelIndicator) {
+      token.levelIndicator.visible = false;
+    }
+  } catch {
+    /* best-effort level chrome cleanup */
+  }
+}

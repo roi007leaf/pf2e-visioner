@@ -18,7 +18,15 @@ describe('EventDrivenVisibilitySystem invalidation coordinator wiring', () => {
         createViewportFilterConfig: jest.fn(() => ({ filter: 'viewport' })),
       };
       const batchProcessor = {};
-      const batchOrchestrator = { enqueueTokens: jest.fn() };
+      const movementSnapshot = {
+        active: false,
+        currentSession: null,
+        totals: { suppressedLightingRefreshes: 2 },
+      };
+      const batchOrchestrator = {
+        enqueueTokens: jest.fn(),
+        getMovementPerformanceSnapshot: jest.fn(() => movementSnapshot),
+      };
       const coreServices = {
         positionManager: {},
         exclusionManager: {},
@@ -81,6 +89,13 @@ describe('EventDrivenVisibilitySystem invalidation coordinator wiring', () => {
       const system = new EventDrivenVisibilitySystem();
       await system.initialize();
 
+      expect(system.getMovementPerformanceSnapshot()).toEqual({
+        ...movementSnapshot,
+        pendingMovement: expect.objectContaining({
+          refreshCalls: expect.any(Number),
+          tokensScanned: expect.any(Number),
+        }),
+      });
       expect(AvsInvalidationCoordinator).toHaveBeenCalledWith({
         systemStateProvider,
         visibilityStateManager,

@@ -1,17 +1,14 @@
 <claude-mem-context>
 # Memory Context
 
-# [pf2e-visioner] recent context, 2026-05-20 9:38am GMT+3
+# [pf2e-visioner] recent context, 2026-05-24 11:41am GMT+3
 
 Legend: 🎯session 🔴bugfix 🟣feature 🔄refactor ✅change 🔵discovery ⚖️decision 🚨security_alert 🔐security_note
 Format: ID TIME TYPE TITLE
 Fetch details: get_observations([IDs]) | Search: mem-search skill
 
-Stats: 50 obs (19,433t read) | 220,094t work | 91% savings
+Stats: 50 obs (20,857t read) | 226,926t work | 91% savings
 
-### May 3, 2026
-S245 Fix stealth cover bonus not appearing on stealth rolls — expanded to include third discovered bug in context routing (May 3 at 9:55 AM)
-S119 GM tracker dots design pivot — dots should only show users who CAN see the stealther, not users blocked by overrides (May 3 at 9:55 AM)
 ### May 7, 2026
 S246 Fix stealth cover bonus not appearing on stealth rolls — three bugs found and fixed, Bug 3 fix verified in source but test not yet re-run (May 7 at 8:04 AM)
 S258 Debugging persistent token image flash bug in pf2e-visioner FoundryVTT module — user asked what debug log was added (May 7 at 8:07 AM)
@@ -24,57 +21,60 @@ S401 Migrate remaining globalThis.game.pf2eVisioner.suppressLightingRefresh acce
 ### May 18, 2026
 S475 Improve pf2e-visioner codebase architecture (performance + coding principles) — session complete, final summary checkpoint (May 18 at 8:42 AM)
 ### May 20, 2026
-S476 Continue pf2e-visioner architecture improvements (performance + coding principles) — spatial fallback fix and ongoing investigation of Ezren/Kobold visibility pair (May 20 at 8:06 AM)
-4202 8:55a 🔵 setVisibilityMapsBatch Call Chain: BatchOrchestrator → VisibilityMapService → Store
-4203 " 🔵 Existing Batch Write Return Shape Contract: { written, skipped }
-4204 " 🟣 Implemented Stale Bulk Readback Repair in setVisibilityMapsBatch
-4205 8:56a 🔄 BatchOrchestrator Stale Readback Fallback Logic Removed — Moved to Store Layer
-4206 " 🔄 Deleted BatchOrchestrator Stale Readback Test — Responsibility Moved to Store Layer
-4207 " 🔵 Stale Readback Repair Implementation Not Taking Effect Despite Patch Application
-4208 " 🔵 Dead Code Bug: repairStaleVisibilityBatchReadback Lines Are Unreachable
-4209 " 🔴 Fixed Dead Code: return → const result = await in setVisibilityMapsBatch
-4210 8:57a 🟣 Stale Readback Repair Feature Fully Shipped and Verified
-4211 " 🟣 Full Test Suite Green: 3624 Tests Pass After Stale Readback Repair Refactor
-4212 " 🔵 HoverTooltips.js Architecture: Singleton Class Wrapping a Large Functional API
-4213 8:58a 🔵 HoverTooltips Dynamic Import Pattern Avoids Circular Dependencies
-4214 " 🔄 Removed refreshCurrentHoverIndicators and Its BatchOrchestrator Caller
-4215 " 🔄 refreshCurrentHoverIndicators Removal Fully Verified
-4216 " 🔄 Full Suite Green After HoverTooltips Cleanup: 3624 Tests Pass
-4217 8:59a 🔄 Session Complete: BatchOrchestrator Simplified by 64 Lines, Store Layer Gains Repair Capability
-4218 " 🔵 TokenEventHandler Movement Pipeline: Dual Hook Strategy with Animation Await
-4219 " 🔵 BatchOrchestrator Pipeline: Policy/Workflow Decomposition Pattern
-4220 9:00a 🟣 TDD: New Test for Movement Session Recreation When Moving Flag Survives Cleanup
-4221 9:01a 🔵 Confirmed Bug: Movement Stop Timer Fires With No Session When Moving Flag Survives Cleanup
-4222 " 🔵 Precise Bug Location: notifyTokenMovementStart Skips Session Creation When Already Moving
-4223 " 🟣 Second TDD Test: Movement Stop Timer Should Drain Tokens Even When Session Disappears Mid-Flight
-4224 " 🔵 Both Movement Session Tests Fail (RED): Two Distinct Orphaned Session Paths Confirmed
-4225 " 🔴 Fixed Orphaned Movement Session: notifyTokenMovementStart Now Recreates Missing Sessions
-4226 9:02a 🔴 Movement Session Orphan Bug Fixed: Both Tests GREEN
-4227 " 🔴 Movement Session Fix Verified: 57 Tests Pass, Lint Clean
-4228 " 🔴 Full Suite Green: 3626 Tests Pass After Movement Session Orphan Fix
-4229 " 🔄 Movement Session Fix Incremental Diff: BatchOrchestrator.js +24 -11 Lines
-4256 9:17a ⚖️ Detection Must Not Preserve Stale Undetected/Concealed State After Observed Visibility
-4258 9:18a 🟣 CONTEXT.md Created for PF2E Visioner Domain Language
-4261 9:21a ⚖️ Observed State Must Track Detection Source (Which Sense)
-4262 9:23a ✅ CONTEXT.md Updated with "Boring Observed" Concept and Persistence Rules
-4268 9:28a 🔵 TDD Skill Loaded for pf2e-visioner Batch/Visibility Work
-4269 " 🔵 pf2e-visioner Visibility Map V2: Structured Perception Profiles Replace Legacy String Flags
-4270 " 🔵 VisibilityCalculator.calculateVisibilityBetweenTokens Architecture
-4271 9:29a 🔵 token-flag-map-persistence.js: Generic Multi-Pass Token Flag Batch Writer
-4272 " 🟣 TDD Red Phase: New perception-state.js Store with Compaction Logic
-4273 9:30a 🟣 New perception-state.js Store: Unified Perception + Detection Flag Writer with Compaction
-4274 9:31a 🔴 perception-state.js: Detection Map Over-Deletion Fixed — Preserve Existing Sense When No New Sense
-4275 " 🔄 visibility-map.js Refactored to Delegate to perception-state.js
-4276 " 🔄 visibility-map.js: Removed Duplicate isDefaultProfile and normalizePerceptionProfileMap Implementations
-4277 " 🔵 visibility-map.js Refactor Incomplete: Local Implementations Still Reference Removed Imports
-4278 9:32a 🔄 visibility-map.js: Batch Write Infrastructure Fully Delegated to perception-state.js
-4279 9:33a 🔵 visibility-map.js Still Has Broken Call Sites After Patch: getRawPerceptionProfileMap and setPerceptionProfileFlag Deleted But Still Referenced
-4280 " 🔵 visibility-map.js Still Has Two More Broken Call Sites: setPerceptionProfileFlag and isDefaultProfile
-4281 " 🔴 visibility-map.js Broken Call Sites Fixed: All 78 Store Tests Now Pass
-4282 " 🟣 perception-state.js Refactor Validated: 6 AVS Test Suites Green (59 Tests)
-4283 9:34a ✅ Refactor Complete: visibility-map.js Net -192 Lines; Lint and Git Check Clean
-4284 " 🟣 perception-state.js Extraction: Full 417-Suite Test Run Passes — 3625 Tests Green
-4285 " 🔵 Git Status Reveals perception-state.js Work Is Part of Larger Branch with AVS Core Changes
+S476 Continue pf2e-visioner architecture improvements (performance + coding principles) — spatial fallback fix and ongoing investigation of Ezren/Kobold visibility pair (May 20 at 7:58 AM)
+S490 Implement canonical perception profile-driven tooltip sense badges in pf2e-visioner FoundryVTT module ("do it") (May 20 at 8:06 AM)
+S508 Diagnose regression of "hidden flash bug" in pf2e-visioner pending token movement system (May 20 at 11:30 AM)
+### May 24, 2026
+4952 10:53a ⚖️ Performance Optimization Initiative for PendingMovement Service
+4953 10:54a 🔵 Performance Analytics Infrastructure in PendingMovement and AVS Services
+4954 " 🔵 Performance Counter Tests Are Tightly Coupled — Removal Requires Test Updates
+4955 10:55a 🟣 New `enableMovementPerformanceDiagnostics` Runtime Flag Added to Gate Performance Counters
+4956 " 🟣 Performance Counters Default to OFF — Diagnostics Flag Required to Enable Collection
+4957 " 🟣 Public API Method `debugMovementPerformanceDiagnostics` Added to `autoVisibility` Facade
+4958 " 🟣 Runtime Flag Functions for Movement Performance Diagnostics Implemented in `runtime-state.js`
+4959 10:56a 🔄 Performance Counter Increments in `pending-token-movement.js` Gated Behind Diagnostics Flag
+4960 " 🟣 Performance Diagnostics Flag Implementation Complete — All 8 Tests Pass
+4961 " ✅ Lint and Full Test Suite Pass Clean After Diagnostics Flag Implementation
+4962 " ✅ Full Test Suite Passes After Performance Diagnostics Feature — 3881 Tests, 433 Suites, Zero Failures
+4971 11:13a ⚖️ Proposed Load-Time Migration to Eliminate legacyVisibilityToProfile
+4973 " 🔵 Legacy Visibility Migration Infrastructure Already Exists in pf2e-visioner
+4976 11:14a 🔵 visibilityV2 Migration Full Implementation Details Confirmed
+4982 11:15a 🔵 Dual-Layer Visibility API: Legacy String Surface Over Profile Internals
+4985 " 🔵 party-token-state.js Writes Legacy visibility Flag Directly in Patches
+4988 " 🔵 search-exploration-service.js tokenIsHiddenByVisionerToAnyPC Reads Stale Legacy Flag
+4990 11:16a 🟣 Test-Driven: Adding setPerceptionProfile/getPerceptionProfile to Public autoVisibility API
+4991 " 🟣 Profile-Native API Methods Added to Pf2eVisionerApi
+4992 " 🟣 Profile-Native Methods Wired into autoVisibility Facade and Tests Pass
+4993 " 🔵 party-token-state.js: Primary Restore Uses setVisibilityMap() But Observer Restore Writes Legacy Flag
+4994 11:17a 🔴 Fixed party-token-state.js Observer Restore Writing Legacy visibility Flag
+4997 " 🔴 Fixed Two More Legacy visibility Flag Reads/Writes
+4999 " 🔵 Legacy visibility Flag Now Only Appears in Migration and Intentional Deletion Paths
+5001 " 🔄 Removed Legacy visibility Flag Deletions from api.js Cleanup Paths
+5002 11:18a 🔄 Legacy v1 visibility Flag Fully Removed from Runtime Code
+5005 " 🔵 autoVisibility.setPerceptionProfile Test Regression: Returns false in Full Suite Run
+5007 " 🔴 Fixed Test Isolation: autoVisibility Facade Suite Now Resets game.user.isGM
+5009 " 🔵 game.user Nulled by api.avs-cleanup.test.js — Deeper Test Isolation Issue
+5011 11:19a 🔵 Facade Test Still Failing — debugMovementPerformanceDiagnostics Sets global.game={} Within Same Suite
+5012 11:20a 🔵 legacyVisibilityToProfile Remains a Legitimate Runtime Conversion Utility
+5013 " 🔵 Root Cause Identified: setPerceptionProfile Test Fails Due to applyVisibilitySideEffects Dynamic Import
+5014 11:21a 🔴 Made updateTokenVisuals Non-Fatal in setPerceptionProfile/setPerceptionProfileMap API Methods
+5015 " 🔴 All API Test Suites Pass: Profile API and Cleanup Tests Green Together
+5016 " 🟣 Legacy v1 Visibility Removal Complete: All 5 Key Test Suites Pass — 66/66 Green
+5017 " 🔵 Git Status: Legacy Visibility Removal Changes Span 5 Files; getVisibilityMap Retained for Reads in party-token-state
+5023 11:31a 🔵 Visibility V2 Migration Runs on Module Ready via setTimeout in lifecycle.js
+5026 " 🔵 Visibility V2 Migration Test Suite Defines Exact Legacy-to-Profile Mappings
+5027 11:32a 🔵 Visibility V2 Migration Runs Silently — No Progress Bar or User Notifications
+5028 " 🟣 New Test Added for Migration Progress Reporting and GM Notification
+5029 " 🔵 New Progress Test Fails Red — Implementation Not Yet Added to Migration Function
+5030 " 🟣 Migration Progress Reporting and GM Notification Implemented in visibility-v2-migration.js
+5031 " 🟣 Visibility V2 Migration Progress Reporting — All 6 Tests Pass (TDD Green)
+5033 11:33a 🟣 Full Test Suite Passes After Migration Progress Feature — 433 Suites, 3883 Tests, 0 Failures
+5036 11:37a 🔵 Visibility V2 Migration Scope Includes Both v13 and v14
+5037 11:38a 🔴 Migration Progress Notification Switched from SceneNavigation to ui.notifications
+5038 " 🔵 Migration Source Code Not Yet Updated to Match New Progress Notification Pattern
+5039 " 🟣 Visibility-V2 Migration Implements ui.notifications Progress Object Pattern
+5040 " 🔴 All 6 Visibility-V2 Migration Tests Now Pass
+5042 11:39a ✅ Full pf2e-visioner Test Suite Passes After Migration Refactor (433 suites, 3883 tests)
 
-Access 220k tokens of past work via get_observations([IDs]) or mem-search skill.
+Access 227k tokens of past work via get_observations([IDs]) or mem-search skill.
 </claude-mem-context>

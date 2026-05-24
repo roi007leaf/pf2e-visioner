@@ -161,6 +161,9 @@ export class BatchOrchestrator {
     this._movementSession = null;
     this._movementRevision = 0;
     this._pendingMovementSessionData = null;
+    this._movementPerformanceTotals = {
+      suppressedLightingRefreshes: 0,
+    };
   }
 
   _getPostBatchPerceptionRefreshSuppression() {
@@ -220,6 +223,31 @@ export class BatchOrchestrator {
     return this._isTokenMoving || !!this._movementSession;
   }
 
+  recordMovementLightingRefreshSuppressed() {
+    if (!this.isTokenMovementActive()) return false;
+    if (this._movementSession) {
+      this._movementSession.suppressedLightingRefreshes =
+        (this._movementSession.suppressedLightingRefreshes || 0) + 1;
+    }
+    this._movementPerformanceTotals.suppressedLightingRefreshes += 1;
+    return true;
+  }
+
+  getMovementPerformanceSnapshot() {
+    return {
+      active: this.isTokenMovementActive(),
+      currentSession: this._movementSession
+        ? {
+            sessionId: this._movementSession.sessionId,
+            positionUpdates: this._movementSession.positionUpdates,
+            tokensAccumulated: this._movementSession.tokensAccumulated.size,
+            suppressedLightingRefreshes: this._movementSession.suppressedLightingRefreshes || 0,
+          }
+        : null,
+      totals: { ...this._movementPerformanceTotals },
+    };
+  }
+
   _flushMovementStop() {
     if (this._movementStopTimer) {
       clearTimeout(this._movementStopTimer);
@@ -239,6 +267,7 @@ export class BatchOrchestrator {
       positionUpdates: this._movementSession.positionUpdates,
       tokensAccumulated: this._movementSession.tokensAccumulated.size,
       pendingTokensCount: this._pendingTokens.size,
+      suppressedLightingRefreshes: this._movementSession.suppressedLightingRefreshes || 0,
     };
 
     this._isTokenMoving = false;
@@ -269,6 +298,7 @@ export class BatchOrchestrator {
     return {
       positionUpdates: 0,
       tokensAccumulated: new Set(initialTokenIds),
+      suppressedLightingRefreshes: 0,
       sessionId: `movement-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
     };
   }

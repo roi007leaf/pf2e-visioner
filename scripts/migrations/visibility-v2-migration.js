@@ -9,6 +9,7 @@ import { legacyVisibilityToProfile } from '../visibility/perception-profile.js';
 export const VISIBILITY_V2_MIGRATION_SETTING = 'visibilityV2MigrationVersion';
 export const VISIBILITY_V2_MIGRATION_VERSION = 3;
 const KNOWN_LEGACY_VISIBILITY_STATES = new Set(['concealed', 'hidden', 'undetected', 'unnoticed']);
+const MIGRATION_LABEL = 'PF2E Visioner: Migrating visibility data';
 
 function collectionToArray(collection) {
   if (!collection) return [];
@@ -23,6 +24,52 @@ function collectionToArray(collection) {
 
 function getDocumentFlag(document, key) {
   return document?.getFlag?.(MODULE_ID, key) ?? document?.flags?.[MODULE_ID]?.[key] ?? null;
+}
+
+function getMigrationCompleteMessage(result) {
+  const tokenLabel = result.updatedTokens === 1 ? 'token' : 'tokens';
+  const overrideLabel = result.updatedOverrides === 1 ? 'override' : 'overrides';
+  return `PF2E Visioner: Migrated ${result.updatedTokens} ${tokenLabel} and ${result.updatedOverrides} ${overrideLabel} to visibility v2.`;
+}
+
+function ensureProgressNotification(progressState, options) {
+  if (options?.showProgress === false) return null;
+  if (progressState.notification !== undefined) return progressState.notification;
+
+  const notification = globalThis.ui?.notifications?.info?.(MIGRATION_LABEL, { progress: true });
+  progressState.notification =
+    notification && typeof notification.update === 'function' ? notification : null;
+  return progressState.notification;
+}
+
+function reportMigrationProgress(options, progressState, pct) {
+  const progress = {
+    label: MIGRATION_LABEL,
+    pct: Math.max(0, Math.min(100, Math.round(pct))),
+  };
+
+  options?.onProgress?.(progress);
+  if (options?.showProgress === false) return;
+
+  const notification = ensureProgressNotification(progressState, options);
+  if (notification) {
+    notification.update({ pct: progress.pct / 100, message: MIGRATION_LABEL });
+    return;
+  }
+
+  globalThis.SceneNavigation?.displayProgressBar?.(progress);
+}
+
+function notifyMigrationComplete(result, progressState) {
+  if ((result.updatedTokens ?? 0) <= 0 && (result.updatedOverrides ?? 0) <= 0) return;
+
+  const message = getMigrationCompleteMessage(result);
+  if (progressState.notification) {
+    progressState.notification.update({ pct: 1, message });
+    return;
+  }
+
+  globalThis.ui?.notifications?.info?.(message);
 }
 
 function buildMigratedProfileMap(tokenDocument) {
@@ -120,14 +167,25 @@ export async function runVisibilityV2MigrationIfNeeded(options = {}) {
   }
 
   const scenes = collectionToArray(options.scenes ?? game.scenes?.contents);
+  const totalTokens = scenes.reduce(
+    (total, scene) => total + collectionToArray(scene?.tokens).length,
+    0,
+  );
   let updatedTokens = 0;
   let updatedOverrides = 0;
   let scannedTokens = 0;
+  const progressState = {};
+
+  if (totalTokens > 0) reportMigrationProgress(options, progressState, 0);
 
   for (const scene of scenes) {
     const tokenDocuments = collectionToArray(scene?.tokens);
     for (const tokenDocument of tokenDocuments) {
-      if (!tokenDocument?.id) continue;
+      if (!tokenDocument?.id) {
+        scannedTokens += 1;
+        reportMigrationProgress(options, progressState, (scannedTokens / totalTokens) * 100);
+        continue;
+      }
       scannedTokens += 1;
 
       const legacyMap = normalizeVisibilityMap(getDocumentFlag(tokenDocument, 'visibility') ?? {});
@@ -148,6 +206,7 @@ export async function runVisibilityV2MigrationIfNeeded(options = {}) {
       tokenUpdated ||= tokenOverrideUpdates > 0;
 
       if (tokenUpdated) updatedTokens += 1;
+      reportMigrationProgress(options, progressState, (scannedTokens / totalTokens) * 100);
     }
   }
 
@@ -157,10 +216,12 @@ export async function runVisibilityV2MigrationIfNeeded(options = {}) {
     VISIBILITY_V2_MIGRATION_VERSION,
   );
 
-  return {
+  const result = {
     skipped: false,
     scannedTokens,
     updatedTokens,
     updatedOverrides,
   };
+  notifyMigrationComplete(result, progressState);
+  return result;
 }

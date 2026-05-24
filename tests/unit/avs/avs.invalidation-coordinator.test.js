@@ -185,18 +185,21 @@ describe('AvsInvalidationCoordinator lighting reasons', () => {
   });
 
   test('lighting-refresh is ignored while token movement is already queued', async () => {
+    const batchOrchestrator = {
+      isTokenMovementActive: jest.fn(() => true),
+      recordMovementLightingRefreshSuppressed: jest.fn(),
+    };
     coordinator = new AvsInvalidationCoordinator({
       systemStateProvider: systemState,
       visibilityStateManager: visibilityState,
       cacheManager,
-      batchOrchestrator: {
-        isTokenMovementActive: jest.fn(() => true),
-      },
+      batchOrchestrator,
     });
 
     const result = await coordinator.invalidate({ reason: 'lighting-refresh' });
 
     expect(result).toBe(false);
+    expect(batchOrchestrator.recordMovementLightingRefreshSuppressed).toHaveBeenCalledTimes(1);
     expect(cacheManager.clearAllCaches).not.toHaveBeenCalled();
     expect(visibilityState.markAllTokensChangedThrottled).not.toHaveBeenCalled();
   });

@@ -5,6 +5,7 @@
  */
 
 import { MODULE_ID } from '../../constants.js';
+import { getPendingMovementPerformanceSnapshot } from '../../services/PendingMovement/pending-movement-render-lock.js';
 import { getLogger } from '../../utils/logger.js';
 import { profileToLegacyVisibility } from '../perception-profile.js';
 import { AvsInvalidationCoordinator } from './core/AvsInvalidationCoordinator.js';
@@ -356,6 +357,18 @@ export class EventDrivenVisibilitySystem {
     });
 
     this.#visibilityStateManager.recalculateForTokens(validIds);
+  }
+
+  getMovementPerformanceSnapshot() {
+    const movementSnapshot = this.#batchOrchestrator?.getMovementPerformanceSnapshot?.() ?? {
+      active: false,
+      currentSession: null,
+      totals: { suppressedLightingRefreshes: 0 },
+    };
+    return {
+      ...movementSnapshot,
+      pendingMovement: getPendingMovementPerformanceSnapshot(),
+    };
   }
 
   /**

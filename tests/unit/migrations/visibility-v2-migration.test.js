@@ -42,6 +42,9 @@ describe('visibilityV2 migration', () => {
     global.game.scenes = {
       contents: [scene],
     };
+    global.SceneNavigation = {
+      displayProgressBar: jest.fn(),
+    };
   });
 
   test('copies legacy visibility maps into normalized visibilityV2 profiles', async () => {
@@ -72,6 +75,35 @@ describe('visibilityV2 migration', () => {
       VISIBILITY_V2_MIGRATION_VERSION,
     );
     expect(result.updatedTokens).toBe(1);
+  });
+
+  test('reports migration progress and notifies GM when data changes', async () => {
+    const onProgress = jest.fn();
+    const progressNotification = {
+      update: jest.fn(),
+    };
+    global.ui.notifications.info.mockReturnValueOnce(progressNotification);
+    scene.tokens.contents = [
+      createTokenDocument('observer-a', {
+        visibility: { targetA: 'hidden' },
+      }),
+      createTokenDocument('observer-b', {}),
+    ];
+
+    const result = await runVisibilityV2MigrationIfNeeded({ onProgress });
+
+    expect(result.updatedTokens).toBe(1);
+    expect(onProgress).toHaveBeenCalledWith(expect.objectContaining({ pct: 0 }));
+    expect(onProgress).toHaveBeenCalledWith(expect.objectContaining({ pct: 50 }));
+    expect(onProgress).toHaveBeenCalledWith(expect.objectContaining({ pct: 100 }));
+    expect(global.ui.notifications.info).toHaveBeenCalledWith(
+      'PF2E Visioner: Migrating visibility data',
+      { progress: true },
+    );
+    expect(progressNotification.update).toHaveBeenCalledWith(
+      expect.objectContaining({ pct: 1, message: expect.stringContaining('Migrated 1 token') }),
+    );
+    expect(global.SceneNavigation.displayProgressBar).not.toHaveBeenCalled();
   });
 
   test('preserves existing visibilityV2 entries over legacy values', async () => {

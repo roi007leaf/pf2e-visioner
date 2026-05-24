@@ -1,6 +1,10 @@
 import { MODULE_ID } from '../../constants.js';
 import { scheduleCanvasPerceptionUpdate } from '../../helpers/perception-refresh.js';
 import {
+  isMovementPerformanceDiagnosticsEnabled,
+  isPendingMovementVisualRefreshSuppressed,
+} from '../runtime-state.js';
+import {
   createPendingMovementFinalVisibilityController,
   createPendingVisibilityStateMap,
   mergeMissingPendingVisibilityStateMap,
@@ -63,10 +67,10 @@ import {
   getPendingRenderState,
   hasPendingMovementRenderLocks,
   hasPendingRenderState,
+  hideTokenLevelIndicatorSurface,
   isPendingMovementRenderLocked,
   prunePendingMovementRenderLocks,
   restorePendingRenderStateVisuals,
-  showTokenInterfaceSurfaces,
 } from './pending-movement-render-state.js';
 import {
   lineOfSightBlockedByCustomSightWall,
@@ -108,10 +112,38 @@ const pendingMovementCoreVisibleGraceContexts = new Map();
 const pendingMovementCurrentSightLineGraceContexts = new Map();
 let pendingMovementHiddenStateVisibilityProbeDepth = 0;
 let pendingMovementSerial = 0;
+const recentCompletedMovementRefreshTargetIds = new Map();
+const pendingMovementTokenRefreshSignatures = new WeakMap();
+let pendingMovementCoalescedRefresh = null;
+const pendingMovementPerformanceCounters = {
+  refreshCalls: 0,
+  targetedRefreshCalls: 0,
+  fullSceneRefreshCalls: 0,
+  suppressedRefreshCalls: 0,
+  tokensScanned: 0,
+  tokensRefreshed: 0,
+  bySource: {},
+};
+
+function emptyPendingMovementPerformanceSnapshot() {
+  return {
+    refreshCalls: 0,
+    targetedRefreshCalls: 0,
+    fullSceneRefreshCalls: 0,
+    suppressedRefreshCalls: 0,
+    tokensScanned: 0,
+    tokensRefreshed: 0,
+    bySource: {},
+  };
+}
 
 const pendingMovementRefreshScheduler = {
   getEntry: (tokenId) => pendingTokenMovementPositions.get(tokenId),
   getTargetTokenIds: (tokenId) => getAnimationRefreshTargetIdsForMovement(tokenId),
+  shouldUseFullAnimationRefreshCadence: (tokenId) =>
+    shouldUseFullAnimationRefreshCadence(tokenId),
+  shouldUseFullPostCompletionRefreshCadence: (tokenId) =>
+    shouldUseFullPostCompletionRefreshCadence(tokenId),
   hasActivePendingMovementForObserver: (tokenId) => hasActivePendingMovementForObserver(tokenId),
   hasRenderWork: () => hasPendingMovementRenderWork(),
   refreshTokenVisibility: (movingTokenIds, options) =>
@@ -920,6 +952,49 @@ function getAnimationRefreshTargetIdsForMovement(tokenId) {
   return [...targetIds];
 }
 
+function shouldUseFullAnimationRefreshCadence(tokenId) {
+  for (const targetId of getAnimationRefreshTargetIdsForMovement(tokenId)) {
+    const target = tokenObjectForId(targetId);
+    if (!target) continue;
+    if (isPendingMovementRenderLocked(target)) return true;
+    if (tokenHasDetectionFilterVisual(target)) return true;
+    if (tokenHasDetectionFilterMeshVisual(target)) return true;
+  }
+  return false;
+}
+
+function shouldUseFullPostCompletionRefreshCadence(tokenId) {
+  for (const targetId of getPendingMovementRefreshTargetIds(tokenId)) {
+    const target = tokenObjectForId(targetId);
+    if (!target) continue;
+    if (isPendingMovementRenderLocked(target)) return true;
+    if (tokenHasDetectionFilterVisual(target)) return true;
+    if (tokenHasDetectionFilterMeshVisual(target)) return true;
+  }
+  return false;
+}
+
+export function getPendingMovementRefreshTargetIds(tokenIds = null) {
+  const movementTokenIds = tokenIds
+    ? (Array.isArray(tokenIds) ? tokenIds : [tokenIds]).filter(Boolean)
+    : [...pendingTokenMovementPositions.keys()];
+  const targetIds = new Set();
+
+  for (const tokenId of movementTokenIds) {
+    for (const targetId of getAnimationRefreshTargetIdsForMovement(tokenId)) {
+      targetIds.add(targetId);
+    }
+  }
+
+  if (!targetIds.size && !tokenIds) {
+    for (const targetId of recentCompletedMovementRefreshTargetIds.keys()) {
+      targetIds.add(targetId);
+    }
+  }
+
+  return [...targetIds];
+}
+
 export function getPendingMovementBlockContext(observer, target) {
   return pendingDecisionContextController.getPendingMovementBlockContext(observer, target);
 }
@@ -1508,7 +1583,6 @@ function restoreCoreVisibleGraceRendering(token) {
       if ('renderable' in token.mesh) token.mesh.renderable = true;
       if ('alpha' in token.mesh && Number(token.mesh.alpha) === 0) token.mesh.alpha = 1;
     }
-    showTokenInterfaceSurfaces(token);
     clearDetectionFilterVisuals(token);
     return true;
   } catch {
@@ -2143,8 +2217,17 @@ export function completePendingTokenMovement(
 
   clearPredictedObservedTransitionVisualsForCompletingMovement(tokenId, entry);
   rememberObservedHiddenSoundwaveGraceForCompletingMovement(tokenId, entry);
+  const refreshTargetIds = getAnimationRefreshTargetIdsForMovement(tokenId);
+  recentCompletedMovementRefreshTargetIds.clear();
+  for (const targetId of refreshTargetIds) {
+    recentCompletedMovementRefreshTargetIds.set(targetId, true);
+  }
   clearPendingTokenMovementPosition(tokenId, { preserveCurrentSightLineGrace: true });
-  refreshPendingMovementTokenVisibility([], { ignoreObservedGrace: true });
+  refreshPendingMovementTokenVisibility([], {
+    ignoreObservedGrace: true,
+    source: 'movement-completion',
+    targetTokenIds: refreshTargetIds,
+  });
   schedulePostCompletionRenderRefreshes(tokenId, entry.serial, pendingMovementRefreshScheduler);
 
   return true;
@@ -2404,12 +2487,188 @@ export function hasPendingMovementRenderWork() {
   return prunePendingMovementRenderLocks(sceneTokens) > 0;
 }
 
+export function resetPendingMovementPerformanceCounters() {
+  pendingMovementPerformanceCounters.refreshCalls = 0;
+  pendingMovementPerformanceCounters.targetedRefreshCalls = 0;
+  pendingMovementPerformanceCounters.fullSceneRefreshCalls = 0;
+  pendingMovementPerformanceCounters.suppressedRefreshCalls = 0;
+  pendingMovementPerformanceCounters.tokensScanned = 0;
+  pendingMovementPerformanceCounters.tokensRefreshed = 0;
+  pendingMovementPerformanceCounters.bySource = {};
+  pendingMovementCoalescedRefresh = null;
+}
+
+export function getPendingMovementPerformanceSnapshot() {
+  if (!isMovementPerformanceDiagnosticsEnabled()) {
+    return emptyPendingMovementPerformanceSnapshot();
+  }
+
+  return {
+    ...pendingMovementPerformanceCounters,
+    bySource: Object.fromEntries(
+      Object.entries(pendingMovementPerformanceCounters.bySource).map(([source, counters]) => [
+        source,
+        { ...counters },
+      ]),
+    ),
+  };
+}
+
+function getPendingMovementSourceCounters(source) {
+  const sourceKey = source || 'unspecified';
+  if (!pendingMovementPerformanceCounters.bySource[sourceKey]) {
+    pendingMovementPerformanceCounters.bySource[sourceKey] = {
+      refreshCalls: 0,
+      targetedRefreshCalls: 0,
+      fullSceneRefreshCalls: 0,
+      suppressedRefreshCalls: 0,
+      tokensScanned: 0,
+      tokensRefreshed: 0,
+    };
+  }
+  return pendingMovementPerformanceCounters.bySource[sourceKey];
+}
+
+function requestPendingMovementRefreshFrame(callback) {
+  if (typeof requestAnimationFrame !== 'function') {
+    callback();
+    return null;
+  }
+  return requestAnimationFrame(callback);
+}
+
+function normalizeRefreshIds(value) {
+  return (Array.isArray(value) ? value : [value]).filter(Boolean);
+}
+
+function mergePendingMovementRefreshOptions(existing, next) {
+  const movingTokenIds = new Set([
+    ...normalizeRefreshIds(existing.movingTokenIds),
+    ...normalizeRefreshIds(next.movingTokenIds),
+  ]);
+  const existingTargetIds = existing.options.targetTokenIds
+    ? normalizeRefreshIds(existing.options.targetTokenIds)
+    : null;
+  const nextTargetIds = next.options.targetTokenIds
+    ? normalizeRefreshIds(next.options.targetTokenIds)
+    : null;
+  const targetTokenIds =
+    existingTargetIds && nextTargetIds
+      ? [...new Set([...existingTargetIds, ...nextTargetIds])]
+      : null;
+
+  return {
+    movingTokenIds: [...movingTokenIds],
+    options: {
+      ignoreObservedGrace:
+        !!existing.options.ignoreObservedGrace || !!next.options.ignoreObservedGrace,
+      skipTokenRefresh:
+        !!existing.options.skipTokenRefresh && !!next.options.skipTokenRefresh,
+      skipPerceptionRefresh:
+        !!existing.options.skipPerceptionRefresh && !!next.options.skipPerceptionRefresh,
+      source: existing.options.source === next.options.source
+        ? existing.options.source
+        : 'coalesced',
+      ...(targetTokenIds ? { targetTokenIds } : {}),
+    },
+  };
+}
+
+function scheduleCoalescedPendingMovementRefresh(movingTokenIds, options) {
+  const next = { movingTokenIds, options: { ...options, coalesceFrame: false } };
+  if (pendingMovementCoalescedRefresh) {
+    pendingMovementCoalescedRefresh = {
+      ...mergePendingMovementRefreshOptions(pendingMovementCoalescedRefresh, next),
+      frameId: pendingMovementCoalescedRefresh.frameId,
+    };
+    return;
+  }
+
+  pendingMovementCoalescedRefresh = next;
+  const frameId = requestPendingMovementRefreshFrame(() => {
+    const refresh = pendingMovementCoalescedRefresh;
+    pendingMovementCoalescedRefresh = null;
+    if (!refresh) return;
+    refreshPendingMovementTokenVisibility(refresh.movingTokenIds, refresh.options);
+  });
+  if (pendingMovementCoalescedRefresh) pendingMovementCoalescedRefresh.frameId = frameId;
+}
+
+function pendingMovementEntriesSignature() {
+  return [...pendingTokenMovementPositions.entries()]
+    .map(([tokenId, entry]) => {
+      const position = entry?.position || {};
+      return `${tokenId}:${entry?.serial ?? 0}:${Number(position.x ?? 0)}:${Number(position.y ?? 0)}`;
+    })
+    .sort()
+    .join('|');
+}
+
+function tokenVisualSignature(token) {
+  return [
+    !!token?.visible,
+    !!token?.renderable,
+    !!token?.mesh?.visible,
+    !!token?.mesh?.renderable,
+    token?.mesh?.alpha ?? '',
+    !!token?.detectionFilter,
+    !!token?.detectionFilterMesh,
+  ].join(':');
+}
+
+function storedVisibilitySignatureForToken(token) {
+  const targetId = tokenIdOf(token);
+  if (!targetId) return '';
+  return pendingMovementObserverCandidates()
+    .map((observer) => {
+      const observerId = tokenIdOf(observer);
+      if (!observerId || observerId === targetId) return null;
+      return `${observerId}:${getStoredVisibilityState(observer, token) || ''}`;
+    })
+    .filter(Boolean)
+    .sort()
+    .join('|');
+}
+
+function pendingMovementTokenRefreshSignature(token, context) {
+  return [
+    tokenIdOf(token) || '',
+    pendingMovementEntriesSignature(),
+    storedVisibilitySignatureForToken(token),
+    tokenVisualSignature(token),
+    context.ignoreObservedGrace ? 'ignore-observed-grace' : '',
+    context.hasDetectionWork ? 'detection-work' : '',
+  ].join('||');
+}
+
+function shouldSkipUnchangedPendingMovementTokenRefresh(token, context) {
+  if (!token || context.skipTokenRefresh) return false;
+  if (context.shouldForceInvisible) return false;
+  if (context.renderHiddenLockDecision) return false;
+  if (context.hasSpecialVisualWork) return false;
+
+  const signature = pendingMovementTokenRefreshSignature(token, context);
+  if (pendingMovementTokenRefreshSignatures.get(token) !== signature) {
+    return false;
+  }
+  return true;
+}
+
+function rememberPendingMovementTokenRefreshSignature(token, context) {
+  if (!token || context.skipTokenRefresh) return;
+  pendingMovementTokenRefreshSignatures.set(
+    token,
+    pendingMovementTokenRefreshSignature(token, context),
+  );
+}
+
 function refreshPendingMovementTokenVisibilityUncached(
   movingTokenIds = [],
   {
     ignoreObservedGrace = false,
     skipTokenRefresh = false,
     skipPerceptionRefresh = false,
+    source = 'unspecified',
     targetTokenIds = null,
   } = {},
 ) {
@@ -2423,10 +2682,35 @@ function refreshPendingMovementTokenVisibilityUncached(
     ? (canvas?.tokens?.placeables || []).filter((token) => targetIds.has(tokenIdOf(token)))
     : canvas?.tokens?.placeables || [];
   const hasDetectionWork = hasPendingMovementDetectionWork();
+  const trackPerformance = isMovementPerformanceDiagnosticsEnabled();
+  const sourceCounters = trackPerformance ? getPendingMovementSourceCounters(source) : null;
+  if (trackPerformance) {
+    pendingMovementPerformanceCounters.refreshCalls += 1;
+    sourceCounters.refreshCalls += 1;
+    if (targetIds) {
+      pendingMovementPerformanceCounters.targetedRefreshCalls += 1;
+      sourceCounters.targetedRefreshCalls += 1;
+    } else {
+      pendingMovementPerformanceCounters.fullSceneRefreshCalls += 1;
+      sourceCounters.fullSceneRefreshCalls += 1;
+    }
+  }
+
+  if (isPendingMovementVisualRefreshSuppressed()) {
+    if (trackPerformance) {
+      pendingMovementPerformanceCounters.suppressedRefreshCalls += 1;
+      sourceCounters.suppressedRefreshCalls += 1;
+    }
+    return;
+  }
 
   for (const token of tokens) {
     if (ids.has(tokenIdOf(token))) {
       continue;
+    }
+    if (trackPerformance) {
+      pendingMovementPerformanceCounters.tokensScanned += 1;
+      sourceCounters.tokensScanned += 1;
     }
     try {
       if (canRestoreDetectionFilterPendingRenderLock(token)) {
@@ -2476,8 +2760,27 @@ function refreshPendingMovementTokenVisibilityUncached(
       const detectionFilterState = shouldForceInvisible
         ? null
         : capturePendingMovementDetectionFilterState(token, { hasDetectionWork });
+      const refreshContext = {
+        hasDetectionWork,
+        ignoreObservedGrace,
+        renderHiddenLockDecision: null,
+        shouldForceInvisible,
+        skipTokenRefresh,
+        hasSpecialVisualWork:
+          !!detectionFilterState ||
+          hasPendingRenderState(token) ||
+          isPendingMovementRenderLocked(token),
+      };
+      if (shouldSkipUnchangedPendingMovementTokenRefresh(token, refreshContext)) {
+        continue;
+      }
       if (!skipTokenRefresh) {
         token?.refresh?.();
+        if (trackPerformance) {
+          pendingMovementPerformanceCounters.tokensRefreshed += 1;
+          sourceCounters.tokensRefreshed += 1;
+        }
+        hideTokenLevelIndicatorSurface(token);
         if (shouldForceInvisible) {
           forcePendingMovementTokenInvisible(token);
         } else {
@@ -2494,6 +2797,7 @@ function refreshPendingMovementTokenVisibilityUncached(
             }
           }
         }
+        rememberPendingMovementTokenRefreshSignature(token, refreshContext);
       }
     } catch {
       /* best-effort visual refresh */
@@ -2510,6 +2814,11 @@ function refreshPendingMovementTokenVisibilityUncached(
 }
 
 export function refreshPendingMovementTokenVisibility(movingTokenIds = [], options = {}) {
+  if (options?.coalesceFrame) {
+    scheduleCoalescedPendingMovementRefresh(movingTokenIds, options);
+    return undefined;
+  }
+
   return withPendingMovementDecisionCache(() =>
     refreshPendingMovementTokenVisibilityUncached(movingTokenIds, options),
   );

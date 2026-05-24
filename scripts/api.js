@@ -19,15 +19,23 @@ import {
 import { LevelsIntegration } from './services/LevelsIntegration.js';
 import { applyActiveSceneHearingRangeLimit } from './services/scene-hearing-range.js';
 import { manuallyRestoreAllPartyTokens } from './services/party-token-state.js';
+import {
+  setMovementPerformanceDiagnosticsEnabled,
+  setSuppressPendingMovementVisualRefresh,
+} from './services/runtime-state.js';
 import { refreshEveryonesPerception } from './services/socket.js';
 import { updateTokenVisuals } from './services/visual-effects.js';
 import { invalidateCaches, CACHE_INVALIDATION_REASONS } from './utils/cache-invalidation.js';
 import {
   cleanupDeletedToken,
   getCoverBetween,
+  getPerceptionProfileBetween as getPerceptionProfileBetweenStore,
+  getPerceptionProfileMap as getPerceptionProfileMapStore,
   getVisibilityMap,
   getVisibility,
   setCoverBetween,
+  setPerceptionProfileBetween as setPerceptionProfileBetweenStore,
+  setPerceptionProfileMap as setPerceptionProfileMapStore,
   setVisibilityBetween,
   showNotification,
 } from './utils.js';
@@ -128,7 +136,6 @@ function scrubManualCoverSources(stateSource) {
 
 function setCommonSceneDataDeletion(update) {
   setFlagDeletion(update, 'visibilityV2');
-  setFlagDeletion(update, 'visibility');
   setFlagDeletion(update, 'detection');
   setFlagDeletion(update, 'cover');
   setFlagDeletion(update, 'autoCoverMap');
@@ -427,6 +434,29 @@ export class Pf2eVisionerApi {
     } catch (error) {
       console.error('Error getting visibility:', error);
       return null;
+    }
+  }
+
+  static getPerceptionProfile(observerId, targetId) {
+    try {
+      const observerToken = canvas.tokens.get(observerId);
+      const targetToken = canvas.tokens.get(targetId);
+      if (!observerToken || !targetToken) return null;
+      return getPerceptionProfileBetweenStore(observerToken, targetToken);
+    } catch (error) {
+      console.error('Error getting perception profile:', error);
+      return null;
+    }
+  }
+
+  static getPerceptionProfileMap(observerId) {
+    try {
+      const observerToken = canvas.tokens.get(observerId);
+      if (!observerToken) return {};
+      return getPerceptionProfileMapStore(observerToken);
+    } catch (error) {
+      console.error('Error getting perception profile map:', error);
+      return {};
     }
   }
 
@@ -1458,6 +1488,55 @@ export class Pf2eVisionerApi {
     }
   }
 
+  static async setPerceptionProfile(observerId, targetId, profile, options = {}) {
+    try {
+      const observerToken = canvas.tokens.get(observerId);
+      const targetToken = canvas.tokens.get(targetId);
+
+      if (!observerToken) {
+        console.error(`Observer token not found with ID: ${observerId}`);
+        return false;
+      }
+
+      if (!targetToken) {
+        console.error(`Target token not found with ID: ${targetId}`);
+        return false;
+      }
+
+      await setPerceptionProfileBetweenStore(observerToken, targetToken, profile, options);
+      try {
+        await updateTokenVisuals();
+      } catch (refreshError) {
+        console.warn('PF2E Visioner | perception profile visual refresh failed:', refreshError);
+      }
+      return true;
+    } catch (error) {
+      console.error('Error setting perception profile:', error);
+      return false;
+    }
+  }
+
+  static async setPerceptionProfileMap(observerId, profileMap, options = {}) {
+    try {
+      const observerToken = canvas.tokens.get(observerId);
+      if (!observerToken) {
+        console.error(`Observer token not found with ID: ${observerId}`);
+        return false;
+      }
+
+      await setPerceptionProfileMapStore(observerToken, profileMap, options);
+      try {
+        await updateTokenVisuals();
+      } catch (refreshError) {
+        console.warn('PF2E Visioner | perception profile map visual refresh failed:', refreshError);
+      }
+      return true;
+    } catch (error) {
+      console.error('Error setting perception profile map:', error);
+      return false;
+    }
+  }
+
   /**
    * Update all token visuals manually
    */
@@ -2059,7 +2138,6 @@ export class Pf2eVisionerApi {
         // Clear visibility/cover maps (these get recalculated by AVS). Use deletion, not
         // empty objects, because Foundry can merge `{}` and leave old manual entries.
         setFlagDeletion(update, 'visibilityV2');
-        setFlagDeletion(update, 'visibility');
         setFlagDeletion(update, 'detection');
         setFlagDeletion(update, 'cover');
         setFlagDeletion(update, 'autoCoverMap');
@@ -2360,7 +2438,6 @@ export class Pf2eVisionerApi {
           setFlagDeletion(update, 'invisibility');
           setFlagDeletion(update, 'coverOverride');
           setFlagDeletion(update, 'visibilityV2');
-          setFlagDeletion(update, 'visibility');
           setFlagDeletion(update, 'detection');
           setFlagDeletion(update, 'cover');
           setFlagDeletion(update, 'autoCoverMap');
@@ -2487,24 +2564,6 @@ export class Pf2eVisionerApi {
                 update[`flags.${MODULE_ID}.visibilityV2`] = cleanedVisibilityProfileMap;
               } else {
                 setFlagDeletion(update, 'visibilityV2');
-              }
-            }
-
-            // Remove selected tokens from this token's legacy visibility map
-            const visibilityMap = token.document.getFlag(MODULE_ID, 'visibility') || {};
-            const cleanedVisibilityMap = { ...visibilityMap };
-            hasChanges = false;
-            for (const selectedId of selectedTokenIds) {
-              if (cleanedVisibilityMap[selectedId]) {
-                delete cleanedVisibilityMap[selectedId];
-                hasChanges = true;
-              }
-            }
-            if (hasChanges) {
-              if (Object.keys(cleanedVisibilityMap).length > 0) {
-                update[`flags.${MODULE_ID}.visibility`] = cleanedVisibilityMap;
-              } else {
-                setFlagDeletion(update, 'visibility');
               }
             }
 
@@ -2876,6 +2935,28 @@ export const autoVisibility = {
     console.warn('updateTokens method not available in refactored system'),
   calculateVisibility: (observer, target) =>
     autoVisibilitySystem.calculateVisibility(observer, target),
+  getPerceptionProfile: (observerId, targetId) =>
+    Pf2eVisionerApi.getPerceptionProfile(observerId, targetId),
+  getPerceptionProfileMap: (observerId) =>
+    Pf2eVisionerApi.getPerceptionProfileMap(observerId),
+  setPerceptionProfile: (observerId, targetId, profile, options = {}) =>
+    Pf2eVisionerApi.setPerceptionProfile(observerId, targetId, profile, options),
+  setPerceptionProfileMap: (observerId, profileMap, options = {}) =>
+    Pf2eVisionerApi.setPerceptionProfileMap(observerId, profileMap, options),
+  getMovementPerformanceSnapshot: () =>
+    autoVisibilitySystem.getMovementPerformanceSnapshot?.() ?? {
+      active: false,
+      currentSession: null,
+      totals: { suppressedLightingRefreshes: 0 },
+    },
+  debugPendingMovementVisualRefresh: (enabled = true) => {
+    setSuppressPendingMovementVisualRefresh(!enabled);
+    return enabled;
+  },
+  debugMovementPerformanceDiagnostics: (enabled = true) => {
+    setMovementPerformanceDiagnosticsEnabled(!!enabled);
+    return !!enabled;
+  },
 
   // Clear light cache (for performance troubleshooting)
   clearLightCache: () => {
