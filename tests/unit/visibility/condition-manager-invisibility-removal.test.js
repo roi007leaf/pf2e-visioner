@@ -116,6 +116,223 @@ describe('ConditionManager invisibility removal', () => {
     });
   });
 
+  test('records canonical AVS override visibility before invisibility is applied', async () => {
+    const actor = {
+      id: 'actor-1',
+      hasCondition: jest.fn(() => false),
+      system: { conditions: { invisible: { active: false } } },
+      conditions: { has: jest.fn(() => false) },
+    };
+    const observer = {
+      id: 'observer',
+      actor: { id: 'observer-actor' },
+      document: { id: 'observer' },
+    };
+    const overrideFlag = {
+      observerId: 'observer',
+      targetId: 'target',
+      detectionState: 'hidden',
+      hasConcealment: false,
+    };
+    const target = {
+      id: 'target',
+      name: 'Target',
+      actor,
+      document: {
+        id: 'target',
+        flags: {
+          'pf2e-visioner': {
+            'avs-override-from-observer': overrideFlag,
+          },
+        },
+        getFlag: jest.fn((moduleId, key) =>
+          moduleId === 'pf2e-visioner' && key === 'avs-override-from-observer'
+            ? overrideFlag
+            : null,
+        ),
+        setFlag: jest.fn().mockResolvedValue(undefined),
+        unsetFlag: jest.fn().mockResolvedValue(undefined),
+      },
+    };
+    const api = {
+      getVisibility: jest.fn(() => 'observed'),
+    };
+
+    global.game.modules.get.mockReturnValue({ api });
+    global.canvas.tokens.controlled = [];
+    global.canvas.tokens.placeables = [target, observer];
+
+    await ConditionManager.getInstance().handleInvisibilityChange(actor, {
+      hasInvisibility: true,
+    });
+
+    expect(api.getVisibility).not.toHaveBeenCalled();
+    expect(target.document.setFlag).toHaveBeenCalledWith('pf2e-visioner', 'invisibility', {
+      observer: {
+        wasVisible: false,
+        previousState: 'hidden',
+        establishedState: null,
+        establishedAt: null,
+      },
+    });
+  });
+
+  test('syncs hidden override to undetected while invisibility is active', async () => {
+    const actor = {
+      id: 'actor-1',
+      hasCondition: jest.fn(() => true),
+      system: { conditions: { invisible: { active: true } } },
+      conditions: { has: jest.fn(() => true) },
+      itemTypes: { condition: [{ id: 'invisible-item', slug: 'invisible', isExpired: false }] },
+    };
+    const observerFlags = { 'pf2e-visioner': {} };
+    const observer = {
+      id: 'observer',
+      actor: { id: 'observer-actor' },
+      document: {
+        id: 'observer',
+        getFlag: jest.fn((moduleId, key) => observerFlags[moduleId]?.[key] ?? null),
+        setFlag: jest.fn((moduleId, key, value) => {
+          observerFlags[moduleId] ||= {};
+          observerFlags[moduleId][key] = value;
+          return Promise.resolve(true);
+        }),
+      },
+    };
+    const overrideFlag = {
+      observerId: 'observer',
+      targetId: 'target',
+      detectionState: 'hidden',
+      hasConcealment: false,
+    };
+    const targetFlags = {
+      'pf2e-visioner': {
+        'avs-override-from-observer': overrideFlag,
+      },
+    };
+    const target = {
+      id: 'target',
+      name: 'Target',
+      actor,
+      document: {
+        id: 'target',
+        flags: targetFlags,
+        getFlag: jest.fn((moduleId, key) => targetFlags[moduleId]?.[key] ?? null),
+        setFlag: jest.fn((moduleId, key, value) => {
+          targetFlags[moduleId] ||= {};
+          targetFlags[moduleId][key] = value;
+          return Promise.resolve(true);
+        }),
+        unsetFlag: jest.fn().mockResolvedValue(undefined),
+      },
+    };
+
+    global.game.modules.get.mockReturnValue({
+      api: {
+        getVisibility: jest.fn(() => 'observed'),
+      },
+    });
+    global.canvas.tokens.controlled = [];
+    global.canvas.tokens.placeables = [target, observer];
+
+    await ConditionManager.getInstance().handleInvisibilityChange(actor, {
+      hasInvisibility: true,
+      token: target,
+    });
+
+    expect(targetFlags['pf2e-visioner'].invisibility.observer.previousState).toBe('hidden');
+    expect(observerFlags['pf2e-visioner'].visibilityV2.target).toMatchObject({
+      detectionState: 'undetected',
+      hasConcealment: false,
+    });
+  });
+
+  test('restores raw hidden override when forced invisibility removal sees stale actor condition', async () => {
+    const actor = {
+      id: 'actor-1',
+      hasCondition: jest.fn(() => true),
+      system: { conditions: { invisible: { active: true } } },
+      conditions: { has: jest.fn(() => true) },
+      itemTypes: { condition: [{ id: 'invisible-item', slug: 'invisible', isExpired: false }] },
+    };
+    const observerFlags = {
+      'pf2e-visioner': {
+        visibilityV2: {
+          target: {
+            detectionState: 'undetected',
+            hasConcealment: false,
+            coverState: 'none',
+            detectionSense: null,
+            awarenessState: null,
+          },
+        },
+      },
+    };
+    const observer = {
+      id: 'observer',
+      actor: { id: 'observer-actor' },
+      document: {
+        id: 'observer',
+        getFlag: jest.fn((moduleId, key) => observerFlags[moduleId]?.[key] ?? null),
+        setFlag: jest.fn((moduleId, key, value) => {
+          observerFlags[moduleId] ||= {};
+          observerFlags[moduleId][key] = value;
+          return Promise.resolve(true);
+        }),
+      },
+    };
+    const overrideFlag = {
+      observerId: 'observer',
+      targetId: 'target',
+      detectionState: 'hidden',
+      hasConcealment: false,
+    };
+    const targetFlags = {
+      'pf2e-visioner': {
+        'avs-override-from-observer': overrideFlag,
+        invisibility: {
+          observer: {
+            previousState: 'hidden',
+            conditionItemId: 'invisible-item',
+          },
+        },
+      },
+    };
+    const target = {
+      id: 'target',
+      name: 'Target',
+      actor,
+      document: {
+        id: 'target',
+        flags: targetFlags,
+        getFlag: jest.fn((moduleId, key) => targetFlags[moduleId]?.[key] ?? null),
+        setFlag: jest.fn((moduleId, key, value) => {
+          targetFlags[moduleId] ||= {};
+          targetFlags[moduleId][key] = value;
+          return Promise.resolve(true);
+        }),
+        unsetFlag: jest.fn((moduleId, key) => {
+          delete targetFlags[moduleId]?.[key];
+          return Promise.resolve(true);
+        }),
+      },
+    };
+
+    global.canvas.tokens.controlled = [];
+    global.canvas.tokens.placeables = [target, observer];
+
+    await ConditionManager.getInstance().handleInvisibilityChange(actor, {
+      hasInvisibility: false,
+      token: target,
+    });
+
+    expect(observerFlags['pf2e-visioner'].visibilityV2.target).toMatchObject({
+      detectionState: 'hidden',
+      hasConcealment: false,
+    });
+    expect(target.document.unsetFlag).toHaveBeenCalledWith('pf2e-visioner', 'invisibility');
+  });
+
   test('uses the exact synthetic actor token instead of every token with the same actor id', async () => {
     const actor = {
       id: 'shared-actor',

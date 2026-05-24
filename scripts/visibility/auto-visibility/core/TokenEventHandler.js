@@ -410,15 +410,15 @@ export class TokenEventHandler {
       this.systemState.debug('wall-flags-detected', tokenDoc.id, changes.flags?.[MODULE_ID]?.walls);
     }
 
-    // Handle light emitter movement (global recalculation)
+    // Handle light emitter movement with spatial fan-out.
     const emitterMoved = effectiveChangeFlags.positionChanged && this._tokenEmitsLight(tokenDoc, changes);
     if (emitterMoved) {
       this.systemState.debug(() => ({
-        msg: 'handleTokenUpdate light emitter moved - global recalc',
+        msg: 'handleTokenUpdate light emitter moved - spatial recalc',
         tokenId: tokenDoc?.id,
       }));
       this.systemState.debug(
-        'emitter-moved: global recalculation for token light move',
+        'emitter-moved: spatial recalculation for token light move',
         tokenDoc.id,
       );
       this.invalidation.invalidate(tokenLightEmitterMoved(tokenDoc, changes, { options, userId }));
@@ -513,7 +513,12 @@ export class TokenEventHandler {
     try {
       const lightConfig = changes.light !== undefined ? changes.light : tokenDoc.light;
       if (!lightConfig) return false;
-      return lightConfig.enabled === true && (lightConfig.bright > 0 || lightConfig.dim > 0);
+      if (lightConfig.enabled === false) return false;
+      return (
+        Number(lightConfig.bright || 0) > 0 ||
+        Number(lightConfig.dim || 0) > 0 ||
+        Number(lightConfig.range || 0) > 0
+      );
     } catch {
       return false;
     }

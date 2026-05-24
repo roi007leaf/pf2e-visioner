@@ -2,7 +2,10 @@ import {
   clearSuppressLightingRefresh,
   isLightingRefreshAfterBatchSuppressed,
   isLightingRefreshSuppressed,
+  isTokenLightMovementLightingRefreshSuppressed,
+  isTokenMovementLightingRefreshSuppressed,
   setSuppressLightingRefresh,
+  setSuppressTokenLightMovementLightingRefresh,
 } from '../../../services/runtime-state.js';
 import { LightingPrecomputer } from './LightingPrecomputer.js';
 import { VisionAnalyzer } from '../VisionAnalyzer.js';
@@ -69,7 +72,8 @@ export class AvsInvalidationCoordinator {
       wallCreatedOrDeleted: () => this.#handleWallCreatedOrDeleted(),
       fullSceneImmediateInvalidation: () => this.#handleFullSceneImmediateInvalidation(),
       tokenLightUpdated: (change) => this.#handleTokenLightUpdated(change.document, change.changeData),
-      tokenLightEmitterMoved: () => this.#handleTokenLightEmitterMoved(),
+      tokenLightEmitterMoved: (change) =>
+        this.#handleTokenLightEmitterMoved(change.document, change.changeData),
       tokenLightRecalculationRequired: () => this.#handleTokenLightRecalculationRequired(),
       tokenPositionUpdated: (change) =>
         this.#handleTokenPositionUpdated(change.document, change.changeData),
@@ -199,6 +203,20 @@ export class AvsInvalidationCoordinator {
       return false;
     }
 
+    if (isTokenMovementLightingRefreshSuppressed()) {
+      this.systemState?.debug?.(
+        'LightingEventHandler: suppressing lightingRefresh after token movement',
+      );
+      return false;
+    }
+
+    if (isTokenLightMovementLightingRefreshSuppressed()) {
+      this.systemState?.debug?.(
+        'LightingEventHandler: suppressing lightingRefresh from token light movement',
+      );
+      return false;
+    }
+
     if (this.#isLightingRefreshFromTokenSelection()) {
       this.systemState?.debug?.('LightingEventHandler: ignoring lightingRefresh from token selection');
       return false;
@@ -275,24 +293,32 @@ export class AvsInvalidationCoordinator {
     return true;
   }
 
-  #handleTokenLightChangeWithSpatialOptimization(tokenDoc, changes) {
+  #handleTokenLightChangeWithSpatialOptimization(tokenDoc, changes, options = {}) {
     try {
       const gridSize = canvas.grid?.size || 1;
-      const tokenPos = {
+      const oldPos = {
         x: tokenDoc.x + (tokenDoc.width * gridSize) / 2,
         y: tokenDoc.y + (tokenDoc.height * gridSize) / 2,
       };
+      const newPos = {
+        x: (changes?.x ?? tokenDoc.x) + (tokenDoc.width * gridSize) / 2,
+        y: (changes?.y ?? tokenDoc.y) + (tokenDoc.height * gridSize) / 2,
+      };
 
-      const affectedTokens = this.spatialAnalyzer.getAffectedTokens(
-        tokenPos,
-        tokenPos,
-        tokenDoc.id,
+      const affectedTokens = this.#getAffectedTokensForTokenLightChange(
+        oldPos,
+        newPos,
+        tokenDoc,
+        changes,
+        options,
       );
 
-      this.visibilityState?.markTokenChangedImmediate?.(tokenDoc.id);
+      const tokenIds = [tokenDoc.id];
       affectedTokens.forEach((token) => {
-        this.visibilityState?.markTokenChangedImmediate?.(token.document.id);
+        const tokenId = token?.document?.id;
+        if (tokenId) tokenIds.push(tokenId);
       });
+      this.#recalculateTokenIds(tokenIds);
     } catch (error) {
       console.error(
         '[PF2E Visioner] Spatial optimization failed, falling back to full recalculation:',
@@ -303,10 +329,69 @@ export class AvsInvalidationCoordinator {
     }
   }
 
-  #handleTokenLightEmitterMoved() {
+  #getAffectedTokensForTokenLightChange(oldPos, newPos, tokenDoc, changes, options = {}) {
+    if (options.restrictToLightRadius && this.spatialAnalyzer?.getTokensInRange) {
+      const lightRadiusFeet = this.#getTokenLightRadiusFeet(tokenDoc, changes);
+      if (lightRadiusFeet > 0) {
+        const candidates = new Set([
+          ...this.spatialAnalyzer.getTokensInRange(oldPos, lightRadiusFeet, tokenDoc.id),
+          ...this.spatialAnalyzer.getTokensInRange(newPos, lightRadiusFeet, tokenDoc.id),
+        ]);
+
+        if (typeof this.spatialAnalyzer.canTokenSeePositionOptimized !== 'function') {
+          return candidates;
+        }
+
+        const metrics = { raysCreated: 0, wallChecks: 0 };
+        return new Set(
+          [...candidates].filter(
+            (token) =>
+              this.spatialAnalyzer.canTokenSeePositionOptimized(token, oldPos, metrics) ||
+              this.spatialAnalyzer.canTokenSeePositionOptimized(token, newPos, metrics),
+          ),
+        );
+      }
+    }
+
+    return this.spatialAnalyzer.getAffectedTokens(oldPos, newPos, tokenDoc.id);
+  }
+
+  #getTokenLightRadiusFeet(tokenDoc, changes = {}) {
+    const light = changes?.light
+      ? { ...(tokenDoc?.light ?? {}), ...changes.light }
+      : tokenDoc?.light;
+    if (!light || light.enabled === false) return 0;
+    return Math.max(
+      Number(light.range || 0),
+      Number(light.dim || 0),
+      Number(light.bright || 0),
+    );
+  }
+
+  #recalculateTokenIds(tokenIds = []) {
+    const uniqueIds = [...new Set(tokenIds.filter(Boolean))];
+    if (uniqueIds.length === 0) return;
+    if (typeof this.visibilityState?.recalculateForTokens === 'function') {
+      this.visibilityState.recalculateForTokens(uniqueIds);
+      return;
+    }
+    uniqueIds.forEach((tokenId) => {
+      this.visibilityState?.markTokenChangedImmediate?.(tokenId);
+    });
+  }
+
+  #handleTokenLightEmitterMoved(tokenDoc, changeData) {
     if (!this.#shouldProcessEvents()) return false;
 
-    this.visibilityState?.markAllTokensChangedImmediate?.();
+    setSuppressTokenLightMovementLightingRefresh();
+    if (!tokenDoc?.id || !this.spatialAnalyzer?.getAffectedTokens) {
+      this.visibilityState?.markAllTokensChangedImmediate?.();
+      return true;
+    }
+
+    this.#handleTokenLightChangeWithSpatialOptimization(tokenDoc, changeData, {
+      restrictToLightRadius: true,
+    });
     return true;
   }
 

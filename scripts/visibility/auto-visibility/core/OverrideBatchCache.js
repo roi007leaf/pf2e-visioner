@@ -15,13 +15,43 @@ function hasOverrideVisibilityData(override) {
     );
 }
 
+function actorHasInvisibleCondition(actor) {
+    return !!(
+        actor?.hasCondition?.('invisible') ||
+        actor?.system?.conditions?.invisible?.active ||
+        actor?.conditions?.has?.('invisible') ||
+        actor?.itemTypes?.condition?.some?.(
+            (condition) => condition.slug === 'invisible' && !condition.isExpired,
+        )
+    );
+}
+
+function applyInvisibleTransitionToOverride(state, observerId, targetToken) {
+    if (!state || !actorHasInvisibleCondition(targetToken?.actor)) return state;
+
+    const invisibilityFlags = targetToken?.document?.getFlag?.('pf2e-visioner', 'invisibility') ?? {};
+    const previousState = invisibilityFlags?.[observerId]?.previousState || state;
+
+    switch (previousState) {
+        case 'observed':
+        case 'concealed':
+            return 'hidden';
+        case 'hidden':
+        case 'undetected':
+            return 'undetected';
+        default:
+            return state;
+    }
+}
+
 export class OverrideBatchCache {
     /**
      * @param {{ getActiveOverrideForTokens: (observer: Token, target: Token) => Promise<{ state?: string } | null> | ({ state?: string } | null) }} overrideService
      */
-    constructor(overrideService) {
+    constructor(overrideService, options = {}) {
         /** @type {{ getActiveOverrideForTokens: (observer: Token, target: Token) => Promise<{ state?: string } | null> | ({ state?: string } | null) }} */
         this._overrideService = overrideService || null;
+        this._applyInvisibilityTransition = options.applyInvisibilityTransition !== false;
         /** @type {Map<string, string | null>} */
         this._memo = new Map();
     }
@@ -58,6 +88,10 @@ export class OverrideBatchCache {
             }
         } catch {
             // noop
+        }
+
+        if (this._applyInvisibilityTransition) {
+            state = applyInvisibleTransitionToOverride(state, aId, tokenB);
         }
 
         this._memo.set(key, state);

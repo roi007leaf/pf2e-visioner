@@ -113,6 +113,7 @@ const pendingMovementCurrentSightLineGraceContexts = new Map();
 let pendingMovementHiddenStateVisibilityProbeDepth = 0;
 let pendingMovementSerial = 0;
 const recentCompletedMovementRefreshTargetIds = new Map();
+let pendingMovementRefreshTargetIdSetCache = null;
 const pendingMovementTokenRefreshSignatures = new WeakMap();
 let pendingMovementCoalescedRefresh = null;
 const pendingMovementPerformanceCounters = {
@@ -993,6 +994,35 @@ export function getPendingMovementRefreshTargetIds(tokenIds = null) {
   }
 
   return [...targetIds];
+}
+
+function pendingMovementTargetSetSignature() {
+  return [
+    pendingMovementEntriesSignature(),
+    [...recentCompletedMovementRefreshTargetIds.keys()].sort().join(','),
+  ].join('||');
+}
+
+function getPendingMovementRefreshTargetIdSet() {
+  const signature = pendingMovementTargetSetSignature();
+  if (pendingMovementRefreshTargetIdSetCache?.signature === signature) {
+    return pendingMovementRefreshTargetIdSetCache.ids;
+  }
+
+  const ids = new Set(getPendingMovementRefreshTargetIds());
+  pendingMovementRefreshTargetIdSetCache = { signature, ids };
+  return ids;
+}
+
+export function shouldHandlePendingMovementCanvasVisibilityForToken(token) {
+  if (!token?.document?.id) return false;
+  cleanupExpiredPendingMovements();
+  if (!hasPendingMovementRenderWork()) return false;
+  if (isPendingMovementRenderLocked(token)) return true;
+  if (hasPendingRenderState(token)) return true;
+  if (tokenHasDetectionFilterVisual(token)) return true;
+
+  return getPendingMovementRefreshTargetIdSet().has(tokenIdOf(token));
 }
 
 export function getPendingMovementBlockContext(observer, target) {
@@ -1879,6 +1909,37 @@ function hasAwaitingDetectionFilterRenderLock(token) {
   );
 }
 
+function meshIsForcedInvisible(mesh) {
+  if (!mesh) return true;
+
+  const alpha = Number(mesh.alpha);
+  const visible = 'visible' in mesh ? mesh.visible === false : true;
+  const renderable = 'renderable' in mesh ? mesh.renderable === false : true;
+  const transparent = !('alpha' in mesh) || (Number.isFinite(alpha) && alpha <= 0);
+
+  return visible && renderable && transparent;
+}
+
+function shouldSkipForcedInvisibleTokenRefresh(token) {
+  const state = getPendingRenderState(token);
+  if (!state) return false;
+
+  const context = state.lastHiddenContext || getRememberedHiddenForceContext(token);
+  if (context?.awaitingDetectionFilter) return false;
+  if (tokenHasDetectionFilterVisual(token)) return false;
+  if (!context?.foundryHidden) {
+    const observer = tokenObjectForId(context?.observerId);
+    const visibilityState = observer ? getPendingMovementVisibilityState(observer, token) : null;
+    if (!RENDER_HIDDEN_FROM_OBSERVER_STATES.has(visibilityState)) return false;
+  }
+
+  return (
+    token.visible === false &&
+    token.renderable === false &&
+    meshIsForcedInvisible(token.mesh)
+  );
+}
+
 export function restorePendingMovementTokenRendering(
   token,
   { ignoreObservedGrace = false, ignoreObserverLocks = false } = {},
@@ -2487,6 +2548,16 @@ export function hasPendingMovementRenderWork() {
   return prunePendingMovementRenderLocks(sceneTokens) > 0;
 }
 
+export function shouldSuppressPendingMovementOcclusionUpdate(flags = {}) {
+  cleanupExpiredPendingMovements();
+  if (pendingTokenMovementPositions.size <= 0 && pendingTokenMovementCompletionTimeouts.size <= 0) {
+    return false;
+  }
+
+  const enabledFlags = Object.entries(flags ?? {}).filter(([, value]) => value === true);
+  return enabledFlags.length === 1 && enabledFlags[0]?.[0] === 'refreshOcclusion';
+}
+
 export function resetPendingMovementPerformanceCounters() {
   pendingMovementPerformanceCounters.refreshCalls = 0;
   pendingMovementPerformanceCounters.targetedRefreshCalls = 0;
@@ -2729,6 +2800,9 @@ function refreshPendingMovementTokenVisibilityUncached(
       const shouldForceInvisible = shouldTemporarilyForceTokenInvisible(token, { hasDetectionWork });
       if (shouldForceInvisible) {
         forcePendingMovementTokenInvisible(token);
+        if (shouldSkipForcedInvisibleTokenRefresh(token)) {
+          continue;
+        }
       }
       if (
         !shouldForceInvisible &&
@@ -2747,6 +2821,9 @@ function refreshPendingMovementTokenVisibilityUncached(
           forcePendingMovementTokenInvisible(token);
           continue;
         }
+      }
+      if (!shouldForceInvisible && shouldSkipForcedInvisibleTokenRefresh(token)) {
+        continue;
       }
       if (
         !shouldForceInvisible &&

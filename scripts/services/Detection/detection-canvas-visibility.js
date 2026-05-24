@@ -6,6 +6,7 @@ import {
 import {
   capturePendingMovementDetectionFilterVisualState,
   restorePendingMovementDetectionFilterVisualState,
+  shouldHandlePendingMovementCanvasVisibilityForToken,
   shouldPreservePendingMovementDetectionFilterVisuals,
   shouldSuppressPendingMovementDetectionFilterVisuals,
   withPreservedPendingMovementDetectionFilterVisuals,
@@ -34,6 +35,9 @@ function hasActiveUnblockedDetectionSource(blockedSources = []) {
 
 export function wrapCanvasVisibilityTest(wrapped, points, options = {}) {
   if (isPendingMovementHiddenStateVisibilityProbe()) {
+    return wrapped(points, options);
+  }
+  if (!shouldHandlePendingMovementCanvasVisibilityForToken(options?.object)) {
     return wrapped(points, options);
   }
 

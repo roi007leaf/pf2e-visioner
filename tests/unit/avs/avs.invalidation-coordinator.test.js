@@ -6,6 +6,7 @@ import {
 } from '../../../scripts/visibility/auto-visibility/core/AvsInvalidationCoordinator.js';
 import { LightingPrecomputer } from '../../../scripts/visibility/auto-visibility/core/LightingPrecomputer.js';
 import {
+  setSuppressTokenMovementLightingRefresh,
   setSuppressLightingRefresh,
   setSuppressLightingRefreshAfterBatch,
 } from '../../../scripts/services/runtime-state.js';
@@ -203,6 +204,19 @@ describe('AvsInvalidationCoordinator lighting reasons', () => {
     expect(cacheManager.clearAllCaches).not.toHaveBeenCalled();
     expect(visibilityState.markAllTokensChangedThrottled).not.toHaveBeenCalled();
   });
+
+  test('lighting-refresh is ignored shortly after token movement spatial recalculation', async () => {
+    setSuppressTokenMovementLightingRefresh();
+
+    const result = await coordinator.invalidate({ reason: 'lighting-refresh' });
+
+    expect(result).toBe(false);
+    expect(systemState.debug).toHaveBeenCalledWith(
+      'LightingEventHandler: suppressing lightingRefresh after token movement',
+    );
+    expect(cacheManager.clearAllCaches).not.toHaveBeenCalled();
+    expect(visibilityState.markAllTokensChangedThrottled).not.toHaveBeenCalled();
+  });
 });
 
 describe('AvsInvalidationCoordinator wall reasons', () => {
@@ -330,6 +344,8 @@ describe('AvsInvalidationCoordinator token light reasons', () => {
     cacheManager = makeCacheManager();
     spatialAnalyzer = {
       getAffectedTokens: jest.fn(() => [{ document: { id: 'token2' } }]),
+      getTokensInRange: jest.fn(() => [{ document: { id: 'token2' } }]),
+      canTokenSeePositionOptimized: jest.fn(() => true),
     };
     coordinator = new AvsInvalidationCoordinator({
       systemStateProvider: systemState,
@@ -363,8 +379,7 @@ describe('AvsInvalidationCoordinator token light reasons', () => {
       { x: 125, y: 225 },
       'token1',
     );
-    expect(visibilityState.markTokenChangedImmediate).toHaveBeenCalledWith('token1');
-    expect(visibilityState.markTokenChangedImmediate).toHaveBeenCalledWith('token2');
+    expect(visibilityState.recalculateForTokens).toHaveBeenCalledWith(['token1', 'token2']);
     expect(global.game.pf2eVisioner.suppressLightingRefresh).toBeUndefined();
   });
 
@@ -390,17 +405,37 @@ describe('AvsInvalidationCoordinator token light reasons', () => {
     expect(global.game.pf2eVisioner.suppressLightingRefresh).toBeUndefined();
   });
 
-  test('token-light-emitter-moved triggers a full immediate recalculation', () => {
+  test('token-light-emitter-moved uses light-radius spatial fan-out instead of full recalculation', () => {
     const result = coordinator.invalidate({
       reason: 'token-light-emitter-moved',
-      document: { id: 'token1' },
+      document: { id: 'token1', x: 100, y: 200, width: 1, height: 1, light: { bright: 20 } },
       changeData: { x: 150 },
     });
 
     expect(result).toBe(true);
-    expect(visibilityState.markAllTokensChangedImmediate).toHaveBeenCalledTimes(1);
-    expect(visibilityState.markTokenChangedWithSpatialOptimization).not.toHaveBeenCalled();
+    expect(spatialAnalyzer.getTokensInRange).toHaveBeenCalledWith({ x: 125, y: 225 }, 20, 'token1');
+    expect(spatialAnalyzer.getTokensInRange).toHaveBeenCalledWith({ x: 175, y: 225 }, 20, 'token1');
+    expect(spatialAnalyzer.getAffectedTokens).not.toHaveBeenCalled();
+    expect(visibilityState.recalculateForTokens).toHaveBeenCalledWith(['token1', 'token2']);
+    expect(visibilityState.markAllTokensChangedImmediate).not.toHaveBeenCalled();
     expect(cacheManager.clearVisibilityCache).not.toHaveBeenCalled();
+  });
+
+  test('token-light-emitter-moved suppresses follow-up lighting-refresh full-scene pass', () => {
+    coordinator.invalidate({
+      reason: 'token-light-emitter-moved',
+      document: { id: 'token1', x: 100, y: 200, width: 1, height: 1, light: { dim: 40 } },
+      changeData: { x: 150 },
+    });
+
+    const result = coordinator.invalidate({ reason: 'lighting-refresh' });
+
+    expect(result).toBe(false);
+    expect(systemState.debug).toHaveBeenCalledWith(
+      'LightingEventHandler: suppressing lightingRefresh from token light movement',
+    );
+    expect(visibilityState.markAllTokensChangedThrottled).not.toHaveBeenCalled();
+    expect(visibilityState.markAllTokensChangedImmediate).not.toHaveBeenCalled();
   });
 
   test('token-light-recalculation-required triggers a full immediate recalculation', () => {

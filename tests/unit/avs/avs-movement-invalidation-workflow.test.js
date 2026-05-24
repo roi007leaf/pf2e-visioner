@@ -4,6 +4,10 @@ import {
   AvsMovementInvalidationWorkflow,
   tokenHasTakeCoverExpirationState,
 } from '../../../scripts/visibility/auto-visibility/core/AvsMovementInvalidationWorkflow.js';
+import {
+  clearSuppressTokenMovementLightingRefresh,
+  isTokenMovementLightingRefreshSuppressed,
+} from '../../../scripts/services/runtime-state.js';
 
 function makeVisibilityState() {
   return {
@@ -38,6 +42,7 @@ function makeWorkflow(overrides = {}) {
 describe('AvsMovementInvalidationWorkflow', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    clearSuppressTokenMovementLightingRefresh();
   });
 
   test('completed movement clears position caches, marks spatial recalculation, then closes movement', () => {
@@ -78,6 +83,7 @@ describe('AvsMovementInvalidationWorkflow', () => {
     expect(
       visibilityState.markTokenChangedWithSpatialOptimization.mock.invocationCallOrder[0],
     ).toBeLessThan(batchOrchestrator.notifyTokenMovementComplete.mock.invocationCallOrder[0]);
+    expect(isTokenMovementLightingRefreshSuppressed()).toBe(true);
   });
 
   test('completed movement expires Take Cover before queueing and scheduling override validation', async () => {

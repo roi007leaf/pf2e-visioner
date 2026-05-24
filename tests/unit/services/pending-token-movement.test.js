@@ -39,6 +39,7 @@ import {
   refreshPendingMovementTokenVisibility,
   restorePendingMovementDetectionFilterState,
   restorePendingMovementTokenRendering,
+  shouldSuppressPendingMovementOcclusionUpdate,
   shouldSuppressPendingMovementDetectionFilterVisuals,
   shouldTemporarilyForceTokenInvisible,
   suppressPendingMovementDetectionFilterVisualsForObservedTransition,
@@ -2966,7 +2967,33 @@ describe('pending token movement hidden detection guard', () => {
 
     jest.advanceTimersByTime(100);
 
-    expect(refreshTokenVisibility).toHaveBeenCalledTimes(8);
+    expect(refreshTokenVisibility).toHaveBeenCalledTimes(4);
+  });
+
+  test('suppresses occlusion-only perception updates during pending movement', () => {
+    const observer = createMockToken({ id: 'observer' });
+    global.canvas = {
+      ...global.canvas,
+      tokens: {
+        get: jest.fn((id) => (id === 'observer' ? observer : null)),
+        controlled: [observer],
+        placeables: [observer],
+      },
+    };
+
+    setPendingTokenMovementPosition(observer.document, { x: 100, y: 0 }, [observer]);
+
+    expect(shouldSuppressPendingMovementOcclusionUpdate({ refreshOcclusion: true })).toBe(true);
+    expect(
+      shouldSuppressPendingMovementOcclusionUpdate({
+        refreshOcclusion: true,
+        refreshVision: true,
+      }),
+    ).toBe(false);
+
+    clearPendingTokenMovementPosition(observer.document.id);
+
+    expect(shouldSuppressPendingMovementOcclusionUpdate({ refreshOcclusion: true })).toBe(false);
   });
 
   test('can refresh pending movement token visuals without refreshing perception', () => {
@@ -3630,6 +3657,47 @@ describe('pending token movement hidden detection guard', () => {
     expect(target.visible).toBe(true);
     expect(target.renderable).toBe(true);
     expect(target.mesh.visible).toBe(true);
+  });
+
+  test('skips token refresh for already render-hidden locked targets', () => {
+    const observer = createMockToken({
+      id: 'observer',
+      flags: visibilityV2Flags({ target: 'undetected' }),
+    });
+    const target = createMockToken({ id: 'target', visible: true });
+    target.renderable = true;
+    target.mesh = { visible: true, renderable: true, alpha: 1 };
+    target.nameplate = { visible: true };
+    target.refresh = jest.fn(() => {
+      target.visible = true;
+      target.renderable = true;
+      target.mesh.visible = true;
+      target.mesh.renderable = true;
+      target.mesh.alpha = 1;
+      target.nameplate.visible = true;
+    });
+    global.canvas = {
+      ...global.canvas,
+      tokens: {
+        get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+        controlled: [observer],
+        placeables: [observer, target],
+      },
+      perception: {
+        update: jest.fn(),
+      },
+    };
+
+    expect(forceTokenInvisibleForObserverVisibility(observer, target, 'undetected')).toBe(true);
+
+    refreshPendingMovementTokenVisibility([], { targetTokenIds: ['target'] });
+
+    expect(target.refresh).not.toHaveBeenCalled();
+    expect(target.visible).toBe(false);
+    expect(target.renderable).toBe(false);
+    expect(target.mesh.visible).toBe(false);
+    expect(target.mesh.renderable).toBe(false);
+    expect(target.mesh.alpha).toBe(0);
   });
 
   test('does not delete detection filter created for pending hidden render unlock', () => {

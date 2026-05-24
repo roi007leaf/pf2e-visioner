@@ -1,5 +1,8 @@
 import { MODULE_ID } from '../../../constants.js';
-import { setLastMovedTokenId } from '../../../services/runtime-state.js';
+import {
+  setLastMovedTokenId,
+  setSuppressTokenMovementLightingRefresh,
+} from '../../../services/runtime-state.js';
 import { LightingPrecomputer } from './LightingPrecomputer.js';
 
 function hasTakeCoverTrackingFlag(flagData) {
@@ -64,6 +67,7 @@ export class AvsMovementInvalidationWorkflow {
     if (!this.shouldProcessEvents?.()) return false;
     if (!tokenDoc) return false;
 
+    setSuppressTokenMovementLightingRefresh();
     this.#clearTokenPositionCaches();
     this.visionAnalyzer?.clearCache?.(tokenDoc);
     this.visibilityState?.markTokenChangedWithSpatialOptimization?.(tokenDoc, movementChanges);
@@ -76,6 +80,7 @@ export class AvsMovementInvalidationWorkflow {
     if (!this.shouldProcessEvents?.()) return false;
     if (!tokenDoc) return false;
 
+    setSuppressTokenMovementLightingRefresh();
     this.#clearTokenPositionCaches();
     this.batchOrchestrator?.notifyTokenMovementStart?.();
     this.visibilityState?.markTokenChangedWithSpatialOptimization?.(tokenDoc, movementChanges);

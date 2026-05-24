@@ -559,6 +559,28 @@ describe('BatchProcessor', () => {
     expect(res.updates.some((u) => u.visibility === 'undetected')).toBe(false);
   });
 
+  test('implicit hearing avoids exact PF2E token distance on LOS-blocked hot path', async () => {
+    const [observer] = global.canvas.tokens.placeables;
+    observer.distanceTo = jest.fn(() => 5);
+    processor.visionAnalyzer.hasLineOfSight.mockReturnValue(false);
+    processor.visionAnalyzer.getVisionCapabilities.mockImplementation(() => ({
+      isDeafened: false,
+      sensingSummary: {
+        precise: [],
+        imprecise: [],
+        hearing: null,
+      },
+    }));
+    optimizedVisibilityCalculator.calculateVisibilityBetweenTokens.mockImplementation(
+      async () => 'hidden',
+    );
+
+    await processor.process(global.canvas.tokens.placeables, new Set(['A']), {});
+
+    expect(observer.distanceTo).not.toHaveBeenCalled();
+    expect(optimizedVisibilityCalculator.calculateVisibilityBetweenTokens).toHaveBeenCalled();
+  });
+
   test('does not short-circuit LOS-blocked precise lifesense pairs to undetected', async () => {
     const observer = makeToken('A', 0, 0);
     const target = makeToken('B', 100, 0);

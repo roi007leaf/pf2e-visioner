@@ -85,6 +85,38 @@ export function isLightingRefreshAfterBatchSuppressed() {
   return !!getRuntimeFlag('suppressLightingRefreshAfterBatch');
 }
 
+export function setSuppressTokenMovementLightingRefresh(durationMs = 1000) {
+  return setRuntimeFlag('suppressTokenMovementLightingRefreshUntil', Date.now() + durationMs);
+}
+
+export function clearSuppressTokenMovementLightingRefresh() {
+  clearRuntimeFlag('suppressTokenMovementLightingRefreshUntil');
+}
+
+export function isTokenMovementLightingRefreshSuppressed() {
+  const until = Number(getRuntimeFlag('suppressTokenMovementLightingRefreshUntil') || 0);
+  if (!until) return false;
+  if (until > Date.now()) return true;
+  clearSuppressTokenMovementLightingRefresh();
+  return false;
+}
+
+export function setSuppressTokenLightMovementLightingRefresh(durationMs = 2500) {
+  return setRuntimeFlag('suppressTokenLightMovementLightingRefreshUntil', Date.now() + durationMs);
+}
+
+export function clearSuppressTokenLightMovementLightingRefresh() {
+  clearRuntimeFlag('suppressTokenLightMovementLightingRefreshUntil');
+}
+
+export function isTokenLightMovementLightingRefreshSuppressed() {
+  const until = Number(getRuntimeFlag('suppressTokenLightMovementLightingRefreshUntil') || 0);
+  if (!until) return false;
+  if (until > Date.now()) return true;
+  clearSuppressTokenLightMovementLightingRefresh();
+  return false;
+}
+
 export function setLastMovedTokenId(tokenId) {
   return setRuntimeFlag('lastMovedTokenId', tokenId);
 }

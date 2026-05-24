@@ -201,6 +201,71 @@ describe('TokenEventHandler - animation detection on position change', () => {
     expect(queueOverrideValidation).not.toHaveBeenCalled();
   });
 
+  test('position update for v14 token light without enabled flag emits token light movement invalidation', () => {
+    const invalidationCoordinator = { invalidate: jest.fn(() => true) };
+    handler = new TokenEventHandler(
+      systemState,
+      visibilityState,
+      spatialAnalyzer,
+      exclusionManager,
+      overrideValidationManager,
+      positionManager,
+      cacheManager,
+      batchOrchestrator,
+      invalidationCoordinator,
+    );
+    const tokenDoc = makeTokenDoc({
+      light: { bright: 20, dim: 40 },
+      object: {
+        _animation: { state: 'completed' },
+        _dragHandle: null,
+        actor: { id: 'actor-1' },
+      },
+    });
+    const changes = { x: 100, y: 100 };
+
+    handler.handleTokenUpdate(tokenDoc, changes, {}, 'user-1');
+
+    expect(invalidationCoordinator.invalidate).toHaveBeenCalledWith({
+      reason: 'token-light-emitter-moved',
+      document: tokenDoc,
+      changeData: changes,
+      options: {},
+      userId: 'user-1',
+    });
+  });
+
+  test('position update for explicitly disabled token light does not emit token light movement invalidation', () => {
+    const invalidationCoordinator = { invalidate: jest.fn(() => true) };
+    handler = new TokenEventHandler(
+      systemState,
+      visibilityState,
+      spatialAnalyzer,
+      exclusionManager,
+      overrideValidationManager,
+      positionManager,
+      cacheManager,
+      batchOrchestrator,
+      invalidationCoordinator,
+    );
+    const tokenDoc = makeTokenDoc({
+      light: { enabled: false, bright: 20, dim: 40 },
+      object: {
+        _animation: { state: 'completed' },
+        _dragHandle: null,
+        actor: { id: 'actor-1' },
+      },
+    });
+
+    handler.handleTokenUpdate(tokenDoc, { x: 100, y: 100 }, {}, 'user-1');
+
+    expect(
+      invalidationCoordinator.invalidate.mock.calls.some(
+        ([change]) => change.reason === 'token-light-emitter-moved',
+      ),
+    ).toBe(false);
+  });
+
   test('position change while dragging should defer processing', () => {
     const tokenDoc = makeTokenDoc({
       object: {

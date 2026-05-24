@@ -56,6 +56,90 @@ describe('Canonical AVS override readers', () => {
     expect(cache.getOverrideState('observer', 'target', observer, target)).toBe('concealed');
   });
 
+  test('batch override cache applies invisible transition to hidden override flags', async () => {
+    const { OverrideBatchCache } = await import(
+      '../../../scripts/visibility/auto-visibility/core/OverrideBatchCache.js'
+    );
+
+    const observer = { document: { id: 'observer' } };
+    const target = {
+      actor: {
+        itemTypes: {
+          condition: [{ id: 'invisible-item', slug: 'invisible', isExpired: false }],
+        },
+      },
+      document: {
+        id: 'target',
+        getFlag: jest.fn((moduleId, key) => {
+          if (moduleId !== 'pf2e-visioner') return null;
+          if (key === 'avs-override-from-observer') {
+            return {
+              observerId: 'observer',
+              targetId: 'target',
+              detectionState: 'hidden',
+              hasConcealment: false,
+            };
+          }
+          if (key === 'invisibility') {
+            return {
+              observer: {
+                previousState: 'hidden',
+                conditionItemId: 'invisible-item',
+              },
+            };
+          }
+          return null;
+        }),
+      },
+    };
+
+    const cache = new OverrideBatchCache(null);
+
+    expect(cache.getOverrideState('observer', 'target', observer, target)).toBe('undetected');
+  });
+
+  test('batch override cache can read raw hidden override while snapshotting invisibility', async () => {
+    const { OverrideBatchCache } = await import(
+      '../../../scripts/visibility/auto-visibility/core/OverrideBatchCache.js'
+    );
+
+    const observer = { document: { id: 'observer' } };
+    const target = {
+      actor: {
+        itemTypes: {
+          condition: [{ id: 'invisible-item', slug: 'invisible', isExpired: false }],
+        },
+      },
+      document: {
+        id: 'target',
+        getFlag: jest.fn((moduleId, key) => {
+          if (moduleId !== 'pf2e-visioner') return null;
+          if (key === 'avs-override-from-observer') {
+            return {
+              observerId: 'observer',
+              targetId: 'target',
+              detectionState: 'hidden',
+              hasConcealment: false,
+            };
+          }
+          if (key === 'invisibility') {
+            return {
+              observer: {
+                previousState: 'hidden',
+                conditionItemId: 'invisible-item',
+              },
+            };
+          }
+          return null;
+        }),
+      },
+    };
+
+    const cache = new OverrideBatchCache(null, { applyInvisibilityTransition: false });
+
+    expect(cache.getOverrideState('observer', 'target', observer, target)).toBe('hidden');
+  });
+
   test('sneak start and end prerequisite checks read canonical override flags', async () => {
     const { SneakPreviewDialog } = await import(
       '../../../scripts/chat/dialogs/SneakPreviewDialog.js'

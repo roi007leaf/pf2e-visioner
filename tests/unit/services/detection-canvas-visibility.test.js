@@ -35,6 +35,30 @@ describe('canvas visibility wrapper', () => {
     global.canvas = originalCanvas;
   });
 
+  test('uses fast path for tokens unrelated to pending movement visibility work', () => {
+    const observer = createMockToken({ id: 'observer' });
+    const target = createMockToken({ id: 'target', visible: true });
+    global.canvas = {
+      ...global.canvas,
+      effects: {
+        get visionSources() {
+          throw new Error('pending movement wrapper should not inspect detection sources');
+        },
+        lightSources: new Map(),
+      },
+      tokens: {
+        get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+        placeables: [observer, target],
+      },
+    };
+    const wrapped = jest.fn(() => true);
+
+    setPendingTokenMovementPosition(observer.document, { x: 100, y: 0 }, [observer]);
+
+    expect(wrapCanvasVisibilityTest(wrapped, [{ x: 0, y: 0 }], { object: target })).toBe(true);
+    expect(wrapped).toHaveBeenCalledTimes(1);
+  });
+
   test('restores detection filter visuals when stale undetected movement rejects core visibility result', () => {
     const observer = createMockToken({
       id: 'observer',

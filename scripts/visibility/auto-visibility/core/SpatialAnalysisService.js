@@ -137,20 +137,17 @@ export class SpatialAnalysisService {
             metrics.raysCreated++;
 
             // Check for walls blocking line of sight
-            if (canvas.walls?.length > 0) {
+            if (this.#hasWallLayerEntries()) {
                 try {
-                    const wallsInBounds = canvas.walls.quadtree.getObjects(ray.bounds);
+                    const wallsInBounds = this.#getWallsInRayBounds(ray);
                     metrics.wallChecks += wallsInBounds.length;
 
                     // Check if any walls actually block the line
                     for (const wall of wallsInBounds) {
-                        // A wall is solid if it blocks movement (move > 0) and is not a door (door === 0 or door === null)
-                        const isSolidWall =
-                            wall.document.move > 0 && (wall.document.door === 0 || wall.document.door === null);
-
-                        if (isSolidWall) {
+                        if (this.#wallBlocksPositionVisibility(wall)) {
                             // This is a solid wall, check if it intersects our ray
-                            if (ray.intersectSegment(wall.coords)) {
+                            const coords = this.#getWallCoords(wall);
+                            if (coords && ray.intersectSegment(coords)) {
                                 return false; // Wall blocks line of sight
                             }
                         }
@@ -166,6 +163,42 @@ export class SpatialAnalysisService {
             // If we can't determine, assume they can see (conservative approach)
             return true;
         }
+    }
+
+    #hasWallLayerEntries() {
+        return (
+            (canvas.walls?.placeables?.length ?? 0) > 0 ||
+            (canvas.walls?.objects?.children?.length ?? 0) > 0 ||
+            Number(canvas.walls?.length || 0) > 0
+        );
+    }
+
+    #getWallsInRayBounds(ray) {
+        return (
+            canvas.walls?.quadtree?.getObjects?.(ray.bounds) ||
+            canvas.walls?.placeables ||
+            canvas.walls?.objects?.children ||
+            []
+        );
+    }
+
+    #wallBlocksPositionVisibility(wall) {
+        const document = wall?.document;
+        if (!document) return false;
+        const doorType = document.door;
+        if (!(doorType === 0 || doorType === null || doorType === undefined)) return false;
+        const move = Number(document.move ?? 0);
+        const sight = Number(document.sight ?? 0);
+        return move > 0 || sight > 0;
+    }
+
+    #getWallCoords(wall) {
+        if (Array.isArray(wall?.coords)) return wall.coords;
+        if (Array.isArray(wall?.document?.c)) return wall.document.c;
+        const { x, y, x2, y2 } = wall?.document || {};
+        return [x, y, x2, y2].every((value) => Number.isFinite(Number(value)))
+            ? [Number(x), Number(y), Number(x2), Number(y2)]
+            : null;
     }
 
     /**
@@ -395,11 +428,10 @@ export class SpatialAnalysisService {
 
             if (!lightConfig) return false;
 
-            // Token emits light if:
-            // 1. Light is enabled AND
-            // 2. Has a bright radius > 0 OR dim radius > 0
-            return lightConfig.enabled === true &&
-                (lightConfig.bright > 0 || lightConfig.dim > 0);
+            if (lightConfig.enabled === false) return false;
+            return Number(lightConfig.bright || 0) > 0 ||
+                Number(lightConfig.dim || 0) > 0 ||
+                Number(lightConfig.range || 0) > 0;
         } catch (error) {
             console.warn('PF2E Visioner | Error checking token light emission:', error);
             return false;

@@ -262,6 +262,8 @@ export class ConditionManager {
         // Invisibility was added - record current visibility states and clear established states
         await this.#recordVisibilityBeforeInvisibility(token);
       } else {
+        await this.#syncActiveOverrideVisibilityAfterInvisibility(token);
+
         // Invisibility was removed - clear established states to allow normal visibility calculation
         await this.clearEstablishedInvisibleStates(token);
 
@@ -369,7 +371,81 @@ export class ConditionManager {
     // Set the flags on the token
     if (Object.keys(invisibilityFlags).length > 0) {
       await token.document.setFlag('pf2e-visioner', 'invisibility', invisibilityFlags);
+      await this.#syncInvisibilityTransitionVisibility(token, invisibilityFlags);
       this.#scheduleInvisibilityFlagPersistence(token, invisibilityFlags);
+    }
+  }
+
+  async #syncInvisibilityTransitionVisibility(token, invisibilityFlags = {}) {
+    const syncVisibility = await this.#createVisibilitySyncWriter();
+    if (!syncVisibility) return;
+
+    const getOverrideVisibility = await this.#createOverrideVisibilityReader();
+    const writes = [];
+
+    for (const otherToken of canvas.tokens.placeables) {
+      if (otherToken === token || !this.#canWriteVisibilityForToken(otherToken)) continue;
+
+      const observerId = otherToken.document.id;
+      const previousState = invisibilityFlags?.[observerId]?.previousState;
+      const overrideState = getOverrideVisibility(otherToken, token);
+      const nextState = this.#transitionPreviousStateForInvisibility(previousState) || overrideState;
+      if (!nextState) continue;
+
+      writes.push(
+        syncVisibility(otherToken, token, nextState, {
+          isAutomatic: true,
+          source: 'invisibility_condition',
+        }),
+      );
+    }
+
+    await Promise.all(writes);
+  }
+
+  async #syncActiveOverrideVisibilityAfterInvisibility(token) {
+    const syncVisibility = await this.#createVisibilitySyncWriter();
+    if (!syncVisibility) return;
+
+    const getOverrideVisibility = await this.#createOverrideVisibilityReader({
+      applyInvisibilityTransition: false,
+    });
+    const writes = [];
+
+    for (const otherToken of canvas.tokens.placeables) {
+      if (otherToken === token || !this.#canWriteVisibilityForToken(otherToken)) continue;
+
+      const overrideState = getOverrideVisibility(otherToken, token);
+      if (!overrideState) continue;
+
+      writes.push(
+        syncVisibility(otherToken, token, overrideState, {
+          isAutomatic: true,
+          source: 'invisibility_condition_removed',
+        }),
+      );
+    }
+
+    await Promise.all(writes);
+  }
+
+  #canWriteVisibilityForToken(token) {
+    if (!token?.document?.id || !token.actor) return false;
+    if (this.#exclusionManager.isExcludedToken(token)) return false;
+    const document = token.document;
+    return typeof document.setFlag === 'function' || typeof document.update === 'function';
+  }
+
+  #transitionPreviousStateForInvisibility(previousState) {
+    switch (previousState) {
+      case 'observed':
+      case 'concealed':
+        return 'hidden';
+      case 'hidden':
+      case 'undetected':
+        return 'undetected';
+      default:
+        return null;
     }
   }
 
@@ -407,6 +483,38 @@ export class ConditionManager {
   }
 
   async #createInvisibilityVisibilityReader() {
+    const getOverrideVisibility = await this.#createOverrideVisibilityReader({
+      applyInvisibilityTransition: false,
+    });
+    const getStoredVisibility = await this.#createStoredVisibilityReader();
+
+    return (observer, target) => {
+      return getOverrideVisibility(observer, target) || getStoredVisibility(observer, target);
+    };
+  }
+
+  async #createOverrideVisibilityReader(options = {}) {
+    try {
+      const [{ OverrideService }, { OverrideBatchCache }] = await Promise.all([
+        import('./core/OverrideService.js'),
+        import('./core/OverrideBatchCache.js'),
+      ]);
+      const overrideCache = new OverrideBatchCache(new OverrideService(), {
+        applyInvisibilityTransition: options.applyInvisibilityTransition !== false,
+      });
+      return (observer, target) => {
+        const observerId = observer?.document?.id;
+        const targetId = target?.document?.id;
+        if (!observerId || !targetId) return null;
+        return overrideCache.getOverrideState(observerId, targetId, observer, target) || null;
+      };
+    } catch (error) {
+      console.error('PF2E Visioner | Failed to prepare invisibility override reader:', error);
+      return () => null;
+    }
+  }
+
+  async #createStoredVisibilityReader() {
     const api = game.modules.get('pf2e-visioner')?.api;
     if (typeof api?.getVisibility === 'function') {
       return (observer, target) => api.getVisibility(observer?.document?.id, target?.document?.id);
@@ -418,6 +526,20 @@ export class ConditionManager {
     } catch (error) {
       console.error('PF2E Visioner | Failed to prepare invisibility visibility reader:', error);
       return () => 'observed';
+    }
+  }
+
+  async #createVisibilitySyncWriter() {
+    try {
+      const { setVisibilityBetween } = await import('../../stores/visibility-map.js');
+      return (observer, target, state, options = {}) =>
+        setVisibilityBetween(observer, target, state, {
+          ...options,
+          skipCleanup: true,
+        });
+    } catch (error) {
+      console.error('PF2E Visioner | Failed to prepare invisibility visibility writer:', error);
+      return null;
     }
   }
 

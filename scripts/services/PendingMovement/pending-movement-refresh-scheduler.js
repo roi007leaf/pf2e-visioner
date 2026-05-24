@@ -1,23 +1,11 @@
 const PENDING_MOVEMENT_ANIMATION_REFRESH_DELAYS_MS = [
   16,
   33,
-  50,
   66,
-  75,
-  83,
-  90,
   100,
-  150,
   200,
-  250,
-  300,
   350,
-  400,
-  450,
   500,
-  550,
-  600,
-  650,
   800,
 ];
 const PENDING_MOVEMENT_LIGHT_ANIMATION_REFRESH_DELAYS_MS = [

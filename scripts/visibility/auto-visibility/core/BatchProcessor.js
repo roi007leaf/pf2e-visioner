@@ -103,14 +103,29 @@ function canSpecialSenseBypassLineOfSight(sense, target, distanceInFeet, isDeafe
 }
 
 function calculateSenseDistanceInFeet(observer, target, distanceInGridUnits) {
-  const gridDistance = Number(canvas?.scene?.grid?.distance ?? canvas?.dimensions?.distance ?? 5) || 5;
   if (typeof observer?.distanceTo === 'function') {
     try {
       const tokenDistance = Number(observer.distanceTo(target));
       if (Number.isFinite(tokenDistance)) return tokenDistance;
     } catch (_) {}
   }
+  return calculateApproximateSenseDistanceInFeet(distanceInGridUnits);
+}
+
+function calculateApproximateSenseDistanceInFeet(distanceInGridUnits) {
+  const gridDistance = Number(canvas?.scene?.grid?.distance ?? canvas?.dimensions?.distance ?? 5) || 5;
   return distanceInGridUnits * gridDistance;
+}
+
+function shouldUseExactSenseDistance(sensingSummary) {
+  const allSenses = [...(sensingSummary?.precise || []), ...(sensingSummary?.imprecise || [])];
+  if (allSenses.some((sense) => {
+    const senseType = normalizeSenseType(sense);
+    return senseType && !VISUAL_SENSE_TYPES.has(senseType);
+  })) {
+    return true;
+  }
+  return !!sensingSummary?.hearing;
 }
 
 function normalizeCacheKeyNumber(value) {
@@ -892,7 +907,10 @@ export class BatchProcessor {
     if (!sensingSummary) {
       return false;
     }
-    const distanceInFeet = calculateSenseDistanceInFeet(observer, target, distance);
+    const approximateDistanceInFeet = calculateApproximateSenseDistanceInFeet(distance);
+    const distanceInFeet = shouldUseExactSenseDistance(sensingSummary)
+      ? calculateSenseDistanceInFeet(observer, target, distance)
+      : approximateDistanceInFeet;
 
     const allSenses = [...(sensingSummary.precise || []), ...(sensingSummary.imprecise || [])];
     const hasSpecialSense = allSenses.some((sense) =>
@@ -921,7 +939,10 @@ export class BatchProcessor {
       sensingSummary.hearing || (isDeafened ? null : { range: implicitHearingRange ?? Infinity });
     if (hearing && hearing.range) {
       const hearingRange = applyActiveSceneHearingRangeLimit(hearing.range ?? Infinity) ?? Infinity;
-      if (hearingRange > 0 && distanceInFeet <= hearingRange) {
+      const hearingDistanceInFeet = sensingSummary.hearing
+        ? distanceInFeet
+        : approximateDistanceInFeet;
+      if (hearingRange > 0 && hearingDistanceInFeet <= hearingRange) {
         return true;
       }
     }
