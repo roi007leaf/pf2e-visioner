@@ -4772,6 +4772,8 @@ describe('pending token movement hidden detection guard', () => {
       },
     };
 
+    expect(currentPendingMovementSightLineSeesTarget(observer, target)).toBe(false);
+
     primePendingControlledTokenDragIntent(observer);
     jest.advanceTimersByTime(500);
 
