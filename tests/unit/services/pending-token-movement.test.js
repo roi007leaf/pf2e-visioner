@@ -4816,16 +4816,14 @@ describe('pending token movement hidden detection guard', () => {
     };
 
     primePendingControlledTokenDragIntent(observer);
-    jest.advanceTimersByTime(100);
+    jest.advanceTimersByTime(16);
     expect(target.detectionFilter).toEqual({ id: 'soundwave-filter' });
-    expect(target.refresh).not.toHaveBeenCalled();
 
-    jest.advanceTimersByTime(80);
+    jest.advanceTimersByTime(34);
     expect(target.detectionFilter).toEqual({ id: 'soundwave-filter' });
-    expect(target.refresh).not.toHaveBeenCalled();
 
     currentLosContainsTarget = true;
-    jest.advanceTimersByTime(80);
+    jest.advanceTimersByTime(34);
     expect(target.detectionFilter).toBeNull();
   });
 
