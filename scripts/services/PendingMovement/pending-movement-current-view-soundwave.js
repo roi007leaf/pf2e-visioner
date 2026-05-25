@@ -263,6 +263,7 @@ export function createPendingMovementCurrentViewSoundwaveController({
   function clearPredictedObservedTransitionVisuals(token) {
     if (!token?.document?.id) return false;
 
+    console.log('[DEBUG-pv-los-clear]', tokenIdOf(token));
     restorePendingMovementTokenRendering(token, { ignoreObservedGrace: true });
     clearDetectionFilterVisuals(token);
     suppressPendingMovementDetectionFilterVisualsForObservedTransition(token);
