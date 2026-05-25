@@ -260,10 +260,19 @@ export function createPendingMovementCurrentViewSoundwaveController({
     return false;
   }
 
+  function observedSoundwaveShouldWaitForCore(target) {
+    for (const observer of getCurrentViewObservers()) {
+      const visibilityState = getPendingMovementVisibilityState(observer, target);
+      if (!isStoredObservedState(visibilityState)) continue;
+      if (currentViewObservedDetectionShouldYieldToCore(observer, target)) return true;
+    }
+    return false;
+  }
+
   function clearPredictedObservedTransitionVisuals(token) {
     if (!token?.document?.id) return false;
+    if (observedSoundwaveShouldWaitForCore(token)) return false;
 
-    console.log('[DEBUG-pv-los-clear]', tokenIdOf(token));
     restorePendingMovementTokenRendering(token, { ignoreObservedGrace: true });
     clearDetectionFilterVisuals(token);
     suppressPendingMovementDetectionFilterVisualsForObservedTransition(token);
@@ -366,6 +375,7 @@ export function createPendingMovementCurrentViewSoundwaveController({
     hasObservedHiddenSoundwaveGraceContexts,
     hasObservedTransitionDetectionFilterSuppression,
     hasPendingControlledTokenDragIntentForCurrentView,
+    observedSoundwaveShouldWaitForCore,
     rememberObservedHiddenSoundwaveGraceForCompletingMovement,
     predictedObservedMovementReachedDestination,
     pruneExpiredObservedHiddenSoundwaveGraceContexts,

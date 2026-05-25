@@ -189,7 +189,7 @@ describe('detection wrapper module ownership', () => {
     expect(renderingSource).toContain('SUPPRESSED_DETECTION_FILTER_RENDER_FILTER');
     expect(renderingSource).toContain('suppressDetectionFilterProperty');
     expect(renderingSource).toContain('preserveDetectionFilterProperty');
-    expect(renderingSource).toContain('isOutlineOverlayDetectionFilter');
+    expect(renderingSource).not.toContain('isOutlineOverlayDetectionFilter');
     expect(pendingSource).toContain("from './pending-movement-detection-filter-rendering.js'");
     expect(pendingSource).not.toContain('const SUPPRESSED_DETECTION_FILTER_RENDER_FILTER');
     expect(pendingSource).not.toContain('function suppressDetectionFilterProperty');

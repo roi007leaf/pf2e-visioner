@@ -215,6 +215,7 @@ const {
   hasObservedHiddenSoundwaveGraceContexts,
   hasObservedTransitionDetectionFilterSuppression,
   hasPendingControlledTokenDragIntentForCurrentView,
+  observedSoundwaveShouldWaitForCore,
   rememberObservedHiddenSoundwaveGraceForCompletingMovement,
   predictedObservedMovementReachedDestination,
   pruneExpiredObservedHiddenSoundwaveGraceContexts,
@@ -233,6 +234,7 @@ const pendingDetectionFilterRenderingController =
     getObservedDetectionFilterSuppressionContext,
     getVisibleCoreGraceContextForTarget,
     hasObservedTransitionDetectionFilterSuppression,
+    observedSoundwaveShouldWaitForCore,
     restorePendingMovementDetectionFilterVisualState,
     shouldAllowCoreHiddenSoundwaveForCurrentView,
     shouldPreserveHiddenSoundwaveForCurrentView,
@@ -271,12 +273,6 @@ export function shouldPrimePendingMovementDetectionFilterVisuals(token, options)
 export function shouldStabilizeHiddenDetectionFilterAnimation(token) {
   return pendingDetectionFilterRenderingController.shouldStabilizeHiddenDetectionFilterAnimation(
     token,
-  );
-}
-
-export function shouldApplyDetectionFilterPrimaryMeshTint(token) {
-  return withPendingMovementDecisionCache(() =>
-    pendingDetectionFilterRenderingController.shouldApplyDetectionFilterPrimaryMeshTint(token),
   );
 }
 
@@ -478,7 +474,10 @@ function isControlledTokenDragActive(tokenOrDoc) {
   return token.controlled === true || isControlledTokenDocument(token);
 }
 
-function controlledTokenDragIntentRefreshTargetIds(tokenId) {
+function controlledTokenDragIntentRefreshTargetIds(
+  tokenId,
+  { includeRenderHiddenTargets = false } = {},
+) {
   const observer = tokenObjectForId(tokenId);
   return (canvas?.tokens?.placeables || [])
     .filter((token) => {
@@ -486,12 +485,14 @@ function controlledTokenDragIntentRefreshTargetIds(tokenId) {
       if (!targetId || targetId === tokenId) return false;
       if (!observer) return true;
       const storedState = getStoredVisibilityState(observer, token);
-      if (RENDER_HIDDEN_FROM_OBSERVER_STATES.has(storedState)) return false;
-      if (
-        CORE_LOS_TRANSITION_REFRESH_STATES.has(storedState) &&
-        !tokenHasDetectionFilterVisual(token)
-      ) {
-        return !currentPendingMovementSightLineSeesTarget(observer, token);
+      if (RENDER_HIDDEN_FROM_OBSERVER_STATES.has(storedState)) {
+        return includeRenderHiddenTargets || isControlledTokenDragActive(observer);
+      }
+      if (CORE_LOS_TRANSITION_REFRESH_STATES.has(storedState)) {
+        const currentSightSeesTarget = currentPendingMovementSightLineSeesTarget(observer, token);
+        return tokenHasDetectionFilterVisual(token)
+          ? currentSightSeesTarget
+          : !currentSightSeesTarget;
       }
       return true;
     })
@@ -511,6 +512,28 @@ export function primePendingControlledTokenDragIntent(tokenOrDoc, options = {}) 
     ...pendingControlledTokenDragIntentAdapter,
     ...options,
   });
+}
+
+export function refreshPendingControlledTokenDragIntent(tokenOrDoc, options = {}) {
+  if (!hasPendingControlledTokenDragIntent(tokenOrDoc)) return false;
+
+  const tokenId = tokenIdOf(tokenOrDoc);
+  if (!tokenId) return false;
+
+  const { includeRenderHiddenTargets = false, ...refreshOptions } = options;
+  const targetTokenIds = controlledTokenDragIntentRefreshTargetIds(tokenId, {
+    includeRenderHiddenTargets,
+  });
+  if (!targetTokenIds.length) return false;
+
+  refreshPendingMovementTokenVisibility([tokenId], {
+    ignoreObservedGrace: true,
+    skipPerceptionRefresh: true,
+    source: 'controlled-drag-pointer-move',
+    targetTokenIds,
+    ...refreshOptions,
+  });
+  return true;
 }
 
 export function releasePendingControlledTokenDragIntent(tokenOrDoc = null, options = {}) {
@@ -653,10 +676,6 @@ function sourceContainsAnyTargetPoint(source, targetPoints) {
   );
 }
 
-function observerIsBlinded(observer) {
-  return actorHasConditionSlug(actorOf(observer), 'blinded');
-}
-
 function sightSourceObserverHasActiveMovement(observer, target) {
   const observerId = tokenIdOf(observer);
   if (!observerId) return false;
@@ -667,7 +686,7 @@ function sightSourceObserverHasActiveMovement(observer, target) {
 
 function currentPendingMovementSightLineSeesTargetUncached(observer, target) {
   if (!observer || !target?.document?.id) return false;
-  if (observerIsBlinded(observer)) return false;
+  if (!observerHasUsableSight(observer)) return false;
 
   const targetPoints = visibilityTestPointsForPendingTarget(target);
   if (!targetPoints.length) return false;
@@ -692,9 +711,6 @@ function currentPendingMovementSightLineSeesTargetUncached(observer, target) {
     }
     if (!sightSourceObserverHasActiveMovement(observer, target)) return false;
   }
-
-  if (!observerHasUsableSight(observer)) return false;
-
   const originPoint = centerForToken(observer);
   if (!originPoint) return false;
 
@@ -846,7 +862,7 @@ function currentSightLineSeesHiddenTargetDuringPendingMovement(
   ]) {
     if (!source?.active || !source.object) continue;
     const observer = source.object;
-    if (observerIsBlinded(observer)) continue;
+    if (!observerHasUsableSight(observer)) continue;
     if (tokenIdOf(observer) === tokenIdOf(target)) continue;
     if (
       !sightSourceObserverHasActiveMovement(observer, target) &&
@@ -933,11 +949,32 @@ function hasActiveControlledMovementPreview(observer, target) {
   );
 }
 
+function activePreviewCanRevealStoredUndetectedTarget(observer, target, storedVisibilityState) {
+  if (storedVisibilityState !== 'undetected') return false;
+  if (invisibleUndetectedRenderLockMustStayLocked(target, storedVisibilityState)) return false;
+  if (!hasActiveControlledMovementPreview(observer, target)) return false;
+  if (
+    hasPendingMovementEntryForPair(observer, target) &&
+    !isControlledTokenDragActive(observer) &&
+    !isControlledTokenDragActive(target)
+  ) {
+    return false;
+  }
+  return currentPendingMovementSightLineSeesTarget(observer, target);
+}
+
 function getPendingMovementVisibilityState(observer, target) {
   const predictedFinalState = getPredictedFinalVisibilityState(observer, target);
   const coreOwnedMovement = hasCoreOwnedPendingMovement(observer, target);
   if (coreOwnedMovement) {
+    const storedVisibilityState = getStoredVisibilityState(observer, target);
+    if (activePreviewCanRevealStoredUndetectedTarget(observer, target, storedVisibilityState)) {
+      return 'observed';
+    }
     if (predictedFinalState) return predictedFinalState;
+    if (RENDER_HIDDEN_FROM_OBSERVER_STATES.has(storedVisibilityState)) {
+      return storedVisibilityState;
+    }
     if (
       hasActiveControlledMovementPreview(observer, target) &&
       !hasPendingMovementEntryForPair(observer, target)
@@ -953,6 +990,10 @@ function visionerStateHidesTargetRendering(visibilityState) {
   if (!RENDER_HIDDEN_FROM_OBSERVER_STATES.has(visibilityState)) return false;
 
   return true;
+}
+
+function invisibleUndetectedRenderLockMustStayLocked(target, visibilityState) {
+  return visibilityState === 'undetected' && actorHasConditionSlug(actorOf(target), 'invisible');
 }
 
 function shouldKeepVisionerRenderLockDuringPendingMovement(observer, target) {
@@ -1001,9 +1042,12 @@ function getAnimationRefreshTargetIdsForMovement(tokenId) {
 }
 
 function shouldUseFullAnimationRefreshCadence(tokenId) {
+  const entry = pendingTokenMovementPositions.get(tokenId);
+  const observer = tokenObjectForId(tokenId) || entry?.tokenDoc || null;
   for (const targetId of getAnimationRefreshTargetIdsForMovement(tokenId)) {
     const target = tokenObjectForId(targetId);
     if (!target) continue;
+    if (observer && getStoredVisibilityState(observer, target) === 'hidden') return true;
     if (isPendingMovementRenderLocked(target)) return true;
     if (tokenHasDetectionFilterVisual(target)) return true;
     if (tokenHasDetectionFilterMeshVisual(target)) return true;
@@ -1142,6 +1186,28 @@ function hasDetectionBlockingStoredVisibilityStateForToken(token) {
   return false;
 }
 
+function hasHiddenStoredVisibilityStateForToken(token) {
+  if (!token?.document?.id) return false;
+  for (const observer of pendingMovementObserverCandidates()) {
+    if (tokenIdOf(observer) === token.document.id) continue;
+    if (getStoredVisibilityState(observer, token) === 'hidden') return true;
+  }
+  return false;
+}
+
+function forceDetectionFilterMeshVisible(token) {
+  const detectionFilterMesh = token?.detectionFilterMesh;
+  if (!detectionFilterMesh) return false;
+  try {
+    if ('visible' in detectionFilterMesh) detectionFilterMesh.visible = true;
+    if ('renderable' in detectionFilterMesh) detectionFilterMesh.renderable = true;
+    if ('alpha' in detectionFilterMesh) detectionFilterMesh.alpha = 1;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function computeShouldHandlePendingMovementCanvasVisibilityForToken(token) {
   const tokenId = tokenIdOf(token);
   if (!tokenId) return false;
@@ -1218,7 +1284,11 @@ export function getPendingMovementHiddenStateContext(target) {
   const targetId = tokenIdOf(target);
   if (!targetId) return null;
 
-  const signature = pendingMovementEntriesSignature();
+  const signature = [
+    pendingMovementEntriesSignature(),
+    storedVisibilitySignatureForToken(target),
+    currentSightLineSignatureForToken(target),
+  ].join('||');
   const cache = cachedMapForPendingMovementSignature(
     pendingMovementHiddenStateContextCache,
     signature,
@@ -1248,6 +1318,7 @@ export function shouldBypassPendingMovementVisionerRenderState(observer, target,
 
 function shouldProbeCoreVisibilityForRenderHiddenPendingState(observer, target, visibilityState) {
   if (!RENDER_HIDDEN_FROM_OBSERVER_STATES.has(visibilityState)) return false;
+  if (invisibleUndetectedRenderLockMustStayLocked(target, visibilityState)) return false;
   if (!hasCommittedCoreOwnedPendingMovement(observer, target)) return false;
 
   const predictedFinalState = getPredictedFinalVisibilityState(observer, target);
@@ -1687,6 +1758,7 @@ function getCoreVisibleGraceContext(observer, target, visibilityState) {
 }
 
 function coreVisibleGraceCanBypassHiddenState(observer, target, visibilityState) {
+  if (invisibleUndetectedRenderLockMustStayLocked(target, visibilityState)) return false;
   const context = getCoreVisibleGraceContext(observer, target, visibilityState);
   if (!context) return false;
   if (!pendingHiddenTargetIsVisibleFromCurrentSources(target, context)) return false;
@@ -1705,6 +1777,7 @@ function rememberCoreVisibleGraceForCoreOwnedPendingObservers(target) {
 
     const storedState = getStoredVisibilityState(observer, target);
     if (!RENDER_HIDDEN_FROM_OBSERVER_STATES.has(storedState)) continue;
+    if (invisibleUndetectedRenderLockMustStayLocked(target, storedState)) continue;
 
     const predictedState = getPredictedFinalVisibilityState(observer, target);
     if (predictedState && RENDER_HIDDEN_FROM_OBSERVER_STATES.has(predictedState)) continue;
@@ -2093,6 +2166,9 @@ function shouldSkipForcedInvisibleTokenRefresh(token) {
   const context = state.lastHiddenContext || getRememberedHiddenForceContext(token);
   if (context?.awaitingDetectionFilter) return false;
   if (tokenHasDetectionFilterVisual(token)) return false;
+  if (invisibleUndetectedRenderLockMustStayLocked(token, context?.visibilityState)) {
+    return token.visible === false && token.renderable === false && meshIsForcedInvisible(token.mesh);
+  }
   if (!context?.foundryHidden) {
     const observer = tokenObjectForId(context?.observerId);
     const visibilityState = observer ? getPendingMovementVisibilityState(observer, token) : null;
@@ -2404,6 +2480,20 @@ export function shouldUseCoreDetectionDuringPendingMovement(observer, target) {
   if (!hasCoreOwnedPendingMovement(observer, target)) return false;
 
   const storedVisibilityState = getStoredVisibilityState(observer, target);
+  if (invisibleUndetectedRenderLockMustStayLocked(target, storedVisibilityState)) return false;
+  if (
+    RENDER_HIDDEN_FROM_OBSERVER_STATES.has(storedVisibilityState) &&
+    hasActiveControlledMovementPreview(observer, target)
+  ) {
+    const previewCanReveal = activePreviewCanRevealStoredUndetectedTarget(
+      observer,
+      target,
+      storedVisibilityState,
+    );
+    if (previewCanReveal || !hasPendingMovementEntryForPair(observer, target)) {
+      return previewCanReveal;
+    }
+  }
   const predictedFinalState = getPredictedFinalVisibilityState(observer, target);
   const storedRenderHidden = RENDER_HIDDEN_FROM_OBSERVER_STATES.has(storedVisibilityState);
   if (predictedFinalState) {
@@ -3242,7 +3332,13 @@ function refreshPendingMovementTokenVisibilityUncached(
                 detectionFilterState &&
                 token.detectionFilter &&
                 token.detectionFilter !== detectionFilterState.detectionFilter;
-              if (!nativeRecomputedDetectionFilter) {
+              const keepPrimedDetectionFilterMesh =
+                token.detectionFilter &&
+                token.detectionFilterMesh &&
+                hasHiddenStoredVisibilityStateForToken(token);
+              if (keepPrimedDetectionFilterMesh) {
+                forceDetectionFilterMeshVisible(token);
+              } else if (!nativeRecomputedDetectionFilter) {
                 restorePendingMovementDetectionFilterState(token, detectionFilterState);
               }
             }

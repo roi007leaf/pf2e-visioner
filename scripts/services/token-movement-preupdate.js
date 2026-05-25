@@ -1,4 +1,6 @@
 import {
+  getPendingMovementRefreshTargetIds,
+  refreshPendingMovementTokenVisibility,
   setPendingTokenMovementPosition,
 } from './PendingMovement/pending-token-movement.js';
 
@@ -84,6 +86,8 @@ export function handlePreUpdateTokenMovement(
     notifyWarn = notifyDefaultWarn,
     getControlledTokens = getDefaultControlledTokens,
     setPendingTokenMovementPosition: recordPendingMovement = setPendingTokenMovementPosition,
+    getPendingMovementRefreshTargetIds: getRefreshTargetIds = getPendingMovementRefreshTargetIds,
+    refreshPendingMovementTokenVisibility: refreshPendingMovement = refreshPendingMovementTokenVisibility,
     getConditionManager = getDefaultConditionManager,
     isCurrentUserGm = isDefaultCurrentUserGm,
   } = {},
@@ -100,11 +104,21 @@ export function handlePreUpdateTokenMovement(
     return false;
   }
 
-  recordPendingMovement(tokenDoc, changes, getControlledTokens(), {
+  const movementRecorded = recordPendingMovement(tokenDoc, changes, getControlledTokens(), {
     userId,
     hookOptions: options,
     predictFinalVisibility: true,
   });
+
+  if (movementRecorded) {
+    const movingTokenId = tokenDoc?.id;
+    const targetTokenIds = getRefreshTargetIds?.(movingTokenId) ?? [];
+    refreshPendingMovement?.(movingTokenId ? [movingTokenId] : [], {
+      skipPerceptionRefresh: true,
+      source: 'pre-update-token-movement',
+      ...(targetTokenIds.length ? { targetTokenIds } : {}),
+    });
+  }
 
   if (isCurrentUserGm()) {
     clearEstablishedInvisibleStatesForMovement(tokenDoc?.object, getConditionManager);

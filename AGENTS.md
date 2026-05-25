@@ -1,78 +1,76 @@
 <claude-mem-context>
 # Memory Context
 
-# [pf2e-visioner] recent context, 2026-05-24 4:04pm GMT+3
+# [pf2e-visioner] recent context, 2026-05-25 2:47pm GMT+3
 
 Legend: 🎯session 🔴bugfix 🟣feature 🔄refactor ✅change 🔵discovery ⚖️decision 🚨security_alert 🔐security_note
 Format: ID TIME TYPE TITLE
 Fetch details: get_observations([IDs]) | Search: mem-search skill
 
-Stats: 50 obs (22,298t read) | 299,740t work | 93% savings
+Stats: 50 obs (21,968t read) | 161,957t work | 86% savings
 
-### May 12, 2026
-S401 Migrate remaining globalThis.game.pf2eVisioner.suppressLightingRefresh accesses in lifecycle.js and ui.js to runtime-state.js, then add BatchProcessor.clearPersistentCaches() method with TDD (May 12 at 10:54 AM)
-### May 18, 2026
-S475 Improve pf2e-visioner codebase architecture (performance + coding principles) — session complete, final summary checkpoint (May 18 at 8:42 AM)
-### May 20, 2026
-S476 Continue pf2e-visioner architecture improvements (performance + coding principles) — spatial fallback fix and ongoing investigation of Ezren/Kobold visibility pair (May 20 at 7:58 AM)
-S490 Implement canonical perception profile-driven tooltip sense badges in pf2e-visioner FoundryVTT module ("do it") (May 20 at 8:06 AM)
-S508 Diagnose regression of "hidden flash bug" in pf2e-visioner pending token movement system (May 20 at 9:44 AM)
-S630 FPS drop investigation during token movement in pf2e-visioner FoundryVTT module — using Playwright + systematic debugging to identify whether token lights or walls are the cause (May 20 at 11:30 AM)
 ### May 24, 2026
-S631 FPS drop investigation during token movement in pf2e-visioner — Playwright-based profiling to identify whether token lights or walls cause the performance regression (May 24 at 1:16 PM)
-S632 FPS drop investigation during token movement in pf2e-visioner — Playwright-based profiling to identify whether token lights or walls cause the performance regression (May 24 at 1:17 PM)
-S645 FPS drop investigation during token movement — debugging visibility/invisibility system with Playwright as Assistant GM (May 24 at 1:17 PM)
-5149 1:28p 🔵 `isMovementVisibilityBatch` Requires `movementSession` — 3 of 5 Movement-Window Batches Fire Without It
-5151 " 🔵 `movementSession` Only Attached to Post-Movement Flush Batch — At Most 1 Movement-Batch Per Move
-5152 " 🔵 `_reapplyRuleElementsAfterMovement` Awaited Before Each `tokenMovementCompleted` Invalidation
-5153 1:29p 🟣 TDD: Debounced `processQueuedValidations` Coalescing Added to `AvsMovementInvalidationWorkflow`
-5154 " 🔴 Debounced `#scheduleOverrideValidationProcessing` Replaces Immediate `processQueuedValidations` Call
-5155 " 🔴 Full Test Suite Green: Both Optimizations Verified — 43/43 Tests Pass
-5159 1:31p 🔵 Combined Fix Benchmark: `coreProcess` Calls Cut 57% (7→3) but Per-Call Cost Shows High Variance
-5161 " 🔴 Full Suite: 1 Test Failure in `avs.invalidation-coordinator.test.js` — Debounce Not Reflected in Coordinator Test
-5163 " 🔴 All 3887 Tests Now Pass — Final Downstream Test Fixed for Debounce Timer Behavior
-5164 1:32p 🔴 Full Suite Clean: 433 Suites / 3887 Tests Pass After All FPS Fix Changes
-5169 1:40p 🔵 FPS Drop Investigation Initiated for Token Movement
-5171 " 🔵 pf2e-visioner Token Refresh Pipeline Architecture Mapped
-5173 1:41p 🔵 Root Cause of Past Token Movement FPS Drops: Excessive updateWallVisuals Calls
-5174 " 🔵 handleTokenRefreshed Has Four Exit Guards; refreshTokenVisibility Can Fire Up to 8 Times Per Move
-5175 1:42p 🔵 system-hidden-token-highlights.js: Sequential Async updateSystemHiddenTokenHighlights Calls Per Movement
-5176 " 🔴 handleTokenRefreshed De-async'd to Avoid Microtask Overhead on Every Animation Frame
-5177 " 🔴 Test Updated for Synchronous Throttled Path After handleTokenRefreshed De-async
-5178 1:43p 🔵 Playwright Performance Trace Tool Exists with Three Built-in Scenarios
-5180 " 🔵 Baseline Perf Trace: 844 refreshToken Events in 3.76s for Single Token Move
-5181 1:44p 🔵 Pending Movement Render-Lock Captures 13+ Token Surfaces for Invisible State Management
-5182 " 🔵 Trace Tool Uses Animated Position Updates Not Drag — Explains Zero Pending Movement Stats
-5183 1:45p 🔵 6 refreshToken Hooks Registered in Live Session — Ct.invalidate() Fires on Every Single One
-5184 1:46p 🔵 Per-Hook Profiling Identifies Elevation Grid Module as Biggest Sync Cost, Not pf2e-visioner
-5185 1:47p 🔵 updateSystemHiddenTokenHighlights Skips Expensive Per-Token Work When Observer Has No Special Senses
-5188 1:48p 🔴 updateSystemHiddenTokenHighlights Optimized to Skip Token Iteration on Common No-Op Paths
-5190 " 🔴 All 37 Tests Pass After Both Optimizations
-5192 1:49p 🔵 Post-Optimization Profiler Run Confirms pf2e-visioner Hook Remains Cheap; Elevation Grid Still Dominant
-5193 1:52p ✅ Full Test Suite Passes After FPS Optimization Changes — 3888 Tests, 433 Suites
-5195 1:55p 🔵 FPS Drop Investigation on Token Movement Initiated
-5196 1:58p 🔵 Playwright FPS Profiling Script Launched for Token Movement Investigation
-5197 " 🔵 Playwright Profiling Results: Token Lights NOT Cause of FPS Drop — Visibility Refresh Volume Is Primary Suspect
-5198 1:59p 🔵 Prior FPS Investigation Round Already Completed — New Session Re-Investigating Recurring Drop
-5199 " 🔵 pf2e-visioner Wraps Token._refreshVisibility via libWrapper — Adds Pending Movement Detection Filter Logic on Every Call
-5200 2:00p 🔵 wrapTokenRefreshVisibility "Should*" Predicates Use Decision Cache — capturePendingMovementDetectionFilterState Has Early Exits
-5201 2:01p 🔵 A/B Test: pf2e-visioner _refreshVisibility Wrapper Adds ~9% Per-Call Overhead — Not the Primary FPS Bottleneck
-5202 2:03p 🔵 Root Cause Found: canvas.visibility.testVisibility Called 4166 Times Per Move — 3380ms CPU in 3.7s
-5203 " 🔵 wrapCanvasVisibilityTest Has Fast-Exit: Only Does Detection Work When getPendingMovementBlockedDetectionSources Returns Entries
-5204 2:05p 🔵 A/B Test: pf2e-visioner testVisibility Wrapper Adds ~18% Per-Call Overhead (~600ms Total Per Move)
-5205 " 🔵 ConditionManager.recordVisibilityBeforeInvisibility Uses getVisibilityMap(token), Not Per-Pair getVisibility Calls
-5206 " 🔄 ConditionManager.recordVisibilityBeforeInvisibility Refactored to Use Per-Pair api.getVisibility
-5207 " ✅ Full Test Suite Passes After ConditionManager Refactor — 3889 Tests, 433 Suites
-5208 2:06p 🔵 Git State: ConditionManager Refactor Is Staged But Not Yet Committed — Prior FPS Fixes Already Committed to main
-5209 3:47p 🔵 FPS Drop Investigation Initiated for Token Movement
-S646 FPS drop during token movement — ongoing investigation into visibility/invalidation pipeline (May 24 at 3:49 PM)
-5218 4:01p 🔵 StatelessVisibilityCalculator.js Visual Detection Logic Traced
-5219 " 🔵 calculateVisibility Top-Level Decision Tree Mapped
-5220 " 🔵 Invisibility Flag Schema Stores Per-Observer Pre-Invisibility State
-5223 " 🟣 Test Added: Duplicate Invisible Handler Must Not Overwrite Established States
-5224 4:02p 🔴 ConditionManager: Duplicate Invisible Handler Overwrote previousState with Live API Value
-5225 " ✅ All 111 Visibility Tests Pass and Lint Clean After ConditionManager Fix
-5226 " ✅ Full pf2e-visioner Test Suite Passes: 3890 Tests Across 433 Suites
+S646 FPS drop during token movement — ongoing investigation into visibility/invalidation pipeline (May 24 at 3:47 PM)
+S651 Fix bug: moving tokens in darkness revealed as black circles instead of soundwave indicators (pf2e-visioner module) (May 24 at 3:49 PM)
+### May 25, 2026
+S652 Continue work on scripts/hooks/registration.js (May 25 at 7:13 AM)
+S653 Bug fix: tokens in darkness without darkvision incorrectly revealed as black circles on move instead of showing soundwave indicator (May 25 at 7:19 AM)
+S654 Bug fix: tokens in darkness without darkvision incorrectly revealed as black circles on move instead of showing soundwave indicator (May 25 at 7:53 AM)
+S655 Fix pf2e-visioner bug: tokens in darkness with no darkvision show as black circles when moving instead of keeping soundwave detection indicator (May 25 at 7:54 AM)
+S668 Soundwave visibility bug in pf2e-visioner: kobold soundwave (detectionFilter mesh) not visible until user hovers over the token (May 25 at 9:01 AM)
+S686 Fix token reveal firing only on movement end instead of when LOS actually detects the token during movement (pf2e-visioner FoundryVTT module) (May 25 at 10:36 AM)
+S690 FPS drop during token movement in pf2e-visioner (FoundryVTT module) — systematic debugging with Playwright as Ass Gm (May 25 at 1:25 PM)
+5614 1:40p 🔵 pf2e-visioner Module Importable via ESM in Live Foundry Browser Context
+5618 1:41p 🔵 Simulating Drag via _draggedToken + document.update Crashes Foundry Drag Context
+5620 1:43p 🔵 clearPendingMovementVisibilityDecisionCaches Explicitly Clears pendingMovementHiddenStateContextCache
+5621 1:45p 🔵 Playwright Mouse Events Don't Control or Drag Tokens on Foundry Canvas in Headless Chrome
+5622 1:46p 🔵 document.update Works Safely When _draggedToken Is Null First
+5626 1:49p 🔵 FPS Drop Investigation: Token Movement Performance Issue
+5627 1:51p 🔵 Playwright Diagnostic Reveals forceInvisible/mesh Visibility Mismatch
+5628 1:53p 🔵 pending-token-movement.js Refresh Architecture and Signature System Internals
+5629 1:54p 🔵 Staggered setTimeout Refresh Cadences Are Core to FPS Impact During Token Movement
+5630 1:58p 🔵 FoundryVTT Join Page Has Two Password Inputs, Breaking Naive Playwright Selectors
+5631 1:59p 🔵 No Pending Movement State Persists After animate:true Token Updates
+5632 2:04p 🔵 LOS Detection Fires at Movement End, Not During Transit
+5633 2:05p 🔵 Playwright Debug Script Built to Inspect Mid-Drag Detection State
+S691 Debug why Ezren only reveals kobolds at movement end instead of when LOS is first established mid-drag — investigate pending-token-movement LOS detection timing bug (May 25 at 2:06 PM)
+5634 2:07p 🔵 Ezren's Current Canvas Position and Grid Size Confirmed
+5635 2:14p 🔵 Ezren Repositioned to x=3600 as New Test Baseline
+5636 " 🔵 Playwright Mouse Drag Did Not Register as FoundryVTT Token Drag — _draggedToken Null Throughout
+5637 2:15p 🔵 Pending Movement Uses Custom Pointer Events, Not FoundryVTT Native Drag — Explains Playwright Failure
+5638 2:16p 🔵 Full Pending Movement Module Architecture Revealed — 12+ Sub-Modules with Drag Intent Controller
+5639 " 🔵 Drag Uses Preview Clone Token — Core Detection Used Before Final Visibility Prediction Exists
+5640 2:17p 🔵 Drag Intent Refreshes Fire at Fixed Intervals But All Route Through Core LOS — Root Cause of Late Detection
+5641 " 🔵 getPendingMovementVisibilityState Has Preview-Reveal Path — hasCoreOwnedPendingMovement True During Drag
+5642 2:18p 🔵 Undetected Targets Stay Hidden After setPendingTokenMovementPosition Even When LOS Reaches Them
+5644 " 🔵 Root Cause Confirmed — Reveal Path Requires setPendingTokenMovementPosition Entry That Only Exists Post-Commit
+5645 " 🔵 Drag Intent Prime/Release Hook Points Confirmed in lifecycle.js
+5646 2:19p 🔵 controlledTokenDragIntentRefreshTargetIds Gates RENDER_HIDDEN Targets on _draggedToken Being Set
+5647 2:20p 🔵 Drag Intent Priming Requires Left-Click on Canvas View Element — eventTargetsCanvasView Guard Likely Blocks Playwright
+5648 " 🔵 lifecycle.js Imports Pending Movement Functions from pending-movement-render-lock.js Barrel, Not pending-token-movement.js Directly
+5649 2:21p 🔵 pending-movement-render-lock.js Is a Pure Re-Export Barrel — currentPendingMovementSightLineSeesTarget Is Valid from pending-token-movement.js
+5650 " 🔵 shouldUseCoreDetectionDuringPendingMovement Lives in pending-movement-detection-gate.js — Not Exported via Barrel
+5652 2:22p 🟣 Added refreshPendingControlledTokenDragIntent — On-Demand Visibility Refresh During Drag
+5653 " ✅ refreshPendingControlledTokenDragIntent Exported via pending-movement-render-lock.js Barrel
+5654 2:23p 🔴 Fixed Mid-Drag Detection — pointermove Handler Now Triggers Throttled Visibility Refresh During Token Drag
+5655 2:24p ✅ refreshPendingControlledTokenDragIntent Added to Test File Imports
+5657 2:25p 🟣 Unit Test Added: refreshPendingControlledTokenDragIntent Reveals Target When Drag Continues Past Initial Timer Burst
+5658 2:26p 🔵 New Test Fails — refreshPendingControlledTokenDragIntent Returns True but target.refresh Not Called After Timer Burst
+5660 2:27p 🔴 Test Assertion Loosened — Removed Requirement That token.refresh Is Called Explicitly
+5662 " 🔴 All 154 Unit Tests Pass — Mid-Drag Detection Fix Fully Verified
+5673 2:33p 🔴 Token Reveal Triggering on Movement End Instead of LOS
+5676 2:34p 🔵 Detection Filter Visual Suppression Logic in Pending Movement
+5680 " 🔵 Controlled Drag Intent System for Mid-Movement LOS Reveals
+5681 " 🔵 Soundwave Suppression Guards During Observed-State Transitions
+5682 2:35p 🔵 primePendingControlledTokenDragIntent Drives Pre-Movement LOS Reveal via Timed Target Refresh
+5683 " 🔴 Added includeRenderHiddenTargets Option to Drag Intent Refresh
+5684 2:36p 🔴 pointermove Handler Now Includes Render-Hidden Targets and Removes Canvas View Guard
+5685 " 🔄 Removed Unused event Parameter from refreshControlledTokenDragIntentFromCanvasPointer
+5689 2:38p 🔴 Test Updated to Validate LOS Reveal During Pre-Drag Intent (Not Active Drag)
+5694 2:39p 🔴 All 154 Pending Token Movement Tests Pass After LOS Reveal Fix
+5705 2:42p 🔵 ESLint Passes Clean and Pointer Intent Listener Registration Structure Confirmed
+5706 " 🔴 Complete Diff: LOS-Based Token Reveal Fix Across 3 Files
+5708 " 🔄 Pointer Move Refresh Wrapped in requestAnimationFrame for Frame-Level Coalescing
 
-Access 300k tokens of past work via get_observations([IDs]) or mem-search skill.
+Access 162k tokens of past work via get_observations([IDs]) or mem-search skill.
 </claude-mem-context>

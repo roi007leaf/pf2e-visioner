@@ -1,15 +1,5 @@
 const SUPPRESSED_DETECTION_FILTER_RENDER_FILTER = Object.freeze({ enabled: false });
 
-function isOutlineOverlayDetectionFilter(filter) {
-  return !!(
-    filter &&
-    (filter.constructor?.name === 'OutlineOverlayFilter' ||
-      (filter.uniforms &&
-        Object.prototype.hasOwnProperty.call(filter.uniforms, 'knockout') &&
-        Object.prototype.hasOwnProperty.call(filter.uniforms, 'wave')))
-  );
-}
-
 function suppressDetectionFilterProperty(token, { value = null } = {}) {
   if (!token) return null;
 
@@ -97,6 +87,7 @@ export function createPendingMovementDetectionFilterRenderingController({
   getObservedDetectionFilterSuppressionContext,
   getVisibleCoreGraceContextForTarget,
   hasObservedTransitionDetectionFilterSuppression,
+  observedSoundwaveShouldWaitForCore,
   restorePendingMovementDetectionFilterVisualState,
   shouldAllowCoreHiddenSoundwaveForCurrentView,
   shouldPreserveHiddenSoundwaveForCurrentView,
@@ -133,6 +124,7 @@ export function createPendingMovementDetectionFilterRenderingController({
     if (!token?.document?.id) return false;
     if (shouldPreserveHiddenSoundwaveForCurrentView?.(token)) return false;
     if (shouldAllowCoreHiddenSoundwaveForCurrentView?.(token)) return false;
+    if (observedSoundwaveShouldWaitForCore?.(token)) return false;
     if (hasObservedTransitionDetectionFilterSuppression?.(token)) return true;
     if (getVisibleCoreGraceContextForTarget?.(token)) return true;
     if (getCurrentSightLineGraceContextForTarget?.(token)) return true;
@@ -169,14 +161,6 @@ export function createPendingMovementDetectionFilterRenderingController({
   function shouldStabilizeHiddenDetectionFilterAnimation(token) {
     void token;
     return false;
-  }
-
-  function shouldApplyDetectionFilterPrimaryMeshTint(token) {
-    if (!token?.document?.id) return false;
-    return (
-      isOutlineOverlayDetectionFilter(token.detectionFilter) &&
-      !shouldSuppressPendingMovementDetectionFilterRender(token)
-    );
   }
 
   function withStableHiddenDetectionFilterAnimation(token, callback) {
@@ -256,7 +240,6 @@ export function createPendingMovementDetectionFilterRenderingController({
 
   return {
     primePendingMovementDetectionFilterVisuals,
-    shouldApplyDetectionFilterPrimaryMeshTint,
     shouldPreservePendingMovementDetectionFilterVisuals,
     shouldPrimePendingMovementDetectionFilterVisuals,
     shouldStabilizeHiddenDetectionFilterAnimation,

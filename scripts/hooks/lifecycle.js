@@ -11,6 +11,7 @@ import {
   getPendingMovementRefreshTargetIds,
   hasPendingMovementRenderWork,
   primePendingControlledTokenDragIntent,
+  refreshPendingControlledTokenDragIntent,
   refreshPendingMovementTokenVisibility,
   releasePendingControlledTokenDragIntent,
   restorePendingMovementTokenRendering,
@@ -36,6 +37,12 @@ const controlTokenSessionState = (globalThis.__pf2eVisionerControlTokenSessions 
 });
 const CONTROL_TOKEN_RECALC_DELAY_MS = 0;
 const NO_OBSERVER_VISIBILITY_REFRESH_DELAYS_MS = Object.freeze([0, 75, 250]);
+const CONTROLLED_DRAG_POINTER_MOVE_REFRESH_MS = 50;
+const controlledDragPointerMoveRefreshState = (globalThis.__pf2eVisionerDragPointerMoveRefresh ??= {
+  lastRefreshAt: 0,
+  refreshFrameId: null,
+  timeoutId: null,
+});
 const fallbackHudButtonState = (globalThis.__pf2eVisionerFallbackHudButton ??= {
   styleInstalled: false,
   documentListenersBound: false,
@@ -197,6 +204,50 @@ function primeControlledTokenDragIntentFromCanvasPointer(event) {
 
 function releaseControlledTokenDragIntentFromCanvasPointer() {
   releasePendingControlledTokenDragIntent();
+  controlledDragPointerMoveRefreshState.lastRefreshAt = 0;
+  if (controlledDragPointerMoveRefreshState.timeoutId) {
+    clearTimeout(controlledDragPointerMoveRefreshState.timeoutId);
+    controlledDragPointerMoveRefreshState.timeoutId = null;
+  }
+  controlledDragPointerMoveRefreshState.refreshFrameId = null;
+}
+
+function refreshControlledTokenDragIntentFromCanvasPointer() {
+  const controlledTokens = canvas?.tokens?.controlled || [];
+  if (!controlledTokens.length) return;
+
+  const refreshNow = () => {
+    controlledDragPointerMoveRefreshState.timeoutId = null;
+    controlledDragPointerMoveRefreshState.lastRefreshAt = Date.now();
+    if (controlledDragPointerMoveRefreshState.refreshFrameId) return;
+    const scheduleFrame =
+      typeof requestAnimationFrame === 'function'
+        ? requestAnimationFrame
+        : (callback) => setTimeout(callback, 0);
+    controlledDragPointerMoveRefreshState.refreshFrameId = scheduleFrame(() => {
+      controlledDragPointerMoveRefreshState.refreshFrameId = null;
+      const currentControlledTokens = canvas?.tokens?.controlled || controlledTokens;
+      if (!currentControlledTokens.length) return;
+      for (const token of currentControlledTokens) {
+        refreshPendingControlledTokenDragIntent(token, {
+          coalesceFrame: true,
+          includeRenderHiddenTargets: true,
+        });
+      }
+    });
+  };
+
+  const elapsedMs = Date.now() - controlledDragPointerMoveRefreshState.lastRefreshAt;
+  if (elapsedMs >= CONTROLLED_DRAG_POINTER_MOVE_REFRESH_MS) {
+    refreshNow();
+    return;
+  }
+
+  if (controlledDragPointerMoveRefreshState.timeoutId) return;
+  controlledDragPointerMoveRefreshState.timeoutId = setTimeout(
+    refreshNow,
+    CONTROLLED_DRAG_POINTER_MOVE_REFRESH_MS - elapsedMs,
+  );
 }
 
 function registerPendingMovementPointerIntentListeners() {
@@ -210,6 +261,12 @@ function registerPendingMovementPointerIntentListeners() {
     'pendingMovementControlledDragIntentPointerUp',
     'pointerup',
     releaseControlledTokenDragIntentFromCanvasPointer,
+    { capture: true },
+  );
+  bindWindowListenerOnce(
+    'pendingMovementControlledDragIntentPointerMove',
+    'pointermove',
+    refreshControlledTokenDragIntentFromCanvasPointer,
     { capture: true },
   );
   bindWindowListenerOnce(

@@ -3,7 +3,6 @@ import { createCanDetectVisibilityWrapper } from './detection-can-detect.js';
 import { wrapCanvasVisibilityTest } from './detection-canvas-visibility.js';
 import { wrapTokenRenderDetectionFilter } from './detection-filter-render.js';
 import { testDetectionModeVisibility } from './detection-mode-visibility.js';
-import { wrapPrimarySpriteMeshRender } from './detection-primary-mesh-render.js';
 import { wrapTokenRefreshVisibility } from './detection-token-refresh.js';
 import {
   wrapTokenDocumentPrepareBaseData,
@@ -86,16 +85,5 @@ function registerTokenDetectionWrappers(libWrapperAdapter, warn) {
     );
   } catch (error) {
     warn('[PF2E-Visioner] Failed to register Token wrapper:', error);
-  }
-
-  try {
-    libWrapperAdapter.register(
-      MODULE_ID,
-      'foundry.canvas.primary.PrimarySpriteMesh.prototype.render',
-      wrapPrimarySpriteMeshRender,
-      'WRAPPER',
-    );
-  } catch (error) {
-    warn('[PF2E-Visioner] Failed to register primary token mesh wrapper:', error);
   }
 }

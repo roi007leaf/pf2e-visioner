@@ -18,9 +18,22 @@ import {
   withSuppressedPendingMovementDetectionFilterVisuals,
 } from '../PendingMovement/pending-movement-render-lock.js';
 import {
+  clearDetectionFilterVisuals,
   tokenHasDetectionFilterMeshVisual,
   tokenHasDetectionFilterVisual,
 } from '../PendingMovement/pending-movement-detection-filter-visuals.js';
+
+function refreshThenRestorePendingInvisible(token, refreshWrapped) {
+  const result = refreshWrapped();
+  try {
+    if (shouldTemporarilyForceTokenInvisible(token)) {
+      forcePendingMovementTokenInvisible(token);
+    }
+  } catch {
+    /* keep Foundry visibility if guard fails */
+  }
+  return result;
+}
 
 export function wrapTokenRefreshVisibility(wrapped, ...args) {
   if (isPendingMovementCoreAnimationBypassActive()) {
@@ -48,7 +61,7 @@ export function wrapTokenRefreshVisibility(wrapped, ...args) {
     !handlesPendingMovementVisibility &&
     !hasDetectionFilterVisual
   ) {
-    return wrapped(...args);
+    return refreshThenRestorePendingInvisible(this, () => wrapped(...args));
   }
 
   const primeDetectionFilterVisuals =
@@ -59,17 +72,17 @@ export function wrapTokenRefreshVisibility(wrapped, ...args) {
     !primeDetectionFilterVisuals &&
     !handlesPendingMovementVisibility
   ) {
-    return wrapped(...args);
+    return refreshThenRestorePendingInvisible(this, () => wrapped(...args));
   }
 
   const suppressDetectionFilterVisuals = shouldSuppressPendingMovementDetectionFilterVisuals(this);
   const preserveDetectionFilterVisuals =
     !suppressDetectionFilterVisuals &&
     shouldPreservePendingMovementDetectionFilterVisuals(this);
+  const detectionFilterState = capturePendingMovementDetectionFilterState(this);
   if (primeDetectionFilterVisuals) {
     primePendingMovementDetectionFilterVisuals(this);
   }
-  const detectionFilterState = capturePendingMovementDetectionFilterState(this);
   const refreshWrapped = () =>
     coalescePerception
       ? withCoalescedPendingMovementPerceptionUpdates(() => wrapped(...args))
@@ -92,12 +105,20 @@ export function wrapTokenRefreshVisibility(wrapped, ...args) {
           detectionFilterState &&
           this.detectionFilter &&
           this.detectionFilter !== detectionFilterState.detectionFilter;
-        if (!nativeRecomputedDetectionFilter) {
+        const keepPrimedDetectionFilterMesh = primeDetectionFilterVisuals && this.detectionFilter;
+        if (keepPrimedDetectionFilterMesh) {
+          primePendingMovementDetectionFilterVisuals(this);
+        } else if (!nativeRecomputedDetectionFilter && detectionFilterState) {
           restorePendingMovementDetectionFilterState(this, detectionFilterState);
+        } else if (!nativeRecomputedDetectionFilter && primeDetectionFilterVisuals) {
+          clearDetectionFilterVisuals(this);
         }
-        if (primeDetectionFilterVisuals) {
+        if (nativeRecomputedDetectionFilter && this.detectionFilter) {
           primePendingMovementDetectionFilterVisuals(this);
         }
+      }
+      if (!this.detectionFilter && !this._pvHiddenEcho && tokenHasDetectionFilterMeshVisual(this)) {
+        clearDetectionFilterVisuals(this);
       }
     }
   } catch {
