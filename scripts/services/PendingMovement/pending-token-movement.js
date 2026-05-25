@@ -683,7 +683,14 @@ function currentPendingMovementSightLineSeesTargetUncached(observer, target) {
     ) {
       return true;
     }
-    return false;
+    if (
+      isControlledTokenDragActive(observer) &&
+      !hasActivePendingMovementForObserver(tokenIdOf(observer)) &&
+      !hasCoreOwnedPendingMovement(observer, target)
+    ) {
+      return false;
+    }
+    if (!sightSourceObserverHasActiveMovement(observer, target)) return false;
   }
 
   if (!observerHasUsableSight(observer)) return false;
