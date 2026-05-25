@@ -683,7 +683,7 @@ function currentPendingMovementSightLineSeesTargetUncached(observer, target) {
     ) {
       return true;
     }
-    if (!sightSourceObserverHasActiveMovement(observer, target)) return false;
+    return false;
   }
 
   if (!observerHasUsableSight(observer)) return false;
@@ -2860,7 +2860,11 @@ function currentSightLineSignatureForToken(token) {
       const observerId = tokenIdOf(observer);
       if (!observerId || observerId === targetId) return null;
       const storedState = getStoredVisibilityState(observer, token);
-      if (!DETECTION_BLOCKING_VISIBILITY_STATES.has(storedState)) return null;
+      const shouldTrackSightLine =
+        DETECTION_BLOCKING_VISIBILITY_STATES.has(storedState) ||
+        (CORE_LOS_TRANSITION_REFRESH_STATES.has(storedState) &&
+          tokenHasDetectionFilterVisual(token));
+      if (!shouldTrackSightLine) return null;
       return `${observerId}:${currentPendingMovementSightLineSeesTarget(observer, token) ? 'seen' : 'blocked'}`;
     })
     .filter(Boolean)
