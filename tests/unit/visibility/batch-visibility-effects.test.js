@@ -33,6 +33,17 @@ const makeToken = (id, name, actor, flags = {}) => ({
 });
 
 describe('batchUpdateVisibilityEffects', () => {
+  let originalGameUser;
+
+  beforeEach(() => {
+    originalGameUser = global.game.user;
+    global.game.user = { isGM: true };
+  });
+
+  afterEach(() => {
+    global.game.user = originalGameUser;
+  });
+
   test('removes legacy off-guard effects when pair becomes observed', async () => {
     const observerLegacy = {
       id: 'legacy-on-observer',
@@ -284,5 +295,37 @@ describe('batchUpdateVisibilityEffects', () => {
     expect(targetActor.deleteEmbeddedDocuments).not.toHaveBeenCalled();
 
     clearPendingTokenMovementPosition('observer');
+  });
+
+  test('does not mutate aggregate effects on a player client', async () => {
+    global.game.user = { isGM: false };
+    const existingHiddenAggregate = {
+      id: 'hidden-aggregate',
+      flags: {
+        'pf2e-visioner': {
+          aggregateOffGuard: true,
+          visibilityState: 'hidden',
+          effectTarget: 'subject',
+        },
+      },
+      system: {
+        rules: [
+          {
+            key: 'EphemeralEffect',
+            predicate: ['target:signature:observer-sig'],
+          },
+        ],
+      },
+    };
+    const observerActor = makeActor('observer-actor', 'observer-sig', []);
+    const targetActor = makeActor('target-actor', 'target-sig', [existingHiddenAggregate]);
+    const observer = makeToken('observer', 'Observer', observerActor);
+    const target = makeToken('target', 'Target', targetActor);
+
+    await batchUpdateVisibilityEffects(observer, [{ target, state: 'observed' }]);
+
+    expect(targetActor.deleteEmbeddedDocuments).not.toHaveBeenCalled();
+    expect(targetActor.updateEmbeddedDocuments).not.toHaveBeenCalled();
+    expect(targetActor.createEmbeddedDocuments).not.toHaveBeenCalled();
   });
 });

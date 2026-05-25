@@ -10,15 +10,9 @@ import {
   mergeMissingPendingVisibilityStateMap,
   normalizePendingVisibilityState as normalizeVisibilityState,
 } from './pending-movement-final-visibility.js';
-import {
-  createPendingMovementCurrentViewSoundwaveController,
-} from './pending-movement-current-view-soundwave.js';
-import {
-  createPendingMovementDecisionContextController,
-} from './pending-movement-decision-context.js';
-import {
-  createPendingMovementDetectionFilterRenderingController,
-} from './pending-movement-detection-filter-rendering.js';
+import { createPendingMovementCurrentViewSoundwaveController } from './pending-movement-current-view-soundwave.js';
+import { createPendingMovementDecisionContextController } from './pending-movement-decision-context.js';
+import { createPendingMovementDetectionFilterRenderingController } from './pending-movement-detection-filter-rendering.js';
 import {
   cachePendingMovementEvaluation,
   cachePendingMovementObjectEvaluation,
@@ -95,11 +89,9 @@ const PENDING_MOVEMENT_TTL_MS = 2500;
 const PENDING_MOVEMENT_RENDER_LOCK_GRACE_MS = 1000;
 const PENDING_MOVEMENT_ANIMATION_DETECTION_DELAY_MS = 50;
 const PENDING_MOVEMENT_ANIMATION_DETECTION_SETTLE_MS = 250;
-export const DETECTION_BLOCKING_VISIBILITY_STATES = new Set([
-  'hidden',
-  'undetected',
-  'unnoticed',
-]);
+const PENDING_MOVEMENT_OCCLUSION_SUPPRESSION_MS = PENDING_MOVEMENT_TTL_MS;
+const PENDING_MOVEMENT_REFRESH_VISIBILITY_PERCEPTION_COALESCE_MS = 3000;
+export const DETECTION_BLOCKING_VISIBILITY_STATES = new Set(['hidden', 'undetected', 'unnoticed']);
 const RENDER_HIDDEN_FROM_OBSERVER_STATES = new Set(['undetected', 'unnoticed']);
 const CORE_LOS_TRANSITION_REFRESH_STATES = new Set(['observed', 'concealed']);
 const VISIBILITY_V2_FLAG = 'visibilityV2';
@@ -115,7 +107,15 @@ let pendingMovementSerial = 0;
 const recentCompletedMovementRefreshTargetIds = new Map();
 let pendingMovementRefreshTargetIdSetCache = null;
 const pendingMovementTokenRefreshSignatures = new WeakMap();
+const pendingMovementRefreshVisibilityPerceptionTargets = new WeakMap();
 let pendingMovementCoalescedRefresh = null;
+let pendingMovementOcclusionOnlyPerceptionSuppression = null;
+let pendingMovementTokenRefreshPerceptionCoalescing = null;
+let pendingMovementCoreAnimationPerceptionDepth = 0;
+let pendingMovementCoreAnimationBypassUntil = 0;
+let pendingMovementCanvasVisibilityHandleCache = null;
+let pendingMovementBlockedDetectionEntriesCache = null;
+let pendingMovementHiddenStateContextCache = null;
 const pendingMovementPerformanceCounters = {
   refreshCalls: 0,
   targetedRefreshCalls: 0,
@@ -141,8 +141,7 @@ function emptyPendingMovementPerformanceSnapshot() {
 const pendingMovementRefreshScheduler = {
   getEntry: (tokenId) => pendingTokenMovementPositions.get(tokenId),
   getTargetTokenIds: (tokenId) => getAnimationRefreshTargetIdsForMovement(tokenId),
-  shouldUseFullAnimationRefreshCadence: (tokenId) =>
-    shouldUseFullAnimationRefreshCadence(tokenId),
+  shouldUseFullAnimationRefreshCadence: (tokenId) => shouldUseFullAnimationRefreshCadence(tokenId),
   shouldUseFullPostCompletionRefreshCadence: (tokenId) =>
     shouldUseFullPostCompletionRefreshCadence(tokenId),
   hasActivePendingMovementForObserver: (tokenId) => hasActivePendingMovementForObserver(tokenId),
@@ -244,75 +243,93 @@ const pendingDetectionFilterRenderingController =
 
 export function shouldSuppressPendingMovementDetectionFilterVisuals(token, options) {
   return withPendingMovementDecisionCache(() =>
-    pendingDetectionFilterRenderingController
-      .shouldSuppressPendingMovementDetectionFilterVisuals(token, options),
+    pendingDetectionFilterRenderingController.shouldSuppressPendingMovementDetectionFilterVisuals(
+      token,
+      options,
+    ),
   );
 }
 
 export function shouldPreservePendingMovementDetectionFilterVisuals(token, options) {
   return withPendingMovementDecisionCache(() =>
-    pendingDetectionFilterRenderingController
-      .shouldPreservePendingMovementDetectionFilterVisuals(token, options),
+    pendingDetectionFilterRenderingController.shouldPreservePendingMovementDetectionFilterVisuals(
+      token,
+      options,
+    ),
   );
 }
 
 export function shouldPrimePendingMovementDetectionFilterVisuals(token, options) {
   return withPendingMovementDecisionCache(() =>
-    pendingDetectionFilterRenderingController
-      .shouldPrimePendingMovementDetectionFilterVisuals(token, options),
+    pendingDetectionFilterRenderingController.shouldPrimePendingMovementDetectionFilterVisuals(
+      token,
+      options,
+    ),
   );
 }
 
 export function shouldStabilizeHiddenDetectionFilterAnimation(token) {
-  return pendingDetectionFilterRenderingController
-    .shouldStabilizeHiddenDetectionFilterAnimation(token);
+  return pendingDetectionFilterRenderingController.shouldStabilizeHiddenDetectionFilterAnimation(
+    token,
+  );
 }
 
 export function shouldApplyDetectionFilterPrimaryMeshTint(token) {
   return withPendingMovementDecisionCache(() =>
-    pendingDetectionFilterRenderingController
-      .shouldApplyDetectionFilterPrimaryMeshTint(token),
+    pendingDetectionFilterRenderingController.shouldApplyDetectionFilterPrimaryMeshTint(token),
   );
 }
 
 export function withStableHiddenDetectionFilterAnimation(token, callback) {
-  return pendingDetectionFilterRenderingController
-    .withStableHiddenDetectionFilterAnimation(token, callback);
+  return pendingDetectionFilterRenderingController.withStableHiddenDetectionFilterAnimation(
+    token,
+    callback,
+  );
 }
 
 export function primePendingMovementDetectionFilterVisuals(token, options) {
   return withPendingMovementDecisionCache(() =>
-    pendingDetectionFilterRenderingController
-      .primePendingMovementDetectionFilterVisuals(token, options),
+    pendingDetectionFilterRenderingController.primePendingMovementDetectionFilterVisuals(
+      token,
+      options,
+    ),
   );
 }
 
 export function withPreservedPendingMovementDetectionFilterVisuals(token, callback) {
-  return pendingDetectionFilterRenderingController
-    .withPreservedPendingMovementDetectionFilterVisuals(token, callback);
+  return pendingDetectionFilterRenderingController.withPreservedPendingMovementDetectionFilterVisuals(
+    token,
+    callback,
+  );
 }
 
 export function withSuppressedPendingMovementDetectionFilterVisuals(token, callback) {
-  return pendingDetectionFilterRenderingController
-    .withSuppressedPendingMovementDetectionFilterVisuals(token, callback);
+  return pendingDetectionFilterRenderingController.withSuppressedPendingMovementDetectionFilterVisuals(
+    token,
+    callback,
+  );
 }
 
 export function withSuppressedPendingMovementDetectionFilterRender(token, callback) {
-  return pendingDetectionFilterRenderingController
-    .withSuppressedPendingMovementDetectionFilterRender(token, callback);
+  return pendingDetectionFilterRenderingController.withSuppressedPendingMovementDetectionFilterRender(
+    token,
+    callback,
+  );
 }
 
 function withSuppressedDetectionFilterProbe(token, callback, options) {
-  return pendingDetectionFilterRenderingController
-    .withSuppressedDetectionFilterProbe(token, callback, options);
+  return pendingDetectionFilterRenderingController.withSuppressedDetectionFilterProbe(
+    token,
+    callback,
+    options,
+  );
 }
 
-export function suppressPendingMovementDetectionFilterVisualsForObservedTransition(
-  token,
-  options,
-) {
-  return pendingCurrentViewSoundwaveController
-    .suppressPendingMovementDetectionFilterVisualsForObservedTransition(token, options);
+export function suppressPendingMovementDetectionFilterVisualsForObservedTransition(token, options) {
+  return pendingCurrentViewSoundwaveController.suppressPendingMovementDetectionFilterVisualsForObservedTransition(
+    token,
+    options,
+  );
 }
 
 function tokenIdOf(tokenOrDoc) {
@@ -383,7 +400,8 @@ function cleanupExpiredPendingMovements(now = Date.now()) {
       removedExpiredMovement = true;
     }
   }
-  if (removedExpiredMovement) rebalancePendingMovementRoutePointBudgets(pendingTokenMovementPositions);
+  if (removedExpiredMovement)
+    rebalancePendingMovementRoutePointBudgets(pendingTokenMovementPositions);
   pruneExpiredCoreVisibleGraceContexts(now);
   pruneExpiredCurrentSightLineGraceContexts(now);
   pruneExpiredObservedHiddenSoundwaveGraceContexts(now);
@@ -393,6 +411,11 @@ function hasActivePendingMovementForObserver(observerId) {
   if (!observerId) return false;
   cleanupExpiredPendingMovements();
   return pendingTokenMovementPositions.has(observerId);
+}
+
+export function hasActivePendingTokenMovement() {
+  cleanupExpiredPendingMovements();
+  return pendingTokenMovementPositions.size > 0;
 }
 
 function isControlledTokenDocument(tokenDoc, controlledTokens = canvas?.tokens?.controlled || []) {
@@ -462,7 +485,15 @@ function controlledTokenDragIntentRefreshTargetIds(tokenId) {
       const targetId = tokenIdOf(token);
       if (!targetId || targetId === tokenId) return false;
       if (!observer) return true;
-      return !RENDER_HIDDEN_FROM_OBSERVER_STATES.has(getStoredVisibilityState(observer, token));
+      const storedState = getStoredVisibilityState(observer, token);
+      if (RENDER_HIDDEN_FROM_OBSERVER_STATES.has(storedState)) return false;
+      if (
+        CORE_LOS_TRANSITION_REFRESH_STATES.has(storedState) &&
+        !tokenHasDetectionFilterVisual(token)
+      ) {
+        return !currentPendingMovementSightLineSeesTarget(observer, token);
+      }
+      return true;
     })
     .map((token) => tokenIdOf(token));
 }
@@ -475,20 +506,14 @@ function shouldRefreshCoreLosTransitionTarget(observer, target, visibilityState)
   return !currentPendingMovementSightLineSeesTarget(observer, target);
 }
 
-export function primePendingControlledTokenDragIntent(
-  tokenOrDoc,
-  options = {},
-) {
+export function primePendingControlledTokenDragIntent(tokenOrDoc, options = {}) {
   return primeControlledTokenDragIntent(tokenOrDoc, {
     ...pendingControlledTokenDragIntentAdapter,
     ...options,
   });
 }
 
-export function releasePendingControlledTokenDragIntent(
-  tokenOrDoc = null,
-  options = {},
-) {
+export function releasePendingControlledTokenDragIntent(tokenOrDoc = null, options = {}) {
   return releaseControlledTokenDragIntent(tokenOrDoc, {
     tokenIdOf,
     ...options,
@@ -528,10 +553,8 @@ function hasLineOfSightToSampledToken(originPoint, targetPoints) {
 }
 
 function sceneHasPendingMovementLimitedOrThresholdWallSense(senseType) {
-  return cachePendingMovementEvaluation(
-    'sceneLimitedOrThresholdWallSense',
-    senseType,
-    () => sceneHasLimitedOrThresholdWallSense(senseType),
+  return cachePendingMovementEvaluation('sceneLimitedOrThresholdWallSense', senseType, () =>
+    sceneHasLimitedOrThresholdWallSense(senseType),
   );
 }
 
@@ -546,7 +569,10 @@ function customSightWallBlocksSampledToken(originPoint, targetPoints) {
 
 function pendingMovementTokenHasCoreOwnedPosition(tokenOrDoc, entry = null) {
   const canonicalToken = getPendingMovementCanonicalToken(tokenOrDoc);
-  if (isControlledMovementPreviewToken(canonicalToken) || isControlledTokenDragActive(canonicalToken)) {
+  if (
+    isControlledMovementPreviewToken(canonicalToken) ||
+    isControlledTokenDragActive(canonicalToken)
+  ) {
     return true;
   }
 
@@ -566,7 +592,10 @@ function pendingMovementTokenHasCoreOwnedPosition(tokenOrDoc, entry = null) {
 
 function pendingMovementTokenHasCommittedCoreMotion(tokenOrDoc, entry = null) {
   const canonicalToken = getPendingMovementCanonicalToken(tokenOrDoc);
-  if (isControlledMovementPreviewToken(canonicalToken) || isControlledTokenDragActive(canonicalToken)) {
+  if (
+    isControlledMovementPreviewToken(canonicalToken) ||
+    isControlledTokenDragActive(canonicalToken)
+  ) {
     return true;
   }
 
@@ -620,8 +649,7 @@ function activeSightSourcesForObserver(observer) {
 function sourceContainsAnyTargetPoint(source, targetPoints) {
   return targetPoints.some(
     (point) =>
-      source?.los?.contains?.(point.x, point.y) ||
-      source?.shape?.contains?.(point.x, point.y),
+      source?.los?.contains?.(point.x, point.y) || source?.shape?.contains?.(point.x, point.y),
   );
 }
 
@@ -693,7 +721,10 @@ function rememberCurrentSightLineGraceContext(observer, target) {
 }
 
 function pruneExpiredCurrentSightLineGraceContexts(now = Date.now()) {
-  for (const [targetId, contextsByObserver] of pendingMovementCurrentSightLineGraceContexts.entries()) {
+  for (const [
+    targetId,
+    contextsByObserver,
+  ] of pendingMovementCurrentSightLineGraceContexts.entries()) {
     for (const [observerId, context] of contextsByObserver.entries()) {
       if (!context?.expiresAt || context.expiresAt <= now) {
         contextsByObserver.delete(observerId);
@@ -706,7 +737,10 @@ function pruneExpiredCurrentSightLineGraceContexts(now = Date.now()) {
 function forgetCurrentSightLineGraceContextsForObserver(observerId) {
   if (!observerId) return;
 
-  for (const [targetId, contextsByObserver] of pendingMovementCurrentSightLineGraceContexts.entries()) {
+  for (const [
+    targetId,
+    contextsByObserver,
+  ] of pendingMovementCurrentSightLineGraceContexts.entries()) {
     contextsByObserver.delete(observerId);
     if (!contextsByObserver.size) pendingMovementCurrentSightLineGraceContexts.delete(targetId);
   }
@@ -1009,6 +1043,45 @@ function pendingMovementTargetSetSignature() {
   ].join('||');
 }
 
+function tokenPositionSignature(tokenOrDoc) {
+  const token = tokenOrDoc?.document ? tokenOrDoc : tokenOrDoc?.object || null;
+  const doc = tokenOrDoc?.document || tokenOrDoc;
+  const x = Number(token?.x ?? doc?.x ?? doc?._source?.x ?? 0);
+  const y = Number(token?.y ?? doc?.y ?? doc?._source?.y ?? 0);
+  const elevation = Number(doc?.elevation ?? doc?._source?.elevation ?? 0);
+  return `${Number.isFinite(x) ? x : 0},${Number.isFinite(y) ? y : 0},${Number.isFinite(elevation) ? elevation : 0}`;
+}
+
+function detectionSourceSignature(sources) {
+  return sourceList(sources)
+    .map((source) => {
+      const object = source?.object;
+      return [
+        source?.active ? 1 : 0,
+        tokenIdOf(object) || 'no-object',
+        tokenPositionSignature(object),
+        object?._animation?.state || '',
+      ].join(':');
+    })
+    .join('|');
+}
+
+function cachedMapForPendingMovementSignature(cache, signature) {
+  if (cache?.signature === signature) return cache.map;
+  return new Map();
+}
+
+function rememberPendingMovementCache(map, signature) {
+  return { signature, map };
+}
+
+function clearPendingMovementVisibilityDecisionCaches() {
+  pendingMovementRefreshTargetIdSetCache = null;
+  pendingMovementCanvasVisibilityHandleCache = null;
+  pendingMovementBlockedDetectionEntriesCache = null;
+  pendingMovementHiddenStateContextCache = null;
+}
+
 function getPendingMovementRefreshTargetIdSet() {
   const signature = pendingMovementTargetSetSignature();
   if (pendingMovementRefreshTargetIdSetCache?.signature === signature) {
@@ -1018,6 +1091,10 @@ function getPendingMovementRefreshTargetIdSet() {
   const ids = new Set(getPendingMovementRefreshTargetIds());
   pendingMovementRefreshTargetIdSetCache = { signature, ids };
   return ids;
+}
+
+function pendingMovementCanvasVisibilityHandleSignature() {
+  return pendingMovementTargetSetSignature();
 }
 
 function hasPendingFinalVisibilityStateForToken(token) {
@@ -1032,16 +1109,61 @@ function hasPendingFinalVisibilityStateForToken(token) {
   return false;
 }
 
-export function shouldHandlePendingMovementCanvasVisibilityForToken(token) {
+function hasDetectionBlockingPendingVisibilityStateForToken(token) {
   if (!token?.document?.id) return false;
-  cleanupExpiredPendingMovements();
-  if (!hasPendingMovementRenderWork()) return false;
+  if (tokenDocOf(token)?.hidden) return true;
+
+  for (const [observerId, entry] of pendingTokenMovementPositions.entries()) {
+    const observer = tokenObjectForId(observerId) || entry?.tokenDoc || { id: observerId };
+    if (shouldUseCoreDetectionDuringPendingMovement(observer, token)) continue;
+    if (DETECTION_BLOCKING_VISIBILITY_STATES.has(getPendingMovementVisibilityState(observer, token))) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function hasDetectionBlockingStoredVisibilityStateForToken(token) {
+  if (!token?.document?.id) return false;
+  for (const observer of pendingMovementObserverCandidates()) {
+    if (tokenIdOf(observer) === token.document.id) continue;
+    if (DETECTION_BLOCKING_VISIBILITY_STATES.has(getStoredVisibilityState(observer, token))) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function computeShouldHandlePendingMovementCanvasVisibilityForToken(token) {
+  const tokenId = tokenIdOf(token);
+  if (!tokenId) return false;
+
   if (isPendingMovementRenderLocked(token)) return true;
   if (hasPendingRenderState(token)) return true;
-  if (tokenHasDetectionFilterVisual(token)) return true;
   if (hasPendingFinalVisibilityStateForToken(token)) return true;
+  if (!getPendingMovementRefreshTargetIdSet().has(tokenId)) return false;
+  return hasDetectionBlockingPendingVisibilityStateForToken(token);
+}
 
-  return getPendingMovementRefreshTargetIdSet().has(tokenIdOf(token));
+export function shouldHandlePendingMovementCanvasVisibilityForToken(token) {
+  const tokenId = tokenIdOf(token);
+  if (!tokenId) return false;
+  cleanupExpiredPendingMovements();
+  if (!hasPendingMovementRenderWork()) return false;
+
+  const signature = pendingMovementCanvasVisibilityHandleSignature();
+  const cache = cachedMapForPendingMovementSignature(
+    pendingMovementCanvasVisibilityHandleCache,
+    signature,
+  );
+  pendingMovementCanvasVisibilityHandleCache = rememberPendingMovementCache(cache, signature);
+  const key = `${tokenId}:${tokenPositionSignature(token)}`;
+  if (cache.has(key)) return cache.get(key);
+
+  const shouldHandle = computeShouldHandlePendingMovementCanvasVisibilityForToken(token);
+  cache.set(key, shouldHandle);
+  return shouldHandle;
 }
 
 export function getPendingMovementBlockContext(observer, target) {
@@ -1056,7 +1178,7 @@ function contextSuppressesPendingDetectionSource(context) {
   return !!context.wallBlocked;
 }
 
-export function getPendingMovementHiddenStateContext(target) {
+function getPendingMovementHiddenStateContextUncached(target) {
   if (!target?.document?.id) return null;
   cleanupExpiredPendingMovements();
 
@@ -1083,6 +1205,24 @@ export function getPendingMovementHiddenStateContext(target) {
   }
 
   return null;
+}
+
+export function getPendingMovementHiddenStateContext(target) {
+  const targetId = tokenIdOf(target);
+  if (!targetId) return null;
+
+  const signature = pendingMovementEntriesSignature();
+  const cache = cachedMapForPendingMovementSignature(
+    pendingMovementHiddenStateContextCache,
+    signature,
+  );
+  pendingMovementHiddenStateContextCache = rememberPendingMovementCache(cache, signature);
+  const key = `${targetId}:${tokenPositionSignature(target)}`;
+  if (cache.has(key)) return cache.get(key);
+
+  const context = getPendingMovementHiddenStateContextUncached(target);
+  cache.set(key, context);
+  return context;
 }
 
 export function isPendingMovementHiddenStateVisibilityProbe() {
@@ -1250,10 +1390,7 @@ function getStoredHiddenDetectionFilterContext(target) {
   return null;
 }
 
-function getHiddenDetectionFilterPreservationContext(
-  target,
-  { hasDetectionWork = null } = {},
-) {
+function getHiddenDetectionFilterPreservationContext(target, { hasDetectionWork = null } = {}) {
   if (!target?.document?.id) return null;
   if (target.controlled) return null;
   if (!isTokenLikeTarget(target)) return null;
@@ -1264,12 +1401,13 @@ function getHiddenDetectionFilterPreservationContext(
   }
 
   const pendingContext =
-    (hasDetectionWork === null || hasDetectionWork === true) &&
-      hasPendingMovementDetectionWork()
+    (hasDetectionWork === null || hasDetectionWork === true) && hasPendingMovementDetectionWork()
       ? getPendingMovementDetectionFilterPreservationContext(target)
       : null;
   const shouldUseStoredContext = !pendingContext && !hasPendingMovementDetectionWork();
-  const storedContext = shouldUseStoredContext ? getStoredHiddenDetectionFilterContext(target) : null;
+  const storedContext = shouldUseStoredContext
+    ? getStoredHiddenDetectionFilterContext(target)
+    : null;
   const context =
     pendingContext || getActiveControlledHiddenDetectionFilterContext(target) || storedContext;
   if (!context) return null;
@@ -1278,15 +1416,13 @@ function getHiddenDetectionFilterPreservationContext(
   return context;
 }
 
-function getObservedDetectionFilterSuppressionContext(
-  target,
-  { hasDetectionWork = null } = {},
-) {
+function getObservedDetectionFilterSuppressionContext(target, { hasDetectionWork = null } = {}) {
   if (!target?.document?.id) return null;
   if (target.controlled) return null;
   if (!isTokenLikeTarget(target)) return null;
 
-  const currentViewObservedContext = getCurrentViewObservedDetectionFilterSuppressionContext(target);
+  const currentViewObservedContext =
+    getCurrentViewObservedDetectionFilterSuppressionContext(target);
   if (currentViewObservedContext) return currentViewObservedContext;
 
   const hiddenContext = getHiddenDetectionFilterPreservationContext(target, { hasDetectionWork });
@@ -1297,7 +1433,9 @@ function getObservedDetectionFilterSuppressionContext(
     restrictedObservedObserverId = hiddenContext.observerId;
   }
 
-  const currentViewObserverIds = new Set(getCurrentViewObservers().map((observer) => tokenIdOf(observer)));
+  const currentViewObserverIds = new Set(
+    getCurrentViewObservers().map((observer) => tokenIdOf(observer)),
+  );
   const observers = [
     ...sourceList(canvas?.effects?.visionSources)
       .filter((source) => source?.active && source?.object)
@@ -1501,7 +1639,9 @@ function rememberCoreVisibleGraceContext(target, context) {
   if (!pendingMovementCoreVisibleGraceContexts.has(targetId)) {
     pendingMovementCoreVisibleGraceContexts.set(targetId, new Map());
   }
-  pendingMovementCoreVisibleGraceContexts.get(targetId).set(normalizedContext.observerId, graceContext);
+  pendingMovementCoreVisibleGraceContexts
+    .get(targetId)
+    .set(normalizedContext.observerId, graceContext);
   return graceContext;
 }
 
@@ -1600,7 +1740,9 @@ function getVisibleCoreGraceContextForTarget(target) {
     if (!context) continue;
 
     const observer = tokenObjectForId(observerId);
-    const currentState = observer ? getStoredVisibilityState(observer, target) : context.visibilityState;
+    const currentState = observer
+      ? getStoredVisibilityState(observer, target)
+      : context.visibilityState;
     if (!RENDER_HIDDEN_FROM_OBSERVER_STATES.has(currentState)) {
       contextsByObserver.delete(observerId);
       continue;
@@ -1696,7 +1838,10 @@ function getCoreOwnedRenderHiddenLockRefreshDecision(token) {
   if (!lock) return null;
 
   const currentSightSeesTarget = currentPendingMovementSightLineSeesTarget(lock.observer, token);
-  const reachedObservedDestination = predictedObservedMovementReachedDestination(lock.observer, token);
+  const reachedObservedDestination = predictedObservedMovementReachedDestination(
+    lock.observer,
+    token,
+  );
   return currentSightSeesTarget || reachedObservedDestination ? 'restore' : 'keep-locked';
 }
 
@@ -1736,17 +1881,14 @@ function getStickyHiddenRenderLockContext(target, state) {
   } else {
     lockContext =
       Number(rememberedLockContext?.lastForcedAt ?? -1) >
-        Number(stateLockContext?.lastForcedAt ?? -1)
+      Number(stateLockContext?.lastForcedAt ?? -1)
         ? rememberedLockContext
         : stateLockContext;
   }
   if (!lockContext) return null;
 
   const foundryHidden = !!tokenDocOf(target)?.hidden;
-  if (
-    !foundryHidden &&
-    contextShouldYieldToCoreDuringPendingMovement(lockContext, target)
-  ) {
+  if (!foundryHidden && contextShouldYieldToCoreDuringPendingMovement(lockContext, target)) {
     forgetHiddenForceContext(target);
     return null;
   }
@@ -1894,9 +2036,7 @@ function hiddenRenderLockCanBeBypassedByVisibilityProbe(token, context) {
 
   const observer = tokenObjectForId(context?.observerId);
   const canBypass =
-    !!context &&
-    !!observer &&
-    pendingHiddenTargetIsVisibleFromCurrentSources(token, context);
+    !!context && !!observer && pendingHiddenTargetIsVisibleFromCurrentSources(token, context);
   if (canBypass) rememberCoreVisibleGraceContext(token, context);
   return canBypass;
 }
@@ -1952,11 +2092,7 @@ function shouldSkipForcedInvisibleTokenRefresh(token) {
     if (!RENDER_HIDDEN_FROM_OBSERVER_STATES.has(visibilityState)) return false;
   }
 
-  return (
-    token.visible === false &&
-    token.renderable === false &&
-    meshIsForcedInvisible(token.mesh)
-  );
+  return token.visible === false && token.renderable === false && meshIsForcedInvisible(token.mesh);
 }
 
 export function restorePendingMovementTokenRendering(
@@ -2037,10 +2173,9 @@ export function forcePendingMovementTokenInvisible(token) {
 
   const state = capturePendingRenderState(token);
   const rememberedContext = getRememberedHiddenForceContext(token);
-  const hiddenRenderLockContext =
-    rememberedContext?.awaitingDetectionFilter
-      ? rememberedContext
-      : getPendingMovementRenderLockContext(token) || rememberedContext;
+  const hiddenRenderLockContext = rememberedContext?.awaitingDetectionFilter
+    ? rememberedContext
+    : getPendingMovementRenderLockContext(token) || rememberedContext;
   if (state) {
     state.lastForcedAt = Date.now();
     state.lastHiddenContext = hiddenRenderLockContext
@@ -2057,10 +2192,7 @@ export function forcePendingMovementTokenInvisible(token) {
 export function forceTokenInvisibleForObserverVisibility(observer, target, visibilityState) {
   if (!observer || !target?.document?.id) return false;
   if (target.controlled) return false;
-  if (
-    visibilityState === 'hidden' &&
-    hasCoreOwnedPendingMovement(observer, target)
-  ) {
+  if (visibilityState === 'hidden' && hasCoreOwnedPendingMovement(observer, target)) {
     return false;
   }
 
@@ -2130,7 +2262,6 @@ export function setPendingTokenMovementPosition(
   if (!tokenId || !('x' in changes || 'y' in changes)) return false;
   const trackingReason = getPendingMovementTrackingReason(tokenDoc, controlledTokens, options);
   if (!trackingReason) {
-
     return false;
   }
 
@@ -2180,6 +2311,7 @@ export function setPendingTokenMovementPosition(
     expiresAt: Date.now() + PENDING_MOVEMENT_TTL_MS,
     timeoutId,
   });
+  installOcclusionOnlyPerceptionSuppression(PENDING_MOVEMENT_OCCLUSION_SUPPRESSION_MS);
   rebalancePendingMovementRoutePointBudgets(pendingTokenMovementPositions);
   scheduleAnimationRenderRefreshes(tokenId, serial, pendingMovementRefreshScheduler);
   pendingFinalVisibilityController.scheduleFinalVisibilityPrediction(
@@ -2225,7 +2357,8 @@ function hasCoreOwnedPendingMovement(observer, target) {
   ) {
     return true;
   }
-  if (isControlledMovementPreviewToken(observer) || isControlledTokenDragActive(observer)) return true;
+  if (isControlledMovementPreviewToken(observer) || isControlledTokenDragActive(observer))
+    return true;
   if (isControlledMovementPreviewToken(target) || isControlledTokenDragActive(target)) return true;
 
   return false;
@@ -2253,7 +2386,8 @@ function hasCommittedCoreOwnedPendingMovement(observer, target) {
   ) {
     return true;
   }
-  if (isControlledMovementPreviewToken(observer) || isControlledTokenDragActive(observer)) return true;
+  if (isControlledMovementPreviewToken(observer) || isControlledTokenDragActive(observer))
+    return true;
   if (isControlledMovementPreviewToken(target) || isControlledTokenDragActive(target)) return true;
 
   return false;
@@ -2278,20 +2412,15 @@ export function shouldUseCoreDetectionDuringPendingMovement(observer, target) {
   return true;
 }
 
-export function completePendingTokenMovement(
-  tokenOrId,
-  expectedSerial = null,
-) {
+export function completePendingTokenMovement(tokenOrId, expectedSerial = null) {
   const tokenId = typeof tokenOrId === 'string' ? tokenOrId : tokenIdOf(tokenOrId);
   if (!tokenId) return false;
 
   const entry = pendingTokenMovementPositions.get(tokenId);
   if (!entry) {
-
     return false;
   }
   if (expectedSerial !== null && entry.serial !== expectedSerial) {
-
     return false;
   }
 
@@ -2305,6 +2434,7 @@ export function completePendingTokenMovement(
   clearPendingTokenMovementPosition(tokenId, { preserveCurrentSightLineGrace: true });
   refreshPendingMovementTokenVisibility([], {
     ignoreObservedGrace: true,
+    skipPerceptionRefresh: true,
     source: 'movement-completion',
     targetTokenIds: refreshTargetIds,
   });
@@ -2327,6 +2457,8 @@ export function schedulePendingTokenMovementCompletion(tokenDoc) {
   }
 
   const serial = entry.serial;
+  activatePendingMovementCoreAnimationBypass();
+  installOcclusionOnlyPerceptionSuppression(PENDING_MOVEMENT_OCCLUSION_SUPPRESSION_MS);
   scheduleAnimationRenderRefreshes(tokenId, serial, pendingMovementRefreshScheduler);
 
   const startedAt = Date.now();
@@ -2350,15 +2482,10 @@ export function schedulePendingTokenMovementCompletion(tokenDoc) {
     const elapsedMs = Date.now() - startedAt;
 
     if (deferredAnimation?.promise && movementAnimationIsRunning(deferredAnimation)) {
-
       deferredAnimation.promise.finally(complete);
       return;
     }
-    if (
-      movementAnimationIsRunning(deferredAnimation) &&
-      elapsedMs < PENDING_MOVEMENT_TTL_MS
-    ) {
-
+    if (movementAnimationIsRunning(deferredAnimation) && elapsedMs < PENDING_MOVEMENT_TTL_MS) {
       const timeoutId = setTimeout(
         waitForAnimationOrComplete,
         PENDING_MOVEMENT_ANIMATION_DETECTION_DELAY_MS,
@@ -2382,7 +2509,6 @@ export function schedulePendingTokenMovementCompletion(tokenDoc) {
     }
 
     if (elapsedMs < PENDING_MOVEMENT_ANIMATION_DETECTION_SETTLE_MS) {
-
       const timeoutId = setTimeout(
         waitForAnimationOrComplete,
         PENDING_MOVEMENT_ANIMATION_DETECTION_DELAY_MS,
@@ -2434,9 +2560,34 @@ function getPendingMovementBlockedDetectionEntriesUncached(
 }
 
 export function getPendingMovementBlockedDetectionEntries(target, options = {}) {
-  return withPendingMovementDecisionCache(() =>
-    getPendingMovementBlockedDetectionEntriesUncached(target, options),
+  const visionSources = options.visionSources ?? canvas?.effects?.visionSources ?? [];
+  const lightSources = options.lightSources ?? canvas?.effects?.lightSources ?? [];
+  const targetId = tokenIdOf(target);
+  if (!targetId) return [];
+
+  const signature = pendingMovementEntriesSignature();
+  const cache = cachedMapForPendingMovementSignature(
+    pendingMovementBlockedDetectionEntriesCache,
+    signature,
   );
+  pendingMovementBlockedDetectionEntriesCache = rememberPendingMovementCache(cache, signature);
+  const cacheKey = [
+    targetId,
+    tokenPositionSignature(target),
+    detectionSourceSignature(visionSources),
+    detectionSourceSignature(lightSources),
+  ].join('||');
+  if (cache.has(cacheKey)) return cache.get(cacheKey);
+
+  const entries = withPendingMovementDecisionCache(() =>
+    getPendingMovementBlockedDetectionEntriesUncached(target, {
+      ...options,
+      visionSources,
+      lightSources,
+    }),
+  );
+  cache.set(cacheKey, entries);
+  return entries;
 }
 
 function getPendingMovementRenderLockBlockedEntries(target) {
@@ -2469,10 +2620,7 @@ function pendingHiddenTargetIsVisibleFromCurrentSources(target, hiddenStateConte
   }
 }
 
-function shouldTemporarilyForceTokenInvisibleUncached(
-  target,
-  { hasDetectionWork = null } = {},
-) {
+function shouldTemporarilyForceTokenInvisibleUncached(target, { hasDetectionWork = null } = {}) {
   if (!target?.document?.id) return false;
   if (target.controlled) return false;
   if (hasDetectionWork === null && !hasPendingMovementDetectionWork()) return false;
@@ -2484,11 +2632,7 @@ function shouldTemporarilyForceTokenInvisibleUncached(
   if (hiddenStateContext) {
     const observer = tokenObjectForId(hiddenStateContext.observerId);
     if (
-      coreVisibleGraceCanBypassHiddenState(
-        observer,
-        target,
-        hiddenStateContext.visibilityState,
-      )
+      coreVisibleGraceCanBypassHiddenState(observer, target, hiddenStateContext.visibilityState)
     ) {
       forgetHiddenForceContext(target);
       return false;
@@ -2642,13 +2786,11 @@ function mergePendingMovementRefreshOptions(existing, next) {
     options: {
       ignoreObservedGrace:
         !!existing.options.ignoreObservedGrace || !!next.options.ignoreObservedGrace,
-      skipTokenRefresh:
-        !!existing.options.skipTokenRefresh && !!next.options.skipTokenRefresh,
+      skipTokenRefresh: !!existing.options.skipTokenRefresh && !!next.options.skipTokenRefresh,
       skipPerceptionRefresh:
         !!existing.options.skipPerceptionRefresh && !!next.options.skipPerceptionRefresh,
-      source: existing.options.source === next.options.source
-        ? existing.options.source
-        : 'coalesced',
+      source:
+        existing.options.source === next.options.source ? existing.options.source : 'coalesced',
       ...(targetTokenIds ? { targetTokenIds } : {}),
     },
   };
@@ -2710,14 +2852,32 @@ function storedVisibilitySignatureForToken(token) {
     .join('|');
 }
 
+function currentSightLineSignatureForToken(token) {
+  const targetId = tokenIdOf(token);
+  if (!targetId) return '';
+  return pendingMovementObserverCandidates()
+    .map((observer) => {
+      const observerId = tokenIdOf(observer);
+      if (!observerId || observerId === targetId) return null;
+      const storedState = getStoredVisibilityState(observer, token);
+      if (!DETECTION_BLOCKING_VISIBILITY_STATES.has(storedState)) return null;
+      return `${observerId}:${currentPendingMovementSightLineSeesTarget(observer, token) ? 'seen' : 'blocked'}`;
+    })
+    .filter(Boolean)
+    .sort()
+    .join('|');
+}
+
 function pendingMovementTokenRefreshSignature(token, context) {
   return [
     tokenIdOf(token) || '',
     pendingMovementEntriesSignature(),
     storedVisibilitySignatureForToken(token),
+    currentSightLineSignatureForToken(token),
     tokenVisualSignature(token),
     context.ignoreObservedGrace ? 'ignore-observed-grace' : '',
     context.hasDetectionWork ? 'detection-work' : '',
+    context.hasSpecialVisualWork ? 'special-visual-work' : '',
   ].join('||');
 }
 
@@ -2725,7 +2885,6 @@ function shouldSkipUnchangedPendingMovementTokenRefresh(token, context) {
   if (!token || context.skipTokenRefresh) return false;
   if (context.shouldForceInvisible) return false;
   if (context.renderHiddenLockDecision) return false;
-  if (context.hasSpecialVisualWork) return false;
 
   const signature = pendingMovementTokenRefreshSignature(token, context);
   if (pendingMovementTokenRefreshSignatures.get(token) !== signature) {
@@ -2740,6 +2899,190 @@ function rememberPendingMovementTokenRefreshSignature(token, context) {
     token,
     pendingMovementTokenRefreshSignature(token, context),
   );
+}
+
+function isOcclusionOnlyPerceptionUpdate(flags) {
+  if (!flags || typeof flags !== 'object') return false;
+  const enabledFlags = Object.entries(flags)
+    .filter(([, value]) => value === true)
+    .map(([key]) => key);
+  return enabledFlags.length > 0 && enabledFlags.every((key) => key.startsWith('refreshOcclusion'));
+}
+
+function isCoreAnimationPerceptionUpdate(flags) {
+  if (!flags || typeof flags !== 'object') return false;
+  return !!(
+    flags.refreshVision &&
+    (flags.refreshLighting ||
+      flags.refreshSounds ||
+      flags.refreshOcclusionMask ||
+      flags.refreshOcclusionStates)
+  );
+}
+
+function withPendingMovementCoreAnimationPerceptionRefresh(callback) {
+  pendingMovementCoreAnimationPerceptionDepth += 1;
+  try {
+    return callback?.();
+  } finally {
+    pendingMovementCoreAnimationPerceptionDepth = Math.max(
+      0,
+      pendingMovementCoreAnimationPerceptionDepth - 1,
+    );
+  }
+}
+
+export function isPendingMovementCoreAnimationPerceptionRefresh() {
+  return pendingMovementCoreAnimationPerceptionDepth > 0;
+}
+
+function activatePendingMovementCoreAnimationBypass(durationMs = 1800) {
+  pendingMovementCoreAnimationBypassUntil = Math.max(
+    pendingMovementCoreAnimationBypassUntil,
+    Date.now() + durationMs,
+  );
+}
+
+export function isPendingMovementCoreAnimationBypassActive() {
+  return Date.now() <= pendingMovementCoreAnimationBypassUntil;
+}
+
+function mergePerceptionUpdateFlags(base, next) {
+  const merged = { ...(base ?? {}) };
+  for (const [key, value] of Object.entries(next ?? {})) {
+    if (value === undefined) continue;
+    merged[key] = merged[key] === true || value === true ? true : value;
+  }
+  return merged;
+}
+
+function installOcclusionOnlyPerceptionSuppression(durationMs = 400) {
+  const perception = canvas?.perception;
+  const originalUpdate = perception?.update;
+  if (typeof originalUpdate !== 'function') return false;
+
+  const now = Date.now();
+  if (
+    pendingMovementOcclusionOnlyPerceptionSuppression?.perception === perception &&
+    perception.update === pendingMovementOcclusionOnlyPerceptionSuppression.wrappedUpdate
+  ) {
+    pendingMovementOcclusionOnlyPerceptionSuppression.expiresAt = Math.max(
+      pendingMovementOcclusionOnlyPerceptionSuppression.expiresAt,
+      now + durationMs,
+    );
+    return true;
+  }
+
+  const state = {
+    perception,
+    originalUpdate,
+    expiresAt: now + durationMs,
+    wrappedUpdate: null,
+  };
+
+  state.wrappedUpdate = function wrappedPendingMovementPerceptionUpdate(flags, ...args) {
+    if (Date.now() <= state.expiresAt && isOcclusionOnlyPerceptionUpdate(flags)) {
+      return undefined;
+    }
+    const callOriginal = () => state.originalUpdate.call(this, flags, ...args);
+    if (Date.now() <= state.expiresAt && isCoreAnimationPerceptionUpdate(flags)) {
+      return withPendingMovementCoreAnimationPerceptionRefresh(callOriginal);
+    }
+    return callOriginal();
+  };
+
+  const restore = () => {
+    if (pendingMovementOcclusionOnlyPerceptionSuppression !== state) return;
+    if (state.perception.update === state.wrappedUpdate) {
+      state.perception.update = state.originalUpdate;
+    }
+    pendingMovementOcclusionOnlyPerceptionSuppression = null;
+  };
+
+  const tickRestore = () => {
+    const remainingMs = state.expiresAt - Date.now();
+    if (remainingMs > 0) {
+      setTimeout(tickRestore, remainingMs);
+      return;
+    }
+    restore();
+  };
+
+  pendingMovementOcclusionOnlyPerceptionSuppression = state;
+  perception.update = state.wrappedUpdate;
+  setTimeout(tickRestore, durationMs);
+  return true;
+}
+
+function withCoalescedTokenRefreshPerceptionUpdates(callback, { flushPerception = true } = {}) {
+  const perception = canvas?.perception;
+  const originalUpdate = perception?.update;
+  if (typeof originalUpdate !== 'function') return callback();
+
+  if (
+    pendingMovementTokenRefreshPerceptionCoalescing?.perception === perception &&
+    perception.update === pendingMovementTokenRefreshPerceptionCoalescing.wrappedUpdate
+  ) {
+    pendingMovementTokenRefreshPerceptionCoalescing.depth += 1;
+    try {
+      return callback();
+    } finally {
+      pendingMovementTokenRefreshPerceptionCoalescing.depth -= 1;
+    }
+  }
+
+  const state = {
+    depth: 1,
+    flags: null,
+    originalUpdate,
+    perception,
+    wrappedUpdate: null,
+  };
+  state.wrappedUpdate = function wrappedPendingMovementTokenRefreshPerceptionUpdate(
+    flags,
+    ...args
+  ) {
+    if (isOcclusionOnlyPerceptionUpdate(flags)) return undefined;
+    state.flags = mergePerceptionUpdateFlags(state.flags, flags);
+    return undefined;
+  };
+
+  pendingMovementTokenRefreshPerceptionCoalescing = state;
+  perception.update = state.wrappedUpdate;
+  try {
+    return callback();
+  } finally {
+    state.depth -= 1;
+    if (state.depth <= 0) {
+      if (state.perception.update === state.wrappedUpdate) {
+        state.perception.update = state.originalUpdate;
+      }
+      pendingMovementTokenRefreshPerceptionCoalescing = null;
+      if (flushPerception && state.flags) {
+        scheduleCanvasPerceptionUpdate(state.flags, { perception: state.perception });
+      }
+    }
+  }
+}
+
+function rememberPendingMovementRefreshVisibilityPerceptionTarget(token) {
+  if (!token) return;
+  pendingMovementRefreshVisibilityPerceptionTargets.set(
+    token,
+    Date.now() + PENDING_MOVEMENT_REFRESH_VISIBILITY_PERCEPTION_COALESCE_MS,
+  );
+}
+
+export function shouldCoalescePendingMovementRefreshVisibilityPerception(token) {
+  const expiresAt = pendingMovementRefreshVisibilityPerceptionTargets.get(token);
+  if (!expiresAt) return false;
+  if (Date.now() <= expiresAt) return true;
+  pendingMovementRefreshVisibilityPerceptionTargets.delete(token);
+  return false;
+}
+
+export function withCoalescedPendingMovementPerceptionUpdates(callback) {
+  return withCoalescedTokenRefreshPerceptionUpdates(callback);
 }
 
 function refreshPendingMovementTokenVisibilityUncached(
@@ -2784,111 +3127,122 @@ function refreshPendingMovementTokenVisibilityUncached(
     return;
   }
 
-  for (const token of tokens) {
-    if (ids.has(tokenIdOf(token))) {
-      continue;
-    }
-    if (trackPerformance) {
-      pendingMovementPerformanceCounters.tokensScanned += 1;
-      sourceCounters.tokensScanned += 1;
-    }
-    try {
-      if (canRestoreDetectionFilterPendingRenderLock(token)) {
-        restorePendingMovementTokenRendering(token, { ignoreObservedGrace });
+  withCoalescedTokenRefreshPerceptionUpdates(() => {
+    for (const token of tokens) {
+      if (ids.has(tokenIdOf(token))) {
         continue;
       }
-
-      if (
-        hasAwaitingDetectionFilterRenderLock(token) &&
-        !tokenHasDetectionFilterVisual(token)
-      ) {
-        forcePendingMovementTokenInvisible(token);
-        continue;
+      if (trackPerformance) {
+        pendingMovementPerformanceCounters.tokensScanned += 1;
+        sourceCounters.tokensScanned += 1;
       }
-
-      const shouldForceInvisible = shouldTemporarilyForceTokenInvisible(token, { hasDetectionWork });
-      if (shouldForceInvisible) {
-        forcePendingMovementTokenInvisible(token);
-        if (shouldSkipForcedInvisibleTokenRefresh(token)) {
-          continue;
-        }
-      }
-      if (
-        !shouldForceInvisible &&
-        (clearObservedDetectionFilterVisualsForCurrentView(token) ||
-          clearObservedDetectionFilterVisualsForCurrentSightLine(token))
-      ) {
-        continue;
-      }
-      if (!shouldForceInvisible) {
-        const renderHiddenLockDecision = getCoreOwnedRenderHiddenLockRefreshDecision(token);
-        if (renderHiddenLockDecision === 'restore') {
+      try {
+        if (canRestoreDetectionFilterPendingRenderLock(token)) {
           restorePendingMovementTokenRendering(token, { ignoreObservedGrace });
           continue;
         }
-        if (renderHiddenLockDecision === 'keep-locked') {
+
+        if (hasAwaitingDetectionFilterRenderLock(token) && !tokenHasDetectionFilterVisual(token)) {
           forcePendingMovementTokenInvisible(token);
           continue;
         }
-      }
-      if (!shouldForceInvisible && shouldSkipForcedInvisibleTokenRefresh(token)) {
-        continue;
-      }
-      if (
-        !shouldForceInvisible &&
-        !skipTokenRefresh &&
-        !!token?.detectionFilter &&
-        shouldStabilizeHiddenDetectionFilterAnimation(token)
-      ) {
-        withStableHiddenDetectionFilterAnimation(token, () => undefined);
-        continue;
-      }
-      const detectionFilterState = shouldForceInvisible
-        ? null
-        : capturePendingMovementDetectionFilterState(token, { hasDetectionWork });
-      const refreshContext = {
-        hasDetectionWork,
-        ignoreObservedGrace,
-        renderHiddenLockDecision: null,
-        shouldForceInvisible,
-        skipTokenRefresh,
-        hasSpecialVisualWork:
-          !!detectionFilterState ||
-          hasPendingRenderState(token) ||
-          isPendingMovementRenderLocked(token),
-      };
-      if (shouldSkipUnchangedPendingMovementTokenRefresh(token, refreshContext)) {
-        continue;
-      }
-      if (!skipTokenRefresh) {
-        token?.refresh?.();
-        if (trackPerformance) {
-          pendingMovementPerformanceCounters.tokensRefreshed += 1;
-          sourceCounters.tokensRefreshed += 1;
-        }
-        hideTokenLevelIndicatorSurface(token);
+
+        const shouldForceInvisible = shouldTemporarilyForceTokenInvisible(token, {
+          hasDetectionWork,
+        });
         if (shouldForceInvisible) {
           forcePendingMovementTokenInvisible(token);
-        } else {
-          const restored = restorePendingMovementTokenRendering(token, { ignoreObservedGrace });
-          if (!restored && hasPendingRenderState(token)) {
-            forcePendingMovementTokenInvisible(token);
-          } else {
-            const nativeRecomputedDetectionFilter =
-              detectionFilterState &&
-              token.detectionFilter &&
-              token.detectionFilter !== detectionFilterState.detectionFilter;
-            if (!nativeRecomputedDetectionFilter) {
-              restorePendingMovementDetectionFilterState(token, detectionFilterState);
-            }
+          if (shouldSkipForcedInvisibleTokenRefresh(token)) {
+            continue;
           }
         }
-        rememberPendingMovementTokenRefreshSignature(token, refreshContext);
+        if (
+          !shouldForceInvisible &&
+          (clearObservedDetectionFilterVisualsForCurrentView(token) ||
+            clearObservedDetectionFilterVisualsForCurrentSightLine(token))
+        ) {
+          continue;
+        }
+        if (!shouldForceInvisible) {
+          const renderHiddenLockDecision = getCoreOwnedRenderHiddenLockRefreshDecision(token);
+          if (renderHiddenLockDecision === 'restore') {
+            restorePendingMovementTokenRendering(token, { ignoreObservedGrace });
+            continue;
+          }
+          if (renderHiddenLockDecision === 'keep-locked') {
+            forcePendingMovementTokenInvisible(token);
+            continue;
+          }
+        }
+        if (!shouldForceInvisible && shouldSkipForcedInvisibleTokenRefresh(token)) {
+          continue;
+        }
+        if (
+          !shouldForceInvisible &&
+          !skipTokenRefresh &&
+          !!token?.detectionFilter &&
+          shouldStabilizeHiddenDetectionFilterAnimation(token)
+        ) {
+          withStableHiddenDetectionFilterAnimation(token, () => undefined);
+          continue;
+        }
+        const hasDetectionBlockingPendingState =
+          hasDetectionBlockingPendingVisibilityStateForToken(token);
+        const hasDetectionBlockingStoredState =
+          hasDetectionBlockingStoredVisibilityStateForToken(token);
+        const hasDetectionFilterVisual =
+          tokenHasDetectionFilterVisual(token) || tokenHasDetectionFilterMeshVisual(token);
+        const hasSpecialVisualWork =
+          hasPendingRenderState(token) ||
+          isPendingMovementRenderLocked(token) ||
+          hasDetectionBlockingPendingState ||
+          hasDetectionBlockingStoredState ||
+          hasDetectionFilterVisual;
+        const detectionFilterState = shouldForceInvisible
+          ? null
+          : capturePendingMovementDetectionFilterState(token, { hasDetectionWork });
+        const refreshContext = {
+          hasDetectionWork,
+          ignoreObservedGrace,
+          renderHiddenLockDecision: null,
+          shouldForceInvisible,
+          skipTokenRefresh,
+          hasSpecialVisualWork,
+        };
+        if (shouldSkipUnchangedPendingMovementTokenRefresh(token, refreshContext)) {
+          continue;
       }
-    } catch {
-      /* best-effort visual refresh */
+      if (!skipTokenRefresh) {
+        rememberPendingMovementRefreshVisibilityPerceptionTarget(token);
+        token?.refresh?.();
+        if (trackPerformance) {
+            pendingMovementPerformanceCounters.tokensRefreshed += 1;
+            sourceCounters.tokensRefreshed += 1;
+          }
+          hideTokenLevelIndicatorSurface(token);
+          if (shouldForceInvisible) {
+            forcePendingMovementTokenInvisible(token);
+          } else {
+            const restored = restorePendingMovementTokenRendering(token, { ignoreObservedGrace });
+            if (!restored && hasPendingRenderState(token)) {
+              forcePendingMovementTokenInvisible(token);
+            } else {
+              const nativeRecomputedDetectionFilter =
+                detectionFilterState &&
+                token.detectionFilter &&
+                token.detectionFilter !== detectionFilterState.detectionFilter;
+              if (!nativeRecomputedDetectionFilter) {
+                restorePendingMovementDetectionFilterState(token, detectionFilterState);
+              }
+            }
+          }
+          rememberPendingMovementTokenRefreshSignature(token, refreshContext);
+        }
+      } catch {
+        /* best-effort visual refresh */
+      }
     }
-  }
+  }, { flushPerception: !skipPerceptionRefresh });
 
   if (!skipTokenRefresh && !skipPerceptionRefresh) {
     try {

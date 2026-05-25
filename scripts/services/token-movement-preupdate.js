@@ -18,6 +18,10 @@ function isDefaultUserGm(userId) {
   return !!globalThis.game?.users?.get?.(userId)?.isGM;
 }
 
+function isDefaultCurrentUserGm() {
+  return !!globalThis.game?.user?.isGM;
+}
+
 function notifyDefaultWarn(message) {
   return globalThis.ui?.notifications?.warn?.(message);
 }
@@ -81,6 +85,7 @@ export function handlePreUpdateTokenMovement(
     getControlledTokens = getDefaultControlledTokens,
     setPendingTokenMovementPosition: recordPendingMovement = setPendingTokenMovementPosition,
     getConditionManager = getDefaultConditionManager,
+    isCurrentUserGm = isDefaultCurrentUserGm,
   } = {},
 ) {
   if (!hasPositionChange(changes)) return undefined;
@@ -101,6 +106,8 @@ export function handlePreUpdateTokenMovement(
     predictFinalVisibility: true,
   });
 
-  clearEstablishedInvisibleStatesForMovement(tokenDoc?.object, getConditionManager);
+  if (isCurrentUserGm()) {
+    clearEstablishedInvisibleStatesForMovement(tokenDoc?.object, getConditionManager);
+  }
   return undefined;
 }

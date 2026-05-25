@@ -1,24 +1,7 @@
-const PENDING_MOVEMENT_ANIMATION_REFRESH_DELAYS_MS = [
-  16,
-  33,
-  66,
-  100,
-  200,
-  350,
-  500,
-  800,
-];
-const PENDING_MOVEMENT_LIGHT_ANIMATION_REFRESH_DELAYS_MS = [
-  33,
-  66,
-  100,
-  200,
-  350,
-  500,
-  800,
-];
-const PENDING_MOVEMENT_POST_COMPLETION_REFRESH_DELAYS_MS = [100, 300, 700, 1200];
-const PENDING_MOVEMENT_LIGHT_POST_COMPLETION_REFRESH_DELAYS_MS = [100, 300];
+const PENDING_MOVEMENT_ANIMATION_REFRESH_DELAYS_MS = [33];
+const PENDING_MOVEMENT_LIGHT_ANIMATION_REFRESH_DELAYS_MS = [33];
+const PENDING_MOVEMENT_POST_COMPLETION_REFRESH_DELAYS_MS = [100];
+const PENDING_MOVEMENT_LIGHT_POST_COMPLETION_REFRESH_DELAYS_MS = [100];
 const PENDING_MOVEMENT_DETECTION_FILTER_RESTORE_DELAYS_MS = [16, 50, 100, 200];
 
 const pendingMovementAnimationRefreshTimeouts = new Map();
@@ -143,6 +126,7 @@ export function schedulePostCompletionRenderRefreshes(
       const targetTokenIds = getTargetTokenIds?.(tokenId) ?? [];
       refreshTokenVisibility?.([], {
         ignoreObservedGrace: true,
+        skipPerceptionRefresh: true,
         source: 'post-completion-refresh',
         ...(targetTokenIds.length ? { targetTokenIds } : {}),
       });

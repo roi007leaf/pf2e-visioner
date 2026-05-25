@@ -4,6 +4,7 @@ import {
   clearPendingTokenMovementPosition,
   forceTokenInvisibleForObserverVisibility,
   setPendingTokenMovementPosition,
+  shouldHandlePendingMovementCanvasVisibilityForToken,
   shouldTemporarilyForceTokenInvisible,
 } from '../../../scripts/services/PendingMovement/pending-token-movement.js';
 import {
@@ -43,6 +44,37 @@ describe('canvas visibility wrapper', () => {
       effects: {
         get visionSources() {
           throw new Error('pending movement wrapper should not inspect detection sources');
+        },
+        lightSources: new Map(),
+      },
+      tokens: {
+        get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+        placeables: [observer, target],
+      },
+    };
+    const wrapped = jest.fn(() => true);
+
+    setPendingTokenMovementPosition(observer.document, { x: 100, y: 0 }, [observer]);
+
+    expect(shouldHandlePendingMovementCanvasVisibilityForToken(target)).toBe(false);
+    expect(wrapCanvasVisibilityTest(wrapped, [{ x: 0, y: 0 }], { object: target })).toBe(true);
+    expect(wrapped).toHaveBeenCalledTimes(1);
+  });
+
+  test('uses fast path for unrelated detection-filter tokens during pending movement', () => {
+    const observer = createMockToken({ id: 'observer' });
+    const target = createMockToken({
+      id: 'target',
+      flags: visibilityV2Flags({ observer: 'observed' }),
+      visible: true,
+    });
+    target.detectionFilter = { id: 'unrelated-soundwave-filter' };
+    target.detectionFilterMesh = { visible: true, renderable: true, alpha: 1 };
+    global.canvas = {
+      ...global.canvas,
+      effects: {
+        get visionSources() {
+          throw new Error('unrelated detection-filter token should not inspect detection sources');
         },
         lightSources: new Map(),
       },

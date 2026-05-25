@@ -1,4 +1,4 @@
-const PENDING_MOVEMENT_CONTROLLED_DRAG_REFRESH_DELAYS_MS = [100, 250, 500];
+const PENDING_MOVEMENT_CONTROLLED_DRAG_REFRESH_DELAYS_MS = [100, 180, 260, 340, 420, 560, 760];
 const PENDING_MOVEMENT_CONTROLLED_DRAG_INTENT_TTL_MS = 1200;
 const PENDING_MOVEMENT_CONTROLLED_DRAG_INTENT_RELEASE_MS = 150;
 
@@ -49,6 +49,7 @@ function scheduleControlledTokenDragIntentRefreshes(
       refreshTokenVisibility?.([tokenId], {
         ignoreObservedGrace: true,
         skipPerceptionRefresh: true,
+        source: 'controlled-drag-intent',
         targetTokenIds,
       });
     }, delayMs);

@@ -4,6 +4,8 @@ import {
   getPendingMovementBlockContext,
   getPendingMovementBlockedDetectionEntries,
   getPendingMovementHiddenStateContext,
+  isPendingMovementCoreAnimationBypassActive,
+  isPendingMovementCoreAnimationPerceptionRefresh,
   isPendingMovementHiddenStateVisibilityProbe,
   shouldBypassPendingMovementVisionerRenderState,
   shouldUseCoreDetectionDuringPendingMovement,
@@ -12,6 +14,8 @@ import {
 
 export {
   isPendingMovementHiddenStateVisibilityProbe,
+  isPendingMovementCoreAnimationBypassActive,
+  isPendingMovementCoreAnimationPerceptionRefresh,
   shouldBypassPendingMovementVisionerRenderState,
   shouldUseCoreDetectionDuringPendingMovement,
 };

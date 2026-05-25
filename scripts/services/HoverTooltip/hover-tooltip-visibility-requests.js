@@ -34,11 +34,15 @@ export function getTooltipSenseUsed(
 export function buildTooltipVisibilityIndicatorDecision({
   observerToken,
   targetToken,
+  visibilityState: precomputedVisibilityState,
   visibilityMap,
   getDetectionBetween = () => null,
 } = {}) {
   const tokenId = targetToken?.document?.id ?? targetToken?.id;
-  const visibilityState = normalizeTooltipVisibilityState(visibilityMap?.[tokenId]);
+  const visibilityState =
+    precomputedVisibilityState === undefined
+      ? normalizeTooltipVisibilityState(visibilityMap?.[tokenId])
+      : normalizeTooltipVisibilityState(precomputedVisibilityState);
   const senseUsed = getTooltipSenseUsed(
     observerToken,
     targetToken,
@@ -57,6 +61,7 @@ function buildTooltipRequest({
   renderToken,
   observerToken,
   targetToken,
+  visibilityState,
   visibilityMap,
   mode,
   detectionTarget = null,
@@ -65,6 +70,7 @@ function buildTooltipRequest({
   const decision = buildTooltipVisibilityIndicatorDecision({
     observerToken,
     targetToken,
+    visibilityState,
     visibilityMap,
     getDetectionBetween,
   });
@@ -107,21 +113,38 @@ export function buildObserverTooltipVisibilityRequests({
     .filter(Boolean);
 }
 
+function readPairVisibilityState(observerToken, targetToken, getVisibilityState) {
+  if (typeof getVisibilityState !== 'function') return undefined;
+  try {
+    return getVisibilityState(observerToken, targetToken);
+  } catch {
+    return undefined;
+  }
+}
+
 export function buildTargetTooltipVisibilityRequests({
   subjectToken,
   observerTokens = [],
   getVisibilityMap = () => ({}),
+  getVisibilityState = null,
   getDetectionBetween = () => null,
 } = {}) {
   if (!subjectToken) return [];
 
   return observerTokens
     .map((observerToken) => {
-      const visibilityMap = getVisibilityMap(observerToken);
+      const visibilityState = readPairVisibilityState(
+        observerToken,
+        subjectToken,
+        getVisibilityState,
+      );
+      const visibilityMap =
+        visibilityState === undefined ? getVisibilityMap(observerToken) : undefined;
       return buildTooltipRequest({
         renderToken: observerToken,
         observerToken,
         targetToken: subjectToken,
+        visibilityState,
         visibilityMap,
         mode: 'target',
         detectionTarget: subjectToken,
@@ -137,6 +160,7 @@ export function buildTooltipVisibilityRequests({
   mode = 'target',
   isGM = false,
   getVisibilityMap = () => ({}),
+  getVisibilityState = null,
   getDetectionBetween = () => null,
 } = {}) {
   if (!subjectToken) return [];
@@ -161,6 +185,7 @@ export function buildTooltipVisibilityRequests({
     subjectToken,
     observerTokens: otherTokens,
     getVisibilityMap,
+    getVisibilityState,
     getDetectionBetween,
   });
 }
@@ -171,6 +196,7 @@ export function buildHoverTooltipVisibilityRequests({
   tooltipMode = 'target',
   isGM = false,
   getVisibilityMap = () => ({}),
+  getVisibilityState = null,
   getDetectionBetween = () => null,
 } = {}) {
   return buildTooltipVisibilityRequests({
@@ -179,6 +205,7 @@ export function buildHoverTooltipVisibilityRequests({
     mode: tooltipMode === 'observer' ? 'observer' : 'target',
     isGM,
     getVisibilityMap,
+    getVisibilityState,
     getDetectionBetween,
   });
 }

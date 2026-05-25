@@ -1,4 +1,24 @@
+import { MODULE_ID } from '../../constants.js';
 import { detectionFrameCache, isTokenBlinded } from './detection-visibility-context.js';
+
+let sceneVisionSharingLinkCache = null;
+
+function currentCanvasFrameKey() {
+  return canvas?.app?.ticker?.lastTime ?? null;
+}
+
+function sceneHasVisionSharingLinks() {
+  const frameKey = currentCanvasFrameKey();
+  if (sceneVisionSharingLinkCache?.frameKey === frameKey) {
+    return sceneVisionSharingLinkCache.value;
+  }
+
+  const value = (canvas?.tokens?.placeables || []).some((token) =>
+    !!token?.document?.getFlag?.(MODULE_ID, 'visionMasterTokenId'),
+  );
+  sceneVisionSharingLinkCache = { frameKey, value };
+  return value;
+}
 
 export function wrapTokenDocumentPrepareBaseData(wrapped) {
   wrapped();
@@ -19,6 +39,14 @@ export function wrapTokenDocumentPrepareBaseData(wrapped) {
 export function wrapTokenVisionSource(wrapped) {
   const isNormalVisionSource = wrapped();
   const thisTokenBlinded = isTokenBlinded(this);
+  if (thisTokenBlinded) {
+    return false;
+  }
+
+  if (!sceneHasVisionSharingLinks()) {
+    return isNormalVisionSource;
+  }
+
   const controlledTokens = canvas?.tokens?.controlled || [];
 
   for (const controlledToken of controlledTokens) {
@@ -36,10 +64,6 @@ export function wrapTokenVisionSource(wrapped) {
         return true;
       }
     }
-  }
-
-  if (thisTokenBlinded) {
-    return false;
   }
 
   const visionMasterTokenId = detectionFrameCache.getVisionMasterTokenId(this.document);

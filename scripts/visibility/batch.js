@@ -40,6 +40,7 @@ function shouldSuppressObservedTargetForObserver(observerToken) {
 }
 
 export async function batchUpdateVisibilityEffects(observerToken, targetUpdates, options = {}) {
+  if (!game.user?.isGM) return;
   if (!observerToken?.actor || !targetUpdates?.length) return;
   if (options.deferDuringPendingMovement !== false && hasPendingMovementRenderWork()) return;
   try {

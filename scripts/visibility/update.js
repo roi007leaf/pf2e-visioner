@@ -48,6 +48,7 @@ export async function updateSingleVisibilityEffect(
   newVisibilityState,
   options = {},
 ) {
+  if (!game.user?.isGM) return;
   if (!observerToken?.actor || !targetToken?.actor) return;
   if (options.deferDuringPendingMovement !== false && hasPendingMovementRenderWork()) return;
 

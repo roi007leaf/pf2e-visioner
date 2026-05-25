@@ -170,6 +170,41 @@ describe('hover tooltip visibility request planning', () => {
     ]);
   });
 
+  test('builds target-mode requests with pair visibility reads instead of full map reads', () => {
+    const subject = makeToken('subject');
+    const observers = Array.from({ length: 20 }, (_, index) =>
+      makeToken(`observer-${index}`),
+    );
+    const getVisibilityMap = jest.fn(() => {
+      throw new Error('full map read should not be needed');
+    });
+    const getVisibilityState = jest.fn((observer) =>
+      observer.id === 'observer-3' ? 'hidden' : 'observed',
+    );
+
+    const requests = buildTooltipVisibilityRequests({
+      subjectToken: subject,
+      allTokens: [subject, ...observers],
+      mode: 'target',
+      isGM: true,
+      getVisibilityMap,
+      getVisibilityState,
+    });
+
+    expect(getVisibilityMap).not.toHaveBeenCalled();
+    expect(getVisibilityState).toHaveBeenCalledTimes(observers.length);
+    expect(requests).toEqual([
+      {
+        renderToken: observers[3],
+        observerToken: observers[3],
+        visibilityState: 'hidden',
+        mode: 'target',
+        detectionTarget: subject,
+        senseUsed: null,
+      },
+    ]);
+  });
+
   test('returns no player requests for non-owned subject token', () => {
     const subject = makeToken('subject', { isOwner: false });
     const observer = makeToken('observer');

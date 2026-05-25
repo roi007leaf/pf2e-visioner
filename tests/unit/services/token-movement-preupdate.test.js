@@ -92,7 +92,7 @@ describe('token movement pre-update service', () => {
     expect(refreshPendingMovementTokenVisibility).not.toHaveBeenCalled();
   });
 
-  test('fires established invisible cleanup without awaiting it', () => {
+  test('fires established invisible cleanup from the GM client without awaiting it', () => {
     const clearEstablishedInvisibleStates = jest.fn().mockResolvedValue(undefined);
     const token = {
       actor: {
@@ -103,10 +103,30 @@ describe('token movement pre-update service', () => {
     handlePreUpdateTokenMovement(makeTokenDoc({ object: token }), { y: 200 }, {}, 'u1', {
       isAvsEnabled: () => false,
       isUserGm: () => false,
+      isCurrentUserGm: () => true,
       setPendingTokenMovementPosition: jest.fn(() => false),
       getConditionManager: () => ({ clearEstablishedInvisibleStates }),
     });
 
     expect(clearEstablishedInvisibleStates).toHaveBeenCalledWith(token);
+  });
+
+  test('does not write invisible cleanup from a player client during movement', () => {
+    const clearEstablishedInvisibleStates = jest.fn().mockResolvedValue(undefined);
+    const token = {
+      actor: {
+        hasCondition: jest.fn(() => true),
+      },
+    };
+
+    handlePreUpdateTokenMovement(makeTokenDoc({ object: token }), { y: 200 }, {}, 'u1', {
+      isAvsEnabled: () => false,
+      isUserGm: () => false,
+      isCurrentUserGm: () => false,
+      setPendingTokenMovementPosition: jest.fn(() => false),
+      getConditionManager: () => ({ clearEstablishedInvisibleStates }),
+    });
+
+    expect(clearEstablishedInvisibleStates).not.toHaveBeenCalled();
   });
 });

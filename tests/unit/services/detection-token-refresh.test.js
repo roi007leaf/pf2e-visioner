@@ -2,8 +2,10 @@ import '../../setup.js';
 
 import {
   clearPendingTokenMovementPosition,
+  refreshPendingMovementTokenVisibility,
   setPendingTokenMovementPosition,
 } from '../../../scripts/services/PendingMovement/pending-token-movement.js';
+import { flushScheduledCanvasPerceptionUpdate } from '../../../scripts/helpers/perception-refresh.js';
 import { forcePendingMovementTokenInvisible } from '../../../scripts/services/PendingMovement/pending-movement-render-lock.js';
 import { wrapTokenRefreshVisibility } from '../../../scripts/services/Detection/detection-token-refresh.js';
 import { legacyVisibilityToProfile } from '../../../scripts/visibility/perception-profile.js';
@@ -802,5 +804,39 @@ describe('detection token refresh wrapper', () => {
 
     expect(wrapped).toHaveBeenCalledTimes(1);
     expect(target.visible).toBe(false);
+  });
+
+  test('coalesces delayed visibility perception updates for pending movement refreshed tokens', () => {
+    const observer = createMockToken({ id: 'observer' });
+    const target = createMockToken({ id: 'target', visible: true });
+    target.refresh = jest.fn();
+    const perceptionUpdate = jest.fn();
+    global.canvas = {
+      ...global.canvas,
+      perception: { update: perceptionUpdate },
+      tokens: {
+        get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+        placeables: [observer, target],
+      },
+    };
+
+    refreshPendingMovementTokenVisibility('observer', { skipPerceptionRefresh: true });
+    const wrapped = jest.fn(() => {
+      global.canvas.perception.update({ refreshVision: true });
+      global.canvas.perception.update({ refreshLighting: true });
+      return 'wrapped-result';
+    });
+
+    expect(wrapTokenRefreshVisibility.call(target, wrapped)).toBe('wrapped-result');
+
+    expect(perceptionUpdate).not.toHaveBeenCalled();
+
+    flushScheduledCanvasPerceptionUpdate();
+
+    expect(perceptionUpdate).toHaveBeenCalledTimes(1);
+    expect(perceptionUpdate).toHaveBeenCalledWith({
+      refreshVision: true,
+      refreshLighting: true,
+    });
   });
 });

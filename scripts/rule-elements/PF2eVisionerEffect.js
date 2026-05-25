@@ -12,6 +12,10 @@ import { ShareVision } from './operations/ShareVision.js';
 import { VisibilityOverride } from './operations/VisibilityOverride.js';
 import { SourceTracker } from './SourceTracker.js';
 
+function isGMClient() {
+  return !!globalThis.game?.user?.isGM;
+}
+
 export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields) {
   if (!baseRuleElementClass || !fields) {
     console.error('PF2E Visioner | Missing dependencies for PF2eVisionerEffect creation');
@@ -262,12 +266,14 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
     async onCreate(actorUpdates) {
       const log = getLogger('RuleElements/Effect');
       log.debug(() => ({ msg: 'onCreate', item: this.item?.name, actor: this.actor?.name }));
+      if (!isGMClient()) return;
       await this.applyOperations({ triggerRecalculation: true });
     }
 
     async onUpdate(actorUpdates) {
       const log = getLogger('RuleElements/Effect');
       log.debug(() => ({ msg: 'onUpdate', item: this.item?.name, actor: this.actor?.name }));
+      if (!isGMClient()) return;
 
       await this.removeAllFlagsForRuleElement();
       await this.applyOperations({ triggerRecalculation: true });
@@ -275,6 +281,7 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
 
     async onDelete(actorUpdates) {
       const log = getLogger('RuleElements/Effect');
+      if (!isGMClient()) return;
       const tokens = this.actor?.getActiveTokens?.() || [];
       const tokenIds = tokens.map((t) => t.id);
       log.debug(() => ({
@@ -520,6 +527,7 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
     async applyOperations(options = {}) {
       const { triggerRecalculation = false } = options;
       const log = getLogger('RuleElements/Effect');
+      if (!isGMClient()) return;
       const token = this.getSubjectToken();
 
       if (!token) {

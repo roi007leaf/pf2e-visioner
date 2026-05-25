@@ -8,6 +8,7 @@ import { scheduleCanvasPerceptionUpdate } from '../helpers/perception-refresh.js
 import { initializeHoverTooltips } from '../services/HoverTooltips.js';
 import {
   clearNoObserverDetectionFilterVisuals,
+  getPendingMovementRefreshTargetIds,
   hasPendingMovementRenderWork,
   primePendingControlledTokenDragIntent,
   refreshPendingMovementTokenVisibility,
@@ -160,10 +161,15 @@ function scheduleNoObserverVisibilityRefresh() {
 function refreshPendingVisibilityAfterControlToken() {
   try {
     const hasRenderWork = hasPendingMovementRenderWork();
+    const targetTokenIds = hasRenderWork ? getPendingMovementRefreshTargetIds() : [];
     refreshPendingMovementTokenVisibility(
       [],
       hasRenderWork
-        ? { ignoreObservedGrace: true }
+        ? {
+          ignoreObservedGrace: true,
+          source: 'control-token-session',
+          ...(targetTokenIds.length ? { targetTokenIds } : {}),
+        }
         : {
           ignoreObservedGrace: true,
           skipTokenRefresh: true,
@@ -216,6 +222,10 @@ function registerPendingMovementPointerIntentListeners() {
 
 async function refreshVisionSharingTokenIds() {
   const log = getLogger('VisionSharing/SceneChange');
+
+  if (!game.user?.isGM) {
+    return;
+  }
 
   if (!canvas?.tokens?.placeables) {
     return;
@@ -282,6 +292,11 @@ async function refreshVisionSharingTokenIds() {
 
 async function reapplyRuleElementsOnLoad() {
   const log = getLogger('RuleElements/Lifecycle');
+
+  if (!game.user?.isGM) {
+    log.debug('Non-GM client, skipping rule element reapplication');
+    return;
+  }
 
   if (!canvas?.tokens?.placeables) {
     log.debug('No tokens on canvas, skipping rule element reapplication');

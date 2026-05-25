@@ -88,6 +88,31 @@ describe('deleted effect cleanup service', () => {
     expect(otherToken.document.unsetFlag).not.toHaveBeenCalledWith(MODULE_ID, 'waitingSneak');
   });
 
+  test('skips token document cleanup for non-GM clients', async () => {
+    const waitingToken = makeToken('waiting', 'actor-1', { waitingSneak: true });
+    const cleanupDeletedVisionerRuleElements = jest.fn();
+
+    const result = await cleanupDeletedEffectItem(
+      makeEffect({
+        system: {
+          slug: 'waiting-for-sneak-start',
+          rules: [{ key: 'PF2eVisionerEffect', operations: [] }],
+        },
+      }),
+      {
+        isGM: () => false,
+        isAvsEnabled: () => true,
+        getTokensForActor: () => [waitingToken],
+        syncCoverMapsForDeletedCoverEffect: jest.fn().mockResolvedValue({ changed: false }),
+        cleanupDeletedVisionerRuleElements,
+      },
+    );
+
+    expect(result).toEqual({ skipped: true, reason: 'not-gm' });
+    expect(waitingToken.document.unsetFlag).not.toHaveBeenCalled();
+    expect(cleanupDeletedVisionerRuleElements).not.toHaveBeenCalled();
+  });
+
   test('clears sneak-active flags for deleted sneaking effects only when AVS is enabled', async () => {
     const sneakingToken = makeToken('sneaking', 'actor-1', { 'sneak-active': true });
     const otherToken = makeToken('other', 'actor-1', { 'sneak-active': false });

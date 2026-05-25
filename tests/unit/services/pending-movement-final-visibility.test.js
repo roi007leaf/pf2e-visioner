@@ -134,4 +134,104 @@ describe('pending movement final visibility prediction', () => {
 
     expect(prediction.finalVisibilityStatesByTargetId.get('target')).toBe('undetected');
   });
+
+  test('targets final prediction completion refresh to affected token ids', async () => {
+    const entry = {
+      serial: 7,
+      finalVisibilityStatesByTargetId: new Map(),
+      finalVisibilityStatesByObserverId: new Map(),
+    };
+    const refreshTokenVisibility = jest.fn();
+    const controller = createPendingMovementFinalVisibilityController({
+      getEntry: (tokenId) => (tokenId === 'observer' ? entry : null),
+      predictionDelayMs: 0,
+      refreshTokenVisibility,
+    });
+
+    controller.scheduleFinalVisibilityPrediction(
+      'observer',
+      7,
+      { id: 'observer' },
+      { x: 100, y: 0 },
+      {
+        predictFinalVisibility: () =>
+          Promise.resolve({
+            finalVisibilityStatesByTargetId: new Map([['target', 'hidden']]),
+            finalVisibilityStatesByObserverId: new Map([['other-observer', 'observed']]),
+          }),
+      },
+    );
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(refreshTokenVisibility).toHaveBeenCalledWith(['observer'], {
+      ignoreObservedGrace: true,
+      source: 'final-visibility-prediction',
+      targetTokenIds: ['target', 'observer'],
+    });
+  });
+
+  test('batches incremental final prediction refreshes while full prediction continues', async () => {
+    jest.useFakeTimers();
+    const observer = createMockToken({ id: 'observer' });
+    const firstTarget = createMockToken({ id: 'first-target' });
+    const secondTarget = createMockToken({ id: 'second-target' });
+    const slowTarget = createMockToken({ id: 'slow-target' });
+    const entry = {
+      serial: 7,
+      finalVisibilityStatesByTargetId: new Map(),
+      finalVisibilityStatesByObserverId: new Map(),
+    };
+    let releaseSlow;
+    const slowPrediction = new Promise((resolve) => {
+      releaseSlow = () => resolve(null);
+    });
+    const refreshTokenVisibility = jest.fn();
+    const controller = createPendingMovementFinalVisibilityController({
+      getEntry: (tokenId) => (tokenId === 'observer' ? entry : null),
+      getPlaceableTokens: () => [observer, firstTarget, secondTarget, slowTarget],
+      getStoredVisibilityState: (_source, target) =>
+        target?.id === 'first-target' || target?.id === 'second-target'
+          ? 'undetected'
+          : 'observed',
+      predictionDelayMs: 0,
+      incrementalRefreshDelayMs: 25,
+      refreshTokenVisibility,
+    });
+
+    controller.scheduleFinalVisibilityPrediction(
+      'observer',
+      7,
+      observer.document,
+      { x: 100, y: 0 },
+      {
+        predictFinalVisibility: true,
+        calculateFinalVisibility: (_observerArg, targetArg) => {
+          if (targetArg?.id === 'first-target') return Promise.resolve('hidden');
+          if (targetArg?.id === 'second-target') return Promise.resolve('hidden');
+          if (targetArg?.id === 'slow-target') return slowPrediction;
+          return Promise.resolve(null);
+        },
+      },
+    );
+
+    jest.advanceTimersByTime(0);
+    for (let i = 0; i < 8; i += 1) {
+      await Promise.resolve();
+    }
+    jest.advanceTimersByTime(25);
+
+    expect(refreshTokenVisibility).toHaveBeenCalledTimes(1);
+    expect(refreshTokenVisibility).toHaveBeenCalledWith(['observer'], {
+      ignoreObservedGrace: true,
+      skipPerceptionRefresh: true,
+      source: 'final-visibility-incremental',
+      targetTokenIds: ['first-target', 'second-target'],
+    });
+
+    releaseSlow();
+    await slowPrediction;
+  });
 });

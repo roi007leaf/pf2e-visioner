@@ -19,6 +19,7 @@ const DEFAULT_DETECTION_BLOCKING_VISIBILITY_STATES = new Set([
 ]);
 const DEFAULT_RENDER_HIDDEN_FROM_OBSERVER_STATES = new Set(['undetected', 'unnoticed']);
 const DEFAULT_CORE_LOS_FINAL_PREDICTION_STATES = new Set(['observed', 'concealed']);
+const PENDING_MOVEMENT_FINAL_VISIBILITY_INCREMENTAL_REFRESH_DELAY_MS = 16;
 
 export function normalizePendingVisibilityState(value) {
   if (!value) return null;
@@ -79,6 +80,9 @@ export function createPendingMovementFinalVisibilityController(adapter = {}) {
   const warn = adapter.warn ?? ((...args) => console.warn(...args));
   const predictionDelayMs =
     adapter.predictionDelayMs ?? PENDING_MOVEMENT_FINAL_VISIBILITY_PREDICTION_DELAY_MS;
+  const incrementalRefreshDelayMs =
+    adapter.incrementalRefreshDelayMs ??
+    PENDING_MOVEMENT_FINAL_VISIBILITY_INCREMENTAL_REFRESH_DELAY_MS;
 
   const getTokenObjectForDocument = (tokenDoc) =>
     tokenDoc?.object || tokenObjectForId(tokenIdOf(tokenDoc));
@@ -294,6 +298,29 @@ export function createPendingMovementFinalVisibilityController(adapter = {}) {
     return byTargetId.size > 0 || byObserverId.size > 0;
   };
 
+  const finalVisibilityRefreshTargetIds = (movingTokenId, prediction) => {
+    const targetIds = new Set();
+    const byTargetId = createPendingVisibilityStateMap(
+      prediction?.finalVisibilityStatesByTargetId ??
+      prediction?.byTargetId ??
+      prediction?.targetStates,
+    );
+    const byObserverId = createPendingVisibilityStateMap(
+      prediction?.finalVisibilityStatesByObserverId ??
+      prediction?.byObserverId ??
+      prediction?.observerStates,
+    );
+
+    for (const targetId of byTargetId.keys()) {
+      targetIds.add(targetId);
+    }
+    if (movingTokenId && byObserverId.size > 0) {
+      targetIds.add(movingTokenId);
+    }
+
+    return [...targetIds];
+  };
+
   const publishFinalVisibilityState = (entry, update) => {
     if (!entry || !update?.tokenId) return false;
 
@@ -316,17 +343,47 @@ export function createPendingMovementFinalVisibilityController(adapter = {}) {
     if (!entry) return;
     entry.finalVisibilityPredictionPending = true;
 
+    let incrementalRefreshTimerId = null;
+    const incrementalRefreshTargetIds = new Set();
+    const flushIncrementalRefresh = () => {
+      incrementalRefreshTimerId = null;
+      const targetTokenIds = [...incrementalRefreshTargetIds];
+      incrementalRefreshTargetIds.clear();
+      if (!targetTokenIds.length) return;
+
+      const currentEntry = getEntry(tokenId);
+      if (!currentEntry || currentEntry.serial !== serial) return;
+      refreshTokenVisibility([tokenId], {
+        ignoreObservedGrace: true,
+        skipPerceptionRefresh: true,
+        source: 'final-visibility-incremental',
+        targetTokenIds,
+      });
+    };
+    const queueIncrementalRefresh = (targetTokenId) => {
+      if (!targetTokenId) return;
+      incrementalRefreshTargetIds.add(targetTokenId);
+      if (incrementalRefreshTimerId !== null) return;
+      incrementalRefreshTimerId = setTimeout(
+        flushIncrementalRefresh,
+        incrementalRefreshDelayMs,
+      );
+    };
+    const clearIncrementalRefresh = () => {
+      if (incrementalRefreshTimerId !== null) {
+        clearTimeout(incrementalRefreshTimerId);
+        incrementalRefreshTimerId = null;
+      }
+      incrementalRefreshTargetIds.clear();
+    };
+
     const publishIncrementalState = (update) => {
       const currentEntry = getEntry(tokenId);
       if (!currentEntry || currentEntry.serial !== serial) return;
       if (!publishFinalVisibilityState(currentEntry, update)) return;
 
       const targetTokenId = update.direction === 'observer' ? tokenId : update.tokenId;
-      refreshTokenVisibility([tokenId], {
-        ignoreObservedGrace: true,
-        skipPerceptionRefresh: true,
-        targetTokenIds: [targetTokenId],
-      });
+      queueIncrementalRefresh(targetTokenId);
     };
 
     const timerId = setTimeout(() => {
@@ -347,7 +404,13 @@ export function createPendingMovementFinalVisibilityController(adapter = {}) {
           currentEntry.finalVisibilityPredictionPending = false;
           const changed = mergeFinalVisibilityStates(currentEntry, prediction);
           if (changed) {
-            refreshTokenVisibility([tokenId], { ignoreObservedGrace: true });
+            clearIncrementalRefresh();
+            const targetTokenIds = finalVisibilityRefreshTargetIds(tokenId, prediction);
+            refreshTokenVisibility([tokenId], {
+              ignoreObservedGrace: true,
+              source: 'final-visibility-prediction',
+              ...(targetTokenIds.length ? { targetTokenIds } : {}),
+            });
           }
         })
         .catch((error) => {
@@ -355,6 +418,7 @@ export function createPendingMovementFinalVisibilityController(adapter = {}) {
           if (currentEntry?.serial === serial) {
             currentEntry.finalVisibilityPredictionPending = false;
           }
+          clearIncrementalRefresh();
           warn('PF2E Visioner | pending movement final visibility prediction failed:', error);
         });
     }, predictionDelayMs);

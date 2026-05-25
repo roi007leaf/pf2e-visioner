@@ -13,7 +13,7 @@ import { getCoverOverlayState } from '../cover/auto-cover/cover-state-query.js';
 import { canShowTooltips } from '../helpers/tooltip-utils.js';
 import { SenseSuppressionRegionBehavior } from '../regions/SenseSuppressionRegionBehavior.js';
 import { getDetectionBetween } from '../stores/detection-map.js';
-import { getVisibilityMap } from '../utils.js';
+import { getVisibilityBetween, getVisibilityMap } from '../utils.js';
 import { setPanningState } from '../utils/scheduler.js';
 import {
   buildVisibilityFactorTooltipLines,
@@ -833,6 +833,7 @@ function showVisibilityIndicators(hoveredToken) {
     tooltipMode: HoverTooltips.tooltipMode,
     isGM: game.user.isGM,
     getVisibilityMap,
+    getVisibilityState: getVisibilityBetween,
     getDetectionBetween,
   });
 
@@ -861,6 +862,7 @@ function showVisibilityIndicatorsForToken(observerToken, forceMode = null) {
     mode: effectiveMode,
     isGM: game.user.isGM,
     getVisibilityMap,
+    getVisibilityState: getVisibilityBetween,
     getDetectionBetween,
   });
 

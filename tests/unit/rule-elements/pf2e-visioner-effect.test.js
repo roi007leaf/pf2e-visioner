@@ -354,6 +354,85 @@ describe('Rule Element Integration', () => {
   });
 });
 
+describe('PF2eVisionerEffect client permissions', () => {
+  class MockStringField { }
+  class MockArrayField {
+    constructor(element) {
+      this.element = element;
+    }
+  }
+  class MockSchemaField {
+    constructor(schema) {
+      this.schema = schema;
+    }
+  }
+  class MockObjectField { }
+  class MockAnyField { }
+
+  async function makeRuleElementClass() {
+    const baseRuleElementClass = class {
+      constructor(data = {}, item = {}) {
+        this.operations = data.operations || [];
+        this.slug = data.slug || 'effect';
+        this.item = item;
+        this.actor = item.actor;
+        this.predicate = [];
+      }
+
+      static defineSchema() {
+        return {};
+      }
+
+      test() {
+        return true;
+      }
+    };
+    const fields = {
+      AnyField: MockAnyField,
+      ArrayField: MockArrayField,
+      SchemaField: MockSchemaField,
+      StringField: MockStringField,
+      NumberField: MockStringField,
+      BooleanField: MockStringField,
+      ObjectField: MockObjectField,
+    };
+    const { createPF2eVisionerEffectRuleElement } = await import(
+      '../../../scripts/rule-elements/PF2eVisionerEffect.js'
+    );
+    return createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields);
+  }
+
+  it('does not update token documents from non-GM rule-element delete hooks', async () => {
+    global.game.user.isGM = false;
+    const token = {
+      id: 'token-1',
+      document: {
+        getFlag: jest.fn((moduleId, key) => {
+          if (key === 'ruleElementRegistry') return { 'item-effect-1': ['visibilityReplacement'] };
+          if (key === 'stateSource') return {};
+          return undefined;
+        }),
+        setFlag: jest.fn(),
+        update: jest.fn(),
+      },
+    };
+    const EffectRuleElement = await makeRuleElementClass();
+    const item = {
+      id: 'effect-1',
+      name: 'Effect 1',
+      actor: { getActiveTokens: () => [token] },
+    };
+    const instance = new EffectRuleElement({
+      operations: [{ type: 'overrideVisibility' }],
+    }, item);
+
+    await instance.onDelete();
+
+    expect(token.document.setFlag).not.toHaveBeenCalled();
+    expect(token.document.update).not.toHaveBeenCalled();
+  });
+});
+
 
 
 

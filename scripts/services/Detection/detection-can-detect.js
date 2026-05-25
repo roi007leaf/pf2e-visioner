@@ -1,10 +1,13 @@
 import { MODULE_ID } from '../../constants.js';
 import { AVS_EXPLICIT_VISIBLE_DETECTION_SENSE } from '../../stores/visibility-map.js';
 import {
+  isPendingMovementCoreAnimationBypassActive,
+  isPendingMovementCoreAnimationPerceptionRefresh,
   isPendingMovementHiddenStateVisibilityProbe,
   shouldUseCoreDetectionDuringPendingMovement,
   shouldTemporarilyBlockSightDetection,
 } from '../PendingMovement/pending-movement-detection-gate.js';
+import { shouldHandlePendingMovementCanvasVisibilityForToken } from '../PendingMovement/pending-movement-render-lock.js';
 import { isExplicitVisiblePair } from '../ExplicitVisibilityPairs.js';
 import {
   detectionFrameCache,
@@ -19,6 +22,14 @@ export function createCanDetectVisibilityWrapper(threshold) {
     const canDetect = wrapped(visionSource, target, ...args);
     const observerToken = visionSource?.object;
     const modeId = this?.id ?? args?.[0]?.id ?? null;
+    if (isPendingMovementCoreAnimationBypassActive()) return canDetect;
+    if (
+      (isPendingMovementCoreAnimationPerceptionRefresh() ||
+        isPendingMovementCoreAnimationBypassActive()) &&
+      !shouldHandlePendingMovementCanvasVisibilityForToken(target)
+    ) {
+      return canDetect;
+    }
     if (shouldUseCoreDetectionDuringPendingMovement(observerToken, target)) return canDetect;
 
     const visibility = getVisionerVisibilityBetweenTokens(observerToken, target);

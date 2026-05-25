@@ -56,7 +56,9 @@ export class TokenEventHandler {
     });
     this._deferredAnimatedMoves = new Map();
     this._recentlyHandledAnimatedMoves = new Map();
+    this._draggingUpdateFallbackTimers = new Map();
     this._recentAnimationSkipMs = 1000;
+    this._draggingUpdateFallbackMs = 1500;
   }
 
   initialize() {
@@ -130,6 +132,7 @@ export class TokenEventHandler {
         movementChanges,
         { options, userId },
       );
+      this._markAnimatedMoveHandledRecently(tokenId, movementChanges);
     } catch (e) {
       console.warn('PF2E Visioner | Error processing move token:', e);
     }
@@ -176,19 +179,47 @@ export class TokenEventHandler {
     this._deferredAnimatedMoves.delete(tokenId);
   }
 
+  _storeMovementDestination(tokenDoc, movementChanges) {
+    this.positionManager.storeUpdatedTokenDoc(tokenDoc.id, {
+      id: tokenDoc.id,
+      x: movementChanges.x ?? tokenDoc.x,
+      y: movementChanges.y ?? tokenDoc.y,
+      width: tokenDoc.width,
+      height: tokenDoc.height,
+      name: tokenDoc.name,
+      elevation: tokenDoc.elevation,
+    });
+  }
+
+  _scheduleDraggingUpdateFallback(tokenDoc, movementChanges, context = {}) {
+    const tokenId = tokenDoc?.id;
+    if (!tokenId) return;
+
+    const existing = this._draggingUpdateFallbackTimers.get(tokenId);
+    if (existing) clearTimeout(existing);
+
+    const timeoutId = setTimeout(async () => {
+      this._draggingUpdateFallbackTimers.delete(tokenId);
+      if (this._wasAnimatedMoveHandledRecently(tokenId, movementChanges)) return;
+      if (this._isAnimatedMoveDeferred(tokenId, movementChanges)) return;
+
+      try {
+        const currentTokenDoc = canvas.tokens?.get(tokenId)?.document ?? tokenDoc;
+        await this._finalizeCompletedMovement(currentTokenDoc, movementChanges, context);
+        this._markAnimatedMoveHandledRecently(tokenId, movementChanges);
+      } catch (error) {
+        console.warn('PF2E Visioner | Error processing dragging fallback movement:', error);
+      }
+    }, this._draggingUpdateFallbackMs);
+
+    this._draggingUpdateFallbackTimers.set(tokenId, timeoutId);
+  }
+
   async _finalizeCompletedMovement(tokenDoc, movementChanges, context = {}) {
     if (!tokenDoc) return;
 
     try {
-      this.positionManager.storeUpdatedTokenDoc(tokenDoc.id, {
-        id: tokenDoc.id,
-        x: movementChanges.x ?? tokenDoc.x,
-        y: movementChanges.y ?? tokenDoc.y,
-        width: tokenDoc.width,
-        height: tokenDoc.height,
-        name: tokenDoc.name,
-        elevation: tokenDoc.elevation,
-      });
+      this._storeMovementDestination(tokenDoc, movementChanges);
     } catch {
       /* best-effort */
     }
@@ -308,14 +339,9 @@ export class TokenEventHandler {
         // CRITICAL: Store the updated document position BEFORE returning early
         // This ensures the PositionManager has the correct destination position
         // when the batch eventually processes (either from moveToken or later updateToken)
-        this.positionManager.storeUpdatedTokenDoc(tokenDoc.id, {
-          id: tokenDoc.id,
+        this._storeMovementDestination(tokenDoc, {
           x: changes.x !== undefined ? changes.x : tokenDoc.x,
           y: changes.y !== undefined ? changes.y : tokenDoc.y,
-          width: tokenDoc.width,
-          height: tokenDoc.height,
-          name: tokenDoc.name,
-          elevation: tokenDoc.elevation,
         });
 
         // If animating (e.g., remote player movement), wait for animation to complete
@@ -366,6 +392,16 @@ export class TokenEventHandler {
         // Token dragged but released at same position - clear cached data
         this.positionManager.clearUpdatedTokenDocsCache(tokenDoc.id);
         this.systemState.debug('token-drag-same-position', tokenDoc.id, 'cleared cached positions');
+        return;
+      }
+
+      if (options?.method === 'dragging') {
+        if (changeFlags.positionChanged && this.batchOrchestrator?.notifyTokenMovementStart) {
+          this.batchOrchestrator.notifyTokenMovementStart();
+        }
+        const movementChanges = { x: newX, y: newY };
+        this._storeMovementDestination(tokenDoc, movementChanges);
+        this._scheduleDraggingUpdateFallback(tokenDoc, movementChanges, { options, userId });
         return;
       }
     }

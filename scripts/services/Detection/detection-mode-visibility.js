@@ -1,10 +1,13 @@
 import { MODULE_ID } from '../../constants.js';
 import {
   getPendingMovementHiddenStateBlock,
+  isPendingMovementCoreAnimationBypassActive,
+  isPendingMovementCoreAnimationPerceptionRefresh,
   isPendingMovementHiddenStateVisibilityProbe,
   shouldUseCoreDetectionDuringPendingMovement,
   shouldTemporarilyBlockSightDetection,
 } from '../PendingMovement/pending-movement-detection-gate.js';
+import { shouldHandlePendingMovementCanvasVisibilityForToken } from '../PendingMovement/pending-movement-render-lock.js';
 import {
   getVisionerVisibilityBetweenTokens,
   NON_VISUAL_DETECTION_MODE_IDS,
@@ -31,6 +34,16 @@ export function testDetectionModeVisibility(visionSource, mode, config = {}) {
   const modeId = mode?.id ?? this?.id ?? null;
   const observerToken = visionSource?.object;
   const targetToken = config.object;
+  if (isPendingMovementCoreAnimationBypassActive()) {
+    return testDetectionPoints(this, visionSource, mode, config);
+  }
+  if (
+    (isPendingMovementCoreAnimationPerceptionRefresh() ||
+      isPendingMovementCoreAnimationBypassActive()) &&
+    !shouldHandlePendingMovementCanvasVisibilityForToken(targetToken)
+  ) {
+    return testDetectionPoints(this, visionSource, mode, config);
+  }
   if (shouldUseCoreDetectionDuringPendingMovement(observerToken, targetToken)) {
     return testDetectionPoints(this, visionSource, mode, config);
   }

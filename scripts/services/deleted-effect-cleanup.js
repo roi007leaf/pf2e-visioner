@@ -9,6 +9,10 @@ function isDefaultAvsEnabled() {
   return globalThis.game?.settings?.get?.(MODULE_ID, 'autoVisibilityEnabled') ?? false;
 }
 
+function isDefaultGM() {
+  return !!globalThis.game?.user?.isGM;
+}
+
 async function defaultSyncCoverMapsForDeletedCoverEffect(item) {
   const { syncCoverMapsForDeletedCoverEffect } = await import('../cover/cleanup.js');
   return syncCoverMapsForDeletedCoverEffect(item);
@@ -111,6 +115,7 @@ async function cleanupVisionerRuleElements(item, tokens, { cleanupDeletedVisione
 export async function cleanupDeletedEffectItem(
   item,
   {
+    isGM = isDefaultGM,
     getTokensForActor = getDefaultTokensForActor,
     isAvsEnabled = isDefaultAvsEnabled,
     syncCoverMapsForDeletedCoverEffect = defaultSyncCoverMapsForDeletedCoverEffect,
@@ -123,6 +128,7 @@ export async function cleanupDeletedEffectItem(
 ) {
   try {
     if (item?.type !== 'effect') return { skipped: true, reason: 'not-effect' };
+    if (!isGM()) return { skipped: true, reason: 'not-gm' };
 
     const actor = item?.parent;
     if (!actor) return { skipped: true, reason: 'no-actor' };
