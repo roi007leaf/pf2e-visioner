@@ -4783,11 +4783,11 @@ describe('pending token movement hidden detection guard', () => {
     global.canvas.walls.placeables = [];
     let currentLosContainsTarget = false;
     const observer = createMockToken({
-      id: 'observer',
+      id: 'observer-los-change',
       controlled: true,
-      flags: visibilityV2Flags({ target: 'observed' }),
+      flags: visibilityV2Flags({ 'target-los-change': 'observed' }),
     });
-    const target = createMockToken({ id: 'target', x: 3, y: 0, visible: true });
+    const target = createMockToken({ id: 'target-los-change', x: 3, y: 0, visible: true });
     target.detectionFilter = { id: 'soundwave-filter' };
     target.detectionFilterMesh = { visible: true, renderable: true, alpha: 1 };
     target.refresh = jest.fn();
@@ -4796,7 +4796,7 @@ describe('pending token movement hidden detection guard', () => {
       effects: {
         visionSources: new Map([
           [
-            'observer',
+            'observer-los-change',
             {
               active: true,
               object: observer,
@@ -4808,7 +4808,9 @@ describe('pending token movement hidden detection guard', () => {
         lightSources: new Map(),
       },
       tokens: {
-        get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+        get: jest.fn((id) =>
+          id === 'observer-los-change' ? observer : id === 'target-los-change' ? target : null,
+        ),
         _draggedToken: observer,
         controlled: [observer],
         placeables: [observer, target],
