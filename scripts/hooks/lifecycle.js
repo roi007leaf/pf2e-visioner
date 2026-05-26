@@ -23,6 +23,11 @@ import {
   setSuppressLightingRefresh,
 } from '../services/runtime-state.js';
 import { updateWallVisuals } from '../services/visual-effects.js';
+import {
+  forcePendingMovementTokenInvisible,
+  targetMustStayHiddenDuringPendingMovement,
+} from '../services/PendingMovement/pending-token-movement.js';
+import { clearDetectionFilterVisuals } from '../services/PendingMovement/pending-movement-detection-filter-visuals.js';
 import { getLogger } from '../utils/logger.js';
 import { logControlTokenVisibilitySnapshot } from '../helpers/visibility-debug.js';
 
@@ -649,8 +654,34 @@ export function onReady() {
   }
 }
 
+function enforceHiddenTokensPerFrame() {
+  const tokens = globalThis.canvas?.tokens?.placeables;
+  if (!tokens?.length) return;
+  for (const token of tokens) {
+    if (!token?.actor?.itemTypes?.condition?.length) continue;
+    try {
+      if (targetMustStayHiddenDuringPendingMovement(token)) {
+        if (token.renderable !== false || (token.mesh?.alpha ?? 0) > 0 || token.detectionFilter) {
+          forcePendingMovementTokenInvisible(token);
+          clearDetectionFilterVisuals(token);
+        }
+      }
+    } catch {
+      /* best-effort per-frame enforcement */
+    }
+  }
+}
+
+let _hiddenTokenTickerRegistered = false;
+function registerHiddenTokenTicker() {
+  if (_hiddenTokenTickerRegistered) return;
+  void enforceHiddenTokensPerFrame;
+  _hiddenTokenTickerRegistered = true;
+}
+
 export async function onCanvasReady() {
   registerPendingMovementPointerIntentListeners();
+  registerHiddenTokenTicker();
 
   try {
     await refreshVisionSharingTokenIds();

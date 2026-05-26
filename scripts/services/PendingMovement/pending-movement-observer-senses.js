@@ -78,7 +78,16 @@ export function observerHasUsableSight(observer) {
   if (sightEnabled === false) return false;
 
   const sightRange = Number(doc?.sight?.range ?? doc?.vision?.range ?? Infinity);
-  return sightRange !== 0;
+  if (sightRange !== 0) return true;
+
+  const token = observer?.object || (observer?.document ? observer : null);
+  if (!token) return false;
+  const visionSource = token.vision || token.visionSource;
+  if (visionSource?.active && visionSource?.los) return true;
+  for (const source of canvas?.effects?.visionSources?.values?.() ?? []) {
+    if (source?.active && source?.object && source.object === token) return true;
+  }
+  return false;
 }
 
 export function createPositionedTokenProxy(tokenOrDoc, position, { getTokenObjectForDocument } = {}) {

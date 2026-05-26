@@ -3,7 +3,7 @@ import { createCanDetectVisibilityWrapper } from './detection-can-detect.js';
 import { wrapCanvasVisibilityTest } from './detection-canvas-visibility.js';
 import { wrapTokenRenderDetectionFilter } from './detection-filter-render.js';
 import { testDetectionModeVisibility } from './detection-mode-visibility.js';
-import { wrapTokenRefreshVisibility } from './detection-token-refresh.js';
+import { wrapTokenRefreshVisibility, wrapTokenRefreshState, wrapTokenApplyRenderFlags } from './detection-token-refresh.js';
 import {
   wrapTokenDocumentPrepareBaseData,
   wrapTokenVisionSource,
@@ -77,6 +77,8 @@ function registerTokenDetectionWrappers(libWrapperAdapter, warn) {
       wrapTokenRenderDetectionFilter,
       'WRAPPER',
     );
+    void wrapTokenRefreshState;
+    void wrapTokenApplyRenderFlags;
     libWrapperAdapter.register(
       MODULE_ID,
       'TokenDocument.prototype.prepareBaseData',

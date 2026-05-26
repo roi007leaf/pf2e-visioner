@@ -15,6 +15,7 @@ import {
   resetPendingMovementPerformanceCounters,
   schedulePendingTokenMovementCompletion,
   setPendingTokenMovementPosition,
+  shouldUseFullAnimationRefreshCadence,
 } from '../../../scripts/services/PendingMovement/pending-token-movement.js';
 import {
   getPendingMovementBlockedDetectionSources,
@@ -1734,6 +1735,33 @@ describe('pending token movement hidden detection guard', () => {
     expect(shouldTemporarilyForceTokenInvisible(target)).toBe(false);
   });
 
+  test('reveals undetected target mid-animation via geometric LOS when sight polygon is stale', () => {
+    global.canvas.walls.placeables = [];
+    const observer = createMockToken({
+      id: 'observer',
+      flags: visibilityV2Flags({ target: 'undetected' }),
+    });
+    observer._animation = { state: 'running', promise: Promise.resolve() };
+    const target = createMockToken({ id: 'target', x: 200, y: 0, visible: true });
+    target.document.getVisibilityTestPoints = jest.fn(() => [{ x: 225, y: 25 }]);
+    global.canvas = {
+      ...global.canvas,
+      tokens: {
+        get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+        placeables: [observer, target],
+      },
+      visibility: {
+        testVisibility: jest.fn(() => false),
+      },
+    };
+
+    setPendingTokenMovementPosition(observer.document, { x: 100, y: 0 }, [observer], {
+      finalVisibilityStatesByTargetId: { target: 'observed' },
+    });
+
+    expect(shouldTemporarilyForceTokenInvisible(target)).toBe(false);
+  });
+
   test('keeps render lock until core movement source can own LOS', () => {
     global.canvas.walls.placeables = [];
     const observer = createMockToken({
@@ -3152,6 +3180,46 @@ describe('pending token movement hidden detection guard', () => {
     expect(refreshTokenVisibility).toHaveBeenCalledTimes(5);
   });
 
+  test('animation refresh uses full cadence when target stored state is undetected', () => {
+    global.canvas.walls.placeables = [];
+    const observer = createMockToken({
+      id: 'observer',
+      flags: visibilityV2Flags({ target: 'undetected' }),
+    });
+    const target = createMockToken({ id: 'target', visible: true });
+    global.canvas = {
+      ...global.canvas,
+      tokens: {
+        get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+        placeables: [observer, target],
+      },
+    };
+
+    setPendingTokenMovementPosition(observer.document, { x: 0, y: 0 }, [observer]);
+
+    expect(shouldUseFullAnimationRefreshCadence('observer')).toBe(true);
+  });
+
+  test('animation refresh uses full cadence when target stored state is unnoticed', () => {
+    global.canvas.walls.placeables = [];
+    const observer = createMockToken({
+      id: 'observer',
+      flags: visibilityV2Flags({ target: 'unnoticed' }),
+    });
+    const target = createMockToken({ id: 'target', visible: true });
+    global.canvas = {
+      ...global.canvas,
+      tokens: {
+        get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+        placeables: [observer, target],
+      },
+    };
+
+    setPendingTokenMovementPosition(observer.document, { x: 0, y: 0 }, [observer]);
+
+    expect(shouldUseFullAnimationRefreshCadence('observer')).toBe(true);
+  });
+
   test('can refresh pending movement token visuals without refreshing perception', () => {
     global.canvas.walls.placeables = [];
     const observer = createMockToken({
@@ -4362,7 +4430,7 @@ describe('pending token movement hidden detection guard', () => {
     expect(target._pf2eVisionerPendingRenderState).toBeDefined();
   });
 
-  test('keeps hidden soundwave when observer sight range is zero despite active core LOS source', () => {
+  test('suppresses hidden soundwave when zero-sight observer has active vision source containing target', () => {
     global.canvas.walls.placeables = [];
     const observer = createMockToken({
       id: 'observer',
@@ -4398,9 +4466,7 @@ describe('pending token movement hidden detection guard', () => {
 
     setPendingTokenMovementPosition(observer.document, { x: 100, y: 0 }, [observer]);
 
-    expect(currentPendingMovementSightLineSeesTarget(observer, target)).toBe(false);
-    expect(shouldSuppressPendingMovementDetectionFilterVisuals(target)).toBe(false);
-    expect(capturePendingMovementDetectionFilterState(target, { hasDetectionWork: true })).not.toBeNull();
+    expect(shouldSuppressPendingMovementDetectionFilterVisuals(target)).toBe(true);
   });
 
   test('keeps hidden soundwave when zero-sight observer light source overlaps target', () => {

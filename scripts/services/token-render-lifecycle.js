@@ -7,7 +7,10 @@ import {
 } from './PendingMovement/pending-movement-render-lock.js';
 import {
   schedulePendingTokenMovementCompletion as defaultSchedulePendingTokenMovementCompletion,
+  targetMustStayHiddenDuringPendingMovement,
+  forcePendingMovementTokenInvisible,
 } from './PendingMovement/pending-token-movement.js';
+import { clearDetectionFilterVisuals } from './PendingMovement/pending-movement-detection-filter-visuals.js';
 import { isRefreshTokenProcessingSuppressed as defaultIsRefreshTokenProcessingSuppressed } from './runtime-state.js';
 import {
   getMatchingControlledTokenForRefresh,

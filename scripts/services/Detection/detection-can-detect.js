@@ -8,6 +8,7 @@ import {
   shouldTemporarilyBlockSightDetection,
 } from '../PendingMovement/pending-movement-detection-gate.js';
 import { shouldHandlePendingMovementCanvasVisibilityForToken } from '../PendingMovement/pending-movement-render-lock.js';
+import { targetMustStayHiddenDuringPendingMovement } from '../PendingMovement/pending-token-movement.js';
 import { isExplicitVisiblePair } from '../ExplicitVisibilityPairs.js';
 import {
   detectionFrameCache,
@@ -20,6 +21,7 @@ import {
 export function createCanDetectVisibilityWrapper(threshold) {
   return function wrapCanDetectVisibility(wrapped, visionSource, target, ...args) {
     const canDetect = wrapped(visionSource, target, ...args);
+    if (targetMustStayHiddenDuringPendingMovement(target)) return false;
     const observerToken = visionSource?.object;
     const modeId = this?.id ?? args?.[0]?.id ?? null;
     if (isPendingMovementCoreAnimationBypassActive()) return canDetect;

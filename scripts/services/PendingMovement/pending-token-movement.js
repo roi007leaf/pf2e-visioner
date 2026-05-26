@@ -549,7 +549,16 @@ function hasPendingControlledTokenDragIntent(tokenOrDoc) {
 
 function movementAnimationIsRunning(animation) {
   if (!animation || animation.state === 'completed') return false;
+  if (typeof animation === 'object' && Object.keys(animation).length === 0) return true;
   return !!animation.promise || !!animation.active || animation.state !== undefined;
+}
+
+function tokenIsAnimating(token) {
+  if (!token) return false;
+  if (token.animation && typeof token.animation === 'object') {
+    if (movementAnimationIsRunning(token.animation)) return true;
+  }
+  return movementAnimationIsRunning(token._animation);
 }
 
 function movementAnimationInfo(animation) {
@@ -601,7 +610,7 @@ function pendingMovementTokenHasCoreOwnedPosition(tokenOrDoc, entry = null) {
 
   const tokenId = tokenIdOf(canonicalToken);
   const token = canonicalToken?.document ? canonicalToken : tokenObjectForId(tokenId);
-  if (movementAnimationIsRunning(token?._animation)) return true;
+  if (tokenIsAnimating(token)) return true;
   if (!entry?.position || !token) return false;
 
   const currentPosition = tokenVisualMovementPosition(token);
@@ -624,7 +633,7 @@ function pendingMovementTokenHasCommittedCoreMotion(tokenOrDoc, entry = null) {
 
   const tokenId = tokenIdOf(canonicalToken);
   const token = canonicalToken?.document ? canonicalToken : tokenObjectForId(tokenId);
-  if (movementAnimationIsRunning(token?._animation)) return true;
+  if (tokenIsAnimating(token)) return true;
   if (!entry?.position || !token) return false;
 
   const currentPosition = tokenVisualMovementPosition(token);
@@ -1041,13 +1050,17 @@ function getAnimationRefreshTargetIdsForMovement(tokenId) {
   return [...targetIds];
 }
 
-function shouldUseFullAnimationRefreshCadence(tokenId) {
+export function shouldUseFullAnimationRefreshCadence(tokenId) {
   const entry = pendingTokenMovementPositions.get(tokenId);
   const observer = tokenObjectForId(tokenId) || entry?.tokenDoc || null;
   for (const targetId of getAnimationRefreshTargetIdsForMovement(tokenId)) {
     const target = tokenObjectForId(targetId);
     if (!target) continue;
-    if (observer && getStoredVisibilityState(observer, target) === 'hidden') return true;
+    if (observer) {
+      const storedState = getStoredVisibilityState(observer, target);
+      if (storedState === 'hidden') return true;
+      if (RENDER_HIDDEN_FROM_OBSERVER_STATES.has(storedState)) return true;
+    }
     if (isPendingMovementRenderLocked(target)) return true;
     if (tokenHasDetectionFilterVisual(target)) return true;
     if (tokenHasDetectionFilterMeshVisual(target)) return true;
@@ -1278,6 +1291,26 @@ function getPendingMovementHiddenStateContextUncached(target) {
   }
 
   return null;
+}
+
+export function targetIsRenderHiddenForAnyObserver(target) {
+  if (!target?.document?.id) return false;
+  if (target.controlled) return false;
+  if (tokenDocOf(target)?.hidden) return true;
+  for (const observer of pendingMovementObserverCandidates()) {
+    if (tokenIdOf(observer) === tokenIdOf(target)) continue;
+    const state = getStoredVisibilityState(observer, target);
+    if (RENDER_HIDDEN_FROM_OBSERVER_STATES.has(state)) return true;
+  }
+  return false;
+}
+
+export function targetMustStayHiddenDuringPendingMovement(target) {
+  if (!target?.document?.id) return false;
+  if (target.controlled) return false;
+  if (tokenDocOf(target)?.hidden) return true;
+  if (actorHasConditionSlug(actorOf(target), 'invisible')) return true;
+  return false;
 }
 
 export function getPendingMovementHiddenStateContext(target) {
@@ -2560,7 +2593,8 @@ export function schedulePendingTokenMovementCompletion(tokenDoc) {
 
   const startedAt = Date.now();
   const complete = () => completePendingTokenMovement(tokenId, serial);
-  const initialAnimation = (tokenDoc?.object || tokenObjectForId(tokenId))?._animation;
+  const initialToken = tokenDoc?.object || tokenObjectForId(tokenId);
+  const initialAnimation = initialToken?._animation;
 
   if (initialAnimation?.promise && movementAnimationIsRunning(initialAnimation)) {
     initialAnimation.promise.finally(complete);
@@ -2582,7 +2616,7 @@ export function schedulePendingTokenMovementCompletion(tokenDoc) {
       deferredAnimation.promise.finally(complete);
       return;
     }
-    if (movementAnimationIsRunning(deferredAnimation) && elapsedMs < PENDING_MOVEMENT_TTL_MS) {
+    if ((movementAnimationIsRunning(deferredAnimation) || tokenIsAnimating(token)) && elapsedMs < PENDING_MOVEMENT_TTL_MS) {
       const timeoutId = setTimeout(
         waitForAnimationOrComplete,
         PENDING_MOVEMENT_ANIMATION_DETECTION_DELAY_MS,
@@ -2742,6 +2776,25 @@ function shouldTemporarilyForceTokenInvisibleUncached(target, { hasDetectionWork
       rememberCoreVisibleGraceContext(target, hiddenStateContext);
       forgetHiddenForceContext(target);
       return false;
+    }
+
+    if (
+      observer &&
+      !invisibleUndetectedRenderLockMustStayLocked(target, hiddenStateContext.visibilityState) &&
+      RENDER_HIDDEN_FROM_OBSERVER_STATES.has(hiddenStateContext.visibilityState) &&
+      shouldUseCoreDetectionDuringPendingMovement(observer, target)
+    ) {
+      const bypassOriginPoint = centerForToken(observer);
+      const bypassTargetPoints = visibilityTestPointsForPendingTarget(target);
+      if (
+        bypassOriginPoint &&
+        bypassTargetPoints.length &&
+        bypassTargetPoints.some((p) => !lineOfSightBlockedByWall(bypassOriginPoint, p))
+      ) {
+        rememberCurrentSightLineGraceContext(observer, target);
+        forgetHiddenForceContext(target);
+        return false;
+      }
     }
 
     rememberHiddenForceContext(target, hiddenStateContext);
@@ -3248,9 +3301,9 @@ function refreshPendingMovementTokenVisibilityUncached(
           continue;
         }
 
-        const shouldForceInvisible = shouldTemporarilyForceTokenInvisible(token, {
-          hasDetectionWork,
-        });
+        const shouldForceInvisible =
+          shouldTemporarilyForceTokenInvisible(token, { hasDetectionWork }) ||
+          targetMustStayHiddenDuringPendingMovement(token);
         if (shouldForceInvisible) {
           forcePendingMovementTokenInvisible(token);
           if (shouldSkipForcedInvisibleTokenRefresh(token)) {

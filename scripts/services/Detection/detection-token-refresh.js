@@ -17,6 +17,7 @@ import {
   withPreservedPendingMovementDetectionFilterVisuals,
   withSuppressedPendingMovementDetectionFilterVisuals,
 } from '../PendingMovement/pending-movement-render-lock.js';
+import { targetMustStayHiddenDuringPendingMovement } from '../PendingMovement/pending-token-movement.js';
 import {
   clearDetectionFilterVisuals,
   tokenHasDetectionFilterMeshVisual,
@@ -35,9 +36,49 @@ function refreshThenRestorePendingInvisible(token, refreshWrapped) {
   return result;
 }
 
+export function wrapTokenRefreshState(wrapped, ...args) {
+  const result = wrapped(...args);
+  try {
+    if (targetMustStayHiddenDuringPendingMovement(this)) {
+      forcePendingMovementTokenInvisible(this);
+      clearDetectionFilterVisuals(this);
+    }
+  } catch {
+    /* keep Foundry state if guard fails */
+  }
+  return result;
+}
+
+export function wrapTokenApplyRenderFlags(wrapped, ...args) {
+  const result = wrapped(...args);
+  try {
+    if (targetMustStayHiddenDuringPendingMovement(this)) {
+      forcePendingMovementTokenInvisible(this);
+      clearDetectionFilterVisuals(this);
+    }
+  } catch {
+    /* keep Foundry render flags if guard fails */
+  }
+  return result;
+}
+
 export function wrapTokenRefreshVisibility(wrapped, ...args) {
-  if (isPendingMovementCoreAnimationBypassActive()) {
-    return wrapped(...args);
+  const bypassActiveAtEntry = isPendingMovementCoreAnimationBypassActive();
+  if (bypassActiveAtEntry && !tokenHasDetectionFilterVisual(this) && !tokenHasDetectionFilterMeshVisual(this)) {
+    const result = wrapped(...args);
+    try {
+      if (this.visible) {
+        if (shouldTemporarilyForceTokenInvisible(this)) {
+          forcePendingMovementTokenInvisible(this);
+          clearDetectionFilterVisuals(this);
+        } else {
+          restorePendingMovementTokenRendering(this);
+        }
+      }
+    } catch {
+      /* keep Foundry visibility if guard fails */
+    }
+    return result;
   }
 
   const handlesPendingMovementVisibility = shouldHandlePendingMovementCanvasVisibilityForToken(this);
