@@ -14,7 +14,7 @@ function tokenInterfaceSurfaces(token) {
     ['effects', token?.effects],
     ['targetArrows', token?.targetArrows],
     ['targetPips', token?.targetPips],
-    ['ruler', token?.ruler],
+    // Token.ruler owns core/PF2e movement path overlays, including colored drag squares.
     ['turnMarker', token?.turnMarker],
     ['turnMarkerMesh', token?.turnMarker?.mesh],
     ['ring', token?.ring],

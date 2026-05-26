@@ -3201,6 +3201,7 @@ describe('pending token movement hidden detection guard', () => {
     target.effects = { visible: true };
     target.targetArrows = { visible: true };
     target.targetPips = { visible: true };
+    target.ruler = { visible: true };
     target.turnMarker = { visible: true, mesh: { visible: true } };
     target.detectionFilter = { id: 'native-filter' };
     target.refresh = jest.fn();
@@ -3224,6 +3225,7 @@ describe('pending token movement hidden detection guard', () => {
     expect(target.effects.visible).toBe(false);
     expect(target.targetArrows.visible).toBe(false);
     expect(target.targetPips.visible).toBe(false);
+    expect(target.ruler.visible).toBe(true);
     expect(target.turnMarker.visible).toBe(false);
     expect(target.turnMarker.mesh.visible).toBe(false);
     expect(target.detectionFilter).toBeNull();
@@ -3240,6 +3242,7 @@ describe('pending token movement hidden detection guard', () => {
     expect(target.effects.visible).toBe(true);
     expect(target.targetArrows.visible).toBe(true);
     expect(target.targetPips.visible).toBe(true);
+    expect(target.ruler.visible).toBe(true);
     expect(target.turnMarker.visible).toBe(true);
     expect(target.turnMarker.mesh.visible).toBe(true);
   });

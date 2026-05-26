@@ -13,10 +13,22 @@
 ### Added
 
 - Added versioned `visibilityV2` profile storage and migration for legacy visibility maps and AVS override flags, preserving string-facing API compatibility while storing canonical detection/concealment metadata only.
+- Added a canonical perception-profile model for detection state, concealment, cover, and encounter awareness, with shared conversion helpers for legacy labels at UI/API boundaries.
+- Added public API support for reading and writing perception profiles and profile maps, including AVS override creation for manual profile writes so API callers and runtime validation use the same data shape.
+- Added migration coverage for legacy visibility maps, AVS override flags, scene cleanup, deleted-token restoration, rule-element cleanup, and purge flows that now operate on `visibilityV2` profile maps.
+- Added focused architecture guard tests for action handlers, action dialogs, detection wrappers, token flag persistence, walls, AVS invalidation, and v2 override boundaries.
 
 ### Changed
 
 - Separated detection, concealment, cover, and encounter awareness semantics internally.
+- Refactored action preview dialogs into focused owner modules: shared BaseAction behavior now owns apply/revert, row actions, timers, dropdowns, and bulk overrides, while Seek, Hide, Sneak, Consequences, Point Out, Create a Diversion, and Take Cover keep action-specific context and UI logic in their own folders.
+- Refactored chat action handlers into focused owner modules for subject discovery, roll outcome mapping, visibility outcome calculation, AVS/legacy application, token resolution, wall handling, and position qualification.
+- Refactored `DetectionWrapper` into the `scripts/services/Detection/` service family, separating libWrapper registration, can-detect policy, canvas visibility tests, token refresh handling, detection-filter rendering, frame caching, visibility context, and vision-sharing behavior.
+- Refactored pending movement into the `scripts/services/PendingMovement/` service family, splitting drag intent, final visibility prediction, wall blocking, observer senses, render locks, current-view soundwave state, detection gates, detection-filter visuals, geometry, sight-line checks, refresh scheduling, and evaluation caching.
+- Refactored AVS batch processing into explicit policies and workflows for preflight, token selection, token settling, calculation options, queueing, directional LOS/visibility resolution, result application, render locks, effect sync, post-processing, finalization, telemetry, and override validation.
+- Refactored AVS invalidation into reason routing and intent modules for token, actor, item/effect, environment, lighting, movement, template, wall, and scene changes, reducing cross-module event knowledge in the coordinator.
+- Refactored visibility persistence behind profile-map and token-flag writer services so batch writes, forced deletion, pending write overlays, and stale document state repair share one storage path.
+- Refactored hover tooltip rendering, wall visuals, token render lifecycle handling, scene AVS refresh suppression, and runtime state into focused services instead of embedding those concerns in larger hook and visibility modules.
 - Scoped Unnoticed to encounter-start Avoid Notice awareness instead of treating it as a general manual visibility state.
 - Removed legacy `visibility` map and AVS override `state` persistence; visibility storage now writes only canonical `visibilityV2` profiles, and AVS override flags now store detection, concealment, cover, and awareness metadata without a legacy state field.
 - Runtime visibility lookups no longer fall back to old `visibility` flags; the migration is the only legacy reader and deletes those flags after conversion.
@@ -28,6 +40,10 @@
 ### Fixed
 
 - Fresh AVS override flags now store canonical detection/concealment metadata, so `concealed` manual overrides save as `detectionState: "observed"` with `hasConcealment: true` instead of an old-shaped legacy-only override.
+- Visibility map updates now use Foundry v14 forced-deletion operators for `visibilityV2` profile entries instead of legacy `-=key` deletion syntax.
+- Manual perception-profile writes now refresh matching token visuals and AVS override state instead of leaving display state stale until the next movement or batch recalculation.
+- Pending movement and AVS result application now read pending profile writes and canonical maps consistently, avoiding stale hidden/undetected render locks after profile updates.
+- Client-side visibility effect cleanup and deletion paths now avoid player-owned permission errors by routing GM-only writes through the correct side of the AVS pipeline.
 - Concealment-sensitive stealth logic no longer treats Hidden or Undetected as if they were the concealed condition.
 - Encounter-start Unnoticed continues to hide tokens and tracker rows while using Undetected as the underlying detection state.
 
