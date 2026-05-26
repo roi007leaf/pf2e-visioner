@@ -7,10 +7,8 @@ import {
 } from './PendingMovement/pending-movement-render-lock.js';
 import {
   schedulePendingTokenMovementCompletion as defaultSchedulePendingTokenMovementCompletion,
-  targetMustStayHiddenDuringPendingMovement,
-  forcePendingMovementTokenInvisible,
+  targetIsRenderHiddenForAnyObserver,
 } from './PendingMovement/pending-token-movement.js';
-import { clearDetectionFilterVisuals } from './PendingMovement/pending-movement-detection-filter-visuals.js';
 import { isRefreshTokenProcessingSuppressed as defaultIsRefreshTokenProcessingSuppressed } from './runtime-state.js';
 import {
   getMatchingControlledTokenForRefresh,
@@ -126,6 +124,19 @@ export function handleTokenRefreshed(
     warn = console.warn,
   } = {},
 ) {
+  try {
+    if (token && targetIsRenderHiddenForAnyObserver(token)) {
+      const mesh = token.detectionFilterMesh;
+      if (mesh && (mesh.visible || mesh.alpha > 0 || mesh.renderable)) {
+        if ('visible' in mesh) mesh.visible = false;
+        if ('renderable' in mesh) mesh.renderable = false;
+        if ('alpha' in mesh) mesh.alpha = 0;
+      }
+    }
+  } catch {
+    /* best-effort detection filter mesh suppression */
+  }
+
   if (isRefreshTokenProcessingSuppressed()) {
     return { handled: false, reason: 'suppressed' };
   }

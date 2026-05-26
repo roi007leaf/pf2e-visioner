@@ -9,6 +9,20 @@ import { targetIsRenderHiddenForAnyObserver } from '../PendingMovement/pending-t
 import { clearDetectionFilterVisuals } from '../PendingMovement/pending-movement-detection-filter-visuals.js';
 
 export function wrapTokenRenderDetectionFilter(wrapped, ...args) {
+  if (targetIsRenderHiddenForAnyObserver(this)) {
+    const mesh = this?.detectionFilterMesh;
+    if (mesh) {
+      try {
+        if ('visible' in mesh) mesh.visible = false;
+        if ('renderable' in mesh) mesh.renderable = false;
+        if ('alpha' in mesh) mesh.alpha = 0;
+      } catch {
+        /* best-effort */
+      }
+    }
+    return wrapped(...args);
+  }
+
   if (
     !this?.detectionFilter &&
     !this?.detectionFilterMesh &&

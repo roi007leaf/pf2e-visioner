@@ -113,6 +113,20 @@ export async function registerHooks() {
 
   Hooks.on('refreshToken', (token) => handleTokenRefreshed(token));
 
+  Hooks.on('pf2e-visioner.visibilityMapUpdated', ({ targetId, state }) => {
+    try {
+      if (state !== 'undetected' && state !== 'unnoticed') return;
+      const target = canvas?.tokens?.get?.(targetId);
+      const mesh = target?.detectionFilterMesh;
+      if (!mesh) return;
+      if ('visible' in mesh) mesh.visible = false;
+      if ('renderable' in mesh) mesh.renderable = false;
+      if ('alpha' in mesh) mesh.alpha = 0;
+    } catch {
+      /* best-effort soundwave clear */
+    }
+  });
+
   Hooks.on('pf2eVisionerAvsBatchComplete', async () => {
     await handleAvsBatchCompleteRefresh();
   });
