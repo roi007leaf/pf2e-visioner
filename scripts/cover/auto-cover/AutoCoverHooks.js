@@ -228,7 +228,7 @@ export class AutoCoverHooks {
             '../../chat/services/take-cover-expiration-service.js'
           );
           await requestTakeCoverExpirationForToken(token, 'movement');
-        } catch {}
+        } catch { }
       }
 
       // Clean up cover for token
@@ -454,6 +454,8 @@ export class AutoCoverHooks {
 
     // Strike with attack trait
     if (ctx.type === 'strike-attack-roll') return true;
+
+    if (ctx.type === 'impulse-attack-roll') return true;
 
     // Check domains for attack
     if (

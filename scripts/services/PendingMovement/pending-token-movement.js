@@ -1,6 +1,8 @@
-import { MODULE_ID } from '../../constants.js';
+import { LightingLevel, MODULE_ID } from '../../constants.js';
 import { scheduleCanvasPerceptionUpdate } from '../../helpers/perception-refresh.js';
 import { getRawPerceptionProfileEntry } from '../../stores/visibility-profile-flag-persistence.js';
+import { LightingCalculator } from '../../visibility/auto-visibility/LightingCalculator.js';
+import { VisionAnalyzer } from '../../visibility/auto-visibility/VisionAnalyzer.js';
 import {
   isMovementPerformanceDiagnosticsEnabled,
   isPendingMovementVisualRefreshSuppressed,
@@ -712,6 +714,88 @@ function sourceHasVisibilityPolygon(source) {
   );
 }
 
+function lightingLevelForPendingToken(token) {
+  const position = centerForToken(token);
+  if (!position) return null;
+  const key = [
+    tokenIdOf(token) || 'token',
+    Math.round(position.x ?? 0),
+    Math.round(position.y ?? 0),
+    token?.document?.elevation ?? token?.elevation ?? 0,
+  ].join(':');
+
+  return cachePendingMovementEvaluation('lightingLevel', key, () => {
+    try {
+      const result = LightingCalculator.getInstance()?.getLightLevelAt?.(position, token);
+      if (!result) return null;
+      if (result.greaterMagicalDarkness || result.isHeightenedDarkness) {
+        return LightingLevel.GREATER_MAGICAL_DARKNESS;
+      }
+      if (result.magicalDarkness || result.isDarknessSource) {
+        return LightingLevel.MAGICAL_DARKNESS;
+      }
+      return result.level || null;
+    } catch {
+      return null;
+    }
+  });
+}
+
+function pendingObserverVisionCapabilities(observer) {
+  const key = tokenIdOf(observer) || observer;
+  return cachePendingMovementEvaluation('observerVisionCapabilities', key, () => {
+    try {
+      return VisionAnalyzer.getInstance()?.getVisionCapabilities?.(observer) || null;
+    } catch {
+      return null;
+    }
+  });
+}
+
+function pendingObserverHasPreciseVision(observer, senseType) {
+  const capabilities = pendingObserverVisionCapabilities(observer);
+  if (!capabilities) return false;
+  if (senseType === 'greaterDarkvision') {
+    return capabilities.hasGreaterDarkvision === true;
+  }
+  if (senseType === 'darkvision') {
+    return capabilities.hasDarkvision === true;
+  }
+  if (senseType === 'lowLightVision') {
+    return capabilities.hasLowLightVision === true;
+  }
+  return capabilities.hasVision !== false;
+}
+
+function pendingLightingAllowsVisualDetection(observer, target) {
+  const targetLighting = lightingLevelForPendingToken(target);
+  if (!targetLighting) return true;
+
+  const observerLighting = lightingLevelForPendingToken(observer);
+  let effectiveLighting = targetLighting;
+  if (observerLighting === LightingLevel.GREATER_MAGICAL_DARKNESS) {
+    effectiveLighting = LightingLevel.GREATER_MAGICAL_DARKNESS;
+  } else if (
+    observerLighting === LightingLevel.MAGICAL_DARKNESS &&
+    effectiveLighting !== LightingLevel.GREATER_MAGICAL_DARKNESS
+  ) {
+    effectiveLighting = LightingLevel.MAGICAL_DARKNESS;
+  }
+
+  if (pendingObserverHasPreciseVision(observer, 'greaterDarkvision')) return true;
+  if (pendingObserverHasPreciseVision(observer, 'darkvision')) return true;
+  if (pendingObserverHasPreciseVision(observer, 'lowLightVision')) {
+    return effectiveLighting === LightingLevel.BRIGHT || effectiveLighting === LightingLevel.DIM;
+  }
+  if (!pendingObserverHasPreciseVision(observer, 'vision')) return false;
+  return effectiveLighting === LightingLevel.BRIGHT || effectiveLighting === LightingLevel.DIM;
+}
+
+function sourceVisuallyContainsAnyTargetPoint(observer, source, target, targetPoints) {
+  if (!sourceContainsAnyTargetPoint(source, targetPoints)) return false;
+  return pendingLightingAllowsVisualDetection(observer, target);
+}
+
 function sightSourceObserverHasActiveMovement(observer, target) {
   const observerId = tokenIdOf(observer);
   if (!observerId) return false;
@@ -730,7 +814,7 @@ function currentPendingMovementSightLineSeesTargetUncached(observer, target) {
   const sightSources = activeSightSourcesForObserver(observer);
   if (sightSources.length) {
     const activeSourceContainsTarget = sightSources.some((source) =>
-      sourceContainsAnyTargetPoint(source, targetPoints),
+      sourceVisuallyContainsAnyTargetPoint(observer, source, target, targetPoints),
     );
     if (
       activeSourceContainsTarget &&
@@ -750,6 +834,7 @@ function currentPendingMovementSightLineSeesTargetUncached(observer, target) {
   }
   const originPoint = centerForToken(observer);
   if (!originPoint) return false;
+  if (!pendingLightingAllowsVisualDetection(observer, target)) return false;
 
   return targetPoints.some((targetPoint) => !lineOfSightBlockedByWall(originPoint, targetPoint));
 }
@@ -935,7 +1020,7 @@ function currentSightLineSeesHiddenTargetDuringPendingMovement(
       observer;
     if (getStoredVisibilityState(stateObserver, target) !== 'hidden') continue;
     if (getPredictedFinalVisibilityState(stateObserver, target) === 'hidden') continue;
-    if (sourceContainsAnyTargetPoint(source, targetPoints)) {
+    if (sourceVisuallyContainsAnyTargetPoint(stateObserver, source, target, targetPoints)) {
       if (hiddenSoundwaveShouldSurviveLimitedWall(stateObserver, target, targetPoints)) {
         continue;
       }
@@ -1152,7 +1237,7 @@ function currentCoreDetectionPolygonSeesTarget(observer, target, { requirePolygo
   }
 
   return sightSources.some((source) =>
-    sourceContainsAnyTargetPoint(source, targetPoints),
+    sourceVisuallyContainsAnyTargetPoint(observer, source, target, targetPoints),
   );
 }
 

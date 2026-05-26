@@ -3,6 +3,8 @@ import '../../setup.js';
 import { flushScheduledCanvasPerceptionUpdate } from '../../../scripts/helpers/perception-refresh.js';
 import { rememberPendingPerceptionProfileWrite } from '../../../scripts/stores/visibility-profile-flag-persistence.js';
 import { legacyVisibilityToProfile } from '../../../scripts/visibility/perception-profile.js';
+import { LightingCalculator } from '../../../scripts/visibility/auto-visibility/LightingCalculator.js';
+import { VisionAnalyzer } from '../../../scripts/visibility/auto-visibility/VisionAnalyzer.js';
 import {
   clearPendingTokenMovementPosition,
   completePendingTokenMovement,
@@ -5550,6 +5552,73 @@ describe('pending token movement hidden detection guard', () => {
       renderable: true,
       alpha: 1,
     });
+  });
+
+  test('refreshes observed targets immediately when current LOS still contains them but darkness blocks sight', () => {
+    jest.useFakeTimers();
+    const observer = createMockToken({
+      id: 'observer',
+      controlled: true,
+      flags: visibilityV2Flags({ target: 'observed' }),
+    });
+    const target = createMockToken({ id: 'target', x: 3, y: 0, visible: true });
+    target.detectionFilter = null;
+    target.detectionFilterMesh = { visible: false, renderable: false, alpha: 0 };
+    target.refresh = jest.fn(() => {
+      target.detectionFilter = { id: 'darkness-soundwave-filter' };
+      target.detectionFilterMesh = { visible: true, renderable: true, alpha: 1 };
+    });
+
+    const lightingSpy = jest.spyOn(LightingCalculator, 'getInstance').mockReturnValue({
+      getLightLevelAt: jest.fn((position, token) => ({
+        level: token?.id === 'target' ? 'darkness' : 'bright',
+      })),
+    });
+    const visionSpy = jest.spyOn(VisionAnalyzer, 'getInstance').mockReturnValue({
+      getVisionCapabilities: jest.fn(() => ({
+        hasVision: true,
+        hasDarkvision: false,
+        hasLowLightVision: false,
+        hasGreaterDarkvision: false,
+      })),
+    });
+
+    try {
+      global.canvas = {
+        ...global.canvas,
+        effects: {
+          visionSources: new Map([
+            [
+              'observer',
+              {
+                active: true,
+                object: observer,
+                los: { contains: jest.fn(() => true) },
+                shape: { contains: jest.fn(() => true) },
+              },
+            ],
+          ]),
+          lightSources: new Map(),
+        },
+        tokens: {
+          get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+          _draggedToken: observer,
+          controlled: [observer],
+          placeables: [observer, target],
+        },
+      };
+
+      expect(currentPendingMovementSightLineSeesTarget(observer, target)).toBe(false);
+
+      primePendingControlledTokenDragIntent(observer);
+      jest.advanceTimersByTime(100);
+
+      expect(target.refresh).toHaveBeenCalled();
+      expect(target.detectionFilter).toEqual({ id: 'darkness-soundwave-filter' });
+    } finally {
+      lightingSpy.mockRestore();
+      visionSpy.mockRestore();
+    }
   });
 
   test('refreshes observed targets as soon as moving observer LOS becomes blocked', () => {
