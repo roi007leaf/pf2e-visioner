@@ -181,6 +181,17 @@ export function tokenSamplePoints(tokenOrDoc, positionOverride = null) {
   ];
 }
 
+export function coreVisibilityTestPoints(tokenOrDoc, positionOverride = null) {
+  const doc = tokenDocOf(tokenOrDoc);
+  if (!positionOverride) {
+    const points = doc?.getVisibilityTestPoints?.();
+    if (Array.isArray(points) && points.length) return points;
+  }
+
+  const center = centerForToken(tokenOrDoc, positionOverride);
+  return center ? [center] : [];
+}
+
 export function buildPendingMovementRoutePositions(tokenDoc, changes = {}, options = {}) {
   const routePositions = [];
   pushUniqueMovementPosition(

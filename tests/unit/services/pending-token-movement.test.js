@@ -2914,7 +2914,7 @@ describe('pending token movement hidden detection guard', () => {
     expect(shouldTemporarilyForceTokenInvisible(target)).toBe(false);
   });
 
-  test('precomputes final observed when edge rays clear despite blocked center ray', () => {
+  test('keeps hidden soundwave when only Visioner edge rays clear a core-blocked target', () => {
     global.canvas.walls.placeables = [
       createMockWall({ id: 'wall', c: [50, 0, 50, 40], sight: 1, sound: 0 }),
     ];
@@ -2949,7 +2949,7 @@ describe('pending token movement hidden detection guard', () => {
       predictFinalVisibility: () => new Promise(() => { }),
     });
 
-    expect(shouldSuppressPendingMovementDetectionFilterVisuals(target)).toBe(true);
+    expect(shouldSuppressPendingMovementDetectionFilterVisuals(target)).toBe(false);
   });
 
   test('keeps stale undetected locked when final sight and sound are blocked', () => {
@@ -4921,6 +4921,45 @@ describe('pending token movement hidden detection guard', () => {
 
     setPendingTokenMovementPosition(observer.document, { x: 100, y: 0 }, [observer]);
 
+    expect(shouldSuppressPendingMovementDetectionFilterVisuals(target)).toBe(false);
+  });
+
+  test('does not use Visioner edge samples to override a core LOS polygon miss', () => {
+    global.canvas.walls.placeables = [];
+    const observer = createMockToken({
+      id: 'observer',
+      controlled: true,
+      flags: visibilityV2Flags({ target: 'hidden' }),
+    });
+    const target = createMockToken({ id: 'target', x: 3, y: 0, visible: true });
+    target.document.getVisibilityTestPoints = jest.fn(() => [target.center]);
+    target.detectionFilter = { id: 'soundwave-filter' };
+    target.detectionFilterMesh = { visible: true, renderable: true, alpha: 1 };
+    global.canvas = {
+      ...global.canvas,
+      effects: {
+        visionSources: new Map([
+          [
+            'observer',
+            {
+              active: true,
+              object: observer,
+              los: { contains: jest.fn((x) => x < target.center.x) },
+              shape: { contains: jest.fn((x) => x < target.center.x) },
+            },
+          ],
+        ]),
+        lightSources: new Map(),
+      },
+      tokens: {
+        get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+        _draggedToken: observer,
+        controlled: [observer],
+        placeables: [observer, target],
+      },
+    };
+
+    expect(currentPendingMovementSightLineSeesTarget(observer, target)).toBe(false);
     expect(shouldSuppressPendingMovementDetectionFilterVisuals(target)).toBe(false);
   });
 

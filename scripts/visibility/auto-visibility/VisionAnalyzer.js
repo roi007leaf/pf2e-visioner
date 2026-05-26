@@ -343,7 +343,7 @@ export class VisionAnalyzer {
 
         // Run full geometric LOS check (same logic as the fallback below)
         const observerCenter = { x: observerPos.x, y: observerPos.y };
-        const targetPoints = this.#getTokenSamplePoints(target, targetPos);
+        const targetPoints = this.#getCoreVisibilityTestPoints(target, targetPos);
 
         let hybridObserverSpan = null;
         let hybridTargetSpan = null;
@@ -447,7 +447,7 @@ export class VisionAnalyzer {
             }
 
             const observerCenter = { x: observerPos.x, y: observerPos.y };
-            const targetPoints = this.#getTokenSamplePoints(target, targetPos);
+            const targetPoints = this.#getCoreVisibilityTestPoints(target, targetPos);
             const cachedWalls = this.#getCachedWalls(null);
             const customWallPass = this.#findNonBlockingCustomSightWallPath(
               observerCenter,
@@ -500,7 +500,7 @@ export class VisionAnalyzer {
       stage = 'sample-points';
       // Get observer and target sample points
       const observerPoints = this.#getTokenSamplePoints(observer, observerPos);
-      const targetPoints = this.#getTokenSamplePoints(target, targetPos);
+      const targetPoints = this.#getCoreVisibilityTestPoints(target, targetPos);
       const observerCenter = observerPoints[0]; // Center is first point
       const targetCenter = targetPoints[0]; // Center is first point
 
@@ -804,6 +804,27 @@ export class VisionAnalyzer {
       { x: x + inset, y: y + h * 0.5 }, // Left edge center
       { x: x + w - inset, y: y + h * 0.5 }, // Right edge center
     ];
+  }
+
+  #getCoreVisibilityTestPoints(token, centerPos = null) {
+    const tokenCenter = token?.center;
+    const centerMatchesToken =
+      !centerPos ||
+      (tokenCenter &&
+        Math.abs(Number(centerPos.x ?? 0) - Number(tokenCenter.x ?? 0)) <= 0.5 &&
+        Math.abs(Number(centerPos.y ?? 0) - Number(tokenCenter.y ?? 0)) <= 0.5);
+
+    if (centerMatchesToken) {
+      const points = token?.document?.getVisibilityTestPoints?.();
+      if (Array.isArray(points) && points.length) return points;
+    }
+
+    const center = centerPos
+      ? { x: centerPos.x, y: centerPos.y }
+      : tokenCenter
+        ? { x: tokenCenter.x, y: tokenCenter.y }
+        : null;
+    return center ? [center] : [];
   }
 
   #getDenseTokenShapeSamplePoints(token, centerPos = null) {

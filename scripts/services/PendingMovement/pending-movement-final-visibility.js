@@ -1,5 +1,5 @@
 import { profileToLegacyVisibility } from '../../visibility/perception-profile.js';
-import { centerForToken, tokenSamplePoints } from './pending-movement-geometry.js';
+import { centerForToken, coreVisibilityTestPoints } from './pending-movement-geometry.js';
 import {
   actorHasConditionSlug,
   createPositionedTokenProxy,
@@ -99,7 +99,7 @@ export function createPendingMovementFinalVisibilityController(adapter = {}) {
     const originPoint = centerForToken(observer);
     const targetPoint = centerForToken(target);
     if (!originPoint || !targetPoint) return null;
-    const targetPoints = tokenSamplePoints(target);
+    const targetPoints = coreVisibilityTestPoints(target);
 
     const targetInvisible = actorHasConditionSlug(actorOf(target), 'invisible');
     if (

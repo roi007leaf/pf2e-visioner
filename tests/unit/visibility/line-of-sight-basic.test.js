@@ -257,6 +257,26 @@ describe('VisionAnalyzer - Line of Sight (Refactored)', () => {
 
             expect(result).toBe(false);
         });
+
+        test('should not use token edge samples when core visibility point is blocked', () => {
+            mockTarget.document.getVisibilityTestPoints = jest.fn(() => [mockTarget.center]);
+            global.canvas.walls.placeables = [
+                {
+                    document: {
+                        move: CONST.WALL_SENSE_TYPES.NORMAL,
+                        sight: CONST.WALL_SENSE_TYPES.NORMAL,
+                        sound: CONST.WALL_SENSE_TYPES.NONE,
+                        c: [200, 190, 200, 210],
+                        door: 0,
+                        ds: 0
+                    }
+                }
+            ];
+
+            const result = visionAnalyzer.hasLineOfSight(mockObserver, mockTarget);
+
+            expect(result).toBe(false);
+        });
     });
 
     describe('hasLineOfSight - Doors', () => {

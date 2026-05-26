@@ -24,6 +24,7 @@ import {
 import {
   buildPendingMovementRoutePositions,
   centerForToken,
+  coreVisibilityTestPoints,
   positionsEqual,
   rebalancePendingMovementRoutePointBudgets,
   sampleMovementRoutePoints,
@@ -688,6 +689,10 @@ function visibilityTestPointsForPendingTarget(target) {
   return center ? [center] : [];
 }
 
+function coreVisibilityTestPointsForPendingTarget(target) {
+  return coreVisibilityTestPoints(target);
+}
+
 function activeSightSourcesForObserver(observer) {
   const observerId = tokenIdOf(observer);
   if (!observerId) return [];
@@ -808,17 +813,17 @@ function currentPendingMovementSightLineSeesTargetUncached(observer, target) {
   if (!observer || !target?.document?.id) return false;
   if (!observerHasUsableSight(observer)) return false;
 
-  const targetPoints = visibilityTestPointsForPendingTarget(target);
-  if (!targetPoints.length) return false;
+  const coreTargetPoints = coreVisibilityTestPointsForPendingTarget(target);
+  if (!coreTargetPoints.length) return false;
 
   const sightSources = activeSightSourcesForObserver(observer);
   if (sightSources.length) {
     const activeSourceContainsTarget = sightSources.some((source) =>
-      sourceVisuallyContainsAnyTargetPoint(observer, source, target, targetPoints),
+      sourceVisuallyContainsAnyTargetPoint(observer, source, target, coreTargetPoints),
     );
     if (
       activeSourceContainsTarget &&
-      !customSightWallBlocksSampledToken(centerForToken(observer), targetPoints)
+      !customSightWallBlocksSampledToken(centerForToken(observer), coreTargetPoints)
     ) {
       return true;
     }
@@ -836,7 +841,7 @@ function currentPendingMovementSightLineSeesTargetUncached(observer, target) {
   if (!originPoint) return false;
   if (!pendingLightingAllowsVisualDetection(observer, target)) return false;
 
-  return targetPoints.some((targetPoint) => !lineOfSightBlockedByWall(originPoint, targetPoint));
+  return coreTargetPoints.some((targetPoint) => !lineOfSightBlockedByWall(originPoint, targetPoint));
 }
 
 export function currentPendingMovementSightLineSeesTarget(observer, target) {
@@ -997,7 +1002,7 @@ function currentSightLineSeesHiddenTargetDuringPendingMovement(
   if (actorHasConditionSlug(actorOf(target), 'invisible')) return false;
   if (hasDetectionWork === false) return false;
 
-  const targetPoints = visibilityTestPointsForPendingTarget(target);
+  const targetPoints = coreVisibilityTestPointsForPendingTarget(target);
   if (!targetPoints.length) return false;
 
   for (const source of [
@@ -1227,7 +1232,7 @@ function getInitialPendingMovementVisibilityState(observer, target) {
 }
 
 function currentCoreDetectionPolygonSeesTarget(observer, target, { requirePolygon = false } = {}) {
-  const targetPoints = visibilityTestPointsForPendingTarget(target);
+  const targetPoints = coreVisibilityTestPointsForPendingTarget(target);
   if (!targetPoints.length) return false;
 
   const sightSources = activeSightSourcesForObserver(observer);
@@ -1463,7 +1468,7 @@ function sightLineFromObserverPositionSeesTarget(observer, target, observerPosit
   if (!observer || !target?.document?.id || !observerPosition) return false;
   if (!observerHasUsableSight(observer)) return false;
 
-  const targetPoints = visibilityTestPointsForPendingTarget(target);
+  const targetPoints = coreVisibilityTestPointsForPendingTarget(target);
   if (!targetPoints.length) return false;
 
   const originPoint = centerForToken(observer, observerPosition);
@@ -3217,7 +3222,7 @@ function shouldTemporarilyForceTokenInvisibleUncached(target, { hasDetectionWork
       }
 
       const bypassOriginPoint = centerForToken(observer);
-      const bypassTargetPoints = visibilityTestPointsForPendingTarget(target);
+      const bypassTargetPoints = coreVisibilityTestPointsForPendingTarget(target);
       if (
         bypassOriginPoint &&
         bypassTargetPoints.length &&

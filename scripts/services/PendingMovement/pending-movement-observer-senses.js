@@ -120,6 +120,9 @@ export function createPositionedTokenProxy(tokenOrDoc, position, { getTokenObjec
       ) {
         return originFactory();
       }
+      if (prop === 'getVisibilityTestPoints') {
+        return () => [{ ...center }];
+      }
 
       const value = target[prop];
       return typeof value === 'function' ? value.bind(target) : value;
