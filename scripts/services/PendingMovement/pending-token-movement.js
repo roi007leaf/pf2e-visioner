@@ -1059,7 +1059,6 @@ export function shouldUseFullAnimationRefreshCadence(tokenId) {
     if (observer) {
       const storedState = getStoredVisibilityState(observer, target);
       if (storedState === 'hidden') return true;
-      if (RENDER_HIDDEN_FROM_OBSERVER_STATES.has(storedState)) return true;
     }
     if (isPendingMovementRenderLocked(target)) return true;
     if (tokenHasDetectionFilterVisual(target)) return true;

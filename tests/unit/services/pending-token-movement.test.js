@@ -3180,45 +3180,6 @@ describe('pending token movement hidden detection guard', () => {
     expect(refreshTokenVisibility).toHaveBeenCalledTimes(5);
   });
 
-  test('animation refresh uses full cadence when target stored state is undetected', () => {
-    global.canvas.walls.placeables = [];
-    const observer = createMockToken({
-      id: 'observer',
-      flags: visibilityV2Flags({ target: 'undetected' }),
-    });
-    const target = createMockToken({ id: 'target', visible: true });
-    global.canvas = {
-      ...global.canvas,
-      tokens: {
-        get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
-        placeables: [observer, target],
-      },
-    };
-
-    setPendingTokenMovementPosition(observer.document, { x: 0, y: 0 }, [observer]);
-
-    expect(shouldUseFullAnimationRefreshCadence('observer')).toBe(true);
-  });
-
-  test('animation refresh uses full cadence when target stored state is unnoticed', () => {
-    global.canvas.walls.placeables = [];
-    const observer = createMockToken({
-      id: 'observer',
-      flags: visibilityV2Flags({ target: 'unnoticed' }),
-    });
-    const target = createMockToken({ id: 'target', visible: true });
-    global.canvas = {
-      ...global.canvas,
-      tokens: {
-        get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
-        placeables: [observer, target],
-      },
-    };
-
-    setPendingTokenMovementPosition(observer.document, { x: 0, y: 0 }, [observer]);
-
-    expect(shouldUseFullAnimationRefreshCadence('observer')).toBe(true);
-  });
 
   test('can refresh pending movement token visuals without refreshing perception', () => {
     global.canvas.walls.placeables = [];
