@@ -42,6 +42,7 @@ const controlTokenSessionState = (globalThis.__pf2eVisionerControlTokenSessions 
   timers: new Set(),
 });
 const CONTROL_TOKEN_RECALC_DELAY_MS = 0;
+const CONTROL_TOKEN_POST_RECALC_VISIBILITY_REFRESH_DELAYS_MS = Object.freeze([75, 250]);
 const NO_OBSERVER_VISIBILITY_REFRESH_DELAYS_MS = Object.freeze([0, 75, 250]);
 const CONTROLLED_DRAG_POINTER_MOVE_REFRESH_MS = 50;
 const controlledDragPointerMoveRefreshState = (globalThis.__pf2eVisionerDragPointerMoveRefresh ??= {
@@ -146,6 +147,16 @@ function scheduleControlTokenSessionTimer(sequence, tokenId, delayMs, callback) 
   return timer;
 }
 
+function refreshPendingVisibilityForActiveControlTokenSession(sequence, tokenId, fallbackToken) {
+  if (!isActiveControlTokenSession(sequence, tokenId)) {
+    return;
+  }
+
+  const currentToken =
+    canvas?.tokens?.controlled?.find?.((token) => token?.document?.id === tokenId) || fallbackToken;
+  refreshPendingVisibilityAfterControlToken(currentToken);
+}
+
 function scheduleNoObserverVisibilityRefresh() {
   let completed = false;
   const run = () => {
@@ -197,6 +208,17 @@ function refreshPendingVisibilityAfterControlToken(token = canvas?.tokens?.contr
     );
   } catch {
     /* best effort */
+  }
+}
+
+async function refreshSystemHiddenHighlightsForControlToken(token) {
+  if (!token?.document?.id) return;
+
+  try {
+    const { updateSystemHiddenTokenHighlights } = await import('../services/visual-effects.js');
+    await updateSystemHiddenTokenHighlights(token.document.id);
+  } catch (error) {
+    console.warn('PF2E Visioner | Failed to update system-hidden token highlights:', error);
   }
 }
 
@@ -709,6 +731,7 @@ export async function onCanvasReady() {
     if (controlledTokens.length > 0) {
       // Process each controlled token to restore their indicators
       for (const token of controlledTokens) {
+        refreshPendingVisibilityAfterControlToken(token);
         const wallFlags = token?.document?.getFlag?.(MODULE_ID, 'walls') || {};
         // Only restore if this token has wall flags
         if (Object.keys(wallFlags).length > 0) {
@@ -720,6 +743,10 @@ export async function onCanvasReady() {
     // Also set up a hook to restore indicators when tokens are controlled after canvas ready
     // OPTIMIZED: Only update wall visuals if the token actually has wall flags to avoid triggering AVS
     bindHookOnce('restoreIndicatorsOnControl', 'controlToken', async (token, controlled) => {
+      if (controlled) {
+        refreshPendingVisibilityAfterControlToken(token);
+      }
+
       // CRITICAL: Set global flag to suppress lighting refreshes during token control operations
       try {
         setSuppressLightingRefresh(true);
@@ -734,8 +761,6 @@ export async function onCanvasReady() {
       }
 
       if (controlled) {
-        refreshPendingVisibilityAfterControlToken(token);
-
         const wallFlags = token?.document?.getFlag?.(MODULE_ID, 'walls') || {};
         if (Object.keys(wallFlags).length > 0) {
           // CRITICAL: Always use the optimized version that doesn't trigger lightingRefresh
@@ -752,14 +777,8 @@ export async function onCanvasReady() {
           }
         }
 
-        try {
-          const { updateSystemHiddenTokenHighlights } = await import(
-            '../services/visual-effects.js'
-          );
-          await updateSystemHiddenTokenHighlights(token.document.id);
-        } catch (error) {
-          console.warn('PF2E Visioner | Failed to update system-hidden token highlights:', error);
-        }
+        // System-hidden highlights depend on freshly recalculated AVS state.
+        // They are refreshed after recalculation settles.
       } else {
         try {
           const { updateSystemHiddenTokenHighlights } = await import(
@@ -1005,9 +1024,31 @@ export async function onCanvasReady() {
         CONTROL_TOKEN_RECALC_DELAY_MS,
         () => {
           try {
-            window.pf2eVisioner?.services?.autoVisibilitySystem?.recalculateForTokens?.([
-              session.tokenId,
-            ]);
+            const result =
+              window.pf2eVisioner?.services?.autoVisibilitySystem?.recalculateForTokens?.([
+                session.tokenId,
+              ]);
+            void Promise.resolve(result).finally(() => {
+              refreshPendingVisibilityForActiveControlTokenSession(
+                session.sequence,
+                session.tokenId,
+                token,
+              );
+              const currentToken =
+                canvas?.tokens?.controlled?.find?.(
+                  (controlledToken) => controlledToken?.document?.id === session.tokenId,
+                ) || token;
+              void refreshSystemHiddenHighlightsForControlToken(currentToken);
+              for (const delayMs of CONTROL_TOKEN_POST_RECALC_VISIBILITY_REFRESH_DELAYS_MS) {
+                scheduleControlTokenSessionTimer(session.sequence, session.tokenId, delayMs, () =>
+                  refreshPendingVisibilityForActiveControlTokenSession(
+                    session.sequence,
+                    session.tokenId,
+                    token,
+                  ),
+                );
+              }
+            });
           } catch {
             /* best effort */
           }

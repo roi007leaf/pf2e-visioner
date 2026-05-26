@@ -20,13 +20,22 @@ const PENDING_PROFILE_WRITE_STORE_KEY = Symbol.for(
 const pendingPerceptionProfileWrites =
   (globalThis[PENDING_PROFILE_WRITE_STORE_KEY] ??= new Map());
 
-function getForcedDeletion() {
+function getForcedDeletionOperator() {
   return foundry?.data?.operators?.ForcedDeletion ?? null;
 }
 
+function createForcedDeletionValue() {
+  const ForcedDeletion = getForcedDeletionOperator();
+  if (!ForcedDeletion) return null;
+  return typeof ForcedDeletion === 'function' ? new ForcedDeletion() : ForcedDeletion;
+}
+
 export function isForcedDeletionValue(value) {
-  const forcedDeletion = getForcedDeletion();
-  return !!forcedDeletion && value === forcedDeletion;
+  const ForcedDeletion = getForcedDeletionOperator();
+  return !!ForcedDeletion && (
+    value === ForcedDeletion ||
+    (typeof ForcedDeletion === 'function' && value instanceof ForcedDeletion)
+  );
 }
 
 export function isDefaultPerceptionProfile(profile) {
@@ -92,6 +101,14 @@ function readDocumentProfileEntry(token, targetId) {
   if (isForcedDeletionValue(profile)) return null;
 
   return normalizePerceptionProfile(profile);
+}
+
+export function getDocumentPerceptionProfileMap(token) {
+  return readDocumentProfileMap(token);
+}
+
+export function getDocumentPerceptionProfileEntry(token, targetId) {
+  return readDocumentProfileEntry(token, targetId);
 }
 
 function mergePendingProfileWrite(token, pendingWrite) {
@@ -176,6 +193,18 @@ async function unsetDocumentFlag(token, flagKey, forcedDeletion, options = {}) {
   return document.update({ [`flags.${MODULE_ID}.-=${flagKey}`]: null }, noRenderUpdateOptions());
 }
 
+function buildProfileMapPatch(nextProfiles = {}, removedTargetIds = [], forcedDeletion = null) {
+  const patch = { ...nextProfiles };
+  for (const targetId of removedTargetIds) {
+    if (forcedDeletion) {
+      patch[targetId] = createForcedDeletionValue();
+    } else {
+      patch[`-=${targetId}`] = null;
+    }
+  }
+  return patch;
+}
+
 async function setDocumentFlag(token, flagKey, value, options = {}) {
   const document = getTokenDocument(token);
   if (!document) return;
@@ -193,26 +222,14 @@ async function setDocumentFlag(token, flagKey, value, options = {}) {
   );
 }
 
-function buildProfileMapPatch(nextProfiles = {}, removedTargetIds = [], forcedDeletion = null) {
-  const patch = { ...nextProfiles };
-  for (const targetId of removedTargetIds) {
-    if (forcedDeletion) {
-      patch[targetId] = forcedDeletion;
-    } else {
-      patch[`-=${targetId}`] = null;
-    }
-  }
-  return patch;
-}
-
 export function buildPerceptionProfileFlagUpdatePasses(token, profileMap = {}) {
   const document = getTokenDocument(token);
   if (!document) return [];
 
-  const previousMap = getRawPerceptionProfileMap(token);
+  const previousMap = readDocumentProfileMap(token);
   const nextProfiles = normalizePerceptionProfileMap(profileMap);
   const removedTargetIds = Object.keys(previousMap).filter((id) => !(id in nextProfiles));
-  const forcedDeletion = getForcedDeletion();
+  const forcedDeletion = createForcedDeletionValue();
 
   if (Object.keys(nextProfiles).length === 0) {
     return [[buildTokenFlagUnsetUpdate({
@@ -224,14 +241,12 @@ export function buildPerceptionProfileFlagUpdatePasses(token, profileMap = {}) {
   }
 
   if (removedTargetIds.length > 0) {
-    return [[
-      buildTokenFlagSetUpdate({
-        document,
-        moduleId: MODULE_ID,
-        flagKey: VISIBILITY_V2_FLAG,
-        value: buildProfileMapPatch(nextProfiles, removedTargetIds, forcedDeletion),
-      }),
-    ]];
+    return [[buildTokenFlagSetUpdate({
+      document,
+      moduleId: MODULE_ID,
+      flagKey: VISIBILITY_V2_FLAG,
+      value: buildProfileMapPatch(nextProfiles, removedTargetIds, forcedDeletion),
+    })]];
   }
 
   return [[buildTokenFlagSetUpdate({
@@ -246,10 +261,10 @@ export async function setPerceptionProfileFlag(token, profileMap, options = {}) 
   const document = getTokenDocument(token);
   if (!document) return;
 
-  const previousMap = getRawPerceptionProfileMap(token);
+  const previousMap = readDocumentProfileMap(token);
   const nextMap = normalizePerceptionProfileMap(profileMap);
   const removedTargetIds = Object.keys(previousMap).filter((id) => !(id in nextMap));
-  const forcedDeletion = getForcedDeletion();
+  const forcedDeletion = createForcedDeletionValue();
 
   rememberPendingPerceptionProfileWrite(token, nextMap, { removedTargetIds });
   await waitForTokenDocumentUpdateSafe(token);

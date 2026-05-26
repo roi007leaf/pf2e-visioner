@@ -7,7 +7,7 @@ import {
 } from './PendingMovement/pending-movement-render-lock.js';
 import {
   schedulePendingTokenMovementCompletion as defaultSchedulePendingTokenMovementCompletion,
-  targetIsRenderHiddenForAnyObserver,
+  targetIsRenderHiddenForCurrentViewObserver,
 } from './PendingMovement/pending-token-movement.js';
 import { isRefreshTokenProcessingSuppressed as defaultIsRefreshTokenProcessingSuppressed } from './runtime-state.js';
 import {
@@ -125,7 +125,7 @@ export function handleTokenRefreshed(
   } = {},
 ) {
   try {
-    if (token && targetIsRenderHiddenForAnyObserver(token)) {
+    if (token && targetIsRenderHiddenForCurrentViewObserver(token)) {
       const mesh = token.detectionFilterMesh;
       if (mesh && (mesh.visible || mesh.alpha > 0 || mesh.renderable)) {
         if ('visible' in mesh) mesh.visible = false;

@@ -120,4 +120,92 @@ describe('seek outcome analysis', () => {
       usedImpreciseSenseRange: 30,
     });
   });
+
+  test('visual Seek cannot make an invisible target observed', async () => {
+    const subject = {
+      id: 'target',
+      actor: {
+        type: 'character',
+        hasCondition: jest.fn((slug) => slug === 'invisible'),
+      },
+    };
+    const visionAnalyzer = {
+      getVisionCapabilities: jest.fn(() => ({
+        hasVision: true,
+        isBlinded: false,
+        sensingSummary: { precise: [{ type: 'vision', range: Infinity }] },
+      })),
+      hasLineOfSight: jest.fn(() => true),
+      hasPreciseNonVisualInRange: jest.fn(() => false),
+    };
+
+    const result = await analyzeSeekOutcome(
+      makeActionData(),
+      subject,
+      baseDeps({
+        createSeekDialogAdapter: jest.fn(() => ({
+          determineSenseUsed: jest.fn(async () => ({
+            canDetect: true,
+            precision: 'precise',
+            senseType: 'vision',
+            range: Infinity,
+          })),
+        })),
+        visionAnalyzer,
+      }),
+    );
+
+    expect(result).toMatchObject({
+      target: subject,
+      currentVisibility: 'hidden',
+      newVisibility: 'hidden',
+      changed: false,
+      usedSenseType: 'vision',
+      usedSensePrecision: 'precise',
+    });
+  });
+
+  test('precise non-visual Seek can still make an invisible target observed', async () => {
+    const subject = {
+      id: 'target',
+      actor: {
+        type: 'character',
+        hasCondition: jest.fn((slug) => slug === 'invisible'),
+      },
+    };
+    const visionAnalyzer = {
+      getVisionCapabilities: jest.fn(() => ({
+        hasVision: false,
+        isBlinded: true,
+        sensingSummary: { precise: [{ type: 'echolocation', range: 30 }] },
+      })),
+      hasLineOfSight: jest.fn(() => false),
+      hasPreciseNonVisualInRange: jest.fn(() => true),
+    };
+
+    const result = await analyzeSeekOutcome(
+      makeActionData(),
+      subject,
+      baseDeps({
+        createSeekDialogAdapter: jest.fn(() => ({
+          determineSenseUsed: jest.fn(async () => ({
+            canDetect: true,
+            precision: 'precise',
+            senseType: 'echolocation',
+            range: 30,
+          })),
+        })),
+        visionAnalyzer,
+      }),
+    );
+
+    expect(result).toMatchObject({
+      target: subject,
+      currentVisibility: 'hidden',
+      newVisibility: 'observed',
+      changed: true,
+      usedSenseType: 'echolocation',
+      usedSensePrecision: 'precise',
+    });
+  });
 });

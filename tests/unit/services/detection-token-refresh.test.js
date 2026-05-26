@@ -32,6 +32,52 @@ describe('detection token refresh wrapper', () => {
     global.canvas = originalCanvas;
   });
 
+  test('restores render-hidden token when current-view guard drops during refresh', () => {
+    const flags = visibilityV2Flags({ target: 'undetected' });
+    const observer = createMockToken({
+      id: 'observer',
+      controlled: true,
+      flags,
+    });
+    const target = createMockToken({ id: 'target', visible: true });
+    target.renderable = true;
+    target.mesh = { visible: true, renderable: true, alpha: 1 };
+    global.canvas = {
+      ...global.canvas,
+      effects: {
+        visionSources: new Map(),
+        lightSources: new Map(),
+      },
+      tokens: {
+        controlled: [observer],
+        get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+        placeables: [observer, target],
+      },
+    };
+
+    forcePendingMovementTokenInvisible(target);
+    expect(target.visible).toBe(false);
+    expect(target.renderable).toBe(false);
+    expect(target.mesh.visible).toBe(false);
+    expect(target.mesh.renderable).toBe(false);
+    expect(target.mesh.alpha).toBe(0);
+
+    const wrapped = jest.fn(() => {
+      flags['pf2e-visioner'].visibilityV2.target = legacyVisibilityToProfile('observed');
+      return 'wrapped-result';
+    });
+
+    const result = wrapTokenRefreshVisibility.call(target, wrapped);
+
+    expect(result).toBe('wrapped-result');
+    expect(wrapped).toHaveBeenCalledTimes(1);
+    expect(target.visible).toBe(true);
+    expect(target.renderable).toBe(true);
+    expect(target.mesh.visible).toBe(true);
+    expect(target.mesh.renderable).toBe(true);
+    expect(target.mesh.alpha).toBe(1);
+  });
+
   test('re-hides invisible undetected target on active-movement fast refresh path', () => {
     const observer = createMockToken({
       id: 'observer',

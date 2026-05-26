@@ -29,7 +29,8 @@ describe('visibility profile flag persistence', () => {
     clearPendingPerceptionProfileWrites();
   });
 
-  test('builds v14-safe nested removal patches for partial visibilityV2 removals', () => {
+  test('builds v14 nested deletion patches for partial visibilityV2 removals', () => {
+    const forcedDeletion = foundry.data.operators.ForcedDeletion;
     const observer = global.createMockToken({ id: 'observer-build' });
     observer.document.getFlag.mockImplementation((moduleId, key) => {
       if (moduleId !== 'pf2e-visioner' || key !== 'visibilityV2') return null;
@@ -48,14 +49,15 @@ describe('visibility profile flag persistence', () => {
         _id: 'observer-build',
         'flags.pf2e-visioner.visibilityV2': {
           keep: expect.objectContaining({ detectionState: 'undetected' }),
-          remove: foundry.data.operators.ForcedDeletion,
+          remove: forcedDeletion,
         },
       },
     ]]);
     expect(passes[0][0]['flags.pf2e-visioner.visibilityV2']).not.toHaveProperty('-=remove');
   });
 
-  test('writes partial visibilityV2 removals in one patch without clearing the whole flag first', async () => {
+  test('writes partial visibilityV2 removals with v14 nested deletion operator', async () => {
+    const forcedDeletion = foundry.data.operators.ForcedDeletion;
     const observer = global.createMockToken({ id: 'observer-write' });
     observer.document.getFlag.mockImplementation((moduleId, key) => {
       if (moduleId !== 'pf2e-visioner' || key !== 'visibilityV2') return null;
@@ -72,11 +74,65 @@ describe('visibility profile flag persistence', () => {
     expect(observer.document.unsetFlag).not.toHaveBeenCalled();
     expect(observer.document.setFlag).toHaveBeenCalledWith('pf2e-visioner', 'visibilityV2', {
       keep: expect.objectContaining({ detectionState: 'undetected' }),
-      remove: foundry.data.operators.ForcedDeletion,
+      remove: forcedDeletion,
     });
   });
 
-  test('falls back to legacy nested deletion syntax only without ForcedDeletion', () => {
+  test('pending write overlays do not hide stale document profile removals', () => {
+    const observer = global.createMockToken({ id: 'observer-pending-stale-build' });
+    observer.document.getFlag.mockImplementation((moduleId, key) => {
+      if (moduleId !== 'pf2e-visioner' || key !== 'visibilityV2') return null;
+      return {
+        keep: hiddenProfile(),
+        stale: undetectedProfile(),
+      };
+    });
+
+    rememberPendingPerceptionProfileWrite(observer, {
+      keep: hiddenProfile(),
+    }, { removedTargetIds: ['stale'] });
+
+    const passes = buildPerceptionProfileFlagUpdatePasses(observer, {
+      keep: hiddenProfile(),
+    });
+
+    expect(passes).toEqual([[
+      {
+        _id: 'observer-pending-stale-build',
+        'flags.pf2e-visioner.visibilityV2': {
+          keep: expect.objectContaining({ detectionState: 'hidden' }),
+          stale: foundry.data.operators.ForcedDeletion,
+        },
+      },
+    ]]);
+    expect(passes[0][0]['flags.pf2e-visioner.visibilityV2']).not.toHaveProperty('-=stale');
+  });
+
+  test('setPerceptionProfileFlag deletes stale document profiles hidden by pending overlay', async () => {
+    const observer = global.createMockToken({ id: 'observer-pending-stale-write' });
+    observer.document.getFlag.mockImplementation((moduleId, key) => {
+      if (moduleId !== 'pf2e-visioner' || key !== 'visibilityV2') return null;
+      return {
+        keep: hiddenProfile(),
+        stale: undetectedProfile(),
+      };
+    });
+
+    rememberPendingPerceptionProfileWrite(observer, {
+      keep: hiddenProfile(),
+    }, { removedTargetIds: ['stale'] });
+
+    await setPerceptionProfileFlag(observer, {
+      keep: hiddenProfile(),
+    });
+
+    expect(observer.document.setFlag).toHaveBeenCalledWith('pf2e-visioner', 'visibilityV2', {
+      keep: expect.objectContaining({ detectionState: 'hidden' }),
+      stale: foundry.data.operators.ForcedDeletion,
+    });
+  });
+
+  test('falls back to legacy nested deletion syntax without ForcedDeletion', () => {
     const originalForcedDeletion = global.foundry.data.operators.ForcedDeletion;
     global.foundry.data.operators.ForcedDeletion = undefined;
     const observer = global.createMockToken({ id: 'observer-legacy' });
@@ -102,6 +158,39 @@ describe('visibility profile flag persistence', () => {
           },
         },
       ]]);
+      expect(passes[0][0]['flags.pf2e-visioner.visibilityV2']).not.toHaveProperty('remove');
+    } finally {
+      global.foundry.data.operators.ForcedDeletion = originalForcedDeletion;
+    }
+  });
+
+  test('instantiates Foundry v14 ForcedDeletion operator classes', () => {
+    const originalForcedDeletion = global.foundry.data.operators.ForcedDeletion;
+    class ForcedDeletion {}
+    global.foundry.data.operators.ForcedDeletion = ForcedDeletion;
+    const observer = global.createMockToken({ id: 'observer-v14-class' });
+    observer.document.getFlag.mockImplementation((moduleId, key) => {
+      if (moduleId !== 'pf2e-visioner' || key !== 'visibilityV2') return null;
+      return {
+        keep: undetectedProfile(),
+        remove: hiddenProfile(),
+      };
+    });
+
+    try {
+      const passes = buildPerceptionProfileFlagUpdatePasses(observer, {
+        keep: undetectedProfile(),
+      });
+      const patch = passes[0][0]['flags.pf2e-visioner.visibilityV2'];
+
+      expect(patch.keep).toEqual(expect.objectContaining({ detectionState: 'undetected' }));
+      expect(patch.remove).toBeInstanceOf(ForcedDeletion);
+      expect(normalizePerceptionProfileMap({
+        keep: hiddenProfile(),
+        remove: new ForcedDeletion(),
+      })).toEqual({
+        keep: expect.objectContaining({ detectionState: 'hidden' }),
+      });
     } finally {
       global.foundry.data.operators.ForcedDeletion = originalForcedDeletion;
     }

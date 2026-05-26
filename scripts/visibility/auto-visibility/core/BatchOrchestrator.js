@@ -984,6 +984,9 @@ export class BatchOrchestrator {
     const applicationPlan = buildBatchResultApplicationPlan({
       updates: batchResult.updates,
       getVisibilityMap: (observer) => this.visibilityMapService.getVisibilityMap(observer),
+      getStoredVisibilityMap: (observer) =>
+        this.visibilityMapService.getDocumentVisibilityMap?.(observer) ??
+        this.visibilityMapService.getVisibilityMap(observer),
       recordExplicitVisiblePair: (update) => this._recordExplicitVisiblePair(update),
       resolveVisibilityForUpdate: (update, currentVisibility) =>
         this._resolvePendingMovementVisibilityUpdate(update, currentVisibility),

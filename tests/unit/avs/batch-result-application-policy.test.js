@@ -45,6 +45,25 @@ describe('BatchResultApplicationPolicy', () => {
     expect(recordExplicitVisiblePair).toHaveBeenCalledTimes(1);
   });
 
+  test('persists observed updates when document map still has stale non-observed state', () => {
+    const observerA = observer('A');
+    const targetB = target('B');
+    const recordExplicitVisiblePair = jest.fn(() => false);
+
+    const plan = buildVisibilityMapApplicationPlan({
+      updates: [{ observer: observerA, target: targetB, visibility: 'observed' }],
+      getVisibilityMap: jest.fn(() => ({})),
+      getStoredVisibilityMap: jest.fn(() => ({ B: 'undetected' })),
+      recordExplicitVisiblePair,
+      overrideMatchesVisibility: jest.fn(() => true),
+      moduleId: 'pf2e-visioner',
+    });
+
+    expect(plan.uniqueUpdateCount).toBe(1);
+    expect(plan.dirtyObservers).toEqual([observerA]);
+    expect(plan.observerMaps.get(observerA)).toEqual({ B: 'observed' });
+  });
+
   test('skips force-ephemeral-only updates and active override mismatches', () => {
     const observerA = observer('A');
     const targetB = target('B', { visibility: 'hidden' });

@@ -18,7 +18,7 @@ import {
   withSuppressedPendingMovementDetectionFilterVisuals,
 } from '../PendingMovement/pending-movement-render-lock.js';
 import {
-  targetIsRenderHiddenForAnyObserver,
+  targetIsRenderHiddenForCurrentViewObserver,
   targetMustStayHiddenDuringPendingMovement,
 } from '../PendingMovement/pending-token-movement.js';
 import {
@@ -26,6 +26,20 @@ import {
   tokenHasDetectionFilterMeshVisual,
   tokenHasDetectionFilterVisual,
 } from '../PendingMovement/pending-movement-detection-filter-visuals.js';
+
+function syncCurrentViewRenderHiddenState(token) {
+  if (
+    targetMustStayHiddenDuringPendingMovement(token) ||
+    targetIsRenderHiddenForCurrentViewObserver(token)
+  ) {
+    forcePendingMovementTokenInvisible(token);
+    clearDetectionFilterVisuals(token);
+    return true;
+  }
+
+  restorePendingMovementTokenRendering(token, { ignoreObservedGrace: true });
+  return false;
+}
 
 function refreshThenRestorePendingInvisible(token, refreshWrapped) {
   const result = refreshWrapped();
@@ -42,10 +56,7 @@ function refreshThenRestorePendingInvisible(token, refreshWrapped) {
 export function wrapTokenRefreshState(wrapped, ...args) {
   const result = wrapped(...args);
   try {
-    if (targetMustStayHiddenDuringPendingMovement(this) || targetIsRenderHiddenForAnyObserver(this)) {
-      forcePendingMovementTokenInvisible(this);
-      clearDetectionFilterVisuals(this);
-    }
+    syncCurrentViewRenderHiddenState(this);
   } catch {
     /* keep Foundry state if guard fails */
   }
@@ -55,10 +66,7 @@ export function wrapTokenRefreshState(wrapped, ...args) {
 export function wrapTokenApplyRenderFlags(wrapped, ...args) {
   const result = wrapped(...args);
   try {
-    if (targetMustStayHiddenDuringPendingMovement(this) || targetIsRenderHiddenForAnyObserver(this)) {
-      forcePendingMovementTokenInvisible(this);
-      clearDetectionFilterVisuals(this);
-    }
+    syncCurrentViewRenderHiddenState(this);
   } catch {
     /* keep Foundry render flags if guard fails */
   }
@@ -73,7 +81,7 @@ export function wrapTokenRefreshVisibility(wrapped, ...args) {
       if (this.visible) {
         if (
           shouldTemporarilyForceTokenInvisible(this) ||
-          targetIsRenderHiddenForAnyObserver(this)
+          targetIsRenderHiddenForCurrentViewObserver(this)
         ) {
           forcePendingMovementTokenInvisible(this);
           clearDetectionFilterVisuals(this);
@@ -87,13 +95,10 @@ export function wrapTokenRefreshVisibility(wrapped, ...args) {
     return result;
   }
 
-  if (targetIsRenderHiddenForAnyObserver(this)) {
+  if (targetIsRenderHiddenForCurrentViewObserver(this)) {
     const result = withSuppressedPendingMovementDetectionFilterVisuals(this, () => wrapped(...args));
     try {
-      if (this.visible) {
-        forcePendingMovementTokenInvisible(this);
-        clearDetectionFilterVisuals(this);
-      }
+      syncCurrentViewRenderHiddenState(this);
     } catch {
       /* keep Foundry visibility if guard fails */
     }

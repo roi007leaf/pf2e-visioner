@@ -302,6 +302,133 @@ describe('BatchProcessor', () => {
     expect(res2.breakdown.visGlobalHits).toBeGreaterThanOrEqual(1);
   });
 
+  test('emits update when document visibility is stale even if canonical map and cache are unchanged', async () => {
+    optimizedVisibilityCalculator.calculateVisibilityBetweenTokens.mockResolvedValue('observed');
+    const allTokens = [...global.canvas.tokens.placeables].slice(0, 2);
+    const canonicalMaps = new Map([
+      ['A', { B: 'observed' }],
+      ['B', { A: 'observed' }],
+    ]);
+    let documentMaps = new Map([
+      ['A', { B: 'observed' }],
+      ['B', { A: 'observed' }],
+    ]);
+    processor.visibilityMapService = {
+      getVisibilityMap: jest.fn((token) => canonicalMaps.get(token.document.id) || {}),
+      getDocumentVisibilityMap: jest.fn((token) => documentMaps.get(token.document.id) || {}),
+    };
+
+    await processor.process(allTokens, new Set(['A']), {});
+    optimizedVisibilityCalculator.calculateVisibilityBetweenTokens.mockClear();
+    documentMaps = new Map([
+      ['A', { B: 'undetected' }],
+      ['B', { A: 'observed' }],
+    ]);
+
+    const res = await processor.process(allTokens, new Set(['A']), {});
+
+    expect(res.breakdown.visGlobalHits).toBeGreaterThan(0);
+    expect(res.updates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          observer: expect.objectContaining({ document: expect.objectContaining({ id: 'A' }) }),
+          target: expect.objectContaining({ document: expect.objectContaining({ id: 'B' }) }),
+          visibility: 'observed',
+        }),
+      ]),
+    );
+  });
+
+  test('controlled observer recalculation ignores stale global visibility cache', async () => {
+    const previousControlled = global.canvas.tokens.controlled;
+    const allTokens = [...global.canvas.tokens.placeables].slice(0, 2);
+    const [observer] = allTokens;
+    global.canvas.tokens.controlled = [observer];
+    optimizedVisibilityCalculator.calculateVisibilityBetweenTokens.mockResolvedValue('observed');
+    processor.visibilityMapService = {
+      getVisibilityMap: jest.fn((token) =>
+        token.document.id === 'A' ? { B: 'observed' } : { A: 'observed' },
+      ),
+      getDocumentVisibilityMap: jest.fn((token) =>
+        token.document.id === 'A' ? { B: 'undetected' } : { A: 'observed' },
+      ),
+    };
+
+    try {
+      globalVisibilityCache.set('A|50:50:0>>B|150:50:0', 'undetected');
+      globalVisibilityCache.set('B|150:50:0>>A|50:50:0', 'undetected');
+
+      const res = await processor.process(allTokens, new Set(['A']), {});
+
+      expect(optimizedVisibilityCalculator.calculateVisibilityBetweenTokens).toHaveBeenCalled();
+      expect(res.updates).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            observer: expect.objectContaining({ document: expect.objectContaining({ id: 'A' }) }),
+            target: expect.objectContaining({ document: expect.objectContaining({ id: 'B' }) }),
+            visibility: 'observed',
+          }),
+        ]),
+      );
+    } finally {
+      global.canvas.tokens.controlled = previousControlled;
+    }
+  });
+
+  test('includes controlled observer core LOS targets outside spatial radius', async () => {
+    const previousControlled = global.canvas.tokens.controlled;
+    const previousEffects = global.canvas.effects;
+    const observer = makeToken('A', 0, 0);
+    const target = makeToken('B', 5000, 0);
+    observer.center = { x: 50, y: 50 };
+    target.center = { x: 5050, y: 50 };
+    target.document.getVisibilityTestPoints = jest.fn(() => [target.center]);
+    global.canvas.tokens.placeables = [observer, target];
+    global.canvas.tokens.controlled = [observer];
+    global.canvas.effects = {
+      ...(global.canvas.effects || {}),
+      visionSources: new Map([
+        [
+          'A',
+          {
+            active: true,
+            object: observer,
+            los: { contains: jest.fn((x, y) => x === target.center.x && y === target.center.y) },
+          },
+        ],
+      ]),
+      lightSources: new Map(),
+    };
+    processor.maxVisibilityDistance = 1;
+    optimizedVisibilityCalculator.calculateVisibilityBetweenTokens.mockResolvedValue('observed');
+    processor.visibilityMapService = {
+      getVisibilityMap: jest.fn((token) =>
+        token.document.id === 'A' ? { B: 'undetected' } : {},
+      ),
+      getDocumentVisibilityMap: jest.fn((token) =>
+        token.document.id === 'A' ? { B: 'undetected' } : {},
+      ),
+    };
+
+    let res;
+    try {
+      res = await processor.process(global.canvas.tokens.placeables, new Set(['A']), {});
+    } finally {
+      global.canvas.tokens.controlled = previousControlled;
+      global.canvas.effects = previousEffects;
+    }
+
+    expect(res.updates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          observer: expect.objectContaining({ document: expect.objectContaining({ id: 'A' }) }),
+          target: expect.objectContaining({ document: expect.objectContaining({ id: 'B' }) }),
+          visibility: 'observed',
+        }),
+      ]),
+    );
+  });
+
   test('rebuilds spatial index inside TTL when token positions change', async () => {
     const tA = makeToken('A', 0, 0);
     const tB = makeToken('B', 1000, 0);

@@ -189,6 +189,76 @@ export function buildTokenPositionCacheKey(tokens, posCache = null, positionMana
   return `scene:${getSceneCacheId()}|count:${entries.length}|${entries.join('|')}`;
 }
 
+function getTokenId(tokenOrObject) {
+  return tokenOrObject?.document?.id ?? tokenOrObject?.id ?? null;
+}
+
+function sourceEntries(sources) {
+  return Array.from(sources || [], (entry) => (Array.isArray(entry) ? entry[1] : entry)).filter(
+    Boolean,
+  );
+}
+
+function getVisibilityTestPoints(token) {
+  try {
+    const points = token?.document?.getVisibilityTestPoints?.();
+    if (Array.isArray(points) && points.length > 0) return points;
+  } catch {
+    // fall through
+  }
+
+  return token?.center ? [token.center] : [];
+}
+
+function hasCoreLosFromControlledObserver(observerToken, targetToken) {
+  const observerId = getTokenId(observerToken);
+  if (!observerId || !targetToken) return false;
+
+  try {
+    const controlled = canvas?.tokens?.controlled || [];
+    if (!controlled.some((token) => getTokenId(token) === observerId)) return false;
+
+    const sources = [
+      ...sourceEntries(canvas?.effects?.visionSources),
+      ...sourceEntries(canvas?.effects?.lightSources),
+    ].filter((source) => source?.active && getTokenId(source.object) === observerId);
+    if (sources.length === 0) return false;
+
+    const points = getVisibilityTestPoints(targetToken);
+    if (points.length === 0) return false;
+
+    return sources.some((source) =>
+      points.some(
+        (point) =>
+          source?.los?.contains?.(point.x, point.y) ||
+          source?.shape?.contains?.(point.x, point.y),
+      ),
+    );
+  } catch {
+    return false;
+  }
+}
+
+function addCoreLosTargetsForControlledObserver(observerToken, relevantTokens, allTokens) {
+  if (!observerToken?.document?.id) return relevantTokens;
+
+  const byId = new Map();
+  for (const token of relevantTokens || []) {
+    const id = token?.document?.id;
+    if (id) byId.set(id, token);
+  }
+
+  for (const token of allTokens || []) {
+    const id = token?.document?.id;
+    if (!id || id === observerToken.document.id || byId.has(id)) continue;
+    if (hasCoreLosFromControlledObserver(observerToken, token)) {
+      byId.set(id, token);
+    }
+  }
+
+  return Array.from(byId.values());
+}
+
 /**
  * BatchProcessor centralizes the heavy per-batch computation:
  * - Token collection per-changed-token (spatial + optional viewport filter)
@@ -420,6 +490,13 @@ export class BatchProcessor {
     // Cache visibility maps once per token for original state comparisons (always needed fresh)
     const visCache = new VisibilityMapBatchCache(this.visibilityMapService);
     visCache.build(allTokens);
+    const documentVisCache = new VisibilityMapBatchCache({
+      getVisibilityMap: (token) =>
+        this.visibilityMapService?.getDocumentVisibilityMap?.(token) ??
+        this.visibilityMapService?.getVisibilityMap?.(token) ??
+        {},
+    });
+    documentVisCache.build(allTokens);
 
     // Per-batch override memoization (always needed fresh)
     const overridesCache = new OverrideBatchCache(this.overrideService);
@@ -492,11 +569,18 @@ export class BatchProcessor {
     const isDoorStateBatch =
       calcOptions?.postBatchPerceptionSuppression?.reason === 'door-state-change';
     const isMovementBatch = calcOptions?.isMovementBatch === true;
+    const controlledChangedTokenIds = new Set(
+      (canvas?.tokens?.controlled || [])
+        .map((token) => token?.document?.id)
+        .filter((id) => id && changedTokenIds.has(id)),
+    );
+    const hasControlledChangedToken = controlledChangedTokenIds.size > 0;
     const doorScopeCoords = this.#getDoorScopeCoords(calcOptions);
     const skipGlobalVisCache =
       LightingPrecomputer.isForcingFreshComputation() ||
       !!calcOptions?.skipPrecomputedLOS ||
-      isDoorStateBatch;
+      isDoorStateBatch ||
+      hasControlledChangedToken;
     const skipLosCache = !!calcOptions?.skipPrecomputedLOS || isDoorStateBatch;
     const directionalLosResolver = new BatchDirectionalLosResolver({
       visionAnalyzer: this.visionAnalyzer,
@@ -543,6 +627,11 @@ export class BatchProcessor {
       let relevantTokens = candidates
         .map((pt) => pt.token)
         .filter((t) => t?.document?.id && t.document.id !== changedTokenId);
+      relevantTokens = addCoreLosTargetsForControlledObserver(
+        changedToken,
+        relevantTokens,
+        allTokens,
+      );
       const usedMovementFallback = calcOptions?.isMovementBatch === true && relevantTokens.length === 0;
       if (usedMovementFallback) {
         relevantTokens = allTokens.filter(
@@ -597,6 +686,10 @@ export class BatchProcessor {
         // This ensures we compare against the true previous state, not values updated during processing
         const originalVisibility1 = visCache.getMapById(aId)?.[bId] || 'observed';
         const originalVisibility2 = visCache.getMapById(bId)?.[aId] || 'observed';
+        const originalDocumentVisibility1 =
+          documentVisCache.getMapById(aId)?.[bId] || 'observed';
+        const originalDocumentVisibility2 =
+          documentVisCache.getMapById(bId)?.[aId] || 'observed';
 
         let effectiveVisibility1, effectiveVisibility2;
         let hasOverride1 = false;
@@ -627,14 +720,22 @@ export class BatchProcessor {
           if (hasOverride1) breakdown.pairsSkippedOverride += 1;
           if (hasOverride2) breakdown.pairsSkippedOverride += 1;
 
-          if (hasOverride1 && effectiveVisibility1 !== originalVisibility1) {
+          if (
+            hasOverride1 &&
+            (effectiveVisibility1 !== originalVisibility1 ||
+              effectiveVisibility1 !== originalDocumentVisibility1)
+          ) {
             updates.push({
               observer: changedToken,
               target: otherToken,
               visibility: effectiveVisibility1,
             });
           }
-          if (hasOverride2 && effectiveVisibility2 !== originalVisibility2) {
+          if (
+            hasOverride2 &&
+            (effectiveVisibility2 !== originalVisibility2 ||
+              effectiveVisibility2 !== originalDocumentVisibility2)
+          ) {
             updates.push({
               observer: otherToken,
               target: changedToken,
@@ -646,7 +747,11 @@ export class BatchProcessor {
 
         // If only observer has override (hasOverride1), apply it but don't skip calculation
         // The moving observer should recalculate visibility to targets regardless of existing overrides
-        if (hasOverride1 && effectiveVisibility1 !== originalVisibility1) {
+        if (
+          hasOverride1 &&
+          (effectiveVisibility1 !== originalVisibility1 ||
+            effectiveVisibility1 !== originalDocumentVisibility1)
+        ) {
           updates.push({
             observer: changedToken,
             target: otherToken,
@@ -691,7 +796,9 @@ export class BatchProcessor {
             hit1 !== null &&
             hit2 !== null &&
             hit1 === originalVisibility1 &&
-            hit2 === originalVisibility2
+            hit2 === originalVisibility2 &&
+            hit1 === originalDocumentVisibility1 &&
+            hit2 === originalDocumentVisibility2
           ) {
             // Nothing to update for this pair; skip LOS and further work
             breakdown.pairsSkippedNoChange++;
@@ -789,6 +896,10 @@ export class BatchProcessor {
         stageStart = this.nowProvider();
         const needsEphemeralUpdate1 = effectiveVisibility1 !== originalVisibility1;
         const needsEphemeralUpdate2 = effectiveVisibility2 !== originalVisibility2;
+        const needsDocumentSync1 = effectiveVisibility1 !== originalDocumentVisibility1;
+        const needsDocumentSync2 = effectiveVisibility2 !== originalDocumentVisibility2;
+        const needsVisibilityUpdate1 = needsEphemeralUpdate1 || needsDocumentSync1;
+        const needsVisibilityUpdate2 = needsEphemeralUpdate2 || needsDocumentSync2;
         const explicitVisiblePair1 =
           !hasOverride1 && los1 === true && EXPLICIT_VISIBLE_STATES.has(effectiveVisibility1);
         const explicitVisiblePair2 =
@@ -796,19 +907,19 @@ export class BatchProcessor {
         const needsDoorDetectionSync1 =
           isDoorStateBatch &&
           !hasOverride1 &&
-          !needsEphemeralUpdate1 &&
+          !needsVisibilityUpdate1 &&
           (explicitVisiblePair1 || los1 === false);
         const needsDoorDetectionSync2 =
           isDoorStateBatch &&
           !hasOverride2 &&
-          !needsEphemeralUpdate2 &&
+          !needsVisibilityUpdate2 &&
           (explicitVisiblePair2 || los2 === false);
         const needsMovementDetectionSync1 =
-          isMovementBatch && !hasOverride1 && !needsEphemeralUpdate1 && explicitVisiblePair1;
+          isMovementBatch && !hasOverride1 && !needsVisibilityUpdate1 && explicitVisiblePair1;
         const needsMovementDetectionSync2 =
-          isMovementBatch && !hasOverride2 && !needsEphemeralUpdate2 && explicitVisiblePair2;
+          isMovementBatch && !hasOverride2 && !needsVisibilityUpdate2 && explicitVisiblePair2;
 
-        if (needsEphemeralUpdate1) {
+        if (needsVisibilityUpdate1) {
           updates.push({
             observer: changedToken,
             target: otherToken,
@@ -816,7 +927,7 @@ export class BatchProcessor {
             explicitVisiblePair: explicitVisiblePair1,
           });
         }
-        if (needsEphemeralUpdate2) {
+        if (needsVisibilityUpdate2) {
           updates.push({
             observer: otherToken,
             target: changedToken,
@@ -847,7 +958,7 @@ export class BatchProcessor {
         // Off-guard suppression changes (e.g. Blind-Fight added/removed) are handled via
         // calcOptions.forceEphemeralResync, which is set by ItemEventHandler when needed.
         if (calcOptions?.forceEphemeralResync) {
-          if (!needsEphemeralUpdate1 && effectiveVisibility1) {
+          if (!needsVisibilityUpdate1 && effectiveVisibility1) {
             updates.push({
               observer: changedToken,
               target: otherToken,
@@ -855,7 +966,7 @@ export class BatchProcessor {
               forceEphemeralOnly: true,
             });
           }
-          if (!needsEphemeralUpdate2 && effectiveVisibility2) {
+          if (!needsVisibilityUpdate2 && effectiveVisibility2) {
             updates.push({
               observer: otherToken,
               target: changedToken,

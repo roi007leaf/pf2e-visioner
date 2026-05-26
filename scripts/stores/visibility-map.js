@@ -29,6 +29,7 @@ import {
 } from './token-flag-map-persistence.js';
 import {
   buildPerceptionProfileFlagUpdatePasses,
+  getDocumentPerceptionProfileMap,
   getRawPerceptionProfileEntry,
   getRawPerceptionProfileMap,
   isDefaultPerceptionProfile as isDefaultProfile,
@@ -412,6 +413,13 @@ export async function setVisibilityMapsBatch(entries = [], options = {}) {
  */
 export function getVisibilityMap(token) {
   const profileLegacyMap = profilesToLegacyVisibilityMap(getRawPerceptionProfileMap(token), {
+    preserveEncounterUnnoticed: true,
+  });
+  return profileLegacyMap;
+}
+
+export function getDocumentVisibilityMap(token) {
+  const profileLegacyMap = profilesToLegacyVisibilityMap(getDocumentPerceptionProfileMap(token), {
     preserveEncounterUnnoticed: true,
   });
   return profileLegacyMap;

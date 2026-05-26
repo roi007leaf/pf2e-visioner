@@ -2,7 +2,7 @@ const PENDING_MOVEMENT_CONTROLLED_DRAG_REFRESH_DELAYS_MS = [
   16, 50, 84, 118, 180, 260, 420, 650, 900,
 ];
 const PENDING_MOVEMENT_CONTROLLED_DRAG_INTENT_TTL_MS = 1200;
-const PENDING_MOVEMENT_CONTROLLED_DRAG_INTENT_RELEASE_MS = 150;
+const PENDING_MOVEMENT_CONTROLLED_DRAG_INTENT_RELEASE_MS = 700;
 
 const pendingControlledTokenDragIntentState = (globalThis.__pf2eVisionerPendingControlledDragIntent ??= {
   tokenIds: new Map(),

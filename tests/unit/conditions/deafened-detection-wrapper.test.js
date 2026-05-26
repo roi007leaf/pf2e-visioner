@@ -433,6 +433,19 @@ describe('Deafened Detection Wrapper', () => {
             )).toBe(false);
         });
 
+        test('hearing renders Visioner-hidden targets even when core canDetect fails', () => {
+            const hearingWrapper = getDetectionWrapperRegistration(
+                'CONFIG.Canvas.detectionModes.hearing._canDetect',
+            );
+            const hiddenPair = buildTokenPair('hidden');
+
+            expect(hearingWrapper(
+                jest.fn().mockReturnValue(false),
+                { object: hiddenPair.observer },
+                hiddenPair.target,
+            )).toBe(true);
+        });
+
         test('basic sight lets core detection decide during pending wall-blocked movement', () => {
             const originalCanvas = global.canvas;
             global.canvas = {

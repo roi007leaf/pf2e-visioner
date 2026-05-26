@@ -1,4 +1,5 @@
 import {
+    getDocumentVisibilityMap as storeGetDocumentVisibilityMap,
     getVisibilityMap as storeGetVisibilityMap,
     setVisibilityMap as storeSetVisibilityMap,
     setVisibilityMapsBatch as storeSetVisibilityMapsBatch,
@@ -19,6 +20,14 @@ export class VisibilityMapService {
     getVisibilityMap(token) {
         try {
             return storeGetVisibilityMap(token) || {};
+        } catch {
+            return {};
+        }
+    }
+
+    getDocumentVisibilityMap(token) {
+        try {
+            return storeGetDocumentVisibilityMap(token) || {};
         } catch {
             return {};
         }

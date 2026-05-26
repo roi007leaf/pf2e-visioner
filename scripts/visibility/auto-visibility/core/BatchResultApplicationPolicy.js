@@ -36,6 +36,7 @@ function shouldApplyUpdate({
 export function buildBatchResultApplicationPlan({
   updates = [],
   getVisibilityMap = () => ({}),
+  getStoredVisibilityMap = null,
   recordExplicitVisiblePair = () => false,
   resolveVisibilityForUpdate = null,
   overrideMatchesVisibility = null,
@@ -75,6 +76,11 @@ export function buildBatchResultApplicationPlan({
 
     const visibilityMap = observerMaps.get(observer);
     const from = visibilityMap[targetId] ?? 'observed';
+    const storedVisibilityMap =
+      typeof getStoredVisibilityMap === 'function'
+        ? getStoredVisibilityMap(observer) || {}
+        : null;
+    const storedFrom = storedVisibilityMap ? storedVisibilityMap[targetId] ?? 'observed' : from;
     const resolvedVisibility =
       resolveVisibilityForUpdate?.(update, from) ?? update.visibility;
     const resolvedUpdate =
@@ -87,7 +93,9 @@ export function buildBatchResultApplicationPlan({
       continue;
     }
 
-    if (from !== resolvedVisibility) {
+    const staleStoredVisibility = storedFrom !== resolvedVisibility;
+
+    if (from !== resolvedVisibility || staleStoredVisibility) {
       visibilityMap[targetId] = resolvedVisibility;
       dirtyObserverSet.add(observer);
       uniqueUpdateCount++;

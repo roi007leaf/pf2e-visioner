@@ -110,6 +110,36 @@ function hasAnomalyAutoDetection(featsHandler, actionData, subject) {
   return !!(isAnomaly && featsHandler?.hasFeat?.(actionData.actor, ['thats-odd', "that's-odd"]));
 }
 
+function actorHasConditionSlug(actor, slug) {
+  if (!actor || !slug) return false;
+  return !!(
+    actor.hasCondition?.(slug) ||
+    actor.system?.conditions?.[slug]?.active ||
+    actor.conditions?.has?.(slug) ||
+    actor.conditions?.some?.((condition) => condition?.slug === slug && !condition?.isExpired) ||
+    actor.itemTypes?.condition?.some?.(
+      (condition) => condition?.slug === slug && !condition?.isExpired,
+    )
+  );
+}
+
+function subjectHasInvisibleCondition(subject) {
+  return actorHasConditionSlug(subject?.actor, 'invisible');
+}
+
+function senseCanObserveInvisibleTarget(sense) {
+  if (sense?.usedSensePrecision !== 'precise') return false;
+  const senseType = sense?.usedSenseType;
+  return !!senseType && !SeekDialogAdapter.isVisualSenseType(senseType);
+}
+
+function enforceInvisibleSeekObservedLimit(subject, current, newVisibility, sense) {
+  if (subject?._isWall || newVisibility !== 'observed') return newVisibility;
+  if (!subjectHasInvisibleCondition(subject)) return newVisibility;
+  if (senseCanObserveInvisibleTarget(sense)) return newVisibility;
+  return current === 'concealed' ? 'concealed' : 'hidden';
+}
+
 function getMinimumPerceptionRankBlock(actionData, subject, current, extractStealthDC) {
   try {
     if (!subject?.actor || (subject.actor.type !== 'hazard' && subject.actor.type !== 'loot')) {
@@ -363,6 +393,7 @@ export async function analyzeSeekOutcome(actionData, subject, deps = {}) {
     newVisibility,
     deps,
   );
+  newVisibility = enforceInvisibleSeekObservedLimit(subject, current, newVisibility, sense);
 
   const wallMeta = await buildWallMetadata(subject, deps);
   const base = buildBaseOutcome(actionData, subject, {

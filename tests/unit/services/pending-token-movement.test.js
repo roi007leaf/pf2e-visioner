@@ -18,6 +18,7 @@ import {
   schedulePendingTokenMovementCompletion,
   setPendingTokenMovementPosition,
   shouldUseFullAnimationRefreshCadence,
+  targetIsRenderHiddenForCurrentViewObserver,
 } from '../../../scripts/services/PendingMovement/pending-token-movement.js';
 import {
   getPendingMovementBlockedDetectionSources,
@@ -147,6 +148,517 @@ describe('pending token movement hidden detection guard', () => {
       'hiddenTarget',
       'undetectedTarget',
     ]);
+  });
+
+  test('does not let an unrelated active source render-hide the current GM view', () => {
+    const hiddenObserver = createMockToken({
+      id: 'hidden-observer',
+      flags: visibilityV2Flags({ target: 'undetected' }),
+    });
+    const currentObserver = createMockToken({
+      id: 'current-observer',
+      controlled: true,
+      flags: visibilityV2Flags({ target: 'observed' }),
+    });
+    const target = createMockToken({ id: 'target', visible: true });
+    global.canvas = {
+      ...global.canvas,
+      effects: {
+        visionSources: new Map([
+          ['hidden-observer', { active: true, object: hiddenObserver }],
+        ]),
+        lightSources: new Map(),
+      },
+      tokens: {
+        get: jest.fn((id) =>
+          id === 'hidden-observer'
+            ? hiddenObserver
+            : id === 'current-observer'
+              ? currentObserver
+              : id === 'target'
+                ? target
+                : null,
+        ),
+        controlled: [currentObserver],
+        placeables: [hiddenObserver, currentObserver, target],
+      },
+    };
+
+    expect(targetIsRenderHiddenForCurrentViewObserver(target)).toBe(false);
+  });
+
+  test('render-hides only from the dragged or controlled observer perspective', () => {
+    const observer = createMockToken({
+      id: 'observer',
+      controlled: true,
+      flags: visibilityV2Flags({ target: 'undetected' }),
+    });
+    const target = createMockToken({ id: 'target', visible: true });
+    global.canvas = {
+      ...global.canvas,
+      tokens: {
+        get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+        controlled: [observer],
+        placeables: [observer, target],
+      },
+    };
+
+    expect(targetIsRenderHiddenForCurrentViewObserver(target)).toBe(true);
+  });
+
+  test('keeps render-hidden target locked until current core polygon reaches predicted observed target', () => {
+    let currentCorePolygonContainsTarget = false;
+    const observer = createMockToken({
+      id: 'observer',
+      controlled: true,
+      flags: visibilityV2Flags({ target: 'undetected' }),
+    });
+    const target = createMockToken({ id: 'target', x: 3, y: 0, visible: true });
+    global.canvas = {
+      ...global.canvas,
+      effects: {
+        visionSources: new Map([
+          [
+            'observer',
+            {
+              active: true,
+              object: observer,
+              los: { contains: jest.fn(() => currentCorePolygonContainsTarget) },
+              shape: { contains: jest.fn(() => currentCorePolygonContainsTarget) },
+            },
+          ],
+        ]),
+        lightSources: new Map(),
+      },
+      tokens: {
+        get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+        _draggedToken: observer,
+        controlled: [observer],
+        placeables: [observer, target],
+      },
+    };
+
+    setPendingTokenMovementPosition(observer.document, { x: 100, y: 0 }, [observer], {
+      finalVisibilityStatesByTargetId: { target: 'observed' },
+    });
+
+    expect(targetIsRenderHiddenForCurrentViewObserver(target)).toBe(true);
+
+    currentCorePolygonContainsTarget = true;
+
+    expect(targetIsRenderHiddenForCurrentViewObserver(target)).toBe(false);
+  });
+
+  test('uses current core polygon for active drag reveal before final prediction exists', () => {
+    let currentCorePolygonContainsTarget = false;
+    const observer = createMockToken({
+      id: 'observer',
+      controlled: true,
+      flags: visibilityV2Flags({ target: 'undetected' }),
+    });
+    const target = createMockToken({ id: 'target', x: 3, y: 0, visible: true });
+    global.canvas = {
+      ...global.canvas,
+      effects: {
+        visionSources: new Map([
+          [
+            'observer',
+            {
+              active: true,
+              object: observer,
+              los: { contains: jest.fn(() => currentCorePolygonContainsTarget) },
+              shape: { contains: jest.fn(() => currentCorePolygonContainsTarget) },
+            },
+          ],
+        ]),
+        lightSources: new Map(),
+      },
+      tokens: {
+        get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+        _draggedToken: observer,
+        controlled: [observer],
+        placeables: [observer, target],
+      },
+    };
+
+    expect(targetIsRenderHiddenForCurrentViewObserver(target)).toBe(true);
+
+    currentCorePolygonContainsTarget = true;
+
+    expect(targetIsRenderHiddenForCurrentViewObserver(target)).toBe(false);
+  });
+
+  test('keeps post-completion observed render visible while flag write is still pending', () => {
+    const observer = createMockToken({
+      id: 'observer',
+      controlled: true,
+      flags: visibilityV2Flags({ target: 'undetected' }),
+    });
+    const target = createMockToken({ id: 'target', x: 3, y: 0, visible: true });
+    global.canvas = {
+      ...global.canvas,
+      effects: {
+        visionSources: new Map([
+          [
+            'observer',
+            {
+              active: true,
+              object: observer,
+              los: { contains: jest.fn(() => true) },
+              shape: { contains: jest.fn(() => true) },
+            },
+          ],
+        ]),
+        lightSources: new Map(),
+      },
+      tokens: {
+        get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+        controlled: [observer],
+        placeables: [observer, target],
+      },
+    };
+
+    setPendingTokenMovementPosition(observer.document, { x: 100, y: 0 }, [observer], {
+      finalVisibilityStatesByTargetId: { target: 'observed' },
+    });
+    completePendingTokenMovement(observer.document);
+
+    expect(targetIsRenderHiddenForCurrentViewObserver(target)).toBe(false);
+  });
+
+  test('keeps observed target visible until current core polygon loses predicted undetected target', () => {
+    let currentCorePolygonContainsTarget = true;
+    const observer = createMockToken({
+      id: 'observer',
+      controlled: true,
+      flags: visibilityV2Flags({ target: 'observed' }),
+    });
+    const target = createMockToken({ id: 'target', x: 3, y: 0, visible: true });
+    global.canvas = {
+      ...global.canvas,
+      effects: {
+        visionSources: new Map([
+          [
+            'observer',
+            {
+              active: true,
+              object: observer,
+              los: { contains: jest.fn(() => currentCorePolygonContainsTarget) },
+              shape: { contains: jest.fn(() => currentCorePolygonContainsTarget) },
+            },
+          ],
+        ]),
+        lightSources: new Map(),
+      },
+      tokens: {
+        get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+        _draggedToken: observer,
+        controlled: [observer],
+        placeables: [observer, target],
+      },
+    };
+
+    setPendingTokenMovementPosition(observer.document, { x: 100, y: 0 }, [observer], {
+      finalVisibilityStatesByTargetId: { target: 'undetected' },
+    });
+
+    expect(targetIsRenderHiddenForCurrentViewObserver(target)).toBe(false);
+
+    currentCorePolygonContainsTarget = false;
+
+    expect(targetIsRenderHiddenForCurrentViewObserver(target)).toBe(true);
+  });
+
+  test('keeps movement-start observed state when live flags flip to final undetected early', () => {
+    let currentCorePolygonContainsTarget = true;
+    const observer = createMockToken({
+      id: 'observer',
+      controlled: true,
+      flags: visibilityV2Flags({ target: 'observed' }),
+    });
+    const target = createMockToken({ id: 'target', x: 3, y: 0, visible: true });
+    global.canvas = {
+      ...global.canvas,
+      effects: {
+        visionSources: new Map([
+          [
+            'observer',
+            {
+              active: true,
+              object: observer,
+              los: { contains: jest.fn(() => currentCorePolygonContainsTarget) },
+              shape: { contains: jest.fn(() => currentCorePolygonContainsTarget) },
+            },
+          ],
+        ]),
+        lightSources: new Map(),
+      },
+      tokens: {
+        get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+        _draggedToken: observer,
+        controlled: [observer],
+        placeables: [observer, target],
+      },
+    };
+
+    setPendingTokenMovementPosition(observer.document, { x: 100, y: 0 }, [observer], {
+      finalVisibilityStatesByTargetId: { target: 'undetected' },
+    });
+    observer.document.flags = visibilityV2Flags({ target: 'undetected' })['pf2e-visioner'];
+    observer.document.getFlag.mockImplementation((moduleId, key) => {
+      if (moduleId !== 'pf2e-visioner') return null;
+      return observer.document.flags?.[key] ?? null;
+    });
+
+    expect(targetIsRenderHiddenForCurrentViewObserver(target)).toBe(false);
+
+    currentCorePolygonContainsTarget = false;
+
+    expect(targetIsRenderHiddenForCurrentViewObserver(target)).toBe(true);
+  });
+
+  test('preserves first movement-start visibility across repeated drag position updates', () => {
+    let currentCorePolygonContainsTarget = true;
+    const observer = createMockToken({
+      id: 'observer',
+      controlled: true,
+      flags: visibilityV2Flags({ target: 'observed' }),
+    });
+    const target = createMockToken({ id: 'target', x: 3, y: 0, visible: true });
+    target.renderable = true;
+    target.mesh = { visible: true, renderable: true, alpha: 1 };
+    global.canvas = {
+      ...global.canvas,
+      effects: {
+        visionSources: new Map([
+          [
+            'observer',
+            {
+              active: true,
+              object: observer,
+              los: { contains: jest.fn(() => currentCorePolygonContainsTarget) },
+              shape: { contains: jest.fn(() => currentCorePolygonContainsTarget) },
+            },
+          ],
+        ]),
+        lightSources: new Map(),
+      },
+      tokens: {
+        get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+        _draggedToken: observer,
+        controlled: [observer],
+        placeables: [observer, target],
+      },
+    };
+
+    setPendingTokenMovementPosition(observer.document, { x: 100, y: 0 }, [observer], {
+      finalVisibilityStatesByTargetId: { target: 'undetected' },
+    });
+    observer.document.flags = visibilityV2Flags({ target: 'undetected' })['pf2e-visioner'];
+
+    setPendingTokenMovementPosition(observer.document, { x: 150, y: 0 }, [observer], {
+      finalVisibilityStatesByTargetId: { target: 'undetected' },
+    });
+
+    expect(targetIsRenderHiddenForCurrentViewObserver(target)).toBe(false);
+
+    currentCorePolygonContainsTarget = false;
+
+    expect(targetIsRenderHiddenForCurrentViewObserver(target)).toBe(true);
+  });
+
+  test('keeps recent observed state when fast reverse starts before flag writes settle', () => {
+    let currentCorePolygonContainsTarget = true;
+    const observer = createMockToken({
+      id: 'observer',
+      controlled: true,
+      flags: visibilityV2Flags({ target: 'undetected' }),
+    });
+    const target = createMockToken({ id: 'target', x: 3, y: 0, visible: true });
+    global.canvas = {
+      ...global.canvas,
+      effects: {
+        visionSources: new Map([
+          [
+            'observer',
+            {
+              active: true,
+              object: observer,
+              los: { contains: jest.fn(() => currentCorePolygonContainsTarget) },
+              shape: { contains: jest.fn(() => currentCorePolygonContainsTarget) },
+            },
+          ],
+        ]),
+        lightSources: new Map(),
+      },
+      tokens: {
+        get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+        _draggedToken: observer,
+        controlled: [observer],
+        placeables: [observer, target],
+      },
+    };
+
+    setPendingTokenMovementPosition(observer.document, { x: 100, y: 0 }, [observer], {
+      finalVisibilityStatesByTargetId: { target: 'observed' },
+    });
+    completePendingTokenMovement(observer.document);
+    observer.document.flags = visibilityV2Flags({ target: 'undetected' })['pf2e-visioner'];
+    observer.document.getFlag.mockImplementation((moduleId, key) => {
+      if (moduleId !== 'pf2e-visioner') return null;
+      return observer.document.flags?.[key] ?? null;
+    });
+
+    setPendingTokenMovementPosition(observer.document, { x: 200, y: 0 }, [observer], {
+      finalVisibilityStatesByTargetId: { target: 'undetected' },
+    });
+
+    expect(targetIsRenderHiddenForCurrentViewObserver(target)).toBe(false);
+
+    currentCorePolygonContainsTarget = false;
+
+    expect(targetIsRenderHiddenForCurrentViewObserver(target)).toBe(true);
+  });
+
+  test('does not render-hide an already visible target until current core polygon loses it', () => {
+    let currentCorePolygonContainsTarget = true;
+    const observer = createMockToken({
+      id: 'observer',
+      controlled: true,
+      flags: visibilityV2Flags({ target: 'undetected' }),
+    });
+    const target = createMockToken({ id: 'target', x: 3, y: 0, visible: true });
+    target.visible = true;
+    target.renderable = true;
+    target.mesh = { visible: true, renderable: true, alpha: 1 };
+    global.canvas = {
+      ...global.canvas,
+      effects: {
+        visionSources: new Map([
+          [
+            'observer',
+            {
+              active: true,
+              object: observer,
+              los: { contains: jest.fn(() => currentCorePolygonContainsTarget) },
+              shape: { contains: jest.fn(() => currentCorePolygonContainsTarget) },
+            },
+          ],
+        ]),
+        lightSources: new Map(),
+      },
+      tokens: {
+        get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+        _draggedToken: observer,
+        controlled: [observer],
+        placeables: [observer, target],
+      },
+    };
+
+    setPendingTokenMovementPosition(observer.document, { x: 100, y: 0 }, [observer], {
+      finalVisibilityStatesByTargetId: { target: 'undetected' },
+    });
+
+    expect(targetIsRenderHiddenForCurrentViewObserver(target)).toBe(false);
+
+    currentCorePolygonContainsTarget = false;
+
+    expect(targetIsRenderHiddenForCurrentViewObserver(target)).toBe(true);
+  });
+
+  test('treats currently core-visible stale undetected target as observed for block context', () => {
+    let currentCorePolygonContainsTarget = true;
+    const observer = createMockToken({
+      id: 'observer',
+      controlled: true,
+      flags: visibilityV2Flags({ target: 'undetected' }),
+    });
+    const target = createMockToken({ id: 'target', x: 3, y: 0, visible: true });
+    target.renderable = true;
+    target.mesh = { visible: true, renderable: true, alpha: 1 };
+    global.canvas = {
+      ...global.canvas,
+      effects: {
+        visionSources: new Map([
+          [
+            'observer',
+            {
+              active: true,
+              object: observer,
+              los: { contains: jest.fn(() => currentCorePolygonContainsTarget) },
+              shape: { contains: jest.fn(() => currentCorePolygonContainsTarget) },
+            },
+          ],
+        ]),
+        lightSources: new Map(),
+      },
+      tokens: {
+        get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+        controlled: [observer],
+        placeables: [observer, target],
+      },
+    };
+
+    setPendingTokenMovementPosition(observer.document, { x: 100, y: 0 }, [observer], {
+      finalVisibilityStatesByTargetId: { target: 'undetected' },
+    });
+    observer.x = 50;
+    observer.y = 0;
+
+    expect(targetIsRenderHiddenForCurrentViewObserver(target)).toBe(false);
+
+    const context = getPendingMovementBlockContext(observer, target);
+    expect(context.visibilityState).toBe('observed');
+    expect(context.renderHiddenByVisioner).toBe(false);
+    expect(shouldTemporarilyForceTokenInvisible(target)).toBe(false);
+
+    currentCorePolygonContainsTarget = false;
+
+    expect(targetIsRenderHiddenForCurrentViewObserver(target)).toBe(true);
+  });
+
+  test('keeps controlled drag intent core-visible target observed during mouse-up handoff', () => {
+    global.canvas.walls.placeables = [];
+    const observer = createMockToken({
+      id: 'observer',
+      controlled: true,
+      flags: visibilityV2Flags({ target: 'undetected' }),
+    });
+    const target = createMockToken({ id: 'target', x: 3, y: 0, visible: true });
+    target.renderable = true;
+    target.mesh = { visible: true, renderable: true, alpha: 1 };
+    global.canvas = {
+      ...global.canvas,
+      effects: {
+        visionSources: new Map([
+          [
+            'observer',
+            {
+              active: true,
+              object: observer,
+              los: { contains: jest.fn(() => true) },
+              shape: { contains: jest.fn(() => true) },
+            },
+          ],
+        ]),
+        lightSources: new Map(),
+      },
+      tokens: {
+        get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+        controlled: [observer],
+        placeables: [observer, target],
+      },
+    };
+
+    primePendingControlledTokenDragIntent(observer);
+    setPendingTokenMovementPosition(observer.document, { x: 100, y: 0 }, [observer], {
+      finalVisibilityStatesByTargetId: { target: 'undetected' },
+    });
+
+    const context = getPendingMovementBlockContext(observer, target);
+    expect(context.visibilityState).toBe('observed');
+    expect(targetIsRenderHiddenForCurrentViewObserver(target)).toBe(false);
+    expect(shouldTemporarilyForceTokenInvisible(target)).toBe(false);
   });
 
   test('preserves hidden soundwave visuals through pending visibilityV2 write overlay', () => {
@@ -1337,6 +1849,44 @@ describe('pending token movement hidden detection guard', () => {
       ...global.canvas,
       tokens: {
         get: jest.fn((id) => (id === 'observer' ? observer : null)),
+        placeables: [observer, target],
+      },
+      perception: {
+        update: jest.fn(),
+      },
+    };
+
+    setPendingTokenMovementPosition(observer.document, { x: 0, y: 0 }, [observer]);
+    refreshPendingMovementTokenVisibility('observer');
+
+    expect(target.visible).toBe(true);
+    expect(target.mesh.visible).toBe(true);
+    expect(target.refresh).toHaveBeenCalledTimes(1);
+    expect(shouldTemporarilyForceTokenInvisible(target)).toBe(false);
+  });
+
+  test('does not force invisible Visioner-hidden targets invisible during movement refresh', () => {
+    global.canvas.walls.placeables = [];
+    const observer = createMockToken({
+      id: 'observer',
+      flags: visibilityV2Flags({ target: 'hidden' }),
+    });
+    const target = createMockToken({
+      id: 'target',
+      actorType: 'npc',
+      visible: true,
+      actor: {
+        hasCondition: jest.fn((slug) => slug === 'invisible'),
+        system: { conditions: { invisible: { active: true } } },
+      },
+    });
+    target.mesh = { visible: true, renderable: true, alpha: 1 };
+    target.refresh = jest.fn();
+    global.canvas = {
+      ...global.canvas,
+      tokens: {
+        get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+        controlled: [observer],
         placeables: [observer, target],
       },
       perception: {
@@ -2764,6 +3314,53 @@ describe('pending token movement hidden detection guard', () => {
     expect(target.nameplate.visible).toBe(false);
   });
 
+  test('does not restore selected-observer undetected target after control refresh', () => {
+    global.canvas.walls.placeables = [];
+    const observer = createMockToken({
+      id: 'observer',
+      controlled: true,
+      flags: visibilityV2Flags({ target: 'undetected' }),
+    });
+    const target = createMockToken({ id: 'target', actorType: 'npc', visible: true });
+    target.renderable = true;
+    target.mesh = { visible: true, renderable: true, alpha: 1 };
+    target.nameplate = { visible: true };
+    target.refresh = jest.fn(() => {
+      target.visible = true;
+      target.renderable = true;
+      target.mesh.visible = true;
+      target.mesh.renderable = true;
+      target.mesh.alpha = 1;
+      target.nameplate.visible = true;
+    });
+    global.canvas = {
+      ...global.canvas,
+      tokens: {
+        get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+        controlled: [observer],
+        placeables: [observer, target],
+      },
+      perception: {
+        update: jest.fn(),
+      },
+    };
+
+    expect(targetIsRenderHiddenForCurrentViewObserver(target)).toBe(true);
+
+    refreshPendingMovementTokenVisibility([], {
+      source: 'control-token-session',
+      skipPerceptionRefresh: true,
+      targetTokenIds: ['target'],
+    });
+
+    expect(target.visible).toBe(false);
+    expect(target.renderable).toBe(false);
+    expect(target.mesh.visible).toBe(false);
+    expect(target.mesh.renderable).toBe(false);
+    expect(target.mesh.alpha).toBe(0);
+    expect(target.nameplate.visible).toBe(false);
+  });
+
   test('can limit pending movement visibility refresh to specific target tokens', () => {
     global.canvas.walls.placeables = [];
     const observer = createMockToken({
@@ -3797,7 +4394,7 @@ describe('pending token movement hidden detection guard', () => {
     expect(target.nameplate.visible).toBe(false);
   });
 
-  test('waits for detection filter when controlled observer state settles back to hidden', () => {
+  test('does not wait for detection filter when controlled observer state settles back to hidden', () => {
     jest.useFakeTimers();
 
     global.canvas.walls.placeables = [];
@@ -3826,24 +4423,28 @@ describe('pending token movement hidden detection guard', () => {
       if (key === 'visibilityV2') return visibilityV2Map({ target: 'hidden' });
       return {};
     });
-    expect(forceTokenInvisibleForObserverVisibility(observer, target, 'hidden')).toBe(true);
+    expect(forceTokenInvisibleForObserverVisibility(observer, target, 'hidden')).toBe(false);
 
     expect(restorePendingMovementTokenRendering(target)).toBe(false);
-    expect(target.renderable).toBe(false);
-    expect(target.mesh.renderable).toBe(false);
-    expect(target.mesh.alpha).toBe(0);
-    expect(target.nameplate.visible).toBe(false);
+    expect(target.visible).toBe(true);
+    expect(target.renderable).toBe(true);
+    expect(target.mesh.visible).toBe(true);
+    expect(target.mesh.renderable).toBe(true);
+    expect(target.mesh.alpha).toBe(1);
+    expect(target.nameplate.visible).toBe(true);
 
     target.detectionFilter = { id: 'soundwave-filter' };
 
-    expect(restorePendingMovementTokenRendering(target)).toBe(true);
+    expect(restorePendingMovementTokenRendering(target)).toBe(false);
+    expect(target.visible).toBe(true);
     expect(target.renderable).toBe(true);
+    expect(target.mesh.visible).toBe(true);
     expect(target.mesh.renderable).toBe(true);
     expect(target.mesh.alpha).toBe(1);
     expect(target.nameplate.visible).toBe(true);
   });
 
-  test('keeps newly hidden target invisible until detection filter is ready', () => {
+  test('keeps newly hidden target visible before detection filter is ready', () => {
     jest.useFakeTimers();
 
     const observer = createMockToken({ id: 'observer' });
@@ -3863,16 +4464,19 @@ describe('pending token movement hidden detection guard', () => {
       },
     };
 
-    expect(forceTokenInvisibleForObserverVisibility(observer, target, 'hidden')).toBe(true);
-    expect(target.visible).toBe(false);
-    expect(target.renderable).toBe(false);
-    expect(target.mesh.visible).toBe(false);
+    expect(forceTokenInvisibleForObserverVisibility(observer, target, 'hidden')).toBe(false);
+    expect(target.visible).toBe(true);
+    expect(target.renderable).toBe(true);
+    expect(target.mesh.visible).toBe(true);
+    expect(target.mesh.renderable).toBe(true);
+    expect(target.mesh.alpha).toBe(1);
+    expect(target.nameplate.visible).toBe(true);
     expect(restorePendingMovementTokenRendering(target)).toBe(false);
     expect(restorePendingMovementTokenRendering(target, { ignoreObserverLocks: true })).toBe(false);
 
     target.detectionFilter = { id: 'soundwave-filter' };
 
-    expect(restorePendingMovementTokenRendering(target)).toBe(true);
+    expect(restorePendingMovementTokenRendering(target)).toBe(false);
     expect(target.visible).toBe(true);
     expect(target.renderable).toBe(true);
     expect(target.mesh.visible).toBe(true);
@@ -3922,7 +4526,7 @@ describe('pending token movement hidden detection guard', () => {
     expect(target.nameplate.visible).toBe(true);
   });
 
-  test('does not downgrade filter-pending hidden lock during wall-blocked refresh', () => {
+  test('does not create filter-pending hidden lock before undetected render lock', () => {
     jest.useFakeTimers();
 
     const observer = createMockToken({ id: 'observer', x: 0, y: 0 });
@@ -3942,17 +4546,22 @@ describe('pending token movement hidden detection guard', () => {
       },
     };
 
-    expect(forceTokenInvisibleForObserverVisibility(observer, target, 'hidden')).toBe(true);
+    expect(forceTokenInvisibleForObserverVisibility(observer, target, 'hidden')).toBe(false);
+    expect(target.visible).toBe(true);
+    expect(target.renderable).toBe(true);
+    expect(target.mesh.visible).toBe(true);
+    expect(target.mesh.renderable).toBe(true);
+    expect(target.mesh.alpha).toBe(1);
+
     expect(forceTokenInvisibleForObserverVisibility(observer, target, 'undetected')).toBe(true);
-
-    expect(restorePendingMovementTokenRendering(target)).toBe(false);
-
-    target.detectionFilter = { id: 'soundwave-filter' };
-
-    expect(restorePendingMovementTokenRendering(target)).toBe(true);
+    expect(target.visible).toBe(false);
+    expect(target.renderable).toBe(false);
+    expect(target.mesh.visible).toBe(false);
+    expect(target.mesh.renderable).toBe(false);
+    expect(target.mesh.alpha).toBe(0);
   });
 
-  test('skips token refresh while newly hidden target waits for detection filter', () => {
+  test('keeps newly hidden target renderable while detection filter is missing', () => {
     jest.useFakeTimers();
 
     const observer = createMockToken({ id: 'observer' });
@@ -3980,16 +4589,15 @@ describe('pending token movement hidden detection guard', () => {
       },
     };
 
-    expect(forceTokenInvisibleForObserverVisibility(observer, target, 'hidden')).toBe(true);
+    expect(forceTokenInvisibleForObserverVisibility(observer, target, 'hidden')).toBe(false);
 
     refreshPendingMovementTokenVisibility([], { targetTokenIds: ['target'] });
 
-    expect(target.refresh).not.toHaveBeenCalled();
-    expect(target.visible).toBe(false);
-    expect(target.renderable).toBe(false);
-    expect(target.mesh.visible).toBe(false);
-    expect(target.mesh.renderable).toBe(false);
-    expect(target.mesh.alpha).toBe(0);
+    expect(target.visible).toBe(true);
+    expect(target.renderable).toBe(true);
+    expect(target.mesh.visible).toBe(true);
+    expect(target.mesh.renderable).toBe(true);
+    expect(target.mesh.alpha).toBe(1);
 
     target.detectionFilter = { id: 'soundwave-filter' };
     refreshPendingMovementTokenVisibility([], { targetTokenIds: ['target'] });
@@ -4040,7 +4648,7 @@ describe('pending token movement hidden detection guard', () => {
     expect(target.mesh.alpha).toBe(0);
   });
 
-  test('does not delete detection filter created for pending hidden render unlock', () => {
+  test('does not delete hidden detection filter without render lock', () => {
     jest.useFakeTimers();
 
     const observer = createMockToken({ id: 'observer' });
@@ -4059,7 +4667,7 @@ describe('pending token movement hidden detection guard', () => {
       },
     };
 
-    expect(forceTokenInvisibleForObserverVisibility(observer, target, 'hidden')).toBe(true);
+    expect(forceTokenInvisibleForObserverVisibility(observer, target, 'hidden')).toBe(false);
 
     const detectionFilterState = capturePendingMovementDetectionFilterState(target, {
       hasDetectionWork: true,
@@ -4067,7 +4675,7 @@ describe('pending token movement hidden detection guard', () => {
     const soundwaveFilter = { id: 'soundwave-filter' };
     target.detectionFilter = soundwaveFilter;
 
-    expect(restorePendingMovementTokenRendering(target)).toBe(true);
+    expect(restorePendingMovementTokenRendering(target)).toBe(false);
     restorePendingMovementDetectionFilterState(target, detectionFilterState);
 
     expect(target.detectionFilter).toBe(soundwaveFilter);

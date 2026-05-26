@@ -257,6 +257,107 @@ describe('Override indicator should not trigger on controlToken', () => {
             .toHaveBeenCalledWith(['t1']);
     });
 
+    test('controlToken refreshes selected-view targets after AVS recalculation settles', async () => {
+        const refreshPendingMovementTokenVisibility = jest.fn();
+        const getControlledObserverDetectionVisualTargetIds = jest
+            .fn()
+            .mockReturnValue(['late-hidden']);
+        jest.doMock('../../../scripts/services/PendingMovement/pending-movement-render-lock.js', () => ({
+            clearNoObserverDetectionFilterVisuals: jest.fn(),
+            getControlledObserverDetectionVisualTargetIds,
+            getPendingMovementRefreshTargetIds: jest.fn(() => []),
+            hasPendingMovementRenderWork: jest.fn(() => false),
+            primePendingControlledTokenDragIntent: jest.fn(),
+            refreshPendingMovementTokenVisibility,
+            releasePendingControlledTokenDragIntent: jest.fn(),
+            restorePendingMovementTokenRendering: jest.fn(),
+        }));
+        global.window.pf2eVisioner.services.autoVisibilitySystem.recalculateForTokens = jest
+            .fn()
+            .mockResolvedValue(undefined);
+
+        const { onCanvasReady } = await import('../../../scripts/hooks/lifecycle.js');
+        await onCanvasReady();
+
+        const controlTokenCbs = global.Hooks.on.mock.calls
+            .filter((c) => c?.[0] === 'controlToken')
+            .map((c) => c?.[1])
+            .filter(Boolean);
+        const trackerCb = controlTokenCbs.find((cb) =>
+            String(cb).includes('trackControlTokenSession'),
+        );
+        const recalcCb = controlTokenCbs.find((cb) =>
+            String(cb).includes('avsRecalculateOnControlToken') ||
+            String(cb).includes('recalculateForTokens'),
+        );
+
+        const token = { document: { id: 't1', getFlag: jest.fn(() => ({})) } };
+        global.canvas.tokens.controlled = [token];
+
+        trackerCb(token, true);
+        recalcCb(token, true);
+        jest.advanceTimersByTime(0);
+        await Promise.resolve();
+        await Promise.resolve();
+
+        expect(global.window.pf2eVisioner.services.autoVisibilitySystem.recalculateForTokens)
+            .toHaveBeenCalledWith(['t1']);
+        expect(refreshPendingMovementTokenVisibility).toHaveBeenCalledWith([], {
+            ignoreObservedGrace: true,
+            source: 'control-token-session',
+            targetTokenIds: ['late-hidden'],
+            skipPerceptionRefresh: true,
+        });
+    });
+
+    test('controlToken refreshes system-hidden highlights after AVS recalculation settles', async () => {
+        const updateSystemHiddenTokenHighlights = jest.fn().mockResolvedValue(undefined);
+        jest.doMock('../../../scripts/services/visual-effects.js', () => ({
+            updateWallVisuals: jest.fn(),
+            updateWallIndicatorsOnly: jest.fn(),
+            updateSystemHiddenTokenHighlights,
+        }));
+        global.window.pf2eVisioner.services.autoVisibilitySystem.recalculateForTokens = jest
+            .fn()
+            .mockResolvedValue(undefined);
+
+        const { onCanvasReady } = await import('../../../scripts/hooks/lifecycle.js');
+        await onCanvasReady();
+
+        const controlTokenCbs = global.Hooks.on.mock.calls
+            .filter((c) => c?.[0] === 'controlToken')
+            .map((c) => c?.[1])
+            .filter(Boolean);
+        const restoreIndicatorsCb = controlTokenCbs.find((cb) =>
+            String(cb).includes('allowControlledFallback'),
+        );
+        const trackerCb = controlTokenCbs.find((cb) =>
+            String(cb).includes('trackControlTokenSession'),
+        );
+        const recalcCb = controlTokenCbs.find((cb) =>
+            String(cb).includes('avsRecalculateOnControlToken') ||
+            String(cb).includes('recalculateForTokens'),
+        );
+
+        const token = { document: { id: 't1', getFlag: jest.fn(() => ({})) } };
+        global.canvas.tokens.controlled = [token];
+
+        trackerCb(token, true);
+        await restoreIndicatorsCb(token, true);
+
+        expect(updateSystemHiddenTokenHighlights).not.toHaveBeenCalled();
+
+        recalcCb(token, true);
+        jest.advanceTimersByTime(0);
+        for (let i = 0; i < 5; i += 1) {
+            await Promise.resolve();
+        }
+
+        expect(global.window.pf2eVisioner.services.autoVisibilitySystem.recalculateForTokens)
+            .toHaveBeenCalledWith(['t1']);
+        expect(updateSystemHiddenTokenHighlights).toHaveBeenCalledWith('t1');
+    });
+
     test('controlToken immediately settles pending hidden render locks for the new observer', async () => {
         const refreshPendingMovementTokenVisibility = jest.fn();
         jest.doMock('../../../scripts/services/PendingMovement/pending-movement-render-lock.js', () => ({

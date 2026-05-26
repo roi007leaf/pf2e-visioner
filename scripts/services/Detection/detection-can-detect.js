@@ -40,6 +40,10 @@ export function createCanDetectVisibilityWrapper(threshold) {
       threshold === VISIBILITY_DETECTION_THRESHOLDS.hidden &&
       shouldTemporarilyBlockSightDetection(observerToken, target);
 
+    if (canUseVisionerHiddenDetection(modeId, visibility, threshold)) {
+      return true;
+    }
+
     if (
       !pendingMovementSightBlocked &&
       canUseExplicitVisionerDetection(observerToken, target, modeId, visibility, threshold)
@@ -63,6 +67,18 @@ export function createCanDetectVisibilityWrapper(threshold) {
       visibility,
     });
   };
+}
+
+function canUseVisionerHiddenDetection(
+  modeId,
+  visibility,
+  threshold = VISIBILITY_DETECTION_THRESHOLDS.hidden,
+) {
+  return (
+    threshold === VISIBILITY_DETECTION_THRESHOLDS.undetected &&
+    (!modeId || NON_VISUAL_DETECTION_MODE_IDS.has(modeId)) &&
+    visibility === 'hidden'
+  );
 }
 
 function canUseExplicitVisionerDetection(

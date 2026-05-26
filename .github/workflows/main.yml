@@ -185,10 +185,11 @@ jobs:
   publish-to-foundry:
     runs-on: ubuntu-latest
     needs: [build]
-    if: github.event_name == 'release' && !github.event.release.prerelease
+    if: ${{ github.event_name == 'release' && github.event.release.prerelease != true }}
 
     steps:
       - name: Publish to Foundry VTT
+        if: ${{ github.event.release.prerelease != true }}
         uses: JamesIves/fetch-api-data-action@v2
         with:
           endpoint: https://foundryvtt.com/_api/packages/release_version/
