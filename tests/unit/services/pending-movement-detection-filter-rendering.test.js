@@ -1,0 +1,81 @@
+import '../../setup.js';
+
+import { createPendingMovementDetectionFilterRenderingController } from '../../../scripts/services/PendingMovement/pending-movement-detection-filter-rendering.js';
+
+function createController(overrides = {}) {
+  return createPendingMovementDetectionFilterRenderingController({
+    getHiddenDetectionFilterPreservationContext: () => ({ observerId: 'observer' }),
+    tokenHasDetectionFilterVisual: (token) => !!token?.detectionFilter,
+    ...overrides,
+  });
+}
+
+function createTintedToken({ tint = 0x111111 } = {}) {
+  const writes = [];
+  const mesh = {};
+  let currentTint = tint;
+  Object.defineProperty(mesh, 'tint', {
+    configurable: true,
+    enumerable: true,
+    get() {
+      return currentTint;
+    },
+    set(next) {
+      writes.push(next);
+      currentTint = next;
+    },
+  });
+
+  return {
+    detectionFilter: { id: 'soundwave-filter' },
+    document: { id: 'target' },
+    mesh,
+    writes,
+  };
+}
+
+describe('pending movement detection filter rendering', () => {
+  test('does not let core detection-filter render pulse hidden token tint white', () => {
+    const controller = createController();
+    const token = createTintedToken({ tint: 0 });
+
+    let tintDuringCoreRender = null;
+    controller.withStableHiddenDetectionFilterAnimation(token, () => {
+      token.mesh.tint = 0xffffff;
+      tintDuringCoreRender = token.mesh.tint;
+      token.mesh.tint = 0;
+    });
+
+    expect(controller.shouldStabilizeHiddenDetectionFilterAnimation(token)).toBe(true);
+    expect(tintDuringCoreRender).toBe(0);
+    expect(token.mesh.tint).toBe(0);
+    expect(token.writes).not.toContain(0xffffff);
+  });
+
+  test('allows real non-core tint changes while stabilizing hidden detection-filter render', () => {
+    const controller = createController();
+    const token = createTintedToken({ tint: 0 });
+
+    controller.withStableHiddenDetectionFilterAnimation(token, () => {
+      token.mesh.tint = 0x222222;
+    });
+
+    expect(token.mesh.tint).toBe(0x222222);
+    expect(token.writes).toEqual([0x222222]);
+  });
+
+  test('leaves core detection-filter tint behavior alone without hidden preservation context', () => {
+    const controller = createController({
+      getHiddenDetectionFilterPreservationContext: () => null,
+    });
+    const token = createTintedToken({ tint: 0 });
+
+    controller.withStableHiddenDetectionFilterAnimation(token, () => {
+      token.mesh.tint = 0xffffff;
+    });
+
+    expect(controller.shouldStabilizeHiddenDetectionFilterAnimation(token)).toBe(false);
+    expect(token.mesh.tint).toBe(0xffffff);
+    expect(token.writes).toEqual([0xffffff]);
+  });
+});

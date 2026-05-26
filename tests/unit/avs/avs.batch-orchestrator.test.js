@@ -8,8 +8,23 @@ import {
 } from '../../../scripts/stores/detection-map.js';
 import {
   clearPendingTokenMovementPosition,
+  completePendingTokenMovement,
   setPendingTokenMovementPosition,
 } from '../../../scripts/services/PendingMovement/pending-token-movement.js';
+import { legacyVisibilityToProfile } from '../../../scripts/visibility/perception-profile.js';
+
+function visibilityV2Flags(map) {
+  return {
+    'pf2e-visioner': {
+      visibilityV2: Object.fromEntries(
+        Object.entries(map).map(([targetId, state]) => [
+          targetId,
+          legacyVisibilityToProfile(state),
+        ]),
+      ),
+    },
+  };
+}
 
 function emptyBatchResult() {
   return {
@@ -151,6 +166,34 @@ describe('BatchOrchestrator', () => {
     expect(
       orchestrator._resolvePendingMovementVisibilityUpdate(
         { observer, target, visibility: 'observed' },
+        'hidden',
+      ),
+    ).toBe('hidden');
+  });
+
+  test('preserves hidden during recent completed movement when stale explicit LOS update says observed', () => {
+    const observer = createMockToken({
+      id: 'A',
+      x: 0,
+      y: 0,
+      flags: visibilityV2Flags({ B: 'hidden' }),
+    });
+    const target = createMockToken({ id: 'B', x: 100, y: 0 });
+    global.canvas.tokens.placeables = [observer, target];
+    global.canvas.tokens.get = jest.fn(
+      (id) => global.canvas.tokens.placeables.find((token) => token.document.id === id) ?? null,
+    );
+    global.canvas.walls.placeables = [
+      createMockWall({ id: 'wall', c: [75, -100, 75, 100], sight: 1 }),
+    ];
+    setPendingTokenMovementPosition(observer.document, { x: 100, y: 0 }, [observer], {
+      finalVisibilityStatesByTargetId: { B: 'hidden' },
+    });
+    completePendingTokenMovement(observer.document.id);
+
+    expect(
+      orchestrator._resolvePendingMovementVisibilityUpdate(
+        { observer, target, visibility: 'observed', explicitVisiblePair: true },
         'hidden',
       ),
     ).toBe('hidden');

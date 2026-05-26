@@ -8,6 +8,7 @@ import { scheduleCanvasPerceptionUpdate } from '../helpers/perception-refresh.js
 import { initializeHoverTooltips } from '../services/HoverTooltips.js';
 import {
   clearNoObserverDetectionFilterVisuals,
+  getControlledObserverDetectionVisualTargetIds,
   getPendingMovementRefreshTargetIds,
   hasPendingMovementRenderWork,
   primePendingControlledTokenDragIntent,
@@ -170,17 +171,23 @@ function scheduleNoObserverVisibilityRefresh() {
   }
 }
 
-function refreshPendingVisibilityAfterControlToken() {
+function refreshPendingVisibilityAfterControlToken(token = canvas?.tokens?.controlled?.[0]) {
   try {
     const hasRenderWork = hasPendingMovementRenderWork();
-    const targetTokenIds = hasRenderWork ? getPendingMovementRefreshTargetIds() : [];
+    const targetTokenIds = [
+      ...new Set([
+        ...(hasRenderWork ? getPendingMovementRefreshTargetIds() : []),
+        ...getControlledObserverDetectionVisualTargetIds(token),
+      ]),
+    ];
     refreshPendingMovementTokenVisibility(
       [],
-      hasRenderWork
+      targetTokenIds.length
         ? {
           ignoreObservedGrace: true,
           source: 'control-token-session',
-          ...(targetTokenIds.length ? { targetTokenIds } : {}),
+          targetTokenIds,
+          ...(!hasRenderWork ? { skipPerceptionRefresh: true } : {}),
         }
         : {
           ignoreObservedGrace: true,
@@ -727,7 +734,7 @@ export async function onCanvasReady() {
       }
 
       if (controlled) {
-        refreshPendingVisibilityAfterControlToken();
+        refreshPendingVisibilityAfterControlToken(token);
 
         const wallFlags = token?.document?.getFlag?.(MODULE_ID, 'walls') || {};
         if (Object.keys(wallFlags).length > 0) {

@@ -11,7 +11,10 @@ import {
 } from '../../../stores/detection-map.js';
 import {
   currentPendingMovementSightLineSeesTarget,
+  getRecentCompletedMovementVisibilityStateForObserver,
+  hasRecentCompletedMovementRefreshTargetForObserver,
   hasPendingMovementEntryForPair,
+  recentCompletedMovementFinalSightLineSeesTarget,
 } from '../../../services/PendingMovement/pending-movement-sight-line.js';
 import { getLogger } from '../../../utils/logger.js';
 import { scheduleTask } from '../../../utils/scheduler.js';
@@ -941,7 +944,25 @@ export class BatchOrchestrator {
       return update?.visibility;
     }
     if (!update?.observer || !update?.target) return update?.visibility;
-    if (!hasPendingMovementEntryForPair(update.observer, update.target)) return update.visibility;
+    const hasPendingMovementPair = hasPendingMovementEntryForPair(update.observer, update.target);
+    const recentCompletedMovementVisibility =
+      update.explicitVisiblePair === true
+        ? getRecentCompletedMovementVisibilityStateForObserver(update.observer, update.target)
+        : null;
+    if (!hasPendingMovementPair && recentCompletedMovementVisibility === currentVisibility) {
+      return currentVisibility;
+    }
+    const recentCompletedFinalSightLineSeesTarget =
+      update.explicitVisiblePair === true
+        ? recentCompletedMovementFinalSightLineSeesTarget(update.observer, update.target)
+        : null;
+    if (!hasPendingMovementPair && recentCompletedFinalSightLineSeesTarget === false) {
+      return currentVisibility;
+    }
+    const hasRecentCompletedMovementPair =
+      update.explicitVisiblePair === true &&
+      hasRecentCompletedMovementRefreshTargetForObserver(update.observer, update.target);
+    if (!hasPendingMovementPair && !hasRecentCompletedMovementPair) return update.visibility;
 
     return currentPendingMovementSightLineSeesTarget(update.observer, update.target)
       ? update.visibility

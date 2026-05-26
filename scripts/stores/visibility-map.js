@@ -16,6 +16,7 @@ import {
 import { waitForTokenDocumentUpdateSafe } from './document-update-guard.js';
 import {
   currentPendingMovementSightLineSeesTarget,
+  getPendingMovementObserverIds,
   hasPendingMovementRenderWork,
   suppressPendingMovementDetectionFilterVisualsForObservedTransition,
 } from '../services/PendingMovement/pending-movement-render-lock.js';
@@ -33,6 +34,7 @@ import {
   isDefaultPerceptionProfile as isDefaultProfile,
   isForcedDeletionValue,
   normalizePerceptionProfileMap,
+  rememberPendingPerceptionProfileWrite,
   setPerceptionProfileFlag,
 } from './visibility-profile-flag-persistence.js';
 
@@ -148,6 +150,9 @@ function getCurrentViewObserverIds() {
   addToken(canvas?.tokens?._draggedToken);
   for (const token of canvas?.tokens?.controlled || []) {
     addToken(token);
+  }
+  for (const id of getPendingMovementObserverIds()) {
+    if (id) ids.add(id);
   }
 
   return ids;
@@ -344,6 +349,13 @@ export async function setVisibilityMapsBatch(entries = [], options = {}) {
     const nextMap = normalizeVisibilityMap(entry.visibilityMap ?? {}, {
       includeObserved: options?.preserveObserved === true,
     });
+    const previousProfiles = getPerceptionProfileMap(token);
+    const nextProfiles = legacyVisibilityMapToProfiles(nextMap, previousProfiles, {
+      preserveObserved: options?.preserveObserved === true,
+    });
+    const removedProfileTargetIds = Object.keys(previousProfiles).filter(
+      (id) => !(id in nextProfiles),
+    );
     tokensToWaitFor.push(token);
     const observerId = getTokenId(token);
     const observerName = token?.name ?? getTokenDocument(token)?.name ?? observerId;
@@ -362,6 +374,9 @@ export async function setVisibilityMapsBatch(entries = [], options = {}) {
     });
 
     const passes = buildVisibilityMapDocumentUpdatePasses(token, entry.visibilityMap, options);
+    rememberPendingPerceptionProfileWrite(token, nextProfiles, {
+      removedTargetIds: removedProfileTargetIds,
+    });
     passes.forEach((updates, index) => {
       if (!updatePasses[index]) updatePasses[index] = [];
       updatePasses[index].push(...updates);
@@ -640,7 +655,15 @@ export async function setPerceptionProfileBetween(
     await setPerceptionProfileMap(observer, profileMap, {
       preserveEncounterUnnoticed: !!options.preserveEncounterUnnoticed,
     });
-    if (legacyState === 'observed' || legacyState === 'concealed') {
+    if (
+      (legacyState === 'observed' || legacyState === 'concealed') &&
+      shouldClearObservedDetectionFilterForChange({
+        observerId,
+        targetId,
+        targetName: target?.name ?? getTokenDocument(target)?.name ?? targetId,
+        to: legacyState,
+      })
+    ) {
       clearDetectionFilterVisuals(target);
     }
     notifyVisibilityMapUpdated(observer, target, legacyState, options);

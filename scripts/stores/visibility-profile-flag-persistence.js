@@ -13,6 +13,12 @@ import {
 } from './token-flag-map-persistence.js';
 
 export const VISIBILITY_V2_FLAG = 'visibilityV2';
+const PENDING_PROFILE_WRITE_GRACE_MS = 1000;
+const PENDING_PROFILE_WRITE_STORE_KEY = Symbol.for(
+  'pf2e-visioner.pendingPerceptionProfileWrites',
+);
+const pendingPerceptionProfileWrites =
+  (globalThis[PENDING_PROFILE_WRITE_STORE_KEY] ??= new Map());
 
 function getForcedDeletion() {
   return foundry?.data?.operators?.ForcedDeletion ?? null;
@@ -51,13 +57,32 @@ export function normalizePerceptionProfileMap(map = {}) {
   return normalized;
 }
 
-export function getRawPerceptionProfileMap(token) {
+function tokenIdOf(token) {
+  return getTokenDocument(token)?.id ?? null;
+}
+
+function prunePendingPerceptionProfileWrites(now = Date.now()) {
+  for (const [tokenId, entry] of pendingPerceptionProfileWrites.entries()) {
+    if (!entry?.expiresAt || entry.expiresAt <= now) {
+      pendingPerceptionProfileWrites.delete(tokenId);
+    }
+  }
+}
+
+function getPendingPerceptionProfileWrite(token) {
+  prunePendingPerceptionProfileWrites();
+  const tokenId = tokenIdOf(token);
+  if (!tokenId) return null;
+  return pendingPerceptionProfileWrites.get(tokenId) ?? null;
+}
+
+function readDocumentProfileMap(token) {
   const document = getTokenDocument(token);
   const map = document?.getFlag?.(MODULE_ID, VISIBILITY_V2_FLAG) ?? {};
   return normalizePerceptionProfileMap(map);
 }
 
-export function getRawPerceptionProfileEntry(token, targetId) {
+function readDocumentProfileEntry(token, targetId) {
   if (!targetId) return null;
   const document = getTokenDocument(token);
   const map = document?.getFlag?.(MODULE_ID, VISIBILITY_V2_FLAG) ?? {};
@@ -67,6 +92,65 @@ export function getRawPerceptionProfileEntry(token, targetId) {
   if (isForcedDeletionValue(profile)) return null;
 
   return normalizePerceptionProfile(profile);
+}
+
+function mergePendingProfileWrite(token, pendingWrite) {
+  const merged = readDocumentProfileMap(token);
+  for (const targetId of pendingWrite?.removedTargetIds || []) {
+    delete merged[targetId];
+  }
+  return {
+    ...merged,
+    ...normalizePerceptionProfileMap(pendingWrite?.map),
+  };
+}
+
+export function clearPendingPerceptionProfileWrites() {
+  pendingPerceptionProfileWrites.clear();
+}
+
+export function rememberPendingPerceptionProfileWrite(
+  token,
+  profileMap = {},
+  { graceMs = PENDING_PROFILE_WRITE_GRACE_MS, removedTargetIds = [] } = {},
+) {
+  const tokenId = tokenIdOf(token);
+  if (!tokenId) return false;
+
+  const normalized = normalizePerceptionProfileMap(profileMap);
+  const expiresAt = Date.now() + Math.max(0, Number(graceMs) || 0);
+  pendingPerceptionProfileWrites.set(tokenId, {
+    map: normalized,
+    removedTargetIds: new Set(removedTargetIds.filter(Boolean).map(String)),
+    expiresAt,
+  });
+  setTimeout(() => {
+    const entry = pendingPerceptionProfileWrites.get(tokenId);
+    if (entry?.expiresAt === expiresAt) {
+      pendingPerceptionProfileWrites.delete(tokenId);
+    }
+  }, Math.max(0, Number(graceMs) || 0));
+  return true;
+}
+
+export function getRawPerceptionProfileMap(token) {
+  const pendingWrite = getPendingPerceptionProfileWrite(token);
+  if (pendingWrite) return mergePendingProfileWrite(token, pendingWrite);
+
+  return readDocumentProfileMap(token);
+}
+
+export function getRawPerceptionProfileEntry(token, targetId) {
+  if (!targetId) return null;
+  const pendingWrite = getPendingPerceptionProfileWrite(token);
+  if (pendingWrite) {
+    if (pendingWrite.removedTargetIds?.has(String(targetId))) return null;
+    return pendingWrite.map?.[targetId]
+      ? normalizePerceptionProfile(pendingWrite.map[targetId])
+      : readDocumentProfileEntry(token, targetId);
+  }
+
+  return readDocumentProfileEntry(token, targetId);
 }
 
 async function unsetDocumentFlag(token, flagKey, forcedDeletion, options = {}) {
@@ -167,6 +251,7 @@ export async function setPerceptionProfileFlag(token, profileMap, options = {}) 
   const removedTargetIds = Object.keys(previousMap).filter((id) => !(id in nextMap));
   const forcedDeletion = getForcedDeletion();
 
+  rememberPendingPerceptionProfileWrite(token, nextMap, { removedTargetIds });
   await waitForTokenDocumentUpdateSafe(token);
 
   if (Object.keys(nextMap).length === 0) {
@@ -176,8 +261,12 @@ export async function setPerceptionProfileFlag(token, profileMap, options = {}) 
   }
 
   if (removedTargetIds.length > 0) {
-    await unsetDocumentFlag(token, VISIBILITY_V2_FLAG, forcedDeletion, options);
-    const result = await setDocumentFlag(token, VISIBILITY_V2_FLAG, nextMap, options);
+    const result = await setDocumentFlag(
+      token,
+      VISIBILITY_V2_FLAG,
+      buildProfileMapPatch(nextMap, removedTargetIds, forcedDeletion),
+      options,
+    );
     invalidateCaches('visibility-profile-flag-write', { tokenId: document?.id });
     return result;
   }

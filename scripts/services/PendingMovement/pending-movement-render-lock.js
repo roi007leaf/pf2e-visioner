@@ -18,6 +18,8 @@ export {
   capturePendingMovementDetectionFilterState,
   currentPendingMovementSightLineSeesTarget,
   forcePendingMovementTokenInvisible,
+  getControlledObserverDetectionVisualTargetIds,
+  getPendingMovementObserverIds,
   getPendingMovementPerformanceSnapshot,
   getPendingMovementRefreshTargetIds,
   primePendingMovementDetectionFilterVisuals,

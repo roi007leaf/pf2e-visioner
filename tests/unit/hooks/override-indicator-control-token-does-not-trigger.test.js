@@ -64,6 +64,7 @@ describe('Override indicator should not trigger on controlToken', () => {
         const releasePendingControlledTokenDragIntent = jest.fn();
         jest.doMock('../../../scripts/services/PendingMovement/pending-movement-render-lock.js', () => ({
             clearNoObserverDetectionFilterVisuals: jest.fn(),
+            getControlledObserverDetectionVisualTargetIds: jest.fn(() => []),
             getPendingMovementRefreshTargetIds: jest.fn(() => []),
             hasPendingMovementRenderWork: jest.fn(() => false),
             primePendingControlledTokenDragIntent,
@@ -259,6 +260,7 @@ describe('Override indicator should not trigger on controlToken', () => {
     test('controlToken immediately settles pending hidden render locks for the new observer', async () => {
         const refreshPendingMovementTokenVisibility = jest.fn();
         jest.doMock('../../../scripts/services/PendingMovement/pending-movement-render-lock.js', () => ({
+            getControlledObserverDetectionVisualTargetIds: jest.fn(() => []),
             getPendingMovementRefreshTargetIds: jest.fn(() => ['target']),
             hasPendingMovementRenderWork: jest.fn(() => true),
             primePendingControlledTokenDragIntent: jest.fn(),
@@ -296,6 +298,7 @@ describe('Override indicator should not trigger on controlToken', () => {
     test('controlToken settles stale observed soundwaves without pending render work', async () => {
         const refreshPendingMovementTokenVisibility = jest.fn();
         jest.doMock('../../../scripts/services/PendingMovement/pending-movement-render-lock.js', () => ({
+            getControlledObserverDetectionVisualTargetIds: jest.fn(() => []),
             getPendingMovementRefreshTargetIds: jest.fn(() => []),
             hasPendingMovementRenderWork: jest.fn(() => false),
             primePendingControlledTokenDragIntent: jest.fn(),
@@ -326,6 +329,41 @@ describe('Override indicator should not trigger on controlToken', () => {
         expect(refreshPendingMovementTokenVisibility).toHaveBeenCalledWith([], {
             ignoreObservedGrace: true,
             skipTokenRefresh: true,
+            skipPerceptionRefresh: true,
+        });
+    });
+
+    test('controlToken immediately refreshes hidden targets for selected observer', async () => {
+        const refreshPendingMovementTokenVisibility = jest.fn();
+        jest.doMock('../../../scripts/services/PendingMovement/pending-movement-render-lock.js', () => ({
+            getControlledObserverDetectionVisualTargetIds: jest.fn(() => ['alon', 'centipede']),
+            getPendingMovementRefreshTargetIds: jest.fn(() => []),
+            hasPendingMovementRenderWork: jest.fn(() => false),
+            primePendingControlledTokenDragIntent: jest.fn(),
+            refreshPendingMovementTokenVisibility,
+            releasePendingControlledTokenDragIntent: jest.fn(),
+            restorePendingMovementTokenRendering: jest.fn(),
+        }));
+
+        const { onCanvasReady } = await import('../../../scripts/hooks/lifecycle.js');
+        await onCanvasReady();
+
+        const restoreIndicatorsCb = global.Hooks.on.mock.calls
+            .filter((c) => c?.[0] === 'controlToken')
+            .map((c) => c?.[1])
+            .find((cb) => String(cb).includes('allowControlledFallback'));
+
+        expect(restoreIndicatorsCb).toBeTruthy();
+
+        const token = { document: { id: 'observer', getFlag: jest.fn(() => ({})) } };
+        global.canvas.tokens.controlled = [token];
+
+        await restoreIndicatorsCb(token, true);
+
+        expect(refreshPendingMovementTokenVisibility).toHaveBeenCalledWith([], {
+            ignoreObservedGrace: true,
+            source: 'control-token-session',
+            targetTokenIds: ['alon', 'centipede'],
             skipPerceptionRefresh: true,
         });
     });
@@ -371,6 +409,7 @@ describe('Override indicator should not trigger on controlToken', () => {
         const restorePendingMovementTokenRendering = jest.fn();
         jest.doMock('../../../scripts/services/PendingMovement/pending-movement-render-lock.js', () => ({
             clearNoObserverDetectionFilterVisuals,
+            getControlledObserverDetectionVisualTargetIds: jest.fn(() => []),
             getPendingMovementRefreshTargetIds: jest.fn(() => []),
             hasPendingMovementRenderWork: jest.fn(() => false),
             primePendingControlledTokenDragIntent: jest.fn(),
@@ -449,6 +488,7 @@ describe('Override indicator should not trigger on controlToken', () => {
         const restorePendingMovementTokenRendering = jest.fn();
         jest.doMock('../../../scripts/services/PendingMovement/pending-movement-render-lock.js', () => ({
             clearNoObserverDetectionFilterVisuals,
+            getControlledObserverDetectionVisualTargetIds: jest.fn(() => []),
             getPendingMovementRefreshTargetIds: jest.fn(() => []),
             hasPendingMovementRenderWork: jest.fn(() => false),
             primePendingControlledTokenDragIntent: jest.fn(),

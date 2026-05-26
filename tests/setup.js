@@ -3,6 +3,8 @@
  * Mocks Foundry VTT globals and provides test utilities
  */
 
+import { clearPendingPerceptionProfileWrites } from '../scripts/stores/visibility-profile-flag-persistence.js';
+
 // Mock Foundry VTT global objects
 global.game = {
   modules: {
@@ -1106,6 +1108,7 @@ beforeEach(() => {
 // Cleanup after each test
 afterEach(() => {
   // Clean up any global state
+  clearPendingPerceptionProfileWrites();
   if (global.pf2eVisionerTestState) {
     delete global.pf2eVisionerTestState;
   }

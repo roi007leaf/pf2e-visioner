@@ -141,6 +141,7 @@ export function createPendingMovementCurrentViewSoundwaveController({
 
       const storedVisibilityState = getStoredVisibilityState(observer, target);
       if (storedVisibilityState === 'hidden') {
+        if (predictedFinalState === 'hidden') return true;
         if (
           !currentPendingMovementSightLineSeesTarget(observer, target) ||
           hiddenSoundwaveShouldSurviveLimitedWall(observer, target)

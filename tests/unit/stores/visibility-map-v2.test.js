@@ -8,6 +8,7 @@ import {
   setPerceptionProfileBetween,
   setVisibilityBetween,
 } from '../../../scripts/stores/visibility-map.js';
+import { clearPendingPerceptionProfileWrites } from '../../../scripts/stores/visibility-profile-flag-persistence.js';
 import {
   clearPendingTokenMovementPosition,
   setPendingTokenMovementPosition,
@@ -30,6 +31,7 @@ describe('Visibility Map V2 profile storage', () => {
 
   afterEach(() => {
     clearPendingTokenMovementPosition('observer');
+    clearPendingPerceptionProfileWrites();
   });
 
   test('setVisibilityBetween writes concealed only as observed plus concealment in visibilityV2', async () => {
@@ -258,7 +260,7 @@ describe('Visibility Map V2 profile storage', () => {
     }
   });
 
-  test('setVisibilityMapsBatch repairs stale bulk readback with direct observer writes', async () => {
+  test('setVisibilityMapsBatch defers stale readback repair while pending write overlay is active', async () => {
     observer = global.createMockToken({
       id: 'observer',
       flags: {
@@ -283,7 +285,7 @@ describe('Visibility Map V2 profile storage', () => {
         { token: observer, visibilityMap: { target: 'observed' } },
       ]);
 
-      expect(result).toEqual(expect.objectContaining({ repaired: 1 }));
+      expect(result).toEqual(expect.objectContaining({ repaired: 0 }));
       expect(global.canvas.scene.updateEmbeddedDocuments).toHaveBeenCalledWith(
         'Token',
         [
@@ -294,7 +296,7 @@ describe('Visibility Map V2 profile storage', () => {
         ],
         { diff: false, render: false, animate: false },
       );
-      expect(observer.document.unsetFlag).toHaveBeenCalledWith('pf2e-visioner', 'visibilityV2');
+      expect(observer.document.unsetFlag).not.toHaveBeenCalled();
       expect(getVisibilityBetween(observer, target)).toBe('observed');
     } finally {
       global.canvas.scene.updateEmbeddedDocuments = originalUpdateEmbeddedDocuments;
@@ -446,6 +448,76 @@ describe('Visibility Map V2 profile storage', () => {
       });
       expect(shouldSuppressPendingMovementDetectionFilterVisuals(target)).toBe(false);
     } finally {
+      global.canvas.tokens = originalTokens;
+      global.canvas.scene.updateEmbeddedDocuments = originalUpdateEmbeddedDocuments;
+    }
+  });
+
+  test('setVisibilityMapsBatch does not clear soundwaves for non-view observers during pending movement', async () => {
+    const movingObserver = global.createMockToken({ id: 'moving-observer' });
+    const otherObserverFlags = {
+      'pf2e-visioner': {
+        visibilityV2: {
+          target: {
+            detectionState: 'hidden',
+            hasConcealment: false,
+            coverState: 'none',
+            detectionSense: null,
+            awarenessState: null,
+          },
+        },
+      },
+    };
+    observer.document.getFlag.mockImplementation(
+      (moduleId, key) => otherObserverFlags[moduleId]?.[key] ?? null,
+    );
+    target.detectionFilter = { id: 'moving-view-soundwave-filter' };
+    target.detectionFilterMesh = { visible: true, renderable: true, alpha: 1 };
+    const originalTokens = global.canvas.tokens;
+    const originalUpdateEmbeddedDocuments = global.canvas.scene.updateEmbeddedDocuments;
+    global.canvas.tokens = {
+      ...global.canvas.tokens,
+      controlled: [],
+      _draggedToken: null,
+      get: jest.fn((id) =>
+        id === 'observer'
+          ? observer
+          : id === 'moving-observer'
+            ? movingObserver
+            : id === 'target'
+              ? target
+              : null,
+      ),
+      placeables: [observer, movingObserver, target],
+    };
+    global.canvas.scene.updateEmbeddedDocuments = jest.fn(async (_documentName, updates) => {
+      for (const update of updates) {
+        const nextMap = update['flags.pf2e-visioner.visibilityV2'];
+        if (nextMap) otherObserverFlags['pf2e-visioner'].visibilityV2 = nextMap;
+      }
+      return [];
+    });
+
+    try {
+      setPendingTokenMovementPosition(
+        movingObserver.document,
+        { x: 100, y: 0 },
+        [movingObserver],
+      );
+
+      await setVisibilityMapsBatch(
+        [{ token: observer, visibilityMap: { target: 'observed' } }],
+        { preserveObserved: true },
+      );
+
+      expect(target.detectionFilter).toEqual({ id: 'moving-view-soundwave-filter' });
+      expect(target.detectionFilterMesh).toMatchObject({
+        visible: true,
+        renderable: true,
+        alpha: 1,
+      });
+    } finally {
+      clearPendingTokenMovementPosition('moving-observer');
       global.canvas.tokens = originalTokens;
       global.canvas.scene.updateEmbeddedDocuments = originalUpdateEmbeddedDocuments;
     }

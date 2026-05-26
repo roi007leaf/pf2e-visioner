@@ -1,5 +1,6 @@
 import { MODULE_ID } from '../../constants.js';
 import { scheduleCanvasPerceptionUpdate } from '../../helpers/perception-refresh.js';
+import { getRawPerceptionProfileEntry } from '../../stores/visibility-profile-flag-persistence.js';
 import {
   isMovementPerformanceDiagnosticsEnabled,
   isPendingMovementVisualRefreshSuppressed,
@@ -414,6 +415,11 @@ export function hasActivePendingTokenMovement() {
   return pendingTokenMovementPositions.size > 0;
 }
 
+export function getPendingMovementObserverIds() {
+  cleanupExpiredPendingMovements();
+  return Array.from(pendingTokenMovementPositions.keys());
+}
+
 function isControlledTokenDocument(tokenDoc, controlledTokens = canvas?.tokens?.controlled || []) {
   const tokenId = tokenIdOf(tokenDoc);
   if (!tokenId) return false;
@@ -495,6 +501,21 @@ function controlledTokenDragIntentRefreshTargetIds(
           : !currentSightSeesTarget;
       }
       return true;
+    })
+    .map((token) => tokenIdOf(token));
+}
+
+export function getControlledObserverDetectionVisualTargetIds(
+  observer = canvas?.tokens?.controlled?.[0],
+) {
+  const observerId = tokenIdOf(observer);
+  if (!observerId) return [];
+
+  return (canvas?.tokens?.placeables || [])
+    .filter((token) => {
+      const targetId = tokenIdOf(token);
+      if (!targetId || targetId === observerId) return false;
+      return DETECTION_BLOCKING_VISIBILITY_STATES.has(getStoredVisibilityState(observer, token));
     })
     .map((token) => tokenIdOf(token));
 }
@@ -645,8 +666,7 @@ function getStoredVisibilityState(observer, target) {
   const targetId = tokenIdOf(target);
   if (!targetId) return 'observed';
 
-  const doc = tokenDocOf(observer);
-  const profile = doc?.getFlag?.(MODULE_ID, VISIBILITY_V2_FLAG)?.[targetId];
+  const profile = getRawPerceptionProfileEntry(observer, targetId);
   if (profile) {
     return normalizeVisibilityState(profile) || 'observed';
   }
@@ -685,6 +705,13 @@ function sourceContainsAnyTargetPoint(source, targetPoints) {
   );
 }
 
+function sourceHasVisibilityPolygon(source) {
+  return (
+    typeof source?.los?.contains === 'function' ||
+    typeof source?.shape?.contains === 'function'
+  );
+}
+
 function sightSourceObserverHasActiveMovement(observer, target) {
   const observerId = tokenIdOf(observer);
   if (!observerId) return false;
@@ -711,6 +738,7 @@ function currentPendingMovementSightLineSeesTargetUncached(observer, target) {
     ) {
       return true;
     }
+    if (sightSources.some(sourceHasVisibilityPolygon)) return false;
     if (
       isControlledTokenDragActive(observer) &&
       !hasActivePendingMovementForObserver(tokenIdOf(observer)) &&
@@ -884,6 +912,7 @@ function currentSightLineSeesHiddenTargetDuringPendingMovement(
       getPendingMovementCanonicalToken(observer) ||
       observer;
     if (getStoredVisibilityState(stateObserver, target) !== 'hidden') continue;
+    if (getPredictedFinalVisibilityState(stateObserver, target) === 'hidden') continue;
     if (sourceContainsAnyTargetPoint(source, targetPoints)) {
       if (hiddenSoundwaveShouldSurviveLimitedWall(stateObserver, target, targetPoints)) {
         continue;
@@ -901,6 +930,7 @@ function currentSightLineSeesHiddenTargetDuringPendingMovement(
       getPendingMovementCanonicalToken(observer) ||
       observer;
     if (getStoredVisibilityState(stateObserver, target) !== 'hidden') continue;
+    if (getPredictedFinalVisibilityState(stateObserver, target) === 'hidden') continue;
     if (currentPendingMovementSightLineSeesTarget(observer, target)) {
       if (hiddenSoundwaveShouldSurviveLimitedWall(stateObserver, target, targetPoints)) {
         continue;
@@ -1097,6 +1127,59 @@ export function getPendingMovementRefreshTargetIds(tokenIds = null) {
   }
 
   return [...targetIds];
+}
+
+function pruneRecentCompletedMovementRefreshTargets(now = Date.now()) {
+  for (const [targetId, context] of recentCompletedMovementRefreshTargetIds.entries()) {
+    if (!context?.expiresAt || context.expiresAt <= now) {
+      recentCompletedMovementRefreshTargetIds.delete(targetId);
+    }
+  }
+}
+
+export function hasRecentCompletedMovementRefreshTargetForObserver(observer, target) {
+  pruneRecentCompletedMovementRefreshTargets();
+  const observerId = tokenIdOf(observer);
+  const targetId = tokenIdOf(target);
+  if (!observerId || !targetId) return false;
+
+  const context = recentCompletedMovementRefreshTargetIds.get(targetId);
+  return !!context && context.observerId === observerId;
+}
+
+export function getRecentCompletedMovementVisibilityStateForObserver(observer, target) {
+  pruneRecentCompletedMovementRefreshTargets();
+  const observerId = tokenIdOf(observer);
+  const targetId = tokenIdOf(target);
+  if (!observerId || !targetId) return null;
+
+  const context = recentCompletedMovementRefreshTargetIds.get(targetId);
+  if (!context || context.observerId !== observerId) return null;
+  return context.finalVisibilityState ?? null;
+}
+
+function sightLineFromObserverPositionSeesTarget(observer, target, observerPosition) {
+  if (!observer || !target?.document?.id || !observerPosition) return false;
+  if (!observerHasUsableSight(observer)) return false;
+
+  const targetPoints = visibilityTestPointsForPendingTarget(target);
+  if (!targetPoints.length) return false;
+
+  const originPoint = centerForToken(observer, observerPosition);
+  if (!originPoint) return false;
+
+  return targetPoints.some((targetPoint) => !lineOfSightBlockedByWall(originPoint, targetPoint));
+}
+
+export function recentCompletedMovementFinalSightLineSeesTarget(observer, target) {
+  pruneRecentCompletedMovementRefreshTargets();
+  const observerId = tokenIdOf(observer);
+  const targetId = tokenIdOf(target);
+  if (!observerId || !targetId) return null;
+
+  const context = recentCompletedMovementRefreshTargetIds.get(targetId);
+  if (!context || context.observerId !== observerId) return null;
+  return sightLineFromObserverPositionSeesTarget(observer, target, context.position);
 }
 
 function pendingMovementTargetSetSignature() {
@@ -2362,6 +2445,11 @@ export function clearPendingTokenMovementPosition(
   }
   pendingTokenMovementPositions.delete(tokenId);
   if (!preserveCurrentSightLineGrace) {
+    for (const [targetId, context] of recentCompletedMovementRefreshTargetIds.entries()) {
+      if (context?.observerId === tokenId) {
+        recentCompletedMovementRefreshTargetIds.delete(targetId);
+      }
+    }
     forgetCurrentSightLineGraceContextsForObserver(tokenId);
   }
   rebalancePendingMovementRoutePointBudgets(pendingTokenMovementPositions);
@@ -2557,8 +2645,14 @@ export function completePendingTokenMovement(tokenOrId, expectedSerial = null) {
   rememberObservedHiddenSoundwaveGraceForCompletingMovement(tokenId, entry);
   const refreshTargetIds = getAnimationRefreshTargetIdsForMovement(tokenId);
   recentCompletedMovementRefreshTargetIds.clear();
+  const recentMovementExpiresAt = Date.now() + PENDING_MOVEMENT_RENDER_LOCK_GRACE_MS;
   for (const targetId of refreshTargetIds) {
-    recentCompletedMovementRefreshTargetIds.set(targetId, true);
+    recentCompletedMovementRefreshTargetIds.set(targetId, {
+      observerId: tokenId,
+      expiresAt: recentMovementExpiresAt,
+      finalVisibilityState: entry.finalVisibilityStatesByTargetId?.get(targetId) ?? null,
+      position: entry.position,
+    });
   }
   clearPendingTokenMovementPosition(tokenId, { preserveCurrentSightLineGrace: true });
   refreshPendingMovementTokenVisibility([], {

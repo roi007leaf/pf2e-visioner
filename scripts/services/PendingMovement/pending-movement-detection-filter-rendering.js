@@ -1,4 +1,15 @@
 const SUPPRESSED_DETECTION_FILTER_RENDER_FILTER = Object.freeze({ enabled: false });
+const CORE_DETECTION_FILTER_TINT = 0xffffff;
+
+function getPropertyDescriptor(object, propertyName) {
+  let target = object;
+  while (target) {
+    const descriptor = Object.getOwnPropertyDescriptor(target, propertyName);
+    if (descriptor) return { descriptor, owner: target };
+    target = Object.getPrototypeOf(target);
+  }
+  return null;
+}
 
 function suppressDetectionFilterProperty(token, { value = null } = {}) {
   if (!token) return null;
@@ -73,6 +84,58 @@ function preserveDetectionFilterProperty(token, tokenHasDetectionFilterVisual) {
       }
     } catch {
       /* best-effort property restore */
+    }
+  };
+}
+
+function stabilizeCoreDetectionFilterTint(token) {
+  const mesh = token?.mesh;
+  if (!mesh) return null;
+
+  const ownDescriptor = Object.getOwnPropertyDescriptor(mesh, 'tint') || null;
+  const descriptorEntry = getPropertyDescriptor(mesh, 'tint');
+  const descriptor = descriptorEntry?.descriptor || null;
+  let tintValue = descriptor?.get
+    ? descriptor.get.call(mesh)
+    : Object.prototype.hasOwnProperty.call(descriptor || {}, 'value')
+      ? descriptor.value
+      : mesh.tint;
+  const originalTint = tintValue;
+
+  try {
+    Object.defineProperty(mesh, 'tint', {
+      configurable: true,
+      enumerable: ownDescriptor?.enumerable ?? descriptor?.enumerable ?? true,
+      get() {
+        return descriptor?.get ? descriptor.get.call(this) : tintValue;
+      },
+      set(next) {
+        if (next === CORE_DETECTION_FILTER_TINT && originalTint !== CORE_DETECTION_FILTER_TINT) {
+          return;
+        }
+        if (descriptor?.set) descriptor.set.call(this, next);
+        else tintValue = next;
+      },
+    });
+  } catch {
+    return null;
+  }
+
+  return () => {
+    try {
+      if (ownDescriptor) {
+        Object.defineProperty(
+          mesh,
+          'tint',
+          Object.prototype.hasOwnProperty.call(ownDescriptor, 'value')
+            ? { ...ownDescriptor, value: tintValue }
+            : ownDescriptor,
+        );
+      } else {
+        delete mesh.tint;
+      }
+    } catch {
+      /* best-effort tint restore */
     }
   };
 }
@@ -159,13 +222,20 @@ export function createPendingMovementDetectionFilterRenderingController({
   }
 
   function shouldStabilizeHiddenDetectionFilterAnimation(token) {
-    void token;
-    return false;
+    if (!tokenHasDetectionFilterVisual?.(token)) return false;
+    if (!token?.mesh) return false;
+    return !!getHiddenDetectionFilterPreservationContext?.(token);
   }
 
   function withStableHiddenDetectionFilterAnimation(token, callback) {
-    void token;
-    return callback?.();
+    if (!shouldStabilizeHiddenDetectionFilterAnimation(token)) return callback?.();
+
+    const restoreTint = stabilizeCoreDetectionFilterTint(token);
+    try {
+      return callback?.();
+    } finally {
+      restoreTint?.();
+    }
   }
 
   function primePendingMovementDetectionFilterVisuals(

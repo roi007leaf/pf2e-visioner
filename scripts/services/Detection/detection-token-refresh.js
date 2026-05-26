@@ -42,7 +42,7 @@ function refreshThenRestorePendingInvisible(token, refreshWrapped) {
 export function wrapTokenRefreshState(wrapped, ...args) {
   const result = wrapped(...args);
   try {
-    if (targetMustStayHiddenDuringPendingMovement(this)) {
+    if (targetMustStayHiddenDuringPendingMovement(this) || targetIsRenderHiddenForAnyObserver(this)) {
       forcePendingMovementTokenInvisible(this);
       clearDetectionFilterVisuals(this);
     }
@@ -55,7 +55,7 @@ export function wrapTokenRefreshState(wrapped, ...args) {
 export function wrapTokenApplyRenderFlags(wrapped, ...args) {
   const result = wrapped(...args);
   try {
-    if (targetMustStayHiddenDuringPendingMovement(this)) {
+    if (targetMustStayHiddenDuringPendingMovement(this) || targetIsRenderHiddenForAnyObserver(this)) {
       forcePendingMovementTokenInvisible(this);
       clearDetectionFilterVisuals(this);
     }

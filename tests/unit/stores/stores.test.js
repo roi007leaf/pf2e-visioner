@@ -206,11 +206,14 @@ describe('Visibility Map Functions', () => {
 
       await setVisibilityMap(mockObserver, { keep: 'undetected' });
 
-      expect(mockObserver.document.unsetFlag).toHaveBeenCalledWith('pf2e-visioner', 'visibilityV2');
+      expect(mockObserver.document.unsetFlag).not.toHaveBeenCalled();
       expect(mockObserver.document.setFlag).toHaveBeenCalledWith(
         'pf2e-visioner',
         'visibilityV2',
-        { keep: expect.objectContaining({ detectionState: 'undetected' }) },
+        {
+          keep: expect.objectContaining({ detectionState: 'undetected' }),
+          remove: global.foundry.data.operators.ForcedDeletion,
+        },
       );
       expect(getVisibilityMap(mockObserver)).toEqual({ keep: 'undetected' });
     });
@@ -249,18 +252,13 @@ describe('Visibility Map Functions', () => {
 
       await setVisibilityMap(mockObserver, { keep: 'undetected' });
 
+      expect(mockObserver.document.update).toHaveBeenCalledTimes(1);
       expect(mockObserver.document.update).toHaveBeenNthCalledWith(
         1,
         {
-          'flags.pf2e-visioner.-=visibilityV2': null,
-        },
-        { diff: false, render: false, animate: false },
-      );
-      expect(mockObserver.document.update).toHaveBeenNthCalledWith(
-        2,
-        {
           'flags.pf2e-visioner.visibilityV2': {
             keep: expect.objectContaining({ detectionState: 'undetected' }),
+            '-=remove': null,
           },
         },
         { diff: false, render: false, animate: false },
