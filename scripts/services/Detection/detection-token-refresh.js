@@ -17,7 +17,10 @@ import {
   withPreservedPendingMovementDetectionFilterVisuals,
   withSuppressedPendingMovementDetectionFilterVisuals,
 } from '../PendingMovement/pending-movement-render-lock.js';
-import { targetMustStayHiddenDuringPendingMovement } from '../PendingMovement/pending-token-movement.js';
+import {
+  targetIsRenderHiddenForAnyObserver,
+  targetMustStayHiddenDuringPendingMovement,
+} from '../PendingMovement/pending-token-movement.js';
 import {
   clearDetectionFilterVisuals,
   tokenHasDetectionFilterMeshVisual,
@@ -68,12 +71,28 @@ export function wrapTokenRefreshVisibility(wrapped, ...args) {
     const result = wrapped(...args);
     try {
       if (this.visible) {
-        if (shouldTemporarilyForceTokenInvisible(this)) {
+        if (
+          shouldTemporarilyForceTokenInvisible(this) ||
+          targetIsRenderHiddenForAnyObserver(this)
+        ) {
           forcePendingMovementTokenInvisible(this);
           clearDetectionFilterVisuals(this);
         } else {
           restorePendingMovementTokenRendering(this);
         }
+      }
+    } catch {
+      /* keep Foundry visibility if guard fails */
+    }
+    return result;
+  }
+
+  if (targetIsRenderHiddenForAnyObserver(this)) {
+    const result = withSuppressedPendingMovementDetectionFilterVisuals(this, () => wrapped(...args));
+    try {
+      if (this.visible) {
+        forcePendingMovementTokenInvisible(this);
+        clearDetectionFilterVisuals(this);
       }
     } catch {
       /* keep Foundry visibility if guard fails */
