@@ -89,9 +89,7 @@ export function restorePendingMovementDetectionFilterState(token, state) {
 
   try {
     if (state.hadDetectionFilter) {
-      if (state.detectionFilter == null && tokenHasAnyHiddenAvsOverride(token)) {
-        // skip — would null a soundwave-bearing override-hidden target
-      } else {
+      if (!(state.detectionFilter == null && tokenHasAnyHiddenAvsOverride(token))) {
         token.detectionFilter = state.detectionFilter;
       }
     } else if (!tokenHasAnyHiddenAvsOverride(token)) {
