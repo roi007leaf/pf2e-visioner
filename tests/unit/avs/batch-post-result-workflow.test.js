@@ -96,6 +96,39 @@ describe('BatchPostResultWorkflow', () => {
     expect(suppression.perceptionRefreshed).toBe(true);
   });
 
+  test('uses resolved applied updates for post-apply render locks and effect sync', async () => {
+    const originalHidden = update('hidden');
+    const resolvedConcealed = { ...originalHidden, visibility: 'concealed' };
+    const syncEphemeralEffectsForUpdates = jest.fn(async () => {});
+    const applyBatchResultRenderLock = jest.fn(async () => {});
+    const applyBatchResults = jest.fn(async (batchResult) => {
+      batchResult.appliedUpdates = [resolvedConcealed];
+      return 1;
+    });
+    const { workflow } = createWorkflow({
+      applyBatchResults,
+      applyBatchResultRenderLock,
+      syncEphemeralEffectsForUpdates,
+    });
+
+    await workflow.run({
+      batchResult: { updates: [originalHidden] },
+      postBatchPerceptionSuppression: null,
+    });
+
+    expect(applyBatchResultRenderLock).toHaveBeenNthCalledWith(
+      1,
+      [originalHidden],
+      expect.objectContaining({ forceVisibility: true }),
+    );
+    expect(applyBatchResultRenderLock).toHaveBeenNthCalledWith(
+      2,
+      [resolvedConcealed],
+      expect.objectContaining({ forceVisibility: false }),
+    );
+    expect(syncEphemeralEffectsForUpdates).toHaveBeenCalledWith([resolvedConcealed]);
+  });
+
   test('flushes detection and schedules suppression clear without effect or perception work when no updates apply', async () => {
     const syncEphemeralEffectsForUpdates = jest.fn(async () => {});
     const refreshPerceptionAfterBatch = jest.fn(async () => {});

@@ -1158,6 +1158,16 @@ function getPendingMovementVisibilityState(observer, target) {
       ) {
         return 'observed';
       }
+      if (
+        visibleDetectionStateShouldWaitForCurrentPolygon(
+          observer,
+          target,
+          storedVisibilityState,
+          predictedFinalState,
+        )
+      ) {
+        return storedVisibilityState;
+      }
       return predictedFinalState;
     }
     if (RENDER_HIDDEN_FROM_OBSERVER_STATES.has(storedVisibilityState)) {
@@ -1271,6 +1281,16 @@ function renderVisibilityStateForCurrentPolygonTransition(observer, target, from
   }
 
   return toState;
+}
+
+function visibleDetectionStateShouldWaitForCurrentPolygon(observer, target, fromState, toState) {
+  if (!CORE_LOS_TRANSITION_REFRESH_STATES.has(fromState)) return false;
+  if (toState !== 'hidden') return false;
+  if (!shouldUseCoreDetectionDuringPendingMovement(observer, target)) return false;
+  if (!currentPendingMovementSightLineSeesTarget(observer, target)) return false;
+
+  rememberCurrentSightLineGraceContext(observer, target);
+  return true;
 }
 
 function getCurrentViewRenderHiddenVisibilityState(observer, target) {

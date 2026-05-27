@@ -371,6 +371,50 @@ describe('pending token movement hidden detection guard', () => {
     expect(targetIsRenderHiddenForCurrentViewObserver(target)).toBe(true);
   });
 
+  test('keeps concealed target from gaining hidden soundwave until current core polygon loses it', () => {
+    let currentCorePolygonContainsTarget = true;
+    const observer = createMockToken({
+      id: 'observer',
+      controlled: true,
+      flags: visibilityV2Flags({ target: 'concealed' }),
+    });
+    const target = createMockToken({ id: 'target', x: 3, y: 0, visible: true });
+    global.canvas = {
+      ...global.canvas,
+      effects: {
+        visionSources: new Map([
+          [
+            'observer',
+            {
+              active: true,
+              object: observer,
+              los: { contains: jest.fn(() => currentCorePolygonContainsTarget) },
+              shape: { contains: jest.fn(() => currentCorePolygonContainsTarget) },
+            },
+          ],
+        ]),
+        lightSources: new Map(),
+      },
+      tokens: {
+        get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+        _draggedToken: observer,
+        controlled: [observer],
+        placeables: [observer, target],
+      },
+    };
+
+    setPendingTokenMovementPosition(observer.document, { x: 100, y: 0 }, [observer], {
+      finalVisibilityStatesByTargetId: { target: 'hidden' },
+    });
+
+    expect(getPendingMovementBlockContext(observer, target).visibilityState).toBe('concealed');
+    expect(shouldSuppressPendingMovementDetectionFilterVisuals(target)).toBe(true);
+
+    currentCorePolygonContainsTarget = false;
+
+    expect(getPendingMovementBlockContext(observer, target).visibilityState).toBe('hidden');
+  });
+
   test('keeps movement-start observed state when live flags flip to final undetected early', () => {
     let currentCorePolygonContainsTarget = true;
     const observer = createMockToken({

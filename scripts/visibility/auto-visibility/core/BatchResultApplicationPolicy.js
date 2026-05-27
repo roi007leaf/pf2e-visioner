@@ -46,6 +46,7 @@ export function buildBatchResultApplicationPlan({
   let uniqueUpdateCount = 0;
   const observerMaps = new Map();
   const dirtyObserverSet = new Set();
+  const appliedUpdates = [];
   const matchesOverrideVisibility =
     overrideMatchesVisibilityFn || overrideMatchesVisibility || (() => true);
 
@@ -66,7 +67,10 @@ export function buildBatchResultApplicationPlan({
 
     if (update.forceDetectionSyncOnly && !resolveVisibilityForUpdate) {
       const explicitPairChanged = recordExplicitVisiblePair(update);
-      if (explicitPairChanged) uniqueUpdateCount++;
+      if (explicitPairChanged) {
+        uniqueUpdateCount++;
+        appliedUpdates.push(update);
+      }
       continue;
     }
 
@@ -89,18 +93,26 @@ export function buildBatchResultApplicationPlan({
         : { ...update, visibility: resolvedVisibility };
     const explicitPairChanged = recordExplicitVisiblePair(resolvedUpdate);
     if (resolvedUpdate.forceDetectionSyncOnly) {
-      if (explicitPairChanged) uniqueUpdateCount++;
+      if (explicitPairChanged) {
+        uniqueUpdateCount++;
+        appliedUpdates.push(resolvedUpdate);
+      }
       continue;
     }
 
     const staleStoredVisibility = storedFrom !== resolvedVisibility;
+    const resolvedHiddenAsVisible =
+      update.visibility === 'hidden' &&
+      (resolvedVisibility === 'observed' || resolvedVisibility === 'concealed');
 
-    if (from !== resolvedVisibility || staleStoredVisibility) {
+    if (from !== resolvedVisibility || staleStoredVisibility || resolvedHiddenAsVisible) {
       visibilityMap[targetId] = resolvedVisibility;
       dirtyObserverSet.add(observer);
       uniqueUpdateCount++;
+      appliedUpdates.push(resolvedUpdate);
     } else if (explicitPairChanged) {
       uniqueUpdateCount++;
+      appliedUpdates.push(resolvedUpdate);
     }
   }
 
@@ -108,6 +120,7 @@ export function buildBatchResultApplicationPlan({
     uniqueUpdateCount,
     observerMaps,
     dirtyObservers: Array.from(dirtyObserverSet),
+    appliedUpdates,
   };
 }
 

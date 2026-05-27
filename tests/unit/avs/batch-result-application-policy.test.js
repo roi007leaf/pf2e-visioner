@@ -42,6 +42,7 @@ describe('BatchResultApplicationPolicy', () => {
     expect(plan.uniqueUpdateCount).toBe(1);
     expect(plan.dirtyObservers).toEqual([observerA]);
     expect(plan.observerMaps.get(observerA)).toEqual({ B: 'observed' });
+    expect(plan.appliedUpdates).toEqual([expect.objectContaining({ visibility: 'observed' })]);
     expect(recordExplicitVisiblePair).toHaveBeenCalledTimes(1);
   });
 
@@ -62,6 +63,7 @@ describe('BatchResultApplicationPolicy', () => {
     expect(plan.uniqueUpdateCount).toBe(1);
     expect(plan.dirtyObservers).toEqual([observerA]);
     expect(plan.observerMaps.get(observerA)).toEqual({ B: 'observed' });
+    expect(plan.appliedUpdates).toEqual([expect.objectContaining({ visibility: 'observed' })]);
   });
 
   test('skips force-ephemeral-only updates and active override mismatches', () => {
@@ -87,6 +89,7 @@ describe('BatchResultApplicationPolicy', () => {
 
     expect(plan.uniqueUpdateCount).toBe(0);
     expect(plan.dirtyObservers).toEqual([]);
+    expect(plan.appliedUpdates).toEqual([]);
     expect(recordExplicitVisiblePair).not.toHaveBeenCalled();
   });
 
@@ -113,6 +116,9 @@ describe('BatchResultApplicationPolicy', () => {
     expect(plan.uniqueUpdateCount).toBe(1);
     expect(plan.dirtyObservers).toEqual([]);
     expect(plan.observerMaps.size).toBe(0);
+    expect(plan.appliedUpdates).toEqual([
+      expect.objectContaining({ visibility: 'observed', forceDetectionSyncOnly: true }),
+    ]);
   });
 
   test('resolves visibility against current map before persisting movement updates', () => {
@@ -140,5 +146,28 @@ describe('BatchResultApplicationPolicy', () => {
     expect(plan.uniqueUpdateCount).toBe(0);
     expect(plan.dirtyObservers).toEqual([]);
     expect(plan.observerMaps.get(observerA)).toEqual({ B: 'hidden' });
+    expect(plan.appliedUpdates).toEqual([]);
+  });
+
+  test('persists visible state when a pending movement resolver vetoes hidden', () => {
+    const observerA = observer('A');
+    const targetB = target('B');
+    const recordExplicitVisiblePair = jest.fn(() => false);
+    const resolveVisibilityForUpdate = jest.fn(() => 'concealed');
+
+    const plan = buildVisibilityMapApplicationPlan({
+      updates: [{ observer: observerA, target: targetB, visibility: 'hidden' }],
+      getVisibilityMap: jest.fn(() => ({ B: 'concealed' })),
+      getStoredVisibilityMap: jest.fn(() => ({ B: 'concealed' })),
+      recordExplicitVisiblePair,
+      resolveVisibilityForUpdate,
+      overrideMatchesVisibility: jest.fn(() => true),
+      moduleId: 'pf2e-visioner',
+    });
+
+    expect(plan.uniqueUpdateCount).toBe(1);
+    expect(plan.dirtyObservers).toEqual([observerA]);
+    expect(plan.observerMaps.get(observerA)).toEqual({ B: 'concealed' });
+    expect(plan.appliedUpdates).toEqual([expect.objectContaining({ visibility: 'concealed' })]);
   });
 });

@@ -171,6 +171,33 @@ describe('BatchOrchestrator', () => {
     ).toBe('hidden');
   });
 
+  test('preserves visible state during active pending movement when current sight still sees target', () => {
+    const [observer, target] = global.canvas.tokens.placeables;
+    setPendingTokenMovementPosition(observer.document, { x: 100, y: 0 }, [observer]);
+
+    expect(
+      orchestrator._resolvePendingMovementVisibilityUpdate(
+        { observer, target, visibility: 'hidden' },
+        'concealed',
+      ),
+    ).toBe('concealed');
+  });
+
+  test('applies hidden during active pending movement once current sight is blocked', () => {
+    const [observer, target] = global.canvas.tokens.placeables;
+    global.canvas.walls.placeables = [
+      createMockWall({ id: 'wall', c: [75, -100, 75, 100], sight: 1 }),
+    ];
+    setPendingTokenMovementPosition(observer.document, { x: 100, y: 0 }, [observer]);
+
+    expect(
+      orchestrator._resolvePendingMovementVisibilityUpdate(
+        { observer, target, visibility: 'hidden' },
+        'concealed',
+      ),
+    ).toBe('hidden');
+  });
+
   test('preserves hidden during recent completed movement when stale explicit LOS update says observed', () => {
     const observer = createMockToken({
       id: 'A',
@@ -732,6 +759,57 @@ describe('BatchOrchestrator', () => {
     expect(visibilityMapService.setVisibilityMap).toHaveBeenCalledWith(observer, { B: 'observed' });
   });
 
+  test('_applyBatchResults keeps visible state while pending movement current sight still sees target', async () => {
+    global.game.pf2eVisioner = {};
+    const observer = createMockToken({ id: 'A', x: 0, y: 0 });
+    const target = createMockToken({ id: 'B', x: 100, y: 0 });
+    global.canvas.tokens.placeables = [observer, target];
+    global.canvas.tokens.controlled = [observer];
+    visibilityMapService.getVisibilityMap = jest.fn(() => ({ B: 'concealed' }));
+    visibilityMapService.setVisibilityMap = jest.fn(async () => { });
+
+    expect(setPendingTokenMovementPosition(observer.document, { x: 100, y: 0 }, [observer])).toBe(
+      true,
+    );
+
+    const batchResult = {
+      updates: [{ observer, target, visibility: 'hidden' }],
+    };
+    const count = await orchestrator._applyBatchResults(batchResult);
+
+    expect(count).toBe(1);
+    expect(batchResult.appliedUpdates).toEqual([
+      expect.objectContaining({ observer, target, visibility: 'concealed' }),
+    ]);
+    expect(visibilityMapService.setVisibilityMap).toHaveBeenCalledWith(observer, {
+      B: 'concealed',
+    });
+  });
+
+  test('_applyBatchResults applies hidden when pending movement current sight is blocked', async () => {
+    global.game.pf2eVisioner = {};
+    const observer = createMockToken({ id: 'A', x: 0, y: 0 });
+    const target = createMockToken({ id: 'B', x: 3, y: 0 });
+    global.canvas.tokens.placeables = [observer, target];
+    global.canvas.tokens.controlled = [observer];
+    global.canvas.walls.placeables = [
+      createMockWall({ id: 'sight-wall', c: [100, 0, 100, 100], sight: 1, sound: 0 }),
+    ];
+    visibilityMapService.getVisibilityMap = jest.fn(() => ({ B: 'concealed' }));
+    visibilityMapService.setVisibilityMap = jest.fn(async () => { });
+
+    expect(setPendingTokenMovementPosition(observer.document, { x: 1, y: 0 }, [observer])).toBe(
+      true,
+    );
+
+    const count = await orchestrator._applyBatchResults({
+      updates: [{ observer, target, visibility: 'hidden' }],
+    });
+
+    expect(count).toBe(1);
+    expect(visibilityMapService.setVisibilityMap).toHaveBeenCalledWith(observer, { B: 'hidden' });
+  });
+
   test('processBatch refreshes perception after ephemeral effect sync', async () => {
     const order = [];
     orchestrator._syncEphemeralEffectsForUpdates = jest.fn(async () => {
@@ -783,7 +861,7 @@ describe('BatchOrchestrator', () => {
             target: { sense: 'hearing', isPrecise: false },
           },
         },
-        { diff: false, render: false, animate: false },
+        { render: false, animate: false },
       );
     } finally {
       discardDetectionBatch();

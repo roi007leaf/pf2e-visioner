@@ -53,18 +53,19 @@ export class BatchPostResultWorkflow {
         postBatchPerceptionSuppression,
       ),
     });
+    const appliedUpdates = batchResult.appliedUpdates ?? batchResult.updates;
 
     await flushDetectionBatch();
 
-    if (batchResult.updates?.length > 0) {
-      await this.#applyBatchResultRenderLock(batchResult.updates, {
+    if (appliedUpdates?.length > 0) {
+      await this.#applyBatchResultRenderLock(appliedUpdates, {
         forceVisibility: false,
         refreshTargets: true,
       });
     }
 
     const postProcessingPlan = buildBatchPostProcessingPlan({
-      updates: batchResult.updates,
+      updates: appliedUpdates,
       uniqueUpdateCount,
       postBatchPerceptionSuppression,
     });

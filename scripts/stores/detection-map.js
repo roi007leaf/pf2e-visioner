@@ -23,6 +23,7 @@ import {
 
 let batchMode = false;
 const batchedUpdates = new Map();
+const DETECTION_FLAG_UPDATE_OPTIONS = { render: false, animate: false };
 
 export function startDetectionBatch() {
   batchMode = true;
@@ -46,6 +47,7 @@ export async function flushDetectionBatch() {
       moduleId: MODULE_ID,
       flagKey: 'detection',
       waitForToken: waitForTokenDocumentUpdateSafe,
+      updateOptions: DETECTION_FLAG_UPDATE_OPTIONS,
     });
   }
 
@@ -64,6 +66,7 @@ async function persistDetectionMap(token, detectionMap) {
     moduleId: MODULE_ID,
     flagKey: 'detection',
     waitForToken: waitForTokenDocumentUpdateSafe,
+    updateOptions: DETECTION_FLAG_UPDATE_OPTIONS,
   });
 }
 
