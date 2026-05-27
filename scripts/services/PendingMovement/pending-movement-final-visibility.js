@@ -105,14 +105,21 @@ export function createPendingMovementFinalVisibilityController(adapter = {}) {
     if (
       !targetInvisible &&
       observerHasUsableSight(observer) &&
-      hasLineOfSightToSampledToken(originPoint, targetPoints)
+      hasLineOfSightToSampledToken(originPoint, targetPoints, {
+        originToken: observer,
+        targetToken: target,
+      })
     ) {
       return renderHiddenFromObserverStates.has(normalizedStoredState) ? 'observed' : null;
     }
 
     const canHearAtFinalPosition =
       observerCanHearTarget(observer, target) &&
-      (!soundCanBeBlocked || !lineOfSoundBlockedByWall(originPoint, targetPoint));
+      (!soundCanBeBlocked ||
+        !lineOfSoundBlockedByWall(originPoint, targetPoint, {
+          originToken: observer,
+          targetToken: target,
+        }));
 
     if (canHearAtFinalPosition) {
       if (

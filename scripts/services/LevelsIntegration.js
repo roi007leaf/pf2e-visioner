@@ -396,6 +396,50 @@ class LevelsIntegration {
     }
   }
 
+  get3DPointCollisionDetails(p0, p1, type = 'sight', options = {}) {
+    if (!p0 || !p1) {
+      return {
+        mode: this.mode,
+        result: false,
+        reason: 'missing-points',
+      };
+    }
+
+    try {
+      if (this.isCoreActive) {
+        return this._getCoreCombinedCollisionDetails(p0, p1, type, options);
+      }
+
+      if (!this.isLegacyActive) {
+        return {
+          mode: 'none',
+          result: false,
+          reason: 'inactive',
+        };
+      }
+
+      const collision = this.api.testCollision(
+        { x: p0.x, y: p0.y, z: p0.elevation ?? p0.z ?? 0 },
+        { x: p1.x, y: p1.y, z: p1.elevation ?? p1.z ?? 0 },
+        type,
+      );
+      return {
+        mode: 'legacy',
+        result: !!collision,
+        reason: collision ? 'legacy-collision' : 'clear',
+        rawCollision: collision || null,
+      };
+    } catch (error) {
+      console.warn('[PF2E Visioner] Error testing 3D point collision:', error);
+      return {
+        mode: this.mode,
+        result: false,
+        reason: 'error',
+        error: error.message,
+      };
+    }
+  }
+
   isTokenInRange(token, placeable, useElevation = true) {
     if (!this.isLegacyActive || !this.api) {
       return true;

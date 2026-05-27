@@ -594,13 +594,13 @@ function movementAnimationInfo(animation) {
   };
 }
 
-function hasLineOfSightToSampledToken(originPoint, targetPoints) {
+function hasLineOfSightToSampledToken(originPoint, targetPoints, options = {}) {
   if (!originPoint || !targetPoints?.length) return false;
-  if (!lineOfSightBlockedByWall(originPoint, targetPoints[0])) return true;
+  if (!lineOfSightBlockedByWall(originPoint, targetPoints[0], options)) return true;
 
   let clearRays = 0;
   for (const targetPoint of targetPoints.slice(1)) {
-    if (lineOfSightBlockedByWall(originPoint, targetPoint)) continue;
+    if (lineOfSightBlockedByWall(originPoint, targetPoint, options)) continue;
     clearRays += 1;
     if (clearRays >= 2) return true;
   }
@@ -841,7 +841,13 @@ function currentPendingMovementSightLineSeesTargetUncached(observer, target) {
   if (!originPoint) return false;
   if (!pendingLightingAllowsVisualDetection(observer, target)) return false;
 
-  return coreTargetPoints.some((targetPoint) => !lineOfSightBlockedByWall(originPoint, targetPoint));
+  return coreTargetPoints.some(
+    (targetPoint) =>
+      !lineOfSightBlockedByWall(originPoint, targetPoint, {
+        originToken: observer,
+        targetToken: target,
+      }),
+  );
 }
 
 export function currentPendingMovementSightLineSeesTarget(observer, target) {
@@ -1494,7 +1500,13 @@ function sightLineFromObserverPositionSeesTarget(observer, target, observerPosit
   const originPoint = centerForToken(observer, observerPosition);
   if (!originPoint) return false;
 
-  return targetPoints.some((targetPoint) => !lineOfSightBlockedByWall(originPoint, targetPoint));
+  return targetPoints.some(
+    (targetPoint) =>
+      !lineOfSightBlockedByWall(originPoint, targetPoint, {
+        originToken: observer,
+        targetToken: target,
+      }),
+  );
 }
 
 export function recentCompletedMovementFinalSightLineSeesTarget(observer, target) {
@@ -3246,7 +3258,13 @@ function shouldTemporarilyForceTokenInvisibleUncached(target, { hasDetectionWork
       if (
         bypassOriginPoint &&
         bypassTargetPoints.length &&
-        bypassTargetPoints.some((p) => !lineOfSightBlockedByWall(bypassOriginPoint, p))
+        bypassTargetPoints.some(
+          (p) =>
+            !lineOfSightBlockedByWall(bypassOriginPoint, p, {
+              originToken: observer,
+              targetToken: target,
+            }),
+        )
       ) {
         rememberCurrentSightLineGraceContext(observer, target);
         forgetHiddenForceContext(target);

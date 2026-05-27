@@ -1,4 +1,5 @@
 import { doesWallSenseBlockFromPoint, getWallSenseTypes } from '../../helpers/wall-sense-utils.js';
+import { LevelsIntegration } from '../LevelsIntegration.js';
 
 const pendingMovementWallRayCacheStack = [];
 
@@ -10,13 +11,59 @@ function pointCacheKey(point) {
   const x = Number(point?.x);
   const y = Number(point?.y);
   if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
-  return `${x},${y}`;
+  const elevation = Number(point?.elevation ?? point?.z ?? 0);
+  return `${x},${y},${Number.isFinite(elevation) ? elevation : 0}`;
 }
 
 function wallRayCacheKey(originPoint, targetPoint) {
   const originKey = pointCacheKey(originPoint);
   const targetKey = pointCacheKey(targetPoint);
   return originKey && targetKey ? `${originKey}>${targetKey}` : null;
+}
+
+function hasPointCollisionTokenContext(options = {}) {
+  return !!(
+    options.originToken ||
+    options.targetToken ||
+    options.originLevel ||
+    options.targetLevel ||
+    options.level
+  );
+}
+
+function coreLevelsLineBlockDecision(originPoint, targetPoint, senseType, options = {}) {
+  if (!originPoint || !targetPoint || !hasPointCollisionTokenContext(options)) return null;
+
+  try {
+    const levelsIntegration = LevelsIntegration.getInstance();
+    if (!levelsIntegration.isCoreActive) return null;
+
+    const details = levelsIntegration.get3DPointCollisionDetails?.(
+      originPoint,
+      targetPoint,
+      senseType,
+      {
+        originToken: options.originToken,
+        targetToken: options.targetToken,
+        originLevel: options.originLevel,
+        targetLevel: options.targetLevel,
+        level: options.level,
+      },
+    );
+    if (!details || details.mode !== 'core') return null;
+    if (details.reason === 'missing-points' || details.reason === 'no-level') return null;
+
+    if (details.surfaceCollision || details.levelInclusionCollision) return true;
+    if (!details.result) return false;
+
+    // Polygon-only collisions are wall/sense-domain collisions. Let pending movement's
+    // wall-sense pass handle limited/proximity/reverse-proximity semantics.
+    if (details.polygonCollision) return null;
+
+    return true;
+  } catch {
+    return null;
+  }
 }
 
 export function withPendingMovementWallRayCache(callback) {
@@ -156,8 +203,18 @@ function lineBlockedByWallSense(
   originPoint,
   targetPoint,
   senseType,
-  { customOnly = false } = {},
+  { customOnly = false, ...options } = {},
 ) {
+  if (!customOnly) {
+    const coreDecision = coreLevelsLineBlockDecision(
+      originPoint,
+      targetPoint,
+      senseType,
+      options,
+    );
+    if (coreDecision !== null) return coreDecision;
+  }
+
   const hits = intersectingWallHits(originPoint, targetPoint);
   let passedLimitedWall = false;
 
@@ -178,16 +235,16 @@ function lineBlockedByWallSense(
   return false;
 }
 
-export function lineOfSightBlockedByWall(originPoint, targetPoint) {
-  return lineBlockedByWallSense(originPoint, targetPoint, 'sight');
+export function lineOfSightBlockedByWall(originPoint, targetPoint, options = {}) {
+  return lineBlockedByWallSense(originPoint, targetPoint, 'sight', options);
 }
 
 export function lineOfSightBlockedByCustomSightWall(originPoint, targetPoint) {
   return lineBlockedByWallSense(originPoint, targetPoint, 'sight', { customOnly: true });
 }
 
-export function lineOfSoundBlockedByWall(originPoint, targetPoint) {
-  return lineBlockedByWallSense(originPoint, targetPoint, 'sound');
+export function lineOfSoundBlockedByWall(originPoint, targetPoint, options = {}) {
+  return lineBlockedByWallSense(originPoint, targetPoint, 'sound', options);
 }
 
 export function lineIntersectsLimitedWall(originPoint, targetPoint, senseType = 'sight') {

@@ -44,10 +44,12 @@ function countedWallCollection(walls, onYield) {
 
 describe('pending movement wall sense blocking', () => {
   let originalCanvas;
+  let originalConfig;
   let originalConst;
 
   beforeEach(() => {
     originalCanvas = global.canvas;
+    originalConfig = global.CONFIG;
     originalConst = global.CONST;
     global.CONST = {
       ...(global.CONST || {}),
@@ -67,6 +69,7 @@ describe('pending movement wall sense blocking', () => {
 
   afterEach(() => {
     global.canvas = originalCanvas;
+    global.CONFIG = originalConfig;
     if (originalConst === undefined) delete global.CONST;
     else global.CONST = originalConst;
   });
@@ -238,5 +241,95 @@ describe('pending movement wall sense blocking', () => {
     expect(withPendingMovementWallRayCache(() => lineOfSightBlockedByWall(origin, target))).toBe(
       true,
     );
+  });
+
+  test('uses v14 core level collision to keep elevated clear sight from being blocked by 2d walls', () => {
+    const level = { id: 'upper' };
+    const scene = {
+      id: 'scene',
+      levels: new Map([[level.id, level]]),
+      getSurfaces: jest.fn(),
+      testSurfaceCollision: jest.fn(() => false),
+    };
+    global.canvas.scene = scene;
+    global.CONFIG = {
+      ...(global.CONFIG || {}),
+      Canvas: {
+        polygonBackends: {
+          sight: {
+            testCollision: jest.fn(() => false),
+          },
+        },
+      },
+    };
+    global.canvas.walls.placeables = [verticalWall({ x: 50, sight: WALL_SENSE_TYPES.NORMAL })];
+
+    const originToken = {
+      document: {
+        id: 'origin',
+        level: level.id,
+        parent: scene,
+      },
+    };
+    const targetToken = {
+      document: {
+        id: 'target',
+        level: level.id,
+        parent: scene,
+      },
+    };
+
+    expect(
+      lineOfSightBlockedByWall(
+        { x: 0, y: 0, elevation: 20 },
+        { x: 100, y: 0, elevation: 20 },
+        { originToken, targetToken },
+      ),
+    ).toBe(false);
+  });
+
+  test('uses v14 core surface collision to block pending sight without 2d wall hits', () => {
+    const level = { id: 'upper' };
+    const scene = {
+      id: 'scene',
+      levels: new Map([[level.id, level]]),
+      getSurfaces: jest.fn(),
+      testSurfaceCollision: jest.fn(() => true),
+    };
+    global.canvas.scene = scene;
+    global.CONFIG = {
+      ...(global.CONFIG || {}),
+      Canvas: {
+        polygonBackends: {
+          sight: {
+            testCollision: jest.fn(() => false),
+          },
+        },
+      },
+    };
+    global.canvas.walls.placeables = [];
+
+    const originToken = {
+      document: {
+        id: 'origin',
+        level: level.id,
+        parent: scene,
+      },
+    };
+    const targetToken = {
+      document: {
+        id: 'target',
+        level: level.id,
+        parent: scene,
+      },
+    };
+
+    expect(
+      lineOfSightBlockedByWall(
+        { x: 0, y: 0, elevation: 0 },
+        { x: 100, y: 0, elevation: 20 },
+        { originToken, targetToken },
+      ),
+    ).toBe(true);
   });
 });

@@ -17,7 +17,8 @@ function pointEvaluationKey(point) {
   const x = Number(point?.x);
   const y = Number(point?.y);
   if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
-  return `${x},${y}`;
+  const elevation = Number(point?.elevation ?? point?.z ?? 0);
+  return `${x},${y},${Number.isFinite(elevation) ? elevation : 0}`;
 }
 
 function pointListEvaluationKey(points) {
@@ -101,6 +102,7 @@ function wallLineBlockedForPendingMovement({
 
 function routeWallBlockedForPendingMovement({
   entry,
+  observer,
   target,
   targetPoint,
   originPoints,
@@ -115,7 +117,9 @@ function routeWallBlockedForPendingMovement({
   const cacheKey = `${entry?.serial ?? 'preview'}:${targetId}:${targetPointKey}:${routePointKey}:${wallCollectionEvaluationKey()}`;
   if (cache?.has(cacheKey)) return cache.get(cacheKey);
 
-  const blocked = originPoints.some((point) => lineOfSightBlockedByWall(point, targetPoint));
+  const blocked = originPoints.some((point) =>
+    lineOfSightBlockedByWall(point, targetPoint, { originToken: observer, targetToken: target }),
+  );
   cache?.set(cacheKey, blocked);
   return blocked;
 }
@@ -182,6 +186,7 @@ export function createPendingMovementDecisionContextController({
     const targetPoint = centerForToken(target);
     const routeWallBlocked = routeWallBlockedForPendingMovement({
       entry: pendingMovementEntry,
+      observer,
       target,
       targetPoint,
       originPoints,
@@ -196,7 +201,11 @@ export function createPendingMovementDecisionContextController({
             originPoint,
             senseType: 'sight',
             tokenIdOf,
-            calculate: () => lineOfSightBlockedByWall(originPoint, targetPoint),
+            calculate: () =>
+              lineOfSightBlockedByWall(originPoint, targetPoint, {
+                originToken: observer,
+                targetToken: target,
+              }),
           })
         : routeWallBlocked;
     const hearingObserver =
@@ -219,7 +228,11 @@ export function createPendingMovementDecisionContextController({
             originPoint,
             senseType: 'sound',
             tokenIdOf,
-            calculate: () => lineOfSoundBlockedByWall(originPoint, targetPoint),
+            calculate: () =>
+              lineOfSoundBlockedByWall(originPoint, targetPoint, {
+                originToken: hearingObserver,
+                targetToken: target,
+              }),
           })
         : !hearingCanReachTarget;
     const canHearThroughWall = wallBlocked && !soundWallBlocked;
