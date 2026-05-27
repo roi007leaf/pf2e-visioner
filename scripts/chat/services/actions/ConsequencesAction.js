@@ -109,6 +109,7 @@ export class ConsequencesActionHandler extends ActionHandlerBase {
           analyzeOutcome: (data, subject) => this.analyzeOutcome(data, subject),
           applyOverrides: (data, outcomes) => this.applyOverrides(data, outcomes),
           cache: this.getCacheMap(),
+          isOutcomeActionable: (data, outcome) => this.isOutcomeActionable(data, outcome),
         });
         this.updateButtonToRevert(button);
         notify.info(`Applied ${overridesCreated} AVS overrides for consequences`);
@@ -125,6 +126,7 @@ export class ConsequencesActionHandler extends ActionHandlerBase {
         applyChangesInternal: (changes) => this.applyChangesInternal(changes),
         groupChangesByObserver: (changes) => this.groupChangesByObserver(changes),
         cacheAfterApply: (data, changes) => this.cacheAfterApply(data, changes),
+        isOutcomeActionable: (data, outcome) => this.isOutcomeActionable(data, outcome),
       });
       if (result.noChanges) {
         notify.info('No changes to apply');

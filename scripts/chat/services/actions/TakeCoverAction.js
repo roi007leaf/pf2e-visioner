@@ -64,6 +64,10 @@ export class TakeCoverActionHandler extends ActionHandlerBase {
     return 'observer_to_target';
   }
 
+  isOutcomeActionable(_actionData, outcome) {
+    return outcome?.changed === true || outcome?.takeCoverProneRangedOnly === true;
+  }
+
   async apply(actionData, button) {
     const takingCoverToken = actionData?.actorToken || actionData?.actor;
     if (tokenHasActiveTakeCoverState(takingCoverToken)) {

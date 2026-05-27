@@ -6614,4 +6614,105 @@ describe('pending token movement hidden detection guard', () => {
     expect(target.mesh.alpha).toBe(1);
     expect(target.nameplate.visible).toBe(true);
   });
+
+  test('keeps AVS-override hidden state during pending movement with full LOS', () => {
+    global.canvas.walls.placeables = [];
+    const observer = createMockToken({
+      id: 'observer',
+      controlled: true,
+      flags: visibilityV2Flags({ target: 'hidden' }),
+    });
+    const target = createMockToken({
+      id: 'target',
+      x: 3,
+      y: 0,
+      visible: true,
+      flags: {
+        'pf2e-visioner': {
+          'avs-override-from-observer': { state: 'hidden', source: 'manual_action' },
+        },
+      },
+    });
+    global.canvas = {
+      ...global.canvas,
+      effects: {
+        visionSources: new Map([
+          [
+            'observer',
+            {
+              active: true,
+              object: observer,
+              los: { contains: jest.fn(() => true) },
+              shape: { contains: jest.fn(() => true) },
+            },
+          ],
+        ]),
+        lightSources: new Map(),
+      },
+      tokens: {
+        get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+        _draggedToken: observer,
+        controlled: [observer],
+        placeables: [observer, target],
+      },
+    };
+
+    setPendingTokenMovementPosition(observer.document, { x: 100, y: 0 }, [observer], {
+      finalVisibilityStatesByTargetId: { target: 'observed' },
+    });
+
+    const context = getPendingMovementBlockContext(observer, target);
+    expect(context.visibilityState).toBe('hidden');
+  });
+
+  test('keeps AVS-override undetected target render-locked during pending movement with full LOS', () => {
+    global.canvas.walls.placeables = [];
+    const observer = createMockToken({
+      id: 'observer',
+      controlled: true,
+      flags: visibilityV2Flags({ target: 'undetected' }),
+    });
+    const target = createMockToken({
+      id: 'target',
+      x: 3,
+      y: 0,
+      visible: true,
+      flags: {
+        'pf2e-visioner': {
+          'avs-override-from-observer': { state: 'undetected', source: 'manual_action' },
+        },
+      },
+    });
+    target.renderable = true;
+    target.mesh = { visible: true, renderable: true, alpha: 1 };
+    global.canvas = {
+      ...global.canvas,
+      effects: {
+        visionSources: new Map([
+          [
+            'observer',
+            {
+              active: true,
+              object: observer,
+              los: { contains: jest.fn(() => true) },
+              shape: { contains: jest.fn(() => true) },
+            },
+          ],
+        ]),
+        lightSources: new Map(),
+      },
+      tokens: {
+        get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+        _draggedToken: observer,
+        controlled: [observer],
+        placeables: [observer, target],
+      },
+    };
+
+    setPendingTokenMovementPosition(observer.document, { x: 100, y: 0 }, [observer], {
+      finalVisibilityStatesByTargetId: { target: 'observed' },
+    });
+
+    expect(targetIsRenderHiddenForCurrentViewObserver(target)).toBe(true);
+  });
 });

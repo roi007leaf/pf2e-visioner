@@ -104,6 +104,7 @@ export class HideActionHandler extends ActionHandlerBase {
       originalOutcome,
       originalTotal,
     });
+    const calculatedNewVisibility = newVisibility;
 
     const positionQualification = await resolveHidePositionQualification({
       actionData,
@@ -148,6 +149,8 @@ export class HideActionHandler extends ActionHandlerBase {
       oldVisibility: current,
       oldVisibilityLabel: getVisibilityStateLabelKey(current, { manual: true }) || current,
       newVisibility,
+      _calculatedNewVisibility: calculatedNewVisibility,
+      oldStateAvsControlled,
       changed: isHideVisibilityChangeActionable(current, newVisibility, oldStateAvsControlled),
       autoCover,
       // Add original total for override display
@@ -164,6 +167,7 @@ export class HideActionHandler extends ActionHandlerBase {
       target: actionData.actorToken || actionData.actor,
       newVisibility: outcome.newVisibility,
       oldVisibility: outcome.oldVisibility,
+      oldStateAvsControlled: outcome.oldStateAvsControlled,
       timedOverride: outcome.timedOverride,
     };
   }
@@ -171,6 +175,7 @@ export class HideActionHandler extends ActionHandlerBase {
     return {
       observerId: change?.observer?.id ?? null,
       oldVisibility: change?.oldVisibility ?? null,
+      oldStateAvsControlled: change?.oldStateAvsControlled === true,
     };
   }
   entriesToRevertChanges(entries, actionData) {
@@ -178,7 +183,7 @@ export class HideActionHandler extends ActionHandlerBase {
       .map((e) => ({
         observer: this.getTokenById(e.observerId),
         target: actionData.actorToken || actionData.actor,
-        newVisibility: e.oldVisibility,
+        newVisibility: e.oldStateAvsControlled ? 'avs' : e.oldVisibility,
       }))
       .filter((c) => c.observer && c.target && c.newVisibility);
   }
@@ -188,7 +193,7 @@ export class HideActionHandler extends ActionHandlerBase {
     const subjects = await this.discoverSubjects(actionData);
     const outcomes = [];
     for (const subject of subjects) outcomes.push(await this.analyzeOutcome(actionData, subject));
-    const filtered = outcomes.filter(Boolean).filter((o) => o.changed);
+    const filtered = outcomes.filter((outcome) => this.isOutcomeActionable(actionData, outcome));
     return filtered.map((o) => ({
       observer: o.target,
       target: actionData.actorToken || actionData.actor,

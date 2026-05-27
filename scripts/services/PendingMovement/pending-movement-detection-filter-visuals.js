@@ -89,8 +89,12 @@ export function restorePendingMovementDetectionFilterState(token, state) {
 
   try {
     if (state.hadDetectionFilter) {
-      token.detectionFilter = state.detectionFilter;
-    } else {
+      if (state.detectionFilter == null && tokenHasAnyHiddenAvsOverride(token)) {
+        // skip — would null a soundwave-bearing override-hidden target
+      } else {
+        token.detectionFilter = state.detectionFilter;
+      }
+    } else if (!tokenHasAnyHiddenAvsOverride(token)) {
       delete token.detectionFilter;
     }
 
@@ -115,6 +119,7 @@ export function restorePendingMovementDetectionFilterState(token, state) {
 
 export function clearDetectionFilterVisuals(token) {
   if (!token) return;
+  if (tokenHasAnyHiddenAvsOverride(token)) return;
 
   try {
     token.detectionFilter = null;
@@ -158,8 +163,19 @@ export function clearNoObserverDetectionFilterVisuals(
   let cleared = 0;
   for (const token of tokens || []) {
     if (!tokenHasDetectionFilterVisual(token)) continue;
+    if (tokenHasAnyHiddenAvsOverride(token)) continue;
     clearDetectionFilterVisuals(token);
     cleared += 1;
   }
   return cleared;
+}
+
+function tokenHasAnyHiddenAvsOverride(token) {
+  const flags = token?.document?.flags?.['pf2e-visioner'];
+  if (!flags) return false;
+  for (const key of Object.keys(flags)) {
+    if (!key.startsWith('avs-override-from-')) continue;
+    if (flags[key]?.state === 'hidden') return true;
+  }
+  return false;
 }

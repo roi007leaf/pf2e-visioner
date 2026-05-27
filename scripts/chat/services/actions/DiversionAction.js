@@ -105,7 +105,7 @@ export class DiversionActionHandler extends ActionHandlerBase {
     const subjects = await this.discoverSubjects(actionData);
     const outcomes = [];
     for (const subject of subjects) outcomes.push(await this.analyzeOutcome(actionData, subject));
-    const filtered = outcomes.filter(Boolean).filter((o) => o.changed);
+    const filtered = outcomes.filter((outcome) => this.isOutcomeActionable(actionData, outcome));
     return filtered.map((o) => ({
       observer: o.observer || o.token || o.target,
       target: actionData.actorToken || actionData.actor,

@@ -199,6 +199,7 @@ const pendingCurrentViewSoundwaveController = createPendingMovementCurrentViewSo
   getPredictedFinalVisibilityState,
   getStoredVisibilityState,
   graceMs: PENDING_MOVEMENT_RENDER_LOCK_GRACE_MS,
+  hasActiveAvsOverride,
   hasPendingControlledTokenDragIntent,
   hasPendingMovementDetectionWork,
   hiddenSoundwaveShouldSurviveLimitedWall,
@@ -344,6 +345,26 @@ function observerTargetEvaluationKey(observer, target) {
 
 function tokenDocOf(tokenOrDoc) {
   return tokenOrDoc?.document || tokenOrDoc || null;
+}
+
+function hasActiveAvsOverride(observer, target) {
+  const observerId = tokenIdOf(observer);
+  if (!observerId) return false;
+  const targetFlags = tokenDocOf(target)?.flags?.[MODULE_ID];
+  if (!targetFlags) return false;
+  const override = targetFlags[`avs-override-from-${observerId}`];
+  return !!override;
+}
+
+export function targetHasAnyHiddenAvsOverride(target) {
+  const targetFlags = tokenDocOf(target)?.flags?.[MODULE_ID];
+  if (!targetFlags) return false;
+  for (const key of Object.keys(targetFlags)) {
+    if (!key.startsWith('avs-override-from-')) continue;
+    const override = targetFlags[key];
+    if (override?.state === 'hidden') return true;
+  }
+  return false;
 }
 
 function actorOf(tokenOrDoc) {
@@ -1030,6 +1051,7 @@ function currentSightLineSeesHiddenTargetDuringPendingMovement(
       getPendingMovementCanonicalToken(observer) ||
       observer;
     if (getStoredVisibilityState(stateObserver, target) !== 'hidden') continue;
+    if (hasActiveAvsOverride(stateObserver, target)) continue;
     if (getPredictedFinalVisibilityState(stateObserver, target) === 'hidden') continue;
     if (sourceVisuallyContainsAnyTargetPoint(stateObserver, source, target, targetPoints)) {
       if (hiddenSoundwaveShouldSurviveLimitedWall(stateObserver, target, targetPoints)) {
@@ -1048,6 +1070,7 @@ function currentSightLineSeesHiddenTargetDuringPendingMovement(
       getPendingMovementCanonicalToken(observer) ||
       observer;
     if (getStoredVisibilityState(stateObserver, target) !== 'hidden') continue;
+    if (hasActiveAvsOverride(stateObserver, target)) continue;
     if (getPredictedFinalVisibilityState(stateObserver, target) === 'hidden') continue;
     if (currentPendingMovementSightLineSeesTarget(observer, target)) {
       if (hiddenSoundwaveShouldSurviveLimitedWall(stateObserver, target, targetPoints)) {
@@ -1135,6 +1158,12 @@ function getPendingMovementVisibilityState(observer, target) {
   const coreOwnedMovement = hasCoreOwnedPendingMovement(observer, target);
   if (coreOwnedMovement) {
     const storedVisibilityState = getStoredVisibilityState(observer, target);
+    if (
+      hasActiveAvsOverride(observer, target) &&
+      DETECTION_BLOCKING_VISIBILITY_STATES.has(storedVisibilityState)
+    ) {
+      return storedVisibilityState;
+    }
     if (activePreviewCanRevealStoredUndetectedTarget(observer, target, storedVisibilityState)) {
       rememberCurrentSightLineGraceContext(observer, target);
       return 'observed';
@@ -1308,6 +1337,13 @@ function getCurrentViewRenderHiddenVisibilityState(observer, target) {
     target,
   );
   const hasCoreOwnedMovement = hasCoreOwnedPendingMovement(observer, target);
+
+  if (
+    hasActiveAvsOverride(observer, target) &&
+    DETECTION_BLOCKING_VISIBILITY_STATES.has(storedVisibilityState)
+  ) {
+    return storedVisibilityState;
+  }
 
   if (!hasCoreOwnedMovement) {
     if (recentCompletedVisibilityState) {
@@ -1761,6 +1797,9 @@ export function targetIsRenderHiddenForCurrentViewObserver(target) {
       rememberCurrentSightLineGraceContext(observer, target);
     }
     if (RENDER_HIDDEN_FROM_OBSERVER_STATES.has(state)) {
+      if (hasActiveAvsOverride(observer, target)) {
+        return true;
+      }
       if (
         !invisibleUndetectedRenderLockMustStayLocked(target, state) &&
         coreOwnedPendingMovement &&
@@ -1814,6 +1853,7 @@ export function shouldBypassPendingMovementVisionerRenderState(observer, target,
     return true;
   }
   if (visibilityState !== 'hidden') return false;
+  if (hasActiveAvsOverride(observer, target)) return false;
 
   const context = getPendingMovementBlockContext(observer, target);
   return context.active && !context.wallBlocked && !context.foundryHidden;
@@ -1821,6 +1861,7 @@ export function shouldBypassPendingMovementVisionerRenderState(observer, target,
 
 function shouldProbeCoreVisibilityForRenderHiddenPendingState(observer, target, visibilityState) {
   if (!RENDER_HIDDEN_FROM_OBSERVER_STATES.has(visibilityState)) return false;
+  if (hasActiveAvsOverride(observer, target)) return false;
   if (invisibleUndetectedRenderLockMustStayLocked(target, visibilityState)) return false;
   if (!hasCommittedCoreOwnedPendingMovement(observer, target)) return false;
 
@@ -1871,12 +1912,15 @@ function getPendingMovementDetectionFilterPreservationContext(target) {
 
     const context = getPendingMovementBlockContext(source.object, target);
     const storedVisibilityState = getStoredVisibilityState(source.object, target);
+    const overrideHiddenActive =
+      storedVisibilityState === 'hidden' && hasActiveAvsOverride(source.object, target);
     const preserveWallBlockedHiddenSoundwave =
       storedVisibilityState === 'hidden' && context.wallBlocked;
     if (
       shouldUseCoreDetectionDuringPendingMovement(source.object, target) &&
       context.visibilityState !== 'hidden' &&
-      !preserveWallBlockedHiddenSoundwave
+      !preserveWallBlockedHiddenSoundwave &&
+      !overrideHiddenActive
     ) {
       continue;
     }
@@ -1887,6 +1931,15 @@ function getPendingMovementDetectionFilterPreservationContext(target) {
         hiddenByVisioner: true,
         renderHiddenByVisioner: false,
         storedWallBlockedHidden: true,
+      };
+    }
+    if (overrideHiddenActive) {
+      return {
+        ...context,
+        visibilityState: 'hidden',
+        hiddenByVisioner: true,
+        renderHiddenByVisioner: false,
+        avsOverrideHidden: true,
       };
     }
     if (contextBlocksPendingDetection(context)) return context;
@@ -2967,6 +3020,12 @@ export function shouldUseCoreDetectionDuringPendingMovement(observer, target) {
   if (!hasCoreOwnedPendingMovement(observer, target)) return false;
 
   const storedVisibilityState = getStoredVisibilityState(observer, target);
+  if (
+    DETECTION_BLOCKING_VISIBILITY_STATES.has(storedVisibilityState) &&
+    hasActiveAvsOverride(observer, target)
+  ) {
+    return false;
+  }
   if (invisibleUndetectedRenderLockMustStayLocked(target, storedVisibilityState)) return false;
   if (
     RENDER_HIDDEN_FROM_OBSERVER_STATES.has(storedVisibilityState) &&

@@ -29,8 +29,17 @@ async function buildConsequencesOutcomes({ actionData, subjects, analyzeOutcome,
   return outcomes;
 }
 
-async function filterChangedOutcomes(actionData, outcomes, filterOutcomesByEncounter) {
-  const changed = outcomes.filter((outcome) => outcome && outcome.changed);
+async function filterChangedOutcomes(
+  actionData,
+  outcomes,
+  filterOutcomesByEncounter,
+  isOutcomeActionable,
+) {
+  const changed = outcomes.filter((outcome) =>
+    typeof isOutcomeActionable === 'function'
+      ? isOutcomeActionable(actionData, outcome)
+      : outcome && outcome.changed,
+  );
   if (typeof actionData?.encounterOnly !== 'boolean') return changed;
 
   const filter = await loadFilterOutcomesByEncounter(filterOutcomesByEncounter);
@@ -105,6 +114,7 @@ export async function applyConsequencesLegacy({
   applyChangesInternal,
   groupChangesByObserver,
   cacheAfterApply,
+  isOutcomeActionable = null,
   filterOutcomesByEncounter = null,
   getPerceptionProfileMap = null,
   legacyVisibilityToProfile = null,
@@ -119,6 +129,7 @@ export async function applyConsequencesLegacy({
     actionData,
     outcomes,
     filterOutcomesByEncounter,
+    isOutcomeActionable,
   );
   if (filtered.length === 0) return { count: 0, noChanges: true };
 

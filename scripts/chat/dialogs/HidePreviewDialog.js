@@ -28,6 +28,10 @@ import { BaseActionDialog } from './base-action-dialog.js';
 let currentHideDialog = null;
 
 export class HidePreviewDialog extends BaseActionDialog {
+  static get currentHideDialog() {
+    return currentHideDialog;
+  }
+
   static DEFAULT_OPTIONS = {
     tag: 'div',
     classes: ['pf2e-visioner', 'hide-preview-dialog'],

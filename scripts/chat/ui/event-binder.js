@@ -44,6 +44,113 @@ export function applyPendingSeekTemplateToActionData(
   return true;
 }
 
+export function getDirectHideChangedOutcomes(handler, outcomes = [], actionData = {}) {
+  return outcomes.filter((outcome) => {
+    if (!outcome) return false;
+    if (
+      typeof handler?.isOutcomeActionable === 'function' &&
+      handler.isOutcomeActionable(actionData, outcome) === true
+    ) {
+      return true;
+    }
+    if (outcome.changed) return true;
+
+    const effectiveNewState = outcome.overrideState || outcome.newVisibility;
+    const baseOld = outcome.oldVisibility ?? outcome.currentVisibility;
+    if (!effectiveNewState || baseOld == null) return false;
+
+    const oldStateAvsControlled =
+      typeof handler?.isOldStateAvsControlled === 'function' &&
+      handler.isOldStateAvsControlled(outcome, actionData) === true;
+
+    if (
+      effectiveNewState === 'avs' &&
+      oldStateAvsControlled &&
+      outcome._calculatedNewVisibility &&
+      outcome._calculatedNewVisibility !== 'avs'
+    ) {
+      outcome.overrideState = outcome._calculatedNewVisibility;
+      return true;
+    }
+
+    if (effectiveNewState === 'avs') return false;
+
+    return (
+      effectiveNewState === baseOld &&
+      oldStateAvsControlled
+    );
+  });
+}
+
+export function getHideDialogActionableOverrides(dialog, actionData = {}) {
+  if (!dialog || !Array.isArray(dialog.outcomes)) return {};
+
+  const dialogMessageId = dialog.actionData?.messageId;
+  if (dialogMessageId && actionData?.messageId && dialogMessageId !== actionData.messageId) {
+    return {};
+  }
+
+  const overrides = {};
+  for (const outcome of dialog.outcomes) {
+    const id = outcome?.target?.id;
+    const effectiveNewState = outcome?.overrideState || outcome?.newVisibility;
+    if (!id || !effectiveNewState || effectiveNewState === 'avs') continue;
+
+    const baseOld = outcome.oldVisibility ?? outcome.currentVisibility;
+    const statesMatch = effectiveNewState === baseOld;
+    const avsControlled =
+      typeof dialog.isOldStateAvsControlled === 'function' &&
+      dialog.isOldStateAvsControlled(outcome) === true;
+    const actionable =
+      outcome.hasActionableChange === true ||
+      effectiveNewState !== baseOld ||
+      (statesMatch && avsControlled);
+    if (!actionable) continue;
+
+    overrides[id] = effectiveNewState;
+  }
+
+  return overrides;
+}
+
+export function getHideOutcomeActionableOverrides(outcomes = []) {
+  const overrides = {};
+  for (const outcome of outcomes || []) {
+    const id = outcome?.target?.id;
+    const effectiveNewState = outcome?.overrideState || outcome?.newVisibility;
+    if (!id || !effectiveNewState || effectiveNewState === 'avs') continue;
+    overrides[id] = effectiveNewState;
+  }
+  return overrides;
+}
+
+function mergeForcedHideOverrides(actionData, overrides) {
+  const ids = Object.keys(overrides || {});
+  if (ids.length === 0) return false;
+
+  actionData.overrides = {
+    ...(actionData.overrides || {}),
+    ...overrides,
+  };
+  actionData.forceApplyOverrideIds = Array.from(
+    new Set([...(actionData.forceApplyOverrideIds || []), ...ids]),
+  );
+  return true;
+}
+
+async function hydrateHideApplyOverridesFromOpenDialog(actionData) {
+  try {
+    const { HidePreviewDialog } = await import('../dialogs/HidePreviewDialog.js');
+    const overrides = getHideDialogActionableOverrides(
+      HidePreviewDialog.currentHideDialog,
+      actionData,
+    );
+    return mergeForcedHideOverrides(actionData, overrides);
+  } catch {
+    return false;
+  }
+}
+
 export function bindAutomationEvents(panel, message, actionData) {
   panel.on('click', '[data-action]', async (event) => {
     event.preventDefault();
@@ -263,18 +370,24 @@ export function bindAutomationEvents(panel, message, actionData) {
         // show a no-changes notification and skip applying
         if (action === 'apply-now-hide') {
           try {
+            const hasDialogOverrides = await hydrateHideApplyOverridesFromOpenDialog(actionData);
             const { HideActionHandler } = await import('../services/actions/HideAction.js');
             const { filterOutcomesByEncounter } = await import('../services/infra/shared-utils.js');
             const handler = new HideActionHandler();
             await handler.ensurePrerequisites(actionData);
-            const subjects = await handler.discoverSubjects(actionData);
+            const subjects = await handler.discoverSubjects({ ...actionData, ignoreAllies: false });
             const outcomes = await Promise.all(
               subjects.map((s) => handler.analyzeOutcome(actionData, s)),
             );
             const encounterOnly = game.settings.get('pf2e-visioner', 'defaultEncounterFilter');
-            let changed = outcomes.filter((o) => o && o.changed);
+            const directChanged = getDirectHideChangedOutcomes(handler, outcomes, actionData);
+            const hasPreflightOverrides = mergeForcedHideOverrides(
+              actionData,
+              getHideOutcomeActionableOverrides(directChanged),
+            );
+            let changed = directChanged;
             changed = filterOutcomesByEncounter(changed, encounterOnly, 'target');
-            if (changed.length === 0) {
+            if (changed.length === 0 && !hasDialogOverrides && !hasPreflightOverrides) {
               notify.info('No changes to apply');
               return;
             }

@@ -101,8 +101,17 @@ async function buildConsequencesOutcomes({ actionData, subjects, analyzeOutcome,
   return outcomes;
 }
 
-async function filterChangedOutcomes(actionData, outcomes, filterOutcomesByEncounter) {
-  let changed = outcomes.filter((outcome) => outcome && outcome.changed);
+async function filterChangedOutcomes(
+  actionData,
+  outcomes,
+  filterOutcomesByEncounter,
+  isOutcomeActionable,
+) {
+  let changed = outcomes.filter((outcome) =>
+    typeof isOutcomeActionable === 'function'
+      ? isOutcomeActionable(actionData, outcome)
+      : outcome && outcome.changed,
+  );
   if (typeof actionData?.encounterOnly === 'boolean') {
     const filter = await loadFilterOutcomesByEncounter(filterOutcomesByEncounter);
     changed = filter(changed, actionData.encounterOnly, 'target');
@@ -227,6 +236,7 @@ export async function applyConsequencesAvs({
   avsOverrideManager = null,
   overrideIndicator = null,
   filterOutcomesByEncounter = null,
+  isOutcomeActionable = null,
 }) {
   const manager = await loadAvsOverrideManager(avsOverrideManager);
   const existingOverrides = collectExistingOverrides(attacker, subjects);
@@ -238,7 +248,12 @@ export async function applyConsequencesAvs({
     analyzeOutcome,
     applyOverrides,
   });
-  const changed = await filterChangedOutcomes(actionData, outcomes, filterOutcomesByEncounter);
+  const changed = await filterChangedOutcomes(
+    actionData,
+    outcomes,
+    filterOutcomesByEncounter,
+    isOutcomeActionable,
+  );
   const createdOverrides = await createConsequencesOverrides({
     changed,
     attacker,

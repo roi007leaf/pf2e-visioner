@@ -161,7 +161,9 @@ export class SeekActionHandler extends ActionHandlerBase {
       this.applyOverrides(actionData, outcomes);
 
       // Keep only changed outcomes, but always include walls for display
-      let filtered = outcomes.filter((o) => o && (o.changed || o._isWall));
+      let filtered = outcomes.filter((outcome) =>
+        outcome && (this.isOutcomeActionable(actionData, outcome) || outcome._isWall)
+      );
 
       // Filter out allies if ignoreAllies setting is enabled
       try {
@@ -246,7 +248,10 @@ export class SeekActionHandler extends ActionHandlerBase {
     const outcomes = actionData.searchExplorationGroupedOutcomes.map((outcome) => ({ ...outcome }));
     this.applyOverrides(actionData, outcomes);
 
-    let filtered = outcomes.filter((outcome) => outcome && (outcome.changed || outcome.hasActionableChange));
+    let filtered = outcomes.filter(
+      (outcome) =>
+        outcome && (this.isOutcomeActionable(actionData, outcome) || outcome.hasActionableChange),
+    );
 
     try {
       const overrides = actionData?.overrides || {};

@@ -8,7 +8,10 @@ import {
   shouldTemporarilyBlockSightDetection,
 } from '../PendingMovement/pending-movement-detection-gate.js';
 import { shouldHandlePendingMovementCanvasVisibilityForToken } from '../PendingMovement/pending-movement-render-lock.js';
-import { targetMustStayHiddenDuringPendingMovement } from '../PendingMovement/pending-token-movement.js';
+import {
+  targetHasAnyHiddenAvsOverride,
+  targetMustStayHiddenDuringPendingMovement,
+} from '../PendingMovement/pending-token-movement.js';
 import { isExplicitVisiblePair } from '../ExplicitVisibilityPairs.js';
 import {
   detectionFrameCache,
@@ -24,15 +27,22 @@ export function createCanDetectVisibilityWrapper(threshold) {
     if (targetMustStayHiddenDuringPendingMovement(target)) return false;
     const observerToken = visionSource?.object;
     const modeId = this?.id ?? args?.[0]?.id ?? null;
-    if (isPendingMovementCoreAnimationBypassActive()) return canDetect;
+    const overrideHiddenActive = targetHasAnyHiddenAvsOverride(target);
+    if (!overrideHiddenActive && isPendingMovementCoreAnimationBypassActive()) return canDetect;
     if (
+      !overrideHiddenActive &&
       (isPendingMovementCoreAnimationPerceptionRefresh() ||
         isPendingMovementCoreAnimationBypassActive()) &&
       !shouldHandlePendingMovementCanvasVisibilityForToken(target)
     ) {
       return canDetect;
     }
-    if (shouldUseCoreDetectionDuringPendingMovement(observerToken, target)) return canDetect;
+    if (
+      !overrideHiddenActive &&
+      shouldUseCoreDetectionDuringPendingMovement(observerToken, target)
+    ) {
+      return canDetect;
+    }
 
     const visibility = getVisionerVisibilityBetweenTokens(observerToken, target);
     const pendingMovementSightBlocked =

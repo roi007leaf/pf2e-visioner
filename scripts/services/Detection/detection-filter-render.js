@@ -5,7 +5,10 @@ import {
   withStableHiddenDetectionFilterAnimation,
   withSuppressedPendingMovementDetectionFilterRender,
 } from '../PendingMovement/pending-movement-render-lock.js';
-import { targetIsRenderHiddenForCurrentViewObserver } from '../PendingMovement/pending-token-movement.js';
+import {
+  targetHasAnyHiddenAvsOverride,
+  targetIsRenderHiddenForCurrentViewObserver,
+} from '../PendingMovement/pending-token-movement.js';
 import { clearDetectionFilterVisuals } from '../PendingMovement/pending-movement-detection-filter-visuals.js';
 
 export function wrapTokenRenderDetectionFilter(wrapped, ...args) {
@@ -33,6 +36,9 @@ export function wrapTokenRenderDetectionFilter(wrapped, ...args) {
 
   if (shouldPrimePendingMovementDetectionFilterVisuals(this)) {
     primePendingMovementDetectionFilterVisuals(this);
+  }
+  if (targetHasAnyHiddenAvsOverride(this)) {
+    return withStableHiddenDetectionFilterAnimation(this, () => wrapped(...args));
   }
   return withStableHiddenDetectionFilterAnimation(this, () =>
     withSuppressedPendingMovementDetectionFilterRender(this, () => wrapped(...args)),

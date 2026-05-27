@@ -822,6 +822,10 @@ class OverrideValidationIndicator {
     const buildStealthPositionBypassBadge = (o) => o?.stealthPositionBypassLabel
       ? `<span class="stealth-position-bypass-badge" data-tooltip="${escapeAttr(o.stealthPositionBypassTooltip || o.stealthPositionBypassLabel)}"><i class="${escapeAttr(o.stealthPositionBypassIcon || 'fas fa-user-ninja')}"></i><span>${escapeText(o.stealthPositionBypassLabel)}</span></span>`
       : '';
+    const groupTooltip = (groupKey) =>
+      groupKey === 'observer'
+        ? 'Changes where this token is the observer: how this token sees other tokens.'
+        : 'Changes where this token is the target: how other tokens see this token.';
 
     const buildRow = (o, { showStealthPositionBypass = true } = {}) => {
       // Items that reach here have already been filtered by #hasDisplayChange() and #shouldShowOverride()
@@ -874,7 +878,7 @@ class OverrideValidationIndicator {
         return `
           <div class="tip-group" data-group="${groupKey}">
             <div class="tip-group-header">
-              <div class="tip-subheader">${title}${movingTokenIndicator}</div>
+              <div class="tip-subheader" data-tooltip="${escapeAttr(groupTooltip(groupKey))}">${title}${movingTokenIndicator}</div>
             </div>
             <div class="tip-group-body">${arr.map((o) => buildRow(o, { showStealthPositionBypass: !headerBypassBadge })).join('')}</div>
           </div>
@@ -894,6 +898,7 @@ class OverrideValidationIndicator {
       </div>
       <div class="tip-footer">
         ${this._data?.nextTokenName ? `<div class="footer-row"><div class="footer-left" style="color: #4a9eff; font-style: italic;"><i class="fas fa-arrow-right"></i> ${game.i18n.localize('PF2E_VISIONER.OVERRIDE_INDICATOR.TOOLTIP_NEXT')} ${this._data.nextTokenName}</div></div>` : ''}
+        <div class="hover-border-legend"><span><i class="border-swatch observer"></i> Blue border = observer</span><span><i class="border-swatch target"></i> Yellow border = target</span></div>
         <div class="footer-row">
           <div class="footer-left">${game.i18n.localize('PF2E_VISIONER.OVERRIDE_INDICATOR.TOOLTIP_LEFT_CLICK')}</div>
           <div class="footer-right">${game.i18n.localize('PF2E_VISIONER.OVERRIDE_INDICATOR.TOOLTIP_RIGHT_CLICK')}</div>
@@ -1071,6 +1076,11 @@ class OverrideValidationIndicator {
       .pf2e-visioner-override-tooltip .footer-row { display: flex; justify-content: space-between; align-items: center; white-space: nowrap; }
       .pf2e-visioner-override-tooltip .footer-left { flex: 0 0 auto; }
       .pf2e-visioner-override-tooltip .footer-right { flex: 0 0 auto; text-align: right; }
+      .pf2e-visioner-override-tooltip .hover-border-legend { display: flex; justify-content: space-between; gap: 10px; color: var(--color-text-light-secondary, #ccc); font-size: 0.86em; line-height: 1.2; }
+      .pf2e-visioner-override-tooltip .hover-border-legend span { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+      .pf2e-visioner-override-tooltip .border-swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; box-sizing: border-box; }
+      .pf2e-visioner-override-tooltip .border-swatch.observer { border: 2px solid #2196f3; }
+      .pf2e-visioner-override-tooltip .border-swatch.target { border: 2px solid #ffd54f; }
       .pf2e-visioner-override-tooltip .moving-token-indicator { color: var(--pf2e-visioner-success, #4caf50); font-weight: 600; font-size: 0.9em; margin-left: 8px; }
       .pf2e-visioner-override-tooltip .moving-token-indicator i { margin-right: 4px; }
       /* Force per-state colors inside tooltip (override any external .state-indicator !important rules) */

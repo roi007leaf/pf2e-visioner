@@ -21,6 +21,7 @@ export function createPendingMovementCurrentViewSoundwaveController({
   getPredictedFinalVisibilityState,
   getStoredVisibilityState,
   graceMs,
+  hasActiveAvsOverride = () => false,
   hasPendingControlledTokenDragIntent,
   hasPendingMovementDetectionWork,
   hiddenSoundwaveShouldSurviveLimitedWall = () => false,
@@ -131,6 +132,14 @@ export function createPendingMovementCurrentViewSoundwaveController({
     if (!target?.document?.id) return false;
 
     for (const observer of getCurrentViewObservers()) {
+      const storedVisibilityState = getStoredVisibilityState(observer, target);
+      if (
+        storedVisibilityState === 'hidden' &&
+        hasActiveAvsOverride(observer, target)
+      ) {
+        return true;
+      }
+
       const predictedFinalState = getPredictedFinalVisibilityState(observer, target);
       if (
         predictedFinalState &&
@@ -139,7 +148,6 @@ export function createPendingMovementCurrentViewSoundwaveController({
         continue;
       }
 
-      const storedVisibilityState = getStoredVisibilityState(observer, target);
       if (storedVisibilityState === 'hidden') {
         if (predictedFinalState === 'hidden') return true;
         if (
@@ -245,6 +253,7 @@ export function createPendingMovementCurrentViewSoundwaveController({
     { durationMs = 300 } = {},
   ) {
     if (!token?.document?.id) return false;
+    if (hasActiveAvsOverrideHiddenForCurrentView(token)) return false;
     const duration = Math.max(0, Number(durationMs) || 0);
     observedDetectionFilterSuppressionTokens.set(token, Date.now() + duration);
     return true;
@@ -270,9 +279,19 @@ export function createPendingMovementCurrentViewSoundwaveController({
     return false;
   }
 
+  function hasActiveAvsOverrideHiddenForCurrentView(target) {
+    if (!target?.document?.id) return false;
+    for (const observer of getCurrentViewObservers()) {
+      if (getStoredVisibilityState(observer, target) !== 'hidden') continue;
+      if (hasActiveAvsOverride(observer, target)) return true;
+    }
+    return false;
+  }
+
   function clearPredictedObservedTransitionVisuals(token) {
     if (!token?.document?.id) return false;
     if (observedSoundwaveShouldWaitForCore(token)) return false;
+    if (hasActiveAvsOverrideHiddenForCurrentView(token)) return false;
 
     restorePendingMovementTokenRendering(token, { ignoreObservedGrace: true });
     clearDetectionFilterVisuals(token);
