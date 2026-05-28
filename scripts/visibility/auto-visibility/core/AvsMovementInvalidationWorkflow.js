@@ -3,6 +3,9 @@ import {
   setLastMovedTokenId,
   setSuppressTokenMovementLightingRefresh,
 } from '../../../services/runtime-state.js';
+import {
+  hasActivePendingTokenMovement as defaultHasActivePendingTokenMovement,
+} from '../../../services/PendingMovement/pending-movement-render-lock.js';
 import { LightingPrecomputer } from './LightingPrecomputer.js';
 
 function hasTakeCoverTrackingFlag(flagData) {
@@ -48,6 +51,7 @@ export class AvsMovementInvalidationWorkflow {
     requestTakeCoverExpirationForToken = defaultRequestTakeCoverExpirationForToken,
     setMovedTokenId = setLastMovedTokenId,
     lightingPrecomputer = LightingPrecomputer,
+    hasActivePendingTokenMovement = defaultHasActivePendingTokenMovement,
     overrideValidationProcessDelayMs = 150,
   } = {}) {
     this.shouldProcessEvents = shouldProcessEvents;
@@ -59,6 +63,7 @@ export class AvsMovementInvalidationWorkflow {
     this.requestTakeCoverExpirationForToken = requestTakeCoverExpirationForToken;
     this.setMovedTokenId = setMovedTokenId;
     this.lightingPrecomputer = lightingPrecomputer;
+    this.hasActivePendingTokenMovement = hasActivePendingTokenMovement;
     this.overrideValidationProcessDelayMs = overrideValidationProcessDelayMs;
     this.overrideValidationProcessTimer = null;
   }
@@ -162,6 +167,11 @@ export class AvsMovementInvalidationWorkflow {
     this.overrideValidationProcessTimer = setTimeout(() => {
       this.overrideValidationProcessTimer = null;
       try {
+        if (this.hasActivePendingTokenMovement?.()) {
+          this.#scheduleOverrideValidationProcessing();
+          return;
+        }
+
         const result = this.overrideValidationManager.processQueuedValidations?.();
         result?.catch?.(() => {});
       } catch {

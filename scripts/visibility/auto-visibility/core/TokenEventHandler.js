@@ -18,6 +18,19 @@ import {
   tokenVisibilityAffectingUpdated,
 } from './InvalidationIntents.js';
 
+function movementAnimationIsRunning(animation) {
+  if (!animation || animation.state === 'completed') return false;
+  if (typeof animation === 'object' && Object.keys(animation).length === 0) return true;
+  return !!animation.promise || !!animation.active || animation.state !== undefined;
+}
+
+function getActiveMovementAnimation(token) {
+  if (!token) return null;
+  if (movementAnimationIsRunning(token._animation)) return token._animation;
+  if (movementAnimationIsRunning(token.animation)) return token.animation;
+  return null;
+}
+
 /**
  * Handles token-related events and updates for the auto-visibility system.
  * Manages position changes, light updates, exclusions, and override validations.
@@ -96,7 +109,7 @@ export class TokenEventHandler {
     const finalY = updateData.destination?.y ?? tokenDoc.y;
     const tokenId = tokenDoc.id;
     const token = tokenDoc.object;
-    const activeAnimation = token?._animation;
+    const activeAnimation = getActiveMovementAnimation(token);
 
     const movementChanges = {
       x: finalX,
@@ -319,7 +332,8 @@ export class TokenEventHandler {
       const token = tokenDoc.object;
 
       // Check if token is currently animating or being dragged
-      const isAnimating = token?._animation != null && token._animation.state !== 'completed';
+      const activeAnimation = getActiveMovementAnimation(token);
+      const isAnimating = !!activeAnimation;
       const isDragging = token?._dragHandle !== undefined && token?._dragHandle !== null;
 
       if (isAnimating || isDragging) {
@@ -345,7 +359,7 @@ export class TokenEventHandler {
         });
 
         // If animating (e.g., remote player movement), wait for animation to complete
-        if (isAnimating && token?._animation?.promise) {
+        if (isAnimating && activeAnimation?.promise) {
           const tokenId = tokenDoc.id;
           const movementChanges = {
             x: changes.x ?? tokenDoc.x,
@@ -353,7 +367,7 @@ export class TokenEventHandler {
           };
           this._markAnimatedMoveDeferred(tokenId, movementChanges);
 
-          token._animation.promise
+          activeAnimation.promise
             .then(async () => {
               // After animation completes, clear position-dependent caches and trigger visibility recalculation
               try {

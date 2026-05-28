@@ -61,6 +61,30 @@ describe('BatchResultRenderLockWorkflow', () => {
     expect(plan.hasWork).toBe(true);
   });
 
+  test('excludes active movement tokens from target-limited refreshes', () => {
+    const refreshPendingMovementTokenVisibility = jest.fn();
+    const workflow = new BatchResultRenderLockWorkflow({
+      refreshPendingMovementTokenVisibility,
+      getActiveMovementTokenIds: () => ['moving-target'],
+    });
+
+    workflow.run({
+      updates: [
+        update({
+          targetId: 'moving-target',
+          visibility: 'hidden',
+        }),
+      ],
+    });
+
+    expect(refreshPendingMovementTokenVisibility).toHaveBeenCalledWith(['moving-target'], {
+      coalesceFrame: true,
+      ignoreObservedGrace: true,
+      source: 'batch-result-hidden-refresh',
+      targetTokenIds: ['moving-target'],
+    });
+  });
+
   test('skips adapters when updates have no render-lock work', () => {
     const forceTokenInvisibleForObserverVisibility = jest.fn();
     const refreshPendingMovementTokenVisibility = jest.fn();

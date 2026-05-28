@@ -6,6 +6,8 @@ import { BatchResultRenderLockWorkflow } from './BatchResultRenderLockWorkflow.j
 import { BatchSuccessTelemetryWorkflow } from './BatchSuccessTelemetryWorkflow.js';
 import {
   forceTokenInvisibleForObserverVisibility as defaultForceTokenInvisibleForObserverVisibility,
+  hasActivePendingTokenMovement as defaultHasActivePendingTokenMovement,
+  getPendingMovementObserverIds as defaultGetPendingMovementObserverIds,
   refreshPendingMovementTokenVisibility as defaultRefreshPendingMovementTokenVisibility,
 } from '../../../services/PendingMovement/pending-movement-render-lock.js';
 
@@ -56,6 +58,7 @@ export function createDefaultBatchWorkflowFactory({
   flushDetectionBatch = async () => { },
   discardDetectionBatch = () => { },
   getLastMovedTokenId = () => null,
+  isTokenMovementActive = () => false,
   overrideValidationManager = null,
   warn = () => { },
   applyBatchResults = async () => 0,
@@ -64,6 +67,7 @@ export function createDefaultBatchWorkflowFactory({
     (globalThis.canvas?.tokens?.controlled || [])
       .map((token) => token?.document?.id)
       .filter(Boolean),
+  getActiveMovementTokenIds = defaultGetPendingMovementObserverIds,
   forceTokenInvisibleForObserverVisibility =
   defaultForceTokenInvisibleForObserverVisibility,
   refreshPendingMovementTokenVisibility = defaultRefreshPendingMovementTokenVisibility,
@@ -88,6 +92,7 @@ export function createDefaultBatchWorkflowFactory({
 } = {}) {
   const renderLockWorkflow = new BatchResultRenderLockWorkflow({
     getControlledObserverIds,
+    getActiveMovementTokenIds,
     forceTokenInvisibleForObserverVisibility,
     refreshPendingMovementTokenVisibility,
   });
@@ -104,6 +109,8 @@ export function createDefaultBatchWorkflowFactory({
       }),
     overrideValidationWorkflow: new BatchOverrideValidationWorkflow({
       getLastMovedTokenId,
+      isTokenMovementActive: () =>
+        isTokenMovementActive() || defaultHasActivePendingTokenMovement(),
       overrideValidationManager,
       warn,
     }),

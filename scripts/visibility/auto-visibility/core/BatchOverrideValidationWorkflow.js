@@ -1,14 +1,17 @@
 export class BatchOverrideValidationWorkflow {
   #getLastMovedTokenId;
+  #isTokenMovementActive;
   #overrideValidationManager;
   #warn;
 
   constructor({
     getLastMovedTokenId = () => null,
+    isTokenMovementActive = () => false,
     overrideValidationManager = null,
     warn = () => {},
   } = {}) {
     this.#getLastMovedTokenId = getLastMovedTokenId;
+    this.#isTokenMovementActive = isTokenMovementActive;
     this.#overrideValidationManager = overrideValidationManager;
     this.#warn = warn;
   }
@@ -17,6 +20,10 @@ export class BatchOverrideValidationWorkflow {
     const tokenId = this.#getLastMovedTokenId();
     if (isMovementBatch) {
       return { queued: false, tokenId, skipped: 'movement-batch' };
+    }
+
+    if (this.#isTokenMovementActive()) {
+      return { queued: false, tokenId, skipped: 'active-movement' };
     }
 
     if (!tokenId || !this.#overrideValidationManager) {

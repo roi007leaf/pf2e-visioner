@@ -150,6 +150,29 @@ describe('TokenEventHandler - animation detection on position change', () => {
     expect(pinTokenDestination).not.toHaveBeenCalled();
   });
 
+  test('position change with active public animation and promise should wait for animation', () => {
+    const animationPromise = new Promise(() => {});
+
+    const tokenDoc = makeTokenDoc({
+      object: {
+        animation: { state: 'running', promise: animationPromise },
+        _animation: null,
+        _dragHandle: null,
+        actor: { id: 'actor-1' },
+      },
+    });
+
+    global.canvas.tokens.get = jest.fn(() => ({
+      document: tokenDoc,
+    }));
+
+    handler.handleTokenUpdate(tokenDoc, { x: 100, y: 100 });
+
+    expect(markTokenChangedWithSpatialOptimization).not.toHaveBeenCalled();
+    expect(notifyTokenMovementStart).toHaveBeenCalled();
+    expect(storeUpdatedTokenDoc).toHaveBeenCalled();
+  });
+
   test('position change with completed animation should process normally', () => {
     const tokenDoc = makeTokenDoc({
       object: {
@@ -376,6 +399,41 @@ describe('TokenEventHandler - animation detection on position change', () => {
     const tokenDoc = makeTokenDoc({
       object: {
         _animation: { state: 'running', promise: animationPromise },
+        _dragHandle: null,
+        actor: { id: 'actor-1', items: [] },
+      },
+    });
+
+    const movePromise = handler.handleMoveToken(
+      tokenDoc,
+      { destination: { x: 100, y: 100 }, chain: [] },
+      {},
+      'user-1',
+    );
+
+    await Promise.resolve();
+
+    expect(markTokenChangedWithSpatialOptimization).not.toHaveBeenCalled();
+
+    resolveAnimation();
+    await movePromise;
+
+    expect(markTokenChangedWithSpatialOptimization).toHaveBeenCalledWith(tokenDoc, {
+      x: 100,
+      y: 100,
+    });
+  });
+
+  test('final move waits for active public animation promise before processing', async () => {
+    let resolveAnimation;
+    const animationPromise = new Promise((resolve) => {
+      resolveAnimation = resolve;
+    });
+
+    const tokenDoc = makeTokenDoc({
+      object: {
+        animation: { state: 'running', promise: animationPromise },
+        _animation: null,
         _dragHandle: null,
         actor: { id: 'actor-1', items: [] },
       },

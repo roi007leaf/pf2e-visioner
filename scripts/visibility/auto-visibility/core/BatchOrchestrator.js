@@ -92,6 +92,7 @@ export class BatchOrchestrator {
         flushDetectionBatch,
         discardDetectionBatch,
         getLastMovedTokenId,
+        isTokenMovementActive: () => this.isTokenMovementActive(),
         overrideValidationManager: this.overrideValidationManager,
         warn: (...args) => console.warn(...args),
         applyBatchResults: (result, resultOptions) =>

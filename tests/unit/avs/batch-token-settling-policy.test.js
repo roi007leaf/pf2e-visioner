@@ -19,16 +19,20 @@ describe('BatchTokenSettlingPolicy', () => {
   test('reports changed tokens with active animation or drag state as unsettled', () => {
     const tokens = new Map([
       ['animated', token({ id: 'animated', _animation: { state: 'running', active: true } })],
+      [
+        'public-animated',
+        token({ id: 'public-animated', animation: { state: 'running', active: true } }),
+      ],
       ['dragging', token({ id: 'dragging', _dragHandle: {} })],
       ['settled', token({ id: 'settled', _animation: { state: 'completed' } })],
     ]);
 
     const result = collectUnsettledChangedTokenIds({
-      changedTokens: new Set(['animated', 'dragging', 'settled']),
+      changedTokens: new Set(['animated', 'public-animated', 'dragging', 'settled']),
       getTokenById: (id) => tokens.get(id),
     });
 
-    expect(result).toEqual(['animated', 'dragging']);
+    expect(result).toEqual(['animated', 'public-animated', 'dragging']);
   });
 
   test('reports render/document position drift and pending destination drift as unsettled', () => {

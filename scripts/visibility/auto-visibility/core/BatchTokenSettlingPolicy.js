@@ -8,6 +8,11 @@ function hasPositionDrift(aX, aY, bX, bY, threshold) {
   );
 }
 
+function movementAnimationIsRunning(animation) {
+  if (!animation || animation.state === 'completed') return false;
+  return !!animation.promise || !!animation.active || animation.state !== undefined;
+}
+
 export function collectUnsettledChangedTokenIds({
   changedTokens = new Set(),
   getTokenById = () => null,
@@ -20,13 +25,9 @@ export function collectUnsettledChangedTokenIds({
     const token = getTokenById(id);
     if (!token) continue;
 
-    const animation = token._animation;
-    const animationState = animation?.state;
-    const isAnimationCompleted = animationState === 'completed';
     const isAnimating =
-      !!animation &&
-      !isAnimationCompleted &&
-      (!!animation.promise || !!animation.active || animationState !== undefined);
+      movementAnimationIsRunning(token._animation) ||
+      movementAnimationIsRunning(token.animation);
     const isDragging =
       token?._dragHandle != null ||
       !!token?._dragPassthrough ||

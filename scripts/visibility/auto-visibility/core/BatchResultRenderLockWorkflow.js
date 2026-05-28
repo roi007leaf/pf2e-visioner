@@ -2,15 +2,18 @@ import { buildBatchResultRenderLockPlan } from './BatchResultRenderLockPolicy.js
 
 export class BatchResultRenderLockWorkflow {
   #getControlledObserverIds;
+  #getActiveMovementTokenIds;
   #forceTokenInvisibleForObserverVisibility;
   #refreshPendingMovementTokenVisibility;
 
   constructor({
     getControlledObserverIds = () => [],
+    getActiveMovementTokenIds = () => [],
     forceTokenInvisibleForObserverVisibility = () => {},
     refreshPendingMovementTokenVisibility = () => {},
   } = {}) {
     this.#getControlledObserverIds = getControlledObserverIds;
+    this.#getActiveMovementTokenIds = getActiveMovementTokenIds;
     this.#forceTokenInvisibleForObserverVisibility = forceTokenInvisibleForObserverVisibility;
     this.#refreshPendingMovementTokenVisibility = refreshPendingMovementTokenVisibility;
   }
@@ -31,8 +34,10 @@ export class BatchResultRenderLockWorkflow {
       }
     }
 
+    const activeMovementTokenIds = this.#getActiveMovementTokenIds();
+
     if (refreshTargets && plan.hasRevealRefreshWork) {
-      this.#refreshPendingMovementTokenVisibility([], {
+      this.#refreshPendingMovementTokenVisibility(activeMovementTokenIds, {
         coalesceFrame: true,
         ignoreObservedGrace: true,
         skipPerceptionRefresh: true,
@@ -42,7 +47,7 @@ export class BatchResultRenderLockWorkflow {
     }
 
     if (refreshTargets && plan.hasHiddenRefreshWork) {
-      this.#refreshPendingMovementTokenVisibility([], {
+      this.#refreshPendingMovementTokenVisibility(activeMovementTokenIds, {
         coalesceFrame: true,
         ignoreObservedGrace: true,
         source: 'batch-result-hidden-refresh',

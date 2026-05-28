@@ -158,6 +158,36 @@ describe('AvsMovementInvalidationWorkflow', () => {
     jest.useRealTimers();
   });
 
+  test('defers completed movement override validation while pending movement is still active', async () => {
+    jest.useFakeTimers();
+    let pendingMovementActive = true;
+    const overrideValidationManager = {
+      queueOverrideValidation: jest.fn(),
+      processQueuedValidations: jest.fn().mockResolvedValue(undefined),
+    };
+    const workflow = makeWorkflow({
+      hasActivePendingTokenMovement: () => pendingMovementActive,
+      overrideValidationManager,
+      overrideValidationProcessDelayMs: 25,
+      requestTakeCoverExpirationForToken: jest.fn().mockResolvedValue(undefined),
+    });
+
+    workflow.handleTokenMovementCompleted({ id: 'token1' }, {});
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(overrideValidationManager.queueOverrideValidation).toHaveBeenCalledWith('token1');
+
+    await jest.advanceTimersByTimeAsync(25);
+    expect(overrideValidationManager.processQueuedValidations).not.toHaveBeenCalled();
+
+    pendingMovementActive = false;
+    await jest.advanceTimersByTimeAsync(25);
+    expect(overrideValidationManager.processQueuedValidations).toHaveBeenCalledTimes(1);
+
+    jest.useRealTimers();
+  });
+
   test('position update records moved token and queues override validation after Take Cover expiration', async () => {
     let finishExpiration;
     const requestTakeCoverExpirationForToken = jest.fn(
