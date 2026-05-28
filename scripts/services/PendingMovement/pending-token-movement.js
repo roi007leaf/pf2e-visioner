@@ -92,6 +92,7 @@ export {
 
 const PENDING_MOVEMENT_TTL_MS = 2500;
 const PENDING_MOVEMENT_RENDER_LOCK_GRACE_MS = 1000;
+const PENDING_MOVEMENT_CURRENT_SIGHT_LINE_GRACE_MS = 2000;
 const PENDING_MOVEMENT_ANIMATION_DETECTION_DELAY_MS = 50;
 const PENDING_MOVEMENT_ANIMATION_DETECTION_SETTLE_MS = 250;
 const PENDING_MOVEMENT_OCCLUSION_SUPPRESSION_MS = PENDING_MOVEMENT_TTL_MS;
@@ -533,6 +534,8 @@ function controlledTokenDragIntentRefreshTargetIds(
 export function getControlledObserverDetectionVisualTargetIds(
   observer = canvas?.tokens?.controlled?.[0],
 ) {
+  if (isSelectAllTokenVisibilityBypassActive()) return [];
+
   const observerId = tokenIdOf(observer);
   if (!observerId) return [];
 
@@ -831,6 +834,22 @@ function sightSourceObserverHasActiveMovement(observer, target) {
   return tokenIdOf(canvas?.tokens?._draggedToken) === observerId;
 }
 
+function observerHasPendingRevealMovement(observer, target) {
+  cleanupExpiredPendingMovements();
+  const observerId = tokenIdOf(observer);
+  const targetId = tokenIdOf(target);
+  const observerEntry = observerId ? pendingTokenMovementPositions.get(observerId) : null;
+  const targetEntry = targetId ? pendingTokenMovementPositions.get(targetId) : null;
+  return !!(
+    (observerEntry?.position &&
+      pendingMovementTokenHasCoreOwnedPosition(
+        observer,
+        observerEntry,
+      )) ||
+    (targetEntry?.position && pendingMovementTokenHasCoreOwnedPosition(target, targetEntry))
+  );
+}
+
 function currentPendingMovementSightLineSeesTargetUncached(observer, target) {
   if (!observer || !target?.document?.id) return false;
   if (!observerHasUsableSight(observer)) return false;
@@ -893,7 +912,7 @@ function rememberCurrentSightLineGraceContext(observer, target) {
   pendingMovementCurrentSightLineGraceContexts.get(targetId).set(observerId, {
     observerId,
     targetId,
-    expiresAt: Date.now() + PENDING_MOVEMENT_RENDER_LOCK_GRACE_MS,
+    expiresAt: Date.now() + PENDING_MOVEMENT_CURRENT_SIGHT_LINE_GRACE_MS,
   });
   return true;
 }
@@ -943,7 +962,10 @@ function getCurrentSightLineGraceContextForTarget(target) {
       contextsByObserver.delete(observerId);
       continue;
     }
-    if (!currentPendingMovementSightLineSeesTarget(observer, target)) {
+    if (
+      !currentPendingMovementSightLineSeesTarget(observer, target) &&
+      recentCompletedMovementFinalSightLineSeesTarget(observer, target) !== true
+    ) {
       contextsByObserver.delete(observerId);
       continue;
     }
@@ -967,7 +989,10 @@ function currentSightLineGraceCanYieldToCore(observer, target, visibilityState) 
   const contextsByObserver = pendingMovementCurrentSightLineGraceContexts.get(targetId);
   const context = contextsByObserver?.get(observerId);
   if (!context) return false;
-  if (!currentPendingMovementSightLineSeesTarget(observer, target)) {
+  if (
+    !currentPendingMovementSightLineSeesTarget(observer, target) &&
+    recentCompletedMovementFinalSightLineSeesTarget(observer, target) !== true
+  ) {
     contextsByObserver.delete(observerId);
     if (!contextsByObserver.size) pendingMovementCurrentSightLineGraceContexts.delete(targetId);
     return false;
@@ -1053,7 +1078,11 @@ function currentSightLineSeesHiddenTargetDuringPendingMovement(
       observer;
     if (getStoredVisibilityState(stateObserver, target) !== 'hidden') continue;
     if (hasActiveAvsOverride(stateObserver, target)) continue;
-    if (getPredictedFinalVisibilityState(stateObserver, target) === 'hidden') continue;
+    const predictedFinalState = getPredictedFinalVisibilityState(stateObserver, target);
+    if (predictedFinalState === 'hidden') continue;
+    if (!predictedFinalState && !observerHasPendingRevealMovement(stateObserver, target)) {
+      continue;
+    }
     if (sourceVisuallyContainsAnyTargetPoint(stateObserver, source, target, targetPoints)) {
       if (hiddenSoundwaveShouldSurviveLimitedWall(stateObserver, target, targetPoints)) {
         continue;
@@ -1072,7 +1101,11 @@ function currentSightLineSeesHiddenTargetDuringPendingMovement(
       observer;
     if (getStoredVisibilityState(stateObserver, target) !== 'hidden') continue;
     if (hasActiveAvsOverride(stateObserver, target)) continue;
-    if (getPredictedFinalVisibilityState(stateObserver, target) === 'hidden') continue;
+    const predictedFinalState = getPredictedFinalVisibilityState(stateObserver, target);
+    if (predictedFinalState === 'hidden') continue;
+    if (!predictedFinalState && !observerHasPendingRevealMovement(stateObserver, target)) {
+      continue;
+    }
     if (currentPendingMovementSightLineSeesTarget(observer, target)) {
       if (hiddenSoundwaveShouldSurviveLimitedWall(stateObserver, target, targetPoints)) {
         continue;
@@ -1554,7 +1587,17 @@ export function recentCompletedMovementFinalSightLineSeesTarget(observer, target
 
   const context = recentCompletedMovementRefreshTargetIds.get(targetId);
   if (!context || context.observerId !== observerId) return null;
+  if (!pendingLightingAllowsVisualDetection(observer, target)) return false;
   return sightLineFromObserverPositionSeesTarget(observer, target, context.position);
+}
+
+function rememberCurrentSightLineGraceForCompletedMovement(observer, target, finalVisibilityState) {
+  if (!observer || !target?.document?.id) return false;
+  if (getStoredVisibilityState(observer, target) !== 'hidden') return false;
+  if (hasActiveAvsOverride(observer, target)) return false;
+  if (DETECTION_BLOCKING_VISIBILITY_STATES.has(finalVisibilityState)) return false;
+  if (recentCompletedMovementFinalSightLineSeesTarget(observer, target) !== true) return false;
+  return rememberCurrentSightLineGraceContext(observer, target);
 }
 
 function pendingMovementTargetSetSignature() {
@@ -3072,16 +3115,20 @@ export function completePendingTokenMovement(tokenOrId, expectedSerial = null) {
 
   clearPredictedObservedTransitionVisualsForCompletingMovement(tokenId, entry);
   rememberObservedHiddenSoundwaveGraceForCompletingMovement(tokenId, entry);
+  const observer = tokenObjectForId(tokenId) || entry?.tokenDoc || null;
   const refreshTargetIds = getAnimationRefreshTargetIdsForMovement(tokenId);
   recentCompletedMovementRefreshTargetIds.clear();
   const recentMovementExpiresAt = Date.now() + PENDING_MOVEMENT_RENDER_LOCK_GRACE_MS;
   for (const targetId of refreshTargetIds) {
+    const target = tokenObjectForId(targetId);
+    const finalVisibilityState = entry.finalVisibilityStatesByTargetId?.get(targetId) ?? null;
     recentCompletedMovementRefreshTargetIds.set(targetId, {
       observerId: tokenId,
       expiresAt: recentMovementExpiresAt,
-      finalVisibilityState: entry.finalVisibilityStatesByTargetId?.get(targetId) ?? null,
+      finalVisibilityState,
       position: entry.position,
     });
+    rememberCurrentSightLineGraceForCompletedMovement(observer, target, finalVisibilityState);
   }
   clearPendingTokenMovementPosition(tokenId, { preserveCurrentSightLineGrace: true });
   refreshPendingMovementTokenVisibility([], {

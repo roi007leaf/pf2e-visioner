@@ -58,6 +58,12 @@ export function createPendingMovementCurrentViewSoundwaveController({
     );
   }
 
+  function currentViewObserverHasPendingRevealMovement(observer) {
+    const observerId = tokenIdOf(observer);
+    if (!observerId) return false;
+    return !!getPendingTokenMovementPosition(observerId);
+  }
+
   function hasPendingControlledTokenDragIntentForCurrentView() {
     return getCurrentViewObservers().some((observer) => hasPendingControlledTokenDragIntent(observer));
   }
@@ -149,10 +155,25 @@ export function createPendingMovementCurrentViewSoundwaveController({
       }
 
       if (storedVisibilityState === 'hidden') {
+        const currentSightLineSeesTarget = currentPendingMovementSightLineSeesTarget(observer, target);
+        const hiddenSoundwaveSurvivesLimitedWall = hiddenSoundwaveShouldSurviveLimitedWall(
+          observer,
+          target,
+        );
+        if (!predictedFinalState) {
+          if (
+            currentViewObserverHasPendingRevealMovement(observer) &&
+            currentSightLineSeesTarget &&
+            !hiddenSoundwaveSurvivesLimitedWall
+          ) {
+            continue;
+          }
+          return true;
+        }
         if (predictedFinalState === 'hidden') return true;
         if (
-          !currentPendingMovementSightLineSeesTarget(observer, target) ||
-          hiddenSoundwaveShouldSurviveLimitedWall(observer, target)
+          !currentSightLineSeesTarget ||
+          hiddenSoundwaveSurvivesLimitedWall
         ) {
           return true;
         }

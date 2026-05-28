@@ -2,6 +2,7 @@ import {
   actorHasConditionSlug,
   observerCanHearTarget,
 } from '../sense-distance.js';
+import { VisionAnalyzer } from '../../visibility/auto-visibility/VisionAnalyzer.js';
 
 export {
   actorHasConditionSlug,
@@ -14,6 +15,89 @@ function tokenDocOf(tokenOrDoc) {
 
 function actorOf(tokenOrDoc) {
   return tokenOrDoc?.actor || tokenDocOf(tokenOrDoc)?.actor || null;
+}
+
+function normalizeSenseCollection(senses) {
+  if (!senses) return [];
+  if (Array.isArray(senses)) return senses;
+  if (Array.isArray(senses.contents)) return senses.contents;
+  if (typeof senses.values === 'function') {
+    try {
+      return Array.from(senses.values());
+    } catch {
+      return [];
+    }
+  }
+  if (typeof senses[Symbol.iterator] === 'function') {
+    try {
+      return Array.from(senses);
+    } catch {
+      return [];
+    }
+  }
+  if (typeof senses === 'object') {
+    return Object.entries(senses).map(([type, sense]) => ({
+      ...(sense && typeof sense === 'object' ? sense : {}),
+      type: sense?.type ?? sense?.slug ?? sense?.id ?? type,
+    }));
+  }
+  return [];
+}
+
+function hasExplicitVisualSense(senses) {
+  return normalizeSenseCollection(senses).some((sense) => {
+    const type = String(sense?.type ?? sense?.slug ?? sense?.id ?? sense ?? '').toLowerCase();
+    return (
+      type === 'vision' ||
+      type === 'sight' ||
+      type === 'basic-sight' ||
+      type === 'basicsight' ||
+      type === 'darkvision' ||
+      type === 'greater-darkvision' ||
+      type === 'greaterdarkvision' ||
+      type === 'low-light-vision' ||
+      type === 'lowlightvision'
+    );
+  });
+}
+
+function actorExplicitlyProvidesSight(observer) {
+  const actor = actorOf(observer);
+  const perception = actor?.system?.perception;
+  if (perception?.vision === false) return false;
+  if (perception?.vision === true) return true;
+  return hasExplicitVisualSense(perception?.senses) || hasExplicitVisualSense(actor?.perception?.senses);
+}
+
+function observerHasActorVisionCapability(observer) {
+  if (!actorExplicitlyProvidesSight(observer)) return false;
+
+  try {
+    const capabilities = VisionAnalyzer.getInstance()?.getVisionCapabilities?.(observer);
+    if (!capabilities) return false;
+    if (capabilities.hasVision === true) return true;
+    if (capabilities.hasDarkvision === true) return true;
+    if (capabilities.hasLowLightVision === true) return true;
+    if (capabilities.hasGreaterDarkvision === true) return true;
+
+    const preciseSenses = capabilities.sensingSummary?.precise || [];
+    return preciseSenses.some((sense) => {
+      const type = String(sense?.type ?? sense ?? '').toLowerCase();
+      return (
+        type === 'vision' ||
+        type === 'sight' ||
+        type === 'basic-sight' ||
+        type === 'basicsight' ||
+        type === 'darkvision' ||
+        type === 'greater-darkvision' ||
+        type === 'greaterdarkvision' ||
+        type === 'low-light-vision' ||
+        type === 'lowlightvision'
+      );
+    });
+  } catch {
+    return false;
+  }
 }
 
 function getTokenDimensions(tokenOrDoc) {
@@ -79,6 +163,7 @@ export function observerHasUsableSight(observer) {
 
   const sightRange = Number(doc?.sight?.range ?? doc?.vision?.range ?? Infinity);
   if (sightRange !== 0) return true;
+  if (observerHasActorVisionCapability(observer)) return true;
 
   const token = observer?.object || (observer?.document ? observer : null);
   if (!token) return false;

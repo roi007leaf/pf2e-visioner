@@ -30,7 +30,10 @@ import {
 } from '../services/PendingMovement/pending-token-movement.js';
 import { clearDetectionFilterVisuals } from '../services/PendingMovement/pending-movement-detection-filter-visuals.js';
 import { getPendingRenderState } from '../services/PendingMovement/pending-movement-render-state.js';
-import { primeSelectAllTokenVisibilityBypassFromKeyboard } from '../services/Detection/select-all-token-visibility-bypass.js';
+import {
+  isSelectAllTokenVisibilityBypassActive,
+  primeSelectAllTokenVisibilityBypassFromKeyboard,
+} from '../services/Detection/select-all-token-visibility-bypass.js';
 import { getLogger } from '../utils/logger.js';
 import { logControlTokenVisibilitySnapshot } from '../helpers/visibility-debug.js';
 
@@ -186,6 +189,11 @@ function scheduleNoObserverVisibilityRefresh() {
 
 function refreshPendingVisibilityAfterControlToken(token = canvas?.tokens?.controlled?.[0]) {
   try {
+    if (isSelectAllTokenVisibilityBypassActive()) {
+      restoreVisionerHiddenTokensForSelectAll();
+      return;
+    }
+
     const hasRenderWork = hasPendingMovementRenderWork();
     const targetTokenIds = [
       ...new Set([
@@ -1044,6 +1052,7 @@ export async function onCanvasReady() {
   bindHookOnce('avsRecalculateOnControlToken', 'controlToken', (token, controlled) => {
     try {
       if (!controlled || !game.user?.isGM || !token?.document?.id) return;
+      if (isSelectAllTokenVisibilityBypassActive()) return;
       const session = getControlTokenSession(token);
       if (!session) return;
 

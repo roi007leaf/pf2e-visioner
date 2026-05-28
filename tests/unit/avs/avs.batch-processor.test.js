@@ -429,6 +429,142 @@ describe('BatchProcessor', () => {
     );
   });
 
+  test('controlled source-polygon LOS reveals target when analyzer LOS is conservative', async () => {
+    const previousControlled = global.canvas.tokens.controlled;
+    const previousEffects = global.canvas.effects;
+    const observer = makeToken('A', 0, 0);
+    const target = makeToken('B', 5000, 0);
+    observer.center = { x: 50, y: 50 };
+    target.center = { x: 5050, y: 50 };
+    target.document.getVisibilityTestPoints = jest.fn(() => [target.center]);
+    global.canvas.tokens.placeables = [observer, target];
+    global.canvas.tokens.controlled = [observer];
+    global.canvas.effects = {
+      ...(global.canvas.effects || {}),
+      visionSources: new Map([
+        [
+          'A',
+          {
+            active: true,
+            object: observer,
+            los: { contains: jest.fn((x, y) => x === target.center.x && y === target.center.y) },
+          },
+        ],
+      ]),
+      lightSources: new Map(),
+    };
+    processor.maxVisibilityDistance = 1;
+    processor.visionAnalyzer = {
+      hasLineOfSight: jest.fn(() => false),
+      getVisionCapabilities: jest.fn(() => ({
+        sensingSummary: { precise: [], imprecise: [], hearing: null },
+        isDeafened: false,
+      })),
+    };
+    optimizedVisibilityCalculator.calculateVisibilityBetweenTokens.mockResolvedValue('observed');
+    processor.visibilityMapService = {
+      getVisibilityMap: jest.fn((token) =>
+        token.document.id === 'A' ? { B: 'hidden' } : {},
+      ),
+      getDocumentVisibilityMap: jest.fn((token) =>
+        token.document.id === 'A' ? { B: 'hidden' } : {},
+      ),
+    };
+
+    let res;
+    try {
+      res = await processor.process(global.canvas.tokens.placeables, new Set(['A']), {});
+    } finally {
+      global.canvas.tokens.controlled = previousControlled;
+      global.canvas.effects = previousEffects;
+    }
+
+    expect(processor.visionAnalyzer.hasLineOfSight).toHaveBeenCalledWith(
+      expect.objectContaining({ document: expect.objectContaining({ id: 'A' }) }),
+      expect.objectContaining({ document: expect.objectContaining({ id: 'B' }) }),
+      'sight',
+    );
+    expect(optimizedVisibilityCalculator.calculateVisibilityBetweenTokens).toHaveBeenCalled();
+    expect(res.updates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          observer: expect.objectContaining({ document: expect.objectContaining({ id: 'A' }) }),
+          target: expect.objectContaining({ document: expect.objectContaining({ id: 'B' }) }),
+          visibility: 'observed',
+          explicitVisiblePair: true,
+        }),
+      ]),
+    );
+  });
+
+  test('controlled token recalculation uses current sight-line LOS for reverse observers', async () => {
+    const previousControlled = global.canvas.tokens.controlled;
+    const controlledTarget = makeToken('A', 0, 0);
+    const reverseObserver = makeToken('B', 100, 0);
+    global.canvas.tokens.placeables = [controlledTarget, reverseObserver];
+    global.canvas.tokens.controlled = [controlledTarget];
+    processor.visionAnalyzer = {
+      hasLineOfSight: jest.fn(() => false),
+      getVisionCapabilities: jest.fn(() => ({
+        sensingSummary: { precise: [], imprecise: [], hearing: null },
+        isDeafened: false,
+      })),
+    };
+    const movementSightLineResolver = jest.fn(
+      (observer, target) =>
+        observer?.document?.id === 'B' && target?.document?.id === 'A',
+    );
+    optimizedVisibilityCalculator.calculateVisibilityBetweenTokens.mockImplementation(
+      async (observer, target, _observerPosition, _targetPosition, options) => {
+        const key = `${observer.document.id}-${target.document.id}`;
+        return options?.precomputedLOS?.get(key) === true ? 'observed' : 'hidden';
+      },
+    );
+    processor = new BatchProcessor({
+      spatialAnalyzer,
+      viewportFilterService,
+      optimizedVisibilityCalculator,
+      globalLosCache,
+      globalVisibilityCache,
+      positionManager,
+      overrideService: { getActiveOverrideForTokens: getActiveOverride },
+      visibilityMapService: {
+        getVisibilityMap: jest.fn((token) =>
+          token.document.id === 'B' ? { A: 'hidden' } : {},
+        ),
+        getDocumentVisibilityMap: jest.fn((token) =>
+          token.document.id === 'B' ? { A: 'hidden' } : {},
+        ),
+      },
+      visionAnalyzer: processor.visionAnalyzer,
+      movementSightLineResolver,
+      maxVisibilityDistance: 20,
+      nowProvider,
+    });
+
+    let res;
+    try {
+      res = await processor.process(global.canvas.tokens.placeables, new Set(['A']), {});
+    } finally {
+      global.canvas.tokens.controlled = previousControlled;
+    }
+
+    expect(movementSightLineResolver).toHaveBeenCalledWith(
+      expect.objectContaining({ document: expect.objectContaining({ id: 'B' }) }),
+      expect.objectContaining({ document: expect.objectContaining({ id: 'A' }) }),
+    );
+    expect(res.updates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          observer: expect.objectContaining({ document: expect.objectContaining({ id: 'B' }) }),
+          target: expect.objectContaining({ document: expect.objectContaining({ id: 'A' }) }),
+          visibility: 'observed',
+          explicitVisiblePair: true,
+        }),
+      ]),
+    );
+  });
+
   test('rebuilds spatial index inside TTL when token positions change', async () => {
     const tA = makeToken('A', 0, 0);
     const tB = makeToken('B', 1000, 0);

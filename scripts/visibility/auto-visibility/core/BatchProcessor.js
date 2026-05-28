@@ -292,6 +292,10 @@ export class BatchProcessor {
     this.overrideService = dependencies.overrideService;
     this.visibilityMapService = dependencies.visibilityMapService;
     this.visionAnalyzer = dependencies.visionAnalyzer || VisionAnalyzer.getInstance();
+    this.movementSightLineResolver =
+      typeof dependencies.movementSightLineResolver === 'function'
+        ? dependencies.movementSightLineResolver
+        : null;
     this.maxVisibilityDistance = dependencies.maxVisibilityDistance;
     this.nowProvider =
       dependencies.nowProvider ||
@@ -590,6 +594,9 @@ export class BatchProcessor {
       precomputedLOS,
       breakdown,
       skipLosCache,
+      sourcePolygonLosResolver: hasCoreLosFromControlledObserver,
+      movementSightLineResolver:
+        isMovementBatch || hasControlledChangedToken ? this.movementSightLineResolver : null,
     });
     const directionalVisibilityResolver = new BatchDirectionalVisibilityResolver({
       optimizedVisibilityCalculator: this.optimizedVisibilityCalculator,

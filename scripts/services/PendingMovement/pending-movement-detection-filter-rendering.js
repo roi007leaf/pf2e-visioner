@@ -185,12 +185,12 @@ export function createPendingMovementDetectionFilterRenderingController({
     { hasDetectionWork = null } = {},
   ) {
     if (!token?.document?.id) return false;
+    if (getCurrentSightLineGraceContextForTarget?.(token)) return true;
     if (shouldPreserveHiddenSoundwaveForCurrentView?.(token)) return false;
     if (shouldAllowCoreHiddenSoundwaveForCurrentView?.(token)) return false;
     if (observedSoundwaveShouldWaitForCore?.(token)) return false;
     if (hasObservedTransitionDetectionFilterSuppression?.(token)) return true;
     if (getVisibleCoreGraceContextForTarget?.(token)) return true;
-    if (getCurrentSightLineGraceContextForTarget?.(token)) return true;
     if (currentSightLineSeesHiddenTargetDuringPendingMovement?.(token, { hasDetectionWork })) {
       return true;
     }

@@ -4763,7 +4763,7 @@ describe('pending token movement hidden detection guard', () => {
     expect(target.detectionFilter).toBe(soundwaveFilter);
   });
 
-  test('suppresses hidden soundwave while controlled pending observer has current sight line', () => {
+  test('suppresses hidden soundwave while controlled pending observer has current sight line without final prediction', () => {
     global.canvas.walls.placeables = [];
     const observer = createMockToken({
       id: 'observer',
@@ -4771,7 +4771,8 @@ describe('pending token movement hidden detection guard', () => {
       flags: visibilityV2Flags({ target: 'hidden' }),
     });
     const target = createMockToken({ id: 'target', x: 3, y: 0, visible: true });
-    target.detectionFilter = { id: 'stale-soundwave-filter' };
+    const soundwaveFilter = { id: 'stale-soundwave-filter' };
+    target.detectionFilter = soundwaveFilter;
     target.detectionFilterMesh = { visible: true, renderable: true, alpha: 1 };
     global.canvas = {
       ...global.canvas,
@@ -4785,8 +4786,54 @@ describe('pending token movement hidden detection guard', () => {
 
     setPendingTokenMovementPosition(observer.document, { x: 100, y: 0 }, [observer]);
 
+    expect(currentPendingMovementSightLineSeesTarget(observer, target)).toBe(true);
     expect(shouldSuppressPendingMovementDetectionFilterVisuals(target)).toBe(true);
     expect(capturePendingMovementDetectionFilterState(target, { hasDetectionWork: true })).toBeNull();
+
+    refreshPendingMovementTokenVisibility(['observer'], {
+      skipPerceptionRefresh: true,
+      targetTokenIds: ['target'],
+    });
+
+    expect(target.detectionFilter).toBe(soundwaveFilter);
+    expect(target.detectionFilterMesh).toMatchObject({
+      visible: true,
+      renderable: true,
+      alpha: 1,
+    });
+  });
+
+  test('keeps completed movement sight-line grace until AVS reveal catches up', () => {
+    jest.useFakeTimers();
+    global.canvas.walls.placeables = [];
+    const observer = createMockToken({
+      id: 'observer',
+      controlled: true,
+      flags: visibilityV2Flags({ target: 'hidden' }),
+    });
+    const target = createMockToken({ id: 'target', x: 3, y: 0, visible: true });
+    target.detectionFilter = { id: 'stale-soundwave-filter' };
+    target.detectionFilterMesh = { visible: true, renderable: true, alpha: 1 };
+    global.canvas = {
+      ...global.canvas,
+      tokens: {
+        get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+        controlled: [observer],
+        placeables: [observer, target],
+      },
+      perception: {
+        update: jest.fn(),
+      },
+    };
+
+    setPendingTokenMovementPosition(observer.document, { x: 100, y: 0 }, [observer], {
+      finalVisibilityStatesByTargetId: { target: 'concealed' },
+    });
+
+    jest.advanceTimersByTime(1100);
+    expect(completePendingTokenMovement('observer')).toBe(true);
+
+    expect(shouldSuppressPendingMovementDetectionFilterVisuals(target)).toBe(true);
   });
 
   test('does not scan wall geometry for current sight-line soundwave suppression without limited walls', () => {
@@ -4832,13 +4879,15 @@ describe('pending token movement hidden detection guard', () => {
       },
     };
 
-    setPendingTokenMovementPosition(observer.document, { x: 100, y: 0 }, [observer]);
+    setPendingTokenMovementPosition(observer.document, { x: 100, y: 0 }, [observer], {
+      finalVisibilityStatesByTargetId: { target: 'undetected' },
+    });
 
     expect(shouldSuppressPendingMovementDetectionFilterVisuals(target)).toBe(true);
     expect(geometryReads).toBe(0);
   });
 
-  test('suppresses hidden soundwave during drag before pending movement entry exists', () => {
+  test('keeps hidden soundwave during drag before pending movement entry exists', () => {
     global.canvas.walls.placeables = [];
     const observer = createMockToken({
       id: 'observer',
@@ -4858,8 +4907,8 @@ describe('pending token movement hidden detection guard', () => {
       },
     };
 
-    expect(shouldSuppressPendingMovementDetectionFilterVisuals(target)).toBe(true);
-    expect(capturePendingMovementDetectionFilterState(target, { hasDetectionWork: true })).toBeNull();
+    expect(shouldSuppressPendingMovementDetectionFilterVisuals(target)).toBe(false);
+    expect(capturePendingMovementDetectionFilterState(target, { hasDetectionWork: true })).not.toBeNull();
   });
 
   test('prefers live dragged observer position over stale canvas token position', () => {
@@ -4956,7 +5005,9 @@ describe('pending token movement hidden detection guard', () => {
       },
     };
 
-    setPendingTokenMovementPosition(observer.document, { x: 100, y: 0 }, [observer]);
+    setPendingTokenMovementPosition(observer.document, { x: 100, y: 0 }, [observer], {
+      finalVisibilityStatesByTargetId: { target: 'undetected' },
+    });
 
     expect(shouldSuppressPendingMovementDetectionFilterVisuals(target)).toBe(true);
   });
@@ -4996,7 +5047,9 @@ describe('pending token movement hidden detection guard', () => {
       },
     };
 
-    setPendingTokenMovementPosition(observer.document, { x: 100, y: 0 }, [observer]);
+    setPendingTokenMovementPosition(observer.document, { x: 100, y: 0 }, [observer], {
+      finalVisibilityStatesByTargetId: { target: 'undetected' },
+    });
 
     expect(shouldSuppressPendingMovementDetectionFilterVisuals(target)).toBe(false);
   });
@@ -5254,7 +5307,9 @@ describe('pending token movement hidden detection guard', () => {
       },
     };
 
-    setPendingTokenMovementPosition(observer.document, { x: 100, y: 0 }, [observer]);
+    setPendingTokenMovementPosition(observer.document, { x: 100, y: 0 }, [observer], {
+      finalVisibilityStatesByTargetId: { target: 'undetected' },
+    });
 
     expect(shouldSuppressPendingMovementDetectionFilterVisuals(target)).toBe(true);
   });
@@ -5294,7 +5349,9 @@ describe('pending token movement hidden detection guard', () => {
       },
     };
 
-    setPendingTokenMovementPosition(observer.document, { x: 100, y: 0 }, [observer]);
+    setPendingTokenMovementPosition(observer.document, { x: 100, y: 0 }, [observer], {
+      finalVisibilityStatesByTargetId: { target: 'undetected' },
+    });
 
     expect(currentPendingMovementSightLineSeesTarget(observer, target)).toBe(false);
     expect(shouldSuppressPendingMovementDetectionFilterVisuals(target)).toBe(false);
@@ -5377,7 +5434,9 @@ describe('pending token movement hidden detection guard', () => {
       },
     };
 
-    setPendingTokenMovementPosition(observer.document, { x: 100, y: 0 }, [observer]);
+    setPendingTokenMovementPosition(observer.document, { x: 100, y: 0 }, [observer], {
+      finalVisibilityStatesByTargetId: { target: 'undetected' },
+    });
     expect(shouldSuppressPendingMovementDetectionFilterVisuals(target)).toBe(true);
 
     expect(completePendingTokenMovement('observer')).toBe(true);
@@ -5385,7 +5444,7 @@ describe('pending token movement hidden detection guard', () => {
 
     expect(shouldSuppressPendingMovementDetectionFilterVisuals(target)).toBe(true);
 
-    jest.advanceTimersByTime(1001);
+    jest.advanceTimersByTime(2001);
 
     expect(shouldSuppressPendingMovementDetectionFilterVisuals(target)).toBe(false);
   });
@@ -5410,7 +5469,9 @@ describe('pending token movement hidden detection guard', () => {
       },
     };
 
-    setPendingTokenMovementPosition(observer.document, { x: 100, y: 0 }, [observer]);
+    setPendingTokenMovementPosition(observer.document, { x: 100, y: 0 }, [observer], {
+      finalVisibilityStatesByTargetId: { target: 'undetected' },
+    });
     expect(shouldSuppressPendingMovementDetectionFilterVisuals(target)).toBe(true);
 
     global.canvas.walls.placeables = [

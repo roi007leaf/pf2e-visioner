@@ -147,6 +147,47 @@ describe('Override indicator should not trigger on controlToken', () => {
         );
     });
 
+    test('Ctrl+A control-token refresh does not reapply selected observer vision', async () => {
+        const refreshPendingMovementTokenVisibility = jest.fn();
+        jest.doMock('../../../scripts/services/PendingMovement/pending-movement-render-lock.js', () => ({
+            clearNoObserverDetectionFilterVisuals: jest.fn(),
+            getControlledObserverDetectionVisualTargetIds: jest.fn(() => ['target']),
+            getPendingMovementRefreshTargetIds: jest.fn(() => []),
+            hasPendingMovementRenderWork: jest.fn(() => false),
+            primePendingControlledTokenDragIntent: jest.fn(),
+            refreshPendingMovementTokenVisibility,
+            releasePendingControlledTokenDragIntent: jest.fn(),
+            restorePendingMovementTokenRendering: jest.fn(),
+        }));
+
+        const observer = { document: { id: 'observer', getFlag: jest.fn(() => ({})) } };
+        const target = { document: { id: 'target', hidden: false } };
+        global.canvas.tokens.placeables = [observer, target];
+        global.canvas.activeLayer = global.canvas.tokens;
+        const addEventListenerSpy = jest.spyOn(global.window, 'addEventListener');
+
+        const { onCanvasReady } = await import('../../../scripts/hooks/lifecycle.js');
+        await onCanvasReady();
+
+        const keydown = addEventListenerSpy.mock.calls.find(
+            ([eventName]) => eventName === 'keydown',
+        )?.[1];
+        expect(keydown).toBeTruthy();
+        keydown({ ctrlKey: true, key: 'a', target: document.body });
+        global.canvas.tokens.controlled = [observer, target];
+        jest.advanceTimersByTime(100);
+
+        const restoreIndicatorsCb = global.Hooks.on.mock.calls
+            .filter((c) => c?.[0] === 'controlToken')
+            .map((c) => c?.[1])
+            .find((cb) => String(cb).includes('allowControlledFallback'));
+
+        expect(restoreIndicatorsCb).toBeTruthy();
+        await restoreIndicatorsCb(observer, true);
+
+        expect(refreshPendingMovementTokenVisibility).not.toHaveBeenCalled();
+    });
+
     test('onCanvasReady does not refresh perception when vision sharing ids are unchanged', async () => {
         const perceptionUpdate = jest.fn();
         global.canvas.perception = { update: perceptionUpdate };

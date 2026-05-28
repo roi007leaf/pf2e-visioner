@@ -37,6 +37,16 @@ export class DependencyInjectionContainer {
       return optimizedVisibilityCalculator;
     });
 
+    this.#factories.set('movementSightLineResolver', async () => {
+      const {
+        currentPendingMovementSightLineSeesTarget,
+        recentCompletedMovementFinalSightLineSeesTarget,
+      } = await import('../../../services/PendingMovement/pending-movement-sight-line.js');
+      return (observer, target) =>
+        currentPendingMovementSightLineSeesTarget(observer, target) === true ||
+        recentCompletedMovementFinalSightLineSeesTarget(observer, target) === true;
+    });
+
     // Lighting raster service (fast-path darkness sampling)
     this.#factories.set('lightingRasterService', async () => {
       const { LightingRasterService } = await import('./LightingRasterService.js');
@@ -125,6 +135,8 @@ export class DependencyInjectionContainer {
         overrideService: dependencies.overrideService,
         visibilityMapService: dependencies.visibilityMapService,
         visionAnalyzer: dependencies.visionAnalyzer,
+        movementSightLineResolver:
+          dependencies.movementSightLineResolver ?? (await this.get('movementSightLineResolver')),
         debug: dependencies.debug,
         maxVisibilityDistance: dependencies.maxVisibilityDistance,
       });

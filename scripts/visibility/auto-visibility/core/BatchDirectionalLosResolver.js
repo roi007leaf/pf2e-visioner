@@ -15,6 +15,8 @@ export class BatchDirectionalLosResolver {
   #precomputedLOS;
   #breakdown;
   #skipLosCache;
+  #sourcePolygonLosResolver;
+  #movementSightLineResolver;
 
   constructor({
     visionAnalyzer,
@@ -24,6 +26,8 @@ export class BatchDirectionalLosResolver {
     precomputedLOS = new Map(),
     breakdown = null,
     skipLosCache = false,
+    sourcePolygonLosResolver = null,
+    movementSightLineResolver = null,
   } = {}) {
     this.#visionAnalyzer = visionAnalyzer;
     this.#globalLosCache = globalLosCache;
@@ -32,12 +36,32 @@ export class BatchDirectionalLosResolver {
     this.#precomputedLOS = precomputedLOS;
     this.#breakdown = breakdown;
     this.#skipLosCache = !!skipLosCache;
+    this.#sourcePolygonLosResolver =
+      typeof sourcePolygonLosResolver === 'function' ? sourcePolygonLosResolver : null;
+    this.#movementSightLineResolver =
+      typeof movementSightLineResolver === 'function' ? movementSightLineResolver : null;
+  }
+
+  #applyLosOverrides(directionalLos, observerToken, targetToken) {
+    if (directionalLos === true) return true;
+    if (this.#sourcePolygonLosResolver?.(observerToken, targetToken)) return true;
+    if (this.#movementSightLineResolver?.(observerToken, targetToken)) return true;
+    return directionalLos;
   }
 
   get(observerToken, targetToken, cacheKey) {
     let directionalLos = this.#batchLosCache.get(cacheKey);
     if (directionalLos !== undefined) {
       increment(this.#breakdown, 'losCacheHits');
+      const overriddenLos = this.#applyLosOverrides(directionalLos, observerToken, targetToken);
+      if (overriddenLos !== directionalLos) {
+        directionalLos = overriddenLos;
+        this.#batchLosCache.set(cacheKey, directionalLos);
+        this.#precomputedLOS.set(
+          `${observerToken.document.id}-${targetToken.document.id}`,
+          directionalLos,
+        );
+      }
       return directionalLos;
     }
 
@@ -48,6 +72,7 @@ export class BatchDirectionalLosResolver {
       directionalLos = burstLos.get(cacheKey);
       increment(this.#breakdown, 'losCacheHits');
       increment(this.#breakdown, 'burstMemoHits');
+      directionalLos = this.#applyLosOverrides(directionalLos, observerToken, targetToken);
     }
 
     if (directionalLos === undefined && this.#globalLosCache && !this.#skipLosCache) {
@@ -55,6 +80,7 @@ export class BatchDirectionalLosResolver {
       if (globalResult.state === 'hit') {
         directionalLos = globalResult.value;
         increment(this.#breakdown, 'losGlobalHits');
+        directionalLos = this.#applyLosOverrides(directionalLos, observerToken, targetToken);
       } else if (globalResult.state === 'expired') {
         increment(this.#breakdown, 'losGlobalExpired');
         increment(this.#breakdown, 'losGlobalMisses');
@@ -67,6 +93,7 @@ export class BatchDirectionalLosResolver {
 
     if (directionalLos === undefined) {
       directionalLos = this.#visionAnalyzer.hasLineOfSight(observerToken, targetToken, 'sight');
+      directionalLos = this.#applyLosOverrides(directionalLos, observerToken, targetToken);
 
       if (this.#globalLosCache && !this.#skipLosCache) {
         this.#globalLosCache.set(cacheKey, directionalLos);
