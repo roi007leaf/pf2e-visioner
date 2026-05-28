@@ -1,3 +1,5 @@
+import { canRenderTooltipToken } from './hover-tooltip-visibility-requests.js';
+
 export const DETECTION_FACTOR_KEYWORDS = [
   'Detected by',
   'detected by',
@@ -143,7 +145,9 @@ export function formatVisibilityFactors(
 }
 
 export function getVisibilityFactorTargets(allTokens = [], observerToken = null) {
-  return allTokens.filter((token) => token && token !== observerToken && token.isVisible);
+  return allTokens.filter(
+    (token) => token && token !== observerToken && canRenderTooltipToken(token),
+  );
 }
 
 export async function buildVisibilityFactorIndicatorRequests({

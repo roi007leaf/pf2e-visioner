@@ -67,6 +67,7 @@ import {
   SENSE_BADGE_BLOCKED_VISIBILITY_STATES,
   buildHoverTooltipVisibilityRequests,
   buildTooltipVisibilityRequests,
+  canRenderTooltipToken,
 } from './HoverTooltip/hover-tooltip-visibility-requests.js';
 
 function getExplicitVisibilityStateLabel(state) {
@@ -887,7 +888,7 @@ export function showAutoCoverComputedOverlay(sourceToken) {
     hideAllCoverIndicators();
 
     const others = (canvas.tokens?.placeables || []).filter(
-      (t) => t && t !== sourceToken && t.isVisible,
+      (t) => t && t !== sourceToken && canRenderTooltipToken(t),
     );
 
     for (const target of others) {

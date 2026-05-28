@@ -6,8 +6,26 @@ export function normalizeTooltipVisibilityState(visibilityState) {
   return visibilityState === 'avs' ? 'observed' : visibilityState || 'observed';
 }
 
-function canRenderTooltipToken(token) {
-  return shouldSkipPendingMovementTokenVisibilityRefresh(token) || token.isVisible;
+export function canRenderTooltipToken(token) {
+  if (!token) return false;
+  if (shouldSkipPendingMovementTokenVisibilityRefresh(token)) return true;
+
+  const detectionFilterMesh = token.detectionFilterMesh;
+  if (
+    detectionFilterMesh &&
+    detectionFilterMesh.visible !== false &&
+    detectionFilterMesh.renderable !== false &&
+    detectionFilterMesh.alpha !== 0
+  ) {
+    return true;
+  }
+
+  if (token.visible === false || token.renderable === false) return false;
+  const mesh = token.mesh;
+  if (mesh && (mesh.visible === false || mesh.renderable === false || mesh.alpha === 0)) {
+    return false;
+  }
+  return true;
 }
 
 export function getVisibleOtherTokens(allTokens = [], subjectToken = null) {

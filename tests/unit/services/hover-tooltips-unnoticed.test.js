@@ -88,10 +88,12 @@ describe('HoverTooltips unnoticed badges', () => {
       x,
       y: 0,
       isVisible: true,
+      visible: true,
+      renderable: true,
       isOwner: true,
       document: { id, width: 1, height: 1 },
       center: { x: x + 25, y: 25 },
-      mesh: {},
+      mesh: { visible: true, renderable: true, alpha: 1 },
     };
   }
 

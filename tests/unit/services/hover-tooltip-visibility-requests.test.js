@@ -14,6 +14,9 @@ function makeToken(id, { isOwner = true, isVisible = true } = {}) {
     id,
     isOwner,
     isVisible,
+    visible: isVisible,
+    renderable: isVisible,
+    mesh: { visible: isVisible, renderable: isVisible, alpha: isVisible ? 1 : 0 },
     document: { id },
   };
 }
@@ -219,7 +222,7 @@ describe('hover tooltip visibility request planning', () => {
     ).toEqual([]);
   });
 
-  test('queries isVisible for hidden soundwave tokens during pending movement', () => {
+  test('uses render state without querying isVisible for hidden soundwave tokens during pending movement', () => {
     const originalCanvas = global.canvas;
     const observer = createMockToken({
       id: 'observer',
@@ -267,13 +270,13 @@ describe('hover tooltip visibility request planning', () => {
         observerToken: observer,
         visibilityState: 'hidden',
       });
-      expect(isVisibleGetter).toHaveBeenCalledTimes(1);
+      expect(isVisibleGetter).not.toHaveBeenCalled();
     } finally {
       global.canvas = originalCanvas;
     }
   });
 
-  test('queries isVisible for hidden soundwave tokens during controlled drag preview', () => {
+  test('uses render state without querying isVisible for hidden soundwave tokens during controlled drag preview', () => {
     const originalCanvas = global.canvas;
     const observer = createMockToken({
       id: 'observer',
@@ -322,7 +325,7 @@ describe('hover tooltip visibility request planning', () => {
         observerToken: observer,
         visibilityState: 'hidden',
       });
-      expect(isVisibleGetter).toHaveBeenCalledTimes(1);
+      expect(isVisibleGetter).not.toHaveBeenCalled();
     } finally {
       global.canvas = originalCanvas;
     }

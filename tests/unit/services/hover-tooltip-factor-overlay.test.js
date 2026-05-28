@@ -8,7 +8,13 @@ import {
 } from '../../../scripts/services/HoverTooltip/hover-tooltip-factor-overlay.js';
 
 function makeToken(id, isVisible = true) {
-  return { id, isVisible };
+  return {
+    id,
+    isVisible,
+    visible: isVisible,
+    renderable: isVisible,
+    mesh: { visible: isVisible, renderable: isVisible, alpha: isVisible ? 1 : 0 },
+  };
 }
 
 describe('hover tooltip factor overlay', () => {
