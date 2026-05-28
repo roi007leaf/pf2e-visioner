@@ -20,10 +20,12 @@ import {
   reachesVisibilityThreshold,
   VISIBILITY_DETECTION_THRESHOLDS,
 } from './detection-visibility-context.js';
+import { isSelectAllTokenVisibilityBypassActive } from './select-all-token-visibility-bypass.js';
 
 export function createCanDetectVisibilityWrapper(threshold) {
   return function wrapCanDetectVisibility(wrapped, visionSource, target, ...args) {
     const canDetect = wrapped(visionSource, target, ...args);
+    if (isSelectAllTokenVisibilityBypassActive()) return canDetect;
     if (targetMustStayHiddenDuringPendingMovement(target)) return false;
     const observerToken = visionSource?.object;
     const modeId = this?.id ?? args?.[0]?.id ?? null;

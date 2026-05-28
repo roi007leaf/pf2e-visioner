@@ -29,6 +29,8 @@ import {
   targetMustStayHiddenDuringPendingMovement,
 } from '../services/PendingMovement/pending-token-movement.js';
 import { clearDetectionFilterVisuals } from '../services/PendingMovement/pending-movement-detection-filter-visuals.js';
+import { getPendingRenderState } from '../services/PendingMovement/pending-movement-render-state.js';
+import { primeSelectAllTokenVisibilityBypassFromKeyboard } from '../services/Detection/select-all-token-visibility-bypass.js';
 import { getLogger } from '../utils/logger.js';
 import { logControlTokenVisibilitySnapshot } from '../helpers/visibility-debug.js';
 
@@ -309,6 +311,32 @@ function registerPendingMovementPointerIntentListeners() {
     releaseControlledTokenDragIntentFromCanvasPointer,
     { capture: true },
   );
+}
+
+function registerSelectAllTokenVisibilityBypassListener() {
+  bindWindowListenerOnce(
+    'selectAllTokenVisibilityBypass',
+    'keydown',
+    handleSelectAllTokenVisibilityBypassKeydown,
+    { capture: true },
+  );
+}
+
+function restoreVisionerHiddenTokensForSelectAll() {
+  for (const token of canvas?.tokens?.placeables || []) {
+    const hiddenContext = getPendingRenderState(token)?.lastHiddenContext;
+    if (!hiddenContext?.renderHiddenByVisioner || hiddenContext.foundryHidden) continue;
+
+    restorePendingMovementTokenRendering(token, {
+      ignoreObservedGrace: true,
+      ignoreObserverLocks: true,
+    });
+  }
+}
+
+function handleSelectAllTokenVisibilityBypassKeydown(event) {
+  if (!primeSelectAllTokenVisibilityBypassFromKeyboard(event)) return;
+  restoreVisionerHiddenTokensForSelectAll();
 }
 
 async function refreshVisionSharingTokenIds() {
@@ -710,6 +738,7 @@ function registerHiddenTokenTicker() {
 
 export async function onCanvasReady() {
   registerPendingMovementPointerIntentListeners();
+  registerSelectAllTokenVisibilityBypassListener();
   registerHiddenTokenTicker();
 
   try {

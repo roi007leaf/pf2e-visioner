@@ -7,6 +7,7 @@ import {
   isMovementPerformanceDiagnosticsEnabled,
   isPendingMovementVisualRefreshSuppressed,
 } from '../runtime-state.js';
+import { isSelectAllTokenVisibilityBypassActive } from '../Detection/select-all-token-visibility-bypass.js';
 import {
   createPendingMovementFinalVisibilityController,
   createPendingVisibilityStateMap,
@@ -1764,6 +1765,7 @@ function getPendingMovementHiddenStateContextUncached(target) {
 
 export function targetIsRenderHiddenForCurrentViewObserver(target) {
   if (!target?.document?.id) return false;
+  if (isSelectAllTokenVisibilityBypassActive()) return false;
   if (target.controlled) return false;
   if (tokenDocOf(target)?.hidden) return true;
 
@@ -2178,6 +2180,7 @@ function hasActiveUnblockedObserverDetectionSource(blockedSources = []) {
 function getControlledObserverHiddenStateContext(target) {
   const targetId = tokenIdOf(target);
   if (!targetId) return null;
+  if (isSelectAllTokenVisibilityBypassActive()) return null;
 
   const foundryHidden = !!tokenDocOf(target)?.hidden;
   for (const observer of canvas?.tokens?.controlled || []) {

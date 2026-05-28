@@ -98,6 +98,55 @@ describe('Override indicator should not trigger on controlToken', () => {
         expect(releasePendingControlledTokenDragIntent).toHaveBeenCalledWith();
     });
 
+    test('Ctrl+A restores Visioner-hidden token render locks before Foundry select-all runs', async () => {
+        const restorePendingMovementTokenRendering = jest.fn();
+        jest.doMock('../../../scripts/services/PendingMovement/pending-movement-render-lock.js', () => ({
+            clearNoObserverDetectionFilterVisuals: jest.fn(),
+            getControlledObserverDetectionVisualTargetIds: jest.fn(() => []),
+            getPendingMovementRefreshTargetIds: jest.fn(() => []),
+            hasPendingMovementRenderWork: jest.fn(() => false),
+            primePendingControlledTokenDragIntent: jest.fn(),
+            refreshPendingMovementTokenVisibility: jest.fn(),
+            releasePendingControlledTokenDragIntent: jest.fn(),
+            restorePendingMovementTokenRendering,
+        }));
+
+        const visionerHiddenToken = {
+            document: { id: 'visioner-hidden' },
+            _pf2eVisionerPendingRenderState: {
+                lastHiddenContext: { renderHiddenByVisioner: true, foundryHidden: false },
+            },
+        };
+        const foundryHiddenToken = {
+            document: { id: 'foundry-hidden' },
+            _pf2eVisionerPendingRenderState: {
+                lastHiddenContext: { renderHiddenByVisioner: true, foundryHidden: true },
+            },
+        };
+        global.canvas.tokens.placeables = [visionerHiddenToken, foundryHiddenToken];
+        global.canvas.activeLayer = global.canvas.tokens;
+        const addEventListenerSpy = jest.spyOn(global.window, 'addEventListener');
+
+        const { onCanvasReady } = await import('../../../scripts/hooks/lifecycle.js');
+        await onCanvasReady();
+
+        const keydown = addEventListenerSpy.mock.calls.find(
+            ([eventName]) => eventName === 'keydown',
+        )?.[1];
+        expect(keydown).toBeTruthy();
+
+        keydown({ ctrlKey: true, key: 'a', target: document.body });
+
+        expect(restorePendingMovementTokenRendering).toHaveBeenCalledWith(visionerHiddenToken, {
+            ignoreObservedGrace: true,
+            ignoreObserverLocks: true,
+        });
+        expect(restorePendingMovementTokenRendering).not.toHaveBeenCalledWith(
+            foundryHiddenToken,
+            expect.anything(),
+        );
+    });
+
     test('onCanvasReady does not refresh perception when vision sharing ids are unchanged', async () => {
         const perceptionUpdate = jest.fn();
         global.canvas.perception = { update: perceptionUpdate };

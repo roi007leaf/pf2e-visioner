@@ -15,6 +15,7 @@ import {
   withSuppressedPendingMovementDetectionFilterVisuals,
 } from '../PendingMovement/pending-movement-render-lock.js';
 import { tokenHasDetectionFilterVisual } from '../PendingMovement/pending-movement-detection-filter-visuals.js';
+import { isSelectAllTokenVisibilityBypassActive } from './select-all-token-visibility-bypass.js';
 
 function sourceFromCollectionEntry(entry) {
   return Array.isArray(entry) && entry.length === 2 ? entry[1] : entry;
@@ -37,6 +38,9 @@ function hasActiveUnblockedDetectionSource(blockedSources = []) {
 }
 
 export function wrapCanvasVisibilityTest(wrapped, points, options = {}) {
+  if (isSelectAllTokenVisibilityBypassActive()) {
+    return wrapped(points, options);
+  }
   if (isPendingMovementHiddenStateVisibilityProbe()) {
     return wrapped(points, options);
   }

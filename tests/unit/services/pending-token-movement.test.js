@@ -50,6 +50,7 @@ import {
   shouldTemporarilyForceTokenInvisible,
   suppressPendingMovementDetectionFilterVisualsForObservedTransition,
 } from '../../../scripts/services/PendingMovement/pending-movement-render-lock.js';
+import { primeSelectAllTokenVisibilityBypassFromKeyboard } from '../../../scripts/services/Detection/select-all-token-visibility-bypass.js';
 
 function visibilityV2Map(map) {
   return Object.fromEntries(
@@ -206,6 +207,38 @@ describe('pending token movement hidden detection guard', () => {
     };
 
     expect(targetIsRenderHiddenForCurrentViewObserver(target)).toBe(true);
+  });
+
+  test('does not render-hide from controlled observer during select-all visibility bypass', () => {
+    jest.useFakeTimers();
+    const observer = createMockToken({
+      id: 'observer',
+      controlled: true,
+      flags: visibilityV2Flags({ target: 'undetected' }),
+    });
+    const target = createMockToken({ id: 'target', visible: true });
+    global.canvas = {
+      ...global.canvas,
+      activeLayer: null,
+      tokens: {
+        get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+        controlled: [observer],
+        placeables: [observer, target],
+      },
+    };
+    global.canvas.activeLayer = global.canvas.tokens;
+
+    expect(
+      primeSelectAllTokenVisibilityBypassFromKeyboard({
+        ctrlKey: true,
+        key: 'a',
+        target: document.body,
+      }),
+    ).toBe(true);
+
+    expect(targetIsRenderHiddenForCurrentViewObserver(target)).toBe(false);
+
+    jest.advanceTimersByTime(100);
   });
 
   test('keeps render-hidden target locked until current core polygon reaches predicted observed target', () => {

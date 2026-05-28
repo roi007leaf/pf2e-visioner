@@ -12,6 +12,7 @@ import {
   getVisionerVisibilityBetweenTokens,
   NON_VISUAL_DETECTION_MODE_IDS,
 } from './detection-visibility-context.js';
+import { isSelectAllTokenVisibilityBypassActive } from './select-all-token-visibility-bypass.js';
 
 function testDetectionPoints(detectionMode, visionSource, mode, config) {
   return (config.tests || []).some((test) =>
@@ -21,6 +22,9 @@ function testDetectionPoints(detectionMode, visionSource, mode, config) {
 
 export function testDetectionModeVisibility(visionSource, mode, config = {}) {
   if (!mode.enabled) return false;
+  if (isSelectAllTokenVisibilityBypassActive()) {
+    return testDetectionPoints(this, visionSource, mode, config);
+  }
 
   const isSneaking = config.object?.document?.getFlag(MODULE_ID, 'sneak-active');
   if (isSneaking) {
