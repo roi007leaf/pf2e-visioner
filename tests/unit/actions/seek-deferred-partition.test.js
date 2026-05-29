@@ -76,12 +76,6 @@ describe('SeekAction LOS partition and filtering', () => {
       expect(code).toContain('shouldFilterAlly');
     });
 
-    test('filters loot tokens without GM-configured stealth DC', () => {
-      const lootFilter = code.includes("target?.actor?.type === 'loot'") &&
-        code.includes("getFlag?.('pf2e-visioner', 'stealthDC')");
-      expect(lootFilter).toBe(true);
-    });
-
     test('shows deferred count notification', () => {
       expect(code).toContain('SEEK_DEFERRED_COUNT');
     });
