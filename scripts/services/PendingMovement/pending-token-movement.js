@@ -56,7 +56,6 @@ import {
   clearDetectionFilterRestoreTimeouts,
   clearPostCompletionRenderRefreshes,
   scheduleAnimationRenderRefreshes,
-  scheduleDetectionFilterRestoreRefreshes,
   schedulePostCompletionRenderRefreshes,
 } from './pending-movement-refresh-scheduler.js';
 import {
@@ -100,7 +99,6 @@ const PENDING_MOVEMENT_REFRESH_VISIBILITY_PERCEPTION_COALESCE_MS = 3000;
 export const DETECTION_BLOCKING_VISIBILITY_STATES = new Set(['hidden', 'undetected', 'unnoticed']);
 const RENDER_HIDDEN_FROM_OBSERVER_STATES = new Set(['undetected', 'unnoticed']);
 const CORE_LOS_TRANSITION_REFRESH_STATES = new Set(['observed', 'concealed']);
-const VISIBILITY_V2_FLAG = 'visibilityV2';
 const PENDING_MOVEMENT_SUPPRESSION_KEY = 'pf2eVisionerPendingMovement';
 
 const pendingTokenMovementPositions = new Map();
@@ -221,7 +219,6 @@ const {
   getCurrentViewObservers,
   hasObservedHiddenSoundwaveGraceContexts,
   hasObservedTransitionDetectionFilterSuppression,
-  hasPendingControlledTokenDragIntentForCurrentView,
   observedSoundwaveShouldWaitForCore,
   rememberObservedHiddenSoundwaveGraceForCompletingMovement,
   predictedObservedMovementReachedDestination,
@@ -347,6 +344,10 @@ function observerTargetEvaluationKey(observer, target) {
 
 function tokenDocOf(tokenOrDoc) {
   return tokenOrDoc?.document || tokenOrDoc || null;
+}
+
+function foundryHiddenRequiresVisionerRenderLock(tokenOrDoc) {
+  return !!tokenDocOf(tokenOrDoc)?.hidden && !globalThis.game?.user?.isGM;
 }
 
 function hasActiveAvsOverride(observer, target) {
@@ -946,7 +947,7 @@ function forgetCurrentSightLineGraceContextsForObserver(observerId) {
 function getCurrentSightLineGraceContextForTarget(target) {
   pruneExpiredCurrentSightLineGraceContexts();
   const targetId = tokenIdOf(target);
-  if (!targetId || tokenDocOf(target)?.hidden) return null;
+  if (!targetId || foundryHiddenRequiresVisionerRenderLock(target)) return null;
   if (actorHasConditionSlug(actorOf(target), 'invisible')) return null;
 
   const contextsByObserver = pendingMovementCurrentSightLineGraceContexts.get(targetId);
@@ -983,7 +984,7 @@ function currentSightLineGraceCanYieldToCore(observer, target, visibilityState) 
 
   const observerId = tokenIdOf(observer);
   const targetId = tokenIdOf(target);
-  if (!observerId || !targetId || tokenDocOf(target)?.hidden) return false;
+  if (!observerId || !targetId || foundryHiddenRequiresVisionerRenderLock(target)) return false;
   if (actorHasConditionSlug(actorOf(target), 'invisible')) return false;
 
   const contextsByObserver = pendingMovementCurrentSightLineGraceContexts.get(targetId);
@@ -1051,7 +1052,7 @@ function currentSightLineSeesHiddenTargetDuringPendingMovement(
   if (!target?.document?.id) return false;
   if (target.controlled) return false;
   if (!isTokenLikeTarget(target)) return false;
-  if (tokenDocOf(target)?.hidden) return false;
+  if (foundryHiddenRequiresVisionerRenderLock(target)) return false;
   if (actorHasConditionSlug(actorOf(target), 'invisible')) return false;
   if (hasDetectionWork === false) return false;
 
@@ -1211,7 +1212,7 @@ function getPendingMovementVisibilityState(observer, target) {
         startingVisibilityState &&
         !invisibleUndetectedRenderLockMustStayLocked(target, startingVisibilityState) &&
         RENDER_HIDDEN_FROM_OBSERVER_STATES.has(startingVisibilityState) !==
-          finalRenderHidden
+        finalRenderHidden
       ) {
         return renderVisibilityStateForCurrentPolygonTransition(
           observer,
@@ -1688,7 +1689,7 @@ function hasActivePendingMovementVisibilityOwnershipForToken(token) {
 
 function hasDetectionBlockingPendingVisibilityStateForToken(token) {
   if (!token?.document?.id) return false;
-  if (tokenDocOf(token)?.hidden) return true;
+  if (foundryHiddenRequiresVisionerRenderLock(token)) return true;
 
   for (const [observerId, entry] of pendingTokenMovementPositions.entries()) {
     const observer = tokenObjectForId(observerId) || entry?.tokenDoc || { id: observerId };
@@ -1787,7 +1788,7 @@ function getPendingMovementHiddenStateContextUncached(target) {
 
     const visibilityState = getPendingMovementVisibilityState(observer, target);
     const hiddenByVisioner = visionerStateHidesTargetRendering(visibilityState);
-    const foundryHidden = !!tokenDocOf(target)?.hidden;
+    const foundryHidden = foundryHiddenRequiresVisionerRenderLock(target);
     if (!hiddenByVisioner && !foundryHidden) continue;
 
     return {
@@ -1810,7 +1811,7 @@ export function targetIsRenderHiddenForCurrentViewObserver(target) {
   if (!target?.document?.id) return false;
   if (isSelectAllTokenVisibilityBypassActive()) return false;
   if (target.controlled) return false;
-  if (tokenDocOf(target)?.hidden) return true;
+  if (foundryHiddenRequiresVisionerRenderLock(target)) return true;
 
   const candidates = [];
   const add = (token) => {
@@ -1863,7 +1864,7 @@ export function targetIsRenderHiddenForCurrentViewObserver(target) {
 export function targetMustStayHiddenDuringPendingMovement(target) {
   if (!target?.document?.id) return false;
   if (target.controlled) return false;
-  if (tokenDocOf(target)?.hidden) return true;
+  if (foundryHiddenRequiresVisionerRenderLock(target)) return true;
   return false;
 }
 
@@ -2031,7 +2032,7 @@ function getActiveControlledHiddenDetectionFilterContext(target) {
       targetId: tokenIdOf(target),
       targetName: target?.name ?? target?.document?.name,
       visibilityState,
-      foundryHidden: !!tokenDocOf(target)?.hidden,
+      foundryHidden: foundryHiddenRequiresVisionerRenderLock(target),
       controlledObserver: true,
     };
   }
@@ -2061,7 +2062,7 @@ function getStoredHiddenDetectionFilterContext(target) {
       visibilityState,
       hiddenByVisioner: true,
       renderHiddenByVisioner: false,
-      foundryHidden: !!tokenDocOf(target)?.hidden,
+      foundryHidden: foundryHiddenRequiresVisionerRenderLock(target),
       storedObserverFallback: true,
     };
   }
@@ -2225,7 +2226,7 @@ function getControlledObserverHiddenStateContext(target) {
   if (!targetId) return null;
   if (isSelectAllTokenVisibilityBypassActive()) return null;
 
-  const foundryHidden = !!tokenDocOf(target)?.hidden;
+  const foundryHidden = foundryHiddenRequiresVisionerRenderLock(target);
   for (const observer of canvas?.tokens?.controlled || []) {
     const observerId = tokenIdOf(observer);
     if (!observerId || observerId === targetId) continue;
@@ -2334,7 +2335,7 @@ function pruneExpiredCoreVisibleGraceContexts(now = Date.now()) {
 
 function getCoreVisibleGraceContext(observer, target, visibilityState) {
   if (!RENDER_HIDDEN_FROM_OBSERVER_STATES.has(visibilityState)) return null;
-  if (tokenDocOf(target)?.hidden) return null;
+  if (foundryHiddenRequiresVisionerRenderLock(target)) return null;
 
   pruneExpiredCoreVisibleGraceContexts();
   const observerId = tokenIdOf(observer);
@@ -2360,7 +2361,7 @@ function coreVisibleGraceCanBypassHiddenState(observer, target, visibilityState)
 }
 
 function rememberCoreVisibleGraceForCoreOwnedPendingObservers(target) {
-  if (!target?.document?.id || tokenDocOf(target)?.hidden) return false;
+  if (!target?.document?.id || foundryHiddenRequiresVisionerRenderLock(target)) return false;
 
   let remembered = false;
   for (const [observerId, entry] of pendingTokenMovementPositions.entries()) {
@@ -2399,7 +2400,7 @@ function rememberCoreVisibleGraceForCoreOwnedPendingObservers(target) {
 function getVisibleCoreGraceContextForTarget(target) {
   pruneExpiredCoreVisibleGraceContexts();
   const targetId = tokenIdOf(target);
-  if (!targetId || tokenDocOf(target)?.hidden) return null;
+  if (!targetId || foundryHiddenRequiresVisionerRenderLock(target)) return null;
 
   const contextsByObserver = pendingMovementCoreVisibleGraceContexts.get(targetId);
   if (!contextsByObserver) return null;
@@ -2553,13 +2554,13 @@ function getStickyHiddenRenderLockContext(target, state) {
   } else {
     lockContext =
       Number(rememberedLockContext?.lastForcedAt ?? -1) >
-      Number(stateLockContext?.lastForcedAt ?? -1)
+        Number(stateLockContext?.lastForcedAt ?? -1)
         ? rememberedLockContext
         : stateLockContext;
   }
   if (!lockContext) return null;
 
-  const foundryHidden = !!tokenDocOf(target)?.hidden;
+  const foundryHidden = foundryHiddenRequiresVisionerRenderLock(target);
   if (!foundryHidden && contextShouldYieldToCoreDuringPendingMovement(lockContext, target)) {
     forgetHiddenForceContext(target);
     return null;
@@ -2856,7 +2857,7 @@ export function forceTokenInvisibleForObserverVisibility(observer, target, visib
     visibilityState,
     hiddenByVisioner: true,
     renderHiddenByVisioner: true,
-    foundryHidden: !!tokenDocOf(target)?.hidden,
+    foundryHidden: foundryHiddenRequiresVisionerRenderLock(target),
     wallBlocked: false,
     awaitingDetectionFilter: false,
     pendingPosition: getPendingTokenMovementPosition(tokenIdOf(observer)),
@@ -3946,11 +3947,11 @@ function refreshPendingMovementTokenVisibilityUncached(
         };
         if (shouldSkipUnchangedPendingMovementTokenRefresh(token, refreshContext)) {
           continue;
-      }
-      if (!skipTokenRefresh) {
-        rememberPendingMovementRefreshVisibilityPerceptionTarget(token);
-        token?.refresh?.();
-        if (trackPerformance) {
+        }
+        if (!skipTokenRefresh) {
+          rememberPendingMovementRefreshVisibilityPerceptionTarget(token);
+          token?.refresh?.();
+          if (trackPerformance) {
             pendingMovementPerformanceCounters.tokensRefreshed += 1;
             sourceCounters.tokensRefreshed += 1;
           }

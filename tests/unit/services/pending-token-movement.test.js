@@ -19,8 +19,8 @@ import {
   resetPendingMovementPerformanceCounters,
   schedulePendingTokenMovementCompletion,
   setPendingTokenMovementPosition,
-  shouldUseFullAnimationRefreshCadence,
   targetIsRenderHiddenForCurrentViewObserver,
+  targetMustStayHiddenDuringPendingMovement,
 } from '../../../scripts/services/PendingMovement/pending-token-movement.js';
 import {
   getPendingMovementBlockedDetectionSources,
@@ -207,6 +207,51 @@ describe('pending token movement hidden detection guard', () => {
     };
 
     expect(targetIsRenderHiddenForCurrentViewObserver(target)).toBe(true);
+  });
+
+  test('keeps GM-visible Foundry-hidden token under core rendering', () => {
+    global.game.user.isGM = true;
+    const observer = createMockToken({ id: 'observer', controlled: true });
+    const target = createMockToken({ id: 'target', hidden: true, visible: true });
+    target.renderable = true;
+    target.mesh = { visible: true, renderable: true, alpha: 0.5 };
+    global.canvas = {
+      ...global.canvas,
+      tokens: {
+        get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+        controlled: [observer],
+        placeables: [observer, target],
+      },
+    };
+
+    setPendingTokenMovementPosition(observer.document, { x: 100, y: 0 }, [observer]);
+
+    expect(targetIsRenderHiddenForCurrentViewObserver(target)).toBe(false);
+    expect(targetMustStayHiddenDuringPendingMovement(target)).toBe(false);
+    expect(shouldTemporarilyForceTokenInvisible(target)).toBe(false);
+    expect(target.visible).toBe(true);
+    expect(target.renderable).toBe(true);
+    expect(target.mesh).toMatchObject({ visible: true, renderable: true, alpha: 0.5 });
+  });
+
+  test('keeps Foundry-hidden token render-hidden for player clients', () => {
+    global.game.user.isGM = false;
+    const observer = createMockToken({ id: 'observer', controlled: true });
+    const target = createMockToken({ id: 'target', hidden: true, visible: false });
+    global.canvas = {
+      ...global.canvas,
+      tokens: {
+        get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+        controlled: [observer],
+        placeables: [observer, target],
+      },
+    };
+
+    setPendingTokenMovementPosition(observer.document, { x: 100, y: 0 }, [observer]);
+
+    expect(targetIsRenderHiddenForCurrentViewObserver(target)).toBe(true);
+    expect(targetMustStayHiddenDuringPendingMovement(target)).toBe(true);
+    expect(shouldTemporarilyForceTokenInvisible(target)).toBe(true);
   });
 
   test('does not render-hide from controlled observer during select-all visibility bypass', () => {
@@ -1318,7 +1363,7 @@ describe('pending token movement hidden detection guard', () => {
     };
 
     setPendingTokenMovementPosition(observer.document, { x: 0, y: 0 }, [observer], {
-      predictFinalVisibility: () => new Promise(() => {}),
+      predictFinalVisibility: () => new Promise(() => { }),
     });
 
     expect(shouldUseCoreDetectionDuringPendingMovement(observer, target)).toBe(true);
@@ -1361,7 +1406,7 @@ describe('pending token movement hidden detection guard', () => {
     };
 
     setPendingTokenMovementPosition(observer.document, { x: -150, y: 0 }, [observer], {
-      predictFinalVisibility: () => new Promise(() => {}),
+      predictFinalVisibility: () => new Promise(() => { }),
     });
 
     const context = getPendingMovementBlockContext(observer, target);
@@ -1405,12 +1450,12 @@ describe('pending token movement hidden detection guard', () => {
       ...global.canvas,
       effects: {
         visionSources: [
-        {
-          active: true,
-          object: observer,
-          los: { contains: jest.fn(() => false) },
-        },
-      ],
+          {
+            active: true,
+            object: observer,
+            los: { contains: jest.fn(() => false) },
+          },
+        ],
         lightSources: [],
       },
       tokens: {

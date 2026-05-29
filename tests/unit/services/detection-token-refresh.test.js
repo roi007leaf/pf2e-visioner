@@ -78,6 +78,36 @@ describe('detection token refresh wrapper', () => {
     expect(target.mesh.alpha).toBe(1);
   });
 
+  test('does not hard-hide GM-visible Foundry-hidden token during refresh', () => {
+    global.game.user.isGM = true;
+    const observer = createMockToken({ id: 'observer', controlled: true });
+    const target = createMockToken({ id: 'target', hidden: true, visible: true });
+    target.renderable = true;
+    target.mesh = { visible: true, renderable: true, alpha: 0.5 };
+    global.canvas = {
+      ...global.canvas,
+      effects: {
+        visionSources: new Map(),
+        lightSources: new Map(),
+      },
+      tokens: {
+        controlled: [observer],
+        get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+        placeables: [observer, target],
+      },
+    };
+
+    const wrapped = jest.fn(() => 'wrapped-result');
+
+    const result = wrapTokenRefreshVisibility.call(target, wrapped);
+
+    expect(result).toBe('wrapped-result');
+    expect(wrapped).toHaveBeenCalledTimes(1);
+    expect(target.visible).toBe(true);
+    expect(target.renderable).toBe(true);
+    expect(target.mesh).toMatchObject({ visible: true, renderable: true, alpha: 0.5 });
+  });
+
   test('re-hides invisible undetected target on active-movement fast refresh path', () => {
     const observer = createMockToken({
       id: 'observer',
