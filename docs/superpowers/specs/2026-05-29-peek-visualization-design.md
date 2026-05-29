@@ -2,7 +2,7 @@
 
 ## Objective
 
-Add a local-only peek preview that lets a user hold a customizable keybind and see a line-of-sight polygon from a legal peek point around the selected token. The polygon follows mouse direction, is limited by walls, doors, Levels/Core collision where available, and the selected token's vision limits.
+Add a local-first peek preview that lets a user hold a customizable keybind and see a line-of-sight polygon from a legal peek point around the selected token. The polygon follows mouse direction, is limited by walls, doors, Levels/Core collision where available, and the selected token's vision limits. When a player peeks, active GM clients receive a throttled mirror of the exact player-side polygon.
 
 ## Non-Goals
 
@@ -10,6 +10,7 @@ Add a local-only peek preview that lets a user hold a customizable keybind and s
 - Do not reveal, hide, target, hover, or otherwise mutate tokens.
 - Do not change Seek, Sneak, cover, or pending-movement behavior.
 - Do not let users scan from arbitrary map positions.
+- Do not make GM clients recompute the player's peek LOS from GM visibility privileges.
 
 ## User Flow
 
@@ -20,6 +21,7 @@ Add a local-only peek preview that lets a user hold a customizable keybind and s
 5. Mouse movement changes peek direction.
 6. The actual origin clamps to the selected token's footprint plus a small adjacent band.
 7. Releasing the keybind removes the polygon.
+8. If the user is a player, active GM clients see a mirrored copy of the player's current polygon while the keybind is held.
 
 The keybinding is customizable and defaults to unbound.
 
@@ -34,6 +36,7 @@ The keybinding is customizable and defaults to unbound.
 - Secret or hidden doors follow their current wall sight state.
 - GM and player clients can use the preview, but players are still limited to legal origins around their controlled token.
 - Output is polygon-only: no token highlighting and no visibility state changes.
+- GM mirror output uses the player-computed polygon points. GM clients do not recompute the polygon.
 
 ## Components
 
@@ -94,6 +97,44 @@ Draw:
 
 Renderer owns no game state and can be destroyed safely on any invalid state.
 
+### GM Mirror Overlay
+
+GM-only overlay renderer that receives player peek payloads through the module socket service.
+
+Responsibilities:
+
+- Keep one mirrored overlay per peeking player.
+- Draw the player-computed polygon points on `canvas.interface`.
+- Tint fill, outline, and origin marker with the player's user color.
+- Show a small player/token label near the origin marker.
+- Clear a player's overlay when an explicit end payload arrives.
+- Auto-expire a player's overlay after about 500 ms without updates.
+- Ignore payloads for inactive scenes or invalid point data.
+
+The mirror is observational only. It does not write visibility state, refresh perception, alter token rendering, or invoke AVS.
+
+### Socket Mirror Payload
+
+Add socket channels through `scripts/services/socket.js`:
+
+- `PeekPreviewUpdate`
+- `PeekPreviewEnd`
+
+The player-side service sends updates to active GMs while the keybind is held. Payload:
+
+- `sceneId`
+- `userId`
+- `userName`
+- `userColor`
+- `tokenId`
+- `tokenName`
+- `origin`
+- `points`
+- `sequence`
+- `timestamp`
+
+`points` are the exact polygon points the player preview rendered. They should be rounded to integer world coordinates before sending. If socketlib supports direct user sends, send only to active GM users. If not, use a broadcast channel and have non-GM clients ignore it.
+
 ## Settings And Keybinding
 
 Add keybinding:
@@ -110,6 +151,12 @@ No new world setting is needed for the first version. Constants such as clamp ba
 - Do no heavy work directly in raw pointer events.
 - Store latest mouse position and schedule one redraw per animation frame.
 - Reuse one graphics object while active.
+- Send GM mirror updates at a hard cap of about 10 Hz.
+- Send mirror updates only when origin or polygon points changed meaningfully.
+- Round polygon points before socket send.
+- Simplify or cap unusually large polygons before socket send.
+- GM clients draw received points only; they do not recompute LOS.
+- GM mirror clear uses both explicit end payload and about 500 ms silence timeout.
 - Cache static wall candidates during one active key-hold where safe.
 - Clear caches on canvas render, wall update/create/delete, token control change, and keyup.
 
@@ -133,6 +180,10 @@ Unit tests:
 - Fallback raycast blocks closed door.
 - Service does not call AVS/store write helpers.
 - Service clears overlay on keyup and invalid token state.
+- Player-side mirror sender throttles update payloads.
+- GM-side mirror draws received points without recomputing LOS.
+- GM-side mirror clears on end payload and stale timeout.
+- GM-side mirror ignores other scenes and invalid point payloads.
 
 Live validation:
 
@@ -142,3 +193,4 @@ Live validation:
 - Confirm polygon follows clamped origin and walls clip the preview.
 - Test closed vs open door.
 - Confirm no visibility-map changes, token reveal changes, targeting changes, or hover regressions.
+- With player and GM clients open, confirm GM sees the mirrored polygon update near real time and clear on key release.
