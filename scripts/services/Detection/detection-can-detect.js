@@ -12,6 +12,7 @@ import {
   targetHasAnyHiddenAvsOverride,
   targetMustStayHiddenDuringPendingMovement,
 } from '../PendingMovement/pending-token-movement.js';
+import { shouldBypassAvsForGmVision } from '../gm-vision-bypass.js';
 import { isExplicitVisiblePair } from '../ExplicitVisibilityPairs.js';
 import {
   detectionFrameCache,
@@ -25,6 +26,7 @@ import { isSelectAllTokenVisibilityBypassActive } from './select-all-token-visib
 export function createCanDetectVisibilityWrapper(threshold) {
   return function wrapCanDetectVisibility(wrapped, visionSource, target, ...args) {
     const canDetect = wrapped(visionSource, target, ...args);
+    if (shouldBypassAvsForGmVision()) return canDetect;
     if (isSelectAllTokenVisibilityBypassActive()) return canDetect;
     if (targetMustStayHiddenDuringPendingMovement(target)) return false;
     const observerToken = visionSource?.object;

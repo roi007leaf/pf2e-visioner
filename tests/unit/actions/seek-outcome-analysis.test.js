@@ -160,6 +160,9 @@ describe('seek outcome analysis', () => {
       currentVisibility: 'hidden',
       newVisibility: 'hidden',
       changed: false,
+      invisibleSeekCapApplied: true,
+      invisibleSeekCapState: 'hidden',
+      invisibleSeekCapReason: 'visual-invisible',
       usedSenseType: 'vision',
       usedSensePrecision: 'precise',
     });
@@ -207,5 +210,6 @@ describe('seek outcome analysis', () => {
       usedSenseType: 'echolocation',
       usedSensePrecision: 'precise',
     });
+    expect(result.invisibleSeekCapApplied).toBeUndefined();
   });
 });

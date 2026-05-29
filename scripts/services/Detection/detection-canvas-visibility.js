@@ -15,6 +15,7 @@ import {
   withSuppressedPendingMovementDetectionFilterVisuals,
 } from '../PendingMovement/pending-movement-render-lock.js';
 import { tokenHasDetectionFilterVisual } from '../PendingMovement/pending-movement-detection-filter-visuals.js';
+import { shouldBypassAvsForGmVision } from '../gm-vision-bypass.js';
 import { isSelectAllTokenVisibilityBypassActive } from './select-all-token-visibility-bypass.js';
 
 function sourceFromCollectionEntry(entry) {
@@ -39,6 +40,9 @@ function hasActiveUnblockedDetectionSource(blockedSources = []) {
 
 export function wrapCanvasVisibilityTest(wrapped, points, options = {}) {
   if (isSelectAllTokenVisibilityBypassActive()) {
+    return wrapped(points, options);
+  }
+  if (shouldBypassAvsForGmVision()) {
     return wrapped(points, options);
   }
   if (isPendingMovementHiddenStateVisibilityProbe()) {

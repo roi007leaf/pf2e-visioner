@@ -309,4 +309,92 @@ describe('HoverTooltips keybind state', () => {
     expect(HoverTooltips.isShowingKeyTooltips).toBe(true);
     expect(HoverTooltips.keyTooltipTokens.has('observer')).toBe(true);
   });
+
+  test('token pointer down cancels pending hover badges before debounce renders', async () => {
+    jest.useFakeTimers();
+    const observer = makeToken('observer', 0);
+    const target = makeToken('target', 100);
+    global.canvas.tokens.controlled = [];
+    global.canvas.tokens.placeables = [observer, target];
+    mockGetVisibilityMap.mockReturnValue({ target: 'hidden' });
+
+    const { HoverTooltips, initializeHoverTooltips } = await import(
+      '../../../scripts/services/HoverTooltips.js'
+    );
+
+    initializeHoverTooltips();
+    getHookHandler('hoverToken')(observer, true);
+
+    expect(HoverTooltips._hoverDebounceTimer).toBeTruthy();
+
+    const pointerDownHandler = observer.on.mock.calls.find(([event]) => event === 'pointerdown')[1];
+    pointerDownHandler();
+    jest.advanceTimersByTime(60);
+
+    expect(HoverTooltips._hoverDebounceTimer).toBeUndefined();
+    expect(HoverTooltips.currentHoveredToken).toBeNull();
+    expect(HoverTooltips.visibilityIndicators.size).toBe(0);
+    expect(HoverTooltips.visibilityBadges.size).toBe(0);
+  });
+
+  test('canvas pointer guard blocks pending hover badges when token pointer event is missed', async () => {
+    jest.useFakeTimers();
+    const observer = makeToken('observer', 0);
+    const target = makeToken('target', 100);
+    const addEventListener = jest.fn();
+    const removeEventListener = jest.fn();
+    global.canvas.app.view = {
+      getBoundingClientRect: jest.fn(() => ({ left: 0, top: 0 })),
+      addEventListener,
+      removeEventListener,
+    };
+    global.canvas.tokens.controlled = [];
+    global.canvas.tokens.placeables = [observer, target];
+    mockGetVisibilityMap.mockReturnValue({ target: 'hidden' });
+
+    const { HoverTooltips, initializeHoverTooltips } = await import(
+      '../../../scripts/services/HoverTooltips.js'
+    );
+
+    initializeHoverTooltips();
+    getHookHandler('hoverToken')(observer, true);
+
+    const pointerDownHandler = addEventListener.mock.calls.find(
+      ([event]) => event === 'pointerdown',
+    )[1];
+    pointerDownHandler({ button: 0 });
+    jest.advanceTimersByTime(60);
+
+    expect(HoverTooltips._pointerIsDown).toBe(true);
+    expect(HoverTooltips.currentHoveredToken).toBeNull();
+    expect(HoverTooltips.visibilityIndicators.size).toBe(0);
+    expect(HoverTooltips.visibilityBadges.size).toBe(0);
+  });
+
+  test('passive hover over controlled token renders visibility badges', async () => {
+    jest.useFakeTimers();
+    const observer = makeToken('observer', 0);
+    const target = makeToken('target', 100);
+    observer.controlled = true;
+    global.canvas.tokens.controlled = [observer];
+    global.canvas.tokens.placeables = [observer, target];
+    mockGetVisibilityMap.mockImplementation((token) =>
+      token?.id === 'target' ? { observer: 'hidden' } : {},
+    );
+
+    const { HoverTooltips, initializeHoverTooltips } = await import(
+      '../../../scripts/services/HoverTooltips.js'
+    );
+
+    initializeHoverTooltips();
+    getHookHandler('hoverToken')(observer, true);
+    jest.advanceTimersByTime(60);
+
+    expect(HoverTooltips._hoverDebounceTimer).toBeUndefined();
+    expect(HoverTooltips.currentHoveredToken).toBe(observer);
+    expect(HoverTooltips.visibilityIndicators.size).toBe(1);
+    expect(document.querySelectorAll('.pf2e-visioner-tooltip-badge.visibility-hidden')).toHaveLength(
+      1,
+    );
+  });
 });

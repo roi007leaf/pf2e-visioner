@@ -142,6 +142,8 @@
             "RANGE_LIMIT_ACTIVE_CUSTOM": "激活射程限制：仅显示{distance}尺内的目标",
             "NO_TARGETS_IN_RANGE": "30尺射程内无有效目标存在",
             "NO_TARGETS_IN_RANGE_CUSTOM": "{distance}尺射程内无有效目标",
+            "INVISIBLE_CAP_LABEL": "隐形",
+            "INVISIBLE_CAP_TOOLTIP": "目标处于隐形状态。使用视觉进行搜索可以确定其位置，但不能使其变为可见；需要使用精确的非视觉感官才能观察到它。",
             "BUTTON_PROCESSED": "结果已应用",
             "NO_UNDETECTED_TOKENS": "{name}的搜索行动未发现藏匿或无踪指示物",
             "NO_CHANGES": "{name}的搜索行动未发生能见度变化",

@@ -1,4 +1,5 @@
 import { MODULE_ID } from '../../constants.js';
+import { shouldBypassAvsForGmVision } from '../gm-vision-bypass.js';
 import { detectionFrameCache, isTokenBlinded } from './detection-visibility-context.js';
 
 let sceneVisionSharingLinkCache = null;
@@ -22,6 +23,7 @@ function sceneHasVisionSharingLinks() {
 
 export function wrapTokenDocumentPrepareBaseData(wrapped) {
   wrapped();
+  if (shouldBypassAvsForGmVision()) return;
 
   const visionMasterTokenId = detectionFrameCache.getVisionMasterTokenId(this);
   const mode = detectionFrameCache.getVisionSharingMode(this);
@@ -38,6 +40,8 @@ export function wrapTokenDocumentPrepareBaseData(wrapped) {
 
 export function wrapTokenVisionSource(wrapped) {
   const isNormalVisionSource = wrapped();
+  if (shouldBypassAvsForGmVision()) return isNormalVisionSource;
+
   const thisTokenBlinded = isTokenBlinded(this);
   if (thisTokenBlinded) {
     return false;

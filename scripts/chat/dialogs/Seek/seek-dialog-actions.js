@@ -71,6 +71,7 @@ export async function applyAllSeekChanges(app) {
     } else {
       payload.overrides = overrides;
     }
+    payload.seekPrecomputedOutcomes = actionableOutcomes;
 
     const appliedCount = await applyNowSeek(payload, { html: () => { }, attr: () => { } });
     notify.info(
@@ -142,7 +143,10 @@ export async function applySeekChange(app, button) {
       const overrides = {
         __wall__: { [outcome.wallId]: outcome.overrideState || outcome.newVisibility },
       };
-      await applyNowSeek({ ...actionData, overrides }, { html: () => { }, attr: () => { } });
+      await applyNowSeek(
+        { ...actionData, overrides, seekPrecomputedOutcomes: [outcome] },
+        { html: () => { }, attr: () => { } },
+      );
       app.updateRowButtonsToApplied([{ wallId: outcome.wallId }]);
     } else {
       const effectiveNewState = outcome.overrideState || outcome.newVisibility;
@@ -182,7 +186,10 @@ export async function applySeekChange(app, button) {
         }
 
         const overrides = { [app.getOutcomeTokenId(outcome)]: overrideValue };
-        await applyNowSeek({ ...actionData, overrides }, { html: () => { }, attr: () => { } });
+        await applyNowSeek(
+          { ...actionData, overrides, seekPrecomputedOutcomes: [outcome] },
+          { html: () => { }, attr: () => { } },
+        );
 
         if (rowTimerConfig) {
           app.rowTimers.delete(tokenId);

@@ -1,8 +1,14 @@
 import { MODULE_ID } from '../constants.js';
+import {
+    clearGmVisionBypassCache,
+    isGmVisionModeActive,
+} from '../services/gm-vision-bypass.js';
 import { getSystemId } from '../system-adapter.js';
 
 const ELEMENT_ID = 'pf2e-visioner-avs-gm-vision-warning';
 const STYLE_ID = 'pf2e-visioner-avs-gm-vision-warning-styles';
+
+export { isGmVisionModeActive };
 
 function suppressionEnabled() {
     return !!game.settings?.get?.(MODULE_ID, 'suppressAvsGmVisionWarning');
@@ -204,69 +210,10 @@ function ensureElement() {
     return el;
 }
 
-function gmVisionEnabled() {
-    try {
-        const setting = game.settings?.get?.(getSystemId(), 'gmVision');
-        if (typeof setting === 'boolean') return setting;
-    } catch {
-        /* ignore */
-    }
-
-    try {
-        const controls = ui?.controls?.controls;
-        if (Array.isArray(controls)) {
-            for (const control of controls) {
-                const tools = control?.tools;
-                if (!Array.isArray(tools)) continue;
-                const tool = tools.find((t) => {
-                    const name = String(t?.name ?? '');
-                    return /gm.*vision|vision.*gm/i.test(name) || name === 'gmVision' || name === 'gm-vision';
-                });
-                if (tool) {
-                    const values = [tool.active, tool.toggled, tool._active, tool.enabled, tool.state];
-                    const bool = values.find((v) => typeof v === 'boolean');
-                    if (typeof bool === 'boolean') return bool;
-                }
-            }
-        }
-    } catch {
-        /* ignore */
-    }
-
-    try {
-        const perceptionMode = canvas?.perception?.visionMode ?? canvas?.perception?.mode;
-        const gmMode = CONST?.VISION_MODES?.GM;
-        if (gmMode !== undefined && perceptionMode === gmMode) return true;
-        if (typeof perceptionMode === 'string' && perceptionMode.toLowerCase?.() === 'gm') return true;
-
-        const visibility = canvas?.effects?.visibility ?? canvas?.visibility;
-        const direct =
-            visibility?.isGMVision ??
-            visibility?.gmVision ??
-            visibility?.gmVisionEnabled ??
-            visibility?.gmVisionActive;
-        if (typeof direct === 'boolean') return direct;
-
-        const mode = visibility?.visionMode ?? visibility?.mode;
-        if (gmMode !== undefined && mode === gmMode) return true;
-        if (typeof mode === 'string' && mode.toLowerCase?.() === 'gm') return true;
-    } catch {
-        /* ignore */
-    }
-
-    return false;
-}
-
-export function isGmVisionModeActive() {
-    if (!game.user?.isGM) return false;
-    if (!(game.settings?.get?.(MODULE_ID, 'autoVisibilityEnabled') ?? false)) return false;
-    if (canvas?.scene?.getFlag?.(MODULE_ID, 'disableAVS')) return false;
-    return gmVisionEnabled();
-}
-
 export function updateAvsGmVisionWarning() {
     if (!game.user?.isGM) return;
 
+    clearGmVisionBypassCache();
     const state = warningState();
     const active = isGmVisionModeActive();
     if (!active) state.dismissed = false;

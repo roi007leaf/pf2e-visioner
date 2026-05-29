@@ -64,6 +64,24 @@ describe('pending movement detection filter rendering', () => {
     expect(token.writes).toEqual([0x222222]);
   });
 
+  test('can force-stabilize core tint pulse for render-hidden branch', () => {
+    const controller = createController({
+      getHiddenDetectionFilterPreservationContext: () => null,
+    });
+    const token = createTintedToken({ tint: 0 });
+
+    controller.withStableHiddenDetectionFilterAnimation(
+      token,
+      () => {
+        token.mesh.tint = 0xffffff;
+      },
+      { force: true },
+    );
+
+    expect(token.mesh.tint).toBe(0);
+    expect(token.writes).not.toContain(0xffffff);
+  });
+
   test('leaves core detection-filter tint behavior alone without hidden preservation context', () => {
     const controller = createController({
       getHiddenDetectionFilterPreservationContext: () => null,

@@ -152,10 +152,14 @@ export class SeekActionHandler extends ActionHandlerBase {
         return await this.#applySearchExplorationGroupedOutcomes(actionData, button);
       }
 
-      const subjects = await this.discoverSubjects(actionData);
-      const outcomes = [];
-      for (const subject of subjects) {
-        outcomes.push(await this.analyzeOutcome(actionData, subject));
+      let outcomes = [];
+      if (Array.isArray(actionData?.seekPrecomputedOutcomes)) {
+        outcomes = actionData.seekPrecomputedOutcomes.map((outcome) => ({ ...outcome }));
+      } else {
+        const subjects = await this.discoverSubjects(actionData);
+        for (const subject of subjects) {
+          outcomes.push(await this.analyzeOutcome(actionData, subject));
+        }
       }
       // Apply overrides (supports __wall__)
       this.applyOverrides(actionData, outcomes);
@@ -176,16 +180,6 @@ export class SeekActionHandler extends ActionHandlerBase {
           });
         }
       } catch { }
-
-      // Filter out loot tokens with no GM-configured stealth DC — they should not get seek overrides
-      filtered = filtered.filter((o) => {
-        if (o._isWall) return true;
-        if (o.target?.actor?.type === 'loot') {
-          const configuredDC = Number(o.target?.document?.getFlag?.('pf2e-visioner', 'stealthDC')) || 0;
-          return configuredDC > 0;
-        }
-        return true;
-      });
 
       // If overrides specify a particular token/wall, limit to those only (per-row apply)
       try {

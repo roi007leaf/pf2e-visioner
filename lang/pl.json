@@ -534,7 +534,9 @@
       "RANGE_LIMIT_ACTIVE": "Aktywne ograniczenie zasięgu: Wyświetlane są tylko cele znajdujące się w odległości do 30 stóp.",
       "RANGE_LIMIT_ACTIVE_CUSTOM": "Aktywne ograniczenie zasięgu: Wyświetlane są tylko cele znajdujące się w odległości {distance} stóp.",
       "NO_TARGETS_IN_RANGE": "Brak ważnych celów w zasięgu 30 stóp.",
-      "NO_TARGETS_IN_RANGE_CUSTOM": "Brak ważnych celów w zasięgu {distance} stóp."
+      "NO_TARGETS_IN_RANGE_CUSTOM": "Brak ważnych celów w zasięgu {distance} stóp.",
+      "INVISIBLE_CAP_LABEL": "Niewidzialny",
+      "INVISIBLE_CAP_TOOLTIP": "Cel jest niewidzialny. Wizualne Szukanie może ustalić jego położenie, ale nie może sprawić, że stanie się obserwowany; użyj precyzyjnego zmysłu innego niż wzrok."
     },
     "SEEK_TEMPLATE_CONFIG": {
       "TITLE": "Konfiguracja szablonu Szukania",

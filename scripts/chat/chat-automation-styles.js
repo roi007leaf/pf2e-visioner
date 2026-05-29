@@ -919,6 +919,12 @@ function getChatAutomationCSS() {
             font-size: 9px !important;
         }
 
+        .seek-invisible-cap-indicator {
+            background: rgba(255, 140, 0, 0.2) !important;
+            border-color: rgba(255, 140, 0, 0.55) !important;
+            color: #ffb347 !important;
+        }
+
         /* Colorblind support for Sneaky feat indicator */
         .colorblind .sneaky-feat-indicator {
             background: rgba(255, 165, 0, 0.2) !important; /* Orange background for colorblind */

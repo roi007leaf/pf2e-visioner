@@ -239,7 +239,7 @@ export function createPendingMovementDecisionContextController({
     const wallDetectionBlocked = wallBlocked && !canHearThroughWall;
     const visibilityState = getPendingMovementVisibilityState(observer, target);
     const hiddenByVisioner = visionerStateBlocksPendingDetection(visibilityState);
-    const renderHiddenByVisioner = visionerStateHidesTargetRendering(visibilityState);
+    const renderHiddenByVisioner = visionerStateHidesTargetRendering(visibilityState, target);
     const foundryHidden = !!tokenDocOf(target)?.hidden;
     const blocked = wallBlocked || hiddenByVisioner || foundryHidden;
     const renderBlocked = wallDetectionBlocked || renderHiddenByVisioner || foundryHidden;

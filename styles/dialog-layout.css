@@ -4368,6 +4368,10 @@ button.row-timer-toggle.active:not(:hover) {
   font-size: 12px;
 }
 
+.pf2e-visioner .seek-invisible-cap-indicator {
+  color: #ffb347;
+}
+
 .pf2e-visioner .sneaky-feat-indicator:hover {
   opacity: 1;
 }

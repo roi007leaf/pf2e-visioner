@@ -12,6 +12,7 @@ import {
   getVisionerVisibilityBetweenTokens,
   NON_VISUAL_DETECTION_MODE_IDS,
 } from './detection-visibility-context.js';
+import { shouldBypassAvsForGmVision } from '../gm-vision-bypass.js';
 import { isSelectAllTokenVisibilityBypassActive } from './select-all-token-visibility-bypass.js';
 
 function testDetectionPoints(detectionMode, visionSource, mode, config) {
@@ -22,6 +23,9 @@ function testDetectionPoints(detectionMode, visionSource, mode, config) {
 
 export function testDetectionModeVisibility(visionSource, mode, config = {}) {
   if (!mode.enabled) return false;
+  if (shouldBypassAvsForGmVision()) {
+    return testDetectionPoints(this, visionSource, mode, config);
+  }
   if (isSelectAllTokenVisibilityBypassActive()) {
     return testDetectionPoints(this, visionSource, mode, config);
   }

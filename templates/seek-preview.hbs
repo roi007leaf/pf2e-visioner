@@ -198,6 +198,12 @@
                   {{localize "PF2E_VISIONER.SNEAKY_FEAT.VISIBILITY_CAPPED"}}
                 </span>
               {{/if}}
+              {{#if outcome.invisibleSeekCapApplied}}
+                <span class="sneaky-feat-indicator seek-invisible-cap-indicator" data-tooltip="{{localize 'PF2E_VISIONER.SEEK_AUTOMATION.INVISIBLE_CAP_TOOLTIP'}}">
+                  <i class="fas fa-eye-slash"></i>
+                  {{localize "PF2E_VISIONER.SEEK_AUTOMATION.INVISIBLE_CAP_LABEL"}}
+                </span>
+              {{/if}}
             </td>
             <td class="visibility-change">
               <div class="visibility-change-with-override">

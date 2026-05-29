@@ -554,6 +554,8 @@
       "RANGE_LIMIT_ACTIVE_CUSTOM": "Range limit active: Only showing targets within {distance} feet",
       "NO_TARGETS_IN_RANGE": "No valid targets within 30 feet range",
       "NO_TARGETS_IN_RANGE_CUSTOM": "No valid targets within {distance} feet range",
+      "INVISIBLE_CAP_LABEL": "Invisible",
+      "INVISIBLE_CAP_TOOLTIP": "Target is invisible. Visual Seek can find its location, but cannot make it observed; use a precise non-visual sense to observe it.",
       "SEARCH_EXPLORATION_ROLL": "Search Exploration: Secret Seek"
     },
     "SEEK_TEMPLATE_CONFIG": {

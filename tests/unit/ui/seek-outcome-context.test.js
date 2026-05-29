@@ -69,6 +69,25 @@ describe('seek outcome context', () => {
     expect(VisionAnalyzer.getInstance).not.toHaveBeenCalled();
   });
 
+  test('preserves invisible Seek cap indicator fields for preview rows', async () => {
+    const result = await prepareSeekOutcomeContext(buildApp(), {
+      target: { id: 'target' },
+      oldVisibility: 'hidden',
+      newVisibility: 'hidden',
+      outcome: 'critical-success',
+      margin: 37,
+      invisibleSeekCapApplied: true,
+      invisibleSeekCapState: 'hidden',
+      invisibleSeekCapReason: 'visual-invisible',
+    });
+
+    expect(result).toEqual(expect.objectContaining({
+      invisibleSeekCapApplied: true,
+      invisibleSeekCapState: 'hidden',
+      invisibleSeekCapReason: 'visual-invisible',
+    }));
+  });
+
   test('checks LOS once for observed results and marks blocked rows deferred', async () => {
     const app = buildApp();
     const result = await prepareSeekOutcomeContext(app, {

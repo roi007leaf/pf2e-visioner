@@ -62,20 +62,19 @@ describe('seek dialog actions', () => {
   }
 
   test('apply all sends token and wall overrides through seek service', async () => {
+    const tokenOutcome = {
+      target: { id: 't1', name: 'Target 1' },
+      overrideState: 'hidden',
+      hasActionableChange: true,
+    };
+    const wallOutcome = {
+      _isWall: true,
+      wallId: 'w1',
+      overrideState: 'hidden',
+      hasActionableChange: true,
+    };
     const app = buildApp({
-      getFilteredOutcomes: jest.fn(async () => [
-        {
-          target: { id: 't1', name: 'Target 1' },
-          overrideState: 'hidden',
-          hasActionableChange: true,
-        },
-        {
-          _isWall: true,
-          wallId: 'w1',
-          overrideState: 'hidden',
-          hasActionableChange: true,
-        },
-      ]),
+      getFilteredOutcomes: jest.fn(async () => [tokenOutcome, wallOutcome]),
     });
 
     await applyAllSeekChanges(app);
@@ -87,6 +86,7 @@ describe('seek dialog actions', () => {
           t1: 'hidden',
           __wall__: { w1: 'hidden' },
         },
+        seekPrecomputedOutcomes: [tokenOutcome, wallOutcome],
       }),
       expect.any(Object),
     );
@@ -121,19 +121,18 @@ describe('seek dialog actions', () => {
   });
 
   test('single row apply strips template limits after dialog filtering', async () => {
+    const rowOutcome = {
+      target: { id: 't1', name: 'Target 1' },
+      overrideState: 'hidden',
+      hasActionableChange: true,
+    };
     const app = buildApp({
       actionData: {
         actor: { id: 'observer' },
         seekTemplateCenter: { x: 10, y: 10 },
         seekTemplateRadiusFeet: 30,
       },
-      outcomes: [
-        {
-          target: { id: 't1', name: 'Target 1' },
-          overrideState: 'hidden',
-          hasActionableChange: true,
-        },
-      ],
+      outcomes: [rowOutcome],
     });
 
     await applySeekChange(app, { dataset: { tokenId: 't1' } });
@@ -142,6 +141,12 @@ describe('seek dialog actions', () => {
       expect.not.objectContaining({
         seekTemplateCenter: expect.anything(),
         seekTemplateRadiusFeet: expect.anything(),
+      }),
+      expect.any(Object),
+    );
+    expect(applyNowSeek).toHaveBeenCalledWith(
+      expect.objectContaining({
+        seekPrecomputedOutcomes: [rowOutcome],
       }),
       expect.any(Object),
     );

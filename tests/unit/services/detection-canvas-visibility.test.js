@@ -12,6 +12,8 @@ import {
   shouldUseCoreDetectionDuringPendingMovement,
 } from '../../../scripts/services/PendingMovement/pending-movement-detection-gate.js';
 import { wrapCanvasVisibilityTest } from '../../../scripts/services/Detection/detection-canvas-visibility.js';
+import { createCanDetectVisibilityWrapper } from '../../../scripts/services/Detection/detection-can-detect.js';
+import { testDetectionModeVisibility } from '../../../scripts/services/Detection/detection-mode-visibility.js';
 import { legacyVisibilityToProfile } from '../../../scripts/visibility/perception-profile.js';
 
 function visibilityV2Flags(map) {
@@ -29,10 +31,14 @@ describe('canvas visibility wrapper', () => {
 
   beforeEach(() => {
     originalCanvas = global.canvas;
+    global.game.settings.set('pf2e', 'gmVision', false);
+    global.game.settings.set('pf2e-visioner', 'autoVisibilityEnabled', false);
   });
 
   afterEach(() => {
     clearPendingTokenMovementPosition('observer');
+    global.game.settings.set('pf2e', 'gmVision', false);
+    global.game.settings.set('pf2e-visioner', 'autoVisibilityEnabled', false);
     global.canvas = originalCanvas;
   });
 
@@ -127,6 +133,95 @@ describe('canvas visibility wrapper', () => {
       renderable: false,
       alpha: 0,
     });
+  });
+
+  test('GM Vision bypass keeps core canvas visibility result', () => {
+    global.game.user.isGM = true;
+    global.game.settings.set('pf2e-visioner', 'autoVisibilityEnabled', true);
+    global.game.settings.set('pf2e', 'gmVision', true);
+    const observer = createMockToken({
+      id: 'observer',
+      flags: visibilityV2Flags({ target: 'undetected' }),
+    });
+    const target = createMockToken({ id: 'target', visible: false });
+    target.detectionFilterMesh = { visible: false, renderable: false, alpha: 0 };
+    global.canvas = {
+      ...global.canvas,
+      effects: {
+        visionSources: new Map([['observer', { active: true, object: observer }]]),
+        lightSources: new Map(),
+      },
+      tokens: {
+        get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+        placeables: [observer, target],
+      },
+    };
+    const wrapped = jest.fn(() => {
+      target.detectionFilter = { id: 'core-soundwave-filter' };
+      target.detectionFilterMesh.visible = true;
+      target.detectionFilterMesh.renderable = true;
+      target.detectionFilterMesh.alpha = 1;
+      return true;
+    });
+
+    setPendingTokenMovementPosition(observer.document, { x: 100, y: 0 }, [observer]);
+
+    expect(wrapCanvasVisibilityTest(wrapped, [{ x: 0, y: 0 }], { object: target })).toBe(true);
+    expect(wrapped).toHaveBeenCalledTimes(1);
+    expect(target.detectionFilter).toEqual({ id: 'core-soundwave-filter' });
+    expect(target.detectionFilterMesh).toMatchObject({
+      visible: true,
+      renderable: true,
+      alpha: 1,
+    });
+  });
+
+  test('GM Vision bypass keeps core can-detect result', () => {
+    global.game.user.isGM = true;
+    global.game.settings.set('pf2e-visioner', 'autoVisibilityEnabled', true);
+    global.game.settings.set('pf2e', 'gmVision', true);
+    const observer = createMockToken({
+      id: 'observer',
+      flags: visibilityV2Flags({ target: 'undetected' }),
+    });
+    const target = createMockToken({ id: 'target' });
+    global.canvas = {
+      ...global.canvas,
+      tokens: {
+        controlled: [observer],
+        get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+        placeables: [observer, target],
+      },
+    };
+    const wrapped = jest.fn(() => true);
+    const wrapper = createCanDetectVisibilityWrapper(2);
+
+    expect(wrapper.call({ id: 'basicSight' }, wrapped, { object: observer }, target)).toBe(true);
+    expect(wrapped).toHaveBeenCalledTimes(1);
+  });
+
+  test('GM Vision bypass keeps core detection-mode visibility result', () => {
+    global.game.user.isGM = true;
+    global.game.settings.set('pf2e-visioner', 'autoVisibilityEnabled', true);
+    global.game.settings.set('pf2e', 'gmVision', true);
+    const observer = createMockToken({ id: 'observer' });
+    const target = createMockToken({ id: 'target' });
+    target.document.getFlag = jest.fn((moduleId, key) =>
+      moduleId === 'pf2e-visioner' && key === 'sneak-active' ? true : null,
+    );
+    const detectionMode = {
+      id: 'basicSight',
+      _canDetect: jest.fn(() => true),
+      _testPoint: jest.fn(() => true),
+    };
+
+    expect(
+      testDetectionModeVisibility.call(detectionMode, { object: observer }, { id: 'basicSight', enabled: true }, {
+        object: target,
+        tests: [{ x: 0, y: 0 }],
+      }),
+    ).toBe(true);
+    expect(detectionMode._testPoint).toHaveBeenCalledTimes(1);
   });
 
   test('lets final undetected movement use the current core visibility result', () => {

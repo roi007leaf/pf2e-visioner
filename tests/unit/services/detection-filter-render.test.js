@@ -7,6 +7,7 @@ import {
   primePendingControlledTokenDragIntent,
   releasePendingControlledTokenDragIntent,
   setPendingTokenMovementPosition,
+  targetIsRenderHiddenForCurrentViewObserver,
 } from '../../../scripts/services/PendingMovement/pending-token-movement.js';
 import { legacyVisibilityToProfile } from '../../../scripts/visibility/perception-profile.js';
 
@@ -25,11 +26,15 @@ describe('detection filter render wrapper', () => {
 
   beforeEach(() => {
     originalCanvas = global.canvas;
+    global.game.settings.set('pf2e', 'gmVision', false);
+    global.game.settings.set('pf2e-visioner', 'autoVisibilityEnabled', false);
   });
 
   afterEach(() => {
     clearPendingTokenMovementPosition('observer');
     releasePendingControlledTokenDragIntent(null, { delayMs: 0 });
+    global.game.settings.set('pf2e', 'gmVision', false);
+    global.game.settings.set('pf2e-visioner', 'autoVisibilityEnabled', false);
     global.canvas = originalCanvas;
   });
 
@@ -67,6 +72,56 @@ describe('detection filter render wrapper', () => {
     expect(wrapTokenRenderDetectionFilter.call(target, wrapped, 'renderer')).toBe('rendered');
     expect(wrapped).toHaveBeenCalledWith('renderer');
     expect(target.detectionFilter).toBeNull();
+    expect(target.detectionFilterMesh).toMatchObject({
+      visible: false,
+      renderable: false,
+      alpha: 0,
+    });
+  });
+
+  test('does not let render-hidden detection filter render pulse token tint white', () => {
+    const observer = createMockToken({
+      id: 'observer',
+      controlled: true,
+      flags: visibilityV2Flags({ target: 'undetected' }),
+    });
+    const target = createMockToken({ id: 'target', x: 3, y: 0, visible: true });
+    const tintWrites = [];
+    let currentTint = 0;
+    target.mesh = {};
+    Object.defineProperty(target.mesh, 'tint', {
+      configurable: true,
+      enumerable: true,
+      get() {
+        return currentTint;
+      },
+      set(next) {
+        tintWrites.push(next);
+        currentTint = next;
+      },
+    });
+    target.detectionFilter = { id: 'soundwave-filter' };
+    target.detectionFilterMesh = { visible: true, renderable: true, alpha: 1 };
+    global.canvas = {
+      ...global.canvas,
+      tokens: {
+        get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+        controlled: [observer],
+        placeables: [observer, target],
+      },
+    };
+
+    const wrapped = jest.fn(() => {
+      expect(target.detectionFilterMesh.visible).toBe(false);
+      target.mesh.tint = 0xffffff;
+      return 'rendered';
+    });
+
+    expect(targetIsRenderHiddenForCurrentViewObserver(target)).toBe(true);
+    expect(wrapTokenRenderDetectionFilter.call(target, wrapped, 'renderer')).toBe('rendered');
+    expect(wrapped).toHaveBeenCalledWith('renderer');
+    expect(target.mesh.tint).toBe(0);
+    expect(tintWrites).not.toContain(0xffffff);
     expect(target.detectionFilterMesh).toMatchObject({
       visible: false,
       renderable: false,
@@ -199,6 +254,108 @@ describe('detection filter render wrapper', () => {
       visible: false,
       renderable: false,
       alpha: 0,
+    });
+  });
+
+  test('clears core-added detection filter during post-completion sight-line grace', () => {
+    global.canvas.walls.placeables = [
+      createMockWall({ id: 'wall', c: [100, 0, 100, 200], sight: 1, sound: 0 }),
+    ];
+    const observer = createMockToken({
+      id: 'observer',
+      x: 0,
+      y: 0,
+      controlled: true,
+      flags: visibilityV2Flags({ target: 'hidden' }),
+    });
+    const target = createMockToken({ id: 'target', x: 3, y: 0, visible: true });
+    global.canvas = {
+      ...global.canvas,
+      effects: {
+        visionSources: new Map([['observer', { active: true, object: observer }]]),
+        lightSources: new Map(),
+      },
+      tokens: {
+        get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+        _draggedToken: observer,
+        controlled: [observer],
+        placeables: [observer, target],
+      },
+    };
+    setPendingTokenMovementPosition(observer.document, { x: 50, y: 0 }, [observer]);
+    completePendingTokenMovement('observer');
+    global.canvas.tokens._draggedToken = null;
+
+    const wrapped = jest.fn(() => {
+      target.detectionFilter = { id: 'core-added-outline' };
+      target.detectionFilterMesh = { visible: true, renderable: true, alpha: 1 };
+      return 'rendered';
+    });
+
+    expect(wrapTokenRenderDetectionFilter.call(target, wrapped, 'renderer')).toBe('rendered');
+    expect(wrapped).toHaveBeenCalledWith('renderer');
+    expect(target.detectionFilter).toBeNull();
+    expect(target.detectionFilterMesh).toMatchObject({
+      visible: false,
+      renderable: false,
+      alpha: 0,
+    });
+  });
+
+  test('suppresses core detection filter render for concealed current-view target after movement completion', () => {
+    const observer = createMockToken({
+      id: 'observer',
+      controlled: true,
+      flags: visibilityV2Flags({ target: 'concealed' }),
+    });
+    const target = createMockToken({ id: 'target', visible: true });
+    target.detectionFilter = { id: 'core-outline-filter' };
+    target.detectionFilterMesh = { visible: true, renderable: true, alpha: 1 };
+    target.mesh = { visible: true, renderable: true, alpha: 1 };
+    global.canvas = {
+      ...global.canvas,
+      effects: {
+        visionSources: new Map(),
+        lightSources: new Map(),
+      },
+      tokens: {
+        get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+        _draggedToken: observer,
+        controlled: [observer],
+        placeables: [observer, target],
+      },
+    };
+    setPendingTokenMovementPosition(observer.document, { x: 100, y: 0 }, [observer]);
+    completePendingTokenMovement('observer');
+    global.canvas.tokens._draggedToken = null;
+
+    const wrapped = jest.fn(() => {
+      expect(target.detectionFilter).toMatchObject({ enabled: false });
+      expect(target.detectionFilterMesh).toMatchObject({
+        visible: false,
+        renderable: false,
+        alpha: 0,
+      });
+      expect(target.mesh).toMatchObject({
+        visible: false,
+        renderable: false,
+        alpha: 0,
+      });
+      return 'rendered';
+    });
+
+    expect(wrapTokenRenderDetectionFilter.call(target, wrapped, 'renderer')).toBe('rendered');
+    expect(wrapped).toHaveBeenCalledWith('renderer');
+    expect(target.detectionFilter).toBeNull();
+    expect(target.detectionFilterMesh).toMatchObject({
+      visible: false,
+      renderable: false,
+      alpha: 0,
+    });
+    expect(target.mesh).toMatchObject({
+      visible: true,
+      renderable: true,
+      alpha: 1,
     });
   });
 
@@ -463,6 +620,50 @@ describe('detection filter render wrapper', () => {
       visible: false,
       renderable: false,
       alpha: 0,
+    });
+  });
+
+  test('GM Vision bypass leaves detection filter rendering to core', () => {
+    global.game.user.isGM = true;
+    global.game.settings.set('pf2e-visioner', 'autoVisibilityEnabled', true);
+    global.game.settings.set('pf2e', 'gmVision', true);
+    const observer = createMockToken({
+      id: 'observer',
+      flags: visibilityV2Flags({ target: 'hidden' }),
+    });
+    const target = createMockToken({ id: 'target', visible: true });
+    target.detectionFilter = { id: 'core-soundwave-filter', animated: true };
+    target.detectionFilterMesh = { visible: true, renderable: true, alpha: 1 };
+    global.canvas = {
+      ...global.canvas,
+      effects: {
+        visionSources: new Map(),
+        lightSources: new Map(),
+      },
+      tokens: {
+        get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+        controlled: [],
+        placeables: [observer, target],
+      },
+    };
+
+    const wrapped = jest.fn(() => {
+      expect(target.detectionFilter).toMatchObject({ id: 'core-soundwave-filter' });
+      expect(target.detectionFilterMesh).toMatchObject({
+        visible: true,
+        renderable: true,
+        alpha: 1,
+      });
+      return 'rendered';
+    });
+
+    expect(wrapTokenRenderDetectionFilter.call(target, wrapped, 'renderer')).toBe('rendered');
+    expect(wrapped).toHaveBeenCalledWith('renderer');
+    expect(target.detectionFilter).toMatchObject({ id: 'core-soundwave-filter' });
+    expect(target.detectionFilterMesh).toMatchObject({
+      visible: true,
+      renderable: true,
+      alpha: 1,
     });
   });
 });

@@ -333,6 +333,75 @@ function stopBadgeTickerIfNoBadgesRemain() {
   if (!hasPositionedTooltipBadges()) stopBadgeTicker();
 }
 
+function clearPendingHoverDebounce() {
+  if (!HoverTooltips._hoverDebounceTimer) return;
+  clearTimeout(HoverTooltips._hoverDebounceTimer);
+  delete HoverTooltips._hoverDebounceTimer;
+}
+
+function hoverTooltipsSuppressedByPointerActivity() {
+  return !!(
+    HoverTooltips._isPanning ||
+    HoverTooltips._isZooming ||
+    HoverTooltips._isTokenMoving ||
+    HoverTooltips._isDragging ||
+    HoverTooltips._pointerIsDown
+  );
+}
+
+function suppressHoverTooltipsForPointerDown() {
+  HoverTooltips._pointerIsDown = true;
+  HoverTooltips._isDragging = true;
+  clearPendingHoverDebounce();
+  hideAllVisibilityIndicators();
+  hideAllCoverIndicators();
+}
+
+function releaseHoverTooltipPointerSuppression() {
+  if (HoverTooltips._dragClearTimer) {
+    clearTimeout(HoverTooltips._dragClearTimer);
+  }
+  HoverTooltips._dragClearTimer = setTimeout(() => {
+    HoverTooltips._isDragging = false;
+    HoverTooltips._pointerIsDown = false;
+    HoverTooltips._dragClearTimer = null;
+  }, 150);
+}
+
+function removeCanvasPointerGuard() {
+  const guard = HoverTooltips._canvasPointerGuard;
+  if (!guard) return;
+  try {
+    guard.view?.removeEventListener?.('pointerdown', guard.pointerDown, true);
+    guard.view?.removeEventListener?.('mousedown', guard.pointerDown, true);
+    globalThis.window?.removeEventListener?.('pointerup', guard.pointerUp, true);
+    globalThis.window?.removeEventListener?.('mouseup', guard.pointerUp, true);
+  } catch (_) { }
+  delete HoverTooltips._canvasPointerGuard;
+}
+
+function installCanvasPointerGuard() {
+  const view = globalThis.canvas?.app?.view;
+  if (!view?.addEventListener) return false;
+  if (HoverTooltips._canvasPointerGuard?.view === view) return true;
+
+  removeCanvasPointerGuard();
+
+  const pointerDown = (event) => {
+    if (event?.button !== undefined && event.button !== 0) return;
+    suppressHoverTooltipsForPointerDown();
+  };
+  const pointerUp = () => releaseHoverTooltipPointerSuppression();
+
+  view.addEventListener('pointerdown', pointerDown, true);
+  view.addEventListener('mousedown', pointerDown, true);
+  globalThis.window?.addEventListener?.('pointerup', pointerUp, true);
+  globalThis.window?.addEventListener?.('mouseup', pointerUp, true);
+
+  HoverTooltips._canvasPointerGuard = { view, pointerDown, pointerUp };
+  return true;
+}
+
 function suspendViewportTooltipRendering() {
   if (HoverTooltips.isShowingKeyTooltips) {
     HoverTooltips.isShowingKeyTooltips = false;
@@ -409,6 +478,7 @@ export function initializeHoverTooltips() {
 
   if (HoverTooltips._initialized || _initialized) {
     addTokenEventListeners();
+    installCanvasPointerGuard();
     HoverTooltips.refreshSizes?.();
     HoverTooltips._initialized = true;
     _initialized = true;
@@ -430,6 +500,7 @@ export function initializeHoverTooltips() {
 
   // Add event listeners to tokens (for drag detection only)
   addTokenEventListeners();
+  installCanvasPointerGuard();
 
   // Register hoverToken hook to handle token hover events
   // This is cleaner than PIXI events and automatically excludes UI hover
@@ -602,6 +673,7 @@ export function initializeHoverTooltips() {
       clearTimeout(HoverTooltips._dragClearTimer);
       HoverTooltips._dragClearTimer = null;
     }
+    clearPendingHoverDebounce();
     if (HoverTooltips._movementDebounceTimer) {
       clearTimeout(HoverTooltips._movementDebounceTimer);
       HoverTooltips._movementDebounceTimer = null;
@@ -634,6 +706,7 @@ export function initializeHoverTooltips() {
       clearTimeout(HoverTooltips._dragClearTimer);
       HoverTooltips._dragClearTimer = null;
     }
+    clearPendingHoverDebounce();
     if (HoverTooltips._movementDebounceTimer) {
       clearTimeout(HoverTooltips._movementDebounceTimer);
       HoverTooltips._movementDebounceTimer = null;
@@ -641,6 +714,7 @@ export function initializeHoverTooltips() {
 
     // Re-add event listeners to new tokens
     addTokenEventListeners();
+    installCanvasPointerGuard();
   });
 
   // Note: Alt key handled via highlightObjects hook registered in main hooks
@@ -658,12 +732,7 @@ export function initializeHoverTooltips() {
  */
 function onTokenHover(hoveredToken) {
   // Skip if currently panning, zooming, during active token movement, or during drag
-  if (
-    HoverTooltips._isPanning ||
-    HoverTooltips._isZooming ||
-    HoverTooltips._isTokenMoving ||
-    HoverTooltips._isDragging
-  )
+  if (hoverTooltipsSuppressedByPointerActivity())
     return;
 
   // Only show hover tooltips if allowed for this user with current mode AND token
@@ -683,11 +752,19 @@ function onTokenHover(hoveredToken) {
   }
 
   // Debounce rapid hover changes to prevent PIXI churn
-  if (HoverTooltips._hoverDebounceTimer) {
-    clearTimeout(HoverTooltips._hoverDebounceTimer);
-  }
+  clearPendingHoverDebounce();
 
   HoverTooltips._hoverDebounceTimer = setTimeout(() => {
+    if (
+      hoverTooltipsSuppressedByPointerActivity() ||
+      HoverTooltips.isShowingKeyTooltips ||
+      HoverTooltips.isShowingCoverOverlay ||
+      HoverTooltips.isShowingFactorsOverlay ||
+      !canShowTooltips(HoverTooltips.tooltipMode, hoveredToken)
+    ) {
+      delete HoverTooltips._hoverDebounceTimer;
+      return;
+    }
     HoverTooltips.currentHoveredToken = hoveredToken;
     showVisibilityIndicators(hoveredToken);
     delete HoverTooltips._hoverDebounceTimer;
@@ -700,10 +777,7 @@ function onTokenHover(hoveredToken) {
  */
 function onTokenHoverEnd(token) {
   // Clear any pending hover debounce
-  if (HoverTooltips._hoverDebounceTimer) {
-    clearTimeout(HoverTooltips._hoverDebounceTimer);
-    delete HoverTooltips._hoverDebounceTimer;
-  }
+  clearPendingHoverDebounce();
 
   if (HoverTooltips.currentHoveredToken === token) {
     HoverTooltips.currentHoveredToken = null;
@@ -717,13 +791,7 @@ function onTokenHoverEnd(token) {
  * @param {Token} token - The token being clicked
  */
 function onTokenPointerDown(token) {
-  // Mark as potentially dragging to prevent tooltips
-  HoverTooltips._isDragging = true;
-
-  // Hide any visible tooltips immediately
-  // Note: Don't set currentHoveredToken = null here, let onTokenHoverEnd handle it
-  hideAllVisibilityIndicators();
-  hideAllCoverIndicators();
+  suppressHoverTooltipsForPointerDown();
 }
 
 /**
@@ -731,10 +799,7 @@ function onTokenPointerDown(token) {
  * @param {Token} token - The token that was released
  */
 function onTokenPointerUp(token) {
-  // Small delay before clearing drag flag to prevent tooltips appearing immediately
-  setTimeout(() => {
-    HoverTooltips._isDragging = false;
-  }, 150);
+  releaseHoverTooltipPointerSuppression();
 }
 
 /**
@@ -808,6 +873,7 @@ function showVisibilityIndicators(hoveredToken) {
 
   // Check if this is a keyboard-triggered call
   const isKeyboardTooltip = !!HoverTooltips._keyboardContext;
+
   const tooltipsAllowed = canShowTooltips(
     HoverTooltips.tooltipMode,
     hoveredToken,
@@ -1495,6 +1561,8 @@ function hideAllCoverIndicators() {
 export function cleanupHoverTooltips() {
   hideAllVisibilityIndicators();
   hideAllCoverIndicators();
+  clearPendingHoverDebounce();
+  removeCanvasPointerGuard();
   HoverTooltips.currentHoveredToken = null;
   HoverTooltips.isShowingKeyTooltips = false;
   HoverTooltips.keyTooltipTokens.clear();

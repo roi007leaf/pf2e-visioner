@@ -140,6 +140,32 @@ function stabilizeCoreDetectionFilterTint(token) {
   };
 }
 
+function withHiddenPrimaryMesh(token, callback) {
+  const mesh = token?.mesh;
+  if (!mesh) return callback?.();
+
+  const state = {
+    visible: 'visible' in mesh ? mesh.visible : undefined,
+    renderable: 'renderable' in mesh ? mesh.renderable : undefined,
+    alpha: 'alpha' in mesh ? mesh.alpha : undefined,
+  };
+
+  try {
+    if ('visible' in mesh) mesh.visible = false;
+    if ('renderable' in mesh) mesh.renderable = false;
+    if ('alpha' in mesh) mesh.alpha = 0;
+    return callback?.();
+  } finally {
+    try {
+      if ('visible' in mesh && state.visible !== undefined) mesh.visible = state.visible;
+      if ('renderable' in mesh && state.renderable !== undefined) mesh.renderable = state.renderable;
+      if ('alpha' in mesh && state.alpha !== undefined) mesh.alpha = state.alpha;
+    } catch {
+      /* best-effort mesh restore */
+    }
+  }
+}
+
 export function createPendingMovementDetectionFilterRenderingController({
   capturePendingMovementDetectionFilterVisualState,
   clearDetectionFilterVisuals,
@@ -224,11 +250,16 @@ export function createPendingMovementDetectionFilterRenderingController({
   function shouldStabilizeHiddenDetectionFilterAnimation(token) {
     if (!tokenHasDetectionFilterVisual?.(token)) return false;
     if (!token?.mesh) return false;
-    return !!getHiddenDetectionFilterPreservationContext?.(token);
+    return !!(
+      getHiddenDetectionFilterPreservationContext?.(token) ||
+      getObservedDetectionFilterSuppressionContext?.(token) ||
+      shouldTemporarilyForceTokenInvisible?.(token, { hasDetectionWork: true })
+    );
   }
 
-  function withStableHiddenDetectionFilterAnimation(token, callback) {
-    if (!shouldStabilizeHiddenDetectionFilterAnimation(token)) return callback?.();
+  function withStableHiddenDetectionFilterAnimation(token, callback, { force = false } = {}) {
+    if (!force && !shouldStabilizeHiddenDetectionFilterAnimation(token)) return callback?.();
+    if (!tokenHasDetectionFilterVisual?.(token) || !token?.mesh) return callback?.();
 
     const restoreTint = stabilizeCoreDetectionFilterTint(token);
     try {
@@ -298,7 +329,7 @@ export function createPendingMovementDetectionFilterRenderingController({
     });
     try {
       clearDetectionFilterVisuals?.(token);
-      return callback?.();
+      return withHiddenPrimaryMesh(token, callback);
     } finally {
       try {
         restoreDetectionFilterProperty?.();

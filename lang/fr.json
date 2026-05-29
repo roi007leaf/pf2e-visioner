@@ -199,6 +199,8 @@
       "RANGE_LIMIT_ACTIVE_CUSTOM": "Limite de portée active : Montre seumement les cibles dans les {distance} pieds ",
       "NO_TARGETS_IN_RANGE": "PAs de cibles valides dans la portée de 9 mètres",
       "NO_TARGETS_IN_RANGE_CUSTOM": "Pas de cibles valides dans la portée de {distance} pieds",
+      "INVISIBLE_CAP_LABEL": "Invisible",
+      "INVISIBLE_CAP_TOOLTIP": "La cible est invisible. Chercher avec la vue peut trouver sa position, mais ne peut pas la rendre observée ; utilisez un sens précis non visuel pour l'observer.",
       "ECHOLOCATION_LABEL": "Écholocalisation",
       "ECHOLOCATION_TOOLTIP": "Ouïe précise active jusqu'au début de votre prochain tour",
       "PREVIEW_AVAILABLE_SENSES": "(FR TODO) Available Senses",

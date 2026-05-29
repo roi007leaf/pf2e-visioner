@@ -133,11 +133,24 @@ function senseCanObserveInvisibleTarget(sense) {
   return !!senseType && !SeekDialogAdapter.isVisualSenseType(senseType);
 }
 
-function enforceInvisibleSeekObservedLimit(subject, current, newVisibility, sense) {
-  if (subject?._isWall || newVisibility !== 'observed') return newVisibility;
-  if (!subjectHasInvisibleCondition(subject)) return newVisibility;
-  if (senseCanObserveInvisibleTarget(sense)) return newVisibility;
-  return current === 'concealed' ? 'concealed' : 'hidden';
+function getInvisibleSeekObservedLimit(subject, current, newVisibility, sense) {
+  if (subject?._isWall || newVisibility !== 'observed') {
+    return { visibility: newVisibility, applied: false };
+  }
+  if (!subjectHasInvisibleCondition(subject)) {
+    return { visibility: newVisibility, applied: false };
+  }
+  if (senseCanObserveInvisibleTarget(sense)) {
+    return { visibility: newVisibility, applied: false };
+  }
+
+  const cappedVisibility = current === 'concealed' ? 'concealed' : 'hidden';
+  return {
+    visibility: cappedVisibility,
+    applied: true,
+    state: cappedVisibility,
+    reason: 'visual-invisible',
+  };
 }
 
 function getMinimumPerceptionRankBlock(actionData, subject, current, extractStealthDC) {
@@ -302,6 +315,13 @@ function buildBaseOutcome(actionData, subject, data) {
     senseType: data.sense.impreciseSenseType,
     senseRange: data.sense.impreciseSenseRange,
     unmetCondition: data.sense.impreciseUnmet,
+    ...(data.invisibleSeekCap?.applied
+      ? {
+        invisibleSeekCapApplied: true,
+        invisibleSeekCapState: data.invisibleSeekCap.state,
+        invisibleSeekCapReason: data.invisibleSeekCap.reason,
+      }
+      : {}),
     ...data.wallMeta,
   };
 }
@@ -393,7 +413,8 @@ export async function analyzeSeekOutcome(actionData, subject, deps = {}) {
     newVisibility,
     deps,
   );
-  newVisibility = enforceInvisibleSeekObservedLimit(subject, current, newVisibility, sense);
+  const invisibleSeekCap = getInvisibleSeekObservedLimit(subject, current, newVisibility, sense);
+  newVisibility = invisibleSeekCap.visibility;
 
   const wallMeta = await buildWallMetadata(subject, deps);
   const base = buildBaseOutcome(actionData, subject, {
@@ -404,6 +425,7 @@ export async function analyzeSeekOutcome(actionData, subject, deps = {}) {
     current,
     newVisibility,
     sense,
+    invisibleSeekCap,
     wallMeta,
   });
 
