@@ -2310,7 +2310,7 @@ function onRenderWallConfig(app, html) {
       row.className = 'form-group';
       row.innerHTML = `
         <label>${game.i18n.localize('PF2E_VISIONER.PEEK.DC_FIELD_LABEL')}</label>
-        <input type="number" name="flags.${MODULE_ID}.peekDC" value="${current ?? ''}" step="1" min="0" />
+        <input type="number" name="flags.${MODULE_ID}.peekDC" value="${current ?? ''}" step="1" min="0" data-dtype="Number" />
       `;
       fs.appendChild(row);
     }
