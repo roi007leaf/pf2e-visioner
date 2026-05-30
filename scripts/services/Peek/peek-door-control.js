@@ -1,17 +1,50 @@
-export function registerDoorPeekInteraction(manager) {
-  if (typeof Hooks === 'undefined') return;
-  Hooks.on('renderDoorControl', (control, html) => {
-    const el = html?.jquery ? html[0] : html;
-    if (!el) return;
-    el.addEventListener('contextmenu', async (event) => {
-      if (!event.shiftKey) return;
-      const token = canvas?.tokens?.controlled?.[0];
-      if (!token || canvas.tokens.controlled.length !== 1) return;
-      const wallDoc = control.wall?.document;
-      if (!wallDoc) return;
-      event.preventDefault();
-      event.stopPropagation();
-      await manager.tryStartDoorPeek(token, wallDoc);
-    });
-  });
+import { MODULE_ID } from '../../constants.js';
+
+let _registered = false;
+
+export function shouldPeekDoor(event) {
+  try {
+    if (game?.keyboard?.isModifierActive && typeof KeyboardManager !== 'undefined') {
+      return game.keyboard.isModifierActive(KeyboardManager.MODIFIER_KEYS.SHIFT);
+    }
+  } catch (_) {}
+  return !!(event?.shiftKey ?? event?.nativeEvent?.shiftKey ?? event?.data?.originalEvent?.shiftKey);
+}
+
+export async function handleDoorRightDown(manager, control) {
+  const controlled = canvas?.tokens?.controlled ?? [];
+  if (controlled.length !== 1) return false;
+  const token = controlled[0];
+  const wallDoc = control?.wall?.document;
+  if (!wallDoc) return false;
+  await manager.tryStartDoorPeek(token, wallDoc);
+  return true;
+}
+
+export function registerDoorPeekInteraction(manager, { libWrapperAdapter } = {}) {
+  if (_registered) return;
+  const adapter = libWrapperAdapter || (typeof libWrapper !== 'undefined' ? libWrapper : null);
+  if (!adapter) return;
+  const hasNamespaced = !!globalThis.foundry?.canvas?.containers?.DoorControl?.prototype;
+  const target = hasNamespaced
+    ? 'foundry.canvas.containers.DoorControl.prototype._onRightDown'
+    : typeof DoorControl !== 'undefined'
+      ? 'DoorControl.prototype._onRightDown'
+      : null;
+  if (!target) return;
+  _registered = true;
+  adapter.register(
+    MODULE_ID,
+    target,
+    function (wrapped, event, ...args) {
+      try {
+        if (shouldPeekDoor(event)) {
+          handleDoorRightDown(manager, this);
+          return;
+        }
+      } catch (_) {}
+      return wrapped.call(this, event, ...args);
+    },
+    'MIXED',
+  );
 }

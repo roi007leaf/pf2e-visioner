@@ -32,6 +32,8 @@ export default [
         Dialog: 'readonly',
         SettingsConfig: 'readonly',
         Item: 'readonly',
+        KeyboardManager: 'readonly',
+        DoorControl: 'readonly',
         // Module specific
         MODULE_ID: 'readonly',
         isStandard: 'readonly',
